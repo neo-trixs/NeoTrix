@@ -116,7 +116,7 @@ fn run_pipeline(args: &[String], base: CleanFlags) -> Result<(), String> {
     let ids = expand_categories(&raw)?;
 
     let home = dirs::home_dir().ok_or_else(|| "cannot resolve home".to_string())?;
-    let mut ex_store = CleanupExclusions::load_default();
+    let ex_store = CleanupExclusions::load_default();
     let excluded: Vec<PathBuf> = ex_store.paths().to_vec();
 
     if !flags.json {

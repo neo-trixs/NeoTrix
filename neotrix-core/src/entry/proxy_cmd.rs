@@ -4,7 +4,9 @@ use colored::Colorize;
 #[cfg(feature = "stealth-net")]
 pub async fn run_proxy_cmd(cmd_str: &str) {
     use neotrix::l3_embodiment::nt_shield::nt_shield_stealth_net::local_proxy::TorManager;
-    use neotrix::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_control::{DaemonMode, ProxyClient};
+    use neotrix::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_control::{
+        DaemonMode, ProxyClient,
+    };
     use neotrix::neotrix::proxy_daemon_wrapper;
 
     let client = ProxyClient::new();
@@ -63,7 +65,11 @@ pub async fn run_proxy_cmd(cmd_str: &str) {
                 None => match client.status().await {
                     Ok(s) => {
                         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&s) {
-                            println!("{} 模式: {}", "当前".blue(), v["mode"].as_str().unwrap_or("?"));
+                            println!(
+                                "{} 模式: {}",
+                                "当前".blue(),
+                                v["mode"].as_str().unwrap_or("?")
+                            );
                         }
                     }
                     Err(e) => eprintln!("{} {}", "✗".red(), e),
@@ -78,7 +84,10 @@ pub async fn run_proxy_cmd(cmd_str: &str) {
             let daemon_path = match proxy_daemon_wrapper::resolve_daemon_path() {
                 Some(p) => p,
                 None => {
-                    eprintln!("{} neotrix-proxy-daemon not found in PATH or alongside current binary", "✗".red());
+                    eprintln!(
+                        "{} neotrix-proxy-daemon not found in PATH or alongside current binary",
+                        "✗".red()
+                    );
                     return;
                 }
             };
@@ -107,8 +116,13 @@ pub async fn run_proxy_cmd(cmd_str: &str) {
             Ok(_) => println!("{} Proxy daemon shutdown.", "✓".green()),
             Err(e) => {
                 eprintln!("{} shutdown API failed: {}. Trying pkill...", "✗".red(), e);
-                match std::process::Command::new("pkill").args(["-f", "neotrix-proxy-daemon"]).status() {
-                    Ok(status) if status.success() => println!("{} Proxy daemon killed.", "✓".green()),
+                match std::process::Command::new("pkill")
+                    .args(["-f", "neotrix-proxy-daemon"])
+                    .status()
+                {
+                    Ok(status) if status.success() => {
+                        println!("{} Proxy daemon killed.", "✓".green())
+                    }
                     Ok(_) => eprintln!("{} No proxy daemon process found.", "✗".red()),
                     Err(e) => eprintln!("{} pkill failed: {}", "✗".red(), e),
                 }
@@ -117,7 +131,8 @@ pub async fn run_proxy_cmd(cmd_str: &str) {
         "install" => {
             let plist = match proxy_daemon_wrapper::resolve_daemon_path() {
                 Some(p) => {
-                    let parent: &std::path::Path = p.parent().unwrap_or(std::path::Path::new("/usr/local/bin"));
+                    let parent: &std::path::Path =
+                        p.parent().unwrap_or(std::path::Path::new("/usr/local/bin"));
                     parent.join("com.neotrix.proxy-daemon.plist")
                 }
                 None => {
@@ -129,15 +144,28 @@ pub async fn run_proxy_cmd(cmd_str: &str) {
                 eprintln!("{} plist not found at: {}", "✗".red(), plist.display());
                 return;
             }
-            match std::process::Command::new("launchctl").args(["load", &plist.to_string_lossy()]).status() {
+            match std::process::Command::new("launchctl")
+                .args(["load", &plist.to_string_lossy()])
+                .status()
+            {
                 Ok(status) if status.success() => {
                     println!("{} launchd plist loaded.", "✓".green());
                 }
                 Ok(_) => {
-                    eprintln!("{} launchctl load failed. Trying unload first...", "✗".red());
-                    let _ = std::process::Command::new("launchctl").args(["unload", &plist.to_string_lossy()]).status();
-                    match std::process::Command::new("launchctl").args(["load", &plist.to_string_lossy()]).status() {
-                        Ok(status) if status.success() => println!("{} launchd plist loaded.", "✓".green()),
+                    eprintln!(
+                        "{} launchctl load failed. Trying unload first...",
+                        "✗".red()
+                    );
+                    let _ = std::process::Command::new("launchctl")
+                        .args(["unload", &plist.to_string_lossy()])
+                        .status();
+                    match std::process::Command::new("launchctl")
+                        .args(["load", &plist.to_string_lossy()])
+                        .status()
+                    {
+                        Ok(status) if status.success() => {
+                            println!("{} launchd plist loaded.", "✓".green())
+                        }
                         Ok(status) => eprintln!("{} launchctl load failed: {}", "✗".red(), status),
                         Err(e) => eprintln!("{} launchctl error: {}", "✗".red(), e),
                     }

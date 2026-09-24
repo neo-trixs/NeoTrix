@@ -3,17 +3,17 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
+use neotrix::agent::hooks::{EccHookRegistry, HookContext, HookEvent};
+use neotrix::agent::skills::SkillsEngine;
+use neotrix::agent::tool::McpRegistry;
+use neotrix::agent::workflow::{Workflow, WorkflowEngine, WorkflowStep};
+use neotrix::l5_cognition::nt_mind::nt_mind::goal_loop::{GoalLoop, GoalState};
 use neotrix::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
 use neotrix::l5_cognition::nt_mind::nt_mind::KnowledgeSource as V1KnowledgeSource;
-use neotrix::l5_cognition::nt_mind::nt_mind::goal_loop::{GoalLoop, GoalState};
-use neotrix::agent::skills::SkillsEngine;
-use neotrix::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
-use neotrix::agent::workflow::{Workflow, WorkflowStep, WorkflowEngine};
-use neotrix::agent::tool::McpRegistry;
 use neotrix::l6_meta::nt_auto_orchestrator::AutoOrchestrator;
 use neotrix_types::core::nt_core_cap::FIELD_NAMES;
 
-use super::print_brain_stats;
+use super::brain::print_brain_stats;
 
 /// Headless 模式 — 原始 stdin/stdout REPL（保留 V1 行为）
 pub(crate) async fn run_headless(
@@ -42,7 +42,9 @@ pub(crate) async fn run_headless(
                 if let Err(e) = a.brain.save() {
                     eprintln!("Failed to save brain on exit: {}", e);
                 }
-                if let Err(e) = goal_loop.save() { log::warn!("[headless] save goal_loop: {}", e); }
+                if let Err(e) = goal_loop.save() {
+                    log::warn!("[headless] save goal_loop: {}", e);
+                }
                 // Fire SessionEnd hook
                 let ctx = HookContext::new(HookEvent::SessionEnd);
                 let _ = hook_registry.read().await.execute_event(&ctx);
@@ -66,15 +68,25 @@ pub(crate) async fn run_headless(
                 }
 
                 let should_exit = handle_command_headless(
-                    &input, &mut a, &mut se, &hr, &mut mcp, &mut goal_loop,
+                    &input,
+                    &mut a,
+                    &mut se,
+                    &hr,
+                    &mut mcp,
+                    &mut goal_loop,
                     &mut orchestrator,
-                ).await;
+                )
+                .await;
 
                 // PostToolUse hook
                 let mut post_ctx = HookContext::new(HookEvent::PostToolUse);
                 post_ctx.tool_name = Some("headless_command".to_string());
                 post_ctx.tool_input = Some(input.clone());
-                post_ctx.tool_output = Some(if should_exit { "exit".into() } else { "ok".into() });
+                post_ctx.tool_output = Some(if should_exit {
+                    "exit".into()
+                } else {
+                    "ok".into()
+                });
                 let _ = hr.execute_event(&post_ctx);
 
                 // Session log
@@ -99,7 +111,15 @@ pub(crate) async fn run_headless(
     }
 }
 
-async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _skills: &mut SkillsEngine, hooks: &EccHookRegistry, mcp: &mut McpRegistry, goal_loop: &mut GoalLoop, orchestrator: &mut AutoOrchestrator) -> bool {
+async fn handle_command_headless(
+    input: &str,
+    brain: &mut SelfIteratingBrain,
+    _skills: &mut SkillsEngine,
+    hooks: &EccHookRegistry,
+    mcp: &mut McpRegistry,
+    goal_loop: &mut GoalLoop,
+    orchestrator: &mut AutoOrchestrator,
+) -> bool {
     // 意图路由（仅非 slash 自由文本）：高置信系统意图自动转为等价 slash 命令。
     let routed = if !input.trim().starts_with('/') && !input.trim().is_empty() {
         orchestrator.route_headless(input)
@@ -120,7 +140,9 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
             println!("  /help /h       - Show this help");
             println!("  /status        - Show silicon self status + archive");
             println!("  /think         - Run silicon self reflection cycle");
-            println!("  /evo           - Show full evolution state (motivation + cognitive health)");
+            println!(
+                "  /evo           - Show full evolution state (motivation + cognitive health)"
+            );
             println!("  /stats /s      - Show brain statistics");
             println!("  /save          - Save brain state");
             println!("  /absorb        - Absorb knowledge sources");
@@ -133,7 +155,9 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
             println!("  /chain <cat>   - 维度链查询 (时间链/文明链/科技链/...)");
             println!("  /mine          - Run KnowledgeMiner (git clone repos)");
             println!("  /proxy         - Show proxy connectivity status");
-            println!("  /goal          - 24/7 autonomous goal pursuit (start/status/pause/resume/clear)");
+            println!(
+                "  /goal          - 24/7 autonomous goal pursuit (start/status/pause/resume/clear)"
+            );
             println!("  /avatar        - Avatar management (list/create/status/harvest/evolve)");
             println!("  /workflow      - Workflow orchestration (list/demo/run)");
             println!("  /mcp           - MCP tool registry (list/status/register/search)");
@@ -148,20 +172,37 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
             let state = bridge.silicon.current_state();
 
             println!("╭─ SiliconSelf Status ───────────────────────────────╮");
-            println!("│ Iteration:  {:<5}                                 │", bridge.silicon.iteration);
+            println!(
+                "│ Iteration:  {:<5}                                 │",
+                bridge.silicon.iteration
+            );
             println!("│ Strategy:   {:<39}│", state.active_strategy.label());
-            println!("│ Context:    {:.0}%                                 │", state.context_usage * 100.0);
+            println!(
+                "│ Context:    {:.0}%                                 │",
+                state.context_usage * 100.0
+            );
             println!("│                                                       │");
             println!("│ 🧠 Cognitive Health                                    │");
-            println!("│ R_int:      {:.3}  (confidence={:.1}%, error={:.0}%, novelty={:.0}%) │",
-                mot.intrinsic_reward, mot.confidence*100.0, mot.error_rate*100.0, mot.novelty_score*100.0);
-            println!("│ Explore:    {:<39}│",
-                if mot.should_explore { "YES ⚡" } else { "no" });
+            println!(
+                "│ R_int:      {:.3}  (confidence={:.1}%, error={:.0}%, novelty={:.0}%) │",
+                mot.intrinsic_reward,
+                mot.confidence * 100.0,
+                mot.error_rate * 100.0,
+                mot.novelty_score * 100.0
+            );
+            println!(
+                "│ Explore:    {:<39}│",
+                if mot.should_explore { "YES ⚡" } else { "no" }
+            );
             println!("│                                                       │");
-            println!("│ 📦 Archive:  {} snapshots                            │",
-                bridge.archive.snapshots.len());
-            println!("│ 🔧 Repairs:  {}                                      │",
-                bridge.self_repair_count);
+            println!(
+                "│ 📦 Archive:  {} snapshots                            │",
+                bridge.archive.snapshots.len()
+            );
+            println!(
+                "│ 🔧 Repairs:  {}                                      │",
+                bridge.self_repair_count
+            );
             println!("│ {} │", bridge.status_summary());
             println!("╰──────────────────────────────────────────────────────╯");
         }
@@ -171,8 +212,11 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
             println!("{}", evo);
             let health = bridge.evolution_summary();
             println!("{}", health);
-            println!("Archive: {} snapshots, {} max",
-                bridge.archive.snapshots.len(), bridge.archive.max_snapshots);
+            println!(
+                "Archive: {} snapshots, {} max",
+                bridge.archive.snapshots.len(),
+                bridge.archive.max_snapshots
+            );
             if let Some(latest) = bridge.archive.latest() {
                 println!("Latest: iter={} label={}", latest.iteration, latest.label);
             }
@@ -180,22 +224,38 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
         "/think" => {
             let mut bridge = neotrix::l5_cognition::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge::new(".");
             let result = bridge.run_reflection_cycle();
-            let grade_label = result.trace.as_ref().map(|t| t.grade.label()).unwrap_or("?");
+            let grade_label = result
+                .trace
+                .as_ref()
+                .map(|t| t.grade.label())
+                .unwrap_or("?");
             let profile = bridge.attention_profile_summary();
-            println!("🧠 reflection cycle #{}: grade={}, traces={}, context={:.0}%",
-                result.iteration, grade_label,
+            println!(
+                "🧠 reflection cycle #{}: grade={}, traces={}, context={:.0}%",
+                result.iteration,
+                grade_label,
                 result.trace.as_ref().map(|t| t.num_steps()).unwrap_or(0),
-                result.state.context_usage * 100.0);
+                result.state.context_usage * 100.0
+            );
             println!("   {}", profile);
             if let Some(ref trace) = result.trace {
                 println!("   steps: {}", trace.num_steps());
                 for step in &trace.steps {
-                    println!("     {}. [{}] {} (conf={:.2})", step.step_number, step.strategy.label(), step.description, step.confidence);
+                    println!(
+                        "     {}. [{}] {} (conf={:.2})",
+                        step.step_number,
+                        step.strategy.label(),
+                        step.description,
+                        step.confidence
+                    );
                 }
             }
             if let Some(outcome) = bridge.check_self_repair_needed() {
                 let repair_msg = bridge.trigger_self_repair();
-                println!("🔧 self-repair triggered: {} (trigger: {})", repair_msg, outcome);
+                println!(
+                    "🔧 self-repair triggered: {} (trigger: {})",
+                    repair_msg, outcome
+                );
             }
         }
         "/stats" | "/s" => print_brain_stats(brain),
@@ -246,31 +306,39 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                         println!("Example: /skills ecc agent-harness-construction");
                     }
                 }
-                Some(other) => println!("Unknown skills subcommand: {}. Try: list, ecc <id>", other),
+                Some(other) => {
+                    println!("Unknown skills subcommand: {}. Try: list, ecc <id>", other)
+                }
             }
         }
-        "/save" => {
-            match brain.brain.save() {
-                Ok(_) => println!("Brain saved to ~/.neotrix/brain.json"),
-                Err(e) => eprintln!("Save failed: {}", e),
-            }
-        }
+        "/save" => match brain.brain.save() {
+            Ok(_) => println!("Brain saved to ~/.neotrix/brain.json"),
+            Err(e) => eprintln!("Save failed: {}", e),
+        },
         "/absorb" => {
-            let sources = vec![V1KnowledgeSource::HeroUI, V1KnowledgeSource::BaseUI, V1KnowledgeSource::ArcUI];
+            let sources = vec![
+                V1KnowledgeSource::HeroUI,
+                V1KnowledgeSource::BaseUI,
+                V1KnowledgeSource::ArcUI,
+            ];
             brain.brain.absorb_batch(&sources);
             println!("Absorbed {} knowledge sources", sources.len());
         }
         "/evolve" => {
-                    let task_type = neotrix::l2_perception::nt_core_knowledge::TaskType::General;
+            let task_type = neotrix::l2_perception::nt_core_knowledge::TaskType::General;
             let result = brain.iterate(task_type);
-            println!("Evolution: {:.3} → {:.3} (improved: {})",
-                result.score_before, result.score_after, result.improved);
+            println!(
+                "Evolution: {:.3} → {:.3} (improved: {})",
+                result.score_before, result.score_after, result.improved
+            );
         }
         "/mem" => {
             let n = brain.reasoning_bank.memories().len();
             let result = brain.consolidate_memories();
-            println!("Memories: {} total | merged: {} pruned: {} replayed: {}",
-                n, result.merged_count, result.pruned_count, result.replayed_count);
+            println!(
+                "Memories: {} total | merged: {} pruned: {} replayed: {}",
+                n, result.merged_count, result.pruned_count, result.replayed_count
+            );
         }
         "/cortex" => {
             brain.print_cortex_report();
@@ -288,7 +356,10 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
         "/mine" => {
             println!("🔧 启动 KnowledgeMiner 知识挖掘...");
             match brain.run_knowledge_chain() {
-                Ok(r) => println!("✅ 挖掘完成: {} 个新来源, 总奖励 {:.3}", r.mined, r.total_reward),
+                Ok(r) => println!(
+                    "✅ 挖掘完成: {} 个新来源, 总奖励 {:.3}",
+                    r.mined, r.total_reward
+                ),
                 Err(e) => eprintln!("❌ 挖掘失败: {}", e),
             }
         }
@@ -316,14 +387,19 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                                 Ok(s) => {
                                     if let Ok(v) = serde_json::from_str::<serde_json::Value>(&s) {
                                         println!("当前模式: {}", v["mode"].as_str().unwrap_or("?"));
-                                    } else { println!("{}", s); }
+                                    } else {
+                                        println!("{}", s);
+                                    }
                                 }
                                 Err(e) => eprintln!("✗ proxy daemon 不可达: {}", e),
                             }
                         }
                     }
                     #[cfg(not(feature = "stealth-net"))]
-                    { let _ = mode_str; println!("未启用 (需 --features stealth-net)"); }
+                    {
+                        let _ = mode_str;
+                        println!("未启用 (需 --features stealth-net)");
+                    }
                 }
                 Some("status") | None => {
                     #[cfg(feature = "stealth-net")]
@@ -332,17 +408,31 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                         use neotrix::l3_embodiment::nt_shield::nt_shield_stealth_net::local_proxy::TorManager;
                         println!("\n╭─ NeoTrix 代理状态 ───────────────────────────────╮");
                         let tor = TorManager::socks5_reachable().await;
-                        println!("│ Tor SOCKS5 :9050 :  {}                     │",
-                            if tor { "✅ Running" } else { "❌ Down" });
+                        println!(
+                            "│ Tor SOCKS5 :9050 :  {}                     │",
+                            if tor { "✅ Running" } else { "❌ Down" }
+                        );
                         let client = ProxyClient::new();
                         match client.status().await {
                             Ok(s) => {
                                 if let Ok(v) = serde_json::from_str::<serde_json::Value>(&s) {
-                                    println!("│ Daemon         :  ✅ {} (mode:{}, pid:{})        │",
-                                        v["port"], v["mode"].as_str().unwrap_or("?"), v["pid"]);
-                                    println!("│ 活跃请求       :  {}                              │", v["active_count"]);
-                                    println!("│ 空闲秒数       :  {}s                             │", v["idle_secs"]);
-                                } else { println!("{}", s); }
+                                    println!(
+                                        "│ Daemon         :  ✅ {} (mode:{}, pid:{})        │",
+                                        v["port"],
+                                        v["mode"].as_str().unwrap_or("?"),
+                                        v["pid"]
+                                    );
+                                    println!(
+                                        "│ 活跃请求       :  {}                              │",
+                                        v["active_count"]
+                                    );
+                                    println!(
+                                        "│ 空闲秒数       :  {}s                             │",
+                                        v["idle_secs"]
+                                    );
+                                } else {
+                                    println!("{}", s);
+                                }
                             }
                             Err(_) => {
                                 println!("│ Daemon         :  ❌ 未运行                         │");
@@ -365,7 +455,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
             let parts: Vec<&str> = cmd.split_whitespace().collect();
             match parts.get(1).copied() {
                 Some("list") | None => {
-//                    println!("WorkflowEngine — 多步骤工作流编排");
+                    //                    println!("WorkflowEngine — 多步骤工作流编排");
                     println!("Types: AgentTask, Route, Parallel, Loop, Repeat");
                     println!("Usage:");
                     println!("  /workflow run <name> [context]  - Run a workflow");
@@ -391,7 +481,11 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                     let results = engine.run("demo", "demo context");
                     println!("╭─ Workflow: demo ────────────────────────╮");
                     for r in &results {
-                        println!("│ {:20} │ {} │", r.step_name, if r.success { "✅" } else { "❌" });
+                        println!(
+                            "│ {:20} │ {} │",
+                            r.step_name,
+                            if r.success { "✅" } else { "❌" }
+                        );
                     }
                     println!("╰──────────────────────────────────────────╯");
                 }
@@ -402,19 +496,24 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                     engine.register(Workflow {
                         name: wf_name.to_string(),
                         description: format!("Workflow '{}'", wf_name),
-                        steps: vec![
-                            WorkflowStep::AgentTask {
-                                name: "step1".to_string(),
-                                task_description: context.to_string(),
-                            },
-                        ],
+                        steps: vec![WorkflowStep::AgentTask {
+                            name: "step1".to_string(),
+                            task_description: context.to_string(),
+                        }],
                     });
                     let results = engine.run(wf_name, context);
                     for r in &results {
-                        println!("  {}: {}", r.step_name, if r.success { "OK" } else { "FAIL" });
+                        println!(
+                            "  {}: {}",
+                            r.step_name,
+                            if r.success { "OK" } else { "FAIL" }
+                        );
                     }
                 }
-                Some(other) => println!("Unknown workflow subcommand: {}. Try: list, demo, run <name>", other),
+                Some(other) => println!(
+                    "Unknown workflow subcommand: {}. Try: list, demo, run <name>",
+                    other
+                ),
             }
         }
         cmd if cmd.starts_with("/mcp") => {
@@ -422,7 +521,11 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
             match parts.get(1).copied() {
                 Some("list") | None => {
                     println!("╭─ MCP Registry ─────────────────────────╮");
-                    println!("│ Servers: {}  Tools: {}             │", mcp.server_count(), mcp.tool_count());
+                    println!(
+                        "│ Servers: {}  Tools: {}             │",
+                        mcp.server_count(),
+                        mcp.tool_count()
+                    );
                     for s in mcp.list_servers() {
                         println!("│   {}                                │", s);
                     }
@@ -456,7 +559,10 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                         }
                     }
                 }
-                Some(other) => println!("Unknown mcp subcommand: {}. Try: list, status, register, search", other),
+                Some(other) => println!(
+                    "Unknown mcp subcommand: {}. Try: list, status, register, search",
+                    other
+                ),
             }
         }
         cmd if cmd.starts_with("/goal") => {
@@ -472,23 +578,34 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                 }
                 Some("pause") => {
                     goal_loop.pause_goal();
-                    if let Err(e) = goal_loop.save() { log::warn!("[headless] save goal_loop: {}", e); }
+                    if let Err(e) = goal_loop.save() {
+                        log::warn!("[headless] save goal_loop: {}", e);
+                    }
                     println!("⏸ Goal paused. Use /goal resume to continue.");
                 }
                 Some("resume") => {
-                    if goal_loop.active_goal.as_ref().map(|g| g.state == GoalState::Paused).unwrap_or(false) {
+                    if goal_loop
+                        .active_goal
+                        .as_ref()
+                        .map(|g| g.state == GoalState::Paused)
+                        .unwrap_or(false)
+                    {
                         goal_loop.resume_goal();
                         println!("▶ Goal resumed. Running iteration...");
                         let log = goal_loop.pursue_all(brain, 1);
                         println!("{}", log);
-                        if let Err(e) = goal_loop.save() { log::warn!("[headless] save goal_loop: {}", e); }
+                        if let Err(e) = goal_loop.save() {
+                            log::warn!("[headless] save goal_loop: {}", e);
+                        }
                     } else {
                         println!("No paused goal to resume.");
                     }
                 }
                 Some("clear") => {
                     goal_loop.clear_goal();
-                    if let Err(e) = goal_loop.save() { log::warn!("[headless] save goal_loop: {}", e); }
+                    if let Err(e) = goal_loop.save() {
+                        log::warn!("[headless] save goal_loop: {}", e);
+                    }
                     println!("✖ Goal cleared and archived.");
                 }
                 Some("history") => {
@@ -498,7 +615,8 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                 Some(_) if parts.len() >= 2 => {
                     let description = parts[1..].join(" ");
                     let score_before = brain.brain.evaluate_capability(
-                        neotrix::l2_perception::nt_core_knowledge::TaskType::General);
+                        neotrix::l2_perception::nt_core_knowledge::TaskType::General,
+                    );
                     goal_loop.start_goal(brain, &description, None);
                     println!("🎯 Goal started: {}", description);
                     println!("   Score before: {:.3}", score_before);
@@ -506,11 +624,17 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                     let log = goal_loop.pursue_all(brain, 5);
                     println!("{}", log);
                     if let Some(ref g) = goal_loop.active_goal {
-                        println!("   State: {} | Iterations: {} | Score: {:.3} → {:.3}",
-                            g.state.label(), g.iterations_completed,
-                            g.score_before, g.score_current);
+                        println!(
+                            "   State: {} | Iterations: {} | Score: {:.3} → {:.3}",
+                            g.state.label(),
+                            g.iterations_completed,
+                            g.score_before,
+                            g.score_current
+                        );
                     }
-                    if let Err(e) = goal_loop.save() { log::warn!("[headless] save goal_loop: {}", e); }
+                    if let Err(e) = goal_loop.save() {
+                        log::warn!("[headless] save goal_loop: {}", e);
+                    }
                 }
                 _ => {
                     println!("/goal: 24/7 autonomous goal pursuit");
@@ -535,9 +659,18 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                 }
                 Some("create") => {
                     let archetype = parts.get(2).unwrap_or(&"");
-                    let valid = ["designer", "engineer", "security", "researcher", "generalist"];
+                    let valid = [
+                        "designer",
+                        "engineer",
+                        "security",
+                        "researcher",
+                        "generalist",
+                    ];
                     if valid.contains(archetype) {
-                        println!("Avatar created: archetype={}, id=#auto, status=idle", archetype);
+                        println!(
+                            "Avatar created: archetype={}, id=#auto, status=idle",
+                            archetype
+                        );
                     } else {
                         println!("Unknown archetype '{}'. Valid: designer, engineer, security, researcher, generalist", archetype);
                     }
@@ -548,12 +681,17 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                 }
                 Some("harvest") => {
                     let id = parts.get(2).unwrap_or(&"?");
-                    println!("Harvested avatar #{}: 3 deltas extracted, 2 applied to brain", id);
+                    println!(
+                        "Harvested avatar #{}: 3 deltas extracted, 2 applied to brain",
+                        id
+                    );
                 }
                 Some("evolve") => {
                     println!("Running distillation on all harvestable avatars...");
                     println!("  Scanning 2 avatars with pending deltas");
-                    println!("  Avatar #1: 3 deltas → distilled into 1 capability update (applied)");
+                    println!(
+                        "  Avatar #1: 3 deltas → distilled into 1 capability update (applied)"
+                    );
                     println!("  Avatar #2: 1 delta → distilled into 1 principle (applied)");
                     println!("  Distillation complete.");
                 }
@@ -575,8 +713,13 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                     let list = hooks.list_hooks();
                     println!("╭─ Registered Hooks ──────────────────────╮");
                     for (name, desc) in &list {
-                        let enabled = hooks.list_hooks().iter().find(|(n,_)| n == name).is_some();
-                        println!("│ {:25} │ {} │ {} │", name, if enabled { "ON" } else { "OFF" }, desc);
+                        let enabled = hooks.list_hooks().iter().find(|(n, _)| n == name).is_some();
+                        println!(
+                            "│ {:25} │ {} │ {} │",
+                            name,
+                            if enabled { "ON" } else { "OFF" },
+                            desc
+                        );
                     }
                     println!("╰──────────────────────────────────────────╯");
                     println!("Profile: standard | Total: {}", list.len());
@@ -593,11 +736,19 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                 let meta_names = ["Observe", "Act", "Reflect", "Transcend"];
                 println!("── E8 Reasoning State ──");
                 println!("  Mode:  {} ({:06b})", state.mode.mode_name(), state.mode.0);
-                println!("  Meta:  {} ({})", meta_names.get(state.meta.0 as usize).unwrap_or(&"?"), state.meta.0);
+                println!(
+                    "  Meta:  {} ({})",
+                    meta_names.get(state.meta.0 as usize).unwrap_or(&"?"),
+                    state.meta.0
+                );
                 println!("  Desc:  {}", state.mode.mode_description());
                 let cap = engine.brain.capability();
                 let arr = cap.arr();
-                let mut pairs: Vec<(&str, f64)> = FIELD_NAMES.iter().copied().zip(arr.iter().copied()).collect();
+                let mut pairs: Vec<(&str, f64)> = FIELD_NAMES
+                    .iter()
+                    .copied()
+                    .zip(arr.iter().copied())
+                    .collect();
                 pairs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
                 println!("── Capability (top 5) ──");
                 for (name, val) in pairs.iter().take(5) {
@@ -606,7 +757,13 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                 println!("── Trajectory (last 8) ──");
                 let start = engine.state_trajectory.len().saturating_sub(8);
                 for (i, s) in engine.state_trajectory[start..].iter().enumerate() {
-                    println!("  {:2}. {} ({:06b}) meta={}", start + i, s.mode.mode_name(), s.mode.0, s.meta.0);
+                    println!(
+                        "  {:2}. {} ({:06b}) meta={}",
+                        start + i,
+                        s.mode.mode_name(),
+                        s.mode.0,
+                        s.meta.0
+                    );
                 }
                 if let Some(state) = engine.observer.trajectory_history.last() {
                     println!("── Observer ──");
@@ -625,7 +782,13 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                 } else {
                     println!("── Hexagram Trajectory Path ({} states) ──", traj.len());
                     for (i, s) in traj.iter().enumerate() {
-                        println!("  {:2}. {} ({:06b}) meta={}", i, s.mode.mode_name(), s.mode.0, s.meta.0);
+                        println!(
+                            "  {:2}. {} ({:06b}) meta={}",
+                            i,
+                            s.mode.mode_name(),
+                            s.mode.0,
+                            s.meta.0
+                        );
                     }
                     println!("── Resonance (dist ≤ 2) ──");
                     for i in 1..traj.len() {
@@ -633,7 +796,8 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                         let cur = traj[i].mode;
                         let dist = prev.hamming_dist(&cur);
                         let resonant = prev.resonance_with(&cur);
-                        println!("  {} → {}: dist={}{}",
+                        println!(
+                            "  {} → {}: dist={}{}",
                             prev.mode_name(),
                             cur.mode_name(),
                             dist,
@@ -675,17 +839,15 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                         Err(e) => eprintln!("Reasoning error: {}", e),
                     }
                 } else {
-            let task_type = neotrix::l2_perception::nt_core_knowledge::TaskType::General;
+                    let task_type = neotrix::l2_perception::nt_core_knowledge::TaskType::General;
                     let result = brain.iterate(task_type);
-                    println!("Learned: {:.3} → {:.3}", result.score_before, result.score_after);
+                    println!(
+                        "Learned: {:.3} → {:.3}",
+                        result.score_before, result.score_after
+                    );
                 }
             }
         }
     }
     false
 }
-
-
-
-
-

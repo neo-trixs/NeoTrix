@@ -187,7 +187,11 @@ fn cmd_status() {
     println!("╭─ NeoTrix SysOps ─────────────────────────╮");
     println!(
         "│ KB   {}  {}",
-        if healthy { "✓ 健康".green() } else { "✗ 异常".red() },
+        if healthy {
+            "✓ 健康".green()
+        } else {
+            "✗ 异常".red()
+        },
         kb.display()
     );
     let bdir = backup_root();
@@ -201,11 +205,7 @@ fn cmd_status() {
             n.starts_with("knowledge-") && n.ends_with(".db")
         })
         .collect();
-    println!(
-        "│      {} 份备份 @ {}",
-        backups.len(),
-        bdir.display()
-    );
+    println!("│      {} 份备份 @ {}", backups.len(), bdir.display());
     for (name, path) in [
         ("kb-guard", kb_guard_plist_path()),
         ("kb-backup", kb_backup_plist_path()),
@@ -219,7 +219,11 @@ fn cmd_status() {
                 "·".dimmed()
             },
             name.to_string().blue(),
-            if installed { "installed" } else { "not installed" }
+            if installed {
+                "installed"
+            } else {
+                "not installed"
+            }
         );
     }
     println!("╰───────────────────────────────────────────╯");
@@ -267,11 +271,7 @@ fn cmd_daemons(sub: &str) {
                 Ok(()) => println!("{} kb-backup daemon installed (6h)", success("✓")),
                 Err(e) => eprintln!("{} {}", err("Error:"), e),
             }
-            println!(
-                "{} ProgramArguments 指向 {}",
-                info("→"),
-                exe.display()
-            );
+            println!("{} ProgramArguments 指向 {}", info("→"), exe.display());
         }
         "uninstall" | "remove" | "off" => {
             bootout("com.neotrix.kb-guard");
@@ -395,7 +395,11 @@ fn cmd_uninstall(force: bool) {
             }
         }
     }
-    println!("{} NeoTrix 已卸载 (备份保留在 {})", success("✓"), backup_root().display());
+    println!(
+        "{} NeoTrix 已卸载 (备份保留在 {})",
+        success("✓"),
+        backup_root().display()
+    );
 }
 
 /// sysops 主入口: 分发到子命令

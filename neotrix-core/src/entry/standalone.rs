@@ -10,7 +10,10 @@ pub(crate) async fn run_standalone(stage: usize) {
     println!("│  {}                        │", engine.stats());
     println!("│                                                    │");
     println!("│  Type your questions. The kernel reasons internally │");
-    println!("│  through {} stages of neural architecture.    │", stage.min(18) + 1);
+    println!(
+        "│  through {} stages of neural architecture.    │",
+        stage.min(18) + 1
+    );
     println!("│                                                    │");
     println!("│  Commands: /stats  /stage <N>  /help  /exit       │");
     println!("╰────────────────────────────────────────────────────╯");
@@ -24,17 +27,24 @@ pub(crate) async fn run_standalone(stage: usize) {
             Ok(_) => {
                 let trimmed = input.trim();
                 match trimmed {
-                    "/exit" | "/q" => { println!("Exiting."); break; }
+                    "/exit" | "/q" => {
+                        println!("Exiting.");
+                        break;
+                    }
                     "/stats" | "/s" => println!("{}", engine.stats()),
                     cmd if cmd.starts_with("/stage") => {
-                        let n = cmd.split_whitespace().nth(1)
+                        let n = cmd
+                            .split_whitespace()
+                            .nth(1)
                             .and_then(|s| match s.parse() {
                                 Ok(n) => Some(n),
                                 Err(e) => {
                                     log::warn!("[main] parse /stage arg: {}", e);
                                     None
                                 }
-                            }).unwrap_or(18).min(18);
+                            })
+                            .unwrap_or(18)
+                            .min(18);
                         engine.kernel = neotrix::nt_io_standalone::ReasoningKernel::new(n);
                         println!("Switched to stage {}", n);
                     }
@@ -65,7 +75,9 @@ pub(crate) async fn run_standalone(stage: usize) {
                                 println!("│  Mode: standalone (limited)              │");
                                 println!("╰──────────────────────────────────────────╯");
                             }
-                            Some(other) => println!("Unknown mcp subcommand: {}. Try: list, status", other),
+                            Some(other) => {
+                                println!("Unknown mcp subcommand: {}. Try: list, status", other)
+                            }
                         }
                     }
                     _ if !trimmed.is_empty() => {
@@ -75,7 +87,10 @@ pub(crate) async fn run_standalone(stage: usize) {
                     _ => {}
                 }
             }
-            Err(e) => { eprintln!("Error: {}", e); break; }
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                break;
+            }
         }
     }
 }

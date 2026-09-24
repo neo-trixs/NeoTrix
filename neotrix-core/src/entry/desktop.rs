@@ -2,11 +2,9 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
-use neotrix::l1_action::nt_io::nt_io_neocodex::{NeoCodexUI, NeoCodexMode, NeoCodexAgent};
-use neotrix::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 use neotrix::l0_substrate::nt_core_traits::BrainHandle;
-
-use neotrix::cli::commands::registry::default_registry;
+use neotrix::l1_action::nt_io::nt_io_neocodex::{NeoCodexAgent, NeoCodexMode, NeoCodexUI};
+use neotrix::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
 /// Run a single evolution-loop iteration against the agent (diagnose → fix).
 /// Kept behind a free function so the loop can be triggered from the TUI
@@ -14,7 +12,6 @@ use neotrix::cli::commands::registry::default_registry;
 pub(crate) async fn step_evolution(agent: &mut NeoCodexAgent) {
     neotrix::l1_action::nt_io::nt_io_neocodex::EvolutionLoop::step(agent);
 }
-
 
 pub(crate) async fn run_tui(agent: Arc<RwLock<SelfIteratingBrain>>, _ephemeral: bool) {
     let brain_handle: Arc<RwLock<dyn BrainHandle>> = agent.clone();
@@ -28,7 +25,11 @@ pub(crate) async fn run_tui(agent: Arc<RwLock<SelfIteratingBrain>>, _ephemeral: 
         let mut agent = agent_ui.agent.lock().await;
         agent.provider.ensure_production_provider();
         if agent.provider.is_resolvable() {
-            eprintln!("[provider] active: {} ({})", agent.provider.active_model(), agent.config.provider_name);
+            eprintln!(
+                "[provider] active: {} ({})",
+                agent.provider.active_model(),
+                agent.config.provider_name
+            );
         } else {
             eprintln!("[provider] warning: no resolvable provider (set NEOTRIX_PROVIDER / API keys) — falling back to stub");
         }
@@ -39,7 +40,11 @@ pub(crate) async fn run_tui(agent: Arc<RwLock<SelfIteratingBrain>>, _ephemeral: 
         let mut agent = agent_ui.agent.lock().await;
         let resumed = agent.resume_session();
         if resumed > 0 {
-            eprintln!("[resume] restored {} prior events from {}", resumed, agent.wire.path.display());
+            eprintln!(
+                "[resume] restored {} prior events from {}",
+                resumed,
+                agent.wire.path.display()
+            );
         }
     }
 
@@ -108,11 +113,18 @@ pub(crate) async fn run_tui(agent: Arc<RwLock<SelfIteratingBrain>>, _ephemeral: 
             "/status" => {
                 let a = agent_ui.agent.lock().await;
                 let report = a.health_report();
-                eprintln!("Mode: {:?} · Turn {} · {} tools · {} tokens",
-                    a.state.mode, a.state.turn_count, a.state.tool_call_count, a.state.tokens_used);
-                eprintln!("Provider: {} ({}) · Context: {} turns / {} max tok ({:.0}%)",
-                    a.config.provider_name, report.provider_model,
-                    a.context.turns.len(), a.context.max_tokens, report.context_usage * 100.0);
+                eprintln!(
+                    "Mode: {:?} · Turn {} · {} tools · {} tokens",
+                    a.state.mode, a.state.turn_count, a.state.tool_call_count, a.state.tokens_used
+                );
+                eprintln!(
+                    "Provider: {} ({}) · Context: {} turns / {} max tok ({:.0}%)",
+                    a.config.provider_name,
+                    report.provider_model,
+                    a.context.turns.len(),
+                    a.context.max_tokens,
+                    report.context_usage * 100.0
+                );
                 eprintln!("Evolution: {}", a.evolution.summary());
                 continue;
             }
@@ -123,7 +135,11 @@ pub(crate) async fn run_tui(agent: Arc<RwLock<SelfIteratingBrain>>, _ephemeral: 
                 if failures.is_empty() {
                     eprintln!("[health] {} ✅ all checks pass", report.summary());
                 } else {
-                    eprintln!("[health] {} ❌ {} failures:", report.summary(), failures.len());
+                    eprintln!(
+                        "[health] {} ❌ {} failures:",
+                        report.summary(),
+                        failures.len()
+                    );
                     for f in &failures {
                         eprintln!("  - {}", f);
                     }
@@ -134,8 +150,10 @@ pub(crate) async fn run_tui(agent: Arc<RwLock<SelfIteratingBrain>>, _ephemeral: 
                 let mut a = agent_ui.agent.lock().await;
                 let before = a.evolution.iteration;
                 crate::entry::desktop::step_evolution(&mut a).await;
-                eprintln!("[evo] iteration {} → {} ({} fixes applied total)",
-                    before, a.evolution.iteration, a.evolution.fixes_applied);
+                eprintln!(
+                    "[evo] iteration {} → {} ({} fixes applied total)",
+                    before, a.evolution.iteration, a.evolution.fixes_applied
+                );
                 continue;
             }
             "/resume" => {
@@ -145,20 +163,8 @@ pub(crate) async fn run_tui(agent: Arc<RwLock<SelfIteratingBrain>>, _ephemeral: 
                 continue;
             }
             _ => {
-                // Registry fallback: unknown slash commands route to the command
-                // registry (90+ commands). Hardcoded commands above take priority
-                // because they operate on agent internal state. Only commands the
-                // match does NOT cover reach here; if the registry also misses,
-                // fall through to send_message (treat as LLM prompt).
-                if input.starts_with('/') {
-                    let reg = default_registry();
-                    let cmd = input.split(' ').next().unwrap_or(input.as_str());
-                    if reg.find(cmd).is_some() {
-                        let out = reg.execute(&input, Some(&agent));
-                        eprintln!("{}", out.message);
-                        continue;
-                    }
-                }
+                // cli::commands removed — 未覆盖的 slash 输入直接落到
+                // send_message (视为 LLM prompt), 不再经命令注册表。
             }
         }
 
@@ -172,7 +178,9 @@ pub(crate) async fn run_tui(agent: Arc<RwLock<SelfIteratingBrain>>, _ephemeral: 
         }
     }
 
-    eprintln!("NeoCodex session ended ({} turns, {} tools)",
+    eprintln!(
+        "NeoCodex session ended ({} turns, {} tools)",
         agent_ui.agent.lock().await.state.turn_count,
-        agent_ui.agent.lock().await.state.tool_call_count);
+        agent_ui.agent.lock().await.state.tool_call_count
+    );
 }
