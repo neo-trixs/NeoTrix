@@ -18,7 +18,6 @@ pub mod nt_shield_audit;
 pub mod nt_shield_comm;
 pub mod nt_shield_internal_scan;
 // pub mod nt_shield_cleanup; // DEAD: zero external references
-pub mod nt_shield_impl;
 pub mod http_intercept;
 pub mod osint;
 pub mod nt_shield_oversight;
