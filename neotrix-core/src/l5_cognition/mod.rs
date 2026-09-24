@@ -70,8 +70,6 @@ pub mod nt_core_agent_circuit_breaker;
 pub mod nt_core_model_router;
 /// Skill Registry
 pub mod nt_core_model_skills;
-/// Unified Model Interface — 通用模型适配框架 (orphan wired T45+1: 含 ModelPreferences 三档位)
-pub mod nt_core_model_unified;
 /// Hybrid Code Search Retriever
 pub mod nt_core_hybrid_search;
 pub mod nt_core_second_brain;
