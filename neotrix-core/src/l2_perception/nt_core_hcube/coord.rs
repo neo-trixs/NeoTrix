@@ -1,4 +1,4 @@
-use super::axis::DimensionAxis;
+use neotrix_types::core::nt_core_hcube::axis::DimensionAxis;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

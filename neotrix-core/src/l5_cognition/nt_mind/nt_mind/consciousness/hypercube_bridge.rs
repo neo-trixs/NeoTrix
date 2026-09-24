@@ -1,7 +1,7 @@
 use super::cortex_memory::{CortexMemory, DimensionTag};
 use super::knowledge_engine::KnowledgeEngine;
 use super::exploration_pipeline::ExploreDomain;
-use crate::l2_perception::nt_core_hcube::axis::DimensionAxis;
+use neotrix_types::core::nt_core_hcube::axis::DimensionAxis;
 use crate::l2_perception::nt_core_hcube::coord::HyperCoord;
 use crate::l2_perception::nt_core_hcube::cube::{KnowledgeHyperCube, CubeEntry};
 use crate::l2_perception::nt_core_hcube::gap::GapReport;

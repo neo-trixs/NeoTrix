@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
 use crate::l2_perception::nt_world::l1_facade::{MicroEdit, ReasoningMemory, T3Views, MemoryTier, MemoryLifecycle, ReasoningBank};
-use crate::l2_perception::nt_core_hcube::axis::DimensionAxis;
+use neotrix_types::core::nt_core_hcube::axis::DimensionAxis;
 use crate::l2_perception::nt_core_hcube::coord::HyperCoord;
 use crate::l2_perception::nt_core_knowledge::{TaskType, RewardSource};
 

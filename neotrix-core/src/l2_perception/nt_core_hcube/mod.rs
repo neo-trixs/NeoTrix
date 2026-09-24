@@ -1,4 +1,3 @@
-pub mod axis;
 pub mod coord;
 pub mod cross_modal;
 pub mod cube;

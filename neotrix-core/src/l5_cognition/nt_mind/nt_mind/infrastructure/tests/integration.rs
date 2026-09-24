@@ -7,7 +7,7 @@ mod tests {
         use crate::l5_cognition::nt_core_gwt::module_def::SpecialistType;
         use crate::l2_perception::nt_core_hcube::cube::KnowledgeHyperCube;
         use crate::l2_perception::nt_core_hcube::coord::HyperCoord;
-        use crate::l2_perception::nt_core_hcube::axis::DimensionAxis;
+        use neotrix_types::core::nt_core_hcube::axis::DimensionAxis;
         use crate::l5_cognition::l1_facade::AttentionDomain;
         use crate::l5_cognition::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge;
 
