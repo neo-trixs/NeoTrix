@@ -3,6 +3,8 @@
 //! L5 Multi-Agent systems — coordination, crew, delegation, parallel execution,
 //! background loop, meta-panel, skill chains, experience tree, self-improvement.
 //!
+
+#![forbid(unsafe_code)]
 //! Migrated from L5 cognition:
 //! - `coordinator` — Multi-Agent parallel execution coordinator
 //! - `coordination` — Shape-level coordination principles

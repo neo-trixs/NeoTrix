@@ -4,6 +4,8 @@
 //! BYOA (Bring Your Own Agent), capability system, Hive coordination,
 //! gate control, context management, and awareness core bridging.
 
+#![forbid(unsafe_code)]
+
 pub mod model_gateway;
 pub mod model_router;
 pub mod skill_registry;

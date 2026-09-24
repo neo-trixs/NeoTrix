@@ -1,0 +1,34 @@
+name: NeoTrix Deterministic Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  nt-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: forbid(unsafe_code) coverage gate
+        run: bash scripts/check-forbid-coverage.sh
+      - name: Layer dependency check
+        run: bash scripts/check-layer-deps.sh
+      - name: nt-audit unit tests
+        run: cargo test -p neotrix-audit
+      - name: nt-audit CLI smoke
+        run: |
+          cargo build -p neotrix-audit
+          ./target/debug/nt-audit rules explain crates/neotrix-audit/src/lib.rs | head -n 3
+          ./target/debug/nt-audit filter-prompt | head -n 3
+          echo '[]' > /tmp/after.json
+          echo '[]' > /tmp/before.json
+          ./target/debug/nt-audit diff-baseline /tmp/before.json /tmp/after.json
