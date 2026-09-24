@@ -65,12 +65,21 @@ workspace 14/14 对齐；`decision-engine` 意图性隔离（编译红，见 §�
 5. 📢 **供给膨胀**：`reqwest 0.11+0.12+0.13`、`wasmtime 41+42` 并存；`crystal_game_disabled` 死 feature（`neotrix-core/Cargo.toml:265`）；swords 两处 spire 残留（`build_font_pixel.py:29`、`STYLE-FORMULA.md:31`）。
 6. 📢 **磁盘**：`thirdparty/kev/{runs,evals}` 196M + `target/` 25G（不清，后者是增量命根子）。
 
-## 四、蜕皮路线（已执行 P0，本轮止于 P1）
+## 四、蜕皮路线（P0–P2 已执行，P3 待立项）
 
-- [x] P0（2026-09-24）：5 crate 根补 `forbid(unsafe_code)`（consciousness/reasoning/gateway/multi-agent/nt-lang）；删 `notes/`（8K 过期草稿）；`neotrix-audit` 确定性审计核心入库；本报告。
-- [ ] P1（待 owner/窗口协调）：Tauri 红（§三.2）、decision-engine 去留（修 vs 删）、78 strict-dead 认领。
-- [ ] P2（架构）：L5↔L6 解环、L1/L2 上翻依赖下沉（`nt_core_state` 已在 L0，`edit_history.rs:52` 之类逐个改）、God-file 拆分。
-- [ ] P3（供给）：`cargo-deny` 引入 + workspace 依赖收敛（7→20 件）、多版本去重。
+- [x] P0（2026-09-24）：5 crate 根补 `forbid(unsafe_code)`；删 `notes/`；`neotrix-audit` 入库；本报告。
+- [x] P1：Tauri 红已修（`b05061c0` 前序 `3bba2507`）；decision-engine 复活（113 测试）；78 strict-dead 清零（7+60+2兼容+3归档+3已接线+1保留+2豁免）。
+- [x] P2 分层：L1/L2 上翻 20+4 处——改道 7 行（nt_core_state×6、hex×1）/ 注记 8 处 / 其余认证不动；L5↔L6 环判定为**设计如此**（门面+trait 实现双向桥，不拆）；双生消除（causal_inventor、DimensionAxis→types）。
+- [ ] P3（供给）：`cargo-deny` 引入 + workspace 依赖收敛、多版本去重（reqwest×3/wasmtime×2）。
+- [ ] P4（God-file）：experience.rs 4195、browser_engine 4559、memory_kb 3839——需专窗+回归，另立项。
+
+## 五、纠错与保留清单
+
+- `video-decode`/`crystal_game_disabled` 并非死 feature（thumbnail.rs×4 / crystal_integration.rs 在用）。
+- 空占位 `consciousness_core.rs`/`coordination.rs`（0 行）是 T39-A4 腾名设计，保留。
+- 兼容垫片 `orchestrator_compat`/`unified_types_compat`、archive 3 文件、已接线 3 文件保留。
+- `nt_infra_unified_search`/`nt_io_protocol_bridge`/`dual_track` 有新鲜改动，豁免删除。
+- `infrastructure/tests/` 系本地忽略目录（其中 1 处 axis 引用已在工作区同步，不入库）。
 
 ## 五、本轮验证
 
