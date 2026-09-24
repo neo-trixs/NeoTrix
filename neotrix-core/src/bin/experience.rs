@@ -175,7 +175,13 @@ fn kb_dir() -> String {
 }
 
 fn open_kb() -> Connection {
-    let db_path = format!("{}/knowledge.db", kb_dir());
+    let dir = kb_dir();
+    // 新鲜 HOME (如刚装机) 无 .neotrix 目录时建目录, 否则首跑即 panic。
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        eprintln!("[kb] 创建目录 {} 失败: {e}", dir);
+        std::process::exit(1);
+    }
+    let db_path = format!("{}/knowledge.db", dir);
     let conn = Connection::open(&db_path).expect("Failed to open KB");
     conn.busy_timeout(std::time::Duration::from_secs(60)).ok();
     conn.execute_batch(
