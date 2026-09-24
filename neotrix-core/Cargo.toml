@@ -70,13 +70,13 @@ name = "model-download"
 path = "src/bin/model_download.rs"
 
 [dependencies]
-neotrix-types = { path = "../crates/neotrix-types" }
-neotrix-sysctl = { path = "../crates/neotrix-sysctl" }
-neotrix-consciousness = { path = "../crates/neotrix-consciousness" }
-neotrix-reasoning = { path = "../crates/neotrix-reasoning" }
-neotrix-gateway = { path = "../crates/neotrix-gateway" }
-neotrix-multi-agent = { path = "../crates/neotrix-multi-agent" }
-nt_core_capability_tree = { path = "src/neotrix/nt_core_capability_tree" }
+neotrix-types = { workspace = true }
+neotrix-sysctl = { workspace = true }
+neotrix-consciousness = { workspace = true }
+neotrix-reasoning = { workspace = true }
+neotrix-gateway = { workspace = true }
+neotrix-multi-agent = { workspace = true }
+nt_core_capability_tree = { workspace = true }
 thiserror = "1"
 serde = { workspace = true }
 serde_json = { workspace = true }

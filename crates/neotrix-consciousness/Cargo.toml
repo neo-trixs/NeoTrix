@@ -7,8 +7,8 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-neotrix-types = { path = "../neotrix-types" }
-neotrix-sysctl = { path = "../neotrix-sysctl" }
+neotrix-types = { workspace = true }
+neotrix-sysctl = { workspace = true }
 # L0/L1/L2/L3 cross-layer deps (via facade re-exports)
 # neotrix (parent crate) — circular: use trait-based decoupling
 serde = { workspace = true }

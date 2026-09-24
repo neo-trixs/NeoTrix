@@ -32,9 +32,9 @@ clap = { version = "4", features = ["derive"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 portable-pty = "0.9.0"
-nt_core_capability_tree = { path = "../neotrix-core/src/neotrix/nt_core_capability_tree" }
-neotrix-neobot = { path = "../crates/neotrix-neobot" }
-neotrix = { path = "../neotrix-core" }
+nt_core_capability_tree = { workspace = true }
+neotrix-neobot = { workspace = true }
+neotrix = { workspace = true }
 chrono = { workspace = true }
 dirs = { workspace = true }
 uuid = { workspace = true }

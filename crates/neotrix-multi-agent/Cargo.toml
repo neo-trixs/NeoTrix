@@ -7,11 +7,11 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-neotrix-types = { path = "../neotrix-types" }
-neotrix-sysctl = { path = "../neotrix-sysctl" }
-neotrix-consciousness = { path = "../neotrix-consciousness" }
-neotrix-reasoning = { path = "../neotrix-reasoning" }
-neotrix-gateway = { path = "../neotrix-gateway" }
+neotrix-types = { workspace = true }
+neotrix-sysctl = { workspace = true }
+neotrix-consciousness = { workspace = true }
+neotrix-reasoning = { workspace = true }
+neotrix-gateway = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
