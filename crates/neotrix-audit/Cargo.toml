@@ -1,0 +1,21 @@
+[package]
+name = "neotrix-audit"
+version.workspace = true
+edition = "2021"
+description = "NeoTrix audit core — deterministic review machinery absorbed from alibaba/open-code-review (Apache-2.0): finding taxonomy, drift-resistant identity, baseline compare, layered rule resolver, file selection. Pure functions, zero LLM."
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "nt-audit"
+path = "src/bin/nt_audit.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+sha2 = "0.10"
+glob = "0.3"
+
+[lints]
+workspace = true

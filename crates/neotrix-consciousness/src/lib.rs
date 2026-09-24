@@ -13,6 +13,8 @@
 //!  CAD Consciousness    IIT Phi       Echo Terminal
 //! ```
 
+#![forbid(unsafe_code)]
+
 pub mod consciousness_core;
 pub mod consciousness_tree;
 pub mod cad_consciousness;
