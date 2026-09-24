@@ -1,4 +1,14 @@
-    use super::*;
+    use super::exp_absorb::*;
+    use super::exp_concept::*;
+    use super::exp_distill::*;
+    use super::exp_query::*;
+    use super::exp_store::*;
+    use super::exp_topo::*;
+    use super::exp_util::*;
+    use super::{NS, DAY, VERIFY_DEFAULT_DAYS};
+    use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_schema;
+    use rusqlite::{params, Connection};
+    use serde_json::{json, Value};
 
     #[test]
     fn test_value_roundtrip() {
@@ -114,7 +124,7 @@
         std::env::set_var("HOME", &home);
         let conn = Connection::open(home.join(".neotrix").join("knowledge.db"))
             .expect("open isolated kb file");
-        crate::nt_memory_schema::initialize(&conn).expect("init isolated schema");
+        nt_memory_schema::initialize(&conn).expect("init isolated schema");
         f(&conn);
         drop(conn);
         std::fs::remove_dir_all(&home).ok();
@@ -316,7 +326,7 @@
     #[test]
     fn test_cmd_distill_dry_run_marks_nothing() {
         let mut conn = Connection::open_in_memory().unwrap();
-        crate::nt_memory_schema::initialize(&conn).unwrap();
+        nt_memory_schema::initialize(&conn).unwrap();
         let now = now_ts();
         // 插入 3 条同主题经验 (NT-CORE)
         for i in 0..3 {
@@ -353,7 +363,7 @@
     #[test]
     fn test_cmd_distill_creates_pattern_and_marks() {
         let mut conn = Connection::open_in_memory().unwrap();
-        crate::nt_memory_schema::initialize(&conn).unwrap();
+        nt_memory_schema::initialize(&conn).unwrap();
         let now = now_ts();
         for i in 0..3 {
             let key = format!("branch_test_{}", i);
@@ -393,7 +403,7 @@
     #[test]
     fn test_cmd_distill_generates_consciousness_entry() {
         let mut conn = Connection::open_in_memory().unwrap();
-        crate::nt_memory_schema::initialize(&conn).unwrap();
+        nt_memory_schema::initialize(&conn).unwrap();
         let now = now_ts();
         for i in 0..3 {
             let key = format!("branch_test_{}", i);
@@ -433,7 +443,7 @@
     #[test]
     fn test_query_filters_distilled_by_default() {
         let conn = Connection::open_in_memory().unwrap();
-        crate::nt_memory_schema::initialize(&conn).unwrap();
+        nt_memory_schema::initialize(&conn).unwrap();
         let now = now_ts();
         // 2 条普通 + 1 条 distilled
         let mut entries = vec![
@@ -476,7 +486,7 @@
         // W4 场账本写路径: 追加型经验写入 stage→tick 后, 下游 kv_get 读回必须与
         // 直写 kv_set 完全等价 (ns/key/value 三元组不变), 且未 tick 前不可见。
         let conn = Connection::open_in_memory().unwrap();
-        crate::nt_memory_schema::initialize(&conn).unwrap();
+        nt_memory_schema::initialize(&conn).unwrap();
 
         let branch = json!({
             "schema_version": 1, "type": "insight", "session_id": "sess_w4",
@@ -492,7 +502,7 @@
         assert_eq!(kv_get(&conn, "audit", "audit_1200_sess_w4_0"), None);
 
         // 一批一解: 统一求解下一版本
-        let r = crate::nt_field_ledger::field_tick(&conn).unwrap().expect("receipt");
+        let r = neotrix::l1_action::nt_memory::nt_memory_kb::nt_field_ledger::field_tick(&conn).unwrap().expect("receipt");
         assert_eq!(r.drained, 2, "两条暂存都参与合并");
         assert_eq!(r.applied, 2, "新键无冲突, 全部落账");
         assert_eq!(r.version, 1);
@@ -508,14 +518,14 @@
         );
 
         // 空集 tick 幂等 + 哈希链完整
-        assert!(crate::nt_field_ledger::field_tick(&conn).unwrap().is_none());
-        assert!(crate::nt_field_ledger::field_verify_chain(&conn).unwrap());
+        assert!(neotrix::l1_action::nt_memory::nt_memory_kb::nt_field_ledger::field_tick(&conn).unwrap().is_none());
+        assert!(neotrix::l1_action::nt_memory::nt_memory_kb::nt_field_ledger::field_verify_chain(&conn).unwrap());
     }
 
     #[test]
     fn test_cmd_rune_set_and_get() {
         let conn = Connection::open_in_memory().unwrap();
-        crate::nt_memory_schema::initialize(&conn).unwrap();
+        nt_memory_schema::initialize(&conn).unwrap();
         // set crimson
         cmd_rune(&conn, "set", Some("crimson"), Some("NT-MEMORY"));
         let val = kv_get(&conn, NS, "rune:NT-MEMORY:crimson");
@@ -534,7 +544,7 @@
     #[test]
     fn test_cmd_constellation_audit_and_mature() {
         let conn = Connection::open_in_memory().unwrap();
-        crate::nt_memory_schema::initialize(&conn).unwrap();
+        nt_memory_schema::initialize(&conn).unwrap();
         // insert a maturity record
         conn.execute(
             "INSERT INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)",
