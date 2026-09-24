@@ -1,0 +1,22 @@
+[package]
+name = "neotrix-guixu"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "NeoTrix Guixu — 南宋武侠动作游戏（歸墟；吸收 swordgame.ai），消费 neotrix-game 引擎"
+
+[[bin]]
+name = "neotrix-guixu"
+path = "src/main.rs"
+
+[dependencies]
+macroquad = "0.4"
+neotrix-game = { workspace = true }
+neotrix-abilities = { workspace = true }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+fontdue = "=0.9.4"

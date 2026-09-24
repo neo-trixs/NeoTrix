@@ -37,6 +37,20 @@ chrono = { version = "0.4", features = ["serde"] }
 dirs = "6.0.0"
 uuid = { version = "1", features = ["v4", "serde"] }
 ureq = "2"
+# 内部 path 依赖统一版本源 (P3 供给收敛; deny wildcards 门要求显式 version; 版本号跟 workspace.package 走，勿手写漂移)
+neotrix = { version = "0.21.0", path = "neotrix-core" }
+neotrix-types = { version = "0.21.0", path = "crates/neotrix-types" }
+neotrix-sysctl = { version = "0.21.0", path = "crates/neotrix-sysctl" }
+neotrix-consciousness = { version = "0.21.0", path = "crates/neotrix-consciousness" }
+neotrix-reasoning = { version = "0.21.0", path = "crates/neotrix-reasoning" }
+neotrix-gateway = { version = "0.21.0", path = "crates/neotrix-gateway" }
+neotrix-multi-agent = { version = "0.21.0", path = "crates/neotrix-multi-agent" }
+neotrix-game = { version = "0.21.0", path = "crates/neotrix-game" }
+neotrix-abilities = { version = "0.21.0", path = "crates/neotrix-abilities" }
+neotrix-neobot = { version = "0.21.0", path = "crates/neotrix-neobot" }
+neotrix-audit = { version = "0.21.0", path = "crates/neotrix-audit" }
+neotrix-decision-engine = { version = "0.1.0", path = "crates/neotrix-decision-engine" }
+nt_core_capability_tree = { version = "0.1.0", path = "neotrix-core/src/neotrix/nt_core_capability_tree" }
 # 内部 path 依赖统一版本源 (P3 供给收敛; deny wildcards 门要求显式 version)
 neotrix = { version = "0.22.0", path = "neotrix-core" }
 neotrix-types = { version = "0.22.0", path = "crates/neotrix-types" }

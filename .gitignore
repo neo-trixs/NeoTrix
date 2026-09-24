@@ -91,10 +91,18 @@ red
 output/
 outputs/
 data/
+# 游戏运行时数据 (RON 卡牌/遗物/事件, 684K, guixu 运行时必需): 解除忽略
+!crates/neotrix-abilities/data/
+!crates/neotrix-abilities/data/**
 vendor/
 profile/
 provenance/
 tools/
+# 开发工具脚本 (import/shot 审计): 解除忽略
+!crates/neotrix-abilities/tools/
+!crates/neotrix-abilities/tools/**
+!games/neotrix-guixu/tools/
+!games/neotrix-guixu/tools/**
 packaging/
 research/
 benches/

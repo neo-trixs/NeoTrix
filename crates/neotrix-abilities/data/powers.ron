@@ -1,0 +1,65 @@
+// ═══════════════════════════════════════════════════════════════════
+// NT-GAME 能力数据 v1 — StS schema 移植
+//
+// 能力 = Buff/Debuff。堆叠: Counter(层数) / Single(有无)。
+// 对接 status.rs：层数型走现有 tick，单体型走 flag。
+// ═══════════════════════════════════════════════════════════════════
+
+[
+    PowerDef(
+        id: "strength",
+        name: "力量",
+        power_type: Buff,
+        stack: Counter,
+        description: "攻击伤害 +层数。",
+    ),
+    PowerDef(
+        id: "vulnerable",
+        name: "易伤",
+        power_type: Debuff,
+        stack: Counter,
+        description: "受到的伤害 +50%。每轮减 1 层。",
+    ),
+    PowerDef(
+        id: "burn",
+        name: "燃烧",
+        power_type: Debuff,
+        stack: Counter,
+        description: "每轮开始受到等同层数的伤害，减半衰退。",
+    ),
+    PowerDef(
+        id: "poison",
+        name: "中毒",
+        power_type: Debuff,
+        stack: Counter,
+        description: "每轮开始受到等同层数的伤害，减 1 层。",
+    ),
+    PowerDef(
+        id: "regen",
+        name: "再生",
+        power_type: Buff,
+        stack: Counter,
+        description: "每轮恢复等同层数的生命，减 1 层。",
+    ),
+    PowerDef(
+        id: "weak",
+        name: "虚弱",
+        power_type: Debuff,
+        stack: Counter,
+        description: "造成的伤害 -25%。每轮减 1 层。",
+    ),
+    PowerDef(
+        id: "fortify",
+        name: "坚壁",
+        power_type: Buff,
+        stack: Single,
+        description: "受到的伤害 -4 点。",
+    ),
+    PowerDef(
+        id: "thorns",
+        name: "荆棘",
+        power_type: Buff,
+        stack: Counter,
+        description: "被攻击时反弹等同层数的伤害。",
+    ),
+]

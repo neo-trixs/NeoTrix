@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0a0a1a">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="apple-touch-icon" href="./icon.svg">
+    <title>NeoTrix Game Engine</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            color: #fff;
+        }
+        .container { text-align: center; }
+        canvas {
+            border: 2px solid #333;
+            border-radius: 4px;
+            max-width: 100vw;
+            max-height: 90vh;
+        }
+        .info { margin-top: 16px; color: #888; font-size: 14px; }
+        .controls { margin-top: 8px; color: #666; font-size: 12px; }
+        #loading {
+            font-size: 18px;
+            color: #gold;
+            margin-top: 40px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #333;
+            border-top: 4px solid #gold;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="glcanvas" tabindex="1" width="1280" height="720"></canvas>
+        <div id="loading">
+            <div class="spinner"></div>
+            <p>正在加载 WASM 模块…（首次联网后可离线畅玩）</p>
+        </div>
+        <div class="info">
+            <p>NeoTrix Game Engine v0.21.0 — Phase 3</p>
+        </div>
+        <div class="controls">
+            <p>WASD/方向键: 移动 | E: 互动 | 空格: 攻击 | Q: 任务 | F1: 音量</p>
+        </div>
+    </div>
+    <script src="./gl.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js').catch(function () { /* 离线能力可选，失败静默 */ });
+        }
+        try {
+            load("./pkg/neotrix-game.wasm");
+            document.getElementById('loading').style.display = 'none';
+        } catch (e) {
+            document.getElementById('loading').innerHTML =
+                '<p style="color: red;">加载失败: ' + e.message + '</p>';
+        }
+    </script>
+</body>
+</html>

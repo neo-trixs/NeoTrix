@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d2e1ff" stop-opacity="0.34"/>
+      <stop offset="0.5" stop-color="#d2e1ff" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.42"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="0.3" cy="0.16" r="0.5">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="sq"><rect width="512" height="512" rx="116" fill="#fff"/></clipPath>
+  </defs>
+  <g clip-path="url(#sq)">
+    <rect width="512" height="512" fill="#0a0a1a" fill-opacity="0.92"/>
+    <rect width="512" height="512" fill="url(#glass)"/>
+    <ellipse cx="256" cy="150" rx="180" ry="90" fill="url(#sheen)"/>
+    <!-- 太极混沌徽章 -->
+    <circle cx="256" cy="268" r="150" fill="#10131c"/>
+    <path d="M256 118a150 150 0 0 1 0 300 75 75 0 0 1 0-150 75 75 0 0 0 0-150z" fill="#f2ecdc"/>
+    <circle cx="256" cy="193" r="17" fill="#10131c"/>
+    <circle cx="256" cy="343" r="17" fill="#f2ecdc"/>
+    <circle cx="256" cy="268" r="150" fill="none" stroke="#c9a227" stroke-width="11"/>
+    <circle cx="256" cy="268" r="124" fill="none" stroke="#c9a227" stroke-opacity="0.35" stroke-width="2"/>
+    <!-- 边缘折射高光 + 点光 -->
+    <path d="M60 220 A220 220 0 0 1 452 220" fill="none" stroke="#ffffff" stroke-opacity="0.4" stroke-width="7" stroke-linecap="round"/>
+    <ellipse cx="118" cy="96" rx="34" ry="26" fill="#ffffff" fill-opacity="0.5"/>
+  </g>
+</svg>

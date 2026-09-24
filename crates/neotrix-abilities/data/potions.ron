@@ -1,0 +1,56 @@
+// ═══════════════════════════════════════════════════════════════════
+// NT-GAME 药水数据 v1 — StS schema 移植
+//
+// 药水 = 限量即时消耗（独立药水格，上限 3）。稀有度决定掉落池。
+// ═══════════════════════════════════════════════════════════════════
+
+[
+    PotionDef(
+        id: "hp_elixir",
+        name: "金疮药",
+        rarity: Common,
+        target: Own,
+        effect: Some(HealPercent(0.3)),
+        description: "恢复 30% 已损失生命。",
+    ),
+    PotionDef(
+        id: "element_phial",
+        name: "元素琉璃瓶",
+        rarity: Uncommon,
+        target: Own,
+        effect: Some(DoubleNextElement),
+        description: "下一次元素伤害翻倍。",
+    ),
+    PotionDef(
+        id: "smoke_bomb",
+        name: "烟雾弹",
+        rarity: Common,
+        target: Own,
+        effect: Some(Stealth(2)),
+        description: "获得 2 层隐匿（敌人命中率减半）。",
+    ),
+    PotionDef(
+        id: "strength_tonic",
+        name: "牛劲散",
+        rarity: Uncommon,
+        target: Own,
+        effect: Some(Strength(2)),
+        description: "本场战斗获得 2 层力量。",
+    ),
+    PotionDef(
+        id: "bell_water",
+        name: "金钟水",
+        rarity: Common,
+        target: Own,
+        effect: Some(Block(15.0)),
+        description: "获得 15 点格挡。",
+    ),
+    PotionDef(
+        id: "purify_dew",
+        name: "净露",
+        rarity: Rare,
+        target: Own,
+        effect: Some(Cleanse),
+        description: "清除所有负面能力。",
+    ),
+]

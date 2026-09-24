@@ -1,0 +1,81 @@
+// ═══════════════════════════════════════════════════════════════════
+// NT-GAME 遗物数据 v1 — StS schema 移植
+//
+// 遗物 = 全局被动规则修正。稀有度: Starter 初始 / Common / Uncommon / Rare / Boss。
+// 来源池: starter(开局) / combat(战斗掉落) / elite(精英) / boss(Boss) / shop(商店)
+// ═══════════════════════════════════════════════════════════════════
+
+[
+    RelicDef(
+        id: "ding_shard",
+        name: "鼎碎片",
+        rarity: Starter,
+        pool: "starter",
+        effect: HealAfterCombat(6.0),
+        description: "每场战斗后恢复 6 点生命。",
+        flavor: "鼎碎亦有余温。",
+    ),
+    RelicDef(
+        id: "bronze_tripod",
+        name: "青铜小鼎",
+        rarity: Common,
+        pool: "combat",
+        effect: FireDamageMult(1.25),
+        description: "火属性伤害 +25%。",
+        flavor: "三足承天火。",
+    ),
+    RelicDef(
+        id: "iron_caltrop",
+        name: "铁蒺藜",
+        rarity: Common,
+        pool: "combat",
+        effect: Thorns(3.0),
+        description: "受到攻击时反弹 3 点伤害。",
+        flavor: "守株亦可待兽。",
+    ),
+    RelicDef(
+        id: "bronze_lantern",
+        name: "青铜灯",
+        rarity: Uncommon,
+        pool: "elite",
+        effect: StartEnergy(1),
+        description: "每场战斗开始时获得 1 点额外能量。",
+        flavor: "一灯破万古夜。",
+    ),
+    RelicDef(
+        id: "jade_compass",
+        name: "玉衡盘",
+        rarity: Uncommon,
+        pool: "elite",
+        effect: DrawExtra(1),
+        description: "开局多抽 1 张牌。",
+        flavor: "璇玑玉衡，以齐七政。",
+    ),
+    RelicDef(
+        id: "phoenix_plume",
+        name: "凤羽",
+        rarity: Uncommon,
+        pool: "shop",
+        effect: MaxHp(12),
+        description: "生命上限 +12。",
+        flavor: "凤凰涅槃，羽不言烬。",
+    ),
+    RelicDef(
+        id: "dragon_abyss_shard",
+        name: "龙渊碎片",
+        rarity: Rare,
+        pool: "boss",
+        effect: MetalDamageMult(1.5),
+        description: "金属性伤害 +50%。",
+        flavor: "剑出龙渊，万邪辟易。",
+    ),
+    RelicDef(
+        id: "hundun_egg",
+        name: "混沌卵",
+        rarity: Boss,
+        pool: "boss",
+        effect: EnergyMax(1),
+        description: "能量上限 +1。（混沌低语：每场战斗开始时失去 10 点生命）",
+        flavor: "混沌未分，祸福同源。",
+    ),
+]

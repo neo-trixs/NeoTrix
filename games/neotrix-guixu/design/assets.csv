@@ -1,0 +1,17 @@
+id,role,type,description,size/ratio,style line ref,source
+font-pixel-game,正文字体（唯一）,ttf,fusion-pixel 12px 打底 + Noto CJK 移植，1823 字零缺失，ASCII 补全，emoji 用汉字替,光栅 14/20/26,STYLE-FORMULA.md#字体栈,reference_media[0]
+font-charset,字体语料,txt,build_font_pixel.py collect_corpus() 再生过滤表,1823 字,STYLE-FORMULA.md#字体栈,generate
+font-cjk-game,备用 CJK 全量,ttf,未缺字时的全量回退（体积大，默认不用）,—,STYLE-FORMULA.md#字体栈,reference_media[0]
+icon-icns,应用图标,icns,液态玻璃 squircle + 透明背景，make_icon.py v2 构建，部署后 killall Finder Dock 刷新,1024,STYLE-FORMULA.md#图标,generate
+icon-master-1024,图标母版,png,图标单源主稿,1024x1024,STYLE-FORMULA.md#图标,generate
+sprite-slime,敌方精灵,png,史莱姆（pixel_forge 8 精灵之一）,—,STYLE-FORMULA.md#色板,generate
+sprite-ghost,敌方精灵,png,幽灵,—,STYLE-FORMULA.md#色板,generate
+sprite-skull,敌方精灵,png,骷髅,—,STYLE-FORMULA.md#色板,generate
+sprite-pig,敌方精灵,png,野猪,—,STYLE-FORMULA.md#色板,generate
+sprite-rino,敌方精灵,png,犀牛,—,STYLE-FORMULA.md#色板,generate
+sprite-bunny,中立精灵,png,兔,—,STYLE-FORMULA.md#色板,generate
+sprite-chicken,中立精灵,png,鸡,—,STYLE-FORMULA.md#色板,generate
+bg-cave,场景背景,png,洞穴背景（水墨分层渲染的位图件）,—,STYLE-FORMULA.md#场景分层,generate
+data-world,RON 数据,ron,世界/关卡/实体数值（18 表，见 data/）,—,PLAN.md#技术栈与托管假设,reference_media[1]
+data-sts-codex,RON 数据,ron,StS 全量库 14 表（577 卡/296 遗物/115 怪/257 能力/63 药水/87 遭遇/66 事件/7 关键词）,—,PLAN.md#技术栈与托管假设,reference_media[1]
+web-shell,wasm 前端,html/js,web/index.html + gl.js + manifest + sw.js（build_wasm.sh 构建）,—,PLAN.md#技术栈与托管假设,generate
