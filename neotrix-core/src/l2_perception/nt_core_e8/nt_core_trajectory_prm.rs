@@ -10,7 +10,7 @@
 //!   - SWE-TRACE: Trajectory Reduction and Agentic Criteria Evaluation
 
 #[cfg(test)]
-use crate::l5_cognition::nt_core_hex::ReasoningHexagram;
+use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
 use crate::l5_cognition::nt_core_prm::AgentTrajectory;
 
 /// Step-attention weights for trajectory-level PRM scoring.

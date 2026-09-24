@@ -1,5 +1,6 @@
 use super::thinking_budget::DifficultyEstimator;
 use crate::l0_substrate::nt_core_hex::{FullReasoningState, ReasoningHexagram};
+// LAYER-EXCEPTION: TTC 调度引擎属认知域类型，E8 状态机语义依赖它；下沉需搬整个 TTC，重构另立项。
 use crate::l5_cognition::nt_core_ttc::{Allocation, TtcEngine};
 use serde::{Deserialize, Serialize};
 
