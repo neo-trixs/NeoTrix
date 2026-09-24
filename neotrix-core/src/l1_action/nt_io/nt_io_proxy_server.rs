@@ -97,7 +97,7 @@ impl ServerProxy {
     }
 
     fn load_brain() -> CapabilityVector {
-        crate::l5_cognition::nt_core_state::load("brain")
+        crate::l0_substrate::nt_core_state::load("brain")
             .and_then(|content| serde_json::from_str::<CapabilityVector>(&content).ok())
             .unwrap_or_else(|| {
                 log::warn!("[server-proxy] brain state missing or unparseable");

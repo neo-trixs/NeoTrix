@@ -1212,7 +1212,7 @@ pub fn run_benchmark(category: Option<&str>) {
     use neotrix::l5_cognition::nt_mind::benchmark::{BenchmarkReport, BenchmarkSuite};
     use neotrix_types::core::nt_core_cap::CapabilityVector;
 
-    let cap: CapabilityVector = neotrix::l5_cognition::nt_core_state::load("brain")
+    let cap: CapabilityVector = neotrix::l0_substrate::nt_core_state::load("brain")
         .and_then(|json| serde_json::from_str(&json).ok())
         .unwrap_or_else(|| {
             eprintln!("{}", warn("failed to parse brain state, using default"));
