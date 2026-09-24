@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::LazyLock;
 
-use log::{warn, error};
+use log::{error, warn};
 
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -18,8 +18,8 @@ pub const NONCE_LEN: usize = 12;
 // D3 架构倒置: kv 原语下沉至 core (nt_core_kb_primitives), 此处 re-export
 // 保持 `nt_memory_unify::kv_*` 调用方路径不变。实现单一事实源在 core。
 pub use crate::l0_substrate::nt_core_kb_primitives::{
-    VALUE_COMPRESSED_MAGIC, is_compressed_value, kv_delete, kv_exists, kv_get, kv_list,
-    kv_list_namespaces, kv_purge_namespace, kv_set,
+    is_compressed_value, kv_delete, kv_exists, kv_get, kv_list, kv_list_namespaces,
+    kv_purge_namespace, kv_set, VALUE_COMPRESSED_MAGIC,
 };
 
 pub fn now() -> i64 {
@@ -32,14 +32,22 @@ pub fn config_get(conn: &Connection, section: &str, key: &str) -> Result<Option<
     let mut stmt = conn
         .prepare("SELECT value FROM config_entries WHERE section=?1 AND key=?2")
         .map_err(|e| format!("config_get prepare: {}", e))?;
-    match stmt.query_row(rusqlite::params![section, key], |row| row.get::<_, String>(0)) {
+    match stmt.query_row(rusqlite::params![section, key], |row| {
+        row.get::<_, String>(0)
+    }) {
         Ok(v) => Ok(Some(v)),
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
         Err(e) => Err(format!("config_get query: {}", e)),
     }
 }
 
-pub fn config_set(conn: &Connection, section: &str, key: &str, value: &str, is_secret: bool) -> Result<(), String> {
+pub fn config_set(
+    conn: &Connection,
+    section: &str,
+    key: &str,
+    value: &str,
+    is_secret: bool,
+) -> Result<(), String> {
     let ts = now();
     conn.execute(
         "INSERT INTO config_entries (section, key, value, is_secret, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)
@@ -60,7 +68,10 @@ pub fn config_delete(conn: &Connection, section: &str, key: &str) -> Result<bool
     Ok(rows > 0)
 }
 
-pub fn config_list_section(conn: &Connection, section: &str) -> Result<Vec<(String, String, bool)>, String> {
+pub fn config_list_section(
+    conn: &Connection,
+    section: &str,
+) -> Result<Vec<(String, String, bool)>, String> {
     let mut stmt = conn
         .prepare("SELECT key, value, is_secret FROM config_entries WHERE section=?1 ORDER BY key")
         .map_err(|e| format!("config_list_section prepare: {}", e))?;
@@ -116,7 +127,10 @@ fn load_master_key() -> [u8; 32] {
             let mut key = [0u8; 32];
             rand::rngs::OsRng.fill_bytes(&mut key);
             let hex_key = hex::encode(key);
-            warn!("[neotrix] NEOTRIX_VAULT_KEY not set. Generated ephemeral key: {}", hex_key);
+            warn!(
+                "[neotrix] NEOTRIX_VAULT_KEY not set. Generated ephemeral key: {}",
+                hex_key
+            );
             key
         }
     }
@@ -127,7 +141,10 @@ static CIPHER: LazyLock<Aes256Gcm> = LazyLock::new(|| {
     match Aes256Gcm::new_from_slice(&key) {
         Ok(c) => c,
         Err(e) => {
-            warn!("[neotrix] AES-256-GCM key init failed: {}. Using zero key (encryption will fail).", e);
+            warn!(
+                "[neotrix] AES-256-GCM key init failed: {}. Using zero key (encryption will fail).",
+                e
+            );
             // Zero key will still produce a valid cipher; encrypt/decrypt will return errors at call time
             Aes256Gcm::new_from_slice(&[0u8; 32]).unwrap_or_else(|_| {
                 error!("[neotrix] FATAL: cannot create AES-256-GCM cipher even with zero key");
@@ -247,15 +264,18 @@ pub fn session_log_get(
         )
         .map_err(|e| format!("session_log_get prepare: {}", e))?;
     let rows = stmt
-        .query_map(rusqlite::params![session_id, limit as i64, offset as i64], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, i64>(3)?.to_string(),
-                row.get::<_, Option<String>>(4)?,
-            ))
-        })
+        .query_map(
+            rusqlite::params![session_id, limit as i64, offset as i64],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?.to_string(),
+                    row.get::<_, Option<String>>(4)?,
+                ))
+            },
+        )
         .map_err(|e| format!("session_log_get query: {}", e))?;
     let mut results = Vec::new();
     for row in rows {
@@ -324,12 +344,17 @@ pub fn cookie_get(
         .prepare("SELECT value FROM cookies WHERE domain=?1 AND name=?2 AND path=?3")
         .map_err(|e| format!("cookie_get prepare: {}", e))?;
     let result = stmt
-        .query_row(rusqlite::params![domain, name, path], |row| row.get::<_, String>(0))
+        .query_row(rusqlite::params![domain, name, path], |row| {
+            row.get::<_, String>(0)
+        })
         .ok();
     Ok(result)
 }
 
-pub fn cookie_list_domain(conn: &Connection, domain: &str) -> Result<Vec<(String, String, String, bool, bool, Option<i64>)>, String> {
+pub fn cookie_list_domain(
+    conn: &Connection,
+    domain: &str,
+) -> Result<Vec<(String, String, String, bool, bool, Option<i64>)>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT name, value, path, secure, http_only, expiry
@@ -355,7 +380,12 @@ pub fn cookie_list_domain(conn: &Connection, domain: &str) -> Result<Vec<(String
     Ok(results)
 }
 
-pub fn cookie_delete(conn: &Connection, domain: &str, name: &str, path: &str) -> Result<bool, String> {
+pub fn cookie_delete(
+    conn: &Connection,
+    domain: &str,
+    name: &str,
+    path: &str,
+) -> Result<bool, String> {
     let rows = conn
         .execute(
             "DELETE FROM cookies WHERE domain=?1 AND name=?2 AND path=?3",
@@ -368,7 +398,10 @@ pub fn cookie_delete(conn: &Connection, domain: &str, name: &str, path: &str) ->
 pub fn cookie_purge_expired(conn: &Connection) -> Result<usize, String> {
     let now_ts = now();
     let rows = conn
-        .execute("DELETE FROM cookies WHERE expiry IS NOT NULL AND expiry < ?1", rusqlite::params![now_ts])
+        .execute(
+            "DELETE FROM cookies WHERE expiry IS NOT NULL AND expiry < ?1",
+            rusqlite::params![now_ts],
+        )
         .map_err(|e| format!("cookie_purge_expired: {}", e))?;
     Ok(rows)
 }
@@ -400,7 +433,10 @@ pub fn asset_store(
     Ok(id)
 }
 
-pub fn asset_load(conn: &Connection, id: &str) -> Result<Option<(Vec<u8>, String, String, Option<String>, i64, Option<String>)>, String> {
+pub fn asset_load(
+    conn: &Connection,
+    id: &str,
+) -> Result<Option<(Vec<u8>, String, String, Option<String>, i64, Option<String>)>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT data, namespace, name, mime_type, size, checksum FROM binary_assets WHERE id=?1",
@@ -424,7 +460,17 @@ pub fn asset_load(conn: &Connection, id: &str) -> Result<Option<(Vec<u8>, String
 pub fn asset_list(
     conn: &Connection,
     namespace: &str,
-) -> Result<Vec<(String, String, Option<String>, Option<String>, i64, Option<String>)>, String> {
+) -> Result<
+    Vec<(
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        i64,
+        Option<String>,
+    )>,
+    String,
+> {
     let mut stmt = conn
         .prepare(
             "SELECT id, name, mime_type, checksum, size, metadata
@@ -452,7 +498,10 @@ pub fn asset_list(
 
 pub fn asset_delete(conn: &Connection, id: &str) -> Result<bool, String> {
     let rows = conn
-        .execute("DELETE FROM binary_assets WHERE id=?1", rusqlite::params![id])
+        .execute(
+            "DELETE FROM binary_assets WHERE id=?1",
+            rusqlite::params![id],
+        )
         .map_err(|e| format!("asset_delete: {}", e))?;
     Ok(rows > 0)
 }
@@ -528,7 +577,6 @@ pub const DOMAIN_SKILL_MAPPING: &[(&str, &str, &str)] = &[
     ("gov/steward", "NT-GOVERNANCE", "Gov-衡"),
     ("mil/officer", "NT-SCOUT", "Search-觅"),
     ("ed/tutor", "NT-IO", "Edu-灯"),
-
     // ── Absorbed from 75+ GitHub/arXiv URLs (Phase 3 integration) ──
 
     // NT-ACT: Code agents, orchestration, penetration testing
@@ -541,9 +589,8 @@ pub const DOMAIN_SKILL_MAPPING: &[(&str, &str, &str)] = &[
     ("pentestcode", "NT-ACT", "Pen-Test"),
     ("unity-mcp", "NT-ACT", "Unity-行"),
     ("microsoft/rd-agent", "NT-ACT", "RD-行动"),
-
     // NT-MIND: SEAL pipeline, skill distillation, evolution
-    ("anthropics/claude-code", "NT-MIND", "Mind-匠"),  // duplicate key conflict resolved below
+    ("anthropics/claude-code", "NT-MIND", "Mind-匠"), // duplicate key conflict resolved below
     ("arxiv-org-abs-2608-27964", "NT-MIND", "SEAL-蒸馏"),
     ("arxiv-org-abs-2608-27991", "NT-MIND", "Self-修"),
     ("openai/codex-pr-27488", "NT-MIND", "Token-预算"),
@@ -554,7 +601,6 @@ pub const DOMAIN_SKILL_MAPPING: &[(&str, &str, &str)] = &[
     ("elijah222/rakazo", "NT-MIND", "沙-重"),
     ("karpathy/autoresearch", "NT-MIND", "研-自动"),
     ("ding-si-ai/auto-research", "NT-MIND", "研-演化"),
-
     // NT-IO: Interface, VTuber, MCP, web apps
     ("open-llm-vtuber", "NT-IO", "VTuber-驱"),
     ("justin-sky/ai-art-engine", "NT-IO", "Art-引擎"),
@@ -563,7 +609,6 @@ pub const DOMAIN_SKILL_MAPPING: &[(&str, &str, &str)] = &[
     ("superlinked/sie", "NT-IO", "Inference-服"),
     ("opopile-beichen-pi-desktop", "NT-IO", "Desktop-侧"),
     ("elementalsouls-claude-osint", "NT-IO", "OSINT-接"),
-
     // NT-META: Meta-cognition, governance, experience absorption
     ("lipku-live-talking", "NT-META", "Talk-吸"),
     ("addyosmani-agent-skills", "NT-META", "技-目录"),
@@ -582,7 +627,6 @@ pub const DOMAIN_SKILL_MAPPING: &[(&str, &str, &str)] = &[
     ("arxiv-org-abs-2608-18027", "NT-META", "核-相"),
     ("elementalsouls-claude-osint", "NT-META", "义-感"),
     ("vercel-com-blog", "NT-META", "页-说"),
-
     // NT-WORLD: Perception, crawling, content extraction
     ("lipku-live-talking", "NT-WORLD", "Talk-感"),
     (" dietrichgebert-ponytail", "NT-WORLD", "毛-提"),
@@ -602,26 +646,22 @@ pub const DOMAIN_SKILL_MAPPING: &[(&str, &str, &str)] = &[
     ("drona23-claude-token-efficient", "NT-WORLD", "效-率"),
     ("google-adk-python", "NT-WORLD", "代-理"),
     ("alibaba-zvec", "NT-WORLD", "向-量"),
-
     // NT-SHIELD: Security, OSINT, fingerprint management
     ("elementalsouls-claude-osint", "NT-SHIELD", "义-感"),
     ("elie222-rakazo", "NT-SHIELD", "沙-重"),
     ("Renset-macai", "NT-SHIELD", "mac-盾"),
     ("workweave/router", "NT-SHIELD", "路-由"),
-
     // NT-REPAIR: Self-healing, repair mechanisms
     ("dietrichgebert-ponytail", "NT-REPAIR", "毛-修"),
     ("arxiv-org-abs-2608-27991", "NT-REPAIR", "自-修"),
     ("elie222-rakazo", "NT-REPAIR", "沙-重"),
     ("Renset-macai", "NT-REPAIR", "mac-修"),
     ("max-sixty-worktrunk", "NT-REPAIR", "工-修"),
-
     // NT-GOVERNANCE: Policy, governance, role-based organization
     ("best-xiaohu-ai-xai-bot-guides", "NT-GOVERNANCE", "治-引"),
     ("mthli-xyz-git-knowledge-loop", "NT-GOVERNANCE", "循-约"),
     ("arxiv-org-abs-2608-30949", "NT-GOVERNANCE", "治-治"),
-]
-;
+];
 
 // domain_nt_<slug>: NT-SHIELD → domain_nt_shield
 pub fn domain_ns(nt_domain: &str) -> String {
@@ -649,7 +689,14 @@ pub fn unify_domain_mapping(conn: &Connection) -> Result<usize, String> {
     let mut written = 0usize;
     for ((nt_domain, star), sources) in &groups {
         let ns = domain_ns(nt_domain);
-        let value = format!("[{}]", sources.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(", "));
+        let value = format!(
+            "[{}]",
+            sources
+                .iter()
+                .map(|s| format!("\"{}\"", s))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
         kv_set(conn, &ns, star, &value)?;
         written += 1;
     }
@@ -661,7 +708,11 @@ pub fn domain_skills(conn: &Connection, nt_domain: &str) -> Result<Vec<(String, 
     kv_list(conn, &domain_ns(nt_domain))
 }
 
-pub fn skill_search(conn: &Connection, query: &str, limit: usize) -> Result<Vec<SkillRecord>, String> {
+pub fn skill_search(
+    conn: &Connection,
+    query: &str,
+    limit: usize,
+) -> Result<Vec<SkillRecord>, String> {
     let pattern = format!("%{}%", query);
     let mut stmt = conn
         .prepare(
@@ -712,7 +763,10 @@ pub fn skill_list_all(conn: &Connection, limit: usize) -> Result<Vec<SkillRecord
 
 pub fn skill_delete(conn: &Connection, name: &str) -> Result<bool, String> {
     let rows = conn
-        .execute("DELETE FROM skills_index WHERE name=?1", rusqlite::params![name])
+        .execute(
+            "DELETE FROM skills_index WHERE name=?1",
+            rusqlite::params![name],
+        )
         .map_err(|e| format!("skill_delete: {}", e))?;
     Ok(rows > 0)
 }
@@ -732,7 +786,9 @@ fn map_skill_row(row: &rusqlite::Row) -> rusqlite::Result<SkillRecord> {
     })
 }
 
-fn collect_skills(rows: impl Iterator<Item = Result<SkillRecord, rusqlite::Error>>) -> Result<Vec<SkillRecord>, String> {
+fn collect_skills(
+    rows: impl Iterator<Item = Result<SkillRecord, rusqlite::Error>>,
+) -> Result<Vec<SkillRecord>, String> {
     let mut results = Vec::new();
     for row in rows {
         results.push(row.map_err(|e| format!("skill row: {}", e))?);
@@ -869,7 +925,14 @@ pub fn migrate_from_files(conn: &Connection) -> MigrationReport {
     let journal_index_path = base.join("journal_index.db");
     if journal_index_path.exists() {
         report.total_files_migrated += 1;
-        if kv_set(conn, "journal_index", "path", &journal_index_path.to_string_lossy()).is_ok() {
+        if kv_set(
+            conn,
+            "journal_index",
+            "path",
+            &journal_index_path.to_string_lossy(),
+        )
+        .is_ok()
+        {
             report.kv_entries_created += 1;
         }
     }
@@ -878,7 +941,14 @@ pub fn migrate_from_files(conn: &Connection) -> MigrationReport {
     let exploration_path = base.join("exploration_sources.txt");
     if exploration_path.exists() {
         report.total_files_migrated += 1;
-        if kv_set(conn, "exploration", "sources_path", &exploration_path.to_string_lossy()).is_ok() {
+        if kv_set(
+            conn,
+            "exploration",
+            "sources_path",
+            &exploration_path.to_string_lossy(),
+        )
+        .is_ok()
+        {
             report.kv_entries_created += 1;
         }
     }
@@ -939,17 +1009,31 @@ pub fn migrate_from_files(conn: &Connection) -> MigrationReport {
 
     // ── 3. Env vars → config entries ──
     let neotrix_vars = [
-        "NEOTRIX_MODEL", "NEOTRIX_PROVIDER", "NEOTRIX_BASE_URL", "NEOTRIX_TIMEOUT",
-        "NEOTRIX_API_KEY", "NEOTRIX_EMBEDDING_API_KEY", "NEOTRIX_EMBEDDING_BASE_URL",
-        "NEOTRIX_EMBEDDING_MODEL", "NEOTRIX_EMBEDDING_DIMENSION", "NEOTRIX_SEARCH_API",
-        "NEOTRIX_ZEN_URL", "NEOTRIX_GATEWAY_ADDR", "NEOTRIX_PROXY_SUB_URL",
-        "NEOTRIX_SPLIT_ENABLE", "NEOTRIX_HEALTH_FILE", "NEOTRIX_HOME",
-        "NEOTRIX_API_TOKEN", "NEOTRIX_SENTRY_DSN",
+        "NEOTRIX_MODEL",
+        "NEOTRIX_PROVIDER",
+        "NEOTRIX_BASE_URL",
+        "NEOTRIX_TIMEOUT",
+        "NEOTRIX_API_KEY",
+        "NEOTRIX_EMBEDDING_API_KEY",
+        "NEOTRIX_EMBEDDING_BASE_URL",
+        "NEOTRIX_EMBEDDING_MODEL",
+        "NEOTRIX_EMBEDDING_DIMENSION",
+        "NEOTRIX_SEARCH_API",
+        "NEOTRIX_ZEN_URL",
+        "NEOTRIX_GATEWAY_ADDR",
+        "NEOTRIX_PROXY_SUB_URL",
+        "NEOTRIX_SPLIT_ENABLE",
+        "NEOTRIX_HEALTH_FILE",
+        "NEOTRIX_HOME",
+        "NEOTRIX_API_TOKEN",
+        "NEOTRIX_SENTRY_DSN",
     ];
     for var_name in &neotrix_vars {
         if let Ok(val) = std::env::var(var_name) {
             let section = "env";
-            let is_secret = var_name.contains("API_KEY") || var_name.contains("TOKEN") || var_name.contains("SENTRY");
+            let is_secret = var_name.contains("API_KEY")
+                || var_name.contains("TOKEN")
+                || var_name.contains("SENTRY");
             if config_set(conn, section, var_name, &val, is_secret).is_ok() {
                 report.config_entries_created += 1;
             }
@@ -963,11 +1047,16 @@ pub fn migrate_from_files(conn: &Connection) -> MigrationReport {
             report.total_files_migrated += 1;
             if let Some(obj) = data.as_object() {
                 for (k, v) in obj {
-                    let val_str = v.as_str().map(|s| s.to_string()).unwrap_or_else(|| v.to_string());
+                    let val_str = v
+                        .as_str()
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| v.to_string());
                     if secret_set(conn, k, &val_str).is_ok() {
                         report.secrets_migrated += 1;
                     } else {
-                        report.errors.push(("secrets.json".into(), format!("secret_set {} failed", k)));
+                        report
+                            .errors
+                            .push(("secrets.json".into(), format!("secret_set {} failed", k)));
                     }
                 }
             }
@@ -983,11 +1072,13 @@ pub fn migrate_from_files(conn: &Connection) -> MigrationReport {
                 if path.extension().map(|e| e == "md").unwrap_or(false) {
                     if let Some(content) = read_text_file(&path) {
                         report.total_files_migrated += 1;
-                        let session_id = path.file_stem()
+                        let session_id = path
+                            .file_stem()
                             .and_then(|s| s.to_str())
                             .unwrap_or("unknown")
                             .to_string();
-                        if session_log_append(conn, &session_id, &content, "markdown", None).is_ok() {
+                        if session_log_append(conn, &session_id, &content, "markdown", None).is_ok()
+                        {
                             report.session_logs_migrated += 1;
                         }
                     }
@@ -1004,11 +1095,20 @@ pub fn migrate_from_files(conn: &Connection) -> MigrationReport {
                 let path = entry.path();
                 if let Some(content) = read_text_file(&path) {
                     report.total_files_migrated += 1;
-                    let session_id = path.file_stem()
+                    let session_id = path
+                        .file_stem()
                         .and_then(|s| s.to_str())
                         .unwrap_or("unknown")
                         .to_string();
-                    if session_log_append(conn, &format!("session-log-{}", session_id), &content, "log", None).is_ok() {
+                    if session_log_append(
+                        conn,
+                        &format!("session-log-{}", session_id),
+                        &content,
+                        "log",
+                        None,
+                    )
+                    .is_ok()
+                    {
                         report.session_logs_migrated += 1;
                     }
                 }
@@ -1024,11 +1124,20 @@ pub fn migrate_from_files(conn: &Connection) -> MigrationReport {
                 let path = entry.path();
                 if let Some(content) = read_text_file(&path) {
                     report.total_files_migrated += 1;
-                    let session_id = path.file_stem()
+                    let session_id = path
+                        .file_stem()
                         .and_then(|s| s.to_str())
                         .unwrap_or("share")
                         .to_string();
-                    if session_log_append(conn, &format!("share-{}", session_id), &content, "json", None).is_ok() {
+                    if session_log_append(
+                        conn,
+                        &format!("share-{}", session_id),
+                        &content,
+                        "json",
+                        None,
+                    )
+                    .is_ok()
+                    {
                         report.session_logs_migrated += 1;
                     }
                 }
@@ -1047,17 +1156,24 @@ pub fn migrate_from_files(conn: &Connection) -> MigrationReport {
                         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&content) {
                             if let Some(obj) = data.as_object() {
                                 report.total_files_migrated += 1;
-                                let domain = path.file_stem()
+                                let domain = path
+                                    .file_stem()
                                     .and_then(|s| s.to_str())
                                     .unwrap_or("unknown");
                                 for (name, value) in obj {
                                     let val_str = if value.is_string() {
-                                        value.as_str().map(|s| s.to_string())
+                                        value
+                                            .as_str()
+                                            .map(|s| s.to_string())
                                             .unwrap_or_else(|| value.to_string())
                                     } else {
                                         value.to_string()
                                     };
-                                    if cookie_set(conn, domain, name, &val_str, "/", false, false, None).is_ok() {
+                                    if cookie_set(
+                                        conn, domain, name, &val_str, "/", false, false, None,
+                                    )
+                                    .is_ok()
+                                    {
                                         report.cookies_migrated += 1;
                                     }
                                 }
@@ -1098,7 +1214,8 @@ pub fn migrate_from_files(conn: &Connection) -> MigrationReport {
                     if skill_md.exists() {
                         if let Some(content) = read_text_file(&skill_md) {
                             report.total_files_migrated += 1;
-                            let name = path.file_name()
+                            let name = path
+                                .file_name()
                                 .and_then(|s| s.to_str())
                                 .unwrap_or("unknown")
                                 .to_string();
@@ -1142,7 +1259,11 @@ fn extract_description(content: &str) -> String {
     // Try to get first non-empty line that isn't YAML frontmatter
     for line in content.lines() {
         let line = line.trim();
-        if !line.is_empty() && !line.starts_with("---") && !line.starts_with('#') && !line.starts_with(':') {
+        if !line.is_empty()
+            && !line.starts_with("---")
+            && !line.starts_with('#')
+            && !line.starts_with(':')
+        {
             return line.to_string();
         }
     }
@@ -1160,7 +1281,13 @@ fn extract_tags_from_content(content: &str) -> Option<String> {
                     let tags = line.trim_start_matches("tags:").trim();
                     if tags.starts_with('[') && tags.ends_with(']') {
                         let inner = tags.trim_start_matches('[').trim_end_matches(']');
-                        return Some(inner.split(',').map(|t| t.trim().trim_matches('"').trim_matches('\'')).collect::<Vec<_>>().join(","));
+                        return Some(
+                            inner
+                                .split(',')
+                                .map(|t| t.trim().trim_matches('"').trim_matches('\''))
+                                .collect::<Vec<_>>()
+                                .join(","),
+                        );
                     }
                     return Some(tags.to_string());
                 }
@@ -1176,8 +1303,14 @@ fn extract_tags_from_content(content: &str) -> Option<String> {
 /// Get total size stats for the unified store
 pub fn store_stats(conn: &Connection) -> Result<HashMap<String, usize>, String> {
     let tables = [
-        "kv_store", "config_entries", "secrets", "session_logs",
-        "cookies", "binary_assets", "skills_index", "rkyv_blobs",
+        "kv_store",
+        "config_entries",
+        "secrets",
+        "session_logs",
+        "cookies",
+        "binary_assets",
+        "skills_index",
+        "rkyv_blobs",
     ];
     let mut stats = HashMap::new();
     for table in &tables {
@@ -1241,7 +1374,10 @@ mod tests {
     fn test_kv_store_roundtrip() {
         let conn = test_conn();
         kv_set(&conn, "test", "key1", "value1").unwrap();
-        assert_eq!(kv_get(&conn, "test", "key1").unwrap(), Some("value1".into()));
+        assert_eq!(
+            kv_get(&conn, "test", "key1").unwrap(),
+            Some("value1".into())
+        );
     }
 
     #[test]
@@ -1285,7 +1421,10 @@ mod tests {
     fn test_config_roundtrip() {
         let conn = test_conn();
         config_set(&conn, "llm", "model", "claude-4", false).unwrap();
-        assert_eq!(config_get(&conn, "llm", "model").unwrap(), Some("claude-4".into()));
+        assert_eq!(
+            config_get(&conn, "llm", "model").unwrap(),
+            Some("claude-4".into())
+        );
     }
 
     #[test]
@@ -1338,8 +1477,21 @@ mod tests {
     #[test]
     fn test_cookie_roundtrip() {
         let conn = test_conn();
-        cookie_set(&conn, "example.com", "session", "abc123", "/", true, true, None).unwrap();
-        assert_eq!(cookie_get(&conn, "example.com", "session", "/").unwrap(), Some("abc123".into()));
+        cookie_set(
+            &conn,
+            "example.com",
+            "session",
+            "abc123",
+            "/",
+            true,
+            true,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            cookie_get(&conn, "example.com", "session", "/").unwrap(),
+            Some("abc123".into())
+        );
     }
 
     #[test]
@@ -1362,8 +1514,28 @@ mod tests {
     #[test]
     fn test_cookie_purge_expired() {
         let conn = test_conn();
-        cookie_set(&conn, "ex.com", "valid", "ok", "/", false, false, Some(now() + 86400)).unwrap();
-        cookie_set(&conn, "ex.com", "expired", "old", "/", false, false, Some(now() - 86400)).unwrap();
+        cookie_set(
+            &conn,
+            "ex.com",
+            "valid",
+            "ok",
+            "/",
+            false,
+            false,
+            Some(now() + 86400),
+        )
+        .unwrap();
+        cookie_set(
+            &conn,
+            "ex.com",
+            "expired",
+            "old",
+            "/",
+            false,
+            false,
+            Some(now() - 86400),
+        )
+        .unwrap();
         let purged = cookie_purge_expired(&conn).unwrap();
         assert_eq!(purged, 1);
     }
@@ -1431,7 +1603,11 @@ mod tests {
         let again = unify_domain_mapping(&conn).unwrap();
         assert_eq!(again, 12);
         assert_eq!(domain_skills(&conn, "NT-SHIELD").unwrap().len(), 1);
-        assert_eq!(domain_skills(&conn, "NT-MEMORY").unwrap().len(), 2, "Exp-藏 + Nexus-梭");
+        assert_eq!(
+            domain_skills(&conn, "NT-MEMORY").unwrap().len(),
+            2,
+            "Exp-藏 + Nexus-梭"
+        );
 
         // namespace 命名契约: domain_nt_<slug>
         assert_eq!(domain_ns("NT-SHIELD"), "domain_nt_shield");
@@ -1476,13 +1652,20 @@ mod tests {
     #[test]
     fn test_skill_upsert_dedup_same_hash_skips() {
         let conn = test_conn();
-        assert!(skill_upsert(&conn, "dedup-skill", &dedup_record("h1")).unwrap(), "首次插入应写入");
+        assert!(
+            skill_upsert(&conn, "dedup-skill", &dedup_record("h1")).unwrap(),
+            "首次插入应写入"
+        );
         assert!(
             !skill_upsert(&conn, "dedup-skill", &dedup_record("h1")).unwrap(),
             "内容 hash 未变化时应去重跳过 (避免每命令全量写)"
         );
         let rows: i64 = conn
-            .query_row("SELECT COUNT(*) FROM skills_index WHERE name='dedup-skill'", [], |r| r.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM skills_index WHERE name='dedup-skill'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(rows, 1, "去重不得产生重复行");
         let recs = skill_list_all(&conn, 10).unwrap();
@@ -1592,9 +1775,18 @@ mod tests {
     #[test]
     fn test_mime_for_extension() {
         assert_eq!(mime_for_extension(Some("png")), Some("image/png".into()));
-        assert_eq!(mime_for_extension(Some("json")), Some("application/json".into()));
-        assert_eq!(mime_for_extension(Some("unknown_ext")), Some("application/octet-stream".into()));
-        assert_eq!(mime_for_extension(None), Some("application/octet-stream".into()));
+        assert_eq!(
+            mime_for_extension(Some("json")),
+            Some("application/json".into())
+        );
+        assert_eq!(
+            mime_for_extension(Some("unknown_ext")),
+            Some("application/octet-stream".into())
+        );
+        assert_eq!(
+            mime_for_extension(None),
+            Some("application/octet-stream".into())
+        );
     }
 
     #[test]

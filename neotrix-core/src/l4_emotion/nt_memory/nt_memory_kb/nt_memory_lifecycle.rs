@@ -87,7 +87,10 @@ impl MemoryLifecycle {
         now: i64,
     ) -> bool {
         // 1. ForgettingCurve: time-based retention
-        if self.forgetting_curve.should_forget(last_access, access_count, now) {
+        if self
+            .forgetting_curve
+            .should_forget(last_access, access_count, now)
+        {
             return false;
         }
 

@@ -42,11 +42,17 @@ fn api_get(url: &str) -> Result<serde_json::Value, String> {
     } else {
         req
     };
-    let resp = super::nt_http::run_blocking(|| req.send()).map_err(|e| format!("HTTP error: {}", e))?;
+    let resp =
+        super::nt_http::run_blocking(|| req.send()).map_err(|e| format!("HTTP error: {}", e))?;
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().unwrap_or_default();
-        return Err(format!("GitHub API {}: {} ({})", status, url, body.chars().take(200).collect::<String>()));
+        return Err(format!(
+            "GitHub API {}: {} ({})",
+            status,
+            url,
+            body.chars().take(200).collect::<String>()
+        ));
     }
     resp.json().map_err(|e| format!("JSON error: {}", e))
 }
@@ -83,7 +89,8 @@ pub fn run_github_topics_discovery(
         Some("Auto-discovered GitHub topics and top repositories"),
         Some("https://github.com/topics"),
         Some("github.com"),
-    ).map_err(|e| format!("DB: {}", e))?;
+    )
+    .map_err(|e| format!("DB: {}", e))?;
 
     // Phase 1: Discover topics from popular repos (定向模式跳过 — 直接使用 target_topics)
     let mut topic_set: HashSet<String> = known_topics.clone();
@@ -98,7 +105,9 @@ pub fn run_github_topics_discovery(
         stats.api_calls += 1;
 
         let data = api_get(&url)?;
-        let items = data["items"].as_array().ok_or_else(|| "Missing items".to_string())?;
+        let items = data["items"]
+            .as_array()
+            .ok_or_else(|| "Missing items".to_string())?;
 
         for item in items {
             if let Some(topics) = item["topics"].as_array() {
@@ -110,9 +119,7 @@ pub fn run_github_topics_discovery(
             }
         }
 
-        discovered_topics = topic_set.difference(&known_topics)
-            .cloned()
-            .collect();
+        discovered_topics = topic_set.difference(&known_topics).cloned().collect();
         total_new_topics = discovered_topics.len();
 
         // Register discovered topics as Concept nodes
@@ -124,7 +131,8 @@ pub fn run_github_topics_discovery(
                 Some(&format!("GitHub topic: {}", topic)),
                 None,
                 Some("github.com/topic"),
-            ).ok();
+            )
+            .ok();
             if let Some(tid) = tid {
                 let _ = store::upsert_edge(
                     conn,
@@ -148,7 +156,8 @@ pub fn run_github_topics_discovery(
                 Some(&format!("GitHub topic: {}", t)),
                 None,
                 Some("github.com/topic"),
-            ).ok();
+            )
+            .ok();
             if let Some(tid) = tid {
                 let _ = store::upsert_edge(
                     conn,
@@ -224,13 +233,21 @@ pub fn run_github_topics_discovery(
 
 /// 从 GitHub search API 结果 item 直接落库 (零额外 API 调用)。
 /// 复用 ingest_from_github 的落库结构: Repository 节点 + Owner 组织 + Topic 概念边。
-fn ingest_repo_from_search_item(conn: &Connection, item: &serde_json::Value) -> Result<usize, String> {
+fn ingest_repo_from_search_item(
+    conn: &Connection,
+    item: &serde_json::Value,
+) -> Result<usize, String> {
     let default_title = "unknown/unknown".to_string();
     let title = item["full_name"].as_str().unwrap_or(&default_title);
     let description = item["description"].as_str().unwrap_or("");
     let repo_url = item["html_url"].as_str().unwrap_or("");
-    let topics: Vec<String> = item["topics"].as_array()
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+    let topics: Vec<String> = item["topics"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
         .unwrap_or_default();
 
     let node_id = store::insert_or_get_node(
@@ -291,9 +308,9 @@ fn ingest_repo_from_search_item(conn: &Connection, item: &serde_json::Value) -> 
 }
 
 fn load_known_topics(conn: &Connection) -> HashSet<String> {
-    let mut stmt = match conn.prepare(
-        "SELECT title FROM nodes WHERE node_type='concept' AND domain='github.com/topic'"
-    ) {
+    let mut stmt = match conn
+        .prepare("SELECT title FROM nodes WHERE node_type='concept' AND domain='github.com/topic'")
+    {
         Ok(s) => s,
         Err(_) => return HashSet::new(),
     };
@@ -305,9 +322,9 @@ fn load_known_topics(conn: &Connection) -> HashSet<String> {
 }
 
 fn load_known_repos(conn: &Connection) -> HashSet<String> {
-    let mut stmt = match conn.prepare(
-        "SELECT url FROM nodes WHERE node_type='repository' AND url IS NOT NULL"
-    ) {
+    let mut stmt = match conn
+        .prepare("SELECT url FROM nodes WHERE node_type='repository' AND url IS NOT NULL")
+    {
         Ok(s) => s,
         Err(_) => return HashSet::new(),
     };
@@ -379,7 +396,15 @@ mod tests {
     #[test]
     fn test_known_topic_tracking() {
         let conn = test_conn();
-        let topic_id = store::insert_or_get_node(&conn, "rust", NodeType::Concept, None, None, Some("github.com/topic")).unwrap();
+        let topic_id = store::insert_or_get_node(
+            &conn,
+            "rust",
+            NodeType::Concept,
+            None,
+            None,
+            Some("github.com/topic"),
+        )
+        .unwrap();
         assert!(!topic_id.is_empty());
         let topics = load_known_topics(&conn);
         assert!(topics.contains("rust"));
@@ -400,7 +425,8 @@ mod tests {
             None,
             Some("https://github.com/topics"),
             Some("github.com"),
-        ).unwrap();
+        )
+        .unwrap();
         for t in &cfg.target_topics {
             let tid = store::insert_or_get_node(
                 &conn,
@@ -409,8 +435,16 @@ mod tests {
                 None,
                 None,
                 Some("github.com/topic"),
-            ).unwrap();
-            let _ = store::upsert_edge(&conn, &tid, &topic_node_id, RelationType::InstanceOf, 0.8, None);
+            )
+            .unwrap();
+            let _ = store::upsert_edge(
+                &conn,
+                &tid,
+                &topic_node_id,
+                RelationType::InstanceOf,
+                0.8,
+                None,
+            );
         }
         let topics = load_known_topics(&conn);
         assert!(topics.contains("llm"));

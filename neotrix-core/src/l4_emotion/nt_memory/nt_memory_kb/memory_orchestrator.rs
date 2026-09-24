@@ -3,9 +3,9 @@
 //! 三级记忆压缩: raw records → compressed trajectories → reusable episodic abstractions
 //! 减少 60-80% token 开销，同时保留决策关键证据。
 
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::{SystemTime, UNIX_EPOCH};
-use serde::{Serialize, Deserialize};
 
 /// 原始记录 — 完整保真度
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,15 +78,23 @@ impl ElasticMemoryOrchestrator {
         }
 
         // 按重要性排序，保留高重要性的
-        to_compress.sort_by(|a, b| b.importance.partial_cmp(&a.importance).unwrap_or(std::cmp::Ordering::Equal));
+        to_compress.sort_by(|a, b| {
+            b.importance
+                .partial_cmp(&a.importance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         let keep_count = to_compress.len() / 3; // 保留 1/3
-        let key_evidence: Vec<String> = to_compress.iter()
+        let key_evidence: Vec<String> = to_compress
+            .iter()
             .take(keep_count)
             .map(|r| r.content.clone())
             .collect();
 
-        let summary = format!("Compressed {} records, kept {} key evidence",
-            to_compress.len(), key_evidence.len());
+        let summary = format!(
+            "Compressed {} records, kept {} key evidence",
+            to_compress.len(),
+            key_evidence.len()
+        );
 
         let trajectory = CompressedTrajectory {
             id: format!("traj_{}", self.compressed_buffer.len()),
@@ -105,9 +113,15 @@ impl ElasticMemoryOrchestrator {
     /// 提取情景抽象 — 识别可复用模式
     pub fn extract_abstraction(&mut self, pattern: String, domain: String) {
         // 检查是否已有相似模式
-        if let Some(existing) = self.episodic_store.iter_mut().find(|e| e.domain == domain && similar(&e.pattern, &pattern)) {
+        if let Some(existing) = self
+            .episodic_store
+            .iter_mut()
+            .find(|e| e.domain == domain && similar(&e.pattern, &pattern))
+        {
             existing.reuse_count += 1;
-            existing.success_rate = (existing.success_rate * (existing.reuse_count - 1) as f64 + 1.0) / existing.reuse_count as f64;
+            existing.success_rate = (existing.success_rate * (existing.reuse_count - 1) as f64
+                + 1.0)
+                / existing.reuse_count as f64;
         } else {
             self.episodic_store.push(EpisodicAbstraction {
                 id: format!("epi_{}", self.episodic_store.len()),
@@ -123,8 +137,16 @@ impl ElasticMemoryOrchestrator {
     pub fn get_context(&self) -> MemoryContext {
         MemoryContext {
             recent_raw: self.raw_buffer.iter().rev().take(5).cloned().collect(),
-            recent_compressed: self.compressed_buffer.iter().rev().take(3).cloned().collect(),
-            relevant_abstractions: self.episodic_store.iter()
+            recent_compressed: self
+                .compressed_buffer
+                .iter()
+                .rev()
+                .take(3)
+                .cloned()
+                .collect(),
+            relevant_abstractions: self
+                .episodic_store
+                .iter()
                 .filter(|e| e.reuse_count > 1)
                 .take(5)
                 .cloned()
@@ -138,7 +160,9 @@ impl ElasticMemoryOrchestrator {
             raw_count: self.raw_buffer.len(),
             compressed_count: self.compressed_buffer.len(),
             abstraction_count: self.episodic_store.len(),
-            total_token_savings: self.compressed_buffer.iter()
+            total_token_savings: self
+                .compressed_buffer
+                .iter()
                 .map(|c| (1.0 - c.compression_ratio) * c.key_evidence.len() as f64 * 100.0)
                 .sum(),
         }
@@ -163,7 +187,10 @@ pub struct OrchestratorStats {
 }
 
 fn now() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs()
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 fn similar(a: &str, b: &str) -> bool {

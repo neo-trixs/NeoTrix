@@ -139,7 +139,11 @@ impl MemoryPalace {
             }
         }
 
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.into_iter().take(limit).collect()
     }
 
@@ -239,9 +243,9 @@ fn extract_keywords(key: &str, value: &str, associations: &[String]) -> Vec<Stri
 
 /// Common stopwords to filter out
 const STOPWORDS: &[&str] = &[
-    "the", "is", "at", "of", "on", "in", "to", "for", "a", "an", "and", "or", "but",
-    "with", "by", "from", "as", "this", "that", "it", "be", "are", "was", "were",
-    "的", "了", "在", "是", "和", "与", "或", "但", "对", "从", "到", "为",
+    "the", "is", "at", "of", "on", "in", "to", "for", "a", "an", "and", "or", "but", "with", "by",
+    "from", "as", "this", "that", "it", "be", "are", "was", "were", "的", "了", "在", "是", "和",
+    "与", "或", "但", "对", "从", "到", "为",
 ];
 
 // ─── Tests ──────────────────────────────────────────────────────────────────

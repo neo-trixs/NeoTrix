@@ -97,7 +97,13 @@ impl SkillCostLedger {
         }
         let mut out = String::from("技能成本 (渐进披露, 薄入口):\n");
         for (skill, tokens, calls) in self.top_cost(10) {
-            out.push_str(&format!("- {}: {} tokens / {} calls (avg {:.0})\n", skill, tokens, calls, tokens as f64 / calls.max(1) as f64));
+            out.push_str(&format!(
+                "- {}: {} tokens / {} calls (avg {:.0})\n",
+                skill,
+                tokens,
+                calls,
+                tokens as f64 / calls.max(1) as f64
+            ));
         }
         out
     }
@@ -117,7 +123,11 @@ mod tests {
     #[test]
     fn record_tracks_total_and_calls() {
         let mut ledger = SkillCostLedger::new(1000);
-        ledger.record("rev-officer", "loads a moderately long body of text here", true);
+        ledger.record(
+            "rev-officer",
+            "loads a moderately long body of text here",
+            true,
+        );
         ledger.record("rev-officer", "second", true);
         assert_eq!(ledger.call_count("rev-officer"), 2);
         assert!(ledger.total("rev-officer") > 0);
@@ -138,7 +148,10 @@ mod tests {
     fn thin_entry_suggested_after_threshold() {
         let mut ledger = SkillCostLedger::new(10);
         ledger.record("heavy", &"x".repeat(100), true);
-        assert!(ledger.should_use_thin_entry("heavy"), "exceeded threshold → thin entry");
+        assert!(
+            ledger.should_use_thin_entry("heavy"),
+            "exceeded threshold → thin entry"
+        );
         let brief = ledger.thin_brief();
         assert!(brief.contains("heavy"));
     }

@@ -149,8 +149,13 @@ fn classify_block_lines(joined: &str) -> BlockKind {
     let first = joined.lines().next().unwrap_or("").trim();
     if first.starts_with('#') {
         BlockKind::Heading
-    } else if first.starts_with('-') || first.starts_with('*')
-        || first.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false)
+    } else if first.starts_with('-')
+        || first.starts_with('*')
+        || first
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_digit())
+            .unwrap_or(false)
     {
         BlockKind::List
     } else {

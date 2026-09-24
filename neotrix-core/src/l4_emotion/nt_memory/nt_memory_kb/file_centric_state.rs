@@ -4,9 +4,9 @@
 //! 任务获取专用工作空间目录，每步从工作空间快照+固定窗口重建上下文。
 //! O(1) 上下文大小，与任务持续时间无关。
 
-use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
+use std::path::PathBuf;
 
 /// 工作空间状态快照 — 固定大小，用于每步上下文重建
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,7 +65,9 @@ impl FileCentricState {
             snapshot.recent_actions.push(action);
             let len = snapshot.recent_actions.len();
             if len > self.action_buffer_size {
-                snapshot.recent_actions.drain(0..len - self.action_buffer_size);
+                snapshot
+                    .recent_actions
+                    .drain(0..len - self.action_buffer_size);
             }
         }
     }
@@ -105,7 +107,10 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn now() -> u64 {
-        SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
     }
 
     #[test]
@@ -113,7 +118,7 @@ mod tests {
         let tmp = std::env::temp_dir().join("nt_file_centric_test");
         let _ = std::fs::remove_dir_all(&tmp);
         std::fs::create_dir_all(&tmp).unwrap();
-        
+
         let mut state = FileCentricState::new(tmp.clone());
         let snapshot = FileTaskSnapshot {
             task_id: "test_task".to_string(),
@@ -125,18 +130,18 @@ mod tests {
             timestamp: now(),
         };
         state.update_snapshot(snapshot);
-        
+
         // Context reconstruction is O(1)
         let ctx = state.reconstruct_context("test_task");
         assert!(ctx.is_some());
         assert_eq!(ctx.unwrap().task_id, "test_task");
-        
+
         // Persist and restore
         state.persist("test_task").unwrap();
         let mut state2 = FileCentricState::new(tmp.clone());
         state2.restore("test_task").unwrap();
         assert!(state2.reconstruct_context("test_task").is_some());
-        
+
         let _ = std::fs::remove_dir_all(&tmp);
     }
 
@@ -145,7 +150,7 @@ mod tests {
         let tmp = std::env::temp_dir().join("nt_action_buffer_test");
         let _ = std::fs::remove_dir_all(&tmp);
         std::fs::create_dir_all(&tmp).unwrap();
-        
+
         let mut state = FileCentricState::new(tmp.clone());
         state.update_snapshot(FileTaskSnapshot {
             task_id: "t".to_string(),
@@ -156,21 +161,24 @@ mod tests {
             recent_actions: vec![],
             timestamp: now(),
         });
-        
+
         // Add 15 actions, buffer should keep only 10
         for i in 0..15 {
-            state.add_action("t", ActionRecord {
-                action_type: "test".to_string(),
-                input: format!("in_{}", i),
-                output: format!("out_{}", i),
-                success: true,
-                timestamp: now(),
-            });
+            state.add_action(
+                "t",
+                ActionRecord {
+                    action_type: "test".to_string(),
+                    input: format!("in_{}", i),
+                    output: format!("out_{}", i),
+                    success: true,
+                    timestamp: now(),
+                },
+            );
         }
-        
+
         let ctx = state.reconstruct_context("t").unwrap();
         assert!(ctx.recent_actions.len() <= 10);
-        
+
         let _ = std::fs::remove_dir_all(&tmp);
     }
 }

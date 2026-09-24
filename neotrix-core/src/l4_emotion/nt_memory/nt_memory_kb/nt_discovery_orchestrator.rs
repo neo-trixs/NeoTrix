@@ -60,7 +60,10 @@ impl DiscoveryCycleReport {
         let mut parts = vec![format!("Discovery Cycle {}:", id_short)];
 
         if let Some(ref g) = self.github {
-            parts.push(format!("  GitHub: {} topics, {} repos ingested ({} skipped)", g.topics_found, g.repos_ingested, g.repos_skipped_existing));
+            parts.push(format!(
+                "  GitHub: {} topics, {} repos ingested ({} skipped)",
+                g.topics_found, g.repos_ingested, g.repos_skipped_existing
+            ));
         }
         if let Some(ref o) = self.openlibrary {
             parts.push(format!("  OpenLibrary: {} ingested", o.resources_ingested));
@@ -72,16 +75,28 @@ impl DiscoveryCycleReport {
             parts.push(format!("  Wikipedia: {} ingested", w.resources_ingested));
         }
         if let Some(ref a) = self.annas_archive {
-            parts.push(format!("  Anna's Archive: {} ingested", a.resources_ingested));
+            parts.push(format!(
+                "  Anna's Archive: {} ingested",
+                a.resources_ingested
+            ));
         }
 
-        parts.push(format!("  Total ingested: {}, errors: {}", self.total_resources_ingested, self.total_errors));
+        parts.push(format!(
+            "  Total ingested: {}, errors: {}",
+            self.total_resources_ingested, self.total_errors
+        ));
         parts.join("\n")
     }
 }
 
 /// Record a source's run status in discovery_sources table
-fn record_source_run(conn: &Connection, source_name: &str, total_items: usize, status: &str, error: Option<&str>) {
+fn record_source_run(
+    conn: &Connection,
+    source_name: &str,
+    total_items: usize,
+    status: &str,
+    error: Option<&str>,
+) {
     let now_ts = now();
     let _ = conn.execute(
         "INSERT INTO discovery_sources (source_name, last_run_at, total_items, status, error_message)
@@ -120,8 +135,22 @@ pub fn run_discovery_cycle(
                 for e in &stats.errors {
                     report.errors.push(e.clone());
                 }
-                let err_msg = if stats.errors.is_empty() { None } else { Some("See cycle errors") };
-                record_source_run(conn, "github_topics", stats.repos_ingested, if stats.errors.is_empty() { "completed" } else { "completed_with_errors" }, err_msg);
+                let err_msg = if stats.errors.is_empty() {
+                    None
+                } else {
+                    Some("See cycle errors")
+                };
+                record_source_run(
+                    conn,
+                    "github_topics",
+                    stats.repos_ingested,
+                    if stats.errors.is_empty() {
+                        "completed"
+                    } else {
+                        "completed_with_errors"
+                    },
+                    err_msg,
+                );
                 report.github = Some(stats);
             }
             Err(e) => {
@@ -136,7 +165,8 @@ pub fn run_discovery_cycle(
     if config.run_openlibrary {
         let mut combined = ExternalDiscoveryStats::default();
         for query in &config.openlibrary_queries {
-            match nt_discovery_sources::discover_books(conn, query, config.max_resources_per_source) {
+            match nt_discovery_sources::discover_books(conn, query, config.max_resources_per_source)
+            {
                 Ok(stats) => {
                     combined.resources_ingested += stats.resources_ingested;
                     combined.resources_found += stats.resources_found;
@@ -152,8 +182,22 @@ pub fn run_discovery_cycle(
         }
         total_ingested += combined.resources_ingested;
         total_errors += combined.errors.len();
-        let err_msg = if combined.errors.is_empty() { None } else { Some("See cycle errors") };
-        record_source_run(conn, "openlibrary", combined.resources_ingested, if combined.errors.is_empty() { "completed" } else { "completed_with_errors" }, err_msg);
+        let err_msg = if combined.errors.is_empty() {
+            None
+        } else {
+            Some("See cycle errors")
+        };
+        record_source_run(
+            conn,
+            "openlibrary",
+            combined.resources_ingested,
+            if combined.errors.is_empty() {
+                "completed"
+            } else {
+                "completed_with_errors"
+            },
+            err_msg,
+        );
         report.openlibrary = Some(combined);
     }
 
@@ -161,7 +205,11 @@ pub fn run_discovery_cycle(
     if config.run_arxiv {
         let mut combined = ExternalDiscoveryStats::default();
         for query in &config.arxiv_queries {
-            match nt_discovery_sources::discover_arxiv_papers(conn, query, config.max_resources_per_source) {
+            match nt_discovery_sources::discover_arxiv_papers(
+                conn,
+                query,
+                config.max_resources_per_source,
+            ) {
                 Ok(stats) => {
                     combined.resources_ingested += stats.resources_ingested;
                     combined.resources_found += stats.resources_found;
@@ -177,8 +225,22 @@ pub fn run_discovery_cycle(
         }
         total_ingested += combined.resources_ingested;
         total_errors += combined.errors.len();
-        let err_msg = if combined.errors.is_empty() { None } else { Some("See cycle errors") };
-        record_source_run(conn, "arxiv", combined.resources_ingested, if combined.errors.is_empty() { "completed" } else { "completed_with_errors" }, err_msg);
+        let err_msg = if combined.errors.is_empty() {
+            None
+        } else {
+            Some("See cycle errors")
+        };
+        record_source_run(
+            conn,
+            "arxiv",
+            combined.resources_ingested,
+            if combined.errors.is_empty() {
+                "completed"
+            } else {
+                "completed_with_errors"
+            },
+            err_msg,
+        );
         report.arxiv = Some(combined);
     }
 
@@ -202,8 +264,22 @@ pub fn run_discovery_cycle(
         }
         total_ingested += combined.resources_ingested;
         total_errors += combined.errors.len();
-        let err_msg = if combined.errors.is_empty() { None } else { Some("See cycle errors") };
-        record_source_run(conn, "wikipedia", combined.resources_ingested, if combined.errors.is_empty() { "completed" } else { "completed_with_errors" }, err_msg);
+        let err_msg = if combined.errors.is_empty() {
+            None
+        } else {
+            Some("See cycle errors")
+        };
+        record_source_run(
+            conn,
+            "wikipedia",
+            combined.resources_ingested,
+            if combined.errors.is_empty() {
+                "completed"
+            } else {
+                "completed_with_errors"
+            },
+            err_msg,
+        );
         report.wikipedia = Some(combined);
     }
 
@@ -211,7 +287,11 @@ pub fn run_discovery_cycle(
     if config.run_annas_archive {
         let mut combined = ExternalDiscoveryStats::default();
         for query in &config.annas_archive_queries {
-            match nt_discovery_sources::discover_annas_archive(conn, query, config.max_resources_per_source) {
+            match nt_discovery_sources::discover_annas_archive(
+                conn,
+                query,
+                config.max_resources_per_source,
+            ) {
                 Ok(stats) => {
                     combined.resources_ingested += stats.resources_ingested;
                     combined.resources_found += stats.resources_found;
@@ -227,8 +307,22 @@ pub fn run_discovery_cycle(
         }
         total_ingested += combined.resources_ingested;
         total_errors += combined.errors.len();
-        let err_msg = if combined.errors.is_empty() { None } else { Some("See cycle errors") };
-        record_source_run(conn, "annas_archive", combined.resources_ingested, if combined.errors.is_empty() { "completed" } else { "completed_with_errors" }, err_msg);
+        let err_msg = if combined.errors.is_empty() {
+            None
+        } else {
+            Some("See cycle errors")
+        };
+        record_source_run(
+            conn,
+            "annas_archive",
+            combined.resources_ingested,
+            if combined.errors.is_empty() {
+                "completed"
+            } else {
+                "completed_with_errors"
+            },
+            err_msg,
+        );
         report.annas_archive = Some(combined);
     }
 
@@ -238,7 +332,11 @@ pub fn run_discovery_cycle(
 
     // Log to ingest_log
     let log_id = Uuid::new_v4().to_string();
-    let status = if total_errors == 0 { "completed" } else { "completed_with_errors" };
+    let status = if total_errors == 0 {
+        "completed"
+    } else {
+        "completed_with_errors"
+    };
     let _ = conn.execute(
         "INSERT INTO ingest_log (id, source_type, source_url, status, items_count, started_at, completed_at, error)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -299,7 +397,9 @@ mod tests {
         // Regression: &self.cycle_id[..8] panicked on an empty/short
         // cycle_id (e.g. DiscoveryCycleReport::default()). chars().take(8)
         // is safe for any length.
-        let report = DiscoveryCycleReport { ..Default::default() };
+        let report = DiscoveryCycleReport {
+            ..Default::default()
+        };
         let summary = report.summary();
         assert!(summary.contains("Discovery Cycle"));
     }

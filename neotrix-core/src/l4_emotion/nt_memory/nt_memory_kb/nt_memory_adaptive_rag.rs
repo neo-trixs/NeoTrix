@@ -90,9 +90,9 @@ impl AdaptiveRetrieval {
     pub fn new(config: AdaptiveRagConfig) -> Self {
         Self {
             config,
-            complexity_cache: RwLock::new(
-                lru::LruCache::new(std::num::NonZeroUsize::new(200).expect("non-zero cache capacity")),
-            ),
+            complexity_cache: RwLock::new(lru::LruCache::new(
+                std::num::NonZeroUsize::new(200).expect("non-zero cache capacity"),
+            )),
         }
     }
 
@@ -131,11 +131,14 @@ impl AdaptiveRetrieval {
 
         let entity_count = self.count_entities(query);
         let has_comparison = [" vs ", " versus ", " compare ", " difference "]
-            .iter().any(|w| q.contains(w) || q.starts_with(w.trim()));
+            .iter()
+            .any(|w| q.contains(w) || q.starts_with(w.trim()));
         let has_analysis = [" why ", " how does ", " what causes ", " explain "]
-            .iter().any(|w| q.contains(w));
+            .iter()
+            .any(|w| q.contains(w));
         let has_multi_hop = [" and ", " then ", " subsequently ", " after that "]
-            .iter().any(|w| q.contains(w));
+            .iter()
+            .any(|w| q.contains(w));
 
         match (entity_count, has_comparison, has_analysis, has_multi_hop) {
             (e, _, _, _) if e >= 4 => QueryComplexity::Hard,
@@ -151,11 +154,11 @@ impl AdaptiveRetrieval {
 
     /// Naïve entity counter: count capitalized words (含短字母数字混合词如 E8/GPT-4)
     fn count_entities(&self, query: &str) -> usize {
-        query.split_whitespace()
+        query
+            .split_whitespace()
             .filter(|w| {
                 w.starts_with(|c: char| c.is_uppercase())
-                    && !["The", "This", "That", "What", "Why", "How", "When", "Where"]
-                        .contains(w)
+                    && !["The", "This", "That", "What", "Why", "How", "When", "Where"].contains(w)
                     && (w.len() > 2 || w.chars().any(|c| c.is_ascii_digit()))
             })
             .count()
@@ -163,11 +166,7 @@ impl AdaptiveRetrieval {
 
     /// CRAG-style retrieval evaluator.
     /// Grades each retrieved document for relevance to the query.
-    pub fn grade_documents(
-        &self,
-        query: &str,
-        results: &[SearchResult],
-    ) -> Vec<GradedDocument> {
+    pub fn grade_documents(&self, query: &str, results: &[SearchResult]) -> Vec<GradedDocument> {
         let query_lower = query.to_lowercase();
         let query_terms: Vec<&str> = query_lower.split_whitespace().collect();
 
@@ -185,10 +184,7 @@ impl AdaptiveRetrieval {
                 let term_match_ratio = if query_terms.is_empty() {
                     0.0
                 } else {
-                    let matched = query_terms
-                        .iter()
-                        .filter(|t| text.contains(*t))
-                        .count();
+                    let matched = query_terms.iter().filter(|t| text.contains(*t)).count();
                     matched as f64 / query_terms.len() as f64
                 };
 
@@ -221,11 +217,7 @@ impl AdaptiveRetrieval {
     /// 2. Retrieve + grade documents
     /// 3. Route decision → Generate / Refine (with rewrite) / WebSearch
     /// 4. Return the final result with all metadata
-    pub fn execute_pipeline(
-        &self,
-        kb: &super::KnowledgeBase,
-        query: &str,
-    ) -> AdaptiveRagResult {
+    pub fn execute_pipeline(&self, kb: &super::KnowledgeBase, query: &str) -> AdaptiveRagResult {
         let (complexity, _) = self.classify_query(query);
 
         // Initial retrieval
@@ -268,13 +260,22 @@ impl AdaptiveRetrieval {
             rewritten = Some(new_query.clone());
             current_query = new_query;
 
-            let more_results = kb.hybrid_rerank_search(&current_query, 5).unwrap_or_default();
+            let more_results = kb
+                .hybrid_rerank_search(&current_query, 5)
+                .unwrap_or_default();
             for r in more_results {
-                if !all_results.iter().any(|existing| existing.node.id == r.node.id) {
+                if !all_results
+                    .iter()
+                    .any(|existing| existing.node.id == r.node.id)
+                {
                     all_results.push(r);
                 }
             }
-            all_results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+            all_results.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
             all_results.truncate(10);
 
             graded = self.grade_documents(&current_query, &all_results);
@@ -295,17 +296,23 @@ impl AdaptiveRetrieval {
         }
     }
 
-    pub fn route_decision(
-        &self,
-        graded: &[GradedDocument],
-    ) -> RetrievalAction {
+    pub fn route_decision(&self, graded: &[GradedDocument]) -> RetrievalAction {
         if graded.is_empty() {
             return RetrievalAction::Skip;
         }
 
-        let relevant_count = graded.iter().filter(|g| g.relevance == RelevanceGrade::Relevant).count();
-        let _partial_count = graded.iter().filter(|g| g.relevance == RelevanceGrade::Partial).count();
-        let irrelevant_count = graded.iter().filter(|g| g.relevance == RelevanceGrade::Irrelevant).count();
+        let relevant_count = graded
+            .iter()
+            .filter(|g| g.relevance == RelevanceGrade::Relevant)
+            .count();
+        let _partial_count = graded
+            .iter()
+            .filter(|g| g.relevance == RelevanceGrade::Partial)
+            .count();
+        let irrelevant_count = graded
+            .iter()
+            .filter(|g| g.relevance == RelevanceGrade::Irrelevant)
+            .count();
         let total = graded.len();
 
         if relevant_count == total {
@@ -344,17 +351,22 @@ pub struct AdaptiveRagResult {
 
 /// Rewrite a query for refined retrieval when initial results are partial.
 /// Extracts distinctive terms from original query and removes stop words.
-pub fn rewrite_query(original: &str, graded: &[GradedDocument], results: &[SearchResult]) -> String {
+pub fn rewrite_query(
+    original: &str,
+    graded: &[GradedDocument],
+    results: &[SearchResult],
+) -> String {
     let stop_words: std::collections::HashSet<&str> = [
-        "a", "an", "the", "is", "are", "was", "were", "be", "been",
-        "being", "have", "has", "had", "do", "does", "did", "will",
-        "would", "could", "should", "may", "might", "shall", "can",
-        "to", "of", "in", "for", "on", "with", "at", "by", "from",
-        "as", "into", "through", "during", "before", "after", "about",
-        "between", "under", "over", "and", "or", "but", "not", "so",
-        "if", "than", "that", "this", "these", "those", "it", "its",
-        "what", "which", "who", "whom", "how", "why", "where",
-    ].iter().copied().collect();
+        "a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+        "do", "does", "did", "will", "would", "could", "should", "may", "might", "shall", "can",
+        "to", "of", "in", "for", "on", "with", "at", "by", "from", "as", "into", "through",
+        "during", "before", "after", "about", "between", "under", "over", "and", "or", "but",
+        "not", "so", "if", "than", "that", "this", "these", "those", "it", "its", "what", "which",
+        "who", "whom", "how", "why", "where",
+    ]
+    .iter()
+    .copied()
+    .collect();
 
     let mut terms: Vec<&str> = original
         .split_whitespace()
@@ -365,7 +377,9 @@ pub fn rewrite_query(original: &str, graded: &[GradedDocument], results: &[Searc
     for g in graded {
         if g.relevance == RelevanceGrade::Irrelevant {
             if let Some(r) = results.iter().find(|r| r.node.id == g.node_id) {
-                let title_terms: Vec<&str> = r.node.title
+                let title_terms: Vec<&str> = r
+                    .node
+                    .title
                     .split_whitespace()
                     .filter(|w| w.len() > 3 && !stop_words.contains(w.to_lowercase().as_str()))
                     .collect();
@@ -386,10 +400,10 @@ pub fn rewrite_query(original: &str, graded: &[GradedDocument], results: &[Searc
 /// Actions the adaptive pipeline can take after retrieval evaluation
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RetrievalAction {
-    Generate,    // all docs relevant → proceed to generation
-    Refine,      // partial → rewrite query + retrieve again
-    WebSearch,   // all docs irrelevant → fallback to web
-    Skip,        // no docs or confidence too low → answer from parametric knowledge
+    Generate,  // all docs relevant → proceed to generation
+    Refine,    // partial → rewrite query + retrieve again
+    WebSearch, // all docs irrelevant → fallback to web
+    Skip,      // no docs or confidence too low → answer from parametric knowledge
 }
 
 /// Multi-step iterative retrieval for Hard queries.
@@ -417,7 +431,11 @@ pub fn iterative_retrieval(
         }
     }
 
-    existing_results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    existing_results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     existing_results.truncate(10);
     Ok(existing_results.clone())
 }
@@ -437,7 +455,9 @@ mod tests {
     fn test_classify_medium() {
         let ar = AdaptiveRetrieval::new(AdaptiveRagConfig::default());
         // 小写对比查询 (无大写实体) → Medium; 带实体对比 (E8 vs GWT) 升级为 Hard 走 decompose
-        let (comp, _) = ar.classify_query("what is the difference between functional and object-oriented programming");
+        let (comp, _) = ar.classify_query(
+            "what is the difference between functional and object-oriented programming",
+        );
         assert_eq!(comp, QueryComplexity::Medium);
     }
 
@@ -452,36 +472,34 @@ mod tests {
 
     #[test]
     fn test_grade_relevant() {
-        let results = vec![
-            SearchResult {
-                node: KnowledgeNode {
-                    id: "1".into(),
-                    node_type: NodeType::Concept,
-                    title: "E8 Reasoning Engine".into(),
-                    summary: Some("E8 state-space reasoning for consciousness".into()),
-                    content: None,
-                    url: None,
-                    domain: None,
-                    language: "en".into(),
-                    confidence: 1.0,
-                    importance: 0.5,
-                    created_at: 0,
-                    updated_at: 0,
-                    access_count: 0,
-                    metadata: None,
-                    temporal: None,
-                    supersedes: None,
-                    source_episode: None,
-                    parent_id: None,
-                    depth: 0,
-                    cluster_id: None,
-                    recall_weight: 1.0,
-                },
-                score: 0.9,
-                matched_on: vec![],
-                signals: None,
+        let results = vec![SearchResult {
+            node: KnowledgeNode {
+                id: "1".into(),
+                node_type: NodeType::Concept,
+                title: "E8 Reasoning Engine".into(),
+                summary: Some("E8 state-space reasoning for consciousness".into()),
+                content: None,
+                url: None,
+                domain: None,
+                language: "en".into(),
+                confidence: 1.0,
+                importance: 0.5,
+                created_at: 0,
+                updated_at: 0,
+                access_count: 0,
+                metadata: None,
+                temporal: None,
+                supersedes: None,
+                source_episode: None,
+                parent_id: None,
+                depth: 0,
+                cluster_id: None,
+                recall_weight: 1.0,
             },
-        ];
+            score: 0.9,
+            matched_on: vec![],
+            signals: None,
+        }];
         let ar = AdaptiveRetrieval::new(AdaptiveRagConfig::default());
         let graded = ar.grade_documents("E8 reasoning", &results);
         assert_eq!(graded[0].relevance, RelevanceGrade::Relevant);
@@ -490,8 +508,16 @@ mod tests {
     #[test]
     fn test_route_generate() {
         let graded = vec![
-            GradedDocument { node_id: "1".into(), relevance: RelevanceGrade::Relevant, confidence: 0.9 },
-            GradedDocument { node_id: "2".into(), relevance: RelevanceGrade::Relevant, confidence: 0.8 },
+            GradedDocument {
+                node_id: "1".into(),
+                relevance: RelevanceGrade::Relevant,
+                confidence: 0.9,
+            },
+            GradedDocument {
+                node_id: "2".into(),
+                relevance: RelevanceGrade::Relevant,
+                confidence: 0.8,
+            },
         ];
         let ar = AdaptiveRetrieval::new(AdaptiveRagConfig::default());
         assert_eq!(ar.route_decision(&graded), RetrievalAction::Generate);
@@ -499,9 +525,11 @@ mod tests {
 
     #[test]
     fn test_route_websearch() {
-        let graded = vec![
-            GradedDocument { node_id: "1".into(), relevance: RelevanceGrade::Irrelevant, confidence: 0.1 },
-        ];
+        let graded = vec![GradedDocument {
+            node_id: "1".into(),
+            relevance: RelevanceGrade::Irrelevant,
+            confidence: 0.1,
+        }];
         let ar = AdaptiveRetrieval::new(AdaptiveRagConfig::default());
         assert_eq!(ar.route_decision(&graded), RetrievalAction::WebSearch);
     }
@@ -509,8 +537,16 @@ mod tests {
     #[test]
     fn test_route_refine() {
         let graded = vec![
-            GradedDocument { node_id: "1".into(), relevance: RelevanceGrade::Relevant, confidence: 0.9 },
-            GradedDocument { node_id: "2".into(), relevance: RelevanceGrade::Irrelevant, confidence: 0.2 },
+            GradedDocument {
+                node_id: "1".into(),
+                relevance: RelevanceGrade::Relevant,
+                confidence: 0.9,
+            },
+            GradedDocument {
+                node_id: "2".into(),
+                relevance: RelevanceGrade::Irrelevant,
+                confidence: 0.2,
+            },
         ];
         let ar = AdaptiveRetrieval::new(AdaptiveRagConfig::default());
         assert_eq!(ar.route_decision(&graded), RetrievalAction::Refine);
@@ -578,8 +614,16 @@ mod tests {
             },
         ];
         let graded = vec![
-            GradedDocument { node_id: "1".into(), relevance: RelevanceGrade::Relevant, confidence: 0.9 },
-            GradedDocument { node_id: "2".into(), relevance: RelevanceGrade::Irrelevant, confidence: 0.1 },
+            GradedDocument {
+                node_id: "1".into(),
+                relevance: RelevanceGrade::Relevant,
+                confidence: 0.9,
+            },
+            GradedDocument {
+                node_id: "2".into(),
+                relevance: RelevanceGrade::Irrelevant,
+                confidence: 0.1,
+            },
         ];
         let cites = GroundingCitation::from_retrieval(&graded, &results);
         assert_eq!(cites.len(), 1, "irrelevant doc must not be grounded");

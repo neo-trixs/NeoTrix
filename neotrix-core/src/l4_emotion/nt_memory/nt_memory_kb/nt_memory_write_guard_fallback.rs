@@ -234,27 +234,23 @@ mod tests {
 
     #[test]
     fn test_verbatim_dup_unique() {
-        let existing = vec![
-            ("id1".into(), "Rust".into(), "systems language".into(), 1000),
-        ];
+        let existing = vec![("id1".into(), "Rust".into(), "systems language".into(), 1000)];
         let r = check_verbatim_dup("Python", "scripting language", &existing);
         assert_eq!(r, VerbatimDupResult::Unique);
     }
 
     #[test]
     fn test_verbatim_dup_exact_match() {
-        let existing = vec![
-            ("id1".into(), "Rust".into(), "systems language".into(), 1000),
-        ];
+        let existing = vec![("id1".into(), "Rust".into(), "systems language".into(), 1000)];
         let r = check_verbatim_dup("rust", "systems language", &existing);
-        assert!(matches!(r, VerbatimDupResult::Duplicate { ref existing_id, .. } if existing_id == "id1"));
+        assert!(
+            matches!(r, VerbatimDupResult::Duplicate { ref existing_id, .. } if existing_id == "id1")
+        );
     }
 
     #[test]
     fn test_verbatim_dup_same_title_different_content() {
-        let existing = vec![
-            ("id1".into(), "Rust".into(), "v1 content".into(), 1000),
-        ];
+        let existing = vec![("id1".into(), "Rust".into(), "v1 content".into(), 1000)];
         let r = check_verbatim_dup("rust", "v2 content", &existing);
         assert!(matches!(r, VerbatimDupResult::NearDuplicate { .. }));
     }

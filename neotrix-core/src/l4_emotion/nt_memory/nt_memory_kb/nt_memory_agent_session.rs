@@ -64,12 +64,16 @@ impl AgentSessionManager {
             CREATE INDEX IF NOT EXISTS idx_ame_agent ON agent_memory_entries(agent_id);
             CREATE INDEX IF NOT EXISTS idx_ame_session ON agent_memory_entries(session_id);
             CREATE INDEX IF NOT EXISTS idx_ame_tier ON agent_memory_entries(tier);
-            CREATE INDEX IF NOT EXISTS idx_as_agent ON agent_sessions(agent_id);"
+            CREATE INDEX IF NOT EXISTS idx_as_agent ON agent_sessions(agent_id);",
         )?;
         Ok(())
     }
 
-    pub fn begin_session(conn: &Connection, agent_id: &str, label: &str) -> rusqlite::Result<String> {
+    pub fn begin_session(
+        conn: &Connection,
+        agent_id: &str,
+        label: &str,
+    ) -> rusqlite::Result<String> {
         let id = Uuid::new_v4().to_string();
         let now = unix_now();
         conn.execute(
@@ -107,7 +111,12 @@ impl AgentSessionManager {
         Ok(id)
     }
 
-    pub fn recall_by_agent(conn: &Connection, agent_id: &str, query: &str, limit: usize) -> rusqlite::Result<Vec<AgentSessionEntry>> {
+    pub fn recall_by_agent(
+        conn: &Connection,
+        agent_id: &str,
+        query: &str,
+        limit: usize,
+    ) -> rusqlite::Result<Vec<AgentSessionEntry>> {
         let pattern = format!("%{}%", query);
         let stmt = conn.prepare(
             "SELECT id, agent_id, session_id, tier, content, metadata, created_at, access_count, superseded, superseded_by
@@ -118,7 +127,12 @@ impl AgentSessionManager {
         map_entries(stmt, params![agent_id, pattern, limit as i64])
     }
 
-    pub fn recall_by_session(conn: &Connection, session_id: &str, query: &str, limit: usize) -> rusqlite::Result<Vec<AgentSessionEntry>> {
+    pub fn recall_by_session(
+        conn: &Connection,
+        session_id: &str,
+        query: &str,
+        limit: usize,
+    ) -> rusqlite::Result<Vec<AgentSessionEntry>> {
         let pattern = format!("%{}%", query);
         let stmt = conn.prepare(
             "SELECT id, agent_id, session_id, tier, content, metadata, created_at, access_count, superseded, superseded_by
@@ -129,7 +143,12 @@ impl AgentSessionManager {
         map_entries(stmt, params![session_id, pattern, limit as i64])
     }
 
-    pub fn recall_similar(conn: &Connection, agent_id: &str, _query_embedding: &[f32], limit: usize) -> rusqlite::Result<Vec<(AgentSessionEntry, f64)>> {
+    pub fn recall_similar(
+        conn: &Connection,
+        agent_id: &str,
+        _query_embedding: &[f32],
+        limit: usize,
+    ) -> rusqlite::Result<Vec<(AgentSessionEntry, f64)>> {
         let mut stmt = conn.prepare(
             "SELECT id, agent_id, session_id, tier, content, metadata, created_at, access_count, superseded, superseded_by, embedding
              FROM agent_memory_entries
@@ -140,19 +159,30 @@ impl AgentSessionManager {
             let meta: HashMap<String, String> = serde_json::from_str(&meta_str).unwrap_or_default();
             let blob: Option<Vec<u8>> = row.get(10)?;
             let emb = blob.map(|b| {
-                b.chunks_exact(4).map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect::<Vec<f32>>()
+                b.chunks_exact(4)
+                    .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+                    .collect::<Vec<f32>>()
             });
-            Ok((AgentSessionEntry {
-                id: row.get(0)?, agent_id: row.get(1)?, session_id: row.get(2)?,
-                tier: row.get(3)?, content: row.get(4)?, metadata: meta,
-                created_at: row.get(6)?, access_count: row.get::<_, i64>(7)? as u64,
-                superseded: row.get::<_, i64>(8)? != 0, superseded_by: row.get(9)?,
-            }, emb))
+            Ok((
+                AgentSessionEntry {
+                    id: row.get(0)?,
+                    agent_id: row.get(1)?,
+                    session_id: row.get(2)?,
+                    tier: row.get(3)?,
+                    content: row.get(4)?,
+                    metadata: meta,
+                    created_at: row.get(6)?,
+                    access_count: row.get::<_, i64>(7)? as u64,
+                    superseded: row.get::<_, i64>(8)? != 0,
+                    superseded_by: row.get(9)?,
+                },
+                emb,
+            ))
         })?;
         let mut scored: Vec<(AgentSessionEntry, f64)> = Vec::new();
         for r in rows {
             if let Ok((_entry, Some(_emb))) = r {
-//                 scored.push((entry, cosine_similarity(query_embedding, &emb)));
+                //                 scored.push((entry, cosine_similarity(query_embedding, &emb)));
             }
         }
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -167,31 +197,54 @@ impl AgentSessionManager {
         let rows = stmt.query_map(params![agent_id], |row| {
             let meta_str: String = row.get(5)?;
             let meta: HashMap<String, String> = serde_json::from_str(&meta_str).unwrap_or_default();
-            Ok(AgentSession { id: row.get(0)?, agent_id: row.get(1)?, label: row.get(2)?, created_at: row.get(3)?, ended_at: row.get(4)?, metadata: meta })
+            Ok(AgentSession {
+                id: row.get(0)?,
+                agent_id: row.get(1)?,
+                label: row.get(2)?,
+                created_at: row.get(3)?,
+                ended_at: row.get(4)?,
+                metadata: meta,
+            })
         })?;
         let mut sessions = Vec::new();
-        for s in rows.flatten() { sessions.push(s); }
+        for s in rows.flatten() {
+            sessions.push(s);
+        }
         Ok(sessions)
     }
 }
 
 fn unix_now() -> i64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64
 }
 
-fn map_entries(mut stmt: rusqlite::Statement, params: impl rusqlite::Params) -> rusqlite::Result<Vec<AgentSessionEntry>> {
+fn map_entries(
+    mut stmt: rusqlite::Statement,
+    params: impl rusqlite::Params,
+) -> rusqlite::Result<Vec<AgentSessionEntry>> {
     let rows = stmt.query_map(params, |row| {
         let meta_str: String = row.get(5)?;
         let meta: HashMap<String, String> = serde_json::from_str(&meta_str).unwrap_or_default();
         Ok(AgentSessionEntry {
-            id: row.get(0)?, agent_id: row.get(1)?, session_id: row.get(2)?,
-            tier: row.get(3)?, content: row.get(4)?, metadata: meta,
-            created_at: row.get(6)?, access_count: row.get::<_, i64>(7)? as u64,
-            superseded: row.get::<_, i64>(8)? != 0, superseded_by: row.get(9)?,
+            id: row.get(0)?,
+            agent_id: row.get(1)?,
+            session_id: row.get(2)?,
+            tier: row.get(3)?,
+            content: row.get(4)?,
+            metadata: meta,
+            created_at: row.get(6)?,
+            access_count: row.get::<_, i64>(7)? as u64,
+            superseded: row.get::<_, i64>(8)? != 0,
+            superseded_by: row.get(9)?,
         })
     })?;
     let mut results = Vec::new();
-    for e in rows.flatten() { results.push(e); }
+    for e in rows.flatten() {
+        results.push(e);
+    }
     Ok(results)
 }
 
@@ -232,8 +285,26 @@ mod tests {
         let sid = AgentSessionManager::begin_session(&conn, "agent-1", "test").unwrap();
         let mut meta = HashMap::new();
         meta.insert("type".into(), "observation".into());
-        AgentSessionManager::store(&conn, "agent-1", &sid, "the sky is blue", "core", meta.clone(), None).unwrap();
-        AgentSessionManager::store(&conn, "agent-1", &sid, "the grass is green", "core", meta, None).unwrap();
+        AgentSessionManager::store(
+            &conn,
+            "agent-1",
+            &sid,
+            "the sky is blue",
+            "core",
+            meta.clone(),
+            None,
+        )
+        .unwrap();
+        AgentSessionManager::store(
+            &conn,
+            "agent-1",
+            &sid,
+            "the grass is green",
+            "core",
+            meta,
+            None,
+        )
+        .unwrap();
         let results = AgentSessionManager::recall_by_agent(&conn, "agent-1", "sky", 10).unwrap();
         assert_eq!(results.len(), 1);
         assert!(results[0].content.contains("sky"));
@@ -244,8 +315,26 @@ mod tests {
         let conn = mgr();
         let sid1 = AgentSessionManager::begin_session(&conn, "agent-1", "s1").unwrap();
         let sid2 = AgentSessionManager::begin_session(&conn, "agent-1", "s2").unwrap();
-        AgentSessionManager::store(&conn, "agent-1", &sid1, "data from session 1", "core", HashMap::new(), None).unwrap();
-        AgentSessionManager::store(&conn, "agent-1", &sid2, "data from session 2", "core", HashMap::new(), None).unwrap();
+        AgentSessionManager::store(
+            &conn,
+            "agent-1",
+            &sid1,
+            "data from session 1",
+            "core",
+            HashMap::new(),
+            None,
+        )
+        .unwrap();
+        AgentSessionManager::store(
+            &conn,
+            "agent-1",
+            &sid2,
+            "data from session 2",
+            "core",
+            HashMap::new(),
+            None,
+        )
+        .unwrap();
         let r1 = AgentSessionManager::recall_by_session(&conn, &sid1, "data", 10).unwrap();
         assert_eq!(r1.len(), 1);
         assert!(r1[0].content.contains("session 1"));
@@ -258,8 +347,26 @@ mod tests {
         let emb1 = vec![1.0, 0.0, 0.0, 0.0];
         let emb2 = vec![0.0, 1.0, 0.0, 0.0];
         let emb_query = vec![0.9, 0.1, 0.0, 0.0];
-        AgentSessionManager::store(&conn, "agent-1", &sid, "rust performance", "core", HashMap::new(), Some(&emb1)).unwrap();
-        AgentSessionManager::store(&conn, "agent-1", &sid, "python simplicity", "core", HashMap::new(), Some(&emb2)).unwrap();
+        AgentSessionManager::store(
+            &conn,
+            "agent-1",
+            &sid,
+            "rust performance",
+            "core",
+            HashMap::new(),
+            Some(&emb1),
+        )
+        .unwrap();
+        AgentSessionManager::store(
+            &conn,
+            "agent-1",
+            &sid,
+            "python simplicity",
+            "core",
+            HashMap::new(),
+            Some(&emb2),
+        )
+        .unwrap();
         let results = AgentSessionManager::recall_similar(&conn, "agent-1", &emb_query, 2).unwrap();
         assert_eq!(results.len(), 2);
         assert!(results[0].0.content.contains("rust"));
@@ -271,9 +378,37 @@ mod tests {
         let conn = mgr();
         let s1 = AgentSessionManager::begin_session(&conn, "agent-alpha", "a").unwrap();
         let s2 = AgentSessionManager::begin_session(&conn, "agent-beta", "b").unwrap();
-        AgentSessionManager::store(&conn, "agent-alpha", &s1, "alpha's data", "core", HashMap::new(), None).unwrap();
-        AgentSessionManager::store(&conn, "agent-beta", &s2, "beta's data", "core", HashMap::new(), None).unwrap();
-        assert_eq!(AgentSessionManager::recall_by_agent(&conn, "agent-alpha", "data", 10).unwrap().len(), 1);
-        assert_eq!(AgentSessionManager::recall_by_agent(&conn, "agent-beta", "data", 10).unwrap().len(), 1);
+        AgentSessionManager::store(
+            &conn,
+            "agent-alpha",
+            &s1,
+            "alpha's data",
+            "core",
+            HashMap::new(),
+            None,
+        )
+        .unwrap();
+        AgentSessionManager::store(
+            &conn,
+            "agent-beta",
+            &s2,
+            "beta's data",
+            "core",
+            HashMap::new(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            AgentSessionManager::recall_by_agent(&conn, "agent-alpha", "data", 10)
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            AgentSessionManager::recall_by_agent(&conn, "agent-beta", "data", 10)
+                .unwrap()
+                .len(),
+            1
+        );
     }
 }

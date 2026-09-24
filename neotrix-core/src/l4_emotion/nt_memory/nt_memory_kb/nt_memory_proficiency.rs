@@ -30,9 +30,15 @@ pub enum MemoryAction {
 impl MemoryAction {
     pub fn all() -> Vec<Self> {
         vec![
-            Self::SearchFts, Self::SearchGraph, Self::SearchEmbed,
-            Self::StoreNode, Self::LinkNodes, Self::ConsolidateCluster,
-            Self::PruneStale, Self::RefreshIndex, Self::SummarizeSubgraph,
+            Self::SearchFts,
+            Self::SearchGraph,
+            Self::SearchEmbed,
+            Self::StoreNode,
+            Self::LinkNodes,
+            Self::ConsolidateCluster,
+            Self::PruneStale,
+            Self::RefreshIndex,
+            Self::SummarizeSubgraph,
             Self::HierarchicalRetrieval,
         ]
     }
@@ -94,11 +100,16 @@ impl Default for MemoryProficiency {
 }
 
 impl MemoryProficiency {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Record a memory action outcome (inner-loop training step).
     pub fn record_action(&mut self, record: MemoryActionRecord) {
-        let stats = self.action_stats.entry(record.action).or_insert((0, 0, 0.0));
+        let stats = self
+            .action_stats
+            .entry(record.action)
+            .or_insert((0, 0, 0.0));
         stats.0 += 1;
         if record.success {
             stats.1 += 1;
@@ -115,9 +126,14 @@ impl MemoryProficiency {
 
     /// Get success rate for a specific action.
     pub fn success_rate(&self, action: &MemoryAction) -> f64 {
-        self.action_stats.get(action)
+        self.action_stats
+            .get(action)
             .map(|(total, successes, _)| {
-                if *total > 0 { *successes as f64 / *total as f64 } else { 0.0 }
+                if *total > 0 {
+                    *successes as f64 / *total as f64
+                } else {
+                    0.0
+                }
             })
             .unwrap_or(0.0)
     }
@@ -131,7 +147,8 @@ impl MemoryProficiency {
             }
         }
         // Fall back to global best action by success rate
-        let best = MemoryAction::all().into_iter()
+        let best = MemoryAction::all()
+            .into_iter()
             .max_by(|a, b| {
                 self.success_rate(a)
                     .partial_cmp(&self.success_rate(b))
@@ -176,16 +193,16 @@ impl MemoryProficiency {
                 entry.1 += 1;
             }
 
-            let mut ranked: Vec<(MemoryAction, f64)> = action_scores.into_iter()
-                .map(|(action, (total, count))| {
-                    (action, total / count.max(1) as f64)
-                })
+            let mut ranked: Vec<(MemoryAction, f64)> = action_scores
+                .into_iter()
+                .map(|(action, (total, count))| (action, total / count.max(1) as f64))
                 .collect();
             ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
             ranked.truncate(3);
 
             if !ranked.is_empty() {
-                self.context_preferences.insert(context_key.to_string(), ranked);
+                self.context_preferences
+                    .insert(context_key.to_string(), ranked);
                 updates += 1;
             }
         }
@@ -203,23 +220,45 @@ impl MemoryProficiency {
                 total_attempts: *total,
                 successes: *successes,
                 avg_duration_ms: *avg_duration,
-                success_rate: if *total > 0 { *successes as f64 / *total as f64 } else { 0.0 },
+                success_rate: if *total > 0 {
+                    *successes as f64 / *total as f64
+                } else {
+                    0.0
+                },
             });
         }
-        action_breakdown.sort_by(|a, b| b.success_rate.partial_cmp(&a.success_rate).unwrap_or(std::cmp::Ordering::Equal));
+        action_breakdown.sort_by(|a, b| {
+            b.success_rate
+                .partial_cmp(&a.success_rate)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         MemoryProficiencyReport {
             total_actions: self.training_steps,
             revision_count: self.revision_count,
             action_breakdown,
-            context_preferences: self.context_preferences.iter()
-                .map(|(k, v)| (k.clone(), v.iter().map(|(a, s)| (a.name().to_string(), *s)).collect()))
-                .collect(),
-            overall_efficiency: self.action_stats.values()
-                .map(|(total, successes, _)| {
-                    if *total > 0 { *successes as f64 / *total as f64 } else { 0.0 }
+            context_preferences: self
+                .context_preferences
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        v.iter().map(|(a, s)| (a.name().to_string(), *s)).collect(),
+                    )
                 })
-                .sum::<f64>() / self.action_stats.len().max(1) as f64,
+                .collect(),
+            overall_efficiency: self
+                .action_stats
+                .values()
+                .map(|(total, successes, _)| {
+                    if *total > 0 {
+                        *successes as f64 / *total as f64
+                    } else {
+                        0.0
+                    }
+                })
+                .sum::<f64>()
+                / self.action_stats.len().max(1) as f64,
         }
     }
 }

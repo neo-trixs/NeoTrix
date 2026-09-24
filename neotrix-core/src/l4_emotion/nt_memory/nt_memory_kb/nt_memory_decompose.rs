@@ -101,8 +101,11 @@ pub fn decompose_query(query: &str) -> Decomposition {
             !w.is_empty()
                 && w.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
                 && w.len() >= 2
-                && !["The", "This", "That", "What", "Why", "How", "When", "Where", "Compare", "Between", "Explain"]
-                    .contains(w)
+                && ![
+                    "The", "This", "That", "What", "Why", "How", "When", "Where", "Compare",
+                    "Between", "Explain",
+                ]
+                .contains(w)
         })
         .map(|w| w.to_string())
         .collect();
@@ -120,7 +123,11 @@ fn split_and_terms(s: &str) -> Vec<String> {
         .split(" and ")
         .flat_map(|p| p.split(" & "))
         .flat_map(|p| p.split(','))
-        .map(|p| p.trim().trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+        .map(|p| {
+            p.trim()
+                .trim_matches(|c: char| !c.is_alphanumeric())
+                .to_string()
+        })
         .filter(|p| !p.is_empty() && p.len() >= 2)
         .collect::<Vec<String>>();
     cleaned
@@ -149,8 +156,8 @@ pub fn merge_results(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::nt_memory_types::{KnowledgeNode, NodeType};
+    use super::*;
 
     fn mk_result(id: &str, score: f64) -> SearchResult {
         SearchResult {
@@ -186,29 +193,41 @@ mod tests {
     #[test]
     fn test_difference_between_decomposes_flat() {
         let d = decompose_query("what is the difference between E8 and GWT");
-        assert!(matches!(d, Decomposition::Flat(ref parts) if parts.len() >= 2),
-            "对比查询应分解为 Flat: {:?}", d);
+        assert!(
+            matches!(d, Decomposition::Flat(ref parts) if parts.len() >= 2),
+            "对比查询应分解为 Flat: {:?}",
+            d
+        );
     }
 
     #[test]
     fn test_vs_decomposes_flat() {
         let d = decompose_query("E8 vs GWT attention routing");
-        assert!(matches!(d, Decomposition::Flat(ref parts) if parts.len() >= 2),
-            "vs 查询应分解为 Flat: {:?}", d);
+        assert!(
+            matches!(d, Decomposition::Flat(ref parts) if parts.len() >= 2),
+            "vs 查询应分解为 Flat: {:?}",
+            d
+        );
     }
 
     #[test]
     fn test_compare_decomposes_flat() {
         let d = decompose_query("compare SEAL pipeline with PRM reward model");
-        assert!(matches!(d, Decomposition::Flat(ref parts) if parts.len() >= 2),
-            "compare 查询应分解为 Flat: {:?}", d);
+        assert!(
+            matches!(d, Decomposition::Flat(ref parts) if parts.len() >= 2),
+            "compare 查询应分解为 Flat: {:?}",
+            d
+        );
     }
 
     #[test]
     fn test_then_decomposes_sequential() {
         let d = decompose_query("first find the E8 module then trace its consumers");
-        assert!(matches!(d, Decomposition::Sequential(ref parts) if parts.len() >= 2),
-            "顺序推理应分解为 Sequential: {:?}", d);
+        assert!(
+            matches!(d, Decomposition::Sequential(ref parts) if parts.len() >= 2),
+            "顺序推理应分解为 Sequential: {:?}",
+            d
+        );
     }
 
     #[test]
@@ -220,7 +239,11 @@ mod tests {
     #[test]
     fn test_simple_query_atomic() {
         let d = decompose_query("what is a vector embedding");
-        assert!(matches!(d, Decomposition::Atomic(_)), "简单查询保持原子: {:?}", d);
+        assert!(
+            matches!(d, Decomposition::Atomic(_)),
+            "简单查询保持原子: {:?}",
+            d
+        );
     }
 
     #[test]
@@ -235,8 +258,12 @@ mod tests {
 
     #[test]
     fn test_merge_truncates() {
-        let a: Vec<SearchResult> = (0..5).map(|i| mk_result(&format!("n{}", i), i as f64)).collect();
-        let b: Vec<SearchResult> = (5..10).map(|i| mk_result(&format!("n{}", i), i as f64)).collect();
+        let a: Vec<SearchResult> = (0..5)
+            .map(|i| mk_result(&format!("n{}", i), i as f64))
+            .collect();
+        let b: Vec<SearchResult> = (5..10)
+            .map(|i| mk_result(&format!("n{}", i), i as f64))
+            .collect();
         let merged = merge_results(a, b, 6);
         assert_eq!(merged.len(), 6, "应截断到 limit");
         assert_eq!(merged[0].node.id, "n9", "高分优先");

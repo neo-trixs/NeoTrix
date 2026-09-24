@@ -196,12 +196,7 @@ impl ForgettingCurve {
     /// 检查节点是否应遗忘
     ///
     /// 基于当前时间和最后访问时间计算保持率。
-    pub fn should_forget(
-        &self,
-        last_access: i64,
-        access_count: i64,
-        now: i64,
-    ) -> bool {
+    pub fn should_forget(&self, last_access: i64, access_count: i64, now: i64) -> bool {
         let time_since = (now - last_access) as f64;
         let s = self.stability(access_count);
         let r = Self::retention_rate(time_since, s);
@@ -216,9 +211,7 @@ impl ForgettingCurve {
             .as_secs() as i64;
 
         let mut stmt = conn
-            .prepare(
-                "SELECT id, updated_at, access_count FROM nodes WHERE access_count > 0",
-            )
+            .prepare("SELECT id, updated_at, access_count FROM nodes WHERE access_count > 0")
             .map_err(|e| format!("Prepare: {}", e))?;
 
         let nodes: Vec<(String, i64, i64)> = stmt
@@ -303,7 +296,9 @@ impl AssociativeRecall {
             .collect();
 
         for (src, tgt, weight) in edges {
-            adj.entry(src.clone()).or_default().push((tgt.clone(), weight));
+            adj.entry(src.clone())
+                .or_default()
+                .push((tgt.clone(), weight));
             adj.entry(tgt).or_default().push((src, weight));
         }
 
@@ -547,10 +542,7 @@ impl Default for MemoryConsolidation {
 
 impl MemoryConsolidation {
     /// 将 STM 条目提升为 LTM
-    pub fn consolidate(
-        &self,
-        conn: &Connection,
-    ) -> Result<usize, String> {
+    pub fn consolidate(&self, conn: &Connection) -> Result<usize, String> {
         let mut stmt = conn
             .prepare(
                 "UPDATE nodes SET importance = importance + 0.1, access_count = access_count + 1
@@ -566,10 +558,7 @@ impl MemoryConsolidation {
     }
 
     /// 清理过期的 STM 条目
-    pub(crate) fn _prune_stm(
-        &self,
-        conn: &Connection,
-    ) -> Result<usize, String> {
+    pub(crate) fn _prune_stm(&self, conn: &Connection) -> Result<usize, String> {
         let seven_days_ago = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()

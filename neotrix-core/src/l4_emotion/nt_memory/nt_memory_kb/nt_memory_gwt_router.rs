@@ -221,7 +221,11 @@ impl GwtRouter {
         let margin = (best - second).abs();
         let confidence = (0.5 + margin * 2.0).clamp(0.5, 0.98);
 
-        QueryIntent { channel, confidence, resonance: scores }
+        QueryIntent {
+            channel,
+            confidence,
+            resonance: scores,
+        }
     }
 }
 
@@ -238,8 +242,10 @@ pub fn extract_features(query: &str) -> QueryFeatures {
     for w in q.split_whitespace() {
         let is_named = w.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
             && w.len() > 2
-            && !["the", "this", "that", "what", "why", "how", "when", "where", "which"]
-                .contains(&w);
+            && ![
+                "the", "this", "that", "what", "why", "how", "when", "where", "which",
+            ]
+            .contains(&w);
         if is_named {
             entities.insert(w);
         }
@@ -254,15 +260,33 @@ pub fn extract_features(query: &str) -> QueryFeatures {
 
     // 关系动词 (中英)
     f.has_relation = [
-        "影响", "依赖", "关系", "相关", "属于", "导致", "between", "related", "depends",
-        "influences", "associated", "relation",
+        "影响",
+        "依赖",
+        "关系",
+        "相关",
+        "属于",
+        "导致",
+        "between",
+        "related",
+        "depends",
+        "influences",
+        "associated",
+        "relation",
     ]
     .iter()
     .any(|kw| q.contains(kw));
 
     // 对比标记
     f.has_compare = [
-        "对比", "比较", "区别", "差异", "versus", "difference", "compare", "pros", "cons",
+        "对比",
+        "比较",
+        "区别",
+        "差异",
+        "versus",
+        "difference",
+        "compare",
+        "pros",
+        "cons",
         "vs ",
     ]
     .iter()
@@ -270,15 +294,31 @@ pub fn extract_features(query: &str) -> QueryFeatures {
 
     // 多跳/因果标记
     f.has_multi_hop = [
-        "然后", "之后", "逐步", "进而", "最终", "then", "subsequently", "after that",
-        "therefore", "consequently",
+        "然后",
+        "之后",
+        "逐步",
+        "进而",
+        "最终",
+        "then",
+        "subsequently",
+        "after that",
+        "therefore",
+        "consequently",
     ]
     .iter()
     .any(|kw| q.contains(kw));
 
     // 纯事实问句
     f.is_factual = [
-        "什么是", "谁", "定义", "介绍", "what is", "what are", "who is", "define", "explain ",
+        "什么是",
+        "谁",
+        "定义",
+        "介绍",
+        "what is",
+        "what are",
+        "who is",
+        "define",
+        "explain ",
     ]
     .iter()
     .any(|kw| q.contains(kw))
@@ -299,32 +339,48 @@ mod tests {
     #[test]
     fn test_factual_query_routes_fast() {
         let intent = router().route("什么是 RAG 检索增强生成?");
-        assert_eq!(intent.channel, RetrievalChannel::Fast,
-            "事实问句应路由 Fast, 实际 {:?} resonance={:?}", intent.channel, intent.resonance);
+        assert_eq!(
+            intent.channel,
+            RetrievalChannel::Fast,
+            "事实问句应路由 Fast, 实际 {:?} resonance={:?}",
+            intent.channel,
+            intent.resonance
+        );
         assert!(intent.confidence >= 0.5);
     }
 
     #[test]
     fn test_relation_query_routes_graph() {
         let intent = router().route("E8 hexagram 如何影响 GWT 注意力路由的关系?");
-        assert_eq!(intent.channel, RetrievalChannel::Graph,
-            "关系查询应路由 Graph, 实际 {:?}", intent.channel);
+        assert_eq!(
+            intent.channel,
+            RetrievalChannel::Graph,
+            "关系查询应路由 Graph, 实际 {:?}",
+            intent.channel
+        );
     }
 
     #[test]
     fn test_compare_query_routes_decompose() {
         let intent = router().route("对比 Naive RAG 与 Agentic RAG 的差异和优缺点");
-        assert_eq!(intent.channel, RetrievalChannel::Decompose,
-            "对比查询应路由 Decompose, 实际 {:?}", intent.channel);
+        assert_eq!(
+            intent.channel,
+            RetrievalChannel::Decompose,
+            "对比查询应路由 Decompose, 实际 {:?}",
+            intent.channel
+        );
     }
 
     #[test]
     fn test_multi_hop_query_routes_agentloop() {
-        let intent = router().route(
-            "SEAL pipeline 进化 然后 逐步影响 ConsciousnessTree 最终 导致 能力网 重构"
+        let intent = router()
+            .route("SEAL pipeline 进化 然后 逐步影响 ConsciousnessTree 最终 导致 能力网 重构");
+        assert_eq!(
+            intent.channel,
+            RetrievalChannel::AgentLoop,
+            "多跳因果查询应路由 AgentLoop, 实际 {:?}",
+            intent.channel
         );
-        assert_eq!(intent.channel, RetrievalChannel::AgentLoop,
-            "多跳因果查询应路由 AgentLoop, 实际 {:?}", intent.channel);
     }
 
     #[test]
@@ -332,17 +388,25 @@ mod tests {
         let intent = router().route(
             "Compare SEAL self-iteration with PRM reward model and E8 hex state transitions and HyperCube"
         );
-        assert_eq!(intent.channel, RetrievalChannel::Decompose,
-            "4+ 实体显式对比应路由 Decompose (map-reduce), 实际 {:?}", intent.channel);
+        assert_eq!(
+            intent.channel,
+            RetrievalChannel::Decompose,
+            "4+ 实体显式对比应路由 Decompose (map-reduce), 实际 {:?}",
+            intent.channel
+        );
     }
 
     #[test]
     fn test_high_entity_causal_routes_agentloop() {
         let intent = router().route(
-            "SEAL 的 E8 和 HyperCube 与 GWT 的关系 然后 进化为 ConsciousnessTree 最终 重构 能力网"
+            "SEAL 的 E8 和 HyperCube 与 GWT 的关系 然后 进化为 ConsciousnessTree 最终 重构 能力网",
         );
-        assert_eq!(intent.channel, RetrievalChannel::AgentLoop,
-            "4+ 实体因果链应路由 AgentLoop, 实际 {:?}", intent.channel);
+        assert_eq!(
+            intent.channel,
+            RetrievalChannel::AgentLoop,
+            "4+ 实体因果链应路由 AgentLoop, 实际 {:?}",
+            intent.channel
+        );
     }
 
     #[test]
@@ -364,7 +428,11 @@ mod tests {
         let f = extract_features("《史记》和《资治通鉴》的对比 以及 对后世的差异影响");
         assert!(f.has_compare, "中文对比标记未检出");
         assert!(f.has_relation, "中文关系词未检出");
-        assert!(f.entity_count >= 1, "中文书名号实体未检出: {}", f.entity_count);
+        assert!(
+            f.entity_count >= 1,
+            "中文书名号实体未检出: {}",
+            f.entity_count
+        );
     }
 
     #[test]
@@ -372,6 +440,9 @@ mod tests {
         for s in ["fast", "vector", "graph", "agent_loop", "decompose"] {
             assert_eq!(RetrievalChannel::from_str(s).as_str(), s);
         }
-        assert_eq!(RetrievalChannel::from_str("unknown"), RetrievalChannel::Decompose);
+        assert_eq!(
+            RetrievalChannel::from_str("unknown"),
+            RetrievalChannel::Decompose
+        );
     }
 }

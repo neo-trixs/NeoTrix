@@ -18,7 +18,8 @@ pub fn all_mappings() -> Vec<PlaceMapping> {
                 scholar: "宫玉海".into(),
                 confidence: 0.75,
             }],
-            evidence_summary: "昆仑＝东非高原，黄河源头＝尼罗河源头,《禹贡》导河积石＝青尼罗河源头".into(),
+            evidence_summary: "昆仑＝东非高原，黄河源头＝尼罗河源头,《禹贡》导河积石＝青尼罗河源头"
+                .into(),
             relation_type: "昆仑山 → 肯尼亚/埃塞俄比亚".into(),
         },
         PlaceMapping {
@@ -66,7 +67,8 @@ pub fn all_mappings() -> Vec<PlaceMapping> {
                 scholar: "Henriette Mertz".into(),
                 confidence: 0.65,
             }],
-            evidence_summary: "光华之谷＝Grand Canyon，东山经第四列山脉「多光彩」描述与大峡谷地貌吻合".into(),
+            evidence_summary:
+                "光华之谷＝Grand Canyon，东山经第四列山脉「多光彩」描述与大峡谷地貌吻合".into(),
             relation_type: "光华之谷 → 科罗拉多大峡谷".into(),
         },
         PlaceMapping {
@@ -76,10 +78,19 @@ pub fn all_mappings() -> Vec<PlaceMapping> {
             modern_bounds: None,
             confidence: 0.5,
             school_attribution: vec![
-                SchoolRef { school: "世界圈说".into(), scholar: "宫玉海".into(), confidence: 0.5 },
-                SchoolRef { school: "世界圈说".into(), scholar: "Henriette Mertz".into(), confidence: 0.6 },
+                SchoolRef {
+                    school: "世界圈说".into(),
+                    scholar: "宫玉海".into(),
+                    confidence: 0.5,
+                },
+                SchoolRef {
+                    school: "世界圈说".into(),
+                    scholar: "Henriette Mertz".into(),
+                    confidence: 0.6,
+                },
             ],
-            evidence_summary: "扶桑在《山海经》中为日出之地，一说富士山(日本)，一说墨西哥/中美洲(Mertz)".into(),
+            evidence_summary:
+                "扶桑在《山海经》中为日出之地，一说富士山(日本)，一说墨西哥/中美洲(Mertz)".into(),
             relation_type: "扶桑 → 富士山/美洲".into(),
         },
         PlaceMapping {
@@ -127,7 +138,6 @@ pub fn all_mappings() -> Vec<PlaceMapping> {
             evidence_summary: "炎火山＝赤道雪山(Snowcap on equator)，唯一可能=乞力马扎罗".into(),
             relation_type: "炎火山 → 乞力马扎罗".into(),
         },
-
         // ── 华夏说 China-Only Mappings ────────────────────────────
         PlaceMapping {
             shanhai_name: "昆仑之丘".into(),
@@ -143,7 +153,9 @@ pub fn all_mappings() -> Vec<PlaceMapping> {
                 scholar: "王红旗".into(),
                 confidence: 0.85,
             }],
-            evidence_summary: "昆仑＝鄂尔多斯高原，其下为黄河河套，对应《山海经》\u{201c}河水出昆仑东北隅\u{201d}".into(),
+            evidence_summary:
+                "昆仑＝鄂尔多斯高原，其下为黄河河套，对应《山海经》\u{201c}河水出昆仑东北隅\u{201d}"
+                    .into(),
             relation_type: "昆仑之丘 → 鄂尔多斯高原".into(),
         },
         PlaceMapping {
@@ -171,7 +183,8 @@ pub fn all_mappings() -> Vec<PlaceMapping> {
                 scholar: "宫玉海".into(),
                 confidence: 0.5,
             }],
-            evidence_summary: "君子国在《海外东经》，朝鲜半岛古代亦自称\u{201c}君子之国\u{201d}".into(),
+            evidence_summary: "君子国在《海外东经》，朝鲜半岛古代亦自称\u{201c}君子之国\u{201d}"
+                .into(),
             relation_type: "君子国 → 朝鲜".into(),
         },
         PlaceMapping {
@@ -188,7 +201,6 @@ pub fn all_mappings() -> Vec<PlaceMapping> {
             evidence_summary: "儋耳即今海南儋州，历史记载明确".into(),
             relation_type: "儋耳 → 海南岛".into(),
         },
-
         // ── Mythical Kingdom Mappings ────────────────────────────
         PlaceMapping {
             shanhai_name: "轩辕之国".into(),
@@ -201,7 +213,9 @@ pub fn all_mappings() -> Vec<PlaceMapping> {
                 scholar: "宫玉海".into(),
                 confidence: 0.6,
             }],
-            evidence_summary: "轩辕＝Scandinavia(斯堪的纳维亚)音译，\u{201c}轩辕之国在穷山之际\u{201d}＝北欧半岛".into(),
+            evidence_summary:
+                "轩辕＝Scandinavia(斯堪的纳维亚)音译，\u{201c}轩辕之国在穷山之际\u{201d}＝北欧半岛"
+                    .into(),
             relation_type: "轩辕之国 → 匈牙利/奥地利".into(),
         },
         PlaceMapping {
@@ -229,7 +243,8 @@ pub fn all_mappings() -> Vec<PlaceMapping> {
                 scholar: "宫玉海".into(),
                 confidence: 0.4,
             }],
-            evidence_summary: "夸父＝Slav(斯拉夫)音译，\u{201c}夸父逐日\u{201d}＝北欧极昼现象的神话表达".into(),
+            evidence_summary:
+                "夸父＝Slav(斯拉夫)音译，\u{201c}夸父逐日\u{201d}＝北欧极昼现象的神话表达".into(),
             relation_type: "夸父 → 斯拉夫".into(),
         },
         PlaceMapping {
@@ -388,5 +403,3 @@ pub fn all_mappings() -> Vec<PlaceMapping> {
         },
     ]
 }
-
-

@@ -50,7 +50,7 @@ pub fn build_semantic_clusters(
     let mut stmt = conn.prepare(
         "SELECT id, title, summary, metadata, importance FROM nodes
          WHERE metadata IS NOT NULL AND node_type != 'Chunk'
-         ORDER BY importance DESC"
+         ORDER BY importance DESC",
     )?;
     let nodes: Vec<(String, String, Option<String>, Option<String>, f64)> = stmt
         .query_map([], |row| {
@@ -75,10 +75,11 @@ pub fn build_semantic_clusters(
                             if tag_str.starts_with("absorbed-") {
                                 continue;
                             }
-                            topic_groups
-                                .entry(tag_str.to_string())
-                                .or_default()
-                                .push((id.clone(), title.clone(), *importance));
+                            topic_groups.entry(tag_str.to_string()).or_default().push((
+                                id.clone(),
+                                title.clone(),
+                                *importance,
+                            ));
                         }
                     }
                 }
@@ -92,7 +93,8 @@ pub fn build_semantic_clusters(
         if members.len() < min_cluster_size {
             continue;
         }
-        let members: Vec<(String, String, f64)> = members.into_iter().take(max_cluster_size).collect();
+        let members: Vec<(String, String, f64)> =
+            members.into_iter().take(max_cluster_size).collect();
         let avg_imp = members.iter().map(|(_, _, imp)| imp).sum::<f64>() / members.len() as f64;
         let member_ids: Vec<String> = members.iter().map(|(id, _, _)| id.clone()).collect();
         let titles: Vec<&str> = members.iter().map(|(_, t, _)| t.as_str()).collect();
@@ -142,7 +144,10 @@ pub fn hierarchical_search(
     let mut node_to_clusters: HashMap<String, Vec<&SemanticCluster>> = HashMap::new();
     for cluster in clusters {
         for member_id in &cluster.member_ids {
-            node_to_clusters.entry(member_id.clone()).or_default().push(cluster);
+            node_to_clusters
+                .entry(member_id.clone())
+                .or_default()
+                .push(cluster);
         }
     }
 
@@ -151,7 +156,9 @@ pub fn hierarchical_search(
     for result in &fts_results {
         if let Some(clusters_for_node) = node_to_clusters.get(&result.node.id) {
             for cluster in clusters_for_node {
-                let entry = cluster_scores.entry(cluster.cluster_id.clone()).or_default();
+                let entry = cluster_scores
+                    .entry(cluster.cluster_id.clone())
+                    .or_default();
                 entry.0 += result.score;
                 entry.1 += 1;
             }
@@ -196,7 +203,9 @@ pub fn hierarchical_search(
     results.sort_by(|a, b| {
         let a_adj = a.score - a.redundancy_score;
         let b_adj = b.score - b.redundancy_score;
-        b_adj.partial_cmp(&a_adj).unwrap_or(std::cmp::Ordering::Equal)
+        b_adj
+            .partial_cmp(&a_adj)
+            .unwrap_or(std::cmp::Ordering::Equal)
     });
 
     results.truncate(limit);
@@ -278,7 +287,9 @@ mod tests {
         results.sort_by(|a, b| {
             let a_adj = a.score - a.redundancy_score;
             let b_adj = b.score - b.redundancy_score;
-            b_adj.partial_cmp(&a_adj).unwrap_or(std::cmp::Ordering::Equal)
+            b_adj
+                .partial_cmp(&a_adj)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         assert_eq!(results[0].score, 0.9);

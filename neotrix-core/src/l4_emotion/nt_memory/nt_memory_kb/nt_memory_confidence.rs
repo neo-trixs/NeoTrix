@@ -65,11 +65,12 @@ impl EpistemicConfidence {
     pub fn reconfirm(&mut self, strength: f64) {
         let w = &CONFIDENCE_WEIGHTS;
         let s = strength.max(0.0).min(1.0);
-        self.source_confidence = self.source_confidence + (1.0 - self.source_confidence) * s * w.reconfirm_source_boost;
-        self.grounding_confidence =
-            self.grounding_confidence + (1.0 - self.grounding_confidence) * s * w.reconfirm_grounding_boost;
-        self.consensus_confidence =
-            self.consensus_confidence + (1.0 - self.consensus_confidence) * s * w.reconfirm_consensus_boost;
+        self.source_confidence =
+            self.source_confidence + (1.0 - self.source_confidence) * s * w.reconfirm_source_boost;
+        self.grounding_confidence = self.grounding_confidence
+            + (1.0 - self.grounding_confidence) * s * w.reconfirm_grounding_boost;
+        self.consensus_confidence = self.consensus_confidence
+            + (1.0 - self.consensus_confidence) * s * w.reconfirm_consensus_boost;
         self.recency_confidence = 1.0;
         let ts = now_ts();
         self.last_confirmed_at = ts;
@@ -119,7 +120,9 @@ pub struct UncertainResult {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RetrievalStrategy {
-    Conservative { min_confidence: f64 },
+    Conservative {
+        min_confidence: f64,
+    },
     Balanced,
     Exploratory,
     ConfidenceWeighted {
@@ -181,8 +184,7 @@ pub fn compute_grounding(
     let source_contribution = (source_count as f64 / 5.0).min(1.0);
     let diversity_contribution = (relationship_types as f64 / 10.0).min(1.0);
 
-    let composite =
-        source_contribution * 0.4 + support_ratio * 0.4 + diversity_contribution * 0.2;
+    let composite = source_contribution * 0.4 + support_ratio * 0.4 + diversity_contribution * 0.2;
 
     grounding_saturation(composite, 2.0)
 }
@@ -210,8 +212,7 @@ pub fn should_auto_archive(confidence: &EpistemicConfidence) -> bool {
     if confidence.last_confirmed_at <= 0 {
         return false;
     }
-    let days_since =
-        (now_ts() - confidence.last_confirmed_at) as f64 / 86400.0;
+    let days_since = (now_ts() - confidence.last_confirmed_at) as f64 / 86400.0;
     days_since > 30.0
 }
 
@@ -277,9 +278,28 @@ pub fn detect_simple_contradiction(claim_a: &str, claim_b: &str) -> bool {
         return false;
     }
 
-    let negation_patterns = ["not ", "no ", "never ", "without ", "isn't ", "aren't ", "doesn't ",
-        "don't ", "didn't ", "won't ", "can't ", "cannot ", "couldn't ", "shouldn't ",
-        "wouldn't ", "hasn't ", "haven't ", "hadn't ", "wasn't ", "weren't "];
+    let negation_patterns = [
+        "not ",
+        "no ",
+        "never ",
+        "without ",
+        "isn't ",
+        "aren't ",
+        "doesn't ",
+        "don't ",
+        "didn't ",
+        "won't ",
+        "can't ",
+        "cannot ",
+        "couldn't ",
+        "shouldn't ",
+        "wouldn't ",
+        "hasn't ",
+        "haven't ",
+        "hadn't ",
+        "wasn't ",
+        "weren't ",
+    ];
 
     for prefix in &negation_patterns {
         let negated_a = format!("{}{}", prefix, a);
@@ -290,12 +310,23 @@ pub fn detect_simple_contradiction(claim_a: &str, claim_b: &str) -> bool {
     }
 
     let opposite_pairs = [
-        ("is", "is not"), ("are", "are not"), ("was", "was not"),
-        ("were", "were not"), ("has", "has not"), ("have", "have not"),
-        ("does", "does not"), ("do", "do not"), ("did", "did not"),
-        ("will", "will not"), ("can", "cannot"), ("could", "could not"),
-        ("should", "should not"), ("would", "would not"), ("may", "may not"),
-        ("might", "might not"), ("must", "must not"),
+        ("is", "is not"),
+        ("are", "are not"),
+        ("was", "was not"),
+        ("were", "were not"),
+        ("has", "has not"),
+        ("have", "have not"),
+        ("does", "does not"),
+        ("do", "do not"),
+        ("did", "did not"),
+        ("will", "will not"),
+        ("can", "cannot"),
+        ("could", "could not"),
+        ("should", "should not"),
+        ("would", "would not"),
+        ("may", "may not"),
+        ("might", "might not"),
+        ("must", "must not"),
     ];
 
     for (pos, neg) in &opposite_pairs {
@@ -307,12 +338,44 @@ pub fn detect_simple_contradiction(claim_a: &str, claim_b: &str) -> bool {
         }
     }
 
-    let opposite_words = ["true", "false", "yes", "no", "positive", "negative",
-        "increase", "decrease", "grow", "shrink", "win", "lose",
-        "success", "failure", "correct", "incorrect", "right", "wrong",
-        "enable", "disable", "start", "stop", "begin", "end",
-        "on", "off", "open", "closed", "full", "empty",
-        "present", "absent", "include", "exclude", "accept", "reject"];
+    let opposite_words = [
+        "true",
+        "false",
+        "yes",
+        "no",
+        "positive",
+        "negative",
+        "increase",
+        "decrease",
+        "grow",
+        "shrink",
+        "win",
+        "lose",
+        "success",
+        "failure",
+        "correct",
+        "incorrect",
+        "right",
+        "wrong",
+        "enable",
+        "disable",
+        "start",
+        "stop",
+        "begin",
+        "end",
+        "on",
+        "off",
+        "open",
+        "closed",
+        "full",
+        "empty",
+        "present",
+        "absent",
+        "include",
+        "exclude",
+        "accept",
+        "reject",
+    ];
 
     for pair in opposite_words.chunks(2) {
         if pair.len() == 2 {
@@ -373,7 +436,10 @@ pub struct ConfidenceStore {
 impl serde::Serialize for ConfidenceStore {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let inner = self.inner.read().map_err(serde::ser::Error::custom)?;
-        let contradictions = self.contradictions.read().map_err(serde::ser::Error::custom)?;
+        let contradictions = self
+            .contradictions
+            .read()
+            .map_err(serde::ser::Error::custom)?;
         #[derive(serde::Serialize)]
         struct Repr<'a> {
             inner: &'a HashMap<Uuid, EpistemicConfidence>,
@@ -417,7 +483,10 @@ impl ConfidenceStore {
     }
 
     /// Convenience: look up confidence by string node ID (parses as UUID).
-    pub fn get_confidence_by_str(&self, node_id: &str) -> Result<Option<EpistemicConfidence>, String> {
+    pub fn get_confidence_by_str(
+        &self,
+        node_id: &str,
+    ) -> Result<Option<EpistemicConfidence>, String> {
         let uuid = Uuid::parse_str(node_id).map_err(|e| format!("Invalid UUID: {}", e))?;
         self.get_confidence(&uuid)
     }
@@ -491,10 +560,7 @@ impl ConfidenceStore {
         Ok(())
     }
 
-    pub fn get_contradictions(
-        &self,
-        node_id: &str,
-    ) -> Result<Vec<ContradictingFact>, String> {
+    pub fn get_contradictions(&self, node_id: &str) -> Result<Vec<ContradictingFact>, String> {
         let map = self
             .contradictions
             .read()
@@ -522,7 +588,9 @@ impl ConfidenceStore {
         let cutoff = now - older_than_days * 86400;
         let to_remove: Vec<Uuid> = map
             .iter()
-            .filter(|(_, epistemic)| epistemic.last_confirmed_at > 0 && epistemic.last_confirmed_at < cutoff)
+            .filter(|(_, epistemic)| {
+                epistemic.last_confirmed_at > 0 && epistemic.last_confirmed_at < cutoff
+            })
             .map(|(id, _)| *id)
             .collect();
         let count = to_remove.len() as u64;
@@ -760,14 +828,8 @@ mod tests {
     fn test_decay_clamps() {
         let mut c = make_confidence(0.8, 0.8, 0.8, 0.5);
         c.decay(1000.0, 10.0);
-        assert!(
-            c.recency_confidence >= 0.0,
-            "Decay should not go negative"
-        );
-        assert!(
-            c.recency_confidence <= 1.0,
-            "Decay should not exceed 1.0"
-        );
+        assert!(c.recency_confidence >= 0.0, "Decay should not go negative");
+        assert!(c.recency_confidence <= 1.0, "Decay should not exceed 1.0");
     }
 
     #[test]
@@ -810,10 +872,7 @@ mod tests {
             c.last_confirmed_at > old_confirmed,
             "last_confirmed_at should update"
         );
-        assert!(
-            c.computed_at >= old_computed,
-            "computed_at should update"
-        );
+        assert!(c.computed_at >= old_computed, "computed_at should update");
     }
 
     #[test]
@@ -982,7 +1041,11 @@ mod tests {
     #[test]
     fn test_newman_consensus_single_source() {
         let c = newman_consensus(&[0.8]);
-        assert!((c - 0.8).abs() < 0.01, "single source 0.8 -> 0.8, got {}", c);
+        assert!(
+            (c - 0.8).abs() < 0.01,
+            "single source 0.8 -> 0.8, got {}",
+            c
+        );
     }
 
     #[test]
@@ -990,7 +1053,12 @@ mod tests {
         let confs = vec![0.8; 10];
         let c = newman_consensus(&confs);
         let expected = 1.0 - (1.0 / 10.0) * 10.0 * (1.0 - 0.8);
-        assert!((c - expected).abs() < 0.01, "10 sources 0.8: expected {}, got {}", expected, c);
+        assert!(
+            (c - expected).abs() < 0.01,
+            "10 sources 0.8: expected {}, got {}",
+            expected,
+            c
+        );
     }
 
     #[test]
@@ -1009,7 +1077,10 @@ mod tests {
     #[test]
     fn test_should_auto_archive_fresh() {
         let c = make_confidence(0.8, 0.8, 0.8, 0.9);
-        assert!(!should_auto_archive(&c), "Fresh fact should not be archived");
+        assert!(
+            !should_auto_archive(&c),
+            "Fresh fact should not be archived"
+        );
     }
 
     #[test]
@@ -1258,16 +1329,10 @@ mod tests {
 
         let store = ConfidenceStore::new(DecayConfig::default());
         store
-            .store_confidence(
-                &high_conf_id,
-                &make_confidence(0.9, 0.9, 0.9, 0.9),
-            )
+            .store_confidence(&high_conf_id, &make_confidence(0.9, 0.9, 0.9, 0.9))
             .unwrap();
         store
-            .store_confidence(
-                &low_conf_id,
-                &make_confidence(0.2, 0.2, 0.2, 0.2),
-            )
+            .store_confidence(&low_conf_id, &make_confidence(0.2, 0.2, 0.2, 0.2))
             .unwrap();
 
         let results = search_with_confidence(
@@ -1338,7 +1403,13 @@ mod tests {
         let info = detect_consensus(
             5,
             0,
-            vec!["s1".to_string(), "s2".to_string(), "s3".to_string(), "s4".to_string(), "s5".to_string()],
+            vec![
+                "s1".to_string(),
+                "s2".to_string(),
+                "s3".to_string(),
+                "s4".to_string(),
+                "s5".to_string(),
+            ],
             vec![],
         );
         assert!(
@@ -1440,7 +1511,9 @@ mod tests {
 
     #[test]
     fn test_conservative_strategy_rejects_low() {
-        let strategy = RetrievalStrategy::Conservative { min_confidence: 0.7 };
+        let strategy = RetrievalStrategy::Conservative {
+            min_confidence: 0.7,
+        };
         let result = matches!(strategy, RetrievalStrategy::Conservative { .. });
         assert!(result, "Conservative with 0.7 min should be identifiable");
     }

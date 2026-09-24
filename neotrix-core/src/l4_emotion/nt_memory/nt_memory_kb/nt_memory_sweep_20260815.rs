@@ -274,19 +274,25 @@ impl UntrustedFence {
     }
 
     /// 围栏写入: 把 untrusted 内容包上边界标记。
-    pub fn fence(&mut self, doc_id: impl Into<String>, content: &str, source_url: impl Into<String>) -> String {
+    pub fn fence(
+        &mut self,
+        doc_id: impl Into<String>,
+        content: &str,
+        source_url: impl Into<String>,
+    ) -> String {
         let id = doc_id.into();
-        self.fences.insert(
-            id.clone(),
-            FencedContent::untrusted(id, source_url),
-        );
+        self.fences
+            .insert(id.clone(), FencedContent::untrusted(id, source_url));
         format!("{}{}{}", self.marker_open, content, self.marker_close)
     }
 
     /// 围栏读取: 剥离边界标记。未闭合 → None (拒绝消费)。
     pub fn unwrap(&self, content: &str) -> Option<String> {
         if content.starts_with(self.marker_open) && content.ends_with(self.marker_close) {
-            Some(content[self.marker_open.len()..content.len() - self.marker_close.len()].to_string())
+            Some(
+                content[self.marker_open.len()..content.len() - self.marker_close.len()]
+                    .to_string(),
+            )
         } else if content.contains(self.marker_open) || content.contains(self.marker_close) {
             None
         } else {
@@ -304,7 +310,9 @@ impl UntrustedFence {
     }
 
     pub fn source_url(&self, doc_id: &str) -> Option<&str> {
-        self.fences.get(doc_id).and_then(|f| f.source_url.as_deref())
+        self.fences
+            .get(doc_id)
+            .and_then(|f| f.source_url.as_deref())
     }
 
     pub(crate) fn _fence_count(&self) -> usize {
@@ -372,7 +380,8 @@ impl QualityRanker {
     }
 
     pub fn set_citation_authority(&mut self, doc_id: impl Into<String>, a: f64) {
-        self.citation_authority.insert(doc_id.into(), a.clamp(0.0, 1.0));
+        self.citation_authority
+            .insert(doc_id.into(), a.clamp(0.0, 1.0));
     }
 
     pub(crate) fn _set_centrality(&mut self, doc_id: impl Into<String>, c: f64) {
@@ -966,10 +975,15 @@ mod tests {
         matrix.index_keywords("trusted", vec![("a".into(), 3)]);
         matrix.index_keywords("untrusted", vec![("a".into(), 3)]);
         fence.fence("untrusted", "raw", "http://x");
-        let hits = matrix.hybrid_search_quality(&[], &["a"], 10, &QualityRanker::new(), &fence, false);
-        assert!(hits.iter().all(|h| h.doc_id != "untrusted"), "untrusted 默认过滤");
+        let hits =
+            matrix.hybrid_search_quality(&[], &["a"], 10, &QualityRanker::new(), &fence, false);
+        assert!(
+            hits.iter().all(|h| h.doc_id != "untrusted"),
+            "untrusted 默认过滤"
+        );
         assert!(matrix.is_fenced_doc("untrusted", &fence));
-        let all = matrix.hybrid_search_quality(&[], &["a"], 10, &QualityRanker::new(), &fence, true);
+        let all =
+            matrix.hybrid_search_quality(&[], &["a"], 10, &QualityRanker::new(), &fence, true);
         assert_eq!(all.len(), 2, "include_untrusted 时全部返回");
     }
 
@@ -1008,7 +1022,10 @@ mod tests {
         ledger.note_updated("fresh", t_now);
         let hits = matrix.hybrid_search(&[], &["a"], 10);
         let staleness = ledger.staleness_at_k(&hits, 3);
-        assert!(staleness > 0.0 && staleness < 1.0, "staleness@k ∈ (0,1), got {staleness}");
+        assert!(
+            staleness > 0.0 && staleness < 1.0,
+            "staleness@k ∈ (0,1), got {staleness}"
+        );
         assert!(ledger.is_stale("stale", 3), "stale 应过期");
         assert!(!ledger.is_stale("fresh", 3), "fresh 不应过期");
     }
@@ -1025,7 +1042,11 @@ mod tests {
         ledger.mark_should_forget("keep");
         ledger.mark_should_forget("forget");
         // 尚未遗忘 → gap 高 (2/2 仍在)
-        assert_eq!(ledger.forgetting_gap(&matrix), 1.0, "2/2 应遗忘记忆仍在 → 1.0");
+        assert_eq!(
+            ledger.forgetting_gap(&matrix),
+            1.0,
+            "2/2 应遗忘记忆仍在 → 1.0"
+        );
         // 模拟真正遗忘: 从索引移除 forget → gap 0.5 (1/2 仍在)
         let mut mx = RetrievalMatrix::new();
         mx.index_keywords("keep", vec![("a".into(), 1)]);

@@ -1,10 +1,14 @@
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::*;
+use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 
-pub fn sync_directory(kb: &KnowledgeBase, dir: &Path, prefix: &str) -> Result<WikiSyncReport, String> {
+pub fn sync_directory(
+    kb: &KnowledgeBase,
+    dir: &Path,
+    prefix: &str,
+) -> Result<WikiSyncReport, String> {
     let mut report = WikiSyncReport::default();
     let mut files: Vec<PathBuf> = Vec::new();
     collect_md_files(dir, &mut files, prefix)?;
@@ -60,15 +64,15 @@ pub fn sync_directory(kb: &KnowledgeBase, dir: &Path, prefix: &str) -> Result<Wi
 
         match kb.insert_node(&node) {
             Ok(()) => report.synced += 1,
-            Err(e) => {
-                match kb.update_node(&node) {
-                    Ok(()) => report.synced += 1,
-                    Err(e2) => {
-                        report.errors.push((file_stem, format!("insert: {}/update: {}", e, e2)));
-                        continue;
-                    }
+            Err(e) => match kb.update_node(&node) {
+                Ok(()) => report.synced += 1,
+                Err(e2) => {
+                    report
+                        .errors
+                        .push((file_stem, format!("insert: {}/update: {}", e, e2)));
+                    continue;
                 }
-            }
+            },
         }
 
         for link in &wiki_links {
@@ -80,7 +84,9 @@ pub fn sync_directory(kb: &KnowledgeBase, dir: &Path, prefix: &str) -> Result<Wi
                 1.0,
                 Some("wiki_link"),
             ) {
-                report.errors.push((format!("{} -> {}", file_stem, link), e));
+                report
+                    .errors
+                    .push((format!("{} -> {}", file_stem, link), e));
             } else {
                 report.edges_created += 1;
             }
@@ -98,7 +104,9 @@ pub fn build_graph(kb: &KnowledgeBase) -> Result<WikiGraph, String> {
     };
 
     for n in &nodes {
-        let file_stem = n.metadata.as_ref()
+        let file_stem = n
+            .metadata
+            .as_ref()
             .and_then(|m| m.get("file_stem"))
             .and_then(|v| v.as_str())
             .unwrap_or(&n.id)
@@ -116,7 +124,11 @@ pub fn build_graph(kb: &KnowledgeBase) -> Result<WikiGraph, String> {
             Ok(c) => c,
             Err(e) => return Err(format!("Lock: {}", e)),
         };
-        if let Ok(edge_list) = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_store::get_edges_for_node(&conn, &n.id) {
+        if let Ok(edge_list) =
+            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_store::get_edges_for_node(
+                &conn, &n.id,
+            )
+        {
             for e in &edge_list {
                 if e.relation_type == RelationType::WikiLink {
                     graph.edges.push(WikiEdge {
@@ -134,8 +146,10 @@ pub fn build_graph(kb: &KnowledgeBase) -> Result<WikiGraph, String> {
 
 pub fn generate_graph_html(kb: &KnowledgeBase) -> Result<String, String> {
     let graph = build_graph(kb)?;
-    let nodes_json = serde_json::to_string(&graph.nodes).map_err(|e| format!("serialize nodes: {}", e))?;
-    let edges_json = serde_json::to_string(&graph.edges).map_err(|e| format!("serialize edges: {}", e))?;
+    let nodes_json =
+        serde_json::to_string(&graph.nodes).map_err(|e| format!("serialize nodes: {}", e))?;
+    let edges_json =
+        serde_json::to_string(&graph.edges).map_err(|e| format!("serialize edges: {}", e))?;
 
     let template = r##"<!DOCTYPE html>
 <html lang="en">
@@ -231,7 +245,11 @@ simulation.on("tick", () => {
     Ok(html)
 }
 
-pub fn query(kb: &KnowledgeBase, query_text: &str, limit: usize) -> Result<Vec<WikiSearchResult>, String> {
+pub fn query(
+    kb: &KnowledgeBase,
+    query_text: &str,
+    limit: usize,
+) -> Result<Vec<WikiSearchResult>, String> {
     let results = kb.search(query_text, limit)?;
     let wiki_results: Vec<WikiSearchResult> = results
         .into_iter()
@@ -249,14 +267,18 @@ pub fn query(kb: &KnowledgeBase, query_text: &str, limit: usize) -> Result<Vec<W
 // ---- Helpers ----
 
 fn collect_md_files(dir: &Path, files: &mut Vec<PathBuf>, prefix: &str) -> Result<(), String> {
-    let entries = std::fs::read_dir(dir)
-        .map_err(|e| format!("read_dir {}: {}", dir.display(), e))?;
+    let entries =
+        std::fs::read_dir(dir).map_err(|e| format!("read_dir {}: {}", dir.display(), e))?;
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
             collect_md_files(&path, files, prefix)?;
         } else if path.extension().is_some_and(|ext| ext == "md") {
-            let relative = path.strip_prefix(prefix).unwrap_or(&path).display().to_string();
+            let relative = path
+                .strip_prefix(prefix)
+                .unwrap_or(&path)
+                .display()
+                .to_string();
             if !relative.contains("node_modules") && !relative.starts_with('.') {
                 files.push(path);
             }
@@ -299,7 +321,12 @@ fn extract_wiki_links(content: &str) -> Vec<String> {
             let after = &remaining[start + 2..];
             if let Some(end) = after.find("]]") {
                 let link_text = &after[..end];
-                let target = link_text.split('|').next().unwrap_or(link_text).trim().to_string();
+                let target = link_text
+                    .split('|')
+                    .next()
+                    .unwrap_or(link_text)
+                    .trim()
+                    .to_string();
                 if !target.is_empty() && !target.starts_with("http") {
                     links.push(target);
                 }

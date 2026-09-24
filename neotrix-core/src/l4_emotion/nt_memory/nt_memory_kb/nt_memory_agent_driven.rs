@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use std::time::Instant;
 use uuid::Uuid;
 
-fn instant_now() -> Instant { Instant::now() }
+fn instant_now() -> Instant {
+    Instant::now()
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MemoryTier {
@@ -71,11 +73,13 @@ impl AgentMemoryEntry {
     }
 
     pub fn with_embedding(mut self, embedding: Vec<f32>) -> Self {
-        self.embedding = Some(embedding); self
+        self.embedding = Some(embedding);
+        self
     }
 
     pub fn with_metadata(mut self, key: &str, value: &str) -> Self {
-        self.metadata.insert(key.to_string(), value.to_string()); self
+        self.metadata.insert(key.to_string(), value.to_string());
+        self
     }
 
     pub fn access(&mut self) {
@@ -101,7 +105,13 @@ pub struct MemoryConfig {
 
 impl Default for MemoryConfig {
     fn default() -> Self {
-        Self { core_max: 50, working_max: 500, archival_max: 5000, auto_archival_score_threshold: 0.5, consolidation_interval_secs: 300 }
+        Self {
+            core_max: 50,
+            working_max: 500,
+            archival_max: 5000,
+            auto_archival_score_threshold: 0.5,
+            consolidation_interval_secs: 300,
+        }
     }
 }
 
@@ -117,7 +127,13 @@ pub struct AgentMemory {
 
 impl AgentMemory {
     pub fn new(config: MemoryConfig) -> Self {
-        Self { config, core: Vec::new(), working: Vec::new(), archival: Vec::new(), last_consolidation: Instant::now() }
+        Self {
+            config,
+            core: Vec::new(),
+            working: Vec::new(),
+            archival: Vec::new(),
+            last_consolidation: Instant::now(),
+        }
     }
 
     pub fn insert(&mut self, content: &str) -> Uuid {
@@ -167,12 +183,18 @@ impl AgentMemory {
     }
 
     pub fn find_entry(&self, entry_id: &Uuid) -> Option<&AgentMemoryEntry> {
-        self.core.iter().chain(self.working.iter()).chain(self.archival.iter())
+        self.core
+            .iter()
+            .chain(self.working.iter())
+            .chain(self.archival.iter())
             .find(|e| e.id == *entry_id)
     }
 
     pub fn find_entry_mut(&mut self, entry_id: &Uuid) -> Option<&mut AgentMemoryEntry> {
-        self.core.iter_mut().chain(self.working.iter_mut()).chain(self.archival.iter_mut())
+        self.core
+            .iter_mut()
+            .chain(self.working.iter_mut())
+            .chain(self.archival.iter_mut())
             .find(|e| e.id == *entry_id)
     }
 
@@ -183,13 +205,20 @@ impl AgentMemory {
             MemoryTier::Working => &self.working,
             MemoryTier::Archival => &self.archival,
         };
-        pool.iter().filter(|e| !e.superseded && e.content.to_lowercase().contains(&q)).collect()
+        pool.iter()
+            .filter(|e| !e.superseded && e.content.to_lowercase().contains(&q))
+            .collect()
     }
 
     pub fn search_all(&self, query: &str) -> Vec<(&AgentMemoryEntry, f64)> {
         let q = query.to_lowercase();
         let mut results = Vec::new();
-        for entry in self.core.iter().chain(self.working.iter()).chain(self.archival.iter()) {
+        for entry in self
+            .core
+            .iter()
+            .chain(self.working.iter())
+            .chain(self.archival.iter())
+        {
             if !entry.superseded && entry.content.to_lowercase().contains(&q) {
                 let weight = entry.tier.weight();
                 results.push((entry, weight));
@@ -201,7 +230,11 @@ impl AgentMemory {
 
     pub(crate) fn _recent_core(&self, n: usize) -> Vec<&AgentMemoryEntry> {
         let mut sorted: Vec<_> = self.core.iter().filter(|e| !e.superseded).collect();
-        sorted.sort_by(|a, b| b.created_at.partial_cmp(&a.created_at).unwrap_or(std::cmp::Ordering::Equal));
+        sorted.sort_by(|a, b| {
+            b.created_at
+                .partial_cmp(&a.created_at)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         sorted.truncate(n);
         sorted
     }
@@ -219,7 +252,9 @@ impl AgentMemory {
                 self.working.push(e);
                 moved += 1;
                 false
-            } else { true }
+            } else {
+                true
+            }
         });
 
         self.working.retain(|entry| {
@@ -231,11 +266,14 @@ impl AgentMemory {
                 self.archival.push(e);
                 moved += 1;
                 false
-            } else { true }
+            } else {
+                true
+            }
         });
 
         self.core.sort_by(|a, b| {
-            b.consolidation_score(now).partial_cmp(&a.consolidation_score(now))
+            b.consolidation_score(now)
+                .partial_cmp(&a.consolidation_score(now))
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         while self.core.len() > self.config.core_max {
@@ -252,10 +290,13 @@ impl AgentMemory {
     }
 
     pub fn apply_budget_pressure(&mut self) {
-        if self.core.len() <= self.config.core_max { return; }
+        if self.core.len() <= self.config.core_max {
+            return;
+        }
         let now = Instant::now();
         self.core.sort_by(|a, b| {
-            b.consolidation_score(now).partial_cmp(&a.consolidation_score(now))
+            b.consolidation_score(now)
+                .partial_cmp(&a.consolidation_score(now))
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         while self.core.len() > self.config.core_max {
@@ -309,7 +350,13 @@ mod tests {
 
     #[test]
     fn test_search_all_tier_weighted() {
-        let mut mem = AgentMemory::new(MemoryConfig { core_max: 50, working_max: 500, archival_max: 5000, auto_archival_score_threshold: 0.5, consolidation_interval_secs: 300 });
+        let mut mem = AgentMemory::new(MemoryConfig {
+            core_max: 50,
+            working_max: 500,
+            archival_max: 5000,
+            auto_archival_score_threshold: 0.5,
+            consolidation_interval_secs: 300,
+        });
         let core_id = mem.insert("shared content");
         let working_entry = AgentMemoryEntry::new(MemoryTier::Working, "shared content");
         let working_id = working_entry.id;
@@ -317,8 +364,16 @@ mod tests {
 
         let res = mem.search_all("shared");
         assert_eq!(res.len(), 2);
-        let core_weight = res.iter().find(|(e, _)| e.id == core_id).map(|(_, w)| *w).unwrap();
-        let working_weight = res.iter().find(|(e, _)| e.id == working_id).map(|(_, w)| *w).unwrap();
+        let core_weight = res
+            .iter()
+            .find(|(e, _)| e.id == core_id)
+            .map(|(_, w)| *w)
+            .unwrap();
+        let working_weight = res
+            .iter()
+            .find(|(e, _)| e.id == working_id)
+            .map(|(_, w)| *w)
+            .unwrap();
         assert!(core_weight > working_weight);
     }
 
@@ -336,7 +391,13 @@ mod tests {
 
     #[test]
     fn test_budget_pressure_keeps_core_within_limit() {
-        let config = MemoryConfig { core_max: 3, working_max: 500, archival_max: 5000, auto_archival_score_threshold: 0.5, consolidation_interval_secs: 300 };
+        let config = MemoryConfig {
+            core_max: 3,
+            working_max: 500,
+            archival_max: 5000,
+            auto_archival_score_threshold: 0.5,
+            consolidation_interval_secs: 300,
+        };
         let mut mem = AgentMemory::new(config);
         mem.insert("a");
         mem.insert("b");
@@ -349,7 +410,13 @@ mod tests {
 
     #[test]
     fn test_consolidation_moves_low_score_entries() {
-        let config = MemoryConfig { core_max: 50, working_max: 500, archival_max: 5000, auto_archival_score_threshold: 999999.0, consolidation_interval_secs: 300 };
+        let config = MemoryConfig {
+            core_max: 50,
+            working_max: 500,
+            archival_max: 5000,
+            auto_archival_score_threshold: 999999.0,
+            consolidation_interval_secs: 300,
+        };
         let mut mem = AgentMemory::new(config);
         let id = mem.insert("important");
         mem.find_entry_mut(&id).unwrap().access();

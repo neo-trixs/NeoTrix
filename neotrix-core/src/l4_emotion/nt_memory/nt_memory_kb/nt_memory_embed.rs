@@ -1,5 +1,5 @@
-use serde::Deserialize;
 use rusqlite::{params, Connection};
+use serde::Deserialize;
 use std::sync::OnceLock;
 
 /// 本地 hash-kernel 嵌入提供者，实现 EmbeddingProvider trait。
@@ -22,7 +22,10 @@ impl Default for LocalEmbeddingProvider {
 impl neotrix_types::knowledge_access::EmbeddingProvider for LocalEmbeddingProvider {
     async fn embed(&self, text: &str) -> Result<Vec<f32>, String> {
         let results = local_embed_texts(&[text], self.dim);
-        results.into_iter().next().ok_or_else(|| "Empty embedding result".to_string())
+        results
+            .into_iter()
+            .next()
+            .ok_or_else(|| "Empty embedding result".to_string())
     }
 
     fn dim(&self) -> usize {
@@ -88,7 +91,8 @@ impl Default for EmbeddingConfig {
             model: std::env::var("NEOTRIX_EMBEDDING_MODEL")
                 .unwrap_or_else(|_| "all-MiniLM-L6-v2".to_string()),
             dimension: std::env::var("NEOTRIX_EMBEDDING_DIMENSION")
-                .ok().and_then(|s| s.parse().ok())
+                .ok()
+                .and_then(|s| s.parse().ok())
                 .unwrap_or(384),
             mode: EmbedMode::from_env(),
         }
@@ -109,7 +113,9 @@ struct EmbeddingData {
 /// Generate a single embedding vector via OpenAI-compatible API.
 pub fn embed_text(config: &EmbeddingConfig, text: &str) -> Result<Vec<f32>, String> {
     let mut results = embed_text_batch(config, &[text])?;
-    results.pop().ok_or_else(|| "Empty batch response".to_string())
+    results
+        .pop()
+        .ok_or_else(|| "Empty batch response".to_string())
 }
 
 /// 内嵌 hash-kernel 文本嵌入 (Cycle 207): 确定性、零依赖、任意维度。
@@ -145,12 +151,16 @@ fn hash_kernel_embed(text: &str, dim: usize) -> Vec<f32> {
     };
     add_ngram(2, 3, 0x8D5B); // bigram
     add_ngram(3, 4, 0x5A9E); // trigram
-    if chars.len() >= 4 { add_ngram(4, 5, 0xC3A1); } // 4-gram (仅长文本)
+    if chars.len() >= 4 {
+        add_ngram(4, 5, 0xC3A1);
+    } // 4-gram (仅长文本)
 
     // L2 归一化
     let norm: f32 = acc.iter().map(|x| x * x).sum::<f32>().sqrt();
     if norm > 1e-8 {
-        for x in acc.iter_mut() { *x /= norm; }
+        for x in acc.iter_mut() {
+            *x /= norm;
+        }
     }
     acc
 }
@@ -166,19 +176,22 @@ fn fnv1a(s: &str, salt: u64) -> u64 {
 
 fn embedding_client() -> Result<&'static reqwest::blocking::Client, String> {
     static CLIENT: OnceLock<Result<reqwest::blocking::Client, String>> = OnceLock::new();
-    CLIENT.get_or_init(|| {
-        reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(120))
-            .build()
-            .map_err(|e| format!("embedding HTTP client: {}", e))
-    })
-    .as_ref()
-    .map_err(|e| e.clone())
+    CLIENT
+        .get_or_init(|| {
+            reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(120))
+                .build()
+                .map_err(|e| format!("embedding HTTP client: {}", e))
+        })
+        .as_ref()
+        .map_err(|e| e.clone())
 }
 
 /// Generate embeddings for multiple texts in a single API call.
 pub fn embed_text_batch(config: &EmbeddingConfig, texts: &[&str]) -> Result<Vec<Vec<f32>>, String> {
-    if texts.is_empty() { return Ok(Vec::new()); }
+    if texts.is_empty() {
+        return Ok(Vec::new());
+    }
 
     if config.mode == EmbedMode::Local {
         return Ok(local_embed_texts(texts, config.dimension));
@@ -213,7 +226,9 @@ pub fn embed_text_batch(config: &EmbeddingConfig, texts: &[&str]) -> Result<Vec<
         let data: EmbeddingResponse = resp.json().map_err(|e| format!("Parse response: {}", e))?;
 
         // Sort by index to preserve original order
-        let mut indexed: Vec<(usize, Vec<f32>)> = data.data.into_iter()
+        let mut indexed: Vec<(usize, Vec<f32>)> = data
+            .data
+            .into_iter()
             .map(|d| (d.index, d.embedding))
             .collect();
         indexed.sort_by_key(|(idx, _)| *idx);
@@ -250,7 +265,12 @@ fn blob_to_vector(blob: &[u8]) -> Vec<f32> {
 }
 
 /// Store a single node's embedding.
-pub fn store_embedding(conn: &Connection, node_id: &str, vector: &[f32], model: &str) -> rusqlite::Result<()> {
+pub fn store_embedding(
+    conn: &Connection,
+    node_id: &str,
+    vector: &[f32],
+    model: &str,
+) -> rusqlite::Result<()> {
     let dim = vector.len() as i32;
     let blob = vector_to_blob(vector);
     conn.execute(
@@ -273,10 +293,18 @@ pub fn get_embedding(conn: &Connection, node_id: &str) -> rusqlite::Result<Optio
 }
 
 pub fn embedding_count(conn: &Connection) -> rusqlite::Result<usize> {
-    conn.query_row("SELECT COUNT(*) FROM embeddings JOIN nodes ON nodes.id = embeddings.node_id", [], |row| row.get(0))
+    conn.query_row(
+        "SELECT COUNT(*) FROM embeddings JOIN nodes ON nodes.id = embeddings.node_id",
+        [],
+        |row| row.get(0),
+    )
 }
 
-pub fn load_embeddings_page(conn: &Connection, offset: usize, limit: usize) -> rusqlite::Result<Vec<(String, Vec<f32>)>> {
+pub fn load_embeddings_page(
+    conn: &Connection,
+    offset: usize,
+    limit: usize,
+) -> rusqlite::Result<Vec<(String, Vec<f32>)>> {
     let mut stmt = conn.prepare(
         "SELECT e.node_id, e.vector FROM embeddings e JOIN nodes n ON n.id = e.node_id ORDER BY e.node_id LIMIT ?1 OFFSET ?2"
     )?;
@@ -295,9 +323,8 @@ pub fn load_embeddings_page(conn: &Connection, offset: usize, limit: usize) -> r
 /// Load all (node_id, embedding) pairs from the database.
 /// Warning: loads entire embedding table into memory — use `load_embeddings_page` for large datasets.
 pub fn load_all_embeddings(conn: &Connection) -> rusqlite::Result<Vec<(String, Vec<f32>)>> {
-    let mut stmt = conn.prepare(
-        "SELECT e.node_id, e.vector FROM embeddings e JOIN nodes n ON n.id = e.node_id"
-    )?;
+    let mut stmt = conn
+        .prepare("SELECT e.node_id, e.vector FROM embeddings e JOIN nodes n ON n.id = e.node_id")?;
     let mut results = Vec::new();
     let rows = stmt.query_map([], |row| {
         let node_id: String = row.get(0)?;
@@ -312,9 +339,8 @@ pub fn load_all_embeddings(conn: &Connection) -> rusqlite::Result<Vec<(String, V
 
 /// Find nodes without embeddings.
 pub fn find_nodes_missing_embeddings(conn: &Connection) -> rusqlite::Result<Vec<String>> {
-    let mut stmt = conn.prepare(
-        "SELECT id FROM nodes WHERE id NOT IN (SELECT node_id FROM embeddings)"
-    )?;
+    let mut stmt =
+        conn.prepare("SELECT id FROM nodes WHERE id NOT IN (SELECT node_id FROM embeddings)")?;
     let rows = stmt.query_map([], |row| row.get(0))?;
     rows.collect()
 }
@@ -360,7 +386,11 @@ pub fn pq_ann_search(
     let ks = cb.ks as usize;
     let d = m * sub_dim;
     if query_vec.len() != d {
-        log::warn!("pq_ann_search: query dim {} != codebook dim {}", query_vec.len(), d);
+        log::warn!(
+            "pq_ann_search: query dim {} != codebook dim {}",
+            query_vec.len(),
+            d
+        );
         return Ok(Vec::new());
     }
 
@@ -372,7 +402,9 @@ pub fn pq_ann_search(
         let mut row = Vec::with_capacity(ks);
         for c in 0..ks {
             let centroid = &cb.codewords[s][c];
-            let dist: f64 = q_sub.iter().zip(centroid.iter())
+            let dist: f64 = q_sub
+                .iter()
+                .zip(centroid.iter())
                 .map(|(a, b)| {
                     let diff = (a - b) as f64;
                     diff * diff
@@ -384,7 +416,7 @@ pub fn pq_ann_search(
     }
 
     let mut stmt = conn.prepare(
-        "SELECT node_id, pq_codes FROM embeddings_pq WHERE (?1 IS NULL OR codebook_id = ?1)"
+        "SELECT node_id, pq_codes FROM embeddings_pq WHERE (?1 IS NULL OR codebook_id = ?1)",
     )?;
     let rows = stmt.query_map([codebook_id], |row| {
         let node_id: String = row.get(0)?;
@@ -398,7 +430,9 @@ pub fn pq_ann_search(
         if codes.len() != m {
             continue;
         }
-        let dist: f64 = codes.iter().enumerate()
+        let dist: f64 = codes
+            .iter()
+            .enumerate()
             .map(|(s, &c)| tables[s][c as usize])
             .sum();
         scored.push((node_id, -dist));
@@ -433,16 +467,23 @@ pub fn pq_ann_search(
 /// Load one vector blob from the `embeddings` table and compute exact cosine
 /// against `query_vec`. Returns `None` if the node has no usable vector.
 fn exact_vector_cosine(conn: &Connection, node_id: &str, query_vec: &[f32]) -> Option<f64> {
-    let blob: Vec<u8> = conn.query_row(
-        "SELECT vector FROM embeddings WHERE node_id = ?1",
-        params![node_id],
-        |row| row.get(0),
-    ).ok()?;
+    let blob: Vec<u8> = conn
+        .query_row(
+            "SELECT vector FROM embeddings WHERE node_id = ?1",
+            params![node_id],
+            |row| row.get(0),
+        )
+        .ok()?;
     let dim_bytes = blob.len() / 4;
     let mut v = Vec::with_capacity(dim_bytes);
     for i in 0..dim_bytes {
         let off = i * 4;
-        v.push(f32::from_le_bytes([blob[off], blob[off + 1], blob[off + 2], blob[off + 3]]));
+        v.push(f32::from_le_bytes([
+            blob[off],
+            blob[off + 1],
+            blob[off + 2],
+            blob[off + 3],
+        ]));
     }
     Some(cosine_similarity_f32(query_vec, &v))
 }
@@ -454,19 +495,38 @@ struct PqCodebook {
     codewords: Vec<Vec<Vec<f32>>>,
 }
 
-fn load_latest_codebook(conn: &Connection, codebook_id: Option<i64>) -> rusqlite::Result<Option<PqCodebook>> {
+fn load_latest_codebook(
+    conn: &Connection,
+    codebook_id: Option<i64>,
+) -> rusqlite::Result<Option<PqCodebook>> {
     let row = if let Some(id) = codebook_id {
         conn.query_row(
             "SELECT m, ks, sub_dim, codewords FROM pq_codebook WHERE id = ?1",
             params![id],
-            |row| Ok((row.get::<_, i32>(0)?, row.get::<_, i32>(1)?, row.get::<_, i32>(2)?, row.get::<_, Vec<u8>>(3)?)),
-        ).ok()
+            |row| {
+                Ok((
+                    row.get::<_, i32>(0)?,
+                    row.get::<_, i32>(1)?,
+                    row.get::<_, i32>(2)?,
+                    row.get::<_, Vec<u8>>(3)?,
+                ))
+            },
+        )
+        .ok()
     } else {
         conn.query_row(
             "SELECT m, ks, sub_dim, codewords FROM pq_codebook ORDER BY id DESC LIMIT 1",
             [],
-            |row| Ok((row.get::<_, i32>(0)?, row.get::<_, i32>(1)?, row.get::<_, i32>(2)?, row.get::<_, Vec<u8>>(3)?)),
-        ).ok()
+            |row| {
+                Ok((
+                    row.get::<_, i32>(0)?,
+                    row.get::<_, i32>(1)?,
+                    row.get::<_, i32>(2)?,
+                    row.get::<_, Vec<u8>>(3)?,
+                ))
+            },
+        )
+        .ok()
     };
     let Some((m, ks, sub_dim, blob)) = row else {
         return Ok(None);
@@ -476,7 +536,11 @@ fn load_latest_codebook(conn: &Connection, codebook_id: Option<i64>) -> rusqlite
     let sub_dim = sub_dim as usize;
     let expect = m * ks * sub_dim * 4;
     if blob.len() != expect {
-        log::warn!("pq_codebook blob size {} != expected {}", blob.len(), expect);
+        log::warn!(
+            "pq_codebook blob size {} != expected {}",
+            blob.len(),
+            expect
+        );
         return Ok(None);
     }
     let mut codewords: Vec<Vec<Vec<f32>>> = Vec::with_capacity(m);
@@ -494,7 +558,12 @@ fn load_latest_codebook(conn: &Connection, codebook_id: Option<i64>) -> rusqlite
         }
         codewords.push(sub);
     }
-    Ok(Some(PqCodebook { m, ks, sub_dim, codewords }))
+    Ok(Some(PqCodebook {
+        m,
+        ks,
+        sub_dim,
+        codewords,
+    }))
 }
 
 /// Result of a PQ training run.
@@ -569,7 +638,10 @@ fn pq_kmeans(rows: &[&[f32]], k: usize, iters: usize) -> Vec<Vec<f32>> {
 }
 
 /// Load all vectors from the `embeddings` table (optionally the first `limit` rows).
-fn load_embeddings_raw(conn: &Connection, limit: Option<usize>) -> rusqlite::Result<(Vec<String>, Vec<Vec<f32>>)> {
+fn load_embeddings_raw(
+    conn: &Connection,
+    limit: Option<usize>,
+) -> rusqlite::Result<(Vec<String>, Vec<Vec<f32>>)> {
     let sql = match limit {
         Some(l) => format!("SELECT node_id, vector FROM embeddings LIMIT {l}"),
         None => "SELECT node_id, vector FROM embeddings".to_string(),
@@ -610,7 +682,8 @@ pub fn train_pq_codebook(
     if m == 0 || !dimension.is_multiple_of(m) {
         return Err(format!("m must be a positive divisor of {dimension}"));
     }
-    let total: i64 = conn.query_row("SELECT COUNT(*) FROM embeddings", [], |r| r.get(0))
+    let total: i64 = conn
+        .query_row("SELECT COUNT(*) FROM embeddings", [], |r| r.get(0))
         .map_err(|e| format!("PQ: count embeddings: {e}"))?;
     if (total as usize) < ks * 4 {
         return Err(format!(
@@ -618,13 +691,17 @@ pub fn train_pq_codebook(
             ks * 4
         ));
     }
-    let (ids, vecs) = load_embeddings_raw(conn, limit).map_err(|e| format!("PQ: load embeddings: {e}"))?;
+    let (ids, vecs) =
+        load_embeddings_raw(conn, limit).map_err(|e| format!("PQ: load embeddings: {e}"))?;
     let n = vecs.len();
     let sub_dim = dimension / m;
 
     let mut codewords_all: Vec<Vec<Vec<f32>>> = Vec::with_capacity(m);
     for s in 0..m {
-        let sub: Vec<&[f32]> = vecs.iter().map(|r| &r[s * sub_dim..(s + 1) * sub_dim]).collect();
+        let sub: Vec<&[f32]> = vecs
+            .iter()
+            .map(|r| &r[s * sub_dim..(s + 1) * sub_dim])
+            .collect();
         codewords_all.push(pq_kmeans(&sub, ks, 10));
     }
 
@@ -667,7 +744,13 @@ pub fn train_pq_codebook(
             params![ids[i], codes, codebook_id],
         ).map_err(|e| format!("insert embeddings_pq for {}: {e}", ids[i]))?;
     }
-    Ok(PqTrainReport { codebook_id, m, ks, sub_dim, vector_count: n })
+    Ok(PqTrainReport {
+        codebook_id,
+        m,
+        ks,
+        sub_dim,
+        vector_count: n,
+    })
 }
 
 fn unix_now() -> i64 {
@@ -702,19 +785,37 @@ mod tests {
         assert_eq!(v.len(), 2);
         assert_eq!(v[0].len(), 384);
         let norm: f32 = v[0].iter().map(|x| x * x).sum::<f32>().sqrt();
-        assert!((norm - 1.0).abs() < 1e-4, "L2 norm should be 1.0, got {}", norm);
+        assert!(
+            (norm - 1.0).abs() < 1e-4,
+            "L2 norm should be 1.0, got {}",
+            norm
+        );
     }
 
     #[test]
     fn test_local_hash_kernel_deterministic_and_similar() {
-        let a = local_embed_texts(&["neotrix consciousness core", "neotrix consciousness core"], 384);
+        let a = local_embed_texts(
+            &["neotrix consciousness core", "neotrix consciousness core"],
+            384,
+        );
         // 同文本 → 同向量
         assert_eq!(a[0], a[1]);
         // 相似文本 → 高 cosine
-        let b = local_embed_texts(&["neotrix consciousness tree", "random unrelated text about quantum"], 384);
+        let b = local_embed_texts(
+            &[
+                "neotrix consciousness tree",
+                "random unrelated text about quantum",
+            ],
+            384,
+        );
         let sim_same = cosine_similarity_f32(&a[0], &b[0]);
         let sim_diff = cosine_similarity_f32(&a[0], &b[1]);
-        assert!(sim_same > sim_diff, "similar should rank above dissimilar: {} vs {}", sim_same, sim_diff);
+        assert!(
+            sim_same > sim_diff,
+            "similar should rank above dissimilar: {} vs {}",
+            sim_same,
+            sim_diff
+        );
     }
 
     #[test]
@@ -736,7 +837,13 @@ mod tests {
 
     #[test]
     fn test_embed_text_batch_local_mode_no_network() {
-        let cfg = EmbeddingConfig { api_key: "local".into(), base_url: "http://127.0.0.1:1/v1".into(), model: "hash-kernel".into(), dimension: 384, mode: EmbedMode::Local };
+        let cfg = EmbeddingConfig {
+            api_key: "local".into(),
+            base_url: "http://127.0.0.1:1/v1".into(),
+            model: "hash-kernel".into(),
+            dimension: 384,
+            mode: EmbedMode::Local,
+        };
         let v = embed_text_batch(&cfg, &["t1", "t2"]).unwrap();
         assert_eq!(v.len(), 2);
         assert_eq!(v[0].len(), 384);
@@ -745,12 +852,25 @@ mod tests {
     #[test]
     fn test_embed_text_batch_http_failure_falls_back_to_local() {
         // 即便 mode=Http, 若 server 不可达也必须回退到 hash-kernel (零依赖闭环).
-        let cfg = EmbeddingConfig { api_key: "x".into(), base_url: "http://127.0.0.1:1/v1".into(), model: "mini".into(), dimension: 384, mode: EmbedMode::Http };
+        let cfg = EmbeddingConfig {
+            api_key: "x".into(),
+            base_url: "http://127.0.0.1:1/v1".into(),
+            model: "mini".into(),
+            dimension: 384,
+            mode: EmbedMode::Http,
+        };
         let v = embed_text_batch(&cfg, &["t1", "t2"]).unwrap();
         assert_eq!(v.len(), 2);
         assert_eq!(v[0].len(), 384);
         // 回退产物应与 Local 模式一致 (确定性)
-        let local = embed_text_batch(&EmbeddingConfig { mode: EmbedMode::Local, ..cfg.clone() }, &["t1", "t2"]).unwrap();
+        let local = embed_text_batch(
+            &EmbeddingConfig {
+                mode: EmbedMode::Local,
+                ..cfg.clone()
+            },
+            &["t1", "t2"],
+        )
+        .unwrap();
         assert_eq!(v, local);
     }
 
@@ -807,7 +927,10 @@ mod tests {
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].0, "n1");
         // After exact re-ranking the score is cosine similarity (positive for a match).
-        assert!(hits[0].1 > 0.0, "re-ranked score should be cosine similarity");
+        assert!(
+            hits[0].1 > 0.0,
+            "re-ranked score should be cosine similarity"
+        );
     }
 
     #[test]
@@ -822,7 +945,10 @@ mod tests {
         // 截断后的 content 部分必须是完整字符 (无 replacement char / 无 panic)
         assert!(text.contains("案"), "content chars preserved");
         // 若截断到 500 bytes, 应以完整字符结束 — 检查最后一个 char 合法
-        assert!(text.is_char_boundary(text.len()), "text ends at char boundary");
+        assert!(
+            text.is_char_boundary(text.len()),
+            "text ends at char boundary"
+        );
         // 边界精确测试: 恰好在边界外的情况
         let content2 = "案".repeat(250); // 750 bytes > 500
         let text2 = build_node_text("t", None, Some(&content2));
@@ -840,7 +966,13 @@ mod tests {
         .unwrap();
         // 8 vectors of dim 4 clustered so kmeans converges: two clusters of 4
         let vecs: Vec<Vec<f32>> = (0..8)
-            .map(|i| if i < 4 { vec![1.0, 1.0, 1.0, 1.0] } else { vec![5.0, 5.0, 5.0, 5.0] })
+            .map(|i| {
+                if i < 4 {
+                    vec![1.0, 1.0, 1.0, 1.0]
+                } else {
+                    vec![5.0, 5.0, 5.0, 5.0]
+                }
+            })
             .collect();
         for (i, v) in vecs.iter().enumerate() {
             conn.execute(
@@ -857,9 +989,13 @@ mod tests {
         assert_eq!(report.vector_count, 8);
         assert!(report.codebook_id >= 1);
 
-        let pq_count: i64 = conn.query_row("SELECT COUNT(*) FROM embeddings_pq", [], |r| r.get(0)).unwrap();
+        let pq_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM embeddings_pq", [], |r| r.get(0))
+            .unwrap();
         assert_eq!(pq_count, 8);
-        let cb_count: i64 = conn.query_row("SELECT COUNT(*) FROM pq_codebook", [], |r| r.get(0)).unwrap();
+        let cb_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM pq_codebook", [], |r| r.get(0))
+            .unwrap();
         assert_eq!(cb_count, 1);
 
         // The trained codebook must be loadable and searchable: query == cluster A
@@ -898,7 +1034,11 @@ mod tests {
 
 /// 岭回归拟合线性映射 W: old_dim → new_dim, 最小化 ||old·W − new||² + λ||W||²。
 /// 按输出维独立解正规方程 (XᵀX + λI) w = Xᵀy, 高斯消元部分主元。
-pub fn fit_linear_map(old: &[Vec<f32>], new: &[Vec<f32>], lambda: f32) -> Result<Vec<Vec<f32>>, String> {
+pub fn fit_linear_map(
+    old: &[Vec<f32>],
+    new: &[Vec<f32>],
+    lambda: f32,
+) -> Result<Vec<Vec<f32>>, String> {
     if old.len() != new.len() || old.is_empty() {
         return Err("paired embeddings required".into());
     }
@@ -1036,14 +1176,17 @@ mod migration_probe_tests {
     /// 判据: 换 embedding 维度后, 经学习映射的旧向量召回保持 >70%。
     #[test]
     fn linear_reader_adaptation_preserves_recall_over_70pct() {
-        let topics = ["quantum computing", "coffee brewing", "mountain hiking", "stock market", "ocean biology", "car racing"];
+        let topics = [
+            "quantum computing",
+            "coffee brewing",
+            "mountain hiking",
+            "stock market",
+            "ocean biology",
+            "car racing",
+        ];
         let docs = cluster_docs(&topics, 12); // 72 docs
-        let olds = local_embed_texts(
-            &docs.iter().map(|s| s.as_str()).collect::<Vec<_>>(), 64,
-        );
-        let news = local_embed_texts(
-            &docs.iter().map(|s| s.as_str()).collect::<Vec<_>>(), 256,
-        );
+        let olds = local_embed_texts(&docs.iter().map(|s| s.as_str()).collect::<Vec<_>>(), 64);
+        let news = local_embed_texts(&docs.iter().map(|s| s.as_str()).collect::<Vec<_>>(), 256);
         // 留出评估: 每 topic 取末 2 条
         let train_idx: Vec<usize> = (0..docs.len()).filter(|i| i % 12 < 9).collect();
         let eval_idx: Vec<usize> = (0..docs.len()).filter(|i| i % 12 >= 9).collect();
@@ -1058,7 +1201,11 @@ mod migration_probe_tests {
             .map(|&i| {
                 let mut v = apply_linear_map(&w, &olds[i]);
                 let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
-                if norm > 1e-8 { for x in v.iter_mut() { *x /= norm; } }
+                if norm > 1e-8 {
+                    for x in v.iter_mut() {
+                        *x /= norm;
+                    }
+                }
                 v
             })
             .collect();
@@ -1072,7 +1219,10 @@ mod migration_probe_tests {
             overlap_total += hit as f64 / 5.0;
         }
         let recall = overlap_total / eval_idx.len() as f64;
-        println!("[W3.1 probe] reader-adaptation recall@5 = {:.1}%", recall * 100.0);
+        println!(
+            "[W3.1 probe] reader-adaptation recall@5 = {:.1}%",
+            recall * 100.0
+        );
         assert!(
             recall > 0.7,
             "迁移召回 {:.1}% 未达 70% 判据 — hash-kernel 跨维度需全量重嵌",

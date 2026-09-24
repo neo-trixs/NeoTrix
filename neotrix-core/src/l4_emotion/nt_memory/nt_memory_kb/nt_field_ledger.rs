@@ -195,10 +195,7 @@ pub fn field_tick(conn: &Connection) -> Result<Option<FieldReceipt>, String> {
 
         let ids: Vec<String> = staged.iter().map(|(id, _)| id.to_string()).collect();
         conn.execute(
-            &format!(
-                "DELETE FROM field_staging WHERE id IN ({})",
-                ids.join(",")
-            ),
+            &format!("DELETE FROM field_staging WHERE id IN ({})", ids.join(",")),
             [],
         )
         .map_err(|e| format!("staging drain: {}", e))?;
@@ -213,7 +210,8 @@ pub fn field_tick(conn: &Connection) -> Result<Option<FieldReceipt>, String> {
 
     match result {
         Ok(r) => {
-            conn.execute_batch("COMMIT").map_err(|e| format!("commit: {}", e))?;
+            conn.execute_batch("COMMIT")
+                .map_err(|e| format!("commit: {}", e))?;
             Ok(r)
         }
         Err(e) => {
@@ -258,8 +256,8 @@ pub fn field_journal_since(
     let mut out = Vec::new();
     for row in rows {
         let (version, entries_json) = row.map_err(|e| e.to_string())?;
-        let entries: Vec<FieldEntry> =
-            serde_json::from_str(&entries_json).map_err(|e| format!("parse v{}: {}", version, e))?;
+        let entries: Vec<FieldEntry> = serde_json::from_str(&entries_json)
+            .map_err(|e| format!("parse v{}: {}", version, e))?;
         out.push((version, entries));
     }
     Ok(out)
@@ -299,7 +297,8 @@ pub fn field_verify_chain(conn: &Connection) -> Result<bool, String> {
         expect_version += 1;
     }
     let (head_version, head_hash) = read_head(conn)?;
-    Ok(head_version == expect_version.saturating_sub(1) && (head_version == 0 || head_hash == prev_hash))
+    Ok(head_version == expect_version.saturating_sub(1)
+        && (head_version == 0 || head_hash == prev_hash))
 }
 
 /// G4 多锚点共识 (灵境协议6 收尾): 聚合每个 writer 已参与求解的最高版本游标。
@@ -379,10 +378,7 @@ mod tests {
         assert_eq!(r.version, 1);
         assert_eq!(r.drained, 1);
         assert_eq!(kb.field_version().unwrap(), 1);
-        assert_eq!(
-            kb.kv_get("g1", "door").unwrap().as_deref(),
-            Some("closed")
-        );
+        assert_eq!(kb.kv_get("g1", "door").unwrap().as_deref(), Some("closed"));
         // 空集 tick 幂等
         assert!(kb.field_tick().unwrap().is_none());
         assert!(kb.field_verify_chain().unwrap());
@@ -503,8 +499,13 @@ mod tests {
                 let kb = Arc::clone(&kb);
                 std::thread::spawn(move || {
                     for i in 0..10 {
-                        kb.field_stage("g1", &format!("key{}", i), &format!("v{}_{}", i, wid), &format!("w{}", wid))
-                            .unwrap();
+                        kb.field_stage(
+                            "g1",
+                            &format!("key{}", i),
+                            &format!("v{}_{}", i, wid),
+                            &format!("w{}", wid),
+                        )
+                        .unwrap();
                     }
                 })
             })
@@ -521,7 +522,8 @@ mod tests {
     fn test_journal_since_cursor_semantics() {
         let kb = temp_kb("since");
         for i in 0..3 {
-            kb.field_stage("g1", &format!("k{}", i), &i.to_string(), "w").unwrap();
+            kb.field_stage("g1", &format!("k{}", i), &i.to_string(), "w")
+                .unwrap();
             kb.field_tick().unwrap();
         }
         {
@@ -571,7 +573,10 @@ mod tests {
             );
             let f = consensus_frame(&conn).unwrap();
             assert_eq!(f.head, 3);
-            assert_eq!(f.quorum, 2, "quorum = 全体锚点 cursor 最小值 (停在 v2 的 w2)");
+            assert_eq!(
+                f.quorum, 2,
+                "quorum = 全体锚点 cursor 最小值 (停在 v2 的 w2)"
+            );
             assert_eq!(f.anchors.len(), 3);
             assert_eq!(f.anchors[0], ("w1".to_string(), 3, 0));
             assert_eq!(f.anchors[1], ("w2".to_string(), 2, 1));
@@ -586,7 +591,8 @@ mod tests {
         kb.field_stage("g4", "a", "1", "slow").unwrap();
         kb.field_tick().unwrap(); // slow cursor = 1
         for i in 0..2 {
-            kb.field_stage("g4", &format!("b{}", i), "x", "fast").unwrap();
+            kb.field_stage("g4", &format!("b{}", i), "x", "fast")
+                .unwrap();
             kb.field_tick().unwrap(); // fast cursor = 3
         }
         {

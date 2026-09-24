@@ -85,18 +85,19 @@ impl PackEncoder {
         // ---- StringTable 字典: 所有字符串字段全局去重 ----
         let mut dict: Vec<String> = Vec::new();
         let mut dict_map: HashMap<String, u32> = HashMap::new();
-        let intern = |s: &str, dict: &mut Vec<String>, dict_map: &mut HashMap<String, u32>| -> u32 {
-            if s.is_empty() {
-                return 0;
-            }
-            if let Some(&idx) = dict_map.get(s) {
-                return idx;
-            }
-            let idx = dict.len() as u32 + 1;
-            dict.push(s.to_string());
-            dict_map.insert(s.to_string(), idx);
-            idx
-        };
+        let intern =
+            |s: &str, dict: &mut Vec<String>, dict_map: &mut HashMap<String, u32>| -> u32 {
+                if s.is_empty() {
+                    return 0;
+                }
+                if let Some(&idx) = dict_map.get(s) {
+                    return idx;
+                }
+                let idx = dict.len() as u32 + 1;
+                dict.push(s.to_string());
+                dict_map.insert(s.to_string(), idx);
+                idx
+            };
 
         // 坐标 (定点化) + 字符串索引
         let mut lats: Vec<i64> = Vec::with_capacity(n);
@@ -298,11 +299,15 @@ impl PackDecoder {
         }
 
         // 字符串段
-        let dict_len = u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]) as usize;
+        let dict_len =
+            u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]])
+                as usize;
         pos += 4;
         let mut dict: Vec<String> = Vec::with_capacity(dict_len);
         for _ in 0..dict_len {
-            let slen = u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]) as usize;
+            let slen =
+                u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]])
+                    as usize;
             pos += 4;
             let s = String::from_utf8_lossy(&bytes[pos..pos + slen]).to_string();
             pos += slen;
@@ -512,13 +517,15 @@ fn find_data_start(bytes: &[u8]) -> usize {
     if pos + 4 > bytes.len() {
         return bytes.len();
     }
-    let dict_len = u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]) as usize;
+    let dict_len =
+        u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]) as usize;
     pos += 4;
     for _ in 0..dict_len {
         if pos + 4 > bytes.len() {
             return bytes.len();
         }
-        let slen = u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]) as usize;
+        let slen = u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]])
+            as usize;
         pos += 4 + slen;
     }
     pos.min(bytes.len())
@@ -642,7 +649,11 @@ mod tests {
         let mid = bytes.len() / 2;
         bytes[mid] ^= 0xFF;
         let err = PackDecoder::decode(&bytes).unwrap_err();
-        assert!(err.contains("checksum"), "应报 checksum 错误, 实际: {}", err);
+        assert!(
+            err.contains("checksum"),
+            "应报 checksum 错误, 实际: {}",
+            err
+        );
     }
 
     #[test]
@@ -675,10 +686,26 @@ mod tests {
                     ),
                     lat: rng.gen_range(-90.0..90.0),
                     lng: rng.gen_range(-180.0..180.0),
-                    country: if rng.gen_bool(0.1) { String::new() } else { format!("C{}", rng.gen_range(0..20)) },
-                    region: if rng.gen_bool(0.1) { String::new() } else { format!("R{}", rng.gen_range(0..50)) },
-                    city: if rng.gen_bool(0.1) { String::new() } else { format!("City{}", rng.gen_range(0..500)) },
-                    tags: if rng.gen_bool(0.2) { String::new() } else { "机场,small_airport".into() },
+                    country: if rng.gen_bool(0.1) {
+                        String::new()
+                    } else {
+                        format!("C{}", rng.gen_range(0..20))
+                    },
+                    region: if rng.gen_bool(0.1) {
+                        String::new()
+                    } else {
+                        format!("R{}", rng.gen_range(0..50))
+                    },
+                    city: if rng.gen_bool(0.1) {
+                        String::new()
+                    } else {
+                        format!("City{}", rng.gen_range(0..500))
+                    },
+                    tags: if rng.gen_bool(0.2) {
+                        String::new()
+                    } else {
+                        "机场,small_airport".into()
+                    },
                     source: sources[rng.gen_range(0..sources.len())].into(),
                 })
                 .collect();
@@ -687,8 +714,12 @@ mod tests {
                 for use_zstd in [false, true] {
                     let enc = PackEncoder::new(precision, use_zstd);
                     let bytes = enc.encode(&pts);
-                    let (dec, out) = PackDecoder::decode(&bytes)
-                        .unwrap_or_else(|e| panic!("round {} prec {} zstd {}: {}", round, precision, use_zstd, e));
+                    let (dec, out) = PackDecoder::decode(&bytes).unwrap_or_else(|e| {
+                        panic!(
+                            "round {} prec {} zstd {}: {}",
+                            round, precision, use_zstd, e
+                        )
+                    });
                     assert_eq!(out.len(), n, "round {}: 条数", round);
                     assert_eq!(dec.precision, precision);
                     assert_eq!(dec.use_zstd, use_zstd);

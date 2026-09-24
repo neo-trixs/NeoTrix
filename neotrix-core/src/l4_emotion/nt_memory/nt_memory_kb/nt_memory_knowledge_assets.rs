@@ -4,8 +4,8 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use super::KnowledgeBase;
 use super::nt_memory_types::{NodeType, RelationType};
+use super::KnowledgeBase;
 
 /// A registered executable skill derived from external resources.
 /// Follows Resource2Skill pattern: resource → skill → tool.
@@ -31,7 +31,9 @@ pub struct SkillsLibrary {
 
 impl SkillsLibrary {
     pub fn new() -> Self {
-        Self { skills: HashMap::new() }
+        Self {
+            skills: HashMap::new(),
+        }
     }
 
     pub fn register(&mut self, entry: KbSkillAsset) {
@@ -47,30 +49,38 @@ impl SkillsLibrary {
     }
 
     pub fn by_domain(&self, domain: &str) -> Vec<&KbSkillAsset> {
-        self.skills.values().filter(|s| s.domain == domain).collect()
+        self.skills
+            .values()
+            .filter(|s| s.domain == domain)
+            .collect()
     }
 
     pub fn rebuild_from_kb(&mut self, kb: &KnowledgeBase) -> Result<usize, String> {
         let conn = kb.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         let query = "SELECT id, title, summary, url, domain FROM nodes WHERE node_type = 'skill'";
         let mut stmt = conn.prepare(query).map_err(|e| format!("Prepare: {}", e))?;
-        let rows = stmt.query_map([], |row| {
-            let title: String = row.get(1)?;
-            let summary: Option<String> = row.get(2)?;
-            let url: Option<String> = row.get(3)?;
-            let domain: Option<String> = row.get(4)?;
-            Ok((title, summary, url, domain))
-        }).map_err(|e| format!("Query: {}", e))?;
+        let rows = stmt
+            .query_map([], |row| {
+                let title: String = row.get(1)?;
+                let summary: Option<String> = row.get(2)?;
+                let url: Option<String> = row.get(3)?;
+                let domain: Option<String> = row.get(4)?;
+                Ok((title, summary, url, domain))
+            })
+            .map_err(|e| format!("Query: {}", e))?;
         let mut count = 0;
         for (name, summary, _url, domain) in rows.flatten() {
-            self.skills.insert(name.clone(), KbSkillAsset {
-                name,
-                description: summary.unwrap_or_default(),
-                source_resource: String::new(),
-                domain: domain.unwrap_or_else(|| "unknown".into()),
-                tool_name: None,
-                confidence: 0.5,
-            });
+            self.skills.insert(
+                name.clone(),
+                KbSkillAsset {
+                    name,
+                    description: summary.unwrap_or_default(),
+                    source_resource: String::new(),
+                    domain: domain.unwrap_or_else(|| "unknown".into()),
+                    tool_name: None,
+                    confidence: 0.5,
+                },
+            );
             count += 1;
         }
         Ok(count)
@@ -84,16 +94,19 @@ impl Default for SkillsLibrary {
 }
 
 fn prefix(s: &str, max: usize) -> &str {
-    if s.len() <= max { s }
-    else {
+    if s.len() <= max {
+        s
+    } else {
         let idx = s.char_indices().nth(max).map(|(i, _)| i).unwrap_or(s.len());
         &s[..idx]
     }
 }
 
 pub fn import_knowledge_assets(kb: &KnowledgeBase, path: &Path) -> Result<ImportReport, String> {
-    let data = fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
-    let entries: Vec<Value> = serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
+    let data =
+        fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
+    let entries: Vec<Value> =
+        serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
 
     let mut report = ImportReport::default();
 
@@ -110,7 +123,13 @@ pub fn import_knowledge_assets(kb: &KnowledgeBase, path: &Path) -> Result<Import
 
         let summary = Some(prefix(body, 200));
 
-        let node_id = match kb.insert_or_get_node(title, NodeType::Concept, summary, Some(&asset_url), Some(domain)) {
+        let node_id = match kb.insert_or_get_node(
+            title,
+            NodeType::Concept,
+            summary,
+            Some(&asset_url),
+            Some(domain),
+        ) {
             Ok(id) => id,
             Err(e) => {
                 report.errors.push(format!("{}: {}", title, e));
@@ -142,12 +161,26 @@ pub fn import_knowledge_assets(kb: &KnowledgeBase, path: &Path) -> Result<Import
                     .as_ref()
                     .and_then(|m| m.get("tags"))
                     .and_then(|t| t.as_array())
-                    .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
                     .unwrap_or_default();
-                let shared: Vec<&str> = tags.iter().filter(|t| other_tags.contains(&t.to_string())).copied().collect();
+                let shared: Vec<&str> = tags
+                    .iter()
+                    .filter(|t| other_tags.contains(&t.to_string()))
+                    .copied()
+                    .collect();
                 for tag in &shared {
                     let weight = 0.5 + (importance.min(other_node.importance)) * 0.5;
-                    let _ = kb.upsert_edge(&node_id, &other_node.id, RelationType::Related, weight, Some(&format!("shared tag: {}", tag)));
+                    let _ = kb.upsert_edge(
+                        &node_id,
+                        &other_node.id,
+                        RelationType::Related,
+                        weight,
+                        Some(&format!("shared tag: {}", tag)),
+                    );
                     report.edges_created += 1;
                 }
             }
@@ -160,11 +193,15 @@ pub fn import_knowledge_assets(kb: &KnowledgeBase, path: &Path) -> Result<Import
 }
 
 pub fn import_review_findings(kb: &KnowledgeBase, path: &Path) -> Result<ImportReport, String> {
-    let data = fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
-    let root: Value = serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
+    let data =
+        fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
+    let root: Value =
+        serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
 
     let mut report = ImportReport::default();
-    let defects = root["defects"].as_array().ok_or("No 'defects' array found")?;
+    let defects = root["defects"]
+        .as_array()
+        .ok_or("No 'defects' array found")?;
     let review_time = root["review_summary"]
         .as_object()
         .and_then(|s| s.get("timestamp"))
@@ -178,15 +215,30 @@ pub fn import_review_findings(kb: &KnowledgeBase, path: &Path) -> Result<ImportR
         let severity = entry["severity"].as_str().unwrap_or("P3");
         let defect_type = entry["defect_type"].as_str().unwrap_or("unknown");
         let description = entry["description"].as_str().unwrap_or("");
-        let title = format!("[{}] {} at {}:{}", severity, defect_type, file_path, line_number);
-        let dedup_url = format!("asset:review_finding:{}:{}:{}", file_path, line_number, defect_type);
+        let title = format!(
+            "[{}] {} at {}:{}",
+            severity, defect_type, file_path, line_number
+        );
+        let dedup_url = format!(
+            "asset:review_finding:{}:{}:{}",
+            file_path, line_number, defect_type
+        );
         let summary = Some(prefix(description, 200));
 
         let _priority = match severity {
-            "P0" => 0.98, "P1" => 0.90, "P2" => 0.70, _ => 0.50,
+            "P0" => 0.98,
+            "P1" => 0.90,
+            "P2" => 0.70,
+            _ => 0.50,
         };
 
-        let node_id = match kb.insert_or_get_node(&title, NodeType::DetectionFinding, summary, Some(&dedup_url), Some("architecture_review")) {
+        let node_id = match kb.insert_or_get_node(
+            &title,
+            NodeType::DetectionFinding,
+            summary,
+            Some(&dedup_url),
+            Some("architecture_review"),
+        ) {
             Ok(id) => id,
             Err(e) => {
                 report.errors.push(format!("{}: {}", title, e));
@@ -214,11 +266,15 @@ pub fn import_review_findings(kb: &KnowledgeBase, path: &Path) -> Result<ImportR
 }
 
 pub fn import_reasoning_memories(kb: &KnowledgeBase, path: &Path) -> Result<ImportReport, String> {
-    let data = fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
-    let root: Value = serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
+    let data =
+        fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
+    let root: Value =
+        serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
 
     let mut report = ImportReport::default();
-    let memories = root["memories"].as_array().ok_or("No 'memories' array found")?;
+    let memories = root["memories"]
+        .as_array()
+        .ok_or("No 'memories' array found")?;
 
     for m in memories {
         let tid = m["id"].as_str().unwrap_or("");
@@ -238,9 +294,13 @@ pub fn import_reasoning_memories(kb: &KnowledgeBase, path: &Path) -> Result<Impo
         let summary = prefix(task_desc, 200);
         let title = format!("[{}] {}", task_type, prefix(task_desc, 80));
 
-        let node_id = match kb.insert_or_get_node(&title, NodeType::ThinkingTrace,
-            Some(summary), Some(&dedup_key), Some(task_type))
-        {
+        let node_id = match kb.insert_or_get_node(
+            &title,
+            NodeType::ThinkingTrace,
+            Some(summary),
+            Some(&dedup_key),
+            Some(task_type),
+        ) {
             Ok(id) => id,
             Err(e) => {
                 report.errors.push(format!("mem: {}", e));
@@ -267,11 +327,15 @@ pub fn import_reasoning_memories(kb: &KnowledgeBase, path: &Path) -> Result<Impo
 }
 
 pub fn import_knowledge_engine(kb: &KnowledgeBase, path: &Path) -> Result<ImportReport, String> {
-    let data = fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
-    let root: Value = serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
+    let data =
+        fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
+    let root: Value =
+        serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
 
     let mut report = ImportReport::default();
-    let entries = root["entries"].as_object().ok_or("No 'entries' object found")?;
+    let entries = root["entries"]
+        .as_object()
+        .ok_or("No 'entries' object found")?;
 
     // ── Import each entry ──
     for (uuid, entry) in entries {
@@ -303,10 +367,13 @@ pub fn import_knowledge_engine(kb: &KnowledgeBase, path: &Path) -> Result<Import
             format!("ke:{}", source_url)
         };
 
-        let sid = match kb.insert_or_get_node(title, node_type,
+        let sid = match kb.insert_or_get_node(
+            title,
+            node_type,
             Some(prefix(summary, 200)),
-            Some(&dedup_key), Some(first_tag))
-        {
+            Some(&dedup_key),
+            Some(first_tag),
+        ) {
             Ok(id) => id,
             Err(e) => {
                 report.errors.push(format!("{}: {}", title, e));
@@ -337,8 +404,10 @@ pub fn import_knowledge_engine(kb: &KnowledgeBase, path: &Path) -> Result<Import
 }
 
 pub fn import_absorption_report(kb: &KnowledgeBase, path: &Path) -> Result<ImportReport, String> {
-    let data = fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
-    let root: Value = serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
+    let data =
+        fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
+    let root: Value =
+        serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
 
     let mut report = ImportReport::default();
     let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
@@ -349,22 +418,43 @@ pub fn import_absorption_report(kb: &KnowledgeBase, path: &Path) -> Result<Impor
     let p1 = root["p1_count"].as_i64().unwrap_or(0);
 
     // ── Summary node ──
-    let summary_title = format!("Absorption Report ({} projects, {} gaps, {} plans)", 
-        root["projects_analyzed"].as_i64().unwrap_or(0), total_gaps, total_plans);
+    let summary_title = format!(
+        "Absorption Report ({} projects, {} gaps, {} plans)",
+        root["projects_analyzed"].as_i64().unwrap_or(0),
+        total_gaps,
+        total_plans
+    );
     let summary_url = "asset:absorption_report:latest";
-    let sid = match kb.insert_or_get_node(&summary_title, NodeType::Concept, 
-        Some(&format!("Absorption report from {}: {} projects, {} gaps ({} P0, {} P1), {} plans", 
-            ts, root["projects_analyzed"].as_i64().unwrap_or(0), total_gaps, p0, p1, total_plans)),
-        Some(summary_url), Some("absorption"))
-    {
+    let sid = match kb.insert_or_get_node(
+        &summary_title,
+        NodeType::Concept,
+        Some(&format!(
+            "Absorption report from {}: {} projects, {} gaps ({} P0, {} P1), {} plans",
+            ts,
+            root["projects_analyzed"].as_i64().unwrap_or(0),
+            total_gaps,
+            p0,
+            p1,
+            total_plans
+        )),
+        Some(summary_url),
+        Some("absorption"),
+    ) {
         Ok(id) => id,
-        Err(e) => { report.errors.push(format!("summary: {}", e)); return Ok(report); }
+        Err(e) => {
+            report.errors.push(format!("summary: {}", e));
+            return Ok(report);
+        }
     };
 
     let mut heatmap = Vec::new();
     if let Some(arr) = root["domain_gap_heatmap"].as_array() {
         for entry in arr {
-            heatmap.push(format!("{}:{}", entry["domain"].as_str().unwrap_or("?"), entry["gaps"].as_i64().unwrap_or(0)));
+            heatmap.push(format!(
+                "{}:{}",
+                entry["domain"].as_str().unwrap_or("?"),
+                entry["gaps"].as_i64().unwrap_or(0)
+            ));
         }
     }
 
@@ -386,25 +476,43 @@ pub fn import_absorption_report(kb: &KnowledgeBase, path: &Path) -> Result<Impor
     // ── Project nodes ──
     if let Some(projects) = root["projects"].as_array() {
         for pval in projects {
-            let name = pval.as_str().or_else(|| pval.get("name").and_then(|v| v.as_str())).unwrap_or("unknown");
+            let name = pval
+                .as_str()
+                .or_else(|| pval.get("name").and_then(|v| v.as_str()))
+                .unwrap_or("unknown");
             let purl = format!("asset:absorption_project:{}", name);
             let pid = match kb.find_node_by_url(&purl) {
                 Ok(Some(n)) => n.id,
                 _ => {
-                    match kb.insert_or_get_node(name, NodeType::Repository, 
+                    match kb.insert_or_get_node(
+                        name,
+                        NodeType::Repository,
                         Some(&format!("Project analyzed during absorption: {}", name)),
-                        Some(&purl), Some("absorption"))
-                    {
+                        Some(&purl),
+                        Some("absorption"),
+                    ) {
                         Ok(id) => id,
-                        Err(e) => { report.errors.push(format!("project {}: {}", name, e)); continue; }
+                        Err(e) => {
+                            report.errors.push(format!("project {}: {}", name, e));
+                            continue;
+                        }
                     }
                 }
             };
-            let _ = kb.update_node_metadata(&pid, &serde_json::json!({
-                "type": "absorption_project",
-                "source": "absorption_report.json",
-            }));
-            let _ = kb.upsert_edge(&sid, &pid, RelationType::Related, 0.5, Some("absorbed_project"));
+            let _ = kb.update_node_metadata(
+                &pid,
+                &serde_json::json!({
+                    "type": "absorption_project",
+                    "source": "absorption_report.json",
+                }),
+            );
+            let _ = kb.upsert_edge(
+                &sid,
+                &pid,
+                RelationType::Related,
+                0.5,
+                Some("absorbed_project"),
+            );
             report.edges_created += 1;
         }
     }
@@ -420,23 +528,40 @@ pub fn import_absorption_report(kb: &KnowledgeBase, path: &Path) -> Result<Impor
             let pid = match kb.find_node_by_url(&purl) {
                 Ok(Some(n)) => n.id,
                 _ => {
-                    match kb.insert_or_get_node(pname, NodeType::GoalResult,
-                        Some(&format!("[{}] {} plan: {} (~{} lines)", priority, domain, pname, lines)),
-                        Some(&purl), Some("absorption"))
-                    {
+                    match kb.insert_or_get_node(
+                        pname,
+                        NodeType::GoalResult,
+                        Some(&format!(
+                            "[{}] {} plan: {} (~{} lines)",
+                            priority, domain, pname, lines
+                        )),
+                        Some(&purl),
+                        Some("absorption"),
+                    ) {
                         Ok(id) => id,
-                        Err(e) => { report.errors.push(format!("plan {}: {}", pname, e)); continue; }
+                        Err(e) => {
+                            report.errors.push(format!("plan {}: {}", pname, e));
+                            continue;
+                        }
                     }
                 }
             };
-            let _ = kb.update_node_metadata(&pid, &serde_json::json!({
-                "domain": domain,
-                "priority": priority,
-                "estimated_lines": lines,
-                "source": "absorption_report.json",
-            }));
-            let _ = kb.upsert_edge(&sid, &pid, RelationType::Related, 
-                if priority == "P0" { 0.95 } else { 0.7 }, Some(&format!("{}_plan:{}", priority, pname)));
+            let _ = kb.update_node_metadata(
+                &pid,
+                &serde_json::json!({
+                    "domain": domain,
+                    "priority": priority,
+                    "estimated_lines": lines,
+                    "source": "absorption_report.json",
+                }),
+            );
+            let _ = kb.upsert_edge(
+                &sid,
+                &pid,
+                RelationType::Related,
+                if priority == "P0" { 0.95 } else { 0.7 },
+                Some(&format!("{}_plan:{}", priority, pname)),
+            );
             report.edges_created += 1;
         }
     }
@@ -466,20 +591,40 @@ pub fn import_brain_state(kb: &KnowledgeBase, base_path: &Path) -> Result<Import
     let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
 
     // Count non-zero capability dimensions
-    let active_dims: Vec<&str> = capabilities.as_object()
-        .map(|obj| obj.iter()
-            .filter(|(_, v)| v.as_f64().unwrap_or(0.0) > 0.01)
-            .map(|(k, _)| k.as_str())
-            .collect())
+    let active_dims: Vec<&str> = capabilities
+        .as_object()
+        .map(|obj| {
+            obj.iter()
+                .filter(|(_, v)| v.as_f64().unwrap_or(0.0) > 0.01)
+                .map(|(k, _)| k.as_str())
+                .collect()
+        })
         .unwrap_or_default();
 
     // ── Overall brain state node ──
     let title = format!("Agent Brain State ({} active dims)", active_dims.len());
     let dedup_url = "asset:brain_state:latest";
-    let learning_rate = meta_obj.get("learning_rate").and_then(|v| v.as_f64()).unwrap_or(0.05);
-    let total_absorb = meta_obj.get("total_absorb_count").and_then(|v| v.as_i64()).unwrap_or(0);
+    let learning_rate = meta_obj
+        .get("learning_rate")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.05);
+    let total_absorb = meta_obj
+        .get("total_absorb_count")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
 
-    let node_id = match kb.insert_or_get_node(&title, NodeType::Concept, Some(&format!("Agent self-model with {}/23 dimensions active, learning_rate={}, absorb_count={}", active_dims.len(), learning_rate, total_absorb)), Some(dedup_url), Some("agent_state")) {
+    let node_id = match kb.insert_or_get_node(
+        &title,
+        NodeType::Concept,
+        Some(&format!(
+            "Agent self-model with {}/23 dimensions active, learning_rate={}, absorb_count={}",
+            active_dims.len(),
+            learning_rate,
+            total_absorb
+        )),
+        Some(dedup_url),
+        Some("agent_state"),
+    ) {
         Ok(id) => id,
         Err(e) => {
             report.errors.push(format!("brain_state node: {}", e));
@@ -518,13 +663,21 @@ pub fn import_brain_state(kb: &KnowledgeBase, base_path: &Path) -> Result<Import
     if let Some(obj) = capabilities.as_object() {
         for (dim_name, dim_val) in obj {
             let val = dim_val.as_f64().unwrap_or(0.0);
-            if val <= 0.01 { continue; }
+            if val <= 0.01 {
+                continue;
+            }
             let dim_title = format!("Capability: {}", dim_name);
             let dim_url = format!("asset:brain_capability:{}", dim_name);
             let dim_id = match kb.find_node_by_url(&dim_url) {
                 Ok(Some(n)) => n.id,
                 _ => {
-                    match kb.insert_or_get_node(&dim_title, NodeType::Skill, Some(&format!("Agent capability dimension with level {:.2}", val)), Some(&dim_url), Some("agent_state")) {
+                    match kb.insert_or_get_node(
+                        &dim_title,
+                        NodeType::Skill,
+                        Some(&format!("Agent capability dimension with level {:.2}", val)),
+                        Some(&dim_url),
+                        Some("agent_state"),
+                    ) {
                         Ok(id) => id,
                         Err(e) => {
                             report.errors.push(format!("dim {}: {}", dim_name, e));
@@ -533,16 +686,27 @@ pub fn import_brain_state(kb: &KnowledgeBase, base_path: &Path) -> Result<Import
                     }
                 }
             };
-            if let Err(e) = kb.update_node_metadata(&dim_id, &serde_json::json!({
-                "dimension": dim_name,
-                "level": val,
-                "source": "brain.json",
-                "synced_at": now,
-            })) {
-                report.errors.push(format!("dim metadata {}: {}", dim_name, e));
+            if let Err(e) = kb.update_node_metadata(
+                &dim_id,
+                &serde_json::json!({
+                    "dimension": dim_name,
+                    "level": val,
+                    "source": "brain.json",
+                    "synced_at": now,
+                }),
+            ) {
+                report
+                    .errors
+                    .push(format!("dim metadata {}: {}", dim_name, e));
             }
             // Edge: brain_state → capability (has_skill)
-            let _ = kb.upsert_edge(&node_id, &dim_id, RelationType::Related, val, Some(&format!("capability:{}={}", dim_name, val)));
+            let _ = kb.upsert_edge(
+                &node_id,
+                &dim_id,
+                RelationType::Related,
+                val,
+                Some(&format!("capability:{}={}", dim_name, val)),
+            );
             report.edges_created += 1;
         }
     }
@@ -551,8 +715,10 @@ pub fn import_brain_state(kb: &KnowledgeBase, base_path: &Path) -> Result<Import
 }
 
 pub fn import_bandit_data(kb: &KnowledgeBase, path: &Path) -> Result<ImportReport, String> {
-    let data = fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
-    let entries: Vec<Value> = serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
+    let data =
+        fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
+    let entries: Vec<Value> =
+        serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
 
     let mut report = ImportReport::default();
     for entry in &entries {
@@ -571,29 +737,47 @@ pub fn import_bandit_data(kb: &KnowledgeBase, path: &Path) -> Result<ImportRepor
 
         let title = format!("Bandit: {} {} {}", tls, platform, h2);
         let dedup_url = format!("asset:bandit:{}:{}:{}", tls, platform, h2);
-        let summary = format!("{} profile: tls={} platform={} h2={} geo={} visits={} wins={} rate={:.2}",
-            tls, tls, platform, h2, geo, visits, wins, wins as f64 / visits.max(1) as f64);
+        let summary = format!(
+            "{} profile: tls={} platform={} h2={} geo={} visits={} wins={} rate={:.2}",
+            tls,
+            tls,
+            platform,
+            h2,
+            geo,
+            visits,
+            wins,
+            wins as f64 / visits.max(1) as f64
+        );
         let importance = (wins as f64 / visits.max(1) as f64).min(1.0);
 
-        let node_id = match kb.insert_or_get_node(&title, NodeType::Concept,
-            Some(&summary), Some(&dedup_url), Some("routing"))
-        {
+        let node_id = match kb.insert_or_get_node(
+            &title,
+            NodeType::Concept,
+            Some(&summary),
+            Some(&dedup_url),
+            Some("routing"),
+        ) {
             Ok(id) => id,
             Err(_) => continue,
         };
-        let _ = kb.update_node_metadata(&node_id, &serde_json::json!({
-            "tls": tls, "platform": platform, "h2_profile": h2, "geo_tag": geo,
-            "visits": visits, "wins": wins, "win_rate": importance,
-            "source": "bandit.json",
-        }));
+        let _ = kb.update_node_metadata(
+            &node_id,
+            &serde_json::json!({
+                "tls": tls, "platform": platform, "h2_profile": h2, "geo_tag": geo,
+                "visits": visits, "wins": wins, "win_rate": importance,
+                "source": "bandit.json",
+            }),
+        );
         report.imported += 1;
     }
     Ok(report)
 }
 
 pub fn import_e8_state(kb: &KnowledgeBase, path: &Path) -> Result<ImportReport, String> {
-    let data = fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
-    let root: Value = serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
+    let data =
+        fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
+    let root: Value =
+        serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
 
     let mut report = ImportReport::default();
     let dedup_url = "asset:e8_state:latest";
@@ -601,14 +785,26 @@ pub fn import_e8_state(kb: &KnowledgeBase, path: &Path) -> Result<ImportReport, 
     let meta = root["current_meta"].as_i64().unwrap_or(0);
     let confidence = root["last_e8_confidence"].as_f64().unwrap_or(0.0);
     let prm_count = root["prm_learning_count"].as_i64().unwrap_or(0);
-    let title = format!("E8 Engine State (mode={} meta={} confidence={:.2})", mode, meta, confidence);
+    let title = format!(
+        "E8 Engine State (mode={} meta={} confidence={:.2})",
+        mode, meta, confidence
+    );
 
-    let node_id = match kb.insert_or_get_node(&title, NodeType::Concept,
-        Some(&format!("E8 hexagram engine runtime state with PRM learning count={}", prm_count)),
-        Some(dedup_url), Some("e8"))
-    {
+    let node_id = match kb.insert_or_get_node(
+        &title,
+        NodeType::Concept,
+        Some(&format!(
+            "E8 hexagram engine runtime state with PRM learning count={}",
+            prm_count
+        )),
+        Some(dedup_url),
+        Some("e8"),
+    ) {
         Ok(id) => id,
-        Err(e) => { report.errors.push(format!("e8: {}", e)); return Ok(report); }
+        Err(e) => {
+            report.errors.push(format!("e8: {}", e));
+            return Ok(report);
+        }
     };
     let _ = kb.update_node_metadata(&node_id, &root);
     report.imported += 1;
@@ -616,25 +812,43 @@ pub fn import_e8_state(kb: &KnowledgeBase, path: &Path) -> Result<ImportReport, 
 }
 
 pub fn import_avatar_chain(kb: &KnowledgeBase, path: &Path) -> Result<ImportReport, String> {
-    let data = fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
-    let root: Value = serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
+    let data =
+        fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
+    let root: Value =
+        serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
 
     let mut report = ImportReport::default();
     let genesis = root["genesis_hash"].as_str().unwrap_or("");
     let entries = root["entries"].as_array().map(|a| a.len()).unwrap_or(0);
-    let title = format!("Avatar Chain ({} entries, genesis={})", entries, &genesis[..genesis.len().min(16)]);
+    let title = format!(
+        "Avatar Chain ({} entries, genesis={})",
+        entries,
+        &genesis[..genesis.len().min(16)]
+    );
 
     let dedup_url = "asset:avatar_chain:latest";
-    let node_id = match kb.insert_or_get_node(&title, NodeType::Concept,
-        Some(&format!("Avatar personality blockchain with {} entries", entries)),
-        Some(dedup_url), Some("avatar"))
-    {
+    let node_id = match kb.insert_or_get_node(
+        &title,
+        NodeType::Concept,
+        Some(&format!(
+            "Avatar personality blockchain with {} entries",
+            entries
+        )),
+        Some(dedup_url),
+        Some("avatar"),
+    ) {
         Ok(id) => id,
-        Err(e) => { report.errors.push(format!("avatar: {}", e)); return Ok(report); }
+        Err(e) => {
+            report.errors.push(format!("avatar: {}", e));
+            return Ok(report);
+        }
     };
-    let _ = kb.update_node_metadata(&node_id, &serde_json::json!({
-        "genesis_hash": genesis, "entry_count": entries, "source": "avatar_chain.json",
-    }));
+    let _ = kb.update_node_metadata(
+        &node_id,
+        &serde_json::json!({
+            "genesis_hash": genesis, "entry_count": entries, "source": "avatar_chain.json",
+        }),
+    );
 
     // Per-entry nodes for chain history
     if let Some(arr) = root["entries"].as_array() {
@@ -644,22 +858,39 @@ pub fn import_avatar_chain(kb: &KnowledgeBase, path: &Path) -> Result<ImportRepo
             let prev_hash = entry["previous_hash"].as_str().unwrap_or("");
             let sig = entry["signature"].as_str().unwrap_or("");
             let e_url = format!("asset:avatar_entry:{}", prev_hash.get(..8).unwrap_or("?"));
-            let summary = format!("Avatar chain entry {} timestamp={} hash={}",
-                idx, ts, prev_hash.get(..8).unwrap_or("?"));
+            let summary = format!(
+                "Avatar chain entry {} timestamp={} hash={}",
+                idx,
+                ts,
+                prev_hash.get(..8).unwrap_or("?")
+            );
             let eid = match kb.find_node_by_url(&e_url) {
                 Ok(Some(n)) => n.id,
-                _ => match kb.insert_or_get_node(&format!("Avatar Entry {}", idx),
-                    NodeType::EventRecord, Some(&summary), Some(&e_url), Some("avatar"))
-                {
+                _ => match kb.insert_or_get_node(
+                    &format!("Avatar Entry {}", idx),
+                    NodeType::EventRecord,
+                    Some(&summary),
+                    Some(&e_url),
+                    Some("avatar"),
+                ) {
                     Ok(id) => id,
                     Err(_) => continue,
-                }
+                },
             };
-            let _ = kb.update_node_metadata(&eid, &serde_json::json!({
-                "index": idx, "timestamp": ts, "previous_hash": prev_hash,
-                "signature": sig, "source": "avatar_chain.json",
-            }));
-            let _ = kb.upsert_edge(&node_id, &eid, RelationType::Related, 1.0 - (i as f64 * 0.001), Some("chain_entry"));
+            let _ = kb.update_node_metadata(
+                &eid,
+                &serde_json::json!({
+                    "index": idx, "timestamp": ts, "previous_hash": prev_hash,
+                    "signature": sig, "source": "avatar_chain.json",
+                }),
+            );
+            let _ = kb.upsert_edge(
+                &node_id,
+                &eid,
+                RelationType::Related,
+                1.0 - (i as f64 * 0.001),
+                Some("chain_entry"),
+            );
             report.edges_created += 1;
         }
     }
@@ -669,8 +900,10 @@ pub fn import_avatar_chain(kb: &KnowledgeBase, path: &Path) -> Result<ImportRepo
 }
 
 pub fn import_proxy_pool(kb: &KnowledgeBase, path: &Path) -> Result<ImportReport, String> {
-    let data = fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
-    let root: Value = serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
+    let data =
+        fs::read_to_string(path).map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
+    let root: Value =
+        serde_json::from_str(&data).map_err(|e| format!("JSON parse error: {}", e))?;
 
     let mut report = ImportReport::default();
     let proxy_entries = root["entries"].as_array().map(|a| a.len()).unwrap_or(0);
@@ -679,22 +912,38 @@ pub fn import_proxy_pool(kb: &KnowledgeBase, path: &Path) -> Result<ImportReport
     let direct = stats["direct_usable_count"].as_i64().unwrap_or(0);
     let encrypted = stats["encrypted_count"].as_i64().unwrap_or(0);
     let total_checks = stats["total_checks"].as_i64().unwrap_or(0);
-    let title = format!("Proxy Pool ({} proxies, {} direct, {} encrypted)", proxy_entries, direct, encrypted);
+    let title = format!(
+        "Proxy Pool ({} proxies, {} direct, {} encrypted)",
+        proxy_entries, direct, encrypted
+    );
 
     let dedup_url = "asset:proxy_pool:latest";
-    let sid = match kb.insert_or_get_node(&title, NodeType::Concept,
-        Some(&format!("Proxy pool state: {} entries, {} checks, {} fetch errors",
-            proxy_entries, stats["fetch_errors"].as_i64().unwrap_or(0), total_checks)),
-        Some(dedup_url), Some("proxy"))
-    {
+    let sid = match kb.insert_or_get_node(
+        &title,
+        NodeType::Concept,
+        Some(&format!(
+            "Proxy pool state: {} entries, {} checks, {} fetch errors",
+            proxy_entries,
+            stats["fetch_errors"].as_i64().unwrap_or(0),
+            total_checks
+        )),
+        Some(dedup_url),
+        Some("proxy"),
+    ) {
         Ok(id) => id,
-        Err(e) => { report.errors.push(format!("proxy: {}", e)); return Ok(report); }
+        Err(e) => {
+            report.errors.push(format!("proxy: {}", e));
+            return Ok(report);
+        }
     };
-    let _ = kb.update_node_metadata(&sid, &serde_json::json!({
-        "total_entries": proxy_entries, "direct_usable": direct,
-        "encrypted_count": encrypted, "total_checks": total_checks,
-        "fetch_errors": stats["fetch_errors"], "source": "proxy-pool-state.json",
-    }));
+    let _ = kb.update_node_metadata(
+        &sid,
+        &serde_json::json!({
+            "total_entries": proxy_entries, "direct_usable": direct,
+            "encrypted_count": encrypted, "total_checks": total_checks,
+            "fetch_errors": stats["fetch_errors"], "source": "proxy-pool-state.json",
+        }),
+    );
     report.imported += 1;
 
     // Top 100 proxies as individual nodes (skip all 7666 — too many for KB)
@@ -703,20 +952,31 @@ pub fn import_proxy_pool(kb: &KnowledgeBase, path: &Path) -> Result<ImportReport
             let host = entry["node"]["host"].as_str().unwrap_or("");
             let port = entry["node"]["port"].as_i64().unwrap_or(0);
             let scheme = entry["node"]["scheme"].as_str().unwrap_or("");
-            if host.is_empty() { continue; }
+            if host.is_empty() {
+                continue;
+            }
             let purl = format!("asset:proxy:{}:{}", host, port);
             let pname = format!("Proxy {}:{}", host, port);
             let pid = match kb.find_node_by_url(&purl) {
                 Ok(Some(n)) => n.id,
-                _ => match kb.insert_or_get_node(&pname, NodeType::Source,
+                _ => match kb.insert_or_get_node(
+                    &pname,
+                    NodeType::Source,
                     Some(&format!("{} proxy {}:{}", scheme, host, port)),
-                    Some(&purl), Some("proxy"))
-                {
+                    Some(&purl),
+                    Some("proxy"),
+                ) {
                     Ok(id) => id,
                     Err(_) => continue,
-                }
+                },
             };
-            let _ = kb.upsert_edge(&sid, &pid, RelationType::Related, 0.5, Some("proxy_pool_member"));
+            let _ = kb.upsert_edge(
+                &sid,
+                &pid,
+                RelationType::Related,
+                0.5,
+                Some("proxy_pool_member"),
+            );
             report.edges_created += 1;
         }
     }
@@ -776,7 +1036,8 @@ mod tests {
         assert!(report.errors.is_empty(), "errors: {:?}", report.errors);
         log::info!(
             "Imported {} knowledge assets, {} edges created",
-            report.imported, report.edges_created,
+            report.imported,
+            report.edges_created,
         );
     }
 }

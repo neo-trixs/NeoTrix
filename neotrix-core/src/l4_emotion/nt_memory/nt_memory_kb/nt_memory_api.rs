@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex};
 
 use super::{
     diff_snapshots, kb_write_guard, nt_memory_embed, record_write_evidence, snapshot_from_file,
-    snapshot_kb, WriteGuardVerdict, KnowledgeBase, SearchResult, SearchMatchType,
+    snapshot_kb, KnowledgeBase, SearchMatchType, SearchResult, WriteGuardVerdict,
 };
 
 /// Shared state for KB API handlers
@@ -29,7 +29,9 @@ impl KbApiState {
     /// Open the default KB at ~/.neotrix/knowledge.db
     pub fn try_open_default() -> Option<Self> {
         let kb = KnowledgeBase::open(None).ok()?;
-        Some(Self { kb: Arc::new(Mutex::new(kb)) })
+        Some(Self {
+            kb: Arc::new(Mutex::new(kb)),
+        })
     }
 }
 
@@ -46,7 +48,10 @@ pub fn build_kb_router(state: KbApiState) -> Router {
         .route("/api/kb/node", post(create_node_handler))
         .route("/api/kb/edge", post(create_edge_handler))
         .route("/api/kb/embeddings/status", get(embeddings_status_handler))
-        .route("/api/kb/embeddings/backfill", post(embeddings_backfill_handler))
+        .route(
+            "/api/kb/embeddings/backfill",
+            post(embeddings_backfill_handler),
+        )
         .route("/api/kb/snapshot", get(snapshot_handler))
         .route("/api/kb/diff", post(diff_handler))
         .with_state(state)
@@ -59,11 +64,17 @@ fn json_ok<T: Serialize>(v: T) -> Json<serde_json::Value> {
 }
 
 fn json_err(msg: &str) -> (StatusCode, Json<serde_json::Value>) {
-    (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": msg})))
+    (
+        StatusCode::BAD_REQUEST,
+        Json(serde_json::json!({"error": msg})),
+    )
 }
 
 fn internal_err(msg: &str) -> (StatusCode, Json<serde_json::Value>) {
-    (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": msg})))
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({"error": msg})),
+    )
 }
 
 /// 写前门 (G3): 运行确定性 kb_write_guard。Reject → 400 (含拒绝原因);
@@ -92,7 +103,11 @@ async fn gate_write(
             if let Ok(kb) = state.kb.lock() {
                 record_write_evidence(&kb, action, payload, &verdict, false);
             }
-            return Err(json_err(&format!("{} 拒绝: {}", action, reasons.join("; "))));
+            return Err(json_err(&format!(
+                "{} 拒绝: {}",
+                action,
+                reasons.join("; ")
+            )));
         }
         WriteGuardVerdict::Hold { .. } => {}
     }
@@ -164,13 +179,19 @@ pub async fn search_handler(
     State(state): State<KbApiState>,
     Query(params): Query<SearchParams>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+    let kb = state
+        .kb
+        .lock()
+        .map_err(|e| internal_err(&format!("Lock: {}", e)))?;
     let limit = params.limit.unwrap_or(10).min(100);
     // 安全加固（C-2）：HTTP 公开搜索面强制 Public clearance，
     // 不接受客户端传入的 permission 参数——否则调用方可自选 "secret"
     // 读取 ThinkingTrace/Secret 等敏感节点。
-    let permission = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::PermissionLevel::Public;
-    let results = kb.search_permission_aware(&params.q, limit, permission).map_err(|e| internal_err(&e))?;
+    let permission =
+        crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::PermissionLevel::Public;
+    let results = kb
+        .search_permission_aware(&params.q, limit, permission)
+        .map_err(|e| internal_err(&e))?;
     Ok(json_ok(results))
 }
 
@@ -179,10 +200,16 @@ pub async fn node_handler(
     State(state): State<KbApiState>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+    let kb = state
+        .kb
+        .lock()
+        .map_err(|e| internal_err(&format!("Lock: {}", e)))?;
     match kb.get_node(&id).map_err(|e| internal_err(&e))? {
         Some(node) => Ok(json_ok(node)),
-        None => Err((StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Node not found"})))),
+        None => Err((
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "Node not found"})),
+        )),
     }
 }
 
@@ -190,7 +217,10 @@ pub async fn node_handler(
 pub async fn stats_handler(
     State(state): State<KbApiState>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+    let kb = state
+        .kb
+        .lock()
+        .map_err(|e| internal_err(&format!("Lock: {}", e)))?;
     let stats = kb.stats().map_err(|e| internal_err(&e))?;
     Ok(json_ok(stats))
 }
@@ -200,25 +230,37 @@ pub async fn advanced_query_handler(
     State(state): State<KbApiState>,
     Json(body): Json<AdvancedQueryBody>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+    let kb = state
+        .kb
+        .lock()
+        .map_err(|e| internal_err(&format!("Lock: {}", e)))?;
     let limit = body.limit.unwrap_or(10).min(100);
 
     let results: Vec<SearchResult> = if let Some(text) = &body.text {
-        kb.hybrid_rerank_search(text, limit * 2).map_err(|e| internal_err(&e))?
+        kb.hybrid_rerank_search(text, limit * 2)
+            .map_err(|e| internal_err(&e))?
     } else if let Some(nt_str) = &body.node_type {
         let nt = super::NodeType::from_str(nt_str);
-        let nodes = kb.search_by_type(&nt, limit * 2).map_err(|e| internal_err(&e))?;
-        nodes.into_iter().map(|n| SearchResult {
-            node: n,
-            score: 0.0,
-            matched_on: vec![SearchMatchType::FtsTitle],
-            signals: None,
-        }).collect()
+        let nodes = kb
+            .search_by_type(&nt, limit * 2)
+            .map_err(|e| internal_err(&e))?;
+        nodes
+            .into_iter()
+            .map(|n| SearchResult {
+                node: n,
+                score: 0.0,
+                matched_on: vec![SearchMatchType::FtsTitle],
+                signals: None,
+            })
+            .collect()
     } else {
-        return Err(json_err("At least one of 'text' or 'node_type' is required"));
+        return Err(json_err(
+            "At least one of 'text' or 'node_type' is required",
+        ));
     };
 
-    let filtered: Vec<SearchResult> = results.into_iter()
+    let filtered: Vec<SearchResult> = results
+        .into_iter()
         .filter(|r| {
             if let Some(domain) = &body.domain {
                 r.node.domain.as_deref() == Some(domain.as_str())
@@ -247,7 +289,10 @@ pub async fn graph_handler(
     Path(node_id): Path<String>,
     Query(params): Query<GraphParams>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+    let kb = state
+        .kb
+        .lock()
+        .map_err(|e| internal_err(&format!("Lock: {}", e)))?;
     let depth = params.depth.unwrap_or(2).min(5);
     let (nodes, edges) = kb.subgraph(&node_id, depth).map_err(|e| internal_err(&e))?;
     Ok(json_ok(serde_json::json!({"nodes": nodes, "edges": edges})))
@@ -259,9 +304,14 @@ pub async fn e8_query_handler(
     Path(mode): Path<String>,
     Query(params): Query<PaginationParams>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+    let kb = state
+        .kb
+        .lock()
+        .map_err(|e| internal_err(&format!("Lock: {}", e)))?;
     let limit = params.limit.unwrap_or(10).min(100);
-    let results = kb.recommend_for_e8_mode(&mode, limit).map_err(|e| internal_err(&e))?;
+    let results = kb
+        .recommend_for_e8_mode(&mode, limit)
+        .map_err(|e| internal_err(&e))?;
     Ok(json_ok(results))
 }
 
@@ -271,9 +321,14 @@ pub async fn specialist_query_handler(
     Path(name): Path<String>,
     Query(params): Query<PaginationParams>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+    let kb = state
+        .kb
+        .lock()
+        .map_err(|e| internal_err(&format!("Lock: {}", e)))?;
     let limit = params.limit.unwrap_or(10).min(100);
-    let results = kb.hybrid_rerank_search(&name, limit).map_err(|e| internal_err(&e))?;
+    let results = kb
+        .hybrid_rerank_search(&name, limit)
+        .map_err(|e| internal_err(&e))?;
     Ok(json_ok(results))
 }
 
@@ -291,19 +346,33 @@ pub async fn create_node_handler(
     });
     let verdict = gate_write(&state, "node:create", &payload).await?;
     let nt = super::NodeType::from_str(
-        payload.get("node_type").and_then(|v| v.as_str()).unwrap_or(""),
+        payload
+            .get("node_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or(""),
     );
-    let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
-    let id = kb.insert_or_get_node(
-        &body.title,
-        nt,
-        body.summary.as_deref(),
-        body.url.as_deref(),
-        body.domain.as_deref(),
-    ).map_err(|e| {
-        record_write_evidence(&kb, "node:create", &payload, &WriteGuardVerdict::Reject(vec![e.clone()]), false);
-        internal_err(&e)
-    })?;
+    let kb = state
+        .kb
+        .lock()
+        .map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+    let id = kb
+        .insert_or_get_node(
+            &body.title,
+            nt,
+            body.summary.as_deref(),
+            body.url.as_deref(),
+            body.domain.as_deref(),
+        )
+        .map_err(|e| {
+            record_write_evidence(
+                &kb,
+                "node:create",
+                &payload,
+                &WriteGuardVerdict::Reject(vec![e.clone()]),
+                false,
+            );
+            internal_err(&e)
+        })?;
     record_write_evidence(&kb, "node:create", &payload, &verdict, true);
     Ok(json_ok(serde_json::json!({"id": id})))
 }
@@ -322,17 +391,30 @@ pub async fn create_edge_handler(
     });
     let verdict = gate_write(&state, "edge:upsert", &payload).await?;
     let rt = super::RelationType::from_str(
-        payload.get("relation_type").and_then(|v| v.as_str()).unwrap_or(""),
+        payload
+            .get("relation_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or(""),
     );
-    let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+    let kb = state
+        .kb
+        .lock()
+        .map_err(|e| internal_err(&format!("Lock: {}", e)))?;
     kb.upsert_edge(
         &body.source_id,
         &body.target_id,
         rt,
         body.weight.unwrap_or(1.0),
         body.description.as_deref(),
-    ).map_err(|e| {
-        record_write_evidence(&kb, "edge:upsert", &payload, &WriteGuardVerdict::Reject(vec![e.clone()]), false);
+    )
+    .map_err(|e| {
+        record_write_evidence(
+            &kb,
+            "edge:upsert",
+            &payload,
+            &WriteGuardVerdict::Reject(vec![e.clone()]),
+            false,
+        );
         internal_err(&e)
     })?;
     record_write_evidence(&kb, "edge:upsert", &payload, &verdict, true);
@@ -348,21 +430,40 @@ pub async fn embeddings_status_handler(
     State(state): State<KbApiState>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let (model, dimension, base_url, vector_count, missing) = {
-        let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
-        let config = kb.embedding_config.read()
+        let kb = state
+            .kb
+            .lock()
+            .map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+        let config = kb
+            .embedding_config
+            .read()
             .map_err(|e| internal_err(&format!("embedding_config read: {}", e)))?
             .clone();
         let vectorized = {
-            let conn = kb.conn.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+            let conn = kb
+                .conn
+                .lock()
+                .map_err(|e| internal_err(&format!("Lock: {}", e)))?;
             nt_memory_embed::embedding_count(&conn).unwrap_or(0)
         };
         let missing = {
-            let conn = kb.conn.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
-            nt_memory_embed::find_nodes_missing_embeddings(&conn).unwrap_or_default().len()
+            let conn = kb
+                .conn
+                .lock()
+                .map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+            nt_memory_embed::find_nodes_missing_embeddings(&conn)
+                .unwrap_or_default()
+                .len()
         };
         match config {
             Some(c) => (c.model, c.dimension, c.base_url, vectorized, missing),
-            None => ("(none)".to_string(), 0, "(not configured)".to_string(), vectorized, missing),
+            None => (
+                "(none)".to_string(),
+                0,
+                "(not configured)".to_string(),
+                vectorized,
+                missing,
+            ),
         }
     };
 
@@ -375,9 +476,15 @@ pub async fn embeddings_status_handler(
                 .build()
                 .ok();
             let Some(client) = client else { return false };
-            client.get(format!("{base_url}/models")).send().map(|r| r.status().is_success()).unwrap_or(false)
+            client
+                .get(format!("{base_url}/models"))
+                .send()
+                .map(|r| r.status().is_success())
+                .unwrap_or(false)
         }
-    }).await.unwrap_or(false);
+    })
+    .await
+    .unwrap_or(false);
 
     Ok(json_ok(serde_json::json!({
         "model": model,
@@ -402,11 +509,13 @@ pub async fn embeddings_backfill_handler(
     gate_write(&state, "embedding:backfill", &payload).await?;
     let kb = state.kb.clone();
     let processed = tokio::task::spawn_blocking(move || {
-        kb.lock().map_err(|e| format!("Lock: {}", e))?.ensure_embeddings()
+        kb.lock()
+            .map_err(|e| format!("Lock: {}", e))?
+            .ensure_embeddings()
     })
-        .await
-        .map_err(|e| internal_err(&format!("Backfill task: {e}")))?
-        .map_err(|e| internal_err(&e))?;
+    .await
+    .map_err(|e| internal_err(&format!("Backfill task: {e}")))?
+    .map_err(|e| internal_err(&e))?;
     Ok(json_ok(serde_json::json!({"processed": processed})))
 }
 
@@ -414,7 +523,10 @@ pub async fn embeddings_backfill_handler(
 pub async fn snapshot_handler(
     State(state): State<KbApiState>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+    let kb = state
+        .kb
+        .lock()
+        .map_err(|e| internal_err(&format!("Lock: {}", e)))?;
     let snap = snapshot_kb(&kb).map_err(|e| internal_err(&e))?;
     Ok(json_ok(snap))
 }
@@ -437,14 +549,20 @@ pub async fn diff_handler(
     let base = match load(&body.base_path)? {
         Some(s) => s,
         None => {
-            let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+            let kb = state
+                .kb
+                .lock()
+                .map_err(|e| internal_err(&format!("Lock: {}", e)))?;
             snapshot_kb(&kb).map_err(|e| internal_err(&e))?
         }
     };
     let other = match load(&body.other_path)? {
         Some(s) => s,
         None => {
-            let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+            let kb = state
+                .kb
+                .lock()
+                .map_err(|e| internal_err(&format!("Lock: {}", e)))?;
             snapshot_kb(&kb).map_err(|e| internal_err(&e))?
         }
     };
@@ -465,9 +583,17 @@ mod tests {
     fn temp_kb() -> (KbApiState, std::path::PathBuf) {
         let dir = std::env::temp_dir().join(format!("nt_kb_api_{}", std::process::id()));
         std::fs::create_dir_all(&dir).ok();
-        let db_path = dir.join(format!("test_api_kb_{}.db", std::thread::current().name().unwrap_or("t")));
+        let db_path = dir.join(format!(
+            "test_api_kb_{}.db",
+            std::thread::current().name().unwrap_or("t")
+        ));
         let kb = KnowledgeBase::open(Some(db_path.clone())).expect("open kb");
-        (KbApiState { kb: Arc::new(Mutex::new(kb)) }, db_path)
+        (
+            KbApiState {
+                kb: Arc::new(Mutex::new(kb)),
+            },
+            db_path,
+        )
     }
 
     #[test]
@@ -476,13 +602,14 @@ mod tests {
         // Config present → status reports model/dim without panicking even if no provider up.
         {
             let kb = state.kb.lock().expect("lock");
-            *kb.embedding_config.write().expect("rwlock") = Some(nt_memory_embed::EmbeddingConfig {
-                api_key: "local".into(),
-                base_url: "http://127.0.0.1:8237/v1".into(),
-                model: "all-MiniLM-L6-v2".into(),
-                dimension: 384,
-                mode: nt_memory_embed::EmbedMode::Http,
-            });
+            *kb.embedding_config.write().expect("rwlock") =
+                Some(nt_memory_embed::EmbeddingConfig {
+                    api_key: "local".into(),
+                    base_url: "http://127.0.0.1:8237/v1".into(),
+                    model: "all-MiniLM-L6-v2".into(),
+                    dimension: 384,
+                    mode: nt_memory_embed::EmbedMode::Http,
+                });
         }
         let body = futures_block_on(embeddings_status_handler(State(state))).expect("status ok");
         let v = body.0;
@@ -521,7 +648,8 @@ mod tests {
             url: Some("ftp://x".into()),
             domain: None,
         };
-        let err = futures_block_on(create_node_handler(State(state.clone()), Json(body))).unwrap_err();
+        let err =
+            futures_block_on(create_node_handler(State(state.clone()), Json(body))).unwrap_err();
         assert_eq!(err.0, StatusCode::BAD_REQUEST);
         // 库应保持空 (无节点写入)。
         let kb = state.kb.lock().unwrap();
@@ -549,11 +677,21 @@ mod tests {
         // 写入一个节点后, 快照应包含该节点。
         {
             let kb = state.kb.lock().unwrap();
-            kb.insert_or_get_node("G5 snap", crate::l4_emotion::nt_memory::nt_memory_kb::NodeType::Concept, None, None, None).unwrap();
+            kb.insert_or_get_node(
+                "G5 snap",
+                crate::l4_emotion::nt_memory::nt_memory_kb::NodeType::Concept,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
         }
         let body = futures_block_on(snapshot_handler(State(state))).expect("snapshot ok");
         let v = body.0;
-        assert_eq!(v["format"], crate::l4_emotion::nt_memory::nt_memory_kb::SNAPSHOT_FORMAT);
+        assert_eq!(
+            v["format"],
+            crate::l4_emotion::nt_memory::nt_memory_kb::SNAPSHOT_FORMAT
+        );
         assert_eq!(v["nodes"].as_array().map(|a| a.len()).unwrap_or(0), 1);
         assert_eq!(v["edges"].as_array().map(|a| a.len()).unwrap_or(0), 0);
     }
@@ -561,8 +699,14 @@ mod tests {
     #[test]
     fn test_diff_handler_against_self_is_empty() {
         let (state, _) = temp_kb();
-        let body = futures_block_on(diff_handler(State(state), Json(DiffBody { base_path: None, other_path: None })))
-            .expect("diff ok");
+        let body = futures_block_on(diff_handler(
+            State(state),
+            Json(DiffBody {
+                base_path: None,
+                other_path: None,
+            }),
+        ))
+        .expect("diff ok");
         assert_eq!(body.0["diff"]["nodes_added"].as_array().unwrap().len(), 0);
     }
 
@@ -572,8 +716,14 @@ mod tests {
         // 空库 → 快照文件 (含 1 节点) → 删除后 diff 应报告 removed 1。
         let node_id = {
             let kb = state.kb.lock().unwrap();
-            kb.insert_or_get_node("G5 file", crate::l4_emotion::nt_memory::nt_memory_kb::NodeType::Concept, None, None, None)
-                .unwrap()
+            kb.insert_or_get_node(
+                "G5 file",
+                crate::l4_emotion::nt_memory::nt_memory_kb::NodeType::Concept,
+                None,
+                None,
+                None,
+            )
+            .unwrap()
         };
         let snap = {
             let kb = state.kb.lock().unwrap();
@@ -591,7 +741,10 @@ mod tests {
         }
         let body = futures_block_on(diff_handler(
             State(state),
-            Json(DiffBody { base_path: Some(path.to_string_lossy().into_owned()), other_path: None }),
+            Json(DiffBody {
+                base_path: Some(path.to_string_lossy().into_owned()),
+                other_path: None,
+            }),
         ))
         .expect("diff ok");
         assert_eq!(body.0["diff"]["nodes_removed"].as_array().unwrap().len(), 1);

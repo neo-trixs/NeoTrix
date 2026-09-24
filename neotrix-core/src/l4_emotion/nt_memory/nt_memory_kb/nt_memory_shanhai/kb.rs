@@ -1,7 +1,7 @@
+use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::*;
 /// Safe KB operations for Shanhai data ingestion.
 /// Uses INSERT OR IGNORE so running multiple times won't fail.
 use rusqlite::Connection;
-use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::*;
 
 pub fn safe_insert_node(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<()> {
     conn.execute(

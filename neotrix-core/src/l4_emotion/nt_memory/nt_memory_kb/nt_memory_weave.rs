@@ -77,7 +77,9 @@ impl WeaveReport {
 }
 
 fn now_iso() -> String {
-    chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.6f").to_string()
+    chrono::Utc::now()
+        .format("%Y-%m-%dT%H:%M:%S%.6f")
+        .to_string()
 }
 
 fn days_ago(secs: u64) -> i64 {
@@ -185,9 +187,13 @@ pub fn connect_patterns(
             links[idx]["last_reinforced"] = json!(now);
             if strength > STRONG_LINK_THRESHOLD {
                 links[idx]["permanent"] = json!(true);
-                report.permanent_links.push(format!("{from_pattern}<->{to_pattern}"));
+                report
+                    .permanent_links
+                    .push(format!("{from_pattern}<->{to_pattern}"));
             }
-            report.reinforced_links.push(format!("{from_pattern}<->{to_pattern} ({strength})"));
+            report
+                .reinforced_links
+                .push(format!("{from_pattern}<->{to_pattern} ({strength})"));
         }
         None => {
             // 新建连接
@@ -199,13 +205,18 @@ pub fn connect_patterns(
                 "last_reinforced": now,
                 "permanent": false,
             }));
-            report.new_links.push(format!("{from_pattern}<->{to_pattern}"));
+            report
+                .new_links
+                .push(format!("{from_pattern}<->{to_pattern}"));
         }
     }
 
     let updated = serde_json::to_string(&graph).map_err(|e| format!("graph 序列化失败: {e}"))?;
     kv_set(conn, WEAVE_NS, GRAPH_KEY, &updated).map_err(|e| format!("graph 写入失败: {e}"))?;
-    Ok((!report.new_links.is_empty(), !report.reinforced_links.is_empty()))
+    Ok((
+        !report.new_links.is_empty(),
+        !report.reinforced_links.is_empty(),
+    ))
 }
 
 /// 图谱维护: 标记 30 天未引用的弱连接, 统计强连接 (Phase 4 graph update)。
@@ -231,7 +242,10 @@ pub fn graph_curate(conn: &Connection) -> Result<(usize, usize), String> {
             .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
             .map(|t| t.timestamp())
             .unwrap_or(0);
-        let permanent = l.get("permanent").and_then(|v| v.as_bool()).unwrap_or(false);
+        let permanent = l
+            .get("permanent")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         if strength > STRONG_LINK_THRESHOLD || permanent {
             l["permanent"] = json!(true);
             strong += 1;

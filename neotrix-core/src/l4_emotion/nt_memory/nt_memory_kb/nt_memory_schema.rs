@@ -2,4 +2,6 @@
 //! 此处 re-export 保持 `nt_memory_schema::initialize` 调用方路径不变。
 //! 单一事实源: `crate::l0_substrate::nt_core_kb_primitives::schema_initialize`。
 
-pub use crate::l0_substrate::nt_core_kb_primitives::{SCHEMA_VERSION, schema_initialize as initialize};
+pub use crate::l0_substrate::nt_core_kb_primitives::{
+    schema_initialize as initialize, SCHEMA_VERSION,
+};

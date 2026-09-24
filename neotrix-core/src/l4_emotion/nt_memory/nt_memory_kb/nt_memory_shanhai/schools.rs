@@ -5,11 +5,15 @@ pub fn all_schools() -> Vec<SchoolParameters> {
         SchoolParameters {
             name: "华夏说——谭其骧学术体系".into(),
             founder: "谭其骧".into(),
-            description: "《山海经》地理范围不出华夏，447座山中约140座可确切定位在豫西/晋南/陕中".into(),
+            description: "《山海经》地理范围不出华夏，447座山中约140座可确切定位在豫西/晋南/陕中"
+                .into(),
             li_scale: LiScale::QinHan,
             scope: GeographicScope::ChinaOnly,
             key_mountains: vec![
-                "华山".into(), "太行山".into(), "王屋山".into(), "嵩山".into(),
+                "华山".into(),
+                "太行山".into(),
+                "王屋山".into(),
+                "嵩山".into(),
             ],
             confidence_base: 0.9,
         },
@@ -19,9 +23,7 @@ pub fn all_schools() -> Vec<SchoolParameters> {
             description: "《山海经》描述全球地理：昆仑=非洲，东山经=北美，轩辕之国=匈牙利".into(),
             li_scale: LiScale::LiuZongdi,
             scope: GeographicScope::Global,
-            key_mountains: vec![
-                "昆仑山".into(), "不周山".into(), "炎火山".into(),
-            ],
+            key_mountains: vec!["昆仑山".into(), "不周山".into(), "炎火山".into()],
             confidence_base: 0.75,
         },
         SchoolParameters {

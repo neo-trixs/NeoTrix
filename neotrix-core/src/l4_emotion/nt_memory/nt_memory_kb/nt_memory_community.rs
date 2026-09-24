@@ -286,12 +286,7 @@ impl CommunityDetector {
         }
     }
 
-    fn find_best_community(
-        &self,
-        graph: &Graph,
-        community_of: &Assignment,
-        node: &str,
-    ) -> u64 {
+    fn find_best_community(&self, graph: &Graph, community_of: &Assignment, node: &str) -> u64 {
         let neighbors = match graph.get(node) {
             Some(n) => n,
             None => return community_of[node],
@@ -306,10 +301,9 @@ impl CommunityDetector {
 
         for neighbor in neighbors.keys() {
             let comm = community_of[neighbor];
-            candidate_comms.entry(comm).or_insert_with(|| {
-                
-                self.cpm_gain(graph, community_of, node, comm)
-            });
+            candidate_comms
+                .entry(comm)
+                .or_insert_with(|| self.cpm_gain(graph, community_of, node, comm));
         }
 
         candidate_comms
@@ -393,10 +387,7 @@ impl CommunityDetector {
             let mut total_degree = 0.0;
 
             for member in members {
-                let deg: f64 = graph
-                    .get(member)
-                    .map(|n| n.values().sum())
-                    .unwrap_or(0.0);
+                let deg: f64 = graph.get(member).map(|n| n.values().sum()).unwrap_or(0.0);
                 total_degree += deg;
 
                 for other in members {
@@ -537,10 +528,7 @@ impl CommunityDetector {
                 .entry(src_key.clone())
                 .or_default()
                 .insert(dst_key.clone(), w);
-            aggregated
-                .entry(dst_key)
-                .or_default()
-                .insert(src_key, w);
+            aggregated.entry(dst_key).or_default().insert(src_key, w);
         }
 
         (aggregated, old_to_new)
@@ -566,16 +554,14 @@ impl CommunityDetector {
 
         let mut communities: Vec<Community> = comm_groups
             .into_iter()
-            .map(|(cid, members)| {
-                Community {
-                    id: CommunityId(cid),
-                    level,
-                    members,
-                    parent: None,
-                    children: Vec::new(),
-                    summary: None,
-                    modularity_score: modularity,
-                }
+            .map(|(cid, members)| Community {
+                id: CommunityId(cid),
+                level,
+                members,
+                parent: None,
+                children: Vec::new(),
+                summary: None,
+                modularity_score: modularity,
             })
             .collect();
 
@@ -778,10 +764,13 @@ impl CommunityAwareSearch {
                 results.push(CommunityResult {
                     community_id: community.id,
                     level: community.level,
-                    summary: community
-                        .summary
-                        .clone()
-                        .unwrap_or_else(|| format!("Community #{} ({} members)", community.id, community.members.len())),
+                    summary: community.summary.clone().unwrap_or_else(|| {
+                        format!(
+                            "Community #{} ({} members)",
+                            community.id,
+                            community.members.len()
+                        )
+                    }),
                     score: community.modularity_score,
                     member_count: community.members.len(),
                 });
@@ -789,7 +778,11 @@ impl CommunityAwareSearch {
         }
 
         // Sort by score descending
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(k);
         results
     }
@@ -811,17 +804,24 @@ impl CommunityAwareSearch {
                 results.push(CommunityResult {
                     community_id: community.id,
                     level: community.level,
-                    summary: community
-                        .summary
-                        .clone()
-                        .unwrap_or_else(|| format!("Community #{} ({} members)", community.id, community.members.len())),
+                    summary: community.summary.clone().unwrap_or_else(|| {
+                        format!(
+                            "Community #{} ({} members)",
+                            community.id,
+                            community.members.len()
+                        )
+                    }),
                     score: community.modularity_score,
                     member_count: community.members.len(),
                 });
             }
         }
 
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(k);
         results
     }
@@ -863,17 +863,24 @@ impl CommunityAwareSearch {
                 results.push(CommunityResult {
                     community_id: community.id,
                     level: community.level,
-                    summary: community
-                        .summary
-                        .clone()
-                        .unwrap_or_else(|| format!("Community #{} ({} members)", community.id, community.members.len())),
+                    summary: community.summary.clone().unwrap_or_else(|| {
+                        format!(
+                            "Community #{} ({} members)",
+                            community.id,
+                            community.members.len()
+                        )
+                    }),
                     score: community.modularity_score * weight,
                     member_count: community.members.len(),
                 });
             }
         }
 
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.dedup_by(|a, b| a.community_id == b.community_id);
         results.truncate(k);
         results
@@ -896,12 +903,13 @@ impl CommunityAwareSearch {
                 results.push(CommunityResult {
                     community_id: community.id,
                     level: community.level,
-                    summary: community
-                        .summary
-                        .clone()
-                        .unwrap_or_else(|| {
-                            format!("Community #{} ({} members)", community.id, community.members.len())
-                        }),
+                    summary: community.summary.clone().unwrap_or_else(|| {
+                        format!(
+                            "Community #{} ({} members)",
+                            community.id,
+                            community.members.len()
+                        )
+                    }),
                     score: community.modularity_score,
                     member_count: community.members.len(),
                 });
@@ -928,10 +936,9 @@ impl CommunityAwareSearch {
                 .map(|c| CommunityResult {
                     community_id: c.id,
                     level: c.level,
-                    summary: c
-                        .summary
-                        .clone()
-                        .unwrap_or_else(|| format!("Community #{} ({} members)", c.id, c.members.len())),
+                    summary: c.summary.clone().unwrap_or_else(|| {
+                        format!("Community #{} ({} members)", c.id, c.members.len())
+                    }),
                     score: c.modularity_score,
                     member_count: c.members.len(),
                 })
@@ -998,11 +1005,14 @@ impl CommunityAwareSearch {
             }
         }
 
-        fused.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        fused.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         fused.truncate(k);
         fused
     }
-
 }
 
 // ─── In-Memory KB for testing / offline use ─────────────────────────
@@ -1053,7 +1063,13 @@ impl InMemoryKB {
         });
     }
 
-    pub fn add_edge(&mut self, source_id: &str, target_id: &str, relation_type: RelationType, weight: f64) {
+    pub fn add_edge(
+        &mut self,
+        source_id: &str,
+        target_id: &str,
+        relation_type: RelationType,
+        weight: f64,
+    ) {
         self.edges.push(KnowledgeEdge {
             id: format!("{}-{}", source_id, target_id),
             source_id: source_id.to_string(),
@@ -1226,7 +1242,14 @@ mod tests {
         // Each community should have the right level assigned
         for level_comms in &hierarchy.levels {
             for comm in level_comms {
-                assert_eq!(comm.level, hierarchy.levels.iter().position(|l| l.iter().any(|c| c.id == comm.id)).unwrap_or(0));
+                assert_eq!(
+                    comm.level,
+                    hierarchy
+                        .levels
+                        .iter()
+                        .position(|l| l.iter().any(|c| c.id == comm.id))
+                        .unwrap_or(0)
+                );
             }
         }
     }
@@ -1275,10 +1298,7 @@ mod tests {
         let mix_results = searcher
             .search_community("test query", CommunityQueryMode::Mix, 5)
             .unwrap();
-        assert!(
-            mix_results.len() <= 5,
-            "Mix mode should return ≤5 results"
-        );
+        assert!(mix_results.len() <= 5, "Mix mode should return ≤5 results");
     }
 
     // ── Test: Different modes produce different result sets ───────

@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
 use super::nt_memory_embed;
 use super::KnowledgeBase;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum SvafDecision {
@@ -38,20 +38,26 @@ impl Default for SvafGate {
             coherence_threshold: 0.2,
             relevance_threshold: 0.1,
             authority_weights: vec![
-                ("arxiv".to_string(), 0.9), ("wikipedia".to_string(), 0.8), ("github".to_string(), 0.6),
-                ("blog".to_string(), 0.4), ("news".to_string(), 0.3), ("forum".to_string(), 0.2), ("unknown".to_string(), 0.1),
+                ("arxiv".to_string(), 0.9),
+                ("wikipedia".to_string(), 0.8),
+                ("github".to_string(), 0.6),
+                ("blog".to_string(), 0.4),
+                ("news".to_string(), 0.3),
+                ("forum".to_string(), 0.2),
+                ("unknown".to_string(), 0.1),
             ],
         }
     }
 }
 
 impl SvafGate {
-    pub fn new(
-        novelty_threshold: f64,
-        coherence_threshold: f64,
-        relevance_threshold: f64,
-    ) -> Self {
-        Self { novelty_threshold, coherence_threshold, relevance_threshold, ..Default::default() }
+    pub fn new(novelty_threshold: f64, coherence_threshold: f64, relevance_threshold: f64) -> Self {
+        Self {
+            novelty_threshold,
+            coherence_threshold,
+            relevance_threshold,
+            ..Default::default()
+        }
     }
 
     /// Evaluate content only (no KB connection) — for testing / pre-filter.
@@ -65,15 +71,32 @@ impl SvafGate {
         } else if coherence < self.coherence_threshold {
             (SvafDecision::Guard, format!("coherence={:.2}", coherence))
         } else if relevance > 0.3 || authority > 0.5 {
-            (SvafDecision::Accept, format!("coherence={:.2} relevance={:.2}", coherence, relevance))
+            (
+                SvafDecision::Accept,
+                format!("coherence={:.2} relevance={:.2}", coherence, relevance),
+            )
         } else {
-            (SvafDecision::Guard, format!("low relevance ({:.2})", relevance))
+            (
+                SvafDecision::Guard,
+                format!("low relevance ({:.2})", relevance),
+            )
         };
-        SvafEvaluation { decision, novelty: 0.5, coherence, relevance, authority, reason }
+        SvafEvaluation {
+            decision,
+            novelty: 0.5,
+            coherence,
+            relevance,
+            authority,
+            reason,
+        }
     }
 
     pub fn evaluate(
-        &self, kb: &KnowledgeBase, title: &str, content: &str, source_type: &str,
+        &self,
+        kb: &KnowledgeBase,
+        title: &str,
+        content: &str,
+        source_type: &str,
     ) -> SvafEvaluation {
         let novelty = self.novelty_score(kb, title, content);
         let coherence = self.coherence_score(content);
@@ -87,18 +110,43 @@ impl SvafGate {
         let min_dim = novelty.min(coherence).min(relevance);
 
         let (decision, reason) = if min_dim < 0.05 {
-            (SvafDecision::Reject, format!("all dimensions too low (min={:.2})", min_dim))
+            (
+                SvafDecision::Reject,
+                format!("all dimensions too low (min={:.2})", min_dim),
+            )
         } else if !novelty_pass && mean < 0.2 {
-            (SvafDecision::Redundant, format!("low novelty ({:.2}) + low mean ({:.2})", novelty, mean))
+            (
+                SvafDecision::Redundant,
+                format!("low novelty ({:.2}) + low mean ({:.2})", novelty, mean),
+            )
         } else if !novelty_pass || !coherence_pass {
-            (SvafDecision::Guard, format!("novelty={:.2} coherence={:.2}", novelty, coherence))
+            (
+                SvafDecision::Guard,
+                format!("novelty={:.2} coherence={:.2}", novelty, coherence),
+            )
         } else if relevance_pass || authority > 0.5 {
-            (SvafDecision::Accept, format!("novelty={:.2} coherence={:.2} relevance={:.2}", novelty, coherence, relevance))
+            (
+                SvafDecision::Accept,
+                format!(
+                    "novelty={:.2} coherence={:.2} relevance={:.2}",
+                    novelty, coherence, relevance
+                ),
+            )
         } else {
-            (SvafDecision::Guard, format!("low relevance ({:.2})", relevance))
+            (
+                SvafDecision::Guard,
+                format!("low relevance ({:.2})", relevance),
+            )
         };
 
-        SvafEvaluation { decision, novelty, coherence, relevance, authority, reason }
+        SvafEvaluation {
+            decision,
+            novelty,
+            coherence,
+            relevance,
+            authority,
+            reason,
+        }
     }
 
     fn novelty_score(&self, kb: &KnowledgeBase, title: &str, content: &str) -> f64 {
@@ -125,32 +173,70 @@ impl SvafGate {
         };
         drop(conn);
 
-        if all.is_empty() { return 1.0; }
-        let max_sim: f64 = all.iter()
-            .map(|(_id, vec)| crate::l0_substrate::nt_core_math::cosine_similarity_f32(&query_vec, vec))
+        if all.is_empty() {
+            return 1.0;
+        }
+        let max_sim: f64 = all
+            .iter()
+            .map(|(_id, vec)| {
+                crate::l0_substrate::nt_core_math::cosine_similarity_f32(&query_vec, vec)
+            })
             .fold(0.0_f64, |a, b| a.max(b));
         (1.0 - max_sim).clamp(0.0, 1.0)
     }
 
     fn coherence_score(&self, content: &str) -> f64 {
-        if content.len() < 10 { return 0.1; }
-        let sentences: Vec<&str> = content.split(['.', '!', '?'])
-            .map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
-        if sentences.len() < 2 { return 0.3; }
-        let avg_len = sentences.iter().map(|s| s.len()).sum::<usize>() as f64 / sentences.len() as f64;
-        if avg_len < 10.0 { return 0.2; }
-        let has_connectors = sentences.iter()
-            .filter(|s| s.contains("因为") || s.contains("所以") || s.contains("但是")
-                || s.contains("因此") || s.contains("例如") || s.contains("then")
-                || s.contains("because") || s.contains("therefore") || s.contains("however"))
+        if content.len() < 10 {
+            return 0.1;
+        }
+        let sentences: Vec<&str> = content
+            .split(['.', '!', '?'])
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if sentences.len() < 2 {
+            return 0.3;
+        }
+        let avg_len =
+            sentences.iter().map(|s| s.len()).sum::<usize>() as f64 / sentences.len() as f64;
+        if avg_len < 10.0 {
+            return 0.2;
+        }
+        let has_connectors = sentences
+            .iter()
+            .filter(|s| {
+                s.contains("因为")
+                    || s.contains("所以")
+                    || s.contains("但是")
+                    || s.contains("因此")
+                    || s.contains("例如")
+                    || s.contains("then")
+                    || s.contains("because")
+                    || s.contains("therefore")
+                    || s.contains("however")
+            })
             .count();
         0.3 + 0.4 * (has_connectors as f64 / sentences.len() as f64).min(1.0)
             + 0.3 * (avg_len / 80.0).min(1.0)
     }
 
     fn relevance_score(&self, _title: &str, content: &str) -> f64 {
-        let keywords = ["algorithm", "model", "system", "method", "data", "learning",
-            "neural", "network", "函数", "算法", "模型", "系统", "方法", "数据"];
+        let keywords = [
+            "algorithm",
+            "model",
+            "system",
+            "method",
+            "data",
+            "learning",
+            "neural",
+            "network",
+            "函数",
+            "算法",
+            "模型",
+            "系统",
+            "方法",
+            "数据",
+        ];
         let lower = content.to_lowercase();
         let hits = keywords.iter().filter(|k| lower.contains(*k)).count();
         (hits as f64 / keywords.len() as f64) * 0.8 + 0.1
@@ -159,7 +245,9 @@ impl SvafGate {
     fn authority_score(&self, source_type: &str) -> f64 {
         let lower = source_type.to_lowercase();
         for (prefix, weight) in &self.authority_weights {
-            if lower.contains(prefix) { return *weight; }
+            if lower.contains(prefix) {
+                return *weight;
+            }
         }
         0.1
     }
@@ -194,7 +282,11 @@ impl crate::l0_substrate::nt_core_self_test::SelfTest for SvafGate {
         if unknown > 0.5 {
             failures.push("unknown source authority too high".into());
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
@@ -252,8 +344,11 @@ mod tests {
     #[test]
     fn test_guard_marginal_coherence() {
         let gate = SvafGate::new(0.1, 0.9, 0.1);
-        let eval = gate.evaluate_content_only("This is an article about machine learning and data science.
-            The model works well.", "arxiv");
+        let eval = gate.evaluate_content_only(
+            "This is an article about machine learning and data science.
+            The model works well.",
+            "arxiv",
+        );
         assert_eq!(eval.decision, SvafDecision::Guard);
     }
 }

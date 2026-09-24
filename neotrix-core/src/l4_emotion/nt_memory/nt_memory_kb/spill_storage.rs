@@ -202,7 +202,10 @@ impl SpillStorage {
         let mut blobs = self.blobs.write().unwrap_or_else(|e| e.into_inner());
         for key in dangling {
             blobs.remove(&key);
-            actions.push(format!("removed dangling index entry '{}' (data missing)", key));
+            actions.push(format!(
+                "removed dangling index entry '{}' (data missing)",
+                key
+            ));
         }
         actions
     }

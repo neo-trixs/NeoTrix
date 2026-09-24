@@ -16,18 +16,18 @@ use unicode_normalization::UnicodeNormalization;
 // - `(?m)` = `re.MULTILINE`，`(?s)` = `re.DOTALL`。
 // - 由 OnceLock 在首次调用时编译一次，避免每次重建 `Regex`。
 const MD_RULES: &[(&str, &str)] = &[
-    (r"!\[.*?\]\(.*?\)", ""),                // 图片
-    (r"\[([^\]]*)\]\(.*?\)", "$1"),          // 链接 -> 保留文本
-    (r"(?s)```[\s\S]*?```", ""),             // 代码围栏
-    (r"`([^`]+)`", "$1"),                    // 行内代码
-    (r"\*\*([^*]+)\*\*", "$1"),              // 粗体
-    (r"__([^_]+)__", "$1"),                  // 粗体 (替代)
-    (r"\*([^*]+)\*", "$1"),                  // 斜体
-    (r"_([^_]+)_", "$1"),                    // 斜体 (替代)
-    (r"(?m)^[#]+ ", ""),                     // 标题
-    (r"(?m)^[>\|] ", ""),                    // 引用/表格
-    (r"(?m)^[-*+]\s+", ""),                  // 列表项
-    (r"(?m)^\d+\.\s+", ""),                  // 有序列表
+    (r"!\[.*?\]\(.*?\)", ""),       // 图片
+    (r"\[([^\]]*)\]\(.*?\)", "$1"), // 链接 -> 保留文本
+    (r"(?s)```[\s\S]*?```", ""),    // 代码围栏
+    (r"`([^`]+)`", "$1"),           // 行内代码
+    (r"\*\*([^*]+)\*\*", "$1"),     // 粗体
+    (r"__([^_]+)__", "$1"),         // 粗体 (替代)
+    (r"\*([^*]+)\*", "$1"),         // 斜体
+    (r"_([^_]+)_", "$1"),           // 斜体 (替代)
+    (r"(?m)^[#]+ ", ""),            // 标题
+    (r"(?m)^[>\|] ", ""),           // 引用/表格
+    (r"(?m)^[-*+]\s+", ""),         // 列表项
+    (r"(?m)^\d+\.\s+", ""),         // 有序列表
 ];
 
 fn md_rules() -> &'static Vec<(Regex, &'static str)> {
@@ -134,7 +134,11 @@ const LANG_SIGNATURES: &[(&str, &str, f64)] = &[
     (r"```r\b", "R", 0.9),
     (r"```(?:matlab|octave)\b", "MATLAB", 0.9),
     (r"```julia\b", "Julia", 0.9),
-    (r"built with python|python library|python package", "Python", 0.6),
+    (
+        r"built with python|python library|python package",
+        "Python",
+        0.6,
+    ),
     (r"built with rust|rust library|rust crate", "Rust", 0.6),
     (r"built with go|golang library", "Go", 0.6),
     (r"built with typescript", "TypeScript", 0.6),
@@ -335,16 +339,42 @@ pub fn compute_quality_score(
 // ── Schema 校验 ───────────────────────────────────────────────────
 
 pub const NODE_TYPES: &[&str] = &[
-    "Repository", "Resource", "Concept", "Article", "Insight", "CodeSnippet",
-    "Framework", "Organization", "Paper", "Theory", "Tutorial", "Tool",
-    "Project", "Book", "Course", "Video", "Audio", "Image", "Dataset",
-    "API", "Standard",
+    "Repository",
+    "Resource",
+    "Concept",
+    "Article",
+    "Insight",
+    "CodeSnippet",
+    "Framework",
+    "Organization",
+    "Paper",
+    "Theory",
+    "Tutorial",
+    "Tool",
+    "Project",
+    "Book",
+    "Course",
+    "Video",
+    "Audio",
+    "Image",
+    "Dataset",
+    "API",
+    "Standard",
 ];
 
 pub const RELATION_TYPES: &[&str] = &[
-    "contains", "related_to", "references", "depends_on", "part_of",
-    "implements", "developed_by", "authored_by", "supports", "uses",
-    "similar_to", "translates_to",
+    "contains",
+    "related_to",
+    "references",
+    "depends_on",
+    "part_of",
+    "implements",
+    "developed_by",
+    "authored_by",
+    "supports",
+    "uses",
+    "similar_to",
+    "translates_to",
 ];
 
 /// 校验并规范化节点类型。

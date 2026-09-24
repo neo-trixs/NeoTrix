@@ -56,7 +56,11 @@ pub struct ExternalDiscoveryStats {
 // ======================================================================
 // 1. 古籍 / Classic Books — Project Gutenberg
 // ======================================================================
-pub fn discover_gutenberg(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_gutenberg(
+    conn: &Connection,
+    query: &str,
+    limit: usize,
+) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -74,14 +78,23 @@ pub fn discover_gutenberg(conn: &Connection, query: &str, limit: usize) -> Resul
     .map_err(|e| format!("Gutenberg fetch error: {}", e))?;
 
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON error: {}", e))?;
-    let results = data["results"].as_array().ok_or_else(|| "Missing results".to_string())?;
+    let results = data["results"]
+        .as_array()
+        .ok_or_else(|| "Missing results".to_string())?;
     stats.queries_executed = 1;
 
     for (i, book) in results.iter().enumerate() {
-        if i >= limit { break; }
+        if i >= limit {
+            break;
+        }
         let title = book["title"].as_str().unwrap_or("Unknown");
-        let authors: Vec<String> = book["authors"].as_array()
-            .map(|a| a.iter().filter_map(|v: &Value| v["name"].as_str().map(|s: &str| s.to_string())).collect())
+        let authors: Vec<String> = book["authors"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v: &Value| v["name"].as_str().map(|s: &str| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default();
         let author_str = authors.join(", ");
         let summary = format!("{} — Project Gutenberg classic book", title);
@@ -89,7 +102,12 @@ pub fn discover_gutenberg(conn: &Connection, query: &str, limit: usize) -> Resul
         let book_url = format!("https://www.gutenberg.org/ebooks/{}", book_id);
 
         let mut desc = ResourceDescriptor::article(title, &summary, &book_url)
-            .with_tags(vec!["book", "gutenberg", "classic", &format!("absorbed-{}", today())])
+            .with_tags(vec![
+                "book",
+                "gutenberg",
+                "classic",
+                &format!("absorbed-{}", today()),
+            ])
             .with_importance(0.5)
             .with_confidence(0.8);
 
@@ -99,9 +117,13 @@ pub fn discover_gutenberg(conn: &Connection, query: &str, limit: usize) -> Resul
 
         if let Ok(result) = ingester.ingest(&desc) {
             stats.resources_ingested += 1;
-            let _ = store::update_node_metadata(conn, &result.node_id, &serde_json::json!({
-                "source": "gutenberg", "book_id": book_id, "authors": authors
-            }));
+            let _ = store::update_node_metadata(
+                conn,
+                &result.node_id,
+                &serde_json::json!({
+                    "source": "gutenberg", "book_id": book_id, "authors": authors
+                }),
+            );
         }
         stats.resources_found += 1;
     }
@@ -111,7 +133,11 @@ pub fn discover_gutenberg(conn: &Connection, query: &str, limit: usize) -> Resul
 /// ======================================================================
 /// 2. 学术论文 / Papers — Semantic Scholar API
 /// ======================================================================
-pub fn discover_semantic_scholar(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_semantic_scholar(
+    conn: &Connection,
+    query: &str,
+    limit: usize,
+) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -130,7 +156,9 @@ pub fn discover_semantic_scholar(conn: &Connection, query: &str, limit: usize) -
     .map_err(|e| format!("Semantic Scholar error: {}", e))?;
 
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON error: {}", e))?;
-    let papers = data["data"].as_array().ok_or_else(|| "Missing data".to_string())?;
+    let papers = data["data"]
+        .as_array()
+        .ok_or_else(|| "Missing data".to_string())?;
     stats.queries_executed = 1;
 
     for paper in papers {
@@ -139,23 +167,37 @@ pub fn discover_semantic_scholar(conn: &Connection, query: &str, limit: usize) -
         let paper_url = paper["url"].as_str().unwrap_or("");
         let venue = paper["venue"].as_str().unwrap_or("unknown");
         let year = paper["year"].as_i64().unwrap_or(0);
-        let authors: Vec<String> = paper["authors"].as_array()
-            .map(|a| a.iter().filter_map(|v| v["name"].as_str().map(|s| s.to_string())).collect::<Vec<_>>())
+        let authors: Vec<String> = paper["authors"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v["name"].as_str().map(|s| s.to_string()))
+                    .collect::<Vec<_>>()
+            })
             .unwrap_or_default();
 
         let summary = format!("{} ({}, {}) — via Semantic Scholar", title, venue, year);
 
         let desc = ResourceDescriptor::article(title, &summary, paper_url)
-            .with_tags(vec!["paper", "semantic-scholar", venue, &format!("absorbed-{}", today())])
+            .with_tags(vec![
+                "paper",
+                "semantic-scholar",
+                venue,
+                &format!("absorbed-{}", today()),
+            ])
             .with_importance(0.7)
             .with_confidence(0.7);
 
         match ingester.ingest(&desc) {
             Ok(r) => {
                 stats.resources_ingested += 1;
-                let _ = store::update_node_metadata(conn, &r.node_id, &serde_json::json!({
-                    "source": "semantic_scholar", "venue": venue, "year": year, "authors": authors
-                }));
+                let _ = store::update_node_metadata(
+                    conn,
+                    &r.node_id,
+                    &serde_json::json!({
+                        "source": "semantic_scholar", "venue": venue, "year": year, "authors": authors
+                    }),
+                );
             }
             Err(e) => stats.errors.push((title.to_string(), e)),
         }
@@ -167,7 +209,11 @@ pub fn discover_semantic_scholar(conn: &Connection, query: &str, limit: usize) -
 /// ======================================================================
 /// 3. 古迹 / Historical Sites & 石碑 / Stone Inscriptions — Pleiades
 /// ======================================================================
-pub fn discover_historical_sites(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_historical_sites(
+    conn: &Connection,
+    query: &str,
+    limit: usize,
+) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -187,29 +233,49 @@ pub fn discover_historical_sites(conn: &Connection, query: &str, limit: usize) -
     .map_err(|e| format!("Pleiades error: {}", e))?;
 
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON error: {}", e))?;
-    let features = data["features"].as_array().ok_or_else(|| "Missing features".to_string())?;
+    let features = data["features"]
+        .as_array()
+        .ok_or_else(|| "Missing features".to_string())?;
     stats.queries_executed = 1;
 
     for feature in features {
         let props = &feature["properties"];
         let title = props["title"].as_str().unwrap_or("Unknown site");
         let description = props["description"].as_str().unwrap_or("");
-        let site_url = format!("https://pleiades.stoa.org/places/{}", props["uri"].as_str().unwrap_or(""));
-        let site_type: String = props["placeTypes"].as_array()
-            .map(|t| t.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect::<Vec<_>>().join(","))
+        let site_url = format!(
+            "https://pleiades.stoa.org/places/{}",
+            props["uri"].as_str().unwrap_or("")
+        );
+        let site_type: String = props["placeTypes"]
+            .as_array()
+            .map(|t| {
+                t.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            })
             .unwrap_or_default();
 
         let desc = ResourceDescriptor::article(title, description, &site_url)
-            .with_tags(vec!["historical-site", "pleiades", "ancient-world", &format!("absorbed-{}", today())])
+            .with_tags(vec![
+                "historical-site",
+                "pleiades",
+                "ancient-world",
+                &format!("absorbed-{}", today()),
+            ])
             .with_importance(0.6)
             .with_confidence(0.7);
 
         match ingester.ingest(&desc) {
             Ok(r) => {
                 stats.resources_ingested += 1;
-                let _ = store::update_node_metadata(conn, &r.node_id, &serde_json::json!({
-                    "source": "pleiades", "site_type": site_type
-                }));
+                let _ = store::update_node_metadata(
+                    conn,
+                    &r.node_id,
+                    &serde_json::json!({
+                        "source": "pleiades", "site_type": site_type
+                    }),
+                );
             }
             Err(e) => stats.errors.push((title.to_string(), e)),
         }
@@ -221,7 +287,11 @@ pub fn discover_historical_sites(conn: &Connection, query: &str, limit: usize) -
 /// ======================================================================
 /// 4. 博物馆藏品 / Museum Collections — Europeana
 /// ======================================================================
-pub fn discover_europeana(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_europeana(
+    conn: &Connection,
+    query: &str,
+    limit: usize,
+) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -240,35 +310,49 @@ pub fn discover_europeana(conn: &Connection, query: &str, limit: usize) -> Resul
     .map_err(|e| format!("Europeana error: {}", e))?;
 
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON error: {}", e))?;
-    let items = data["items"].as_array().ok_or_else(|| "Missing items".to_string())?;
+    let items = data["items"]
+        .as_array()
+        .ok_or_else(|| "Missing items".to_string())?;
     stats.queries_executed = 1;
 
     for item in items {
-        let title = item["title"].as_array()
+        let title = item["title"]
+            .as_array()
             .and_then(|a| a.first())
             .and_then(|v| v.as_str())
             .unwrap_or("Unknown");
-        let summary = item["dcDescription"].as_array()
+        let summary = item["dcDescription"]
+            .as_array()
             .and_then(|a| a.first())
             .and_then(|v| v.as_str())
             .unwrap_or("");
         let item_url = item["guid"].as_str().unwrap_or("");
-        let provider = item["dataProvider"].as_array()
+        let provider = item["dataProvider"]
+            .as_array()
             .and_then(|a| a.first())
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
 
         let desc = ResourceDescriptor::article(title, summary, item_url)
-            .with_tags(vec!["museum", "europeana", "cultural-heritage", &format!("absorbed-{}", today())])
+            .with_tags(vec![
+                "museum",
+                "europeana",
+                "cultural-heritage",
+                &format!("absorbed-{}", today()),
+            ])
             .with_importance(0.6)
             .with_confidence(0.7);
 
         match ingester.ingest(&desc) {
             Ok(r) => {
                 stats.resources_ingested += 1;
-                let _ = store::update_node_metadata(conn, &r.node_id, &serde_json::json!({
-                    "source": "europeana", "provider": provider
-                }));
+                let _ = store::update_node_metadata(
+                    conn,
+                    &r.node_id,
+                    &serde_json::json!({
+                        "source": "europeana", "provider": provider
+                    }),
+                );
             }
             Err(e) => stats.errors.push((title.to_string(), e)),
         }
@@ -280,7 +364,11 @@ pub fn discover_europeana(conn: &Connection, query: &str, limit: usize) -> Resul
 /// ======================================================================
 /// 5. 铭刻 / Inscriptions — PHI (Packard Humanities Institute) via DMMapper
 /// ======================================================================
-pub fn discover_inscriptions(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_inscriptions(
+    conn: &Connection,
+    query: &str,
+    limit: usize,
+) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -308,7 +396,12 @@ pub fn discover_inscriptions(conn: &Connection, query: &str, limit: usize) -> Re
                 let url_s = res["url"].as_str().unwrap_or("");
 
                 let desc = ResourceDescriptor::article(title, desc_text, url_s)
-                    .with_tags(vec!["inscription", "epigraphy", "ancient-writing", &format!("absorbed-{}", today())])
+                    .with_tags(vec![
+                        "inscription",
+                        "epigraphy",
+                        "ancient-writing",
+                        &format!("absorbed-{}", today()),
+                    ])
                     .with_importance(0.65);
 
                 match ingester.ingest(&desc) {
@@ -324,8 +417,17 @@ pub fn discover_inscriptions(conn: &Connection, query: &str, limit: usize) -> Re
         // Fallback: create a structured record from query
         let desc = ResourceDescriptor::concept(
             &format!("Inscription search: {}", query),
-            &format!("Inscriptions related to '{}' — search query logged for later retrieval", query),
-        ).with_tags(vec!["inscription", "epigraphy", "search-query", &format!("absorbed-{}", today())]);
+            &format!(
+                "Inscriptions related to '{}' — search query logged for later retrieval",
+                query
+            ),
+        )
+        .with_tags(vec![
+            "inscription",
+            "epigraphy",
+            "search-query",
+            &format!("absorbed-{}", today()),
+        ]);
         if ingester.ingest(&desc).is_ok() {
             stats.resources_ingested += 1;
         }
@@ -338,7 +440,11 @@ pub fn discover_inscriptions(conn: &Connection, query: &str, limit: usize) -> Re
 /// ======================================================================
 /// 6. 古籍 / Chinese Ancient Texts — 国学大师 / Chinese Text Project
 /// ======================================================================
-pub fn discover_chinese_ancient(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_chinese_ancient(
+    conn: &Connection,
+    query: &str,
+    limit: usize,
+) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -366,7 +472,12 @@ pub fn discover_chinese_ancient(conn: &Connection, query: &str, limit: usize) ->
                     let url_s = res["url"].as_str().unwrap_or("");
 
                     let desc = ResourceDescriptor::article(title, excerpt, url_s)
-                        .with_tags(vec!["chinese", "ancient-text", "古籍", &format!("absorbed-{}", today())])
+                        .with_tags(vec![
+                            "chinese",
+                            "ancient-text",
+                            "古籍",
+                            &format!("absorbed-{}", today()),
+                        ])
                         .with_importance(0.6);
 
                     match ingester.ingest(&desc) {
@@ -384,8 +495,16 @@ pub fn discover_chinese_ancient(conn: &Connection, query: &str, limit: usize) ->
         let d = ResourceDescriptor::concept(
             &format!("Chinese ancient text search: {}", query),
             &format!("Query for classical Chinese texts related to '{}'", query),
-        ).with_tags(vec!["chinese", "古籍", "search-query", &format!("absorbed-{}", today())]);
-        if ingester.ingest(&d).is_ok() { stats.resources_ingested += 1; }
+        )
+        .with_tags(vec![
+            "chinese",
+            "古籍",
+            "search-query",
+            &format!("absorbed-{}", today()),
+        ]);
+        if ingester.ingest(&d).is_ok() {
+            stats.resources_ingested += 1;
+        }
         stats.resources_found += 1;
     }
 
@@ -395,7 +514,11 @@ pub fn discover_chinese_ancient(conn: &Connection, query: &str, limit: usize) ->
 /// ======================================================================
 /// 7. Internet Archive / 互联网档案馆
 /// ======================================================================
-pub fn discover_internet_archive(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_internet_archive(
+    conn: &Connection,
+    query: &str,
+    limit: usize,
+) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -414,7 +537,9 @@ pub fn discover_internet_archive(conn: &Connection, query: &str, limit: usize) -
     .map_err(|e| format!("Internet Archive error: {}", e))?;
 
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON error: {}", e))?;
-    let docs = data["response"]["docs"].as_array().ok_or_else(|| "Missing docs".to_string())?;
+    let docs = data["response"]["docs"]
+        .as_array()
+        .ok_or_else(|| "Missing docs".to_string())?;
     stats.queries_executed = 1;
 
     for doc in docs {
@@ -426,7 +551,11 @@ pub fn discover_internet_archive(conn: &Connection, query: &str, limit: usize) -
         let item_url = format!("https://archive.org/details/{}", identifier);
 
         let mut desc = ResourceDescriptor::article(title, desc_text, &item_url)
-            .with_tags(vec!["internet-archive", mediatype, &format!("absorbed-{}", today())])
+            .with_tags(vec![
+                "internet-archive",
+                mediatype,
+                &format!("absorbed-{}", today()),
+            ])
             .with_importance(0.5)
             .with_confidence(0.7);
 
@@ -437,9 +566,13 @@ pub fn discover_internet_archive(conn: &Connection, query: &str, limit: usize) -
         match ingester.ingest(&desc) {
             Ok(r) => {
                 stats.resources_ingested += 1;
-                let _ = store::update_node_metadata(conn, &r.node_id, &serde_json::json!({
-                    "source": "internet_archive", "mediatype": mediatype, "creator": creator
-                }));
+                let _ = store::update_node_metadata(
+                    conn,
+                    &r.node_id,
+                    &serde_json::json!({
+                        "source": "internet_archive", "mediatype": mediatype, "creator": creator
+                    }),
+                );
             }
             Err(e) => stats.errors.push((title.to_string(), e)),
         }
@@ -451,7 +584,11 @@ pub fn discover_internet_archive(conn: &Connection, query: &str, limit: usize) -
 /// ======================================================================
 /// 8. HathiTrust Digital Library / 数字图书馆
 /// ======================================================================
-pub fn discover_hathitrust(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_hathitrust(
+    conn: &Connection,
+    query: &str,
+    limit: usize,
+) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -477,18 +614,34 @@ pub fn discover_hathitrust(conn: &Connection, query: &str, limit: usize) -> Resu
         let title = rec["title"].as_str().unwrap_or("Unknown");
         let author = rec["author"].as_str().unwrap_or("");
         let pub_info = rec["publisher"].as_str().unwrap_or("");
-        let rec_url = format!("https://catalog.hathitrust.org/Record/{}", rec["recordID"].as_str().unwrap_or(""));
+        let rec_url = format!(
+            "https://catalog.hathitrust.org/Record/{}",
+            rec["recordID"].as_str().unwrap_or("")
+        );
 
-        let desc = ResourceDescriptor::article(title, &format!("{} — HathiTrust digital library", title), &rec_url)
-            .with_tags(vec!["book", "hathitrust", "digital-library", &format!("absorbed-{}", today())])
-            .with_importance(0.5);
+        let desc = ResourceDescriptor::article(
+            title,
+            &format!("{} — HathiTrust digital library", title),
+            &rec_url,
+        )
+        .with_tags(vec![
+            "book",
+            "hathitrust",
+            "digital-library",
+            &format!("absorbed-{}", today()),
+        ])
+        .with_importance(0.5);
 
         match ingester.ingest(&desc) {
             Ok(r) => {
                 stats.resources_ingested += 1;
-                let _ = store::update_node_metadata(conn, &r.node_id, &serde_json::json!({
-                    "source": "hathitrust", "author": author, "publisher": pub_info
-                }));
+                let _ = store::update_node_metadata(
+                    conn,
+                    &r.node_id,
+                    &serde_json::json!({
+                        "source": "hathitrust", "author": author, "publisher": pub_info
+                    }),
+                );
             }
             Err(e) => stats.errors.push((title.to_string(), e)),
         }
@@ -500,7 +653,11 @@ pub fn discover_hathitrust(conn: &Connection, query: &str, limit: usize) -> Resu
 /// ======================================================================
 /// 9. 考古 / Archaeology — Open Context
 /// ======================================================================
-pub fn discover_open_context(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_open_context(
+    conn: &Connection,
+    query: &str,
+    limit: usize,
+) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -528,7 +685,12 @@ pub fn discover_open_context(conn: &Connection, query: &str, limit: usize) -> Re
                     let item_url = item["url"].as_str().unwrap_or("");
 
                     let desc = ResourceDescriptor::article(label, desc_text, item_url)
-                        .with_tags(vec!["archaeology", "open-context", "artifact", &format!("absorbed-{}", today())])
+                        .with_tags(vec![
+                            "archaeology",
+                            "open-context",
+                            "artifact",
+                            &format!("absorbed-{}", today()),
+                        ])
                         .with_importance(0.6);
 
                     match ingester.ingest(&desc) {
@@ -545,8 +707,15 @@ pub fn discover_open_context(conn: &Connection, query: &str, limit: usize) -> Re
         let d = ResourceDescriptor::concept(
             &format!("Archaeology search: {}", query),
             &format!("Archaeological records related to '{}'", query),
-        ).with_tags(vec!["archaeology", "search-query", &format!("absorbed-{}", today())]);
-        if ingester.ingest(&d).is_ok() { stats.resources_ingested += 1; }
+        )
+        .with_tags(vec![
+            "archaeology",
+            "search-query",
+            &format!("absorbed-{}", today()),
+        ]);
+        if ingester.ingest(&d).is_ok() {
+            stats.resources_ingested += 1;
+        }
         stats.resources_found += 1;
     }
 
@@ -556,7 +725,10 @@ pub fn discover_open_context(conn: &Connection, query: &str, limit: usize) -> Re
 /// ======================================================================
 /// 10. 技术文档 / Technical Documentation — Wikipedia / Wikisource
 /// ======================================================================
-pub fn discover_technical_docs(conn: &Connection, topic: &str) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_technical_docs(
+    conn: &Connection,
+    topic: &str,
+) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
 
     let created = super::nt_memory_crawl::ingest_from_wikipedia(conn, topic)?;
@@ -570,7 +742,11 @@ pub fn discover_technical_docs(conn: &Connection, topic: &str) -> Result<Externa
 /// ======================================================================
 /// 11. Gallica (Bibliothèque nationale de France) / 法国国家图书馆
 /// ======================================================================
-pub fn discover_gallica(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_gallica(
+    conn: &Connection,
+    query: &str,
+    limit: usize,
+) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -599,15 +775,24 @@ pub fn discover_gallica(conn: &Connection, query: &str, limit: usize) -> Result<
         let desc_text = extract_xml_tag(record, "dc:description").unwrap_or_default();
 
         let desc = ResourceDescriptor::article(&title, &desc_text, "")
-            .with_tags(vec!["gallica", "bnf", "french-heritage", &format!("absorbed-{}", today())])
+            .with_tags(vec![
+                "gallica",
+                "bnf",
+                "french-heritage",
+                &format!("absorbed-{}", today()),
+            ])
             .with_importance(0.5);
 
         match ingester.ingest(&desc) {
             Ok(r) => {
                 stats.resources_ingested += 1;
-                let _ = store::update_node_metadata(conn, &r.node_id, &serde_json::json!({
-                    "source": "gallica", "creator": creator
-                }));
+                let _ = store::update_node_metadata(
+                    conn,
+                    &r.node_id,
+                    &serde_json::json!({
+                        "source": "gallica", "creator": creator
+                    }),
+                );
             }
             Err(e) => stats.errors.push((title, e)),
         }
@@ -619,7 +804,11 @@ pub fn discover_gallica(conn: &Connection, query: &str, limit: usize) -> Result<
 /// ======================================================================
 /// 12. 书籍 / Books — OpenLibrary (existing, enhanced)
 /// ======================================================================
-pub fn discover_books(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_books(
+    conn: &Connection,
+    query: &str,
+    limit: usize,
+) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -638,18 +827,22 @@ pub fn discover_books(conn: &Connection, query: &str, limit: usize) -> Result<Ex
     .map_err(|e| format!("OpenLibrary fetch error: {}", e))?;
 
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON error: {}", e))?;
-    let docs = data["docs"].as_array().ok_or_else(|| "Missing docs".to_string())?;
+    let docs = data["docs"]
+        .as_array()
+        .ok_or_else(|| "Missing docs".to_string())?;
 
     stats.queries_executed = 1;
 
     for doc in docs {
         let title = doc["title"].as_str().unwrap_or("Unknown");
-        let author = doc["author_name"].as_array()
+        let author = doc["author_name"]
+            .as_array()
             .and_then(|a| a.first())
             .and_then(|v| v.as_str())
             .unwrap_or("Unknown author");
         let first_publish = doc["first_publish_year"].as_i64().unwrap_or(0);
-        let isbn = doc["isbn"].as_array()
+        let isbn = doc["isbn"]
+            .as_array()
             .and_then(|a| a.first())
             .and_then(|v| v.as_str())
             .unwrap_or("");
@@ -698,7 +891,10 @@ pub fn discover_books(conn: &Connection, query: &str, limit: usize) -> Result<Ex
 /// ======================================================================
 /// 13. Wikipedia topic ingest (leverages existing)
 /// ======================================================================
-pub fn discover_wikipedia_topic(conn: &Connection, topic: &str) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_wikipedia_topic(
+    conn: &Connection,
+    topic: &str,
+) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let created = super::nt_memory_crawl::ingest_from_wikipedia(conn, topic)?;
     stats.queries_executed = 1;
@@ -710,7 +906,11 @@ pub fn discover_wikipedia_topic(conn: &Connection, topic: &str) -> Result<Extern
 /// ======================================================================
 /// 14. ArXiv papers (leverages existing, enhanced)
 /// ======================================================================
-pub fn discover_arxiv_papers(conn: &Connection, query: &str, max_results: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_arxiv_papers(
+    conn: &Connection,
+    query: &str,
+    max_results: usize,
+) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -744,8 +944,7 @@ pub fn discover_arxiv_papers(conn: &Connection, query: &str, max_results: usize)
         let summary = extract_xml_tag(entry, "summary")
             .map(|s| s.trim().to_string())
             .unwrap_or_default();
-        let authors_raw = extract_xml_tag(entry, "author")
-            .unwrap_or_default();
+        let authors_raw = extract_xml_tag(entry, "author").unwrap_or_default();
 
         if arxiv_id.is_empty() || title == "Unknown" {
             continue;
@@ -754,10 +953,7 @@ pub fn discover_arxiv_papers(conn: &Connection, query: &str, max_results: usize)
         stats.resources_found += 1;
 
         let mut desc = ResourceDescriptor::paper(&arxiv_id, &title, &summary)
-            .with_tags(vec![
-                "arxiv",
-                &format!("absorbed-{}", today()),
-            ])
+            .with_tags(vec!["arxiv", &format!("absorbed-{}", today())])
             .with_importance(0.7)
             .with_confidence(0.8);
 
@@ -768,9 +964,13 @@ pub fn discover_arxiv_papers(conn: &Connection, query: &str, max_results: usize)
         match ingester.ingest(&desc) {
             Ok(r) => {
                 stats.resources_ingested += 1;
-                let _ = store::update_node_metadata(conn, &r.node_id, &serde_json::json!({
-                    "source": "arxiv", "arxiv_id": arxiv_id
-                }));
+                let _ = store::update_node_metadata(
+                    conn,
+                    &r.node_id,
+                    &serde_json::json!({
+                        "source": "arxiv", "arxiv_id": arxiv_id
+                    }),
+                );
             }
             Err(e) => stats.errors.push((title, e)),
         }
@@ -782,7 +982,11 @@ pub fn discover_arxiv_papers(conn: &Connection, query: &str, max_results: usize)
 /// ======================================================================
 /// 15. Anna's Archive / 安娜档案 (shadow library)
 /// ======================================================================
-pub fn discover_annas_archive(conn: &Connection, query: &str, limit: usize) -> Result<ExternalDiscoveryStats, String> {
+pub fn discover_annas_archive(
+    conn: &Connection,
+    query: &str,
+    limit: usize,
+) -> Result<ExternalDiscoveryStats, String> {
     let mut stats = ExternalDiscoveryStats::default();
     let mut ingester = ResourceIngester::new(conn);
 
@@ -790,19 +994,14 @@ pub fn discover_annas_archive(conn: &Connection, query: &str, limit: usize) -> R
     let mut last_err = String::new();
 
     for domain in &domains {
-        let url = format!(
-            "https://{}/search?q={}",
-            domain,
-            urlencoding(query),
-        );
+        let url = format!("https://{}/search?q={}", domain, urlencoding(query),);
 
         match super::nt_http::run_blocking(|| {
             browser_client()
                 .get(&url)
                 .timeout(std::time::Duration::from_secs(15))
                 .send()
-        })
-        {
+        }) {
             Ok(resp) => {
                 let html = resp.text().map_err(|e| format!("Read error: {}", e))?;
                 stats.queries_executed = 1;
@@ -821,14 +1020,21 @@ pub fn discover_annas_archive(conn: &Connection, query: &str, limit: usize) -> R
     Err(last_err)
 }
 
-fn parse_annas_page(ingester: &mut ResourceIngester, html: &str, limit: usize) -> ExternalDiscoveryStats {
+fn parse_annas_page(
+    ingester: &mut ResourceIngester,
+    html: &str,
+    limit: usize,
+) -> ExternalDiscoveryStats {
     let mut stats = ExternalDiscoveryStats::default();
     let mut count = 0;
     let mut pos = 0;
     while let Some(start) = html[pos..].find("<div class=\"h-[1px]\"></div>") {
-        if count >= limit { break; }
+        if count >= limit {
+            break;
+        }
         let block_start = pos + start;
-        let block_end = html[block_start..].find("<div class=\"flex justify-center items-center gap-4\">")
+        let block_end = html[block_start..]
+            .find("<div class=\"flex justify-center items-center gap-4\">")
             .map(|e| block_start + e)
             .unwrap_or(html.len());
         let block = &html[block_start..block_end];
@@ -836,21 +1042,24 @@ fn parse_annas_page(ingester: &mut ResourceIngester, html: &str, limit: usize) -
         let title = extract_between(block, "aria-label=\"", "\"")
             .or_else(|| extract_between(block, "<h3>", "</h3>"))
             .unwrap_or_else(|| "Unknown".to_string());
-        let link = extract_between(block, "href=\"", "\"")
-            .unwrap_or_default();
+        let link = extract_between(block, "href=\"", "\"").unwrap_or_default();
         let page_url = if link.starts_with("http") {
             link
         } else {
             format!("https://annas-archive.gl{}", link)
         };
 
-        let desc = ResourceDescriptor::article(&title, &format!("Book from Anna's Archive: {}", title), &page_url)
-            .with_tags(vec![
-                "book",
-                "annas-archive",
-                &format!("absorbed-{}", today()),
-            ])
-            .with_importance(0.5);
+        let desc = ResourceDescriptor::article(
+            &title,
+            &format!("Book from Anna's Archive: {}", title),
+            &page_url,
+        )
+        .with_tags(vec![
+            "book",
+            "annas-archive",
+            &format!("absorbed-{}", today()),
+        ])
+        .with_importance(0.5);
 
         match ingester.ingest(&desc) {
             Ok(_) => stats.resources_ingested += 1,
@@ -887,11 +1096,13 @@ fn extract_between(text: &str, start_delim: &str, end_delim: &str) -> Option<Str
 }
 
 fn urlencoding(s: &str) -> String {
-    s.chars().map(|c| match c {
-        'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
-        ' ' => "+".to_string(),
-        _ => format!("%{:02X}", c as u8),
-    }).collect()
+    s.chars()
+        .map(|c| match c {
+            'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
+            ' ' => "+".to_string(),
+            _ => format!("%{:02X}", c as u8),
+        })
+        .collect()
 }
 
 fn today() -> String {
@@ -902,8 +1113,6 @@ fn today() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-
 
     #[test]
     fn test_urlencoding() {
@@ -920,7 +1129,10 @@ mod tests {
     #[test]
     fn test_extract_between() {
         let html = "<a href=\"https://example.com\">link</a>";
-        assert_eq!(extract_between(html, "href=\"", "\""), Some("https://example.com".into()));
+        assert_eq!(
+            extract_between(html, "href=\"", "\""),
+            Some("https://example.com".into())
+        );
     }
 
     #[test]

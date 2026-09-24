@@ -41,14 +41,14 @@ impl E8Phase {
     /// 阶段绑定的卦象 bits (Shao Yong 序)
     pub fn bits(&self) -> u8 {
         match self {
-            Self::Init => 0x3F,      // 乾
-            Self::Retrieve => 23,    // 需: 上坎(2)下乾(7)
-            Self::Grade => 5,        // 明夷: 上坤(0)下离(5)
-            Self::Generate => 7,     // 泰: 上坤(0)下乾(7)
-            Self::Rewrite => 53,     // 革: 上兑(6)下离(5)
-            Self::Fallback => 20,    // 屯: 上坎(2)下震(4)
-            Self::GraphHop => 25,    // 渐: 上巽(3)下艮(1)
-            Self::Converge => 21,    // 既济: 上坎(2)下离(5)
+            Self::Init => 0x3F,   // 乾
+            Self::Retrieve => 23, // 需: 上坎(2)下乾(7)
+            Self::Grade => 5,     // 明夷: 上坤(0)下离(5)
+            Self::Generate => 7,  // 泰: 上坤(0)下乾(7)
+            Self::Rewrite => 53,  // 革: 上兑(6)下离(5)
+            Self::Fallback => 20, // 屯: 上坎(2)下震(4)
+            Self::GraphHop => 25, // 渐: 上巽(3)下艮(1)
+            Self::Converge => 21, // 既济: 上坎(2)下离(5)
         }
     }
 
@@ -206,7 +206,9 @@ impl E8AgentLoop {
                         }
                     }
                     results.sort_by(|a, b| {
-                        b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)
+                        b.score
+                            .partial_cmp(&a.score)
+                            .unwrap_or(std::cmp::Ordering::Equal)
                     });
                     results.truncate(10);
                 }
@@ -225,7 +227,8 @@ impl E8AgentLoop {
                 }
                 E8Phase::Generate => {
                     // 泰 → 既济: 生成完成即收敛
-                    self.matrix.record_transition(phase.bits(), E8Phase::Converge.bits());
+                    self.matrix
+                        .record_transition(phase.bits(), E8Phase::Converge.bits());
                     phases.push(E8Phase::Converge);
                     converged = true;
                     break;
@@ -371,8 +374,14 @@ mod tests {
     fn test_phases_have_unique_hexagrams() {
         let mut seen = std::collections::HashSet::new();
         for p in [
-            E8Phase::Init, E8Phase::Retrieve, E8Phase::Grade, E8Phase::Generate,
-            E8Phase::Rewrite, E8Phase::Fallback, E8Phase::GraphHop, E8Phase::Converge,
+            E8Phase::Init,
+            E8Phase::Retrieve,
+            E8Phase::Grade,
+            E8Phase::Generate,
+            E8Phase::Rewrite,
+            E8Phase::Fallback,
+            E8Phase::GraphHop,
+            E8Phase::Converge,
         ] {
             assert!(seen.insert(p.bits()), "卦象重复: {:?} bits={}", p, p.bits());
         }
@@ -427,8 +436,11 @@ mod tests {
     fn test_rewrite_iteration_limit_converges() {
         let e = loop_engine();
         let g = graded(1, 1, 0);
-        assert_eq!(e.next_phase(E8Phase::Rewrite, &g, 3), E8Phase::Converge,
-            "达迭代上限应收敛");
+        assert_eq!(
+            e.next_phase(E8Phase::Rewrite, &g, 3),
+            E8Phase::Converge,
+            "达迭代上限应收敛"
+        );
     }
 
     // ── 集成循环 (TDD: mock 检索器) ──
@@ -512,7 +524,11 @@ mod tests {
             }]
         });
         assert!(result.converged);
-        assert!(result.phases.contains(&E8Phase::Rewrite), "应进入革(改写)阶段: {:?}", result.phases);
+        assert!(
+            result.phases.contains(&E8Phase::Rewrite),
+            "应进入革(改写)阶段: {:?}",
+            result.phases
+        );
         // 转移矩阵记录了轨迹 (至少 2 条转移)
         let total: u64 = e.matrix.recent_transitions.len() as u64;
         assert!(total >= 2, "转移矩阵应记录轨迹: {}", total);

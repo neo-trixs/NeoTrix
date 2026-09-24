@@ -65,9 +65,7 @@ impl FeedbackStore {
             Ok(g) => g,
             Err(e) => e.into_inner(),
         };
-        let entry = agg
-            .entry(signal.strategy.clone())
-            .or_insert((0, 0, 0));
+        let entry = agg.entry(signal.strategy.clone()).or_insert((0, 0, 0));
         entry.0 += signal.adopted_ids.len() as u64;
         entry.1 += signal.rejected_ids.len() as u64;
         entry.2 += 1;
@@ -75,7 +73,10 @@ impl FeedbackStore {
 
     /// 当前融合权重 (只读)
     pub fn weights(&self) -> [f64; 4] {
-        self.weights.read().map(|w| *w).unwrap_or([0.25, 0.15, 0.40, 0.20])
+        self.weights
+            .read()
+            .map(|w| *w)
+            .unwrap_or([0.25, 0.15, 0.40, 0.20])
     }
 
     /// 按策略名取权重 (Fast/Vector/Graph/AgentLoop/Decompose → 映射到 4 信号)
@@ -160,7 +161,11 @@ impl FeedbackStore {
                 }
             })
             .collect();
-        out.sort_by(|a, b| b.adoption_rate.partial_cmp(&a.adoption_rate).unwrap_or(std::cmp::Ordering::Equal));
+        out.sort_by(|a, b| {
+            b.adoption_rate
+                .partial_cmp(&a.adoption_rate)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         out
     }
 
@@ -224,14 +229,23 @@ mod tests {
         let before = store.weights();
         store.record(&signal("factual", "vector", 10, 0)); // 100% 采纳
         let after = store.update_weights();
-        assert!(after[2] > before[2], "高采纳率应抬升 vector 权重: {} -> {}", before[2], after[2]);
+        assert!(
+            after[2] > before[2],
+            "高采纳率应抬升 vector 权重: {} -> {}",
+            before[2],
+            after[2]
+        );
         // 钳制上限
         for _ in 0..50 {
             store.record(&signal("factual", "vector", 10, 0));
             store.update_weights();
         }
         let clamped = store.weights();
-        assert!(clamped[2] <= 0.7 + 1e-9, "权重应钳制上限 0.7, 实际 {}", clamped[2]);
+        assert!(
+            clamped[2] <= 0.7 + 1e-9,
+            "权重应钳制上限 0.7, 实际 {}",
+            clamped[2]
+        );
     }
 
     #[test]

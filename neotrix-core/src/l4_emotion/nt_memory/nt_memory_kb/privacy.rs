@@ -57,7 +57,12 @@ impl DataSovereigntyProof {
     }
 
     pub fn verify(&self, secret: &[u8; 32]) -> bool {
-        let message = format!("{}:{}:{}", self.record_id, self.timestamp, hex_fingerprint(secret));
+        let message = format!(
+            "{}:{}:{}",
+            self.record_id,
+            self.timestamp,
+            hex_fingerprint(secret)
+        );
         let expected = compute_hash(&message);
         expected == self.signature_hex
     }
@@ -106,10 +111,15 @@ impl PrivacyEnforcer {
         &self.config
     }
 
-    pub fn store_with_privacy(&self, record: &KnowledgeNode) -> Result<DataSovereigntyProof, String> {
+    pub fn store_with_privacy(
+        &self,
+        record: &KnowledgeNode,
+    ) -> Result<DataSovereigntyProof, String> {
         match self.config.mode {
             PrivacyMode::Stateless => {
-                return Err("Cannot store in Stateless mode: no local storage permitted".to_string());
+                return Err(
+                    "Cannot store in Stateless mode: no local storage permitted".to_string()
+                );
             }
             PrivacyMode::Encrypted => {
                 let encrypted = self.encrypt_record(record)?;
@@ -139,7 +149,8 @@ impl PrivacyEnforcer {
                 std::fs::write(
                     format!("/tmp/neotrix_encrypted_{}", record.id),
                     meta_node.content.as_deref().unwrap_or(""),
-                ).map_err(|e| format!("Store encrypted: {}", e))?;
+                )
+                .map_err(|e| format!("Store encrypted: {}", e))?;
             }
             PrivacyMode::Sovereign => {
                 let json = serde_json::to_string_pretty(record)
@@ -155,7 +166,10 @@ impl PrivacyEnforcer {
     }
 
     pub(crate) fn _export_snapshot(&self, _path: &str) -> Result<(), String> {
-        Err("Snapshot requires KB integration; use Sovereign mode with auto_export_path".to_string())
+        Err(
+            "Snapshot requires KB integration; use Sovereign mode with auto_export_path"
+                .to_string(),
+        )
     }
 
     pub fn verify_proof(&self, proof: &DataSovereigntyProof) -> bool {
@@ -163,7 +177,10 @@ impl PrivacyEnforcer {
     }
 
     fn encrypt_record(&self, record: &KnowledgeNode) -> Result<String, String> {
-        let key = self.encryption_key.as_ref().ok_or("No encryption key configured")?;
+        let key = self
+            .encryption_key
+            .as_ref()
+            .ok_or("No encryption key configured")?;
         let plaintext = serde_json::to_string(record).map_err(|e| format!("Serialize: {}", e))?;
         let mut result = String::with_capacity(plaintext.len() * 2 + 64);
         for (i, byte) in plaintext.as_bytes().iter().enumerate() {
@@ -179,9 +196,14 @@ impl PrivacyEnforcer {
     }
 
     fn decrypt_node(&self, content: &str) -> Result<String, String> {
-        let key = self.encryption_key.as_ref().ok_or("No encryption key configured")?;
+        let key = self
+            .encryption_key
+            .as_ref()
+            .ok_or("No encryption key configured")?;
         let bytes = simple_hex_decode(content);
-        let plain: Vec<u8> = bytes.iter().enumerate()
+        let plain: Vec<u8> = bytes
+            .iter()
+            .enumerate()
             .map(|(i, &b)| b ^ key[i % 32])
             .collect();
         String::from_utf8(plain).map_err(|e| format!("UTF-8: {}", e))
@@ -208,7 +230,9 @@ fn simple_hex_decode(hex: &str) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(hex.len() / 2);
     let chars: Vec<char> = hex.chars().collect();
     for chunk in chars.chunks(2) {
-        if chunk.len() < 2 { continue; }
+        if chunk.len() < 2 {
+            continue;
+        }
         let byte = u8::from_str_radix(&format!("{}{}", chunk[0], chunk[1]), 16).unwrap_or(0);
         bytes.push(byte);
     }

@@ -66,7 +66,16 @@ fn truncate_chars(s: &str, max: usize) -> &str {
 }
 
 /// 将 WebMiner 挖掘结果持久化到 KnowledgeBase
-pub fn persist_mined_knowledge(conn: &Connection, title: &str, summary: &str, url: &str, source_type: &str, _confidence: f64, _edits: &[(String, f64)], insights: &[String]) -> Result<String, String> {
+pub fn persist_mined_knowledge(
+    conn: &Connection,
+    title: &str,
+    summary: &str,
+    url: &str,
+    source_type: &str,
+    _confidence: f64,
+    _edits: &[(String, f64)],
+    insights: &[String],
+) -> Result<String, String> {
     let domain = extract_domain(url);
     let node_type = match source_type {
         "Wikipedia" => NodeType::Concept,
@@ -77,21 +86,40 @@ pub fn persist_mined_knowledge(conn: &Connection, title: &str, summary: &str, ur
 
     let summary_short = truncate_chars(summary, 2000);
 
-    let node_id = store::insert_or_get_node(conn, title, node_type, Some(summary_short), Some(url), Some(&domain))
-        .map_err(|e| format!("KB insert node: {}", e))?;
+    let node_id = store::insert_or_get_node(
+        conn,
+        title,
+        node_type,
+        Some(summary_short),
+        Some(url),
+        Some(&domain),
+    )
+    .map_err(|e| format!("KB insert node: {}", e))?;
 
     for insight in insights {
-        let insight_id = store::insert_or_get_node(conn, insight, NodeType::Insight, None, None, None)
-            .map_err(|e| format!("KB insert insight: {}", e))?;
-        store::upsert_edge(conn, &node_id, &insight_id, RelationType::Related, 0.7, Some("Mined insight"))
-            .map_err(|e| format!("KB upsert edge: {}", e))?;
+        let insight_id =
+            store::insert_or_get_node(conn, insight, NodeType::Insight, None, None, None)
+                .map_err(|e| format!("KB insert insight: {}", e))?;
+        store::upsert_edge(
+            conn,
+            &node_id,
+            &insight_id,
+            RelationType::Related,
+            0.7,
+            Some("Mined insight"),
+        )
+        .map_err(|e| format!("KB upsert edge: {}", e))?;
     }
 
     Ok(node_id)
 }
 
 /// 将 KnowledgeEngine 全量条目导入 KnowledgeBase
-pub fn import_from_knowledge_engine(conn: &Connection, entries: &[KnowledgeEntry], relations: &[KnowledgeRelation]) -> Result<(usize, usize), String> {
+pub fn import_from_knowledge_engine(
+    conn: &Connection,
+    entries: &[KnowledgeEntry],
+    relations: &[KnowledgeRelation],
+) -> Result<(usize, usize), String> {
     let mut nodes = 0;
     let mut edges = 0;
 
@@ -104,18 +132,53 @@ pub fn import_from_knowledge_engine(conn: &Connection, entries: &[KnowledgeEntry
             KnowledgeSourceType::WebPage => NodeType::Article,
             KnowledgeSourceType::SemanticScholar => NodeType::Paper,
         };
-        let summary = if entry.summary.is_empty() { &entry.body } else { &entry.summary };
-    let summary_short = truncate_chars(summary, 2000);
+        let summary = if entry.summary.is_empty() {
+            &entry.body
+        } else {
+            &entry.summary
+        };
+        let summary_short = truncate_chars(summary, 2000);
         let domain = extract_domain(&entry.source_url);
 
-        let node_id = store::insert_or_get_node(conn, &entry.title, node_type, Some(summary_short), Some(&entry.source_url), Some(&domain))
-            .map_err(|e| format!("KB insert: {}", e))?;
+        let node_id = store::insert_or_get_node(
+            conn,
+            &entry.title,
+            node_type,
+            Some(summary_short),
+            Some(&entry.source_url),
+            Some(&domain),
+        )
+        .map_err(|e| format!("KB insert: {}", e))?;
 
         let mut meta = serde_json::Map::new();
-        meta.insert("tags".into(), serde_json::Value::Array(entry.tags.iter().map(|t| serde_json::Value::String(t.clone())).collect()));
-        meta.insert("confidence".into(), serde_json::Value::Number(serde_json::Number::from_f64(entry.confidence).unwrap_or(serde_json::Number::from(0))));
+        meta.insert(
+            "tags".into(),
+            serde_json::Value::Array(
+                entry
+                    .tags
+                    .iter()
+                    .map(|t| serde_json::Value::String(t.clone()))
+                    .collect(),
+            ),
+        );
+        meta.insert(
+            "confidence".into(),
+            serde_json::Value::Number(
+                serde_json::Number::from_f64(entry.confidence)
+                    .unwrap_or(serde_json::Number::from(0)),
+            ),
+        );
         if !entry.dimensions.is_empty() {
-            meta.insert("dimensions".into(), serde_json::Value::Array(entry.dimensions.iter().map(|d| serde_json::Value::String(d.clone())).collect()));
+            meta.insert(
+                "dimensions".into(),
+                serde_json::Value::Array(
+                    entry
+                        .dimensions
+                        .iter()
+                        .map(|d| serde_json::Value::String(d.clone()))
+                        .collect(),
+                ),
+            );
         }
 
         store::update_node_metadata(conn, &node_id, &serde_json::Value::Object(meta))
@@ -137,8 +200,15 @@ pub fn import_from_knowledge_engine(conn: &Connection, entries: &[KnowledgeEntry
             KnowledgeRelationType::Related => RelationType::Related,
         };
 
-        store::upsert_edge(conn, &rel.from_id, &rel.to_id, relation_type, rel.weight, Some(&rel.description))
-            .map_err(|e| format!("KB upsert edge: {}", e))?;
+        store::upsert_edge(
+            conn,
+            &rel.from_id,
+            &rel.to_id,
+            relation_type,
+            rel.weight,
+            Some(&rel.description),
+        )
+        .map_err(|e| format!("KB upsert edge: {}", e))?;
         edges += 1;
     }
 
@@ -146,7 +216,8 @@ pub fn import_from_knowledge_engine(conn: &Connection, entries: &[KnowledgeEntry
 }
 
 fn extract_domain(url_str: &str) -> String {
-    url_str.split('/')
+    url_str
+        .split('/')
         .nth(2)
         .unwrap_or("unknown")
         .trim_start_matches("www.")

@@ -230,8 +230,14 @@ mod tests {
             .map(|i| res(&format!("n{}", i), 0.08, Some([0.1, 0.9, 0.0, 0.0])))
             .collect();
         let verdicts = filter_visibility(results, &cfg);
-        let interstitial_count = verdicts.iter().filter(|v| v.visibility == Visibility::Interstitial).count();
-        assert_eq!(interstitial_count, 2, "interstitials capped at max_interstitials");
+        let interstitial_count = verdicts
+            .iter()
+            .filter(|v| v.visibility == Visibility::Interstitial)
+            .count();
+        assert_eq!(
+            interstitial_count, 2,
+            "interstitials capped at max_interstitials"
+        );
         // 超额的弱相关内容被 Drop (quota exhausted)
         assert!(verdicts.iter().any(|v| v.visibility == Visibility::Drop));
     }
@@ -248,6 +254,9 @@ mod tests {
             &cfg,
         );
         assert_eq!(allowed_ids(&verdicts), vec!["ok".to_string()]);
-        assert_eq!(visible_ids(&verdicts), vec!["ok".to_string(), "weak".to_string()]);
+        assert_eq!(
+            visible_ids(&verdicts),
+            vec!["ok".to_string(), "weak".to_string()]
+        );
     }
 }

@@ -6,7 +6,7 @@
 //! 删除/批量重建要求审批 (Tier3/Tier4)。守卫是纯函数 (无 I/O), 便于单元测试;
 //! 证据记录是唯一副作用。
 
-pub use neotrix_types::write_guard_types::{WriteGuardVerdict, WriteGuardEvidence};
+pub use neotrix_types::write_guard_types::{WriteGuardEvidence, WriteGuardVerdict};
 
 /// 守卫证据落盘命名空间 (kv_store)。
 pub const WRITE_GUARD_NS: &str = "write_guard";
@@ -56,8 +56,14 @@ pub fn kb_write_guard(action: &str, payload: &serde_json::Value) -> WriteGuardVe
             }
         }
         "edge:upsert" => {
-            let src = payload.get("source_id").and_then(|v| v.as_str()).unwrap_or("");
-            let tgt = payload.get("target_id").and_then(|v| v.as_str()).unwrap_or("");
+            let src = payload
+                .get("source_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let tgt = payload
+                .get("target_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             if src.trim().is_empty() {
                 reasons.push("source_id 为空".into());
             }
@@ -81,13 +87,19 @@ pub fn kb_write_guard(action: &str, payload: &serde_json::Value) -> WriteGuardVe
             if id.starts_with("secret_") {
                 reasons.push("id 为保留前缀 secret_".into());
             }
-            let force = payload.get("force").and_then(|v| v.as_bool()).unwrap_or(false);
+            let force = payload
+                .get("force")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
             if !force {
                 return WriteGuardVerdict::RequiresApproval;
             }
         }
         "kv:set" => {
-            let ns = payload.get("namespace").and_then(|v| v.as_str()).unwrap_or("");
+            let ns = payload
+                .get("namespace")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             if ns.trim().is_empty() {
                 reasons.push("namespace 为空".into());
             }
@@ -100,11 +112,17 @@ pub fn kb_write_guard(action: &str, payload: &serde_json::Value) -> WriteGuardVe
             }
         }
         "kv:delete" => {
-            let ns = payload.get("namespace").and_then(|v| v.as_str()).unwrap_or("");
+            let ns = payload
+                .get("namespace")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             if PROTECTED_NAMESPACES.contains(&ns) {
                 reasons.push(format!("namespace '{}' 受保护", ns));
             }
-            let force = payload.get("force").and_then(|v| v.as_bool()).unwrap_or(false);
+            let force = payload
+                .get("force")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
             if !force {
                 return WriteGuardVerdict::RequiresApproval;
             }
@@ -168,7 +186,11 @@ pub fn parse_write_evidence(key: &str, raw: &str) -> Option<WriteGuardEvidence> 
     let verdict: WriteGuardVerdict = serde_json::from_value(v.get("verdict").cloned()?).ok()?;
     Some(WriteGuardEvidence {
         key: key.to_string(),
-        action: v.get("action").and_then(|x| x.as_str()).unwrap_or("").to_string(),
+        action: v
+            .get("action")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string(),
         verdict,
         executed: v.get("executed").and_then(|x| x.as_bool()).unwrap_or(false),
         ts_ms: v.get("ts_ms").and_then(|x| x.as_u64()).unwrap_or(0),
@@ -197,13 +219,17 @@ pub fn scan_write_guard_evidence(kb: &super::KnowledgeBase) -> WriteGuardStats {
     let entries = match kb.kv_list(WRITE_GUARD_NS) {
         Ok(e) => e,
         Err(e) => {
-            stats.anomalies.push(format!("write_guard 命名空间读取失败: {}", e));
+            stats
+                .anomalies
+                .push(format!("write_guard 命名空间读取失败: {}", e));
             return stats;
         }
     };
     for (key, raw) in entries {
         let Some(ev) = parse_write_evidence(&key, &raw) else {
-            stats.anomalies.push(format!("write_guard 证据解析失败: {}", key));
+            stats
+                .anomalies
+                .push(format!("write_guard 证据解析失败: {}", key));
             continue;
         };
         stats.total += 1;
@@ -212,20 +238,26 @@ pub fn scan_write_guard_evidence(kb: &super::KnowledgeBase) -> WriteGuardStats {
             WriteGuardVerdict::RequiresApproval => {
                 stats.requires_approval += 1;
                 if ev.executed {
-                    stats.anomalies.push(format!("action={} 需审批仍执行", ev.action));
+                    stats
+                        .anomalies
+                        .push(format!("action={} 需审批仍执行", ev.action));
                 }
             }
             WriteGuardVerdict::Hold { .. } => {
                 stats.requires_approval += 1; // Hold 归入 requires_approval 统计
                 if ev.executed {
-                    stats.anomalies.push(format!("action={} 被 hold 仍执行", ev.action));
+                    stats
+                        .anomalies
+                        .push(format!("action={} 被 hold 仍执行", ev.action));
                 }
             }
             WriteGuardVerdict::Reject(_) => {
                 stats.rejected += 1;
                 *stats.rejected_actions.entry(ev.action.clone()).or_insert(0) += 1;
                 if ev.executed {
-                    stats.anomalies.push(format!("action={} 被拒仍执行", ev.action));
+                    stats
+                        .anomalies
+                        .push(format!("action={} 被拒仍执行", ev.action));
                 }
             }
         }
@@ -322,8 +354,12 @@ mod tests {
 
     #[test]
     fn test_node_create_allows_valid() {
-        let payload = serde_json::json!({"title": "Rust", "url": "https://rust-lang.org", "content": "lang"});
-        assert_eq!(kb_write_guard("node:create", &payload), WriteGuardVerdict::Allow);
+        let payload =
+            serde_json::json!({"title": "Rust", "url": "https://rust-lang.org", "content": "lang"});
+        assert_eq!(
+            kb_write_guard("node:create", &payload),
+            WriteGuardVerdict::Allow
+        );
     }
 
     #[test]
@@ -348,20 +384,29 @@ mod tests {
     fn test_node_create_rejects_reserved_id() {
         let payload = serde_json::json!({"title": "t", "id": "secret_foo"});
         let v = kb_write_guard("node:create", &payload);
-        assert!(matches!(v, WriteGuardVerdict::Reject(ref rs) if rs.iter().any(|r| r.contains("保留前缀"))));
+        assert!(
+            matches!(v, WriteGuardVerdict::Reject(ref rs) if rs.iter().any(|r| r.contains("保留前缀")))
+        );
     }
 
     #[test]
     fn test_edge_upsert_valid() {
         let payload = serde_json::json!({"source_id": "a", "target_id": "b", "weight": 0.5});
-        assert_eq!(kb_write_guard("edge:upsert", &payload), WriteGuardVerdict::Allow);
+        assert_eq!(
+            kb_write_guard("edge:upsert", &payload),
+            WriteGuardVerdict::Allow
+        );
     }
 
     #[test]
     fn test_edge_upsert_rejects_self_loop_and_range() {
         let payload = serde_json::json!({"source_id": "a", "target_id": "a", "weight": 1.5});
         let v = kb_write_guard("edge:upsert", &payload);
-        assert!(matches!(v, WriteGuardVerdict::Reject(ref rs) if rs.len() == 2), "{:?}", v);
+        assert!(
+            matches!(v, WriteGuardVerdict::Reject(ref rs) if rs.len() == 2),
+            "{:?}",
+            v
+        );
     }
 
     #[test]
@@ -376,20 +421,28 @@ mod tests {
     #[test]
     fn test_delete_allowed_with_force() {
         let payload = serde_json::json!({"id": "u_1", "force": true});
-        assert_eq!(kb_write_guard("node:delete", &payload), WriteGuardVerdict::Allow);
+        assert_eq!(
+            kb_write_guard("node:delete", &payload),
+            WriteGuardVerdict::Allow
+        );
     }
 
     #[test]
     fn test_delete_rejects_reserved_prefix_even_with_force() {
         let payload = serde_json::json!({"id": "secret_x", "force": true});
-        assert!(matches!(kb_write_guard("node:delete", &payload), WriteGuardVerdict::Reject(_)));
+        assert!(matches!(
+            kb_write_guard("node:delete", &payload),
+            WriteGuardVerdict::Reject(_)
+        ));
     }
 
     #[test]
     fn test_kv_set_protected_namespace() {
         let payload = serde_json::json!({"namespace": "secrets", "key": "k", "value": "v"});
         let v = kb_write_guard("kv:set", &payload);
-        assert!(matches!(v, WriteGuardVerdict::Reject(ref rs) if rs.iter().any(|r| r.contains("受保护"))));
+        assert!(
+            matches!(v, WriteGuardVerdict::Reject(ref rs) if rs.iter().any(|r| r.contains("受保护")))
+        );
     }
 
     #[test]
@@ -409,16 +462,26 @@ mod tests {
 
     #[test]
     fn test_unknown_action_rejected() {
-        assert!(matches!(kb_write_guard("rm -rf", &serde_json::json!({})), WriteGuardVerdict::Reject(_)));
+        assert!(matches!(
+            kb_write_guard("rm -rf", &serde_json::json!({})),
+            WriteGuardVerdict::Reject(_)
+        ));
     }
 
     #[test]
     fn test_record_write_evidence_persists() {
         let tmp = std::env::temp_dir().join(format!("nt_wg_evid_{}", std::process::id()));
         let _ = std::fs::remove_file(&tmp);
-        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(tmp.clone())).unwrap();
+        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(tmp.clone()))
+            .unwrap();
         let verdict = WriteGuardVerdict::Reject(vec!["title 为空".into()]);
-        record_write_evidence(&kb, "node:create", &serde_json::json!({"title": ""}), &verdict, false);
+        record_write_evidence(
+            &kb,
+            "node:create",
+            &serde_json::json!({"title": ""}),
+            &verdict,
+            false,
+        );
         let entries = kb.kv_list(WRITE_GUARD_NS).unwrap();
         assert_eq!(entries.len(), 1);
         assert!(entries[0].1.contains("node:create"));
@@ -467,7 +530,10 @@ mod tests {
         let ev = parse_write_evidence("k-1", &raw).unwrap();
         assert_eq!(ev.key, "k-1");
         assert_eq!(ev.action, "node:create");
-        assert_eq!(ev.verdict, WriteGuardVerdict::Reject(vec!["title 为空".into()]));
+        assert_eq!(
+            ev.verdict,
+            WriteGuardVerdict::Reject(vec!["title 为空".into()])
+        );
         assert!(!ev.executed);
         assert_eq!(ev.ts_ms, 1234);
     }
@@ -533,8 +599,14 @@ mod tests {
         assert_eq!(stats.rejected_actions.get("node:create"), Some(&1));
         assert_eq!(stats.rejected_actions.get("kv:set"), Some(&1));
         assert_eq!(stats.anomalies.len(), 2, "anomalies: {:?}", stats.anomalies);
-        assert!(stats.anomalies.iter().any(|a| a.contains("kv:set") && a.contains("被拒仍执行")));
-        assert!(stats.anomalies.iter().any(|a| a.contains("node:delete") && a.contains("需审批仍执行")));
+        assert!(stats
+            .anomalies
+            .iter()
+            .any(|a| a.contains("kv:set") && a.contains("被拒仍执行")));
+        assert!(stats
+            .anomalies
+            .iter()
+            .any(|a| a.contains("node:delete") && a.contains("需审批仍执行")));
     }
 
     #[test]

@@ -58,7 +58,9 @@ pub fn subgraph(
                 weight: row.get(4)?,
                 description: row.get(5)?,
                 created_at: row.get(6)?,
-                metadata: row.get::<_, Option<String>>(7)?.and_then(|m| serde_json::from_str(&m).ok()),
+                metadata: row
+                    .get::<_, Option<String>>(7)?
+                    .and_then(|m| serde_json::from_str(&m).ok()),
             });
         }
     }
@@ -111,7 +113,9 @@ pub fn compute_trust_scores(
         return Ok(Vec::new());
     }
     let n = node_ids.len();
-    let id_index: HashMap<&str, usize> = node_ids.iter().enumerate()
+    let id_index: HashMap<&str, usize> = node_ids
+        .iter()
+        .enumerate()
         .map(|(i, id)| (id.as_str(), i))
         .collect();
 
@@ -119,9 +123,7 @@ pub fn compute_trust_scores(
     let mut out_edges: Vec<Vec<(usize, f64)>> = vec![Vec::new(); n];
     let mut in_edges: Vec<Vec<(usize, f64)>> = vec![Vec::new(); n];
     {
-        let mut stmt = conn.prepare(
-            "SELECT source_id, target_id, weight FROM edges"
-        )?;
+        let mut stmt = conn.prepare("SELECT source_id, target_id, weight FROM edges")?;
         let rows = stmt.query_map([], |row| {
             let src: String = row.get(0)?;
             let tgt: String = row.get(1)?;
@@ -129,7 +131,8 @@ pub fn compute_trust_scores(
             Ok((src, tgt, w))
         })?;
         for r in rows.filter_map(|r| r.ok()) {
-            if let (Some(&si), Some(&ti)) = (id_index.get(r.0.as_str()), id_index.get(r.1.as_str())) {
+            if let (Some(&si), Some(&ti)) = (id_index.get(r.0.as_str()), id_index.get(r.1.as_str()))
+            {
                 out_edges[si].push((ti, r.2));
                 in_edges[ti].push((si, r.2));
             }
@@ -163,7 +166,9 @@ pub fn compute_trust_scores(
         }
 
         // Convergence check (L1 norm)
-        let diff: f64 = trust.iter().zip(new_trust.iter())
+        let diff: f64 = trust
+            .iter()
+            .zip(new_trust.iter())
             .map(|(a, b)| (a - b).abs())
             .sum();
         trust = new_trust;
@@ -180,14 +185,16 @@ pub fn compute_trust_scores(
         }
     }
 
-    Ok(node_ids.iter().enumerate().map(|(i, id)| {
-        TrustScore {
+    Ok(node_ids
+        .iter()
+        .enumerate()
+        .map(|(i, id)| TrustScore {
             node_id: id.clone(),
             trust: trust[i],
             in_degree: in_edges[i].len(),
             out_degree: out_edges[i].len(),
-        }
-    }).collect())
+        })
+        .collect())
 }
 
 /// Quick trust lookup for a set of node IDs (for search result augmentation).
@@ -200,10 +207,9 @@ pub fn trust_for_nodes(
 ) -> rusqlite::Result<HashMap<String, f64>> {
     let all_trust = compute_trust_scores(conn, damping, max_iter)?;
     let target_set: HashSet<&str> = target_ids.iter().copied().collect();
-    Ok(all_trust.into_iter()
+    Ok(all_trust
+        .into_iter()
         .filter(|ts| target_set.contains(ts.node_id.as_str()))
         .map(|ts| (ts.node_id, ts.trust))
         .collect())
 }
-
-

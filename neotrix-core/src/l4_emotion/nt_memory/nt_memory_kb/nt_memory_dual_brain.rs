@@ -17,7 +17,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
-
 use super::KnowledgeBase;
 
 /// Default ring capacity for the streaming buffer (STM half of the dual brain).
@@ -117,8 +116,7 @@ impl DualBrainWorkingMemory {
     /// Recall the `n` most recent anchors, highest-importance first.
     /// Agentic LTM prioritisation begins with importance ordering (src12).
     pub fn recall_recent(&self, n: usize) -> Vec<ExperienceAnchor> {
-        let mut recent: Vec<ExperienceAnchor> =
-            self.buffer.iter().rev().take(n).cloned().collect();
+        let mut recent: Vec<ExperienceAnchor> = self.buffer.iter().rev().take(n).cloned().collect();
         recent.sort_by(|a, b| {
             b.importance
                 .partial_cmp(&a.importance)
@@ -153,7 +151,8 @@ impl DualBrainWorkingMemory {
                     .clone()
                     .or_else(|| node.summary.clone())
                     .unwrap_or_else(|| node.title.clone());
-                let mut anchor = ExperienceAnchor::new(node.id.clone(), content, r.score.clamp(0.0, 1.0));
+                let mut anchor =
+                    ExperienceAnchor::new(node.id.clone(), content, r.score.clamp(0.0, 1.0));
                 anchor.timestamp = node.created_at.max(0) as u64;
                 anchor
             })
@@ -202,7 +201,11 @@ mod tests {
         wm.anchor(ExperienceAnchor::new("low", "low-importance", 0.1));
         wm.anchor(ExperienceAnchor::new("high", "high-importance", 0.9));
         let recent = wm.recall_recent(8);
-        assert_eq!(recent.first().unwrap().id, "high", "highest importance first");
+        assert_eq!(
+            recent.first().unwrap().id,
+            "high",
+            "highest importance first"
+        );
     }
 
     #[test]
@@ -221,7 +224,10 @@ mod tests {
         assert!(hits.len() <= 5, "LTM recall must respect limit");
         for a in &hits {
             assert!(!a.id.is_empty(), "anchor id derived from KB node id");
-            assert!(a.timestamp > 0 || a.importance >= 0.0, "anchor fields populated");
+            assert!(
+                a.timestamp > 0 || a.importance >= 0.0,
+                "anchor fields populated"
+            );
         }
     }
 }

@@ -144,7 +144,8 @@ impl UserMemory {
     }
 
     pub fn add_fact(&mut self, fact: &str, source: &str, confidence: f64) {
-        self.atomic_facts.push(AtomicFact::new(fact, source, confidence));
+        self.atomic_facts
+            .push(AtomicFact::new(fact, source, confidence));
     }
 
     pub fn record_session(&mut self) {
@@ -154,15 +155,17 @@ impl UserMemory {
 
     pub fn save(&self, conn: &Connection) -> Result<(), String> {
         let ns = format!("user_memory.{}", self.profile.user_id);
-        let profile_json = serde_json::to_string(&self.profile).map_err(|e| format!("serde: {}", e))?;
+        let profile_json =
+            serde_json::to_string(&self.profile).map_err(|e| format!("serde: {}", e))?;
         kv_set(conn, &ns, "profile", &profile_json)?;
 
-        let episodes_json = serde_json::to_string(
-            &self.episodes.entries.iter().collect::<Vec<&EpisodeEntry>>()
-        ).map_err(|e| format!("serde: {}", e))?;
+        let episodes_json =
+            serde_json::to_string(&self.episodes.entries.iter().collect::<Vec<&EpisodeEntry>>())
+                .map_err(|e| format!("serde: {}", e))?;
         kv_set(conn, &ns, "episodes", &episodes_json)?;
 
-        let facts_json = serde_json::to_string(&self.atomic_facts).map_err(|e| format!("serde: {}", e))?;
+        let facts_json =
+            serde_json::to_string(&self.atomic_facts).map_err(|e| format!("serde: {}", e))?;
         kv_set(conn, &ns, "facts", &facts_json)?;
 
         Ok(())
@@ -189,10 +192,13 @@ impl UserMemory {
             Vec::new()
         };
 
-        Some(Self { profile, episodes, atomic_facts })
+        Some(Self {
+            profile,
+            episodes,
+            atomic_facts,
+        })
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -238,7 +244,10 @@ mod tests {
     fn test_update_profile() {
         let mut um = UserMemory::new("update_user");
         let mut prefs = HashMap::new();
-        prefs.insert("theme".to_string(), serde_json::Value::String("dark".to_string()));
+        prefs.insert(
+            "theme".to_string(),
+            serde_json::Value::String("dark".to_string()),
+        );
         um.update_profile(Some(prefs), Some("technical".to_string()), Some(0.9));
         assert_eq!(um.profile.interaction_style, "technical");
         assert!((um.profile.expertise_level - 0.9).abs() < 1e-9);

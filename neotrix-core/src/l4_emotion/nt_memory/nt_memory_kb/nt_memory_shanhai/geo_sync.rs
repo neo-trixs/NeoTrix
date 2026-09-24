@@ -62,9 +62,15 @@ pub fn sync_shanhai_to_geo(conn: &Connection) -> rusqlite::Result<usize> {
 
 /// 从现代地名粗粒度推断国家 (仅用于地图着色，非精确地理编码)。
 fn infer_country(modern_name: &str) -> String {
-    if modern_name.contains("肯尼亚") || modern_name.contains("埃塞俄比亚") || modern_name.contains("东非") {
+    if modern_name.contains("肯尼亚")
+        || modern_name.contains("埃塞俄比亚")
+        || modern_name.contains("东非")
+    {
         "肯尼亚/埃塞俄比亚".into()
-    } else if modern_name.contains("落基") || modern_name.contains("北美") || modern_name.contains("科罗拉多") {
+    } else if modern_name.contains("落基")
+        || modern_name.contains("北美")
+        || modern_name.contains("科罗拉多")
+    {
         "美国".into()
     } else if modern_name.contains("中国") || modern_name.contains("华夏") {
         "中国".into()

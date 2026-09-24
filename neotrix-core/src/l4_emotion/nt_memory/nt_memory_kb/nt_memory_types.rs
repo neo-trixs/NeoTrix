@@ -48,7 +48,9 @@ pub fn node_sensitivity(node_type: &NodeType) -> PermissionLevel {
         | NodeType::GoalResult
         | NodeType::ConversationEvolution
         | NodeType::HarnessProfile => PermissionLevel::Secret,
-        NodeType::EventRecord | NodeType::Session | NodeType::EvolutionPattern => PermissionLevel::Internal,
+        NodeType::EventRecord | NodeType::Session | NodeType::EvolutionPattern => {
+            PermissionLevel::Internal
+        }
         _ => PermissionLevel::Public,
     }
 }
@@ -234,8 +236,14 @@ mod tests {
 
     #[test]
     fn test_node_type_pascal_cases() {
-        assert_eq!(NodeType::from_str("EvolutionPattern"), NodeType::EvolutionPattern);
-        assert_eq!(NodeType::from_str("ConversationEvolution"), NodeType::ConversationEvolution);
+        assert_eq!(
+            NodeType::from_str("EvolutionPattern"),
+            NodeType::EvolutionPattern
+        );
+        assert_eq!(
+            NodeType::from_str("ConversationEvolution"),
+            NodeType::ConversationEvolution
+        );
         assert_eq!(NodeType::from_str("Textbook"), NodeType::Textbook);
         assert_eq!(NodeType::from_str("Resource"), NodeType::Resource);
         assert_eq!(NodeType::from_str("External"), NodeType::External);
@@ -247,8 +255,14 @@ mod tests {
 
     #[test]
     fn test_node_type_snake_cases() {
-        assert_eq!(NodeType::from_str("evolution_pattern"), NodeType::EvolutionPattern);
-        assert_eq!(NodeType::from_str("conversation_evolution"), NodeType::ConversationEvolution);
+        assert_eq!(
+            NodeType::from_str("evolution_pattern"),
+            NodeType::EvolutionPattern
+        );
+        assert_eq!(
+            NodeType::from_str("conversation_evolution"),
+            NodeType::ConversationEvolution
+        );
         assert_eq!(NodeType::from_str("textbook"), NodeType::Textbook);
         assert_eq!(NodeType::from_str("concept"), NodeType::Concept);
     }
@@ -256,61 +270,131 @@ mod tests {
     #[test]
     fn test_relation_type_pascal_cases() {
         assert_eq!(RelationType::from_str("RelatedTo"), RelationType::RelatedTo);
-        assert_eq!(RelationType::from_str("EvolvedFrom"), RelationType::EvolvedFrom);
-        assert_eq!(RelationType::from_str("ResourceFor"), RelationType::ResourceFor);
-        assert_eq!(RelationType::from_str("AboutTopic"), RelationType::AboutTopic);
+        assert_eq!(
+            RelationType::from_str("EvolvedFrom"),
+            RelationType::EvolvedFrom
+        );
+        assert_eq!(
+            RelationType::from_str("ResourceFor"),
+            RelationType::ResourceFor
+        );
+        assert_eq!(
+            RelationType::from_str("AboutTopic"),
+            RelationType::AboutTopic
+        );
         assert_eq!(RelationType::from_str("BelongsTo"), RelationType::BelongsTo);
-        assert_eq!(RelationType::from_str("SubTopicOf"), RelationType::SubTopicOf);
-        assert_eq!(RelationType::from_str("CrossDomain"), RelationType::CrossDomain);
-        assert_eq!(RelationType::from_str("ArchPartOf"), RelationType::ArchPartOf);
-        assert_eq!(RelationType::from_str("InsightAbout"), RelationType::InsightAbout);
+        assert_eq!(
+            RelationType::from_str("SubTopicOf"),
+            RelationType::SubTopicOf
+        );
+        assert_eq!(
+            RelationType::from_str("CrossDomain"),
+            RelationType::CrossDomain
+        );
+        assert_eq!(
+            RelationType::from_str("ArchPartOf"),
+            RelationType::ArchPartOf
+        );
+        assert_eq!(
+            RelationType::from_str("InsightAbout"),
+            RelationType::InsightAbout
+        );
         assert_eq!(RelationType::from_str("BrandFor"), RelationType::BrandFor);
-        assert_eq!(RelationType::from_str("Illustrates"), RelationType::Illustrates);
+        assert_eq!(
+            RelationType::from_str("Illustrates"),
+            RelationType::Illustrates
+        );
     }
 
     #[test]
     fn test_relation_type_snake_cases() {
-        assert_eq!(RelationType::from_str("related_to"), RelationType::RelatedTo);
-        assert_eq!(RelationType::from_str("evolved_from"), RelationType::EvolvedFrom);
-        assert_eq!(RelationType::from_str("resource_for"), RelationType::ResourceFor);
-        assert_eq!(RelationType::from_str("references"), RelationType::References);
+        assert_eq!(
+            RelationType::from_str("related_to"),
+            RelationType::RelatedTo
+        );
+        assert_eq!(
+            RelationType::from_str("evolved_from"),
+            RelationType::EvolvedFrom
+        );
+        assert_eq!(
+            RelationType::from_str("resource_for"),
+            RelationType::ResourceFor
+        );
+        assert_eq!(
+            RelationType::from_str("references"),
+            RelationType::References
+        );
         assert_eq!(RelationType::from_str("brand_for"), RelationType::BrandFor);
     }
 
     #[test]
     fn test_as_str_roundtrip() {
         for variant in [
-            NodeType::Concept, NodeType::Paper, NodeType::Repository,
-            NodeType::EvolutionPattern, NodeType::ConversationEvolution,
-            NodeType::Textbook, NodeType::Resource, NodeType::External,
-            NodeType::Summary, NodeType::Guide, NodeType::Skill, NodeType::Reference,
+            NodeType::Concept,
+            NodeType::Paper,
+            NodeType::Repository,
+            NodeType::EvolutionPattern,
+            NodeType::ConversationEvolution,
+            NodeType::Textbook,
+            NodeType::Resource,
+            NodeType::External,
+            NodeType::Summary,
+            NodeType::Guide,
+            NodeType::Skill,
+            NodeType::Reference,
         ] {
             let s = variant.as_str();
             let back = NodeType::from_str(s);
-            assert_eq!(variant, back, "roundtrip failed for {:?} -> {} -> {:?}", variant, s, back);
+            assert_eq!(
+                variant, back,
+                "roundtrip failed for {:?} -> {} -> {:?}",
+                variant, s, back
+            );
         }
     }
 
     #[test]
     fn test_relation_as_str_roundtrip() {
         for variant in [
-            RelationType::References, RelationType::RelatedTo, RelationType::EvolvedFrom,
-            RelationType::ResourceFor, RelationType::AboutTopic, RelationType::BelongsTo,
-            RelationType::SubTopicOf, RelationType::CrossDomain, RelationType::Contains,
-            RelationType::Influenced, RelationType::ArchPartOf, RelationType::Categorized,
-            RelationType::RelatesTo, RelationType::InsightAbout, RelationType::Implements,
-            RelationType::Uses, RelationType::Visualizes, RelationType::BrandFor,
+            RelationType::References,
+            RelationType::RelatedTo,
+            RelationType::EvolvedFrom,
+            RelationType::ResourceFor,
+            RelationType::AboutTopic,
+            RelationType::BelongsTo,
+            RelationType::SubTopicOf,
+            RelationType::CrossDomain,
+            RelationType::Contains,
+            RelationType::Influenced,
+            RelationType::ArchPartOf,
+            RelationType::Categorized,
+            RelationType::RelatesTo,
+            RelationType::InsightAbout,
+            RelationType::Implements,
+            RelationType::Uses,
+            RelationType::Visualizes,
+            RelationType::BrandFor,
             RelationType::Illustrates,
         ] {
             let s = variant.as_str();
             let back = RelationType::from_str(s);
-            assert_eq!(variant, back, "roundtrip failed for {:?} -> {} -> {:?}", variant, s, back);
+            assert_eq!(
+                variant, back,
+                "roundtrip failed for {:?} -> {} -> {:?}",
+                variant, s, back
+            );
         }
     }
 
     #[test]
     fn test_fallback() {
-        assert_eq!(NodeType::from_str("nonexistent_type_xyz"), NodeType::Concept);
-        assert_eq!(RelationType::from_str("nonexistent_type_xyz"), RelationType::Related);
+        assert_eq!(
+            NodeType::from_str("nonexistent_type_xyz"),
+            NodeType::Concept
+        );
+        assert_eq!(
+            RelationType::from_str("nonexistent_type_xyz"),
+            RelationType::Related
+        );
     }
 }

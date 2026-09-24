@@ -21,10 +21,7 @@ pub struct GeoRecord {
 }
 
 /// 写入或更新一条地理索引记录 (幂等 upsert)。
-pub fn upsert_geo(
-    conn: &Connection,
-    rec: &GeoRecord,
-) -> Result<()> {
+pub fn upsert_geo(conn: &Connection, rec: &GeoRecord) -> Result<()> {
     conn.execute(
         "INSERT INTO geo_index (node_id, lat, lng, country, region, city, tags, source, confidence, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
@@ -110,22 +107,19 @@ pub fn query_by_place(
          ORDER BY confidence DESC
          LIMIT ?4",
     )?;
-    let rows = stmt.query_map(
-        params![country, region, city, limit as i64],
-        |r| {
-            Ok(GeoRecord {
-                node_id: r.get(0)?,
-                lat: r.get(1)?,
-                lng: r.get(2)?,
-                country: r.get(3)?,
-                region: r.get(4)?,
-                city: r.get(5)?,
-                tags: r.get(6)?,
-                source: r.get(7)?,
-                confidence: r.get(8)?,
-            })
-        },
-    )?;
+    let rows = stmt.query_map(params![country, region, city, limit as i64], |r| {
+        Ok(GeoRecord {
+            node_id: r.get(0)?,
+            lat: r.get(1)?,
+            lng: r.get(2)?,
+            country: r.get(3)?,
+            region: r.get(4)?,
+            city: r.get(5)?,
+            tags: r.get(6)?,
+            source: r.get(7)?,
+            confidence: r.get(8)?,
+        })
+    })?;
     let mut out = Vec::new();
     for row in rows {
         out.push(row?);
@@ -191,9 +185,8 @@ pub fn export_geojson(conn: &Connection) -> Result<String> {
             "total": features.len(),
         },
     });
-    serde_json::to_string_pretty(&geojson).map_err(|e| {
-        rusqlite::Error::InvalidColumnName(format!("GeoJSON serialization: {}", e))
-    })
+    serde_json::to_string_pretty(&geojson)
+        .map_err(|e| rusqlite::Error::InvalidColumnName(format!("GeoJSON serialization: {}", e)))
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -476,8 +469,20 @@ pub const CITY_LATLNG: &[(&str, &str, &str, f64, f64)] = &[
     ("Sao Paulo", "圣保罗", "巴西", -23.5505, -46.6333),
     ("里约热内卢", "里约热内卢", "巴西", -22.9068, -43.1729),
     ("Rio de Janeiro", "里约热内卢", "巴西", -22.9068, -43.1729),
-    ("布宜诺斯艾利斯", "布宜诺斯艾利斯", "阿根廷", -34.6037, -58.3816),
-    ("Buenos Aires", "布宜诺斯艾利斯", "阿根廷", -34.6037, -58.3816),
+    (
+        "布宜诺斯艾利斯",
+        "布宜诺斯艾利斯",
+        "阿根廷",
+        -34.6037,
+        -58.3816,
+    ),
+    (
+        "Buenos Aires",
+        "布宜诺斯艾利斯",
+        "阿根廷",
+        -34.6037,
+        -58.3816,
+    ),
     ("开罗", "开罗", "埃及", 30.0444, 31.2357),
     ("Cairo", "开罗", "埃及", 30.0444, 31.2357),
     ("拉各斯", "拉各斯", "尼日利亚", 6.5244, 3.3792),
@@ -518,7 +523,11 @@ pub fn geo_tag_nodes(conn: &Connection, limit: usize) -> rusqlite::Result<usize>
          LIMIT ?1",
     )?;
     let rows = stmt.query_map(params![limit as i64], |r| {
-        Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, String>(1)?,
+            r.get::<_, String>(2)?,
+        ))
     })?;
 
     let mut tagged = 0usize;
@@ -594,7 +603,11 @@ pub fn geo_tag_cities(conn: &Connection, limit: usize) -> rusqlite::Result<usize
          LIMIT ?1",
     )?;
     let rows = stmt.query_map(params![limit as i64], |r| {
-        Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, String>(1)?,
+            r.get::<_, String>(2)?,
+        ))
     })?;
 
     let mut tagged: Vec<(String, &'static str, &'static str, f64, f64)> = Vec::new();
@@ -665,7 +678,10 @@ pub fn geo_linked_nodes(
 /// 返回 Vec<(国家, 节点数)>。覆盖度 = 该国家已挂载的知识节点数 (geo_index 中
 /// country 字段非空且非 geonames-cities 城市点)。缺失区域 = 节点数低于阈值
 /// 或完全无节点的国家。
-pub fn geo_coverage_report(conn: &Connection, min_threshold: i64) -> rusqlite::Result<Vec<(String, i64)>> {
+pub fn geo_coverage_report(
+    conn: &Connection,
+    min_threshold: i64,
+) -> rusqlite::Result<Vec<(String, i64)>> {
     let mut stmt = conn.prepare(
         "SELECT country, COUNT(*) AS cnt
          FROM geo_index
@@ -809,7 +825,10 @@ pub fn fetch_elevations(conn: &Connection, limit: usize) -> Result<usize, String
 }
 
 /// 查询已缓存的海拔记录 (node_id → 海拔米)。
-pub fn query_elevations(conn: &Connection, limit: usize) -> Result<Vec<(String, f64, f64, f64)>, String> {
+pub fn query_elevations(
+    conn: &Connection,
+    limit: usize,
+) -> Result<Vec<(String, f64, f64, f64)>, String> {
     ensure_elevation_table(conn).map_err(|e| format!("elevation table: {}", e))?;
     let mut stmt = conn
         .prepare(
@@ -934,8 +953,7 @@ pub fn fetch_weather_snapshot(conn: &Connection, limit: usize) -> Result<usize, 
                                     let temp = item.get("temperature_2m").and_then(|n| n.as_f64());
                                     let pressure =
                                         item.get("pressure_msl").and_then(|n| n.as_f64());
-                                    let wind =
-                                        item.get("wind_speed_10m").and_then(|n| n.as_f64());
+                                    let wind = item.get("wind_speed_10m").and_then(|n| n.as_f64());
                                     let precip = item.get("precipitation").and_then(|n| n.as_f64());
                                     if temp.is_none() || pressure.is_none() {
                                         continue;
@@ -997,10 +1015,7 @@ pub fn fetch_weather_snapshot(conn: &Connection, limit: usize) -> Result<usize, 
 }
 
 /// 查询已缓存的气象快照 (node_id → 温度/气压/风/降水)。
-pub fn query_weather(
-    conn: &Connection,
-    limit: usize,
-) -> Result<Vec<WeatherRecord>, String> {
+pub fn query_weather(conn: &Connection, limit: usize) -> Result<Vec<WeatherRecord>, String> {
     ensure_weather_table(conn).map_err(|e| format!("weather table: {}", e))?;
     let mut stmt = conn
         .prepare(
@@ -1044,7 +1059,7 @@ pub fn ensure_trajectory_table(conn: &Connection) -> rusqlite::Result<()> {
             bbox_north REAL NOT NULL,
             distance_km REAL,
             created_at INTEGER NOT NULL
-        );"
+        );",
     )
 }
 
@@ -1054,22 +1069,20 @@ pub fn insert_trajectory(
     id: &str,
     name: &str,
     kind: Option<&str>,
-    points: &[f64], // GeoJSON LineString 坐标序列 (交替 lat, lng)
+    points: &[f64],             // GeoJSON LineString 坐标序列 (交替 lat, lng)
     bbox: (f64, f64, f64, f64), // (west, south, east, north)
     distance_km: f64,
 ) -> Result<(), rusqlite::Error> {
     ensure_trajectory_table(conn)?;
-    let points_json = serde_json::json!(
-        points
-            .chunks_exact(2)
-            .map(|c| {
-                serde_json::json!({
-                    "type": "Feature",
-                    "geometry": {"type": "Point", "coordinates": [c[0], c[1]]}
-                })
+    let points_json = serde_json::json!(points
+        .chunks_exact(2)
+        .map(|c| {
+            serde_json::json!({
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [c[0], c[1]]}
             })
-            .collect::<serde_json::Value>()
-    );
+        })
+        .collect::<serde_json::Value>());
     conn.execute(
         "INSERT OR REPLACE INTO trajectory (id, name, kind, points_json, bbox_west, bbox_south, bbox_east, bbox_north, distance_km, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
@@ -1139,8 +1152,7 @@ pub fn ingest_geo_volcanoes(
 ) -> Result<usize, String> {
     let body = if url_or_path.starts_with("file://") || std::path::Path::new(url_or_path).exists() {
         let path = url_or_path.strip_prefix("file://").unwrap_or(url_or_path);
-        std::fs::read_to_string(path)
-            .map_err(|e| format!("读取本地文件失败: {} ({})", e, path))?
+        std::fs::read_to_string(path).map_err(|e| format!("读取本地文件失败: {} ({})", e, path))?
     } else {
         let url = format!(
             "{}&PropertyName=VolcanoNumber,VolcanoName,Country,GeoLocation&maxFeatures={}",
@@ -1156,8 +1168,8 @@ pub fn ingest_geo_volcanoes(
         resp.text().map_err(|e| format!("read: {}", e))?
     };
 
-    let fc: serde_json::Value = serde_json::from_str(&body)
-        .map_err(|e| format!("GeoJSON 解析失败 (volcanoes): {}", e))?;
+    let fc: serde_json::Value =
+        serde_json::from_str(&body).map_err(|e| format!("GeoJSON 解析失败 (volcanoes): {}", e))?;
     let features = fc
         .get("features")
         .and_then(|f| f.as_array())
@@ -1185,7 +1197,10 @@ pub fn ingest_geo_volcanoes(
     const BATCH: usize = 500;
 
     for feat in features.iter().take(limit) {
-        let props = feat.get("properties").cloned().unwrap_or(serde_json::Value::Null);
+        let props = feat
+            .get("properties")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
         let num = props
             .get("VolcanoNumber")
             .and_then(|v| v.as_i64())
@@ -1203,10 +1218,22 @@ pub fn ingest_geo_volcanoes(
         if num == 0 || name.is_empty() {
             continue;
         }
-        let geom = feat.get("geometry").cloned().unwrap_or(serde_json::Value::Null);
-        let coords = geom.get("coordinates").cloned().unwrap_or(serde_json::Value::Null);
-        let lng = coords.as_array().and_then(|a| a.first()).and_then(|v| v.as_f64());
-        let lat = coords.as_array().and_then(|a| a.get(1)).and_then(|v| v.as_f64());
+        let geom = feat
+            .get("geometry")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+        let coords = geom
+            .get("coordinates")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+        let lng = coords
+            .as_array()
+            .and_then(|a| a.first())
+            .and_then(|v| v.as_f64());
+        let lat = coords
+            .as_array()
+            .and_then(|a| a.get(1))
+            .and_then(|v| v.as_f64());
         let (Some(lat), Some(lng)) = (lat, lng) else {
             continue;
         };
@@ -1311,7 +1338,15 @@ pub fn export_geo_ntpack(
 }
 
 /// 从 NT-Pack 文件解码回读 geo_index 数据 (验证/恢复用)
-pub fn import_geo_ntpack(path: &str) -> Result<(usize, Vec<crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_pack::GeoPoint>), String> {
+pub fn import_geo_ntpack(
+    path: &str,
+) -> Result<
+    (
+        usize,
+        Vec<crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_pack::GeoPoint>,
+    ),
+    String,
+> {
     use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_pack::PackDecoder;
     let bytes = std::fs::read(path).map_err(|e| format!("读文件 {}: {}", path, e))?;
     let (_dec, points) = PackDecoder::decode(&bytes)?;
@@ -1435,7 +1470,8 @@ pub fn archive_geo_cold(
         .map_err(|e| format!("archive tx begin: {}", e))?;
     tx.execute("DELETE FROM geo_index WHERE source = ?", params![source])
         .map_err(|e| format!("archive delete: {}", e))?;
-    tx.commit().map_err(|e| format!("archive tx commit: {}", e))?;
+    tx.commit()
+        .map_err(|e| format!("archive tx commit: {}", e))?;
 
     Ok((exported, bytes))
 }
@@ -1534,7 +1570,8 @@ pub fn query_bbox_with_cold(
         return Ok((hot, 0));
     }
 
-    let mut seen: std::collections::HashSet<String> = hot.iter().map(|r| r.node_id.clone()).collect();
+    let mut seen: std::collections::HashSet<String> =
+        hot.iter().map(|r| r.node_id.clone()).collect();
     let mut cold_hits = Vec::new();
     let quota = limit - hot.len();
     for (_, recs) in cold_layers_records(cold_dir) {
@@ -1542,11 +1579,14 @@ pub fn query_bbox_with_cold(
             if cold_hits.len() >= quota {
                 break;
             }
-            if r.lat >= min_lat && r.lat <= max_lat && r.lng >= min_lng && r.lng <= max_lng
-                    && seen.insert(r.node_id.clone())
-                {
-                    cold_hits.push(r);
-                }
+            if r.lat >= min_lat
+                && r.lat <= max_lat
+                && r.lng >= min_lng
+                && r.lng <= max_lng
+                && seen.insert(r.node_id.clone())
+            {
+                cold_hits.push(r);
+            }
         }
     }
     let cold_count = cold_hits.len();
@@ -1571,7 +1611,8 @@ pub fn query_by_place_with_cold(
         return Ok((hot, 0));
     }
 
-    let mut seen: std::collections::HashSet<String> = hot.iter().map(|r| r.node_id.clone()).collect();
+    let mut seen: std::collections::HashSet<String> =
+        hot.iter().map(|r| r.node_id.clone()).collect();
     let mut cold_added = 0usize;
     let quota = limit - hot.len();
     let mut out = hot;
@@ -1596,7 +1637,10 @@ pub fn query_by_place_with_cold(
 /// 修调研发现的"前端层计数突变"风险 — 归档后 `kb_geo_layers` 只统计热表,
 /// 层计数会骤减; 本函数冷热合并, 让层感知不被归档扭曲。返回
 /// Vec<(source, warm_count, cold_bytes, 冷层路径?)>。
-pub fn geo_layer_inventory(conn: &Connection, cold_dir: &str) -> Result<Vec<(String, i64, Option<(String, u64)>)>, String> {
+pub fn geo_layer_inventory(
+    conn: &Connection,
+    cold_dir: &str,
+) -> Result<Vec<(String, i64, Option<(String, u64)>)>, String> {
     let mut stmt = conn
         .prepare("SELECT source, COUNT(*) FROM geo_index GROUP BY source ORDER BY source")
         .map_err(|e| format!("inventory query: {}", e))?;
@@ -1611,10 +1655,8 @@ pub fn geo_layer_inventory(conn: &Connection, cold_dir: &str) -> Result<Vec<(Str
     // 合并: warm 优先, cold 仅附加冷层信息 (若该 source 既热又冷, 仍保留冷层标记)
     let mut out: Vec<(String, i64, Option<(String, u64)>)> =
         warm.into_iter().map(|(s, c)| (s, c, None)).collect();
-    let cold_map: std::collections::HashMap<String, (String, u64)> = cold
-        .into_iter()
-        .map(|(s, p, b)| (s, (p, b)))
-        .collect();
+    let cold_map: std::collections::HashMap<String, (String, u64)> =
+        cold.into_iter().map(|(s, p, b)| (s, (p, b))).collect();
     for (s, (p, b)) in &cold_map {
         if let Some(entry) = out.iter_mut().find(|(src, _, _)| src == s) {
             entry.2 = Some((p.clone(), *b));
@@ -1625,8 +1667,6 @@ pub fn geo_layer_inventory(conn: &Connection, cold_dir: &str) -> Result<Vec<(Str
     out.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(out)
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -1751,18 +1791,39 @@ mod tests {
 
     #[test]
     fn test_city_dict_matches() {
-        assert_eq!(match_city_in_text("Stanford University research").map(|c| c.0), Some("旧金山"));
-        assert_eq!(match_city_in_text("牛津大学 的研究").map(|c| c.0), Some("牛津"));
-        assert_eq!(match_city_in_text("A study of Londoner culture").map(|c| c.0), Some("伦敦"));
+        assert_eq!(
+            match_city_in_text("Stanford University research").map(|c| c.0),
+            Some("旧金山")
+        );
+        assert_eq!(
+            match_city_in_text("牛津大学 的研究").map(|c| c.0),
+            Some("牛津")
+        );
+        assert_eq!(
+            match_city_in_text("A study of Londoner culture").map(|c| c.0),
+            Some("伦敦")
+        );
         // 词边界: "San" 不应命中 "Santa", "Tokyo" 不应命中 "Tokyopop"
         assert_eq!(match_city_in_text("Santa Monica beach").map(|c| c.0), None);
         assert_eq!(match_city_in_text("量子力学导论").map(|c| c.0), None);
         // 词形派生: "Londoner"/"London-based" 命中伦敦, "Oxfordian" 命中牛津
-        assert_eq!(match_city_in_text("a London-based firm").map(|c| c.0), Some("伦敦"));
-        assert_eq!(match_city_in_text("Oxfordian scholarship").map(|c| c.0), Some("牛津"));
+        assert_eq!(
+            match_city_in_text("a London-based firm").map(|c| c.0),
+            Some("伦敦")
+        );
+        assert_eq!(
+            match_city_in_text("Oxfordian scholarship").map(|c| c.0),
+            Some("牛津")
+        );
         // 子地点归入主城市, 坐标与 city 字段一致 (Stanford/硅谷 → 旧金山市中心)
-        assert_eq!(match_city_in_text("Stanford University research").map(|c| c.0), Some("旧金山"));
-        assert_eq!(match_city_in_text("Stanford University research").map(|c| c.2), Some(37.7749));
+        assert_eq!(
+            match_city_in_text("Stanford University research").map(|c| c.0),
+            Some("旧金山")
+        );
+        assert_eq!(
+            match_city_in_text("Stanford University research").map(|c| c.2),
+            Some(37.7749)
+        );
     }
 
     #[test]
@@ -1882,7 +1943,12 @@ mod tests {
         std::fs::create_dir_all(&tmp).unwrap();
 
         // 两个 source 各 2 条
-        for (src, i) in [("ourairports", 0), ("ourairports", 1), ("gvp-volcanoes", 0), ("gvp-volcanoes", 1)] {
+        for (src, i) in [
+            ("ourairports", 0),
+            ("ourairports", 1),
+            ("gvp-volcanoes", 0),
+            ("gvp-volcanoes", 1),
+        ] {
             upsert_geo(
                 &conn,
                 &GeoRecord {
@@ -1943,18 +2009,21 @@ mod tests {
         // 用 export 先构造 1200 条 (> 500 BATCH) 的 NT-Pack 文件
         let mut pts = Vec::new();
         for i in 0..1200 {
-            pts.push(crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_pack::GeoPoint {
-                node_id: format!("bulk:{}", i),
-                lat: (i as f64 % 90.0),
-                lng: (i as f64 % 180.0),
-                country: "CN".into(),
-                region: String::new(),
-                city: String::new(),
-                tags: String::new(),
-                source: "bulk".into(),
-            });
+            pts.push(
+                crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_pack::GeoPoint {
+                    node_id: format!("bulk:{}", i),
+                    lat: (i as f64 % 90.0),
+                    lng: (i as f64 % 180.0),
+                    country: "CN".into(),
+                    region: String::new(),
+                    city: String::new(),
+                    tags: String::new(),
+                    source: "bulk".into(),
+                },
+            );
         }
-        let enc = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_pack::PackEncoder::new(5, true);
+        let enc =
+            crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_pack::PackEncoder::new(5, true);
         let bytes = enc.encode(&pts);
         std::fs::write(&path, &bytes).unwrap();
 
@@ -1974,18 +2043,32 @@ mod tests {
         let path = tmp.join("geo_append.ntpack").to_str().unwrap().to_string();
 
         let mk = |id: &str, lat: f64, src: &str| GeoPoint {
-            node_id: id.into(), lat, lng: 100.0,
-            country: "CN".into(), region: String::new(), city: String::new(),
-            tags: String::new(), source: src.into(),
+            node_id: id.into(),
+            lat,
+            lng: 100.0,
+            country: "CN".into(),
+            region: String::new(),
+            city: String::new(),
+            tags: String::new(),
+            source: src.into(),
         };
 
         // 第一批 3 条
-        let (n, b) = append_geo_ntpack(&path, &[mk("a", 1.0, "src1"), mk("b", 2.0, "src1"), mk("c", 3.0, "src2")]).unwrap();
+        let (n, b) = append_geo_ntpack(
+            &path,
+            &[
+                mk("a", 1.0, "src1"),
+                mk("b", 2.0, "src1"),
+                mk("c", 3.0, "src2"),
+            ],
+        )
+        .unwrap();
         assert_eq!(n, 3);
         assert!(b > 0);
 
         // 追加: a 覆盖 (新 lat), d 新增 → 总数 4, a 的 lat 更新
-        let (n2, _) = append_geo_ntpack(&path, &[mk("a", 99.0, "src1"), mk("d", 4.0, "src2")]).unwrap();
+        let (n2, _) =
+            append_geo_ntpack(&path, &[mk("a", 99.0, "src1"), mk("d", 4.0, "src2")]).unwrap();
         assert_eq!(n2, 4);
 
         let (dec_n, pts) = import_geo_ntpack(&path).unwrap();
@@ -2019,16 +2102,36 @@ mod tests {
         std::fs::create_dir_all(&tmp).unwrap();
 
         // 两个 source: cold (归档) + hot (留热表)
-        upsert_geo(&conn, &GeoRecord {
-            node_id: "cold:1".into(), lat: 30.0, lng: 110.0, country: "CN".into(),
-            region: "华东".into(), city: "上海".into(), tags: String::new(),
-            source: "cold-src".into(), confidence: 0.9,
-        }).unwrap();
-        upsert_geo(&conn, &GeoRecord {
-            node_id: "hot:1".into(), lat: 30.1, lng: 110.1, country: "CN".into(),
-            region: "华东".into(), city: "上海".into(), tags: String::new(),
-            source: "hot-src".into(), confidence: 0.8,
-        }).unwrap();
+        upsert_geo(
+            &conn,
+            &GeoRecord {
+                node_id: "cold:1".into(),
+                lat: 30.0,
+                lng: 110.0,
+                country: "CN".into(),
+                region: "华东".into(),
+                city: "上海".into(),
+                tags: String::new(),
+                source: "cold-src".into(),
+                confidence: 0.9,
+            },
+        )
+        .unwrap();
+        upsert_geo(
+            &conn,
+            &GeoRecord {
+                node_id: "hot:1".into(),
+                lat: 30.1,
+                lng: 110.1,
+                country: "CN".into(),
+                region: "华东".into(),
+                city: "上海".into(),
+                tags: String::new(),
+                source: "hot-src".into(),
+                confidence: 0.8,
+            },
+        )
+        .unwrap();
 
         // 归档 cold-src → 热表只剩 hot
         let cold_path = tmp.join("geo_cold-src.ntpack");
@@ -2036,14 +2139,17 @@ mod tests {
         assert_eq!(n, 1);
 
         // 透明 bbox: 热表命中 1 (hot), 冷层兜底 1 (cold) → 2 条
-        let (recs, cold_hits) = query_bbox_with_cold(&conn, 29.0, 109.0, 31.0, 111.0, 10, tmp.to_str().unwrap()).unwrap();
+        let (recs, cold_hits) =
+            query_bbox_with_cold(&conn, 29.0, 109.0, 31.0, 111.0, 10, tmp.to_str().unwrap())
+                .unwrap();
         assert_eq!(recs.len(), 2);
         assert_eq!(cold_hits, 1);
         let cold_rec = recs.iter().find(|r| r.node_id == "cold:1").unwrap();
         assert_eq!(cold_rec.confidence, 0.0); // NT-Pack 无 confidence
 
         // 透明 by_place: 中国全部 → 2 条 (hot + cold)
-        let (recs2, cold2) = query_by_place_with_cold(&conn, "CN", "", "", 10, tmp.to_str().unwrap()).unwrap();
+        let (recs2, cold2) =
+            query_by_place_with_cold(&conn, "CN", "", "", 10, tmp.to_str().unwrap()).unwrap();
         assert_eq!(recs2.len(), 2);
         assert_eq!(cold2, 1);
 

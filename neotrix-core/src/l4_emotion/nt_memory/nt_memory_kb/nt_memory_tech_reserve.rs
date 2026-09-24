@@ -56,10 +56,12 @@ impl TechReserveDimension {
             NodeType::Algorithm | NodeType::Theory | NodeType::Method | NodeType::Concept => {
                 Some(Self::TechnicalPrinciples)
             }
-            NodeType::Tool | NodeType::Framework | NodeType::Dataset | NodeType::Repository
-            | NodeType::Benchmark | NodeType::Organization => {
-                Some(Self::ProductEcosystem)
-            }
+            NodeType::Tool
+            | NodeType::Framework
+            | NodeType::Dataset
+            | NodeType::Repository
+            | NodeType::Benchmark
+            | NodeType::Organization => Some(Self::ProductEcosystem),
             NodeType::CodeSnippet | NodeType::Reference | NodeType::Resource => {
                 Some(Self::CodeAssets)
             }
@@ -177,7 +179,11 @@ impl TechReserveStore {
         let domain_tags: Vec<String> = metadata
             .and_then(|m| m.get("tags"))
             .and_then(|t| t.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
         let maturity = metadata
@@ -227,7 +233,10 @@ impl TechReserveStore {
             for tag in &entry.domain_tags {
                 self.domain_index.entry(tag.clone()).or_default().push(idx);
             }
-            self.dimension_index.entry(entry.dimension).or_default().push(idx);
+            self.dimension_index
+                .entry(entry.dimension)
+                .or_default()
+                .push(idx);
         }
     }
 
@@ -239,7 +248,10 @@ impl TechReserveStore {
         for tag in &entry.domain_tags {
             self.domain_index.entry(tag.clone()).or_default().push(idx);
         }
-        self.dimension_index.entry(entry.dimension).or_default().push(idx);
+        self.dimension_index
+            .entry(entry.dimension)
+            .or_default()
+            .push(idx);
     }
 
     /// 查询技术储备
@@ -266,7 +278,10 @@ impl TechReserveStore {
                 }
                 if !q.query.is_empty() {
                     let title_match = e.title.to_lowercase().contains(&query_lower);
-                    let tag_match = e.domain_tags.iter().any(|t| t.to_lowercase().contains(&query_lower));
+                    let tag_match = e
+                        .domain_tags
+                        .iter()
+                        .any(|t| t.to_lowercase().contains(&query_lower));
                     let summary_match = e
                         .summary
                         .as_ref()
@@ -279,7 +294,11 @@ impl TechReserveStore {
             .collect();
 
         // 按成熟度降序排列
-        results.sort_by(|a, b| b.maturity.partial_cmp(&a.maturity).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.maturity
+                .partial_cmp(&a.maturity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(q.top_k.max(1));
         results
     }
@@ -310,10 +329,26 @@ impl TechReserveStore {
         TechProfile {
             tech_name: tech_name.to_string(),
             total_entries: results.len(),
-            principles: results.iter().filter(|e| e.dimension == TechReserveDimension::TechnicalPrinciples).map(|e| (*e).clone()).collect(),
-            products: results.iter().filter(|e| e.dimension == TechReserveDimension::ProductEcosystem).map(|e| (*e).clone()).collect(),
-            code_assets: results.iter().filter(|e| e.dimension == TechReserveDimension::CodeAssets).map(|e| (*e).clone()).collect(),
-            architecture_refs: results.iter().filter(|e| e.dimension == TechReserveDimension::ArchitectureReference).map(|e| (*e).clone()).collect(),
+            principles: results
+                .iter()
+                .filter(|e| e.dimension == TechReserveDimension::TechnicalPrinciples)
+                .map(|e| (*e).clone())
+                .collect(),
+            products: results
+                .iter()
+                .filter(|e| e.dimension == TechReserveDimension::ProductEcosystem)
+                .map(|e| (*e).clone())
+                .collect(),
+            code_assets: results
+                .iter()
+                .filter(|e| e.dimension == TechReserveDimension::CodeAssets)
+                .map(|e| (*e).clone())
+                .collect(),
+            architecture_refs: results
+                .iter()
+                .filter(|e| e.dimension == TechReserveDimension::ArchitectureReference)
+                .map(|e| (*e).clone())
+                .collect(),
         }
     }
 
@@ -327,7 +362,9 @@ impl TechReserveStore {
             // 检查 D1: 技术原理
             let has_principles = self.entries.iter().any(|e| {
                 e.dimension == TechReserveDimension::TechnicalPrinciples
-                    && e.domain_tags.iter().any(|t| t.to_lowercase() == domain_lower)
+                    && e.domain_tags
+                        .iter()
+                        .any(|t| t.to_lowercase() == domain_lower)
             });
             if !has_principles {
                 gaps.push(ArchitectureGap {
@@ -337,14 +374,19 @@ impl TechReserveStore {
                     priority: 1,
                     description: format!("缺乏「{}」领域的技术原理知识", domain),
                     known_solutions: vec![],
-                    suggested_action: format!("搜索 {} 的核心论文、算法文档和理论资料并入库", domain),
+                    suggested_action: format!(
+                        "搜索 {} 的核心论文、算法文档和理论资料并入库",
+                        domain
+                    ),
                 });
             }
 
             // 检查 D2: 产品生态
             let has_products = self.entries.iter().any(|e| {
                 e.dimension == TechReserveDimension::ProductEcosystem
-                    && e.domain_tags.iter().any(|t| t.to_lowercase() == domain_lower)
+                    && e.domain_tags
+                        .iter()
+                        .any(|t| t.to_lowercase() == domain_lower)
             });
             if !has_products {
                 gaps.push(ArchitectureGap {
@@ -354,14 +396,19 @@ impl TechReserveStore {
                     priority: 2,
                     description: format!("缺乏「{}」领域的产品生态信息", domain),
                     known_solutions: vec![],
-                    suggested_action: format!("扫描 GitHub topics 和产品目录，收集 {} 领域的工具/框架", domain),
+                    suggested_action: format!(
+                        "扫描 GitHub topics 和产品目录，收集 {} 领域的工具/框架",
+                        domain
+                    ),
                 });
             }
 
             // 检查 D3: 代码资产
             let has_code = self.entries.iter().any(|e| {
                 e.dimension == TechReserveDimension::CodeAssets
-                    && e.domain_tags.iter().any(|t| t.to_lowercase() == domain_lower)
+                    && e.domain_tags
+                        .iter()
+                        .any(|t| t.to_lowercase() == domain_lower)
             });
             if !has_code {
                 gaps.push(ArchitectureGap {
@@ -371,14 +418,19 @@ impl TechReserveStore {
                     priority: 3,
                     description: format!("缺乏「{}」领域的代码资产", domain),
                     known_solutions: vec![],
-                    suggested_action: format!("采集 {} 领域的 SDK 示例、API 用法和代码片段", domain),
+                    suggested_action: format!(
+                        "采集 {} 领域的 SDK 示例、API 用法和代码片段",
+                        domain
+                    ),
                 });
             }
 
             // 检查 D4: 架构参考
             let has_arch = self.entries.iter().any(|e| {
                 e.dimension == TechReserveDimension::ArchitectureReference
-                    && e.domain_tags.iter().any(|t| t.to_lowercase() == domain_lower)
+                    && e.domain_tags
+                        .iter()
+                        .any(|t| t.to_lowercase() == domain_lower)
             });
             if !has_arch {
                 gaps.push(ArchitectureGap {
@@ -388,7 +440,10 @@ impl TechReserveStore {
                     priority: 4,
                     description: format!("缺乏「{}」领域的架构参考", domain),
                     known_solutions: vec![],
-                    suggested_action: format!("收集 {} 领域的设计文档、架构决策记录和最佳实践指南", domain),
+                    suggested_action: format!(
+                        "收集 {} 领域的设计文档、架构决策记录和最佳实践指南",
+                        domain
+                    ),
                 });
             }
         }
@@ -432,26 +487,107 @@ pub struct TechProfile {
 
 /// 常见技术领域的关键词模式
 const TECH_DOMAIN_PATTERNS: &[(&str, &[&str])] = &[
-    ("llm", &["large language model", "llm", "transformer", "gpt", "language model"]),
-    ("rag", &["rag", "retrieval augmented", "vector search", "hybrid search"]),
+    (
+        "llm",
+        &[
+            "large language model",
+            "llm",
+            "transformer",
+            "gpt",
+            "language model",
+        ],
+    ),
+    (
+        "rag",
+        &[
+            "rag",
+            "retrieval augmented",
+            "vector search",
+            "hybrid search",
+        ],
+    ),
     ("agent", &["agent", "autonomous", "tool use", "ai agent"]),
-    ("crawler", &["crawler", "scraper", "web crawl", "html parse", "spider"]),
-    ("database", &["database", "sqlite", "postgresql", "dbms", "nosql", "vector db"]),
-    ("frontend", &["react", "vue", "web app", "ui", "frontend", "component"]),
-    ("backend", &["api server", "backend", "rest api", "microservice"]),
-    ("ml", &["machine learning", "deep learning", "neural network", "pytorch", "tensorflow"]),
-    ("search", &["search", "information retrieval", "index", "bm25", "fts"]),
-    ("security", &["security", "authentication", "oauth", "encryption", "vulnerability"]),
-    ("devops", &["devops", "ci/cd", "deploy", "kubernetes", "docker"]),
+    (
+        "crawler",
+        &["crawler", "scraper", "web crawl", "html parse", "spider"],
+    ),
+    (
+        "database",
+        &[
+            "database",
+            "sqlite",
+            "postgresql",
+            "dbms",
+            "nosql",
+            "vector db",
+        ],
+    ),
+    (
+        "frontend",
+        &["react", "vue", "web app", "ui", "frontend", "component"],
+    ),
+    (
+        "backend",
+        &["api server", "backend", "rest api", "microservice"],
+    ),
+    (
+        "ml",
+        &[
+            "machine learning",
+            "deep learning",
+            "neural network",
+            "pytorch",
+            "tensorflow",
+        ],
+    ),
+    (
+        "search",
+        &["search", "information retrieval", "index", "bm25", "fts"],
+    ),
+    (
+        "security",
+        &[
+            "security",
+            "authentication",
+            "oauth",
+            "encryption",
+            "vulnerability",
+        ],
+    ),
+    (
+        "devops",
+        &["devops", "ci/cd", "deploy", "kubernetes", "docker"],
+    ),
     ("rust", &["rust", "cargo", "rustc", "unsafe rust"]),
     ("python", &["python", "pypi", "pip", "python3"]),
-    ("javascript", &["javascript", "typescript", "node.js", "npm"]),
-    ("data", &["data pipeline", "etl", "data processing", "stream", "batch"]),
-    ("embedding", &["embedding", "vector", "semantic search", "embed", "bert"]),
-    ("mcp", &["mcp", "model context protocol", "tool server", "json-rpc"]),
-    ("knowledge_graph", &["knowledge graph", "graph rag", "neo4j", "graph db"]),
-    ("multi_modal", &["multimodal", "vision", "speech", "audio", "image gen"]),
-    ("fine_tuning", &["fine tune", "lora", "qlora", "sft", "rlhf"]),
+    (
+        "javascript",
+        &["javascript", "typescript", "node.js", "npm"],
+    ),
+    (
+        "data",
+        &["data pipeline", "etl", "data processing", "stream", "batch"],
+    ),
+    (
+        "embedding",
+        &["embedding", "vector", "semantic search", "embed", "bert"],
+    ),
+    (
+        "mcp",
+        &["mcp", "model context protocol", "tool server", "json-rpc"],
+    ),
+    (
+        "knowledge_graph",
+        &["knowledge graph", "graph rag", "neo4j", "graph db"],
+    ),
+    (
+        "multi_modal",
+        &["multimodal", "vision", "speech", "audio", "image gen"],
+    ),
+    (
+        "fine_tuning",
+        &["fine tune", "lora", "qlora", "sft", "rlhf"],
+    ),
 ];
 
 /// 从文本中提取技术领域标签
@@ -537,34 +673,57 @@ mod tests {
 
         assert_eq!(store.entry_count(), 4); // Person 被过滤
         let stats = store.stats_by_dimension();
-        assert_eq!(*stats.get(&TechReserveDimension::TechnicalPrinciples).unwrap(), 1);
-        assert_eq!(*stats.get(&TechReserveDimension::ProductEcosystem).unwrap(), 1);
+        assert_eq!(
+            *stats
+                .get(&TechReserveDimension::TechnicalPrinciples)
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            *stats.get(&TechReserveDimension::ProductEcosystem).unwrap(),
+            1
+        );
         assert_eq!(*stats.get(&TechReserveDimension::CodeAssets).unwrap(), 1);
-        assert_eq!(*stats.get(&TechReserveDimension::ArchitectureReference).unwrap(), 1);
+        assert_eq!(
+            *stats
+                .get(&TechReserveDimension::ArchitectureReference)
+                .unwrap(),
+            1
+        );
     }
 
     #[test]
     fn test_query_by_dimension() {
         let mut store = TechReserveStore::new();
         store.add_entry(TechReserveEntry {
-            node_id: "1".into(), title: "GPT-4".into(),
+            node_id: "1".into(),
+            title: "GPT-4".into(),
             dimension: TechReserveDimension::ProductEcosystem,
             domain_tags: vec!["llm".into(), "openai".into()],
-            maturity: 0.95, latest_version: Some("gpt-4-turbo".into()),
-            updated_at: 1000000, url: None, summary: None,
+            maturity: 0.95,
+            latest_version: Some("gpt-4-turbo".into()),
+            updated_at: 1000000,
+            url: None,
+            summary: None,
         });
         store.add_entry(TechReserveEntry {
-            node_id: "2".into(), title: "Transformer Paper".into(),
+            node_id: "2".into(),
+            title: "Transformer Paper".into(),
             dimension: TechReserveDimension::TechnicalPrinciples,
             domain_tags: vec!["llm".into()],
-            maturity: 0.9, latest_version: None,
-            updated_at: 1000000, url: None, summary: None,
+            maturity: 0.9,
+            latest_version: None,
+            updated_at: 1000000,
+            url: None,
+            summary: None,
         });
 
         let results = store.query(&TechReserveQuery {
             query: String::new(),
             dimension: Some(TechReserveDimension::ProductEcosystem),
-            domain: None, min_maturity: None, top_k: 10,
+            domain: None,
+            min_maturity: None,
+            top_k: 10,
         });
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].title, "GPT-4");
@@ -574,18 +733,26 @@ mod tests {
     fn test_latest_mature_products() {
         let mut store = TechReserveStore::new();
         store.add_entry(TechReserveEntry {
-            node_id: "a".into(), title: "LangChain".into(),
+            node_id: "a".into(),
+            title: "LangChain".into(),
             dimension: TechReserveDimension::ProductEcosystem,
             domain_tags: vec!["llm".into(), "agent".into()],
-            maturity: 0.85, latest_version: Some("0.3.0".into()),
-            updated_at: 1000000, url: None, summary: None,
+            maturity: 0.85,
+            latest_version: Some("0.3.0".into()),
+            updated_at: 1000000,
+            url: None,
+            summary: None,
         });
         store.add_entry(TechReserveEntry {
-            node_id: "b".into(), title: "AutoGPT".into(),
+            node_id: "b".into(),
+            title: "AutoGPT".into(),
             dimension: TechReserveDimension::ProductEcosystem,
             domain_tags: vec!["agent".into()],
-            maturity: 0.7, latest_version: None,
-            updated_at: 1000000, url: None, summary: None,
+            maturity: 0.7,
+            latest_version: None,
+            updated_at: 1000000,
+            url: None,
+            summary: None,
         });
 
         let products = store.latest_mature_products("agent", 5);
@@ -597,18 +764,26 @@ mod tests {
     fn test_full_tech_profile() {
         let mut store = TechReserveStore::new();
         store.add_entry(TechReserveEntry {
-            node_id: "1".into(), title: "RAG Paper".into(),
+            node_id: "1".into(),
+            title: "RAG Paper".into(),
             dimension: TechReserveDimension::TechnicalPrinciples,
             domain_tags: vec!["rag".into()],
-            maturity: 0.9, latest_version: None,
-            updated_at: 1000000, url: None, summary: None,
+            maturity: 0.9,
+            latest_version: None,
+            updated_at: 1000000,
+            url: None,
+            summary: None,
         });
         store.add_entry(TechReserveEntry {
-            node_id: "2".into(), title: "ChromaDB".into(),
+            node_id: "2".into(),
+            title: "ChromaDB".into(),
             dimension: TechReserveDimension::ProductEcosystem,
             domain_tags: vec!["rag".into(), "vector".into()],
-            maturity: 0.8, latest_version: Some("0.5.0".into()),
-            updated_at: 1000000, url: None, summary: None,
+            maturity: 0.8,
+            latest_version: Some("0.5.0".into()),
+            updated_at: 1000000,
+            url: None,
+            summary: None,
         });
 
         let profile = store.full_tech_profile("rag");
@@ -621,11 +796,15 @@ mod tests {
     fn test_architecture_gap_analysis() {
         let mut store = TechReserveStore::new();
         store.add_entry(TechReserveEntry {
-            node_id: "1".into(), title: "Transformers".into(),
+            node_id: "1".into(),
+            title: "Transformers".into(),
             dimension: TechReserveDimension::TechnicalPrinciples,
             domain_tags: vec!["llm".into()],
-            maturity: 0.9, latest_version: None,
-            updated_at: 1000000, url: None, summary: None,
+            maturity: 0.9,
+            latest_version: None,
+            updated_at: 1000000,
+            url: None,
+            summary: None,
         });
 
         let required = vec!["llm", "rag", "agent"];
@@ -638,7 +817,12 @@ mod tests {
         assert_eq!(gaps.len(), 11);
 
         // llm 的 D1 不应该在 gaps 里
-        assert!(!gaps.iter().any(|g| g.domain == "llm" && g.dimension == TechReserveDimension::TechnicalPrinciples));
+        assert!(
+            !gaps
+                .iter()
+                .any(|g| g.domain == "llm"
+                    && g.dimension == TechReserveDimension::TechnicalPrinciples)
+        );
     }
 
     #[test]
@@ -673,24 +857,34 @@ mod tests {
     fn test_query_with_min_maturity() {
         let mut store = TechReserveStore::new();
         store.add_entry(TechReserveEntry {
-            node_id: "1".into(), title: "Tool A".into(),
+            node_id: "1".into(),
+            title: "Tool A".into(),
             dimension: TechReserveDimension::ProductEcosystem,
             domain_tags: vec!["test".into()],
-            maturity: 0.3, latest_version: None,
-            updated_at: 1000000, url: None, summary: None,
+            maturity: 0.3,
+            latest_version: None,
+            updated_at: 1000000,
+            url: None,
+            summary: None,
         });
         store.add_entry(TechReserveEntry {
-            node_id: "2".into(), title: "Tool B".into(),
+            node_id: "2".into(),
+            title: "Tool B".into(),
             dimension: TechReserveDimension::ProductEcosystem,
             domain_tags: vec!["test".into()],
-            maturity: 0.8, latest_version: None,
-            updated_at: 1000000, url: None, summary: None,
+            maturity: 0.8,
+            latest_version: None,
+            updated_at: 1000000,
+            url: None,
+            summary: None,
         });
 
         let results = store.query(&TechReserveQuery {
             query: String::new(),
             dimension: Some(TechReserveDimension::ProductEcosystem),
-            domain: None, min_maturity: Some(0.6), top_k: 10,
+            domain: None,
+            min_maturity: Some(0.6),
+            top_k: 10,
         });
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].title, "Tool B");
@@ -700,23 +894,34 @@ mod tests {
     fn test_search_by_keyword() {
         let mut store = TechReserveStore::new();
         store.add_entry(TechReserveEntry {
-            node_id: "1".into(), title: "Fast Search Engine".into(),
+            node_id: "1".into(),
+            title: "Fast Search Engine".into(),
             dimension: TechReserveDimension::ProductEcosystem,
             domain_tags: vec!["search".into()],
-            maturity: 0.8, latest_version: None,
-            updated_at: 1000000, url: None, summary: None,
+            maturity: 0.8,
+            latest_version: None,
+            updated_at: 1000000,
+            url: None,
+            summary: None,
         });
         store.add_entry(TechReserveEntry {
-            node_id: "2".into(), title: "Sorting Algorithm".into(),
+            node_id: "2".into(),
+            title: "Sorting Algorithm".into(),
             dimension: TechReserveDimension::TechnicalPrinciples,
             domain_tags: vec!["algorithm".into()],
-            maturity: 0.9, latest_version: None,
-            updated_at: 1000000, url: None, summary: None,
+            maturity: 0.9,
+            latest_version: None,
+            updated_at: 1000000,
+            url: None,
+            summary: None,
         });
 
         let results = store.query(&TechReserveQuery {
             query: "search".into(),
-            dimension: None, domain: None, min_maturity: None, top_k: 10,
+            dimension: None,
+            domain: None,
+            min_maturity: None,
+            top_k: 10,
         });
         assert_eq!(results.len(), 1);
     }

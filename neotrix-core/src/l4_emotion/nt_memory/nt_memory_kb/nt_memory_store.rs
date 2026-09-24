@@ -12,7 +12,13 @@ use super::shared_utils::row_to_knowledge_node;
 pub fn normalize_title(title: &str) -> String {
     title
         .chars()
-        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { ' ' })
+        .map(|c| {
+            if c.is_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                ' '
+            }
+        })
         .collect::<String>()
         .split_whitespace()
         .collect::<Vec<_>>()
@@ -41,7 +47,11 @@ pub fn ensure_domain_cluster(conn: &Connection, domain: &str) -> rusqlite::Resul
 
 /// Assign a node to the cluster matching its domain field.
 /// If domain is None/empty, assigns to "unclustered" cluster.
-pub fn assign_cluster_to_node(conn: &Connection, node_id: &str, domain: Option<&str>) -> rusqlite::Result<()> {
+pub fn assign_cluster_to_node(
+    conn: &Connection,
+    node_id: &str,
+    domain: Option<&str>,
+) -> rusqlite::Result<()> {
     let cluster_domain = domain.unwrap_or("unclustered");
     let cluster_id = ensure_domain_cluster(conn, cluster_domain)?;
     conn.execute(
@@ -55,9 +65,10 @@ pub fn assign_cluster_to_node(conn: &Connection, node_id: &str, domain: Option<&
 /// 无事务的 nodes+nodes_fts 双写核心。调用方必须自管事务 (批量路径复用)。
 /// 插入后自动根据 domain 字段分配 cluster_id (domain clustering auto-assignment)。
 pub fn insert_node_rows(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<()> {
-    let temporal_json = node.temporal.as_ref().map(|t| {
-        serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string())
-    });
+    let temporal_json = node
+        .temporal
+        .as_ref()
+        .map(|t| serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string()));
     let norm_title = normalize_title(&node.title);
     conn.execute(
         "INSERT INTO nodes (id, node_type, title, summary, content, url, domain, language,
@@ -164,9 +175,10 @@ pub fn insert_or_get_node(
 }
 
 pub fn insert_node(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<()> {
-    let _temporal_json = node.temporal.as_ref().map(|t| {
-        serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string())
-    });
+    let _temporal_json = node
+        .temporal
+        .as_ref()
+        .map(|t| serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string()));
     // 事务：nodes + nodes_fts 双写保持一致性，crash 不残留孤立 FTS 行
     let tx = conn.unchecked_transaction()?;
     // cluster_id auto-assigned inside insert_node_rows
@@ -207,7 +219,11 @@ pub fn update_node(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<
     tx.commit()
 }
 
-pub fn update_node_metadata(conn: &Connection, id: &str, metadata: &serde_json::Value) -> rusqlite::Result<()> {
+pub fn update_node_metadata(
+    conn: &Connection,
+    id: &str,
+    metadata: &serde_json::Value,
+) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE nodes SET metadata=?1, updated_at=?2 WHERE id=?3",
         params![metadata.to_string(), now(), id],
@@ -226,7 +242,10 @@ pub fn get_node(conn: &Connection, id: &str) -> rusqlite::Result<Option<Knowledg
     let mut rows = stmt.query(params![id])?;
     match rows.next()? {
         Some(row) => {
-            conn.execute("UPDATE nodes SET access_count = access_count + 1 WHERE id=?1", params![id])?;
+            conn.execute(
+                "UPDATE nodes SET access_count = access_count + 1 WHERE id=?1",
+                params![id],
+            )?;
             Ok(Some(KnowledgeNode {
                 id: row.get(0)?,
                 node_type: NodeType::from_str(&row.get::<_, String>(1)?),
@@ -242,7 +261,9 @@ pub fn get_node(conn: &Connection, id: &str) -> rusqlite::Result<Option<Knowledg
                 created_at: row.get(11)?,
                 updated_at: row.get(12)?,
                 access_count: row.get::<_, i64>(13)? + 1,
-                metadata: row.get::<_, Option<String>>(14)?.and_then(|m| serde_json::from_str(&m).ok()),
+                metadata: row
+                    .get::<_, Option<String>>(14)?
+                    .and_then(|m| serde_json::from_str(&m).ok()),
                 temporal: None,
                 supersedes: row.get(15)?,
                 source_episode: None,
@@ -288,7 +309,11 @@ pub fn find_node_by_title_and_type(
         None => Ok(None),
     }
 }
-pub fn merge_duplicate_nodes(conn: &Connection, keep_id: &str, remove_id: &str) -> rusqlite::Result<()> {
+pub fn merge_duplicate_nodes(
+    conn: &Connection,
+    keep_id: &str,
+    remove_id: &str,
+) -> rusqlite::Result<()> {
     // 事务：边重映射 + 节点删除必须原子，否则残留指向已删节点的边
     let tx = conn.unchecked_transaction()?;
     // Remove edges from remove_id that already exist on keep_id (avoid UNIQUE conflict)
@@ -302,24 +327,34 @@ pub fn merge_duplicate_nodes(conn: &Connection, keep_id: &str, remove_id: &str) 
          (SELECT source_id, relation_type FROM edges WHERE target_id=?2)",
         params![remove_id, keep_id],
     )?;
-    tx.execute("UPDATE edges SET source_id=?1 WHERE source_id=?2", params![keep_id, remove_id])?;
-    tx.execute("UPDATE edges SET target_id=?1 WHERE target_id=?2", params![keep_id, remove_id])?;
+    tx.execute(
+        "UPDATE edges SET source_id=?1 WHERE source_id=?2",
+        params![keep_id, remove_id],
+    )?;
+    tx.execute(
+        "UPDATE edges SET target_id=?1 WHERE target_id=?2",
+        params![keep_id, remove_id],
+    )?;
     tx.execute("DELETE FROM nodes WHERE id=?1", params![remove_id])?;
-    tx.execute("DELETE FROM nodes_fts WHERE rowid = (SELECT rowid FROM nodes WHERE id=?1)", params![remove_id])?;
+    tx.execute(
+        "DELETE FROM nodes_fts WHERE rowid = (SELECT rowid FROM nodes WHERE id=?1)",
+        params![remove_id],
+    )?;
     tx.commit()
 }
 
 /// 查找并合并所有重复标题的节点 (仅无 URL 节点)
 pub fn dedup_nodes(conn: &Connection) -> rusqlite::Result<usize> {
-    let mut stmt = conn.prepare(
-        "SELECT id, title, node_type FROM nodes WHERE url IS NULL ORDER BY title"
-    )?;
-    let rows: Vec<(String, String, String)> = stmt.query_map([], |row| {
-        Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-    })?.filter_map(|r| r.ok()).collect();
+    let mut stmt =
+        conn.prepare("SELECT id, title, node_type FROM nodes WHERE url IS NULL ORDER BY title")?;
+    let rows: Vec<(String, String, String)> = stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+        .filter_map(|r| r.ok())
+        .collect();
 
     let mut merged = 0usize;
-    let mut seen: std::collections::HashMap<(String, String), String> = std::collections::HashMap::new();
+    let mut seen: std::collections::HashMap<(String, String), String> =
+        std::collections::HashMap::new();
     for (id, title, ntype) in &rows {
         let key = (title.to_lowercase(), ntype.clone());
         if let Some(existing_id) = seen.get(&key) {
@@ -349,7 +384,10 @@ pub fn find_node_by_url(conn: &Connection, url: &str) -> rusqlite::Result<Option
 pub fn delete_node(conn: &Connection, id: &str) -> rusqlite::Result<bool> {
     // 事务：先删 FTS 行再删节点行，crash 不留孤立 FTS 行
     let tx = conn.unchecked_transaction()?;
-    tx.execute("DELETE FROM nodes_fts WHERE rowid = (SELECT rowid FROM nodes WHERE id=?1)", params![id])?;
+    tx.execute(
+        "DELETE FROM nodes_fts WHERE rowid = (SELECT rowid FROM nodes WHERE id=?1)",
+        params![id],
+    )?;
     let affected = tx.execute("DELETE FROM nodes WHERE id=?1", params![id])?;
     tx.commit()?;
     Ok(affected > 0)
@@ -379,7 +417,10 @@ pub fn insert_edge(conn: &Connection, edge: &KnowledgeEdge) -> rusqlite::Result<
     Ok(())
 }
 
-pub fn get_edges_for_node(conn: &Connection, node_id: &str) -> rusqlite::Result<Vec<KnowledgeEdge>> {
+pub fn get_edges_for_node(
+    conn: &Connection,
+    node_id: &str,
+) -> rusqlite::Result<Vec<KnowledgeEdge>> {
     let mut stmt = conn.prepare(
         "SELECT id, source_id, target_id, relation_type, weight, description, created_at, metadata
          FROM edges WHERE source_id=?1 OR target_id=?1",
@@ -393,13 +434,22 @@ pub fn get_edges_for_node(conn: &Connection, node_id: &str) -> rusqlite::Result<
             weight: row.get(4)?,
             description: row.get(5)?,
             created_at: row.get(6)?,
-            metadata: row.get::<_, Option<String>>(7)?.and_then(|m| serde_json::from_str(&m).ok()),
+            metadata: row
+                .get::<_, Option<String>>(7)?
+                .and_then(|m| serde_json::from_str(&m).ok()),
         })
     })?;
     rows.collect()
 }
 
-pub fn upsert_crawl_queue(conn: &Connection, url: &str, depth: i64, domain: &str, priority: i64, discovered_at: i64) -> rusqlite::Result<()> {
+pub fn upsert_crawl_queue(
+    conn: &Connection,
+    url: &str,
+    depth: i64,
+    domain: &str,
+    priority: i64,
+    discovered_at: i64,
+) -> rusqlite::Result<()> {
     conn.execute(
         "INSERT OR IGNORE INTO crawl_queue (id, url, depth, domain, priority, status, discovered_at)
          VALUES (?1, ?2, ?3, ?4, ?5, 'pending', ?6)",
@@ -416,7 +466,10 @@ pub fn claim_next_crawl_url(conn: &Connection) -> rusqlite::Result<Option<CrawlQ
     claim_pending_url_where(conn, "status='pending'")
 }
 
-fn claim_pending_url_where(conn: &Connection, where_clause: &str) -> rusqlite::Result<Option<CrawlQueueItem>> {
+fn claim_pending_url_where(
+    conn: &Connection,
+    where_clause: &str,
+) -> rusqlite::Result<Option<CrawlQueueItem>> {
     let sql = format!(
         "SELECT id, url, depth, domain, priority, status, discovered_at, last_attempt, retry_count, error_message
          FROM crawl_queue
@@ -451,7 +504,12 @@ fn claim_pending_url_where(conn: &Connection, where_clause: &str) -> rusqlite::R
     }
 }
 
-pub fn mark_crawl_complete(conn: &Connection, id: &str, success: bool, error: Option<&str>) -> rusqlite::Result<()> {
+pub fn mark_crawl_complete(
+    conn: &Connection,
+    id: &str,
+    success: bool,
+    error: Option<&str>,
+) -> rusqlite::Result<()> {
     if success {
         conn.execute(
             "UPDATE crawl_queue SET status='completed' WHERE id=?1",
@@ -470,7 +528,9 @@ pub fn get_stats(conn: &Connection) -> Result<KnowledgeStats, rusqlite::Error> {
     let total_nodes: i64 = conn.query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0))?;
     let total_edges: i64 = conn.query_row("SELECT COUNT(*) FROM edges", [], |r| r.get(0))?;
 
-    let mut type_stmt = conn.prepare("SELECT node_type, COUNT(*) FROM nodes GROUP BY node_type ORDER BY COUNT(*) DESC")?;
+    let mut type_stmt = conn.prepare(
+        "SELECT node_type, COUNT(*) FROM nodes GROUP BY node_type ORDER BY COUNT(*) DESC",
+    )?;
     let by_type: Vec<(String, i64)> = {
         let rows = type_stmt.query_map([], |r| {
             let t: String = r.get(0)?;
@@ -490,14 +550,28 @@ pub fn get_stats(conn: &Connection) -> Result<KnowledgeStats, rusqlite::Error> {
         rows.filter_map(|r| r.ok()).collect()
     };
 
-    let crawl_pending: i64 = conn.query_row("SELECT COUNT(*) FROM crawl_queue WHERE status='pending'", [], |r| r.get(0))?;
-    let crawl_completed: i64 = conn.query_row("SELECT COUNT(*) FROM crawl_queue WHERE status='completed'", [], |r| r.get(0))?;
+    let crawl_pending: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM crawl_queue WHERE status='pending'",
+        [],
+        |r| r.get(0),
+    )?;
+    let crawl_completed: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM crawl_queue WHERE status='completed'",
+        [],
+        |r| r.get(0),
+    )?;
 
     let db_size: i64 = conn
-        .query_row("SELECT COALESCE(SUM(pgsize), 0) FROM dbstat WHERE name LIKE 'knowledge_%'", [], |r| r.get(0))
+        .query_row(
+            "SELECT COALESCE(SUM(pgsize), 0) FROM dbstat WHERE name LIKE 'knowledge_%'",
+            [],
+            |r| r.get(0),
+        )
         .unwrap_or(0);
 
-    let total_clusters: i64 = conn.query_row("SELECT COUNT(*) FROM domain_clusters", [], |r| r.get(0)).unwrap_or(0);
+    let total_clusters: i64 = conn
+        .query_row("SELECT COUNT(*) FROM domain_clusters", [], |r| r.get(0))
+        .unwrap_or(0);
 
     Ok(KnowledgeStats {
         total_nodes,
@@ -546,7 +620,15 @@ pub fn upsert_edge(
     weight: f64,
     description: Option<&str>,
 ) -> rusqlite::Result<()> {
-    upsert_edge_full(conn, source_id, target_id, relation_type, weight, description, None)
+    upsert_edge_full(
+        conn,
+        source_id,
+        target_id,
+        relation_type,
+        weight,
+        description,
+        None,
+    )
 }
 
 // D3 架构倒置: 基础 count 原语下沉至 core (nt_core_kb_primitives), re-export
@@ -570,7 +652,8 @@ pub fn count_nodes_by_type_map(conn: &Connection) -> rusqlite::Result<HashMap<St
 }
 
 pub fn count_nodes_by_domain(conn: &Connection) -> rusqlite::Result<HashMap<String, usize>> {
-    let mut stmt = conn.prepare("SELECT COALESCE(domain,'unknown'), COUNT(*) FROM nodes GROUP BY domain")?;
+    let mut stmt =
+        conn.prepare("SELECT COALESCE(domain,'unknown'), COUNT(*) FROM nodes GROUP BY domain")?;
     let rows = stmt.query_map([], |row| {
         let domain: String = row.get(0)?;
         let count: usize = row.get(1)?;
@@ -585,7 +668,8 @@ pub fn count_nodes_by_domain(conn: &Connection) -> rusqlite::Result<HashMap<Stri
 }
 
 pub fn count_edges_by_type(conn: &Connection) -> rusqlite::Result<HashMap<String, usize>> {
-    let mut stmt = conn.prepare("SELECT relation_type, COUNT(*) FROM edges GROUP BY relation_type")?;
+    let mut stmt =
+        conn.prepare("SELECT relation_type, COUNT(*) FROM edges GROUP BY relation_type")?;
     let rows = stmt.query_map([], |row| {
         let rel_type: String = row.get(0)?;
         let count: usize = row.get(1)?;
@@ -599,12 +683,18 @@ pub fn count_edges_by_type(conn: &Connection) -> rusqlite::Result<HashMap<String
     Ok(map)
 }
 
-pub fn count_nodes_by_domain_and_type(conn: &Connection) -> rusqlite::Result<Vec<(String, String, usize)>> {
+pub fn count_nodes_by_domain_and_type(
+    conn: &Connection,
+) -> rusqlite::Result<Vec<(String, String, usize)>> {
     let mut stmt = conn.prepare(
         "SELECT COALESCE(domain,'unknown'), node_type, COUNT(*) FROM nodes GROUP BY domain, node_type ORDER BY domain"
     )?;
     let rows = stmt.query_map([], |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, usize>(2)?))
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, usize>(2)?,
+        ))
     })?;
     let mut results = Vec::new();
     for row in rows {
@@ -652,7 +742,10 @@ pub fn get_cluster(conn: &Connection, id: &str) -> rusqlite::Result<Option<Knowl
     }
 }
 
-pub fn get_cluster_by_name(conn: &Connection, name: &str) -> rusqlite::Result<Option<KnowledgeCluster>> {
+pub fn get_cluster_by_name(
+    conn: &Connection,
+    name: &str,
+) -> rusqlite::Result<Option<KnowledgeCluster>> {
     let mut stmt = conn.prepare(
         "SELECT id, name, description, parent_cluster_id, node_count, avg_confidence, updated_at
          FROM domain_clusters WHERE name=?1",
@@ -712,7 +805,10 @@ pub fn delete_cluster(conn: &Connection, id: &str) -> rusqlite::Result<bool> {
     Ok(affected > 0)
 }
 
-pub fn get_cluster_children(conn: &Connection, parent_id: &str) -> rusqlite::Result<Vec<KnowledgeCluster>> {
+pub fn get_cluster_children(
+    conn: &Connection,
+    parent_id: &str,
+) -> rusqlite::Result<Vec<KnowledgeCluster>> {
     let mut stmt = conn.prepare(
         "SELECT id, name, description, parent_cluster_id, node_count, avg_confidence, updated_at
          FROM domain_clusters WHERE parent_cluster_id=?1 ORDER BY name",
@@ -735,16 +831,17 @@ pub fn get_cluster_children(conn: &Connection, parent_id: &str) -> rusqlite::Res
     Ok(clusters)
 }
 
-pub fn get_nodes_in_cluster(conn: &Connection, cluster_id: &str) -> rusqlite::Result<Vec<KnowledgeNode>> {
+pub fn get_nodes_in_cluster(
+    conn: &Connection,
+    cluster_id: &str,
+) -> rusqlite::Result<Vec<KnowledgeNode>> {
     let mut stmt = conn.prepare(
         "SELECT id, node_type, title, summary, content, url, domain, language,
             confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
             supersedes, parent_id, depth, cluster_id
          FROM nodes WHERE cluster_id=?1 ORDER BY depth, title",
     )?;
-    let rows = stmt.query_map(params![cluster_id], |row| {
-        row_to_knowledge_node(row)
-    })?;
+    let rows = stmt.query_map(params![cluster_id], |row| row_to_knowledge_node(row))?;
     let mut nodes = Vec::new();
     for row in rows {
         nodes.push(row?);
@@ -752,16 +849,17 @@ pub fn get_nodes_in_cluster(conn: &Connection, cluster_id: &str) -> rusqlite::Re
     Ok(nodes)
 }
 
-pub fn get_node_children(conn: &Connection, parent_id: &str) -> rusqlite::Result<Vec<KnowledgeNode>> {
+pub fn get_node_children(
+    conn: &Connection,
+    parent_id: &str,
+) -> rusqlite::Result<Vec<KnowledgeNode>> {
     let mut stmt = conn.prepare(
         "SELECT id, node_type, title, summary, content, url, domain, language,
             confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
             supersedes, parent_id, depth, cluster_id
          FROM nodes WHERE parent_id=?1 ORDER BY depth, title",
     )?;
-    let rows = stmt.query_map(params![parent_id], |row| {
-        row_to_knowledge_node(row)
-    })?;
+    let rows = stmt.query_map(params![parent_id], |row| row_to_knowledge_node(row))?;
     let mut nodes = Vec::new();
     for row in rows {
         nodes.push(row?);
@@ -769,7 +867,10 @@ pub fn get_node_children(conn: &Connection, parent_id: &str) -> rusqlite::Result
     Ok(nodes)
 }
 
-pub fn get_node_ancestors(conn: &Connection, node_id: &str) -> rusqlite::Result<Vec<KnowledgeNode>> {
+pub fn get_node_ancestors(
+    conn: &Connection,
+    node_id: &str,
+) -> rusqlite::Result<Vec<KnowledgeNode>> {
     let mut ancestors = Vec::new();
     let mut current_id = Some(node_id.to_string());
     // Walk up the hierarchy (max 32 levels to prevent infinite loops)
@@ -792,7 +893,7 @@ pub fn get_node_ancestors(conn: &Connection, node_id: &str) -> rusqlite::Result<
 
 pub fn get_cluster_stats(conn: &Connection) -> rusqlite::Result<HashMap<String, usize>> {
     let mut stmt = conn.prepare(
-        "SELECT COALESCE(cluster_id, 'unclustered'), COUNT(*) FROM nodes GROUP BY cluster_id"
+        "SELECT COALESCE(cluster_id, 'unclustered'), COUNT(*) FROM nodes GROUP BY cluster_id",
     )?;
     let rows = stmt.query_map([], |row| {
         let k: String = row.get(0)?;
@@ -816,7 +917,11 @@ pub fn get_stale_node_count(conn: &Connection, older_than_days: i64) -> rusqlite
     )
 }
 
-pub fn get_nodes_page(conn: &Connection, offset: usize, limit: usize) -> rusqlite::Result<Vec<KnowledgeNode>> {
+pub fn get_nodes_page(
+    conn: &Connection,
+    offset: usize,
+    limit: usize,
+) -> rusqlite::Result<Vec<KnowledgeNode>> {
     let mut stmt = conn.prepare(
         "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, recall_weight, created_at, updated_at, access_count, metadata, supersedes, parent_id, depth, cluster_id FROM nodes ORDER BY rowid LIMIT ?1 OFFSET ?2"
     )?;
@@ -830,7 +935,11 @@ pub fn get_nodes_page(conn: &Connection, offset: usize, limit: usize) -> rusqlit
     Ok(nodes)
 }
 
-pub fn get_edges_page(conn: &Connection, offset: usize, limit: usize) -> rusqlite::Result<Vec<KnowledgeEdge>> {
+pub fn get_edges_page(
+    conn: &Connection,
+    offset: usize,
+    limit: usize,
+) -> rusqlite::Result<Vec<KnowledgeEdge>> {
     let mut stmt = conn.prepare(
         "SELECT id, source_id, target_id, relation_type, weight, description, created_at, metadata FROM edges ORDER BY rowid LIMIT ?1 OFFSET ?2"
     )?;
@@ -843,7 +952,9 @@ pub fn get_edges_page(conn: &Connection, offset: usize, limit: usize) -> rusqlit
             weight: row.get(4)?,
             description: row.get(5)?,
             created_at: row.get(6)?,
-            metadata: row.get::<_, Option<String>>(7)?.and_then(|m| serde_json::from_str(&m).ok()),
+            metadata: row
+                .get::<_, Option<String>>(7)?
+                .and_then(|m| serde_json::from_str(&m).ok()),
         })
     })?;
     let mut edges = Vec::with_capacity(limit.min(4096));
@@ -857,9 +968,7 @@ pub fn get_all_nodes(conn: &Connection) -> rusqlite::Result<Vec<KnowledgeNode>> 
     let mut stmt = conn.prepare(
         "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, recall_weight, created_at, updated_at, access_count, metadata, supersedes, parent_id, depth, cluster_id FROM nodes"
     )?;
-    let rows = stmt.query_map([], |row| {
-        row_to_knowledge_node(row)
-    })?;
+    let rows = stmt.query_map([], |row| row_to_knowledge_node(row))?;
     let mut nodes = Vec::new();
     for row in rows {
         nodes.push(row?);
@@ -880,7 +989,9 @@ pub fn get_all_edges(conn: &Connection) -> rusqlite::Result<Vec<KnowledgeEdge>> 
             weight: row.get(4)?,
             description: row.get(5)?,
             created_at: row.get(6)?,
-            metadata: row.get::<_, Option<String>>(7)?.and_then(|m| serde_json::from_str(&m).ok()),
+            metadata: row
+                .get::<_, Option<String>>(7)?
+                .and_then(|m| serde_json::from_str(&m).ok()),
         })
     })?;
     let mut edges = Vec::new();
@@ -890,8 +1001,10 @@ pub fn get_all_edges(conn: &Connection) -> rusqlite::Result<Vec<KnowledgeEdge>> 
     Ok(edges)
 }
 
-
-pub fn store_procedural_memory(conn: &Connection, record: &ProceduralMemoryRecord) -> rusqlite::Result<()> {
+pub fn store_procedural_memory(
+    conn: &Connection,
+    record: &ProceduralMemoryRecord,
+) -> rusqlite::Result<()> {
     conn.execute(
         "INSERT OR REPLACE INTO procedural_memory
          (id, skill_id, name, description, e8_sequence, trigger_pattern,
@@ -915,11 +1028,14 @@ pub fn store_procedural_memory(conn: &Connection, record: &ProceduralMemoryRecor
     Ok(())
 }
 
-pub fn get_procedural_memory(conn: &Connection, skill_id: &str) -> rusqlite::Result<Option<ProceduralMemoryRecord>> {
+pub fn get_procedural_memory(
+    conn: &Connection,
+    skill_id: &str,
+) -> rusqlite::Result<Option<ProceduralMemoryRecord>> {
     let mut stmt = conn.prepare(
         "SELECT id, skill_id, name, description, e8_sequence, trigger_pattern,
                 success_rate, execution_count, avg_reward, created_at, updated_at, tags
-         FROM procedural_memory WHERE skill_id=?1"
+         FROM procedural_memory WHERE skill_id=?1",
     )?;
     let mut rows = stmt.query(params![skill_id])?;
     match rows.next()? {
@@ -941,11 +1057,14 @@ pub fn get_procedural_memory(conn: &Connection, skill_id: &str) -> rusqlite::Res
     }
 }
 
-pub fn list_procedural_memories(conn: &Connection, top_k: usize) -> rusqlite::Result<Vec<ProceduralMemoryRecord>> {
+pub fn list_procedural_memories(
+    conn: &Connection,
+    top_k: usize,
+) -> rusqlite::Result<Vec<ProceduralMemoryRecord>> {
     let mut stmt = conn.prepare(
         "SELECT id, skill_id, name, description, e8_sequence, trigger_pattern,
                 success_rate, execution_count, avg_reward, created_at, updated_at, tags
-         FROM procedural_memory ORDER BY success_rate DESC LIMIT ?1"
+         FROM procedural_memory ORDER BY success_rate DESC LIMIT ?1",
     )?;
     let rows = stmt.query_map(params![top_k as i64], |row| {
         Ok(ProceduralMemoryRecord {
@@ -970,7 +1089,11 @@ pub fn list_procedural_memories(conn: &Connection, top_k: usize) -> rusqlite::Re
     Ok(records)
 }
 
-pub fn update_procedural_memory_success(conn: &Connection, skill_id: &str, reward: f64) -> rusqlite::Result<()> {
+pub fn update_procedural_memory_success(
+    conn: &Connection,
+    skill_id: &str,
+    reward: f64,
+) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE procedural_memory SET
             execution_count = execution_count + 1,
@@ -983,12 +1106,15 @@ pub fn update_procedural_memory_success(conn: &Connection, skill_id: &str, rewar
     Ok(())
 }
 
-pub fn find_matching_skills(conn: &Connection, e8_state: u8) -> rusqlite::Result<Vec<ProceduralMemoryRecord>> {
+pub fn find_matching_skills(
+    conn: &Connection,
+    e8_state: u8,
+) -> rusqlite::Result<Vec<ProceduralMemoryRecord>> {
     let pattern_str = format!("%{}%", e8_state);
     let mut stmt = conn.prepare(
         "SELECT id, skill_id, name, description, e8_sequence, trigger_pattern,
                 success_rate, execution_count, avg_reward, created_at, updated_at, tags
-         FROM procedural_memory WHERE trigger_pattern LIKE ?1 ORDER BY success_rate DESC"
+         FROM procedural_memory WHERE trigger_pattern LIKE ?1 ORDER BY success_rate DESC",
     )?;
     let rows = stmt.query_map(params![pattern_str], |row| {
         Ok(ProceduralMemoryRecord {
@@ -1017,11 +1143,16 @@ pub fn find_matching_skills(conn: &Connection, e8_state: u8) -> rusqlite::Result
 mod tests {
 
     use super::*;
-    
 
     #[test]
     fn test_normalize_title_collapses_punctuation() {
-        assert_eq!(normalize_title("Attention Is All You Need!"), "attention is all you need");
-        assert_eq!(normalize_title("  Transformer-Attention  "), "transformer attention");
+        assert_eq!(
+            normalize_title("Attention Is All You Need!"),
+            "attention is all you need"
+        );
+        assert_eq!(
+            normalize_title("  Transformer-Attention  "),
+            "transformer attention"
+        );
     }
 }

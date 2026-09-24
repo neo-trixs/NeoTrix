@@ -51,9 +51,7 @@ pub fn shanhai_stats(
 
 /// 查询山海世界山峰 (id 前缀 `shanhai-peak:`)。
 /// 返回 (id, title, importance, location)。
-pub fn shanhai_peaks(
-    conn: &Connection,
-) -> rusqlite::Result<Vec<(String, String, f64, String)>> {
+pub fn shanhai_peaks(conn: &Connection) -> rusqlite::Result<Vec<(String, String, f64, String)>> {
     let mut stmt = conn.prepare(
         "SELECT id, title, importance, metadata FROM nodes \
          WHERE id LIKE 'shanhai-peak:%' ORDER BY id",
@@ -75,9 +73,7 @@ pub fn shanhai_peaks(
 
 /// 查询山海世界全球对应映射 (id 前缀 `shanhai-map:`)。
 /// 返回结构: (id, title, summary, modern_name, location, confidence, scholars)。
-pub fn shanhai_mappings(
-    conn: &Connection,
-) -> rusqlite::Result<Vec<MappingRecord>> {
+pub fn shanhai_mappings(conn: &Connection) -> rusqlite::Result<Vec<MappingRecord>> {
     let mut stmt = conn.prepare(
         "SELECT id, title, summary, metadata FROM nodes \
          WHERE id LIKE 'shanhai-map:%' ORDER BY id",
@@ -93,21 +89,31 @@ pub fn shanhai_mappings(
     let mut out = Vec::new();
     for row in rows {
         let (id, title, summary, meta_str) = row?;
-        let meta: Option<Value> = meta_str.as_deref().and_then(|s| serde_json::from_str(s).ok());
-        let modern_name = meta.as_ref()
+        let meta: Option<Value> = meta_str
+            .as_deref()
+            .and_then(|s| serde_json::from_str(s).ok());
+        let modern_name = meta
+            .as_ref()
             .and_then(|v| v.get("modern_name").and_then(|l| l.as_str()))
             .unwrap_or("")
             .to_string();
-        let location = meta.as_ref()
+        let location = meta
+            .as_ref()
             .and_then(|v| v.get("modern_location").and_then(|l| l.as_str()))
             .unwrap_or("")
             .to_string();
-        let confidence = meta.as_ref()
+        let confidence = meta
+            .as_ref()
             .and_then(|v| v.get("confidence").and_then(|c| c.as_f64()))
             .unwrap_or(0.0);
-        let scholars = meta.as_ref()
+        let scholars = meta
+            .as_ref()
             .and_then(|v| v.get("attributed_by").and_then(|a| a.as_array()))
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default();
         out.push(MappingRecord {
             id,
@@ -154,17 +160,30 @@ pub fn shanhai_evidence(
     let mut out = Vec::new();
     for row in rows {
         let (id, title, importance, meta_str) = row?;
-        let meta: Option<Value> = meta_str.as_deref().and_then(|s| serde_json::from_str(s).ok());
-        let ev_type = meta.as_ref()
+        let meta: Option<Value> = meta_str
+            .as_deref()
+            .and_then(|s| serde_json::from_str(s).ok());
+        let ev_type = meta
+            .as_ref()
             .and_then(|v| v.get("type").and_then(|t| t.as_str()))
             .unwrap_or("unknown")
             .to_string();
-        let scholar = meta.as_ref()
-            .and_then(|v| v.get("scholar").or_else(|| v.get("archaeologist")).and_then(|s| s.as_str()))
+        let scholar = meta
+            .as_ref()
+            .and_then(|v| {
+                v.get("scholar")
+                    .or_else(|| v.get("archaeologist"))
+                    .and_then(|s| s.as_str())
+            })
             .unwrap_or("")
             .to_string();
-        let key = meta.as_ref()
-            .and_then(|v| v.get("key_insight").or_else(|| v.get("conclusion")).and_then(|k| k.as_str()))
+        let key = meta
+            .as_ref()
+            .and_then(|v| {
+                v.get("key_insight")
+                    .or_else(|| v.get("conclusion"))
+                    .and_then(|k| k.as_str())
+            })
             .unwrap_or("")
             .to_string();
         out.push((id, title, importance, ev_type, scholar, key));
@@ -193,10 +212,18 @@ pub fn shanhai_schools(
     let mut out = Vec::new();
     for row in rows {
         let (id, title, summary, importance, meta_str) = row?;
-        let meta: Option<Value> = meta_str.as_deref().and_then(|s| serde_json::from_str(s).ok());
-        let tags = meta.as_ref()
+        let meta: Option<Value> = meta_str
+            .as_deref()
+            .and_then(|s| serde_json::from_str(s).ok());
+        let tags = meta
+            .as_ref()
             .and_then(|v| v.get("tags").and_then(|t| t.as_array()))
-            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", "))
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
             .unwrap_or_default();
         out.push((id, title, summary.unwrap_or_default(), importance, tags));
     }
@@ -247,15 +274,21 @@ pub fn export_geojson(conn: &Connection) -> rusqlite::Result<String> {
             "total_mappings": features.len(),
         },
     });
-    serde_json::to_string_pretty(&geojson).map_err(|e| {
-        rusqlite::Error::InvalidColumnName(format!("GeoJSON serialization: {}", e))
-    })
+    serde_json::to_string_pretty(&geojson)
+        .map_err(|e| rusqlite::Error::InvalidColumnName(format!("GeoJSON serialization: {}", e)))
 }
 
 /// 从节点 metadata JSON 中提取指定字符串 key (用于查询展示)。
 fn meta_key(meta: Option<String>, key: &str) -> String {
-    match meta.as_deref().and_then(|s| serde_json::from_str::<Value>(s).ok()) {
-        Some(v) => v.get(key).and_then(|k| k.as_str()).unwrap_or("").to_string(),
+    match meta
+        .as_deref()
+        .and_then(|s| serde_json::from_str::<Value>(s).ok())
+    {
+        Some(v) => v
+            .get(key)
+            .and_then(|k| k.as_str())
+            .unwrap_or("")
+            .to_string(),
         None => String::new(),
     }
 }

@@ -19,69 +19,249 @@
 //! 7 域: NT-CORE, NT-MIND, NT-MEMORY, NT-WORLD, NT-ACT, NT-SHIELD, NT-IO
 
 use regex::Regex;
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 
 /// 7 域 → 主属能力 (36 原子能力 Cycle 121)
 pub fn branch_capabilities() -> BTreeMap<&'static str, &'static [&'static str]> {
     let mut m = BTreeMap::new();
-    m.insert("NT-CORE", &["detect", "classify", "measure", "predict", "compare", "discover",
-                          "plan", "decompose", "critique", "explain"][..]);
-    m.insert("NT-MIND", &["generate", "transform", "integrate", "plan", "decompose"][..]);
-    m.insert("NT-MEMORY", &["state", "transition", "attribute", "ground", "simulate",
-                            "persist", "recall"][..]);
-    m.insert("NT-WORLD", &["retrieve", "search", "observe", "receive"][..]);
+    m.insert(
+        "NT-CORE",
+        &[
+            "detect",
+            "classify",
+            "measure",
+            "predict",
+            "compare",
+            "discover",
+            "plan",
+            "decompose",
+            "critique",
+            "explain",
+        ][..],
+    );
+    m.insert(
+        "NT-MIND",
+        &["generate", "transform", "integrate", "plan", "decompose"][..],
+    );
+    m.insert(
+        "NT-MEMORY",
+        &[
+            "state",
+            "transition",
+            "attribute",
+            "ground",
+            "simulate",
+            "persist",
+            "recall",
+        ][..],
+    );
+    m.insert(
+        "NT-WORLD",
+        &["retrieve", "search", "observe", "receive"][..],
+    );
     m.insert("NT-ACT", &["execute", "mutate", "send"][..]);
-    m.insert("NT-SHIELD", &["verify", "checkpoint", "rollback", "constrain", "audit"][..]);
-    m.insert("NT-IO", &["delegate", "synchronize", "invoke", "inquire"][..]);
+    m.insert(
+        "NT-SHIELD",
+        &["verify", "checkpoint", "rollback", "constrain", "audit"][..],
+    );
+    m.insert(
+        "NT-IO",
+        &["delegate", "synchronize", "invoke", "inquire"][..],
+    );
     m
 }
 
 /// 5 道之本源 (Cycle 161i): 每节点溯源到一个本源 + 演化路径。
-pub fn source_cores() -> &'static [(&'static str, &'static str, &'static [&'static str], &'static str)] {
+pub fn source_cores() -> &'static [(
+    &'static str,
+    &'static str,
+    &'static [&'static str],
+    &'static str,
+)] {
     use std::sync::OnceLock;
     static CORES: OnceLock<Vec<(&str, &str, &[&str], &str)>> = OnceLock::new();
     CORES.get_or_init(|| {
         vec![
-            ("E8", "NT-CORE", &["symmetr", "mathemat", "algebra", "geometry", "theorem", "axiom",
-                                "formal", "topolog", "calculus", "equation", "fractal", "invariant",
-                                "funct", "statistical mechan", "proof", "quantum", "thermodynam",
-                                "entrop", "relativit", "hamiltonian", "particle", "differential",
-                                "topolog", "set theor", "number theor", "homolog", "manifold",
-                                "tensor", "optimiz", "algorith", "complexity theor"][..],
-                "一切形式/结构/规律之源"),
-            ("VSA", "NT-MEMORY", &["memor", "semant", "represent", "vector", "embed", "symbol",
-                                   "meaning", "concept", "knowledge base", "encod", "hypercub",
-                                   "recall", "retrieve", "latent", "holographic", "state space",
-                                   "distributed represent", "kb", "embedding", "knowledge graph",
-                                   "hyperdimension", "ontolog", "semantic memory", "associative memor",
-                                   "content-addressable", "episodic memor", "working memor",
-                                   "dual-coding", "vector symbolic", "holographic represent"][..],
-                "一切概念/记忆/表示之源"),
-            ("GWT", "NT-CORE", &["conscious", "consciousness", "percept", "aware", "cognition",
-                                 "cognitiv", "global workspace", "integrat inform", "mind", "sentient",
-                                 "binding", "focus", "thalamus", "metacognit", "introspect",
-                                 "self-aware", "neurosci", "mental", "emotion", "brain",
-                                 "neural activ", "cognitive architecture", "phenomenolog", "qualia",
-                                 "self model", "cognitive model", "working memor", "cognitive science",
-                                 "subjective experienc", "sense of self", "perception",
-                                 "attention mechanism", "gwt", "workspace theor",
-                                 "conscious experienc"][..],
-                "一切意识/感知/认知之源"),
-            ("ConsciousnessTree", "NT-MIND", &["absorb", "distill", "crystalliz", "evolve",
-                                               "self-improv", "learn", "adapt", "internaliz",
-                                               "feedback", "growth", "self-heal", "recursion",
-                                               "reflect", "experience", "pattern recognit",
-                                               "intuition", "pruning", "meta-learn", "self-organiz",
-                                               "self-evolv", "autonom", "curriculum"][..],
-                "一切元认知/吸收/演化之源"),
-            ("Reality", "NT-WORLD", &["world", "world model", "agent", "act", "action", "interact",
-                                      "environ", "sensor", "control", "tool", "execute", "robot",
-                                      "simulat", "perceiv", "explore", "harvest", "crawl", "embodied",
-                                      "real world", "physical", "device", "hardware", "deploy",
-                                      "operate", "drone"][..],
-                "一切世界/感知/行动之源"),
+            (
+                "E8",
+                "NT-CORE",
+                &[
+                    "symmetr",
+                    "mathemat",
+                    "algebra",
+                    "geometry",
+                    "theorem",
+                    "axiom",
+                    "formal",
+                    "topolog",
+                    "calculus",
+                    "equation",
+                    "fractal",
+                    "invariant",
+                    "funct",
+                    "statistical mechan",
+                    "proof",
+                    "quantum",
+                    "thermodynam",
+                    "entrop",
+                    "relativit",
+                    "hamiltonian",
+                    "particle",
+                    "differential",
+                    "topolog",
+                    "set theor",
+                    "number theor",
+                    "homolog",
+                    "manifold",
+                    "tensor",
+                    "optimiz",
+                    "algorith",
+                    "complexity theor",
+                ][..],
+                "一切形式/结构/规律之源",
+            ),
+            (
+                "VSA",
+                "NT-MEMORY",
+                &[
+                    "memor",
+                    "semant",
+                    "represent",
+                    "vector",
+                    "embed",
+                    "symbol",
+                    "meaning",
+                    "concept",
+                    "knowledge base",
+                    "encod",
+                    "hypercub",
+                    "recall",
+                    "retrieve",
+                    "latent",
+                    "holographic",
+                    "state space",
+                    "distributed represent",
+                    "kb",
+                    "embedding",
+                    "knowledge graph",
+                    "hyperdimension",
+                    "ontolog",
+                    "semantic memory",
+                    "associative memor",
+                    "content-addressable",
+                    "episodic memor",
+                    "working memor",
+                    "dual-coding",
+                    "vector symbolic",
+                    "holographic represent",
+                ][..],
+                "一切概念/记忆/表示之源",
+            ),
+            (
+                "GWT",
+                "NT-CORE",
+                &[
+                    "conscious",
+                    "consciousness",
+                    "percept",
+                    "aware",
+                    "cognition",
+                    "cognitiv",
+                    "global workspace",
+                    "integrat inform",
+                    "mind",
+                    "sentient",
+                    "binding",
+                    "focus",
+                    "thalamus",
+                    "metacognit",
+                    "introspect",
+                    "self-aware",
+                    "neurosci",
+                    "mental",
+                    "emotion",
+                    "brain",
+                    "neural activ",
+                    "cognitive architecture",
+                    "phenomenolog",
+                    "qualia",
+                    "self model",
+                    "cognitive model",
+                    "working memor",
+                    "cognitive science",
+                    "subjective experienc",
+                    "sense of self",
+                    "perception",
+                    "attention mechanism",
+                    "gwt",
+                    "workspace theor",
+                    "conscious experienc",
+                ][..],
+                "一切意识/感知/认知之源",
+            ),
+            (
+                "ConsciousnessTree",
+                "NT-MIND",
+                &[
+                    "absorb",
+                    "distill",
+                    "crystalliz",
+                    "evolve",
+                    "self-improv",
+                    "learn",
+                    "adapt",
+                    "internaliz",
+                    "feedback",
+                    "growth",
+                    "self-heal",
+                    "recursion",
+                    "reflect",
+                    "experience",
+                    "pattern recognit",
+                    "intuition",
+                    "pruning",
+                    "meta-learn",
+                    "self-organiz",
+                    "self-evolv",
+                    "autonom",
+                    "curriculum",
+                ][..],
+                "一切元认知/吸收/演化之源",
+            ),
+            (
+                "Reality",
+                "NT-WORLD",
+                &[
+                    "world",
+                    "world model",
+                    "agent",
+                    "act",
+                    "action",
+                    "interact",
+                    "environ",
+                    "sensor",
+                    "control",
+                    "tool",
+                    "execute",
+                    "robot",
+                    "simulat",
+                    "perceiv",
+                    "explore",
+                    "harvest",
+                    "crawl",
+                    "embodied",
+                    "real world",
+                    "physical",
+                    "device",
+                    "hardware",
+                    "deploy",
+                    "operate",
+                    "drone",
+                ][..],
+                "一切世界/感知/行动之源",
+            ),
         ]
     })
 }
@@ -92,25 +272,124 @@ fn fallback_hints() -> &'static [(&'static [&'static str], &'static str)] {
     static HINTS: OnceLock<Vec<(&[&str], &str)>> = OnceLock::new();
     HINTS.get_or_init(|| {
         vec![
-            (&["math", "phys", "theor", "scien", "logic", "philosoph", "quantum", "chem", "astron",
-               "relativ", "biolog", "geolog", "crystal", "equat", "axiom", "proof", "formal"][..], "E8"),
-            (&["memor", "semantic", "represent", "concept", "knowledge", "intellig", "language",
-               "symbol", "embed", "vector", "database", "graph", "word", "text"][..], "VSA"),
-            (&["conscious", "mind", "brain", "cogni", "percept", "psych", "emotion", "aware", "neuro",
-               "attention", "mental", "dream"][..], "GWT"),
-            (&["learn", "evolv", "adapt", "growth", "self", "reflect", "experienc", "feedback",
-               "develop", "train", "improv"][..], "ConsciousnessTree"),
-            (&["world", "action", "agent", "society", "polit", "econom", "hist", "culture", "art",
-               "war", "power", "soci", "commun", "technolog", "engineer", "industr", "market", "law",
-               "govern", "earth", "space", "human", "life"][..], "Reality"),
+            (
+                &[
+                    "math",
+                    "phys",
+                    "theor",
+                    "scien",
+                    "logic",
+                    "philosoph",
+                    "quantum",
+                    "chem",
+                    "astron",
+                    "relativ",
+                    "biolog",
+                    "geolog",
+                    "crystal",
+                    "equat",
+                    "axiom",
+                    "proof",
+                    "formal",
+                ][..],
+                "E8",
+            ),
+            (
+                &[
+                    "memor",
+                    "semantic",
+                    "represent",
+                    "concept",
+                    "knowledge",
+                    "intellig",
+                    "language",
+                    "symbol",
+                    "embed",
+                    "vector",
+                    "database",
+                    "graph",
+                    "word",
+                    "text",
+                ][..],
+                "VSA",
+            ),
+            (
+                &[
+                    "conscious",
+                    "mind",
+                    "brain",
+                    "cogni",
+                    "percept",
+                    "psych",
+                    "emotion",
+                    "aware",
+                    "neuro",
+                    "attention",
+                    "mental",
+                    "dream",
+                ][..],
+                "GWT",
+            ),
+            (
+                &[
+                    "learn",
+                    "evolv",
+                    "adapt",
+                    "growth",
+                    "self",
+                    "reflect",
+                    "experienc",
+                    "feedback",
+                    "develop",
+                    "train",
+                    "improv",
+                ][..],
+                "ConsciousnessTree",
+            ),
+            (
+                &[
+                    "world",
+                    "action",
+                    "agent",
+                    "society",
+                    "polit",
+                    "econom",
+                    "hist",
+                    "culture",
+                    "art",
+                    "war",
+                    "power",
+                    "soci",
+                    "commun",
+                    "technolog",
+                    "engineer",
+                    "industr",
+                    "market",
+                    "law",
+                    "govern",
+                    "earth",
+                    "space",
+                    "human",
+                    "life",
+                ][..],
+                "Reality",
+            ),
         ]
     })
 }
 
 /// 本源溯源: 返回 (source_core, primary_domain, trace_keywords) 或 None。
 /// 互斥判定: 取最高关键词命中数; 相同取列表序靠前者 (确定性)。
-pub fn map_source_core(title: &str, content: &str, node_type: &str) -> Option<(&'static str, &'static str, Vec<&'static str>)> {
-    let blob = format!("{} {}", title, &content.chars().take(2000).collect::<String>());
+pub fn map_source_core(
+    title: &str,
+    content: &str,
+    node_type: &str,
+) -> Option<(&'static str, &'static str, Vec<&'static str>)> {
+    let blob = format!(
+        "{} {}",
+        title,
+        &content.chars().take(2000).collect::<String>()
+    );
 
     // paper 载体默认溯源 E8, 除非内容强命中其它本源
     let (prior_core, prior_margin): (Option<&str>, f64) = match node_type {
@@ -143,7 +422,12 @@ pub fn map_source_core(title: &str, content: &str, node_type: &str) -> Option<(&
             best = Some((name, domain));
             let mut sorted = hits.clone();
             sorted.sort_by(|a, b| b.1.cmp(&a.1));
-            best_kws = sorted.iter().filter(|(_, h)| *h > 0).map(|(k, _)| *k).take(3).collect();
+            best_kws = sorted
+                .iter()
+                .filter(|(_, h)| *h > 0)
+                .map(|(k, _)| *k)
+                .take(3)
+                .collect();
         }
     }
 
@@ -407,15 +691,29 @@ fn keyword_rules() -> &'static Vec<(Regex, &'static str, &'static str)> {
 /// `'Karpathy AutoResearch'` 或 `'GitHub - owner/repo: desc'` → owner/repo
 fn normalize_repo_title(title: &str) -> String {
     let t = title.strip_prefix("GitHub - ").unwrap_or(title);
-    t.split(':').next().map(|s| s.trim()).unwrap_or(t.trim()).to_string()
+    t.split(':')
+        .next()
+        .map(|s| s.trim())
+        .unwrap_or(t.trim())
+        .to_string()
 }
 
 /// 映射单节点 → (branch, capability, evidence)。
-pub fn map_node(node_type: &str, title: &str, content: &str, url: &str) -> Option<(&'static str, &'static str, String)> {
+pub fn map_node(
+    node_type: &str,
+    title: &str,
+    content: &str,
+    url: &str,
+) -> Option<(&'static str, &'static str, String)> {
     // 1. KNOWN_REPOS 确定性映射 (URL 判真优先, 任意 node_type)
     if !url.is_empty() && url.contains("github.com") {
         let url_low = url.to_ascii_lowercase();
-        let last = url_low.trim_end_matches('/').rsplit('/').next().unwrap_or("").to_string();
+        let last = url_low
+            .trim_end_matches('/')
+            .rsplit('/')
+            .next()
+            .unwrap_or("")
+            .to_string();
         // Pass 1: 完整 owner/repo key
         for (k, br, cap) in known_repos() {
             let kl = k.to_ascii_lowercase();
@@ -444,7 +742,11 @@ pub fn map_node(node_type: &str, title: &str, content: &str, url: &str) -> Optio
 
     // 2. 关键词规则
     let title_lower = title.to_ascii_lowercase();
-    let blob = format!("{} {}", title, &content.chars().take(1200).collect::<String>());
+    let blob = format!(
+        "{} {}",
+        title,
+        &content.chars().take(1200).collect::<String>()
+    );
     let mut best: Option<(&'static str, &'static str)> = None;
     let mut best_hits = 0usize;
 
@@ -558,12 +860,16 @@ impl MappingReport {
 }
 
 /// 读取 batch_% 节点并映射, 返回映射表 (不写库)。
-pub fn map_batch_nodes(conn: &Connection) -> rusqlite::Result<(Vec<(String, CapabilityMapping)>, MappingReport)> {
+pub fn map_batch_nodes(
+    conn: &Connection,
+) -> rusqlite::Result<(Vec<(String, CapabilityMapping)>, MappingReport)> {
     map_nodes(conn, Some("batch_"), None, None)
 }
 
 /// 读取全部节点并映射 (全库本源溯源, Rust 原生取代 scripts/absorb_full_kb.py)。
-pub fn map_all_nodes(conn: &Connection) -> rusqlite::Result<(Vec<(String, CapabilityMapping)>, MappingReport)> {
+pub fn map_all_nodes(
+    conn: &Connection,
+) -> rusqlite::Result<(Vec<(String, CapabilityMapping)>, MappingReport)> {
     map_nodes(conn, None, None, None)
 }
 
@@ -574,7 +880,9 @@ pub fn map_nodes(
     types: Option<&[String]>,
     limit: Option<usize>,
 ) -> rusqlite::Result<(Vec<(String, CapabilityMapping)>, MappingReport)> {
-    let pattern = prefix.map(|p| format!("{}%", p)).unwrap_or_else(|| "%".to_string());
+    let pattern = prefix
+        .map(|p| format!("{}%", p))
+        .unwrap_or_else(|| "%".to_string());
     let mut sql = String::from(
         "SELECT id, node_type, title, COALESCE(summary, content, ''), url, metadata FROM nodes WHERE id LIKE ?1",
     );
@@ -648,7 +956,11 @@ pub fn map_nodes(
             (c, d, vec![k])
         });
 
-        report.per_branch.entry(branch.to_string()).or_default().push(cap.to_string());
+        report
+            .per_branch
+            .entry(branch.to_string())
+            .or_default()
+            .push(cap.to_string());
         *report.per_cap.entry(cap.to_string()).or_insert(0) += 1;
         *report.per_source.entry(src.0.to_string()).or_insert(0) += 1;
 
@@ -672,7 +984,10 @@ pub fn map_nodes(
 }
 
 /// 写库: 合并 `absorbed_capability` + `knowledge_source` 进 metadata (read-modify-write)。
-pub fn apply_mappings(conn: &Connection, mappings: &[(String, CapabilityMapping)]) -> rusqlite::Result<usize> {
+pub fn apply_mappings(
+    conn: &Connection,
+    mappings: &[(String, CapabilityMapping)],
+) -> rusqlite::Result<usize> {
     use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_store;
     let now = unix_now();
     for (nid, m) in mappings {
@@ -711,8 +1026,12 @@ pub fn load_absorbed_capabilities(conn: &Connection) -> rusqlite::Result<Vec<(St
     let mut out: Vec<(String, String)> = Vec::new();
     for row in rows {
         let Some(mj) = row? else { continue };
-        let Ok(md) = serde_json::from_str::<Value>(&mj) else { continue };
-        let Some(ac) = md.get("absorbed_capability") else { continue };
+        let Ok(md) = serde_json::from_str::<Value>(&mj) else {
+            continue;
+        };
+        let Some(ac) = md.get("absorbed_capability") else {
+            continue;
+        };
         let (Some(branch), Some(cap)) = (
             ac.get("branch").and_then(Value::as_str),
             ac.get("capability").and_then(Value::as_str),
@@ -758,7 +1077,13 @@ mod tests {
 
     #[test]
     fn test_map_repository_known_repo() {
-        let (br, cap, ev) = map_node("repository", "GitHub - openai/codex: coding agent", "src", "").unwrap();
+        let (br, cap, ev) = map_node(
+            "repository",
+            "GitHub - openai/codex: coding agent",
+            "src",
+            "",
+        )
+        .unwrap();
         assert_eq!(br, "NT-ACT");
         assert_eq!(cap, "execute");
         assert!(ev.starts_with("known_repo:"));
@@ -766,14 +1091,21 @@ mod tests {
 
     #[test]
     fn test_map_paper_default() {
-        let (br, cap, _) = map_node("paper", "Attention Is All You Need", "neutral prose", "").unwrap();
+        let (br, cap, _) =
+            map_node("paper", "Attention Is All You Need", "neutral prose", "").unwrap();
         assert_eq!(br, "NT-CORE");
         assert_eq!(cap, "critique");
     }
 
     #[test]
     fn test_map_repository_fallback() {
-        let (br, cap, ev) = map_node("repository", "Some Random Repo No Keywords", "no content", "").unwrap();
+        let (br, cap, ev) = map_node(
+            "repository",
+            "Some Random Repo No Keywords",
+            "no content",
+            "",
+        )
+        .unwrap();
         assert_eq!(br, "NT-WORLD");
         assert_eq!(cap, "retrieve");
         assert_eq!(ev, "fallback:repo");
@@ -804,8 +1136,14 @@ mod tests {
 
     #[test]
     fn test_normalize_repo_title() {
-        assert_eq!(normalize_repo_title("GitHub - openai/codex: desc"), "openai/codex");
-        assert_eq!(normalize_repo_title("Karpathy AutoResearch"), "Karpathy AutoResearch");
+        assert_eq!(
+            normalize_repo_title("GitHub - openai/codex: desc"),
+            "openai/codex"
+        );
+        assert_eq!(
+            normalize_repo_title("Karpathy AutoResearch"),
+            "Karpathy AutoResearch"
+        );
     }
 
     #[test]
@@ -826,7 +1164,11 @@ mod tests {
 
         apply_mappings(&conn, &mapped).unwrap();
         let meta: Option<String> = conn
-            .query_row("SELECT metadata FROM nodes WHERE id LIKE 'batch_%'", [], |r| r.get(0))
+            .query_row(
+                "SELECT metadata FROM nodes WHERE id LIKE 'batch_%'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         let v: Value = serde_json::from_str(&meta.unwrap()).unwrap();
         assert_eq!(v["absorbed_capability"]["capability"], "execute");
@@ -882,7 +1224,8 @@ mod tests {
             "absorbed_capability": {"branch": "NT-ACT", "capability": "execute", "evidence": "known_repo:openai/codex", "mapped_at": now},
             "knowledge_source": {"source_core": "Reality", "primary_domain": "NT-ACT", "mapped_at": now},
         });
-        conn.execute("UPDATE nodes SET metadata = ?1", params![meta.to_string()]).unwrap();
+        conn.execute("UPDATE nodes SET metadata = ?1", params![meta.to_string()])
+            .unwrap();
 
         let pairs = load_absorbed_capabilities(&conn).unwrap();
         assert_eq!(pairs, vec![("NT-ACT".to_string(), "execute".to_string())]);

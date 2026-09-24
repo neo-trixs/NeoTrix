@@ -13,12 +13,12 @@
 //! - FTS JOIN 必须 `nodes_fts.rowid = nodes.rowid` (整数), 用 `n.id` (TEXT) 必错
 //! - nodes 表 `updated_at/tier/data_tier` NOT NULL 无默认 → 插入必须补全
 
-use super::nt_memory_types::*;
 use super::nt_memory_store;
+use super::nt_memory_types::*;
 use super::KnowledgeBase;
 
-use neotrix_types::knowledge_access::{NodeType, RelationType};
 use super::nt_memory_gwt_router::RetrievalChannel;
+use neotrix_types::knowledge_access::{NodeType, RelationType};
 
 use serde::{Deserialize, Serialize};
 
@@ -85,7 +85,10 @@ fn hub_id_for(domain: &str) -> String {
 /// 幂等创建域枢纽节点 (nodes 全字段, 含 FTS 双写)
 fn ensure_hub(conn: &rusqlite::Connection, domain: &str) -> Result<String, String> {
     let hid = hub_id_for(domain);
-    if nt_memory_store::get_node(conn, &hid).map_err(|e| e.to_string())?.is_some() {
+    if nt_memory_store::get_node(conn, &hid)
+        .map_err(|e| e.to_string())?
+        .is_some()
+    {
         return Ok(hid);
     }
     let ts = std::time::SystemTime::now()
@@ -115,10 +118,14 @@ fn ensure_hub(conn: &rusqlite::Connection, domain: &str) -> Result<String, Strin
         depth: 0,
         cluster_id: None,
     };
-    let tx = conn.unchecked_transaction().map_err(|e| format!("ensure_hub tx: {}", e))?;
+    let tx = conn
+        .unchecked_transaction()
+        .map_err(|e| format!("ensure_hub tx: {}", e))?;
     // insert_node_rows 内部已含 nodes + nodes_fts 双写 (last_insert_rowid), 勿重复写 FTS
-    nt_memory_store::insert_node_rows(&tx, &hub).map_err(|e| format!("ensure_hub insert_node_rows: {}", e))?;
-    tx.commit().map_err(|e| format!("ensure_hub commit: {}", e))?;
+    nt_memory_store::insert_node_rows(&tx, &hub)
+        .map_err(|e| format!("ensure_hub insert_node_rows: {}", e))?;
+    tx.commit()
+        .map_err(|e| format!("ensure_hub commit: {}", e))?;
     log::info!("[pipeline] hub 创建: {hid}");
     Ok(hid)
 }
@@ -127,7 +134,11 @@ fn ensure_hub(conn: &rusqlite::Connection, domain: &str) -> Result<String, Strin
 fn sync_fts(conn: &rusqlite::Connection, node: &KnowledgeNode) -> Result<(), String> {
     // nodes_fts.rowid == nodes 整数 rowid
     let rowid: i64 = conn
-        .query_row("SELECT rowid FROM nodes WHERE id=?1", rusqlite::params![node.id], |r| r.get(0))
+        .query_row(
+            "SELECT rowid FROM nodes WHERE id=?1",
+            rusqlite::params![node.id],
+            |r| r.get(0),
+        )
         .map_err(|e| format!("resolve rowid for {}: {}", node.id, e))?;
     conn.execute(
         "INSERT OR REPLACE INTO nodes_fts(rowid, title, summary, content, domain) VALUES(?1, ?2, ?3, ?4, ?5)",
@@ -175,7 +186,10 @@ fn extract_entities(query: &str) -> Vec<String> {
     }
     // 去重, 过滤纯数字/过短
     let mut seen = std::collections::HashSet::new();
-    tokens.into_iter().filter(|t| t.len() >= 2 && seen.insert(t.clone())).collect()
+    tokens
+        .into_iter()
+        .filter(|t| t.len() >= 2 && seen.insert(t.clone()))
+        .collect()
 }
 
 /// W1.4 摄取时概念编译 (单一分词口径, 写读两侧共用):
@@ -183,23 +197,29 @@ fn extract_entities(query: &str) -> Vec<String> {
 /// 语义对齐经验层 `_extract_concepts`。返回按首现序去重的 ≤24 个概念。
 pub fn compile_ingest_index(title: &str, summary: &str, content: &str) -> Vec<String> {
     const ASCII_STOPWORDS: &[&str] = &[
-        "this", "that", "with", "from", "have", "has", "had", "will", "would", "could",
-        "should", "into", "than", "then", "them", "they", "when", "what", "which", "while",
-        "about", "after", "also", "been", "before", "being", "were", "your", "their",
-        "there", "these", "those", "some", "such", "through", "under", "until", "very",
-        "where", "other", "more", "most", "only", "over", "same", "just", "like", "make",
-        "made", "many", "much", "need", "each", "both", "between", "because", "used",
-        "using", "uses", "onto", "upon", "here", "does", "doing", "done", "from",
+        "this", "that", "with", "from", "have", "has", "had", "will", "would", "could", "should",
+        "into", "than", "then", "them", "they", "when", "what", "which", "while", "about", "after",
+        "also", "been", "before", "being", "were", "your", "their", "there", "these", "those",
+        "some", "such", "through", "under", "until", "very", "where", "other", "more", "most",
+        "only", "over", "same", "just", "like", "make", "made", "many", "much", "need", "each",
+        "both", "between", "because", "used", "using", "uses", "onto", "upon", "here", "does",
+        "doing", "done", "from",
     ];
     const MAX_CONCEPTS: usize = 24;
     let mut out: Vec<String> = Vec::new();
     let mut seen = std::collections::HashSet::new();
     let text = format!("{}\n{}\n{}", title, summary, content);
-    for word in text.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || ('\u{4e00}'..='\u{9fff}').contains(&c))) {
+    for word in text.split(|c: char| {
+        !(c.is_ascii_alphanumeric() || c == '_' || ('\u{4e00}'..='\u{9fff}').contains(&c))
+    }) {
         if word.is_empty() {
             continue;
         }
-        let is_cjk = word.chars().next().map(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)).unwrap_or(false);
+        let is_cjk = word
+            .chars()
+            .next()
+            .map(|c| ('\u{4e00}'..='\u{9fff}').contains(&c))
+            .unwrap_or(false);
         if is_cjk {
             // CJK 连续段 ≥2 字, 截断超长段 (12 字) 防整段正文混入。
             // 段长 >6 时额外取前/后 6 字窗口 — 提升子串查询命中率
@@ -213,7 +233,10 @@ pub fn compile_ingest_index(title: &str, summary: &str, content: &str) -> Vec<St
                     out.push(full);
                 }
                 if n > 6 && m >= 6 {
-                    for window in [chars[..6].iter().collect::<String>(), chars[m - 6..].iter().collect::<String>()] {
+                    for window in [
+                        chars[..6].iter().collect::<String>(),
+                        chars[m - 6..].iter().collect::<String>(),
+                    ] {
                         if seen.insert(window.clone()) {
                             out.push(window);
                         }
@@ -222,7 +245,10 @@ pub fn compile_ingest_index(title: &str, summary: &str, content: &str) -> Vec<St
             }
         } else {
             let lower = word.to_lowercase();
-            if lower.len() >= 4 && !ASCII_STOPWORDS.contains(&lower.as_str()) && seen.insert(lower.clone()) {
+            if lower.len() >= 4
+                && !ASCII_STOPWORDS.contains(&lower.as_str())
+                && seen.insert(lower.clone())
+            {
                 out.push(lower);
             }
         }
@@ -248,12 +274,18 @@ impl KnowledgeBase {
         // fail-closed: 命中 Blocked 直接拒绝写入, 不产生可验证收据 (拒绝即无痕)。
         // 使用 trait 抽象 (消除了 L1→L3 直接依赖)。
         let verdict = {
-            let scanner_guard = self.absorb_scanner.read().map_err(|e| format!("KB lock: {}", e))?;
+            let scanner_guard = self
+                .absorb_scanner
+                .read()
+                .map_err(|e| format!("KB lock: {}", e))?;
             if let Some(ref scanner) = *scanner_guard {
                 scanner.scan(&entry.title, &entry.summary, &entry.content)
             } else {
                 // 默认: 无扫描器时不阻断 (兼容未注入 L3 实现的场景)
-                crate::l0_substrate::nt_core_traits::AbsorbVerdict { blocked: false, reasons: Vec::new() }
+                crate::l0_substrate::nt_core_traits::AbsorbVerdict {
+                    blocked: false,
+                    reasons: Vec::new(),
+                }
             }
         };
         if verdict.is_blocked() {
@@ -331,7 +363,10 @@ impl KnowledgeBase {
             //    正文为 input, 摘要为 output 签发票 (事后可回放校验不可篡改)。
             // 使用 trait 抽象 (消除了 L1→L3 直接依赖)。
             let receipt_sig = {
-                let emitter_guard = self.receipt_emitter.read().map_err(|e| format!("KB lock: {}", e))?;
+                let emitter_guard = self
+                    .receipt_emitter
+                    .read()
+                    .map_err(|e| format!("KB lock: {}", e))?;
                 if let Some(ref emitter) = *emitter_guard {
                     Some(emitter.emit_receipt(
                         &node.id,
@@ -353,7 +388,11 @@ impl KnowledgeBase {
             hub_id_res = Some(hid.clone());
             // 直接走已持锁的 conn, 避免 self.upsert_edge 重入锁死 (Mutex 非重入)
             let linked = nt_memory_store::upsert_edge(
-                &conn, &node_id, &hid, RelationType::BelongsTo, 1.0,
+                &conn,
+                &node_id,
+                &hid,
+                RelationType::BelongsTo,
+                1.0,
                 Some(&format!("{} → {}", entry.title, domain)),
             );
             if linked.is_ok() {
@@ -385,7 +424,16 @@ impl KnowledgeBase {
             }
             let w = spec.weight.unwrap_or(1.0);
             let desc = Some(format!("{} {}", entry.title, spec.relation));
-            if nt_memory_store::upsert_edge(&conn, &node_id, &target_id, relation, w, desc.as_deref()).is_ok() {
+            if nt_memory_store::upsert_edge(
+                &conn,
+                &node_id,
+                &target_id,
+                relation,
+                w,
+                desc.as_deref(),
+            )
+            .is_ok()
+            {
                 edges_added += 1;
             }
         }
@@ -436,8 +484,17 @@ impl KnowledgeBase {
                     .is_some()
                 {
                     // 使用加权最短路径替代 BFS
-                    let cache = self.graph_cache.read().map_err(|e| format!("Cache lock: {}", e))?;
-                    if let Some((node_ids, edges, cost)) = super::nt_memory_graph_cache::weighted_shortest_path(&cache, &top.node.id, &hid) {
+                    let cache = self
+                        .graph_cache
+                        .read()
+                        .map_err(|e| format!("Cache lock: {}", e))?;
+                    if let Some((node_ids, edges, cost)) =
+                        super::nt_memory_graph_cache::weighted_shortest_path(
+                            &cache,
+                            &top.node.id,
+                            &hid,
+                        )
+                    {
                         if node_ids.len() > 1 {
                             // 转换为 GraphPath 格式
                             let mut nodes = Vec::new();
@@ -477,7 +534,9 @@ impl KnowledgeBase {
             let matched = conn
                 .prepare("SELECT id FROM nodes WHERE title LIKE ?1 ESCAPE '\\' LIMIT 5")
                 .map_err(|e| format!("graph_entity_search prepare: {}", e))?
-                .query_map(rusqlite::params![format!("%{}%", token)], |r| r.get::<_, String>(0))
+                .query_map(rusqlite::params![format!("%{}%", token)], |r| {
+                    r.get::<_, String>(0)
+                })
                 .map_err(|e| format!("graph_entity_search query: {}", e))?
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|e| format!("graph_entity_search collect: {}", e))?;
@@ -512,8 +571,14 @@ mod tests {
     fn temp_kb() -> (KnowledgeBase, std::path::PathBuf) {
         let dir = std::env::temp_dir().join(format!("nt_kb_pipe_{}", std::process::id()));
         std::fs::create_dir_all(&dir).ok();
-        let db_path = dir.join(format!("test_pipe_{}.db", std::thread::current().name().unwrap_or("t")));
-        (KnowledgeBase::open(Some(db_path.clone())).expect("open kb"), db_path)
+        let db_path = dir.join(format!(
+            "test_pipe_{}.db",
+            std::thread::current().name().unwrap_or("t")
+        ));
+        (
+            KnowledgeBase::open(Some(db_path.clone())).expect("open kb"),
+            db_path,
+        )
     }
 
     #[test]
@@ -537,7 +602,11 @@ mod tests {
         // FTS 检索闭环验证
         let served = kb.serve_core("最短路径管道", 5).expect("serve");
         assert!(!served.results.is_empty(), "FTS 应检索到新节点");
-        assert!(served.channel == "fast" || served.channel == "vector", "channel={}", served.channel);
+        assert!(
+            served.channel == "fast" || served.channel == "vector",
+            "channel={}",
+            served.channel
+        );
     }
 
     #[test]
@@ -571,7 +640,11 @@ mod tests {
         assert_eq!(h1, "kb_domain_hub_nt-memory");
         // FTS 存在
         let n = conn
-            .query_row("SELECT COUNT(*) FROM nodes_fts WHERE title=?1", rusqlite::params![format!("KB-NT-MEMORY")], |r| r.get::<_, i64>(0))
+            .query_row(
+                "SELECT COUNT(*) FROM nodes_fts WHERE title=?1",
+                rusqlite::params![format!("KB-NT-MEMORY")],
+                |r| r.get::<_, i64>(0),
+            )
             .expect("count");
         assert_eq!(n, 1, "hub 应有 FTS 行");
     }
@@ -605,12 +678,17 @@ mod tests {
         kb.absorb_core(&a).expect("a");
         let rb = kb.absorb_core(&b).expect("b");
         let conn = kb.conn.lock().expect("lock");
-        let gid = nt_memory_store::find_node_by_title_and_type(&conn, "GWT", &NodeType::Concept, false)
-            .expect("find").expect("gwt").id;
+        let gid =
+            nt_memory_store::find_node_by_title_and_type(&conn, "GWT", &NodeType::Concept, false)
+                .expect("find")
+                .expect("gwt")
+                .id;
         drop(conn);
         let _ = kb.upsert_edge(&gid, &rb.node_id, RelationType::RelatedTo, 1.0, None);
         // 关系查询路由 Graph 通道
-        let served = kb.serve_core("E8 如何影响 GWT 注意力路由的关系", 5).expect("serve");
+        let served = kb
+            .serve_core("E8 如何影响 GWT 注意力路由的关系", 5)
+            .expect("serve");
         assert_eq!(served.channel, "graph", "channel={}", served.channel);
         assert!(!served.results.is_empty(), "graph 通道应检索到结果");
     }
@@ -631,8 +709,11 @@ mod tests {
         };
         kb.absorb_core(&base).expect("base");
         let conn = kb.conn.lock().expect("lock");
-        let base_id = nt_memory_store::find_node_by_title_and_type(&conn, "Base", &NodeType::Concept, false)
-            .expect("find").expect("id").id;
+        let base_id =
+            nt_memory_store::find_node_by_title_and_type(&conn, "Base", &NodeType::Concept, false)
+                .expect("find")
+                .expect("id")
+                .id;
         drop(conn);
         let entry = AbsorbEntry {
             title: "Related".into(),
@@ -670,14 +751,25 @@ mod ingest_index_tests {
         // ASCII 停用词被滤除, 词被小写化
         assert!(concepts.contains(&"compaction".to_string()), "{concepts:?}");
         assert!(concepts.contains(&"cliff".to_string()));
-        assert!(concepts.contains(&"agent".to_string()) || concepts.contains(&"memory".to_string()));
+        assert!(
+            concepts.contains(&"agent".to_string()) || concepts.contains(&"memory".to_string())
+        );
         assert!(!concepts.contains(&"the".to_string()), "停用词泄漏");
-        assert!(!concepts.iter().any(|c| {
-            c.chars().next().map(|ch: char| ('\u{4e00}'..='\u{9fff}').contains(&ch)).unwrap_or(false)
-                && c.chars().count() < 2
-        }), "短 CJK 段泄漏");
+        assert!(
+            !concepts.iter().any(|c| {
+                c.chars()
+                    .next()
+                    .map(|ch: char| ('\u{4e00}'..='\u{9fff}').contains(&ch))
+                    .unwrap_or(false)
+                    && c.chars().count() < 2
+            }),
+            "短 CJK 段泄漏"
+        );
         // CJK 连续段保留 (≥2 字)
-        assert!(concepts.contains(&"记忆压缩断崖".to_string()), "{concepts:?}");
+        assert!(
+            concepts.contains(&"记忆压缩断崖".to_string()),
+            "{concepts:?}"
+        );
         // 上限 24
         let flood = compile_ingest_index(
             &"word ".repeat(200),
@@ -690,7 +782,9 @@ mod ingest_index_tests {
     #[test]
     fn test_absorb_core_writes_ingest_index() {
         let db = std::env::temp_dir().join(format!(
-            "nt_w14_{}_{}.db", std::process::id(), std::thread::current().name().unwrap_or("t").len()
+            "nt_w14_{}_{}.db",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("t").len()
         ));
         let _ = std::fs::remove_file(&db);
         let kb = KnowledgeBase::open(Some(db.clone())).expect("kb");
@@ -700,7 +794,10 @@ mod ingest_index_tests {
             content: Some("Measures retention ratio collapse across compaction events.".into()),
             node_type: "article".into(),
             domain: Some("NT-MEMORY".into()),
-            url: Some(format!("https://example.test/compaction-{}", std::process::id())),
+            url: Some(format!(
+                "https://example.test/compaction-{}",
+                std::process::id()
+            )),
             language: Some("en".into()),
             importance: Some(0.6),
             relations: vec![],
@@ -725,13 +822,18 @@ mod ingest_index_tests {
             .filter_map(|c| c.as_str().map(String::from))
             .collect();
         assert!(concepts.contains(&"compaction".to_string()), "{concepts:?}");
-        assert!(concepts.contains(&"记忆压缩断崖".to_string()), "{concepts:?}");
+        assert!(
+            concepts.contains(&"记忆压缩断崖".to_string()),
+            "{concepts:?}"
+        );
     }
 
     #[test]
     fn test_search_fts_boosts_concept_matches() {
         let db = std::env::temp_dir().join(format!(
-            "nt_w14s_{}_{}.db", std::process::id(), std::thread::current().name().unwrap_or("t").len()
+            "nt_w14s_{}_{}.db",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("t").len()
         ));
         let _ = std::fs::remove_file(&db);
         let kb = KnowledgeBase::open(Some(db.clone())).expect("kb");
@@ -741,7 +843,10 @@ mod ingest_index_tests {
             content: Some("Deep dive into quantum correction codes and thresholds.".into()),
             node_type: "article".into(),
             domain: None,
-            url: Some(format!("https://example.test/quantum-{}", std::process::id())),
+            url: Some(format!(
+                "https://example.test/quantum-{}",
+                std::process::id()
+            )),
             language: Some("en".into()),
             importance: Some(0.5),
             relations: vec![],

@@ -18,8 +18,8 @@ use std::collections::{HashMap, HashSet};
 
 use rusqlite::Connection;
 
-use crate::l5_cognition::nt_core_context::revertible::{ClosureEffect, RevertibleContext};
 use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_unify::{kv_delete, kv_get, kv_set};
+use crate::l5_cognition::nt_core_context::revertible::{ClosureEffect, RevertibleContext};
 
 /// coeffect 依赖表的持久化 namespace。
 pub const COEFFECT_NS: &str = "coeffect_deps";
@@ -36,7 +36,11 @@ pub struct CoeffectBinding {
 }
 
 impl CoeffectBinding {
-    pub fn new(key: impl Into<String>, provider: impl Into<String>, value: impl Into<String>) -> Self {
+    pub fn new(
+        key: impl Into<String>,
+        provider: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Self {
         Self {
             key: key.into(),
             provider: provider.into(),
@@ -74,7 +78,6 @@ impl CoeffectRegistry {
     pub fn dom(&self) -> HashSet<&str> {
         self.dom.keys().map(String::as_str).collect()
     }
-
 }
 
 /// 通知分类 (Def 26): activating / deactivating / neutral。
@@ -146,7 +149,8 @@ impl<'a> CoeffectTx<'a> {
                 let provider = provider.clone();
                 let value = value.clone();
                 move |reg: &mut &mut CoeffectRegistry| {
-                    reg.dom.insert(key.clone(), (provider.clone(), value.clone()));
+                    reg.dom
+                        .insert(key.clone(), (provider.clone(), value.clone()));
                 }
             },
             {
@@ -239,7 +243,8 @@ pub fn load_bindings(conn: &Connection, reg: &mut CoeffectRegistry) -> Result<us
     for row in rows {
         let (key, serialized) = row.map_err(|e| format!("load_bindings row: {}", e))?;
         if let Some((provider, value)) = serialized.split_once('|') {
-            reg.dom.insert(key, (provider.to_string(), value.to_string()));
+            reg.dom
+                .insert(key, (provider.to_string(), value.to_string()));
             n += 1;
         }
     }
@@ -264,7 +269,9 @@ fn kv_get_all_keys(conn: &Connection) -> Result<Vec<String>, String> {
         .prepare("SELECT key FROM kv_store WHERE namespace=?1 ORDER BY key")
         .map_err(|e| format!("kv_get_all_keys prepare: {}", e))?;
     let rows = stmt
-        .query_map(rusqlite::params![COEFFECT_NS], |row| row.get::<_, String>(0))
+        .query_map(rusqlite::params![COEFFECT_NS], |row| {
+            row.get::<_, String>(0)
+        })
         .map_err(|e| format!("kv_get_all_keys query: {}", e))?;
     let mut keys = Vec::new();
     for row in rows {
@@ -274,7 +281,10 @@ fn kv_get_all_keys(conn: &Connection) -> Result<Vec<String>, String> {
 }
 
 /// 便捷读取: 从持久化读单个绑定 (不加载进内存表)。
-pub fn get_persisted_binding(conn: &Connection, key: &str) -> Result<Option<CoeffectBinding>, String> {
+pub fn get_persisted_binding(
+    conn: &Connection,
+    key: &str,
+) -> Result<Option<CoeffectBinding>, String> {
     match kv_get(conn, COEFFECT_NS, key)? {
         Some(serialized) => {
             if let Some((provider, value)) = serialized.split_once('|') {
@@ -296,7 +306,12 @@ mod tests {
         let mut reg = CoeffectRegistry::new();
         let bindings = {
             let mut tx = CoeffectTx::begin(&mut reg);
-            tx.set(CoeffectBinding::new("db", "knowledge", "{\"path\":\"kb.db\"}")).unwrap();
+            tx.set(CoeffectBinding::new(
+                "db",
+                "knowledge",
+                "{\"path\":\"kb.db\"}",
+            ))
+            .unwrap();
             tx.commit()
         };
         assert_eq!(bindings.len(), 1);
@@ -309,9 +324,11 @@ mod tests {
         let mut reg = CoeffectRegistry::new();
         let err = {
             let mut tx = CoeffectTx::begin(&mut reg);
-            tx.set(CoeffectBinding::new("db", "knowledge", "v1")).unwrap();
+            tx.set(CoeffectBinding::new("db", "knowledge", "v1"))
+                .unwrap();
             // 重复提供 → 前置条件违反 (Def 23: k∉dom), 整批 all-or-nothing 回滚
-            tx.set(CoeffectBinding::new("db", "other", "v2")).unwrap_err()
+            tx.set(CoeffectBinding::new("db", "other", "v2"))
+                .unwrap_err()
         };
         assert!(err.contains("already provided"));
         // all-or-nothing: 整批回滚, 第一条 db 也撤销
@@ -369,7 +386,11 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         let _ = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_schema::initialize(&conn);
         let _reg = CoeffectRegistry::new();
-        let bindings = vec![CoeffectBinding::new("db", "knowledge", "{\"path\":\"kb.db\"}")];
+        let bindings = vec![CoeffectBinding::new(
+            "db",
+            "knowledge",
+            "{\"path\":\"kb.db\"}",
+        )];
         assert_eq!(persist_bindings(&conn, &bindings).unwrap(), 1);
         let mut restored = CoeffectRegistry::new();
         assert_eq!(load_bindings(&conn, &mut restored).unwrap(), 1);

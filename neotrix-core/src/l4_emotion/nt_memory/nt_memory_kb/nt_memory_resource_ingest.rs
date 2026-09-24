@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::process::Command;
 
-use log::{warn, info};
+use log::{info, warn};
 use rusqlite::Connection;
 use serde_json;
 use uuid::Uuid;
@@ -36,9 +36,11 @@ impl ResourceSource {
         match self {
             ResourceSource::GitHub { .. } => Some("github.com".into()),
             ResourceSource::ArXiv { .. } => Some("arxiv.org".into()),
-            ResourceSource::Web { url } => {
-                url.split('/').nth(2).or(url.split('/').nth(0)).map(|d| d.to_string())
-            }
+            ResourceSource::Web { url } => url
+                .split('/')
+                .nth(2)
+                .or(url.split('/').nth(0))
+                .map(|d| d.to_string()),
             ResourceSource::Direct => None,
         }
     }
@@ -64,7 +66,10 @@ impl ResourceDescriptor {
             title: title.to_string(),
             summary: summary.to_string(),
             content: None,
-            source: ResourceSource::GitHub { owner: owner.to_string(), repo: repo.to_string() },
+            source: ResourceSource::GitHub {
+                owner: owner.to_string(),
+                repo: repo.to_string(),
+            },
             key_insights: Vec::new(),
             tags: Vec::new(),
             importance: 0.7,
@@ -78,7 +83,9 @@ impl ResourceDescriptor {
             title: title.to_string(),
             summary: summary.to_string(),
             content: None,
-            source: ResourceSource::ArXiv { id: arxiv_id.to_string() },
+            source: ResourceSource::ArXiv {
+                id: arxiv_id.to_string(),
+            },
             key_insights: Vec::new(),
             tags: Vec::new(),
             importance: 0.8,
@@ -92,7 +99,9 @@ impl ResourceDescriptor {
             title: title.to_string(),
             summary: summary.to_string(),
             content: None,
-            source: ResourceSource::Web { url: url.to_string() },
+            source: ResourceSource::Web {
+                url: url.to_string(),
+            },
             key_insights: Vec::new(),
             tags: Vec::new(),
             importance: 0.6,
@@ -191,7 +200,11 @@ struct IngestLogEntry {
 impl<'a> ResourceIngester<'a> {
     pub fn new(conn: &'a Connection) -> Self {
         let episode_id = Uuid::new_v4().to_string();
-        Self { conn, episode_id, ingest_log: Vec::new() }
+        Self {
+            conn,
+            episode_id,
+            ingest_log: Vec::new(),
+        }
     }
 
     pub fn ingest(&mut self, desc: &ResourceDescriptor) -> Result<ResourceIngestResult, String> {
@@ -254,7 +267,10 @@ impl<'a> ResourceIngester<'a> {
 
         for insight_text in &desc.key_insights {
             let insight_title = if insight_text.len() > 80 {
-                let cut = (0..=77).rev().find(|&i| insight_text.is_char_boundary(i)).unwrap_or(77);
+                let cut = (0..=77)
+                    .rev()
+                    .find(|&i| insight_text.is_char_boundary(i))
+                    .unwrap_or(77);
                 format!("{}...", &insight_text[..cut])
             } else {
                 insight_text.clone()
@@ -290,9 +306,15 @@ impl<'a> ResourceIngester<'a> {
             let iid = insight_node.id.clone();
             insert_node(self.conn, &insight_node)
                 .map_err(|e| format!("insert insight node failed: {}", e))?;
-            upsert_edge(self.conn, &node_id, &iid, RelationType::Supports, 0.7,
-                Some("Key insight derived from resource"))
-                .map_err(|e| format!("upsert insight edge failed: {}", e))?;
+            upsert_edge(
+                self.conn,
+                &node_id,
+                &iid,
+                RelationType::Supports,
+                0.7,
+                Some("Key insight derived from resource"),
+            )
+            .map_err(|e| format!("upsert insight edge failed: {}", e))?;
             insight_ids.push(iid);
         }
 
@@ -304,15 +326,32 @@ impl<'a> ResourceIngester<'a> {
             error: None,
         });
 
-        Ok(ResourceIngestResult { node_id, insight_ids })
+        Ok(ResourceIngestResult {
+            node_id,
+            insight_ids,
+        })
     }
 
-    pub fn relate(&self, from_id: &str, to_id: &str, rel: RelationType, weight: f64, desc: Option<&str>) -> Result<(), String> {
+    pub fn relate(
+        &self,
+        from_id: &str,
+        to_id: &str,
+        rel: RelationType,
+        weight: f64,
+        desc: Option<&str>,
+    ) -> Result<(), String> {
         upsert_edge(self.conn, from_id, to_id, rel, weight, desc)
             .map_err(|e| format!("relate failed: {}", e))
     }
 
-    pub fn relate_by_title(&self, from_title: &str, to_title: &str, rel: RelationType, weight: f64, desc: Option<&str>) -> Result<(), String> {
+    pub fn relate_by_title(
+        &self,
+        from_title: &str,
+        to_title: &str,
+        rel: RelationType,
+        weight: f64,
+        desc: Option<&str>,
+    ) -> Result<(), String> {
         let from = find_node_by_title(self.conn, from_title)
             .map_err(|e| format!("find from '{}' failed: {}", from_title, e))?
             .ok_or_else(|| format!("node not found by title: {}", from_title))?;
@@ -327,10 +366,20 @@ impl<'a> ResourceIngester<'a> {
         let mut lines = Vec::new();
         lines.push("=== Resource Ingestion Report ===".to_string());
         lines.push(format!("Episode ID: {}", self.episode_id));
-        lines.push(format!("Total resources ingested: {}", self.ingest_log.len()));
+        lines.push(format!(
+            "Total resources ingested: {}",
+            self.ingest_log.len()
+        ));
         for entry in &self.ingest_log {
-            let status = if entry.status == "success" { "✅" } else { "❌" };
-            lines.push(format!("  {} {} ({:?}) — {}", status, entry.title, entry.node_type, entry.node_id));
+            let status = if entry.status == "success" {
+                "✅"
+            } else {
+                "❌"
+            };
+            lines.push(format!(
+                "  {} {} ({:?}) — {}",
+                status, entry.title, entry.node_type, entry.node_id
+            ));
             if let Some(ref err) = entry.error {
                 lines.push(format!("    Error: {}", err));
             }
@@ -347,7 +396,7 @@ fn find_node_by_title(conn: &Connection, title: &str) -> rusqlite::Result<Option
     let mut stmt = conn.prepare(
         "SELECT id, node_type, title, summary, content, url, domain, language,
             confidence, importance, created_at, updated_at, access_count, metadata
-         FROM nodes WHERE title=?1 LIMIT 1"
+         FROM nodes WHERE title=?1 LIMIT 1",
     )?;
     let mut rows = stmt.query(rusqlite::params![title])?;
     match rows.next()? {
@@ -366,7 +415,9 @@ fn find_node_by_title(conn: &Connection, title: &str) -> rusqlite::Result<Option
             created_at: row.get(10)?,
             updated_at: row.get(11)?,
             access_count: row.get(12)?,
-            metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
+            metadata: row
+                .get::<_, Option<String>>(13)?
+                .and_then(|m| serde_json::from_str(&m).ok()),
             temporal: None,
             supersedes: None,
             source_episode: None,
@@ -508,9 +559,15 @@ fn local_corpus_source() -> Option<std::path::PathBuf> {
     let local = std::path::Path::new(&home)
         .join(".neotrix")
         .join("knowledge-archive-corpus-20260825.db");
-    if local.exists() { return Some(local); }
+    if local.exists() {
+        return Some(local);
+    }
     let ext = std::path::Path::new(CORTEX_ROOT).join("knowledge-archive-corpus-20260825.db");
-    if ext.exists() { Some(ext) } else { None }
+    if ext.exists() {
+        Some(ext)
+    } else {
+        None
+    }
 }
 
 /// Copy the local 68 GB corpus DB onto the external brain volume as cold storage.
@@ -525,10 +582,13 @@ pub fn migrate_cortex_corpus(
     root: &std::path::Path,
     dry_run: bool,
 ) -> Result<String, String> {
-    let src = local_corpus_source()
-        .ok_or_else(|| "本地未找到 68GB corpus (knowledge-archive-corpus-20260825.db)".to_string())?;
+    let src = local_corpus_source().ok_or_else(|| {
+        "本地未找到 68GB corpus (knowledge-archive-corpus-20260825.db)".to_string()
+    })?;
     let dest = root.join("knowledge-archive-corpus-20260825.db");
-    let size = std::fs::metadata(&src).map(|m| m.len()).map_err(|e| e.to_string())?;
+    let size = std::fs::metadata(&src)
+        .map(|m| m.len())
+        .map_err(|e| e.to_string())?;
     // idempotent: a complete copy already present
     if dest.exists() {
         let dsz = std::fs::metadata(&dest).map(|m| m.len()).unwrap_or(0);
@@ -570,7 +630,9 @@ pub fn migrate_cortex_corpus(
 fn copy_resumable(src: &std::path::Path, dest: &std::path::Path) -> Result<u64, String> {
     use std::io::{Read, Seek, SeekFrom, Write};
     const CHUNK: usize = 256 * 1024 * 1024; // 256 MiB
-    let size = std::fs::metadata(src).map(|m| m.len()).map_err(|e| e.to_string())?;
+    let size = std::fs::metadata(src)
+        .map(|m| m.len())
+        .map_err(|e| e.to_string())?;
     let prog = std::path::PathBuf::from(format!("{}.prog", dest.display()));
     let mut verified = read_progress(&prog).unwrap_or(0);
     // sanity: dest shorter than verified means a corrupt/truncated tail → restart from 0
@@ -587,8 +649,10 @@ fn copy_resumable(src: &std::path::Path, dest: &std::path::Path) -> Result<u64, 
         .create(true)
         .open(dest)
         .map_err(|e| e.to_string())?;
-    sf.seek(SeekFrom::Start(verified)).map_err(|e| e.to_string())?;
-    df.seek(SeekFrom::Start(verified)).map_err(|e| e.to_string())?;
+    sf.seek(SeekFrom::Start(verified))
+        .map_err(|e| e.to_string())?;
+    df.seek(SeekFrom::Start(verified))
+        .map_err(|e| e.to_string())?;
     let mut buf = vec![0u8; CHUNK];
     let mut check = vec![0u8; CHUNK];
     let mut offset = verified;
@@ -618,7 +682,9 @@ fn copy_resumable(src: &std::path::Path, dest: &std::path::Path) -> Result<u64, 
         );
     }
     let _ = std::fs::remove_file(&prog);
-    let dest_size = std::fs::metadata(dest).map(|m| m.len()).map_err(|e| e.to_string())?;
+    let dest_size = std::fs::metadata(dest)
+        .map(|m| m.len())
+        .map_err(|e| e.to_string())?;
     if dest_size != size {
         let _ = std::fs::remove_file(dest);
         return Err(format!(
@@ -740,7 +806,9 @@ pub fn prune_cortex_orphans(
     dry_run: bool,
 ) -> Result<(usize, usize), String> {
     if !root.exists() {
-        return Err("external brain not mounted — refuse to prune (would orphan everything)".into());
+        return Err(
+            "external brain not mounted — refuse to prune (would orphan everything)".into(),
+        );
     }
     let mut backed = disk_zim_uuids(root)?;
     if backed.is_empty() {
@@ -753,9 +821,9 @@ pub fn prune_cortex_orphans(
     // delete hundreds of thousands of valid article nodes.
     if let Some(corpus) = corpus_archive_path() {
         if let Ok(cdb) = Connection::open(&corpus) {
-            if let Ok(mut st) = cdb.prepare(
-                "SELECT DISTINCT substr(url,10,36) FROM nodes WHERE url LIKE 'zimid://%'",
-            ) {
+            if let Ok(mut st) = cdb
+                .prepare("SELECT DISTINCT substr(url,10,36) FROM nodes WHERE url LIKE 'zimid://%'")
+            {
                 let rows = st
                     .query_map([], |r| r.get::<_, String>(0))
                     .map_err(|e| e.to_string())?
@@ -783,7 +851,11 @@ pub fn prune_cortex_orphans(
         orphan_sources += 1;
         let like = format!("zimid://{src}/%");
         let n: i64 = conn
-            .query_row("SELECT COUNT(*) FROM nodes WHERE url LIKE ?1", [&like], |r| r.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM nodes WHERE url LIKE ?1",
+                [&like],
+                |r| r.get(0),
+            )
             .unwrap_or(0);
         orphan_nodes += n as usize;
         if !dry_run {
@@ -820,7 +892,11 @@ fn disk_zim_uuids(root: &std::path::Path) -> Result<HashSet<String>, String> {
         return Err(format!("libzim/uuid scan failed: {msg}"));
     }
     let stdout = String::from_utf8_lossy(&out.stdout);
-    Ok(stdout.lines().filter(|l| !l.is_empty()).map(|l| l.to_string()).collect())
+    Ok(stdout
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(|l| l.to_string())
+        .collect())
 }
 
 /// Scan one directory and upsert a `cortex_source://<sub>` registry node per populated
@@ -1076,18 +1152,74 @@ fn ingest_new_modules(ingester: &mut ResourceIngester) -> Result<Vec<String>, St
 }
 
 fn link_related_resources(ingester: &mut ResourceIngester) -> Result<(), String> {
-    link_pair(ingester, "stablyai/orca — Orca: Dual-System NextState Prediction", "Training-in-Imagination Module (nt_core_imagination.rs)", RelationType::InspiredBy, 0.8, "Orca dual-system inspired E8 conscious/unconscious split")?;
-    link_pair(ingester, "offchainthoughts/Amber — Self-Certifying Embedding Artifacts", "Amber Embedding Commitment (nt_memory_commitment.rs)", RelationType::InspiredBy, 0.9, "Amber commitment format directly implemented")?;
-    link_pair(ingester, "google/sec-gemini — Security Agents with Function-Calling", "Security MCP Tools (nt_shield_mcp_security.rs)", RelationType::InspiredBy, 0.8, "Sec-Gemini function-calling pattern for MCP security tools")?;
-    link_pair(ingester, "facebook/astryx — Graph Memory Architecture", "Graph Memory Layer (nt_gwt_graph_memory.rs)", RelationType::InspiredBy, 0.7, "Astryx graph memory patterns for GWT integration")?;
-    link_pair(ingester, "Training in Imagination — Optimal Sample Allocation for Model-Based RL", "Bug #1: GRPO Importance Ratio — Value Ratio vs Softmax Policy Ratio (CRITICAL)", RelationType::References, 0.6, "GRPO policy ratio theory from RL literature")?;
-    link_pair(ingester, "State of the Graph 2026 — Knowledge Graphs as Agent Memory", "Graph Memory Layer (nt_gwt_graph_memory.rs)", RelationType::InspiredBy, 0.8, "Knowledge graphs as core architecture for agent memory")?;
-    link_pair(ingester, "Fable 5 Prompt Library — Goal→Reason→Boundaries→Verification", "Bug #3: MODULE_COUNT Mismatch — 11 vs 14 Specialists (MAJOR)", RelationType::References, 0.5, "Boundary separation principle aligns with Fable 5 verification gate")?;
+    link_pair(
+        ingester,
+        "stablyai/orca — Orca: Dual-System NextState Prediction",
+        "Training-in-Imagination Module (nt_core_imagination.rs)",
+        RelationType::InspiredBy,
+        0.8,
+        "Orca dual-system inspired E8 conscious/unconscious split",
+    )?;
+    link_pair(
+        ingester,
+        "offchainthoughts/Amber — Self-Certifying Embedding Artifacts",
+        "Amber Embedding Commitment (nt_memory_commitment.rs)",
+        RelationType::InspiredBy,
+        0.9,
+        "Amber commitment format directly implemented",
+    )?;
+    link_pair(
+        ingester,
+        "google/sec-gemini — Security Agents with Function-Calling",
+        "Security MCP Tools (nt_shield_mcp_security.rs)",
+        RelationType::InspiredBy,
+        0.8,
+        "Sec-Gemini function-calling pattern for MCP security tools",
+    )?;
+    link_pair(
+        ingester,
+        "facebook/astryx — Graph Memory Architecture",
+        "Graph Memory Layer (nt_gwt_graph_memory.rs)",
+        RelationType::InspiredBy,
+        0.7,
+        "Astryx graph memory patterns for GWT integration",
+    )?;
+    link_pair(
+        ingester,
+        "Training in Imagination — Optimal Sample Allocation for Model-Based RL",
+        "Bug #1: GRPO Importance Ratio — Value Ratio vs Softmax Policy Ratio (CRITICAL)",
+        RelationType::References,
+        0.6,
+        "GRPO policy ratio theory from RL literature",
+    )?;
+    link_pair(
+        ingester,
+        "State of the Graph 2026 — Knowledge Graphs as Agent Memory",
+        "Graph Memory Layer (nt_gwt_graph_memory.rs)",
+        RelationType::InspiredBy,
+        0.8,
+        "Knowledge graphs as core architecture for agent memory",
+    )?;
+    link_pair(
+        ingester,
+        "Fable 5 Prompt Library — Goal→Reason→Boundaries→Verification",
+        "Bug #3: MODULE_COUNT Mismatch — 11 vs 14 Specialists (MAJOR)",
+        RelationType::References,
+        0.5,
+        "Boundary separation principle aligns with Fable 5 verification gate",
+    )?;
 
     Ok(())
 }
 
-fn link_pair(ingester: &mut ResourceIngester, from_title: &str, to_title: &str, rel: RelationType, weight: f64, desc: &str) -> Result<(), String> {
+fn link_pair(
+    ingester: &mut ResourceIngester,
+    from_title: &str,
+    to_title: &str,
+    rel: RelationType,
+    weight: f64,
+    desc: &str,
+) -> Result<(), String> {
     ingester.relate_by_title(from_title, to_title, rel, weight, Some(desc))
 }
 
@@ -1151,26 +1283,37 @@ fn ingest_arxiv_complete_metadata(ingester: &mut ResourceIngester) -> Result<Vec
                     let categories = row_data["categories"].as_str().unwrap_or("");
                     let date = row_data["date"].as_str().unwrap_or("");
 
-                    if title.is_empty() { continue; }
+                    if title.is_empty() {
+                        continue;
+                    }
 
                     let summary = if abstract_text.len() > 500 {
-                        format!("{}...", &abstract_text[..abstract_text.char_indices().nth(500).map(|(i, _)| i).unwrap_or(500)])
+                        format!(
+                            "{}...",
+                            &abstract_text[..abstract_text
+                                .char_indices()
+                                .nth(500)
+                                .map(|(i, _)| i)
+                                .unwrap_or(500)]
+                        )
                     } else {
                         abstract_text.to_string()
                     };
 
-                    let desc = ResourceDescriptor::paper(
-                        paper_id,
-                        title,
-                        &summary,
-                    ).with_content(&format!(
-                        "Authors: {}\nCategories: {}\nDate: {}\nAbstract: {}",
-                        authors, categories, date, abstract_text,
-                    )).with_tags(vec![
-                        "arxiv", "paper", "academic",
-                        categories.split_whitespace().next().unwrap_or("unknown"),
-                        &format!("absorbed-{}", now()),
-                    ]).with_importance(0.75).with_confidence(0.9);
+                    let desc = ResourceDescriptor::paper(paper_id, title, &summary)
+                        .with_content(&format!(
+                            "Authors: {}\nCategories: {}\nDate: {}\nAbstract: {}",
+                            authors, categories, date, abstract_text,
+                        ))
+                        .with_tags(vec![
+                            "arxiv",
+                            "paper",
+                            "academic",
+                            categories.split_whitespace().next().unwrap_or("unknown"),
+                            &format!("absorbed-{}", now()),
+                        ])
+                        .with_importance(0.75)
+                        .with_confidence(0.9);
 
                     if let Ok(result) = ingester.ingest(&desc) {
                         ids.push(result.node_id);
@@ -1203,24 +1346,38 @@ fn ingest_arxiv_complete_metadata(ingester: &mut ResourceIngester) -> Result<Vec
     for (cat, name, desc_text) in &arxiv_categories {
         let node_desc = ResourceDescriptor::concept(
             &format!("arXiv:{} — {}", cat, name),
-            &format!("Category summary for the full arXiv corpus (3.1M papers total). {}: {}.", name, desc_text),
-        ).with_key_insights(vec![
+            &format!(
+                "Category summary for the full arXiv corpus (3.1M papers total). {}: {}.",
+                name, desc_text
+            ),
+        )
+        .with_key_insights(vec![
             &format!("arXiv category {} covers: {}", cat, desc_text),
             "Part of the 3,148,796 paper arxiv-complete corpus on HuggingFace",
             "Full metadata available via secemp9/arxiv-complete dataset",
-        ]).with_tags(vec![
-            "arxiv", "category", "taxonomy", "academic",
+        ])
+        .with_tags(vec![
+            "arxiv",
+            "category",
+            "taxonomy",
+            "academic",
             cat,
             &format!("absorbed-{}", now()),
-        ]).with_importance(0.85).with_confidence(0.9);
+        ])
+        .with_importance(0.85)
+        .with_confidence(0.9);
 
         if let Ok(result) = ingester.ingest(&node_desc) {
             ids.push(result.node_id);
         }
     }
 
-    info!("[arxiv-complete] Absorbed {} nodes (dataset + {} sampled papers + {} category summaries)",
-          ids.len(), ids.len().saturating_sub(1 + arxiv_categories.len()), arxiv_categories.len());
+    info!(
+        "[arxiv-complete] Absorbed {} nodes (dataset + {} sampled papers + {} category summaries)",
+        ids.len(),
+        ids.len().saturating_sub(1 + arxiv_categories.len()),
+        arxiv_categories.len()
+    );
 
     Ok(ids)
 }
@@ -1280,24 +1437,35 @@ fn ingest_crystal_core_repos(ingester: &mut ResourceIngester) -> Result<Vec<Stri
     ids.push(r.node_id);
 
     // ── 3. ccodex-sleep-state — Codex connection quality tool (441★) ──
-    let r = ingester.ingest(&ResourceDescriptor::github(
-        "gylive", "ccodex-sleep-state",
-        "gylive/ccodex-sleep-state — Codex Connection Quality Tool",
-        "A tool to improve Codex degradation, rate limiting, and connection experience. \
+    let r = ingester.ingest(
+        &ResourceDescriptor::github(
+            "gylive",
+            "ccodex-sleep-state",
+            "gylive/ccodex-sleep-state — Codex Connection Quality Tool",
+            "A tool to improve Codex degradation, rate limiting, and connection experience. \
          Local one-click startup with web configuration. Supports Astra/Sol/Terra models, \
          subscriptions and proxies. Manages turn-state injection, proxy routing, and \
          model/account isolation. Written in Go with embedded web UI.",
-    ).with_key_insights(vec![
-        "Turn-state injection for Codex connection quality management",
-        "Model and account isolation: state per account, credential, and model",
-        "Proxy pool management with subscription import, HTTP/SOCKS5 support",
-        "Web panel for configuration: model selection, proxy routing, diagnostics",
-        "Strict mode vs fallback: controlled behavior when state unavailable",
-    ]).with_tags(vec![
-        "codex", "connection-quality", "proxy", "turn-state",
-        "agent-infrastructure", "go",
-        &format!("absorbed-{}", now()),
-    ]).with_importance(0.70).with_confidence(0.85))?;
+        )
+        .with_key_insights(vec![
+            "Turn-state injection for Codex connection quality management",
+            "Model and account isolation: state per account, credential, and model",
+            "Proxy pool management with subscription import, HTTP/SOCKS5 support",
+            "Web panel for configuration: model selection, proxy routing, diagnostics",
+            "Strict mode vs fallback: controlled behavior when state unavailable",
+        ])
+        .with_tags(vec![
+            "codex",
+            "connection-quality",
+            "proxy",
+            "turn-state",
+            "agent-infrastructure",
+            "go",
+            &format!("absorbed-{}", now()),
+        ])
+        .with_importance(0.70)
+        .with_confidence(0.85),
+    )?;
     ids.push(r.node_id);
 
     // ── 4. Laya — Non-autoregressive decision engine (2.5k★) ──
@@ -1323,23 +1491,35 @@ fn ingest_crystal_core_repos(ingester: &mut ResourceIngester) -> Result<Vec<Stri
     ids.push(r.node_id);
 
     // ── 5. Cutter — Reverse engineering platform (19.7k★) ──
-    let r = ingester.ingest(&ResourceDescriptor::github(
-        "rizinorg", "cutter",
-        "rizinorg/cutter — Cutter: Free Open Source RE Platform",
-        "Free and open-source reverse engineering platform powered by rizin. Advanced and \
+    let r = ingester.ingest(
+        &ResourceDescriptor::github(
+            "rizinorg",
+            "cutter",
+            "rizinorg/cutter — Cutter: Free Open Source RE Platform",
+            "Free and open-source reverse engineering platform powered by rizin. Advanced and \
          customizable RE platform with GUI. Supports Python and Native C++ plugins. \
          Integrates Ghidra decompiler, DynamoRIO code coverage visualization. \
          Cross-platform: Linux, macOS, Windows. 19.7k stars.",
-    ).with_key_insights(vec![
-        "Plugin architecture: Python and Native C++ plugins for extensibility",
-        "Rizin-powered backend with advanced binary analysis capabilities",
-        "Ghidra decompiler integration via rz-ghidra plugin",
-        "Cross-platform GUI for reverse engineering workflows",
-    ]).with_tags(vec![
-        "reverse-engineering", "binary-analysis", "rizin", "ghidra",
-        "security", "plugins", "gui",
-        &format!("absorbed-{}", now()),
-    ]).with_importance(0.75).with_confidence(0.9))?;
+        )
+        .with_key_insights(vec![
+            "Plugin architecture: Python and Native C++ plugins for extensibility",
+            "Rizin-powered backend with advanced binary analysis capabilities",
+            "Ghidra decompiler integration via rz-ghidra plugin",
+            "Cross-platform GUI for reverse engineering workflows",
+        ])
+        .with_tags(vec![
+            "reverse-engineering",
+            "binary-analysis",
+            "rizin",
+            "ghidra",
+            "security",
+            "plugins",
+            "gui",
+            &format!("absorbed-{}", now()),
+        ])
+        .with_importance(0.75)
+        .with_confidence(0.9),
+    )?;
     ids.push(r.node_id);
 
     // ── 6. maka-cu — macOS Computer Use execution layer (17★) ──
@@ -1389,19 +1569,22 @@ fn ingest_crystal_core_repos(ingester: &mut ResourceIngester) -> Result<Vec<Stri
     let _ = ingester.relate_by_title(
         "tinyhumansai/openhuman — OpenHuman: Personal AI Superintelligence",
         "incoai/splash — Splash: Local Inference Engine for Apple Silicon",
-        RelationType::Related, 0.7,
+        RelationType::Related,
+        0.7,
         Some("OpenHuman can use Splash as local inference backend"),
     );
     let _ = ingester.relate_by_title(
         "wuyoscar/jev-skill — Awesome Jev Skills: Decision-Making for Agents",
         "NandhaKishorM/laya — Laya: Non-Autoregressive Decision Engine",
-        RelationType::Related, 0.8,
+        RelationType::Related,
+        0.8,
         Some("Jev and Laya are competing/complementary typed decision engines"),
     );
     let _ = ingester.relate_by_title(
         "maka-agent/maka-cu — Maka Computer Use: Native macOS Execution Layer",
         "tinyhumansai/openhuman — OpenHuman: Personal AI Superintelligence",
-        RelationType::Related, 0.6,
+        RelationType::Related,
+        0.6,
         Some("Maka-CU provides computer use primitives applicable to agent harnesses"),
     );
 
@@ -1517,19 +1700,29 @@ fn ingest_personal_ai_ecosystem(ingester: &mut ResourceIngester) -> Result<Vec<S
     ids.push(r.node_id);
 
     // ── 7. Elephant Agent — Self-evolving AI (585★) ──
-    let r = ingester.ingest(&ResourceDescriptor::github(
-        "agentic-in", "elephant-agent",
-        "agentic-in/elephant-agent — Elephant: Personal-Model First Self-Evolving Agent",
-        "Personal-Model First Self-Evolving AI Agent. Agent with memory, model management, \
+    let r = ingester.ingest(
+        &ResourceDescriptor::github(
+            "agentic-in",
+            "elephant-agent",
+            "agentic-in/elephant-agent — Elephant: Personal-Model First Self-Evolving Agent",
+            "Personal-Model First Self-Evolving AI Agent. Agent with memory, model management, \
          context awareness, and self-evolution capabilities.",
-    ).with_key_insights(vec![
-        "Self-evolution: agent improves its own capabilities over time",
-        "Personal-model first: user's model drives agent behavior",
-        "Memory and context awareness for persistent agent state",
-    ]).with_tags(vec![
-        "personal-ai", "self-evolution", "agent-memory", "agentic",
-        &format!("absorbed-{}", now()),
-    ]).with_importance(0.70).with_confidence(0.85))?;
+        )
+        .with_key_insights(vec![
+            "Self-evolution: agent improves its own capabilities over time",
+            "Personal-model first: user's model drives agent behavior",
+            "Memory and context awareness for persistent agent state",
+        ])
+        .with_tags(vec![
+            "personal-ai",
+            "self-evolution",
+            "agent-memory",
+            "agentic",
+            &format!("absorbed-{}", now()),
+        ])
+        .with_importance(0.70)
+        .with_confidence(0.85),
+    )?;
     ids.push(r.node_id);
 
     // ── 8. Sentient OS — On-device proactive intelligence (518★) ──
@@ -1553,17 +1746,22 @@ fn ingest_personal_ai_ecosystem(ingester: &mut ResourceIngester) -> Result<Vec<S
     let _ = ingester.relate_by_title(
         "tinyhumansai/openhuman — OpenHuman: Personal AI Superintelligence",
         "MemTensor/memmy-agent — Memmy: Personal AI Memory Hub",
-        RelationType::Related, 0.8,
+        RelationType::Related,
+        0.8,
         Some("Both implement local-first persistent memory for personal AI"),
     );
     let _ = ingester.relate_by_title(
         "tinyhumansai/openhuman — OpenHuman: Personal AI Superintelligence",
         "danielmiessler/LifeOS — LifeOS: Universal AI Harness",
-        RelationType::Related, 0.7,
+        RelationType::Related,
+        0.7,
         Some("LifeOS and OpenHuman both aim to be comprehensive personal AI platforms"),
     );
 
-    info!("[personal-ai-ecosystem] Absorbed {} ecosystem nodes", ids.len());
+    info!(
+        "[personal-ai-ecosystem] Absorbed {} ecosystem nodes",
+        ids.len()
+    );
     Ok(ids)
 }
 
@@ -1580,14 +1778,19 @@ mod tests {
     #[test]
     fn test_reclaim_nt_target_tmp_dry_run_safe() {
         // dry_run 只计数不删除, 对任意 /private/tmp 状态均安全; 验证返回 Ok 且不报错。
-         assert!(reclaim_nt_target_tmp(9999, true).is_ok(), "reclaim dry-run");
+        assert!(reclaim_nt_target_tmp(9999, true).is_ok(), "reclaim dry-run");
     }
 
     #[test]
     fn test_ingest_github_resource() {
         let conn = test_conn();
         let mut ingester = ResourceIngester::new(&conn);
-        let desc = ResourceDescriptor::github("testowner", "testrepo", "Test Repo", "A test repository for testing.");
+        let desc = ResourceDescriptor::github(
+            "testowner",
+            "testrepo",
+            "Test Repo",
+            "A test repository for testing.",
+        );
         let result = ingester.ingest(&desc).unwrap();
         assert!(!result.node_id.is_empty());
         assert!(result.insight_ids.is_empty());
@@ -1631,7 +1834,8 @@ mod tests {
     fn test_ingest_article_resource() {
         let conn = test_conn();
         let mut ingester = ResourceIngester::new(&conn);
-        let desc = ResourceDescriptor::article("Test Article", "Summary", "https://example.com/article");
+        let desc =
+            ResourceDescriptor::article("Test Article", "Summary", "https://example.com/article");
         let result = ingester.ingest(&desc).unwrap();
         let fetched = get_node(&conn, &result.node_id).unwrap().unwrap();
         assert_eq!(fetched.node_type, NodeType::Article);
@@ -1653,8 +1857,14 @@ mod tests {
     fn test_ingest_tool_resource() {
         let conn = test_conn();
         let mut ingester = ResourceIngester::new(&conn);
-        let desc = ResourceDescriptor::tool("Test Tool", "A tool description.",
-            ResourceSource::GitHub { owner: "test".into(), repo: "tool".into() });
+        let desc = ResourceDescriptor::tool(
+            "Test Tool",
+            "A tool description.",
+            ResourceSource::GitHub {
+                owner: "test".into(),
+                repo: "tool".into(),
+            },
+        );
         let result = ingester.ingest(&desc).unwrap();
         let fetched = get_node(&conn, &result.node_id).unwrap().unwrap();
         assert_eq!(fetched.node_type, NodeType::Tool);
@@ -1687,10 +1897,22 @@ mod tests {
     fn test_ingest_multiple_and_relate() {
         let conn = test_conn();
         let mut ingester = ResourceIngester::new(&conn);
-        let r1 = ingester.ingest(&ResourceDescriptor::concept("Concept A", "First concept.")).unwrap();
-        let r2 = ingester.ingest(&ResourceDescriptor::concept("Concept B", "Second concept.")).unwrap();
+        let r1 = ingester
+            .ingest(&ResourceDescriptor::concept("Concept A", "First concept."))
+            .unwrap();
+        let r2 = ingester
+            .ingest(&ResourceDescriptor::concept("Concept B", "Second concept."))
+            .unwrap();
 
-        ingester.relate(&r1.node_id, &r2.node_id, RelationType::References, 0.8, Some("A references B")).unwrap();
+        ingester
+            .relate(
+                &r1.node_id,
+                &r2.node_id,
+                RelationType::References,
+                0.8,
+                Some("A references B"),
+            )
+            .unwrap();
 
         let edges = get_edges_for_node(&conn, &r1.node_id).unwrap();
         assert_eq!(edges.len(), 1);
@@ -1715,7 +1937,12 @@ mod tests {
     fn test_ingest_report_format() {
         let conn = test_conn();
         let mut ingester = ResourceIngester::new(&conn);
-        ingester.ingest(&ResourceDescriptor::concept("Report Test", "Testing report.")).unwrap();
+        ingester
+            .ingest(&ResourceDescriptor::concept(
+                "Report Test",
+                "Testing report.",
+            ))
+            .unwrap();
         let report = ingester.report();
         assert!(report.contains("Report Test"));
         assert!(report.contains("Episode ID"));
@@ -1760,9 +1987,21 @@ mod tests {
     fn test_relate_by_title() {
         let conn = test_conn();
         let mut ingester = ResourceIngester::new(&conn);
-        ingester.ingest(&ResourceDescriptor::concept("Source Node", "Source.")).unwrap();
-        ingester.ingest(&ResourceDescriptor::concept("Target Node", "Target.")).unwrap();
-        ingester.relate_by_title("Source Node", "Target Node", RelationType::DependsOn, 0.9, Some("depends")).unwrap();
+        ingester
+            .ingest(&ResourceDescriptor::concept("Source Node", "Source."))
+            .unwrap();
+        ingester
+            .ingest(&ResourceDescriptor::concept("Target Node", "Target."))
+            .unwrap();
+        ingester
+            .relate_by_title(
+                "Source Node",
+                "Target Node",
+                RelationType::DependsOn,
+                0.9,
+                Some("depends"),
+            )
+            .unwrap();
 
         let src = find_node_by_title(&conn, "Source Node").unwrap().unwrap();
         let edges = get_edges_for_node(&conn, &src.id).unwrap();
@@ -1827,7 +2066,9 @@ mod tests {
     fn test_ingest_project_nomad_data_sources() {
         let conn = test_conn();
         let mut ingester = ResourceIngester::new(&conn);
-        let src = std::path::Path::new("/Users/neo/.neotrix/downloads/project-nomad-main-src/project-nomad-main/collections");
+        let src = std::path::Path::new(
+            "/Users/neo/.neotrix/downloads/project-nomad-main-src/project-nomad-main/collections",
+        );
         let mut ingested = 0;
 
         // kiwix-categories.json
@@ -1838,9 +2079,17 @@ mod tests {
                         if let Some(resources) = cat["resources"].as_array() {
                             for res in resources {
                                 if let Some(url) = res["url"].as_str() {
-                                    let title = format!("Kiwix: {} - {}", cat["name"].as_str().unwrap_or(""), res["title"].as_str().unwrap_or(""));
+                                    let title = format!(
+                                        "Kiwix: {} - {}",
+                                        cat["name"].as_str().unwrap_or(""),
+                                        res["title"].as_str().unwrap_or("")
+                                    );
                                     let summary = res["description"].as_str().unwrap_or("");
-                                    let tags = vec!["kiwix".to_string(), "data-source".to_string(), cat["slug"].as_str().unwrap_or("").to_string()];
+                                    let tags = vec![
+                                        "kiwix".to_string(),
+                                        "data-source".to_string(),
+                                        cat["slug"].as_str().unwrap_or("").to_string(),
+                                    ];
                                     let desc = ResourceDescriptor::article(&title, summary, url)
                                         .with_tags(tags.iter().map(|s| s.as_str()).collect())
                                         .with_importance(0.7);
@@ -1863,9 +2112,18 @@ mod tests {
                         if let Some(resources) = coll["resources"].as_array() {
                             for res in resources {
                                 if let Some(url) = res["url"].as_str() {
-                                    let title = format!("Map: {} - {}", coll["name"].as_str().unwrap_or(""), res["title"].as_str().unwrap_or(""));
+                                    let title = format!(
+                                        "Map: {} - {}",
+                                        coll["name"].as_str().unwrap_or(""),
+                                        res["title"].as_str().unwrap_or("")
+                                    );
                                     let summary = res["description"].as_str().unwrap_or("");
-                                    let tags = vec!["maps".to_string(), "pmtiles".to_string(), "data-source".to_string(), coll["slug"].as_str().unwrap_or("").to_string()];
+                                    let tags = vec![
+                                        "maps".to_string(),
+                                        "pmtiles".to_string(),
+                                        "data-source".to_string(),
+                                        coll["slug"].as_str().unwrap_or("").to_string(),
+                                    ];
                                     let desc = ResourceDescriptor::article(&title, summary, url)
                                         .with_tags(tags.iter().map(|s| s.as_str()).collect())
                                         .with_importance(0.7);
@@ -1887,9 +2145,14 @@ mod tests {
                     for opt in opts {
                         if let Some(url) = opt["url"].as_str() {
                             if !url.is_empty() && url != "null" {
-                                let title = format!("Wikipedia: {}", opt["name"].as_str().unwrap_or(""));
+                                let title =
+                                    format!("Wikipedia: {}", opt["name"].as_str().unwrap_or(""));
                                 let summary = opt["description"].as_str().unwrap_or("");
-                                let tags = vec!["wikipedia".to_string(), "zim".to_string(), "data-source".to_string()];
+                                let tags = vec![
+                                    "wikipedia".to_string(),
+                                    "zim".to_string(),
+                                    "data-source".to_string(),
+                                ];
                                 let desc = ResourceDescriptor::article(&title, summary, url)
                                     .with_tags(tags.iter().map(|s| s.as_str()).collect())
                                     .with_importance(0.7);
@@ -1903,7 +2166,10 @@ mod tests {
             }
         }
 
-        assert!(ingested > 0, "at least one project-nomad data source should be ingested");
+        assert!(
+            ingested > 0,
+            "at least one project-nomad data source should be ingested"
+        );
         println!("project-nomad data sources ingested: {}", ingested);
     }
 
@@ -1923,7 +2189,10 @@ mod tests {
             )
             .unwrap();
         let n = register_cortex_brain(&conn, &dir).unwrap();
-        assert!(n >= 2, "should register zim dir + causal graph node, got {n}");
+        assert!(
+            n >= 2,
+            "should register zim dir + causal graph node, got {n}"
+        );
         let cnt: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM nodes WHERE node_type='cortex_brain'",

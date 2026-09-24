@@ -96,8 +96,8 @@ impl Bm25Index {
             doc_id: doc.id.clone(),
             field_length: field_len,
             term_freqs: tf,
-                    recall_weight: 1.0,
-                });
+            recall_weight: 1.0,
+        });
         self.n_docs += 1;
     }
 
@@ -106,7 +106,8 @@ impl Bm25Index {
             return;
         }
         let total_docs = self.n_docs + other.n_docs;
-        let avg_sum = self.avg_doc_len * self.n_docs as f64 + other.avg_doc_len * other.n_docs as f64;
+        let avg_sum =
+            self.avg_doc_len * self.n_docs as f64 + other.avg_doc_len * other.n_docs as f64;
         self.avg_doc_len = avg_sum / total_docs as f64;
         for (term, count) in other.df {
             *self.df.entry(term).or_insert(0) += count;

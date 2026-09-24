@@ -36,18 +36,44 @@ impl VectorIndex {
         if query.len() != self.dimension {
             return Vec::new();
         }
-        let mut scores: Vec<(usize, f64)> = self.entries.iter().enumerate().map(|(i, e)| {
-            let dot: f64 = query.iter().zip(e.vector.iter()).map(|(a, b)| *a as f64 * *b as f64).sum();
-            let norm_a: f64 = query.iter().map(|a| *a as f64 * *a as f64).sum::<f64>().sqrt();
-            let norm_b: f64 = e.vector.iter().map(|b| *b as f64 * *b as f64).sum::<f64>().sqrt();
-            let score = if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot / (norm_a * norm_b) };
-            (i, score)
-        }).collect();
+        let mut scores: Vec<(usize, f64)> = self
+            .entries
+            .iter()
+            .enumerate()
+            .map(|(i, e)| {
+                let dot: f64 = query
+                    .iter()
+                    .zip(e.vector.iter())
+                    .map(|(a, b)| *a as f64 * *b as f64)
+                    .sum();
+                let norm_a: f64 = query
+                    .iter()
+                    .map(|a| *a as f64 * *a as f64)
+                    .sum::<f64>()
+                    .sqrt();
+                let norm_b: f64 = e
+                    .vector
+                    .iter()
+                    .map(|b| *b as f64 * *b as f64)
+                    .sum::<f64>()
+                    .sqrt();
+                let score = if norm_a == 0.0 || norm_b == 0.0 {
+                    0.0
+                } else {
+                    dot / (norm_a * norm_b)
+                };
+                (i, score)
+            })
+            .collect();
         scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        scores.iter().take(top_k).map(|(i, score)| SearchResult {
-            id: self.entries[*i].id.clone(),
-            score: *score,
-        }).collect()
+        scores
+            .iter()
+            .take(top_k)
+            .map(|(i, score)| SearchResult {
+                id: self.entries[*i].id.clone(),
+                score: *score,
+            })
+            .collect()
     }
 
     pub fn len(&self) -> usize {

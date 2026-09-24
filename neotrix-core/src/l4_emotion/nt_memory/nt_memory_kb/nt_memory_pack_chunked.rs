@@ -30,11 +30,11 @@
 
 use std::collections::HashMap;
 
-use super::nt_memory_pack::{GeoPoint, MAGIC, VERSION};
 use super::nt_memory_pack::{
-    COL_COORD_LAT, COL_COORD_LNG, COL_NODE_ID, COL_STRING_DICT, FLAG_CHECKSUM, FLAG_CHUNKED,
-    FLAG_DELTA, FLAG_ZSTD, push_varint, pop_varint, pop_zigzag_varint, push_zigzag_varint,
+    pop_varint, pop_zigzag_varint, push_varint, push_zigzag_varint, COL_COORD_LAT, COL_COORD_LNG,
+    COL_NODE_ID, COL_STRING_DICT, FLAG_CHECKSUM, FLAG_CHUNKED, FLAG_DELTA, FLAG_ZSTD,
 };
+use super::nt_memory_pack::{GeoPoint, MAGIC, VERSION};
 
 /// v2 版本号
 pub const VERSION_CHUNKED: u8 = 2;
@@ -300,29 +300,43 @@ pub fn parse_chunked_header(bytes: &[u8]) -> Result<ChunkedMeta, String> {
         cols.push((t, prec));
     }
     // 字典
-    let dict_len = u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]) as usize;
+    let dict_len =
+        u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]) as usize;
     pos += 4;
     let mut dict = Vec::with_capacity(dict_len);
     for _ in 0..dict_len {
-        let slen = u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]) as usize;
+        let slen = u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]])
+            as usize;
         pos += 4;
         let s = String::from_utf8_lossy(&bytes[pos..pos + slen]).to_string();
         pos += slen;
         dict.push(s);
     }
     // node_id LCP 前缀 (明文)
-    let plen = u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]) as usize;
+    let plen =
+        u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]) as usize;
     pos += 4;
     let prefix = String::from_utf8_lossy(&bytes[pos..pos + plen]).to_string();
     pos += plen;
     // 块表
-    let nchunks = u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]) as usize;
+    let nchunks =
+        u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]) as usize;
     pos += 4;
     let mut tables = Vec::with_capacity(nchunks);
     for _ in 0..nchunks {
         let off = u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]);
-        let clen = u32::from_le_bytes([bytes[pos + 4], bytes[pos + 5], bytes[pos + 6], bytes[pos + 7]]);
-        let cnt = u32::from_le_bytes([bytes[pos + 8], bytes[pos + 9], bytes[pos + 10], bytes[pos + 11]]);
+        let clen = u32::from_le_bytes([
+            bytes[pos + 4],
+            bytes[pos + 5],
+            bytes[pos + 6],
+            bytes[pos + 7],
+        ]);
+        let cnt = u32::from_le_bytes([
+            bytes[pos + 8],
+            bytes[pos + 9],
+            bytes[pos + 10],
+            bytes[pos + 11],
+        ]);
         pos += 12;
         tables.push((off, clen, cnt));
     }
@@ -340,7 +354,11 @@ pub fn parse_chunked_header(bytes: &[u8]) -> Result<ChunkedMeta, String> {
 
 /// 解码单个块 (随机访问)。只解压+解析目标块, 不碰其他块。
 /// `meta` 由 [`parse_chunked_header`] 得; 单块错误不影响其他块 (已返回目标块结果)。
-pub fn decode_one_chunk(bytes: &[u8], meta: &ChunkedMeta, idx: usize) -> Result<Vec<GeoPoint>, String> {
+pub fn decode_one_chunk(
+    bytes: &[u8],
+    meta: &ChunkedMeta,
+    idx: usize,
+) -> Result<Vec<GeoPoint>, String> {
     if idx >= meta.nchunks {
         return Err(format!("chunk index {} out of range {}", idx, meta.nchunks));
     }
@@ -349,9 +367,13 @@ pub fn decode_one_chunk(bytes: &[u8], meta: &ChunkedMeta, idx: usize) -> Result<
     if pos + 4 > bytes.len() {
         return Err("chunk offset truncated".into());
     }
-    let stored_clen = u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]) as usize;
+    let stored_clen =
+        u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]) as usize;
     if stored_clen != clen as usize {
-        return Err(format!("chunk clen mismatch: table={} block={}", clen, stored_clen));
+        return Err(format!(
+            "chunk clen mismatch: table={} block={}",
+            clen, stored_clen
+        ));
     }
     let end = pos + 4 + clen as usize;
     if end > bytes.len() {
@@ -361,9 +383,11 @@ pub fn decode_one_chunk(bytes: &[u8], meta: &ChunkedMeta, idx: usize) -> Result<
 
     let data: Vec<u8> = {
         use std::io::Read as _;
-        let mut dec = zstd::stream::read::Decoder::new(comp).map_err(|e| format!("zstd chunk init: {}", e))?;
+        let mut dec = zstd::stream::read::Decoder::new(comp)
+            .map_err(|e| format!("zstd chunk init: {}", e))?;
         let mut buf = Vec::new();
-        dec.read_to_end(&mut buf).map_err(|e| format!("zstd chunk decompress: {}", e))?;
+        dec.read_to_end(&mut buf)
+            .map_err(|e| format!("zstd chunk decompress: {}", e))?;
         buf
     };
 
@@ -371,7 +395,11 @@ pub fn decode_one_chunk(bytes: &[u8], meta: &ChunkedMeta, idx: usize) -> Result<
 }
 
 /// 解析一块的列数据 → 记录 (全局字典/前缀/列描述由 meta 提供)。
-fn parse_block_records(data: &[u8], meta: &ChunkedMeta, count: usize) -> Result<Vec<GeoPoint>, String> {
+fn parse_block_records(
+    data: &[u8],
+    meta: &ChunkedMeta,
+    count: usize,
+) -> Result<Vec<GeoPoint>, String> {
     let mut precision = 5u8;
     let mut has_node_id = false;
     for (t, prec) in &meta.cols {
@@ -476,7 +504,7 @@ pub fn decode_chunk_range(
     for idx in 0..meta.nchunks {
         let (_, _, _cnt) = meta.tables[idx];
         let blk_lo = start.max(out.len()); // 全局累计已产出
-        // 简化: 逐块全量解码后截取 (块内无需二次索引; 收益在"只解命中块")
+                                           // 简化: 逐块全量解码后截取 (块内无需二次索引; 收益在"只解命中块")
         let pts = decode_one_chunk(bytes, meta, idx)?;
         let cur_base = 0usize; // 每块从头到整个块的全局位置计算在下方
         let _ = (blk_lo, cur_base);
@@ -494,7 +522,11 @@ pub fn decode_chunk_range(
 /// ⚠ 仍为 merge (O(n)), 与 A4 相同语义: 这是"追加正确性"基线。
 ///   真正 O(chunk) 的原地追加需"后置块表" (块表在文件末尾), 需 v3 格式, 标记 deferred
 ///   (见 docs/nt-pack-format.md A5 节)。v2 的价值 = 随机访问 + 每块独立解压。
-pub fn append_chunked(path: &str, new_points: &[GeoPoint], chunk_size: usize) -> Result<usize, String> {
+pub fn append_chunked(
+    path: &str,
+    new_points: &[GeoPoint],
+    chunk_size: usize,
+) -> Result<usize, String> {
     let data = std::fs::read(path).map_err(|e| format!("read {}: {}", path, e))?;
     let mut merged: HashMap<String, GeoPoint> = HashMap::new();
     let old_len = if data.is_empty() {
@@ -680,9 +712,11 @@ mod tests {
                 })
                 .collect();
             let bytes = encode_chunked(&pts, cs);
-            let meta = parse_chunked_header(&bytes).unwrap_or_else(|e| panic!("step {} parse: {}", step, e));
+            let meta = parse_chunked_header(&bytes)
+                .unwrap_or_else(|e| panic!("step {} parse: {}", step, e));
             assert_eq!(meta.nchunks, n.div_ceil(cs), "step {}: 块数", step);
-            let v2_out = decode_chunked(&bytes).unwrap_or_else(|e| panic!("step {} decode: {}", step, e));
+            let v2_out =
+                decode_chunked(&bytes).unwrap_or_else(|e| panic!("step {} decode: {}", step, e));
             assert_eq!(v2_out.len(), n, "step {}: 条数", step);
             for (a, b) in pts.iter().zip(v2_out.iter()) {
                 assert_eq!(a.node_id, b.node_id, "step {}: node_id", step);

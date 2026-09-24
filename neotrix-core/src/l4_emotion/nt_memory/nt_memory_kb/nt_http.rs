@@ -92,10 +92,23 @@ pub fn resolve_safe_origin(url: &str) -> Result<(SocketAddr, url::Url), String> 
         return Ok((SocketAddr::new(ip, port), parsed));
     }
 
-    // 域名: 解析全部,任一私有即拒绝,取首个安全地址
-    let addrs: Vec<SocketAddr> = std::net::ToSocketAddrs::to_socket_addrs(&(host.clone(), port))
-        .map_err(|e| format!("DNS resolve: {e}"))?
-        .collect();
+    // 域名: 解析全部,任一私有即拒绝,取首个安全地址。
+    // DNS 解析无内置超时 (ToSocketAddrs 阻塞可达数分钟/永久): 独立线程 +
+    // 10s join 超时。超时后线程游离 (结果丢弃), 调用方立即失败, 不拖死吞入管线。
+    // 背景: kb-crawl 曾在首个可抓 URL 处 0 CPU 卡死 6min+, 且持有 KB 独占锁
+    // 导致全库写入停摆 — 根因为此解析无超时。
+    let (tx, rx) = std::sync::mpsc::channel();
+    let host_port = (host.clone(), port);
+    std::thread::spawn(move || {
+        let r: Result<Vec<SocketAddr>, String> =
+            std::net::ToSocketAddrs::to_socket_addrs(&host_port)
+                .map(|it| it.collect())
+                .map_err(|e| format!("DNS resolve: {e}"));
+        let _ = tx.send(r);
+    });
+    let addrs: Vec<SocketAddr> = rx
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .map_err(|_| "DNS resolve timed out after 10s".to_string())??;
     if addrs.is_empty() {
         return Err("DNS resolve: empty".into());
     }
@@ -122,17 +135,16 @@ pub fn fetch_safe_http_with_headers(
     fetch_safe_http_inner(url, extra_headers)
 }
 
-
 /// 安全解析重定向链：最多 max_redirects 跳，每跳都经 resolve_safe_origin 校验。
 /// 防止开放重定向攻击 (open redirect) 并保持 SSRF 防护一致性。
 fn resolve_redirects_safely(url: &str, max_redirects: usize) -> Result<String, String> {
     let mut current_url = url.to_string();
     let mut redirects = 0;
-    
+
     loop {
         let (addr, parsed) = resolve_safe_origin(&current_url)?;
         let host = parsed.host_str().ok_or("no host")?.to_string();
-        
+
         let client = reqwest::blocking::Client::builder()
             .user_agent(USER_AGENT)
             .timeout(CONNECT_TIMEOUT)
@@ -141,12 +153,12 @@ fn resolve_redirects_safely(url: &str, max_redirects: usize) -> Result<String, S
             .resolve(&host, addr)
             .build()
             .map_err(|e| format!("redirect client: {e}"))?;
-        
+
         let resp = client
             .head(&current_url)
             .send()
             .map_err(|e| format!("redirect head: {e}"))?;
-        
+
         if resp.status().is_redirection() {
             if redirects >= max_redirects {
                 return Err(format!("too many redirects (> {})", max_redirects));
@@ -158,20 +170,23 @@ fn resolve_redirects_safely(url: &str, max_redirects: usize) -> Result<String, S
                 .to_str()
                 .map_err(|e| format!("invalid Location header: {e}"))?
                 .to_string();
-            
+
             // 解析重定向 URL（支持相对路径）
             let next_url = if let Ok(abs) = url::Url::parse(&location) {
                 abs.to_string()
             } else {
-                let base = url::Url::parse(&current_url).map_err(|e| format!("base URL parse: {e}"))?;
-                base.join(&location).map_err(|e| format!("redirect join: {e}"))?.to_string()
+                let base =
+                    url::Url::parse(&current_url).map_err(|e| format!("base URL parse: {e}"))?;
+                base.join(&location)
+                    .map_err(|e| format!("redirect join: {e}"))?
+                    .to_string()
             };
-            
+
             current_url = next_url;
             redirects += 1;
             continue;
         }
-        
+
         // 非重定向：返回当前 URL
         return Ok(current_url);
     }
@@ -197,7 +212,7 @@ fn fetch_safe_http_inner(
             .redirect(reqwest::redirect::Policy::none())
             .resolve(&host, addr);
 
-if !extra_headers.is_empty() {
+        if !extra_headers.is_empty() {
             let mut h = reqwest::header::HeaderMap::new();
             for (k, v) in extra_headers {
                 let header_name = k
@@ -211,17 +226,13 @@ if !extra_headers.is_empty() {
             builder = builder.default_headers(h);
         }
 
-        let pin_client = builder
-            .build()
-            .map_err(|e| format!("pin client: {e}"))?;
+        let pin_client = builder.build().map_err(|e| format!("pin client: {e}"))?;
 
         let mut req = pin_client.get(url);
         for (k, v) in extra_headers {
             req = req.header(*k, *v);
         }
-        let resp = req
-            .send()
-            .map_err(|e| format!("fetch: {e}"))?;
+        let resp = req.send().map_err(|e| format!("fetch: {e}"))?;
         if !resp.status().is_success() {
             return Err(format!("HTTP {}", resp.status()));
         }
@@ -242,8 +253,11 @@ pub fn fetch_safe_http_with_retry(url: &str) -> Result<(String, String), String>
                 Ok(ok) => return Ok(ok),
                 Err(e) if e.starts_with("HTTP 429") || e.starts_with("HTTP 503") => {
                     std::thread::sleep(wait);
-                    wait = std::time::Duration::from_secs(wait.as_secs() * 2).min(std::time::Duration::from_secs(8));
-                    if attempt == 2 { return Err(e); }
+                    wait = std::time::Duration::from_secs(wait.as_secs() * 2)
+                        .min(std::time::Duration::from_secs(8));
+                    if attempt == 2 {
+                        return Err(e);
+                    }
                 }
                 Err(e) => return Err(e),
             }
@@ -415,8 +429,12 @@ fn pool_record_result(_host: Option<&str>, _success: bool) {}
 /// 判定错误是否属于可重试网络错误 (project-nomad: ECONNRESET/ENOTFOUND/ETIMEDOUT 语义)。
 /// 非网络错误 (SSRF guard 拒绝 / HTTP 状态码 / MIME 拒绝) 不重试 — 保证 guard 语义不被绕过。
 fn is_retriable_network_err(e: &str) -> bool {
-    e.contains("timed out") || e.contains("Connection reset") || e.contains("connect error")
-        || e.contains("peer closed") || e.contains("connection closed") || e.contains("refused")
+    e.contains("timed out")
+        || e.contains("Connection reset")
+        || e.contains("connect error")
+        || e.contains("peer closed")
+        || e.contains("connection closed")
+        || e.contains("refused")
 }
 
 fn download_to_file_inner(opts: &DownloadOptions<'_>) -> Result<DownloadResult, String> {
@@ -443,10 +461,10 @@ fn download_to_file_inner(opts: &DownloadOptions<'_>) -> Result<DownloadResult, 
     // HEAD 预检: 大小 / accept-ranges / MIME
     // 先安全解析重定向链（最多5跳），验证每跳都通过 SSRF guard
     let final_url = resolve_redirects_safely(opts.url, 5)?;
-    
+
     let (final_addr, final_parsed) = resolve_safe_origin(&final_url)?;
     let final_host = final_parsed.host_str().ok_or("no host")?.to_string();
-    
+
     let mut cbuilder = reqwest::blocking::Client::builder()
         .user_agent(ua)
         .timeout(opts.total_timeout.unwrap_or(DOWNLOAD_TOTAL_TIMEOUT))
@@ -463,9 +481,7 @@ fn download_to_file_inner(opts: &DownloadOptions<'_>) -> Result<DownloadResult, 
             }
         }
     }
-    let pin_client = cbuilder
-        .build()
-        .map_err(|e| format!("pin client: {e}"))?;
+    let pin_client = cbuilder.build().map_err(|e| format!("pin client: {e}"))?;
 
     let head = pin_client
         .head(&final_url)
@@ -517,8 +533,7 @@ fn download_to_file_inner(opts: &DownloadOptions<'_>) -> Result<DownloadResult, 
 
     // .tmp 已完整但未 rename → 直接 rename
     if start_byte == total_bytes && total_bytes > 0 {
-        std::fs::rename(&temp_path, opts.dest)
-            .map_err(|e| format!("rename complete tmp: {e}"))?;
+        std::fs::rename(&temp_path, opts.dest).map_err(|e| format!("rename complete tmp: {e}"))?;
         return Ok(DownloadResult {
             path: opts.dest.to_path_buf(),
             bytes_written: total_bytes,
@@ -550,7 +565,10 @@ fn download_to_file_inner(opts: &DownloadOptions<'_>) -> Result<DownloadResult, 
 
     // Range 头 (支持时)
     let mut headers = reqwest::header::HeaderMap::new();
-    headers.insert(reqwest::header::USER_AGENT, reqwest::header::HeaderValue::from_str(ua).map_err(|e| format!("UA: {e}"))?);
+    headers.insert(
+        reqwest::header::USER_AGENT,
+        reqwest::header::HeaderValue::from_str(ua).map_err(|e| format!("UA: {e}"))?,
+    );
     if supports_range && start_byte > 0 {
         let range = format!("bytes={}-", start_byte);
         headers.insert(
@@ -588,16 +606,13 @@ fn download_to_file_inner(opts: &DownloadOptions<'_>) -> Result<DownloadResult, 
             .open(&temp_path)
             .map_err(|e| format!("append open {}: {e}", temp_path.display()))?
     } else {
-        File::create(&temp_path)
-            .map_err(|e| format!("create {}: {e}", temp_path.display()))?
+        File::create(&temp_path).map_err(|e| format!("create {}: {e}", temp_path.display()))?
     };
 
     let mut buf = vec![0u8; DOWNLOAD_CHUNK_SIZE];
     let mut written: u64 = start_byte;
     loop {
-        let n = resp
-            .read(&mut buf)
-            .map_err(|e| format!("read: {e}"))?;
+        let n = resp.read(&mut buf).map_err(|e| format!("read: {e}"))?;
         if n == 0 {
             break;
         }
@@ -613,8 +628,7 @@ fn download_to_file_inner(opts: &DownloadOptions<'_>) -> Result<DownloadResult, 
     drop(out);
 
     // 原子 rename 完成
-    std::fs::rename(&temp_path, opts.dest)
-        .map_err(|e| format!("rename final: {e}"))?;
+    std::fs::rename(&temp_path, opts.dest).map_err(|e| format!("rename final: {e}"))?;
 
     Ok(DownloadResult {
         path: opts.dest.to_path_buf(),
@@ -655,8 +669,11 @@ fn is_private_ip_with(ip: std::net::IpAddr, allow_fake_ip: bool) -> bool {
             if is_fake_ip_ula && allow_fake_ip {
                 return false;
             }
-            v6.is_loopback() || v6.is_unspecified() || v6.is_unique_local()
-                || v6.is_unicast_link_local() || v6.is_multicast()
+            v6.is_loopback()
+                || v6.is_unspecified()
+                || v6.is_unique_local()
+                || v6.is_unicast_link_local()
+                || v6.is_multicast()
         }
     }
 }
@@ -697,7 +714,9 @@ mod tests {
         use std::net::IpAddr;
         // CGNAT 100.64.0.0/10 (RFC 6598) — std is_private() 不覆盖
         assert!(is_private_ip(IpAddr::V4("100.64.0.1".parse().unwrap())));
-        assert!(is_private_ip(IpAddr::V4("100.127.255.254".parse().unwrap())));
+        assert!(is_private_ip(IpAddr::V4(
+            "100.127.255.254".parse().unwrap()
+        )));
         // benchmarking 198.18.0.0/15 (RFC 2544)
         assert!(is_private_ip(IpAddr::V4("198.18.0.1".parse().unwrap())));
         assert!(is_private_ip(IpAddr::V4("198.19.255.254".parse().unwrap())));
@@ -719,16 +738,37 @@ mod tests {
     fn is_private_ip_fake_ip_env_override() {
         use std::net::IpAddr;
         // 默认 (allow_fake_ip=false): 198.18/15 拒绝 (RFC 2544)
-        assert!(is_private_ip_with(IpAddr::V4("198.18.0.1".parse().unwrap()), false));
+        assert!(is_private_ip_with(
+            IpAddr::V4("198.18.0.1".parse().unwrap()),
+            false
+        ));
         // allow_fake_ip=true: fake-ip 透明隧道放行
-        assert!(!is_private_ip_with(IpAddr::V4("198.18.0.5".parse().unwrap()), true));
+        assert!(!is_private_ip_with(
+            IpAddr::V4("198.18.0.5".parse().unwrap()),
+            true
+        ));
         // fake-ip 隧道 ULA (Clash 系 fdfe:dcba:9876::/48) — allow 时放行
-        assert!(is_private_ip_with("fdfe:dcba:9876::12".parse().unwrap(), false));
-        assert!(!is_private_ip_with("fdfe:dcba:9876::12".parse().unwrap(), true));
+        assert!(is_private_ip_with(
+            "fdfe:dcba:9876::12".parse().unwrap(),
+            false
+        ));
+        assert!(!is_private_ip_with(
+            "fdfe:dcba:9876::12".parse().unwrap(),
+            true
+        ));
         // 其他私有段不受 override 影响 (仍拒绝)
-        assert!(is_private_ip_with(IpAddr::V4("10.0.0.1".parse().unwrap()), true));
-        assert!(is_private_ip_with(IpAddr::V4("192.168.1.1".parse().unwrap()), true));
-        assert!(is_private_ip_with(IpAddr::V4("100.64.0.1".parse().unwrap()), true));
+        assert!(is_private_ip_with(
+            IpAddr::V4("10.0.0.1".parse().unwrap()),
+            true
+        ));
+        assert!(is_private_ip_with(
+            IpAddr::V4("192.168.1.1".parse().unwrap()),
+            true
+        ));
+        assert!(is_private_ip_with(
+            IpAddr::V4("100.64.0.1".parse().unwrap()),
+            true
+        ));
         // 非 fake-ip ULA (其他 fdfe 变体) 仍拒绝
         assert!(is_private_ip_with("fd00::1".parse().unwrap(), true));
     }
@@ -751,8 +791,10 @@ mod tests {
     fn retry_does_not_bypass_ssrf_guard() {
         // 非 429/503 错误 (含 guard 拒绝) 不得重试 — guard 语义必须保持
         let err = fetch_safe_http_with_retry("http://127.0.0.1:8080/").unwrap_err();
-        assert!(err.contains("private") || err.contains("reject") || err.contains("loopback"),
-            "guard error surfaced: {err}");
+        assert!(
+            err.contains("private") || err.contains("reject") || err.contains("loopback"),
+            "guard error surfaced: {err}"
+        );
     }
 
     #[test]
@@ -776,8 +818,12 @@ mod tests {
         assert!(is_retriable_network_err("connect error: refused"));
         assert!(is_retriable_network_err("peer closed connection"));
         // 非网络错误 (guard / HTTP 状态 / MIME) → 不重试 (R-P42 guard 语义)
-        assert!(!is_retriable_network_err("private/reserved resolved IP rejected"));
-        assert!(!is_retriable_network_err("MIME type text/html is not allowed"));
+        assert!(!is_retriable_network_err(
+            "private/reserved resolved IP rejected"
+        ));
+        assert!(!is_retriable_network_err(
+            "MIME type text/html is not allowed"
+        ));
         assert!(!is_retriable_network_err("GET HTTP 404"));
         assert!(!is_retriable_network_err("HEAD HTTP 403"));
     }
@@ -792,9 +838,9 @@ mod tests {
             allowed_mime_types: &[],
             max_bytes: 0,
             total_timeout: None,
-                    proxy: None,
-                    proxy_pool: false,
-                    host: None,
+            proxy: None,
+            proxy_pool: false,
+            host: None,
         };
         let err = download_to_file_with_retry(&opts, 3).unwrap_err();
         assert!(
@@ -813,9 +859,9 @@ mod tests {
             allowed_mime_types: &[],
             max_bytes: 0,
             total_timeout: None,
-                    proxy: None,
-                    proxy_pool: false,
-                    host: None,
+            proxy: None,
+            proxy_pool: false,
+            host: None,
         };
         let err = download_to_file(&opts).unwrap_err();
         assert!(err.contains("credentials"), "userinfo rejected: {err}");
@@ -832,9 +878,9 @@ mod tests {
             allowed_mime_types: &[],
             max_bytes: 0,
             total_timeout: None,
-                    proxy: None,
-                    proxy_pool: true,
-                    host: Some("codeload.github.com"),
+            proxy: None,
+            proxy_pool: true,
+            host: Some("codeload.github.com"),
         };
         let err = download_to_file_with_retry(&opts, 3).unwrap_err();
         assert!(

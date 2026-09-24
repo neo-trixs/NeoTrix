@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 
-use crate::l2_perception::nt_core_hcube::vsa::{VsaBackend, VSAEngine};
+use crate::l2_perception::nt_core_hcube::vsa::{VSAEngine, VsaBackend};
 
 /// VSA 联想扩召器
 pub struct VsaAssociativeExpander {
@@ -120,7 +120,11 @@ impl VsaAssociativeExpander {
         (0..self.dim)
             .map(|i| {
                 let r = splitmix64(seed.wrapping_add(i as u64));
-                if (r & 1) == 1 { 1.0 } else { -1.0 }
+                if (r & 1) == 1 {
+                    1.0
+                } else {
+                    -1.0
+                }
             })
             .collect()
     }
@@ -152,9 +156,19 @@ mod tests {
         let mut e = VsaAssociativeExpander::new(1024);
         e.insert_terms(
             [
-                "retrieval", "retrieve", "search", "query", "index",
-                "generation", "generate", "llm", "prompt",
-                "graph", "knowledge", "entity", "relation",
+                "retrieval",
+                "retrieve",
+                "search",
+                "query",
+                "index",
+                "generation",
+                "generate",
+                "llm",
+                "prompt",
+                "graph",
+                "knowledge",
+                "entity",
+                "relation",
             ]
             .iter()
             .map(|s| s.to_string()),
@@ -193,7 +207,8 @@ mod tests {
         let top = related[0].0.as_str();
         assert!(
             top == "retrieval" || top == "retrieve" || top == "search",
-            "top 关联词应语义相关, 实际: {}", top
+            "top 关联词应语义相关, 实际: {}",
+            top
         );
     }
 
@@ -202,7 +217,11 @@ mod tests {
         let e = expander();
         let expanded = e.expand_query("retrieval", 2);
         assert!(expanded.contains("retrieval"), "扩召查询应保留原词");
-        assert!(expanded.len() > "retrieval".len(), "应追加关联词: {}", expanded);
+        assert!(
+            expanded.len() > "retrieval".len(),
+            "应追加关联词: {}",
+            expanded
+        );
     }
 
     #[test]

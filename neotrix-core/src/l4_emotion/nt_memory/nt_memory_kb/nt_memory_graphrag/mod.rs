@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use neotrix_types::knowledge_access::{KnowledgeNode, KnowledgeEdge, NodeType, RelationType};
 use super::nt_memory_community::{CommunityAwareSearch, CommunityDetector};
+use neotrix_types::knowledge_access::{KnowledgeEdge, KnowledgeNode, NodeType, RelationType};
 
 static ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
@@ -86,10 +86,18 @@ impl From<EntityNode> for KnowledgeNode {
 
 impl From<KnowledgeNode> for EntityNode {
     fn from(k: KnowledgeNode) -> Self {
-        let source_node_id = k.source_episode
-            .or_else(|| k.metadata.as_ref().and_then(|m| m.get("source_node_id").and_then(|v| v.as_str().map(String::from))))
+        let source_node_id = k
+            .source_episode
+            .or_else(|| {
+                k.metadata.as_ref().and_then(|m| {
+                    m.get("source_node_id")
+                        .and_then(|v| v.as_str().map(String::from))
+                })
+            })
             .unwrap_or_default();
-        let properties = k.metadata.as_ref()
+        let properties = k
+            .metadata
+            .as_ref()
             .and_then(|m| m.get("properties"))
             .and_then(|v| serde_json::from_value(v.clone()).ok())
             .unwrap_or_default();
@@ -126,7 +134,9 @@ impl From<RelationEdge> for KnowledgeEdge {
 
 impl From<KnowledgeEdge> for RelationEdge {
     fn from(k: KnowledgeEdge) -> Self {
-        let confidence = k.metadata.as_ref()
+        let confidence = k
+            .metadata
+            .as_ref()
             .and_then(|m| m.get("confidence"))
             .and_then(|v| v.as_f64())
             .unwrap_or(1.0);
@@ -172,22 +182,28 @@ impl EntityGraph {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum GraphQueryMode {
-    Local { max_depth: usize, max_neighbors: usize },
-    Global { community_level: usize },
-    Hybrid { local_depth: usize, global_level: usize },
+    Local {
+        max_depth: usize,
+        max_neighbors: usize,
+    },
+    Global {
+        community_level: usize,
+    },
+    Hybrid {
+        local_depth: usize,
+        global_level: usize,
+    },
     Auto,
 }
 
 // ─── Config ──────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum ExtractionMode {
     #[default]
     Heuristic,
     Llm,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphRagConfig {
@@ -504,7 +520,9 @@ impl GraphRagStore {
                 let mut queue: VecDeque<(String, usize)> = VecDeque::new();
 
                 for seed_id in seed_entity_ids {
-                    if self.graph.entities.contains_key(seed_id) && visited_entities.insert(seed_id.clone()) {
+                    if self.graph.entities.contains_key(seed_id)
+                        && visited_entities.insert(seed_id.clone())
+                    {
                         if let Some(entity) = self.graph.entities.get(seed_id) {
                             collected_entities.push(entity.clone());
                         }
@@ -535,14 +553,19 @@ impl GraphRagStore {
                             wb.partial_cmp(&wa).unwrap_or(std::cmp::Ordering::Equal)
                         });
 
-                        for (_rel_type, target_id, edge_id) in neighbors.iter().take(max_neighbors) {
+                        for (_rel_type, target_id, edge_id) in neighbors.iter().take(max_neighbors)
+                        {
                             if visited_relations.insert(edge_id.to_string()) {
-                                if let Some(relation) = self.graph.relations.get(&edge_id.to_string()) {
+                                if let Some(relation) =
+                                    self.graph.relations.get(&edge_id.to_string())
+                                {
                                     collected_relations.push(relation.clone());
                                 }
                             }
                             if visited_entities.insert(target_id.to_string()) {
-                                if let Some(entity) = self.graph.entities.get(&target_id.to_string()) {
+                                if let Some(entity) =
+                                    self.graph.entities.get(&target_id.to_string())
+                                {
                                     collected_entities.push(entity.clone());
                                 }
                                 queue.push_back((target_id.to_string(), depth + 1));
@@ -605,7 +628,10 @@ impl GraphRagStore {
             GraphQueryMode::Auto => {
                 // Auto-detect: if seed entity IDs are provided, use local; otherwise global
                 if seed_entity_ids.is_empty() {
-                    let subgraph = self.query(seed_entity_ids, GraphQueryMode::Global { community_level: 0 })?;
+                    let subgraph = self.query(
+                        seed_entity_ids,
+                        GraphQueryMode::Global { community_level: 0 },
+                    )?;
                     return Ok(SubgraphResult {
                         entities: subgraph.entities,
                         relations: subgraph.relations,
@@ -615,7 +641,10 @@ impl GraphRagStore {
                 }
                 let subgraph = self.query(
                     seed_entity_ids,
-                    GraphQueryMode::Local { max_depth: 2, max_neighbors: 10 },
+                    GraphQueryMode::Local {
+                        max_depth: 2,
+                        max_neighbors: 10,
+                    },
                 )?;
                 Ok(SubgraphResult {
                     entities: subgraph.entities,
@@ -648,12 +677,20 @@ impl GraphRagStore {
                 let mut merged_entities: Vec<EntityNode> = Vec::new();
                 let mut merged_relations: Vec<RelationEdge> = Vec::new();
 
-                for e in local.entities.into_iter().chain(global.entities.into_iter()) {
+                for e in local
+                    .entities
+                    .into_iter()
+                    .chain(global.entities.into_iter())
+                {
                     if seen_entities.insert(e.id.clone()) {
                         merged_entities.push(e);
                     }
                 }
-                for r in local.relations.into_iter().chain(global.relations.into_iter()) {
+                for r in local
+                    .relations
+                    .into_iter()
+                    .chain(global.relations.into_iter())
+                {
                     if seen_relations.insert(r.id.clone()) {
                         merged_relations.push(r);
                     }
@@ -766,10 +803,16 @@ impl GraphRagStore {
         // 1) 悬空关系: 关系引用的实体不在图中
         for rel in self.graph.relations.values() {
             if !self.graph.entities.contains_key(&rel.source_entity) {
-                findings.push(format!("dangling relation {}: source '{}' missing", rel.id, rel.source_entity));
+                findings.push(format!(
+                    "dangling relation {}: source '{}' missing",
+                    rel.id, rel.source_entity
+                ));
             }
             if !self.graph.entities.contains_key(&rel.target_entity) {
-                findings.push(format!("dangling relation {}: target '{}' missing", rel.id, rel.target_entity));
+                findings.push(format!(
+                    "dangling relation {}: target '{}' missing",
+                    rel.id, rel.target_entity
+                ));
             }
         }
         // 2) 孤立实体: 无任何关系
@@ -785,11 +828,19 @@ impl GraphRagStore {
             }
         }
         // 3) 重复关系: 同源同目标同类型
-        let mut seen: std::collections::HashSet<(String, String, String)> = std::collections::HashSet::new();
+        let mut seen: std::collections::HashSet<(String, String, String)> =
+            std::collections::HashSet::new();
         for rel in self.graph.relations.values() {
-            let key = (rel.source_entity.clone(), rel.target_entity.clone(), rel.relation_type.clone());
+            let key = (
+                rel.source_entity.clone(),
+                rel.target_entity.clone(),
+                rel.relation_type.clone(),
+            );
             if !seen.insert(key) {
-                findings.push(format!("duplicate relation: {} -> {} ({})", rel.source_entity, rel.target_entity, rel.relation_type));
+                findings.push(format!(
+                    "duplicate relation: {} -> {} ({})",
+                    rel.source_entity, rel.target_entity, rel.relation_type
+                ));
             }
         }
         findings
@@ -897,7 +948,8 @@ impl GraphRagStore {
         avg_conf /= size as f64;
 
         // Sort members by centrality descending, take top 5
-        member_centralities.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        member_centralities
+            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let top_entities: Vec<String> = member_centralities
             .into_iter()
             .take(5)
@@ -920,9 +972,7 @@ impl GraphRagStore {
         let member_set: HashSet<&String> = members.iter().collect();
         let mut rel_types: HashMap<String, usize> = HashMap::new();
         for rel in self.graph.relations.values() {
-            if member_set.contains(&rel.source_entity)
-                && member_set.contains(&rel.target_entity)
-            {
+            if member_set.contains(&rel.source_entity) && member_set.contains(&rel.target_entity) {
                 *rel_types.entry(rel.relation_type.clone()).or_insert(0) += 1;
             }
         }
@@ -964,7 +1014,10 @@ impl GraphRagStore {
     }
 
     /// Internal: community summary with optional pre-computed searcher.
-    fn community_summary_with_opt(&self, searcher: Option<&CommunityAwareSearch>) -> Vec<Community> {
+    fn community_summary_with_opt(
+        &self,
+        searcher: Option<&CommunityAwareSearch>,
+    ) -> Vec<Community> {
         if self.graph.entities.is_empty() {
             return Vec::new();
         }
@@ -974,8 +1027,20 @@ impl GraphRagStore {
         let effective_searcher = match searcher {
             Some(s) => s,
             None => {
-                let kb_nodes: Vec<KnowledgeNode> = self.graph.entities.values().cloned().map(Into::into).collect();
-                let kb_edges: Vec<KnowledgeEdge> = self.graph.relations.values().cloned().map(Into::into).collect();
+                let kb_nodes: Vec<KnowledgeNode> = self
+                    .graph
+                    .entities
+                    .values()
+                    .cloned()
+                    .map(Into::into)
+                    .collect();
+                let kb_edges: Vec<KnowledgeEdge> = self
+                    .graph
+                    .relations
+                    .values()
+                    .cloned()
+                    .map(Into::into)
+                    .collect();
                 let detector = CommunityDetector::new(1.0, 20, 3);
                 let mut s = CommunityAwareSearch::new(detector);
                 s.detect(&kb_nodes, &kb_edges);
@@ -1011,7 +1076,11 @@ impl GraphRagStore {
                 let hierarchy = searcher.hierarchy();
                 let member_ids = hierarchy
                     .and_then(|h| {
-                        h.levels.first()?.iter().find(|c| c.id == cr.community_id).map(|c| c.members.clone())
+                        h.levels
+                            .first()?
+                            .iter()
+                            .find(|c| c.id == cr.community_id)
+                            .map(|c| c.members.clone())
                     })
                     .unwrap_or_default();
                 self.build_community_summary(cr.community_id.0 as usize, &member_ids, &centrality)
@@ -1071,11 +1140,7 @@ impl GraphRagStore {
 
     // ── BFS Subgraph ───────────────────────────────────────────────
 
-    pub fn get_subgraph(
-        &self,
-        entity_ids: &[String],
-        depth: usize,
-    ) -> SubgraphResult {
+    pub fn get_subgraph(&self, entity_ids: &[String], depth: usize) -> SubgraphResult {
         self.query(
             entity_ids,
             GraphQueryMode::Local {
@@ -1117,7 +1182,10 @@ impl GraphRagStore {
                     score += 0.5;
                 }
             }
-            let overlap: usize = name_words.iter().filter(|w| query_terms.contains(w)).count();
+            let overlap: usize = name_words
+                .iter()
+                .filter(|w| query_terms.contains(w))
+                .count();
             if overlap > 0 {
                 score += 0.3 * (overlap as f64 / name_words.len().max(1) as f64);
             }
@@ -1151,7 +1219,10 @@ impl GraphRagStore {
             let has_term_match = query_terms.iter().any(|qt| {
                 name_lower.contains(qt)
                     || type_lower.contains(qt)
-                    || entity.properties.values().any(|pv| pv.to_lowercase().contains(qt))
+                    || entity
+                        .properties
+                        .values()
+                        .any(|pv| pv.to_lowercase().contains(qt))
             });
             if score > 0.0 && has_term_match {
                 scored_entities.push((eid.clone(), score));
@@ -1209,10 +1280,8 @@ impl GraphRagStore {
 
         // Compute communities once (avoids re-detection per summary)
         let communities = self.community_summary();
-        let comm_map: HashMap<String, &Community> = communities
-            .iter()
-            .map(|c| (c.id.clone(), c))
-            .collect();
+        let comm_map: HashMap<String, &Community> =
+            communities.iter().map(|c| (c.id.clone(), c)).collect();
 
         let mut scored: Vec<(usize, f64)> = Vec::new();
 
@@ -1284,7 +1353,12 @@ impl GraphRagStore {
 
     /// Merge local entity-level results with global community-level summaries.
     /// Deduplicate entities and rank by combined score.
-    pub fn search_hybrid(&self, query: &str, top_k_local: usize, top_k_global: usize) -> HybridResult {
+    pub fn search_hybrid(
+        &self,
+        query: &str,
+        top_k_local: usize,
+        top_k_global: usize,
+    ) -> HybridResult {
         let local = self.search_local(query, top_k_local);
         let global = self.search_global(query, top_k_global);
 
@@ -1309,10 +1383,8 @@ impl GraphRagStore {
 
         // Compute communities once (avoids re-detection per summary)
         let communities = self.community_summary();
-        let comm_map: HashMap<String, &Community> = communities
-            .iter()
-            .map(|c| (c.id.clone(), c))
-            .collect();
+        let comm_map: HashMap<String, &Community> =
+            communities.iter().map(|c| (c.id.clone(), c)).collect();
 
         // Merge entities from global results (those in matching communities)
         let mut comm_entity_ids: HashSet<String> = HashSet::new();
@@ -1391,7 +1463,11 @@ impl GraphRagStore {
             let communities = self.community_summary();
             let affected_community_ids: HashSet<String> = communities
                 .iter()
-                .filter(|c| c.entity_ids.iter().any(|eid| affected_entity_ids.contains(eid)))
+                .filter(|c| {
+                    c.entity_ids
+                        .iter()
+                        .any(|eid| affected_entity_ids.contains(eid))
+                })
                 .map(|c| c.id.clone())
                 .collect();
 
@@ -1450,7 +1526,9 @@ impl GraphRagStore {
             for eid in &community.entity_ids {
                 if let Some(entity) = self.graph.entities.get(eid) {
                     keywords.push(entity.name.clone());
-                    *type_distribution.entry(entity.entity_type.clone()).or_insert(0) += 1;
+                    *type_distribution
+                        .entry(entity.entity_type.clone())
+                        .or_insert(0) += 1;
                 }
             }
 
@@ -1461,7 +1539,9 @@ impl GraphRagStore {
                 if member_set.contains(&rel.source_entity)
                     && member_set.contains(&rel.target_entity)
                 {
-                    *rel_type_weights.entry(rel.relation_type.clone()).or_insert(0.0) += rel.weight;
+                    *rel_type_weights
+                        .entry(rel.relation_type.clone())
+                        .or_insert(0.0) += rel.weight;
                     relation_count += 1;
                 }
             }
@@ -1469,13 +1549,18 @@ impl GraphRagStore {
             for (rt, w) in &rel_type_weights {
                 top_relations.push((rt.clone(), *w));
             }
-            top_relations.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            top_relations
+                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
             // Build a rich summary text
             keywords.sort();
             keywords.dedup();
             let keyword_str = if keywords.len() > 10 {
-                format!("{} (top: {})", keywords.len(), keywords[..10.min(keywords.len())].join(", "))
+                format!(
+                    "{} (top: {})",
+                    keywords.len(),
+                    keywords[..10.min(keywords.len())].join(", ")
+                )
             } else {
                 keywords.join(", ")
             };
@@ -1495,7 +1580,11 @@ impl GraphRagStore {
                     .take(3)
                     .map(|(rt, w)| format!("{} (w={:.2})", rt, w))
                     .collect();
-                format!("{} key relations: {}", relation_count, top_rel_str.join(", "))
+                format!(
+                    "{} key relations: {}",
+                    relation_count,
+                    top_rel_str.join(", ")
+                )
             };
 
             let top_entities: Vec<String> = community
@@ -1565,8 +1654,17 @@ impl GraphRagStore {
         // Heuristic: if query has capitalized words or specific terms, likely entity query
         let has_capitalized = query.chars().any(|c| c.is_uppercase());
         let conceptual_indicators = [
-            "what is", "explain", "overview", "summary", "concept", "describe",
-            "how does", "why is", "what are", "tell me about", "relationship between",
+            "what is",
+            "explain",
+            "overview",
+            "summary",
+            "concept",
+            "describe",
+            "how does",
+            "why is",
+            "what are",
+            "tell me about",
+            "relationship between",
         ];
         let length = query_words.len();
 
@@ -1576,7 +1674,11 @@ impl GraphRagStore {
                 max_depth: 2,
                 max_neighbors: 10,
             }
-        } else if conceptual_indicators.iter().any(|ind| query_lower.contains(ind)) || length > 8 {
+        } else if conceptual_indicators
+            .iter()
+            .any(|ind| query_lower.contains(ind))
+            || length > 8
+        {
             // Long query or conceptual indicators → global
             GraphQueryMode::Global { community_level: 0 }
         } else {
@@ -1720,8 +1822,24 @@ fn extract_capitalized_terms(sentence: &str, _source_id: &str) -> Vec<String> {
                 if !term_parts.is_empty()
                     && matches!(
                         wlower.as_str(),
-                        "the" | "a" | "an" | "and" | "or" | "but" | "in" | "on" | "at" | "for"
-                            | "with" | "by" | "to" | "of" | "is" | "are" | "was" | "were"
+                        "the"
+                            | "a"
+                            | "an"
+                            | "and"
+                            | "or"
+                            | "but"
+                            | "in"
+                            | "on"
+                            | "at"
+                            | "for"
+                            | "with"
+                            | "by"
+                            | "to"
+                            | "of"
+                            | "is"
+                            | "are"
+                            | "was"
+                            | "were"
                     )
                 {
                     break;
@@ -1736,12 +1854,46 @@ fn extract_capitalized_terms(sentence: &str, _source_id: &str) -> Vec<String> {
                 let tlower = term.to_lowercase();
                 if !matches!(
                     tlower.as_str(),
-                    "this" | "that" | "these" | "those" | "they" | "what" | "which" | "when"
-                        | "where" | "why" | "how" | "there" | "here" | "then" | "than" | "thus"
-                        | "hence" | "very" | "just" | "also" | "only" | "more" | "most" | "some"
-                        | "any" | "each" | "every" | "both" | "such" | "because" | "while"
-                        | "although" | "however" | "therefore" | "moreover" | "furthermore"
-                        | "nevertheless" | "nonetheless" | "accordingly" | "consequently"
+                    "this"
+                        | "that"
+                        | "these"
+                        | "those"
+                        | "they"
+                        | "what"
+                        | "which"
+                        | "when"
+                        | "where"
+                        | "why"
+                        | "how"
+                        | "there"
+                        | "here"
+                        | "then"
+                        | "than"
+                        | "thus"
+                        | "hence"
+                        | "very"
+                        | "just"
+                        | "also"
+                        | "only"
+                        | "more"
+                        | "most"
+                        | "some"
+                        | "any"
+                        | "each"
+                        | "every"
+                        | "both"
+                        | "such"
+                        | "because"
+                        | "while"
+                        | "although"
+                        | "however"
+                        | "therefore"
+                        | "moreover"
+                        | "furthermore"
+                        | "nevertheless"
+                        | "nonetheless"
+                        | "accordingly"
+                        | "consequently"
                         | "additionally"
                 ) && term.len() > 1
                 {
@@ -1877,10 +2029,7 @@ fn estimate_entity_confidence(name: &str, sentence: &str) -> f64 {
     }
 
     // If the entity appears multiple times in the sentence, higher confidence
-    let count = sentence
-        .to_lowercase()
-        .matches(&lower)
-        .count();
+    let count = sentence.to_lowercase().matches(&lower).count();
     if count > 1 {
         confidence += 0.1;
     }
@@ -2055,7 +2204,11 @@ impl GraphExtractor {
         &self.config
     }
 
-    pub fn extract(&self, text: &str, source_id: &str) -> Result<(Vec<EntityNode>, Vec<RelationEdge>), String> {
+    pub fn extract(
+        &self,
+        text: &str,
+        source_id: &str,
+    ) -> Result<(Vec<EntityNode>, Vec<RelationEdge>), String> {
         let sentences = split_sentences(text);
         let mut entities_map: HashMap<String, EntityNode> = HashMap::new();
         let mut relations: Vec<RelationEdge> = Vec::new();
@@ -2114,8 +2267,8 @@ impl GraphExtractor {
                         if let (Some(e1), Some(e2)) =
                             (entities_map.get(&e1_lower), entities_map.get(&e2_lower))
                         {
-                            let weight =
-                                (1.0 / distance.max(1.0)) * self.config.confidence_threshold.max(0.5);
+                            let weight = (1.0 / distance.max(1.0))
+                                * self.config.confidence_threshold.max(0.5);
                             relations.push(RelationEdge {
                                 id: generate_id(),
                                 source_entity: e1.id.clone(),

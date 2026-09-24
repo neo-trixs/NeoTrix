@@ -1,17 +1,21 @@
 use std::collections::HashMap;
 
+use crate::l0_substrate::nt_core_self_test::{SelfTest, SelfTestRegistry};
 #[cfg(feature = "full")]
 use log::debug;
-use crate::l0_substrate::nt_core_self_test::{SelfTest, SelfTestRegistry};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 
 use super::bm25;
 use super::nt_memory_embed::load_all_embeddings;
-use crate::l0_substrate::nt_core_math::cosine_similarity_f32;
 use super::nt_memory_types::*;
+use crate::l0_substrate::nt_core_math::cosine_similarity_f32;
 
-pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Result<Vec<SearchResult>> {
+pub fn search_fts(
+    conn: &Connection,
+    query: &str,
+    limit: usize,
+) -> rusqlite::Result<Vec<SearchResult>> {
     // FTS5 rank = bm25 分数, 越大越相关 (大文档 term 密度低, rank 偏小 → 需标题加权纠正)
     // ORDER BY rank DESC: 修正原实现 ASC + score=1.0-rank 的双重反向缺陷
     // 标题加权在 SQL 层: title 与查询词完全相等 → 排最前 (LIMIT 前生效, 防大文档被截断)
@@ -74,7 +78,9 @@ pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Res
                 created_at: row.get(10)?,
                 updated_at: row.get(11)?,
                 access_count: row.get(12)?,
-                metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
+                metadata: row
+                    .get::<_, Option<String>>(13)?
+                    .and_then(|m| serde_json::from_str(&m).ok()),
                 temporal: None,
                 supersedes: None,
                 source_episode: None,
@@ -93,8 +99,14 @@ pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Res
     // 标题加权 +1.0 不足以抵消 (-11 vs -0.01), 会把原书压到引用书后面。
     // 正确排序键: 先精确标题命中(原书), 再按 score。
     let title_pri = |r: &SearchResult| -> u8 {
-        if r.matched_on.iter().any(|m| matches!(m, SearchMatchType::FtsTitle)) { 2 }
-        else { 1 }
+        if r.matched_on
+            .iter()
+            .any(|m| matches!(m, SearchMatchType::FtsTitle))
+        {
+            2
+        } else {
+            1
+        }
     };
     let mut results: Vec<SearchResult> = rows.collect::<rusqlite::Result<Vec<_>>>()?;
     // W1.4 (batch3 2026-08-26, arxiv 2608.20845 ingest-time compilation):
@@ -111,8 +123,14 @@ pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Res
             })
         };
         for r in results.iter_mut() {
-            let Some(meta) = r.node.metadata.as_ref() else { continue };
-            let Some(idx) = meta.get("ingest_index").and_then(|v| v.get("concepts")).and_then(|v| v.as_array()) else {
+            let Some(meta) = r.node.metadata.as_ref() else {
+                continue;
+            };
+            let Some(idx) = meta
+                .get("ingest_index")
+                .and_then(|v| v.get("concepts"))
+                .and_then(|v| v.as_array())
+            else {
                 continue;
             };
             let idx_terms: Vec<&str> = idx.iter().filter_map(|c| c.as_str()).collect();
@@ -133,15 +151,31 @@ pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Res
         let pa = title_pri(a);
         let pb = title_pri(b);
         // 优先级大的排前 (FtsTitle=2 > FtsContent=1): 用 pb.cmp(&pa) 实现降序
-        pb.cmp(&pa).then(b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal))
+        pb.cmp(&pa).then(
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal),
+        )
     });
     #[cfg(feature = "full")]
-    debug!("[search_fts] q={} rows={} first10={:?}", query, results.len(),
-        results.iter().take(10).map(|r| format!("{}|{:.2}|{:?}", r.node.title, r.score, r.matched_on)).collect::<Vec<_>>());
+    debug!(
+        "[search_fts] q={} rows={} first10={:?}",
+        query,
+        results.len(),
+        results
+            .iter()
+            .take(10)
+            .map(|r| format!("{}|{:.2}|{:?}", r.node.title, r.score, r.matched_on))
+            .collect::<Vec<_>>()
+    );
     Ok(results)
 }
 
-pub fn search_by_type(conn: &Connection, node_type: &NodeType, limit: usize) -> rusqlite::Result<Vec<KnowledgeNode>> {
+pub fn search_by_type(
+    conn: &Connection,
+    node_type: &NodeType,
+    limit: usize,
+) -> rusqlite::Result<Vec<KnowledgeNode>> {
     let mut stmt = conn.prepare(
         "SELECT id, node_type, title, summary, COALESCE(content, summary, ''), url, domain, language,
             confidence, importance, created_at, updated_at, access_count, metadata
@@ -167,7 +201,9 @@ pub fn search_by_type(conn: &Connection, node_type: &NodeType, limit: usize) -> 
             created_at: row.get(10)?,
             updated_at: row.get(11)?,
             access_count: row.get(12)?,
-            metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
+            metadata: row
+                .get::<_, Option<String>>(13)?
+                .and_then(|m| serde_json::from_str(&m).ok()),
             temporal: None,
             supersedes: None,
             source_episode: None,
@@ -180,7 +216,12 @@ pub fn search_by_type(conn: &Connection, node_type: &NodeType, limit: usize) -> 
     rows.collect()
 }
 
-pub fn get_related(conn: &Connection, node_id: &str, relation_type: Option<&str>, limit: usize) -> rusqlite::Result<Vec<SearchResult>> {
+pub fn get_related(
+    conn: &Connection,
+    node_id: &str,
+    relation_type: Option<&str>,
+    limit: usize,
+) -> rusqlite::Result<Vec<SearchResult>> {
     let (sql, has_relation) = if let Some(_rt) = relation_type {
         ("SELECT n.id, n.node_type, n.title, n.summary, COALESCE(n.content, n.summary, ''), n.url, n.domain,
                 n.language, n.confidence, n.importance, n.created_at, n.updated_at,
@@ -206,7 +247,7 @@ pub fn get_related(conn: &Connection, node_id: &str, relation_type: Option<&str>
         stmt.query_map(params![node_id, relation_type, limit as i64], |row| {
             Ok(SearchResult {
                 node: KnowledgeNode {
-                recall_weight: 1.0,
+                    recall_weight: 1.0,
                     id: row.get(0)?,
                     node_type: NodeType::from_str(&row.get::<_, String>(1)?),
                     title: row.get(2)?,
@@ -220,7 +261,9 @@ pub fn get_related(conn: &Connection, node_id: &str, relation_type: Option<&str>
                     created_at: row.get(10)?,
                     updated_at: row.get(11)?,
                     access_count: row.get(12)?,
-                    metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
+                    metadata: row
+                        .get::<_, Option<String>>(13)?
+                        .and_then(|m| serde_json::from_str(&m).ok()),
                     temporal: None,
                     supersedes: None,
                     source_episode: None,
@@ -232,12 +275,13 @@ pub fn get_related(conn: &Connection, node_id: &str, relation_type: Option<&str>
                 matched_on: vec![SearchMatchType::GraphRelation],
                 signals: None,
             })
-        })?.collect::<Result<Vec<_>, _>>()?
+        })?
+        .collect::<Result<Vec<_>, _>>()?
     } else {
         stmt.query_map(params![node_id, limit as i64], |row| {
             Ok(SearchResult {
                 node: KnowledgeNode {
-                recall_weight: 1.0,
+                    recall_weight: 1.0,
                     id: row.get(0)?,
                     node_type: NodeType::from_str(&row.get::<_, String>(1)?),
                     title: row.get(2)?,
@@ -251,7 +295,9 @@ pub fn get_related(conn: &Connection, node_id: &str, relation_type: Option<&str>
                     created_at: row.get(10)?,
                     updated_at: row.get(11)?,
                     access_count: row.get(12)?,
-                    metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
+                    metadata: row
+                        .get::<_, Option<String>>(13)?
+                        .and_then(|m| serde_json::from_str(&m).ok()),
                     temporal: None,
                     supersedes: None,
                     source_episode: None,
@@ -263,7 +309,8 @@ pub fn get_related(conn: &Connection, node_id: &str, relation_type: Option<&str>
                 matched_on: vec![SearchMatchType::GraphRelation],
                 signals: None,
             })
-        })?.collect::<Result<Vec<_>, _>>()?
+        })?
+        .collect::<Result<Vec<_>, _>>()?
     };
 
     Ok(rows)
@@ -285,7 +332,8 @@ pub fn hybrid_search(
     };
 
     // Convert FTS results to (score, id) pairs for RRF fusion
-    let fts_pairs: Vec<(f64, String)> = fts_results.iter()
+    let fts_pairs: Vec<(f64, String)> = fts_results
+        .iter()
         .map(|r| (r.score, r.node.id.clone()))
         .collect();
 
@@ -319,8 +367,13 @@ pub fn hybrid_search(
     // (BM25/内容命中排名靠前) 挤到后面。融合后恢复标题加权: FtsTitle 精确命中 +1.0,
     // 前缀命中 +0.3 (与 search_fts 内部加权一致), 再重排。
     {
-        let title_boost: std::collections::HashMap<&str, f64> = fts_results.iter()
-            .filter(|r| r.matched_on.iter().any(|m| matches!(m, SearchMatchType::FtsTitle)))
+        let title_boost: std::collections::HashMap<&str, f64> = fts_results
+            .iter()
+            .filter(|r| {
+                r.matched_on
+                    .iter()
+                    .any(|m| matches!(m, SearchMatchType::FtsTitle))
+            })
             .map(|r| {
                 let t = r.node.title.trim();
                 let boost = if t == query.trim() { 1.0 } else { 0.3 };
@@ -335,8 +388,15 @@ pub fn hybrid_search(
         fused.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
     }
     #[cfg(feature = "full")]
-    debug!("[hybrid] fused={} first5={:?}", fused.len(),
-        fused.iter().take(5).map(|(s, id)| format!("{:.2}|{}", s, id.chars().take(24).collect::<String>())).collect::<Vec<_>>());
+    debug!(
+        "[hybrid] fused={} first5={:?}",
+        fused.len(),
+        fused
+            .iter()
+            .take(5)
+            .map(|(s, id)| format!("{:.2}|{}", s, id.chars().take(24).collect::<String>()))
+            .collect::<Vec<_>>()
+    );
 
     // Fetch full node data for fused IDs
     let mut fused_ids: Vec<String> = Vec::new();
@@ -349,7 +409,9 @@ pub fn hybrid_search(
     let mut seen_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     if !fused_ids.is_empty() {
-        let placeholders: Vec<String> = fused_ids.iter().enumerate()
+        let placeholders: Vec<String> = fused_ids
+            .iter()
+            .enumerate()
             .map(|(i, _)| format!("?{}", i + 1))
             .collect();
         let sql = format!(
@@ -359,7 +421,8 @@ pub fn hybrid_search(
             placeholders.join(",")
         );
         if let Ok(mut stmt) = conn.prepare(&sql) {
-            let params: Vec<&dyn rusqlite::types::ToSql> = fused_ids.iter()
+            let params: Vec<&dyn rusqlite::types::ToSql> = fused_ids
+                .iter()
                 .map(|id| id as &dyn rusqlite::types::ToSql)
                 .collect();
             if let Ok(rows) = stmt.query_map(params.as_slice(), |row| {
@@ -367,7 +430,7 @@ pub fn hybrid_search(
                 let score = fused_scores.get(&id).copied().unwrap_or(0.5);
                 Ok(SearchResult {
                     node: KnowledgeNode {
-                recall_weight: 1.0,
+                        recall_weight: 1.0,
                         id,
                         node_type: NodeType::from_str(&row.get::<_, String>(1)?),
                         title: row.get(2)?,
@@ -381,7 +444,9 @@ pub fn hybrid_search(
                         created_at: row.get(10)?,
                         updated_at: row.get(11)?,
                         access_count: row.get(12)?,
-                        metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
+                        metadata: row
+                            .get::<_, Option<String>>(13)?
+                            .and_then(|m| serde_json::from_str(&m).ok()),
                         temporal: None,
                         supersedes: None,
                         source_episode: None,
@@ -405,8 +470,14 @@ pub fn hybrid_search(
 
     // fetch 后按 fused 排名恢复顺序 (WHERE id IN 不保证顺序)
     results.sort_by(|a, b| {
-        let ia = fused_ids.iter().position(|x| *x == a.node.id).unwrap_or(usize::MAX);
-        let ib = fused_ids.iter().position(|x| *x == b.node.id).unwrap_or(usize::MAX);
+        let ia = fused_ids
+            .iter()
+            .position(|x| *x == a.node.id)
+            .unwrap_or(usize::MAX);
+        let ib = fused_ids
+            .iter()
+            .position(|x| *x == b.node.id)
+            .unwrap_or(usize::MAX);
         ia.cmp(&ib)
     });
 
@@ -423,13 +494,21 @@ pub fn hybrid_search(
         let half_life: i64 = 7 * 24 * 3600; // 7 天半衰期
         results.sort_by(|a, b| {
             // 主: fused 原排名
-            let ia = fused_ids.iter().position(|x| *x == a.node.id).unwrap_or(usize::MAX);
-            let ib = fused_ids.iter().position(|x| *x == b.node.id).unwrap_or(usize::MAX);
+            let ia = fused_ids
+                .iter()
+                .position(|x| *x == a.node.id)
+                .unwrap_or(usize::MAX);
+            let ib = fused_ids
+                .iter()
+                .position(|x| *x == b.node.id)
+                .unwrap_or(usize::MAX);
             // 仅当两结果处于相邻近排名 (差距 ≤ 1) 时, 才用置信×衰减做二级修正,
             // 避免颠覆强相关性 (标题精确命中/高分 BM25) 的既有排序。
             if ia.abs_diff(ib) <= 1 {
-                let ra = a.node.confidence.max(0.1) * decay_factor(now - a.node.updated_at, half_life);
-                let rb = b.node.confidence.max(0.1) * decay_factor(now - b.node.updated_at, half_life);
+                let ra =
+                    a.node.confidence.max(0.1) * decay_factor(now - a.node.updated_at, half_life);
+                let rb =
+                    b.node.confidence.max(0.1) * decay_factor(now - b.node.updated_at, half_life);
                 rb.partial_cmp(&ra).unwrap_or(std::cmp::Ordering::Equal)
             } else {
                 ia.cmp(&ib)
@@ -444,7 +523,11 @@ pub fn hybrid_search(
 
     // Tier 2: FTS5 title-only fallback — catches nodes missed by RRF fusion
     let remaining = limit - results.len();
-    let fts_title_query: String = query.trim().split_whitespace().collect::<Vec<&str>>().join(" OR ");
+    let fts_title_query: String = query
+        .trim()
+        .split_whitespace()
+        .collect::<Vec<&str>>()
+        .join(" OR ");
     let fts_rows = conn.prepare(
         "SELECT n.id, n.node_type, n.title, n.summary, COALESCE(n.content, n.summary, ''), n.url, n.domain,
                 n.language, n.confidence, n.importance, n.created_at, n.updated_at,
@@ -507,14 +590,15 @@ pub fn hybrid_search(
             let student = super::nt_memory_distill::load_student();
             let mut scored: Vec<(SearchResult, f64)> = Vec::new();
             for r in &results {
-                let emb_score = if let Some(emb) = embeddings.iter().find(|(id, _)| *id == r.node.id) {
-                    match &student {
-                        Some(s) => s.score(&query_embedding, &emb.1),
-                        None => cosine_similarity_f32(&query_embedding, &emb.1),
-                    }
-                } else {
-                    0.0
-                };
+                let emb_score =
+                    if let Some(emb) = embeddings.iter().find(|(id, _)| *id == r.node.id) {
+                        match &student {
+                            Some(s) => s.score(&query_embedding, &emb.1),
+                            None => cosine_similarity_f32(&query_embedding, &emb.1),
+                        }
+                    } else {
+                        0.0
+                    };
                 let combined = r.score * 0.7 + emb_score * 0.3;
                 scored.push((r.clone(), combined));
             }
@@ -560,7 +644,11 @@ fn build_walsh_ranklist(
     let mut scored: Vec<(f64, String)> = Vec::new();
     for r in fts_results.iter().take(limit) {
         // 用 title + summary 作为文档表示 (避免 content 过长)
-        let doc_text = format!("{} {}", r.node.title, r.node.summary.as_deref().unwrap_or(""));
+        let doc_text = format!(
+            "{} {}",
+            r.node.title,
+            r.node.summary.as_deref().unwrap_or("")
+        );
         let doc_vec = walsh.encode(&doc_text);
         let sim = cosine_similarity_f64(&query_vec, &doc_vec);
         if sim > 0.0 {
@@ -581,14 +669,17 @@ fn query_to_avg_embedding(query: &str, all_embeddings: &[(String, Vec<f32>)]) ->
     }
     let dim = all_embeddings[0].1.len();
     let q = query.to_lowercase();
-    let matching: Vec<&[f32]> = all_embeddings.iter()
+    let matching: Vec<&[f32]> = all_embeddings
+        .iter()
         .filter(|(id, _)| id.to_lowercase().contains(&q))
         .map(|(_, emb)| emb.as_slice())
         .collect();
     if matching.is_empty() {
         return vec![0.0_f32; dim];
     }
-    let sum: Vec<f32> = (0..dim).map(|i| matching.iter().map(|e| e[i]).sum::<f32>()).collect();
+    let sum: Vec<f32> = (0..dim)
+        .map(|i| matching.iter().map(|e| e[i]).sum::<f32>())
+        .collect();
     let n = matching.len() as f32;
     sum.into_iter().map(|v| v / n).collect()
 }
@@ -596,7 +687,10 @@ fn query_to_avg_embedding(query: &str, all_embeddings: &[(String, Vec<f32>)]) ->
 /// Entity graph scores: find seed nodes matching query keywords, then propagate
 /// probability via Personalized PageRank (1 iteration). Seeds get base score,
 /// 1-hop neighbors get edge-weight boost, 2-hop neighbors get attenuated boost.
-pub fn entity_graph_scores(conn: &Connection, query: &str) -> rusqlite::Result<HashMap<String, f64>> {
+pub fn entity_graph_scores(
+    conn: &Connection,
+    query: &str,
+) -> rusqlite::Result<HashMap<String, f64>> {
     let query_lower = query.to_lowercase();
     let query_words: Vec<&str> = query_lower
         .split_whitespace()
@@ -808,11 +902,11 @@ pub fn temporal_score(updated_at: i64, now: i64, half_life_secs: i64) -> f64 {
 /// Compute confidence score from ConfidenceStore aggregate.
 /// Maps the epistemic confidence [0.0, 1.0] directly.
 /// Falls back to node.confidence if ConfidenceStore lookup fails.
-pub fn confidence_score(
-    node_confidence: f64,
-    store_confidence: Option<f64>,
-) -> f64 {
-    store_confidence.unwrap_or(node_confidence).max(0.0).min(1.0)
+pub fn confidence_score(node_confidence: f64, store_confidence: Option<f64>) -> f64 {
+    store_confidence
+        .unwrap_or(node_confidence)
+        .max(0.0)
+        .min(1.0)
 }
 
 /// Compute relational score from graph topology: edge density + PageRank trust.
@@ -880,8 +974,8 @@ impl SmartVectorScorer {
         let edge_map = batch_edge_stats(conn, &node_ids);
 
         // PageRank trust scores from topology (best-effort, non-fatal)
-        let trust_map: HashMap<String, f64> = super::nt_memory_graph::trust_for_nodes(conn, &node_ids, 0.85, 50)
-            .unwrap_or_default();
+        let trust_map: HashMap<String, f64> =
+            super::nt_memory_graph::trust_for_nodes(conn, &node_ids, 0.85, 50).unwrap_or_default();
 
         // Load ConfidenceStore if available (best-effort, non-fatal)
         let confidence_store: Option<super::nt_memory_confidence::ConfidenceStore> =
@@ -893,13 +987,18 @@ impl SmartVectorScorer {
                 let sem = r.score.max(0.0).min(1.0);
                 let temp = temporal_score(r.node.updated_at, now, self.half_life_secs);
 
-                let store_conf = confidence_store.as_ref().and_then(|cs| {
-                    cs.get_confidence_by_str(&r.node.id).ok().flatten()
-                }).map(|ec| ec.aggregate());
+                let store_conf = confidence_store
+                    .as_ref()
+                    .and_then(|cs| cs.get_confidence_by_str(&r.node.id).ok().flatten())
+                    .map(|ec| ec.aggregate());
                 let conf = confidence_score(r.node.confidence, store_conf);
 
-                let (edge_count, total_weight) = edge_map.get(&r.node.id).copied().unwrap_or((0, 0.0));
-                let trust = trust_map.get(&r.node.id).copied().unwrap_or(1.0 / (results.len() as f64).max(1.0));
+                let (edge_count, total_weight) =
+                    edge_map.get(&r.node.id).copied().unwrap_or((0, 0.0));
+                let trust = trust_map
+                    .get(&r.node.id)
+                    .copied()
+                    .unwrap_or(1.0 / (results.len() as f64).max(1.0));
                 let rel = relational_score(edge_count, total_weight, trust);
 
                 let fused = self.weights.semantic * sem
@@ -921,14 +1020,13 @@ impl SmartVectorScorer {
 }
 
 /// Batch-fetch edge statistics for multiple nodes in one query.
-fn batch_edge_stats(
-    conn: &Connection,
-    node_ids: &[&str],
-) -> HashMap<String, (usize, f64)> {
+fn batch_edge_stats(conn: &Connection, node_ids: &[&str]) -> HashMap<String, (usize, f64)> {
     if node_ids.is_empty() {
         return HashMap::new();
     }
-    let placeholders: Vec<String> = node_ids.iter().enumerate()
+    let placeholders: Vec<String> = node_ids
+        .iter()
+        .enumerate()
         .map(|(i, _)| format!("?{}", i + 1))
         .collect();
     let sql = format!(
@@ -967,11 +1065,13 @@ fn batch_edge_stats(
 fn load_confidence_store_from_conn(
     conn: &Connection,
 ) -> Option<super::nt_memory_confidence::ConfidenceStore> {
-    let data: Option<String> = conn.query_row(
-        "SELECT value FROM kv_store WHERE namespace = 'confidence' AND key = 'store'",
-        [],
-        |row| row.get(0),
-    ).ok();
+    let data: Option<String> = conn
+        .query_row(
+            "SELECT value FROM kv_store WHERE namespace = 'confidence' AND key = 'store'",
+            [],
+            |row| row.get(0),
+        )
+        .ok();
     data.and_then(|d| serde_json::from_str(&d).ok())
 }
 
@@ -1020,22 +1120,29 @@ impl CraniMEMGate {
             return (true, 1.0);
         }
         let desc_lower = event_description.to_lowercase();
-        let max_relevance: f64 = self.active_goals.iter().map(|g| {
-            let keyword_hits = g.keywords.iter()
-                .filter(|kw| desc_lower.contains(&kw.to_lowercase()))
-                .count();
-            if keyword_hits == 0 {
-                0.0
-            } else {
-                g.weight * (keyword_hits as f64 / g.keywords.len() as f64).min(1.0)
-            }
-        }).fold(0.0, f64::max);
+        let max_relevance: f64 = self
+            .active_goals
+            .iter()
+            .map(|g| {
+                let keyword_hits = g
+                    .keywords
+                    .iter()
+                    .filter(|kw| desc_lower.contains(&kw.to_lowercase()))
+                    .count();
+                if keyword_hits == 0 {
+                    0.0
+                } else {
+                    g.weight * (keyword_hits as f64 / g.keywords.len() as f64).min(1.0)
+                }
+            })
+            .fold(0.0, f64::max);
         (max_relevance >= self.threshold, max_relevance)
     }
 
     /// Filter a batch of sensory events, returning only those that pass the gate.
     pub fn filter_events(&self, events: Vec<(String, f64)>) -> Vec<(String, f64)> {
-        events.into_iter()
+        events
+            .into_iter()
             .filter(|(desc, _)| self.gate_event(desc).0)
             .collect()
     }
@@ -1422,12 +1529,18 @@ impl MaterializedNeighborCache {
         }
         buf.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let m = kk.min(buf.len());
-        buf[..m].iter().map(|(j, s)| (embeddings[*j].0.clone(), *s)).collect()
+        buf[..m]
+            .iter()
+            .map(|(j, s)| (embeddings[*j].0.clone(), *s))
+            .collect()
     }
 }
 
 /// 便捷封装: 从 KB 连接构建物化邻居缓存 (供生产路径调用)。
-pub fn build_materialized_neighbors(conn: &Connection, k: usize) -> rusqlite::Result<MaterializedNeighborCache> {
+pub fn build_materialized_neighbors(
+    conn: &Connection,
+    k: usize,
+) -> rusqlite::Result<MaterializedNeighborCache> {
     MaterializedNeighborCache::from_conn(conn, k)
 }
 
@@ -1482,7 +1595,12 @@ mod tests {
         let unrelated = walsh.encode("cooking recipes pasta");
         let sim = super::cosine_similarity_f64(&q, &similar);
         let unrel = super::cosine_similarity_f64(&q, &unrelated);
-        assert!(sim > unrel, "相似文档应得分更高: sim={} unrel={}", sim, unrel);
+        assert!(
+            sim > unrel,
+            "相似文档应得分更高: sim={} unrel={}",
+            sim,
+            unrel
+        );
     }
 
     /// 缺陷7 回归测试 (真实运转): hybrid_search 的 RRF 融合只按排名位置融合,
@@ -1500,7 +1618,8 @@ mod tests {
                 updated_at INTEGER, access_count INTEGER, metadata TEXT
             );
             CREATE VIRTUAL TABLE nodes_fts USING fts5(title, summary, content, domain);",
-        ).unwrap();
+        )
+        .unwrap();
         // 本体: 标题精确匹配"史记" (FtsTitle)
         conn.execute(
             "INSERT INTO nodes (id, node_type, title, summary, content, domain, language,
@@ -1523,15 +1642,22 @@ mod tests {
         conn.execute_batch(
             "INSERT INTO nodes_fts(rowid, title, summary, content, domain)
              SELECT rowid, title, summary, content, domain FROM nodes;",
-        ).unwrap();
+        )
+        .unwrap();
 
         let results = super::hybrid_search(&conn, "史记", 5, None).unwrap();
         assert!(!results.is_empty(), "应检索到结果");
         let first_title = results[0].node.title.clone();
-        assert_eq!(first_title, "史记",
+        assert_eq!(
+            first_title,
+            "史记",
             "标题精确匹配的本体应排第一, 实际: {} | {:?}",
             first_title,
-            results.iter().map(|r| format!("{}[{:.2}]", r.node.title, r.score)).collect::<Vec<_>>());
+            results
+                .iter()
+                .map(|r| format!("{}[{:.2}]", r.node.title, r.score))
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]
@@ -1581,14 +1707,20 @@ mod tests {
         for _ in 0..8 {
             ev.evaluate("term", 10, 0.9);
         }
-        let proposal = super::RetrievalTuning { boost: 1.0, committed_at: 0 };
+        let proposal = super::RetrievalTuning {
+            boost: 1.0,
+            committed_at: 0,
+        };
         assert!(ev.guard(&proposal), "窗口均值高应接受调参");
         assert_eq!(ev.recall_boost(), 1.0);
         // 之后检索质量下滑 → 新调参被拒绝, 保留已提交的 boost
         for _ in 0..8 {
             ev.evaluate("noise", 0, 0.05);
         }
-        let proposal2 = super::RetrievalTuning { boost: 2.0, committed_at: 0 };
+        let proposal2 = super::RetrievalTuning {
+            boost: 2.0,
+            committed_at: 0,
+        };
         assert!(!ev.guard(&proposal2), "均值下滑应拒绝");
         assert_eq!(ev.recall_boost(), 1.0, "拒绝后保留原 tuning");
     }
@@ -1607,10 +1739,7 @@ mod tests {
 /// 技能/记忆候选池从 5 条增长到 100 条时, actual-use precision 从 29.6% 崩到 3.3% —
 /// 检索是独立于技能质量的瓶颈。池规模越大, 低分结果被实际使用的概率越低,
 /// 因此按池规模收紧分数阈值, 丢弃明显低质候选, 抑制 precision 崩塌。
-pub fn precision_gate(
-    results: Vec<SearchResult>,
-    pool_size: usize,
-) -> Vec<SearchResult> {
+pub fn precision_gate(results: Vec<SearchResult>, pool_size: usize) -> Vec<SearchResult> {
     if results.is_empty() {
         return results;
     }
@@ -1618,18 +1747,12 @@ pub fn precision_gate(
     // 使用 sqrt(log2(pool+1)) 使阈值在常见池规模 (10-500) 内单调收紧且不会全杀。
     let log2_pool = (pool_size as f64 + 1.0).log2();
     let threshold_ratio = (0.25 + 0.10 * log2_pool).min(0.9);
-    let top = results
-        .iter()
-        .map(|r| r.score)
-        .fold(f64::MIN, f64::max);
+    let top = results.iter().map(|r| r.score).fold(f64::MIN, f64::max);
     if top <= 0.0 {
         return results;
     }
     let cutoff = top * threshold_ratio;
-    let retained: Vec<SearchResult> = results
-        .into_iter()
-        .filter(|r| r.score >= cutoff)
-        .collect();
+    let retained: Vec<SearchResult> = results.into_iter().filter(|r| r.score >= cutoff).collect();
     // 保底: 小池/无低分时不得清空 (precision gate 是软化, 不是硬截断)
     if retained.is_empty() {
         vec![]
@@ -1671,7 +1794,8 @@ mod precision_gate_tests {
     fn node(id: &str) -> KnowledgeNode {
         KnowledgeNode {
             id: id.into(),
-            node_type: crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::NodeType::Concept,
+            node_type:
+                crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::NodeType::Concept,
             title: id.into(),
             summary: None,
             content: None,
@@ -1800,7 +1924,7 @@ mod precision_gate_tests {
     #[test]
     fn test_decay_factor_half_life() {
         let half_life = 7 * 24 * 3600; // 7 天
-        // age=0 → 1.0 (全新)
+                                       // age=0 → 1.0 (全新)
         assert!((decay_factor(0, half_life) - 1.0).abs() < 1e-9);
         // age=half_life → 0.5 (一个半衰期)
         assert!((decay_factor(half_life, half_life) - 0.5).abs() < 1e-9);
@@ -1928,15 +2052,25 @@ mod materialized_neighbors_tests {
         let p95 = latencies[(QUERIES as f64 * 0.95) as usize];
         log::info!(
             "[bench] 10K 向量, dim={DIM}: median={:.3}ms p95={:.3}ms (queries={QUERIES})",
-            latencies[QUERIES / 2], p95
+            latencies[QUERIES / 2],
+            p95
         );
         // sanity gate: 单次扫描查询应在合理延迟内 (远高于 HNSW 目标但远优于 269ms 暴力)
-        assert!(p95 < 50.0, "p95 查询延迟应远低于 Phase-1 基线, 实际 {p95:.3}ms");
+        assert!(
+            p95 < 50.0,
+            "p95 查询延迟应远低于 Phase-1 基线, 实际 {p95:.3}ms"
+        );
         // 缓存命中 (已建节点) 路径应更便宜 (O(k) 查表)
         let mut hit_lat: Vec<f64> = Vec::with_capacity(QUERIES);
         for i in 0..QUERIES {
             let start = std::time::Instant::now();
-            let _ = cache.search(&emb[i % N].1, Some(&format!("node-{}", i % N)), &emb, K, &mut buf);
+            let _ = cache.search(
+                &emb[i % N].1,
+                Some(&format!("node-{}", i % N)),
+                &emb,
+                K,
+                &mut buf,
+            );
             hit_lat.push(start.elapsed().as_secs_f64() * 1000.0);
         }
         hit_lat.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -2015,9 +2149,8 @@ mod selftest_tests {
 // ════════════════════════════════════════════════════════════════
 
 use crate::l1_action::traits::{
-    L1Capability, SearchEngine as SearchEngineTrait, CapabilityCategory, ConstellationLevel,
-    CapabilityHealth, CapabilityStats, CapabilityError,
-    SearchResult as UnifiedSearchResult, Document,
+    CapabilityCategory, CapabilityError, CapabilityHealth, CapabilityStats, ConstellationLevel,
+    Document, L1Capability, SearchEngine as SearchEngineTrait, SearchResult as UnifiedSearchResult,
 };
 
 /// KB Search wrapper implementing unified SearchEngine trait
@@ -2027,38 +2160,63 @@ pub struct KbSearchEngine {
 
 impl KbSearchEngine {
     pub fn new(conn: Connection) -> Self {
-        Self { conn: std::sync::Arc::new(std::sync::Mutex::new(conn)) }
+        Self {
+            conn: std::sync::Arc::new(std::sync::Mutex::new(conn)),
+        }
     }
 }
 
 impl L1Capability for KbSearchEngine {
-    fn capability_id(&self) -> &str { "memory.kb_search" }
-    fn category(&self) -> CapabilityCategory { CapabilityCategory::Search }
-    fn constellation(&self) -> ConstellationLevel { ConstellationLevel::C2Integration }
+    fn capability_id(&self) -> &str {
+        "memory.kb_search"
+    }
+    fn category(&self) -> CapabilityCategory {
+        CapabilityCategory::Search
+    }
+    fn constellation(&self) -> ConstellationLevel {
+        ConstellationLevel::C2Integration
+    }
     fn health_check(&self) -> CapabilityHealth {
         CapabilityHealth {
             healthy: self.conn.lock().is_ok(),
             latency_ms: None,
             error_rate: 0.0,
-            last_check: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),
+            last_check: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
             message: None,
         }
     }
-    fn description(&self) -> &str { "KB search with FTS5 + vector hybrid ranking" }
-    fn stats(&self) -> CapabilityStats { CapabilityStats::default() }
+    fn description(&self) -> &str {
+        "KB search with FTS5 + vector hybrid ranking"
+    }
+    fn stats(&self) -> CapabilityStats {
+        CapabilityStats::default()
+    }
 }
 
 impl SearchEngineTrait for KbSearchEngine {
-    fn search(&self, query: &str, limit: usize) -> Result<Vec<UnifiedSearchResult>, CapabilityError> {
-        let conn = self.conn.lock().map_err(|e| CapabilityError::Internal(e.to_string()))?;
+    fn search(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<UnifiedSearchResult>, CapabilityError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| CapabilityError::Internal(e.to_string()))?;
         let results = search_fts(&conn, query, limit)
             .map_err(|e| CapabilityError::ExecutionFailed(e.to_string()))?;
-        Ok(results.into_iter().map(|r| UnifiedSearchResult {
-            id: r.node.id,
-            score: r.score,
-            title: r.node.title,
-            snippet: r.node.summary.unwrap_or_default(),
-        }).collect())
+        Ok(results
+            .into_iter()
+            .map(|r| UnifiedSearchResult {
+                id: r.node.id,
+                score: r.score,
+                title: r.node.title,
+                snippet: r.node.summary.unwrap_or_default(),
+            })
+            .collect())
     }
 
     fn index(&self, _doc: &Document) -> Result<(), CapabilityError> {
@@ -2077,20 +2235,35 @@ pub struct SearchRegistry {
 }
 
 impl Default for SearchRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SearchRegistry {
-    pub fn new() -> Self { Self { engines: Vec::new() } }
-    pub fn register(&mut self, engine: Box<dyn SearchEngineTrait>) { self.engines.push(engine); }
+    pub fn new() -> Self {
+        Self {
+            engines: Vec::new(),
+        }
+    }
+    pub fn register(&mut self, engine: Box<dyn SearchEngineTrait>) {
+        self.engines.push(engine);
+    }
     pub fn get(&self, id: &str) -> Option<&dyn SearchEngineTrait> {
-        self.engines.iter().find(|e| e.capability_id() == id).map(|e| e.as_ref())
+        self.engines
+            .iter()
+            .find(|e| e.capability_id() == id)
+            .map(|e| e.as_ref())
     }
     pub fn health_check_all(&self) -> Vec<(String, CapabilityHealth)> {
-        self.engines.iter().map(|e| (e.capability_id().to_string(), e.health_check())).collect()
+        self.engines
+            .iter()
+            .map(|e| (e.capability_id().to_string(), e.health_check()))
+            .collect()
     }
     pub fn optimal(&self) -> Option<&dyn SearchEngineTrait> {
-        self.engines.iter()
+        self.engines
+            .iter()
             .filter(|e| e.health_check().healthy)
             .max_by(|a, b| {
                 let a_s = 1.0 - a.health_check().error_rate;
@@ -2107,10 +2280,19 @@ pub struct SearchRouter {
 }
 
 impl SearchRouter {
-    pub fn new(registry: SearchRegistry) -> Self { Self { registry } }
-    pub fn route(&self, _query: &str) -> Option<&dyn SearchEngineTrait> { self.registry.optimal() }
-    pub fn search(&self, query: &str, limit: usize) -> Result<Vec<UnifiedSearchResult>, CapabilityError> {
+    pub fn new(registry: SearchRegistry) -> Self {
+        Self { registry }
+    }
+    pub fn route(&self, _query: &str) -> Option<&dyn SearchEngineTrait> {
         self.registry.optimal()
+    }
+    pub fn search(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<UnifiedSearchResult>, CapabilityError> {
+        self.registry
+            .optimal()
             .ok_or_else(|| CapabilityError::NotAvailable("No search engine".into()))?
             .search(query, limit)
     }
@@ -2122,8 +2304,14 @@ pub struct SearchBridge {
 }
 
 impl SearchBridge {
-    pub fn new(router: SearchRouter) -> Self { Self { router } }
-    pub fn search(&self, query: &str, limit: usize) -> Result<Vec<UnifiedSearchResult>, CapabilityError> {
+    pub fn new(router: SearchRouter) -> Self {
+        Self { router }
+    }
+    pub fn search(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<UnifiedSearchResult>, CapabilityError> {
         self.router.search(query, limit)
     }
 }

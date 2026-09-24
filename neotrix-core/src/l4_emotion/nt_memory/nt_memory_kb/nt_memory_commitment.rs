@@ -319,7 +319,8 @@ impl EmbeddingCommitmentStore {
                 Some(c) => c,
                 None => continue,
             };
-            let chunks = Self::chunk_bytes(&commitment.quantized_vector, &commitment.domain_separator);
+            let chunks =
+                Self::chunk_bytes(&commitment.quantized_vector, &commitment.domain_separator);
             let leaf_hashes: Vec<[u8; 32]> = chunks.iter().map(|c| Self::sha2_256(c)).collect();
             let recomputed_root = Self::merkle_root_from_leaves(&leaf_hashes);
 
@@ -392,10 +393,7 @@ impl EmbeddingCommitmentStore {
 
     /// Compute a `PositionLengthBinding` for `node_id` that binds each
     /// chunk to its position and to the node, preventing reordering attacks.
-    pub fn compute_position_binding(
-        &self,
-        node_id: &str,
-    ) -> Result<PositionLengthBinding, String> {
+    pub fn compute_position_binding(&self, node_id: &str) -> Result<PositionLengthBinding, String> {
         let commitment = self
             .commitments
             .get(node_id)
@@ -452,16 +450,8 @@ impl EmbeddingCommitmentStore {
         if vector.is_empty() {
             return (Vec::new(), 0.0, 0.0);
         }
-        let min = vector
-            .iter()
-            .copied()
-            .reduce(f32::min)
-            .unwrap_or(0.0);
-        let max = vector
-            .iter()
-            .copied()
-            .reduce(f32::max)
-            .unwrap_or(0.0);
+        let min = vector.iter().copied().reduce(f32::min).unwrap_or(0.0);
+        let max = vector.iter().copied().reduce(f32::max).unwrap_or(0.0);
 
         if (max - min).abs() < f32::EPSILON {
             return (vec![0i8; vector.len()], min, max);
@@ -520,8 +510,8 @@ impl EmbeddingCommitmentStore {
             let mut next = Vec::with_capacity(level.len().div_ceil(2));
             for pair in level.chunks(2) {
                 let mut hasher = Sha256::new();
-    hasher.update(pair[0]);
-    hasher.update(if pair.len() > 1 { &pair[1] } else { &pair[0] });
+                hasher.update(pair[0]);
+                hasher.update(if pair.len() > 1 { &pair[1] } else { &pair[0] });
                 let result = hasher.finalize();
                 let mut h = [0u8; 32];
                 h.copy_from_slice(&result);
@@ -552,8 +542,8 @@ impl EmbeddingCommitmentStore {
             let mut next = Vec::with_capacity(level.len().div_ceil(2));
             for pair in level.chunks(2) {
                 let mut hasher = Sha256::new();
-    hasher.update(pair[0]);
-    hasher.update(if pair.len() > 1 { &pair[1] } else { &pair[0] });
+                hasher.update(pair[0]);
+                hasher.update(if pair.len() > 1 { &pair[1] } else { &pair[0] });
                 let result = hasher.finalize();
                 let mut h = [0u8; 32];
                 h.copy_from_slice(&result);
@@ -599,7 +589,9 @@ mod tests {
     use tempfile::tempdir;
 
     fn test_vector(length: usize) -> Vec<f32> {
-        (0..length).map(|i| (i as f32) / (length as f32) * 2.0 - 1.0).collect()
+        (0..length)
+            .map(|i| (i as f32) / (length as f32) * 2.0 - 1.0)
+            .collect()
     }
 
     fn _uniform_vector(length: usize, value: f32) -> Vec<f32> {
@@ -615,7 +607,12 @@ mod tests {
         let mut store = make_store();
         let vector = test_vector(128);
         let _commitment = store
-            .commit_vector("n1".to_string(), &vector, "test-model".to_string(), "test-domain".to_string())
+            .commit_vector(
+                "n1".to_string(),
+                &vector,
+                "test-model".to_string(),
+                "test-domain".to_string(),
+            )
             .expect("commit should succeed");
 
         // Verify with the same vector — should succeed
@@ -630,7 +627,12 @@ mod tests {
         let mut store = make_store();
         let vector = test_vector(128);
         store
-            .commit_vector("n1".to_string(), &vector, "test-model".to_string(), "test-domain".to_string())
+            .commit_vector(
+                "n1".to_string(),
+                &vector,
+                "test-model".to_string(),
+                "test-domain".to_string(),
+            )
             .expect("commit should succeed");
 
         // Tampered vector (flip a sign)
@@ -678,8 +680,12 @@ mod tests {
     fn test_quantization_roundtrip_mse_below_threshold() {
         let vector = test_vector(768);
         let (quantized, qmin, qmax) = EmbeddingCommitmentStore::quantize_with_bounds(&vector);
-        let reconstructed =
-            EmbeddingCommitmentStore::_dequantize_with_bounds(&quantized, qmin, qmax, vector.len() as u32);
+        let reconstructed = EmbeddingCommitmentStore::_dequantize_with_bounds(
+            &quantized,
+            qmin,
+            qmax,
+            vector.len() as u32,
+        );
 
         assert_eq!(vector.len(), reconstructed.len());
         let mse: f64 = vector
@@ -698,12 +704,7 @@ mod tests {
         for i in 0..20 {
             let v = test_vector(64);
             store
-                .commit_vector(
-                    format!("n{}", i),
-                    &v,
-                    "m".to_string(),
-                    "d".to_string(),
-                )
+                .commit_vector(format!("n{}", i), &v, "m".to_string(), "d".to_string())
                 .expect("commit");
         }
 
@@ -728,12 +729,7 @@ mod tests {
         for i in 0..5 {
             let v = test_vector(64);
             store
-                .commit_vector(
-                    format!("n{}", i),
-                    &v,
-                    "m".to_string(),
-                    "d".to_string(),
-                )
+                .commit_vector(format!("n{}", i), &v, "m".to_string(), "d".to_string())
                 .expect("commit");
         }
         store.save(&path).expect("save");
@@ -810,10 +806,20 @@ mod tests {
         let vector = test_vector(64);
 
         let c1 = store
-            .commit_vector("a".to_string(), &vector, "m".to_string(), "domain1".to_string())
+            .commit_vector(
+                "a".to_string(),
+                &vector,
+                "m".to_string(),
+                "domain1".to_string(),
+            )
             .expect("commit");
         let c2 = store
-            .commit_vector("b".to_string(), &vector, "m".to_string(), "domain2".to_string())
+            .commit_vector(
+                "b".to_string(),
+                &vector,
+                "m".to_string(),
+                "domain2".to_string(),
+            )
             .expect("commit");
 
         assert_ne!(
@@ -867,12 +873,8 @@ mod tests {
     #[test]
     fn test_empty_vector_edge_case() {
         let mut store = make_store();
-        let result = store.commit_vector(
-            "empty".to_string(),
-            &[],
-            "m".to_string(),
-            "d".to_string(),
-        );
+        let result =
+            store.commit_vector("empty".to_string(), &[], "m".to_string(), "d".to_string());
         assert!(result.is_err(), "empty vector commit should fail");
     }
 
@@ -957,7 +959,10 @@ mod tests {
         let proof = store
             .verify_commitment_origin("a2", &v, "mal")
             .expect("origin verify");
-        assert!(!proof.verified, "forged author must fail origin verification");
+        assert!(
+            !proof.verified,
+            "forged author must fail origin verification"
+        );
 
         // 作者不同 → root 不同 (不能借 alice 的内容改名真 own)
         let mut other = store.clone();
@@ -972,7 +977,10 @@ mod tests {
             .expect("bob authored commit");
         let root_alice = store.commitments.get("a2").unwrap().merkle_root;
         let root_bob = other.commitments.get("a3").unwrap().merkle_root;
-        assert_ne!(root_alice, root_bob, "author must bind into the Merkle root");
+        assert_ne!(
+            root_alice, root_bob,
+            "author must bind into the Merkle root"
+        );
     }
 
     #[test]

@@ -1,7 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::Row;
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
 
 use neotrix_types::knowledge_access::{KnowledgeNode, NodeType};
 
@@ -37,7 +37,9 @@ pub fn row_to_knowledge_node(row: &Row) -> rusqlite::Result<KnowledgeNode> {
         created_at: row.get(11)?,
         updated_at: row.get(12)?,
         access_count: row.get(13)?,
-        metadata: row.get::<_, Option<String>>(14)?.and_then(|m| serde_json::from_str(&m).ok()),
+        metadata: row
+            .get::<_, Option<String>>(14)?
+            .and_then(|m| serde_json::from_str(&m).ok()),
         temporal: None,
         supersedes: row.get(15)?,
         source_episode: None,
@@ -53,18 +55,29 @@ pub const NODE_COLUMNS: &str = "id, node_type, title, summary, content, url, dom
     supersedes, parent_id, depth, cluster_id";
 
 /// 泛型 KV 状态保存: 将任意 Serialize 类型序列化为 JSON 存入 KB kv_store。
-pub fn save_kv_state<T: Serialize>(kb: &super::KnowledgeBase, ns: &str, key: &str, data: &T) -> Result<(), String> {
+pub fn save_kv_state<T: Serialize>(
+    kb: &super::KnowledgeBase,
+    ns: &str,
+    key: &str,
+    data: &T,
+) -> Result<(), String> {
     let json = serde_json::to_string(data).map_err(|e| format!("serde: {}", e))?;
     let conn = kb.conn.lock().map_err(|e| format!("Lock: {}", e))?;
     super::nt_memory_unify::kv_set(&conn, ns, key, &json)
 }
 
 /// 泛型 KV 状态加载: 从 KB kv_store 读取 JSON 并反序列化为任意 DeserializeOwned 类型。
-pub fn load_kv_state<T: DeserializeOwned>(kb: &super::KnowledgeBase, ns: &str, key: &str) -> Result<Option<T>, String> {
+pub fn load_kv_state<T: DeserializeOwned>(
+    kb: &super::KnowledgeBase,
+    ns: &str,
+    key: &str,
+) -> Result<Option<T>, String> {
     let conn = kb.conn.lock().map_err(|e| format!("Lock: {}", e))?;
     let json = super::nt_memory_unify::kv_get(&conn, ns, key)?;
     match json {
-        Some(data) => Ok(Some(serde_json::from_str(&data).map_err(|e| format!("deser: {}", e))?)),
+        Some(data) => Ok(Some(
+            serde_json::from_str(&data).map_err(|e| format!("deser: {}", e))?,
+        )),
         None => Ok(None),
     }
 }

@@ -103,20 +103,17 @@ pub fn snapshot_kb(kb: &KnowledgeBase) -> Result<KbSnapshot, String> {
 /// 快照落盘 (父目录不存在时自动创建)。
 pub fn snapshot_to_file(snap: &KbSnapshot, path: &Path) -> Result<(), String> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("创建快照目录失败: {}", e))?;
+        std::fs::create_dir_all(parent).map_err(|e| format!("创建快照目录失败: {}", e))?;
     }
-    let json = serde_json::to_string_pretty(snap)
-        .map_err(|e| format!("序列化快照失败: {}", e))?;
+    let json = serde_json::to_string_pretty(snap).map_err(|e| format!("序列化快照失败: {}", e))?;
     std::fs::write(path, json).map_err(|e| format!("写快照文件失败: {}", e))
 }
 
 /// 从文件加载快照 (校验格式标识与版本)。
 pub fn snapshot_from_file(path: &Path) -> Result<KbSnapshot, String> {
-    let text = std::fs::read_to_string(path)
-        .map_err(|e| format!("读快照文件失败: {}", e))?;
-    let snap: KbSnapshot = serde_json::from_str(&text)
-        .map_err(|e| format!("解析快照失败: {}", e))?;
+    let text = std::fs::read_to_string(path).map_err(|e| format!("读快照文件失败: {}", e))?;
+    let snap: KbSnapshot =
+        serde_json::from_str(&text).map_err(|e| format!("解析快照失败: {}", e))?;
     if snap.format != SNAPSHOT_FORMAT {
         return Err(format!("非 KB 快照文件 (format='{}')", snap.format));
     }
@@ -147,7 +144,8 @@ pub fn diff_snapshots(base: &KbSnapshot, other: &KbSnapshot) -> KbDiff {
     }
     for id in base_ids.difference(&other_ids) {
         let n = base_nodes.get(*id).copied().expect("key from set");
-        diff.nodes_removed.push(diff_node(n, vec!["(removed)".into()]));
+        diff.nodes_removed
+            .push(diff_node(n, vec!["(removed)".into()]));
     }
     for id in base_ids.intersection(&other_ids) {
         let b = base_nodes.get(*id).copied().expect("key from set");
@@ -167,10 +165,14 @@ pub fn diff_snapshots(base: &KbSnapshot, other: &KbSnapshot) -> KbDiff {
     let other_edge_ids: HashSet<&str> = other_edges.keys().copied().collect();
 
     for id in other_edge_ids.difference(&base_edge_ids) {
-        diff.edges_added.push(diff_edge(other_edges.get(*id).copied().expect("key from set")));
+        diff.edges_added.push(diff_edge(
+            other_edges.get(*id).copied().expect("key from set"),
+        ));
     }
     for id in base_edge_ids.difference(&other_edge_ids) {
-        diff.edges_removed.push(diff_edge(base_edges.get(*id).copied().expect("key from set")));
+        diff.edges_removed.push(diff_edge(
+            base_edges.get(*id).copied().expect("key from set"),
+        ));
     }
 
     diff
@@ -281,7 +283,11 @@ mod tests {
     #[test]
     fn test_diff_add_remove_change() {
         let base = snapshot_of(
-            vec![node("a", "A", "v1"), node("b", "B", "x"), node("c", "C", "z")],
+            vec![
+                node("a", "A", "v1"),
+                node("b", "B", "x"),
+                node("c", "C", "z"),
+            ],
             vec![edge("e1", "a", "b")],
         );
         let mut b2 = node("b", "B", "x");
@@ -296,7 +302,11 @@ mod tests {
         assert_eq!(diff.nodes_added[0].id, "d");
         assert_eq!(diff.nodes_removed.len(), 1, "c removed");
         assert_eq!(diff.nodes_removed[0].id, "c");
-        assert_eq!(diff.nodes_changed.len(), 2, "a (content) + b (content) changed");
+        assert_eq!(
+            diff.nodes_changed.len(),
+            2,
+            "a (content) + b (content) changed"
+        );
         let b_change = diff
             .nodes_changed
             .iter()
@@ -311,10 +321,7 @@ mod tests {
 
     #[test]
     fn test_diff_identical_is_empty() {
-        let base = snapshot_of(
-            vec![node("a", "A", "v1")],
-            vec![edge("e1", "a", "a")],
-        );
+        let base = snapshot_of(vec![node("a", "A", "v1")], vec![edge("e1", "a", "a")]);
         let other = base.clone();
         assert!(diff_snapshots(&base, &other).is_empty());
     }
@@ -333,10 +340,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("nt_kb_snap_{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("snap.json");
-        let snap = snapshot_of(
-            vec![node("a", "A", "v1")],
-            vec![edge("e1", "a", "a")],
-        );
+        let snap = snapshot_of(vec![node("a", "A", "v1")], vec![edge("e1", "a", "a")]);
         snapshot_to_file(&snap, &path).unwrap();
         let loaded = snapshot_from_file(&path).unwrap();
         assert_eq!(loaded.nodes.len(), 1);

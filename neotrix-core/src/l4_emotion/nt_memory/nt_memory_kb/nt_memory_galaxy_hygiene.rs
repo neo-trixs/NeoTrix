@@ -95,10 +95,16 @@ pub fn hub_active_epoch(hub: &Value) -> Option<u64> {
 /// 兼容压缩值 (NTZ1: Rust 侧不解码, 跳过) 与非星辰 hub (experience / domain_nt_*)。
 pub fn galaxy_list_hubs(conn: &Connection) -> Vec<(String, Value)> {
     let mut hubs = Vec::new();
-    let Ok(nss) = kv_list_namespaces(conn) else { return hubs };
+    let Ok(nss) = kv_list_namespaces(conn) else {
+        return hubs;
+    };
     for ns in nss {
-        let Ok(Some(raw)) = kv_get(conn, &ns, "hub") else { continue };
-        let Ok(v) = serde_json::from_str::<Value>(&raw) else { continue };
+        let Ok(Some(raw)) = kv_get(conn, &ns, "hub") else {
+            continue;
+        };
+        let Ok(v) = serde_json::from_str::<Value>(&raw) else {
+            continue;
+        };
         if v.get("star_name").is_some() {
             hubs.push((ns, v));
         }
@@ -119,9 +125,9 @@ pub fn galaxy_wake_star(conn: &Connection, ns: &str) -> Result<String, String> {
     }
     let inv = hub.get("invocations").and_then(|v| v.as_u64()).unwrap_or(0) + 1;
     hub["invocations"] = serde_json::json!(inv);
-    hub["last_loaded"] = serde_json::json!(
-        chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.6f").to_string()
-    );
+    hub["last_loaded"] = serde_json::json!(chrono::Utc::now()
+        .format("%Y-%m-%dT%H:%M:%S%.6f")
+        .to_string());
     let total = hub
         .get("metrics")
         .and_then(|m| m.get("total_runs"))
@@ -144,8 +150,7 @@ pub fn galaxy_get_persona(conn: &Connection, ns: &str) -> Result<Option<Value>, 
     let raw = kv_get(conn, ns, "hub")
         .map_err(|e| format!("hub 读取失败 ({ns}): {e}"))?
         .ok_or_else(|| format!("星辰 {ns} 不存在 hub"))?;
-    let hub: Value =
-        serde_json::from_str(&raw).map_err(|e| format!("hub 解析失败 ({ns}): {e}"))?;
+    let hub: Value = serde_json::from_str(&raw).map_err(|e| format!("hub 解析失败 ({ns}): {e}"))?;
     if hub.get("star_name").is_none() {
         return Err(format!("{ns} 非星辰 hub, 无 persona"));
     }
@@ -170,7 +175,10 @@ pub fn galaxy_set_persona(
     if hub.get("star_name").is_none() {
         return Err(format!("{ns} 非星辰 hub, 拒绝写入 persona"));
     }
-    let mut persona = hub.get("persona").cloned().unwrap_or_else(|| serde_json::json!({}));
+    let mut persona = hub
+        .get("persona")
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!({}));
     if let Some(r) = role {
         persona["role"] = serde_json::json!(r);
     }
@@ -210,7 +218,10 @@ pub fn galaxy_wake_scan(conn: &Connection, staleness_days: u64) -> Vec<(String, 
 /// - 引力中枢 `router` 的 `cross_route` 指向的 hub 存在 (星系完整性)
 ///
 /// `clean_ghosts` 为 true 时移除幽灵路由 (写回 hub)。
-pub fn galaxy_hygiene_check(conn: &Connection, config: &GalaxyHygieneConfig) -> GalaxyHygieneReport {
+pub fn galaxy_hygiene_check(
+    conn: &Connection,
+    config: &GalaxyHygieneConfig,
+) -> GalaxyHygieneReport {
     let mut report = GalaxyHygieneReport::default();
 
     let staleness_secs = config.staleness_days * 86400;
@@ -249,7 +260,9 @@ pub fn galaxy_hygiene_check(conn: &Connection, config: &GalaxyHygieneConfig) -> 
         if let Some(rt) = hub.get("route_table").and_then(|r| r.as_object()) {
             if rt.is_empty() {
                 report.empty_route_tables += 1;
-                report.findings.push(format!("[empty-route] hub '{}' 的 route_table 为空", key));
+                report
+                    .findings
+                    .push(format!("[empty-route] hub '{}' 的 route_table 为空", key));
             }
             let mut new_rt: serde_json::Map<String, Value> = serde_json::Map::new();
             for (kw, arr) in rt {
@@ -324,7 +337,8 @@ pub fn galaxy_hygiene_check(conn: &Connection, config: &GalaxyHygieneConfig) -> 
     }
 
     // ── 星系完整性: 引力中枢 router 的 cross_route 校验 ──
-    let known_hubs: std::collections::HashSet<String> = hubs.iter().map(|(k, _, _)| k.clone()).collect();
+    let known_hubs: std::collections::HashSet<String> =
+        hubs.iter().map(|(k, _, _)| k.clone()).collect();
     if let Ok(Some(router_json)) = kv_get(conn, "consciousness", "router") {
         if let Ok(router) = serde_json::from_str::<Value>(&router_json) {
             if let Some(cross) = router.get("cross_route").and_then(|c| c.as_object()) {
@@ -397,7 +411,8 @@ mod tests {
                 "updated_at": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),
             }
         });
-        super::super::nt_memory_unify::kv_set(&conn, "consciousness", "test_hub", &hub.to_string()).unwrap();
+        super::super::nt_memory_unify::kv_set(&conn, "consciousness", "test_hub", &hub.to_string())
+            .unwrap();
         super::super::nt_memory_unify::kv_set(&conn, "consciousness", "branch_a", "{}").unwrap();
 
         let report = galaxy_hygiene_check(&conn, &GalaxyHygieneConfig::default());
@@ -414,7 +429,8 @@ mod tests {
                 "updated_at": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),
             }
         });
-        super::super::nt_memory_unify::kv_set(&conn, "consciousness", "test_hub", &hub.to_string()).unwrap();
+        super::super::nt_memory_unify::kv_set(&conn, "consciousness", "test_hub", &hub.to_string())
+            .unwrap();
         // branch_ghost 不存在 → 幽灵分支
 
         let report = galaxy_hygiene_check(&conn, &GalaxyHygieneConfig::default());
@@ -425,14 +441,19 @@ mod tests {
     #[test]
     fn test_stale_star_detected() {
         let conn = test_conn();
-        let old_ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() - 200 * 86400;
+        let old_ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            - 200 * 86400;
         let hub = serde_json::json!({
             "hub": {
                 "route_table": {},
                 "updated_at": old_ts,
             }
         });
-        super::super::nt_memory_unify::kv_set(&conn, "consciousness", "old_hub", &hub.to_string()).unwrap();
+        super::super::nt_memory_unify::kv_set(&conn, "consciousness", "old_hub", &hub.to_string())
+            .unwrap();
 
         let report = galaxy_hygiene_check(&conn, &GalaxyHygieneConfig::default());
         assert_eq!(report.stale_stars, 1, "应检测到 1 个沉寂星辰");
@@ -444,7 +465,13 @@ mod tests {
         let router = serde_json::json!({
             "cross_route": {"review": ["nonexistent_hub"]}
         });
-        super::super::nt_memory_unify::kv_set(&conn, "consciousness", "router", &router.to_string()).unwrap();
+        super::super::nt_memory_unify::kv_set(
+            &conn,
+            "consciousness",
+            "router",
+            &router.to_string(),
+        )
+        .unwrap();
 
         let report = galaxy_hygiene_check(&conn, &GalaxyHygieneConfig::default());
         assert_eq!(report.missing_hubs, 1, "应检测到 1 个缺失 hub");
@@ -459,16 +486,25 @@ mod tests {
                 "updated_at": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),
             }
         });
-        super::super::nt_memory_unify::kv_set(&conn, "consciousness", "test_hub", &hub.to_string()).unwrap();
+        super::super::nt_memory_unify::kv_set(&conn, "consciousness", "test_hub", &hub.to_string())
+            .unwrap();
         super::super::nt_memory_unify::kv_set(&conn, "consciousness", "branch_real", "{}").unwrap();
 
         let mut config = GalaxyHygieneConfig::default();
         config.clean_ghosts = true;
-        let report = galaxy_hygiene_check(&conn, &GalaxyHygieneConfig { clean_ghosts: true, ..config });
+        let report = galaxy_hygiene_check(
+            &conn,
+            &GalaxyHygieneConfig {
+                clean_ghosts: true,
+                ..config
+            },
+        );
         assert_eq!(report.ghost_branches, 1);
 
         // 验证写回: route_table 只剩 branch_real
-        let saved = super::super::nt_memory_unify::kv_get(&conn, "consciousness", "test_hub").unwrap().unwrap();
+        let saved = super::super::nt_memory_unify::kv_get(&conn, "consciousness", "test_hub")
+            .unwrap()
+            .unwrap();
         let v: Value = serde_json::from_str(&saved).unwrap();
         let rt = v["hub"]["route_table"]["review"].as_array().unwrap();
         assert_eq!(rt.len(), 1, "清理后应只剩 1 条路由");
@@ -495,7 +531,8 @@ mod tests {
         insert_real_hub(&conn, "star_a", 0, None);
         insert_real_hub(&conn, "star_b", 2, Some("2026-08-01T10:00:00"));
         // 非星辰 hub (experience 式) 不应被发现
-        super::super::nt_memory_unify::kv_set(&conn, "plain_ns", "hub", r#"{"no_star": true}"#).unwrap();
+        super::super::nt_memory_unify::kv_set(&conn, "plain_ns", "hub", r#"{"no_star": true}"#)
+            .unwrap();
 
         let hubs = galaxy_list_hubs(&conn);
         assert_eq!(hubs.len(), 2, "应发现 2 颗星辰");
@@ -510,19 +547,29 @@ mod tests {
         let msg = galaxy_wake_star(&conn, "star_a").unwrap();
         assert!(msg.contains("唤醒 #4"), "第 4 次唤醒: {}", msg);
 
-        let raw = super::super::nt_memory_unify::kv_get(&conn, "star_a", "hub").unwrap().unwrap();
+        let raw = super::super::nt_memory_unify::kv_get(&conn, "star_a", "hub")
+            .unwrap()
+            .unwrap();
         let v: Value = serde_json::from_str(&raw).unwrap();
         assert_eq!(v["invocations"].as_u64(), Some(4));
         assert_eq!(v["metrics"]["total_runs"].as_u64(), Some(4));
         let last = v["last_loaded"].as_str().unwrap();
-        assert!(last.starts_with("2026-"), "last_loaded 应为当前 ISO: {}", last);
+        assert!(
+            last.starts_with("2026-"),
+            "last_loaded 应为当前 ISO: {}",
+            last
+        );
     }
 
     #[test]
     fn test_galaxy_wake_star_rejects_non_star() {
         let conn = test_conn();
-        super::super::nt_memory_unify::kv_set(&conn, "plain_ns", "hub", r#"{"no_star": true}"#).unwrap();
-        assert!(galaxy_wake_star(&conn, "plain_ns").is_err(), "非星辰应拒绝唤醒");
+        super::super::nt_memory_unify::kv_set(&conn, "plain_ns", "hub", r#"{"no_star": true}"#)
+            .unwrap();
+        assert!(
+            galaxy_wake_star(&conn, "plain_ns").is_err(),
+            "非星辰应拒绝唤醒"
+        );
     }
 
     #[test]
@@ -534,7 +581,8 @@ mod tests {
         assert!(galaxy_get_persona(&conn, "star_persona").unwrap().is_none());
 
         // 部分更新: 先只设 role
-        let msg = galaxy_set_persona(&conn, "star_persona", Some("Researcher"), None, None).unwrap();
+        let msg =
+            galaxy_set_persona(&conn, "star_persona", Some("Researcher"), None, None).unwrap();
         assert!(msg.contains("persona 已更新"));
         let p = galaxy_get_persona(&conn, "star_persona").unwrap().unwrap();
         assert_eq!(p["role"].as_str(), Some("Researcher"));
@@ -547,11 +595,19 @@ mod tests {
             None,
             Some("calm, precise"),
             Some("You find patterns across noise. Best at long-form research."),
-        ).unwrap();
+        )
+        .unwrap();
         let p = galaxy_get_persona(&conn, "star_persona").unwrap().unwrap();
-        assert_eq!(p["role"].as_str(), Some("Researcher"), "role 必须保留 (部分更新)");
+        assert_eq!(
+            p["role"].as_str(),
+            Some("Researcher"),
+            "role 必须保留 (部分更新)"
+        );
         assert_eq!(p["voice"].as_str(), Some("calm, precise"));
-        assert!(p["system_prompt"].as_str().unwrap().contains("patterns across noise"));
+        assert!(p["system_prompt"]
+            .as_str()
+            .unwrap()
+            .contains("patterns across noise"));
 
         // 完整覆盖: 提供全部三字段
         galaxy_set_persona(
@@ -560,7 +616,8 @@ mod tests {
             Some("Designer"),
             Some("sharp eye"),
             Some("The team's eye. From sketch to ship."),
-        ).unwrap();
+        )
+        .unwrap();
         let p = galaxy_get_persona(&conn, "star_persona").unwrap().unwrap();
         assert_eq!(p["role"].as_str(), Some("Designer"));
         assert_eq!(p["voice"].as_str(), Some("sharp eye"));
@@ -569,10 +626,14 @@ mod tests {
     #[test]
     fn test_galaxy_persona_rejects_non_star() {
         let conn = test_conn();
-        super::super::nt_memory_unify::kv_set(&conn, "plain_ns", "hub", r#"{"no_star": true}"#).unwrap();
+        super::super::nt_memory_unify::kv_set(&conn, "plain_ns", "hub", r#"{"no_star": true}"#)
+            .unwrap();
         assert!(galaxy_get_persona(&conn, "plain_ns").is_err());
         assert!(galaxy_set_persona(&conn, "plain_ns", Some("x"), None, None).is_err());
-        assert!(galaxy_get_persona(&conn, "missing_ns").is_err(), "不存在 hub 应报错");
+        assert!(
+            galaxy_get_persona(&conn, "missing_ns").is_err(),
+            "不存在 hub 应报错"
+        );
     }
 
     #[test]
@@ -581,9 +642,15 @@ mod tests {
         insert_real_hub(&conn, "star_p", 3, Some("2026-08-18T10:00:00"));
         galaxy_set_persona(&conn, "star_p", Some("Engineer"), None, None).unwrap();
         // persona 写入不得改变 invocations
-        let raw = super::super::nt_memory_unify::kv_get(&conn, "star_p", "hub").unwrap().unwrap();
+        let raw = super::super::nt_memory_unify::kv_get(&conn, "star_p", "hub")
+            .unwrap()
+            .unwrap();
         let v: Value = serde_json::from_str(&raw).unwrap();
-        assert_eq!(v["invocations"].as_u64(), Some(3), "persona 写入不得影响唤醒计数");
+        assert_eq!(
+            v["invocations"].as_u64(),
+            Some(3),
+            "persona 写入不得影响唤醒计数"
+        );
         assert_eq!(v["star_name"].as_str(), Some("Test-star_p"));
     }
 
@@ -597,7 +664,9 @@ mod tests {
 
         assert!(hub_active_epoch(&serde_json::json!({"last_loaded": "None"})).is_none());
         assert!(hub_active_epoch(&serde_json::json!({})).is_none());
-        assert!(hub_active_epoch(&serde_json::json!({"last_loaded": "2026-08-11T13:18:23Z"})).is_some());
+        assert!(
+            hub_active_epoch(&serde_json::json!({"last_loaded": "2026-08-11T13:18:23Z"})).is_some()
+        );
         assert!(hub_active_epoch(&serde_json::json!({"updated_at": 1700000000u64})).is_some());
     }
 
@@ -635,7 +704,9 @@ mod tests {
     #[ignore]
     fn test_real_kb_hygiene_readonly() {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        let db_path = std::path::PathBuf::from(&home).join(".neotrix").join("knowledge.db");
+        let db_path = std::path::PathBuf::from(&home)
+            .join(".neotrix")
+            .join("knowledge.db");
         let Ok(conn) = Connection::open(&db_path) else {
             log::info!("无法打开真实 KB: {}", db_path.display());
             return;
@@ -643,14 +714,21 @@ mod tests {
         let hubs = galaxy_list_hubs(&conn);
         println!("[integration] 真实星系 hub 数: {}", hubs.len());
         let nss = kv_list_namespaces(&conn).unwrap_or_default();
-        println!("[integration] kv_list_namespaces 返回 {} 个 namespace", nss.len());
+        println!(
+            "[integration] kv_list_namespaces 返回 {} 个 namespace",
+            nss.len()
+        );
         let mut hub_ns = 0usize;
         for ns in &nss {
             match kv_get(&conn, ns, "hub") {
                 Ok(Some(raw)) => {
                     hub_ns += 1;
                     if !raw.contains("\"star_name\"") && hub_ns < 6 {
-                        println!("[integration]   ns={} hub 无 star_name (len={})", ns, raw.len());
+                        println!(
+                            "[integration]   ns={} hub 无 star_name (len={})",
+                            ns,
+                            raw.len()
+                        );
                     }
                 }
                 Ok(None) => {}
@@ -660,13 +738,24 @@ mod tests {
         println!("[integration] 命中 hub key 的 namespace 数: {}", hub_ns);
         for (ns, hub) in hubs.iter().take(5) {
             let inv = hub.get("invocations").and_then(|i| i.as_u64()).unwrap_or(0);
-            println!("[integration]   - {} (invocations={}, last={})", ns, inv,
-                hub.get("last_loaded").and_then(|l| l.as_str()).unwrap_or("None"));
+            println!(
+                "[integration]   - {} (invocations={}, last={})",
+                ns,
+                inv,
+                hub.get("last_loaded")
+                    .and_then(|l| l.as_str())
+                    .unwrap_or("None")
+            );
         }
         let report = galaxy_hygiene_check(&conn, &GalaxyHygieneConfig::default());
-        println!("[integration] hygiene: {} hubs, {} ghost, {} stale, {} missing, {} empty",
-            report.hub_count, report.ghost_branches, report.stale_stars,
-            report.missing_hubs, report.empty_route_tables);
+        println!(
+            "[integration] hygiene: {} hubs, {} ghost, {} stale, {} missing, {} empty",
+            report.hub_count,
+            report.ghost_branches,
+            report.stale_stars,
+            report.missing_hubs,
+            report.empty_route_tables
+        );
         for f in report.findings.iter().take(8) {
             println!("[integration]   finding: {}", f);
         }
@@ -675,6 +764,10 @@ mod tests {
         for f in report.findings.iter().filter(|f| f.contains("missing-hub")) {
             println!("[integration]   missing: {}", f);
         }
-        assert!(report.hub_count >= 50, "真实星系应发现 50+ 星辰, 实得 {}", report.hub_count);
+        assert!(
+            report.hub_count >= 50,
+            "真实星系应发现 50+ 星辰, 实得 {}",
+            report.hub_count
+        );
     }
 }

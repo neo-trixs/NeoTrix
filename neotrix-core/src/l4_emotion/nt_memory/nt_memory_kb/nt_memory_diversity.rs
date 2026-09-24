@@ -11,7 +11,10 @@ use super::nt_memory_types::{KnowledgeNode, SearchResult};
 /// 当前 unix 秒 — 供 recency 计算用基准
 pub fn now_unix_secs() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
 }
 
 /// 时间衰减半衰期 (秒) — 约 30 天。超过后旧文档相关度减半。
@@ -54,7 +57,8 @@ where
         let mut best_val = f64::NEG_INFINITY;
         for (i, cand) in pool.iter().enumerate() {
             let rel = cand.score;
-            let max_sim = selected.iter()
+            let max_sim = selected
+                .iter()
                 .map(|s| similarity(&s.node, &cand.node))
                 .fold(0.0f64, f64::max);
             let val = MMR_LAMBDA * rel - (1.0 - MMR_LAMBDA) * max_sim;
@@ -79,7 +83,7 @@ pub fn rerank_with_recency_and_mmr(
     let recency_sorted = apply_recency_decay(results, now_secs);
     diversify_mmr(recency_sorted, k, |a, b| {
         match (embeddings.get(&a.id), embeddings.get(&b.id)) {
-//             (Some(va), Some(vb)) => cosine_similarity(va, vb),
+            //             (Some(va), Some(vb)) => cosine_similarity(va, vb),
             _ => 0.0,
         }
     })
@@ -136,7 +140,12 @@ mod tests {
         // 断言 decay 因子本身: 旧节点 score 必须显著低于新节点 (60天≈2半衰期 → decay=0.25)。
         let old_score = results.iter().find(|r| r.node.id == "old").unwrap().score;
         let new_score = results.iter().find(|r| r.node.id == "new").unwrap().score;
-        assert!(new_score > old_score, "decay must lower old score below new: old={} new={}", old_score, new_score);
+        assert!(
+            new_score > old_score,
+            "decay must lower old score below new: old={} new={}",
+            old_score,
+            new_score
+        );
     }
 
     #[test]
@@ -148,9 +157,20 @@ mod tests {
         let mut results = vec![weak_new, strong_old];
         results = apply_recency_decay(results, now);
         // 语义同上: 不重排, 只断言衰减后旧强仍大于弱新 (0.5 > 0.1)
-        let strong_old_score = results.iter().find(|r| r.node.id == "strong-old").unwrap().score;
-        let weak_new_score = results.iter().find(|r| r.node.id == "weak-new").unwrap().score;
-        assert!(strong_old_score > weak_new_score, "strong relevance must survive recency decay");
+        let strong_old_score = results
+            .iter()
+            .find(|r| r.node.id == "strong-old")
+            .unwrap()
+            .score;
+        let weak_new_score = results
+            .iter()
+            .find(|r| r.node.id == "weak-new")
+            .unwrap()
+            .score;
+        assert!(
+            strong_old_score > weak_new_score,
+            "strong relevance must survive recency decay"
+        );
     }
 
     #[test]
@@ -170,8 +190,11 @@ mod tests {
         let out = diversify_mmr(vec![a, b, c], 3, sim);
         let ids: Vec<&str> = out.iter().map(|r| r.node.id.as_str()).collect();
         // 期望 c 被挤到前面 (去冗余), b 与 a 太相似被后置
-        assert!(ids.iter().position(|&x| x == "c").unwrap() < ids.iter().position(|&x| x == "b").unwrap(),
-            "MMR must promote diverse c before near-duplicate b");
+        assert!(
+            ids.iter().position(|&x| x == "c").unwrap()
+                < ids.iter().position(|&x| x == "b").unwrap(),
+            "MMR must promote diverse c before near-duplicate b"
+        );
         assert_eq!(ids.len(), 3);
     }
 

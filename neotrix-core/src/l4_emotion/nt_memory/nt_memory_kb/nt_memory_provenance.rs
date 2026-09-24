@@ -97,7 +97,16 @@ impl ProvenanceRecord {
 
     /// 对记录内容计算 HMAC-SHA256 签名 (十六进制)。signature 字段本身不参与摘要。
     pub fn sign(&mut self, key: &[u8]) {
-        self.signature = sign_content(key, &self.id, &self.agent, &self.activity, &self.entity, &self.evidence, &self.outcome, self.created_at);
+        self.signature = sign_content(
+            key,
+            &self.id,
+            &self.agent,
+            &self.activity,
+            &self.entity,
+            &self.evidence,
+            &self.outcome,
+            self.created_at,
+        );
     }
 
     /// 校验签名是否有效 (空签名 / 签名失配均视为无效)。
@@ -105,7 +114,16 @@ impl ProvenanceRecord {
         if self.signature.is_empty() {
             return false;
         }
-        let expected = sign_content(key, &self.id, &self.agent, &self.activity, &self.entity, &self.evidence, &self.outcome, self.created_at);
+        let expected = sign_content(
+            key,
+            &self.id,
+            &self.agent,
+            &self.activity,
+            &self.entity,
+            &self.evidence,
+            &self.outcome,
+            self.created_at,
+        );
         constant_time_eq_hex(&self.signature, &expected)
     }
 }
@@ -121,8 +139,7 @@ fn sign_content(
     outcome: &str,
     created_at: i64,
 ) -> String {
-    let mut mac = HmacSha256::new_from_slice(key)
-        .expect("HMAC accepts any key length");
+    let mut mac = HmacSha256::new_from_slice(key).expect("HMAC accepts any key length");
     mac.update(id.as_bytes());
     mac.update([0u8; 1].as_slice());
     mac.update(agent.as_bytes());
@@ -139,7 +156,11 @@ fn sign_content(
     mac.update(outcome.as_bytes());
     mac.update([0u8; 1].as_slice());
     mac.update(created_at.to_le_bytes().as_slice());
-    mac.finalize().into_bytes().iter().map(|b| format!("{:02x}", b)).collect()
+    mac.finalize()
+        .into_bytes()
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect()
 }
 
 /// 常量时间十六进制字符串比较 (防时序侧信道)。
@@ -222,11 +243,9 @@ pub fn record_provenance_signed(
 }
 
 /// 写入一条决策溯源记录 (kv_store `provenance` 命名空间)。
-pub fn record_provenance(
-    conn: &Connection,
-    record: &ProvenanceRecord,
-) -> Result<(), String> {
-    let value = serde_json::to_string(record).map_err(|e| format!("serialize provenance: {}", e))?;
+pub fn record_provenance(conn: &Connection, record: &ProvenanceRecord) -> Result<(), String> {
+    let value =
+        serde_json::to_string(record).map_err(|e| format!("serialize provenance: {}", e))?;
     kv_set(conn, "provenance", &record.id, &value)
 }
 
@@ -259,19 +278,12 @@ pub fn query_provenance(
         }
     }
     // 按时间倒序; 同时间戳 (同秒写入) 以索引插入位置倒序作次键 (后写入在前)。
-    results.sort_by(|(pa, a), (pb, b)| {
-        b.created_at
-            .cmp(&a.created_at)
-            .then_with(|| pb.cmp(pa))
-    });
+    results.sort_by(|(pa, a), (pb, b)| b.created_at.cmp(&a.created_at).then_with(|| pb.cmp(pa)));
     Ok(results.into_iter().map(|(_, r)| r).collect())
 }
 
 /// 便捷: 记录 + 维护索引。返回记录 id。
-pub fn record_with_index(
-    conn: &Connection,
-    record: ProvenanceRecord,
-) -> Result<String, String> {
+pub fn record_with_index(conn: &Connection, record: ProvenanceRecord) -> Result<String, String> {
     record_provenance(conn, &record)?;
     // 维护 __index__ (幂等追加, 防重复)
     let all = kv_get(conn, "provenance", "__index__")?;
@@ -312,11 +324,9 @@ pub fn audit_verified(
     let raw = query_provenance(conn, None, None, None)?;
     Ok(raw
         .into_iter()
-        .map(|r| {
-            match guard.review(&r) {
-                Ok(()) => (r, true, String::new()),
-                Err(reason) => (r, false, reason),
-            }
+        .map(|r| match guard.review(&r) {
+            Ok(()) => (r, true, String::new()),
+            Err(reason) => (r, false, reason),
         })
         .collect())
 }
@@ -513,11 +523,13 @@ mod tests {
         let guard = InjectionGuard::new(TEST_KEY.to_vec())
             .with_trusted_agents(vec!["nt_memory_curation".into()]);
 
-        let mut trusted = ProvenanceRecord::new("nt_memory_curation", ProvActivity::Curate, "n", "ok");
+        let mut trusted =
+            ProvenanceRecord::new("nt_memory_curation", ProvActivity::Curate, "n", "ok");
         guard.sign_record(&mut trusted);
         assert!(guard.review(&trusted).is_ok());
 
-        let unsigned = ProvenanceRecord::new("nt_memory_curation", ProvActivity::Curate, "n", "no-sig");
+        let unsigned =
+            ProvenanceRecord::new("nt_memory_curation", ProvActivity::Curate, "n", "no-sig");
         assert!(guard.review(&unsigned).is_err());
 
         let foreign = ProvenanceRecord::new("attacker", ProvActivity::Curate, "n", "inject");
@@ -548,7 +560,11 @@ mod tests {
         record_with_index(&conn, bad).unwrap();
 
         let verified = query_provenance_verified(&conn, &guard, None, None, None).unwrap();
-        assert_eq!(verified.len(), 1, "only signed record survives teacher pass");
+        assert_eq!(
+            verified.len(),
+            1,
+            "only signed record survives teacher pass"
+        );
         assert_eq!(verified[0].entity, "e-good");
 
         let audit = audit_verified(&conn, &guard).unwrap();

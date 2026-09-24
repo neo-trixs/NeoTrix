@@ -13,13 +13,13 @@
 use std::io::Write;
 use std::path::Path;
 
-use rusqlite::Connection;
-use serde::{Deserialize, Serialize};
 use super::nt_memory_store::{get_node, insert_or_get_node, update_node_metadata};
 use super::nt_memory_types::NodeType;
 use super::nt_normalizer::validate_node_type;
 use super::shared_utils::now;
 use crate::l2_perception::nt_core_e8::abduction::causal_graph::CausalGraph;
+use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
 
 const SCHEMA_VERSION: u32 = 1;
 /// 超过该体积的文件不计算 sha256 (避免 68GB corpus 卡死); 仅小文件 (因果图) 取指纹。
@@ -132,7 +132,9 @@ pub fn report_lineage(conn: &Connection) -> Result<Vec<LineageReport>, String> {
             external_sha256: lineage.as_ref().and_then(|l| l.external_sha256.clone()),
             last_synced_at: lineage.as_ref().and_then(|l| l.last_synced_at),
             last_seal_cycle: lineage.as_ref().and_then(|l| l.last_seal_cycle.clone()),
-            direction: lineage.map(|l| l.direction).unwrap_or_else(|| "in".to_string()),
+            direction: lineage
+                .map(|l| l.direction)
+                .unwrap_or_else(|| "in".to_string()),
         });
     }
     Ok(out)
@@ -277,7 +279,10 @@ fn read_cortex_lineage(conn: &Connection, url: &str) -> Result<Option<Lineage>, 
     Ok(meta.and_then(|m| {
         serde_json::from_str::<serde_json::Value>(&m)
             .ok()
-            .and_then(|v| v.get("lineage").and_then(|l| serde_json::from_value::<Lineage>(l.clone()).ok()))
+            .and_then(|v| {
+                v.get("lineage")
+                    .and_then(|l| serde_json::from_value::<Lineage>(l.clone()).ok())
+            })
     }))
 }
 
@@ -397,7 +402,11 @@ pub fn digest_sample(
         }
         // 已 live 则跳过 (避免重复激活)
         let live: i64 = conn
-            .query_row("SELECT COUNT(*) FROM nodes WHERE url=?", rusqlite::params![url.clone()], |r| r.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM nodes WHERE url=?",
+                rusqlite::params![url.clone()],
+                |r| r.get(0),
+            )
             .unwrap_or(0);
         if live > 0 {
             rep.already_live += 1;
@@ -415,7 +424,9 @@ pub fn digest_sample(
         .map_err(|e| e.to_string())?;
         // 写入 lineage + 原始 content/metadata (G3)
         let mut meta = match meta_str {
-            Some(s) => serde_json::from_str::<serde_json::Value>(&s).unwrap_or(serde_json::Value::Null),
+            Some(s) => {
+                serde_json::from_str::<serde_json::Value>(&s).unwrap_or(serde_json::Value::Null)
+            }
             None => serde_json::Value::Null,
         };
         if !meta.is_object() {
@@ -471,10 +482,8 @@ pub fn ingest_causal_graph(
         .map_err(|e| e.to_string())?;
         // 写 lineage (G3): 用既有 metadata 增量更新, 不平行造写入器
         if let Ok(Some(existing)) = get_node(conn, &id) {
-            let mut payload: serde_json::Value = existing
-                .metadata
-                .clone()
-                .unwrap_or(serde_json::Value::Null);
+            let mut payload: serde_json::Value =
+                existing.metadata.clone().unwrap_or(serde_json::Value::Null);
             if !payload.is_object() {
                 payload = serde_json::json!({});
             }
@@ -494,10 +503,8 @@ pub fn ingest_causal_graph(
     )
     .map_err(|e| e.to_string())?;
     if let Ok(Some(existing)) = get_node(conn, &umbrella_id) {
-        let mut payload: serde_json::Value = existing
-            .metadata
-            .clone()
-            .unwrap_or(serde_json::json!({}));
+        let mut payload: serde_json::Value =
+            existing.metadata.clone().unwrap_or(serde_json::json!({}));
         enrich_cortex_metadata(&mut payload, source_path, "in");
         update_node_metadata(conn, &umbrella_id, &payload).map_err(|e| e.to_string())?;
     }
@@ -607,8 +614,11 @@ mod tests {
     fn enrich_adds_lineage_with_sha() -> Result<(), String> {
         let dir = tempfile::tempdir().expect("tmp");
         let cg = dir.path().join("causal_graph.json");
-        std::fs::write(&cg, serde_json::json!({"ts": 1700000000, "nodes": []}).to_string())
-            .expect("write");
+        std::fs::write(
+            &cg,
+            serde_json::json!({"ts": 1700000000, "nodes": []}).to_string(),
+        )
+        .expect("write");
         let mut payload = serde_json::json!({"kind": "cortex_causal_graph"});
         enrich_cortex_metadata(&mut payload, Some(&cg), "in");
         let lineage: Lineage = serde_json::from_value(payload["lineage"].clone()).expect("parse");
@@ -680,7 +690,11 @@ mod tests {
         assert_eq!(r.entries, 1); // updated_at>150 仅 cycle_002 (200) 算, cycle_001 (100) 不算
         assert_eq!(r.since, 150);
         // dry-run 不写盘
-        assert!(!dir.path().join("working").join("nt_cortex_delta.jsonl").exists());
+        assert!(!dir
+            .path()
+            .join("working")
+            .join("nt_cortex_delta.jsonl")
+            .exists());
         Ok(())
     }
 
@@ -828,8 +842,11 @@ mod tests {
             .map_err(|e| e.to_string())?;
         let dir = tempfile::tempdir().expect("tmp");
         let cg = dir.path().join("causal_graph.json");
-        std::fs::write(&cg, serde_json::json!({"ts": 1700000000, "nodes": []}).to_string())
-            .expect("write");
+        std::fs::write(
+            &cg,
+            serde_json::json!({"ts": 1700000000, "nodes": []}).to_string(),
+        )
+        .expect("write");
         // 构造因果图: a(高置信) → c, b(低置信) → c; c 度数=2 (高信号), b 度数=1 且低置信 (应被跳过)
         let mut g = CausalGraph::new();
         let a = g.add_node("原则: 模块化降低耦合".to_string(), 0.9);
@@ -857,7 +874,9 @@ mod tests {
             .map_err(|e| e.to_string())?;
         let v: serde_json::Value = serde_json::from_str(&meta).map_err(|e| e.to_string())?;
         assert!(
-            v.get("lineage").and_then(|l| l.get("external_sha256")).is_some(),
+            v.get("lineage")
+                .and_then(|l| l.get("external_sha256"))
+                .is_some(),
             "伞节点应含 sha: {meta}"
         );
         Ok(())
@@ -898,7 +917,12 @@ mod tests {
         )
         .map_err(|e| e.to_string())?;
         insert_or_get_node(
-            &conn, "live", NodeType::from_str("article"), Some("s"), Some("zimid://live/2"), Some("d"),
+            &conn,
+            "live",
+            NodeType::from_str("article"),
+            Some("s"),
+            Some("zimid://live/2"),
+            Some("d"),
         )
         .map_err(|e| e.to_string())?;
         // dry-run 先计数

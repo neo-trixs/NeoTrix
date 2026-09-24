@@ -15,12 +15,37 @@ use serde_json::json;
 fn polarity(content: &str) -> i32 {
     let c = content.to_lowercase();
     let mut p = 0i32;
-    for neg in ["not ", "no", "false", "disabled", "unsupported", "不支持", "错误", "禁止", "禁用", "不允许", "cannot", "cannot be"] {
+    for neg in [
+        "not ",
+        "no",
+        "false",
+        "disabled",
+        "unsupported",
+        "不支持",
+        "错误",
+        "禁止",
+        "禁用",
+        "不允许",
+        "cannot",
+        "cannot be",
+    ] {
         if c.contains(neg) {
             p -= 3;
         }
     }
-    for pos in ["is ", "yes", "true", "enabled", "supported", "正确", "是", "支持", "启用", "允许", "can be"] {
+    for pos in [
+        "is ",
+        "yes",
+        "true",
+        "enabled",
+        "supported",
+        "正确",
+        "是",
+        "支持",
+        "启用",
+        "允许",
+        "can be",
+    ] {
         if c.contains(pos) {
             p += 1;
         }
@@ -100,9 +125,7 @@ pub fn conflict_detect(conn: &Connection, title_sim: f64) -> Result<Vec<Conflict
         )
         .map_err(|e| e.to_string())?;
     let rows: Vec<(String, String, String, i64)> = stmt
-        .query_map([], |r| {
-            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
-        })
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
         .map_err(|e| e.to_string())?
         .collect::<Result<_, _>>()
         .map_err(|e| e.to_string())?;
@@ -392,7 +415,11 @@ pub fn curate_by_hitrate(
     for (id, title, access_count) in rows {
         // rewrite: 有内容但几乎没被访问 → 标注 metadata 建议重写
         // archive: 完全零访问 → 直接降级冷
-        let action = if access_count == 0 { "archive" } else { "rewrite" };
+        let action = if access_count == 0 {
+            "archive"
+        } else {
+            "rewrite"
+        };
         if action == "archive" {
             conn.execute(
                 "UPDATE nodes SET tier = 'cold', updated_at = ?1 WHERE id = ?2",
@@ -481,7 +508,15 @@ mod tests {
         conn
     }
 
-    fn seed(conn: &Connection, id: &str, title: &str, content: &str, ts: i64, access: i64, importance: f64) {
+    fn seed(
+        conn: &Connection,
+        id: &str,
+        title: &str,
+        content: &str,
+        ts: i64,
+        access: i64,
+        importance: f64,
+    ) {
         conn.execute(
             "INSERT INTO nodes (id, node_type, title, content, created_at, updated_at, access_count, importance) \
              VALUES (?1, 'fact', ?2, ?3, ?4, ?4, ?5, ?6)",
@@ -494,10 +529,30 @@ mod tests {
     fn conflict_detect_finds_opposite_claims() {
         let conn = mem_conn();
         let now = now_unix();
-        seed(&conn, "a", "Rate limit retry policy", "retry is enabled for provider", now, 3, 0.8);
-        seed(&conn, "b", "Rate limit retry policy", "retry is not enabled", now + 10, 1, 0.7);
+        seed(
+            &conn,
+            "a",
+            "Rate limit retry policy",
+            "retry is enabled for provider",
+            now,
+            3,
+            0.8,
+        );
+        seed(
+            &conn,
+            "b",
+            "Rate limit retry policy",
+            "retry is not enabled",
+            now + 10,
+            1,
+            0.7,
+        );
         let hits = conflict_detect(&conn, 0.4).unwrap();
-        assert_eq!(hits.len(), 1, "similar title + opposite polarity must be flagged");
+        assert_eq!(
+            hits.len(),
+            1,
+            "similar title + opposite polarity must be flagged"
+        );
         assert_eq!(hits[0].older_id, "a");
         assert_eq!(hits[0].newer_id, "b");
         let applied = apply_supersede(&conn, &hits).unwrap();
@@ -507,7 +562,9 @@ mod tests {
             .unwrap();
         assert_eq!(tier, "cold", "older node retired");
         let supersedes: String = conn
-            .query_row("SELECT supersedes FROM nodes WHERE id='a'", [], |r| r.get(0))
+            .query_row("SELECT supersedes FROM nodes WHERE id='a'", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(supersedes, "b", "evidence chain kept");
     }
@@ -516,8 +573,24 @@ mod tests {
     fn same_polarity_not_conflict() {
         let conn = mem_conn();
         let now = now_unix();
-        seed(&conn, "a", "MMR diversity lambda", "diversify uses lambda 0.7", now, 0, 0.8);
-        seed(&conn, "b", "MMR diversity lambda", "diversify uses lambda 0.7", now + 5, 0, 0.8);
+        seed(
+            &conn,
+            "a",
+            "MMR diversity lambda",
+            "diversify uses lambda 0.7",
+            now,
+            0,
+            0.8,
+        );
+        seed(
+            &conn,
+            "b",
+            "MMR diversity lambda",
+            "diversify uses lambda 0.7",
+            now + 5,
+            0,
+            0.8,
+        );
         let hits = conflict_detect(&conn, 0.4).unwrap();
         assert!(hits.is_empty(), "same polarity must not conflict");
     }
@@ -528,8 +601,24 @@ mod tests {
         // 覆盖解决需留差异清单, 并在旧节点 metadata 记录解决依据。
         let conn = mem_conn();
         let now = now_unix();
-        seed(&conn, "a", "Retry backoff policy", "backoff is enabled", now, 0, 0.8);
-        seed(&conn, "b", "Retry backoff policy", "backoff is not enabled", now + 10, 0, 0.8);
+        seed(
+            &conn,
+            "a",
+            "Retry backoff policy",
+            "backoff is enabled",
+            now,
+            0,
+            0.8,
+        );
+        seed(
+            &conn,
+            "b",
+            "Retry backoff policy",
+            "backoff is not enabled",
+            now + 10,
+            0,
+            0.8,
+        );
         let hits = conflict_detect(&conn, 0.4).unwrap();
         assert_eq!(hits.len(), 1);
         let (applied, ledger) = apply_supersede_with_ledger(&conn, &hits).unwrap();
@@ -541,7 +630,11 @@ mod tests {
         let meta: String = conn
             .query_row("SELECT metadata FROM nodes WHERE id='a'", [], |r| r.get(0))
             .unwrap();
-        assert!(meta.contains("resolved_by"), "provenance must be recorded, got {}", meta);
+        assert!(
+            meta.contains("resolved_by"),
+            "provenance must be recorded, got {}",
+            meta
+        );
         assert!(meta.contains("b"), "resolved_by should point to newer");
         assert!(meta.contains("sim"));
         // 幂等: 二次解决无新增
@@ -569,19 +662,47 @@ mod tests {
         // title 字典序做稳定 tie-break, 保证 supersede 方向确定性 (幂等)。
         let conn = mem_conn();
         let now = now_unix();
-        seed(&conn, "z-node", "Equal ts policy", "rate limit is enabled", now, 0, 0.8);
-        seed(&conn, "a-node", "Equal ts policy", "rate limit is not enabled", now, 0, 0.8);
+        seed(
+            &conn,
+            "z-node",
+            "Equal ts policy",
+            "rate limit is enabled",
+            now,
+            0,
+            0.8,
+        );
+        seed(
+            &conn,
+            "a-node",
+            "Equal ts policy",
+            "rate limit is not enabled",
+            now,
+            0,
+            0.8,
+        );
         let hits1 = conflict_detect(&conn, 0.4).unwrap();
-        assert_eq!(hits1.len(), 1, "opposite polarity + equal ts must be flagged");
-        assert_eq!(hits1[0].older_id, "a-node", "title tie-break: a-node < z-node");
+        assert_eq!(
+            hits1.len(),
+            1,
+            "opposite polarity + equal ts must be flagged"
+        );
+        assert_eq!(
+            hits1[0].older_id, "a-node",
+            "title tie-break: a-node < z-node"
+        );
         assert_eq!(hits1[0].newer_id, "z-node");
         // 幂等: 二次扫描结果必须一致 (不依赖行序)
         let hits2 = conflict_detect(&conn, 0.4).unwrap();
-        assert_eq!(hits1[0].older_id, hits2[0].older_id, "deterministic across runs");
+        assert_eq!(
+            hits1[0].older_id, hits2[0].older_id,
+            "deterministic across runs"
+        );
         let applied = apply_supersede(&conn, &hits1).unwrap();
         assert_eq!(applied, 1);
         let supersedes: String = conn
-            .query_row("SELECT supersedes FROM nodes WHERE id='a-node'", [], |r| r.get(0))
+            .query_row("SELECT supersedes FROM nodes WHERE id='a-node'", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(supersedes, "z-node", "older (by title) points to newer");
     }
@@ -591,9 +712,25 @@ mod tests {
         let conn = mem_conn();
         let now = now_unix();
         // 很旧 + 零访问 + 低重要性
-        seed(&conn, "old", "dead experiment", "stale experiment notes", now - 90 * 86_400, 0, 0.1);
+        seed(
+            &conn,
+            "old",
+            "dead experiment",
+            "stale experiment notes",
+            now - 90 * 86_400,
+            0,
+            0.1,
+        );
         // 旧但重要 → 不该被遗忘
-        seed(&conn, "imp", "important design", "critical invariant", now - 90 * 86_400, 0, 0.9);
+        seed(
+            &conn,
+            "imp",
+            "important design",
+            "critical invariant",
+            now - 90 * 86_400,
+            0,
+            0.9,
+        );
         let hits = forget_stale(&conn, 60, 0.3).unwrap();
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].id, "old");
@@ -611,11 +748,29 @@ mod tests {
     fn curate_archives_zero_access_marks_rewrite_for_low() {
         let conn = mem_conn();
         let now = now_unix();
-        seed(&conn, "z", "zero hit doc", "never retrieved", now - 90 * 86_400, 0, 0.5);
-        seed(&conn, "l", "low hit doc", "rarely retrieved", now - 90 * 86_400, 1, 0.5);
+        seed(
+            &conn,
+            "z",
+            "zero hit doc",
+            "never retrieved",
+            now - 90 * 86_400,
+            0,
+            0.5,
+        );
+        seed(
+            &conn,
+            "l",
+            "low hit doc",
+            "rarely retrieved",
+            now - 90 * 86_400,
+            1,
+            0.5,
+        );
         let hits = curate_by_hitrate(&conn, 1, 30).unwrap();
-        let by_id: std::collections::HashMap<String, String> =
-            hits.iter().map(|h| (h.id.clone(), h.action.clone())).collect();
+        let by_id: std::collections::HashMap<String, String> = hits
+            .iter()
+            .map(|h| (h.id.clone(), h.action.clone()))
+            .collect();
         assert_eq!(by_id.get("z").map(String::as_str), Some("archive"));
         assert_eq!(by_id.get("l").map(String::as_str), Some("rewrite"));
         let tier: String = conn

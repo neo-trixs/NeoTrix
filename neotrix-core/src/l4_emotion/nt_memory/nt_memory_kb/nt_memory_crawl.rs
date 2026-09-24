@@ -35,7 +35,10 @@ pub fn on_node_inserted(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Re
     Ok(())
 }
 
-pub fn enqueue_seed_urls(conn: &Connection, topic_urls: &[(&str, i64, &str)]) -> rusqlite::Result<usize> {
+pub fn enqueue_seed_urls(
+    conn: &Connection,
+    topic_urls: &[(&str, i64, &str)],
+) -> rusqlite::Result<usize> {
     let ts = now();
     let mut count = 0;
     for (url, priority, domain) in topic_urls {
@@ -46,9 +49,15 @@ pub fn enqueue_seed_urls(conn: &Connection, topic_urls: &[(&str, i64, &str)]) ->
 }
 
 pub fn ingest_from_wikipedia(conn: &Connection, topic: &str) -> Result<usize, String> {
-    let url = format!("https://en.wikipedia.org/api/rest_v1/page/summary/{}", topic);
-    let resp = super::nt_http::run_blocking(|| http_client().get(&url).send()).map_err(|e| format!("Wikipedia fetch error: {}", e))?;
-    let data: serde_json::Value = resp.json().map_err(|e| format!("JSON parse error: {}", e))?;
+    let url = format!(
+        "https://en.wikipedia.org/api/rest_v1/page/summary/{}",
+        topic
+    );
+    let resp = super::nt_http::run_blocking(|| http_client().get(&url).send())
+        .map_err(|e| format!("Wikipedia fetch error: {}", e))?;
+    let data: serde_json::Value = resp
+        .json()
+        .map_err(|e| format!("JSON parse error: {}", e))?;
 
     let title = data["title"].as_str().unwrap_or(topic);
     let summary = data["extract"].as_str().unwrap_or("");
@@ -94,7 +103,8 @@ pub fn ingest_from_wikipedia(conn: &Connection, topic: &str) -> Result<usize, St
 
 pub fn ingest_from_arxiv(conn: &Connection, arxiv_id: &str) -> Result<usize, String> {
     let url = format!("https://export.arxiv.org/api/query?id_list={}", arxiv_id);
-    let resp = super::nt_http::run_blocking(|| http_client().get(&url).send()).map_err(|e| format!("arXiv fetch error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| http_client().get(&url).send())
+        .map_err(|e| format!("arXiv fetch error: {}", e))?;
     let text = resp.text().map_err(|e| format!("Text error: {}", e))?;
 
     // export API 返回 feed, 首个 <title> 是 feed 级 "arXiv Query: ..."。
@@ -183,8 +193,8 @@ pub fn ingest_from_alphaxiv_feed(
         let resp = super::nt_http::run_blocking(|| http_client().get(&url).send())
             .map_err(|e| format!("alphaXiv fetch error: {}", e))?;
         let text = resp.text().map_err(|e| format!("Text error: {}", e))?;
-        let json: serde_json::Value = serde_json::from_str(&text)
-            .map_err(|e| format!("JSON parse error: {}", e))?;
+        let json: serde_json::Value =
+            serde_json::from_str(&text).map_err(|e| format!("JSON parse error: {}", e))?;
         let papers = json["papers"].as_array().cloned().unwrap_or_default();
         if papers.is_empty() {
             break;
@@ -324,11 +334,13 @@ pub fn ingest_from_openlibrary(conn: &Connection) -> Result<usize, String> {
         let api_url = format!("{}.json", url.trim_end_matches('/'));
         if let Ok((body, _host)) = super::nt_http::fetch_safe_http_with_retry(&api_url) {
             if let Ok(data) = serde_json::from_str::<serde_json::Value>(&body) {
-                let desc = data["description"].as_str()
+                let desc = data["description"]
+                    .as_str()
                     .or_else(|| data["description"]["value"].as_str())
                     .or_else(|| data["subtitle"].as_str())
                     .or_else(|| {
-                        data["excerpts"].as_array()
+                        data["excerpts"]
+                            .as_array()
                             .and_then(|a| a.first())
                             .and_then(|e| e["text"].as_str())
                     });
@@ -352,16 +364,24 @@ pub fn ingest_from_openlibrary(conn: &Connection) -> Result<usize, String> {
 
 pub fn ingest_from_github(conn: &Connection, owner: &str, repo: &str) -> Result<usize, String> {
     let api_url = format!("https://api.github.com/repos/{}/{}", owner, repo);
-    let resp = super::nt_http::run_blocking(|| http_client().get(&api_url).send()).map_err(|e| format!("GitHub fetch error: {}", e))?;
-    let data: serde_json::Value = resp.json().map_err(|e| format!("JSON parse error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| http_client().get(&api_url).send())
+        .map_err(|e| format!("GitHub fetch error: {}", e))?;
+    let data: serde_json::Value = resp
+        .json()
+        .map_err(|e| format!("JSON parse error: {}", e))?;
 
     let default_title = format!("{}/{}", owner, repo);
     let title = data["full_name"].as_str().unwrap_or(&default_title);
     let description = data["description"].as_str().unwrap_or("");
     let repo_url = data["html_url"].as_str().unwrap_or(&api_url);
     let stars = data["stargazers_count"].as_i64().unwrap_or(0);
-    let topics: Vec<String> = data["topics"].as_array()
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+    let topics: Vec<String> = data["topics"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
         .unwrap_or_default();
     let lang = data["language"].as_str().unwrap_or("unknown");
 
@@ -461,7 +481,9 @@ pub fn ingest_from_hf_dataset(conn: &Connection, dataset_ref: &str) -> Result<us
     if resp.status().is_client_error() || resp.status().is_server_error() {
         return Err(format!("HF API {} for {}", resp.status(), api_url));
     }
-    let data: serde_json::Value = resp.json().map_err(|e| format!("HF JSON parse error: {}", e))?;
+    let data: serde_json::Value = resp
+        .json()
+        .map_err(|e| format!("HF JSON parse error: {}", e))?;
 
     let ds_id = data["id"].as_str().unwrap_or(after_ds);
     let author = data["author"].as_str().unwrap_or(owner);
@@ -469,8 +491,13 @@ pub fn ingest_from_hf_dataset(conn: &Connection, dataset_ref: &str) -> Result<us
     let likes = data["likes"].as_i64().unwrap_or(0);
     let gated = data["gated"].as_bool().unwrap_or(false);
     let _private = data["private"].as_bool().unwrap_or(false);
-    let tags: Vec<String> = data["tags"].as_array()
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+    let tags: Vec<String> = data["tags"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
         .unwrap_or_default();
     let description = data["description"].as_str().unwrap_or("").to_string();
 
@@ -526,7 +553,10 @@ pub fn ingest_from_hf_dataset(conn: &Connection, dataset_ref: &str) -> Result<us
     // tags → Concept 节点 + Related edges
     let mut tags_created = 0usize;
     for tag in tags.iter().filter(|t| !t.is_empty()).take(12) {
-        let tag_clean = tag.trim_start_matches("task_categories:").trim_start_matches("language:").trim_start_matches("license:");
+        let tag_clean = tag
+            .trim_start_matches("task_categories:")
+            .trim_start_matches("language:")
+            .trim_start_matches("license:");
         if tag_clean.is_empty() {
             continue;
         }
@@ -601,8 +631,8 @@ pub fn run_crawl_cycle(conn: &Connection, max_items: usize) -> Result<CrawlCycle
     let mut report = CrawlCycleReport::default();
 
     for _ in 0..max_items {
-        let item = store::claim_next_crawl_url(conn)
-            .map_err(|e| format!("DB claim error: {}", e))?;
+        let item =
+            store::claim_next_crawl_url(conn).map_err(|e| format!("DB claim error: {}", e))?;
 
         let item = match item {
             Some(item) => item,
@@ -627,8 +657,13 @@ pub fn run_crawl_cycle(conn: &Connection, max_items: usize) -> Result<CrawlCycle
             }
             Err(e) => {
                 let err_str = format!("{:?}", e);
-                store::mark_crawl_complete(conn, &item.id, false, Some(&err_str[..std::cmp::min(err_str.len(), 500)]))
-                    .map_err(|e| format!("DB error: {}", e))?;
+                store::mark_crawl_complete(
+                    conn,
+                    &item.id,
+                    false,
+                    Some(&err_str[..std::cmp::min(err_str.len(), 500)]),
+                )
+                .map_err(|e| format!("DB error: {}", e))?;
                 report.failed += 1;
                 report.errors.push((item.url, err_str));
             }
@@ -838,8 +873,12 @@ pub struct CrawlCycleReport {
 }
 
 pub fn discover_from_seed(conn: &Connection, seed_topic: &str) -> Result<usize, String> {
-    let url = format!("https://en.wikipedia.org/api/rest_v1/page/summary/{}", seed_topic);
-    let resp = super::nt_http::run_blocking(|| http_client().get(&url).send()).map_err(|e| format!("Fetch error: {}", e))?;
+    let url = format!(
+        "https://en.wikipedia.org/api/rest_v1/page/summary/{}",
+        seed_topic
+    );
+    let resp = super::nt_http::run_blocking(|| http_client().get(&url).send())
+        .map_err(|e| format!("Fetch error: {}", e))?;
 
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON error: {}", e))?;
 
@@ -933,26 +972,27 @@ pub fn ingest_geo_cities(
         let mut last_err = String::new();
         for attempt in 0..3 {
             match super::nt_http::run_blocking(|| http_client().get(url).send()) {
-                Ok(resp) if resp.status().is_success() => {
-                    match resp.json::<serde_json::Value>() {
-                        Ok(v) if v.is_array() => {
-                            data = Some(v);
-                            break;
-                        }
-                        Ok(_) => {
-                            last_err = "cities payload is not an array".into();
-                            break;
-                        }
-                        Err(e) => last_err = format!("cities JSON parse error: {}", e),
+                Ok(resp) if resp.status().is_success() => match resp.json::<serde_json::Value>() {
+                    Ok(v) if v.is_array() => {
+                        data = Some(v);
+                        break;
                     }
-                }
+                    Ok(_) => {
+                        last_err = "cities payload is not an array".into();
+                        break;
+                    }
+                    Err(e) => last_err = format!("cities JSON parse error: {}", e),
+                },
                 Ok(resp) => last_err = format!("HTTP {} for {}", resp.status(), url),
                 Err(e) => last_err = format!("geo cities fetch error: {}", e),
             }
             std::thread::sleep(std::time::Duration::from_millis(800 * (attempt as u64 + 1)));
         }
         if data.is_none() {
-            return Err(format!("geo cities download failed after 3 attempts: {}", last_err));
+            return Err(format!(
+                "geo cities download failed after 3 attempts: {}",
+                last_err
+            ));
         }
     }
 
@@ -996,8 +1036,14 @@ pub fn ingest_geo_cities(
             break;
         }
         let name = city["name"].as_str().unwrap_or("").to_string();
-        let lat = city["lat"].as_str().and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
-        let lng = city["lng"].as_str().and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+        let lat = city["lat"]
+            .as_str()
+            .and_then(|s| s.parse::<f64>().ok())
+            .unwrap_or(0.0);
+        let lng = city["lng"]
+            .as_str()
+            .and_then(|s| s.parse::<f64>().ok())
+            .unwrap_or(0.0);
         if name.is_empty() || (lat == 0.0 && lng == 0.0) {
             continue;
         }
@@ -1011,7 +1057,10 @@ pub fn ingest_geo_cities(
             &tx,
             &title,
             NodeType::Resource,
-            Some(&format!("城市坐标: {},{} (GeoNames cities1000 via cities.json)", lat, lng)),
+            Some(&format!(
+                "城市坐标: {},{} (GeoNames cities1000 via cities.json)",
+                lat, lng
+            )),
             None,
             Some("geonames.org"),
         )
@@ -1064,8 +1113,7 @@ pub fn ingest_geo_peaks(
     // 支持本地文件路径与 file:// 前缀
     let body = if url_or_path.starts_with("file://") || std::path::Path::new(url_or_path).exists() {
         let path = url_or_path.strip_prefix("file://").unwrap_or(url_or_path);
-        std::fs::read_to_string(path)
-            .map_err(|e| format!("读取本地文件失败: {} ({})", e, path))?
+        std::fs::read_to_string(path).map_err(|e| format!("读取本地文件失败: {} ({})", e, path))?
     } else {
         let resp = super::nt_http::run_blocking(|| http_client().get(url_or_path).send())
             .map_err(|e| format!("peaks fetch error: {}", e))?;
@@ -1184,8 +1232,8 @@ pub fn ingest_country_boundaries(conn: &Connection, url: &str) -> Result<usize, 
         return Err(format!("HTTP {} for {}", resp.status(), url));
     }
     let body = resp.text().map_err(|e| format!("read: {}", e))?;
-    let topo: serde_json::Value = serde_json::from_str(&body)
-        .map_err(|e| format!("TopoJSON parse error: {}", e))?;
+    let topo: serde_json::Value =
+        serde_json::from_str(&body).map_err(|e| format!("TopoJSON parse error: {}", e))?;
 
     // world-atlas countries 对象: geometries[].properties.name
     let countries = topo
@@ -1243,8 +1291,8 @@ pub fn ingest_geo_vectors(conn: &Connection, url: &str, kind: &str) -> Result<us
         }
         resp.text().map_err(|e| format!("read: {}", e))?
     };
-    let fc: serde_json::Value = serde_json::from_str(&body)
-        .map_err(|e| format!("GeoJSON parse error: {}", e))?;
+    let fc: serde_json::Value =
+        serde_json::from_str(&body).map_err(|e| format!("GeoJSON parse error: {}", e))?;
 
     let features = fc
         .get("features")
@@ -1253,7 +1301,11 @@ pub fn ingest_geo_vectors(conn: &Connection, url: &str, kind: &str) -> Result<us
 
     let mut count = 0usize;
     for (idx, feat) in features.iter().enumerate() {
-        let geom = feat.get("geometry").and_then(|g| g.get("type")).and_then(|t| t.as_str()).unwrap_or("");
+        let geom = feat
+            .get("geometry")
+            .and_then(|g| g.get("type"))
+            .and_then(|t| t.as_str())
+            .unwrap_or("");
         let name = feat
             .get("properties")
             .and_then(|p| p.get("name"))
@@ -1277,7 +1329,12 @@ pub fn ingest_geo_vectors(conn: &Connection, url: &str, kind: &str) -> Result<us
                 .and_then(|c| c.as_array())
                 .and_then(|arr| arr.first())
                 .and_then(|p| p.as_array())
-                .map(|p| (p.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0), p.first().and_then(|v| v.as_f64()).unwrap_or(0.0)))
+                .map(|p| {
+                    (
+                        p.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0),
+                        p.first().and_then(|v| v.as_f64()).unwrap_or(0.0),
+                    )
+                })
                 .unwrap_or((0.0, 0.0)),
             "Polygon" => coords
                 .and_then(|c| c.as_array())
@@ -1285,7 +1342,12 @@ pub fn ingest_geo_vectors(conn: &Connection, url: &str, kind: &str) -> Result<us
                 .and_then(|ring| ring.as_array())
                 .and_then(|ring| ring.first())
                 .and_then(|p| p.as_array())
-                .map(|p| (p.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0), p.first().and_then(|v| v.as_f64()).unwrap_or(0.0)))
+                .map(|p| {
+                    (
+                        p.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0),
+                        p.first().and_then(|v| v.as_f64()).unwrap_or(0.0),
+                    )
+                })
                 .unwrap_or((0.0, 0.0)),
             _ => (0.0, 0.0),
         };
@@ -1342,8 +1404,7 @@ pub fn ingest_geo_airports(
 ) -> Result<usize, String> {
     let body = if url_or_path.starts_with("file://") || std::path::Path::new(url_or_path).exists() {
         let path = url_or_path.strip_prefix("file://").unwrap_or(url_or_path);
-        std::fs::read_to_string(path)
-            .map_err(|e| format!("读取本地文件失败: {} ({})", e, path))?
+        std::fs::read_to_string(path).map_err(|e| format!("读取本地文件失败: {} ({})", e, path))?
     } else {
         let resp = super::nt_http::run_blocking(|| http_client().get(url_or_path).send())
             .map_err(|e| format!("airports fetch error: {}", e))?;
@@ -1433,7 +1494,11 @@ pub fn ingest_geo_airports(
             continue;
         }
         let title = format!("{} ({})", name, ident);
-        let elev_m = if elev_ft != 0.0 { (elev_ft * 0.3048) as i64 } else { 0 };
+        let elev_m = if elev_ft != 0.0 {
+            (elev_ft * 0.3048) as i64
+        } else {
+            0
+        };
         store::insert_or_get_node(
             &tx,
             &title,
@@ -1463,7 +1528,11 @@ pub fn ingest_geo_airports(
                 lng,
                 country: country.to_string(),
                 region: region.to_string(),
-                city: if city.is_empty() { name.to_string() } else { city.to_string() },
+                city: if city.is_empty() {
+                    name.to_string()
+                } else {
+                    city.to_string()
+                },
                 tags,
                 source: "ourairports".into(),
                 confidence: 1.0,
@@ -1496,8 +1565,7 @@ pub fn ingest_geo_boundaries(
 ) -> Result<usize, String> {
     let body = if url_or_path.starts_with("file://") || std::path::Path::new(url_or_path).exists() {
         let path = url_or_path.strip_prefix("file://").unwrap_or(url_or_path);
-        std::fs::read_to_string(path)
-            .map_err(|e| format!("读取本地文件失败: {} ({})", e, path))?
+        std::fs::read_to_string(path).map_err(|e| format!("读取本地文件失败: {} ({})", e, path))?
     } else {
         let resp = super::nt_http::run_blocking(|| http_client().get(url_or_path).send())
             .map_err(|e| format!("boundaries fetch error: {}", e))?;
@@ -1514,7 +1582,10 @@ pub fn ingest_geo_boundaries(
     };
     let mut existing: std::collections::HashSet<String> = {
         let mut stmt = conn
-            .prepare(&format!("SELECT node_id FROM geo_index WHERE source='{}'", source))
+            .prepare(&format!(
+                "SELECT node_id FROM geo_index WHERE source='{}'",
+                source
+            ))
             .map_err(|e| format!("existing {} prepare: {}", e, source))?;
         let rows = stmt
             .query_map([], |r| r.get::<_, String>(0))
@@ -1526,8 +1597,8 @@ pub fn ingest_geo_boundaries(
         set
     };
 
-    let fc: serde_json::Value = serde_json::from_str(&body)
-        .map_err(|e| format!("GeoJSON parse: {}", e))?;
+    let fc: serde_json::Value =
+        serde_json::from_str(&body).map_err(|e| format!("GeoJSON parse: {}", e))?;
     let features = fc
         .get("features")
         .and_then(|f| f.as_array())
@@ -1543,7 +1614,10 @@ pub fn ingest_geo_boundaries(
         if count >= limit {
             break;
         }
-        let props = feat.get("properties").cloned().unwrap_or(serde_json::Value::Null);
+        let props = feat
+            .get("properties")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
         let name = props
             .get(if level == "admin1" { "name" } else { "NAME" })
             .and_then(|v| v.as_str())
@@ -1554,17 +1628,29 @@ pub fn ingest_geo_boundaries(
             continue;
         }
         let adm0 = props
-            .get(if level == "admin1" { "adm0_a3" } else { "ADM0_A3" })
+            .get(if level == "admin1" {
+                "adm0_a3"
+            } else {
+                "ADM0_A3"
+            })
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
         let iso = props
-            .get(if level == "admin1" { "iso_3166_2" } else { "ISO_A2" })
+            .get(if level == "admin1" {
+                "iso_3166_2"
+            } else {
+                "ISO_A2"
+            })
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
         let pop: i64 = props
-            .get(if level == "admin1" { "pop_est" } else { "POP_EST" })
+            .get(if level == "admin1" {
+                "pop_est"
+            } else {
+                "POP_EST"
+            })
             .and_then(|v| v.as_i64())
             .unwrap_or(0);
         let _continent = props
@@ -1574,17 +1660,20 @@ pub fn ingest_geo_boundaries(
             .to_string();
 
         // 质心: 取 geometry 所有坐标的平均 (粗略但足够 geo_index 点模型)
-        let geom = feat.get("geometry").cloned().unwrap_or(serde_json::Value::Null);
-        let coords = geom.get("coordinates").cloned().unwrap_or(serde_json::Value::Null);
+        let geom = feat
+            .get("geometry")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+        let coords = geom
+            .get("coordinates")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
         let mut lat_sum = 0.0f64;
         let mut lng_sum = 0.0f64;
         let mut n_pts = 0usize;
         fn collect_coords(v: &serde_json::Value, lat: &mut f64, lng: &mut f64, n: &mut usize) {
             if let Some(arr) = v.as_array() {
-                if arr.len() >= 2
-                    && arr[0].is_number()
-                    && arr[1].is_number()
-                {
+                if arr.len() >= 2 && arr[0].is_number() && arr[1].is_number() {
                     let x = arr[0].as_f64().unwrap_or(0.0);
                     let y = arr[1].as_f64().unwrap_or(0.0);
                     *lng += x;
@@ -1614,7 +1703,11 @@ pub fn ingest_geo_boundaries(
         }
         let title = format!(
             "{} {}",
-            if level == "admin1" { "省/州" } else { "国家" },
+            if level == "admin1" {
+                "省/州"
+            } else {
+                "国家"
+            },
             name
         );
         store::insert_or_get_node(
@@ -1644,8 +1737,16 @@ pub fn ingest_geo_boundaries(
                 node_id,
                 lat,
                 lng,
-                country: if level == "admin1" { adm0.clone() } else { name.clone() },
-                region: if level == "admin1" { name.clone() } else { String::new() },
+                country: if level == "admin1" {
+                    adm0.clone()
+                } else {
+                    name.clone()
+                },
+                region: if level == "admin1" {
+                    name.clone()
+                } else {
+                    String::new()
+                },
                 city: String::new(),
                 tags,
                 source: source.into(),
@@ -1733,7 +1834,9 @@ mod tests {
         assert!(!is_safe_fetch_url("http://172.16.0.1/"));
         assert!(!is_safe_fetch_url("http://192.168.1.1/"));
         // AWS IMDS / cloud metadata (link-local)
-        assert!(!is_safe_fetch_url("http://169.254.169.254/latest/meta-data/"));
+        assert!(!is_safe_fetch_url(
+            "http://169.254.169.254/latest/meta-data/"
+        ));
         assert!(!is_safe_fetch_url("http://[fc00::1]/"));
         assert!(!is_safe_fetch_url("http://[fe80::1]/"));
     }

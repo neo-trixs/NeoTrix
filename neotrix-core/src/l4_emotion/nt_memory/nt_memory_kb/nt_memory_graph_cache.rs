@@ -19,8 +19,14 @@ impl GraphCache {
         let mut backward: HashMap<String, Vec<KnowledgeEdge>> = HashMap::new();
         let mut nodes = std::collections::HashSet::new();
         for edge in &edges {
-            forward.entry(edge.source_id.clone()).or_default().push(edge.clone());
-            backward.entry(edge.target_id.clone()).or_default().push(edge.clone());
+            forward
+                .entry(edge.source_id.clone())
+                .or_default()
+                .push(edge.clone());
+            backward
+                .entry(edge.target_id.clone())
+                .or_default()
+                .push(edge.clone());
             nodes.insert(edge.source_id.clone());
             nodes.insert(edge.target_id.clone());
         }
@@ -68,8 +74,14 @@ impl GraphCache {
     }
 
     pub fn insert_edge(&mut self, edge: KnowledgeEdge) {
-        self.forward.entry(edge.source_id.clone()).or_default().push(edge.clone());
-        self.backward.entry(edge.target_id.clone()).or_default().push(edge);
+        self.forward
+            .entry(edge.source_id.clone())
+            .or_default()
+            .push(edge.clone());
+        self.backward
+            .entry(edge.target_id.clone())
+            .or_default()
+            .push(edge);
         self.edge_count += 1;
     }
 
@@ -87,8 +99,8 @@ pub fn weighted_shortest_path(
     if from_id == to_id {
         return Some((vec![from_id.to_string()], vec![], 0.0));
     }
-    use std::collections::BinaryHeap;
     use std::cmp::Ordering;
+    use std::collections::BinaryHeap;
 
     #[derive(Clone, PartialEq)]
     struct State {
@@ -105,7 +117,10 @@ pub fn weighted_shortest_path(
     }
     impl Ord for State {
         fn cmp(&self, other: &Self) -> Ordering {
-            other.cost.partial_cmp(&self.cost).unwrap_or(Ordering::Equal)
+            other
+                .cost
+                .partial_cmp(&self.cost)
+                .unwrap_or(Ordering::Equal)
         }
     }
 
@@ -114,7 +129,12 @@ pub fn weighted_shortest_path(
     let mut heap: BinaryHeap<State> = BinaryHeap::new();
 
     best_cost.insert(from_id.to_string(), 0.0);
-    heap.push(State { cost: 0.0, node: from_id.to_string(), prev_node: String::new(), prev_edge: String::new() });
+    heap.push(State {
+        cost: 0.0,
+        node: from_id.to_string(),
+        prev_node: String::new(),
+        prev_edge: String::new(),
+    });
 
     while let Some(State { cost, node, .. }) = heap.pop() {
         if node == to_id {
@@ -125,11 +145,7 @@ pub fn weighted_shortest_path(
                 if let Some((p, eid)) = prev.get(&cur) {
                     // Recover the full edge that led into `cur` from `p`,
                     // by matching its id among the neighbors of `p`.
-                    if let Some(edge) = cache
-                        .neighbors(p)
-                        .into_iter()
-                        .find(|e| &e.id == eid)
-                    {
+                    if let Some(edge) = cache.neighbors(p).into_iter().find(|e| &e.id == eid) {
                         path_edges.push(edge.clone());
                     }
                     cur = p.clone();
@@ -177,7 +193,17 @@ pub fn all_paths(
     let mut current_path: Vec<String> = Vec::new();
     visited.insert(from_id.to_string());
     current_path.push(from_id.to_string());
-    dfs_all_paths(cache, from_id, to_id, max_paths, max_depth, &mut visited, &mut current_path, 0.0, &mut results);
+    dfs_all_paths(
+        cache,
+        from_id,
+        to_id,
+        max_paths,
+        max_depth,
+        &mut visited,
+        &mut current_path,
+        0.0,
+        &mut results,
+    );
     results.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
     results
 }
@@ -208,7 +234,17 @@ fn dfs_all_paths(
         if !visited.contains(&next_key) {
             visited.insert(next_key.clone());
             path.push(next_key.clone());
-            dfs_all_paths(cache, &next_key, target, max_paths, max_depth, visited, path, cost + edge.weight, results);
+            dfs_all_paths(
+                cache,
+                &next_key,
+                target,
+                max_paths,
+                max_depth,
+                visited,
+                path,
+                cost + edge.weight,
+                results,
+            );
             path.pop();
             visited.remove(&next_key);
         }
@@ -222,9 +258,14 @@ mod tests {
 
     fn edge(id: &str, src: &str, dst: &str, weight: f64) -> KnowledgeEdge {
         KnowledgeEdge {
-            id: id.into(), source_id: src.into(), target_id: dst.into(),
-            relation_type: RelationType::References, weight,
-            description: None, created_at: 0, metadata: None,
+            id: id.into(),
+            source_id: src.into(),
+            target_id: dst.into(),
+            relation_type: RelationType::References,
+            weight,
+            description: None,
+            created_at: 0,
+            metadata: None,
         }
     }
 

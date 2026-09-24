@@ -190,7 +190,8 @@ impl NarrativeConsistencyChecker {
                 tags,
                 consistency_issues: Vec::new(),
             };
-            self.entity_index.insert(entity_name.to_string(), self.state.characters.len());
+            self.entity_index
+                .insert(entity_name.to_string(), self.state.characters.len());
             self.state.characters.push(sheet);
         }
     }
@@ -207,7 +208,10 @@ impl NarrativeConsistencyChecker {
     }
 
     pub fn link_commit_to_arc(&mut self, commit_id: &str, arc_name: &str) -> Result<(), String> {
-        let idx = self.arc_index.get(arc_name).ok_or_else(|| format!("arc '{}' not found", arc_name))?;
+        let idx = self
+            .arc_index
+            .get(arc_name)
+            .ok_or_else(|| format!("arc '{}' not found", arc_name))?;
         self.state.arcs[*idx].commits.push(commit_id.to_string());
         Ok(())
     }
@@ -232,8 +236,11 @@ impl NarrativeConsistencyChecker {
                 for commit_id in &arc.commits {
                     if let Some(event) = self.state.events.iter().find(|e| &e.id == commit_id) {
                         let desc_lower = event.description.to_lowercase();
-                        let desc_words_lower: HashSet<String> = desc_words.iter().map(|w| w.to_lowercase()).collect();
-                        let has_overlap = desc_words_lower.iter().any(|w| desc_lower.contains(w.as_str()));
+                        let desc_words_lower: HashSet<String> =
+                            desc_words.iter().map(|w| w.to_lowercase()).collect();
+                        let has_overlap = desc_words_lower
+                            .iter()
+                            .any(|w| desc_lower.contains(w.as_str()));
                         if !has_overlap {
                             issues.push(format!(
                                 "arc '{}': commit '{}' ('{}') may drift from arc description '{}'",
@@ -253,7 +260,10 @@ impl NarrativeConsistencyChecker {
             let active = self.state.arcs.iter().any(|arc| {
                 arc.status == ArcStatus::Active
                     && arc.commits.iter().any(|cid| {
-                        self.state.events.iter().any(|e| &e.id == cid && e.files_changed.contains(&sheet.entity_name))
+                        self.state
+                            .events
+                            .iter()
+                            .any(|e| &e.id == cid && e.files_changed.contains(&sheet.entity_name))
                     })
             });
             if !active && sheet.commit_count > 1 {
@@ -296,7 +306,11 @@ impl NarrativeConsistencyChecker {
             "NarrativeConsistencyChecker: {} events, {} arcs ({} active), {} entities tracked",
             self.state.events.len(),
             self.state.arcs.len(),
-            self.state.arcs.iter().filter(|a| a.status == ArcStatus::Active).count(),
+            self.state
+                .arcs
+                .iter()
+                .filter(|a| a.status == ArcStatus::Active)
+                .count(),
             self.state.characters.len(),
         )
     }
@@ -322,7 +336,11 @@ impl SelfTest for NarrativeConsistencyChecker {
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
         if self.state.events.len() > MAX_EVENTS {
-            failures.push(format!("event count {} exceeds max {}", self.state.events.len(), MAX_EVENTS));
+            failures.push(format!(
+                "event count {} exceeds max {}",
+                self.state.events.len(),
+                MAX_EVENTS
+            ));
         }
         for sheet in &self.state.characters {
             if sheet.first_seen > sheet.last_modified {
@@ -383,12 +401,18 @@ mod tests {
     fn test_repeated_entity_updates_not_duplicated() {
         let mut checker = NarrativeConsistencyChecker::new();
         checker.record_event(
-            "c1".into(), "dev1".into(), "first commit".into(),
-            vec!["src/core.rs".into()], CommitType::Feature,
+            "c1".into(),
+            "dev1".into(),
+            "first commit".into(),
+            vec!["src/core.rs".into()],
+            CommitType::Feature,
         );
         checker.record_event(
-            "c2".into(), "dev1".into(), "second commit".into(),
-            vec!["src/core.rs".into()], CommitType::Fix,
+            "c2".into(),
+            "dev1".into(),
+            "second commit".into(),
+            vec!["src/core.rs".into()],
+            CommitType::Fix,
         );
         assert_eq!(checker.character_count(), 1);
         let sheet = &checker.state.characters[0];
@@ -399,10 +423,17 @@ mod tests {
     fn test_add_arc_and_link() {
         let mut checker = NarrativeConsistencyChecker::new();
         checker.record_event(
-            "c1".into(), "dev1".into(), "initial setup".into(),
-            vec!["src/main.rs".into()], CommitType::Feature,
+            "c1".into(),
+            "dev1".into(),
+            "initial setup".into(),
+            vec!["src/main.rs".into()],
+            CommitType::Feature,
         );
-        checker.add_arc("auth".into(), "authentication system".into(), ArcStatus::Active);
+        checker.add_arc(
+            "auth".into(),
+            "authentication system".into(),
+            ArcStatus::Active,
+        );
         assert!(checker.link_commit_to_arc("c1", "auth").is_ok());
         assert!(checker.link_commit_to_arc("c1", "nonexistent").is_err());
     }
@@ -410,10 +441,17 @@ mod tests {
     #[test]
     fn test_check_consistency_finds_drift() {
         let mut checker = NarrativeConsistencyChecker::new();
-        checker.add_arc("core".into(), "database engine optimization".into(), ArcStatus::Active);
+        checker.add_arc(
+            "core".into(),
+            "database engine optimization".into(),
+            ArcStatus::Active,
+        );
         checker.record_event(
-            "c1".into(), "dev1".into(), "refactor UI button colors".into(),
-            vec!["src/ui.rs".into()], CommitType::Refactor,
+            "c1".into(),
+            "dev1".into(),
+            "refactor UI button colors".into(),
+            vec!["src/ui.rs".into()],
+            CommitType::Refactor,
         );
         assert!(checker.link_commit_to_arc("c1", "core").is_ok());
         let issues = checker.check_consistency();
@@ -425,8 +463,11 @@ mod tests {
     fn test_get_summary_format() {
         let mut checker = NarrativeConsistencyChecker::new();
         checker.record_event(
-            "c1".into(), "dev1".into(), "work".into(),
-            vec!["src/a.rs".into()], CommitType::Feature,
+            "c1".into(),
+            "dev1".into(),
+            "work".into(),
+            vec!["src/a.rs".into()],
+            CommitType::Feature,
         );
         checker.add_arc("main".into(), "main work".into(), ArcStatus::Active);
         let summary = checker.get_summary();
@@ -445,7 +486,9 @@ mod tests {
     fn test_entity_tagging_by_extension() {
         let mut checker = NarrativeConsistencyChecker::new();
         checker.record_event(
-            "c1".into(), "dev1".into(), "add docs".into(),
+            "c1".into(),
+            "dev1".into(),
+            "add docs".into(),
             vec!["README.md".into(), "src/lib.rs".into(), "script.py".into()],
             CommitType::Docs,
         );

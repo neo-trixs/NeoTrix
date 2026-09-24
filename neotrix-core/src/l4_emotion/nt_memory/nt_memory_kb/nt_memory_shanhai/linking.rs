@@ -18,8 +18,11 @@ use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::{KnowledgeEdge,
 use crate::l4_emotion::nt_memory::nt_memory_kb::shared_utils::now;
 
 /// 查询所有 shanhai 节点 (id, node_type, title, metadata)。
-fn load_shanhai_nodes(conn: &Connection) -> rusqlite::Result<Vec<(String, String, String, Option<String>)>> {
-    let mut stmt = conn.prepare("SELECT id, node_type, title, metadata FROM nodes WHERE id LIKE 'shanhai-%'")?;
+fn load_shanhai_nodes(
+    conn: &Connection,
+) -> rusqlite::Result<Vec<(String, String, String, Option<String>)>> {
+    let mut stmt =
+        conn.prepare("SELECT id, node_type, title, metadata FROM nodes WHERE id LIKE 'shanhai-%'")?;
     let rows = stmt.query_map([], |r| {
         Ok((
             r.get::<_, String>(0)?,
@@ -41,7 +44,8 @@ fn find_nodes_containing<'a>(
     keyword: &str,
 ) -> Vec<&'a str> {
     let kw = keyword.to_lowercase();
-    nodes.iter()
+    nodes
+        .iter()
         .filter(|(id, _ty, title, _meta)| {
             id.to_lowercase().contains(&kw) || title.to_lowercase().contains(&kw)
         })
@@ -62,12 +66,15 @@ pub fn infer_shanhai_links(conn: &Connection) -> rusqlite::Result<usize> {
     let mut edges_created = 0usize;
 
     for (id, _ty, title, meta_str) in &nodes {
-        let meta: Option<Value> = meta_str.as_deref().and_then(|m| serde_json::from_str(m).ok());
+        let meta: Option<Value> = meta_str
+            .as_deref()
+            .and_then(|m| serde_json::from_str(m).ok());
 
         // ── 模式1: 证据节点 → 关联学者/山峰/昆仑 ──
         if id.starts_with("shanhai-evidence:") {
             // 学者关联
-            let scholar = meta.as_ref()
+            let scholar = meta
+                .as_ref()
                 .and_then(|m| m.get("scholar").or_else(|| m.get("archaeologist")))
                 .and_then(|s| s.as_str());
             if let Some(sch) = scholar {
@@ -90,7 +97,8 @@ pub fn infer_shanhai_links(conn: &Connection) -> rusqlite::Result<usize> {
             }
 
             // 结论中的山名 → 山峰节点
-            let conclusion = meta.as_ref()
+            let conclusion = meta
+                .as_ref()
                 .and_then(|m| m.get("conclusion").or_else(|| m.get("key_insight")))
                 .and_then(|c| c.as_str());
             if let Some(conc) = conclusion {
@@ -119,7 +127,8 @@ pub fn infer_shanhai_links(conn: &Connection) -> rusqlite::Result<usize> {
             }
 
             // 昆仑关联
-            let _relation_to = meta.as_ref()
+            let _relation_to = meta
+                .as_ref()
                 .and_then(|m| m.get("relation_to_kunlun"))
                 .and_then(|r| r.as_str());
             let kunlun_ids = find_nodes_containing(&nodes, "昆仑");
@@ -144,7 +153,8 @@ pub fn infer_shanhai_links(conn: &Connection) -> rusqlite::Result<usize> {
 
         // ── 模式2: 映射节点 → 归因学者 ──
         if id.starts_with("shanhai-map:") {
-            let attributed = meta.as_ref()
+            let attributed = meta
+                .as_ref()
                 .and_then(|m| m.get("attributed_by"))
                 .and_then(|a| a.as_array())
                 .cloned()
@@ -178,7 +188,11 @@ pub fn infer_shanhai_links(conn: &Connection) -> rusqlite::Result<usize> {
 
 /// 山海边总数统计。
 pub fn shanhai_edge_count(conn: &Connection) -> rusqlite::Result<i64> {
-    conn.query_row("SELECT COUNT(*) FROM edges WHERE id LIKE 'shanhai-edge:%'", [], |r| r.get(0))
+    conn.query_row(
+        "SELECT COUNT(*) FROM edges WHERE id LIKE 'shanhai-edge:%'",
+        [],
+        |r| r.get(0),
+    )
 }
 
 #[cfg(test)]
@@ -196,8 +210,18 @@ mod tests {
     #[test]
     fn test_find_nodes_containing() {
         let nodes = vec![
-            ("shanhai-peak:kunlun".to_string(), "mountain".to_string(), "昆仑山".to_string(), None),
-            ("shanhai-peak:taishan".to_string(), "mountain".to_string(), "泰山".to_string(), None),
+            (
+                "shanhai-peak:kunlun".to_string(),
+                "mountain".to_string(),
+                "昆仑山".to_string(),
+                None,
+            ),
+            (
+                "shanhai-peak:taishan".to_string(),
+                "mountain".to_string(),
+                "泰山".to_string(),
+                None,
+            ),
         ];
         let hits = find_nodes_containing(&nodes, "昆仑");
         assert_eq!(hits.len(), 1);
