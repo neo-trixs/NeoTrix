@@ -2,9 +2,11 @@ use crate::domain::app_handle::get_app_handle;
 use crate::domain::registry::DomainRegistry;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
 use async_trait::async_trait;
-use neotrix::l5_cognition::nt_core_consciousness_core::{
-    AttemptOutcome, ConsciousTask, ExternalClosureConfig, SolutionExecutor, CORE,
+use neotrix::l5_cognition::consciousness_core::{
+    dispatch::ConsciousTask,
+    external_closure::{ExternalClosureConfig, SolutionExecutor},
 };
+use neotrix::l5_cognition::consciousness_core::core as consciousness_core;
 use std::sync::Arc;
 use tauri::Emitter;
 
@@ -14,13 +16,13 @@ struct GatewayExecutor {
     registry: std::sync::Arc<tokio::sync::RwLock<DomainRegistry>>,
 }
 
+#[async_trait]
 impl SolutionExecutor for GatewayExecutor {
-    fn attempt(&self, task: &ConsciousTask, grounding: &str, _attempt_no: u32) -> AttemptOutcome {
+    async fn execute(&self, task: &ConsciousTask) -> Result<String, String> {
         let system_prompt = format!(
             "你是 NeoTrix 意识核心的任务执行器。当前任务: {} (域: {}, 能力: {})\n\
-             上下文: {}\n\
              请直接执行此任务并返回结果。",
-            task.summary, task.domain, task.capability_tag, grounding
+            task.summary, task.domain, task.capability_tag
         );
 
         let request = serde_json::json!({
@@ -32,24 +34,14 @@ impl SolutionExecutor for GatewayExecutor {
             "max_tokens": crate::constants::DEFAULT_MAX_LLM_TOKENS,
         });
 
-        // 通过 domain_call 统一调用
-        let rt = tokio::runtime::Handle::current();
-        match rt.block_on(async {
-            let registry = self.registry.read().await;
-            registry.call_async("agent", "complete", request).await
-        }) {
+        // 新 trait 已是 async，直接 await（旧同步 attempt + block_in_place 已删除）。
+        let registry = self.registry.read().await;
+        match registry.call_async("agent", "complete", request).await {
             Ok(response) => {
                 let content = response["content"].as_str().unwrap_or("");
-                let tokens = response["usage"]["total_tokens"].as_u64().unwrap_or(0) as u32;
-                AttemptOutcome::Solved {
-                    solution: content.to_string(),
-                    tokens_used: tokens,
-                }
+                Ok(content.to_string())
             }
-            Err(e) => AttemptOutcome::Failed {
-                error: e.to_string(),
-                tokens_used: 0,
-            },
+            Err(e) => Err(e.to_string()),
         }
     }
 }
@@ -154,9 +146,7 @@ impl ChatPlugin {
 
         let config = ExternalClosureConfig {
             max_attempts: 3,
-            token_budget: crate::constants::DEFAULT_TOKEN_BUDGET,
-            max_llm_tokens: crate::constants::DEFAULT_MAX_LLM_TOKENS,
-            acquire_knowledge: false,
+            timeout_secs: 120,
         };
 
         // Emit tool event
@@ -172,10 +162,8 @@ impl ChatPlugin {
             }
         }
 
-        let report = {
-            let mut core = CORE.write().map_err(|e| DomainError::from(format!("acquiring consciousness core lock for LLM call: {}", e)))?;
-            core.execute_task_loop(content, &executor, &config)
-        };
+        // 进程内单例闭环入口（内部处理 CORE 锁，锁毒化时返回默认空报告）。
+        let report = consciousness_core::execute_task_loop(content, &executor, &config);
 
         // Emit tool completion event
         if let Some(app) = get_app_handle() {
