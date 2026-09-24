@@ -5,6 +5,8 @@
 //! (指针守恒: 经验正文只落 KB hub, AGENTS.md 不内联)。并以其最贴近的既有
 //! `KnowledgeSource::DialogueExperience` 身份登记一次 `AbsorptionRecord` (bookkeeping)。
 
+// LAYER-EXCEPTION: GenCAD 静态经验载荷属领域知识下流（L2 吸收外部知识是本层职责），
+// 载荷生产方在 L5，消费链 background_loop → absorb_cad_experience 真调用；搬移另立项。
 use crate::l5_cognition::nt_core_cad_consciousness::cad_experience_payload;
 use crate::l2_perception::nt_core_knowledge::{AbsorptionRecord, KnowledgeSource};
 use crate::l2_perception::nt_world::l1_facade::KnowledgeBase;
