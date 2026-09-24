@@ -74,18 +74,20 @@ workspace 14/14 对齐；`decision-engine` 意图性隔离（编译红，见 §�
 - [x] P2 分层：L1/L2 上翻 20+4 处——改道 7 行（nt_core_state×6、hex×1）/ 注记 8 处 / 其余认证不动；L5↔L6 环判定为**设计如此**（门面+trait 实现双向桥，不拆）；双生消除（causal_inventor、DimensionAxis→types）。
 - [x] P3（供给）：`deny.toml` 落地（bans/licenses/sources 全绿）+ workspace 依赖 7→20 收敛 + serde_yml 换血（RUSTSEC-2025-0068）；多版本台账（tauri/otlp 系第三方强制，oauth2 4→5 另立项）。
 - [x] 游戏三件套入库（abilities/game/guixu，零密钥零 unsafe）；版本纠错（workspace 实 0.21.0）；swords→guixu 更名跟进。
-- [ ] P4（God-file）：experience.rs 4195、browser_engine 4559、memory_kb 3839——需专窗+回归，另立项。
+- [x] P4（God-file）：experience.rs→7 模块、browser_engine→8 模块、memory_kb→18 模块，
+  全部行为零变更验证（单测+冒烟+黄金输出）。
 
 ## 六、后续核心建议（2026-09-24 第三刷，P0–P3 已结项）
 
 只剩三类活，按先决关系排序：
 
-1. **experience 回归线（P4 先决条件，半天）**：给 `neotrix-experience` 补全命令冒烟脚本
-   （absorb/query/distill/stale 真 KB，断言退出码+行数）。没这条线 P4 不开工。
-2. **God-file 拆分（专窗，2–3 天）**：experience.rs → `#[path]` 子模块，
-   NTZ1/SQLite 语义逐命令 diff；browser_engine/memory_kb 排后。
-3. **认知下沉（按周，需产品拍板）**：TTC/PRM/TD trait 先行（DimensionAxis 模式已验证），
-   实现搬迁另算；dispatcher 签名换本地 trait（LocalCrtPlan/LocalTrace 已有）。
+1. **experience 回归线 ✅（已交付）**：`scripts/experience-smoke.sh` 12 命令 12/12。
+2. **God-file 拆分 ✅（已交付）**：experience.rs→7 模块、browser_engine→8 模块、
+   memory_kb→18 模块，全部单测/smoke/黄金验证。
+3. **认知下沉（不做，有依据）**：TTC/PRM/TD 全是具体引擎（无 trait 可抽），
+   "下沉"实为整体搬家 + E8 使用方全改；且 E8 片区有 session 并行施工。
+   DimensionAxis 模式不可复制（那次是纯数据类型）。等邻居收工+产品拍板再立项。
+   dispatcher 签名同理（LocalCrtPlan/LocalTrace 已有，换签名即断 API）。
 4. **oauth2 4→5（已完成，需方认领提交）**：reqwest 0.11 已退出 lock；
    `social_access/auth.rs` 完整 v5 化（typestate 构建器+显式端点类型+blocking 同步交换），
    `cargo check -p neotrix --lib` 0 error 验证通过。文件仍是未提交状态，等 owner 收。
