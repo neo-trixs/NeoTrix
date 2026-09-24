@@ -1,8 +1,10 @@
-# NeoTrix 全项目审计 + 蜕皮方案（2026-09-24）
+# NeoTrix 全项目审计 + 蜕皮方案（2026-09-24，同日刷新至 11:40）
 
 > 方法：rev-officer（FPAM + 7 维并行 squad），只读审计 + 最小安全执行。
-> 基线：2939 `.rs` / 904,902 行；分支 `feat/capability-absorb-20260828`；
-> 脏区 978 项（774 M / 109 D / 95 ??，多窗口并发施工中）。
+> 基线：2939 `.rs` / 904,902 行 → 现约 2830 `.rs` / ~87 万行；
+> 分支 `feat/capability-absorb-20260828`； codemap 索引 3740 文件
+> （`.project-map/codemap.json`，`make project-audit-map` 双零）。
+> 蜕皮累计：删 ~100 文件 / ~3.1 万行，提交 9 个（neobot×2、audit×1、rebirth×5、map×1）。
 
 ## 一、文件代码 Map
 
@@ -13,7 +15,7 @@
 | `neotrix-core/src/` | 2415 rs | 主 crate（`neotrix`）：l0–l6 + entry + 15 bins |
 | `crates/` | 285 rs | 叶/中间 crate（types/sysctl/consciousness/reasoning/gateway/multi-agent/abilities/game/neobot/audit/nt-lang） |
 | `src-tauri/` | 95 rs + TS 前端 | 桌面壳（`neotrix_tauri` lib + main） |
-| `games/neotrix-swords` | 4 rs | 唯一游戏体（消费 game+abilities） |
+| `games/neotrix-guixu` | 18 rs | 唯一游戏体（swords 更名，消费 game+abilities） |
 | `ntos/src` | 212K（TS） | 第二壳（node_modules 65M 已忽略） |
 | `fuzz/` | 82 行 | 独立 fuzz 包（未进 workspace，正确） |
 | `_archive/` | 3.7M | 唯一历史备份（已忽略，勿删） |
@@ -72,6 +74,23 @@ workspace 14/14 对齐；`decision-engine` 意图性隔离（编译红，见 §�
 - [x] P2 分层：L1/L2 上翻 20+4 处——改道 7 行（nt_core_state×6、hex×1）/ 注记 8 处 / 其余认证不动；L5↔L6 环判定为**设计如此**（门面+trait 实现双向桥，不拆）；双生消除（causal_inventor、DimensionAxis→types）。
 - [ ] P3（供给）：`cargo-deny` 引入 + workspace 依赖收敛、多版本去重（reqwest×3/wasmtime×2）。
 - [ ] P4（God-file）：experience.rs 4195、browser_engine 4559、memory_kb 3839——需专窗+回归，另立项。
+
+## 六、后续核心建议（2026-09-24 刷新后）
+
+按杠杆/风险排序，只列能开工的：
+
+1. **P3 供给收敛（低风险，半天）**：`cargo deny init` + ban 多版本（reqwest/wasmtime/axum/tungstenite 二选一）；workspace 依赖 7→20 件收敛。先只告警不拦门，跑一周再转硬门。
+2. **experience.rs 回归线（先决条件，半天）**：God-file 拆分前，先给 `neotrix-experience` 补全命令冒烟脚本（absorb/query/distill/stale 各一遍真 KB，断言行数/退出码）。没这条线，P4 不开工。
+3. **God-file 拆分（专窗，2–3 天）**：experience.rs 用 `#[path]` 子模块（util/kv/concepts/cmds/topo），NTZ1 编解码与 SQLite 语义逐命令 diff 验证；browser_engine/memory_kb 排后。
+4. **TTC/PRM/TD 下沉（按周）**：先把三者的 trait 抽到 `neotrix-types`（如 DimensionAxis 模式），L2 只转 trait 不转实现；实现搬迁另算。
+5. **dispatcher 解耦（按周）**：`LocalCrtPlan/LocalTrace` 已有，下一步把 `cot_generator/decompose_fn` 签名换本地 trait，组合根注入 L5 实现；E8Policy 字段不动（纯存储）。
+6. **施工纪律（立即）**：多窗口已关，但脏区仍 ~900 项——`sessions/handoff-*.md` 恢复写，`git stash` 兜底；pre-commit 门禁证明了自己（本轮 2 次真拦截：consciousness 笔误、axis 漏消费者），保持常开。
+
+## 七、codemap 定位入口（新增）
+
+- `.project-map/codemap.json`（3740 文件：area/layer/modpath/items/loc）。
+- `make project-locate COMPONENT=Foo | FILE=bar.rs | QUERY=xxx`（0.2s）。
+- `make project-audit-map`（rs 2863/2863、missing/extra 双零；断裂 symlink 自动标出）。
 
 ## 五、纠错与保留清单
 
