@@ -608,7 +608,8 @@ fn feather_weight_asymmetric(pos: usize, size: usize, halo_start: usize, halo_en
 #[cfg(feature = "onnx")]
 mod onnx_engine {
     use super::*;
-    use ort::{Session, session::builder::GraphOptimizationLevel};
+    use ort::session::{builder::GraphOptimizationLevel, Session};
+    use ort::value::Tensor;
     use ndarray::{Array, CowArray};
 
     /// ONNX 超分推理器 — 带自动分块
@@ -633,7 +634,7 @@ mod onnx_engine {
         }
 
         /// 推理整个图像 (自动 tiling)
-        pub fn upscale(&self, img: &image::DynamicImage) -> Result<image::DynamicImage, SuperResolutionError> {
+        pub fn upscale(&mut self, img: &image::DynamicImage) -> Result<image::DynamicImage, SuperResolutionError> {
             let rgb = img.to_rgb8();
             let (w, h) = img.dimensions();
             let channels = 3u32;
@@ -649,31 +650,35 @@ mod onnx_engine {
 
         /// 单 tile 推理
         fn upscale_single_tile(
-            &self,
+            &mut self,
             img: &image::RgbImage,
             w: u32,
             h: u32,
         ) -> Result<image::DynamicImage, SuperResolutionError> {
-            let input_tensor = image_to_tensor(img, w, h)?;
-
-            let input_name = self.session.inputs[0].name.clone();
-            let outputs = self.session.run(ort::inputs![input_name => input_tensor].map_err(|e| SuperResolutionError::OnnxInfer(e.to_string()))?)
+            let input_array = image_to_tensor(img, w, h)?;
+            let owned = input_array.into_owned();
+            let dims = owned.shape().to_vec();
+            let input_tensor = Tensor::from_array((dims, owned.into_raw_vec()))
                 .map_err(|e| SuperResolutionError::OnnxInfer(e.to_string()))?;
 
-            let output_name = &self.session.outputs[0].name;
-            let output_tensor = outputs[output_name].try_extract_tensor::<f32>()
+            let input_name = self.session.inputs()[0].name().to_string();
+            let output_name = self.session.outputs()[0].name().to_string();
+            let outputs = self.session.run(ort::inputs![input_name => input_tensor])
+                .map_err(|e| SuperResolutionError::OnnxInfer(e.to_string()))?;
+
+            let (_shape, output_data) = outputs[output_name.as_str()].try_extract_tensor::<f32>()
                 .map_err(|e| SuperResolutionError::OnnxInfer(e.to_string()))?;
 
             let out_w = w * self.scale;
             let out_h = h * self.scale;
-            let output_image = tensor_to_image(&output_tensor, out_w, out_h)?;
+            let output_image = tensor_to_image(output_data, out_w, out_h)?;
 
             Ok(image::DynamicImage::ImageRgb8(output_image))
         }
 
         /// 分块推理
         fn upscale_tiled(
-            &self,
+            &mut self,
             img: &image::RgbImage,
             w: u32,
             h: u32,
@@ -688,18 +693,25 @@ mod onnx_engine {
             };
             let resolver = TiledSuperResolver::new(tiling);
 
-            let session = &self.session;
             let scale = self.scale;
+            // session.run 需 &mut，而 process_tiled 要求 Fn：经 RefCell 串行出借
+            //（无重入调用，不会 panic）。
+            let session_cell = std::cell::RefCell::new(&mut self.session);
 
             let result_bytes = resolver.process_tiled(&pixels, w, h, channels, |tile, tw, th, ch| {
-                let input_tensor = tile_bytes_to_tensor(tile, tw, th, ch)?;
-                let input_name = session.inputs[0].name.clone();
-                let outputs = session.run(ort::inputs![input_name => input_tensor].map_err(|e| SuperResolutionError::OnnxInfer(e.to_string()))?)
+                let input_array = tile_bytes_to_tensor(tile, tw, th, ch)?;
+                let owned = input_array.into_owned();
+                let dims = owned.shape().to_vec();
+                let input_tensor = Tensor::from_array((dims, owned.into_raw_vec()))
                     .map_err(|e| SuperResolutionError::OnnxInfer(e.to_string()))?;
-                let output_name = &session.outputs[0].name;
-                let output_tensor = outputs[output_name].try_extract_tensor::<f32>()
+                let mut session = session_cell.borrow_mut();
+                let input_name = session.inputs()[0].name().to_string();
+                let output_name = session.outputs()[0].name().to_string();
+                let outputs = session.run(ort::inputs![input_name => input_tensor])
                     .map_err(|e| SuperResolutionError::OnnxInfer(e.to_string()))?;
-                tensor_to_bytes(&output_tensor, tw * scale, th * scale)
+                let (_shape, output_data) = outputs[output_name.as_str()].try_extract_tensor::<f32>()
+                    .map_err(|e| SuperResolutionError::OnnxInfer(e.to_string()))?;
+                tensor_to_bytes(output_data, tw * scale, th * scale)
             })?;
 
             let out_w = w * self.scale;
@@ -724,7 +736,7 @@ mod onnx_engine {
 
         let array = Array::from_shape_vec((1, 3, h as usize, w as usize), pixels)
             .map_err(|e| SuperResolutionError::TensorShape(e.to_string()))?;
-        Ok(CowArray::Owned(array))
+        Ok(CowArray::from(array))
     }
 
     /// 原始字节 → NCHW float32 tensor
@@ -749,17 +761,15 @@ mod onnx_engine {
 
         let array = Array::from_shape_vec((1, 3, h as usize, w as usize), pixels)
             .map_err(|e| SuperResolutionError::TensorShape(e.to_string()))?;
-        Ok(CowArray::Owned(array))
+        Ok(CowArray::from(array))
     }
 
     /// NCHW float32 tensor → 图像
     fn tensor_to_image(
-        tensor: &ndarray::ArrayView<f32, ndarray::Dim<[usize; 4]>>,
+        data: &[f32],
         w: u32,
         h: u32,
     ) -> Result<image::RgbImage, SuperResolutionError> {
-        let data = tensor.as_slice()
-            .ok_or_else(|| SuperResolutionError::TensorShape("Cannot get tensor slice".to_string()))?;
         let mut img = image::RgbImage::new(w, h);
 
         let hw = (h as usize) * (w as usize);
@@ -778,12 +788,10 @@ mod onnx_engine {
 
     /// NCHW float32 tensor → raw bytes
     fn tensor_to_bytes(
-        tensor: &ndarray::ArrayView<f32, ndarray::Dim<[usize; 4]>>,
+        data: &[f32],
         w: u32,
         h: u32,
     ) -> Result<Vec<u8>, SuperResolutionError> {
-        let data = tensor.as_slice()
-            .ok_or_else(|| SuperResolutionError::TensorShape("Cannot get tensor slice".to_string()))?;
         let hw = (h as usize) * (w as usize);
         let mut bytes = Vec::with_capacity(hw * 3);
         for idx in 0..hw {
@@ -996,7 +1004,7 @@ impl ImageSuperResolver {
         match onnx_engine::OnnxSuperResolver::from_path(
             model_path, self.config.scale, tile_size, overlap,
         ) {
-            Ok(resolver) => match resolver.upscale(img) {
+            Ok(mut resolver) => match resolver.upscale(img) {
                 Ok(output) => {
                     let tiles = if tile_size > 0 { 1 } else { 0 }; // TODO: 统计实际 tile 数
                     (output, tiles)

@@ -24,6 +24,9 @@ use crate::l0_substrate::nt_core_capability_types::{
 };
 use crate::l2_perception::nt_world::ocr::pdf_to_text_pipeline::PdfToTextPipeline;
 
+#[cfg(feature = "onnx")]
+use ort::session::Session as OcrSession;
+
 pub mod pdf_to_text_pipeline;
 
 // ──────────────────────────────────────────────
@@ -165,12 +168,12 @@ impl PaddleOcrEngine {
             return None;
         }
         match OcrSession::builder()
-            .map_err(|e| eprintln!("Failed to create ORT session builder: {e}"))
+            .map_err(|e| e.to_string())
             .and_then(|builder| {
                 builder
                     .with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level3)
-                    .map_err(|e| eprintln!("Failed to set optimization: {e}"))
-                    .and_then(|b| b.commit_from_file(model_path))
+                    .map_err(|e| e.to_string())
+                    .and_then(|mut b| b.commit_from_file(model_path).map_err(|e| e.to_string()))
             }) {
             Ok(session) => {
                 eprintln!("PaddleOCR ONNX session loaded from {}", model_path);
@@ -429,7 +432,6 @@ pub fn pdf_to_text(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
     fn test_ocr_config_default() {

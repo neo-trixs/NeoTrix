@@ -185,11 +185,12 @@ impl SidecarState {
         self.status == DownloadStatus::Complete
     }
 
-    /// Returns true if the download can be resumed (Downloading or Paused).
+    /// Returns true if the download can be (re)started safely.
+    /// Fresh `Pending` counts: nothing downloaded yet, start is trivially safe.
     pub fn is_resumable(&self) -> bool {
         matches!(
             self.status,
-            DownloadStatus::Downloading | DownloadStatus::Paused
+            DownloadStatus::Pending | DownloadStatus::Downloading | DownloadStatus::Paused
         )
     }
 

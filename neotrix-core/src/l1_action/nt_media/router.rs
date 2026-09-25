@@ -116,7 +116,8 @@ pub fn extract_filename(url: &str) -> Option<String> {
 
 pub fn parse_content_disposition(cd: &str) -> Option<String> {
     if let Some(pos) = cd.find("filename*=UTF-8''") {
-        let encoded = &cd[pos + 16..];
+        // 前缀 "filename*=UTF-8''" 长 17（8+2+5+2），+16 会吞掉第二个引号。
+        let encoded = &cd[pos + 17..];
         if let Some(name) = encoded.split(';').next() {
             if let Ok(decoded) = urlencoding::decode(name) {
                 return Some(decoded.into_owned());

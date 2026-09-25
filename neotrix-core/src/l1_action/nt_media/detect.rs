@@ -125,6 +125,10 @@ impl MediaKind {
 
 /// Detect from magic bytes (most reliable)
 pub fn detect_from_bytes(data: &[u8]) -> MediaKind {
+    // gzip 魔数仅 2 字节（1F 8B + 方法字节），先判，不受 4 字节门限影响。
+    if data.len() >= 2 && data[0] == 0x1F && data[1] == 0x8B {
+        return MediaKind::Gzip;
+    }
     if data.len() < 4 {
         return MediaKind::Unknown;
     }
@@ -138,7 +142,7 @@ pub fn detect_from_bytes(data: &[u8]) -> MediaKind {
     if data.starts_with(b"fLaC") {
         return MediaKind::AudioFlac;
     }
-    if data.starts_with(b"RIFF") && data.len() > 12 && &data[8..12] == b"WAVE" {
+    if data.starts_with(b"RIFF") && data.len() >= 12 && &data[8..12] == b"WAVE" {
         return MediaKind::AudioWav;
     }
     if data.starts_with(b"OggS") {
@@ -159,9 +163,6 @@ pub fn detect_from_bytes(data: &[u8]) -> MediaKind {
     }
     if data.starts_with(b"%PDF") {
         return MediaKind::Pdf;
-    }
-    if data[0] == 0x1F && data[1] == 0x8B {
-        return MediaKind::Gzip;
     }
     if data.starts_with(b"\xfd7zXZ") {
         return MediaKind::Xz;

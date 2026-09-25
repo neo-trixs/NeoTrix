@@ -167,6 +167,7 @@ impl DownloadConfig {
             timeout: Duration::from_secs(self.timeout_secs),
             max_retries: self.retry_count,
             concurrency: self.max_concurrent,
+            min_disk_space: self.min_disk_space,
             ..Default::default()
         }
     }

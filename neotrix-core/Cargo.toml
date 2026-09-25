@@ -54,6 +54,10 @@ name = "neotrix-shanhai-query"
 path = "src/bin/shanhai_query.rs"
 
 [[bin]]
+name = "neotrix-douyin"
+path = "src/bin/nt_douyin_ingest.rs"
+
+[[bin]]
 name = "neotrix-shanhai-link"
 path = "src/bin/shanhai_link.rs"
 

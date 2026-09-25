@@ -55,6 +55,7 @@ impl StallDetector {
 pub struct RetryPolicy {
     pub(crate) max_retries: u32,
     base_delay: Duration,
+    delay_table: Vec<Duration>,
 }
 
 impl RetryPolicy {
@@ -62,21 +63,28 @@ impl RetryPolicy {
         Self {
             max_retries,
             base_delay: Duration::from_secs(1),
+            delay_table: Vec::new(),
         }
     }
 
-    pub fn with_delay_table(max_retries: u32, _delay_table: Vec<Duration>) -> Self {
+    pub fn with_delay_table(max_retries: u32, delay_table: Vec<Duration>) -> Self {
         Self {
             max_retries,
             base_delay: Duration::from_secs(1),
+            delay_table,
         }
     }
 
     /// Compute delay for attempt number (1-indexed).
-    /// Returns None if retries exhausted.
+    /// Returns None if retries exhausted (or attempt == 0).
+    /// 表模式：按表取（超表长用末项封顶），确定性；空表回退 n²+jitter。
     pub fn delay(&self, attempt: u32) -> Option<Duration> {
-        if attempt > self.max_retries {
+        if attempt == 0 || attempt > self.max_retries {
             return None;
+        }
+        if !self.delay_table.is_empty() {
+            let idx = (attempt as usize - 1).min(self.delay_table.len() - 1);
+            return Some(self.delay_table[idx]);
         }
         let base_ms = (attempt as u64) * (attempt as u64) * self.base_delay.as_millis() as u64;
         let capped = base_ms.min(30_000);

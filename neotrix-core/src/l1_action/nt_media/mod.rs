@@ -11,6 +11,8 @@ pub mod auth;
 pub mod detect;
 pub mod download_progress;
 pub mod hls;
+pub mod nt_douyin_extract;
+pub mod nt_speech_transcribe;
 pub mod persistence;
 pub mod playback;
 pub mod router;
