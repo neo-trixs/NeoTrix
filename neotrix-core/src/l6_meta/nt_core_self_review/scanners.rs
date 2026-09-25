@@ -4,7 +4,9 @@
 //! this module is `pub(crate)` so the parent calls helpers by name via `use scanners::*;`.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::SystemTime;
 use syn;
 
 use super::*;

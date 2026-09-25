@@ -1,4 +1,8 @@
     use super::*;
+    use super::nt_review_types::{ArchLayer, BlastRisk, ReviewFinding, SelfReviewGate};
+    use super::scanners::scan_for_pattern_excluding_tests;
+    use super::Severity;
+    use std::path::Path;
 
     #[test]
     fn test_self_review_basic() {
