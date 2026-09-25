@@ -1,6 +1,7 @@
     use super::*;
     use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
-    use crate::l5_cognition::nt_core_prm::TrajectoryStep;
+    use crate::l1_action::nt_core_llm::LlmProvider;
+    use crate::l5_cognition::nt_core_prm::{AgentTrajectory, TrajectoryStep};
     use crate::l0_substrate::nt_core_traits::SpecialistType;
     use crate::l1_action::nt_io::nt_io_provider::{
         FinishReason, LlmError, LlmRequest, LlmResponse, Usage,
