@@ -17,8 +17,17 @@ pub mod audio;
 pub mod events;
 pub mod state_stack;
 pub mod ecs;
+pub mod nt_behavior;
 pub mod ui;
 pub mod input;
 pub mod components;
 pub mod tween;
 pub mod ecs_systems;
+// ── 三引擎吸收（2026-09-25）：KAPLAY / OpenWarcraft3 / Pokerogue ──
+pub mod nt_object;
+pub mod nt_timer;
+pub mod nt_tilemap;
+pub mod nt_commands;
+pub mod nt_grid;
+pub mod nt_phase;
+pub mod nt_run;
