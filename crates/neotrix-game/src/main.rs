@@ -2,7 +2,7 @@
 //! ECS 生成/移动/绘制 + 点击粒子 + 死区相机跟随 + 输入。无游戏内容。
 
 use macroquad::prelude::*;
-use neotrix_game::components::{Position, Sprite, Velocity};
+use neotrix_game::components::{Position, Rgba, Sprite, Velocity};
 use neotrix_game::ecs::SimpleEcs;
 use neotrix_game::nt_behavior::{Behavior, BehaviorRegistry};
 use neotrix_game::input::InputState;
@@ -63,7 +63,7 @@ async fn main() {
     ecs.insert(mover, Velocity { vx: 120.0, vy: 0.0 });
     ecs.insert(
         mover,
-        Sprite { w: 24.0, h: 24.0, color: YELLOW },
+        Sprite { w: 24.0, h: 24.0, color: Rgba::from(YELLOW) },
     );
     behaviors.attach(
         mover,
@@ -103,7 +103,7 @@ async fn main() {
         clear_background(Color::new(0.02, 0.03, 0.05, 1.0));
         // 世界层（相机偏移演示：直接平移绘制）
         for (_, p, s) in ecs.query2::<Position, Sprite>() {
-            draw_rectangle(p.x - cx - s.w / 2.0, p.y - cy - s.h / 2.0, s.w, s.h, s.color);
+            draw_rectangle(p.x - cx - s.w / 2.0, p.y - cy - s.h / 2.0, s.w, s.h, s.color.into());
         }
         fx.render();
         // HUD（屏幕层，不跟相机）

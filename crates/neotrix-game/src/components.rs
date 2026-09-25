@@ -19,11 +19,43 @@ pub struct Physics {
     pub deceleration: f32,
 }
 
+/// 引擎自有颜色（渲染解耦：组件层不再直接依赖 macroquad 类型；
+///
+/// 渲染边界经 `From` 转换，`Sprite` 等组件保持无头可测）.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Rgba {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
+}
+
+impl Rgba {
+    pub const fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self { r, g, b, a }
+    }
+
+    pub const WHITE: Self = Self::new(1.0, 1.0, 1.0, 1.0);
+    pub const TRANSPARENT: Self = Self::new(0.0, 0.0, 0.0, 0.0);
+}
+
+impl From<macroquad::color::Color> for Rgba {
+    fn from(c: macroquad::color::Color) -> Self {
+        Self::new(c.r, c.g, c.b, c.a)
+    }
+}
+
+impl From<Rgba> for macroquad::color::Color {
+    fn from(c: Rgba) -> Self {
+        Self::new(c.r, c.g, c.b, c.a)
+    }
+}
+
 /// 精灵渲染
 #[derive(Debug, Clone)]
 pub struct Sprite {
     pub w: f32, pub h: f32,
-    pub color: macroquad::color::Color,
+    pub color: Rgba,
 }
 
 /// 生命值
@@ -33,7 +65,6 @@ pub struct Health { pub hp: f32, pub max_hp: f32 }
 /// 实体名称
 #[derive(Debug, Clone)]
 pub struct Name(pub String);
-
 /// Marker: 玩家
 #[derive(Debug, Clone)]
 pub struct PlayerMarker;
@@ -67,3 +98,17 @@ pub struct Collider {
 /// 物理常量
 pub const GRAVITY_ACCEL: f32 = 980.0;  // 像素/秒²
 pub const FRICTION: f32 = 0.88;        // 摩擦系数
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rgba_roundtrip_macroquad() {
+        let c = macroquad::color::Color::new(0.1, 0.2, 0.3, 0.4);
+        let r = Rgba::from(c);
+        assert!((r.r - 0.1).abs() < 1e-6);
+        let back = macroquad::color::Color::from(r);
+        assert!((back.g - 0.2).abs() < 1e-6 && (back.a - 0.4).abs() < 1e-6);
+    }
+}

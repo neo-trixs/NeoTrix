@@ -30,7 +30,14 @@ fn key_name(k: KeyCode) -> Option<&'static str> {
         KeyCode::W => "W", KeyCode::A => "A", KeyCode::S => "S", KeyCode::D => "D",
         KeyCode::E => "E", KeyCode::I => "I", KeyCode::Q => "Q", KeyCode::F => "F",
         KeyCode::B => "B", KeyCode::C => "C", KeyCode::X => "X", KeyCode::G => "G",
-        KeyCode::J => "J", KeyCode::M => "M", KeyCode::K => "K", KeyCode::V => "V",
+        KeyCode::H => "H", KeyCode::J => "J", KeyCode::K => "K", KeyCode::L => "L",
+        KeyCode::M => "M", KeyCode::N => "N", KeyCode::O => "O", KeyCode::P => "P",
+        KeyCode::R => "R", KeyCode::T => "T", KeyCode::U => "U", KeyCode::V => "V",
+        KeyCode::Y => "Y", KeyCode::Z => "Z",
+        KeyCode::Key1 => "1", KeyCode::Key2 => "2", KeyCode::Key3 => "3",
+        KeyCode::Key4 => "4", KeyCode::Key5 => "5", KeyCode::Key6 => "6",
+        KeyCode::Key7 => "7", KeyCode::Key8 => "8", KeyCode::Key9 => "9",
+        KeyCode::Key0 => "0",
         KeyCode::Up => "Up", KeyCode::Down => "Down", KeyCode::Left => "Left",
         KeyCode::Right => "Right", KeyCode::Space => "Space", KeyCode::Tab => "Tab",
         KeyCode::F1 => "F1", KeyCode::F5 => "F5", KeyCode::F9 => "F9", KeyCode::F10 => "F10",
@@ -44,7 +51,14 @@ fn parse_key(s: &str) -> Option<KeyCode> {
         "W" => KeyCode::W, "A" => KeyCode::A, "S" => KeyCode::S, "D" => KeyCode::D,
         "E" => KeyCode::E, "I" => KeyCode::I, "Q" => KeyCode::Q, "F" => KeyCode::F,
         "B" => KeyCode::B, "C" => KeyCode::C, "X" => KeyCode::X, "G" => KeyCode::G,
-        "J" => KeyCode::J, "M" => KeyCode::M, "K" => KeyCode::K, "V" => KeyCode::V,
+        "H" => KeyCode::H, "J" => KeyCode::J, "K" => KeyCode::K, "L" => KeyCode::L,
+        "M" => KeyCode::M, "N" => KeyCode::N, "O" => KeyCode::O, "P" => KeyCode::P,
+        "R" => KeyCode::R, "T" => KeyCode::T, "U" => KeyCode::U, "V" => KeyCode::V,
+        "Y" => KeyCode::Y, "Z" => KeyCode::Z,
+        "1" => KeyCode::Key1, "2" => KeyCode::Key2, "3" => KeyCode::Key3,
+        "4" => KeyCode::Key4, "5" => KeyCode::Key5, "6" => KeyCode::Key6,
+        "7" => KeyCode::Key7, "8" => KeyCode::Key8, "9" => KeyCode::Key9,
+        "0" => KeyCode::Key0,
         "Up" => KeyCode::Up, "Down" => KeyCode::Down, "Left" => KeyCode::Left,
         "Right" => KeyCode::Right, "Space" => KeyCode::Space, "Tab" => KeyCode::Tab,
         "F1" => KeyCode::F1, "F5" => KeyCode::F5, "F9" => KeyCode::F9, "F10" => KeyCode::F10,
@@ -178,6 +192,18 @@ impl InputState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn extended_vocabulary_roundtrips() {
+        // 数字/补齐字母可持久化往返（游戏键位表依赖）
+        for name in ["1", "2", "3", "0", "T", "H", "R", "L", "N", "P", "U", "Y", "Z"] {
+            let k = parse_key(name).expect("可解析");
+            assert_eq!(key_name(k), Some(name));
+        }
+        let rows = vec![("skill1".to_string(), vec!["1".to_string()])];
+        let t = BindingTable::import(&rows).unwrap();
+        assert_eq!(t.keys("skill1"), &[KeyCode::Key1]);
+    }
 
     #[test]
     fn defaults_match_legacy_hardcoded() {

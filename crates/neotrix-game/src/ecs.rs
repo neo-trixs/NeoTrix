@@ -8,11 +8,22 @@ use std::collections::HashMap;
 /// 使用 Option<T> 避免 unsafe zeroed 初始化
 struct ComponentStore {
     data: Box<dyn Any>,
+    /// 按实体下标置空槽位（despawn 清理用，T 在构造时绑定）
+    clear: fn(&mut Box<dyn Any>, u64),
 }
 
 impl ComponentStore {
     fn new<T: 'static>() -> Self {
-        Self { data: Box::new(Vec::<Option<T>>::new()) }
+        Self {
+            data: Box::new(Vec::<Option<T>>::new()),
+            clear: |data, id| {
+                if let Some(vec) = data.downcast_mut::<Vec<Option<T>>>() {
+                    if let Some(slot) = vec.get_mut(id as usize) {
+                        *slot = None;
+                    }
+                }
+            },
+        }
     }
 
     fn as_vec<T: 'static>(&self) -> &Vec<Option<T>> {
@@ -24,10 +35,21 @@ impl ComponentStore {
     }
 }
 
+/// 实体句柄（代际索引：ID 复用时代际+1，旧引用自然失效——
+///
+/// 此前裸 u64 引用有 ABA 风险：怪 A 死 → ID 被飞弹复用 → 怪 B 的仇恨
+/// 目标一夜变成一颗飞弹。`same/valid` 做（id, gen）双校验）.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Entity {
+    pub id: u64,
+    pub gen: u32,
+}
+
 /// 简单 ECS — 按 Entity ID 索引，按 TypeId 分组存储
 /// 借鉴 Blubber Engine: SoA (Array of Structures) 布局
 /// 相同组件连续存储 → 缓存友好
 /// 使用 Option<T> 确保 zero-cost 初始化 (无 unsafe)
+/// despawn 清组件表（防 ID 复用时僵尸组件复活——2026-09 实测：飞弹复用死怪 ID 被当尸体反复结算）
 pub struct SimpleEcs {
     /// 每种组件类型一个存储
     stores: HashMap<TypeId, ComponentStore>,
@@ -36,31 +58,71 @@ pub struct SimpleEcs {
     /// 空闲 ID 池 (借鉴 Specs 的 slot map)
     free_ids: Vec<u64>,
     next_id: u64,
+    /// 实体 → 所持组件类型（despawn 时清理用）
+    members: HashMap<u64, Vec<TypeId>>,
+    /// ID → 代际（复用时 +1）
+    gens: Vec<u32>,
 }
 
 impl SimpleEcs {
     pub fn new() -> Self {
-        Self { stores: HashMap::new(), alive: Vec::new(), free_ids: Vec::new(), next_id: 0 }
+        Self { stores: HashMap::new(), alive: Vec::new(), free_ids: Vec::new(), next_id: 0, members: HashMap::new(), gens: Vec::new() }
     }
 
-    /// 创建实体，返回 ID
+    /// 创建实体，返回 ID（裸 ID 兼容口；新代码优先 `spawn_entity`）
     pub fn spawn(&mut self) -> u64 {
+        self.spawn_entity().id
+    }
+
+    /// 创建实体，返回代际句柄（ID 复用时自动 +1）
+    pub fn spawn_entity(&mut self) -> Entity {
         if let Some(id) = self.free_ids.pop() {
             self.alive[id as usize] = true;
-            id
+            let g = self.gens[id as usize].wrapping_add(1);
+            self.gens[id as usize] = g;
+            Entity { id, gen: g }
         } else {
             let id = self.next_id;
             self.alive.push(true);
+            self.gens.push(0);
             self.next_id += 1;
-            id
+            Entity { id, gen: 0 }
         }
     }
 
-    /// 销毁实体
+    /// 当前代际（无记录 → 0）
+    pub fn generation(&self, id: u64) -> u32 {
+        self.gens.get(id as usize).copied().unwrap_or(0)
+    }
+
+    /// 当前句柄（查表/比较用）
+    pub fn entity_of(&self, id: u64) -> Entity {
+        Entity { id, gen: self.generation(id) }
+    }
+
+    /// 代际有效：存活且代际一致（旧引用自动失效）
+    pub fn valid(&self, e: Entity) -> bool {
+        self.is_alive(e.id) && self.generation(e.id) == e.gen
+    }
+
+    /// 句柄与 ID 是否指向同一代实体
+    pub fn same(&self, e: Entity, id: u64) -> bool {
+        e.id == id && self.valid(e)
+    }
+
+    /// 销毁实体（清组件 + 回收 ID）
     pub fn despawn(&mut self, id: u64) {
         if (id as usize) < self.alive.len() {
             self.alive[id as usize] = false;
             self.free_ids.push(id);
+            // 清组件：逐存储置空（ID 复用不再继承僵尸）
+            if let Some(types) = self.members.remove(&id) {
+                for t in types {
+                    if let Some(store) = self.stores.get_mut(&t) {
+                        (store.clear)(&mut store.data, id);
+                    }
+                }
+            }
         }
     }
 
@@ -75,6 +137,7 @@ impl SimpleEcs {
         self.free_ids.clear();
         self.next_id = 0;
         self.stores.clear();
+        self.members.clear();
     }
 
     /// 添加组件 (entity 必须先 spawn)
@@ -87,6 +150,35 @@ impl SimpleEcs {
             vec.push(None);
         }
         vec[id as usize] = Some(component);
+        // 登记成员关系（despawn 清理用）
+        let entry = self.members.entry(id).or_default();
+        if !entry.contains(&type_id) {
+            entry.push(type_id);
+        }
+    }
+
+    /// 删除组件（实体保留；无组件/死亡实体 → false，幂等）.
+    /// 此前调用方只能用哨兵值模拟删除（如读条 `t<0`），现直删.
+    pub fn remove<T: 'static>(&mut self, id: u64) -> bool {
+        if !self.is_alive(id) {
+            return false;
+        }
+        let type_id = TypeId::of::<T>();
+        let store = match self.stores.get_mut(&type_id) {
+            Some(s) => s,
+            None => return false,
+        };
+        let vec = store.as_vec_mut::<T>();
+        let had = match vec.get_mut(id as usize) {
+            Some(slot) => slot.take().is_some(),
+            None => false,
+        };
+        if had {
+            if let Some(list) = self.members.get_mut(&id) {
+                list.retain(|t| *t != type_id);
+            }
+        }
+        had
     }
 
     /// 获取组件 (不可变)
@@ -200,6 +292,46 @@ impl SimpleEcs {
     pub fn count(&self) -> usize {
         self.alive.iter().filter(|&&a| a).count()
     }
+
+    /// 惰性查询：拥有 A 的 `(id, &A)` 迭代器（零分配，热循环用；语义同 `query1`）.
+    pub fn iter1<A: 'static>(&self) -> impl Iterator<Item = (u64, &A)> + '_ {
+        let vec = self.stores.get(&TypeId::of::<A>()).map(|s| s.as_vec::<A>());
+        let next_id = self.next_id;
+        let alive = &self.alive;
+        (0..next_id).filter_map(move |id| {
+            if (id as usize) < alive.len() && alive[id as usize] {
+                vec.and_then(|v| v.get(id as usize)?.as_ref()).map(|a| (id, a))
+            } else {
+                None
+            }
+        })
+    }
+
+    /// 惰性查询：拥有 A 的实体 ID 迭代器（零分配；语义同 `query1_ids`）.
+    pub fn iter1_ids<A: 'static>(&self) -> impl Iterator<Item = u64> + '_ {
+        self.iter1::<A>().map(|(id, _)| id)
+    }
+
+    /// 惰性查询：同时拥有 A 和 B 的迭代器（零分配；语义同 `query2`）.
+    pub fn iter2<A: 'static, B: 'static>(&self) -> impl Iterator<Item = (u64, &A, &B)> + '_ {
+        let a_vec = self.stores.get(&TypeId::of::<A>()).map(|s| s.as_vec::<A>());
+        let b_vec = self.stores.get(&TypeId::of::<B>()).map(|s| s.as_vec::<B>());
+        let next_id = self.next_id;
+        let alive = &self.alive;
+        (0..next_id).filter_map(move |id| {
+            if (id as usize) < alive.len() && alive[id as usize] {
+                match (
+                    a_vec.and_then(|v| v.get(id as usize)?.as_ref()),
+                    b_vec.and_then(|v| v.get(id as usize)?.as_ref()),
+                ) {
+                    (Some(a), Some(b)) => Some((id, a, b)),
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        })
+    }
 }
 
 impl Default for SimpleEcs {
@@ -249,5 +381,75 @@ mod tests {
         let b = ecs.spawn();
         assert_eq!(a, b);
         assert_eq!(ecs.count(), 1);
+    }
+
+    #[test]
+    fn remove_component_idempotent() {
+        let mut ecs = SimpleEcs::new();
+        let id = ecs.spawn();
+        ecs.insert(id, 7u32);
+        assert!(ecs.remove::<u32>(id));
+        assert!(ecs.get::<u32>(id).is_none());
+        assert!(!ecs.remove::<u32>(id)); // 二次删除 false
+        assert!(!ecs.remove::<u32>(9999)); // 越界 false
+        assert!(ecs.is_alive(id)); // 实体保留
+    }
+
+    #[test]
+    fn despawn_clears_components_no_zombie() {
+        // 回归：ID 复用不再继承僵尸组件（飞弹复用死怪 ID 被当尸体反复结算）
+        let mut ecs = SimpleEcs::new();
+        let id = ecs.spawn();
+        ecs.insert(id, 7u32);
+        ecs.insert(id, "dead");
+        ecs.despawn(id);
+        let id2 = ecs.spawn();
+        assert_eq!(id, id2); // 复用同一 ID
+        assert!(ecs.get::<u32>(id2).is_none());
+        assert!(ecs.get::<&str>(id2).is_none());
+        // 新实体挂新组件正常工作
+        ecs.insert(id2, 42u32);
+        assert_eq!(*ecs.get::<u32>(id2).unwrap(), 42);
+    }
+
+    #[test]
+    fn iter_matches_query() {
+        let mut ecs = SimpleEcs::new();
+        let a = ecs.spawn();
+        ecs.insert(a, 1u32);
+        ecs.insert(a, "x");
+        let b = ecs.spawn();
+        ecs.insert(b, 2u32);
+        ecs.despawn(b);
+        let c = ecs.spawn();
+        ecs.insert(c, 3u32);
+        // iter1 与 query1 一致（含死亡过滤）
+        let from_iter: Vec<(u64, &u32)> = ecs.iter1::<u32>().collect();
+        let from_query = ecs.query1::<u32>();
+        assert_eq!(from_iter.len(), from_query.len());
+        assert!(from_iter.iter().all(|(id, _)| *id == a || *id == c));
+        // iter2 交集
+        let pairs: Vec<(u64, &u32, &&str)> = ecs.iter2::<u32, &str>().collect();
+        assert_eq!(pairs.len(), 1);
+        assert_eq!(pairs[0].0, a);
+        // ids
+        let ids: Vec<u64> = ecs.iter1_ids::<u32>().collect();
+        assert_eq!(ids.len(), 2);
+    }
+
+    #[test]
+    fn generations_invalidate_stale_handles() {
+        let mut ecs = SimpleEcs::new();
+        let a = ecs.spawn_entity();
+        assert_eq!((a.id, a.gen), (0, 0));
+        ecs.despawn(a.id);
+        let b = ecs.spawn_entity();
+        assert_eq!(b.id, a.id); // 同一 ID
+        assert_ne!(b.gen, a.gen); // 代际不同
+        assert!(!ecs.valid(a)); // 旧句柄失效
+        assert!(ecs.valid(b));
+        assert!(ecs.same(b, b.id));
+        assert!(!ecs.same(a, b.id)); // 旧句柄不再匹配
+        assert_eq!(ecs.entity_of(b.id), b);
     }
 }
