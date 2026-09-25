@@ -77,6 +77,12 @@ impl ComponentVec {
     fn entities(&self) -> Vec<u64> {
         self.data.keys().copied().collect()
     }
+
+    /// Lazily iterate entity ids holding a component (zero-alloc driver
+    /// for `World::iter_query`; short-circuits on find/take).
+    fn iter_keys(&self) -> impl Iterator<Item = u64> + '_ {
+        self.data.keys().copied()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -203,9 +209,16 @@ impl World {
 
     /// All living entities with current generation.
     pub fn entities(&self) -> Vec<Entity> {
-        self.alive.iter()
-            .map(|&id| Entity::new(id, self.generations[id as usize]))
-            .collect()
+        self.iter_entities().collect()
+    }
+
+    /// Lazily iterate living entities (zero-alloc; same set as `entities()`).
+    /// Prefer this in hot loops; use `.find()/.take()/.count()` to short-circuit.
+    pub fn iter_entities(&self) -> impl Iterator<Item = Entity> + '_ {
+        let gens = &self.generations;
+        self.alive
+            .iter()
+            .map(|&id| Entity::new(id, gens[id as usize]))
     }
 
     // -- component ops --
@@ -243,11 +256,19 @@ impl World {
 
     /// Get all entities with a specific component.
     pub fn query<T: Component>(&self) -> Vec<Entity> {
-        self.components.get(&TypeId::of::<T>())
-            .map_or(Vec::new(), |cv| {
-                cv.entities().into_iter()
-                    .map(|id| Entity::new(id, self.generations[id as usize]))
-                    .collect()
+        self.iter_query::<T>().collect()
+    }
+
+    /// Lazily iterate entities having component T (zero-alloc; same set as
+    /// `query::<T>()`). Despawn removes components eagerly, so every key is live.
+    pub fn iter_query<T: Component>(&self) -> impl Iterator<Item = Entity> + '_ {
+        let gens = &self.generations;
+        self.components
+            .get(&TypeId::of::<T>())
+            .into_iter()
+            .flat_map(move |cv| {
+                cv.iter_keys()
+                    .map(move |id| Entity::new(id, gens[id as usize]))
             })
     }
 
@@ -259,18 +280,26 @@ impl World {
 
     /// Iterate all entities that have both component A and B.
     pub fn query2<A: Component, B: Component>(&self) -> Vec<Entity> {
-        let a_entities = self.query::<A>();
-        a_entities.into_iter()
-            .filter(|&e| self.has::<B>(e))
-            .collect()
+        self.iter_query2::<A, B>().collect()
+    }
+
+    /// Lazily iterate entities having both A and B (zero-alloc; drives the
+    /// smaller store first is left to the caller via `query_many` if needed).
+    pub fn iter_query2<A: Component, B: Component>(&self) -> impl Iterator<Item = Entity> + '_ {
+        self.iter_query::<A>().filter(|e| self.has::<B>(*e))
     }
 
     /// Iterate all entities that have components A, B, and C.
     pub fn query3<A: Component, B: Component, C: Component>(&self) -> Vec<Entity> {
-        let a_entities = self.query::<A>();
-        a_entities.into_iter()
-            .filter(|&e| self.has::<B>(e) && self.has::<C>(e))
-            .collect()
+        self.iter_query3::<A, B, C>().collect()
+    }
+
+    /// Lazily iterate entities having A, B, and C (zero-alloc).
+    pub fn iter_query3<A: Component, B: Component, C: Component>(
+        &self,
+    ) -> impl Iterator<Item = Entity> + '_ {
+        self.iter_query::<A>()
+            .filter(|e| self.has::<B>(*e) && self.has::<C>(*e))
     }
 
     /// Iterate entities matching an arbitrary list of TypeIds.
@@ -665,8 +694,7 @@ mod tests {
     }
 
     #[test]
-    fn test_system_priority_order() {
-        use std::sync::{Arc, Mutex};
+    fn test_system_priority_order() {        use std::sync::{Arc, Mutex};
 
         let order = Arc::new(Mutex::new(Vec::<i32>::new()));
         let order_clone = order.clone();
@@ -698,5 +726,52 @@ mod tests {
 
         let v = order_clone.lock().unwrap();
         assert_eq!(*v, vec![1, 2]); // high priority first
+    }
+
+    #[test]
+    fn test_iter_entities_matches_entities() {
+        let mut world = World::new();
+        let e1 = world.spawn();
+        let e2 = world.spawn();
+        world.despawn(e1);
+        let mut from_iter: Vec<Entity> = world.iter_entities().collect();
+        let mut from_vec = world.entities();
+        from_iter.sort_by_key(|e| e.id);
+        from_vec.sort_by_key(|e| e.id);
+        assert_eq!(from_iter, from_vec);
+        assert_eq!(from_iter, vec![e2]);
+    }
+
+    #[test]
+    fn test_iter_query_matches_query() {
+        let mut world = World::new();
+        let e1 = world.spawn();
+        let e2 = world.spawn();
+        world.insert(e1, Position { x: 0.0, y: 0.0 });
+        world.insert(e1, Velocity { dx: 1.0, dy: 0.0 });
+        world.insert(e2, Position { x: 5.0, y: 5.0 });
+        let mut a: Vec<Entity> = world.iter_query::<Position>().collect();
+        let mut b = world.query::<Position>();
+        a.sort_by_key(|e| e.id);
+        b.sort_by_key(|e| e.id);
+        assert_eq!(a, b);
+        let ab: Vec<Entity> = world.iter_query2::<Position, Velocity>().collect();
+        assert_eq!(ab, vec![e1]);
+        let abc: Vec<Entity> = world.iter_query3::<Position, Velocity, Health>().collect();
+        assert!(abc.is_empty());
+    }
+
+    #[test]
+    fn test_iter_short_circuits() {
+        let mut world = World::new();
+        for i in 0..100 {
+            let e = world.spawn();
+            world.insert(e, Health(i));
+        }
+        // find() must return the first match without caller-side allocation
+        let first = world.iter_query::<Health>().next().unwrap();
+        assert!(world.has::<Health>(first));
+        assert_eq!(world.iter_query::<Health>().count(), 100);
+        assert_eq!(world.iter_query2::<Health, Position>().count(), 0);
     }
 }
