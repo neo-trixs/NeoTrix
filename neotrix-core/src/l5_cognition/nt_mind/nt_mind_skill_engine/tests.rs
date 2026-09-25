@@ -1,5 +1,6 @@
     use super::*;
     use crate::l0_substrate::nt_core_self_test::SelfTest;
+    use crate::l5_cognition::l1_facade::ProceduralMemoryRecord;
 
     fn sample_skill_content() -> &'static str {
         r#"---
