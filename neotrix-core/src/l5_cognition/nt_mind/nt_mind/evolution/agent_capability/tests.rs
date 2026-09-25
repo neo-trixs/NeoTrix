@@ -1,6 +1,12 @@
 
 use super::*;
+use crate::l5_cognition::l1_facade::KnowledgeBase;
+use crate::l5_cognition::l1_facade::attention_head::AttentionDomain;
+use crate::l5_cognition::nt_core_consciousness_tree::{BranchKind, CapabilityBranch, ConsciousnessTree};
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
+use crate::l5_cognition::nt_mind::nt_mind::evolution::co_evolution::{CoEvoConfig, CoEvolutionLoop};
 use crate::l2_perception::nt_world::nt_world_search::WebSearchResult as SearchResult;
+use neotrix_types::knowledge_access::NodeType;
 
 fn mem_agent() -> MemoryAgent {
     let tmp = std::env::temp_dir().join(format!(
