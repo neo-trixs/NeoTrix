@@ -1,7 +1,6 @@
 //! skill_attribution — 从 `nt_mind_skill_engine.rs` 拆分 (行为零变更).
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
@@ -55,13 +54,3 @@ pub(crate) fn parse_array_field(val: &str) -> Vec<String> {
             .collect()
     }
 }
-
-// ────────────────────────────────────────────────────────────────
-// P-F1: RevertibleEffect + InverseLedger (吸收 cordiverse §3.1, F1)
-// 每个 skill-install 上下文变换携带追踪的逆 (Γ → Γ×(Γ→Γ))。Runtime 把逆
-// 按加载序累积到 accumulator φ (twisted composition monoid 𝔗Γ); teardown
-// 以 LIFO 逆序应用 φ — 结构性保证, 非手写清理 (paper §3.3.3 p.27)。
-// ────────────────────────────────────────────────────────────────
-
-/// 逆操作闭包: 返回 Result 以便按 fiber 捕获失败而不中断其余逆操作 (L-Raise)。
-pub type _InverseOp = Arc<dyn Fn() -> Result<(), String> + Send + Sync>;
