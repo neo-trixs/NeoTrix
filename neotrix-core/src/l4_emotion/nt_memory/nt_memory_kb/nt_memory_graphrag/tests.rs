@@ -1,6 +1,10 @@
 
 use super::*;
 
+use std::collections::HashMap;
+
+use super::nt_extractor::{extract_capitalized_terms, infer_entity_type, split_sentences};
+
 fn make_config() -> GraphRagConfig {
     GraphRagConfig {
         max_entities_per_doc: 100,
