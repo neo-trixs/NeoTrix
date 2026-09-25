@@ -92,23 +92,34 @@ impl KnowledgeBase {
         let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open KB: {}", e))?;
         nt_memory_schema::initialize(&conn)
             .map_err(|e| format!("Failed to initialize KB: {}", e))?;
+        // 锁侧车文件（2026-09-25 根因修复）：flock 绝不能直接下在 sqlite 库文件上。
+        // macOS 上 WAL 模式的 sqlite 持有与 flock 互斥的锁（`kb_flocktest` S5 实证：
+        // WAL-idle 下 try_lock 必败 WouldBlock），open 期 try_lock 失败 → 写前阻塞锁
+        // 等自己，构成进程内自死锁（`kb_probe` v2 stage A + sample 2667 帧全卡 flock 实锤）。
+        // 侧车 `<db>.lock` 仅 flock 用户可见、sqlite 永不触碰：跨进程互斥语义不变，自冲突归零。
+        let lock_path = db_path.with_extension("lock");
         let db_file = OpenOptions::new()
             .read(true)
             .write(true)
-            .open(&db_path)
+            .create(true)
+            .open(&lock_path)
             .ok();
+        let mut locked = false;
         if let Some(ref f) = db_file {
-            if let Err(e) = f.lock_exclusive() {
-                log::warn!("[KB] file lock failed: {}", e);
-            } else {
-                log::info!("[KB] acquired exclusive file lock on knowledge.db");
+            match f.try_lock_exclusive() {
+                Ok(()) => {
+                    log::info!("[KB] acquired exclusive file lock on knowledge.db");
+                    locked = true;
+                }
+                Err(e) => {
+                    log::warn!("[KB] file lock busy/failed ({e}), continue without exclusive lock");
+                }
             }
         }
         let kb = Self::init_fields(conn, db_path.clone(), db_file, true);
-        // 标记文件锁已持有 (open 时获取)
-        if kb.db_file.is_some() {
-            kb.file_lock_held.store(true, Ordering::Relaxed);
-        }
+        // 如实记录：只有真正拿到锁才标持有（之前无条件置 true 会误导
+        // lock_before_write 跳过加锁；拿不到时写前会再试）。
+        kb.file_lock_held.store(locked, Ordering::Relaxed);
         let db_path_str = db_path.display().to_string();
         log::info!("[KB] opened at {db_path_str} — graph_cache lazy (rebuilt by background loop on demand); BM25/tech-reserve lazy");
 

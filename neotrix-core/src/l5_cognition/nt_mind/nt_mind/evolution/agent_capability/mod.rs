@@ -713,6 +713,36 @@ impl ProductionAgentExecutor {
             search: UnifiedSearch::new(),
         }
     }
+
+    /// 深特征路由（D1，deep_route.py 的 Rust 镜像）：只读任务文本。
+    /// 不可逆/高风险 → researcher 先取证（保守）；校准/概率 → verifier；
+    /// 健康/计数 → watcher；定位/文件 → explorer；默认 generalist。
+    pub(crate) fn selfcall_route(task: &str) -> &'static str {
+        let high_stakes = [
+            "删库",
+            "不可逆",
+            "irreversible",
+            "生产",
+            "prod",
+            "线上",
+            "删除",
+        ];
+        let calib = ["校准", "概率", "calib", "confidence", "置信"];
+        let health = ["健康", "数量", "health", "count", "规模"];
+        let locate = ["定位", "文件", "locate", "代码", "file"];
+        let hits = |words: &[&str]| words.iter().any(|w| task.contains(w));
+        if hits(&high_stakes) {
+            "researcher"
+        } else if hits(&calib) {
+            "verifier"
+        } else if hits(&health) {
+            "watcher"
+        } else if hits(&locate) {
+            "explorer"
+        } else {
+            "generalist"
+        }
+    }
 }
 
 impl AgentExecutor for ProductionAgentExecutor {
@@ -763,6 +793,22 @@ impl AgentExecutor for ProductionAgentExecutor {
                     }
                     (Err(err), _) => AgentExecutionOutcome::Failure(format!("retrieve: {}", err)),
                     _ => AgentExecutionOutcome::NoOp("no combined signal".into()),
+                }
+            }
+            // selfcaller: 能力自调用（D1 融合）— 按深层特征选子臂执行，全程留痕。
+            // selfcall_route 永不返回 "selfcaller"，无递归。
+            "selfcaller" => {
+                let sub = Self::selfcall_route(task);
+                match self.execute(sub, task) {
+                    AgentExecutionOutcome::Success(s) => {
+                        AgentExecutionOutcome::Success(format!("selfcall [{sub}]: {s}"))
+                    }
+                    AgentExecutionOutcome::NoOp(s) => {
+                        AgentExecutionOutcome::NoOp(format!("selfcall [{sub}]: {s}"))
+                    }
+                    AgentExecutionOutcome::Failure(s) => {
+                        AgentExecutionOutcome::Failure(format!("selfcall [{sub}]: {s}"))
+                    }
                 }
             }
             other => AgentExecutionOutcome::NoOp(format!("no executor for agent '{}'", other)),
@@ -912,7 +958,15 @@ impl MetaAgentShell {
     pub fn route_with_hint(&self, task_hint: &str) -> Option<&'static str> {
         let dominant = self.attention.dominant_domain()?;
         if dominant == AttentionDomain::PatternMatch && !task_hint.trim().is_empty() {
-            // AgentCatalog removed — fall through to static mapping
+            // P0#4：关键词路由内联（AgentCatalog 已移除，逻辑落于此，契约见上）。
+            // 非研究文本回退静态映射 + learner 校正（原行为不变）。
+            let hint_lc = task_hint.to_lowercase();
+            if ["research", "研究", "synthesize"]
+                .iter()
+                .any(|w| hint_lc.contains(w))
+            {
+                return Some("researcher");
+            }
         }
         self.route_to_catalog()
     }

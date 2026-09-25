@@ -19,6 +19,7 @@ pub mod planner;
 pub mod scanner;
 pub mod knowledge_gap_detector;
 pub mod monitor;
+pub mod nt_deep_route;
 
 pub use arch_optimizer::SelfArchitectureOptimizer;
 pub use whale::{AdaptiveSwitching, OptimizationPhase, WHALEConfig, WhaleCycleDetector, WhaleCycleResult};

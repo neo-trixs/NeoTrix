@@ -1416,3 +1416,33 @@ fn execution_outcome_summary_human_readable() {
     assert!(AgentExecutionOutcome::Success("x".into()).is_success());
     assert!(!AgentExecutionOutcome::Failure("x".into()).is_success());
 }
+
+#[test]
+fn selfcall_route_picks_by_deep_features() {
+    // D1 Rust 镜像：深层特征 → 子臂，与 deep_route.py 同规则。
+    use crate::l5_cognition::nt_mind::nt_mind::evolution::agent_capability::ProductionAgentExecutor;
+    assert_eq!(
+        ProductionAgentExecutor::selfcall_route("删库跑路吗"),
+        "researcher"
+    );
+    assert_eq!(
+        ProductionAgentExecutor::selfcall_route("校准概率分布"),
+        "verifier"
+    );
+    assert_eq!(
+        ProductionAgentExecutor::selfcall_route("健康计数看看"),
+        "watcher"
+    );
+    assert_eq!(
+        ProductionAgentExecutor::selfcall_route("定位文件位置"),
+        "explorer"
+    );
+    assert_eq!(
+        ProductionAgentExecutor::selfcall_route("随便聊聊"),
+        "generalist"
+    );
+}
+
+// 注：selfcaller 执行端到端不断言——ProductionAgentExecutor::new 内
+// UnifiedSearch::new / KB 调用在本网环境挂起（代理黑洞），与被测路由逻辑无关；
+// 路由由 selfcall_route_picks_by_deep_features 覆盖，执行臂随全绿重跑补测。

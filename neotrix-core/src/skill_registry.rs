@@ -100,20 +100,56 @@ pub struct ExecutionContext {
 
 /// 三层路由（活路径版）：Layer-3 Skill 触发 → Layer-2 Agent 能力 → DirectLlm。
 /// Layer-1 静态兜底暂由 orchestrator 侧处理（静态表在死目录，待模块归属裁决）。
+/// D1 深特征预遍：特征非空时先按特征匹配排序取首（替代整句 contains），
+/// 空特征回退原字面逻辑（fail-open，不降级）。
 pub fn route_entity_aware(
     input: &str,
     workspace_id: &str,
     skill_registry: &mut SkillRegistry,
     agent_registry: &AgentCardRegistry,
 ) -> EntityRouteDecision {
+    use crate::nt_route_features::{extract_deep_features, score_by_features};
     let query = input.trim();
     if query.is_empty() {
         return EntityRouteDecision::DirectLlm;
+    }
+    // D1 预遍：深特征排序（tags+name 作候选面）。
+    let feats = extract_deep_features(query);
+    if !feats.is_empty() {
+        let mut scored: Vec<(f64, ResolvedSkill)> = skill_registry
+            .discover()
+            .into_iter()
+            .map(|s| {
+                let mut tags = s.tags.clone();
+                tags.push(s.name.clone());
+                let sc = score_by_features(&tags, &feats);
+                (sc, s)
+            })
+            .filter(|(sc, _)| *sc > 0.0)
+            .collect();
+        scored.sort_by(|a, b| {
+            b.0.partial_cmp(&a.0)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        if let Some((_, skill)) = scored.into_iter().next() {
+            let mut wanted = skill.tags.clone();
+            wanted.push(skill.name.clone());
+            wanted.extend(feats.domains.clone());
+            let agent_id = agent_registry
+                .find_best_agent_for(&wanted)
+                .map(|c| c.id.clone());
+            return EntityRouteDecision::Skill {
+                skill_id: skill.name,
+                agent_id,
+            };
+        }
     }
     // Layer-3：首个触发命中的 skill；agent 绑定取其 tags＋name 作能力愿望单。
     if let Some(skill) = skill_registry.match_trigger(query).into_iter().next() {
         let mut wanted = skill.tags.clone();
         wanted.push(skill.name.clone());
+        // D1：wanted 追加特征域词（替代全文单串，Layer-2 精确比对才有命中）。
+        wanted.extend(feats.domains.clone());
         let agent_id = agent_registry
             .find_best_agent_for(&wanted)
             .map(|c| c.id.clone());
