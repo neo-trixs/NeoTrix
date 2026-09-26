@@ -169,3 +169,13 @@ PARK（P-01~P-05）不动。
 - EVO-04 spec：`sessions/handoff-EVO04-browse-20260926.md`（三步，归属 browser 窗，零引擎改动）。
 - 门控未执行：P1（EVO-05~08，Phase2 窗口排队）/ P2（EVO-09~12，条件未到）/
   G-01 sidecar（禁直起，等门）/ G-02 App 目视（等你在屏）/ G-10·G-11（等决议）/ VER bump（独占窗口）。
+
+## 8. P1 执行证据（子代理 infra 证书故障→主线程直写，四新文件 821 行 18 单测）
+
+- EVO-05 `l2_perception/nt_code_graph.rs`（270 行，5 单测）→ **5/5**。
+- EVO-06 `l5_cognition/nt_skill_route.rs`（199 行，5 单测）→ **5/5**。
+- EVO-07 `l6_meta/nt_evolve_loop.rs`（156 行，4 单测）→ **4/4**。
+- EVO-08 `l0_substrate/nt_data_gateway.rs`（196 行，4 单测）→ **4/4**
+ （含自修 mask_dsn scheme 冒号误判一处，回归绿）。
+- `cargo check -p neotrix --lib` EXIT:0；生产区无 unwrap/expect/panic/unsafe。
+- 状态：未提交（等下一提交令；mod 注册 4 处皆自有行，hunk 过滤预案就绪）。

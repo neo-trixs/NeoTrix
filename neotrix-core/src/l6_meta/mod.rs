@@ -60,3 +60,5 @@ pub mod nt_auto_orchestrator;
 pub mod nt_safety_monitor;
 /// Emergence Detector — absorbed from neotrix-sim
 pub mod nt_emergence_detector;
+// EVO-07 在线进化闭环（Serve收据/Observe评分/版本化artifact/热切换纯逻辑）
+pub mod nt_evolve_loop;

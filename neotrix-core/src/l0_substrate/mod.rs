@@ -86,3 +86,5 @@ pub mod nt_ecs;
 pub mod nt_tick_schedule;
 /// Judge 影子内核（EVO-02 mu 式：只记录不拦截，intercept 恒 false）
 pub mod nt_judge;
+/// EVO-08 统一数据面网关（DbKind/端点校验/注册表/DSN 脱敏/默认拒写）
+pub mod nt_data_gateway;

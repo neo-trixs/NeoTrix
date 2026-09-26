@@ -11,6 +11,8 @@ pub mod nt_core_sense;
 pub mod nt_core_knowledge;
 pub mod nt_core_vector_store;
 pub mod nt_core_code_search;
+/// EVO-05 有界符号调用图（symbols/calls/impact/explain，全有界 50）
+pub mod nt_code_graph;
 pub mod nt_routing;
 pub mod nt_web_perception;
 

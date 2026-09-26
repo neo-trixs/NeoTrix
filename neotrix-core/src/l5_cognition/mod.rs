@@ -72,6 +72,8 @@ pub mod nt_core_agent_circuit_breaker;
 pub mod nt_core_model_router;
 /// Skill Registry
 pub mod nt_core_model_skills;
+/// EVO-06 技能路由单源真理＋三件套评审（RouteTable/Manifest 纯逻辑）
+pub mod nt_skill_route;
 /// Hybrid Code Search Retriever
 pub mod nt_core_hybrid_search;
 pub mod nt_core_second_brain;
