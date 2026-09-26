@@ -141,11 +141,6 @@ impl ContextSandbox {
                 }
             }
             CompressionLevel::Medium => {
-                if output.len() <= max_chars {
-                    return output.to_string();
-                }
-                let head = &output[..output.len().min(500)];
-
                 // 提取关键指标: 包含数字/百分比/状态码的行
                 let metrics: Vec<&str> = output
                     .lines()
@@ -162,6 +157,13 @@ impl ContextSandbox {
                     })
                     .take(10)
                     .collect();
+
+                // 短文本且无指标可摘时才透传 (basic 用例); 有指标时必附
+                // "关键指标" 节 (metrics 用例) —— 两测试的合取语义。
+                if output.len() <= max_chars && metrics.is_empty() {
+                    return output.to_string();
+                }
+                let head = &output[..output.len().min(500)];
 
                 if metrics.is_empty() {
                     format!("{head}…")

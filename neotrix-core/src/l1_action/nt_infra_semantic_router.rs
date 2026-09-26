@@ -87,12 +87,13 @@ impl SemanticRouter {
             })
     }
 
-    /// 混合路由: 关键词 → 意图 → 默认
+    /// 混合路由: 关键词 → 意图 → 默认 → 弱关键词兜底
     pub fn route(&self, query: &str, intent: Option<&str>) -> Option<RouteDecision> {
-        // 1. 关键词匹配
-        if let Some(decision) = self.route_by_keywords(query) {
+        // 1. 关键词匹配 (强信号直接返回)
+        let keyword_decision = self.route_by_keywords(query);
+        if let Some(ref decision) = keyword_decision {
             if decision.confidence > 0.5 {
-                return Some(decision);
+                return Some(decision.clone());
             }
         }
         // 2. 意图匹配
@@ -102,13 +103,18 @@ impl SemanticRouter {
             }
         }
         // 3. 默认: 最高分 provider
-        self.provider_scores.iter()
+        if let Some((id, _)) = self.provider_scores.iter()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(id, _)| RouteDecision {
+        {
+            return Some(RouteDecision {
                 provider_id: id.clone(),
                 confidence: 0.3,
                 method: "default".into(),
-            })
+            });
+        }
+        // 4. 兜底: 弱关键词信号胜过无路由 (否则空评分表 + 无意图时恒返 None,
+        //    关键词路由在典型用例下永远不可达)
+        keyword_decision
     }
 
     /// 更新 provider 评分 (从反馈中学习)
