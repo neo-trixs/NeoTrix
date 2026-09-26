@@ -50,6 +50,74 @@ pub fn follow_lookahead(
     (cam.0 + (wx - cam.0) * s, cam.1 + (wy - cam.1) * s)
 }
 
+/// 二维相机变换 — 中心 `(x, y)` + 缩放 + 旋转 + 震屏（trauma 模型）.
+/// 纯 f32 元组数学，无头可测；`zoom` 为倍率，`rotation` 为弧度（逆时针为正）.
+#[derive(Debug, Clone, Copy)]
+pub struct Camera2D {
+    pub x: f32,
+    pub y: f32,
+    pub zoom: f32,
+    pub rotation: f32,
+    trauma: f32,
+    t: f32,
+}
+
+impl Camera2D {
+    /// 新建相机：`zoom=1`（无缩放），`rotation=0`（无旋转），`trauma=0`（无震动）.
+    pub fn new(x: f32, y: f32) -> Self {
+        Self { x, y, zoom: 1.0, rotation: 0.0, trauma: 0.0, t: 0.0 }
+    }
+
+    /// 世界→屏幕（相对坐标系，原点即相机中心）：平移（以 `x,y` 为中心）→旋转→缩放.
+    /// 旋向约定：数学逆时针为正（右手系），`rotation=+90°` 时 `(1,0)->(0,1)`.
+    pub fn world_to_screen(&self, wx: f32, wy: f32) -> (f32, f32) {
+        let dx = wx - self.x;
+        let dy = wy - self.y;
+        let (s, c) = self.rotation.sin_cos();
+        let rx = dx * c - dy * s;
+        let ry = dx * s + dy * c;
+        (rx * self.zoom, ry * self.zoom)
+    }
+
+    /// 屏幕→世界：`world_to_screen` 的逆变换；`zoom<=0` 时按 `1.0` 处理防除零.
+    pub fn screen_to_world(&self, sx: f32, sy: f32) -> (f32, f32) {
+        let z = if self.zoom <= 0.0 { 1.0 } else { self.zoom };
+        let dx = sx / z;
+        let dy = sy / z;
+        let (s, c) = self.rotation.sin_cos();
+        // 逆旋转 R(-r)：[c, s; -s, c]
+        (self.x + dx * c + dy * s, self.y + (-dx * s) + dy * c)
+    }
+
+    /// 累加震动强度后钳制到 `[0,1]`（trauma 模型：1=满震）.
+    pub fn add_trauma(&mut self, amount: f32) {
+        self.trauma = (self.trauma + amount).clamp(0.0, 1.0);
+    }
+
+    /// 时间步进：`dt<=0` 不动；`trauma` 按 `1.2/s` 线性衰减到 `0`；`t` 累积供震动采样.
+    pub fn update(&mut self, dt: f32) {
+        if dt <= 0.0 {
+            return;
+        }
+        self.t += dt;
+        self.trauma = (self.trauma - 1.2 * dt).max(0.0);
+    }
+
+    /// 震动偏移：`trauma^2 * 14px`，x 轴 `sin(t*47)`、y 轴 `cos(t*39)`；`trauma=0` 返回 `(0,0)`.
+    pub fn shake_offset(&self) -> (f32, f32) {
+        if self.trauma <= 0.0 {
+            return (0.0, 0.0);
+        }
+        let mag = self.trauma * self.trauma * 14.0;
+        (mag * (self.t * 47.0).sin(), mag * (self.t * 39.0).cos())
+    }
+
+    /// 设置缩放倍率，钳制到 `[0.25, 4.0]`（防翻转/防爆像素）.
+    pub fn set_zoom(&mut self, z: f32) {
+        self.zoom = z.clamp(0.25, 4.0);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -112,5 +180,84 @@ mod tests {
             prev = rx;
         }
         assert!((rx - 480.0).abs() < 2.0);
+    }
+
+    #[test]
+    fn cam_roundtrip_identity() {
+        // zoom=1/rot=0 下 world<->screen 往返一致（中心平移而已）
+        let cam = Camera2D::new(10.0, -20.0);
+        let (sx, sy) = cam.world_to_screen(13.0, -16.0);
+        assert!((sx - 3.0).abs() < 1e-5 && (sy - 4.0).abs() < 1e-5);
+        let (wx, wy) = cam.screen_to_world(sx, sy);
+        assert!((wx - 13.0).abs() < 1e-4 && (wy + 16.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn cam_zoom2_scales() {
+        // zoom=2：相对偏移翻倍
+        let mut cam = Camera2D::new(0.0, 0.0);
+        cam.set_zoom(2.0);
+        let (sx, sy) = cam.world_to_screen(3.0, 4.0);
+        assert!((sx - 6.0).abs() < 1e-5 && (sy - 8.0).abs() < 1e-5);
+        let (wx, wy) = cam.screen_to_world(sx, sy);
+        assert!((wx - 3.0).abs() < 1e-4 && (wy - 4.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn cam_rot90_ccw_maps_x_to_y() {
+        // 旋向约定：数学逆时针为正（右手系）；rotation=+90° 时 (1,0)->(0,1)
+        use core::f32::consts::FRAC_PI_2;
+        let mut cam = Camera2D::new(0.0, 0.0);
+        cam.rotation = FRAC_PI_2;
+        let (sx, sy) = cam.world_to_screen(1.0, 0.0);
+        assert!(sx.abs() < 1e-5 && (sy - 1.0).abs() < 1e-5);
+        // 逆变换能回来
+        let (wx, wy) = cam.screen_to_world(sx, sy);
+        assert!((wx - 1.0).abs() < 1e-4 && wy.abs() < 1e-4);
+    }
+
+    #[test]
+    fn cam_trauma_decays_and_offset_zeroes() {
+        // trauma 按 1.2/s 衰减到 0，且 offset 归零
+        let mut cam = Camera2D::new(0.0, 0.0);
+        cam.add_trauma(1.0);
+        assert!(cam.shake_offset() != (0.0, 0.0) || cam.t == 0.0); // t=0 时 sin=0，允许零向量
+        cam.add_trauma(10.0); // 钳制到 1
+        cam.update(1.0); // 1.2/s * 1s → 归零
+        assert_eq!(cam.shake_offset(), (0.0, 0.0));
+        // 部分衰减：0.5 - 1.2*0.1 = 0.38
+        let mut cam2 = Camera2D::new(0.0, 0.0);
+        cam2.add_trauma(0.5);
+        cam2.update(0.1);
+        let (ox, oy) = cam2.shake_offset();
+        let mag = 0.38 * 0.38 * 14.0;
+        // 双轴频率不同（47/39），故按分量各自以 mag 为界，而非以合向量为界
+        assert!(ox.abs() <= mag + 1e-4 && oy.abs() <= mag + 1e-4);
+        assert!(ox.abs() + oy.abs() > 0.0);
+        // dt<=0 不动
+        let before = cam2.shake_offset();
+        cam2.update(0.0);
+        cam2.update(-1.0);
+        assert_eq!(cam2.shake_offset(), before);
+    }
+
+    #[test]
+    fn cam_bad_zoom_never_explodes() {
+        // 非法 zoom：set_zoom 钳制到 [0.25,4.0]；直接写 0/负数时逆变换按 1.0 处理
+        let mut cam = Camera2D::new(0.0, 0.0);
+        cam.set_zoom(0.0);
+        assert!((cam.zoom - 0.25).abs() < 1e-6);
+        cam.set_zoom(-3.0);
+        assert!((cam.zoom - 0.25).abs() < 1e-6);
+        cam.set_zoom(100.0);
+        assert!((cam.zoom - 4.0).abs() < 1e-6);
+        // 防除零：zoom 被外部直接置 0/负数（字段 pub），逆变换仍可用、不出 inf/nan
+        cam.zoom = 0.0;
+        let (wx, wy) = cam.screen_to_world(5.0, -3.0);
+        assert!(wx.is_finite() && wy.is_finite());
+        assert!((wx - 5.0).abs() < 1e-5 && (wy + 3.0).abs() < 1e-5);
+        cam.zoom = -2.0;
+        let (wx2, wy2) = cam.screen_to_world(5.0, -3.0);
+        assert!(wx2.is_finite() && wy2.is_finite());
     }
 }

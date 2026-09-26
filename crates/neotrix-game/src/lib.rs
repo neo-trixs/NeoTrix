@@ -31,3 +31,8 @@ pub mod nt_commands;
 pub mod nt_grid;
 pub mod nt_phase;
 pub mod nt_run;
+pub mod nt_battle;
+// ── 九源吸收（2026-09-26）：kaplay SpriteAnims + bevy Atlas ──
+pub mod nt_anim;
+// ── 缺陷并行补齐（2026-09-26）：空间分区 + 相机变换 + 发射器 ──
+pub mod nt_spatial;
