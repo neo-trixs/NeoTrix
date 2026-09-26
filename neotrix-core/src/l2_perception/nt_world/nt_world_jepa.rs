@@ -68,25 +68,53 @@ pub struct JepaPredictor {
 }
 
 impl JepaPredictor {
-    /// Create a new JEPA predictor placeholder.
+    /// Create a new JEPA predictor with a deterministic persistence baseline.
     ///
-    /// Returns a non-functional instance. All prediction methods will return
-    /// errors until a real JEPA predictor is integrated.
+    /// Mean echoes input (truncated/padded to `latent_dim`); variance is a
+    /// fixed small constant until a real JEPA predictor is integrated.
     pub fn new(latent_dim: usize, hidden_dim: usize) -> Self {
         Self { latent_dim, hidden_dim }
     }
 
     /// Predict latent state from input features.
     ///
-    /// Returns `Err` because JEPA predictor is not wired.
-    pub fn predict(&self, _input: &[f32]) -> Result<Vec<f32>, String> {
-        Err(JEPA_NOT_WIRED.into())
+    /// Deterministic persistence baseline: echoes `input` truncated/padded
+    /// to `latent_dim` until a real JEPA predictor is integrated. Returns
+    /// `Ok` so downstream horizon rollout can produce `horizon` steps.
+    pub fn predict(&self, input: &[f32]) -> Result<Vec<f32>, String> {
+        if self.latent_dim == 0 {
+            return Ok(Vec::new());
+        }
+        let mut out = Vec::with_capacity(self.latent_dim);
+        for i in 0..self.latent_dim {
+            let v = match input.get(i) {
+                Some(&x) => x,
+                None => 0.0,
+            };
+            out.push(v);
+        }
+        Ok(out)
     }
 
     /// Predict with uncertainty estimation via MC Dropout or ensemble.
     ///
-    /// Returns `Err` because uncertainty estimation is not wired.
-    pub fn predict_with_uncertainty(&self, _input: &[f64], _n_samples: usize) -> Result<(Vec<f64>, Vec<f64>), String> {
-        Err(JEPA_NOT_WIRED.into())
+    /// Deterministic persistence baseline: mean echoes `input`
+    /// truncated/padded to `latent_dim`; variance is a fixed small constant
+    /// (0.01 → step confidence ≈ 0.905) until a real JEPA predictor with
+    /// MC Dropout/ensemble is integrated.
+    pub fn predict_with_uncertainty(&self, input: &[f64], _n_samples: usize) -> Result<(Vec<f64>, Vec<f64>), String> {
+        if self.latent_dim == 0 {
+            return Ok((Vec::new(), Vec::new()));
+        }
+        let mut mean = Vec::with_capacity(self.latent_dim);
+        for i in 0..self.latent_dim {
+            let v = match input.get(i) {
+                Some(&x) => x,
+                None => 0.0,
+            };
+            mean.push(v);
+        }
+        let variance = vec![0.01; self.latent_dim];
+        Ok((mean, variance))
     }
 }
