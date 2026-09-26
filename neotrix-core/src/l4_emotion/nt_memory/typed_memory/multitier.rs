@@ -58,7 +58,7 @@ impl HotStore {
     pub fn new(capacity: usize) -> Self {
         Self {
             cache: LruCache::new(
-                NonZeroUsize::new(capacity).unwrap_or(NonZeroUsize::new(1).unwrap()),
+                NonZeroUsize::new(capacity).unwrap_or(NonZeroUsize::MIN),
             ),
         }
     }
@@ -145,6 +145,19 @@ impl ColdStore {
                 .unwrap_or(0)
             })
             .unwrap_or(0)
+    }
+    pub fn remove(&self, id: &str) -> Result<bool, String> {
+        if let Some(conn) = &self.conn {
+            let count = conn
+                .execute(
+                    "DELETE FROM typed_memory_cold_archive WHERE id=?1",
+                    rusqlite::params![id],
+                )
+                .map_err(|e| e.to_string())?;
+            Ok(count > 0)
+        } else {
+            Ok(false)
+        }
     }
 }
 
@@ -289,6 +302,15 @@ impl MemoryMultitier {
         }
         Ok(())
     }
+    /// Evict an id from every tier. Cache eviction is best-effort: the
+    /// authoritative delete happens in the SQLite store (`kb.rs`), so a
+    /// cold-archive failure here must not fail the whole delete.
+    pub fn remove(&mut self, id: &str) -> bool {
+        let hot_hit = self.hot.remove(id).is_some();
+        let warm_hit = self.warm.remove(id).is_some();
+        let cold_hit = self.cold.remove(id).unwrap_or(false);
+        hot_hit || warm_hit || cold_hit
+    }
     pub fn tier_stats(&self) -> (usize, usize, usize) {
         (self.hot.len(), self.warm.len(), self.cold.len())
     }
@@ -296,7 +318,16 @@ impl MemoryMultitier {
 
 impl Default for MemoryMultitier {
     fn default() -> Self {
-        Self::new(50, 500).unwrap_or(Self::new(1, 1).expect("minimal"))
+        // `new` is infallible for these capacities; the fallback only exists
+        // so `default()` can never panic (production bans expect/unwrap).
+        Self::new(50, 500).unwrap_or_else(|_| Self {
+            hot: HotStore::new(50),
+            warm: WarmStore::new(),
+            cold: ColdStore { conn: None },
+            jit: JitForWeights::new(),
+            capacity_hot: 50,
+            capacity_warm: 500,
+        })
     }
 }
 
@@ -308,9 +339,9 @@ mod tests {
         id: &str,
         estate: MemoryEstate,
         confidence: f64,
-        access_count: u64,
+        _access_count: u64,
     ) -> TypedMemoryEntry {
-        let now = SystemTime::now()
+        let _now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs() as i64;

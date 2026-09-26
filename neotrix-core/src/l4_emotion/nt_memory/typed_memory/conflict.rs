@@ -66,13 +66,31 @@ impl ConflictResolver {
         &self,
         entries: &'a mut Vec<TypedMemoryEntry>,
     ) -> HashMap<String, Vec<&'a mut TypedMemoryEntry>> {
+        // Group by connected components of the conflict graph (union-find
+        // over entry-id <-> conflicting-id edges). The previous
+        // implementation keyed each entry only by its first counterparty id,
+        // which split mutually conflicting pairs (e1 lists e2 AND e2 lists
+        // e1) into two singleton groups; the len > 1 filter then dropped
+        // both and `resolve_all` returned empty.
+        let mut parent: HashMap<String, String> = HashMap::new();
+        for entry in entries.iter() {
+            parent
+                .entry(entry.id.clone())
+                .or_insert_with(|| entry.id.clone());
+            for record in &entry.conflicts {
+                parent
+                    .entry(record.conflicting_id.clone())
+                    .or_insert_with(|| record.conflicting_id.clone());
+                let root_a = find_root(&mut parent, &entry.id);
+                let root_b = find_root(&mut parent, &record.conflicting_id);
+                if root_a != root_b {
+                    parent.insert(root_b, root_a);
+                }
+            }
+        }
         let mut groups: HashMap<String, Vec<&mut TypedMemoryEntry>> = HashMap::new();
         for entry in entries.iter_mut() {
-            let key = entry
-                .conflicts
-                .first()
-                .map(|c| c.conflicting_id.clone())
-                .unwrap_or_else(|| entry.id.clone());
+            let key = find_root(&mut parent, &entry.id);
             groups.entry(key).or_default().push(entry);
         }
         groups.retain(|_, v| v.len() > 1);
@@ -182,11 +200,33 @@ impl ConflictResolver {
     }
 }
 
+/// Union-find root lookup with path compression. Never panics: unknown ids
+/// fall back to themselves instead of unwrapping map lookups.
+fn find_root(parent: &mut HashMap<String, String>, node: &str) -> String {
+    let mut root = node.to_string();
+    while let Some(next) = parent.get(&root).cloned() {
+        if next == root {
+            break;
+        }
+        root = next;
+    }
+    let mut current = node.to_string();
+    while current != root {
+        let next = parent
+            .get(&current)
+            .cloned()
+            .unwrap_or_else(|| root.clone());
+        parent.insert(current.clone(), root.clone());
+        current = next;
+    }
+    root
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::entry::ConflictRecord;
-    use super::*;
     use super::super::estate::MemoryEstate;
+    use super::*;
     fn make_conflicting() -> (TypedMemoryEntry, TypedMemoryEntry) {
         let mut e1 =
             TypedMemoryEntry::new("e1".into(), MemoryEstate::Semantic, "content A".into(), 0.8);
@@ -208,7 +248,7 @@ mod tests {
     }
     #[test]
     fn test_resolve_latest_wins() {
-        let (mut e1, mut e2) = make_conflicting();
+        let (e1, mut e2) = make_conflicting();
         e2.timestamp = e1.timestamp + 100;
         let mut entries = vec![e1, e2];
         let mut r = ConflictResolver::new(ConflictStrategy::LatestWins);
@@ -218,7 +258,7 @@ mod tests {
     }
     #[test]
     fn test_resolve_highest_confidence() {
-        let (mut e1, mut e2) = make_conflicting();
+        let (mut e1, e2) = make_conflicting();
         e1.confidence = 0.5;
         let mut entries = vec![e1, e2];
         let mut r = ConflictResolver::new(ConflictStrategy::HighestConfidence);

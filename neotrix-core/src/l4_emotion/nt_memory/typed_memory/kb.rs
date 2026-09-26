@@ -93,8 +93,11 @@ impl TypedMemoryStore {
     }
 
     pub fn get_by_estate(&self, estate: MemoryEstate) -> Vec<TypedMemoryEntry> {
-        let mut stmt = self.conn.prepare(&format!("SELECT id, estate, content, confidence, timestamp, ttl, access_count FROM typed_memory WHERE estate='{}'", estate.as_str())).unwrap();
-        let rows = stmt
+        let mut stmt = match self.conn.prepare(&format!("SELECT id, estate, content, confidence, timestamp, ttl, access_count FROM typed_memory WHERE estate='{}'", estate.as_str())) {
+            Ok(stmt) => stmt,
+            Err(_) => return Vec::new(),
+        };
+        let rows = match stmt
             .query_map([], |row| {
                 let id: String = row.get(0)?;
                 let estate_str: String = row.get(1)?;
@@ -113,8 +116,10 @@ impl TypedMemoryStore {
                     conflicts: Vec::new(),
                     access_count,
                 })
-            })
-            .unwrap();
+            }) {
+                Ok(rows) => rows,
+                Err(_) => return Vec::new(),
+            };
         rows.filter_map(|r| r.ok()).collect()
     }
 
@@ -162,7 +167,11 @@ impl TypedMemoryStore {
         resolved_ids
     }
 
-    pub fn delete_entry(&self, id: &str) -> Result<bool, String> {
+    /// Delete an entry from SQLite AND evict it from every multitier cache.
+    /// The eviction is required: `get_entry` consults the hot/warm tiers
+    /// first, so a SQLite-only delete leaves a stale readable copy behind.
+    pub fn delete_entry(&mut self, id: &str) -> Result<bool, String> {
+        self.multitier.remove(id);
         let count = self
             .conn
             .execute("DELETE FROM typed_memory WHERE id=?1", params![id])
@@ -204,8 +213,11 @@ impl TypedMemoryStore {
     }
 
     pub fn get_all_entries(&self) -> Vec<TypedMemoryEntry> {
-        let mut stmt = self.conn.prepare("SELECT id, estate, content, confidence, timestamp, ttl, access_count FROM typed_memory").unwrap();
-        let rows = stmt
+        let mut stmt = match self.conn.prepare("SELECT id, estate, content, confidence, timestamp, ttl, access_count FROM typed_memory") {
+            Ok(stmt) => stmt,
+            Err(_) => return Vec::new(),
+        };
+        let rows = match stmt
             .query_map([], |row| {
                 let id: String = row.get(0)?;
                 let estate_str: String = row.get(1)?;
@@ -224,35 +236,38 @@ impl TypedMemoryStore {
                     conflicts: Vec::new(),
                     access_count,
                 })
-            })
-            .unwrap();
+            }) {
+                Ok(rows) => rows,
+                Err(_) => return Vec::new(),
+            };
         rows.filter_map(|r| r.ok()).collect()
     }
 
     pub fn stats(&self) -> TypedMemoryStats {
-        let total = self
+        let total: i64 = self
             .conn
             .query_row("SELECT COUNT(*) FROM typed_memory", [], |r| r.get(0))
             .unwrap_or(0);
-        let mut by_estate = self
-            .conn
-            .prepare("SELECT estate, COUNT(*) FROM typed_memory GROUP BY estate")
-            .unwrap();
-        let estate_counts: Vec<(String, i64)> = by_estate
-            .query_map([], |r| {
-                Ok((r.get(0).unwrap_or_default(), r.get(1).unwrap_or(0)))
-            })
-            .unwrap()
-            .filter_map(|r| r.ok())
-            .collect();
-        let avg = self
+        let average_confidence: f64 = self
             .conn
             .query_row("SELECT AVG(confidence) FROM typed_memory", [], |r| r.get(0))
             .unwrap_or(0.0);
+        let by_estate: Vec<(String, i64)> = match self
+            .conn
+            .prepare("SELECT estate, COUNT(*) FROM typed_memory GROUP BY estate")
+        {
+            Ok(mut stmt) => stmt
+                .query_map([], |r| {
+                    Ok((r.get(0).unwrap_or_default(), r.get(1).unwrap_or(0)))
+                })
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default(),
+            Err(_) => Vec::new(),
+        };
         TypedMemoryStats {
             total_entries: total,
-            by_estate: estate_counts,
-            average_confidence: avg,
+            by_estate,
+            average_confidence,
         }
     }
 
@@ -307,10 +322,15 @@ pub struct TypedMemoryStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     fn make_store() -> TypedMemoryStore {
-        let dir = tempdir().unwrap();
-        let conn = Connection::open(dir.path().join("test.db")).unwrap();
+        // Root cause of the "attempt to write a readonly database" cluster:
+        // the old helper opened a file-backed DB inside a `tempdir()` guard
+        // that was dropped at the end of the function, deleting the parent
+        // directory out from under the live connection. Not parallel-test
+        // contention (each test already had a unique path) and not a
+        // production permission issue. An in-memory DB gives every test a
+        // fully isolated store with no filesystem lifetime to manage.
+        let conn = Connection::open_in_memory().unwrap();
         TypedMemoryStore::new(conn).unwrap()
     }
     fn make_entry(estate: MemoryEstate) -> TypedMemoryEntry {
