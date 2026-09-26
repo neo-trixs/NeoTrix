@@ -43,7 +43,7 @@
             line: 42,
         };
         let s = format!("{}", finding.severity);
-        assert_eq!(s, "ERROR");
+        assert_eq!(s, "Error");
     }
 
     #[test]

@@ -92,9 +92,19 @@ pub fn apply_context_budget(_messages: &[Message], _max_tokens: usize) -> Budget
     BudgetResult::default()
 }
 
-/// Estimate tokens in a list of messages (stub)
-pub fn estimate_messages_tokens(_messages: &[Message]) -> usize {
-    0
+/// Estimate tokens in a list of messages.
+///
+/// 口径与下沉前 `core::nt_core_llm` 一致 (e2d73656): 每条 `estimate_tokens(content) + 4`
+/// (role 标签 + tool 协议开销)。636d379c 误留 stub 返回 0, 导致 compaction
+/// 预算推导为 0 并命中 `budget == 0` 早返, 测试 `test_compaction_*` 漂移, 故恢复真实现。
+pub fn estimate_messages_tokens(messages: &[Message]) -> usize {
+    let mut total = 0usize;
+    for m in messages {
+        total += estimate_tokens(&m.content);
+        // role 标签 + 可能的 tool_calls/tool_call_id 协议开销
+        total += 4;
+    }
+    total
 }
 
 /// Unified provider metadata (stub)

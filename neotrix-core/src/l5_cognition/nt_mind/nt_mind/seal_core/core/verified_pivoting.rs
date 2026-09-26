@@ -108,11 +108,14 @@ impl VerifiedPivoting {
     /// Reviewer: 发出裁定
     pub fn reviewer_inspect(&mut self, artifact: &str) -> Verdict {
         self.contract.stage = CampaignStage::Review;
-        
-        // 简单验证逻辑: 如果 artifact 包含 "error" 或 "fail"，标记为需要修订
-        let verdict = if artifact.contains("error") || artifact.contains("fail") {
+
+        // 大小写不敏感: 真实产物多为 "Error: ..." 首字母大写,
+        // 大小写敏感的 contains("error") 会漏检 (测试用 "Error: endpoint returns 500" 实锤);
+        // 全仓同类判定 (emotion_engine/nt_loop_step/crystal engine) 均为 lowercased 后 contains。
+        let lowered = artifact.to_lowercase();
+        let verdict = if lowered.contains("error") || lowered.contains("fail") {
             Verdict::Revise
-        } else if artifact.contains("done") || artifact.contains("complete") {
+        } else if lowered.contains("done") || lowered.contains("complete") {
             Verdict::Done
         } else {
             Verdict::Continue

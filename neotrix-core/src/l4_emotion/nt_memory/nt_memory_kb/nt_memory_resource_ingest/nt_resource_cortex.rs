@@ -22,8 +22,8 @@ pub(crate) fn upsert_cortex_node(
     let ts = now();
     conn.execute(
         "INSERT OR REPLACE INTO nodes \
-         (id, node_type, title, content, url, created_at, updated_at, data_tier, tier, metadata) \
-         VALUES (?1,'cortex_brain',?2,?3,?4,?5,?5,'cache','warm',?6)",
+         (id, node_type, title, content, url, created_at, updated_at, transaction_time, data_tier, tier, metadata) \
+         VALUES (?1,'cortex_brain',?2,?3,?4,?5,?5,?5,'cache','warm',?6)",
         rusqlite::params![id, title, content, url, ts, meta.to_string()],
     )
     .map_err(|e| e.to_string())?;

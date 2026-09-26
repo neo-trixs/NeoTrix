@@ -249,7 +249,7 @@ impl ResourceRouter {
             .collect();
 
         if scored_resources.is_empty() {
-            return RoutingResult {
+            let result = RoutingResult {
                 id: format!("route_{}", uuid::Uuid::new_v4()),
                 selected_resource: _ResourceEntry {
                     id: "default".to_string(),
@@ -273,6 +273,20 @@ impl ResourceRouter {
                 estimated_latency: 1000,
                 routing_reason: "No available resources".to_string(),
             };
+            // 回退路径同样记账: stats() 以 routing_history 为唯一口径,
+            // 不记录则空池路由不可观测 (自 fe6e9916 创建即缺失, 测试期望 len==1)。
+            let record = RoutingRecord {
+                id: format!("routing_{}", uuid::Uuid::new_v4()),
+                cycle,
+                request: request.clone(),
+                result: result.clone(),
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                actual_duration_ms: None,
+                success: None,
+            };
+            self.routing_history.push(record);
+            self.trim_history();
+            return result;
         }
 
         scored_resources.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));

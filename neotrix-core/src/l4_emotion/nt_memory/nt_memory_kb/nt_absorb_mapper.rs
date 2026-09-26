@@ -1152,7 +1152,7 @@ mod tests {
         let now = unix_now();
         let now_str = now.to_string();
         conn.execute(
-            "INSERT INTO nodes(id,node_type,title,summary,content,url,domain,language,confidence,importance,created_at,updated_at,access_count,metadata,data_tier,temporal,supersedes,source_episode,tier) VALUES(?1,'repository','GitHub - openai/codex: desc','s','c','https://github.com/openai/codex','github.com','en',1.0,0.7,?2,?3,0,'{}','cache',NULL,NULL,NULL,'warm')",
+            "INSERT INTO nodes(id,node_type,title,summary,content,url,domain,language,confidence,importance,created_at,updated_at,access_count,metadata,data_tier,temporal,supersedes,source_episode,tier,transaction_time) VALUES(?1,'repository','GitHub - openai/codex: desc','s','c','https://github.com/openai/codex','github.com','en',1.0,0.7,?2,?3,0,'{}','cache',NULL,NULL,NULL,'warm',?2)",
             params![format!("batch_{now_str}_abcdef12"), now, now],
         ).unwrap();
 
@@ -1188,7 +1188,7 @@ mod tests {
         .enumerate()
         {
             conn.execute(
-                "INSERT INTO nodes(id,node_type,title,summary,content,url,domain,language,confidence,importance,created_at,updated_at,access_count,metadata,data_tier,temporal,supersedes,source_episode,tier) VALUES(?1,?2,?3,'s','c','https://github.com/openai/codex','github.com','en',1.0,0.7,?4,?5,0,'{}','cache',NULL,NULL,NULL,'warm')",
+                "INSERT INTO nodes(id,node_type,title,summary,content,url,domain,language,confidence,importance,created_at,updated_at,access_count,metadata,data_tier,temporal,supersedes,source_episode,tier,transaction_time) VALUES(?1,?2,?3,'s','c','https://github.com/openai/codex','github.com','en',1.0,0.7,?4,?5,0,'{}','cache',NULL,NULL,NULL,'warm',?4)",
                 params![format!("{}_{}", nid, now), ntype, format!("GitHub - openai/codex #{}", i), now, now],
             ).unwrap();
         }
@@ -1215,7 +1215,7 @@ mod tests {
 
         let now = unix_now();
         conn.execute(
-            "INSERT INTO nodes(id,node_type,title,summary,content,url,domain,language,confidence,importance,created_at,updated_at,access_count,metadata,data_tier,temporal,supersedes,source_episode,tier) VALUES(?1,'repository','GitHub - openai/codex: desc','s','c','https://github.com/openai/codex','github.com','en',1.0,0.7,?2,?3,0,'{}','cache',NULL,NULL,NULL,'warm')",
+            "INSERT INTO nodes(id,node_type,title,summary,content,url,domain,language,confidence,importance,created_at,updated_at,access_count,metadata,data_tier,temporal,supersedes,source_episode,tier,transaction_time) VALUES(?1,'repository','GitHub - openai/codex: desc','s','c','https://github.com/openai/codex','github.com','en',1.0,0.7,?2,?3,0,'{}','cache',NULL,NULL,NULL,'warm',?2)",
             params![format!("u_{now}"), now, now],
         ).unwrap();
         let (mapped, _) = map_batch_nodes(&conn).unwrap();
