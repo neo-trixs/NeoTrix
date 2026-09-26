@@ -143,7 +143,7 @@ pub fn _censys_egress_rule() -> super::super::l1_facade::EgressRule {
 }
 
 pub fn _censys_egress_policy() -> super::super::l1_facade::EgressPolicy {
-    super::super::l1_facade::EgressPolicy::new(vec![_censys_egress_rule()], false)
+    super::super::l1_facade::EgressPolicy::new(vec![_censys_egress_rule()], true)
 }
 #[cfg(test)]
 mod tests {

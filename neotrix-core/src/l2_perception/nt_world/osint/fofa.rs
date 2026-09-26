@@ -553,7 +553,7 @@ pub fn _fofa_egress_rule() -> super::super::l1_facade::EgressRule {
 pub fn _fofa_egress_policy() -> super::super::l1_facade::EgressPolicy {
     super::super::l1_facade::EgressPolicy::new(
         vec![_fofa_egress_rule()],
-        false,
+        true,
     )
 }
 

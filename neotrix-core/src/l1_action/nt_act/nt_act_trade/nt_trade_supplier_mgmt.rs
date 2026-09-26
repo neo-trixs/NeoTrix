@@ -39,12 +39,7 @@ pub struct SupplierEvaluation {
 
 impl SupplierEvaluation {
     /// 计算加权综合评分 (默认权重: 质量40%, 交期25%, 价格20%, 服务15%)
-    pub fn calculate_overall(
-        quality: f64,
-        delivery: f64,
-        price: f64,
-        service: f64,
-    ) -> f64 {
+    pub fn calculate_overall(quality: f64, delivery: f64, price: f64, service: f64) -> f64 {
         quality * 0.40 + delivery * 0.25 + price * 0.20 + service * 0.15
     }
 }
@@ -66,10 +61,15 @@ pub enum SupplierGrade {
 
 impl SupplierGrade {
     pub fn from_score(score: f64) -> Self {
-        if score >= 85.0 { Self::A }
-        else if score >= 70.0 { Self::B }
-        else if score >= 55.0 { Self::C }
-        else { Self::D }
+        if score >= 85.0 {
+            Self::A
+        } else if score >= 70.0 {
+            Self::B
+        } else if score >= 55.0 {
+            Self::C
+        } else {
+            Self::D
+        }
     }
 }
 
@@ -186,11 +186,7 @@ impl SupplierMgmtEngine {
     }
 
     /// 加入/移除合格供应商清单
-    pub fn set_avl_status(
-        &mut self,
-        supplier_id: &str,
-        on_avl: bool,
-    ) -> Result<(), String> {
+    pub fn set_avl_status(&mut self, supplier_id: &str, on_avl: bool) -> Result<(), String> {
         let now = self.current_timestamp();
         let supplier = self
             .suppliers
@@ -202,22 +198,27 @@ impl SupplierMgmtEngine {
     }
 
     /// 多供应商对比
-    pub fn compare_suppliers(
-        &self,
-        supplier_ids: &[String],
-    ) -> SupplierComparison {
+    pub fn compare_suppliers(&self, supplier_ids: &[String]) -> SupplierComparison {
         let profiles: Vec<SupplierProfile> = supplier_ids
             .iter()
             .filter_map(|id| self.suppliers.get(id).cloned())
             .collect();
         let best_quality = profiles
             .iter()
-            .filter_map(|s| s.evaluation.as_ref().map(|e| (s.id.clone(), e.quality_score)))
+            .filter_map(|s| {
+                s.evaluation
+                    .as_ref()
+                    .map(|e| (s.id.clone(), e.quality_score))
+            })
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
             .map(|(id, _)| id);
         let best_delivery = profiles
             .iter()
-            .filter_map(|s| s.evaluation.as_ref().map(|e| (s.id.clone(), e.delivery_score)))
+            .filter_map(|s| {
+                s.evaluation
+                    .as_ref()
+                    .map(|e| (s.id.clone(), e.delivery_score))
+            })
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
             .map(|(id, _)| id);
         let best_price = profiles
@@ -227,7 +228,11 @@ impl SupplierMgmtEngine {
             .map(|(id, _)| id);
         let best_overall = profiles
             .iter()
-            .filter_map(|s| s.evaluation.as_ref().map(|e| (s.id.clone(), e.overall_score)))
+            .filter_map(|s| {
+                s.evaluation
+                    .as_ref()
+                    .map(|e| (s.id.clone(), e.overall_score))
+            })
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
             .map(|(id, _)| id);
         SupplierComparison {
@@ -271,11 +276,13 @@ mod tests {
         };
         engine.create_supplier(profile);
         let eval = SupplierEvaluation {
-            quality_score: 90.0,
+            // 综合 = 95*0.4+85*0.25+75*0.2+80*0.15 = 86.25 ≥ 85 → A；
+            // 原 90/85/75/80 得 84.25，按文档阈值应为 B（生产阈值不动，fail-closed 不虚增等级）
+            quality_score: 95.0,
             delivery_score: 85.0,
             price_score: 75.0,
             service_score: 80.0,
-            overall_score: SupplierEvaluation::calculate_overall(90.0, 85.0, 75.0, 80.0),
+            overall_score: SupplierEvaluation::calculate_overall(95.0, 85.0, 75.0, 80.0),
             evaluated_at: 0,
             evaluator: "admin".into(),
             notes: None,
@@ -287,10 +294,18 @@ mod tests {
     #[test]
     fn test_avl_list() {
         let mut engine = SupplierMgmtEngine::new();
-        let mut p1 = SupplierProfile { id: "S1".into(), name: "A".into(), ..Default::default() };
+        let mut p1 = SupplierProfile {
+            id: "S1".into(),
+            name: "A".into(),
+            ..Default::default()
+        };
         p1.on_avl = true;
         engine.create_supplier(p1);
-        let p2 = SupplierProfile { id: "S2".into(), name: "B".into(), ..Default::default() };
+        let p2 = SupplierProfile {
+            id: "S2".into(),
+            name: "B".into(),
+            ..Default::default()
+        };
         engine.create_supplier(p2);
         assert_eq!(engine.avl_list().len(), 1);
     }
@@ -298,16 +313,46 @@ mod tests {
     #[test]
     fn test_compare_suppliers() {
         let mut engine = SupplierMgmtEngine::new();
-        engine.create_supplier(SupplierProfile { id: "S1".into(), name: "A".into(), ..Default::default() });
-        engine.create_supplier(SupplierProfile { id: "S2".into(), name: "B".into(), ..Default::default() });
-        engine.evaluate_supplier("S1", SupplierEvaluation {
-            quality_score: 90.0, delivery_score: 80.0, price_score: 70.0, service_score: 85.0,
-            overall_score: 82.0, evaluated_at: 0, evaluator: "".into(), notes: None,
-        }).unwrap();
-        engine.evaluate_supplier("S2", SupplierEvaluation {
-            quality_score: 75.0, delivery_score: 90.0, price_score: 85.0, service_score: 70.0,
-            overall_score: 80.0, evaluated_at: 0, evaluator: "".into(), notes: None,
-        }).unwrap();
+        engine.create_supplier(SupplierProfile {
+            id: "S1".into(),
+            name: "A".into(),
+            ..Default::default()
+        });
+        engine.create_supplier(SupplierProfile {
+            id: "S2".into(),
+            name: "B".into(),
+            ..Default::default()
+        });
+        engine
+            .evaluate_supplier(
+                "S1",
+                SupplierEvaluation {
+                    quality_score: 90.0,
+                    delivery_score: 80.0,
+                    price_score: 70.0,
+                    service_score: 85.0,
+                    overall_score: 82.0,
+                    evaluated_at: 0,
+                    evaluator: "".into(),
+                    notes: None,
+                },
+            )
+            .unwrap();
+        engine
+            .evaluate_supplier(
+                "S2",
+                SupplierEvaluation {
+                    quality_score: 75.0,
+                    delivery_score: 90.0,
+                    price_score: 85.0,
+                    service_score: 70.0,
+                    overall_score: 80.0,
+                    evaluated_at: 0,
+                    evaluator: "".into(),
+                    notes: None,
+                },
+            )
+            .unwrap();
         let cmp = engine.compare_suppliers(&["S1".into(), "S2".into()]);
         assert_eq!(cmp.best_quality, Some("S1".into()));
         assert_eq!(cmp.best_price, Some("S2".into()));

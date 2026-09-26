@@ -171,7 +171,8 @@ impl TradeTaskEngine {
             assignee_id: assignee_id.to_string(),
             due_at,
             completed_at: None,
-            remind_at: due_at.map(|d| d - 3600), // 提前1小时提醒
+            // 提前1小时提醒；saturating 防 due_at < 3600 下溢 panic
+            remind_at: due_at.map(|d| d.saturating_sub(3600)),
             reminded: false,
             notes: Vec::new(),
             created_at: now,
@@ -259,8 +260,7 @@ impl TradeTaskEngine {
                 if let Some(due) = t.due_at {
                     let dt = chrono::DateTime::from_timestamp(due as i64, 0);
                     if let Some(dt) = dt {
-                        dt.format("%Y-%m").to_string()
-                            == format!("{:04}-{:02}", year, month)
+                        dt.format("%Y-%m").to_string() == format!("{:04}-{:02}", year, month)
                     } else {
                         false
                     }
@@ -328,8 +328,24 @@ mod tests {
     #[test]
     fn test_pending_tasks() {
         let mut engine = TradeTaskEngine::new();
-        engine.create_task("Task 1", TradeTaskType::CustomerFollowUp, TaskPriority::High, "s1", None, None, None);
-        engine.create_task("Task 2", TradeTaskType::QuoteFollowUp, TaskPriority::Low, "s1", None, None, None);
+        engine.create_task(
+            "Task 1",
+            TradeTaskType::CustomerFollowUp,
+            TaskPriority::High,
+            "s1",
+            None,
+            None,
+            None,
+        );
+        engine.create_task(
+            "Task 2",
+            TradeTaskType::QuoteFollowUp,
+            TaskPriority::Low,
+            "s1",
+            None,
+            None,
+            None,
+        );
         let pending = engine.pending_tasks(None);
         assert_eq!(pending.len(), 2);
     }

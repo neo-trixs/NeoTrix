@@ -174,7 +174,7 @@ pub fn _shodan_egress_rule() -> super::super::l1_facade::EgressRule {
     super::super::l1_facade::EgressRule::allow(SHODAN_API_HOST, "443")
 }
 pub fn _shodan_egress_policy() -> super::super::l1_facade::EgressPolicy {
-    super::super::l1_facade::EgressPolicy::new(vec![_shodan_egress_rule()], false)
+    super::super::l1_facade::EgressPolicy::new(vec![_shodan_egress_rule()], true)
 }
 
 #[cfg(test)]

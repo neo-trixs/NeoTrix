@@ -374,21 +374,22 @@ mod tests {
         let inst_id = engine.create_instance("test", HashMap::new()).unwrap();
         engine.start_instance(&inst_id).unwrap();
 
-        // Pause
-        let result = engine.pause_instance(&inst_id);
-        assert!(result.is_ok());
-        assert_eq!(
-            engine.get_instance(&inst_id).unwrap().status,
-            ProcessStatus::Paused
-        );
-
-        // Resume
-        let result = engine.resume_instance(&inst_id);
-        assert!(result.is_ok());
+        // 同步引擎：start 即跑完，此处只能是 Completed；Completed 上的
+        // pause/resume 必须拒绝（fail-closed）。真正的 pause→resume 正向
+        // 转移由 process_engine 模块内白盒测试覆盖（Running 需执行中途注入，
+        // 公共 API 无法从外部构造）。
         assert_eq!(
             engine.get_instance(&inst_id).unwrap().status,
             ProcessStatus::Completed
         );
+
+        // Pause terminal → Err
+        let result = engine.pause_instance(&inst_id);
+        assert!(result.is_err());
+
+        // Resume non-paused → Err
+        let result = engine.resume_instance(&inst_id);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -660,7 +661,7 @@ mod tests {
 
         engine.start_instance(&inst_id).unwrap();
         let duration = engine.get_total_duration_ms(&inst_id).unwrap();
-        assert!(duration >= 0);
+        let _ = duration;
     }
 
     #[test]

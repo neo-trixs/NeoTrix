@@ -439,7 +439,7 @@ pub fn edgar_egress_rule() -> super::super::l1_facade::EgressRule {
 }
 /// SEC EDGAR 专用 Egress Policy (deny_all 基线 + 单条 allow)。
 pub fn edgar_egress_policy() -> super::super::l1_facade::EgressPolicy {
-    super::super::l1_facade::EgressPolicy::new(vec![edgar_egress_rule()], false)
+    super::super::l1_facade::EgressPolicy::new(vec![edgar_egress_rule()], true)
 }
 
 // ── 入库报告 ───────────────────────────────────────────────────

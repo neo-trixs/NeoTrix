@@ -158,7 +158,7 @@ pub fn opencorporates_egress_rule() -> super::super::l1_facade::EgressRule {
 }
 
 pub fn opencorporates_egress_policy() -> super::super::l1_facade::EgressPolicy {
-    super::super::l1_facade::EgressPolicy::new(vec![opencorporates_egress_rule()], false)
+    super::super::l1_facade::EgressPolicy::new(vec![opencorporates_egress_rule()], true)
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct _OcIngestReport {

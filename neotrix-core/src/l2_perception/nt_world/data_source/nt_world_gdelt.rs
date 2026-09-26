@@ -213,7 +213,7 @@ pub fn gdelt_egress_rule() -> super::super::l1_facade::EgressRule {
 }
 /// GDELT 专用 Egress Policy (deny_all 基线 + 单条 allow)。
 pub fn _gdelt_egress_policy() -> super::super::l1_facade::EgressPolicy {
-    super::super::l1_facade::EgressPolicy::new(vec![gdelt_egress_rule()], false)
+    super::super::l1_facade::EgressPolicy::new(vec![gdelt_egress_rule()], true)
 }
 
 // ── 入库报告 ───────────────────────────────────────────────────

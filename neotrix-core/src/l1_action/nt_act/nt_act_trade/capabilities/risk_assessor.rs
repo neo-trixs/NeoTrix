@@ -210,7 +210,13 @@ impl RiskAssessor {
             findings.iter().map(|f| f.impact_score).sum::<f64>() / findings.len() as f64
         };
 
-        let overall_level = if overall_score >= self.config.high_risk_threshold {
+        // fail-closed: 任一 Critical 发现直接拉满综合等级，不被平均分稀释
+        // （如制裁国家合规风险）；任一 High 发现至少为 High。
+        let has_critical = findings.iter().any(|f| f.level == RiskLevel::Critical);
+        let has_high = findings.iter().any(|f| f.level == RiskLevel::High);
+        let overall_level = if has_critical {
+            RiskLevel::Critical
+        } else if has_high || overall_score >= self.config.high_risk_threshold {
             RiskLevel::High
         } else if overall_score >= 0.4 {
             RiskLevel::Medium
@@ -218,8 +224,12 @@ impl RiskAssessor {
             RiskLevel::Low
         };
 
-        let blocking = overall_level == RiskLevel::Critical
-            || (overall_level == RiskLevel::High && request.transaction_amount_usd > 1_000_000.0);
+        // fail-closed: Critical 直接阻断；大额 + High 以上发现阻断
+        // （平均分可能把 High 拉到 Medium，不能只看综合等级）。
+        let blocking = has_critical
+            || overall_level == RiskLevel::Critical
+            || (overall_level == RiskLevel::High && request.transaction_amount_usd > 1_000_000.0)
+            || (has_high && request.transaction_amount_usd > 1_000_000.0);
 
         let elapsed_us = start.elapsed().as_micros() as u64;
 

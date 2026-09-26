@@ -5,9 +5,7 @@
 //!
 //! This is a NOTABLE skill (域级突破) under the foreign_trade_full_cycle Keystone.
 
-use nt_core_capability_tree::{
-    CapabilityNode, CapabilityRegistry, Domain, NodeLayer,
-};
+use nt_core_capability_tree::{CapabilityNode, CapabilityRegistry, Domain, NodeLayer};
 use serde::{Deserialize, Serialize};
 
 // ── SSOT imports: RiskLevel 统一从 trade_core 引用 ──
@@ -264,7 +262,9 @@ pub enum RefundStatus {
 pub struct FinanceEngine;
 
 impl Default for FinanceEngine {
-    fn default() -> Self { Self }
+    fn default() -> Self {
+        Self
+    }
 }
 
 impl FinanceEngine {
@@ -277,7 +277,11 @@ impl FinanceEngine {
         let mut risk_score = 0.0;
 
         // Check payment terms
-        if !policy.payment_terms.iter().any(|t| contract.payment_terms.contains(t)) {
+        if !policy
+            .payment_terms
+            .iter()
+            .any(|t| contract.payment_terms.contains(t))
+        {
             findings.push(ContractFinding {
                 clause: "payment_terms".into(),
                 issue: "Payment terms not in approved list".into(),
@@ -287,17 +291,23 @@ impl FinanceEngine {
             risk_score += 20.0;
         }
 
-        // Check deposit ratio
+        // Check deposit ratio (fail-closed: 解析不出比例按不达标处理，
+        // 不静默放过；"T/T 10% deposit" 取 % 前最后一个数字 token)
         if let Some(deposit_part) = contract.payment_terms.split(',').next() {
-            if let Some(ratio_str) = deposit_part.trim().split('%').next() {
-                if let Ok(ratio) = ratio_str.parse::<f64>() {
-                    if ratio / 100.0 < policy.risk_control.min_deposit_ratio {
+            if let Some(percent_head) = deposit_part.trim().split('%').next() {
+                let ratio_opt = percent_head
+                    .split_whitespace()
+                    .next_back()
+                    .and_then(|tok| tok.parse::<f64>().ok());
+                match ratio_opt {
+                    Some(ratio) if ratio / 100.0 >= policy.risk_control.min_deposit_ratio => {}
+                    _ => {
                         findings.push(ContractFinding {
                             clause: "deposit_ratio".into(),
                             issue: format!(
-                                "Deposit ratio {}% below minimum {}%",
-                                ratio,
-                                policy.risk_control.min_deposit_ratio * 100.0
+                                "Deposit ratio below minimum {}% (terms: {})",
+                                policy.risk_control.min_deposit_ratio * 100.0,
+                                deposit_part.trim(),
                             ),
                             severity: FindingSeverity::Critical,
                             recommendation: "Increase deposit or require LC".into(),
@@ -314,7 +324,9 @@ impl FinanceEngine {
         // Check delivery date reasonableness
         // ... additional checks
 
-        let approved = findings.iter().all(|f| f.severity != FindingSeverity::Critical)
+        let approved = findings
+            .iter()
+            .all(|f| f.severity != FindingSeverity::Critical)
             && risk_score < 50.0;
 
         ContractReview {
@@ -325,7 +337,11 @@ impl FinanceEngine {
             findings,
             risk_score,
             approved,
-            conditions: if approved { vec![] } else { vec!["Requires management approval".into()] },
+            conditions: if approved {
+                vec![]
+            } else {
+                vec!["Requires management approval".into()]
+            },
         }
     }
 
@@ -425,7 +441,10 @@ impl FinanceEngine {
         clauses
     }
 
-    fn check_discrepancies(_lc_text: &str, _contract: &super::full_cycle::Contract) -> Vec<Discrepancy> {
+    fn check_discrepancies(
+        _lc_text: &str,
+        _contract: &super::full_cycle::Contract,
+    ) -> Vec<Discrepancy> {
         let discrepancies = Vec::new();
         // Simplified - would check actual documents against LC terms
         discrepancies
@@ -550,10 +569,7 @@ impl FinanceEngine {
     }
 
     /// Instance method: declare tax refund (FT23)
-    pub fn declare_tax_refund(
-        &self,
-        claim: &TaxRefundClaim,
-    ) -> Result<RefundDocument, String> {
+    pub fn declare_tax_refund(&self, claim: &TaxRefundClaim) -> Result<RefundDocument, String> {
         // In production, this would submit tax refund application
         Ok(RefundDocument {
             doc_type: "Tax Refund Application".into(),
@@ -576,7 +592,10 @@ pub fn register_finance_compliance_capability(registry: &mut CapabilityRegistry)
         Domain::Mind,
         NodeLayer::L3DomainService,
         vec!["trade_finance_compliance".to_string()],
-        vec!["trade_product_spec".to_string(), "trade_quote_negotiation".to_string()],
+        vec![
+            "trade_product_spec".to_string(),
+            "trade_quote_negotiation".to_string(),
+        ],
     );
     registry
         .register(node.clone())
@@ -591,7 +610,7 @@ mod tests {
 
     #[test]
     fn test_contract_review_approved() {
-        use super::super::full_cycle::{Contract, ContractItem, CompanyPolicy, RiskControl};
+        use super::super::full_cycle::{CompanyPolicy, Contract, ContractItem, RiskControl};
 
         let contract = Contract {
             contract_id: "CONTRACT-1".into(),
@@ -628,7 +647,7 @@ mod tests {
 
     #[test]
     fn test_contract_review_low_deposit() {
-        use super::super::full_cycle::{Contract, ContractItem, CompanyPolicy, RiskControl};
+        use super::super::full_cycle::{CompanyPolicy, Contract, ContractItem, RiskControl};
 
         let contract = Contract {
             contract_id: "CONTRACT-2".into(),
@@ -660,7 +679,10 @@ mod tests {
 
         let review = FinanceEngine::review_contract(&contract, &policy);
         assert!(!review.approved);
-        assert!(review.findings.iter().any(|f| f.severity == FindingSeverity::Critical));
+        assert!(review
+            .findings
+            .iter()
+            .any(|f| f.severity == FindingSeverity::Critical));
     }
 
     #[test]
@@ -715,19 +737,15 @@ mod tests {
         assert!(review.risk_score > 0.0);
         assert!(matches!(
             review.recommendation,
-            LcRecommendation::AcceptWithAmendment | LcRecommendation::RequestClarification | LcRecommendation::Reject
+            LcRecommendation::AcceptWithAmendment
+                | LcRecommendation::RequestClarification
+                | LcRecommendation::Reject
         ));
     }
 
     #[test]
     fn test_tax_refund_claim() {
-        let claim = FinanceEngine::apply_tax_refund(
-            "CONTRACT-1",
-            "CUST-1",
-            "8471",
-            50000.0,
-            0.13,
-        );
+        let claim = FinanceEngine::apply_tax_refund("CONTRACT-1", "CUST-1", "8471", 50000.0, 0.13);
 
         assert_eq!(claim.product_hs_code, "8471");
         assert!((claim.claim_amount - 6500.0).abs() < 0.01);
@@ -771,7 +789,8 @@ mod tests {
             status: CollectionStatus::Completed,
         };
 
-        let settlement = FinanceEngine::complete_settlement(&collection, "BANK-RCPT-1", 35000.0, 7.2);
+        let settlement =
+            FinanceEngine::complete_settlement(&collection, "BANK-RCPT-1", 35000.0, 7.2);
         assert!((settlement.settlement_amount - 252000.0).abs() < 1.0);
         assert!((settlement.net_amount - 250740.0).abs() < 10.0); // after fees
         assert_eq!(settlement.verification_status, VerificationStatus::Pending);
@@ -785,7 +804,12 @@ mod tests {
             contract_id: "CONTRACT-1".into(),
             pi_number: "PI-1".into(),
             parties: ("Seller".into(), "Buyer".into()),
-            items: vec![ContractItem { product: "Widget".into(), qty: 1000, unit_price: 50.0, ..Default::default() }],
+            items: vec![ContractItem {
+                product: "Widget".into(),
+                qty: 1000,
+                unit_price: 50.0,
+                ..Default::default()
+            }],
             price: 50000.0,
             incoterms: "FOB Shanghai".into(),
             payment_terms: "LC at sight".into(),
@@ -823,8 +847,18 @@ mod tests {
             bl_sent: false,
             bl_sent_date: None,
             documents: vec![
-                CollectionDocument { doc_type: "Commercial Invoice".into(), originals: 1, copies: 2, status: DocumentStatus::Prepared },
-                CollectionDocument { doc_type: "Packing List".into(), originals: 1, copies: 2, status: DocumentStatus::Prepared },
+                CollectionDocument {
+                    doc_type: "Commercial Invoice".into(),
+                    originals: 1,
+                    copies: 2,
+                    status: DocumentStatus::Prepared,
+                },
+                CollectionDocument {
+                    doc_type: "Packing List".into(),
+                    originals: 1,
+                    copies: 2,
+                    status: DocumentStatus::Prepared,
+                },
             ],
             payment_received: false,
             payment_date: None,
@@ -860,13 +894,18 @@ mod tests {
 
     #[test]
     fn test_contract_review_forbidden_country() {
-        use super::super::full_cycle::{Contract, ContractItem, CompanyPolicy, RiskControl};
+        use super::super::full_cycle::{CompanyPolicy, Contract, ContractItem, RiskControl};
 
         let contract = Contract {
             contract_id: "CONTRACT-1".into(),
             pi_number: "PI-1".into(),
             parties: ("Seller".into(), "Buyer".into()),
-            items: vec![ContractItem { product: "Widget".into(), qty: 1000, unit_price: 50.0, ..Default::default() }],
+            items: vec![ContractItem {
+                product: "Widget".into(),
+                qty: 1000,
+                unit_price: 50.0,
+                ..Default::default()
+            }],
             price: 50000.0,
             incoterms: "FOB Shanghai".into(),
             payment_terms: "T/T 30% deposit".into(),
@@ -923,7 +962,12 @@ mod tests {
             contract_id: "CONTRACT-1".into(),
             pi_number: "PI-1".into(),
             parties: ("Seller".into(), "Buyer".into()),
-            items: vec![ContractItem { product: "Widget".into(), qty: 1000, unit_price: 50.0, ..Default::default() }],
+            items: vec![ContractItem {
+                product: "Widget".into(),
+                qty: 1000,
+                unit_price: 50.0,
+                ..Default::default()
+            }],
             price: 50000.0,
             incoterms: "FOB Shanghai".into(),
             payment_terms: "LC at sight".into(),
@@ -947,12 +991,14 @@ mod tests {
         };
 
         // EUR settlement
-        let settlement_eur = FinanceEngine::complete_settlement(&collection, "BANK-RCPT-1", 50000.0, 7.8);
+        let settlement_eur =
+            FinanceEngine::complete_settlement(&collection, "BANK-RCPT-1", 50000.0, 7.8);
         assert!((settlement_eur.settlement_amount - 390000.0).abs() < 100.0);
         assert_eq!(settlement_eur.settlement_currency, "CNY");
 
         // USD settlement
-        let settlement_usd = FinanceEngine::complete_settlement(&collection, "BANK-RCPT-1", 50000.0, 7.2);
+        let settlement_usd =
+            FinanceEngine::complete_settlement(&collection, "BANK-RCPT-1", 50000.0, 7.2);
         assert!((settlement_usd.settlement_amount - 360000.0).abs() < 100.0);
     }
 }

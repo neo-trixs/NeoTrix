@@ -268,13 +268,13 @@ pub fn urlhaus_egress_rule() -> super::super::l1_facade::EgressRule {
     super::super::l1_facade::EgressRule::allow(URLHAUS_HOST, "443")
 }
 pub fn urlhaus_egress_policy() -> super::super::l1_facade::EgressPolicy {
-    super::super::l1_facade::EgressPolicy::new(vec![urlhaus_egress_rule()], false)
+    super::super::l1_facade::EgressPolicy::new(vec![urlhaus_egress_rule()], true)
 }
 pub fn cisa_kev_egress_rule() -> super::super::l1_facade::EgressRule {
     super::super::l1_facade::EgressRule::allow(CISA_KEV_HOST, "443")
 }
 pub fn cisa_kev_egress_policy() -> super::super::l1_facade::EgressPolicy {
-    super::super::l1_facade::EgressPolicy::new(vec![cisa_kev_egress_rule()], false)
+    super::super::l1_facade::EgressPolicy::new(vec![cisa_kev_egress_rule()], true)
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

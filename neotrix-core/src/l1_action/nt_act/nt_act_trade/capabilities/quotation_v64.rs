@@ -115,7 +115,7 @@ pub fn build_quotation(inputs: &[QuoteInput], freight: f64) -> Quotation {
         total_gw,
         total_amount,
         freight,
-        fca_shanghai: (total_amount + freight * 100.0).round() / 100.0,
+        fca_shanghai: ((total_amount + freight) * 100.0).round() / 100.0,
     }
 }
 

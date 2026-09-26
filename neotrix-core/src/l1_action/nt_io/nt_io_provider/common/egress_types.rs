@@ -34,7 +34,7 @@ impl SandboxEgressRule {
         if let Some(suffix) = self.host.strip_prefix("*.") {
             // `*.example.com` matches subdomains only — not the bare apex,
             // and never across a dot boundary (example.com.evil.net).
-            host == suffix || host.ends_with(&format!(".{suffix}"))
+            host.ends_with(&format!(".{suffix}"))
         } else {
             host == self.host
         }

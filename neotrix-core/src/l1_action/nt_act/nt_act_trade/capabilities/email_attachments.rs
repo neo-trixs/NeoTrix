@@ -52,8 +52,13 @@ pub fn parse_attachments(value: &serde_json::Value) -> Vec<AttachmentInfo> {
         for it in arr {
             let s = |k: &str| it.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
             let file_type = s("fileType");
+            // 无 fileType 时从文件名扩展名推断；无点号则置空
+            // （"note".rsplit('.') 会返回整串，不可直接当扩展名）
             let file_type = if file_type.is_empty() {
-                s("fileName").rsplit('.').next().unwrap_or("").to_string()
+                match s("fileName").rsplit_once('.') {
+                    Some((_, ext)) => ext.to_string(),
+                    None => String::new(),
+                }
             } else {
                 file_type
             };

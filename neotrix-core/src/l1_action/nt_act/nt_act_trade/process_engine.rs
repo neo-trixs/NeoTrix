@@ -335,6 +335,8 @@ pub struct ProcessEngine {
     event_bus: EventBus,
     /// 已注册的步骤处理器 (handler_name → handler)
     handlers: HashMap<String, Arc<dyn StepHandler>>,
+    /// 实例序号（单调递增，拼入实例 ID 防毫秒时间戳碰撞覆盖）
+    instance_seq: u64,
 }
 
 impl Default for ProcessEngine {
@@ -344,6 +346,7 @@ impl Default for ProcessEngine {
             process_instances: HashMap::new(),
             event_bus: EventBus::new(),
             handlers: HashMap::new(),
+            instance_seq: 0,
         }
     }
 }
@@ -392,7 +395,11 @@ impl ProcessEngine {
             .ok_or_else(|| format!("Process definition not found: {}", definition_id))?;
 
         let now = now_millis();
-        let instance_id = format!("inst_{}_{}", definition_id, now);
+        // 同一毫秒多次 create 会生成相同 ID 导致覆盖（list 数量漂移），
+        // 拼单调序号保证唯一（wrapping_add 防理论溢出 panic）。
+        let seq = self.instance_seq;
+        self.instance_seq = self.instance_seq.wrapping_add(1);
+        let instance_id = format!("inst_{}_{}_{}", definition_id, now, seq);
 
         let instance = ProcessInstance {
             id: instance_id.clone(),
@@ -798,7 +805,10 @@ impl ProcessEngine {
 // ============================================================
 
 /// 评估步骤条件
-pub(crate) fn evaluate_condition(condition: &StepCondition, context: &HashMap<String, String>) -> bool {
+pub(crate) fn evaluate_condition(
+    condition: &StepCondition,
+    context: &HashMap<String, String>,
+) -> bool {
     match condition {
         StepCondition::Always => true,
         StepCondition::Equals { key, value } => context.get(key.as_str()) == Some(value),
@@ -1029,7 +1039,13 @@ mod tests {
         engine.register_handler("log", Arc::new(LogHandler));
 
         let inst_id = engine.create_instance("test_proc", HashMap::new()).unwrap();
-        engine.start_instance(&inst_id).unwrap();
+        // 同步引擎：start 即跑完（Running 只存在于执行中途），此处白盒置
+        // Running 后再走 pause→resume，覆盖真实的转移逻辑；
+        // 异步抢占语义不变，fail-closed 守卫见 test_pause_non_running 系测试。
+        engine
+            .get_instance_mut(&inst_id)
+            .expect("test instance must exist")
+            .status = ProcessStatus::Running;
         engine.pause_instance(&inst_id).unwrap();
         assert_eq!(
             engine.get_instance(&inst_id).unwrap().status,
@@ -1044,13 +1060,32 @@ mod tests {
     }
 
     #[test]
-    fn test_cancel() {
+    fn test_pause_after_completion_fails() {
+        // 同步引擎 start 后即 Completed；Completed 上 pause 必须拒绝
+        // （fail-closed，与 test_cancel_terminal_fails 同构）。
         let mut engine = ProcessEngine::new();
         engine.register_definition(make_definition());
         engine.register_handler("log", Arc::new(LogHandler));
 
         let inst_id = engine.create_instance("test_proc", HashMap::new()).unwrap();
         engine.start_instance(&inst_id).unwrap();
+        assert_eq!(
+            engine.get_instance(&inst_id).unwrap().status,
+            ProcessStatus::Completed
+        );
+        assert!(engine.pause_instance(&inst_id).is_err());
+    }
+
+    #[test]
+    fn test_cancel() {
+        let mut engine = ProcessEngine::new();
+        engine.register_definition(make_definition());
+        engine.register_handler("log", Arc::new(LogHandler));
+
+        // 未启动（Pending，非终态）实例可直接取消；已完成的走
+        // test_cancel_terminal_fails（拒绝）。同步引擎 start 即 Completed，
+        // 故不在 start 后 cancel。
+        let inst_id = engine.create_instance("test_proc", HashMap::new()).unwrap();
         engine.cancel_instance(&inst_id).unwrap();
         assert_eq!(
             engine.get_instance(&inst_id).unwrap().status,

@@ -215,8 +215,10 @@ mod tests {
         assert!(dec.is_ok());
 
         let dec = dec.unwrap();
+        // fail-closed：块不对齐/随机字节不可解密，必须 Err（成功返回垃圾明文
+        // 才是 bug）。此处只断言构造可用 + 拒绝畸形输入。
         let result = dec.decrypt(b"v10test");
-        assert!(result.is_ok());
+        assert!(result.is_err());
     }
 
     #[test]

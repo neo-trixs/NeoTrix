@@ -179,15 +179,16 @@ impl ViewGuard {
     /// 请求切到 target；若已在他人视图且 target≠home，先要求回巢
     /// （返回 Err 防嵌套切换）。成功后更新状态，返回应发送的请求体。
     pub fn switch_to(&mut self, target: u64) -> Result<SwitchRequest, String> {
+        if target == self.current_operator_id {
+            // 幂等：已在目标视图，无需请求（优先于嵌套守卫，
+            // 否则重复切同一目标会被误判为嵌套切换）
+            return Ok(switch_request(target, self.home_operator_id));
+        }
         if self.switched && target != self.home_operator_id {
             return Err(format!(
                 "view already switched to {}; switch_back to {} first",
                 self.current_operator_id, self.home_operator_id
             ));
-        }
-        if target == self.current_operator_id {
-            // 幂等：已在目标视图，无需请求
-            return Ok(switch_request(target, self.home_operator_id));
         }
         let req = switch_request(target, self.home_operator_id);
         self.current_operator_id = target;

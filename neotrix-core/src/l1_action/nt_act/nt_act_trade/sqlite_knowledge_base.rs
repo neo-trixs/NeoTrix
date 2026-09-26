@@ -13,10 +13,10 @@ use rusqlite::{params, Connection};
 use serde_json;
 
 use super::knowledge_base::{
-    CustomerRecord, KnowledgeBase, KnowledgeBaseError, KnowledgeOperation, KnowledgeResult, KnowledgeUpdateResult,
-    PriceQuery, PriceResult, ProductFilters, ProductMatchEntry, ProductMatchResult, ProductQueryResult,
-    ProductRecord, SupplierFilters, SupplierMatchEntry, SupplierMatchResult, SupplierQueryResult,
-    SupplierRecord,
+    CustomerRecord, KnowledgeBase, KnowledgeBaseError, KnowledgeOperation, KnowledgeResult,
+    KnowledgeUpdateResult, PriceQuery, PriceResult, ProductFilters, ProductMatchEntry,
+    ProductMatchResult, ProductQueryResult, ProductRecord, SupplierFilters, SupplierMatchEntry,
+    SupplierMatchResult, SupplierQueryResult, SupplierRecord,
 };
 
 // ============================================================
@@ -73,9 +73,12 @@ impl SqliteKnowledgeBase {
 
     /// 初始化数据库表结构
     fn init_tables(&self) -> KnowledgeResult<()> {
-        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
-            reason: e.to_string(),
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| KnowledgeBaseError::Unavailable {
+                reason: e.to_string(),
+            })?;
 
         conn.execute_batch(
             "
@@ -162,9 +165,12 @@ impl SqliteKnowledgeBase {
 
     /// 批量导入产品数据
     pub fn import_products(&self, products: &[ProductRecord]) -> KnowledgeResult<u32> {
-        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
-            reason: e.to_string(),
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| KnowledgeBaseError::Unavailable {
+                reason: e.to_string(),
+            })?;
         let mut count = 0u32;
         for p in products {
             let spec_json = serde_json::to_string(&p.spec)?;
@@ -193,9 +199,12 @@ impl SqliteKnowledgeBase {
 
     /// 批量导入供应商数据
     pub fn import_suppliers(&self, suppliers: &[SupplierRecord]) -> KnowledgeResult<u32> {
-        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
-            reason: e.to_string(),
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| KnowledgeBaseError::Unavailable {
+                reason: e.to_string(),
+            })?;
         let mut count = 0u32;
         for s in suppliers {
             let categories_json = serde_json::to_string(&s.product_categories)?;
@@ -227,9 +236,12 @@ impl SqliteKnowledgeBase {
 
     /// 批量导入客户数据 (富通天下 CRM)
     pub fn import_customers(&self, customers: &[CustomerRecord]) -> KnowledgeResult<u32> {
-        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
-            reason: e.to_string(),
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| KnowledgeBaseError::Unavailable {
+                reason: e.to_string(),
+            })?;
         let mut count = 0u32;
         for c in customers {
             let tags_json = serde_json::to_string(&c.tags)?;
@@ -278,9 +290,12 @@ impl SqliteKnowledgeBase {
         key: &str,
         value: &str,
     ) -> KnowledgeResult<()> {
-        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
-            reason: e.to_string(),
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| KnowledgeBaseError::Unavailable {
+                reason: e.to_string(),
+            })?;
         let config_id = format!("{}:{}", product_id, key);
         conn.execute(
             "INSERT OR REPLACE INTO product_configs (config_id, product_id, key, value)
@@ -295,12 +310,14 @@ impl SqliteKnowledgeBase {
         &self,
         product_id: &str,
     ) -> KnowledgeResult<HashMap<String, String>> {
-        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
-            reason: e.to_string(),
-        })?;
-        let mut stmt = conn.prepare(
-            "SELECT key, value FROM product_configs WHERE product_id = ?1",
-        )?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| KnowledgeBaseError::Unavailable {
+                reason: e.to_string(),
+            })?;
+        let mut stmt =
+            conn.prepare("SELECT key, value FROM product_configs WHERE product_id = ?1")?;
         let rows = stmt.query_map(params![product_id], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })?;
@@ -314,27 +331,36 @@ impl SqliteKnowledgeBase {
 
     /// 获取产品总数
     pub fn product_count(&self) -> KnowledgeResult<u64> {
-        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
-            reason: e.to_string(),
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| KnowledgeBaseError::Unavailable {
+                reason: e.to_string(),
+            })?;
         let count: i64 = conn.query_row("SELECT COUNT(*) FROM products", [], |r| r.get(0))?;
         Ok(count as u64)
     }
 
     /// 获取供应商总数
     pub fn supplier_count(&self) -> KnowledgeResult<u64> {
-        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
-            reason: e.to_string(),
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| KnowledgeBaseError::Unavailable {
+                reason: e.to_string(),
+            })?;
         let count: i64 = conn.query_row("SELECT COUNT(*) FROM suppliers", [], |r| r.get(0))?;
         Ok(count as u64)
     }
 
     /// 获取客户总数
     pub fn customer_count(&self) -> KnowledgeResult<u64> {
-        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
-            reason: e.to_string(),
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| KnowledgeBaseError::Unavailable {
+                reason: e.to_string(),
+            })?;
         let count: i64 = conn.query_row("SELECT COUNT(*) FROM customers", [], |r| r.get(0))?;
         Ok(count as u64)
     }
@@ -381,11 +407,13 @@ impl SqliteKnowledgeBase {
     fn text_similarity(a: &str, b: &str) -> f64 {
         let a_lower = a.to_lowercase();
         let b_lower = b.to_lowercase();
-        if a_lower == b_lower {
-            return 1.0;
-        }
+        // fail-closed：空串无信息量，一律 0（即使双方都空；空-空满分会导致
+        // 空查询虚假命中）。恒等满分只适用于非空串。
         if a_lower.is_empty() || b_lower.is_empty() {
             return 0.0;
+        }
+        if a_lower == b_lower {
+            return 1.0;
         }
 
         let a_bigrams: Vec<String> = a_lower
@@ -430,11 +458,7 @@ impl SqliteKnowledgeBase {
             reasons.push(format!("名称匹配 ({:.0}%)", name_sim * 100.0));
         }
 
-        let spec_desc = format!(
-            "{:?} {}",
-            product.spec.product_type,
-            product.spec.hs_code
-        );
+        let spec_desc = format!("{:?} {}", product.spec.product_type, product.spec.hs_code);
         let spec_sim = Self::text_similarity(query, &spec_desc);
         if spec_sim > 0.2 {
             score += spec_sim * 0.3;
@@ -516,9 +540,12 @@ impl KnowledgeBase for SqliteKnowledgeBase {
         &self,
         filters: &ProductFilters,
     ) -> KnowledgeResult<ProductQueryResult> {
-        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
-            reason: e.to_string(),
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| KnowledgeBaseError::Unavailable {
+                reason: e.to_string(),
+            })?;
 
         let mut conditions: Vec<String> = Vec::new();
         let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -586,9 +613,12 @@ impl KnowledgeBase for SqliteKnowledgeBase {
         &self,
         filters: &SupplierFilters,
     ) -> KnowledgeResult<SupplierQueryResult> {
-        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
-            reason: e.to_string(),
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| KnowledgeBaseError::Unavailable {
+                reason: e.to_string(),
+            })?;
 
         let mut conditions: Vec<String> = Vec::new();
         let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -655,14 +685,13 @@ impl KnowledgeBase for SqliteKnowledgeBase {
         })
     }
 
-    async fn match_product(
-        &self,
-        query: &str,
-        limit: u32,
-    ) -> KnowledgeResult<ProductMatchResult> {
-        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
-            reason: e.to_string(),
-        })?;
+    async fn match_product(&self, query: &str, limit: u32) -> KnowledgeResult<ProductMatchResult> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| KnowledgeBaseError::Unavailable {
+                reason: e.to_string(),
+            })?;
 
         let mut stmt = conn.prepare(
             "SELECT product_id, name, spec_json, reference_price, moq, lead_time_days,
@@ -694,7 +723,11 @@ impl KnowledgeBase for SqliteKnowledgeBase {
             }
         }
 
-        fuzzy_entries.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        fuzzy_entries.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         fuzzy_entries.truncate(limit as usize);
 
         Ok(ProductMatchResult {
@@ -710,9 +743,12 @@ impl KnowledgeBase for SqliteKnowledgeBase {
         product_category: Option<&str>,
         limit: u32,
     ) -> KnowledgeResult<SupplierMatchResult> {
-        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
-            reason: e.to_string(),
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| KnowledgeBaseError::Unavailable {
+                reason: e.to_string(),
+            })?;
 
         let mut stmt = conn.prepare(
             "SELECT supplier_id, name, country, product_categories, credit_score, rating,
@@ -745,7 +781,11 @@ impl KnowledgeBase for SqliteKnowledgeBase {
             }
         }
 
-        fuzzy_entries.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        fuzzy_entries.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         fuzzy_entries.truncate(limit as usize);
 
         Ok(SupplierMatchResult {
@@ -756,9 +796,12 @@ impl KnowledgeBase for SqliteKnowledgeBase {
     }
 
     async fn get_price(&self, query: &PriceQuery) -> KnowledgeResult<PriceResult> {
-        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
-            reason: e.to_string(),
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| KnowledgeBaseError::Unavailable {
+                reason: e.to_string(),
+            })?;
 
         let product: ProductRecord = conn
             .query_row(
@@ -799,9 +842,12 @@ impl KnowledgeBase for SqliteKnowledgeBase {
         &self,
         operations: &[KnowledgeOperation],
     ) -> KnowledgeResult<KnowledgeUpdateResult> {
-        let conn = self.conn.lock().map_err(|e| KnowledgeBaseError::Unavailable {
-            reason: e.to_string(),
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| KnowledgeBaseError::Unavailable {
+                reason: e.to_string(),
+            })?;
 
         let mut affected = 0u32;
         let mut errors = Vec::new();
@@ -841,22 +887,19 @@ impl KnowledgeBase for SqliteKnowledgeBase {
                         let sql = format!(
                             "UPDATE products SET {} = ?1 WHERE product_id = ?2",
                             match key.as_str() {
-                                "name" | "reference_price" | "moq" | "lead_time_days"
-                                | "tags" | "supplier_ids" => key.as_str(),
+                                "name" | "reference_price" | "moq" | "lead_time_days" | "tags"
+                                | "supplier_ids" => key.as_str(),
                                 _ => continue,
                             }
                         );
                         match conn.execute(&sql, params![value, product_id]) {
                             Ok(n) => affected += n as u32,
-                            Err(e) => {
-                                errors.push(format!("UpdateProduct {}: {}", product_id, e))
-                            }
+                            Err(e) => errors.push(format!("UpdateProduct {}: {}", product_id, e)),
                         }
                     }
                 }
                 KnowledgeOperation::DeleteProduct(pid) => {
-                    match conn.execute("DELETE FROM products WHERE product_id = ?1", params![pid])
-                    {
+                    match conn.execute("DELETE FROM products WHERE product_id = ?1", params![pid]) {
                         Ok(n) => affected += n as u32,
                         Err(e) => errors.push(format!("DeleteProduct {}: {}", pid, e)),
                     }
@@ -903,17 +946,13 @@ impl KnowledgeBase for SqliteKnowledgeBase {
                         );
                         match conn.execute(&sql, params![value, supplier_id]) {
                             Ok(n) => affected += n as u32,
-                            Err(e) => {
-                                errors.push(format!("UpdateSupplier {}: {}", supplier_id, e))
-                            }
+                            Err(e) => errors.push(format!("UpdateSupplier {}: {}", supplier_id, e)),
                         }
                     }
                 }
                 KnowledgeOperation::DeleteSupplier(sid) => {
-                    match conn.execute(
-                        "DELETE FROM suppliers WHERE supplier_id = ?1",
-                        params![sid],
-                    ) {
+                    match conn.execute("DELETE FROM suppliers WHERE supplier_id = ?1", params![sid])
+                    {
                         Ok(n) => affected += n as u32,
                         Err(e) => errors.push(format!("DeleteSupplier {}: {}", sid, e)),
                     }
@@ -996,7 +1035,9 @@ impl KnowledgeBase for SqliteKnowledgeBase {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l1_action::nt_act::nt_act_trade::full_cycle::{BomItem, PackagingSpec, ProductSpec, ProductType, RoutingStep};
+    use crate::l1_action::nt_act::nt_act_trade::full_cycle::{
+        PackagingSpec, ProductSpec, ProductType,
+    };
     use crate::l1_action::nt_act::nt_act_trade::knowledge_base::{ProductFilters, SupplierFilters};
 
     fn sample_product(id: &str, name: &str) -> ProductRecord {
@@ -1164,9 +1205,9 @@ mod tests {
     async fn test_update_knowledge_add_and_delete() {
         let kb = SqliteKnowledgeBase::new_in_memory().unwrap();
         let result = kb
-            .update_knowledge(&[KnowledgeOperation::AddProduct(
-                sample_product("P-001", "Test"),
-            )])
+            .update_knowledge(&[KnowledgeOperation::AddProduct(sample_product(
+                "P-001", "Test",
+            ))])
             .await
             .unwrap();
         assert!(result.success);
@@ -1199,7 +1240,9 @@ mod tests {
     fn test_text_similarity() {
         assert_eq!(SqliteKnowledgeBase::text_similarity("", ""), 0.0);
         assert_eq!(SqliteKnowledgeBase::text_similarity("abc", "abc"), 1.0);
-        assert!(SqliteKnowledgeBase::text_similarity("abc", "abd") > 0.5);
+        // bigram 重叠：abc/abd 共享 "ab"，1/2 = 0.5 恰为边界（单字符替换的
+        // 理论值，严格 > 恒不成立），故取 >=；xyz 无共享 bigram 得 0。
+        assert!(SqliteKnowledgeBase::text_similarity("abc", "abd") >= 0.5);
         assert!(SqliteKnowledgeBase::text_similarity("abc", "xyz") < 0.1);
     }
 
@@ -1208,10 +1251,7 @@ mod tests {
         let kb = SqliteKnowledgeBase::new_in_memory().unwrap();
         let result = kb
             .update_knowledge(&[KnowledgeOperation::BulkImport {
-                products: vec![
-                    sample_product("P-001", "A"),
-                    sample_product("P-002", "B"),
-                ],
+                products: vec![sample_product("P-001", "A"), sample_product("P-002", "B")],
                 suppliers: vec![sample_supplier("S-001", "X", "CN")],
             }])
             .await

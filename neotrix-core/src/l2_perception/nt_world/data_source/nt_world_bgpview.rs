@@ -153,7 +153,7 @@ pub fn bgpview_egress_rule() -> super::super::l1_facade::EgressRule {
 }
 
 pub fn bgpview_egress_policy() -> super::super::l1_facade::EgressPolicy {
-    super::super::l1_facade::EgressPolicy::new(vec![bgpview_egress_rule()], false)
+    super::super::l1_facade::EgressPolicy::new(vec![bgpview_egress_rule()], true)
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct _BgpviewIngestReport {

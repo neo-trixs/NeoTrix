@@ -276,7 +276,7 @@ pub fn ucdp_egress_rule() -> super::super::l1_facade::EgressRule {
 }
 
 pub fn ucdp_egress_policy() -> super::super::l1_facade::EgressPolicy {
-    super::super::l1_facade::EgressPolicy::new(vec![ucdp_egress_rule()], false)
+    super::super::l1_facade::EgressPolicy::new(vec![ucdp_egress_rule()], true)
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct _UcdpIngestReport {
