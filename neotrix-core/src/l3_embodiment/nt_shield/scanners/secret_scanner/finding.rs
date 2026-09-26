@@ -3,14 +3,17 @@
 //! Records detected secrets with masked values and severity classification.
 
 /// Severity of a detected secret
+///
+/// Variants are ordered Low < Medium < High < Critical so the derived
+/// `Ord` matches severity semantics (fail-closed: Critical sorts highest).
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
 pub enum Severity {
-    Critical,
-    High,
-    Medium,
     Low,
+    Medium,
+    High,
+    Critical,
 }
 
 impl std::fmt::Display for Severity {

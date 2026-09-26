@@ -41,8 +41,10 @@ static PATTERNS: LazyLock<Vec<SecretPattern>> = LazyLock::new(|| {
         SecretPattern {
             name: "GitHub Token",
             regex: LazyLock::new(|| {
+                // fail-closed: accept 32+ chars (classic is 36; truncated/rotated
+                // variants in docs and tests run shorter). ghp_ prefix keeps precision.
                 Regex::new(
-                    "(?:ghp_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{82})",
+                    "(?:ghp_[A-Za-z0-9]{32,}|gho_[A-Za-z0-9]{32,}|github_pat_[A-Za-z0-9_]{82})",
                 )
                 .expect("invalid GitHub token regex")
             }),
@@ -118,7 +120,9 @@ static PATTERNS: LazyLock<Vec<SecretPattern>> = LazyLock::new(|| {
         SecretPattern {
             name: "JWT Token",
             regex: LazyLock::new(|| {
-                Regex::new("eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}")
+                // fail-closed: signature segment accepts 6+ chars (examples truncate
+                // it, e.g. ".abc123"); eyJ header/payload prefixes keep precision.
+                Regex::new("eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{6,}")
                     .expect("invalid JWT regex")
             }),
             severity: Severity::Medium,

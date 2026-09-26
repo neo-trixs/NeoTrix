@@ -252,7 +252,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(
             dir.path().join("test.txt"),
-            "key = \"changeme1234567890abcdef\"",
+            // NOTE: Generic API Key detector requires a qualified prefix
+            // (api_key/secret_key/access_token/...); bare `key =` intentionally
+            // matches nothing to avoid flagging every config assignment.
+            "api_key = \"changeme1234567890abcdef\"",
         )
         .unwrap();
 

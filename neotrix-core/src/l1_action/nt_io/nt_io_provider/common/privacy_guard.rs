@@ -141,6 +141,193 @@ pub fn redact_internals(content: &str) -> String {
     out
 }
 
+/// 常见密钥/凭据前缀 — 出站前必脱 (自包含实现, 不依赖 L3 Redactor 以满足分层约束;
+/// L1→L3 直接依赖被 `nt_core_traits::SecretScanner` 抽象禁止, 此处用子串匹配零依赖实现)。
+/// 覆盖旧 core 实现 (`nt_core_llm::SECRET_PREFIXES`) 的高频子集: OpenAI/AWS/GitHub/Slack/
+/// 私钥/Bearer/键值对式泄露。
+const SECRET_PREFIXES: &[&str] = &[
+    "sk-",
+    "AKIA",
+    "AIza",
+    "ghp_",
+    "gho_",
+    "ghu_",
+    "ghs_",
+    "ghr_",
+    "glpat-",
+    "xoxb-",
+    "xoxp-",
+    "xoxo-",
+    "-----BEGIN",
+    "Bearer ",
+    "api_key=",
+    "apikey=",
+    "api-key=",
+    "secret=",
+    "password=",
+    "token=",
+];
+
+/// 文本是否含已知密钥前缀。
+fn has_secret(s: &str) -> bool {
+    SECRET_PREFIXES.iter().any(|p| s.contains(p))
+}
+
+/// 密钥 token 在 `rest` (以已知前缀开头) 中的字节 extent:
+/// 止于空白/引号/反引号, 上限 64 字节。按 `char_indices` 推进, 返回值恒为字符边界。
+fn secret_token_end(rest: &str) -> usize {
+    let mut end = 0usize;
+    for (i, c) in rest.char_indices() {
+        if i >= 64 {
+            break;
+        }
+        if c.is_whitespace() || c == '"' || c == '\'' || c == '`' {
+            break;
+        }
+        end = i + c.len_utf8();
+    }
+    end
+}
+
+/// 脱敏单条文本中的密钥/凭据 (子串匹配, 不引入 regex/L3 依赖)。
+/// 全程经 `str::get` 做边界检查 — 任意输入 (含多字节字符) 不得 panic。
+fn redact_secret_text(s: &str) -> String {
+    let mut out = s.to_string();
+    for prefix in SECRET_PREFIXES {
+        let mut scan = 0usize;
+        loop {
+            let slice = match out.get(scan..) {
+                Some(v) => v,
+                None => break,
+            };
+            let rel = match slice.find(prefix) {
+                Some(v) => v,
+                None => break,
+            };
+            let idx = match scan.checked_add(rel) {
+                Some(v) => v,
+                None => break,
+            };
+            let rest = match out.get(idx..) {
+                Some(v) => v,
+                None => break,
+            };
+            let end = secret_token_end(rest);
+            if end == 0 {
+                // 前缀后紧跟终止符 (如行尾 `sk-`): 仅遮蔽前缀本身后结束本轮
+                out = out.replace(prefix, "[REDACTED:secret]");
+                break;
+            }
+            let token = match rest.get(..end) {
+                Some(v) => v,
+                None => break,
+            };
+            if token.is_empty() {
+                break;
+            }
+            out = out.replace(token, "[REDACTED:secret]");
+            scan = idx + "[REDACTED:secret]".len();
+        }
+    }
+    out
+}
+
+/// 脱密钥 (保留原 `scrub_egress_secrets` 行为) — 覆盖出站消息与图像载荷, 密钥绝不外泄。
+fn scrub_secrets(req: &mut LlmRequest) {
+    for m in req.messages.iter_mut() {
+        if has_secret(&m.content) {
+            m.content = redact_secret_text(&m.content);
+        }
+    }
+    if let Some(ref mut img) = req.image_data {
+        if has_secret(img) {
+            *img = redact_secret_text(img);
+        }
+    }
+}
+
+/// 扩展载荷脱敏: tools / structured_output / provider_params / constraint_json
+/// 经序列化做内部指纹+密钥脱敏后回填。序列化/回填失败则保持脱密钥后原样
+/// (不 panic、不静默丢弃载荷; Untrusted 下的阻断判定以检出 leaks 为准)。
+fn redact_extended_payload(req: &mut LlmRequest) {
+    for tool in req.tools.iter_mut() {
+        if let Ok(s) = serde_json::to_string(&*tool) {
+            if scan_internals(&s).is_empty() && !has_secret(&s) {
+                continue;
+            }
+            let red = redact_internals(&redact_secret_text(&s));
+            if red != s {
+                if let Ok(parsed) = serde_json::from_str(&red) {
+                    *tool = parsed;
+                }
+            }
+        }
+    }
+    if let Some(ref mut so) = req.structured_output {
+        if let Ok(s) = serde_json::to_string(&*so) {
+            if !scan_internals(&s).is_empty() || has_secret(&s) {
+                let red = redact_internals(&redact_secret_text(&s));
+                if red != s {
+                    if let Ok(parsed) = serde_json::from_str(&red) {
+                        *so = parsed;
+                    }
+                }
+            }
+        }
+    }
+    for (_, v) in req.provider_params.iter_mut() {
+        if let Ok(s) = serde_json::to_string(&*v) {
+            if !scan_internals(&s).is_empty() || has_secret(&s) {
+                let red = redact_internals(&redact_secret_text(&s));
+                if red != s {
+                    if let Ok(parsed) = serde_json::from_str(&red) {
+                        *v = parsed;
+                    }
+                }
+            }
+        }
+    }
+    if let Some(ref mut c) = req.constraint_json {
+        if let Ok(s) = serde_json::to_string(&*c) {
+            if !scan_internals(&s).is_empty() || has_secret(&s) {
+                let red = redact_internals(&redact_secret_text(&s));
+                if red != s {
+                    if let Ok(parsed) = serde_json::from_str(&red) {
+                        *c = parsed;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 扫描扩展载荷中的内部指纹, 返回命中的标签列表 (空 = 无泄露)。
+/// 序列化失败的载荷跳过 (不计入, 亦不阻断 — 阻断只依据已检出的确定性命中)。
+fn scan_extended_payload(req: &LlmRequest) -> Vec<&'static str> {
+    let mut leaks: Vec<&'static str> = Vec::new();
+    for tool in &req.tools {
+        if let Ok(s) = serde_json::to_string(tool) {
+            leaks.extend(scan_internals(&s));
+        }
+    }
+    if let Some(ref so) = req.structured_output {
+        if let Ok(s) = serde_json::to_string(&*so) {
+            leaks.extend(scan_internals(&s));
+        }
+    }
+    for (_, v) in &req.provider_params {
+        if let Ok(s) = serde_json::to_string(v) {
+            leaks.extend(scan_internals(&s));
+        }
+    }
+    if let Some(ref c) = req.constraint_json {
+        if let Ok(s) = serde_json::to_string(c) {
+            leaks.extend(scan_internals(&s));
+        }
+    }
+    leaks
+}
+
 /// 出网隐私守卫主入口 — 每条出站请求必经。
 ///
 /// `trust` 由 `LlmProviderType::data_trust()` / `trust_from_name()` 推导;
@@ -166,8 +353,8 @@ pub fn redact_internals(content: &str) -> String {
 /// - **延迟风险**: 流式 chunk 可能截断 PII 模式 (如邮箱跨 chunk), 建议在 chunk
 ///   边界处维护 256 字节重叠缓冲区, 或在完整响应后二次扫描
 pub fn egress_privacy_guard(
-    _req: &mut LlmRequest,
-    _trust: DataTrust,
+    req: &mut LlmRequest,
+    trust: DataTrust,
     provider_label: &str,
 ) -> Result<(), String> {
     ensure_configured();
@@ -176,18 +363,83 @@ pub fn egress_privacy_guard(
         Ok(v) => v != "0" && v != "false",
         Err(_) => PRIVACY_ENABLED.load(Ordering::Relaxed),
     };
-    let _block_untrusted = match std::env::var("NEOTRIX_PRIVACY_BLOCK") {
+    let block_untrusted = match std::env::var("NEOTRIX_PRIVACY_BLOCK") {
         Ok(v) => v != "0" && v != "false",
         Err(_) => PRIVACY_BLOCK_UNTRUSTED.load(Ordering::Relaxed),
     };
     if !enabled {
         return Ok(());
     }
-    // P1 收敛: 单一逻辑源 = core::nt_core_llm::egress_privacy_guard (扫描/脱敏/阻断决策);
-    // neotrix 层仅保留启用开关与 untrusted 降级策略, 不再复制守卫逻辑。
-    let _ = provider_label;
-    // Stub: always allow (full implementation would scan/redact PII)
-    Ok(())
+    // 自包含实现 (13dfd9a8 stub 回滚):
+    // 曾委托的 `crate::core::nt_core_llm::egress_privacy_guard` 在分层重构后已不存在
+    // (现 `nt_core_llm` 仅剩签名不兼容的 stub), 为"build clean"被替换为永远 `Ok(())`,
+    // 导致 Untrusted 放行/Contracted 不脱敏/密钥不脱敏。此处恢复旧 core 语义
+    // (Trusted 仅脱密钥; Contracted 脱敏放行; Untrusted 命中内部指纹则 fail-closed 阻断,
+    // 显式关闭 block 时退化为脱敏放行), 密钥在所有分级下始终先脱。
+    // 1. 始终先脱密钥 (所有信任分级, 密钥绝不外泄)
+    scrub_secrets(req);
+
+    if trust == DataTrust::Trusted {
+        // 本地推理: 数据不出设备, 仅脱密钥, 内部指纹保留可用性
+        return Ok(());
+    }
+
+    // 2. 扫描内部指纹 (messages + model + image + 扩展载荷)
+    let mut leaks: Vec<&'static str> = Vec::new();
+    for m in &req.messages {
+        leaks.extend(scan_internals(&m.content));
+    }
+    leaks.extend(scan_internals(&req.model));
+    if let Some(ref img) = req.image_data {
+        leaks.extend(scan_internals(img));
+    }
+    leaks.extend(scan_extended_payload(req));
+    leaks.sort_unstable();
+    leaks.dedup();
+
+    match trust {
+        DataTrust::Trusted => Ok(()),
+        DataTrust::Contracted => {
+            // 付费云: 脱敏内部指纹后放行
+            for m in req.messages.iter_mut() {
+                if !scan_internals(&m.content).is_empty() {
+                    m.content = redact_internals(&m.content);
+                }
+            }
+            if let Some(ref mut img) = req.image_data {
+                if !scan_internals(img).is_empty() {
+                    *img = redact_internals(img);
+                }
+            }
+            redact_extended_payload(req);
+            Ok(())
+        }
+        DataTrust::Untrusted => {
+            // fail-closed: 免费/代理端点绝不放行 NeoTrix 内部代码/对话
+            if leaks.is_empty() {
+                Ok(())
+            } else if block_untrusted {
+                let joined = leaks.join(", ");
+                Err(format!(
+                    "privacy guard: egress to untrusted provider '{provider_label}' would leak NeoTrix internal code/conversation ({joined}). Blocked. Use a local (Ollama/vLLM/SGLang) or paid contracted provider."
+                ))
+            } else {
+                // 显式降级: 不阻断, 改为脱敏内部指纹后放行
+                for m in req.messages.iter_mut() {
+                    if !scan_internals(&m.content).is_empty() {
+                        m.content = redact_internals(&m.content);
+                    }
+                }
+                if let Some(ref mut img) = req.image_data {
+                    if !scan_internals(img).is_empty() {
+                        *img = redact_internals(img);
+                    }
+                }
+                redact_extended_payload(req);
+                Ok(())
+            }
+        }
+    }
 }
 
 /// 由 provider 注册名 (如 `llm7` 或 `llm7/codestral-latest`) 推导信任分级。

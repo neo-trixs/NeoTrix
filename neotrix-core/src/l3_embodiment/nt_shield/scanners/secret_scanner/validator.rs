@@ -96,6 +96,14 @@ impl SecretValidator {
     fn check_false_positives(&self, finding: &SecretFinding) -> Option<ValidationResult> {
         let masked_lower = finding.masked_value.to_lowercase();
         let type_lower = finding.secret_type.to_lowercase();
+        // Masking keeps only first4***last4, so FP words sitting in the raw
+        // middle can never match `masked_lower.contains(fp)`. Check the visible
+        // head (raw first 4 chars, before "***") against known FP prefixes.
+        // Tail-only markers are ignored so AWS doc keys (*MPLE) stay valid.
+        let head_lower = match finding.masked_value.split("***").next() {
+            Some(h) => h.to_lowercase(),
+            None => String::new(),
+        };
 
         for &fp in FALSE_POSITIVES {
             if masked_lower.contains(&fp.to_lowercase()) {
@@ -104,6 +112,21 @@ impl SecretValidator {
                     validation_method: ValidationMethod::FalsePositiveList,
                     details: format!("Matched false positive pattern '{}' in masked value", fp),
                 });
+            }
+            // Visible-head FP check: reject when the head opens a known FP
+            // word (e.g. "exam" -> "example", "plac" -> "placeholder").
+            if head_lower.len() >= 3 {
+                let fp_lower = fp.to_lowercase();
+                if fp_lower.starts_with(head_lower.as_str()) {
+                    return Some(ValidationResult {
+                        is_valid: false,
+                        validation_method: ValidationMethod::FalsePositiveList,
+                        details: format!(
+                            "Masked head matches false positive prefix '{}'",
+                            fp
+                        ),
+                    });
+                }
             }
             // Also check the raw pattern context from the secret type
             if type_lower.contains("example") && finding.confidence < 0.9 {
@@ -145,18 +168,20 @@ impl SecretValidator {
                 })
             }
             "JWT Token" => {
-                // Validate JWT has 3 dot-separated base64 segments
-                if finding.masked_value.matches('.').count() >= 2 {
+                // Masking strips the middle dots, so dot-counting on the masked
+                // value can never reach 2. Validate by the distinctive eyJ
+                // header prefix instead (detector guarantees it for true JWTs).
+                if finding.masked_value.starts_with("eyJ") {
                     Some(ValidationResult {
                         is_valid: true,
                         validation_method: ValidationMethod::PatternMatch,
-                        details: "JWT structure validated (3 segments)".to_string(),
+                        details: "JWT structure validated (eyJ header prefix)".to_string(),
                     })
                 } else {
                     Some(ValidationResult {
                         is_valid: false,
                         validation_method: ValidationMethod::PatternMatch,
-                        details: "JWT missing expected segment structure".to_string(),
+                        details: "JWT missing expected eyJ header prefix".to_string(),
                     })
                 }
             }
