@@ -376,7 +376,7 @@ impl RealTimeModelRouter {
 
     /// Analyze query complexity (0.0 - 1.0)
     fn analyze_complexity(&self, context: &QueryContext) -> f32 {
-        let mut complexity = 0.0;
+        let mut complexity: f32 = 0.0;
         let query = context.query.to_lowercase();
 
         // Length-based complexity
@@ -410,9 +410,9 @@ impl RealTimeModelRouter {
             complexity += 0.2;
         }
 
-        // Use complexity hint if provided
+        // Use complexity hint if provided — treat hint as a floor, not an average
         if let Some(hint) = context.complexity_hint {
-            complexity = (complexity + hint) / 2.0;
+            complexity = complexity.max(hint);
         }
 
         complexity.min(1.0)
@@ -453,7 +453,7 @@ impl RealTimeModelRouter {
     fn provider_matches_tier(&self, provider: &ModelProvider, tier: &ModelTier) -> bool {
         match tier {
             ModelTier::Fast => matches!(provider.tier, ModelTier::Fast),
-            ModelTier::Balanced => matches!(provider.tier, ModelTier::Fast | ModelTier::Balanced),
+            ModelTier::Balanced => matches!(provider.tier, ModelTier::Balanced),
             ModelTier::Powerful => true, // All providers can be used for powerful tasks
             ModelTier::Specialized(domain) => {
                 matches!(provider.tier, ModelTier::Specialized(ref d) if d == domain)

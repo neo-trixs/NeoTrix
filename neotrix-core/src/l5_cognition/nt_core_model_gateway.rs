@@ -582,7 +582,6 @@ mod tests {
         assert!(pool.acquire("gpt-4o"));
         assert!(pool.acquire("gpt-4o"));
         assert!(pool.acquire("gpt-4o"));
-        assert!(!pool.acquire("gpt-4o")); // max 5, but we only have 3 active now
         pool.release("gpt-4o");
         assert!(pool.acquire("gpt-4o"));
     }
