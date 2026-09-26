@@ -57,7 +57,7 @@ impl AutoRecovery {
 
         if tracker.consecutive_failures >= self.config.circuit_breaker_threshold {
             tracker.state = HealthState::CircuitOpen;
-        } else if tracker.consecutive_failures >= 2 {
+        } else if tracker.consecutive_failures >= 1 {
             tracker.state = HealthState::Degraded;
         }
     }
@@ -119,7 +119,7 @@ impl AutoRecovery {
         }
     }
 
-    /// Attempt to transition a provider from CircuitOpen to Recovering state.
+    /// Attempt to transition a provider from CircuitOpen/Degraded to Recovering state.
     ///
     /// Note: Real implementation needs — returns true if transition occurred.
     /// Consider: adding a cooldown between recovery attempts and limiting
@@ -127,7 +127,7 @@ impl AutoRecovery {
     pub fn try_recover(&self, provider: &str) -> bool {
         let mut trackers = self.trackers.write().unwrap_or_else(|e| e.into_inner());
         if let Some(tracker) = trackers.get_mut(provider) {
-            if tracker.state == HealthState::CircuitOpen {
+            if tracker.state == HealthState::CircuitOpen || tracker.state == HealthState::Degraded {
                 tracker.state = HealthState::Recovering;
                 tracker.recovery_attempts += 1;
                 return true;

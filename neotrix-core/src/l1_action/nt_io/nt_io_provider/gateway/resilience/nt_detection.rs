@@ -63,7 +63,13 @@ impl SlidingWindow {
         let mean = self.mean();
         let std = self.std_dev();
         if std == 0.0 {
-            0.0
+            // Zero-variance baseline (e.g. constant 100.0): any real deviation
+            // is maximally anomalous instead of scoring 0.
+            if (value - mean).abs() <= f64::EPSILON {
+                0.0
+            } else {
+                f64::INFINITY
+            }
         } else {
             (value - mean) / std
         }
@@ -264,13 +270,13 @@ impl DriftDetector {
             ("quality".to_string(), quality_z)
         };
 
-        if worst_z > self.severe_threshold {
+        if worst_z >= self.severe_threshold {
             DriftStatus::SevereDrift {
                 metric: worst_metric,
                 deviation: worst_z,
                 suggested_alternative: "backup_provider".to_string(),
             }
-        } else if worst_z > self.drift_threshold {
+        } else if worst_z >= self.drift_threshold {
             DriftStatus::MildDrift {
                 metric: worst_metric,
                 deviation: worst_z,

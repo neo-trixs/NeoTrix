@@ -146,14 +146,17 @@ impl CircuitBreaker {
 
     /// Return the current circuit breaker state as a CircuitState enum.
     ///
-    /// Note: Real implementation needs — the HalfOpen state is determined by
-    /// `failure_count > 0` while not Open, which may be inaccurate after a
-    /// successful half-open probe. Consider: tracking explicit half-open state.
+    /// Closed while failure count is below threshold (failures alone do not
+    /// imply half-open); Open once tripped; HalfOpen once the recovery
+    /// timeout has elapsed and a probe is due.
     pub fn state(&self) -> CircuitState {
-        if self.is_open() {
+        if self.state.load(Ordering::Relaxed) {
+            if let Some(last) = self.last_failure.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+                if last.elapsed() > self.recovery_timeout {
+                    return CircuitState::HalfOpen;
+                }
+            }
             CircuitState::Open
-        } else if self.failure_count.load(Ordering::Relaxed) > 0 {
-            CircuitState::HalfOpen
         } else {
             CircuitState::Closed
         }

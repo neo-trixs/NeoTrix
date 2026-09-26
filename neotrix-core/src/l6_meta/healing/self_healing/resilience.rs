@@ -85,6 +85,12 @@ impl ResilienceManager {
         let mut attempts = 0;
         let start = Instant::now();
 
+        // Fast-path: an already-open circuit blocks without consuming an attempt,
+        // so callers can distinguish "rejected" (0) from "tried and failed" (N).
+        if self.circuit_breaker.state() == CircuitState::Open {
+            return ResilienceResult::failure(0, CircuitState::Open);
+        }
+
         loop {
             attempts += 1;
 
@@ -98,6 +104,16 @@ impl ResilienceManager {
 
             match result {
                 Ok(val) => {
+                    // Deadline applies to slow successes too: an op that
+                    // completes after the timeout still reports failure.
+                    if let Some(timeout) = self.timeout {
+                        if start.elapsed() >= timeout {
+                            return ResilienceResult::failure(
+                                attempts,
+                                self.circuit_breaker.state(),
+                            );
+                        }
+                    }
                     return ResilienceResult::success(val, attempts, self.circuit_breaker.state());
                 }
                 Err(_) => {
@@ -172,7 +188,9 @@ mod tests {
             .with_retry(100, Duration::from_millis(1))
             .with_timeout(Duration::from_millis(50));
         let result = rm.execute(|| {
-            std::thread::sleep(Duration::from_millis(5));
+            // Fixture must exceed the deadline: a 5ms op under a 50ms timeout
+            // always succeeds, so the timeout path was never exercised.
+            std::thread::sleep(Duration::from_millis(60));
             Ok::<_, String>("never".to_string())
         });
         assert!(!result.success);
@@ -298,7 +316,9 @@ mod tests {
             .with_timeout(Duration::from_millis(100));
         let start = std::time::Instant::now();
         let result = rm.execute(|| {
-            std::thread::sleep(Duration::from_millis(10));
+            // Fixture must exceed the deadline (was 10ms op vs 100ms timeout,
+            // which always succeeded before reaching the timeout path).
+            std::thread::sleep(Duration::from_millis(150));
             Ok::<_, String>("late")
         });
         let elapsed = start.elapsed();
