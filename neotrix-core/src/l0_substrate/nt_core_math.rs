@@ -74,10 +74,15 @@ pub fn normalize_url(url: &str) -> String {
         let rest = &u[pos + 3..];
         if let Some(slash) = rest.find('/') {
             let (host, path) = rest.split_at(slash);
-            u = format!("{}://{}{}", &u[..pos], host.to_lowercase(), path);
+            u = format!(
+                "{}://{}{}",
+                u[..pos].to_lowercase(),
+                host.to_lowercase(),
+                path
+            );
         } else {
             let host = rest;
-            u = format!("{}://{}", &u[..pos], host.to_lowercase());
+            u = format!("{}://{}", u[..pos].to_lowercase(), host.to_lowercase());
         }
     }
     u

@@ -271,8 +271,12 @@ impl WalshMemoryIndex {
         let dim = vec.len();
         let mut result = vec![0.0f64; dim];
         for i in 0..dim {
-            let sign = if (i & 1) == 0 { 1.0 } else { -1.0 };
-            result[i] = vec[(dim + i - 1) % dim] * sign;
+            // Undo `wh_transform`: value at output j carries sign(j), so the
+            // value read back from j = (i - 1) mod dim must be un-signed with
+            // sign(j), not sign(i) (parities differ for i >= 1).
+            let j = (dim + i - 1) % dim;
+            let sign = if (j & 1) == 0 { 1.0 } else { -1.0 };
+            result[i] = vec[j] * sign;
         }
         result
     }

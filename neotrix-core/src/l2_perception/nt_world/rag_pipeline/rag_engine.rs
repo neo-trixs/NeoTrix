@@ -290,12 +290,18 @@ mod tests {
             engine.save(&path).unwrap();
         }
 
-        // Load, query.
+        // Load, query. Query with doc1's exact content: self-similarity is
+        // 1.0 by construction, so doc1 must rank first both before and
+        // after the persistence roundtrip (hash embeddings carry no
+        // semantics; asserting a semantic ranking would be luck-based).
         {
             let engine = RagEngine::with_persistence(&path).unwrap();
             assert_eq!(engine.stored_count(), 2);
 
-            let results = engine.query("memory safety", 2);
+            let results = engine.query(
+                "Rust provides memory safety without garbage collection.",
+                2,
+            );
             assert_eq!(results.len(), 2);
             assert_eq!(results[0].doc_id, "doc1");
         }
