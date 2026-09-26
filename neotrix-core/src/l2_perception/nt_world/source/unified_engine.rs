@@ -399,6 +399,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // 实网隔离: 29 媒体源真实 HTTP，默认 `cargo test` 跳过；需 `cargo test -- --ignored` 单跑
     async fn test_search_media() {
         let engine = UnifiedEngine::new().with_media_sources();
         let results = engine.search_media("test", 1).await.unwrap();

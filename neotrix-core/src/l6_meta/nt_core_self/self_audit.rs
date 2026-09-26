@@ -947,6 +947,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // 自死锁隔离: scan_build_status 在 cargo test 内 spawn `cargo check --lib`，与外层 target 锁互斥挂起；需 `cargo test -- --ignored` 或分 job 单跑
     fn test_scan_build_status() {
         // Should run cargo check and return findings (may be empty if build passes)
         let findings = scan_build_status(".");
@@ -958,6 +959,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // 自死锁隔离: scan_system_health → scan_build_status 会 spawn `cargo check --lib`，同上挂起；需 `-- --ignored` 单跑
     fn test_scan_system_health_aggregates_all() {
         // Should aggregate all four signal types
         let findings = scan_system_health(".");
@@ -968,6 +970,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // 自死锁隔离: converge_check → scan_system_health → scan_build_status，同上挂起；需 `-- --ignored` 单跑
     fn test_converge_check_includes_health_signals() {
         let report = converge_check(".");
         // Should include health signals in findings
