@@ -91,7 +91,12 @@ impl VectorIndex {
     ///
     /// # Returns
     /// `true` if the insert succeeded, `false` if vector dimension mismatch
-    pub fn insert(&mut self, id: &str, vector: Vec<f64>, metadata: HashMap<String, String>) -> bool {
+    pub fn insert(
+        &mut self,
+        id: &str,
+        vector: Vec<f64>,
+        metadata: HashMap<String, String>,
+    ) -> bool {
         if vector.len() != self.dimensions {
             return false;
         }
@@ -130,9 +135,9 @@ impl VectorIndex {
         }
 
         let entries: Vec<VectorEntry> = {
-        let cache = self.cache.lock().unwrap();
-        cache.iter().map(|(_, v)| v.clone()).collect()
-    };
+            let cache = self.cache.lock().unwrap();
+            cache.iter().map(|(_, v)| v.clone()).collect()
+        };
 
         let mut results: Vec<SearchResult> = entries
             .iter()
@@ -150,7 +155,11 @@ impl VectorIndex {
             })
             .collect();
 
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(k);
 
         results
@@ -177,7 +186,12 @@ impl VectorIndex {
     ///
     /// # Returns
     /// `true` if the entry was found and updated, `false` otherwise
-    pub fn update(&mut self, id: &str, vector: Vec<f64>, metadata: HashMap<String, String>) -> bool {
+    pub fn update(
+        &mut self,
+        id: &str,
+        vector: Vec<f64>,
+        metadata: HashMap<String, String>,
+    ) -> bool {
         if vector.len() != self.dimensions {
             return false;
         }
@@ -282,7 +296,10 @@ mod tests {
 
     #[test]
     fn test_search() {
-        let mut index = VectorIndex::new();
+        let mut index = VectorIndex::with_config(VectorIndexConfig {
+            capacity: 100,
+            dimensions: 3,
+        });
         let v1 = vec![1.0, 0.0, 0.0];
         let v2 = vec![0.0, 1.0, 0.0];
         let v3 = vec![1.0, 0.1, 0.0];
@@ -311,7 +328,10 @@ mod tests {
 
     #[test]
     fn test_update() {
-        let mut index = VectorIndex::new();
+        let mut index = VectorIndex::with_config(VectorIndexConfig {
+            capacity: 100,
+            dimensions: 2,
+        });
         let v1 = vec![1.0, 0.0];
         let v2 = vec![0.0, 1.0];
 
@@ -337,7 +357,7 @@ mod tests {
     #[test]
     fn test_empty_index_search() {
         let index = VectorIndex::new();
-        let results = index.search(&[1.0, 0.0], 5);
+        let results = index.search(&make_vector(128), 5);
         assert!(results.is_empty());
     }
 }

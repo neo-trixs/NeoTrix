@@ -146,7 +146,7 @@ impl AgentSessionManager {
     pub fn recall_similar(
         conn: &Connection,
         agent_id: &str,
-        _query_embedding: &[f32],
+        query_embedding: &[f32],
         limit: usize,
     ) -> rusqlite::Result<Vec<(AgentSessionEntry, f64)>> {
         let mut stmt = conn.prepare(
@@ -181,8 +181,8 @@ impl AgentSessionManager {
         })?;
         let mut scored: Vec<(AgentSessionEntry, f64)> = Vec::new();
         for r in rows {
-            if let Ok((_entry, Some(_emb))) = r {
-                //                 scored.push((entry, cosine_similarity(query_embedding, &emb)));
+            if let Ok((entry, Some(emb))) = r {
+                scored.push((entry, cosine_similarity(query_embedding, &emb)));
             }
         }
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -248,13 +248,18 @@ fn map_entries(
     Ok(results)
 }
 
-// fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
-//     let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-//     let mag_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-//     let mag_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-//     if mag_a == 0.0 || mag_b == 0.0 { return 0.0; }
-//     (dot / (mag_a * mag_b)) as f64
-// }
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
+    if a.is_empty() || b.is_empty() || a.len() != b.len() {
+        return 0.0;
+    }
+    let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| f64::from(*x) * f64::from(*y)).sum();
+    let mag_a: f64 = a.iter().map(|x| { let v = f64::from(*x); v * v }).sum::<f64>().sqrt();
+    let mag_b: f64 = b.iter().map(|x| { let v = f64::from(*x); v * v }).sum::<f64>().sqrt();
+    if mag_a == 0.0 || mag_b == 0.0 {
+        return 0.0;
+    }
+    dot / (mag_a * mag_b)
+}
 
 #[cfg(test)]
 mod tests {

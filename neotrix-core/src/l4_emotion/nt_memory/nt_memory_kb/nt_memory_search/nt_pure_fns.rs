@@ -118,6 +118,68 @@ pub fn search_fts(
         }
     };
     let mut results: Vec<SearchResult> = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+    // FTS5 unicode61 精确词匹配不到 CJK 子串 ("最短路径管道" vs "最短路径管道测试" 单词元) 时，
+    // MATCH 返回空但节点已正确双写提交。LIKE 子串兜底保证写↔读闭环。
+    if results.is_empty() && !query_trim.is_empty() {
+        let escaped = query_trim
+            .replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_");
+        let pattern = format!("%{escaped}%");
+        if let Ok(mut like_stmt) = conn.prepare(
+            "SELECT id, node_type, title, summary, COALESCE(content, summary, ''), url, domain,
+                    language, confidence, importance, created_at, updated_at, access_count, metadata
+             FROM nodes
+             WHERE title LIKE ?1 ESCAPE '\\' OR summary LIKE ?1 ESCAPE '\\' OR content LIKE ?1 ESCAPE '\\'
+             LIMIT ?2",
+        ) {
+            if let Ok(like_rows) = like_stmt.query_map(params![pattern, limit as i64], |row| {
+                let title: String = row.get(2)?;
+                let is_title_hit: bool = title.contains(query_trim);
+                Ok(SearchResult {
+                    node: KnowledgeNode {
+                        recall_weight: 1.0,
+                        id: row.get(0)?,
+                        node_type: NodeType::from_str(&row.get::<_, String>(1)?),
+                        title,
+                        summary: row.get(3)?,
+                        content: row.get(4)?,
+                        url: row.get(5)?,
+                        domain: row.get(6)?,
+                        language: row.get(7)?,
+                        confidence: row.get(8)?,
+                        importance: row.get(9)?,
+                        created_at: row.get(10)?,
+                        updated_at: row.get(11)?,
+                        access_count: row.get(12)?,
+                        metadata: row
+                            .get::<_, Option<String>>(13)?
+                            .and_then(|m| serde_json::from_str(&m).ok()),
+                        temporal: None,
+                        supersedes: None,
+                        source_episode: None,
+                        parent_id: None,
+                        depth: 0,
+                        cluster_id: None,
+                    },
+                    score: if is_title_hit { 0.6 } else { 0.4 },
+                    matched_on: vec![if is_title_hit {
+                        SearchMatchType::FtsTitle
+                    } else {
+                        SearchMatchType::FtsContent
+                    }],
+                    signals: None,
+                })
+            }) {
+                for r in like_rows.filter_map(|r| r.ok()) {
+                    results.push(r);
+                    if results.len() >= limit {
+                        break;
+                    }
+                }
+            }
+        }
+    }
     // W1.4 (batch3 2026-08-26, arxiv 2608.20845 ingest-time compilation):
     // 查询词与节点摄取时编译的概念索引求交 → 命中加分 (每词 +0.05, 封顶 +0.25)。
     // 纯增量修正: 无 ingest_index 的存量节点行为不变。

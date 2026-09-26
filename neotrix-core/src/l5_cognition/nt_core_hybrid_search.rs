@@ -75,7 +75,8 @@ impl Default for SearchConfig {
             max_results: 20,
             bm25_weight: 0.5,
             vector_weight: 0.5,
-            min_score: 0.01,
+            // RRF 单源上限 1/(60+0+1)*0.5 ≈ 0.0082；阈值必须低于此，否则单通道检索恒被过滤。
+            min_score: 0.001,
             token_budget: 8000,
         }
     }
@@ -122,6 +123,15 @@ pub struct NodeMeta {
     pub body: String,
 }
 
+/// 分词口径（写读两侧共用）：按非字母数字切分 + 小写化。
+/// 修复 `split_whitespace` 导致 `func` 匹配不到 `func_0()` 的精确词漂移。
+fn tokenize(text: &str) -> Vec<String> {
+    text.split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(|w| w.to_lowercase())
+        .collect()
+}
+
 impl HybridRetriever {
     pub fn new(config: SearchConfig) -> Self {
         Self {
@@ -146,12 +156,16 @@ impl HybridRetriever {
             text: text.to_string(),
         });
 
-        // Update avgdl
-        let total_chars: usize = bm25.documents.iter().map(|d| d.text.len()).sum();
-        bm25.avgdl = total_chars as f32 / bm25.documents.len() as f32;
+        // Update avgdl (token 数口径，与 bm25_search 的 doc_len 一致)
+        let total_tokens: usize = bm25
+            .documents
+            .iter()
+            .map(|d| tokenize(&d.text).len())
+            .sum();
+        bm25.avgdl = total_tokens as f32 / bm25.documents.len() as f32;
 
         // Update IDF (simplified)
-        let words: Vec<String> = text.split_whitespace().map(|w| w.to_lowercase()).collect();
+        let words: Vec<String> = tokenize(text);
         let mut doc_freq: HashMap<String, usize> = HashMap::new();
         for word in &words {
             *doc_freq.entry(word.clone()).or_insert(0) += 1;
@@ -185,13 +199,14 @@ impl HybridRetriever {
     /// BM25 lexical search
     fn bm25_search(&self, query: &str) -> Vec<(u64, f32)> {
         let bm25 = self.bm25_index.lock().unwrap();
-        let query_words: Vec<String> = query.split_whitespace().map(|w| w.to_lowercase()).collect();
+        let query_words: Vec<String> = tokenize(query);
 
         let mut scores: Vec<(u64, f32)> = Vec::new();
+        let avgdl = if bm25.avgdl > 0.0 { bm25.avgdl } else { 1.0 };
 
         for doc in &bm25.documents {
             let mut score = 0.0;
-            let doc_words: Vec<String> = doc.text.split_whitespace().map(|w| w.to_lowercase()).collect();
+            let doc_words: Vec<String> = tokenize(&doc.text);
             let doc_len = doc_words.len() as f32;
 
             for q_word in &query_words {
@@ -201,7 +216,7 @@ impl HybridRetriever {
                 // BM25 formula
                 let k1 = 1.2_f32;
                 let b = 0.75_f32;
-                let tf_norm = (tf * (k1 + 1.0)) / (tf + k1 * (1.0 - b + b * doc_len / bm25.avgdl));
+                let tf_norm = (tf * (k1 + 1.0)) / (tf + k1 * (1.0 - b + b * doc_len / avgdl));
                 score += idf * tf_norm;
             }
 
