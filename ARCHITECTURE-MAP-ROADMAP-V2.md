@@ -303,3 +303,10 @@
 > 本路线图受 R-P111-R-P115 架构管理规则约束。
 > 每次迭代完成后更新 ARCHITECTURE.md。
 > 迭代记录走 KB experience-tree 吸收流程。
+
+## 迭代记录 · 2026-09-26 大清洗
+
+- 基线 HEAD `8a11227a`；9 worktree 全合入（diff 0）；脏树 ~1087（多窗 churn，不代他人合）。
+- 版本：workspace 0.21.0 一致；`NeoBot@0.21.0` / `NeoTrix@0.22.0` 双产品线并存（见 ARCHITECTURE.md §14）。
+- 清单：`sessions/handoff-global-todo-20260926.md` §8；§39 见 `sessions/handoff-S39-20260926.md`。
+- 活体：soul 双端 online（tools=9）；`:8149` Down 按门拉起（blocked）；App 待目视。

@@ -84,3 +84,5 @@ pub mod nt_core_answer_engine;
 pub mod nt_ecs;
 /// Multi-Timescale Tick Schedule — absorbed from neotrix-sim (Reflex/Fast/Medium/Slow/Background)
 pub mod nt_tick_schedule;
+/// Judge 影子内核（EVO-02 mu 式：只记录不拦截，intercept 恒 false）
+pub mod nt_judge;

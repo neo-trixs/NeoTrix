@@ -29,6 +29,8 @@ pub mod nt_core_cot_generator;
 pub mod nt_core_gate;
 pub mod nt_core_prm;
 pub mod nt_core_dispatch;
+/// EVO-03 DSPy 声明式自优化层 (Signature/Metric/BootstrapCompiler/CompiledPrompt 纯逻辑)
+pub mod nt_dspy;
 
 // ============================================================================
 // Strategy — 目标/计划/策略/规则

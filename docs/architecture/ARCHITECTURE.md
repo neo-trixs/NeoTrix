@@ -417,3 +417,18 @@ L0 Substrate ──────────────────────�
 ---
 
 **注意**: 此架构文档是活文档，随项目迭代持续更新。每次重大架构变更后，必须同步更新此文档。
+## 14. 版本迭代记录（2026-09-26 大清洗）
+
+- 基线：分支 `feat/capability-absorb-20260828` HEAD `8a11227a`；workspace 0.21.0 全员一致
+  （`apps/neobot-desktop` NeoBot 0.21.0 与 `src-tauri` NeoTrix 0.22.0 为不同产品，各自版本线）。
+- 整合：本仓 9 worktree 已全合入 HEAD（diff 0，无需再合；删留待各窗确认）。
+- 清洗：`sessions/handoff-global-todo-20260926.md` §8（G-01~G-11＋PARK）为唯一待修清单；
+  §39 交接提示词见 `sessions/handoff-S39-20260926.md`。
+- 对话面 (§13) + soul online（tools=9，crystal 0.2.0）为本迭代活体证据。
+
+## 15. 统一进化迭代（34 源吸收，2026-09-26）
+
+- 吸收战报＋12 缺口＋P0→P2 路线＋v0.22.0 目标＋归档计划＋任务清单：
+  `sessions/handoff-evo-20260926.md`（34/34 成功，零编造）。
+- P0 首点名建议：EVO-01 Token 成本门 → EVO-03 DSPy → EVO-02 judge 影子 → EVO-04 高速浏览器环。
+- 版本 bump（0.21.0→0.22.0）留待独占窗口（重编风险，见该文件§3）。

@@ -28,6 +28,7 @@ pub mod nt_error;
 pub mod nt_http_engine;
 pub mod nt_policy;
 pub mod nt_store;
+pub mod nt_token_guard;
 pub mod nt_types;
 
 pub use nt_agent::run_local_turn;
