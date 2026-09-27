@@ -1,15 +1,22 @@
 //! NT-REPAIR Self-Heal Integration Tests (Track 3: D22/D26/D27/D28)
 //! Verifies the self-healing loop: monitoring → diagnosis → heal → retest
 
-use crate::l5_cognition::l1_facade::self_audit::{scan_system_health, scan_disk_pressure, scan_memory_pressure, scan_build_status, scan_test_flakiness, AuditSeverity};
+use crate::l5_cognition::l1_facade::self_audit::{scan_system_health_with, scan_disk_pressure, scan_memory_pressure, scan_build_status_with, scan_test_flakiness, AuditSeverity, BuildCheckOutcome};
 use crate::l5_cognition::nt_mind::evolution::autofixer::HealerRegistry;
 use std::fs;
 use std::env;
 
+/// 2026-09-27 除根: 原测试直接调生产入口 → 测试进程内再起 cargo check,
+/// 与外层 cargo test 抢构建锁 → 100% 死锁 (锁空闲时还会拉起编译器吃内存)。
+/// 改注入桩: 断言逻辑不变, 且额外覆盖"构建失败"分支。
+fn build_ok(_root: &std::path::Path) -> Result<BuildCheckOutcome, String> {
+    Ok(BuildCheckOutcome { success: true, stderr: String::new() })
+}
+
 #[tokio::test]
 async fn test_system_health_monitoring_signals() {
     // Test that all four monitoring signals can be collected
-    let findings = scan_system_health(".");
+    let findings = scan_system_health_with(".", build_ok);
     
     // Verify signal categories are recognized
     let categories: Vec<String> = findings.iter().map(|f| f.category.to_string()).collect();
@@ -61,11 +68,23 @@ async fn test_memory_pressure_thresholds() {
 
 #[tokio::test]
 async fn test_build_status_monitoring() {
-    let findings = scan_build_status(".");
+    // 成功路径: 无 build-failure 发现
+    let findings = scan_build_status_with(".", build_ok);
+    assert!(findings.is_empty(), "build ok should yield no findings");
+
+    // 失败路径: 注入 2 个 error[ → 产出 1 条 Error 级发现且错误计数正确
+    let findings = scan_build_status_with(".", |_root| {
+        Ok(BuildCheckOutcome {
+            success: false,
+            stderr: "error[E0308]: mismatched types\nerror[E0599]: no method".into(),
+        })
+    });
+    assert_eq!(findings.len(), 1, "build failure should yield exactly one finding");
     for f in &findings {
         assert_eq!(f.category, "build-failure");
         assert_eq!(f.severity, AuditSeverity::Error);
         assert!(!f.message.is_empty());
+        assert!(f.message.contains('2'), "error count should be 2: {}", f.message);
     }
 }
 

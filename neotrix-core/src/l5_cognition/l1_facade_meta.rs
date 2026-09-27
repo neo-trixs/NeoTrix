@@ -150,14 +150,17 @@ pub use crate::l6_meta::nt_core_self::seal::ConstitutionGate; // ALLOW: nt_meta/
 pub use crate::l6_meta::nt_core_self::self_audit::{
     converge_check,
     scan_build_status,
+    scan_build_status_with,
     scan_disk_pressure,
     scan_memory_pressure,
     scan_system_health,
+    scan_system_health_with,
     scan_test_flakiness,
     // ALLOW: nt_meta/进化/governance 字段直访（trait-object 不可行，见 l1_facade.rs 125-128 注释）
     AuditFinding,
     AuditReport,
     AuditSeverity,
+    BuildCheckOutcome,
     ConvergeCheckFn,
     MultiSignalEval,
     ToolGroundingMonitor,

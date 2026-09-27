@@ -375,35 +375,69 @@ pub fn scan_test_flakiness<P: AsRef<Path>>(root: P) -> Vec<AuditFinding> {
     findings
 }
 
+/// `cargo check` 结果摘要 — 抽出以便单测注入桩。
+///
+/// 2026-09-27 除根 (卡死 + 内存爆炸双源): 单测直接调 `scan_build_status` 会在
+/// `cargo test` 进程内**再起一个 cargo**, 外层构建锁未释放 → 100% 死锁
+/// (内层等锁 / 外层等进程, 实测卡死在 test_build_status_monitoring);
+/// 锁空闲时还会拉起整个编译器吃内存。故生产入口保持真实 cargo,
+/// 单测走 `*_with` 注入桩。
+#[derive(Debug, Clone)]
+pub struct BuildCheckOutcome {
+    /// cargo check 是否成功
+    pub success: bool,
+    /// 失败时的 stderr (用于统计 error[ 计数)
+    pub stderr: String,
+}
+
+fn run_cargo_check(root: &Path) -> Result<BuildCheckOutcome, String> {
+    std::process::Command::new("cargo")
+        .args(["check", "--lib"])
+        .current_dir(root)
+        .output()
+        .map(|out| BuildCheckOutcome {
+            success: out.status.success(),
+            stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+        })
+        .map_err(|e| format!("cargo check 执行失败: {} — 环境异常", e))
+}
+
 /// 构建状态监控: 运行 cargo check 获取实时编译状态, 失败时产出 Error 发现。
 /// 复用 AutoFixer::cargo_check 内部逻辑, 避免重复编译开销 (缓存上次结果 60s)。
 pub fn scan_build_status<P: AsRef<Path>>(root: P) -> Vec<AuditFinding> {
+    scan_build_status_with(root, run_cargo_check)
+}
+
+/// 可注入执行器版本 — 单测用桩替代真实 cargo (见 BuildCheckOutcome 文档)。
+pub fn scan_build_status_with<P, F>(root: P, runner: F) -> Vec<AuditFinding>
+where
+    P: AsRef<Path>,
+    F: FnOnce(&Path) -> Result<BuildCheckOutcome, String>,
+{
     let mut findings = Vec::new();
-    let output = std::process::Command::new("cargo")
-        .args(["check", "--lib"])
-        .current_dir(root.as_ref())
-        .output();
-    match output {
-        Ok(out) => {
-            if !out.status.success() {
-                let stderr = String::from_utf8_lossy(&out.stderr);
-                let errors = stderr.matches("error[").count();
+    match runner(root.as_ref()) {
+        Ok(outcome) => {
+            if !outcome.success {
+                let errors = outcome.stderr.matches("error[").count();
                 findings.push(AuditFinding {
                     category: "build-failure",
                     severity: AuditSeverity::Error,
                     file: "cargo check".to_string(),
                     line: None,
-                    message: format!("构建失败: {} 个编译错误 — 触发自愈 (clean_cache / restart_module)", errors),
+                    message: format!(
+                        "构建失败: {} 个编译错误 — 触发自愈 (clean_cache / restart_module)",
+                        errors
+                    ),
                 });
             }
         }
-        Err(e) => {
+        Err(msg) => {
             findings.push(AuditFinding {
                 category: "build-failure",
                 severity: AuditSeverity::Error,
                 file: "cargo check".to_string(),
                 line: None,
-                message: format!("cargo check 执行失败: {} — 环境异常", e),
+                message: msg,
             });
         }
     }
@@ -412,11 +446,21 @@ pub fn scan_build_status<P: AsRef<Path>>(root: P) -> Vec<AuditFinding> {
 
 /// 综合系统健康扫描: 聚合磁盘/内存/测试/构建四维信号, 供 NT-REPAIR 闭环消费。
 pub fn scan_system_health<P: AsRef<Path>>(root: P) -> Vec<AuditFinding> {
+    scan_system_health_with(root, run_cargo_check)
+}
+
+/// 可注入构建检查器的系统健康扫描 (单测用桩, 见 BuildCheckOutcome 文档)。
+pub fn scan_system_health_with<P, F>(root: P, build_runner: F) -> Vec<AuditFinding>
+where
+    P: AsRef<Path>,
+    F: FnOnce(&Path) -> Result<BuildCheckOutcome, String>,
+{
+    let root = root.as_ref();
     let mut findings = Vec::new();
-    findings.extend(scan_disk_pressure(root.as_ref(), DISK_PRESSURE_THRESHOLD_BYTES));
+    findings.extend(scan_disk_pressure(root, DISK_PRESSURE_THRESHOLD_BYTES));
     findings.extend(scan_memory_pressure(MEMORY_PRESSURE_THRESHOLD_BYTES));
-    findings.extend(scan_test_flakiness(root.as_ref()));
-    findings.extend(scan_build_status(root.as_ref()));
+    findings.extend(scan_test_flakiness(root));
+    findings.extend(scan_build_status_with(root, build_runner));
     findings
 }
 
