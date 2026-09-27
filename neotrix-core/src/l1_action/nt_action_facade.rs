@@ -8,6 +8,7 @@
 use std::sync::Arc;
 
 use crate::l1_action::nt_act::async_tool_executor::AsyncToolExecutor;
+use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_store;
 use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 use crate::l1_action::traits::LlmRouter;
 
@@ -115,6 +116,12 @@ impl ActionFacade {
     pub fn search(&self, query: &str) -> Result<Vec<SearchResult>, FacadeError> {
         let kb = self.kb.as_ref().ok_or(FacadeError::NotInitialized)?;
 
+        // 2026-09-27 除根 (自死锁): rebuild_bm25 内部自锁 kb.conn, 必须在此之前
+        // 完成。原顺序先 raw_conn() 持守卫再 rebuild_bm25() → 同一线程二次锁
+        // 非重入 Mutex → 搜索永久挂死, 并连带阻塞所有 KB 操作 (栈实证
+        // __psynch_mutexwait @ kb_core.rs:343)。
+        kb.rebuild_bm25();
+
         let conn = kb
             .raw_conn()
             .map_err(|e| FacadeError::SearchFailed(format!("KB lock: {e}")))?;
@@ -122,13 +129,20 @@ impl ActionFacade {
         let mut results = Vec::new();
 
         // BM25 path (always available)
-        kb.rebuild_bm25();
         if let Ok(bm25_guard) = kb.bm25.read() {
             if let Some(ref bm25) = *bm25_guard {
-                for hit in bm25.search(query, 10) {
+                // 2026-09-27 修正: Bm25Index::search 返回 (score, doc_id) ——
+                // 原先把 doc_id 直接当 title 返回, 搜索结果标题全是 id。
+                // 按 id 回表取真实 title, 回表失败才退回 id。
+                for (score, doc_id) in bm25.search(query, 10) {
+                    let title =
+                        nt_memory_store::get_node(&conn, &doc_id).ok().flatten().map_or_else(
+                            || doc_id.clone(),
+                            |node| node.title,
+                        );
                     results.push(SearchResult {
-                        title: hit.1.clone(),
-                        score: hit.0,
+                        title,
+                        score,
                         snippet: String::new(),
                     });
                 }
@@ -253,7 +267,7 @@ impl std::fmt::Debug for ActionFacade {
 mod tests {
     use super::*;
     use crate::l1_action::nt_act::async_tool_executor::AsyncToolExecutor;
-    use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
     use crate::l1_action::traits::{
         CapabilityCategory, CapabilityHealth, ConstellationLevel, L1Capability, LlmRequest,
         LlmRoute,
