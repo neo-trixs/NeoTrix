@@ -14,3 +14,5 @@ pub mod nt_computer_fleet;
 // ============================================================================
 /// A* Pathfinding — absorbed from neotrix-sim
 pub mod nt_astar;
+/// EVO-09 近场协作平面（发现注册/通道策略/帧长门纯逻辑）
+pub mod nt_near_field;

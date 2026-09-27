@@ -179,3 +179,15 @@ PARK（P-01~P-05）不动。
  （含自修 mask_dsn scheme 冒号误判一处，回归绿）。
 - `cargo check -p neotrix --lib` EXIT:0；生产区无 unwrap/expect/panic/unsafe。
 - 状态：未提交（等下一提交令；mod 注册 4 处皆自有行，hunk 过滤预案就绪）。
+
+## 9. P2 执行证据（主线程直写，四新文件 593 行 16 单测，一次全绿）
+
+- EVO-09 `l3_embodiment/nt_near_field.rs`（180 行，4 单测）→ **4/4**。
+- EVO-10 `l4_emotion/nt_sim_eval.rs`（134 行，4 单测）→ **4/4**。
+- EVO-11 `l6_meta/nt_law_gate.rs`（149 行，4 单测）→ **4/4**。
+- EVO-12 `l2_perception/nt_intel_digest.rs`（130 行，4 单测）→ **4/4**。
+- `cargo check -p neotrix --lib` EXIT:0；生产区无 unwrap/expect/panic/unsafe。
+- 门控收尾：G-11 关闭（env.sh 无 deepseek key，14 处引用皆惰性选项；Lingee 已退役）；
+  G-01 保持 blocked（nt_watch.sh 只是邻居哨兵非 sidecar 启动器，:8149 拉起＝训练侧进程，
+  16G＋cargo 占用＋train 禁令三重门）；G-02 目视/G-10 决议/VER 独占等主；
+  PARK 全不动。P2 包未提交，等令。

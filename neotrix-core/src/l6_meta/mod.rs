@@ -62,3 +62,5 @@ pub mod nt_safety_monitor;
 pub mod nt_emergence_detector;
 // EVO-07 在线进化闭环（Serve收据/Observe评分/版本化artifact/热切换纯逻辑）
 pub mod nt_evolve_loop;
+// EVO-11 证明门影子＋语义网关（LAWS影子裁决/按分选路/归因账本）
+pub mod nt_law_gate;

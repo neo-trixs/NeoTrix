@@ -13,6 +13,8 @@ pub mod nt_core_vector_store;
 pub mod nt_core_code_search;
 /// EVO-05 有界符号调用图（symbols/calls/impact/explain，全有界 50）
 pub mod nt_code_graph;
+/// EVO-12 情报profile管线＋配对收益（rubric/去重/配额/PairedGap）
+pub mod nt_intel_digest;
 pub mod nt_routing;
 pub mod nt_web_perception;
 
