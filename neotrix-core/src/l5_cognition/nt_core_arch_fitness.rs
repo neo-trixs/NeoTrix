@@ -208,6 +208,7 @@ impl SelfTest for TreeSingletonFitness {
                 continue;
             };
             let lines: Vec<&str> = content.lines().collect();
+            let test_ctx = test_context_flags(&content);
             for (i, line) in lines.iter().enumerate() {
                 let trimmed = line.trim_start();
                 // 跳过注释与 doc 注释 (守卫自身文档含示例字符串)
@@ -226,7 +227,7 @@ impl SelfTest for TreeSingletonFitness {
                     let rel = file.strip_prefix(repo_root()).unwrap_or(&file).display();
                     let site = format!("{}:{}", rel, i + 1);
                     // 测试代码豁免: 测试函数/模块内的实例化不计入生产单例
-                    if in_test_context(&content, i) {
+                    if test_ctx.get(i).copied().unwrap_or(false) {
                         continue;
                     }
                     sites.push(site);
@@ -246,22 +247,26 @@ impl SelfTest for TreeSingletonFitness {
     }
 }
 
-/// 粗略判断行号是否在测试上下文内 (#[cfg(test)] / #[test] / mod tests)
-fn in_test_context(content: &str, line_idx: usize) -> bool {
+/// 逐行标注"是否处于测试上下文" — 一次扫描产出全文件结果。
+///
+/// 2026-09-27 性能除根: 旧 `in_test_context(content, i)` 每次调用都重新
+/// `content.lines()` 全量切分, 而两个架构守卫是"遍历全仓 .rs × 逐行调用" → 每文件
+/// O(命中数 × 行数) 二次方膨胀, 表现为 self-test 长时间空转 (采样实证
+/// `in_test_context` 占 300-800/804 帧) 并连带内存churn。改为按文件预计算一次。
+///
+/// 语义与旧函数逐行严格等价: flags[i] = (处理完 i 行 cfg/test 标记后的状态) ||
+/// (处理完 i 行深度复位后的状态) —— 即旧函数在 line_idx=i 处的返回值。
+fn test_context_flags(content: &str) -> Vec<bool> {
     let lines: Vec<&str> = content.lines().collect();
+    let mut flags = vec![false; lines.len()];
     let mut in_test_mod = false;
     let mut depth = 0i32;
     for (i, l) in lines.iter().enumerate() {
-        if i > line_idx {
-            break;
-        }
         let trimmed = l.trim();
         if trimmed.starts_with("#[cfg(test)]") || trimmed.starts_with("#[test]") {
             in_test_mod = true;
         }
-        if in_test_mod && i == line_idx {
-            return true;
-        }
+        let after_marker = in_test_mod;
         if trimmed.starts_with("mod tests") || trimmed.starts_with("mod test") {
             in_test_mod = true;
         }
@@ -273,8 +278,17 @@ fn in_test_context(content: &str, line_idx: usize) -> bool {
         if in_test_mod && depth <= 0 && trimmed.starts_with('}') {
             in_test_mod = false;
         }
+        flags[i] = after_marker || in_test_mod;
     }
-    in_test_mod
+    flags
+}
+
+/// 粗略判断行号是否在测试上下文内 (#[cfg(test)] / #[test] / mod tests)
+fn in_test_context(content: &str, line_idx: usize) -> bool {
+    test_context_flags(content)
+        .get(line_idx)
+        .copied()
+        .unwrap_or(false)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -555,8 +569,9 @@ impl SelfTest for ConfidenceLabelFitness {
                 let Ok(content) = std::fs::read_to_string(&file) else {
                     continue;
                 };
+                let test_ctx = test_context_flags(&content);
                 for (i, line) in content.lines().enumerate() {
-                    if is_comment_line(line) || in_test_context(&content, i) {
+                    if is_comment_line(line) || test_ctx.get(i).copied().unwrap_or(false) {
                         continue;
                     }
                     for target in extract_layer_targets(line, &re) {
