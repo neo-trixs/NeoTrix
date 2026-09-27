@@ -36,3 +36,6 @@ mod process_engine_tests;
 
 #[cfg(test)]
 mod event_bus_tests;
+
+#[cfg(test)]
+mod test_extractors;

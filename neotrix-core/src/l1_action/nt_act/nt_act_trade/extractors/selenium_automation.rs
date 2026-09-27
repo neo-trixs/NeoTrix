@@ -38,6 +38,9 @@ pub struct Cookie {
 pub struct NetworkLogEntry {
     pub url: String,
     pub method: String,
+    /// Omitted from the wire form when absent, matching the other optional
+    /// fields in this module (see the skip_serializing_if above).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<u16>,
     pub resource_type: String,
     pub headers: HashMap<String, String>,
@@ -467,7 +470,7 @@ mod tests {
             expires: Some(1700000000),
             secure: false,
         });
-        let mut session = SeleniumSession::with_backend(config, Box::new(mock)).unwrap();
+        let session = SeleniumSession::with_backend(config, Box::new(mock)).unwrap();
 
         let cookies = session.extract_cookies().await;
         assert_eq!(cookies.len(), 1);

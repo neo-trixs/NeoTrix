@@ -390,14 +390,16 @@ pub async fn investigate(
 
 /// 从目标构建 FOFA 查询语法
 fn build_fofa_query(target: &OsintTarget) -> Result<String, String> {
+    // 2026-09-27 修复: from_email 会同时填 email 与 domain, 原先先判 domain →
+    // 邮箱目标永远只生成 domain= 查询, email= 分支不可达。邮箱判定必须在前。
+    if let Some(ref email) = target.email {
+        return Ok(format!("email=\"{}\"", email));
+    }
     if let Some(ref domain) = target.domain {
         return Ok(format!("domain=\"{}\"", domain));
     }
     if let Some(ref ip) = target.ip {
         return Ok(format!("ip=\"{}\"", ip));
-    }
-    if let Some(ref email) = target.email {
-        return Ok(format!("email=\"{}\"", email));
     }
     if let Some(ref url) = target.url {
         if let Some(host) = url.split("://").nth(1) {

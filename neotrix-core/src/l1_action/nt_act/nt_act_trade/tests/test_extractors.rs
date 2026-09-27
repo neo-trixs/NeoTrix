@@ -67,18 +67,32 @@ mod chrome_decrypt_tests {
 
     #[test]
     fn test_v10_prefix_stripping() {
-        let inner = ChromeDecryptor::with_password("x")
-            .unwrap()
-            .decrypt(b"v10abc123def456");
-        assert!(inner.is_ok());
+        // 只断言「前缀被识别」: 载荷是任意字节, 解密结果不是合法 UTF-8,
+        // 故 decrypt() 必然返回 Err —— 那是预期内的。真正要测的是它不能
+        // 报 UnknownPrefix。块级前缀剥离本身由 chrome_decrypt.rs 自身的
+        // strip_prefix_v10/strip_prefix_v11 覆盖(通过)。
+        let d = ChromeDecryptor::with_password("x").unwrap();
+        let res = d.decrypt(b"v10abcdefghijklmnop"); // 16B: AES-128-CBC 需块对齐
+        assert!(
+            !matches!(res, Err(ChromeDecryptError::UnknownPrefix(_))),
+            "v10 prefix must be recognised, got {:?}",
+            res
+        );
     }
 
     #[test]
     fn test_v11_prefix_stripping() {
-        let inner = ChromeDecryptor::with_password("x")
-            .unwrap()
-            .decrypt(b"v11abc123def456");
-        assert!(inner.is_ok());
+        // 只断言「前缀被识别」: 载荷是任意字节, 解密结果不是合法 UTF-8,
+        // 故 decrypt() 必然返回 Err —— 那是预期内的。真正要测的是它不能
+        // 报 UnknownPrefix。块级前缀剥离本身由 chrome_decrypt.rs 自身的
+        // strip_prefix_v10/strip_prefix_v11 覆盖(通过)。
+        let d = ChromeDecryptor::with_password("x").unwrap();
+        let res = d.decrypt(b"v11abcdefghijklmnop"); // 16B: AES-128-CBC 需块对齐
+        assert!(
+            !matches!(res, Err(ChromeDecryptError::UnknownPrefix(_))),
+            "v11 prefix must be recognised, got {:?}",
+            res
+        );
     }
 
     #[test]
@@ -473,7 +487,7 @@ mod selenium_automation_tests {
             expires: Some(1700000000),
             secure: false,
         });
-        let mut session = SeleniumSession::with_backend(config, Box::new(mock)).unwrap();
+        let session = SeleniumSession::with_backend(config, Box::new(mock)).unwrap();
 
         let cookies = session.extract_cookies().await;
         assert_eq!(cookies.len(), 1);
@@ -519,6 +533,11 @@ mod selenium_automation_tests {
 
 mod joinf_tests {
     use crate::l1_action::nt_act::nt_act_trade::extractors::joinf::*;
+    // trait must be in scope for the platform_id()/platform_name() accessors,
+    // which are ExternalPlatformExtractor trait methods, not inherent ones.
+    use crate::l1_action::nt_act::nt_act_trade::extractors::{
+        ActivityLog, EmailConfig, ExternalPlatformExtractor, ExtractConfig,
+    };
     use crate::l1_action::nt_act::nt_act_trade::nt_trade_crm::CustomerGrade;
 
     #[test]
@@ -1095,7 +1114,7 @@ mod data_pipeline_tests {
     use crate::l1_action::nt_act::nt_act_trade::data_pipeline::*;
     use crate::l1_action::nt_act::nt_act_trade::unified_types::*;
     use async_trait::async_trait;
-    use chrono::Utc;
+    use chrono::{DateTime, Utc};
 
     // ── Mock extractor for testing ──
 
@@ -1466,7 +1485,7 @@ mod data_pipeline_tests {
 
     #[test]
     fn test_pipeline_registry_mut() {
-        let mut registry = PlatformRegistry::new();
+        let registry = PlatformRegistry::new();
         let mut pipeline = TradeDataPipeline::with_registry(registry);
         pipeline.registry_mut().register(Arc::new(MockExtractor));
         assert_eq!(pipeline.registry().len(), 1);
@@ -1533,6 +1552,8 @@ mod data_pipeline_tests {
 // ═══════════════════════════════════════════════════════════════
 
 mod platform_registry_tests {
+    use std::sync::Arc;
+
     use crate::l1_action::nt_act::nt_act_trade::platform_registry::*;
 
     struct TestAdapter {

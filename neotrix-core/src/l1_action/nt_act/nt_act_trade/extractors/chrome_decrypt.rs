@@ -195,7 +195,13 @@ impl ChromeDecryptor {
     /// Strip the `v10` or `v11` prefix from Chrome encrypted data.
     fn strip_prefix(data: &[u8]) -> Result<&[u8], ChromeDecryptError> {
         if data.starts_with(V10) || data.starts_with(V11) {
-            Ok(&data[3..])
+            let inner = &data[3..];
+            if inner.is_empty() {
+                return Err(ChromeDecryptError::UnknownPrefix(
+                    "v10/v11 prefix present but no ciphertext follows".to_string(),
+                ));
+            }
+            Ok(inner)
         } else {
             Err(ChromeDecryptError::UnknownPrefix(format!(
                 "expected v10/v11 prefix, got {:?}",

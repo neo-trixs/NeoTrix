@@ -553,7 +553,7 @@ impl JoinfExtractor {
     }
 
     /// 将 JoinfCustomer 转换为 CustomerProfile
-    fn map_customer(&self, c: &JoinfCustomer) -> CustomerProfile {
+    pub fn map_customer(&self, c: &JoinfCustomer) -> CustomerProfile {
         let grade = Self::parse_grade(&c.grade);
         let source = CustomerSource::OtherPlatform(c.source.clone());
         let status = match c.status.as_str() {
@@ -624,7 +624,7 @@ impl JoinfExtractor {
     }
 
     /// 将 ActivityLog 转换为 InteractionRecord
-    fn map_interaction(&self, log: &ActivityLog) -> InteractionRecord {
+    pub fn map_interaction(&self, log: &ActivityLog) -> InteractionRecord {
         let interaction_type = match log.interaction_type.as_str() {
             "email" => InteractionType::Email,
             "whatsapp" => InteractionType::WhatsApp,
@@ -651,7 +651,7 @@ impl JoinfExtractor {
     }
 
     /// 将 JoinfEmail 转换为 EmailRecord
-    fn map_email(&self, e: &JoinfEmail) -> EmailRecord {
+    pub fn map_email(&self, e: &JoinfEmail) -> EmailRecord {
         let status = if e.is_read {
             EmailStatus::Opened
         } else {
