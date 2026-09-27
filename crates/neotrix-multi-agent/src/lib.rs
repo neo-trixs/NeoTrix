@@ -13,15 +13,6 @@
 //! - `skill_registry` — SKILL.md discovery and activation
 
 pub mod multi_agent;
-pub mod parallel;
-pub mod background_loop;
-pub mod meta_panel;
-pub mod skill_chain;
-pub mod element_bus;
-pub mod infrastructure;
-pub mod experience_tree;
-pub mod self_improvement;
-pub mod dual_track;
 
 // Migrated from L5 cognition
 pub mod coordinator;
