@@ -21,6 +21,13 @@ impl SelfTest for ExternalVerifier {
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
+        // 2026-09-27 除根 (与 arch_fitness DeadCodeFitness 同病): 测试进程内再起
+        // `cargo check` 会与外层 cargo test 抢 target 构建锁 → 永久等待
+        // (read_output→poll 栈实证) + 编译器内存爆炸。测试构建跳过, 生产真跑。
+        if cfg!(test) || std::env::var_os("NT_SKIP_CARGO_CHECK").is_some() {
+            log::debug!("[self-test] external_verifier cargo-check tier skipped");
+            return Ok(());
+        }
         let output = std::process::Command::new("cargo")
             .args(["check", "--lib", "-p", "neotrix"])
             .output()

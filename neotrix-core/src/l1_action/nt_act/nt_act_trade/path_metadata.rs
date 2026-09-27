@@ -9,7 +9,24 @@ pub fn extract_order_metadata(order_folder: &str) -> OrderMetadata {
     let mut meta = OrderMetadata::default();
     meta.order_folder = order_folder.to_string();
 
-    let parts: Vec<&str> = order_folder.split_whitespace().collect();
+    let mut parts: Vec<&str> = Vec::new();
+    // 2026-09-27 修正: 订单文件夹常见"日期+国家"无空格粘连 (如 "4.02危地马拉")。
+    // 原实现直接按空白切分, is_date_pattern("4.02危地马拉") 失配 → 日期既没抽走
+    // 又被当国家, 结果 country="4.02危地马拉"。先剥离前导日期再解析。
+    let mut leading_date: Option<&str> = None;
+    for (idx, raw) in order_folder.split_whitespace().enumerate() {
+        if idx == 0 {
+            let (date, rest) = split_leading_date(raw);
+            if let Some(d) = date {
+                leading_date = Some(d);
+                if !rest.is_empty() {
+                    parts.push(rest);
+                }
+                continue;
+            }
+        }
+        parts.push(raw);
+    }
 
     // 提取订单号 (WSD-X-数字 或 WZD-X-数字)
     for part in &parts {
@@ -20,7 +37,13 @@ pub fn extract_order_metadata(order_folder: &str) -> OrderMetadata {
     }
 
     // 提取日期 (数字.数字 格式，如 4.01, 4.21)
+    if let Some(d) = leading_date {
+        meta.order_date = Some(d.to_string());
+    }
     for part in &parts {
+        if meta.order_date.is_some() {
+            break;
+        }
         if is_date_pattern(part) {
             meta.order_date = Some(part.to_string());
             break;
@@ -71,8 +94,34 @@ fn is_date_pattern(s: &str) -> bool {
     parts[0].parse::<u32>().is_ok() && parts[1].parse::<u32>().is_ok()
 }
 
+/// 剥离粘连的前导日期: "4.02危地马拉" → (Some("4.02"), "危地马拉")。
+///
+/// 判据: `d+.` 前缀 (全 ASCII 数字) + 紧随恰好两位数字, 其余为残余文本。
+/// 整段本身即日期时返回 (Some(整段), "")。
+fn split_leading_date(part: &str) -> (Option<&str>, &str) {
+    if is_date_pattern(part) {
+        return (Some(part), "");
+    }
+    for (i, ch) in part.char_indices() {
+        if ch != '.' {
+            continue;
+        }
+        let head = &part[..i];
+        if head.is_empty() || !head.chars().all(|c| c.is_ascii_digit()) {
+            continue;
+        }
+        let rest = &part[i + 1..];
+        let digits = rest.chars().take_while(|c| c.is_ascii_digit()).count();
+        if digits == 2 {
+            return (Some(&part[..i + 1 + digits]), &rest[digits..]);
+        }
+    }
+    (None, part)
+}
+
 fn is_english_only(s: &str) -> bool {
-    s.chars().all(|c| c.is_ascii_alphabetic() || c.is_ascii_whitespace())
+    s.chars()
+        .all(|c| c.is_ascii_alphabetic() || c.is_ascii_whitespace())
 }
 
 /// 路径元数据

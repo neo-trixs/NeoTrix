@@ -300,6 +300,11 @@ fn in_test_context(content: &str, line_idx: usize) -> bool {
 /// (掩盖死代码而非消除)。
 pub struct DeadCodeFitness;
 
+/// cargo check 层是否跳过 — 测试构建内禁止起子进程 (见 self_test 内注释)。
+fn skip_cargo_check_tier() -> bool {
+    cfg!(test) || std::env::var_os("NT_SKIP_CARGO_CHECK").is_some()
+}
+
 impl SelfTest for DeadCodeFitness {
     fn name(&self) -> &str {
         "arch_fitness_dead_code"
@@ -331,6 +336,22 @@ impl SelfTest for DeadCodeFitness {
         }
 
         // 2. cargo check 抓 dead_code warning (仅 lib, 对齐 CI)
+        //
+        // 2026-09-27 除根 (第 8 条卡死): 本检测件经 arch_fitness_tests() 注册进
+        // 全量 SelfTestRegistry, 单测 `test_all_have_names` 会 run_all 到这里。
+        // 在 `cargo test` 进程内再起 `cargo check` → 与外层 cargo 抢 target 构建锁,
+        // 外层测试阶段持锁不放 → 内层永久等待 (栈实证 read_output→poll),
+        // 全量套件卡死在此; 锁空闲时还会拉起整个编译器吃内存。
+        // 测试构建内跳过该层 (静态 allow(dead_code) 扫描仍跑, 语义不丢);
+        // 生产/CI 仍真跑。也可显式 NT_SKIP_CARGO_CHECK=1 跳过。
+        if skip_cargo_check_tier() {
+            log::debug!("[arch_fitness] dead_code cargo-check tier skipped");
+            return if failures.is_empty() {
+                Ok(())
+            } else {
+                Err(failures)
+            };
+        }
         let output = std::process::Command::new("cargo")
             .args(["check", "--lib", "-p", "neotrix"])
             .current_dir(repo_root())
