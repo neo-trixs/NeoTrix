@@ -135,6 +135,31 @@
 > `consciousness_state{phi,coherence,gwt_resonance}` + `capabilities_used` + `confidence`，
 > 与 L5 意识核**类型级吻合** —— 契约已定好，填值即可。
 
+## 已知债 · LLM 缓存零计量（2026-09-27 实测，影响面大）
+
+`crates/neotrix-types/src/llm_types.rs:104-107` `Usage` 只有
+`prompt_tokens` / `completion_tokens` / `total_tokens` —— **没有任何 cache 字段**。
+而 `neotrix-core/src/l1_action/nt_io/nt_io_provider/anthropic/anthropic.rs:92`
+正在打 `cache_control` 断点（注释 "P0-4 prefix caching"）。
+
+**即：项目在享受 prompt 缓存，却对缓存命中/写入零计量。**
+按 AIBrix 结论（`AIBRIX_PREFIX_CACHE_INCLUDE_TOOLS` 默认 true，网关把规范化后的
+`tools` 前置进哈希文本，"so requests that share messages but carry different tools
+do not look like a full prefix match"）—— **工具集身份是缓存身份的一部分**。
+本仓有 **120 个 skill + 28 个 Tauri plugin**，任何一次 skill 集变更都会击穿前缀缓存，
+而当前**无任何可见性**去发现这件事。
+
+**已完成**：`nt_io_provider/common/cost_attribution.rs`（新，411 行 / 12 测试全绿）——
+内容块分类 + 缓存边界前缀切分 + 分级计价 + **残差公开**。与 `egress_types.rs` 同层（L1，
+供 L2/L3 共用）。
+
+**未完成（接线）**：
+1. `Usage` 加 `cache_read` / `cache_write` 字段（须 `#[serde(default)]` 保旧数据可解析）
+2. `anthropic/anthropic.rs:92` 的 `complete_raw` 处把组装好的请求分类成块并发出归因
+   —— 那是「系统提示 + tool schema + 消息在内存组装完成、且从不写入 transcript」的
+   **唯一漏斗**，也是全链路归因唯一正确的抓取点
+3. provider 侧回传 `cached` / `rewrote`；`write_1h` 上浮系数 1.6 已在 `ProviderUsage` 内
+
 ## 已知债 · 主 CI workflow 曾无法解析（2026-09-27 修复）
 
 `.github/workflows/ci.yml` **在 HEAD 就是非法 YAML**：`Truth-surface gate (ratchet: blocks ...)`

@@ -4,6 +4,7 @@ pub mod factory;
 pub mod privacy_guard;
 pub mod generation_classifier;
 pub mod egress_types;
+pub mod cost_attribution;
 pub use types::*;
 pub use factory::*;
 pub use generation_classifier::*;
