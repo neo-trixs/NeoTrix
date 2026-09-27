@@ -71,7 +71,15 @@ pub struct AutoInspector {
 }
 
 /// 运行 cargo 命令并返回 (是否成功, 标准输出, 标准错误)
+///
+/// 在测试中**必须**短路: 外层 `cargo test` 持有 build 目录锁, 内层 cargo 会
+/// 永久阻塞等锁 —— 该仓已因同一族问题返工过多次 (见 nt_core_self_test.rs /
+/// nt_core_arch_fitness.rs 采用的同一 idiom)。沿用既有约定而非另立一套。
 fn run_cargo(args: &[&str]) -> (bool, String, String) {
+    if cfg!(test) || std::env::var_os("NT_SKIP_CARGO_CHECK").is_some() {
+        return (false, String::new(), "cargo invocation skipped in test".to_string());
+    }
+
     // 查找 workspace 根目录（包含 Cargo.toml 的目录）
     let workspace_root = find_workspace_root();
 
@@ -277,12 +285,19 @@ impl AutoInspector {
 
     /// 安全扫描 — 检查已知漏洞（优先 cargo audit，回退到依赖版本检查）
     fn inspect_security(&self) -> InspectionResult {
+        // 测试中不得探测 cargo 可用性: 同 run_cargo 的理由, 外层 cargo test
+        // 持锁时内层 cargo 会永久阻塞。
+        let cargo_skipped = cfg!(test) || std::env::var_os("NT_SKIP_CARGO_CHECK").is_some();
         // 尝试 cargo audit（需要 cargo-audit 工具）
-        let audit_available = Command::new("cargo")
-            .args(["audit", "--version"])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
+        let audit_available = if cargo_skipped {
+            false
+        } else {
+            Command::new("cargo")
+                .args(["audit", "--version"])
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
+        };
 
         if audit_available {
             let (success, stdout, stderr) = run_cargo(&["audit"]);
@@ -709,9 +724,11 @@ mod tests {
     #[test]
     fn test_inspect_compilation() {
         let mut inspector = AutoInspector::new();
+        // 测试中 run_cargo 会短路 (见其文档: 外层 cargo test 持锁时内层
+        // cargo 永久阻塞), 所以这里只能验证「检查流程能跑通且不 panic」,
+        // 无法断言真实编译结果。真实校验请在 cargo test 之外跑。
         let result = inspector.inspect(InspectionType::Compilation);
-        // 编译检查应能正常运行，不一定通过（可能有编译错误）
-        assert!(!result.issues.is_empty() || result.passed);
+        let _ = (result.issues.len(), result.passed);
     }
 
     #[test]
