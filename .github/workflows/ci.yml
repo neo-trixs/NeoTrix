@@ -25,7 +25,7 @@ jobs:
       - run: cargo check -p neotrix
       - name: Layer dependency check
         run: bash scripts/check-layer-deps.sh
-      - name: Truth-surface gate (ratchet: blocks NEW 0-byte .rs / undeclared test modules / tracked build artifacts)
+      - name: "Truth-surface gate (ratchet: blocks NEW 0-byte .rs / undeclared test modules / tracked build artifacts)"
         run: bash scripts/check-truth-surface.sh --strict
 
   test:
@@ -179,3 +179,21 @@ jobs:
           prompt: 'print("hello")'
           api-key: ${{ secrets.NEOTRIX_TEST_API_KEY || 'mock-key' }}
           max-budget-usd: '0.01'
+
+  # 2026-09-27 新增。能力诚实度门：registry 声称的 Constellation 等级是否被
+  # 其 metadata 声明的证据支撑。机制 nt_core_capability_tree::maturity_audit()
+  # 本已完整实现且带自愈 (demote_mislabeled, 可逆)，但 CLI 此前恒返回 Ok(())
+  # —— 机制齐备却无法被任何流水线引用，于是自愈路径从不触发、虚标长期累积。
+  #
+  # 暂为**报告态**（不阻塞）：当前有 24 项虚标待补真实 wiring_evidence，
+  # 详见 TODO.md「已知债 · 能力成熟度虚标」。补完后本 job 改用 --strict 转阻塞。
+  capability-truth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: Swatinem/rust-cache@v2
+      - name: Build capability-tree CLI (leaf crate, ~12s)
+        run: cargo build -p nt_core_capability_tree --bin neotrix-capability
+      - name: Maturity audit (report mode; --strict once baseline is clean)
+        run: ./target/debug/neotrix-capability audit-maturity

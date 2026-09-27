@@ -198,6 +198,9 @@ pub enum Commands {
         /// 执行降标写回 (默认仅报告)
         #[arg(long)]
         apply: bool,
+        /// 存在虚标节点时以非零码退出 (供 CI 门使用, 2026-09-27 新增)
+        #[arg(long)]
+        strict: bool,
     },
 
     /// 最短路径路由: 计算目标能力的最优依赖链 (LoopX 吸收: 流程节点最优解)
@@ -280,8 +283,8 @@ impl CapabilityCli {
             Commands::Contracts => {
                 self.cmd_contracts(&registry);
             }
-            Commands::AuditMaturity { apply } => {
-                self.cmd_audit_maturity(&mut registry, *apply)?;
+            Commands::AuditMaturity { apply, strict } => {
+                self.cmd_audit_maturity(&mut registry, *apply, *strict)?;
             }
             Commands::Route { target, from, to } => {
                 self.cmd_route(&registry, target, from.as_deref(), to.as_deref())?;
@@ -295,27 +298,47 @@ impl CapabilityCli {
     fn load_registry(&self) -> Result<CapabilityRegistry, Box<dyn std::error::Error>> {
         if self.registry.exists() {
             let content = fs::read_to_string(&self.registry)?;
-            let export: crate::registry::RegistryExport = serde_json::from_str(&content)?;
             let mut reg = CapabilityRegistry::new();
-            // 两阶段加载: 先全量注册 (延迟依赖警告, 允许前向声明),
-            // 再统一 validate_dependencies — 消除 JSON 数组顺序导致的误报。
-            reg.set_defer_dep_warnings(true);
-            for node in export.nodes {
-                reg.register(node).map_err(|e| format!("Failed to register node: {}", e))?;
-            }
-            reg.validate_dependencies();
-            for (from, to) in export.edges {
-                // 外部消费者容错: 边的端点可能不在注册表中 (如 nt_io_neocodex::build_request 等外部模块)
-                // 这些是外部消费者引用, 非树内依赖, 跳过并警告而非阻塞加载
-                if !reg.nodes.contains_key(&from) || !reg.nodes.contains_key(&to) {
-                    eprintln!("[capability_tree] skip edge {} -> {} (external consumer, not in registry)", from, to);
-                    continue;
+            match serde_json::from_str::<crate::registry::RegistryExport>(&content) {
+                Ok(export) => {
+                    // 两阶段加载: 先全量注册 (延迟依赖警告, 允许前向声明),
+                    // 再统一 validate_dependencies — 消除 JSON 数组顺序导致的误报。
+                    reg.set_defer_dep_warnings(true);
+                    for node in export.nodes {
+                        reg.register(node).map_err(|e| format!("Failed to register node: {}", e))?;
+                    }
+                    reg.validate_dependencies();
+                    for (from, to) in export.edges {
+                        // 外部消费者容错: 边的端点可能不在注册表中 (如 nt_io_neocodex::build_request 等外部模块)
+                        // 这些是外部消费者引用, 非树内依赖, 跳过并警告而非阻塞加载
+                        if !reg.nodes.contains_key(&from) || !reg.nodes.contains_key(&to) {
+                            eprintln!("[capability_tree] skip edge {} -> {} (external consumer, not in registry)", from, to);
+                            continue;
+                        }
+                        reg.add_dependency(&from, &to).map_err(|e| format!("Failed to add edge: {}", e))?;
+                    }
+                    reg.set_defer_dep_warnings(false);
+                    // 保留经验驱动迭代目标 (distill 蒸馏写入, scan --apply 消费)
+                    reg.experience_targets = export.experience_targets;
                 }
-                reg.add_dependency(&from, &to).map_err(|e| format!("Failed to add edge: {}", e))?;
+                Err(_) => {
+                    // 老 schema 文件（domains 形，无 nodes）：内存迁移。
+                    // 先落一次性备份，下一次写命令 save_registry 即转正新 schema。
+                    reg = CapabilityRegistry::migrate_legacy(&content).map_err(|e| {
+                        format!("registry 既非新 schema 也非老 schema: {e}")
+                    })?;
+                    let bak = self.registry.with_extension("json.bak-legacy");
+                    if !bak.exists() {
+                        let _ = fs::copy(&self.registry, &bak);
+                    }
+                    eprintln!(
+                        "[capability_tree] 老 schema 已内存迁移（{} 节点，{} 经验目标），备份 {:?}，下次写入转正",
+                        reg.nodes.len(),
+                        reg.experience_targets.len(),
+                        bak
+                    );
+                }
             }
-            reg.set_defer_dep_warnings(false);
-            // 保留经验驱动迭代目标 (distill 蒸馏写入, scan --apply 消费)
-            reg.experience_targets = export.experience_targets;
             // Durable 覆盖层: 合并提交的 overlay, 使手动写入在基础重新生成后仍生效。
             if let Some(ov) = CapabilityRegistry::load_overlay_file(&self.overlay_path()) {
                 reg.merge_overlay(&ov);
@@ -548,13 +571,15 @@ impl CapabilityCli {
         EvolutionEngine::new(registry).execute(plan)?;
         
         if force {
-            if let Err(e) = registry.remove(id) {
-                if !matches!(e, RegistryError::CircularDependency(_, _)) {
-                    return Err(e.into());
+            match registry.remove(id) {
+                Ok(_) => println!("Pruned and removed: {}", id),
+                // execute(Prune) 已删无 dependents 节点（见 evolution.rs），
+                // 此处再删必中 NotFound——视为已完成而非失败，否则 save 跑不成。
+                Err(RegistryError::NotFound(_)) => println!("Pruned and removed: {}", id),
+                Err(RegistryError::CircularDependency(_, _)) => {
+                    println!("Pruned (deprecated, has dependents): {}", id)
                 }
-                println!("Pruned (deprecated, has dependents): {}", id);
-            } else {
-                println!("Pruned and removed: {}", id);
+                Err(e) => return Err(e.into()),
             }
         } else {
             println!("Pruned (deprecated): {}", id);
@@ -909,6 +934,7 @@ impl CapabilityCli {
         &self,
         registry: &mut CapabilityRegistry,
         apply: bool,
+        strict: bool,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let findings = registry.maturity_audit();
         if findings.is_empty() {
@@ -930,8 +956,19 @@ impl CapabilityCli {
         if apply {
             let n = registry.demote_mislabeled(&self.cycle);
             println!("\n已降标 {} 个节点到证据支撑等级 (可逆转: 补 evidence 后可 re-mature)", n);
+            // 即使已修复写回, strict 仍以**发现前**的状态判定: 门禁要拦的是
+            // "仓库里存在虚标" 这一事实, --apply 只是修复手段而非豁免。
         } else {
             println!("\n(只读报告; 加 --apply 执行降标写回)");
+        }
+        if strict {
+            // CI 门: 虚标存在即失败。此前本命令恒返回 Ok(()) —— 机制齐备却
+            // 无法被任何流水线引用, 于是自愈路径 (demote_mislabeled) 从不触发。
+            return Err(format!(
+                "成熟度虚标: {} 个节点声称等级高于证据支撑 (--apply 可自动降标, 可逆转)",
+                findings.len()
+            )
+            .into());
         }
         Ok(())
     }
