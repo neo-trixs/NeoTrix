@@ -477,7 +477,7 @@ L0 Substrate ──────────────────────�
 | `crates/neotrix-{types,sysctl,game,neobot,audit,abilities,decision-engine}` | 正常 | — |
 | `crates/neotrix-{reasoning,consciousness,multi-agent,gateway}` | **曾为空壳** | 抽取重构只搬了 Cargo.toml 与 `pub mod`，代码没搬：54 个 0 字节模块被 L5 当公开 API 再导出。2026-09-27 已摘除空壳门面，真实代码 27 文件 / 12,113 LOC 保留 |
 | `crates/nt-lang` | 事实上的孤儿 | 只有 `[[bin]]` 无 `[lib]`，**结构上无法被任何 crate 依赖**；0 依赖者 |
-| `neotrix-core/src/neotrix/nt_core_capability_tree` | **住在 src/ 里的独立 crate** | 4,670 LOC / ~30 处真实调用，根 `Cargo.toml:11` 是 workspace member。路径违反直觉：`cargo` 从不把它当 neotrix-core 的模块编译 |
+| `crates/nt-core-capability-tree` | **住在 src/ 里的独立 crate** | 4,670 LOC / ~30 处真实调用，根 `Cargo.toml:11` 是 workspace member。路径违反直觉：`cargo` 从不把它当 neotrix-core 的模块编译 |
 
 ### 16.2 已拆除 / 曾经从未编译的模块
 

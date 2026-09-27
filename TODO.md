@@ -62,7 +62,7 @@
 >   4. **4 个抽取 crate 的定位裁决** —— `crates/nt-lang` 只有 `[[bin]]` 无 `[lib]`，
 >      **结构上无法被任何 crate 依赖**，却仍占 workspace member 槽（根 `Cargo.toml:12`）：
 >      补 `[lib]` 并接入，或删掉。
->   5. **`neotrix-core/src/neotrix/nt_core_capability_tree` 住在 `src/` 里** ——
+>   5. **`crates/nt-core-capability-tree` 住在 `src/` 里** ——
 >      独立 crate（根 `Cargo.toml:11` member）却位于另一 crate 的源码目录，
 >      4,670 LOC / ~30 处真实调用。已补 `[lints] workspace=true`（原 18 条 lint 全失效，
 >      补上后暴露 20 条告警含 7 处可能 panic），但**归属未裁决**：是搬出去还是接受。
