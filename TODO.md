@@ -124,7 +124,16 @@
 
 | # | 任务 | 支脉节点 | 状态 |
 |---|---|---|---|
-| 0.1 | **`UnifiedApi` 脱 stub** —— 桌面 chat 接真内核 | `src-tauri/src/stub.rs:275`（零状态单元结构体）· `:285-304`（`:289` 返回字面量）· `main.rs:52` 注册源 · `main.rs:387,407-408` 调用点 | ⬜ |
+| 0.1 | **`UnifiedApi` 脱 stub**（⚠️ 2026-09-27 降级：**不是核弹级**）|
+  `src-tauri/src/stub.rs:275`（零状态单元结构体）· `:289`（返回字面量）|
+  **纠正**：`main.rs:387` 与 `:407` 的调用方是 **CLI 子命令**（`Headless` / `Reason{prompt}`），
+  **不是 GUI**。GUI 经 `domain/plugins/chat.rs:166`
+ （真调 `consciousness_core::execute_task_loop`，零占位）与 `ntcode/commands.rs`
+ （真实例化 `UnifiedModelPool::default_pool()`）走真实内核。
+  故正确动作是：让 `UnifiedApiImpl` 委托给 domain plugins 已用的同一后端
+ （`UnifiedModelPool` / `consciousness_core`），**或**废弃 CLI 子命令对 stub 的引用。
+  隐藏工作量仍成立：`UnifiedResponse.metadata`（`stub.rs:292-303`）已预留
+  `consciousness_state{phi,coherence,gwt_resonance}` + `confidence`，与 L5 意识核类型级吻合 |（零状态单元结构体）· `:285-304`（`:289` 返回字面量）· `main.rs:52` 注册源 · `main.rs:387,407-408` 调用点 | ⬜ |
 | 0.2 | **删 `ToolRegistry` 45 行 stub**，其余 3 份改 `pub use` | 删 `l5_cognition/nt_core_gate/nt_tool_registry.rs:11`；保留 `l1_action/nt_act/tool_registry.rs:85`（770 行唯一真实现） | ⬜ |
 | 0.3 | **`CapabilityRegistry` 4→1** | `l0_substrate/nt_core_capability_types.rs:533` · `l5_cognition/nt_core/capability/registry.rs:453` · `neotrix/nt_file_ability/capability.rs:173` · `nt_core_capability_tree/src/registry.rs:53` | ⬜ |
 | 0.4 | **`SkillRegistry` 5→1**：先删 `neotrix-types` **包内自重复**（零风险第一刀） | 自重复：`neotrix-types/src/core/skill.rs:54` + `core/skills/mod.rs:25`；另 3 份：`neotrix-core/src/skill_registry.rs:14`（正典）· `neotrix-gateway/src/skill_registry.rs:157` · `neotrix-multi-agent/src/skill_registry.rs:157` | ⬜ |
