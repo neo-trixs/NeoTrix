@@ -207,3 +207,53 @@
 2. 内存门必须**每次发构建前看退出码**，不能只看输出行（本轮我漏看一次，
    在 180MB 空闲时起了 rustc，侥幸未 OOM）。
 3. 提交一律 `git commit -- <paths>` pathspec 限定，避开共享暂存区。
+
+---
+
+## 8. 第二轮并行修复（4 代理并行编辑 + 单线验证）
+
+**并行方式**：4 个 `general` 子代理各领一组**文件互斥**的清单，只做定点 `Edit`，
+禁 cargo / 禁 git / 禁 Write；构建验证由主代理单线串行执行（16G 铁律）。
+产出：4 个 stub 补实现 + 6 个环境依赖去抖动 + 12 处契约对齐 + 5 处新发现真 bug。
+
+### 8.1 补上的真实现（此前是空壳）
+- `nt_core_llm::apply_context_budget` — **上下文预算此前完全不生效**（直接 `default()`）。
+  现按 W1.1 规则驱逐最旧非 System 消息（尾部当前请求永不驱逐），填 `is_cliff`/`messages_evicted`。
+  签名改 `&mut Vec<Message>`（两处调用点本就传 `&mut`）。
+- `nt_core_llm::estimate_tokens` — 字节数 `/4` 把汉字按 3 字节高估 3 倍；改 CJK 感知。
+- `nt_core_llm::truncate_preserving` — **按字节切片会切在多字节字符中间 → panic**（违反禁 panic 铁律）；改 char 边界单调回退。
+- `reason/sleep/hebbian.rs` — `consolidate_to_capability` 硬编码 0.0 → 确定性 Hebbian 强化（argmax 峰值维）。
+- `dynamic_memory_bank` — 语义相似度只比 `description` 不比 `name` → 双路检索恒失效。
+- `nt_emotion_reasoning_bridge` — `process_events` 从不写 `self.emotions` → 后续全空转，事件→情绪未接线。
+- `governance/enforcement/audit.rs` — `timestamp_now()` 秒级 → 同秒两次 log 同时间戳；升纳秒 + 严格递增。
+- `nt_forecast::with_llm_narrator(None)` — **None 仍发真实 LLM**（含 sleep/重试）；现真短路到确定性回退。
+- `blank_space_checker::calculate_score` — 计分方向反了：全通过得 20 分（`100 - score`），`score>=80` 对任何合格夹具永不可达。
+
+### 8.2 本轮新发现的真 bug
+- **`inventory::add_item` 把 `ItemStack::add` 的"剩余量"当成"已加入量"从 remaining 里减**
+  → 合并成功时 remaining 不归零，继续开新栈：加 5 再加 3，`count_item` 得 **11** 而非 8。
+  （`ItemStack::add` 返回剩余量的契约由 `test_item_stack_add_capped` 钉住，是调用方用错。）
+- `time_system` 魔法 `*10.0`（1 秒 = 10 游戏分）违反文档时钟。
+- `vsa.rs` `diversity = distinct/64` 硬编码分母，恒达不到 0.5 阈值。
+- `self_play_loop` Phase 2 把轨迹重复入队 → 缓冲区翻倍、半数样本 `advantage: None`。
+- `load_balancer::compute_load_fractions` 无视真实选择记录做 tie-break argmax → 负载熵恒 0。
+- `cad_route` 重复注册 `ImageGenerator`（`module_index` 按 `specialist_type` 索引，重复槽不可路由）。
+
+### 8.3 环境依赖去抖动（6 项）
+`video_stitcher`（真调 ffmpeg + 不存在路径 → 改断言命令生成）、`experience_tree`
+（`KnowledgeBase::open(None)` 命中真实 `$HOME` 库 + flock → 改 `:memory:`）、
+`galaxy_hygiene`（硬编码 `2026-08-11` 已过期 47 天 → 改相对时间）、
+`subdomain_harvester`（`.invalid` 依赖活体 DNS → `#[ignore]` + 补确定性用例；
+`SubdomainSource` 补 `#[serde(rename_all="snake_case")]` 与 `Display` 对齐）、
+`audit` 时间戳、forecast narrator。
+
+### 8.4 三处"看起来该翻、其实不能翻"
+- `shared_types::Severity` 的派生 `Ord`（判别序 Critical=0 最"小"）看着反了，
+  但 `l2_perception/nt_world/osint/sweep.rs:225` **显式依赖**该约定做 `min_severity` 过滤
+  → 翻转会静默反转过滤器。改为让 cvss 测试对齐既定约定。
+- `load_balancer` 均匀态辅助损失恒等于 `aux_loss_coef`（N·Σf·P = 1），不是 1/N；改测试。
+- `estimate_tokens` ASCII 段取整方向：测试自称"单一事实源 P0-7"要求 11 字符 = 2 token
+  （对齐 tiktoken），故用 floor 而非 ceil。
+
+### 8.5 全量推进
+`10113 绿/125 红` → `11339 绿/87 红`（本轮中途中断点）→ 第四轮全量进行中。
