@@ -36,18 +36,29 @@ impl PathMetadata {
         // 文件名
         meta.file_name = path.file_name().map(|s| s.to_string_lossy().into_owned());
 
-        // 父文件夹 → 业务员
-        if let Some(parent) = path.parent() {
-            if let Some(parent_name) = parent.file_name() {
-                let name = parent_name.to_string_lossy();
-                // 业务员文件夹通常是人名 (中文，2-4字)
-                if name
-                    .chars()
-                    .all(|c| c.is_alphanumeric() || c == '_' || c == ' ')
-                    && name.len() <= 20
-                {
-                    meta.salesperson = Some(name.into_owned());
-                }
+        // 父文件夹 → 业务员（父级若是订单文件夹则上溯一级取业务员）
+        let sales_name: Option<String> = path.parent().and_then(|parent| {
+            let name = parent.file_name()?.to_string_lossy().into_owned();
+            let is_order = name.contains("WSD-")
+                || name.contains("WZD-")
+                || name.split_whitespace().any(is_date_pattern)
+                || name
+                    .split_whitespace()
+                    .next()
+                    .map(|t| strip_leading_date(t).0.is_some())
+                    .unwrap_or(false);
+            if is_order {
+                parent.parent()?.file_name().map(|s| s.to_string_lossy().into_owned())
+            } else {
+                Some(name)
+            }
+        });
+        if let Some(name) = sales_name {
+            // 业务员文件夹通常是人名 (中文，2-4字)
+            if name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == ' ')
+                && name.len() <= 20
+            {
+                meta.salesperson = Some(name);
             }
         }
 
@@ -114,7 +125,7 @@ fn parse_order_folder(folder: &str, meta: &mut PathMetadata) {
         }
     }
 
-    // 提取国家和客户 (跳过日期和订单号)
+    // 提取国家和客户 (跳过日期和订单号；兼容无空格粘连如 "4.01菲律宾"/"印尼Alvin")
     let mut country_parts = Vec::new();
     let mut customer_parts = Vec::new();
 
@@ -123,16 +134,28 @@ fn parse_order_folder(folder: &str, meta: &mut PathMetadata) {
         if part.starts_with("WSD-") || part.starts_with("WZD-") {
             break;
         }
-        // 跳过日期
-        if is_date_pattern(part) {
+        // 跳过纯日期；粘连日期先剥离（日期另由上方循环收录）
+        let mut token = *part;
+        if is_date_pattern(token) {
             continue;
         }
-        // 英文名 → customer
-        if is_english_only(part) {
-            customer_parts.push(*part);
+        if let (Some(d), rest) = strip_leading_date(token) {
+            if meta.order_date.is_none() {
+                meta.order_date = Some(d.to_string());
+            }
+            if !rest.is_empty() {
+                token = rest;
+            }
+        }
+        // 英文名 → customer；CJK 尾随 ASCII（印尼Alvin）→ 拆分
+        if is_english_only(token) {
+            customer_parts.push(token);
         } else {
-            // 中文 → country
-            country_parts.push(*part);
+            let (head, tail) = split_cjk_ascii(token);
+            country_parts.push(head);
+            if !tail.is_empty() {
+                customer_parts.push(tail);
+            }
         }
     }
 
@@ -162,6 +185,38 @@ fn is_date_pattern(s: &str) -> bool {
 fn is_english_only(s: &str) -> bool {
     s.chars()
         .all(|c| c.is_ascii_alphabetic() || c.is_ascii_whitespace())
+}
+
+/// 剥离开头的日期前缀（"4.01菲律宾" → (Some("4.01"), "菲律宾")；无则 (None, 原串)）。
+fn strip_leading_date(token: &str) -> (Option<&str>, &str) {
+    let bytes = token.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() && bytes[i].is_ascii_digit() {
+        i += 1;
+    }
+    if i > 0
+        && bytes.get(i) == Some(&b'.')
+        && bytes.get(i + 1).map_or(false, |b| b.is_ascii_digit())
+    {
+        let mut j = i + 1;
+        while j < bytes.len() && bytes[j].is_ascii_digit() {
+            j += 1;
+        }
+        return (Some(&token[..j]), &token[j..]);
+    }
+    (None, token)
+}
+
+/// 拆 CJK 头＋ASCII 尾（"印尼Alvin" → ("印尼", "Alvin")；纯串原样返回，尾空）。
+fn split_cjk_ascii(s: &str) -> (&str, &str) {
+    let idx = s
+        .char_indices()
+        .find(|(_, c)| c.is_ascii_alphabetic())
+        .map(|(i, _)| i);
+    match idx {
+        Some(0) | None => (s, ""),
+        Some(i) => (&s[..i], &s[i..]),
+    }
 }
 
 /// 批量提取多个路径的元数据

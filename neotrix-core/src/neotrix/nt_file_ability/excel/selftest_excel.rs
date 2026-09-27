@@ -145,7 +145,7 @@ mod tests {
     fn test_excel_tool_schema_existence() {
         let schema = super::super::excel_tool_schema::parse_excel_schema();
         assert_eq!(schema["name"], "parse_excel");
-        let required = schema["required"].as_array().unwrap();
+        let required = schema["parameters"]["required"].as_array().unwrap();
         assert!(required.contains(&serde_json::json!("file_path")));
     }
 

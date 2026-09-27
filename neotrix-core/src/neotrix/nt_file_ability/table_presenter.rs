@@ -45,7 +45,7 @@ impl<'a> TablePresenter<'a> {
         // 表头
         md.push_str("| ");
         for h in &headers[..show_cols] {
-            md.push_str(&format!("{} |", truncate(h, 20)));
+            md.push_str(&format!("{} | ", truncate(h, 20)));
         }
         md.push('\n');
 
@@ -60,7 +60,7 @@ impl<'a> TablePresenter<'a> {
         for row in &rows[..show_rows] {
             md.push_str("| ");
             for cell in &row[..show_cols] {
-                md.push_str(&format!("{} |", truncate(cell, 20)));
+                md.push_str(&format!("{} | ", truncate(cell, 20)));
             }
             md.push('\n');
         }

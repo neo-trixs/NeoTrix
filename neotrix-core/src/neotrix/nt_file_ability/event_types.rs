@@ -48,9 +48,25 @@ impl ExcelEvent {
         }
     }
 
-    /// 事件数据 (JSON)
+    /// 事件数据 (JSON，拍平变体字段；外部标签枚举默认嵌套一层，调用方要的是字段本身)
     pub fn data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
+        match self {
+            Self::XlsxParseStarted { file_path, parse_mode } => {
+                serde_json::json!({"file_path": file_path, "parse_mode": parse_mode})
+            }
+            Self::XlsxParseCompleted { file_path, total_rows, total_cols, duration_ms } => {
+                serde_json::json!({"file_path": file_path, "total_rows": total_rows, "total_cols": total_cols, "duration_ms": duration_ms})
+            }
+            Self::XlsxParseFailed { file_path, error } => {
+                serde_json::json!({"file_path": file_path, "error": error})
+            }
+            Self::TemplateDetected { file_path, template_type, confidence } => {
+                serde_json::json!({"file_path": file_path, "template_type": template_type, "confidence": confidence})
+            }
+            Self::ConfigParsed { raw, fields_count } => {
+                serde_json::json!({"raw": raw, "fields_count": fields_count})
+            }
+        }
     }
 }
 

@@ -207,14 +207,14 @@ mod tests {
     fn test_parse_excel_schema() {
         let schema = parse_excel_schema();
         assert_eq!(schema["name"], "parse_excel");
-        assert!(schema["properties"]["file_path"]["description"].is_string());
+        assert!(schema["parameters"]["properties"]["file_path"]["description"].is_string());
     }
 
     #[test]
     fn test_detect_template_schema() {
         let schema = detect_template_schema();
         assert_eq!(schema["name"], "detect_template");
-        let required = schema["required"].as_array().unwrap();
+        let required = schema["parameters"]["required"].as_array().unwrap();
         assert!(required.contains(&serde_json::json!("file_path")));
     }
 

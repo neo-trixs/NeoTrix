@@ -44,8 +44,11 @@ impl ConfigFields {
                 continue;
             }
 
-            // 尝试按冒号分割
-            if let Some((key, value)) = pair.split_once(':') {
+            // 尝试按冒号分割（半角 : 与全角 ：，域内报价单混用）
+            if let Some((key, value)) = pair
+                .split_once(':')
+                .or_else(|| pair.split_once('：'))
+            {
                 let key = key.trim();
                 let value = value.trim();
                 if value.is_empty() {

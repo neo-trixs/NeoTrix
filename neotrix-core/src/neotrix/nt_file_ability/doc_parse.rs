@@ -9,13 +9,36 @@ use crate::neotrix::nt_file_ability::types::{FileModel, ParseError, ParseResult}
 use std::path::Path;
 
 /// Parse any supported document format to unified FileModel.
+///
+/// 无扩展名/未知扩展名时回落：可读 UTF-8 文本按纯文本收纳（anydoc 无 Txt 格式），
+/// 二进制仍报 UnsupportedFormat。
 pub fn parse_document(path: &Path) -> ParseResult<FileModel> {
-    let format = Format::from_path(path).ok_or_else(|| ParseError::UnsupportedFormat)?;
-    
+    let format = match Format::from_path(path) {
+        Some(f) => f,
+        None => {
+            let bytes = std::fs::read(path).map_err(ParseError::Io)?;
+            match String::from_utf8(bytes) {
+                Ok(text) => {
+                    return Ok(FileModel {
+                        format: "txt".to_string(),
+                        title: path
+                            .file_name()
+                            .map(|s| s.to_string_lossy().into_owned()),
+                        content: text,
+                        tables: None,
+                        metadata: None,
+                        images: None,
+                    })
+                }
+                Err(_) => return Err(ParseError::UnsupportedFormat),
+            }
+        }
+    };
+
     if matches!(format, Format::Pdf) {
         return parse_pdf_enhanced(path);
     }
-    
+
     let bytes = std::fs::read(path).map_err(ParseError::Io)?;
     let doc = to_document(&bytes, format).map_err(|e| ParseError::AnyDoc(e.to_string()))?;
     Ok(document_to_filemodel(doc))
