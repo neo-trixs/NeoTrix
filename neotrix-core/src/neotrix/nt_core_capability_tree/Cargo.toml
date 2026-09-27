@@ -17,6 +17,11 @@ chrono = { version = "0.4", features = ["serde"] }
 daggy = "0.9"
 petgraph = "0.6"
 
+# 继承 workspace 的 18 条限制 lint (unwrap_used / indexing_slicing / panic ...)。
+# 缺这一节 = 这 4,670 LOC 完全不受 clippy 门禁约束 (audit 2026-09-27)。
+[lints]
+workspace = true
+
 [[bin]]
 name = "neotrix-capability"
 path = "src/main.rs"
