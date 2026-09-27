@@ -228,3 +228,40 @@
 - [x] check --tests 零错（0.31s 增量，0 error）
 - [x] 自有/EVO/快照/路由/tags/jeweled 过滤全绿（285 passed, 0 failed）
 - 结论：**全绿 ✅**（无自有红；App/soul/sidecar 存活沿用上轮，未 kill 未探活干扰 cargo 槽）
+
+## 9. 长循环本轮4（2026-09-27 长循环 agent，HEAD 24b19713，单 cargo 串行 -j2）
+
+### 任务 1 check ✅ 零错即过（无自有新错，无修）
+- 槽确认：`pgrep -f "cargo (check|test|build)"` → SLOT_EMPTY 后 `sleep 2; touch /tmp/mm_keepalive` → TOUCH_EXIT:0
+- `nohup cargo check -p neotrix --lib --tests -j 2 > /tmp/mm_check.log` → LAUNCH_PID 89923；55s 轮询已 Finished
+- `/tmp/mm_check.log`：`Finished dev profile in 0.29s`（增量缓存命中），`grep -c ^error` = 0，`^warning` = 2 行（同一位置 1 warning：`neotrix-core/src/entry/agent.rs:16:8 dead_code run_agent_mode`＋1 行 summary）
+- 自有归因判定：0 新错；唯一 warning 为 Park 明示项（`entry/agent 死码`＋产品决策 park，沿用§7/§8），shape 不在（导入/mut/可见性/match 臂）之列，行为变更一律 park → 不修
+
+### 任务 2 过滤单测 ✅ EVO/tags/快照/晶体（单 cargo 串行，零失败零修）
+- 批 EVO+快照+晶体：`cargo test -p neotrix --lib -j 2 -- nt_judge nt_dspy nt_data_gateway nt_code_graph nt_skill_route nt_evolve_loop nt_intel_digest nt_near_field nt_sim_eval nt_law_gate nt_crystal_core nt_reuse backup_plan nt_snapshot` → `/tmp/mm_test.log` 前半 **266 passed / 0 failed / 8 ignored**（11600 filtered）
+- 批 tags：`cargo test -p neotrix-neobot --lib -j 2 -- nt_token_guard nt_reply_tag` → `/tmp/mm_test.log` 后半（append） **11 passed / 0 failed**（guard 6＋reply_tag 5，94 filtered）
+- 合计自有过滤：266＋11＝**277 passed, 0 failed**（8 ignored 皆历史 `nt_reuse` 周快照忽略项）
+
+### 任务 3 每批一提交 ✅（无修批→空真零提交＋证据批 1 提交，自有归属）
+- 修批提交：0 批（check 零新错＋两批零失败，故无代码改动；符合“每修完一批提交一次”空真）
+- 证据批：精确 stage 单路径 `sessions/handoff-loop-20260927.md`（-f），无 --no-verify，hook 门禁待验
+
+## 提交列表（本轮4新增）
+- `（本提交）docs(loop): 长循环本轮4证据（check零错+277绿，HEAD 24b19713，自有归属）`
+
+## 测试证据（本轮4）
+- `/tmp/mm_check.log`：check --lib --tests 0 error / 1 warning（park，entry/agent.rs:16）
+- `/tmp/mm_test.log`：266 passed, 0 failed, 8 ignored ＋ 11 passed, 0 failed（合计 277 passed, 0 failed）
+- 合计：277 passed, 0 failed
+
+## Park 表（本轮4新增；历史 park 沿用§5/§6/§7/§8/上游 handoff）
+| 文件 | 行/位置 | 原因 |
+|---|---|---|
+| `neotrix-core/src/entry/agent.rs:16` | `pub fn run_agent_mode` dead_code | Park 明示（entry/agent 死码＋产品决策），本轮唯一 warning，不修 |
+| 其余 `git status` 1058 项 M/D/?? | 全工作树 | 非自有归因（EVO12/tags/合体/im拆分/serve/C批以外＋行为变更）一律未碰；`.worktrees/` 未进；运行中进程未杀；禁 clean/--all-targets 遵守，单 cargo -j2 串行 |
+| `games/guixu`、`skills/icons`、`src-tauri`（除已拆 im/plugin 5 路径+neobot.rs 臂）、`proxy_pool`、entry/agent 死码、bin 文件、训练/采矿/datasets/models、运行中进程、`apps/` | Park 清单 | 碰都别碰，本轮未读未改（除 status 只读计数） |
+
+## 终止条件复验（本轮4终态 HEAD `24b19713`）
+- [x] check --tests 零错（0.29s 增量，0 error）
+- [x] 自有/EVO/tags/快照/晶体过滤全绿（277 passed, 0 failed）
+- 结论：**全绿 ✅**（无自有红；未 kill 未探活干扰 cargo 槽）
