@@ -160,6 +160,25 @@ do not look like a full prefix match"）—— **工具集身份是缓存身份�
    **唯一漏斗**，也是全链路归因唯一正确的抓取点
 3. provider 侧回传 `cached` / `rewrote`；`write_1h` 上浮系数 1.6 已在 `ProviderUsage` 内
 
+## 1.1 剩余接线 · DnsEgressPolicy 进 shell 层（2026-09-27 定位完成，未执行）
+
+**已完成**：`DnsEgressPolicy` + `DnsVerdict` + 11 测试（`egress_types.rs`，全绿已提交 `11d27d43`）。
+
+**已查明不该动的地方**：
+- `osint_bridge.rs` / `osint/dns.rs:74 query_doh` 查 MX/TXT/NS 是**合法侦察职能**，
+  默认拒会破坏 OSINT。正确设计是调用方显式授权，而非默认拦死。
+- agent `ToolRegistry` 内**无任何 DNS/network 工具**（已全仓 grep 确认）。
+
+**真正的威胁面**：agent 经 shell 跑 `dig`/`nslookup`/`host` 或直连 53 端口。
+候选卡点（均有 DNS 关键字，需逐个读现场再下刀）：
+- `l3_embodiment/nt_shield/nt_shield_stealth_net/firewall.rs`（565 行，PF + nftables）
+- `l3_embodiment/nt_shield/nt_shield_stealth_net/network_pool.rs`
+- `l3_embodiment/nt_shield/nt_shield_sandbox/mod.rs`（策略扩展点 :76-138）
+
+**设计约束**：shell 层看到的是**命令字符串**（`dig TXT foo.example`）而非结构化
+`(qname, qtype)` —— 需先解析命令提取二元组，再调 `verify_query`。命令解析本身是
+注入面，写测试时必须覆盖 `dig @1.1.1.1 TXT x` / `nslookup -type=TXT` 等变体。
+
 ## 已知债 · 主 CI workflow 曾无法解析（2026-09-27 修复）
 
 `.github/workflows/ci.yml` **在 HEAD 就是非法 YAML**：`Truth-surface gate (ratchet: blocks ...)`
