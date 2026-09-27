@@ -265,3 +265,13 @@
 - [x] check --tests 零错（0.29s 增量，0 error）
 - [x] 自有/EVO/tags/快照/晶体过滤全绿（277 passed, 0 failed）
 - 结论：**全绿 ✅**（无自有红；未 kill 未探活干扰 cargo 槽）
+
+## 治病轮（2026-09-27：完整清单＋F1/F2/F4 落地，`1b43a194`）
+
+- 完整待修复清单（去重后）：F1 死码 3（run_agent_mode/AgentInterface/SkillSource，零调用已验）✅删；
+  F2 stub 指引对话面 ✅；F3 L0 同名异构 park（Registry×4/Semantic×2 字段各异，alias 是错药，改名专窗）；
+  F4 双拆 ✅（unify 1815→dir3＋file_ability 2017→门面82；check 绿）；
+  15 stale 测试：4 修 ✅（unify 数据驱动断言＋name() 路由契约恢复，真 bug：结果静默丢弃），
+  11 未动模块 park（他窗）；bin 2 警告＝F1 同项；proxy/agent转接/God续拆/worktree park 不变。
+- OOM 教训：全量过滤跑挂 SIGKILL（sidecar 常驻下 16G）， thereafter 单模块＋test-threads 串行。
+- 基线对照协议：动前先判预存（unmoved 模块失败即预存），动后只认自有回归。
