@@ -483,6 +483,18 @@ src/
   | grep -E 'rustc|cargo'` 确认**是不是自己**起的。若是他窗的 `cargo check --tests`
   （两个 rustc 实测 3.6G+4.2G），**不要 kill、也不要去 join** —— 先通报、等它
   跑完释放内存。`--tests` 是 AGENTS.md 明文禁止的重型档位。
+  (4) **取闸口退出码要用变量，别用 `$?`**：`sh gate.sh; echo $?` 之后紧跟
+  `if [ $? -eq 0 ]` 判断的是 **`echo` 的退出码（恒 0）**，不是闸口的。正确写法：
+  `sh gate.sh; rc=$?; if [ $rc -eq 0 ]; then ...`。本轮即因此在闸口 BLOCKED 时
+  误起了一次构建（幸好是 12 秒的叶子 bin，结果正确，但**规则被违反了**）。
+
+- **R-BUILD-7 门必须验证"真的在跑"，不只是"脚本存在"**
+  （2026-09-27 新增）：`.github/workflows/ci.yml` 长期是非法 YAML（某 `- name:` 值未加引号
+  且含冒号），**主 workflow 从未被解析** ⇒ 其中的 `check-truth-surface.sh --strict` 门
+  从未执行。而文档里「基线 0 条 ✅」被当作门有效的证据。**基线再准，门没跑等于没有门。**
+  新增/改动任何门之后必须：(1) `python3 -c "import yaml;yaml.safe_load(open('<workflow>'))"`
+  确认 workflow 可解析；(2) 确认 job 名出现在 `yaml.safe_load(...)['jobs']` 里；
+  (3) 至少一次在 CI 上看到它跑（绿或红都算）。
 
 ### 17.3 卡死 vs 空转的判别（省下大量盲猜）
 

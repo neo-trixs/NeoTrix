@@ -1,5 +1,23 @@
 # NeoTrix TODO 列表
-> 智能同步生成，最后更新：2026-13-02T01:58:00
+> 智能同步生成，最后更新：2026-09-27（人工重建）
+
+> **2026-09-27 目录架构统一轮（本轮，已 cargo 验证）**
+> `cargo check -p neotrix --lib` **exit=0 / 1m07s**。完成 12 项：
+> - 🔧 **修真 bug**：`KnowledgeBase::open` 把 SQLite 哨兵 `":memory:"` 当**文件路径**传，
+>   在磁盘真建库 + `with_extension("lock")` 侧车再造假 `:memory:.lock`（落在仓库根）。
+>   9 个调用点全修。**同族 `TemporalFactLedger::open`(`nt_temporal_facts.rs:63`) 早有正确处理，
+>   唯独漏了此处** —— 按同一模式补齐。锚点 `l4_emotion/nt_memory/nt_memory_kb/kb_core.rs:101-111`
+> - 删 `protocol/`（312 行 NIP-01 死代码，从未编译）与 `adapter/`（7 行陈旧桩）、`games/`（仅 `.DS_Store`）
+> - `.gitignore`：`sessions/` 整目录忽略 → 按内容忽略 + 白名单（此前 11 个文件全靠 `git add -f` 硬塞）；
+>   `HANDOFF*.md` → `/HANDOFF*.md` 锚定到根（无斜杠会匹配任意层级且在文件末尾覆盖白名单）；
+>   清 3 条指向已删 `games/neotrix-guixu/` 的陈旧规则
+> - `sessions/HANDOFF-TEMPLATE.md` **入库**（`AGENTS.md` 引用它做交接模板，模板不在库 = 规范不可执行）
+> - 正典索引统一：`AGENTS.md` + `DOCUMENTATION-MAP.md` → 指向 `docs/architecture/NEOTRIX-MASTER-BLUEPRINT.md`
+>   （`docs/architecture/README.md:7` 早已声明它是"唯一图纸入口"，不一致的是索引不是文档）
+> - 规则沉淀：`AGENTS.md` 新增 R-SCAN-1/2/3（扫描器告警≠缺陷 / 手推≠实证 / 门记录必带时间戳）+
+>   下刀前查 mtime；`RUST-STANDARDS.md` §17 新增 R-LOCK-4/5、R-BUILD-6、R-GIT-5；
+>   门记录刷新为"22:52 实测 3 条 → 23:4x 复测 **0 条**"
+> - 经验文档：`docs/architecture/LESSONS-2026-09-27-scanner-trust.md`
 
 > **2026-09-27 卡死/内存专项 + 长尾分诊（收口）**：全量 `--lib` 串行实跑
 > **11493 绿 / 51 红**（起点 10113/125）。8 条卡死/内存根因全部除根并加三道闸；
@@ -91,432 +109,185 @@
 
 
 > **Batch3 吸收执行 (47 源)**: 四波 21 任务 20/20 闭环 · **交接 Wave 4: 10 任务待做** (🔴P0×3 越层修复/e8_state 合成值/测试抖动加固 · 🟡P1×3 情报工具接线/SEAL C0→C2/补全排序 · ⚪P2×4) → `docs/absorption-knowledge-base/batch3-2026-08-26-unified-evolution-todo.md` Wave 4 段 + 根 `HANDOFF.md` (2026-08-26 版)
+---
 
-### 🔄 task-2: parent
+# 统一进化清单（2026-09-27 重建）
 
-**状态**: in_progress
-**子代理**: ses_1787882307_4
-**依赖**: task-1
-**更新**: 2026-13-02T01:58:00
-**效率分数**: 32.0
+> 本节由三份审计合并去重而成，是**唯一**的进化任务入口。
+> 来源：`docs/architecture/DIR-AUDIT-2026-09-27.md`（目录/依赖）·
+> `docs/architecture/EVOLUTION-ROADMAP-CODE-NODES-2026-09-27.md`（18 项支脉定位）·
+> `docs/architecture/ABSORPTION-EXTERNAL-2026-09-27.md`（19 项外部吸收）。
+> 三份文档保留推导过程，本节只保留**去重后的可执行条目**。
+> 每项均带 `file:line`；无定点不改（RUST-STANDARDS §17）。
 
-### ⬜ task-1: blockable
+## 阶段 0 · 脱 stub 与收敛（1-2 天，最高杠杆）
 
-**状态**: in_progress
-**更新**: 2026-13-02T01:58:00
-**效率分数**: 30.0
+| # | 任务 | 支脉节点 | 状态 |
+|---|---|---|---|
+| 0.1 | **`UnifiedApi` 脱 stub** —— 桌面 chat 接真内核 | `src-tauri/src/stub.rs:275`（零状态单元结构体）· `:285-304`（`:289` 返回字面量）· `main.rs:52` 注册源 · `main.rs:387,407-408` 调用点 | ⬜ |
+| 0.2 | **删 `ToolRegistry` 45 行 stub**，其余 3 份改 `pub use` | 删 `l5_cognition/nt_core_gate/nt_tool_registry.rs:11`；保留 `l1_action/nt_act/tool_registry.rs:85`（770 行唯一真实现） | ⬜ |
+| 0.3 | **`CapabilityRegistry` 4→1** | `l0_substrate/nt_core_capability_types.rs:533` · `l5_cognition/nt_core/capability/registry.rs:453` · `neotrix/nt_file_ability/capability.rs:173` · `nt_core_capability_tree/src/registry.rs:53` | ⬜ |
+| 0.4 | **`SkillRegistry` 5→1**：先删 `neotrix-types` **包内自重复**（零风险第一刀） | 自重复：`neotrix-types/src/core/skill.rs:54` + `core/skills/mod.rs:25`；另 3 份：`neotrix-core/src/skill_registry.rs:14`（正典）· `neotrix-gateway/src/skill_registry.rs:157` · `neotrix-multi-agent/src/skill_registry.rs:157` | ⬜ |
+| 0.5 | **`maturity_audit()` 接 CI 门** —— 机制已完整实现且**带自愈**（`:484-485` 自动下调声称等级），缺的只是没人调它 | `nt_core_capability_tree/src/registry.rs:459` · 数据源 `.neotrix/capability_registry.json` → `nodes[]` | ⬜ |
+| 0.6 | **CI 三断言基座**：① `detector_coverage ⊇ execution_scope` ②注册表唯一性防回潮 ③schema 指纹门（`sha256(DDL)[..12]`，环境派生字段拆独立门） | `security-audit.yml`（实测全文只有 `cargo deny check all`）· 挂靠点 `scripts/ops/` | ⬜ |
 
-### ⬜ task-3: child
+> **0.1 的隐藏工作量**：`UnifiedResponse.metadata`（`stub.rs:292-303`）**已预留**
+> `consciousness_state{phi,coherence,gwt_resonance}` + `capabilities_used` + `confidence`，
+> 与 L5 意识核**类型级吻合** —— 契约已定好，填值即可。
 
-**状态**: pending
-**更新**: 2026-13-02T01:58:00
-**效率分数**: 30.0
+## 已知债 · 主 CI workflow 曾无法解析（2026-09-27 修复）
 
-### ⬜ task-4: test
+`.github/workflows/ci.yml` **在 HEAD 就是非法 YAML**：`Truth-surface gate (ratchet: blocks ...)`
+这一行 `- name:` 的值未加引号且含冒号，`yaml.safe_load` 报
+`mapping values are not allowed here (line 28)`。
 
-**状态**: pending
-**更新**: 2026-13-02T01:58:00
-**效率分数**: 30.0
+**影响**：`ci.yml` 是主 workflow（12 个 job 中的 11 个在此）。它无法被解析 ⇒
+**`check-truth-surface.sh --strict` 这个门从未在 CI 里跑过**。而本项目多份文档
+（包括本文件此前）把「`truth-surface-baseline.txt` 基线 0 条 ✅」当作门有效的证据 ——
+**基线再准，门没跑就等于没有门**。这与 R-SCAN-3（门记录会腐化）是同一族问题的更严重形态：
+不是记录过时，而是**门本身从未接线**。
 
-### ⬜ task-5: move_test
+**已修**：该行加引号；全 14 个 workflow 用 `yaml.safe_load` 扫过，其余 13 个均合法。
+**新增** `capability-truth` job（报告态，见「已知债 · 能力成熟度虚标」）。
 
-**状态**: pending
-**更新**: 2026-13-02T01:58:00
-**效率分数**: 30.0
+**遗留动作**：核实 `check-truth-surface.sh` / `check-layer-deps.sh` 在修好 workflow 后
+是否真的通过（本次未在 CI 环境验证，只做了本地 YAML 合法性检查）。
 
-### ⬜ task-6: json_test
+## 已知债 · 能力成熟度虚标 24 项（2026-09-27 实测，暂不自动降标）
 
-**状态**: pending
-**更新**: 2026-13-02T01:58:00
-**效率分数**: 30.0
+`./target/debug/neotrix-capability audit-maturity` 实测 **24 个虚标节点，全部在 NT-ACT**
+（`nt_file_ability::*`，声称 C2/C3 而"证据"只支撑 C1）。
+
+**已做**：给 CLI 加 `--strict`（`nt_core_capability_tree/src/cli.rs` `Commands::AuditMaturity`），
+使 `maturity_audit()` 可被 CI 引用 —— 此前该命令**恒返回 `Ok(())`**，机制齐备却无法被任何流水线
+引用，于是 `demote_mislabeled` 自愈路径从不触发。
+
+**为何不执行 `--apply` 自动降标**：`evidence_supported_constellation`
+（`nt_core_capability_tree/src/node.rs:465-485`）**不检查真实测试文件**，只读 `metadata` 三个声明字段：
+
+| 等级 | 判据 |
+|---|---|
+| C1 | `provides` 非空 |
+| C2 | `metadata.wiring_evidence` 非空字符串 |
+| C3 | `metadata.evidence_gated == "passed"` |
+
+抽样 3 个模块（`tables::xlsx_read` / `merge::merge_tables_with_mode` / `ocr::OcrEngine`）在
+`neotrix-core/tests/` 与 `benches/` **各 0 次出现** → C1 对它们确实正确。
+**但该机制无法区分「真没集成测试」与「测了但元数据没填」**。而 `nt_file_ability` 按外部吸收分析
+是已接入生产的（xlsx-data skill 分支）。用声明元数据这个代理指标下调 24 个节点的项目语义，
+属于用指标代替内容。
+
+**正确修法**：为这些节点补真实 `wiring_evidence`（file:line）或跑 D16 promotion gate，
+**而非**降标。补完后 `--strict` 即可转绿并正式设为阻塞门。
+
+## 阶段 1 · 安全封口（3-5 天，事故已真实发生）
+
+| # | 任务 | 支脉节点 | 状态 |
+|---|---|---|---|
+| 1.1 | **DNS qtype 白名单** + qname 长度上限 + 把 `dns_allow` 从"学习提示"改成"过滤器" | `l1_action/nt_io/nt_io_provider/common/egress_types.rs:14-21` —— `SandboxEgressRule` **只有 `host`/`port`/`allow` 三字段，全文件零 DNS 概念** | ⬜ |
+| 1.2 | **"以尝试为检测单元，结果是独立字段"** —— 任何情况下不得让 outcome 衰减 attempt 严重性 | `l0_substrate/nt_core_telemetry.rs`（事件 schema）· `l6_meta/nt_safety_monitor.rs` · `l6_meta/nt_core_guardian/health.rs` | ⬜ |
+| 1.3 | **严重性校准对 + 职责分离**（借 cloudflare/security-audit-skill，MIT） | 写入 `RUST-STANDARDS.md` §17.5 或 audit 规则 | ⬜ |
+| 1.4 | **非不可宽化策略地板**：把"允许绕过批准的能力集合"变成测试钉死的冻结数据 | `crates/neotrix-neobot/src/nt_policy.rs:75` `evaluate_policy`（现 deny 全集：`human-control:77` `computer-allow:84` `computer-host:90` `workspace-jail:98,106` `unknown-tool:119` `default-deny:121`；`evaluate_extra_deny:137`） | ⬜ |
+
+> **1.1 的行业空白**：深挖 7 个沙箱/安全仓，**没有一个做 qtype 过滤**。
+> `microsandbox` 唯一真做 host 侧 DNS 管控（smoltcp，guest 不持 resolver socket）但也无 qtype；
+> `CubeSandbox` 的 eBPF `dns_allow` **只学 A 记录**，不在名单内的查询不被拦且 gateway 常放行
+> —— **与 OpenAI 2026-09-20 事故同构的隐蔽信道**。
+
+## 阶段 2 · 记忆正确性（1-2 周）
+
+| # | 任务 | 支脉节点 | 状态 |
+|---|---|---|---|
+| 2.1 | **supersession 形态**（绕开主键重写，今天可迁） | `l5_cognition/nt_mind/nt_mind/experience_tree/mod.rs` —— 5 段即 `:169 snapshot` / `:195 distill` / `:253 classify` / `:306 persist` / `:403 feedback` | ⬜ |
+| 2.2 | **真双时间四列迁移**（依赖 2.1 先落地） | 同上 `:29 ExperienceEntry` + `l4_emotion/nt_memory/{kb_kb,paged_kv}`。先例：`l0_substrate/nt_core_kb_primitives.rs:188`（即上方 B 类第 1 项） | ⬜ |
+| 2.3 | **`Provenance` 第二轴**（**不要重载 `Source`**） | `experience_tree/mod.rs:101` `Source{Dialogue,Audit,Research,Absorption}` 是**渠道**语义，与"证据等级"正交 | ⬜ |
+
+> **2.2 最值得抄的细节**：`valid_to_precision = 'unknown'` 三态
+> （`valid_to IS NULL` + `precision IS NULL` = 持续；`+ precision='unknown'` = 已结束但日期未知）。
+> 教科书做法（把文档日期塞进 `valid_to` 当上界）被 utopia 显式拒绝，理由是
+> *"看起来像个确定的时间戳；每个读者都得先查精度，而不撒谎才是产品。"*
+
+## 阶段 3 · 可观测与成本（1-2 周）
+
+| # | 任务 | 支脉节点 | 状态 |
+|---|---|---|---|
+| 3.1 | **成本归因：在链路上抓** —— canonical block 记录（`zone`/`section`/`bucket`/`tool`/**`skill`**/`role`/`tokens`/`hash`），skills 与 MCP server 作为一等维度 | **唯一插点已存在**：`l1_action/nt_io/nt_io_provider/anthropic/anthropic.rs:92,237`（注释 "P0-4 prefix caching"）= 请求时组装、从不落 transcript 的不可见前缀。已有 `Usage`：`crates/neotrix-decision-engine/src/types.rs:304` | ⬜ |
+| 3.2 | **能力 manifest 加安全信封**（声明式爆炸半径 + 构建期校验） | `.neotrix/capability_registry.json`（形状已对：`provides`/`requires`/`rune_sockets`/`evolution_log`）· 弃用机制已在 `capability_overrides.json`（`deprecated`/`deprecated_reason`） | ⬜ |
+
+> **3.1 为何必须走链路**：系统提示、注入的 tool schema、MCP schema 都在**请求时组装、从不写进
+> transcript**，那段前缀"可以占到上下文的一半甚至更多"。**基于日志的归因对最大的成本中心结构性失明。**
+> 120 个 skill + 28 个 Tauri plugin 正在这个盲区里。
+
+## 阶段 4 · 决策面与自治（2-3 周）
+
+| # | 任务 | 支脉节点 | 状态 |
+|---|---|---|---|
+| 4.1 | **JEV 四件套**：场景指纹 / 硬 `call_budget` / 过期 / 非阻塞 worker + 三路置信门 | 三原语**已忠实建模**：`neotrix-decision-engine/src/types.rs:85 QuestionType` `:146 NoulAnswer` `:166 ChoiceAnswer` `:189 ScoreAnswer`；后门 `engine.rs`/`router.rs`；已有 stale 机制 `crates/neotrix-neobot/src/nt_stale_guard.rs` | ⬜ |
+| 4.2 | **"未解析"建模为一等状态**（`epistemic: exact \| lower-bound`） | `nt_core_capability_tree/src/node.rs` · 雏形已在 `registry.rs:15-18 MaturityFinding{claimed,supported}` | ⬜ |
+| 4.3 | **自治循环 git 化 + 固定墙钟预算**（`results.tsv` 5 列，变好推进/变差 `git reset`） | `Makefile`（现有目标 `run:4` `project-locate:151`）· 反馈判据 `experience_tree/mod.rs:403 feedback()` | ⬜ |
+| 4.4 | **覆盖率账本状态机**（hunters 不能写自己的覆盖率） | `l3_embodiment/nt_shield/nt_shield_audit/`（10 文件）· `l6_meta/nt_core_self/self_audit.rs` · 基线 `scripts/truth-surface-baseline.txt`（现 0 条 ✅） | ⬜ |
+
+> **4.1 最高价值的一条方法论**（jev-drone 自评，MIT）：
+> *"a state-design bug, not a model failure"* —— JEV 从不选 `climb`，因为状态是 5 个**水平**距离扇区、
+> **没有垂直信息**，"飞过去"根本不可推断；加入障碍顶边高度后 `climb` 从"从未被选"→ **p=0.93**。
+> **规则：如果一个决策从不触发，先审状态形状，再审模型。**
+> ⚠️ 同时记住反面：该仓头条数字是 **n=1 单次运行**，3-seed 配对比较**无优势**。别把单次胜利当机制有效性。
+
+## 阶段 5 · GUI 与 MCP（2-4 周，可全程并行）
+
+| # | 任务 | 支脉节点 | 状态 |
+|---|---|---|---|
+| 5.1 | **元素寻址 GUI 驱动**（B 路：a11y 树优先，坐标仅 fallback） | 现状：`l3_embodiment/nt_computer.rs`(477 行，**filesystem/process trait，不是 GUI**) · `nt_computer_fleet.rs`(262) · `crates/neotrix-neobot/src/nt_computer.rs`(155，`NoopBackend` 唯一后端) · `l1_action/nt_io/nt_io_desktop/` **只有 2 文件**（`mod.rs` 9 行 + `updater_signing.rs`） | ⬜ |
+| 5.2 | **MCP per-request capability 协商** + 客户端提生产 | 协议层 2026 已稳定：每请求必带 `protocolVersion`+`clientCapabilities`，缺字段 `-32602`；`MissingRequiredClientCapabilityError`(`-32021`)。本地：`l1_action/nt_act/mcp_protocol/`(775 行 ✅) · `l1_action/nt_io/mcp_server.rs:20`（内存 Vec，**无 wire transport**）· **客户端 `McpRegistry` 还在 `neotrix-core/src/agent.rs:566` 的 `#[cfg(test)]` 块里** | ⬜ |
+| 5.3 | **无 API 重放**（审计路径） | `crates/neotrix-neobot/src/nt_audit.rs`（**全仓 `replay` 零命中**）· CLI `bin/neobot.rs` 已有 `audit` 子命令 | ⬜ |
+| 5.4 | **UI 组件 + 动效 token** | `src-tauri/frontend/src/canvas/`(9 文件/1793) · **SolidJS**（5 个候选 UI 站里 4 个是 React，需 1-3h/个移植）。`rareui.com` **已死**（HTTP 402 `DEPLOYMENT_DISABLED`） | ⬜ |
+
+> **5.2 别投钱的部分**：registry 只是元数据 —— 其自身 roadmap 白纸黑字
+> *"Unified runtime: Not solving how servers are executed"* · *"Quality rankings: No built-in server
+> quality assessments"*；schema 里**根本没有 `capabilities` 字段**。**行业自己都还没做，别自建。**
+> 长任务已被移出 core 到扩展（SEP-2663），协议**无服务端 task store**。
+> 2026-07-28 弃用 `roots`/`sampling`/`logging` → **客户端必须处理三个协议世代**。
+>
+> **5.4 该建的那一叠**：`beautifului.dev`(MIT) + `ui.shadcn.com`(MIT) 是唯一连贯的一对。
+> **别把 beUI 动效混进 transitions.dev 的 token scale** —— 会正好产出 `transitions.dev refine`
+> 命令存在的意义所在的那种 ad-hoc 硬编码时长债务。
+
+## 成本感知路由 —— 2026 全行业空位（强依赖 3.1）
+
+深挖 8 个编排仓的模型选择机制清点：Orca 的 per-worker `--model/--effort`（手动覆盖）、
+AX 的 `Model` CRD（凭据包不是选择器）、MAF 的 `MagenticProgressLedger`（进度感知非成本）、
+dsh 的 `TeamMemberSnapshot.provider`、Symphony 的单一固定 `codex.executable`。
+**没有一个有价格表、token 成本模型，或把成本/质量前沿放进路由路径。**
+Symphony 记 token 与 rate limit —— 但**只用于显示，从不用于路由**。
+
+**顺序是强依赖的：先能归因（3.1），再能路由。**
 
 ---
 
-## 🔴 Agent Guardrail 架构升级 (2026-09-20)
-> 解决 AI 对话过程中违反规则的问题
-> 方案文件: `docs/plans/2026-09-20-agent-guardrail-architecture.md`
-> 参考: AEGIS (336★), GuardRail (172★), AgentJail (85★), AgentGuard, LITMUS
+## 编排隔离单元的实测（决策依据，非待办）
 
-### ⬜ ag-1: 实现 Pre-Execution Firewall 核心框架
-**优先级**: 🔴 High | **状态**: pending
-文件: `neotrix-core/src/l2_perception/nt_shield/pre_execution_firewall.rs` (新建)
-操作: 创建 5-stage pipeline (Classify → Anomaly → Evaluate → Match DSL → Decide)
-参考: AEGIS architecture
+8 个编排仓**无共识**，实测如下：
 
-### ⬜ ag-2: 实现 5 个核心 Guards
-**优先级**: 🔴 High | **状态**: pending | **依赖**: ag-1
-Guards:
-- main_push_guard (禁止 push 到 protected branches)
-- force_push_guard (禁止 force push)
-- destructive_path_guard (禁止 rm -rf 系统路径)
-- secret_leak_guard (检测 API key 泄漏)
-- sql_injection_guard (检测 SQL 注入)
-参考: GuardRail 18 guards
+| 隔离单元 | 谁在用 | 判定 |
+|---|---|---|
+| 一进程一 agent | **8/8 无异议** | 不是选择，是地板 |
+| **一 worktree 一任务** | 只有 Orca（worktree-native）。**Symphony SPEC.md §9.3 明文反共识**："The spec does not require any built-in VCS or repository bootstrap behavior" | 有争议 |
+| 一容器一任务 | 只有集群派（AX / CubeSandbox），非谈判项 | 集群专属 |
+| 共享队列 + 租约 | **没有一个有分布式租约**，全是本地 FS 存活探针或内存 claim | 空白 |
 
-### ⬜ ag-3: 实现 Policy DSL 解析器
-**优先级**: 🔴 High | **状态**: pending
-文件: `neotrix-core/src/l2_perception/nt_shield/policy_engine.rs` (新建)
-操作: 解析 nt-policies.yaml，执行策略匹配
-参考: AEGIS Policy DSL, AgentJail OPA Rego
-
-### ⬜ ag-4: 创建 nt-policies.yaml 策略文件
-**优先级**: 🟡 Medium | **状态**: pending | **依赖**: ag-3
-文件: `nt-policies.yaml` (根目录)
-内容: 定义核心策略规则
-
-### ⬜ ag-5: 实现 Audit Log (SHA-256 hash chain)
-**优先级**: 🟡 Medium | **状态**: pending
-文件: `neotrix-core/src/l2_perception/nt_shield/audit_log.rs` (新建)
-操作: 不可篡改审计日志，每次决策记录 hash chain
-
-### ⬜ ag-6: 实现 Human Approval Queue
-**优先级**: 🟡 Medium | **状态**: pending | **依赖**: ag-3
-文件: `neotrix-core/src/l2_perception/nt_shield/approval_queue.rs` (新建)
-操作: 高风险操作需要人工审批
-
-### ⬜ ag-7: 集成到 Agent 执行循环
-**优先级**: 🔴 High | **状态**: pending | **依赖**: ag-1, ag-3
-操作: 在 Agent 执行 tool call 前调用 firewall.check()
-文件: Agent 执行循环相关文件
-
-### ⬜ ag-8: Physical-Layer Verification 原型
-**优先级**: 🟢 Low | **状态**: pending
-操作: 验证实际系统状态，检测 Execution Hallucination
-参考: LITMUS semantic-physical dual verification
+**NeoTrix 已做对**：`l1_action/nt_act/nt_act_workspace_isolator.rs`(719 行，git-worktree-per-task)
+正是唯一有真实共识基础的那一档。**别动它。** 缺的是 reconciliation，不是 worktree。
 
 ---
 
-## 🔴 Bend 语言吸收 — NT-LAWS 设计 (2026-09-20)
-> 吸收自 https://github.com/bend-lang/bend (22K★)，核心启发：LAWS.bend + 数学证明机制
-> 方案文件: `docs/plans/2026-09-20-bend-absorption-analysis.md`
-
-### ⬜ bend-1: 实现 NT-LAWS.nt parser 原型
-**优先级**: 🔴 High | **状态**: pending
-文件: `crates/nt-lang/src/` 
-操作: 添加 `law` / `proof` 语法解析，生成 IR
-参考: Bend LAWS.bend 语法 + 现有 test_parser.rs 模式
-
-**Phase 0 第一步 (今天可做)**:
-1. 在 test_parser.rs 中添加 `law` 关键字识别
-2. 生成 `LawIR { name, for_vars, ensures }` 结构
-3. codegen 输出 `const_assert!(...)` 宏调用
-
-### ⬜ bend-2: 选择 2-3 个关键不变量用 NT-LAWS 表达
-**优先级**: 🔴 High | **状态**: pending | **依赖**: bend-1
-候选不变量:
-- memory_never_leaks (R-P161 对抗管线)
-- cost_stays_below (R-P190 成本追踪)
-- handoff_includes_context (R-P186 交接协议)
-
-### ⬜ bend-3: Agent 并行声明式标记原型
-**优先级**: 🟡 Medium | **状态**: pending
-文件: `crates/neotrix-multi-agent/src/parallel.rs`
-操作: 添加 `#[nt_parallel]` 属性宏，自动映射到 rayon
-
-### ⬜ bend-4: 依赖类型 trait bound 代码生成
-**优先级**: 🟡 Medium | **状态**: pending | **依赖**: bend-1
-操作: nt-lang codegen 生成带能力约束的 Rust trait bound
-
----
-
-## 🔴 统一数据源架构 — 后续任务 (2026-09-20)
-> `cargo check -p neotrix --lib` 已通过 0 errors。以下任务待其他会话完成。
-
-### ⬜ ds-1: cargo check --all-targets 验证测试编译
-**优先级**: 🔴 High | **状态**: pending
-```bash
-cargo check --all-targets -p neotrix 2>&1 | head -100
-```
-修复模式: 仅在 `#[cfg(test)]` 中使用的 import → 移入 `mod tests` 内部
-
-### ⬜ ds-2: 检查 UnifiedEngine 是否集成 crawl_bridge 和 subscription_source
-**优先级**: 🔴 High | **状态**: pending | **依赖**: ds-1
-文件: `unified_engine.rs` / `crawl_bridge.rs` / `subscription_source.rs`
-操作: 如缺失 `with_crawl_sources()` / `with_subscription_sources()`，补充到 UnifiedEngine
-
-### ⬜ ds-3: 审查各桥接层函数命名一致性
-**优先级**: 🟡 Medium | **状态**: pending | **依赖**: ds-2
-统一为 `bridge_all_*()` 或 `create_*_bridges()`，当前命名不统一
-
-### ⬜ ds-4: 补充 UnifiedEngine 测试覆盖
-**优先级**: 🟡 Medium | **状态**: pending | **依赖**: ds-1
-补充: `test_search_by_domains` / `test_health_check` / `test_engine_stats` / `test_registry_find`
-
-### ⬜ ds-5: 更新架构文档模块数量和桥接状态
-**优先级**: 🟢 Low | **状态**: pending | **依赖**: ds-2, ds-3
-更新: `docs/architecture/NEOTRIX-FULL-ARCHITECTURE.md` 等
-
----
-
-## 🔴 Fusion Cleanup — 架构清理 (2026-09-20)
-> MemoryEntry 重复类型已清理（11→1 canonical + 9 renamed）。lib 编译 0 errors。
-> 经验已写入 `~/.neotrix/pending-absorb.json`，等待后台循环吸收。
-
-### ⬜ fc-1: 删除 unused import 修复 lib 编译
-**优先级**: 🔴 High | **状态**: pending
-```bash
-# 修复这两个文件
-neotrix-core/src/l0_substrate/nt_core_platform/agent_registry.rs:14
-  → 删除: use super::health::HealthChecker;
-neotrix-core/src/l2_perception/nt_world/crawl/classifier.rs:5
-  → 删除: use super::discover::DiscoveryExtractor;
-```
-
-### ⬜ fc-2: cargo check --all-targets 修复剩余测试错误
-**优先级**: 🔴 High | **状态**: pending | **依赖**: fc-1
-```bash
-cargo check -p neotrix --all-targets 2>&1 | grep "error\["
-```
-已修复的测试错误（供参考，无需重复）：
-- orchestrator.rs: +import AttackStrategy
-- chain_executor.rs: +import ChainConfig
-- first_person_ref.rs: vsa_tag 路径→nt_consciousness
-- nt_core_capability/mod.rs: +import std::sync::Arc
-- mem.rs: +impl Default for ReasoningMemory
-- nt_emotion_reasoning_bridge.rs: +EmotionEngine::new(), +SystemEvent variants
-- nt_core_kernel.rs: 删除 output.trace 断言
-- agent_capability/tests.rs: SearchResult→WebSearchResult
-- integration.rs: SelfModel→MetaSelfModel
-- diagnostic_chain/mod.rs: HealthSignal::new +timestamp
-- resilience.rs: value 类型 + 类型标注
-- whois_module.rs: test 函数重命名
-- vector_store.rs: search_batch 参数类型
-- cert_transparency.rs / harvest_engine.rs: 删 proxy() 断言
-- subscription_source.rs: +chrono::Datelike
-- recon_engine.rs: "v".into()→"v"
-
-### ⬜ fc-3: GraphEdge 重复类型清理（8→1）
-**优先级**: 🟡 Medium | **状态**: pending
-canonical 在 L0 `nt_core_capability_types.rs:496`。
-7 个非 canonical 定义需 rename:
-- crystal_core/knowledge_graph.rs → CrystalGraphEdge
-- nt_core_graph.rs → ActionGraphEdge
-- nt_mind/evolution/deliberation.rs → DeliberationGraphEdge
-- nt_mind/graph_types.rs → MindGraphEdge
-- nt_core/nt_state_graph.rs → StateGraphEdge
-- nt_memory_openknowledge.rs → KnowledgeGraphEdge
-- nt_memory_leann_store.rs → LeannGraphEdge
-
-### ⬜ fc-4: SearchResult 重复类型清理（13→trait impl）
-**优先级**: 🟡 Medium | **状态**: pending
-`SearchResultTrait` 已在 L0。各模块保留自己的 SearchResult struct，实现 trait。
-
-### ⬜ fc-5: L5 拆分分析（nt_mind 388 文件占 59%）
-**优先级**: 🟢 Low | **状态**: pending
-候选: nt_game(61)→独立 crate, mind_modules(25)→L4, cross_domain(5)→L6
-
-### ⬜ fc-6: nt_memory/cascade 路径更新
-**优先级**: 🟢 Low | **状态**: pending
-已移到 `l4_emotion/nt_memory/cascade/mod.rs`，路线图路径过时。
-
-### ⬜ fc-7: 最终验证
-**优先级**: 🔴 High | **状态**: pending | **依赖**: fc-1, fc-2
-```bash
-cargo check -p neotrix --lib          # 0 errors
-cargo check -p neotrix --all-targets  # 0 errors
-cargo test -p neotrix --lib           # pass
-```
-
----
-
-## 🔴 编译修复 — 阻塞所有后续工作 (2026-09-20)
-> `cargo check -p neotrix --lib` 有 4 个 error，必须先修复
-
-### ⬜ cf-1: 删除 unused import `HealthChecker`
-**优先级**: 🔴 High | **状态**: pending
-文件: `neotrix-core/src/l0_substrate/nt_core_platform/agent_registry.rs:14`
-修复: 删除 `use super::health::HealthChecker;` 或改为 `use super::health::HealthChecker as _;`
-
-### ⬜ cf-2: 删除 unused import `DiscoveryExtractor`
-**优先级**: 🔴 High | **状态**: pending
-文件: `neotrix-core/src/l2_perception/nt_world/crawl/classifier.rs:5`
-修复: 删除 `use super::discover::DiscoveryExtractor;`
-
-### ⬜ cf-3: 修复 `PersonalitySnapshot` 缺少 `tick` 字段
-**优先级**: 🔴 High | **状态**: pending
-文件: 搜索 `PersonalitySnapshot` struct 定义
-修复: 删除 struct 初始化中的 `tick` 字段，或在 struct 中添加 `pub tick: u64`
-
-### ⬜ cf-4: 修复 unused variable `base`
-**优先级**: 🔴 High | **状态**: pending
-修复: 改为 `_base` 或删除
-
-### ⬜ cf-5: 测试编译验证
-**优先级**: 🔴 High | **状态**: pending | **依赖**: cf-1~cf-4
-```bash
-cargo check -p neotrix --lib        # 0 errors
-cargo test -p neotrix --lib         # 单元测试通过
-cargo test -p neotrix --tests       # 集成测试通过
-```
-
----
-
-## 🟡 能力树 C1→C2 推进 (2026-09-20)
-> 41 个模块已在 C1 (UnitTest)，需推进到 C2 (IntegrationTest)
-
-### ⬜ ct-1: nt_memory 域 C2 推进
-**优先级**: 🟡 Medium | **状态**: pending
-模块: entity_linking, consolidation, distillation, add_only_writes, hybrid_retrieval, admission_control, decay_forgetting
-验证: 集成测试 `nt_memory_integration.rs` 全部通过
-
-### ⬜ ct-2: nt_shield 域 C2 推进
-**优先级**: 🟡 Medium | **状态**: pending
-模块: llm_scanner, red_team, secret_scanner, container_scan, compliance, agent_guardrails
-验证: 集成测试 `nt_shield_integration.rs` 全部通过
-
-### ⬜ ct-3: nt_meta/nt_core 域 C2 推进
-**优先级**: 🟡 Medium | **状态**: pending
-模块: prompt_manager, context_router, coordinator, graph_orch, decision_engine, skill_chain
-验证: 集成测试 `nt_meta_integration.rs` 全部通过
-
-### ⬜ ct-4: healing/governance 域 C2 推进
-**优先级**: 🟡 Medium | **状态**: pending
-模块: self_healing, predictive_maintenance, diagnostic_chain, enforcement
-验证: 集成测试 `healing_integration.rs` 全部通过
-
-### ⬜ ct-5: 更新能力树 roadmap.rs
-**优先级**: 🟡 Medium | **状态**: pending | **依赖**: ct-1~ct-4
-文件: `nt_core_capability_tree/src/roadmap.rs`
-操作: 将 41 个模块的 maturity 从 C1UnitTest 改为 C2IntegrationTest
-
----
-
-## 🔴 P0: 紧急修复 — 编译验证 (2026-09-20)
-
-### ⬜ TODO-001: 验证编译状态
-**优先级**: 🔴 P0 | **状态**: pending
-描述: 运行 cargo clean && cargo check 验证当前编译状态
-命令:
-```bash
-cargo clean -p neotrix
-cargo check -p neotrix 2>&1 | tail -50
-```
-验收标准: 编译通过或错误数明确
-耗时: ~5 分钟
-
----
-
-## 🟡 P1: 高优先级 — 本周任务 (2026-09-20)
-
-### ⬜ TODO-007: 修复 SelfIteratingBrain FIXME
-**优先级**: 🟡 P1 | **状态**: pending
-描述: select_operator / selective_state 字段被注释
-涉及文件:
-- `l5_cognition/nt_mind/seal_core/self_iterating/pipeline.rs:1015`
-- `l5_cognition/nt_mind/seal_core/self_iterating/loop_impl/seal_loop.rs:1211`
-耗时: ~30 分钟
-
-### ⬜ TODO-010: 提升 L2 测试覆盖率
-**优先级**: 🟡 P1 | **状态**: pending
-描述: 从 62% 提升到 70%+
-涉及目录: `neotrix-core/src/l2_perception/`
-步骤:
-1. 找出没有测试的文件
-2. 为每个文件添加基本单元测试
-3. 运行 cargo test 验证
-耗时: ~2 小时
-
-### ⬜ TODO-011: 修复剩余编译错误
-**优先级**: 🟡 P1 | **状态**: pending
-描述: 164 个预存错误需要修复
-重点区域:
-- `l2_perception/nt_world/` (导入错误)
-- `l4_emotion/nt_memory/` (类型错误)
-- `l5_cognition/nt_mind/` (路径错误)
-耗时: ~4 小时
-
-### ⬜ TODO-012: 清理 neotrix-core/src/neotrix/ 命名空间
-**优先级**: 🟡 P1 | **状态**: pending
-描述: 110 个文件在遗留命名空间中
-涉及目录: `neotrix-core/src/neotrix/`
-耗时: ~4 小时
-
----
-
-## ⚪ P2: 中优先级 — 本月任务 (2026-09-20)
-
-### ⬜ TODO-013: 解决 fusion-plan-215 TODO
-**优先级**: ⚪ P2 | **状态**: pending
-描述: 合并 EchoPrmBridge 和 MethodRegistry
-涉及文件:
-- `echo_terminal.rs:406`
-- `reasoning_core.rs:66`
-耗时: ~2 小时
-
-### ⬜ TODO-014: 删除 neotrix-consciousness/src/legacy.rs
-**优先级**: ⚪ P2 | **状态**: pending
-描述: 所有消费者迁移到新路径后删除
-前提: 所有使用旧路径的代码已更新
-耗时: ~1 小时
-
-### ⬜ TODO-015: 添加文档注释
-**优先级**: ⚪ P2 | **状态**: pending
-描述: 78.5% 公共项未文档化
-涉及目录: 整个 neotrix-core/src/
-耗时: ~8 小时
-
-### ⬜ TODO-016: 修复 L4→L5 层次违规
-**优先级**: ⚪ P2 | **状态**: pending
-描述: nt_feel/emotion_engine.rs 导入 l5_cognition::l1_facade::emotion_state
-涉及文件:
-- `l4_emotion/nt_feel/emotion_engine.rs`
-- `l4_emotion/nt_emotion_facade.rs`
-- `l4_emotion/nt_memory_kb/mod.rs`
-耗时: ~1 小时
-
----
-
-## ⚪ P3: 低优先级 — 积压任务 (2026-09-20)
-
-### ⬜ TODO-017: 解决 29 个 TODO 注释
-**优先级**: ⚪ P3 | **状态**: pending
-描述: 生产代码中的 TODO 注释
-耗时: ~4 小时
-
-### ⬜ TODO-018: 修复 nt_codegen.rs:165
-**优先级**: ⚪ P3 | **状态**: pending
-描述: 生成 `// TODO: implement system logic` 作为代码输出
-涉及文件: `nt_codegen.rs:165`
-耗时: ~30 分钟
-
-### ⬜ TODO-019: 实现 McpRegistry.gateway()
-**优先级**: ⚪ P3 | **状态**: pending
-描述: 2 个 FIXME 关于此功能
-涉及文件: `agent_cmds.rs:408,520`
-耗时: ~2 小时
-
-### ⬜ TODO-020: 整理 nt_core_capability_tree
-**优先级**: ⚪ P3 | **状态**: pending
-描述: 嵌入式路径 crate 需要评估
-涉及目录: `neotrix-core/src/neotrix/nt_core_capability_tree/`
-耗时: ~1 小时
-
----
-
-## ✅ 文档标准建立 (2026-09-20) — 已完成
-
-### ✅ doc-1: 创建 DOCUMENTATION-MAP.md
-**优先级**: 🔴 High | **状态**: ✅ completed
-文件: `/Users/neo/Downloads/neotrix/DOCUMENTATION-MAP.md`
-内容: 文档分类、存放位置、命名规范、禁止行为、生命周期
-
-### ✅ doc-2: 添加文档管理规则 R-P212~R-P220
-**优先级**: 🔴 High | **状态**: ✅ completed
-文件: `docs/dev-rules.md`
-内容: 9 条文档管理规则
-
-### ✅ doc-3: 清理 neotrix-core/docs/ 研究笔记
-**优先级**: 🟡 Medium | **状态**: ✅ completed
-操作: 删除/移动 20+ 研究文件
-
-### ✅ doc-4: 清理根目录临时文件
-**优先级**: 🟡 Medium | **状态**: ✅ completed
-操作: 删除空 README.md、.specstory/、notes/
-
-### ✅ doc-5: 更新 AGENTS.md 引用文档标准
-**优先级**: 🟡 Medium | **状态**: ✅ completed
-操作: 添加文档管理规则章节
-
-> **本线交接**：`sessions/handoff-s-audit0927.md`（结构性审计线，含已改文件清单与
-> 接手须知）。经验已入 KB：cycle `audit0927`（16 条）+ `audit0927b`（4 条），
-> 检索 `neotrix-experience list --cycle audit0927`。
+## 附：已废止，不得再实现
+
+| 来源 | 原因 |
+|---|---|
+| `rareui.com` | 站点已死：HTTP 402 `x-vercel-error: DEPLOYMENT_DISABLED` |
+| `ARCHITECTURE-EVOLUTION-ROADMAP.md` | 零引用，55 行 |
+| `FUSION-ARCHITECTURE.md` | 零有效引用，其"下一步"含**已被证伪**的"解决预存编译错误" |
+| `ARCHITECTURE.md §1-§12` | 已被 §13（neobot 融合，2026-09-26）推翻。读 §13 起的实测部分 |
+| `protocol/`（已删） | 312 行 NIP-01 事件总线，从未编译（不在 `lib.rs`）→ 那 7 个测试**从未真正跑过**；Nostr/NIP-01/Buzz 在 914k 行代码库零足迹。git history 可追回 |
+| `neotrix-core/src/adapter/`（已删） | 7 行陈旧桩，自述功能已并入 `nt_io_provider`（后者已完全消失，坐实合并残留） |
+| `nt-lang` 的"删掉"建议 | **已自我纠正**：`docs/plans/2026-09-20-nt-lang-evolution-roadmap.md` 显示它是"测试生成器→声明式 DSL"的在制品。补 `[lib]` 或接线，**不要删** |

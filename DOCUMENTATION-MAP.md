@@ -16,10 +16,16 @@
 | `CONTRIBUTING.md` | 贡献指南 | Owner |
 | `LICENSE` | 许可证 | Owner |
 | `TODO.md` | **唯一任务清单** (结构化) | 所有会话 |
-| `TODO.yml` | 任务机器可读格式 | 所有会话 |
+| `TODO.yml` | 任务机器可读格式。**由 `neotrix todo sync` 生成，禁止手改** —— `git_hook.rs:58-61` 提交时自动重新生成；被两个 pre-commit 钩子消费（`git_hook.rs:25-49`、`safety_tools/git-hook.sh:9`），**不可删** |
 | `Makefile` | 构建命令 | Owner |
-| `ARCHITECTURE-MAP-ROADMAP-V2.md` | 架构进化路线图 | Owner |
-| `FUSION-ARCHITECTURE.md` | 融合架构说明 | Owner |
+| `ARCHITECTURE-MAP-ROADMAP-V2.md` | 模块台账（治理 R-P161-257 要求更新）；**§1-§7 数字永久陈旧，只取 §11 起** | Owner |
+| `docs/architecture/NEOTRIX-MASTER-BLUEPRINT.md` | **唯一图纸入口**（D-00~D-15） | Owner |
+| `docs/architecture/DIR-AUDIT-2026-09-27.md` | 目录架构审计（16 包依赖图 + 8 类重复类型） | Owner |
+| `docs/architecture/ABSORPTION-EXTERNAL-2026-09-27.md` | 外部吸收（trendshift 1041 仓 + 22 指定源） | Owner |
+| `docs/architecture/EVOLUTION-ROADMAP-CODE-NODES-2026-09-27.md` | 18 项进化路线的 file:line 支脉定位 | Owner |
+| `docs/architecture/LESSONS-2026-09-27-scanner-trust.md` | 经验沉淀：扫描器告警 / 门记录腐化 / 并发写入 | Owner |
+| `sessions/HANDOFF-TEMPLATE.md` | 交接模板（**已入库**，`AGENTS.md` 引用） | 所有会话 |
+| `FUSION-ARCHITECTURE.md` | ⚠️ **已废止** —— 零有效引用，其"下一步"含已被证伪的"解决预存编译错误" | — |
 | `DOCUMENTATION-MAP.md` | 本文档 | Owner |
 
 **禁止**: 根目录放置临时文件、会话笔记、分析报告
@@ -38,7 +44,8 @@ docs/
 │   ├── DATAFLOW.md           # 数据流
 │   └── NEOTRIX-FULL-ARCHITECTURE.md
 ├── plans/                    # 设计方案 (日期前缀)
-│   └── YYYY-MM-DD-{topic}.md
+│   ├── YYYY-MM-DD-{topic}.md
+│   └── 2026-09-22-wsd-wiki-index.md  # 外部挂载：WSD 企业 Wiki 索引（实体 /Users/neo/Downloads/wsd/wiki/docs/，19 篇，不复制内容进仓）
 └── 2-PLANS/                  # 路线图
     └── ROADMAP-*.md
 ```
@@ -118,7 +125,8 @@ skills/
 | 设计方案 | `YYYY-MM-DD-{topic}.md` | `2026-09-20-memory-distillation.md` |
 | 路线图 | `ROADMAP-{scope}.md` | `ROADMAP-ARCHITECTURE-FUSION.md` |
 | 分析报告 | `{topic}-analysis.md` | `gap-analysis.md` |
-| 任务清单 | `TODO.md` / `TODO.yml` | 根目录唯一 |
+| 任务清单 | `TODO.md`（**唯一权威**，末节为统一进化清单） | 根目录唯一 |
+| 交接文档 | `sessions/handoff-*.md`（**已入库**，`.gitignore` 白名单） | 每轮一份 |
 | API 文档 | `{module}.md` | `memory.md`, `security.md` |
 | 技能定义 | `SKILL.md` | 每个技能目录 |
 | 变更日志 | `CHANGELOG.md` | 根目录 + 子 crate |

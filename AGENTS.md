@@ -38,17 +38,42 @@ cargo build -p neotrix                  # 完整构建
 
 - 改码前先定点：`python3 scripts/ops/nt_locate.py --component X --source-file Y`（选择器→文件:行），读上下文再下刀，无定点不改。
 - 闭环：点选/标注 → 定点 → 最小改动 → 单测验证。
+- **下刀前查并发**：`git status --porcelain <file>` 看他窗改动 + `stat -f "%Sm"` 看
+  mtime 是否在数秒内变过。本轮撞见另一窗口正在用 python 改同一个文件 ——
+  `mtime` 比检查时间只早 12 秒。**mtime 近期变动 = 他方在写，换文件或先通报。**
+  （`nt_locate.py` 的索引可能陈旧：`--audit` 显示 3 天前、476 缺失时改用 grep 定点）
 
 ## 正典索引
 
-- 架构：`docs/architecture/ARCHITECTURE.md`、`FUSION-ARCHITECTURE.md`
-- 文档规范：`DOCUMENTATION-MAP.md`
-- 路线图：`ARCHITECTURE-MAP-ROADMAP-V2.md`
-- 待办：`TODO.md`（顶部为人工摘要区）；事故与分诊：`sessions/handoff-disease-list-20260927.md`
+- **唯一图纸入口**：`docs/architecture/NEOTRIX-MASTER-BLUEPRINT.md`（D-00~D-15，按图施工）
+- 架构现状：`docs/architecture/ARCHITECTURE.md`（⚠️ §1-§12 的 C4/分层设计已被 §13 neobot 融合推翻，读 §13 起的实测部分）
+- 模块拓扑实测：`docs/architecture/DIR-AUDIT-2026-09-27.md`（16 包依赖图 + 8 类重复类型）
+- 外部吸收与进化路线：`docs/architecture/ABSORPTION-EXTERNAL-2026-09-27.md`、`EVOLUTION-ROADMAP-CODE-NODES-2026-09-27.md`
+- 文档规范：`DOCUMENTATION-MAP.md`（目录导航以 `docs/architecture/README.md` 为准）
+- 模块台账（治理规则 R-P161-257 要求新增 L1-L6 模块时更新）：`ARCHITECTURE-MAP-ROADMAP-V2.md` —— **其 §1-§7 数字自述永久陈旧，只取 §11 起的可再生实测值**
+- 已废止：`FUSION-ARCHITECTURE.md`（其"下一步"含已被证伪的"解决预存编译错误"）、`ARCHITECTURE-EVOLUTION-ROADMAP.md`（零引用）
+- 待办：`TODO.md`（顶部为人工摘要区）；事故与分诊：`sessions/handoff-disease-list-20260927.md`（模板 `sessions/HANDOFF-TEMPLATE.md`，两者均已入库）
 
 ## 三道闸（2026-09-27 事故后置入，违反即阻塞）
 
 - 重型 cargo 前：`sh scripts/ops/nt_mem_gate.sh; echo $?` — 非 0 禁止起构建
-- 死锁静态扫描：`python3 scripts/ops/nt_lock_audit.py neotrix-core/src`（当前 0 命中）
+- 死锁静态扫描：`python3 scripts/ops/nt_lock_audit.py neotrix-core/src`
+  — 门记录（**每次改代码后必须刷新，禁止沿用旧值**）：
+  - 2026-09-27 **22:52** 实测 3 条（1 真死锁 `kb_search.rs:549` / 2 误报）
+  - 2026-09-27 **23:4x** 复测 **0 条**（真死锁已修 + 扫描器已补 `drop()`/临时锁识别）
+  - 历史教训：22:52 之前本文长期写着"当前 0 命中"，而实际是 12 条 —— **陈旧门记录会让下一个 agent 去"修"正确代码，比没有门更危险**（见 R-SCAN-3）
 - sidecar 按需：`sh scripts/ops/nt_sidecar.sh {start|stop|status}` — 用完即停
 - 硬规则细则见 `RUST-STANDARDS.md` §17（锁/构建/卡死判别/Git/修 bug 判据/字节安全）
+
+## 扫描器告警 ≠ 缺陷（2026-09-27 差点把 bug 修进正确代码）
+
+- **R-SCAN-1 静态扫描告警必须先读现场证实或证伪，再动代码。** 本轮
+  `nt_lock_audit.py` 报 12 条，逐个读代码后 **2/3 是误报**：`tor_client.rs:324`
+  作者已显式 `drop(proc);`；`llama_process.rs:329` 的 `*self.x.lock().await = v;`
+  是赋值型临时锁（`;` 处即释放）。若照单全修，会把 bug 引进**正确**代码。
+  这是 `nt-locate` "无定点不改"对扫描器同样成立。
+- **R-SCAN-2 手推 ≠ 实证。** 判断扫描器行为必须把**真实代码形态**喂进去跑，
+  不要在脑子里模拟 —— 本轮手推 `audit_indirect` 不会误报，实测它确实误报。
+- **R-SCAN-3 门记录必须带核实时间戳。** 本文与 `RUST-STANDARDS.md §17.1`
+  都曾长期写着"0 命中"，而实际是 12 条 —— 陈旧的门记录会让下一个 agent
+  **去"修"正确代码**，比没有门更危险。

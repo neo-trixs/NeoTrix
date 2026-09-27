@@ -5,7 +5,13 @@ Cargo.lock
 node_modules/
 dist/
 notes/
-sessions/
+# 2026-09-27: 原为 `sessions/`（整目录忽略），导致交接/分诊文档只能靠
+# `git add -f` 硬塞入库 —— 规范证据是否入库取决于个人操作而非策略。
+# 改为忽略目录内容 + 显式白名单：交接模板与 handoff-* 必须入库
+# （AGENTS.md 与 RUST-STANDARDS.md §17 都引用它们作为证据来源）。
+sessions/*
+!sessions/HANDOFF-TEMPLATE.md
+!sessions/handoff-*.md
 _archive/
 _archive/opencode/*
 !_archive/opencode/plugins/
@@ -102,8 +108,6 @@ tools/
 # 开发工具脚本 (import/shot 审计): 解除忽略
 !crates/neotrix-abilities/tools/
 !crates/neotrix-abilities/tools/**
-!games/neotrix-guixu/tools/
-!games/neotrix-guixu/tools/**
 packaging/
 research/
 benches/
@@ -141,7 +145,10 @@ DESKTOP_AI_APPS_ANALYSIS_2026.md
 EXTERNAL_*.md
 FUSION-*.md
 GATEWAY_V2_ANALYSIS.md
-HANDOFF*.md
+# 2026-09-27 加 `/` 锚定到根：原 `HANDOFF*.md` 无斜杠会匹配任意层级，
+# 且位于本文件末尾（git 最后匹配者胜），把 :13 的 `!sessions/HANDOFF-TEMPLATE.md`
+# 白名单覆盖掉 —— 交接模板因此无法入库，而 AGENTS.md 引用它作为交接模板。
+/HANDOFF*.md
 ITERATION-REPORT-*.md
 KB_RESTRUCTURING_PLAN.md
 LOCAL_MODEL_OPTIMIZATION_SUMMARY.md
@@ -194,10 +201,9 @@ target/
 target/builds/
 *.log
 
-# Game SHOT artifacts (visible dir, not /tmp)
-games/neotrix-guixu/shots/
 # Local .app bundle (binary inside, rebuilt on demand)
-games/neotrix-guixu/*.app/
+# 2026-09-27: 移除 games/neotrix-guixu/ 相关 3 条规则 —— 该目录已删除，
+# 保留会持续误导定位。games/ 现仅剩 .DS_Store，见 DIR-AUDIT-2026-09-27.md。
 
 # Crystal pool config holds live API keys — local only, never commit
 # (template: neotrix-core/config/crystal.example.toml)
