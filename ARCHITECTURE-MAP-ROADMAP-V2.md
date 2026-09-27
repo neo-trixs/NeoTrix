@@ -350,7 +350,7 @@
 | 3 | 4 个抽取 crate 的 54 个 0 字节模块被 L5 当公开 API 再导出 | 54 文件 | ✅ 已摘 |
 | 6 | 6 个 md5 相同的重复文件 (目录重构残留) | 1,769 LOC | ✅ 已删 |
 | 7 | `nt_core_capability_tree` 未继承 workspace lint, 4,670 LOC 零约束 | 20 条告警 | ✅ 已修 |
-| 8 | `nt_act_trade/tests/` 3 文件未声明 → 311 个测试从不编译 | 4,899 LOC | ◑ 复活 107, 删 88, 余 116 见 §11.3 |
+| 8 | `nt_act_trade/tests/` 3 文件未声明 → 311 个测试从不编译 | 4,899 LOC | ✅ 复活 223 (107+116 全绿) / 删 88 |
 | 9 | `auto_inspector` 内嵌 cargo 死锁 → 3 个测试永久挂起, 全量套件跑不完 | 3 测试 | ✅ 已修 |
 | 10 | `.githooks/{post,pre-merge}` 悬空链接 → `reset --hard` 护栏一直没生效 | 2 hook | ✅ 已复活 |
 | 11 | `.gitignore` 的 `tests/` 通配屏蔽 10 个源码目录 | — | ✅ 已解禁 |
@@ -361,17 +361,25 @@
 接线: `Makefile` (`make truth-surface` / `-strict` / `-baseline`) +
 `ci.yml` check job (3 OS 矩阵, `--strict`)。
 
-### 11.3 仍开放的两项 (需设计决策, 非机械修复)
+### 11.3 仍开放的一项 (需设计决策)
 
-1. **`test_orchestration.rs` 116 个测试** —— 它把两个**同名不同设计**的枚举
-   当成同一个: `workers::WorkerType` 是能力维度
-   `{Extract,Analyze,Write,Send,Track}`, 而 `orchestrator_v2.rs:70` 是业务维度
-   `{Inquiry,Quotation,Contract,Production,Logistics,Finance,Generic}`。
-   它要的 `WorkerType::{Generic,Inquiry,Quotation}` + `from_task_type` 在前者
-   不存在。101 错, import 对账后反升到 120。**需先裁决两套 taxonomy 归属。**
-2. **`ExtractConfig` / `EmailConfig` 双定义** —— 同时存在于
-   `extractors/mod.rs` 与 `data_pipeline.rs`。测试按所在模块各取一份,
-   是个随时会咬人的坑。建议收敛到一处。
+**`ExtractConfig` / `EmailConfig` / `PlatformRegistry` 三处双定义** —— 分别同时
+存在于 `extractors/mod.rs` 与 `data_pipeline.rs`(`PlatformRegistry` 在
+`data_pipeline.rs:211` 与 `platform_registry.rs:46`)。测试按所在模块各取一份,
+`TradeDataPipeline::with_registry` 只认 `data_pipeline` 那份。这是随时会咬人的
+坑, 但两个模块的语义确实不同, **收敛前需先确认二者是否本就该合并**。
+
+### 11.3b 已被推翻的判断 (留档, 防止重犯)
+
+审计中途我写过「`test_orchestration.rs` 的 116 个测试不可修, 属设计决策,
+需先裁决两套 `WorkerType` taxonomy 的归属」。**该判断是错的。** 实为:
+`DomainWorkerType` / `DomainWorkerResult` 是 `orchestrator_v2::{WorkerType,
+WorkerResult}` 的**旧名**, 我把 import 路由到了 `workers` 模块才导致 120 个错。
+两个同名符号确实存在 (两个 `WorkerType`、两个 `TradeWorker` trait), 但那是
+**并存设计**而非冲突 —— 测试两个都要用, 分别引入作用域即可。
+
+教训: 遇到「同名符号」先确认是否**旧名/新名**关系, 别直接上升为设计冲突。
+判据: 若一个符号是另一个的子集且用法自洽, 它多半是重命名而非两套设计。
 
 ### 11.4 未除的已知债 (仅登记, 不在本次范围)
 

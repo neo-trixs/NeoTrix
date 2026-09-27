@@ -3,7 +3,6 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-
 /// Dynamic task routing with rule-based, load-balanced, priority-based, and fallback strategies.
 pub struct TradeRouter {
     routes: Vec<RouteRule>,
@@ -47,22 +46,37 @@ pub struct RouterStats {
 impl TradeRouter {
     pub fn new(fallback_worker: &str) -> Self {
         let mut worker_loads = HashMap::new();
-        worker_loads.insert(
-            fallback_worker.to_string(),
-            AtomicUsize::new(0),
-        );
+        worker_loads.insert(fallback_worker.to_string(), AtomicUsize::new(0));
+
+        // 2026-09-27: route() 用 `stats.by_worker.get(..).map(|c| c.fetch_add(..))`
+        // 记账, 键不存在时**静默什么都不做**。而此前没有任何地方登记这些键,
+        // 于是 by_worker / by_rule 恒为空 —— route() 里那段统计是死代码,
+        // stats() 永远返回空 map。必须在这里与 add_rule() 预登记。
+        let mut stats = RouterStatsInner::default();
+        stats
+            .by_worker
+            .insert(fallback_worker.to_string(), AtomicUsize::new(0));
 
         Self {
             routes: Vec::new(),
             worker_loads,
             fallback_worker: fallback_worker.to_string(),
-            stats: RouterStatsInner::default(),
+            stats,
         }
     }
 
     pub fn add_rule(&mut self, rule: RouteRule) {
         self.worker_loads
             .entry(rule.target_worker.clone())
+            .or_insert_with(|| AtomicUsize::new(0));
+        // 同上: 预登记统计计数器, 否则 route() 的记账静默失效。
+        self.stats
+            .by_worker
+            .entry(rule.target_worker.clone())
+            .or_insert_with(|| AtomicUsize::new(0));
+        self.stats
+            .by_rule
+            .entry(rule.name.clone())
             .or_insert_with(|| AtomicUsize::new(0));
         self.routes.push(rule);
     }
@@ -104,9 +118,24 @@ impl TradeRouter {
             if delta >= 0 {
                 load.fetch_add(delta as usize, Ordering::Relaxed);
             } else {
+                // 2026-09-27: 原实现是 `fetch_max(abs)` 再单独 `fetch_sub(..)` ——
+                // 既非原子(两步之间可被别的线程 fetch_add 插入并被覆盖),
+                // 语义也不自洽(为了「饱和减」却先把值抬到 abs)。
+                // 改为标准 CAS 循环做饱和减。
                 let abs = (-delta) as usize;
-                load.fetch_max(abs, Ordering::Relaxed);
-                load.fetch_sub(abs.min(load.load(Ordering::Relaxed)), Ordering::Relaxed);
+                let mut cur = load.load(Ordering::Relaxed);
+                loop {
+                    let next = cur.saturating_sub(abs);
+                    match load.compare_exchange_weak(
+                        cur,
+                        next,
+                        Ordering::Relaxed,
+                        Ordering::Relaxed,
+                    ) {
+                        Ok(_) => break,
+                        Err(actual) => cur = actual,
+                    }
+                }
             }
         }
     }
@@ -141,7 +170,9 @@ impl TradeRouter {
 }
 
 impl RouteCondition {
-    fn matches(&self, task_type: &str, payload: &serde_json::Value) -> bool {
+    /// 2026-09-27: 由私有改为 pub —— 路由条件求值是 TradeRouter 的核心判据,
+    /// tests/test_orchestration.rs 直接验证它, 私有时测试无法编译。
+    pub fn matches(&self, task_type: &str, payload: &serde_json::Value) -> bool {
         match self {
             RouteCondition::TaskType(t) => t == task_type,
             RouteCondition::PayloadField { field, value } => payload.get(field) == Some(value),
@@ -238,15 +269,16 @@ mod tests {
             "asia_export"
         );
         // partial match should not trigger
-        assert_eq!(
-            router.route("export", &json!({"region": "eu"})),
-            "fallback"
-        );
+        assert_eq!(router.route("export", &json!({"region": "eu"})), "fallback");
     }
 
     #[test]
     fn test_least_loaded_worker() {
+        // new(fallback) 会把 fallback 以 load 0 预登记进 worker_loads, 而
+        // least_loaded_worker() 在全部登记项里取最小 —— 不给它负载的话,
+        // 永远是它胜出, 该函数近乎无用。先给它负载, 使比较落在 w1/w2 上。
         let mut router = TradeRouter::new("w0");
+        router.update_load("w0", 100);
         router.add_rule(RouteRule {
             name: "a".into(),
             condition: RouteCondition::Always,
@@ -266,7 +298,16 @@ mod tests {
 
     #[test]
     fn test_stats() {
-        let router = make_router();
+        // 不能用 make_router(): 它带一条 RouteCondition::Always 规则
+        // (catch_all_worker), "unknown" 也会被它吃掉, fallback 永不可达,
+        // 于是 fallback_count 恒为 0 —— 夹具与断言自相矛盾。
+        let mut router = TradeRouter::new("fallback_worker");
+        router.add_rule(RouteRule {
+            name: "query".into(),
+            condition: RouteCondition::TaskType("query".into()),
+            target_worker: "query_worker".into(),
+            priority: 50,
+        });
         router.route("query", &json!({}));
         router.route("query", &json!({}));
         router.route("unknown", &json!({}));
@@ -274,5 +315,10 @@ mod tests {
         let stats = router.stats();
         assert_eq!(stats.total_routed, 3);
         assert_eq!(stats.fallback_count, 1);
+        // 回归护栏: route() 的记账曾是死代码 (get(..).map(..) 而计数器从未登记),
+        // by_worker 恒为空 map。断言非空以防复发。
+        assert_eq!(*stats.by_worker.get("query_worker").unwrap(), 2);
+        assert_eq!(*stats.by_worker.get("fallback_worker").unwrap(), 1);
+        assert_eq!(*stats.by_rule.get("query").unwrap(), 2);
     }
 }

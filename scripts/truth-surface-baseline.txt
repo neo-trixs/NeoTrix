@@ -20,4 +20,3 @@
 #
 # TRACKED (3) — fixed 2026-09-27 via `git rm --cached`; these entries are stale and
 #   will drop out of the baseline on the next --update-baseline.
-UNDECLARED neotrix-core/src/l1_action/nt_act/nt_act_trade/tests/test_orchestration.rs

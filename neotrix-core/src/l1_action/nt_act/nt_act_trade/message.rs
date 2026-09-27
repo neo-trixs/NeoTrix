@@ -86,10 +86,16 @@ impl MessageHeader {
 
     /// 检查消息是否已过期
     pub fn is_expired(&self) -> bool {
-        Utc::now()
+        // 2026-09-27: 原实现用 num_seconds() (向零截断) 再 `>`, 导致
+        //   · ttl=0 的消息刚建好也不算过期 (0 > 0 为假)
+        //   · 任何消息都会比 TTL 多活将近一整秒 (0.9s 的消息在 ttl=1
+        //     下算作 0 秒, 判为未过期)
+        // 改为毫秒精度 + `>=`: TTL 的常规语义是「活到 TTL 为止」, 到点即过期。
+        // 时间戳落在未来(时钟回拨)时差值为负, 判为未过期。
+        let elapsed_ms = Utc::now()
             .signed_duration_since(self.timestamp)
-            .num_seconds() as u64
-            > self.ttl_secs
+            .num_milliseconds();
+        elapsed_ms >= self.ttl_secs as i64 * 1000
     }
 }
 
@@ -411,9 +417,7 @@ impl TradeMessage {
     pub fn is_command_message(&self) -> bool {
         matches!(
             self,
-            Self::ExtractCustomers(_)
-                | Self::AnalyzeCustomers(_)
-                | Self::GenerateReport(_)
+            Self::ExtractCustomers(_) | Self::AnalyzeCustomers(_) | Self::GenerateReport(_)
         )
     }
 

@@ -13,15 +13,17 @@
 //!   序列化成 null), 已修。另有 2 个测试自身写错 (载荷非 AES 块对齐,
 //!   且断言随机字节能解出合法 UTF-8), 已改为断言其名所声称的事。
 //!
-//! - `test_orchestration.rs` (116 test) —— **保持未声明**。
-//!   实测 101 个错误, 做完 import 对账后反而升到 120。根因是它把两个
-//!   **同名但不同设计**的枚举当成一个:
-//!     workers::WorkerType  = 能力维度 {Extract, Analyze, Write, Send, Track}
-//!     orchestrator_v2.rs:70 = 业务维度 {Inquiry, Quotation, Contract,
-//!                               Production, Logistics, Finance, Generic}
-//!   它要 `WorkerType::{Generic, Inquiry, Quotation}` + `from_task_type`,
-//!   而前者没有这些变体。它是一份「已被现行设计取代」的旧规格, 不是可修的
-//!   测试。要接就得先裁决两套 taxonomy 哪个留 —— 属设计决策, 非机械修复。
+//! - `test_orchestration.rs` (116 test) —— **已复活并声明, 116 全绿**。
+//!   中途我曾判它「不可修, 属设计决策」—— **那个判断是错的**, 特此留档:
+//!   我把 `DomainWorkerType`/`DomainWorkerResult` 路由到了 `workers` 模块,
+//!   而它们其实是 `orchestrator_v2::{WorkerType, WorkerResult}` 的**旧名**。
+//!   同名陷阱有两层, 都要注意:
+//!     1. 两个 `WorkerType`: workers 是能力维度 {Extract,Analyze,Write,Send,Track},
+//!        orchestrator_v2 是业务维度 {Inquiry,Quotation,Contract,...,Generic}
+//!     2. 两个 `TradeWorker` trait: workers 的是 execute(WorkerTask) 且多
+//!        worker_id/can_handle; orchestrator_v2 的是 execute(&TradeTask)。
+//!        本文件两者都要用, 必须分别引入作用域。
+//!   120 个错误里绝大多数是这类「import 指错模块」, 逐一改对后剩 6 个真问题。
 //!
 //! - `test_business.rs` (88 test) —— **已删除**。
 //!   它测的 `nt_mind::sales_coaching` 已在 3bba2507「首批死码清除」中删除,
@@ -32,7 +34,8 @@
 //! 附带成果: `nt_feel::writing_style`(1,241 LOC) 此前从未被 `mod` 声明,
 //! 从未参与编译; 本次接上后 0 error 0 warning —— 它一直是好代码, 只是没通电。
 //!
-//! 残留的 UNDECLARED 由 scripts/check-truth-surface.sh 棘轮监控。
+//! 三个文件现已全部有归宿: 复活 2 (223 test) / 删除 1。棘轮基线归零
+//! (scripts/check-truth-surface.sh 现为 0 条)。
 
 #![forbid(unsafe_code)]
 
@@ -50,3 +53,6 @@ mod event_bus_tests;
 
 #[cfg(test)]
 mod test_extractors;
+
+#[cfg(test)]
+mod test_orchestration;

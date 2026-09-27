@@ -22,20 +22,36 @@ use crate::l1_action::nt_act::nt_act_trade::message::{
 };
 
 use crate::l1_action::nt_act::nt_act_trade::orchestrator_v2::{
-    OrchestratorConfig, OrchestratorResult, OrchestratorStats, TaskPriority, TradeMessage as OrchMessage,
-    TradeOrchestrator, TradeRouter as OrchRouter, TradeTask, TradeWorker as OrchTradeWorker,
-    WorkerPool as OrchWorkerPool, DomainWorkerResult as OrchWorkerResult, DomainWorkerType as OrchWorkerType,
+    OrchestratorConfig, OrchestratorResult, OrchestratorStats, TaskPriority,
+    TradeMessage as OrchMessage, TradeOrchestrator, TradeRouter as OrchRouter, TradeTask,
+    WorkerResult as OrchWorkerResult, WorkerType as OrchWorkerType,
 };
 
 use crate::l1_action::nt_act::nt_act_trade::router::{RouteCondition, RouteRule, TradeRouter};
 
+// TradeWorker 是 workers 里的 trait (can_handle/execute/worker_id/worker_type),
+// 必须显式引入作用域。注意: workers::WorkerType 是**能力**维度
+// {Extract,Analyze,Write,Send,Track}, 与 orchestrator_v2::WorkerType 的
+// **业务**维度 {Inquiry,Quotation,...} 是两个不同枚举 —— 本文件要的是后者。
 use crate::l1_action::nt_act::nt_act_trade::workers::{
-    AnalyzeWorker, SendWorker, TrackWorker, WorkerPool, WorkerResult, WorkerTask, TaskWorkerType,
+    AnalyzeWorker, SendWorker, TrackWorker, TradeWorker, WorkerPool, WorkerResult, WorkerTask,
     WriteWorker, extract_worker::ExtractWorker,
 };
+// nt_act_trade/mod.rs:257 把 workers::WorkerType 再导出为 TaskWorkerType;
+// 本文件按该名使用。以及 orchestrator_v2 的 WorkerType 的 trait 别名。
+use crate::l1_action::nt_act::nt_act_trade::TaskWorkerType;
+// 存在两个同名 TradeWorker trait, 签名不同, 本文件两者都要用:
+//   orchestrator_v2::TradeWorker  worker_type()->业务维度 WorkerType,
+//                                 execute(&self, &TradeTask)  —— 编排器用
+//   workers::TradeWorker          多出 worker_id()/can_handle(),
+//                                 execute(WorkerTask) —— 五个具体 worker 用
+use crate::l1_action::nt_act::nt_act_trade::orchestrator_v2::TradeWorker as OrchTradeWorker;
 use crate::l1_action::nt_act::nt_act_trade::workers::track_worker::{ProgressTracker, TaskStatus as TrackTaskStatus};
 use crate::l1_action::nt_act::nt_act_trade::data_pipeline::TradeDataPipeline;
-use crate::l1_action::nt_act::nt_act_trade::platform_registry::PlatformRegistry;
+// 注意: 全仓有**两个不同的** PlatformRegistry —— data_pipeline.rs:211 与
+// platform_registry.rs:46 各定义一个。TradeDataPipeline::with_registry 要的是
+// 前者, 故此处从 data_pipeline 取。与 ExtractConfig/EmailConfig 同类问题。
+use crate::l1_action::nt_act::nt_act_trade::data_pipeline::PlatformRegistry;
 
 // ════════════════════════════════════════════════════════════════
 // Helpers
@@ -539,7 +555,12 @@ fn test_router_priority() {
 
 #[test]
 fn test_router_load_balancing() {
+    // 注意: TradeRouter::new(fallback) 会把 fallback 以 load 0 预登记进
+    // worker_loads, 而 least_loaded_worker() 会在**全部**登记项里取最小 ——
+    // 于是永远是这个从未承载流量的 fallback 胜出, 该函数近乎无用。
+    // 这里用 "w0" 作 fallback 但先给它加负载, 使比较只在 w1/w2 之间进行。
     let mut router = TradeRouter::new("w0");
+    router.update_load("w0", 100);
     router.add_rule(RouteRule {
         name: "a".into(),
         condition: RouteCondition::Always,
@@ -562,7 +583,17 @@ fn test_router_load_balancing() {
 
 #[test]
 fn test_router_stats() {
-    let router = make_trade_router();
+    // 不能用 make_trade_router(): 它带一条 RouteCondition::Always 规则
+    // (catch_all_worker), 会把 "unknown" 也吃掉, fallback 永远不可达,
+    // 于是本测试要断言的 fallback_count 恒为 0 —— 是夹具与断言自相矛盾。
+    // 这里自建一个只含 TaskType 规则的 router, 让 fallback 真正可达。
+    let mut router = TradeRouter::new("fallback_worker");
+    router.add_rule(RouteRule {
+        name: "query".into(),
+        condition: RouteCondition::TaskType("query".into()),
+        target_worker: "query_worker".into(),
+        priority: 50,
+    });
     router.route("query", &json!({}));
     router.route("query", &json!({}));
     router.route("unknown", &json!({}));
@@ -573,6 +604,10 @@ fn test_router_stats() {
     assert_eq!(*stats.by_worker.get("query_worker").unwrap(), 2);
     assert_eq!(*stats.by_worker.get("fallback_worker").unwrap(), 1);
     assert_eq!(*stats.by_rule.get("query").unwrap(), 2);
+    // 回归护栏: 此前 route() 的记账是死代码 —— 用 get(..).map(..) 统计,
+    // 而计数器从未登记, by_worker/by_rule 恒为空 map。断言非空以防复发。
+    assert!(!stats.by_worker.is_empty());
+    assert!(!stats.by_rule.is_empty());
 }
 
 #[test]
@@ -1788,7 +1823,12 @@ async fn test_orchestrator_task_status_nonexistent() {
 #[tokio::test]
 async fn test_orchestrator_message_bus() {
     let orch = TradeOrchestrator::new(orch_config());
-    let mut rx = orch.message_sender().into_stream();
+    // Sender 无法换出 Receiver (现代 tokio 已无 into_stream), 故用新增的
+    // take_message_receiver() —— 它同时暴露了「编排器只发不收」这个事实。
+    let mut rx = orch
+        .take_message_receiver()
+        .await
+        .expect("receiver available once");
 
     let task = TradeTask::new("inquiry_test", json!({}));
     let _ = orch.execute(task).await;

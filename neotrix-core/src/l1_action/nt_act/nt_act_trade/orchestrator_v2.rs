@@ -501,9 +501,10 @@ impl WorkerPool {
 
 pub struct TradeOrchestrator {
     router: TradeRouter,
-    worker_pool: WorkerPool,
+    /// 2026-09-27: 由私有改为 pub —— 测试需要断言 worker 注册/容量。
+    pub worker_pool: WorkerPool,
     message_tx: mpsc::Sender<TradeMessage>,
-    message_rx: Mutex<mpsc::Receiver<TradeMessage>>,
+    message_rx: Mutex<Option<mpsc::Receiver<TradeMessage>>>,
     task_tracker: Mutex<TaskTracker>,
     config: OrchestratorConfig,
     stats: Arc<AtomicStats>,
@@ -545,7 +546,7 @@ impl TradeOrchestrator {
             router: TradeRouter::new(),
             worker_pool,
             message_tx: tx,
-            message_rx: Mutex::new(rx),
+            message_rx: Mutex::new(Some(rx)),
             task_tracker: Mutex::new(TaskTracker::new()),
             config,
             stats: Arc::new(AtomicStats::default()),
@@ -564,6 +565,16 @@ impl TradeOrchestrator {
 
     pub fn message_sender(&self) -> mpsc::Sender<TradeMessage> {
         self.message_tx.clone()
+    }
+
+    /// 取出消息接收端 (只可取一次, 之后返回 `None`)。
+    ///
+    /// 2026-09-27: 本仓原先把接收端存在 `message_rx` 里却**从不读取**
+    /// (`message_rx.lock()` 出现 0 次) —— 编排器只发不收, 而通道容量是 256。
+    /// 也就是说消息发满 256 条后 `send()` 会永久挂起, 是个潜伏的背压死锁。
+    /// 有了本访问器, 调用方(含测试)才能真正把消息排空。
+    pub async fn take_message_receiver(&self) -> Option<mpsc::Receiver<TradeMessage>> {
+        self.message_rx.lock().await.take()
     }
 
     /// Execute a single trade task with retry
@@ -615,7 +626,11 @@ impl TradeOrchestrator {
                     })
                     .await;
 
-                let duration = start.elapsed().as_millis() as u64;
+                // 2026-09-27: 原为 `start.elapsed().as_millis() as u64`, 向零截断 ——
+                // 任何快于 1ms 的任务都记 0, 于是 avg_duration_ms 也为 0,
+                // 「瞬间完成」与「根本没测量」在指标上不可区分。改为向上取整:
+                // 只要真的花了时间就至少记 1ms, 0 只在未测量时出现。
+                let duration = start.elapsed().as_nanos().div_ceil(1_000_000) as u64;
                 self.stats.completed.fetch_add(1, Ordering::Relaxed);
                 self.stats.in_progress.fetch_sub(1, Ordering::Relaxed);
                 self.stats
