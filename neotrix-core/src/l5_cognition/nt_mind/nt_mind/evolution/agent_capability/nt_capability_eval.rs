@@ -336,7 +336,12 @@ impl MetaAgentShell {
         let dominant = self.attention.dominant_domain()?;
         if dominant == AttentionDomain::PatternMatch && !task_hint.trim().is_empty() {
             // P0#4：关键词路由内联（AgentCatalog 已移除，逻辑落于此，契约见上）。
-            // 非研究文本回退静态映射 + learner 校正（原行为不变）。
+            // research/研究/synthesize → researcher（网络研究）;
+            // 其余检索类提示 → explorer（KB 检索/只读探索，与静态映射同侧）。
+            //
+            // 2026-09-27 补真洞: 契约写的 "否则 explorer" 分支曾缺失, 全部落到
+            // route_to_catalog → learner 证据不足时返回拓扑边 (researcher),
+            // explorer 永远 0 次派单 → 无证据 → 路由永不迁移 (dispatch_self_test:317 实锤)。
             let hint_lc = task_hint.to_lowercase();
             if ["research", "研究", "synthesize"]
                 .iter()
@@ -344,6 +349,7 @@ impl MetaAgentShell {
             {
                 return Some("researcher");
             }
+            return Some("explorer");
         }
         self.route_to_catalog()
     }

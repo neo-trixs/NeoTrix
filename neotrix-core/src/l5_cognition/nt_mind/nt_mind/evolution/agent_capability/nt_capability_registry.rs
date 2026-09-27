@@ -75,11 +75,16 @@ impl RouteLearner {
     /// 修复: 冷启动覆盖 (MAGE curriculum coverage, 与 P4 任务级搜索 bandit 对齐) —
     /// 只要存在未达证据阈值的已见候选, 就探索尝试最少的候选, 保证每臂都被观察;
     /// 全部已见臂都达标后才纯利用。
+    ///
+    /// 2026-09-27 复核: 覆盖集只含已见臂是**既定契约** (tests.rs
+    /// `route_learner_below_evidence_keeps_static` / `..._config_is_calibratable`
+    /// 要求证据不足时保持 static 防冷启动噪声), 未观察臂由提示路由层保证被派单。
     pub fn route(&self, domain: AttentionDomain, static_agent: &'static str) -> &'static str {
         if !self.has_enough_evidence(domain) {
             return static_agent;
         }
-        let map = self.outcomes.get(&domain).expect("evidence implies map");
+        let empty = std::collections::HashMap::new();
+        let map = self.outcomes.get(&domain).unwrap_or(&empty);
         let rate = |s: &u32, t: &u32| *s as f64 / (*t).max(1) as f64;
         // 冷启动覆盖: 存在未达阈值的已见臂 → 探索尝试最少的臂。
         let under_evidence: Vec<(&str, u32)> = map
