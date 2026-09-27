@@ -27,6 +27,28 @@
 >   从未编译，接上即 0 error 0 warning。详见 `sessions/handoff-disease-list-20260927.md` §10。
 >   仍待处理：`l6_meta::nt_core_aware`（4）、`nt_core_observer_error`（2）、
 >   `nt_feel::cognitive_bridge::feedback`（2）
+> - 🔴 **P0·本线遗留（cycle `audit0927`/`audit0927b`，按建议顺序接手）**：
+>   1. **50 个失败测试** —— 多数是断言与实现漂移（夹具自带 `Always` 规则使被测分支
+>      不可达、亚毫秒时长断言 `> 0`）。单条易改但 50 条一起动风险大，**独立成轮**。
+>      分布：nt_shield 7 / nt_core_capability 6 / nt_memory 5 / nt_feel 5 /
+>      nt_core_aware 4 / nt_meta 3 / healing 3 / 其余 17 个各 1-2。
+>      复现：`cargo test -p neotrix --lib --no-run` 后跑二进制，`--test-threads=2`。
+>   2. **`--test-threads=4` 时 SIGSEGV（退出码 139）** —— 崩在
+>      `l6_meta::healing::predictive_maintenance::trend::tests` 之后；同模块单/双线程
+>      跑均不复现（311 passed）。pre-existing 并发问题，**CI 暂用 `--test-threads=2`**。
+>      根因需单独定位（共享资源竞态 / 栈深 / fd 耗尽）。
+>   3. **三处同名类型双定义** —— `ExtractConfig` / `EmailConfig`
+>      （`extractors/mod.rs` 与 `data_pipeline.rs` 各一份）、`PlatformRegistry`
+>      （`data_pipeline.rs:211` 与 `platform_registry.rs:46` 各一份）。
+>      `TradeDataPipeline::with_registry` 只认后者，收敛前须先确认二者语义是否本就该合并。
+>   4. **4 个抽取 crate 的定位裁决** —— `crates/nt-lang` 只有 `[[bin]]` 无 `[lib]`，
+>      **结构上无法被任何 crate 依赖**，却仍占 workspace member 槽（根 `Cargo.toml:12`）：
+>      补 `[lib]` 并接入，或删掉。
+>   5. **`neotrix-core/src/neotrix/nt_core_capability_tree` 住在 `src/` 里** ——
+>      独立 crate（根 `Cargo.toml:11` member）却位于另一 crate 的源码目录，
+>      4,670 LOC / ~30 处真实调用。已补 `[lints] workspace=true`（原 18 条 lint 全失效，
+>      补上后暴露 20 条告警含 7 处可能 panic），但**归属未裁决**：是搬出去还是接受。
+
 > - ⚪ **结构性债务（PARK，有归属前置）**：L0 `CapabilityRegistry` ×4 + `SemanticRouter` ×2
 >   正典收敛（异构，需专窗迁移）｜`proxy_pool.rs` 1757 行拆分（他人在途 1039+/24-）｜
 >   剩余 God-file（`pdf.rs` 2142 / `nt_crystal_serve.rs` 2002 / gateway 1678 / hex 1530）｜
@@ -459,3 +481,6 @@ cargo check -p neotrix 2>&1 | tail -50
 **优先级**: 🟡 Medium | **状态**: ✅ completed
 操作: 添加文档管理规则章节
 
+> **本线交接**：`sessions/handoff-s-audit0927.md`（结构性审计线，含已改文件清单与
+> 接手须知）。经验已入 KB：cycle `audit0927`（16 条）+ `audit0927b`（4 条），
+> 检索 `neotrix-experience list --cycle audit0927`。
