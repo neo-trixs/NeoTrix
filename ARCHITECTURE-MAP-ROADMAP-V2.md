@@ -334,15 +334,17 @@
 
 | 指标 | 实测值 | 再生命令 |
 |---|---|---|
-| Rust 文件 / LOC | 2,945 / 896,574 | `find neotrix-core/src crates apps src-tauri/src -name '*.rs'` |
+| Rust 文件 / LOC | 2,945 / 897,274 | `find neotrix-core/src crates apps src-tauri/src -name '*.rs'` |
 | 0 字节 `.rs` | **0** | `find neotrix-core/src crates -name '*.rs' -size 0 \| wc -l` |
 | 真值面门禁基线 | **1** | `grep -vc '^#' scripts/truth-surface-baseline.txt` |
 | 门禁新增违规 | **0** | `bash scripts/check-truth-surface.sh --strict` |
 | HEAD 能否独立编译 | **能** (2026-09-27 起) | `cargo check --tests -p neotrix` |
-| `src/` 内 `#[test]` 数 | 13,316 | `grep -rc '#\[test\]\|#\[tokio::test\]' --include='*.rs' neotrix-core/src` |
+| `src/` 内 `#[test]` 数 | 13,318 | `grep -rc '#\[test\]\|#\[tokio::test\]' --include='*.rs' neotrix-core/src` |
 | 全量套件通过 / 失败 / 忽略 | **12,042 / 50 / 37** | `cargo test -p neotrix --lib --no-run` 后跑二进制, `--test-threads=2` |
 | 全量套件耗时 | 101s (2026-09-27 前**跑不完**) | 同上 |
 | 永久挂起测试 | **0** (原 6) | `grep -c 'has been running for over' <log>` |
+| HEAD 断裂 mod 引用 | **0** (原 9) | 遍历已入库 `mod X;` 取传递闭包, 与 `git ls-tree` 比对 |
+| 本轮经验入库 | 16 条 / cycle `audit0927` | `neotrix-experience list --cycle audit0927` |
 
 ### 11.2 2026-09-27 审计已除的根 (均为「代码存在但工具链看不见」)
 
@@ -405,3 +407,41 @@ nt_core_aware 4 / nt_meta 3 / healing 3 / 其余 17 个各 1-2。
   `TODO.md` 是唯一任务清单、§三.3 禁止每会话独立 TODO —— 规范自身被绕过 80 次。
 - `DOCUMENTATION-MAP.md` §三.7 禁 >500 行的 md, 实测 67 个超限 (排除 node_modules)。
   这两条都说明**规范缺少强制点**; 门禁化 (退出码) 才是解药, 与 §11.2 同理。
+
+## 迭代记录 · 2026-09-27 结构性审计（cycle `audit0927`）
+
+**基线 HEAD** `ca814c7b` · 13 个提交 · 经验入库 16 条（`neotrix-experience list --cycle audit0927`）
+
+### 净效果
+
+| 维度 | 前 | 后 |
+|---|---|---|
+| HEAD 断裂 mod 引用 | 9 | **0**（全新 clone 可构建） |
+| 真值面门禁棘轮基线 | 60（其中 57 为待裁决） | **0** |
+| 永久挂起测试 | 6（全量套件跑不完） | **0**（101s 跑完） |
+| 全量套件通过 / 失败 | 11,299 / 124 | **12,042 / 50** |
+| 死码清除 | — | 31,652 LOC（24,884 从未编译 + 1,769 md5 重复 + 4,899 测已删功能） |
+| 复活测试 | — | 223（107 + 116，全绿） |
+| 真实实现缺陷修复 | — | 8 |
+
+### 三条最可复用的结论（已入 KB）
+
+1. **「存在 ≠ 生效」且编译器报绿** —— 已入库未编译 / 已编译未执行 / 已导出但为空，
+   三种形态都让 `cargo test` 与 `cargo check` 失去信号价值。必须门禁化，不能靠文档。
+2. **「无法编译」是最容易下错的结论** —— 先量再判。同一个文件 31 个错里 21 个是机械性的；
+   120 个错里绝大多数是「import 指错模块」。遇同名符号先确认是否旧名/新名关系。
+3. **指标类代码最容易被跳过验证** —— 8 个缺陷里多数表象是「函数都在、返回值也看着合理」，
+   复活测试才把它们暴露出来。
+
+### 本轮未除（已登记，见 §11.4 / §11.5）
+
+- 50 个失败测试（需独立一轮 triage）
+- `--test-threads=4` 时 SIGSEGV（pre-existing 并发问题，CI 暂用 2 线程）
+- `ExtractConfig`/`EmailConfig`/`PlatformRegistry` 三处双定义
+- `sessions/` 80 文件与 67 个超 500 行 md 绕过 `DOCUMENTATION-MAP.md` —— 规范缺强制点
+
+### 安全网
+
+`refs/audit/snapshot-20260927`（已 pin，GC 不可回收）+ 15 MB untracked 备份 tar。
+全程未动他窗在途文件；期间 4 次撞到他人在途编辑导致的编译失败，均按「等稳定」处理，
+仅在必要时最小修并明示可 revert。

@@ -20,9 +20,13 @@
 >   `nt_shield_ztnet/crypto/noise_handshake`（缺 `_create_message3`，握手无法完成）、
 >   `publish_gateway`（YouTube 上传）、`nt_codegen::parse_yaml`（误用 serde_json，需引 serde_yaml）、
 >   `nt_memory_kb::nt_memory_distill`（测试 teacher 与 student 恒等，`after<before` 不可满足）
-> - 🟡 **环境依赖**（改确定性断言或 `#[ignore]`）：`l6_meta::runtime_monitor::test_get_health`
->   （探针挂起）、`l6_meta::nt_core_aware`（4）、`nt_core_observer_error`（2）、
->   `nt_feel::writing_style`（2）、`nt_feel::cognitive_bridge::feedback`（2）
+> - 🟡 **环境依赖**（改确定性断言或 `#[ignore]`）：~~`l6_meta::runtime_monitor::test_get_health`（探针挂起）~~
+>   ~~`nt_feel::writing_style`（2）~~ —— **已由 cycle `audit0927b` 修掉，非环境问题**：
+>   runtime_monitor 是**真死锁**（monitor 持 metrics 守卫调 check_thresholds，后者再
+>   锁同一把，std Mutex 不可重入）；writing_style 是该 1,241 LOC 模块**从未被 mod 声明**，
+>   从未编译，接上即 0 error 0 warning。详见 `sessions/handoff-disease-list-20260927.md` §10。
+>   仍待处理：`l6_meta::nt_core_aware`（4）、`nt_core_observer_error`（2）、
+>   `nt_feel::cognitive_bridge::feedback`（2）
 > - ⚪ **结构性债务（PARK，有归属前置）**：L0 `CapabilityRegistry` ×4 + `SemanticRouter` ×2
 >   正典收敛（异构，需专窗迁移）｜`proxy_pool.rs` 1757 行拆分（他人在途 1039+/24-）｜
 >   剩余 God-file（`pdf.rs` 2142 / `nt_crystal_serve.rs` 2002 / gateway 1678 / hex 1530）｜
