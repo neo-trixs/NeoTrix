@@ -67,10 +67,16 @@ impl RISEReflector {
     }
 
     pub fn project_future(&self, current_capabilities: &[String], growth_rate: f64) -> FutureProjection {
-        let count = self.projection_count.lock().unwrap();
-        if *count >= self.max_projections {
-            drop(count);
-            *self.projection_count.lock().unwrap() = 0;
+        // 2026-09-27 除根 (自死锁 #6): 原实现 `let count = self.projection_count.lock()`,
+        // 守卫只在 reset 分支里 drop; 正常路径 (count < max) 守卫一直活到函数尾,
+        // 末尾 `*self.projection_count.lock().unwrap() += 1` 二次锁同一把非重入
+        // Mutex → 永久阻塞 (栈实证 __psynch_mutexwait @ rise_reflector.rs:79),
+        // RISE 预演首次调用即挂死。改为: 读计数用独立作用域, 计数自增单独一次锁。
+        {
+            let count = *self.projection_count.lock().unwrap();
+            if count >= self.max_projections {
+                *self.projection_count.lock().unwrap() = 0;
+            }
         }
         let projected_capabilities = current_capabilities.iter().map(|c| format!("{}+", c)).collect();
         let projected_knowledge = current_capabilities.iter().enumerate().map(|(_i, c)| format!("{}[t+{}]", c, self.time_horizon)).collect();
