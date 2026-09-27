@@ -144,6 +144,9 @@ pub struct _TestOutput {
     pub regression_pass_rate: f64,
     /// Patterns that failed validation
     pub failed_patterns: Vec<String>,
+    /// 本级尚未接线 (stub) — 与"跑过但失败"严格区分 (2026-09-27)。
+    /// 未接线不是失败: 计入 details 供审计, 不污染 success 判定。
+    pub not_wired: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -288,7 +291,12 @@ pub fn run_training_cycle(
                     items_processed: out.t1_existence.total + out.t2_registration.total + out.t3_production.total,
                     items_passed: out.t1_existence.passed + out.t2_registration.passed + out.t3_production.passed,
                     items_failed: failed,
-                    details: HashMap::new(),
+                    details: if out.not_wired {
+                        // 缺口留痕但不判失败 (与 root_cause:"not_wired" 词表一致)
+                        HashMap::from([("not_wired".into(), "true".into())])
+                    } else {
+                        HashMap::new()
+                    },
                 };
                 if failed > 0 {
                     all_success = false;
@@ -393,12 +401,17 @@ fn execute_test(
 ) -> _TestOutput {
     // Not wired: requires SelfTest registry traversal and T1/T2/T3 evaluation
     // of extracted patterns. Returns zero counts to indicate no tests were run.
+    //
+    // 2026-09-27 修正死 stub: 旧实现把 "not wired" 塞进 failed_patterns, 于是
+    // (a) 整个训练环永远判红 success=false, (b) absorb 被永久跳过 (absorb=None),
+    // 调用方无法区分"没接线"与"跑挂了"。未接线 = 0 失败, 缺口走 not_wired 标记。
     _TestOutput {
         t1_existence: _TestTierResult { total: 0, passed: 0, failed: 0 },
         t2_registration: _TestTierResult { total: 0, passed: 0, failed: 0 },
         t3_production: _TestTierResult { total: 0, passed: 0, failed: 0 },
         regression_pass_rate: 0.0,
-        failed_patterns: vec!["test stage not wired: needs SelfTest registry integration".into()],
+        failed_patterns: Vec::new(),
+        not_wired: true,
     }
 }
 
