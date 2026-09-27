@@ -362,6 +362,22 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
             crate::l1_action::nt_io::nt_io_multimodal_transform::VoiceLoader::empty(),
         ),
     ));
+    // 迷雾治理四分支 (Repair/Meta/Governance/Nexus) — 2026-09-27 补接:
+    // 四个 SelfTest 早已存在且纯内存 (Copy/Default, 无网络/cargo/全仓扫描),
+    // 但从未进本注册表 → 每 tick 迷雾四分支无健康数据 (自注释: fog 卡 0.15),
+    // 守卫测试 test_lightweight_covers_four_branch_prefixes 长期报红。
+    registry.register(Box::new(
+        crate::l6_meta::healing::nt_repair_causal_trace::CausalTraceSelfTest,
+    ));
+    registry.register(Box::new(
+        crate::l6_meta::memory::meta_observer::MetaObserverSelfTest,
+    ));
+    registry.register(Box::new(
+        crate::l6_meta::nt_core_self_constitution::GovernanceConstitutionSelfTest,
+    ));
+    registry.register(Box::new(
+        crate::l6_meta::nt_nexus::cross_session_memory::CrossSessionMemorySelfTest,
+    ));
 }
 
 /// 轻量 SelfTest 运行器 (纯内存检测件, 无网络/无 cargo/无全仓扫描) — 供意识核心
