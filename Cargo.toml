@@ -8,7 +8,7 @@ members = [
     "crates/neotrix-reasoning",
     "crates/neotrix-gateway",
     "crates/neotrix-multi-agent",
-    "neotrix-core/src/neotrix/nt_core_capability_tree",
+    "crates/nt-core-capability-tree",
     "crates/nt-lang",
     "crates/neotrix-game",
     "crates/neotrix-neobot",
@@ -33,6 +33,7 @@ description = "NeoTrix - Self-evolving reasoning kernel with 18 stages of neural
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
+serde_yaml = "0.9.34"
 tokio = { version = "1", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "6.0.0"
@@ -51,7 +52,7 @@ neotrix-abilities = { version = "0.23.0", path = "crates/neotrix-abilities" }
 neotrix-neobot = { version = "0.23.0", path = "crates/neotrix-neobot" }
 neotrix-audit = { version = "0.23.0", path = "crates/neotrix-audit" }
 neotrix-decision-engine = { version = "0.1.0", path = "crates/neotrix-decision-engine" }
-nt_core_capability_tree = { version = "0.1.0", path = "neotrix-core/src/neotrix/nt_core_capability_tree" }
+nt_core_capability_tree = { version = "0.1.0", path = "crates/nt-core-capability-tree" }
 
 [workspace.lints.clippy]
 # Restriction lints — bug prevention (R-P2xx)
