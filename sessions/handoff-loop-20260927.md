@@ -132,3 +132,58 @@
 - 大提交（合体落地）：neobot crate 闭包（15 M/D＋10 ??＋store/ 目录，生成式 §37 归属）＋
   warnings 11 文件＋tags（nt_reply_tag×2＋nt_commands×2）＋本文件证据。前端/serve/余 parked。
 - 结论：sidecar 在线＋warnings 归零（除 1 产品决策）＋tags 后端落地 ✅
+
+## 7. 长循环本轮2（2026-09-27 午，owner 直令：前端 rebuild tags 上线＋扫荡，HEAD 3b3fa10c）
+
+### 任务 1 前端 rebuild 让 tags 上线 ✅
+- `ls frontend/node_modules` 在位 → 跳过 `npm ci`（按任务分支条件）
+- `npm run build` → NPM_BUILD_EXIT:0（`tsc --noEmit` 零错＋`vite build` 131ms，21 modules，dist 8 文件：index/settings.html＋assets 6）
+- 单 cargo 槽确认 FREE 后 `CARGO_BUILD_JOBS=2 tauri build --debug --bundles app`（nohup PID 68308，sleep 55 一轮即完）
+  → `/tmp/nt_tauri_build.log`：`^error` 0，`Finished dev profile in 20.77s`，
+  `Built application at: /Users/neo/Downloads/neotrix/target/debug/neobot-desktop`，
+  `Bundling NeoBot.app (/Users/neo/Downloads/neotrix/target/debug/bundle/macos/NeoBot.app)`，`Finished 1 bundle`
+- 产物（只打 debug 包）：`/Users/neo/Downloads/neotrix/target/debug/bundle/macos/NeoBot.app`（mtime 2026-09-27 11:03:09）
+- 运行中 App：PID 53886 本轮构建后已不在（全程未执行 kill/open；疑似自行退出；按“不重启 App”未拉起，待 owner 目视）
+- tags 前端证据（构建前已验源码）：`thread.ts:272-292` reply-tags（model・mode・tools・tokens/cost）＋`main.ts:418` 新口径 labels 兼容
+
+### 任务 2 全域扫荡 ✅ 零修（无新失败，无自有归因可修）
+- `cargo check -p neotrix --lib --tests -j 2`（touch 后全量 23.41s）→ `/tmp/nt_loop2_check_full.log`：`^error` 0，
+  warning 1（`neotrix-core/src/entry/agent.rs:16:8` dead_code `run_agent_mode`，产品决策 park 沿用）
+- EVO/晶体过滤 `nt_judge nt_dspy nt_data_gateway nt_code_graph nt_skill_route nt_evolve_loop nt_intel_digest nt_near_field nt_sim_eval nt_law_gate nt_crystal_core nt_reuse backup_plan nt_snapshot`
+  → `/tmp/nt_loop2_test_evo.log`：**266 passed / 0 failed / 8 ignored**
+- tags 过滤 `cargo test -p neotrix-neobot --lib -- nt_token_guard nt_reply_tag`
+  → `/tmp/nt_loop2_test_tags.log`：**11 passed / 0 failed**（guard 6＋reply_tag 5）
+- 自有回归警告 0 新增；他人 warning 位未碰（本次全量仅 1 warning，无他人项可 park 计数）
+
+### 任务 3 每批一提交 ✅（本批：证据提交，自有归属）
+- 精确 stage 单路径 `sessions/handoff-loop-20260927.md`（-f），无 --no-verify，hook 门禁绿（doc-drift advisory 仅提示他人 `nt_memory_svaf_gate.rs`，未拦截）
+
+## 提交列表（本轮2新增）
+- `（本提交）docs(loop): 长循环本轮2证据（前端rebuild上线+扫荡277绿，HEAD 3b3fa10c，自有归属）`
+
+## 测试证据（本轮2）
+- `/tmp/nt_tauri_build.log`：tauri debug 20.77s，0 error，bundle 1
+- `/tmp/nt_loop2_check_full.log`：check --tests 0 error / 1 warning（park）
+- `/tmp/nt_loop2_test_evo.log`：266 passed, 0 failed, 8 ignored
+- `/tmp/nt_loop2_test_tags.log`：11 passed, 0 failed
+- 合计：277 passed, 0 failed
+
+## Park 表（本轮2新增；历史 park 沿用§5/§6/上游 handoff）
+| 文件 | 行/位置 | 原因 |
+|---|---|---|
+| `apps/neobot-desktop/frontend/` 全目录 `??` | 源码＋dist（含本次构建产物） | 归属未定（上轮 park“待 rebuild 窗”）；本轮仅构建未 stage，产物留工作树 |
+| `apps/neobot-desktop/src/nt_commands/nt_cmd_{convo,core,sys,tasks}.rs` 等 `??` | 桌面侧 10＋项 | 非 HEAD 3b3fa10c 自有项（HEAD 仅 nt_commands.rs＋nt_cmd_run.rs），未知归属 park |
+| `neotrix-core/src/bin/nt_crystal_serve.rs` `??` | 全文件 | 他人新文件，park（未碰；晶体 53677 照常 serve） |
+| `neotrix-core/src/entry/agent.rs:16` | `run_agent_mode` dead_code | 产品决策 park（需产品定去留，不修） |
+| `games/neotrix-guixu/` D、`skills/assets/icons/` D、`src-tauri/` 248 M | 工作树 | 沿用 park，碰都别碰 |
+| `models/` 权重 | sidecar 只读使用 | 只读，未改 |
+| 运行中进程 53677/65651 | 晶体/sidecar | 存活，未杀；App 53886 已不在（非本窗所杀） |
+| 其余 tracked M 901 项 | 全工作树 | 非自有归因，一律未碰 |
+
+## 终止条件复验（本轮2终态）
+- [x] check --tests 零错（全量 23.41s，0 error）
+- [x] 自有/EVO/合体/tags 过滤单测全绿（266＋11＝277，0 failed）
+- [x] soul online（带 token：`soul online (1 models, model=neotrix-crystal at 127.0.0.1:3000/v1, 4ms, crystal_version=0.2.0 tools=9)`）
+- [x] sidecar :8149 healthy（只探活：`{"status":"ready","model":"AgentJev-0.6B",...}`，未重启）
+- [△] NeoBot.app 未运行（53886 不在，未 kill/open，待 owner 目视；终止条件无此项，不计红）
+- 结论：**全绿 ✅**（App 一项黄待目视）
