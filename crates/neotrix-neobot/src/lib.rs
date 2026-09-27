@@ -37,6 +37,7 @@ pub mod nt_provider;
 pub mod nt_reply_tag;
 pub mod nt_routine;
 pub mod nt_skills;
+pub mod nt_stale_guard;
 pub mod nt_store;
 pub mod nt_token_guard;
 pub mod nt_types;

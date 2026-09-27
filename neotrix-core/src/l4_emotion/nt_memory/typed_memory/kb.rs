@@ -93,12 +93,15 @@ impl TypedMemoryStore {
     }
 
     pub fn get_by_estate(&self, estate: MemoryEstate) -> Vec<TypedMemoryEntry> {
-        let mut stmt = match self.conn.prepare(&format!("SELECT id, estate, content, confidence, timestamp, ttl, access_count FROM typed_memory WHERE estate='{}'", estate.as_str())) {
+        // W-lane 嫁接（typed-memory-fix ?1 参数化，防 estate 插值注入；行为同义）
+        let mut stmt = match self.conn.prepare(
+            "SELECT id, estate, content, confidence, timestamp, ttl, access_count FROM typed_memory WHERE estate=?1",
+        ) {
             Ok(stmt) => stmt,
             Err(_) => return Vec::new(),
         };
         let rows = match stmt
-            .query_map([], |row| {
+            .query_map(params![estate.as_str()], |row| {
                 let id: String = row.get(0)?;
                 let estate_str: String = row.get(1)?;
                 let content: String = row.get(2)?;
