@@ -1,4 +1,5 @@
 use super::*;
+use super::severity::severity_from_score;
 
 fn approx_eq(a: f64, b: f64) -> bool {
     (a - b).abs() < 0.01
@@ -98,8 +99,7 @@ fn test_parse_vector_string() {
 
 #[test]
 fn test_parse_vector_string_with_temporal() {
-    let vector =
-        "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/E:P/RL:O/RC:C";
+    let vector = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/E:P/RL:O/RC:C";
     let cvss = CvssBuilder::with_vector(vector).expect("result");
     assert_eq!(cvss.e, ExploitCodeMaturity::ProofOfConcept);
     assert_eq!(cvss.rl, RemediationLevel::OfficialFix);
@@ -159,16 +159,19 @@ fn test_score_with_official_fix() {
 
 #[test]
 fn test_severity_boundaries() {
-    assert_eq!(Severity::from_score(0.0), Severity::Informational);
-    assert_eq!(Severity::from_score(0.09), Severity::Informational);
-    assert_eq!(Severity::from_score(0.1), Severity::Low);
-    assert_eq!(Severity::from_score(3.9), Severity::Low);
-    assert_eq!(Severity::from_score(4.0), Severity::Medium);
-    assert_eq!(Severity::from_score(6.9), Severity::Medium);
-    assert_eq!(Severity::from_score(7.0), Severity::High);
-    assert_eq!(Severity::from_score(8.9), Severity::High);
-    assert_eq!(Severity::from_score(9.0), Severity::Critical);
-    assert_eq!(Severity::from_score(10.0), Severity::Critical);
+    // Stale: used the shared `Severity::from_score` (7-step ladder, Medium at
+    // 5.0 / Low at 3.0 / Info at 0.1). CVSS has its own 5-step mapping
+    // (`severity_from_score`, Medium at 4.0, Low at 0.1).
+    assert_eq!(severity_from_score(0.0), Severity::Informational);
+    assert_eq!(severity_from_score(0.09), Severity::Informational);
+    assert_eq!(severity_from_score(0.1), Severity::Low);
+    assert_eq!(severity_from_score(3.9), Severity::Low);
+    assert_eq!(severity_from_score(4.0), Severity::Medium);
+    assert_eq!(severity_from_score(6.9), Severity::Medium);
+    assert_eq!(severity_from_score(7.0), Severity::High);
+    assert_eq!(severity_from_score(8.9), Severity::High);
+    assert_eq!(severity_from_score(9.0), Severity::Critical);
+    assert_eq!(severity_from_score(10.0), Severity::Critical);
 }
 
 #[test]

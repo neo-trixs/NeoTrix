@@ -84,6 +84,31 @@ impl EmotionEngine {
         self.emotions.get(&et).copied().unwrap_or(0.0)
     }
 
+    /// 事件 → 情绪标签 + 强度 (确定性, 无 RNG)。
+    ///
+    /// 强度口径 = 事件的驱动量本身 (novelty score / attempts×0.1 / 学习量),
+    /// 无量纲事件取 `process_events` 里同事件 PAD 位移的量级 (0.2/0.15/0.5),
+    /// 统一 clamp 到 0..1 — 即 `gwt_modulation` / `e8_bias` /
+    /// `ct_branch_modulation` 期望的量纲。重复同类事件饱和累加 (上限 1.0)。
+    fn _event_emotion(event: &SystemEvent) -> (EmotionType, f64) {
+        match event {
+            SystemEvent::NoveltyDetected { score } => (EmotionType::Curiosity, *score),
+            SystemEvent::GoalBlocked { attempts } => {
+                (EmotionType::Frustration, (*attempts as f64) * 0.1)
+            }
+            SystemEvent::GoalCompleted { success } => (
+                if *success { EmotionType::Satisfaction } else { EmotionType::Frustration },
+                0.2,
+            ),
+            SystemEvent::SocialInteraction { positive } => (
+                if *positive { EmotionType::Empathy } else { EmotionType::Frustration },
+                0.15,
+            ),
+            SystemEvent::ThreatDetected => (EmotionType::Anxiety, 0.5),
+            SystemEvent::LearningProgress { amount } => (EmotionType::Satisfaction, *amount),
+        }
+    }
+
     pub fn process_events(&mut self, events: &[SystemEvent]) {
         for event in events {
             match event {
@@ -116,6 +141,11 @@ impl EmotionEngine {
                     self.pad.valence += 0.05;
                 }
             }
+            // 情绪表必须同步落账, 否则 CoreBridge 迭代空 map → 恒走中性默认,
+            // 事件对 GWT 注意力 / E8 迁移 / CT 分支优先级的调制全部失效。
+            let (et, intensity) = Self::_event_emotion(event);
+            let slot = self.emotions.entry(et).or_insert(0.0);
+            *slot = (*slot + intensity.clamp(0.0, 1.0)).min(1.0);
         }
     }
 }

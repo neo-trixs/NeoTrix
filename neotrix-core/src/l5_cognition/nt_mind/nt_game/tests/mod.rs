@@ -65,7 +65,7 @@ mod game_engine_tests {
         fn test_with_tag() {
             let mut em = EntityManager::new();
             let e1 = em.create();
-            let e2 = em.create();
+            let _e2 = em.create();
             let e3 = em.create();
             em.tag(e1, "enemy");
             em.tag(e3, "enemy");
@@ -248,8 +248,10 @@ mod game_engine_tests {
         fn test_world_to_local() {
             let cm = ChunkManager::new(3);
             let (lx, ly) = cm.world_to_local(35.0, 67.0);
-            assert_eq!(lx, 35);
-            assert_eq!(ly, 67);
+            // Stale: asserted the raw world coords; CHUNK_SIZE is 32, so
+            // world_to_local is `coord % CHUNK_SIZE` → (3, 3).
+            assert_eq!(lx, 3);
+            assert_eq!(ly, 3);
         }
 
         #[test]
@@ -728,7 +730,9 @@ mod game_engine_tests {
             let mut c = Combatant::new(1, "Hero").with_stats(100.0, 10.0, 5.0);
             c.take_damage(50.0);
             c.heal(30.0);
-            assert_eq!(c.hp, 80.0);
+            // Stale: asserted 80.0, but flat defense absorbs 5 of the 50 damage
+            // (hp 100 → 55), so +30 heal lands on 85.0.
+            assert_eq!(c.hp, 85.0);
         }
 
         #[test]

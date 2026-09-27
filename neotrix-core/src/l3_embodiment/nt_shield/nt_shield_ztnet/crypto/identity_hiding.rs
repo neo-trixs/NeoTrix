@@ -142,18 +142,18 @@ mod tests {
     #[test]
     fn obfuscation_deterministic_with_same_seed() {
         let mut hider = _IdentityHider::new();
-        let seed = *hider.seed();
+        let _seed = *hider.seed();
 
         let public_key = [42u8; 32];
         let obfuscated1 = hider._obfuscate_public_key(&public_key);
 
-        // 恢复种子
+        // 恢复种子 (refresh() is a no-op before refresh_interval elapses)
         hider.refresh();
-        // 用不同种子
+        // 用同一种子
         let obfuscated2 = hider._obfuscate_public_key(&public_key);
 
-        // 不同种子产生不同混淆结果
-        assert_ne!(obfuscated1, obfuscated2);
+        // 同一种子产生相同混淆结果 (pseudonym = Blake2s(seed || key))
+        assert_eq!(obfuscated1, obfuscated2);
     }
 
     #[test]

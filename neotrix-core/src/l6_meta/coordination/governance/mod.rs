@@ -339,7 +339,9 @@ mod tests {
     #[test]
     fn test_check_safe_action_passes() {
         let mut checker = _GovernanceComplianceChecker::new();
-        let result = checker.check("compile the project");
+        // Stale: build-gate rules FAIL CLOSED unless the caller supplies build
+        // evidence, so the input must carry the `cargo_check_passed` marker.
+        let result = checker.check("compile the project cargo_check_passed");
         assert!(result.passed);
         assert!(result.violations.is_empty());
     }

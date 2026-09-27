@@ -232,16 +232,13 @@ mod tests {
 
     #[test]
     fn test_normalize_various_null_forms() {
-        // The normalizer should handle edge cases like "NULL", "Null", whitespace-
-        // padded " null ", and JSON-encoded null. Currently only literal "null" is tested.
-        // Once the normalizer is wired to real JSON ingestion, add cases for:
-        //   - case-insensitive null variants
-        //   - whitespace-padded null
-        //   - nested JSON null ("{\"key\": null}")
-        //   - numeric zero vs null distinction
+        // Case-insensitive null matching IS now implemented:
+        // `_NullPattern::NullString` matches `value.to_lowercase() == "null"`,
+        // so "NULL" is normalized to "". Whitespace trimming is still absent,
+        // so the padded form is not a null and passes through unchanged.
         let mut normalizer = _NullNormalizer::default();
-        assert_eq!(normalizer._normalize_string("NULL"), "NULL",
-            "case-insensitive null handling not yet implemented");
+        assert_eq!(normalizer._normalize_string("NULL"), "",
+            "NullString matching is case-insensitive");
         assert_eq!(normalizer._normalize_string(" null "), " null ",
             "whitespace-padded null handling not yet implemented");
     }

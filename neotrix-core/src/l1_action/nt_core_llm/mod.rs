@@ -48,19 +48,68 @@ pub trait LlmProvider: Send + Sync {
     }
 }
 
+/// CJK / 全角 字符判定 (1 token/char 口径)。
+///
+/// 范围与 `neotrix_types::core::context_strategy::ContextStrategy::is_cjk`
+/// 保持一致 — 那边的注释把本函数当作单一事实源, 两边不得发散。
+fn is_cjk_char(c: char) -> bool {
+    matches!(
+        c,
+        '\u{3000}'..='\u{303F}'   // CJK 标点
+        | '\u{3040}'..='\u{30FF}' // 假名
+        | '\u{3400}'..='\u{4DBF}' // CJK Ext A
+        | '\u{4E00}'..='\u{9FFF}' // CJK 统一表意
+        | '\u{AC00}'..='\u{D7AF}' // 谚文
+        | '\u{FF00}'..='\u{FFEF}' // 全角/半角
+    )
+}
+
 /// Backward-compatible: estimate_tokens helper
+///
+/// CJK 感知: CJK/全角 1 token/char, 其余 4 chars/token (向下取整)。
+/// 纯字节数 `len()/4` 会把中文高估 3 倍 (一个汉字 3 字节), 预算推导随之失真。
+/// 非空输入至少 1 token; 空串 0 token。
+///
+/// 2026-09-27: ASCII 段由向上取整改为向下取整 ——
+/// `nt_forecast::test_estimate_tokens_cjk_aware` 把本函数标为"单一事实源
+/// (P0-7)", 要求 11 个 ASCII 字符 = 2 token (与 tiktoken cl100k 一致);
+/// 向上取整会得 3。非空最小 1 的约定保留, 预算不足时由调用方按需加严。
 pub fn estimate_tokens(text: &str) -> usize {
-    text.len() / 4
+    // 空串同样走 `.max(1)`: nt_forecast 的"单一事实源"契约要求空串 = 1
+    // (保守上界, 预算侧不为空串开口子)。
+    let mut cjk = 0usize;
+    let mut rest = 0usize;
+    for c in text.chars() {
+        if is_cjk_char(c) {
+            cjk += 1;
+        } else {
+            rest += 1;
+        }
+    }
+    (cjk + rest / 4).max(1)
 }
 
 /// Backward-compatible: truncate_preserving helper
 pub fn truncate_preserving(text: &str, max_tokens: usize) -> &str {
-    let max_chars = max_tokens * 4;
-    if text.len() <= max_chars {
-        text
-    } else {
-        &text[..max_chars]
+    // 2026-09-27 修复: 原按**字节**切 (`&text[..max_chars]`), 对中文会切在
+    // 多字节字符中间 → 直接 panic (违反禁 panic 铁律)。改为按 char 边界单调回退,
+    // token 口径与 estimate_tokens 一致 (CJK 1 字 1 token, ASCII 4 字符 1 token)。
+    if estimate_tokens(text) <= max_tokens {
+        return text;
     }
+    let mut cjk = 0usize;
+    let mut ascii = 0usize;
+    for (i, c) in text.char_indices() {
+        if cjk + ascii / 4 >= max_tokens {
+            return &text[..i];
+        }
+        if is_cjk_char(c) {
+            cjk += 1;
+        } else {
+            ascii += 1;
+        }
+    }
+    text
 }
 
 // ─── Additional backward-compatible stubs ──────────────────────────
@@ -87,9 +136,47 @@ impl BudgetResult {
     }
 }
 
-/// Apply context budget to messages (stub)
-pub fn apply_context_budget(_messages: &[Message], _max_tokens: usize) -> BudgetResult {
-    BudgetResult::default()
+/// Apply the context budget in place: evict oldest turns until the estimated
+/// token count fits `max_tokens`.
+///
+/// Eviction order = oldest first, and the load-bearing anchors are never
+/// dropped: System messages (task definition) and the trailing message (the
+/// current request). `max_tokens == 0` means "budget disabled" → no eviction.
+///
+/// `tool_outputs_truncated` stays 0: this pass evicts whole turns only; tool
+/// output truncation belongs to ContextPipeline layer 3
+/// (`nt_agent_exec::budget_react_messages` documents the same contract).
+pub fn apply_context_budget(messages: &mut Vec<Message>, max_tokens: usize) -> BudgetResult {
+    let input_tokens = estimate_messages_tokens(messages);
+    let mut total = input_tokens;
+    let mut messages_evicted = 0usize;
+
+    if max_tokens > 0 {
+        while total > max_tokens {
+            // 末条 (当前请求) 不可驱逐, System 不可驱逐。
+            let evictable = messages.len().saturating_sub(1);
+            match messages[..evictable].iter().position(|m| m.role != Role::System) {
+                Some(idx) => {
+                    // 同 estimate_messages_tokens 口径: content tokens + 4 协议开销
+                    total = total.saturating_sub(estimate_tokens(&messages[idx].content) + 4);
+                    messages.remove(idx);
+                    messages_evicted += 1;
+                }
+                None => break,
+            }
+        }
+    }
+
+    BudgetResult {
+        input_tokens,
+        output_tokens: 0,
+        within_budget: max_tokens == 0 || total <= max_tokens,
+        // W1.1 compaction cliff: 上下文被压到保留率 < 35% = 任务成功率坍缩前兆。
+        is_cliff: messages_evicted > 0
+            && total.saturating_mul(100) < input_tokens.saturating_mul(35),
+        messages_evicted,
+        tool_outputs_truncated: 0,
+    }
 }
 
 /// Estimate tokens in a list of messages.

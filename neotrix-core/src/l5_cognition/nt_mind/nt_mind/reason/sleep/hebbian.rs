@@ -96,16 +96,23 @@ impl HebbianUpdater {
         }
     }
 
-    /// Consolidate a reasoning memory into a capability vector.
+    /// Consolidate sleep observations into a capability vector.
     ///
-    /// Returns 0.0 as a conservative no-op: without SelectiveState, we cannot
-    /// compute meaningful capability deltas. Real implementation would project
-    /// memory embeddings into capability space and update weights.
+    /// Hebbian: 同维度反复激活 → 该维度权重增强。`run_consolidation_pass`
+    /// (consolidation.rs:95) 只把累积后的 `CapabilityVector` 交到这里, 没有
+    /// `SelectiveState` / observation 流可用, 所以 "关联最强的维度" 取当前
+    /// 激活度最高的维度 (证据累积最多者), 按 `consolidation_rate` 增强一档。
+    /// 纯确定性 (argmax over activations, 无 RNG), 空向量安全返回 0.0。
     pub fn consolidate_to_capability(&self, capability: &mut CapabilityVector) -> f64 {
-        // Without SelectiveState, we cannot compute meaningful consolidation.
-        // Return 0.0 to indicate no change was applied.
-        let _ = capability;
-        0.0
+        let dim = self.dim.min(capability.arr.len());
+        let activations = &capability.arr[..dim];
+        // f64::max 遇 NaN 取另一侧, 全 NaN 时 peak 为 NaN → position 失败 → 0.0
+        let peak = activations.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        let Some(idx) = activations.iter().position(|v| *v == peak) else {
+            return 0.0;
+        };
+        capability.arr[idx] += self.consolidation_rate;
+        self.consolidation_rate
     }
 
     //     pub(crate) fn _add_transition_noise(&self, state: &mut SelectiveState, noise_level: f64) {
@@ -124,8 +131,8 @@ impl HebbianUpdater {
 mod tests {
     use super::*;
     use crate::l1_action::nt_core_bank::{MemoryLifecycle, MemoryTier, T3Views};
-    use crate::l2_perception::nt_core_knowledge::types::RewardSource;
     use crate::l2_perception::nt_core_knowledge::types::TaskType;
+    use neotrix_types::RewardSource;
 
     fn dummy_memory(reward: f64, success: bool, id: &str) -> ReasoningMemory {
         ReasoningMemory {

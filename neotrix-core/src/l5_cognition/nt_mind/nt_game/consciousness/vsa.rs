@@ -50,7 +50,7 @@ impl GameVsaEncoder {
     /// - avg_hexgram (mean hexagram value / 63)
     /// - resonance_count (normalized by trajectory length)
     /// - reward_variance (std deviation of step rewards, if available)
-    /// - hexgram_diversity (number of distinct hexagrams / 64)
+    /// - hexgram_diversity (distinct hexagrams / hexagrams actually visited)
     ///
     /// Returns a unit-normalized vector.
     pub fn encode_trajectory(trajectory: &Trajectory) -> Vec<f64> {
@@ -76,7 +76,7 @@ impl GameVsaEncoder {
         // Feature 5: hexgram diversity
         let distinct: std::collections::HashSet<u8> =
             trajectory.hexagrams.iter().copied().collect();
-        let diversity = distinct.len() as f64 / 64.0;
+        let diversity = distinct.len() as f64 / trajectory.hexagrams.len().max(1) as f64;
 
         let features = vec![
             reward_norm,

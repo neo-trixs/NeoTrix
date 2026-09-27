@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::super::env::NtGameEnv;
 use super::super::framework::{
-    Action, Actor, Arena, ArenaConfig, Episode, Rubric, Trajectory, TrajectoryStep, WinLossReward,
+    Action, Actor, Arena, ArenaConfig, Episode, Rubric, TrajectoryStep, WinLossReward,
 };
 use super::advantage::{AdvantageConfig, GameAdvantageEstimator};
 use super::buffer::GameTrajectoryBuffer;
@@ -192,30 +192,26 @@ impl SelfPlayLoop {
         }
 
         // ── Phase 2: Advantage ────────────────────────────────────
-        // Compute advantages for all trajectories in the buffer that lack them
-        let buffer_len = self.buffer.len();
-        // We need to estimate advantages per-trajectory. Since the estimator
-        // maintains role_stats across calls, we iterate and estimate each.
-        // We take a clone-safe approach: sample what we have and re-estimate.
-        // For correctness we do a full pass by sampling the entire buffer.
+        // Compute advantages for all trajectories in the buffer that lack them.
+        // The buffer is drained so each trajectory is estimated in place and
+        // stored back exactly once — sampling clones and re-storing them would
+        // double the buffer and leave duplicate advantage-less copies behind.
         {
-            // Collect all trajectories as owned copies for in-place mutation,
-            // then put them back. This is the simplest correct approach.
-            let all: Vec<Trajectory> = {
-                let batch = self.buffer.sample_batch(buffer_len);
-                batch.into_iter().cloned().collect()
-            };
+            let mut all = self.buffer.drain_all();
 
             let mut roles = std::collections::HashMap::new();
             // In self-play: actor 0 = Player, actor 1 = Opponent
             roles.insert(0, super::super::framework::Role::Player);
             roles.insert(1, super::super::framework::Role::Opponent);
 
-            for mut traj in all {
+            for traj in all.iter_mut() {
                 if traj.steps.iter().any(|s| s.advantage.is_none()) {
-                    self.advantage_estimator.estimate(&mut traj, &roles);
-                    self.buffer.store(traj);
+                    self.advantage_estimator.estimate(traj, &roles);
                 }
+            }
+
+            for traj in all {
+                self.buffer.store(traj);
             }
         }
 
@@ -293,7 +289,7 @@ impl SelfPlayLoop {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l5_cognition::nt_mind::nt_game::env::{Difficulty, GameMeta, GameState, RenderMode};
+    use crate::l5_cognition::nt_mind::nt_game::env::{Difficulty, GameMeta, GameState};
     use crate::l5_cognition::nt_mind::nt_game::{Observation, StepResult};
     use std::collections::HashMap;
 
@@ -342,7 +338,7 @@ mod tests {
             }
         }
 
-        fn step(&mut self, action: &Action) -> StepResult {
+        fn step(&mut self, _action: &Action) -> StepResult {
             self.turn += 1;
             self.done = self.turn >= self.max_turns;
             StepResult {
@@ -427,7 +423,7 @@ mod tests {
             buffer_capacity: 64,
             ..Default::default()
         };
-        let mut loop_ = SelfPlayLoop::new(config);
+        let loop_ = SelfPlayLoop::new(config);
         assert_eq!(loop_.buffer.capacity(), 64);
         assert_eq!(loop_.scaling.max_turns(), 10);
         assert!(loop_.metrics_history.is_empty());
@@ -444,7 +440,7 @@ mod tests {
         };
         let mut loop_ = SelfPlayLoop::new(config);
 
-        let factory = |seed: u64| -> Box<dyn NtGameEnv> {
+        let factory = |_seed: u64| -> Box<dyn NtGameEnv> {
             Box::new(DummyEnv::new(3)) // 3-turn episodes
         };
 
@@ -465,7 +461,7 @@ mod tests {
         };
         let mut loop_ = SelfPlayLoop::new(config);
 
-        let factory = |seed: u64| -> Box<dyn NtGameEnv> { Box::new(DummyEnv::new(2)) };
+        let factory = |_seed: u64| -> Box<dyn NtGameEnv> { Box::new(DummyEnv::new(2)) };
 
         let report = loop_.run(&factory, 3);
         assert_eq!(report.metrics_history.len(), 3);

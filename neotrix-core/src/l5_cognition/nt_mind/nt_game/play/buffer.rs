@@ -53,6 +53,15 @@ impl GameTrajectoryBuffer {
         self.buffer.push_back(trajectory);
     }
 
+    /// Take ownership of every buffered trajectory, leaving the buffer empty.
+    ///
+    /// Lets callers mutate trajectories in place and hand them back via
+    /// `store` once, instead of sampling clones and re-storing them (which
+    /// would duplicate every trajectory in the ring).
+    pub fn drain_all(&mut self) -> Vec<Trajectory> {
+        self.buffer.drain(..).collect()
+    }
+
     /// Sample a random mini-batch of trajectories (with replacement).
     pub fn sample_batch(&self, size: usize) -> Vec<&Trajectory> {
         use std::time::{SystemTime, UNIX_EPOCH};

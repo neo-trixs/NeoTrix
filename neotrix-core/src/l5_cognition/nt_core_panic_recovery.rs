@@ -504,7 +504,9 @@ mod tests {
     fn from_payload_with_unit_panic() {
         let result = catch_panic("unit", || panic!());
         let err = result.unwrap_err();
-        assert!(err.message.is_empty() || err.message.contains("()"));
+        // Stale: expected "()" — a bare `panic!()` carries a `&str` payload
+        // ("explicit panic"), which `from_payload` downcasts verbatim.
+        assert_eq!(err.message, "explicit panic");
     }
 
     #[test]

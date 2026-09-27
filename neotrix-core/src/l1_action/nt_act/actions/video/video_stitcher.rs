@@ -3,8 +3,7 @@
 //! 多片段视频拼接、转场、字幕、音频混合
 //! 支持 FFmpeg 操作、时间线编辑
 
-use serde::{Serialize, Deserialize};
-
+use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // 拼接定义
@@ -173,7 +172,7 @@ impl VideoStitcher {
             history: vec![],
         }
     }
-    
+
     /// 使用配置创建
     pub fn with_config(config: StitchConfig) -> Self {
         Self {
@@ -181,7 +180,7 @@ impl VideoStitcher {
             history: vec![],
         }
     }
-    
+
     /// 拼接视频 — 实际调用 FFmpeg 执行拼接
     pub fn stitch(&mut self, timeline: &Timeline, output_path: &str) -> StitchResult {
         let start = std::time::Instant::now();
@@ -227,24 +226,24 @@ impl VideoStitcher {
         self.history.push(result.clone());
         result
     }
-    
+
     /// 生成 FFmpeg 命令
     pub fn generate_ffmpeg_command(&self, timeline: &Timeline, output_path: &str) -> String {
         let mut cmd = String::from("ffmpeg");
-        
+
         // 输入文件
         for clip in &timeline.clips {
             cmd.push_str(&format!(" -i {}", clip.file_path));
         }
-        
+
         // 音频轨道
         for track in &timeline.audio_tracks {
             cmd.push_str(&format!(" -i {}", track.file_path));
         }
-        
+
         // 滤镜
         cmd.push_str(" -filter_complex \"");
-        
+
         // 拼接滤镜
         let clip_count = timeline.clips.len();
         cmd.push_str(&format!("[0:v]"));
@@ -252,17 +251,20 @@ impl VideoStitcher {
             cmd.push_str(&format!("[{}:v]", i));
         }
         cmd.push_str(&format!("concat={}:v=1:a=0[vout]", clip_count));
-        
+
         cmd.push_str("\"");
-        
+
         // 输出
-        cmd.push_str(&format!(" -map \"[vout]\" -c:v {}", self.config.output_codec));
+        cmd.push_str(&format!(
+            " -map \"[vout]\" -c:v {}",
+            self.config.output_codec
+        ));
         cmd.push_str(&format!(" -b:v {}", self.config.output_bitrate));
         cmd.push_str(&format!(" {}", output_path));
-        
+
         cmd
     }
-    
+
     /// 添加转场
     ///
     /// Returns an FFmpeg xfade filter string for the given transition type.
@@ -282,32 +284,47 @@ impl VideoStitcher {
                 return Ok(String::new());
             }
             TransitionType::CrossDissolve => {
-                format!("xfade=transition=fade:duration={}:offset={}", duration, offset)
+                format!(
+                    "xfade=transition=fade:duration={}:offset={}",
+                    duration, offset
+                )
             }
             TransitionType::Dissolve => {
-                format!("xfade=transition=dissolve:duration={}:offset={}", duration, offset)
+                format!(
+                    "xfade=transition=dissolve:duration={}:offset={}",
+                    duration, offset
+                )
             }
             TransitionType::Wipe => {
-                format!("xfade=transition=wipeleft:duration={}:offset={}", duration, offset)
+                format!(
+                    "xfade=transition=wipeleft:duration={}:offset={}",
+                    duration, offset
+                )
             }
             TransitionType::Push => {
-                format!("xfade=transition=smoothleft:duration={}:offset={}", duration, offset)
+                format!(
+                    "xfade=transition=smoothleft:duration={}:offset={}",
+                    duration, offset
+                )
             }
             TransitionType::Zoom => {
-                format!("xfade=transition=circlecrop:duration={}:offset={}", duration, offset)
+                format!(
+                    "xfade=transition=circlecrop:duration={}:offset={}",
+                    duration, offset
+                )
             }
         };
         Ok(filter)
     }
-    
+
     /// 生成字幕滤镜
     pub(crate) fn _generate_subtitle_filter(&self, subtitles: &[SubtitleEntry]) -> String {
         if subtitles.is_empty() {
             return String::new();
         }
-        
+
         let mut filter = String::from("subtitles='");
-        
+
         for (i, sub) in subtitles.iter().enumerate() {
             if i > 0 {
                 filter.push('\\');
@@ -322,11 +339,11 @@ impl VideoStitcher {
                 0
             ));
         }
-        
+
         filter.push('\'');
         filter
     }
-    
+
     /// 格式化时间
     fn format_time(&self, seconds: f32) -> String {
         let hours = (seconds / 3600.0) as u32;
@@ -334,13 +351,13 @@ impl VideoStitcher {
         let secs = seconds % 60.0;
         format!("{:02}:{:02}:{:06.3}", hours, minutes, secs)
     }
-    
+
     /// 获取统计信息
     pub fn statistics(&self) -> StitchStats {
         let total_stitched = self.history.len();
         let successful = self.history.iter().filter(|r| r.success).count();
         let total_duration: f32 = self.history.iter().map(|r| r.total_duration).sum();
-        
+
         StitchStats {
             total_stitched,
             successful,
@@ -370,11 +387,11 @@ pub struct StitchStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_video_stitcher() {
-        let mut stitcher = VideoStitcher::new();
-        
+        let stitcher = VideoStitcher::new();
+
         let timeline = Timeline {
             clips: vec![
                 VideoClip {
@@ -406,11 +423,30 @@ mod tests {
             subtitles: vec![],
             total_duration: 10.0,
         };
-        
-        let result = stitcher.stitch(&timeline, "/output/final.mp4");
-        assert!(result.success);
-        
+
+        // 只断言生成的 ffmpeg 计划 —— 不真实执行 ffmpeg / 不依赖真实媒体文件
         let cmd = stitcher.generate_ffmpeg_command(&timeline, "/output/final.mp4");
-        assert!(cmd.contains("ffmpeg"));
+        assert!(cmd.starts_with("ffmpeg"), "应以 ffmpeg 开头: {cmd}");
+        assert!(cmd.contains(" -i /input/clip1.mp4"), "应含 clip1 输入: {cmd}");
+        assert!(cmd.contains(" -i /input/clip2.mp4"), "应含 clip2 输入: {cmd}");
+        assert!(
+            cmd.contains("[0:v][1:v]concat=2:v=1:a=0[vout]"),
+            "应含两片段 concat 滤镜: {cmd}"
+        );
+        assert!(cmd.contains("-c:v libx264"), "应含默认编码器: {cmd}");
+        assert!(cmd.contains("-b:v 8M"), "应含默认码率: {cmd}");
+        assert!(
+            cmd.ends_with(" /output/final.mp4"),
+            "应以输出路径结尾: {cmd}"
+        );
+    }
+
+    #[test]
+    fn test_video_stitcher_history_empty_without_stitch() {
+        let stitcher = VideoStitcher::new();
+        let stats = stitcher.statistics();
+        assert_eq!(stats.total_stitched, 0);
+        assert_eq!(stats.successful, 0);
+        assert_eq!(stats.failed, 0);
     }
 }

@@ -656,16 +656,20 @@ mod tests {
 
     #[test]
     fn test_hub_active_epoch_iso_and_none() {
-        let v = serde_json::json!({"last_loaded": "2026-08-11T13:18:23.829840"});
+        // 相对时间构造 (1 小时前) —— 硬编码日历日期会随时间漂移出活跃窗口
+        let one_hour_ago = chrono::Utc::now() - chrono::Duration::hours(1);
+        let fresh = one_hour_ago.format("%Y-%m-%dT%H:%M:%S%.6f").to_string();
+        let v = serde_json::json!({"last_loaded": fresh});
         let ts = hub_active_epoch(&v).unwrap();
-        // 2026-08-11T13:18:23Z 与 now 相差远小于 90 天 → 不沉寂 (用回归断言)
+        // 1 小时前与 now 相差远小于 30 天 → 不沉寂 (用回归断言)
         let now = chrono::Utc::now().timestamp().max(0) as u64;
         assert!(now.saturating_sub(ts) < 30 * 86400);
 
         assert!(hub_active_epoch(&serde_json::json!({"last_loaded": "None"})).is_none());
         assert!(hub_active_epoch(&serde_json::json!({})).is_none());
         assert!(
-            hub_active_epoch(&serde_json::json!({"last_loaded": "2026-08-11T13:18:23Z"})).is_some()
+            hub_active_epoch(&serde_json::json!({"last_loaded": "2026-08-11T13:18:23Z"})).is_some(),
+            "带 Z 的合法 ISO 应可解析 (只验解析, 不验窗口)"
         );
         assert!(hub_active_epoch(&serde_json::json!({"updated_at": 1700000000u64})).is_some());
     }

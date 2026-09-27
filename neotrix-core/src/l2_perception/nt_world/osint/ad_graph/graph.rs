@@ -132,6 +132,14 @@ mod tests {
             "C1".into(),
             AdEdgeType::HasSession,
         ));
+        // Stale: the fixture had no Group→Computer edge, so the BFS from U2
+        // could not reach C1 (U2→G1 dead-ends). Added G1→C1 to make the
+        // path U2→G1→C1 exist, as test_find_paths assumes.
+        g.add_edge(AdEdge::new(
+            "G1".into(),
+            "C1".into(),
+            AdEdgeType::HasSession,
+        ));
         g
     }
 

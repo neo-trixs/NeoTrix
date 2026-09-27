@@ -63,10 +63,15 @@ mod tests {
 
     #[test]
     fn test_severity_ordering() {
-        assert!(Severity::Informational < Severity::Low);
-        assert!(Severity::Low < Severity::Medium);
-        assert!(Severity::Medium < Severity::High);
-        assert!(Severity::High < Severity::Critical);
+        // 2026-09-27 修正: 判别序即"越严重 → 越小"
+        // (Critical=0 … Informational=7), 这是 shared_types::Severity 的既定约定,
+        // 且被 l2_perception/nt_world/osint/sweep.rs:225 显式依赖:
+        // "Severity 降序 (Critical=0 < Info=3): 保留 <= min_severity 的条目"。
+        // 翻转 Ord 会静默反转那个过滤器, 因此按约定断言而非翻转类型。
+        assert!(Severity::Critical < Severity::High);
+        assert!(Severity::High < Severity::Medium);
+        assert!(Severity::Medium < Severity::Low);
+        assert!(Severity::Low < Severity::Informational);
     }
 
     #[test]

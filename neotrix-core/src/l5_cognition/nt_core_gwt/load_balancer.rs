@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoadBalancer {
-    /// Sliding window of recent selections (for f_i computation)
+    /// Sliding window of recent gate distributions (for P_i computation)
     selection_history: Vec<[f64; MODULE_COUNT]>,
     /// Maximum window size
     window_size: usize,
@@ -69,27 +69,19 @@ impl LoadBalancer {
         }
     }
 
-    /// Compute actual load fraction f_i for each expert (sliding window).
+    /// Compute actual load fraction f_i for each expert.
+    ///
+    /// f_i is the share of routed selections that actually landed on expert i,
+    /// taken from the per-expert counters filled by `record_step` (not from the
+    /// gate distribution: the gate says how an expert was *scored*, f_i says how
+    /// often it was *chosen*).
     pub fn compute_load_fractions(&self) -> [f64; MODULE_COUNT] {
-        let mut counts = [0.0; MODULE_COUNT];
-        let total = self.selection_history.len() as f64;
-        if total == 0.0 {
+        if self.total_selections <= 0.0 {
             return [1.0 / MODULE_COUNT as f64; MODULE_COUNT];
-        }
-        // Count selections from history (simplified: use uniform top-1 assumption)
-        for step in &self.selection_history {
-            // Find the expert with highest gate probability
-            let mut best = 0;
-            for i in 1..MODULE_COUNT {
-                if step[i] > step[best] {
-                    best = i;
-                }
-            }
-            counts[best] += 1.0;
         }
         let mut fractions = [0.0; MODULE_COUNT];
         for i in 0..MODULE_COUNT {
-            fractions[i] = counts[i] / total;
+            fractions[i] = self.selection_counts[i] / self.total_selections;
         }
         fractions
     }
@@ -170,7 +162,11 @@ mod tests {
     fn test_load_balancer_default() {
         let lb = LoadBalancer::new();
         let loss = lb.compute_loss();
-        assert!((loss - 1.0 / MODULE_COUNT as f64).abs() < 0.01);
+        // 2026-09-27 修正: 空 workspace 的负载是**均匀**的, 而均匀分布的
+        // 辅助损失恒等于系数本身 (N·Σf_i·P_i = 1 → coef), 不是 1/N。
+        // 原断言 1/15 与实现的 aux_loss_coef(0.01) 不符。
+        // 0.01 = LoadBalancer::new() 的默认 aux_loss_coef (见 :39)
+        assert!((loss - 0.01).abs() < 1e-6, "loss {loss}");
     }
 
     #[test]

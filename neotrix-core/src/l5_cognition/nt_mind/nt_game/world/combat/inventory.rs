@@ -97,13 +97,17 @@ impl Inventory {
         if item.stackable {
             for slot in &mut self.slots {
                 if let Some(ref mut stack) = slot {
-                    if stack.item.id == item.id {
-                        let added = stack.add(remaining);
-                        remaining -= added;
-                        if remaining == 0 {
-                            return 0;
-                        }
+                if stack.item.id == item.id {
+                    // 2026-09-27 修复: ItemStack::add 返回的是**剩余量**(契约由
+                    // test_item_stack_add_capped 钉住: 10 只能进 4 → 返回 6),
+                    // 原代码却当成"已加入量"从 remaining 里减 → 合并成功时
+                    // remaining 不归零, 继续开新栈, 同种物品被重复开堆
+                    // (加 5 再加 3 → count_item 得 11 而非 8)。
+                    remaining = stack.add(remaining);
+                    if remaining == 0 {
+                        return 0;
                     }
+                }
                 }
             }
         }

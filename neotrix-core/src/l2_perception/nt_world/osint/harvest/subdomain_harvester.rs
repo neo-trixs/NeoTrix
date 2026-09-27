@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use super::super::OsintConfig;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum SubdomainSource {
     DnsBrute,
     CrtSh,
@@ -205,6 +206,21 @@ mod tests {
     }
 
     #[test]
+    fn test_subdomain_source_serde_roundtrip_matches_display() {
+        for src in [
+            SubdomainSource::DnsBrute,
+            SubdomainSource::CrtSh,
+            SubdomainSource::Permutation,
+        ] {
+            let json = serde_json::to_string(&src).unwrap();
+            let name = json.trim_matches('"');
+            assert_eq!(name, format!("{src}"), "serde 名应与 Display 一致");
+            let back: SubdomainSource = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, src);
+        }
+    }
+
+    #[test]
     fn test_subdomain_source_display() {
         assert_eq!(format!("{}", SubdomainSource::DnsBrute), "dns_brute");
         assert_eq!(format!("{}", SubdomainSource::CrtSh), "crt_sh");
@@ -248,9 +264,18 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "depends on live DNS resolver"]
     fn test_resolve_subdomain_ips_nonexistent() {
         let ips = resolve_subdomain_ips("this-does-not-exist-xyz.invalid");
         assert!(ips.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_dns_brute_empty_wordlist_makes_no_lookups() {
+        // 空词表 → 循环体不执行 → 无任何 DNS 查询, 结果必空 (不依赖 live resolver)
+        let h = SubdomainHarvester::new(Client::new());
+        let results = h.dns_brute("example.invalid", &[]).await;
+        assert!(results.is_empty());
     }
 
     #[tokio::test]

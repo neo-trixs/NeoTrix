@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn test_at_max() {
-        let mut sched = ScalingScheduler::new(ScalingConfig {
+        let sched = ScalingScheduler::new(ScalingConfig {
             initial_horizon: 10,
             step_size: 100,
             scaling_interval: 1,
@@ -191,7 +191,9 @@ mod tests {
             initial_horizon: 5,
             step_size: 5,
             scaling_interval: 1,
-            max_horizon: 20,
+            // Stale: was 20, but 5 + 5 = 10 can never reach it, so the
+            // post-scale `at_max()` assert below could not hold.
+            max_horizon: 10,
         });
         assert!(!sched2.at_max());
         sched2.maybe_scale();

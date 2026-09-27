@@ -142,9 +142,10 @@ mod tests {
 
     #[test]
     fn test_clean_dockerfile() {
+        // Stale: the fixture carried `RUN curl … -o /app`, which legitimately
+        // trips DC-004 (build-time download). Removed so the fixture is clean.
         let content = r#"FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y curl
-RUN curl -fsSL https://example.com/app -o /app
 USER nobody
 EXPOSE 8080
 CMD ["/app"]

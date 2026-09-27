@@ -1,3 +1,8 @@
+/// Game minutes advanced per real second at `speed = 1.0`.
+/// 1 real second = 1 game minute (a full 24h day = 1440 real seconds);
+/// `GameClock::speed` scales this factor up or down.
+const GAME_MINUTES_PER_SECOND: f64 = 1.0;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimeOfDay {
     Dawn,
@@ -31,7 +36,7 @@ impl GameClock {
         if self.paused {
             return;
         }
-        let minutes = dt * self.speed * 10.0;
+        let minutes = dt * self.speed * GAME_MINUTES_PER_SECOND;
         self.minute += minutes as u32;
         while self.minute >= 60 {
             self.minute -= 60;

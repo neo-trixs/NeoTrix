@@ -157,7 +157,7 @@ impl _DynamicMemoryBank {
         
         for bank in self.banks.values() {
             for entry in bank.values() {
-                let relevance = self.calculate_semantic_similarity(query, &entry.state.description);
+                let relevance = self.calculate_semantic_similarity(query, &entry.state);
                 if relevance >= self.config.identity_retrieval_threshold {
                     let mut entry = entry.clone();
                     entry.relevance_score = relevance;
@@ -189,7 +189,7 @@ impl _DynamicMemoryBank {
         
         for bank in self.banks.values() {
             for entry in bank.values() {
-                let relevance = self.calculate_semantic_similarity(query, &entry.state.description);
+                let relevance = self.calculate_semantic_similarity(query, &entry.state);
                 if relevance >= self.config.context_retrieval_threshold {
                     let mut entry = entry.clone();
                     entry.relevance_score = relevance;
@@ -248,16 +248,20 @@ impl _DynamicMemoryBank {
     
     /// 计算语义相似度
     ///
+    /// 匹配范围 = `name` + `description`: 实体名是身份锚点, 只比 description
+    /// 会让按名字检索 (双查询里的长上下文查询, 如 "主角的故事") 恒为 0 分。
+    ///
     /// 注意：此为嵌入模型未接入时的降级方案。使用关键词重叠度估算相似度。
     /// 接入 DINOv2/CLIP 后应替换为向量余弦相似度。
-    fn calculate_semantic_similarity(&self, query: &str, description: &str) -> f32 {
+    fn calculate_semantic_similarity(&self, query: &str, state: &EntityState) -> f32 {
         let query_words: Vec<&str> = query.split_whitespace().collect();
-        let desc_words: Vec<&str> = description.split_whitespace().collect();
+        let mut target_words: Vec<&str> = state.name.split_whitespace().collect();
+        target_words.extend(state.description.split_whitespace());
         
-        // 关键词重叠度 + 长度惩罚
+        // 关键词重叠度
         let mut matches = 0;
         for qw in &query_words {
-            if desc_words.iter().any(|dw| dw.contains(qw) || qw.contains(dw)) {
+            if target_words.iter().any(|dw| dw.contains(qw) || qw.contains(dw)) {
                 matches += 1;
             }
         }

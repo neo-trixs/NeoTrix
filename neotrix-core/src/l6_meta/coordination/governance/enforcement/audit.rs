@@ -18,7 +18,10 @@ pub struct AuditEntry {
     pub action: String,
     /// The enforcement result for this action.
     pub result: EnforcementResult,
-    /// Unix timestamp of when this entry was recorded.
+    /// Unix timestamp (nanoseconds) of when this entry was recorded.
+    ///
+    /// Strictly increasing within one `AuditLog` (see [`AuditLog::log`]), so
+    /// entry order is recoverable from timestamps even for sub-second gaps.
     pub timestamp: u64,
     /// ID of the policy that was checked (empty if multiple).
     pub policy_id: String,
@@ -52,13 +55,17 @@ impl AuditLog {
     /// Log an enforcement result.
     ///
     /// Generates a unique ID and records the entry with the current timestamp.
+    /// The timestamp is nanosecond-resolution and strictly increasing within
+    /// this log, so two back-to-back entries are always orderable and
+    /// `get_by_time_range` can separate them even inside the same second.
     pub fn log(&mut self, result: &EnforcementResult, action: &str, agent_id: &str) -> &AuditEntry {
+        let prev = self.entries.last().map(|e| e.timestamp).unwrap_or(0);
         let entry = AuditEntry {
             id: format!("audit_{}_{}", agent_id, self.entries.len()),
             agent_id: agent_id.to_string(),
             action: action.to_string(),
             result: result.clone(),
-            timestamp: timestamp_now(),
+            timestamp: timestamp_now().max(prev.saturating_add(1)),
             policy_id: String::new(),
         };
 
@@ -129,7 +136,7 @@ fn timestamp_now() -> u64 {
             tracing::warn!("SystemTime before UNIX_EPOCH, falling back to 0: {}", e);
             std::time::Duration::ZERO
         })
-        .as_secs()
+        .as_nanos() as u64
 }
 
 #[cfg(test)]
@@ -309,7 +316,7 @@ mod tests {
     fn test_get_by_time_range_no_match() {
         let mut log = AuditLog::new(100);
         log.log(&allowed_result(), "a", "agent_1");
-        let entries = log.get_by_time_range(0, 1);
+        let _entries = log.get_by_time_range(0, 1);
         // Should match since timestamp is likely > 1
         // But let's test with a future range
         let entries = log.get_by_time_range(u64::MAX - 1, u64::MAX);

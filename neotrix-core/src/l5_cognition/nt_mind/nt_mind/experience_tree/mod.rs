@@ -891,11 +891,14 @@ mod tests {
     #[test]
     fn test_nexus_weaver_scheduler() {
         // 验证 NexusWeaverScheduler 结构正确
-        // (实际 KB 交互需要运行时环境)
-        let _scheduler = NexusWeaverScheduler {
-            kb: Arc::new(KnowledgeBase::open(None).unwrap_or_else(|_| panic!("KB open failed"))),
+        // (实际 KB 交互需要运行时环境) —— 用 `:memory:` 库, 不碰真实 $HOME DB / 文件锁
+        let kb = KnowledgeBase::open(Some(std::path::PathBuf::from(":memory:")))
+            .unwrap_or_else(|e| panic!("KB open failed: {e}"));
+        let scheduler = NexusWeaverScheduler {
+            kb: Arc::new(kb),
             min_pattern_occurrences: 3,
             last_weave_ts: 0,
         };
+        assert_eq!(scheduler.min_pattern_occurrences, 3);
     }
 }

@@ -643,13 +643,17 @@ impl ForecastEngine {
     }
 
     /// 启用 LLM 叙事层 — 推演时内部自动调用 NT-IO LLM 池子。
-    /// `model` 传 None 让池子自动选择最佳 provider。
+    ///
+    /// `model` 传 `None` 表示"不启用叙事层"：`narrator` 保持 `None`，
+    /// [`ForecastEngine::generate_forecast`] 直接走确定性叙事兜底，
+    /// 不发起任何 LLM 调用（无 provider 探测 / 无重试 / 无退避 sleep）。
+    /// 传具体模型名才启用 LLM 叙事。
     pub fn with_llm_narrator(mut self, model: Option<&str>) -> Self {
-        let mut narrator = LlmNarrator::new();
-        if let Some(m) = model {
-            narrator = narrator.with_model(m);
-        }
-        self.narrator = Some(narrator);
+        let Some(m) = model else {
+            self.narrator = None;
+            return self;
+        };
+        self.narrator = Some(LlmNarrator::new().with_model(m));
         self
     }
 
@@ -1227,12 +1231,12 @@ mod tests {
         assert!(ctx.contains("TARGET: gold"));
     }
 
-    /// 启用 LLM 叙事层后，生成推演不因缺 provider 而 panic（优雅降级）。
+    /// `with_llm_narrator(None)`（不启用叙事层）时，生成推演走确定性兜底、
+    /// 不发起任何 LLM 调用（无 provider 探测 / 无重试退避）。
     ///
-    /// llm7 匿名可用时走真实 LLM 叙事；不可用时降级确定性叙事。两种都合法，
-    /// 关键是：不 panic、每个叶子都有非空叙事。
+    /// 每个叶子都应有非空叙事（确定性描述）。
     #[test]
-    fn test_llm_narrator_enabled_falls_back_gracefully() {
+    fn test_llm_narrator_disabled_falls_back_gracefully() {
         let mut engine = ForecastEngine::new().with_llm_narrator(None);
         engine.ingest_event("fed", "cut", "rates", 0.9);
         let f = engine.generate_forecast("gold", 1);
@@ -1240,8 +1244,9 @@ mod tests {
             let narr = leaf.narrative.as_deref().unwrap_or("");
             assert!(
                 !narr.trim().is_empty(),
-                "每个叶子都应有叙事（LLM 或确定性）"
+                "每个叶子都应有叙事（确定性兜底）"
             );
+            assert!(narr.contains("scenario"), "应为确定性描述, got: {narr}");
         }
     }
 
