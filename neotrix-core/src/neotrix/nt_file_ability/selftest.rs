@@ -316,7 +316,8 @@ pub struct FileAbilitySelfTest;
 
 impl SelfTest for FileAbilitySelfTest {
     fn name(&self) -> &str {
-        "nt_file_ability"
+        // T3 共享语言：nt_io_ 前缀 → ConsciousnessTree Io 分支（melt 改名回归修复）
+        "nt_io_file_ability"
     }
     
     fn self_test(&self) -> Result<(), Vec<String>> {
@@ -358,7 +359,7 @@ impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CoreDocParseBridge
 
 /// 双 trait 实现: 使 FileAbilitySelfTest 可被 NT-MIND 意识树 SelfTestRegistry 注册。
 impl crate::l6_meta::healing::nt_core_self_test::SelfTest for FileAbilitySelfTest {
-    fn name(&self) -> &str { "nt_file_ability" }
+    fn name(&self) -> &str { "nt_io_file_ability" }
     fn self_test(&self) -> Result<(), Vec<String>> { Ok(()) }
 }
 

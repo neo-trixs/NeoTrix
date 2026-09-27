@@ -253,11 +253,7 @@ pub mod team {
     }
 }
 
-pub mod interface {
-    #[derive(Debug, Clone)]
-    pub struct AgentInterface;
-}
-
+// F1 死码清理（2026-09-27）：空 `interface::AgentInterface` 全仓零引用已删。
 pub mod decoder {
     pub fn decode_state(delta: &[f64], confidence: f64, min: f64) -> String {
         let mag: f64 = delta.iter().map(|x| x * x).sum::<f64>().sqrt();
@@ -372,8 +368,7 @@ pub mod skills {
         fn default() -> Self { Self::new() }
     }
 
-    #[derive(Debug, Clone)]
-    pub struct SkillSource;
+    // F1 死码清理（2026-09-27）：空 `SkillSource` 全仓零引用已删。
 }
 
 pub mod workflow {
