@@ -546,6 +546,10 @@ impl KnowledgeBase {
         let hits = nt_memory_embed::pq_ann_search(&conn, &query_vec, limit, None)
             .map_err(|e| format!("pq_ann_search: {}", e))?;
         if hits.is_empty() {
+            // 必须先释放 `conn` 守卫再递归: `self.conn` 是 `std::sync::Mutex`
+            // (nt_memory_kb/mod.rs:186), 不可重入。`semantic_search` 内部会再次
+            // `self.conn.lock()`, 不释放即永久自死锁。
+            drop(conn);
             return self.semantic_search(query, limit);
         }
         let mut results = Vec::with_capacity(hits.len());

@@ -89,9 +89,26 @@ impl KnowledgeBase {
             let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
             PathBuf::from(home).join(".neotrix").join("knowledge.db")
         });
-        let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open KB: {}", e))?;
+        // 2026-09-27 根因修复：拦截 SQLite 惯用哨兵 ":memory:"。
+        // 此前 `Connection::open(PathBuf::from(":memory:"))` 会在磁盘上**真的**创建
+        // 名为 `:memory:` 的库文件，随后下面 `with_extension("lock")` 的 flock 侧车
+        // 再以 `create(true)` 造出 `:memory:.lock` —— 两者都落在进程 CWD（实测即
+        // 仓库根，0 字节 `:memory:.lock` 生成于 2026-09-27 22:22）。
+        // 全仓 9 处测试用 `Some(PathBuf::from(":memory:"))` 表达"内存库"，这是 Rust
+        // 生态惯例写法，故在被调用方拦截：一处修好全部调用点。
+        // 同族 `TemporalFactLedger::open`(nt_temporal_facts.rs:63) 已有同样处理，
+        // 此处对齐之，保持两处写法一致。内存库无跨进程共享，flock 侧车本无意义。
+        let is_memory = db_path.to_string_lossy() == ":memory:";
+        let conn = if is_memory {
+            Connection::open_in_memory().map_err(|e| format!("Failed to open in-memory KB: {}", e))?
+        } else {
+            Connection::open(&db_path).map_err(|e| format!("Failed to open KB: {}", e))?
+        };
         nt_memory_schema::initialize(&conn)
             .map_err(|e| format!("Failed to initialize KB: {}", e))?;
+        if is_memory {
+            return Ok(Self::init_fields(conn, db_path, None, true));
+        }
         // 锁侧车文件（2026-09-25 根因修复）：flock 绝不能直接下在 sqlite 库文件上。
         // macOS 上 WAL 模式的 sqlite 持有与 flock 互斥的锁（`kb_flocktest` S5 实证：
         // WAL-idle 下 try_lock 必败 WouldBlock），open 期 try_lock 失败 → 写前阻塞锁
