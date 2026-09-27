@@ -664,7 +664,7 @@ impl SelfImprovementLoop {
     /// Consider: logarithmic scaling for high-severity issues, priority caps,
     /// and consideration of historical impact when prioritizing.
     fn severity_to_priority(severity: f64) -> u8 {
-        ((severity * 9.0) + 1.0).round() as u8
+        1 + (severity * 9.0).floor() as u8
     }
 
     /// Prune metrics history to keep only the most recent entries.

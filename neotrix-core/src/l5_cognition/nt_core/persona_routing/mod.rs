@@ -119,7 +119,7 @@ impl PersonaRouter {
     pub fn detect_prism_route(&self, input: &str) -> PrismRoute {
         let input_lower = input.to_lowercase();
 
-        if input_lower.contains("制作") || input_lower.contains("craft") || input_lower.contains("build") {
+        if input_lower.contains("制作") || input_lower.contains("craft") || input_lower.contains("build") || input_lower.contains("设计") {
             PrismRoute::Craft
         } else if input_lower.contains("解剖") || input_lower.contains("dissect") || input_lower.contains("analyze") {
             PrismRoute::Dissect

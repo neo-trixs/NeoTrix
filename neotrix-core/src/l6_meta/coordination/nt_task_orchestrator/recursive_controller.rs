@@ -40,15 +40,31 @@ impl RecursiveController {
 
     /// Atomizer: 判断任务是否原子（无需进一步分解）
     pub fn atomize(&self, task: &str) -> bool {
-        // 简单启发: 任务描述短于50字符且不包含分解关键词
+        // 简单启发: 无分句符/无多子句, 任务描述短于50字符且不包含分解关键词
         let decomposition_keywords = ["and then", "after that", "first.*then", "multiple", "several"];
         let task_lower = task.to_lowercase();
-        
+
+        // 显式分句符 → 必定可分解（长度短也必须分解）
+        if task.contains(';') || task.contains('\n') {
+            return false;
+        }
+
+        // ≥2 个子句 → 可分解
+        let clause_count = task
+            .split([',', '，', '、'])
+            .filter(|s| !s.trim().is_empty())
+            .count();
+        if clause_count >= 2 {
+            return false;
+        }
+
         if task.len() < 50 {
             return true;
         }
-        
-        !decomposition_keywords.iter().any(|kw| task_lower.contains(kw))
+
+        !decomposition_keywords
+            .iter()
+            .any(|kw| regex::Regex::new(kw).is_ok_and(|re| re.is_match(&task_lower)))
     }
 
     /// Planner: 将非原子任务分解为 MECE 子任务

@@ -163,10 +163,12 @@ impl CollisionSystem {
                         entity.collider.layer,
                         entity.collider.mask,
                         other.collider.layer,
+                        other.collider.mask,
                     ) && !layers_compatible(
                         other.collider.layer,
                         other.collider.mask,
                         entity.collider.layer,
+                        entity.collider.mask,
                     ) {
                         continue;
                     }
@@ -204,8 +206,8 @@ impl CollisionSystem {
 // 碰撞检测内部函数
 // ═══════════════════════════════════════════════════════════════════
 
-fn layers_compatible(layer: u32, mask: u32, other_layer: u32) -> bool {
-    (layer & mask) != 0 && (other_layer & mask) != 0
+fn layers_compatible(a_layer: u32, a_mask: u32, b_layer: u32, b_mask: u32) -> bool {
+    (a_layer & b_mask) != 0 && (b_layer & a_mask) != 0
 }
 
 fn detect_collision(
@@ -583,7 +585,10 @@ mod tests {
             },
             EntityData {
                 id: 2,
-                transform: Transform2D::new(Vec2::new(20.0, 0.0)),
+                // 2026-09-27: 原 20.0 → 碰撞盒 15..25 与 5..15 仅边缘相接,
+                // 按 test_adjacent_no_overlap 的既定语义属"不相交"; 移至 18.0
+                // 形成 3 单位真实重叠, 才是本例要验的 offset 场景
+                transform: Transform2D::new(Vec2::new(18.0, 0.0)),
                 collider: Collider::rectangle(10.0, 10.0),
             },
         ];

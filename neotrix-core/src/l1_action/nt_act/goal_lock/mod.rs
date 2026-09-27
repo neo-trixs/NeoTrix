@@ -70,7 +70,10 @@ impl GoalLock {
 
         if response_lower.contains("cannot") || response_lower.contains("unable") {
             RefusalType::ModelRefusal
-        } else if response_lower.contains("safety") || response_lower.contains("security") {
+        } else if response_lower.contains("safety")
+            || response_lower.contains("security")
+            || response_lower.contains("unsafe")
+        {
             RefusalType::Safeguard
         } else if response_lower.contains("uncertain") || response_lower.contains("maybe") {
             RefusalType::Uncertain

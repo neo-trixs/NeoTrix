@@ -761,7 +761,7 @@ mod tests {
         // 消费点: seal_loop.rs decompose 分支 (atomic_decomposition/output_contract)
         //         seal_loop.rs 意图隔离观测点 (intent_isolation/need_to_know)
         let seal = std::fs::read_to_string(
-            concat!(env!("CARGO_MANIFEST_DIR"), "/src/neotrix/l8_autonomic_impl/nt_mind/seal_core/self_iterating/loop_impl/seal_loop.rs"),
+            concat!(env!("CARGO_MANIFEST_DIR"), "/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/loop_impl/seal_loop.rs"),
         )
         .unwrap();
         assert!(seal.contains("AtomicDecomposer"), "seal_loop 必须消费 atomic_decomposition");

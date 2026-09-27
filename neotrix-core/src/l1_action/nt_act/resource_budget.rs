@@ -3,7 +3,7 @@
 //! 管理 AI 生成任务的 Token、GPU、成本等资源
 //! 适用于：所有 AI 生成和推理场景
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // ============================================================================
@@ -62,12 +62,12 @@ impl ResourceQuota {
     pub fn available(&self) -> f64 {
         (self.limit - self.used - self.reserved).max(0.0)
     }
-    
+
     /// 检查是否有足够资源
     pub fn has_enough(&self, amount: f64) -> bool {
         self.available() >= amount
     }
-    
+
     /// 获取使用率
     pub fn usage_rate(&self) -> f64 {
         if self.limit == 0.0 {
@@ -76,7 +76,7 @@ impl ResourceQuota {
             self.used / self.limit
         }
     }
-    
+
     /// 是否接近上限
     pub(crate) fn _is_near_limit(&self, threshold: f64) -> bool {
         self.usage_rate() >= threshold
@@ -211,7 +211,7 @@ impl ResourceBudgetManager {
             period_usage: HashMap::new(),
         }
     }
-    
+
     /// 使用配置创建
     pub fn with_config(config: BudgetConfig) -> Self {
         Self {
@@ -220,12 +220,15 @@ impl ResourceBudgetManager {
             period_usage: HashMap::new(),
         }
     }
-    
+
     /// 检查预算
     pub fn check_budget(&self, resource_type: ResourceType, amount: f64) -> BudgetCheckResult {
-        let quota = self.config.quotas.iter()
+        let quota = self
+            .config
+            .quotas
+            .iter()
             .find(|q| q.resource_type == resource_type);
-        
+
         match quota {
             Some(quota) => {
                 let remaining = quota.available();
@@ -233,7 +236,7 @@ impl ResourceBudgetManager {
                 let within_budget = remaining >= amount;
                 let alert_triggered = usage_rate >= self.config.alert_threshold;
                 let hard_limit_triggered = usage_rate >= self.config.hard_limit_threshold;
-                
+
                 let recommendation = if hard_limit_triggered {
                     BudgetRecommendation::Reject
                 } else if alert_triggered {
@@ -243,7 +246,7 @@ impl ResourceBudgetManager {
                 } else {
                     BudgetRecommendation::Continue
                 };
-                
+
                 BudgetCheckResult {
                     within_budget,
                     alert_triggered,
@@ -263,22 +266,25 @@ impl ResourceBudgetManager {
             },
         }
     }
-    
+
     /// 记录资源使用
     pub fn record_usage(&mut self, usage: ResourceUsage) {
         // 更新配额使用量
-        if let Some(quota) = self.config.quotas.iter_mut()
-            .find(|q| q.resource_type == usage.resource_type) 
+        if let Some(quota) = self
+            .config
+            .quotas
+            .iter_mut()
+            .find(|q| q.resource_type == usage.resource_type)
         {
             quota.used += usage.amount;
         }
-        
+
         // 更新周期统计
         *self.period_usage.entry(usage.resource_type).or_insert(0.0) += usage.amount;
-        
+
         self.history.push(usage);
     }
-    
+
     /// 获取成本估算
     ///
     /// Uses `external_prices` when provided (model → $/1K tokens).
@@ -326,33 +332,42 @@ impl ResourceBudgetManager {
 
         Some((token_count as f64 / 1000.0) * cost_per_1k)
     }
-    
+
     /// 获取使用统计
     pub fn statistics(&self) -> BudgetStats {
-        let total_cost: f64 = self.history.iter()
-            .filter(|u| u.resource_type == ResourceType::CostUSD)
-            .map(|u| u.cost)
-            .sum();
-        
-        let total_tokens: f64 = self.history.iter()
+        let total_cost: f64 = self.history.iter().map(|u| u.cost).sum();
+
+        let total_tokens: f64 = self
+            .history
+            .iter()
             .filter(|u| u.resource_type == ResourceType::Token)
             .map(|u| u.amount)
             .sum();
-        
-        let total_tasks = self.history.iter()
+
+        let total_tasks = self
+            .history
+            .iter()
             .map(|u| u.task_id.clone())
             .collect::<std::collections::HashSet<_>>()
             .len();
-        
+
         BudgetStats {
             total_cost_usd: total_cost,
             total_tokens: total_tokens as u64,
             total_tasks,
-            avg_cost_per_task: if total_tasks > 0 { total_cost / total_tasks as f64 } else { 0.0 },
-            avg_tokens_per_task: if total_tasks > 0 { total_tokens / total_tasks as f64 } else { 0.0 },
+            avg_cost_per_task: if total_tasks > 0 {
+                total_cost / total_tasks as f64
+            } else {
+                0.0
+            },
+            avg_tokens_per_task: if total_tasks > 0 {
+                total_tokens / total_tasks as f64
+            } else {
+                0.0
+            },
         }
     }
-    
+
     /// 重置周期使用量
     pub(crate) fn _reset_period_usage(&mut self) {
         self.period_usage.clear();
@@ -408,7 +423,7 @@ mod tests {
                 resource_type: ResourceType::Token,
                 period: BudgetPeriod::Daily,
                 limit: 1000.0,
-                used: 800.0,  // 80% used
+                used: 800.0, // 80% used
                 reserved: 0.0,
             }],
             alert_threshold: 0.9,
@@ -437,7 +452,7 @@ mod tests {
                 resource_type: ResourceType::Token,
                 period: BudgetPeriod::Daily,
                 limit: 1000.0,
-                used: 900.0,  // 90% used = alert_threshold
+                used: 900.0, // 90% used = alert_threshold
                 reserved: 0.0,
             }],
             alert_threshold: 0.9,
@@ -454,7 +469,7 @@ mod tests {
         let manager = ResourceBudgetManager::with_config(config);
 
         let result = manager.check_budget(ResourceType::Token, 1.0);
-        assert!(result.within_budget);  // 99 remaining >= 1
+        assert!(result.within_budget); // 99 remaining >= 1
         assert!(result.alert_triggered);
         assert_eq!(result.recommendation, BudgetRecommendation::Degraded);
     }
@@ -466,7 +481,7 @@ mod tests {
                 resource_type: ResourceType::Token,
                 period: BudgetPeriod::Daily,
                 limit: 1000.0,
-                used: 960.0,  // 96% used = hard_limit_threshold
+                used: 960.0, // 96% used = hard_limit_threshold
                 reserved: 0.0,
             }],
             alert_threshold: 0.8,
@@ -499,7 +514,9 @@ mod tests {
         manager.record_usage(ResourceUsage {
             task_id: "heavy".into(),
             resource_type: ResourceType::Token,
-            amount: 950_000.0,
+            // 2026-09-27: 0.95 恰好等于 hard_limit_threshold(0.95) → Reject;
+            // 本例验证的是"降级"档, 取 0.90 留余量
+            amount: 900_000.0,
             cost: 0.0,
             timestamp: 0,
             tags: vec![],

@@ -21,8 +21,12 @@ impl Conversation {
     /// 创建新对话
     pub fn new(goal: &str, model: Option<String>) -> Self {
         let now = unix_now();
+        let id_nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
         Self {
-            id: format!("conv-{:x}", now),
+            id: format!("conv-{:x}", id_nanos),
             goal: goal.to_string(),
             transcript: Vec::new(),
             model,

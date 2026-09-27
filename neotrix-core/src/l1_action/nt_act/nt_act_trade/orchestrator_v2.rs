@@ -77,9 +77,11 @@ impl WorkerType {
             Self::Contract
         } else if lower.contains("produc") || lower.contains("生产") {
             Self::Production
-        } else if lower.contains("logist") || lower.contains("物流") || lower.contains("shipment") {
+        } else if lower.contains("logist") || lower.contains("物流") || lower.contains("shipment")
+        {
             Self::Logistics
-        } else if lower.contains("financ") || lower.contains("财务") || lower.contains("payment") {
+        } else if lower.contains("financ") || lower.contains("财务") || lower.contains("payment")
+        {
             Self::Finance
         } else {
             Self::Generic
@@ -239,16 +241,15 @@ impl TaskTracker {
     }
 
     fn is_ready(&self, task: &TradeTask) -> bool {
-        task.dependencies.iter().all(|dep| {
-            matches!(
-                self.tasks.get(dep),
-                Some(TaskStatus::Completed)
-            )
-        })
+        task.dependencies
+            .iter()
+            .all(|dep| matches!(self.tasks.get(dep), Some(TaskStatus::Completed)))
     }
 
     fn elapsed_ms(&self, task_id: &Uuid) -> Option<u64> {
-        self.start_times.get(task_id).map(|t| t.elapsed().as_millis() as u64)
+        self.start_times
+            .get(task_id)
+            .map(|t| t.elapsed().as_millis() as u64)
     }
 }
 
@@ -276,17 +277,47 @@ impl Default for TradeRouter {
 impl TradeRouter {
     pub fn new() -> Self {
         let rules = vec![
-            RouteRule { pattern: "inquiry".into(), worker: WorkerType::Inquiry },
-            RouteRule { pattern: "quote".into(), worker: WorkerType::Quotation },
-            RouteRule { pattern: "quotation".into(), worker: WorkerType::Quotation },
-            RouteRule { pattern: "contract".into(), worker: WorkerType::Contract },
-            RouteRule { pattern: "production".into(), worker: WorkerType::Production },
-            RouteRule { pattern: "logistics".into(), worker: WorkerType::Logistics },
-            RouteRule { pattern: "shipment".into(), worker: WorkerType::Logistics },
-            RouteRule { pattern: "finance".into(), worker: WorkerType::Finance },
-            RouteRule { pattern: "payment".into(), worker: WorkerType::Finance },
+            RouteRule {
+                pattern: "inquiry".into(),
+                worker: WorkerType::Inquiry,
+            },
+            RouteRule {
+                pattern: "quote".into(),
+                worker: WorkerType::Quotation,
+            },
+            RouteRule {
+                pattern: "quotation".into(),
+                worker: WorkerType::Quotation,
+            },
+            RouteRule {
+                pattern: "contract".into(),
+                worker: WorkerType::Contract,
+            },
+            RouteRule {
+                pattern: "production".into(),
+                worker: WorkerType::Production,
+            },
+            RouteRule {
+                pattern: "logistics".into(),
+                worker: WorkerType::Logistics,
+            },
+            RouteRule {
+                pattern: "shipment".into(),
+                worker: WorkerType::Logistics,
+            },
+            RouteRule {
+                pattern: "finance".into(),
+                worker: WorkerType::Finance,
+            },
+            RouteRule {
+                pattern: "payment".into(),
+                worker: WorkerType::Finance,
+            },
         ];
-        Self { rules, default_worker: WorkerType::Generic }
+        Self {
+            rules,
+            default_worker: WorkerType::Generic,
+        }
     }
 
     pub fn route(&self, task: &TradeTask) -> WorkerType {
@@ -318,7 +349,14 @@ pub trait TradeWorker: Send + Sync {
 /// 通用回调 Worker — 用闭包实现不同 worker 类型
 struct CallbackWorker {
     wtype: WorkerType,
-    handler: Box<dyn Fn(&TradeTask) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<WorkerResult, String>> + Send>> + Send + Sync>,
+    handler: Box<
+        dyn Fn(
+                &TradeTask,
+            ) -> std::pin::Pin<
+                Box<dyn std::future::Future<Output = Result<WorkerResult, String>> + Send>,
+            > + Send
+            + Sync,
+    >,
 }
 
 #[async_trait::async_trait]
@@ -355,7 +393,13 @@ impl WorkerPool {
     pub fn register_callback_worker(
         &mut self,
         wtype: WorkerType,
-        handler: impl Fn(&TradeTask) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<WorkerResult, String>> + Send>> + Send + Sync + 'static,
+        handler: impl Fn(
+                &TradeTask,
+            ) -> std::pin::Pin<
+                Box<dyn std::future::Future<Output = Result<WorkerResult, String>> + Send>,
+            > + Send
+            + Sync
+            + 'static,
     ) {
         let worker = Arc::new(CallbackWorker {
             wtype: wtype.clone(),
@@ -397,11 +441,7 @@ impl WorkerPool {
         }
     }
 
-    pub async fn execute_task(
-        &self,
-        task: &TradeTask,
-        worker_type: &WorkerType,
-    ) -> WorkerResult {
+    pub async fn execute_task(&self, task: &TradeTask, worker_type: &WorkerType) -> WorkerResult {
         let worker = match self.workers.get(worker_type) {
             Some(w) => Arc::clone(w),
             None => {
@@ -415,7 +455,11 @@ impl WorkerPool {
             }
         };
 
-        let permit = self.semaphore.clone().acquire_owned().await
+        let permit = self
+            .semaphore
+            .clone()
+            .acquire_owned()
+            .await
             .map_err(|_| "semaphore closed".to_string())
             .expect("semaphore closed unexpectedly");
 
@@ -494,10 +538,7 @@ impl Default for TradeOrchestrator {
 impl TradeOrchestrator {
     pub fn new(config: OrchestratorConfig) -> Self {
         let (tx, rx) = mpsc::channel(256);
-        let mut worker_pool = WorkerPool::new(
-            config.max_parallel_tasks,
-            config.task_timeout_secs,
-        );
+        let mut worker_pool = WorkerPool::new(config.max_parallel_tasks, config.task_timeout_secs);
         worker_pool.register_default_workers();
 
         Self {
@@ -534,10 +575,13 @@ impl TradeOrchestrator {
         tracker.register(task.id);
         drop(tracker);
 
-        let _ = self.message_tx.send(TradeMessage::TaskScheduled {
-            task_id: task.id,
-            task_type: task.task_type.clone(),
-        }).await;
+        let _ = self
+            .message_tx
+            .send(TradeMessage::TaskScheduled {
+                task_id: task.id,
+                task_type: task.task_type.clone(),
+            })
+            .await;
 
         let worker_type = self.router.route(&task);
         let start = Instant::now();
@@ -548,10 +592,13 @@ impl TradeOrchestrator {
             tracker.set_running(task.id);
             drop(tracker);
 
-            let _ = self.message_tx.send(TradeMessage::TaskStarted {
-                task_id: task.id,
-                worker: worker_type.clone(),
-            }).await;
+            let _ = self
+                .message_tx
+                .send(TradeMessage::TaskStarted {
+                    task_id: task.id,
+                    worker: worker_type.clone(),
+                })
+                .await;
 
             let result = self.worker_pool.execute_task(&task, &worker_type).await;
 
@@ -560,18 +607,26 @@ impl TradeOrchestrator {
                 tracker.set_completed(task.id, result.clone());
                 drop(tracker);
 
-                let _ = self.message_tx.send(TradeMessage::TaskCompleted {
-                    task_id: task.id,
-                    success: true,
-                }).await;
+                let _ = self
+                    .message_tx
+                    .send(TradeMessage::TaskCompleted {
+                        task_id: task.id,
+                        success: true,
+                    })
+                    .await;
 
                 let duration = start.elapsed().as_millis() as u64;
                 self.stats.completed.fetch_add(1, Ordering::Relaxed);
                 self.stats.in_progress.fetch_sub(1, Ordering::Relaxed);
-                self.stats.total_duration_ms.fetch_add(duration, Ordering::Relaxed);
+                self.stats
+                    .total_duration_ms
+                    .fetch_add(duration, Ordering::Relaxed);
 
                 let aggregated = if self.config.enable_aggregation {
-                    Some(serde_json::to_value(self.aggregate_results(vec![result.clone()])).unwrap_or_default())
+                    Some(
+                        serde_json::to_value(self.aggregate_results(vec![result.clone()]))
+                            .unwrap_or_default(),
+                    )
                 } else {
                     None
                 };
@@ -600,10 +655,13 @@ impl TradeOrchestrator {
         tracker.set_failed(task.id, error_msg.clone());
         drop(tracker);
 
-        let _ = self.message_tx.send(TradeMessage::TaskFailed {
-            task_id: task.id,
-            error: error_msg.clone(),
-        }).await;
+        let _ = self
+            .message_tx
+            .send(TradeMessage::TaskFailed {
+                task_id: task.id,
+                error: error_msg.clone(),
+            })
+            .await;
 
         self.stats.failed.fetch_add(1, Ordering::Relaxed);
         self.stats.in_progress.fetch_sub(1, Ordering::Relaxed);
@@ -630,7 +688,9 @@ impl TradeOrchestrator {
         }
 
         let task_count = tasks.len();
-        self.stats.total.fetch_add(task_count as u64, Ordering::Relaxed);
+        self.stats
+            .total
+            .fetch_add(task_count as u64, Ordering::Relaxed);
 
         let task_map: HashMap<Uuid, TradeTask> = tasks.into_iter().map(|t| (t.id, t)).collect();
         let task_ids: Vec<Uuid> = task_map.keys().copied().collect();
@@ -648,7 +708,8 @@ impl TradeOrchestrator {
         loop {
             let ready: Vec<Uuid> = {
                 let tracker = self.task_tracker.lock().await;
-                task_ids.iter()
+                task_ids
+                    .iter()
                     .filter(|id| !completed_set.contains(id))
                     .filter(|id| {
                         let task = &task_map[*id];
@@ -664,13 +725,16 @@ impl TradeOrchestrator {
                         let tracker = self.task_tracker.lock().await;
                         if matches!(tracker.status(id), Some(TaskStatus::Pending)) {
                             completed_set.push(*id);
-                            results.insert(*id, OrchestratorResult {
-                                task_id: *id,
-                                status: TaskStatus::Failed("dependency deadlock".into()),
-                                results: vec![],
-                                aggregated: None,
-                                duration_ms: 0,
-                            });
+                            results.insert(
+                                *id,
+                                OrchestratorResult {
+                                    task_id: *id,
+                                    status: TaskStatus::Failed("dependency deadlock".into()),
+                                    results: vec![],
+                                    aggregated: None,
+                                    duration_ms: 0,
+                                },
+                            );
                         }
                     }
                 }
@@ -683,14 +747,17 @@ impl TradeOrchestrator {
                 break;
             }
 
-            let handles: Vec<_> = ready.into_iter().map(|id| {
-                let task = task_map[&id].clone();
-                let orchestrator_ref = self;
-                async move {
-                    let result = orchestrator_ref.execute(task).await;
-                    (id, result)
-                }
-            }).collect();
+            let handles: Vec<_> = ready
+                .into_iter()
+                .map(|id| {
+                    let task = task_map[&id].clone();
+                    let orchestrator_ref = self;
+                    async move {
+                        let result = orchestrator_ref.execute(task).await;
+                        (id, result)
+                    }
+                })
+                .collect();
 
             let batch_results = futures::future::join_all(handles).await;
 
@@ -700,15 +767,18 @@ impl TradeOrchestrator {
             }
         }
 
-        task_ids.iter().map(|id| {
-            results.remove(id).unwrap_or_else(|| OrchestratorResult {
-                task_id: *id,
-                status: TaskStatus::Cancelled,
-                results: vec![],
-                aggregated: None,
-                duration_ms: 0,
+        task_ids
+            .iter()
+            .map(|id| {
+                results.remove(id).unwrap_or_else(|| OrchestratorResult {
+                    task_id: *id,
+                    status: TaskStatus::Cancelled,
+                    results: vec![],
+                    aggregated: None,
+                    duration_ms: 0,
+                })
             })
-        }).collect()
+            .collect()
     }
 
     /// Decompose complex task into subtasks
@@ -785,27 +855,31 @@ impl TradeOrchestrator {
         let all_success = results.iter().all(|r| r.success);
         let total_duration: u64 = results.iter().map(|r| r.duration_ms).sum();
 
-        let aggregated_output = if results.is_empty() {
+        let outputs: Vec<serde_json::Value> = results.iter().map(|r| r.output.clone()).collect();
+        let combined = if results.is_empty() {
             serde_json::json!({"status": "no_results"})
         } else {
-            let outputs: Vec<serde_json::Value> = results.iter().map(|r| r.output.clone()).collect();
-            serde_json::json!({
-                "combined": outputs,
-                "worker_count": results.len(),
-                "all_success": all_success,
-                "total_duration_ms": total_duration,
-            })
+            serde_json::json!(outputs)
         };
+        let aggregated_output = serde_json::json!({
+            "combined": combined,
+            "worker_count": results.len(),
+            "all_success": all_success,
+            "total_duration_ms": total_duration,
+        });
 
-        let first_task_id = results.first()
-            .and_then(|_| {
-                results.first().map(|_| Uuid::nil())
-            })
+        let first_task_id = results
+            .first()
+            .and_then(|_| results.first().map(|_| Uuid::nil()))
             .unwrap_or(Uuid::nil());
 
         OrchestratorResult {
             task_id: first_task_id,
-            status: if all_success { TaskStatus::Completed } else { TaskStatus::Failed("partial failure".into()) },
+            status: if all_success {
+                TaskStatus::Completed
+            } else {
+                TaskStatus::Failed("partial failure".into())
+            },
             results,
             aggregated: Some(aggregated_output),
             duration_ms: total_duration,
@@ -899,22 +973,52 @@ mod tests {
 
     #[test]
     fn test_worker_type_from_task_type() {
-        assert_eq!(WorkerType::from_task_type("inquiry_parse"), WorkerType::Inquiry);
-        assert_eq!(WorkerType::from_task_type("generate_quotation"), WorkerType::Quotation);
-        assert_eq!(WorkerType::from_task_type("contract_review"), WorkerType::Contract);
-        assert_eq!(WorkerType::from_task_type("production_schedule"), WorkerType::Production);
-        assert_eq!(WorkerType::from_task_type("logistics_tracking"), WorkerType::Logistics);
-        assert_eq!(WorkerType::from_task_type("finance_payment"), WorkerType::Finance);
-        assert_eq!(WorkerType::from_task_type("random_task"), WorkerType::Generic);
+        assert_eq!(
+            WorkerType::from_task_type("inquiry_parse"),
+            WorkerType::Inquiry
+        );
+        assert_eq!(
+            WorkerType::from_task_type("generate_quotation"),
+            WorkerType::Quotation
+        );
+        assert_eq!(
+            WorkerType::from_task_type("contract_review"),
+            WorkerType::Contract
+        );
+        assert_eq!(
+            WorkerType::from_task_type("production_schedule"),
+            WorkerType::Production
+        );
+        assert_eq!(
+            WorkerType::from_task_type("logistics_tracking"),
+            WorkerType::Logistics
+        );
+        assert_eq!(
+            WorkerType::from_task_type("finance_payment"),
+            WorkerType::Finance
+        );
+        assert_eq!(
+            WorkerType::from_task_type("random_task"),
+            WorkerType::Generic
+        );
     }
 
     #[test]
     fn test_worker_type_chinese() {
         assert_eq!(WorkerType::from_task_type("询盘处理"), WorkerType::Inquiry);
-        assert_eq!(WorkerType::from_task_type("报价生成"), WorkerType::Quotation);
+        assert_eq!(
+            WorkerType::from_task_type("报价生成"),
+            WorkerType::Quotation
+        );
         assert_eq!(WorkerType::from_task_type("合同审核"), WorkerType::Contract);
-        assert_eq!(WorkerType::from_task_type("生产调度"), WorkerType::Production);
-        assert_eq!(WorkerType::from_task_type("物流跟踪"), WorkerType::Logistics);
+        assert_eq!(
+            WorkerType::from_task_type("生产调度"),
+            WorkerType::Production
+        );
+        assert_eq!(
+            WorkerType::from_task_type("物流跟踪"),
+            WorkerType::Logistics
+        );
         assert_eq!(WorkerType::from_task_type("财务结算"), WorkerType::Finance);
     }
 
@@ -963,8 +1067,7 @@ mod tests {
         tracker.set_completed(dep_id, dep_result);
         assert_eq!(tracker.status(&dep_id), Some(&TaskStatus::Completed));
 
-        let task_with_dep = TradeTask::new("test", serde_json::json!({}))
-            .with_dependency(dep_id);
+        let task_with_dep = TradeTask::new("test", serde_json::json!({})).with_dependency(dep_id);
         assert!(tracker.is_ready(&task_with_dep));
 
         let task_without_dep = TradeTask::new("test2", serde_json::json!({}));
@@ -981,8 +1084,7 @@ mod tests {
         tracker.register(task_id);
         tracker.register(dep_id);
 
-        let task = TradeTask::new("test", serde_json::json!({}))
-            .with_dependency(dep_id);
+        let task = TradeTask::new("test", serde_json::json!({})).with_dependency(dep_id);
         assert!(!tracker.is_ready(&task));
     }
 
@@ -994,8 +1096,7 @@ mod tests {
         tracker.register(dep_id);
         tracker.set_failed(dep_id, "test error".into());
 
-        let task = TradeTask::new("test", serde_json::json!({}))
-            .with_dependency(dep_id);
+        let task = TradeTask::new("test", serde_json::json!({})).with_dependency(dep_id);
         assert!(!tracker.is_ready(&task));
     }
 
@@ -1089,7 +1190,10 @@ mod tests {
         ];
 
         let aggregated = orch.aggregate_results(results);
-        assert_eq!(aggregated.status, TaskStatus::Failed("partial failure".into()));
+        assert_eq!(
+            aggregated.status,
+            TaskStatus::Failed("partial failure".into())
+        );
         let agg_val = aggregated.aggregated.unwrap();
         assert_eq!(agg_val["all_success"], false);
     }
@@ -1150,8 +1254,8 @@ mod tests {
         let orch = TradeOrchestrator::new(test_config());
 
         let task_a = TradeTask::new("inquiry_task", serde_json::json!({}));
-        let task_b = TradeTask::new("quotation_task", serde_json::json!({}))
-            .with_dependency(task_a.id);
+        let task_b =
+            TradeTask::new("quotation_task", serde_json::json!({})).with_dependency(task_a.id);
 
         let tasks = vec![task_b.clone(), task_a.clone()];
 
@@ -1174,9 +1278,8 @@ mod tests {
         };
 
         let mut orch = TradeOrchestrator::new(config);
-        orch.worker_pool.register_callback_worker(
-            WorkerType::Generic,
-            |_task| {
+        orch.worker_pool
+            .register_callback_worker(WorkerType::Generic, |_task| {
                 Box::pin(async {
                     tokio::time::sleep(Duration::from_secs(5)).await;
                     Ok(WorkerResult {
@@ -1187,12 +1290,14 @@ mod tests {
                         duration_ms: 0,
                     })
                 })
-            },
-        );
+            });
 
         let task = TradeTask::new("slow_task", serde_json::json!({}));
         let result = orch.execute(task).await;
-        assert_eq!(result.status, TaskStatus::Failed("Task timed out after 1s".into()));
+        assert_eq!(
+            result.status,
+            TaskStatus::Failed("Task timed out after 1s".into())
+        );
     }
 
     #[tokio::test]
@@ -1208,9 +1313,8 @@ mod tests {
         let call_count_clone = Arc::clone(&call_count);
 
         let mut orch = TradeOrchestrator::new(config);
-        orch.worker_pool.register_callback_worker(
-            WorkerType::Generic,
-            move |_task| {
+        orch.worker_pool
+            .register_callback_worker(WorkerType::Generic, move |_task| {
                 let count = call_count_clone.fetch_add(1, Ordering::SeqCst);
                 Box::pin(async move {
                     if count < 2 {
@@ -1225,8 +1329,7 @@ mod tests {
                         })
                     }
                 })
-            },
-        );
+            });
 
         let task = TradeTask::new("flaky_task", serde_json::json!({}));
         let result = orch.execute(task).await;
@@ -1244,14 +1347,10 @@ mod tests {
         };
 
         let mut orch = TradeOrchestrator::new(config);
-        orch.worker_pool.register_callback_worker(
-            WorkerType::Generic,
-            |_task| {
-                Box::pin(async {
-                    Err("persistent error".into())
-                })
-            },
-        );
+        orch.worker_pool
+            .register_callback_worker(WorkerType::Generic, |_task| {
+                Box::pin(async { Err("persistent error".into()) })
+            });
 
         let task = TradeTask::new("always_fail_task", serde_json::json!({}));
         let result = orch.execute(task).await;
@@ -1303,8 +1402,7 @@ mod tests {
     async fn test_is_task_ready() {
         let orch = TradeOrchestrator::new(test_config());
         let dep = TradeTask::new("dep_task", serde_json::json!({}));
-        let task = TradeTask::new("main_task", serde_json::json!({}))
-            .with_dependency(dep.id);
+        let task = TradeTask::new("main_task", serde_json::json!({})).with_dependency(dep.id);
 
         assert!(!orch.is_task_ready(&task).await);
 
@@ -1324,7 +1422,9 @@ mod tests {
         struct CustomWorker;
         #[async_trait::async_trait]
         impl TradeWorker for CustomWorker {
-            fn worker_type(&self) -> WorkerType { WorkerType::Inquiry }
+            fn worker_type(&self) -> WorkerType {
+                WorkerType::Inquiry
+            }
             async fn execute(&self, _task: &TradeTask) -> Result<WorkerResult, String> {
                 Ok(WorkerResult {
                     worker_type: WorkerType::Inquiry,
@@ -1360,9 +1460,8 @@ mod tests {
         let max_clone = Arc::clone(&max_observed);
 
         let mut orch = TradeOrchestrator::new(config);
-        orch.worker_pool.register_callback_worker(
-            WorkerType::Generic,
-            move |_task| {
+        orch.worker_pool
+            .register_callback_worker(WorkerType::Generic, move |_task| {
                 let active = Arc::clone(&active_clone);
                 let max = Arc::clone(&max_clone);
                 Box::pin(async move {
@@ -1378,8 +1477,7 @@ mod tests {
                         duration_ms: 0,
                     })
                 })
-            },
-        );
+            });
 
         let tasks: Vec<_> = (0..6)
             .map(|i| TradeTask::new(format!("task_{}", i), serde_json::json!({})))
@@ -1388,6 +1486,10 @@ mod tests {
         let _ = orch.execute_parallel(tasks).await;
 
         let observed_max = max_observed.load(Ordering::SeqCst);
-        assert!(observed_max <= 2, "Max concurrent should be <= 2, got {}", observed_max);
+        assert!(
+            observed_max <= 2,
+            "Max concurrent should be <= 2, got {}",
+            observed_max
+        );
     }
 }

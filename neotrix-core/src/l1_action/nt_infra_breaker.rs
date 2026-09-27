@@ -74,7 +74,9 @@ impl InfraBreaker {
                 if self.recent_results.len() > self.config.window_size as usize {
                     self.recent_results.remove(0);
                 }
-                if self.error_rate() >= self.config.error_threshold {
+                if self.recent_results.len() >= self.config.window_size as usize
+                    && self.error_rate() >= self.config.error_threshold
+                {
                     self.inner.state = BreakerState::Open;
                     self.inner.last_state_change = Some(std::time::Instant::now());
                     self.open_since = Some(now);
@@ -202,7 +204,7 @@ mod tests {
 
     #[test]
     fn test_breaker_closed_allows() {
-        let mut b = InfraBreaker::new(BreakerConfig::default());
+        let b = InfraBreaker::new(BreakerConfig::default());
         assert!(b.allow());
         assert_eq!(b.state(), BreakerState::Closed);
     }

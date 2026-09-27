@@ -88,16 +88,23 @@ impl RotationCoordinator {
             let mult = domain.mean_multiplier();
             let dmean = mean_ms * mult;
             let dstd = std_ms * mult;
-            let offset = if max_ms == 0 { 0 } else { rng.gen_range(0..max_ms) };
+            let offset = if max_ms == 0 {
+                0
+            } else {
+                rng.gen_range(0..max_ms)
+            };
             let interval = Self::sample_interval(dmean, dstd);
-            domains.push((domain, DomainState {
-                mean_ms: dmean,
-                std_dev_ms: dstd,
-                phase_offset_ms: offset,
-                last_rotation: Instant::now(),
-                rotation_count: AtomicU64::new(0),
-                next_interval_ms: interval,
-            }));
+            domains.push((
+                domain,
+                DomainState {
+                    mean_ms: dmean,
+                    std_dev_ms: dstd,
+                    phase_offset_ms: offset,
+                    last_rotation: Instant::now(),
+                    rotation_count: AtomicU64::new(0),
+                    next_interval_ms: interval,
+                },
+            ));
         }
 
         Arc::new(Self {
@@ -111,10 +118,13 @@ impl RotationCoordinator {
     }
 
     pub async fn next_interval_ms(&self, domain: RotationDomain) -> u64 {
-        let domains = self.domains.read().await;
-        for (d, state) in domains.iter() {
+        let mut domains = self.domains.write().await;
+        for (d, state) in domains.iter_mut() {
             if *d == domain {
-                return state.next_interval_ms;
+                // 重新采样而非返回缓存值，否则抖动是死的
+                let interval = Self::sample_interval(state.mean_ms, state.std_dev_ms);
+                state.next_interval_ms = interval;
+                return interval;
             }
         }
         Self::sample_interval(7500.0, 2500.0)
@@ -198,10 +208,18 @@ impl RotationCoordinator {
 
     pub async fn summary(&self) -> Vec<(RotationDomain, u64, u64, u64)> {
         let domains = self.domains.read().await;
-        domains.iter().map(|(d, state)| {
-            let elapsed = state.last_rotation.elapsed().as_millis() as u64;
-            (*d, state.mean_ms as u64, elapsed, state.rotation_count.load(Ordering::Relaxed))
-        }).collect()
+        domains
+            .iter()
+            .map(|(d, state)| {
+                let elapsed = state.last_rotation.elapsed().as_millis() as u64;
+                (
+                    *d,
+                    state.mean_ms as u64,
+                    elapsed,
+                    state.rotation_count.load(Ordering::Relaxed),
+                )
+            })
+            .collect()
     }
 }
 
@@ -219,10 +237,17 @@ mod tests {
     #[tokio::test]
     async fn test_gaussian_interval_bounds() {
         let coord = RotationCoordinator::new();
+        // 2026-09-27: 上下界跟随真实 clamp 配置 (sample_interval 用
+        // min/max_interval_secs 夹取), 原硬编码 2000..15000 与配置不符 ——
+        // 此前 next_interval_ms 返回缓存值只采样一次, 侥幸落在界内;
+        // 恢复重采样后 200 次里必然越界, 断言才真正成立。
+        let c = cfg();
+        let min = (c.rotation.min_interval_secs * 1000.0) as u64;
+        let max = (c.rotation.max_interval_secs * 1000.0) as u64;
         for _ in 0..200 {
             let i = coord.next_interval_ms(RotationDomain::TlsFingerprint).await;
-            assert!(i >= 2000, "interval {} below 2000ms", i);
-            assert!(i <= 15000, "interval {} above 15000ms", i);
+            assert!(i >= min, "interval {} below clamp min {}", i, min);
+            assert!(i <= max, "interval {} above clamp max {}", i, max);
         }
     }
 
@@ -258,7 +283,10 @@ mod tests {
         coord.mark_rotated(RotationDomain::ProxyChain).await;
         coord.mark_rotated(RotationDomain::TlsFingerprint).await;
         assert_eq!(coord.rotation_count(RotationDomain::ProxyChain).await, 1);
-        assert_eq!(coord.rotation_count(RotationDomain::TlsFingerprint).await, 1);
+        assert_eq!(
+            coord.rotation_count(RotationDomain::TlsFingerprint).await,
+            1
+        );
         assert_eq!(coord.rotation_count(RotationDomain::SourceIp).await, 0);
     }
 
@@ -275,8 +303,18 @@ mod tests {
         for &domain in RotationDomain::all() {
             for _ in 0..100 {
                 let i = coord.next_interval_ms(domain).await;
-                assert!(i <= max_ms, "domain {:?} interval {} exceeds max {max_ms}", domain, i);
-                assert!(i >= min_ms, "domain {:?} interval {} below min {min_ms}", domain, i);
+                assert!(
+                    i <= max_ms,
+                    "domain {:?} interval {} exceeds max {max_ms}",
+                    domain,
+                    i
+                );
+                assert!(
+                    i >= min_ms,
+                    "domain {:?} interval {} below min {min_ms}",
+                    domain,
+                    i
+                );
             }
         }
     }

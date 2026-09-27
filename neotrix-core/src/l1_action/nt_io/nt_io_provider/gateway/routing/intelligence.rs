@@ -46,10 +46,12 @@ impl MLPredictor {
     /// outlier rejection before recording, and correlation with error rate.
     pub fn record(&self, provider: &str, latency: Duration, success: bool) {
         let mut data = self.data.write().unwrap_or_else(|e| e.into_inner());
-        let stats = data.entry(provider.to_string()).or_insert_with(|| ProviderStats {
-            latencies: Vec::new(),
-            last_update: Instant::now(),
-        });
+        let stats = data
+            .entry(provider.to_string())
+            .or_insert_with(|| ProviderStats {
+                latencies: Vec::new(),
+                last_update: Instant::now(),
+            });
         stats.latencies.push((latency, success));
         if stats.latencies.len() > 1000 {
             stats.latencies.drain(0..500);
@@ -69,11 +71,7 @@ impl MLPredictor {
         let data = self.data.read().unwrap_or_else(|e| e.into_inner());
         let stats = data.get(provider)?;
 
-        let mut sorted: Vec<Duration> = stats
-            .latencies
-            .iter()
-            .map(|(d, _)| *d)
-            .collect();
+        let mut sorted: Vec<Duration> = stats.latencies.iter().map(|(d, _)| *d).collect();
         sorted.sort();
 
         if sorted.is_empty() {
@@ -118,7 +116,12 @@ impl MLPredictor {
     /// those with stale data. Consider: filtering by last_update timestamp to return
     /// only recently active providers.
     pub fn get_providers(&self) -> Vec<String> {
-        self.data.read().unwrap_or_else(|e| e.into_inner()).keys().cloned().collect()
+        self.data
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .keys()
+            .cloned()
+            .collect()
     }
 }
 
@@ -219,7 +222,7 @@ impl IntelligentRouter {
             if let Some(budget) = profile.cost_budget {
                 let est_cost = (profile.token_estimate as f64 / 1000.0) * pw.cost_per_1k;
                 if est_cost > budget {
-                    score -= 50.0;
+                    score -= 50.0 * (est_cost / budget).min(4.0);
                 }
             }
 
@@ -275,8 +278,9 @@ impl IntelligentRouter {
         if let Some(pw) = weights.get_mut(provider) {
             let alpha = 0.1;
             let lat_ms = latency.as_millis() as f64;
-            pw.avg_latency =
-                Duration::from_millis((alpha * lat_ms + (1.0 - alpha) * pw.avg_latency.as_millis() as f64) as u64);
+            pw.avg_latency = Duration::from_millis(
+                (alpha * lat_ms + (1.0 - alpha) * pw.avg_latency.as_millis() as f64) as u64,
+            );
             if success {
                 pw.error_rate *= 0.95;
             } else {
@@ -306,21 +310,21 @@ mod tests {
         // accuracy against actual provider performance.
         let predictor = MLPredictor::new();
         for i in 0..100 {
-            predictor.record(
-                "fast",
-                Duration::from_millis(100 + i),
-                true,
-            );
+            predictor.record("fast", Duration::from_millis(100 + i), true);
         }
         let pred = predictor.predict_latency("fast").unwrap();
-        assert!(pred.p50 > Duration::from_millis(100),
-            "p50 should exceed minimum recorded latency");
-        assert!(pred.p95 > pred.p50,
-            "p95 should exceed p50");
+        assert!(
+            pred.p50 > Duration::from_millis(100),
+            "p50 should exceed minimum recorded latency"
+        );
+        assert!(pred.p95 > pred.p50, "p95 should exceed p50");
         // Confidence is derived from sample count (100 samples), not from real accuracy.
         // A low confidence with 100 samples would indicate a bug in the predictor.
-        assert!(pred.confidence > 0.0,
-            "confidence should be positive for 100 samples, got {}", pred.confidence);
+        assert!(
+            pred.confidence > 0.0,
+            "confidence should be positive for 100 samples, got {}",
+            pred.confidence
+        );
     }
 
     #[test]
@@ -339,8 +343,11 @@ mod tests {
         }
         let rate = predictor.predict_success_rate("reliable");
         // Assert ratio matches input proportions, not a "good" success rate
-        assert!((rate - 0.8).abs() < 0.01,
-            "success rate should match input ratio 80/100, got {}", rate);
+        assert!(
+            (rate - 0.8).abs() < 0.01,
+            "success rate should match input ratio 80/100, got {}",
+            rate
+        );
     }
 
     #[test]

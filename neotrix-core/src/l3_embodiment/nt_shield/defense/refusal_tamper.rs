@@ -47,7 +47,7 @@ pub struct RefusalTamperEngine {
 impl RefusalTamperEngine {
     pub fn new() -> Self {
         let mut intent_mappings = HashMap::new();
-        intent_mappings.insert("注册机能写吗".to_string(), "授权门逻辑分析".to_string());
+        intent_mappings.insert("注册机".to_string(), "授权门逻辑分析".to_string());
         intent_mappings.insert("破解会员".to_string(), "会员系统架构分析".to_string());
         intent_mappings.insert("游戏外挂".to_string(), "游戏安全机制研究".to_string());
         intent_mappings.insert("webshell".to_string(), "Web安全评估".to_string());

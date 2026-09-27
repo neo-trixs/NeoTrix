@@ -61,9 +61,13 @@ impl LlmRequest {
         self
     }
 
-    /// Backward-compatible: set image data
+    /// Backward-compatible: set image data (upgrades raw base64 into a `data:` URI)
     pub fn with_image_b64(mut self, b64: String) -> Self {
-        self.image_data = Some(b64);
+        self.image_data = Some(if b64.starts_with("data:") {
+            b64
+        } else {
+            format!("data:image/png;base64,{}", b64)
+        });
         self
     }
 

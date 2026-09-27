@@ -7,6 +7,15 @@ use serde::{Deserialize, Serialize};
 
 use super::scorer::ScoredOption;
 
+/// 判定 top 与 runner-up "几乎并列" 的绝对分差阈值(含边界)
+/// 平局判定阈值 + 浮点容差 —— 0.50-0.49 的实差是 0.010000000000000009,
+/// 不加容差会把真平局判成"有差距" (test_analyze_tied_options 实锤)。
+const TIE_GAP_THRESHOLD: f64 = 0.01 + 1e-9;
+/// 判定 Low risk 的最小相对领先比例: (top - second) / top
+const LOW_RISK_GAP_RATIO: f64 = 0.4;
+/// 判定 Medium risk 的最小相对领先比例: (top - second) / top
+const MEDIUM_RISK_GAP_RATIO: f64 = 0.1;
+
 /// Analysis result from evaluating scored options
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Analysis {
@@ -91,7 +100,7 @@ impl DecisionAnalyzer {
         let runner_up = &scored[1];
         let gap = top.weighted_score - runner_up.weighted_score;
 
-        if gap < 0.01 {
+        if gap <= TIE_GAP_THRESHOLD {
             format!(
                 "Options '{}' and '{}' are virtually tied ({:.3} vs {:.3}). Consider additional criteria.",
                 top.option_id, runner_up.option_id, top.weighted_score, runner_up.weighted_score
@@ -111,11 +120,16 @@ impl DecisionAnalyzer {
         }
 
         let top = scored[0].weighted_score;
-        let avg: f64 = scored.iter().map(|s| s.weighted_score).sum::<f64>() / scored.len() as f64;
+        let second = scored[1].weighted_score;
 
-        if top > avg * 1.5 {
+        // 以 top 与 runner-up 的绝对分差为准(而非均值), 保证 2 选项下 Medium 档可达
+        let gap = top - second;
+        let low_cut = top * LOW_RISK_GAP_RATIO;
+        let medium_cut = top * MEDIUM_RISK_GAP_RATIO;
+
+        if gap >= low_cut {
             "Low risk: clear winner significantly outperforms alternatives.".to_string()
-        } else if top > avg * 1.1 {
+        } else if gap >= medium_cut {
             "Medium risk: winner has moderate advantage. Consider sensitivity analysis.".to_string()
         } else {
             "High risk: options are closely clustered. Recommendation may be sensitive to weight changes.".to_string()

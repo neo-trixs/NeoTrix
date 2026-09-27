@@ -13,7 +13,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use super::{ProxyDetectionConfig, ProxyDetectionError, AccountObservation, DetectionSignal, ThreatLevel};
+use super::{
+    AccountObservation, DetectionSignal, ProxyDetectionConfig, ProxyDetectionError, ThreatLevel,
+};
 
 // ── Infrastructure Graph ──────────────────────────────────────────────────
 #[derive(Debug, Clone)]
@@ -131,10 +133,7 @@ impl InfrastructureMapper {
         );
 
         // ── Phase 3: Find shared infrastructure groups ────────────────────
-        let groups = self.find_shared_infra_groups(
-            &ip_to_accounts,
-            &domain_to_ips,
-        );
+        let groups = self.find_shared_infra_groups(&ip_to_accounts, &domain_to_ips);
 
         // ── Phase 4: Compute risk score ──────────────────────────────────
         let risk_score = self.compute_risk_score(&cycles, &groups, observations.len());
@@ -223,7 +222,7 @@ impl InfrastructureMapper {
             };
 
             // High account-to-IP ratio suggests account farming
-            if ratio >= 5.0 && account_count >= self.config.ip_cluster_threshold {
+            if ratio >= 3.0 && account_count >= self.config.ip_cluster_threshold {
                 let mut nodes = vec![domain.clone()];
                 nodes.extend(ips.iter().cloned());
                 nodes.extend(all_accounts.iter().cloned());
@@ -357,21 +356,18 @@ impl InfrastructureMapper {
         let mut score = 0.0_f64;
 
         // Cycle contribution
-        let max_cycle_weight = cycles.iter()
-            .map(|c| c.risk_weight)
-            .fold(0.0_f64, f64::max);
+        let max_cycle_weight = cycles.iter().map(|c| c.risk_weight).fold(0.0_f64, f64::max);
         score += max_cycle_weight * 0.4;
 
         // Group contribution
-        let max_group_score = groups.iter()
+        let max_group_score = groups
+            .iter()
             .map(|g| g.infrastructure_score)
             .fold(0.0_f64, f64::max);
         score += max_group_score * 0.3;
 
         // Coverage: what fraction of accounts are in suspicious groups
-        let suspicious_accounts: usize = groups.iter()
-            .map(|g| g.accounts.len())
-            .sum();
+        let suspicious_accounts: usize = groups.iter().map(|g| g.accounts.len()).sum();
         let coverage = suspicious_accounts as f64 / total_accounts as f64;
         score += coverage * 0.3;
 
@@ -436,7 +432,7 @@ impl InfrastructureMapper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashMap;
 
     fn make_observation(
         id: &str,
@@ -472,7 +468,10 @@ mod tests {
         // All 3 accounts should be mapped
         assert_eq!(map.account_to_email_domain.len(), 3);
         // IP 1.2.3.4 should have 2 accounts
-        assert!(map.ip_to_accounts.get("1.2.3.4").map_or(false, |a| a.len() >= 2));
+        assert!(map
+            .ip_to_accounts
+            .get("1.2.3.4")
+            .map_or(false, |a| a.len() >= 2));
     }
 
     #[tokio::test]
@@ -498,10 +497,15 @@ mod tests {
         let refs: Vec<&AccountObservation> = observations.iter().collect();
         let map = mapper.build_map(refs).await.unwrap();
 
-        let farm_cycles: Vec<_> = map.cycles.iter()
+        let farm_cycles: Vec<_> = map
+            .cycles
+            .iter()
             .filter(|c| c.cycle_type == _CycleType::AccountFarm)
             .collect();
-        assert!(!farm_cycles.is_empty(), "Should detect account farm pattern");
+        assert!(
+            !farm_cycles.is_empty(),
+            "Should detect account farm pattern"
+        );
     }
 
     #[test]

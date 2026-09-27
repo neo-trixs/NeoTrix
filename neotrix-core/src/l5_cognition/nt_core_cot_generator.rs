@@ -153,7 +153,12 @@ pub enum CoTError {
 impl From<CoTError> for NeoTrixError {
     fn from(e: CoTError) -> Self {
         match e {
-            CoTError::Provider(s) => NeoTrixError::Network(s.to_string()),
+            CoTError::Provider(s) => match s {
+                LlmError::Network(_) | LlmError::Server(_) | LlmError::RateLimit(_) => {
+                    NeoTrixError::Network(s.to_string())
+                }
+                _ => NeoTrixError::Brain(s.to_string()),
+            },
             CoTError::JsonParse(s) => NeoTrixError::Serde(s.to_string()),
             CoTError::InvalidFormat(s) => NeoTrixError::InvalidInput(s),
             CoTError::EmptyResponse => NeoTrixError::InvalidState("CoT empty response".into()),

@@ -28,9 +28,10 @@ impl SelfTest for ConsciousnessTreeSelfTest {
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
         let mut tree = ConsciousnessTree::new();
-        if tree.branches.len() != 11 {
+        if tree.branches.len() != BranchKind::all().len() {
             failures.push(format!(
-                "consciousness_tree: expected 11 branches, got {}",
+                "consciousness_tree: expected {} branches, got {}",
+                BranchKind::all().len(),
                 tree.branches.len()
             ));
             return Err(failures);
@@ -88,7 +89,9 @@ mod tests {
     #[test]
     fn test_tree_new() {
         let tree = ConsciousnessTree::new();
-        assert_eq!(tree.branches.len(), 11);
+        // 2026-09-27: 跟随 BranchKind::all() (已 12 个), 原钉死 11 ——
+        // 与出厂 self-test 同源, 分支演进后两处同时失效
+        assert_eq!(tree.branches.len(), BranchKind::all().len());
         assert_eq!(tree.cycle, 0);
     }
 

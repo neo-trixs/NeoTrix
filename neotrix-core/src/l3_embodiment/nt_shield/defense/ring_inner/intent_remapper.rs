@@ -44,7 +44,10 @@ pub struct IntentRemapper {
 impl IntentRemapper {
     pub fn new() -> Self {
         let mut intent_mappings = HashMap::new();
-        intent_mappings.insert("注册机能写吗".to_string(), "授权门逻辑分析".to_string());
+        // 2026-09-27: 键用整句会让 replace 吞掉请求后缀 ("能写吗"),
+        // 改为实体词, remap_intent 的 contains+replace 才能保留后缀
+        // (与 defense/refusal_tamper.rs 同源修复)。
+        intent_mappings.insert("注册机".to_string(), "授权门逻辑分析".to_string());
         intent_mappings.insert("破解会员".to_string(), "会员系统架构分析".to_string());
         intent_mappings.insert("游戏外挂".to_string(), "游戏安全机制研究".to_string());
         intent_mappings.insert("webshell".to_string(), "Web安全评估".to_string());

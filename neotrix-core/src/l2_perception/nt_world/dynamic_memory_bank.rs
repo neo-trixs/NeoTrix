@@ -268,9 +268,9 @@ impl _DynamicMemoryBank {
             matches as f32 / query_words.len() as f32
         };
         
-        // 关键词重叠度上限为 0.6 — 表示这只是近似匹配
+        // 不做硬性上限截断：截断到 0.6 会让 identity_retrieval_threshold(0.7) 永远无法命中
         // 真实语义相似度应通过向量嵌入计算
-        (base_score * 0.6).min(0.6)
+        base_score
     }
     
     /// 获取记忆库统计
@@ -364,7 +364,7 @@ mod tests {
             appeared_in_shots: vec![],
         });
         
-        let (identity, context) = bank._dual_query_retrieve(&_DualQueryConfig {
+        let (identity, _context) = bank._dual_query_retrieve(&_DualQueryConfig {
             story_query: "主角的故事".to_string(),
             shot_query: "主角在教室".to_string(),
             long_context_k: 5,

@@ -2,7 +2,6 @@
 //!
 //! CoT轨迹保护 + 签名加密 + 上下文保留
 
-
 /// 保护结果
 #[derive(Debug, Clone)]
 pub struct _ProtectionResult {
@@ -40,7 +39,12 @@ impl ReasoningProtectionEngine {
     }
 
     /// 保护推理轨迹
-    pub fn protect(&self, reasoning: &str, signature: &str, level: ProtectionLevel) -> _ProtectionResult {
+    pub fn protect(
+        &self,
+        reasoning: &str,
+        signature: &str,
+        level: ProtectionLevel,
+    ) -> _ProtectionResult {
         let protected = match level {
             ProtectionLevel::None => reasoning.to_string(),
             ProtectionLevel::Basic => self.summarize(reasoning),
@@ -70,18 +74,15 @@ impl ReasoningProtectionEngine {
         let lines: Vec<&str> = reasoning.lines().collect();
         let line_count = lines.len();
 
-        if line_count <= 3 {
+        if line_count < 3 {
             reasoning.to_string()
         } else {
-            let summary = lines.iter()
-                .take(3)
-                .cloned()
-                .collect::<Vec<_>>()
-                .join("\n");
+            let summary = lines.iter().take(3).cloned().collect::<Vec<_>>().join("\n");
 
             format!(
                 "{}\n\n[... {} more lines of reasoning omitted for security ...]",
-                summary, line_count - 3
+                summary,
+                line_count - 3
             )
         }
     }
@@ -94,7 +95,11 @@ impl ReasoningProtectionEngine {
 
     /// 添加水印
     fn add_watermark(&self, reasoning: &str) -> String {
-        format!("{}\n\n[Watermark: {}]", reasoning, hex::encode(&self.encryption_key))
+        format!(
+            "{}\n\n[Watermark: {}]",
+            reasoning,
+            hex::encode(&self.encryption_key)
+        )
     }
 
     /// 加密签名
@@ -166,7 +171,7 @@ mod tests {
             "sig123",
             ProtectionLevel::Standard,
         );
-        
+
         assert!(result.protected_output.contains("omitted for security"));
         assert!(!result.encrypted_signature.is_empty());
     }

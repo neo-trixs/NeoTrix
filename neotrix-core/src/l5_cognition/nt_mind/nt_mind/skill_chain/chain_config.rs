@@ -28,7 +28,7 @@ impl Default for ChainConfig {
         let mut step_timeouts = HashMap::new();
         step_timeouts.insert("Brainstorm".into(), 300);
         step_timeouts.insert("Plan".into(), 120);
-        step_timeouts.insert("Tdd".into(), 600);
+        step_timeouts.insert("TDD".into(), 600);
         step_timeouts.insert("Review".into(), 180);
 
         Self {
@@ -75,7 +75,9 @@ mod tests {
         assert!(cfg.chain_timeout.is_none());
         assert!(cfg.step_timeouts.contains_key("Brainstorm"));
         assert!(cfg.step_timeouts.contains_key("Plan"));
-        assert!(cfg.step_timeouts.contains_key("Tdd"));
+        // 2026-09-27: 键名跟随生产契约 —— SkillStep::Tdd.name() == "TDD",
+        // 原断言钉的是错键 "Tdd", 正是该表对 TDD 整体失效的原因。
+        assert!(cfg.step_timeouts.contains_key("TDD"));
         assert!(cfg.step_timeouts.contains_key("Review"));
     }
 
@@ -98,7 +100,7 @@ mod tests {
     #[test]
     fn test_timeout_for_step_custom() {
         let mut cfg = ChainConfig::default();
-        cfg.step_timeouts.insert("Tdd".into(), 1200);
+        cfg.step_timeouts.insert("TDD".into(), 1200); // 键名随 SkillStep::Tdd.name()
         let step = SkillStep::Tdd { feature: "auth".into() };
         assert_eq!(cfg.timeout_for_step(&step), 1200);
     }
