@@ -86,9 +86,21 @@ fn main() {
                 }
             }
         })
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .unwrap_or_else(|err| {
             eprintln!("NeoBot 启动失败: {err}");
             std::process::exit(1);
+        })
+        .run(|app, event| {
+            // Cmd-Q/Dock Quit 转 Hide（macOS 惯例；优雅退出只走菜单外显路径）。
+            // 自退 hunting 结论：未拦截 ExitRequested 是连环退主因（关窗已 Hide 化）。
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                use tauri::Manager as _;
+                api.prevent_exit();
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
         });
 }
