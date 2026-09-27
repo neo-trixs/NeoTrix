@@ -84,3 +84,13 @@
 - M4：**1058**（629M/271D/158??，净 -5098）；小文件候选（gitignore/build.rs/tsconfig/crystal.example
   等，自有疑似，可分批）。
 - 待提交：本文件 §8。循环未终：App 连环退slots真缺陷（ hunting 中），park 余项不变。
+
+## 9. 四 agent 同步轮3（L 侧栏／T 背景／F 五官／I 红日）＋v0.23.0
+
+- L：侧栏 Telegram 化（presence 点＋置顶分组线＋草稿/typing snippet＋未读 pill，tsc 绿，park 在 worktree）。
+- T：背景统一（壁纸贯通 body 层＋深色同步＋深色气泡对比；abyss＋浅色 trade-off 已告知）。
+- F：云团五官清晰（描边压暗 0.35＋线宽＋高光缩＋腮红 cap 0.5，非云团隔离）。
+- I：红日融生命之花（clip r64 同圆＋6 瓣＋中心＋外圈，#ffd9a8 w3；r64 一字未动；
+  qlmanage＋sips＋iconutil 重出 png×4＋icns；.ico 未动）。
+- VER：workspace＋双 tauri.conf 0.22→**0.23.0**（根去重块在位；src-tauri radius/CSP 他人脏未动），check 绿。
+- App 连环退已根治（ExitRequested 臂，0bbe6c60），前序自退均为旧包行为。
