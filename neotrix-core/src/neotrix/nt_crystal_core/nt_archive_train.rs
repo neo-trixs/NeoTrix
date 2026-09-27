@@ -510,7 +510,7 @@ mod tests {
     #[ignore = "rebuild crystal.json from cocoons, seconds"]
     fn rebuild_crystal_from_cocoons() {
         use super::super::{CocoonStore, CrystalConsciousness, CrystalCore};
-        let mut core = CrystalCore::load().unwrap_or_else(|_| CrystalCore::new("NeoTrix"));
+        let core = CrystalCore::load().unwrap_or_else(|_| CrystalCore::new("NeoTrix"));
         let mut c = CrystalConsciousness::new("NeoTrix");
         let cocoons = CocoonStore::load();
         let stats = cocoons.stats();

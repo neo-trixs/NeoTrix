@@ -1482,7 +1482,7 @@ mod tests {
             },
         ];
         let shared = SharedMind::new();
-        let (answers, failed) = eng.dispatch_parallel(&subtasks, &PanicAsk, None, &shared);
+        let (_answers, failed) = eng.dispatch_parallel(&subtasks, &PanicAsk, None, &shared);
         // panic 的子任务进 failed，另一个也被 panic 炸了（scope 传播）
         // 但不会导致进程 abort
         assert!(failed.len() >= 1);
