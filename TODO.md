@@ -1,6 +1,33 @@
 # NeoTrix TODO 列表
 > 智能同步生成，最后更新：2026-13-02T01:58:00
 
+> **2026-09-27 卡死/内存专项 + 长尾分诊（收口）**：全量 `--lib` 串行实跑
+> **11493 绿 / 51 红**（起点 10113/125）。8 条卡死/内存根因全部除根并加三道闸；
+> 21+25+27 = **73 处生产缺陷**已修（安全洞 5、解析/数据 11、逻辑 25、stub 补实现 9、
+> 环境依赖去抖动 6、契约对齐 12、并发/治理 5）。详见
+> `sessions/handoff-disease-list-20260927.md`（含 125 条分诊全表与 file:line）。
+>
+> **待办（按性质分组，非按模块）**
+> - 🔴 **B 类·需设计裁决**（不可一行改，先定方向）：
+>   1. `l0_substrate/nt_core_kb_primitives.rs:188` — `nodes.id` 单列 PK 使双时态版本化
+>      不可能 → 需 PK→`UNIQUE(id,transaction_time)` + edges FK 重构 + 真实库迁移（2 测试）
+>   2. `l4_emotion/nt_memory/cascade/cascade.rs:216,126` — `length_score = len/200` 过小，
+>      且 `tick()` 永久丢弃未达阈样本（属设计缺陷，需重定晋升/丢弃策略）
+>   3. `neotrix-types` 的 `Severity`/`FlagSeverity` 判别序"越严重越小"是**承重约定**
+>      （`l2_perception/nt_world/osint/sweep.rs:225` 依赖它做 `min_severity` 过滤）→ 不要盲翻 `Ord`
+> - 🟡 **C 类·未接线 stub**（实现或显式 `#[ignore]`，禁止改松断言凑绿）：
+>   `nt_core_embed::TextEmbedder`（字节位置袋，任意文本相似度≈0.83）、
+>   `nt_shield_ztnet/crypto/noise_handshake`（缺 `_create_message3`，握手无法完成）、
+>   `publish_gateway`（YouTube 上传）、`nt_codegen::parse_yaml`（误用 serde_json，需引 serde_yaml）、
+>   `nt_memory_kb::nt_memory_distill`（测试 teacher 与 student 恒等，`after<before` 不可满足）
+> - 🟡 **环境依赖**（改确定性断言或 `#[ignore]`）：`l6_meta::runtime_monitor::test_get_health`
+>   （探针挂起）、`l6_meta::nt_core_aware`（4）、`nt_core_observer_error`（2）、
+>   `nt_feel::writing_style`（2）、`nt_feel::cognitive_bridge::feedback`（2）
+> - ⚪ **结构性债务（PARK，有归属前置）**：L0 `CapabilityRegistry` ×4 + `SemanticRouter` ×2
+>   正典收敛（异构，需专窗迁移）｜`proxy_pool.rs` 1757 行拆分（他人在途 1039+/24-）｜
+>   剩余 God-file（`pdf.rs` 2142 / `nt_crystal_serve.rs` 2002 / gateway 1678 / hex 1530）｜
+>   5 个内容型 worktree 裁决｜前端 `apps/neobot-desktop/frontend/{src,dist}` 归属与提交
+
 > **Batch3 吸收执行 (47 源)**: 四波 21 任务 20/20 闭环 · **交接 Wave 4: 10 任务待做** (🔴P0×3 越层修复/e8_state 合成值/测试抖动加固 · 🟡P1×3 情报工具接线/SEAL C0→C2/补全排序 · ⚪P2×4) → `docs/absorption-knowledge-base/batch3-2026-08-26-unified-evolution-todo.md` Wave 4 段 + 根 `HANDOFF.md` (2026-08-26 版)
 
 ### 🔄 task-2: parent

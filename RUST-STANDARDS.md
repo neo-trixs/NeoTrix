@@ -383,49 +383,140 @@ src/
 
 ## 16. CLI 命令架构禁令（CLI Architecture Ban）
 
-> 2026-09-21 确立：Agent 管理迁移到自动编排，禁止 CLI 命令架构设计
+> 2026-09-21 确立并落地：Agent 管理迁移到自动编排，`neotrix-core/src/cli/` 已完全删除
 
 ### 设计原则
 1. **用户对话层零 CLI**：用户只说意图，系统自动路由到合适的 agent
 2. **自动编排**：系统自动 spawn/kill/manage agent，零手动管理
-3. **CLI 仅用于观测/调试**：status/logs/budget/kill 用于开发调试和应急干预
+3. **观测走 API，入口走意图**：状态观测用 `AutoOrchestrator::status()/instances()`；
+   headless REPL 的自由文本经 `route_headless()` 自动分发，slash 仅保留观测/调试/应急
 
 ### 禁止的模式
 ```rust
-// ❌ 禁止：用户手动管理 agent
+// ❌ 禁止：任何用户手动管理 agent 的命令（已随 cli/ 删除）
 /agent spawn <name> <mode>        // 系统应自动 spawn
 /agent list                       // 系统应自动管理
 /agent talk <id> <message>        // 系统应自动路由
 /agent background <name> <mode>   // 系统应自动管理
+/board create|move|assign         // 看板管理命令（已删除；状态观测走 API）
 ```
 
 ### 允许的模式
 ```rust
-// ✅ 允许：观测/调试/应急
-/agent status                     // 查看编排器状态
-/agent instances                  // 列出 agent 实例
-/agent budget                     // 查看成本消耗
-/agent kill <id>                  // 应急终止 agent
-/mcp list                         // 查看 MCP 工具
-/mcp search <query>               // 搜索 MCP 工具
+// ✅ 允许：API 观测 + headless 观测类 slash（显式调试/应急入口）
+// API: AutoOrchestrator::status() / instances() / recycle()
+// headless: /status /stats /think /evo /mem /cortex /mcp list|status|search
+//           /goal status|history /proxy status /workflow list /exit
+// 自由文本: route_headless() 高置信自动路由（research→/recall，absorption→/absorb，memory→/mem）
 ```
 
 ### 架构要求
-1. **AutoOrchestrator**：自动编排器，处理用户意图，自动选择/创建/管理 agent
-2. **AgentLifecycleManager**：生命周期管理器，自动 spawn/kill/recycle agent
-3. **IntentClassifier**：意图分类器，自动识别任务类型
-4. **CLI 命令**：仅用于观测/调试/应急，不用于管理
+1. **AutoOrchestrator**（`l6_meta::nt_auto_orchestrator`）：意图统一入口，`handle_intent/complete_task/recycle/status/instances/route_headless`
+2. **AgentLifecycleManager**：生命周期，自动 spawn/recycle，成本预算熔断
+3. **IntentClassifier**：关键词意图分类（15 任务类型），`route_headless` 阈值 0.8
+4. **基础设施归位**：审批/成本/权限/规则→`l6_meta`；沙箱/安全执行→`l3_embodiment`；连接/路由→`l1_action`；JSONL→`l0_substrate`
 
-### 迁移指南
-1. **移除**：spawn/list/talk/background/tasks 等管理命令
-2. **降级**：status/instances/budget/kill 保留为调试命令
-3. **新增**：AutoOrchestrator + AgentLifecycleManager + IntentClassifier
-4. **文档**：更新所有文档，说明自动编排架构
+### 迁移指南（已执行完毕，2026-09-21）
+1. **移除**：`commands/`（52 文件）、`nt_subagent/`、`tui/`、整个 `cli/` 目录、`pub mod cli`
+2. **迁移**：10 模块按上表归位，9 处外部引用改新路径（`seal_loop`/`factory`/`consciousness_core`/`main` 等）
+3. **收敛**：headless 自由文本经 `route_headless` 自动分发；`handle_intent` 返回副本状态修正为 `Running`
 
 ### 验证清单
-- [ ] AutoOrchestrator 实现完成
-- [ ] AgentLifecycleManager 实现完成
-- [ ] IntentClassifier 实现完成
-- [ ] CLI 命令降级为观测/调试
-- [ ] 开发规则更新
+- [x] AutoOrchestrator 实现完成（含单测 13 项）
+- [x] AgentLifecycleManager 实现完成
+- [x] IntentClassifier 实现完成
+- [x] `cli/` 完全删除，`cargo check --all-targets` 零 error 零 warning
+- [x] 开发规则更新（本节）
 - [ ] 文档更新
+
+---
+
+## 17. 卡死/内存事故沉淀的硬规则（2026-09-27，8 起生产事故换来的）
+
+> 来源：一次会话内定位并根除 8 条卡死/内存爆炸根因（`chunk_planner` 无限循环、
+> `DeferredLoader` 自死锁、KB 搜索二次加锁、RISE 守卫活到函数尾、架构守卫二次方空转、
+> 3 处"测试/审计路径里再起 cargo"、sidecar 3G 常驻）。每条都有 file:line 实证。
+> 完整分诊表见 `sessions/handoff-disease-list-20260927.md`。
+
+### 17.1 锁与循环（最高频事故源）
+
+- **R-LOCK-1 非重入 Mutex 不得同块二次获取**：`let g = x.lock()` 之后若在同一
+  `{}` 作用域内再 `x.lock()`，同线程永久阻塞（`std::sync::Mutex` 不可重入）。
+  典型形态是"为图省事在已持锁的函数里调另一个也加锁的方法"。
+  守门：`python3 scripts/ops/nt_lock_audit.py neotrix-core/src`（块身份栈扫描，
+  `--selftest` 自带正/负样本）。**当前全仓 0 命中。**
+- **R-LOCK-2 锁守卫不得活到函数尾**：只在某个分支里 `drop(g)` 等于没 drop。
+  读计数用独立作用域 `{}`，自增另开一次 `lock()`。
+- **R-LOOP-1 循环步长必须单调递增**：任何 `start = end - overlap` 形式，
+  当 `end` 触顶后会**倒退或原地踏步** → 无限循环 + 每轮 clone → 内存爆炸。
+  必须同时满足 `overlap < stride` 且"赋值后严格大于原值"（双重保险）。
+- **R-LOCK-3 RwLock 的 layer/mask 不可混用**：`layers_compatible` 这类
+  "a_layer & b_mask" 写反会让跨层判定全部漏判。
+
+### 17.2 构建纪律（16G 机器，OOM 连坐）
+
+- **R-BUILD-1 同一工作区只允许一个 cargo**（含子代理）。串行 `-j1` + 后台轮询。
+  两个 `rustc` 峰值可达 4G+。
+- **R-BUILD-2 内存门必须看退出码，不能只看输出行**：
+  `sh scripts/ops/nt_mem_gate.sh; echo $?` → 非 0 即禁止起重型构建。
+  （本规则因"只看输出行"被违反过一次，180MB 空闲时起了 rustc。）
+- **R-BUILD-3 sidecar 按需**：`sh scripts/ops/nt_sidecar.sh {start|stop|status}`。
+  权重常驻 3G，是 OOM 的第一嫌疑人；用完即 `stop`。
+- **R-BUILD-4 测试/审计路径禁止再起 cargo**：内层 `cargo` 抢外层构建锁
+  → 100% 死锁（`read_output→poll`），锁空闲时还会拉起整个编译器。
+  需要真实构建的检测件：生产真跑，测试构建跳过（`cfg!(test)` 或
+  `NT_SKIP_CARGO_CHECK=1`），或抽出可注入执行器（`BuildCheckOutcome` 先例）。
+- **R-BUILD-5 禁 `cargo clean`**；`target/debug/incremental` 可删（纯缓存），
+  `target/debug/deps` 保留（活指纹，删了全量重编数小时）。
+
+### 17.3 卡死 vs 空转的判别（省下大量盲猜）
+
+- `ps -o %cpu,rss,time` → CPU≈0 = **阻塞**；CPU 打满 = **空转/死循环**。
+- `sample <pid> 1 -file /tmp/s.txt` 最快定性：
+  - 栈底 `__psynch_mutexwait` / `mutex.rs:lock` → 锁问题，看 R-LOCK-1/2
+  - 栈底 `read_output` → `poll` → 在等子进程（多半是 R-BUILD-4）
+  - 某函数采样占比 300-800/N 帧 → 二次方/无界循环，看 R-LOOP-1
+- 定位后**先 kill 测试进程**再改代码，否则两个重活叠加必 OOM。
+
+### 17.4 Git 纪律（多人/多窗口共享工作区）
+
+- **R-GIT-1 提交前必须 `git diff --cached --name-only`**：暂存区是共享的，
+  别人的暂存会被你的 `git commit` 一并带走（本规则被违反过一次，卷进 9 个他人删除）。
+- **R-GIT-2 一律 `git commit -- <paths>` 做 pathspec 限定提交**，不裸 `git commit`。
+- **R-GIT-3 改文件前先 `git status --porcelain <file>`**：他人 `M` 的文件不要重写；
+  若是纯 rustfmt 差异可叠加语义修改，但**必须在提交信息里写明含他人变更**。
+- **R-GIT-4 禁止 `--no-verify`**：门禁拒绝时先查是不是别人的树坏了
+  （本轮被拒 3 次全是他窗并发重构），用 `cargo check --lib`（排除 test cfg）
+  验证自己的生产改动，等对方提交后再跑测试放行。
+
+### 17.5 修 bug 的判据（先分类再动手）
+
+分诊四类，**每条失败先归类再改**：
+- **P 生产 bug** → 修生产，测试自然绿
+- **S 契约漂移** → 生产是有意改的，改**夹具**，并写明"旧预期为何过期"
+- **U 未接线 stub** → 实现，或显式 `#[ignore]`；**禁止改松断言凑绿**
+- **E 环境依赖** → 改确定性断言（相对时间、`:memory:`、命令断言）或 `#[ignore]`
+
+- **R-FIX-1 修生产必然撞旧断言时，先判断谁对**。本轮 3 例是**测试钉死了错值**
+  （键名 `"Tdd"` vs `name()` 的 `"TDD"`、分支数硬编码 11、`950_000` 恰撞 0.95 阈值）。
+- **R-FIX-2 翻 `Ord`/派生顺序前必须审调用点**：本仓 `Severity` 判别序
+  "越严重越小"看着是反的，但 `osint/sweep.rs:225` 显式依赖它做 `min_severity`
+  过滤 —— 盲翻会**静默反转**过滤器。承重的"反直觉约定"要顺着它，不是纠正它。
+- **R-FIX-3 返回值语义要看别的测试钉的是什么**。本轮 `ItemStack::add` 返回
+  "剩余量"（被 `test_item_stack_add_capped` 钉住），而调用方 `add_item` 把它当
+  "已加入量"从 remaining 里减 → 合并成功时继续开新栈（5+3 = 11）。
+  这类 bug 的症状是"数值多了一点"，只有顺着契约链读才能发现。
+- **R-FIX-4 修复合查询/解析器后，原先"靠 bug 才通过"的断言会现形**：
+  本轮 `parse_range_query` 用 8080 断言 `< 1000`（恒假），此前因 `&&` 被空格
+  截断成只剩左项才碰巧为真。**这属于修复暴露出的正确结果，不是回归。**
+
+### 17.6 字节/字符安全（禁 panic 铁律的常见破口）
+
+- **R-STR-1 禁止按字节切字符串**：`&text[..n]` 对中文会切在多字节字符中间
+  → 直接 panic。必须按 `char_indices()` 边界回退（本轮 `truncate_preserving` 即此）。
+- **R-STR-2 token/长度估算要分口径**：汉字 3 字节，纯 `len()/4` 会把中文高估 3 倍；
+  同一口径只能有一处实现（`LlmNarrator::estimate_tokens` 委托共享实现即为此）。
+- **R-STR-3 时间戳别用 `Instant::now()` 自减**：`duration_since(Instant::now())`
+  恒为 ~0；`Instant::now().elapsed()` 同样恒为 ~0。要么存进程内单调基准
+  （`OnceLock<Instant>` + `elapsed().as_millis()`），要么用 `SystemTime`。
+  本轮 4 处，其中熔断器因此**永久锁死 Open**、审批 id 恒为 `conf_0` 撞号。
