@@ -14,7 +14,7 @@ members = [
     "crates/neotrix-neobot",
     "crates/neotrix-audit",
     "crates/neotrix-decision-engine",
-    "games/neotrix-guixu",
+    "apps/neobot-desktop",
 ]
 
 resolver = "2"
