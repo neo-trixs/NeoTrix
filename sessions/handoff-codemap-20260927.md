@@ -94,3 +94,14 @@
   qlmanage＋sips＋iconutil 重出 png×4＋icns；.ico 未动）。
 - VER：workspace＋双 tauri.conf 0.22→**0.23.0**（根去重块在位；src-tauri radius/CSP 他人脏未动），check 绿。
 - App 连环退已根治（ExitRequested 臂，0bbe6c60），前序自退均为旧包行为。
+
+## 10. 四 agent 同步轮4（A1 审计／A2 图谱／A3 蜕皮／A4 循环）＋abilities 入位
+
+- A1 七维审计：架构反向依赖 ❌（L1→L5/L6 三例）／死码 ＋3／重复 ＋2（SkillRegistry×4 在 crates、
+  WalshIndex×2、KnowledgeBase×2）／密钥皆测试夹具／TODO 20+／abilities 幽灵成员／前端 any 72。
+  Top3：分层腐化／allow 掩盖＋重复／游离 crate＋类型债。
+- A2 增量：＋12 提交；im 消 God 一格；serve 入库；L0 零收敛；worktree 本仓 5。
+- A3 蜕皮：**删 0**（bak/tmp/draft/old 全零命中；3 候选逐个否决有据）——仓内无可 shed 件，纯净度守住。
+- A4 循环：check 零错＋**791 绿 3 败**（evolution×2＋seal×1，他窗行为断言，park 未动）。
+- abilities 入 members（A1 P0 单行，game 经 workspace 引用游离，入位恢复可见性）。
+- 待提交：Cargo.toml 1 行＋本文件 §10。循环未终项：死码/agent转接/God续拆/L0正典（皆需产品或专窗）。
