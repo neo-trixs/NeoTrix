@@ -187,3 +187,44 @@
 - [x] sidecar :8149 healthy（只探活：`{"status":"ready","model":"AgentJev-0.6B",...}`，未重启）
 - [△] NeoBot.app 未运行（53886 不在，未 kill/open，待 owner 目视；终止条件无此项，不计红）
 - 结论：**全绿 ✅**（App 一项黄待目视）
+
+## 8. 长循环本轮3（2026-09-27 长循环 agent，HEAD 5e7af5f5，单 cargo 串行 -j2）
+
+### 任务 1 check ✅ 零错即过（无自有新错，无修）
+- 槽确认：`pgrep -f "cargo (check|test|build)"` → SLOT_EMPTY 后 `sleep 2; touch /tmp/m2_keepalive` → TOUCH_EXIT:0
+- `nohup cargo check -p neotrix --lib --tests -j 2 > /tmp/m2_check.log` → LAUNCH_PID 81981；30s 轮询已 Finished
+- `/tmp/m2_check.log`：`Finished dev profile in 0.31s`（增量缓存命中），`grep -c ^error` = 0，`^warning` = 2 行（同一位置 1 warning：`neotrix-core/src/entry/agent.rs:16:8 dead_code run_agent_mode`＋1 行 summary）
+- 自有归因判定：0 新错；唯一 warning 为 Park 明示项（`entry/agent 死码`＋产品决策 park，沿用§本轮2），shape 不在（未用导入/多余mut/可见性/缺match臂）之列，行为变更一律 park → 不修
+
+### 任务 2 过滤单测 ✅ 按 EVO/快照/路由关键字分批（单 cargo 串行，失败只修自有→零失败零修）
+- 批 EVO：`cargo test -p neotrix --lib -j 2 -- nt_judge nt_dspy nt_data_gateway nt_code_graph nt_skill_route nt_evolve_loop nt_intel_digest nt_near_field nt_sim_eval nt_law_gate` → `/tmp/m2_test_evo.log` **46 passed / 0 failed**（11828 filtered）
+- 批快照/路由/jeweled：`cargo test -p neotrix --lib -j 2 -- nt_crystal_core nt_reuse backup_plan nt_snapshot jeweled nt_route` → `/tmp/m2_test_snap.log` **228 passed / 0 failed / 8 ignored**（11638 filtered；jeweled 在 neotrix-lib 零命中，过滤器已带，符合 `nt_ jeweled` 口径）
+- 批合体 tags：`cargo test -p neotrix-neobot --lib -j 2 -- nt_token_guard nt_reply_tag` → `/tmp/m2_test_tags.log` **11 passed / 0 failed**（guard 6＋reply_tag 5，94 filtered）
+- 合计自有过滤：46＋228＋11＝**285 passed, 0 failed**（8 ignored 皆历史 `nt_reuse` 周快照忽略项）
+
+### 任务 3 每批一提交 ✅（无修批→空真零提交＋证据批 1 提交，自有归属）
+- 修批提交：0 批（check 零新错＋三批零失败，故无代码改动；符合“每修完一批提交一次”空真）
+- 证据批：精确 stage 单路径 `sessions/handoff-loop-20260927.md`（-f），无 --no-verify，hook 门禁待验
+
+## 提交列表（本轮3新增）
+- `（本提交）docs(loop): 长循环本轮3证据（check零错+285绿，HEAD 5e7af5f5，自有归属）`
+
+## 测试证据（本轮3）
+- `/tmp/m2_check.log`：check --lib --tests 0 error / 1 warning（park，entry/agent.rs:16）
+- `/tmp/m2_test_evo.log`：46 passed, 0 failed
+- `/tmp/m2_test_snap.log`：228 passed, 0 failed, 8 ignored
+- `/tmp/m2_test_tags.log`：11 passed, 0 failed
+- 合计：285 passed, 0 failed
+
+## Park 表（本轮3新增；历史 park 沿用§5/§6/§7/上游 handoff）
+| 文件 | 行/位置 | 原因 |
+|---|---|---|
+| `neotrix-core/src/entry/agent.rs:16` | `pub fn run_agent_mode` dead_code | Park 明示（entry/agent 死码＋产品决策），本轮唯一 warning，不修 |
+| `jeweled` 在 neotrix-lib | 过滤器零命中（仅 `crates/neotrix-abilities/data/sts_relics.ron:1115 jeweled_mask` 数据项） | 非测试归因，无修无 park 计数，记录备查 |
+| 其余 `git status` 约 1059 项 M/D/?? | 全工作树（900 files diff） | 非自有归因（EVO12/tags/合体/im拆分/serve/C批以外＋行为变更）一律未碰；`.worktrees/` 未进；运行中进程未杀 |
+| `src-tauri` 248 M、`games/guixu` D、`skills/icons` D、`proxy_pool`、`serve以外bin`、训练/采矿/datasets/models 权重 | Park 清单 | 碰都别碰，本轮未读未改（除 status 只读计数） |
+
+## 终止条件复验（本轮3终态 HEAD `5e7af5f5`）
+- [x] check --tests 零错（0.31s 增量，0 error）
+- [x] 自有/EVO/快照/路由/tags/jeweled 过滤全绿（285 passed, 0 failed）
+- 结论：**全绿 ✅**（无自有红；App/soul/sidecar 存活沿用上轮，未 kill 未探活干扰 cargo 槽）
