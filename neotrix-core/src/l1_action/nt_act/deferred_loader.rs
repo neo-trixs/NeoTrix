@@ -31,9 +31,13 @@ impl From<DeferredError> for neotrix_types::NtError {
     fn from(err: DeferredError) -> Self {
         match err {
             DeferredError::NotFound(msg) => neotrix_types::NtError::NotFound(msg),
-            DeferredError::AlreadyLoaded(msg) => neotrix_types::NtError::InvalidState(format!("resource already loaded: {msg}")),
+            DeferredError::AlreadyLoaded(msg) => {
+                neotrix_types::NtError::InvalidState(format!("resource already loaded: {msg}"))
+            }
             DeferredError::LoadFailed(msg) => neotrix_types::NtError::OperationFailed(msg),
-            DeferredError::Evicted(msg) => neotrix_types::NtError::NotFound(format!("resource evicted: {msg}")),
+            DeferredError::Evicted(msg) => {
+                neotrix_types::NtError::NotFound(format!("resource evicted: {msg}"))
+            }
         }
     }
 }
@@ -97,8 +101,10 @@ impl DeferredLoader {
     {
         let mut count = 0;
         for key in keys {
-            if self.is_loaded(key) { continue; }
-            if let Ok(data) = loader(key) {
+            if self.is_loaded(key) {
+                continue;
+            }
+            if let Ok(_data) = loader(key) {
                 let size_bytes = std::mem::size_of::<T>();
                 let meta = ResourceMeta {
                     resource_id: key.clone(),
@@ -113,7 +119,9 @@ impl DeferredLoader {
                 resources.insert(key.clone(), meta.clone());
                 loaded.insert(key.clone());
                 *current_size += size_bytes;
-                self.cache_data(key, data).ok();
+                // 2026-09-27 除根: 原先此处调 cache_data() 再锁 self.resources,
+                // 同样自死锁 (守卫仍持有)。meta 已带 loaded=true 落库, 二次
+                // 加锁只重复写 loaded/last_accessed, 无语义增量。
                 count += 1;
             }
         }
@@ -127,7 +135,10 @@ impl DeferredLoader {
         if let Some(meta) = resources.remove(key) {
             loaded.remove(key);
             *current_size = current_size.saturating_sub(meta.size_bytes);
-            self.remove_cached(key);
+            // 2026-09-27 除根: 原先此处调 remove_cached() 再锁 self.resources ——
+            // 而 resources 守卫仍在持有, std::sync::Mutex 非重入 → 永久自死锁
+            // (栈实证 __psynch_mutexwait, 全量测试卡死在此)。resources.remove
+            // 已完成清理, 二次加锁纯属多余。
             true
         } else {
             false
@@ -158,41 +169,76 @@ impl DeferredLoader {
         Ok(data)
     }
 
-    fn remove_cached(&self, key: &str) {
-        let _ = self.resources.lock().unwrap().remove(key);
-    }
-
     fn retrieve_cached<T>(&self, _key: &str) -> Result<T, DeferredError> {
         Err(DeferredError::NotFound("cached data".to_string()))
     }
 
-    fn evict_low_priority(&self, resources: &mut HashMap<String, ResourceMeta>, loaded: &mut HashSet<String>, current_size: &mut usize) {
-        let low_priority_keys: Vec<String> = resources.iter().filter(|(_, meta)| meta.priority <= 1).map(|(k, _)| k.clone()).collect();
+    fn evict_low_priority(
+        &self,
+        resources: &mut HashMap<String, ResourceMeta>,
+        loaded: &mut HashSet<String>,
+        current_size: &mut usize,
+    ) {
+        let low_priority_keys: Vec<String> = resources
+            .iter()
+            .filter(|(_, meta)| meta.priority <= 1)
+            .map(|(k, _)| k.clone())
+            .collect();
         for key in low_priority_keys {
             if let Some(meta) = resources.remove(&key) {
                 loaded.remove(&key);
                 *current_size = current_size.saturating_sub(meta.size_bytes);
             }
-            if *current_size <= self.capacity / 2 { break; }
+            if *current_size <= self.capacity / 2 {
+                break;
+            }
         }
     }
 
-    pub fn current_usage(&self) -> usize { *self.current_size.lock().unwrap() }
-    pub fn loaded_count(&self) -> usize { self.loaded_keys.lock().unwrap().len() }
+    pub fn current_usage(&self) -> usize {
+        *self.current_size.lock().unwrap()
+    }
+    pub fn loaded_count(&self) -> usize {
+        self.loaded_keys.lock().unwrap().len()
+    }
 }
 
 impl Default for DeferredLoader {
-    fn default() -> Self { Self::new(1024 * 1024 * 100) }
+    fn default() -> Self {
+        Self::new(1024 * 1024 * 100)
+    }
 }
 
 fn get_timestamp() -> u64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test] fn test_load_and_is_loaded() { let loader = DeferredLoader::new(1024); let data = loader.load("test", || Ok(vec![1u8;10])); assert!(data.is_ok()); assert!(loader.is_loaded("test")); }
-    #[test] fn test_evict() { let loader = DeferredLoader::new(1024); loader.load("test", || Ok(vec![1u8;10])).ok(); assert!(loader.is_loaded("test")); assert!(loader.evict("test")); assert!(!loader.is_loaded("test")); }
-    #[test] fn test_prefetch() { let loader = DeferredLoader::new(10240); let keys = vec!["a".to_string(), "b".to_string()]; let count = loader.prefetch(&keys, |k| Ok(vec![k.len() as u8])); assert_eq!(count, 2); }
+    #[test]
+    fn test_load_and_is_loaded() {
+        let loader = DeferredLoader::new(1024);
+        let data = loader.load("test", || Ok(vec![1u8; 10]));
+        assert!(data.is_ok());
+        assert!(loader.is_loaded("test"));
+    }
+    #[test]
+    fn test_evict() {
+        let loader = DeferredLoader::new(1024);
+        loader.load("test", || Ok(vec![1u8; 10])).ok();
+        assert!(loader.is_loaded("test"));
+        assert!(loader.evict("test"));
+        assert!(!loader.is_loaded("test"));
+    }
+    #[test]
+    fn test_prefetch() {
+        let loader = DeferredLoader::new(10240);
+        let keys = vec!["a".to_string(), "b".to_string()];
+        let count = loader.prefetch(&keys, |k| Ok(vec![k.len() as u8]));
+        assert_eq!(count, 2);
+    }
 }
