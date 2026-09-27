@@ -60,3 +60,16 @@
 - Q 静音：allow 删除引发 142 死码洪水（全他窗，check 实测）→ **已回滚归零**（lib.rs/agent.rs 零 diff），
   关静音转专窗分批清；agent 转接因无对应 DialogCmd 变体未动（行为变更禁令）。
 - 本轮提交：T 5 路径＋serve＋本文件；W 复制件/proxy/agent转接 park。
+
+## 7. 四 agent 同步轮（M1 图谱刷新／M2 扫荡／M3 活体／M4 脏树）
+
+- M1 增量：基线后＋3 提交（map§10/W去重/T收尾）；God 消减一格（im/plugin 1987→13＋4 件），
+  serve 系转入非新增；L0 正典 4/2/6 零收敛；worktree 本仓 9 零删（归档 13 另计 22）；
+  结论旧 desert 缩小一格。Top5：#4 进行中，其余 park 不变。
+- M2 扫荡：`cb5c3bb7 docs(loop)`（§191-230 证据）；check 零错＋EVO 46＋快照 228＋tags 11＝**285 绿**，
+  唯一 warning 即 park 死码；修批 0（空真）。
+- M3 活体：soul online（pool 29/degraded 8/tools 9，401 对照正常）＋sidecar ready＋
+  App 又自退一次→已重开 **PID 82676**；dist 比 src 新 20min，免 build。
+- M4 脏树：**1059**（629M/271D/159??，净 -5098 行）；core 556＋src-tauri 248 为主体；
+  models/sessions 干净；小文件候选（<200 行前 10：gitignore/build.rs/username.ts/ntos 等）可分批先收。
+- 待提交：本文件 §7（单路径）。App 两次自退（非本窗所杀）→ 崩溃原因待查（另列任务）。
