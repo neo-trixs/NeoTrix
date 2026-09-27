@@ -73,3 +73,14 @@
 - M4 脏树：**1059**（629M/271D/159??，净 -5098 行）；core 556＋src-tauri 248 为主体；
   models/sessions 干净；小文件候选（<200 行前 10：gitignore/build.rs/username.ts/ntos 等）可分批先收。
 - 待提交：本文件 §7（单路径）。App 两次自退（非本窗所杀）→ 崩溃原因待查（另列任务）。
+
+## 8. 四 agent 同步轮2（M1 增量／M2 扫荡／M3 活体／M4 triage）
+
+- M1：基线后＋6 提交；im/plugin 消 God 一格，serve 转入；L0 4/2/6 零收敛；本仓 9 窗零删。
+  旧 desert 再缩一格（累计两格）。
+- M2：`cf263c08 docs(loop)`；check 零错＋**277 绿**（EVO 46＋快照 228＋tags 11），修批空真。
+- M3：soul online＋sidecar ready；App 第三次自退→重开 **PID 90653**（11:59 含 Hide 修包仍退，
+  排除关窗路径， hunting 升级：查 OOM/退出调用点）。
+- M4：**1058**（629M/271D/158??，净 -5098）；小文件候选（gitignore/build.rs/tsconfig/crystal.example
+  等，自有疑似，可分批）。
+- 待提交：本文件 §8。循环未终：App 连环退slots真缺陷（ hunting 中），park 余项不变。
