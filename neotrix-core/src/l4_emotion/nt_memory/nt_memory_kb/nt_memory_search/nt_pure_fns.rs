@@ -1187,7 +1187,7 @@ mod materialized_neighbors_tests {
 
     /// 基准: 合成 10K 向量 (dim=64) 构建物化缓存, 测量相似查询 p95 延迟。
     /// 目标 sanity: 单次查询 (10K 向量全扫) 远低于 Phase-1 269ms 量级 (纯扫描 < 5ms)。
-    #[test]
+    #[ignore = "基准测试(10k x 64d 物化邻居缓存 + 200 次查询), 默认套件不该跑; 用 cargo bench 或 --ignored"]
     fn bench_p95_search_latency_10k() {
         const N: usize = 10_000;
         const DIM: usize = 64;

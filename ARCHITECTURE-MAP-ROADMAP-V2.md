@@ -340,6 +340,9 @@
 | 门禁新增违规 | **0** | `bash scripts/check-truth-surface.sh --strict` |
 | HEAD 能否独立编译 | **能** (2026-09-27 起) | `cargo check --tests -p neotrix` |
 | `src/` 内 `#[test]` 数 | 13,316 | `grep -rc '#\[test\]\|#\[tokio::test\]' --include='*.rs' neotrix-core/src` |
+| 全量套件通过 / 失败 / 忽略 | **12,042 / 50 / 37** | `cargo test -p neotrix --lib --no-run` 后跑二进制, `--test-threads=2` |
+| 全量套件耗时 | 101s (2026-09-27 前**跑不完**) | 同上 |
+| 永久挂起测试 | **0** (原 6) | `grep -c 'has been running for over' <log>` |
 
 ### 11.2 2026-09-27 审计已除的根 (均为「代码存在但工具链看不见」)
 
@@ -381,7 +384,20 @@ WorkerResult}` 的**旧名**, 我把 import 路由到了 `workers` 模块才导�
 教训: 遇到「同名符号」先确认是否**旧名/新名**关系, 别直接上升为设计冲突。
 判据: 若一个符号是另一个的子集且用法自洽, 它多半是重命名而非两套设计。
 
-### 11.4 未除的已知债 (仅登记, 不在本次范围)
+### 11.4 剩余 50 个失败 + 一个并发崩溃 (仅登记, 需单独一轮 triage)
+
+按模块: nt_shield 7 / nt_core_capability 6 / nt_memory 5 / nt_feel 5 /
+nt_core_aware 4 / nt_meta 3 / healing 3 / 其余 17 个各 1-2。
+共同点多数是**断言与实现漂移**(如夹具自带 `Always` 规则、亚毫秒时长),
+单看容易改, 但 50 个一起动风险大, 应独立成轮。
+
+**并发崩溃 (pre-existing)**: `--test-threads=4` 时测试进程 **SIGSEGV**
+(退出码 139), 在 `l6_meta::healing::predictive_maintenance::trend::tests`
+之后; 同一模块单线程/两线程跑均不复现(311 passed)。属共享资源竞态或
+栈/句柄耗尽, 非本次改动引入(未触碰相关模块)。**CI 暂用 `--test-threads=2`**;
+根因需单独定位。
+
+### 11.5 未除的已知债 (仅登记, 不在本次范围)
 
 - `l5_cognition/lib.rs` 式的「目录模块旁挂 lib.rs」副本 (已随本次清掉 1 处;
   机制上仍可能再生, 故门禁只查 `mod` 绑定, 不查此类副本)。

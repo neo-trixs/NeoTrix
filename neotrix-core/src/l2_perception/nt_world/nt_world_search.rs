@@ -175,14 +175,67 @@ impl _WebSearchEngine {
     }
 
     fn client(&self) -> &reqwest::blocking::Client {
-        self.client.get_or_init(|| {
-            reqwest::blocking::Client::builder()
-                .user_agent("NeoTrix/0.18 (research tool; https://github.com/neotrix)")
-                .build()
-                .unwrap_or_else(|_| reqwest::blocking::Client::new())
-        })
+        self.client.get_or_init(blocking_client_with_proxy)
     }
+}
 
+/// 代理出口（环境）：`HTTPS_PROXY>HTTP_PROXY>ALL_PROXY`，大小写皆可。
+/// 与 browser_engine fetch.rs 同律；OnceLock 常驻，起服后改需重启。
+fn proxy_from_env() -> Option<String> {
+    ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"]
+        .iter()
+        .find_map(|k| std::env::var(k).ok())
+        .map(|v| v.trim().to_owned())
+        .filter(|v| !v.is_empty())
+}
+
+fn blocking_client_with_proxy() -> reqwest::blocking::Client {
+    let mut builder = reqwest::blocking::Client::builder()
+        .user_agent("NeoTrix/0.18 (research tool; https://github.com/neotrix)");
+    // NO_PROXY（含默认回环）bypass：本机地址不穿代理（见 fetch.rs 同律）。
+    if let Some(proxy) = proxy_from_env().and_then(|s| reqwest::Url::parse(&s).ok()) {
+        builder = builder.proxy(reqwest::Proxy::custom(move |url| {
+            if no_proxy_hit(url.host_str().unwrap_or("")) {
+                None
+            } else {
+                Some(proxy.clone())
+            }
+        }));
+    }
+    builder
+        .build()
+        .unwrap_or_else(|_| reqwest::blocking::Client::new())
+}
+
+/// NO_PROXY 命中（fetch.rs 同律精简版：精确 + `.域` 后缀 + `*` + 默认回环）。
+fn no_proxy_hit(host: &str) -> bool {
+    let h = host.trim().trim_end_matches('.').to_lowercase();
+    if h.is_empty() {
+        return false;
+    }
+    if h == "localhost" || h == "127.0.0.1" || h == "::1" {
+        return true;
+    }
+    ["NO_PROXY", "no_proxy"]
+        .iter()
+        .find_map(|k| std::env::var(k).ok())
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .any(|rule| {
+            let r = rule.trim_end_matches('.').to_lowercase();
+            if r == "*" {
+                true
+            } else if let Some(suffix) = r.strip_prefix('.') {
+                h == suffix || h.ends_with(&format!(".{suffix}"))
+            } else {
+                h == r
+            }
+        })
+}
+
+impl _WebSearchEngine {
     pub fn search(&self, query: &str, count: usize) -> Result<Vec<SearchResult>, String> {
         let encoded: String = url::form_urlencoded::byte_serialize(query.as_bytes()).collect();
         let url = format!(
@@ -605,12 +658,7 @@ impl Default for _WikipediaBackend {
 
 impl _WikipediaBackend {
     fn client(&self) -> &reqwest::blocking::Client {
-        self.client.get_or_init(|| {
-            reqwest::blocking::Client::builder()
-                .user_agent("NeoTrix/0.18 (research tool; https://github.com/neotrix)")
-                .build()
-                .unwrap_or_else(|_| reqwest::blocking::Client::new())
-        })
+        self.client.get_or_init(blocking_client_with_proxy)
     }
 }
 
@@ -1320,6 +1368,17 @@ mod tests {
 
     #[test]
     fn unified_search_doctor_probes_through_surface() {
+        // doctor() 会对**每个已注册后端**发一次真实 search(probe_query, 3)。
+        // 默认后端含联网搜索源, 故本用例的耗时取决于外部网络(可达与否都
+        // 可能耗到分钟级), 会让默认套件看起来挂死。
+        // 与 osint/search_engine 同因同治, 改为显式 opt-in:
+        //     NT_E2E_NETWORK=1 cargo test --lib nt_world_search
+        // 断言本身对离线是成立的(doctor 把错误也产出一条 health 记录),
+        // 但要真正离线可跑, 需要给 UnifiedSearch 注入 mock 后端 —— 另议。
+        if std::env::var_os("NT_E2E_NETWORK").is_none() {
+            eprintln!("skipping unified_search_doctor_probes_through_surface: 需真实网络, 设 NT_E2E_NETWORK=1");
+            return;
+        }
         // 生产消费面: UnifiedSearch::doctor 是 agent/CLI 可调用的体检入口
         let search = UnifiedSearch::new();
         let report = search.doctor("Rust");

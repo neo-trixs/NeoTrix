@@ -101,6 +101,19 @@ impl Default for SocialSearchEngine {
 mod tests {
     use super::*;
 
+    /// 这两个用例是真网络集成测试, 不是单元测试: `search()` 会去
+    /// SocialSearchChecker 逐个探测数十个真实平台(concurrency=2,
+    /// timeout=5s), 实测单个用例可跑数分钟, 并依赖外部服务可达,
+    /// 且断言 `!report.results.is_empty()` 随第三方服务状态波动。
+    ///
+    /// 放在默认套件里会让 `cargo test` 看起来挂死(>60s 无输出), 也是
+    /// 「测试不可靠」的经典来源。改为显式 opt-in:
+    ///     NT_E2E_NETWORK=1 cargo test --lib search_engine
+    /// 沿用本仓既有的 NT_E2E_CARGO / NT_SKIP_CARGO_CHECK 环境变量开关惯例。
+    fn network_gate() -> bool {
+        std::env::var_os("NT_E2E_NETWORK").is_some()
+    }
+
     #[test]
     fn default_engine_has_many_platforms() {
         let engine = SocialSearchEngine::new();
@@ -116,6 +129,10 @@ mod tests {
 
     #[tokio::test]
     async fn search_returns_report() {
+        if !network_gate() {
+            eprintln!("skipping search_returns_report: 需要真实网络, 设 NT_E2E_NETWORK=1 开启");
+            return;
+        }
         let engine = SocialSearchEngine::new().with_config(SearchConfig {
             concurrency: 2,
             timeout: Duration::from_secs(5),
@@ -128,6 +145,10 @@ mod tests {
 
     #[tokio::test]
     async fn search_found_returns_subset() {
+        if !network_gate() {
+            eprintln!("skipping search_found_returns_subset: 需要真实网络, 设 NT_E2E_NETWORK=1 开启");
+            return;
+        }
         let engine = SocialSearchEngine::new().with_config(SearchConfig {
             concurrency: 2,
             timeout: Duration::from_secs(5),

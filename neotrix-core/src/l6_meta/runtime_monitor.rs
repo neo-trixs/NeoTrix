@@ -87,8 +87,14 @@ impl RuntimeMonitor {
 
     pub fn monitor(&self) {
         let metrics = self.collect_metrics();
-        let mut guard = self.metrics.lock().unwrap();
-        *guard = metrics;
+        // 2026-09-27: 原实现让 guard 活到函数末尾, 而 check_thresholds()
+        // 内部又 `self.metrics.lock()` —— std::sync::Mutex 不可重入, 同线程
+        // 二次加锁 = 永久死锁 (test_get_health / test_monitor_and_get_metrics
+        // 两个测试因此永久挂起)。显式用块让 guard 先释放再调 check_thresholds()。
+        {
+            let mut guard = self.metrics.lock().unwrap();
+            *guard = metrics;
+        }
         self.check_thresholds();
     }
 
