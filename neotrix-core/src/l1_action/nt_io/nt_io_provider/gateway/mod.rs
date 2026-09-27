@@ -508,6 +508,9 @@ mod tests {
                             prompt_tokens: 10,
                             completion_tokens: 5,
                             total_tokens: 15,
+                            // 2026-09-27: 测试恢复桩, 无真实缓存, 恒 0。
+                            cache_read_tokens: 0,
+                            cache_write_tokens: 0,
                         },
                         finish_reason: FinishReason::Stop,
                         tool_calls: None,
@@ -589,6 +592,9 @@ mod tests {
                                     prompt_tokens: 10,
                                     completion_tokens: 5,
                                     total_tokens: 15,
+                                    // 2026-09-27: 测试(流式)恢复桩, 无真实缓存, 恒 0。
+                                    cache_read_tokens: 0,
+                                    cache_write_tokens: 0,
                                 },
                                 finish_reason: FinishReason::Stop,
                                 tool_calls: None,
@@ -1329,7 +1335,7 @@ mod tests {
 #[cfg(test)]
 mod provider_reliability_tests {
     use super::*;
-    use crate::l2_perception::nt_core_llm::{Usage, FinishReason, Message, Role};
+    use crate::l2_perception::nt_core_llm::{Message, Role};
     use std::time::Duration;
 
     // ── ResponseCache (G: Response Caching) ─────────────────────────

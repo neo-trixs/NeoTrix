@@ -335,6 +335,9 @@ mod tests {
                         prompt_tokens: 5,
                         completion_tokens: 5,
                         total_tokens: 10,
+                        // 2026-09-27: 测试桩, 无真实缓存, 恒 0。
+                        cache_read_tokens: 0,
+                        cache_write_tokens: 0,
                     },
                     finish_reason: FinishReason::Stop,
                     tool_calls: None,

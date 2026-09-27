@@ -234,8 +234,12 @@ pub fn cut_at_cache_boundary(blocks: &[ContentBlock], usage: &ProviderUsage) -> 
         let n_read = overlap(lo, hi, 0, read_end);
         let n_write = overlap(lo, hi, read_end, write_end);
         let n_fresh = tokens - n_read - n_write;
-        // 单一类别记账: 取该块的主导段, 避免同一块被重复计价
-        let (cache, n) = if n_read >= n_write && n_read >= n_fresh {
+        // 单一类别记账: 取该块的主导段, 避免同一块被重复计价。
+        // 2026-09-27 修正: 0-token 块 (如未估 token 的 tool 名) 三段全 0,
+        // 若按 `0>=0` 先命中会误判为 CacheRead —— 显式归 Fresh。
+        let (cache, n) = if tokens == 0 {
+            (CacheClass::Fresh, 0)
+        } else if n_read >= n_write && n_read >= n_fresh {
             (CacheClass::CacheRead, n_read)
         } else if n_write >= n_fresh {
             (CacheClass::CacheWrite, n_write)
@@ -440,5 +444,166 @@ mod tests {
         let a = attribute(&blocks, &u, &Rates::from_input(1e-6));
         // 出向块不应被入向缓存边界切成 CacheRead
         assert_eq!(a.blocks[0].cache, CacheClass::Fresh);
+    }
+}
+
+// ============ 请求分类 (3.1 接线) ============
+// `LlmRequest` 在全仓有 3 个同名定义 (`unified.rs:301` / `llm_types.rs:15`
+// / `traits.rs:326`), 为避开该耦合, 本函数只收原始切片, 由各 provider 适配。
+
+/// 简单内容哈希：长度 + 首尾各 8 字节。
+/// 不是加密哈希 —— 用途是"跨轮去重", 不是"防碰撞"。8+8 字节加长度对
+/// session 级去重足够；若未来要全局账本, 换 sha1(content)[:8]。
+pub fn block_hash(content: &str) -> String {
+    let bytes = content.as_bytes();
+    let (head, tail) = if bytes.len() <= 16 {
+        (bytes, &[][..])
+    } else {
+        (&bytes[..8], &bytes[bytes.len() - 8..])
+    };
+    format!("{:x}:{:02x?}{:02x?}", bytes.len(), head, tail)
+}
+
+/// 把一次组装好的请求切成可寻址块。
+///
+/// 块顺序 = 线上字节顺序：`static` 先（系统提示 → skill schema → tool schema），
+/// `messages` 后。**这个顺序是负载**：`cut_at_cache_boundary` 做前缀切分时依赖它。
+pub fn classify_input(
+    system: Option<&str>,
+    skill_schemas: &[(String, String)],
+    tool_names: &[String],
+    messages: &[(String, String)],
+    estimate: &dyn Fn(&str) -> u32,
+) -> Vec<ContentBlock> {
+    let mut blocks = Vec::new();
+    if let Some(sys) = system {
+        blocks.push(
+            ContentBlock::new(Zone::Input, Section::Static, Bucket::System, block_hash(sys))
+                .with_tokens(estimate(sys)),
+        );
+    }
+    for (skill, schema) in skill_schemas {
+        blocks.push(
+            ContentBlock::new(Zone::Input, Section::Static, Bucket::Schema, block_hash(schema))
+                .with_skill(skill.clone())
+                .with_tokens(estimate(schema)),
+        );
+    }
+    for tool in tool_names {
+        blocks.push(
+            ContentBlock::new(Zone::Input, Section::Static, Bucket::Schema, block_hash(tool))
+                .with_tool(tool.clone()),
+        );
+    }
+    for (role, content) in messages {
+        let bucket = match role.as_str() {
+            "tool" | "tool_result" | "function_call_output" => Bucket::ToolResult,
+            "thinking" | "reasoning" => Bucket::Thinking,
+            "function_call" | "tool_use" => Bucket::ToolUse,
+            _ => Bucket::Text,
+        };
+        let mut b = ContentBlock::new(
+            Zone::Input,
+            Section::Messages,
+            bucket,
+            block_hash(content),
+        )
+        .with_tokens(estimate(content));
+        b.role = Some(role.clone());
+        blocks.push(b);
+    }
+    blocks
+}
+
+#[cfg(test)]
+mod classify_tests {
+    use super::*;
+
+    fn est(s: &str) -> u32 {
+        (s.len() / 4).max(1) as u32
+    }
+
+    #[test]
+    fn block_order_matches_wire_order() {
+        let b = classify_input(
+            Some("sys"),
+            &[("xlsx".into(), "schema-bytes".into())],
+            &["Read".into(), "mcp__perplexity__search".into()],
+            &[("user".into(), "hi".into())],
+            &est,
+        );
+        // static 先: system -> skill schema -> tool schema ×2; messages 后
+        let buckets: Vec<_> = b.iter().map(|x| (x.section, x.bucket)).collect();
+        assert_eq!(
+            buckets,
+            vec![
+                (Section::Static, Bucket::System),
+                (Section::Static, Bucket::Schema),
+                (Section::Static, Bucket::Schema),
+                (Section::Static, Bucket::Schema),
+                (Section::Messages, Bucket::Text),
+            ]
+        );
+    }
+
+    #[test]
+    fn skill_and_tool_dimensions_are_populated() {
+        let b = classify_input(
+            None,
+            &[("xlsx-data".into(), "s".into())],
+            &["mcp__perplexity__search".into()],
+            &[],
+            &est,
+        );
+        assert_eq!(b[0].skill.as_deref(), Some("xlsx-data"));
+        assert_eq!(b[1].tool.as_deref(), Some("mcp__perplexity__search"));
+        assert_eq!(b[1].mcp_server(), Some("perplexity"));
+    }
+
+    #[test]
+    fn role_maps_to_bucket_across_providers() {
+        let b = classify_input(
+            None,
+            &[],
+            &[],
+            &[
+                ("tool".into(), "r".into()),
+                ("thinking".into(), "t".into()),
+                ("function_call".into(), "f".into()),
+                ("assistant".into(), "a".into()),
+            ],
+            &est,
+        );
+        let got: Vec<Bucket> = b.iter().map(|x| x.bucket).collect();
+        assert_eq!(got, vec![Bucket::ToolResult, Bucket::Thinking, Bucket::ToolUse, Bucket::Text]);
+    }
+
+    #[test]
+    fn classify_feeds_cut_end_to_end() {
+        let b = classify_input(
+            Some("system prompt here"),
+            &[("k".into(), "skill schema".into())],
+            &["Read".into()],
+            &[("user".into(), "new question".into())],
+            &est,
+        );
+        let u = ProviderUsage { fresh: 100, cached: 0, rewrote: 0, output: 5, write_1h: false };
+        let a = attribute(&b, &u, &Rates::from_input(1e-6));
+        assert_eq!(a.blocks.len(), b.len());
+        assert!(a.blocks.iter().all(|p| p.cache == CacheClass::Fresh));
+        assert_eq!(a.blocks[0].block.bucket, Bucket::System);
+    }
+
+    #[test]
+    fn hash_distinguishes_content_and_is_stable() {
+        assert_eq!(block_hash("abc"), block_hash("abc"));
+        assert_ne!(block_hash("abc"), block_hash("abd"));
+        assert_ne!(block_hash("short"), block_hash(&"short ".repeat(50)));
+    }
+
+    #[test]
+    fn empty_request_is_empty_blocks_not_an_error() {
+        let b = classify_input(None, &[], &[], &[], &est);
+        assert!(b.is_empty());
     }
 }

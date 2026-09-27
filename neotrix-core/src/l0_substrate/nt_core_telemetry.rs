@@ -1471,6 +1471,8 @@ mod tests {
             prompt_tokens: p,
             completion_tokens: c,
             total_tokens: p + c,
+            cache_read_tokens: 0,
+            cache_write_tokens: 0,
         }
     }
 

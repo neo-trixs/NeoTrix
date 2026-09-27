@@ -99,11 +99,23 @@ pub struct LlmResponse {
 }
 
 /// Token 用量
+///
+/// 2026-09-27 新增 `cache_read/cache_write`：`anthropic.rs:92` 在打
+/// `cache_control` 断点（P0-4 prefix caching），但此前 Usage 无任何 cache 字段 ——
+/// **项目在享受 prompt 缓存却对命中/写入零计量**。按 AIBrix 结论，工具集身份是
+/// 缓存身份的一部分；本仓 120 skill + 28 plugin，skill 集变更即击穿前缀缓存。
+/// 两字段均为加性且 `#[serde(default)]`，旧数据照常解析。
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct Usage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
     pub total_tokens: u32,
+    /// 命中 prompt cache 的输入 token（Anthropic `cache_read_input_tokens`）。
+    #[serde(default)]
+    pub cache_read_tokens: u32,
+    /// 重新写入 cache 的输入 token（Anthropic `cache_creation_input_tokens`）。
+    #[serde(default)]
+    pub cache_write_tokens: u32,
 }
 
 /// 完成原因

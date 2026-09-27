@@ -16,7 +16,7 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use super::analyzer::TrafficAnalyzer;
 use crate::l3_embodiment::l1_facade::{
-    GatewayV2, FinishReason, LlmRequest, LlmResponse, Message, Role, Tool,
+    FinishReason, GatewayV2, LlmRequest, LlmResponse, Message, Role, Tool,
 };
 
 #[derive(Debug, Clone)]
@@ -347,7 +347,8 @@ async fn handle_stream(
         Ok(mut rx) => {
             let a2 = state.analyzer.clone();
 
-            let (tx, rx_out) = tokio::sync::mpsc::channel::<Result<Event, std::convert::Infallible>>(64);
+            let (tx, rx_out) =
+                tokio::sync::mpsc::channel::<Result<Event, std::convert::Infallible>>(64);
 
             tokio::spawn(async move {
                 let _ = tx.send(Ok(Event::default().event("message_start").data(
@@ -361,38 +362,47 @@ async fn handle_stream(
                     match chunk {
                         Ok(partial) => {
                             full_content.push_str(&partial.content);
-                            let _ = tx.send(Ok(Event::default().event("content_block_delta").data(
-                                serde_json::json!({
-                                    "type": "content_block_delta",
-                                    "index": 0,
-                                    "delta": {
-                                        "type": "text_delta",
-                                        "text": partial.content
-                                    }
-                                }).to_string(),
-                            ))).await;
+                            let _ = tx
+                                .send(Ok(Event::default().event("content_block_delta").data(
+                                    serde_json::json!({
+                                        "type": "content_block_delta",
+                                        "index": 0,
+                                        "delta": {
+                                            "type": "text_delta",
+                                            "text": partial.content
+                                        }
+                                    })
+                                    .to_string(),
+                                )))
+                                .await;
                         }
                         Err(e) => {
-                            let _ = tx.send(Ok(Event::default().event("error").data(
-                                format!("{{\"type\":\"error\",\"error\":\"{:?}\"}}", e),
-                            ))).await;
+                            let _ = tx
+                                .send(Ok(Event::default().event("error").data(format!(
+                                    "{{\"type\":\"error\",\"error\":\"{:?}\"}}",
+                                    e
+                                ))))
+                                .await;
                             break;
                         }
                     }
                 }
 
-                let _ = tx.send(Ok(Event::default().event("message_delta").data(
-                    serde_json::json!({
-                        "type": "message_delta",
-                        "delta": {
-                            "stop_reason": "end_turn",
-                            "stop_sequence": null
-                        },
-                        "usage": {
-                            "output_tokens": 0
-                        }
-                    }).to_string(),
-                ))).await;
+                let _ = tx
+                    .send(Ok(Event::default().event("message_delta").data(
+                        serde_json::json!({
+                            "type": "message_delta",
+                            "delta": {
+                                "stop_reason": "end_turn",
+                                "stop_sequence": null
+                            },
+                            "usage": {
+                                "output_tokens": 0
+                            }
+                        })
+                        .to_string(),
+                    )))
+                    .await;
 
                 {
                     let mut a = a2.lock().await;
@@ -400,11 +410,9 @@ async fn handle_stream(
                 }
             });
 
-            let stream = Sse::new(ReceiverStream::new(rx_out))
-                .keep_alive(
-                    axum::response::sse::KeepAlive::new()
-                        .interval(Duration::from_secs(15)),
-                );
+            let stream = Sse::new(ReceiverStream::new(rx_out)).keep_alive(
+                axum::response::sse::KeepAlive::new().interval(Duration::from_secs(15)),
+            );
 
             Ok(stream.into_response())
         }
@@ -468,14 +476,21 @@ mod tests {
                 prompt_tokens: 10,
                 completion_tokens: 5,
                 total_tokens: 15,
+                // 2026-09-27: 测试桩, 无真实缓存, 恒 0。
+                cache_read_tokens: 0,
+                cache_write_tokens: 0,
             },
             model: "claude-sonnet-4-6".into(),
             tool_calls: None,
-         reasoning: None,};
+            reasoning: None,
+        };
         let anthropic = to_anthropic_response(&resp, "claude-sonnet-4-6");
         assert_eq!(anthropic.role, "assistant");
         assert_eq!(anthropic.stop_reason.as_deref(), Some("end_turn"));
         assert!(!anthropic.content.is_empty());
-        assert_eq!(anthropic.content[0].text.as_deref(), Some("Hello, I'm Claude."));
+        assert_eq!(
+            anthropic.content[0].text.as_deref(),
+            Some("Hello, I'm Claude.")
+        );
     }
 }

@@ -1,11 +1,10 @@
-use crate::l1_action::nt_io::nt_io_provider::common::types::*;
-use crate::l1_action::nt_core_llm::{LlmRequest, LlmResponse, LlmError};
+use crate::l1_action::nt_core_llm::{LlmError, LlmRequest, LlmResponse};
 use crate::l1_action::nt_io::nt_io_http_factory::global_client;
+use crate::l1_action::nt_io::nt_io_provider::common::types::*;
 
 const GROQ_BASE: &str = "https://api.groq.com/openai/v1";
 const OPENROUTER_BASE: &str = "https://openrouter.ai/api/v1";
 const POLLINATIONS_BASE: &str = "https://text.pollinations.ai/openai";
-
 
 pub struct GroqProvider {
     api_key: String,
@@ -61,11 +60,17 @@ impl GroqProvider {
             .to_string();
 
         let model = v["model"].as_str().unwrap_or("unknown").to_string();
-        let usage = v["usage"].as_object().map(|u| Usage {
-            prompt_tokens: u["prompt_tokens"].as_u64().unwrap_or(0) as u32,
-            completion_tokens: u["completion_tokens"].as_u64().unwrap_or(0) as u32,
-            total_tokens: u["total_tokens"].as_u64().unwrap_or(0) as u32,
-        }).unwrap_or_default();
+        let usage = v["usage"]
+            .as_object()
+            .map(|u| Usage {
+                prompt_tokens: u["prompt_tokens"].as_u64().unwrap_or(0) as u32,
+                completion_tokens: u["completion_tokens"].as_u64().unwrap_or(0) as u32,
+                total_tokens: u["total_tokens"].as_u64().unwrap_or(0) as u32,
+                // 2026-09-27: 免费代理层通用 shape, 无 cache 上报, 恒 0。
+                cache_read_tokens: 0,
+                cache_write_tokens: 0,
+            })
+            .unwrap_or_default();
 
         let finish = match v["choices"][0]["finish_reason"].as_str() {
             Some("stop") => FinishReason::Stop,
@@ -75,7 +80,14 @@ impl GroqProvider {
             _ => FinishReason::Unknown,
         };
 
-        Ok(LlmResponse { content, model, usage, finish_reason: finish, tool_calls: None , reasoning: None})
+        Ok(LlmResponse {
+            content,
+            model,
+            usage,
+            finish_reason: finish,
+            tool_calls: None,
+            reasoning: None,
+        })
     }
 }
 
@@ -86,14 +98,17 @@ impl LlmProvider for GroqProvider {
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {
-        self.client = crate::l1_action::nt_io::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+        self.client = crate::l1_action::nt_io::nt_io_http_factory::build_async_client_with_proxy(
+            Some(proxy_url),
+        );
     }
 
     async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let body = self.build_request_body(request);
         let url = format!("{}/chat/completions", self.base_url);
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.api_key))
             .json(&body)
@@ -102,7 +117,9 @@ impl LlmProvider for GroqProvider {
             .map_err(|e| LlmError::Network(format!("{}", e)))?;
 
         let status = resp.status();
-        let text = resp.text().await
+        let text = resp
+            .text()
+            .await
             .map_err(|e| LlmError::Network(format!("failed to read response body: {}", e)))?;
 
         match status.as_u16() {
@@ -115,7 +132,10 @@ impl LlmProvider for GroqProvider {
         }
     }
 
-    async fn stream_complete_raw(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+    async fn stream_complete_raw(
+        &self,
+        request: &LlmRequest,
+    ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let mut body = serde_json::json!({
             "model": request.model,
             "messages": request.messages.iter().map(|m| {
@@ -154,7 +174,10 @@ impl LlmProvider for GroqProvider {
                 Ok(response) => {
                     let status = response.status();
                     if !status.is_success() {
-                        let text = response.text().await.unwrap_or_else(|e| format!("failed to read error body: {}", e));
+                        let text = response
+                            .text()
+                            .await
+                            .unwrap_or_else(|e| format!("failed to read error body: {}", e));
                         let err = match status.as_u16() {
                             401 => LlmError::Authentication(text),
                             429 => LlmError::RateLimit(text),
@@ -168,23 +191,33 @@ impl LlmProvider for GroqProvider {
                     let full_text = match response.text().await {
                         Ok(t) => t,
                         Err(e) => {
-                            let _ = tx.send(Err(LlmError::Network(format!("failed to read response body: {}", e)))).await;
+                            let _ = tx
+                                .send(Err(LlmError::Network(format!(
+                                    "failed to read response body: {}",
+                                    e
+                                ))))
+                                .await;
                             return;
                         }
                     };
                     for line in full_text.lines() {
                         let line = line.trim();
-                        if line.is_empty() || line == "data: [DONE]" { continue; }
+                        if line.is_empty() || line == "data: [DONE]" {
+                            continue;
+                        }
                         if let Some(data) = line.strip_prefix("data: ") {
                             if let Ok(v) = serde_json::from_str::<serde_json::Value>(data) {
                                 if let Some(delta) = v["choices"][0]["delta"]["content"].as_str() {
-                                    let _ = tx.send(Ok(LlmResponse {
-                                        content: delta.to_string(),
-                                        model: v["model"].as_str().unwrap_or("").to_string(),
-                                        usage: Usage::default(),
-                                        finish_reason: FinishReason::Unknown,
-                                    tool_calls: None,
-                                     reasoning: None,})).await;
+                                    let _ = tx
+                                        .send(Ok(LlmResponse {
+                                            content: delta.to_string(),
+                                            model: v["model"].as_str().unwrap_or("").to_string(),
+                                            usage: Usage::default(),
+                                            finish_reason: FinishReason::Unknown,
+                                            tool_calls: None,
+                                            reasoning: None,
+                                        }))
+                                        .await;
                                 }
                             }
                         }
@@ -228,7 +261,9 @@ impl LlmProvider for OpenRouterProvider {
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {
-        self.client = crate::l1_action::nt_io::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+        self.client = crate::l1_action::nt_io::nt_io_http_factory::build_async_client_with_proxy(
+            Some(proxy_url),
+        );
     }
 
     async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -253,7 +288,8 @@ impl LlmProvider for OpenRouterProvider {
             body["temperature"] = serde_json::json!(temp);
         }
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("HTTP-Referer", "https://neotrix.ai")
@@ -264,26 +300,44 @@ impl LlmProvider for OpenRouterProvider {
             .map_err(|e| LlmError::Network(format!("{}", e)))?;
 
         let status = resp.status();
-        let text = resp.text().await
+        let text = resp
+            .text()
+            .await
             .map_err(|e| LlmError::Network(format!("failed to read response body: {}", e)))?;
 
         match status.as_u16() {
             200 => {
                 let v: serde_json::Value = serde_json::from_str(&text)
                     .map_err(|e| LlmError::Unknown(format!("JSON: {}", e)))?;
-                let content = v["choices"][0]["message"]["content"].as_str().unwrap_or("").to_string();
+                let content = v["choices"][0]["message"]["content"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
                 let model = v["model"].as_str().unwrap_or("unknown").to_string();
-                let usage = v["usage"].as_object().map(|u| Usage {
-                    prompt_tokens: u["prompt_tokens"].as_u64().unwrap_or(0) as u32,
-                    completion_tokens: u["completion_tokens"].as_u64().unwrap_or(0) as u32,
-                    total_tokens: u["total_tokens"].as_u64().unwrap_or(0) as u32,
-                }).unwrap_or_default();
+                let usage = v["usage"]
+                    .as_object()
+                    .map(|u| Usage {
+                        prompt_tokens: u["prompt_tokens"].as_u64().unwrap_or(0) as u32,
+                        completion_tokens: u["completion_tokens"].as_u64().unwrap_or(0) as u32,
+                        total_tokens: u["total_tokens"].as_u64().unwrap_or(0) as u32,
+                        // 2026-09-27: 免费代理层通用 shape, 无 cache 上报, 恒 0。
+                        cache_read_tokens: 0,
+                        cache_write_tokens: 0,
+                    })
+                    .unwrap_or_default();
                 let finish = match v["choices"][0]["finish_reason"].as_str() {
                     Some("stop") => FinishReason::Stop,
                     Some("length") => FinishReason::Length,
                     _ => FinishReason::Unknown,
                 };
-                Ok(LlmResponse { content, model, usage, finish_reason: finish, tool_calls: None , reasoning: None})
+                Ok(LlmResponse {
+                    content,
+                    model,
+                    usage,
+                    finish_reason: finish,
+                    tool_calls: None,
+                    reasoning: None,
+                })
             }
             401 => Err(LlmError::Authentication(text)),
             429 => Err(LlmError::RateLimit(text)),
@@ -293,7 +347,10 @@ impl LlmProvider for OpenRouterProvider {
         }
     }
 
-    async fn stream_complete_raw(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+    async fn stream_complete_raw(
+        &self,
+        request: &LlmRequest,
+    ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let mut body = serde_json::json!({
             "model": request.model,
             "messages": request.messages.iter().map(|m| {
@@ -331,34 +388,49 @@ impl LlmProvider for OpenRouterProvider {
                 Ok(response) => {
                     let status = response.status();
                     if !status.is_success() {
-                        let text = response.text().await.unwrap_or_else(|e| format!("failed to read error body: {}", e));
-                        let _ = tx.send(Err(match status.as_u16() {
-                            401 => LlmError::Authentication(text),
-                            429 => LlmError::RateLimit(text),
-                            _ => LlmError::Server(text),
-                        })).await;
+                        let text = response
+                            .text()
+                            .await
+                            .unwrap_or_else(|e| format!("failed to read error body: {}", e));
+                        let _ = tx
+                            .send(Err(match status.as_u16() {
+                                401 => LlmError::Authentication(text),
+                                429 => LlmError::RateLimit(text),
+                                _ => LlmError::Server(text),
+                            }))
+                            .await;
                         return;
                     }
                     let full_text = match response.text().await {
                         Ok(t) => t,
                         Err(e) => {
-                            let _ = tx.send(Err(LlmError::Network(format!("failed to read response body: {}", e)))).await;
+                            let _ = tx
+                                .send(Err(LlmError::Network(format!(
+                                    "failed to read response body: {}",
+                                    e
+                                ))))
+                                .await;
                             return;
                         }
                     };
                     for line in full_text.lines() {
                         let line = line.trim();
-                        if line.is_empty() || line == "data: [DONE]" { continue; }
+                        if line.is_empty() || line == "data: [DONE]" {
+                            continue;
+                        }
                         if let Some(data) = line.strip_prefix("data: ") {
                             if let Ok(v) = serde_json::from_str::<serde_json::Value>(data) {
                                 if let Some(delta) = v["choices"][0]["delta"]["content"].as_str() {
-                                    let _ = tx.send(Ok(LlmResponse {
-                                        content: delta.to_string(),
-                                        model: v["model"].as_str().unwrap_or("").to_string(),
-                                        usage: Usage::default(),
-                                        finish_reason: FinishReason::Unknown,
-                                    tool_calls: None,
-                                     reasoning: None,})).await;
+                                    let _ = tx
+                                        .send(Ok(LlmResponse {
+                                            content: delta.to_string(),
+                                            model: v["model"].as_str().unwrap_or("").to_string(),
+                                            usage: Usage::default(),
+                                            finish_reason: FinishReason::Unknown,
+                                            tool_calls: None,
+                                            reasoning: None,
+                                        }))
+                                        .await;
                                 }
                             }
                         }
@@ -401,7 +473,9 @@ impl LlmProvider for PollinationsProvider {
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {
-        self.client = crate::l1_action::nt_io::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+        self.client = crate::l1_action::nt_io::nt_io_http_factory::build_async_client_with_proxy(
+            Some(proxy_url),
+        );
     }
 
     async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -426,7 +500,8 @@ impl LlmProvider for PollinationsProvider {
             body["temperature"] = serde_json::json!(temp);
         }
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(&self.base_url)
             // pollinations 匿名访问要求 referer=pollinations.ai 否则按认证用户返回 402
             .header(reqwest::header::REFERER, "https://pollinations.ai/")
@@ -436,7 +511,9 @@ impl LlmProvider for PollinationsProvider {
             .map_err(|e| LlmError::Network(format!("{}", e)))?;
 
         let status = resp.status();
-        let text = resp.text().await
+        let text = resp
+            .text()
+            .await
             .map_err(|e| LlmError::Network(format!("failed to read response body: {}", e)))?;
 
         match status.as_u16() {
@@ -447,8 +524,9 @@ impl LlmProvider for PollinationsProvider {
                     model: request.model.clone(),
                     usage: Usage::default(),
                     finish_reason: FinishReason::Stop,
-                tool_calls: None,
-                 reasoning: None,})
+                    tool_calls: None,
+                    reasoning: None,
+                })
             }
             429 => Err(LlmError::RateLimit(text)),
             500..=599 => Err(LlmError::Server(text)),
@@ -456,7 +534,10 @@ impl LlmProvider for PollinationsProvider {
         }
     }
 
-    async fn stream_complete_raw(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+    async fn stream_complete_raw(
+        &self,
+        request: &LlmRequest,
+    ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let mut body = serde_json::json!({
             "model": request.model,
             "messages": request.messages.iter().map(|m| serde_json::json!({
@@ -501,7 +582,10 @@ impl LlmProvider for PollinationsProvider {
             // 非 200 时上报明确错误 (此前静默丢弃导致调用方看到空内容)
             let status = response.status();
             if !status.is_success() {
-                let text = response.text().await.unwrap_or_else(|e| format!("failed to read error body: {}", e));
+                let text = response
+                    .text()
+                    .await
+                    .unwrap_or_else(|e| format!("failed to read error body: {}", e));
                 let err = match status.as_u16() {
                     429 => LlmError::RateLimit(text),
                     401..=403 => LlmError::Authentication(text),
@@ -514,7 +598,12 @@ impl LlmProvider for PollinationsProvider {
             let full_text = match response.text().await {
                 Ok(t) => t,
                 Err(e) => {
-                    let _ = tx.send(Err(LlmError::Network(format!("failed to read response body: {}", e)))).await;
+                    let _ = tx
+                        .send(Err(LlmError::Network(format!(
+                            "failed to read response body: {}",
+                            e
+                        ))))
+                        .await;
                     return;
                 }
             };
@@ -522,17 +611,22 @@ impl LlmProvider for PollinationsProvider {
             // 对齐 openai.rs 的解析模式 — 此前整段 text 当单 chunk 发出含 data: 前缀。
             for line in full_text.lines() {
                 let line = line.trim();
-                if line.is_empty() || line == "data: [DONE]" { continue; }
+                if line.is_empty() || line == "data: [DONE]" {
+                    continue;
+                }
                 if let Some(data) = line.strip_prefix("data: ") {
                     if let Ok(v) = serde_json::from_str::<serde_json::Value>(data) {
                         if let Some(delta) = v["choices"][0]["delta"]["content"].as_str() {
-                            let _ = tx.send(Ok(LlmResponse {
-                                content: delta.to_string(),
-                                model: v["model"].as_str().unwrap_or("").to_string(),
-                                usage: Usage::default(),
-                                finish_reason: FinishReason::Unknown,
-                            tool_calls: None,
-                             reasoning: None,})).await;
+                            let _ = tx
+                                .send(Ok(LlmResponse {
+                                    content: delta.to_string(),
+                                    model: v["model"].as_str().unwrap_or("").to_string(),
+                                    usage: Usage::default(),
+                                    finish_reason: FinishReason::Unknown,
+                                    tool_calls: None,
+                                    reasoning: None,
+                                }))
+                                .await;
                         }
                     }
                 }
@@ -564,7 +658,9 @@ impl LlmProvider for CerebrasProvider {
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {
-        self.client = crate::l1_action::nt_io::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+        self.client = crate::l1_action::nt_io::nt_io_http_factory::build_async_client_with_proxy(
+            Some(proxy_url),
+        );
     }
 
     async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -586,7 +682,8 @@ impl LlmProvider for CerebrasProvider {
             body["temperature"] = serde_json::json!(temp);
         }
 
-        let resp = self.client
+        let resp = self
+            .client
             .post("https://api.cerebras.ai/v1/chat/completions")
             .header("Authorization", format!("Bearer {}", self.api_key))
             .json(&body)
@@ -595,23 +692,36 @@ impl LlmProvider for CerebrasProvider {
             .map_err(|e| LlmError::Network(format!("{}", e)))?;
 
         let status = resp.status();
-        let text = resp.text().await
+        let text = resp
+            .text()
+            .await
             .map_err(|e| LlmError::Network(format!("failed to read response body: {}", e)))?;
 
         match status.as_u16() {
             200 => {
-                let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| LlmError::Unknown(format!("JSON: {}", e)))?;
+                let v: serde_json::Value = serde_json::from_str(&text)
+                    .map_err(|e| LlmError::Unknown(format!("JSON: {}", e)))?;
                 Ok(LlmResponse {
-                    content: v["choices"][0]["message"]["content"].as_str().unwrap_or("").to_string(),
+                    content: v["choices"][0]["message"]["content"]
+                        .as_str()
+                        .unwrap_or("")
+                        .to_string(),
                     model: v["model"].as_str().unwrap_or("").to_string(),
-                    usage: v["usage"].as_object().map(|u| Usage {
-                        prompt_tokens: u["prompt_tokens"].as_u64().unwrap_or(0) as u32,
-                        completion_tokens: u["completion_tokens"].as_u64().unwrap_or(0) as u32,
-                        total_tokens: u["total_tokens"].as_u64().unwrap_or(0) as u32,
-                    }).unwrap_or_default(),
+                    usage: v["usage"]
+                        .as_object()
+                        .map(|u| Usage {
+                            prompt_tokens: u["prompt_tokens"].as_u64().unwrap_or(0) as u32,
+                            completion_tokens: u["completion_tokens"].as_u64().unwrap_or(0) as u32,
+                            total_tokens: u["total_tokens"].as_u64().unwrap_or(0) as u32,
+                            // 2026-09-27: 免费代理层通用 shape, 无 cache 上报, 恒 0。
+                            cache_read_tokens: 0,
+                            cache_write_tokens: 0,
+                        })
+                        .unwrap_or_default(),
                     finish_reason: FinishReason::Stop,
-                tool_calls: None,
-                 reasoning: None,})
+                    tool_calls: None,
+                    reasoning: None,
+                })
             }
             401 => Err(LlmError::Authentication(text)),
             429 => Err(LlmError::RateLimit(text)),
@@ -619,7 +729,10 @@ impl LlmProvider for CerebrasProvider {
         }
     }
 
-    async fn stream_complete_raw(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+    async fn stream_complete_raw(
+        &self,
+        request: &LlmRequest,
+    ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let mut body = serde_json::json!({
             "model": request.model,
             "messages": request.messages.iter().map(|m| serde_json::json!({
@@ -654,7 +767,10 @@ impl LlmProvider for CerebrasProvider {
                 Ok(response) => {
                     let status = response.status();
                     if !status.is_success() {
-                        let text = response.text().await.unwrap_or_else(|e| format!("failed to read error body: {}", e));
+                        let text = response
+                            .text()
+                            .await
+                            .unwrap_or_else(|e| format!("failed to read error body: {}", e));
                         let err = match status.as_u16() {
                             401 => LlmError::Authentication(text),
                             429 => LlmError::RateLimit(text),
@@ -668,23 +784,33 @@ impl LlmProvider for CerebrasProvider {
                     let full_text = match response.text().await {
                         Ok(t) => t,
                         Err(e) => {
-                            let _ = tx.send(Err(LlmError::Network(format!("failed to read response body: {}", e)))).await;
+                            let _ = tx
+                                .send(Err(LlmError::Network(format!(
+                                    "failed to read response body: {}",
+                                    e
+                                ))))
+                                .await;
                             return;
                         }
                     };
                     for line in full_text.lines() {
                         let line = line.trim();
-                        if line.is_empty() || line == "data: [DONE]" { continue; }
+                        if line.is_empty() || line == "data: [DONE]" {
+                            continue;
+                        }
                         if let Some(data) = line.strip_prefix("data: ") {
                             if let Ok(v) = serde_json::from_str::<serde_json::Value>(data) {
                                 if let Some(delta) = v["choices"][0]["delta"]["content"].as_str() {
-                                    let _ = tx.send(Ok(LlmResponse {
-                                        content: delta.to_string(),
-                                        model: v["model"].as_str().unwrap_or("").to_string(),
-                                        usage: Usage::default(),
-                                        finish_reason: FinishReason::Unknown,
-                                    tool_calls: None,
-                                     reasoning: None,})).await;
+                                    let _ = tx
+                                        .send(Ok(LlmResponse {
+                                            content: delta.to_string(),
+                                            model: v["model"].as_str().unwrap_or("").to_string(),
+                                            usage: Usage::default(),
+                                            finish_reason: FinishReason::Unknown,
+                                            tool_calls: None,
+                                            reasoning: None,
+                                        }))
+                                        .await;
                                 }
                             }
                         }
@@ -699,7 +825,6 @@ impl LlmProvider for CerebrasProvider {
         Ok(rx)
     }
 }
-
 
 #[cfg(test)]
 mod tests {

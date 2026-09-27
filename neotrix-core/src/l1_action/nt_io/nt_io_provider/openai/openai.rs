@@ -151,6 +151,10 @@ impl LlmProvider for OpenAiProvider {
                     prompt_tokens: u["prompt_tokens"].as_u64().unwrap_or(0) as u32,
                     completion_tokens: u["completion_tokens"].as_u64().unwrap_or(0) as u32,
                     total_tokens: u["total_tokens"].as_u64().unwrap_or(0) as u32,
+                    // 2026-09-27: OpenAI 自动前缀缓存的命中数 (新版 API 才返回)。
+                    // 缺失 => 0, 不炸。
+                    cache_read_tokens: u["prompt_tokens_details"]["cached_tokens"].as_u64().unwrap_or(0) as u32,
+                    cache_write_tokens: 0,
                 }).unwrap_or_default();
                 let finish = match resp["choices"][0]["finish_reason"].as_str() {
                     Some("stop") => FinishReason::Stop,

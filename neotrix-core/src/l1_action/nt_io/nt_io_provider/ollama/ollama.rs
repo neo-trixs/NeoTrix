@@ -111,6 +111,9 @@ impl LlmProvider for OllamaProvider {
                     prompt_tokens,
                     completion_tokens,
                     total_tokens: prompt_tokens + completion_tokens,
+                    // 2026-09-27: 本地推理无 prompt cache, 恒 0。
+                    cache_read_tokens: 0,
+                    cache_write_tokens: 0,
                 };
 
                 let finish_reason = if tool_calls.is_some() {

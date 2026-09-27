@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 
 use crate::l1_action::nt_io::nt_io_provider::health::context_budget::estimate_tokens;
+use crate::l1_action::nt_io::nt_io_provider::common::cost_attribution;
 use crate::l1_action::nt_io::nt_io_provider::common::types::{DataTrust, FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, StructuredOutputConfig, Usage, Role};
 
 pub struct AnthropicProvider {
@@ -204,7 +205,73 @@ impl LlmProvider for AnthropicProvider {
                     prompt_tokens: resp["usage"]["input_tokens"].as_u64().unwrap_or(0) as u32,
                     completion_tokens: resp["usage"]["output_tokens"].as_u64().unwrap_or(0) as u32,
                     total_tokens: (resp["usage"]["input_tokens"].as_u64().unwrap_or(0) + resp["usage"]["output_tokens"].as_u64().unwrap_or(0)) as u32,
+                    // 2026-09-27 接线: provider 回传的缓存命中/写入计数。
+                    // 本模块 :92 正在打 cache_control 断点 (P0-4 prefix caching),
+                    // 此前 Usage 无此字段 => 对缓存命中/写入零计量, 此处补齐。
+                    // 缺失键 => 0 (老模型/代理不返回这些键时不炸)。
+                    cache_read_tokens: resp["usage"]["cache_read_input_tokens"].as_u64().unwrap_or(0) as u32,
+                    cache_write_tokens: resp["usage"]["cache_creation_input_tokens"].as_u64().unwrap_or(0) as u32,
                 };
+                // 2026-09-27 成本归因接线 (3.1): 此处是「系统提示 + tool schema +
+                // 消息在内存组装完成、且从不写入 transcript」的唯一漏斗。
+                // 用刚解析出的 usage.cache_* 真实值跑全链路 (blocks -> cut -> price)。
+                {
+                    let role_str = |r: &Role| match r {
+                        Role::System => "system",
+                        Role::User => "user",
+                        Role::Assistant => "assistant",
+                        Role::Tool => "tool",
+                    };
+                    let sys_text: Option<&str> = request
+                        .messages
+                        .iter()
+                        .find(|m| m.role == Role::System)
+                        .map(|m| m.content.as_str());
+                    let tool_names: Vec<String> =
+                        request.tools.iter().map(|t| t.name.clone()).collect();
+                    let msgs: Vec<(String, String)> = request
+                        .messages
+                        .iter()
+                        .filter(|m| m.role != Role::System)
+                        .map(|m| (role_str(&m.role).to_string(), m.content.clone()))
+                        .collect();
+                    let est = |s: &str| estimate_tokens(s) as u32;
+                    let blocks = cost_attribution::classify_input(
+                        sys_text,
+                        &[],
+                        &tool_names,
+                        &msgs,
+                        &est,
+                    );
+                    let pu = cost_attribution::ProviderUsage {
+                        fresh: usage
+                            .prompt_tokens
+                            .saturating_sub(usage.cache_read_tokens + usage.cache_write_tokens),
+                        cached: usage.cache_read_tokens,
+                        rewrote: usage.cache_write_tokens,
+                        output: usage.completion_tokens,
+                        write_1h: false,
+                    };
+                    // 单价未知时用 Anthropic 典型值占位, 只用于结构化日志的相对拆分。
+                    // 残差 input_err 会如实反映估算偏差, 见 Attribution.residual_ratio。
+                    let rates = cost_attribution::Rates::from_input(3e-6);
+                    let attr = cost_attribution::attribute(&blocks, &pu, &rates);
+                    log::debug!(
+                        "[cost] model={} blocks={} cache_hit={:.2} resid={:.3} static_schema={} msgs={}",
+                        request.model,
+                        attr.blocks.len(),
+                        attr.cache_hit,
+                        attr.residual_ratio(),
+                        attr.blocks
+                            .iter()
+                            .filter(|b| b.block.bucket == cost_attribution::Bucket::Schema)
+                            .count(),
+                        attr.blocks
+                            .iter()
+                            .filter(|b| b.block.section == cost_attribution::Section::Messages)
+                            .count(),
+                    );
+                }
                 Ok(LlmResponse { content: text_content, model: request.model.clone(), usage, finish_reason, tool_calls, reasoning: None })
             }
             401 => Err(LlmError::Authentication(text)),

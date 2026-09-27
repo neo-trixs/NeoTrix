@@ -13,6 +13,9 @@ fn parse_usage(resp: &serde_json::Value) -> Usage {
         prompt_tokens: meta.get("promptTokenCount").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
         completion_tokens: meta.get("candidatesTokenCount").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
         total_tokens: meta.get("totalTokenCount").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+        // 2026-09-27: Gemini 显式缓存内容的命中数。缺失 => 0。
+        cache_read_tokens: meta.get("cachedContentTokenCount").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+        cache_write_tokens: 0,
     }
 }
 
