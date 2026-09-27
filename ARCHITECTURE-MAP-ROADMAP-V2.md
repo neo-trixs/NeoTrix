@@ -1,5 +1,16 @@
 # NeoTrix 架构映射与进化路线图 (v2)
 
+> **状态: 事实层已过期, 路线图仅表达意图。**
+> §1–§7 是 2026-09-19 的快照, 此后 221 次提交未回填过任何一格。文中所有
+> 百分比 (「外部对标覆盖 36%」「平均成熟度 C3.2」) **没有任何机制会更新它**,
+> 因此永远是 36%。
+> **当前权威 = git + CI, 不是本文。** 可再生的实测值见 §11;
+> 结构性门禁见 `scripts/check-truth-surface.sh`。
+> 另注: §4 用 `Gap Score = Stars × Uniqueness` 排序, Top 10 全是「能力缺口」,
+> 而 2026-09-27 审计发现的真实瓶颈没有一个是能力缺口 —— 见 §11.3。
+
+> 五实体正典：`docs/architecture/FIVE-ENTITY-BLUEPRINT-V3.md`（56 项目对标的能力落点以 E1 正典类型为准；迭代编号 E0–E4 与本文 I/M/NODE 并存，执行以任务清单为准）。
+
 > 基于 ~1000+ URL 去重 → 4 Agent 并行分析 → 56 个项目映射
 > 版本: v2.0.0 (2026-09-19)
 
@@ -310,3 +321,63 @@
 - 版本：workspace 0.21.0 一致；`NeoBot@0.21.0` / `NeoTrix@0.22.0` 双产品线并存（见 ARCHITECTURE.md §14）。
 - 清单：`sessions/handoff-global-todo-20260926.md` §8；§39 见 `sessions/handoff-S39-20260926.md`。
 - 活体：soul 双端 online（tools=9）；`:8149` Down 按门拉起（blocked）；App 待目视。
+
+---
+
+## 11. 事实对账层 (2026-09-27 审计新增)
+
+> 本节与 §1–§7 相反: **§1–§7 是意图, 本节是事实。**
+> 本节所有数字都必须能被命令重新生成, 不接受人工填写 —— 否则重蹈 §7
+> 「外部对标覆盖 36%」永远停在 36% 的覆辙。
+
+### 11.1 可再生实测值
+
+| 指标 | 实测值 | 再生命令 |
+|---|---|---|
+| Rust 文件 / LOC | 2,945 / 896,574 | `find neotrix-core/src crates apps src-tauri/src -name '*.rs'` |
+| 0 字节 `.rs` | **0** | `find neotrix-core/src crates -name '*.rs' -size 0 \| wc -l` |
+| 真值面门禁基线 | **1** | `grep -vc '^#' scripts/truth-surface-baseline.txt` |
+| 门禁新增违规 | **0** | `bash scripts/check-truth-surface.sh --strict` |
+| HEAD 能否独立编译 | **能** (2026-09-27 起) | `cargo check --tests -p neotrix` |
+| `src/` 内 `#[test]` 数 | 13,316 | `grep -rc '#\[test\]\|#\[tokio::test\]' --include='*.rs' neotrix-core/src` |
+
+### 11.2 2026-09-27 审计已除的根 (均为「代码存在但工具链看不见」)
+
+| # | 问题 | 规模 | 状态 |
+|---|---|---|---|
+| 1 | HEAD 无法独立编译: 已入库文件 `use` 了只存在于工作区的 `mod` 声明 | 29 文件 / 7,339 LOC | ✅ 已入库 |
+| 2 | `cli/` 树已入库但 `pub mod cli;` 从未出现在任何 commit → 从未编译 | 87 文件 / 24,884 LOC | ✅ 已删 |
+| 3 | 4 个抽取 crate 的 54 个 0 字节模块被 L5 当公开 API 再导出 | 54 文件 | ✅ 已摘 |
+| 6 | 6 个 md5 相同的重复文件 (目录重构残留) | 1,769 LOC | ✅ 已删 |
+| 7 | `nt_core_capability_tree` 未继承 workspace lint, 4,670 LOC 零约束 | 20 条告警 | ✅ 已修 |
+| 8 | `nt_act_trade/tests/` 3 文件未声明 → 311 个测试从不编译 | 4,899 LOC | ◑ 复活 107, 删 88, 余 116 见 §11.3 |
+| 9 | `auto_inspector` 内嵌 cargo 死锁 → 3 个测试永久挂起, 全量套件跑不完 | 3 测试 | ✅ 已修 |
+| 10 | `.githooks/{post,pre-merge}` 悬空链接 → `reset --hard` 护栏一直没生效 | 2 hook | ✅ 已复活 |
+| 11 | `.gitignore` 的 `tests/` 通配屏蔽 10 个源码目录 | — | ✅ 已解禁 |
+
+**新增门禁** `scripts/check-truth-surface.sh` 卡 4 类:
+`EMPTY` / `UNDECLARED` / `TRACKED` / `UNCOMMITTED_DEP`。
+棘轮基线用**列表**而非计数 —— 计数基线挡不住「删一加一」, 新违规会隐身。
+接线: `Makefile` (`make truth-surface` / `-strict` / `-baseline`) +
+`ci.yml` check job (3 OS 矩阵, `--strict`)。
+
+### 11.3 仍开放的两项 (需设计决策, 非机械修复)
+
+1. **`test_orchestration.rs` 116 个测试** —— 它把两个**同名不同设计**的枚举
+   当成同一个: `workers::WorkerType` 是能力维度
+   `{Extract,Analyze,Write,Send,Track}`, 而 `orchestrator_v2.rs:70` 是业务维度
+   `{Inquiry,Quotation,Contract,Production,Logistics,Finance,Generic}`。
+   它要的 `WorkerType::{Generic,Inquiry,Quotation}` + `from_task_type` 在前者
+   不存在。101 错, import 对账后反升到 120。**需先裁决两套 taxonomy 归属。**
+2. **`ExtractConfig` / `EmailConfig` 双定义** —— 同时存在于
+   `extractors/mod.rs` 与 `data_pipeline.rs`。测试按所在模块各取一份,
+   是个随时会咬人的坑。建议收敛到一处。
+
+### 11.4 未除的已知债 (仅登记, 不在本次范围)
+
+- `l5_cognition/lib.rs` 式的「目录模块旁挂 lib.rs」副本 (已随本次清掉 1 处;
+  机制上仍可能再生, 故门禁只查 `mod` 绑定, 不查此类副本)。
+- `sessions/` 80 个文件 / 8.2 MB, 而 `DOCUMENTATION-MAP.md` §一.1 规定根目录
+  `TODO.md` 是唯一任务清单、§三.3 禁止每会话独立 TODO —— 规范自身被绕过 80 次。
+- `DOCUMENTATION-MAP.md` §三.7 禁 >500 行的 md, 实测 67 个超限 (排除 node_modules)。
+  这两条都说明**规范缺少强制点**; 门禁化 (退出码) 才是解药, 与 §11.2 同理。

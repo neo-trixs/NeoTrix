@@ -115,6 +115,24 @@
   - `nt_nexus/` - 跨会话记忆
   - `evolution/` - 进化系统
 
+## X. 五实体投影（FIVE-ENTITY-BLUEPRINT-V3 正典，2026-09-22 接入）
+
+> CrystalState 为单一事实源；五实体是它的五种投影，外围注册表为投影的序列化层。
+> 实施编号 E0–E4（旧 D/I/W/P 冻结）；任务清单见 `FIVE-ENTITY-TASK-CHECKLIST.md`（T01–T37）。
+
+| 实体 | 正典类型 | 投影字段 | KB 键 | 状态 |
+|---|---|---|---|---|
+| Workspace | `l0 nt_core_ws::WorkSpace` | `workspace: WorkspaceProjection` | `workspaces` | ⬜ E1 |
+| Agent | `l1 nt_infra_agent_card::AgentCard` | `agents: Vec<AgentProjection>` | `agent_cards` | ⬜ E1 |
+| Skill | `skill_loader::ResolvedSkill`＋`skill_evolution::SkillCandidate` | `skills: Vec<SkillProjection>` | `skill_candidates` | ✅ 门禁已落地（P0-2） |
+| Task | `l1 nt_act_scheduler::ScheduledTask` | `tasks: Vec<TaskProjection>` | `scheduled_tasks` | ⬜ E1 |
+| MCP | `agent::tool::mcp::McpRegistry` | `tools: Vec<ToolProjection>` | `mcp_servers` | ⬜ E1（注册表已融合 cli 版，死链待修） |
+
+路由三层（Skill 触发＞Agent 能力＞CAPABILITY_ROUTES 兜底；召回与裁决分离）；
+事件 12 变体见 CoreEvent；tick 同步读镜像（Scheduler 异步墙已立方案）。
+E0 顺序：E0.0✅ → E0.2/E0.5（路径改写）→ E0.3/E0.1 → E0.4（最后）。
+详见 `FIVE-ENTITY-BLUEPRINT-V3.md`。
+
 ## 3. 统一数据源架构 (数据流程节点 Map)
 
 ```
@@ -417,6 +435,18 @@ L0 Substrate ──────────────────────�
 ---
 
 **注意**: 此架构文档是活文档，随项目迭代持续更新。每次重大架构变更后，必须同步更新此文档。
+
+## 13. 对话面（neobot 即 neotrix 对外对话的一部分，2026-09-26 合体）
+
+- 定位：neobot 不是 side 项目，是 neotrix L3 对话外表（Dialog Facet）。
+  同工作区、同版本（workspace 0.21.0）、同库（`crates/neotrix-neobot` 不依赖 core，
+  core 单向依赖 neobot lib，桌面壳只认 lib）。
+- 单入口：`neotrix dialog <say|agent|models|provider|core|convo|task>`
+  与 `neobot` 二进制同律（同 `load_config/open_store` + 同 `pool_models` 聚合），
+  `neotrix-core/src/entry/dialog.rs` 薄封装。
+- 三端：`neotrix dialog`（引擎 CLI）/ `neobot`（对话管理 CLI）/ NeoBot.app（桌面壳）。
+  路由律一致：配对在线先晶体（模型透传池内解析），`env` 本地直连舱除外，离线回落。
+
 ## 14. 版本迭代记录（2026-09-26 大清洗）
 
 - 基线：分支 `feat/capability-absorb-20260828` HEAD `8a11227a`；workspace 0.21.0 全员一致
@@ -432,3 +462,41 @@ L0 Substrate ──────────────────────�
   `sessions/handoff-evo-20260926.md`（34/34 成功，零编造）。
 - P0 首点名建议：EVO-01 Token 成本门 → EVO-03 DSPy → EVO-02 judge 影子 → EVO-04 高速浏览器环。
 - 版本 bump（0.21.0→0.22.0）留待独占窗口（重编风险，见该文件§3）。
+
+## 16. 模块拓扑实测（2026-09-27 审计新增）
+
+> 本节记录**代码实际形态**，与 §1–§2 的设计意图分开。设计图不反映现实时，
+> 调试会一直在找不存在的东西 —— 本节就是为了让两者不再混为一谈。
+> 可再生实测值与门禁见 `ARCHITECTURE-MAP-ROADMAP-V2.md` §11。
+
+### 16.1 crate 拓扑：哪些是真 crate，哪些是空壳
+
+| crate | 状态 | 说明 |
+|---|---|---|
+| `neotrix-core` | 主体 | 2,945 .rs 中约 87% 在此 |
+| `crates/neotrix-{types,sysctl,game,neobot,audit,abilities,decision-engine}` | 正常 | — |
+| `crates/neotrix-{reasoning,consciousness,multi-agent,gateway}` | **曾为空壳** | 抽取重构只搬了 Cargo.toml 与 `pub mod`，代码没搬：54 个 0 字节模块被 L5 当公开 API 再导出。2026-09-27 已摘除空壳门面，真实代码 27 文件 / 12,113 LOC 保留 |
+| `crates/nt-lang` | 事实上的孤儿 | 只有 `[[bin]]` 无 `[lib]`，**结构上无法被任何 crate 依赖**；0 依赖者 |
+| `neotrix-core/src/neotrix/nt_core_capability_tree` | **住在 src/ 里的独立 crate** | 4,670 LOC / ~30 处真实调用，根 `Cargo.toml:11` 是 workspace member。路径违反直觉：`cargo` 从不把它当 neotrix-core 的模块编译 |
+
+### 16.2 已拆除 / 曾经从未编译的模块
+
+- **`neotrix-core/src/cli/`（87 文件 / 24,884 LOC）已删除。** 它曾已入库，
+  但 `pub mod cli;` **从未出现在任何 commit 的 lib.rs 里** —— Rust 的目录模块
+  只解析 `foo.rs` 或 `foo/mod.rs`，故这 87 个文件自入库起从未参与编译。
+  替代落点见 `l3_embodiment/{nt_sandbox,nt_sandboxed_shell,nt_shield_enforcer}`、
+  `l6_meta/{nt_approval,nt_cost_tracker,nt_laws,nt_permission_profiles,nt_agents_guard}`、
+  `l1_action/nt_act/nt_act_cleanup/*`。
+- **目录模块旁挂 `lib.rs` 副本**（`l5_cognition/lib.rs`，171 行）是从不被解析的
+  陈旧副本 —— 也正因如此，它声明的 `mod nt_core_state;` 一直没暴露为错误。
+  已删。这类副本会**掩盖真实的缺失依赖**，比缺文件更危险。
+
+### 16.3 「存在 ≠ 生效」的三种形态（本仓反复出现）
+
+1. **已入库但从未编译** —— `cli/` 树、6 个 md5 相同的重复文件。
+2. **已编译但从不执行** —— `nt_act_trade/tests/` 下 311 个 `#[test]` 因父
+   `mod.rs` 未声明而永不参与编译，`cargo test` 全绿也看不见。
+3. **已导出但为空** —— 0 字节模块被 `pub use` 成公开 API。
+
+三者共同的隐蔽性在于：**编译器和测试运行器都报「绿」**。
+因此 `scripts/check-truth-surface.sh` 把它们当门禁（退出码）而非文档约定。
