@@ -48,3 +48,15 @@
 
 - 前端 rebuild：tsc 零错＋vite 131ms＋tauri debug 包（11:03）；277 单测绿；soul online；sidecar ready。
 - App 自退一次（非本窗所杀），已重开待目视；tags 前后端齐，包内即所见。
+
+## 6. 四 lane 执行轮（W/S/T/Q）裁决更新
+
+- W 收窗：cleanup 5 件与主仓逐字节一致（跳过）；mcp registry 613 行大分叉（跳过）；复制 1 件
+  injection_threat 426 行暂未接线（park，待去重裁决）；删窗序已出（drift 首删），零删除执行。
+- S serve 入库：2002 行零硬违规（无 unwrap/expect/panic/unsafe），依赖全在主仓，[[bin]] 已声明，
+  结论绿 → **本轮入库**（作者待认领，message 注明）。
+- T 双 Tauri：im/plugin 四拆落地（门面 13＋4 子模块，自重读＋括号零差；31 行他人脏随切片带走，
+  message 注明）；proxy_pool 1063 行他人在途 → 未动＋三拆方案留存。
+- Q 静音：allow 删除引发 142 死码洪水（全他窗，check 实测）→ **已回滚归零**（lib.rs/agent.rs 零 diff），
+  关静音转专窗分批清；agent 转接因无对应 DialogCmd 变体未动（行为变更禁令）。
+- 本轮提交：T 5 路径＋serve＋本文件；W 复制件/proxy/agent转接 park。

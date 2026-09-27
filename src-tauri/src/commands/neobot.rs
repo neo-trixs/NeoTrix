@@ -6,7 +6,7 @@
 
 use neotrix_neobot::{
     CliEngine, EngineAdapter, EngineKind, HttpEngine, LocalEchoEngine, NeobotConfig, NeobotStore,
-    run_local_turn,
+    OpencodeEngine, run_local_turn,
 };
 
 /// 前端任务 DTO.
@@ -51,6 +51,9 @@ fn resolve_engine(config: &NeobotConfig) -> Result<EngineSelection, String> {
         EngineKind::Http { .. } => HttpEngine::from_env()
             .map(EngineSelection::Http)
             .map_err(|err| err.to_string()),
+        EngineKind::Opencode { model } => OpencodeEngine::new(model)
+            .map(EngineSelection::Opencode)
+            .map_err(|err| err.to_string()),
     }
 }
 
@@ -58,6 +61,7 @@ enum EngineSelection {
     Echo,
     Cli(CliEngine),
     Http(HttpEngine),
+    Opencode(OpencodeEngine),
 }
 
 impl EngineSelection {
@@ -76,6 +80,7 @@ impl EngineSelection {
             }
             Self::Cli(engine) => run_local_turn(store, config, engine, title, text),
             Self::Http(engine) => run_local_turn(store, config, engine, title, text),
+            Self::Opencode(engine) => run_local_turn(store, config, engine, title, text),
         }
         .map_err(|err| err.to_string())?;
         Ok(status.as_str().to_owned())
@@ -91,6 +96,7 @@ pub fn neobot_doctor() -> Result<String, String> {
         EngineSelection::Echo => LocalEchoEngine.probe().map_err(|err| err.to_string())?,
         EngineSelection::Cli(engine) => engine.probe().map_err(|err| err.to_string())?,
         EngineSelection::Http(engine) => engine.probe().map_err(|err| err.to_string())?,
+        EngineSelection::Opencode(engine) => engine.probe().map_err(|err| err.to_string())?,
     };
     let tasks = store.list_tasks(1).map_err(|err| err.to_string())?;
     Ok(format!("doctor ok: engine={engine_info} tasks={}", tasks.len()))
