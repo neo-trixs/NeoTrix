@@ -257,3 +257,96 @@
 
 ### 8.5 全量推进
 `10113 绿/125 红` → `11339 绿/87 红`（本轮中途中断点）→ 第四轮全量进行中。
+
+---
+
+## 9. 完整后续待修复清单（51 条，逐条带根因与 file:line）
+
+> 快照：`/tmp/nt_full8.log`（HEAD `51355bca`，全量 11493 绿 / 51 红）。
+> 分诊：3 个只读代理并行拆解，**51/51 全覆盖**，分类 P=生产 bug / S=契约漂移 / U=未接线 stub / E=环境依赖。
+> 分布：**P 17 · S 27 · U 4 · E 3**。
+
+### 9.1 P · 生产 bug（17 条）——优先做
+
+**P0 安全/正确性（10 条，多为一行改）**
+| # | 位置 | 病 |
+|---|---|---|
+| 1 | `nt_core_capability/dependency.rs:136,154` | 拓扑排序**恒失败**：入度记在依赖侧、却从反向边递减 → 队列永不播种，`get_load_order`/`load_all` 永远 `Err` |
+| 2 | `nt_core_capability/integrator.rs:30` | router 持 `init_*_capabilities` **之前**的 registry 克隆 → `route` 恒"无匹配能力"，整个 integrator 是空转 |
+| 3 | `nt_agent_identity.rs:497` | 手搓 `uuid_v4()`（时钟+计数器）同一 tick 内碰撞 → `register` panic（也是测试抖动源）。换 `uuid::Uuid::new_v4()` |
+| 4 | `nt_meta/gwt_router/cost_weight.rs:130` | 预算上限被静默丢弃，空 `budget_ok` 不兜底 → `RoutingReason::BudgetConstraint` 分支不可达 |
+| 5 | `nt_meta/gwt_router/attention.rs:91` | 第 4 步按 `frac_sum` 重新归一化**抵消了上限**（0.6/0.7=0.857 ≫ 0.6）→ 需 water-fill 而非按和除 |
+| 6 | `nt_core_self/dynamic_params.rs:188` | 解析器按行读，而 `format_as_description:221` 输出一行逗号串 → **读不出自己写的格式** |
+| 7 | `nt_feel/cognitive_bridge/feedback.rs:101` | `Satisfaction｜Joy` 分支吸收失败信号 → 失败时**永远不会升级为 Frustration**（违背结构体文档） |
+| 8 | `nt_memory/cascade/cascade.rs:128` | 晋升门用 `distill_threshold`(0.5) 而非 `attention_threshold`(0.3)，实测 attention=0.42 → **五级记忆流全死**，跨层召回恒空 |
+| 9 | `nt_memory_kb/memory_orchestrator.rs:70` | `compress()` 触发线在 50 条而 `add_raw:62` 封顶 100 → 常规会话永不压缩 |
+| 10 | `nt_feel/writing_style.rs:903` | 空串守卫被 `a==b → 1.0` 快路径遮蔽 → 退化输入返回 1.0 而非 0.0 |
+
+**P1 需多一点工作量（7 条）**
+| # | 位置 | 病 |
+|---|---|---|
+| 11 | `l2_perception/nt_core_vector_store/store_hnsw.rs:83-87` | 索引恒按**余弦**排序，但 `IndexConfig::default()` 是 **Hamming** → 报告的 distance 与排序自相矛盾（真索引 bug） |
+| 12 | `l0_substrate/nt_core_speculative_decoding.rs:250` | `speedup = total/verification_count`，而每次验证只出 1 token → 恒等于 1.0。分母应为 `rejected+1` |
+| 13 | `l5_cognition/nt_codegen.rs:54` | `parse_yaml` 调 `serde_json::from_str`（`.yml` 解析必炸）。需加 `serde_yaml = "0.9.34"` 到 workspace + core 两处 manifest（Cargo.lock 已有，可离线） |
+| 14 | `nt_core_capability/monitor.rs:137,197` | 无 Call 事件时**静默丢弃** latency；`get_status` 只扫 registry → 指标不聚合 |
+| 15 | `nt_core_capability/security.rs:257` | `check_ip` 仅精确串匹配，生产无任何 CIDR 输入 → IP 白名单形同虚设（需真 CIDR 匹配） |
+| 16 | `shared_types.rs:130`（潜伏） | `on_failure` 在未达阈值时就置 `HalfOpen` → `half_open_probes_*` 统计恒死 |
+| 17 | `nt_memory_kb/nt_memory_distill.rs:316` | teacher 标签 = 原始点积，与恒等 student 完全一致 → 误差恒 0、梯度恒 0，`after<before` 不可满足 |
+
+### 9.2 S · 契约漂移（27 条，改夹具不碰生产）
+
+- **⚠️ 由我本轮安全修复暴露的 2 条（重点）**：`nt_shield_sandbox/stateful_bench.rs:187,205-208,328`
+  的 S4 场景**把修复前的"有洞"极性写成了断言**（`deny_all=true` 配非空白名单，
+  修复后=白名单语义，`random.host` 应被拒，但步骤期望放行）。修法是互换两处策略的
+  布尔值，让场景表达"显式白名单不放行未知主机"。**这两条等于在给漏洞背书，必须改。**
+- `nt_core_aware` 4 条：`eps` 口径（1e-6 vs 1e-7）、`Default.health=1.0` 由**另一个通过
+  的测试**钉住、`>` vs `>=` 边界、权重和为 1.0 算出的期望值写错。
+- 熔断器 3 条（`shared_types.rs:97`、`self_healing/circuit_breaker.rs:117`）：**单位漂移**
+  —— `new(1,1)` 的冷却是 1 **秒**，测试只 sleep 2 **毫秒**。
+- `predictive_maintenance` 2 条：`detect()` 是移动平均 z-score，测试注入的 150.0 是 13.9σ
+  而非"异常但非致命"，测试自己的算术错了。
+- `nt_core_capability` 3 条：`Domain::Trade` 加入后域列表仍断言 11 项（两份重复的
+  `layer_domain_coverage`）；`record_latency` 测试没注册 mock cap。
+- `nt_feel` 4 条：负分可读度是**有意设计**（有 Pre-K 档）、3-gram 数被 `take(5)` 截断、
+  TTL 是插入锚定（`get` 也计 turn）→ 用 `new(10, 3)`。
+- `distiller.rs:252`：守卫是 `s.len() >= 4`，`"Short"` 5 字符也过（另：`len()` 是字节，
+  1 个汉字也能过 → 应改 `chars().count()`）。
+- `shield_core/audit.rs:1176`：夹具 `sk-test123` 只有 7 字符，而规则要求 `sk-` 后 ≥20。
+- `shield_core/safety_kernel.rs:727`：`FileDelete` 在破坏性闸门就短路，根本到不了风险分
+  分支 → 断言需含 "explicit confirmation"。
+- `compliance::requirement.rs:191` / `threat_modeler.rs:180`：**这两个是各自独立的本地
+  enum**（非 shared `Severity`），且**全仓无任何排序/比较调用点** → 可安全对齐断言
+  （与 `osint/sweep.rs` 那个承重约定不同）。
+- `parallel_task.rs:380`：夹具 `max_retries: 3` 让失败依赖被重排队，生产依赖阻塞逻辑**是对的**。
+- `cad_full_wiring_verification`：见 9.4 决策项。
+
+### 9.3 U · 未接线 stub（4 条）——实现或显式 `#[ignore]`，禁止改松断言
+| 位置 | 缺口 |
+|---|---|
+| `nt_core_embed/mod.rs:12-20` | `TextEmbedder` 是"字节位置袋"→ 任意英文文本相似度 ≈0.83，排序无意义。**可在 ~30 行内做真实现**（分词 + FNV-1a 哈希 + 符号哈希 + L2 归一，零新依赖）；但它有 5 个生产调用方，改 `embed` 会重排全部检索结果 → 需评估 |
+| `noise_handshake.rs:226` | `create_message3` 是 **private** 且其输出在 `_consume_message2` 里被 `let _ = msg3;` **丢弃** → responder 永远到不了 `Completed`；测试用 `[0u8;48]` 占位 + `unwrap_or_else` 吞错掩盖了它 |
+| `publish_gateway.rs:205-212` | 5 个平台臂全部硬编码"not wired"（YouTube 无 dry_run/mock 路径） |
+| `nt_codegen` / `nt_memory_distill` | 见 P 13 / P 17 |
+
+### 9.4 需人工决策（3 条，不可机械修）
+1. **双时态节点 schema**（`nt_core_kb_primitives.rs:188` + `:685-691`）
+   `id TEXT PRIMARY KEY` 使同一节点的多版本无法共存。改复合 PK `(id, transaction_time)`
+   需 v11 迁移 + 重指 4 个 FK（`:237,238,258,277,347`）；另一条路是承认"每 id 最新版本"
+   这个 API 契约是虚构并重写两个测试。**注意：`nodes_as_of`/`node_history` 目前零生产调用方** ——
+   所以真正的决策是"给它接调用方，还是删掉"。
+2. **CAD self-test 来源可疑**（`nt_core_cad_consciousness.rs:332-336`）
+   `CAD_SELFTESTS` 12 项里 8 项指向本仓不存在的 `neotrix/l2_world_impl/*.rs`
+   （注册处 `nt_core_self_test_integration.rs:26,34` 已被注释为 "module not found"），
+   列表里还有字面垃圾条目 `"// // cad_generator"`。更严重的是 `cad_wiring_map():164-209`
+   把这些**死 file:line 当作"接线证据"**喂给 D16 晋升门 —— 这是自我欺骗面，
+   **假"通过"比红测试更糟**。要么重新吸收模块，要么砍掉证据表。
+3. **publish gateway**（见 9.3）—— 要么投 OAuth2 + `reqwest` 可续传上传，要么加一等公民
+   `dry_run` 让测试走任务生命周期；直接删测试等于藏掉文档里承诺的能力。
+
+### 9.5 E · 环境依赖（3 条）
+- `healing/self_healing/health_monitor.rs:117-126` 2 条：5 个内建探针走**活体** sys-info
+  （本机 mem/cpu/disk 直接踩 Critical 阈值）→ 注入固定状态集或 `#[ignore]`。
+- `nt_core_guardian/mod.rs:75` 1 条：`results.len() <= 1` 取决于真实 `df`/`vm_stat`/
+  `$HOME/.neotrix/knowledge.db`/`target/debug` 状态。
+  **⚠️ 附带发现的高危项：`nt_core_guardian/repair.rs:119` 会执行 `cargo clean`** ——
+  这条一旦被触发就会删掉 63G 活指纹，建议立刻单独加门禁。
