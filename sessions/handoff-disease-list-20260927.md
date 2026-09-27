@@ -114,3 +114,96 @@
 4. 循环步长必须单调递增（`chunk_planner` 教训：重叠不得 ≥ 步长）。
 5. 重型 cargo 前必过 `nt_mem_gate.sh`；sidecar 用完即 `stop`。
 
+
+---
+
+## 6. 长尾分诊结果（4 个只读子代理并行拆解，125 条全覆盖）
+
+分诊判据：**P**=生产 bug / **S**=测试契约漂移 / **U**=未接线 stub / **E**=环境依赖。
+并行方式：4 个 explore 子代理只读分诊（零 cargo），构建验证单线串行（16G 铁律）。
+
+### 6.1 本轮已修（16 处生产 bug，均编译+测试双验或编译已验）
+
+| 位置 | 病 | 类别 | 验证 |
+|---|---|---|---|
+| `nt_shield_sandbox/mod.rs:108` | `matched_allow \|\| !deny_all` → 任何白名单策略全放行 | P·安全 | check ✓ |
+| `actions/security/security.rs:106` | `target_pattern="*"` 用 `contains` 字面量比对 → 通配规则永不 deny | P·安全 | check ✓ |
+| `nt_io_browser_engine/fetch.rs:278` | 显式代理 URL 解析失败被 `.ok()` 吞 → 静默直连（违反 fail-closed） | P·安全 | check ✓ |
+| `shield/circuit_breaker.rs:156,226` | `Instant::now().duration_since(Instant::now())` 当时间戳 → 半开恢复永不触发，熔断永久锁死 | P | check ✓ |
+| `shield_approval/human_approval.rs:118` | `conf` id 恒为 `conf_0` → 并发审批撞号覆盖 | P | check ✓ |
+| `asset_map/query/mod.rs:95,109` | `parse_or/and` 判定前未跳空白 → 复合查询条件被静默丢弃 | P | 125 绿 ✓ |
+| `asset_map/query/mod.rs:372` | `Like` 无通配符退化为精确 `==` | P | 125 绿 ✓ |
+| `source/subscription_source.rs:511` | 入队后不清缓冲 → 闭合标签重复推送同一条目 | P | 125 绿 ✓ |
+| `nt_world_repomap/mod.rs:83` | 函数分支漏剥 `"fn "` → 函数名不可检索 | P | 125 绿 ✓ |
+| `osint/fofa.rs:393` | domain 判定先于 email → 邮箱目标生成不了 `email=` 查询 | P | 125 绿 ✓ |
+| `osint/whois_module.rs:78` | 在小写副本上取值 → 实体名被小写化 | P | 125 绿 ✓ |
+| `sense/types.rs:126` | 双零向量余弦 = 0 → "相同状态相似度 0" | P | 125 绿 ✓ |
+| `source/crypto.rs:11` | 32 字节 MD5 hex 喂 AES-128 → 一调就 panic | P | 125 绿 ✓ |
+| `entity_linking/linker.rs:94,197` | 提及去重含 offset → 同名实体不合并 | P | 125 绿 ✓ |
+| `entity_linking/extractor.rs:173` | 地点去重缺类型 → 被 Person 认领后静默吞掉 | P | 125 绿 ✓ |
+| `entity_linking/linker.rs` | 补缩写匹配（MIT ↔ Massachusetts Institute of Technology） | P·新能力 | 125 绿 ✓ |
+| `nt_memory_kb/cognitive_graph.rs:168` | `trace_causal` 边方向与 `reasoning_gaps` 相反 + 漏 `InferredFrom` | P | 125 绿 ✓ |
+| `nt_core_consciousness_types.rs:353` | effort 加权上限 0.7 → `EffortTier::Max` 死代码 | P | 125 绿 ✓ |
+| `nt_core_kb_primitives.rs:211` | `nodes.transaction_time` 缺 `DEFAULT 0`（edges 侧一直有） | P | 125 绿 ✓ |
+
+### 6.2 待修（已分诊，按建议顺序）
+
+**A. 一行级生产 bug（低风险高回报，建议下一批）**
+- `chain_config.rs:31` `"Tdd"` → `"TDD"`（步骤超时表对 TDD 整体失效，2 测试）
+- `nt_core_consciousness_tree.rs:31` 硬编码 11 分支 → `BranchKind::all().len()`（**这是出厂 self-test**，运行时健康门常红）
+- `nt_core_parallel/isolation.rs:764` 测试路径已失效（`l8_autonomic_impl` → `l5_cognition/...`）
+- `resource_budget.rs:338` `total_cost` 过滤掉非 `CostUSD` 行的 cost → 真实花费报 $0
+- `nt_infra_breaker.rs:77` 窗口未满即评估 → 单次瞬时错误即熔断
+- `nt_conversation.rs:25` 秒级 id → 同秒会话互相覆盖（数据丢失）
+- `goal_lock/mod.rs:73` 缺 `unsafe` 关键词 → 危险回应漏判
+- `mock_adapters.rs:674` harness 第 3 步必 `Err` → 集成测试永远不可能 Ok
+- `orchestrator_v2.rs:858` 空结果分支丢 `worker_count`/`all_success` 字段
+- `routing/intelligence.rs:225` 超预算固定扣 50 分 → 1.7x 与 33x 超预算同分，路由不确定
+- `decision_engine/analyzer.rs:94` `gap < 0.01` 漏 0.01 差值；`:116` Medium 档不可达
+- `render/physics.rs:207` `layers_compatible` 混淆 layer/mask → 跨层碰撞全部漏判
+- `render/ui.rs:369` Anchor 算了 ax/ay/aw/ah 却不写回 bounds
+- `persona_routing/mod.rs:122` 缺"设计"关键词
+- `nt_cot_generator.rs:156` 所有 `LlmError` 一律映射 Network
+- `llm_types.rs:65` `with_image_b64` 未补 `data:` 前缀（调用方注释却这么声称）
+- `dynamic_memory_bank.rs:273` 相似度硬顶 0.6 < 阈值 0.7 → `_retrieve_identity` 永不返回
+- `self_improvement.rs:667` `.round()` → `.floor()`（1-10 优先级差一档）
+- `l6_meta/.../recursive_controller.rs:43` `atomize` 忽略 `;` 分隔 → 多任务树不分解
+- `rotation_coordinator.rs:124` 返回缓存值 → 轮换抖动是死的
+- `reasoning_protection.rs:77` `line_count <= 3` 时 CoT 原样输出，无省略标记
+- `refusal_tamper.rs:50` 映射键是整句 → 请求后缀被吞
+- `infrastructure_mapper.rs:222` 账号/IP 比阈值 5.0 过严（4.0 的极端信号被拒）
+- `red_team/orchestrator.rs:79` 关键词表缺 `ignore all previous` 等 → 模拟器自己标 VULNERABLE 却得分 0
+
+**B. 需设计裁决（不宜一行改）**
+- `nt_core_kb_primitives.rs:188` `nodes.id` 是单列 PK → 双时态版本化不可能（需 PK→(id,transaction_time) + edges FK 重构 + 真实库迁移）
+- `cascade/cascade.rs:216` `length_score = len/200` 过小 + `tick():126` 永久丢弃未达阈样本
+- `nt_shield/circuit_breaker` 之外三处 `Severity` 派生 `Ord` 反向（`compliance/requirement.rs:9`、`threat_modeler.rs:29`、`neotrix-types/shared_types.rs:6`）→ 翻转会改变全局排序，需调用点审计
+
+**C. 未接线 stub（要么实现要么 `#[ignore]`，禁止改松断言）**
+- `nt_core_llm/mod.rs:91` `apply_context_budget` 空实现（上下文预算完全不生效）
+- `nt_core_embed/mod.rs:12` `TextEmbedder` 是"字节位置袋"兼容桩 → 任意文本相似度≈0.83
+- `reason/sleep/hebbian.rs:104` `consolidate_to_capability` 硬编码 0.0
+- `nt_emotion_reasoning_bridge.rs:87` `process_events` 从不写入 `self.emotions` → 后续全空转
+- `noise_handshake.rs:269` 缺 `_create_message3` → 握手无法完成
+- `publish_gateway.rs:211` YouTube 上传未接线
+- `dynamic_memory_bank.rs:253` `calculate_semantic_similarity` 只比 description 不比 name
+- `nt_codegen.rs:54` `parse_yaml` 误用 `serde_json`（需引 serde_yaml）
+
+**D. 环境依赖（注入桩或 `#[ignore]`）**
+- `video_stitcher.rs:192` 真调 ffmpeg + 不存在的输入路径
+- `experience_tree/mod.rs:896` `KnowledgeBase::open(None)` 命中真实 `$HOME` 库 + flock
+- `nt_memory_galaxy_hygiene.rs:659` 硬编码 `2026-08-11` 已过期 47 天
+- `governance/enforcement/audit.rs:125` `timestamp_now()` 秒级 → 两次 log 同秒
+- `subdomain_harvester.rs:171` `.invalid` 域名依赖活体 DNS
+- `nt_forecast.rs:768` `with_llm_narrator(None)` 仍发真实 LLM 请求（含 sleep/重试）
+
+## 7. 并发纪律（本轮新增教训）
+
+1. **他窗并发重构会周期性把 test 构建弄红**（本轮观测 3 次：`test_extractors.rs` 缺类型 →
+   `test_orchestration.rs` 私有方法 → `nt_feel::writing_style` 未接通）。期间：
+   - 用 `cargo check -p neotrix --lib`（排除 test cfg）验证生产改动；
+   - 提交门禁会拒绝（`BUILD GATE FAILED`）——**这是正确行为，禁止 `--no-verify`**；
+   - 等对方提交后重跑测试再提交（本轮最终 125 绿后放行）。
+2. 内存门必须**每次发构建前看退出码**，不能只看输出行（本轮我漏看一次，
+   在 180MB 空闲时起了 rustc，侥幸未 OOM）。
+3. 提交一律 `git commit -- <paths>` pathspec 限定，避开共享暂存区。
