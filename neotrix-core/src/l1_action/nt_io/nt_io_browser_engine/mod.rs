@@ -62,6 +62,8 @@ pub mod policy;
 pub mod engine;
 pub mod js;
 pub mod error;
+/// EVO-04 步骤1：原子快照表（[id] type name/value，jev-ultrafast 思想）
+pub mod nt_snapshot;
 
 // 平坦路径兼容：拆分前外部经 `nt_io_browser_engine::{X}` 直引类型，
 // 此处集中重导出，保持外部路径零断裂（新增引用请走子模块路径）。
