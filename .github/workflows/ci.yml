@@ -25,6 +25,8 @@ jobs:
       - run: cargo check -p neotrix
       - name: Layer dependency check
         run: bash scripts/check-layer-deps.sh
+      - name: Truth-surface gate (ratchet: blocks NEW 0-byte .rs / undeclared test modules / tracked build artifacts)
+        run: bash scripts/check-truth-surface.sh --strict
 
   test:
     runs-on: ${{ matrix.os }}

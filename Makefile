@@ -278,6 +278,18 @@ doc-drift:
 doc-drift-strict:
 	bash scripts/check-doc-drift.sh --strict
 
+# 真值面门禁 (audit 2026-09-27; 零编译成本, 纯 grep/find)
+# 卡三类"代码存在但工具链看不见"的漂移: 0 字节 .rs / tests 下未声明的 .rs / 入库的编译产物
+# 棘轮基线 = scripts/truth-surface-baseline.txt (列表而非计数, 防止"删一加一"隐身)
+truth-surface:
+	bash scripts/check-truth-surface.sh
+
+truth-surface-strict:
+	bash scripts/check-truth-surface.sh --strict
+
+truth-surface-baseline:
+	bash scripts/check-truth-surface.sh --update-baseline
+
 # 覆盖率地板 (过渡值 70 防腐化; P2 清理后提到 80 卡点)
 # 需: cargo install cargo-llvm-cov
 coverage-gate:
@@ -315,7 +327,8 @@ audit-all:
 	bash scripts/check-doc-drift.sh; \
 	bash scripts/check-build-surface.sh; \
 	bash scripts/check-fuzz-ready.sh; \
-	bash scripts/check-api-surface.sh
+	bash scripts/check-api-surface.sh; \
+	bash scripts/check-truth-surface.sh
 
 # 架构环门 (NTS-B13; 需: cargo install cargo-modules)
 arch-acyclic:
