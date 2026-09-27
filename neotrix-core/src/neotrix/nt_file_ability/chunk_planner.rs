@@ -98,6 +98,8 @@ impl ChunkPlanner {
         let mut chunks = Vec::new();
         let mut start = 0;
         let total_rows = rows.len();
+        // 重叠不得超过步长，否则 start 会原地/倒退 → 死循环 + 内存无限增长（2026-09-27 实锤）
+        let overlap = self.config.overlap_rows.min(rows_per_chunk.saturating_sub(1));
 
         while start < total_rows {
             let end = (start + rows_per_chunk).min(total_rows);
@@ -122,10 +124,9 @@ impl ChunkPlanner {
                 estimated_tokens,
             });
 
-            start = end.saturating_sub(self.config.overlap_rows); // 重叠
-            if start >= total_rows {
-                break;
-            }
+            // 强制单调前进：end > start 恒成立，故此赋值必使 start 严格增长
+            let next = end.saturating_sub(overlap);
+            start = if next > start { next } else { end };
         }
 
         // 填充 total
@@ -216,6 +217,32 @@ mod tests {
         for c in &chunks {
             assert_eq!(c.table.headers, vec!["Key", "Val"]);
         }
+    }
+
+    /// 回归（2026-09-27）：单行超长单元格 → rows_per_chunk=1，overlap=2 时
+    /// 旧实现 start 原地踏步 → 死循环 + 内存无限增长，把测试进程吃到被内核 SIGKILL。
+    #[test]
+    fn test_chunk_forces_forward_progress() {
+        let table = TableData {
+            name: "wide".into(),
+            headers: vec!["Blob".into()],
+            rows: vec![
+                vec!["x".repeat(500)],
+                vec!["y".repeat(500)],
+                vec!["z".repeat(500)],
+            ],
+        };
+        let config = ChunkConfig {
+            max_chars_per_chunk: 200,
+            ..Default::default()
+        };
+        let chunks = ChunkPlanner::with_config(config).chunk(&table);
+        assert!(
+            chunks.len() <= 3,
+            "chunk 数必须有界（否则死循环），实际 {}",
+            chunks.len()
+        );
+        assert_eq!(chunks.last().map(|c| c.row_range.1), Some(3));
     }
 
     #[test]
