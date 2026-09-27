@@ -82,6 +82,10 @@ impl RepoMap {
                         .unwrap_or("")
                         .trim_start_matches("pub ")
                         .trim_start_matches("async ")
+                        // 2026-09-27 修复: 函数分支漏剥 "fn " (struct/enum/trait/mod
+                        // 分支都剥了自己的关键字) → 索引里的函数名带 "fn " 前缀,
+                        // search_symbol("hello") 永远匹配不到。
+                        .trim_start_matches("fn ")
                         .to_string(),
                     kind: SymbolKind::Function,
                     file: path.to_path_buf(),

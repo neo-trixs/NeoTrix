@@ -39,10 +39,7 @@ pub struct EntityLinker {
 
 impl EntityLinker {
     pub fn new(config: LinkerConfig) -> Self {
-        Self {
-            config,
-            next_id: 1,
-        }
+        Self { config, next_id: 1 }
     }
 
     pub fn with_default_config() -> Self {
@@ -86,17 +83,21 @@ impl EntityLinker {
 
         for entity in entities {
             // Try to find an existing merged entity to append to
-            let target = merged.iter_mut().find(|m| {
-                self.names_match(&m.name, &entity.name)
-            });
+            let target = merged
+                .iter_mut()
+                .find(|m| self.names_match(&m.name, &entity.name));
 
             match target {
                 Some(target) => {
                     // Merge mentions
                     for mention in entity.mentions {
-                        let already_present = target.mentions.iter().any(|existing| {
-                            existing.surface == mention.surface && existing.offset == mention.offset
-                        });
+                        // 2026-09-27 修复: 去重键含 offset → 同一实体在文中不同
+                        // 位置各留一条, 合并后提及数虚高 (同文两个 "Alice" 不合并)。
+                        // 提及列表的语义是"出现过哪些提及", 按 surface 去重。
+                        let already_present = target
+                            .mentions
+                            .iter()
+                            .any(|existing| existing.surface == mention.surface);
                         if !already_present {
                             target.mentions.push(mention);
                         }
@@ -139,6 +140,13 @@ impl EntityLinker {
             }
         }
 
+        // 2026-09-27 补缩写判定: "MIT" 不是 "Massachusetts Institute of Technology"
+        // 的子串, 相似度也仅 0.06 → 两者永不合并 (linker_merges_substring_matches
+        // 实锤)。全大写短形式按"各词首字母"匹配长形式, 这是缩写消歧的标准做法。
+        if acronym_matches(a, b) || acronym_matches(b, a) {
+            return true;
+        }
+
         // Levenshtein distance
         let dist = levenshtein(&a_lower, &b_lower);
         let max_len = a.len().max(b.len());
@@ -157,12 +165,38 @@ impl EntityLinker {
     }
 }
 
+/// 缩写匹配: `acronym` 是否为 `full` 各实词首字母的缩写。
+///
+/// 判据 (保守, 避免误合并): acronym 全 ASCII 字母、长度 2..=6、全大写;
+/// full 至少 2 个词; 逐词首字母 (跳过 "of/the/and" 等连接词) 与 acronym 顺序一致。
+fn acronym_matches(acronym: &str, full: &str) -> bool {
+    let acr: Vec<char> = acronym.chars().collect();
+    if acr.len() < 2 || acr.len() > 6 {
+        return false;
+    }
+    if !acr.iter().all(|c| c.is_ascii_alphabetic() && c.is_ascii_uppercase()) {
+        return false;
+    }
+    const STOP: [&str; 5] = ["of", "the", "and", "for", "de"];
+    let initials: Vec<char> = full
+        .split(|c: char| !c.is_ascii_alphabetic())
+        .filter(|w| !w.is_empty())
+        .filter(|w| !STOP.contains(&w.to_lowercase().as_str()))
+        .filter_map(|w| w.chars().next())
+        .collect();
+    initials.len() >= 2 && initials.len() == acr.len() && initials == acr
+}
+
 /// Compute Levenshtein edit distance between two strings.
 pub fn levenshtein(a: &str, b: &str) -> usize {
     let a_len = a.len();
     let b_len = b.len();
-    if a_len == 0 { return b_len; }
-    if b_len == 0 { return a_len; }
+    if a_len == 0 {
+        return b_len;
+    }
+    if b_len == 0 {
+        return a_len;
+    }
 
     let a_bytes = a.as_bytes();
     let b_bytes = b.as_bytes();
@@ -177,10 +211,12 @@ pub fn levenshtein(a: &str, b: &str) -> usize {
     for i in 1..=a_len {
         curr[0] = i;
         for j in 1..=b_len {
-            let cost = if a_bytes[i - 1] == b_bytes[j - 1] { 0 } else { 1 };
-            curr[j] = (curr[j - 1] + 1)
-                .min(prev[j] + 1)
-                .min(prev[j - 1] + cost);
+            let cost = if a_bytes[i - 1] == b_bytes[j - 1] {
+                0
+            } else {
+                1
+            };
+            curr[j] = (curr[j - 1] + 1).min(prev[j] + 1).min(prev[j - 1] + cost);
         }
         std::mem::swap(&mut prev, &mut curr);
     }
@@ -191,9 +227,8 @@ pub fn levenshtein(a: &str, b: &str) -> usize {
 /// Merge two entities by consolidating their mentions and temporal windows.
 pub fn merge_entities(mut a: Entity, b: Entity) -> Entity {
     for mention in b.mentions {
-        let already_present = a.mentions.iter().any(|existing| {
-            existing.surface == mention.surface && existing.offset == mention.offset
-        });
+        // 2026-09-27 同上: 自由函数版按 surface 去重
+        let already_present = a.mentions.iter().any(|existing| existing.surface == mention.surface);
         if !already_present {
             a.mentions.push(mention);
         }
@@ -240,7 +275,12 @@ mod tests {
     fn linker_merges_substring_matches() {
         let mut linker = EntityLinker::with_default_config();
         let e1 = Entity::new("MIT", EntityType::Org, 0, ts());
-        let e2 = Entity::new("Massachusetts Institute of Technology", EntityType::Org, 10, ts());
+        let e2 = Entity::new(
+            "Massachusetts Institute of Technology",
+            EntityType::Org,
+            10,
+            ts(),
+        );
 
         let linked = linker.link(vec![e1, e2]);
         assert_eq!(linked.len(), 1);
@@ -280,7 +320,7 @@ mod tests {
 
     #[test]
     fn merge_entities_combines_mentions() {
-        let mut a = Entity::new("Google", EntityType::Org, 0, 100);
+        let a = Entity::new("Google", EntityType::Org, 0, 100);
         let b = Entity::new("Google Inc", EntityType::Org, 50, 200);
         let merged = merge_entities(a.clone(), b.clone());
         assert_eq!(merged.mentions.len(), 2);
@@ -315,7 +355,8 @@ mod tests {
         let mut b = Entity::new("Foo", EntityType::Org, 10, 150);
         b.add_mention("Foo Inc", 55, 250);
         let merged = merge_entities(a, b);
-        let unique_surfaces: Vec<&str> = merged.mentions.iter().map(|m| m.surface.as_str()).collect();
+        let unique_surfaces: Vec<&str> =
+            merged.mentions.iter().map(|m| m.surface.as_str()).collect();
         assert_eq!(merged.mentions.len(), 2);
         assert!(unique_surfaces.contains(&"Foo"));
         assert!(unique_surfaces.contains(&"Foo Inc"));

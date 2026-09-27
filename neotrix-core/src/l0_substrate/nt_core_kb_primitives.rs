@@ -208,7 +208,9 @@ pub fn schema_initialize(conn: &Connection) -> rusqlite::Result<()> {
             norm_title TEXT,
             valid_start_time INTEGER,
             valid_end_time INTEGER,
-            transaction_time INTEGER NOT NULL,
+            -- 2026-09-27 修复: nodes 侧缺 DEFAULT (edges 侧一直有) → 任何省略该
+            -- 列的手写 INSERT 撞 NOT-NULL 违例, bitemporal 探针无法自建样本。
+            transaction_time INTEGER NOT NULL DEFAULT 0,
             parent_id TEXT,
             depth INTEGER NOT NULL DEFAULT 0,
             cluster_id TEXT

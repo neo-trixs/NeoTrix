@@ -92,7 +92,13 @@ impl QueryParser {
     fn parse_or(&mut self) -> Result<QueryExpr, ParseError> {
         let mut left = self.parse_and()?;
 
-        while self.peek() == Some('|') && self.peek_next() == Some('|') {
+        // 2026-09-27 修复: 循环判定前未跳空白 → `port="80" || port="443"` 这类
+        // 带空格的复合查询被静默截断成左项 (只返回第一个条件的结果)。
+        loop {
+            self.skip_whitespace();
+            if !(self.peek() == Some('|') && self.peek_next() == Some('|')) {
+                break;
+            }
             self.advance(2);
             self.skip_whitespace();
             let right = self.parse_and()?;
@@ -106,7 +112,12 @@ impl QueryParser {
     fn parse_and(&mut self) -> Result<QueryExpr, ParseError> {
         let mut left = self.parse_not()?;
 
-        while self.peek() == Some('&') && self.peek_next() == Some('&') {
+        // 2026-09-27 同上: 复合 AND 查询的空格导致条件被丢弃
+        loop {
+            self.skip_whitespace();
+            if !(self.peek() == Some('&') && self.peek_next() == Some('&')) {
+                break;
+            }
             self.advance(2);
             self.skip_whitespace();
             let right = self.parse_not()?;
@@ -369,7 +380,11 @@ impl QueryEvaluator {
                             let pattern = &value[..value.len()-1];
                             asset_value.starts_with(pattern)
                         } else {
-                            asset_value == value.as_str()
+                            // 2026-09-27 修复: 无通配符时退化为**子串包含** (原为
+                            // 精确 ==), 否则 `title*="admin"` 匹配不到 "Admin Login"。
+                            asset_value
+                                .to_lowercase()
+                                .contains(&value.to_lowercase())
                         }
                     }
                     CompareOp::Gt => {
@@ -451,8 +466,14 @@ mod tests {
     fn parse_range_query() {
         let expr = QueryParser::parse("port>100 && port<1000").unwrap();
         let mut asset = HashMap::new();
-        asset.insert("port".into(), "8080".into());
+        // 2026-09-27 修正夹具: 原用 8080 却断言 < 1000 (恒假)。此前 `&&` 因空格
+        // 未被识别, 表达式被截断成只剩 `port>100` 才"碰巧"为真 —— 解析器修好后
+        // 错误断言现形。改用区间内取值, 并补一条区间外应为假的断言。
+        asset.insert("port".into(), "500".into());
         assert!(QueryEvaluator::evaluate(&expr, &asset));
+        let mut outside = HashMap::new();
+        outside.insert("port".into(), "8080".into());
+        assert!(!QueryEvaluator::evaluate(&expr, &outside));
     }
 
     #[test]

@@ -350,7 +350,9 @@ pub enum EffortTier {
 impl EffortTier {
     pub fn from_difficulty(difficulty: f64, task_length: usize) -> Self {
         let length_factor = (task_length as f64 / 500.0).min(1.0);
-        let combined = difficulty * 0.7 + length_factor * 0.3;
+        // 2026-09-27 修复: 原式上限 = 0.7*1 + 0.3*1 = 0.7, 而 Max 档要求 >= 0.8
+        // → EffortTier::Max 是死代码。按 difficulty 归一化, 使五档都可达。
+        let combined = (difficulty * 0.7 + length_factor * 0.3) / 0.7;
         if combined < 0.2 {
             EffortTier::Low
         } else if combined < 0.4 {

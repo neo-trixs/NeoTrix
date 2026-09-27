@@ -123,7 +123,11 @@ impl LatentState {
         let dot: f64 = self.value.iter().zip(other.value.iter()).map(|(a, b)| a * b).sum();
         let norm_a: f64 = self.value.iter().map(|x| x * x).sum::<f64>().sqrt();
         let norm_b: f64 = other.value.iter().map(|x| x * x).sum::<f64>().sqrt();
-        if norm_a == 0.0 || norm_b == 0.0 {
+        if norm_a == 0.0 && norm_b == 0.0 {
+            // 2026-09-27 修复: 两个零向量 (= 同一初始态) 余弦无定义, 原返回 0.0
+            // → "相同状态相似度 0" 自相矛盾。约定: 双零即完全相同 = 1.0。
+            1.0
+        } else if norm_a == 0.0 || norm_b == 0.0 {
             0.0
         } else {
             dot / (norm_a * norm_b)

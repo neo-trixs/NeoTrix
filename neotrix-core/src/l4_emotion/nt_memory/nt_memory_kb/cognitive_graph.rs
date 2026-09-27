@@ -165,10 +165,17 @@ impl CognitiveEventGraph {
             chain.push(event.clone());
         }
 
-        // 查找因果边 (target → source 表示 source caused by target)
+        // 沿因果/依赖边回溯"我的原因"。边约定与 `reasoning_gaps` 一致:
+        // source = 效果/依赖方, target = 原因/被依赖方 (见 :187)。
+        // 2026-09-27 修复: 原实现 `edge.target == id` 再递归 `edge.source` ——
+        // 两边都与该约定相反, 查的是"谁被我导致"(下游) 而非"谁导致我",
+        // 导致推理链断裂 (test_causal_chain 实锤 left=1 right=2);
+        // 且只认 CausedBy, 漏掉 reasoning_gaps 当作依赖的 InferredFrom。
         for edge in &self.edges {
-            if edge.target == id && edge.edge_type == EdgeType::CausedBy {
-                self.trace_causal(&edge.source, chain, visited);
+            if edge.source == id
+                && matches!(edge.edge_type, EdgeType::CausedBy | EdgeType::InferredFrom)
+            {
+                self.trace_causal(&edge.target, chain, visited);
             }
         }
     }

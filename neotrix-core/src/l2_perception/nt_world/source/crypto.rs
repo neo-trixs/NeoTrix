@@ -8,7 +8,10 @@ type Aes128CbcEnc = cbc::Encryptor<Aes128>;
 /// Kugou Eapi 加密
 pub fn kugou_eapi_encrypt(_url: &str, params: &str) -> String {
     let secret = format!("{:x}", Md5::digest(params.as_bytes()));
-    let key = secret.as_bytes();
+    // 2026-09-27 修复: MD5 hex 是 **32 字节** 字符串, 而 AES-128 只吃 16 字节
+    // → Aes128CbcEnc::new 直接 panic, kugou_eapi_encrypt 一调就炸。取 hex 前
+    // 16 字节 (= Kugou 真实密钥口径)。
+    let key = &secret.as_bytes()[..16];
     let plaintext = params.as_bytes();
     let padded = pkcs7_pad(plaintext, 16);
     let mut buf = padded.clone();

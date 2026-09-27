@@ -75,8 +75,13 @@ fn extract_field(response: &str, keys: &[&str]) -> Option<String> {
             continue;
         }
         for key in keys {
-            if let Some(rest) = trimmed.to_lowercase().strip_prefix(&key.to_lowercase()) {
-                let val = rest.trim().trim_start_matches(':').trim();
+            // 2026-09-27 修复: 在**小写副本**上剥前缀 → 返回值也被小写化
+            // ("Example Inc" 变 "example inc", 实体名失真)。改为小写仅用于
+            // 匹配判定, 取值切回原始行。
+            if trimmed.len() >= key.len()
+                && trimmed[..key.len()].eq_ignore_ascii_case(key)
+            {
+                let val = trimmed[key.len()..].trim().trim_start_matches(':').trim();
                 if !val.is_empty() {
                     return Some(val.to_string());
                 }

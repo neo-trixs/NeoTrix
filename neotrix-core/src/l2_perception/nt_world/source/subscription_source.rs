@@ -517,6 +517,14 @@ fn parse_feed(xml: &str, source_id: &str) -> Result<Vec<SubscriptionItem>, Strin
                         source: source_id.to_string(),
                         tags: std::mem::take(&mut tags),
                     });
+                    // 2026-09-27 修复: 入队后未清空 title/link/content/description →
+                    // 闭合标签 (</item> </channel> </rss> </entry> </feed>) 再次触发
+                    // push, 把上一条重复推一遍 (每个订阅源都在产重复项)。
+                    title.clear();
+                    link.clear();
+                    content.clear();
+                    description.clear();
+                    pub_date.clear();
                 }
                 current_tag.clear();
             }
