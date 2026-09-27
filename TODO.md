@@ -54,6 +54,42 @@
 >   剩余 God-file（`pdf.rs` 2142 / `nt_crystal_serve.rs` 2002 / gateway 1678 / hex 1530）｜
 >   5 个内容型 worktree 裁决｜前端 `apps/neobot-desktop/frontend/{src,dist}` 归属与提交
 
+> **2026-09-27 第三轮（4 代理并行）已改未验 — 交接给下一对话，优先收口**
+> 30 项修改在 working tree，**全部未提交**（提交门禁需跑 cargo，当时内存门 BLOCKED）。
+> 验证进度：一次跑 **802 passed / 2 failed**（29 项中 28 项绿），补修后再跑 **65 passed / 1 failed**。
+> 唯一残留：`noise_handshake::full_handshake` —— 已从"构造即 panic"推进到
+> `_consume_message2` 处 unwrap 失败（`noise_handshake.rs:420`），是真 crypto 缺口。
+>
+> **🔧 接手第一步（务必按序）**
+> 1. `sh scripts/ops/nt_mem_gate.sh; echo $?` → 必须为 0 才继续
+> 2. 定向验证：`CARGO_BUILD_JOBS=1 cargo test -p neotrix --lib -- <模块前缀> --test-threads=1`
+> 3. 全绿后 `git commit -- <paths>` **pathspec 限定**（禁 `git add -A`、禁 `--no-verify`）：
+>    `nt_core_capability/{dependency,integrator,monitor}.rs`、`nt_meta/gwt_router/{cost_weight,attention}.rs`、
+>    `nt_core_self/dynamic_params.rs`、`nt_agent_identity.rs`、`nt_core_aware/mod.rs`、`nt_feel/{cognitive_bridge/feedback,writing_style,salesperson_profiling}.rs`、
+>    `nt_memory/{cascade/cascade,consolidation/cache,distillation/distiller}.rs`、`nt_memory_kb/{memory_orchestrator,nt_memory_distill}.rs`、
+>    `nt_shield_sandbox/stateful_bench.rs`、`nt_shield_ztnet/crypto/noise_handshake.rs`、
+>    `nt_shield/{compliance/requirement,nt_shield_audit/threat_modeler,shield_core/audit,shield_core/safety_kernel}.rs`、
+>    `nt_core_speculative_decoding.rs`、`nt_core_vector_store/store_hnsw.rs`、`nt_codegen.rs`、
+>    `nt_core_guardian/repair.rs`、`crates/neotrix-types/src/{core/shared_types.rs,llm_types.rs}`、
+>    `Cargo.toml`、`neotrix-core/Cargo.toml`
+>
+> **⚠️ 本线已做但未验证的高价值修复（接手方请优先确认）**
+> - `nt_core_guardian/repair.rs` —— 自愈动作 `ClearCache` 原本执行 **`cargo clean`**
+>   （会删整个 target/ 含 deps 活指纹）。已改为只删 `target/<profile>/incremental`。
+> - `noise_handshake.rs` —— `hash[..27]` 拷 25 字节协议名，**任何构造都 panic**，
+>   整个模块从未可用过。已按字面量自身长度自适应。
+> - `stateful_bench.rs` S4 —— 原本把安全修复前的"有洞极性"写成断言（给漏洞背书），已互换策略布尔。
+> - `store_hnsw.rs` —— 索引按余弦排序却报 Hamming 距离（自相矛盾），Hamming 配置改走图外精确扫描。
+> - `check_ip` —— 原本无 CIDR 支持，IP 白名单形同虚设；已实现（blacklist 同步）。
+> - `check_ip`/`serde_yaml` —— `serde_yaml` 已入 workspace + core 两处 manifest，
+>   **首次构建会自动更新 Cargo.lock**（离线可解，`--locked` 构建会失败，需注意）。
+>
+> **📋 剩余 51 条待修**：全量 11493 绿 / 51 红，逐条根因见
+> `sessions/handoff-disease-list-20260927.md` §9（P 17 / S 27 / U 4 / E 3，含 file:line）。
+> **🧭 3 项需人工决策**：`sessions/handoff-decision-20260927.md`
+> （双时态 PK 建议删 API / CAD 证据表建议砍到 4 个 / publish_gateway 建议加 dry_run）。
+
+
 > **Batch3 吸收执行 (47 源)**: 四波 21 任务 20/20 闭环 · **交接 Wave 4: 10 任务待做** (🔴P0×3 越层修复/e8_state 合成值/测试抖动加固 · 🟡P1×3 情报工具接线/SEAL C0→C2/补全排序 · ⚪P2×4) → `docs/absorption-knowledge-base/batch3-2026-08-26-unified-evolution-todo.md` Wave 4 段 + 根 `HANDOFF.md` (2026-08-26 版)
 
 ### 🔄 task-2: parent

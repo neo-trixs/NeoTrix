@@ -444,9 +444,19 @@ src/
   `{}` 作用域内再 `x.lock()`，同线程永久阻塞（`std::sync::Mutex` 不可重入）。
   典型形态是"为图省事在已持锁的函数里调另一个也加锁的方法"。
   守门：`python3 scripts/ops/nt_lock_audit.py neotrix-core/src`（块身份栈扫描，
-  `--selftest` 自带正/负样本）。**当前全仓 0 命中。**
+  `--selftest` 自带正/负样本）。**2026-09-27 22:52 实测 3 条，非"0 命中"**；
+  旧记录已证伪订正。**告警数会随代码变动漂移，跑一次记一次，别引用旧值。**
 - **R-LOCK-2 锁守卫不得活到函数尾**：只在某个分支里 `drop(g)` 等于没 drop。
   读计数用独立作用域 `{}`，自增另开一次 `lock()`。
+- **R-LOCK-4 早退路径必须显式释放守卫再委托**（2026-09-27 新增，1 真死锁）：
+  `let conn = self.conn.lock()?;` 的守卫活到函数尾，若某条 `return
+  self.other_method()` 分支上的 `other_method` 内部也 `self.conn.lock()`，
+  就是**永久自死锁**。`kb_search.rs:545-549` `pq_search` 即此形态
+  （`semantic_search` 首行就 `self.conn.lock()`），修法是 `return` 前 `drop(conn)`。
+  判别：持锁函数里**任何**调用了同锁方法的分支，都要确认守卫已释放。
+- **R-LOCK-5 `*self.x.lock() = v;` 是赋值型临时锁，`;` 处即释放**，
+  不构成"持有守卫"。`audit_indirect` 尚未识别此形态（见 R-SCAN-1），
+  读代码时别把它当持锁，也别因为工具报了就去"修"它。
 - **R-LOOP-1 循环步长必须单调递增**：任何 `start = end - overlap` 形式，
   当 `end` 触顶后会**倒退或原地踏步** → 无限循环 + 每轮 clone → 内存爆炸。
   必须同时满足 `overlap < stride` 且"赋值后严格大于原值"（双重保险）。
@@ -468,6 +478,11 @@ src/
   `NT_SKIP_CARGO_CHECK=1`），或抽出可注入执行器（`BuildCheckOutcome` 先例）。
 - **R-BUILD-5 禁 `cargo clean`**；`target/debug/incremental` 可删（纯缓存），
   `target/debug/deps` 保留（活指纹，删了全量重编数小时）。
+- **R-BUILD-6 内存闸是全工作区共享的，别人的 cargo 会把你的闸拉黑**
+  （2026-09-27 新增）：`nt_mem_gate.sh` 报 BLOCKED 时，先 `ps -Ao pid,rss,etime,command
+  | grep -E 'rustc|cargo'` 确认**是不是自己**起的。若是他窗的 `cargo check --tests`
+  （两个 rustc 实测 3.6G+4.2G），**不要 kill、也不要去 join** —— 先通报、等它
+  跑完释放内存。`--tests` 是 AGENTS.md 明文禁止的重型档位。
 
 ### 17.3 卡死 vs 空转的判别（省下大量盲猜）
 
@@ -488,6 +503,12 @@ src/
 - **R-GIT-4 禁止 `--no-verify`**：门禁拒绝时先查是不是别人的树坏了
   （本轮被拒 3 次全是他窗并发重构），用 `cargo check --lib`（排除 test cfg）
   验证自己的生产改动，等对方提交后再跑测试放行。
+- **R-GIT-5 `git status` 只告诉你"脏没脏"，不告诉你"是否正在被写"**
+  （2026-09-27 新增）：落盘前补一条 `stat -f "%Sm" <file>`，mtime 距今几秒内
+  = 他人正在写。本轮 `nt_lock_audit.py` mtime 比检查早 12 秒、告警数在同一会话里
+  从 12 变 3；`kb_search.rs` 我改完后另一窗口的 `assert s.count(o)==1`
+  恰好失败，才没被重复打补丁 —— **反过来证明 `assert` 做幂等守卫是有效手法**，
+  无人值守的批量改写脚本应当一律先 `assert` 再写。
 
 ### 17.5 修 bug 的判据（先分类再动手）
 
@@ -520,3 +541,32 @@ src/
   恒为 ~0；`Instant::now().elapsed()` 同样恒为 ~0。要么存进程内单调基准
   （`OnceLock<Instant>` + `elapsed().as_millis()`），要么用 `SystemTime`。
   本轮 4 处，其中熔断器因此**永久锁死 Open**、审批 id 恒为 `conf_0` 撞号。
+
+### 17.7 第三轮追加（代理并行 + 门禁阻塞暴露的新规则）
+
+- **R-COMPILE-1 `deny(warnings)` 下类型延后推断会变硬错**：
+  `let mut n = 0;` 后接 `n.saturating_add(1)`，若首次使用点在几行之后，rustc 报
+  **E0689 ambiguous numeric type**。修法是在**声明处**标注（`let mut n: u32 = 0;`），
+  不是在使用点 `as` 转换 —— 后者会把错误顺着字段类型扩散到别处（本轮
+  `speedup_factor` 改成 f64 后又撞上 `total_target_verifications: u32`）。
+- **R-COMPILE-2 改动公共度量结构体前先查 `Default`**：`PerformanceMetrics` 没有
+  `Default`，补 derive 是最小改动；用 `or_insert_with(Default::default)` 前必须确认。
+  注意同名不同型陷阱：`CapabilityMeta.metrics` 是 `CapabilityMetrics`，
+  而报表的 `metrics` 是 `PerformanceMetrics`，两者不可互填。
+- **R-TEST-1 修编译错误时不要改测试**：子代理改生产代码后编译失败，正确做法是回退
+  自己的类型改动去迁就原有字段类型，而不是让测试适配。
+- **R-BUG-1 "从未被调用过的模块"里可能有构造即 panic 的死代码**：
+  `noise_handshake` 的 `hash[..27].copy_from_slice(<25 字节>)` 让
+  `_initiator`/`_responder` **第一行就炸**，全模块从未成功构造过 —— 而它的测试
+  "失败"看起来只是断言不符。**症状会伪装成下游问题**，要顺着栈顶往上读。
+  修法：`hash[..name.len()].copy_from_slice(name)`，让长度自适应，杜绝再次漂移。
+- **R-BUG-2 "写进去了却读不出来"是一类独立病**：`record_latency` 用
+  `if let Some(metrics) = map.get_mut(..)` 静默丢弃未注册能力的数据，
+  而 `get_status` 只遍历 registry → 数据写了读不到。两端都要修
+  （写入端 `or_insert_with`，读取端为"有指标未注册"合成报告）。
+- **R-GIT-5 门禁被内存阻塞时，修改会长期停留在"已改未验"**：
+  此时必须在 handoff 里写清 **①未提交文件清单 ②验证命令 ③pathspec 提交清单**，
+  否则下一对话无法安全接手，且共享暂存区可能被他人 `git add -A` 卷走。
+- **R-ENV-1 三个并发 agent 窗口 ≈ 4.4G**，加上供 App 的 9B `llama-server` 670M，
+  16G 机器上 `cargo` 会被挤到 OOM。**开重型构建前必须查其它窗口是否在跑**
+  （`pgrep -c rustc` + 看 `ps -o %cpu,time` 判断是否真在干活，而非空挂）。
