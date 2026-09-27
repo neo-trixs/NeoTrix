@@ -91,6 +91,7 @@ red
 output/
 outputs/
 data/
+datasets/
 # 游戏运行时数据 (RON 卡牌/遗物/事件, 684K, guixu 运行时必需): 解除忽略
 !crates/neotrix-abilities/data/
 !crates/neotrix-abilities/data/**
@@ -192,3 +193,32 @@ target/
 # Build versioning (keep only latest symlink, not full build history)
 target/builds/
 *.log
+
+# Game SHOT artifacts (visible dir, not /tmp)
+games/neotrix-guixu/shots/
+# Local .app bundle (binary inside, rebuilt on demand)
+games/neotrix-guixu/*.app/
+
+# Crystal pool config holds live API keys — local only, never commit
+# (template: neotrix-core/config/crystal.example.toml)
+neotrix-core/config/crystal.toml
+
+# ── 解除 blanket tests/ benches/ examples/ 的过度屏蔽 ──────────────────────
+# 上面的 `tests/` `benches/` `examples/` 三条是目录级通配, 会匹配**任意层级**的
+# 同名目录 (gitignore 语义: 不含斜杠的模式匹配所有层级)。它们本意是屏蔽
+# 生成物, 却顺带屏蔽了下面这些**源码目录** —— 已跟踪文件不受影响, 所以问题
+# 一直潜伏, 直到要新增文件时才发现: `git add <某>/tests/` 会被直接拒绝。
+# 现按实测 (git ls-files | grep -E '/(tests|benches|examples)/') 精确解禁。
+!neotrix-core/tests/
+!neotrix-core/tests/**
+!neotrix-core/benches/
+!neotrix-core/benches/**
+!neotrix-core/examples/
+!neotrix-core/examples/**
+!crates/neotrix-types/benches/
+!crates/neotrix-types/benches/**
+!crates/neotrix-types/examples/
+!crates/neotrix-types/examples/**
+# src/ 内嵌的单元测试子目录 (随实现走, 不是生成物)
+!neotrix-core/src/**/tests/
+!neotrix-core/src/**/tests/**
