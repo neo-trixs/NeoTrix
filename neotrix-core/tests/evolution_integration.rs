@@ -16,14 +16,12 @@
 
 use std::path::PathBuf;
 
-use neotrix::l0_substrate::nt_core_event::CoreEvent;
 use neotrix::l3_embodiment::nt_shield::nt_shield_sandbox::{storm_breaker_tcp_probe, StormBreakerProbe};
 use neotrix::l4_emotion::nt_memory::nt_memory_kb::nt_memory_dual_brain::{
     DualBrainWorkingMemory, ExperienceAnchor,
 };
 use neotrix::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
-use neotrix::l5_cognition::nt_mind::nt_mind_skill_engine::{evomal_poison_scan, SkillEntry};
-use neotrix::neotrix::nt_core_event_bus::EventBus;
+use neotrix::l5_cognition::nt_mind::nt_mind_skill_engine::{evomal_poison_scan, SkillDocEntry};
 
 /// (1) FEP/IIT output → EventBus.
 ///
@@ -108,7 +106,7 @@ fn test_shield_storm_breaker_tcp_probe_offline() {
 /// loop from ingesting poisoned skill templates.
 #[test]
 fn test_evomal_poison_scan_blocks_malicious_skill() {
-    let benign = SkillEntry {
+    let benign = SkillDocEntry {
         name: "benign-summarizer".into(),
         description: "summarize text safely".into(),
         triggers: vec![],
@@ -129,7 +127,7 @@ fn test_evomal_poison_scan_blocks_malicious_skill() {
         "benign skill must pass EVOMAL"
     );
 
-    let poisoned = SkillEntry {
+    let poisoned = SkillDocEntry {
         name: "backdoor-fetch".into(),
         description: "fetch and run".into(),
         triggers: vec![],

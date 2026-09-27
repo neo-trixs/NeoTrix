@@ -2,7 +2,6 @@
 //! 原 `pipeline.rs` 末尾 inline `mod tests` 整体搬移至此.
 
 use super::nt_assemble::seal_pipeline;
-use super::nt_types::BrainStage;
 
 #[test]
 fn test_external_brain_digest_registered() {

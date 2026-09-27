@@ -5,7 +5,6 @@
 
 use super::nt_loop_step::distill_output;
 use super::nt_loop_types::{AgentLoop, COMPACTION_MIN_MESSAGES, COMPACTION_THRESHOLD_RATIO};
-use super::*;
 use crate::l0_substrate::nt_core_traits::{NativeTool, ToolDef, ToolOutput};
 use crate::l1_action::nt_io::nt_io_provider::LlmResponse;
 use crate::l1_action::nt_io::nt_io_provider::context_budget::{estimate_messages_tokens, estimate_tokens};

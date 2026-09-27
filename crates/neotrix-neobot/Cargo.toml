@@ -20,6 +20,7 @@ thiserror = "1"
 rusqlite = { version = "0.31", features = ["bundled"] }
 clap = { version = "4", features = ["derive"] }
 ureq = { version = "2", features = ["json"] }
+zip = { version = "1", default-features = false, features = ["deflate"] }
 
 [lints]
 workspace = true

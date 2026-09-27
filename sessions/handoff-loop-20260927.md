@@ -116,3 +116,19 @@
 - [x] soul online（带 token：`soul online (1 models, model=neotrix-crystal at 127.0.0.1:3000/v1, 5ms, crystal_version=0.2.0 tools=9)`）
 - [x] NeoBot.app 进程在（PID 53886）
 - 结论：**全绿 ✅**（G-01 blocked 为预期态，非红）
+
+## 单窗口总攻轮（2026-09-27 日间，owner：sidecar 需要就拉＋警告/1083＋消息流标签）
+
+- sidecar：归档恢复全套件（agent-jev 2.2G＋qwen3-06b 1.1G＋server 7M，`~/Downloads/Neo/neotrix-archive/` 原样保留）→
+  `sh sessions/logs/sidecar_gate.sh` 按门拉起（free 263k＞100k）→ `:8149/health` HEALTHY
+  `{"status":"ready","model":"AgentJev-0.6B"}`，门 EXIT:0。G-01 关闭 ✅。
+- warnings：子代理清 22 处（12 文件，机械类：去 mut/删冗余引/别名正名/deferred-init），check 剩 1（entry/agent.rs dead_code，需产品决策，park）；
+  serve bin `??`（他人新文件，park）。本窗复核：11 跟踪文件 diff 皆纯修复小改。
+- tags（对标 Claude/Codex/Grok）：后端 `nt_reply_tag.rs`（302 行 5 单测：model/mode/tools/usage）＋
+  store helper＋`nt_core` 回填（mode/tools/usage，serde default 兼容）＋desktop `nt_commands` 双令；
+  前端 chips（model・mode・tools・tokens/cost）＋tsc 零错。桌面 Rust `check -p neobot-desktop` EXIT:0。
+  前端＋serve bin 随大部队 park（前者待 rebuild/repack 窗，后者他人新文件）。
+- neobot `test --lib` 105 绿（含 tags 5）；桌面 check 绿。
+- 大提交（合体落地）：neobot crate 闭包（15 M/D＋10 ??＋store/ 目录，生成式 §37 归属）＋
+  warnings 11 文件＋tags（nt_reply_tag×2＋nt_commands×2）＋本文件证据。前端/serve/余 parked。
+- 结论：sidecar 在线＋warnings 归零（除 1 产品决策）＋tags 后端落地 ✅

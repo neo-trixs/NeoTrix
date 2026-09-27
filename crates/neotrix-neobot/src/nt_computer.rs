@@ -1,17 +1,15 @@
 //! `nt_computer` — 受控 computer 动作.
 //!
-//! 语义移植 openbot `server/src/computer/schema.ts`
-//! (`COMPUTER_TOOLS` 11 / `COMPUTER_ACTING_TOOLS` 8) + 网关
-//! (resolve → policy → 先写 audit → 再执行).
-//! 本地后端 trait 化: 当前仅 `NoopBackend` (诚实失败,
-//! 不伪造截图/点击); 真浏览器后端 (Playwright/chromiumoxide)
-//! 按 `ComputerBackend` 实现即插.
+//! 受控动作表（11 声明 / 8 执行）+ 网关（resolve → policy →
+//! 先写 audit → 再执行）。本地后端 trait 化：当前仅 `NoopBackend`
+//! （诚实失败，不伪造截图/点击）；真浏览器后端按 `ComputerBackend`
+//! 实现即插.
 
 use serde::{Deserialize, Serialize};
 
 use crate::nt_error::NtBotError;
 
-/// 受控动作 (openbot `COMPUTER_ACTING_TOOLS` 本地子集).
+/// 受控动作（执行子集）.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ComputerAction {

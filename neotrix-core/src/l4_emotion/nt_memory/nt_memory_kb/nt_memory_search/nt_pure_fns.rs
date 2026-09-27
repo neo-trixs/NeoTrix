@@ -10,11 +10,9 @@ use log::debug;
 // Tests cross-module refs: re-export so existing `super::X` in moved tests keeps resolving.
 // Production code has no cycle (these are test-only).
 #[cfg(test)]
-use super::nt_cache::{MaterializedNeighborCache, MaterializedNeighborCacheSelfTest};
+use super::nt_cache::MaterializedNeighborCacheSelfTest;
 #[cfg(test)]
-use super::nt_gate_optimizer::{
-    Diagnosis, Fts5OptimizerConfig, RetrievalEvolver, RetrievalTuning,
-};
+use super::nt_gate_optimizer::{Fts5OptimizerConfig, RetrievalEvolver, RetrievalTuning};
 #[cfg(test)]
 use super::nt_scoring::cosine_f32;
 
@@ -756,10 +754,6 @@ fn query_to_avg_embedding(query: &str, all_embeddings: &[(String, Vec<f32>)]) ->
 
 #[cfg(test)]
 mod tests {
-    use super::super::nt_gate_optimizer::{Fts5OptimizerConfig, RetrievalEvolver, RetrievalTuning};
-    use super::super::nt_cache::MaterializedNeighborCache;
-    use super::super::nt_scoring::cosine_f32;
-
     #[test]
     fn test_fts5_config_defaults() {
         let cfg = super::Fts5OptimizerConfig::default();
@@ -1115,8 +1109,6 @@ mod precision_gate_tests {
 #[cfg(test)]
 mod materialized_neighbors_tests {
     use super::super::nt_cache::MaterializedNeighborCache;
-    use super::super::nt_scoring::cosine_f32;
-    use super::*;
 
     /// 确定性伪随机向量生成 (LCG), 保证测试可复现。
     fn synth_embeddings(count: usize, dim: usize) -> Vec<(String, Vec<f32>)> {
@@ -1248,8 +1240,6 @@ mod materialized_neighbors_tests {
 
 #[cfg(test)]
 mod selftest_tests {
-    use super::super::nt_cache::MaterializedNeighborCacheSelfTest;
-    use super::*;
     use crate::l0_substrate::nt_core_self_test::SelfTest;
 
     #[test]

@@ -747,7 +747,7 @@ mod tests {
         traj.push(TrajectoryStep {
             step_idx: 0,
             specialist: SpecialistType::Planner,
-            e8_mode: crate::l0_substrate::nt_core_hex::ReasoningHexagram::default(),
+            e8_mode: crate::l0_substrate::nt_core_hex::ReasoningHexagram(0),
             action: "plan".into(),
             input: "x".into(),
             output: "y".into(),
@@ -827,7 +827,7 @@ mod tests {
 
     #[test]
     fn oscillator_network_coherence_range() {
-        let mut net = OscillatorNetwork::new(8);
+        let net = OscillatorNetwork::new(8);
         let c = net.coherence();
         assert!(c >= 0.0 && c <= 1.0);
     }

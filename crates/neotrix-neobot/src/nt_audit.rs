@@ -1,7 +1,5 @@
-//! `nt_audit` — append-only 审计 + 脱敏.
-//!
-//! 移植 openbot `server/src/audit.ts`: refused 必带 rule 名;
-//! secret/`tool_result` 永不落明文 transcript. 本地落 SQLite (见 `nt_store`).
+//! `nt_audit` — append-only 审计 + 脱敏：refused 必带 rule 名；
+//! secret/`tool_result` 永不落明文 transcript。本地落 SQLite（见 `nt_store`）。
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -57,17 +55,27 @@ impl AuditEvent {
     }
 }
 
-/// 脱敏: 命中敏感 key 名的行整行替换为 `[redacted]`.
-/// (openbot `sensitiveKeys` 集合的本地子集.)
+/// 脱敏：命中敏感 key 名的行整行替换为 `[redacted]`。
+/// 此处是行子串匹配（非 JSON key 精确匹配），故只收密钥类高信号词——
+/// `content/prompt/result` 等宽词在此会误杀正常输出，不收。
+/// 审计 detail 本就不含工具输出，只有任务元信息。)
 pub fn redact_detail(raw: &str) -> String {
-    const KEYS: [&str; 7] = [
+    const KEYS: [&str; 15] = [
+        "access_token",
         "api_key",
         "apikey",
-        "token",
-        "secret",
-        "password",
         "authorization",
+        "client_secret",
+        "credential",
+        "document_content",
+        "encrypted_value",
+        "id_token",
         "key_encryption_key",
+        "password",
+        "refresh_token",
+        "secret",
+        "token",
+        "tool_result",
     ];
     let mut out = Vec::new();
     for line in raw.lines() {
@@ -109,6 +117,16 @@ mod tests {
         let event = AuditEvent::new("bot", "bash", super::AuditDecision::Allow, None, "OPENAI_API_KEY=sk-x\nok=1");
         assert!(event.detail.contains("[redacted]"));
         assert!(!event.detail.contains("sk-x"));
+        // client_secret / tool_result 行整行替换
+        let event2 = AuditEvent::new(
+            "bot",
+            "bash",
+            super::AuditDecision::Deny,
+            Some("workspace-jail".to_owned()),
+            "client_secret=abc\ntool_result={\"x\":1}\nnormal line",
+        );
+        assert!(!event2.detail.contains("abc"));
+        assert!(event2.detail.contains("normal line"));
     }
 
     #[test]

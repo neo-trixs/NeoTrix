@@ -1,9 +1,9 @@
 //! `nt_http_engine` — OpenAI 兼容 HTTP 引擎.
 //!
-//! 让 neobot 直连本地模型 (Ollama `http://127.0.0.1:11434/v1`,
-//! LM Studio `http://127.0.0.1:1234/v1`, vLLM, 或
-//! `OPENAI_BASE_URL` 指向的自建网关 — openbot 预留的同一道缝).
-//! 同步阻塞实现 (`ureq`), 与 `EngineAdapter` 同步 trait 对齐, 无新增异步依赖.
+//! 让 neobot 直连本地模型（Ollama `http://127.0.0.1:11434/v1`，
+//! LM Studio `http://127.0.0.1:1234/v1`，vLLM，或
+//! `OPENAI_BASE_URL` 指向的自建网关）。
+//! 同步阻塞实现（`ureq`），与 `EngineAdapter` 同步 trait 对齐，无新增异步依赖.
 //!
 //! 安全: `api_key` 只活在内存 + 环境变量, 永不落 `config.json`
 //! (`EngineKind::Http` 只存 `base_url`/`model`), 错误串永不携带 key
@@ -85,6 +85,8 @@ pub struct HttpEngine {
     api_key: String,
     /// 是否向模型开放 `computer_act` (执行仍受网关 allowlist 门控).
     offer_computer: bool,
+    /// 跨会话个人记忆（`MEMORY.md` 全文；None/空则不注入）。
+    memory_context: Option<String>,
 }
 
 impl std::fmt::Debug for HttpEngine {
@@ -94,6 +96,7 @@ impl std::fmt::Debug for HttpEngine {
             .field("base_url", &self.config.base_url)
             .field("model", &self.config.model)
             .field("offer_computer", &self.offer_computer)
+            .field("memory_context", &self.memory_context.as_ref().map(|_| "[set]"))
             .field("api_key", &"[redacted]")
             .finish()
     }
@@ -106,12 +109,19 @@ impl HttpEngine {
             config,
             api_key,
             offer_computer: false,
+            memory_context: None,
         })
     }
 
     /// `NEOBOT_OFFER_COMPUTER=1` 时向模型开放 `computer_act` schema.
     pub fn with_computer(mut self, offer: bool) -> Self {
         self.offer_computer = offer;
+        self
+    }
+
+    /// 注入跨会话记忆（`MEMORY.md` 全文；调用方从配置数据目录读）。
+    pub fn with_memory_context(mut self, memory: Option<String>) -> Self {
+        self.memory_context = memory.filter(|m| !m.trim().is_empty());
         self
     }
 
@@ -124,6 +134,7 @@ impl HttpEngine {
             config,
             api_key,
             offer_computer: offer,
+            memory_context: None,
         })
     }
 
@@ -142,6 +153,7 @@ impl HttpEngine {
             },
             api_key: api_key.to_owned(),
             offer_computer: false,
+            memory_context: None,
         }
     }
 
@@ -177,9 +189,14 @@ impl HttpEngine {
 
     fn chat_body(&self, prompt: &str, history: &[TranscriptItem], stream: bool) -> serde_json::Value {
         let mut messages = Vec::with_capacity(history.len() + 2);
+        let mut system = SYSTEM_PROMPT.to_owned();
+        if let Some(memory) = self.memory_context.as_deref() {
+            system.push_str("\n\n");
+            system.push_str(memory);
+        }
         messages.push(serde_json::json!({
             "role": "system",
-            "content": "你是 neobot 本地助手。需要行动时调用工具, 否则直接回复。结束时调用 set_turn_status。",
+            "content": system,
         }));
         for item in history {
             messages.push(transcript_message(item));
@@ -271,22 +288,28 @@ fn transcript_message(item: &TranscriptItem) -> serde_json::Value {
     }
 }
 
+/// 系统提示（CLI 即协议：模型唯一的世界动作入口是
+/// `bash` 里的 `neobot` CLI 子命令 + 3 个文件工具；`set_turn_status`
+/// 声明终态，结束时必调）。
+const SYSTEM_PROMPT: &str = "你是 neobot 本地助手，跑在用户自己的机器上。\n\n世界动作只能经 bash 调 `neobot` CLI（本地可执行，无密钥）：\n- `neobot task list` 看任务；`neobot task claim <id> --actor <你名字>` 认领；`neobot task release` 交回；`neobot task cancel/retry` 取消/重跑\n- `neobot audit list` 看审计（只读）；`neobot models` 看本地模型池\n- `neobot routine list` 看定时例行；`neobot skill list` 看已装技能\n- `neobot ledger` 看成本账；`neobot doctor` 自检\n\n联网能力（客户端直调）：`web_search` 查资料（Bing→Wikipedia 回退，证据行自带出处）；`web_fetch` 抓页面正文（只收 http/https）。时效问题先搜再答，不凭记忆编。\n\n文件读写在 workspace 内：read_file / write_file / edit_file（edit 必须精确一次匹配）。\n技能只是指令参考，不扩展能力：你能调的只有网关后的工具。\nset_turn_status 声明本轮状态：done（办完）/ continue（还有活）/ needs_clarification（要问一句）/ blocked（明确失败）/ waiting（已行动、等外部）。纯回复也要先调 set_turn_status 再结束。\n拿不准就问（needs_clarification），不要瞎猜执行。\n\n回答格式契约（降信息密度）：\n- 结论先行（一句话先给答案），再给依据/步骤；不复述用户问题。\n- 超过 5 行用分节（结论/依据/下一步），列表优先，段落不超过 3 行。\n- 联网结论必须带出处（[标题 — url]）；不确定的标“不确定”，不编。\n- 拒绝废话开场（不说“好的”“当然”）；无可答时直接说缺什么。\n- 语气像人：有温度、直接，短句为主；坏消息先给结论再给原因；办成了可以一句轻快确认，不许表情包刷屏、不许过度寒暄。";
+
 /// OpenAI function schemas — 与本地网关工具 1:1 (`computer_act` 仅 opt-in).
 fn tool_schemas(offer_computer: bool) -> Vec<serde_json::Value> {
     let mut tools = vec![
         serde_json::json!({"type": "function", "function": {
             "name": "bash",
-            "description": "在 workspace 内执行 shell(唯一世界动作入口)",
+            "description": "在 workspace 内执行 shell(唯一世界动作入口；`neobot task/audit/routine/skill/ledger` 等子命令走这里)",
             "parameters": {"type": "object", "properties": {
                 "command": {"type": "string", "description": "shell 命令"},
             }, "required": ["command"]},
         }}),
         serde_json::json!({"type": "function", "function": {
             "name": "set_turn_status",
-            "description": "终态协议信号, 防沉默即完成误判",
+            "description": "终态协议信号, 防沉默即完成误判（status 必填；reason 写清为什么停）",
             "parameters": {"type": "object", "properties": {
                 "status": {"type": "string", "enum": ["done", "continue", "needs_clarification", "blocked", "waiting"]},
                 "reason": {"type": "string"},
+                "next_step": {"type": "string"},
             }, "required": ["status"]},
         }}),
         serde_json::json!({"type": "function", "function": {
@@ -325,6 +348,22 @@ fn tool_schemas(offer_computer: bool) -> Vec<serde_json::Value> {
             }, "required": ["action"]},
         }}));
     }
+    // 联网读写（对话即 crystal 全能力外表：chat 路径直调，不经服务端中转）。
+    tools.push(serde_json::json!({"type": "function", "function": {
+            "name": "web_search",
+            "description": "联网搜索（Bing → Wikipedia 回退；证据行返回；count 缺省 5 上限 10）。新闻类直接传中文热点词（如“今日要闻”），勿改写，改写会丢热点直连。",
+            "parameters": {"type": "object", "properties": {
+                "query": {"type": "string", "description": "搜索关键词（新闻类保留热点词）"},
+                "count": {"type": "integer", "description": "条数 1-10"},
+            }, "required": ["query"]},
+    }}));
+    tools.push(serde_json::json!({"type": "function", "function": {
+        "name": "web_fetch",
+        "description": "抓取网页正文（只允许 http/https；4000 字截断）",
+        "parameters": {"type": "object", "properties": {
+            "url": {"type": "string", "description": "http(s) 地址"},
+        }, "required": ["url"]},
+    }}));
     tools
 }
 
@@ -391,6 +430,7 @@ fn finish_turn(content: &str, tool_calls: Vec<ToolCall>, usage: Option<TokenUsag
         status,
         tool_calls,
         usage,
+        side_effects: Vec::new(),
     }
 }
 
@@ -595,40 +635,7 @@ impl EngineAdapter for HttpEngine {
                 Ok(chunk) => chunk,
                 Err(_) => continue,
             };
-            if let Some(text) = chunk
-                .pointer("/choices/0/delta/content")
-                .and_then(|value| value.as_str())
-            {
-                content.push_str(text);
-                on_delta(text);
-            }
-            if let Some(calls) = chunk
-                .pointer("/choices/0/delta/tool_calls")
-                .and_then(|value| value.as_array())
-            {
-                for call in calls {
-                    let index = call.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-                    while partials.len() <= index {
-                        partials.push(StreamToolCall::default());
-                    }
-                    let Some(slot) = partials.get_mut(index) else {
-                        continue;
-                    };
-                    if let Some(id) = call.get("id").and_then(|v| v.as_str()) {
-                        if !id.is_empty() {
-                            slot.id = id.to_owned();
-                        }
-                    }
-                    if let Some(name) = call.pointer("/function/name").and_then(|v| v.as_str()) {
-                        if !name.is_empty() {
-                            slot.name = name.to_owned();
-                        }
-                    }
-                    if let Some(args) = call.pointer("/function/arguments").and_then(|v| v.as_str()) {
-                        slot.arguments.push_str(args);
-                    }
-                }
-            }
+            apply_sse_chunk(&mut content, &mut partials, on_delta, &chunk);
             // neotrix 服务端也可能在末 chunk 带 usage.
             if let Some(value) = chunk.get("usage") {
                 if let Ok(parsed) = serde_json::from_value::<ChatUsage>(value.clone()) {
@@ -658,6 +665,82 @@ struct StreamToolCall {
     id: String,
     name: String,
     arguments: String,
+}
+
+/// SSE 单 chunk 累积（契约事件形状）：
+/// - `choices[0].delta.content` 字符串增量（回调 + 拼接）；
+/// - `choices[0].delta.tool_calls` 数组按 `index` 累积
+///  （`id` / `function.name` / `function.arguments` 分片拼接，随 `[DONE]` 与
+///   `EngineTurn.tool_calls` 合流由调用方完成）；
+/// - 兼容 `choices[0].message.tool_calls`（`finish_reason=tool_calls` 独立事件
+///   把完整 tool_calls 放在 message 而非 delta 时）；
+/// - `arguments` 为字符串分片直接拼接，非字符串（对象/数字）则序列化后拼接，
+///   空/非法 chunk 静默跳过；非流式行为不受影响。
+fn apply_sse_chunk(
+    content: &mut String,
+    partials: &mut Vec<StreamToolCall>,
+    on_delta: &mut dyn FnMut(&str),
+    chunk: &serde_json::Value,
+) {
+    if let Some(text) = chunk
+        .pointer("/choices/0/delta/content")
+        .and_then(|value| value.as_str())
+    {
+        content.push_str(text);
+        on_delta(text);
+    }
+    if let Some(calls) = chunk
+        .pointer("/choices/0/delta/tool_calls")
+        .and_then(|value| value.as_array())
+    {
+        accumulate_tool_calls(partials, calls, None);
+    }
+    if let Some(calls) = chunk
+        .pointer("/choices/0/message/tool_calls")
+        .and_then(|value| value.as_array())
+    {
+        accumulate_tool_calls(partials, calls, None);
+    }
+}
+
+/// tool_calls 数组累积（`index` 缺省按到达序；`id/name` 非空覆盖，
+/// `arguments` 分片拼接；调用方保证入参为数组元素切片）。
+fn accumulate_tool_calls(
+    partials: &mut Vec<StreamToolCall>,
+    calls: &[serde_json::Value],
+    base_index: Option<usize>,
+) {
+    for (offset, call) in calls.iter().enumerate() {
+        let index = call
+            .get("index")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize)
+            .or(base_index.map(|b| b + offset))
+            .unwrap_or(offset);
+        while partials.len() <= index {
+            partials.push(StreamToolCall::default());
+        }
+        let Some(slot) = partials.get_mut(index) else {
+            continue;
+        };
+        if let Some(id) = call.get("id").and_then(|v| v.as_str()) {
+            if !id.is_empty() {
+                slot.id = id.to_owned();
+            }
+        }
+        if let Some(name) = call.pointer("/function/name").and_then(|v| v.as_str()) {
+            if !name.is_empty() {
+                slot.name = name.to_owned();
+            }
+        }
+        if let Some(args_value) = call.pointer("/function/arguments") {
+            if let Some(fragment) = args_value.as_str() {
+                slot.arguments.push_str(fragment);
+            } else if !args_value.is_null() {
+                slot.arguments.push_str(&args_value.to_string());
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -911,7 +994,9 @@ mod tests {
     fn fake_server_seq(replies: Vec<String>) -> String {
         use std::io::{Read as _, Write as _};
         use std::sync::{Arc, Mutex};
-        let queue = Arc::new(Mutex::new(replies));
+        // 队列打空后循环重放：调用方失败重试时永远能拿到完整序列，
+        // 否则一次瞬时抖动烧掉队列后后续全是 `{}`，并行必现 flake。
+        let queue = Arc::new(Mutex::new((replies, 0usize)));
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
         let addr = listener.local_addr().expect("addr").to_string();
         std::thread::spawn(move || {
@@ -930,7 +1015,15 @@ mod tests {
                 let reply = queue
                     .lock()
                     .ok()
-                    .and_then(|mut q| if q.is_empty() { None } else { Some(q.remove(0)) })
+                    .and_then(|mut q| {
+                        if q.0.is_empty() {
+                            None
+                        } else {
+                            let i = q.1 % q.0.len();
+                            q.1 += 1;
+                            Some(q.0[i].clone())
+                        }
+                    })
                     .unwrap_or_else(|| "{}".to_owned());
                 let response = format!(
                     "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -974,6 +1067,8 @@ mod tests {
             engine: crate::nt_config::EngineKind::Echo,
             computer_allow: Vec::new(),
             computer_hosts: Vec::new(),
+            extra_deny: Vec::new(),
+            write_budget: crate::nt_config::default_write_budget(),
         };
         config.validate().expect("validate");
         let store = crate::nt_store::NeobotStore::open(":memory:").expect("open");
@@ -1013,5 +1108,48 @@ mod tests {
             timeout_secs: 5,
         };
         assert!(no_model.validate().is_err());
+    }
+
+    #[test]
+    fn sse_chunk_accumulates_contract_tool_calls_delta() {
+        use super::{StreamToolCall, apply_sse_chunk};
+        let mut content = String::new();
+        let mut partials: Vec<StreamToolCall> = Vec::new();
+        let mut deltas = String::new();
+        let mut emit = |s: &str| deltas.push_str(s);
+        // 契约形状：delta.content + delta.tool_calls 分片（index 对齐）。
+        let c1 = serde_json::json!({
+            "choices": [{"delta": {"content": "hi"}, "index": 0}],
+            "object": "chat.completion.chunk",
+        });
+        apply_sse_chunk(&mut content, &mut partials, &mut emit, &c1);
+        let c2 = serde_json::json!({
+            "choices": [{"delta": {"tool_calls": [
+                {"index": 0, "id": "c1", "function": {"name": "bash", "arguments": "{\"comma"}}
+            ]}, "index": 0}],
+            "object": "chat.completion.chunk",
+        });
+        apply_sse_chunk(&mut content, &mut partials, &mut emit, &c2);
+        let c3 = serde_json::json!({
+            "choices": [{"delta": {"tool_calls": [
+                {"index": 0, "function": {"arguments": "nd\":\"echo hi\"}"}}
+            ]}, "index": 0}],
+            "object": "chat.completion.chunk",
+        });
+        apply_sse_chunk(&mut content, &mut partials, &mut emit, &c3);
+        // finish_reason=tool_calls 独立事件：message.tool_calls 合流。
+        let c4 = serde_json::json!({
+            "choices": [{"message": {"tool_calls": [
+                {"index": 1, "id": "c2", "function": {"name": "read_file", "arguments": "{\"path\":\"a\"}"}}
+            ]}, "finish_reason": "tool_calls"}],
+        });
+        apply_sse_chunk(&mut content, &mut partials, &mut emit, &c4);
+        assert_eq!(content, "hi");
+        assert_eq!(deltas, "hi");
+        assert_eq!(partials.len(), 2);
+        assert_eq!(partials[0].id, "c1");
+        assert_eq!(partials[0].name, "bash");
+        assert_eq!(partials[0].arguments, "{\"command\":\"echo hi\"}");
+        assert_eq!(partials[1].name, "read_file");
     }
 }

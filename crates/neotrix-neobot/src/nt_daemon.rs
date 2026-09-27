@@ -1,8 +1,7 @@
 //! `nt_daemon` — wake 去抖 + triage 门 + steer 注入.
 //!
-//! 移植 cumora `COORDINATION.md` 纪律 + `daemon.ts` 状态机 (本地简化):
-//! per-agent 串行、burst 合并 (2.5s debounce)、小脑 triage 门、
-//! 同轮 steer 注入. 无 Redis/SSE, 纯内存 + 可测试纯函数.
+//! 协作纪律本地版：per-agent 串行、burst 合并（2.5s debounce）、
+//! 轻量 triage 门、同轮 steer 注入。无 Redis/SSE，纯内存 + 可测试纯函数.
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -47,7 +46,7 @@ impl DaemonGate {
         }
     }
 
-    /// triage 门: 空文本/与上次完全重复 → 丢弃 (省钱, cumora 小脑门简化版).
+    /// triage 门：空文本/与上次完全重复 → 丢弃（省模型调用）。
     pub fn triage(&mut self, agent_id: &str, text: &str) -> bool {
         let trimmed = text.trim();
         if trimmed.is_empty() {

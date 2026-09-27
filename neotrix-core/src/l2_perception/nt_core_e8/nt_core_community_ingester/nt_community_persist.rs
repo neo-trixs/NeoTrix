@@ -289,7 +289,6 @@ impl CommunityDataIngester {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::l2_perception::nt_core_e8::nt_core_community_ingester::CommunityDataIngester;
 
     #[test]

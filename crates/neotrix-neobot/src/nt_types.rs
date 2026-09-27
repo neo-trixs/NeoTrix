@@ -1,12 +1,9 @@
-//! `nt_types` — neobot 核心类型.
-//!
-//! 对标: OpenMuse `packages/domain/src/agent.ts` (`AgentTask`), cumora
-//! `tools-shared.ts` (`TurnStatusValue`), openbot `computer/schema.ts`
-//! (computer 工具契约). 本地 SQLite 存 `status` 字符串, 与这些枚举 1:1.
+//! `nt_types` — neobot 核心类型（任务/回合终态/工具名/转录项）。
+//! 本地 SQLite 存 `status` 字符串，与这些枚举 1:1.
 
 use serde::{Deserialize, Serialize};
 
-/// 回合终态协议 — 直接复用 cumora `set_turn_status` 五态语义.
+/// 回合终态协议（五态：done/continue/waiting/failed/cancelled）.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TurnStatus {
@@ -42,7 +39,7 @@ impl TurnStatus {
     }
 }
 
-/// 任务状态 — 对标 OpenMuse `AgentTask.status` + TaskWorker 租约机 (简化版).
+/// 任务状态（pending/running/done/failed/cancelled，租约机简化版）.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskStatus {
@@ -50,6 +47,7 @@ pub enum TaskStatus {
     Running,
     Done,
     Failed,
+    Cancelled,
 }
 
 impl TaskStatus {
@@ -59,6 +57,7 @@ impl TaskStatus {
             Self::Running => "running",
             Self::Done => "done",
             Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
         }
     }
 
@@ -68,6 +67,7 @@ impl TaskStatus {
             "running" => Some(Self::Running),
             "done" => Some(Self::Done),
             "failed" => Some(Self::Failed),
+            "cancelled" => Some(Self::Cancelled),
             _ => None,
         }
     }
@@ -81,10 +81,38 @@ pub struct AgentTask {
     pub status: TaskStatus,
     pub created_at: String,
     pub updated_at: String,
+    /// 认领者 actor（原子认领；None=未认领）
+    #[serde(default)]
+    pub claimed_by: Option<String>,
+    /// 所属会话 id（`conversations` 表；落库恒有值，IM 语义：同会话发送即追加）
+    #[serde(default)]
+    pub conversation_id: Option<String>,
+    /// 认领时刻（RFC3339；过期可扫回）
+    #[serde(default)]
+    pub claimed_at: Option<String>,
+    /// 可见性：team（默认）| private
+    #[serde(default = "default_visibility")]
+    pub visibility: String,
+    /// 运行租约（崩溃恢复凭据）
+    #[serde(default)]
+    pub lease_id: Option<String>,
+    #[serde(default)]
+    pub lease_until: Option<String>,
+    /// 已执行次数（含崩溃后重跑）
+    #[serde(default)]
+    pub attempts: i64,
+    /// 末次失败原因（成功则空）
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+/// 新任务默认可见性（Team AI：默认队内可见）。
+pub fn default_visibility() -> String {
+    "team".to_owned()
 }
 
 /// token 用量 (OpenAI `usage` 形状子集, 落 `ledger` 表).
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct TokenUsage {
     pub prompt_tokens: i64,
     pub completion_tokens: i64,
@@ -92,8 +120,8 @@ pub struct TokenUsage {
     pub cost_usd: f64,
 }
 
-/// 极简 tool 名 — cumora 三板斧 + openbot computer 受控动作之最小交集.
-/// `Unknown` 保留原始名用于审计, 网关一律拒绝 (fail-closed).
+/// 极简 tool 名（bash + 状态机 + 3×FS + computer 受控动作 + 联网读写 + 未知兜底）.
+/// `Unknown` 保留原始名用于审计，网关一律拒绝（fail-closed）。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ToolName {
@@ -102,9 +130,13 @@ pub enum ToolName {
     ReadFile,
     WriteFile,
     EditFile,
-    /// openbot `COMPUTER_ACTING_TOOLS` 本地占位: 当前只做策略门控,
+    /// computer 受控动作占位：当前只做策略门控，
     /// 具体 navigate/click/type 由后续 `nt_computer` 实现.
     ComputerAct,
+    /// 联网搜索（DDG → Wikipedia 回退，客户端直调，对话即 crystal 全能力外表）。
+    WebSearch,
+    /// 网页抓取（http/https 门控，4000 字截断）。
+    WebFetch,
     Unknown(String),
 }
 
@@ -117,6 +149,8 @@ impl ToolName {
             Self::WriteFile => "write_file",
             Self::EditFile => "edit_file",
             Self::ComputerAct => "computer_act",
+            Self::WebSearch => "web_search",
+            Self::WebFetch => "web_fetch",
             Self::Unknown(_) => "unknown_tool",
         }
     }
@@ -130,7 +164,24 @@ impl ToolName {
             "write_file" => Self::WriteFile,
             "edit_file" => Self::EditFile,
             "computer_act" => Self::ComputerAct,
+            "web_search" | "search" => Self::WebSearch,
+            "web_fetch" | "fetch" | "browse" => Self::WebFetch,
             _ => Self::Unknown(raw.to_owned()),
+        }
+    }
+
+    /// 效果视角：机制名回答“调了什么”，intent 回答“改变了什么”。
+    /// 审计明细用它，方便人按效果读。
+    pub fn intent(&self) -> &'static str {
+        match self {
+            Self::Bash => "run_command",
+            Self::SetTurnStatus => "turn_status",
+            Self::ReadFile => "read_file",
+            Self::WriteFile | Self::EditFile => "write_file",
+            Self::ComputerAct => "computer_act",
+            Self::WebSearch => "web_search",
+            Self::WebFetch => "web_fetch",
+            Self::Unknown(_) => "unknown_tool",
         }
     }
 }

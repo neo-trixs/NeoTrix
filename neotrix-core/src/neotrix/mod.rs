@@ -21,6 +21,8 @@ pub mod nt_file_ability;
 pub mod nt_crystal_core;
 pub mod nt_jev;
 pub mod proxy_daemon_wrapper;
+/// neotrix → L0 error conversions (moved from l0_substrate to respect L0 ← neotrix direction)
+pub mod error_conversions;
 
 // ─── Standalone crate re-export ──────────────────────────────────────────
 pub use nt_core_capability_tree::{
@@ -54,6 +56,3 @@ pub use nt_file_ability::{
 };
 
 pub use nt_file_ability::merge_docx;
-
-#[cfg(test)]
-pub(crate) use nt_file_ability::{make_min_docx, make_min_pptx};

@@ -14,7 +14,7 @@ mod tests {
         _AuditorRole,
     };
     use crate::l5_cognition::nt_mind::evolution::harness_optimizer::{_HarnessCandidate, _HarnessTarget};
-    use crate::l5_cognition::nt_mind::evolution::rst_flywheel::{_RstFlywheel, _RstTask, _RstVerdict};
+    use crate::l5_cognition::nt_mind::evolution::rst_flywheel::{_RstFlywheel, _RstTask};
     use crate::l5_cognition::nt_mind::evolution::train_pipeline::{_TrainConfig, _TrainPipeline, _TrainStage};
     use crate::l0_substrate::nt_core_self_test::SelfTest;
 

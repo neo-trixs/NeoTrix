@@ -69,7 +69,7 @@ mod tests {
 use super::dl_fs::make_dl_tmp_dir;
     use super::parallel::ParallelDownloader;
     use super::pipeline::StreamingPipeline;
-    use super::types::{PipelineConfig, StreamingPipelineConfig};
+    use super::types::StreamingPipelineConfig;
     use std::time::Duration;
     use tokio::sync::mpsc;
 use std::path::{Path, PathBuf};
