@@ -114,8 +114,17 @@ impl ApprovalManager {
         };
 
         let now = Instant::now();
+        // 2026-09-27 修复: 原用 `now.duration_since(Instant::now()).as_millis()`
+        // 当 id 后缀 —— 自己减自己恒为 0 → 每次请求都是 `conf_0`, 审批 id 撞号
+        // (并发审批互相覆盖)。改用墙钟纳秒 + 进程内单调序号。
+        static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let id_nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or_default();
+        let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         ApprovalRequest {
-            id: format!("conf_{}", now.duration_since(Instant::now()).as_millis()),
+            id: format!("conf_{}_{}", id_nanos, seq),
             action: confirmation_type.to_string(),
             description: description.to_string(),
             risk_level,
@@ -145,7 +154,9 @@ impl ApprovalManager {
 
     /// 做出审批决策
     pub fn make_decision(&mut self, decision: ApprovalDecision) -> Result<(), String> {
-        let request = self.pending_requests.get_mut(&decision.request_id)
+        let request = self
+            .pending_requests
+            .get_mut(&decision.request_id)
             .ok_or("Request not found")?;
 
         // 检查审批人权限
@@ -160,8 +171,13 @@ impl ApprovalManager {
         request.status = decision.decision.clone();
 
         // 如果批准或拒绝，移动到完成列表
-        if decision.decision == ApprovalStatus::Approved || decision.decision == ApprovalStatus::Rejected {
-            let completed = self.pending_requests.remove(&decision.request_id).expect("key exists");
+        if decision.decision == ApprovalStatus::Approved
+            || decision.decision == ApprovalStatus::Rejected
+        {
+            let completed = self
+                .pending_requests
+                .remove(&decision.request_id)
+                .expect("key exists");
             self.completed_requests.push(completed);
         }
 
@@ -173,7 +189,9 @@ impl ApprovalManager {
         let now = Instant::now();
         let mut timed_out = Vec::new();
 
-        let expired_ids: Vec<String> = self.pending_requests.iter()
+        let expired_ids: Vec<String> = self
+            .pending_requests
+            .iter()
             .filter(|(_, req)| now > req.expires_at)
             .map(|(id, _)| id.clone())
             .collect();
@@ -208,16 +226,31 @@ impl ApprovalManager {
     fn should_auto_approve(&self, request: &ApprovalRequest) -> bool {
         match request.risk_level {
             RiskLevel::Low => true,
-            RiskLevel::Medium => matches!(self.policy.auto_approve_below, RiskLevel::Medium | RiskLevel::High | RiskLevel::Critical),
+            RiskLevel::Medium => matches!(
+                self.policy.auto_approve_below,
+                RiskLevel::Medium | RiskLevel::High | RiskLevel::Critical
+            ),
             _ => false,
         }
     }
 
     /// 获取统计信息
     pub fn stats(&self) -> ApprovalStats {
-        let approved = self.completed_requests.iter().filter(|r| r.status == ApprovalStatus::Approved).count();
-        let rejected = self.completed_requests.iter().filter(|r| r.status == ApprovalStatus::Rejected).count();
-        let expired = self.completed_requests.iter().filter(|r| r.status == ApprovalStatus::Expired).count();
+        let approved = self
+            .completed_requests
+            .iter()
+            .filter(|r| r.status == ApprovalStatus::Approved)
+            .count();
+        let rejected = self
+            .completed_requests
+            .iter()
+            .filter(|r| r.status == ApprovalStatus::Rejected)
+            .count();
+        let expired = self
+            .completed_requests
+            .iter()
+            .filter(|r| r.status == ApprovalStatus::Expired)
+            .count();
 
         ApprovalStats {
             pending: self.pending_requests.len(),
@@ -402,19 +435,25 @@ mod tests {
         let mut manager = ApprovalManager::new(ApprovalPolicy::default());
 
         // 自动批准
-        let req1 = ApprovalRequestBuilder::new("req1", "action1").risk_level(RiskLevel::Low).build();
+        let req1 = ApprovalRequestBuilder::new("req1", "action1")
+            .risk_level(RiskLevel::Low)
+            .build();
         manager.submit_request(req1).unwrap();
 
         // 手动批准
-        let req2 = ApprovalRequestBuilder::new("req2", "action2").risk_level(RiskLevel::High).build();
+        let req2 = ApprovalRequestBuilder::new("req2", "action2")
+            .risk_level(RiskLevel::High)
+            .build();
         manager.submit_request(req2).unwrap();
-        manager.make_decision(ApprovalDecision {
-            request_id: "req2".to_string(),
-            approver: "admin".to_string(),
-            decision: ApprovalStatus::Approved,
-            reason: None,
-            decided_at: Instant::now(),
-        }).unwrap();
+        manager
+            .make_decision(ApprovalDecision {
+                request_id: "req2".to_string(),
+                approver: "admin".to_string(),
+                decision: ApprovalStatus::Approved,
+                reason: None,
+                decided_at: Instant::now(),
+            })
+            .unwrap();
 
         let stats = manager.stats();
         assert_eq!(stats.approved, 2);

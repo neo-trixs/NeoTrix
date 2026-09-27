@@ -47,6 +47,17 @@ pub struct CircuitBreakerOpenError {
     pub last_failure: Option<Duration>,
 }
 
+/// 单调毫秒时钟 (进程内基准)。
+///
+/// 2026-09-27 修复: 原实现用 `Instant::now().duration_since(Instant::now())
+/// .subsec_nanos()` 当"最后失败时间戳" —— 自己减自己恒为 ~0, 且 `subsec_nanos`
+/// 只是亚秒纳秒数不是时间戳 → `elapsed_since_last_failure` 永远是垃圾值,
+/// 半开恢复永不触发, 熔断器一旦跳闸就**永久锁死 Open**。
+fn mono_millis() -> u64 {
+    static BASE: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+    BASE.get_or_init(Instant::now).elapsed().as_millis() as u64
+}
+
 impl CircuitBreaker {
     /// Create a new circuit breaker.
     ///
@@ -77,11 +88,9 @@ impl CircuitBreaker {
     where
         F: FnOnce() -> Result<R, ()>,
     {
-        let state = self.state.lock().map_err(|_| {
-            CircuitBreakerOpenError {
-                failure_count: self.failure_count.load(Ordering::SeqCst),
-                last_failure: None,
-            }
+        let state = self.state.lock().map_err(|_| CircuitBreakerOpenError {
+            failure_count: self.failure_count.load(Ordering::SeqCst),
+            last_failure: None,
         })?;
 
         match *state {
@@ -154,10 +163,7 @@ impl CircuitBreaker {
     /// Record a failed call.
     fn on_failure(&self) {
         let count = self.failure_count.fetch_add(1, Ordering::SeqCst) + 1;
-        self.last_failure_time.store(
-            Instant::now().duration_since(Instant::now()).subsec_nanos() as u64,
-            Ordering::SeqCst,
-        );
+        self.last_failure_time.store(mono_millis(), Ordering::SeqCst);
         if count >= self.failure_threshold {
             self.transition_to_open();
         }
@@ -167,7 +173,7 @@ impl CircuitBreaker {
     fn transition_to_open(&self) {
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         *state = BreakerState::Open;
-        self.closed_at.store(Instant::now().elapsed().as_millis() as u64, Ordering::SeqCst);
+        self.closed_at.store(mono_millis(), Ordering::SeqCst);
         self.failure_count.store(0, Ordering::SeqCst);
         self.success_count.store(0, Ordering::SeqCst);
         log::warn!("[circuit-breaker] transitioned to OPEN");
@@ -193,7 +199,10 @@ impl CircuitBreaker {
 
     /// Get the current state.
     pub fn state(&self) -> BreakerState {
-        self.state.lock().map(|s| *s).unwrap_or(BreakerState::Closed)
+        self.state
+            .lock()
+            .map(|s| *s)
+            .unwrap_or(BreakerState::Closed)
     }
 
     /// Get the current failure count.
@@ -219,8 +228,7 @@ impl CircuitBreaker {
     /// Time elapsed since last failure in milliseconds.
     fn elapsed_since_last_failure(&self) -> u64 {
         let last_failure = self.last_failure_time.load(Ordering::SeqCst);
-        let now = Instant::now().duration_since(Instant::now()).subsec_nanos() as u64;
-        now.saturating_sub(last_failure)
+        mono_millis().saturating_sub(last_failure)
     }
 
     /// Reset the circuit breaker to closed state.

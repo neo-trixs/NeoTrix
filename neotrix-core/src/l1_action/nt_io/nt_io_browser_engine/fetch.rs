@@ -264,17 +264,72 @@ pub(crate) fn decode_body(content_type: Option<&str>, bytes: &[u8]) -> String {
 pub(crate) fn http_client_for(config: &BrowserConfig) -> Result<Client, BrowserError> {
     let mut builder =
         Client::builder().redirect(reqwest::redirect::Policy::limited(5));
-    if let Some(proxy) = config.proxy.as_deref() {
-        let proxy = proxy.trim();
-        if !proxy.is_empty() {
-            builder = builder.proxy(reqwest::Proxy::all(proxy).map_err(|e| {
-                BrowserError::ActionFailed(format!("bad proxy '{proxy}': {e}"))
-            })?);
-        }
+    // 显式配置优先，空则读环境（HTTPS_PROXY>HTTP_PROXY>ALL_PROXY 大小写皆可），
+    // 封锁区出口：配了即走代理，未配直连（与 nt_web / nt_world_search 同律）。
+    // NO_PROXY（含默认回环）一律 bypass——否则 127.0.0.1 探活被自家代理掐死。
+    let explicit = config
+        .proxy
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned);
+    // 2026-09-27 安全修复: 显式代理 URL 解析失败原先被 `.ok()` 静默吞掉 →
+    // 悄悄降级为**直连**, 与本仓"出口 fail-closed"律法相悖 (mandated proxy 失效
+    // 等于没有)。显式配置必须严格校验并报错; 仅环境变量保持宽容。
+    let proxy_url = match explicit.as_deref() {
+        Some(s) => Some(
+            reqwest::Url::parse(s)
+                .map_err(|e| BrowserError::ActionFailed(format!("invalid proxy url: {e}")))?,
+        ),
+        None => proxy_from_env().and_then(|s| reqwest::Url::parse(&s).ok()),
+    };
+    if let Some(base) = proxy_url {
+        builder = builder.proxy(reqwest::Proxy::custom(move |url| {
+            if no_proxy_hit(url.host_str().unwrap_or("")) {
+                None
+            } else {
+                Some(base.clone())
+            }
+        }));
     }
     builder
         .build()
         .map_err(|e| BrowserError::ActionFailed(format!("http client: {e}")))
+}
+
+/// 代理出口（环境）：`HTTPS_PROXY>HTTP_PROXY>ALL_PROXY`，大小写皆可；空串视为未配。
+pub(crate) fn proxy_from_env() -> Option<String> {
+    ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"]
+        .iter()
+        .find_map(|k| std::env::var(k).ok())
+        .map(|v| v.trim().to_owned())
+        .filter(|v| !v.is_empty())
+}
+
+/// NO_PROXY 命中（精确 + `.域` 后缀 + `*`；本机回环默认直连，配了代理也不穿代理——
+/// 否则 crystal/ollama 的 127.0.0.1 探活会被自家代理掐死）。
+pub(crate) fn no_proxy_hit(host: &str) -> bool {
+    let h = host.trim().trim_end_matches('.').to_lowercase();
+    if h.is_empty() {
+        return false;
+    }
+    if h == "localhost" || h == "127.0.0.1" || h == "::1" {
+        return true;
+    }
+    let rules = ["NO_PROXY", "no_proxy"]
+        .iter()
+        .find_map(|k| std::env::var(k).ok())
+        .unwrap_or_default();
+    rules.split(',').map(str::trim).filter(|s| !s.is_empty()).any(|rule| {
+        let r = rule.trim_end_matches('.').to_lowercase();
+        if r == "*" {
+            true
+        } else if let Some(suffix) = r.strip_prefix('.') {
+            h == suffix || h.ends_with(&format!(".{suffix}"))
+        } else {
+            h == r
+        }
+    })
 }
 
 pub(crate) async fn http_get(

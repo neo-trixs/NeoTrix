@@ -16,7 +16,9 @@ pub mod provider;
 pub mod remote;
 pub mod stateful_bench;
 
-pub use device::{DeviceSandbox, DeviceTool, SandboxEngine, SandboxSession, SandboxSpec, SandboxStatus};
+pub use device::{
+    DeviceSandbox, DeviceTool, SandboxEngine, SandboxSession, SandboxSpec, SandboxStatus,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CloudRuntime {
@@ -71,20 +73,25 @@ pub enum CloudSessionStatus {
 
 // Re-export shared egress types from L1 to avoid L2→L3 upward dependencies.
 pub use crate::l1_action::nt_io::nt_io_provider::common::egress_types::{
-    SandboxEgressRule as EgressRule,
-    SandboxEgressPolicy as EgressPolicy,
+    SandboxEgressPolicy as EgressPolicy, SandboxEgressRule as EgressRule,
 };
 
 /// Extended EgressPolicy methods for L3-specific functionality.
 impl EgressPolicy {
     /// Everything out — matches legacy sandbox behaviour.
     pub fn permissive() -> Self {
-        Self { rules: vec![], deny_all: false }
+        Self {
+            rules: vec![],
+            deny_all: false,
+        }
     }
 
     /// Nothing out — the closed trust boundary default for agent sandboxes.
     pub fn deny_all() -> Self {
-        Self { rules: vec![], deny_all: true }
+        Self {
+            rules: vec![],
+            deny_all: true,
+        }
     }
 
     /// Evaluate one outbound connection. Deny rules shadow allow rules.
@@ -98,7 +105,12 @@ impl EgressPolicy {
                 matched_allow = true;
             }
         }
-        matched_allow || !self.deny_all
+        // 2026-09-27 安全修复: 原 `matched_allow || !self.deny_all` 使任何非 deny_all
+        // 策略变成"全放行" —— 显式白名单形同虚设, 信任边界静默敞开
+        // (egress_tests 4 条 + stateful_bench 2 条实锤)。语义应为:
+        //   有白名单命中 → 放行; 无任何规则且未 deny_all → 放行(默认开放);
+        //   配了白名单但未命中 → 拒绝(白名单即全部许可)。
+        matched_allow || (self.rules.is_empty() && !self.deny_all)
     }
 
     /// Sanity validation: deny-all + a localhost allow must pass only the allow.
@@ -116,11 +128,17 @@ impl EgressPolicy {
     pub fn apply(&self) -> EgressPolicy {
         let mut rules: Vec<EgressRule> = self.rules.clone();
         rules.sort_by(|a, b| {
-            (a.host.as_str(), a.port.as_str(), a.allow)
-                .cmp(&(b.host.as_str(), b.port.as_str(), b.allow))
+            (a.host.as_str(), a.port.as_str(), a.allow).cmp(&(
+                b.host.as_str(),
+                b.port.as_str(),
+                b.allow,
+            ))
         });
         rules.dedup_by(|a, b| a.host == b.host && a.port == b.port && a.allow == b.allow);
-        EgressPolicy { rules, deny_all: self.deny_all }
+        EgressPolicy {
+            rules,
+            deny_all: self.deny_all,
+        }
     }
 
     /// 是否已处于规范化 (幂等后) 状态。
@@ -129,8 +147,11 @@ impl EgressPolicy {
         while i + 1 < self.rules.len() {
             let a = &self.rules[i];
             let b = &self.rules[i + 1];
-            let ord = (a.host.as_str(), a.port.as_str(), a.allow)
-                .cmp(&(b.host.as_str(), b.port.as_str(), b.allow));
+            let ord = (a.host.as_str(), a.port.as_str(), a.allow).cmp(&(
+                b.host.as_str(),
+                b.port.as_str(),
+                b.allow,
+            ));
             if ord == std::cmp::Ordering::Greater {
                 return false;
             }
@@ -371,7 +392,10 @@ impl CloudSession {
         env: &HashMap<String, String>,
     ) -> Result<CloudResult, String> {
         self.status = CloudSessionStatus::Running;
-        let result = self.provider.execute(&self.session_id, code, runtime, env).await?;
+        let result = self
+            .provider
+            .execute(&self.session_id, code, runtime, env)
+            .await?;
         self.status = match result.exit_code {
             0 => CloudSessionStatus::Completed,
             _ if result.execution_time >= Duration::from_secs(300) => CloudSessionStatus::TimedOut,
@@ -381,7 +405,9 @@ impl CloudSession {
     }
 
     pub async fn upload_file(&mut self, path: &str, data: Vec<u8>) -> Result<(), String> {
-        self.provider.upload_file(&self.session_id, path, data).await
+        self.provider
+            .upload_file(&self.session_id, path, data)
+            .await
     }
 
     pub async fn download_result(&self) -> Result<CloudResult, String> {
@@ -482,7 +508,10 @@ impl CloudSandbox {
                 );
             }
             Err(e) => {
-                log::warn!("[sandbox] vault unavailable: {}; running without secret injection", e);
+                log::warn!(
+                    "[sandbox] vault unavailable: {}; running without secret injection",
+                    e
+                );
             }
         }
     }
@@ -505,8 +534,12 @@ impl CloudSandbox {
 
     pub fn create_session(&mut self, runtime: CloudRuntime) -> String {
         let session_id = uuid::Uuid::new_v4().to_string();
-        let session =
-            CloudSession::new(session_id.clone(), runtime, self.egress.clone(), Arc::clone(&self.provider));
+        let session = CloudSession::new(
+            session_id.clone(),
+            runtime,
+            self.egress.clone(),
+            Arc::clone(&self.provider),
+        );
         self.sessions.push(session);
         session_id
     }
@@ -516,7 +549,9 @@ impl CloudSandbox {
     }
 
     pub fn get_session_mut(&mut self, session_id: &str) -> Option<&mut CloudSession> {
-        self.sessions.iter_mut().find(|s| s.session_id == session_id)
+        self.sessions
+            .iter_mut()
+            .find(|s| s.session_id == session_id)
     }
 
     pub fn list_sessions(&self) -> &[CloudSession] {
@@ -544,7 +579,9 @@ impl CloudSandbox {
         self.provider.validate_ready().await?;
         let env = self.vault_env();
         let session_id = self.create_session(runtime);
-        let session = self.get_session_mut(&session_id).ok_or("session creation failed")?;
+        let session = self
+            .get_session_mut(&session_id)
+            .ok_or("session creation failed")?;
         session.execute(code, runtime, &env).await
     }
 
@@ -674,7 +711,10 @@ impl CallDenial {
         Self {
             kind: DenialKind::Egress,
             code: format!("egress_denied:{}:{}", host, port),
-            message: format!("egress denied for {}:{} — outside the sandbox trust boundary", host, port),
+            message: format!(
+                "egress denied for {}:{} — outside the sandbox trust boundary",
+                host, port
+            ),
         }
     }
 
@@ -708,7 +748,9 @@ impl CallDenial {
             DenialKind::Egress => {
                 "rewrite the call to use an allowed host/port from the sandbox egress policy"
             }
-            DenialKind::Resource => "reduce the call's resource footprint (output size / concurrency)",
+            DenialKind::Resource => {
+                "reduce the call's resource footprint (output size / concurrency)"
+            }
             DenialKind::Approval => "request human approval for the call, then retry",
             DenialKind::Sandbox => {
                 "use a backend that can enforce the demanded level, or lower the call's level"
@@ -740,8 +782,8 @@ impl CallVerdict {
 #[cfg(all(test, feature = "sandbox"))]
 mod sandbox_vault_tests {
     use super::*;
-    use futures::StreamExt;
     use crate::l3_embodiment::nt_shield::vault::Vault;
+    use futures::StreamExt;
 
     /// Test-only provider: spawns a real child process that reads the injected
     /// `NEOTRIX_VAULT_*` variable, proving secrets reach the workload env.
@@ -818,8 +860,14 @@ mod sandbox_vault_tests {
         cloud.attach_vault(Some(Arc::new(vault)));
 
         let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
-        let result = rt.block_on(cloud.run_code("print('hi')", CloudRuntime::Python3)).expect("run");
-        assert_eq!(result.exit_code, 0, "child should run; stderr={}", result.stderr);
+        let result = rt
+            .block_on(cloud.run_code("print('hi')", CloudRuntime::Python3))
+            .expect("run");
+        assert_eq!(
+            result.exit_code, 0,
+            "child should run; stderr={}",
+            result.stderr
+        );
         assert_eq!(
             result.stdout, "sk-supersecret",
             "secret must be readable via NEOTRIX_VAULT_API_KEY in the child env"
@@ -837,7 +885,9 @@ mod sandbox_vault_tests {
             Arc::new(EnvCaptureProvider),
         );
         let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
-        let result = rt.block_on(cloud.run_code("echo hi", CloudRuntime::Python3)).expect("run");
+        let result = rt
+            .block_on(cloud.run_code("echo hi", CloudRuntime::Python3))
+            .expect("run");
         assert_eq!(result.exit_code, 0);
     }
 }
@@ -924,9 +974,16 @@ mod validate_gate_tests {
         let err = rt
             .block_on(cloud.run_code("print('hi')", CloudRuntime::Python3))
             .expect_err("unready backend must fail closed");
-        assert!(err.contains("daemon not reachable"), "gate error surfaced: {}", err);
+        assert!(
+            err.contains("daemon not reachable"),
+            "gate error surfaced: {}",
+            err
+        );
         // 工作负载未派发 → 无会话创建残留。
-        assert!(cloud.list_sessions().is_empty(), "no session may be created past a failed gate");
+        assert!(
+            cloud.list_sessions().is_empty(),
+            "no session may be created past a failed gate"
+        );
     }
 
     /// 门正例: 验证通过 → 正常派发执行。
@@ -948,13 +1005,13 @@ mod egress_tests {
 
     #[test]
     fn test_egress_exact_host_allow() {
-        let policy = EgressPolicy::new(
-            vec![EgressRule::allow("api.github.com", "443")],
-            false,
-        );
+        let policy = EgressPolicy::new(vec![EgressRule::allow("api.github.com", "443")], false);
         assert!(policy.check("api.github.com", 443));
         assert!(!policy.check("api.github.com", 80), "port must match");
-        assert!(!policy.check("evil.com", 443), "unlisted host denied by default");
+        assert!(
+            !policy.check("evil.com", 443),
+            "unlisted host denied by default"
+        );
     }
 
     #[test]
@@ -962,8 +1019,14 @@ mod egress_tests {
         let policy = EgressPolicy::new(vec![EgressRule::allow("*.example.com", "443")], false);
         assert!(policy.check("api.example.com", 443));
         assert!(policy.check("a.b.example.com", 443));
-        assert!(!policy.check("example.com", 443), "bare apex must match exactly, not suffix");
-        assert!(!policy.check("example.com.evil.net", 443), "suffix must be dot-bounded");
+        assert!(
+            !policy.check("example.com", 443),
+            "bare apex must match exactly, not suffix"
+        );
+        assert!(
+            !policy.check("example.com.evil.net", 443),
+            "suffix must be dot-bounded"
+        );
     }
 
     #[test]
@@ -976,7 +1039,10 @@ mod egress_tests {
             false,
         );
         assert!(policy.check("ok.example.com", 443));
-        assert!(!policy.check("blocked.example.com", 443), "explicit deny wins");
+        assert!(
+            !policy.check("blocked.example.com", 443),
+            "explicit deny wins"
+        );
     }
 
     #[test]
@@ -1023,13 +1089,22 @@ mod call_policy_tests {
         // Demanded Full but the backend only guarantees Partial → fail-closed denial,
         // even though the egress policy would allow the host (permissive).
         let policy = CallPolicy::full();
-        let verdict =
-            policy.evaluate(EnforcementLevel::Partial, &EgressPolicy::permissive(), "api.example.com", 443);
+        let verdict = policy.evaluate(
+            EnforcementLevel::Partial,
+            &EgressPolicy::permissive(),
+            "api.example.com",
+            443,
+        );
         assert!(!verdict.is_allowed());
         assert_eq!(verdict.denial().map(|d| d.kind), Some(DenialKind::Sandbox));
 
         // When the backend reports Full, the same call is allowed.
-        let ok = policy.evaluate(EnforcementLevel::Full, &EgressPolicy::permissive(), "api.example.com", 443);
+        let ok = policy.evaluate(
+            EnforcementLevel::Full,
+            &EgressPolicy::permissive(),
+            "api.example.com",
+            443,
+        );
         assert!(ok.is_allowed());
     }
 
@@ -1050,7 +1125,9 @@ mod call_policy_tests {
                 d.kind
             );
         }
-        assert!(CallDenial::egress("h", 1).code.starts_with("egress_denied:"));
+        assert!(CallDenial::egress("h", 1)
+            .code
+            .starts_with("egress_denied:"));
         assert_eq!(CallDenial::approval("x").kind, DenialKind::Approval);
         assert_eq!(CallDenial::resource("y").kind, DenialKind::Resource);
         assert_eq!(CallDenial::sandbox("z").kind, DenialKind::Sandbox);
@@ -1076,16 +1153,34 @@ mod call_policy_tests {
             vec![EgressRule::allow("api.openai.com", "443")],
             false,
         ));
-        let verdict = policy.evaluate(EnforcementLevel::Full, &session.egress, "api.openai.com", 443);
-        assert!(verdict.is_allowed(), "per-call override grants the API host");
+        let verdict = policy.evaluate(
+            EnforcementLevel::Full,
+            &session.egress,
+            "api.openai.com",
+            443,
+        );
+        assert!(
+            verdict.is_allowed(),
+            "per-call override grants the API host"
+        );
 
         // Global/session policy must be untouched by the per-call override.
-        assert!(!cloud.egress.check("api.openai.com", 443), "global policy unchanged");
-        assert!(!session.egress.check("api.openai.com", 443), "session policy unchanged");
+        assert!(
+            !cloud.egress.check("api.openai.com", 443),
+            "global policy unchanged"
+        );
+        assert!(
+            !session.egress.check("api.openai.com", 443),
+            "session policy unchanged"
+        );
 
         // Without the override, the same host is denied by the session policy.
-        let denied = CallPolicy::full()
-            .evaluate(EnforcementLevel::Full, &session.egress, "api.openai.com", 443);
+        let denied = CallPolicy::full().evaluate(
+            EnforcementLevel::Full,
+            &session.egress,
+            "api.openai.com",
+            443,
+        );
         assert_eq!(denied.denial().map(|d| d.kind), Some(DenialKind::Egress));
     }
 }

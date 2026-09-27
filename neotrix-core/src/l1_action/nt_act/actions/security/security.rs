@@ -6,13 +6,12 @@
 //!
 //! 适配 L3 nt_shield guard 到 L1 统一 trait
 
-use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::l1_action::traits::{
-    L1Capability, SecurityGuard, CapabilityCategory, ConstellationLevel,
-    CapabilityHealth, CapabilityStats, CapabilityError,
-    ActionRequest, SecurityVerdict, AuditEntry,
+    ActionRequest, AuditEntry, CapabilityCategory, CapabilityError, CapabilityHealth,
+    CapabilityStats, ConstellationLevel, L1Capability, SecurityGuard, SecurityVerdict,
 };
 
 // ════════════════════════════════════════════════════════════════
@@ -45,7 +44,10 @@ pub struct SecurityAuditLog {
 
 impl Default for SecurityAuditLog {
     fn default() -> Self {
-        Self { entries: Vec::new(), max_entries: 10000 }
+        Self {
+            entries: Vec::new(),
+            max_entries: 10000,
+        }
     }
 }
 
@@ -58,7 +60,8 @@ impl SecurityAuditLog {
     }
 
     pub fn query(&self, action: &str, limit: usize) -> Vec<&AuditEntry> {
-        self.entries.iter()
+        self.entries
+            .iter()
             .filter(|e| e.action.contains(action))
             .rev()
             .take(limit)
@@ -78,7 +81,9 @@ pub struct SecurityGuardManager {
 }
 
 impl Default for SecurityGuardManager {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SecurityGuardManager {
@@ -97,9 +102,12 @@ impl SecurityGuardManager {
     pub fn evaluate(&self, request: &ActionRequest) -> SecurityVerdict {
         for policy in &self.policies {
             for rule in &policy.rules {
-                if request.action.contains(&rule.action_pattern)
-                    && request.target.contains(&rule.target_pattern)
-                {
+                // 2026-09-27 修复: target_pattern 是通配模式, 原用 `contains` 字面量比对
+                // → `"*"` 永远匹配不到, 任何通配安全规则都无法 deny (fail-open)。
+                let target_ok = rule.target_pattern == "*"
+                    || rule.target_pattern.contains('*')
+                    || request.target.contains(&rule.target_pattern);
+                if request.action.contains(&rule.action_pattern) && target_ok {
                     return rule.verdict.clone();
                 }
             }
@@ -109,20 +117,37 @@ impl SecurityGuardManager {
 }
 
 impl L1Capability for SecurityGuardManager {
-    fn capability_id(&self) -> &str { "security.guard" }
-    fn category(&self) -> CapabilityCategory { CapabilityCategory::Security }
-    fn constellation(&self) -> ConstellationLevel { ConstellationLevel::C1UnitTest }
+    fn capability_id(&self) -> &str {
+        "security.guard"
+    }
+    fn category(&self) -> CapabilityCategory {
+        CapabilityCategory::Security
+    }
+    fn constellation(&self) -> ConstellationLevel {
+        ConstellationLevel::C1UnitTest
+    }
     fn health_check(&self) -> CapabilityHealth {
         CapabilityHealth {
             healthy: true,
             latency_ms: None,
             error_rate: 0.0,
-            last_check: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
-            message: Some(format!("{} policies, {} audit entries", self.policies.len(), self.audit_log.entries.len())),
+            last_check: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            message: Some(format!(
+                "{} policies, {} audit entries",
+                self.policies.len(),
+                self.audit_log.entries.len()
+            )),
         }
     }
-    fn description(&self) -> &str { "Security guard with policy-based access control and audit" }
-    fn stats(&self) -> CapabilityStats { self.stats.clone() }
+    fn description(&self) -> &str {
+        "Security guard with policy-based access control and audit"
+    }
+    fn stats(&self) -> CapabilityStats {
+        self.stats.clone()
+    }
 }
 
 impl SecurityGuard for SecurityGuardManager {
@@ -146,20 +171,33 @@ pub struct SecurityRegistry {
 }
 
 impl Default for SecurityRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SecurityRegistry {
-    pub fn new() -> Self { Self { guards: Vec::new() } }
-    pub fn register(&mut self, guard: Box<dyn SecurityGuard>) { self.guards.push(guard); }
+    pub fn new() -> Self {
+        Self { guards: Vec::new() }
+    }
+    pub fn register(&mut self, guard: Box<dyn SecurityGuard>) {
+        self.guards.push(guard);
+    }
     pub fn get(&self, id: &str) -> Option<&dyn SecurityGuard> {
-        self.guards.iter().find(|g| g.capability_id() == id).map(|g| g.as_ref())
+        self.guards
+            .iter()
+            .find(|g| g.capability_id() == id)
+            .map(|g| g.as_ref())
     }
     pub fn health_check_all(&self) -> Vec<(String, CapabilityHealth)> {
-        self.guards.iter().map(|g| (g.capability_id().to_string(), g.health_check())).collect()
+        self.guards
+            .iter()
+            .map(|g| (g.capability_id().to_string(), g.health_check()))
+            .collect()
     }
     pub fn optimal(&self) -> Option<&dyn SecurityGuard> {
-        self.guards.iter()
+        self.guards
+            .iter()
             .filter(|g| g.health_check().healthy)
             .max_by(|a, b| {
                 let a_s = 1.0 - a.health_check().error_rate;
@@ -176,10 +214,15 @@ pub struct SecurityRouter {
 }
 
 impl SecurityRouter {
-    pub fn new(registry: SecurityRegistry) -> Self { Self { registry } }
-    pub fn route(&self, _action: &ActionRequest) -> Option<&dyn SecurityGuard> { self.registry.optimal() }
-    pub fn check(&self, action: &ActionRequest) -> SecurityVerdict {
+    pub fn new(registry: SecurityRegistry) -> Self {
+        Self { registry }
+    }
+    pub fn route(&self, _action: &ActionRequest) -> Option<&dyn SecurityGuard> {
         self.registry.optimal()
+    }
+    pub fn check(&self, action: &ActionRequest) -> SecurityVerdict {
+        self.registry
+            .optimal()
             .map(|g| g.check(action))
             .unwrap_or(SecurityVerdict::Deny("No security guard".into()))
     }
@@ -191,8 +234,12 @@ pub struct SecurityBridge {
 }
 
 impl SecurityBridge {
-    pub fn new(router: SecurityRouter) -> Self { Self { router } }
-    pub fn check(&self, action: &ActionRequest) -> SecurityVerdict { self.router.check(action) }
+    pub fn new(router: SecurityRouter) -> Self {
+        Self { router }
+    }
+    pub fn check(&self, action: &ActionRequest) -> SecurityVerdict {
+        self.router.check(action)
+    }
 }
 
 // ════════════════════════════════════════════════════════════════
