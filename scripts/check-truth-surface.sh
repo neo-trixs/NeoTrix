@@ -81,6 +81,62 @@ done | sort -u >> "$CUR"
 # ---------- 3) TRACKED: build artifacts / runtime DB in git ----------
 git ls-files 2>/dev/null | grep -E "$TRACK_GLOBS" | sed 's/^/TRACKED /' >> "$CUR"
 
+# ---------- 4) UNCOMMITTED_DEP: a `mod X;` target that is not in git ----------
+# This is the check that would have caught the 2026-09-27 broken HEAD: three
+# committed files did `use crate::l6_meta::nt_approval::...` while the only
+# `mod nt_approval;` lived in an uncommitted mod.rs, so a fresh clone could
+# not build.
+#
+# Reads the WORKING TREE on purpose, not `git show HEAD:` — the whole point is
+# to fire *before* the breaking commit lands, when worktree != HEAD. In CI the
+# two are identical, so behaviour is unchanged there.
+#
+# Module resolution honours BOTH layouts:
+#   sibling : foo.rs  declaring `mod bar;`  ->  bar.rs | bar/mod.rs
+#   nested  : foo.rs  declaring `mod bar;`  ->  foo/bar.rs | foo/bar/mod.rs
+python3 - "$CUR" <<'PY' 2>/dev/null
+import subprocess, sys, re, os
+out = open(sys.argv[1], 'a')
+tracked = set(subprocess.run(['git', 'ls-files'], capture_output=True,
+                             text=True).stdout.split())
+roots = sorted(f for f in tracked if f.endswith('.rs') and os.path.exists(f))
+def mods_of(f):
+    try:
+        with open(f, encoding='utf-8', errors='ignore') as fh:
+            src = fh.read()
+    except Exception:
+        return []
+    d, stem = os.path.dirname(f), os.path.basename(f)[:-3]
+    res = []
+    for m in re.finditer(r'^\s*(?:pub\s+)?mod\s+([a-z_0-9]+)\s*;', src, re.M):
+        n = m.group(1)
+        # resolve on the FILESYSTEM, then ask git whether it is committed.
+        # Resolving against `tracked` here would be a no-op: a never-committed
+        # file could never be discovered in the first place.
+        for c in (f'{d}/{n}.rs', f'{d}/{n}/mod.rs',
+                  f'{d}/{stem}/{n}.rs', f'{d}/{stem}/{n}/mod.rs'):
+            if os.path.exists(c):
+                res.append(c)
+                break
+    return res
+# transitive closure: committed code can reach an uncommitted file through
+# another uncommitted file, so walk until fixpoint
+seen, frontier, need = set(roots), list(roots), set()
+while frontier:
+    nxt = []
+    for f in frontier:
+        for c in mods_of(f):
+            if c not in tracked:
+                need.add(c)
+            if c not in seen:
+                seen.add(c)
+                nxt.append(c)
+    frontier = nxt
+for c in sorted(need):
+    out.write(f'UNCOMMITTED_DEP {c}\n')
+out.close()
+PY
+
 sort -u "$CUR" -o "$CUR"
 
 # ---------- diff against baseline ----------
@@ -101,12 +157,13 @@ fi
 N_EMPTY=$(grep -c '^EMPTY ' "$NEW" || true)
 N_UNDECL=$(grep -c '^UNDECLARED ' "$NEW" || true)
 N_TRACK=$(grep -c '^TRACKED ' "$NEW" || true)
+N_DEP=$(grep -c '^UNCOMMITTED_DEP ' "$NEW" || true)
 N_GONE=$(grep -c . "$GONE" || true)
 N_BASE=$(grep -vc '^#' "$BASELINE" 2>/dev/null || true)
 
 echo "=== NeoTrix truth-surface gate ==="
 echo "baseline entries: $N_BASE   resolved since baseline: $N_GONE"
-echo "NEW offenders  -> EMPTY:$N_EMPTY  UNDECLARED:$N_UNDECL  TRACKED:$N_TRACK"
+echo "NEW offenders  -> EMPTY:$N_EMPTY  UNDECLARED:$N_UNDECL  TRACKED:$N_TRACK  UNCOMMITTED_DEP:$N_DEP"
 
 if [ "$N_GONE" -gt 0 ]; then
   echo "--- resolved (drop from baseline via --update-baseline) ---"
@@ -132,10 +189,12 @@ if [ "$UPDATE" -eq 1 ]; then
 fi
 
 if [ "$STRICT" -eq 1 ] && [ -s "$NEW" ]; then
-  echo "FAIL(strict): $((N_EMPTY + N_UNDECL + N_TRACK)) new truth-drift offenders."
-  echo "  EMPTY     -> delete the file, or implement it (a 0-byte 'pub mod' is a lie)"
-  echo "  UNDECLARED-> add 'mod <name>;' to the sibling tests/mod.rs, or delete the file"
-  echo "  TRACKED   -> git rm --cached <path> (and fix the matching .gitignore rule)"
+  echo "FAIL(strict): $((N_EMPTY + N_UNDECL + N_TRACK + N_DEP)) new truth-drift offenders."
+  echo "  EMPTY          -> delete the file, or implement it (a 0-byte 'pub mod' is a lie)"
+  echo "  UNDECLARED     -> add 'mod <name>;' to the sibling tests/mod.rs, or delete the file"
+  echo "  TRACKED        -> git rm --cached <path> (and fix the matching .gitignore rule)"
+  echo "  UNCOMMITTED_DEP-> committed code declares/uses this file but it is NOT in git;"
+  echo "                    a fresh clone cannot build. git add it (see the list above)."
   exit 1
 fi
 
