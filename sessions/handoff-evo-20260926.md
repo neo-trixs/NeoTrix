@@ -191,3 +191,14 @@ PARK（P-01~P-05）不动。
   G-01 保持 blocked（nt_watch.sh 只是邻居哨兵非 sidecar 启动器，:8149 拉起＝训练侧进程，
   16G＋cargo 占用＋train 禁令三重门）；G-02 目视/G-10 决议/VER 独占等主；
   PARK 全不动。P2 包未提交，等令。
+
+## 10. 单窗口收尾（2026-09-27 夜：VER＋C 批＋EVO-04 三提交）
+
+- VER `3d080a96`：workspace 0.21→0.22 去重收敛（HEAD 自带重复块实锤并除）＋NeoBot tauri 0.22.0；
+  members 换留他窗；门禁绿。
+- C 批 `84e98aff`（13 文件 +4381/-22）：生成式注册行＋gap-fill 代际快照＋cli 迁移＋10 依赖新文件；
+  knowledge_graph fmt 已在 HEAD（无 diff）；门禁绿。
+- EVO-04 `8ebfb491`：nt_snapshot 快照表＋SingleOp＋Stale/Occluded 双检＋按需等待，
+  7 单测全绿；引擎分发零改动（e2e 接入点已留）。
+- 活体：soul online（5ms，tools=9）＋NeoBot.app 在屏（PID 53886）。
+- 仅剩：G-01 sidecar（训练侧，保持 blocked）、G-02 目视（请看屏）、members 换（待 guixu 主）。
