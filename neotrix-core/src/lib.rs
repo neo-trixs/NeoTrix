@@ -8,10 +8,12 @@
 //! ```text
 //! core/       — 纯数据模型（零外部依赖）
 //! agent/      — Agent 运行时
-//! cli/        — 终端 UI
 //! server/     — HTTP/WebSocket 服务
 //! neotrix/    — 全局模块
 //! ```
+//!
+//! CLI 命令已移除：用户意图由 l6_meta::nt_auto_orchestrator 自动分类路由，
+//! 基础设施（审批/成本/沙箱/安全）已迁移到 l6_meta / l3_embodiment / l0_substrate。
 //!
 //! 统一版本: 0.18.0 — 推理内核 18 stages
 #![forbid(unsafe_code)]
@@ -44,10 +46,12 @@ pub use neotrix::ffi::{
     DualSpecializationImpl, NeoTrixHandle,
 };
 
-pub mod cli;
 pub mod server;
 pub mod agent;
 pub mod skill_loader;
+pub mod skill_registry;
+pub mod nt_route_features; // D1 深特征路由（纯规则，零模型）
+pub mod nt_reuse; // D2 结晶复用率仪表（kv 后端，零 migration）
 pub mod neotrix;
 pub mod config;
 pub mod unified_cmd;

@@ -57,9 +57,19 @@ pub use nt_train_export::NtTrainExport;
 pub mod nt_awaken_loop; // 自验证觉醒循环（Voyager 课程 + SEAL ReST EM）
 pub use nt_awaken_loop::{AwakenCycleReport, NtAwakenLoop, VerifyScores};
 pub mod nt_hf_bridge; // HF 开源训练数据 → 晶体摄入桥
-pub use nt_hf_bridge::{HfMemory, NtHfBridge};
+pub use nt_hf_bridge::{HfCatalogEntry, HfMemory, NtHfBridge};
 pub mod nt_predict_loop; // FEP 预测误差 → 爬取优先级（AutoExplore 映射）
 pub use nt_predict_loop::NtPredictLoop;
+pub mod nt_jev_calibration; // 晶体自验证分数 → JEV 校准训练数据（免外部教师）
+pub use nt_jev_calibration::{CalibRow, NtJevCalibration, PlattBucketTable, PlattParams, GOLD_FLOOR};
+pub mod nt_jev_agentjev; // AgentJev-0.6B sidecar 桥（决策模型生产落地）
+pub use nt_jev_agentjev::{AgentJevQuestion, NtJevAgentJev, DEFAULT_PORT};
+pub mod nt_orchestrator; // 进化闭环调度器（tick + 模型回灌）
+pub use nt_orchestrator::{InferenceSource, NtOrchestrator, NtOrchestratorConfig, OrchestratorReport};
+pub mod nt_eval_loop; // 评估闭环（EvalReport → 门限/重训动作）
+pub use nt_eval_loop::{EvalAction, EvalLoopReport, NtEvalLoop};
+pub mod nt_self_iterate; // 晶体自我迭代闭环（tick→eval→自适应→收敛，D2/D5 落地）
+pub use nt_self_iterate::{NtSelfIterate, NtSelfIterateConfig, NtSelfIterateReport, RoundReport};
 pub mod nt_crystal_task_fusion; // 晶体任务闭环 — 智能拆解 → LLM问答分发 → JEV融合 → 后续任务
 pub use nt_crystal_task_fusion::{
     NtAnswerCluster, NtCrystalSubtask, NtCrystalTaskLoop, NtFusedAnswer, NtLlmReply,
@@ -72,9 +82,69 @@ pub use nt_crystal_dialogue::{
     NtDemand, NtDemandKind, NtDialogueWindow, NtHumanChannel, NtHumanReply, NtInnerLoop,
     NtInnerLoopOutcome, NtLoopStatus,
 };
+pub mod knowledge_graph; // 晶体知识图谱 — 节点/边/实体链接/时序查询（皇極种子前置）
+pub mod nt_cosmo_frames; // 宇宙论结构框架 — 递归/倍增/相序/接地（标签剥离，皇極骨）
+pub mod nt_huangji_atlas; // 皇極經世宇宙论种子图谱 — 元會運世/先天八卦/取象（公有领域）
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod backup_plan_tests {
+    use super::*;
+
+    #[test]
+    fn test_rotation_plan_old_first() {
+        let root = PathBuf::from("/tmp/x");
+        let plan = backup_rotation_plan(&root, 3);
+        assert_eq!(plan.len(), 3);
+        // 先搬老代：.2→.3，.1→.2，main→.1
+        assert!(plan[0].0.ends_with("crystal.json.2"));
+        assert!(plan[0].1.ends_with("crystal.json.3"));
+        assert!(plan[1].0.ends_with("crystal.json.1"));
+        assert!(plan[2].0.ends_with("crystal.json"));
+        assert!(plan[2].1.ends_with("crystal.json.1"));
+    }
+
+    #[test]
+    fn test_rotation_plan_zero_empty() {
+        let root = PathBuf::from("/tmp/x");
+        assert!(backup_rotation_plan(&root, 0).is_empty());
+    }
+
+    #[test]
+    fn test_load_candidates_order() {
+        let root = PathBuf::from("/tmp/x");
+        let cs = load_candidates(&root, 2);
+        assert_eq!(cs.len(), 4); // main + .1 + .2 + .bak
+        assert!(cs[0].ends_with("crystal.json"));
+        assert!(cs[1].ends_with("crystal.json.1"));
+        assert!(cs[2].ends_with("crystal.json.2"));
+        assert!(cs[3].ends_with("crystal.json.bak"));
+    }
+
+    #[test]
+    fn test_rotation_drill_on_tempdir() {
+        // tempdir 真实 rename 演练（不碰 live crystal_root）
+        let dir = std::env::temp_dir().join("nt_backup_drill");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("crystal.json"), "v3").unwrap();
+        std::fs::write(dir.join("crystal.json.1"), "v2").unwrap();
+        std::fs::write(dir.join("crystal.json.2"), "v1").unwrap();
+        for (src, dst) in backup_rotation_plan(&dir, 3) {
+            if src.exists() {
+                std::fs::rename(&src, &dst).unwrap();
+            }
+        }
+        // v3→.1，v2→.2，v1→.3（最老代覆盖，无丢失错位）
+        assert_eq!(std::fs::read_to_string(dir.join("crystal.json.1")).unwrap(), "v3");
+        assert_eq!(std::fs::read_to_string(dir.join("crystal.json.2")).unwrap(), "v2");
+        assert_eq!(std::fs::read_to_string(dir.join("crystal.json.3")).unwrap(), "v1");
+        assert!(!dir.join("crystal.json").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -82,6 +152,37 @@ use std::path::PathBuf;
 /// save() 并发 tmp 序列号（见 `CrystalCore::save`）
 static SAVE_TMP_SEQ: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(0);
+
+/// 代际快照深度（缺陷 #6 修复）：保留最近 N 代 crystal.json.{1..N}。
+pub const BACKUP_GENERATIONS: usize = 5;
+
+/// 代际轮转计划（纯函数，可测）：返回 (src, dst) 搬运序，先搬老代防覆盖。
+/// generations=0 → 空计划（不轮转）。
+pub fn backup_rotation_plan(root: &PathBuf, generations: usize) -> Vec<(PathBuf, PathBuf)> {
+    let mut plan = Vec::new();
+    if generations == 0 {
+        return plan;
+    }
+    for i in (1..=generations).rev() {
+        let src = if i == 1 {
+            root.join("crystal.json")
+        } else {
+            root.join(format!("crystal.json.{}", i - 1))
+        };
+        plan.push((src, root.join(format!("crystal.json.{i}"))));
+    }
+    plan
+}
+
+/// 加载候选链（纯函数，可测）：主 → .1..=.N → .bak（legacy 兼容）。
+pub fn load_candidates(root: &PathBuf, generations: usize) -> Vec<PathBuf> {
+    let mut out = vec![root.join("crystal.json")];
+    for i in 1..=generations {
+        out.push(root.join(format!("crystal.json.{i}")));
+    }
+    out.push(root.join("crystal.json.bak"));
+    out
+}
 
 /// 晶体核心根目录
 pub fn crystal_root() -> PathBuf {
@@ -115,22 +216,27 @@ impl CrystalCore {
         }
     }
 
-    /// 从磁盘加载（R-P0-2：主文件损坏时自动回退到 .bak 快照）
+    /// 从磁盘加载（R-P0-2：主文件损坏时按代际快照逐级回退 .1 → .N → .bak）
     pub fn load() -> Result<Self, String> {
         let root = crystal_root();
-        let path = root.join("crystal.json");
-        match std::fs::read_to_string(&path) {
-            Ok(data) => serde_json::from_str(&data)
-                .map_err(|e| format!("Failed to parse crystal core: {}", e)),
-            Err(first_err) => {
-                let bak = root.join("crystal.json.bak");
-                let data = std::fs::read_to_string(&bak).map_err(|_| {
-                    format!("Failed to read crystal core: {}", first_err)
-                })?;
-                serde_json::from_str(&data)
-                    .map_err(|e| format!("Failed to parse crystal core (.bak): {}", e))
+        let candidates = load_candidates(&root, BACKUP_GENERATIONS);
+        let mut first_err = String::from("no candidates");
+        for cand in &candidates {
+            match std::fs::read_to_string(cand) {
+                Ok(data) => match serde_json::from_str(&data) {
+                    Ok(core) => return Ok(core),
+                    Err(e) => {
+                        first_err = format!("Failed to parse crystal core ({}): {}", cand.display(), e);
+                    }
+                },
+                Err(e) => {
+                    if first_err == "no candidates" {
+                        first_err = format!("Failed to read crystal core: {e}");
+                    }
+                }
             }
         }
+        Err(first_err)
     }
 
     /// 保存到磁盘（R-P0-2：tmp + rename 原子写，旧核轮转为 .bak 快照）
@@ -148,18 +254,21 @@ impl CrystalCore {
             std::process::id(),
             SAVE_TMP_SEQ.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
         ));
-        let bak = root.join("crystal.json.bak");
         let data = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize crystal: {}", e))?;
         std::fs::write(&tmp, data)
             .map_err(|e| format!("Failed to write crystal tmp: {}", e))?;
         if path.exists() {
-            match std::fs::rename(&path, &bak) {
-                Ok(()) => {}
-                // 并发 save 时另一线程已搬走 crystal.json：快照已有，直接继续
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                Err(e) => {
-                    return Err(format!("Failed to rotate crystal backup: {}", e))
+            // 代际轮转（缺陷 #6 修复）：.N-1→.N … .1→.2，current→.1。
+            // 单 .bak 时代两次坏 save 即永失好状态；5 代可扛连续坏写。
+            // 缺失代际忽略（首跑）；最老代直接覆盖。
+            for (src, dst) in backup_rotation_plan(&root, BACKUP_GENERATIONS) {
+                match std::fs::rename(&src, &dst) {
+                    Ok(()) => {}
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(e) => {
+                        return Err(format!("Failed to rotate crystal backup: {}", e))
+                    }
                 }
             }
         }
