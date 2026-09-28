@@ -28,6 +28,16 @@
 | 2 | **禁多窗口并发 `--all-targets`/`--test`** | AGENTS.md 并行公约；16 GB 机器 |
 | 3 | **禁 `git add -A` / `git reset --hard`** | 主树含他窗 961 个未提交改动；`handoff-neobot-absorption` 第 1 条也是这么写的 |
 
+### 2.0 ⭐ 复核纪律（本会话两次翻车换来的）
+
+1. **任何「某仓是死代码 / 是 stub / 是孤儿」的断言**，动手前先打开
+   `docs/architecture/absorption-sources/repos.csv` 确认该仓确实在吸收清单内，
+   再用 **构造点**（`Type::new(` 调用点）复核。**本会话凭旧文档删过一次活代码** ——
+   `nt_core_gate/nt_tool_registry.rs` 被标 stub，实测有活消费者。
+2. **任何许可判断**，先查 `absorption-sources/LICENSES.md`；表里没有就自己跑
+   `curl -s https://raw.githubusercontent.com/<owner>/<repo>/HEAD/LICENSE | head -4`。
+3. **不要凭印象补全 `owner/repo`** —— 本会话因此在许可台账里写出过 3 个不存在的仓库。
+
 **⇒ 第一件事：确认无他窗在写。**
 
 ```bash
@@ -189,7 +199,8 @@ git checkout -- <具体文件>                # 只回滚自己的
 
 | 文档 | 作用 |
 |---|---|
-| `docs/architecture/EVOLUTION-ROADMAP-CODE-NODES-2026-09-28.md` | 正典路线图（109 仓 + trendshift 385 仓 + 5 arXiv） |
+| **`docs/architecture/absorption-sources/`** | **吸收源清单（483 仓 CSV + 436 条榜单排名 + 许可台账 + 5 论文）** ⭐ 复核任何结论都从这开始 |
+| `docs/architecture/EVOLUTION-ROADMAP-CODE-NODES-2026-09-28.md` | 正典路线图（483 仓 + 5 arXiv） |
 | `docs/architecture/DIR-REMEDY-2026-09-28.md` | 目录架构解法（层归属显式化，不搬目录） |
 | `docs/architecture/OWNERSHIP.md` | 唯一裁决表（**以构造点取证**，含 §9 测量台事故） |
 | `docs/architecture/BATCH-FIX-CHECKLIST-2026-09-28.md` | A/B/C/D/E 任务清单 + 三道闸 + 回滚 |
