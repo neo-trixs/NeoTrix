@@ -74,17 +74,19 @@ cargo build -p neotrix                  # 完整构建
   - 历史教训：22:52 之前本文长期写着"当前 0 命中"，而实际是 12 条 —— **陈旧门记录会让下一个 agent 去"修"正确代码，比没有门更危险**（见 R-SCAN-3）
 - sidecar 按需：`sh scripts/ops/nt_sidecar.sh {start|stop|status}` — 用完即停
 - 目录/命名门（2026-09-28 新增，均 bash，无需 cargo）：
-  - `bash scripts/check-layer-deps.sh --strict` → **exit 0**，**101 known**
-    （= 92 条 `l*_` 层 + 10 条 `neotrix/` 第二棵树 − 1 条已修）。
+  - `bash scripts/check-layer-deps.sh --strict` → **exit 0**，**80 known**
     **测量台：`git worktree add --detach HEAD` 的干净检出**。
-    - **2026-09-28 20:0x 实测 101**（`.worktrees/ratchet` 干净检出 + `71e1c412`；
-      首次**真降**：`evolution_daemon.rs` 的 L5→L6 改走 `l1_facade`）。
-      棘轮**只向下**，`PASS 0 new`、RC=0。
-    - ⛔ 此前记录的「94」是**主工作树（脏）**测量；「102」是 `bdf1e9f1` 的干净检出值，
-      现已被 101 取代。**照抄旧值会让 CI 以 `FAIL: N new` 红**（见 L8）。
-    - ⚠️ 修 101 条里的绝大多数**需要编译器**（改 Rust import），不是纯 bash 就能收的：
-      84 个单违规叶子中**只有 1 个**是「facade 已 `pub use` 出精确路径」的纯 import 重写，
-      其余要先给 facade 加导出且易同名冲突 ⇒ **无编译器时勿盲做**（见 L12）。
+    - **2026-09-28 20:5x 实测 80**（车道 `fix/bitemporal-and-layer-ratchet`；
+      棘轮 **101 → 92 → 89 → 80**，`PASS 0 new`、RC=0；**L3/L4/L5 三层已清**）。
+    - ⛔ 历史值依次为 94（脏树）→ 102（`bdf1e9f1` 干净检出）→ 101/92/89（棘轮）。
+      **照抄旧值会让 CI 以 `FAIL: N new` 红**（见 L8）。
+    - **剩余 80 条 = L1 36 文件/70 引用 + L2 30 文件/43 引用 + 2 条不可改道误报。**
+    - ⚠️ **改跨层引用的唯一合法通道是「消费方自己那层」的 facade**：
+      走**目标层** facade **无效**（路径里仍含层名，门照样报）。
+    - ⚠️ 门**分不清字符串字面量与代码引用** ⇒ 2 条误报改道消不掉、
+      删基线又会让 CI 红 ⇒ **留在基线 + 记 file:line**（见 L14）。
+    - ⚠️ 批量改路径时**提取脚本必须与门同口径**（都剥注释/字符串），
+      并在改后**自查 diff 有无改到注释行**（改注释也能让门变绿，见 L13）。
   - `bash scripts/check-naming.sh` → advisory，打印 **1,646** 个无 `nt_` 前缀文件
     （**规约 vs 现实差 1,646 ⇒ 规约无约束力**）。干净检出实测；此前的 1,644 同为脏树值
   - 层归属真源：`.neotrix/layer-map.json`（**`bdf1e9f1` 已入库**）；裁决表：`docs/architecture/OWNERSHIP.md`（随车道并入本提交入库）
