@@ -229,7 +229,12 @@ mod tests {
 
     #[test]
     fn test_auto_heal_with_healthy_system() {
-        let monitor = ComponentMonitor::new();
+        // 2026-09-28：原用 `ComponentMonitor::new()`（含 memory/cpu/disk 三个
+        // **真实 sys-info** 组件）。宿主一忙（`--test-threads=4` 全量跑时必然如此）
+        // 它们就翻成 Degraded/Critical ⇒ `auto_heal` 凭空产出修复 ⇒ 本测试时绿时红，
+        // 与被测逻辑无关。改用两个**硬编码 Healthy** 的组件（network/agent_pool），
+        // 断言"健康系统无修复"的本意不变，但不再依赖宿主健康度。
+        let monitor = ComponentMonitor::with_components(["network", "agent_pool"]);
         let repair = AutoRepair::new(monitor);
         let results = repair.auto_heal();
         assert!(results.is_empty());
@@ -280,9 +285,12 @@ mod tests {
 
     #[test]
     fn test_auto_heal_detects_multiple_failures() {
-        let mut monitor = ComponentMonitor::new();
-        monitor.register_component("bogus_a");
-        monitor.register_component("bogus_b");
+        // 2026-09-28：原用 `ComponentMonitor::new()` 再 register 两个 bogus，断言
+        // `results.len() == 2`。但 `new()` 的 5 个真实组件里任一在宿主繁忙时越阈值，
+        // 就会多出第 3 条修复（实测 left:3 right:2）⇒ flaky。
+        // 改为**只**用两个未知名：未知名走 `_ =>` 分支恒 `Critical`
+        // （`exists: 0.0`），于是"恰好 2 个故障"是确定的，且不碰宿主。
+        let monitor = ComponentMonitor::with_components(["bogus_a", "bogus_b"]);
         let repair = AutoRepair::new(monitor);
         let results = repair.auto_heal();
         assert_eq!(results.len(), 2);

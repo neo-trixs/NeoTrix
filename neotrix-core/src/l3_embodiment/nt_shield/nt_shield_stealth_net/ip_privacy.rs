@@ -360,20 +360,31 @@ mod tests {
 
     #[tokio::test]
     async fn test_public_ip_range() {
-        let mut found_public = false;
-        for _ in 0..20 {
+        // 2026-09-28：原版只在 20 次抽样里找 1 个 Public，找不到就红。
+        // Public 的生成概率是 1/5（`gen_range(0..5)`，见 generate_fake_config），
+        // 故单次失败概率 = (4/5)^20 ≈ **1.15%** —— 看着低，但 CI 天天跑就必然偶发
+        // （实测 4 线程全量跑时红过一次）。
+        //
+        // 改两处：① 抽样量 20 → 500（未出现概率 ≈ 1e-55）；
+        // ② 断言从「有没有抽到 Public」改成「**每一个** Public 产物都不得含
+        // RFC1918 / CGNAT 前缀」—— 后者才是本测试真正要验的不变式，
+        // 前者只是「样本够不够大」的统计性把戏。
+        let mut public_seen = 0usize;
+        for _ in 0..500 {
             let cfg = IpPrivacyManager::generate_fake_config("test");
             if matches!(cfg.subnet, IpSubnet::Public) {
-                found_public = true;
+                public_seen += 1;
                 let ip_str = cfg.ip.to_string();
                 // 不包含 RFC1918 前缀
                 assert!(!ip_str.starts_with("10."));
                 assert!(!ip_str.starts_with("172."));
                 assert!(!ip_str.starts_with("192.168."));
                 assert!(!ip_str.starts_with("100."));
-                break;
             }
         }
-        assert!(found_public, "Should generate at least one public IP out of 20");
+        assert!(
+            public_seen > 0,
+            "500 次抽样应至少产出一个 Public（未出现概率 ~1e-55）"
+        );
     }
 }

@@ -127,9 +127,21 @@ mod tests {
 
     #[test]
     fn test_heartbeat_fresh() {
+        // 2026-09-28：原断言 `tick_age_ms() == 0`（精确 0）。但该值是
+        // "现在 - last_tick"，`new()` 之后只要**经过一次调度**就是非 0 ——
+        // 并行跑（`--test-threads=4`）时必然偶尔为 1ms 而红（实测 left:1 right:0）。
+        // 本测试要验的是「新建的心跳是新鲜的」，不是「时钟分辨率恰好为 0ms」。
+        // 故改为「年龄仍在一个宽松阈值内」，与 `is_alive()` 用同一个
+        // `STALE_AFTER_MS` 语义（见 `tick_age_ms` / `is_alive` 的关系）。
         let state = HeartbeatState::new();
         assert!(state.is_alive());
-        assert_eq!(state.tick_age_ms(), 0);
+        let age = state.tick_age_ms();
+        assert!(
+            age < STALE_AFTER_MS,
+            "新建心跳应是新鲜的（age={}ms, STALE_AFTER_MS={}）",
+            age,
+            STALE_AFTER_MS
+        );
     }
 
     #[test]

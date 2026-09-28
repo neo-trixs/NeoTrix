@@ -93,6 +93,37 @@ impl Default for ComponentMonitor {
 }
 
 impl ComponentMonitor {
+    /// 用**显式指定**的组件集创建监控器。
+    ///
+    /// # 为什么需要这个构造函数
+    ///
+    /// `new()` 的 5 个内置组件里，`memory` / `cpu` / `disk` 走的是**真实
+    /// sys-info**（`sys_info_used_memory_pct` / `sys_info_cpu_load` /
+    /// `sys_info_disk_pct`）。宿主一忙（尤其是 `--test-threads=4` 全量跑时），
+    /// 这些读数就会越过 `>0.90` / `>0.95` 的阈值翻成 Critical ⇒
+    /// **任何依赖"宿主是健康的"的测试在并行下必然 flake**。
+    /// （2026-09-28 实测：`auto_repair` 的两条测试正是这样时绿时红，
+    /// 与被测逻辑无关；本机内存本就常在 75%~90% 区间。）
+    ///
+    /// 需要确定性时用本构造函数显式给出组件集：
+    /// - `"network"` / `"agent_pool"` 的指标是**硬编码**的（恒 Healthy），不碰宿主；
+    /// - 任何**未知名**走 `_ =>` 分支，恒 `Critical`（`exists: 0.0`），
+    ///   可用来构造确定的"不健康"集。
+    pub fn with_components<I, S>(components: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let mut seen: Vec<String> = Vec::new();
+        for c in components {
+            let c = c.into();
+            if !seen.contains(&c) {
+                seen.push(c);
+            }
+        }
+        Self { components: seen }
+    }
+
     /// 创建内置 5 组件监控器。
     pub fn new() -> Self {
         Self {
