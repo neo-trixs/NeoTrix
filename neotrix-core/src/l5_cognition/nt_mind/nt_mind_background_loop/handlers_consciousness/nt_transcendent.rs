@@ -13,17 +13,17 @@ impl BackgroundLoopHandle {
             Ok(j) => j,
             Err(_) => return, // 能力网未初始化 → 静默跳过
         };
-        let (infos, _problems): (Vec<_>, Vec<_>) = <crate::l6_meta::memory::evolution_harness::EvolutionHarness as EvolutionHarnessApi>::harness_infos_from_registry_export(&json);
+        let (infos, _problems): (Vec<_>, Vec<_>) = <crate::l5_cognition::l1_facade::EvolutionHarness as EvolutionHarnessApi>::harness_infos_from_registry_export(&json);
         if infos.is_empty() {
             return;
         }
         let snapshot_json = serde_json::to_value(crate::l5_cognition::consciousness_core::status())
             .unwrap_or(serde_json::json!({}));
-        let mut harness = <crate::l6_meta::memory::evolution_harness::EvolutionHarness as EvolutionHarnessApi>::new_harness();
+        let mut harness = <crate::l5_cognition::l1_facade::EvolutionHarness as EvolutionHarnessApi>::new_harness();
         let report = harness.harness_run_cycle(&snapshot_json, &infos);
         let persisted = harness.harness_persist_suggestions(kb, &report);
         // 高共振建议 → goal_loop (超越层建议真实驱动行为, 而非仅日志)
-        let actionable = <crate::l6_meta::memory::evolution_harness::EvolutionHarness as EvolutionHarnessApi>::harness_actionable_suggestions(&report, 0.7);
+        let actionable = <crate::l5_cognition::l1_facade::EvolutionHarness as EvolutionHarnessApi>::harness_actionable_suggestions(&report, 0.7);
         let goal_count = actionable.len();
         if goal_count > 0 {
             if let Ok(mut brain) = self.brain.try_write() {

@@ -391,7 +391,7 @@ impl BrainStage for SelfReviewStage {
         // 单元测试不打全树 self-review 扫描 (run_all ~50 次全树扫描, 单次 ~6s)。
         // 测试验证循环机制; 真实审查留待集成测试/生产路径 (与 cfg!(test) 隔离纪律一致)。
         let report = if cfg!(test) {
-            crate::l6_meta::nt_core_self_review::SelfReviewReport {
+            crate::l5_cognition::l1_facade::SelfReviewReport {
                 findings: Vec::new(),
                 passed: 1,
                 failed: 0,

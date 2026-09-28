@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::l5_cognition::nt_core_gate::{GateDecision, GuardrailReport, PanelVerdict};
-use crate::l6_meta::nt_core_self_review::SelfReviewReport;
+use crate::l5_cognition::l1_facade::SelfReviewReport;
 use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{PerspectiveLens, ReasoningTaxonomy};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

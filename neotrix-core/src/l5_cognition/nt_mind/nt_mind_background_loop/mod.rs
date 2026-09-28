@@ -8,7 +8,7 @@ use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
 use crate::l5_cognition::nt_mind::nt_mind::knowledge::knowledge_chain::KnowledgeChain;
 use crate::l5_cognition::nt_mind::nt_mind::goal_loop::GoalLoop;
 use crate::l5_cognition::nt_mind::nt_mind::distillation::MetaCognitionBridge;
-use crate::l6_meta::healing::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
+use crate::l5_cognition::l1_facade::ConsciousnessGoldStandard;
 use crate::l5_cognition::nt_mind::nt_mind::consciousness::bbrain_monitor::BMonitor;
 use self::always_on::AlwaysOnEngine;
 use crate::l5_cognition::nt_mind::foundation::cleanup_engine::CleanupEngine;
@@ -20,7 +20,7 @@ use crate::l5_cognition::nt_mind::nt_mind::exploration_pipeline::ExplorationPipe
 use crate::l1_action::nt_act::nt_act_voice::VoiceInput;
 use crate::l5_cognition::nt_mind::foundation::l1_wrappers::DistillationEngineWrapper;
 use crate::l5_cognition::nt_mind::nt_mind::self_evolver::SelfEvolver;
-use crate::l6_meta::nt_core_scheduler::SchedulerEngine;
+use crate::l5_cognition::l1_facade::SchedulerEngine;
 use crate::l5_cognition::nt_mind::nt_mind::curiosity_drive::CuriosityDrive;
 use crate::l5_cognition::nt_mind::nt_mind::knowledge_aging::KnowledgeAging;
 use crate::l5_cognition::nt_mind::nt_mind::auto_crystallizer::AutoCrystallizer;
@@ -234,7 +234,7 @@ mod tests {
         // tree.trunk.coherence 应非零 (ConsciousnessMonitor compute_coherence 起步 0.1),
         // 且 GWT resonance 激活逻辑在 handle_consciousness_tick 生效。
         // 直接验证链路源头: observe() 产生非零 coherence, 注入 tree 后非零。
-use crate::l6_meta::healing::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
+use crate::l5_cognition::l1_facade::ConsciousnessGoldStandard;
 use crate::l5_cognition::l1_facade::ConsciousnessMonitor;
         use crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree;
         let mut monitor = ConsciousnessMonitor::new();
