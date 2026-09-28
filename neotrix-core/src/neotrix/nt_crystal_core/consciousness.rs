@@ -543,7 +543,22 @@ impl CrystalConsciousness {
 
     /// 关键词抽取：按空白与中英标点切分，去停用词与单字符 token
     /// （crate 内共享：觉醒循环的新颖度验证复用同一分词口径）
-    pub(crate) fn keywords(text: &str) -> Vec<String> {
+    ///
+    /// 2026-09-28 由 `pub(crate)` 提为 `pub`：`src/bin/nt_keywords.rs` 需要
+    /// 把这个口径导出给 `scripts/ops/nt_jev_live_eval.py`（其原依赖
+    /// `nt_verify_sim.keywords` 已随 2bbed32c 删除，脚本断链跑不起来）。
+    ///
+    /// **为何导出而不是让 Python 重写一份**：
+    /// - 本函数是晶体核心的**权威分词**，带 `strip_src_tag` 前处理 + 停用词表 +
+    ///   单字符过滤，且同一口径被觉醒循环的新颖度验证复用；Python 重写会立刻
+    ///   产生第二套分词（「第二份真源会漂」，见 R-DISK-7 / R-SCAN-3）。
+    /// - crate 内另有 3 个同名 `keywords`（`nt_crystal_task_fusion.rs:57`、
+    ///   `nt_shared_mind.rs:22,173`）且**实现各不相同** ⇒「哪个权威」本身
+    ///   就是歧义源，公开本函数可让调用方锚定唯一口径。
+    ///
+    /// ⚠️ 改本函数的口径会同时改变晶体核心的检索分词与外部评测口径 ——
+    ///    这是**故意的**：它们本就该是同一个东西。
+    pub fn keywords(text: &str) -> Vec<String> {
         Self::strip_src_tag(text).split(|c: char| {
             c.is_whitespace() || "，。、；：？！…—·,. ;:?!()（）「」『』\"'【】《》".contains(c)
         })

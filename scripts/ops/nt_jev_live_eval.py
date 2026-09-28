@@ -22,8 +22,12 @@ RFC §v3.2 那个「词法判分器判别力天花板 ≈ 0.02」的结论，是
 
 ## 纪律
 
-- 复用 `nt_verify_sim.keywords`（**不重写**）—— 必须量的是核心真正在用的那个切分
-  函数，重写一份就变成在量另一个东西。
+- 复用核心的权威分词（**不重写**）—— 必须量的是核心真正在用的那个切分函数，
+  重写一份就变成在量另一个东西。
+  2026-09-28 起：`nt_verify_sim` 已随 2bbed32c 删除，改调 Rust 导出点
+  `cargo build -p neotrix --bin nt_keywords`（内部即
+  `CrystalConsciousness::keywords`，consciousness.rs:546）。
+  **首次使用需先 build**（见下方 keywords() 的报错指引）。
 - 只读活库，不写。
 - 截断处理：`候选` 每项截到 44 字符而 `标答` 截到 90，故标答↔候选用**前缀**匹配
   对齐，不是等值匹配；对不齐的条目**丢弃并计数**（不静默）。
@@ -40,7 +44,49 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from nt_verify_sim import keywords  # noqa: E402
+
+# 2026-09-28 修断链依赖：本脚本原先 `from nt_verify_sim import keywords`，
+# 而该模块已随 2bbed32c 删除 ⇒ **脚本当前完全跑不起来**（ImportError）。
+#
+# 修法（遵守本文件「不重写」纪律）：改为调 Rust 侧新导出的 `nt_keywords` bin，
+# 它直接调用晶体核心的权威实现 `CrystalConsciousness::keywords`
+# （neotrix/nt_crystal_core/consciousness.rs:546）。**不在 Python 里重写分词** ——
+# 重写会立刻产生第二套口径，而「第二份真源会漂」是本仓反复治的病。
+#
+# 代价：首次调用要 cargo build（可能数分钟）。用 --selftest 预热。
+_NT_KEYWORDS_BIN = None
+
+
+def _keywords_bin():
+    """定位 nt_keywords 可执行文件；找不到时给出可执行的修复指引。"""
+    global _NT_KEYWORDS_BIN
+    if _NT_KEYWORDS_BIN is not None:
+        return _NT_KEYWORDS_BIN
+    for cand in (
+        os.path.expanduser("~/Downloads/neotrix/target/debug/nt_keywords"),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__)))), "target/debug/nt_keywords"),
+    ):
+        if os.path.isfile(cand) and os.access(cand, os.X_OK):
+            _NT_KEYWORDS_BIN = cand
+            return _NT_KEYWORDS_BIN
+    sys.exit(
+        "jev-eval: 找不到 nt_keywords 可执行文件。\n"
+        "  修法: cargo build -p neotrix --bin nt_keywords\n"
+        "  （它是晶体核心权威分词的导出点，勿改为在 Python 里重写分词）"
+    )
+
+
+def keywords(text):
+    """调 Rust 权威分词。批量喂（一行一段文本）避免逐条起进程。"""
+    import subprocess
+    proc = subprocess.run(
+        [_keywords_bin()], input=text + "\n",
+        capture_output=True, text=True, timeout=60,
+    )
+    if proc.returncode != 0:
+        sys.exit(f"jev-eval: nt_keywords 失败: {proc.stderr.strip()}")
+    return json.loads(proc.stdout.strip() or "[]")
 
 COCOONS = os.path.expanduser("~/.neotrix/crystal_core/cocoons.json")
 DOMAIN = "jev-choice"
