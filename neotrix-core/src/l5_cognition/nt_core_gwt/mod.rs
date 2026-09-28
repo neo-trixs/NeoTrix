@@ -8,7 +8,6 @@ pub mod ctm_verifier;
 pub mod independence;
 pub mod instruction_follow;
 pub mod inner_speech;
-pub mod load_balancer;
 pub mod meta_workspace;
 pub mod modality_router;
 pub mod mode_router;
