@@ -418,7 +418,9 @@ do not look like a full prefix match"）—— **工具集身份是缓存身份�
 （先例：`agent.rs:506` 的 `TEST_MCP_SERIAL`）。当时因 `cipher.rs` 属他窗在制品未做。
 
 
-## ✅ 大幅收口 · 单元测试 57 → 8 例失败（2026-09-28）
+<!-- 以下两节的标题已被本节取代, 仅保留其成因分析 -->
+
+### [已被上节取代] 中途快照 · 57 → 8 例失败（2026-09-28）
 
 修好构建后测试才第一次能跑, 暴露出 57 条失败。逐个诊断后**消除 49 条**, 余 8 条。
 
@@ -463,7 +465,9 @@ do not look like a full prefix match"）—— **工具集身份是缓存身份�
 CI 继续跑**建议模式不拦** —— 会 flap 的门只会训练人忽略它。
 
 
-## 已知债 · 单元测试 57 例失败（2026-09-28 实测，**未解决**）
+### [已被上节取代] 起点记录 · 57 例失败（2026-09-28 实测）
+> ⚠️ 本节结论**已过时**：57 例已于本轮全部处理到 3 例，账本见上节。
+> 此处仅保留**起点数据与成因分析**作为对照，勿据本节判断当前状态。
 
 修好构建后测试终于能跑：`cargo test --lib -p neotrix` → **12093 passed / 57 failed**
 （38 ignored，约 200s）。**这 57 条此前不可见** —— HEAD 长期编译不过，测试从未有过
@@ -639,7 +643,7 @@ ID 指向不存在的 `ocr` 模块。实为 `nt_file_ability.rs:70` 的 `pub use
 | # | 任务 | 支脉节点 | 状态 |
 |---|---|---|---|
 | 4.1 | **JEV 四件套**：场景指纹 / 硬 `call_budget` / 过期 / 非阻塞 worker + 三路置信门 | ⚠️ **前提证伪，推迟**（2026-09-28）。三原语已忠实建模(`types.rs:85/:146/:166/:189`)+ stale 机制齐 + 113 测试全绿，**但三个「决策引擎」全无生产消费者**：`crates/neotrix-decision-engine/` 仅自身测试(gateway 再导出在**无人启用**的 optional feature 后) · `nt_decision_engine.rs:351` 的 `new()` 仅 `:611/:620/:644` 三处**全在 `#[test]` 内** · `nt_mind/decision_engine/` 的 `WeightedScorer`/`DecisionRecommender` **外部引用 0**。**先装饰=造第四份死代码**。依据 `DIR-AUDIT §六`；新欠条「JEV 决策面违反 R-P79 未接生产」 | ⛔ |
-| 4.2 | **"未解析"建模为一等状态**（`epistemic: exact \| lower-bound`） | `nt_core_capability_tree/src/node.rs` · 雏形已在 `registry.rs:15-18 MaturityFinding{claimed,supported}` | ⬜ |
+| 4.2 | **"未解析"建模为一等状态**（`epistemic: exact \| lower-bound`） | `nt_core_capability_tree/src/node.rs` · 雏形已在 `registry.rs:15-18 MaturityFinding{claimed,supported}` | ✅ |。**2026-09-28 已完成**（`4c5f6307`）：新增 `epistemic::Epistemic{Exact\|LowerBound}` 并挂到 `MaturityFinding`（`registry.rs`），Default=**LowerBound**(fail-closed)，只有节点显式认领 `metadata.evidence_exhaustive` 才 Exact（系统无法证明「没有更多证据」，只能采信认领，故不做推断）；`cli.rs` 输出行加 `[exact\|lower-bound(未解析)]` 让未解析在 CI 可见。⚠️ 干净检出上该 crate 当时编译不过，故这项的验证是在脏树跑的——已由 `9bbc9dc2` 修复，建议下一轮在干净检出上复跑 `audit-maturity --strict` 确认 |
 | 4.3 | **自治循环 git 化 + 固定墙钟预算**（`results.tsv` 5 列，变好推进/变差 `git reset`） | `Makefile`（现有目标 `run:4` `project-locate:151`）· 反馈判据 `experience_tree/mod.rs:403 feedback()` | ⬜ |
 | 4.4 | **覆盖率账本状态机**（hunters 不能写自己的覆盖率） | `l3_embodiment/nt_shield/nt_shield_audit/`（10 文件）· `l6_meta/nt_core_self/self_audit.rs` · 基线 `scripts/truth-surface-baseline.txt`（现 0 条 ✅） | ⬜ |
 
