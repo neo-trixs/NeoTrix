@@ -264,3 +264,6 @@ neotrix-core/config/crystal.toml
 !crates/neotrix-decision-engine/examples/**
 !crates/nt-core-capability-tree/tests/
 !crates/nt-core-capability-tree/tests/**
+
+# worktree 兜底 patch（R-DISK-5，临时产物，确认已提交/已弃方可删）
+.neotrix/worktree-salvage/
