@@ -334,3 +334,46 @@ unused import」。**动手前复核那一行，内容已变、mtime 是 42 秒�
 `neotrix-core/src/nt_mcp_stdio_session.rs` 与 `nt_qwen_mm_manifests.rs`
 —— 两个都是他窗 `??` 未提交的新文件，而 `agent.rs`/`lib.rs` 正在引用它们。
 该门的设计正是捕捉这个（"已提交代码引用了未入库文件"），属**如实报告**。
+
+## 11. 收尾：死引用清零 + 经验吸收（2026-09-29 凌晨）
+
+### 11.1 死引用 6 条清零（`0daee35d`）
+`nt_mapgen.py` ROOT_AREAS：`src-tauri/{src,frontend,frontend/src}`（5c02e738
+归档）、`games`/`fuzz`（2bbed32c 归档，现居 neotrix-archive/）、**`ntos/src`
+（该目录从来不存在** —— 代码里 "ntos" 只是普通词）。
+`check-truth-surface.sh:43`：`apps`（本会话移除）+ `src-tauri/src`。
+
+**取证澄清（勿夸大）**：`nt_mapgen.py` 的 `ROOT_AREAS` 只是**分类标签表**，
+真正遍历是 `os.walk(root)` + `.` 跳过 SKIP_DIRS，且已有 `"other"` fallback
+⇒ 死引用影响的是**area 标注**，不是"生成不了图"。
+
+### 11.2 工具自身的两处盲区（本轮最重要的发现）
+用**注入法**实测发现——「用它防死引用」这件事本身有盲区：
+① `KNOWN_ROOTS` 过滤器把**新死引用一起滤掉**（注入 `definitely-gone-dir` 不报）
+② `PATH_RE` **要求路径含 `/`** ⇒ 单段扫描根（games/fuzz/ntos 都是单段！）连
+候选都进不来 —— 而本仓死引用**恰好全是单段**。
+
+修法：三级分档（现存 / 硬缺失 / 待确认，只有硬缺失进退出码）+ 二元组首段扫描。
+**调三轮才既不漏又不吵**：裸扫二元组 24 噪声 → 限「≥4 字符无扩展名」9 噪声
+→ 9 条全是固定项逐条登记豁免 ⇒ **基线 0 噪声，注入两种形态各抓到 1 条**。
+
+取舍说明：「待确认」不进退出码是刻意的 —— 宁可多报一条 `?`，
+也不让门因噪声被人 `--no-verify` 绕过。**门一旦被习惯性绕过就等于没有门。**
+
+### 11.3 经验吸收（`71c55dac`）
+`docs/architecture/LESSONS-20260928-verification-must-be-executable.md`：
+9 次「结论与实测矛盾」的共同根因 —— **没有一次是因为想得不认真**，
+全部因为验证只存在于叙述中。9 条按「症状→根因→机械化」排列。
+元规则：**「把『我验证了』变成可检查的记录，而不是可信赖的声明。」**
+
+### 11.4 收工自查（§8 更新）
+- `nt_worktree_gate.sh check`：**worktree 1 个**（ratchet），脏文件 **0**
+  （此前 5 处他窗已自行提交），近 3h 有活动 ⇒ 他窗活跃，**不碰**
+- 本会话新建 worktree：**0 个**。临时验证台 `/tmp/nt-verify-` `/tmp/nt-v2-`
+  均已 `worktree remove` + `prune`
+- 主仓未提交 21 项：**全部为他窗 WIP**（multimodal 方向：QWEN-MM manifests
+  / nt_mcp_stdio_session / skills/nt_multimodal / check-capability-manifests.sh
+  / 9 个文档）。**本会话零产物留在工作区**
+- 门：layer-deps 101known/0new · truth-surface EMPTY/UNDECLARED/TRACKED 全 0
+  （UNCOMMITTED_DEP=2 是他窗新文件未入库，门如实报告）· find 31/31 ·
+  manifest 5/5 · scan-surface 21/21 · lock-audit 0 · 全绿
