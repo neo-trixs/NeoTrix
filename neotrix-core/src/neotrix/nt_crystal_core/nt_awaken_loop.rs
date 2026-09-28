@@ -554,8 +554,21 @@ mod tests {
     #[test]
     fn test_cycle_end_to_end_all_chosen() {
         let mut c = CrystalConsciousness::new("t");
-        for i in 0..4 {
-            c.remember(format!("事实{i}"), MemoryType::Fact, "d", 0.8);
+        // 夹具前提：每轮都必须落在**有 ≥3 条成员**的域上。
+        // `propose_domain` 按 (访问次数少者, 成员多者) 轮转，而每轮 `reason()`
+        // 会**新造一条属于新域的结论**；原夹具 4 条全在 "d"，于是第 2 轮就轮转到
+        // 那个只有 1 条成员的结论域 ⇒ `domain_fallback` 只回 1 条前提 ⇒
+        // `verify_robust` 因 `len() < 2` 硬拒（单前提「链」不算链）⇒ chosen 2≠3。
+        // 铺 3 个域 × 4 条，轮转落点恒有 ≥3 条成员。
+        for d in 0..3 {
+            for i in 0..4 {
+                c.remember(
+                    format!("域{d}事实{i}"),
+                    MemoryType::Fact,
+                    format!("d{d}"),
+                    0.8,
+                );
+            }
         }
         let mut core = CrystalCore::new("t");
         let mut lp = NtAwakenLoop::new();
