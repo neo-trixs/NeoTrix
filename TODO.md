@@ -188,6 +188,15 @@ do not look like a full prefix match"）—— **工具集身份是缓存身份�
 `(qname, qtype)` —— 需先解析命令提取二元组，再调 `verify_query`。命令解析本身是
 注入面，写测试时必须覆盖 `dig @1.1.1.1 TXT x` / `nslookup -type=TXT` 等变体。
 
+## 已知债 · 外部吸收的 JEV 决策面违反 R-P79（2026-09-28 新发现）
+
+三决策引擎建模完整、测试全绿，**却无一条接进生产决策点**（明细见
+`DIR-AUDIT-2026-09-27.md` §六）。这是 R-P79（外部技术必须同会话接到生产可用）
+的未清偿项：**先接线，后装饰**，故 4.1 标 ⛔ 而非 ✅。
+
+**附带**：`check-truth-surface.sh --strict` 在主工作树报 exit=1 会被误读成 CI 红，
+**干净 HEAD 实测 exit=0**。本地噪音，暂不修（避免动他窗在写的文件）。
+
 ## 已知债 · 主 CI workflow 曾无法解析（2026-09-27 修复）
 
 `.github/workflows/ci.yml` **在 HEAD 就是非法 YAML**：`Truth-surface gate (ratchet: blocks ...)`
@@ -267,7 +276,7 @@ ID 指向不存在的 `ocr` 模块。实为 `nt_file_ability.rs:70` 的 `pub use
 
 | # | 任务 | 支脉节点 | 状态 |
 |---|---|---|---|
-| 4.1 | **JEV 四件套**：场景指纹 / 硬 `call_budget` / 过期 / 非阻塞 worker + 三路置信门 | 三原语**已忠实建模**：`neotrix-decision-engine/src/types.rs:85 QuestionType` `:146 NoulAnswer` `:166 ChoiceAnswer` `:189 ScoreAnswer`；后门 `engine.rs`/`router.rs`；已有 stale 机制 `crates/neotrix-neobot/src/nt_stale_guard.rs` | ⬜ |
+| 4.1 | **JEV 四件套**：场景指纹 / 硬 `call_budget` / 过期 / 非阻塞 worker + 三路置信门 | ⚠️ **前提证伪，推迟**（2026-09-28）。三原语已忠实建模(`types.rs:85/:146/:166/:189`)+ stale 机制齐 + 113 测试全绿，**但三个「决策引擎」全无生产消费者**：`crates/neotrix-decision-engine/` 仅自身测试(gateway 再导出在**无人启用**的 optional feature 后) · `nt_decision_engine.rs:351` 的 `new()` 仅 `:611/:620/:644` 三处**全在 `#[test]` 内** · `nt_mind/decision_engine/` 的 `WeightedScorer`/`DecisionRecommender` **外部引用 0**。**先装饰=造第四份死代码**。依据 `DIR-AUDIT §六`；新欠条「JEV 决策面违反 R-P79 未接生产」 | ⛔ |
 | 4.2 | **"未解析"建模为一等状态**（`epistemic: exact \| lower-bound`） | `nt_core_capability_tree/src/node.rs` · 雏形已在 `registry.rs:15-18 MaturityFinding{claimed,supported}` | ⬜ |
 | 4.3 | **自治循环 git 化 + 固定墙钟预算**（`results.tsv` 5 列，变好推进/变差 `git reset`） | `Makefile`（现有目标 `run:4` `project-locate:151`）· 反馈判据 `experience_tree/mod.rs:403 feedback()` | ⬜ |
 | 4.4 | **覆盖率账本状态机**（hunters 不能写自己的覆盖率） | `l3_embodiment/nt_shield/nt_shield_audit/`（10 文件）· `l6_meta/nt_core_self/self_audit.rs` · 基线 `scripts/truth-surface-baseline.txt`（现 0 条 ✅） | ⬜ |
