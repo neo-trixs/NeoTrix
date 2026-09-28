@@ -85,7 +85,6 @@ l6_meta	neotrix-core/src/l5_cognition/nt_core/capability/l7_l1_bridge.rs
 l6_meta	neotrix-core/src/l5_cognition/nt_core_arch_fitness.rs
 l6_meta	neotrix-core/src/l5_cognition/nt_core_cad_consciousness.rs
 l6_meta	neotrix-core/src/l5_cognition/nt_core_orchestration_failure_taxonomy.rs
-l6_meta	neotrix-core/src/l5_cognition/nt_mind/evolution/evolution_daemon.rs
 l6_meta	neotrix-core/src/l5_cognition/nt_mind/nt_mind/meta_panel/engine.rs
 l6_meta	neotrix-core/src/l5_cognition/nt_mind/nt_mind/meta_panel/types.rs
 l6_meta	neotrix-core/src/l5_cognition/nt_mind/nt_mind/reason/reasoning_engine/engine_core/nt_builders.rs
