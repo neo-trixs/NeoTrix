@@ -46,14 +46,43 @@ bash scripts/ops/nt_weights_manifest.sh verify
 | `Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-Q6_K.gguf` | `HauhauCS/Qwen3.5-4B-Uncensored-HauhauCS-Aggressive` | `c09cdbcdb1fefad6d335809d445621b5f5ba0c6e` | **SHA-256 与上游 LFS oid 逐字节一致** |
 | `mmproj-Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-BF16.gguf` | 同上 | 同上 | **SHA-256 与上游 LFS oid 逐字节一致** |
 | `minimind-3/model.safetensors` | `jingyaogong/minimind-3` | `f92512d4cd6142fa9acc0d6022375049a8974bf6` | **SHA-256 与上游 LFS oid 逐字节一致** |
-| `minimind-3/config.json` | 同上 | 同上 | 尺寸 863 ✓（上游为 git blob，比对口径不同，见下） |
-| `minimind-3/tokenizer.json` | 同上 | 同上 | 尺寸 451182 ✓ |
+| `minimind-3/config.json` | 同上 | 同上 | **git blob sha1 逐字节一致** |
+| `minimind-3/tokenizer.json` | 同上 | 同上 | **git blob sha1 逐字节一致** |
 
 复算：
 
 ```bash
 bash scripts/ops/nt_weights_manifest.sh provenance
 ```
+
+### 两种校验口径，不可混用
+
+HF 对不同类型的文件给的 oid 是**两种不同的东西**：
+
+| 文件类型 | 上游给的 oid | 本地怎么算 | 本仓标记 |
+|---|---|---|---|
+| LFS（`.gguf` / `.safetensors`） | `lfs.oid` = **内容 SHA-256** | `shasum -a 256` | `[lfs]` |
+| 非 LFS（`.json`） | git **blob sha1** = `sha1("blob <字节数>\0" + content)` | `git hash-object` | `[blob]` |
+
+混用会**永远不符** —— 而"永远不符"看起来很像"文件坏了"，会把人引向完全错误的方向
+（重新下载、白查磁盘）。脚本按记录里的算法标记分派，不靠猜。
+
+`git hash-object` 走的是仓库自己的对象格式，**即使 `models/` 被 gitignore 也照样能算**
+（它只算不写对象库，不需要文件被跟踪）。
+
+### 顺带补上的一个更基础的漏
+
+`config.json` / `tokenizer.json` 此前**根本没进清单**，不只是"只比了尺寸"。
+原 `write` 的 `[R]` 收集用的是权重扩展名白名单
+（`.gguf|.safetensors|.bin|.pt|.pth`），而这两个文件是 `.json` —— 于是被漏在外面：
+**丢了不会被 `verify` 发现，也不在台账里**。而 minimind-3 没有 config/tokenizer
+根本加载不了，等于半个模型不可用。
+
+已改为**收集 `models/` 下除 `training/` 外的全部文件**（排除 `.DS_Store` 与
+`__pycache__`）。清单 58 → **60 项，双向零缺口**（盘上 60 / 登记 60）。
+
+## 校验
+
 
 ### 为什么必须逐字节比对，不能只比尺寸
 
@@ -77,9 +106,7 @@ sha256 177130464c7d…     ← 与本地不同
 文件在历史上被重传过。**结论：HF 上 LFS oid 就是内容的 SHA-256**，拿它当基准，
 比对就变成确定性的，无需信任任何文件名或目录结构。
 
-`config.json` / `tokenizer.json` 这类**非 LFS** 文件，HF API 给的是 git blob sha1
-（`sha1("blob <len>\0" + content)`），与本地 `shasum -a 256` 不同口径，故只比尺寸。
-要严格比对需 `git hash-object`，本轮未做。
+
 
 ### 顺带确认的两件事
 

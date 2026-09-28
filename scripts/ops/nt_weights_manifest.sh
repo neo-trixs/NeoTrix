@@ -75,8 +75,8 @@ gen_manifest() {
     rel="${f#$REPO_ROOT/}"
     printf '[R] %s  %s\n' "$(sha256 "$f")" "$rel" >> "$MANIFEST"
     n=$((n + 1))
-  done < <(find "$MODELS_DIR" -type f \( -name '*.gguf' -o -name '*.safetensors' \
-                -o -name '*.bin' -o -name '*.pt' -o -name '*.pth' \) 2>/dev/null | sort)
+  done < <(find "$MODELS_DIR" -type f -not -path '*/training/*' \
+                -not -name '.DS_Store' -not -path '*__pycache__*' 2>/dev/null | sort)
   local n_r=$n
   ok "可再生权重 $n_r 个已登记"
 
@@ -153,8 +153,8 @@ do_restore() {
 do_status() {
   hdr "现状"
   local r i
-  r=$(find "$MODELS_DIR" -type f \( -name '*.gguf' -o -name '*.safetensors' \
-        -o -name '*.bin' \) 2>/dev/null | wc -l | tr -d ' ')
+  r=$(find "$MODELS_DIR" -type f -not -path '*/training/*' -not -name '.DS_Store' \
+        -not -path '*__pycache__*' 2>/dev/null | wc -l | tr -d ' ')
   i=$(find "$MODELS_DIR/training" -type f -not -path '*__pycache__*' -not -name '*.pyc' 2>/dev/null | wc -l | tr -d ' ')
   printf '  [R] 可再生权重   %3s 个  %s\n' "$r" "$(du -sh "$MODELS_DIR" 2>/dev/null | cut -f1)"
   printf '  [I] 不可再生     %3s 个  %s\n' "$i" "$(du -sh "$MODELS_DIR/training" 2>/dev/null | cut -f1)"
@@ -174,9 +174,11 @@ do_status() {
 # 而搜索首先命中的是 5 个月前的历史 commit, 它的 model.safetensors **尺寸与本地
 # 一模一样 (127834168) 但 sha256 不同** —— 只比尺寸会把错误来源记成事实。
 PROVENANCE=(
-  "models/qwen35-4b-uncensored/Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-Q6_K.gguf|HauhauCS/Qwen3.5-4B-Uncensored-HauhauCS-Aggressive@c09cdbcdb1fefad6d335809d445621b5f5ba0c6e|ba93c21300854075ab42655bc30dca82c7c6c958f511d1ec9ea2b3e750b4b75f"
-  "models/qwen35-4b-uncensored/mmproj-Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-BF16.gguf|HauhauCS/Qwen3.5-4B-Uncensored-HauhauCS-Aggressive@c09cdbcdb1fefad6d335809d445621b5f5ba0c6e|a1e32e86ea99aa7a56f3dcfe7e63c1d0be9439d31fd07087099f15bc0fda0f22"
-  "models/minimind-3/model.safetensors|jingyaogong/minimind-3@f92512d4cd6142fa9acc0d6022375049a8974bf6|3adf69402b5d22e693151cabadc12528f923c4ba6bf343738aaf13f0892162e8"
+  "models/qwen35-4b-uncensored/Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-Q6_K.gguf|HauhauCS/Qwen3.5-4B-Uncensored-HauhauCS-Aggressive@c09cdbcdb1fefad6d335809d445621b5f5ba0c6e|ba93c21300854075ab42655bc30dca82c7c6c958f511d1ec9ea2b3e750b4b75f|lfs"
+  "models/qwen35-4b-uncensored/mmproj-Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-BF16.gguf|HauhauCS/Qwen3.5-4B-Uncensored-HauhauCS-Aggressive@c09cdbcdb1fefad6d335809d445621b5f5ba0c6e|a1e32e86ea99aa7a56f3dcfe7e63c1d0be9439d31fd07087099f15bc0fda0f22|lfs"
+  "models/minimind-3/model.safetensors|jingyaogong/minimind-3@f92512d4cd6142fa9acc0d6022375049a8974bf6|3adf69402b5d22e693151cabadc12528f923c4ba6bf343738aaf13f0892162e8|lfs"
+  "models/minimind-3/config.json|jingyaogong/minimind-3@f92512d4cd6142fa9acc0d6022375049a8974bf6|c8db3894798ad2218caf6a4c0156141227958904|blob"
+  "models/minimind-3/tokenizer.json|jingyaogong/minimind-3@f92512d4cd6142fa9acc0d6022375049a8974bf6|e6ca86c9335a4bbbc1ffda03f479c076d4cdf4ba|blob"
 )
 
 # 逐字节比对本地文件与上游 LFS oid。
@@ -188,17 +190,24 @@ do_provenance() {
   local bad=0
   for entry in "${PROVENANCE[@]}"; do
     local rel="${entry%%|*}" rest="${entry#*|}"
-    local src="${rest%%|*}" want="${rest#*|}"
+    local src="${rest%%|*}" rest2="${rest#*|}"
+    local want="${rest2%%|*}" algo="${rest2#*|}"
     local f="$REPO_ROOT/$rel"
     if [ ! -f "$f" ]; then
       printf '  ✗ 缺失  %s\n      应来自 %s\n' "$rel" "$src"; bad=$((bad + 1)); continue
     fi
-    local got; got=$(sha256 "$f")
-    if [ "$got" = "$want" ]; then
-      printf '  ✓ %s\n      ← %s\n' "${rel##*/}" "$src"
+    local got
+    if [ "$algo" = "blob" ]; then
+      # git hash-object 走的是仓库自己的对象格式, 即使 models/ 被 gitignore 也照样能算
+      got=$(git hash-object "$f")
     else
-      printf '  ✗ 不符  %s\n      ← %s\n      本地 %s\n      上游 %s\n' \
-        "$rel" "$src" "$got" "$want"
+      got=$(sha256 "$f")
+    fi
+    if [ "$got" = "$want" ]; then
+      printf '  ✓ %s  [%s]\n      ← %s\n' "${rel##*/}" "$algo" "$src"
+    else
+      printf '  ✗ 不符  %s  [%s]\n      ← %s\n      本地 %s\n      上游 %s\n' \
+        "$rel" "$algo" "$src" "$got" "$want"
       bad=$((bad + 1))
     fi
   done

@@ -1,5 +1,5 @@
 # WEIGHTS-MANIFEST —— models/ 的内容账本
-# 生成: 2026-09-28 20:30:22  机器: iMac-3693
+# 生成: 2026-09-28 21:02:27  机器: iMac-3693
 #
 # models/ 被 .gitignore 的 'models/*' 整条拦着, git 保护不到。
 # 本清单是**唯一**记录「盘上有什么、什么版本、损坏没有」的地方。
@@ -12,7 +12,9 @@
 
 # ─── [R] 可再生权重 ───
 # 来源见 docs/architecture/WEIGHTS-INVENTORY-2026-09-28.md
+[R] efcfa39ede9bbb5b64ded2bb90969e4b840f0f9e1e36725d386acb7eca1c6d05  models/minimind-3/config.json
 [R] 3adf69402b5d22e693151cabadc12528f923c4ba6bf343738aaf13f0892162e8  models/minimind-3/model.safetensors
+[R] 71f32c68cf63a15355a8fc171b7594b3d41870fe0ddb54fc6aefa55f73a4a668  models/minimind-3/tokenizer.json
 [R] ba93c21300854075ab42655bc30dca82c7c6c958f511d1ec9ea2b3e750b4b75f  models/qwen35-4b-uncensored/Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-Q6_K.gguf
 [R] a1e32e86ea99aa7a56f3dcfe7e63c1d0be9439d31fd07087099f15bc0fda0f22  models/qwen35-4b-uncensored/mmproj-Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-BF16.gguf
 
