@@ -430,3 +430,19 @@ pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_api::{
 pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_geo::query_bbox_with_cold;
 pub use crate::l4_emotion::nt_memory::nt_memory_lead;
 pub use crate::l4_emotion::nt_memory::nt_memory_lead::{InteractionType, LeadStage};
+
+// ─── L1→L2 跨层引用收敛 ──────────────────────────────────────────────────────
+// ⚠️ 模块型与类型型引用**都要查**（L4 子批与上上批各踩过一次 `E0432`）。
+// 本段涉及的 4 个 l2 **模块**（`nt_core_sense` / `nt_core_llm` /
+// `nt_core_code_search` / `nt_world::nt_world_mirror`）与 `nt_world::source` 均按
+// **模块整体**转出，消费方以 `facade::模块::…` 访问其下项。
+pub use crate::l2_perception::nt_core_code_search;
+pub use crate::l2_perception::nt_core_knowledge::{
+    publish_affective_observation, AffectiveFeedback, KnowledgeSource, TaskType,
+};
+pub use crate::l2_perception::nt_core_llm;
+pub use crate::l2_perception::nt_core_sense;
+pub use crate::l2_perception::nt_core_e8::nt_multimodal::model_supports_vision;
+pub use crate::l2_perception::nt_world::nt_world_mirror;
+pub use crate::l2_perception::nt_world::source;
+pub use crate::l2_perception::nt_world::source::engine::MediaSource;

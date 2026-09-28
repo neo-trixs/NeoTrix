@@ -143,12 +143,12 @@ pub async fn absorb_source_handler(
     Json(body): Json<AbsorbBody>,
 ) -> Result<Json<serde_json::Value>, (axum::http::StatusCode, Json<serde_json::Value>)> {
     let source = match body.source.to_lowercase().as_str() {
-        "heroui" => crate::l2_perception::nt_core_knowledge::types::KnowledgeSource::HeroUI,
-        "baseui" => crate::l2_perception::nt_core_knowledge::types::KnowledgeSource::BaseUI,
-        "arcui" => crate::l2_perception::nt_core_knowledge::types::KnowledgeSource::ArcUI,
-        "cortexui" => crate::l2_perception::nt_core_knowledge::types::KnowledgeSource::CortexUI,
-        "agenticds" => crate::l2_perception::nt_core_knowledge::types::KnowledgeSource::AgenticDS,
-        "designphilosophy" => crate::l2_perception::nt_core_knowledge::types::KnowledgeSource::DesignPhilosophy,
+        "heroui" => crate::l1_action::nt_action_facade::KnowledgeSource::HeroUI,
+        "baseui" => crate::l1_action::nt_action_facade::KnowledgeSource::BaseUI,
+        "arcui" => crate::l1_action::nt_action_facade::KnowledgeSource::ArcUI,
+        "cortexui" => crate::l1_action::nt_action_facade::KnowledgeSource::CortexUI,
+        "agenticds" => crate::l1_action::nt_action_facade::KnowledgeSource::AgenticDS,
+        "designphilosophy" => crate::l1_action::nt_action_facade::KnowledgeSource::DesignPhilosophy,
         _ => {
             return Err(json_err(
                 "Unknown source. Options: HeroUI, BaseUI, ArcUI, CortexUI, AgenticDS, DesignPhilosophy",

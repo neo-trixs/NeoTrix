@@ -238,7 +238,7 @@ impl Orchestrator {
             let capability = eng.capability().clone();
 
             // 使用 HP@K 协议评估
-            let core_task: crate::l2_perception::nt_core_knowledge::types::TaskType = ctx.task_type.into();
+            let core_task: crate::l1_action::nt_action_facade::TaskType = ctx.task_type.into();
             let critic_task: critic::TaskType = core_task.into();
             let scores = vec![self.critic.evaluate(critic_task, &capability)];
             let hp_result = self.critic.heavy_pass_verify(&scores);

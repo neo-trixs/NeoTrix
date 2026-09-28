@@ -212,7 +212,7 @@ impl LlmProvider for GatewayV2 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l2_perception::nt_core_llm::{Usage, FinishReason, Message, Role};
+    use crate::l1_action::nt_action_facade::nt_core_llm::{Usage, FinishReason, Message, Role};
 
     #[tokio::test]
     async fn test_gateway_selects_free_provider() {
@@ -1335,7 +1335,7 @@ mod tests {
 #[cfg(test)]
 mod provider_reliability_tests {
     use super::*;
-    use crate::l2_perception::nt_core_llm::{Message, Role};
+    use crate::l1_action::nt_action_facade::nt_core_llm::{Message, Role};
     use std::time::Duration;
 
     // ── ResponseCache (G: Response Caching) ─────────────────────────
