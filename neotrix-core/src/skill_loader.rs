@@ -234,9 +234,18 @@ impl SkillLoader {
 
     /// List all known skills from the index, optionally resolving paths.
     pub fn list_skills(&mut self) -> Result<Vec<ResolvedSkill>, String> {
-        let skill_dirs = self.skill_dirs.clone();
         let index = self.load_index()?;
+        // borrow 结束后再用 self.skill_dirs，避免与 load_index 的 &mut 借用重叠
+        let index = index.clone();
+        Ok(self.resolve_from_index(&index))
+    }
 
+    /// Resolve every category entry into a `ResolvedSkill` with a real on-disk path.
+    ///
+    /// Pure w.r.t. disk reads (only `Path::exists` touches the FS) so tests can
+    /// inject a synthetic [`SkillIndex`] without touching `skills/index.json`.
+    pub fn resolve_from_index(&self, index: &SkillIndex) -> Vec<ResolvedSkill> {
+        let skill_dirs = &self.skill_dirs;
         // Build path lookup from skill_index
         let mut path_map: HashMap<&str, &SkillIndexEntry> = HashMap::new();
         for (name, entry) in &index.skill_index {
@@ -247,9 +256,18 @@ impl SkillLoader {
 
         for (cat_name, category) in &index.categories {
             for (skill_name, entry) in &category.skills {
-                // Resolve the full path from skill_index
+                // Resolve the full path from skill_index.
+                //
+                // 2026-09-28 bug fix: `skill_index` 的 key 是**路径式**
+                // （`architecture-auditor/diagnose`），而 `categories.<cat>.skills`
+                // 的 key 是**裸名**（`diagnose`）。旧代码只用裸名查 ⇒ 嵌套技能全部
+                // 落空，退化成 `skills/<裸名>` 这种不存在的路径（实测 45/58 失败，
+                // `ResolvedSkill.exists=false`）。正确查法：**先试 `<cat>/<skill>`
+                // 路径式 key，再退回裸名**（顶层技能的 key 恰好等于裸名）。
+                let qualified = format!("{}/{}", cat_name, skill_name);
                 let file_path = path_map
-                    .get(skill_name.as_str())
+                    .get(qualified.as_str())
+                    .or_else(|| path_map.get(skill_name.as_str()))
                     .map(|idx| {
                         skill_dirs
                             .iter()
@@ -282,7 +300,7 @@ impl SkillLoader {
             }
         }
 
-        Ok(skills)
+        skills
     }
 
     /// Load a specific skill by name.
@@ -691,6 +709,103 @@ mod tests {
             SkillLoader::extract_description_legacy(content),
             "Fallback description"
         );
+    }
+
+    // ── skill_index 路径式 key 解析（2026-09-28 bug fix 固化）──
+    //
+    // 现场：`skill_index` 的 key 是路径式（`architecture-auditor/diagnose`），
+    // `categories.<cat>.skills` 的 key 是裸名（`diagnose`）。旧代码只用裸名查
+    // ⇒ 嵌套技能全部落空，退化成 `skills/<裸名>` 这种不存在的路径。
+    // 实测 45/58 解析失败，`ResolvedSkill.exists=false`。
+
+    fn index_with_path_keys() -> SkillIndex {
+        let mut skill_index = HashMap::new();
+        for (key, file) in [
+            ("architecture-auditor", "architecture-auditor/SKILL.md"),
+            (
+                "architecture-auditor/diagnose",
+                "architecture-auditor/diagnose/SKILL.md",
+            ),
+        ] {
+            skill_index.insert(
+                key.to_string(),
+                SkillIndexEntry {
+                    category: "architecture-auditor".into(),
+                    file: file.into(),
+                },
+            );
+        }
+        let mut skills = HashMap::new();
+        for name in ["architecture-auditor", "diagnose"] {
+            skills.insert(
+                name.to_string(),
+                SkillEntry {
+                    description: "d".into(),
+                    tags: vec![],
+                    triggers: vec![],
+                    dependencies: vec![],
+                    exclusions: vec![],
+                    output_contract: None,
+                    license: String::new(),
+                },
+            );
+        }
+        let mut categories = HashMap::new();
+        categories.insert(
+            "architecture-auditor".to_string(),
+            SkillCategory {
+                description: "c".into(),
+                tags: vec![],
+                skills,
+            },
+        );
+        SkillIndex {
+            version: "1.0.0".into(),
+            generated: "2026-09-28".into(),
+            categories,
+            skill_index,
+        }
+    }
+
+    #[test]
+    fn test_skill_index_path_key_resolution() {
+        // 用真实临时目录当 skill 根，让 exists 判定有意义。
+        let tmp = std::env::temp_dir().join("nt_skill_loader_pathkey");
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(tmp.join("architecture-auditor/diagnose"))
+            .expect("create nested skill dir");
+        std::fs::write(tmp.join("architecture-auditor/SKILL.md"), "top").expect("write top");
+        std::fs::write(
+            tmp.join("architecture-auditor/diagnose/SKILL.md"),
+            "nested",
+        )
+        .expect("write nested");
+
+        let loader = SkillLoader::with_dirs(vec![tmp.clone()]);
+        let resolved = loader.resolve_from_index(&index_with_path_keys());
+        assert_eq!(resolved.len(), 2);
+
+        // 关键断言：嵌套技能必须落在真实路径上，而不是 `skills/diagnose`。
+        let diag = resolved
+            .iter()
+            .find(|s| s.name == "diagnose")
+            .expect("diagnose 应被解析出来");
+        assert_eq!(
+            diag.path,
+            tmp.join("architecture-auditor/diagnose/SKILL.md"),
+            "路径式 key 未被解析 —— 回退到了裸名路径"
+        );
+        assert!(diag.exists, "嵌套技能应存在");
+
+        // 顶层技能（key 恰好等于裸名）也必须正确
+        let top = resolved
+            .iter()
+            .find(|s| s.name == "architecture-auditor")
+            .expect("顶层技能应被解析出来");
+        assert_eq!(top.path, tmp.join("architecture-auditor/SKILL.md"));
+        assert!(top.exists, "顶层技能应存在");
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     // -- P0-2 三段式门禁 --
