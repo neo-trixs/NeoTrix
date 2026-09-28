@@ -29,6 +29,7 @@ pub mod nt_channel_dispatch;
 pub mod nt_channel_serve;
 pub mod nt_channel_telegram;
 pub mod nt_cli;
+pub mod nt_llama;
 pub mod nt_computer;
 pub mod nt_config;
 pub mod nt_core;

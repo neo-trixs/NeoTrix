@@ -124,6 +124,12 @@ fn main() {
             nt_commands::nt_cmd_channels::neobot_channel_poll_once,
             nt_commands::nt_cmd_channels::neobot_channel_status,
             nt_commands::nt_cmd_channels::neobot_channel_parse_allow,
+            nt_commands::nt_cmd_llamacpp::neobot_llamacpp_health,
+            nt_commands::nt_cmd_llamacpp::neobot_llamacpp_models,
+            nt_commands::nt_cmd_llamacpp::neobot_llamacpp_state,
+            nt_commands::nt_cmd_llamacpp::neobot_llamacpp_start,
+            nt_commands::nt_cmd_llamacpp::neobot_llamacpp_stop,
+            nt_commands::nt_cmd_llamacpp::neobot_llamacpp_swap,
         ])
         .on_window_event(|window, event| {
             if window.label() == "main" {

@@ -253,6 +253,7 @@ pub mod nt_cmd_channels;
 pub mod nt_cmd_convo;
 pub mod nt_cmd_core;
 pub mod nt_cmd_files;
+pub mod nt_cmd_llamacpp;
 pub mod nt_cmd_run;
 pub mod nt_cmd_sidebar;
 pub mod nt_cmd_sys;
@@ -333,8 +334,9 @@ mod registration_tests {
     const SYS: &str = include_str!("nt_commands/nt_cmd_sys.rs");
     const TASKS: &str = include_str!("nt_commands/nt_cmd_tasks.rs");
     const CHANNELS: &str = include_str!("nt_commands/nt_cmd_channels.rs");
+    const LLAMACPP: &str = include_str!("nt_commands/nt_cmd_llamacpp.rs");
 
-    fn all_command_sources() -> [(&'static str, &'static str); 8] {
+    fn all_command_sources() -> [(&'static str, &'static str); 9] {
         [
             ("nt_cmd_convo", CONVO),
             ("nt_cmd_core", CORE),
@@ -344,6 +346,7 @@ mod registration_tests {
             ("nt_cmd_sys", SYS),
             ("nt_cmd_tasks", TASKS),
             ("nt_cmd_channels", CHANNELS),
+            ("nt_cmd_llamacpp", LLAMACPP),
         ]
     }
 

@@ -21,6 +21,9 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 clap = { version = "4", features = ["derive"] }
 ureq = { version = "2", features = ["json"] }
 zip = { version = "1", default-features = false, features = ["deflate"] }
+# nt_llama 的进程生命周期日志。`log` 是零后端 facade (~10KB, 仅 cfg-if),
+# 不引任何日志实现 —— 后端由最终二进制决定。与 neotrix-core 同一套口径。
+log = "0.4"
 
 [lints]
 workspace = true

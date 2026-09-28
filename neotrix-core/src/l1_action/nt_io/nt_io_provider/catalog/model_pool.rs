@@ -18,6 +18,8 @@
 
 use std::path::{Path, PathBuf};
 
+use neotrix_neobot::nt_llama::{default_max_model_gb, llamacpp_base_url, ollama_base_url};
+
 use crate::l1_action::nt_io::nt_io_provider::catalog::provider_catalog::ProviderCategory;
 use crate::l1_action::nt_io::nt_io_provider::common::factory::LlmProviderType;
 
@@ -131,58 +133,6 @@ pub trait ModelSource: Send + Sync {
 }
 
 // ═══════════════════════════════════════════════════════════
-// 本机本地推理默认值 — 全部可被环境变量覆盖, 不写死
-// ═══════════════════════════════════════════════════════════
-
-/// llama.cpp / 任何 OpenAI 兼容本地端点的 base_url
-///
-/// 硬编码 `localhost:8080` 会在三种情况下骗人: 端口被占、多实例并存
-/// (8080/8081 同时跑两个模型)、以及容器/远端部署。`NEOTRIX_LLAMACPP_BASE_URL`
-/// 可覆盖。
-pub fn llamacpp_base_url() -> String {
-    std::env::var("NEOTRIX_LLAMACPP_BASE_URL")
-        .ok()
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "http://localhost:8080/v1".to_string())
-}
-
-/// 本地端点端口 (供启动进程时绑定用)
-pub fn llamacpp_port() -> u16 {
-    // 优先显式端口, 否则从 base_url 的端口解析, 都没有才回落 8080
-    if let Ok(p) = std::env::var("NEOTRIX_LLAMACPP_PORT") {
-        if let Ok(v) = p.parse::<u16>() {
-            return v;
-        }
-    }
-    port_from_url(&llamacpp_base_url()).unwrap_or(8080)
-}
-
-/// Ollama base_url (`NEOTRIX_OLLAMA_BASE_URL` 可覆盖)
-pub fn ollama_base_url() -> String {
-    std::env::var("NEOTRIX_OLLAMA_BASE_URL")
-        .ok()
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "http://localhost:11434/v1".to_string())
-}
-
-/// 从 base_url 里解析端口 (取不出则 None)
-fn port_from_url(url: &str) -> Option<u16> {
-    url.split("://")
-        .nth(1)
-        .and_then(|rest| rest.split('/').next())
-        .and_then(|hostport| hostport.rsplit_once(':'))
-        .and_then(|(_, port)| port.parse::<u16>().ok())
-}
-
-/// 本地模型体积上限 (GB) —— 超过则不纳入模型池 (装不进本机内存)
-pub fn default_max_model_gb() -> f64 {
-    std::env::var("NEOTRIX_MAX_MODEL_GB")
-        .ok()
-        .and_then(|s| s.parse::<f64>().ok())
-        .unwrap_or(5.0)
-}
-
-// ═══════════════════════════════════════════════════════════
 // LocalGgufSource — 本地 GGUF 文件扫描
 // ═══════════════════════════════════════════════════════════
 
@@ -211,7 +161,7 @@ impl LocalGgufSource {
     /// 避免"启动进程用的目录"和"列模型用的目录"两处各写一份而漂移。
     pub fn default_m5() -> Self {
         Self::new(
-            crate::l1_action::nt_io::nt_io_provider::llama::llama_process::model_search_dirs(),
+            neotrix_neobot::nt_llama::model_search_dirs(),
             default_max_model_gb(),
         )
     }
@@ -550,6 +500,8 @@ impl Default for UnifiedModelPool {
   #[cfg(test)]
   mod tests {
     use super::*;
+    // 这两个只在测试里用; 顶层 import 会让非测试构建报 unused。
+    use neotrix_neobot::nt_llama::{llamacpp_port, port_from_url};
     // 2026-09-28：生产侧 `:214` 用的是这个全路径真源，但测试里只写了裸名
     // `model_search_dirs()`，本模块顶部没有引入 ⇒ `cargo test` 编译不过
     // (E0425 + 后续 E0282)。补上导入，与 `:214` 保持同一真源。
