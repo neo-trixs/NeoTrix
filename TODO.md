@@ -381,6 +381,70 @@
 > 三份文档保留推导过程，本节只保留**去重后的可执行条目**。
 > 每项均带 `file:line`；无定点不改（RUST-STANDARDS §17）。
 
+
+---
+
+## 🆕 2026-09-28 单窗口汇总修复（架构侧吸收产出）
+
+> **唯一汇总入口**：`sessions/handoff-consolidate-all-windows-20260928.md`
+> 汇总 7 个窗口 + 本会话。**由单一窗口统一执行**，避免多窗口并发编译（16G 机必爆 swap）。
+> 全部数据 2026-09-28 实测。`[实测]`=本人复核；`[转述]`=引用他窗，**接手前自行复核**。
+
+### S 组 · 零编译风险（现在就能做）
+
+- [ ] **S-1** 合并隔离车道 `lane/batch-fix-20260928`（3 commit，零 `.rs`）
+- [ ] **S-2** ⛔ 分层基线**只在主树**测 —— 车道测 102、主树测 94，差 8 处（§6.1 事故）
+- [ ] **S-3** 裁决 `nt_file_ability` 层归属（声明 L1 却引 L2/L5/L6，10 处）
+- [ ] **S-4** 裁决 `ffi` 层归属（声明 L0 却引 L5：`consciousness_tree.rs:290,320,321`、`seal_pipeline.rs:131,132`）
+- [ ] **S-5** 给 `nt_core_gate/nt_tool_registry.rs` 加防误删注释（活消费者 `nt_shield_enforcer.rs:388-390`）
+- [ ] **S-6** 统一提交 neobot 那 54 个路径（`git add` **精确列出**，禁 `-A`）
+- [ ] **S-7** 拍板 `/stop` 回执措辞（**唯一需产品决策项**）
+
+### B 组 · 冗余清理（需编译验证；零消费者已实测）
+
+- [ ] **B-1** 删 `neotrix/nt_file_ability/capability.rs:185` 的 `CapabilityRegistry`（0 消费者 🟢）
+- [ ] **B-2** 删 `l5_cognition/nt_core/capability/registry.rs:462` 的 `CapabilityRegistry`（仅自测 🔵）
+- [ ] **B-3** `neotrix-types` 包内 `SkillRegistry` 2→1（`core/skill.rs:54` / `core/skills/mod.rs:25` 🟢）
+- [ ] **B-4** `error_conversions.rs` **6 份 → 1**（l1 有 26 个 From impl；**解 17 个 E0119** 🔴）
+- [ ] ⛔ **不要删** `nt_core_gate` / `agentic_browse` 的 `ToolRegistry` —— **与 `nt_act` 正交**，09-27 路线图说 stub 是**错的**
+
+### D 组 · 跨域错位
+
+- [ ] **D-1** `neotrix-sysctl`（唯一 `unsafe` FFI）从 L5 剥离，只留 `l0_substrate` 依赖
+- [ ] **D-2** `nt-lang` 孤儿：5 文件/273 行、**只有 `[[bin]]` 无 `[lib]`**、**0 个主树 manifest 依赖** → 删或补 `[lib]`
+- [ ] **D-3** 纠正 `ARCHITECTURE.md:97`（称 `nt_computer/` 是「计算集群」；**实测是 fs/process trait**）
+- [ ] **D-4** `nt_file_ability` / `ffi` 层归属（解码层，同 S-3/S-4）
+
+### E 组 · 能力补齐
+
+- [ ] **E-1** 证伪门（`crates/neotrix-audit/` + CI）—— 11 个自进化仓**无一**证明自己有效
+- [ ] **E-2** 记忆权威头 + 五个留存标签（`experience_tree/mod.rs:29`）
+- [ ] **E-3** delta-ops 取代整体重写（`experience_tree/mod.rs:241` `:355`）
+- [ ] **E-4** 成本归因插点（`anthropic/anthropic.rs:93` 的 P0-4 断点处）
+- [ ] **E-5** GUI 执行回路 5 项（`l3_embodiment/nt_computer.rs`）
+- [ ] **E-6** DNS qtype 白名单（`egress_types.rs:14-21`，**全文件零 DNS 概念**）
+
+### ⚠️ 本会话的两次自身错误（勿重犯）
+
+- [ ] **测量台纪律**：基线只在**主树且主树干净**时测。脏树比干净树「更干净」（主树脏测 94 / 车道干净测 102）
+- [ ] **机器读 ledger 不能加注释**：`grep -c .`（`check-layer-deps.sh:153`）会把 `#` 行计为条目，94→105 棘轮失真
+- [ ] **共享 index 会竞争**：曾见暂存区混入 46 个非我暂存的 `.rs` ⇒ 用 worktree（**独立 index**）
+
+### 各窗口剩余债 `[转述]`（**接手前自行复核，勿照单全收**）
+
+- [ ] neobot：`nt_smoke.sh` **6 步编排从未整体执行过**（各步手工跑绿）· `edit_of` 真正生效 · IM 的 `/stop` 兑现
+- [ ] 测试债：`nodes` 表无法存双时间历史（2 条测试）· Noise 握手协议
+- [ ] **crystal id 分配无互斥**：8 个吸收脚本各自独立 `fast_max_mid(COCOONS)`，8 个茧时间戳集中在 5 分钟内
+- [ ] 50 个失败测试（**独立成轮，勿与结构清理混做**）· `--test-threads=4` SIGSEGV（`l6_meta::healing::predictive_maintenance::trend::tests`）
+- [ ] 三处同名双定义：`ExtractConfig` / `EmailConfig` / `PlatformRegistry`
+
+> **已实测推翻 2 条转述**：`nt_core_gate/nt_tool_registry.rs` **不是 stub**（有活消费者）；
+> `nt_jev` + `nt_crystal_core` **是活路径**（L1 有 6 个消费者）⇒ **禁止当死代码删**。
+> 详见 `docs/architecture/OWNERSHIP.md`。
+> 本会话自身的三次错误留痕：`docs/architecture/LESSONS-2026-09-28-measurement-and-dedup.md`
+
+---
+
 ## 阶段 0 · 脱 stub 与收敛（1-2 天，最高杠杆）
 
 | # | 任务 | 支脉节点 | 状态 |
@@ -704,8 +768,8 @@ ID 指向不存在的 `ocr` 模块。实为 `nt_file_ability.rs:70` 的 `pub use
 
 | # | 任务 | 支脉节点 | 状态 |
 |---|---|---|---|
-| 2.1 | **supersession 形态**（绕开主键重写，今天可迁） | `l5_cognition/nt_mind/nt_mind/experience_tree/mod.rs` —— 5 段即 `:169 snapshot` / `:195 distill` / `:253 classify` / `:306 persist` / `:403 feedback` | ⬜ |
-| 2.2 | **真双时间四列迁移**（依赖 2.1 先落地） | 同上 `:29 ExperienceEntry` + `l4_emotion/nt_memory/{kb_kb,paged_kv}`。先例：`l0_substrate/nt_core_kb_primitives.rs:188`（即上方 B 类第 1 项） | ⬜ |
+| 2.1 | **supersession 形态**（绕开主键重写，今天可迁） | `l5_cognition/nt_mind/nt_mind/experience_tree/mod.rs` —— 5 段即 `:169 snapshot` / `:195 distill` / `:253 classify` / `:306 persist` / `:403 feedback` | ⬜ |。**2026-09-28 前提已勘清**：`supersession` **在记忆库层早已实现** —— `nt_memory_kb/nt_memory_curation.rs:182/238` 的 D2 冲突消解（`UPDATE nodes SET supersedes=?1, tier='cold'`，新者胜出、旧者指向新者、保留证据链）+ 已有测试 `tests.rs:564 test_write_memory_entry_conflict_supersedes_old`；`nt_memory_historian/nt_temporal_facts.rs` 更是一整套「每版本独立 id + `supersedes`/`superseded_by`/`contradicted_by`」的版本链（**91 测试全绿**）。**真正缺的是 experience_tree 自身** —— `EntryType{Pattern,Rule,Defect,Insight,Cycle,Artifact}` 无生命周期形态，`ExperienceEntry` 无 `lifecycle_state`/`supersedes`。路线图 §1.1 要求的 9 个字段里，tree 只满足 `source`，缺 `authority`/`lifecycle_state`/`supersession`/`revocation`/`expiry`。**照 `temporal_facts` 已验证的形态做即可**（每版本独立 id + 指针，绕开主键重写 —— 这正是「今天可迁」的含义） |
+| 2.2 | **真双时间四列迁移**（依赖 2.1 先落地） | 同上 `:29 ExperienceEntry` + `l4_emotion/nt_memory/{kb_kb,paged_kv}`。先例：`l0_substrate/nt_core_kb_primitives.rs:188`（即上方 B 类第 1 项） | ⬜ |。**2026-09-28 前提已勘清**：`nt_memory_historian/nt_temporal_facts.rs:41` 的 `temporal_facts` 表**已经是真双时间** —— `valid_from`/`valid_until`（有效时间轴）+ `created_at`（事务时间轴），且用「每版本独立 id」绕开了复合主键。**唯一真正缺双时间的是 `l0_substrate/nt_core_kb_primitives.rs` 的 `nodes` 表**（`id TEXT PRIMARY KEY` 无时间维），那 2 条失败测试卡在这里，与 historian 无关。⇒ 本项应改述为「把 nodes 表对齐 temporal_facts 已验证的形态」，而非「从零做双时间」 |
 | 2.3 | **`Provenance` 第二轴**（**不重载 `Source`**）✅ | `experience_tree/mod.rs:101` `Source{Dialogue,Audit,Research,Absorption}` 是**渠道**语义，与"证据等级"正交。已加 `Provenance` 4 变体 + `#[serde(default)]` 字段（**Default=ModelAdded 如实**）+ 6 测试（25 passed） | ✅ |
 
 > **2.2 最值得抄的细节**：`valid_to_precision = 'unknown'` 三态
