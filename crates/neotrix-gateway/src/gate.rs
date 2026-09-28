@@ -1267,35 +1267,12 @@ impl GateDecision {
     }
 }
 
-// ───────────────────────────── 工具注册表 ─────────────────────────────
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ToolRegistry {
-    specs: std::collections::HashMap<String, ToolSpec>,
-}
-
-impl ToolRegistry {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn register(mut self, spec: ToolSpec) -> Self {
-        self.specs.insert(spec.name.clone(), spec);
-        self
-    }
-
-    pub fn get(&self, name: &str) -> Option<&ToolSpec> {
-        self.specs.get(name)
-    }
-
-    pub fn from_read_only(names: &[&str]) -> Self {
-        let mut reg = Self::new();
-        for n in names {
-            reg = reg.register(ToolSpec::read_only(n));
-        }
-        reg
-    }
-}
+// 2026-09-27 删除了本文件的 `ToolRegistry` (工具注册表) —— 经核实零消费者:
+//   - 本文件 1337 行内无任何代码使用它(仅定义处 + impl)
+//   - 全仓 grep 无 `gateway::ToolRegistry` / `gate::ToolRegistry` 引用
+//   - 真正在用的是 `nt_core_gate::ToolRegistry` (l5_cognition/nt_core_gate/),
+//     见 nt_mind_background_loop/run.rs:4 与 l3_embodiment/nt_shield_enforcer.rs:388
+// `ToolSpec` 本身**仍在使用** (本文件 ActionTier::classify 等), 故保留。
 
 #[cfg(test)]
 mod tests {
