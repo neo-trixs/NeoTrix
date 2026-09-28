@@ -245,7 +245,7 @@ ID 指向不存在的 `ocr` 模块。实为 `nt_file_ability.rs:70` 的 `pub use
 |---|---|---|---|
 | 2.1 | **supersession 形态**（绕开主键重写，今天可迁） | `l5_cognition/nt_mind/nt_mind/experience_tree/mod.rs` —— 5 段即 `:169 snapshot` / `:195 distill` / `:253 classify` / `:306 persist` / `:403 feedback` | ⬜ |
 | 2.2 | **真双时间四列迁移**（依赖 2.1 先落地） | 同上 `:29 ExperienceEntry` + `l4_emotion/nt_memory/{kb_kb,paged_kv}`。先例：`l0_substrate/nt_core_kb_primitives.rs:188`（即上方 B 类第 1 项） | ⬜ |
-| 2.3 | **`Provenance` 第二轴**（**不要重载 `Source`**） | `experience_tree/mod.rs:101` `Source{Dialogue,Audit,Research,Absorption}` 是**渠道**语义，与"证据等级"正交 | ⬜ |
+| 2.3 | **`Provenance` 第二轴**（**不重载 `Source`**）✅ | `experience_tree/mod.rs:101` `Source{Dialogue,Audit,Research,Absorption}` 是**渠道**语义，与"证据等级"正交。已加 `Provenance` 4 变体 + `#[serde(default)]` 字段（**Default=ModelAdded 如实**）+ 6 测试（25 passed） | ✅ |
 
 > **2.2 最值得抄的细节**：`valid_to_precision = 'unknown'` 三态
 > （`valid_to IS NULL` + `precision IS NULL` = 持续；`+ precision='unknown'` = 已结束但日期未知）。

@@ -40,6 +40,52 @@ pub struct ExperienceEntry {
     pub patterns: Vec<String>,
     /// 分类置信度
     pub confidence: f64,
+    /// 证据等级 (2026-09-27 新增, 与上面的 `source` **正交**)
+    #[serde(default)]
+    pub provenance: Provenance,
+}
+
+/// 证据等级 —— 「这条断言有多可信」, 与 `Source`(从哪个渠道来) **正交**。
+///
+/// 2026-09-27 引入。**不要用 `Source` 承载它**：`Source` 的 4 变体
+/// (Dialogue/Audit/Research/Absorption) 是**渠道**语义, 而这里是**证据等级**,
+/// 两者构成 4×4 的正交矩阵。合并即把两个轴焊死, 且破坏 `Source::default()`。
+///
+/// 借 `learn-from-materials`(MIT) 的四分法, 该仓端到端强制:
+/// 进数据模型、进 UI(hover **与键盘焦点**)、进账本。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Provenance {
+    /// 材料支持的事实 —— 有出处
+    MaterialBacked,
+    /// 材料未覆盖 —— 明说"这里没依据", 不许用断言语气
+    Uncovered,
+    /// 模型添加 —— 推断/外推, 非材料原文
+    ModelAdded,
+    /// 外部已验证 —— 经独立渠道核实
+    ExternallyVerified,
+}
+
+impl Default for Provenance {
+    /// 默认 `ModelAdded`: 现有条目都是分析产出而非材料原文, 这是**如实**默认。
+    /// 反直觉(多数系统默认"有依据"), 但默认值必须说真话 —— 见 R-SCAN-1。
+    fn default() -> Self { Provenance::ModelAdded }
+}
+
+impl Provenance {
+    /// 是否可作为断言使用。`Uncovered` 明说无依据, **结构上不能携带断言**。
+    pub fn is_assertable(&self) -> bool {
+        !matches!(self, Provenance::Uncovered)
+    }
+
+    /// 展示用短标签 (UI badge / 账本)。
+    pub fn label(&self) -> &'static str {
+        match self {
+            Provenance::MaterialBacked => "材料支持",
+            Provenance::Uncovered => "未覆盖",
+            Provenance::ModelAdded => "模型添加",
+            Provenance::ExternallyVerified => "外部已验证",
+        }
+    }
 }
 
 /// 条目类型: pattern | rule | defect | insight | cycle | artifact
@@ -282,6 +328,9 @@ pub fn classify(
             source: Source::Dialogue,
             patterns: vec![],
             confidence,
+            // 2026-09-27: classify 产出的是**分析结论**而非材料原文,
+            // 故显式标 ModelAdded 而非依赖 Default。
+            provenance: Provenance::ModelAdded,
         };
         entries.push(ClassifiedEntry {
             matched_nodes: vec![format!("node_{}_{}", domain as u8, entry.entry_type as u8)],
@@ -900,5 +949,107 @@ mod tests {
             last_weave_ts: 0,
         };
         assert_eq!(scheduler.min_pattern_occurrences, 3);
+    }
+}
+#[cfg(test)]
+mod provenance_tests {
+    use super::*;
+
+    fn entry(source: Source, provenance: Provenance) -> ExperienceEntry {
+        ExperienceEntry {
+            schema_version: 1,
+            entry_type: EntryType::Insight,
+            session_id: "s".into(),
+            cycle: "c".into(),
+            ts: 0,
+            domain: Domain::Core,
+            content: "x".into(),
+            evidence: "e".into(),
+            source,
+            patterns: vec![],
+            confidence: 0.9,
+            provenance,
+        }
+    }
+
+    /// 核心不变量: `Source`(渠道) 与 `Provenance`(证据等级) 是**正交两轴**。
+    /// 4×4 组合全部可达 —— 这正是不能把两者合并的证据。
+    #[test]
+    fn source_and_provenance_are_orthogonal_axes() {
+        for s in [Source::Dialogue, Source::Audit, Source::Research, Source::Absorption] {
+            for p in [
+                Provenance::MaterialBacked,
+                Provenance::Uncovered,
+                Provenance::ModelAdded,
+                Provenance::ExternallyVerified,
+            ] {
+                let e = entry(s, p);
+                assert_eq!(e.source, s);
+                assert_eq!(e.provenance, p);
+            }
+        }
+    }
+
+    /// `Uncovered` 结构上不能作为断言使用 —— 对应「材料未覆盖就直说, 不许编」。
+    #[test]
+    fn uncovered_is_not_assertable() {
+        assert!(!Provenance::Uncovered.is_assertable());
+        for p in [
+            Provenance::MaterialBacked,
+            Provenance::ModelAdded,
+            Provenance::ExternallyVerified,
+        ] {
+            assert!(p.is_assertable(), "{} 应可断言", p.label());
+        }
+    }
+
+    /// 默认值必须**说真话**: 现有条目是分析产出, 不是材料原文。
+    /// 多数系统会默认 MaterialBacked, 那是撒谎的默认值。
+    #[test]
+    fn default_provenance_is_honest_not_optimistic() {
+        assert_eq!(Provenance::default(), Provenance::ModelAdded);
+        assert!(!Provenance::default().is_assertable() == false);
+    }
+
+    /// Source 的默认值不受影响(两个轴各自独立默认)。
+    #[test]
+    fn source_default_unchanged() {
+        assert_eq!(Source::default(), Source::Dialogue);
+    }
+
+    /// 旧数据(无 provenance 字段)必须仍可反序列化 —— 加字段的兼容契约。
+    #[test]
+    fn legacy_entry_without_provenance_still_deserializes() {
+        let legacy = r#"{
+            "schema_version":1,"entry_type":"Insight","session_id":"s","cycle":"c",
+            "ts":0,"domain":"Core","content":"x","evidence":"e","source":"Dialogue",
+            "patterns":[],"confidence":0.9
+        }"#;
+        let e: ExperienceEntry = serde_json::from_str(legacy).expect("旧形状应可解析");
+        assert_eq!(e.provenance, Provenance::ModelAdded, "缺字段时取 Default");
+        assert_eq!(e.source, Source::Dialogue, "原字段不受影响");
+    }
+
+    /// 新字段可往返序列化。
+    #[test]
+    fn provenance_round_trips() {
+        let e = entry(Source::Research, Provenance::ExternallyVerified);
+        let s = serde_json::to_string(&e).unwrap();
+        assert!(s.contains("ExternallyVerified"), "got {s}");
+        let back: ExperienceEntry = serde_json::from_str(&s).unwrap();
+        assert_eq!(back.provenance, Provenance::ExternallyVerified);
+    }
+
+    /// 每个变体都有 UI 标签 —— 账本/UI 不得出现空标签。
+    #[test]
+    fn every_variant_has_a_label() {
+        for p in [
+            Provenance::MaterialBacked,
+            Provenance::Uncovered,
+            Provenance::ModelAdded,
+            Provenance::ExternallyVerified,
+        ] {
+            assert!(!p.label().is_empty());
+        }
     }
 }
