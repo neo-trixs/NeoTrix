@@ -103,12 +103,24 @@ B-11 与 C-2 都卡在这里。
 | 序 | 任务 | 状态 | 方案 | 验收 |
 |---|---|---|---|---|
 | 1 | `nodes` 真双时间（B-1） | ✅ **已完成** `71e1c412` | 每版本独立 `id` + `supersedes` 链，**零 schema 变更**（L11：两列早已存在）；69 处生产写入 / 5 处外键未动 | 2 条 `#[ignore]` 已摘除；`12154 passed / 0 failed @4 线程` |
-| 2 | 分层违规棘轮 | 🔶 **51/101**（101→92→89→80→50） | **必须经「消费方自己那层」的 facade** —— 走目标层 facade 无效（路径仍含层名）。`OneObserver` 等 14 个符号 l5 facade 已有；缺的按「消费方原本就在用的路径」补 `pub use` | 基线**只向下**：50/50 `PASS 0 new`、RC=0；**L2/L3/L4/L5 四层已清** |
+| 2 | 分层违规棘轮 | ✅ **93/101**（101→92→89→80→50→47→40→26→25→8） | **必须经「消费方自己那层」的 facade** —— 走目标层 facade 无效（路径仍含层名）。`OneObserver` 等 14 个符号 l5 facade 已有；缺的按「消费方原本就在用的路径」补 `pub use` | 基线**只向下**：8/8 `PASS 0 new`、RC=0；**L1–L5 真引用全清，剩余 8 条均为已记录不可改道项** |
 | 3 | Noise IK 对齐 spec（B-2） | ⛔ **阻塞于外部输入** | 改名到 `Noise_IKpsk2_25519_ChaChaPoly_SHA256`(39B)，用**官方测试向量**交叉验证 `es/ee/s` 派生次序 | `full_handshake` 绿并摘 `#[ignore]`；加**握手对称性**测试 |
 | 4 | CAD 假证据面（B-3） | ✅ **早已完成**（勿重做） | 判据从「路径含 `:`」改成「**文件真实存在**」 | 已改 `CARGO_MANIFEST_DIR` + `is_file()` |
 | 5 | `/stop` 过期测试前提（B-5） | ✅ **早已完成**（勿重做） | `nt_channel_cmd.rs` 已禁「按发送键」类假建议 | 4 条反撒谎契约绿 |
 
-### 分层违规剩余 50 条：只余 L1 一块
+### 分层违规剩余 8 条：全部是已记录不可改道项（真引用清零）
+
+| # | 条目 | 原因 | 处置 |
+|---|---|---|---|
+| 1 | `nt_file_ability/tests.rs [l2]` VSAEngine/VsaBackend 4 处 | l0 无 VSA，被引的是 l2 真实现 | 留基线 |
+| 2 | `ffi/consciousness_tree.rs [l5]` metacalib 2 处 | l0 无 brier/ece，真实现在 l5 | 留基线 |
+| 3 | `ffi/seal_pipeline.rs [l5]` training_cycle 3 处 | l0 无对应；且该文件 ios-bridge 下有预存 `types::` 解析错（未动） | 留基线 |
+| 4 | `nt_file_ability/tests.rs [l5]` BranchKind 2 处 | l0 无，真实现在 l5 | 留基线 |
+| 5 | `ffi/consciousness_tree.rs [l6]` register_absorbed_modules 1 处 | l6 本地真实现，不可下沉 | 留基线 |
+| 6-8 | nt_agent_session[l5]、arch_fitness[l6]、orchestration_taxonomy[l6] | 剥离后 0 命中：字符串/参数字面量 | 留基线（L14） |
+
+**累计** 101 → 92 → 89 → 80 → 50 → 47 → 40 → 26 → 25 → **8**（清 93 条）。
+真引用清零的验证口径：每批改道后门计数实际下降（L19），而非分类器断言。
 
 | 类别 | 文件 | 引用 | 状态 |
 |---|---|---|---|

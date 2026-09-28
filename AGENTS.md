@@ -74,15 +74,19 @@ cargo build -p neotrix                  # 完整构建
   - 历史教训：22:52 之前本文长期写着"当前 0 命中"，而实际是 12 条 —— **陈旧门记录会让下一个 agent 去"修"正确代码，比没有门更危险**（见 R-SCAN-3）
 - sidecar 按需：`sh scripts/ops/nt_sidecar.sh {start|stop|status}` — 用完即停
 - 目录/命名门（2026-09-28 新增，均 bash，无需 cargo）：
-  - `bash scripts/check-layer-deps.sh --strict` → **exit 0**，**50 known**
+  - `bash scripts/check-layer-deps.sh --strict` → **exit 0**，**8 known**
     **测量台：`git worktree add --detach HEAD` 的干净检出**。
-    - **2026-09-28 21:0x 实测 50**（车道 `fix/bitemporal-and-layer-ratchet`；
-      棘轮 **101 → 92 → 89 → 80 → 50**，`PASS 0 new`、RC=0；
-      **L2 / L3 / L4 / L5 四层已清零**）。
-    - ⛔ 历史值依次为 94(脏树) → 102(`bdf1e9f1`) → 101/92/89/80/50。
+    - **2026-09-28 23:x 实测 8**（车道 `fix/bitemporal-and-layer-ratchet`；
+      棘轮 **101 → 92 → 89 → 80 → 50 → 47 → 40 → 26 → 25 → 8**，
+      `PASS 0 new`、RC=0；**L1–L5 真引用全清**）。
+    - ⛔ 历史值依次为 94(脏树) → 102(`bdf1e9f1`) → 101/…/50/…/8。
       **照抄旧值会让 CI 以 `FAIL: N new` 红**（见 L8）。
-    - **剩余 50 条 = L1 36 文件/70 引用 + 2 条不可改道误报。**
-      L1 的 `nt_action_facade.rs` **0 条 `pub use`** ⇒ 需从零建 barrel，风险最高。
+    - **剩余 8 条全部是已记录不可改道项**（l0 无对应真实现 / 字符串字面量），
+      详见 DECISIONS §"剩余 8 条"。真引用清零。
+    - ⚠️ `neotrix/` 树受 `#[cfg(feature="ios-bridge")]` 门控，默认测试编不进；
+      该树改动须另跑 `cargo check -p neotrix --features ios-bridge` 验证。
+      实测该 feature 下有**预存** `seal_pipeline.rs:126,154` 的 `types::` 解析错
+      （未动过的文件，与棘轮无关，另立待办）。
     - ⚠️ **改跨层引用的唯一合法通道是「消费方自己那层」的 facade**：
       走**目标层** facade **无效**（路径里仍含层名，门照样报）。
     - ⚠️ **同名 ≠ 同一符号**：facade 里已有该名字**不等于**能直接改道，
