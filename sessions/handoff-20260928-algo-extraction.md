@@ -228,3 +228,49 @@ pre-commit cargo check --tests ✅ Build gate passed（多轮；本轮门共抓�
 - `check-truth-surface.sh`：EMPTY:0 / UNDECLARED:0 ✅
 - `nt_lock_audit.py`：0 处 ✅
 - 门红归属：无本会话引入的红
+
+## 9. 补充：scripts/ + skills/ 架构吸收（2026-09-28 晚）
+
+### 9.1 根因诊断
+`scripts/` 的发现机制**散落在散文里**（AGENTS.md 10 处 / RUST-STANDARDS.md 3 处 /
+Makefile 21 处），无单一权威；`skills/` 有 `index.json` 但它答的是
+「有哪些技能」而非「我这任务该调什么」。⇒ 都不是"融入架构"的问题，
+是**缺机器可查的意图→工具索引**。
+
+### 9.2 交付
+| 提交 | 内容 |
+|---|---|
+| `ef01b200` | skill_loader 路径式 key 解析（**13/58 → 58/58**）|
+| `d183f04e` | check-skill-gate 改**双侧**校验（此前只看 index，看不见 67 个 SKILL.md）|
+| `20b24595` | `SkillInvocationPolicy` 调用策略正交两维（官方规范吸收）|
+| `73ad06e4` | run.rs 知识资产路径 bug（**166KB 资产从未被导入过一次**）+ 删撒谎注释 |
+| `ca6aed8e` | **pre-push 收工门是死代码**（中途 exit 0），R-DISK-8 |
+| `50ac02bd`+`176b074d` | task-index + `nt_find.py` + pre-commit 门 |
+| `cc9032cd` | **Context Manifest**（`nt_manifest.py`）+ pre-commit 门 |
+| `3f85b03a` | 索引 19→30 条，40 个脚本**孤儿归零** |
+| `93a0898c` | dev-tools 6 技能补 frontmatter（按需，非批量）|
+| `75fc7384` | 8 项目吸收正典文档 |
+
+### 9.3 三次「验证后否决原计划」
+1. **外部调研的核心结论被证伪** —— 「skills 文件名不是 SKILL.md 故不可发现」
+   实测证伪（67 个 SKILL.md 齐备、59 条路径零缺失），真问题是 frontmatter
+2. **`--serves` 反向声明被否决** —— 反向映射已能从 task-index 单向推导，
+   再让每个脚本手写一份 = 制造第二份真源（本会话反复治的病）。改做孤儿检测
+3. **批量生成 frontmatter 被否决** —— 失败模式是填假值（`description: TODO`），
+   自己先造假值等于拆自己刚立的门。只补真引用执行体的 6 个
+
+### 9.4 本会话的失败模式（已全部固化进门）
+| 失败 | 固化成的机制 |
+|---|---|
+| 误删 ratchet（判据自相矛盾仍下结论）| R-DISK-7 判据同向原则 + `nt_worktree_gate.sh` 三判据 |
+| pre-push 死代码（测逻辑 ≠ 测可达性）| R-DISK-8 + `nt_manifest.py --audit`（记了 file:line ≠ 还指在那里）|
+| layer-map 数字过期 | 按 HEAD 口径重测 + 3 轮时效核查 |
+| 采信外部 agent 结论未实测 | `nt_manifest.py add` 要求带 file:line 证据，`--audit` 校验行号有效 |
+| grep 判据写死 `^exit 0` 匹配不到缩进 | R-DISK-6（追加前先 grep -c 计数）|
+
+### 9.5 收工自查（§8 补充）
+- `nt_worktree_gate.sh check` exit 4 —— `.worktrees/ratchet` 5 处脏，**他窗活跃**（近 3h 有改动），明确移交不收
+- 本会话新建 worktree：**0 个**
+- 主仓未提交 10 处：全为他窗 WIP
+- 门：layer-deps 101known/0new · truth-surface 0/0/0 · find --audit 30/30 ·
+  manifest --audit 5/5 file:line · lock-audit 0 · 全绿
