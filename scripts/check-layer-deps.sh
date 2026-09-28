@@ -82,6 +82,67 @@ check_layer "l3_embodiment" "L3(embodiment)" "l4_emotion" "l5_cognition" "l6_met
 check_layer "l4_emotion"    "L4(emotion)"    "l5_cognition" "l6_meta"
 check_layer "l5_cognition"  "L5(cognition)"  "l6_meta"
 
+# --- neotrix/ second tree (2026-09-28) -----------------------------------------
+# `neotrix-core/src/neotrix/` is 129 files / 43,834 lines that do NOT live under
+# any l*_ dir, so the check_layer calls above never see it. Its layer ownership is
+# declared in .neotrix/layer-map.json; we enforce the same rule against that
+# declared layer. Rationale: docs/architecture/DIR-REMEDY-2026-09-28.md
+#   - decoupling layer ownership from directory location is what lets us enforce
+#     architecture here WITHOUT moving 129 files (a large regression for zero
+#     architectural gain).
+#   - Everything here is ratcheted: the tree is live (nt_crystal_core has 6 L1
+#     consumers), so it enters the same baseline ledger, not a hard failure.
+LAYER_MAP=".neotrix/layer-map.json"
+if [ -f "$LAYER_MAP" ]; then
+  mapfile_layers=$(python3 - "$LAYER_MAP" <<'PY' 2>/dev/null
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(0)
+ORDER = ["l0_substrate", "l1_action", "l2_perception",
+         "l3_embodiment", "l4_emotion", "l5_cognition", "l6_meta"]
+for path, meta in d.get("trees", {}).items():
+    if meta.get("role") != "primary":
+        continue
+    layer = meta.get("layer")
+    if layer not in ORDER:
+        continue
+    # It may not reference any STRICTLY HIGHER layer.
+    for higher in ORDER[ORDER.index(layer) + 1:]:
+        print(f"{path}\t{higher}")
+PY
+)
+  if [ -n "$mapfile_layers" ]; then
+    echo
+    echo "--- neotrix/ second tree (layer declared in $LAYER_MAP) ---"
+    while IFS=$'\t' read -r tree higher; do
+      [ -n "$tree" ] && [ -n "$higher" ] || continue
+      [ -d "$SRC/$tree" ] || { echo "WARN: declared tree missing: $SRC/$tree"; continue; }
+      # Recover the declared layer from the map for the human-readable message.
+      decl=$(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(d['trees'][sys.argv[2]].get('layer','?'))" \
+             "$LAYER_MAP" "$tree" 2>/dev/null || echo "?")
+      # Match either the bare layer name or its absolute crate path.
+      hits=$(rg --no-heading -n "(crate::)?$higher" "$SRC/$tree" \
+        -g '!*facade*' -g '!traits.rs' 2>/dev/null \
+        | rg -v ':[0-9]+:\s*//' | rg -v ':[0-9]+:\s*/\*' || true)
+      [ -n "$hits" ] || continue
+      n=$(printf '%s\n' "$hits" | wc -l | tr -d ' ')
+      echo "VIOLATION: $tree (declared $decl) must not reference $higher  (${n} site(s))"
+      printf '%s\n' "$hits" | head -n 10 | sed 's/^/  /'
+      [ "$n" -gt 10 ] && echo "  ... and $((n - 10)) more"
+      echo "---"
+      printf '%s\n' "$hits" | cut -d: -f1 | sort -u | while read -r f; do
+        printf '%s\t%s\n' "$higher" "$f"
+      done >> "$CUR"
+    done <<< "$mapfile_layers"
+  fi
+else
+  echo
+  echo "NOTE: $LAYER_MAP not found — the neotrix/ second tree is UNCHECKED."
+  echo "      See docs/architecture/DIR-REMEDY-2026-09-28.md"
+fi
+
 sort -u "$CUR" -o "$CUR"
 TOTAL=$(wc -l < "$CUR" | tr -d ' ')
 

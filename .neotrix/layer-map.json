@@ -1,0 +1,56 @@
+{
+  "_comment": "层归属显式化 —— 2026-09-28。理由见 docs/architecture/DIR-REMEDY-2026-09-28.md。neotrix-core/src/neotrix/ 是嵌在分层 core 内部的第二棵树（128 文件 / 42,070 行），不参与 L0-L6，且完全逃过 scripts/check-layer-deps.sh（该门只解析 l*_ 目录）。本文件把「目录位置」与「层归属」解耦：目录不动，层归属变成可被门读取的显式数据。",
+  "_verified": "2026-09-28 15:2x 实测。**测量台：`git worktree add --detach HEAD` 的干净检出**（e90a68cf），find/wc/grep 递归计数。每条 note 记录真实构造点证据，裁决以构造点为准，不以 mod 声明为准。",
+  "_measurement_台_correction": "本文件首版的全部 files/lines 数字是在**主工作树（脏，含他窗未提交 .rs）**上量的，7/8 与干净检出不符，最大偏差 nt_crystal_core 21,134 -> 19,371（-1,763，-8%）。已在本次提交按干净检出全部校正。教训见 docs/architecture/LESSONS-20260928-fresh-checkout.md：脏树不是合法测量台。",
+  "_rule": "「导出 ≠ 调用」已错过 4 次（CapabilityRegistry x4 / SearchResult x9 / 三个决策引擎 / JEV 反向）。本文件的 role 字段必须有构造点证据支撑，改动前先 grep 复核。",
+  "trees": {
+    "neotrix/nt_crystal_core": {
+      "layer": "l5_cognition",
+      "role": "primary",
+      "lines": 19371,
+      "files": 51,
+      "live_consumers": [
+        "neotrix-core/src/l1_action/nt_dialogue_tui.rs",
+        "neotrix-core/src/l1_action/nt_tui_app.rs",
+        "neotrix-core/src/l1_action/nt_stdin_human.rs",
+        "neotrix-core/src/l1_action/nt_crystal_llm_bridge.rs",
+        "neotrix-core/src/l1_action/nt_free_pool.rs",
+        "neotrix-core/src/l1_action/nt_core_task_dispatcher/nt_dispatcher_core.rs"
+      ],
+      "note": "全系统决策/意识主干。CrystalConsciousness + JEV 决策。⛔ 禁止当死代码清理 —— DIR-AUDIT §6 曾把它归入「未接线」，实测是活路径。"
+    },
+    "neotrix/nt_jev": {
+      "layer": "l5_cognition",
+      "role": "primary",
+      "lines": 4312,
+      "files": 14,
+      "live_consumers": [
+        "neotrix/nt_crystal_core/nt_eval_loop.rs:13",
+        "neotrix/nt_crystal_core/nt_jev_agentjev.rs:17",
+        "neotrix/nt_crystal_core/nt_jev_calibration.rs:18",
+        "neotrix/nt_crystal_core/nt_crystal_dialogue.rs:40",
+        "neotrix/nt_crystal_core/nt_crystal_task_fusion.rs:41"
+      ],
+      "note": "决策三原语（primitives.rs 481 行 / gate.rs 480 / eval.rs 569）。⛔ 同上，勿删。"
+    },
+    "neotrix/nt_file_ability": {
+      "layer": "l1_action",
+      "role": "primary",
+      "lines": 14016,
+      "files": 44,
+      "note": "文件能力。其 capability.rs:185 的 CapabilityRegistry 零消费者（真冗余，见 BATCH-FIX-CHECKLIST B-1），但本子树整体是活的（l2_perception/nt_world/ocr/mod.rs:283 消费 OcrEngine）。"
+    },
+    "neotrix/ffi": {
+      "layer": "l0_substrate",
+      "role": "primary",
+      "lines": 2907,
+      "files": 12,
+      "note": "uniffi 绑定（GWT attention / types）。属 L0 基座。"
+    }
+  },
+  "unresolved": {
+    "l4_emotion/nt_memory": { "layer": "l4_emotion", "role": "primary", "note": "存储真典候选（237 文件 / 81,227 行）" },
+    "l5_cognition/nt_mind": { "layer": "l5_cognition", "role": "primary", "note": "经验树真典候选（422 文件 / 133,019 行）" },
+    "l6_meta/memory": { "layer": "l6_meta", "role": "undecided", "note": "⛔ 待裁决（8 文件 / 2,048 行，含 nt_memory_experience_tree.rs）。三棵记忆树之一，C-3 处理。" }
+  }
+}

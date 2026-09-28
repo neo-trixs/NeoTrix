@@ -13,6 +13,7 @@ l2_perception	neotrix-core/src/l1_action/nt_io/universal_model/ollama_adapter.rs
 l2_perception	neotrix-core/src/l1_action/nt_io/universal_model/openai_adapter.rs
 l2_perception	neotrix-core/src/l1_action/nt_media/playback.rs
 l2_perception	neotrix-core/src/l1_action/nt_media/streaming/mod.rs
+l2_perception	neotrix-core/src/neotrix/nt_file_ability/tests.rs
 l3_embodiment	neotrix-core/src/l1_action/nt_io/nt_io_hotreload/mod.rs
 l3_embodiment	neotrix-core/src/l1_action/nt_io/nt_io_provider/common/factory.rs
 l3_embodiment	neotrix-core/src/l2_perception/nt_world/data_source/nt_world_edgar.rs
@@ -72,6 +73,9 @@ l5_cognition	neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_distil
 l5_cognition	neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_gwtq.rs
 l5_cognition	neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_search/nt_pure_fns.rs
 l5_cognition	neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/tests.rs
+l5_cognition	neotrix-core/src/neotrix/ffi/consciousness_tree.rs
+l5_cognition	neotrix-core/src/neotrix/ffi/seal_pipeline.rs
+l5_cognition	neotrix-core/src/neotrix/nt_file_ability/tests.rs
 l6_meta	neotrix-core/src/l1_action/nt_io/nt_io_agent_loop/nt_loop_core.rs
 l6_meta	neotrix-core/src/l1_action/nt_io/nt_io_agent_loop/nt_loop_step.rs
 l6_meta	neotrix-core/src/l3_embodiment/nt_sandboxed_shell.rs
@@ -90,3 +94,9 @@ l6_meta	neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_c
 l6_meta	neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_consciousness/nt_transcendent.rs
 l6_meta	neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/mod.rs
 l6_meta	neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs
+l6_meta	neotrix-core/src/neotrix/ffi/consciousness_tree.rs
+l6_meta	neotrix-core/src/neotrix/nt_file_ability/capability.rs
+l6_meta	neotrix-core/src/neotrix/nt_file_ability/excel/selftest_excel.rs
+l6_meta	neotrix-core/src/neotrix/nt_file_ability/format_route.rs
+l6_meta	neotrix-core/src/neotrix/nt_file_ability/selftest.rs
+l6_meta	neotrix-core/src/neotrix/nt_file_ability/tests.rs
