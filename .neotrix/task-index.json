@@ -12,7 +12,15 @@
   "tasks": [
     {
       "id": "check-layer-deps",
-      "query": ["分层", "层依赖", "layer", "架构分层", "L0 L6", "依赖方向", "层归属违规"],
+      "query": [
+        "分层",
+        "层依赖",
+        "layer",
+        "架构分层",
+        "L0 L6",
+        "依赖方向",
+        "层归属违规"
+      ],
       "tool": "bash scripts/check-layer-deps.sh --strict",
       "kind": "gate",
       "read_only": true,
@@ -21,7 +29,15 @@
     },
     {
       "id": "check-truth-surface",
-      "query": ["truth", "空文件", "0字节", "未声明测试", "假实现", "stub", "空壳"],
+      "query": [
+        "truth",
+        "空文件",
+        "0字节",
+        "未声明测试",
+        "假实现",
+        "stub",
+        "空壳"
+      ],
       "tool": "bash scripts/check-truth-surface.sh --strict",
       "kind": "gate",
       "read_only": true,
@@ -30,7 +46,13 @@
     },
     {
       "id": "check-naming",
-      "query": ["命名", "naming", "nt_前缀", "前缀规范", "文件名规范"],
+      "query": [
+        "命名",
+        "naming",
+        "nt_前缀",
+        "前缀规范",
+        "文件名规范"
+      ],
       "tool": "bash scripts/check-naming.sh",
       "kind": "gate",
       "read_only": true,
@@ -39,7 +61,12 @@
     },
     {
       "id": "check-forbid-coverage",
-      "query": ["unsafe", "forbid", "安全边界", "unsafe_code"],
+      "query": [
+        "unsafe",
+        "forbid",
+        "安全边界",
+        "unsafe_code"
+      ],
       "tool": "bash scripts/check-forbid-coverage.sh",
       "kind": "gate",
       "read_only": true,
@@ -48,7 +75,13 @@
     },
     {
       "id": "check-skill-gate",
-      "query": ["skill 门", "技能门", "三段式", "frontmatter", "skill 合规"],
+      "query": [
+        "skill 门",
+        "技能门",
+        "三段式",
+        "frontmatter",
+        "skill 合规"
+      ],
       "tool": "bash scripts/check-skill-gate.sh",
       "kind": "gate",
       "read_only": true,
@@ -57,7 +90,13 @@
     },
     {
       "id": "check-fresh-build",
-      "query": ["干净构建", "fresh build", "能不能编译", "CI 会不会红", "干净检出"],
+      "query": [
+        "干净构建",
+        "fresh build",
+        "能不能编译",
+        "CI 会不会红",
+        "干净检出"
+      ],
       "tool": "bash scripts/check-fresh-build.sh",
       "kind": "gate",
       "read_only": true,
@@ -66,7 +105,12 @@
     },
     {
       "id": "check-doc-drift",
-      "query": ["文档漂移", "doc drift", "缺模块注释", "//! 缺失"],
+      "query": [
+        "文档漂移",
+        "doc drift",
+        "缺模块注释",
+        "//! 缺失"
+      ],
       "tool": "bash scripts/check-doc-drift.sh",
       "kind": "gate",
       "read_only": true,
@@ -74,7 +118,14 @@
     },
     {
       "id": "audit-lock",
-      "query": ["死锁", "deadlock", "自死锁", "锁审计", "mutex 卡死", "锁没释放"],
+      "query": [
+        "死锁",
+        "deadlock",
+        "自死锁",
+        "锁审计",
+        "mutex 卡死",
+        "锁没释放"
+      ],
       "tool": "python3 scripts/ops/nt_lock_audit.py neotrix-core/src",
       "kind": "ops",
       "read_only": true,
@@ -83,7 +134,15 @@
     },
     {
       "id": "locate",
-      "query": ["在哪", "找文件", "定位", "定点", "这个函数在哪", "locate", "哪个文件"],
+      "query": [
+        "在哪",
+        "找文件",
+        "定位",
+        "定点",
+        "这个函数在哪",
+        "locate",
+        "哪个文件"
+      ],
       "tool": "python3 scripts/ops/nt_locate.py --component <组件名>",
       "kind": "locate",
       "read_only": true,
@@ -92,7 +151,16 @@
     },
     {
       "id": "worktree-gate",
-      "query": ["worktree", "工作树", "磁盘满", "占空间", "收工", "清理", "脏文件", "未提交改动"],
+      "query": [
+        "worktree",
+        "工作树",
+        "磁盘满",
+        "占空间",
+        "收工",
+        "清理",
+        "脏文件",
+        "未提交改动"
+      ],
       "tool": "sh scripts/ops/nt_worktree_gate.sh check",
       "kind": "ops",
       "read_only": true,
@@ -101,7 +169,11 @@
     },
     {
       "id": "worktree-clean",
-      "query": ["worktree 清 target", "删编译产物", "释放磁盘"],
+      "query": [
+        "worktree 清 target",
+        "删编译产物",
+        "释放磁盘"
+      ],
       "tool": "sh scripts/ops/nt_worktree_gate.sh clean",
       "kind": "ops",
       "read_only": false,
@@ -110,7 +182,11 @@
     },
     {
       "id": "worktree-prune",
-      "query": ["删 worktree", "移除工作树", "prune"],
+      "query": [
+        "删 worktree",
+        "移除工作树",
+        "prune"
+      ],
       "tool": "sh scripts/ops/nt_worktree_gate.sh prune --force",
       "kind": "ops",
       "read_only": false,
@@ -119,7 +195,14 @@
     },
     {
       "id": "mem-gate",
-      "query": ["内存", "OOM", "swap", "跑不动", "内存不够", "重型构建"],
+      "query": [
+        "内存",
+        "OOM",
+        "swap",
+        "跑不动",
+        "内存不够",
+        "重型构建"
+      ],
       "tool": "sh scripts/ops/nt_mem_gate.sh; echo $?",
       "kind": "ops",
       "read_only": true,
@@ -128,7 +211,13 @@
     },
     {
       "id": "sidecar",
-      "query": ["sidecar", "推理服务", "llama", "本地模型", "8149"],
+      "query": [
+        "sidecar",
+        "推理服务",
+        "llama",
+        "本地模型",
+        "8149"
+      ],
       "tool": "sh scripts/ops/nt_sidecar.sh status",
       "kind": "ops",
       "read_only": true,
@@ -137,7 +226,13 @@
     },
     {
       "id": "project-map",
-      "query": ["项目地图", "codemap", "全仓索引", "代码地图", "map"],
+      "query": [
+        "项目地图",
+        "codemap",
+        "全仓索引",
+        "代码地图",
+        "map"
+      ],
       "tool": "make project-map",
       "kind": "locate",
       "read_only": true,
@@ -145,7 +240,14 @@
     },
     {
       "id": "crystal-graph-audit",
-      "query": ["晶体图", "记忆图", "crystal", "知识图谱体检", "hubs", "度数"],
+      "query": [
+        "晶体图",
+        "记忆图",
+        "crystal",
+        "知识图谱体检",
+        "hubs",
+        "度数"
+      ],
       "tool": "python3 scripts/ops/nt_graph_audit.py",
       "kind": "ops",
       "read_only": true,
@@ -153,7 +255,13 @@
     },
     {
       "id": "weights-manifest",
-      "query": ["模型权重", "weights", "models 账本", "权重校验", "备份权重"],
+      "query": [
+        "模型权重",
+        "weights",
+        "models 账本",
+        "权重校验",
+        "备份权重"
+      ],
       "tool": "bash scripts/ops/nt_weights_manifest.sh status",
       "kind": "ops",
       "read_only": true,
@@ -161,7 +269,11 @@
     },
     {
       "id": "experience-smoke",
-      "query": ["经验树冒烟", "KB 回路", "experience 冒烟"],
+      "query": [
+        "经验树冒烟",
+        "KB 回路",
+        "experience 冒烟"
+      ],
       "tool": "bash scripts/experience-smoke.sh",
       "kind": "ops",
       "read_only": false,
@@ -169,11 +281,199 @@
     },
     {
       "id": "audit-all",
-      "query": ["全部检查", "跑所有门", "全量审计", "提交前检查"],
+      "query": [
+        "全部检查",
+        "跑所有门",
+        "全量审计",
+        "提交前检查"
+      ],
       "tool": "make audit-all",
       "kind": "gate",
       "read_only": true,
       "when_not": "6 个门聚合，其中多数 advisory；要 blocking 结论请逐个跑对应 --strict"
+    },
+    {
+      "id": "check-test-baseline",
+      "query": [
+        "测试基线",
+        "test baseline",
+        "红测试",
+        "新增失败",
+        "测试挂了"
+      ],
+      "tool": "bash scripts/check-test-baseline.sh --strict",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "账本为空（0 字节）⇒ 任何新失败即红。若你有意的 flaky 未登记，会被打回；先修或明确 ignore",
+      "spec": "CI ci.yml"
+    },
+    {
+      "id": "check-supply-iocs",
+      "query": [
+        "供应链",
+        "IOC",
+        "恶意包",
+        "依赖投毒",
+        "license 卫生",
+        "cargo-deny"
+      ],
+      "tool": "bash scripts/check-supply-iocs.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "其 advisory B（license 卫生）已被 deny.toml + .github/workflows/deny.yml 覆盖 ⇒ 别两边都当权威",
+      "spec": "deny.toml"
+    },
+    {
+      "id": "check-build-surface",
+      "query": [
+        "build.rs",
+        "proc-macro",
+        "build 依赖",
+        "构建面"
+      ],
+      "tool": "bash scripts/check-build-surface.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "advisory；--strict 备用"
+    },
+    {
+      "id": "check-fuzz-ready",
+      "query": [
+        "fuzz",
+        "模糊测试",
+        "cargo-fuzz",
+        "语料"
+      ],
+      "tool": "bash scripts/check-fuzz-ready.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "恒 exit 0 的探针，只报告就绪度"
+    },
+    {
+      "id": "check-api-surface",
+      "query": [
+        "API 盘点",
+        "tauri command",
+        "axum route",
+        "OpenAPI",
+        "api 面"
+      ],
+      "tool": "bash scripts/check-api-surface.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "**基线已失真** —— 它 grep 的 src-tauri/ 已随 5c02e738 删除，恒 0 命中且不报错。要真实 API 面用别处",
+      "spec": "已知缺陷，待修"
+    },
+    {
+      "id": "wait-for-cargo",
+      "query": [
+        "等构建",
+        "cargo 在跑",
+        "构建锁",
+        "等编译完",
+        "轮询构建"
+      ],
+      "tool": "bash scripts/wait-for-cargo.sh",
+      "kind": "ops",
+      "read_only": true,
+      "when_not": "它只轮询不 kill；真要停用 nt_mem_gate.sh 或人工判断",
+      "spec": "R-ENV-1"
+    },
+    {
+      "id": "git-safe-reset",
+      "query": [
+        "安全 reset",
+        "误 checkout",
+        "误 stash pop",
+        "恢复误删",
+        "覆盖事故"
+      ],
+      "tool": "bash scripts/git-safe-reset.sh",
+      "kind": "ops",
+      "read_only": false,
+      "when_not": "**改前先读 git status --porcelain** —— 2026-09-22 三次覆盖事故的教训：stash pop / checkout -- 会静默吞掉未提交改动",
+      "spec": "AGENTS.md 并行公约"
+    },
+    {
+      "id": "manifest",
+      "query": [
+        "结论记录",
+        "环境指纹",
+        "stale",
+        "假证据",
+        "在哪个环境验证",
+        "manifest"
+      ],
+      "tool": "python3 scripts/ops/nt_manifest.py list",
+      "kind": "ops",
+      "read_only": true,
+      "when_not": "别用它当任务索引用（那是 nt_find.py 的活）；它记的是**结论 + 其环境**",
+      "spec": "Context Manifest"
+    },
+    {
+      "id": "find",
+      "query": [
+        "该跑什么",
+        "用什么工具",
+        "查工具",
+        "怎么查",
+        "找脚本",
+        "任务索引"
+      ],
+      "tool": "python3 scripts/ops/nt_find.py <你的问题>",
+      "kind": "ops",
+      "read_only": true,
+      "when_not": "**先查它再动手** —— 索引外的手写重复实现是本仓反复出现的问题（nt_mapgen.py vs nt_core_code_search.rs）",
+      "spec": "task-index"
+    },
+    {
+      "id": "crystal-ingest-verify",
+      "query": [
+        "吸收验收",
+        "cocoons 验收",
+        "摄入校验",
+        "8 项验收",
+        "M-id 唯一"
+      ],
+      "tool": "python3 scripts/ops/nt_cocoons_verify_absorb.py",
+      "kind": "absorb",
+      "read_only": true,
+      "when_not": "**刻意不复用生产代码函数** —— 生产脚本自证 ≠ 独立验收。这是设计不是缺陷，别去「重构」它",
+      "spec": "consciousness.rs:39-56 为权威枚举"
+    },
+    {
+      "id": "jev-live-eval",
+      "query": [
+        "jev 评测",
+        "判分器准确率",
+        "MRR",
+        "随机基线",
+        "真实标答"
+      ],
+      "tool": "python3 scripts/ops/nt_jev_live_eval.py",
+      "kind": "absorb",
+      "read_only": true,
+      "when_not": "⚠️ **当前跑不起来** —— 它 import 的 nt_verify_sim 已随 2bbed32c 删除（__pycache__ 里的 .pyc 是悬空残影）。用前先修依赖",
+      "spec": "已知缺陷，待修"
     }
-  ]
+  ],
+  "excluded": {
+    "_about": "刻意不进入日常索引的脚本 —— 它们是一次性数据管道，日常任务不该找到它们。",
+    "platform_scrapers": {
+      "files": "scripts/ops/nt_douyin_*.py (6), nt_deepseek_*.py (2), nt_doubao_batch.py",
+      "why": "playwright/faster-whisper 的一次性采集管道，Rust 无等价形态；进日常索引会污染 nt_find 的排序（它们有 1~2 个触发词但几乎不会被日常问起）"
+    },
+    "hf_absorption": {
+      "files": "scripts/ops/nt_hf_survey.py, nt_hf_batch_absorb.py, nt_hf_digest_to_cocoons.py",
+      "why": "数据集批量吸收，跑一次即完成；nt_cocoons_verify_absorb.py 已单列（它是**验收器**，会被重复调用）"
+    },
+    "mapgen": {
+      "files": "scripts/ops/nt_mapgen.py",
+      "why": "**与 neotrix-core/src/l2_perception/nt_core_code_search.rs 强重复且 Rust 更强**（670 行含 RRF 融合）。task-index 的 project-map 条目指向 make project-map 即可。**合并前勿删此文件** —— 它仍是 Makefile 的实际后端"
+    },
+    "orphan_misc": {
+      "files": "scripts/ops/__pycache__/ (7 个 .pyc)",
+      "why": "悬空残影，源码已删（nt_docclaims/nt_foundation_laws/nt_hf_smelt_chains/nt_ipc_keys/nt_symbol_brain/nt_verify_sim）。建议 gitignore + 清理"
+    }
+  }
 }
