@@ -34,7 +34,7 @@
 | `crates/nt-core-capability-tree/src/registry.rs:60` | `IndexMap` + `experience_targets` + `maturity_audit` | CLI 依赖 DAG + CI `capability-truth` | ✅ **真典** |
 | `l0_substrate/nt_core_capability_types.rs:533` | `HashMap<Arc<dyn>>` + by_domain/by_layer | `l2_perception/nt_world/ocr/mod.rs:405` · `l1_action/nt_act/nt_act_trade/capability_registry.rs:171` | ✅ **活**，保留 |
 | `neotrix/nt_file_ability/capability.rs:185` | `Vec<Arc<dyn>>` 精简版 | **零**（精确搜索 0 命中；`l5_cognition/.../registry.rs:454` 注释独立佐证） | ✅ **已删**（2026-09-28 提交 B-1，该文件整体移除） |
-| `l5_cognition/nt_core/capability/registry.rs:462` | `Vec<Capability>` + tag_index | **仅自审**（`cluster_self_test.rs:24,33`，编译期代码但只做自审；无生产消费者） | ⛔ **B-2 撤销 —— 不可删整文件**（2026-09-28 复核推翻，见下） |
+| `l5_cognition/nt_core/capability/registry.rs:473`（原 :462，2026-09-28 改名 `CapabilityCatalog`）| `Vec<Capability>` + tag_index | **仅自审**（`cluster_self_test.rs:24,33`，编译期代码但只做自审；无生产消费者） | ⛔ **B-2 撤销 —— 不可删整文件**（2026-09-28 复核推翻，见下） |
 
 > ### ⚠️ B-2 撤销记录（2026-09-28 复核，原判「可删」是错的）
 >
