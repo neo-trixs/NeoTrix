@@ -134,9 +134,9 @@
  （`UnifiedModelPool` / `consciousness_core`），**或**废弃 CLI 子命令对 stub 的引用。
   隐藏工作量仍成立：`UnifiedResponse.metadata`（`stub.rs:292-303`）已预留
   `consciousness_state{phi,coherence,gwt_resonance}` + `confidence`，与 L5 意识核类型级吻合 |（零状态单元结构体）· `:285-304`（`:289` 返回字面量）· `main.rs:52` 注册源 · `main.rs:387,407-408` 调用点 | ⬜ |
-| 0.2 | **删 `ToolRegistry` 45 行 stub**，其余 3 份改 `pub use` | 删 `l5_cognition/nt_core_gate/nt_tool_registry.rs:11`；保留 `l1_action/nt_act/tool_registry.rs:85`（770 行唯一真实现） | ⬜ |
-| 0.3 | **`CapabilityRegistry` 4→1** | `l0_substrate/nt_core_capability_types.rs:533` · `l5_cognition/nt_core/capability/registry.rs:453` · `neotrix/nt_file_ability/capability.rs:173` · `nt_core_capability_tree/src/registry.rs:53` | ⬜ |
-| 0.4 | **`SkillRegistry` 5→1**：先删 `neotrix-types` **包内自重复**（零风险第一刀） | 自重复：`neotrix-types/src/core/skill.rs:54` + `core/skills/mod.rs:25`；另 3 份：`neotrix-core/src/skill_registry.rs:14`（正典）· `neotrix-gateway/src/skill_registry.rs:157` · `neotrix-multi-agent/src/skill_registry.rs:157` | ⬜ |
+| 0.2 | **删 `ToolRegistry` 零消费者副本** ✅ | 4 份**全不同型**（逐对核实）。已删 `crates/neotrix-gateway/src/gate.rs:1273`（`7664ecd8`）；`nt_core_gate` 那份**在用**（run.rs:4、shield_enforcer.rs:388）**保留** | ✅ |
+| 0.3 | **`CapabilityRegistry` 4→1** ❌ **结论：不成立** | 4 份全不同型；l0 版**有真实跨层消费者**（ocr/mod.rs:405、nt_act_trade/capability_registry.rs:171）。仅 nt_core 版仅自测、nt_file_ability 版零消费者，已加注释 | ⚠️ 改判 | `l0_substrate/nt_core_capability_types.rs:533` · `l5_cognition/nt_core/capability/registry.rs:453` · `neotrix/nt_file_ability/capability.rs:173` · `nt_core_capability_tree/src/registry.rs:53` | ⬜ |
+| 0.4 | **`SkillRegistry` 5→1** ✅ 部分 | 逐对核实：5 份中**仅 multi-agent 与 gateway 逐字重复**（内部外部零引用、4 测试同名重复），已删 600 行（`474c2b7e`）。其余 4 份不同型保留 | ✅ | 自重复：`neotrix-types/src/core/skill.rs:54` + `core/skills/mod.rs:25`；另 3 份：`neotrix-core/src/skill_registry.rs:14`（正典）· `neotrix-gateway/src/skill_registry.rs:157` · `neotrix-multi-agent/src/skill_registry.rs:157` | ⬜ |
 | 0.5 | **`maturity_audit()` 接 CI 门** —— 机制已完整实现且**带自愈**（`:484-485` 自动下调声称等级），缺的只是没人调它 | `nt_core_capability_tree/src/registry.rs:459` · 数据源 `.neotrix/capability_registry.json` → `nodes[]` | ⬜ |
 | 0.6 | **CI 三断言基座**：① `detector_coverage ⊇ execution_scope` ②注册表唯一性防回潮 ③schema 指纹门（`sha256(DDL)[..12]`，环境派生字段拆独立门） | `security-audit.yml`（实测全文只有 `cargo deny check all`）· 挂靠点 `scripts/ops/` | ⬜ |
 
