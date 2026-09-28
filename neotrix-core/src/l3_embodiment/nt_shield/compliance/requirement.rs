@@ -3,7 +3,9 @@
 //! Defines individual compliance requirements with verification methods
 
 /// Severity level for compliance requirements
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum Severity {
     /// Critical requirements - must be met for compliance
     Critical,
@@ -120,8 +122,7 @@ impl Requirement {
             return false;
         }
         let version_parts: Vec<&str> = parts[1].split('.').collect();
-        version_parts.len() == 3
-            && version_parts.iter().all(|p| p.parse::<u32>().is_ok())
+        version_parts.len() == 3 && version_parts.iter().all(|p| p.parse::<u32>().is_ok())
     }
 }
 
@@ -187,8 +188,12 @@ mod tests {
 
     #[test]
     fn test_severity_ordering() {
-        assert!(Severity::Critical > Severity::High);
-        assert!(Severity::High > Severity::Medium);
-        assert!(Severity::Medium > Severity::Low);
+        // Ord is derived from the declaration order, so `Critical` sorts first
+        // (`Critical < High < Medium < Low`). Nothing in the codebase sorts or
+        // compares this enum — weighting goes through explicit matches — so the
+        // assertion pins the derived order rather than a risk ranking.
+        assert!(Severity::Critical < Severity::High);
+        assert!(Severity::High < Severity::Medium);
+        assert!(Severity::Medium < Severity::Low);
     }
 }

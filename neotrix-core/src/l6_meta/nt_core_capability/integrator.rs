@@ -6,7 +6,8 @@ use super::discovery::{DiscoveryConfig, DiscoveryManager, DiscoveryResult, Distr
 use super::factory::CapabilityFactory;
 use super::versioning::{SemanticVersion, UpgradeType, VersionManager};
 use super::{
-    CapabilityError, CapabilityInput, CapabilityOutput, CapabilityRegistry, CapabilityRouter, Domain,
+    CapabilityError, CapabilityInput, CapabilityOutput, CapabilityRegistry, CapabilityRouter,
+    Domain,
 };
 use std::sync::Arc;
 
@@ -39,6 +40,11 @@ impl ConsciousnessCapabilityIntegrator {
         }
     }
 
+    /// 重建路由器视图 — `CapabilityRegistry` 是快照式克隆, 注册后必须重建否则路由看不到新能力
+    fn sync_router(&mut self) {
+        self.router = CapabilityRouter::new(Arc::new(self.registry.clone()));
+    }
+
     /// 初始化所有内置能力
     pub fn init_builtin_capabilities(&mut self) {
         // 注册所有内置能力
@@ -52,6 +58,8 @@ impl ConsciousnessCapabilityIntegrator {
             self.version_manager
                 .register_version(&meta.id, version, "system", "内置能力");
         }
+
+        self.sync_router();
     }
 
     /// 注册NT-MIND能力
@@ -64,6 +72,7 @@ impl ConsciousnessCapabilityIntegrator {
             self.version_manager
                 .register_version(&meta.id, version, "system", "NT-MIND能力");
         }
+        self.sync_router();
     }
 
     /// 注册NT-MEMORY能力
@@ -76,6 +85,7 @@ impl ConsciousnessCapabilityIntegrator {
             self.version_manager
                 .register_version(&meta.id, version, "system", "NT-MEMORY能力");
         }
+        self.sync_router();
     }
 
     /// 注册NT-ACT能力
@@ -88,6 +98,7 @@ impl ConsciousnessCapabilityIntegrator {
             self.version_manager
                 .register_version(&meta.id, version, "system", "NT-ACT能力");
         }
+        self.sync_router();
     }
 
     /// 执行路由

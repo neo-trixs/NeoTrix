@@ -881,7 +881,7 @@ mod tests {
         assert!(style.avg_message_length > 0);
         assert!(style.emoji_usage > 0.0);
         assert!(style.question_ratio > 0.0);
-        assert_eq!(style.templates.len(), 3); // 3-word phrases extracted
+        assert_eq!(style.templates.len(), 5); // distinct 3-grams, capped by extract_common_phrases
     }
 
     #[test]

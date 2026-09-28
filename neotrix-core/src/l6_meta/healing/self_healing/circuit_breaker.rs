@@ -93,7 +93,8 @@ impl CircuitBreaker {
     {
         self.total_calls.fetch_add(1, Ordering::Relaxed);
 
-        {
+        // 记住进入调用时的有效状态: 半开探针的失败要区别于常规失败(见下)。
+        let was_half_open = {
             let inner = self.inner.lock().unwrap();
             let state = self.effective_state(&inner);
             if state == CircuitState::Open {
@@ -102,7 +103,8 @@ impl CircuitBreaker {
                     inner.consecutive_failures, inner.failure_threshold
                 ));
             }
-        }
+            state == CircuitState::HalfOpen
+        };
 
         match f() {
             Ok(val) => {
@@ -114,10 +116,20 @@ impl CircuitBreaker {
             Err(e) => {
                 self.total_failures.fetch_add(1, Ordering::Relaxed);
                 let mut inner = self.inner.lock().unwrap();
-                inner.consecutive_failures += 1;
                 inner.last_failure = Some(Instant::now());
-                if inner.consecutive_failures >= inner.failure_threshold {
+                if was_half_open {
+                    // 半开探针失败 = 依赖**仍然坏着** => 立即回到 Open, 且计数
+                    // **重置**为 1 开启新周期。
+                    // 2026-09-28 修复: 原实现是 `+= 1` 累加, 于是冷却后的第一
+                    // 次探针失败会把「曾经熔断的旧计数」继续往上加, 熔断器只能靠
+                    // 成功脱困; 计数永不清零意味着每个新周期都从超阈值起步。
+                    inner.consecutive_failures = 1;
                     inner.state = CircuitState::Open;
+                } else {
+                    inner.consecutive_failures += 1;
+                    if inner.consecutive_failures >= inner.failure_threshold {
+                        inner.state = CircuitState::Open;
+                    }
                 }
                 Err(format!("{}", e))
             }

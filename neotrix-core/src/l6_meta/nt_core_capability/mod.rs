@@ -18,7 +18,6 @@ pub mod composer;
 pub mod dependency;
 pub mod discovery;
 pub mod factory;
-pub mod hotreload;
 pub mod integrator;
 pub mod loadbalancer;
 pub mod monitor;
@@ -66,6 +65,7 @@ mod inline_tests {
             Domain::NtPhysical,
             Domain::NtFeel,
             Domain::NtFileAbility,
+            Domain::Trade,
         ];
         assert_eq!(layers.len(), 6);
         assert_eq!(domains.len(), 11);
@@ -79,18 +79,22 @@ mod inline_tests {
         registry.register(cheap_cap);
         registry.register(expensive_cap);
 
-        let router = CapabilityRouter::with_strategy(
-            Arc::new(registry),
-            MoERoutingStrategy::CostOptimized,
+        let router =
+            CapabilityRouter::with_strategy(Arc::new(registry), MoERoutingStrategy::CostOptimized);
+        assert_eq!(
+            *router.routing_strategy(),
+            MoERoutingStrategy::CostOptimized
         );
-        assert_eq!(*router.routing_strategy(), MoERoutingStrategy::CostOptimized);
     }
 
     #[test]
     fn moe_strategy_default_is_cost_optimized() {
         let registry = Arc::new(CapabilityRegistry::new());
         let router = CapabilityRouter::new(registry);
-        assert_eq!(*router.routing_strategy(), MoERoutingStrategy::CostOptimized);
+        assert_eq!(
+            *router.routing_strategy(),
+            MoERoutingStrategy::CostOptimized
+        );
     }
 
     struct MockCapability {
@@ -101,7 +105,11 @@ mod inline_tests {
 
     impl MockCapability {
         fn new(id: &str, domain: Domain, cost_weight: f64) -> Self {
-            Self { id: id.to_string(), domain, cost_weight }
+            Self {
+                id: id.to_string(),
+                domain,
+                cost_weight,
+            }
         }
     }
 
@@ -171,6 +179,7 @@ mod inline_tests_2 {
             Domain::NtPhysical,
             Domain::NtFeel,
             Domain::NtFileAbility,
+            Domain::Trade,
         ];
         assert_eq!(layers.len(), 6);
         assert_eq!(domains.len(), 11);
@@ -185,18 +194,22 @@ mod inline_tests_2 {
         registry.register(cheap_cap);
         registry.register(expensive_cap);
 
-        let router = CapabilityRouter::with_strategy(
-            Arc::new(registry),
-            MoERoutingStrategy::CostOptimized,
+        let router =
+            CapabilityRouter::with_strategy(Arc::new(registry), MoERoutingStrategy::CostOptimized);
+        assert_eq!(
+            *router.routing_strategy(),
+            MoERoutingStrategy::CostOptimized
         );
-        assert_eq!(*router.routing_strategy(), MoERoutingStrategy::CostOptimized);
     }
 
     #[test]
     fn moe_strategy_default_is_cost_optimized() {
         let registry = Arc::new(CapabilityRegistry::new());
         let router = CapabilityRouter::new(registry);
-        assert_eq!(*router.routing_strategy(), MoERoutingStrategy::CostOptimized);
+        assert_eq!(
+            *router.routing_strategy(),
+            MoERoutingStrategy::CostOptimized
+        );
     }
 
     struct MockCapability {
@@ -207,7 +220,11 @@ mod inline_tests_2 {
 
     impl MockCapability {
         fn new(id: &str, domain: Domain, cost_weight: f64) -> Self {
-            Self { id: id.to_string(), domain, cost_weight }
+            Self {
+                id: id.to_string(),
+                domain,
+                cost_weight,
+            }
         }
     }
 

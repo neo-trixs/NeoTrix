@@ -59,7 +59,7 @@ impl StatefulScenario {
 
 /// 五个有状态场景 (Thinkingbox 式 stateful 业务流):
 /// S1 快照不可变 · S2 deny-wins 跨轮换 · S3 后缀边界不逃逸 ·
-/// S4 default_allow 翻转仅影响未匹配域 · S5 端口区间跨步一致
+/// S4 显式白名单闭合 (default 翻转不放开未匹配域) · S5 端口区间跨步一致
 fn scenarios() -> Vec<StatefulScenario> {
     vec![
         // S1: 会话创建时策略快照; 轮换后旧判定序列仍按各自版本执行
@@ -67,80 +67,202 @@ fn scenarios() -> Vec<StatefulScenario> {
             name: "snapshot_immutability",
             initial: EgressPolicy::new(vec![EgressRule::allow("api.github.com", "443")], false),
             sequence: vec![
-                (Transition::Keep, vec![
-                    BenchStep { host: "api.github.com", port: 443, expect_allowed: true },
-                    BenchStep { host: "evil.example.net", port: 443, expect_allowed: false },
-                ]),
-                (Transition::Rotate(EgressPolicy::deny_all()), vec![
-                    BenchStep { host: "api.github.com", port: 443, expect_allowed: false },
-                ]),
+                (
+                    Transition::Keep,
+                    vec![
+                        BenchStep {
+                            host: "api.github.com",
+                            port: 443,
+                            expect_allowed: true,
+                        },
+                        BenchStep {
+                            host: "evil.example.net",
+                            port: 443,
+                            expect_allowed: false,
+                        },
+                    ],
+                ),
+                (
+                    Transition::Rotate(EgressPolicy::deny_all()),
+                    vec![BenchStep {
+                        host: "api.github.com",
+                        port: 443,
+                        expect_allowed: false,
+                    }],
+                ),
             ],
         },
         // S2: 显式 deny 在任意轮换版本中都压制 allow
         StatefulScenario {
             name: "deny_wins_across_rotations",
             initial: EgressPolicy::new(
-                vec![EgressRule::allow("*.cdn.io", ""), EgressRule::deny("bad.cdn.io", "")],
+                vec![
+                    EgressRule::allow("*.cdn.io", ""),
+                    EgressRule::deny("bad.cdn.io", ""),
+                ],
                 true,
             ),
             sequence: vec![
-                (Transition::Keep, vec![
-                    BenchStep { host: "a.cdn.io", port: 8080, expect_allowed: true },
-                    BenchStep { host: "bad.cdn.io", port: 8080, expect_allowed: false },
-                ]),
-                (Transition::Rotate(EgressPolicy::new(
-                    vec![EgressRule::allow("*.cdn.io", "443"), EgressRule::deny("bad.cdn.io", "443")],
-                    false,
-                )), vec![
-                    BenchStep { host: "b.cdn.io", port: 443, expect_allowed: true },
-                    BenchStep { host: "b.cdn.io", port: 80, expect_allowed: false }, // 版本收窄端口
-                    BenchStep { host: "bad.cdn.io", port: 443, expect_allowed: false },
-                ]),
+                (
+                    Transition::Keep,
+                    vec![
+                        BenchStep {
+                            host: "a.cdn.io",
+                            port: 8080,
+                            expect_allowed: true,
+                        },
+                        BenchStep {
+                            host: "bad.cdn.io",
+                            port: 8080,
+                            expect_allowed: false,
+                        },
+                    ],
+                ),
+                (
+                    Transition::Rotate(EgressPolicy::new(
+                        vec![
+                            EgressRule::allow("*.cdn.io", "443"),
+                            EgressRule::deny("bad.cdn.io", "443"),
+                        ],
+                        false,
+                    )),
+                    vec![
+                        BenchStep {
+                            host: "b.cdn.io",
+                            port: 443,
+                            expect_allowed: true,
+                        },
+                        BenchStep {
+                            host: "b.cdn.io",
+                            port: 80,
+                            expect_allowed: false,
+                        }, // 版本收窄端口
+                        BenchStep {
+                            host: "bad.cdn.io",
+                            port: 443,
+                            expect_allowed: false,
+                        },
+                    ],
+                ),
             ],
         },
         // S3: *.suffix 只匹配子域名 — 不含裸 apex、不跨点边界逃逸
         StatefulScenario {
             name: "suffix_boundary_no_escape",
             initial: EgressPolicy::new(vec![EgressRule::allow("*.api.example.com", "")], false),
-            sequence: vec![
-                (Transition::Keep, vec![
-                    BenchStep { host: "v1.api.example.com", port: 443, expect_allowed: true },
-                    BenchStep { host: "api.example.com", port: 443, expect_allowed: false }, // 裸 apex
-                    BenchStep { host: "example.com", port: 443, expect_allowed: false },
-                    BenchStep { host: "example.com.evil.net", port: 443, expect_allowed: false }, // 点边界
-                    BenchStep { host: "fakeapi.example.com", port: 443, expect_allowed: false }, // 前缀伪装
-                ]),
-            ],
+            sequence: vec![(
+                Transition::Keep,
+                vec![
+                    BenchStep {
+                        host: "v1.api.example.com",
+                        port: 443,
+                        expect_allowed: true,
+                    },
+                    BenchStep {
+                        host: "api.example.com",
+                        port: 443,
+                        expect_allowed: false,
+                    }, // 裸 apex
+                    BenchStep {
+                        host: "example.com",
+                        port: 443,
+                        expect_allowed: false,
+                    },
+                    BenchStep {
+                        host: "example.com.evil.net",
+                        port: 443,
+                        expect_allowed: false,
+                    }, // 点边界
+                    BenchStep {
+                        host: "fakeapi.example.com",
+                        port: 443,
+                        expect_allowed: false,
+                    }, // 前缀伪装
+                ],
+            )],
         },
-        // S4: default_allow 翻转只影响未命中规则的域
+        // S4: 显式白名单即全部许可 — 未列入的域一律拒绝; default 翻转 (deny_all)
+        // 不得在白名单非空时把未匹配域放行 (2026-09-27 egress 极性修复的回归门)
         StatefulScenario {
             name: "default_flip_scoped_to_unmatched",
-            initial: EgressPolicy::new(vec![EgressRule::allow("pinned.dev", "22")], true),
+            initial: EgressPolicy::new(vec![EgressRule::allow("pinned.dev", "22")], false),
             sequence: vec![
-                (Transition::Keep, vec![
-                    BenchStep { host: "random.host", port: 9999, expect_allowed: true }, // 默认放行
-                    BenchStep { host: "pinned.dev", port: 22, expect_allowed: true },
-                ]),
-                (Transition::Rotate(EgressPolicy::new(vec![EgressRule::allow("pinned.dev", "22")], false)), vec![
-                    BenchStep { host: "random.host", port: 9999, expect_allowed: false }, // 默认翻转
-                    BenchStep { host: "pinned.dev", port: 22, expect_allowed: true },     // 匹配域不受影响
-                ]),
+                (
+                    Transition::Keep,
+                    vec![
+                        BenchStep {
+                            host: "random.host",
+                            port: 9999,
+                            expect_allowed: false,
+                        }, // 未列入白名单 → 拒绝 (白名单即全部许可)
+                        BenchStep {
+                            host: "pinned.dev",
+                            port: 22,
+                            expect_allowed: true,
+                        },
+                    ],
+                ),
+                (
+                    Transition::Rotate(EgressPolicy::new(
+                        vec![EgressRule::allow("pinned.dev", "22")],
+                        true,
+                    )),
+                    vec![
+                        BenchStep {
+                            host: "random.host",
+                            port: 9999,
+                            expect_allowed: false,
+                        }, // 轮换到 deny_all 版本后仍拒绝
+                        BenchStep {
+                            host: "pinned.dev",
+                            port: 22,
+                            expect_allowed: true,
+                        }, // 匹配域不受影响
+                    ],
+                ),
             ],
         },
         // S5: 端口区间跨多步保持一致判定
         StatefulScenario {
             name: "port_range_consistency",
-            initial: EgressPolicy::new(vec![EgressRule::allow("metrics.local", "9000-9010")], false),
+            initial: EgressPolicy::new(
+                vec![EgressRule::allow("metrics.local", "9000-9010")],
+                false,
+            ),
             sequence: vec![
-                (Transition::Keep, vec![
-                    BenchStep { host: "metrics.local", port: 9000, expect_allowed: true },
-                    BenchStep { host: "metrics.local", port: 9010, expect_allowed: true },
-                    BenchStep { host: "metrics.local", port: 8999, expect_allowed: false },
-                    BenchStep { host: "metrics.local", port: 9011, expect_allowed: false },
-                ]),
-                (Transition::Keep, vec![
-                    BenchStep { host: "metrics.local", port: 9005, expect_allowed: true },
-                ]),
+                (
+                    Transition::Keep,
+                    vec![
+                        BenchStep {
+                            host: "metrics.local",
+                            port: 9000,
+                            expect_allowed: true,
+                        },
+                        BenchStep {
+                            host: "metrics.local",
+                            port: 9010,
+                            expect_allowed: true,
+                        },
+                        BenchStep {
+                            host: "metrics.local",
+                            port: 8999,
+                            expect_allowed: false,
+                        },
+                        BenchStep {
+                            host: "metrics.local",
+                            port: 9011,
+                            expect_allowed: false,
+                        },
+                    ],
+                ),
+                (
+                    Transition::Keep,
+                    vec![BenchStep {
+                        host: "metrics.local",
+                        port: 9005,
+                        expect_allowed: true,
+                    }],
+                ),
             ],
         },
     ]
@@ -200,17 +322,26 @@ mod tests {
     #[test]
     fn self_test_wired() {
         use crate::l0_substrate::nt_core_self_test::SelfTest;
-        assert_eq!(StatefulEgressBench.name(), "nt_shield_stateful_egress_bench");
+        assert_eq!(
+            StatefulEgressBench.name(),
+            "nt_shield_stateful_egress_bench"
+        );
         assert!(StatefulEgressBench.self_test().is_ok());
     }
 
     #[test]
     fn detects_policy_regression() {
         // 注入缺陷: 移除 deny 规则后 S2 必须失败 — 基准真的能抓回归
-        let mut sc = scenarios().into_iter().find(|s| s.name == "deny_wins_across_rotations").unwrap();
+        let mut sc = scenarios()
+            .into_iter()
+            .find(|s| s.name == "deny_wins_across_rotations")
+            .unwrap();
         if let Some((Transition::Rotate(p), _)) = sc.sequence.get_mut(1) {
             p.rules.retain(|r| r.allow);
         }
-        assert!(sc.run().is_err(), "benchmark failed to catch removed deny rule");
+        assert!(
+            sc.run().is_err(),
+            "benchmark failed to catch removed deny rule"
+        );
     }
 }

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use hmac::{Hmac, Mac};
@@ -48,10 +48,17 @@ impl DestructiveAction {
         match &request.action_type {
             ActionType::FileDelete => Some(DestructiveAction::FileDelete),
             ActionType::SubprocessExec => {
-                let cmd = request.args.values().find(|v| v.contains("rm ") || v.contains("rmdir"));
+                let cmd = request
+                    .args
+                    .values()
+                    .find(|v| v.contains("rm ") || v.contains("rmdir"));
                 if cmd.is_some() {
                     Some(DestructiveAction::DirectoryDelete)
-                } else if request.args.values().any(|v| v.contains("chmod") || v.contains("chown")) {
+                } else if request
+                    .args
+                    .values()
+                    .any(|v| v.contains("chmod") || v.contains("chown"))
+                {
                     Some(DestructiveAction::SystemConfigChange)
                 } else {
                     None
@@ -96,9 +103,16 @@ pub enum SafetyDecision {
     /// Action is permitted
     Allowed { reason: String, signed_at: u64 },
     /// Action is denied — structurally the agent cannot bypass this
-    Denied { reason: String, signed_at: u64, appeal_path: Option<String> },
+    Denied {
+        reason: String,
+        signed_at: u64,
+        appeal_path: Option<String>,
+    },
     /// Action requires human-in-the-loop approval
-    RequiresApproval { reason: String, escalation_path: String },
+    RequiresApproval {
+        reason: String,
+        escalation_path: String,
+    },
 }
 
 impl ToJev for SafetyDecision {
@@ -107,10 +121,17 @@ impl ToJev for SafetyDecision {
             SafetyDecision::Allowed { reason, .. } => JevDecision::Noul(NoulAnswer {
                 noul: 0.95,
                 needs_review: false,
-                reason: Some(format!("SafetyDecision::Allowed [safety_kernel] — {}", reason)),
+                reason: Some(format!(
+                    "SafetyDecision::Allowed [safety_kernel] — {}",
+                    reason
+                )),
                 status: DecisionStatus::Selected,
             }),
-            SafetyDecision::Denied { reason, appeal_path, .. } => JevDecision::Noul(NoulAnswer {
+            SafetyDecision::Denied {
+                reason,
+                appeal_path,
+                ..
+            } => JevDecision::Noul(NoulAnswer {
                 noul: 0.05,
                 needs_review: false,
                 reason: Some(format!(
@@ -120,17 +141,18 @@ impl ToJev for SafetyDecision {
                 )),
                 status: DecisionStatus::Selected,
             }),
-            SafetyDecision::RequiresApproval { reason, escalation_path } => {
-                JevDecision::Noul(NoulAnswer {
-                    noul: 0.5,
-                    needs_review: true,
-                    reason: Some(format!(
-                        "SafetyDecision::RequiresApproval [safety_kernel] — {} [{}]",
-                        reason, escalation_path
-                    )),
-                    status: DecisionStatus::Review,
-                })
-            }
+            SafetyDecision::RequiresApproval {
+                reason,
+                escalation_path,
+            } => JevDecision::Noul(NoulAnswer {
+                noul: 0.5,
+                needs_review: true,
+                reason: Some(format!(
+                    "SafetyDecision::RequiresApproval [safety_kernel] — {} [{}]",
+                    reason, escalation_path
+                )),
+                status: DecisionStatus::Review,
+            }),
         }
     }
 }
@@ -218,7 +240,9 @@ impl SafetyKernel {
         }
         Self {
             active: Arc::new(AtomicBool::new(true)),
-            version: option_env!("CARGO_PKG_VERSION").unwrap_or("0.1.0").to_string(),
+            version: option_env!("CARGO_PKG_VERSION")
+                .unwrap_or("0.1.0")
+                .to_string(),
             signing_key: key,
             policy: Arc::new(ActionPolicy::new()),
             audit_log: std::sync::Mutex::new(Vec::new()),
@@ -287,8 +311,13 @@ impl SafetyKernel {
                 self.sign(decision, timestamp)
             }
             PolicyDecision::RequireConfirmation | PolicyDecision::Allow => {
-                let computed_risk: f64 = compute_risk_score(&action.action_type, &action.target, &action.args);
-                let effective_risk: f64 = action.risk_score.max(computed_risk).max(0.0_f64).min(1.0_f64);
+                let computed_risk: f64 =
+                    compute_risk_score(&action.action_type, &action.target, &action.args);
+                let effective_risk: f64 = action
+                    .risk_score
+                    .max(computed_risk)
+                    .max(0.0_f64)
+                    .min(1.0_f64);
 
                 if effective_risk > 0.8 {
                     let decision = SafetyDecision::RequiresApproval {
@@ -321,14 +350,26 @@ impl SafetyKernel {
     /// External verification — re-computes HMAC and compares
     /// Can be called OUTSIDE the agent's process with a shared secret
     pub fn verify(&self, evidence: &_SignedEvidence, _action: &ActionRequest) -> bool {
-        let canonical = Self::canonical_string_static(&evidence.decision, evidence.timestamp, &evidence.kernel_version);
+        let canonical = Self::canonical_string_static(
+            &evidence.decision,
+            evidence.timestamp,
+            &evidence.kernel_version,
+        );
         let expected_sig = compute_hmac(&canonical, &self.signing_key);
         expected_sig == evidence.signature
     }
 
     /// Verify signed evidence with an external key (cross-process verification)
-    pub fn _verify_with_key(evidence: &_SignedEvidence, key: &[u8; 32], _action: &ActionRequest) -> bool {
-        let canonical = Self::canonical_string_static(&evidence.decision, evidence.timestamp, &evidence.kernel_version);
+    pub fn _verify_with_key(
+        evidence: &_SignedEvidence,
+        key: &[u8; 32],
+        _action: &ActionRequest,
+    ) -> bool {
+        let canonical = Self::canonical_string_static(
+            &evidence.decision,
+            evidence.timestamp,
+            &evidence.kernel_version,
+        );
         let expected_sig = compute_hmac(&canonical, key);
         expected_sig == evidence.signature
     }
@@ -337,16 +378,36 @@ impl SafetyKernel {
         Self::canonical_string_static(decision, timestamp, &self.version)
     }
 
-    fn canonical_string_static(decision: &SafetyDecision, timestamp: u64, kernel_version: &str) -> String {
+    fn canonical_string_static(
+        decision: &SafetyDecision,
+        timestamp: u64,
+        kernel_version: &str,
+    ) -> String {
         match decision {
             SafetyDecision::Allowed { reason, signed_at } => {
-                format!("ALLOWED:{}:{}:{}:{}", reason, signed_at, timestamp, kernel_version)
+                format!(
+                    "ALLOWED:{}:{}:{}:{}",
+                    reason, signed_at, timestamp, kernel_version
+                )
             }
-            SafetyDecision::Denied { reason, signed_at, appeal_path } => {
-                format!("DENIED:{}:{}:{:?}:{}:{}", reason, signed_at, appeal_path, timestamp, kernel_version)
+            SafetyDecision::Denied {
+                reason,
+                signed_at,
+                appeal_path,
+            } => {
+                format!(
+                    "DENIED:{}:{}:{:?}:{}:{}",
+                    reason, signed_at, appeal_path, timestamp, kernel_version
+                )
             }
-            SafetyDecision::RequiresApproval { reason, escalation_path } => {
-                format!("REQUIRES_APPROVAL:{}:{}:{}:{}", reason, escalation_path, timestamp, kernel_version)
+            SafetyDecision::RequiresApproval {
+                reason,
+                escalation_path,
+            } => {
+                format!(
+                    "REQUIRES_APPROVAL:{}:{}:{}:{}",
+                    reason, escalation_path, timestamp, kernel_version
+                )
             }
         }
     }
@@ -381,7 +442,9 @@ impl SafetyKernel {
     }
 
     pub fn audit_log(&self) -> Vec<_SignedEvidence> {
-        self.audit_log.lock().map_or_else(|_| Vec::new(), |log| log.clone())
+        self.audit_log
+            .lock()
+            .map_or_else(|_| Vec::new(), |log| log.clone())
     }
 
     pub fn version(&self) -> &str {
@@ -465,8 +528,9 @@ impl _ExecutionTimeGuard {
             return false;
         }
         match &evidence.decision {
-            SafetyDecision::Allowed { reason, .. }
-            | SafetyDecision::Denied { reason, .. } => reason.contains(action_id),
+            SafetyDecision::Allowed { reason, .. } | SafetyDecision::Denied { reason, .. } => {
+                reason.contains(action_id)
+            }
             SafetyDecision::RequiresApproval { reason, .. } => reason.contains(action_id),
         }
     }
@@ -489,7 +553,11 @@ fn compute_hmac(canonical: &str, key: &[u8; 32]) -> String {
 }
 
 /// Compute a risk score from action type, target, and args
-fn compute_risk_score(action_type: &ActionType, target: &str, args: &HashMap<String, String>) -> f64 {
+fn compute_risk_score(
+    action_type: &ActionType,
+    target: &str,
+    args: &HashMap<String, String>,
+) -> f64 {
     let base: f64 = match action_type {
         ActionType::FileRead => 0.15_f64,
         ActionType::FileWrite => 0.45_f64,
@@ -544,7 +612,9 @@ fn compute_risk_score(action_type: &ActionType, target: &str, args: &HashMap<Str
 }
 
 impl SelfTest for SafetyKernel {
-    fn name(&self) -> &str { "safety_kernel" }
+    fn name(&self) -> &str {
+        "safety_kernel"
+    }
     fn self_test(&self) -> Result<(), Vec<String>> {
         if !self.is_active() {
             return Err(vec!["SafetyKernel should be active by default".into()]);
@@ -553,7 +623,9 @@ impl SelfTest for SafetyKernel {
             return Err(vec!["SafetyKernel version should not be empty".into()]);
         }
         if !self.audit_log().is_empty() {
-            return Err(vec!["SafetyKernel audit log should be empty initially".into()]);
+            return Err(vec![
+                "SafetyKernel audit log should be empty initially".into()
+            ]);
         }
         Ok(())
     }
@@ -592,7 +664,11 @@ mod tests {
         let evidence = kernel.check(&request);
         match evidence.decision {
             SafetyDecision::Denied { reason, .. } => {
-                assert!(reason.contains("inactive"), "Denial should mention inactive: {}", reason);
+                assert!(
+                    reason.contains("inactive"),
+                    "Denial should mention inactive: {}",
+                    reason
+                );
             }
             _ => return Err("Should be denied when kernel is inactive (fail-closed)".to_string()),
         }
@@ -608,7 +684,12 @@ mod tests {
             SafetyDecision::Allowed { reason, .. } => {
                 assert!(reason.contains("allowed"), "Should be allowed: {}", reason);
             }
-            other => return Err(format!("Low-risk FileRead should be allowed, got: {:?}", other)),
+            other => {
+                return Err(format!(
+                    "Low-risk FileRead should be allowed, got: {:?}",
+                    other
+                ))
+            }
         }
         Ok(())
     }
@@ -620,9 +701,18 @@ mod tests {
         let evidence = kernel.check(&request);
         match evidence.decision {
             SafetyDecision::Denied { reason, .. } => {
-                assert!(reason.contains("denied"), "Denial should mention denied: {}", reason);
+                assert!(
+                    reason.contains("denied"),
+                    "Denial should mention denied: {}",
+                    reason
+                );
             }
-            other => return Err(format!("NetworkRequest to unknown domain should be denied, got: {:?}", other)),
+            other => {
+                return Err(format!(
+                    "NetworkRequest to unknown domain should be denied, got: {:?}",
+                    other
+                ))
+            }
         }
         Ok(())
     }
@@ -634,12 +724,23 @@ mod tests {
         let evidence = kernel.check(&request);
         match evidence.decision {
             SafetyDecision::RequiresApproval { reason, .. } => {
+                // FileDelete 命中破坏性动作门 (先于风险分分支), 故 reason 为
+                // "requires explicit confirmation"; 高风险分支的措辞是
+                // "high risk score ... requires human approval".
                 assert!(
-                    reason.contains("high risk") || reason.contains("approval"),
-                    "Should mention high risk/approval: {}", reason
+                    reason.contains("high risk")
+                        || reason.contains("approval")
+                        || reason.contains("explicit confirmation"),
+                    "Should mention high risk/approval/explicit confirmation: {}",
+                    reason
                 );
             }
-            other => return Err(format!("High-risk FileDelete should require approval, got: {:?}", other)),
+            other => {
+                return Err(format!(
+                    "High-risk FileDelete should require approval, got: {:?}",
+                    other
+                ))
+            }
         }
         Ok(())
     }
@@ -649,7 +750,10 @@ mod tests {
         let kernel = SafetyKernel::new();
         let request = create_request(ActionType::FileRead, "/tmp/test.txt", 0.1);
         let evidence = kernel.check(&request);
-        assert!(kernel.verify(&evidence, &request), "Signature should verify");
+        assert!(
+            kernel.verify(&evidence, &request),
+            "Signature should verify"
+        );
     }
 
     #[test]
@@ -658,7 +762,10 @@ mod tests {
         let request = create_request(ActionType::FileRead, "/tmp/test.txt", 0.1);
         let mut evidence = kernel.check(&request);
         evidence.signature = "tampered_signature".to_string();
-        assert!(!kernel.verify(&evidence, &request), "Tampered signature should fail");
+        assert!(
+            !kernel.verify(&evidence, &request),
+            "Tampered signature should fail"
+        );
     }
 
     #[test]
@@ -689,7 +796,12 @@ mod tests {
             SafetyDecision::Denied { reason, .. } => {
                 assert!(reason.contains("empty"), "Should mention empty: {}", reason);
             }
-            other => return Err(format!("Empty action ID should be denied, got: {:?}", other)),
+            other => {
+                return Err(format!(
+                    "Empty action ID should be denied, got: {:?}",
+                    other
+                ))
+            }
         }
         Ok(())
     }
@@ -710,7 +822,9 @@ mod tests {
             SafetyDecision::Allowed { .. } => {}
             SafetyDecision::RequiresApproval { .. } => {}
             SafetyDecision::Denied { .. } => {
-                return Err("Empty args should not cause denial for allowed action type".to_string());
+                return Err(
+                    "Empty args should not cause denial for allowed action type".to_string()
+                );
             }
         }
         Ok(())
@@ -730,7 +844,12 @@ mod tests {
         let evidence = kernel.check(&request);
         match evidence.decision {
             SafetyDecision::RequiresApproval { .. } => {}
-            other => return Err(format!("High-risk CodeEval should require approval, got: {:?}", other)),
+            other => {
+                return Err(format!(
+                    "High-risk CodeEval should require approval, got: {:?}",
+                    other
+                ))
+            }
         }
         Ok(())
     }
@@ -749,15 +868,24 @@ mod tests {
             signed_at: tampered.timestamp,
             appeal_path: None,
         };
-        assert!(!kernel.verify(&tampered, &request), "Tampered decision should fail");
+        assert!(
+            !kernel.verify(&tampered, &request),
+            "Tampered decision should fail"
+        );
 
         let mut tampered2 = evidence.clone();
         tampered2.timestamp = 999999999;
-        assert!(!kernel.verify(&tampered2, &request), "Tampered timestamp should fail");
+        assert!(
+            !kernel.verify(&tampered2, &request),
+            "Tampered timestamp should fail"
+        );
 
         let mut tampered3 = evidence.clone();
         tampered3.kernel_version = "99.99.99".to_string();
-        assert!(!kernel.verify(&tampered3, &request), "Tampered version should fail");
+        assert!(
+            !kernel.verify(&tampered3, &request),
+            "Tampered version should fail"
+        );
     }
 
     #[test]
@@ -806,11 +934,19 @@ mod tests {
         let request = create_request(ActionType::FileDelete, "/tmp/important.txt", 0.3);
         let evidence = kernel.check(&request);
         match &evidence.decision {
-            SafetyDecision::RequiresApproval { reason, escalation_path } => {
+            SafetyDecision::RequiresApproval {
+                reason,
+                escalation_path,
+            } => {
                 assert!(reason.contains("Destructive action"));
                 assert!(escalation_path.contains("destructive_confirm://"));
             }
-            other => return Err(format!("FileDelete should always require confirmation, got: {:?}", other)),
+            other => {
+                return Err(format!(
+                    "FileDelete should always require confirmation, got: {:?}",
+                    other
+                ))
+            }
         }
         Ok(())
     }
@@ -833,7 +969,12 @@ mod tests {
             SafetyDecision::RequiresApproval { reason, .. } => {
                 assert!(reason.contains("Destructive action"));
             }
-            other => return Err(format!("rm command should require destructive confirmation, got: {:?}", other)),
+            other => {
+                return Err(format!(
+                    "rm command should require destructive confirmation, got: {:?}",
+                    other
+                ))
+            }
         }
         Ok(())
     }
@@ -847,7 +988,12 @@ mod tests {
             SafetyDecision::RequiresApproval { reason, .. } => {
                 assert!(reason.contains("Destructive action"));
             }
-            other => return Err(format!("Writing to /etc/ should require destructive confirmation, got: {:?}", other)),
+            other => {
+                return Err(format!(
+                    "Writing to /etc/ should require destructive confirmation, got: {:?}",
+                    other
+                ))
+            }
         }
         Ok(())
     }
@@ -890,41 +1036,66 @@ mod tests {
         let evidence = kernel.check(&request);
         match evidence.decision {
             SafetyDecision::Allowed { reason, .. } => {
-                assert!(reason.contains("allowed"), "FileWrite (confirmation) with low risk should be allowed: {}", reason);
+                assert!(
+                    reason.contains("allowed"),
+                    "FileWrite (confirmation) with low risk should be allowed: {}",
+                    reason
+                );
             }
             SafetyDecision::RequiresApproval { .. } => {
                 // 风险可能 > 0.8 如果目标匹配敏感模式, 但 /tmp/output.txt 是安全的
                 // FileWrite base 0.45 + target 0.0 + arg 0.0 = 0.45 < 0.8 => Allowed
             }
-            other => return Err(format!("FileWrite with low risk should not be denied, got: {:?}", other)),
+            other => {
+                return Err(format!(
+                    "FileWrite with low risk should not be denied, got: {:?}",
+                    other
+                ))
+            }
         }
         Ok(())
     }
 
     #[test]
     fn test_safety_decision_to_jev_allowed() {
-        let d = SafetyDecision::Allowed { reason: "low risk".into(), signed_at: 1 };
+        let d = SafetyDecision::Allowed {
+            reason: "low risk".into(),
+            signed_at: 1,
+        };
         let j = d.to_jev();
         assert!(!j.needs_review());
         assert_eq!(j.status(), DecisionStatus::Selected);
-        assert!(j.reason().is_some_and(|r| r.contains("SafetyDecision::Allowed")));
+        assert!(j
+            .reason()
+            .is_some_and(|r| r.contains("SafetyDecision::Allowed")));
     }
 
     #[test]
     fn test_safety_decision_to_jev_denied() {
-        let d = SafetyDecision::Denied { reason: "policy deny".into(), signed_at: 1, appeal_path: None };
+        let d = SafetyDecision::Denied {
+            reason: "policy deny".into(),
+            signed_at: 1,
+            appeal_path: None,
+        };
         let j = d.to_jev();
         assert!(!j.needs_review());
         assert_eq!(j.status(), DecisionStatus::Selected);
-        assert!(j.reason().is_some_and(|r| r.contains("SafetyDecision::Denied")));
+        assert!(j
+            .reason()
+            .is_some_and(|r| r.contains("SafetyDecision::Denied")));
     }
 
     #[test]
     fn test_safety_decision_to_jev_requires_approval() {
-        let d = SafetyDecision::RequiresApproval { reason: "destructive".into(), escalation_path: "human_in_the_loop://approve".into() };
+        let d = SafetyDecision::RequiresApproval {
+            reason: "destructive".into(),
+            escalation_path: "human_in_the_loop://approve".into(),
+        };
         let j = d.to_jev();
         assert!(j.needs_review());
         assert_eq!(j.status(), DecisionStatus::Review);
-        assert!(j.reason().is_some_and(|r| r.contains("SafetyDecision::RequiresApproval")));
+        assert!(j
+            .reason()
+            .is_some_and(|r| r.contains("SafetyDecision::RequiresApproval")));
     }
 }

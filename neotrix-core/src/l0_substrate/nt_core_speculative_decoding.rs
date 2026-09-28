@@ -211,7 +211,9 @@ impl SpeculativeDecodingEngine {
         // Collect accepted tokens
         let mut output_tokens = Vec::new();
         let mut accepted_count = 0;
-        let mut rejected_count = 0;
+        // 类型显式: metrics.rejected_draft_tokens 是 u32 (:121), 延后推断会在
+        // saturating_add 处触发 E0689 (deny(warnings) 下是硬错)
+        let mut rejected_count: u32 = 0;
 
         for verification in &verification_results {
             if verification.accepted {
@@ -246,13 +248,13 @@ impl SpeculativeDecodingEngine {
 
         // Calculate speedup vs standard autoregressive decoding
         // Standard: 1 token per forward pass
-        // Speculative: Multiple tokens per verification pass
-        let verification_count = verification_results.len() as f64;
-        let speedup_factor = if verification_count > 0.0 {
-            total_tokens as f64 / verification_count
-        } else {
-            1.0
-        };
+        // Speculative: Multiple tokens per verification pass.
+        // The target model is invoked once per rejection plus one final pass, so
+        // that pass count — not the number of verified tokens (exactly one token
+        // is emitted per verification) — is the denominator. Dividing tokens by
+        // the verification count would always yield 1.0.
+        let target_passes: u32 = rejected_count.saturating_add(1);
+        let speedup_factor = total_tokens as f64 / target_passes as f64;
 
         // Estimate cost savings
         // Draft model is ~10x cheaper than target model
@@ -271,7 +273,7 @@ impl SpeculativeDecodingEngine {
             } else {
                 0.0
             },
-            total_target_verifications: verification_results.len() as u32,
+            total_target_verifications: target_passes,
             avg_verification_latency_ms: verification_results
                 .iter()
                 .map(|v| v.verification_latency_ms)
@@ -468,7 +470,29 @@ mod tests {
 
         let result = engine.generate(&request);
         assert!(!result.output_tokens.is_empty());
-        assert!(result.metrics.speedup_factor > 1.0);
+
+        // Metric identity: tokens emitted per TARGET forward pass
+        // (one pass per rejection + the final pass).
+        let target_passes = result.metrics.rejected_draft_tokens.saturating_add(1);
+        assert_eq!(result.metrics.total_target_verifications, target_passes);
+        let expected_speedup = result.output_tokens.len() as f64 / target_passes as f64;
+        assert!((result.metrics.speedup_factor - expected_speedup).abs() < 1e-9);
+
+        // `verify_draft_tokens` simulates acceptance with `rand::random`, so a
+        // single run can reject enough drafts to leave the speedup at or below
+        // 1.0 (~1% of runs at max_draft_length = 6). Retry a bounded number of
+        // times rather than letting an unlucky draw fail the test.
+        let mut speedup = result.metrics.speedup_factor;
+        for _ in 0..8 {
+            if speedup > 1.0 {
+                break;
+            }
+            speedup = engine.generate(&request).metrics.speedup_factor;
+        }
+        assert!(
+            speedup > 1.0,
+            "speculative decoding never exceeded 1.0 tokens/pass in 9 runs"
+        );
     }
 
     #[test]

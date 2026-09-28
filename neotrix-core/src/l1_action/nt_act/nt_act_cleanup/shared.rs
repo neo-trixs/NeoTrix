@@ -13,10 +13,10 @@ use std::path::{Path, PathBuf};
 /// 风险等级 (单一事实源)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum RiskLevel {
-    Safe,       // 自动重建的缓存
-    Moderate,   // 可能需要重新下载/登录
-    Risky,      // 可能包含用户数据
-    Protected,  // 系统保护，不可删除
+    Safe,      // 自动重建的缓存
+    Moderate,  // 可能需要重新下载/登录
+    Risky,     // 可能包含用户数据
+    Protected, // 系统保护，不可删除
 }
 
 impl RiskLevel {
@@ -68,10 +68,10 @@ pub enum CacheType {
 /// 删除方法
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DeleteMethod {
-    Trash,      // 移动到回收站 (via osascript)
-    Archive,    // 归档到备份目录
-    Permanent,  // 永久删除
-    Skipped,    // 跳过
+    Trash,     // 移动到回收站 (via osascript)
+    Archive,   // 归档到备份目录
+    Permanent, // 永久删除
+    Skipped,   // 跳过
 }
 
 /// 清理策略
@@ -299,11 +299,21 @@ pub struct CleanupPattern {
 
 impl CleanupPattern {
     /// 匹配路径是否命中模式
+    ///
+    /// 不含 `/` 的模式按 basename 语义（同 .gitignore）：`*.log` 命中任何目录下的
+    /// `*.log` 文件；含 `/` 的模式走全路径 glob。内置模式全含 `/`，行为不变。
     pub fn matches(&self, path: &std::path::Path) -> bool {
         let path_str = path.to_string_lossy();
         for pattern in &self.patterns {
             if glob_match(pattern, &path_str) {
                 return true;
+            }
+            if !pattern.contains('/') {
+                if let Some(name) = path.file_name().map(|n| n.to_string_lossy()) {
+                    if glob_match(pattern, &name) {
+                        return true;
+                    }
+                }
             }
         }
         false
@@ -362,7 +372,12 @@ impl CleanupPattern {
             Self {
                 name: "Next.js cache",
                 kind: ScanCategory::BuildArtifacts,
-                patterns: vec!["**/.next/**", "**/.nuxt/**", "**/.output/**", "**/.svelte-kit/**"],
+                patterns: vec![
+                    "**/.next/**",
+                    "**/.nuxt/**",
+                    "**/.output/**",
+                    "**/.svelte-kit/**",
+                ],
                 max_age_days: Some(7),
                 safe: true,
                 recursive: true,
@@ -546,7 +561,10 @@ mod tests {
 
     #[test]
     fn test_glob_match_recursive() {
-        assert!(glob_match("**/node_modules/**", "/app/node_modules/package/dist/index.js"));
+        assert!(glob_match(
+            "**/node_modules/**",
+            "/app/node_modules/package/dist/index.js"
+        ));
         assert!(!glob_match("**/node_modules/**", "/app/package.json"));
     }
 

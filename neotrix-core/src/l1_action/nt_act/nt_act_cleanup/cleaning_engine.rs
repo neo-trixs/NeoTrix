@@ -67,18 +67,25 @@ impl CleaningEngine {
 
     /// 清理一批项目
     pub fn clean_items(&self, items: &[CleanableItem]) -> CleaningResult {
+        // home 解析一次：first/canonical 侧比较用同一坐标系（见 safety::can_remove 注记）。
+        let home_std = normalize(&self.config.home);
         let mut result = CleaningResult::default();
         for item in items {
             if excludes(&item.path, &self.config.excluded) {
                 result.excluded.push(item.path.clone());
                 continue;
             }
-            self.clean_one(item, &mut result);
+            self.clean_one(item, &home_std, &mut result);
         }
         result
     }
 
-    fn clean_one(&self, item: &CleanableItem, result: &mut CleaningResult) {
+    fn clean_one(
+        &self,
+        item: &CleanableItem,
+        home_std: &std::path::Path,
+        result: &mut CleaningResult,
+    ) {
         let path = &item.path;
         if !path.exists() {
             // 扫描后已消失 — 视为已处理
@@ -90,7 +97,7 @@ impl CleaningEngine {
         let first = path.canonicalize().unwrap_or_else(|_| normalize(path));
         let verdict = can_remove(
             path,
-            &self.config.home,
+            home_std,
             &self.config.excluded,
             self.config.use_allowlist,
         );
@@ -103,7 +110,7 @@ impl CleaningEngine {
             }
             return;
         }
-        if !is_safe_to_delete(&first, &self.config.home) {
+        if !is_safe_to_delete(&first, home_std) {
             result
                 .skipped
                 .push((path.clone(), "outside allow-list".into()));

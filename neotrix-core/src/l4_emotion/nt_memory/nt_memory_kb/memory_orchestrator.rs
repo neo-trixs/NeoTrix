@@ -67,10 +67,8 @@ impl ElasticMemoryOrchestrator {
     /// 压缩轨迹 — 过滤低重要性，保留关键证据
     pub fn compress(&mut self) {
         let mut to_compress: Vec<RawRecord> = Vec::new();
-        while self.raw_buffer.len() > self.max_raw_size / 2 {
-            if let Some(record) = self.raw_buffer.pop_front() {
-                to_compress.push(record);
-            }
+        while let Some(record) = self.raw_buffer.pop_front() {
+            to_compress.push(record);
         }
 
         if to_compress.is_empty() {

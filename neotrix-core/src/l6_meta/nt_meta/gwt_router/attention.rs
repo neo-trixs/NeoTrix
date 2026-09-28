@@ -3,6 +3,9 @@
 //! Given a set of salience scores and a total budget, distributes attention proportionally.
 //! Higher-salience components receive more budget. Implements R-P123 (decompose by domain).
 
+/// Tolerance for share-sum / cap comparisons.
+const EPS: f64 = 1e-9;
+
 /// Attention allocation for a single component.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Allocation {
@@ -38,7 +41,8 @@ impl AttentionManager {
     /// 1. Normalize salience scores to get raw fractions.
     /// 2. Enforce max_fraction cap.
     /// 3. Enforce min_allocation floor.
-    /// 4. Re-normalize to fit within total_budget.
+    /// 4. Restore shares summing to 1, redistributing the shortfall into the
+    ///    entries that are still below the cap (water-filling).
     pub fn allocate(
         &self,
         salience_scores: &[(String, f64)],
@@ -84,9 +88,29 @@ impl AttentionManager {
             }
         }
 
-        // Step 4: re-normalize
+        // Step 4: restore the sum-to-1 invariant *without* breaking the cap.
+        // A capped entry cannot be scaled up, so the shortfall is redistributed
+        // (water-filling) into the entries that still have headroom.
         let frac_sum: f64 = fractions.iter().map(|(_, f, _)| f).sum();
-        if frac_sum > 0.0 {
+        let deficit = 1.0 - frac_sum;
+        if deficit > EPS {
+            let headroom: f64 = fractions
+                .iter()
+                .map(|(_, f, _)| (max_cap - *f).max(0.0))
+                .sum();
+            if headroom > EPS {
+                let share = deficit / headroom;
+                for (_, frac, _) in &mut fractions {
+                    *frac += ((max_cap - *frac).max(0.0)) * share;
+                }
+            }
+        }
+
+        // Degenerate case: every entry is already at the cap, so the shortfall
+        // cannot be absorbed without violating the cap — fall back to a plain
+        // re-normalisation to keep the shares summing to 1.
+        let frac_sum: f64 = fractions.iter().map(|(_, f, _)| f).sum();
+        if (frac_sum - 1.0).abs() > EPS && frac_sum > 0.0 {
             for (_, frac, _) in &mut fractions {
                 *frac /= frac_sum;
             }

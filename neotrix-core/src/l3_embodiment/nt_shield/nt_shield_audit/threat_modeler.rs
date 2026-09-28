@@ -177,6 +177,13 @@ mod tests {
 
     #[test]
     fn test_severity_ordering() {
-        assert!(Severity::Critical > Severity::High);
+        // Ord is derived from the declaration order, so `Critical` sorts first
+        // (`Critical < High < Medium < Low < Info`) — see also the integration
+        // test `test_threat_modeler_severity_ordering` in
+        // neotrix-core/tests/phase_integration_tests.rs, which already asserts
+        // this direction. Risk weighting is an explicit match (analyze()), so
+        // the derived order is otherwise unobserved.
+        assert!(Severity::Critical < Severity::High);
+        assert!(Severity::High < Severity::Medium);
     }
 }

@@ -655,7 +655,17 @@ mod tests {
     #[test]
     fn test_skill_loader_new() {
         let loader = SkillLoader::new();
-        assert!(!loader.skill_dirs.is_empty());
+        // 原断言 `!skill_dirs.is_empty()` 依赖**运行机器**: SkillLoader::new() 只收录
+        // 存在的目录($HOME/.neotrix/skills 等), 于是在没装 skill 的机器/CI 上必然失败,
+        // 也会被并发改 HOME 的其它测试(全仓 6 处 set_var("HOME"))打中 —— 这不是本测试
+        // 该关心的事。改为断言真正的不变量: **收录进来的目录都真实存在**。
+        // 机器无关, 且仍能抓住「收录了不存在的路径」这种真 bug。
+        for d in &loader.skill_dirs {
+            assert!(d.is_dir(), "收录了不存在的目录: {}", d.display());
+        }
+        // 显式目录构造仍应原样保留
+        let explicit = SkillLoader::with_dirs(vec![PathBuf::from("/tmp/x")]);
+        assert_eq!(explicit.skill_dirs.len(), 1);
     }
 
     #[test]

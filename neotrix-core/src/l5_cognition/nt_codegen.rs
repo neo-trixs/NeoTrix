@@ -51,8 +51,8 @@ impl GameDefParser {
     pub fn parse_yaml(path: &Path) -> Result<GameDefinition, String> {
         let content = std::fs::read_to_string(path)
             .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
-        serde_json::from_str(&content)
-            .map_err(|e| format!("YAML/JSON parse error: {}", e))
+        serde_yaml::from_str(&content)
+            .map_err(|e| format!("YAML parse error: {}", e))
     }
 
     /// Parse JSON game definition file
@@ -90,12 +90,15 @@ entities: {}
 systems: {}
 resources: {}
 "#;
-        let path = Path::new("/tmp/nt_world_sim_test_game.yaml");
-        std::fs::write(path, yaml).unwrap();
-        let def = GameDefParser::parse_yaml(path).unwrap();
+        let dir = tempfile::Builder::new()
+            .prefix("nt_world_sim_test_game")
+            .tempdir()
+            .unwrap();
+        let path = dir.path().join("game.yaml");
+        std::fs::write(&path, yaml).unwrap();
+        let def = GameDefParser::parse_yaml(&path).unwrap();
         assert_eq!(def.name, "TestGame");
         assert_eq!(def.engine.target, "bevy");
-        let _ = std::fs::remove_file(path);
     }
 
     #[test]
@@ -108,11 +111,14 @@ resources: {}
   "systems": {},
   "resources": {}
 }"#;
-        let path = Path::new("/tmp/nt_world_sim_test_game.json");
-        std::fs::write(path, json).unwrap();
-        let def = GameDefParser::parse_json(path).unwrap();
+        let dir = tempfile::Builder::new()
+            .prefix("nt_world_sim_test_json")
+            .tempdir()
+            .unwrap();
+        let path = dir.path().join("game.json");
+        std::fs::write(&path, json).unwrap();
+        let def = GameDefParser::parse_json(&path).unwrap();
         assert_eq!(def.name, "JsonGame");
-        let _ = std::fs::remove_file(path);
     }
 
     #[test]
@@ -127,11 +133,14 @@ entities: {}
 systems: {}
 resources: {}
 "#;
-        let path = Path::new("/tmp/nt_world_sim_test_auto.yml");
-        std::fs::write(path, yaml).unwrap();
-        let def = GameDefParser::parse(path).unwrap();
+        let dir = tempfile::Builder::new()
+            .prefix("nt_world_sim_test_auto")
+            .tempdir()
+            .unwrap();
+        let path = dir.path().join("auto.yml");
+        std::fs::write(&path, yaml).unwrap();
+        let def = GameDefParser::parse(&path).unwrap();
         assert_eq!(def.name, "AutoGame");
-        let _ = std::fs::remove_file(path);
     }
 }
 

@@ -3,7 +3,7 @@
 //! 管理 GPU 显存、批量调度、指数退避重试
 //! 适用于：所有 AI 推理和生成场景
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // ============================================================================
@@ -96,7 +96,7 @@ impl GPUDevice {
     pub fn available_memory_mb(&self) -> u64 {
         self.total_memory_mb.saturating_sub(self.used_memory_mb)
     }
-    
+
     /// 检查是否满足任务需求
     pub fn can_run_task(&self, task: &Task) -> bool {
         self.available && self.available_memory_mb() >= task.gpu_memory_mb
@@ -194,7 +194,7 @@ impl ParallelTaskManager {
             completed_tasks: vec![],
         }
     }
-    
+
     /// 使用配置创建
     pub fn with_config(config: SchedulerConfig) -> Self {
         Self {
@@ -205,42 +205,43 @@ impl ParallelTaskManager {
             completed_tasks: vec![],
         }
     }
-    
+
     /// 注册 GPU 设备
     pub fn register_device(&mut self, device: GPUDevice) {
         self.devices.push(device);
     }
-    
+
     /// 提交任务
     pub fn submit_task(&mut self, task: Task) {
         self.task_queue.push(task);
         self.task_queue.sort_by(|a, b| b.priority.cmp(&a.priority));
     }
-    
+
     /// 调度下一个任务
     pub fn schedule_next(&mut self) -> Option<String> {
         // 检查并行限制
         if self.running_tasks.len() as u32 >= self.config.max_parallel_tasks {
             return None;
         }
-        
+
         // 查找可运行的任务
         for task in &self.task_queue {
             // 检查依赖是否满足
-            let deps_met = task.dependencies.iter()
-                .all(|dep| self.completed_tasks.iter().any(|r| &r.task_id == dep && r.success));
-            
+            let deps_met = task.dependencies.iter().all(|dep| {
+                self.completed_tasks
+                    .iter()
+                    .any(|r| &r.task_id == dep && r.success)
+            });
+
             if !deps_met {
                 continue;
             }
-            
+
             // 查找可用 GPU
-            if let Some(device) = self.devices.iter_mut()
-                .find(|d| d.can_run_task(task)) 
-            {
+            if let Some(device) = self.devices.iter_mut().find(|d| d.can_run_task(task)) {
                 // 分配显存
                 device.used_memory_mb += task.gpu_memory_mb;
-                
+
                 // 从队列移除并加入运行中
                 if let Some(pos) = self.task_queue.iter().position(|t| t.id == task.id) {
                     let mut task = self.task_queue.remove(pos);
@@ -251,10 +252,10 @@ impl ParallelTaskManager {
                 }
             }
         }
-        
+
         None
     }
-    
+
     /// 完成任务
     pub fn complete_task(&mut self, task_id: &str, result: TaskResult) {
         // Remove the task from running_tasks exactly once.
@@ -270,9 +271,11 @@ impl ParallelTaskManager {
         };
 
         // Release GPU memory on the device that was running this task.
-        if let Some(device) = self.devices.iter_mut().find(|d| {
-            d.used_memory_mb >= task.gpu_memory_mb
-        }) {
+        if let Some(device) = self
+            .devices
+            .iter_mut()
+            .find(|d| d.used_memory_mb >= task.gpu_memory_mb)
+        {
             device.used_memory_mb = device.used_memory_mb.saturating_sub(task.gpu_memory_mb);
         }
 
@@ -283,7 +286,9 @@ impl ParallelTaskManager {
             if task.current_retries < task.max_retries {
                 task.status = TaskStatus::Pending;
                 let delay_secs = self.config.retry_interval_base_secs
-                    * (2u32.pow(task.current_retries).min(self.config.retry_max_multiplier));
+                    * (2u32
+                        .pow(task.current_retries)
+                        .min(self.config.retry_max_multiplier));
                 task.next_retry_at = Some(
                     std::time::Instant::now() + std::time::Duration::from_secs(delay_secs as u64),
                 );
@@ -295,7 +300,7 @@ impl ParallelTaskManager {
             self.completed_tasks.push(result);
         }
     }
-    
+
     /// 获取统计信息
     pub fn statistics(&self) -> SchedulerStats {
         let queued = self.task_queue.len();
@@ -304,7 +309,7 @@ impl ParallelTaskManager {
         let failed = self.completed_tasks.iter().filter(|r| !r.success).count();
         let total_memory_mb: u64 = self.devices.iter().map(|d| d.total_memory_mb).sum();
         let used_memory_mb: u64 = self.devices.iter().map(|d| d.used_memory_mb).sum();
-        
+
         SchedulerStats {
             queued_tasks: queued,
             running_tasks: running,
@@ -319,7 +324,7 @@ impl ParallelTaskManager {
             },
         }
     }
-    
+
     /// 计算指数退避延迟
     pub fn calculate_backoff_delay(&self, retry_count: u32) -> u32 {
         self.config.retry_interval_base_secs
@@ -399,7 +404,11 @@ mod tests {
             execution_time_ms: 5000,
             peak_gpu_memory_mb: 0,
             retries: 0,
-            error: if success { None } else { Some("simulated failure".into()) },
+            error: if success {
+                None
+            } else {
+                Some("simulated failure".into())
+            },
         }
     }
 
@@ -465,7 +474,7 @@ mod tests {
         let mut scheduler = ParallelTaskManager::new();
         scheduler.register_device(make_device(0, 24000));
 
-        let mut dep_task = make_task("dep", TaskPriority::High, 1000);
+        let dep_task = make_task("dep", TaskPriority::High, 1000);
         let mut dependent = make_task("main", TaskPriority::High, 1000);
         dependent.dependencies = vec!["dep".to_string()];
 
@@ -549,7 +558,7 @@ mod tests {
     #[test]
     fn test_gpu_memory_release() {
         let mut scheduler = ParallelTaskManager::new();
-        let mut device = make_device(0, 8000);
+        let device = make_device(0, 8000);
         scheduler.register_device(device);
 
         scheduler.submit_task(make_task("mem_task", TaskPriority::High, 4000));

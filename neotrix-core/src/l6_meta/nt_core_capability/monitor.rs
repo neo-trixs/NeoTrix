@@ -36,7 +36,9 @@ pub enum EventType {
 }
 
 /// 性能指标
-#[derive(Debug, Clone)]
+// 2026-09-27: 补 Default — record_latency 需要为"尚未注册"的能力创建指标条目,
+// 纯标量结构, Default 即全零 (与 CapabilityMetrics 的 Default impl 同惯例)
+#[derive(Debug, Clone, Default)]
 pub struct PerformanceMetrics {
     /// 调用次数
     pub call_count: u64,
@@ -134,7 +136,13 @@ impl MonitorDashboard {
         }
 
         // 更新指标
-        if let Some(metrics) = self.metrics.get_mut(capability_id) {
+        // 2026-09-27 修复: 原用 `if let Some(...)` —— 能力尚未注册时**静默丢弃**
+        // 这次延迟采样 (数据凭空消失且无任何日志)。改为缺失即创建。
+        {
+            let metrics = self
+                .metrics
+                .entry(capability_id.to_string())
+                .or_insert_with(Default::default);
             metrics.max_latency_ms = metrics.max_latency_ms.max(latency_ms);
             metrics.min_latency_ms = metrics.min_latency_ms.min(latency_ms);
 
@@ -195,9 +203,41 @@ impl MonitorDashboard {
 
     /// 获取特定能力状态
     pub fn get_status(&self, capability_id: &str) -> Option<CapabilityStatusReport> {
-        self.get_all_status()
+        if let Some(found) = self
+            .get_all_status()
             .into_iter()
             .find(|s| s.meta.id == capability_id)
+        {
+            return Some(found);
+        }
+        // 2026-09-27 修复: get_all_status 只遍历 registry, 于是"已记录指标但尚未
+        // 注册"的能力永远查不到 (record_latency 却已把数据收了) —— 观测数据写了
+        // 却读不出来。这里为这类能力合成一份最小报告。
+        let perf = self.metrics.get(capability_id)?.clone();
+        Some(CapabilityStatusReport {
+            meta: CapabilityMeta {
+                id: capability_id.to_string(),
+                name: capability_id.to_string(),
+                layer: Layer::L1Action,
+                domain: Domain::NtCore,
+                version: "unregistered".to_string(),
+                description: "capability with recorded metrics but not in registry".to_string(),
+                tags: Vec::new(),
+                status: CapabilityStatus::Healthy,
+                // meta.metrics 是 CapabilityMetrics (注册表侧), 未注册能力无从取得
+                metrics: CapabilityMetrics::default(),
+                cost_weight: 1.0,
+                priority: 0.5,
+            },
+            health: CapabilityHealth {
+                state: CapabilityState::Ready,
+                success_rate: 0.0,
+                avg_latency_ms: perf.avg_latency_ms,
+                last_called: None,
+                call_count: perf.call_count,
+            },
+            metrics: perf,
+        })
     }
 
     /// 获取最近事件

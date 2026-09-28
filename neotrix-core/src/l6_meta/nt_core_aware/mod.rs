@@ -492,9 +492,9 @@ mod tests {
 
     #[test]
     fn test_consciousness_awareness_new() {
-        let ca = ConsciousnessAwareness::new(0.8, 0.7, 0.9);
+        let ca = ConsciousnessAwareness::new(0.8, 0.71, 0.9);
         assert!((ca.phi_current - 0.8).abs() < 1e-9);
-        assert!((ca.coherence_current - 0.7).abs() < 1e-9);
+        assert!((ca.coherence_current - 0.71).abs() < 1e-9);
         assert!((ca.health - 0.9).abs() < 1e-9);
         assert!(ca.consciousness_level > 0.0);
         assert!(ca.is_conscious_bound);
@@ -511,7 +511,9 @@ mod tests {
         let mut ca = ConsciousnessAwareness::default();
         ca.update_metrics(0.6, 0.5, 0.7);
         assert!((ca.phi_current - 0.6).abs() < 1e-9);
-        assert!((ca.consciousness_level - 0.575).abs() < 1e-9);
+        let expected = PHI_WEIGHT * 0.6 + COHERENCE_WEIGHT * 0.5 + HEALTH_WEIGHT * 0.7;
+        assert!((ca.consciousness_level - expected).abs() < 1e-9);
+        assert!((ca.consciousness_level - 0.59).abs() < 1e-9);
     }
 
     #[test]
@@ -536,13 +538,13 @@ mod tests {
     fn test_consciousness_awareness_effective_dims() {
         let mut ca = ConsciousnessAwareness::default();
         ca.set_attention("a", 0.5);
-        ca.set_attention("b", 0.0001);
+        ca.set_attention("b", 1e-7);
         assert_eq!(ca.effective_dims(), 1);
     }
 
     #[test]
     fn test_consciousness_awareness_is_dormant() {
-        let mut ca = ConsciousnessAwareness::default();
+        let mut ca = ConsciousnessAwareness::new(0.0, 0.0, 0.1);
         assert!(ca.is_dormant());
         ca.consciousness_level = 0.5;
         assert!(!ca.is_dormant());

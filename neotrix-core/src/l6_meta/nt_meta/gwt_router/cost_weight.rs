@@ -127,14 +127,18 @@ impl CostWeightedRouting {
             .copied()
             .collect();
 
-        let candidates = if budget_ok.is_empty() {
-            candidates
-        } else {
-            budget_ok
-        };
+        // 没有任何候选能装进预算 — 显式上报预算约束, 而不是丢弃 max_budget_per_task 去选最贵的
+        if budget_ok.is_empty() {
+            return RoutingDecision {
+                tier: "fallback".into(),
+                estimated_cost: 0.0,
+                quality: 0.0,
+                reason: RoutingReason::BudgetConstraint,
+            };
+        }
 
         // Select cheapest (tiers are sorted by cost ascending)
-        let selected = candidates[0];
+        let selected = budget_ok[0];
         let estimated_cost =
             selected.cost_per_1k_tokens * (estimated_tokens as f64 / 1000.0);
 

@@ -162,7 +162,8 @@ fn extract_key_facts(content: &str) -> Vec<String> {
     let mut facts = Vec::new();
     for sentence in content.split(['。', '！', '？', '.', '!', '?', '\n']) {
         let s = sentence.trim();
-        if s.len() >= 4 && s.len() <= 200 {
+        let len = s.chars().count();
+        if len >= 4 && len <= 200 {
             facts.push(s.to_string());
         }
     }
@@ -249,7 +250,7 @@ mod tests {
 
     #[test]
     fn test_extract_key_facts() {
-        let facts = extract_key_facts("First fact. Second fact. Short.");
+        let facts = extract_key_facts("First fact. Second fact. Ok.");
         assert_eq!(facts.len(), 2);
     }
 

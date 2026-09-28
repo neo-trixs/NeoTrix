@@ -10,11 +10,11 @@
 //! 4. **EpisodicStore** compresses short-term memories into summaries
 //! 5. **LongTermStore** distills rules from episodes with confidence tracking
 
-use super::sensory::SensoryBuffer;
-use super::working::WorkingMemory;
-use super::short_term::ShortTermStore;
 use super::episodic::EpisodicStore;
 use super::long_term::LongTermStore;
+use super::sensory::SensoryBuffer;
+use super::short_term::ShortTermStore;
+use super::working::WorkingMemory;
 
 /// Configuration for the full cascade pipeline.
 #[derive(Debug, Clone)]
@@ -114,20 +114,18 @@ impl MemoryCascade {
 
         for obs in observations {
             let attention = self.compute_attention(&obs.content);
-            let admitted = self.working.attend(
-                obs.content.clone(),
-                attention,
-                obs.source.clone(),
-            );
+            let admitted = self
+                .working
+                .attend(obs.content.clone(), attention, obs.source.clone());
             if admitted {
                 stats.items_admitted_to_working += 1;
             }
         }
 
-        // Promote high-attention working memory items to short-term
+        // Promote working memory items that cleared the attention gate to short-term
         let working_items = self.working.drain_all();
         for item in working_items {
-            if item.attention_weight >= self.config.distill_threshold {
+            if item.attention_weight >= self.config.attention_threshold {
                 let st_id = self.short_term.store(item.content, item.attention_weight);
                 surviving_ids.push(st_id);
                 stats.items_promoted_to_short_term += 1;
@@ -135,7 +133,9 @@ impl MemoryCascade {
         }
 
         // Compress short-term into episodic summaries
-        let candidates = self.short_term.promote_candidates(self.config.distill_threshold);
+        let candidates = self
+            .short_term
+            .promote_candidates(self.config.distill_threshold);
         if candidates.len() >= 3 {
             let summary = self.compress_to_summary(&candidates);
             let source_ids: Vec<u64> = candidates.iter().map(|c| c.id).collect();
@@ -155,11 +155,8 @@ impl MemoryCascade {
         let episodes = self.episodic.all_by_importance();
         for ep in episodes.iter().take(5) {
             if ep.importance >= self.config.distill_threshold && ep.summary.len() > 10 {
-                self.long_term.distill(
-                    ep.summary.clone(),
-                    ep.importance,
-                    ep.source_ids.clone(),
-                );
+                self.long_term
+                    .distill(ep.summary.clone(), ep.importance, ep.source_ids.clone());
                 stats.rules_distilled += 1;
             }
         }

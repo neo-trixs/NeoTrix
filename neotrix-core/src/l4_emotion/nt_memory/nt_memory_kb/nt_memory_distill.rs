@@ -308,7 +308,8 @@ mod tests {
     #[test]
     fn test_train_reduces_mse() {
         let dim = 4;
-        // 构造强相关样本: teacher = 真实内积比值 (人工), 学生应能学出 w 使 score 逼近 teacher
+        // 构造强相关但**不完美**的 teacher 标签 (缩放过的内积): 恒等初始化学生的
+        // 初始预测 != teacher, 存在可下降的 MSE 与非零梯度。
         let samples: Vec<(Vec<f32>, Vec<f32>, f64)> = (0..40)
             .map(|i| {
                 let q = make_vec(dim, i as u64 + 10);
@@ -317,7 +318,8 @@ mod tests {
                     .iter()
                     .zip(d.iter())
                     .map(|(a, b)| (*a as f64) * (*b as f64))
-                    .sum();
+                    .sum::<f64>()
+                    * 0.5;
                 (q, d, teacher)
             })
             .collect();

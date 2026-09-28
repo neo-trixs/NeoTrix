@@ -137,6 +137,57 @@ impl RateLimiter {
     }
 }
 
+/// 解析IPv4点分十进制地址为u32（网络字节序）
+fn parse_ipv4(ip: &str) -> Option<u32> {
+    let mut value: u32 = 0;
+    let mut octets = 0u32;
+    for part in ip.split('.') {
+        let octet: u32 = part.parse().ok()?;
+        if octet > 255 {
+            return None;
+        }
+        value = (value << 8) | octet;
+        octets += 1;
+    }
+    if octets == 4 {
+        Some(value)
+    } else {
+        None
+    }
+}
+
+/// 判断IP白/黑名单条目是否命中给定IP
+///
+/// 条目可以是裸地址（精确匹配），也可以是CIDR前缀
+/// （如`192.168.1.0/24`，命中`192.168.1.37`）。IPv6地址不支持前缀形式，
+/// 退化为精确字符串匹配。
+fn ip_entry_matches(entry: &str, ip: &str) -> bool {
+    let entry = entry.trim();
+    if entry == ip {
+        return true;
+    }
+    let (network, prefix_len) = match entry.split_once('/') {
+        Some((network, prefix)) => match prefix.parse::<u32>() {
+            Ok(len) if len <= 32 => (network, len),
+            _ => return false,
+        },
+        None => return false,
+    };
+    let base = match parse_ipv4(network) {
+        Some(base) => base,
+        None => return false,
+    };
+    let addr = match parse_ipv4(ip) {
+        Some(addr) => addr,
+        None => return false,
+    };
+    if prefix_len == 0 {
+        return true;
+    }
+    let mask = u32::MAX << (32 - prefix_len);
+    (base & mask) == (addr & mask)
+}
+
 /// 安全管理器
 pub struct SecurityManager {
     /// 策略
@@ -256,13 +307,22 @@ impl SecurityManager {
     /// 检查IP是否允许
     pub fn check_ip(&self, ip: &str) -> bool {
         // 检查黑名单
-        if self.policy.ip_blacklist.contains(&ip.to_string()) {
+        if self
+            .policy
+            .ip_blacklist
+            .iter()
+            .any(|entry| ip_entry_matches(entry, ip))
+        {
             return false;
         }
 
         // 检查白名单（如果配置了白名单）
         if !self.policy.ip_whitelist.is_empty()
-            && !self.policy.ip_whitelist.contains(&ip.to_string())
+            && !self
+                .policy
+                .ip_whitelist
+                .iter()
+                .any(|entry| ip_entry_matches(entry, ip))
         {
             return false;
         }
@@ -298,7 +358,10 @@ impl SecureCapability {
         token_id: &str,
         ip_address: &str,
     ) -> Result<CapabilityOutput, CapabilityError> {
-        let mut manager = self.security_manager.lock().unwrap_or_else(|e| e.into_inner());
+        let mut manager = self
+            .security_manager
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
 
         // 验证令牌
         if manager.policy.enable_authentication {

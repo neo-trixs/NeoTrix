@@ -123,7 +123,9 @@ pub trait CircuitBreakerExt {
 
 impl CircuitBreakerExt for CircuitBreaker {
     fn allow_request(&mut self) -> bool {
-        self.is_available()
+        // 用 try_acquire 而非 is_available: 后者是纯查询, 不做 Open->HalfOpen
+        // 转换, 也不消耗 HalfOpen 探针 —— 那正是本测试失败的原因。
+        self.try_acquire()
     }
 
     fn record_success(&mut self) {
@@ -276,22 +278,25 @@ mod tests {
 
     #[test]
     fn test_circuit_breaker_half_open_transition() {
-        let mut cb = CircuitBreaker::new(1, 1);
+        // new(1, 1) 的第二参是**秒**; 原测试 sleep 2ms 后期望已恢复, 那是
+        // API 从未有过的毫秒语义, 永远不可能通过。改用 new_with_cooldown 显式
+        // 表达 2ms, 测试意图(超时后转 HalfOpen)原样保留, 而不是被改弱。
+        let mut cb = CircuitBreaker::new_with_cooldown(1, Duration::from_millis(50));
         cb.record_failure();
         assert!(cb.is_open());
         assert!(!cb.allow_request());
-        std::thread::sleep(Duration::from_millis(2));
+        std::thread::sleep(Duration::from_millis(70));
         assert!(cb.allow_request());
         assert_eq!(cb.state, BreakerState::HalfOpen);
     }
 
     #[test]
     fn test_circuit_breaker_recovers_on_success() {
-        let mut cb = CircuitBreaker::new(2, 1);
+        let mut cb = CircuitBreaker::new_with_cooldown(2, Duration::from_millis(50));
         cb.record_failure();
         cb.record_failure();
         assert!(cb.is_open());
-        std::thread::sleep(Duration::from_millis(2));
+        std::thread::sleep(Duration::from_millis(70));
         assert!(cb.allow_request());
         cb.record_success();
         assert_eq!(cb.state, BreakerState::Closed);

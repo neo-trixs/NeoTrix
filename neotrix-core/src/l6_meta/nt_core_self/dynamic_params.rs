@@ -176,6 +176,31 @@ pub const STRONG_PRESET: DynamicParams = DynamicParams {
 // ============================================================================
 // 转换实用函数
 
+/// 提取片段中的第一个数字 (如 "0.5s/动作" → 0.5, "30°" → 30.0)
+fn parse_first_number(field: &str) -> Option<f32> {
+    let chars: Vec<char> = field.chars().collect();
+    let start = chars
+        .iter()
+        .position(|c| c.is_ascii_digit() || *c == '-' || *c == '+')?;
+
+    let mut end = start;
+    while end < chars.len() {
+        let c = chars[end];
+        if c.is_ascii_digit() || c == '.' {
+            end += 1;
+        } else if (c == 'e' || c == 'E')
+            && end + 1 < chars.len()
+            && (chars[end + 1].is_ascii_digit() || chars[end + 1] == '-' || chars[end + 1] == '+')
+        {
+            end += 2;
+        } else {
+            break;
+        }
+    }
+
+    chars[start..end].iter().collect::<String>().parse().ok()
+}
+
 pub fn parse_from_string(description: &str) -> Option<DynamicParams> {
     let mut params = DynamicParams {
         speed: 1.0,
@@ -184,33 +209,24 @@ pub fn parse_from_string(description: &str) -> Option<DynamicParams> {
         unit: ParamUnit::Degrees,
         valid: false,
     };
-    
+
+    // `format_as_description` 输出的是单行逗号分隔, 故先按行再按 ',' 切分
     for line in description.lines() {
-        let line = line.trim();
-        if line.starts_with("速度") || line.starts_with("速度：") {
-            let val: f32 = line.split_whitespace()
-                .nth(1)
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(1.0);
-            params.speed = val;
-        } else if line.starts_with("幅度") || line.starts_with("幅度：") {
-            let val: f32 = line.split_whitespace()
-                .nth(1)
-                .and_then(|s| s.trim_end_matches('°').parse().ok())
-                .unwrap_or(10.0);
-            params.amplitude = val;
-            if line.contains("°") || line.contains("度") {
-                params.unit = ParamUnit::Degrees;
+        for field in line.split(',') {
+            let field = field.trim();
+            if field.starts_with("速度") {
+                params.speed = parse_first_number(field).unwrap_or(1.0);
+            } else if field.starts_with("幅度") {
+                params.amplitude = parse_first_number(field).unwrap_or(10.0);
+                if field.contains("°") || field.contains("度") {
+                    params.unit = ParamUnit::Degrees;
+                }
+            } else if field.starts_with("频率") {
+                params.frequency = parse_first_number(field).unwrap_or(1.0);
             }
-        } else if line.starts_with("频率") || line.starts_with("频率：") {
-            let val: f32 = line.split_whitespace()
-                .nth(1)
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(1.0);
-            params.frequency = val;
         }
     }
-    
+
     if params.validate() {
         Some(params)
     } else {

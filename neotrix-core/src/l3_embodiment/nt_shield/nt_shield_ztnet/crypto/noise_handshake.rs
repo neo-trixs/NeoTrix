@@ -55,6 +55,8 @@ pub struct _NoiseHandshake {
     ephemeral_private: Option<PrivateKey>,
     /// 对端临时公钥
     remote_ephemeral: Option<PublicKey>,
+    /// 已生成但尚未发往对端的 message 3 字节 (由 `_take_message3` 取走)
+    pending_message3: Option<Vec<u8>>,
 }
 
 impl _NoiseHandshake {
@@ -66,7 +68,17 @@ impl _NoiseHandshake {
     ) -> Self {
         let static_public = static_private.public();
         let mut hash = [0u8; 32];
-        hash[..27].copy_from_slice(b"Noise_IKpsk2_25519_ChaCha");
+        // 2026-09-27 修复 (原有 bug, 非本次改动引入): 协议名字面量是 **25 字节**,
+        // 而目标切片是 27 → copy_from_slice 长度不匹配直接 panic。也就是说
+        // `_initiator` / `_responder` 的第一行就会炸 —— 整个噪声握手模块
+        // 从来没被成功构造过 (HEAD 里两处皆然)。改为按字面量自身长度拷贝,
+        // 杜绝再次长度漂移。
+        //
+        // 注: 协议名与 Noise spec 的 `Noise_IKpsk2_25519_ChaChaPoly_SHA256`
+        // (39 字节) 不一致。本模块目前无其它调用方, 是否对齐 spec 属协议决策,
+        // 此处只保证不 panic; 对齐时请同步改名字面量 (本行已按 .len() 自适应)。
+        let protocol_name = b"Noise_IKpsk2_25519_ChaCha";
+        hash[..protocol_name.len()].copy_from_slice(protocol_name);
 
         Self {
             static_private,
@@ -78,17 +90,25 @@ impl _NoiseHandshake {
             symmetric_key: [0u8; 32],
             ephemeral_private: None,
             remote_ephemeral: None,
+            pending_message3: None,
         }
     }
 
     /// 创建 Responder 握手
-    pub fn _responder(
-        static_private: PrivateKey,
-        psk: Option<[u8; 32]>,
-    ) -> Self {
+    pub fn _responder(static_private: PrivateKey, psk: Option<[u8; 32]>) -> Self {
         let static_public = static_private.public();
         let mut hash = [0u8; 32];
-        hash[..27].copy_from_slice(b"Noise_IKpsk2_25519_ChaCha");
+        // 2026-09-27 修复 (原有 bug, 非本次改动引入): 协议名字面量是 **25 字节**,
+        // 而目标切片是 27 → copy_from_slice 长度不匹配直接 panic。也就是说
+        // `_initiator` / `_responder` 的第一行就会炸 —— 整个噪声握手模块
+        // 从来没被成功构造过 (HEAD 里两处皆然)。改为按字面量自身长度拷贝,
+        // 杜绝再次长度漂移。
+        //
+        // 注: 协议名与 Noise spec 的 `Noise_IKpsk2_25519_ChaChaPoly_SHA256`
+        // (39 字节) 不一致。本模块目前无其它调用方, 是否对齐 spec 属协议决策,
+        // 此处只保证不 panic; 对齐时请同步改名字面量 (本行已按 .len() 自适应)。
+        let protocol_name = b"Noise_IKpsk2_25519_ChaCha";
+        hash[..protocol_name.len()].copy_from_slice(protocol_name);
 
         Self {
             static_private,
@@ -100,6 +120,7 @@ impl _NoiseHandshake {
             symmetric_key: [0u8; 32],
             ephemeral_private: None,
             remote_ephemeral: None,
+            pending_message3: None,
         }
     }
 
@@ -149,7 +170,10 @@ impl _NoiseHandshake {
 
         let ephemeral = PrivateKey::generate();
         let e_pub = ephemeral.public();
-        let remote_eph = self.remote_ephemeral.as_ref().ok_or(_NoiseError::InvalidState)?;
+        let remote_eph = self
+            .remote_ephemeral
+            .as_ref()
+            .ok_or(_NoiseError::InvalidState)?;
 
         let mut msg = Vec::new();
         msg.extend_from_slice(e_pub.as_bytes());
@@ -164,7 +188,9 @@ impl _NoiseHandshake {
 
         // es
         let es = ephemeral.diffie_hellman(
-            self.remote_static_public.as_ref().ok_or(_NoiseError::InvalidState)?,
+            self.remote_static_public
+                .as_ref()
+                .ok_or(_NoiseError::InvalidState)?,
         );
         self.mix_key(es.as_bytes());
 
@@ -190,7 +216,10 @@ impl _NoiseHandshake {
         let e_pub = PublicKey::from_bytes(msg[..32].try_into().expect("correct size"));
         self.remote_ephemeral = Some(e_pub.clone());
 
-        let eph_priv = self.ephemeral_private.as_ref().ok_or(_NoiseError::InvalidState)?;
+        let eph_priv = self
+            .ephemeral_private
+            .as_ref()
+            .ok_or(_NoiseError::InvalidState)?;
 
         // ee
         let ee = eph_priv.diffie_hellman(&e_pub);
@@ -216,9 +245,10 @@ impl _NoiseHandshake {
         self.hash_concat(msg);
         self.state = _HandshakeState::Message2Received;
 
-        // 生成 message 3
-        let msg3 = self.create_message3()?;
-        let _ = msg3; // message 3 需要发送给对端
+        // 生成 message 3 — 字节缓存在 `pending_message3`, 驱动方用
+        // `_take_message3` 取走并发送给对端; 丢弃它等于对端永远收不到
+        // message 3, 永远卡在 Message2Sent (无法到达 Completed)
+        self.create_message3()?;
 
         // 导出对称密钥
         let send_key = AeadKey::new(&self.derive_key(b""));
@@ -234,7 +264,10 @@ impl _NoiseHandshake {
     }
 
     /// Message 3: Initiator → Responder
-    fn create_message3(&mut self) -> Result<Vec<u8>, _NoiseError> {
+    ///
+    /// Public: 握手状态机 (SANS-IO) 之外的驱动方需要显式生成/重放 message 3,
+    /// 生成的字节同时缓存在 `pending_message3` 供 `_take_message3` 取走。
+    pub fn create_message3(&mut self) -> Result<Vec<u8>, _NoiseError> {
         if self.state != _HandshakeState::Message2Received {
             return Err(_NoiseError::InvalidState);
         }
@@ -243,7 +276,10 @@ impl _NoiseHandshake {
         let msg = enc_static;
 
         // se
-        let remote_eph = self.remote_ephemeral.as_ref().ok_or(_NoiseError::InvalidState)?;
+        let remote_eph = self
+            .remote_ephemeral
+            .as_ref()
+            .ok_or(_NoiseError::InvalidState)?;
         let se = self.static_private.diffie_hellman(remote_eph);
         self.mix_key(se.as_bytes());
 
@@ -254,7 +290,15 @@ impl _NoiseHandshake {
 
         self.hash_concat(&msg);
         self.state = _HandshakeState::Message3Sent;
+        self.pending_message3 = Some(msg.clone());
         Ok(msg)
+    }
+
+    /// 取走已生成但尚未发送的 message 3 字节 (由 `create_message3` 缓存)。
+    ///
+    /// 一次性取走 (take): 重复取返回 `None`, 防止同一条 message 3 被重放。
+    pub fn _take_message3(&mut self) -> Option<Vec<u8>> {
+        self.pending_message3.take()
     }
 
     /// Responder 消费 message 3
@@ -273,7 +317,10 @@ impl _NoiseHandshake {
         let initiator_static = PublicKey::from_bytes(&static_bytes);
 
         // se
-        let remote_eph = self.remote_ephemeral.as_ref().ok_or(_NoiseError::InvalidState)?;
+        let remote_eph = self
+            .remote_ephemeral
+            .as_ref()
+            .ok_or(_NoiseError::InvalidState)?;
         let se = self.static_private.diffie_hellman(remote_eph);
         self.mix_key(se.as_bytes());
 
@@ -376,21 +423,28 @@ mod tests {
         let result = _initiator._consume_message2(&msg2).unwrap();
         assert_eq!(_initiator.state(), &_HandshakeState::Completed);
 
-        let msg3_bytes = [0u8; 48]; // placeholder
-        let _ = msg3_bytes;
+        // message 3 由消费 message 2 的副作用生成 — 必须取真实字节发给对端
+        let msg3 = _initiator
+            ._take_message3()
+            .expect("initiator must have a real message 3 to send");
+        assert_eq!(msg3.len(), 48, "message 3 = 32-byte static || 16-byte tag");
+        assert!(
+            _initiator._take_message3().is_none(),
+            "message 3 must not be replayable"
+        );
 
-        let result2 = _responder._consume_message3(&[0u8; 48]).unwrap_or_else(|_| {
-            // 实际中 msg3 需要从 _initiator 获取
-            _HandshakeResult {
-                send_key: AeadKey::new(&[0u8; 32]),
-                recv_key: AeadKey::new(&[0u8; 32]),
-                peer_static_public: _initiator.static_public.clone(),
-            }
-        });
+        let result2 = _responder
+            ._consume_message3(&msg3)
+            .expect("responder must accept the genuine message 3");
         assert_eq!(_responder.state(), &_HandshakeState::Completed);
         assert_eq!(
             result.peer_static_public.to_bytes(),
             _responder.static_public.to_bytes()
+        );
+        assert_eq!(
+            result2.peer_static_public.to_bytes(),
+            _initiator.static_public.to_bytes(),
+            "responder must learn the initiator static key from message 3"
         );
     }
 }

@@ -39,14 +39,14 @@ mod tests {
 
     #[test]
     fn test_embedding_creation() {
-        let mut embedder = TextEmbedder::new();
+        let embedder = TextEmbedder::new();
         let vec = embedder.embed("hello world test");
         assert_eq!(vec.len(), EMBEDDING_DIM);
     }
 
     #[test]
     fn test_similar_texts() {
-        let mut embedder = TextEmbedder::new();
+        let embedder = TextEmbedder::new();
         let sim = embedder.similarity(
             "implement user authentication with JWT tokens",
             "add JWT based user authentication system",
@@ -56,7 +56,7 @@ mod tests {
 
     #[test]
     fn test_dissimilar_texts() {
-        let mut embedder = TextEmbedder::new();
+        let embedder = TextEmbedder::new();
         let sim = embedder.similarity(
             "implement user authentication",
             "color scheme for dark mode UI design",
@@ -66,7 +66,7 @@ mod tests {
 
     #[test]
     fn test_find_most_similar() {
-        let mut embedder = TextEmbedder::new();
+        let embedder = TextEmbedder::new();
         let candidates = [
             "fix database connection pool leak",
             "design landing page with tailwind",
@@ -96,7 +96,7 @@ mod tests {
 
     #[test]
     fn test_embedder_vocab_growth() {
-        let mut embedder = TextEmbedder::new();
+        let embedder = TextEmbedder::new();
         embedder.embed("rust compiler optimization techniques");
         assert!(embedder.vocab_size() >= 3);
     }

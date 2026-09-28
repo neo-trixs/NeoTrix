@@ -13,6 +13,15 @@ struct Inner {
     config: IndexConfig,
 }
 
+/// The `instant_distance` graph is built exclusively from `FloatVec`, whose
+/// `Point::distance` is cosine distance (see `float_vec`). The graph therefore
+/// only ever produces a *cosine* ordering. Hamming has no graph, so it is
+/// served by exact scan; reporting a Hamming distance next to a
+/// cosine-ordered candidate list would contradict the ranking.
+fn graph_supports(metric: DistanceMetric) -> bool {
+    matches!(metric, DistanceMetric::Cosine | DistanceMetric::Euclidean)
+}
+
 pub struct HnswVectorStore {
     inner: Mutex<Inner>,
 }
@@ -41,6 +50,43 @@ impl HnswVectorStore {
         let values: Vec<usize> = (0..inner.records.len()).collect();
         inner.hnsw = Some(Builder::default().build(points, values));
     }
+
+    /// Exact brute-force path for metrics the cosine graph cannot rank by.
+    /// Reported distance and ordering are produced by the same function, so the
+    /// two can never disagree. `filter` is applied before ranking, keeping the
+    /// result exact rather than a filtered sample of graph candidates.
+    fn exact_hamming_scan(
+        inner: &Inner,
+        query: &[u8],
+        k: usize,
+        filter: Option<&HashMap<String, String>>,
+    ) -> Vec<VectorSearchResult> {
+        let mut results: Vec<VectorSearchResult> = inner
+            .records
+            .iter()
+            .filter(|record| match filter {
+                Some(filter) => filter
+                    .iter()
+                    .all(|(fk, fv)| record.metadata.get(fk).map(|mv| mv == fv).unwrap_or(false)),
+                None => true,
+            })
+            .map(|record| VectorSearchResult {
+                id: record.id.clone(),
+                distance: hamming_distance_u8(query, &record.vector) as f64,
+                metadata: record.metadata.clone(),
+            })
+            .collect();
+        // Tie-break on id so equal distances (e.g. an all-zero query) yield a
+        // stable, reproducible ordering instead of an arbitrary one.
+        results.sort_by(|a, b| {
+            a.distance
+                .partial_cmp(&b.distance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        results.truncate(k);
+        results
+    }
 }
 
 fn hamming_distance_u8(a: &[u8], b: &[u8]) -> u64 {
@@ -68,6 +114,14 @@ impl VectorStore for HnswVectorStore {
             e.into_inner()
         });
 
+        if inner.records.is_empty() {
+            return Vec::new();
+        }
+
+        if !graph_supports(inner.config.distance_metric) {
+            return Self::exact_hamming_scan(&inner, query, k, None);
+        }
+
         let hnsw = match &inner.hnsw {
             Some(h) => h,
             None => return Vec::new(),
@@ -76,10 +130,13 @@ impl VectorStore for HnswVectorStore {
         let query_f32 = FloatVec(bytes_to_f32s(query));
         let mut search = Search::default();
 
-        hnsw.search(&query_f32, &mut search)
+        let mut results: Vec<VectorSearchResult> = hnsw
+            .search(&query_f32, &mut search)
             .take(k)
             .filter_map(|item| {
                 let record = inner.records.get(*item.value)?;
+                // Same metric the graph ranked by: cosine distance, and for
+                // Euclidean the monotone remap of that same cosine distance.
                 let distance = match inner.config.distance_metric {
                     DistanceMetric::Hamming => hamming_distance_u8(query, &record.vector) as f64,
                     DistanceMetric::Cosine => item.distance as f64,
@@ -91,7 +148,17 @@ impl VectorStore for HnswVectorStore {
                     metadata: record.metadata.clone(),
                 })
             })
-            .collect()
+            .collect();
+        // A zero-norm query has cosine distance 1.0 against every record, so the
+        // graph's own order among those ties is unspecified. Sort (id as
+        // tie-break) so the degenerate case is still well defined.
+        results.sort_by(|a, b| {
+            a.distance
+                .partial_cmp(&b.distance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        results
     }
 
     fn remove(&mut self, id: &str) -> Result<(), String> {
@@ -124,6 +191,14 @@ impl VectorStore for HnswVectorStore {
             log::warn!("[hnsw_vector_store] mutex poisoned: {}", e);
             e.into_inner()
         });
+
+        if inner.records.is_empty() {
+            return Vec::new();
+        }
+
+        if !graph_supports(inner.config.distance_metric) {
+            return Self::exact_hamming_scan(&inner, query, k, Some(filter));
+        }
 
         let hnsw = match &inner.hnsw {
             Some(h) => h,
@@ -161,6 +236,7 @@ impl VectorStore for HnswVectorStore {
             a.distance
                 .partial_cmp(&b.distance)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id.cmp(&b.id))
         });
         filtered.truncate(k);
         filtered

@@ -361,7 +361,20 @@ mod tests {
     use super::*;
 
     fn temp_dir() -> String {
-        let dir = std::env::temp_dir().join(format!("nt_checkpoint_test_{}", std::process::id()));
+        // 2026-09-28 修复: 原实现只以 **进程 pid** 命名临时目录, 于是同进程内
+        // 全部 6 个 checkpoint 测试**共用同一个目录** —— 各自建索引、互相看到
+        // 对方的 checkpoint。单跑一个测试时看不出来(只有它自己), 全量跑就炸:
+        //   test_list_checkpoints_filters_by_workflow  left: 1  (混进了别人的)
+        //   test_delete_checkpoint_removes_index_and_file  assert!(save.success) 失败
+        // 这与 HOME 环境变量无关, 是测试自身的隔离缺陷。改为 pid + 原子计数器,
+        // 每个测试调用都拿到独占目录。
+        static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let n = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!(
+            "nt_checkpoint_test_{}_{}",
+            std::process::id(),
+            n
+        ));
         std::fs::create_dir_all(&dir).unwrap();
         dir.to_string_lossy().to_string()
     }

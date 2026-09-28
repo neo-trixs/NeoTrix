@@ -209,7 +209,6 @@ mod tests {
         assert_eq!(entries[0].id, "opencode/mimo-v2.5-free");
         assert!(entries[0].is_free);
         assert_eq!(entries[0].source, "cli-free");
-        assert_eq!(entries[0].source, "cloud_free");
     }
 
     #[test]

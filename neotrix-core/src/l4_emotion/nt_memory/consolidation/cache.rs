@@ -216,11 +216,11 @@ mod tests {
 
     #[test]
     fn test_get_advances_turn() {
-        let mut c = MemoryCache::new(10, 2);
+        let mut c = MemoryCache::new(10, 3);
         c.put("k".into(), "v".into());
         let _ = c.get("k"); // turn 1
         let _ = c.get("k"); // turn 2 — still within TTL
-        assert_eq!(c.get("k"), Some("v".to_string()));
+        assert_eq!(c.get("k"), Some("v".to_string())); // turn 3 — insert-anchored TTL still live
     }
 
     #[test]

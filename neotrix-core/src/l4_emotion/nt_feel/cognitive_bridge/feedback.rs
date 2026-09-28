@@ -98,9 +98,6 @@ impl FeedbackLoop {
             }
         } else {
             match emotion.variant {
-                EmotionVariant::Satisfaction | EmotionVariant::Joy => {
-                    emotion.intensity = (emotion.intensity - self.influence_strength).max(0.0);
-                }
                 EmotionVariant::Curiosity => {
                     emotion.intensity = (emotion.intensity + self.influence_strength * 0.1).min(1.0);
                 }

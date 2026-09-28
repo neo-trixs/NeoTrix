@@ -900,15 +900,15 @@ fn hash_str(s: &str) -> u64 {
 }
 
 fn fuzzy_similarity(a: &str, b: &str) -> f32 {
-    if a == b {
-        return 1.0;
-    }
-
     let a_words: Vec<&str> = a.split_whitespace().collect();
     let b_words: Vec<&str> = b.split_whitespace().collect();
 
     if a_words.is_empty() || b_words.is_empty() {
         return 0.0;
+    }
+
+    if a == b {
+        return 1.0;
     }
 
     let mut matches = 0u32;
@@ -1074,7 +1074,8 @@ mod tests {
     fn test_readability_empty() {
         let analyzer = WritingStyleAnalyzer::new();
         let score = analyzer.calculate_readability("");
-        assert!(score.flesch_kincaid >= 0.0);
+        assert!(score.flesch_kincaid.is_finite());
+        assert_eq!(score.grade_level, "Pre-K");
     }
 
     #[test]

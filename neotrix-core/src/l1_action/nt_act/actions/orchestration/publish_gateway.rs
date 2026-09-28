@@ -3,7 +3,7 @@
 //! 多平台发布（YouTube/TikTok/抖音）
 //! 支持 OAuth、定时发布、元数据生成
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // ============================================================================
@@ -139,12 +139,12 @@ impl PublishGateway {
             history: vec![],
         }
     }
-    
+
     /// 注册平台配置
     pub fn register_platform(&mut self, platform: PublishPlatform, config: PublishConfig) {
         self.configs.insert(platform, config);
     }
-    
+
     /// 创建发布任务
     pub fn create_task(
         &mut self,
@@ -155,9 +155,9 @@ impl PublishGateway {
         if !self.configs.contains_key(&platform) {
             return Err(format!("平台 {:?} 未配置", platform));
         }
-        
+
         let task_id = format!("publish_{}", current_timestamp());
-        
+
         let task = PublishTask {
             task_id: task_id.clone(),
             video_path: video_path.to_string(),
@@ -167,11 +167,11 @@ impl PublishGateway {
             created_at: current_timestamp(),
             updated_at: current_timestamp(),
         };
-        
+
         self.tasks.push(task);
         Ok(task_id)
     }
-    
+
     /// 执行发布 — 实际调用平台 API
     ///
     /// **Feature not wired**: All platform branches return errors indicating
@@ -283,7 +283,7 @@ impl PublishGateway {
             }
         }
     }
-    
+
     /// 生成标题
     pub(crate) fn _generate_title(&self, base_title: &str, platform: &PublishPlatform) -> String {
         match platform {
@@ -296,7 +296,7 @@ impl PublishGateway {
             _ => base_title.to_string(),
         }
     }
-    
+
     /// 生成描述
     pub fn generate_description(&self, base_desc: &str, tags: &[String]) -> String {
         let mut desc = base_desc.to_string();
@@ -306,13 +306,17 @@ impl PublishGateway {
         }
         desc
     }
-    
+
     /// 获取统计信息
     pub fn statistics(&self) -> PublishStats {
         let total_tasks = self.tasks.len();
-        let published = self.tasks.iter().filter(|t| t.status == PublishStatus::Published).count();
+        let published = self
+            .tasks
+            .iter()
+            .filter(|t| t.status == PublishStatus::Published)
+            .count();
         let total_published = self.history.iter().filter(|r| r.success).count();
-        
+
         PublishStats {
             total_tasks,
             published_tasks: published,
@@ -347,20 +351,23 @@ fn current_timestamp() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_publish_gateway() {
         let mut gateway = PublishGateway::new();
-        
-        gateway.register_platform(PublishPlatform::YouTube, PublishConfig {
-            platform: PublishPlatform::YouTube,
-            oauth_token: None,
-            channel_id: None,
-            scheduled: false,
-            scheduled_time: None,
-            auto_publish: true,
-        });
-        
+
+        gateway.register_platform(
+            PublishPlatform::YouTube,
+            PublishConfig {
+                platform: PublishPlatform::YouTube,
+                oauth_token: None,
+                channel_id: None,
+                scheduled: false,
+                scheduled_time: None,
+                auto_publish: true,
+            },
+        );
+
         let task_id = gateway.create_task(
             "/output/video.mp4",
             VideoMetadata {
@@ -374,9 +381,9 @@ mod tests {
             },
             PublishPlatform::YouTube,
         );
-        
+
         assert!(task_id.is_ok());
-        
+
         let result = gateway.publish(&task_id.unwrap());
         assert!(result.success);
     }

@@ -123,7 +123,7 @@ impl DependencyGraph {
             return Err("检测到循环依赖".into());
         }
 
-        let mut in_degree = HashMap::new();
+        let mut in_degree: HashMap<String, usize> = HashMap::new();
         let mut queue = VecDeque::new();
 
         // 计算入度
@@ -131,10 +131,10 @@ impl DependencyGraph {
             in_degree.entry(node.clone()).or_insert(0);
         }
 
-        for dependencies in self.edges.values() {
-            for dep in dependencies {
-                *in_degree.entry(dep.capability_id.clone()).or_insert(0) += 1;
-            }
+        // 边方向为 `from -> 其依赖`, 而输出顺序要求「依赖在前」, 所以入度 = 本节点声明的依赖数
+        for (node, dependencies) in &self.edges {
+            let entry = in_degree.entry(node.clone()).or_insert(0);
+            *entry += dependencies.len();
         }
 
         // 找出入度为0的节点
@@ -149,12 +149,13 @@ impl DependencyGraph {
         while let Some(node) = queue.pop_front() {
             result.push(node.clone());
 
-            if let Some(dependencies) = self.edges.get(&node) {
-                for dep in dependencies {
-                    let degree = in_degree.get_mut(&dep.capability_id).expect("key exists");
-                    *degree -= 1;
-                    if *degree == 0 {
-                        queue.push_back(dep.capability_id.clone());
+            if let Some(dependents) = self.reverse_edges.get(&node) {
+                for dependent in dependents {
+                    if let Some(degree) = in_degree.get_mut(dependent) {
+                        *degree = degree.saturating_sub(1);
+                        if *degree == 0 {
+                            queue.push_back(dependent.clone());
+                        }
                     }
                 }
             }
