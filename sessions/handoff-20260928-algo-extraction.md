@@ -377,3 +377,51 @@ unused import」。**动手前复核那一行，内容已变、mtime 是 42 秒�
 - 门：layer-deps 101known/0new · truth-surface EMPTY/UNDECLARED/TRACKED 全 0
   （UNCOMMITTED_DEP=2 是他窗新文件未入库，门如实报告）· find 31/31 ·
   manifest 5/5 · scan-surface 21/21 · lock-audit 0 · 全绿
+
+## 12. 收尾二：占位 skill 治理 + 死链门（2026-09-29）
+
+### 12.1 三个占位 skill：标注而非删除 `3e9e8783`
+`code-expert`/`law-expert`/`mcp-gateway` —— 只有 SKILL.md 一个文件、零实现、
+**仓内消费者 0 处**、84 天未动。
+
+**取证澄清一处误判**：初查 `mcp-gateway` 有"1 处引用"，实为
+`models/training/repo_meta.jsonl` 里某 GitHub repo 的 `topics` 字段恰好叫
+`mcp-gateway` —— 不是消费。**index.json 的引用是注册关系，也不等于使用。**
+
+**不删的四个理由**（删的证据齐了，但四条反证更硬）：
+① 删 skill 要同步改 index.json + skill_loader + check-skill-gate（多点风险）
+② `code-expert`/`law-expert` 是**真实能力领域**，只是内容待补
+   ⇒「待建设」而非「错误资产」
+③ 同类先例：`trending/` 5 个被 Rust 取代的 skill 本会话也没删
+④ 删除不可逆（git 之外无副本）
+
+⇒ 加 `disable-model-invocation: true`（模型不自动加载）+ 正文
+「状态：PLACEHOLDER」写明不承担职责与真实承接者（`mcp-gateway` →
+`crates/neotrix-gateway`）。**依据「导出 ≠ 调用」：0 消费者是删除的必要
+条件，不是充分条件。**
+
+### 12.2 `skills/SKILL.md`：死链存在一年无人发现
+- 移出 `src-tauri/`（已随 5c02e738 删除）
+- 解决自相矛盾：`crates/` 曾同时列在「skill 目录」与「非 skill 核心目录」
+- 补 11 个漏列分类（external-absorption / research-absorption /
+  self-iteration-agent / self-health / productivity / root + 3 占位 +
+  trending 移入废弃段并标注已被 L1/L3/L5 Rust 取代）
+
+### 12.3 根本预防：门加死链检查
+`check-skill-gate.sh` 新增文档侧相对链接校验。判据与 `nt_scan_surface` 同源：
+**路径不存在 ≠ 该面为空**（分类表里的死链是「导航腐烂」入口）。
+
+**首版有覆盖面盲区，靠注入法自测抓到**：初版只在 `index.json` 覆盖的条目里查，
+而 `skills/SKILL.md`（顶层导航，含全部链接表）**不在索引里** ⇒ 死链照样过。
+改为扫整棵树。⇒ 这是本会话**第 10 次**翻车，同型于 nt_scan_surface 盲区 #1
+（把「已注册的对象」当成了「全部对象」）。已补进 lessons 档第 10 条。
+
+### 12.4 收工自查（§8 最终）
+- worktree **2 个**（他窗新建 1 个 + ratchet），**本会话新建 0 个**
+- 主仓未提交 22 项，其中 6 项是他窗 multimodal 方向（QWEN-MM manifests /
+  nt_mcp_stdio_session / skills/nt_multimodal / check-capability-manifests.sh）
+  ⇒ **本会话零产物留在工作区**
+- 8 个门：layer-deps 101known/0new · truth-surface EMPTY/UNDECLARED/TRACKED
+  全 0（UNCOMMITTED_DEP=2 是他窗新文件未入库，门如实报告）·
+  skill-gate 0 broken doc links · find 32/32 · manifest 5/5 ·
+  scan-surface 21/21 · lock-audit 0
