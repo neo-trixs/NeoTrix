@@ -1,0 +1,179 @@
+{
+  "_about": "任务→工具机器索引。解决「日常任务要跑哪个脚本」需全文读 AGENTS.md 的问题。",
+  "_schema": {
+    "id": "任务意图的稳定 slug（小写连字符）",
+    "query": "自然语言触发词数组 —— agent 用它做匹配",
+    "tool": "可直接执行的命令（相对仓库根）",
+    "kind": "gate | locate | ops | absorb | oneoff",
+    "read_only": "true 表示不产生副作用，可放心试跑",
+    "when_not": "明确的禁用条件 —— 吸收 awesome-autoresearch「领养前检查表」的反面：不列何时别用，agent 会误用",
+    "spec": "可选，指向规范条目（如 R-DISK-1）"
+  },
+  "tasks": [
+    {
+      "id": "check-layer-deps",
+      "query": ["分层", "层依赖", "layer", "架构分层", "L0 L6", "依赖方向", "层归属违规"],
+      "tool": "bash scripts/check-layer-deps.sh --strict",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "不要用它判层归属对错 —— 那是 .neotrix/layer-map.json 的职责；本门只查依赖方向",
+      "spec": "AGENTS.md 三道闸"
+    },
+    {
+      "id": "check-truth-surface",
+      "query": ["truth", "空文件", "0字节", "未声明测试", "假实现", "stub", "空壳"],
+      "tool": "bash scripts/check-truth-surface.sh --strict",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "",
+      "spec": "AGENTS.md 三道闸"
+    },
+    {
+      "id": "check-naming",
+      "query": ["命名", "naming", "nt_前缀", "前缀规范", "文件名规范"],
+      "tool": "bash scripts/check-naming.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "advisory 而已 —— 规约 vs 现实差 1,646 个文件，该规约无约束力，PASS 不代表合规",
+      "spec": "AGENTS.md 三道闸"
+    },
+    {
+      "id": "check-forbid-coverage",
+      "query": ["unsafe", "forbid", "安全边界", "unsafe_code"],
+      "tool": "bash scripts/check-forbid-coverage.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "",
+      "spec": "R-P1 零 unsafe"
+    },
+    {
+      "id": "check-skill-gate",
+      "query": ["skill 门", "技能门", "三段式", "frontmatter", "skill 合规"],
+      "tool": "bash scripts/check-skill-gate.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "别用 --strict —— 存量 58/58 全红会逼你批量改存量而非修真问题；要卡新接入用 --adopt",
+      "spec": "P0-2"
+    },
+    {
+      "id": "check-fresh-build",
+      "query": ["干净构建", "fresh build", "能不能编译", "CI 会不会红", "干净检出"],
+      "tool": "bash scripts/check-fresh-build.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "脏工作树下测出的结论**不可信** —— 本脚本会自动开临时 worktree 当测量台，必须让它跑完",
+      "spec": "LESSONS-20260928-fresh-checkout.md"
+    },
+    {
+      "id": "check-doc-drift",
+      "query": ["文档漂移", "doc drift", "缺模块注释", "//! 缺失"],
+      "tool": "bash scripts/check-doc-drift.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "advisory，永不拦门"
+    },
+    {
+      "id": "audit-lock",
+      "query": ["死锁", "deadlock", "自死锁", "锁审计", "mutex 卡死", "锁没释放"],
+      "tool": "python3 scripts/ops/nt_lock_audit.py neotrix-core/src",
+      "kind": "ops",
+      "read_only": true,
+      "when_not": "**报了不等于有 bug** —— 2026-09-27 实测 12 条里 2/3 是误报（作者已显式 drop()）。必须逐条读现场证实或证伪再动代码",
+      "spec": "R-SCAN-1 / R-SCAN-2 / R-SCAN-3"
+    },
+    {
+      "id": "locate",
+      "query": ["在哪", "找文件", "定位", "定点", "这个函数在哪", "locate", "哪个文件"],
+      "tool": "python3 scripts/ops/nt_locate.py --component <组件名>",
+      "kind": "locate",
+      "read_only": true,
+      "when_not": "索引可能陈旧（--audit 会显示几天前 + N 条缺失）；**陈旧时改用 grep 定点**，别信索引",
+      "spec": "AGENTS.md 微操作公约"
+    },
+    {
+      "id": "worktree-gate",
+      "query": ["worktree", "工作树", "磁盘满", "占空间", "收工", "清理", "脏文件", "未提交改动"],
+      "tool": "sh scripts/ops/nt_worktree_gate.sh check",
+      "kind": "ops",
+      "read_only": true,
+      "when_not": "**禁止手删 worktree 目录**（rm -rf .worktrees/*）—— 850 处未提交改动不在任何提交里。删必须走 prune（内建双闸 + patch 兜底）",
+      "spec": "R-DISK-1~8 / 收工义务"
+    },
+    {
+      "id": "worktree-clean",
+      "query": ["worktree 清 target", "删编译产物", "释放磁盘"],
+      "tool": "sh scripts/ops/nt_worktree_gate.sh clean",
+      "kind": "ops",
+      "read_only": false,
+      "when_not": "有 cargo 在跑时脚本会让位（R-DISK-4）；主 target 会立刻被 build gate 重建",
+      "spec": "R-DISK-4"
+    },
+    {
+      "id": "worktree-prune",
+      "query": ["删 worktree", "移除工作树", "prune"],
+      "tool": "sh scripts/ops/nt_worktree_gate.sh prune --force",
+      "kind": "ops",
+      "read_only": false,
+      "when_not": "只删**双闸通过**的（脏=0 且 HEAD 已合入）；近 3h 有改动的会被跳过（疑似他窗在用）",
+      "spec": "R-DISK-2/5/7"
+    },
+    {
+      "id": "mem-gate",
+      "query": ["内存", "OOM", "swap", "跑不动", "内存不够", "重型构建"],
+      "tool": "sh scripts/ops/nt_mem_gate.sh; echo $?",
+      "kind": "ops",
+      "read_only": true,
+      "when_not": "exit 2 = BLOCKED，此时**禁止**起重型 cargo（先停重活或等 sidecar）",
+      "spec": "AGENTS.md 三道闸"
+    },
+    {
+      "id": "sidecar",
+      "query": ["sidecar", "推理服务", "llama", "本地模型", "8149"],
+      "tool": "sh scripts/ops/nt_sidecar.sh status",
+      "kind": "ops",
+      "read_only": true,
+      "when_not": "用完即停；常驻会挤占 16G 机器内存导致 cargo 被 OOM 杀",
+      "spec": "LOCAL-LLAMA-2026-09-28.md"
+    },
+    {
+      "id": "project-map",
+      "query": ["项目地图", "codemap", "全仓索引", "代码地图", "map"],
+      "tool": "make project-map",
+      "kind": "locate",
+      "read_only": true,
+      "when_not": "产物在 .project-map/，同样是快照 —— 会随编辑漂移，重要结论要重新生成"
+    },
+    {
+      "id": "crystal-graph-audit",
+      "query": ["晶体图", "记忆图", "crystal", "知识图谱体检", "hubs", "度数"],
+      "tool": "python3 scripts/ops/nt_graph_audit.py",
+      "kind": "ops",
+      "read_only": true,
+      "when_not": "口径刻意与 Rust nt_graph_index::Adjacency 对齐做**交叉验证** —— 两边数字不一致才是真信号，单边看会误判"
+    },
+    {
+      "id": "weights-manifest",
+      "query": ["模型权重", "weights", "models 账本", "权重校验", "备份权重"],
+      "tool": "bash scripts/ops/nt_weights_manifest.sh status",
+      "kind": "ops",
+      "read_only": true,
+      "when_not": "models/ 是 gitignored 的 ⇒ **git 保护不到它**，任何删除都不可恢复。provenance 子命令可对照上游 LFS oid 逐字节验证"
+    },
+    {
+      "id": "experience-smoke",
+      "query": ["经验树冒烟", "KB 回路", "experience 冒烟"],
+      "tool": "bash scripts/experience-smoke.sh",
+      "kind": "ops",
+      "read_only": false,
+      "when_not": "它会写临时 HOME（隔离），不会污染真实 KB"
+    },
+    {
+      "id": "audit-all",
+      "query": ["全部检查", "跑所有门", "全量审计", "提交前检查"],
+      "tool": "make audit-all",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "6 个门聚合，其中多数 advisory；要 blocking 结论请逐个跑对应 --strict"
+    }
+  ]
+}

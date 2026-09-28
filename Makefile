@@ -166,6 +166,14 @@ project-stats:
 	@echo "  模块数量: $$(find neotrix-core/src -type d | wc -l | tr -d ' ')"
 	@echo "  代码行数: $$(find neotrix-core/src -name '*.rs' -exec cat {} + | wc -l | tr -d ' ')"
 
+.PHONY: find find-audit
+# 按任务意图查工具（替代「读 AGENTS.md 全文再人肉匹配」）
+# 用法: make find QUERY="worktree 磁盘"
+find:
+	@python3 scripts/ops/nt_find.py $(QUERY)
+find-audit:
+	@python3 scripts/ops/nt_find.py --audit
+
 .PHONY: project-map project-view project-modules project-functions project-search project-stats
 
 # ═══════════════════════════════════════════════════════════
