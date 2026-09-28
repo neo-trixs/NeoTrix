@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use crate::l1_action::nt_act::async_tool_executor::AsyncToolExecutor;
 use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_store;
-use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 use crate::l1_action::traits::LlmRouter;
 
 // ════════════════════════════════════════════════════════════════
@@ -267,7 +267,7 @@ impl std::fmt::Debug for ActionFacade {
 mod tests {
     use super::*;
     use crate::l1_action::nt_act::async_tool_executor::AsyncToolExecutor;
-use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
+
     use crate::l1_action::traits::{
         CapabilityCategory, CapabilityHealth, ConstellationLevel, L1Capability, LlmRequest,
         LlmRoute,
@@ -412,3 +412,21 @@ pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_pool::Prox
 pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::rules::RuleEngine;
 pub use crate::l6_meta::nt_approval;
 pub use crate::l6_meta::nt_approval::PendingAction;
+
+// ─── L1→L4 跨层引用收敛（接上批 L3/L6 段）────────────────────────────────────
+// 路径沿用消费方原本就在用的路径（原代码已能编译 ⇒ 路径可证）。
+// ⚠️ `nt_memory` 与 `nt_feel_facade` 是**模块型**引用（L1 门面需要它们做
+// re-export 出口），故按模块整体转出；`InteractionType::Inquiry` /
+// `LeadStage` / `KnowledgeBase::open` 等是类型上的关联项，类型转出后即可用。
+pub use crate::l4_emotion::nt_feel_facade;
+pub use crate::l4_emotion::nt_memory;
+pub use crate::l4_emotion::nt_memory::addressable_store::AddressableStore;
+pub use crate::l4_emotion::nt_memory::nt_memory_historian::{
+    build_ewhr_router, EvidenceApiState,
+};
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_api::{
+    build_kb_router, KbApiState,
+};
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_geo::query_bbox_with_cold;
+pub use crate::l4_emotion::nt_memory::nt_memory_lead;
+pub use crate::l4_emotion::nt_memory::nt_memory_lead::{InteractionType, LeadStage};

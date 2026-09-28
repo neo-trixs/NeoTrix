@@ -15,13 +15,6 @@ l2_perception	neotrix-core/src/l1_action/nt_media/playback.rs
 l2_perception	neotrix-core/src/l1_action/nt_media/streaming/mod.rs
 l2_perception	neotrix-core/src/neotrix/nt_file_ability/tests.rs
 l3_embodiment	neotrix-core/src/l1_action/nt_io/nt_io_provider/common/factory.rs
-l4_emotion	neotrix-core/src/l1_action/mod.rs
-l4_emotion	neotrix-core/src/l1_action/nt_act/nt_act_trade/orchestrator.rs
-l4_emotion	neotrix-core/src/l1_action/nt_io/context_sandbox.rs
-l4_emotion	neotrix-core/src/l1_action/nt_io/nt_io_digital_human.rs
-l4_emotion	neotrix-core/src/l1_action/nt_io/nt_io_proxy_server.rs
-l4_emotion	neotrix-core/src/l1_action/nt_io/nt_io_web/server.rs
-l4_emotion	neotrix-core/src/l1_action/nt_io/nt_io_web/tiles.rs
 l5_cognition	neotrix-core/src/l1_action/nt_core_bank/bank/mod.rs
 l5_cognition	neotrix-core/src/l1_action/nt_core_task_dispatcher/nt_dispatcher_core.rs
 l5_cognition	neotrix-core/src/l1_action/nt_core_task_dispatcher/nt_dispatcher_dto.rs

@@ -6,7 +6,7 @@ use crate::l5_cognition::l1_facade::affective_interface::{
     AffectiveInterface, AffectiveReadout, GuideMode, ResponseIntent,
 };
 
-pub use crate::l4_emotion::nt_feel_facade::{
+pub use crate::l1_action::nt_action_facade::nt_feel_facade::{
     DigitalHumanEmotion as Emotion, DigitalHumanEmotionEngine as EmotionEngine,
     emotion_from_expression,
 };
