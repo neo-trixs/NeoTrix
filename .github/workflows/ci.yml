@@ -54,14 +54,15 @@ jobs:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
       # Reports the standing test failures as a countable ledger instead of a
-      # bare red line. Deliberately ADVISORY (no --strict): ~3 of the 57 are
-        # 2026-09-28 转严格模式。此前 advisory 是因为账本里有 3 条失败且历史
-        # flaky 会 flap（filesystem-backed 测试）——一个会 flap 的门只会训练所有人
-        # 忽略它。现在这 3 条已全部消除（双时间 2 条 + Noise 握手 1 条，均按仓规
-        # 「实现或 #[ignore]」处理并写明理由），基线重算为空 ⇒ 任何**新增**失败
-        # 都会 FAIL，等于把「不许再引入失败」变成机器可拦的事实。
-        - name: "Test suite + failure ledger (strict; baseline is empty)"
-          run: bash scripts/check-test-baseline.sh --strict
+      # bare red line. STRICT as of 2026-09-28: this was advisory because the
+      # ledger held 3 failures and a historically flaky filesystem-backed test
+      # would flap — a gate that flaps only trains everyone to ignore it. Those
+      # 3 are now gone (2 clock-based + 1 Noise handshake; each either fixed or
+      # #[ignore]d with the reason written down), so the baseline recomputes
+      # empty ⇒ any NEW failure FAILs, making "do not introduce failures" a
+      # machine-enforced fact rather than a convention.
+      - name: "Test suite + failure ledger (strict; baseline is empty)"
+        run: bash scripts/check-test-baseline.sh --strict
 
       - name: Egress privacy guard regression
         run: cargo test -p neotrix --lib egress_guard -- --nocapture

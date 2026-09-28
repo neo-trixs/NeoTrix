@@ -1,0 +1,74 @@
+# WEIGHTS-MANIFEST —— models/ 的内容账本
+# 生成: 2026-09-28 20:30:22  机器: iMac-3693
+#
+# models/ 被 .gitignore 的 'models/*' 整条拦着, git 保护不到。
+# 本清单是**唯一**记录「盘上有什么、什么版本、损坏没有」的地方。
+#
+# 三类处置（见 scripts/ops/nt_weights_manifest.sh 文件头）:
+#   [R] 可再生  可从 HF 按下方来源重新下载, 不备份
+#   [I] 不可再生 训练产物, 已 gzip 备份 (verify 不含它们的大小比对)
+#
+# 校验: bash scripts/ops/nt_weights_manifest.sh verify
+
+# ─── [R] 可再生权重 ───
+# 来源见 docs/architecture/WEIGHTS-INVENTORY-2026-09-28.md
+[R] 3adf69402b5d22e693151cabadc12528f923c4ba6bf343738aaf13f0892162e8  models/minimind-3/model.safetensors
+[R] ba93c21300854075ab42655bc30dca82c7c6c958f511d1ec9ea2b3e750b4b75f  models/qwen35-4b-uncensored/Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-Q6_K.gguf
+[R] a1e32e86ea99aa7a56f3dcfe7e63c1d0be9439d31fd07087099f15bc0fda0f22  models/qwen35-4b-uncensored/mmproj-Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-BF16.gguf
+
+# ─── [I] 不可再生训练产物 ───
+[I] 3ab1b6924c22d44e97edb36d027896ba6b1e3e429ca8625f841615f6b1e06146  models/training/ab_kev_agentjev.py
+[I] df0db52c8c910f0dd6fe0b33eb8ca0fc730aeba96c9b9fdbda53b6f61cec9380  models/training/ab_kev_agentjev_report.md
+[I] 60e0a8a30f36056854ba26747771f4ec67925fce605ca67897fa834209b17208  models/training/ab_next.py
+[I] 9caa7505d8d333f0dfa7ad81fee4702aefbd8637d248bedd81637aad5b0e3f59  models/training/ab_next_report-20260925.md
+[I] 7fa35c49ae4b46d1bd1cb86d08dfe8622d93f8d186bc8e699467bf23105ddb2a  models/training/ab_next_report.md
+[I] 4e62eb956d42264667e7714ca7305706410af5d658d9f37055661df349b431f1  models/training/ab_router.py
+[I] c4a0fb2e7dc23faf3b06663615be06dbc80d56908224c6f6bd14bf6fa50a1c2b  models/training/ab_threeway.py
+[I] a2b814c54e47fda1dc6b53fcb95557e058ff642fcf29eb826c909594ee2138e4  models/training/ab_threeway_report.md
+[I] cdc94c5b33e6116baf99cc25bd8349e5d26f16ccfdea57eb575b102b306519d7  models/training/agentation_to_cards.py
+[I] 9a94d01ceca8ebfce2c1afa6d60834a468a6566c9f85b7dfc5d59bf6d0d06722  models/training/clean_data.py
+[I] 708ac9093f890b54359bb0a090293e6ce5d17f8cddcecdc07c474edeae61d6e7  models/training/colab_finetune.py
+[I] 15c8b13c7ba07ffdab47c96801946814193f1865b634026453fa4b0d3d54e0a5  models/training/deep_route.py
+[I] 407536896e1761ffff834b5b73915d11a8357b7fe04b822c95023dc03f5ca9d5  models/training/dialogue_cards.jsonl
+[I] e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  models/training/dpo.jsonl
+[I] 2a7df1f72ee3ad0f9029a4bee5e406f541c77ae9324ba184a30bd60770ef4a5f  models/training/eval_full.py
+[I] 3106bc5ec2d203f313b52c66fc1c74ef7196269c6cba16ce48fc6a9c2b129a70  models/training/eval_lora.py
+[I] 782441048b4432ac5df08a3319eee01c536df991d42e0deb321865eb09c7afbd  models/training/finetune.py
+[I] 02e68ccbb8d2d5f42eeaa29e67efe924df61dc21fc8c3659dc3a29434ed59ce7  models/training/game_assets_cards.jsonl
+[I] 1e3e0b66a910d9c2f29607687d15816f700d9974e3f2f703ab381e4f5acecb2d  models/training/hf_prm800k.jsonl
+[I] 59159819c2a7cc4062072077fdf214bd40b0f22a40ca16eae11f6d65c6823c15  models/training/hf_reasoning.jsonl
+[I] 16478aef00590035e866c3fdfb20e0229e3985e5fed6d30154c59af66b165188  models/training/jev_builds.jsonl
+[I] bd1ff898fa4d515b09f205f5fb22eae264a7992e3c42c3d7bf6f0f3c0b8af69d  models/training/jev_calib_rows.jsonl
+[I] 05a8d2ff025cf2f1e9a027062ad8bc0af517e4d477b767d9ff13dd9fe93120e0  models/training/jev_kev.jsonl
+[I] ee80042b3221b3164b8d67fd251dd6782847032cdb9f33ac10fc99e5b69c6003  models/training/jev_labeled.jsonl
+[I] a42d1a639c17952bd1c4b28b0e423457d9387fe20a4c98696adb29260910ac1c  models/training/jev_labeled_cal.jsonl
+[I] 7e5cb6d1cad6bb7d21998ad23045fa826256a3629c512782a656bafd876f4879  models/training/jev_platts.json
+[I] b14ed446f3f8aaa4e1e8ba1d32c763bae1d37fcbf5410ab8ae662fa823fcab51  models/training/jev_platts.py
+[I] 1c697440042dc8d93314b2ac69b934a2e1abb91015735eac683c27f1f6b54c07  models/training/label_jev.py
+[I] 12844db8db432783f924dd8edd27297ae1212239220f1f1a057f5f2a1b57dff2  models/training/laya_tempfit.py
+[I] 09fe4fe460b87516f9ac31e4e1c1579dc65c9ffc554c8a90c5f7e2c36299f795  models/training/laya_temps.json
+[I] 9615686841214ceb8639372f0b2d9b58437c4cedd47b41afae238e2e6fa2d609  models/training/lora_finetune.py
+[I] 8dff98a732b4d31eef6c45b1ddba994474424dde6e7e3a47d368d86e08bc3192  models/training/merge_adapter.py
+[I] cc0a1795007775fd83c9e54cd7cec05824f0b942f3c4e504b2f0520c2aae2c84  models/training/nll_select.py
+[I] 8fe13c37d45a37bb368f3d4d76dffd565425c51bd808da8f743774a2bf53705d  models/training/oc_refresh.py
+[I] f9b7f53e9477ba39a4aad6e0d8ead8f8fe06763b572adaf311ed28d2fc79a763  models/training/pack_texts.py
+[I] 9939939cc7777ba8f15100f65c4a3ad4300b26346b6ca4e2f8a5f4df9ab578c1  models/training/paper_cards.jsonl
+[I] a900ad457a0289b475ebb240342d78819869ad0b365d4678f076d778e65a7335  models/training/pretrain.jsonl
+[I] b8ce680e773b9fd181d2e251633fa2e2a519d1feb57486571fa0f9264737c655  models/training/pretrain_clean.jsonl
+[I] 835c295eda8b4150becf74f8365c2fa19cade6a730542203f6a4b5d48363cc90  models/training/pretrain_dedup.jsonl
+[I] 13b999a3e63d0fd0ec096df01016c7880f9281194f72c63d1ceb0544dea09b8b  models/training/recalibrate_labels.py
+[I] faef6c8b4de29d0304412aa242913fac703184a730550483e8644afa40d982f4  models/training/repo_cards.jsonl
+[I] e8f11e43549f262a0e8df60e0d02ac5b197c01de59acbc022eafd58ccacb056c  models/training/repo_cards.jsonl.bak-20260924-093053
+[I] 44cebcc4e7ed8d8f12919046b8f9f4983efea6289ab470dbebae9ed0fb2edbbc  models/training/repo_meta.jsonl
+[I] 0146114bcf10663fcddc6a59aecc5133acbf7d8ac3d0cbc2bcd3fc2a00937d25  models/training/router_table.json
+[I] e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  models/training/sft.jsonl
+[I] a4e0e145e6f18441652db8e38e9ad7dcac28118b7a6939d0bb2140001558a495  models/training/smelt/oc_cards.json
+[I] 7495c228584d3487d4592a70ed307bd8cdf6c3586b539dcd4bd46bb23ed84146  models/training/smelt/oc_seen_ids.json
+[I] aa091715ef2dbdda1a6f19574b01b7bba30df008894ee5c6dafb3b5c4b6f48bf  models/training/smelt/repo_index.json
+[I] 6c7453b8c262ce3e04311eaa18ac9c64a3cd35eb1333283d96414e289049a693  models/training/smelt/repo_index.json.bak-20260924
+[I] 287f4b83bb3f86518bbd65f00cecb66b2ae433857042b041fdf3270ff9723785  models/training/smelt/smelt_progress.json
+[I] 3e6abbc3a8dcd9b8c53a07ae0d6f99d9a6d902de39f4b8ed3d2d4a8841299521  models/training/smelt_github.py
+[I] d6ac0b3626def907e4f871ad609abd9a80b963b331580461ccad55f2863d54e4  models/training/smelt_prm.py
+[I] 0f400bb3f14fab483dc6d30e09ffc046f8b7ea124e00ff8ac62e3acd592503d5  models/training/smelt_repos.txt
+[I] e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  models/training/think.jsonl
+[I] a585e114f5c1765e80b4cb45e19dd0e4f7bc6f2a725c74d0ff383f9edb01fe0b  models/training/to_kev_format.py

@@ -56,58 +56,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           features: self-update
 
-  build-desktop:
-    needs: changelog
-    strategy:
-      matrix:
-        include:
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            suffix: macos_arm64
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            suffix: macos_x64
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            suffix: linux_x64
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            suffix: windows_x64
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Verify external input provenance
-        run: bash scripts/provenance_check.sh
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-      - name: Install Linux deps
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-      - name: Install Windows deps
-        if: matrix.os == 'windows-latest'
-        run: choco install -y webview2-runtime
-      - name: Build desktop app
-        uses: tauri-apps/tauri-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "NeoTrix Desktop v${{ github.ref_name }}"
-          releaseBody: "See CLI release notes below."
-          releaseDraft: true
-          args: --target ${{ matrix.target }}
-
   release:
-    needs: [build-cli, build-desktop]
+    needs: [build-cli]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
