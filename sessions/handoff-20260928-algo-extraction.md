@@ -6,7 +6,7 @@
 
 从 `crates/` 的 2 个孤立 crate 里萃取出 **8 个通用算法**进主代码 L0–L6，
 把 4 个 crate + 2 个顶层目录归档到 `~/Downloads/Neo/neotrix-archive/`，
-裁决 2 笔架构债。顶层目录 **17 → 11**，`crates/` **13 → 9**。
+裁决 2 笔架构债。顶层目录 **17 → 9**（末轮清理后），`crates/` **13 → 9**。
 
 ## 2. 萃取清单（7 个文件被 git 识别为 rename，非增删）
 
@@ -148,7 +148,7 @@ multi-agent / reasoning）源码内零引用，纯死依赖，已剔除。
 | `SearchResult` | ✅ **已定性，无需消歧**（`a8554a47` 后 7 处）。历史文档写 4 处低估；9 处中有 2 处是零消费者 hybrid 副本，删除后余 7 处**字段集两两不交**（doc_id/chunk_text、title/url、title/score/snippet、skill/score、id+similarity+metadata、id+score、id+title），非重复 |
 | ~~hybrid 副本去重~~ | ✅ **已删**（`a8554a47`，−799 行）：`l5_cognition/nt_core_hybrid_search.rs`(401) 与 `crates/neotrix-gateway/src/hybrid_search.rs`(398) 零消费者，且被 `nt_memory_kb/nt_memory_search/`(2,423 行，全活) 完全覆盖。顺带 `HybridRetriever` 3→1、`NodeMeta` 2→0、`Bm25Document` 4→2 |
 | 治理记录自身过期 | `_rule` 在两小时内过期两次（102→101、CapabilityRegistry 4→3→1）。**改完同名类型必须同步重写治理记录**，否则即制造下一个 R-SCAN-3 陷阱 |
-| `target/` | 81G 构建产物（他窗持续跑测试，体积仍在涨），未清 —— 需 cargo 全空闲才能 `cargo clean` |
+| ~~`target/`~~ | ✅ **已清，释放 80 GB**。清理前实测本仓 target **0 句柄占用**（并行窗口当时在 `/Users/neo/Downloads/Neo/neobot` 跑测试，用的是另一个仓的 target）。清理后四门仍全绿 —— 证明门不依赖构建产物 |
 | `AGENTS.md` 门记录 | ✅ **已入库**（`3a0bf1c6`）：熔炼至 102 行，并更正两处过期数字（分层门 102→101、命名门补明 clean-HEAD 基线 1,646 vs 脏树 1,630） |
 
 ## 10. 门状态（本会话实测）
