@@ -78,6 +78,13 @@ cargo build -p neotrix                  # 完整构建
   - 沿用规则：改动为**非 `.rs`**（脚本/JSON/TXT）可沿用上次值；改了 `.rs` 必须重跑
   - 历史教训：22:52 之前本文长期写"当前 0 命中"而实际 12 条 —— **陈旧门记录会让下一个 agent 去"修"正确代码，比没有门更危险**（见 R-SCAN-3）
 - sidecar 按需：`sh scripts/ops/nt_sidecar.sh {start|stop|status}` — 用完即停
+- **任务→工具索引（2026-09-28 立，日常任务先查它再动手）**：
+  `make find QUERY="死锁"` / `python3 scripts/ops/nt_find.py 死锁`。
+  19 条意图索引在 `.neotrix/task-index.json`，**每条必带「何时别用」** ——
+  只写「何时用」agent 会用错（`check-naming` PASS 不代表合规；
+  `nt_lock_audit` 报 12 条里 2/3 是误报）。pre-commit 校验索引指向的工具存在。
+  动机：脚本发现机制此前散落在 AGENTS.md(10处)/RUST-STANDARDS.md(3处) 的散文里，
+  回答「该跑什么」需全文心智模型，且无单一权威。
 - **worktree 门**（2026-09-28 立，取代纯人工纪律）：`sh scripts/ops/nt_worktree_gate.sh {check|clean|prune [--force]}`
   详见 `scripts/ops/WORKTREE-GATE.md`。**收工删 worktree 必须走 `prune`，禁止手删目录**
   （`prune` 内建双闸 + patch 兜底 + 判据同向检查，见下条 R-DISK-1~7 细则）
