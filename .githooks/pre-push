@@ -21,7 +21,6 @@ if ! cargo test -p neotrix --lib egress_guard >/tmp/prepush-egress-test.log 2>&1
     exit 1
 fi
 echo -e "\033[0;32m✅ Egress guard gate passed\033[0m"
-exit 0
 
 # ---------- 收工门：worktree 与未提交改动泄漏检查 ----------
 # 依据 2026-09-28 实测：22 个 worktree 占 28G、850 处未提交改动不在任何提交里，
