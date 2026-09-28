@@ -75,7 +75,7 @@ pub mod nt_core_model_skills;
 /// EVO-06 技能路由单源真理＋三件套评审（RouteTable/Manifest 纯逻辑）
 pub mod nt_skill_route;
 /// Hybrid Code Search Retriever
-pub mod nt_core_hybrid_search;
+
 pub mod nt_core_second_brain;
 pub mod nt_core_orchestration_failure_taxonomy;
 pub mod nt_core_panic_recovery;
@@ -139,7 +139,6 @@ pub use neotrix_reasoning::kernel_types as reasoning_kernel_types;
 pub use neotrix_gateway::model_gateway;
 pub use neotrix_gateway::model_router;
 pub use neotrix_gateway::skill_registry;  // ← SKILL.md 正典 (2026-09-27: multi-agent 的 600 行副本零消费者已删)
-pub use neotrix_gateway::hybrid_search;
 pub use neotrix_gateway::hive;
 pub use neotrix_gateway::mind_modules;
 pub use neotrix_gateway::context_mgmt;
