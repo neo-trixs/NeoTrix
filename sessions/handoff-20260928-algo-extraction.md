@@ -61,24 +61,116 @@
    **CI 门在用**（`nt-audit.yml:30-31`、`ci.yml:224-226`）。须一并 grep
    `.github/workflows/`。
 
-## 6. 遗留 / 待办
+## 6. 同名类型消歧（第二轮，commit `25118be7` + 待提交）
+
+主代码存在**多处同名类型**。逐目录 grep 确认它们**分处互斥作用域、无任何文件同时
+引用 2 份** —— 不是功能冲突，是**检索歧义**（`grep ReasoningTrace` 得到 4 个语义
+完全不同的结果）。故只改名，不动结构。
+
+| 原名 | 处数 | 处置 |
+|---|---|---|
+| `ReasoningTrace` | 4 | 保留 crate 通用名作规范名；`crawl`→`CircuitTrace`、`seal_core`→`ProcessStageTrace`、`reason`→`ReasoningRecord` |
+| `ReasoningMethod` | 3 | 同上；`crawl`→`CircuitMethod`、`reason`→`ReasoningTaxonomy` |
+| `ReasoningStep` | 5 | 同上；`nt_core_ttc`→`TtcStep`、`control_distillation`→`ControlDistillStep`、`cross_domain`→`RefineStep` |
+| `TraceSource` | 2 | `seal_core`→`ProcessStageTraceSource` |
+
+**净结果：11 个同名类型消歧，每概念收敛到 1 处。零结构改动、零行为改变。**
+
+### ⚠️ 更正一处不实自述（重要）
+
+`crates/neotrix-reasoning/src/reasoning_core.rs:3` 原本写着
+「消除 4 处 ReasoningTrace 重复定义」—— **事实是该统一类型从未被主代码采纳**，
+4 处一直并存。逐字段核对后证明**根本不可统一**：
+
+- `crawl` 那份的 `steps` 是 `usize`（**计数**），统一体里是 `Vec<ReasoningStep>`（**列表**）—— 语义不同，不是超集。
+- `reason` 那份有 `prompt` / `perspective_lens` / `error_context` / `success` / `reasoning_type` 共 **5 个字段**，统一体**均无对应** —— 强行统一要往里塞 4 个使用方都用不上的字段。
+- 三份 `ReasoningMethod` 的**变体集本质不同**（`reason` 那份有 `Direct`/`EdgeCaseFocus`/`ConstraintPropagation`，另两份没有）。
+
+**教训：看到「已消除重复」的声明要重新验算，它可能只是意图没落地。**
+
+### ⚠️ 改名过程中被 pre-commit 抓出的 3 个错
+
+1. **撞上已有同名** —— 初版把 `reason` 的 `ReasoningMethod` 改成 `ReasoningApproach`，
+   改完统计发现该名已被 `l0_substrate/nt_core_hex.rs:1017` 与
+   `neotrix-types/core/nt_core_hex.rs:447` 占用（八卦工作流语义，恰好与推理策略无关）。
+   → 立即改用 `ReasoningTaxonomy`（**改名后必须复统计**，否则用一个同名换一个同名）。
+2. **漏了 re-export 路径的消费者** —— 首轮只搜定义所在子树，漏掉经
+   `nt_mind/mod.rs:153 pub use reasoning_types::{...}` 暴露的 4 个消费者
+   （`meta_panel/{types,engine}.rs`、`nt_mind/mod.rs`、`knowledge/memory.rs`），
+   被 E0432 抓出。→ **找消费者必须顺 re-export 追，不能只看定义处。**
+3. **整文件替换误伤全限定路径** —— `nt_reason_entry.rs` 里有 6 处用的是
+   `crate::l5_cognition::reasoning_core::ReasoningTrace`（**crate 经 re-export 的**），
+   被无差别 sed 一并改错（E0422）。→ **同一文件里同名符号可能指向不同作用域，
+   全限定路径必须逐条甄别。**
+
+### 方法论：先做三类测量，再动 sed
+
+第二轮（`ReasoningStep`）先量后改，只动了 3 个文件就完成：
+① `use`/`pub use` 导入 → 0 处 ② 全限定路径 → 0 处 ③ 文件内自用 → 25 处。
+既无跨作用域消费者也无同文件多义，**不必像第一轮那样大范围追消费者**。
+上轮三个错，全部源于没先做这三类测量。
+
+## 7. crates/ 死依赖剔除（commit `00bc3223`）
+
+`neotrix-sysctl`(150 行) 声明 5 个消费者，**只有 `neotrix-core` 真用**
+（`nt_core_memory_budget.rs:43,47`）。其余 4 个（consciousness / gateway /
+multi-agent / reasoning）源码内零引用，纯死依赖，已剔除。
+
+**该 crate 本身绝对不可内联** —— 它是 `#![forbid(unsafe_code)]` 的 **FFI 专用逃生舱**
+（crate 级 `allow(unsafe_code, reason=...)` + `libc::sysctl` + 裸指针转换）。
+内联进 `neotrix-core` 就得给它加 `allow(unsafe_code)`，直接破坏项目最硬规则。
+
+## 8. crates/ 整目录归档不可行（三条硬证据）
+
+| 事实 | 实测 |
+|---|---|
+| `neotrix-core` 依赖其中 **8/9** 个 crate | 71,438 行。萃取 = 内联进已 797K 行的主代码 |
+| `nt-core-capability-tree` 是 **CI 阻塞门** | `ci.yml:226` `neotrix-capability audit-maturity --strict`，带 318 节点/43 边落盘治理数据 |
+| `neotrix-audit` 是 **CI 门** | `nt-audit.yml:26,30` 跑其 bin（0 库消费者但有 CI 门 = dev-tool crate，位置正确）|
+
+另核实两处**不是**重复，是互补：
+- `crates/neotrix-multi-agent`(2,571) vs 主代码 `l5_cognition/nt_core/multi_agent/`(4,655)
+  —— 前者独有 35 个公开类型（hive/crew/blackboard/god_agent），后者独有 39 个
+  （graph_orch/delegation/aggregation/load_balancer），仅 2 个同名；且前者有 3 处活调用
+- `neotrix-reasoning` 有多处活调用（bank/kron、task_dispatcher/kernel_types、l5 re-export）
+
+## 9. 遗留 / 待办
 
 | 项 | 状态 |
 |---|---|
-| **`l6_meta/nt_core_capability/` 14 个死引擎 4,945 行** | 已审计出**零外部消费者**（15 个符号逐个开 import 核实，非零的 3 个是同名异物）。其 91 个测试全是死代码互测，且 `mod.rs:37-148` 与 `151-262` 是**逐字重复的两份 `inline_tests`**。**本轮未动** |
-| 主代码重名副本 | `LoadBalancer` **3 份**（`l6_meta/nt_core_capability/loadbalancer.rs:59` / `l5_cognition/nt_core_gwt/load_balancer.rs:15` / `l5_cognition/nt_core/multi_agent/coordinator/load_balancer.rs:37`）；`VersionManager` **2 份**（`l6_meta/.../versioning.rs:121` / `l2_perception/nt_core_knowledge/versioning.rs:141`） |
-| `layer-map.json` 的 `_rule` 写「CapabilityRegistry x4」 | **已过期，实为 3 套**（第 4 份 `nt_file_ability/capability.rs` 已于 2026-09-28 删除） |
-| `Cargo.lock` | 未入库（`.gitignore:4` 的 `*.lock`）⇒ 构建不可复现。本轮改过 3 份 `Cargo.toml`，锁文件应随之更新入库 |
-| `target/` | 52G 构建产物，未清 |
+| **`nt_core_capability` 14 个死引擎 4,940 行** | ✅ **已删**（`2bbed32c`）：14 引擎 + 2 死测试，5,708 → 155 行；其 91 个测试全是死代码互测；顺带合并逐字重复的 `inline_tests`/`inline_tests_2` |
+| `Cargo.lock` 未入库 | ✅ **已修**（`2bbed32c`）：`.gitignore` 定点解禁（`*.lock` 仍生效于 node 侧锁文件） |
+| **11 个同名类型** | ✅ **已消歧**：`25118be7` + 待提交那一笔。`ReasoningTrace` 4→1 / `ReasoningMethod` 3→1 / `ReasoningStep` 5→1 / `TraceSource` 2→1 |
+| 4 条 `neotrix-sysctl` 死依赖 | ✅ **已剔**（`00bc3223`） |
+| `layer-map.json` 的 `_rule` 写「CapabilityRegistry x4」 | ✅ **已更正为实测值**（见该文件；删完死引擎后 `CapabilityRegistry` 3 处 / `LoadBalancer` 2 处 / `VersionManager` 1 处） |
+| 剩余重名副本 | `CapabilityRegistry` **3 套**：A=`nt-core-capability-tree`（CI 阻塞门）/ B=L0 类型层（16 处实现）/ C=L5 `nt_core/capability/registry.rs`（**仅自测**）。A/B 均有活消费者不可合并，C 是下一个可删的候选。`LoadBalancer` 2 处（`nt_core_gwt/load_balancer.rs:15` + `nt_core/multi_agent/coordinator/load_balancer.rs:37`） |
+| `nt_core/capability/registry.rs` | ⛔ 零消费者（自述见 `registry.rs:452-461`），是 B-2 遗留，**本轮未动** |
+| `target/` | 78G 构建产物（他窗在跑测试，持续增长），未清 |
+| `AGENTS.md` 门记录 | 已在工作树但**未入库**：该文件 140 行 > 守卫 130，而 HEAD 仅 97 行，超限源于他窗未提交的 41 行；正文已写入本文 |
 
-## 7. 门状态（本会话实测）
+## 10. 门状态（本会话实测）
 
 ```
 check-layer-deps.sh --strict   PASS: 0 new violation(s); 102 known/recorded
 check-naming.sh                PASS (advisory)
 nt_lock_audit.py               0 处
-check-forbid-coverage.sh       OK        ← 曾因他窗删 src-tauri 而恒红，已修
+check-forbid-coverage.sh       OK      ← 曾因他窗删 src-tauri 而恒红，已修
 cargo metadata --no-deps       exit 0，12 成员清单与 path 依赖全解析
-pre-commit cargo check --tests 全仓仅 1 error（**他窗 model_pool.rs 的 unused
-                               imports**，非本会话改动；详见该文件 model_pool.rs:22）
+pre-commit cargo check --tests ✅ Build gate passed（多轮；本轮门共抓出 4 个真实错误：
+   2 个他窗的 model_pool.rs unused imports，1 个我漏 re-export 消费者，1 个我误伤全限定路径）
 ```
+
+## 11. 本会话沉淀的方法论（可直接复用）
+
+1. **找消费者必须三方查**：`use`/`pub use` 导入 + **全限定路径** + **顺 re-export 追**。只搜定义所在子树会漏。
+2. **改名前必做**：① 语义定性（比字段，不比名字）② 候选名冲突预检 ③ 改完复统计。三步缺一就会「用一个同名换一个同名」。
+3. **同名 ≠ 重复**：先查字段集是否相交、交集多大。4 处 `ReasoningTrace` 里 2 处字段
+   语义冲突（`usize` vs `Vec`），根本不构成超集，只能改名不能合并。
+4. **「已消除重复」的声明要重新验算** —— `reasoning_core.rs:3` 声称消除了 4 处重复，
+   实际从未被采纳，且根本不可统一。
+5. **共享 index 事故**：另一窗口把 64 个删除暂存进了共享 index，我 `git add` 时才发现。
+   提交前必须 `git diff --cached --name-status` 核对归属；清理用 `git reset`
+   （mixed，不动工作树）而非 `git checkout --`。
+6. **Cargo 反查看不见 CI**：`neotrix-audit` 与 `nt-core-capability-tree` 的 Cargo
+   反查显示零消费者，实为 **CI 门在用**（`nt-audit.yml:30`、`ci.yml:224-226`）。须一并 grep
+   `.github/workflows/`。
