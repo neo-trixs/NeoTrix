@@ -52,14 +52,35 @@ cargo check --lib -p neotrix     exit=0
 cargo check -p neotrix (bins)    exit=0
 cargo test  --lib                 12143 passed / 3 failed
 check-fresh-build.sh --full       PASS
-check-layer-deps.sh --strict     PASS (0 new / 94 known)
+check-layer-deps.sh --strict     PASS (0 new / 102 known)   ← 勘误见下，原写 94
 check-truth-surface.sh --strict  PASS
 nt_lock_audit.py                  0 处
 ```
 
 **3 条剩余失败** = `nodes` 表无法存双时间（2 条，阶段级工程，见交接 T6）+ Noise 握手协议（1 条，⛔ **需产品决定**）
 
-**分层违规 94 条** = 84（l\*_ 层）+ 10（此前逃过检查的 `neotrix/` 第二棵树，另一窗口纳入）。棘轮已就位，`--update-baseline` **只应向下** —— 调大基线等于把债藏起来。
+**分层违规 102 条** = 92（l\*_ 层）+ 10（`neotrix/` 第二棵树）。棘轮已就位，`--update-baseline` **只应向下** —— 调大基线等于把债藏起来。
+
+> ### ⚠️ 上面「94」是脏树测量，照抄会打断 CI（`bdf1e9f1` 已修，15:2x 实测）
+>
+> 那 8 条 `l*_` 之所以从 92 掉出基线，只因**主工作树有 393 个未提交的 `.rs` 修复** ——
+> 新 clone 里它们是真实违规。干净检出三态：
+>
+> | 状态 | baseline | violations | RC | 第二棵树覆盖 |
+> |---|---|---|---|---|
+> | `[A]` HEAD 原样（= 新 clone） | 92 | 92 | 0 | **0 个文件** |
+> | `[B]` 照抄 94 | 94 | 102 | **1** | 有 |
+> | `[C]` 干净检出重算（**已入库**） | **102** | 102 | 0 | 有 |
+>
+> `[A]` 是最危险的：门报 `PASS: 0 new`，却**完全没看** `neotrix/` 第二棵树的
+> 128 文件 / 42,070 行 —— 因为 `.neotrix/layer-map.json` 与 `check-naming.sh`
+> 当时只在主树未入库。
+>
+> **102 不是「调大基线藏债」**：92 是**残缺门**下的债，102 是**完整门**下的债。
+> **元教训**：这是「脏树不是合法测量台」的**第三次**复发 ⇒ 写进门记录/正典文档的
+> 数字必须记「测量台 = 干净检出 @ commit」。同一批修正：`naming` 基线
+> 1,644（脏树）→ **1,646**；`layer-map.json` 首版 8 个数字 7 个是脏树值
+> （最大 `nt_crystal_core` 21,134 → **19,371**，−8%）。
 
 ## 从哪开始
 

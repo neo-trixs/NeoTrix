@@ -11,7 +11,7 @@ cargo check --lib -p neotrix     exit=0
 cargo check -p neotrix (bins)    exit=0
 cargo test  --lib --no-run       exit=0
 check-fresh-build.sh --full       PASS
-check-layer-deps.sh --strict     PASS (0 new / 94 known)
+check-layer-deps.sh --strict     PASS (0 new / 102 known)   ← 见下方勘误，原写 94
 check-truth-surface.sh --strict  PASS
 nt_lock_audit.py                  0 处
 cargo test --lib                 12143 passed / 3 failed
