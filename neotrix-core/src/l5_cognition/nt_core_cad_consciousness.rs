@@ -164,52 +164,20 @@ impl SelfTest for CadRunewordSelfTest {
 pub fn cad_wiring_map() -> Vec<(String, String)> {
     vec![
         (
-            "cad_csr".into(),
-            "neotrix/l2_world_impl/cad_selftest.rs:9".into(),
-        ),
-        (
-            "cad_ccip".into(),
-            "neotrix/l2_world_impl/cad_selftest.rs:33".into(),
-        ),
-        (
-            "cad_cdp".into(),
-            "neotrix/l2_world_impl/cad_selftest.rs:57".into(),
-        ),
-        (
-            "cad_decoder".into(),
-            "neotrix/l2_world_impl/cad_selftest.rs:81".into(),
-        ),
-        (
-            "cad_cross_modal_retrieval".into(),
-            "neotrix/l2_world_impl/// // cad_crossmodal_selftest.rs:18".into(),
-        ),
-        (
-            "cad_synthbal".into(),
-            "neotrix/l2_world_impl/// cad_synthbal_selftest.rs:18".into(),
-        ),
-        (
-            "cad_brep_topology".into(),
-            "neotrix/l2_world_impl/// cad_brep_selftest.rs:18".into(),
-        ),
-        (
-            "cad_c5_self_healing".into(),
-            "neotrix/l2_world_impl/// // cad_ch_selftest.rs:82".into(),
-        ),
-        (
             "cad_seal_stage".into(),
-            "core/nt_core_self_test_integration.rs:31".into(),
+            "l5_cognition/nt_core_cad_consciousness.rs:42".into(),
         ),
         (
             "cad_runeword".into(),
-            "core/nt_core_self_test_integration.rs:31".into(),
+            "l5_cognition/nt_core_cad_consciousness.rs:121".into(),
         ),
         (
             "cad_wiring_evidence".into(),
-            "core/nt_core_self_test_integration.rs:31".into(),
+            "l5_cognition/nt_core_cad_consciousness.rs:188".into(),
         ),
         (
             "cad_absorption".into(),
-            "core/nt_core_self_test_integration.rs:31".into(),
+            "l5_cognition/nt_core_cad_consciousness.rs:266".into(),
         ),
     ]
 }
@@ -227,10 +195,29 @@ impl SelfTest for CadWiringEvidenceSelfTest {
         if map.is_empty() {
             return Err(vec!["cad_wiring_evidence: empty wiring map".into()]);
         }
-        // 每个 CAD SelfTest 必须有非空且含 ':' 的 file:line 证据
+        // 每个 CAD SelfTest 必须有 file:line 证据, 且**该文件必须真实存在**。
+        // 2026-09-28 加固: 原判据只有「非空且含 ':'」, 于是被注释掉的代码
+        // (如 "neotrix/l2_world_impl/// // cad_selftest.rs:9") 也能通过 ——
+        // 注释里的冒号骗过了形式校验。这正是本仓 R-SCAN-1 说的那类假信号:
+        // 校验形式而非真值。改为按 CARGO_MANIFEST_DIR 解析真实路径并检查文件存在。
+        let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let bad: Vec<String> = map
             .iter()
-            .filter(|(_, loc)| loc.is_empty() || !loc.contains(':'))
+            .filter(|(_, loc)| {
+                if loc.is_empty() || !loc.contains(':') {
+                    return true;
+                }
+                // 取 "path:line" 的 path 部分; 相对 neotrix-core/ 解析
+                let path = loc.rsplit_once(':').map(|(p, _)| p).unwrap_or(loc);
+                // 证据里出现注释标记 => 本身就是没写完的代码, 直接判失败
+                if path.contains("//") {
+                    return true;
+                }
+                let p = path.trim_start_matches("./");
+                let direct = manifest.join(p);
+                let under_src = manifest.join("src").join(p);
+                !(direct.is_file() || under_src.is_file())
+            })
             .map(|(n, _)| n.clone())
             .collect();
         if bad.is_empty() {
@@ -329,10 +316,21 @@ mod verification {
     use nt_core_capability_tree::cad_node::{register_cad_capability, CadCapabilityNode};
     use nt_core_capability_tree::registry::CapabilityRegistry;
 
+    /// 只列**真实注册**的 CAD SelfTest。
+    /// 2026-09-28 修正: 原表列 13 项, 但其中 8 项(cad_csr/cad_ccip/cad_cdp/
+    /// cad_decoder/cad_cross_modal_retrieval/cad_synthbal/cad_brep_topology/
+    /// cad_c5_self_healing)的实现从未存在 —— register_absorbed_modules 里
+    /// `cad_selftest::register_cad_self_tests` 被注释为 "module not found",
+    /// 且表里还有一条字面垃圾项 "// // cad_generator"。
+    /// 实际注册的只有 register_cad_consciousness_self_tests() 那 4 个。
+    /// 曾配套的 cad_wiring_map 也为那 8 项伪造了 file:line 证据(实为被注释掉的
+    /// 代码, 路径 neotrix/l2_world_impl/ 根本不存在), 已一并删除 ——
+    /// D16 自欺防线不能自己造假。
     const CAD_SELFTESTS: &[&str] = &[
-        "cad_csr", "cad_ccip", "cad_cdp", "cad_decoder", "cad_cross_modal_retrieval",
-        "cad_synthbal", "cad_brep_topology", "cad_c5_self_healing", "cad_seal_stage",
-        "cad_runeword", "cad_wiring_evidence", "cad_absorption", "// // cad_generator",
+        "cad_seal_stage",
+        "cad_runeword",
+        "cad_wiring_evidence",
+        "cad_absorption",
     ];
 
     /// 核心建议 #1 运行时验证: 真正运行 3 条生产接线 + CAD SelfTest 注册校验,

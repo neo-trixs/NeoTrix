@@ -504,7 +504,15 @@ mod tests {
 
         let mut dependent = make_task("main", TaskPriority::High, 1000);
         dependent.dependencies = vec!["dep".to_string()];
-        scheduler.submit_task(make_task("dep", TaskPriority::High, 1000));
+        // 2026-09-28 修复测试搭建: make_task 默认 max_retries=3, 于是 dep 失败后会
+        // 被**带重试重新入队**(complete_task 的重试分支), schedule_next() 返回的
+        // 是那个重排的 dep 自己, 断言 is_none() 永远不成立。
+        // 本测试要验的是「依赖失败应阻断下游」, 所以必须让这次失败成为**终局**:
+        // max_retries=1 时 current_retries(1) < 1 为假, 失败被记入 completed_tasks,
+        // 下游的依赖检查才可观测。同文件 test_no_retry_when_max_is_one 已用此写法。
+        let mut dep = make_task("dep", TaskPriority::High, 1000);
+        dep.max_retries = 1;
+        scheduler.submit_task(dep);
         scheduler.submit_task(dependent);
 
         let dep_id = scheduler.schedule_next().unwrap();

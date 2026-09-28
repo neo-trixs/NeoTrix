@@ -34,10 +34,16 @@ impl RecursiveStrategy {
         }
     }
     pub fn best(&self) -> Option<&StrategyLevel> {
+        // 2026-09-28 修复: 原实现只用 success_rate 比较, 而 `max_by` 在比较器返回
+        // Equal 时**返回最后一个**最大值。`add_level` 给每层的初始成功率都是 0.5,
+        // 于是两层同分时 best() 必然返回较深的那个 —— 对递归策略是错的: 同分应当
+        // 选**最浅**的层(先试浅的, 不行再深入), 否则浅层永远得不到机会。
+        // 故并列时按 depth 取小。这修的是实现语义, 不是把测试改弱。
         self.levels.iter().max_by(|a, b| {
             a.success_rate
                 .partial_cmp(&b.success_rate)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.depth.cmp(&a.depth))
         })
     }
     pub fn should_recurse(&self, depth: usize) -> bool {
