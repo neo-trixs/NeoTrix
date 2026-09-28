@@ -251,31 +251,31 @@ impl UnifiedCapability for PdfEnhanceCapability {
 /// 旧的「本地注册中心」路线（`CapabilityRegistry` + `register_pdf_enhance_capability`）
 /// 已删除：那是 4 份同名 `CapabilityRegistry` 中的一份早期重复实现，全仓零生产
 /// 消费者（唯一引用是 README 的示例片段）。
-pub fn create_pdf_enhance_capability() -> Arc<dyn crate::l6_meta::nt_core_capability::UnifiedCapability> {
+pub fn create_pdf_enhance_capability() -> Arc<dyn crate::l0_substrate::nt_core_capability_types::UnifiedCapability> {
     Arc::new(PdfEnhanceCapability::new())
 }
 
 /// 双 trait 实现: 使 PdfEnhanceCapability 可被 NT-CORE CapabilityFactory 消费
-impl crate::l6_meta::nt_core_capability::UnifiedCapability for PdfEnhanceCapability {
-    fn meta(&self) -> crate::l6_meta::nt_core_capability::CapabilityMeta {
-        crate::l6_meta::nt_core_capability::CapabilityMeta {
+impl crate::l0_substrate::nt_core_capability_types::UnifiedCapability for PdfEnhanceCapability {
+    fn meta(&self) -> crate::l0_substrate::nt_core_capability_types::CapabilityMeta {
+        crate::l0_substrate::nt_core_capability_types::CapabilityMeta {
             id: "nt-file-pdf-enhance".to_string(),
             name: "PDF Enhancement".to_string(),
-            layer: crate::l6_meta::nt_core_capability::Layer::L1Action,
-            domain: crate::l6_meta::nt_core_capability::Domain::NtFileAbility,
+            layer: crate::l0_substrate::nt_core_capability_types::Layer::L1Action,
+            domain: crate::l0_substrate::nt_core_capability_types::Domain::NtFileAbility,
             version: "1.0.0".to_string(),
             description: "PDF icon/image super-resolution enhancement".to_string(),
             tags: vec!["pdf".to_string(), "enhance".to_string(), "super-resolution".to_string()],
-            status: crate::l6_meta::nt_core_capability::CapabilityStatus::Healthy,
-            metrics: crate::l6_meta::nt_core_capability::CapabilityMetrics::default(),
+            status: crate::l0_substrate::nt_core_capability_types::CapabilityStatus::Healthy,
+            metrics: crate::l0_substrate::nt_core_capability_types::CapabilityMetrics::default(),
             cost_weight: 0.0,
             priority: 1.0,
         }
     }
 
-    fn health(&self) -> crate::l6_meta::nt_core_capability::CapabilityHealth {
-        crate::l6_meta::nt_core_capability::CapabilityHealth {
-            state: crate::l6_meta::nt_core_capability::CapabilityState::Healthy,
+    fn health(&self) -> crate::l0_substrate::nt_core_capability_types::CapabilityHealth {
+        crate::l0_substrate::nt_core_capability_types::CapabilityHealth {
+            state: crate::l0_substrate::nt_core_capability_types::CapabilityState::Healthy,
             success_rate: 1.0,
             avg_latency_ms: 0.0,
             last_called: None,
@@ -283,34 +283,34 @@ impl crate::l6_meta::nt_core_capability::UnifiedCapability for PdfEnhanceCapabil
         }
     }
 
-    fn execute(&self, input: crate::l6_meta::nt_core_capability::CapabilityInput) -> Result<crate::l6_meta::nt_core_capability::CapabilityOutput, crate::l6_meta::nt_core_capability::CapabilityError> {
+    fn execute(&self, input: crate::l0_substrate::nt_core_capability_types::CapabilityInput) -> Result<crate::l0_substrate::nt_core_capability_types::CapabilityOutput, crate::l0_substrate::nt_core_capability_types::CapabilityError> {
         match input {
-            crate::l6_meta::nt_core_capability::CapabilityInput::FileEnhance(file_input) => {
+            crate::l0_substrate::nt_core_capability_types::CapabilityInput::FileEnhance(file_input) => {
                 let input_path = std::path::Path::new(&file_input.input_path);
                 let config = super::pdf::pdf_icon_enhance::PdfIconEnhanceConfig {
                     output_pdf: file_input.output_path.map(std::path::PathBuf::from),
                     ..Default::default()
                 };
                 match super::enhance_pdf_icons_with_config(input_path, config) {
-                    Ok(result) => Ok(crate::l6_meta::nt_core_capability::CapabilityOutput::FileEnhance(
-                        crate::l6_meta::nt_core_capability::FileEnhanceOutput {
+                    Ok(result) => Ok(crate::l0_substrate::nt_core_capability_types::CapabilityOutput::FileEnhance(
+                        crate::l0_substrate::nt_core_capability_types::FileEnhanceOutput {
                             success: result.success,
                             input_path: result.input_pdf,
                         output_path: result.output_pdf,
                             message: format!("Extracted {} images, enhanced {}", result.images_extracted, result.images_enhanced),
                         },
                     )),
-                    Err(e) => Err(crate::l6_meta::nt_core_capability::CapabilityError::ExecutionFailed(e.to_string())),
+                    Err(e) => Err(crate::l0_substrate::nt_core_capability_types::CapabilityError::ExecutionFailed(e.to_string())),
                 }
             }
-            _ => Err(crate::l6_meta::nt_core_capability::CapabilityError::UnsupportedInput(
+            _ => Err(crate::l0_substrate::nt_core_capability_types::CapabilityError::UnsupportedInput(
                 "Expected FileEnhance input".to_string(),
             )),
         }
     }
 
-    fn supports(&self, input: &crate::l6_meta::nt_core_capability::CapabilityInput) -> bool {
-        matches!(input, crate::l6_meta::nt_core_capability::CapabilityInput::FileEnhance(_))
+    fn supports(&self, input: &crate::l0_substrate::nt_core_capability_types::CapabilityInput) -> bool {
+        matches!(input, crate::l0_substrate::nt_core_capability_types::CapabilityInput::FileEnhance(_))
     }
 }
 
