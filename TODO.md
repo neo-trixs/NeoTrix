@@ -31,6 +31,38 @@
 > 「各机器人独立绑定模型」（serve 不用）、`nt_cmd_channels.rs:306` 自称「各自独立」、
 > `OutboundMessage.edit_of` 看着像已实现（实为半接）。
 >
+> **2026-09-28 内存门 BLOCKED 期间的零编译批次（3 agent）**：
+> 另一扇窗口的 `rustc` 占 3.5GB 编译 `neotrix-core`（free_pages 9.5k/100k），故本批
+> **全程禁 cargo / 禁 npm install**，只做静态分析与文档。三件事：
+>
+> ✅ **关闭一个已登记的验证缺口**：「前端 invoke 键名 vs Rust 形参名没人守」——
+>    新增 `scripts/ops/nt_ipc_keys.py`（纯标准库，`--self-test` 60/60），
+>    实测 **声明 97 / 注册 97 / 键名错配 0 / 声明注册差集空**；已接成
+>    `nt_smoke.sh` **第 6 步**，并订正脚本头那段「本脚本验不了、靠人读」的旧文案
+>    （它刚被关掉，留着就是新的说谎注释）。
+>    **仍不覆盖**：只到键名不到类型（`{taskId:123}` 键对型错不报）、只到静态不到运行时
+>    （serde 转换 / `Option` 缺省仍要真进程往返）。
+> ✅ **订正冻结规则引用**：`AGENTS.md:53` + `DOCUMENTATION-MAP.md:21` 的
+>    「R-P161-257」实为归档文件编号区间，真实规则号是 **R-P199**
+>    （`archive/dev-rules-legacy-R-P161-257.md:259`，非规范副本，口径限 `neotrix-core` L1–L6）。
+> ✅ **门记录刷新**（R-SCAN-3：本轮改过码，旧值即陈旧）：`lock_audit` 两 scope 均 **0 条**，
+>    写入时间戳 **2026-09-28 11:58**；`AGENTS.md` 80 行（<100 未超限）。
+>
+> 🔴 **本批新挖出、待编译才能修的 2 条**（agent 只订正了注释、未交报告，主 agent 复核为**真**）：
+> 1. **`find` 静默截断**：`MAX_SEARCH_HITS=200` 在 `nt_workspace.rs:531/539` 生效，
+>    但 `SearchHit` **没有 `truncated` 字段**、`find` 也只返回 `Vec<SearchHit>` ——
+>    IPC 与前端**无从知道结果被砍过**。后果具体：用户搜到 200 条就以为「全库只有
+>    200 个匹配」，进而断定某文件**不存在**。`list_dir`/`read_text` 都带 `truncated`，
+>    **只有 `find` 没有** —— 静默截断比报错更骗人。修它要改 `find` 的签名。
+> 2. **`nt_git` 的 pathspec 只过词法门**：`check_rel` 与 `jail_join` 都是**纯词法**
+>    （拒 `/`、`~`、盘符、`..`、超深），能挡 `..` 但**挡不住软链接**；
+>    第二道门 `resolve_within`（`canonicalize` 后核验）是 `nt_workspace` **私有**的，
+>    `nt_git` 够不着。故「工作区内一个指向外部的软链接 + 一条不含 `..` 的相对路径」
+>    可让 `diff` 的未跟踪文件分支（`jail_join` 后直接 `read_to_string`）读到工作区
+>    **之外**的内容。`repo_root` 本身安全（会 `canonicalize` 并在越界时
+>    `workspace-jail` 拒绝），缺口只在 pathspec 这一段。**可达性待核**：
+>    前提是工作区内已存在一个攻击者可控的软链接。
+>
 > 🔴 **仍然待办（本轮只做到「不说谎」，没做到「能停」）**：
 > - **`/stop` 真能用** = 架构级：调度改并发（线程池/async）+ `nt_agent` 的 stop hook。
 >   设计见 `docs/architecture/DESIGN-CHANNEL-DISPATCH.md`。
@@ -266,6 +298,38 @@ do not look like a full prefix match"）—— **工具集身份是缓存身份�
 这类缺陷对编译器/clippy/`cargo test` **全是绿的**，只有「声明 ⊆ 注册」这类
 **机械断言**能抓。**故：IPC 层冒烟测试补齐之前，先别加新功能** ——
 缺的那一层正是唯一能对「接错线 / 没接线」发信号的地方。
+
+## 已知债 · 单元测试 57 例失败（2026-09-28 实测，**未解决**）
+
+修好构建后测试终于能跑：`cargo test --lib -p neotrix` → **12093 passed / 57 failed**
+（38 ignored，约 200s）。**这 57 条此前不可见** —— HEAD 长期编译不过，测试从未有过
+可验证基线，所以它们是既有债，不是任何一次改动的回归。
+
+按层分布：`l6_meta` 20 · `l4_emotion` 10 · `l1_action` 8 · `l3_embodiment` 7 ·
+`l5_cognition` 5 · `l0_substrate` 3 · 其余 4。
+
+抽样 4 条，**全是真实行为断言失败，不是环境问题**：
+
+| 测试 | 断言 | 含义 |
+|---|---|---|
+| `nt_core_speculative_decoding::test_speculative_decoding` | `speedup_factor > 1.0` | 投机解码并没有更快 |
+| `checkpoint_persistence::test_delete_checkpoint_removes_index_and_file` | `save.success` | checkpoint 存不下来 |
+| `nt_core_capability::security::ip_check` | `check_ip("192.168.1.1")` | 私有 IP 判定为不通过 |
+| `nt_core_aware::test_consciousness_awareness_new` | `ca.is_conscious_bound` | 意识未绑定 |
+
+**为什么不在本轮修**：每一条都要一次产品判断 —— 是代码没实现，还是断言写了从未
+实现的行为？猜错会把 bug 固化成"正确行为"。这是需要逐条裁决的工程，不是批量替换。
+
+**门的行为（重要）**：`scripts/check-test-baseline.sh` 记 57 条账
+（`scripts/test-failures-baseline.txt`），但 CI 跑的是**建议模式，不拦**。原因：
+连续两次运行都是 57 条，但**集合有 3 条抖动**（`checkpoint_persistence` 等
+文件系统类为 flaky）。`--strict` 会因抖动误报 —— 一个会flap的门比没有门更糟，
+它只会训练所有人忽略它。门的作用是把债变成**可数**的，不是把它变绿。
+
+**判别式修正留痕**：守卫最初写 `grep -qE "^error(\[|:)"`，结果把
+`error: test failed, to rerun pass`（测试失败摘要）当成构建错误而拒记账本。
+改为只匹配 `error[E####]` / `error: could not compile`。
+
 
 ## 已知债 · 分层依赖违规 92 处（2026-09-28 记账，**未解决**）
 
