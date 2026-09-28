@@ -8,7 +8,6 @@ repository.workspace = true
 
 [dependencies]
 neotrix-types = { workspace = true }
-neotrix-sysctl = { workspace = true }
 neotrix-consciousness = { workspace = true }
 neotrix-gateway = { workspace = true }
 serde = { workspace = true }
