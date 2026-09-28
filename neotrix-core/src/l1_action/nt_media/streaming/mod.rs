@@ -75,32 +75,56 @@ use super::dl_fs::make_dl_tmp_dir;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
-    #[tokio::test]
-    async fn test_pipeline_http_streaming() {
-        let (tx, mut rx) = mpsc::channel(100);
-        let pipeline = StreamingPipeline::new(StreamingPipelineConfig {
-            url: "https://httpbin.org/bytes/4096".into(),
-            output_dir: std::env::temp_dir(),
-            prefer_streaming: true,
-            buffer_threshold: 1024,
-            ..Default::default()
-        });
+      #[tokio::test]
+      async fn test_pipeline_http_streaming() {
+          // 本地回环服务，**不依赖外网**。原实现打 `https://httpbin.org/bytes/4096`，
+          // 而本测试每条消息只给 5s；实测该端点往返 2.2s ⇒ 余量极小，
+          // 属「环境依赖型 flaky」：网络快就过、网络抖就红，且红时与被测逻辑无关。
+          // 2026-09-28 改为回环端点，断言一字未动。
+          use axum::routing::get;
+          use axum::Router;
+          let body: Vec<u8> = (0..4096u32).map(|i| (i % 251) as u8).collect();
+          let app = Router::new().route(
+              "/bytes/4096",
+              get(move || {
+                  let b = body.clone();
+                  async move { b }
+              }),
+          );
+          let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+              .await
+              .expect("bind loopback");
+          let addr = listener.local_addr().expect("local_addr");
+          tokio::spawn(async move {
+              let _ = axum::serve(listener, app).await;
+          });
+          let url = format!("http://{addr}/bytes/4096");
 
-        let handle = pipeline.run(tx).await.unwrap();
+          let (tx, mut rx) = mpsc::channel(100);
+          let pipeline = StreamingPipeline::new(StreamingPipelineConfig {
+              url,
+              output_dir: std::env::temp_dir(),
+              prefer_streaming: true,
+              buffer_threshold: 1024,
+              ..Default::default()
+          });
 
-        let mut got_complete = false;
-        while let Ok(Some(p)) = tokio::time::timeout(Duration::from_secs(5), rx.recv()).await {
-            if matches!(p.status, PipelineStatus::Complete { .. }) {
-                got_complete = true;
-                break;
-            }
-        }
+          let handle = pipeline.run(tx).await.unwrap();
 
-        assert!(got_complete);
-        let output_path = handle.output_path().to_path_buf();
-        handle.wait().await.ok();
-        let _ = fs::remove_file(output_path).await;
-    }
+          let mut got_complete = false;
+          while let Ok(Some(p)) = tokio::time::timeout(Duration::from_secs(5), rx.recv()).await {
+              if matches!(p.status, PipelineStatus::Complete { .. }) {
+                  got_complete = true;
+                  break;
+              }
+          }
+
+          assert!(got_complete, "回环端点应在 5s 内发 Complete");
+          let output_path = handle.output_path().to_path_buf();
+          handle.wait().await.ok();
+          let _ = fs::remove_file(output_path).await;
+      }
+
 
     #[tokio::test]
     async fn test_pipeline_file_copy() {
