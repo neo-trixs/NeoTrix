@@ -1,0 +1,146 @@
+{
+  "_about": "Context Manifest（2026-09-28 立）",
+  "claims": {
+    "prepush_deadcode_bug": {
+      "statement": "worktree 收工门此前是死代码（pre-push 中途 exit 0），已修并重验",
+      "evidence": [
+        ".githooks/pre-push:26 收工门起点（exit 0 已移至文件末尾）"
+      ],
+      "env": {
+        "head": "8d6c4fc68e1c",
+        "dirty_count": 12,
+        "dirty": [
+          ".neotrix/context-manifest.json",
+          "ARCHITECTURE-MAP-ROADMAP-V2.md",
+          "CHANGELOG.md",
+          "CONTRIBUTING.md",
+          "TODO.md",
+          "docs/api/README.md",
+          "docs/architecture/ARCHITECTURE.md",
+          "docs/architecture/SIM-PROTOCOL.md",
+          "neotrix-core/src/l0_substrate/nt_core_kb_primitives.rs",
+          "neotrix-core/src/l5_cognition/nt_mind/evolution/evolution_daemon.rs",
+          "scripts/layer-deps-baseline.txt",
+          "scripts/ops/nt_manifest.py"
+        ],
+        "cargo_lock": true,
+        "fingerprint": "69f893b0f0430f5f"
+      },
+      "declared_env": "working-tree",
+      "recorded_at": "2026-09-28T14:54Z"
+    },
+    "lock_audit_false_positive": {
+      "statement": "nt_lock_audit 报 12 条里 2/3 是误报",
+      "evidence": [
+        "RUST-STANDARDS.md R-SCAN-1/2/3 段"
+      ],
+      "env": {
+        "head": "8d6c4fc68e1c",
+        "dirty_count": 12,
+        "dirty": [
+          ".neotrix/context-manifest.json",
+          "ARCHITECTURE-MAP-ROADMAP-V2.md",
+          "CHANGELOG.md",
+          "CONTRIBUTING.md",
+          "TODO.md",
+          "docs/api/README.md",
+          "docs/architecture/ARCHITECTURE.md",
+          "docs/architecture/SIM-PROTOCOL.md",
+          "neotrix-core/src/l0_substrate/nt_core_kb_primitives.rs",
+          "neotrix-core/src/l5_cognition/nt_mind/evolution/evolution_daemon.rs",
+          "scripts/layer-deps-baseline.txt",
+          "scripts/ops/nt_manifest.py"
+        ],
+        "cargo_lock": true,
+        "fingerprint": "69f893b0f0430f5f"
+      },
+      "declared_env": "working-tree",
+      "recorded_at": "2026-09-28T14:54Z"
+    },
+    "layer_map_numbers": {
+      "statement": "layer-map 数字按 HEAD 口径重测（trees 3 条 + unresolved 2 条已更正）",
+      "evidence": [
+        ".neotrix/layer-map.json trees 三条已按 HEAD 口径校正"
+      ],
+      "env": {
+        "head": "8d6c4fc68e1c",
+        "dirty_count": 12,
+        "dirty": [
+          ".neotrix/context-manifest.json",
+          "ARCHITECTURE-MAP-ROADMAP-V2.md",
+          "CHANGELOG.md",
+          "CONTRIBUTING.md",
+          "TODO.md",
+          "docs/api/README.md",
+          "docs/architecture/ARCHITECTURE.md",
+          "docs/architecture/SIM-PROTOCOL.md",
+          "neotrix-core/src/l0_substrate/nt_core_kb_primitives.rs",
+          "neotrix-core/src/l5_cognition/nt_mind/evolution/evolution_daemon.rs",
+          "scripts/layer-deps-baseline.txt",
+          "scripts/ops/nt_manifest.py"
+        ],
+        "cargo_lock": true,
+        "fingerprint": "69f893b0f0430f5f"
+      },
+      "declared_env": "working-tree",
+      "recorded_at": "2026-09-28T14:54Z"
+    },
+    "skills_discoverable_claim_refuted": {
+      "statement": "外部 agent 报的「skills 文件名不是 SKILL.md 故不可发现」被实测证伪",
+      "evidence": [
+        "docs/architecture/ABSORPTION-AGENT-ARCH-2026-09-28.md 第六节"
+      ],
+      "env": {
+        "head": "8d6c4fc68e1c",
+        "dirty_count": 12,
+        "dirty": [
+          ".neotrix/context-manifest.json",
+          "ARCHITECTURE-MAP-ROADMAP-V2.md",
+          "CHANGELOG.md",
+          "CONTRIBUTING.md",
+          "TODO.md",
+          "docs/api/README.md",
+          "docs/architecture/ARCHITECTURE.md",
+          "docs/architecture/SIM-PROTOCOL.md",
+          "neotrix-core/src/l0_substrate/nt_core_kb_primitives.rs",
+          "neotrix-core/src/l5_cognition/nt_mind/evolution/evolution_daemon.rs",
+          "scripts/layer-deps-baseline.txt",
+          "scripts/ops/nt_manifest.py"
+        ],
+        "cargo_lock": true,
+        "fingerprint": "69f893b0f0430f5f"
+      },
+      "declared_env": "working-tree",
+      "recorded_at": "2026-09-28T14:54Z"
+    },
+    "skill_index_path_resolution": {
+      "statement": "skill_loader 路径式 key 解析：13/58 → 58/58",
+      "evidence": [
+        "neotrix-core/src/skill_loader.rs:267 关键修复行（qualified key 查找）",
+        "python3 复测 skills/index.json：59 条路径 0 缺失"
+      ],
+      "env": {
+        "head": "8d6c4fc68e1c",
+        "dirty_count": 12,
+        "dirty": [
+          ".neotrix/context-manifest.json",
+          "ARCHITECTURE-MAP-ROADMAP-V2.md",
+          "CHANGELOG.md",
+          "CONTRIBUTING.md",
+          "TODO.md",
+          "docs/api/README.md",
+          "docs/architecture/ARCHITECTURE.md",
+          "docs/architecture/SIM-PROTOCOL.md",
+          "neotrix-core/src/l0_substrate/nt_core_kb_primitives.rs",
+          "neotrix-core/src/l5_cognition/nt_mind/evolution/evolution_daemon.rs",
+          "scripts/layer-deps-baseline.txt",
+          "scripts/ops/nt_manifest.py"
+        ],
+        "cargo_lock": true,
+        "fingerprint": "69f893b0f0430f5f"
+      },
+      "declared_env": "working-tree",
+      "recorded_at": "2026-09-28T14:54Z"
+    }
+  }
+}

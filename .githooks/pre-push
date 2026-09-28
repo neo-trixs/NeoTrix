@@ -52,3 +52,5 @@ if [ "$LEAK" -eq 1 ]; then
     exit 1
 fi
 echo -e "\033[0;32m✅ Worktree 收工检查通过\033[0m"
+
+exit 0
