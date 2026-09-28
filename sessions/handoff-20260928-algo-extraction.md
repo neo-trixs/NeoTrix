@@ -142,7 +142,7 @@ multi-agent / reasoning）源码内零引用，纯死依赖，已剔除。
 | `Cargo.lock` 未入库 | ✅ **已修**（`2bbed32c`）：`.gitignore` 定点解禁（`*.lock` 仍生效于 node 侧锁文件） |
 | **11 个同名类型** | ✅ **已消歧**：`25118be7` + 待提交那一笔。`ReasoningTrace` 4→1 / `ReasoningMethod` 3→1 / `ReasoningStep` 5→1 / `TraceSource` 2→1 |
 | 4 条 `neotrix-sysctl` 死依赖 | ✅ **已剔**（`00bc3223`） |
-| `layer-map.json` 的 `_rule` 写「CapabilityRegistry x4」 | ✅ **已更正为实测值**（见该文件；删完死引擎后 `CapabilityRegistry` 3 处 / `LoadBalancer` 2 处 / `VersionManager` 1 处） |
+| `layer-map.json` 的 `_rule` 写「CapabilityRegistry x4」 | ✅ **已更正并多次重测**（`99ec80b6`/`df80ccca`/本次）：消歧后 `CapabilityRegistry` **1 处**（唯一保留 L0 版）、`CapabilityTreeRegistry` 1、`CapabilityCatalog` 1；`LoadBalancer` **0 处**（两处已改名/删除）；`VersionManager` 1；`SearchResult` 7 处 |
 | ~~剩余重名副本~~ | ✅ **已消歧**（`2afcbcc2`）：`CapabilityRegistry` 3 套 → L0 版保留原名（活，16 处 trait 实现），另两套改名 `CapabilityCatalog`（L5，仅自审）与 `CapabilityTreeRegistry`（crate，318 节点 CI 门）。`LoadBalancer` 2 处 → `MoELoadBalancer`（GWT，**已删** `f52238d2`）+ `AgentLoadBalancer`（multi-agent）|
 | `nt_core/capability/registry.rs` | 该文件内 `CapabilityRegistry` 已改名 `CapabilityCatalog`（`registry.rs:473`），**不可删整文件** —— 同文件另 14 个类型中 11 个被 6 个兄弟文件生产引用。详见 `docs/architecture/OWNERSHIP.md` 的「B-2 撤销记录」 |
 | `SearchResult` | ✅ **已定性，无需消歧**（`a8554a47` 后 7 处）。历史文档写 4 处低估；9 处中有 2 处是零消费者 hybrid 副本，删除后余 7 处**字段集两两不交**（doc_id/chunk_text、title/url、title/score/snippet、skill/score、id+similarity+metadata、id+score、id+title），非重复 |
