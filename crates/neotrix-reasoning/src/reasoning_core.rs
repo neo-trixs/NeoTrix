@@ -16,9 +16,12 @@
 //! - seal_core    `ReasoningTrace`→`ProcessStageTrace`、`ReasoningStep`→`ProcessStageStep`、
 //!                `TraceSource`→`ProcessStageTraceSource`
 //! - reason       `ReasoningTrace`→`ReasoningRecord`、`ReasoningMethod`→`ReasoningApproach`
-//! 另有 `ReasoningStep` 在主代码共 5 处同名（`nt_core_ttc.rs:124`、
-//! `nt_mind/control_distillation.rs:229`、`nt_mind/cross_domain/reason_retrieve_refine.rs:118`
-//! 及上述两处），本轮只改了 seal_core 那份，其余 3 处尚未消歧。
+//! 同批完成 `ReasoningStep` 的消歧（本类型保留规范名 `ReasoningStep`）：
+//! - `nt_core_ttc.rs:124`            → `TtcStep`（PRM 打分步骤：prm_score/cumulative_score）
+//! - `nt_mind/control_distillation.rs` → `ControlDistillStep`（控制蒸馏：e8_mode/token_count）
+//! - `nt_mind/cross_domain/reason_retrieve_refine.rs` → `RefineStep`（检索-精炼：input/output/confidence）
+//! 这 3 处经 grep 确认**无任何 `use` 导入、无全限定路径引用**，仅本文件内自用，
+//! 故改名不波及其他作用域。
 
 use crate::kernel_types::{ReasoningMethod, Vector, EVOLUTION};
 use neotrix_types::e8_reasoning::ReasoningHexagram;

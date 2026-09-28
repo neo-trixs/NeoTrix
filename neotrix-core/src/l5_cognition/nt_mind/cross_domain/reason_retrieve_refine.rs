@@ -78,7 +78,7 @@ pub struct ReasonResult {
     /// 生成的检索查询
     pub queries: Vec<RetrievalQuery>,
     /// 推理过程
-    pub reasoning_trace: Vec<ReasoningStep>,
+    pub reasoning_trace: Vec<RefineStep>,
     /// 预期的知识类型
     pub expected_knowledge_types: Vec<KnowledgeType>,
     /// 置信度
@@ -115,7 +115,7 @@ pub enum QueryIntent {
 
 /// 推理步骤
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReasoningStep {
+pub struct RefineStep {
     /// 步骤类型
     pub step_type: ReasoningStepType,
     /// 步骤描述
@@ -332,7 +332,7 @@ impl ReasonRetrieveRefinePipeline {
         let mut expected_knowledge_types = Vec::new();
 
         // 任务分析步骤
-        let task_analysis = ReasoningStep {
+        let task_analysis = RefineStep {
             step_type: ReasoningStepType::TaskAnalysis,
             description: format!("分析迁移任务: {}", context.task_description),
             input: HashMap::new(),
@@ -345,7 +345,7 @@ impl ReasonRetrieveRefinePipeline {
 
         // 域映射步骤
         if let Some(mapping) = self.domain_mappings.get(&context.source_domain) {
-            let domain_mapping = ReasoningStep {
+            let domain_mapping = RefineStep {
                 step_type: ReasoningStepType::DomainMapping,
                 description: format!(
                     "映射域 {} -> {}",

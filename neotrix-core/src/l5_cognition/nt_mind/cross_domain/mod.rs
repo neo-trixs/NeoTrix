@@ -19,7 +19,7 @@ pub mod reason_retrieve_refine;
 // Re-exports
 pub use reason_retrieve_refine::{
     Constraint, ConstraintType, DomainMapping, KnowledgeItem, KnowledgeType, QueryIntent,
-    ReasonResult, ReasonRetrieveRefinePipeline, ReasoningStep, ReasoningStepType, RefineResult,
+    ReasonResult, ReasonRetrieveRefinePipeline, ReasoningStepType, RefineResult, RefineStep,
     RefinedKnowledge, RetrievalQuery, RetrieveResult, RrrPipelineConfig, TaskType,
     TransferContext, TransferError,
 };

@@ -141,7 +141,7 @@ impl _TakeoverDetector {
     }
 
     /// 检测单条推理轨迹中的 takeover 点
-    pub fn detect(&self, _trace: &str, steps: &[ReasoningStep]) -> Vec<_TakeoverPoint> {
+    pub fn detect(&self, _trace: &str, steps: &[ControlDistillStep]) -> Vec<_TakeoverPoint> {
         let mut takeovers = Vec::new();
 
         // 启发式扫描
@@ -226,7 +226,7 @@ impl _TakeoverDetector {
 
 /// 推理步骤 (来自 trace)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReasoningStep {
+pub struct ControlDistillStep {
     pub step_idx: usize,
     pub text: String,
     pub e8_mode: Option<u8>,
@@ -259,7 +259,7 @@ impl ControlDistiller {
         trajectory_id: String,
         task: &str,
         trace: &str,
-        steps: &[ReasoningStep],
+        steps: &[ControlDistillStep],
         final_answer: &str,
     ) -> Result<AlternatingSequence, _DistillError> {
         // 1. Takeover 检测
@@ -291,7 +291,7 @@ impl ControlDistiller {
     /// 构建 reason ↔ control 交替片段
     fn build_alternating_segments(
         &self,
-        steps: &[ReasoningStep],
+        steps: &[ControlDistillStep],
         takeovers: &[_TakeoverPoint],
         signals: &[_ControlSignal],
     ) -> Vec<_AlternatingSegment> {
@@ -640,13 +640,13 @@ mod tests {
     fn test_takeover_detection_backtrack() {
         let detector = _TakeoverDetector::default();
         let steps = vec![
-            ReasoningStep {
+            ControlDistillStep {
                 step_idx: 0,
                 text: "Let me solve this step by step".into(),
                 e8_mode: None,
                 token_count: 20,
             },
-            ReasoningStep {
+            ControlDistillStep {
                 step_idx: 1,
                 text: "Wait, I made an error in the calculation".into(),
                 e8_mode: None,
@@ -668,13 +668,13 @@ mod tests {
     fn test_takeover_detection_strategy_switch() {
         let detector = _TakeoverDetector::default();
         let steps = vec![
-            ReasoningStep {
+            ControlDistillStep {
                 step_idx: 0,
                 text: "First I'll try algebraic manipulation".into(),
                 e8_mode: None,
                 token_count: 20,
             },
-            ReasoningStep {
+            ControlDistillStep {
                 step_idx: 1,
                 text: "Alternatively, let me use a geometric approach".into(),
                 e8_mode: None,
@@ -710,19 +710,19 @@ mod tests {
         let gold = Arc::new(ConsciousnessGoldStandard::new());
         let distiller = ControlDistiller::new(gold);
         let steps = vec![
-            ReasoningStep {
+            ControlDistillStep {
                 step_idx: 0,
                 text: "Step 1".into(),
                 e8_mode: None,
                 token_count: 10,
             },
-            ReasoningStep {
+            ControlDistillStep {
                 step_idx: 1,
                 text: "Wait, rethink".into(),
                 e8_mode: None,
                 token_count: 15,
             },
-            ReasoningStep {
+            ControlDistillStep {
                 step_idx: 2,
                 text: "Step 2 corrected".into(),
                 e8_mode: None,
@@ -753,19 +753,19 @@ mod tests {
     fn build_training_sequence(gold: Arc<ConsciousnessGoldStandard>) -> AlternatingSequence {
         let distiller = ControlDistiller::new(gold);
         let steps = vec![
-            ReasoningStep {
+            ControlDistillStep {
                 step_idx: 0,
                 text: "Step 1".into(),
                 e8_mode: None,
                 token_count: 10,
             },
-            ReasoningStep {
+            ControlDistillStep {
                 step_idx: 1,
                 text: "Wait, rethink".into(),
                 e8_mode: None,
                 token_count: 15,
             },
-            ReasoningStep {
+            ControlDistillStep {
                 step_idx: 2,
                 text: "Step 2 corrected".into(),
                 e8_mode: None,

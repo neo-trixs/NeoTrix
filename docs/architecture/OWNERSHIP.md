@@ -33,8 +33,21 @@
 |---|---|---|---|
 | `crates/nt-core-capability-tree/src/registry.rs:60` | `IndexMap` + `experience_targets` + `maturity_audit` | CLI 依赖 DAG + CI `capability-truth` | ✅ **真典** |
 | `l0_substrate/nt_core_capability_types.rs:533` | `HashMap<Arc<dyn>>` + by_domain/by_layer | `l2_perception/nt_world/ocr/mod.rs:405` · `l1_action/nt_act/nt_act_trade/capability_registry.rs:171` | ✅ **活**，保留 |
-| `neotrix/nt_file_ability/capability.rs:185` | `Vec<Arc<dyn>>` 精简版 | **零**（精确搜索 0 命中；`l5_cognition/.../registry.rs:454` 注释独立佐证） | ⛔ **真冗余 → B-1 删除** |
-| `l5_cognition/nt_core/capability/registry.rs:462` | `Vec<Capability>` + tag_index | **仅自测** | ⛔ **可删 → B-2**（删前查 `mod.rs` 的 `pub use`） |
+| `neotrix/nt_file_ability/capability.rs:185` | `Vec<Arc<dyn>>` 精简版 | **零**（精确搜索 0 命中；`l5_cognition/.../registry.rs:454` 注释独立佐证） | ✅ **已删**（2026-09-28 提交 B-1，该文件整体移除） |
+| `l5_cognition/nt_core/capability/registry.rs:462` | `Vec<Capability>` + tag_index | **仅自审**（`cluster_self_test.rs:24,33`，编译期代码但只做自审；无生产消费者） | ⛔ **B-2 撤销 —— 不可删整文件**（2026-09-28 复核推翻，见下） |
+
+> ### ⚠️ B-2 撤销记录（2026-09-28 复核，原判「可删」是错的）
+>
+> 原判据只有一句「仅被本文件 `#[cfg(test)]` 使用」。复核发现**判据不成立**，三处推翻：
+>
+> 1. **不是整文件零消费者。** `registry.rs`(957 行) 导出 15 个公开类型，其中 **11 个被同目录 6 个兄弟文件生产引用**（`Capability` 19 处 / `CapabilityKind` 43 / `MaturityLevel` 35 / `CapabilityStats` 8 / `CapabilityCost` 9 …）。`observer.rs:3` `use super::registry::Capability`、`mature.rs:1` `use super::registry::{Capability, MaturityLevel}` 都是**生产 import**。按整文件删会直接编译失败。
+> 2. **`CapabilityRegistry` 本身也不是"仅本文件 `#[cfg(test)]`"。** 它被 `cluster_self_test.rs:24,33` 调用，而该文件的 `#[cfg(test)]` 从第 56 行才开始 —— 那两处在**编译期代码**里（该模块是 `pub mod cluster_self_test;` 而非 `#[cfg(test)] mod`）。原注释漏了这一处。
+> 3. **看似零引用的 4 个类型（`ContextSlot` / `SlotKind` / `FallbackEntry` / `FallbackCondition`）是结构字段，不是死代码。** 它们只经活 `Capability` 的字段触达：`Capability.context_requirements: Vec<ContextSlot>`(`:430`)、`Capability.fallback_chain: Vec<FallbackEntry>`(`:439`)、`FallbackEntry.condition: FallbackCondition`(`:89`)、`ContextSlot.kind: SlotKind`(`:340`)。删它们等于改 `Capability` 的 schema，是功能变更不是清死码。
+>
+> **唯一真正可删的**是 `CapabilityRegistry` 这一个结构体（连同其 `impl` 与自审用例，约 250 行），前提是先改 `cluster_self_test.rs` 的两处调用改为直接用 `Capability`。**该改动收益小于风险，本轮不做。**
+>
+> 方法论：**"某文件里的某类型零消费者" ≠ "该文件可删"。** 必须逐项定性，且要看清
+> 「零引用」是死代码还是结构字段——后者只经宿主类型的字段触达。
 
 ---
 

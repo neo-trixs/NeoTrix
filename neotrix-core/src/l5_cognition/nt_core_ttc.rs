@@ -121,7 +121,7 @@ impl LagrangianAllocator {
 
 /// A single reasoning step with score from PRM
 #[derive(Debug, Clone)]
-pub struct ReasoningStep {
+pub struct TtcStep {
     pub step_idx: usize,
     pub content: String,
     pub prm_score: f64,
@@ -131,7 +131,7 @@ pub struct ReasoningStep {
 /// Beam search state
 #[derive(Debug, Clone)]
 pub struct BeamState {
-    pub steps: Vec<ReasoningStep>,
+    pub steps: Vec<TtcStep>,
     pub cumulative_score: f64,
     pub is_terminal: bool,
 }
@@ -207,7 +207,7 @@ impl PrmBeamSearch {
 #[derive(Debug, Clone)]
 pub struct ParallelTrajectory {
     pub trajectory_id: usize,
-    pub steps: Vec<ReasoningStep>,
+    pub steps: Vec<TtcStep>,
     pub final_score: f64,
     pub token_count: u64,
     pub converged: bool,
@@ -961,7 +961,7 @@ mod tests {
         let results = beam.search(initial, |_state| {
             vec![
                 BeamState {
-                    steps: vec![ReasoningStep {
+                    steps: vec![TtcStep {
                         step_idx: 0,
                         content: "A".into(),
                         prm_score: 0.8,
@@ -971,7 +971,7 @@ mod tests {
                     is_terminal: false,
                 },
                 BeamState {
-                    steps: vec![ReasoningStep {
+                    steps: vec![TtcStep {
                         step_idx: 0,
                         content: "B".into(),
                         prm_score: 0.6,
@@ -993,7 +993,7 @@ mod tests {
         let results = beam.search(initial, |_state| {
             (0..5)
                 .map(|i| BeamState {
-                    steps: vec![ReasoningStep {
+                    steps: vec![TtcStep {
                         step_idx: 0,
                         content: i.to_string(),
                         prm_score: i as f64 / 5.0,
@@ -1229,7 +1229,7 @@ mod tests {
                 }]
             } else {
                 vec![BeamState {
-                    steps: vec![ReasoningStep {
+                    steps: vec![TtcStep {
                         step_idx: 0,
                         content: "step".into(),
                         prm_score: 0.9,

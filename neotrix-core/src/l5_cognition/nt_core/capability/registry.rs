@@ -450,15 +450,26 @@ pub struct Capability {
 }
 
 #[derive(Debug)]
-/// 2026-09-27 标注: **仅被本文件的 `#[cfg(test)]` 使用, 生产零消费者**
-/// (全仓 `capability::CapabilityRegistry` 精确搜索除本文件外无命中)。
+/// 2026-09-27 标注: **仅被本文件的 `#[cfg(test)]` 使用, 生产零消费者**。
+///
+/// ⚠️ **2026-09-28 更正**：原括注「全仓 `capability::CapabilityRegistry` 精确搜索
+/// 除本文件外无命中」**不准确** —— 本类型确无生产消费者，但被
+/// `cluster_self_test.rs:24,33` 调用，而该模块是 `pub mod`（非 `#[cfg(test)] mod`）
+/// 且其 `#[cfg(test)]` 从第 56 行才开始，故那两处是**编译期代码**，只做系统自审。
+/// **同时：本文件不可整体删除。** 它导出 15 个公开类型，其中 11 个被同目录 6 个
+/// 兄弟文件生产引用（`observer.rs:3` 用 `Capability`、`mature.rs:1` 用
+/// `Capability`+`MaturityLevel` 等）。另 `ContextSlot`/`SlotKind`/`FallbackEntry`/
+/// `FallbackCondition` 虽零外部引用，但它们是 `Capability` 的**结构字段**
+/// （`:430` `context_requirements`、`:439` `fallback_chain`、`:89` `condition`、
+/// `:340` `kind`），属结构性而非死代码。
+/// 详见 `docs/architecture/OWNERSHIP.md` 的「B-2 撤销记录」。
 ///
 /// 本类型值类型是 `Capability` + `tag_index`, 与
 /// `l0_substrate::nt_core_capability_types::CapabilityRegistry`
 /// (`HashMap<String, Arc<dyn UnifiedCapability>>` + by_domain/by_layer 索引,
 /// 有真实跨层消费者: l2_perception/nt_world/ocr/mod.rs:405 与
 /// l1_action/nt_act/nt_act_trade/capability_registry.rs:171) **不是同一设计**。
-/// 生产路径用 l0 版; 本版仅被自测保留。
+/// 生产路径用 l0 版; 本版仅被自审保留。
 pub struct CapabilityRegistry {
     capabilities: Vec<Capability>,
     tag_index: std::collections::HashMap<String, Vec<CapabilityId>>,

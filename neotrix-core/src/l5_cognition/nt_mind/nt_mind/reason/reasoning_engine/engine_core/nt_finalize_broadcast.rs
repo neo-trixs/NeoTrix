@@ -8,7 +8,7 @@ use crate::l0_substrate::nt_core_span::{
 };
 use crate::l5_cognition::l1_facade::ConsciousnessGoldStandard;
 use crate::l5_cognition::nt_mind::nt_mind::control_distillation::{
-    AlternatingSequence, ControlTrainer, CsppoReport, ReasoningStep, SftReport,
+    AlternatingSequence, ControlTrainer, CsppoReport, ControlDistillStep, SftReport,
 };
 use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{ReasoningRecord, ReasoningType};
 use crate::neotrix::nt_core_error::{ NeoTrixResult};
@@ -458,7 +458,7 @@ pub(crate) fn hydrate_ewhr_hypotheses(
 
 /// 把推理 response 文本切分为步骤序列，供 ControlDistiller 检测 takeover 点。
 /// 按换行分段；若不足 2 段则按句号/分号切分。每步携带近似 token 数。
-pub fn _split_response_into_steps(response: &str) -> Vec<ReasoningStep> {
+pub fn _split_response_into_steps(response: &str) -> Vec<ControlDistillStep> {
     let mut segments: Vec<String> = response
         .split('\n')
         .map(|s| s.trim())
@@ -476,7 +476,7 @@ pub fn _split_response_into_steps(response: &str) -> Vec<ReasoningStep> {
     segments
         .iter()
         .enumerate()
-        .map(|(i, text)| ReasoningStep {
+        .map(|(i, text)| ControlDistillStep {
             step_idx: i,
             text: text.clone(),
             e8_mode: None,
