@@ -138,7 +138,7 @@ pub use neotrix_reasoning::kernel_types as reasoning_kernel_types;
 // ── neotrix-gateway ─────────────────────────────────────────────────────────
 pub use neotrix_gateway::model_gateway;
 pub use neotrix_gateway::model_router;
-pub use neotrix_gateway::skill_registry;
+pub use neotrix_gateway::skill_registry;  // ← SKILL.md 正典 (2026-09-27: multi-agent 的 600 行副本零消费者已删)
 pub use neotrix_gateway::hybrid_search;
 pub use neotrix_gateway::hive;
 pub use neotrix_gateway::mind_modules;
@@ -152,4 +152,3 @@ pub use neotrix_multi_agent::coordinator;
 pub use neotrix_multi_agent::coordination as multi_agent_coordination;
 pub use neotrix_multi_agent::hive as multi_agent_hive;
 pub use neotrix_multi_agent::god_agent;
-pub use neotrix_multi_agent::skill_registry as migrated_skill_registry;

@@ -10,7 +10,6 @@
 //! - `coordination` — Shape-level coordination principles
 //! - `hive` — Hive Communication Protocol (inbox/outbox/blackboard)
 //! - `god_agent` — GOD Agent central orchestrator
-//! - `skill_registry` — SKILL.md discovery and activation
 
 pub mod multi_agent;
 
@@ -19,4 +18,3 @@ pub mod coordinator;
 pub mod coordination;
 pub mod hive;
 pub mod god_agent;
-pub mod skill_registry;
