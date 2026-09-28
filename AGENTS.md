@@ -64,6 +64,7 @@ cargo build -p neotrix                  # 完整构建
 - 已废止：`FUSION-ARCHITECTURE.md`（其"下一步"含已被证伪的"解决预存编译错误"）、`ARCHITECTURE-EVOLUTION-ROADMAP.md`（零引用）
 - 待办：`TODO.md`（顶部为人工摘要区）；事故与分诊：`sessions/handoff-disease-list-20260927.md`（模板 `sessions/HANDOFF-TEMPLATE.md`，两者均已入库）
 - **新窗口统一修复的**开头提示词**：`sessions/handoff-20260928-new-window-opening.md`（2026-09-28，接手前先读它 —— 含必读文档顺序、三条硬约束、以及「主工作树不是可信地面真相」这一最容易浪费数小时的前提）
+- **本轮方法论教训**：`docs/architecture/LESSONS-20260928-verification-must-be-executable.md` —— 「本地全绿但仓库不可交付」的完整解剖。**元教训：任何「X 是好的/坏的」断言都要问「我是在哪个环境里验证的」；答「我的工作树」就等于还没有证据**
 - **本轮目录/算法改造的**交接**：`sessions/handoff-20260928-algo-extraction.md`（8 项算法萃取进 L0–L6 + 6 个目录归档 + 2 笔债裁决 + 删 4,640 行死引擎；含 5 个踩坑坑位与「反查消费者须一并 grep `.github/workflows/`」的方法论教训）
 - **剩余任务汇总交接**：`sessions/handoff-20260928-consolidated.md`（2026-09-28，**动手前必读其 §2 勘误表** —— 4.1/2.1/2.2/5.2/4.4 的台账前提均已被实测证伪，照原文做会重造已存在的东西或"修"已正确工作的机制）
 - **本轮方法论教训**：`docs/architecture/LESSONS-20260928-fresh-checkout.md` —— 「本地全绿但仓库不可交付」的完整解剖。**元教训：任何「X 是好的/坏的」断言都要问「我是在哪个环境里验证的」；答「我的工作树」就等于还没有证据**
