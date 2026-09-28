@@ -221,9 +221,9 @@ do not look like a full prefix match"）—— **工具集身份是缓存身份�
   - `image_super_resolution::ImageSuperResolver` → `l2_perception/nt_world/ocr/pdf_to_text_pipeline.rs:17,30`
 - 基线复测 **0 项**；`ci.yml` 的 `capability-truth` job 由**报告态转阻塞态**（`--strict`）
 
-**遗留（已记，不影响门）**：`nt_file_ability::ocr::OcrEngine` 的 registry ID 写 `ocr::`，
-而真实定义在 `visual/ocr.rs:16`（trait）—— ID 路径有误。因 `mature`/`audit` 均按 ID 索引，
-改 ID 需同步 `mod.rs` re-export，收益低于风险，故保留并在证据字符串中记真实位置。
+**已排除的疑虑（我一度误判并自我纠正）**：曾怀疑 `nt_file_ability::ocr::OcrEngine` 这个
+ID 指向不存在的 `ocr` 模块。实为 `nt_file_ability.rs:70` 的 `pub use visual::*;` 链式再导出
+（`visual/mod.rs:6` 有 `pub use ocr::*;`），ID 有效。教训同前：先验证再下结论。
 
 ## 阶段 1 · 安全封口（3-5 天，事故已真实发生）
 
