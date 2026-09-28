@@ -67,6 +67,7 @@ cargo build -p neotrix                  # 完整构建
   - 2026-09-27 **23:4x** 复测 **0 条**（真死锁已修 + 扫描器已补 `drop()`/临时锁识别）
 
   - 2026-09-28 **14:45** 复测 **0 条**（`neotrix-core/src` 2554 `.rs` + `crates/neotrix-neobot/src` 48 `.rs`，两次退出码均 0；**本轮仅改文档未改码，故沿用同值**）
+  - 2026-09-28 **15:5x** 复测 **0 条**（`neotrix-core/src` 2554 `.rs` + `crates/neotrix-neobot/src` 48 `.rs` 同为 0，退出码 0；`apps/neobot-desktop/src` 亦 0；本批 /stop 接线后重跑）
   - 2026-09-28 **15:2x** 复测 **0 条**（同上两处）。改的是门不是产品码（2 个脚本：`.sh`/`.json`/`.txt`，非 `.rs`），故沿用同值。**`bdf1e9f1` 已把 `scripts/check-naming.sh`（新建）+ `check-layer-deps.sh`（纳入 `.neotrix/layer-map.json`）+ 重算的 102 基线入库** —— 此前它们只在主树未入库，导致新 clone 的分层门**完全看不见第二棵树却报 PASS**
   - 历史教训：22:52 之前本文长期写着"当前 0 命中"，而实际是 12 条 —— **陈旧门记录会让下一个 agent 去"修"正确代码，比没有门更危险**（见 R-SCAN-3）
 - sidecar 按需：`sh scripts/ops/nt_sidecar.sh {start|stop|status}` — 用完即停
@@ -78,7 +79,7 @@ cargo build -p neotrix                  # 完整构建
     修复；照抄 94 会让 CI 以 `FAIL: 8 new` 红。可交付态的真值是 **102**。
   - `bash scripts/check-naming.sh` → advisory，打印 **1,646** 个无 `nt_` 前缀文件
     （**规约 vs 现实差 1,646 ⇒ 规约无约束力**）。干净检出实测；此前的 1,644 同为脏树值
-  - 层归属真源：`.neotrix/layer-map.json`（**`bdf1e9f1` 已入库**）；裁决表：`docs/architecture/OWNERSHIP.md`（⚠️ 仍**未入库**）
+  - 层归属真源：`.neotrix/layer-map.json`（**`bdf1e9f1` 已入库**）；裁决表：`docs/architecture/OWNERSHIP.md`（随车道并入本提交入库）
   - ⛔ **`truth-surface` 本地红不是 CI 红**：他窗 WIP 造成 UNCOMMITTED_DEP；干净检出实测 exit=0
 - 硬规则细则见 `RUST-STANDARDS.md` §17（锁/构建/卡死判别/Git/修 bug 判据/字节安全）
 
