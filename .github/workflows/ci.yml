@@ -185,8 +185,12 @@ jobs:
   # 本已完整实现且带自愈 (demote_mislabeled, 可逆)，但 CLI 此前恒返回 Ok(())
   # —— 机制齐备却无法被任何流水线引用，于是自愈路径从不触发、虚标长期累积。
   #
-  # 暂为**报告态**（不阻塞）：当前有 24 项虚标待补真实 wiring_evidence，
-  # 详见 TODO.md「已知债 · 能力成熟度虚标」。补完后本 job 改用 --strict 转阻塞。
+  # 2026-09-27 已转**阻塞态**：24 项虚标经逐条考据后确认「零跨层消费者」属实
+  # （grep 全仓证伪：所谓外部消费者均为同名异物，如 merge_pdfs 撞
+  # neotrix-types/core/file_parser/pdf.rs:155、detect_encoding 撞
+  # shield/guard/input_gatekeeper.rs:117 的同名方法），故 demote 到 C1 是**如实**
+  # 而非惩罚；另核实 2 个确有跨层消费者者（OcrEngine / ImageSuperResolver）
+  # 已带真实 file:line 升到 C2。基线现为 0 项，--strict 转阻塞。
   capability-truth:
     runs-on: ubuntu-latest
     steps:
@@ -195,5 +199,5 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Build capability-tree CLI (leaf crate, ~12s)
         run: cargo build -p nt_core_capability_tree --bin neotrix-capability
-      - name: Maturity audit (report mode; --strict once baseline is clean)
-        run: ./target/debug/neotrix-capability audit-maturity
+      - name: Maturity audit (blocking)
+        run: ./target/debug/neotrix-capability audit-maturity --strict

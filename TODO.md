@@ -206,32 +206,24 @@ do not look like a full prefix match"）—— **工具集身份是缓存身份�
 **遗留动作**：核实 `check-truth-surface.sh` / `check-layer-deps.sh` 在修好 workflow 后
 是否真的通过（本次未在 CI 环境验证，只做了本地 YAML 合法性检查）。
 
-## 已知债 · 能力成熟度虚标 24 项（2026-09-27 实测，暂不自动降标）
+## ✅ 已收口 · 能力成熟度虚标（原 24 项）
 
-`./target/debug/neotrix-capability audit-maturity` 实测 **24 个虚标节点，全部在 NT-ACT**
-（`nt_file_ability::*`，声称 C2/C3 而"证据"只支撑 C1）。
+**逐条考据结论：24 项「零跨层消费者」属实**，降标是如实而非惩罚。
+证伪方法：对每个符号查全仓调用方，发现所谓外部消费者全是**同名异物** ——
+`merge_pdfs` 撞 `neotrix-types/core/file_parser/pdf.rs:155`（另一个函数）、
+`detect_encoding` 撞 `shield/guard/input_gatekeeper.rs:117`（另一个 struct 的方法）、
+`xlsx_read`/`OcrEngine` 撞 `mod.rs:33-56` 的 `pub use` 再导出（无进一步消费者）。
 
-**已做**：给 CLI 加 `--strict`（`nt_core_capability_tree/src/cli.rs` `Commands::AuditMaturity`），
-使 `maturity_audit()` 可被 CI 引用 —— 此前该命令**恒返回 `Ok(())`**，机制齐备却无法被任何流水线
-引用，于是 `demote_mislabeled` 自愈路径从不触发。
+**已执行**：
+- `audit-maturity --apply`：24 项降标到 C1，每项记 `evolution_log`（可逆：补 evidence 后 re-mature）
+- 核实确有跨层消费者的 2 项**带真实 file:line 升到 C2**：
+  - `ocr::OcrEngine` → `l2_perception/nt_world/ocr/mod.rs:283,286,314`
+  - `image_super_resolution::ImageSuperResolver` → `l2_perception/nt_world/ocr/pdf_to_text_pipeline.rs:17,30`
+- 基线复测 **0 项**；`ci.yml` 的 `capability-truth` job 由**报告态转阻塞态**（`--strict`）
 
-**为何不执行 `--apply` 自动降标**：`evidence_supported_constellation`
-（`nt_core_capability_tree/src/node.rs:465-485`）**不检查真实测试文件**，只读 `metadata` 三个声明字段：
-
-| 等级 | 判据 |
-|---|---|
-| C1 | `provides` 非空 |
-| C2 | `metadata.wiring_evidence` 非空字符串 |
-| C3 | `metadata.evidence_gated == "passed"` |
-
-抽样 3 个模块（`tables::xlsx_read` / `merge::merge_tables_with_mode` / `ocr::OcrEngine`）在
-`neotrix-core/tests/` 与 `benches/` **各 0 次出现** → C1 对它们确实正确。
-**但该机制无法区分「真没集成测试」与「测了但元数据没填」**。而 `nt_file_ability` 按外部吸收分析
-是已接入生产的（xlsx-data skill 分支）。用声明元数据这个代理指标下调 24 个节点的项目语义，
-属于用指标代替内容。
-
-**正确修法**：为这些节点补真实 `wiring_evidence`（file:line）或跑 D16 promotion gate，
-**而非**降标。补完后 `--strict` 即可转绿并正式设为阻塞门。
+**遗留（已记，不影响门）**：`nt_file_ability::ocr::OcrEngine` 的 registry ID 写 `ocr::`，
+而真实定义在 `visual/ocr.rs:16`（trait）—— ID 路径有误。因 `mature`/`audit` 均按 ID 索引，
+改 ID 需同步 `mod.rs` re-export，收益低于风险，故保留并在证据字符串中记真实位置。
 
 ## 阶段 1 · 安全封口（3-5 天，事故已真实发生）
 
