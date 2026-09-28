@@ -398,6 +398,26 @@ do not look like a full prefix match"）—— **工具集身份是缓存身份�
 **机械断言**能抓。**故：IPC 层冒烟测试补齐之前，先别加新功能** ——
 缺的那一层正是唯一能对「接错线 / 没接线」发信号的地方。
 
+## ✅ 收口 · 单元测试 57 → 3 例失败（2026-09-28，**已无 flaky**）
+
+账本已棘轮到 3 条（`scripts/test-failures-baseline.txt`）。剩余 3 条**均需产品判断或
+阶段级工程**，精确诊断见 `sessions/handoff-test-debt-20260928.md`：
+
+| 测试 | 性质 |
+|---|---|
+| `kb_primitives::test_node_history` / `test_nodes_as_of_returns_committed` | **schema bug**：`nodes` 主键不含时间维 ⇒ 双时间无法存历史。改复合主键后暴露 `edges` 真外键失效 + `nodes_as_of` 文档与实现矛盾 + 既有 DB 需数据迁移 ⇒ 即 **2.2 真双时间迁移**，已回退不做半迁移 |
+| `noise_handshake::full_handshake` | **协议实现 bug**：responder 在 IK 模式下无法计算 `es`（对端 static 正是被加密送达的）。该模块无生产调用方且协议名与 spec 不一致，建议先决定「对齐 spec 还是明确降级」 |
+
+**账本已无 flaky** ⇒ `check-test-baseline.sh` 的 `--strict` 现在技术上可用，
+但**先只棘轮数据、不转 strict**：需先在 CI 上连跑数轮确认那 3 条不再进出
+（历史上 flaky 是按运行变动的，不跑够轮次就转 strict 会立刻误报）。
+
+**另有一项已知未完**：全仓 6+ 处测试用 `set_var("HOME")` 改进程全局环境变量，
+与读 `HOME` 的测试竞态。已让受害测试自足（`skill_loader` / `checkpoint`），
+但根因未除 —— 正解是给所有 HOME 改写点加共享 `Mutex`
+（先例：`agent.rs:506` 的 `TEST_MCP_SERIAL`）。当时因 `cipher.rs` 属他窗在制品未做。
+
+
 ## ✅ 大幅收口 · 单元测试 57 → 8 例失败（2026-09-28）
 
 修好构建后测试才第一次能跑, 暴露出 57 条失败。逐个诊断后**消除 49 条**, 余 8 条。
