@@ -5,7 +5,7 @@ pub use crate::l1_action::nt_core_bank::{
     ReasoningMemory, ReasoningBank, MemoryTier, TemporalContext, MemoryLifecycle,
     ReasoningBankStats, MemoryDetailedStats, MemoryIterationResult,
 };
-pub use super::reasoning_types::ReasoningTrace;
+pub use super::reasoning_types::ReasoningRecord;
 
 use crate::l2_perception::nt_core_knowledge::TaskType;
 use super::kronecker_cleanup::KroneckerCleanup;

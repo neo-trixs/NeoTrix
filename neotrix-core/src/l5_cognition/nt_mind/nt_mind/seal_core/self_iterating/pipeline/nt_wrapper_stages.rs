@@ -8,9 +8,9 @@ use super::super::constitutional_stage::ConstitutionalSelfCritiqueStage;
 use super::super::hypercore::SafetyCheckResult;
 use super::super::process_stage::ProcessExample;
 use super::super::process_stage::ProcessStage;
-use super::super::process_stage::ReasoningStep;
-use super::super::process_stage::ReasoningTrace;
-use super::super::process_stage::TraceSource;
+use super::super::process_stage::ProcessStageStep;
+use super::super::process_stage::ProcessStageTrace;
+use super::super::process_stage::ProcessStageTraceSource;
 use super::super::safety_stage::SafetyCheckStage;
 use super::super::search_skill_stage::Evidence;
 use super::super::search_skill_stage::SearchExercise;
@@ -215,11 +215,11 @@ impl BrainStage for ProcessWrapperStage {
             .map(|d| d.as_secs())
             .unwrap_or(0);
         // 从工具调用轨迹构造推理链步骤
-        let steps: Vec<ReasoningStep> = brain
+        let steps: Vec<ProcessStageStep> = brain
             .tool_traces
             .iter()
             .enumerate()
-            .map(|(i, (tool, dur, ok))| ReasoningStep {
+            .map(|(i, (tool, dur, ok))| ProcessStageStep {
                 step_idx: i,
                 specialist: "Tool".to_string(),
                 e8_mode: 0,
@@ -238,18 +238,18 @@ impl BrainStage for ProcessWrapperStage {
         let examples: Vec<ProcessExample> = if steps.is_empty() {
             Vec::new()
         } else {
-            let trace = ReasoningTrace {
+            let trace = ProcessStageTrace {
                 trace_id: format!("iter-{}", brain.iteration),
                 task,
                 steps,
                 completed: true,
                 final_quality: brain._reward.clamp(0.0, 1.0),
-                source: TraceSource::Synthesis,
+                source: ProcessStageTraceSource::Synthesis,
                 timestamp,
             };
             vec![ProcessExample { trace, weight: 1.0 }]
         };
-        // B5 (缺陷4修复): 消费意识树果实 → 转换为 ReasoningTrace 并入 process 样本。
+        // B5 (缺陷4修复): 消费意识树果实 → 转换为 ProcessStageTrace 并入 process 样本。
         // 此前 extract_from_consciousness_tree (process_stage.rs:130) 无生产调用者,
         // 意识树产出的进化果实从不进入 SEAL 过程学习。果实轨迹以 quality 加权,
         // 使高质量进化果实优先塑造 reasoning_depth/cot_quality 等能力维度。

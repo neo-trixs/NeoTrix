@@ -1,7 +1,7 @@
 //! 推理引擎类型定义（从 reasoning_engine.rs 拆分）
 //!
-//! 包含: _CascadeConfig, _CascadeResult, ReasoningType, ReasoningMethod,
-//!       PerspectiveLens, ReasoningTrace, ReasoningStats
+//! 包含: _CascadeConfig, _CascadeResult, ReasoningType, ReasoningTaxonomy,
+//!       PerspectiveLens, ReasoningRecord, ReasoningStats
 
 use super::model_router::ModelTier;
 use serde::{Deserialize, Serialize};
@@ -52,7 +52,7 @@ pub enum ReasoningType {
 
 /// 推理方法（来自 qiaomu-heavyskill 的 8 种方法）
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ReasoningMethod {
+pub enum ReasoningTaxonomy {
     Direct,
     FirstPrinciples,
     Adversarial,
@@ -63,7 +63,7 @@ pub enum ReasoningMethod {
     Analogical,
 }
 
-impl ReasoningMethod {
+impl ReasoningTaxonomy {
     pub fn all() -> Vec<Self> {
         vec![
             Self::Direct,
@@ -134,10 +134,10 @@ impl PerspectiveLens {
 
 /// 推理轨迹 — 每次推理的完整记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReasoningTrace {
+pub struct ReasoningRecord {
     pub id: String,
     pub reasoning_type: ReasoningType,
-    pub reasoning_method: Option<ReasoningMethod>,
+    pub reasoning_method: Option<ReasoningTaxonomy>,
     pub perspective_lens: Option<PerspectiveLens>,
     pub task: String,
     pub prompt: String,

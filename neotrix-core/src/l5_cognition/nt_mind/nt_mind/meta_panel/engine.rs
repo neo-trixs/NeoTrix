@@ -8,7 +8,7 @@ use crate::l5_cognition::nt_core_gate::{
     Claim, GuardrailReport, JudgeFamily, JudgeInput, JudgePanel, ToolSpec, GateDecision,
 };
 use crate::l6_meta::nt_core_self_review::{SelfReviewGate, Severity};
-use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{PerspectiveLens, ReasoningMethod};
+use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{PerspectiveLens, ReasoningTaxonomy};
 
 use super::fusion::FusionEngine;
 use super::types::{AnalysisDepth, FusionResult, MetaPanelResult, Viewpoint};
@@ -16,7 +16,7 @@ use super::types::{AnalysisDepth, FusionResult, MetaPanelResult, Viewpoint};
 pub struct MetaPanelEngine {
     pub depth: AnalysisDepth,
     pub strict_review: bool,
-    pub viewpoint_registry: HashMap<(PerspectiveLens, ReasoningMethod), String>,
+    pub viewpoint_registry: HashMap<(PerspectiveLens, ReasoningTaxonomy), String>,
     /// 动作路径工具清单 — 爆炸半径分级的输入 (构建期注册, 非运行期猜测)
     pub tools: Vec<ToolSpec>,
 }
@@ -31,7 +31,7 @@ impl MetaPanelEngine {
     pub fn new(depth: AnalysisDepth, strict_review: bool) -> Self {
         let mut registry = HashMap::new();
         for p in PerspectiveLens::all() {
-            for m in ReasoningMethod::all() {
+            for m in ReasoningTaxonomy::all() {
                 registry.insert((p, m), format!("{:?}_{:?}", p, m));
             }
         }
@@ -125,7 +125,7 @@ impl MetaPanelEngine {
     fn generate_viewpoints(&self, question: &str) -> Vec<Viewpoint> {
         let count = self.depth.viewpoint_count();
         let all_perspectives = PerspectiveLens::all();
-        let all_methods = ReasoningMethod::all();
+        let all_methods = ReasoningTaxonomy::all();
         let mut viewpoints = Vec::with_capacity(count);
 
         let mut idx = 0usize;
@@ -141,7 +141,7 @@ impl MetaPanelEngine {
         viewpoints
     }
 
-    fn build_viewpoint(&self, question: &str, perspective: PerspectiveLens, method: ReasoningMethod, seed: usize) -> Viewpoint {
+    fn build_viewpoint(&self, question: &str, perspective: PerspectiveLens, method: ReasoningTaxonomy, seed: usize) -> Viewpoint {
         let id = Uuid::new_v4().to_string();
         let label = format!("{:?}+{:?}", perspective, method);
         let confidence = self.compute_confidence(method, perspective, seed);
@@ -151,16 +151,16 @@ impl MetaPanelEngine {
         Viewpoint::new(id, label, perspective, method, analysis, confidence, evidence)
     }
 
-    fn compute_confidence(&self, method: ReasoningMethod, perspective: PerspectiveLens, seed: usize) -> f64 {
+    fn compute_confidence(&self, method: ReasoningTaxonomy, perspective: PerspectiveLens, seed: usize) -> f64 {
         let base = match method {
-            ReasoningMethod::Direct => 0.8,
-            ReasoningMethod::FirstPrinciples => 0.7,
-            ReasoningMethod::Adversarial => 0.6,
-            ReasoningMethod::EdgeCaseFocus => 0.5,
-            ReasoningMethod::ConstraintPropagation => 0.6,
-            ReasoningMethod::ReverseEngineering => 0.7,
-            ReasoningMethod::HistoricalEmpirical => 0.6,
-            ReasoningMethod::Analogical => 0.5,
+            ReasoningTaxonomy::Direct => 0.8,
+            ReasoningTaxonomy::FirstPrinciples => 0.7,
+            ReasoningTaxonomy::Adversarial => 0.6,
+            ReasoningTaxonomy::EdgeCaseFocus => 0.5,
+            ReasoningTaxonomy::ConstraintPropagation => 0.6,
+            ReasoningTaxonomy::ReverseEngineering => 0.7,
+            ReasoningTaxonomy::HistoricalEmpirical => 0.6,
+            ReasoningTaxonomy::Analogical => 0.5,
         };
         let perspective_mod = match perspective {
             PerspectiveLens::Builder => 0.1,
@@ -176,7 +176,7 @@ impl MetaPanelEngine {
         raw.max(0.1).min(1.0)
     }
 
-    fn generate_evidence(&self, question: &str, perspective: PerspectiveLens, method: ReasoningMethod, _seed: usize) -> Vec<String> {
+    fn generate_evidence(&self, question: &str, perspective: PerspectiveLens, method: ReasoningTaxonomy, _seed: usize) -> Vec<String> {
         let mut ev = Vec::new();
         ev.push(format!("Question: {}", question));
         ev.push(format!("Perspective: {} — {}", perspective_label_str(perspective), perspective_desc_str(perspective)));
@@ -184,7 +184,7 @@ impl MetaPanelEngine {
         ev
     }
 
-    fn synthesize_analysis(&self, _question: &str, perspective: PerspectiveLens, method: ReasoningMethod, confidence: f64, evidence: &[String]) -> String {
+    fn synthesize_analysis(&self, _question: &str, perspective: PerspectiveLens, method: ReasoningTaxonomy, confidence: f64, evidence: &[String]) -> String {
         format!(
             "[{}][{}] c={:.2} ev={} — Simulated: {} via {}",
             perspective_label_str(perspective),
@@ -236,20 +236,20 @@ fn perspective_desc_str(p: PerspectiveLens) -> &'static str {
     p.description()
 }
 
-fn method_label_str(m: ReasoningMethod) -> &'static str {
+fn method_label_str(m: ReasoningTaxonomy) -> &'static str {
     match m {
-        ReasoningMethod::Direct => "Direct",
-        ReasoningMethod::FirstPrinciples => "FirstPrinciples",
-        ReasoningMethod::Adversarial => "Adversarial",
-        ReasoningMethod::EdgeCaseFocus => "EdgeCaseFocus",
-        ReasoningMethod::ConstraintPropagation => "ConstraintPropagation",
-        ReasoningMethod::ReverseEngineering => "ReverseEngineering",
-        ReasoningMethod::HistoricalEmpirical => "HistoricalEmpirical",
-        ReasoningMethod::Analogical => "Analogical",
+        ReasoningTaxonomy::Direct => "Direct",
+        ReasoningTaxonomy::FirstPrinciples => "FirstPrinciples",
+        ReasoningTaxonomy::Adversarial => "Adversarial",
+        ReasoningTaxonomy::EdgeCaseFocus => "EdgeCaseFocus",
+        ReasoningTaxonomy::ConstraintPropagation => "ConstraintPropagation",
+        ReasoningTaxonomy::ReverseEngineering => "ReverseEngineering",
+        ReasoningTaxonomy::HistoricalEmpirical => "HistoricalEmpirical",
+        ReasoningTaxonomy::Analogical => "Analogical",
     }
 }
 
-fn method_desc_str(m: ReasoningMethod) -> &'static str {
+fn method_desc_str(m: ReasoningTaxonomy) -> &'static str {
     m.description()
 }
 
@@ -345,7 +345,7 @@ mod tests {
     fn test_fusion_engine_direct() {
         let fusion = FusionEngine::default();
         let vp = Viewpoint::new("id1".into(), "test".into(),
-            PerspectiveLens::Builder, ReasoningMethod::Direct,
+            PerspectiveLens::Builder, ReasoningTaxonomy::Direct,
             "analysis".into(), 0.8, vec!["ev".into()]);
         let result = fusion.fuse(&[vp], AnalysisDepth::Mid);
         assert!(result.consensus_score > 0.5);

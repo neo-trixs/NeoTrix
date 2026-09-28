@@ -35,7 +35,7 @@ use crate::l5_cognition::nt_mind::nt_mind::control_distillation::{
 };
 use crate::l5_cognition::nt_mind::nt_mind::core::BrainMutView;
 use crate::l5_cognition::nt_mind::nt_mind::distillation::{AntiPattern, StrategicPrinciple};
-use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{ReasoningTrace};
+use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{ReasoningRecord};
 use crate::l5_cognition::nt_mind::nt_mind::seal_core::model_router::ModelRouter;
 use crate::l2_perception::nt_world::nt_world_jepa::JepaWorldModel;
 use super::super::CognitiveEye;
@@ -68,7 +68,7 @@ pub struct ReasoningEngine {
     pub last_core_plan: Option<String>,
     pub brain: Box<dyn BrainMutView>,
     pub bank: ReasoningBank,
-    pub traces: Vec<ReasoningTrace>,
+    pub traces: Vec<ReasoningRecord>,
     pub principles: Vec<StrategicPrinciple>,
     pub anti_patterns: Vec<AntiPattern>,
     pub gwt: Option<GlobalWorkspace>,

@@ -10,7 +10,7 @@ use crate::l5_cognition::l1_facade::ConsciousnessGoldStandard;
 use crate::l5_cognition::nt_mind::nt_mind::control_distillation::{
     AlternatingSequence, ControlTrainer, CsppoReport, ReasoningStep, SftReport,
 };
-use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{ReasoningTrace, ReasoningType};
+use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{ReasoningRecord, ReasoningType};
 use crate::neotrix::nt_core_error::{ NeoTrixResult};
 use super::nt_builders::{ReasoningEngine, CONTROL_TRAIN_BATCH, MAX_TRACES};
 
@@ -177,7 +177,7 @@ impl ReasoningEngine {
         error_info: Option<&str>,
         reward: f64,
     ) {
-        let trace = ReasoningTrace {
+        let trace = ReasoningRecord {
             id: format!("trace-{}", self.llm_call_count),
             reasoning_type: rt,
             reasoning_method: None,

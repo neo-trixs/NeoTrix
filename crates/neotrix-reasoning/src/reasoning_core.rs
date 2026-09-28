@@ -1,7 +1,24 @@
 //! Unified Reasoning Core — 统一推理核心类型与注册表
 //!
-//! 消除 4 处 ReasoningTrace 重复定义，建立 Method↔Stage↔Hexagram 显式映射，
 //! 提供 KB/经验 → Kernel context 自动注入的 ContextBuilder。
+//!
+//! ⚠️ **更正（原第 3 行称"消除 4 处 ReasoningTrace 重复定义"—— 事实不符）**
+//! 本 crate 的 `ReasoningTrace` 统一类型**从未被主代码采纳**，4 处同名定义一直并存。
+//! 2026-09-28 逐字段核对后确认**不可统一**，理由：
+//! - `l2 crawl/circuits_types.rs` 那份有 `steps: usize`（**计数**），
+//!   本类型这里是 `steps: Vec<ReasoningStep>`（**列表**）—— 语义不同，非超集。
+//! - `l5 reason/reasoning_types.rs` 那份有 `prompt` / `perspective_lens` /
+//!   `error_context` / `success` / `reasoning_type` 共 5 个字段，
+//!   **本类型均无对应** —— 若统一需为所有 4 个使用方塞入用不上的字段。
+//! - 4 处作用域互斥，**无任何文件同时引用 2 份**，故不存在编译冲突。
+//! 因此改为**改名消歧**（保留本 crate 的通用名 `ReasoningTrace` 作为规范名）：
+//! - crawl        `ReasoningTrace`→`CircuitTrace`、`ReasoningMethod`→`CircuitMethod`
+//! - seal_core    `ReasoningTrace`→`ProcessStageTrace`、`ReasoningStep`→`ProcessStageStep`、
+//!                `TraceSource`→`ProcessStageTraceSource`
+//! - reason       `ReasoningTrace`→`ReasoningRecord`、`ReasoningMethod`→`ReasoningApproach`
+//! 另有 `ReasoningStep` 在主代码共 5 处同名（`nt_core_ttc.rs:124`、
+//! `nt_mind/control_distillation.rs:229`、`nt_mind/cross_domain/reason_retrieve_refine.rs:118`
+//! 及上述两处），本轮只改了 seal_core 那份，其余 3 处尚未消歧。
 
 use crate::kernel_types::{ReasoningMethod, Vector, EVOLUTION};
 use neotrix_types::e8_reasoning::ReasoningHexagram;

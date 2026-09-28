@@ -31,7 +31,7 @@ pub use asset_graph::{
 
 use std::sync::Mutex;
 use self::circuits_types::{
-    ReasoningCircuit, ReasoningInput, ReasoningOutput, ReasoningTrace, ReasoningMethod,
+    ReasoningCircuit, ReasoningInput, ReasoningOutput, CircuitTrace, CircuitMethod,
 };
 
 pub struct BrowserCircuit { pub session: Mutex<session::BrowserSession> }
@@ -49,7 +49,7 @@ impl BrowserCircuit {
 }
 
 impl ReasoningCircuit for BrowserCircuit {
-    fn method(&self) -> ReasoningMethod { ReasoningMethod::SystemIntegration }
+    fn method(&self) -> CircuitMethod { CircuitMethod::SystemIntegration }
     fn complexity_ceiling(&self) -> f64 { 0.5 }
     fn process(&self, input: &ReasoningInput) -> ReasoningOutput {
         let session = self.session.lock().unwrap_or_else(|e| e.into_inner());
@@ -64,7 +64,7 @@ impl ReasoningCircuit for BrowserCircuit {
         let norm = state.iter().map(|x| x * x).sum::<f64>().sqrt().max(1e-8);
         for v in state.iter_mut() { *v /= norm; }
         ReasoningOutput { state_delta: state, confidence: (result.len() as f64 / 500.0).clamp(0.05, 1.0),
-            trace: ReasoningTrace { method: ReasoningMethod::SystemIntegration, steps: result.lines().count(), intermediate_states: vec![], convergence: (result.len() as f64 / 2000.0).min(1.0) } }
+            trace: CircuitTrace { method: CircuitMethod::SystemIntegration, steps: result.lines().count(), intermediate_states: vec![], convergence: (result.len() as f64 / 2000.0).min(1.0) } }
     }
     fn is_applicable(&self, _c: f64) -> bool { true }
 }
@@ -119,7 +119,7 @@ mod tests {
     #[test]
     fn test_nt_world_browse_circuit_new_default() {
         let circuit = BrowserCircuit::new();
-        assert_eq!(circuit.method(), ReasoningMethod::SystemIntegration);
+        assert_eq!(circuit.method(), CircuitMethod::SystemIntegration);
     }
 
     #[test]

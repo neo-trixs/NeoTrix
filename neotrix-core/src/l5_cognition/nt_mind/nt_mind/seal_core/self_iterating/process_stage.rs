@@ -18,7 +18,7 @@ pub const PROCESS_LEARNING_RATE: f64 = 1e-4;
 
 /// 单条推理轨迹步骤 (对齐 TrajectoryStep / EvidenceChain)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReasoningStep {
+pub struct ProcessStageStep {
     pub step_idx: usize,
     pub specialist: String,           // 专家角色: "RiskAssessor" | "Planner" | "Coder" | "Searcher" | ...
     pub e8_mode: u8,                  // E8 推理模式 (0-15)
@@ -32,18 +32,18 @@ pub struct ReasoningStep {
 
 /// 完整推理轨迹 (对齐 AgentTrajectory)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReasoningTrace {
+pub struct ProcessStageTrace {
     pub trace_id: String,
     pub task: String,
-    pub steps: Vec<ReasoningStep>,
+    pub steps: Vec<ProcessStageStep>,
     pub completed: bool,
     pub final_quality: f64,           // 最终输出质量 (0-1)
-    pub source: TraceSource,          // 来源: ConsciousnessTree | KBExperience | Synthesis
+    pub source: ProcessStageTraceSource,          // 来源: ConsciousnessTree | KBExperience | Synthesis
     pub timestamp: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TraceSource {
+pub enum ProcessStageTraceSource {
     ConsciousnessTree,
     KBExperience,
     Synthesis,
@@ -52,14 +52,14 @@ pub enum TraceSource {
 /// 过程监督样本：任务 → 期望推理轨迹
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessExample {
-    pub trace: ReasoningTrace,
+    pub trace: ProcessStageTrace,
     pub weight: f64,                  // 样本权重 (质量 * 来源可信度)
 }
 
 /// 过程缓冲
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct _ProcessBuffer {
-    pub traces: VecDeque<ReasoningTrace>,
+    pub traces: VecDeque<ProcessStageTrace>,
     pub max_size: usize,
 }
 
@@ -71,7 +71,7 @@ impl _ProcessBuffer {
     pub fn new() -> Self {
         Self { traces: VecDeque::with_capacity(PROCESS_BUFFER_SIZE), max_size: PROCESS_BUFFER_SIZE }
     }
-    pub fn push(&mut self, trace: ReasoningTrace) {
+    pub fn push(&mut self, trace: ProcessStageTrace) {
         if self.traces.len() >= self.max_size { self.traces.pop_front(); }
         self.traces.push_back(trace);
     }
@@ -129,16 +129,16 @@ impl ProcessStage {
     /// 从 ConsciousnessTree EvolutionFruit 提取推理轨迹
     pub fn extract_from_consciousness_tree(
         fruits: &[crate::l5_cognition::nt_core_consciousness_tree::EvolutionFruit],
-    ) -> Vec<ReasoningTrace> {
+    ) -> Vec<ProcessStageTrace> {
         let mut traces = Vec::new();
         for fruit in fruits {
             // EvidenceChain.run_id 格式: "cycle-{cycle}-{kind}"
             if let Some(_run_id) = &fruit.evidence.run_id {
                 // 从 run_id 反推 cycle，这里简化：用 fruit 生成的 cycle
-                let trace = ReasoningTrace {
+                let trace = ProcessStageTrace {
                     trace_id: format!("ct-{}-{}", fruit.produced_at_cycle, fruit.source_branch.label()),
                     task: fruit.claim.clone(),
-                    steps: vec![ReasoningStep {
+                    steps: vec![ProcessStageStep {
                         step_idx: 0,
                         specialist: fruit.source_branch.label().to_string(),
                         e8_mode: 0, // 需从 branch 状态推断
@@ -151,7 +151,7 @@ impl ProcessStage {
                     }],
                     completed: true,
                     final_quality: fruit.quality,
-                    source: TraceSource::ConsciousnessTree,
+                    source: ProcessStageTraceSource::ConsciousnessTree,
                     timestamp: fruit.evidence.timestamp,
                 };
                 traces.push(trace);
@@ -163,9 +163,9 @@ impl ProcessStage {
     /// 从 KB Experience GoldTrajectory 提取推理轨迹
     pub(crate) fn _extract_from_kb_experience(
         trajectories: &[crate::l5_cognition::nt_core_prm::AgentTrajectory],
-    ) -> Vec<ReasoningTrace> {
+    ) -> Vec<ProcessStageTrace> {
         trajectories.iter().enumerate().map(|(i, traj)| {
-            let steps: Vec<ReasoningStep> = traj.steps.iter().map(|s| ReasoningStep {
+            let steps: Vec<ProcessStageStep> = traj.steps.iter().map(|s| ProcessStageStep {
                 step_idx: s.step_idx,
                 specialist: format!("{:?}", s.specialist),
                 e8_mode: s.e8_mode.0 & 0x3F,
@@ -177,13 +177,13 @@ impl ProcessStage {
                 reward: s.external_reward,
             }).collect();
             let avg_reward = steps.iter().filter_map(|s| s.reward).sum::<f64>() / steps.len().max(1) as f64;
-            ReasoningTrace {
+            ProcessStageTrace {
                 trace_id: format!("kb-{}-{}", traj.trajectory_id, i),
                 task: traj.task.clone(),
                 steps,
                 completed: traj.completed,
                 final_quality: avg_reward.clamp(0.0, 1.0),
-                source: TraceSource::KBExperience,
+                source: ProcessStageTraceSource::KBExperience,
                 timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
             }
         }).collect()
@@ -321,15 +321,15 @@ fn current_timestamp() -> u64 {
 mod tests {
     use super::*;
 
-    fn make_trace(_steps: usize, quality: f64, actions: Vec<&str>) -> ReasoningTrace {
-        ReasoningTrace {
+    fn make_trace(_steps: usize, quality: f64, actions: Vec<&str>) -> ProcessStageTrace {
+        ProcessStageTrace {
             trace_id: "test".into(),
             task: "test task".into(),
-            steps: actions.into_iter().enumerate().map(|(i, a)| ReasoningStep {
+            steps: actions.into_iter().enumerate().map(|(i, a)| ProcessStageStep {
                 step_idx: i, specialist: "Tester".into(), e8_mode: 0, action: a.into(),
                 input: "in".into(), output: "out".into(), duration_ms: None, success: true, reward: Some(quality),
             }).collect(),
-            completed: true, final_quality: quality, source: TraceSource::Synthesis, timestamp: current_timestamp(),
+            completed: true, final_quality: quality, source: ProcessStageTraceSource::Synthesis, timestamp: current_timestamp(),
         }
     }
 

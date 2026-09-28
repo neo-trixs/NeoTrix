@@ -3,7 +3,7 @@ use std::collections::HashMap;
 pub type Vector = Vec<f64>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ReasoningMethod {
+pub enum CircuitMethod {
     Deductive, Inductive, Abductive, Analogical, Compositional, Recursive,
     Adversarial, FirstPrinciples, AutoFetch, KnowledgeRetrieval,
     GradientLearning, ArchitectureSearch, GpuCompute, DistributedConsensus,
@@ -22,19 +22,19 @@ pub struct ReasoningInput {
 pub struct ReasoningOutput {
     pub state_delta: Vector,
     pub confidence: f64,
-    pub trace: ReasoningTrace,
+    pub trace: CircuitTrace,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReasoningTrace {
-    pub method: ReasoningMethod,
+pub struct CircuitTrace {
+    pub method: CircuitMethod,
     pub steps: usize,
     pub intermediate_states: Vec<Vector>,
     pub convergence: f64,
 }
 
 pub trait ReasoningCircuit: Send + Sync {
-    fn method(&self) -> ReasoningMethod;
+    fn method(&self) -> CircuitMethod;
     fn complexity_ceiling(&self) -> f64;
     fn process(&self, input: &ReasoningInput) -> ReasoningOutput;
     fn is_applicable(&self, task_complexity: f64) -> bool;
@@ -48,16 +48,16 @@ mod tests {
     #[test]
     fn test_reasoning_method_20_variants() {
         let variants = vec![
-            ReasoningMethod::Deductive, ReasoningMethod::Inductive,
-            ReasoningMethod::Abductive, ReasoningMethod::Analogical,
-            ReasoningMethod::Compositional, ReasoningMethod::Recursive,
-            ReasoningMethod::Adversarial, ReasoningMethod::FirstPrinciples,
-            ReasoningMethod::AutoFetch, ReasoningMethod::KnowledgeRetrieval,
-            ReasoningMethod::GradientLearning, ReasoningMethod::ArchitectureSearch,
-            ReasoningMethod::GpuCompute, ReasoningMethod::DistributedConsensus,
-            ReasoningMethod::ExperienceDistill, ReasoningMethod::EmergentAnalysis,
-            ReasoningMethod::SystemIntegration, ReasoningMethod::EnsembleVoting,
-            ReasoningMethod::SelfImprovement, ReasoningMethod::SparseRouting,
+            CircuitMethod::Deductive, CircuitMethod::Inductive,
+            CircuitMethod::Abductive, CircuitMethod::Analogical,
+            CircuitMethod::Compositional, CircuitMethod::Recursive,
+            CircuitMethod::Adversarial, CircuitMethod::FirstPrinciples,
+            CircuitMethod::AutoFetch, CircuitMethod::KnowledgeRetrieval,
+            CircuitMethod::GradientLearning, CircuitMethod::ArchitectureSearch,
+            CircuitMethod::GpuCompute, CircuitMethod::DistributedConsensus,
+            CircuitMethod::ExperienceDistill, CircuitMethod::EmergentAnalysis,
+            CircuitMethod::SystemIntegration, CircuitMethod::EnsembleVoting,
+            CircuitMethod::SelfImprovement, CircuitMethod::SparseRouting,
         ];
         assert_eq!(variants.len(), 20);
     }
@@ -78,8 +78,8 @@ mod tests {
         let output = ReasoningOutput {
             state_delta: vec![0.1],
             confidence: 0.75,
-            trace: ReasoningTrace {
-                method: ReasoningMethod::Deductive,
+            trace: CircuitTrace {
+                method: CircuitMethod::Deductive,
                 steps: 3,
                 intermediate_states: vec![],
                 convergence: 0.99,
@@ -91,13 +91,13 @@ mod tests {
 
     #[test]
     fn test_reasoning_trace_method_match() {
-        let trace = ReasoningTrace {
-            method: ReasoningMethod::Abductive,
+        let trace = CircuitTrace {
+            method: CircuitMethod::Abductive,
             steps: 0,
             intermediate_states: vec![],
             convergence: 0.0,
         };
-        assert_eq!(trace.method, ReasoningMethod::Abductive);
+        assert_eq!(trace.method, CircuitMethod::Abductive);
     }
 
     #[test]
@@ -117,14 +117,14 @@ mod tests {
     fn test_trait_mock_circuit_applicability() {
         struct Mock;
         impl ReasoningCircuit for Mock {
-            fn method(&self) -> ReasoningMethod { ReasoningMethod::EnsembleVoting }
+            fn method(&self) -> CircuitMethod { CircuitMethod::EnsembleVoting }
             fn complexity_ceiling(&self) -> f64 { 1.0 }
             fn process(&self, _: &ReasoningInput) -> ReasoningOutput {
                 ReasoningOutput {
                     state_delta: vec![],
                     confidence: 1.0,
-                    trace: ReasoningTrace {
-                        method: ReasoningMethod::EnsembleVoting,
+                    trace: CircuitTrace {
+                        method: CircuitMethod::EnsembleVoting,
                         steps: 1, intermediate_states: vec![], convergence: 1.0,
                     },
                 }
@@ -134,6 +134,6 @@ mod tests {
         let c: Box<dyn ReasoningCircuit> = Box::new(Mock);
         assert!(c.is_applicable(0.5));
         assert!(!c.is_applicable(0.9));
-        assert_eq!(c.method(), ReasoningMethod::EnsembleVoting);
+        assert_eq!(c.method(), CircuitMethod::EnsembleVoting);
     }
 }

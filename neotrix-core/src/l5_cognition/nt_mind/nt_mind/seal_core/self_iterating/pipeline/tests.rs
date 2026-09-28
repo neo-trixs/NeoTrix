@@ -47,7 +47,7 @@
                 .buffer
                 .traces
                 .iter()
-                .any(|t| t.source == TraceSource::ConsciousnessTree),
+                .any(|t| t.source == ProcessStageTraceSource::ConsciousnessTree),
             "consciousness fruit trace consumed by SEAL process: {:?}",
             brain
                 ._process_stage
@@ -70,7 +70,7 @@
             .buffer
             .traces
             .iter()
-            .filter(|t| t.source == TraceSource::ConsciousnessTree)
+            .filter(|t| t.source == ProcessStageTraceSource::ConsciousnessTree)
             .count();
         let _ = stage.process(&mut brain).expect("process again ok");
         let after = brain
@@ -78,7 +78,7 @@
             .buffer
             .traces
             .iter()
-            .filter(|t| t.source == TraceSource::ConsciousnessTree)
+            .filter(|t| t.source == ProcessStageTraceSource::ConsciousnessTree)
             .count();
         assert_eq!(before, after, "no re-consumption after clear");
     }

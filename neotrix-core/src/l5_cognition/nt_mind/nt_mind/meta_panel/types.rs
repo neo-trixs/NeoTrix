@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::l5_cognition::nt_core_gate::{GateDecision, GuardrailReport, PanelVerdict};
 use crate::l6_meta::nt_core_self_review::SelfReviewReport;
-use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{PerspectiveLens, ReasoningMethod};
+use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{PerspectiveLens, ReasoningTaxonomy};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AnalysisDepth {
@@ -46,7 +46,7 @@ pub struct Viewpoint {
     pub id: String,
     pub label: String,
     pub perspective: PerspectiveLens,
-    pub method: ReasoningMethod,
+    pub method: ReasoningTaxonomy,
     pub analysis: String,
     pub confidence: f64,
     pub evidence: Vec<String>,
@@ -57,7 +57,7 @@ impl Viewpoint {
         id: String,
         label: String,
         perspective: PerspectiveLens,
-        method: ReasoningMethod,
+        method: ReasoningTaxonomy,
         analysis: String,
         confidence: f64,
         evidence: Vec<String>,
@@ -80,14 +80,14 @@ impl Viewpoint {
 
     pub fn method_label(&self) -> &'static str {
         match self.method {
-            ReasoningMethod::Direct => "Direct",
-            ReasoningMethod::FirstPrinciples => "FirstPrinciples",
-            ReasoningMethod::Adversarial => "Adversarial",
-            ReasoningMethod::EdgeCaseFocus => "EdgeCaseFocus",
-            ReasoningMethod::ConstraintPropagation => "ConstraintPropagation",
-            ReasoningMethod::ReverseEngineering => "ReverseEngineering",
-            ReasoningMethod::HistoricalEmpirical => "HistoricalEmpirical",
-            ReasoningMethod::Analogical => "Analogical",
+            ReasoningTaxonomy::Direct => "Direct",
+            ReasoningTaxonomy::FirstPrinciples => "FirstPrinciples",
+            ReasoningTaxonomy::Adversarial => "Adversarial",
+            ReasoningTaxonomy::EdgeCaseFocus => "EdgeCaseFocus",
+            ReasoningTaxonomy::ConstraintPropagation => "ConstraintPropagation",
+            ReasoningTaxonomy::ReverseEngineering => "ReverseEngineering",
+            ReasoningTaxonomy::HistoricalEmpirical => "HistoricalEmpirical",
+            ReasoningTaxonomy::Analogical => "Analogical",
         }
     }
 }

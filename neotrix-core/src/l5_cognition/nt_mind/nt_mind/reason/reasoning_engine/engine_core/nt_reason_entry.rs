@@ -99,8 +99,8 @@ impl ReasoningEngine {
         // 使用推理轨迹的收敛度和质量作为奖励信号，更新 E8Policy
         if let Ok(ref response) = result {
             // 优先使用引擎内真实的推理轨迹（Kernel trace 真实反哺）
-            // 注: self.traces 元素为 reasoning_types::ReasoningTrace, 需转换为
-            // nt_core_reasoning::ReasoningTrace (E8Policy 反哺所需字段)。
+            // 注: self.traces 元素为 reasoning_types::ReasoningRecord, 需转换为
+            // nt_core_reasoning::ReasoningRecord (E8Policy 反哺所需字段)。
             let feedback_trace = if let Some(last_trace) = self.traces.last() {
                 crate::l5_cognition::reasoning_core::ReasoningTrace {
                     trace_id: last_trace.id.clone(),

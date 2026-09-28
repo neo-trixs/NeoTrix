@@ -150,7 +150,7 @@ pub use self_iterating::{ReasoningBrain, SelfIteratingBrain, EvaluationRecord, S
 pub use self_iterating::brain_impl::{RLAlgorithm, WeightUpdateRecord};
 pub use stats::{BrainStats, BrainReport, IterationResult};
 pub use reasoning_engine::ReasoningEngine;
-pub use reasoning_types::{ReasoningMethod, PerspectiveLens, ReasoningType, ReasoningTrace};
+pub use reasoning_types::{ReasoningTaxonomy, PerspectiveLens, ReasoningType, ReasoningRecord};
 
 // --- Memory & Knowledge ---
 pub use memory::{ReasoningBank, ReasoningMemory, ReasoningBankStats, MemoryDetailedStats, MemoryIterationResult};
