@@ -48,9 +48,10 @@ cargo build -p neotrix                  # 完整构建
 - **唯一图纸入口**：`docs/architecture/NEOTRIX-MASTER-BLUEPRINT.md`（D-00~D-15，按图施工）
 - 架构现状：`docs/architecture/ARCHITECTURE.md`（⚠️ §1-§12 的 C4/分层设计已被 §13 neobot 融合推翻，读 §13 起的实测部分）
 - 模块拓扑实测：`docs/architecture/DIR-AUDIT-2026-09-27.md`（16 包依赖图 + 8 类重复类型）
-- 外部吸收与进化路线：`docs/architecture/ABSORPTION-EXTERNAL-2026-09-27.md`、`EVOLUTION-ROADMAP-CODE-NODES-2026-09-27.md`
+- **目录架构解法**：`docs/architecture/DIR-REMEDY-2026-09-28.md` —— `neotrix-core/src/neotrix/`（129 文件/43,834 行）是**不参与 L0–L6 的第二棵树且**完全逃过 `check-layer-deps.sh`；解法是**层归属显式化**（`.neotrix/layer-map.json`）而非搬目录。**其 §2.5 记录：`nt_jev` + `nt_crystal_core` 是活路径（L1 有 6 个消费者），勿当死代码删** —— 「导出 ≠ 调用」已错过 3 次
+- 外部吸收与进化路线：`docs/architecture/ABSORPTION-EXTERNAL-2026-09-27.md`、**`EVOLUTION-ROADMAP-CODE-NODES-2026-09-28.md`（正典）**；09-27 版已归档至 `_superseded/`
 - 文档规范：`DOCUMENTATION-MAP.md`（目录导航以 `docs/architecture/README.md` 为准）
-- 模块台账（治理规则 R-P161-257 要求新增 L1-L6 模块时更新）：`ARCHITECTURE-MAP-ROADMAP-V2.md` —— **其 §1-§7 数字自述永久陈旧，只取 §11 起的可再生实测值**
+- 模块台账：`ARCHITECTURE-MAP-ROADMAP-V2.md` —— **其 §1-§7 数字自述永久陈旧，只取 §11 起的可再生实测值**。台账更新规则是 **R-P199**（`docs/standards/archive/dev-rules-legacy-R-P161-257.md:259`，**非规范副本**；"R-P161-257" 只是该归档文件的编号区间，不是规则号），口径是 **`neotrix-core` 的 L1–L6**；`crates/neotrix-neobot` 是独立 crate、不占 L 层 ⇒ 本轮**不进**此台账，正典记录见 `docs/architecture/ABSORPTION-DSH-SIDEBAR-IM.md`
 - 已废止：`FUSION-ARCHITECTURE.md`（其"下一步"含已被证伪的"解决预存编译错误"）、`ARCHITECTURE-EVOLUTION-ROADMAP.md`（零引用）
 - 待办：`TODO.md`（顶部为人工摘要区）；事故与分诊：`sessions/handoff-disease-list-20260927.md`（模板 `sessions/HANDOFF-TEMPLATE.md`，两者均已入库）
 
@@ -61,6 +62,8 @@ cargo build -p neotrix                  # 完整构建
   — 门记录（**每次改代码后必须刷新，禁止沿用旧值**）：
   - 2026-09-27 **22:52** 实测 3 条（1 真死锁 `kb_search.rs:549` / 2 误报）
   - 2026-09-27 **23:4x** 复测 **0 条**（真死锁已修 + 扫描器已补 `drop()`/临时锁识别）
+  - 2026-09-28 **14:45** 复测 **0 条**（`neotrix-core/src` 2554 `.rs` + `crates/neotrix-neobot/src` 48 `.rs`，两次退出码均 0；**本轮仅改文档未改码，故沿用同值**）
+  - 2026-09-28 **14:49** 复测 **0 条**（`neotrix-core/src` 与 `crates/neotrix-neobot/src` 各一次，退出码均 0）。**本轮确实改了 Rust 码**（`nt_crystal_core` 5 改 1 增：内容去重两阶段化、链落盘、前提选择器接入、D8/D9/coverage 修复），故上一条的"沿用同值"理由**已不成立**，按 R-SCAN-3 重测
   - 历史教训：22:52 之前本文长期写着"当前 0 命中"，而实际是 12 条 —— **陈旧门记录会让下一个 agent 去"修"正确代码，比没有门更危险**（见 R-SCAN-3）
 - sidecar 按需：`sh scripts/ops/nt_sidecar.sh {start|stop|status}` — 用完即停
 - 硬规则细则见 `RUST-STANDARDS.md` §17（锁/构建/卡死判别/Git/修 bug 判据/字节安全）
