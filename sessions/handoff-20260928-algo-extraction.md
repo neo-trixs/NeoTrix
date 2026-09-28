@@ -145,12 +145,11 @@ multi-agent / reasoning）源码内零引用，纯死依赖，已剔除。
 | `layer-map.json` 的 `_rule` 写「CapabilityRegistry x4」 | ✅ **已更正为实测值**（见该文件；删完死引擎后 `CapabilityRegistry` 3 处 / `LoadBalancer` 2 处 / `VersionManager` 1 处） |
 | ~~剩余重名副本~~ | ✅ **已消歧**（`2afcbcc2`）：`CapabilityRegistry` 3 套 → L0 版保留原名（活，16 处 trait 实现），另两套改名 `CapabilityCatalog`（L5，仅自审）与 `CapabilityTreeRegistry`（crate，318 节点 CI 门）。`LoadBalancer` 2 处 → `MoELoadBalancer`（GWT，**已删** `f52238d2`）+ `AgentLoadBalancer`（multi-agent）|
 | `nt_core/capability/registry.rs` | 该文件内 `CapabilityRegistry` 已改名 `CapabilityCatalog`（`registry.rs:473`），**不可删整文件** —— 同文件另 14 个类型中 11 个被 6 个兄弟文件生产引用。详见 `docs/architecture/OWNERSHIP.md` 的「B-2 撤销记录」 |
-| `SearchResult` | ⚠️ **实测 9 处**（文档长期写 4 处，严重低估）。9 处路径已记入 `.neotrix/layer-map.json` 的 `_rule`，待消歧 |
-| **`SearchResult` 9 处中的真重复对** | ⚠️ **不可去重，方向与直觉相反**。`l5_cognition/nt_core_hybrid_search.rs`(401行) 与 `crates/neotrix-gateway/src/hybrid_search.rs`(398行) 是近完整副本（公开 API 全同、`SearchResult` 结构体逐字节相同、diff 仅 55 行），**但主代码那份含 gateway 缺失的两处 bug 修复**：① 抽出 `tokenize()` 按非字母数字切分，修复 `split_whitespace` 导致 `func` 匹配不到 `func_0()` 的精确词漂移（gateway 版仍在 3 处用 `split_whitespace`）；② BM25 `avgdl` 更新与 `bm25_search` 的 `doc_len` 口径对齐。**若去重只能删 gateway 那份**（反向移植 9 行 `tokenize` + avgdl 修复），**绝不能删主代码那份** |
-| 两者均零消费者 | `nt_core_hybrid_search` 仅被 `l5_cognition/mod.rs:78` 声明、gateway 版仅被 `lib.rs:12` 声明，**都没有任何调用点**。故本轮只记录不处置 —— 它们是待接线的检索能力，不是死代码 |
+| `SearchResult` | ✅ **已定性，无需消歧**（`a8554a47` 后 7 处）。历史文档写 4 处低估；9 处中有 2 处是零消费者 hybrid 副本，删除后余 7 处**字段集两两不交**（doc_id/chunk_text、title/url、title/score/snippet、skill/score、id+similarity+metadata、id+score、id+title），非重复 |
+| ~~hybrid 副本去重~~ | ✅ **已删**（`a8554a47`，−799 行）：`l5_cognition/nt_core_hybrid_search.rs`(401) 与 `crates/neotrix-gateway/src/hybrid_search.rs`(398) 零消费者，且被 `nt_memory_kb/nt_memory_search/`(2,423 行，全活) 完全覆盖。顺带 `HybridRetriever` 3→1、`NodeMeta` 2→0、`Bm25Document` 4→2 |
 | 治理记录自身过期 | `_rule` 在两小时内过期两次（102→101、CapabilityRegistry 4→3→1）。**改完同名类型必须同步重写治理记录**，否则即制造下一个 R-SCAN-3 陷阱 |
-| `target/` | 78G 构建产物（他窗在跑测试，持续增长），未清 |
-| `AGENTS.md` 门记录 | 已在工作树但**未入库**：该文件 140 行 > 守卫 130，而 HEAD 仅 97 行，超限源于他窗未提交的 41 行；正文已写入本文 |
+| `target/` | 81G 构建产物（他窗持续跑测试，体积仍在涨），未清 —— 需 cargo 全空闲才能 `cargo clean` |
+| `AGENTS.md` 门记录 | ✅ **已入库**（`3a0bf1c6`）：熔炼至 102 行，并更正两处过期数字（分层门 102→101、命名门补明 clean-HEAD 基线 1,646 vs 脏树 1,630） |
 
 ## 10. 门状态（本会话实测）
 
