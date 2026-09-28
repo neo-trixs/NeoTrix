@@ -1,3 +1,14 @@
+# scripts/layer-deps-baseline.txt
+# ⛔ 本文件【不可】从隔离车道提交更新 —— 棘轮只允许在主树测量。
+#
+# 2026-09-28 事故记录（我自己的方法论错误，R-SCAN-3 实例）：
+#   本基线最初在【主树脏状态】下测量（当时主树含他窗 561 个未提交改动）得 94。
+#   在【干净 HEAD 的隔离车道】复测得 102。差 8 处，真因是主树那批未提交改动
+#   恰好【修好了】8 处 l1_action -> l2_perception 违规。
+#   ⇒ 同样的代码、不同的树状态，基线差 8。脏树不是合法测量台。
+#
+# 正确做法：基线只在主树、且主树相对其 HEAD 无未提交 .rs 改动时测量。
+# 合并本车道时：先合入代码，再在【主树】跑 --update-baseline，不要用车道里的值。
 l2_perception	neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/mod.rs
 l2_perception	neotrix-core/src/l1_action/nt_act/nt_act_voice/mod.rs
 l2_perception	neotrix-core/src/l1_action/nt_infra_unified_search.rs
