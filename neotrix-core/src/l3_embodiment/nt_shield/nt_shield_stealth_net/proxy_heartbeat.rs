@@ -352,8 +352,22 @@ mod tests {
         let r2 = engine.tick().await;
         assert!(r1.success && r2.success);
 
-        // Fingerprints should differ after rotation
-        assert_ne!(r1.fingerprint_id, r2.fingerprint_id);
+        // 2026-09-28 修正一个**按构造就会 flaky**的断言:
+        // atomic_rotate -> select_profile 是 `rng.gen_range` **随机**取一个 profile
+        // (self_iterating.rs:516), 池子 4 个 ⇒ 连续两次取到**同一个**的概率 = 1/4
+        // = 25%。原 `assert_ne!(r1.fingerprint_id, r2.fingerprint_id)` 于是有
+        // 四分之一概率必然失败 —— 这不是偶发环境问题, 是把概率性属性当确定性断言。
+        // 测试的真实意图是「轮换确实会改变指纹」, 那就该在多次轮换上验证:
+        // 连续 K 次全同的概率 = (1/4)^(K-1); K=8 时约 6e-5, 可忽略。
+        // 未改生产代码的随机语义 —— 那属于「轮换是否应排除当前 profile」的产品决策。
+        let mut ids = vec![r1.fingerprint_id, r2.fingerprint_id];
+        for _ in 0..6 {
+            ids.push(engine.tick().await.fingerprint_id);
+        }
+        assert!(
+            ids.iter().any(|id| *id != ids[0]),
+            "连续 8 次轮换后指纹始终未变 (ids={ids:?}) —— 轮换池可能只剩 1 个 profile"
+        );
     }
 
     #[test]

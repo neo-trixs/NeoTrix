@@ -10,8 +10,17 @@ use serde::{Deserialize, Serialize};
 
 /// 任务分类器
 pub struct TaskCategorizer {
-    /// 分类规则
-    pub categories: HashMap<String, Vec<String>>,
+    /// 分类规则。**保序**（Vec 而非 HashMap）。
+    ///
+    /// 2026-09-28: 原为 `HashMap<String, Vec<String>>`, 而 Rust 的 HashMap
+    /// **每个进程迭代顺序随机**。categorize 用 `score > best_score` 严格大于,
+    /// 于是在**得分并列**时「先被迭代到的类别」获胜 —— 而并列在真实输入里很常见:
+    /// 实测 "请帮我分析这段代码" 同时命中 reasoning 的「分析」与 coding 的
+    /// 「代码」, 两者都 1/6 完全并列, 于是分类结果**每次运行都可能不同**
+    /// (测试表现为 flaky, 约一半概率失败)。
+    /// 改为 Vec 保序: 迭代确定, 并列时由**声明顺序**决出 —— 先声明的规则获胜,
+    /// 这既确定, 也符合直觉(主规则优先)。全仓无外部消费者使用该字段。
+    pub categories: Vec<(String, Vec<String>)>,
     /// 分类历史
     pub history: Vec<_ClassificationRecord>,
 }
@@ -35,14 +44,18 @@ impl TaskCategorizer {
     /// 创建新的任务分类器
     pub fn new() -> Self {
         Self {
-            categories: HashMap::new(),
+            categories: Vec::new(),
             history: Vec::new(),
         }
     }
 
     /// 添加分类规则
     pub(crate) fn _add_category(&mut self, name: String, keywords: Vec<String>) {
-        self.categories.insert(name, keywords);
+        // 同名覆盖时保持原位置, 不改变声明顺序
+        match self.categories.iter_mut().find(|(n, _)| *n == name) {
+            Some(slot) => slot.1 = keywords,
+            None => self.categories.push((name, keywords)),
+        }
     }
 
     /// 分类输入
@@ -51,6 +64,7 @@ impl TaskCategorizer {
         let mut best_category = "general".to_string();
         let mut best_score = 0.0;
 
+        // 保序迭代 ⇒ 并列时先声明者胜, 结果确定 (见字段注释)
         for (category, keywords) in &self.categories {
             let matches = keywords.iter()
                 .filter(|k| input_lower.contains(k.as_str()))
