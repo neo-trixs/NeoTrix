@@ -57,6 +57,8 @@ cargo build -p neotrix                  # 完整构建
 - **新窗口统一修复的**开头提示词**：`sessions/handoff-20260928-new-window-opening.md`（2026-09-28，接手前先读它 —— 含必读文档顺序、三条硬约束、以及「主工作树不是可信地面真相」这一最容易浪费数小时的前提）
 - **剩余任务汇总交接**：`sessions/handoff-20260928-consolidated.md`（2026-09-28，**动手前必读其 §2 勘误表** —— 4.1/2.1/2.2/5.2/4.4 的台账前提均已被实测证伪，照原文做会重造已存在的东西或"修"已正确工作的机制）
 - **本轮方法论教训**：`docs/architecture/LESSONS-20260928-fresh-checkout.md` —— 「本地全绿但仓库不可交付」的完整解剖。**元教训：任何「X 是好的/坏的」断言都要问「我是在哪个环境里验证的」；答「我的工作树」就等于还没有证据**
+- **同日第二篇经验**：`docs/architecture/LESSONS-2026-09-28-ledger-rot-and-consumer-audit.md`（L1–L12）。最该先读的三条：**L7-b 共享 index 被拒 5 次的真解 = 开 `.worktrees/`**、**L9 P0 门红要先判红因归属（HEAD 侧完好的话红因在他窗未提交 WIP，别去修）**、**L10 复现门脚本必须用门自己的调用形态**（单文件 rg 省略文件名 ⇒ 过滤器静默失效）
+- **待办总清单（勿重做已关闭项）**：`docs/architecture/DECISIONS-2026-09-28.md` §P0–P3（A 组=证伪不做 / B 组=已定方案 / C 组=需外部输入）。**B-3/B-4/B-5 早已完成**，照单重做即引入 bug
 
 ## 三道闸（2026-09-27 事故后置入，违反即阻塞）
 
@@ -72,11 +74,17 @@ cargo build -p neotrix                  # 完整构建
   - 历史教训：22:52 之前本文长期写着"当前 0 命中"，而实际是 12 条 —— **陈旧门记录会让下一个 agent 去"修"正确代码，比没有门更危险**（见 R-SCAN-3）
 - sidecar 按需：`sh scripts/ops/nt_sidecar.sh {start|stop|status}` — 用完即停
 - 目录/命名门（2026-09-28 新增，均 bash，无需 cargo）：
-  - `bash scripts/check-layer-deps.sh --strict` → **exit 0**，**102 known**
-    （= 92 条 `l*_` 层 + 10 条 `neotrix/` 第二棵树）。**测量台：`git worktree add
-    --detach HEAD` 的干净检出**，`bdf1e9f1` 15:2x 实测。⛔ 此前记录的「94」是
-    **主工作树（脏）**测量 —— 那 8 条 `l*_` 之所以消失只因主树有未提交的 `.rs`
-    修复；照抄 94 会让 CI 以 `FAIL: 8 new` 红。可交付态的真值是 **102**。
+  - `bash scripts/check-layer-deps.sh --strict` → **exit 0**，**101 known**
+    （= 92 条 `l*_` 层 + 10 条 `neotrix/` 第二棵树 − 1 条已修）。
+    **测量台：`git worktree add --detach HEAD` 的干净检出**。
+    - **2026-09-28 20:0x 实测 101**（`.worktrees/ratchet` 干净检出 + `71e1c412`；
+      首次**真降**：`evolution_daemon.rs` 的 L5→L6 改走 `l1_facade`）。
+      棘轮**只向下**，`PASS 0 new`、RC=0。
+    - ⛔ 此前记录的「94」是**主工作树（脏）**测量；「102」是 `bdf1e9f1` 的干净检出值，
+      现已被 101 取代。**照抄旧值会让 CI 以 `FAIL: N new` 红**（见 L8）。
+    - ⚠️ 修 101 条里的绝大多数**需要编译器**（改 Rust import），不是纯 bash 就能收的：
+      84 个单违规叶子中**只有 1 个**是「facade 已 `pub use` 出精确路径」的纯 import 重写，
+      其余要先给 facade 加导出且易同名冲突 ⇒ **无编译器时勿盲做**（见 L12）。
   - `bash scripts/check-naming.sh` → advisory，打印 **1,646** 个无 `nt_` 前缀文件
     （**规约 vs 现实差 1,646 ⇒ 规约无约束力**）。干净检出实测；此前的 1,644 同为脏树值
   - 层归属真源：`.neotrix/layer-map.json`（**`bdf1e9f1` 已入库**）；裁决表：`docs/architecture/OWNERSHIP.md`（随车道并入本提交入库）

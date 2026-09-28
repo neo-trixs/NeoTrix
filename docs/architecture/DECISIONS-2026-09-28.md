@@ -82,27 +82,31 @@ B-11 与 C-2 都卡在这里。
 
 # 后续待解决问题（按可执行顺序梳理）
 
-> 状态快照 2026-09-28 18:3x：`cargo check --lib -p neotrix` **exit=0**（已转绿），
-> 但共享 index 仍有 **177 个他窗暂存项**、最近 3 分钟仍有文件在被改
-> ⇒ **提交通道不安全**（`git commit` 会连他那 177 个一起卷走）。
+> 状态快照 **2026-09-28 20:0x**（较 18:3x 那版有实质变化）：
+> **P0「提交通道」已解除** —— 解法是 `.worktrees/ratchet` 独立 worktree
+> （L7-b）。B-1 + 分层棘轮首批已落 `71e1c412`（P0 门 ✅ 通过）。
+> 主工作树仍被另一 agent 的 WIP 占用（`nt_core_capability_tree` 断链等），
+> **我不在主树继续施工**。
 
-## P0 · 唯一阻塞：提交通道（不是代码问题）
+## P0 · ✅ 已解除：提交通道（L7-b 的真解）
 
-| 项 | 现状 | 我的处置 |
-|---|---|---|
-| 提交我这 5 个文件（TODO / OPEN-TASKS / DECISIONS / 新 LESSONS / handoff） | lib 已绿，但 index 被占 | **等 index 清空再提**。不 `--no-verify`、不在 177 个暂存上提交 |
+| 项 | 结论 |
+|---|---|
+| 解法 | `git worktree add --detach .worktrees/ratchet HEAD` + `git checkout -b` ⇒ **独立 index**，不再卷走他窗暂存项，且他窗搞红主树不影响本车道 P0 门 |
+| 效果 | 主树 P0 红 ×3 拒；同改动在 worktree 上 `cargo check --tests` **exit=0**、门 ✅、提交 `71e1c412` 一次成功 |
+| 当前车道 | 分支 `fix/bitemporal-and-layer-ratchet`，基于 `d5413335` |
+| 合入时机 | 待他窗重构收口后合（合入后**必须复核分层门数字**，见 L8「Auto-merging 静默降级」） |
+| 注意 | 独立 `CARGO_TARGET_DIR` 建议导出到 `/tmp/...`，避免与对方抢 cargo 锁 |
 
-> 判据：提交前 `git diff --cached --name-only \| wc -l` 必须是 **0**（或只含我的文件）。
+## P1 · 本车道可继续（已定方案，无需再决策）
 
-## P1 · 通道一开就做（已定方案，无需再决策）
-
-| 序 | 任务 | 方案 | 验收 |
-|---|---|---|---|
-| 1 | `nodes` 真双时间（B-1） | 照 `nt_temporal_facts.rs`：**每版本独立 `id` + `supersedes`/`superseded_by` 指针链**，**不改主键、不动 5 处外键** | 两条 `#[ignore]` 测试转绿并**删掉 `#[ignore]`**；`nodes_as_of`/`node_history` 接到真实调用方 |
-| 2 | Noise IK 对齐 spec（B-2） | 改名到 `Noise_IKpsk2_25519_ChaChaPoly_SHA256`(39B)，用**官方测试向量**交叉验证 `es/ee/s` 派生次序 | `full_handshake` 绿且**删掉 `#[ignore]`**；加**握手对称性**测试（两侧 chaining key 必须相等） |
-| 3 | CAD 假证据面（B-3） | 删 `cad_wiring_map()`；判据从「路径含 `:`」改成「**文件真实存在**」 | 8 个指向不存在文件的条目不再被当"接线证据" |
-| 4 | `/stop` 过期测试前提（B-5） | 修 `nt_agent.rs:2283` 那条**假设"取消尚未接线"**的反向测试（现已接线） | 4 条反撒谎契约仍绿 |
-| 5 | 102 条分层违规（B-8） | **先做 84 个「单文件单规则」叶子**；能改走 `facade` 的优先（门已排除 `*facade*`/`*l1_facade*`/`traits.rs`） | 基线**只向下**：`check-layer-deps.sh --strict` 报数递减 |
+| 序 | 任务 | 状态 | 方案 | 验收 |
+|---|---|---|---|---|
+| 1 | `nodes` 真双时间（B-1） | ✅ **已完成** `71e1c412` | 每版本独立 `id` + `supersedes` 链，**零 schema 变更**（L11：两列早已存在）；69 处生产写入 / 5 处外键未动 | 2 条 `#[ignore]` 已摘除；`12154 passed / 0 failed @4 线程` |
+| 2 | 分层违规棘轮 | 🔶 **1/101** | 优先改 facade 已 `pub use` 出**精确路径**的（见 L12：84 叶子里仅 1 个属此类），其余需先给 facade 加导出 | 基线**只向下**：`102 → 101`，`PASS 0 new`、RC=0 |
+| 3 | Noise IK 对齐 spec（B-2） | ⛔ **阻塞于外部输入** | 改名到 `Noise_IKpsk2_25519_ChaChaPoly_SHA256`(39B)，用**官方测试向量**交叉验证 `es/ee/s` 派生次序 | `full_handshake` 绿并摘 `#[ignore]`；加**握手对称性**测试 |
+| 4 | CAD 假证据面（B-3） | ✅ **早已完成**（勿重做） | 判据从「路径含 `:`」改成「**文件真实存在**」 | 已改 `CARGO_MANIFEST_DIR` + `is_file()` |
+| 5 | `/stop` 过期测试前提（B-5） | ✅ **早已完成**（勿重做） | `nt_channel_cmd.rs` 已禁「按发送键」类假建议 | 4 条反撒谎契约绿 |
 
 ## P2 · 阶段工程（单独立项，不混做）
 
@@ -110,24 +114,30 @@ B-11 与 C-2 都卡在这里。
 |---|---|
 | 185 个未核验删除 | 需逐条核验才能提交；全在 `stash@{0}` |
 | 32 个未跟踪 `scripts/ops` | 含活路径 `nt_graph_audit.py`；全在 stash |
-| 5 个陈旧 worktree | 实测全部 dirty（2/1/12/6/8 文件）⇒ 删=毁在制品；需先导出内容再删 |
+| 5 个陈旧 worktree | 实测全部 dirty ⇒ 删=毁在制品；需先导出内容再删 |
 | `TextEmbedder` 换真实现 | 5 个生产调用方，改 `embed` 会**重排全部检索结果**，须先评估影响面 |
 | `publish gateway` 真实上传 | 加 `dry_run` 是 B-4（低成本）；投 OAuth2+reqwest 是独立工程 |
 | `cascade` `length_score` 改分档 | 改的是记忆晋升评分，需领域评估，不宜顺手改 |
+| `edges` 绑定到具体版本 | B-1 的**明示取舍**：`edges` 仍按 `nodes.id` 绑定，不指向版本。要「边绑定到某版」是**独立 schema 议题** |
 
-## P3 · 需你拍板/外部输入
+## P3 · 需你拍板 / 外部输入
 
 | 项 | 状态 |
 |---|---|
-| 另一 agent 的并发重构 | 我全程避让，未在其半成品上提交 |
-| CI `--test-threads` 2→4 | **暂不改**。4 连绿是强证据**非证明**（修前 3 跑 2 崩）；再观察数轮 |
+| **Noise IK 官方测试向量** | ⛔ B-2 唯一卡点。**不接受手写"看起来能跑"的 crypto**；需从 spec 或参考实现取向量 |
+| 另一 agent 的并发重构 | 主树被占用（`nt_core_capability_tree` 断链 4+ 处、`d5413335` 删 `apps/neobot-desktop`）。**非我窗任务，我不去修**（L9） |
+| 分支合入时机 | `fix/bitemporal-and-layer-ratchet` 何时合入主干 |
+| CI `--test-threads` 2→4 | **暂不改**。4 连绿是强证据**非证明**；再观察数轮 |
 | `stash@{0}` 是否整体恢复 | 759 tracked + 240 untracked；B-11/C-2/阶段工程都卡在这里 |
 | 185 个删除是否恢复 | 同上 |
 
 ## 已彻底关闭（勿再翻）
 
 - ⛔ 12 项前提证伪 / 已被外部解决（见 A 组）
-- ✅ 9 个 commit 已落盘：分层门 102 基线 · 记录校正 · S-1 并车道 · 晶体入库+9 测试归零 ·
-  B-1/B-4 · streaming 去外网依赖 · 台账 §3 证伪 · 门清单/2 examples/HOME 竞态/测试门转严格 ·
-  4 条 flaky 归零（`12233 passed / 0 failed @4 线程` 4 连跑）
+- ✅ 本轮 commit：`bdf1e9f1`(门+102 基线) · `f23177de`(记录校正) · `a9ad48f5`(S-1 并车道) ·
+  `8eac716e`+`ecd10d3e`(晶体+9 测试归零) · `024c2ae0`(B-1 死 `CapabilityRegistry`/B-4) ·
+  `7676f6f8`(streaming 去外网) · `d5edd461`(门清单/2 examples/HOME 竞态/测试门转严格) ·
+  `89769661`(4 条 flaky 归零) · `26749ac0`(经验+裁决+Yootta 移除) ·
+  **`71e1c412`(B-1 真双时间 + 分层棘轮 102→101)**
 - ⛔ Yootta gated 401（用户指令移除，理由记录保留）
+- ⛔ B-2 之外，B-3 / B-4 / B-5 均**早已完成**，勿当待办重做
