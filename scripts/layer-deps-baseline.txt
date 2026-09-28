@@ -64,15 +64,6 @@ l5_cognition	neotrix-core/src/l2_perception/nt_core_knowledge/vectors_group_b/sp
 l5_cognition	neotrix-core/src/l2_perception/nt_world/crawl/unified.rs
 l5_cognition	neotrix-core/src/l2_perception/nt_world/sense/world_model.rs
 l5_cognition	neotrix-core/src/l3_embodiment/nt_shield_enforcer.rs
-l5_cognition	neotrix-core/src/l4_emotion/nt_feel/affective_interface.rs
-l5_cognition	neotrix-core/src/l4_emotion/nt_feel/emotion_engine.rs
-l5_cognition	neotrix-core/src/l4_emotion/nt_memory/nt_memory_historian/nt_evidence_store.rs
-l5_cognition	neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/mod.rs
-l5_cognition	neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_coeffect.rs
-l5_cognition	neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_distill.rs
-l5_cognition	neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_gwtq.rs
-l5_cognition	neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_search/nt_pure_fns.rs
-l5_cognition	neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/tests.rs
 l5_cognition	neotrix-core/src/neotrix/ffi/consciousness_tree.rs
 l5_cognition	neotrix-core/src/neotrix/ffi/seal_pipeline.rs
 l5_cognition	neotrix-core/src/neotrix/nt_file_ability/tests.rs

@@ -317,8 +317,8 @@ impl EmotionEngine {
     /// - Multi-language support beyond Chinese/English keywords
     /// - Context-aware detection (same word → different emotion in different contexts)
     /// - Integration with PlutchikEmotion enum for richer emotion taxonomy
-    pub fn detect_from_text(&mut self, text: &str) -> crate::l5_cognition::l1_facade::emotion_state::EmotionLabel {
-        use crate::l5_cognition::l1_facade::emotion_state::EmotionLabel;
+    pub fn detect_from_text(&mut self, text: &str) -> crate::l4_emotion::nt_feel_facade::EmotionLabel {
+        use crate::l4_emotion::nt_feel_facade::EmotionLabel;
         let lower = text.to_lowercase();
         if lower.contains("success") || lower.contains("完成") || lower.contains("great") {
             EmotionLabel::Joy

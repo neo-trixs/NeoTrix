@@ -19,7 +19,7 @@ use std::collections::{HashMap, HashSet};
 use rusqlite::Connection;
 
 use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_unify::{kv_delete, kv_get, kv_set};
-use crate::l5_cognition::nt_core_context::revertible::{ClosureEffect, RevertibleContext};
+use crate::l4_emotion::nt_feel_facade::{ClosureEffect, RevertibleContext};
 
 /// coeffect 依赖表的持久化 namespace。
 pub const COEFFECT_NS: &str = "coeffect_deps";
