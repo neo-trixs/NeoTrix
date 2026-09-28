@@ -101,20 +101,20 @@ impl SelfTest for ExcelSelfTest {
 }
 
 struct CoreExcelBridge;
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CoreExcelBridge {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for CoreExcelBridge {
     fn name(&self) -> &str { "nt_file_ability::excel" }
     fn self_test(&self) -> Result<(), Vec<String>> { ExcelSelfTest.self_test() }
 }
 
 /// 注册 Excel SelfTest 到核心 registry
-pub fn register_excel_self_tests(registry: &mut crate::l6_meta::healing::nt_core_self_test::SelfTestRegistry) {
+pub fn register_excel_self_tests(registry: &mut crate::l0_substrate::nt_core_self_test::SelfTestRegistry) {
     registry.register(Box::new(CoreExcelBridge));
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l6_meta::healing::nt_core_self_test::SelfTestRegistry;
+    use crate::l0_substrate::nt_core_self_test::SelfTestRegistry;
 
     #[test]
     fn test_excel_selftest() {

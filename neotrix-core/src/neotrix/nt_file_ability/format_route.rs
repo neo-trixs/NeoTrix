@@ -98,13 +98,13 @@ impl SelfTest for FormatRouteSelfTest {
 }
 
 struct CoreFormatRouteBridge;
-impl crate::l6_meta::healing::nt_core_self_test::SelfTest for CoreFormatRouteBridge {
+impl crate::l0_substrate::nt_core_self_test::SelfTest for CoreFormatRouteBridge {
     fn name(&self) -> &str { "nt_world_file_format_route" }
     fn self_test(&self) -> Result<(), Vec<String>> { FormatRouteSelfTest.self_test() }
 }
 
 /// 注册文档格式路由 SelfTest 到核心全局注册表 (T2)。
-pub fn register_format_route_self_tests(registry: &mut crate::l6_meta::healing::nt_core_self_test::SelfTestRegistry) {
+pub fn register_format_route_self_tests(registry: &mut crate::l0_substrate::nt_core_self_test::SelfTestRegistry) {
     registry.register(Box::new(CoreFormatRouteBridge));
 }
 

@@ -287,7 +287,7 @@ fn compute_phi_from_branches(branches: &HashMap<String, BranchState>) -> f32 {
         };
         state.push(v);
     }
-    crate::l5_cognition::nt_core::nt_iit_phi::IITPhiCalculator::new()
+    crate::l0_substrate::nt_core_consciousness_types::IITPhiCalculator::new()
         .compute_phi(&state)
         .phi as f32
 }
