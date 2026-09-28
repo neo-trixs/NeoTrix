@@ -274,3 +274,63 @@ Makefile 21 处），无单一权威；`skills/` 有 `index.json` 但它答的�
 - 主仓未提交 10 处：全为他窗 WIP
 - 门：layer-deps 101known/0new · truth-surface 0/0/0 · find --audit 30/30 ·
   manifest --audit 5/5 file:line · lock-audit 0 · 全绿
+
+## 10. 两个已知缺陷的根本修复（2026-09-28 夜）
+
+### 10.1 缺陷一：`check-api-surface.sh` 死引用致「假 0」→ `f6c4929e`
+`rg` 对不存在路径 exit 2 并写 stderr，但 `2>/dev/null` 吞掉它，`awk` 仍输出
+`0` ⇒ 脚本打印 **`Tauri commands: 0`** —— 一个**看起来正常的假数字**。
+读它的人会得出「本仓没有 Tauri 命令面」，而真因是「我压根没扫那个面」。
+
+核心区分写进注释：
+    **路径不存在 ≠ 该面为空**（前者是脚本缺陷，后者才是被扫描对象的事实）
+
+修法三层：① 删死引用 ② 面缺失时打 `?` + exit 3 + stderr 说明 ③ 讲清
+「tauri=0 是事实（桌面端已随 5c02e738 归档），非扫描失败」。
+
+**实测**：把 `neotrix-core/src` 临时移走 ⇒ 输出 `?` + `SURFACE-MISSING` + exit 3；
+移回 ⇒ exit 0。中间踩了两个坑并留档：
+- 诊断混进 `$(...)` 返回值 ⇒ stderr 泄漏 + `[: : integer expression expected`
+- `$(...)` 失败给空串，对空串 `[ -eq 2 ]` 报错 ⇒ 改用**退出码**判定
+
+### 10.2 通用预防：`nt_scan_surface.py`（`f6c4929e`）
+扫所有扫描器的扫描面是否存在。同型 4 处（`check-truth-surface.sh:43` 的
+`apps`/`src-tauri/src`、`nt_mapgen.py:48-50` 三条 `src-tauri/*`），
+前人已用不同方式修过（删引用+注释 / `[ -d ] || continue`）但**都不报「少扫了」**。
+
+**工具自身调了两轮才可信**（守门工具噪声大 = 没守）：
+① 首版 20 个 MISSING 里大半是假警报（注释里的 `foo/bar.rs`、文档里的
+   `nested/test`）⇒ 加注释/heredoc 剥离 + 已知根过滤
+② 剩 `tests/mod.rs` 误报（是 echo 里的提示文字）⇒ 加 PROSE_PATHS 豁免
+③ 现存 11 面 / 缺失 5 面，**5 个全是真死引用**（4 个 KNOWN-GONE + 1 个未知）
+
+### 10.3 缺陷二：`nt_jev_live_eval.py` 断链 import → `22a9c600`
+`from nt_verify_sim import keywords`，该模块已随 `2bbed32c` 删除 ⇒
+**脚本一 import 就 ImportError，完全跑不起来**（`__pycache__` 的 .pyc 掩盖了这点）。
+
+修法遵守该文件自己的「**不重写**」纪律：新增 Rust 导出点
+`neotrix-core/src/bin/nt_keywords.rs` 调 `CrystalConsciousness::keywords`
+（`consciousness.rs:546`），而非在 Python 里重写分词。
+**为何必须走 Rust**：① 那是权威口径（带 `strip_src_tag` + 停用词 + 单字符
+过滤，且被觉醒循环复用），重写=第二份真源 ② crate 内另有 **3 个同名
+`keywords` 且实现各不相同** ⇒「哪个权威」本身就是歧义源。
+
+连带：`keywords` 由 `pub(crate)` 提为 `pub`（`src/bin/*.rs` 是独立 binary
+target，`pub(crate)` 对它不可见，报 E0624）。doc 写明为何公开，且若降级则
+`nt_keywords` 编译失败 —— 那正是想要的强制点。
+
+**实测（干净检出）**：`cargo check --tests` 全绿；`Rust 的所有权很安全` →
+`["Rust","的所有权很安全"]`；`a 的 了 and the Rust` → `["Rust"]`（停用词全过滤）。
+
+### 10.4 R-SCAN-4：请示后仍须复核现场（`a972e03f`）
+门红在他窗未提交文件，我取证确认归属后请示，用户选定「顺手删掉那个
+unused import」。**动手前复核那一行，内容已变、mtime 是 42 秒前** ——
+那个窗口还活着且已自己修好。若照决策下手，就往正在被编辑的文件里写入。
+
+**规约**：请示与执行之间存在时间窗，那个窗口里世界可能已变。
+
+### 10.5 当前门红（他窗 WIP，非本会话引入）
+`check-truth-surface --strict` 报 `UNCOMMITTED_DEP:2`：
+`neotrix-core/src/nt_mcp_stdio_session.rs` 与 `nt_qwen_mm_manifests.rs`
+—— 两个都是他窗 `??` 未提交的新文件，而 `agent.rs`/`lib.rs` 正在引用它们。
+该门的设计正是捕捉这个（"已提交代码引用了未入库文件"），属**如实报告**。
