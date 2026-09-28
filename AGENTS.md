@@ -57,6 +57,7 @@ cargo build -p neotrix                  # 完整构建
 - 架构现状：`docs/architecture/ARCHITECTURE.md`（⚠️ §1-§12 的 C4/分层设计已被 §13 neobot 融合推翻，读 §13 起的实测部分）
 - 模块拓扑实测：`docs/architecture/DIR-AUDIT-2026-09-27.md`（16 包依赖图 + 8 类重复类型）
 - **目录架构解法**：`docs/architecture/DIR-REMEDY-2026-09-28.md` —— `neotrix-core/src/neotrix/`（129 文件/43,834 行）是**不参与 L0–L6 的第二棵树且**完全逃过 `check-layer-deps.sh`；解法是**层归属显式化**（`.neotrix/layer-map.json`）而非搬目录。**其 §2.5 记录：`nt_jev` + `nt_crystal_core` 是活路径（L1 有 6 个消费者），勿当死代码删** —— 「导出 ≠ 调用」已错过 3 次
+- 外部吸收（agent 架构向，2026-09-28）：**`docs/architecture/ABSORPTION-AGENT-ARCH-2026-09-28.md`** —— 8 项目（CLI-Anything / deepseek-harness / awesome-autoresearch / aliyun-handbook / Understand-Anything / Horizon / ralph / logo-skill + 官方 plugin 规范）的可吸收模式，按「已落地 / 明确不吸收 / 待落地」分档并标落点。**已落地 3 项**（skill 路径解析 13/58→58/58、调用策略正交两维、frontmatter 门）。核心结论：病根在**接线**不在语言，**不要把 sh/py 改写成 Rust**
 - 外部吸收与进化路线：`docs/architecture/ABSORPTION-EXTERNAL-2026-09-27.md`、**`EVOLUTION-ROADMAP-CODE-NODES-2026-09-28.md`（正典）**；09-27 版已归档至 `_superseded/`
 - 文档规范：`DOCUMENTATION-MAP.md`（目录导航以 `docs/architecture/README.md` 为准）
 - 模块台账：`ARCHITECTURE-MAP-ROADMAP-V2.md` —— **其 §1-§7 数字自述永久陈旧，只取 §11 起的可再生实测值**。台账更新规则是 **R-P199**（`docs/standards/archive/dev-rules-legacy-R-P161-257.md:259`，**非规范副本**；"R-P161-257" 只是该归档文件的编号区间，不是规则号），口径是 **`neotrix-core` 的 L1–L6**；`crates/neotrix-neobot` 是独立 crate、不占 L 层 ⇒ 本轮**不进**此台账，正典记录见 `docs/architecture/ABSORPTION-DSH-SIDEBAR-IM.md`
