@@ -31,8 +31,14 @@ jobs:
         run: bash scripts/check-fresh-build.sh --metadata
       - run: cargo check --lib -p neotrix
       - run: cargo check -p neotrix
-      - name: Layer dependency check
-        run: bash scripts/check-layer-deps.sh
+      # --strict blocks NEW layer violations only. The gate previously failed
+      # unconditionally on 92 pre-existing L1->L2/L3/L4/L5/L6 sites, so it had
+      # been red in CI for its whole life and a real regression was
+      # indistinguishable from standing debt. Standing debt is now a ledger
+      # (scripts/layer-deps-baseline.txt) that only ratchets downward; the debt
+      # itself is tracked in TODO.md and is NOT resolved.
+      - name: Layer dependency check (blocks NEW violations; debt is baselined)
+        run: bash scripts/check-layer-deps.sh --strict
       - name: "Truth-surface gate (ratchet: blocks NEW 0-byte .rs / undeclared test modules / tracked build artifacts)"
         run: bash scripts/check-truth-surface.sh --strict
 

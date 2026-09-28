@@ -1,5 +1,49 @@
 # NeoTrix TODO 列表
-> 智能同步生成，最后更新：2026-09-27（人工重建）
+> 智能同步生成，最后更新：2026-09-28（人工重建）
+
+> **2026-09-28 DSH 吸收轮 · 收口复核（4 agent 并行产出 + 主 agent 独立核验）**
+> 验证（`CARGO_BUILD_JOBS=2` 串行，内存门 OPEN 时跑）：
+> `neotrix-neobot --lib` **308 绿 / 0 红**；`neobot-desktop` **4+4 注册 + 38 IPC 冒烟 绿**；
+> `cargo check -p neobot-desktop --all-targets` 0 error 0 warning；前端 `typecheck` / `selftest` / `build` 全过；
+> `lock_audit` **0**；clippy **新增/改动行 0**（27 条全在未触碰的 `nt_web.rs` 等旧代码）。
+>
+> 🔴 **本轮修真 bug（agent 报的问题，主 agent 逐条读现场证实后修 —— 不是照单全收）**：
+> 1. **跨聊消息静默丢失**：`dedup_key` 只有 `{channel}:{message_id}`，而平台 message_id
+>    **按 chat 各自编号** → A 群 5 号与 B 群 5 号撞键，**后一条被当重复丢掉**。
+>    改 `dedup_key(channel, chat, message_id)`。回归测试 `dedup_key_is_scoped_by_channel_and_chat`。
+> 2. **入站附件模型永远读不到**：落在 `<data_dir>/attachments`，jail 只放行
+>    `<data_dir>/workspace` —— **兄弟目录**，note 里那条绝对路径必被网关拒 → **收了等于没收**。
+>    改落进 `workspace/attachments`（不扩 jail）+ note 给工作区相对路径 + 按平台原名挑
+>    `read_image`。回归测试 `inbound_attachment_lands_inside_the_jail_and_is_reachable`。
+> 3. **第二个及以后的机器人永远收不到消息**：`run_once` 把 `poll()` 放进 `for bot in &bots`，
+>    而适配器**按渠道**注册、offset 全渠道共享 → 第一个取走全部 update。改「每渠道只 poll 一次
+>    + 按白名单 `route_bot` 路由」；桌面 `neobot_channel_poll_once` 同一处也改了。
+> 4. **`/stop` 回执推荐了一个不取消任何东西的键**：桌面停止键只置 `shell.stopRequested`
+>    让渲染跳过增量，`spawn_blocking` 照跑 —— 而测试还断言「桌面 App」必须在回执里，
+>    **把假建议钉成了契约**。回执改为只说事实 + 给真能生效的路径（退出 App）；
+>    测试改为**禁止**出现「按发送键」等动作短语。README / 吸收文档同步。
+> 5. **2 条 clippy 告警落在本轮新增行上**（`nt_store_convos.rs` 的 10 元组 `type_complexity`）
+>    → 提 `ConvoRow` 具名结构。
+>
+> 🟡 **本轮改了注释（原本在说谎，比没注释更坏）**：`TurnStatus` 自称有
+> `failed/cancelled`（实为 `done/continue/needs_clarification/blocked/waiting`）、
+> `slice_sleep` 自称让 Ctrl-C 200ms 生效（**不检查任何标志**）、`BotRow` 自称
+> 「各机器人独立绑定模型」（serve 不用）、`nt_cmd_channels.rs:306` 自称「各自独立」、
+> `OutboundMessage.edit_of` 看着像已实现（实为半接）。
+>
+> 🔴 **仍然待办（本轮只做到「不说谎」，没做到「能停」）**：
+> - **`/stop` 真能用** = 架构级：调度改并发（线程池/async）+ `nt_agent` 的 stop hook。
+>   设计见 `docs/architecture/DESIGN-CHANNEL-DISPATCH.md`。
+> - **per-bot `token_env` / `model` 未生效**：一个渠道一个共享适配器，跑轮只用全局
+>   `config.engine`。已在多机器人时 `warn_shared_adapter_once` 警告，但要真支持得先有
+>   chat→bot 绑定字段。
+> - **`edit_of` 半接**：`deliver_result`/`sweep_pending` 填了 `Some`，但 `send()` 不实现
+>   `editMessage`，payload 里也没这字段 → **没有任何路径真会编辑原消息**，用户只看到重复两条。
+> - **桌面聊天不解析斜杠指令**（走 `neobot_run_stream`）→ 桌面打 `/stop` 会被当字面文本发给模型。
+> - `scripts/ops/nt_smoke.sh` 本轮**因内存门 BLOCKED 未整体跑通**（它如实拒绝并声明
+>   「不构成任何通过证据」✅）；其 5 个步骤已**逐项手工跑绿**，但**没跑过脚本编排本身**。
+> - 无浏览器设施（Playwright/Puppeteer）→ 前端真实渲染仍未端到端验证；前端 invoke
+>   **键名**与 Rust 形参名的跨进程一致性仍**未验**（冒烟只验了参数绑定层）。
 
 > **2026-09-27 目录架构统一轮（本轮，已 cargo 验证）**
 > `cargo check -p neotrix --lib` **exit=0 / 1m07s**。完成 12 项：
@@ -222,6 +266,36 @@ do not look like a full prefix match"）—— **工具集身份是缓存身份�
 这类缺陷对编译器/clippy/`cargo test` **全是绿的**，只有「声明 ⊆ 注册」这类
 **机械断言**能抓。**故：IPC 层冒烟测试补齐之前，先别加新功能** ——
 缺的那一层正是唯一能对「接错线 / 没接线」发信号的地方。
+
+## 已知债 · 分层依赖违规 92 处（2026-09-28 记账，**未解决**）
+
+`scripts/check-layer-deps.sh` 实测 **92 个 file×pattern 违规点**，横跨 11 类：
+
+```
+L1→L2  L1→L3  L1→L4  L1→L5  L1→L6
+L2→L3  L2→L4  L2→L5
+L3→L4  L3→L5  L3→L6
+L4→L5  L5→L6
+```
+
+即 L0→L6 的单向依赖在**源码层面**基本没被遵守（`deny(warnings)` 管不到跨层引用）。
+
+**为什么记在这里而不是直接修**：92 处是架构级重构（要把 L1 对 L2/L3/L5/L6 的
+引用全部改走 `l0_substrate` 门面或下沉依赖注入），不是一轮能收的活，且会牵动
+正在被别人编辑的 `nt_io_web/api.rs`、`nt_act_orchestrator/`、`main.rs` 等。
+
+**为什么门要改**：原脚本无 baseline，**恒定失败** —— 一个永远红的门等于没有门，
+真正的信号（新增违规）与既有债无法区分。已按 `check-truth-surface.sh` 同一设计
+加棘轮：既有债进 `scripts/layer-deps-baseline.txt`（92 条，按 `pattern+file`
+记账、**不含行号**以免行号抖动刷假警报），`--strict` 只拦**新增**。
+CI 已改跑 `--strict`。
+
+**回归证明**：干净检出上基线态 `--strict` exit=0；注入一条 `L5→L6` 后 exit=1
+并精确报出该 file。**门不是空门。**
+
+⚠️ **生成基线必须在干净检出上做**。我第一次在脏工作树生成，把另一窗口未提交的
+改动编进了账，导致干净检出上 `--strict` 反而失败 —— 门立刻抓到了这个错误。
+
 
 ## ✅ 已收口 · 「已提交代码引用未入库文件」全家族（2026-09-28）
 
