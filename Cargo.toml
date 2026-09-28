@@ -8,10 +8,8 @@ members = [
     "crates/neotrix-gateway",
     "crates/neotrix-multi-agent",
     "crates/nt-core-capability-tree",
-    "crates/nt-lang",
     "crates/neotrix-neobot",
     "crates/neotrix-audit",
-    "crates/neotrix-decision-engine",
     "apps/neobot-desktop",
 ]
 
@@ -46,7 +44,6 @@ neotrix-gateway = { version = "0.23.0", path = "crates/neotrix-gateway" }
 neotrix-multi-agent = { version = "0.23.0", path = "crates/neotrix-multi-agent" }
 neotrix-neobot = { version = "0.23.0", path = "crates/neotrix-neobot" }
 neotrix-audit = { version = "0.23.0", path = "crates/neotrix-audit" }
-neotrix-decision-engine = { version = "0.1.0", path = "crates/neotrix-decision-engine" }
 nt_core_capability_tree = { version = "0.1.0", path = "crates/nt-core-capability-tree" }
 
 [workspace.lints.clippy]

@@ -1,7 +1,12 @@
 target/
-Cargo.lock
+# 2026-09-28: Cargo.lock 改为入库。理由：本仓含可执行产物（neotrix CLI /
+# neobot-desktop / 原 src-tauri），Rust 惯例要求**应用**提交锁文件，否则
+# CI 与本机依赖图可漂移，构建不可复现。下方 `*.lock` 仍生效于
+# .opencode/package-lock.json 等 node 侧锁文件 —— 只定点解禁这一个。
+!Cargo.lock
 .DS_Store
 *.lock
+!Cargo.lock
 node_modules/
 dist/
 notes/
@@ -216,8 +221,11 @@ target/builds/
 *.log
 
 # Local .app bundle (binary inside, rebuilt on demand)
-# 2026-09-27: 移除 games/neotrix-guixu/ 相关 3 条规则 —— 该目录已删除，
-# 保留会持续误导定位。games/ 现仅剩 .DS_Store，见 DIR-AUDIT-2026-09-27.md。
+# 2026-09-28: `games/neotrix-guixu/`(38 文件) 已归档至
+# ~/Downloads/Neo/neotrix-archive/games/（逐字节 0 差异），整个 games/ 已移出仓库。
+# 同批移出：fuzz/(4, manifest 不可构建)、crates/{neotrix-abilities,neotrix-game,
+# neotrix-decision-engine,nt-lang}。见 sessions/handoff-20260928-algo-extraction.md。
+# 下方 3 条指向已删目录的规则保留会持续误导定位。
 
 # Crystal pool config holds live API keys — local only, never commit
 # (template: neotrix-core/config/crystal.example.toml)

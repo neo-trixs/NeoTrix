@@ -31,6 +31,8 @@ pub mod evolution;
 pub mod framework;
 pub mod hex_crucible;
 pub mod mcp;
+pub mod nt_clock;
+pub mod nt_commands;
 pub mod persistence;
 pub mod play;
 pub mod render;

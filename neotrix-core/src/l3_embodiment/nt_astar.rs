@@ -3,9 +3,17 @@
 //! Grid-based A* with BinaryHeap, obstacle avoidance, and movement costs.
 //!
 //! Source: archive/neotrix-sim/src/navigation/astar.rs
+//!
+//! 2026-09-28: 对角步代价由字面量 `1.414` 改为 `SQRT_2`（精确 √2），
+//! 与同层 `nt_flow` 共用同一常量，两文件度量从此只有一个定义点。
+//! 数值变化约 0.0151%；本文件测试只断言路径结构（长度/端点/绕障），
+//! 不锁距离值，故无需改测试。
 
 use std::collections::{BinaryHeap, HashMap};
 use std::cmp::Ordering;
+
+/// 对角步代价系数（√2）。与 `nt_flow::SQRT_2` 同值，勿各自硬编码。
+pub const SQRT_2: f32 = std::f32::consts::SQRT_2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct GridPos {
@@ -136,7 +144,7 @@ impl AStar {
                 let dx = (neighbor.x - current.pos.x).abs();
                 let dy = (neighbor.y - current.pos.y).abs();
                 let move_cost = if dx + dy == 2 {
-                    1.414 * self.movement_cost[neighbor.x as usize][neighbor.y as usize]
+                    SQRT_2 * self.movement_cost[neighbor.x as usize][neighbor.y as usize]
                 } else {
                     self.movement_cost[neighbor.x as usize][neighbor.y as usize]
                 };
@@ -215,7 +223,7 @@ impl AStar {
                 let dx = (neighbor.x - current.pos.x).abs();
                 let dy = (neighbor.y - current.pos.y).abs();
                 let move_cost = if dx + dy == 2 {
-                    1.414 * self.movement_cost[neighbor.x as usize][neighbor.y as usize]
+                    SQRT_2 * self.movement_cost[neighbor.x as usize][neighbor.y as usize]
                 } else {
                     self.movement_cost[neighbor.x as usize][neighbor.y as usize]
                 };

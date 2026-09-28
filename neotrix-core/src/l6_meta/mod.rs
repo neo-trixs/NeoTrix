@@ -91,3 +91,9 @@ pub use nt_individual::{
 pub mod nt_evolve_loop;
 // EVO-11 证明门影子＋语义网关（LAWS影子裁决/按分选路/归因账本）
 pub mod nt_law_gate;
+/// 权威房间协议（server-authoritative `validate→apply→view_for` + 序列
+/// guard，2026-09-28 自 crates/neotrix-abilities 萃取；该 crate 已归档至
+/// ~/Downloads/Neo/neotrix-archive/crates/neotrix-abilities/）。传输层可插拔：现为
+/// 内存 LoopbackBus，真 socket 未实现。与 `nt_game/mcp.rs` 同属多 agent
+/// 通信信任边界，二者尚未接线。
+pub mod nt_net;

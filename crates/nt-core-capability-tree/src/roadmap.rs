@@ -167,7 +167,9 @@ type RoadmapResult = Result<(usize, Vec<(String, String)>), Box<dyn std::error::
 
 /// 从默认路径加载并注册 roadmap 模块
 ///
-/// 默认路径: `neotrix-core/src/neotrix/nt_core_capability_tree/roadmap_modules.json`
+/// 默认路径: `crates/nt-core-capability-tree/roadmap_modules.json`
+/// （2026-09-28 更正：原注释写 `neotrix-core/src/neotrix/nt_core_capability_tree/`，
+///  该目录不存在；数据文件实际在本 crate 根下）
 pub fn register_from_default_path(
     registry: &mut CapabilityRegistry,
 ) -> RoadmapResult {

@@ -54,9 +54,18 @@
 
 ## 4. 决策引擎 —— 3 死 1 活 ⛔（**本表最重要的一条**）
 
+> **2026-09-28 处置更新**：`crates/neotrix-decision-engine/` 已**实际归档**至
+> `~/Downloads/Neo/neotrix-archive/crates/neotrix-decision-engine/`（24 文件，
+> `rsync -an -c` 逐字节 0 差异）。移除前复核实测：全仓 **0 处**启用
+> `decision-engine` feature，`gateway` 的 `pub use neotrix_decision_engine as
+> decision_engine` 别名**从未被解引用**。其中唯一有价值的确定性采样器
+> （`NtSampler`，温度/top-k/top-p/重复惩罚）已萃取至
+> `neotrix-core/src/l0_substrate/nt_sampler.rs`。同行
+> `gateway/Cargo.toml` 的依赖行、2 个 feature 声明与该 re-export 一并移除。
+
 | 位置 | 状态 | 构造点证据 |
 |---|---|---|
-| `crates/neotrix-decision-engine/` | ⛔ **死** | `gateway/Cargo.toml:13` 该 dep 为 `optional`，feature `decision-engine`(:29) 仅 `full`(:28) 包含，**全仓无人启用**；唯一消费者是自身 113 测试 + `examples/` |
+| `crates/neotrix-decision-engine/` | ✅ **已归档**（2026-09-28，原 ⛔ 死） | `gateway/Cargo.toml:13` 该 dep 为 `optional`，feature `decision-engine`(:29) 仅 `full`(:28) 包含，**全仓无人启用**；唯一消费者是自身 113 测试 + `examples/`。归档前 `nt_gen_model.rs`(973) 更从未参与编译（`git log -S` 无 `mod` 声明） |
 | `l5_cognition/nt_decision_engine.rs:351` | ⛔ **死** | `DecisionEngine::new()` 全仓仅 `:611` `:620` `:644`，**全在 `#[test]` 内** |
 | `nt_mind/nt_mind/decision_engine/`（scorer/recommender） | ⛔ **死** | `WeightedScorer`(scorer.rs:26) / `DecisionRecommender`(recommender.rs:28) 外部引用 = 0 |
 | **`neotrix/nt_jev/` + `neotrix/nt_crystal_core/`** | ✅ **活（生产）** | L1 **6 个消费者**（`nt_dialogue_tui.rs` `nt_tui_app.rs` `nt_stdin_human.rs` `nt_crystal_llm_bridge.rs` `nt_free_pool.rs` `nt_dispatcher_core.rs`）+ `nt_crystal_core` 内部 5 处 |

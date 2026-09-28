@@ -23,3 +23,8 @@ pub mod nt_shield_enforcer;
 pub mod error_conversions;
 /// EVO-09 近场协作平面（发现注册/通道策略/帧长门纯逻辑）
 pub mod nt_near_field;
+/// 多源 Dijkstra 流场 + A*（2026-09-28 自 crates/neotrix-abilities 萃取；该 crate 已归档至
+/// ~/Downloads/Neo/neotrix-archive/crates/neotrix-abilities/）。
+/// 度量与本层 `nt_astar` **已统一为欧氏**（对角 ×√2），裁决理由见 `nt_flow.rs`
+/// 文件头：原 Chebyshev 边代价配 octile 启发会高估并返回次优路径。
+pub mod nt_flow;

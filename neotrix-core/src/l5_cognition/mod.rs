@@ -152,3 +152,10 @@ pub use neotrix_multi_agent::coordinator;
 pub use neotrix_multi_agent::coordination as multi_agent_coordination;
 pub use neotrix_multi_agent::hive as multi_agent_hive;
 pub use neotrix_multi_agent::god_agent;
+
+/// 通用效用决策选择器（gate → hysteresis → argmax → fail-open，2026-09-28
+/// 自 crates/neotrix-abilities 萃取；该 crate 已归档至
+/// ~/Downloads/Neo/neotrix-archive/crates/neotrix-abilities/）。全泛型于调用方的 mode 枚举，
+/// 不含任何游戏类型；`fail-open` 语义同 nt_route_features.rs（失败落到
+/// 调用方给定的 fallback，而非放行请求）。
+pub mod nt_utility;

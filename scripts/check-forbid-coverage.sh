@@ -25,9 +25,12 @@ check_root() {
 }
 
 check_root "neotrix-core/src/lib.rs"
-check_root "src-tauri/src/lib.rs"
+# 2026-09-28: 移除 `check_root "src-tauri/src/lib.rs"` —— src-tauri 已随 commit
+# 5c02e738（归档桌面端，599 files）从仓库删除，该行令本门恒为
+# `MISSING-FILE: src-tauri/src/lib.rs` → FAILED。桌面端现由 apps/neobot-desktop
+# 承担，其 lib.rs 根的 forbid 覆盖由该 crate 自身的门负责。
 for crate in neotrix-types neotrix-sysctl neotrix-consciousness neotrix-reasoning \
-    neotrix-gateway neotrix-multi-agent neotrix-abilities neotrix-game \
+    neotrix-gateway neotrix-multi-agent \
     neotrix-neobot neotrix-audit; do
   check_root "crates/$crate/src/lib.rs"
 done

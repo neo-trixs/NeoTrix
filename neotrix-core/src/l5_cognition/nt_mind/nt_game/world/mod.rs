@@ -1,5 +1,6 @@
 pub mod audio;
 pub mod combat;
+pub mod dungeongen;
 pub mod generation;
 pub mod input;
 pub mod minimap;

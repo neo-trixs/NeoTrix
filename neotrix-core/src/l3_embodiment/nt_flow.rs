@@ -4,9 +4,20 @@
 //! bracket 原版 VecDeque 松弛只对近均匀代价正确（源码自带 WARNING），本模块用
 //! 二叉堆（`total_cmp` 排序，无新依赖），加权代价亦正确。
 //! 对角线禁穿角（两侧正交邻居其一不可走则禁），防穿墙斜行。
+//!
+//! ── 度量已统一为欧氏（2026-09-28 裁决）──
+//! 本文件与同层 `nt_astar.rs` 现在用**同一个度量**：对角步乘 `√2`，正交步乘 1。
+//! 此前本文件对角不乘 √2（Chebyshev），而同层 `nt_astar` 乘 1.414，且本文件
+//! 自己的 A* 启发式用的是 octile（`a + (√2-1)*b`，见下）——**Chebyshev 边代价
+//! 配 octile 启发会高估，返回次优路径**。统一到欧氏后二者一致，且使该 A* 的
+//! 启发式恢复可容许。改动前确认过两者均 0 消费者（`nt_astar.rs` 亦无调用点）。
+//! 如需改回或改成参数化，必须同步更新两侧锁定测试。
 
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
+
+/// 对角步代价系数（√2）。与 `astar` 的 octile 启发式（√2-1）配套，见文件头。
+pub const SQRT_2: f32 = std::f32::consts::SQRT_2;
 
 /// 不可达（保持 f32::MAX，与 bracket 一致语义）
 pub const INF: f32 = f32::MAX;
@@ -134,7 +145,7 @@ pub fn build_flow(
                     continue;
                 }
             }
-            let step = cost(nx, ny);
+            let step = cost(nx, ny) * if dx != 0 && dy != 0 { SQRT_2 } else { 1.0 };
             if !(step > 0.0) || step >= INF {
                 continue;
             }
@@ -160,15 +171,20 @@ mod tests {
         true
     }
 
+    /// f32 累加有舍入，期望值用推导式 + 容差比较，不用 assert_eq! 硬编码。
+    fn near(got: f32, want: f32) -> bool {
+        (got - want).abs() < 1e-4
+    }
+
     #[test]
-    fn open_field_chebyshev() {
-        // 8 向单位代价：距离 = 切比雪夫距离
+    fn open_field_euclidean() {
+        // 8 向：正交 1，对角 √2（度量已统一为欧氏，见文件头）
         let m = build_flow(9, 9, &[(4, 4)], 100.0, &open_cost);
-        assert_eq!(m.dist(4, 4), 0.0);
-        assert_eq!(m.dist(5, 4), 1.0);
-        assert_eq!(m.dist(5, 5), 1.0);
-        assert_eq!(m.dist(6, 6), 2.0);
-        assert_eq!(m.dist(0, 0), 4.0);
+        assert!(near(m.dist(4, 4), 0.0));
+        assert!(near(m.dist(5, 4), 1.0));
+        assert!(near(m.dist(5, 5), SQRT_2));
+        assert!(near(m.dist(6, 6), 2.0 * SQRT_2));
+        assert!(near(m.dist(0, 0), 4.0 * SQRT_2));
     }
 
     #[test]
@@ -191,7 +207,7 @@ mod tests {
     #[test]
     fn multi_target_takes_min_and_depth_cutoff() {
         let m = build_flow(9, 9, &[(0, 0), (8, 8)], 100.0, &open_cost);
-        assert_eq!(m.dist(4, 4), 4.0); // 到任一源的最小值
+        assert!(near(m.dist(4, 4), 4.0 * SQRT_2)); // 到任一源的最小值（纯对角 4 步）
         let m2 = build_flow(9, 9, &[(0, 0)], 3.0, &open_cost);
         assert_eq!(m2.dist(8, 8), INF); // 超深截断
         assert_eq!(m2.dist(2, 0), 2.0);
@@ -238,8 +254,9 @@ mod tests {
         // 单格沼泽 (4,1) 代价 5：真 Dijkstra 绕开它（VecDeque 松弛版在此会错）
         let cost = |x: i32, y: i32| if x == 4 && y == 1 { 5.0 } else { 1.0 };
         let m = build_flow(9, 3, &[(0, 1)], 100.0, &cost);
-        // 直穿 (8,1)：8 步含 1 格沼泽 = 7×1+5=12；绕行上下两行 8 步 = 8
-        assert_eq!(m.dist(8, 1), 8.0);
+        // 直穿 (8,1)：8 步含 1 格沼泽 = 7×1+5=12；绕行上下两行 = 6 正交 + 2 对角
+        // （首尾各跨一个对角，其余 6 步正交）= 6 + 2√2
+        assert!(near(m.dist(8, 1), 6.0 + 2.0 * SQRT_2));
     }
 }
 
@@ -312,7 +329,7 @@ pub fn astar(
                 continue; // 禁穿角
             }
             let ni = idx(nx, ny);
-            let ng = g[cur] + cost(nx, ny);
+            let ng = g[cur] + cost(nx, ny) * if dx != 0 && dy != 0 { SQRT_2 } else { 1.0 };
             if ng < g[ni] {
                 g[ni] = ng;
                 came[ni] = Some(cur);

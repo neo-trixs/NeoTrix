@@ -17,4 +17,8 @@ pub mod nt_code_graph;
 pub mod nt_intel_digest;
 pub mod nt_routing;
 pub mod nt_web_perception;
+/// 对称阴影投射 FOV + 连续空间几何 LOS（2026-09-28 自 crates/neotrix-abilities 萃取；该 crate 已归档至
+/// ~/Downloads/Neo/neotrix-archive/crates/neotrix-abilities/）。
+/// 感知层能力：主代码 nt_game 无 FOV 实现，此前为真空；纯函数、零渲染、零 IO。
+pub mod nt_fov;
 
