@@ -1096,8 +1096,8 @@ impl UnifiedAbsorber {
     }
 
     fn absorb_webpage(&self, url: &str) -> Result<WebPageReport, String> {
-        let (html, host) = crate::l4_emotion::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(url)?;
-        let (title, text) = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::extract_html_content(&html);
+        let (html, host) = crate::l2_perception::nt_world::l1_facade::fetch_safe_http(url)?;
+        let (title, text) = crate::l2_perception::nt_world::l1_facade::extract_html_content(&html);
         if text.is_empty() {
             return Err("Empty content".into());
         }
@@ -1111,7 +1111,7 @@ impl UnifiedAbsorber {
             Some(domain),
         )?;
 
-        let links = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::extract_links(&html, url);
+        let links = crate::l2_perception::nt_world::l1_facade::extract_links(&html, url);
         let ts = now();
         for link in links.iter().take(20) {
             let link_domain = link.split('/').nth(2).unwrap_or("").trim_start_matches("www.").to_string();
@@ -1178,7 +1178,7 @@ pub struct AbsorberStatus {
 mod nt_memory_kb_crawl {
     use rusqlite::Connection;
     pub fn run_crawl_cycle(conn: &Connection, max: usize) -> Result<super::CrawlCycleReport, String> {
-        let r = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::run_crawl_cycle(conn, max)?;
+        let r = crate::l2_perception::nt_world::l1_facade::run_crawl_cycle(conn, max)?;
         Ok(super::CrawlCycleReport {
             attempted: r.attempted,
             completed: r.completed,
@@ -1191,7 +1191,7 @@ mod nt_memory_kb_crawl {
         })
     }
     pub fn discover_from_seed(conn: &Connection, topic: &str) -> Result<usize, String> {
-        crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::discover_from_seed(conn, topic)
+        crate::l2_perception::nt_world::l1_facade::discover_from_seed(conn, topic)
     }
 }
 
@@ -1202,13 +1202,13 @@ mod nt_memory_kb_discovery {
 mod nt_memory_store {
     use rusqlite::Connection;
     pub fn upsert_crawl_queue(conn: &Connection, url: &str, depth: i64, domain: &str, priority: i64, ts: i64) -> rusqlite::Result<()> {
-        crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_store::upsert_crawl_queue(conn, url, depth, domain, priority, ts)
+        crate::l2_perception::nt_world::l1_facade::upsert_crawl_queue(conn, url, depth, domain, priority, ts)
     }
     pub fn count_nodes(conn: &Connection) -> rusqlite::Result<usize> {
-        crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_store::count_nodes(conn)
+        crate::l2_perception::nt_world::l1_facade::count_nodes(conn)
     }
     pub fn count_nodes_by_type_map(conn: &Connection) -> rusqlite::Result<std::collections::HashMap<String, usize>> {
-        crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_store::count_nodes_by_type_map(conn)
+        crate::l2_perception::nt_world::l1_facade::count_nodes_by_type_map(conn)
     }
 }
 
@@ -1275,7 +1275,7 @@ mod tests {
 
     #[test]
     fn test_extract_html() {
-        let (title, text) = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::extract_html_content(
+        let (title, text) = crate::l2_perception::nt_world::l1_facade::extract_html_content(
             "<html><title>Test</title><body><p>Hello world</p></body></html>");
         assert_eq!(title, "Test");
         assert!(text.contains("Hello world"));
@@ -1288,7 +1288,7 @@ mod tests {
 <style>.cls{color:red}</style>
 <p>Visible content</p>
 </body></html>"#;
-        let (title, text) = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::extract_html_content(html);
+        let (title, text) = crate::l2_perception::nt_world::l1_facade::extract_html_content(html);
         assert_eq!(title, "Page");
         assert!(text.contains("Visible content"), "Visible text should survive");
         assert!(!text.contains("alert"), "Script content should be stripped");
@@ -1298,7 +1298,7 @@ mod tests {
     #[test]
     fn test_extract_links() {
         let html = r#"<a href="http://8.8.8.8/page1">Link 1</a><a href="http://8.8.8.8/page2">Link 2</a>"#;
-        let links = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::extract_links(html, "");
+        let links = crate::l2_perception::nt_world::l1_facade::extract_links(html, "");
         assert_eq!(links.len(), 2);
         assert!(links.iter().any(|l| l.contains("page1")));
         assert!(links.iter().any(|l| l.contains("page2")));
@@ -1307,7 +1307,7 @@ mod tests {
     #[test]
     fn test_extract_links_deduplication() {
         let html = r#"<a href="http://8.8.8.8/page">Link</a><a href="http://8.8.8.8/page">Dup</a>"#;
-        let links = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::extract_links(html, "");
+        let links = crate::l2_perception::nt_world::l1_facade::extract_links(html, "");
         assert_eq!(links.len(), 1, "Duplicate links should be deduped");
     }
 

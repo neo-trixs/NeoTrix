@@ -98,3 +98,35 @@ impl KnowledgeStore for KnowledgeBase {
         KnowledgeBase::insert_or_get_node(self, title, node_type, summary, url, domain)
     }
 }
+
+// ─── L2→L3/L4/L5 跨层引用收敛点（分层门 sanctioned channel）──────────────────
+// 以下符号此前由 L2 业务文件（data_source 15 个 + crawl/osint/e8/knowledge 等）
+// **直引** `crate::l3_embodiment::…` / `l4_emotion::…` / `l5_cognition::…`，
+// 层名出现在业务代码里 ⇒ 门记违规。走目标层 facade 无效（路径仍含层名），
+// 必须经**本层**门面。
+//
+// 路径一律沿用消费方**原本就在用**的路径（原代码已能编译 ⇒ 路径可证）。
+// ALLOW: 类型/函数直访，trait-object 不可行（同本文件 :64-71 KnowledgeStore
+// 解耦注释一脉相承 —— 长期方向是 trait 化，本段是过渡收敛点）。
+//
+// ⚠️ `EgressRule` / `KnowledgeBase` / `NodeType` **本文件已导出**（:60/:6/:7），
+//    故消费方直接改道即可。三处同源已核实：
+//    · `EgressRule` = l1 `egress_types.rs:12 SandboxEgressRule`；
+//      l3 `nt_shield_sandbox/mod.rs:75` 同样 `SandboxEgressRule as EgressRule`
+//      ⇒ **同一类型**，改道类型安全（不换类型身份）。
+//    · `NodeType`：`nt_memory_kb/mod.rs:109 pub use nt_memory_types::*`
+//      ⇒ `nt_memory_kb::NodeType` 与 `nt_memory_kb::nt_memory_types::NodeType` 同源。
+pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::{Response, StealthHttpClient};
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_http::fetch_safe_http;
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_crawl::{
+    discover_from_seed, extract_html_content, extract_links, run_crawl_cycle,
+};
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_store::{
+    count_nodes, count_nodes_by_type_map, upsert_crawl_queue,
+};
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::PermissionLevel;
+pub use crate::l5_cognition::nt_core_prm::{AgentTrajectory, TrajectoryStep};
+pub use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
+pub use crate::l5_cognition::nt_core_cad_consciousness::cad_experience_payload;
+pub use crate::l5_cognition::nt_core_td;
+pub use crate::l5_cognition::nt_core_ttc;

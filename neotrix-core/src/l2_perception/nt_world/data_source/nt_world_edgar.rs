@@ -597,7 +597,7 @@ mod tests {
         assert!(!policy.check("evil.com", 443), "non-edgar host denied");
         // deny-wins: 叠加 deny 规则应覆盖 allow
         let mut with_deny = edgar_egress_policy();
-        with_deny.rules.push(crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::deny(EDGAR_HOST, "443"));
+        with_deny.rules.push(crate::l2_perception::nt_world::l1_facade::EgressRule::deny(EDGAR_HOST, "443"));
         assert!(!with_deny.check(EDGAR_HOST, 443), "explicit deny wins over allow");
     }
 
@@ -616,7 +616,7 @@ mod tests {
     fn test_ingest_fixture_to_kb_and_requery() {
         let dir = tempfile::tempdir().expect("tempdir");
         let db_path = dir.path().join("test_edgar_kb.db");
-        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(db_path)).expect("open kb");
+        let kb = crate::l2_perception::nt_world::l1_facade::KnowledgeBase::open(Some(db_path)).expect("open kb");
         let fetcher = EdgarFetcher::new();
         // 用 fixture 纯内存 ingest，无网络
         let report = fetcher._ingest_submissions_from_json(&kb, EDGAR_FIXTURE_JSON, "320193").expect("ingest");
@@ -630,7 +630,7 @@ mod tests {
         assert_eq!(node.title, "10-Q (0000320193-23-000106)");
         assert_eq!(node.domain.as_deref(), Some("edgar"));
         // FTS 搜索可回查
-        let hits = kb.search_permission_aware("Apple", 10, crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::PermissionLevel::Public).expect("search");
+        let hits = kb.search_permission_aware("Apple", 10, crate::l2_perception::nt_world::l1_facade::PermissionLevel::Public).expect("search");
         assert!(!hits.is_empty(), "FTS should recall ingested filing by keyword");
 
         // 幂等：二次 ingest 同 fixture → nodes_reused
@@ -650,7 +650,7 @@ mod tests {
     fn test_ingest_skips_empty_accession() {
         let dir = tempfile::tempdir().expect("tempdir");
         let db_path = dir.path().join("test_edgar_skip.db");
-        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(db_path)).expect("open kb");
+        let kb = crate::l2_perception::nt_world::l1_facade::KnowledgeBase::open(Some(db_path)).expect("open kb");
         let fetcher = EdgarFetcher::new();
         // 构造无 accession_number 的 bad fixture
         let bad_json = r#"{
