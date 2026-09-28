@@ -197,6 +197,66 @@ do not look like a full prefix match"）—— **工具集身份是缓存身份�
 **附带**：`check-truth-surface.sh --strict` 在主工作树报 exit=1 会被误读成 CI 红，
 **干净 HEAD 实测 exit=0**。本地噪音，暂不修（避免动他窗在写的文件）。
 
+## 已知债 · NeoBot 工作台 + IM 渠道的验证缺口（2026-09-28 新吸收）
+
+吸收 `DSH-better-sidebar` + `dsh-im` 两个 TS 源，落地 `crates/neotrix-neobot`
+**12 个新模块 / 5 张新表**、`apps/neobot-desktop` **97 个注册 IPC**（注册数 53→97）、
+前端 4 个零依赖文件。**功能与取舍不在此复述** —— 正典记录：
+`docs/architecture/ABSORPTION-DSH-SIDEBAR-IM.md`。
+（注：12 个新模块**不进** `ARCHITECTURE-MAP-ROADMAP-V2.md`，理由见该文抬头「台账归属」：
+那条规则是 R-P199，文本只在 `docs/standards/archive/` 的非规范副本里，口径是
+`neotrix-core` 的 L1–L6 分层，而 `neotrix-neobot` 是独立 crate、不占 L 层。）
+
+此处只记**没被证明的部分**（数字随补测推进会变，用前复算）：
+
+| 缺口 | 2026-09-28 实测 |
+|---|---|
+| 桌面 IPC 层零测试 | `apps/neobot-desktop` 的 `cfg(test)` 命中 **0**；254 个测试全在下一层 `neotrix-neobot` |
+| 侧边栏渲染从未执行 | **开工时** 13 个 `*Html(): string` 困在 `frontend/src/sidebar.ts`（顶层 import Tauri API），`selftest` **import 不了**；本批正在抽到 `frontend/src/render.ts` |
+| Telegram 未碰真平台 | 23 个测试全是手写 JSON 夹具、**零 HTTP**；`API_BASE` 是编译期 `const`，**连假服务器都起不来** |
+| 端到端 | **从未**对真浏览器 / 真 `api.telegram.org` 跑过一次 |
+
+**P0 教训（跨模块可复用）**：两轮 P0 抓到的都是**没被测过的那道缝** ——
+跨 IPC 边界的传参值写错（`taskId: ""`）、命令**漏注册**（HEAD 时 42 个工作台/IM 命令
+写好了却没进 `generate_handler!`，编译与测试全绿而前端一个都调不到）。
+这类缺陷对编译器/clippy/`cargo test` **全是绿的**，只有「声明 ⊆ 注册」这类
+**机械断言**能抓。**故：IPC 层冒烟测试补齐之前，先别加新功能** ——
+缺的那一层正是唯一能对「接错线 / 没接线」发信号的地方。
+
+## ✅ 已收口 · 「已提交代码引用未入库文件」全家族（2026-09-28）
+
+**症状**：`cargo test` 全绿、`check-truth-surface --strict` 报 0、`ci.yml` YAML 合法 ——
+但**新鲜克隆跑不了任何 cargo 命令**。真值只在干净检出上。
+
+**根因一类，四个实例**（`DIR-AUDIT §六/§七` 有完整证据链）：
+
+| # | 未入库的东西 | 被谁引用 | 症状 |
+|---|---|---|---|
+| 1 | `apps/neobot-desktop/Cargo.toml` | 根 `Cargo.toml:18` 的 workspace member 声明 | workspace 加载失败 |
+| 2 | `neotrix-core/benches/{memory_bench,security_bench}.rs` | `neotrix-core/Cargo.toml:224-230` 的 `[[bench]]` | manifest 解析失败 |
+| 3 | `fn migrate_legacy` 定义 | `nt-core-capability-tree/src/cli.rs:327` | E0599，且 `neotrix-core:99` 依赖它 ⇒ CI 构建不过 |
+| 4 | `models/training/jev_platts.json` | `include_str!`（**编译期**读取） | 干净检出编译失败 |
+
+另加 3 处 blanket 通配规则（`tests/` `examples/` `models/`）静默屏蔽真实源码/数据
+—— 危害不在屏蔽大文件，而在**静默**：`git add` 不报错不提示，落差可潜伏任意久。
+`models/` 3.4GB 权重**该忽略**，故只精确解禁 `models/training/`。
+
+**收口后实测**（全新干净检出，非工作树）：
+
+```
+cargo check --lib -p neotrix            exit=0
+cargo check -p neotrix     (全部 bins)   exit=0
+cargo test --lib -p neotrix --no-run     exit=0
+scripts/check-fresh-build.sh --full      PASS
+```
+
+**新门 `scripts/check-fresh-build.sh`**（已接 `ci.yml` 第一条检查）：脏树不是合法
+oracle，故脏树时自建 `git worktree add --detach HEAD` 再跑。**回归证明**：修复前
+的 `5fcb291b` 上 tier1 得 exit=101。
+
+**方法论（与上一节的 IPC 教训同源）**：「本地能编译」「门是绿的」「YAML 合法」
+都不能证明仓库可交付；**只有干净检出 + 真实命令**能。
+
 ## 已知债 · 主 CI workflow 曾无法解析（2026-09-27 修复）
 
 `.github/workflows/ci.yml` **在 HEAD 就是非法 YAML**：`Truth-surface gate (ratchet: blocks ...)`
