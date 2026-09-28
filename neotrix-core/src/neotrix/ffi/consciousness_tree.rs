@@ -204,7 +204,7 @@ fn now_ms() -> i64 {
 /// 按分支前缀统计真实通过率作为健康分; 成熟度由全局通过率映射 (全绿→C4/C5 区间)。
 /// 纯只读, 不产生副作用, 成本 = 一次 SelfTest 全量运行。
 fn real_branch_health() -> (HashMap<String, f32>, u8) {
-    use crate::l6_meta::healing::nt_core_self_test::{SelfTestRegistry};
+    use crate::l0_substrate::nt_core_self_test::SelfTestRegistry;
     use crate::l6_meta::healing::nt_core_self_test_integration::register_absorbed_modules;
 
     let mut registry = SelfTestRegistry::new();
