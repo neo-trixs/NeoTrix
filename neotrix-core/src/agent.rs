@@ -493,6 +493,20 @@ pub mod tool {
             .register_sse(server_name, url, tools);
     }
 
+    /// 快捷入口：注册会话式 stdio 服务器并同步写入全局 McpRegistry。
+    pub fn register_stdio_session_global(
+        server_name: &str,
+        command: &str,
+        args: &[&str],
+        timeout_ms: u64,
+        tools: Vec<mcp::McpToolDef>,
+    ) {
+        GLOBAL_MCP
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .register_stdio_session(server_name, command, args, timeout_ms, tools);
+    }
+
     #[cfg(test)]
     pub fn reset_global_mcp_for_tests() {
         if let Ok(mut global) = GLOBAL_MCP.try_lock() {
@@ -577,6 +591,12 @@ pub mod tool {
         /// SSE 端点（stdio 服务器为 None）。
         sse_url: Option<String>,
         tools: Vec<mcp::McpToolDef>,
+        /// true = 长驻式 MCP 服务器：执行走 `McpSessionTool`（完整
+        /// initialize 握手）；false = 短命令式工具，走旧 `StdioNativeTool`
+        /// （裸 tools/call）。见 `nt_mcp_stdio_session.rs`。
+        use_session: bool,
+        /// 会话式执行的单次调用超时（毫秒）；stdio 短命令路径忽略。
+        session_timeout_ms: u64,
     }
 
     impl McpRegistry {
@@ -598,6 +618,35 @@ pub mod tool {
                 args: args.iter().map(|s| s.to_string()).collect(),
                 sse_url: None,
                 tools,
+                use_session: false,
+                session_timeout_ms: crate::nt_mcp_stdio_session::DEFAULT_TIMEOUT_MS,
+            };
+            self.servers.push(entry.clone());
+            Self::mirror_to_global(&entry);
+        }
+
+        /// 注册一个**会话式** stdio MCP 服务器（长驻进程 + 完整握手）。
+        ///
+        /// 与 `register_stdio` 的唯一区别：`as_native_tools` 把它的工具
+        /// 适配成 `McpSessionTool`（`nt_mcp_stdio_session.rs`），能调通
+        /// 真 MCP 服务器；旧路径调长驻服务器会 30s 超时。
+        /// `timeout_ms` 建议：元数据类 30s；帧渲染类（视频/文档可视化）90s。
+        pub fn register_stdio_session(
+            &mut self,
+            server_name: &str,
+            command: &str,
+            args: &[&str],
+            timeout_ms: u64,
+            tools: Vec<mcp::McpToolDef>,
+        ) {
+            let entry = McpServer {
+                name: server_name.to_string(),
+                command: command.to_string(),
+                args: args.iter().map(|s| s.to_string()).collect(),
+                sse_url: None,
+                tools,
+                use_session: true,
+                session_timeout_ms: timeout_ms,
             };
             self.servers.push(entry.clone());
             Self::mirror_to_global(&entry);
@@ -611,6 +660,8 @@ pub mod tool {
                 args: Vec::new(),
                 sse_url: Some(url.to_string()),
                 tools,
+                use_session: false,
+                session_timeout_ms: crate::nt_mcp_stdio_session::DEFAULT_TIMEOUT_MS,
             };
             self.servers.push(entry.clone());
             Self::mirror_to_global(&entry);
@@ -716,15 +767,25 @@ pub mod tool {
                 .iter()
                 .flat_map(|s| {
                     s.tools.iter().map(|t| {
-                        let tool = StdioNativeTool {
-                            def: t.clone(),
-                            command: s.command.clone(),
-                            args: s.args.clone(),
-                        };
-                        Box::new(tool)
-                            as Box<
-                                dyn crate::l0_substrate::nt_core_traits::NativeTool,
-                            >
+                        if s.use_session {
+                            Box::new(crate::nt_mcp_stdio_session::McpSessionTool {
+                                def_name: t.name.clone(),
+                                def_description: t.description.clone(),
+                                def_schema: t.input_schema.clone(),
+                                command: s.command.clone(),
+                                args: s.args.clone(),
+                                timeout_ms: s.session_timeout_ms,
+                                artifacts_dir: None,
+                            })
+                                as Box<dyn crate::l0_substrate::nt_core_traits::NativeTool>
+                        } else {
+                            Box::new(StdioNativeTool {
+                                def: t.clone(),
+                                command: s.command.clone(),
+                                args: s.args.clone(),
+                            })
+                                as Box<dyn crate::l0_substrate::nt_core_traits::NativeTool>
+                        }
                     })
                 })
                 .collect()
