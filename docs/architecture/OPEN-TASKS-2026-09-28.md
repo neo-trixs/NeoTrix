@@ -154,7 +154,6 @@ CARGO_BUILD_JOBS=2 cargo test -p neotrix --lib -j 2 -- nt_crystal_core --test-th
 | **D-13** | 32 个未跟踪 `scripts/ops/` 脚本是否全量入库（含活路径 `nt_graph_audit.py`/`nt_cocoons_dedupe_ids.py`） | — |
 | **D-14** | `total_memories` 断言目标值冲突（63,747 / 64,720 / 69,840） | 见 §1 V-5 |
 | **D-15** | 归属裁决：`nt_io_web/api.rs`（7+ 违规，疑并发编辑中）· `apps/neobot-desktop/frontend/`+`gen/` 27 文件 · 6 个脚本硬编码 M-477231~479942（活库真 max `M-065651`） | — |
-| **D-16** | Yootta/World-SimReady-Home：3.0TB gated，**401 物理不可达** | 需用户申请令牌 |
 | **D-17** | 3 处本地 `Severity` 派生 `Ord` 反向：**与 D-18 冲突**，须先定承重版是否可翻 | — |
 | **D-18** | ⛔ `shared_types::Severity` **不能翻**：`l2_perception/nt_world/osint/sweep.rs:225` 显式依赖该约定做 `min_severity` 过滤，翻转会**静默反转过滤器** | 已被裁定 |
 | **D-19** | hh-rlhf 2 条 `[redteam]`：下游过滤 vs 留作拒答样本 | — |

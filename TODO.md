@@ -926,7 +926,6 @@ Symphony 记 token 与 rate limit —— 但**只用于显示，从不用于路�
 | 6 | 修 `keywords()` 的 CJK 失明 | — | 见下「实测发现」，**影响面远超晶体核心** |
 | 7 | 接 judge 模型 | #6 | 数据已到位（jev-choice 431 + decision-calib 600 + agentic-trace 816） |
 | 8 | 32 个未跟踪 ops 脚本 | 需用户决策 | `scripts/ops/` 整个目录未入库；我只提交了自己那 6 个 |
-| 9 | `Yootta` 授权 | 需用户 | 需你去 HF 申请 gated 授权，拿到我补做 |
 
 ### 🔴 实测发现：`keywords()` 对中文近乎失明（跨模块影响，不止晶体）
 

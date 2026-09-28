@@ -40,7 +40,7 @@ nt_graph_audit  VERDICT: PASS
 | genrobot2025/Gen-HumanEgo | 62.7 TB | 跳过 | 用户指令 + **401** |
 | eidon-ai/tracker-pov | 9.0 TB | 跳过 | 用户指令 |
 | IFM/Code-Reasoning | 3.3 TB | 跳过 | 用户指令 |
-| **Yootta/World-SimReady-Home** | 3.0 TB | **跳过（强制）** | **401 Unauthorized**。用户点名要「吸收学习其经验」，但 gated 无令牌**物理不可达**。**不是本轮的选择，需用户申请授权** |
+| **Yootta/World-SimReady-Home** | 3.0 TB | **跳过（强制）** | **401 Unauthorized**。用户点名要「吸收学习其经验」，但 gated 无令牌**物理不可达**。**已于 2026-09-28 由用户指令关闭该任务**（不再作为待办） |
 | malcolmrey/various | 6.08 GB | 跳过 | 实测**仅 33 行纯图像**（无文本）+ `wtfpl` 许可 ⇒ 零蒸馏价值。**实测推翻自己原计划** |
 | MoreThought/Fable-…-10000x | 8.59 GB | 吸收 **816** | 吸 `full`(10000x) 而非已在库的 `lite`(5000x) |
 | nyu-mll/glue | 4.01 GB | 吸收 **419** | 只吸 `train` —— 它是**基准**，吸 `test` 会真实污染 |
@@ -177,7 +177,7 @@ keywords("支付网关")                     -> ['支付网关']                
 
 | # | 事项 | 状态 |
 |---|---|---|
-| 1 | `Yootta/World-SimReady-Home` 授权 | **需用户去 HF 申请 gated 授权**。当前 401 物理不可达 |
+| 1 | ~~`Yootta/World-SimReady-Home` 授权~~ | **已关闭（2026-09-28 用户指令移除该任务）**。处置见 §3 矩阵「跳过（强制）· 401」—— 那是**已做的决定**，不再是待办 |
 | 2 | **32 个未跟踪的 `scripts/ops/` 脚本** | 整个目录未入库（含 `nt_graph_audit.py` / `nt_cocoons_dedupe_ids.py` 等活路径）。本会话**只提交了自己那 6 个**，未扫他人文件。是否全量入库待决 |
 | 3 | hh-rlhf 红队策略 | 2 条已打 `[redteam]`。下游过滤，还是当拒答样本留用？ |
 | 4 | 8 个测试失败 | **已全部登记在册**（`sessions/handoff-test-debt-20260928.md` + `TODO.md` + `scripts/test-failures-baseline.txt`），本会话实测与账本**逐条吻合** ⇒ **非新增债，不必重查** |
