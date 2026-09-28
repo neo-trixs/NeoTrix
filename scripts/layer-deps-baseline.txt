@@ -63,14 +63,11 @@ l5_cognition	neotrix-core/src/l2_perception/nt_core_knowledge/vectors_group_b/mo
 l5_cognition	neotrix-core/src/l2_perception/nt_core_knowledge/vectors_group_b/specialized.rs
 l5_cognition	neotrix-core/src/l2_perception/nt_world/crawl/unified.rs
 l5_cognition	neotrix-core/src/l2_perception/nt_world/sense/world_model.rs
-l5_cognition	neotrix-core/src/l3_embodiment/nt_shield_enforcer.rs
 l5_cognition	neotrix-core/src/neotrix/ffi/consciousness_tree.rs
 l5_cognition	neotrix-core/src/neotrix/ffi/seal_pipeline.rs
 l5_cognition	neotrix-core/src/neotrix/nt_file_ability/tests.rs
 l6_meta	neotrix-core/src/l1_action/nt_io/nt_io_agent_loop/nt_loop_core.rs
 l6_meta	neotrix-core/src/l1_action/nt_io/nt_io_agent_loop/nt_loop_step.rs
-l6_meta	neotrix-core/src/l3_embodiment/nt_sandboxed_shell.rs
-l6_meta	neotrix-core/src/l3_embodiment/nt_shield_enforcer.rs
 l6_meta	neotrix-core/src/l5_cognition/consciousness_core/core.rs
 l6_meta	neotrix-core/src/l5_cognition/nt_core/capability/l7_l1_bridge.rs
 l6_meta	neotrix-core/src/l5_cognition/nt_core_arch_fitness.rs
