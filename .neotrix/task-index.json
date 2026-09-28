@@ -361,7 +361,7 @@
       "tool": "bash scripts/check-api-surface.sh",
       "kind": "gate",
       "read_only": true,
-      "when_not": "**基线已失真** —— 它 grep 的 src-tauri/ 已随 5c02e738 删除，恒 0 命中且不报错。要真实 API 面用别处",
+      "when_not": "面缺失时脚本报 `?` 并 exit 3 —— **标 ? 的数字不可解读，别当 0 用**。若看到 tauri=0，那是事实（桌面端已随 5c02e738 归档），不是扫描失败",
       "spec": "已知缺陷，待修"
     },
     {
@@ -453,8 +453,24 @@
       "tool": "python3 scripts/ops/nt_jev_live_eval.py",
       "kind": "absorb",
       "read_only": true,
-      "when_not": "⚠️ **当前跑不起来** —— 它 import 的 nt_verify_sim 已随 2bbed32c 删除（__pycache__ 里的 .pyc 是悬空残影）。用前先修依赖",
+      "when_not": "首次调用需 `cargo build -p neotrix --bin nt_keywords`（数分钟）——断链 import 已修为调 Rust 权威分词，**不要**改回 Python 重写",
       "spec": "已知缺陷，待修"
+    },
+    {
+      "id": "scan-surface",
+      "query": [
+        "扫描面",
+        "扫描器失效",
+        "假 0",
+        "路径不存在",
+        "死引用",
+        "扫描面缺失"
+      ],
+      "tool": "python3 scripts/ops/nt_scan_surface.py",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "退出码非 0 表示有扫描面已消失 ⇒ 该扫描器会输出**看似正常的 0**。先看 KNOWN-GONE 是否已解释；未解释的须人工确认",
+      "spec": "路径不存在 ≠ 该面为空"
     }
   ],
   "excluded": {
