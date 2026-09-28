@@ -13,14 +13,12 @@ use super::nt_dispatcher_reduce::{
 use crate::l1_action::nt_core_llm::{
     estimate_tokens, truncate_preserving, LlmProvider, LlmRequest, Message, Role,
 };
-use crate::l5_cognition::nt_core::capability::nt_core_antidistil::decompose::{
-    DecomposeSuggestion, TaskDecomposer,
-};
-use crate::l5_cognition::nt_core::nt_crt::{CrtPlan, CrtTimeScale};
-use crate::l5_cognition::nt_core_cot_generator::{CoTGenerator, DefaultCoTGenerator};
+use crate::l1_action::nt_action_facade::{DecomposeSuggestion, TaskDecomposer};
+use crate::l1_action::nt_action_facade::{CrtPlan, CrtTimeScale};
+use crate::l1_action::nt_action_facade::{CoTGenerator, DefaultCoTGenerator};
 // LAYER-EXCEPTION: E8Policy 仅存储（组合根注入），本文件无读取／透传逻辑，不动。
-use crate::l5_cognition::nt_core_policy::E8Policy;
-use crate::l5_cognition::reasoning_core::TraceSource;
+use crate::l1_action::nt_action_facade::E8Policy;
+use crate::l1_action::nt_action_facade::TraceSource;
 use neotrix_reasoning::kernel_types::{ReasoningMethod, KERNEL_DIM, ReasoningKernel, Vector};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
@@ -776,7 +774,7 @@ Output your result for this subtask only."#,
             .iter()
             .map(|(k, v)| (k.clone(), self.text_to_vector(v, KERNEL_DIM)))
             .collect();
-        let kernel_trace = crate::l5_cognition::reasoning_core::ReasoningTrace {
+        let kernel_trace = crate::l1_action::nt_action_facade::ReasoningTrace {
             trace_id: format!("cot_{}", uuid::Uuid::new_v4().simple()),
             task: sub_task.title.clone(),
             method: ReasoningMethod::Deductive,

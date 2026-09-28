@@ -98,7 +98,7 @@ pub struct NeoCodexAgent {
     pub goals: GoalQueue,
     pub wire: WireSession,
     pub markdown: StreamingMarkdown,
-    pub consciousness: Option<crate::l5_cognition::nt_core_consciousness_tree::ConsciousnessTree>,
+    pub consciousness: Option<crate::l1_action::nt_action_facade::ConsciousnessTree>,
     pub event_bus: Option<crate::neotrix::nt_core_event_bus::EventBus>,
     pub brain: Option<
         Arc<tokio::sync::RwLock<dyn crate::l0_substrate::nt_core_traits::BrainHandle>>,
@@ -112,7 +112,7 @@ pub struct NeoCodexAgent {
     pub evolution: EvolutionLoop,
     pub audit: NeoCodexSelfAudit,
     // Cycle 160e: tool grounding monitor (D25 production-wired, R-P49~R-P53)
-    pub tool_grounding: crate::l5_cognition::l1_facade::self_audit::ToolGroundingMonitor,
+    pub tool_grounding: crate::l1_action::nt_action_facade::ToolGroundingMonitor,
     // P2-5: MCP tool registry (Codex/Claude MCP parity). When registered, the
     // agent gains a `mcp_call` tool proxying to the registry; previously the
     // MCP host existed only for CLI/headless and the NeoCodex agent could not
@@ -139,7 +139,7 @@ impl NeoCodexAgent {
             subagent_results: Vec::new(),
             evolution: EvolutionLoop::new(),
             audit: NeoCodexSelfAudit::new(),
-            tool_grounding: crate::l5_cognition::l1_facade::self_audit::ToolGroundingMonitor::new(),
+            tool_grounding: crate::l1_action::nt_action_facade::ToolGroundingMonitor::new(),
             mcp: None,
         }
     }

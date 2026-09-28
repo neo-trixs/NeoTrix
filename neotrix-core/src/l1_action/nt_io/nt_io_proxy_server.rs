@@ -1,4 +1,4 @@
-use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
+use crate::l1_action::nt_action_facade::CapabilityVector;
 use crate::l1_action::nt_core_bank::ReasoningBank;
 
 /// Local benchmark types (replaces L8 BenchmarkSuite dependency)

@@ -410,6 +410,7 @@ mod tests {
 pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::config::{reload, snapshot};
 pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_pool::ProxyPool;
 pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::rules::RuleEngine;
+pub use crate::l3_embodiment::nt_shield_enforcer::global_shield;
 pub use crate::l6_meta::nt_approval;
 pub use crate::l6_meta::nt_approval::PendingAction;
 
@@ -443,6 +444,25 @@ pub use crate::l2_perception::nt_core_knowledge::{
 pub use crate::l2_perception::nt_core_llm;
 pub use crate::l2_perception::nt_core_sense;
 pub use crate::l2_perception::nt_core_e8::nt_multimodal::model_supports_vision;
+pub use crate::l2_perception::nt_core_e8::nt_multimodal::VisionBridge;
 pub use crate::l2_perception::nt_world::nt_world_mirror;
 pub use crate::l2_perception::nt_world::source;
 pub use crate::l2_perception::nt_world::source::engine::MediaSource;
+
+// ─── L1→L5 跨层引用收敛 ──────────────────────────────────────────────────────
+// 路径沿用消费方原本就在用的路径（原代码已能编译 ⇒ 路径可证）。
+pub use crate::l5_cognition::l1_facade::affective_interface::{
+    AffectiveInterface, AffectiveReadout, GuideMode, ResponseIntent,
+};
+pub use crate::l5_cognition::l1_facade::self_audit::ToolGroundingMonitor;
+pub use crate::l5_cognition::nt_core::capability::nt_core_antidistil::decompose::{
+    DecomposeSuggestion, TaskDecomposer,
+};
+pub use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
+pub use crate::l5_cognition::nt_core::nt_crt::{CrtPlan, CrtTimeScale};
+pub use crate::l5_cognition::nt_core_consciousness_tree::{ConsciousnessTree, NodeSnapshot};
+pub use crate::l5_cognition::nt_core_context::revertible::{ClosureEffect, RevertibleContext};
+pub use crate::l5_cognition::nt_core_cot_generator::{CoTGenerator, CoTOutput, DefaultCoTGenerator};
+pub use crate::l5_cognition::nt_core_policy::E8Policy;
+pub use crate::l5_cognition::nt_core_walsh::WalshMemoryIndex;
+pub use crate::l5_cognition::reasoning_core::{ReasoningTrace, TraceSource};

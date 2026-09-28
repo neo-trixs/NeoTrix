@@ -1,7 +1,7 @@
 //! Dispatcher reduce — Claim/Reduce/分级/Error（纯搬移，行为零变更）。
 
 use super::nt_dispatcher_dto::{DecompositionResult, SubTask, SubTaskResult};
-use crate::l5_cognition::nt_core::nt_crt::CrtTimeScale;
+use crate::l1_action::nt_action_facade::CrtTimeScale;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -268,7 +268,7 @@ pub enum TaskDispatchError {
 mod tests {
     use super::*;
     use crate::l1_action::nt_core_task_dispatcher::nt_dispatcher_dto::{DecompositionResult, SubTask};
-    use crate::l5_cognition::nt_core::nt_crt::{CrtPlan, CrtTimeScale};
+    use crate::l1_action::nt_action_facade::{CrtPlan, CrtTimeScale};
     use std::collections::HashMap;
 
     fn result(id: &str, success: bool, output: &str) -> SubTaskResult {
