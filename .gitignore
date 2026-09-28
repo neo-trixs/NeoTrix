@@ -119,7 +119,14 @@ packaging/
 research/
 benches/
 examples/
-tests/
+# 只忽略**根目录**的 tests/，不匹配任意层级。
+# 裸 `tests/` 会匹配每一层，于是把各 crate 的**集成测试目录**一起吞掉：
+# 实测 `neotrix-core/tests` 26 个 .rs 只入库 2 个（24 个丢），
+# `apps/neobot-desktop/tests` 6 个 .rs **入库 0 个**（本轮建的 55 个 IPC 测试全在里面，
+# 存在于磁盘却永远进不了版本库 —— clone 下来等于没有这套网）。
+# 锚成 `/tests/` 后根目录那个 scratch 目录仍被忽略，crate 内的测试目录正常入库。
+# 已入库的文件不受影响（gitignore 只对未跟踪文件生效），所以这是纯增量修复。
+/tests/
 guard_core/
 neocodex-frontend/
 neotrix-ios/
