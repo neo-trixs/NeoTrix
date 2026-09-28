@@ -43,3 +43,41 @@
 - 恢复命令：先读本文件，再跑 `git status --short` / `git diff --stat` 核对
 - 禁止事项：不要跑 `cargo check --all-targets`，只用 `cargo check -p neotrix --lib`
 - 风险提示：与其他窗口改了同一文件？（写清楚文件名）
+
+## 8. 收工自查（2026-09-28 起**必填**，空着视为交接未完成）
+
+收工是**自己的义务**，不是接手者的义务。以下三项逐条回答，不得留空：
+
+### 8.1 worktree 去向
+
+- 跑 `sh scripts/ops/nt_worktree_gate.sh check`，把输出粘在这里：
+
+```
+<粘贴 check 输出>
+```
+
+- 本会话**新建**的 worktree，逐个说明去向（`prune --force` 收掉 / 明确移交他人 /
+  仍活跃需后续）：
+
+| worktree | 用途 | 去向 |
+|---|---|---|
+| 例：`.worktrees/xxx` | 隔离某改动 | 已 `prune --force` 移除 / 移交窗口B / 仍活跃 |
+
+- **禁止手删 worktree 目录**（`rm -rf .worktrees/*`）—— 2026-09-28 实测有 850 处
+  未提交改动不在任何提交里，手删即永久丢失。必须走 `prune`（内建双闸 + patch 兜底）。
+
+### 8.2 未提交改动的去向
+
+列出本会话结束时的所有未提交改动，逐个说明**最终去了哪**：
+
+| 文件 | 改动内容 | 去向（勾一个） |
+|---|---|---|
+| 例：`neotrix-core/src/foo.rs` | 修了 X | ☐ `git add` 已提交（`<hash>`） ☐ patch 兜底（路径） ☐ 明确弃用（理由） |
+
+> 「留给下一个 agent」**不算合法去向**。弃用也要写明理由，让接手者能判断。
+
+### 8.3 门状态
+
+- `sh scripts/ops/nt_worktree_gate.sh check` 的 exit code：`<0/3/4>`
+- 提交前是否跑过 `cargo xl` / `cargo check -p neotrix --lib`：☐ 是 ☐ 否
+- 若有门红（如分层门 `N new`），写清是「他窗 WIP」还是「本会话引入」：

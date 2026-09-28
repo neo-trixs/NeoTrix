@@ -33,6 +33,14 @@ cargo build -p neotrix                  # 完整构建
 - `#![forbid(unsafe_code)]` —— 永不加 `unsafe`。
 - 编辑后必须重读文件验证落盘（R-P16）。
 - 外部技术必须同会话接到生产可用（R-P79）。
+- **收工义务（2026-09-28 立，违反即阻塞）** —— 会话/任务结束前**必须**：
+  1. `sh scripts/ops/nt_worktree_gate.sh check` 看 worktree 现状；
+  2. 自己开的 worktree 走 `prune`（**禁止手删目录**）收掉，别留给下一个 agent；
+  3. 写 `sessions/handoff-<窗口>.md`，模板 §8「收工自查」**必填**（worktree 去向 +
+     未提交改动去了哪：`git add` 提交 / patch 兜底 / 明确声明弃用）。
+  依据：2026-09-28 实测 22 个 worktree 占 28G、**850 处未提交改动不在任何
+  提交里**（单个 758 处），全靠事后一个 agent 大扫除才救回来，而那次扫除
+  误删了 `ratchet`（4 处脏文件）靠 patch 才恢复。**收工是自己的义务，不是别人的。**
 
 ## 微操作公约（Agentation 思想吸收，skill: nt-locate）
 
