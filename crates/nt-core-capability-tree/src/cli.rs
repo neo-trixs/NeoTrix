@@ -943,9 +943,12 @@ impl CapabilityCli {
         }
         let mut by_domain: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
         for f in &findings {
+            // TODO 4.2: 把「未解析」带进 CI 输出 —— supported 只是**能证明的
+            // 地板**, 不加此轴会被读成「真实上限就是这么大」。
             println!(
-                "  {}  claimed={} supported={} ({})",
-                f.id, f.claimed.as_str(), f.supported.as_str(), f.domain.as_str()
+                "  {}  claimed={} supported={} ({}) [{}]",
+                f.id, f.claimed.as_str(), f.supported.as_str(), f.domain.as_str(),
+                f.epistemic.label()
             );
             *by_domain.entry(f.domain.as_str().to_string()).or_insert(0) += 1;
         }

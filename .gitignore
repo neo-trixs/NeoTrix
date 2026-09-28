@@ -228,3 +228,11 @@ neotrix-core/config/crystal.toml
 # src/ 内嵌的单元测试子目录 (随实现走, 不是生成物)
 !neotrix-core/src/**/tests/
 !neotrix-core/src/**/tests/**
+# crates/ 下的集成测试目录 (原解禁清单漏了 tests/: 此前无 crate 有入库测试,
+# 于是 `tests/` 通配从未被发现命中 crates —— 直到要新增才暴露。
+# 其中 neotrix-decision-engine/tests/integration_test.rs 早已存在于磁盘却未入库,
+# 导致本地测试数 > 新鲜克隆可跑数, CI 静默少测 (无任何告警)。
+!crates/neotrix-decision-engine/tests/
+!crates/neotrix-decision-engine/tests/**
+!crates/nt-core-capability-tree/tests/
+!crates/nt-core-capability-tree/tests/**

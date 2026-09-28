@@ -1,5 +1,6 @@
 //! 能力注册表
 
+use crate::epistemic::Epistemic;
 use crate::evolution::{EvolutionAction, EvolutionPlan};
 use crate::node::{ConstellationLevel, Domain, EvolutionOp, NodeLayer};
 pub use crate::node::CapabilityNode;
@@ -17,6 +18,12 @@ pub struct MaturityFinding {
     pub claimed: ConstellationLevel,    // 声称的 ConstellationLevel
     pub supported: ConstellationLevel,  // 证据链实际支撑的最高等级
     pub domain: Domain,
+    /// 「未解析」一等状态 (TODO 4.2, 2026-09-28): `supported` 这个数字究竟
+    /// 是**真实上限**, 还是**我们目前能证明的地板**。
+    ///
+    /// 证据缺失时二者不可区分(见 `epistemic` 模块), 故显式携带此轴,
+    /// 避免 CI 门禁把「没登记证据」印成「已查清不够格」。
+    pub epistemic: Epistemic,
 }
 
 /// 最短路径结果 (意识能力网最优解路由)
@@ -470,6 +477,7 @@ impl CapabilityRegistry {
                 claimed: n.constellation,
                 supported,
                 domain: n.domain,
+                epistemic: Epistemic::of(&n.metadata),
             })
             .collect()
     }

@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod epistemic;
 pub mod node;
 pub mod registry;
 pub mod evolution;
@@ -19,6 +20,7 @@ pub mod roadmap;
 pub use node::{CapabilityNode, NodeLayer, ConstellationLevel, Domain, RuneSocket, EvolutionOp, EvolutionLogEntry};
 pub use registry::{CapabilityRegistry, RegistryError};
 pub use evolution::{EvolutionEngine, EvolutionPlan, EvolutionAction};
+pub use epistemic::Epistemic;
 pub use cli::CapabilityCli;
 pub use fusion::{FusionReport, TraitNodeDescriptor};
 
