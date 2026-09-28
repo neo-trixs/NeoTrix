@@ -22,7 +22,7 @@ cargo test --lib                 12143 passed / 3 failed
 | 门 | 作用 | 证明 |
 |---|---|---|
 | `scripts/check-fresh-build.sh` | 脏树不是合法 oracle → 自建 `git worktree add --detach HEAD` 再跑 | 修复前的 `5fcb291b` 上 tier1 得 exit=101 |
-| `scripts/check-layer-deps.sh --strict` | 拦**新增**分层违规，既有 92 处记账 | 注入 L5→L6 后 exit=1 并精确报出 |
+| `scripts/check-layer-deps.sh --strict` | 拦**新增**分层违规，既有 94 处记账（84 层 + 10 neotrix/ 第二棵树） | 注入 L5→L6 后 exit=1 并精确报出 |
 | `scripts/check-test-baseline.sh` | 57 条失败变可数的债 | 账本态 PASS；**暂建议模式不拦**（见 T1） |
 
 ## 2. ⚠️ 勘误表 —— 台账里已被证伪的前提（**动手前必读**）
