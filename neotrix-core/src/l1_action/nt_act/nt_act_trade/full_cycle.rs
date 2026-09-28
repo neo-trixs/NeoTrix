@@ -10,7 +10,7 @@
 //! 3. trade_finance_compliance — 财务合规闭环 (FT05-FT06, FT14-FT16)
 
 use nt_core_capability_tree::{
-    CapabilityNode, CapabilityRegistry, Domain, NodeLayer,
+    CapabilityNode, CapabilityTreeRegistry, Domain, NodeLayer,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -754,8 +754,8 @@ pub fn execute_trade_full_cycle(context: TradeContext) -> TradeResult {
     machine.partial_result
 }
 
-/// Register the Keystone capability node in the CapabilityRegistry
-pub fn register_trade_full_cycle_capability(registry: &mut CapabilityRegistry) -> CapabilityNode {
+/// Register the Keystone capability node in the CapabilityTreeRegistry
+pub fn register_trade_full_cycle_capability(registry: &mut CapabilityTreeRegistry) -> CapabilityNode {
     let node = CapabilityNode::new_constellation(
         "NT-MIND::trade::foreign_trade_full_cycle".to_string(),
         Domain::Mind,

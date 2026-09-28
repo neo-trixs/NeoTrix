@@ -15,12 +15,12 @@ pub fn capability_registry_path() -> std::path::PathBuf {
     }
 }
 
-pub fn load_capability_registry() -> Option<nt_core_capability_tree::registry::CapabilityRegistry> {
+pub fn load_capability_registry() -> Option<nt_core_capability_tree::registry::CapabilityTreeRegistry> {
     let path = capability_registry_path();
     let json = std::fs::read_to_string(path).ok()?;
     let export: nt_core_capability_tree::registry::RegistryExport =
         serde_json::from_str(&json).ok()?;
-    let mut registry = nt_core_capability_tree::registry::CapabilityRegistry::new();
+    let mut registry = nt_core_capability_tree::registry::CapabilityTreeRegistry::new();
     for node in export.nodes {
         if registry.register(node).is_err() {
             return None;
@@ -38,7 +38,7 @@ pub fn load_capability_registry() -> Option<nt_core_capability_tree::registry::C
         .map(|p| p.join("capability_overrides.json"))
         .unwrap_or_else(|| std::path::PathBuf::from("capability_overrides.json"));
     if let Some(ov) =
-        nt_core_capability_tree::registry::CapabilityRegistry::load_overlay_file(&overlay_path)
+        nt_core_capability_tree::registry::CapabilityTreeRegistry::load_overlay_file(&overlay_path)
     {
         registry.merge_overlay(&ov);
     }
@@ -46,7 +46,7 @@ pub fn load_capability_registry() -> Option<nt_core_capability_tree::registry::C
 }
 
 pub fn persist_capability_registry(
-    registry: &nt_core_capability_tree::registry::CapabilityRegistry,
+    registry: &nt_core_capability_tree::registry::CapabilityTreeRegistry,
 ) -> Result<(), String> {
     let path = capability_registry_path();
     if let Some(parent) = path.parent() {

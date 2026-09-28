@@ -10,7 +10,7 @@
 //! - Rune 槽 (5): Crimson/Indigo/Obsidian/Golden/Alabaster
 
 use crate::node::{CapabilityNode, ConstellationLevel, Domain, NodeLayer, RuneSocket};
-use crate::registry::{CapabilityRegistry, RegistryError};
+use crate::registry::{CapabilityTreeRegistry, RegistryError};
 use serde_json::Value as Json;
 
 /// CAD 能力节点描述符。
@@ -92,10 +92,10 @@ impl CadCapabilityNode {
     }
 }
 
-/// 将 CAD 能力节点注册进能力树 (Tree 类型: [`CapabilityRegistry`])。
+/// 将 CAD 能力节点注册进能力树 (Tree 类型: [`CapabilityTreeRegistry`])。
 ///
 /// 镜像既有注册调用模式 (`tree.register(node)`), 返回 `RegistryError`
 /// (节点已存在 / 循环依赖 / 校验失败)。
-pub fn register_cad_capability(tree: &mut CapabilityRegistry) -> Result<(), RegistryError> {
+pub fn register_cad_capability(tree: &mut CapabilityTreeRegistry) -> Result<(), RegistryError> {
     tree.register(CadCapabilityNode.build())
 }

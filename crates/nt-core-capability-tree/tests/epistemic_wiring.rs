@@ -1,11 +1,11 @@
 //! 4.2 集成验证: `Epistemic` 确实接进了 `maturity_audit` 的**真实路径**。
 //!
 //! 单元测试 (`src/epistemic.rs`) 只证明枚举逻辑; 本文件证明
-//! `CapabilityRegistry::maturity_audit()` 产出的每个 finding 都真的携带
+//! `CapabilityTreeRegistry::maturity_audit()` 产出的每个 finding 都真的携带
 //! 该字段, 且判据来自节点 metadata 而非硬编码。
 
 use nt_core_capability_tree::node::{CapabilityNode, ConstellationLevel, Domain};
-use nt_core_capability_tree::registry::CapabilityRegistry;
+use nt_core_capability_tree::registry::CapabilityTreeRegistry;
 use nt_core_capability_tree::Epistemic;
 
 /// 声称 C4 但**零证据**登记的节点 —— 门禁必须报它, 且标为「未解析」。
@@ -14,7 +14,7 @@ use nt_core_capability_tree::Epistemic;
 /// 「我们没有证据」, 不是「已查清它只到 C0」。
 #[test]
 fn finding_carries_lower_bound_when_no_evidence_exhaustiveness_claimed() {
-    let mut reg = CapabilityRegistry::new();
+    let mut reg = CapabilityTreeRegistry::new();
     let mut node = CapabilityNode::new_primitive(
         "test::unproven_claim".into(),
         Domain::Core,
@@ -44,7 +44,7 @@ fn finding_carries_lower_bound_when_no_evidence_exhaustiveness_claimed() {
 /// 证明这不是硬编码常量, 而是真正接在节点证据上。
 #[test]
 fn epistemic_tracks_node_metadata() {
-    let mut reg = CapabilityRegistry::new();
+    let mut reg = CapabilityTreeRegistry::new();
     let mut node = CapabilityNode::new_primitive(
         "test::declared_exhaustive".into(),
         Domain::Core,
@@ -71,7 +71,7 @@ fn epistemic_tracks_node_metadata() {
 /// epistemic 标签 —— 空标签会污染 CI 日志。
 #[test]
 fn clean_registry_produces_no_findings() {
-    let mut reg = CapabilityRegistry::new();
+    let mut reg = CapabilityTreeRegistry::new();
     // 声称 C1 且 provides 非空 ⇒ supported 恰为 C1, 无虚标
     reg.register(CapabilityNode::new_primitive(
         "test::honest".into(),

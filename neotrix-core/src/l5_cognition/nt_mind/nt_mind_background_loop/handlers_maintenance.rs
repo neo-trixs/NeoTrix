@@ -192,7 +192,7 @@ impl BackgroundLoopHandle {
                 return None;
             }
         };
-        let mut registry = nt_core_capability_tree::registry::CapabilityRegistry::new();
+        let mut registry = nt_core_capability_tree::registry::CapabilityTreeRegistry::new();
         for node in export.nodes {
             if let Err(e) = registry.register(node) {
                 log::warn!("[bg] capability_auto_evolve: register failed: {}", e);
@@ -213,7 +213,7 @@ impl BackgroundLoopHandle {
             .map(|p| p.join("capability_overrides.json"))
             .unwrap_or_else(|| PathBuf::from("capability_overrides.json"));
         if let Some(ov) =
-            nt_core_capability_tree::registry::CapabilityRegistry::load_overlay_file(&overlay_path)
+            nt_core_capability_tree::registry::CapabilityTreeRegistry::load_overlay_file(&overlay_path)
         {
             registry.merge_overlay(&ov);
         }

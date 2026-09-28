@@ -1,7 +1,7 @@
 //! CLI: neotrix-capability 子命令
 
 use crate::node::{CapabilityNode, ConstellationLevel, Domain, NodeLayer};
-use crate::registry::{CapabilityRegistry, RegistryError};
+use crate::registry::{CapabilityTreeRegistry, RegistryError};
 use crate::evolution::{EvolutionAction, EvolutionEngine, EvolutionPlan};
 use clap::{Parser, Subcommand};
 use serde_json;
@@ -295,10 +295,10 @@ impl CapabilityCli {
         Ok(())
     }
 
-    fn load_registry(&self) -> Result<CapabilityRegistry, Box<dyn std::error::Error>> {
+    fn load_registry(&self) -> Result<CapabilityTreeRegistry, Box<dyn std::error::Error>> {
         if self.registry.exists() {
             let content = fs::read_to_string(&self.registry)?;
-            let mut reg = CapabilityRegistry::new();
+            let mut reg = CapabilityTreeRegistry::new();
             match serde_json::from_str::<crate::registry::RegistryExport>(&content) {
                 Ok(export) => {
                     // 两阶段加载: 先全量注册 (延迟依赖警告, 允许前向声明),
@@ -324,7 +324,7 @@ impl CapabilityCli {
                 Err(_) => {
                     // 老 schema 文件（domains 形，无 nodes）：内存迁移。
                     // 先落一次性备份，下一次写命令 save_registry 即转正新 schema。
-                    reg = CapabilityRegistry::migrate_legacy(&content).map_err(|e| {
+                    reg = CapabilityTreeRegistry::migrate_legacy(&content).map_err(|e| {
                         format!("registry 既非新 schema 也非老 schema: {e}")
                     })?;
                     let bak = self.registry.with_extension("json.bak-legacy");
@@ -340,15 +340,15 @@ impl CapabilityCli {
                 }
             }
             // Durable 覆盖层: 合并提交的 overlay, 使手动写入在基础重新生成后仍生效。
-            if let Some(ov) = CapabilityRegistry::load_overlay_file(&self.overlay_path()) {
+            if let Some(ov) = CapabilityTreeRegistry::load_overlay_file(&self.overlay_path()) {
                 reg.merge_overlay(&ov);
             }
             // 架构演进路线图 18 模块批量注册 (R-P100) — 幂等
             let _ = crate::roadmap::register_from_default_path(&mut reg);
             Ok(reg)
         } else {
-            let mut reg = CapabilityRegistry::new();
-            if let Some(ov) = CapabilityRegistry::load_overlay_file(&self.overlay_path()) {
+            let mut reg = CapabilityTreeRegistry::new();
+            if let Some(ov) = CapabilityTreeRegistry::load_overlay_file(&self.overlay_path()) {
                 reg.merge_overlay(&ov);
             }
             // 架构演进路线图 18 模块批量注册 (R-P100) — 幂等
@@ -366,7 +366,7 @@ impl CapabilityCli {
             .unwrap_or_else(|| std::path::PathBuf::from("capability_overrides.json"))
     }
 
-    fn save_registry(&self, registry: &CapabilityRegistry) -> Result<(), Box<dyn std::error::Error>> {
+    fn save_registry(&self, registry: &CapabilityTreeRegistry) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(parent) = self.registry.parent() {
             fs::create_dir_all(parent)?;
         }
@@ -430,7 +430,7 @@ impl CapabilityCli {
 
     fn cmd_tree(
         &self,
-        registry: &CapabilityRegistry,
+        registry: &CapabilityTreeRegistry,
         format: &TreeFormat,
         domain: &Option<String>,
         layer: &Option<String>,
@@ -524,7 +524,7 @@ impl CapabilityCli {
 
     fn cmd_bud(
         &self,
-        registry: &mut CapabilityRegistry,
+        registry: &mut CapabilityTreeRegistry,
         id: &str,
         domain: &str,
         layer: &str,
@@ -545,7 +545,7 @@ impl CapabilityCli {
 
     fn cmd_graft(
         &self,
-        registry: &mut CapabilityRegistry,
+        registry: &mut CapabilityTreeRegistry,
         target: &str,
         folded: &str,
         note: &str,
@@ -562,7 +562,7 @@ impl CapabilityCli {
 
     fn cmd_prune(
         &self,
-        registry: &mut CapabilityRegistry,
+        registry: &mut CapabilityTreeRegistry,
         id: &str,
         reason: &str,
         force: bool,
@@ -587,7 +587,7 @@ impl CapabilityCli {
         Ok(())
     }
 
-    fn cmd_mature(&self, registry: &mut CapabilityRegistry, id: &str, wiring: Option<&str>, evidence: bool) -> Result<(), Box<dyn std::error::Error>> {
+    fn cmd_mature(&self, registry: &mut CapabilityTreeRegistry, id: &str, wiring: Option<&str>, evidence: bool) -> Result<(), Box<dyn std::error::Error>> {
         // 写入晋升证据 (D16 门禁): C1→C2 需 wiring_evidence; C2+ 需 evidence_gated
         if let Some(node) = registry.get_mut(id) {
             if let Some(w) = wiring {
@@ -617,7 +617,7 @@ impl CapabilityCli {
         Ok(())
     }
 
-    fn cmd_strengthen(&self, registry: &mut CapabilityRegistry, id: &str, note: &str) -> Result<(), Box<dyn std::error::Error>> {
+    fn cmd_strengthen(&self, registry: &mut CapabilityTreeRegistry, id: &str, note: &str) -> Result<(), Box<dyn std::error::Error>> {
         if registry.get(id).is_none() {
             return Err(format!("Node '{}' not found", id).into());
         }
@@ -629,7 +629,7 @@ impl CapabilityCli {
 
     fn cmd_cross_pollinate(
         &self,
-        registry: &mut CapabilityRegistry,
+        registry: &mut CapabilityTreeRegistry,
         shared: &str,
         domain_a: &str,
         domain_b: &str,
@@ -648,7 +648,7 @@ impl CapabilityCli {
 
     fn cmd_link(
         &self,
-        registry: &mut CapabilityRegistry,
+        registry: &mut CapabilityTreeRegistry,
         from: &str,
         to: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -657,7 +657,7 @@ impl CapabilityCli {
         Ok(())
     }
 
-    fn cmd_scan(&self, registry: &mut CapabilityRegistry, apply: bool) -> Result<(), Box<dyn std::error::Error>> {
+    fn cmd_scan(&self, registry: &mut CapabilityTreeRegistry, apply: bool) -> Result<(), Box<dyn std::error::Error>> {
         let engine = EvolutionEngine::new(registry);
         let mut plans = engine.auto_scan(&self.cycle);
 
@@ -697,7 +697,7 @@ impl CapabilityCli {
     /// 闭环: distill_promote_to_capability 写入 → 此处消费 → 能力树 Strengthen/Bud 执行。
     pub(crate) fn experience_target_plans(
         &self,
-        registry: &CapabilityRegistry,
+        registry: &CapabilityTreeRegistry,
     ) -> Result<Vec<EvolutionPlan>, Box<dyn std::error::Error>> {
         let mut plans = Vec::new();
         let targets = &registry.experience_targets;
@@ -765,7 +765,7 @@ impl CapabilityCli {
         Ok(plans)
     }
 
-    fn cmd_get(&self, registry: &CapabilityRegistry, id: &str) -> Result<(), Box<dyn std::error::Error>> {
+    fn cmd_get(&self, registry: &CapabilityTreeRegistry, id: &str) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(node) = registry.get(id) {
             println!("{}", serde_json::to_string_pretty(node)?);
         } else {
@@ -776,7 +776,7 @@ impl CapabilityCli {
 
     fn cmd_list(
         &self,
-        registry: &CapabilityRegistry,
+        registry: &CapabilityTreeRegistry,
         domain: &Option<String>,
         layer: &Option<String>,
         constellation: &Option<String>,
@@ -812,7 +812,7 @@ impl CapabilityCli {
         Ok(())
     }
 
-    fn cmd_stats(&self, registry: &CapabilityRegistry) -> Result<(), Box<dyn std::error::Error>> {
+    fn cmd_stats(&self, registry: &CapabilityTreeRegistry) -> Result<(), Box<dyn std::error::Error>> {
         let stats = registry.stats();
         println!("{}", serde_json::to_string_pretty(&stats)?);
         Ok(())
@@ -820,7 +820,7 @@ impl CapabilityCli {
 
     fn cmd_export(
         &self,
-        registry: &CapabilityRegistry,
+        registry: &CapabilityTreeRegistry,
         output: &Option<PathBuf>,
         format: &ExportFormat,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -863,7 +863,7 @@ impl CapabilityCli {
         Ok(())
     }
 
-    fn cmd_validate(&self, registry: &CapabilityRegistry) -> Result<(), Box<dyn std::error::Error>> {
+    fn cmd_validate(&self, registry: &CapabilityTreeRegistry) -> Result<(), Box<dyn std::error::Error>> {
         let mut errors = 0;
         
         // 检查循环依赖
@@ -907,7 +907,7 @@ impl CapabilityCli {
 
     /// 契约审计 (P1): 报告缺失 input/output_schema + fallback_chain 的节点。
     /// 履约率 = 合规节点 / 总节点。只读审计, 不阻塞 (既有节点向后兼容)。
-    fn cmd_contracts(&self, registry: &CapabilityRegistry) {
+    fn cmd_contracts(&self, registry: &CapabilityTreeRegistry) {
         let violations = registry.contract_violations();
         let compliance = registry.contract_compliance();
         println!(
@@ -932,7 +932,7 @@ impl CapabilityCli {
     /// 成熟度真相反查 (E2 虚标治理): 报告并可选降标虚标节点。
     fn cmd_audit_maturity(
         &self,
-        registry: &mut CapabilityRegistry,
+        registry: &mut CapabilityTreeRegistry,
         apply: bool,
         strict: bool,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -980,7 +980,7 @@ impl CapabilityCli {
     /// 目标可以是能力标签 (自动选最优 provider) 或节点 ID。
     fn cmd_route(
         &self,
-        registry: &CapabilityRegistry,
+        registry: &CapabilityTreeRegistry,
         target: &str,
         from: Option<&str>,
         to: Option<&str>,

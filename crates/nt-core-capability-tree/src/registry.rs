@@ -57,7 +57,7 @@ pub enum RegistryError {
 
 /// 注册表核心
 #[derive(Debug, Clone)]
-pub struct CapabilityRegistry {
+pub struct CapabilityTreeRegistry {
     pub nodes: IndexMap<String, CapabilityNode>,  // id -> node
     domain_index: HashMap<Domain, Vec<String>>,
     layer_index: HashMap<NodeLayer, Vec<String>>,
@@ -74,13 +74,13 @@ pub struct CapabilityRegistry {
     pending_dep_warnings: Vec<(String, String)>,  // (dependency, consumer)
 }
 
-impl Default for CapabilityRegistry {
+impl Default for CapabilityTreeRegistry {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl CapabilityRegistry {
+impl CapabilityTreeRegistry {
     pub fn new() -> Self {
         Self {
             nodes: IndexMap::new(),
@@ -996,7 +996,7 @@ fn legacy_constellation_of(c: &str) -> ConstellationLevel {
     }
 }
 
-impl CapabilityRegistry {
+impl CapabilityTreeRegistry {
     /// 老文件迁移：domains 形文本 → 内存注册表。experience_targets 原样保留。
     /// 坏条目（空 id）跳过单条，不炸整批；重复 id 后写优先（register 幂等忽略）。
     pub fn migrate_legacy(text: &str) -> Result<Self, String> {
@@ -1048,8 +1048,8 @@ mod tests {
     use super::*;
     use crate::node::CapabilityNode;
 
-    fn build_test_registry() -> CapabilityRegistry {
-        let mut reg = CapabilityRegistry::new();
+    fn build_test_registry() -> CapabilityTreeRegistry {
+        let mut reg = CapabilityTreeRegistry::new();
         // L0 primitives
         reg.register(CapabilityNode::new_primitive("p1".into(), Domain::Core, vec!["read".into()])).unwrap();
         reg.register(CapabilityNode::new_primitive("p2".into(), Domain::Core, vec!["bash".into()])).unwrap();
@@ -1089,7 +1089,7 @@ mod tests {
             },
             "experience_targets": [{"action": "strengthen_or_bud"}]
         });
-        let reg = CapabilityRegistry::migrate_legacy(&old.to_string()).unwrap();
+        let reg = CapabilityTreeRegistry::migrate_legacy(&old.to_string()).unwrap();
         assert_eq!(reg.nodes.len(), 2, "空 id 条目应跳过");
         let n0 = reg.get("nt_file_ability::xlsx_fast::read").unwrap();
         assert_eq!(n0.domain, Domain::Act);
@@ -1106,7 +1106,7 @@ mod tests {
 
     #[test]
     fn test_orphan_nodes_excludes_wired() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         // 无 dependents、无 wiring_evidence → 孤儿
         reg.register(CapabilityNode::new_primitive("orphan_a".into(), Domain::Core, vec!["x".into()])).unwrap();
         // 无 dependents 但有 wiring_evidence (T3 生产接线) → 非孤儿
@@ -1154,7 +1154,7 @@ mod tests {
     /// 节点 ID 与 tag 双命名空间 — 仅查 provides_index 会误报节点 ID 引用。
     #[test]
     fn test_requires_node_id_resolves_without_false_warning() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         // 依赖先注册 (全路径 ID, 提供 tag 'mode_routing')
         let dep = CapabilityNode::new_primitive(
             "nt_core_gwt::mode_router".into(), Domain::Core, vec!["mode_routing".into()],
@@ -1183,7 +1183,7 @@ mod tests {
     /// 全部注册后 validate_dependencies 仅报告真实缺失。
     #[test]
     fn test_two_phase_load_forward_declaration_no_false_warning() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         reg.set_defer_dep_warnings(true);
         // 消费者先注册 (前向声明依赖后注册节点)
         let mut consumer = CapabilityNode::new_primitive(
@@ -1202,7 +1202,7 @@ mod tests {
         assert!(unresolved.is_empty(), "forward-declared dep must resolve: {:?}", unresolved);
 
         // 真实缺失仍报告
-        let mut reg2 = CapabilityRegistry::new();
+        let mut reg2 = CapabilityTreeRegistry::new();
         reg2.set_defer_dep_warnings(true);
         let mut c2 = CapabilityNode::new_primitive(
             "consumer_x".into(), Domain::Core, vec!["x".into()],
@@ -1290,7 +1290,7 @@ mod tests {
     /// 防止后续改动把审计误判回"119 虚标"或漏报真实虚标。
     #[test]
     fn test_maturity_audit_demote_regression() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         // 声称 C2 但无 provides/wiring_evidence → 实际支撑 C0
         let mut ghost = CapabilityNode::new_primitive("mind::ghost".into(), Domain::Mind, vec![]);
         ghost.constellation = ConstellationLevel::C2IntegrationTest;

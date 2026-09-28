@@ -11,7 +11,7 @@ use super::nt_dispatch_types::{
 use crate::l5_cognition::l1_facade::{AbsorbEntry, KnowledgeBase};
 
 pub fn allocate_tasks(
-    registry: Option<&nt_core_capability_tree::registry::CapabilityRegistry>,
+    registry: Option<&nt_core_capability_tree::registry::CapabilityTreeRegistry>,
     tasks: &[ConsciousTask],
 ) -> Vec<TaskAllocation> {
     let mut allocations = Vec::new();
@@ -43,7 +43,7 @@ pub fn allocate_tasks(
 }
 
 pub fn reflect_and_strengthen(
-    registry: &mut nt_core_capability_tree::registry::CapabilityRegistry,
+    registry: &mut nt_core_capability_tree::registry::CapabilityTreeRegistry,
     allocations: &[TaskAllocation],
 ) -> usize {
     use nt_core_capability_tree::{Domain as CapDomain, EvolutionEngine, NodeLayer};

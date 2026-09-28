@@ -11,7 +11,7 @@
 //!   3. 论证推演: 生成 EvolutionPlan (bud/graft/strengthen/mature/prune) 供能力树执行
 
 use nt_core_capability_tree::{
-    CapabilityRegistry, EvolutionAction, EvolutionPlan, NodeLayer, Domain,
+    CapabilityTreeRegistry, EvolutionAction, EvolutionPlan, NodeLayer, Domain,
 };
 use std::collections::HashMap;
 
@@ -234,7 +234,7 @@ impl ExperienceRouter {
     /// 论证推演: 每个高信号经验 → Strengthen 对应节点 (若节点不存在则 Bud 建议)
     /// 杠杆最高切入点: signal >= 0.7 的经验是 C0/C1 弱节点的最佳升级目标
     pub fn plan_evolution(
-        registry: &CapabilityRegistry,
+        registry: &CapabilityTreeRegistry,
         dims: &[ExperienceDimension],
         cycle: &str,
     ) -> Vec<EvolutionPlan> {
@@ -387,10 +387,10 @@ pub fn promote_to_file(registry_path: &std::path::Path, dims: &[ExperienceDimens
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nt_core_capability_tree::{CapabilityNode, CapabilityRegistry};
+    use nt_core_capability_tree::{CapabilityNode, CapabilityTreeRegistry};
 
-    fn sample_registry() -> CapabilityRegistry {
-        let mut reg = CapabilityRegistry::new();
+    fn sample_registry() -> CapabilityTreeRegistry {
+        let mut reg = CapabilityTreeRegistry::new();
         let node = CapabilityNode::new_primitive(
             "test::retrieval".into(),
             Domain::Memory,

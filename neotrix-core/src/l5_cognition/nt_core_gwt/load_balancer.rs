@@ -12,7 +12,7 @@ use super::resonance::MODULE_COUNT;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LoadBalancer {
+pub struct MoELoadBalancer {
     /// Sliding window of recent gate distributions (for P_i computation)
     selection_history: Vec<[f64; MODULE_COUNT]>,
     /// Maximum window size
@@ -25,13 +25,13 @@ pub struct LoadBalancer {
     total_selections: f64,
 }
 
-impl Default for LoadBalancer {
+impl Default for MoELoadBalancer {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl LoadBalancer {
+impl MoELoadBalancer {
     pub fn new() -> Self {
         Self {
             selection_history: Vec::new(),
@@ -160,18 +160,18 @@ mod tests {
 
     #[test]
     fn test_load_balancer_default() {
-        let lb = LoadBalancer::new();
+        let lb = MoELoadBalancer::new();
         let loss = lb.compute_loss();
         // 2026-09-27 修正: 空 workspace 的负载是**均匀**的, 而均匀分布的
         // 辅助损失恒等于系数本身 (N·Σf_i·P_i = 1 → coef), 不是 1/N。
         // 原断言 1/15 与实现的 aux_loss_coef(0.01) 不符。
-        // 0.01 = LoadBalancer::new() 的默认 aux_loss_coef (见 :39)
+        // 0.01 = MoELoadBalancer::new() 的默认 aux_loss_coef (见 :39)
         assert!((loss - 0.01).abs() < 1e-6, "loss {loss}");
     }
 
     #[test]
     fn test_record_step() {
-        let mut lb = LoadBalancer::new();
+        let mut lb = MoELoadBalancer::new();
         let probs = [0.1; MODULE_COUNT];
         lb.record_step(&probs, &[0]);
         assert_eq!(lb.selection_counts[0], 1.0);
@@ -180,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_load_entropy_balanced() {
-        let mut lb = LoadBalancer::new();
+        let mut lb = MoELoadBalancer::new();
         let probs = [1.0 / MODULE_COUNT as f64; MODULE_COUNT];
         for i in 0..MODULE_COUNT {
             lb.record_step(&probs, &[i]);
@@ -191,7 +191,7 @@ mod tests {
 
     #[test]
     fn test_apply_biases() {
-        let mut lb = LoadBalancer::new();
+        let mut lb = MoELoadBalancer::new();
         // Simulate all selections to expert 0
         let probs = [0.1; MODULE_COUNT];
         for _ in 0..100 {

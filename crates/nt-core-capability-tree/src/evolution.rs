@@ -1,7 +1,7 @@
 //! 演化引擎: 规划与执行 Budding/Grafting/Pruning/CrossPollination/Maturation
 
 use crate::node::{CapabilityNode, Domain, EvolutionLogEntry, EvolutionOp, NodeLayer};
-use crate::registry::{CapabilityRegistry, RegistryError};
+use crate::registry::{CapabilityTreeRegistry, RegistryError};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -63,11 +63,11 @@ pub struct EvolutionPlan {
 }
 
 pub struct EvolutionEngine<'a> {
-    registry: &'a mut CapabilityRegistry,
+    registry: &'a mut CapabilityTreeRegistry,
 }
 
 impl<'a> EvolutionEngine<'a> {
-    pub fn new(registry: &'a mut CapabilityRegistry) -> Self {
+    pub fn new(registry: &'a mut CapabilityTreeRegistry) -> Self {
         Self { registry }
     }
 
@@ -458,10 +458,10 @@ impl<'a> EvolutionEngine<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::registry::CapabilityRegistry;
+    use crate::registry::CapabilityTreeRegistry;
 
-    fn seeded_registry() -> (CapabilityRegistry, String) {
-        let mut reg = CapabilityRegistry::new();
+    fn seeded_registry() -> (CapabilityTreeRegistry, String) {
+        let mut reg = CapabilityTreeRegistry::new();
         let id = "mind::harness::synthesizer".to_string();
         let node = CapabilityNode::new_primitive(id.clone(), Domain::Mind, vec!["agent_harness".into()]);
         reg.register(node).unwrap();
@@ -470,7 +470,7 @@ mod tests {
 
     #[test]
     fn plan_harness_synthesize_carries_task_signature() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         let engine = EvolutionEngine::new(&mut reg);
         let plan = engine.plan_harness_synthesize(
             "mind::harness::s".into(),

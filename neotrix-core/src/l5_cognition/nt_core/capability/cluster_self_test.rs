@@ -1,6 +1,6 @@
 //! # CapabilityClusterSelfTest — L7 能力集群级自测
 //!
-//! 对 `CapabilityRegistry` 做完整性自审 (R-P23 检测系统自审计):
+//! 对 `CapabilityCatalog` 做完整性自审 (R-P23 检测系统自审计):
 //! - 注册表可达且可构造 (不 panic)
 //! - 集群计数非负、模块技能注册幂等
 //!
@@ -21,7 +21,7 @@ impl SelfTest for CapabilityClusterSelfTest {
         let mut failures = Vec::new();
 
         // 注册表可构造且空表计数为 0 — 防未来 Default 实现破坏不变量
-        let empty = super::registry::CapabilityRegistry::new();
+        let empty = super::registry::CapabilityCatalog::new();
         if empty.count() != 0 {
             failures.push(format!(
                 "empty registry count = {}, expected 0",
@@ -30,7 +30,7 @@ impl SelfTest for CapabilityClusterSelfTest {
         }
 
         // 注册模型技能应幂等: 首次返回新注册数, 重复调用返回 0 (不重复注册)
-        let mut reg = super::registry::CapabilityRegistry::new();
+        let mut reg = super::registry::CapabilityCatalog::new();
         let first = reg.register_model_skills();
         let second = reg.register_model_skills();
         if second != 0 {

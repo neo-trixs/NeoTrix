@@ -4,7 +4,7 @@
 //! 数据源: `roadmap_modules.json` (架构演进路线图 18 模块清单)
 
 use crate::node::{CapabilityNode, ConstellationLevel, Domain, NodeLayer};
-use crate::registry::{CapabilityRegistry, RegistryError};
+use crate::registry::{CapabilityTreeRegistry, RegistryError};
 use serde::Deserialize;
 use std::path::Path;
 
@@ -141,7 +141,7 @@ fn entry_to_node(entry: &RoadmapModuleEntry) -> Result<CapabilityNode, RegistryE
 ///
 /// 返回成功注册数和失败详情。
 pub fn register_roadmap_modules(
-    registry: &mut CapabilityRegistry,
+    registry: &mut CapabilityTreeRegistry,
     manifest: &RoadmapManifest,
 ) -> (usize, Vec<(String, String)>) {
     let mut registered = 0;
@@ -171,7 +171,7 @@ type RoadmapResult = Result<(usize, Vec<(String, String)>), Box<dyn std::error::
 /// （2026-09-28 更正：原注释写 `neotrix-core/src/neotrix/nt_core_capability_tree/`，
 ///  该目录不存在；数据文件实际在本 crate 根下）
 pub fn register_from_default_path(
-    registry: &mut CapabilityRegistry,
+    registry: &mut CapabilityTreeRegistry,
 ) -> RoadmapResult {
     // 相对于 crate root 的路径
     let manifest_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -203,7 +203,7 @@ mod tests {
             return; // skip if file not present
         }
         let manifest = load_manifest(&manifest_path).unwrap();
-        let mut registry = CapabilityRegistry::new();
+        let mut registry = CapabilityTreeRegistry::new();
         let (registered, errors) = register_roadmap_modules(&mut registry, &manifest);
         assert_eq!(registered, 41, "all 41 modules should register: errors={:?}", errors);
         assert!(errors.is_empty(), "no errors expected: {:?}", errors);

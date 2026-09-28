@@ -1,6 +1,6 @@
 //! Excel 能力树注册节点
 //!
-//! 将 Excel 解析能力注册到 CapabilityRegistry:
+//! 将 Excel 解析能力注册到 CapabilityTreeRegistry:
 //! - L0Primitive: 基础解析 (xlsx_read, csv_read)
 //! - L1Composite: 组合能力 (template_detect, parse_config, extract_metadata)
 //! - L2Orchestrator: 编排能力 (auto_parse)
@@ -65,7 +65,7 @@ impl ExcelCapability {
     }
 
     /// 注册 Excel 能力节点到能力树
-    pub fn register_nodes(registry: &mut nt_core_capability_tree::CapabilityRegistry) {
+    pub fn register_nodes(registry: &mut nt_core_capability_tree::CapabilityTreeRegistry) {
         // L0 原语节点: 基础解析能力
         let xlsx_node = CapabilityNode::new_primitive(
             "nt_file_ability::excel::xlsx_read".into(),

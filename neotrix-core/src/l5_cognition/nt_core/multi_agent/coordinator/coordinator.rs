@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use super::load_balancer::LoadBalancer;
+use super::load_balancer::AgentLoadBalancer;
 use super::monitor::CoordinatorMonitor;
 use super::task_routing::{TaskDescription, TaskRouter};
 
@@ -45,7 +45,7 @@ pub struct Assignment {
 pub struct MultiAgentCoordinator {
     agents: Vec<AgentEntry>,
     agent_map: HashMap<String, usize>,
-    load_balancer: LoadBalancer,
+    load_balancer: AgentLoadBalancer,
     monitor: CoordinatorMonitor,
 }
 
@@ -55,7 +55,7 @@ impl MultiAgentCoordinator {
         Self {
             agents: Vec::new(),
             agent_map: HashMap::new(),
-            load_balancer: LoadBalancer::new(),
+            load_balancer: AgentLoadBalancer::new(),
             monitor: CoordinatorMonitor::new(),
         }
     }

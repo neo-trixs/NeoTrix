@@ -6,7 +6,7 @@
 //! This is a NOTABLE skill (域级突破) under the foreign_trade_full_cycle Keystone.
 
 use nt_core_capability_tree::{
-    CapabilityNode, CapabilityRegistry, Domain, NodeLayer,
+    CapabilityNode, CapabilityTreeRegistry, Domain, NodeLayer,
 };
 use serde::{Deserialize, Serialize};
 
@@ -647,7 +647,7 @@ pub struct BookingRequirements {
 }
 
 /// Register the Notable capability node
-pub fn register_production_logistics_capability(registry: &mut CapabilityRegistry) -> CapabilityNode {
+pub fn register_production_logistics_capability(registry: &mut CapabilityTreeRegistry) -> CapabilityNode {
     let node = CapabilityNode::new_composite(
         "NT-MIND::trade::trade_production_logistics".to_string(),
         Domain::Mind,

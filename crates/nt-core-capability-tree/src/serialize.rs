@@ -1,7 +1,7 @@
 //! 序列化/反序列化与 KB 集成
 
 use crate::node::{EvolutionLogEntry, EvolutionOp};
-use crate::registry::{CapabilityRegistry, RegistryExport};
+use crate::registry::{CapabilityTreeRegistry, RegistryExport};
 use serde::{Deserialize, Serialize};
 /// KB 存储格式 (kv_store capability_tree namespace)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12,7 +12,7 @@ pub struct KBCapabilityTree {
 }
 
 impl KBCapabilityTree {
-    pub fn from_registry(registry: &CapabilityRegistry) -> Self {
+    pub fn from_registry(registry: &CapabilityTreeRegistry) -> Self {
         Self {
             version: 1,
             updated_at: chrono::Utc::now(),
@@ -20,8 +20,8 @@ impl KBCapabilityTree {
         }
     }
 
-    pub fn to_registry(&self) -> CapabilityRegistry {
-        let mut reg = CapabilityRegistry::new();
+    pub fn to_registry(&self) -> CapabilityTreeRegistry {
+        let mut reg = CapabilityTreeRegistry::new();
         for node in &self.registry.nodes {
             reg.register(node.clone()).unwrap_or_else(|e| {
                 eprintln!("[KBCapabilityTree] Failed to register {}: {}", node.id, e);
@@ -66,7 +66,7 @@ impl From<EvolutionLogEntry> for CapabilityEvolutionExperience {
 }
 
 /// 导出为 experience-tree 兼容格式
-pub fn export_experiences(registry: &CapabilityRegistry) -> Vec<CapabilityEvolutionExperience> {
+pub fn export_experiences(registry: &CapabilityTreeRegistry) -> Vec<CapabilityEvolutionExperience> {
     let mut exps = Vec::new();
     for node in registry.nodes.values() {
         for entry in &node.evolution_log {
@@ -86,7 +86,7 @@ pub fn export_experiences(registry: &CapabilityRegistry) -> Vec<CapabilityEvolut
 }
 
 /// 从 experience-tree 导入演化日志
-pub fn import_experiences(registry: &mut CapabilityRegistry, experiences: &[CapabilityEvolutionExperience]) {
+pub fn import_experiences(registry: &mut CapabilityTreeRegistry, experiences: &[CapabilityEvolutionExperience]) {
     for exp in experiences {
         if let Some(node) = registry.get_mut(&exp.node_id) {
             // 去重: 检查是否已有相同日志
@@ -112,11 +112,11 @@ pub fn import_experiences(registry: &mut CapabilityRegistry, experiences: &[Capa
 mod tests {
     use super::*;
     use crate::node::{CapabilityNode, Domain};
-    use crate::registry::CapabilityRegistry;
+    use crate::registry::CapabilityTreeRegistry;
 
     #[test]
     fn test_kb_roundtrip() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         let node = CapabilityNode::new_primitive(
             "test::primitive".into(),
             Domain::Core,

@@ -13,7 +13,7 @@
 //! 设计蓝本: `docs/1-DESIGN/2026-08-14-quantum-state-link-capability-network-fusion.md` §2.3
 
 use crate::node::{CapabilityNode, ConstellationLevel, Domain, NodeLayer, RuneSocket, EvolutionOp, EvolutionLogEntry};
-use crate::registry::CapabilityRegistry;
+use crate::registry::CapabilityTreeRegistry;
 
 /// 外部 trait 能力节点描述 — 由 `CapabilityNode` trait 实现的 node_id/provides 提取。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,7 +49,7 @@ pub struct FusionReport {
     pub stats: String,
 }
 
-impl CapabilityRegistry {
+impl CapabilityTreeRegistry {
     /// 域 → 短名 (归一化前缀用): Core→"core", Mind→"mind", ...
     fn domain_slug(domain: Domain) -> &'static str {
         match domain {
@@ -233,18 +233,18 @@ mod tests {
     #[test]
     fn test_normalize_trait_node_id() {
         assert_eq!(
-            CapabilityRegistry::normalize_trait_node_id("nt_mind::safety::safety_core", Domain::Mind),
+            CapabilityTreeRegistry::normalize_trait_node_id("nt_mind::safety::safety_core", Domain::Mind),
             "nt_mind_safety_safety_core"
         );
         assert_eq!(
-            CapabilityRegistry::normalize_trait_node_id("nt_core_retrieval", Domain::Core),
+            CapabilityTreeRegistry::normalize_trait_node_id("nt_core_retrieval", Domain::Core),
             "nt_core_retrieval"
         );
     }
 
     #[test]
     fn test_dedup_duplicate_edges() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         reg.register(CapabilityNode::new_primitive("nt_act::a".into(), Domain::Act, vec!["read".into()])).unwrap();
         reg.register(CapabilityNode::new_primitive("nt_act::b".into(), Domain::Act, vec!["write".into()])).unwrap();
         // 构造重复依赖: requires 中同一 target 出现两次
@@ -258,7 +258,7 @@ mod tests {
 
     #[test]
     fn test_fuse_trait_nodes_absorbs() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         reg.register(CapabilityNode::new_primitive("nt_act::base".into(), Domain::Act, vec!["read".into()])).unwrap();
         let descriptors = vec![
             TraitNodeDescriptor {
@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_fuse_skips_conflict() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         reg.register(CapabilityNode::new_primitive("nt_core_retrieval".into(), Domain::Core, vec!["hybrid_retrieval".into()])).unwrap();
         let descriptors = vec![TraitNodeDescriptor {
             raw_id: "nt_core_retrieval".into(),
@@ -300,7 +300,7 @@ mod tests {
 
     #[test]
     fn test_degree_centrality_top() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         reg.register(CapabilityNode::new_primitive("p1".into(), Domain::Core, vec!["x".into()])).unwrap();
         reg.register(CapabilityNode::new_primitive("p2".into(), Domain::Core, vec!["y".into()])).unwrap();
         reg.register(CapabilityNode::new_primitive("p3".into(), Domain::Core, vec!["z".into()])).unwrap();
@@ -319,7 +319,7 @@ mod tests {
 
     #[test]
     fn test_orphan_trait_nodes_detection() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         // 无消费者且无依赖 → 孤儿
         reg.register(CapabilityNode::new_primitive("nt_act::solo".into(), Domain::Act, vec!["read".into()])).unwrap();
         // 有消费者的节点 → 非孤儿

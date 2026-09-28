@@ -320,7 +320,7 @@ pub fn create_ocr_engine(#[allow(unused_variables)] config: OcrConfig) -> Arc<dy
 // ──────────────────────────────────────────────
 
 /// OCR 能力实现 — 实现了 NT-CORE 的 UnifiedCapability trait
-/// 可注册到 CapabilityRegistry 进行统一调度
+/// 可注册到 CapabilityTreeRegistry 进行统一调度
 pub struct OcrCapability {
     meta: CapabilityMeta,
     health: crate::l0_substrate::nt_core_capability_types::CapabilityHealth,

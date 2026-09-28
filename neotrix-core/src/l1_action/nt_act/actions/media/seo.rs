@@ -6,7 +6,7 @@
 #![forbid(unsafe_code)]
 
 use nt_core_capability_tree::node::{CapabilityNode, ConstellationLevel, Domain, NodeLayer};
-use nt_core_capability_tree::registry::{CapabilityRegistry, RegistryError};
+use nt_core_capability_tree::registry::{CapabilityTreeRegistry, RegistryError};
 use serde_json::Value as Json;
 
 /// SEO 分析器 — 内容可见性/关键词/排名分析的占位叶。
@@ -35,7 +35,7 @@ impl SeoAnalyzer {
 ///
 /// 镜像 `nt_core_capability_tree::cad_node::register_cad_capability` 模式:
 /// 构造 `CapabilityNode` 后 `tree.register(node)`。wiring_evidence 标注为新芽。
-pub fn register_capability(tree: &mut CapabilityRegistry) -> Result<(), RegistryError> {
+pub fn register_capability(tree: &mut CapabilityTreeRegistry) -> Result<(), RegistryError> {
     let mut node = CapabilityNode::new_primitive(
         "nt_act::seo::analyze".into(),
         Domain::Act,

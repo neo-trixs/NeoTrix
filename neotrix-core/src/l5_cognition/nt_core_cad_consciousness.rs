@@ -314,7 +314,7 @@ mod verification {
     use crate::l2_perception::nt_core_knowledge::cad_absorb::absorb_cad_experience;
     use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
     use nt_core_capability_tree::cad_node::{register_cad_capability, CadCapabilityNode};
-    use nt_core_capability_tree::registry::CapabilityRegistry;
+    use nt_core_capability_tree::registry::CapabilityTreeRegistry;
 
     /// 只列**真实注册**的 CAD SelfTest。
     /// 2026-09-28 修正: 原表列 13 项, 但其中 8 项(cad_csr/cad_ccip/cad_cdp/
@@ -367,7 +367,7 @@ mod verification {
         );
 
         // 4) 能力树节点 (C4 / 满 5 槽 RuneSocket)
-        let mut cap = CapabilityRegistry::new();
+        let mut cap = CapabilityTreeRegistry::new();
         register_cad_capability(&mut cap).expect("register CAD capability node");
 
         // 4b) D16 晋升门禁实测 (C4 需 evidence_gated='passed')

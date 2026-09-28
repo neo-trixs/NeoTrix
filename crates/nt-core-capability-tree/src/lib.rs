@@ -18,7 +18,7 @@ pub mod social_access_node;
 pub mod roadmap;
 
 pub use node::{CapabilityNode, NodeLayer, ConstellationLevel, Domain, RuneSocket, EvolutionOp, EvolutionLogEntry};
-pub use registry::{CapabilityRegistry, RegistryError};
+pub use registry::{CapabilityTreeRegistry, RegistryError};
 pub use evolution::{EvolutionEngine, EvolutionPlan, EvolutionAction};
 pub use epistemic::Epistemic;
 pub use cli::CapabilityCli;
@@ -32,7 +32,7 @@ mod tests {
 
     #[test]
     fn test_registry_basic() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         let node = CapabilityNode::new_primitive(
             "nt_http::fetch_safe_http".into(),
             Domain::Memory,
@@ -44,7 +44,7 @@ mod tests {
 
     #[test]
     fn test_evolution_graft() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         
         // Register primitive
         let primitive = CapabilityNode::new_primitive(
@@ -73,7 +73,7 @@ mod tests {
     #[test]
     fn test_experience_targets_roundtrip() {
         // 经验驱动迭代目标: export → 序列化 → 反序列化 → import 保留 (save 不丢 targets)
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         reg.experience_targets.push(serde_json::json!({
             "domain": "NT-ACT",
             "capability": "sandbox_guard",
@@ -99,7 +99,7 @@ mod tests {
     #[test]
     fn test_experience_target_bud_plan() {
         // scan 消费 experience_targets → 缺失能力节点生成 Budding 计划
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         reg.experience_targets.push(serde_json::json!({
             "domain": "NT-ACT",
             "capability": "sandbox_guard",
@@ -251,7 +251,7 @@ mod tests {
     #[test]
     fn test_stale_nodes_skips_recently_matured() {
         // 刚晋升到 C1 的节点 (budding + maturation 两条记录) 不应被判 stale
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         let mut node = CapabilityNode::new_primitive(
             "nt_nexus_memory::cross_session_link_store".into(),
             Domain::Nexus,

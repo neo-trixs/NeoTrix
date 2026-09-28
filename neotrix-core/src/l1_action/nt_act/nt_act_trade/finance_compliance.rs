@@ -5,7 +5,7 @@
 //!
 //! This is a NOTABLE skill (域级突破) under the foreign_trade_full_cycle Keystone.
 
-use nt_core_capability_tree::{CapabilityNode, CapabilityRegistry, Domain, NodeLayer};
+use nt_core_capability_tree::{CapabilityNode, CapabilityTreeRegistry, Domain, NodeLayer};
 use serde::{Deserialize, Serialize};
 
 // ── SSOT imports: RiskLevel 统一从 trade_core 引用 ──
@@ -586,7 +586,7 @@ impl FinanceEngine {
 }
 
 /// Register the Notable capability node
-pub fn register_finance_compliance_capability(registry: &mut CapabilityRegistry) -> CapabilityNode {
+pub fn register_finance_compliance_capability(registry: &mut CapabilityTreeRegistry) -> CapabilityNode {
     let node = CapabilityNode::new_composite(
         "NT-MIND::trade::trade_finance_compliance".to_string(),
         Domain::Mind,

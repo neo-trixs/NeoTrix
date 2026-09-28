@@ -8,7 +8,7 @@
 use uniffi;
 use std::sync::{Arc, RwLock};
 use crate::neotrix::ffi::types::*;
-use crate::neotrix::{CapabilityRegistry, NodeLayer};
+use crate::neotrix::{CapabilityTreeRegistry, NodeLayer};
 
 /// capability_tree 注册表路径 (与 nt_core_capability_tree CLI 默认值一致)。
 const REGISTRY_PATH: &str = ".neotrix/capability_registry.json";
@@ -131,7 +131,7 @@ fn load_from_registry_path(path: &std::path::Path) -> Option<Vec<SkillNode>> {
     if export.nodes.is_empty() {
         return None;
     }
-    let mut registry = CapabilityRegistry::new();
+    let mut registry = CapabilityTreeRegistry::new();
     for node in export.nodes {
         registry.register(node).ok()?;
     }
@@ -295,7 +295,7 @@ mod tests {
     fn test_load_from_registry_path_maps_nodes() {
         // 构造 2 节点 registry (core 域) + 依赖边 → 真实调用映射函数
         let reg_path = temp_registry("capability_tree.json");
-        let mut registry = CapabilityRegistry::new();
+        let mut registry = CapabilityTreeRegistry::new();
         let p1 = CapabilityNode::new_primitive(
             "nt_test::e8_reason".into(),
             CapabilityDomain::Core,

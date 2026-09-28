@@ -6,7 +6,7 @@
 //! inspection standards, document templates, risk rules, and compliance maps.
 
 use nt_core_capability_tree::{
-    CapabilityNode, CapabilityRegistry, Domain,
+    CapabilityNode, CapabilityTreeRegistry, Domain,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -946,7 +946,7 @@ impl ProductKnowledgePack for GenericKnowledgePack {
 }
 
 /// Register the ProductSpec capability node
-pub fn register_product_spec_capability(registry: &mut CapabilityRegistry) -> CapabilityNode {
+pub fn register_product_spec_capability(registry: &mut CapabilityTreeRegistry) -> CapabilityNode {
     let node = CapabilityNode::new_primitive(
         "NT-MEMORY::trade::trade_product_spec".to_string(),
         Domain::Memory,

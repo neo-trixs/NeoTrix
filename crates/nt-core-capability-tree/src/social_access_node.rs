@@ -10,7 +10,7 @@
 //! - Rune 槽 (1): Crimson (数据摄取)
 
 use crate::node::{CapabilityNode, ConstellationLevel, Domain, NodeLayer, RuneSocket};
-use crate::registry::{CapabilityRegistry, RegistryError};
+use crate::registry::{CapabilityTreeRegistry, RegistryError};
 
 /// Social Access 能力节点描述符。
 ///
@@ -79,7 +79,7 @@ impl SocialAccessCapabilityNode {
 
 /// 将 Social Access 能力节点注册进能力树
 pub fn register_social_access_capability(
-    tree: &mut CapabilityRegistry,
+    tree: &mut CapabilityTreeRegistry,
 ) -> Result<(), RegistryError> {
     tree.register(SocialAccessCapabilityNode.build())
 }
@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     fn social_access_registers_in_registry() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityTreeRegistry::new();
         register_social_access_capability(&mut reg).expect("register social_access capability");
         assert!(reg.get("nt_world::social_access").is_some());
     }

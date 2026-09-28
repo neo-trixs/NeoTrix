@@ -452,7 +452,7 @@ pub struct Capability {
 #[derive(Debug)]
 /// 2026-09-27 标注: **仅被本文件的 `#[cfg(test)]` 使用, 生产零消费者**。
 ///
-/// ⚠️ **2026-09-28 更正**：原括注「全仓 `capability::CapabilityRegistry` 精确搜索
+/// ⚠️ **2026-09-28 更正**：原括注「全仓 `capability::CapabilityCatalog` 精确搜索
 /// 除本文件外无命中」**不准确** —— 本类型确无生产消费者，但被
 /// `cluster_self_test.rs:24,33` 调用，而该模块是 `pub mod`（非 `#[cfg(test)] mod`）
 /// 且其 `#[cfg(test)]` 从第 56 行才开始，故那两处是**编译期代码**，只做系统自审。
@@ -465,23 +465,23 @@ pub struct Capability {
 /// 详见 `docs/architecture/OWNERSHIP.md` 的「B-2 撤销记录」。
 ///
 /// 本类型值类型是 `Capability` + `tag_index`, 与
-/// `l0_substrate::nt_core_capability_types::CapabilityRegistry`
+/// `l0_substrate::nt_core_capability_types::CapabilityCatalog`
 /// (`HashMap<String, Arc<dyn UnifiedCapability>>` + by_domain/by_layer 索引,
 /// 有真实跨层消费者: l2_perception/nt_world/ocr/mod.rs:405 与
 /// l1_action/nt_act/nt_act_trade/capability_registry.rs:171) **不是同一设计**。
 /// 生产路径用 l0 版; 本版仅被自审保留。
-pub struct CapabilityRegistry {
+pub struct CapabilityCatalog {
     capabilities: Vec<Capability>,
     tag_index: std::collections::HashMap<String, Vec<CapabilityId>>,
 }
 
-impl Default for CapabilityRegistry {
+impl Default for CapabilityCatalog {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl CapabilityRegistry {
+impl CapabilityCatalog {
     pub fn new() -> Self {
         Self {
             capabilities: Vec::new(),
@@ -767,7 +767,7 @@ mod tests {
 
     #[test]
     fn test_register_and_get() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityCatalog::new();
         let cap = test_cap("test", CapabilityKind::Cognitive, 4);
         let id = cap.id;
         reg.register(cap);
@@ -777,14 +777,14 @@ mod tests {
 
     #[test]
     fn test_find_by_name() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityCatalog::new();
         reg.register(test_cap("finder", CapabilityKind::Physical, 1));
         assert!(reg.find_by_name("finder").is_some());
     }
 
     #[test]
     fn test_find_by_tag() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityCatalog::new();
         let mut cap = test_cap("t", CapabilityKind::Social, 2);
         cap.tags = vec!["alpha".into(), "beta".into()];
         reg.register(cap);
@@ -794,7 +794,7 @@ mod tests {
 
     #[test]
     fn test_find_by_kind() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityCatalog::new();
         reg.register(test_cap("c1", CapabilityKind::Cognitive, 4));
         reg.register(test_cap("c2", CapabilityKind::Cognitive, 4));
         reg.register(test_cap("p1", CapabilityKind::Physical, 1));
@@ -804,7 +804,7 @@ mod tests {
 
     #[test]
     fn test_search_by_e8_state() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityCatalog::new();
         let mut cap = test_cap("e8cap", CapabilityKind::Cognitive, 4);
         cap.e8_triggers = vec![0x42];
         reg.register(cap);
@@ -813,7 +813,7 @@ mod tests {
 
     #[test]
     fn test_remove() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityCatalog::new();
         reg.register(test_cap("r", CapabilityKind::Shield, 1));
         let id = capability_id_from_name("r");
         assert_eq!(reg.count(), 1);
@@ -877,7 +877,7 @@ mod tests {
 
     #[test]
     fn test_find_by_domain() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityCatalog::new();
         let mut cap = test_cap("img_gen", CapabilityKind::Physical, 1);
         cap.domain = DomainCategory::ImageGeneration;
         cap.runtime = CapabilityRuntime::Api;
@@ -897,7 +897,7 @@ mod tests {
 
     #[test]
     fn test_domain_matching_scoring() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityCatalog::new();
         let mut cap = test_cap("debug1", CapabilityKind::Cognitive, 4);
         cap.domain = DomainCategory::Debugging;
         cap.tags = vec!["bug".into(), "fix".into()];
@@ -915,7 +915,7 @@ mod tests {
 
     #[test]
     fn test_fallback_chain_resolution() {
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityCatalog::new();
         let mut primary = test_cap("primary", CapabilityKind::Physical, 1);
         primary.domain = DomainCategory::ImageGeneration;
         primary.fallback_chain = vec![FallbackEntry {
@@ -949,7 +949,7 @@ mod tests {
     #[test]
     fn test_register_model_skills_bridges_capabilities() {
         // 桥接 nt_core_model_skills → L7 能力网: 模型能力注册为 Cognitive capability
-        let mut reg = CapabilityRegistry::new();
+        let mut reg = CapabilityCatalog::new();
         let registered = reg.register_model_skills();
         assert!(registered > 0, "应注册至少一个模型能力");
         assert_eq!(reg.count(), registered);

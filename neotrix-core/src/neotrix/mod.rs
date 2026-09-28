@@ -26,7 +26,7 @@ pub mod error_conversions;
 
 // ─── Standalone crate re-export ──────────────────────────────────────────
 pub use nt_core_capability_tree::{
-    CapabilityNode, CapabilityRegistry, ConstellationLevel, Domain as CapabilityDomain,
+    CapabilityNode, CapabilityTreeRegistry, ConstellationLevel, Domain as CapabilityDomain,
     EvolutionAction, EvolutionEngine, EvolutionOp, EvolutionPlan, NodeLayer, RuneSocket,
 };
 

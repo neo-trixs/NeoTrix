@@ -34,11 +34,11 @@ impl AgentStats {
 }
 
 /// Manages load tracking and rebalancing across agents
-pub struct LoadBalancer {
+pub struct AgentLoadBalancer {
     stats: Vec<AgentStats>,
 }
 
-impl LoadBalancer {
+impl AgentLoadBalancer {
     pub fn new() -> Self {
         Self { stats: Vec::new() }
     }
@@ -137,7 +137,7 @@ impl LoadBalancer {
     }
 }
 
-impl Default for LoadBalancer {
+impl Default for AgentLoadBalancer {
     fn default() -> Self {
         Self::new()
     }
@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn load_balancer_register_and_load() {
-        let mut lb = LoadBalancer::new();
+        let mut lb = AgentLoadBalancer::new();
         lb.register_agent("a1");
         assert_eq!(lb.get_load("a1"), 0.0);
         assert_eq!(lb.len(), 1);
@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn load_balancer_task_lifecycle() {
-        let mut lb = LoadBalancer::new();
+        let mut lb = AgentLoadBalancer::new();
         lb.register_agent("a1");
 
         lb.task_started("a1");
@@ -183,7 +183,7 @@ mod tests {
 
     #[test]
     fn load_balancer_rolling_average() {
-        let mut lb = LoadBalancer::new();
+        let mut lb = AgentLoadBalancer::new();
         lb.register_agent("a1");
 
         lb.task_completed("a1", 2.0);
@@ -196,7 +196,7 @@ mod tests {
 
     #[test]
     fn load_balancer_rebalance_sorts_by_load() {
-        let mut lb = LoadBalancer::new();
+        let mut lb = AgentLoadBalancer::new();
         lb.register_agent("a1");
         lb.register_agent("a2");
         lb.register_agent("a3");
@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn load_balancer_unregister() {
-        let mut lb = LoadBalancer::new();
+        let mut lb = AgentLoadBalancer::new();
         lb.register_agent("a1");
         lb.register_agent("a2");
         lb.unregister_agent("a1");
@@ -225,21 +225,21 @@ mod tests {
 
     #[test]
     fn load_balancer_unknown_agent() {
-        let lb = LoadBalancer::new();
+        let lb = AgentLoadBalancer::new();
         assert_eq!(lb.get_load("nonexistent"), 0.0);
         assert!(lb.get_stats("nonexistent").is_none());
     }
 
     #[test]
     fn load_balancer_empty() {
-        let lb = LoadBalancer::new();
+        let lb = AgentLoadBalancer::new();
         assert!(lb.is_empty());
         assert!(lb.rebalance().is_empty());
     }
 
     #[test]
     fn load_balancer_get_all_loads() {
-        let mut lb = LoadBalancer::new();
+        let mut lb = AgentLoadBalancer::new();
         lb.register_agent("a1");
         lb.register_agent("a2");
         lb.task_started("a1");
@@ -250,7 +250,7 @@ mod tests {
 
     #[test]
     fn load_capped_at_1_0() {
-        let mut lb = LoadBalancer::new();
+        let mut lb = AgentLoadBalancer::new();
         lb.register_agent("a1");
         for _ in 0..20 {
             lb.task_started("a1");
@@ -260,7 +260,7 @@ mod tests {
 
     #[test]
     fn load_balancer_unregister_mid_task() {
-        let mut lb = LoadBalancer::new();
+        let mut lb = AgentLoadBalancer::new();
         lb.register_agent("a1");
         lb.task_started("a1");
         lb.unregister_agent("a1");
@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn agent_stats_total_tasks() {
-        let mut lb = LoadBalancer::new();
+        let mut lb = AgentLoadBalancer::new();
         lb.register_agent("a1");
         lb.task_started("a1");
         lb.task_started("a1");
@@ -281,7 +281,7 @@ mod tests {
 
     #[test]
     fn load_balancer_rolling_average_three_tasks() {
-        let mut lb = LoadBalancer::new();
+        let mut lb = AgentLoadBalancer::new();
         lb.register_agent("a1");
         lb.task_completed("a1", 10.0);
         lb.task_completed("a1", 20.0);
@@ -293,7 +293,7 @@ mod tests {
 
     #[test]
     fn rebalance_preserves_order_with_same_load() {
-        let mut lb = LoadBalancer::new();
+        let mut lb = AgentLoadBalancer::new();
         lb.register_agent("a1");
         lb.register_agent("a2");
         lb.register_agent("a3");
@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn task_completed_unknown_agent_no_panic() {
-        let mut lb = LoadBalancer::new();
+        let mut lb = AgentLoadBalancer::new();
         lb.register_agent("a1");
         lb.task_completed("ghost", 5.0); // should be no-op
         assert_eq!(lb.get_stats("a1").unwrap().completed_tasks, 0);
@@ -312,20 +312,20 @@ mod tests {
 
     #[test]
     fn task_started_unknown_agent_no_panic() {
-        let mut lb = LoadBalancer::new();
+        let mut lb = AgentLoadBalancer::new();
         lb.task_started("ghost"); // should be no-op
         assert!(lb.is_empty());
     }
 
     #[test]
     fn get_all_loads_empty() {
-        let lb = LoadBalancer::new();
+        let lb = AgentLoadBalancer::new();
         assert!(lb.get_all_loads().is_empty());
     }
 
     #[test]
     fn load_balancer_default() {
-        let lb = LoadBalancer::default();
+        let lb = AgentLoadBalancer::default();
         assert!(lb.is_empty());
         assert_eq!(lb.len(), 0);
     }
