@@ -15,7 +15,13 @@ pub struct NeoCodexUI {
     pub streaming_text: String,
     pub input_buffer: String,
     pub message_log: Vec<(String, String)>,
-    pub goal_display: crate::cli::tui::app::types::GoalDisplay,
+    pub goal_active: bool,
+    pub goal_id: String,
+    pub goal_description: String,
+    pub goal_state_label: String,
+    pub goal_state_icon: String,
+    pub goal_iterations: u32,
+    pub goal_max_iterations: u32,
 }
 
 impl NeoCodexUI {
@@ -27,7 +33,13 @@ impl NeoCodexUI {
             streaming_text: String::new(),
             input_buffer: String::new(),
             message_log: Vec::new(),
-            goal_display: crate::cli::tui::app::types::GoalDisplay::idle(),
+            goal_active: false,
+            goal_id: String::new(),
+            goal_description: String::new(),
+            goal_state_label: String::new(),
+            goal_state_icon: String::new(),
+            goal_iterations: 0,
+            goal_max_iterations: 0,
         }
     }
 
@@ -47,22 +59,19 @@ impl NeoCodexUI {
             agent.evolution.summary(),
         );
         if let Some(ref goal) = agent.goals.active {
-            self.goal_display = crate::cli::tui::app::types::GoalDisplay {
-                has_goal: true,
-                id: goal.id.clone(),
-                description: goal.description.clone(),
-                state_label: format!("{:?}", goal.state),
-                state_icon: match goal.state {
-                    GoalState::Active => "▶".into(),
-                    GoalState::Paused => "⏸".into(),
-                    GoalState::Completed => "✅".into(),
-                    GoalState::Blocked => "🚫".into(),
-                    GoalState::Cancelled => "❌".into(),
-                },
-                iterations: goal.iterations,
-                max_iterations: goal.max_iterations,
-                ..crate::cli::tui::app::types::GoalDisplay::idle()
+            self.goal_active = true;
+            self.goal_id = goal.id.clone();
+            self.goal_description = goal.description.clone();
+            self.goal_state_label = format!("{:?}", goal.state);
+            self.goal_state_icon = match goal.state {
+                GoalState::Active => "▶".into(),
+                GoalState::Paused => "⏸".into(),
+                GoalState::Completed => "✅".into(),
+                GoalState::Blocked => "🚫".into(),
+                GoalState::Cancelled => "❌".into(),
             };
+            self.goal_iterations = goal.iterations as u32;
+            self.goal_max_iterations = goal.max_iterations as u32;
         }
     }
 }

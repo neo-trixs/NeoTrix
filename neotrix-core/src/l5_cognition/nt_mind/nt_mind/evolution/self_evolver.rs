@@ -149,7 +149,7 @@ impl SelfEvolver {
             task_type: crate::l2_perception::nt_core_knowledge::TaskType::CodeAnalysis,
             micro_edits: micro_edits.clone(),
             reward,
-            reward_source: crate::l5_cognition::nt_mind::nt_mind::core::RewardSource::External,
+            reward_source: neotrix_types::RewardSource::External,
             success: reward > 0.5,
             timestamp: chrono::Utc::now().timestamp(),
             embedding: None,

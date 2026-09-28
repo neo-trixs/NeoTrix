@@ -10,8 +10,8 @@ use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use oauth2::{AuthUrl, ClientId, ClientSecret, TokenUrl, CsrfToken, RedirectUrl, Scope};
+use oauth2::{EndpointNotSet, EndpointSet};
 use oauth2::basic::{BasicClient, BasicTokenResponse};
-use oauth2::reqwest::http_client;
 
 use crate::l2_perception::nt_world::social_access::traits::*;
 use crate::l2_perception::nt_world::social_access::SocialAccessError;
@@ -26,7 +26,11 @@ fn now_ts() -> u64 {
 /// 认证服务
 pub struct AuthService {
     sessions: HashMap<SocialPlatform, SessionEntry>,
-    clients: HashMap<SocialPlatform, BasicClient>,
+    /// oauth2 v5 typestate：auth+token 端点已 set（其余未 set）。
+    clients: HashMap<
+        SocialPlatform,
+        BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>,
+    >,
     callback_port: u16,
 }
 
@@ -36,25 +40,30 @@ impl AuthService {
 
         let mut clients = HashMap::new();
 
-        // X/Twitter OAuth2 PKCE client
-        let twitter_client = BasicClient::new(
-            ClientId::new("twitter_client_id".to_string()),
-            Some(ClientSecret::new("twitter_client_secret".to_string())),
-            AuthUrl::new("https://api.x.com/2/oauth2/authorize".to_string()).unwrap(),
-            Some(TokenUrl::new("https://api.x.com/2/oauth2/token".to_string()).unwrap()),
-        )
-        .set_redirect_uri(RedirectUrl::new(format!("http://localhost:{}/callback", callback_port)).unwrap());
+        // X/Twitter OAuth2 PKCE client（oauth2 v5 构建器：typestate 要求显式 set 端点）
+        let twitter_client = BasicClient::new(ClientId::new("twitter_client_id".to_string()))
+            .set_client_secret(ClientSecret::new("twitter_client_secret".to_string()))
+            .set_auth_uri(AuthUrl::new("https://api.x.com/2/oauth2/authorize".to_string()).unwrap())
+            .set_token_uri(TokenUrl::new("https://api.x.com/2/oauth2/token".to_string()).unwrap())
+            .set_redirect_uri(
+                RedirectUrl::new(format!("http://localhost:{}/callback", callback_port)).unwrap(),
+            );
 
         clients.insert(SocialPlatform::Twitter, twitter_client);
 
         // Reddit OAuth2 client
-        let reddit_client = BasicClient::new(
-            ClientId::new("reddit_client_id".to_string()),
-            None,
-            AuthUrl::new("https://www.reddit.com/api/v1/authorize".to_string()).unwrap(),
-            Some(TokenUrl::new("https://oauth.reddit.com/api/v1/access_token".to_string()).unwrap()),
-        )
-        .set_redirect_uri(RedirectUrl::new(format!("http://localhost:{}/reddit/callback", callback_port)).unwrap());
+        let reddit_client = BasicClient::new(ClientId::new("reddit_client_id".to_string()))
+            .set_auth_uri(
+                AuthUrl::new("https://www.reddit.com/api/v1/authorize".to_string()).unwrap(),
+            )
+            .set_token_uri(
+                TokenUrl::new("https://oauth.reddit.com/api/v1/access_token".to_string())
+                    .unwrap(),
+            )
+            .set_redirect_uri(
+                RedirectUrl::new(format!("http://localhost:{}/reddit/callback", callback_port))
+                    .unwrap(),
+            );
 
         clients.insert(SocialPlatform::Reddit, reddit_client);
 
@@ -122,7 +131,7 @@ impl AuthService {
 
         let token: BasicTokenResponse = client
             .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
-            .request(http_client)
+            .request(&reqwest::blocking::Client::new())
             .map_err(|e| SocialAccessError::AuthFailed {
                 platform: SocialPlatform::Twitter,
                 reason: format!("token exchange failed: {}", e),

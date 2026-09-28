@@ -17,13 +17,10 @@
 //! ```
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
-use crate::l0_substrate::nt_core_platform::agent::{Agent, AgentError, AgentStatus};
-use crate::l0_substrate::nt_core_platform::agent_registry::AgentRegistry;
+use crate::l0_substrate::nt_core_platform::agent::AgentError;
 use crate::l6_meta::nt_agent_identity::{
-    AgentIdentityRegistry, AgentPersona, AgentPreset, AgentStatus as IdentityStatus,
+    AgentIdentityRegistry, AgentPersona, AgentStatus as IdentityStatus,
     AutonomyLevel,
 };
 use crate::l6_meta::nt_agent_gallery::AgentGallery;
@@ -167,7 +164,7 @@ impl IntentClassifier {
             .unwrap_or((TaskType::GeneralChat, 0.5));
 
         ClassificationResult {
-            task_type,
+            task_type: task_type.clone(),
             confidence,
             keywords: self
                 .rules
@@ -497,13 +494,15 @@ impl AgentLifecycleManager {
             current_task: None,
         };
 
+        let persona_id = persona.id.clone();
+
         // 注册到身份注册表
         self.identity_registry
             .register(persona)
             .map_err(|e| AgentError::InitializationFailed(e))?;
 
         self.instances
-            .insert(persona.id.clone(), instance.clone());
+            .insert(persona_id, instance.clone());
 
         Ok(instance)
     }
@@ -798,10 +797,14 @@ impl AutoOrchestrator {
         // 2. 获取或创建 agent 实例
         let instance = self.lifecycle.get_or_create(&classification.task_type).await?;
 
-        // 3. 标记运行中
+        // 3. 标记运行中（存储副本 + 返回副本保持一致）
         self.lifecycle
             .mark_running(&instance.persona.id, user_message);
 
+        let mut instance = instance;
+        instance.status = InstanceStatus::Running;
+        instance.last_active = now_secs();
+        instance.current_task = Some(user_message.to_string());
         Ok(instance)
     }
 
@@ -858,6 +861,39 @@ impl AutoOrchestrator {
     /// 获取所有实例（用于调试）
     pub fn instances(&self) -> Vec<InstanceInfo> {
         self.lifecycle.status_summary()
+    }
+
+    /// 意图分类（供各入口复用：先分类再分发，不创建实例）
+    pub fn classify_intent(&self, user_message: &str) -> ClassificationResult {
+        self.classifier.classify(user_message)
+    }
+
+    /// Headless 意图路由：自由文本 → 等价 slash 命令。
+    ///
+    /// 仅高置信系统意图才路由（返回 Some），其余返回 None 走默认推理路径。
+    /// 路由即记录（agent_id = "headless-local"），可经 status() 观测。
+    pub fn route_headless(&mut self, text: &str) -> Option<String> {
+        let classification = self.classifier.classify(text);
+        if classification.confidence < 0.8 {
+            return None;
+        }
+        let slash = match classification.task_type {
+            TaskType::Research => Some(format!("/recall {}", text.trim())),
+            TaskType::KnowledgeAbsorption => Some("/absorb".to_string()),
+            TaskType::MemoryManagement => Some("/mem".to_string()),
+            _ => None,
+        };
+        if slash.is_some() {
+            self.router.record(
+                text,
+                &classification,
+                "headless-local",
+                "headless-local",
+                true,
+                0,
+            );
+        }
+        slash
     }
 }
 
@@ -956,15 +992,46 @@ mod tests {
 
     #[test]
     fn test_lifecycle_stats() {
-        let mut mgr = AgentLifecycleManager::new();
+        let mgr = AgentLifecycleManager::new();
         let stats = mgr.status_summary();
         assert!(stats.is_empty());
     }
 
     #[test]
     fn test_routing_stats() {
-        let mut router = TaskRouter::new();
+        let router = TaskRouter::new();
         let stats = router.stats();
         assert_eq!(stats.total_routes, 0);
+    }
+
+    #[test]
+    fn test_route_headless_research() {
+        let mut orch = AutoOrchestrator::new();
+        let routed = orch.route_headless("研究一下这个框架并比较几个方案");
+        assert_eq!(
+            routed,
+            Some("/recall 研究一下这个框架并比较几个方案".to_string())
+        );
+    }
+
+    #[test]
+    fn test_route_headless_absorb() {
+        let mut orch = AutoOrchestrator::new();
+        let routed = orch.route_headless("把这些知识吸收学习一下");
+        assert_eq!(routed, Some("/absorb".to_string()));
+    }
+
+    #[test]
+    fn test_route_headless_mem() {
+        let mut orch = AutoOrchestrator::new();
+        let routed = orch.route_headless("查看记忆存储情况");
+        assert_eq!(routed, Some("/mem".to_string()));
+    }
+
+    #[test]
+    fn test_route_headless_fallback() {
+        let mut orch = AutoOrchestrator::new();
+        assert_eq!(orch.route_headless("今天天气怎么样"), None);
+        assert_eq!(orch.route_headless("帮我实现一个解析器"), None);
     }
 }

@@ -36,6 +36,9 @@ pub struct CalibRow {
     pub confidence: f64,
     /// 是否为正例（gold）
     pub gold: bool,
+    /// 域（前提记忆 domain 多数票；空链/无前提则 None → 校准回 global）。
+    /// tick 接线用它调 `PlattBucketTable::calibrate`，11 域桶才进得去生产。
+    pub domain: Option<String>,
 }
 
 pub struct NtJevCalibration;
@@ -48,6 +51,38 @@ impl NtJevCalibration {
         premise_ids: &[String],
     ) -> VerifyScores {
         NtAwakenLoop::verify(consciousness, conclusion_id, premise_ids)
+    }
+
+    /// 链的域：前提记忆 domain 多数票（与 consciousness 归纳句式同口径）；
+    /// 票数持平取首前提域（确定性），无前提/链不存在则 None。
+    pub fn chain_domain(
+        consciousness: &CrystalConsciousness,
+        chain_id: &str,
+    ) -> Option<String> {
+        let ch = consciousness
+            .reasoning_chains
+            .iter()
+            .find(|c| c.id == chain_id)?;
+        let mut order: Vec<&str> = Vec::new();
+        let mut counts: HashMap<&str, usize> = HashMap::new();
+        for pid in &ch.premises {
+            if let Some(m) = consciousness.memories.get(pid) {
+                if !counts.contains_key(m.domain.as_str()) {
+                    order.push(m.domain.as_str());
+                }
+                *counts.entry(m.domain.as_str()).or_insert(0) += 1;
+            }
+        }
+        // 多数票；持平取最早出现的前提域（严格大于才替换）。
+        let mut best: Option<(&str, usize)> = None;
+        for d in order {
+            let n = counts.get(d).copied().unwrap_or(0);
+            match best {
+                Some((_, bn)) if bn >= n => {}
+                _ => best = Some((d, n)),
+            }
+        }
+        best.map(|(d, _)| d.to_string())
     }
 
     /// noul 行：前提 → "结论成立吗？" → think 痕迹 + verdict + confidence。
@@ -92,6 +127,7 @@ impl NtJevCalibration {
             jsonl,
             confidence: conf,
             gold: conf >= GOLD_FLOOR,
+            domain: Self::chain_domain(consciousness, chain_id),
         })
     }
 
@@ -168,6 +204,8 @@ impl NtJevCalibration {
             jsonl,
             confidence: p_hi,
             gold: true,
+            // 选的是高者（hi 链），域跟 hi 走；跨域对决命中桶则校准，不命中回 global。
+            domain: Self::chain_domain(consciousness, high_chain_id),
         })
     }
 
@@ -508,8 +546,63 @@ mod tests {
     }
 
     #[test]
-    fn test_decide_plugs_into_eval() {
-        use crate::neotrix::nt_jev::eval::evaluate;
+    fn test_chain_domain_majority_tie_missing() {
+        let mut c = seeded();
+        let id = c.reasoning_chains.first().map(|ch| ch.id.clone()).unwrap();
+        // 种子链：两前提皆 physics → 多数票 physics
+        assert_eq!(
+            NtJevCalibration::chain_domain(&c, &id),
+            Some("physics".to_string())
+        );
+        // 2v1：physics 多数
+        let p1 = c.remember("水 流动 向下", MemoryType::Fact, "physics", 0.9);
+        let p2 = c.remember("火 向上 燃烧", MemoryType::Fact, "physics", 0.9);
+        let q1 = c.remember("叶 绿色 光合", MemoryType::Fact, "biology", 0.9);
+        c.reason(vec![p1, p2, q1], ReasoningType::Inductive);
+        let id2 = c.reasoning_chains.last().map(|ch| ch.id.clone()).unwrap();
+        assert_eq!(
+            NtJevCalibration::chain_domain(&c, &id2),
+            Some("physics".to_string())
+        );
+        // 1v1 持平 → 首前提域（chem 在前）
+        let r1 = c.remember("酸 腐蚀 金属", MemoryType::Fact, "chemistry", 0.9);
+        let r2 = c.remember("鸟 有 翅膀", MemoryType::Fact, "biology", 0.9);
+        c.reason(vec![r1, r2], ReasoningType::Analogical);
+        let id3 = c.reasoning_chains.last().map(|ch| ch.id.clone()).unwrap();
+        assert_eq!(
+            NtJevCalibration::chain_domain(&c, &id3),
+            Some("chemistry".to_string())
+        );
+        // 不存在的链 → None（fail-open，调用方回 global）
+        assert_eq!(NtJevCalibration::chain_domain(&c, "no-such-chain"), None);
+    }
+
+    #[test]
+    fn test_noul_row_carries_domain() {
+        let c = seeded();
+        let id = c.reasoning_chains.first().map(|ch| ch.id.clone()).unwrap();
+        let row = NtJevCalibration::noul_row(&c, &id).unwrap();
+        assert_eq!(row.domain, Some("physics".to_string()));
+    }
+
+    #[test]
+    fn test_embedded_table_not_stub() {
+        // 回归门：models/training/jev_platts.json 曾被归档误搬后剩 `{}` 空壳，
+        // embedded 表退化为恒等则 11 域桶全进不了生产。此门一响先查文件在不在。
+        let t = PlattBucketTable::embedded();
+        assert!(
+            !t.buckets.is_empty(),
+            "embedded Platt 表为空：jev_platts.json 疑似被 stub 覆盖"
+        );
+        // 未知域回 global（确定性）
+        let a = t.calibrate("未知域-xyz", 0.8);
+        let b = t.calibrate("未知域-xyz", 0.8);
+        assert!((a - b).abs() < 1e-12);
+        assert!((a - t.global.apply(0.8)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_decide_plugs_into_eval() {        use crate::neotrix::nt_jev::eval::evaluate;
         let c = seeded();
         let id = c.reasoning_chains.first().map(|ch| ch.id.clone()).unwrap();
         let (case, pred) = NtJevCalibration::decide(&c, &id).unwrap();

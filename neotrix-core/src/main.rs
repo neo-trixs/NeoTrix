@@ -7,7 +7,7 @@
 
 mod entry;
 
-use clap::{Parser, Subcommand, CommandFactory};
+use clap::{CommandFactory, Parser, Subcommand};
 use entry::*;
 // config 模块由 lib 提供 (neotrix::config), 避免与 lib.rs 重复定义。
 
@@ -32,13 +32,23 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    #[arg(global = true, long, value_name = "COLOR", help = "Color mode: auto|always|never")]
+    #[arg(
+        global = true,
+        long,
+        value_name = "COLOR",
+        help = "Color mode: auto|always|never"
+    )]
     color: Option<String>,
 
     #[arg(global = true, long, help = "Suppress non-error log output")]
     quiet: bool,
 
-    #[arg(global = true, long, short = 's', help = "Run HTTP server mode (legacy flag)")]
+    #[arg(
+        global = true,
+        long,
+        short = 's',
+        help = "Run HTTP server mode (legacy flag)"
+    )]
     serve: bool,
 
     #[arg(global = true, long, help = "Run headless mode (legacy flag)")]
@@ -47,13 +57,23 @@ struct Cli {
     #[arg(global = true, long, help = "Run standalone mode (no LLM)")]
     standalone: bool,
 
-    #[arg(global = true, long, help = "Run Agent Loop mode (NeoTrix as subject, LLM as backend)")]
+    #[arg(
+        global = true,
+        long,
+        help = "Run Agent Loop mode (NeoTrix as subject, LLM as backend)"
+    )]
     agent: bool,
 
     #[arg(global = true, long, value_name = "ADDR", default_value_t = String::from("0.0.0.0:3000"), help = "Server address")]
     addr: String,
 
-    #[arg(global = true, long, value_name = "STAGE", default_value_t = 18, help = "Reasoning stage count")]
+    #[arg(
+        global = true,
+        long,
+        value_name = "STAGE",
+        default_value_t = 18,
+        help = "Reasoning stage count"
+    )]
     stage: usize,
 
     #[arg(global = true, long, default_value_t = String::from("default"), help = "Profile name for isolated state")]
@@ -72,13 +92,25 @@ enum Commands {
         pipe: bool,
         #[arg(long, help = "JSONL streaming output (one JSON object per line)")]
         json: bool,
-        #[arg(long, value_name = "SCHEMA", help = "Output schema for structured validation (reserved)")]
+        #[arg(
+            long,
+            value_name = "SCHEMA",
+            help = "Output schema for structured validation (reserved)"
+        )]
         output_schema: Option<String>,
         #[arg(long, help = "Execution timeout in seconds", default_value_t = 60)]
         timeout: u64,
-        #[arg(long, value_name = "DOLLARS", help = "Hard limit on total API spend in USD")]
+        #[arg(
+            long,
+            value_name = "DOLLARS",
+            help = "Hard limit on total API spend in USD"
+        )]
         max_budget_usd: Option<f64>,
-        #[arg(long, short = 'S', help = "Stream output in real-time (text mode only)")]
+        #[arg(
+            long,
+            short = 'S',
+            help = "Stream output in real-time (text mode only)"
+        )]
         stream: bool,
     },
     #[command(about = "Run interactive mode (TUI) or one-shot prompt")]
@@ -97,21 +129,40 @@ enum Commands {
         suggest: bool,
         #[arg(long, help = "Start in AutoEdit mode (auto-approve file writes)")]
         auto_edit: bool,
-        #[arg(long, help = "Start in FullAuto mode (no approvals, like Codex --yolo)")]
+        #[arg(
+            long,
+            help = "Start in FullAuto mode (no approvals, like Codex --yolo)"
+        )]
         full_auto: bool,
         #[arg(long, help = "Alias for --full-auto")]
         yolo: bool,
-        #[arg(long, value_name = "DOLLARS", help = "Hard limit on total API spend in USD")]
+        #[arg(
+            long,
+            value_name = "DOLLARS",
+            help = "Hard limit on total API spend in USD"
+        )]
         max_budget_usd: Option<f64>,
-        #[arg(long, value_name = "MODE", default_value = "disabled", help = "Sandbox mode: disabled|read-only")]
+        #[arg(
+            long,
+            value_name = "MODE",
+            default_value = "disabled",
+            help = "Sandbox mode: disabled|read-only"
+        )]
         sandbox: String,
         #[arg(long, help = "Disposable session — do not save to disk")]
         ephemeral: bool,
-        #[arg(long, short = 'S', help = "Stream output in real-time (text mode only)")]
+        #[arg(
+            long,
+            short = 'S',
+            help = "Stream output in real-time (text mode only)"
+        )]
         stream: bool,
     },
     #[command(about = "Start HTTP API server")]
-    Serve { #[arg(long, default_value_t = String::from("0.0.0.0:3000"))] addr: String },
+    Serve {
+        #[arg(long, default_value_t = String::from("0.0.0.0:3000"))]
+        addr: String,
+    },
     #[command(about = "One-shot reasoning (non-interactive)")]
     Reason {
         prompt: Option<String>,
@@ -128,7 +179,10 @@ enum Commands {
     McpServer,
 
     // ── Consciousness Core (意识核心 — opencode agent 通道) ──
-    #[command(name = "consciousness", about = "意识核心状态/运行: status|tick|health|branches [--json] [--cycles N]")]
+    #[command(
+        name = "consciousness",
+        about = "意识核心状态/运行: status|tick|health|branches [--json] [--cycles N]"
+    )]
     Consciousness {
         #[arg(help = "子命令: status (默认) | tick | health | branches")]
         sub: Option<String>,
@@ -139,7 +193,10 @@ enum Commands {
     },
 
     // ── Project Evolution (独立项目进化 — 第三方 CLI 集成入口) ──
-    #[command(name = "project-evolve", about = "对任意目标项目运行进化链路 (scan→detect→score→report); 第三方 CLI 可集成")]
+    #[command(
+        name = "project-evolve",
+        about = "对任意目标项目运行进化链路 (scan→detect→score→report); 第三方 CLI 可集成"
+    )]
     ProjectEvolve {
         #[arg(help = "目标项目目录 (默认当前目录)")]
         target: Option<String>,
@@ -152,17 +209,15 @@ enum Commands {
     },
 
     // ── Knowledge & Memory ──
-    #[command(name = "evidence", about = "EWHR evidence management (list|get|calibrate|export|stats)")]
-    Evidence {
-        #[command(subcommand)]
-        command: neotrix::cli::commands::evidence_cmds::EvidenceCommand,
-    },
     #[command(name = "wiki", about = "Wiki KB: generate|status|sync|graph|query")]
     Wiki {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    #[command(name = "todo", about = "TODO smart-sync (sync_todos.py replacement): sync|status|allocate [max]|import <path>")]
+    #[command(
+        name = "todo",
+        about = "TODO smart-sync (sync_todos.py replacement): sync|status|allocate [max]|import <path>"
+    )]
     Todo {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
@@ -180,9 +235,15 @@ enum Commands {
     #[command(about = "Show brain/daemon status")]
     Status,
     #[command(about = "Start background daemon")]
-    Daemon { #[arg(long)] evolve: bool },
+    Daemon {
+        #[arg(long)]
+        evolve: bool,
+    },
     #[command(about = "Self-update the binary")]
-    Update { #[arg(long)] check_only: bool },
+    Update {
+        #[arg(long)]
+        check_only: bool,
+    },
     #[command(about = "Generate shell completions")]
     Completions { shell: String },
     #[command(about = "Manage runtime feature flags")]
@@ -195,33 +256,61 @@ enum Commands {
         #[command(subcommand)]
         command: ConfigCommands,
     },
-    #[command(about = "NeoTrix 系统运维 (统一安装/守护/卸载, 替代分散 sh 脚本): daemons|uninstall|status")]
+    #[command(
+        about = "NeoTrix 系统运维 (统一安装/守护/卸载, 替代分散 sh 脚本): daemons|uninstall|status"
+    )]
     Sysops {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    #[command(
+        name = "clean",
+        about = "Scan & remove dev/junk/ai/trash (PureMac-style safe clean): [dev|junk|ai|trash|all] [--dry-run] [--json] [--force]"
+    )]
+    Clean {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
 
     // ── Guard & Compliance ──
-    #[command(about = "AGENTS.md pointer-conservation guard (check structure, ceilings, forbidden sections)")]
+    #[command(
+        about = "AGENTS.md pointer-conservation guard (check structure, ceilings, forbidden sections)"
+    )]
     Guard {
         #[arg(long, help = "Path to AGENTS.md (default: ./AGENTS.md)")]
         path: Option<String>,
-        #[arg(long, help = "Exit with non-zero code on violation (for CI/pre-commit)")]
+        #[arg(
+            long,
+            help = "Exit with non-zero code on violation (for CI/pre-commit)"
+        )]
         strict: bool,
     },
 
     // ── Network & Agents ──
     #[command(about = "Browse a URL")]
     Browse { url: String },
+    #[command(about = "Run browser action file (JSON array of BrowserAction)")]
+    BrowseAct { file: String },
     #[command(about = "Browser login")]
     Login { url: String },
+    // ── 对话面（neobot 即 neotrix 对外对话的一部分；与 neobot 二进制同律） ──
+    #[command(about = "对话：跑一轮/agent/模型池/端点/配对/会话/任务（neobot 同律）")]
+    Dialog {
+        #[command(subcommand)]
+        cmd: DialogCmd,
+    },
     #[command(about = "Proxy daemon control (status|mode|start|stop|install)")]
     Proxy { args: Vec<String> },
     #[command(about = "Scan network for NeoTrix agents via UDP discovery")]
     Discover {
         #[arg(long, short = 'p', default_value_t = 42069, help = "UDP port")]
         port: u16,
-        #[arg(long, short = 'd', default_value_t = 3000, help = "Scan duration in ms")]
+        #[arg(
+            long,
+            short = 'd',
+            default_value_t = 3000,
+            help = "Scan duration in ms"
+        )]
         duration: u64,
         #[arg(long, help = "JSON output")]
         json: bool,
@@ -246,9 +335,19 @@ enum SandboxCommands {
     Run {
         #[arg(help = "Code to execute (reads from stdin if omitted)")]
         code: Option<String>,
-        #[arg(long, short = 'r', default_value = "python3", help = "Runtime (python3, node18, rust, go1_21, linux)")]
+        #[arg(
+            long,
+            short = 'r',
+            default_value = "python3",
+            help = "Runtime (python3, node18, rust, go1_21, linux)"
+        )]
         runtime: String,
-        #[arg(long, short = 't', default_value_t = 300, help = "Max runtime in seconds")]
+        #[arg(
+            long,
+            short = 't',
+            default_value_t = 300,
+            help = "Max runtime in seconds"
+        )]
         timeout: u64,
     },
     #[command(about = "List active sandbox sessions")]
@@ -330,31 +429,7 @@ fn main() {
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(e) => {
-            if e.kind() == clap::error::ErrorKind::InvalidSubcommand {
-                if let Some(unknown) = extract_unknown_subcommand(&e) {
-                    let reg = neotrix::cli::commands::registry::default_registry();
-                    let lookup = if unknown.starts_with('/') {
-                        unknown.clone()
-                    } else {
-                        format!("/{}", unknown)
-                    };
-                    if reg.find(&lookup).is_some() {
-                        // 对标主流 CLI: 回退命令输出保持干净, 抑制 INFO/WARN 日志
-                        std::env::set_var("RUST_LOG", "neotrix=error");
-                        let raw: Vec<String> = std::env::args().skip(1).collect();
-                        let input = if unknown.starts_with('/') {
-                            raw.join(" ")
-                        } else {
-                            format!("/{}", raw.join(" "))
-                        };
-                        let out = reg.execute(&input, None);
-                        if !out.message.is_empty() {
-                            println!("{}", out.message);
-                        }
-                        std::process::exit(if out.success { 0 } else { 1 });
-                    }
-                }
-            }
+            // cli::commands removed — no command registry fallback
             e.exit()
         }
     };
@@ -382,16 +457,17 @@ fn main() {
             | Some(Commands::Features { .. })
             | Some(Commands::Config { .. })
             | Some(Commands::Wallet { .. })
-            | Some(Commands::Evidence { .. })
             | Some(Commands::Wiki { .. })
             | Some(Commands::Todo { .. })
             | Some(Commands::Bench { .. })
             | Some(Commands::Discover { .. })
             | Some(Commands::Proxy { .. })
             | Some(Commands::Sandbox { .. })
+            | Some(Commands::Clean { .. })
             | Some(Commands::Update { .. })
             | Some(Commands::Browse { .. })
             | Some(Commands::Login { .. })
+            | Some(Commands::Dialog { .. })
     ) || cli.agent
         || cli.standalone
         || cli.headless;
@@ -399,8 +475,12 @@ fn main() {
         // 管理类 slash 命令 (provider pool 等) 在未配置 provider 时也须可用 —
         // 它们本身就是配置 provider 的入口, 不应被 wizard 阻塞。
         let is_mgmt_prompt = match &cli.command {
-            Some(Commands::Exec { prompt: Some(p), .. })
-            | Some(Commands::Run { prompt: Some(p), .. }) => {
+            Some(Commands::Exec {
+                prompt: Some(p), ..
+            })
+            | Some(Commands::Run {
+                prompt: Some(p), ..
+            }) => {
                 let t = p.trim_start();
                 t.starts_with("/provider") || t.starts_with("/free") || t.starts_with("/model")
             }
@@ -413,7 +493,11 @@ fn main() {
 
     let cfg = neotrix::config::NeoTrixConfig::load();
 
-    let color_mode = cli.color.as_deref().or(cfg.color_mode.as_deref()).unwrap_or("auto");
+    let color_mode = cli
+        .color
+        .as_deref()
+        .or(cfg.color_mode.as_deref())
+        .unwrap_or("auto");
     if color_mode == "never" {
         colored::control::set_override(false);
     } else {
@@ -426,9 +510,21 @@ fn main() {
     // (--quiet 已在 parse 后提前设置, 此处不再重复)
 
     match &cli.command {
-        Some(Commands::Exec { prompt, file, pipe, json, output_schema: _, timeout, max_budget_usd, stream }) => {
+        Some(Commands::Exec {
+            prompt,
+            file,
+            pipe,
+            json,
+            output_schema: _,
+            timeout,
+            max_budget_usd,
+            stream,
+        }) => {
             if let Some(limit) = max_budget_usd {
-                neotrix::cli::cost_tracker::COST_TRACKER.lock().unwrap_or_else(|e| e.into_inner()).set_max_budget_usd(*limit);
+                neotrix::l6_meta::nt_cost_tracker::COST_TRACKER
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .set_max_budget_usd(*limit);
             }
             let resolved = resolve_prompt(prompt.as_deref(), file.as_deref(), *pipe);
             if resolved.is_empty() {
@@ -442,8 +538,10 @@ fn main() {
                 let mut engine = StandaloneEngine::new(cli.stage.min(18));
                 let response = engine.reason(&resolved);
                 if *json {
-                    println!("{{\"standalone\":true,\"output\":{}}}",
-                        serde_json::to_string(&response).unwrap_or_default());
+                    println!(
+                        "{{\"standalone\":true,\"output\":{}}}",
+                        serde_json::to_string(&response).unwrap_or_default()
+                    );
                 } else {
                     println!("{}", response);
                 }
@@ -451,19 +549,41 @@ fn main() {
                 run_exec(&resolved, *json, *stream, *timeout);
             }
         }
-        Some(Commands::Run { headless, prompt, file, pipe, format, suggest: _, auto_edit, full_auto, yolo, sandbox, max_budget_usd, ephemeral, stream }) => {
+        Some(Commands::Run {
+            headless,
+            prompt,
+            file,
+            pipe,
+            format,
+            suggest: _,
+            auto_edit,
+            full_auto,
+            yolo,
+            sandbox,
+            max_budget_usd,
+            ephemeral,
+            stream,
+        }) => {
             if let Some(limit) = max_budget_usd {
-                neotrix::cli::cost_tracker::COST_TRACKER.lock().unwrap_or_else(|e| e.into_inner()).set_max_budget_usd(*limit);
+                neotrix::l6_meta::nt_cost_tracker::COST_TRACKER
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .set_max_budget_usd(*limit);
             }
             let approval_mode = if *yolo || *full_auto {
-                neotrix::cli::approval::ApprovalMode::FullAuto
+                neotrix::l6_meta::nt_approval::ApprovalMode::FullAuto
             } else if *auto_edit {
-                neotrix::cli::approval::ApprovalMode::AutoEdit
+                neotrix::l6_meta::nt_approval::ApprovalMode::AutoEdit
             } else {
-                neotrix::cli::approval::ApprovalMode::Suggest
+                neotrix::l6_meta::nt_approval::ApprovalMode::Suggest
             };
-            neotrix::cli::approval::global_approval().lock().unwrap_or_else(|e| e.into_inner()).set_mode(approval_mode);
-            neotrix::cli::sandbox::init_sandbox(neotrix::cli::sandbox::SandboxMode::from_str(sandbox.as_str()));
+            neotrix::l6_meta::nt_approval::global_approval()
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .set_mode(approval_mode);
+            neotrix::l3_embodiment::nt_sandbox::init_sandbox(
+                neotrix::l3_embodiment::nt_sandbox::SandboxMode::from_str(sandbox.as_str()),
+            );
             if let Some(p) = prompt {
                 let resolved = resolve_prompt(Some(p), file.as_deref(), *pipe);
                 run_one_shot(&resolved, format.as_deref(), &cli.profile, *stream);
@@ -480,7 +600,13 @@ fn main() {
             }
         }
         Some(Commands::Serve { addr }) => run_background_daemon(addr, &cli.profile),
-        Some(Commands::Reason { prompt, file, pipe, format, stream }) => {
+        Some(Commands::Reason {
+            prompt,
+            file,
+            pipe,
+            format,
+            stream,
+        }) => {
             let resolved = resolve_prompt(prompt.as_deref(), file.as_deref(), *pipe);
             if cli.standalone {
                 // standalone: 纯 ReasoningKernel 推理, 不依赖外部 LLM/网络 (无 LLM 环境可用)
@@ -494,159 +620,165 @@ fn main() {
         Some(Commands::Bench { category }) => run_benchmark(category.as_deref()),
         Some(Commands::Status) => show_status(),
         Some(Commands::Daemon { evolve }) => {
-            if *evolve { run_daemon_evolution(&cli.profile); } else { run_daemon(&cli.profile); }
+            if *evolve {
+                run_daemon_evolution(&cli.profile);
+            } else {
+                run_daemon(&cli.profile);
+            }
         }
         Some(Commands::Update { check_only }) => run_update(*check_only),
         Some(Commands::Completions { shell }) => generate_completions(shell, &mut Cli::command()),
         Some(Commands::Browse { url }) => run_browse(url),
+        Some(Commands::Dialog { cmd }) => {
+            if let Err(e) = run_dialog(cmd.clone()) {
+                eprintln!("neotrix dialog: {e}");
+                std::process::exit(1);
+            }
+        }
+        Some(Commands::BrowseAct { file }) => run_browse_act(file),
         Some(Commands::Login { url }) => run_login(url),
         Some(Commands::Proxy { args }) => {
             let cmd_str = args.join(" ");
             let rt = tokio::runtime::Runtime::new().expect("tokio");
             rt.block_on(entry::run_proxy_cmd(&cmd_str));
         }
-        Some(Commands::Sandbox { command }) => {
-            match command {
-                SandboxCommands::Run { code, runtime, timeout } => {
-                    entry::run_sandbox_run(code.as_deref(), runtime, *timeout);
-                }
-                SandboxCommands::List => {
-                    entry::run_sandbox_list();
-                }
-                SandboxCommands::Cancel { session_id } => {
-                    entry::run_sandbox_cancel(session_id);
-                }
-                SandboxCommands::Upload { path, session_id } => {
-                    entry::run_sandbox_upload(path, session_id);
-                }
+        Some(Commands::Sandbox { command }) => match command {
+            SandboxCommands::Run {
+                code,
+                runtime,
+                timeout,
+            } => {
+                entry::run_sandbox_run(code.as_deref(), runtime, *timeout);
             }
-        }
+            SandboxCommands::List => {
+                entry::run_sandbox_list();
+            }
+            SandboxCommands::Cancel { session_id } => {
+                entry::run_sandbox_cancel(session_id);
+            }
+            SandboxCommands::Upload { path, session_id } => {
+                entry::run_sandbox_upload(path, session_id);
+            }
+        },
         Some(Commands::Search { query, count }) => {
             run_search(query, *count);
         }
-        Some(Commands::Discover { port, duration, json }) => {
+        Some(Commands::Discover {
+            port,
+            duration,
+            json,
+        }) => {
             run_discover(*port, *duration, *json);
         }
         Some(Commands::McpServer) => entry::run_mcp_server(),
         Some(Commands::Consciousness { sub, json, cycles }) => {
             entry::run_consciousness_core(sub.as_deref(), *json, *cycles);
         }
-        Some(Commands::ProjectEvolve { target, autofix, json, max_rounds }) => {
-            if let Err(e) = entry::run_project_evolve(target.as_deref(), *autofix, *json, *max_rounds) {
+        Some(Commands::ProjectEvolve {
+            target,
+            autofix,
+            json,
+            max_rounds,
+        }) => {
+            if let Err(e) =
+                entry::run_project_evolve(target.as_deref(), *autofix, *json, *max_rounds)
+            {
                 eprintln!("error: {}", e);
                 std::process::exit(1);
             }
         }
-        Some(Commands::Features { command }) => {
-            match command {
-                FeaturesCommands::Enable { name } => {
-                    entry::run_features_enable(name);
-                }
-                FeaturesCommands::List => {
-                    entry::run_features_list();
-                }
+        Some(Commands::Features { command }) => match command {
+            FeaturesCommands::Enable { name } => {
+                entry::run_features_enable(name);
             }
-        }
-        Some(Commands::Wallet { command }) => {
-            match command {
-                WalletCommands::Create { label } => {
-                    entry::run_wallet_create(label);
-                }
-                WalletCommands::Import { label, private_key } => {
-                    entry::run_wallet_import(label, private_key);
-                }
-                WalletCommands::List { json } => {
-                    entry::run_wallet_list(*json);
-                }
-                WalletCommands::Balance { chain } => {
-                    entry::run_wallet_balance(chain);
-                }
-                WalletCommands::Delete { label } => {
-                    entry::run_wallet_delete(label);
-                }
-                WalletCommands::Export { label } => {
-                    entry::run_wallet_export(label);
-                }
+            FeaturesCommands::List => {
+                entry::run_features_list();
             }
-        }
-        Some(Commands::Config { command }) => {
-            match command {
-                ConfigCommands::EncryptKeys => {
-                    entry::run_config_encrypt_keys();
-                }
-                ConfigCommands::DecryptKeys => {
-                    entry::run_config_decrypt_keys();
-                }
+        },
+        Some(Commands::Wallet { command }) => match command {
+            WalletCommands::Create { label } => {
+                entry::run_wallet_create(label);
             }
-        }
-        Some(Commands::Evidence { command }) => {
-            if let Err(e) = neotrix::cli::commands::evidence_cmds::handle_evidence_command(command) {
-                eprintln!("error: {}", e);
-                std::process::exit(1);
+            WalletCommands::Import { label, private_key } => {
+                entry::run_wallet_import(label, private_key);
             }
-        }
+            WalletCommands::List { json } => {
+                entry::run_wallet_list(*json);
+            }
+            WalletCommands::Balance { chain } => {
+                entry::run_wallet_balance(chain);
+            }
+            WalletCommands::Delete { label } => {
+                entry::run_wallet_delete(label);
+            }
+            WalletCommands::Export { label } => {
+                entry::run_wallet_export(label);
+            }
+        },
+        Some(Commands::Config { command }) => match command {
+            ConfigCommands::EncryptKeys => {
+                entry::run_config_encrypt_keys();
+            }
+            ConfigCommands::DecryptKeys => {
+                entry::run_config_decrypt_keys();
+            }
+        },
         Some(Commands::Wiki { args }) => {
-            use neotrix::cli::commands::types::CliCommand;
-            let cmd = neotrix::cli::commands::wiki_cmds::WikiCmd;
-            let out = cmd.execute(args, None);
-            if out.success {
-                println!("{}", out.message);
-            } else {
-                eprintln!("error: {}", out.message);
+            // 意图路由收敛：wiki 经 AutoOrchestrator 分类后走 KB 后端
+            if let Err(e) = entry::run_wiki(args) {
+                eprintln!("error: {e}");
                 std::process::exit(1);
             }
         }
         Some(Commands::Todo { args }) => {
-            use neotrix::cli::commands::types::CliCommand;
-            let cmd = neotrix::cli::commands::kanban_cmds::BoardCmd;
-            let out = cmd.execute(args, None);
-            if out.success {
-                println!("{}", out.message);
-            } else {
-                eprintln!("error: {}", out.message);
+            // 意图路由收敛：todo status 走 orchestrator 观测；管理命令已迁移
+            if let Err(e) = entry::run_todo(args) {
+                eprintln!("error: {e}");
                 std::process::exit(1);
             }
         }
         Some(Commands::Sysops { args }) => {
             entry::run_sysops(args);
         }
-        Some(Commands::Guard { path, strict }) => {
-            let p = path.as_deref().map(std::path::Path::new).unwrap_or_else(|| std::path::Path::new("AGENTS.md"));
-            if let Err(e) = neotrix::cli::commands::guard_cmds::run_guard(p, *strict) {
-                eprintln!("{}", e);
+        Some(Commands::Clean { args }) => {
+            if let Err(e) = entry::run_clean(args) {
+                eprintln!("error: {e}");
                 std::process::exit(1);
             }
         }
-        None => {
-            if cli.standalone { run_standalone_mode(cli.stage); }
-            else if cli.agent { entry::run_agent_tui(&cli.profile); }
-            else if cli.serve { run_background_daemon(&cli.addr, &cli.profile); }
-            else if cli.headless { run_headless_mode(&cfg, &cli.profile); }
-            else { run_interactive(&cfg, &cli.profile); }
+        Some(Commands::Guard { path, strict }) => {
+            // 意图路由收敛：guard 经 AutoOrchestrator 分类（SecurityAudit）后走治理检查
+            let orchestrator = neotrix::l6_meta::nt_auto_orchestrator::AutoOrchestrator::new();
+            let classification =
+                orchestrator.classify_intent("guard agents-md pointer conservation audit");
+            println!(
+                "🔍 意图识别: {:?} (conf={:.2})",
+                classification.task_type, classification.confidence
+            );
+            let target = path.as_deref().unwrap_or("./AGENTS.md");
+            match neotrix::l6_meta::nt_agents_guard::run_guard(
+                std::path::Path::new(target),
+                *strict,
+            ) {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    std::process::exit(1);
+                }
+            }
         }
-    }
-}
-
-/// 从 clap 错误中提取未知子命令名。
-/// clap 格式: `error: unrecognized subcommand 'xxx'`
-fn extract_unknown_subcommand(e: &clap::Error) -> Option<String> {
-    let msg = e.to_string();
-    let start = msg.find('\'')? + 1;
-    let rest = &msg[start..];
-    let end = rest.find('\'')?;
-    Some(rest[..end].to_string())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_extract_unknown_subcommand() {
-        let err = clap::Error::raw(
-            clap::error::ErrorKind::InvalidSubcommand,
-            "error: unrecognized subcommand 'kbl'\n\nUsage: neotrix <COMMAND>\n",
-        );
-        assert_eq!(extract_unknown_subcommand(&err).as_deref(), Some("kbl"));
+        None => {
+            if cli.standalone {
+                run_standalone_mode(cli.stage);
+            } else if cli.agent {
+                entry::run_agent_tui(&cli.profile);
+            } else if cli.serve {
+                run_background_daemon(&cli.addr, &cli.profile);
+            } else if cli.headless {
+                run_headless_mode(&cfg, &cli.profile);
+            } else {
+                run_interactive(&cfg, &cli.profile);
+            }
+        }
     }
 }

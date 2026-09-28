@@ -69,21 +69,55 @@ impl Planner for PlannerAgent {
             .enumerate()
             .map(|(i, sentence)| {
                 let action_verbs = [
-                    "implement", "create", "build", "design", "optimize", "refactor",
-                    "test", "deploy", "analyze", "integrate", "configure", "write",
-                    "add", "fix", "remove", "migrate", "document", "validate",
-                    "extract", "transform", "load", "query", "render", "compile",
+                    "implement",
+                    "create",
+                    "build",
+                    "design",
+                    "optimize",
+                    "refactor",
+                    "test",
+                    "deploy",
+                    "analyze",
+                    "integrate",
+                    "configure",
+                    "write",
+                    "add",
+                    "fix",
+                    "remove",
+                    "migrate",
+                    "document",
+                    "validate",
+                    "extract",
+                    "transform",
+                    "load",
+                    "query",
+                    "render",
+                    "compile",
                 ];
                 let has_action = action_verbs
                     .iter()
                     .any(|v| sentence.to_lowercase().contains(v));
-                let priority = if has_action { 10u8.saturating_sub(i as u8 * 2).max(1) } else { 5u8.saturating_sub(i as u8).max(1) };
+                let priority = if has_action {
+                    10u8.saturating_sub(i as u8 * 2).max(1)
+                } else {
+                    5u8.saturating_sub(i as u8).max(1)
+                };
                 PlanStep {
-                    id: format!("step-{}", Uuid::new_v4().to_string().chars().take(8).collect::<String>()),
+                    id: format!(
+                        "step-{}",
+                        Uuid::new_v4()
+                            .to_string()
+                            .chars()
+                            .take(8)
+                            .collect::<String>()
+                    ),
                     description: sentence.to_string(),
                     priority,
                     dependencies: vec![],
-                    expected_outcome: format!("Complete: {}", sentence.chars().take(60).collect::<String>()),
+                    expected_outcome: format!(
+                        "Complete: {}",
+                        sentence.chars().take(60).collect::<String>()
+                    ),
                     status: StepStatus::Pending,
                 }
             })
@@ -134,7 +168,7 @@ pub struct ExecutorAgent {
     pub name: String,
     pub execution_count: u64,
     pub last_result: Option<ActionResult>,
-/// 动作缓存 — 命中免 LLM 推理 (D16 自愈)。
+    /// 动作缓存 — 命中免 LLM 推理 (D16 自愈)。
     pub action_cache: ActionCache,
 }
 
@@ -156,7 +190,11 @@ impl ExecutorAgent {
         keys.sort();
         let mut buf = format!("{}|{}", step.id, step.description);
         for k in keys {
-            buf.push_str(&format!("|{}={}", k, context.get(k).unwrap_or(&String::new())));
+            buf.push_str(&format!(
+                "|{}={}",
+                k,
+                context.get(k).unwrap_or(&String::new())
+            ));
         }
         let mut hash: u64 = 0xcbf29ce484222325;
         for b in buf.as_bytes() {
@@ -227,7 +265,14 @@ impl Executor for ExecutorAgent {
                 step_id: step.id.clone(),
                 success: true,
                 artifacts: vec![Artifact {
-                    id: format!("art-cached-{}", Uuid::new_v4().to_string().chars().take(8).collect::<String>()),
+                    id: format!(
+                        "art-cached-{}",
+                        Uuid::new_v4()
+                            .to_string()
+                            .chars()
+                            .take(8)
+                            .collect::<String>()
+                    ),
                     content: format!("[CACHED] {}", cached.action),
                     step_id: step.id.clone(),
                     timestamp: (now_ms() / 1000) as i64,
@@ -235,7 +280,10 @@ impl Executor for ExecutorAgent {
                 errors: vec![],
                 warnings: vec!["served from action_cache (no re-inference)".into()],
                 duration_ms: 0,
-                summary: format!("Cache hit: {}", cached.action.chars().take(40).collect::<String>()),
+                summary: format!(
+                    "Cache hit: {}",
+                    cached.action.chars().take(40).collect::<String>()
+                ),
             };
             self.last_result = Some(cached_result.clone());
             return cached_result;
@@ -248,7 +296,14 @@ impl Executor for ExecutorAgent {
         );
 
         let artifact = Artifact {
-            id: format!("art-{}", Uuid::new_v4().to_string().chars().take(8).collect::<String>()),
+            id: format!(
+                "art-{}",
+                Uuid::new_v4()
+                    .to_string()
+                    .chars()
+                    .take(8)
+                    .collect::<String>()
+            ),
             content,
             step_id: step.id.clone(),
             timestamp: (now_ms() / 1000) as i64,
@@ -261,7 +316,10 @@ impl Executor for ExecutorAgent {
             errors: vec![],
             warnings: vec![],
             duration_ms: now_ms() - start,
-            summary: format!("Step '{}' executed successfully", step.description.chars().take(40).collect::<String>()),
+            summary: format!(
+                "Step '{}' executed successfully",
+                step.description.chars().take(40).collect::<String>()
+            ),
         };
         // 记录成功动作供下次免推理。
         self.action_cache
@@ -333,8 +391,19 @@ impl PlanRevision {
                     any_failed = true;
                     total_score += 0.0;
                     let fix_step = PlanStep {
-                        id: format!("step-retry-{}", Uuid::new_v4().to_string().chars().take(8).collect::<String>()),
-                        description: format!("Retry: {} (previously failed: {})", step.description, r.errors.join("; ")),
+                        id: format!(
+                            "step-retry-{}",
+                            Uuid::new_v4()
+                                .to_string()
+                                .chars()
+                                .take(8)
+                                .collect::<String>()
+                        ),
+                        description: format!(
+                            "Retry: {} (previously failed: {})",
+                            step.description,
+                            r.errors.join("; ")
+                        ),
                         priority: step.priority.max(8),
                         dependencies: vec![step.id.clone()],
                         expected_outcome: step.expected_outcome.clone(),
@@ -492,7 +561,8 @@ impl PlanExecuteReflectLoop {
                 break;
             }
 
-            plan.steps.retain(|s| !revision.dropped_step_ids.contains(&s.id));
+            plan.steps
+                .retain(|s| !revision.dropped_step_ids.contains(&s.id));
             for modified in &revision.modified_steps {
                 if let Some(step) = plan.steps.iter_mut().find(|s| s.id == modified.step_id) {
                     step.description = modified.new_description.clone();
@@ -578,12 +648,22 @@ mod tests {
         // release wraps to 0 -> priority 10. saturating_mul keeps it a floor
         // of 1 for action steps.
         let mut planner = PlannerAgent::new("test");
-        let sentences: Vec<String> = (0..200).map(|i| format!("Action sentence {}.", i)).collect();
+        let sentences: Vec<String> = (0..200)
+            .map(|i| format!("Action sentence {}.", i))
+            .collect();
         let plan = planner.plan(&sentences.join(" "));
         assert!(plan.steps.len() >= 200);
         for step in &plan.steps {
-            assert!(step.priority >= 1, "priority must stay >= 1, got {}", step.priority);
-            assert!(step.priority <= 10, "priority must stay <= 10, got {}", step.priority);
+            assert!(
+                step.priority >= 1,
+                "priority must stay >= 1, got {}",
+                step.priority
+            );
+            assert!(
+                step.priority <= 10,
+                "priority must stay <= 10, got {}",
+                step.priority
+            );
         }
     }
 
@@ -591,7 +671,10 @@ mod tests {
     fn test_planner_gives_action_steps_higher_priority() {
         let mut planner = PlannerAgent::new("test");
         let plan = planner.plan("Implement the core. Review the docs.");
-        let implement_step = plan.steps.iter().find(|s| s.description.contains("Implement"));
+        let implement_step = plan
+            .steps
+            .iter()
+            .find(|s| s.description.contains("Implement"));
         let review_step = plan.steps.iter().find(|s| s.description.contains("Review"));
         assert!(implement_step.is_some());
         assert!(review_step.is_some());
@@ -640,10 +723,15 @@ mod tests {
         assert!(r2.success);
         assert_eq!(executor.execution_count, 1, "cache hit must not re-execute");
         assert!(
-            r2.warnings.iter().any(|w| w.contains("served from action_cache")),
+            r2.warnings
+                .iter()
+                .any(|w| w.contains("served from action_cache")),
             "cache hit should carry a served-from-cache warning"
         );
-        assert!(r2.artifacts.is_empty(), "cache hit reuses prior result, no new artifact");
+        assert!(
+            r2.artifacts.is_empty(),
+            "cache hit reuses prior result, no new artifact"
+        );
     }
 
     #[test]
@@ -664,13 +752,22 @@ mod tests {
         // 不同 context → 不同签名 → 各自 miss 执行
         let r1 = executor.execute(&step, &ctx_a);
         let r2 = executor.execute(&step, &ctx_b);
-        assert_eq!(executor.execution_count, 2, "different context must miss cache");
+        assert_eq!(
+            executor.execution_count, 2,
+            "different context must miss cache"
+        );
         assert!(r1.warnings.is_empty());
         assert!(r2.warnings.is_empty());
         // 相同 context 再执行 → 命中
         let r3 = executor.execute(&step, &ctx_a);
-        assert_eq!(executor.execution_count, 2, "same context re-execution hits cache");
-        assert!(r3.warnings.iter().any(|w| w.contains("served from action_cache")));
+        assert_eq!(
+            executor.execution_count, 2,
+            "same context re-execution hits cache"
+        );
+        assert!(r3
+            .warnings
+            .iter()
+            .any(|w| w.contains("served from action_cache")));
     }
 
     #[test]
@@ -699,29 +796,25 @@ mod tests {
     fn test_reflector_all_success_stops_loop() {
         let plan = TaskPlan {
             task: "Test task".into(),
-            steps: vec![
-                PlanStep {
-                    id: "s1".into(),
-                    description: "Step one".into(),
-                    priority: 5,
-                    dependencies: vec![],
-                    expected_outcome: "done".into(),
-                    status: StepStatus::Completed,
-                },
-            ],
+            steps: vec![PlanStep {
+                id: "s1".into(),
+                description: "Step one".into(),
+                priority: 5,
+                dependencies: vec![],
+                expected_outcome: "done".into(),
+                status: StepStatus::Completed,
+            }],
             context: HashMap::new(),
         };
-        let results = vec![
-            ActionResult {
-                step_id: "s1".into(),
-                success: true,
-                artifacts: vec![],
-                errors: vec![],
-                warnings: vec![],
-                duration_ms: 10,
-                summary: "ok".into(),
-            },
-        ];
+        let results = vec![ActionResult {
+            step_id: "s1".into(),
+            success: true,
+            artifacts: vec![],
+            errors: vec![],
+            warnings: vec![],
+            duration_ms: 10,
+            summary: "ok".into(),
+        }];
         let mut reflector = ReflectorAgent::new("test-refl");
         let revision = reflector.reflect(&plan, &results);
         assert!(!revision.should_continue);
@@ -733,29 +826,25 @@ mod tests {
     fn test_reflector_failure_creates_retry_step() {
         let plan = TaskPlan {
             task: "Test task".into(),
-            steps: vec![
-                PlanStep {
-                    id: "s1".into(),
-                    description: "Step one".into(),
-                    priority: 5,
-                    dependencies: vec![],
-                    expected_outcome: "done".into(),
-                    status: StepStatus::Completed,
-                },
-            ],
+            steps: vec![PlanStep {
+                id: "s1".into(),
+                description: "Step one".into(),
+                priority: 5,
+                dependencies: vec![],
+                expected_outcome: "done".into(),
+                status: StepStatus::Completed,
+            }],
             context: HashMap::new(),
         };
-        let results = vec![
-            ActionResult {
-                step_id: "s1".into(),
-                success: false,
-                artifacts: vec![],
-                errors: vec!["timeout".into()],
-                warnings: vec![],
-                duration_ms: 100,
-                summary: "failed".into(),
-            },
-        ];
+        let results = vec![ActionResult {
+            step_id: "s1".into(),
+            success: false,
+            artifacts: vec![],
+            errors: vec!["timeout".into()],
+            warnings: vec![],
+            duration_ms: 100,
+            summary: "failed".into(),
+        }];
         let mut reflector = ReflectorAgent::new("test-refl");
         let revision = reflector.reflect(&plan, &results);
         assert!(revision.should_continue);

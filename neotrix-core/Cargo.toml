@@ -30,6 +30,10 @@ path = "src/bin/proxy_daemon.rs"
 required-features = ["stealth-net"]
 
 [[bin]]
+name = "nt-crystal-serve"
+path = "src/bin/nt_crystal_serve.rs"
+
+[[bin]]
 name = "neotrix-kb-crawl"
 path = "src/bin/kb_crawl_daemon.rs"
 
@@ -73,6 +77,18 @@ path = "src/bin/geoint.rs"
 name = "model-download"
 path = "src/bin/model_download.rs"
 
+[[bin]]
+name = "ntcode"
+path = "src/bin/ntcode.rs"
+
+[[bin]]
+name = "nt-train-export"
+path = "src/bin/nt_train_export.rs"
+
+[[bin]]
+name = "neotrix-hf-catalog"
+path = "src/bin/nt_hf_catalog_download.rs"
+
 [dependencies]
 neotrix-types = { workspace = true }
 neotrix-sysctl = { workspace = true }
@@ -81,9 +97,11 @@ neotrix-reasoning = { workspace = true }
 neotrix-gateway = { workspace = true }
 neotrix-multi-agent = { workspace = true }
 nt_core_capability_tree = { workspace = true }
+neotrix-neobot = { workspace = true }
 thiserror = "1"
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = "0.1"
 fs2 = "0.4"
@@ -107,7 +125,7 @@ ring = "0.17"
 bitflags = { version = "2", features = ["serde"] }
 bincode = "1"
 lz4_flex = "0.11"
-oauth2 = "4"
+oauth2 = { version = "5", features = ["reqwest-blocking"] }
 num-bigint = "0.4"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "multipart", "socks", "rustls-tls", "stream"] }
 url = "2"
@@ -254,6 +272,12 @@ research = []
 self_model = []
 echo_bridge = []
 desktop = []
+# Opt-in test gates: network-dependent / integration tests (off by default)
+network_tests = []
+integration_tests = []
+# Integration-test-only gates (kept off by default)
+crystal_game_disabled = []
+mail = []
 
 [[example]]
 name = "evolve"

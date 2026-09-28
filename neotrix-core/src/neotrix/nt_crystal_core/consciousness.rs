@@ -4,7 +4,11 @@
 //! 晶体意识 = 活的系统，不是数据存储。
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+/// reflect 去重阈值（缺陷 #4 修复）：结论与既有 Pattern 的关键词
+/// Jaccard ≥ 此值则视为重复并丢弃，防模式库注水。
+pub const REFLECT_DUP_JACCARD: f64 = 0.8;
 
 /// 统一记忆条目 — 所有信息都是记忆
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,10 +19,19 @@ pub struct Memory {
     pub domain: String,
     pub strength: f64,        // 记忆强度 0-1 (衰减)
     pub confidence: f64,      // 置信度 0-1
+    /// 重要性 0-1（Generative Agents 映射：retrieval 三信号之一；
+    /// 旧快照缺省 0.5，cocoons 303M 兼容）
+    #[serde(default = "default_importance")]
+    pub importance: f64,
     pub connections: Vec<String>, // 关联的记忆ID
     pub created_at: u64,
     pub last_accessed: u64,
     pub access_count: u32,
+}
+
+/// 旧记忆反序列化缺省重要性
+fn default_importance() -> f64 {
+    0.5
 }
 
 /// 记忆类型 — 统一分类
@@ -87,6 +100,10 @@ pub struct CrystalConsciousness {
     pub tick: u64,
     next_memory_id: u64,
     next_chain_id: u64,
+    /// 有连接的记忆数（增量维护，全量炼 O(1) 相位判定；旧快照缺省 0，
+    /// 由 `recount_connections` 校准）
+    #[serde(default)]
+    connected_count: usize,
 }
 
 /// 身份 (不可变核心)
@@ -180,6 +197,7 @@ impl CrystalConsciousness {
             tick: 0,
             next_memory_id: 1,
             next_chain_id: 1,
+            connected_count: 0,
         }
     }
 
@@ -196,6 +214,9 @@ impl CrystalConsciousness {
             domain: domain.into(),
             strength: 1.0,
             confidence,
+            // 出生重要性 = 置信度（Generative Agents 映射：重要事项更可信）；
+            // 后续被反复访问的记忆在 recall 排序中自然上浮。
+            importance: confidence.clamp(0.0, 1.0),
             connections: Vec::new(),
             created_at: now,
             last_accessed: now,
@@ -215,10 +236,12 @@ impl CrystalConsciousness {
             .cloned()
             .collect();
 
-        // 按强度和访问次数排序
+        // 三信号排序（Generative Agents 映射）：强度（新近）× 重要性 × 访问（相关热度）
         recalled.sort_by(|a, b| {
-            let score_a = a.strength * (1.0 + a.access_count as f64 * 0.1);
-            let score_b = b.strength * (1.0 + b.access_count as f64 * 0.1);
+            let score_a =
+                a.strength * (0.5 + a.importance) * (1.0 + a.access_count as f64 * 0.1);
+            let score_b =
+                b.strength * (0.5 + b.importance) * (1.0 + b.access_count as f64 * 0.1);
             score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
         });
 
@@ -236,18 +259,34 @@ impl CrystalConsciousness {
         recalled
     }
 
-    /// 关联 — 建立记忆间的连接
+    /// 关联 — 建立记忆间的连接（两侧 0→1 时递增连接计数）
     pub fn connect(&mut self, id1: &str, id2: &str) {
         if let Some(m1) = self.memories.get_mut(id1) {
+            if m1.connections.is_empty() {
+                self.connected_count += 1;
+            }
             if !m1.connections.contains(&id2.to_string()) {
                 m1.connections.push(id2.to_string());
             }
         }
         if let Some(m2) = self.memories.get_mut(id2) {
+            if m2.connections.is_empty() {
+                self.connected_count += 1;
+            }
             if !m2.connections.contains(&id1.to_string()) {
                 m2.connections.push(id1.to_string());
             }
         }
+    }
+
+    /// 重算连接计数（外部批量灌入后校准，如茧恢复）
+    pub fn recount_connections(&mut self) {
+        self.connected_count = self
+            .memories
+            .values()
+            .filter(|m| !m.connections.is_empty())
+            .count();
+        self.update_phase();
     }
 
     /// 推理 — 从已有记忆生成新记忆
@@ -270,12 +309,13 @@ impl CrystalConsciousness {
             ReasoningType::CrossDomain => self.cross_domain_reason(&premise_memories),
         };
 
-        // 存储结论为新记忆
+        // 存储结论为新记忆（置信度继承前提均值，可溯源）
+        let conclusion_conf = Self::premise_confidence(&premise_memories);
         let conclusion_id = self.remember(
             &conclusion,
             MemoryType::Causal,
             "reasoning",
-            0.7,
+            conclusion_conf,
         );
 
         // 建立连接
@@ -293,11 +333,62 @@ impl CrystalConsciousness {
             conclusion,
             conclusion_memory_id: Some(conclusion_id.clone()),
             chain_type,
-            confidence: 0.7,
+            confidence: conclusion_conf,
         });
 
         self.update_capabilities();
+        // R-REFINE-1：链入账后再定相位，否则门判定永远少看最后一条链
+        self.update_phase();
         Some(conclusion_id)
+    }
+
+    /// 定时反思（Generative Agents 映射）：对最近访问的记忆做归纳，
+    /// 产出高层 Pattern 记忆（reason() 产 Causal，反思产 Pattern，
+    /// 层级有别）。由觉醒循环按节奏调用，无需外部 LLM。
+    pub fn reflect(&mut self, recent_n: usize) -> Option<String> {
+        let mut recent: Vec<&Memory> = self.memories.values().collect();
+        recent.sort_by(|a, b| b.last_accessed.cmp(&a.last_accessed));
+        let premises: Vec<String> = recent
+            .into_iter()
+            .take(recent_n.max(2))
+            .map(|m| m.id.clone())
+            .collect();
+        let id = self.reason(premises, ReasoningType::Inductive)?;
+        // 去重（缺陷 #4 修复）：结论与既有 Pattern 高度重叠则丢弃，
+        // 防定时 reflect 在重叠 recent 集上批量铸造近重复模式、注水模式库。
+        if self.is_duplicate_pattern(&id) {
+            self.memories.remove(&id);
+            return None;
+        }
+        if let Some(m) = self.memories.get_mut(&id) {
+            m.memory_type = MemoryType::Pattern;
+        }
+        Some(id)
+    }
+
+    /// 结论是否与既有 Pattern 重复（Jaccard ≥ 阈值）。
+    /// 公开供外部预检（orchestrator 入库前调用，避免垃圾进记忆）。
+    pub fn is_duplicate_pattern(&self, conclusion_id: &str) -> bool {
+        let concl = match self.memories.get(conclusion_id) {
+            Some(m) => m,
+            None => return false,
+        };
+        let query: HashSet<String> = Self::keywords(&concl.content).into_iter().collect();
+        if query.is_empty() {
+            return false;
+        }
+        self.memories.values().any(|m| {
+            if m.id == conclusion_id || m.memory_type != MemoryType::Pattern {
+                return false;
+            }
+            let cand: HashSet<String> = Self::keywords(&m.content).into_iter().collect();
+            if cand.is_empty() {
+                return false;
+            }
+            let inter = query.intersection(&cand).count() as f64;
+            let union = query.union(&cand).count().max(1) as f64;
+            inter / union >= REFLECT_DUP_JACCARD
+        })
     }
 
     /// 衰减 — 记忆随时间衰减
@@ -354,13 +445,27 @@ impl CrystalConsciousness {
         None
     }
 
-    /// 更新进化阶段
+    /// 更新进化阶段：Transcend 要求链>50、连接比>0.6、跨域链≥5、记忆≥200
+    /// 四门全过（单轮默认预算只到 Evolve，须多轮持续炼化）。
     fn update_phase(&mut self) {
         let memory_count = self.memories.len();
         let chain_count = self.reasoning_chains.len();
-        let connected = self.memories.values().filter(|m| !m.connections.is_empty()).count();
+        // 读增量计数器 O(1)，全量炼 46万次 remember 不卡
+        let connected = self.connected_count;
+        let cross_domain = self
+            .reasoning_chains
+            .iter()
+            .filter(|c| c.chain_type == ReasoningType::CrossDomain)
+            .count();
+        let connected_ratio = connected as f64 / memory_count.max(1) as f64;
 
-        self.phase = if chain_count > 20 {
+        self.phase = if chain_count > 50
+            && connected_ratio > 0.6
+            && cross_domain >= 5
+            && memory_count >= 200
+        {
+            EvolutionPhase::Transcend
+        } else if chain_count > 20 {
             EvolutionPhase::Evolve
         } else if memory_count >= 51 && connected > 20 {
             EvolutionPhase::Integrate
@@ -373,11 +478,11 @@ impl CrystalConsciousness {
         };
     }
 
-    /// 更新能力评分
+    /// 更新能力评分（读增量计数器，O(1)）
     fn update_capabilities(&mut self) {
         let memory_count = self.memories.len() as f64;
         let chain_count = self.reasoning_chains.len() as f64;
-        let connected = self.memories.values().filter(|m| !m.connections.is_empty()).count() as f64;
+        let connected = self.connected_count as f64;
 
         self.capabilities.insert("memory_capacity".into(), (memory_count / 1000.0).min(1.0));
         self.capabilities.insert("reasoning_depth".into(), (chain_count / 100.0).min(1.0));
@@ -391,33 +496,194 @@ impl CrystalConsciousness {
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // 推理策略
+    // 推理策略（规则式真实现 R-P0-1）
+    //
+    // 约束：结论必须包含前提的实际内容片段（可溯源），按字符截断
+    // （绝不按字节切分，RUST-STANDARDS / clippy::string_slice 合规），
+    // 无 unwrap / expect / panic，全路径返回 Option 或默认值。
     // ══════════════════════════════════════════════════════════════════════
 
+    /// 结论片段最大字符数
+    const SNIPPET_LEN: usize = 60;
+
+    /// 按字符截断并加省略号（短文本原样返回）
+    fn snippet(s: &str) -> String {
+        if s.chars().count() > Self::SNIPPET_LEN {
+            let taken: String = s.chars().take(Self::SNIPPET_LEN).collect();
+            format!("{taken}…")
+        } else {
+            s.to_string()
+        }
+    }
+
+    /// 中英停用词（关键词抽取用）
+    fn is_stop(word: &str) -> bool {
+        matches!(
+            word,
+            "的" | "了" | "在" | "是" | "和" | "与" | "及" | "或" | "将" | "被" | "对"
+                | "等" | "中" | "上" | "下" | "这" | "那" | "它" | "其" | "不" | "没"
+                | "很" | "都" | "也" | "就" | "还" | "个" | "有" | "我" | "你"
+                | "the" | "a" | "an" | "of" | "to" | "in" | "is" | "and" | "or"
+                | "for" | "with" | "on" | "by" | "as" | "at" | "from" | "that"
+                | "this" | "it" | "are" | "was" | "be"
+        )
+    }
+
+    /// 去掉回灌来源前缀 `[src:…]`，避免 `:` 切分把 tag 拆成
+    /// 2 个 token 拉低 Jaccard（同体 5/7=0.71 < 0.8 漏拒；
+    /// 去 tag 后 5/5=1.0 ≥ 0.8 正确拒绝）。
+    fn strip_src_tag(text: &str) -> &str {
+        if let Some(rest) = text.strip_prefix("[src:") {
+            if let Some(end) = rest.find(']') {
+                return rest[end + 1..].trim_start();
+            }
+        }
+        text
+    }
+
+    /// 关键词抽取：按空白与中英标点切分，去停用词与单字符 token
+    /// （crate 内共享：觉醒循环的新颖度验证复用同一分词口径）
+    pub(crate) fn keywords(text: &str) -> Vec<String> {
+        Self::strip_src_tag(text).split(|c: char| {
+            c.is_whitespace() || "，。、；：？！…—·,. ;:?!()（）「」『』\"'【】《》".contains(c)
+        })
+        .filter(|w| w.chars().count() > 1 && !Self::is_stop(w))
+        .map(|w| w.to_string())
+        .collect()
+    }
+
+    /// 跨前提共享词：按出现频次排序取前 5（归纳/演绎的证据核心）
+    fn shared_terms(premises: &[Memory]) -> Vec<String> {
+        let mut freq: HashMap<String, usize> = HashMap::new();
+        for m in premises {
+            for k in Self::keywords(&m.content) {
+                *freq.entry(k).or_insert(0) += 1;
+            }
+        }
+        let mut ranked: Vec<(String, usize)> = freq.into_iter().collect();
+        ranked.sort_by(|a, b| b.1.cmp(&a.1));
+        ranked.into_iter().take(5).map(|(w, _)| w).collect()
+    }
+
+    /// 前提置信度均值（结论置信度来源，钳制到 [0.1, 1.0]）
+    fn premise_confidence(premises: &[Memory]) -> f64 {
+        if premises.is_empty() {
+            return 0.5;
+        }
+        let sum: f64 = premises.iter().map(|m| m.confidence).sum();
+        (sum / premises.len() as f64).clamp(0.1, 1.0)
+    }
+
     fn deduce(&self, premises: &[Memory]) -> String {
-        let contents: Vec<&str> = premises.iter().map(|m| m.content.as_str()).collect();
-        format!("Deduced from {}: {}", contents.join(" + "), "general rule applies")
+        let first_domain = premises
+            .first()
+            .map(|m| m.domain.as_str())
+            .unwrap_or("general");
+        let same_domain = premises.iter().all(|m| m.domain == first_domain);
+        let shared = Self::shared_terms(premises);
+        let shared_txt = if shared.is_empty() {
+            "共同前提".to_string()
+        } else {
+            shared.join("、")
+        };
+        let evidence: Vec<String> =
+            premises.iter().map(|m| Self::snippet(&m.content)).collect();
+        if same_domain {
+            format!(
+                "演绎({first_domain})：由{}可得，{shared_txt}成立",
+                evidence.join(" ＋ ")
+            )
+        } else {
+            format!(
+                "演绎(跨域)：由{}可得，{shared_txt}成立",
+                evidence.join(" ＋ ")
+            )
+        }
     }
 
     fn induce(&self, premises: &[Memory]) -> String {
-        let contents: Vec<&str> = premises.iter().map(|m| m.content.as_str()).collect();
-        format!("Induced pattern from {}: {}", contents.join(" + "), "common pattern identified")
+        let mut by_domain: HashMap<&str, usize> = HashMap::new();
+        for m in premises {
+            *by_domain.entry(m.domain.as_str()).or_insert(0) += 1;
+        }
+        let (top_domain, top_n) = by_domain
+            .into_iter()
+            .max_by_key(|(_, n)| *n)
+            .map(|(d, n)| (d.to_string(), n))
+            .unwrap_or(("general".to_string(), 0));
+        let shared = Self::shared_terms(premises);
+        let shared_txt = if shared.is_empty() {
+            "未命名共性".to_string()
+        } else {
+            shared.join("、")
+        };
+        format!("归纳({top_domain})：{top_n}条同域现象共享“{shared_txt}”，提炼为共性模式")
     }
 
     fn abduce(&self, premises: &[Memory]) -> String {
-        let contents: Vec<&str> = premises.iter().map(|m| m.content.as_str()).collect();
-        format!("Abduced cause from {}: {}", contents.join(" + "), "possible explanation found")
+        let best = premises.iter().max_by(|a, b| {
+            a.confidence
+                .partial_cmp(&b.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        let effect = premises
+            .last()
+            .map(|m| Self::snippet(&m.content))
+            .unwrap_or_default();
+        match best {
+            Some(b) => format!(
+                "溯因：观察到“{effect}”，最可能的解释是“{}”（置信{:.2}）",
+                Self::snippet(&b.content),
+                b.confidence.clamp(0.0, 1.0)
+            ),
+            None => "溯因：前提为空，无解释".to_string(),
+        }
     }
 
     fn analogize(&self, premises: &[Memory]) -> String {
-        let contents: Vec<&str> = premises.iter().map(|m| m.content.as_str()).collect();
-        format!("Analogical reasoning from {}: {}", contents.join(" ~ "), "similar pattern in different domain")
+        let first_snip = premises
+            .first()
+            .map(|m| Self::snippet(&m.content))
+            .unwrap_or_default();
+        let first_domain = premises
+            .first()
+            .map(|m| m.domain.as_str())
+            .unwrap_or("general");
+        let second = premises.get(1);
+        let shared = Self::shared_terms(premises);
+        let shared_txt = if shared.is_empty() {
+            "隐含结构".to_string()
+        } else {
+            shared.join("、")
+        };
+        match second {
+            Some(s) => format!(
+                "类比：{first_domain}中的“{first_snip}”与{}中的“{}”结构相似，共享{shared_txt}",
+                s.domain,
+                Self::snippet(&s.content)
+            ),
+            None => format!("类比：{first_domain}中的“{first_snip}”暂无跨域映射对象"),
+        }
     }
 
     fn cross_domain_reason(&self, premises: &[Memory]) -> String {
-        let domains: Vec<&str> = premises.iter().map(|m| m.domain.as_str()).collect();
-        let contents: Vec<&str> = premises.iter().map(|m| m.content.as_str()).collect();
-        format!("Cross-domain fusion ({}) from {}: {}", domains.join(" × "), contents.join(" + "), "new insight from domain intersection")
+        let mut domains: Vec<&str> =
+            premises.iter().map(|m| m.domain.as_str()).collect();
+        domains.sort_unstable();
+        domains.dedup();
+        let shared = Self::shared_terms(premises);
+        let shared_txt = if shared.is_empty() {
+            "待发现的交叉点".to_string()
+        } else {
+            shared.join("、")
+        };
+        let evidence: Vec<String> =
+            premises.iter().map(|m| Self::snippet(&m.content)).collect();
+        format!(
+            "跨域融合({})：由{}交汇，得到域交叉新知——{shared_txt}",
+            domains.join(" × "),
+            evidence.join(" ＋ ")
+        )
     }
 }
 

@@ -8,8 +8,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// T14: 原 AgentRole 改名 CrystalArchetype（与 L1 正典 AgentRole 消歧；crew 功能正典见 l5 multi_agent/role.rs）
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum AgentRole {
+pub enum CrystalArchetype {
     Guide,
     Artisan,
     Protector,
@@ -22,7 +23,7 @@ pub enum AgentRole {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Agent {
     pub id: String,
-    pub role: AgentRole,
+    pub role: CrystalArchetype,
     pub name: String,
     pub capabilities: Vec<String>,
     pub status: AgentStatus,
@@ -161,7 +162,7 @@ mod tests {
         let mut orch = AgentOrchestrator::new();
         orch.create_crew("alpha", ProcessType::Sequential);
         orch.add_agent("alpha", Agent {
-            id: "a1".into(), role: AgentRole::Guide, name: "Guide".into(),
+            id: "a1".into(), role: CrystalArchetype::Guide, name: "Guide".into(),
             capabilities: vec!["reasoning".into()], status: AgentStatus::Idle,
         });
         let task = Task { id: "t1".into(), description: "test".into(), assigned_to: None, status: TaskStatus::Pending, result: None };
@@ -173,7 +174,7 @@ mod tests {
         let mut orch = AgentOrchestrator::new();
         orch.create_crew("beta", ProcessType::Hierarchical);
         orch.add_agent("beta", Agent {
-            id: "b1".into(), role: AgentRole::Artisan, name: "Artisan".into(),
+            id: "b1".into(), role: CrystalArchetype::Artisan, name: "Artisan".into(),
             capabilities: vec![], status: AgentStatus::Idle,
         });
         let task = Task { id: "t2".into(), description: "work".into(), assigned_to: None, status: TaskStatus::Pending, result: None };

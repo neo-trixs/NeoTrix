@@ -40,7 +40,7 @@ struct Observation {
     confidence: f64, // 0..1
     attrs: Map<String, Value>, // 学科特定属性
     source: String, // 可追溯
-    classification: String, // 分类传播 (branch_215_4)
+    _classification: String, // 分类传播 (branch_215_4，写入保留、暂未读取)
 }
 
 /// 适配器层: 把外部事件转为规范观测 (适配器只转换, 不解释).
@@ -54,7 +54,7 @@ fn ingest(raw: &[Value]) -> Vec<Observation> {
             confidence: e["confidence"].as_f64().unwrap_or(0.6),
             attrs: e.get("attrs").and_then(|a| a.as_object()).cloned().unwrap_or_default(),
             source: e.get("source").and_then(|s| s.as_str()).unwrap_or("unknown").to_string(),
-            classification: e
+            _classification: e
                 .get("classification")
                 .and_then(|c| c.as_str())
                 .unwrap_or("unclassified")

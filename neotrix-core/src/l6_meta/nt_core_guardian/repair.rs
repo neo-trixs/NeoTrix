@@ -114,15 +114,40 @@ impl RepairOrchestrator {
     fn execute_action(&self, action: &RepairAction) -> RepairResult {
         match action {
             RepairAction::ClearCache { reason } => {
-                log::info!("[repair] clearing cache: {}", reason);
-                // cargo clean
-                let _ = std::process::Command::new("cargo")
-                    .args(["clean"])
-                    .output();
+                // 2026-09-27 安全修复 (高危): 原实现执行 `cargo clean` ——
+                // 会删掉整个 target/ (含 deps 活指纹), 一次自愈动作即可让全量重编
+                // 数小时, 且违反本仓硬规则 R-BUILD-5。改为只删 target/<profile>/incremental
+                // (纯派生产物, 可再生), 并如实上报实际结果, 不再无脑报 success。
+                log::info!("[repair] clearing incremental build cache: {}", reason);
+                let target_dir = std::env::var("CARGO_TARGET_DIR").unwrap_or_else(|_| "target".into());
+                let mut cleared: Vec<String> = Vec::new();
+                let mut failed: Vec<String> = Vec::new();
+                for profile in ["debug", "release"] {
+                    let inc = std::path::Path::new(&target_dir).join(profile).join("incremental");
+                    if !inc.exists() {
+                        continue;
+                    }
+                    match std::fs::remove_dir_all(&inc) {
+                        Ok(()) => cleared.push(inc.display().to_string()),
+                        Err(e) => failed.push(format!("{}: {}", inc.display(), e)),
+                    }
+                }
+                let ok = failed.is_empty();
+                if !ok {
+                    log::warn!("[repair] incremental cache clear partial: {:?}", failed);
+                }
                 RepairResult {
                     action: action.clone(),
-                    success: true,
-                    message: format!("cache cleared: {}", reason),
+                    success: ok,
+                    message: if cleared.is_empty() && ok {
+                        format!("no incremental cache to clear: {}", reason)
+                    } else {
+                        format!(
+                            "incremental cache cleared ({} dir(s), deps preserved): {}",
+                            cleared.len(),
+                            reason
+                        )
+                    },
                 }
             }
             RepairAction::RestartComponent { component, reason } => {
@@ -183,13 +208,14 @@ impl RepairOrchestrator {
 
 #[cfg(test)]
 mod tests {
+    use super::super::health::ComponentHealth;
     use super::*;
     use std::collections::HashMap;
 
     #[test]
     fn test_no_repair_for_healthy() {
         let health = Arc::new(HealthState::new());
-        health.update_component(super::health::ComponentHealth {
+        health.update_component(ComponentHealth {
             name: "test".into(),
             level: HealthLevel::Healthy,
             message: "ok".into(),
@@ -204,7 +230,7 @@ mod tests {
     #[test]
     fn test_repair_for_critical() {
         let health = Arc::new(HealthState::new());
-        health.update_component(super::health::ComponentHealth {
+        health.update_component(ComponentHealth {
             name: "disk".into(),
             level: HealthLevel::Critical,
             message: "disk full".into(),

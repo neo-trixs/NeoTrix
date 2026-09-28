@@ -821,26 +821,8 @@ pub async fn share_get_handler(
 pub async fn share_create_handler(
     Json(req): Json<ShareCreateRequest>,
 ) -> Json<Result<ShareCreateResponse, String>> {
-    let store = crate::cli::tui::session_store::SessionStore::new();
-    let session_json = match crate::cli::tui::session_store::SessionStore::export_to_json(&store, &req.name).or_else(|_| store.export_to_json(&req.name)) {
-        Ok(j) => j,
-        Err(e) => return Json(Err(format!("无法加载会话 '{}': {}", req.name, e))),
-    };
-    let json_value: serde_json::Value = match serde_json::from_str(&session_json) {
-        Ok(v) => v,
-        Err(_) => return Json(Err("会话 JSON 解析失败".to_string())),
-    };
-    let mgr = crate::server::session::SessionShareManager::new();
-    match mgr.create(&req.name, json_value, req.ttl_hours) {
-        Ok(share) => Json(Ok(ShareCreateResponse {
-            token: share.token.clone(),
-            url: format!("/api/sessions/share/{}", share.token),
-            session_name: share.session_name,
-            created_at: share.created_at.to_rfc3339(),
-            expires_at: share.expires_at.map(|e| e.to_rfc3339()),
-        })),
-        Err(e) => Json(Err(e)),
-    }
+    // SessionStore removed (cli::tui module deleted) — return error
+    Json(Err(format!("Session sharing unavailable: session store removed for '{}'", req.name)))
 }
 
 // ─── H5 远程聊天页 (通用能力: 从 server/h5.rs 拆解融合) ──────────

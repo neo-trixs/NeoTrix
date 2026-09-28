@@ -1,15 +1,12 @@
-//! # AwarenessCore — 意识核心命令面 (命令 → 意识能力桥接)
+//! # AwarenessCore — 意识核心命令面 (命令桥接已退役, 保留类型与契约)
 //!
-//! 对外只暴露一个意识核心：人类交互 (TUI/CLI/headless) 只接触基础控制命令,
-//! 领域操作全部由意识核心 (AgentLoop + AttentionRouter) 智能调度。
+//! src/cli/commands 删除后: 命令字符串执行面不再可用
+//! (`execute_command` 恒返 Err, `neotrix_command_tools()` 恒为空)。
+//! 意图路由改走 `l6_meta::nt_auto_orchestrator::classify` + MCP NativeTools;
+//! AgentLoop 的工具面由 `entry` 经 MCP 注册表装配, 人类交互走 Tauri。
 //!
-//! 本模块把 CommandRegistry 的全部命令 (file/git/session/agent/memory/
-//! crypto/kb/wiki/...) 桥接为 NativeTool, 注入 AgentLoop 的能力面。
-//! LLM 意识核心通过 AttentionRouter 判断意图 → 调用对应命令工具 → 回传结果。
-//!
-//! 进程内执行 (CommandRegistry::execute), 无需 spawn 子进程, 复用 registry 的
-//! sandbox/shield/hook/approval 治理。命令仍可被人类直接输入, 但不占一级
-//! 认知面 (is_primary=false)。
+//! 本模块保留 `CommandNativeTool` 类型与"已移除"契约测试, 供历史调用方
+//! 以类型兼容方式迁移; 不再提供执行能力。
 
 use serde_json::Value;
 
@@ -35,24 +32,10 @@ fn execute_command(command: &str) -> Result<String, String> {
     if input.is_empty() {
         return Err("Empty command".to_string());
     }
-    let reg = crate::cli::commands::registry::default_registry();
-    let out = reg.execute(&input, None);
-
-    let mut result = String::new();
-    if out.success {
-        result.push_str(&out.message);
-    } else {
-        result.push_str(&format!("Error: {}", out.message));
-    }
-    if let Some(json) = &out.json {
-        if let Ok(s) = serde_json::to_string(json) {
-            if !result.is_empty() {
-                result.push('\n');
-            }
-            result.push_str(&s);
-        }
-    }
-    Ok(result)
+    // cli::commands removed — command execution unavailable.
+    // Intent-based routing is handled by l6_meta::nt_auto_orchestrator.
+    let _ = input;
+    Err("CommandRegistry removed".to_string())
 }
 
 /// 单个命令 → NativeTool 适配。LLM 通过工具名 (`neotrix_<cmd>`) 调用。
@@ -110,34 +93,9 @@ impl NativeTool for CommandNativeTool {
 }
 
 /// 从 CommandRegistry 生成全部命令工具 (意识能力面)。
-///
-/// 每个已注册命令生成一个 `neotrix_<cmd名去slash>` 工具, 描述引用命令原文,
-/// 让 LLM 意识核心能智能调度任意能力。附带 agent_all 兜底工具。
 pub fn neotrix_command_tools() -> Vec<Box<dyn NativeTool>> {
-    use crate::cli::commands::registry::default_registry;
-    let reg = default_registry();
-    let mut tools: Vec<Box<dyn NativeTool>> = Vec::new();
-
-    // 兜底: 通过单个工具执行任意命令 (LLM 一次只能看到有限工具时启用)。
-    tools.push(Box::new(CommandNativeTool::new(
-        "neotrix_command",
-        "Execute any NeoTrix command in-process (agent 后端自我调度通道). \
-         command 为完整命令文本, 如 'file read src/main.rs' 或 '/memory search kb'.",
-    )));
-
-    for name in reg.list() {
-        if name.is_empty() {
-            continue;
-        }
-        let tool_id = format!("neotrix_cmd_{}", name.trim_start_matches('/').replace('/', "_"));
-        let desc = if let Some(cmd) = reg.get(name) {
-            format!("{} — {}", name, cmd.description())
-        } else {
-            format!("Execute NeoTrix command {}", name)
-        };
-        tools.push(Box::new(CommandNativeTool::new(&tool_id, &desc)));
-    }
-    tools
+    // cli::commands removed — no command tools available
+    Vec::new()
 }
 
 /// 便捷入口: 供 entry (TUI/agent) 装配 AwarenessCore 工具面。
@@ -158,21 +116,22 @@ mod tests {
     }
 
     #[test]
-    fn test_execute_command_help() {
-        let out = execute_command("/help").unwrap();
-        assert!(!out.is_empty());
+    fn test_execute_command_help_removed() {
+        // 命令执行面已随 src/cli/commands 删除而移除
+        let err = execute_command("/help").unwrap_err();
+        assert!(err.contains("CommandRegistry removed"), "unexpected: {err}");
     }
 
     #[test]
-    fn test_execute_command_no_slash() {
-        let out = execute_command("help").unwrap();
-        assert!(out.contains("help") || out.contains("命令"));
+    fn test_execute_command_no_slash_removed() {
+        let err = execute_command("help").unwrap_err();
+        assert!(err.contains("CommandRegistry removed"), "unexpected: {err}");
     }
 
     #[test]
-    fn test_execute_command_memory_aggregator() {
-        let out = execute_command("/memory").unwrap();
-        assert!(out.contains("evidence"), "aggregator 应可执行: {}", out);
+    fn test_execute_command_memory_aggregator_removed() {
+        let err = execute_command("/memory").unwrap_err();
+        assert!(err.contains("CommandRegistry removed"), "unexpected: {err}");
     }
 
     #[test]
@@ -181,11 +140,14 @@ mod tests {
     }
 
     #[test]
-    fn test_command_tool_execute() {
+    fn test_command_tool_execute_removed() {
+        // 工具类型保留 (类型兼容), 执行恒 Err
+        // (ToolOutput 无 Debug, 不用 unwrap_err, 走 match 断言)
         let tool = CommandNativeTool::new("neotrix_cmd_help", "help");
-        let out = tool.execute(&serde_json::json!({"command": "/help"})).unwrap();
-        assert!(out.success);
-        assert!(!out.content.is_empty());
+        match tool.execute(&serde_json::json!({"command": "/help"})) {
+            Ok(_) => assert!(false, "execution surface removed, must err"),
+            Err(e) => assert!(e.contains("CommandRegistry removed"), "unexpected: {e}"),
+        }
     }
 
     #[test]
@@ -195,14 +157,10 @@ mod tests {
     }
 
     #[test]
-    fn test_neotrix_command_tools_nonempty() {
-        let tools = neotrix_command_tools();
-        assert!(tools.len() > 10, "应有 10+ 工具面, got {}", tools.len());
-        // 兜底工具存在
-        assert!(tools.iter().any(|t| t.id() == "neotrix_command"));
-        // 特定命令工具存在
-        let ids: Vec<&str> = tools.iter().map(|t| t.id()).collect();
-        assert!(ids.contains(&"neotrix_cmd_help"), "应有 help 命令工具");
-        assert!(ids.contains(&"neotrix_cmd_memory"), "应有 memory 聚合器工具 / 兜底");
+    fn test_neotrix_command_tools_empty_by_design() {
+        // 能力面改走 MCP NativeTools + nt_auto_orchestrator 意图分类,
+        // 不再由命令字符串桥接: 两处入口恒为空。
+        assert!(neotrix_command_tools().is_empty());
+        assert!(awareness_core_tools().is_empty());
     }
 }

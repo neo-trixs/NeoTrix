@@ -84,6 +84,12 @@ pub mod nt_core_answer_engine;
 pub mod nt_ecs;
 /// Multi-Timescale Tick Schedule — absorbed from neotrix-sim (Reflex/Fast/Medium/Slow/Background)
 pub mod nt_tick_schedule;
+
+/// JSON Lines structured streaming output (migrated from cli/jsonl_stream)
+pub mod nt_core_jsonl;
+
+/// Awareness monitor + consciousness types (orphan wired T45+1; 3rd CoreSnapshot adjudication pending T39)
+pub mod nt_core_consciousness_types;
 /// Judge 影子内核（EVO-02 mu 式：只记录不拦截，intercept 恒 false）
 pub mod nt_judge;
 /// EVO-08 统一数据面网关（DbKind/端点校验/注册表/DSN 脱敏/默认拒写）

@@ -168,7 +168,8 @@ impl SleepEngine {
 mod tests {
     use super::*;
     use crate::l1_action::nt_core_bank::{MemoryLifecycle, MemoryTier, ReasoningMemory, T3Views};
-    use crate::l2_perception::nt_core_knowledge::{RewardSource, TaskType};
+    use crate::l2_perception::nt_core_knowledge::TaskType;
+    use neotrix_types::RewardSource;
 
     fn make_memory(reward: f64, success: bool, id: &str) -> ReasoningMemory {
         ReasoningMemory {

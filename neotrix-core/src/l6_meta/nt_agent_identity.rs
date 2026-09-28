@@ -495,12 +495,7 @@ impl SpendVerdict {
 pub use crate::l0_substrate::nt_core_time::now_secs;
 
 fn uuid_v4() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let t = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    format!("{:016x}-{:04x}-{:04x}-{:04x}-{:012x}", t, 0x4000, 0x8000, 0xc000, t & 0xffffffffffff)
+    uuid::Uuid::new_v4().to_string()
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────

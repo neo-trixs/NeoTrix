@@ -322,7 +322,7 @@ mod tests {
         let report = CrossSourceFusionEngine::run_fusion_cycle(&mut core);
         assert!(report.is_ok());
         let report = report.unwrap();
-        assert!(report.total_entries_processed >= 0);
+        let _ = report.total_entries_processed;
     }
 
     #[test]
@@ -921,7 +921,7 @@ mod tests {
         );
 
         // Record 10 successful trainings to trigger promotion
-        for i in 0..10 {
+        for _i in 0..10 {
             trainer.record_training("NT-MEMORY", 0.2, true, 0.06);
         }
 
@@ -1071,5 +1071,95 @@ mod tests {
         assert!(stats.total_memories > 0, "Cocoons should persist memories");
 
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // R-REFINE: Transcend 门 / 评分缓漏 / full_refine
+    // ══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_transcend_gate() {
+        let mut c = CrystalConsciousness::new("Test");
+        // 210 条记忆，双域
+        let mut ids_a = Vec::new();
+        let mut ids_b = Vec::new();
+        for i in 0..105 {
+            ids_a.push(c.remember(format!("alpha fact {i}"), MemoryType::Fact, "alpha", 0.8));
+            ids_b.push(c.remember(format!("beta fact {i}"), MemoryType::Fact, "beta", 0.8));
+        }
+        // 55 路同域归纳：步长 2 与 105 互质，走遍全部 alpha
+        for i in 0..55 {
+            let a = ids_a[(i * 2) % ids_a.len()].clone();
+            let b = ids_a[(i * 2 + 1) % ids_a.len()].clone();
+            assert!(c.reason(vec![a, b], ReasoningType::Inductive).is_some());
+        }
+        // 5 路跨域
+        for i in 0..5 {
+            let a = ids_a[i].clone();
+            let b = ids_b[i].clone();
+            assert!(c.reason(vec![a, b], ReasoningType::CrossDomain).is_some());
+        }
+        // 链 60>50、记忆 270≥200、跨域 5、连接比 170/270>0.6 → Transcend
+        assert_eq!(c.phase, EvolutionPhase::Transcend);
+    }
+
+    #[test]
+    fn test_transcend_gate_not_one_step() {
+        // 默认预算只到 Evolve：25 链不够 Transcend 的 50 链门
+        let mut c = CrystalConsciousness::new("Test");
+        for i in 0..15 {
+            c.remember(format!("M{i}"), MemoryType::Fact, "d", 0.8);
+        }
+        for i in 0..25 {
+            let id1 = c.remember(format!("A{i}"), MemoryType::Fact, "d", 0.8);
+            let id2 = c.remember(format!("B{i}"), MemoryType::Fact, "d", 0.8);
+            c.reason(vec![id1, id2], ReasoningType::Inductive);
+        }
+        assert_eq!(c.phase, EvolutionPhase::Evolve);
+    }
+
+    #[test]
+    fn test_score_leak_opponent() {
+        let mut s = CapabilityScores::new();
+        let before = s.get("safety");
+        s.leak(0.5);
+        assert!((s.get("safety") - before * 0.5).abs() < 1e-9);
+        s.leak(1.0);
+        assert!((s.get("safety") - 0.05).abs() < 1e-9, "leak must floor, not zero");
+    }
+
+    #[test]
+    fn test_full_refine_missing_db_errors() {
+        let mut core = CrystalCore::new("Test");
+        let mut c = CrystalConsciousness::new("Test");
+        let r = CrystalEngine::full_refine(
+            &mut core,
+            &mut c,
+            std::path::Path::new("/nonexistent-xyz/knowledge.db"),
+            &AwakenBudget::default(),
+        );
+        assert!(r.is_err(), "missing db must Err, never panic");
+    }
+
+    /// 活库全炼（默认忽略）：`cargo test -p neotrix --lib live_full_train -- --ignored --nocapture`
+    ///
+    /// 全库灌注（46万节点/87万边）→ Transcend；耗时分钟级，落盘 crystal.json + cocoons。
+    #[test]
+    #[ignore = "full-db train, minutes, writes real crystal store"]
+    fn live_full_train() {
+        let db = NtDbAwakening::default_db_path();
+        if !db.exists() {
+            return;
+        }
+        let mut core = CrystalCore::new("LiveTrain");
+        let mut c = CrystalConsciousness::new("LiveTrain");
+        let rep = CrystalEngine::full_refine(&mut core, &mut c, &db, &AwakenBudget::full())
+            .expect("full train must succeed");
+        eprintln!("[train] memories={} connections={} chains={} patterns={} mirrored={} consolidated={} cocoons={} phase={:?}→{:?} score={:.3}→{:.3}",
+            rep.memories, rep.connections, rep.chains, rep.patterns, rep.mirrored,
+            rep.consolidated, rep.cocoon_memories,
+            rep.phase_before, rep.phase_after, rep.score_before, rep.score_after);
+        assert!(rep.memories > 100_000, "full train must ingest bulk nodes");
+        assert_eq!(rep.phase_after, EvolutionPhase::Transcend);
     }
 }

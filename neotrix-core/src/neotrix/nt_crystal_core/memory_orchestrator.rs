@@ -171,10 +171,15 @@ impl MemoryOrchestrator {
         results.sort_by(|a, b| b.fused_score.partial_cmp(&a.fused_score).unwrap_or(std::cmp::Ordering::Equal));
         results.truncate(top_k);
 
-        // 更新访问计数
+        // 更新访问计数（R-P0-3：写回真实记录，否则用进废退失效）
+        let now = now_ms();
         for r in &results {
-            if let Some(rec) = all.iter().find(|a| a.id == r.record.id) {
-                let _ = rec;
+            for records in self.records.values_mut() {
+                if let Some(rec) = records.iter_mut().find(|a| a.id == r.record.id) {
+                    rec.access_count += 1;
+                    rec.last_accessed = now;
+                    break;
+                }
             }
         }
 

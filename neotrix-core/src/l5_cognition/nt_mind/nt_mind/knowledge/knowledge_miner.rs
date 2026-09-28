@@ -166,7 +166,7 @@ impl KnowledgeMiner {
                         task_type: crate::l2_perception::nt_core_knowledge::TaskType::General,
                         micro_edits: knowledge.micro_edits.clone(),
                         reward: knowledge.confidence * 0.85,
-                        reward_source: crate::l5_cognition::nt_mind::nt_mind::core::RewardSource::External,
+                        reward_source: neotrix_types::RewardSource::External,
                         success: knowledge.confidence > 0.6,
                         timestamp: chrono::Utc::now().timestamp(),
                         embedding: None,

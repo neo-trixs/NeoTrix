@@ -144,6 +144,15 @@ impl CapabilityScores {
             .map(|(k, v)| (k.clone(), *v))
             .collect()
     }
+
+    /// 缓漏（对手过程）：每轮进化按率衰减，增益必须跑赢漏损。
+    /// 无对手过程的加分迟早顶到 1.0 天花板后失效；下限 0.05 保火种。
+    pub fn leak(&mut self, rate: f64) {
+        let keep = (1.0 - rate).clamp(0.0, 1.0);
+        for v in self.scores.values_mut() {
+            *v = (*v * keep).clamp(0.05, 1.0);
+        }
+    }
 }
 
 /// 适应记录

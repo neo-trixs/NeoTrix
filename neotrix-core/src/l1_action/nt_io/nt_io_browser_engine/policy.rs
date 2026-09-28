@@ -93,6 +93,7 @@ pub(crate) fn action_kind(action: &BrowserAction) -> &'static str {
         BrowserAction::PrintPdf => "pdf",
         BrowserAction::SubmitForm { .. } => "submit",
         BrowserAction::WaitForElement { .. } => "wait",
+        BrowserAction::Sleep { .. } => "sleep",
         BrowserAction::ExecuteJs { .. } => "execjs",
         BrowserAction::GoBack => "back",
         BrowserAction::GoForward => "forward",

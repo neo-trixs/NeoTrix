@@ -44,6 +44,10 @@ pub mod nt_io_plugin;
 pub mod platform_gateway;
 pub mod nt_io_http_factory;
 pub mod universal_browser;
+/// 统一认证纳管（auth.toml + 系统钥匙串，密码永不落盘）
+pub mod nt_io_auth_store;
+/// 自研最小无头浏览器内核（Mock/Http/ChromeHeadless 三后端，真抓取）
+pub mod nt_io_browser_engine;
 /// 浏览器网络捕获（XHR URL＋响应体＋文本/坐标点击 JS＋登录壳检查，WSD 实战融合）
 pub mod nt_io_browser_capture;
 pub mod nt_io_proxy_server;

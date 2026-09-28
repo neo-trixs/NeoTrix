@@ -50,6 +50,8 @@ pub enum BrowserAction {
     SubmitForm { selector: Option<String> },
     /// Wait for element（轮询重抓直到匹配或超时）
     WaitForElement { selector: String, timeout_ms: u64 },
+    /// Sleep（等待异步渲染/执行完成；钳制 ≤60s，超长请链多个 Sleep）
+    Sleep { ms: u64 },
     /// Execute JavaScript（dump-dom 管道不支持，如实报错，CDP 在途）
     ExecuteJs { script: String },
     /// Go back

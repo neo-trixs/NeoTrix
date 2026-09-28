@@ -113,90 +113,14 @@ impl From<&str> for NeoTrixError {
 
 // L1 Action 层错误 — moved to crate::l1_action::error_conversions
 
-// L2 Perception 层错误
-impl From<crate::l2_perception::nt_world::asset_map::query::ParseError> for NeoTrixError {
-    fn from(e: crate::l2_perception::nt_world::asset_map::query::ParseError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
+// L2 Perception 层错误 — moved to l2_perception::error_conversions
 
-impl From<crate::l2_perception::nt_world::social_access::traits::SocialAccessError> for NeoTrixError {
-    fn from(e: crate::l2_perception::nt_world::social_access::traits::SocialAccessError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
+// L3 Embodiment 层错误 — moved to l3_embodiment::error_conversions
 
-impl From<crate::l2_perception::nt_world::source::offline_download::OfflineError> for NeoTrixError {
-    fn from(e: crate::l2_perception::nt_world::source::offline_download::OfflineError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
+// L5 Cognition 层错误 — moved to l5_cognition::error_conversions
+// (注: nt_core_skill_registry / nt_core_multi_agent 已迁至独立 crates)
 
-// L3 Embodiment 层错误
-impl From<crate::l3_embodiment::nt_shield::binary_analyzer::BinaryError> for NeoTrixError {
-    fn from(e: crate::l3_embodiment::nt_shield::binary_analyzer::BinaryError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l3_embodiment::nt_shield::proxy_detection::ProxyDetectionError> for NeoTrixError {
-    fn from(e: crate::l3_embodiment::nt_shield::proxy_detection::ProxyDetectionError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l3_embodiment::nt_shield::nt_shield_ztnet::ZtnetError> for NeoTrixError {
-    fn from(e: crate::l3_embodiment::nt_shield::nt_shield_ztnet::ZtnetError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l3_embodiment::nt_shield::nt_shield_ztnet::connectivity::stun::StunError> for NeoTrixError {
-    fn from(e: crate::l3_embodiment::nt_shield::nt_shield_ztnet::connectivity::stun::StunError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l3_embodiment::nt_shield::nt_shield_ztnet::packet::ip_parser::ParseError> for NeoTrixError {
-    fn from(e: crate::l3_embodiment::nt_shield::nt_shield_ztnet::packet::ip_parser::ParseError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-// L5 Cognition 层错误 — nt_core_skill_registry and nt_core_multi_agent migrated to crates
-
-
-
-impl From<crate::l5_cognition::nt_core::capability::nt_act_orch_patterns::AgentError> for NeoTrixError {
-    fn from(e: crate::l5_cognition::nt_core::capability::nt_act_orch_patterns::AgentError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l5_cognition::nt_mind::nt_mind::consciousness::element::ElementError> for NeoTrixError {
-    fn from(e: crate::l5_cognition::nt_mind::nt_mind::consciousness::element::ElementError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l5_cognition::nt_mind::nt_game::world::combat::equipment::EquipError> for NeoTrixError {
-    fn from(e: crate::l5_cognition::nt_mind::nt_game::world::combat::equipment::EquipError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::l5_cognition::nt_mind::nt_game::world::combat::equipment::CraftError> for NeoTrixError {
-    fn from(e: crate::l5_cognition::nt_mind::nt_game::world::combat::equipment::CraftError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-// L6 Meta 层错误
-impl From<crate::l6_meta::healing::nt_mind_eval_harness::EvalError> for NeoTrixError {
-    fn from(e: crate::l6_meta::healing::nt_mind_eval_harness::EvalError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
+// L6 Meta 层错误 — moved to l6_meta::error_conversions
 
 // Core 层错误
 impl From<crate::l0_substrate::nt_core_platform::PlatformError> for NeoTrixError {
@@ -211,51 +135,11 @@ impl From<crate::l0_substrate::nt_core_platform::AgentError> for NeoTrixError {
     }
 }
 
-impl From<crate::l5_cognition::nt_core_panic_recovery::BoundaryError> for NeoTrixError {
-    fn from(e: crate::l5_cognition::nt_core_panic_recovery::BoundaryError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
+// L5/L6/neotrix 层其余错误 — moved to 各层 error_conversions
+// (BoundaryError → l5_cognition; ErrorRecoveryError/CapabilityError → l6_meta;
+//  CapabilityError/FileAbilityError/SuperResolutionError/RegistryError → neotrix)
 
-
-
-impl From<crate::l6_meta::nt_core_observer_error::ErrorRecoveryError> for NeoTrixError {
-    fn from(e: crate::l6_meta::nt_core_observer_error::ErrorRecoveryError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-// Neotrix 层错误
-impl From<crate::neotrix::nt_file_ability::capability::CapabilityError> for NeoTrixError {
-    fn from(e: crate::neotrix::nt_file_ability::capability::CapabilityError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::neotrix::nt_file_ability::types::FileAbilityError> for NeoTrixError {
-    fn from(e: crate::neotrix::nt_file_ability::types::FileAbilityError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<crate::neotrix::nt_file_ability::image_super_resolution::SuperResolutionError> for NeoTrixError {
-    fn from(e: crate::neotrix::nt_file_ability::image_super_resolution::SuperResolutionError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-impl From<nt_core_capability_tree::registry::RegistryError> for NeoTrixError {
-    fn from(e: nt_core_capability_tree::registry::RegistryError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
-
-// Core 层补充错误
-impl From<crate::l6_meta::nt_core_capability::CapabilityError> for NeoTrixError {
-    fn from(e: crate::l6_meta::nt_core_capability::CapabilityError) -> Self {
-        NeoTrixError::OperationFailed(e.to_string())
-    }
-}
+// Core 层补充错误 (L0 内部, 保留)
 
 impl From<crate::l0_substrate::nt_core_hot_data::HotDataError> for NeoTrixError {
     fn from(e: crate::l0_substrate::nt_core_hot_data::HotDataError) -> Self {

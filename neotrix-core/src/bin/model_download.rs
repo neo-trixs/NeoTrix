@@ -65,7 +65,7 @@ async fn main() {
         priority: 128,
     };
 
-    let start = SystemTime::now();
+    let _start = SystemTime::now();
     let status = engine.download(&task).await;
 
     match status {

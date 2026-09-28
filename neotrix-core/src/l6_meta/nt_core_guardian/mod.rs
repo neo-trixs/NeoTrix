@@ -57,7 +57,7 @@ mod tests {
         // 3. 看门狗检查
         let mut registry = WatchdogRegistry::new();
         registry.register(Box::new(BuildCheck));
-        let watchdog_findings = registry.run_all();
+        let _watchdog_findings = registry.run_all();
 
         // 4. 修复编排
         let mut repair = RepairOrchestrator::new(health.clone());

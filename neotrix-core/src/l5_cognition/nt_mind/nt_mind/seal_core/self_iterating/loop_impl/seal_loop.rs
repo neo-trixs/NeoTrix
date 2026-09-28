@@ -26,7 +26,7 @@ use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 // // use crate::core::// nt_core_signal::SelectiveState;
 use crate::l2_perception::nt_core_e8::ewhr_bridge::E8EwhrBridge;
 use std::sync::{Arc, Mutex};
-use crate::cli::shield_enforcer::global_shield;
+use crate::l3_embodiment::nt_shield_enforcer::global_shield;
 use crate::l1_action::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherConfig};
 use crate::l5_cognition::nt_core_cot_generator::{DefaultCoTGenerator, CoTConfig};
 use crate::l0_substrate::nt_core_answer_engine::ContextBuilder;
@@ -46,10 +46,10 @@ impl SelfIteratingBrain {
         if let Ok(shield) = global_shield().lock() {
             if let Err(decision) = shield.check_all("seal_iterate", "internal", None, None) {
                 let msg = match decision {
-                    crate::cli::ShieldDecision::Block(m) => format!("Shield blocked SEAL iteration: {}", m),
-                    crate::cli::ShieldDecision::Violation(v) => format!("Shield blocked SEAL iteration: {} law violation(s)", v.len()),
-                    crate::cli::ShieldDecision::RequireApproval(m) => format!("Shield requires approval for SEAL iteration: {}", m),
-                    crate::cli::ShieldDecision::Allow => String::new(),
+                    crate::l3_embodiment::nt_shield_enforcer::ShieldDecision::Block(m) => format!("Shield blocked SEAL iteration: {}", m),
+                    crate::l3_embodiment::nt_shield_enforcer::ShieldDecision::Violation(v) => format!("Shield blocked SEAL iteration: {} law violation(s)", v.len()),
+                    crate::l3_embodiment::nt_shield_enforcer::ShieldDecision::RequireApproval(m) => format!("Shield requires approval for SEAL iteration: {}", m),
+                    crate::l3_embodiment::nt_shield_enforcer::ShieldDecision::Allow => String::new(),
                 };
                 return Err(NeoTrixError::Shield(msg));
             }
