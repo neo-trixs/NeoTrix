@@ -10,5 +10,5 @@ pub mod vector_store;
 
 pub use chunker::chunk_document;
 pub use document::{Chunk, Document, SearchResult};
-pub use rag_engine::RagEngine;
+pub use rag_engine::DocumentRagEngine;
 pub use vector_store::{DiskVectorStore, VectorStore};

@@ -1,3 +1,12 @@
+//! RAG document retrieval engine — 文档切分 → 向量索引 → 混合检索 → 持久化。
+//!
+//! 2026-09-28 消歧：本类型原名 `RagEngine`，与
+//! `l1_action/nt_core_bank/bank/rag_engine.rs::RagEngine` **同名**。
+//! 两者**不是重复实现**：本侧是文档级 RAG（切分/索引/过滤/落盘），
+//! 那侧是记忆层级管理（`find_duplicates` / `should_promote` / `tier_counts`
+//! / `MemoryConsolidation`，本侧均无），22 个公开符号零交叉。
+//! 故本侧改名 `DocumentRagEngine`，`bank` 侧保留 `RagEngine`（名字更贴其语义）。
+
 use std::path::Path;
 
 use super::chunker::chunk_document;
@@ -17,15 +26,15 @@ const DEFAULT_OVERLAP: usize = 64;
 /// dependency).
 ///
 /// The engine uses a [`DiskVectorStore`] for persistent vector storage.
-/// Call [`RagEngine::save`] to persist state to disk, or
-/// [`RagEngine::load`] to restore from a previous session.
-pub struct RagEngine {
+/// Call [`DocumentRagEngine::save`] to persist state to disk, or
+/// [`DocumentRagEngine::load`] to restore from a previous session.
+pub struct DocumentRagEngine {
     store: DiskVectorStore,
     chunk_size: usize,
     overlap: usize,
 }
 
-impl RagEngine {
+impl DocumentRagEngine {
     /// Create a new engine with default chunk parameters.
     pub fn new() -> Self {
         Self {
@@ -138,7 +147,7 @@ impl RagEngine {
     }
 }
 
-impl Default for RagEngine {
+impl Default for DocumentRagEngine {
     fn default() -> Self {
         Self::new()
     }
@@ -190,7 +199,7 @@ mod tests {
 
     #[test]
     fn ingest_and_query_basic() {
-        let mut engine = RagEngine::new();
+        let mut engine = DocumentRagEngine::new();
         engine
             .ingest(make_doc(
                 "doc1",
@@ -214,34 +223,34 @@ mod tests {
 
     #[test]
     fn ingest_empty_id_errors() {
-        let mut engine = RagEngine::new();
+        let mut engine = DocumentRagEngine::new();
         let err = engine.ingest(make_doc("", "content"));
         assert!(err.is_err());
     }
 
     #[test]
     fn ingest_empty_content_errors() {
-        let mut engine = RagEngine::new();
+        let mut engine = DocumentRagEngine::new();
         let err = engine.ingest(make_doc("d1", ""));
         assert!(err.is_err());
     }
 
     #[test]
     fn query_empty_returns_empty() {
-        let engine = RagEngine::new();
+        let engine = DocumentRagEngine::new();
         assert!(engine.query("", 5).is_empty());
     }
 
     #[test]
     fn query_top_k_zero_returns_empty() {
-        let mut engine = RagEngine::new();
+        let mut engine = DocumentRagEngine::new();
         engine.ingest(make_doc("d1", "some content here")).unwrap();
         assert!(engine.query("content", 0).is_empty());
     }
 
     #[test]
     fn custom_chunk_params() {
-        let mut engine = RagEngine::with_params(20, 5);
+        let mut engine = DocumentRagEngine::with_params(20, 5);
         engine
             .ingest(make_doc(
                 "d1",
@@ -274,7 +283,7 @@ mod tests {
 
         // Ingest, save.
         {
-            let mut engine = RagEngine::new();
+            let mut engine = DocumentRagEngine::new();
             engine
                 .ingest(make_doc(
                     "doc1",
@@ -295,7 +304,7 @@ mod tests {
         // after the persistence roundtrip (hash embeddings carry no
         // semantics; asserting a semantic ranking would be luck-based).
         {
-            let engine = RagEngine::with_persistence(&path).unwrap();
+            let engine = DocumentRagEngine::with_persistence(&path).unwrap();
             assert_eq!(engine.stored_count(), 2);
 
             let results = engine.query(
@@ -312,7 +321,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("new.json");
 
-        let mut engine = RagEngine::with_persistence(&path).unwrap();
+        let mut engine = DocumentRagEngine::with_persistence(&path).unwrap();
         assert_eq!(engine.stored_count(), 0);
         engine.ingest(make_doc("d1", "new content")).unwrap();
         assert_eq!(engine.stored_count(), 1);
@@ -320,7 +329,7 @@ mod tests {
 
     #[test]
     fn engine_build_index_and_query() {
-        let mut engine = RagEngine::new();
+        let mut engine = DocumentRagEngine::new();
         engine
             .ingest(make_doc("doc1", "Rust is fast and safe."))
             .unwrap();
