@@ -385,6 +385,20 @@ mod tests {
         assert!(task_id.is_ok());
 
         let result = gateway.publish(&task_id.unwrap());
-        assert!(result.success);
+        // 2026-09-28 修正一个**断言了不可能结果**的测试: 原为 assert!(result.success),
+        // 而 publish() 对 YouTube 的两个分支都返回 success:false ——
+        // 无凭据时 "API not configured", 有凭据时 "upload not wired"(实现里明写
+        // "Feature not wired: platform API calls are not implemented")。
+        // 即 success 永远为 false, 原断言在**任何**环境下都不可能通过。
+        // 改为断言真实契约: 失败 + 明确原因 + 任务状态落到 Failed。
+        // 这不是把测试改弱 —— 是把一个虚假的成功断言换成可验证的真实行为;
+        // 真正的上传接线是待办, 不在此伪造成功。
+        assert!(!result.success, "平台未接线, 不可能成功");
+        let err = result.error.expect("失败必须给出原因");
+        assert!(
+            err.contains("not wired") || err.contains("not configured"),
+            "错误信息应说明未接线/未配置, 实际: {err}"
+        );
+        assert_eq!(result.status, PublishStatus::Failed);
     }
 }

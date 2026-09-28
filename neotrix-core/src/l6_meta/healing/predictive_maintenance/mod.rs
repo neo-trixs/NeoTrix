@@ -42,8 +42,12 @@ mod tests {
 
         // 2. Anomaly detection on the last point.
         let detector = AnomalyDetector::new(20);
-        let result = detector.detect(150.0, &history);
-        assert!(!result.is_anomaly); // Within expected trend.
+        // 2026-09-28 修正测试取值: 注释说「Within expected trend」, 但传的是 150.0,
+        // 而序列是 100 + 0.5*i (i<30), 末值 114.5 ⇒ 150 偏离 z ≈ 9.7, 必然判异常,
+        // 与注释自相矛盾。该序列的**下一个点恰好是 100 + 0.5*30 = 115.0** ——
+        // 那才是「趋势内」的值, 也正是本测试想验的。150 应是遗留错值。
+        let result = detector.detect(115.0, &history);
+        assert!(!result.is_anomaly); // 正好是线性趋势的下一个点, z ≈ 1.76 < 2.0
 
         // 3. Prediction.
         let predictor = Predictor::new();

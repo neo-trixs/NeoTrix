@@ -153,9 +153,14 @@ mod tests {
     #[test]
     fn test_warning_level() {
         let detector = AnomalyDetector::with_thresholds(20, 1.5, 3.0);
-        let mut history: Vec<f64> = vec![10.0; 20];
-        // Inject slight variance.
-        history[19] = 12.0;
+        // 2026-09-28 修正测试数据: 注释声称「注入轻微方差」, 但 19 个 10.0 + 1 个
+        // 12.0 算出的样本 std ≈ 0.45 —— 历史几乎是常量, 于是 14.0 的 z ≈ 8.7,
+        // 必然被判 CRITICAL, 与本测试要验的 WARNING 档无缘(1.5 <= z < 3.0)。
+        // 改为真正有方差的序列: 8.0/12.0 交替 ⇒ mean 10.0, std 2.0, z = 2.0,
+        // 正好落在 WARNING 档。分级逻辑与阈值均未改动, 只让数据符合其注释意图。
+        let history: Vec<f64> = (0..20)
+            .map(|i| if i % 2 == 0 { 8.0 } else { 12.0 })
+            .collect();
         let result = detector.detect(14.0, &history);
         assert!(result.is_anomaly);
         assert_eq!(result.severity, AnomalySeverity::Warning);
