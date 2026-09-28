@@ -470,9 +470,22 @@ impl BackgroundLoop {
         }
 
         // ── Import knowledge assets at startup ──
+        //
+        // 2026-09-28 bug fix: 原写死 `"assets/knowledge_data.json"`，而仓库根**没有**
+        // `assets/` 目录（该文件在 `skills/assets/`）⇒ `exists()` 恒假 ⇒ 166KB 的
+        // 知识资产**从未被导入过一次**，只会打一条 warn。同文件下一段的
+        // `skills/design/review-findings.json` 路径是对的，同理是漏改。
+        //
+        // 修法：按候选顺序探测，命中第一个存在的即可。根目录 `assets/` 仍作候选
+        // 以兼容「从 skills/ 内运行」等非仓库根 cwd 场景。
         if let Some(ref kb_ref) = kb {
-            let assets_path = std::path::Path::new("assets/knowledge_data.json");
-            if assets_path.exists() {
+            const ASSET_CANDIDATES: [&str; 2] =
+                ["skills/assets/knowledge_data.json", "assets/knowledge_data.json"];
+            if let Some(assets_path) = ASSET_CANDIDATES
+                .iter()
+                .map(std::path::Path::new)
+                .find(|p| p.exists())
+            {
                 match kb_ref.import_knowledge_assets(assets_path) {
                     Ok(report) => {
                         if report.imported > 0 || report.edges_created > 0 {
@@ -483,7 +496,10 @@ impl BackgroundLoop {
                     Err(e) => log::warn!("[knowledge-assets] Import failed: {}", e),
                 }
             } else {
-                log::warn!("[knowledge-assets] {} not found, skipping", assets_path.display());
+                log::warn!(
+                    "[knowledge-assets] knowledge_data.json not found in any of {:?}, skipping",
+                    ASSET_CANDIDATES
+                );
             }
         }
 

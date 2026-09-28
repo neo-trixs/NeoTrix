@@ -1,6 +1,12 @@
 #!/bin/bash
-# Layer dependency check — mirrors neotrix-core/tests/architecture_constraints.rs
-# Enforces L0->L1->L2->L3->L4->L5->L6 unidirectional dependencies.
+# Layer dependency check — enforces L0->L1->L2->L3->L4->L5->L6 unidirectional deps.
+#
+# 2026-09-28 修正：本文件原第 2 行写 "mirrors neotrix-core/tests/architecture_constraints.rs"，
+# 但那个 Rust 文件**从未存在**（`git log --all` 查无，`neotrix-core/tests/` 实有
+# `evolution_integration.rs` + `g3_metrics.rs`）。即注释在指一个不存在的"孪生实现"，
+# 会让下一个 agent 以为 Rust 侧已有等价门而不敢动它。已改为如实描述。
+#
+# 唯一层归属真源：`.neotrix/layer-map.json`（见 RUST-STANDARDS.md R-P199 口径）。
 #
 # Usage:
 #   bash scripts/check-layer-deps.sh              # advisory: report, never fail
