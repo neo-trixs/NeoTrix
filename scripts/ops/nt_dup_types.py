@@ -39,6 +39,54 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 SRC = os.path.join(REPO, "neotrix-core", "src")
 SKIP_DIRS = {"tests", "__pycache__", "target"}
 
+# 已裁决组（2026-09-29）：**字段集相同但不该融合**，连同理由一并记下，
+# 避免下一个 agent 重复调查 122 组候选。
+#
+# 教训：字段集相同只是**必要条件**，不是充分条件。真正的判据还要读
+# **代码注释里的设计意图** —— 本例 L1 那份副本是刻意的接口隔离层。
+ADJUDICATED = {
+    "AwarenessReport": {
+        "verdict": "不融合",
+        "reason": (
+            "三处字段+derive 完全一致，但 L1 那份是**刻意**的接口隔离："
+            "l1_action/nt_act/nt_act_autonomy/types.rs:1-5 明写"
+            "「mirror the L5 `awareness_monitor` types to preserve the dependency "
+            "direction: L1 must NOT depend on L5. When L5 evolves, these stay stable "
+            "as the interface contract for the oracle gate」。"
+            "改成 use L0 会让 L1 与 L5 共享同一类型 ⇒ L5 演进直接波及 L1，"
+            "**破坏原作者写下的契约**。"
+        ),
+        "next_action": (
+            "唯一可疑的是 L0 那份（零消费者，只有 mod.rs:92 声明）—— "
+            "但它是否被下游 crate 使用需另查，**不要顺手删**。"
+        ),
+        "groups_with": ["CapabilityGap", "GapSeverity"],  # 同源，同裁决
+    },
+}
+
+def _wrap(text, width):
+    """按显示宽度折行（中文按 2 列算，避免表格错位）。"""
+    import unicodedata
+    def w(s):
+        return sum(2 if unicodedata.east_asian_width(c) in "WF" else 1 for c in s)
+    out, cur = [], ""
+    for ch in text:
+        # 必须在**空格**处断行，不能逐字硬切 —— 否则中文会被切坏。
+        if w(cur + ch) > width:
+            cut = cur.rfind(" ")
+            if cut > width // 2:
+                out.append(cur[:cut])
+                cur = cur[cut + 1:] + ch
+            else:
+                out.append(cur)
+                cur = ch
+            continue
+        cur += ch
+    if cur:
+        out.append(cur)
+    return out or [""]
+
+
 STRUCT_RE = re.compile(r"pub struct (\w+)\s*(?:<[^>]*>)?\s*\{([^}]*)\}")
 FIELD_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?([a-z_][a-z_0-9]*)\s*:", re.M)
 DERIVE_RE = re.compile(r"#\[derive\(([^)]*)\)\]")
@@ -131,17 +179,29 @@ def main():
 
     print(f"nt-dup-types: 同名类型 {same_name_total} 个（分布在多文件）")
     print(f"             其中**同名 + 字段集完全相同** = {len(exact_groups)} 组 ⬅ 融合候选")
+    n_adj = sum(1 for g in exact_groups if g["name"] in ADJUDICATED)
     print(f"             其余 {same_name_total - len(set(g['name'] for g in exact_groups))} 个是"
           f"**合理同名**（字段集不同 ⇒ 领域不同，不该动）")
+    print(f"             已裁决不融合: {n_adj} 组（字段同但**代码注释表明是刻意设计**）")
     print()
+    adjudicated = 0
     for g in exact_groups[: args.top]:
+        verdict = ADJUDICATED.get(g["name"])
+        tag = f"  ⚖️ 已裁决: {verdict['verdict']}" if verdict else ""
         print(f"── {g['name']}  ({len(g['paths'])} 处, {len(g['fields'])} 字段: "
-              f"{', '.join(g['fields'][:5])}{'…' if len(g['fields']) > 5 else ''})")
+              f"{', '.join(g['fields'][:5])}{'…' if len(g['fields']) > 5 else ''}){tag}")
         print(f"   derive: {', '.join(g['derives'])}")
         for p in g["paths"][:5]:
             print(f"     {p}")
         if len(g["paths"]) > 5:
             print(f"     …另 {len(g['paths']) - 5} 处")
+        if verdict:
+            adjudicated += 1
+            for line in _wrap(verdict["reason"], 92):
+                print(f"   ▸ {line}")
+            print(f"   ▸ 下一步: {verdict['next_action']}")
+            if verdict.get("groups_with"):
+                print(f"   ▸ 同裁决同源类型: {', '.join(verdict['groups_with'])}")
         print()
     print("判据提醒：**同名 ≠ 重复**。字段集相同才是（⇒ 同一份数据被定义多遍）。")
     print("本工具**不自动改** —— 融合是架构决策（改层归属、动 trait 实现、")
