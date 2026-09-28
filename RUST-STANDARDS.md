@@ -599,3 +599,15 @@ src/
 - **R-DISK-4 有 cargo 在跑时不碰主 `target/`**（含他窗构建）：
   `ps aux | grep -c '[c]argo'` 非 0 即让位。主 target 由 pre-commit build gate
   频繁重建，清了立刻又要 6.9G。
+- **R-DISK-5 要删「带未提交改动的 worktree」时，先 patch 兜底再删**：
+  850 处未提交改动（2026-09-28 实测 15 个 worktree，其中单个 758 处）**不在任何
+  提交里**，`git branch -a --contains` 判不出来 ⇒ 删目录即永久丢失。
+  兜底三步：①`git -C <wt> diff > <NN>-<name>.patch` ②
+  `git -C <wt> status --porcelain | grep '^??' > <NN>-<name>.untracked.txt`
+  （patch **不含**未跟踪内容，必须单独留清单）③
+  **`git -C <wt> apply --check --reverse <patch>` 逐个校验可回放**，
+  全过才执行 `git worktree remove --force`。删完写 README 说明回放方式。
+- **R-DISK-6 `grep -q '^pattern'` 匹配不到已有配置 ≠ 配置缺失**：
+  追加前先 `grep -n 'pattern'` 看全貌 —— 本轮误判 `.worktrees/` 未配置，
+  实际它在 `.gitignore:70` 中部（我用了行首锚 `^` 才漏判），差点重复追加。
+  追加前先 `grep -c` 计数，命中则跳过。
