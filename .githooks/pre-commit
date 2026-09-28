@@ -54,6 +54,19 @@ if git diff --cached --name-only | grep -qE '\.rs$'; then
   echo -e "\033[0;32m✅ Build gate passed\033[0m"
 fi
 
+# ---------- 2.5) task-index 自门（blocking）----------
+# .neotrix/task-index.json 是「日常任务该跑哪个工具」的唯一机器索引。
+# 它会漂移：脚本改名/删除后索引仍指向旧路径 ⇒ agent 照着跑会 command not found，
+# 且**静默失败**（比报错更贵）。故每次提交校验工具路径确实存在。
+if [ -f .neotrix/task-index.json ] && [ -f scripts/ops/nt_find.py ]; then
+  if ! python3 scripts/ops/nt_find.py --audit >/tmp/nt-find-audit.log 2>&1; then
+    echo -e "\033[0;31m❌ TASK-INDEX GATE: .neotrix/task-index.json 指向不存在的工具\033[0m"
+    sed 's|^|   |' /tmp/nt-find-audit.log
+    echo -e "\033[1;33m   修法：跑 make find-audit 看详情，然后更新索引或恢复脚本\033[0m"
+    exit 1
+  fi
+fi
+
 # ---------- 3) doc-drift 提示位 (SIM-42/EQ-12; advisory, 永不拦门) ----------
 # check-doc-drift.sh 基线 111 (2026-09-21)。只提示不阻断：基线变化靠 CI audit-all 裁决。
 if [ -x scripts/check-doc-drift.sh ]; then
