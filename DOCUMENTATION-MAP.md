@@ -28,6 +28,7 @@
 | `docs/architecture/OWNERSHIP.md` | **唯一裁决表** —— 每条以**构造点**取证（非 `mod` 声明）；含 4 处「同名不同型」判定 | Owner |
 | `docs/architecture/BATCH-FIX-CHECKLIST-2026-09-28.md` | **批量修复任务清单** A/B/C/D/E 五组 + 三道闸 + 回滚规程 | Owner |
 | `docs/architecture/LESSONS-2026-09-28-measurement-and-dedup.md` | 经验沉淀：测量台纪律 / 机器读 ledger / worktree index / 同名非重复 | Owner |
+| `docs/architecture/absorption-sources/` | **吸收源清单** —— 483 仓 CSV + 436 条榜单排名 + 许可台账 + 5 论文；复核任何结论从这里开始 | Owner |
 | `docs/architecture/ABSORPTION-DSH-SIDEBAR-IM.md` | NeoBot 吸收正典记录（+12 模块 / IPC 97）；**neobot 改动的台账落点** | Owner |
 | `docs/architecture/LESSONS-2026-09-27-scanner-trust.md` | 经验沉淀：扫描器告警 / 门记录腐化 / 并发写入 | Owner |
 | `sessions/HANDOFF-TEMPLATE.md` | 交接模板（**已入库**，`AGENTS.md` 引用） | 所有会话 |
