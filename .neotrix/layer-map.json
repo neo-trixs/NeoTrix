@@ -1,0 +1,55 @@
+{
+  "_comment": "层归属显式化 —— 2026-09-28。理由见 docs/architecture/DIR-REMEDY-2026-09-28.md。neotrix-core/src/neotrix/ 是嵌在分层 core 内部的第二棵树（129 文件 / 43,834 行），不参与 L0-L6，且完全逃过 scripts/check-layer-deps.sh（该门只解析 l*_ 目录）。本文件把「目录位置」与「层归属」解耦：目录不动，层归属变成可被门读取的显式数据。",
+  "_verified": "2026-09-28 实测（find/wc/grep）。每条 note 记录真实构造点证据，裁决以构造点为准，不以 mod 声明为准。",
+  "_rule": "「导出 ≠ 调用」已错过 4 次（CapabilityRegistry x4 / SearchResult x9 / 三个决策引擎 / JEV 反向）。本文件的 role 字段必须有构造点证据支撑，改动前先 grep 复核。",
+  "trees": {
+    "neotrix/nt_crystal_core": {
+      "layer": "l5_cognition",
+      "role": "primary",
+      "lines": 21134,
+      "files": 52,
+      "live_consumers": [
+        "neotrix-core/src/l1_action/nt_dialogue_tui.rs",
+        "neotrix-core/src/l1_action/nt_tui_app.rs",
+        "neotrix-core/src/l1_action/nt_stdin_human.rs",
+        "neotrix-core/src/l1_action/nt_crystal_llm_bridge.rs",
+        "neotrix-core/src/l1_action/nt_free_pool.rs",
+        "neotrix-core/src/l1_action/nt_core_task_dispatcher/nt_dispatcher_core.rs"
+      ],
+      "note": "全系统决策/意识主干。CrystalConsciousness + JEV 决策。⛔ 禁止当死代码清理 —— DIR-AUDIT §6 曾把它归入「未接线」，实测是活路径。"
+    },
+    "neotrix/nt_jev": {
+      "layer": "l5_cognition",
+      "role": "primary",
+      "lines": 4312,
+      "files": 14,
+      "live_consumers": [
+        "neotrix/nt_crystal_core/nt_eval_loop.rs:13",
+        "neotrix/nt_crystal_core/nt_jev_agentjev.rs:17",
+        "neotrix/nt_crystal_core/nt_jev_calibration.rs:18",
+        "neotrix/nt_crystal_core/nt_crystal_dialogue.rs:40",
+        "neotrix/nt_crystal_core/nt_crystal_task_fusion.rs:41"
+      ],
+      "note": "决策三原语（primitives.rs 481 行 / gate.rs 480 / eval.rs 569）。⛔ 同上，勿删。"
+    },
+    "neotrix/nt_file_ability": {
+      "layer": "l1_action",
+      "role": "primary",
+      "lines": 14014,
+      "files": 44,
+      "note": "文件能力。其 capability.rs:185 的 CapabilityRegistry 零消费者（真冗余，见 BATCH-FIX-CHECKLIST B-1），但本子树整体是活的（l2_perception/nt_world/ocr/mod.rs:283 消费 OcrEngine）。"
+    },
+    "neotrix/ffi": {
+      "layer": "l0_substrate",
+      "role": "primary",
+      "lines": 2910,
+      "files": 12,
+      "note": "uniffi 绑定（GWT attention / types）。属 L0 基座。"
+    }
+  },
+  "unresolved": {
+    "l4_emotion/nt_memory": { "layer": "l4_emotion", "role": "primary", "note": "存储真典候选（236 文件 / 82,071 行）" },
+    "l5_cognition/nt_mind": { "layer": "l5_cognition", "role": "primary", "note": "经验树真典候选（422 文件 / 132,990 行）" },
+    "l6_meta/memory": { "layer": "l6_meta", "role": "undecided", "note": "⛔ 待裁决（7 文件 / 2,048 行，含 nt_memory_experience_tree.rs）。三棵记忆树之一，C-3 处理。" }
+  }
+}

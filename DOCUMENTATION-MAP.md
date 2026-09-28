@@ -18,11 +18,16 @@
 | `TODO.md` | **唯一任务清单** (结构化) | 所有会话 |
 | `TODO.yml` | 任务机器可读格式。**由 `neotrix todo sync` 生成，禁止手改** —— `git_hook.rs:58-61` 提交时自动重新生成；被两个 pre-commit 钩子消费（`git_hook.rs:25-49`、`safety_tools/git-hook.sh:9`），**不可删** |
 | `Makefile` | 构建命令 | Owner |
-| `ARCHITECTURE-MAP-ROADMAP-V2.md` | 模块台账（治理 R-P161-257 要求更新）；**§1-§7 数字永久陈旧，只取 §11 起** | Owner |
+| `ARCHITECTURE-MAP-ROADMAP-V2.md` | 模块台账（更新规则为 **R-P199**，口径仅限 `neotrix-core` 的 L1–L6；`neotrix-neobot` 不占 L 层故不进此台账）；**§1-§7 数字永久陈旧，只取 §11 起** | Owner |
 | `docs/architecture/NEOTRIX-MASTER-BLUEPRINT.md` | **唯一图纸入口**（D-00~D-15） | Owner |
-| `docs/architecture/DIR-AUDIT-2026-09-27.md` | 目录架构审计（16 包依赖图 + 8 类重复类型） | Owner |
+| `docs/architecture/DIR-AUDIT-2026-09-27.md` | 目录架构审计（16 包依赖图 + 8 类重复类型）。**§六需加限定**：`nt_jev` 是活路径，勿当死代码 | Owner |
+| `docs/architecture/DIR-REMEDY-2026-09-28.md` | **目录架构解法** —— 第二棵树 `neotrix/` 层归属显式化 + 唯一裁决表 | Owner |
 | `docs/architecture/ABSORPTION-EXTERNAL-2026-09-27.md` | 外部吸收（trendshift 1041 仓 + 22 指定源） | Owner |
-| `docs/architecture/EVOLUTION-ROADMAP-CODE-NODES-2026-09-27.md` | 18 项进化路线的 file:line 支脉定位 | Owner |
+| `docs/architecture/EVOLUTION-ROADMAP-CODE-NODES-2026-09-28.md` | **正典**：进化路线的 file:line 支脉定位（109 仓 + trendshift 385 仓 + 5 arXiv；含 §执行状态 实测复核） | Owner |
+| `docs/architecture/_superseded/EVOLUTION-ROADMAP-CODE-NODES-2026-09-27.md` | ⛔ 已归档，被 09-28 版取代（0.1/0.2/0.3 原始论证仍有效） | — |
+| `docs/architecture/OWNERSHIP.md` | **唯一裁决表** —— 每条以**构造点**取证（非 `mod` 声明）；含 4 处「同名不同型」判定 | Owner |
+| `docs/architecture/BATCH-FIX-CHECKLIST-2026-09-28.md` | **批量修复任务清单** A/B/C/D/E 五组 + 三道闸 + 回滚规程 | Owner |
+| `docs/architecture/ABSORPTION-DSH-SIDEBAR-IM.md` | NeoBot 吸收正典记录（+12 模块 / IPC 97）；**neobot 改动的台账落点** | Owner |
 | `docs/architecture/LESSONS-2026-09-27-scanner-trust.md` | 经验沉淀：扫描器告警 / 门记录腐化 / 并发写入 | Owner |
 | `sessions/HANDOFF-TEMPLATE.md` | 交接模板（**已入库**，`AGENTS.md` 引用） | 所有会话 |
 | `FUSION-ARCHITECTURE.md` | ⚠️ **已废止** —— 零有效引用，其"下一步"含已被证伪的"解决预存编译错误" | — |
