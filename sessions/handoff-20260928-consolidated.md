@@ -11,7 +11,7 @@ cargo check --lib -p neotrix     exit=0
 cargo check -p neotrix (bins)    exit=0
 cargo test  --lib --no-run       exit=0
 check-fresh-build.sh --full       PASS
-check-layer-deps.sh --strict     PASS (0 new / 92 known)
+check-layer-deps.sh --strict     PASS (0 new / 94 known)
 check-truth-surface.sh --strict  PASS
 nt_lock_audit.py                  0 处
 cargo test --lib                 12143 passed / 3 failed
@@ -96,7 +96,7 @@ cargo test --lib                 12143 passed / 3 failed
 
 ### 第三优先：逐处棘轮 / 阶段工程
 
-**T9 · A3 92 处分层违规** —— 棘轮已就位（`--update-baseline` 只应向下）。
+**T9 · A3 分层违规（现 94（84 条在 l*_ 层 + 10 条来自此前逃过检查的 `neotrix/` 第二棵树；另一窗口 2026-09-28 纳入该树，**属覆盖面扩大而非新增债**）** —— 棘轮已就位（`--update-baseline` 只应向下）。
 建议**按文件聚类**而非按类别硬啃：
 1. 先挑单文件只违反 1 条规则的叶子违规
 2. 门已排除 `!*facade*` / `!*l1_facade*` / `!traits.rs` —— 这三类是**官方认可的跨层通道**，

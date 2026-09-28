@@ -384,53 +384,77 @@
 
 ---
 
-## 🆕 2026-09-28 单窗口汇总修复（架构侧吸收产出）
+## 🆕 2026-09-28 单窗口汇总修复（架构侧吸收轮）
 
 > **唯一汇总入口**：`sessions/handoff-consolidate-all-windows-20260928.md`
-> 汇总 7 个窗口 + 本会话。**由单一窗口统一执行**，避免多窗口并发编译（16G 机必爆 swap）。
+> **吸收源清单**（483 仓 + 436 条榜单排名 + 许可台账 + 5 论文）：`docs/architecture/absorption-sources/`
+> **路线图 / 裁决表 / 目录解法 / 任务清单 / 经验**：
+> `EVOLUTION-ROADMAP-CODE-NODES-2026-09-28.md` · `OWNERSHIP.md` · `DIR-REMEDY-2026-09-28.md` ·
+> `BATCH-FIX-CHECKLIST-2026-09-28.md` · `LESSONS-2026-09-28-measurement-and-dedup.md`
+>
+> **汇总 7 窗口 + 架构侧，由单一窗口统一执行**（避免多窗口并发编译，16G 机必爆 swap）。
 > 全部数据 2026-09-28 实测。`[实测]`=本人复核；`[转述]`=引用他窗，**接手前自行复核**。
 
-### S 组 · 零编译风险（现在就能做）
+### ✅ 已完成（车道 `lane/batch-fix-20260928` @ `22257920`，11 commit，**整分支零 `.rs`**）
 
-- [ ] **S-1** 合并隔离车道 `lane/batch-fix-20260928`（3 commit，零 `.rs`）
-- [ ] **S-2** ⛔ 分层基线**只在主树**测 —— 车道测 102、主树测 94，差 8 处（§6.1 事故）
+- [x] **A-1** `.neotrix/layer-map.json` —— 层归属显式化，让第二棵树（129 文件/43,834 行）**不用搬目录**就可治理
+- [x] **A-2** `scripts/check-naming.sh` —— `nt_` 前缀门（advisory），实测 **1,644** 不合规
+- [x] **A-3** `docs/architecture/OWNERSHIP.md` —— 唯一裁决表，9 节，**以构造点取证**
+- [x] **A-4** `check-layer-deps.sh` 纳入 layer-map —— 第二棵树首次可见，暴露 **10 处**此前无门能发现的跨层引用
+- [x] **吸收源固化** `absorption-sources/` —— 483 仓 CSV + 许可台账 + 5 论文
+- [x] **证伪修正** —— 09-27 路线图「删 `nt_core_gate/nt_tool_registry.rs`（stub）」**是错的**
+- [x] **经验留痕** `LESSONS-2026-09-28` —— 5 条，含我自己 3 次翻车
+
+### ⏳ S 组 · 零编译风险（接手即可做）
+
+- [ ] **S-1** 合并车道 `lane/batch-fix-20260928`（11 commit，零 `.rs`）
+- [ ] **S-2** ⛔ 分层基线**只在主树、且主树干净时**测 —— 车道测 **102**、主树脏状态测 **94**，差 8 处
 - [ ] **S-3** 裁决 `nt_file_ability` 层归属（声明 L1 却引 L2/L5/L6，10 处）
 - [ ] **S-4** 裁决 `ffi` 层归属（声明 L0 却引 L5：`consciousness_tree.rs:290,320,321`、`seal_pipeline.rs:131,132`）
 - [ ] **S-5** 给 `nt_core_gate/nt_tool_registry.rs` 加防误删注释（活消费者 `nt_shield_enforcer.rs:388-390`）
 - [ ] **S-6** 统一提交 neobot 那 54 个路径（`git add` **精确列出**，禁 `-A`）
 - [ ] **S-7** 拍板 `/stop` 回执措辞（**唯一需产品决策项**）
 
-### B 组 · 冗余清理（需编译验证；零消费者已实测）
+### ⏳ B 组 · 冗余清理（需编译验证；零消费者已实测）
 
-- [ ] **B-1** 删 `neotrix/nt_file_ability/capability.rs:185` 的 `CapabilityRegistry`（0 消费者 🟢）
-- [ ] **B-2** 删 `l5_cognition/nt_core/capability/registry.rs:462` 的 `CapabilityRegistry`（仅自测 🔵）
-- [ ] **B-3** `neotrix-types` 包内 `SkillRegistry` 2→1（`core/skill.rs:54` / `core/skills/mod.rs:25` 🟢）
-- [ ] **B-4** `error_conversions.rs` **6 份 → 1**（l1 有 26 个 From impl；**解 17 个 E0119** 🔴）
-- [ ] ⛔ **不要删** `nt_core_gate` / `agentic_browse` 的 `ToolRegistry` —— **与 `nt_act` 正交**，09-27 路线图说 stub 是**错的**
+**当前实测计数**：`CapabilityRegistry` **4** · `ToolRegistry` **3** · `SkillRegistry` **4** · `error_conversions.rs` **6**
 
-### D 组 · 跨域错位
+- [ ] **B-1** 删 `neotrix/nt_file_ability/capability.rs:185` 的 `CapabilityRegistry`（0 消费者 🟢）→ **4→3**
+- [ ] **B-2** 删 `l5_cognition/nt_core/capability/registry.rs:462` 的 `CapabilityRegistry`（仅自测 🔵）→ **3→2**
+- [ ] **B-3** `neotrix-types` 包内 `SkillRegistry` 2→1（`core/skill.rs:54` / `core/skills/mod.rs:25` 🟢）→ **4→3**
+- [ ] **B-4** `error_conversions.rs` **6 → 1**（`l1_action` 有 26 个 `From` impl）🔴 → **解 17 个 E0119**
+- [ ] ⛔ **不要删** `nt_core_gate` / `agentic_browse` 的 `ToolRegistry` —— **与 `nt_act` 正交**（运行期统计 vs 写操作可逆性 vs crawl 局部）
 
-- [ ] **D-1** `neotrix-sysctl`（唯一 `unsafe` FFI）从 L5 剥离，只留 `l0_substrate` 依赖
-- [ ] **D-2** `nt-lang` 孤儿：5 文件/273 行、**只有 `[[bin]]` 无 `[lib]`**、**0 个主树 manifest 依赖** → 删或补 `[lib]`
-- [ ] **D-3** 纠正 `ARCHITECTURE.md:97`（称 `nt_computer/` 是「计算集群」；**实测是 fs/process trait**）
+### ⏳ D 组 · 跨域错位
+
+- [ ] **D-1** `neotrix-sysctl`（**全仓唯一 `unsafe` FFI**）从 L5 剥离，只留 `l0_substrate` 依赖
+- [ ] **D-2** `nt-lang` 孤儿：5 文件/273 行、**只有 `[[bin]]` 无 `[lib]`**、**0 个主树 manifest 依赖** → 删或补 `[lib]`+消费者
+- [ ] **D-3** 纠正 `ARCHITECTURE.md:97`（称 `nt_computer/` 是「计算集群」；**实测是 fs/process trait**，`screenshot()` 默认 `None`，neobot 侧 `NoopBackend` 唯一后端）
 - [ ] **D-4** `nt_file_ability` / `ffi` 层归属（解码层，同 S-3/S-4）
 
-### E 组 · 能力补齐
+### ⏳ E 组 · 能力补齐
 
-- [ ] **E-1** 证伪门（`crates/neotrix-audit/` + CI）—— 11 个自进化仓**无一**证明自己有效
-- [ ] **E-2** 记忆权威头 + 五个留存标签（`experience_tree/mod.rs:29`）
-- [ ] **E-3** delta-ops 取代整体重写（`experience_tree/mod.rs:241` `:355`）
-- [ ] **E-4** 成本归因插点（`anthropic/anthropic.rs:93` 的 P0-4 断点处）
-- [ ] **E-5** GUI 执行回路 5 项（`l3_embodiment/nt_computer.rs`）
+- [ ] **E-1** 证伪门（`crates/neotrix-audit/` + CI）—— ⭐ **11 个自进化仓无一证明自己有效**；prime-agent 的 `RefinementEvent.outcome` 是模型自写自由文本
+- [ ] **E-2** 记忆权威头 + 五个留存标签（`experience_tree/mod.rs:29`）—— `Authority` 与 `Confidence` **必须解耦**（置信高 ≠ 有权）
+- [ ] **E-3** delta-ops 取代整体重写（`experience_tree/mod.rs:241` `:355`）—— 零 op ⇒ 文档逐字节不变
+- [ ] **E-4** 成本归因插点（`anthropic/anthropic.rs:93` 的 P0-4 断点）—— **skill 是一等维度**（120 个 skill）
+- [ ] **E-5** GUI 执行回路 5 项（`l3_embodiment/nt_computer.rs`）—— ⭐ `capture_id`（cua-driver）是全清单**唯一**坐标漂移解
 - [ ] **E-6** DNS qtype 白名单（`egress_types.rs:14-21`，**全文件零 DNS 概念**）
 
-### ⚠️ 本会话的两次自身错误（勿重犯）
+### ⏳ C 组 · 结构性（依赖 B 组）
 
-- [ ] **测量台纪律**：基线只在**主树且主树干净**时测。脏树比干净树「更干净」（主树脏测 94 / 车道干净测 102）
-- [ ] **机器读 ledger 不能加注释**：`grep -c .`（`check-layer-deps.sh:153`）会把 `#` 行计为条目，94→105 棘轮失真
-- [ ] **共享 index 会竞争**：曾见暂存区混入 46 个非我暂存的 `.rs` ⇒ 用 worktree（**独立 index**）
+- [ ] **C-1** `UnifiedApiImpl` 脱 stub（`src-tauri/src/stub.rs:275`；`:289` 返回字面量；`main.rs:52` `:387` `:407`）—— 委派 `nt_crystal_core`
+- [ ] **C-2** 20 处 `Orchestrator*` 收敛（真典候选 `neotrix-core/src/pipeline/` 7 文件/1,130 行）
+- [ ] **C-3** 三棵记忆树裁决（`l4/nt_memory` 236 文件 · `l5/nt_mind` 422 文件 · `l6_meta/memory` 7 文件）
+- [ ] **C-4** `neotrix::neotrix::` 双命名消除（**20 处**）—— P1 层归属解耦后已降级为可选
 
-### 各窗口剩余债 `[转述]`（**接手前自行复核，勿照单全收**）
+### ⚠️ 本会话 3 次自身错误（勿重犯，已入 `LESSONS-2026-09-28`）
+
+- [ ] **测量台纪律**：基线只在**主树且主树干净**时测。**脏树比干净树「更干净」**（主树脏测 94 / 车道干净测 102）
+- [ ] **机器读 ledger 不能加注释**：`check-layer-deps.sh:153` 的 `grep -c .` 会把 `#` 行计为条目，94→105 棘轮失真
+- [ ] **共享 index 会竞争**：曾见暂存区混入 **46 个非我暂存的 `.rs`** ⇒ worktree 的独立 index 才是真隔离
+
+### ⏳ 各窗口剩余债 `[转述]`（**自行复核，勿照单全收**）
 
 - [ ] neobot：`nt_smoke.sh` **6 步编排从未整体执行过**（各步手工跑绿）· `edit_of` 真正生效 · IM 的 `/stop` 兑现
 - [ ] 测试债：`nodes` 表无法存双时间历史（2 条测试）· Noise 握手协议
@@ -438,10 +462,15 @@
 - [ ] 50 个失败测试（**独立成轮，勿与结构清理混做**）· `--test-threads=4` SIGSEGV（`l6_meta::healing::predictive_maintenance::trend::tests`）
 - [ ] 三处同名双定义：`ExtractConfig` / `EmailConfig` / `PlatformRegistry`
 
-> **已实测推翻 2 条转述**：`nt_core_gate/nt_tool_registry.rs` **不是 stub**（有活消费者）；
-> `nt_jev` + `nt_crystal_core` **是活路径**（L1 有 6 个消费者）⇒ **禁止当死代码删**。
-> 详见 `docs/architecture/OWNERSHIP.md`。
-> 本会话自身的三次错误留痕：`docs/architecture/LESSONS-2026-09-28-measurement-and-dedup.md`
+> **已实测推翻 2 条转述**：① `nt_core_gate/nt_tool_registry.rs` **不是 stub**（有活消费者）；
+> ② `nt_jev` + `nt_crystal_core` **是活路径**（L1 有 6 个消费者）⇒ **禁止当死代码删**。
+> 「导出 ≠ 调用」已错过 4 次。裁决表见 `OWNERSHIP.md`。
+
+### ⛔ 执行前硬闸
+
+- [ ] 无他窗在写：`find neotrix-core/src crates src-tauri/src -name '*.rs' -mmin -5 | head` **必须空**
+- [ ] 内存闸 OPEN：`sh scripts/ops/nt_mem_gate.sh; echo $?` **必须 0**（2026-09-28 实测 **exit 2**，两个 `rustc` 各 2.5 GB）
+- [ ] 禁 `git add -A` / `git reset --hard`（主树含他窗 441 个 `.rs` 改动）
 
 ---
 
@@ -649,7 +678,7 @@ CI 继续跑**建议模式不拦** —— 会 flap 的门只会训练人忽略�
 改为只匹配 `error[E####]` / `error: could not compile`。
 
 
-## 已知债 · 分层依赖违规 92 处（2026-09-28 记账，**未解决**）
+## 已知债 · 分层依赖违规（2026-09-28 记账，**未解决**；现 94（84 条在 l*_ 层 + 10 条来自此前逃过检查的 `neotrix/` 第二棵树；另一窗口 2026-09-28 纳入该树，**属覆盖面扩大而非新增债**）
 
 `scripts/check-layer-deps.sh` 实测 **92 个 file×pattern 违规点**，横跨 11 类：
 
@@ -662,7 +691,7 @@ L4→L5  L5→L6
 
 即 L0→L6 的单向依赖在**源码层面**基本没被遵守（`deny(warnings)` 管不到跨层引用）。
 
-**为什么记在这里而不是直接修**：92 处是架构级重构（要把 L1 对 L2/L3/L5/L6 的
+**为什么记在这里而不是直接修**：这 94（84 条在 l*_ 层 + 10 条来自此前逃过检查的 `neotrix/` 第二棵树；另一窗口 2026-09-28 纳入该树，**属覆盖面扩大而非新增债**） 是架构级重构（要把 L1 对 L2/L3/L5/L6 的
 引用全部改走 `l0_substrate` 门面或下沉依赖注入），不是一轮能收的活，且会牵动
 正在被别人编辑的 `nt_io_web/api.rs`、`nt_act_orchestrator/`、`main.rs` 等。
 
