@@ -168,34 +168,6 @@ pub trait UnifiedCapability: Send + Sync {
     fn supports(&self, input: &CapabilityInput) -> bool;
 }
 
-/// 能力注册表 (精简版)
-///
-/// 2026-09-27 实测: **全仓零消费者** —— 本类型与 `register_pdf_enhance_capability`
-/// 只在本文件内互相引用; 外部唯一引用该模块的是 `error_conversions.rs:10` 的
-/// `CapabilityError` 转换(与本类型无关)。
-///
-/// PDF 增强能力的**正典注册路径**是本文件 `create_pdf_enhance_capability()`,
-/// 它返回 `Arc<dyn nt_core_capability::UnifiedCapability>`(另一 trait, 本文件有
-/// 双 trait impl), 供 NT-CORE 的 CapabilityFactory 消费。本 "精简版" 是早期重复实现。
-///
-/// 保留而不删的理由: 本文件经 `nt_file_ability.rs:60` 的 `pub use capability::*`
-/// 对外暴露, 删除属破坏性变更; 另 `pub` 项不触发 `dead_code` lint, 故本状态
-/// 静默存在。清理动作见 TODO.md。
-#[derive(Default)]
-pub struct CapabilityRegistry {
-    capabilities: Vec<Arc<dyn UnifiedCapability>>,
-}
-
-impl CapabilityRegistry {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn register(&mut self, cap: Arc<dyn UnifiedCapability>) {
-        self.capabilities.push(cap);
-    }
-}
-
 /// PDF 增强能力
 pub struct PdfEnhanceCapability;
 
@@ -274,16 +246,13 @@ impl UnifiedCapability for PdfEnhanceCapability {
 }
 
 /// 创建 PDF 增强能力 — 返回核心 trait 对象供 NT-CORE 能力工厂消费
+///
+/// **这是 PDF 增强能力的唯一正典注册路径**（2026-09-28）。
+/// 旧的「本地注册中心」路线（`CapabilityRegistry` + `register_pdf_enhance_capability`）
+/// 已删除：那是 4 份同名 `CapabilityRegistry` 中的一份早期重复实现，全仓零生产
+/// 消费者（唯一引用是 README 的示例片段）。
 pub fn create_pdf_enhance_capability() -> Arc<dyn crate::l6_meta::nt_core_capability::UnifiedCapability> {
     Arc::new(PdfEnhanceCapability::new())
-}
-
-/// 注册 PDF 增强能力到本地注册中心
-///
-/// 2026-09-27 实测: 零消费者, 与本文件的 `CapabilityRegistry` 同批早期重复实现。
-/// 正典路径见 `create_pdf_enhance_capability()`。
-pub fn register_pdf_enhance_capability(registry: &mut CapabilityRegistry) {
-    registry.register(Arc::new(PdfEnhanceCapability::new()) as Arc<dyn UnifiedCapability>);
 }
 
 /// 双 trait 实现: 使 PdfEnhanceCapability 可被 NT-CORE CapabilityFactory 消费

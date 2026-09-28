@@ -213,7 +213,9 @@ let model = parse_document("report.docx")?;
 
 ## 能力树注册
 
-`nt_file_ability` 通过 `CapabilityRegistry` 向 NT-CORE 能力树注册:
+`nt_file_ability` 通过 **NT-CORE 的 `UnifiedCapability` 工厂**注册（不再经本地
+`CapabilityRegistry` 中转 —— 那条路已删除，见 `capability.rs` 的
+`create_pdf_enhance_capability()` 文档）:
 
 | 能力 ID | 域 | 层级 | 说明 |
 |---------|------|------|------|
@@ -222,13 +224,15 @@ let model = parse_document("report.docx")?;
 ### 注册方式
 
 ```rust
-// 本地注册
-let mut registry = CapabilityRegistry::new();
-register_pdf_enhance_capability(&mut registry);
-
-// NT-CORE 能力工厂消费 (双 trait 实现)
+// 唯一正典路径：返回 trait 对象交给 NT-CORE 能力工厂 (双 trait 实现)
 let cap = create_pdf_enhance_capability(); // Arc<dyn UnifiedCapability>
 ```
+
+> ⚠️ 2026-09-28：本节原先示范的 `CapabilityRegistry::new()` +
+> `register_pdf_enhance_capability()` **已删除** —— 全仓零生产消费者，且该类型是
+> 4 份同名 `CapabilityRegistry` 中的一份重复实现。
+> ⚠️ 注意别与 `nt_core_capability_tree::CapabilityRegistry`（**活路径**，
+> `excel/excel_capability.rs:68` 等在用）混淆。
 
 ### UnifiedCapability 接口
 
