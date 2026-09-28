@@ -144,11 +144,45 @@ enum Cmd {
         #[command(subcommand)]
         cmd: AgentCmd,
     },
+    /// IM 渠道（长轮询常驻 / 单轮收取 / 探活）.
+    Channel {
+        #[command(subcommand)]
+        cmd: ChannelCmd,
+    },
     /// 一键备份（db + 附件 + MEMORY.md + config.json → 单 zip；换机搬运即此一文件）.
     Export {
         /// 输出路径（缺省 `<data_dir>/backups/neobot-<时间>.zip`）.
         #[arg(long)]
         out: Option<PathBuf>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum ChannelCmd {
+    /// 列出已配置的渠道与机器人（token 只出变量名）.
+    List,
+    /// 探活（读环境变量里的 token 去问平台一次）.
+    Probe { channel: String },
+    /// 手动跑一轮：收取 + 出站排空 + 补发，然后退出.
+    ///
+    /// 桌面 App 的「收一轮」走同一条逻辑（`neobot_channel_poll_once`），
+    /// 故两边行为一致。
+    Once {
+        /// 只处理这一个渠道（缺省 = 所有启用的渠道）.
+        #[arg(long)]
+        channel: Option<String>,
+    },
+    /// 常驻长轮询（Ctrl-C 退出）.
+    ///
+    /// 桌面 App **不**做常驻：App 关掉就不该有后台进程在偷偷连公网。
+    /// 要一直在线就跑这个。
+    Serve {
+        /// 只服务这一个渠道（缺省 = 所有启用的渠道）.
+        #[arg(long)]
+        channel: Option<String>,
+        /// 空闲轮询秒数（缺省取渠道自己的 `poll_secs`）.
+        #[arg(long)]
+        interval: Option<i64>,
     },
 }
 
@@ -353,6 +387,12 @@ fn real_main() -> Result<(), NtBotError> {
     match cli.cmd {
         Cmd::Init => cmd_init(),
         Cmd::Doctor => cmd_doctor(),
+        Cmd::Channel { cmd } => match cmd {
+            ChannelCmd::List => cmd_channel_list(),
+            ChannelCmd::Probe { channel } => cmd_channel_probe(&channel),
+            ChannelCmd::Once { channel } => cmd_channel_once(channel.as_deref()),
+            ChannelCmd::Serve { channel, interval } => cmd_channel_serve(channel.as_deref(), interval),
+        },
         Cmd::Export { out } => cmd_export(out.as_deref()),
         Cmd::Run { title, text, engine, provider, model, convo, stream } => {
             cmd_run(&title, &text, &engine, provider.as_deref(), model.as_deref(), convo.as_deref(), stream)
@@ -455,6 +495,113 @@ fn real_main() -> Result<(), NtBotError> {
 }
 
 /// 一键备份：db（含 WAL 落盘）+ 附件 + MEMORY.md + config.json → 单 zip。
+/// 列出渠道与机器人（token 只出**变量名**）。
+fn cmd_channel_list() -> Result<(), NtBotError> {
+    use neotrix_neobot::nt_store::parse_allow_list;
+    let cfg = load_config()?;
+    let store = open_store(&cfg)?;
+    let channels = store.list_channels()?;
+    if channels.is_empty() {
+        println!("没有配置任何渠道。到设置页「IM 机器人」里加，或见 `neobot doctor`。");
+        return Ok(());
+    }
+    for row in &channels {
+        let flag = if row.enabled { "启用" } else { "停用" };
+        println!("\n== {} ({}) · {flag} · 访问 {} · 节拍 {}s",
+            row.title, row.id, row.access_mode, row.poll_secs);
+        let bots = store.list_bots(&row.id)?;
+        if bots.is_empty() {
+            println!("   （还没挂机器人）");
+            continue;
+        }
+        for bot in bots {
+            let alias = if bot.alias.trim().is_empty() { &bot.bot_id } else { &bot.alias };
+            let token = if bot.token_env.trim().is_empty() {
+                "（未设 token 变量）".to_owned()
+            } else if neotrix_neobot::nt_channel_serve::bot_token_missing(&bot.token_env) {
+                format!("{} ← 未设置！", bot.token_env)
+            } else {
+                format!("{} ← 已设", bot.token_env)
+            };
+            let allow = parse_allow_list(&bot.allow_list);
+            let allow_txt = if allow.is_empty() { "（名单空）".to_owned() } else { allow.join(", ") };
+            let convo = bot.conversation_id.as_deref().unwrap_or("（未绑定）");
+            println!(
+                "   · {alias} [{}] token: {token}\n     绑定会话 {convo} · 白名单 {allow_txt} · 最近 {}",
+                bot.bot_id,
+                bot.last_seen.as_deref().unwrap_or("从未收发")
+            );
+        }
+    }
+    println!("\n提示：`neobot channel serve` 常驻长轮询；`neobot channel once` 单轮。");
+    Ok(())
+}
+
+/// 探活一个渠道。
+fn cmd_channel_probe(channel: &str) -> Result<(), NtBotError> {
+    let mut reg = neotrix_neobot::nt_channel_serve::registry();
+    let Some(adapter) = reg.get_mut(channel) else {
+        return Err(NtBotError::Invalid(format!("未注册的渠道：{channel}")));
+    };
+    let health = adapter.probe();
+    if health.ok {
+        println!("{channel} 在线{}", if health.info.is_empty() { String::new() } else { format!(" · {}", health.info) });
+    } else {
+        println!("{channel} 不通：{}", health.detail);
+    }
+    Ok(())
+}
+
+/// 手动跑一轮。
+fn cmd_channel_once(channel: Option<&str>) -> Result<(), NtBotError> {
+    let cfg = load_config()?;
+    let store = open_store(&cfg)?;
+    let stats = neotrix_neobot::nt_channel_serve::run_once(&store, &cfg, channel)
+        .map_err(NtBotError::Store)?;
+    println!(
+        "收到 {}（跑轮 {} · 忽略 {}）· 失败 {} · 补发 {}",
+        stats.received, stats.ran, stats.ignored, stats.failed, stats.deferred
+    );
+    Ok(())
+}
+
+/// 常驻长轮询（Ctrl-C 退出）。
+///
+/// 每轮**重读**渠道配置：在设置页改了访问模式或停用了某渠道，
+/// 不必重启本进程就生效 —— 否则「停用」这个动作只是看起来生效了。
+fn cmd_channel_serve(channel: Option<&str>, interval: Option<i64>) -> Result<(), NtBotError> {
+    use std::time::Duration;
+    let cfg = load_config()?;
+    let store = open_store(&cfg)?;
+    let fixed = interval.map(|secs| secs.max(1));
+    println!("neobot channel serve —— Ctrl-C 退出。数据只在 {}", cfg.data_dir.display());
+    let mut round: u64 = 0;
+    loop {
+        round = round.saturating_add(1);
+        let stats = match neotrix_neobot::nt_channel_serve::run_once(&store, &cfg, channel) {
+            Ok(stats) => stats,
+            Err(err) => {
+                // 单轮整体失败也不退出：长轮询服务本来就该比它服务的平台更耐用。
+                eprintln!("[neobot] 第 {round} 轮出错（继续）：{err}");
+                neotrix_neobot::nt_channel_serve::RoundStats::default()
+            }
+        };
+        if !stats.is_quiet() {
+            println!(
+                "[第 {round} 轮] 收到 {} · 跑轮 {} · 忽略 {} · 失败 {} · 补发 {}",
+                stats.received, stats.ran, stats.ignored, stats.failed, stats.deferred
+            );
+        }
+        // 节拍：显式 --interval > 该渠道的 poll_secs；多渠道取最小（最急的那个说话）。
+        let secs = fixed.unwrap_or_else(|| {
+            let table = neotrix_neobot::nt_channel_serve::intervals(&store, channel);
+            table.values().copied().min().unwrap_or(5)
+        });
+        // 分片睡：Ctrl-C 能在最坏 200ms 内生效，而不是等满一个轮询周期。
+        neotrix_neobot::nt_channel_serve::slice_sleep(Duration::from_secs(secs as u64));
+    }
+}
+
 fn cmd_export(out: Option<&std::path::Path>) -> Result<(), NtBotError> {
     use neotrix_neobot::export_bundle;
     let cfg = load_config()?;

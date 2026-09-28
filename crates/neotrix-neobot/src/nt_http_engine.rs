@@ -190,6 +190,9 @@ impl HttpEngine {
     fn chat_body(&self, prompt: &str, history: &[TranscriptItem], stream: bool) -> serde_json::Value {
         let mut messages = Vec::with_capacity(history.len() + 2);
         let mut system = SYSTEM_PROMPT.to_owned();
+        if self.vision_capable() {
+            system.push_str(VISION_PROMPT);
+        }
         if let Some(memory) = self.memory_context.as_deref() {
             system.push_str("\n\n");
             system.push_str(memory);
@@ -208,7 +211,7 @@ impl HttpEngine {
             "temperature": 0.2,
             "stream": stream,
         });
-        let tools = tool_schemas(self.offer_computer);
+        let tools = tool_schemas(self.offer_computer, self.vision_capable());
         if let Some(map) = body.as_object_mut() {
             map.insert("tools".to_owned(), serde_json::Value::Array(tools));
         }
@@ -280,11 +283,30 @@ fn transcript_message(item: &TranscriptItem) -> serde_json::Value {
                 })
             }
         }
-        TranscriptRole::Tool => serde_json::json!({
-            "role": "tool",
-            "tool_call_id": item.tool_call_id.as_deref().unwrap_or(""),
-            "content": item.content,
-        }),
+        TranscriptRole::Tool => {
+            let tool_call_id = item.tool_call_id.as_deref().unwrap_or("");
+            match item.image.as_ref() {
+                // 无图 = 今天的样子（content 是字符串）。不为了「统一」把所有
+                // tool 行都改成数组形状：老版本 Ollama 之类的本地端点对
+                // tool 消息的数组 content 挑刺，没必要给无关轮次惹这个麻烦。
+                None => serde_json::json!({
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": item.content,
+                }),
+                // 有图：content 升级成数组 —— 文本一段 + 真图像部件一段。
+                // 图像**必须**以 `image_url` 部件抵达模型：base64 若落回字符串
+                // 通道，模型收到的是一堵字符墙，它会开始「描述」没看见的东西。
+                Some(image) => serde_json::json!({
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": [
+                        {"type": "text", "text": item.content},
+                        {"type": "image_url", "image_url": {"url": image.data_url()}},
+                    ],
+                }),
+            }
+        }
     }
 }
 
@@ -293,8 +315,20 @@ fn transcript_message(item: &TranscriptItem) -> serde_json::Value {
 /// 声明终态，结束时必调）。
 const SYSTEM_PROMPT: &str = "你是 neobot 本地助手，跑在用户自己的机器上。\n\n世界动作只能经 bash 调 `neobot` CLI（本地可执行，无密钥）：\n- `neobot task list` 看任务；`neobot task claim <id> --actor <你名字>` 认领；`neobot task release` 交回；`neobot task cancel/retry` 取消/重跑\n- `neobot audit list` 看审计（只读）；`neobot models` 看本地模型池\n- `neobot routine list` 看定时例行；`neobot skill list` 看已装技能\n- `neobot ledger` 看成本账；`neobot doctor` 自检\n\n联网能力（客户端直调）：`web_search` 查资料（Bing→Wikipedia 回退，证据行自带出处）；`web_fetch` 抓页面正文（只收 http/https）。时效问题先搜再答，不凭记忆编。\n\n文件读写在 workspace 内：read_file / write_file / edit_file（edit 必须精确一次匹配）。\n技能只是指令参考，不扩展能力：你能调的只有网关后的工具。\nset_turn_status 声明本轮状态：done（办完）/ continue（还有活）/ needs_clarification（要问一句）/ blocked（明确失败）/ waiting（已行动、等外部）。纯回复也要先调 set_turn_status 再结束。\n拿不准就问（needs_clarification），不要瞎猜执行。\n\n回答格式契约（降信息密度）：\n- 结论先行（一句话先给答案），再给依据/步骤；不复述用户问题。\n- 超过 5 行用分节（结论/依据/下一步），列表优先，段落不超过 3 行。\n- 联网结论必须带出处（[标题 — url]）；不确定的标“不确定”，不编。\n- 拒绝废话开场（不说“好的”“当然”）；无可答时直接说缺什么。\n- 语气像人：有温度、直接，短句为主；坏消息先给结论再给原因；办成了可以一句轻快确认，不许表情包刷屏、不许过度寒暄。";
 
+/// 视觉能力附加条款 —— 只在 `vision_capable()` 为真时接在系统提示后面。
+///
+/// 为什么要单独一段：模型看见一张**真的**进了上下文的图片时，最该做的是描述它；
+/// 而工具失败/没挂载时最该做的是**说没看见**。这两种情形必须用不同的话术
+/// 区分开，否则模型会把「我没拿到图」也讲成一段像模像样的画面描述。
+const VISION_PROMPT: &str = "\n\n视觉：你有 `read_image` 工具。工具结果里带图片时，你会收到**真的**图像部件——直接描述你看见的画面。\
+工具报错、或结果里只有路径而没有图像部件时，说明这张图没到你手上：直说「我看不到这张图」，\
+不要根据文件名、路径或上下文猜画面内容。\n";
+
 /// OpenAI function schemas — 与本地网关工具 1:1 (`computer_act` 仅 opt-in).
-fn tool_schemas(offer_computer: bool) -> Vec<serde_json::Value> {
+///
+/// `read_image` 同样**按能力挂载**：引擎/模型看不见图时就不摆上桌。挂了却在
+/// 执行期才失败，模型会白白浪费一轮去发现「这台机器没有眼睛」。
+fn tool_schemas(offer_computer: bool, offer_vision: bool) -> Vec<serde_json::Value> {
     let mut tools = vec![
         serde_json::json!({"type": "function", "function": {
             "name": "bash",
@@ -363,6 +397,24 @@ fn tool_schemas(offer_computer: bool) -> Vec<serde_json::Value> {
         "parameters": {"type": "object", "properties": {
             "url": {"type": "string", "description": "http(s) 地址"},
         }, "required": ["url"]},
+    }}));
+    if offer_vision {
+        tools.push(serde_json::json!({"type": "function", "function": {
+            "name": "read_image",
+            "description": "真正**看**一张 workspace 内的图片（png/jpeg/gif/webp，按魔数判型，4MiB 上限）。图片会作为多模态部件随下一轮请求抵达你，你能直接描述画面。文本文件用 read_file，别用这个。",
+            "parameters": {"type": "object", "properties": {
+                "path": {"type": "string", "description": "workspace 内相对路径（如 attachments/shot.png）"},
+            }, "required": ["path"]},
+        }}));
+    }
+    // 侧边栏导航：模型**提议**界面打开什么，Rust 侧只成文不执行。
+    tools.push(serde_json::json!({"type": "function", "function": {
+        "name": "sidebar_open",
+        "description": "让界面在侧边栏打开文件/页签（只是提议，界面可拒；workspace 外的路径会被网关拒）",
+        "parameters": {"type": "object", "properties": {
+            "topic": {"type": "string", "enum": ["files", "changes", "tasks", "chat"], "description": "要打开的页签"},
+            "path": {"type": "string", "description": "workspace 内相对路径（topic=files 时必填）"},
+        }, "required": ["topic"]},
     }}));
     tools
 }
@@ -458,6 +510,47 @@ fn engine_id_of(model: &str) -> String {
     format!("http:{model}")
 }
 
+/// `NEOBOT_VISION` 的显式裁决（`1`=开 / `0`=关）；没设或不是这两个值 → `None`。
+///
+/// 存在的意义是给**认不出来**的模型一个出口：本机自训的 VL 模型名字千奇百怪，
+/// 与其让启发式猜，不如让运维说一句实话。
+fn vision_enabled_by_env() -> Option<bool> {
+    match std::env::var("NEOBOT_VISION").ok()?.trim() {
+        "1" => Some(true),
+        "0" => Some(false),
+        _ => None,
+    }
+}
+
+/// 模型名 → 是否**大概率**支持视觉输入。
+///
+/// **默认拒绝**：认不出的名字一律当「不支持」。因为猜错的代价不对称 ——
+/// - 误判「支持」：请求带上 `image_url` 部件，非视觉端点要么 400（浪费一轮、
+///   错误信息晦涩），要么更糟：某些网关**静默丢弃**部件，模型于是开始描述一张
+///   它从未看见的图。这是编造，比明说看不见坏得多。
+/// - 误判「不支持」：用户只多读一句「这个引擎看不到图」，配上 `NEOBOT_VISION=1`
+///   即可。看得见的错比看不见的错便宜。
+///
+/// 只在 `provider/model` 的**裸模型段**上匹配，避免 `openai/gpt-4o` 里的
+/// provider 前缀误伤（或误救）判定。
+pub fn model_likely_vision(model: &str) -> bool {
+    let bare = model.rsplit('/').next().unwrap_or(model).to_ascii_lowercase();
+    const NEEDLES: &[&str] = &[
+        // 通用视觉后缀 / 家族名（本地 Ollama、vLLM、自训模型都吃这一套）。
+        //
+        // `vl` 取**裸串**是刻意的：Ollama 把它当 tag 拼名字（`qwen2.5vl`、
+        // `minicpm-v` 都不带分隔符），按 `-vl` 匹配会漏掉最常见的那批。误判为
+        // 能看的代价是一次诚实的 400 + 一轮浪费；漏判的代价是功能整个用不了。
+        "vl", "vision", "llava", "moondream", "pixtral", "internvl", "idefics", "omni",
+        "minicpm",
+        // 已知多模态家族。
+        "gpt-4o", "gpt-4.1", "gpt-4.5", "gpt-4-turbo", "gpt-4-vision", "gpt-5",
+        "claude-3", "claude-4", "claude-sonnet", "claude-opus", "claude-haiku", "claude",
+        "gemini", "llama-4", "llama4", "gemma-3", "phi-3.5-vision", "phi-4-multimodal",
+    ];
+    NEEDLES.iter().any(|needle| bare.contains(needle))
+}
+
 /// 池子 id 匹配 — 与服务端 (`openai_chat_completions`) 同语义:
 /// 全等, 或裸名命中 `provider/model` 后缀, 或 `provider/` 前缀命中.
 fn pool_match(entry_id: &str, wanted: &str) -> bool {
@@ -549,6 +642,10 @@ impl EngineAdapter for HttpEngine {
         &self.config.model
     }
 
+    fn vision_capable(&self) -> bool {
+        vision_enabled_by_env().unwrap_or_else(|| model_likely_vision(&self.config.model))
+    }
+
     fn probe(&self) -> Result<String, NtBotError> {
         let timeout = Duration::from_secs(self.config.timeout_secs.min(15));
         let mut request = ureq::get(&self.models_url()).timeout(timeout);
@@ -587,6 +684,7 @@ impl EngineAdapter for HttpEngine {
                 content: content.clone(),
                 tool_calls: Vec::new(),
                 tool_call_id: None,
+                image: None,
             })
             .collect();
         self.run_turn_with_history(prompt, &history)
@@ -991,7 +1089,9 @@ mod tests {
     }
 
     /// 按序应答的 fake 服务器 (多跳回路用, 用完即停).
-    fn fake_server_seq(replies: Vec<String>) -> String {
+    /// 返回 `(base_url, replay_flag)`。`replay_flag` 置位后，下一次请求会把
+    /// 应答游标拨回序列开头（供整轮重试时重放同一脚本）。
+    fn fake_server_seq(replies: Vec<String>) -> (String, std::sync::Arc<std::sync::atomic::AtomicBool>) {
         use std::io::{Read as _, Write as _};
         use std::sync::{Arc, Mutex};
         // 队列打空后循环重放：调用方失败重试时永远能拿到完整序列，
@@ -999,8 +1099,21 @@ mod tests {
         let queue = Arc::new(Mutex::new((replies, 0usize)));
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
         let addr = listener.local_addr().expect("addr").to_string();
+        // 「重放」开关：调用方在**重试整轮之前**置位，服务端据此把游标拨回 0。
+        //
+        // 没有它的时候，一次失败的重试会让下一轮从序列中段开始（拿到「没有
+        // tool_calls 的那条」），于是这轮直接 Done、断言里的 bash 审计永远
+        // 找不到 —— 失败点离真正的原因十万八千里。实测并行下 8 次跑挂 3 次。
+        let replay = Arc::new(std::sync::atomic::AtomicBool::new(true));
+        // 线程拿走一份；调用方留一份用来在重试前置位。
+        let replay_flag = Arc::clone(&replay);
         std::thread::spawn(move || {
-            for _ in 0..16 {
+            for _ in 0..64 {
+                if replay_flag.swap(false, std::sync::atomic::Ordering::SeqCst) {
+                    if let Ok(mut q) = queue.lock() {
+                        q.1 = 0;
+                    }
+                }
                 let Ok((mut stream, _)) = listener.accept() else {
                     return;
                 };
@@ -1035,7 +1148,7 @@ mod tests {
                 }
             }
         });
-        format!("http://{addr}/v1")
+        (format!("http://{addr}/v1"), replay)
     }
 
     #[test]
@@ -1054,9 +1167,9 @@ mod tests {
             "usage": {"prompt_tokens": 30, "completion_tokens": 3},
         })
         .to_string();
-        let base = fake_server_seq(vec![first, second]);
+        let (base, replay) = fake_server_seq(vec![first, second]);
         let engine = HttpEngine::new(test_config(&base), String::new()).expect("engine");
-        let dir = std::env::temp_dir().join("neobot-toolloop-test");
+        let dir = crate::nt_testutil::temp_dir("toolloop-test");
         let _ = std::fs::remove_dir_all(&dir);
         let config = crate::nt_config::NeobotConfig {
             data_dir: dir.clone(),
@@ -1074,6 +1187,10 @@ mod tests {
         let store = crate::nt_store::NeobotStore::open(":memory:").expect("open");
         let mut status = None;
         for _ in 0..40 {
+            // 每次尝试前让服务端重放脚本，否则重试会落在序列中段
+            // （拿到「无 tool_calls」那条），这轮直接 Done，下面的 bash
+            // 审计断言就永远对不上 —— 报错还指错了地方。
+            replay.store(true, std::sync::atomic::Ordering::SeqCst);
             match crate::run_local_turn(&store, &config, &engine, "loop", "go") {
                 Ok(done) => {
                     status = Some(done);
@@ -1108,6 +1225,233 @@ mod tests {
             timeout_secs: 5,
         };
         assert!(no_model.validate().is_err());
+    }
+
+    fn tool_named<'a>(tools: &'a [serde_json::Value], name: &str) -> Option<&'a serde_json::Value> {
+        tools
+            .iter()
+            .find(|tool| tool.pointer("/function/name").and_then(|v| v.as_str()) == Some(name))
+    }
+
+    #[test]
+    fn read_image_is_advertised_only_when_the_model_can_see() {
+        use super::tool_schemas;
+        let blind = tool_schemas(false, false);
+        // 看不见就别摆上桌：挂了却在执行期才失败，模型会白费一轮才发现没眼睛。
+        assert!(tool_named(&blind, "read_image").is_none());
+        let seeing = tool_schemas(false, true);
+        let schema = tool_named(&seeing, "read_image").expect("read_image schema");
+        assert_eq!(
+            schema
+                .pointer("/function/parameters/required/0")
+                .and_then(|v| v.as_str()),
+            Some("path")
+        );
+        assert_eq!(
+            schema
+                .pointer("/function/parameters/properties/path/type")
+                .and_then(|v| v.as_str()),
+            Some("string")
+        );
+        // computer_act 的 opt-in 语义没被这次改动带歪。
+        assert!(tool_named(&tool_schemas(true, true), "computer_act").is_some());
+        assert!(tool_named(&blind, "read_file").is_some());
+    }
+
+    #[test]
+    fn tool_row_becomes_a_multimodal_content_array() {
+        use super::transcript_message;
+        use crate::nt_types::{ImagePart, TranscriptItem, TranscriptRole};
+        // 无图：content 保持字符串（老端点对 tool 行的数组 content 挑刺，
+        // 没必要给无关轮次惹这个麻烦）。
+        let plain = transcript_message(&TranscriptItem {
+            role: TranscriptRole::Tool,
+            content: "hello".to_owned(),
+            tool_calls: Vec::new(),
+            tool_call_id: Some("c1".to_owned()),
+            image: None,
+        });
+        assert_eq!(plain.pointer("/content").and_then(|v| v.as_str()), Some("hello"));
+        // 有图：content 升级成数组，图像是真 `image_url` 部件。
+        let with_image = transcript_message(&TranscriptItem {
+            role: TranscriptRole::Tool,
+            content: "attached 1 image".to_owned(),
+            tool_calls: Vec::new(),
+            tool_call_id: Some("c2".to_owned()),
+            image: Some(ImagePart {
+                media_type: "image/png".to_owned(),
+                base64: "iVBORw0KGgo=".to_owned(),
+            }),
+        });
+        assert_eq!(with_image.pointer("/role").and_then(|v| v.as_str()), Some("tool"));
+        assert_eq!(
+            with_image.pointer("/tool_call_id").and_then(|v| v.as_str()),
+            Some("c2")
+        );
+        let parts = with_image
+            .get("content")
+            .and_then(|v| v.as_array())
+            .expect("content must be an array when an image rides along");
+        assert_eq!(parts.len(), 2);
+        assert_eq!(parts.first().and_then(|p| p.pointer("/type")).and_then(|v| v.as_str()), Some("text"));
+        assert_eq!(
+            parts.last().and_then(|p| p.pointer("/type")).and_then(|v| v.as_str()),
+            Some("image_url")
+        );
+        assert_eq!(
+            parts.last().and_then(|p| p.pointer("/image_url/url")).and_then(|v| v.as_str()),
+            Some("data:image/png;base64,iVBORw0KGgo=")
+        );
+    }
+
+    #[test]
+    fn vision_heuristic_is_fail_closed_and_narrow() {
+        use super::model_likely_vision;
+        for yes in [
+            "qwen2.5vl", "llama3.2-vision", "llava:13b", "minicpm-v", "gpt-4o",
+            "openai/gpt-4o-mini", "claude-sonnet-4-5", "gemini-2.5-pro", "gemma-3-12b",
+            "moondream", "internvl2", "pixtral-12b",
+        ] {
+            assert!(model_likely_vision(yes), "{yes} should look multimodal");
+        }
+        // 认不出即当「不支持」：误判为支持的代价是模型开始编造画面。
+        for no in ["llama3.2", "qwen2.5", "mistral-nemo", "deepseek-r1", "", "gpt-3.5-turbo"] {
+            assert!(!model_likely_vision(no), "{no} must not be assumed multimodal");
+        }
+    }
+
+    /// `NEOBOT_VISION` 是**进程级**变量，两个用它/依赖它缺席的用例并行跑就会
+    /// 互相踩（一个设成 `0`，另一个正好在断言「启发式说是能看的」）。
+    /// 这把锁把「动这个变量」和「读这个变量」串成一条线。
+    static VISION_ENV: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn neoBOT_vision_env_overrides_the_heuristic_both_ways() {
+        use crate::nt_engine::EngineAdapter;
+        let _guard = VISION_ENV.lock();
+        let base = test_config("http://127.0.0.1:1/v1");
+        // 认不出的模型 + NEOBOT_VISION=1 → 开（给自训 VL 模型一个出口）。
+        std::env::set_var("NEOBOT_VISION", "1");
+        let forced_on = HttpEngine::new(base.clone(), String::new()).expect("engine");
+        assert!(forced_on.vision_capable());
+        // 明说不许：即便模型名看着能看。
+        std::env::set_var("NEOBOT_VISION", "0");
+        let forced_off = HttpEngine::new(
+            HttpEngineConfig {
+                model: "gpt-4o".to_owned(),
+                ..base.clone()
+            },
+            String::new(),
+        )
+        .expect("engine");
+        assert!(!forced_off.vision_capable());
+        // 乱值不算裁决（回落到启发式，不是回落到 true）。
+        std::env::set_var("NEOBOT_VISION", "maybe");
+        let ignored = HttpEngine::new(base.clone(), String::new()).expect("engine");
+        assert!(!ignored.vision_capable());
+        std::env::remove_var("NEOBOT_VISION");
+        // 撤掉环境变量后回到启发式。
+        let heuristic = HttpEngine::new(base, String::new()).expect("engine");
+        assert!(!heuristic.vision_capable());
+    }
+
+    #[test]
+    fn image_part_reaches_the_wire_as_a_real_content_part() {
+        // 端到端那一刀：把带图的 tool 行推进 `chat_body`，看它是不是真的
+        // 变成了 `image_url` 部件。前面那些断言都是在验零件，这是验总装。
+        use super::tool_schemas;
+        use crate::nt_engine::EngineAdapter;
+        use crate::nt_types::{ImagePart, TranscriptItem, TranscriptRole};
+        {
+            let _guard = VISION_ENV.lock();
+            // 自己先把变量清干净：残留的 `0` 会让本用例凭空失败。
+            std::env::remove_var("NEOBOT_VISION");
+        }
+        let base = fake_server(|request_line, _| {
+            assert!(request_line.contains("POST /v1/chat/completions"));
+            serde_json::json!({"choices": [{"message": {"content": "ok"}}]}).to_string()
+        });
+        let engine = HttpEngine::new(
+            HttpEngineConfig {
+                base_url: base,
+                model: "qwen2.5vl".to_owned(),
+                timeout_secs: 5,
+            },
+            String::new(),
+        )
+        .expect("engine");
+        assert!(engine.vision_capable());
+        let history = vec![TranscriptItem {
+            role: TranscriptRole::Tool,
+            content: "attached 1 image as a multimodal part: shot.png".to_owned(),
+            tool_calls: Vec::new(),
+            tool_call_id: Some("c1".to_owned()),
+            image: Some(ImagePart {
+                media_type: "image/png".to_owned(),
+                base64: "iVBORw0KGgoAAAANSUhEUg".to_owned(),
+            }),
+        }];
+        let mut ok = false;
+        for _ in 0..40 {
+            if engine.run_turn_with_history("describe it", &history).is_ok() {
+                ok = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        assert!(ok);
+        // 复用同一个 handler 抓请求体做不到（FnOnce 已跑）——重建一次，
+        // 这次把 body 存出来给断言看。
+        let captured: std::sync::Arc<std::sync::Mutex<Option<String>>> =
+            std::sync::Arc::new(std::sync::Mutex::new(None));
+        let sink = std::sync::Arc::clone(&captured);
+        let base2 = fake_server(move |_request_line, body| {
+            if let Ok(mut slot) = sink.lock() {
+                *slot = Some(body.to_owned());
+            }
+            serde_json::json!({"choices": [{"message": {"content": "ok"}}]}).to_string()
+        });
+        let engine2 = HttpEngine::new(
+            HttpEngineConfig {
+                base_url: base2,
+                model: "qwen2.5vl".to_owned(),
+                timeout_secs: 5,
+            },
+            String::new(),
+        )
+        .expect("engine");
+        let mut sent = false;
+        for _ in 0..40 {
+            if engine2.run_turn_with_history("describe it", &history).is_ok() {
+                sent = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        assert!(sent);
+        let body = captured
+            .lock()
+            .ok()
+            .and_then(|slot| slot.clone())
+            .expect("request body captured");
+        let parsed: serde_json::Value = serde_json::from_str(&body).expect("valid json request");
+        assert_eq!(
+            parsed.pointer("/messages/1/content/1/type").and_then(|v| v.as_str()),
+            Some("image_url"),
+            "the image must be a real content part: {body}"
+        );
+        assert_eq!(
+            parsed
+                .pointer("/messages/1/content/1/image_url/url")
+                .and_then(|v| v.as_str()),
+            Some("data:image/png;base64,iVBORw0KGgoAAAANSUhEUg")
+        );
+        // schema 里也得有 read_image（否则模型压根不会去调）。
+        let tools: Vec<serde_json::Value> =
+            serde_json::from_value(parsed.get("tools").cloned().unwrap_or(serde_json::json!([])))
+                .expect("tools array");
+        assert!(tool_named(&tools, "read_image").is_some());
+        assert!(tool_named(&tool_schemas(false, false), "read_image").is_none());
     }
 
     #[test]

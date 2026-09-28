@@ -9,6 +9,9 @@ use crate::nt_error::NtBotError;
 /// 认领默认 TTL 秒（认领过期自动释放：5 分钟）。
 pub const CLAIM_TTL_SECS: i64 = 300;
 
+/// 单次补发最多试几次（到顶就不再自动重试，防重复发送）。
+pub const MAX_SEND_ATTEMPTS: i64 = 3;
+
 /// 会话行（`conversations` 表 + 聚合；IM 语义的容器）。
 #[derive(Debug, Clone)]
 pub struct Conversation {
@@ -24,6 +27,10 @@ pub struct Conversation {
     pub muted: bool,
     /// 未读数（已读水位本地版：水位之后新建任务数）。
     pub unread: i64,
+    /// 侧聊的母会话 id（`None` = 顶层会话；见 `nt_side_chat`）。
+    pub parent_id: Option<String>,
+    /// `chat`（顶层，主列表可见）| `sidebar`（侧聊，只在侧边栏可见）。
+    pub origin: String,
 }
 
 /// 晶体核心配对行（`core_pair` 单行表；灵魂嵌入状态：配对即嵌入，删除即摘除）。
@@ -65,10 +72,51 @@ pub fn classify_attachment(name: &str) -> &'static str {
     }
 }
 
+/// 本轮文件改动账目行（`file_changes` 表；**不含** before/after）。
+///
+/// 前后内容是重物（两侧各 256 KiB 上限），故不进列表行、按需走
+/// [`FileChangeView`] 取 —— 列一百行账不该拖一百份文件内容。
+#[derive(Debug, Clone)]
+pub struct FileChange {
+    pub id: String,
+    pub task_id: String,
+    pub at: String,
+    /// 相对工作区根的路径（即便工作区整体搬走，历史账仍读得懂）。
+    pub path: String,
+    /// `read` | `write` | `edit`（见 `nt_changes::KIND_*`）。
+    pub kind: String,
+    /// 读=读到的长度；写/改=**改后**内容长度（真实增删行数由前端 diff 算）。
+    pub bytes: i64,
+    /// 任一侧超 `nt_changes::CHANGE_CONTENT_CAP`，内容整笔略去。
+    pub content_omitted: bool,
+}
+
+/// 账目行 + 前后内容（渲染 diff 的唯一入口）。
+#[derive(Debug, Clone)]
+pub struct FileChangeView {
+    pub change: FileChange,
+    /// `None` = 新建（此前不存在）或内容被略去；靠 `content_omitted` 区分。
+    pub before: Option<String>,
+    pub after: Option<String>,
+}
+
+/// 一任务内按文件分组的汇总（「本轮文件」列表的一行）。
+#[derive(Debug, Clone)]
+pub struct PathTally {
+    pub path: String,
+    pub reads: i64,
+    pub writes: i64,
+    pub edits: i64,
+    /// 最近一次改动的字节数。
+    pub bytes: i64,
+    pub last_at: String,
+    /// 最近一条账的 id（点开即取 before/after）。
+    pub last_change: String,
+}
+
 /// 账本行（模型调用记录本地版）。
 #[derive(Debug, Clone)]
-pub struct LedgerEntry {
-    pub id: String,
+pub struct LedgerEntry {    pub id: String,
     pub at: String,
     pub engine: String,
     pub model: String,
@@ -81,6 +129,55 @@ pub struct LedgerEntry {
     pub status: String,
     pub latency_ms: i64,
     pub error: Option<String>,
+}
+
+/// 渠道行（`channels` 表；token 值永不落库，只有 `token_env` 变量名）。
+#[derive(Debug, Clone)]
+pub struct ChannelRow {
+    pub id: String,
+    pub title: String,
+    pub enabled: bool,
+    /// 缺省访问模式（新机器人继承）。
+    pub access_mode: String,
+    pub poll_secs: i64,
+    pub created_at: String,
+}
+
+/// 机器人行（`channel_bots` 表；别名/白名单/会话**各机器人独立**）。
+///
+/// **`model` 与 `token_env` 存了但 serve 不用**：一个渠道只注册一个适配器，
+/// 所以 per-bot 的 token 与模型在跑轮里**没有生效**（跑轮只用全局设置）。
+/// 别在这里写「模型各自独立绑定」——那会让读代码的人以为多模型分发已经可用。
+#[derive(Debug, Clone)]
+pub struct BotRow {
+    pub channel: String,
+    pub bot_id: String,
+    /// 显示别名（空 = 用平台原名）。
+    pub alias: String,
+    /// token 的**环境变量名**（绝不是值）。
+    pub token_env: String,
+    /// 绑定的 neobot 会话 id。
+    pub conversation_id: Option<String>,
+    /// 覆盖用模型（空 = 跟主设置）。
+    pub model: String,
+    /// 独立白名单（逗号分隔）。
+    pub allow_list: String,
+    pub created_at: String,
+    pub last_seen: Option<String>,
+}
+
+/// 待补发的结果行（`pending_deliveries` 表；超时后补发）。
+#[derive(Debug, Clone)]
+pub struct PendingDelivery {
+    pub id: String,
+    pub channel: String,
+    pub bot_id: String,
+    pub chat: String,
+    pub origin_message: String,
+    pub text: String,
+    pub task_id: String,
+    pub attempts: i64,
+    pub created_at: String,
 }
 
 /// 任务行 13 元组（`get_task`/`list_tasks` 共用，压 type_complexity）。
@@ -211,7 +308,38 @@ impl NeobotStore {
                 disabled INTEGER NOT NULL DEFAULT 0,
                 next_run_at INTEGER NOT NULL DEFAULT 0,
                 last_run_at INTEGER NOT NULL DEFAULT 0,
-                last_error TEXT);",
+                last_error TEXT);
+              CREATE TABLE IF NOT EXISTS file_changes(
+                id TEXT PRIMARY KEY, task_id TEXT NOT NULL, at TEXT NOT NULL,
+                path TEXT NOT NULL, kind TEXT NOT NULL,
+                bytes INTEGER NOT NULL DEFAULT 0,
+                content_omitted INTEGER NOT NULL DEFAULT 0,
+                before TEXT, after TEXT);
+              CREATE INDEX IF NOT EXISTS file_changes_task
+                ON file_changes(task_id, at);
+              CREATE INDEX IF NOT EXISTS file_changes_path
+                ON file_changes(path, at);
+            CREATE TABLE IF NOT EXISTS channels(
+              id TEXT PRIMARY KEY, title TEXT NOT NULL,
+              enabled INTEGER NOT NULL DEFAULT 1,
+              access_mode TEXT NOT NULL DEFAULT 'allow',
+              poll_secs INTEGER NOT NULL DEFAULT 5,
+              created_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS channel_bots(
+              channel TEXT NOT NULL, bot_id TEXT NOT NULL,
+              alias TEXT NOT NULL DEFAULT '',
+              token_env TEXT NOT NULL DEFAULT '',
+              conversation_id TEXT, model TEXT NOT NULL DEFAULT '',
+              allow_list TEXT NOT NULL DEFAULT '',
+              created_at TEXT NOT NULL, last_seen TEXT,
+              PRIMARY KEY (channel, bot_id));
+            CREATE TABLE IF NOT EXISTS channel_seen(
+              dedup_key TEXT PRIMARY KEY, at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS pending_deliveries(
+              id TEXT PRIMARY KEY, channel TEXT NOT NULL, bot_id TEXT NOT NULL,
+              chat TEXT NOT NULL, origin_message TEXT NOT NULL DEFAULT '',
+              text TEXT NOT NULL, task_id TEXT NOT NULL DEFAULT '',
+              attempts INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);",
         )?;
         // 存量库补列（新库建表已含；ALTER 重复报错吞掉，保证幂等；
         // 单机本地库，补列失败不影响本次调用——返回时统一 Ok）。
@@ -238,6 +366,8 @@ impl NeobotStore {
             "ALTER TABLE routines ADD COLUMN owner TEXT NOT NULL DEFAULT 'owner'",
             "ALTER TABLE routines ADD COLUMN instruction TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE conversations ADD COLUMN muted INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE conversations ADD COLUMN parent_id TEXT",
+            "ALTER TABLE conversations ADD COLUMN origin TEXT NOT NULL DEFAULT 'chat'",
             "ALTER TABLE core_pair ADD COLUMN via TEXT NOT NULL DEFAULT 'http'",
             "ALTER TABLE core_pair ADD COLUMN token_env TEXT NOT NULL DEFAULT 'CRYSTAL_TOKEN'",
         ] {
@@ -297,6 +427,11 @@ impl NeobotStore {
     }
 }
 
+mod nt_store_changes;
+mod nt_store_channels;
+pub use nt_store_channels::{
+    MAX_POLL_SECS, MIN_POLL_SECS, PENDING_RETENTION_DAYS, SEEN_RETENTION_DAYS, parse_allow_list,
+};
 mod nt_store_convos;
 mod nt_store_files;
 mod nt_store_ledger;
@@ -304,4 +439,7 @@ mod nt_store_providers;
 mod nt_store_reply_tag;
 mod nt_store_routines;
 mod nt_store_tasks;
+/// 重导出：调用方能用 `.ok` / `.output`，但**写不出**该类型（模块私有），
+/// 所以具名类型必须从这里出去，否则调用点只能继续拿位置性元组。
+pub use nt_store_tasks::LastStep;
 mod nt_store_upkeep;

@@ -90,7 +90,7 @@ mod tests {
     use super::{append_memory, memory_block, read_memory};
 
     fn tmp(case: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("neobot-memory-test-{case}"));
+        let dir = crate::nt_testutil::temp_dir(&format!("neobot-memory-test-{}", case));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("mkdir");
         dir

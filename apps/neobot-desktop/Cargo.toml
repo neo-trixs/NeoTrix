@@ -10,6 +10,14 @@ repository.workspace = true
 name = "neobot-desktop"
 path = "src/main.rs"
 
+# lib 目标只为「让 `tests/` 集成测试能 import 命令函数」而存在。
+# 命令源码在 bin 与 lib 两边各编一份（`main.rs` 一行未改），换来的是
+# 参数绑定层可被执行验证 —— 见 src/lib.rs 头注释的缺陷复盘。
+# 不要在这里加 `crate-type = ["cdylib"]` 之类：那是给外部插件用的，与测试无关。
+[lib]
+name = "neobot_desktop"
+path = "src/lib.rs"
+
 [lints]
 workspace = true
 

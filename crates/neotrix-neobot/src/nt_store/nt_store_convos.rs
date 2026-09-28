@@ -4,6 +4,41 @@ use super::{Conversation, NeobotStore};
 use crate::nt_error::NtBotError;
 use rusqlite::{OptionalExtension, params};
 
+/// `conversations` 一行的中间形态（`list_conversations_where` 用）。
+///
+/// 早先是 10 元组 —— `clippy::type_complexity` 会报，而且十个位置参数在
+/// `for (id, kind, title, …) in collected` 里只能靠顺序认，**读 SQL 时无从
+/// 对照**。改成具名结构后，选哪一列是自解释的。
+struct ConvoRow {
+    id: String,
+    kind: String,
+    title: String,
+    created_at: String,
+    muted: i64,
+    task_count: i64,
+    last_active: String,
+    unread: i64,
+    parent_id: Option<String>,
+    origin: String,
+}
+
+/// 行 → `ConvoRow`（提成自由函数才能在 `params![p]` / `params![]` 两条分支上
+/// 复用同一个映射器）。
+fn conversation_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<ConvoRow> {
+    Ok(ConvoRow {
+        id: r.get::<_, String>(0)?,
+        kind: r.get::<_, String>(1)?,
+        title: r.get::<_, String>(2)?,
+        created_at: r.get::<_, String>(3)?,
+        muted: r.get::<_, i64>(4)?,
+        task_count: r.get::<_, i64>(5)?,
+        last_active: r.get::<_, String>(6)?,
+        unread: r.get::<_, i64>(7)?,
+        parent_id: r.get::<_, Option<String>>(8)?,
+        origin: r.get::<_, String>(9)?,
+    })
+}
+
 impl NeobotStore {
     // ---- conversations（IM 语义：会话是容器，发送即追加） ----
 
@@ -50,31 +85,67 @@ impl NeobotStore {
         Ok(id)
     }
 
-    /// 会话列表（按最后活跃倒序；含成员、任务数、免打扰、未读数）。
+    /// 顶层会话列表（按最后活跃倒序；含成员、任务数、免打扰、未读数）。
+    ///
+    /// **只列 `origin='chat'`**：侧聊（`origin='sidebar'`）是侧边栏的私事，
+    /// 混进主列表会把对话栏弄得像开了几十个群。侧聊走 `list_side_threads`。
     pub fn list_conversations(&self) -> Result<Vec<Conversation>, NtBotError> {
-        let mut stmt = self.conn.prepare(
+        self.list_conversations_where("c.origin='chat'", None)
+    }
+
+    /// 全部会话（不过滤 origin；导入 / 备份恢复 / doctor 用）。
+    pub fn list_all_conversations(&self) -> Result<Vec<Conversation>, NtBotError> {
+        self.list_conversations_where("1=1", None)
+    }
+
+    /// 侧聊列表（某母会话下的侧聊；按最后活跃倒序）。
+    pub fn list_side_threads(&self, parent_id: &str) -> Result<Vec<Conversation>, NtBotError> {
+        self.list_conversations_where("c.parent_id=?1", Some(parent_id))
+    }
+
+    /// 会话列举的唯一实现。
+    ///
+    /// `filter` 是**内联的 SQL 片段**（不是绑定参数）—— 三个调用方传的
+    /// 都是本文件里的字面量，没有一处来自用户输入，故不存在注入面；
+    /// 绑定参数在这条 SQL 里也放不下（子查询里要按位置复用 `?1`）。
+    /// 片段里的 `?1` 由 `param` 喂（`None` 表示片段无占位符）。
+    fn list_conversations_where(
+        &self,
+        filter: &str,
+        param: Option<&str>,
+    ) -> Result<Vec<Conversation>, NtBotError> {
+        let sql = format!(
             "SELECT c.id,c.kind,c.title,c.created_at,c.muted,
                (SELECT COUNT(*) FROM tasks t WHERE t.conversation_id=c.id),
                COALESCE((SELECT MAX(t.created_at) FROM tasks t WHERE t.conversation_id=c.id), c.created_at),
                (SELECT COUNT(*) FROM tasks t WHERE t.conversation_id=c.id
-                 AND t.created_at > COALESCE((SELECT last_read_at FROM read_marks WHERE convo_id=c.id), c.created_at))
-              FROM conversations c ORDER BY 7 DESC, c.created_at DESC",
-        )?;
-        let rows = stmt.query_map([], |r| {
-            Ok((
-                r.get::<_, String>(0)?,
-                r.get::<_, String>(1)?,
-                r.get::<_, String>(2)?,
-                r.get::<_, String>(3)?,
-                r.get::<_, i64>(4)?,
-                r.get::<_, i64>(5)?,
-                r.get::<_, String>(6)?,
-                r.get::<_, i64>(7)?,
-            ))
-        })?;
+                 AND t.created_at > COALESCE((SELECT last_read_at FROM read_marks WHERE convo_id=c.id), c.created_at)),
+               c.parent_id, c.origin
+              FROM conversations c WHERE {filter} ORDER BY 7 DESC, c.created_at DESC"
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
         let mut out = Vec::new();
-        for row in rows {
-            let (id, kind, title, created_at, muted, task_count, last_active, unread) = row?;
+        let collected: Vec<ConvoRow> = match param {
+            Some(bound) => stmt
+                .query_map(params![bound], conversation_row)?
+                .collect::<Result<Vec<_>, _>>()?,
+            None => stmt
+                .query_map(params![], conversation_row)?
+                .collect::<Result<Vec<_>, _>>()?,
+        };
+        for row in collected {
+            let ConvoRow {
+                id,
+                kind,
+                title,
+                created_at,
+                muted,
+                task_count,
+                last_active,
+                unread,
+                parent_id,
+                origin,
+            } = row;
             let members = self.conversation_members(&id)?;
             out.push(Conversation {
                 id,
@@ -86,9 +157,27 @@ impl NeobotStore {
                 last_active,
                 muted: muted != 0,
                 unread,
+                parent_id,
+                origin,
             });
         }
         Ok(out)
+    }
+
+    /// 单个会话（`None` = 不存在）。
+    ///
+    /// 渠道层要靠它读「绑定会话的 kind」（`/new` 要继承母会话是 dm 还是
+    /// group），故不能只有列表接口。
+    pub fn get_conversation(&self, id: &str) -> Result<Option<Conversation>, NtBotError> {
+        Ok(self
+            .list_all_conversations()?
+            .into_iter()
+            .find(|row| row.id == id))
+    }
+
+    /// 单个会话的标题（`None` = 不存在）。
+    pub fn get_convo_title(&self, id: &str) -> Result<Option<String>, NtBotError> {
+        Ok(self.get_conversation(id)?.map(|row| row.title))
     }
 
     /// 免打扰开关（免打扰会话不亮未读）。
@@ -173,6 +262,73 @@ impl NeobotStore {
         self.conn.execute("DELETE FROM tasks WHERE conversation_id=?1", params![id])?;
         self.conn.execute("DELETE FROM conversation_members WHERE convo_id=?1", params![id])?;
         self.conn.execute("DELETE FROM conversations WHERE id=?1", params![id])?;
+        // 侧聊**不随母会话陪葬**：它们是真会话（有自己的历史与任务），
+        // 母没了就升为顶层（`origin='chat'`, `parent_id=NULL`），
+        // 静默删掉等于替用户销毁他可能想要的东西。
+        self.conn.execute(
+            "UPDATE conversations SET origin='chat', parent_id=NULL
+             WHERE parent_id=?1 AND origin='sidebar'",
+            params![id],
+        )?;
+        Ok(())
+    }
+
+    /// 建侧聊（`nt_side_chat` 的落库原语；领域规则见该模块）。
+    ///
+    /// 母会话必须存在。侧聊 `kind` **随母**（`dm` 的侧聊仍是 `dm`），
+    /// 故这里没有 `kind` 参数 —— 传进来反而多一处可能与母不一致的口子。
+    /// `origin='sidebar'` 故**不进主会话列表**。
+    pub fn insert_side_thread(&self, parent_id: &str, title: &str) -> Result<String, NtBotError> {
+        let parent_kind: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT kind FROM conversations WHERE id=?1",
+                params![parent_id],
+                |r| r.get(0),
+            )
+            .optional()?;
+        let Some(parent_kind) = parent_kind else {
+            return Err(NtBotError::Store(format!(
+                "no such parent conversation '{parent_id}'"
+            )));
+        };
+        let title = title.trim();
+        if title.is_empty() || title.chars().count() > 80 {
+            return Err(NtBotError::Invalid(
+                "side thread title must be 1..=80 chars".to_owned(),
+            ));
+        }
+        let now = chrono::Utc::now().to_rfc3339();
+        let id = uuid::Uuid::new_v4().to_string();
+        self.conn.execute(
+            "INSERT INTO conversations(id,kind,title,created_at,updated_at,parent_id,origin)
+             VALUES(?1,?2,?3,?4,?4,?5,'sidebar')",
+            params![id, parent_kind, title, now, parent_id],
+        )?;
+        Ok(id)
+    }
+
+    /// 侧聊升为顶层会话（better-sidebar 的「保存为新会话」）。
+    ///
+    /// 幂等：已升过的再升一次不报错（用户连点两下不该看到失败）。
+    pub fn promote_side_thread(&self, id: &str) -> Result<(), NtBotError> {
+        let now = chrono::Utc::now().to_rfc3339();
+        let n = self.conn.execute(
+            "UPDATE conversations SET origin='chat', parent_id=NULL, updated_at=?1
+             WHERE id=?2 AND origin='sidebar'",
+            params![now, id],
+        )?;
+        if n == 0 {
+            // 区分「不存在」与「已在顶层」——后者是幂等成功。
+            let exists: i64 = self.conn.query_row(
+                "SELECT COUNT(*) FROM conversations WHERE id=?1",
+                params![id],
+                |r| r.get(0),
+            )?;
+            if exists == 0 {
+                return Err(NtBotError::Store(format!("no such conversation '{id}'")));
+            }
+        }
         Ok(())
     }
 

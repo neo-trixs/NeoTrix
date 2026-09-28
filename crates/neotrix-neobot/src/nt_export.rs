@@ -130,7 +130,7 @@ mod tests {
 
     #[test]
     fn export_roundtrip_manifest_counts() {
-        let dir = std::env::temp_dir().join("neobot-export-test");
+        let dir = crate::nt_testutil::temp_dir("export-test");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("attachments")).expect("mkdir");
         // 最小资产：库（1 会话）+ 记忆 + 配置 + 1 附件。
@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn export_missing_db_fails_helpfully() {
-        let dir = std::env::temp_dir().join("neobot-export-empty-test");
+        let dir = crate::nt_testutil::temp_dir("export-empty-test");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("mkdir");
         let err = export_bundle(&dir, &dir.join("b.zip")).expect_err("must fail");

@@ -10,6 +10,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::nt_audit::{AuditDecision, AuditEvent};
+use crate::nt_cancel::StopToken;
 use crate::nt_config::{NeobotConfig, PolicyMode};
 use crate::nt_engine::EngineAdapter;
 use crate::nt_error::NtBotError;
@@ -22,6 +23,88 @@ const WRITE_CAP: usize = 2 * 1024 * 1024;
 const OUTPUT_CAP: usize = 8 * 1024;
 /// 运行租约秒（单轮最长 10 分钟；崩溃后 `recover_stale_running` 凭它回收）。
 pub const LEASE_SECS: i64 = 600;
+/// 租约心跳的**最短间隔**：两跳之间至少隔这么久才允许再写一次库。
+///
+/// 为什么不是「每跳一次」：一 hop 可能是 300s（CLI 引擎超时）也可能只有
+/// 几毫秒（本地回显）。按跳写库，慢轮次一次不多、快轮次一次不少 ⇒
+/// 「每毫秒写一次库」。按**时间**闸才是真正的退避。
+pub const LEASE_RENEW_INTERVAL_SECS: u64 = 60;
+/// 单轮续租次数**上限**（32 × 60s ≈ 32 分钟连续心跳后停止续租）。
+///
+/// 有界是为了「异常长寿的单轮」不会无限续命：到顶即停手，让租约自然过期，
+/// 崩溃恢复窗口重新变回一个 `LEASE_SECS`。**宁可在第 32 分钟之后让
+/// `recover_stale_running` 回收，也好过让一个跑飞的任务永久占住一行。**
+pub const LEASE_RENEW_MAX: usize = 32;
+/// C2 取消汇总行的工具名（本跳被叫停时尚未执行的那些调用都记在这一行）。
+const CANCELLED_TOOL_STEPS: &str = "cancelled:tool_calls";
+/// C2 审计行的 `rule` 值（区别于网关自己的 deny 规则名）。
+const CANCELLED_RULE: &str = "cancelled";
+/// 落进 `tasks.error` 的取消原因前缀（`stopped by user at hop N/M`）。
+const STOPPED_PREFIX: &str = "stopped by user";
+
+/// 租约心跳（**有界 + 退避**的续租闸）。
+///
+/// 每跳之后问一次 `due()`，只在「距上次续租够间隔」且「本轮未到上限」时
+/// 才推后 `lease_until`。续的是**滚动窗口**（`now + LEASE_SECS`），不是
+/// 在旧值上累加 —— 于是进程一死，最坏仍只挂一个 `LEASE_SECS`。
+struct LeaseHeartbeat {
+    interval: std::time::Duration,
+    cap: usize,
+    renewals: usize,
+    last: Option<std::time::Instant>,
+}
+
+impl LeaseHeartbeat {
+    /// 生产默认（60s 一次、最多 32 次）。
+    fn new() -> Self {
+        Self {
+            interval: std::time::Duration::from_secs(LEASE_RENEW_INTERVAL_SECS),
+            cap: LEASE_RENEW_MAX,
+            renewals: 0,
+            last: None,
+        }
+    }
+
+    /// 测试专用闸（生产恒走 `new()`）：把间隔/上限调成「一跳之内看得见」
+    /// 的量级，否则毫秒级跑完的用例根本等不到 60s 那一拍。
+    #[cfg(test)]
+    fn tuned(interval: std::time::Duration, cap: usize) -> Self {
+        Self {
+            interval,
+            cap,
+            renewals: 0,
+            last: None,
+        }
+    }
+
+    /// 该不该现在续一次。
+    fn due(&self) -> bool {
+        if self.renewals >= self.cap {
+            return false;
+        }
+        match self.last {
+            None => true,
+            Some(last) => last.elapsed() >= self.interval,
+        }
+    }
+
+    /// 记一次「已经续过」（**成功与失败都记**）。
+    ///
+    /// 失败也记，是为了让退避照样生效：库忙/钥匙丢了都不该变成「每跳重试
+    /// 一次」的写库活。计数同样占上限名额 —— 反复失败也不该无限重试。
+    fn note(&mut self) {
+        self.renewals += 1;
+        self.last = Some(std::time::Instant::now());
+    }
+}
+
+/// 租约窗口（**滚动**）：此刻 + `LEASE_SECS`。
+///
+/// 单独抽出来是因为「入轮那一次」与「每跳续租那 N 次」必须**同一条**算式：
+/// 只要有一处写成在旧值上累加，崩溃恢复窗口就会被放大成累加的倍数。
+fn lease_deadline() -> String {
+    (Utc::now() + chrono::Duration::seconds(LEASE_SECS)).to_rfc3339()
+}
 
 /// 增量回调（流式对话流用）。
 pub type DeltaCallback<'a> = &'a mut dyn FnMut(&str);
@@ -59,7 +142,7 @@ pub fn run_local_turn(
         user_text,
         convo_id: None,
     };
-    run_local_turn_inner(&ctx, None, None)
+    run_local_turn_cancellable(&ctx, None, None, None)
 }
 
 /// 发起方具名版（routine firing 审计记 `routine:<name>`；审计 actor 即发起方）。
@@ -85,7 +168,7 @@ pub fn run_local_turn_as(
         user_text,
         convo_id,
     };
-    run_local_turn_inner(&ctx, None, None)
+    run_local_turn_cancellable(&ctx, None, None, None)
 }
 
 /// 流式版 — 模型增量内容经 `on_delta` 回调 (SSE 真流式引擎).
@@ -107,7 +190,7 @@ pub fn run_local_turn_stream(
         user_text,
         convo_id: None,
     };
-    run_local_turn_inner(&ctx, Some(on_delta), None)
+    run_local_turn_cancellable(&ctx, Some(on_delta), None, None)
 }
 
 /// 流式具名版.
@@ -133,7 +216,29 @@ pub fn run_local_turn_stream_as(
         user_text,
         convo_id,
     };
-    run_local_turn_inner(&ctx, Some(on_delta), on_step)
+    run_local_turn_cancellable(&ctx, Some(on_delta), on_step, None)
+}
+
+/// **带停止令牌**的跑轮入口（切片 C1/C2/C3 用）。
+///
+/// 为什么收 `&RunContext` 而不是再抄一遍 8 个参数：四个 wrapper 已经各自
+/// 建好 ctx，而本函数真正的变量只有 `stop`。参数打包是本文件既有的做法
+/// （见 `RunContext` 的 rish Env 注释：把 9 参函数压到 clippy 线下）。
+///
+/// `stop = None` ⇒ 造一枚**私有**令牌（无人能置位）⇒ 行为与本函数存在
+/// 之前**逐字相同**。这是本切片能独立上线的根据：`channel serve` 今天
+/// 没人传 `Some`，所以对外行为不变，而取消机制已真实存在且被测试覆盖。
+///
+/// **给用户看的那句「已停（第 N 跳）」不由本函数产出** —— 它是 dispatch
+/// 侧的事（那边持有令牌、知道自己置过位）。本函数只如实落库
+/// `TaskStatus::Cancelled` + 位置，并返回 `TurnStatus::Waiting`（人可接手）。
+pub fn run_local_turn_cancellable(
+    ctx: &RunContext<'_>,
+    on_delta: Option<DeltaCallback<'_>>,
+    on_step: Option<StepCallback<'_>>,
+    stop: Option<&StopToken>,
+) -> Result<TurnStatus, NtBotError> {
+    run_local_turn_inner(ctx, on_delta, on_step, stop, LeaseHeartbeat::new())
 }
 
 /// 占位标题（自动命名只动这些；用户手改过的永不动）。
@@ -159,19 +264,44 @@ fn run_local_turn_inner(
     ctx: &RunContext<'_>,
     on_delta: Option<DeltaCallback<'_>>,
     on_step: Option<StepCallback<'_>>,
+    stop: Option<&StopToken>,
+    lease: LeaseHeartbeat,
 ) -> Result<TurnStatus, NtBotError> {
     let store = ctx.store;
+    let config = ctx.config;
     let title = ctx.title;
     let convo_id = ctx.convo_id;
     let now = Utc::now().to_rfc3339();
+    // 检查点 C0（取消）：**入轮清一次旗**。
+    //
+    // 语义是「进入这一轮时的值」就是「这一轮专属的停止意图」。共享令牌
+    // 可能带着上一轮的置位进来（同一会话连跑两轮），也可能被一次打在
+    // 已结束轮次上的 `cancel()` 弄脏；不清就会误伤下一轮。故名是
+    // 「入口清」而不是「用完清」。
+    //
+    // `None` 分支造一枚私有令牌：无人能置位 ⇒ 与本函数存在之前同行为。
+    let owned_stop: StopToken;
+    let stop: &StopToken = match stop {
+        Some(token) => {
+            token.reset();
+            token
+        }
+        None => {
+            owned_stop = StopToken::new();
+            &owned_stop
+        }
+    };
     // 起点两扫（单机，一次 UPDATE 级代价）：崩溃残留回收 + 过期认领释放。
     // best-effort：扫失败不挡本轮（下次起点再扫）。
     let _recovered: usize = store.recover_stale_running(&now).unwrap_or(0);
     let _swept: usize = store
         .sweep_stale_claims(&now, crate::nt_store::CLAIM_TTL_SECS)
         .unwrap_or(0);
-    let lease_until =
-        (Utc::now() + chrono::Duration::seconds(LEASE_SECS)).to_rfc3339();
+    // 租约窗口是**滚动**的：`lease_deadline()` 每次都按「此刻 + LEASE_SECS」
+    // 重算，续租只是把它推后，绝不在旧值上累加（否则续 N 次就把崩溃恢复
+    // 窗口放大成 N 倍 —— 那样续租反而成了泄漏源）。
+    let lease_until = lease_deadline();
+    let lease_id = Uuid::new_v4().to_string();
     // 会话归属：指定即用（不存在则报错，不静默建）；缺省自动建群组会话。
     let convo_id = match convo_id {
         Some(id) => {
@@ -203,17 +333,25 @@ fn run_local_turn_inner(
         claimed_by: None,
         claimed_at: None,
         visibility: crate::nt_types::default_visibility(),
-        lease_id: Some(Uuid::new_v4().to_string()),
+        lease_id: Some(lease_id.clone()),
         lease_until: Some(lease_until),
         attempts: 1,
         error: None,
         conversation_id: Some(convo_id),
     };
     store.save_task(&task)?;
-    let status = run_loop(ctx, &task.id, on_delta, on_step);
+    let outcome = run_loop(
+        ctx,
+        &task.id,
+        &lease_id,
+        on_delta,
+        on_step,
+        stop,
+        lease,
+    );
     // turn 级错误（落库失败等）记终态 Failed + error 后原错返回，不吞错。
-    let status = match status {
-        Ok(status) => status,
+    let (status, stopped_at) = match outcome {
+        Ok(pair) => pair,
         Err(err) => {
             let failed = AgentTask {
                 status: TaskStatus::Failed,
@@ -228,6 +366,38 @@ fn run_local_turn_inner(
             return Err(err);
         }
     };
+    // 检查点 C4（中止落库）：被用户叫停的这一轮写 `TaskStatus::Cancelled`。
+    //
+    // 三件事同时定（§10.4）：① 落库用 `TaskStatus::Cancelled`（既有变体，
+    // `cancel_task` 早写它、`retry_task` 早收它 ⇒ 用户有正规重跑出口）；
+    // ② 公开签名返回 `TurnStatus::Waiting`（人可接手，且它是**既有**变体，
+    // 不必给 `TurnStatus` 造一个新造一个假的）；③ 面向用户的中文回执由
+    // dispatch 侧产出，不由 `TurnStatus` 承载。
+    //
+    // `lease_id/lease_until` **必须清**：不清则 `recover_stale_running`
+    // 在一个 `LEASE_SECS` 内不碰它（与 `cancel_task` 同款，同一个道理）。
+    if let Some(hop) = stopped_at {
+        // 分母与 `run_loop` 的归一化同款（`max_steps.max(1)`）。
+        let steps = config.max_steps.max(1);
+        let cancelled = AgentTask {
+            status: TaskStatus::Cancelled,
+            updated_at: Utc::now().to_rfc3339(),
+            lease_id: None,
+            lease_until: None,
+            // 「第几跳」写在 error 里，信息不丢：`hop` 是 0 基的跳序号，
+            // 即「在哪一跳的哪个检查点被拦下」。
+            error: Some(format!("{STOPPED_PREFIX} at hop {hop}/{steps}")),
+            ..task.clone()
+        };
+        store.save_task(&cancelled)?;
+        store.enqueue_outbox(
+            &Uuid::new_v4().to_string(),
+            "CH_MESSAGE_NEW",
+            &serde_json::json!({"task_id": cancelled.id, "status": cancelled.status.as_str()})
+                .to_string(),
+        )?;
+        return Ok(TurnStatus::Waiting);
+    }
     let finished = AgentTask {
         status: match status {
             TurnStatus::Done => TaskStatus::Done,
@@ -255,12 +425,21 @@ fn run_local_turn_inner(
     Ok(status)
 }
 
+/// 有界多跳循环。
+///
+/// 返回 `(终态, 被叫停的跳序号)`：第二项 `Some(hop)` 表示这一轮是**被用户
+/// 叫停**的（`hop` 为 0 基，即在哪个检查点被拦下），`None` 表示正常跑完。
+/// 「哪一跳被取消」走返回值而不是 `StopToken` 的内部可变性 —— 给一个跨
+/// 执行流共享的载体加内部可变性，会逼出 `Mutex` 或 `unsafe`，两个都不要。
 fn run_loop(
     ctx: &RunContext<'_>,
     task_id: &str,
+    lease_id: &str,
     mut on_delta: Option<DeltaCallback<'_>>,
     mut on_step: Option<StepCallback<'_>>,
-) -> Result<TurnStatus, NtBotError> {
+    stop: &StopToken,
+    mut lease: LeaseHeartbeat,
+) -> Result<(TurnStatus, Option<usize>), NtBotError> {
     use crate::nt_types::{TranscriptItem, TranscriptRole};
     let store = ctx.store;
     let config = ctx.config;
@@ -273,6 +452,14 @@ fn run_loop(
     let mut current = TurnStatus::Continue;
     // 单轮累计写入（rish 嵌套预算中层）。
     let mut turn_written: usize = 0;
+    // 被叫停的那一跳（0 基）。`None` = 正常跑完。
+    let mut stopped_at: Option<usize> = None;
+    // 本轮文件改动账（侧边栏「本轮文件」视角；写/改/读都记账）。
+    let sink = crate::nt_changes::ChangeSink {
+        store,
+        task_id,
+        workspace: &config.workspace_dir,
+    };
     for n in 0..steps {
         // 最后一步且已有工具活动: 提醒收尾 (防跑满 max_steps 仍无终态).
         if n + 1 == steps && !history.is_empty() {
@@ -284,7 +471,16 @@ fn run_loop(
                 ),
                 tool_calls: Vec::new(),
                 tool_call_id: None,
+                image: None,
             });
+        }
+        // 检查点 C1：别再发起**新的一次模型调用**（省钱的主要来源）。
+        // 命中即 `break`，**不写任何 steps 行**：没有发生的事不记账。
+        // 不自己 `return`：`current` 仍是 `Continue`，下面的兜底会把它
+        // 映射成 `Waiting`（人可接手）—— 这正是我们要的语义。
+        if stop.is_cancelled() {
+            stopped_at = Some(usize::from(n));
+            break;
         }
         let hop_started = std::time::Instant::now();
         let turn = match on_delta.as_mut() {
@@ -344,6 +540,7 @@ fn run_loop(
             content: turn.assistant_text.clone(),
             tool_calls: turn.tool_calls.clone(),
             tool_call_id: None,
+            image: None,
         });
         // 引擎自带 tool_calls 为空时按纯回复处理.
         if turn.tool_calls.is_empty() {
@@ -352,7 +549,41 @@ fn run_loop(
             break;
         }
         let mut saw_status: Option<TurnStatus> = None;
-        for call in &turn.tool_calls {
+        for (call_idx, call) in turn.tool_calls.iter().enumerate() {
+            // 检查点 C2：**同跳内不再执行下一个工具**（最重要的一处）。
+            //
+            // 三个子动作的顺序不可换（`:366-367` 那条网关律「先写审计行，
+            // 再执行」）：① 审计行 ② steps 汇总行 ③ break。
+            //
+            // 放在 `gate` **之前**而不是之后：`gate` 之后造出的是一条
+            // 「声称网关已判定、实际什么也没做」的中间态；放在 `gate`
+            // 之前则是**如实**记「用户叫停」而不是「网关拒绝」——
+            // 这是两件不同的事实，不能混。所以这里的 `tool` 是合成的
+            // `tool_calls`（网关并没有逐个判过这些调用），`rule=cancelled`。
+            if stop.is_cancelled() {
+                // `.get(..)` 而非 `[..]`：`call_idx` 来自对本数组的
+                // `enumerate`，切片必然合法，但工作区禁裸下标（panic 面）。
+                let pending: Vec<&str> = turn
+                    .tool_calls
+                    .get(call_idx..)
+                    .map(|rest| rest.iter().map(|left| left.name.as_str()).collect())
+                    .unwrap_or_default();
+                let pending_csv = pending.join(",");
+                store.record_audit(&AuditEvent::new(
+                    actor_name,
+                    "tool_calls",
+                    AuditDecision::Deny,
+                    Some(CANCELLED_RULE.to_owned()),
+                    &format!("task={task_id} hop={n} stopped by user; not executed: {pending_csv}"),
+                ))?;
+                // 汇总 steps 行：本跳**尚未执行**的调用记在这里，于是每个被
+                // 请求过的工具都有归属（正常路径有自己的行，取消路径进这一
+                // 行）—— 不留悬空的 tool_call id（history 里有、steps 里
+                // 查无此行是最难查的一类脏数据）。
+                store.add_step(task_id, i64::from(n), CANCELLED_TOOL_STEPS, false, &pending_csv)?;
+                stopped_at = Some(usize::from(n));
+                break;
+            }
             let (decision, rule) = gate(config, actor, call)?;
             let allowed = matches!(decision, PolicyDecision::Allow);
             // 网关律：先写审计行（无论放行与否），再执行。
@@ -372,17 +603,17 @@ fn run_loop(
             store.record_audit(&pre_event)?;
             // dry-run: 记录但不执行. 执行错误转失败结果 (模型可见, 可换路),
             // 只有落库/审计失败才 `?` 中断.
-            let result = if allowed && config.policy_mode == crate::nt_config::PolicyMode::Enforce {
-                match execute_tool(config, call, &mut turn_written) {
-                    Ok(result) => result,
-                    Err(err) => ToolResult {
+            let outcome = if allowed && config.policy_mode == crate::nt_config::PolicyMode::Enforce {
+                match execute_tool(config, engine, call, &mut turn_written, &sink, stop) {
+                    Ok(outcome) => outcome,
+                    Err(err) => ToolOutcome::from(ToolResult {
                         ok: false,
                         output: format!("tool error: {err}"),
                         truncated: false,
-                    },
+                    }),
                 }
             } else {
-                ToolResult {
+                ToolOutcome::from(ToolResult {
                     ok: false,
                     output: if allowed {
                         "(dry-run: not executed)".to_owned()
@@ -390,8 +621,9 @@ fn run_loop(
                         "(denied)".to_owned()
                     },
                     truncated: false,
-                }
+                })
             };
+            let result = outcome.result;
             let reason_note = status_reason(&call.args)
                 .map(|reason| format!(" reason={reason}"))
                 .unwrap_or_default();
@@ -420,6 +652,10 @@ fn run_loop(
                 content: truncate_history(&result.output),
                 tool_calls: Vec::new(),
                 tool_call_id: Some(call.id.clone()),
+                // 图像**不进 content**（`content` 是纯文本通道，进去了模型只会读到
+                // 一堵 base64 字符墙）。它走这个侧信道，由 `nt_http_engine` 在下一次
+                // 请求里升级成真正的 `image_url` 多模态部件。
+                image: outcome.image,
             });
             if call.name == ToolName::SetTurnStatus {
                 saw_status = parse_status_arg(&call.args);
@@ -428,6 +664,11 @@ fn run_loop(
                 current = TurnStatus::Blocked;
                 break;
             }
+        }
+        // C2 命中后不再走下一跳 —— 否则下一跳开头的 C1 会把「第几跳」
+        // 覆盖成一个更大的数，落库就谎报了被拦下的位置。
+        if stopped_at.is_some() {
+            break;
         }
         if let Some(status) = saw_status {
             current = status;
@@ -438,12 +679,26 @@ fn run_loop(
             break;
         }
         enforce_transcript_budget(&mut history);
+        // 租约心跳（C0）：每跳之后问一次闸（`due()` = 距上次够间隔 **且**
+        // 本轮未到次数上限）。不快也不慢地写库：按时间闸退避、按次数封顶。
+        //
+        // best-effort（同起点的 `recover_stale_running` 那一扫）：续租失败
+        // 不挡本轮 —— SQLite 写竞争的真实现是「一失败就整轮死掉」，而
+        // 少续一次的后果只是租约窗口短一点，仍然可回收。
+        if lease.due() {
+            let until = lease_deadline();
+            // 0 行 = 不再持有这行（被回收或被接管）：不重试，更不重写 ——
+            // 续租只推后**自己手上那把钥匙**的窗口。
+            let _renewed: Result<usize, NtBotError> =
+                store.renew_lease(task_id, lease_id, &until);
+            lease.note();
+        }
     }
     // 跑满仍无终态 (模型一直行动不收尾) → Waiting (任务 Pending, 人可接手).
     if current == TurnStatus::Continue {
         current = TurnStatus::Waiting;
     }
-    Ok(current)
+    Ok((current, stopped_at))
 }
 
 /// 转录预算（rish 转录上限思想本地值：总量 256KiB / 200 条）。
@@ -451,6 +706,21 @@ fn run_loop(
 /// 全量仍在 steps 表，可追溯）。
 const TRANSCRIPT_CAP_BYTES: usize = 256 * 1024;
 const TRANSCRIPT_CAP_ITEMS: usize = 200;
+
+/// 单条转录项占用的预算权重。
+///
+/// 图像必须**计入**：它不走 `content`（`content` 只有一行几十字节的说明），
+/// 4 MiB 的图在 `image.base64` 里是 5.6 MiB。若只按 `content` 计账，
+/// 一轮里连读十张图就能把请求体堆到 50 MiB 以上，而预算显示「几乎没占」。
+/// 从旧往新丢的策略正好合适：先丢的那张图也是最该被忘掉的那张。
+fn transcript_weight(item: &crate::nt_types::TranscriptItem) -> usize {
+    item.content.len()
+        + item
+            .image
+            .as_ref()
+            .map(|image| image.base64.len())
+            .unwrap_or(0)
+}
 
 fn enforce_transcript_budget(history: &mut Vec<crate::nt_types::TranscriptItem>) {
     while history.len() > TRANSCRIPT_CAP_ITEMS {
@@ -462,7 +732,7 @@ fn enforce_transcript_budget(history: &mut Vec<crate::nt_types::TranscriptItem>)
         };
         history.remove(pos);
     }
-    let mut bytes: usize = history.iter().map(|item| item.content.len()).sum();
+    let mut bytes: usize = history.iter().map(transcript_weight).sum();
     while bytes > TRANSCRIPT_CAP_BYTES {
         let Some(pos) = history
             .iter()
@@ -473,7 +743,7 @@ fn enforce_transcript_budget(history: &mut Vec<crate::nt_types::TranscriptItem>)
         bytes = bytes.saturating_sub(
             history
                 .get(pos)
-                .map(|item| item.content.len())
+                .map(transcript_weight)
                 .unwrap_or(0),
         );
         if history.get(pos).is_none() {
@@ -583,26 +853,149 @@ fn parse_status_arg(args: &serde_json::Value) -> Option<TurnStatus> {
         .and_then(TurnStatus::parse)
 }
 
+/// 工具产出：文本结果（进 steps 表与转录）＋ 可能的图像部件（进下一次请求的
+/// 多模态 content）。
+///
+/// 为什么**不**把图像挂进 `ToolResult`：那会让全仓每个构造点都多写一个字段，
+/// 而全仓只有一个工具会产出图像。单独拎出来，读代码的人一眼看得出「哪些工具
+/// 真的看得见图」，也把 base64 这个重物的传播路径限死在一条线上。
+#[derive(Debug)]
+struct ToolOutcome {
+    result: ToolResult,
+    image: Option<crate::nt_types::ImagePart>,
+}
+
+impl From<ToolResult> for ToolOutcome {
+    /// 纯文本工具的落点：图像恒 `None`。
+    fn from(result: ToolResult) -> Self {
+        Self { result, image: None }
+    }
+}
+
 fn execute_tool(
     config: &NeobotConfig,
+    engine: &dyn EngineAdapter,
     call: &crate::nt_types::ToolCall,
     turn_written: &mut usize,
-) -> Result<ToolResult, NtBotError> {
+    sink: &crate::nt_changes::ChangeSink<'_>,
+    stop: &StopToken,
+) -> Result<ToolOutcome, NtBotError> {
     match &call.name {
         ToolName::SetTurnStatus => Ok(ToolResult {
             ok: parse_status_arg(&call.args).is_some(),
             output: "status recorded".to_owned(),
             truncated: false,
-        }),
-        ToolName::Bash => execute_bash(config, call),
-        ToolName::ReadFile => execute_read(config, call),
-        ToolName::WriteFile => execute_write(config, call, turn_written),
-        ToolName::EditFile => execute_edit(config, call, turn_written),
-        ToolName::ComputerAct => execute_computer(call),
-        ToolName::WebSearch => execute_web_search(call),
-        ToolName::WebFetch => execute_web_fetch(call),
+        }
+        .into()),
+        ToolName::Bash => Ok(execute_bash(config, call, stop)?.into()),
+        ToolName::ReadFile => Ok(execute_read(config, call, sink)?.into()),
+        ToolName::ReadImage => execute_read_image(config, engine, call),
+        ToolName::WriteFile => Ok(execute_write(config, call, turn_written, sink)?.into()),
+        ToolName::EditFile => Ok(execute_edit(config, call, turn_written, sink)?.into()),
+        ToolName::ComputerAct => Ok(execute_computer(call)?.into()),
+        ToolName::WebSearch => Ok(execute_web_search(call)?.into()),
+        ToolName::WebFetch => Ok(execute_web_fetch(call)?.into()),
+        ToolName::SidebarOpen => Ok(execute_sidebar_open(call)?.into()),
         ToolName::Unknown(raw) => Err(NtBotError::Invalid(format!("unknown tool '{raw}'"))),
     }
+}
+
+/// 看图执行：工作区内的图 → 真正的多模态部件。
+///
+/// 顺序有讲究：**先问引擎有没有眼睛，再去读盘**。看不见的引擎根本不该被喂
+/// 一张图的字节（白读、白 base64），更不该拿到一个「成功」的空结果。
+///
+/// 三种失败都是**明说**，没有一种悄悄返回空：
+/// - 引擎/模型无视觉 → 点名引擎与模型，叫用户设 `NEOBOT_VISION=1`；
+/// - 路径越狱 / 缺参 → 网关与 jail 的原话；
+/// - 不是图 / 超限 → `nt_vision` 说清实际认成了什么。
+fn execute_read_image(
+    config: &NeobotConfig,
+    engine: &dyn EngineAdapter,
+    call: &crate::nt_types::ToolCall,
+) -> Result<ToolOutcome, NtBotError> {
+    if !engine.vision_capable() {
+        return Err(NtBotError::Denied {
+            rule: "no-vision-engine".to_owned(),
+            reason: format!(
+                "engine '{}' cannot deliver image parts to the model (model '{}'), \
+                 so reading an image would only hand back a path — set NEOBOT_VISION=1 \
+                 if this model really is multimodal",
+                engine.engine_id(),
+                engine.model_name()
+            ),
+        });
+    }
+    let path = required_path(&call.args)?;
+    // 第二道 jail（策略层已判一次，这里按 `read_file` 的双保险惯例再拼一次）。
+    let _guarded = join_workspace(&config.workspace_dir, &path)?;
+    let (image, kind) = crate::nt_vision::load_image(&config.workspace_dir, &path)?;
+    // 报**编码后**的字节数（手上有精确值；原图大小要靠 padding 反推，
+    // 与其给个差 1-2 字节的「约等于」，不如报一个不用猜的数）。
+    let encoded = image.base64.len();
+    Ok(ToolOutcome {
+        result: ToolResult {
+            ok: true,
+            // 给人（和模型）看的这行是**短文本**：图像本身走 image 通道，
+            // 不在这里复述 base64（复述了模型就只会收到一堵字符墙）。
+            output: format!(
+                "attached 1 image as a multimodal part: {path} ({} , {encoded} base64 chars). \
+                 You can see it now — describe what is actually visible.",
+                kind.media_type()
+            ),
+            truncated: false,
+        },
+        image: Some(image),
+    })
+}
+
+/// 侧边栏导航：**不执行、只成文**。
+///
+/// 输出是一行 JSON（`{"topic":"files","path":"a/b.rs","viewer":"code"}`），
+/// 前端在流式 `Step` 事件里认出 `tool == "sidebar_open"` 后解析并跳。
+/// 模型因此只能「提议打开」——开不开、开哪页永远由界面说了算。
+///
+/// 校验只有两件，都必要：topic 必须在册（防模型编页签），target 必须过
+/// `nt_workspace` 的 jail 词法判定（防提议工作区外的路径）。
+fn execute_sidebar_open(call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBotError> {
+    let topic = call
+        .args
+        .get("topic")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    let target = ["path", "target"]
+        .iter()
+        .find_map(|key| call.args.get(*key))
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    let registry = crate::nt_sidebar::TabRegistry::with_builtins();
+    let viewers = crate::nt_sidebar::builtin_viewers();
+    let resolved =
+        crate::nt_sidebar::resolve_open(&registry, &viewers, topic, target)?;
+    let output = serde_json::to_string(&resolved)
+        .map_err(|err| NtBotError::Codec(format!("sidebar_open encode: {err}")))?;
+    Ok(ToolResult {
+        ok: true,
+        output,
+        truncated: false,
+    })
+}
+
+/// 抓「改前」内容，供改动账渲染 diff。
+///
+/// 不存在 / 不是普通文件 / 二进制 / 超 `CHANGE_CONTENT_CAP` 一律当「没有」——
+/// 账会如实记 `before = None`，而不是在账里塞半个文件或半个二进制。
+fn peek_before(full: &std::path::Path) -> Option<String> {
+    use crate::nt_changes::CHANGE_CONTENT_CAP;
+    let meta = std::fs::metadata(full).ok()?;
+    if !meta.is_file() || meta.len() > CHANGE_CONTENT_CAP as u64 {
+        return None;
+    }
+    let bytes = std::fs::read(full).ok()?;
+    if crate::nt_workspace::is_binary(&bytes) {
+        return None;
+    }
+    String::from_utf8(bytes).ok()
 }
 
 /// computer 执行 — 当前 Noop 后端诚实失败 (调用方转失败结果回填模型).
@@ -644,8 +1037,14 @@ fn execute_web_fetch(call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtB
 /// - 60s 超时杀（此前 `.output()` 死等，一句 `sleep 999` 卡死整轮）；
 /// - 环境脱敏：`env_clear` + 最小白名单，不把宿主 secrets 递进 bash
 ///   （此前 `env` 回显直达模型 = key 送提供方）；
-/// - 管道读数走独立线程，避免大输出撑爆 pipe 导致假死。
-fn execute_bash(config: &NeobotConfig, call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBotError> {
+/// - 管道读数走独立线程，避免大输出撑爆 pipe 导致假死；
+/// - **用户叫停**（C3）：`stop` 置位后杀掉已起的子进程 —— 这是整条取消
+///   链路上唯一能到亚秒的地方（其余检查点的上界是一跳）。
+fn execute_bash(
+    config: &NeobotConfig,
+    call: &crate::nt_types::ToolCall,
+    stop: &StopToken,
+) -> Result<ToolResult, NtBotError> {
     use std::io::Read as _;
     use std::process::Stdio;
     use std::time::{Duration, Instant};
@@ -700,7 +1099,25 @@ fn execute_bash(config: &NeobotConfig, call: &crate::nt_types::ToolCall) -> Resu
                 text.push_str("\n[neobot] bash timed out after 60s and was killed");
                 return Ok(truncate_output(text, false));
             }
-            None => std::thread::sleep(Duration::from_millis(50)),
+            None => {
+                // 检查点 C3：睡之前问一次。放在 sleep **之前**才有亚秒级
+                // 的响应（放在之后就是 50ms + 50ms）；50ms 本来就是既有
+                // 轮询粒度，不值得为它引入 runtime 去等一个通知。
+                if stop.is_cancelled() {
+                    let _killed: Option<()> = child.kill().ok();
+                    let _waited: Option<std::process::ExitStatus> = child.wait().ok();
+                    let mut text = String::from_utf8_lossy(
+                        &stdout_handle
+                            .and_then(|h| h.join().ok())
+                            .unwrap_or_default(),
+                    )
+                    .into_owned();
+                    text.push_str("\n[neobot] stopped by user");
+                    // `ok=false`：这一条**没有**跑完，如实说没跑完。
+                    return Ok(truncate_output(text, false));
+                }
+                std::thread::sleep(Duration::from_millis(50))
+            }
         }
     };
     let mut text = String::from_utf8_lossy(
@@ -715,7 +1132,11 @@ fn execute_bash(config: &NeobotConfig, call: &crate::nt_types::ToolCall) -> Resu
     Ok(truncate_output(text, status.success()))
 }
 
-fn execute_read(config: &NeobotConfig, call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBotError> {
+fn execute_read(
+    config: &NeobotConfig,
+    call: &crate::nt_types::ToolCall,
+    sink: &crate::nt_changes::ChangeSink<'_>,
+) -> Result<ToolResult, NtBotError> {
     let path = required_path(&call.args)?;
     let full = join_workspace(&config.workspace_dir, &path)?;
     let meta = std::fs::metadata(&full)?;
@@ -726,13 +1147,19 @@ fn execute_read(config: &NeobotConfig, call: &crate::nt_types::ToolCall) -> Resu
         )));
     }
     let content = std::fs::read_to_string(&full)?;
-    Ok(truncate_output(content, true))
+    let mut result = truncate_output(content.clone(), true);
+    // 读也记账（只记元信息，不记内容——内容回放没意义，路径才有）。
+    if let Err(err) = sink.read(&path, content.len()) {
+        crate::nt_changes::note_journal_failure(&mut result, err);
+    }
+    Ok(result)
 }
 
 fn execute_write(
     config: &NeobotConfig,
     call: &crate::nt_types::ToolCall,
     turn_written: &mut usize,
+    sink: &crate::nt_changes::ChangeSink<'_>,
 ) -> Result<ToolResult, NtBotError> {
     let path = required_path(&call.args)?;
     let Some(content) = call.args.get("content").and_then(|v| v.as_str()) else {
@@ -761,21 +1188,28 @@ fn execute_write(
         });
     }
     let full = join_workspace(&config.workspace_dir, &path)?;
+    // 改动账要在写盘**前**抓「改前」内容 —— 写完就抓不到了。
+    let before = peek_before(&full);
     if let Some(parent) = full.parent() {
         std::fs::create_dir_all(parent)?;
     }
     std::fs::write(&full, content)?;
-    Ok(ToolResult {
+    let mut result = ToolResult {
         ok: true,
         output: format!("wrote {} bytes", content.len()),
         truncated: false,
-    })
+    };
+    if let Err(err) = sink.write(&path, before.as_deref(), content) {
+        crate::nt_changes::note_journal_failure(&mut result, err);
+    }
+    Ok(result)
 }
 
 fn execute_edit(
     config: &NeobotConfig,
     call: &crate::nt_types::ToolCall,
     turn_written: &mut usize,
+    sink: &crate::nt_changes::ChangeSink<'_>,
 ) -> Result<ToolResult, NtBotError> {
     let path = required_path(&call.args)?;
     let (Some(old), Some(new)) = (
@@ -807,12 +1241,17 @@ fn execute_edit(
             ),
         });
     }
-    std::fs::write(&full, updated)?;
-    Ok(ToolResult {
+    std::fs::write(&full, &updated)?;
+    let mut result = ToolResult {
         ok: true,
         output: "edited 1 occurrence".to_owned(),
         truncated: false,
-    })
+    };
+    // 编辑的前后内容手上就有（`content` 即改前、`updated` 即改后），不必再抓。
+    if let Err(err) = sink.edit(&path, &content, &updated) {
+        crate::nt_changes::note_journal_failure(&mut result, err);
+    }
+    Ok(result)
 }
 
 fn required_path(args: &serde_json::Value) -> Result<String, NtBotError> {
@@ -866,6 +1305,15 @@ mod tests {
     use crate::nt_store::NeobotStore;
     use crate::nt_types::{TranscriptItem, TranscriptRole};
 
+    /// 8 字节 PNG 签名（过魔数那一关即可，不必是能解码的整图）。
+    const PNG_HEAD: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+
+    /// 「无人叫停」的令牌：恒为干净的新令牌（`execute_tool` 签名要一个，
+    /// 而这些既有用例验的是别的东西 —— 它们的**断言一个字都不改**）。
+    fn live_stop() -> super::StopToken {
+        super::StopToken::new()
+    }
+
     #[test]
     fn transcript_budget_drops_oldest_tool_rows_first() {
         let mut history = vec![
@@ -874,18 +1322,21 @@ mod tests {
                 content: "keep me".to_owned(),
                 tool_calls: Vec::new(),
                 tool_call_id: None,
+                image: None,
             },
             TranscriptItem {
                 role: TranscriptRole::Tool,
                 content: "x".repeat(300 * 1024),
                 tool_calls: Vec::new(),
                 tool_call_id: Some("old".to_owned()),
+                image: None,
             },
             TranscriptItem {
                 role: TranscriptRole::Assistant,
                 content: "keep me too".to_owned(),
                 tool_calls: Vec::new(),
                 tool_call_id: None,
+                image: None,
             },
         ];
         enforce_transcript_budget(&mut history);
@@ -901,7 +1352,7 @@ mod tests {
         use crate::nt_types::{ToolCall, ToolName};
         // 审计 F2：宿主 secrets 不得递进 bash；白名单 PATH 得留（找得到 wc）。
         std::env::set_var("NEOBOT_TEST_ONLY_SECRET", "s3cr3t-marker");
-        let dir = std::env::temp_dir().join("neobot-bash-test");
+        let dir = crate::nt_testutil::temp_dir("bash-test");
         let _ = std::fs::create_dir_all(dir.join("workspace"));
         let config = NeobotConfig {
             data_dir: dir.clone(),
@@ -924,7 +1375,7 @@ mod tests {
             name: ToolName::Bash,
             args: serde_json::json!({"command": "echo $NEOBOT_TEST_ONLY_SECRET | wc -c"}),
         };
-        let res = execute_bash(&config, &call).expect("run");
+        let res = execute_bash(&config, &call, &live_stop()).expect("run");
         std::env::remove_var("NEOBOT_TEST_ONLY_SECRET");
         assert!(res.ok, "PATH whitelist must keep wc working: {}", res.output);
         assert!(
@@ -936,7 +1387,7 @@ mod tests {
 
     #[test]
     fn turn_write_budget_denies_overrun() {
-        let dir = std::env::temp_dir().join("neobot-budget-test");
+        let dir = crate::nt_testutil::temp_dir("budget-test");
         let _ = std::fs::remove_dir_all(&dir);
         let config = NeobotConfig {
             data_dir: dir.clone(),
@@ -955,6 +1406,14 @@ mod tests {
             },
         };
         config.validate().expect("validate");
+        // 改动账：真存一个内存库，顺带验「预算被拒时不记账」（拒在写盘前，
+        // 盘上没动过就不该有账 —— 记了就是假账）。
+        let store = crate::nt_store::NeobotStore::open(":memory:").expect("store");
+        let sink = crate::nt_changes::ChangeSink {
+            store: &store,
+            task_id: "budget-task",
+            workspace: &config.workspace_dir,
+        };
         // 单次超限拒
         let big = serde_json::json!({"path": "a.txt", "content": "0123456789ABCDEF"});
         let mut turn_written = 0usize;
@@ -962,7 +1421,7 @@ mod tests {
             id: "w1".to_owned(),
             name: crate::nt_types::ToolName::WriteFile,
             args: big,
-        }, &mut turn_written)
+        }, &mut turn_written, &sink)
         .expect_err("single over budget must fail");
         assert!(err.to_string().contains("single-write"), "{err}");
         // 两次小写累计超轮预算拒
@@ -972,16 +1431,23 @@ mod tests {
             name: crate::nt_types::ToolName::WriteFile,
             args: small,
         };
-        super::execute_write(&config, &call, &mut turn_written).expect("first small write");
-        let err = super::execute_write(&config, &call, &mut turn_written)
+        super::execute_write(&config, &call, &mut turn_written, &sink)
+            .expect("first small write");
+        let err = super::execute_write(&config, &call, &mut turn_written, &sink)
             .expect_err("turn over budget must fail");
         assert!(err.to_string().contains("write-budget"), "{err}");
+        // 只有第一次成功写入了盘，才该有一笔账。
+        let tallies = store
+            .tally_task_paths("budget-task")
+            .expect("tally");
+        assert_eq!(tallies.len(), 1, "被拒的两次不该记账：{tallies:?}");
+        assert_eq!(tallies.first().map(|t| t.path.as_str()), Some("b.txt"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn placeholder_convo_auto_titles_from_first_text() {
-        let dir = std::env::temp_dir().join("neobot-autotitle-test");
+        let dir = crate::nt_testutil::temp_dir("autotitle-test");
         let _ = std::fs::remove_dir_all(&dir);
         let config = NeobotConfig {
             data_dir: dir.clone(),
@@ -1042,7 +1508,7 @@ mod tests {
 
     #[test]
     fn echo_run_completes_and_persists() {
-        let dir = std::env::temp_dir().join("neobot-agent-test");
+        let dir = crate::nt_testutil::temp_dir("agent-test");
         let _ = std::fs::remove_dir_all(&dir);
         let config = NeobotConfig {
             data_dir: dir.clone(),
@@ -1112,7 +1578,7 @@ mod tests {
 
     #[test]
     fn exhaustion_becomes_waiting_with_nudge() {
-        let dir = std::env::temp_dir().join("neobot-agent-loop-test");
+        let dir = crate::nt_testutil::temp_dir("agent-loop-test");
         let _ = std::fs::remove_dir_all(&dir);
         let config = NeobotConfig {
             data_dir: dir.clone(),
@@ -1141,5 +1607,729 @@ mod tests {
             3
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 会看图的引擎（`LocalEchoEngine` 不可用，故借一个只覆写 `vision_capable`
+    /// 的壳 —— 它要验证的是「看得见的那条路上图像真的被生产出来」，
+    /// 而不是引擎本身的网络行为）。
+    struct VisionEngine;
+
+    impl crate::nt_engine::EngineAdapter for VisionEngine {
+        fn engine_id(&self) -> &str {
+            "vision-test"
+        }
+
+        fn model_name(&self) -> &str {
+            "test-vl"
+        }
+
+        fn vision_capable(&self) -> bool {
+            true
+        }
+
+        fn probe(&self) -> Result<String, crate::NtBotError> {
+            Ok("vision-test".to_owned())
+        }
+
+        fn run_turn(
+            &self,
+            _prompt: &str,
+            _inbox: &[String],
+        ) -> Result<crate::nt_engine::EngineTurn, crate::NtBotError> {
+            Ok(crate::nt_engine::EngineTurn {
+                assistant_text: String::new(),
+                status: crate::nt_types::TurnStatus::Done,
+                tool_calls: Vec::new(),
+                usage: None,
+                side_effects: Vec::new(),
+            })
+        }
+    }
+
+    /// 每个用例一份**独立**目录：`cargo test` 默认并行跑，同名目录会互相
+    /// `remove_dir_all` —— 上一轮就是被这个坑出来的偶发红灯。
+    fn vision_fixture(tag: &str) -> (std::path::PathBuf, crate::nt_config::NeobotConfig) {
+        let dir = crate::nt_testutil::temp_dir(&format!("neobot-readimage-{}", tag));
+        let _ = std::fs::remove_dir_all(&dir);
+        let workspace = dir.join("workspace");
+        std::fs::create_dir_all(&workspace).expect("mkdir workspace");
+        // 4 字节 PNG 头 + 一点体（够过魔数与 base64 往返，不必是能解码的整图）。
+        let mut png = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+        png.extend_from_slice(&[b'I', b'H', b'D', b'R']);
+        std::fs::write(workspace.join("shot.png"), &png).expect("write png");
+        let config = crate::nt_config::NeobotConfig {
+            data_dir: dir.clone(),
+            workspace_dir: workspace,
+            policy_mode: crate::nt_config::PolicyMode::Enforce,
+            human_has_control: false,
+            max_steps: 4,
+            engine: crate::nt_config::EngineKind::Echo,
+            computer_allow: Vec::new(),
+            computer_hosts: Vec::new(),
+            extra_deny: Vec::new(),
+            write_budget: crate::nt_config::default_write_budget(),
+        };
+        (dir, config)
+    }
+
+    fn read_image_call(path: &str) -> crate::nt_types::ToolCall {
+        crate::nt_types::ToolCall {
+            id: "c-img".to_owned(),
+            name: crate::nt_types::ToolName::ReadImage,
+            args: serde_json::json!({"path": path}),
+        }
+    }
+
+    #[test]
+    fn read_image_fails_honestly_on_a_blind_engine() {
+        let (dir, config) = vision_fixture("blind");
+        // `LocalEchoEngine` 没有模型、也就没有眼睛：必须**报错**，
+        // 绝不返回「已读到 shot.png」这种会让模型开始编画面的成功结果。
+        let err = super::execute_tool(
+            &config,
+            &LocalEchoEngine,
+            &read_image_call("shot.png"),
+            &mut 0usize,
+            &crate::nt_changes::ChangeSink {
+                store: &crate::nt_store::NeobotStore::open(":memory:").expect("store"),
+                task_id: "t",
+                workspace: &config.workspace_dir,
+            },
+            &live_stop(),
+        )
+        .expect_err("blind engine must not pretend to see");
+        let text = err.to_string();
+        assert!(text.contains("no-vision-engine"), "{text}");
+        assert!(text.contains("echo"), "{text}"); // 点名是哪个引擎
+        assert!(text.contains("NEOBOT_VISION"), "{text}"); // 给可操作的出路
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn read_image_produces_a_real_part_not_a_base64_wall() {
+        let (dir, config) = vision_fixture("part");
+        let outcome = super::execute_tool(
+            &config,
+            &VisionEngine,
+            &read_image_call("shot.png"),
+            &mut 0usize,
+            &crate::nt_changes::ChangeSink {
+                store: &crate::nt_store::NeobotStore::open(":memory:").expect("store"),
+                task_id: "t",
+                workspace: &config.workspace_dir,
+            },
+            &live_stop(),
+        )
+        .expect("vision engine must see the image");
+        assert!(outcome.result.ok);
+        let image = outcome.image.expect("must carry the image part");
+        assert_eq!(image.media_type, "image/png");
+        assert_eq!(
+            image.base64,
+            crate::nt_vision::base64_encode(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, b'I', b'H', b'D', b'R'])
+        );
+        // 文本那行是**说明**不是载荷：base64 不许漏进 content。
+        assert!(!outcome.result.output.contains(&image.base64));
+        assert!(outcome.result.output.contains("image/png"), "{}", outcome.result.output);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn read_image_jail_and_type_refusals_reach_the_model() {
+        let (dir, config) = vision_fixture("jail");
+        let store = crate::nt_store::NeobotStore::open(":memory:").expect("store");
+        let sink = crate::nt_changes::ChangeSink {
+            store: &store,
+            task_id: "t",
+            workspace: &config.workspace_dir,
+        };
+        // 越狱：与 read_file 同一道 jail。
+        let err = super::execute_tool(
+            &config,
+            &VisionEngine,
+            &read_image_call("../escape.png"),
+            &mut 0usize,
+            &sink,
+            &live_stop(),
+        )
+        .expect_err("escape must fail");
+        assert!(err.to_string().contains("workspace-jail"), "{err}");
+        // 缺参：不装懂。（空串另算 —— `required_path` 只管键在不在，
+        // 空串交给下一道 jail 拒，报的是「越狱」而不是「缺参」，同样诚实。）
+        let err = super::execute_tool(
+            &config,
+            &VisionEngine,
+            &crate::nt_types::ToolCall {
+                id: "c-noargs".to_owned(),
+                name: crate::nt_types::ToolName::ReadImage,
+                args: serde_json::json!({}),
+            },
+            &mut 0usize,
+            &sink,
+            &live_stop(),
+        )
+        .expect_err("missing path must fail");
+        assert!(err.to_string().contains("requires {path}"), "{err}");
+        let err = super::execute_tool(
+            &config,
+            &VisionEngine,
+            &read_image_call(""),
+            &mut 0usize,
+            &sink,
+            &live_stop(),
+        )
+        .expect_err("empty path must fail");
+        assert!(err.to_string().contains("workspace-jail"), "{err}");
+        // 名不副实：zip 装的 .png 必须被拆穿，且图像**字段为空**
+        // （宁可不发，也不能发一个错 media_type 的部件）。
+        std::fs::write(
+            config.workspace_dir.join("fake.png"),
+            b"PK\x03\x04not an image",
+        )
+        .expect("write fake");
+        let err = super::execute_tool(
+            &config,
+            &VisionEngine,
+            &read_image_call("fake.png"),
+            &mut 0usize,
+            &sink,
+            &live_stop(),
+        )
+        .expect_err("zip is not an image");
+        assert!(err.to_string().contains("zip archive"), "{err}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// **已知缺口（不在本文件修）**：入站 IM 附件落在 `<data_dir>/attachments`，
+    /// 而 jail 只认 workspace（默认 `<data_dir>/workspace`，两者是**兄弟目录**）；
+    /// `nt_channel_dispatch::download_attachments` 又把**绝对路径**写进给模型的那
+    /// 行说明里。绝对路径在两道 jail 上都会被拒，所以 `read_file` 与 `read_image`
+    /// 目前都读不到入站附件。本测试把这个观察钉住，免得它被当成「读图功能坏了」，
+    /// 而实际上是附件落盘位置与 jail 范围没对齐（改动点在别人的文件里）。
+    #[test]
+    fn inbound_attachment_path_is_outside_the_workspace_jail() {
+        let dir = crate::nt_testutil::temp_dir("attachment-jail-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        // 模拟 `download_attachments` 的落点：data_dir/attachments（与 workspace 同级）。
+        let attachments = dir.join("attachments");
+        std::fs::create_dir_all(&attachments).expect("mkdir attachments");
+        std::fs::write(attachments.join("shot.png"), &PNG_HEAD).expect("write png");
+        let config = crate::nt_config::NeobotConfig {
+            data_dir: dir.clone(),
+            workspace_dir: dir.join("workspace"),
+            policy_mode: crate::nt_config::PolicyMode::Enforce,
+            human_has_control: false,
+            max_steps: 4,
+            engine: crate::nt_config::EngineKind::Echo,
+            computer_allow: Vec::new(),
+            computer_hosts: Vec::new(),
+            extra_deny: Vec::new(),
+            write_budget: crate::nt_config::default_write_budget(),
+        };
+        let absolute = attachments.join("shot.png").to_string_lossy().into_owned();
+        // 网关层：绝对路径直接判越狱（工具根本不执行）。
+        let mut ctx = crate::nt_policy::PolicyContext {
+            tool: crate::nt_types::ToolName::ReadImage,
+            actor: crate::nt_policy::Actor::Bot,
+            human_has_control: false,
+            file_path: Some(absolute.clone()),
+            command: None,
+            computer_action: None,
+            computer_target: None,
+            computer_allow: Vec::new(),
+            computer_hosts: Vec::new(),
+        };
+        assert!(matches!(
+            crate::nt_policy::evaluate_policy(&ctx),
+            crate::nt_policy::PolicyDecision::Deny { .. }
+        ));
+        // 执行层：即便绕过网关，`join_workspace` 也拒。
+        assert!(super::join_workspace(&config.workspace_dir, &absolute).is_err());
+        ctx.file_path = None;
+        let _ = ctx;
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn transcript_budget_counts_image_bytes() {
+        // 图像不走 `content`，若预算只按 content 计账，一轮十张图就是 50MiB+
+        // 的请求体而账面显示「几乎没占」。
+        let mut history = vec![
+            TranscriptItem {
+                role: TranscriptRole::User,
+                content: "what is in this picture?".to_owned(),
+                tool_calls: Vec::new(),
+                tool_call_id: None,
+                image: None,
+            },
+            TranscriptItem {
+                role: TranscriptRole::Tool,
+                content: "attached 1 image as a multimodal part".to_owned(),
+                tool_calls: Vec::new(),
+                tool_call_id: Some("c1".to_owned()),
+                image: Some(crate::nt_types::ImagePart {
+                    media_type: "image/png".to_owned(),
+                    base64: "A".repeat(400 * 1024),
+                }),
+            },
+        ];
+        assert_eq!(
+            super::transcript_weight(&history[1]),
+            history[1].content.len() + 400 * 1024
+        );
+        enforce_transcript_budget(&mut history);
+        // 400KiB 的图像 Tool 行被丢，用户原文保留。
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].role, TranscriptRole::User);
+    }
+
+    // ---- 切片 C0（租约续租）/ C1（取消钩子）的验收 ----
+    //
+    // 前提（已核对代码）：跑轮**同步阻塞**，所以今天**没有任何执行流**能
+    // 置位这些令牌 —— 本模块全部用例都是「在引擎/回调里代置位」。这正是
+    // 它们能独立存在的原因：`channel serve` 的行为一个字都没变。
+
+    /// 每跳都回 N 条 bash/web_search 调用且 `Continue` 的引擎；记被叫了几次。
+    ///
+    /// 为什么不用 `LoopForever`：它每跳只回一条 `echo x`，而 C2（工具边界）
+    /// 要验「同一跳内第二个工具没被执行」，得有一跳多调用的引擎。
+    struct ToolFarm {
+        calls: std::sync::Mutex<usize>,
+        tools_per_hop: usize,
+        command: &'static str,
+    }
+
+    impl ToolFarm {
+        fn new(tools_per_hop: usize) -> Self {
+            Self {
+                calls: std::sync::Mutex::new(0),
+                tools_per_hop,
+                command: "echo x",
+            }
+        }
+
+        fn with_command(mut self, command: &'static str) -> Self {
+            self.command = command;
+            self
+        }
+
+        fn calls(&self) -> usize {
+            self.calls.lock().map(|n| *n).unwrap_or(0)
+        }
+    }
+
+    impl crate::nt_engine::EngineAdapter for ToolFarm {
+        fn engine_id(&self) -> &str {
+            "tool-farm"
+        }
+
+        fn probe(&self) -> Result<String, crate::NtBotError> {
+            Ok("tool-farm".to_owned())
+        }
+
+        fn run_turn(
+            &self,
+            _prompt: &str,
+            _inbox: &[String],
+        ) -> Result<crate::nt_engine::EngineTurn, crate::NtBotError> {
+            if let Ok(mut calls) = self.calls.lock() {
+                *calls += 1;
+            }
+            let tools = (0..self.tools_per_hop)
+                .map(|i| crate::nt_types::ToolCall {
+                    id: format!("c{i}"),
+                    // 第二个工具换个名字：断言「它没有 allow 审计行」时
+                    // 才不会与第一个工具的审计行混淆。
+                    name: if i == 0 {
+                        crate::nt_types::ToolName::Bash
+                    } else {
+                        crate::nt_types::ToolName::WebSearch
+                    },
+                    args: serde_json::json!({"command": self.command, "query": "x"}),
+                })
+                .collect();
+            Ok(crate::nt_engine::EngineTurn {
+                assistant_text: String::new(),
+                status: crate::nt_types::TurnStatus::Continue,
+                tool_calls: tools,
+                usage: None,
+                side_effects: Vec::new(),
+            })
+        }
+    }
+
+    fn cancel_fixture(tag: &str, max_steps: u8) -> (std::path::PathBuf, NeobotConfig) {
+        let dir = crate::nt_testutil::temp_dir(&format!("neobot-cancel-{}", tag));
+        let _ = std::fs::remove_dir_all(&dir);
+        let workspace = dir.join("workspace");
+        std::fs::create_dir_all(&workspace).expect("mkdir workspace");
+        let config = NeobotConfig {
+            data_dir: dir.clone(),
+            workspace_dir: workspace,
+            policy_mode: crate::nt_config::PolicyMode::Enforce,
+            human_has_control: false,
+            max_steps,
+            engine: crate::nt_config::EngineKind::Echo,
+            computer_allow: Vec::new(),
+            computer_hosts: Vec::new(),
+            extra_deny: Vec::new(),
+            write_budget: crate::nt_config::default_write_budget(),
+        };
+        config.validate().expect("validate");
+        (dir, config)
+    }
+
+    fn farm_ctx<'a>(
+        store: &'a NeobotStore,
+        config: &'a NeobotConfig,
+        engine: &'a dyn crate::nt_engine::EngineAdapter,
+    ) -> super::RunContext<'a> {
+        super::RunContext {
+            store,
+            config,
+            engine,
+            actor: crate::nt_policy::Actor::Bot,
+            actor_name: "bot",
+            title: "cancel-test",
+            user_text: "go",
+            convo_id: None,
+        }
+    }
+
+    /// C1（hop 边界）+ C4（中止落库）。
+    ///
+    /// 钉四件事：① 叫停后**不再发起新的一次模型调用**（引擎只被叫 1 次）；
+    /// ② task 行是 `cancelled` 且**租约已清**（不清就十分钟内没人碰它）；
+    /// ③ `error` 说得出**第几跳**（信息不许丢）；④ 被取消的那一跳
+    /// **一条 steps 行都不写**（没发生的事不记账）。
+    #[test]
+    fn cancel_stops_before_next_hop_and_says_which_hop() {
+        let (dir, config) = cancel_fixture("hops", 3);
+        let store = NeobotStore::open(":memory:").expect("open");
+        let engine = ToolFarm::new(1);
+        let token = super::StopToken::new();
+        let ctx = farm_ctx(&store, &config, &engine);
+        // 第一个工具跑完就置位（今天没人能置位 —— 这里代置）。
+        let mut after_first = |_tool: &str, _ok: bool, _out: &str| token.cancel();
+        let status = super::run_local_turn_cancellable(&ctx, None, Some(&mut after_first), Some(&token))
+            .expect("run");
+        assert_eq!(status, crate::nt_types::TurnStatus::Waiting);
+        assert_eq!(engine.calls(), 1, "叫停后不许再发起第 2 次模型调用");
+        let task = store.list_tasks(1).expect("list").remove(0);
+        assert_eq!(task.status, crate::nt_types::TaskStatus::Cancelled);
+        assert!(task.lease_id.is_none(), "取消必须清租约钥匙");
+        assert!(task.lease_until.is_none(), "不清则十分钟内没人碰它");
+        let error = task.error.clone().unwrap_or_default();
+        assert!(error.contains("stopped by user"), "{error}");
+        assert!(error.contains("at hop 1/3"), "要能说清第几跳：{error}");
+        // hop 0 的一条 bash + 没有别的（被取消的 hop 1 不写 steps）。
+        assert_eq!(
+            store.list_step_tools(&task.id).expect("steps"),
+            vec!["bash".to_owned()],
+            "被取消的跳不许留下 steps 行"
+        );
+        // 用户有正规重跑出口（`retry_task` 收 cancelled）。
+        store.retry_task(&task.id).expect("retry");
+        assert_eq!(
+            store.get_task(&task.id).expect("get").expect("row").status,
+            crate::nt_types::TaskStatus::Pending
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// C2（工具边界）：**不留悬空 + 不造假账**。
+    ///
+    /// 三条断言合起来才有效：审计里有 `deny` + `rule='cancelled'`（如实记
+    /// 「用户叫停」而不是「网关拒绝」）；被跳过的那个工具**没有** allow
+    /// 审计行（不许有一条声称判过、实际没做的记录）；有一条
+    /// `cancelled:tool_calls` 的 steps 行且 `ok=0`，清单里点名它。
+    #[test]
+    fn cancel_at_tool_boundary_denies_the_rest_of_the_hop() {
+        let (dir, config) = cancel_fixture("tooledge", 3);
+        let store = NeobotStore::open(":memory:").expect("open");
+        let engine = ToolFarm::new(2);
+        let token = super::StopToken::new();
+        let ctx = farm_ctx(&store, &config, &engine);
+        let mut after_first = |_tool: &str, _ok: bool, _out: &str| token.cancel();
+        let status = super::run_local_turn_cancellable(&ctx, None, Some(&mut after_first), Some(&token))
+            .expect("run");
+        assert_eq!(status, crate::nt_types::TurnStatus::Waiting);
+        let task = store.list_tasks(1).expect("list").remove(0);
+        assert_eq!(task.status, crate::nt_types::TaskStatus::Cancelled);
+        // 拦在 hop 0 的第二个工具之前 ⇒ 第 0 跳。
+        assert!(
+            task.error.clone().unwrap_or_default().contains("at hop 0/3"),
+            "{:?}",
+            task.error
+        );
+        let audits = store.list_audit(50).expect("audits");
+        let cancel_row = audits
+            .iter()
+            .find(|event| event.rule.as_deref() == Some(super::CANCELLED_RULE))
+            .expect("必须有 rule=cancelled 的审计行");
+        assert_eq!(cancel_row.decision, crate::nt_audit::AuditDecision::Deny);
+        assert_eq!(cancel_row.tool, "tool_calls");
+        assert!(
+            !audits
+                .iter()
+                .any(|event| event.tool == "web_search"
+                    && event.decision == crate::nt_audit::AuditDecision::Allow),
+            "被跳过的工具不许有 allow 审计行（那是假账）"
+        );
+        // 汇总 steps 行：`ok=0` + 点名未执行的那一个。
+        let marker = store
+            .last_step(&task.id, super::CANCELLED_TOOL_STEPS)
+            .expect("last")
+            .expect("cancelled 汇总行必须存在");
+        assert!(!marker.ok, "ok 必须是 0");
+        assert!(marker.output.contains("web_search"), "{}", marker.output);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// C0（清旗在**入口**而不是「用完」）：同一枚令牌连跑两轮，
+    /// 第一轮被停、第二轮必须**正常跑完**。
+    ///
+    /// 若把清旗写成「用完清」，第二轮进来时旗还立着 → 第二轮一进 hop
+    /// 循环就被自己上一轮的停止意图杀掉。
+    #[test]
+    fn stop_flag_is_cleared_at_turn_entry() {
+        let (dir, config) = cancel_fixture("entry", 3);
+        let store = NeobotStore::open(":memory:").expect("open");
+        let engine = ToolFarm::new(1);
+        let token = super::StopToken::new();
+        let ctx = farm_ctx(&store, &config, &engine);
+        let mut cancel_once = |_tool: &str, _ok: bool, _out: &str| token.cancel();
+        super::run_local_turn_cancellable(&ctx, None, Some(&mut cancel_once), Some(&token))
+            .expect("first run");
+        assert!(token.is_cancelled(), "第一轮结束时旗确实是立着的");
+        let calls_after_first = engine.calls();
+        // 第二轮：同一枚令牌，不给任何回调 ⇒ C0 必须先把旗清掉。
+        let status = super::run_local_turn_cancellable(&ctx, None, None, Some(&token)).expect("second run");
+        assert_eq!(status, crate::nt_types::TurnStatus::Waiting, "第二轮不该被误杀");
+        assert_eq!(engine.calls() - calls_after_first, 3, "第二轮应跑满 3 跳");
+        let tasks = store.list_tasks(5).expect("list");
+        let newest = tasks.iter().find(|t| t.status != crate::nt_types::TaskStatus::Cancelled);
+        assert!(
+            newest.is_some(),
+            "第二轮必须留下一个非 cancelled 的行（它跑完了）"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 取消**不跨会话**：A 的令牌置位，B 那一轮照跑。
+    ///
+    /// 今天之所以成立，是因为令牌是**每次调用现传**的（登记表演到切片 C2
+    /// 才出现）。这条钉住的是那个设计的边界：登记表按 `convo_id` 键，
+    /// 值是每轮专属的那枚令牌。
+    #[test]
+    fn cancel_does_not_cross_conversations() {
+        let (dir, config) = cancel_fixture("cross", 2);
+        let store = NeobotStore::open(":memory:").expect("open");
+        let engine = ToolFarm::new(1);
+        let token_a = super::StopToken::new();
+        let token_b = super::StopToken::new();
+        let ctx = farm_ctx(&store, &config, &engine);
+        let mut cancel_a = |_tool: &str, _ok: bool, _out: &str| token_a.cancel();
+        super::run_local_turn_cancellable(&ctx, None, Some(&mut cancel_a), Some(&token_a))
+            .expect("A run");
+        // B：另一枚令牌，且入轮照 C0 清旗（它是干净的）。
+        let status =
+            super::run_local_turn_cancellable(&ctx, None, None, Some(&token_b)).expect("B run");
+        assert_eq!(status, crate::nt_types::TurnStatus::Waiting);
+        let tasks = store.list_tasks(5).expect("list");
+        assert_eq!(tasks.len(), 2);
+        assert_eq!(
+            tasks
+                .iter()
+                .filter(|t| t.status == crate::nt_types::TaskStatus::Cancelled)
+                .count(),
+            1,
+            "只有 A 那一轮该是 cancelled"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// C3：已经起了的 bash 子进程被杀掉，**亚秒级**返回且 `ok=false`。
+    ///
+    /// 两段都必要：只测「预先置位」钉不住「检查在轮询**循环里**」——
+    /// 那样一个只在循环前问一次的实现也能过。
+    #[test]
+    fn bash_child_is_killed_within_one_poll_interval() {
+        let (dir, config) = cancel_fixture("bashkill", 3);
+        let call = crate::nt_types::ToolCall {
+            id: "c1".to_owned(),
+            name: crate::nt_types::ToolName::Bash,
+            args: serde_json::json!({"command": "sleep 30"}),
+        };
+        // (a) 预先置位：第一个轮询臂就该杀（远小于 30s 的 sleep / 60s 超时）。
+        let token = super::StopToken::new();
+        token.cancel();
+        let started = std::time::Instant::now();
+        let res = super::execute_bash(&config, &call, &token).expect("run");
+        let elapsed = started.elapsed();
+        assert!(!res.ok, "被叫停的工具不许报成功");
+        assert!(res.output.contains("stopped by user"), "{}", res.output);
+        assert!(
+            elapsed < std::time::Duration::from_secs(1),
+            "预先置位就该在一个轮询间隔内回来，实耗 {elapsed:?}"
+        );
+        // (b) 在飞途中置位：证明检查在循环里（0.1s 取消 ⇒ 亚秒级回来）。
+        let token = super::StopToken::new();
+        let signal = token.clone();
+        let handle = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            signal.cancel();
+        });
+        let started = std::time::Instant::now();
+        let res = super::execute_bash(&config, &call, &token).expect("run");
+        let elapsed = started.elapsed();
+        let _joined: Option<()> = handle.join().ok();
+        assert!(!res.ok);
+        assert!(
+            elapsed < std::time::Duration::from_secs(2),
+            "在飞途中被叫停必须亚秒级回来（50ms 轮询），实耗 {elapsed:?}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// C0 续租：每跳之后 `lease_until` 被推后（**滚动**窗口，不是累加）。
+    ///
+    /// 用 `sleep 0.05` 的 bash 是为了把两跳之间拉开 ≥100ms —— 否则
+    /// 「续租后与续租前的字符串」可能落在同一个时钟刻度上，断言会偶发。
+    #[test]
+    fn lease_is_renewed_across_hops() {
+        let (dir, config) = cancel_fixture("renew", 3);
+        let store = NeobotStore::open(":memory:").expect("open");
+        let engine = ToolFarm::new(1).with_command("sleep 0.05");
+        let seen: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+        let ctx = farm_ctx(&store, &config, &engine);
+        let mut probe = |_tool: &str, _ok: bool, _out: &str| {
+            if let Ok(mut rows) = store.list_tasks(1) {
+                if let Some(lease_until) = rows.remove(0).lease_until {
+                    if let Ok(mut log) = seen.lock() {
+                        log.push(lease_until);
+                    }
+                }
+            }
+        };
+        let heartbeat = super::LeaseHeartbeat::tuned(std::time::Duration::ZERO, 32);
+        super::run_local_turn_inner(&ctx, None, Some(&mut probe), None, heartbeat).expect("run");
+        let log = seen.lock().map(|log| log.clone()).unwrap_or_default();
+        assert!(log.len() >= 2, "至少要看到两跳的租约：{log:?}");
+        assert!(
+            log[1] > log[0],
+            "hop 1 看到的 lease_until 必须比 hop 0 更靠后（已续租）：{log:?}"
+        );
+        // 滚动窗口：续租后仍只有一个 LEASE_SECS 宽，不是逐跳累加。
+        let first = chrono::DateTime::parse_from_rfc3339(&log[0]).expect("rfc3339");
+        let second = chrono::DateTime::parse_from_rfc3339(&log[1]).expect("rfc3339");
+        let width = (second - first).num_seconds();
+        assert!(
+            (0..=(super::LEASE_SECS as i64)).contains(&width),
+            "续租是滚动窗口（≤ LEASE_SECS），不是累加，实测 {width}s"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// C0 续租的**上限**：到顶就停手，让租约自然过期。
+    ///
+    /// 「异常长寿的单轮」不该永远续命 —— 到顶后 `due()` 恒假，后面的跳
+    /// 一行库都不写（`lease_until` 不再变化即为证据）。
+    #[test]
+    fn lease_renewal_stops_at_the_cap() {
+        let (dir, config) = cancel_fixture("cap", 3);
+        let store = NeobotStore::open(":memory:").expect("open");
+        let engine = ToolFarm::new(1).with_command("sleep 0.05");
+        let seen: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+        let ctx = farm_ctx(&store, &config, &engine);
+        let mut probe = |_tool: &str, _ok: bool, _out: &str| {
+            if let Ok(mut rows) = store.list_tasks(1) {
+                if let Some(lease_until) = rows.remove(0).lease_until {
+                    if let Ok(mut log) = seen.lock() {
+                        log.push(lease_until);
+                    }
+                }
+            }
+        };
+        // cap=1 ⇒ 只有第 0 跳之后续那一次。
+        let heartbeat = super::LeaseHeartbeat::tuned(std::time::Duration::ZERO, 1);
+        super::run_local_turn_inner(&ctx, None, Some(&mut probe), None, heartbeat).expect("run");
+        let log = seen.lock().map(|log| log.clone()).unwrap_or_default();
+        assert_eq!(log.len(), 3, "三跳都该看到租约：{log:?}");
+        assert!(log[1] > log[0], "第一次续租必须发生：{log:?}");
+        assert_eq!(log[2], log[1], "到上限后不许再续（有界）：{log:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 退避闸本身：刚续过就不该立刻又续（否则快 hop 会把库写穿）。
+    #[test]
+    fn lease_heartbeat_backs_off_after_a_renewal() {
+        let mut heartbeat =
+            super::LeaseHeartbeat::tuned(std::time::Duration::from_secs(60), 4);
+        assert!(heartbeat.due(), "第一跳就该续（还没有上一次）");
+        heartbeat.note();
+        assert!(!heartbeat.due(), "刚续过 → 退避期内不再续");
+        // 次数上限同样封住闸。
+        let mut capped = super::LeaseHeartbeat::tuned(std::time::Duration::ZERO, 2);
+        assert!(capped.due());
+        capped.note();
+        assert!(capped.due());
+        capped.note();
+        assert!(!capped.due(), "到上限 ⇒ 恒不再续");
+        capped.note();
+        assert!(!capped.due());
+    }
+
+    /// **反向测试（切片 C1 最重要的护栏）**：取消信号与落库接通之后，
+    /// `/stop` 的回执**仍然不许**说「已停」。
+    ///
+    /// 理由：真正能被用户触发的路径要到切片 C2（`on_inbound` 切分）才有
+    /// 第二个执行流去置位。此刻若谁顺手把回执改成「已停」，用户就会以为
+    /// 停掉了而那一轮照跑照写 —— 比说「停不了」更危险。
+    ///
+    /// 切片 C3 真正接线时，**必须同一个提交里反向这条测试**（连同回执
+    /// 一起改），否则它会红 —— 那正是它该做的事。
+    #[test]
+    fn stop_receipt_still_admits_the_limitation() {
+        let store = NeobotStore::open(":memory:").expect("open");
+        let bot = crate::nt_store::BotRow {
+            channel: "tg".to_owned(),
+            bot_id: "1".to_owned(),
+            alias: String::new(),
+            token_env: "NEOBOT_T".to_owned(),
+            conversation_id: None,
+            model: String::new(),
+            allow_list: String::new(),
+            created_at: String::new(),
+            last_seen: None,
+        };
+        let got = crate::nt_channel_cmd::execute(
+            &store,
+            &crate::nt_channel_cmd::Command::Stop,
+            &bot,
+            "TG",
+        )
+        .expect("exec");
+        // 标志仍置位（将来并发调度时这条命令已经在）。
+        assert!(got.stop_requested);
+        // 必须说清为什么停不了。
+        assert!(got.reply.contains("停不了"), "{}", got.reply);
+        assert!(got.reply.contains("同步"), "{}", got.reply);
+        // **不许**出现任何「已经停下来了」的断言词。
+        for claim in ["已请求停止", "已停", "已中止", "已终止", "停止成功"] {
+            assert!(
+                !got.reply.contains(claim),
+                "取消尚未接线（C2/C3 之前），回执不能声称已停（命中 {claim:?}）：{}",
+                got.reply
+            );
+        }
+        // `/help` 同理：它也在教用户用 `/stop`。
+        let help = crate::nt_channel_cmd::help_text("TG");
+        for claim in ["已停", "已终止", "停止成功"] {
+            assert!(
+                !help.contains(claim),
+                "help 也不能承诺一个此刻停不下来的动作（命中 {claim:?}）：{help}"
+            );
+        }
     }
 }

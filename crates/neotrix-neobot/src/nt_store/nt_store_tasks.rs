@@ -13,6 +13,19 @@ fn rfc3339_minus_secs(now: &str, secs: i64) -> String {
     (parsed - chrono::Duration::seconds(secs.max(0))).to_rfc3339()
 }
 
+/// `steps` 里某一步的取值（[`NeobotStore::last_step`] 返回）。
+///
+/// 早先是 `Option<(bool, String)>` —— 位置性返回，调用方只能靠 `marker.0` /
+/// `marker.1` 猜哪个是 `ok`、哪个是 `output`；而 SQL 里的 `tool` 是**查询条件**
+/// （形参），**不在返回值里**，极易被误当成第二个字段的名字。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LastStep {
+    /// `steps.ok`：这一步**本身**成功没有。
+    pub ok: bool,
+    /// `steps.output`：输出正文。
+    pub output: String,
+}
+
 impl NeobotStore {
     // ---- tasks (durable TaskWorker 简化: insert + status CAS) ----
 
@@ -119,6 +132,56 @@ impl NeobotStore {
             return Err(NtBotError::Store(format!("no such task '{id}'")));
         }
         Ok(())
+    }
+
+    /// 某任务**最后一条**指定工具的 step 行（`(ok, output)`，按写入序）。
+    ///
+    /// 与 `nt_store_reply_tag::last_step_output` 互补：那个只取 `output`
+    /// （给侧聊继承摘要），这个把 `ok` 一起带出来 —— 取消落库要能自证
+    /// 「那行 `cancelled:tool_calls` 的 `ok` 是 0」，不能只凭工具名猜。
+    /// 没有匹配行即 `None`。
+    pub fn last_step(&self, task_id: &str, tool: &str) -> Result<Option<LastStep>, NtBotError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT ok, output FROM steps WHERE task_id=?1 AND tool=?2 ORDER BY id DESC LIMIT 1",
+                params![task_id, tool],
+                |r| {
+                    Ok(LastStep {
+                        ok: r.get::<_, i64>(0)? != 0,
+                        output: r.get::<_, String>(1)?,
+                    })
+                },
+            )
+            .ok())
+    }
+
+    /// 续租：把 `lease_until` 推后，**仅限仍持有这把钥匙的那一轮**。
+    ///
+    /// 两个条件缺一不可（`lease_id` 相等 **且** 仍 `running`）：
+    /// - 少了 `lease_id` 相等 → 一台慢机器上的僵尸跑轮能把**别人已经接管**
+    ///   的行改回自己手里（抢别人正在写的行 = 数据损坏）。
+    /// - 少了 `status='running'` → 已经落终态的行会被心跳重新拉回「活着」。
+    ///
+    /// 返回受影响行数：`0` = **不再持有**（已被 `recover_stale_running`
+    /// 回收或被他人接管）。调用方据此**不再重试** —— 拿不回钥匙就不该
+    /// 假装还拿着。
+    ///
+    /// `lease_until` 由调用方按**滚动窗口**给（`now + LEASE_SECS`），不是
+    /// 在旧值上累加。这一点是回收保证的全部：进程一死，最坏仍只挂一个
+    /// `LEASE_SECS`，绝不会因为续过 N 次而挂 N 倍。
+    pub fn renew_lease(
+        &self,
+        id: &str,
+        lease_id: &str,
+        lease_until: &str,
+    ) -> Result<usize, NtBotError> {
+        let n = self.conn.execute(
+            "UPDATE tasks SET lease_until=?1, updated_at=?1
+             WHERE id=?2 AND lease_id=?3 AND status='running'",
+            params![lease_until, id, lease_id],
+        )?;
+        Ok(n)
     }
 
     /// 取消运行中/排队任务（仅 pending/running 可取消，顺带清租约）。
@@ -372,4 +435,106 @@ mod tests {
         assert!(got.claimed_by.is_none());
     }
 
+    /// 续租的**有界**与**归属**两律。
+    ///
+    /// 钉三件事：① 只有持钥匙者能续；② 窗口是**滚动**的（不是累加，
+    /// 否则续 N 次就把崩溃恢复窗口放大成 N 倍）；③ 落终态后不许被
+    /// 心跳拉回「活着」。
+    #[test]
+    fn lease_renewal_is_bounded_and_owner_only() {
+        let store = NeobotStore::open(":memory:").expect("open memory db");
+        let task = AgentTask {
+            id: "r1".to_owned(),
+            title: "r".to_owned(),
+            status: TaskStatus::Running,
+            created_at: "2026-09-24T00:00:00Z".to_owned(),
+            updated_at: "2026-09-24T00:00:00Z".to_owned(),
+            claimed_by: None,
+            claimed_at: None,
+            visibility: crate::nt_types::default_visibility(),
+            lease_id: Some("lease-a".to_owned()),
+            lease_until: Some("2026-09-24T00:10:00Z".to_owned()),
+            attempts: 1,
+            error: None,
+            conversation_id: None,
+        };
+        store.save_task(&task).expect("save");
+        // 别人的钥匙续不动（0 行 = 不再持有）。
+        assert_eq!(
+            store
+                .renew_lease("r1", "lease-b", "2026-09-24T00:20:00Z")
+                .expect("renew"),
+            0
+        );
+        // 自己的钥匙能续，且窗口由调用方给（滚动：now + LEASE_SECS）。
+        assert_eq!(
+            store
+                .renew_lease("r1", "lease-a", "2026-09-24T00:20:00Z")
+                .expect("renew"),
+            1
+        );
+        let got = store.get_task("r1").expect("get").expect("exists");
+        assert_eq!(got.lease_until.as_deref(), Some("2026-09-24T00:20:00Z"));
+        assert_eq!(got.lease_id.as_deref(), Some("lease-a"), "钥匙不许被换掉");
+        // 续租**不改**状态：它只管「还活着吗」，不管「活成什么样」。
+        assert_eq!(got.status, TaskStatus::Running);
+        // 落终态后心跳失效：否则已完成的轮次会被拉回 running。
+        let done = AgentTask {
+            status: TaskStatus::Done,
+            lease_until: Some("2026-09-24T00:30:00Z".to_owned()),
+            ..task.clone()
+        };
+        store.save_task(&done).expect("save done");
+        assert_eq!(
+            store
+                .renew_lease("r1", "lease-a", "2026-09-24T00:40:00Z")
+                .expect("renew"),
+            0
+        );
+        // 续租过的行仍可被租约回收（进程不再持有 → 窗口一过就回收）。
+        let running = AgentTask {
+            status: TaskStatus::Running,
+            ..task
+        };
+        store.save_task(&running).expect("save running");
+        assert_eq!(
+            store
+                .renew_lease("r1", "lease-a", "2026-09-24T00:50:00Z")
+                .expect("renew"),
+            1
+        );
+        assert_eq!(
+            store
+                .recover_stale_running("2026-09-24T00:45:00Z")
+                .expect("recover"),
+            0,
+            "窗口未到不该动"
+        );
+        assert_eq!(
+            store
+                .recover_stale_running("2026-09-24T01:05:00Z")
+                .expect("recover"),
+            1,
+            "进程不再持有 → 窗口一过就回收，不泄漏行"
+        );
+    }
+
+    /// `last_step` 把 `ok` 一起带出来（取消落库要自证 `ok=0`）。
+    #[test]
+    fn last_step_reports_the_ok_flag() {
+        let store = NeobotStore::open(":memory:").expect("open memory db");
+        store
+            .add_step("t1", 0, "cancelled:tool_calls", false, "web_search")
+            .expect("step");
+        let got = store
+            .last_step("t1", "cancelled:tool_calls")
+            .expect("last")
+            .expect("row exists");
+        assert!(!got.ok, "取消汇总行的 ok 必须是 0");
+        assert_eq!(got.output, "web_search");
+        assert!(
+            store.last_step("t1", "nope").expect("last").is_none(),
+            "无匹配行即 None，不编"
+        );
+    }
 }

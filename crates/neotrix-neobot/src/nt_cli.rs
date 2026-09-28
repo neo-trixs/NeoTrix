@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn result_file_roundtrip_and_failed_write_marker() {
-        let dir = std::env::temp_dir().join("neobot-cli-result-test");
+        let dir = crate::nt_testutil::temp_dir("cli-result-test");
         let _ = std::fs::create_dir_all(&dir);
         let path = dir.join("effects.jsonl");
         let _ = std::fs::remove_file(&path);

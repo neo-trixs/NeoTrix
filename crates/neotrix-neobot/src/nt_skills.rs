@@ -196,7 +196,7 @@ mod tests {
     use super::{install_skill, read_skill, scan_skills, skills_context_line};
 
     fn tmp_root(case: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("neobot-skill-test-{case}"));
+        let dir = crate::nt_testutil::temp_dir(&format!("neobot-skill-test-{}", case));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("mkdir");
         dir

@@ -193,8 +193,8 @@ mod tests {
     #[test]
     fn rejects_bad_max_steps() {
         let mut cfg = NeobotConfig {
-            data_dir: std::env::temp_dir().join("neobot-test-bad"),
-            workspace_dir: std::env::temp_dir().join("neobot-test-bad-ws"),
+            data_dir: crate::nt_testutil::temp_dir("test-bad"),
+            workspace_dir: crate::nt_testutil::temp_dir("test-bad-ws"),
             policy_mode: super::PolicyMode::Enforce,
             human_has_control: false,
             max_steps: 0,

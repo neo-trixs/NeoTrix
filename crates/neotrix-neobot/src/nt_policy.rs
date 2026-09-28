@@ -109,13 +109,23 @@ pub fn evaluate_policy(ctx: &PolicyContext) -> PolicyDecision {    // 1) 人接�
         return PolicyDecision::Allow;
     }
     // 5) 纯协议工具默认放行; 未知工具永拒 (fail-closed, 原名进审计).
+    //
+    // `SidebarOpen` 放行是**安全**的：它不在 Rust 侧动任何世界状态，只把
+    // 「打开 X」记成一步交给前端解释。即便模型被注入而乱开，也开不出
+    // 工作区之外的东西 —— 前端那侧仍走 `nt_workspace` 的 jail。
+    //
+    // `ReadImage` 排在册里是**只读**保证：它把工作区内一张图读成 base64 部件，
+    // 不写盘、不改世界状态，越狱由上面第 3 步的 `file_path` 通道（与 `ReadFile`
+    // 同一道 `is_jailbreak_path`）和执行层的 `join_workspace` 各拦一次。
     match &ctx.tool {
         ToolName::SetTurnStatus
         | ToolName::ReadFile
+        | ToolName::ReadImage
         | ToolName::WriteFile
         | ToolName::EditFile
         | ToolName::WebSearch
-        | ToolName::WebFetch => PolicyDecision::Allow,
+        | ToolName::WebFetch
+        | ToolName::SidebarOpen => PolicyDecision::Allow,
         ToolName::Unknown(raw) => deny("unknown-tool", &format!("unknown tool '{raw}'")),
         ToolName::Bash | ToolName::ComputerAct => {
             deny("default-deny", "no explicit allow rule matched")
@@ -394,6 +404,42 @@ mod tests {
         }
         // 空规则集 → None
         assert!(evaluate_extra_deny(&[], &ToolName::Bash, agent, None, None).is_none());
+    }
+
+    #[test]
+    fn read_image_is_allowlisted_but_jailed() {
+        // 工作区内的相对路径放行（与 read_file 同律：只读 + jail 即可）。
+        let mut ok = ctx(ToolName::ReadImage);
+        ok.file_path = Some("attachments/shot.png".to_owned());
+        assert_eq!(evaluate_policy(&ok), PolicyDecision::Allow);
+        // 越狱路径一律拒：拿图当后门去读工作区外的东西，必须和文本一样被拦。
+        for bad in ["../secret.png", "/etc/passwd", "~/keys.png", ""] {
+            let mut bad_ctx = ctx(ToolName::ReadImage);
+            bad_ctx.file_path = Some(bad.to_owned());
+            assert!(
+                matches!(evaluate_policy(&bad_ctx), PolicyDecision::Deny { .. }),
+                "read_image must refuse '{bad}'"
+            );
+        }
+        // 没给 path 也放行（模型幻觉出的空参）—— 执行层再以
+        // `requires {path}` 诚实失败，而不是在网关装懂。
+        assert_eq!(evaluate_policy(&ctx(ToolName::ReadImage)), PolicyDecision::Allow);
+        // 人接管时与其他工具一样拒一切 Bot 动作。
+        let mut controlled = ctx(ToolName::ReadImage);
+        controlled.human_has_control = true;
+        assert!(matches!(
+            evaluate_policy(&controlled),
+            PolicyDecision::Deny { .. }
+        ));
+        // operator 自写规则仍能单独拒它。
+        assert!(super::evaluate_extra_deny(
+            &["deny tool:read_image".to_owned()],
+            &ToolName::ReadImage,
+            Actor::Bot,
+            None,
+            Some("a.png"),
+        )
+        .is_some());
     }
 
     #[test]

@@ -217,10 +217,29 @@ pub struct NeobotAttachItem {
 
 /// 跑轮结果（含回复标签；前端气泡顶部 chips 直消）。
 /// `status` 沿旧口径（`TurnStatus::as_str`）；`labels` 含 model/mode/tools/usage。
+///
+/// ## `task_id`（2026-09-28 切片 C3）
+///
+/// 前端此前**拿不到**本轮任务自己的 id，只能用「窗口内新建 + 归属本会话」
+/// 作间接证据（`frontend/src/turn_task.ts`）。现在后端把**本轮那一个** id
+/// 直接给出，`turn_task.ts` 优先用它、缺失时才回落到间接判据。
+///
+/// **空串 = 没有任务**（桌面斜杠指令那条路不进跑轮，一个任务都不建）。
+/// 刻意**不**填 `list_tasks(1).first()`：那是「库里最新的」，与「本轮的」
+/// 没有必然关系（队内并行、后台例程、别的窗口都会让它指到别人的任务）——
+/// 那正是本字段要取代的东西。
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct NeobotRunResult {
     pub status: String,
     pub labels: neotrix_neobot::TurnLabels,
+    /// 本轮自己的任务 id；**没有任务时是空串**（不是猜、不是编）。
+    pub task_id: String,
+    /// 本轮**真的**以 `TaskStatus::Cancelled` 结束（`false` = 不是被用户叫停的）。
+    ///
+    /// 口径是**回库核对**（`get_task(task_id).status`），不是「令牌被翻过」——
+    /// 停止请求送达 ≠ 这一轮真被停掉（它可能已经跑完了）。前端拿它当
+    /// 「停掉了」的**唯一**依据，不用猜。
+    pub cancelled: bool,
 }
 
 fn now_epoch() -> i64 {
@@ -230,8 +249,163 @@ fn now_epoch() -> i64 {
         .unwrap_or(0)
 }
 
+pub mod nt_cmd_channels;
 pub mod nt_cmd_convo;
 pub mod nt_cmd_core;
+pub mod nt_cmd_files;
 pub mod nt_cmd_run;
+pub mod nt_cmd_sidebar;
 pub mod nt_cmd_sys;
 pub mod nt_cmd_tasks;
+
+// ─── 命令注册完整性 ───
+//
+// 为什么需要它：**漏注册一个 `#[tauri::command]` 编译得过、clippy 干净、
+// `cargo test` 全绿**，只是那个命令从前端永远调不到 —— 运行时才发现「没这条线」。
+//
+// 两个方向都要查（第一版只写了反向，变异测试立刻证明它抓不到正向）：
+// - **正向** 声明 ⊆ 注册：写好了却没挂上 → 上面那个静默缺陷；
+// - **反向** 注册 ⊆ 声明：表里拼错了模块/函数名（那种编译器会抓一半，
+//   但同名不同模块的情况抓不到）。
+//
+// 读源码而不是反射：本 crate 只有 bin 目标、没有 lib 可 introspect ——
+// 为了测试而加 lib 目标，等于把 `main.rs` 的注册表搬一次家，不值得。
+#[cfg(test)]
+mod registration_tests {
+    /// 从源码文本里抓出全部 `#[tauri::command]` 声明的函数名。
+    ///
+    /// 逐行扫：遇到 `#[tauri::command]` 就记住，下一个非空、非注释且以
+    /// `pub fn ` / `fn ` 开头的行即函数名（跳过 `pub async fn`）。
+    fn declared_commands(source: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut armed = false;
+        for line in source.lines() {
+            let trimmed = line.trim();
+            if trimmed == "#[tauri::command]" {
+                armed = true;
+                continue;
+            }
+            if !armed {
+                continue;
+            }
+            if trimmed.is_empty() || trimmed.starts_with("//") {
+                continue;
+            }
+            // 下一个函数定义；若是别的属性则继续等。
+            let candidate = trimmed
+                .strip_prefix("pub async fn ")
+                .or_else(|| trimmed.strip_prefix("pub fn "))
+                .or_else(|| trimmed.strip_prefix("async fn "))
+                .or_else(|| trimmed.strip_prefix("fn "));
+            match candidate {
+                Some(rest) => {
+                    if let Some(name) = rest.split('(').next() {
+                        out.push(name.to_owned());
+                    }
+                    armed = false;
+                }
+                None => {
+                    if trimmed.starts_with('#') || trimmed.starts_with("///") {
+                        continue;
+                    }
+                    armed = false;
+                }
+            }
+        }
+        out
+    }
+
+    /// `generate_handler!` 里注册的命令名。
+    fn registered_commands(main: &str) -> Vec<String> {
+        main.lines()
+            .filter_map(|line| line.trim().strip_prefix("nt_commands::"))
+            .filter_map(|rest| rest.strip_suffix(','))
+            .map(|entry| entry.rsplit("::").next().unwrap_or("").to_owned())
+            .collect()
+    }
+
+    const MAIN: &str = include_str!("main.rs");
+    const CONVO: &str = include_str!("nt_commands/nt_cmd_convo.rs");
+    const CORE: &str = include_str!("nt_commands/nt_cmd_core.rs");
+    const FILES: &str = include_str!("nt_commands/nt_cmd_files.rs");
+    const RUN: &str = include_str!("nt_commands/nt_cmd_run.rs");
+    const SIDEBAR: &str = include_str!("nt_commands/nt_cmd_sidebar.rs");
+    const SYS: &str = include_str!("nt_commands/nt_cmd_sys.rs");
+    const TASKS: &str = include_str!("nt_commands/nt_cmd_tasks.rs");
+    const CHANNELS: &str = include_str!("nt_commands/nt_cmd_channels.rs");
+
+    fn all_command_sources() -> [(&'static str, &'static str); 8] {
+        [
+            ("nt_cmd_convo", CONVO),
+            ("nt_cmd_core", CORE),
+            ("nt_cmd_files", FILES),
+            ("nt_cmd_run", RUN),
+            ("nt_cmd_sidebar", SIDEBAR),
+            ("nt_cmd_sys", SYS),
+            ("nt_cmd_tasks", TASKS),
+            ("nt_cmd_channels", CHANNELS),
+        ]
+    }
+
+    /// 解析器自检：这两条抓不到东西的话，后面的断言全是空的。
+    #[test]
+    fn the_parser_actually_finds_commands() {
+        let declared: Vec<String> = all_command_sources()
+            .iter()
+            .flat_map(|(_, src)| declared_commands(src))
+            .collect();
+        assert!(
+            declared.len() >= 90,
+            "只认出 {} 个命令 —— 解析规则失效，下面的断言会变成空转",
+            declared.len()
+        );
+        let registered = registered_commands(MAIN);
+        assert!(registered.len() >= 90, "只认出 {} 个注册项", registered.len());
+    }
+
+    /// **正向**：每个声明都必须出现在注册表里。
+    #[test]
+    fn every_declared_command_is_registered() {
+        let registered: std::collections::BTreeSet<String> =
+            registered_commands(MAIN).into_iter().collect();
+        let mut missing = Vec::new();
+        for (module, src) in all_command_sources() {
+            for name in declared_commands(src) {
+                if !registered.contains(&name) {
+                    missing.push(format!("{module}::{name}"));
+                }
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "这些命令声明了却没进 generate_handler!，从前端永远调不到：{missing:?}"
+        );
+    }
+
+    /// **反向**：注册表里不能有不存在的命令。
+    #[test]
+    fn every_registered_command_exists() {
+        let declared: std::collections::BTreeSet<String> = all_command_sources()
+            .iter()
+            .flat_map(|(_, src)| declared_commands(src))
+            .collect();
+        let mut unknown = Vec::new();
+        for name in registered_commands(MAIN) {
+            if !declared.contains(&name) {
+                unknown.push(name);
+            }
+        }
+        assert!(unknown.is_empty(), "注册表里有不存在的命令：{unknown:?}");
+    }
+
+    /// 注册表自身不许重复。
+    #[test]
+    fn registrations_are_unique() {
+        let all = registered_commands(MAIN);
+        let mut sorted = all.clone();
+        sorted.sort();
+        let before = sorted.len();
+        sorted.dedup();
+        assert_eq!(before, sorted.len(), "generate_handler! 里有重复注册");
+    }
+}

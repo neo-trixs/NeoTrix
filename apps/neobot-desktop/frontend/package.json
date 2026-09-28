@@ -1,0 +1,21 @@
+{
+  "name": "neobot-frontend",
+  "version": "0.21.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 1422",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "selftest": "tsc src/selftest.ts --outDir ../../target/nt-frontend-selftest --module commonjs --target es2021 --skipLibCheck --strict && node -e \"const f=require('../../target/nt-frontend-selftest/selftest.js').runSelfTest();if(f.length){console.error('自测失败 '+f.length+' 项:');f.forEach(x=>console.error('  - '+x));process.exit(1)}console.log('自测全过')\""
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-dialog": "^2.7.3",
+    "@tauri-apps/plugin-shell": "^2.3.6"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11"
+  }
+}

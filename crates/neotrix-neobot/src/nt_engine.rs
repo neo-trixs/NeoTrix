@@ -35,6 +35,17 @@ pub trait EngineAdapter {
     fn model_name(&self) -> &str {
         ""
     }
+    /// 引擎能否把**多模态内容部件**（OpenAI `image_url`）真正送进模型。
+    ///
+    /// 默认 `false` —— 拿不准就说拿不准。`read_image` 在返回 `false` 的引擎上
+    /// **诚实失败**，绝不回一句「已读到图片」：那会让模型开始描述它其实什么都
+    /// 没看见的东西（编造），比明说「这个引擎看不到图」坏得多。
+    ///
+    /// 三个内置引擎都不实现它，因此零改动即是 `false`（`echo` 没有模型、
+    /// `cli`/`opencode` 只吐纯文本 stdout，图像无处可去）。
+    fn vision_capable(&self) -> bool {
+        false
+    }
     fn probe(&self) -> Result<String, NtBotError>;
     fn run_turn(&self, prompt: &str, inbox: &[String]) -> Result<EngineTurn, NtBotError>;
     /// 带历史的多跳入口 — 默认忽略历史 (Echo/CLI 保持原语义).
@@ -514,6 +525,18 @@ mod tests {
     #[test]
     fn strip_ansi_drops_escapes() {
         assert_eq!(super::strip_ansi("\x1b[91m\x1b[1mError:\x1b[0m hi"), "Error: hi");
+    }
+
+    #[test]
+    fn builtins_have_no_vision_honest_default() {
+        // 零实现即「看不见」：这是诚实失败的前提，不是遗漏。
+        assert!(!LocalEchoEngine.vision_capable());
+        assert!(!CliEngine::new("true").expect("engine").vision_capable());
+        assert!(!OpencodeEngine::new("opencode/space-bunny-free")
+            .expect("engine")
+            .vision_capable());
+        // 引擎没有模型名时，账本侧的 `model_name` 同样退化为空串。
+        assert_eq!(LocalEchoEngine.model_name(), "");
     }
 
     #[test]

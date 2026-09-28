@@ -10,7 +10,7 @@
 
 use neotrix_neobot::{
     nt_channel::{self, AccessMode, ChannelRegistry},
-    nt_channel_dispatch,
+    nt_channel_dispatch, nt_channel_serve,
     nt_channel_telegram, nt_store::parse_allow_list,
 };
 
@@ -303,16 +303,24 @@ pub fn neobot_channel_poll_once(
         sent: 0,
         deferred: 0,
     };
-    // 收取：每个机器人各拉一次（同渠道可挂多个 bot，各自独立）。
-    for bot in &bots {
+    // 收取：**每个渠道只 poll 一次**，然后按各自白名单把消息路由给机器人。
+    //
+    // 早先这里写的是「每个机器人各拉一次（同渠道可挂多个 bot，各自独立）」——
+    // 那句注释和实现都是错的：适配器**按渠道**注册，offset 全渠道共享，
+    // 于是第一个机器人就把这轮 update 全部取走，后面的机器人再 poll 只会拿到空，
+    // **第二个及以后的机器人永远收不到消息且一声不响**。静默失效比报错更坏。
+    let access = nt_channel::AccessMode::parse(&row.access_mode);
+    {
         let Some(adapter) = reg.get_mut(&channel) else {
-            break;
+            return Err(format!("未知渠道：{channel}"));
         };
         let Ok(inbound) = adapter.poll() else {
-            break;
+            return Err("收取失败（检查 token 与网络）".to_owned());
         };
         for msg in inbound {
             report.received += 1;
+            // 认领这个发件人的那个机器人才拿到这条消息。
+            let bot = nt_channel_serve::route_bot(&bots, access, &msg);
             // 引擎与桌面**同一条**路由（同一份 `resolve_engine`）——
             // IM 侧不该有另一套「IM 专用模型」。
             let selection = super::resolve_engine(&config)?;
@@ -324,7 +332,6 @@ pub fn neobot_channel_poll_once(
                 adapter.as_ref(),
                 bot,
                 &msg,
-                None,
             ) {
                 Ok(outcome) => {
                     if !matches!(outcome, nt_channel_dispatch::InboundOutcome::Turn { .. }) {
