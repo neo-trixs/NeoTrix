@@ -39,29 +39,59 @@ bash scripts/ops/nt_weights_manifest.sh verify
 
 `restore` 会先校验备份自身 sha256，不符即拒还原。
 
-## [R] 可再生权重 —— 来源（部分待确认）
+## [R] 可再生权重 —— 来源已核实（2026-09-28 逐字节验证）
 
-| 文件 | SHA-256 前 12 | 上游模型（取自 GGUF `general.name`） |
-|---|---|---|
-| `Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-Q6_K.gguf` | 见清单 | `Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-BF16` |
-| `mmproj-Qwen3.5-4B-Uncensored-HauhouCS-Aggressive-BF16.gguf` | 见清单 | 同上（多模态投影） |
-| `minimind-3/model.safetensors` | 见清单 | `architectures: [Qwen3ForCausalLM]`, `model_type: qwen3` |
+| 文件 | 上游 repo | revision | 验证结果 |
+|---|---|---|---|
+| `Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-Q6_K.gguf` | `HauhauCS/Qwen3.5-4B-Uncensored-HauhauCS-Aggressive` | `c09cdbcdb1fefad6d335809d445621b5f5ba0c6e` | **SHA-256 与上游 LFS oid 逐字节一致** |
+| `mmproj-Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-BF16.gguf` | 同上 | 同上 | **SHA-256 与上游 LFS oid 逐字节一致** |
+| `minimind-3/model.safetensors` | `jingyaogong/minimind-3` | `f92512d4cd6142fa9acc0d6022375049a8974bf6` | **SHA-256 与上游 LFS oid 逐字节一致** |
+| `minimind-3/config.json` | 同上 | 同上 | 尺寸 863 ✓（上游为 git blob，比对口径不同，见下） |
+| `minimind-3/tokenizer.json` | 同上 | 同上 | 尺寸 451182 ✓ |
 
-⚠️ **HF repo 与 revision 未确认。** GGUF 头只记了 `general.name` /
-`general.basename`（`Qwen3.5`）/ `general.architecture`（`qwen35`），**没有**
-记 repo URL 或 commit。文件名 `HauhauCS-Aggressive` 强烈指向某个 HF 组织，
-但**我没有验证过，不写进台账当事实** —— 写错 repo 比留空更糟：照错的 repo
-下回来的量化版本校验和对不上，反而更难查。
+复算：
 
-补齐方式（二选一）：
+```bash
+bash scripts/ops/nt_weights_manifest.sh provenance
+```
 
-1. 查 HF 页面确认 repo + revision，填进下表并提交；
-2. 重新下载一次并记录 `--revision` / commit hash。
+### 为什么必须逐字节比对，不能只比尺寸
 
-在补齐之前：**这 3 个文件属于「知道自己丢了，但不知道从哪捡回来」的状态。**
-这是当前台账最大的缺口，比备份本身更要紧。
+这一条是本次差点踩进去的坑。`minimind-3` 在 HF 上**被大量镜像**（`meet447/minimind`、
+`Alrightlone/…`、`narvalsmiths/…` …），且 `config.json` 完全相同
+（`Qwen3ForCausalLM` / `vocab 6400` / `hidden 768` / `8 layers`）—— 靠 config 匹配
+**无法区分镜像**。
+
+更要命的是尺寸：搜索首先命中的是 5 个月前的历史 commit `2943d18`，它的
+`model.safetensors` 是
+
+```
+size  127834168          ← 与本地完全相同
+sha256 177130464c7d…     ← 与本地不同
+```
+
+**尺寸一分不差，内容不同。** 只比尺寸会把错误来源记成事实，而照错来源重下的文件
+校验和对不上，反而比"不知道来源"更难查。
+
+同一 repo 的 `main` 才是对的：其 LFS oid `3adf69402b5d22e6…` 与本地一致 ——
+文件在历史上被重传过。**结论：HF 上 LFS oid 就是内容的 SHA-256**，拿它当基准，
+比对就变成确定性的，无需信任任何文件名或目录结构。
+
+`config.json` / `tokenizer.json` 这类**非 LFS** 文件，HF API 给的是 git blob sha1
+（`sha1("blob <len>\0" + content)`），与本地 `shasum -a 256` 不同口径，故只比尺寸。
+要严格比对需 `git hash-object`，本轮未做。
+
+### 顺带确认的两件事
+
+- **架构交叉验证**：上游 API 报 `architecture: qwen35`，与盘上 GGUF 头的
+  `general.architecture: qwen35` 一致。
+- **`--reasoning off` 有据**：该 repo 的 chat template 里确有
+  `{%- if enable_thinking is defined and enable_thinking is false %}` 分支，
+  即关思考要走显式开关 —— 这正是 `LOCAL-LLAMA-2026-09-28.md` 记的那条硬要求。
+  上游 `context_length: 262144`（262K）。
 
 ## 校验
+
 
 ```bash
 bash scripts/ops/nt_weights_manifest.sh verify

@@ -18,7 +18,8 @@
 #
 # 用法
 #   nt_weights_manifest.sh write     # 生成/更新清单 (默认)
-#   nt_weights_manifest.sh verify    # 校验现有清单, 不符即报
+#   nt_weights_manifest.sh verify     # 校验现有清单, 不符即报
+#   nt_weights_manifest.sh provenance # 逐字节比对上游 LFS oid (= 内容 SHA-256), 离线可跑
 #   nt_weights_manifest.sh backup    # 把不可再生产物打成 gzip 备份
 #   nt_weights_manifest.sh restore <tar.gz>   # 从备份还原
 #   nt_weights_manifest.sh status    # 三类各自的现状
@@ -162,11 +163,61 @@ do_status() {
   printf '  ⚠ 备份与仓库同盘, 不防磁盘物理故障。\n'
 }
 
+# 已核实的上游来源。**键是本地相对路径，值是 "repo@revision|上游LFS-oid"**。
+#
+# 为什么记 oid 而不是只记 repo: HF API 的 `tree` 端点对 LFS 文件返回
+# `lfs.oid`，那个值**就是文件内容的 SHA-256**。拿它当基准，比对就是确定性的 ——
+# 不依赖文件名、不依赖目录结构、也不依赖 HF 页面显示的体积。
+#
+# 这条是踩过坑才定下来的: `minimind-3` 在 HF 上被大量镜像且 config 完全相同
+# (`Qwen3ForCausalLM`/vocab 6400/hidden 768), 靠 config 或文件名都区分不了;
+# 而搜索首先命中的是 5 个月前的历史 commit, 它的 model.safetensors **尺寸与本地
+# 一模一样 (127834168) 但 sha256 不同** —— 只比尺寸会把错误来源记成事实。
+PROVENANCE=(
+  "models/qwen35-4b-uncensored/Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-Q6_K.gguf|HauhauCS/Qwen3.5-4B-Uncensored-HauhauCS-Aggressive@c09cdbcdb1fefad6d335809d445621b5f5ba0c6e|ba93c21300854075ab42655bc30dca82c7c6c958f511d1ec9ea2b3e750b4b75f"
+  "models/qwen35-4b-uncensored/mmproj-Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-BF16.gguf|HauhauCS/Qwen3.5-4B-Uncensored-HauhauCS-Aggressive@c09cdbcdb1fefad6d335809d445621b5f5ba0c6e|a1e32e86ea99aa7a56f3dcfe7e63c1d0be9439d31fd07087099f15bc0fda0f22"
+  "models/minimind-3/model.safetensors|jingyaogong/minimind-3@f92512d4cd6142fa9acc0d6022375049a8974bf6|3adf69402b5d22e693151cabadc12528f923c4ba6bf343738aaf13f0892162e8"
+)
+
+# 逐字节比对本地文件与上游 LFS oid。
+#
+# 离线可跑（oid 硬编码在上面的 PROVENANCE 里），所以这是一道**不依赖网络**的门 ——
+# 上游哪天改了 main 也不会误报; 只有本地文件被动过才会红。
+do_provenance() {
+  hdr "来源逐字节校验（对照上游 LFS oid = 内容 SHA-256）"
+  local bad=0
+  for entry in "${PROVENANCE[@]}"; do
+    local rel="${entry%%|*}" rest="${entry#*|}"
+    local src="${rest%%|*}" want="${rest#*|}"
+    local f="$REPO_ROOT/$rel"
+    if [ ! -f "$f" ]; then
+      printf '  ✗ 缺失  %s\n      应来自 %s\n' "$rel" "$src"; bad=$((bad + 1)); continue
+    fi
+    local got; got=$(sha256 "$f")
+    if [ "$got" = "$want" ]; then
+      printf '  ✓ %s\n      ← %s\n' "${rel##*/}" "$src"
+    else
+      printf '  ✗ 不符  %s\n      ← %s\n      本地 %s\n      上游 %s\n' \
+        "$rel" "$src" "$got" "$want"
+      bad=$((bad + 1))
+    fi
+  done
+  printf '\n  %d 项, ' "${#PROVENANCE[@]}"
+  if [ "$bad" -eq 0 ]; then
+    ok "全部与所记 revision 逐字节一致"
+    printf '  丢了就按上面的 repo@revision 重下, 不会捡错版本。\n'
+    return 0
+  fi
+  printf '%d 项不符\n' "$bad"
+  return 1
+}
+
 case "${1:-write}" in
-  write)   gen_manifest ;;
-  verify)  verify_manifest ;;
-  backup)  do_backup ;;
-  restore) do_restore "${2:-}" ;;
-  status)  do_status ;;
-  *)       printf '用法: %s {write|verify|backup|restore <tar.gz>|status}\n' "$0" >&2; exit 2 ;;
+  write)      gen_manifest ;;
+  verify)     verify_manifest ;;
+  provenance) do_provenance ;;
+  backup)     do_backup ;;
+  restore)    do_restore "${2:-}" ;;
+  status)     do_status ;;
+  *)          printf '用法: %s {write|verify|provenance|backup|restore <tar.gz>|status}\n' "$0" >&2; exit 2 ;;
 esac
