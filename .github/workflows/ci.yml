@@ -21,6 +21,14 @@ jobs:
         with:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
+      # Runs FIRST: manifest breakage ("committed manifest names a file git does
+      # not have") makes every later step meaningless, and it has shipped green
+      # before — apps/neobot-desktop was a workspace member with no Cargo.toml,
+      # so a fresh clone could not load the workspace at all. Seconds to detect.
+      # Content-level staleness is what the `cargo check` steps below enforce;
+      # this gate's --full tier is the same oracle with grouped diagnostics.
+      - name: "Fresh-build gate (a clean clone must load the workspace)"
+        run: bash scripts/check-fresh-build.sh --metadata
       - run: cargo check --lib -p neotrix
       - run: cargo check -p neotrix
       - name: Layer dependency check
