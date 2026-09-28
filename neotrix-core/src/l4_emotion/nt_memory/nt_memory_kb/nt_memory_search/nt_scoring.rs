@@ -1,3 +1,13 @@
+//! KB 检索打分：4 维信号融合（semantic / temporal / confidence / relational）。
+//!
+//! ── 能力边界（2026-09-28 消歧时评估两次后确立）──
+//! 本模块面向 **KB 节点**（有 `updated_at` / `node_confidence` / 图边），故 4 维权重
+//! 全部有数据源。**不要**把它套到 `l1_action/nt_core_bank/bank/rag_engine.rs`
+//! （记忆层级管理）的 `score_memory` 上 —— 后者对象是 `ReasoningMemory`
+//! （`task_description` 等），**没有 temporal/confidence/relational 的数据源**，
+//! 硬接只能传 0 或造假值，比它现有的 bm25+embedding+关键词重叠三信号线性加权更差。
+//! 详见该文件顶部的「能力边界」段（含若要升级的正确顺序：先补数据源，再换算法）。
+
 use std::collections::HashMap;
 
 use rusqlite::{params, Connection};

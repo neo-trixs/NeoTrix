@@ -5,6 +5,28 @@
 //! - Memory tier promotion (working → episodic → semantic)
 //! - Memory consolidation and deduplication
 //! - Fast retrieval with relevance scoring
+//!
+//! ── 能力边界（2026-09-28 消歧时评估两次后确立，勿再尝试「合并」）──
+//! 本文件与 `l2_perception/nt_world/rag_pipeline/rag_engine.rs`（已改名
+//! `DocumentRagEngine`）**同名但非重复**：22 个公开符号仅 `RagEngine`/`new`/
+//! `ingest` 三名相同，`find_duplicates`/`should_promote`/`tier_counts`/
+//! `MemoryConsolidation`/`TierPromotion` 仅本侧有，文档切分/索引/落盘仅那侧有。
+//! 两侧均为重负载活代码（本侧 16 处引用含 `l6_meta/coordination/
+//! self_improvement.rs`；那侧 35 处调用）⇒ 合并会丢能力并动 60+ 调用点。
+//!
+//! 本文件亦**不应换成** `l4_emotion/nt_memory/nt_memory_kb/nt_memory_search/
+//! nt_scoring.rs` 的打分（2026-09-28 同批评估，结论：不换）。理由：
+//! - **数据源不同**：`nt_scoring` 的 4 维权重是 semantic / temporal(半衰期衰减) /
+//!   confidence(ConfidenceStore) / relational(图密度+PageRank trust)，依赖 KB 节点
+//!   才有 `updated_at`/`node_confidence`/图边；本侧对象是 `ReasoningMemory`
+//!   （`task_description` 等），**这三个信号无数据源**，硬接只能传 0 或造假值，
+//!   比现有加权线性更差。
+//! - **现状无缺陷**：本侧 `score_memory` = bm25×w + embedding×w + 关键词重叠率×剩余，
+//!   是能工作的 3 信号线性融合；升级属产品调优而非修 bug。
+//! - **风险不对称**：改本侧打分会影响 16 处调用的检索排序，并波及
+//!   `self_improvement` 的自我改进闭环。
+//! 若日后确需 temporal/confidence 维度，**正确顺序是先给 `ReasoningMemory`
+//! 补上这两类数据源，再调 `fuse_signals`** —— 先补数据、再换算法，不是反过来。
 
 use std::collections::VecDeque;
 
