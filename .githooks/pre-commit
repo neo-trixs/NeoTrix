@@ -67,6 +67,17 @@ if [ -f .neotrix/task-index.json ] && [ -f scripts/ops/nt_find.py ]; then
     echo -e "\033[1;33m   行号漂移或文件被删 ⇒ 那是**假证据**。修 manifest 或重验结论\033[0m"
     exit 1
   fi
+  # 扫描面守门：脚本引用的扫描根若已消失，扫描器会输出**看似正常的 0**
+  # （路径不存在 ≠ 该面为空）。blocking，防新增死引用。
+  if [ -f scripts/ops/nt_scan_surface.py ]; then
+    if ! python3 scripts/ops/nt_scan_surface.py >/tmp/nt-scan-surface.log 2>&1; then
+      echo -e "\033[0;31m❌ SCAN-SURFACE GATE: 扫描器引用了已消失的面\033[0m"
+      sed 's|^|   |' /tmp/nt-scan-surface.log
+      echo -e "\033[1;33m   后果：该扫描器会输出 0，而你以为「扫过了确实没有」\033[0m"
+      echo -e "\033[1;33m   修法：删死引用并记因由，或改指新位置（KNOWN-GONE 需在脚本里登记）\033[0m"
+      exit 1
+    fi
+  fi
   if ! python3 scripts/ops/nt_find.py --audit >/tmp/nt-find-audit.log 2>&1; then
     echo -e "\033[0;31m❌ TASK-INDEX GATE: .neotrix/task-index.json 指向不存在的工具\033[0m"
     sed 's|^|   |' /tmp/nt-find-audit.log

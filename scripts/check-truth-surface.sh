@@ -39,8 +39,15 @@ for arg in "$@"; do
   esac
 done
 
-# Roots to scan. Excludes target/, .worktrees/ (5 stale full copies), thirdparty/.
-SCAN_ROOTS="neotrix-core/src crates apps src-tauri/src"
+# Roots to scan. Excludes target/, .worktrees/ (stale full copies), thirdparty/.
+#
+# 2026-09-28 删两条死引用（`nt_scan_surface.py` 定位）：
+#   - `apps`         → 已于本会话彻底移除（apps/neobot-desktop 归档后仅剩空壳，
+#                      实测 0 跟踪文件、0 代码引用）
+#   - `src-tauri/src`→ 桌面端随 5c02e738 归档（599 files），现由 crates/neotrix-neobot
+# 两行此前靠下游的 `[ -d "$root" ] || continue` 静默兜住 ⇒ **不报错**，
+# 但也**不告知少扫了哪两个面**。静默少扫与「扫过且干净」在报告上无法区分。
+SCAN_ROOTS="neotrix-core/src crates"
 TRACK_GLOBS='\.(rlib|so|dylib|a|o|wasm)$|^\.neotrix/.*\.(db|sqlite|sqlite3)$'
 
 CUR=$(mktemp)

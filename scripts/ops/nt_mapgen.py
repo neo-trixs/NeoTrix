@@ -45,12 +45,17 @@ ROOT_AREAS = [
     ("neotrix-core/benches", "neotrix-core"),
     ("neotrix-core/examples", "neotrix-core"),
     ("crates", "crates"),
-    ("src-tauri/src", "tauri"),
-    ("src-tauri/frontend/src", "frontend"),
-    ("src-tauri/frontend", "frontend"),
-    ("games", "game"),
-    ("ntos/src", "ntos"),
-    ("fuzz", "fuzz"),
+    # 2026-09-28 修正 6 条死引用（`nt_scan_surface.py` 定位）：
+    #   src-tauri/src          → 桌面端随 5c02e738 归档（599 files）
+    #   src-tauri/frontend     → 同上
+    #   src-tauri/frontend/src → 同上
+    #   games                  → 随 2bbed32c 归档，现居 neotrix-archive/games/neotrix-guixu
+    #   fuzz                   → 随 2bbed32c 归档，现居 neotrix-archive/fuzz
+    #   ntos/src               → 该目录从来不存在（代码里的 "ntos" 只是普通词，
+    #                            见 bin/nt_douyin_ingest.rs 等）
+    # 桌面端代码现居 `crates/neotrix-neobot`（已由 `("crates", "crates")` 覆盖，
+    # 故此处不重复列出；单列一个 neobot 条目只为让 area 标注可读）。
+    ("crates/neotrix-neobot", "neobot"),
     ("sessions", "sessions"),
     ("scripts", "scripts"),
     ("skills", "skills"),

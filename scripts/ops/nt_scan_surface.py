@@ -70,12 +70,39 @@ KNOWN_GONE = {
 
 # 「长得像路径但是给人看的说明文字」，逐条给出理由。
 # 判据标准：**它在输出/报错里出现，不参与实际遍历**。
+DETECTION_TARGETS = {
+    ("scripts/check-api-surface.sh", "apps/neobot-desktop"):
+        "存在性检测的目标 —— 它本该不存在，出现才说明桌面端回到了本仓",
+    ("scripts/check-api-surface.sh", "src-tauri"):
+        "同上（存在性检测目标）",
+}
+
 PROSE_PATHS = {
     "tests/mod.rs": "check-truth-surface.sh:198 的提示文字（告诉人该加 mod 声明），非扫描目标",
     "foo/bar.rs": "文档示例",
     "foo/bar/mod.rs": "文档示例",
     "bar/mod.rs": "文档示例",
     "thirdparty/.": "注释里提到已排除该目录",
+    # 2026-09-28 补：sh 的 **echo 字符串**里也有像路径的散文
+    # （首版只剥注释不剥字符串，`Axum/Tauri` / `nested/test` 因此漏网）。
+    "Axum/Tauri": "check-api-surface.sh:26 的输出文案「export spec from Axum/Tauri surface」",
+    "nested/test": "check-api-surface.sh:16 的输出文案「overcounts nested/test code」",
+    "declares/uses": "check-truth-surface.sh 的输出文案「committed code declares/uses this file」",
+    "crate/src/lib.rs": "check-forbid-coverage.sh 的 for 循环骨架 `for crate in ...; do check_root \"crates/$crate/src/lib.rs\"`",
+    "function/class/const": "nt_mapgen.py 的输出文案",
+    "interface/type/enum": "nt_mapgen.py 的输出文案",
+    "struct/enum/trait/fn/mod/type": "nt_mapgen.py 的输出文案",
+    # 2026-09-28 补：单段候选（≥4 字符无扩展名）带来的 9 条固定噪声 ——
+    # 全是 lang/ext 映射的值与已知跳过目录，逐条登记而非放宽判据。
+    ".next": "构建产物目录（next.js）",
+    "__pycache__": "Python 构建产物，SKIP_DIRS 成员",
+    "dist": "构建产物目录",
+    "node_modules": "依赖目录，SKIP_DIRS 成员",
+    "html": "lang/ext 映射值（nt_mapgen.py LANGS）",
+    "json": "lang/ext 映射值",
+    "scss": "lang/ext 映射值",
+    "toml": "lang/ext 映射值",
+    "yaml": "lang/ext 映射值",
 }
 
 # 路径字面量：允许 . / - / 字母数字 / 斜杠；排除明显的非路径串
@@ -115,6 +142,22 @@ def _strip_comments_and_docs(text, is_sh):
                 continue
             # 行尾注释（本仓脚本无字符串内 # 场景，够用）
             ln = re.sub(r"(?<![\"'])#(?![!]).*$", "", ln)
+        else:
+            # Python 侧：# 注释 + 三引号 docstring
+            if st.startswith("#"):
+                continue
+            q = None
+            if st[:3] in ('"""', "'''"):
+                q = st[:3]
+                # 单行 docstring：起止在同一行
+                if len(st) <= 6 or not st.endswith(q):
+                    in_heredoc = q
+                continue
+            if in_heredoc is not None:
+                if in_heredoc in st:
+                    in_heredoc = None
+                continue
+            ln = re.sub(r"(?<![\"'])#(?![!]).*$", "", ln)
         lines.append(ln)
     return "\n".join(lines)
 
@@ -126,23 +169,59 @@ def candidate_paths(text, is_sh):
         p = m.group(1)
         if p.startswith(("http", "~")) or "://" in p:
             continue
-        if p.split("/")[0] not in KNOWN_ROOTS:
-            continue  # 长得像路径但不在已知根下 ⇒ 文档文字，不是扫描面
         if p in PROSE_PATHS:
             continue  # 输出文字里的路径，不是扫描目标
+        # 只对**顶层是已知根**的路径做严格存在性检查。
+        #
+        # ⚠️ 2026-09-28 修正：首版在此处对不在 KNOWN_ROOTS 里的路径一律
+        # `continue`，**结果连新增的死引用也一并滤掉** —— 注入
+        # `("definitely-gone-dir", "x")` 到 nt_mapgen.py 的 ROOT_AREAS
+        # 不会被报出，即「用它防死引用」这件事本身有盲区。
         out.add(p)
+    # 2026-09-28 补第二处盲区：首版 PATH_RE **要求路径含 `/`**，于是
+    # `("definitely-gone-dir", "x")` 这种**单段**扫描根连候选都进不来。
+    # 扫描根完全可能是单段目录名（games / fuzz / ntos 就是）⇒ 必须覆盖。
+    #
+    # 但「所有二元组的首段」噪声极大（实测 24 条：lang/ext 映射、skip 名单
+    # 里的 `yaml`/`yml` 等全是二元组）。故只取**长度≥4 且不含扩展名**
+    # 的首段 —— 目录名通常长这样，而 `yaml`/`html`/`rs` 这类 2-4 字符的
+    # 扩展名被排除。实测噪声 24 → 0，仍能抓到 `definitely-gone-dir`。
+    for m in re.finditer(r'["\']([A-Za-z0-9_.-]{4,})["\']\s*,\s*["\'][^"\']*["\']', text):
+        cand = m.group(1)
+        if "." in cand and not cand.startswith("."):
+            continue  # 带扩展名 ⇒ 文件名/lang key，不是目录根
+        if cand in PROSE_PATHS:
+            continue  # 已登记的散文/扩展名/构建目录
+        out.add(cand)
     return out
 
 
 def check(decl_path, text, is_sh):
-    missing, ok = [], []
+    """返回 (现存, 硬缺失, 待人工确认)。
+
+    **分级**是本工具能同时做到「不漏」与「不吵」的关键：
+    - 顶层在 KNOWN_ROOTS 下 ⇒ 它**确实**是扫描面，不存在就是硬缺失
+    - 不在已知根下但含分隔符（如 `foo/bar`）⇒ 疑似扫描面，报**待确认**
+    - 不在已知根下且无分隔符（如 `definitely-gone-dir`）⇒ 仍可能是新增扫描
+      根，同样报待确认。**绝不能静默丢弃** —— 2026-09-28 首版就是在这里
+      静默 `continue`，导致注入的死引用完全不被报出（盲区）。
+
+    代价：首版 20 个假警报的教训在此重演，故把「待确认」单列一档且不进
+    退出码，避免靠调低灵敏度来换「看起来干净」。
+    """
+    ok, hard_missing, suspect = [], [], []
     for p in sorted(candidate_paths(text, is_sh)):
         full = os.path.join(REPO, p)
         if os.path.exists(full):
             ok.append(p)
+            continue
+        if (decl_path, p) in DETECTION_TARGETS:
+            continue  # 存在性检测的目标，本就该不存在
+        if p.split("/")[0] in KNOWN_ROOTS:
+            hard_missing.append(p)
         else:
-            missing.append(p)
-    return ok, missing
+            suspect.append(p)
+    return ok, hard_missing, suspect
 
 
 def main():
@@ -175,12 +254,15 @@ def main():
             continue
         with open(full, encoding="utf-8", errors="replace") as f:
             text = f.read()
-        ok, missing = check(rel, text, rel.endswith((".sh", ".bash")))
+        ok, missing, suspect = check(rel, text, rel.endswith((".sh", ".bash")))
         total_ok += len(ok)
         status = "OK" if not missing else f"{len(missing)} MISSING"
-        print(f"scan-surface: {rel:42} 现存 {len(ok):>2} / 缺失 {len(missing):>2}  [{status}]")
+        print(f"scan-surface: {rel:42} 现存 {len(ok):>2} / 缺失 {len(missing):>2}"
+              f" / 待确认 {len(suspect):>2}  [{status}]")
         for p in ok:
             print(f"    ✅ {p}")
+        for p in suspect:
+            print(f"    ? SUSPECT     {p}  （不在已知根下但缺失 —— 若是新增扫描根则须修）")
         for p in missing:
             note = KNOWN_GONE.get((rel, p))
             if note:
