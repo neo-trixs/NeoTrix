@@ -899,6 +899,140 @@ pub struct RegistryExport {
     pub experience_targets: Vec<serde_json::Value>,
 }
 
+// ============================================================================
+// 老 schema 迁移（v1.0.0 domains 形 → nodes 形）。
+// 背景：CLI 写路径要求 RegistryExport（含 nodes），但落盘的
+// .neotrix/capability_registry.json 仍是老形
+// {version, last_updated, domains: {key: {capabilities: [...] }}, experience_targets}，
+// bud 等写命令直接 `missing field nodes` 拒绝。本迁移使老文件可读，
+// 下一次写命令 save 时自然转正；迁移前先落 `.bak-legacy` 保险（cli 侧）。
+// ============================================================================
+
+/// 老形单能力（缺字段一律默认，坏条目调用方跳过）。
+#[derive(Debug, Deserialize)]
+struct LegacyCapability {
+    id: String,
+    #[serde(default)]
+    level: String,
+    #[serde(default)]
+    provides: Vec<String>,
+    #[serde(default)]
+    constellation: String,
+}
+
+/// 老形单域。
+#[derive(Debug, Deserialize)]
+struct LegacyDomain {
+    #[serde(default)]
+    capabilities: Vec<LegacyCapability>,
+}
+
+/// 老形注册表文件。
+#[derive(Debug, Deserialize)]
+struct LegacyRegistryFile {
+    #[serde(default)]
+    domains: HashMap<String, LegacyDomain>,
+    #[serde(default)]
+    experience_targets: Vec<serde_json::Value>,
+}
+
+fn legacy_domain_of(key: &str) -> Domain {
+    let k = key.to_lowercase();
+    if k.contains("memory") {
+        Domain::Memory
+    } else if k.contains("mind") {
+        Domain::Mind
+    } else if k.contains("world") {
+        Domain::World
+    } else if k.contains("shield") {
+        Domain::Shield
+    } else if k.contains("browse") || k.contains("_io") || k == "io" {
+        Domain::Io
+    } else if k.contains("meta") {
+        Domain::Meta
+    } else if k.contains("nexus") {
+        Domain::Nexus
+    } else if k.contains("govern") {
+        Domain::Governance
+    } else if k.contains("repair") {
+        Domain::Repair
+    } else if k.contains("act") || k.contains("file") || k.contains("media") {
+        Domain::Act
+    } else {
+        Domain::Core
+    }
+}
+
+fn legacy_layer_of(level: &str) -> NodeLayer {
+    let l = level.to_uppercase();
+    if l.starts_with("L0") {
+        NodeLayer::L0Primitive
+    } else if l.starts_with("L1") {
+        NodeLayer::L1Composite
+    } else if l.starts_with("L2") {
+        NodeLayer::L2Orchestrator
+    } else if l.starts_with("L3") {
+        NodeLayer::L3DomainService
+    } else if l.starts_with("L4") {
+        NodeLayer::L4Application
+    } else if l.starts_with("L5") {
+        NodeLayer::L5Conscious
+    } else if l.starts_with("L6") {
+        NodeLayer::L6Self
+    } else {
+        NodeLayer::L0Primitive
+    }
+}
+
+fn legacy_constellation_of(c: &str) -> ConstellationLevel {
+    match c.to_uppercase().as_str() {
+        "C1" => ConstellationLevel::C1UnitTest,
+        "C2" => ConstellationLevel::C2IntegrationTest,
+        "C3" => ConstellationLevel::C3Benchmark,
+        "C4" => ConstellationLevel::C4MainPipeline,
+        "C5" => ConstellationLevel::C5SelfHealing,
+        "C6" => ConstellationLevel::C6EvolutionLoop,
+        _ => ConstellationLevel::default(),
+    }
+}
+
+impl CapabilityRegistry {
+    /// 老文件迁移：domains 形文本 → 内存注册表。experience_targets 原样保留。
+    /// 坏条目（空 id）跳过单条，不炸整批；重复 id 后写优先（register 幂等忽略）。
+    pub fn migrate_legacy(text: &str) -> Result<Self, String> {
+        let old: LegacyRegistryFile =
+            serde_json::from_str(text).map_err(|e| format!("legacy parse: {e}"))?;
+        let mut reg = Self::new();
+        for (dkey, dom) in &old.domains {
+            let domain = legacy_domain_of(dkey);
+            for cap in &dom.capabilities {
+                if cap.id.trim().is_empty() {
+                    continue;
+                }
+                let mut node = CapabilityNode::new_composite(
+                    cap.id.clone(),
+                    domain,
+                    legacy_layer_of(&cap.level),
+                    cap.provides.clone(),
+                    Vec::new(),
+                );
+                node.constellation = legacy_constellation_of(&cap.constellation);
+                node.metadata.insert(
+                    "migrated_from".to_string(),
+                    serde_json::Value::String("legacy-domains-v1".to_string()),
+                );
+                node.metadata.insert(
+                    "legacy_domain".to_string(),
+                    serde_json::Value::String(dkey.clone()),
+                );
+                let _ = reg.register(node);
+            }
+        }
+        reg.experience_targets = old.experience_targets;
+        Ok(reg)
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct RegistryStats {
     pub total_nodes: usize,
@@ -932,6 +1066,42 @@ mod tests {
         c3.requires = vec!["c2".into()];
         reg.register(c3).unwrap();
         reg
+    }
+
+    #[test]
+    fn test_migrate_legacy_domains_shape() {
+        // 老 schema（v1.0.0：domains 映射，无 nodes）必须可读：bud 拒绝写入即此门。
+        let old = serde_json::json!({
+            "version": "1.0.0",
+            "last_updated": "2026-09-01",
+            "domains": {
+                "nt_file_ability": {
+                    "name": "统一文件能力",
+                    "layer": "L1_Action",
+                    "capabilities": [
+                        {"id": "nt_file_ability::xlsx_fast::read", "name": "快速读",
+                         "level": "L0_Primitive", "provides": ["xlsx_read"], "constellation": "C2"},
+                        {"id": "nt_file_ability::merge::merge_tables", "name": "合并",
+                         "level": "L1_Composite", "provides": ["xlsx_merge"], "constellation": "C3"},
+                        {"id": "", "level": "L0_Primitive"}
+                    ]
+                }
+            },
+            "experience_targets": [{"action": "strengthen_or_bud"}]
+        });
+        let reg = CapabilityRegistry::migrate_legacy(&old.to_string()).unwrap();
+        assert_eq!(reg.nodes.len(), 2, "空 id 条目应跳过");
+        let n0 = reg.get("nt_file_ability::xlsx_fast::read").unwrap();
+        assert_eq!(n0.domain, Domain::Act);
+        assert_eq!(n0.layer, NodeLayer::L0Primitive);
+        assert_eq!(n0.constellation, ConstellationLevel::C2IntegrationTest);
+        let n1 = reg.get("nt_file_ability::merge::merge_tables").unwrap();
+        assert_eq!(n1.layer, NodeLayer::L1Composite);
+        assert_eq!(n1.constellation, ConstellationLevel::C3Benchmark);
+        assert_eq!(reg.experience_targets.len(), 1, "经验目标须保留");
+        // 往返：迁移后 export 即新 schema，可被 load 路径解析
+        let exp = reg.export();
+        assert_eq!(exp.nodes.len(), 2);
     }
 
     #[test]
