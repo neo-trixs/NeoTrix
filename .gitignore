@@ -19,6 +19,13 @@ _archive/opencode/plugins/*.lock
 .claude-plugin/
 *.rs.bak.DS_Store
 models/
+# models/ 是 3.4GB 权重(safetensors/onnx/pt), 忽略它是对的, 不可整体解禁。
+# 但 include_str! 是**编译期**读取: 被它引用的校准数据不在 git 里, 干净检出
+# 就直接编译失败 —— 与 tests/、examples/、benches/ 同一类 blanket 规则伤人。
+# 故只解禁 training/ 下的轻量校准数据, 权重继续忽略。
+!models/
+models/*
+!models/training/
 
 # Generated nt-test files (tracked integration tests are force-added explicitly;
 # keep the ignore for generated scratch, but never hide real test sources)
