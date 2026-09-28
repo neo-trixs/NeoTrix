@@ -17,7 +17,7 @@
 **结论：`src-tauri` 与 `apps/neobot-desktop` 不是重复。** 三条独立证据：
 
 1. **产品标识不同**：`ai.neotrix.desktop` vs `ai.neobot.desktop`，是两个可并存的桌面应用
-2. **规模差一个数量级**：33,834 行 vs 2,215 行（15×）。前者是完整 IDE 级工作台，后者是壳
+2. **规模差近 6 倍**：33,834 行 vs 5,698 行（5.9×）。前者是完整 IDE 级工作台，后者是精简客户端
 3. **依赖方向**：`src-tauri/Cargo.toml` 显式依赖 `neotrix-neobot = { workspace = true }` ——
    **NeoBot 侧栏消费 NeoTrix 引擎**，是 consumer 而非替代品
 
