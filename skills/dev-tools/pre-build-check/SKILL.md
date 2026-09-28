@@ -1,3 +1,11 @@
+---
+name: pre-build-check
+description: 构建前的门禁与检查（先跑这个再构建）
+when_to_use: 任何 cargo 构建之前，尤其是大改动之后
+tools:
+  - dev-tools/pre-build-check/pre-build-check.sh
+---
+
 # Pre-Build Check
 
 ## Purpose

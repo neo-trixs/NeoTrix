@@ -1,3 +1,13 @@
+---
+name: launchd-service
+description: 安装/卸载 macOS launchd 常驻服务（todo-sync 等）
+when_to_use: 需要让某个任务在 macOS 登录后常驻运行时
+tools:
+  - dev-tools/launchd-service/com.neotrix.todo-sync.plist
+# 无 .sh 工具 —— 本技能交付的是 plist 本身，由 Makefile 的
+# install-launchd / uninstall-launchd target 调用。
+---
+
 # LaunchD Service
 
 ## Purpose

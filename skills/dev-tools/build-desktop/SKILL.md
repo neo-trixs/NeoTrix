@@ -1,3 +1,14 @@
+---
+name: build-desktop
+description: 构建桌面端（launchd 服务 + Rust bin 打包）
+when_to_use: 需要构建或更新 macOS 桌面服务产物时
+tools:
+  - dev-tools/build-desktop/build-desktop.sh
+# ⚠️ 已知失效（2026-09-28 实测）：脚本调 `cargo build -p neotrix-tauri`，
+# 该包已随 5c02e738 移出 workspace 且 src-tauri/ 已删 ⇒ **必失败**。
+# 脚本自身第 20/28 行已标注此事。用前先读那两行。
+---
+
 # Desktop Build Pipeline
 
 ## Purpose

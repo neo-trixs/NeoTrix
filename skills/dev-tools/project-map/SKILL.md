@@ -1,3 +1,15 @@
+---
+name: project-map
+description: 生成全仓 code map（codemap.json）供定位与审计
+when_to_use: 需要全仓结构视图，或索引陈旧需重建时
+tools:
+  - dev-tools/project-map/map-project.sh
+# 产物 .project-map/codemap.json 是**快照**，会随编辑漂移。
+# ⚠️ 与 scripts/ops/nt_mapgen.py 强重复（后者是实际后端），
+# 且 neotrix-core/src/l2_perception/nt_core_code_search.rs（670 行含 RRF
+# 融合）在能力上更强 —— 合并前本脚本勿删。
+---
+
 # Project Structure Map
 
 ## Purpose

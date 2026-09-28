@@ -1,3 +1,11 @@
+---
+name: daemon-monitor
+description: 监控后台守护进程的健康与资源占用
+when_to_use: 怀疑 daemon 卡死或资源异常时
+tools:
+  - dev-tools/daemon-monitor/daemon-monitor.sh
+---
+
 # Daemon Monitor
 
 ## Purpose

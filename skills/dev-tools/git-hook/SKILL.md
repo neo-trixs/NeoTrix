@@ -1,3 +1,14 @@
+---
+name: git-hook
+description: 安装/卸载 NeoTrix 的 git hooks（pre-commit 等）
+when_to_use: 新克隆仓库后需要装上钩子，或排查钩子为何未生效时
+tools:
+  - dev-tools/git-hook/git-hook.sh
+  - dev-tools/git-hook/no-main-direct.sh
+# 注意：Rust 侧 `nt_act_dev_tools/git_hook.rs` 会把 no-main-direct.sh
+# symlink 进 .git/hooks —— 改这个文件会同时影响两条路径。
+---
+
 # Git Hook
 
 ## Purpose
