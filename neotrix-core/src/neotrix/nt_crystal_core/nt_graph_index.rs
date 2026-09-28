@@ -337,7 +337,10 @@ mod tests {
         // 正向：从 P1 走 1 跳到 A，A 无出边 → 2 跳必空（这正是要建双向的理由）
         let fwd1 = a.out_neighbors("P1");
         assert_eq!(fwd1, &["A"]);
-        assert!(a.out_neighbors(fwd1[0].as_str()).is_empty(), "正向第 2 跳必须为空");
+        assert!(
+            a.out_neighbors(fwd1[0].as_str()).is_empty(),
+            "正向第 2 跳必须为空"
+        );
         // 反向：从 A 走入邻域拿到整簇 5 条
         assert_eq!(a.in_neighbors("A").len(), 5);
     }

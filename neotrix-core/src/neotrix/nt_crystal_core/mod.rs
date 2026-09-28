@@ -66,6 +66,7 @@ pub mod nt_jev_agentjev; // AgentJev-0.6B sidecar 桥（决策模型生产落地
 pub use nt_jev_agentjev::{AgentJevQuestion, NtJevAgentJev, DEFAULT_PORT};
 pub mod nt_orchestrator; // 进化闭环调度器（tick + 模型回灌）
 pub mod nt_graph_index; // 记忆图双向邻接（推理链前提选择的图基础）
+pub mod nt_premise_selector; // 推理链前提选择（语义簇 + 确定性 + 反 monoculture）
 pub use nt_orchestrator::{InferenceSource, NtOrchestrator, NtOrchestratorConfig, OrchestratorReport};
 pub mod nt_eval_loop; // 评估闭环（EvalReport → 门限/重训动作）
 pub use nt_eval_loop::{EvalAction, EvalLoopReport, NtEvalLoop};

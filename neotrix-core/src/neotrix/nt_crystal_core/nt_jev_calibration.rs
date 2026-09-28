@@ -112,8 +112,8 @@ impl NtJevCalibration {
         let conf = scores.total.clamp(0.0, 1.0);
         let verdict = if conf >= GOLD_FLOOR { "成立" } else { "存疑" };
         let thinking = format!(
-            "<think>类型={:?}，新颖度={:.2}，接地={:.2}，跨域桥={:.2}。</think>",
-            ch.chain_type, scores.novelty, scores.grounding, scores.bridge
+            "<think>类型={:?}，新颖度={:.2}，接地率={:.2}，跨域桥={:.2}。</think>",
+            ch.chain_type, scores.novelty, scores.coverage, scores.bridge
         );
         let jsonl = serde_json::json!({
             "conversations": [
