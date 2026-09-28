@@ -397,3 +397,18 @@ use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
         assert_eq!(sr.title, sr2.title);
     }
 }
+
+// ─── L1→L3/L6 跨层引用收敛点（分层门 sanctioned channel）──────────────────────
+// 本文件此前**只有内部 `use`、0 条 `pub use`**，故 L1 业务文件一律直引
+// `crate::l3_embodiment::…` / `crate::l6_meta::…`，层名出现在业务代码里 ⇒
+// 门记违规。走目标层 facade 无效（路径仍含层名），必须经**本层**门面。
+//
+// 路径一律沿用消费方**原本就在用**的路径（原代码已能编译 ⇒ 路径可证），
+// 不重新定位定义处。ALLOW: 类型/函数直访，trait-object 不可行
+// （同 l5_cognition/l1_facade.rs:125-128 的既有说明）。
+// ⚠️ 本段按目标层**逐批追加**（先 L3/L6，再 L2/L4/L5），每批单独编译验证。
+pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::config::{reload, snapshot};
+pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_pool::ProxyPool;
+pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::rules::RuleEngine;
+pub use crate::l6_meta::nt_approval;
+pub use crate::l6_meta::nt_approval::PendingAction;

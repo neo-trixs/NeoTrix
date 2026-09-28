@@ -14,7 +14,6 @@ l2_perception	neotrix-core/src/l1_action/nt_io/universal_model/openai_adapter.rs
 l2_perception	neotrix-core/src/l1_action/nt_media/playback.rs
 l2_perception	neotrix-core/src/l1_action/nt_media/streaming/mod.rs
 l2_perception	neotrix-core/src/neotrix/nt_file_ability/tests.rs
-l3_embodiment	neotrix-core/src/l1_action/nt_io/nt_io_hotreload/mod.rs
 l3_embodiment	neotrix-core/src/l1_action/nt_io/nt_io_provider/common/factory.rs
 l4_emotion	neotrix-core/src/l1_action/mod.rs
 l4_emotion	neotrix-core/src/l1_action/nt_act/nt_act_trade/orchestrator.rs
@@ -36,8 +35,6 @@ l5_cognition	neotrix-core/src/l1_action/nt_io/nt_io_proxy_server.rs
 l5_cognition	neotrix-core/src/neotrix/ffi/consciousness_tree.rs
 l5_cognition	neotrix-core/src/neotrix/ffi/seal_pipeline.rs
 l5_cognition	neotrix-core/src/neotrix/nt_file_ability/tests.rs
-l6_meta	neotrix-core/src/l1_action/nt_io/nt_io_agent_loop/nt_loop_core.rs
-l6_meta	neotrix-core/src/l1_action/nt_io/nt_io_agent_loop/nt_loop_step.rs
 l6_meta	neotrix-core/src/l5_cognition/nt_core_arch_fitness.rs
 l6_meta	neotrix-core/src/l5_cognition/nt_core_orchestration_failure_taxonomy.rs
 l6_meta	neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_consciousness/nt_audit.rs
