@@ -28,6 +28,15 @@ pub struct SkillEntry {
     /// Output contract: promised result shape (P0-2 三段式之三).
     #[serde(default)]
     pub output_contract: Option<String>,
+    // ── 调用策略（2026-09-28 吸收，见 SkillInvocationPolicy）──
+    // 对齐官方 Agent Skills 的 `disable-model-invocation` / `user-invocable`：
+    // 「存在」与「对模型暴露」是**正交两维**，不是一件事。
+    /// 禁止模型自动加载本技能。缺省 false = 允许按 description 触发。
+    #[serde(default)]
+    pub disable_model_invocation: bool,
+    /// 不在用户 `/` 菜单展示，只供程序化调用。缺省 true。
+    #[serde(default = "default_true")]
+    pub user_invocable: bool,
     /// License identifier (T35 E轨；S7.1 install 侧已有 license，此处候选本体侧对齐）.
     #[serde(default)]
     pub license: String,
@@ -46,6 +55,10 @@ pub struct SkillCategory {
 pub struct SkillIndexEntry {
     pub category: String,
     pub file: String,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Root structure of `skills/index.json`.
@@ -77,6 +90,55 @@ pub struct ResolvedSkill {
     pub license: String,
     /// Intake gate verdict (P0-2 门禁).
     pub admission: SkillAdmission,
+    /// 调用策略（2026-09-28 吸收）：与「是否存在」「是否准入」正交的第三维。
+    pub invocation: SkillInvocationPolicy,
+}
+
+/// 调用策略：技能**存在**与**对模型暴露**是两件独立的事。
+///
+/// 吸收源：官方 Agent Skills 规范的 `disable-model-invocation` 与
+/// `user-invocable` 两个独立字段。四种组合全部合法，**包括两者皆假**
+/// ——那种技能仍可被受信调用方按名字取用，只是不出现在任何自动发现面里。
+///
+/// NeoTrix 的具体动机：`skills/self-health/`、`skills/self-iteration-agent/`
+/// 这类自检/自迭代技能**必须能被模型自动触发**（它们的价值就在于被触发），
+/// 而 `external-absorption` 这类会**修改 KB 的技能**不应被模型随手唤起
+/// ——此前两种诉求挤在同一个 `description` 里，无法分别表达。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SkillInvocationPolicy {
+    /// 允许模型按 description/triggers 自动加载（`!disable_model_invocation`）。
+    pub model_invocable: bool,
+    /// 在用户 `/` 菜单中展示（`user_invocable`）。
+    pub user_invocable: bool,
+}
+
+impl SkillInvocationPolicy {
+    /// 是否应出现在**面向模型的目录**里（官方规范：目录只含
+    /// name + description，且对不可调用的技能不可见）。
+    pub fn visible_to_model(&self) -> bool {
+        self.model_invocable
+    }
+
+    /// 是否应出现在**用户 `/` 菜单**里。
+    pub fn visible_to_user(&self) -> bool {
+        self.user_invocable
+    }
+
+    /// 是否仅供受信调用方按名取用（两个维度皆不暴露）。
+    pub fn is_trusted_only(&self) -> bool {
+        !self.model_invocable && !self.user_invocable
+    }
+}
+
+impl Default for SkillInvocationPolicy {
+    fn default() -> Self {
+        // 缺省=最宽松：允许模型自动触发 + 出现在用户菜单。
+        // 与 `SkillEntry` 的 serde default 一致，既有 index.json 行为不变。
+        Self {
+            model_invocable: true,
+            user_invocable: true,
+        }
+    }
 }
 
 /// Intake gate verdict for the three-part description rule (P0-2).
@@ -296,6 +358,10 @@ impl SkillLoader {
                         &entry.exclusions,
                         &entry.output_contract,
                     ),
+                    invocation: SkillInvocationPolicy {
+                        model_invocable: !entry.disable_model_invocation,
+                        user_invocable: entry.user_invocable,
+                    },
                 });
             }
         }
@@ -528,6 +594,10 @@ impl SkillLoader {
                         &entry.exclusions,
                         &entry.output_contract,
                     ),
+                    invocation: SkillInvocationPolicy {
+                        model_invocable: !entry.disable_model_invocation,
+                        user_invocable: entry.user_invocable,
+                    },
                 });
 
                 // Recurse into dependencies
@@ -578,6 +648,7 @@ impl SkillLoader {
                                 missing_exclusion: true,
                                 missing_contract: true,
                             },
+                            invocation: SkillInvocationPolicy::default(),
                         });
                     }
                 } else if let Some(ext) = path.extension() {
@@ -605,6 +676,7 @@ impl SkillLoader {
                                     missing_exclusion: true,
                                     missing_contract: true,
                                 },
+                                invocation: SkillInvocationPolicy::default(),
                             });
                         }
                     }
@@ -747,6 +819,8 @@ mod tests {
                     exclusions: vec![],
                     output_contract: None,
                     license: String::new(),
+                    disable_model_invocation: false,
+                    user_invocable: true,
                 },
             );
         }
@@ -808,6 +882,58 @@ mod tests {
         let _ = std::fs::remove_dir_all(&tmp);
     }
 
+    // ── 调用策略（2026-09-28 吸收）──
+
+    #[test]
+    fn test_invocation_policy_four_combinations() {
+        // 四个组合全部合法，包括「两者皆不暴露」（仅受信调用方可取用）。
+        // 语义恒等式，故期望值直接由输入推导 —— 手写第三四列反而容易把
+        // `model_invocable` 与 `disable_model_invocation` 的极性写反（本轮就翻过一次）。
+        for (disable_model, user_invocable) in
+            [(false, true), (true, true), (true, false), (false, false)]
+        {
+            let p = SkillInvocationPolicy {
+                model_invocable: !disable_model,
+                user_invocable,
+            };
+            assert_eq!(p.visible_to_model(), !disable_model, "disable_model={disable_model}");
+            assert_eq!(p.visible_to_user(), user_invocable);
+            assert_eq!(
+                p.is_trusted_only(),
+                disable_model && !user_invocable,
+                "is_trusted_only == (禁止模型 且 不对用户暴露)"
+            );
+        }
+    }
+
+    #[test]
+    fn test_invocation_policy_default_is_permissive() {
+        // 既有 index.json 无这两个 key ⇒ 行为必须与吸收前一致（最宽松）。
+        let d = SkillInvocationPolicy::default();
+        assert!(d.visible_to_model() && d.visible_to_user());
+        assert!(!d.is_trusted_only());
+    }
+
+    #[test]
+    fn test_entry_invocation_derives_from_serde_fields() {
+        // serde 缺省：disable_model_invocation=false / user_invocable=true
+        let e: SkillEntry =
+            serde_json::from_str(r#"{"description":"d","tags":[]}"#).expect("parse");
+        assert!(!e.disable_model_invocation);
+        assert!(e.user_invocable, "user_invocable 缺省必须是 true");
+    }
+
+    #[test]
+    fn test_entry_invocation_honors_explicit_false() {
+        // 显式 false 必须被解析成 false（不能被 default 覆盖）——
+        // 这是「对模型隐藏但用户可调」这一组合的表达力所在。
+        let e: SkillEntry = serde_json::from_str(
+            r#"{"description":"d","tags":[],"user_invocable":false}"#,
+        )
+        .expect("parse");
+        assert!(!e.user_invocable);
+    }
+
     // -- P0-2 三段式门禁 --
 
     fn gated_entry() -> SkillEntry {
@@ -819,6 +945,8 @@ mod tests {
             exclusions: vec!["不用于删除".into()],
             output_contract: Some("JSON".into()),
             license: String::new(),
+            disable_model_invocation: false,
+            user_invocable: true,
         }
     }
 
@@ -876,13 +1004,16 @@ mod tests {
             output_contract: None,
             license: String::new(),
             admission: SkillAdmission::Admitted,
-        };
+        
+            invocation: SkillInvocationPolicy::default(),
+};
         let needs_work = ResolvedSkill {
             admission: SkillAdmission::NeedsWork {
                 missing_trigger: true,
                 missing_exclusion: true,
                 missing_contract: true,
             },
+            invocation: SkillInvocationPolicy::default(),
             ..admitted.clone()
         };
         let filter = SkillFilter::default();
@@ -911,6 +1042,7 @@ mod tests {
                 missing_exclusion: true,
                 missing_contract: true,
             },
+            invocation: SkillInvocationPolicy::default(),
         }
     }
 
