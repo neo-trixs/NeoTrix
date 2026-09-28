@@ -479,7 +479,7 @@ impl BackgroundLoopHandle {
         // data source exists.
 
         // ── Absorbed module SelfTests (Cycle 113) ──
-        crate::l6_meta::healing::nt_core_self_test_integration::register_absorbed_modules(&mut self_tests);
+        crate::l5_cognition::l1_facade::register_absorbed_modules(&mut self_tests);
 
         // ── Substrate + Engine SelfTests (Cycle 119 architecture refactor) ──
         self_tests.register(Box::new(

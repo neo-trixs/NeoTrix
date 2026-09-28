@@ -166,7 +166,7 @@ impl BackgroundLoop {
             proxy_client: None,
             nt_act_voice_input: Some(VoiceInput::new()),
             avatar_engine: Some(DistillationEngineWrapper::new()),
-            scheduler: Some(crate::l6_meta::nt_core_scheduler::default_scheduler(
+            scheduler: Some(crate::l5_cognition::l1_facade::default_scheduler(
                 std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()
             )),
             handles: Vec::new(),

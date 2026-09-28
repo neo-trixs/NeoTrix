@@ -547,7 +547,7 @@ pub fn network_access_allowed(provider_type: LlmProviderType, base_url: Option<&
             return true;
         }
     }
-    match crate::l3_embodiment::nt_shield_enforcer::global_shield().lock() {
+    match crate::l1_action::nt_action_facade::global_shield().lock() {
         Ok(shield) => {
             use crate::l0_substrate::nt_core_traits::NetworkPolicy;
             match shield.policy.check_network_access(&host) {
