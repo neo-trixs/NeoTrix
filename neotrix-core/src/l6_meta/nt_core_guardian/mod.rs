@@ -59,9 +59,32 @@ mod tests {
         registry.register(Box::new(BuildCheck));
         let _watchdog_findings = registry.run_all();
 
-        // 4. 修复编排
+        // 4. 修复编排 —— 机器无关的不变量验证
+        // 2026-09-28 修正: 原断言 `results.len() <= 1` 依赖**运行机器** ——
+        // 上面 scan_system_health 扫的是真实内存/磁盘, 于是本测试的结果取决于
+        // 跑它的那台机器当时健康与否; 内存吃紧时多个组件降级, 修复数自然 > 1。
+        // 这不是被测代码的错, 是测试把宿主环境当成了前置条件。
+        // 改为用**只含健康组件**的独立 HealthState 验证真正的不变量:
+        // 健康组件不该被修复。这完全不依赖宿主状态。
+        let healthy_only = Arc::new(HealthState::new());
+        healthy_only.update_batch(vec![ComponentHealth {
+            name: "deterministic_probe".into(),
+            level: HealthLevel::Healthy,
+            message: "显式注入的健康组件".into(),
+            metrics: std::collections::HashMap::new(),
+            checked_at_ms: 0,
+        }]);
+        let mut repair_probe = RepairOrchestrator::new(healthy_only);
+        let probe_results = repair_probe.repair_cycle();
+        assert!(
+            probe_results.is_empty(),
+            "健康组件不该触发修复, 实际修了 {:?}",
+            probe_results.iter().map(|r| &r.message).collect::<Vec<_>>()
+        );
+
+        // 真实扫描那条路径仍然要能跑通(它是管道的一部分), 但不断言其修复数
         let mut repair = RepairOrchestrator::new(health.clone());
-        let results = repair.repair_cycle();
+        let _results = repair.repair_cycle();
 
         // 5. 熔断器
         let cb = CircuitBreaker::with_defaults();
@@ -72,7 +95,6 @@ mod tests {
 
         // 验证
         assert!(health.global_level() != HealthLevel::Unknown || findings.is_empty());
-        assert!(results.len() <= 1); // 大部分情况无需修复
         assert_eq!(cb.state(), CircuitState::Closed);
         assert_eq!(config.max_restarts, 10);
     }

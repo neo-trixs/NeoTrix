@@ -1,8 +1,3 @@
 l0_substrate::nt_core_kb_primitives::tests::test_node_history
 l0_substrate::nt_core_kb_primitives::tests::test_nodes_as_of_returns_committed
-l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_heartbeat::tests::test_heartbeat_twice_rotates
 l3_embodiment::nt_shield::nt_shield_ztnet::crypto::noise_handshake::tests::full_handshake
-l5_cognition::nt_core::nt_consciousness_core::task_categorizer::tests::test_categorizer
-l6_meta::nt_core_guardian::tests::test_full_guardian_pipeline
-neotrix::nt_file_ability::selftest::tests::test_doc_parse_selftest
-neotrix::nt_file_ability::selftest::tests::test_file_ability_selftest

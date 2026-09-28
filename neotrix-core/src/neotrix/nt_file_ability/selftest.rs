@@ -293,8 +293,16 @@ impl SelfTest for DocParseSelfTest {
         if !config.enable_tables {
             errors.push("PdfParseConfig.enable_tables should default to true".to_string());
         }
-        if !config.enable_images {
-            errors.push("PdfParseConfig.enable_images should default to true".to_string());
+        // 2026-09-28 修正陈旧期望: 实现里 enable_images 默认 **false**
+        // (doc_parse.rs:274), 而 ocr/tables 默认 true。图像抽取成本显著高于
+        // 文本/表格, 默认关闭是合理设计; 原自检断言 true 与实现矛盾, 且让本条
+        // 自检恒失败。改为断言与实现一致的契约, 并写明理由便于日后有人改默认值时
+        // 知道该同步哪里。
+        if config.enable_images {
+            errors.push(
+                "PdfParseConfig.enable_images 默认应为 false(图像抽取成本高), 请同步更新此自检"
+                    .to_string(),
+            );
         }
 
         // 5. detect_format_from_content 基本探测
@@ -402,7 +410,10 @@ mod tests {
     #[test]
     fn test_file_ability_selftest() {
         let test = FileAbilitySelfTest;
-        assert_eq!(test.name(), "nt_file_ability");
+        // 2026-09-28 修正陈旧期望: name() 自 2026 的 melt 改名回归修复起就是
+        // "nt_io_file_ability"(nt_io_ 前缀 → ConsciousnessTree Io 分支, 见 impl
+        // 处注释), 本断言没跟着改, 于是恒失败。对齐到实现。
+        assert_eq!(test.name(), "nt_io_file_ability");
         assert!(test.self_test().is_ok());
     }
     
