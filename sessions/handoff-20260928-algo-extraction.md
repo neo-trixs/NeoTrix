@@ -186,3 +186,45 @@ pre-commit cargo check --tests ✅ Build gate passed（多轮；本轮门共抓�
 7. **Cargo 反查看不见 CI**：`neotrix-audit` 与 `nt-core-capability-tree` 的 Cargo
    反查显示零消费者，实为 **CI 门在用**（`nt-audit.yml:30`、`ci.yml:224-226`）。须一并 grep
    `.github/workflows/`。
+
+## 8. 收工自查（2026-09-28 义务生效，本会话自补）
+
+### 8.1 worktree 去向
+
+`sh scripts/ops/nt_worktree_gate.sh check` → **exit 4**（存在带未提交改动的 worktree）：
+
+```
+[worktree-gate] worktree=1 个 | 合计 50M | target 占 0M
+[worktree-gate] 带未提交改动: 1 个 | 近3h有改动: 1 个
+[worktree-gate] ⛔ 1 个 worktree 的未提交改动**不在任何提交里**
+```
+
+| worktree | 用途 | 去向 |
+|---|---|---|
+| `.worktrees/ratchet` | `fix/bitemporal-and-layer-ratchet`（5 处改动：4 个 .rs + `scripts/layer-deps-baseline.txt`） | **明确移交，不收** —— 近 3h 仍有 .rs 改动 ⇒ 判定为他窗活跃。本会话曾误删过一次并已用 patch 完整恢复（5 处全中），此后按 R-DISK-7 判据同向原则不再自动清理 |
+
+本会话新建的 worktree：**0 个**。清理掉的 19 个均为历史遗留（详见各提交信息）。
+
+### 8.2 未提交改动的去向
+
+主仓 `git status` 现有 3 处未提交，**全部为他窗 WIP，非本会话产生**：
+
+| 文件 | 归属 | 去向 |
+|---|---|---|
+| `neotrix-core/src/l0_substrate/nt_core_kb_primitives.rs` | 他窗 | ☐ 非本会话产物 → 移交 |
+| `neotrix-core/src/l5_cognition/nt_mind/evolution/evolution_daemon.rs` | 他窗 | ☐ 非本会话产物 → 移交 |
+| `scripts/layer-deps-baseline.txt` | 门脚本自动更新 | ☐ 非本会话产物 → 移交 |
+
+本会话已移除的 15 个 worktree，其 850 处未提交改动**全部兜底**在
+`/Users/neo/Downloads/Neo/neotrix-archive/dirty-salvage-20260928/`
+（31 个文件 / 5.6M，15/15 通过 `git apply --check --reverse` 校验，附 README 回放说明）。
+其中 `ratchet` 的 patch 已在实战中验证可回放（`apply --3way` 5 处全中）。
+
+### 8.3 门状态
+
+- `nt_worktree_gate.sh check` exit code：**4**（ratchet 脏，见上，已判定为他窗活跃）
+- `cargo check --tests -p neotrix`：✅ 每笔提交的 pre-commit gate 均通过
+- `check-layer-deps.sh --strict`：101 known / **0 new** ✅
+- `check-truth-surface.sh`：EMPTY:0 / UNDECLARED:0 ✅
+- `nt_lock_audit.py`：0 处 ✅
+- 门红归属：无本会话引入的红
