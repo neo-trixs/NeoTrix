@@ -63,6 +63,105 @@
 >    `workspace-jail` 拒绝），缺口只在 pathspec 这一段。**可达性待核**：
 >    前提是工作区内已存在一个攻击者可控的软链接。
 >
+> **2026-09-28 内存门 OPEN 后第一批（4 agent，文件所有权互斥，带 cargo）**：
+> 基线 308 绿 → 现 **331 绿**（+5 find / +2 git / +16 edit_of）；desktop 7 → **8 个二进制 60 绿**
+> （+12 斜杠命令 +2 find 冒烟）。`lock_audit` 0；clippy 本轮改动文件 **0**。
+>
+> ✅ **find 静默截断**（`SearchResults { hits, truncated, truncated_by }`）：上限判定移到
+>    `pop_front()` 之前 ⇒ 「还有没扫的目录」是**可证**的而非估计，故能严格区分
+>    「恰好 200 个」与「被砍断」。三个上限（hits/visits/depth）**分别**如实回报。
+>    顺带发现前端原有 `hits.length >= 200` **双向都错**：恰好 200 会假报截断、
+>    visits/depth 撞顶时会漏报，且 200 是 Rust 常量的前端硬编码副本。
+> ✅ **nt_git pathspec 第二道门**：5 个落地点（diff/log/stage/unstage/discard）全过
+>    `jail_real`（`canonicalize` 后核验）。测试**先断言纯词法门放行**再断言 `Denied` ——
+>    非空转。变异验证：把门改成 `if false && …` 真的漏出 `TOP SECRET`。
+> ✅ **桌面斜杠指令**：`/help` `/stop` 直接调 core 的 `parse`/`help_text`（不抄字符串）；
+>    `/stop` 与 IM **字节相等**；`/new` **明确拒绝**且一个会话都不建（桌面后端没有
+>    切界面的通道，造假 = fiction）。「不撒谎」用**反向断言**钉（禁用词表 9 个）。
+> ✅ **edit_of 三段接通** + 降级记账 `SendOutcome{edited,degraded,already_there,…}`。
+>    平台回 `message is not modified` 时**不发新消息**（再发一条正是要消灭的重复）。
+>
+> 🔴 **本批暴露的未闭合事实（agent 主动交代，主 agent 复核为真）**：
+> 1. **`edit_of` 在当前调用图里永远不成功**：`deliver_result` **没有任何生产调用点**
+>    （只在 `#[cfg(test)]` 里被调，是「测试充分但生产死代码」的典型）；
+>    而生产可达的 `sweep_pending`（`nt_channel_serve.rs:232` 调用）传的是**用户那条
+>    入站消息**的 id —— **bot 不能编辑用户的消息**，平台回
+>    `message to edit not found`，于是**每次补发先浪费一次 API 调用再降级**。
+>    用户可见行为没变差（原来发一条，现在仍是一条），但编辑能力等于没接上。
+>    真要生效：先发占位消息、记住**它自己**的 message_id（要动 `nt_store` 落库）。
+> 2. **`read_text` 限读分支的 `truncated` 是死代码恒 false**（`end` 初值 = `buf.len()`），
+>    今天不咬人（超限在上一分支已返回），但删掉那个提前返回就会静默截断。
+> 3. **`MAX_SEARCH_VISITS` 不是收敛闸门**：撞到它只 break 内层 `for`，外层 BFS 继续
+>    逐个读剩余目录。本轮**保留原语义**（改它属行为变更），只如实回报。
+> 4. **需要改 core 才能结构同源**（~15 行）：`nt_channel_cmd::local_reply(cmd, channel)`
+>    渠道无关入口。有了它，桌面那份 `STOP_REPLY` 拷贝可以删掉，两端口径靠**结构**
+>    保证而非靠测试兜。
+> 5. `help_text` 里的 `**当前不可用**` 在桌面气泡里**不渲染成粗体**（前端 `esc()` 后
+>    按字面显示两个星号）。IM 侧是纯文本发送看不出来。
+> 6. 前端 `main.ts:691-695` 流式收尾时无条件取 `tasks[0]`，团队会话里会把**上一轮**的
+>    任务卡挂到本地指令气泡上。
+> 7. `SearchResults`/`SearchCap` 未进 `lib.rs:101` 的 re-export 列表（功能不受影响，
+>    走 `nt_workspace::` 路径；按惯例应在其中）。
+>
+> 🔧 **主 agent 本批自己修的 2 处**：
+> - `nt_channel_cmd.rs:177-178` **我自己早先写的注释被本轮改动证伪**（写着「桌面聊天
+>   也不解析斜杠指令」，而桌面现在解析了）—— 注释在说谎这个毛病，本轮我又犯了一次。
+> - `nt_channel_dispatch.rs:507` 新代码用了 `payload["edit_of"] = …`，本 crate 开着
+>   `-W clippy::indexing_slicing`；改用 `as_object_mut()`（`Value` 下标插入在 key 类型
+>   不对时会 **panic**）。
+>
+> **2026-09-28 第三批（4 agent，带 cargo）**：331 → **353 core 绿**，desktop **63 绿**（8 个二进制）。
+>
+> 🔴 **本批最大发现：一个一直存在的 flake 源（不在原清单里，是我核验时撞见的）**：
+> neobot crate 有 **30 处**测试用 `std::env::temp_dir().join(固定名)` 造夹具
+> （19 处完全固定名，11 处只按用例名唯一化 ⇒ **同一用例跑两遍仍撞**）。
+> 一个测试的 `remove_dir_all` 会删掉另一个正在用的夹具 ⇒ 断言在与被测代码无关的地方炸。
+> **实测**：同一 test binary **并发跑 3 份，每份各挂 9–18 个测试，且每份挂的不是同一批**
+> ——共享夹具互相踩的指纹。串行 353 全绿。
+> 这解释了此前那次「352/1 失败、8 次重跑又全绿」的幽灵。
+> **危害比单测红更大**：我常态派多 agent 同时 `cargo test` 同一 crate（cargo 只串行化
+> **构建**，两个 `cargo test` 的**执行**阶段并行），所以这会持续制造假红灯，
+> 而假红灯会训练人忽略红灯。
+> **已修**：新增 `nt_testutil::temp_dir(tag)`（pid + 单调纳秒唯一），30 处机械替换；
+> 对照实验 **4 实例并发 × 353 测试 → 0 失败**（修复前 3 实例各挂 9–18）。
+>
+> 🔴 **`.gitignore` 的裸 `tests/` 规则静默丢弃集成测试（跨批次累积，不只影响本轮）**：
+> `.gitignore:122` 写的是 `tests/`，git 的裸模式**匹配任意层级**，于是把各 crate 的
+> **集成测试目录**一起吞掉。实测：`neotrix-core/tests` **26 个 .rs 只入库 2 个**（24 个丢），
+> `apps/neobot-desktop/tests` **6 个入库 0 个** —— 本轮建的 55 个 IPC 测试
+> **存在于磁盘却永远进不了版本库**，clone 下来等于没有这套网。
+> （好消息：`src/**/tests` 模块目录**都已入库**，所以全新 clone 仍能编译。）
+> **已修**：锚成 `/tests/`（根目录那个 scratch 目录仍被忽略），27 个文件重新可入库；
+> 已入库的不受影响（gitignore 只管未跟踪文件），是纯增量修复。
+>
+> ✅ **`read_text` 限读分支「做实」而非删掉**（删掉等于移除唯一兜底，会退化成静默截断）；
+> ✅ **`MAX_SEARCH_VISITS` 改成真收敛**（`break` → `break 'bfs`，否则「总访问上限」名不副实）；
+>    变异验证：`break` 改回 `break 'bfs` 立刻红；agent 还**用它自己注释里的手推值证伪了手推**
+>    （原写「会扫完 930 项」，实测 80）—— R-SCAN-2。
+> ✅ **core 加 `local_reply(cmd, channel)`** 渠道无关入口，桌面删掉 `STOP_REPLY` 拷贝，
+>    回执文本**全仓只剩一处**；`/stop` 字节不变。
+> ✅ **前端任务卡归属改语义判据**（`turn_task.ts`）：本地指令不再挂上一轮的任务卡。
+>    agent 诚实报告**真 id 前端拿不到**（`NeobotRunResult` 只有 status+labels），
+>    用「窗口内新建 + 归属本会话」作间接证据并明说残余风险。
+> ✅ **`/stop` C0+C1**：租约续租（有界+按时间退避，`renew_lease` 是条件 UPDATE 防越权）
+>    + 四个取消检查点；中止落 `TaskStatus::Cancelled` 并带「第几跳」；
+>    **回执一个字未改**（仍诚实说停不了）。
+>
+> 🟡 **本批新发现（未做）**：
+> 1. `apps/neobot-desktop/tests/` 曾被 gitignore 整目录忽略（已修 `.gitignore`，
+>    但**这些文件仍未入库** —— 需要一次 `git add` 才会真正进版本库）。
+> 2. **一条既有测试本来就是恒真的摆设**：`help_text_is_byte_identical_to_the_im_help_text`
+>    比的是 `help_text(X)` vs `help_text(X)`，上一批桌面直调该函数后它就测不出东西了
+>    （agent 用变异实证，非手推）。按「不许删既有断言」的要求留着，但**它现在没有牙**。
+> 3. `help_text` 里命令名仍被反引号包着（也是 markdown 记号，两端按字面显示）；
+>    agent 未动，因为改它会变更 IM 侧用户可见文案。
+> 4. `nt_store/mod.rs` 不是任何 agent 的所有权，导致 `last_step` 只能返回
+>    `Option<(bool, String)>` 元组而非具名 `StepRow`。
+> 5. 真实跑轮的 `task_id` **端到端缺失**：正解是后端在 `NeobotRunResult` 加 `task_id`；
+>    同类问题还有 `collect_labels` 用 `list_tasks(1).first()` 取 step 工具。
+> 6. `/stop` C1 的 `run_local_turn_cancellable` 改成了吃 `RunContext` 的 4 参签名
+>    （设计文档 §10.5 那条 11 参签名会触发 `too_many_arguments`）——**C2/C3 的 agent 必读**。
+>
 > 🔴 **仍然待办（本轮只做到「不说谎」，没做到「能停」）**：
 > - **`/stop` 真能用** = 架构级：调度改并发（线程池/async）+ `nt_agent` 的 stop hook。
 >   设计见 `docs/architecture/DESIGN-CHANNEL-DISPATCH.md`。
@@ -298,6 +397,51 @@ do not look like a full prefix match"）—— **工具集身份是缓存身份�
 这类缺陷对编译器/clippy/`cargo test` **全是绿的**，只有「声明 ⊆ 注册」这类
 **机械断言**能抓。**故：IPC 层冒烟测试补齐之前，先别加新功能** ——
 缺的那一层正是唯一能对「接错线 / 没接线」发信号的地方。
+
+## ✅ 大幅收口 · 单元测试 57 → 8 例失败（2026-09-28）
+
+修好构建后测试才第一次能跑, 暴露出 57 条失败。逐个诊断后**消除 49 条**, 余 8 条。
+
+**成因分布（关键发现）**：57 条里 **37 条在工作树里早已修好但从未入库**
+（与构建错误同一模式）—— 入库即解决。真正需要诊断的 20 条里：
+
+| 类别 | 条数 | 处置 |
+|---|---|---|
+| 工作树已修未入库 | 37 | 落盘（32 文件） |
+| **真 bug** | 6 | 熔断器 3（`is_available` 不转换状态 / 探针配额从未自增 / 半开探针失败累加旧计数致恢复死锁）、`best()` 同分返回最深层 |
+| **虚标** | 1 | CAD SelfTest 的 file:line 证据是**被注释掉的代码**，路径目录不存在 |
+| **stub 能力缺失** | 1 | `TextEmbedder` 是字节袋不是词袋，任意英文相似度被抬到 0.8+ |
+| **测试隔离缺陷** | 1 | checkpoint `temp_dir()` 只用 pid 命名 → 同进程 6 测试共用目录互相踩 |
+| **测试断言了不可能/矛盾的结果** | 4 | 见下 |
+
+### 值得记住的 4 类「坏测试」
+
+1. `publish()` 的两个分支**都**返回 `success:false`（实现明写 "Feature not wired"），
+   而测试 `assert!(result.success)` —— 在**任何**环境下都不可能通过。
+2. `test_warning_level` 注释说「注入轻微方差」，数据却是 19×10.0+1×12.0
+   ⇒ std≈0.45，z≈8.7 必然 CRITICAL，与它要验的 WARNING 档无缘。
+3. `test_full_pipeline` 注释说「Within expected trend」，传 150.0，而序列
+   `100+0.5*i` 的**下一个点恰好是 115.0** —— 那才是「趋势内」。150 是遗留错值。
+4. `CadWiringEvidenceSelfTest` 判据只有「非空且含冒号」，于是**注释里的冒号**
+   骗过了它。加固为「文件真实存在」后，立刻抓出剩余 4 条证据路径也是错的。
+
+> 这 4 类的共同点：**测试在断言一个不存在的能力**，而不是在验证一个存在的行为。
+> 加固校验器比放宽断言更有价值 —— 前者抓出新问题，后者只是让门变绿。
+
+### 剩余 8 条（其中 2 条 flaky）
+
+| 测试 | 性质 |
+|---|---|
+| `kb_primitives::test_node_history` / `test_nodes_as_of_returns_committed` | **真 schema bug**：`nodes` 主键不含时间维 ⇒ 双时间**根本无法存历史**。已试改复合主键，又暴露 `edges` 真外键 `REFERENCES nodes(id) ON DELETE CASCADE` 失效 + `nodes_as_of` 文档写「latest version」**实现却返回全部版本**。这三项 + 既有 DB 数据迁移 = **TODO 2.2 真双时间迁移**，已回退，不做半迁移 |
+| `noise_handshake::full_handshake` | `InvalidState`，噪声握手状态机 |
+| `nt_core_guardian::test_full_guardian_pipeline` | `results.len() <= 1`，修复编排返回数超预期 |
+| `nt_file_ability::selftest` ×2 | 自检依赖真实文件/环境 |
+| `proxy_heartbeat::test_heartbeat_twice_rotates` | **flaky**（连续运行间进出） |
+| `task_categorizer::test_categorizer` | **flaky**（连续运行间进出） |
+
+**账本已棘轮到 8 条**（`scripts/test-failures-baseline.txt`）。因仍有 flaky，
+CI 继续跑**建议模式不拦** —— 会 flap 的门只会训练人忽略它。
+
 
 ## 已知债 · 单元测试 57 例失败（2026-09-28 实测，**未解决**）
 
