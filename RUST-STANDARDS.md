@@ -582,3 +582,20 @@ src/
 - **R-ENV-1 三个并发 agent 窗口 ≈ 4.4G**，加上供 App 的 9B `llama-server` 670M，
   16G 机器上 `cargo` 会被挤到 OOM。**开重型构建前必须查其它窗口是否在跑**
   （`pgrep -c rustc` + 看 `ps -o %cpu,time` 判断是否真在干活，而非空挂）。
+- **R-DISK-1 回收磁盘先分「工作区 / 生成物」两半，只删生成物**：
+  `du -sh <wt>/target` vs `du -sh --exclude=target <wt>` 一比即知。多 worktree
+  场景下 `.worktrees/*/target` 常占仓库体积的 **90%+**（本轮实测 17G 中 16.6G
+  是 target）。`target` 已 gitignore ⇒ 是纯生成物，删零风险；**但 worktree 本体
+  可能带未提交工作（本轮 3 个巨型 worktree 分别有 12/6/8 处脏文件）⇒ 绝不可
+  `rm -rf` worktree 目录**。判据：`git check-ignore -q target` 确认生成物身份。
+- **R-DISK-2 删 worktree 必须过两道闸**：`git worktree remove` 前要求
+  ①`git status --porcelain` **为空**（有脏文件 = 未保存工作，`kb-flock-fix-2`
+  曾有 758 处）；②`git branch -a --contains <HEAD>` **非空**（HEAD 已合入
+  分支，删了不丢提交）。两闸全过才删，之后 `git worktree prune`。
+  **"HEAD 含于某分支"不等于"可删"** —— 未提交改动不在任何提交里。
+- **R-DISK-3 删 `target/` 后必须复验脏文件计数未变**：`git status --porcelain
+  | wc -l` 清理前后逐一比对（本轮 758/20/16/9/4/4/2/2/1 全部一致才算过）。
+  这是 R-P16 在文件系统操作上的等价物 —— 体积数字好看不等于没删错东西。
+- **R-DISK-4 有 cargo 在跑时不碰主 `target/`**（含他窗构建）：
+  `ps aux | grep -c '[c]argo'` 非 0 即让位。主 target 由 pre-commit build gate
+  频繁重建，清了立刻又要 6.9G。

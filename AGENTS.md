@@ -69,6 +69,11 @@ cargo build -p neotrix                  # 完整构建
   - 沿用规则：改动为**非 `.rs`**（脚本/JSON/TXT）可沿用上次值；改了 `.rs` 必须重跑
   - 历史教训：22:52 之前本文长期写"当前 0 命中"而实际 12 条 —— **陈旧门记录会让下一个 agent 去"修"正确代码，比没有门更危险**（见 R-SCAN-3）
 - sidecar 按需：`sh scripts/ops/nt_sidecar.sh {start|stop|status}` — 用完即停
+- 磁盘回收（R-DISK-1~4，细则见 `RUST-STANDARDS.md` §17.7）：**只删生成物，不删带
+  脏文件的 worktree**。`.worktrees/*/target` 常占 90%+ 体积（2026-09-28 实测
+  17G 中 16.6G 是 target）。删 `target/` 零风险（gitignore 已确认）；删 worktree
+  本体须过双闸：`status --porcelain` 为空 **且** `branch -a --contains HEAD` 非空。
+  **有 cargo 在跑时不碰主 `target/`**
 - 目录/命名门（2026-09-28 新增，均 bash，无需 cargo）：
   - `bash scripts/check-layer-deps.sh --strict` → **exit 0**，**101 known**
     （基线 `scripts/layer-deps-baseline.txt`）。⚠️ **只信干净检出的数字**：
