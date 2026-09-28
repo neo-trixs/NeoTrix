@@ -1,0 +1,20 @@
+{"gold_bool":true,"gold_choice":null,"id":"n01","kind":"noul","options":null,"question":"Is the landmark in France?","state":"The Eiffel Tower is in Paris."}
+{"gold_bool":true,"gold_choice":null,"id":"n02","kind":"noul","options":null,"question":"Does water boil at 100C at sea level?","state":"Water boils at 100C at sea level."}
+{"gold_bool":false,"gold_choice":null,"id":"n03","kind":"noul","options":null,"question":"Is the statement scientifically accurate?","state":"The Moon is made of green cheese."}
+{"gold_bool":true,"gold_choice":null,"id":"n04","kind":"noul","options":null,"question":"Is Tokyo the capital of Japan?","state":"Tokyo is the capital of Japan."}
+{"gold_bool":true,"gold_choice":null,"id":"n05","kind":"noul","options":null,"question":"Is this message spam?","state":"Congratulations! You won $5M, click this link to claim."}
+{"gold_bool":false,"gold_choice":null,"id":"n06","kind":"noul","options":null,"question":"Is this message spam?","state":"Hi, can we move our meeting to 3pm tomorrow?"}
+{"gold_bool":true,"gold_choice":null,"id":"n07","kind":"noul","options":null,"question":"Is this a critical alert?","state":"Server CPU at 98% for 10 minutes."}
+{"gold_bool":false,"gold_choice":null,"id":"n08","kind":"noul","options":null,"question":"Is this a critical alert?","state":"Disk usage at 12%, all checks green."}
+{"gold_bool":true,"gold_choice":null,"id":"n09","kind":"noul","options":null,"question":"Has the delivery completed?","state":"The package arrived yesterday."}
+{"gold_bool":false,"gold_choice":null,"id":"n10","kind":"noul","options":null,"question":"Has the train already left?","state":"The train departs in two hours."}
+{"gold_bool":true,"gold_choice":null,"id":"n11","kind":"noul","options":null,"question":"Is the invoice settled?","state":"Invoice 42 was paid in full."}
+{"gold_bool":false,"gold_choice":null,"id":"n12","kind":"noul","options":null,"question":"Has the refund been issued?","state":"A refund was requested but not approved."}
+{"gold_bool":null,"gold_choice":"billing","id":"c01","kind":"choice","options":["billing","technical","sales"],"question":"Which team handles this?","state":"My credit card was charged twice."}
+{"gold_bool":null,"gold_choice":"technical","id":"c02","kind":"choice","options":["billing","technical","sales"],"question":"Which team handles this?","state":"The app crashes when I open settings."}
+{"gold_bool":null,"gold_choice":"sales","id":"c03","kind":"choice","options":["billing","technical","sales"],"question":"Which team handles this?","state":"Do you offer discounts for teams of 20?"}
+{"gold_bool":null,"gold_choice":"urgent","id":"c04","kind":"choice","options":["urgent","normal","low"],"question":"How urgent is this?","state":"Production database is down, all users affected."}
+{"gold_bool":null,"gold_choice":"low","id":"c05","kind":"choice","options":["urgent","normal","low"],"question":"How urgent is this?","state":"Consider adding dark mode someday."}
+{"gold_bool":null,"gold_choice":"spam","id":"c06","kind":"choice","options":["spam","benign"],"question":"Classify this message.","state":"FREE crypto giveaway, send 0.1 BTC to double it."}
+{"gold_bool":null,"gold_choice":"benign","id":"c07","kind":"choice","options":["spam","benign"],"question":"Classify this message.","state":"Lunch tomorrow at noon?"}
+{"gold_bool":null,"gold_choice":"approve","id":"c08","kind":"choice","options":["approve","reject","defer"],"question":"What action to take?","state":"Deploy v2.3 passed all tests, two approvals."}

@@ -234,5 +234,11 @@ neotrix-core/config/crystal.toml
 # 导致本地测试数 > 新鲜克隆可跑数, CI 静默少测 (无任何告警)。
 !crates/neotrix-decision-engine/tests/
 !crates/neotrix-decision-engine/tests/**
+# 同理 examples/ 也在 blanket 屏蔽里, 而本 crate 的 s1bench_smoke 例程是
+# **已入库的 examples/ 清单里唯一被屏蔽的**真实源码: 它运行时读
+# tests/data/s1_smoke.jsonl(同样被屏蔽), 故新鲜克隆既编不出该 example,
+# 也拿不到它的 golden pack —— 同样是静默少测, 无任何告警。
+!crates/neotrix-decision-engine/examples/
+!crates/neotrix-decision-engine/examples/**
 !crates/nt-core-capability-tree/tests/
 !crates/nt-core-capability-tree/tests/**
