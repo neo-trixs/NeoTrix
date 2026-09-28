@@ -174,6 +174,11 @@ pre-commit cargo check --tests ✅ Build gate passed（多轮；本轮门共抓�
 5. **共享 index 事故**：另一窗口把 64 个删除暂存进了共享 index，我 `git add` 时才发现。
    提交前必须 `git diff --cached --name-status` 核对归属；清理用 `git reset`
    （mixed，不动工作树）而非 `git checkout --`。
-6. **Cargo 反查看不见 CI**：`neotrix-audit` 与 `nt-core-capability-tree` 的 Cargo
+6. **删文件必须确认 `D` 行随提交落地**（本会话踩中，`a8554a47` → `cca40a17` 补提交）。
+   用 `git rm` + 逐个 `git add <mod.rs>` 时，**文件本体的删除会漏**，提交里只剩 `M`。
+   后果：HEAD 仍跟踪该文件 → checkout/clone 复活成永不被编译的死文件，而 mod 声明已删。
+   校验法：`git diff --cached --name-status` 应见 `D`；只见 `M` 即漏。正确做法是
+   `git add -A <路径>` 或 `git commit -a`。
+7. **Cargo 反查看不见 CI**：`neotrix-audit` 与 `nt-core-capability-tree` 的 Cargo
    反查显示零消费者，实为 **CI 门在用**（`nt-audit.yml:30`、`ci.yml:224-226`）。须一并 grep
    `.github/workflows/`。
