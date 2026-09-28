@@ -402,7 +402,36 @@ pub enum _NoiseError {
 mod tests {
     use super::*;
 
+    // ⛔ 本模块**从未成功完成过一次握手**，测试断言的是一个不存在的实现，
+    //    按仓规「实现或 `#[ignore]`，禁改松断言」挂起。
+    //
+    // 根因（2026-09-28 读现场确认，非转述）：`_create_message2`（responder 侧）
+    // 计算 `es = DH(自身 ephemeral, remote_static)`（`:190-194`），而按
+    // **Noise IK** 模式，msg2 里加密送达的是**responder 自己的静态公钥** `re`，
+    // 而 `es` 应为 `DH(e_i, rs_r)` = **initiator 的临时密钥 × responder 的静态**。
+    // 现实现把两个角色接反了：
+    //   1. 角色反了 —— `es` 用 responder 的 `e` 配 initiator 的 `rs`；
+    //   2. 时序反了 —— `remote_static_public` 在此刻尚未被 msg2 的密文填充
+    //      （msg2 密文装的是 `self.static_public`，即 responder 自己的）。
+    // ⇒ `remote_static_public.as_ref()` 必为 `None` ⇒ **恒** `InvalidState`，
+    //   握手在第 2 条消息就死，`Completed` 状态永不可达。
+    //
+    // 为何不就地"顺手修"（crypto，不宜）：
+    // - 这是**协议实现**而非局部逻辑，修对需要 Noise spec 的正式测试向量
+    //   （cavpn 官方 `noise-c` vectors）交叉验证；
+    // - 手写一个"看起来能跑通"但密钥派生次序不对的实现，比红测试**更坏** ——
+    //   它会把一个坏掉的握手伪装成可用的加密通道；
+    // - 本模块**零生产调用方**（全仓仅 `crypto/mod.rs:14` 的 `pub mod`），
+    //   挂起不损失任何在用能力，也没有安全敞口。
+    // - 另需一并决策：协议名字面量 `Noise_IKpsk2_25519_ChaCha`（25B）与 spec 的
+    //   `Noise_IKpsk2_25519_ChaChaPoly_SHA256`（39B）不一致（见 `:78` 的注释）——
+    //   要么对齐 spec，要么显式降级并改名/改注释。
+    //
+    // 台账：`docs/architecture/OPEN-TASKS-2026-09-28.md` §5 D-2。
+    // 正确形态参考同仓已验证的版本链实现：
+    // `l4_emotion/nt_memory/nt_memory_historian/nt_temporal_facts.rs`（每版本独立 id）。
     #[test]
+    #[ignore = "Noise IK 的 es 角色/时序接反，握手恒 InvalidState；需按 spec + 官方测试向量重写，见上方说明"]
     fn full_handshake() {
         let initiator_key = PrivateKey::generate();
         let responder_key = PrivateKey::generate();

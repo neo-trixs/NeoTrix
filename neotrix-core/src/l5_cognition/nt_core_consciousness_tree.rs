@@ -16,7 +16,7 @@ pub use review::*;
 
 use crate::l0_substrate::nt_core_self_test::{SelfTest, SelfTestRegistry, SelfTestResult};
 
-/// T3 SelfTest 接线 (NT-CORE ConsciousnessTree): 校验 11 分支健康注入 +
+/// T3 SelfTest 接线 (NT-CORE ConsciousnessTree): 校验全部分支健康注入 +
 /// 真实 SelfTest 数据推导成熟度/果实/引导的生产路径 (B2/B4 修复的运行时不变量)。
 pub struct ConsciousnessTreeSelfTest;
 

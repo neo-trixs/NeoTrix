@@ -170,10 +170,14 @@ if [ "$N_GONE" -gt 0 ]; then
   cat "$GONE"
 fi
 
-if [ "$N_EMPTY" -gt 0 ] || [ "$N_UNDECL" -gt 0 ] || [ "$N_TRACK" -gt 0 ]; then
-  echo "--- NEW offenders (regression, not in baseline) ---"
-  cat "$NEW"
-fi
+  # 2026-09-28 修：条件漏了 N_DEP ⇒ UNCOMMITTED_DEP offender **只计数、从不出现在
+  # 清单里**，而下面的 FAIL 文案却写「see the list above」—— 读者无从行动。
+  # 那一类恰恰是最可交付性的一类（新 clone 编不过），必须列出来。
+  if [ "$N_EMPTY" -gt 0 ] || [ "$N_UNDECL" -gt 0 ] || [ "$N_TRACK" -gt 0 ] || [ "$N_DEP" -gt 0 ]; then
+    echo "--- NEW offenders (regression, not in baseline) ---"
+    cat "$NEW"
+  fi
+
 
 if [ "$UPDATE" -eq 1 ]; then
   # preserve any leading comment block, replace the entry list

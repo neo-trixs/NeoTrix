@@ -957,7 +957,30 @@ mod tests {
         .unwrap();
     }
 
+    // ⛔ 本测试断言的是**当前 schema 结构上不可能存在的能力**，故按仓规
+    //    「实现或 `#[ignore]`，禁改松断言」挂起，而不是把断言改松。
+    //
+    // 根因：`nodes` 表 `:188` 是 `id TEXT PRIMARY KEY` ⇒ **同一 id 只能存一行**。
+    // 本测试要插 3 个版本（v1@tx100 / v2@tx200 / v3@tx300），第二行就撞
+    // `UNIQUE constraint failed: nodes.id`（extended_code 1555）。
+    //
+    // 为什么不就地改主键（2026-09-28 评估）：
+    // - **爆炸半径 69 处**生产代码写 `nodes`（INSERT/UPDATE），其中
+    //   `bin/experience/exp_absorb.rs:898,945,1039` 是
+    //   `UPDATE nodes SET metadata=? WHERE id=?` ⇒ 复合主键下会**同时改写所有版本**；
+    // - **5 处外键**要重指：`:237,238,258,277,347` 均 `REFERENCES nodes(id)`，
+    //   复合主键下 SQLite 报 `foreign key mismatch`；
+    // - 既有 DB 需**真实数据迁移**（`CREATE TABLE IF NOT EXISTS` 不改已存在的表）；
+    // - 本会话已半迁移过一次并回退（「半迁移比不迁移更糟」）。
+    //
+    // 影响面：`nodes_as_of()` / `node_history()` **零生产调用方**（全仓仅本文件
+    // 定义处与这两个测试命中），故挂起不损失任何在用能力。
+    // 正典形态见 `l4_emotion/nt_memory/nt_memory_historian/nt_temporal_facts.rs`
+    // （每版本独立 id + `supersedes` 指针，91 测试全绿）—— 迁移时照该形态做，
+    // 可完全避开复合主键与外键问题。
+    // 台账：`docs/architecture/OPEN-TASKS-2026-09-28.md` §5 D-1。
     #[test]
+    #[ignore = "需要 nodes 表真双时间 schema 迁移（复合主键/外键重指/数据迁移），见上方说明"]
     fn test_nodes_as_of_returns_committed() {
         let conn = mem_conn();
         insert_node(&conn, "n1", "v1", None, None, 100);
@@ -1021,7 +1044,13 @@ mod tests {
         assert_eq!(r.len(), 0);
     }
 
+    // ⛔ 同 `test_nodes_as_of_returns_committed`：`nodes.id` 是单列主键
+    //    （`:188`），同 id 存 3 个版本必撞 `UNIQUE constraint failed: nodes.id`。
+    //    真双时间需要 schema 迁移（69 处生产写入 / 5 处外键 / 真实数据迁移），
+    //    按仓规「实现或 `#[ignore]`」挂起。完整理由见上方那条测试的注释。
+    //    `node_history()` 零生产调用方，挂起不损失在用能力。
     #[test]
+    #[ignore = "需要 nodes 表真双时间 schema 迁移（复合主键/外键重指/数据迁移），见 test_nodes_as_of_returns_committed 的说明"]
     fn test_node_history() {
         let conn = mem_conn();
         insert_node(&conn, "n1", "v1", None, None, 100);

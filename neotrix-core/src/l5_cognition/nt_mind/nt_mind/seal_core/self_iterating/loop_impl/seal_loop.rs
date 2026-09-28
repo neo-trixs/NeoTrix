@@ -1379,6 +1379,9 @@ mod tests {
     //   （重定向 HOME 至临时目录，避免覆写真实 ~/.neotrix/cortex.json。）
     #[test]
     fn seal_loop_save_load_cortex_roundtrip() {
+        let _ge = crate::l0_substrate::nt_core_self_test::TEST_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()); // 串行化进程全局 HOME 改写
         let tmp = std::env::temp_dir().join(format!("neotrix_seal_cortex_{}", std::process::id()));
         let old_home = std::env::var_os("HOME");
         std::env::set_var("HOME", &tmp);

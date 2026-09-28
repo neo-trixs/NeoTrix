@@ -13,7 +13,7 @@ use neotrix::agent::{
 use neotrix::agent::workflow::{Workflow, WorkflowStep, WorkflowEngine};
 use neotrix::agent::skills::SkillsEngine;
 use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};
-use neotrix::cli::commands::agent_cmds::McpRegistry;
+use neotrix::agent::tool::McpRegistry;
 
 fn main() {
     println!("╭──────────────────────────────────────╮");
@@ -83,9 +83,16 @@ fn main() {
                 command: "echo".into(),
                 args: vec!["hello".into()],
             },
-            input_schema: serde_json::json!({}),
-            schema_version: None,
-        },
+              input_schema: serde_json::json!({}),
+              schema_version: None,
+              // 其余 4 个字段（required_permission / risk_level / usage_count /
+              // avg_latency_ms）自 2026-07 起加入 `McpToolDef`，本 example 一直
+              // 没跟 ⇒ `cargo check --all-targets` 红。结构体 derive 了 Default，
+              // 补 `..Default::default()` 而不是逐字段硬填：后 4 个都是
+              // 「调用侧回写」或「显式授权」用的，示例里取默认值即正确语义。
+              ..Default::default()
+          },
+
     ]);
     println!("   注册服务: {} 个, 工具: {} 个",
         mcp.server_count(), mcp.tool_count());

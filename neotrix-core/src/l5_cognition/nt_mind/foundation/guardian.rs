@@ -654,6 +654,9 @@ mod tests {
 
     #[test]
     fn test_kb_guard_restore_with_no_backup() {
+        let _ge = crate::l0_substrate::nt_core_self_test::TEST_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()); // 串行化进程全局 HOME 改写
         let _guard = HOME_TEST_LOCK.lock().unwrap();
         // 用唯一临时 HOME 隔离 (防与其他测试共享目录产生残留备份)
         let test_home = std::env::temp_dir().join(format!(
@@ -670,6 +673,9 @@ mod tests {
 
     #[test]
     fn test_kb_guard_backup_restore_full_cycle() {
+        let _ge = crate::l0_substrate::nt_core_self_test::TEST_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()); // 串行化进程全局 HOME 改写
         // 真实 sqlite 库 → backup → 删库 → guard 自动恢复 全链路
         let _guard = HOME_TEST_LOCK.lock().unwrap();
         let test_home = std::env::temp_dir().join(format!("neotrix-kbguard-{}", std::process::id()));
@@ -721,6 +727,9 @@ mod tests {
 
     #[test]
     fn test_corrupt_backup_rejected_and_cleaned() {
+        let _ge = crate::l0_substrate::nt_core_self_test::TEST_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()); // 串行化进程全局 HOME 改写
         // 坏备份 (0字节/无 kv_store 表) 不得被选中恢复, 且 rotate 会清理
         let _guard = HOME_TEST_LOCK.lock().unwrap();
         let test_home = std::env::temp_dir().join(format!("neotrix-kbguard-bad-{}", std::process::id()));

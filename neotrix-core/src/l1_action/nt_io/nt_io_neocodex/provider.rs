@@ -339,6 +339,9 @@ mod tests {
 
     #[test]
     fn test_provider_persist_roundtrip() {
+        let _ge = crate::l0_substrate::nt_core_self_test::TEST_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()); // 串行化进程全局 HOME 改写
         // Isolate the persisted provider file to a temp data dir.
         let tmp =
             std::env::temp_dir().join(format!("neocodex-provider-test-{}", std::process::id()));

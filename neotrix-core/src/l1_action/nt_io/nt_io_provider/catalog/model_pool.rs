@@ -45,11 +45,10 @@ pub struct UnifiedModelEntry {
 impl UnifiedModelEntry {
     /// Create a model entry from a local GGUF file.
     ///
-    /// Note: Real implementation needs — extracts model name from filename stem,
-    /// hardcodes base_url to localhost:8080 (llama.cpp default). Consider:
-    /// - Reading GGUF header metadata for model name/description
-    /// - Auto-detecting the serving endpoint from running processes
-    /// - Supporting multiple backend formats (GGUF, GGML, safetensors)
+    /// `base_url` 取自 [`llamacpp_base_url()`] (可被 `NEOTRIX_LLAMACPP_BASE_URL`
+    /// 覆盖), 不再写死 `localhost:8080` —— 端口冲突/多实例时那个常量是错的。
+    /// 仍待补: 解析 GGUF header 拿真实模型名/架构, 以及从运行中的进程自动
+    /// 发现实际服务的端点。
     pub fn local_gguf(path: PathBuf, size_gb: f64) -> Self {
         let name = path.file_stem()
             .and_then(|s| s.to_str())
@@ -60,7 +59,7 @@ impl UnifiedModelEntry {
             display_name: name.clone(),
             category: ProviderCategory::Local,
             source: "gguf".into(),
-            base_url: "http://localhost:8080/v1".into(),
+            base_url: llamacpp_base_url(),
             model_id: name,
             size_gb,
             tier: classify_size_tier(size_gb),
@@ -132,6 +131,58 @@ pub trait ModelSource: Send + Sync {
 }
 
 // ═══════════════════════════════════════════════════════════
+// 本机本地推理默认值 — 全部可被环境变量覆盖, 不写死
+// ═══════════════════════════════════════════════════════════
+
+/// llama.cpp / 任何 OpenAI 兼容本地端点的 base_url
+///
+/// 硬编码 `localhost:8080` 会在三种情况下骗人: 端口被占、多实例并存
+/// (8080/8081 同时跑两个模型)、以及容器/远端部署。`NEOTRIX_LLAMACPP_BASE_URL`
+/// 可覆盖。
+pub fn llamacpp_base_url() -> String {
+    std::env::var("NEOTRIX_LLAMACPP_BASE_URL")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "http://localhost:8080/v1".to_string())
+}
+
+/// 本地端点端口 (供启动进程时绑定用)
+pub fn llamacpp_port() -> u16 {
+    // 优先显式端口, 否则从 base_url 的端口解析, 都没有才回落 8080
+    if let Ok(p) = std::env::var("NEOTRIX_LLAMACPP_PORT") {
+        if let Ok(v) = p.parse::<u16>() {
+            return v;
+        }
+    }
+    port_from_url(&llamacpp_base_url()).unwrap_or(8080)
+}
+
+/// Ollama base_url (`NEOTRIX_OLLAMA_BASE_URL` 可覆盖)
+pub fn ollama_base_url() -> String {
+    std::env::var("NEOTRIX_OLLAMA_BASE_URL")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "http://localhost:11434/v1".to_string())
+}
+
+/// 从 base_url 里解析端口 (取不出则 None)
+fn port_from_url(url: &str) -> Option<u16> {
+    url.split("://")
+        .nth(1)
+        .and_then(|rest| rest.split('/').next())
+        .and_then(|hostport| hostport.rsplit_once(':'))
+        .and_then(|(_, port)| port.parse::<u16>().ok())
+}
+
+/// 本地模型体积上限 (GB) —— 超过则不纳入模型池 (装不进本机内存)
+pub fn default_max_model_gb() -> f64 {
+    std::env::var("NEOTRIX_MAX_MODEL_GB")
+        .ok()
+        .and_then(|s| s.parse::<f64>().ok())
+        .unwrap_or(5.0)
+}
+
+// ═══════════════════════════════════════════════════════════
 // LocalGgufSource — 本地 GGUF 文件扫描
 // ═══════════════════════════════════════════════════════════
 
@@ -140,20 +191,28 @@ pub struct LocalGgufSource {
     max_size_gb: f64,
 }
 
+/// 取字符串前 `n` 个**字符**的前缀 (按字节切会在多字节字符上 panic)
+///
+/// 用于 mmproj 配对时比较模型名/投影名的公共前缀。模型文件名可能含中文,
+/// 字节切片会在字符边界处 panic —— 生产代码不允许。
+fn prefix_chars(s: &str, n: usize) -> &str {
+    match s.char_indices().nth(n) {
+        Some((idx, _)) => &s[..idx],
+        None => s,
+    }
+}
+
 impl LocalGgufSource {
     pub fn new(scan_dirs: Vec<PathBuf>, max_size_gb: f64) -> Self {
         Self { scan_dirs, max_size_gb }
     }
 
+    /// 本机默认扫描目录 —— 唯一真源是 `llama_process::model_search_dirs()`,
+    /// 避免"启动进程用的目录"和"列模型用的目录"两处各写一份而漂移。
     pub fn default_m5() -> Self {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/Users/neo".into());
         Self::new(
-            vec![
-                PathBuf::from("/Users/neo/Downloads/neotrix/models"),
-                PathBuf::from(&home).join(".cache/neotrix/models"),
-                PathBuf::from(&home).join(".ollama/models"),
-            ],
-            5.0, // M5 16GB: 最大 5GB 模型
+            crate::l1_action::nt_io::nt_io_provider::llama::llama_process::model_search_dirs(),
+            default_max_model_gb(),
         )
     }
 
@@ -202,16 +261,26 @@ impl LocalGgufSource {
 
         let mut entry = UnifiedModelEntry::local_gguf(path.clone(), size_gb);
 
-        // 查找对应的 mmproj 文件
+        // 查找同目录下的 mmproj 投影。
+        //
+        // 命名约定: `mmproj-<模型名>-<量化>.gguf` 配 `<模型名>-<量化>.gguf`。
+        // 旧实现用 `&model_id[..10]` 取字节前缀 —— 模型名含多字节字符时会切在
+        // 字符边界上 **panic**, 且 10 字节对短名/长名都不稳。改为按字符取前缀。
+        //
+        // `prefix_chars` 返回去掉了量化后缀的模型名, 与 mmproj 名去掉
+        // `mmproj-` 前缀后的部分比公共前缀。
         if let Some(parent) = path.parent() {
+            let stem = prefix_chars(&entry.model_id, 24);
             if let Ok(read_dir) = std::fs::read_dir(parent) {
                 for f in read_dir.filter_map(|e| e.ok()) {
                     let fp = f.path();
                     if fp.extension().map(|e| e == "gguf").unwrap_or(false) {
                         let fn_name = fp.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                        if fn_name.starts_with("mmproj") && fn_name.contains(&entry.model_id[..entry.model_id.len().min(10)]) {
-                            entry.mmproj_path = Some(fp);
-                            break;
+                        if let Some(rest) = fn_name.strip_prefix("mmproj") {
+                            if !stem.is_empty() && prefix_chars(rest, stem.len()) == stem {
+                                entry.mmproj_path = Some(fp);
+                                break;
+                            }
                         }
                     }
                 }
@@ -300,9 +369,13 @@ pub struct LocalEndpointSource {
 impl LocalEndpointSource {
     pub fn new() -> Self {
         Self {
+            // base_url 走 llamacpp_base_url() / ollama_base_url(), 可被
+            // NEOTRIX_LLAMACPP_BASE_URL / NEOTRIX_OLLAMA_BASE_URL 覆盖。
+            // 写死端口在「端口被占」或「多实例并存(8080/8081 各跑一个模型)」
+            // 时探测的是错的端点 —— 而这恰恰是多模型场景的常态。
             endpoints: vec![
-                ("llama-cpp".into(), "http://localhost:8080/v1".into(), "llama.cpp".into()),
-                ("ollama".into(), "http://localhost:11434/v1".into(), "Ollama".into()),
+                ("llama-cpp".into(), llamacpp_base_url(), "llama.cpp".into()),
+                ("ollama".into(), ollama_base_url(), "Ollama".into()),
             ],
         }
     }
@@ -474,9 +547,115 @@ impl Default for UnifiedModelPool {
 // Tests
 // ═══════════════════════════════════════════════════════════
 
-#[cfg(test)]
-mod tests {
+  #[cfg(test)]
+  mod tests {
     use super::*;
+    // 2026-09-28：生产侧 `:214` 用的是这个全路径真源，但测试里只写了裸名
+    // `model_search_dirs()`，本模块顶部没有引入 ⇒ `cargo test` 编译不过
+    // (E0425 + 后续 E0282)。补上导入，与 `:214` 保持同一真源。
+    use crate::l1_action::nt_io::nt_io_provider::llama::llama_process::model_search_dirs;
+
+
+    /// 回归锁: `prefix_chars` 按**字符**切, 不按字节。
+    ///
+    /// 旧实现在 mmproj 配对处写的是 `&model_id[..model_id.len().min(10)]`,
+    /// 字节切片。模型文件名含多字节字符 (中文等) 时会切在字符边界上
+    /// **panic** —— 生产代码不允许, 且这是扫描路径, 一个坏文件名就能打挂
+    /// 整个模型池发现。
+    #[test]
+    fn test_prefix_chars_is_char_safe_not_byte_unsafe() {
+        assert_eq!(prefix_chars("abcdefghij", 4), "abcd");
+        // 短于 n → 整串
+        assert_eq!(prefix_chars("abc", 10), "abc");
+        // 空串
+        assert_eq!(prefix_chars("", 5), "");
+        // 多字节: "模型权重-v1-Qwen" 前 4 个**字符** = "模型权重" (12 字节)
+        let s = "模型权重-v1-Qwen";
+        let got = prefix_chars(s, 4);
+        assert_eq!(got, "模型权重");
+        // 关键: 结果必须是合法 UTF-8 边界, 且能安全 round-trip
+        assert!(s.starts_with(got), "前缀必须是原串的字节前缀");
+        assert_eq!(got.chars().count(), 4);
+        // 旧写法在这个输入上会 panic —— 记录下来作为对照
+        assert!(10 < "模型权重".len(), "10 字节落在多字节字符中间, 证明旧写法危险");
+    }
+
+    /// mmproj 配对必须用字符前缀, 且认得 `mmproj-` 前缀剥离。
+    #[test]
+    fn test_mmproj_pairing_uses_stripped_prefix() {
+        let model_id = "Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-Q6_K";
+        let stem = prefix_chars(model_id, 24);
+        // mmproj 文件名去掉 `mmproj-` 后应与模型名共享该前缀
+        let mmproj_rest = "Qwen3.5-4B-Uncensored-HauhauCS-Aggressive-BF16";
+        assert_eq!(prefix_chars(mmproj_rest, stem.chars().count()), stem);
+        // 不匹配的名字不得误配
+        let other = "MiniCPM5-2B-heretic-abliterated-BF16";
+        assert_ne!(prefix_chars(other, stem.chars().count()), stem);
+    }
+
+    /// 端口必须从 base_url 解析, 而不是各处写死 8080。
+    #[test]
+    fn test_port_from_url() {
+        assert_eq!(port_from_url("http://localhost:8080/v1"), Some(8080));
+        assert_eq!(port_from_url("http://127.0.0.1:8081/v1"), Some(8081));
+        // 无端口 → None (调用方回落)
+        assert_eq!(port_from_url("http://localhost/v1"), None);
+        // 畸形输入不得 panic
+        assert_eq!(port_from_url(""), None);
+        assert_eq!(port_from_url("::::"), None);
+        assert_eq!(port_from_url("http://host:notaport/v1"), None);
+    }
+
+    /// 搜索目录必须**推导**得出, 而不是源码里写死一条绝对路径。
+    ///
+    /// ⚠️ 这条测试曾经写错: 它断言 `dirs` 里不出现 `/Users/neo`, 结果误报了
+    /// 正确的实现 —— 因为 `$CARGO_MANIFEST_DIR/../models` 在本机**恰好**就是
+    /// `/Users/neo/Downloads/neotrix/models`。输出值含用户名是正常的, 该断言的
+    /// 是"来源是推导的"而非"输出不含某个字符串"。
+    #[test]
+    fn test_model_search_dirs_are_derived_not_hardcoded() {
+        let dirs = model_search_dirs();
+        assert!(!dirs.is_empty(), "至少要有一个搜索目录");
+
+        // 1) 相对路径兜底必须存在 (不依赖任何环境)
+        assert!(
+            dirs.iter().any(|p| p == Path::new("models")),
+            "必须含 cwd 相对的 `models` 兜底, 实际: {:?}", dirs
+        );
+
+        // 2) 仓库内 models 必须由 CARGO_MANIFEST_DIR 推导, 而非写死
+        if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
+            let expected = Path::new(&manifest).parent().map(|r| r.join("models"));
+            assert!(
+                expected.as_ref().is_some_and(|e| dirs.contains(e)),
+                "必须含由 CARGO_MANIFEST_DIR 推导的 {:?}, 实际: {:?}",
+                expected, dirs
+            );
+        }
+
+        // 3) HOME 派生的缓存目录只在 HOME 存在时出现
+        if let Ok(home) = std::env::var("HOME") {
+            if !home.is_empty() {
+                assert!(
+                    dirs.contains(&PathBuf::from(&home).join(".ollama/models")),
+                    "必须含 HOME 派生的 ollama 目录, 实际: {:?}", dirs
+                );
+            }
+        }
+    }
+
+    /// base_url 走 env 覆盖; 未设置时有可用的默认值 (不得为空/畸形)。
+    #[test]
+    fn test_base_urls_are_non_empty_and_wellformed() {
+        let ll = llamacpp_base_url();
+        assert!(ll.starts_with("http"), "llamacpp base_url 必须是 http(s), 实际 {}", ll);
+        assert!(ll.ends_with("/v1"), "应为 OpenAI 兼容的 /v1 结尾, 实际 {}", ll);
+        let ol = ollama_base_url();
+        assert!(ol.starts_with("http") && ol.ends_with("/v1"), "ollama base_url 畸形: {}", ol);
+        // 端口必须能从 base_url 解析回来
+        let p = llamacpp_port();
+        assert!(p > 0, "端口必须为正");
+    }
 
     #[test]
     fn test_local_gguf_source_discovers_models() {

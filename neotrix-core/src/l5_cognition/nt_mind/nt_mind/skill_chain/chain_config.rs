@@ -54,6 +54,19 @@ impl ChainConfig {
     }
 
     /// 获取指定步骤的超时时间(秒)，未配置则返回默认值
+    ///
+    /// # ⚠️ 当前**未被执行器读取**（2026-09-28 实测）
+    ///
+    /// `ChainExecutor::execute_chain` 与 `StepExecutor::execute_step` 都是**同步**
+    /// 的（`Box<dyn StepExecutor>`，无 async/await），链里**没有任何超时机制**。
+    /// 全仓 `step_timeouts` / `timeout_for_step` 的引用只出现在本文件（定义 + 测试）。
+    ///
+    /// ⇒ **这张表目前是死数据**：TDD 的 600s、Plan 的 120s 等**从未生效**。
+    /// 不要以为配了它就有超时保护。
+    ///
+    /// 补齐它是**功能新增**而非修 bug，需要先定方案（同步侧只能用
+    /// 「另起线程 + 限时 join」，涉及线程回收与 panic 传播；或把执行器整体改 async）。
+    /// 台账：`docs/architecture/OPEN-TASKS-2026-09-28.md` §3.1 R-1。
     pub fn timeout_for_step(&self, step: &SkillStep) -> u64 {
         self.step_timeouts
             .get(step.name())
