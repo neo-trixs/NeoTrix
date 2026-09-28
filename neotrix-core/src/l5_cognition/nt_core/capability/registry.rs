@@ -450,6 +450,15 @@ pub struct Capability {
 }
 
 #[derive(Debug)]
+/// 2026-09-27 标注: **仅被本文件的 `#[cfg(test)]` 使用, 生产零消费者**
+/// (全仓 `capability::CapabilityRegistry` 精确搜索除本文件外无命中)。
+///
+/// 本类型值类型是 `Capability` + `tag_index`, 与
+/// `l0_substrate::nt_core_capability_types::CapabilityRegistry`
+/// (`HashMap<String, Arc<dyn UnifiedCapability>>` + by_domain/by_layer 索引,
+/// 有真实跨层消费者: l2_perception/nt_world/ocr/mod.rs:405 与
+/// l1_action/nt_act/nt_act_trade/capability_registry.rs:171) **不是同一设计**。
+/// 生产路径用 l0 版; 本版仅被自测保留。
 pub struct CapabilityRegistry {
     capabilities: Vec<Capability>,
     tag_index: std::collections::HashMap<String, Vec<CapabilityId>>,
