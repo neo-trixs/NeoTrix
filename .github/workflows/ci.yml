@@ -56,6 +56,13 @@ jobs:
       # （需改产品码或跑 cargo，见 scripts/gate-registry.tsv 的 note 栏）。
       - name: "Gate-satisfiability meta-gate (are the gates themselves trustworthy?)"
         run: bash scripts/check-gate-satisfiable.sh --strict
+      # 2026-09-29 新增。抓「文档断言被代码反驳」：文档写「X 零生产消费者」而
+      # 代码里其实已有 X 的消费者。本会话此类死记录复发 6 次，每次都靠人追问
+      # 才发现 —— 靠记性已经失败 6 次，故门禁化。
+      # 非 cargo、秒级，只读 git grep。已登记 scripts/gate-registry.tsv
+      # （injectable，探针 scripts/probes/check-doc-claims.sh 实证非空）。
+      - name: "Doc-claims gate (docs asserting 'zero consumers' that code refutes)"
+        run: bash scripts/check-doc-claims.sh
 
   test:
     runs-on: ${{ matrix.os }}

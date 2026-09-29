@@ -20,6 +20,17 @@
 
 set -o pipefail   # 刻意不加 -u：本门是只读 lint，`$t` 等在管道子 shell 里可能未绑定
 
+# `--strict` 为**约定兼容**，当前是 no-op：本门只有阻断语义，没有 advisory 模式
+# ——「有断言被代码反驳」在语义上不可能是 advisory（要么记录对，要么记录错）。
+# 接受它是为了让 scripts/check-gate-satisfiable.sh 的门发现逻辑
+# （`grep -q -- "--strict" scripts/check-*.sh`）把本门纳入统计，
+# 否则它就是元门看不见的门。
+case "${1:-}" in
+  --strict|"") ;;
+  -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+  *) echo "用法: bash $0 [--strict]"; exit 2 ;;
+esac
+
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
   echo "[doc-claims] ERROR: 不在 git 仓库内"; exit 2
 }
