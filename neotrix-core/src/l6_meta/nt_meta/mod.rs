@@ -66,6 +66,12 @@ pub use monitor::{AlertSeverity, HealthCheck, HealthTrend, MetaAlert, MetaMonito
 /// **不直接 `use crate::l6_meta::*`**（见 traits.rs:133-139 的跨层隔离约定）。
 pub mod nt_evolution_eval;
 
+/// 实验运行器 —— 把 `nt_evolution_eval` 的判决能力变成**可调用的能力**。
+///
+/// ⛔ 2026-09-29 之前 `nt_evolution_eval` 零消费者（754 行 + 19 测试从未被调用）
+/// ⇒ 本模块是它的接线点。见 `nt_evolution_runner.rs` 的模块文档 §为什么需要这一层。
+pub mod nt_evolution_runner;
+
 pub use nt_evolution_eval::nt_evolution_eval::{
     case_level_regressions, estimate_noise_floor, judge_ab, judge_case, noise_threshold, pass_rate,
     safety_regressions, Arm, CaseOutcome, CaseSpec, ClaimFidelity, EnvFingerprint, Ledger,
@@ -76,6 +82,11 @@ pub use nt_evolution_eval::nt_evolution_eval::{
 #[cfg(test)]
 #[path = "tests/nt_evolution_eval_tests.rs"]
 mod nt_evolution_eval_tests;
+
+/// 单元测试（ 的非空门证明）。
+#[cfg(test)]
+#[path = "tests/nt_evolution_runner_tests.rs"]
+mod nt_evolution_runner_tests;
 
 // NOTE: 以下模块已声明但内部编译错误待修复，暂时注释
 // pub mod otel_bridge;
