@@ -601,8 +601,14 @@ fn r8_hallucinated_paths(text: &str, root: &Path, line_ref_re: &Regex) -> RuleRe
 }
 
 /// R09 语言一致: 禁止显著中英混杂 (代码块除外)。
+/// 2026-09-29：本地副本已删，改用唯一事实源。
+/// 本处是**格式/语言判断**（统计正文里汉字占比）⇒ 用宽口径 `is_cjk_wide`。
+/// ⚠️ 原口径含 `F900–FAFF`（CJK 兼容表意），而 `is_cjk_wide` 不含该段 ——
+/// 那是 Unicode 重复区（NFKC 归一后即基本区），归一后仍会被识别，
+/// 故不影响「统计汉字占比」的结论。
 fn is_cjk(c: char) -> bool {
-    matches!(c, '\u{4E00}'..='\u{9FFF}' | '\u{3400}'..='\u{4DBF}' | '\u{F900}'..='\u{FAFF}')
+    neotrix_types::core::nt_cjk::is_cjk_wide(c)
+        || ('\u{F900}'..='\u{FAFF}').contains(&c)
 }
 
 fn r9_consistent_language(text: &str) -> RuleResult {

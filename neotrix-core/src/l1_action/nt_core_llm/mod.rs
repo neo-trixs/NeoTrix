@@ -50,18 +50,12 @@ pub trait LlmProvider: Send + Sync {
 
 /// CJK / 全角 字符判定 (1 token/char 口径)。
 ///
-/// 范围与 `neotrix_types::core::context_strategy::ContextStrategy::is_cjk`
-/// 保持一致 — 那边的注释把本函数当作单一事实源, 两边不得发散。
+/// 2026-09-29：本地副本已删，改用唯一事实源。
+/// 本处是**计量**（1 token/char 估算）⇒ 用宽口径 `is_cjk_wide`。
+/// ⛔ 勿改用窄口径 `is_cjk_han` —— 那会让假名/谚文/全角被错判为
+/// 「英文 1/4 char」，直接低估 token 数。
 fn is_cjk_char(c: char) -> bool {
-    matches!(
-        c,
-        '\u{3000}'..='\u{303F}'   // CJK 标点
-        | '\u{3040}'..='\u{30FF}' // 假名
-        | '\u{3400}'..='\u{4DBF}' // CJK Ext A
-        | '\u{4E00}'..='\u{9FFF}' // CJK 统一表意
-        | '\u{AC00}'..='\u{D7AF}' // 谚文
-        | '\u{FF00}'..='\u{FFEF}' // 全角/半角
-    )
+    neotrix_types::core::nt_cjk::is_cjk_wide(c)
 }
 
 /// Backward-compatible: estimate_tokens helper

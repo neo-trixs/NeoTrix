@@ -15,8 +15,11 @@ use std::sync::{Arc, Mutex};
 
 // ── 文本工具（与 nt_crystal_task_fusion 同源） ──
 
+/// 2026-09-29：本地副本已删，改用唯一事实源。
+/// ⛔ 分词必须用**窄**口径（仅汉字）—— 宽口径会把 CJK 标点/全角塞进 bigram，
+/// 产出 `付，` `，网` 这类垃圾词元。实测见 `nt_cjk` 的同名测试。
 fn is_cjk(c: char) -> bool {
-    ('\u{4e00}'..='\u{9fff}').contains(&c)
+    neotrix_types::core::nt_cjk::is_cjk_han(c)
 }
 
 pub(crate) fn keywords(text: &str) -> HashSet<String> {

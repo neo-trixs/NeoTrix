@@ -45,17 +45,14 @@ impl ContextStrategy {
     }
 
     /// CJK 相关 Unicode 区间: 汉字/假名/谚文/全角。
-    /// 与 `neotrix-core` 的 `context_budget::is_cjk` 口径一致。
+    ///
+    /// ⛔ 2026-09-29：**本地副本已删**，改用唯一事实源
+    /// [`super::nt_cjk::is_cjk_wide`]。原注释指向
+    /// `neotrix-core::context_budget::is_cjk` —— 而该模块**根本不存在**，
+    /// 且 `nt_core_llm/mod.rs` 又反向指向本文件 ⇒ 两个「单一事实源」互指、
+    /// 指针一端是虚的，环已解除。
     fn is_cjk(c: char) -> bool {
-        matches!(
-            c,
-            '\u{3000}'..='\u{303F}'   // CJK 标点
-            | '\u{3040}'..='\u{30FF}' // 假名
-            | '\u{3400}'..='\u{4DBF}' // CJK Ext A
-            | '\u{4E00}'..='\u{9FFF}' // CJK 统一表意
-            | '\u{AC00}'..='\u{D7AF}' // 谚文
-            | '\u{FF00}'..='\u{FFEF}' // 全角/半角
-        )
+        super::nt_cjk::is_cjk_wide(c)
     }
 
     /// 估算一段文本的 token 数。

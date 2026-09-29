@@ -86,8 +86,12 @@ fn tokenize(text: &str) -> Vec<String> {
     out
 }
 
+/// 2026-09-29：本地副本已删，改用唯一事实源。
+/// ⚠️ 本处原口径含 ExtA/假名/谚文（比 `is_cjk_han` 宽）。统一到窄口径后，
+/// 假名/谚文/ExtA 不再被当作 CJK ⇒ 走 ASCII 分支。该文件是「切词」，
+/// 与 `nt_crystal_core` 同语义，故取窄口径（宽口径会把标点塞进 bigram）。
 fn is_cjk(ch: char) -> bool {
-    matches!(ch as u32, 0x4E00..=0x9FFF | 0x3400..=0x4DBF | 0x3040..=0x30FF | 0xAC00..=0xD7AF)
+    neotrix_types::core::nt_cjk::is_cjk_han(ch)
 }
 
 fn fnv1a(s: &str) -> u64 {

@@ -137,6 +137,9 @@ pub mod self_measure;
 pub mod self_model;
 pub mod llm_timeout;
 pub mod context_strategy;
+/// CJK 字符判定的**唯一事实源**（2026-09-29）：`is_cjk_han`（分词）/ `is_cjk_wide`（计量）。
+/// 此前全仓 8 个私有副本、4 种口径，且两个「单一事实源」互指一个不存在的模块。
+pub mod nt_cjk;
 pub mod shared_types;
 pub mod nt_core_approval;
 

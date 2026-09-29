@@ -522,9 +522,12 @@ fn neotrix_memory_available() -> bool {
 
 /// 查询分词：ASCII 词（≥2）+ CJK bigram（中英混排整词子串命中率太低）。
 fn recall_keywords(query: &str) -> Vec<String> {
+    /// 2026-09-29：本地副本已删，改用唯一事实源。
+    /// 本处喂给 **bigram** ⇒ 必须用窄口径 `is_cjk_han`（宽口径会把标点
+    /// 塞进 bigram 产垃圾词元）。⚠️ 原口径含 ExtA，统一后 ExtA 走 ASCII 分支
+    /// —— 该区是罕用生僻字，对召回影响可忽略。
     fn is_cjk(c: char) -> bool {
-        ('\u{4e00}'..='\u{9fff}').contains(&c)
-            || ('\u{3400}'..='\u{4dbf}').contains(&c)
+        neotrix_types::core::nt_cjk::is_cjk_han(c)
     }
     fn flush_ascii(buf: &mut String, out: &mut Vec<String>) {
         if buf.chars().count() >= 2 {

@@ -63,11 +63,11 @@
 | ~~9~~ | ~~收掉本会话的 2 处 worktree~~ | 收工 | ✅ **已完成**（2026-09-29）：根因不在时机、在门的判据 —— mtime 启发式分不清「他窗在写」与「我刚做完」。已修为「脏才看 mtime」（干净+已并入分支 ⇒ 可证无损），并**造真实反例自测**确认脏 worktree 保护未放松。3 支冗余分支（`f_merged_ratchet`/`f_integrated`/`fix/bitemporal-and-layer-ratchet`）已用 `git branch -d` 删除 |
 | ~~10~~ | ~~`noise_handshake` 接到生产（R-P79）~~ | 实现 | ✅ **已完成**（2026-09-29）：新增 `protocol/noise_ik.rs` —— C1 SANS-IO 协议引擎，作为 `noise_handshake` 的唯一生产消费者。分层方向合法（C1→C0），`noise_ik` 10 测试全绿，全量 **12207 passed / 0 failed**。⚠️ 接线时测试抓到我自己写死的错误断言（见下），已改为断言正确性质 |
 | 6 | 经验吸收：`neotrix-experience absorb` 把 L23–L26 入 KB | 收尾 | **待办** |
-| 11 | **统一 8 个 `is_cjk` 副本**（2026-09-29 修 `keywords()` CJK 失明时发现） | DRY | **待办，需编译验证**（详见下方登记） |
+| ~~11~~ | ~~统一 8 个 `is_cjk` 副本~~ | DRY | ✅ **已完成**（2026-09-29）：裁决**不是统一成一个**，而是「两种语义各一个事实源」——`is_cjk_han`（分词，窄）/ `is_cjk_wide`（计量，宽）。7 个副本改薄转发，环形依赖解除。详见下方详案 |
 | 12 | 重新实现 IPC 键名校验器（`nt_ipc_keys.py` 从未入库，缺口仍敞开） | 实现 | **待办**（详见下方登记） |
 | 7 | 收工：`nt_worktree_gate.sh check` → 自己开的 worktree 走 `prune`（**禁手删**） | 收工 | **待办**（硬规则） |
 
-### 待办 11 详案：8 个 `is_cjk` 副本，口径真不一致（2026-09-29 实测）
+### ~~待办 11~~ 详案：`is_cjk` 八副本 —— **裁决：不是重复，是两种语义**（2026-09-29 已完成）
 
 修 `keywords()` CJK 失明时顺带发现。**8 个副本，4 种不同口径，且无一为 `pub`** ——
 所以没有任何一个能被复用，这正是重复的根因。
@@ -88,17 +88,46 @@
 （`rg -l context_budget` 只命中引用它的文件）。`nt_core_llm` 又反向指向
 `context_strategy` ⇒ 两边互指，且指针的一端是虚的。
 
-**方案**（需编译验证，本轮未做）：
-1. 在 `neotrix-types`（workspace 内、被全部 crate 依赖）导出 `pub fn is_cjk`，
-   取**最宽口径**（`nt_core_llm` 那 6 段 —— 假名/谚文/全角都属 CJK 书写系统，
-   窄口径会把它们错判为「英文 1 token/4char」）。
-2. 其余 7 个改为调用它，删本地副本。
-3. ⚠️ **改宽口径会改变 4 个既有调用点的行为**（`nt_core_embed` 的分词、
-   `nt_io_output_style` 的格式化判断等）⇒ 必须先跑受影响模块的测试，
-   逐条判读差异是否可接受。**这一步不能省。**
+### ✅ 裁决与实施（2026-09-29 完成）
 
-⛔ 本轮**未动**：编译门红（他窗正重构 `tool_registry.rs` → `tool_contract/`），
-改 7 处跨 crate 引用却无法编译验证是冒险。且 §微操作公约要求「最小改动」。
+**原判断错了**：我先前打算「统一成最宽的 1 个」。动手前实测发现**那是错的** ——
+两种口径各有对的场合，强行统一会引入 bug：
+
+```text
+"支付，网关" 喂给 bigram：
+  窄（仅汉字）→ bigrams=[支付, 付网, 网关]        ✅ 无垃圾
+  宽（含标点）→ bigrams=[支付, 付，, ，网, 网关]  ⛔ 产垃圾
+```
+
+⇒ **8 个副本不是「重复」，是「2 种语义 × 4 份」**：
+  · **分词**（bigram / 切词）→ 必须**窄**（仅基本汉字）
+  · **计量**（1 token/char 估算 / 格式判断）→ 必须**宽**（含标点/假名/谚文/全角）
+  窄口径做计量 ⇒ 假名/谚文/全角被错判为「英文 1/4 char」→ 低估 token；
+  宽口径做分词 ⇒ 产出 `付，` `，网` 这类垃圾词元。
+
+**实施**：在 `neotrix-types` 新建 `core/nt_cjk.rs`（workspace 内、被全仓依赖），
+提供两个 `pub fn` + 4 个测试（含一条锁住「窄是宽的真子集」和一条复现
+「宽口径误用于分词会产垃圾」的回归锁）。7 个私有副本改为薄转发：
+
+| 副本 | 归类 | 改为 |
+|---|---|---|
+| `nt_crystal_core/{consciousness,nt_shared_mind,nt_crystal_task_fusion}.rs` | 分词 | `is_cjk_han` |
+| `nt_core_embed/mod.rs` | 分词 | `is_cjk_han`（⚠️ 原含 ExtA/假名/谚文，现走 ASCII 分支） |
+| `nt_core_llm/mod.rs` | 计量 | `is_cjk_wide` |
+| `nt_io_output_style.rs` | 计量 | `is_cjk_wide` ＋ 保留 `F900–FAFF`（NFKC 重复区） |
+| `nt_crystal_serve.rs` | 分词 | `is_cjk_han`（⚠️ 原含 ExtA） |
+| `context_strategy.rs` | 计量 | `is_cjk_wide` |
+
+**环形依赖已解除**：`context_strategy.rs` 曾注释指向
+`neotrix-core::context_budget::is_cjk` —— 而该**模块根本不存在**；
+`nt_core_llm` 又反向指向 `context_strategy` ⇒ 两个「单一事实源」互指、
+指针一端是虚的。现在两个事实源都在 `nt_cjk.rs`。
+
+**验证**：`cargo check --tests` 0 error；全量 `12207 passed / 1 failed`，
+唯一失败是既存的浮点 1-ULP 断言（`nt_jev_calibration`，与本改动零调用关系，
+已用「文件未被触碰 + 零调用引用」双重证伪）；`neotrix-types` 566 passed /
+2 failed，两条失败在 `nt_core_bank`/`nt_core_gwt`（断言数值 13≠6），
+同样零引用本改动。
 
 ### 待办 12 详案：IPC 键名校验缺口仍敞开
 
