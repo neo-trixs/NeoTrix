@@ -65,7 +65,7 @@
 | 6 | 经验吸收：`neotrix-experience absorb` 把 L23–L26 入 KB | 收尾 | **待办** |
 | ~~11~~ | ~~统一 8 个 `is_cjk` 副本~~ | DRY | ✅ **已完成**（2026-09-29）：裁决**不是统一成一个**，而是「两种语义各一个事实源」——`is_cjk_han`（分词，窄）/ `is_cjk_wide`（计量，宽）。7 个副本改薄转发，环形依赖解除。详见下方详案 |
 | ~~14~~ | ~~裁决 `neotrix-core/docs/` 3 份架构文档（744 行）存废~~ | 裁决 | ✅ **已完成**（2026-09-29）：逐份取证后**三种不同处置**——1 份归档（含全仓独有的外部威胁溯源）、1 份归档（方法论被继承但数据作废）、1 份归档（8/8 类型全不存在）。全部移入 `docs/architecture/_superseded/` 并写明依据 |
-| 13 | **恢复 842 行丢失的冒烟测试**（落点 `Neo/neobot`，需授权） | 实现 | ⛔ 跨仓待授权 |
+| ~~13~~ | ~~恢复 842 行丢失的冒烟测试~~ | 实现 | ⛔ **主人裁决：不做了**（2026-09-29）。取证已备：三个测试的被测模块**全部不存在** ⇒ 恢复等于重做已下线功能。详见下方 |
 | ~~12~~ | ~~重新实现 IPC 键名校验器~~ | 实现 | ⚠️ **改判**（2026-09-29）：验的契约**已整体迁出本仓**（桌面端 → 独立仓 `Neo/neobot`）⇒ 本仓实现不了，正确落点是那个仓。详见下方改判 |
 | 7 | 收工：`nt_worktree_gate.sh check` → 自己开的 worktree 走 `prune`（**禁手删**） | 收工 | **待办**（硬规则） |
 
@@ -165,7 +165,7 @@ TODO 原 §156-162 记「新增 `scripts/ops/nt_ipc_keys.py`，实测 声明 97/
 `scripts/layout-baseline.txt` 归零（这是 `--update-baseline` 的正当用途 ——
 修好一个删一行，而非为让门变绿而调大）。
 
-### ⚠️ 待办 13：842 行冒烟测试已丢失，恢复点在 git 历史（2026-09-29 取证）
+### ~~待办 13~~：842 行冒烟测试 —— **裁决不恢复**（2026-09-29）
 
 `620e9712`（neobot 线入库）里有 6 个冒烟测试共 2,496 行，`d5413335` 随
 内嵌 crate 一起删除。**逐个核对 `Neo/neobot` 仓的现状**：
@@ -189,9 +189,31 @@ git show 620e9712:apps/neobot-desktop/tests/nt_smoke_sidebar.rs
 ```
 
 ⚠️ **但不能直接在本仓恢复**：它们 `use neobot_desktop::nt_commands::…`，
-而该 crate 已迁到 `Neo/neobot`（本仓 workspace 不含 `neobot-desktop`）
-⇒ 放本仓编不过。**恢复必须落到 `Neo/neobot` 仓内**，且需核对
-`nt_commands` 的 API 是否已变（该仓在 `p0-llamacpp` 分支持续演进）。
+而该 crate 已迁到 `Neo/neobot`（本仓 workspace 不含 `neobot-desktop`）。
+
+### ⛔ 裁决：**不恢复**（2026-09-29，主人决定）
+
+动手前的取证已把结论钉死 —— **三个测试的被测模块全部不存在**：
+
+| 测试 | 依赖的模块 | 现状 |
+|---|---|---|
+| `nt_smoke_files` | `nt_cmd_files` | ⛔ `nt_cmd_files.rs` 整个文件已不存在 |
+| `nt_smoke_changes` | `nt_cmd_files` + `nt_cmd_convo` | ⛔ 部分依赖缺（`nt_cmd_files` 无） |
+| `nt_smoke_sidebar` | `nt_cmd_sidebar` | ⛔ `nt_cmd_sidebar.rs` 已不存在 |
+
+`nt_commands/` 现存 9 个模块：`nt_cmd_{channels,convo,core,evidence,llamacpp,run,sys,tasks,web}.rs`
+—— **无 files、无 sidebar**。且 `rg -l 'nt_cmd_files|nt_cmd_sidebar' Neo/neobot --glob '*.rs'`
+全仓零命中 ⇒ 确认这两个功能是**被有意移除**的，不是改名。
+
+⇒ 恢复这 842 行不是「找回测试」，而是**重做一个已下线功能的测试套件** ——
+工作量与「当初为什么删掉它」是同一个量级的问题。主人裁决不做，**正确**：
+无功能 ⇒ 无对象可测，硬造测试只会得到一批测「不存在的东西」的假覆盖。
+
+⚠️ 留档的教训：那三个测试当年测的是**具体缺陷类别**（文件头自述
+「越狱必须被拒，而不是静默重新定根到工作区」这类参数绑定/越狱漏洞）。
+若将来**重新引入**文件工作台或侧边栏，这些测试是现成的验收材料 ——
+恢复点：`git show 620e9712:apps/neobot-desktop/tests/nt_smoke_{files,changes,sidebar}.rs`
+（本仓 git 历史里完好，未丢失）。
 
 ⛔ 本会话**未动** `Neo/neobot`（跨仓改动需主人授权）。
 ⛔ 另注：`Neo/neobot/target/nt-smoke/nt_smoke_sidebar` 是**构建产物**
