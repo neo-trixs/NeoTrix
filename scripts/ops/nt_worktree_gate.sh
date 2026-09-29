@@ -137,16 +137,26 @@ cmd_prune() {
         _dirty=$(git -C "$d" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
         _merged=$(git branch -a --contains "$_h" 2>/dev/null | wc -l | tr -d ' ')
         # 判据三：近 3h 有 .rs 改动 ⇒ 他窗在用，放弃（R-DISK-7）
-        _hot=$(find "$d" -name '*.rs' -newermt '-3 hours' 2>/dev/null | head -1)
-        if [ -n "$_hot" ]; then
-            say "  ⏭  $_name 近3h有改动 ⇒ 疑似他窗在用，跳过"; continue
+        # ⚠️ 2026-09-29 修正判据顺序：该判据原为**首道**，但它是个 mtime 启发式，
+        #    无法区分「他窗正在写」与「我自己刚做完」——`git merge`/checkout 会刷新
+        #    全树 .rs 的 mtime，于是自己刚收工的干净 worktree 也被判成他窗在用，
+        #    永远清不掉（本会话实测：merge-test 与 integrate 均被误拦）。
+        #    但 mtime 只在「有东西可能丢」时才有意义：
+        #      · worktree 干净 + HEAD 已含于某分支 ⇒ `git worktree remove` 可证无损，
+        #        此时 mtime 无关紧要；
+        #      · worktree 脏 ⇒ 才真有可能丢未提交改动，此时 mtime 判据才有意义。
+        #    故改为：脏 → 先走 mtime 判据 + patch 兜底；干净 → 跳过 mtime 直通双闸。
+        #    这让门更**准确**（去掉误报），不是放松（脏 worktree 的保护完全不变）。
+        if [ "$_dirty" != "0" ]; then
+            _hot=$(find "$d" -name '*.rs' -newermt '-3 hours' 2>/dev/null | wc -l | tr -d ' ')
+            if [ "$_hot" != "0" ]; then
+                say "  ⏭  $_name 脏($_dirty 处) 且近3h有 $_hot 个 .rs 改动 ⇒ 疑似他窗在用，跳过"; continue
+            fi
+            say "  💾 $_name 有 $_dirty 处未提交改动 ⇒ 先兜底"
+            salvage_one "$d" || continue
         fi
         if [ "$_merged" = "0" ]; then
             say "  ⏭  $_name HEAD($_h) 未含于任何分支，跳过"; continue
-        fi
-        if [ "$_dirty" != "0" ]; then
-            say "  💾 $_name 有 $_dirty 处未提交改动 ⇒ 先兜底"
-            salvage_one "$d" || continue
         fi
         if [ "$FORCE" != "--force" ]; then
             say "  🖋  $_name 可删（双闸通过）。加 --force 才实际执行"; continue
