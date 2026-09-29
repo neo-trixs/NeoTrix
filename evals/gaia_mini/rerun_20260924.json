@@ -1,0 +1,193 @@
+{
+ "rerun": "2026-09-24",
+ "score": "20/20",
+ "drifts": {
+  "D04": "finished 58000 (was 41249)",
+  "D05": "29 (was 23, neighbor files)",
+  "C01": "streak>=patience now nt_self_iterate.rs:189 (was :185, rustfmt shift)",
+  "C02": "run_browse_act moved entry/mod.rs -> entry/browse.rs:153, 2 breaks at 249/253",
+  "C03": "--resume now finetune.py:122 (was :119)"
+ },
+ "results": [
+  {
+   "id": "R01",
+   "pass": true,
+   "answer": "Apache-2.0（minimind README_en）",
+   "steps": 2,
+   "note": "首查 429，重查命中",
+   "rerun": "2026-09-24",
+   "drift": ""
+  },
+  {
+   "id": "R02",
+   "pass": true,
+   "answer": "有（chromiumoxide 0.7 browser.rs:780，另经 registry 源码复核）",
+   "steps": 1,
+   "note": "",
+   "rerun": "2026-09-24",
+   "drift": ""
+  },
+  {
+   "id": "R03",
+   "pass": true,
+   "answer": "77.55%（OPT-350M，ToolBench）",
+   "steps": 1,
+   "note": "",
+   "rerun": "2026-09-24",
+   "drift": ""
+  },
+  {
+   "id": "R04",
+   "pass": true,
+   "answer": "1266（openai.com + arXiv 2504.12516）",
+   "steps": 2,
+   "note": "首查 429，重查命中",
+   "rerun": "2026-09-24",
+   "drift": ""
+  },
+  {
+   "id": "R05",
+   "pass": true,
+   "answer": "1945（MacTutor + APA + WorldCat 三源一致）",
+   "steps": 1,
+   "note": "",
+   "rerun": "2026-09-24",
+   "drift": ""
+  },
+  {
+   "id": "D01",
+   "pass": true,
+   "answer": "26 行全 JSON 合法",
+   "steps": 1,
+   "note": "",
+   "rerun": "2026-09-24",
+   "drift": ""
+  },
+  {
+   "id": "D02",
+   "pass": true,
+   "answer": "975 唯一 URL",
+   "steps": 1,
+   "note": "",
+   "rerun": "2026-09-24",
+   "drift": ""
+  },
+  {
+   "id": "D03",
+   "pass": true,
+   "answer": "965",
+   "steps": 1,
+   "note": "",
+   "rerun": "2026-09-24",
+   "drift": ""
+  },
+  {
+   "id": "D04",
+   "pass": true,
+   "answer": "41249 > 40000",
+   "steps": 1,
+   "note": "",
+   "rerun": "2026-09-24",
+   "drift": "finished 58000 (was 41249)"
+  },
+  {
+   "id": "D05",
+   "pass": true,
+   "answer": "23（sessions/*.md，含邻窗新增）",
+   "steps": 1,
+   "note": "早前读数为 19，邻窗加了文件",
+   "rerun": "2026-09-24",
+   "drift": "29 (was 23, neighbor files)"
+  },
+  {
+   "id": "C01",
+   "pass": true,
+   "answer": "streak >= patience（nt_self_iterate.rs:185）",
+   "steps": 1,
+   "note": "",
+   "rerun": "2026-09-24",
+   "drift": "streak>=patience now nt_self_iterate.rs:189 (was :185, rustfmt shift)"
+  },
+  {
+   "id": "C02",
+   "pass": true,
+   "answer": "run_browse_act 内 2 处 break（Ok失败分支 1498 + Err分支 1502）",
+   "steps": 1,
+   "note": "全文件 11 处，其余存量",
+   "rerun": "2026-09-24",
+   "drift": "run_browse_act moved entry/mod.rs -> entry/browse.rs:153, 2 breaks at 249/253"
+  },
+  {
+   "id": "C03",
+   "pass": true,
+   "answer": "--resume（finetune.py:119）",
+   "steps": 1,
+   "note": "",
+   "rerun": "2026-09-24",
+   "drift": "--resume now finetune.py:122 (was :119)"
+  },
+  {
+   "id": "C04",
+   "pass": true,
+   "answer": "step 0 预灌（step B 为 build+探针）",
+   "steps": 1,
+   "note": "",
+   "rerun": "2026-09-24",
+   "drift": ""
+  },
+  {
+   "id": "C05",
+   "pass": true,
+   "answer": "verify3.done（nt_reporter.sh:20）",
+   "steps": 1,
+   "note": "",
+   "rerun": "2026-09-24",
+   "drift": ""
+  },
+  {
+   "id": "M01",
+   "pass": true,
+   "answer": "分解（152 meta-only 现象）→匹配（content-hash 幂等 + 写缓冲模型）→映射（落盘后 975/975 自愈）",
+   "steps": 1,
+   "note": "",
+   "rerun": "2026-09-24",
+   "drift": ""
+  },
+  {
+   "id": "M02",
+   "pass": true,
+   "answer": "超时→无监听→non-default dir 报错→指向默认目录本身→走副本",
+   "steps": 1,
+   "note": "",
+   "rerun": "2026-09-24",
+   "drift": ""
+  },
+  {
+   "id": "M03",
+   "pass": true,
+   "answer": "锁门（零cargo/rustc）+ 内存门（free>40k）+ 单实例门",
+   "steps": 1,
+   "note": "",
+   "rerun": "2026-09-24",
+   "drift": ""
+  },
+  {
+   "id": "M04",
+   "pass": true,
+   "answer": "参数稀释 + 行为聚焦 + 评测对齐（三点全中）",
+   "steps": 1,
+   "note": "",
+   "rerun": "2026-09-24",
+   "drift": ""
+  },
+  {
+   "id": "M05",
+   "pass": true,
+   "answer": "crystallize_rate = new_patterns / chosen",
+   "steps": 1,
+   "note": "已在 nt_self_iterate.rs 落地",
+   "rerun": "2026-09-24",
+   "drift": ""
+  }
+ ]
+}

@@ -1,0 +1,20 @@
+{"id": "R01", "category": "search", "prompt": "jingyaogong/minimind MiniMind-3 的开源 license 是什么？", "check": "答案含 Apache-2.0", "max_steps": 4}
+{"id": "R02", "category": "search", "prompt": "chromiumoxide 0.7 的 BrowserConfigBuilder 是否提供 user_data_dir 方法？", "check": "答案：有（browser.rs）", "max_steps": 4}
+{"id": "R03", "category": "search", "prompt": "ToolBench 上微调后的 OPT-350M 工具调用 pass rate 是多少？", "check": "答案含 77.55%", "max_steps": 4}
+{"id": "R04", "category": "search", "prompt": "OpenAI BrowseComp 基准共多少道题？", "check": "答案含 1266", "max_steps": 4}
+{"id": "R05", "category": "search", "prompt": "波利亚《How to Solve It》初版年份？", "check": "答案含 1945", "max_steps": 4}
+{"id": "D01", "category": "data", "prompt": "models/training/dialogue_cards.jsonl 共几行？是否全 JSON 合法？", "check": "26 行全合法", "max_steps": 3}
+{"id": "D02", "category": "data", "prompt": "models/training/repo_cards.jsonl 唯一 URL 几个？", "check": "975", "max_steps": 3}
+{"id": "D03", "category": "data", "prompt": "models/training/smelt/smelt_progress.json 完成数？", "check": "965", "max_steps": 3}
+{"id": "D04", "category": "data", "prompt": "sessions/logs/ftv4.log 最新训练步数是否超过 40000？", "check": "是（给出数字）", "max_steps": 3}
+{"id": "D05", "category": "data", "prompt": "sessions/ 目录下 .md 文件几个（含子目录 logs 除外）？", "check": "给出数字（read 目录数）", "max_steps": 3}
+{"id": "C01", "category": "code", "prompt": "nt_self_iterate.rs 收敛判断是哪一行比较？", "check": "streak >= patience", "max_steps": 3}
+{"id": "C02", "category": "code", "prompt": "run_browse_act 失败即停靠什么实现？有几处？", "check": "break，两处（Ok失败分支 + Err分支）", "max_steps": 3}
+{"id": "C03", "category": "code", "prompt": "finetune.py 断点续跑参数名？", "check": "--resume", "max_steps": 3}
+{"id": "C04", "category": "code", "prompt": "arch3_gate.sh 里 ingest dialogue_cards 是第几步？", "check": "step 0（step B 是 build+探针）", "max_steps": 3}
+{"id": "C05", "category": "code", "prompt": "reporter WATCH 里 verify3 盯的 done 文件名？", "check": "verify3.done", "max_steps": 3}
+{"id": "M01", "category": "method", "prompt": "用分解-匹配-映射三步解释 smelt cards 曾缺失 152 的原因", "check": "含三步词 + 缓冲未落盘/历史截断解释", "max_steps": 4}
+{"id": "M02", "category": "method", "prompt": "对 CDP 启动超时做 5Whys 追到根因", "check": "终点为默认目录被拒 remote-debugging", "max_steps": 4}
+{"id": "M03", "category": "method", "prompt": "用要素法给 ftv4 OOM 设计预防门的三要素", "check": "含锁/内存/单实例三要素", "max_steps": 4}
+{"id": "M04", "category": "method", "prompt": "第一性原理解释小模型工具调用赢大模型", "check": "提到参数稀释/行为聚焦/评测对齐中至少两点", "max_steps": 4}
+{"id": "M05", "category": "method", "prompt": "为 D2 结晶复用率设计度量公式", "check": "含 new_patterns/chosen 或复用率定义", "max_steps": 4}
