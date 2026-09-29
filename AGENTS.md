@@ -73,6 +73,16 @@
 ## 5. 扫描器告警 ≠ 缺陷（2026-09-27 差点把 bug 修进正确代码）
 
 - **R-SCAN-1** 扫描告警**先读现场证实/证伪再动代码**。本轮 `nt_lock_audit` 报 12 条，逐个读代码后 **2/3 是误报**：`tor_client.rs:324` 作者已显式 `drop(proc);`；`llama_process.rs:329` 的 `*self.x.lock().await = v;` 是赋值型临时锁。若照单全修，会把 bug 引进**正确**代码 —— 「无定点不改」对扫描器同样成立。
+- **R-SCAN-1b（2026-09-29 立）** **裸 `grep` 的命中不构成证据** —— 必须读那一行本身。
+  本仓把 `unsafe`/`forbid`/`unwrap` 等禁词**当数据持有**（`nt_meta/scanner.rs` 扫禁词、
+  `nt_laws.rs` 夹具、文档字符串），**注释与字符串里的命中全是误报**。
+  实测：`grep forbid(unsafe_code) crates/neotrix-sysctl/src/lib.rs` 命中 ⇒ 我断言
+  「声明失效」并立成 TODO 的 **P0 裁决项**。**真相**：第 12 行是
+  `#![allow(unsafe_code, reason=…)]`，命中的是第 10 行**注释里的文字**；5 处 unsafe
+  **每处带 `// SAFETY:`**，上层 `neotrix-core` 保持 `forbid` ⇒ **设计本就正确，我制造了问题**。
+  ⛔ 同会话我刚写完 `_strip_noncode` 并在 `CODE-TOPOLOGY.md` 写下「raw grep 会误报」，
+  **然后自己用 raw grep 下 P0 结论**。⇒ 判据统一走 `nt_topology.py`（5.1，已剥离）
+  或 `nt_locate --component`。**grep 只找候选行，不下结论。**
 - **R-SCAN-2** **手推 ≠ 实证**。判断扫描器行为必须把**真实代码形态**喂进去跑 ——
   本轮手推 `audit_indirect` 不会误报，实测它确实误报。
 - **R-SCAN-3** **门记录必须带核实时间戳**（见 §4.1）。

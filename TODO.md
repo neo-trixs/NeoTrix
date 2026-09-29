@@ -702,42 +702,40 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 `config/*.toml`，**一律先确认忽略生效再 `git add` 周边文件** ——
 `git add .` 会把「刚被解禁的目录」连同密钥一起吞进去。
 
-### 🟡 P0 裁决：`neotrix-sysctl` 的 `#![forbid(unsafe_code)]` 声明失效（2026-09-29 立）
+### ✅ 已核实无问题：`neotrix-sysctl` 的 unsafe 处置（2026-09-29 撤回原 P0 裁决项）
 
-**实测**（`scripts/ops/nt_topology.py` 剥离注释与字符串字面量后统计）：
+⛔ **本项原为「P0 裁决：`forbid` 声明失效」，现已撤回 —— 那个前提是错的。**
 
-| 位置 | 形态 | 判定 |
-|---|---|---|
-| `crates/neotrix-sysctl/src/lib.rs:24` | `unsafe { libc::getpid() }` | FFI，**正当** |
-| `…/lib.rs:28` | `unsafe { libc::sysctl(…) }` | FFI + 裸指针，**正当** |
-| `…/lib.rs:33` | 同上 | 同上 |
-| `…/lib.rs:85` | `unsafe { &*(proc_info.as_ptr() as *const _) }` | 裸指针解引用，**正当** |
-| `…/lib.rs:119` | `unsafe { libc::sysctl(…) }` | FFI，同上 |
+**我犯的错（R-SCAN-1 教科书案例，三步全错）**：
+1. `grep 'forbid(unsafe_code)' crates/neotrix-sysctl/src/lib.rs` → 命中
+   ⛔ **没区分「crate 属性」与「注释里的文字」**
+2. 据此断言「声明了 `forbid` 却含 unsafe ⇒ 声明失效」
+   ⛔ **没读那一行本身**
+3. 写进 TODO 立 P0 裁决项（附 5 处逐行证据）
+   ⛔ 证据是真的，但**结论建立在错误 grep 上**
 
-⇒ **真实 unsafe = 5，全部集中在这一个 crate**（macOS `sysctl` 进程枚举）。
-**`neotrix-core` 内零违反**（R-P1 在主 crate 内成立）。
+> 讽刺点：我在**同一会话**刚为 `unsafe` 写过完整的注释/字面量剥离器，
+> 并在 `CODE-TOPOLOGY.md` 写下「本仓把禁词当**数据**写，raw grep 会误报」——
+> 然后自己用 raw grep 判了 `forbid`，还立成 P0。
 
-⛔ **但该 crate 声明了 `#![forbid(unsafe_code)]`** —— 声明与实际代码**不一致**，
-`forbid` 形同虚设。这与 R-P1「永不加 unsafe」不是同一件事：5 处 FFI 需求本身正当，
-**问题在于声明说了「绝无」而实际有**。
+**真相（逐行核实）**：
 
-**待裁决（二选一）**：
-- **A. 移除该 crate 的 `forbid`**，改为显式 `// SAFETY:` 注释逐处说明
-  （符合 Rust 惯例：FFI crate 不该用 `forbid`，该用 `#![deny]` + 豁免）
-- **B. 保留 `forbid` 并重写为安全封装**（把 5 处 libc 调用收进一个 `unsafe` 内部模块）
+| 事实 | 证据 |
+|---|---|
+| 该 crate 声明的是 **`allow` 不是 `forbid`** | `lib.rs:12`：`#![allow(unsafe_code, reason = "FFI crate: sysctl/procfs access requires unsafe; confined to this crate, neotrix-core remains forbid(unsafe_code)")]` |
+| 上层 `neotrix-core` 保持 `forbid` | `neotrix-core/src/lib.rs:19` `#![forbid(unsafe_code)]` + `:20` `#![deny(unsafe_op_in_unsafe_fn)]` |
+| 作用域被物理限制在本 crate | `lib.rs:9-10` 文件头明确写了这条设计意图 |
+| **5 处 unsafe 每处都有 `// SAFETY:` 注释** | `lib.rs:24/28/33/85/119`，理由具体（如「getpid() 在 POSIX 上总是安全」） |
 
-⇒ **需要你定**。在裁决前，该 crate 的 `forbid` 声明不可当作「已合规」的证据。
+⇒ **这正是 Rust 社区对 FFI crate 的标准做法**（原选项 A「移除 forbid 改 deny +
+逐处 SAFETY」**早已实现**），**无需裁决，无需改一行代码**。
 
-**取证入口**：
-```sh
-python3 scripts/ops/nt_topology.py            # 维度 5.1，含逐处证据
-bash scripts/check-unwrap.sh                  # 另一类明令规则（712 站点）已建棘轮
-```
-
-**为什么记在 TODO 而不是我直接改**：`forbid` 的增删是**架构级裁决**，
-且该 crate 5 处 FFI 是否可重写我未逐行读证（`lib.rs` 内 sysctl 调用含
-可变长度 buffer 管理，改错会引入真实的内存安全缺陷）。
-按「无定点不改」，我只取证与立项，不动代码。
+**留一条可执行的教训**（比撤销更重要）：
+`grep forbid` / `grep unsafe` / `grep unwrap` 在本仓**不可直接下结论** ——
+代码里大量存在「把这些词当数据持有」的扫描器与注释。
+判据统一走 `python3 scripts/ops/nt_topology.py`（维度 5.1，含
+`_strip_noncode` 剥离）或 `nt_locate --component`。
+**⇒ 建议：把「裸 grep 结论一律先读现场」写进 R-SCAN-1，它现在有第 2 个实例。**
 
 ## 🆕 2026-09-28 单窗口汇总修复（架构侧吸收轮）
 
