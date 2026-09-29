@@ -3,9 +3,11 @@
 //! Reciprocal Rank Fusion (RRF) engine combining semantic, BM25, entity,
 //! and temporal signals with configurable weights.
 
-use super::bm25_search::ScoredDoc as BM25ScoredDoc;
-use super::entity_search::ScoredDoc as EntScoredDoc;
-use super::semantic_search::ScoredDoc as SemScoredDoc;
+// 2026-09-29: 三份重复的 ScoredDoc 已统一到 `super::ScoredDoc`，
+// 别名不再需要。此前这三行迫使融合函数的三个参数是三个**不同类型**
+// （`&[SemScoredDoc]` / `&[BM25ScoredDoc]` / `&[EntScoredDoc]`），
+// 字段完全一样却无法放进同一个 Vec。
+use super::ScoredDoc;
 use super::temporal_scoring::TemporalScorer;
 use std::collections::HashMap;
 
@@ -88,9 +90,9 @@ impl FusionEngine {
     /// - `top_k`: max results to return
     pub fn fuse(
         &self,
-        sem_results: &[SemScoredDoc],
-        bm25_results: &[BM25ScoredDoc],
-        entity_results: &[EntScoredDoc],
+        sem_results: &[ScoredDoc],
+        bm25_results: &[ScoredDoc],
+        entity_results: &[ScoredDoc],
         timestamps: &[(String, i64)],
         query_time: i64,
         top_k: usize,
@@ -179,15 +181,15 @@ mod tests {
     #[test]
     fn test_fuse_combines_signals() {
         let engine = FusionEngine::new(FusionWeights::balanced());
-        let sem = vec![SemScoredDoc {
+        let sem = vec![ScoredDoc {
             id: "a".into(),
             score: 0.9,
         }];
-        let bm25 = vec![BM25ScoredDoc {
+        let bm25 = vec![ScoredDoc {
             id: "b".into(),
             score: 0.8,
         }];
-        let ent = vec![EntScoredDoc {
+        let ent = vec![ScoredDoc {
             id: "a".into(),
             score: 0.7,
         }];
@@ -203,19 +205,19 @@ mod tests {
     #[test]
     fn test_top_k_limits_output() {
         let engine = FusionEngine::new(FusionWeights::balanced());
-        let sem: Vec<SemScoredDoc> = (0..10)
-            .map(|i| SemScoredDoc {
+        let sem: Vec<ScoredDoc> = (0..10)
+            .map(|i| ScoredDoc {
                 id: format!("d{}", i),
                 score: 1.0 - i as f64 * 0.1,
             })
             .collect();
-        let bm25: Vec<BM25ScoredDoc> = (0..10)
-            .map(|i| BM25ScoredDoc {
+        let bm25: Vec<ScoredDoc> = (0..10)
+            .map(|i| ScoredDoc {
                 id: format!("d{}", i),
                 score: 1.0 - i as f64 * 0.1,
             })
             .collect();
-        let ent: Vec<EntScoredDoc> = vec![];
+        let ent: Vec<ScoredDoc> = vec![];
         let ts: Vec<(String, i64)> = (0..10)
             .map(|i| (format!("d{}", i), 1_000_000 + i * 1000))
             .collect();

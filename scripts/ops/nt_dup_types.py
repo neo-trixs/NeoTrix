@@ -39,6 +39,73 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 SRC = os.path.join(REPO, "neotrix-core", "src")
 SKIP_DIRS = {"tests", "__pycache__", "target"}
 
+# 「刻意镜像」的设计意图标记 —— 命中任一即判定为**刻意**，不应融合。
+#
+# 来源：AwarenessReport 一组的裁决（2026-09-29）。该组字段集与 derive 完全相同，
+# 但 l1_action/nt_act/nt_act_autonomy/types.rs:1-5 明写
+#   「These mirror the L5 ... to preserve the dependency direction:
+#     L1 must NOT depend on L5. When L5 evolves, these stay stable
+#     as the interface contract for the oracle gate.」
+# ⇒ 副本是**刻意的接口隔离层**，不是疏忽。
+#
+# 这类注释是**作者写下的设计意图**，比任何静态分析都权威。
+# 故本工具把它们自动识别出来，避免下一个 agent 逐个人工阅读 122 组注释。
+DELIBERATE_MARKERS = (
+    "mirror",
+    "mirrors",
+    "mirroring",
+    "keep stable",
+    "stay stable",
+    "stays stable",
+    "interface contract",
+    "must NOT depend on",
+    "must not depend on",
+    "l1-local",
+    "local equivalent",
+    "locally equivalent",
+    "deliberately",
+    "intentionally",
+    "on purpose",
+    "刻意",
+    "故意",
+)
+
+# 每处定义**上方 12 行内**的注释/文档（刻意声明通常紧邻定义）
+DOC_WINDOW = 12
+
+
+def deliberate_note(path, name):
+    """返回命中设计意图标记的注释行；无则返回 None。"""
+    full = os.path.join(SRC, path)
+    try:
+        text = open(full, encoding="utf-8", errors="replace").read()
+    except OSError:
+        return None
+    m = re.search(r"pub struct " + re.escape(name) + r"\b", text)
+    if not m:
+        m = re.search(r"pub enum " + re.escape(name) + r"\b", text)
+    if not m:
+        return None
+    # ① 定义紧邻的注释（DOC_WINDOW 行内）
+    window = text[max(0, m.start() - DOC_WINDOW * 80): m.start()]
+    candidates = window.split("\n")[-DOC_WINDOW:]
+    # ② **文件头**的模块级说明 —— 刻意声明常写在那里。
+    #    2026-09-29 实测踩坑：AwarenessReport 的刻意声明在 types.rs:1-5
+    #    （「L1-local type equivalents ... mirror the L5 types ...」）
+    #    而定义在第 28 行，只扫紧邻窗口会漏判 False（错把刻意当疏忽）。
+    head_end = text.find("\n\n", 0)
+    if head_end > 0:
+        candidates += text[:head_end].split("\n")
+    for line in candidates:
+        low = line.lower()
+        if not low.strip().startswith(("//", "///", "//!", "*")):
+            continue
+        for marker in DELIBERATE_MARKERS:
+            if marker in low:
+                return line.strip().lstrip("/!*").strip()
+    return None
+
+
 # 已裁决组（2026-09-29）：**字段集相同但不该融合**，连同理由一并记下，
 # 避免下一个 agent 重复调查 122 组候选。
 #
@@ -167,7 +234,20 @@ def main():
         print(f"nt-dup-types: 无 {args.name} 的真重复组")
         return 1
 
-    exact_groups.sort(key=lambda g: (-len(g["paths"]), g["name"]))
+    # 打「刻意镜像」标记：任一处定义旁的注释表明是刻意副本 ⇒ 该组不是疏忽
+    for g in exact_groups:
+        hits = []
+        for p in g["paths"]:
+            note = deliberate_note(p, g["name"])
+            if note:
+                hits.append((p, note))
+        g["deliberate"] = bool(hits)
+        g["deliberate_notes"] = hits
+
+    # 排序：先真疏忽（可动）→ 刻意镜像（别动）→ 已裁决
+    exact_groups.sort(key=lambda g: (
+        0 if (not g["deliberate"] and g["name"] not in ADJUDICATED) else 1,
+        -len(g["paths"]), g["name"]))
 
     if args.json:
         print(json.dumps({
@@ -177,17 +257,27 @@ def main():
         }, ensure_ascii=False, indent=2))
         return 0
 
-    print(f"nt-dup-types: 同名类型 {same_name_total} 个（分布在多文件）")
-    print(f"             其中**同名 + 字段集完全相同** = {len(exact_groups)} 组 ⬅ 融合候选")
     n_adj = sum(1 for g in exact_groups if g["name"] in ADJUDICATED)
+    n_delib = sum(1 for g in exact_groups
+                  if g["deliberate"] and g["name"] not in ADJUDICATED)
+    n_plain = len(exact_groups) - n_adj - n_delib
+    print(f"nt-dup-types: 同名类型 {same_name_total} 个（分布在多文件）")
+    print(f"             其中**同名 + 字段集完全相同** = {len(exact_groups)} 组")
     print(f"             其余 {same_name_total - len(set(g['name'] for g in exact_groups))} 个是"
           f"**合理同名**（字段集不同 ⇒ 领域不同，不该动）")
-    print(f"             已裁决不融合: {n_adj} 组（字段同但**代码注释表明是刻意设计**）")
     print()
-    adjudicated = 0
+    print(f"             ├─ ✅ 真疏忽候选（无刻意声明）  {n_plain} 组 ⬅ 可逐组取证")
+    print(f"             ├─ ⛔ 刻意镜像（注释自证设计）   {n_delib} 组 别动")
+    print(f"             └─ ⚖️  已人工裁决                {n_adj} 组")
+    print()
     for g in exact_groups[: args.top]:
         verdict = ADJUDICATED.get(g["name"])
-        tag = f"  ⚖️ 已裁决: {verdict['verdict']}" if verdict else ""
+        if verdict:
+            tag = f"  ⚖️ 已裁决: {verdict['verdict']}"
+        elif g["deliberate"]:
+            tag = "  ⛔ 刻意镜像（注释自证设计）"
+        else:
+            tag = "  ✅ 无刻意声明 ⇒ 真疏忽候选"
         print(f"── {g['name']}  ({len(g['paths'])} 处, {len(g['fields'])} 字段: "
               f"{', '.join(g['fields'][:5])}{'…' if len(g['fields']) > 5 else ''}){tag}")
         print(f"   derive: {', '.join(g['derives'])}")
@@ -195,8 +285,11 @@ def main():
             print(f"     {p}")
         if len(g["paths"]) > 5:
             print(f"     …另 {len(g['paths']) - 5} 处")
+        if g["deliberate"] and not verdict:
+            for pth, note in g["deliberate_notes"][:2]:
+                print(f"     ▸ 注释自证: {pth}")
+                print(f"       「{note[:74]}」")
         if verdict:
-            adjudicated += 1
             for line in _wrap(verdict["reason"], 92):
                 print(f"   ▸ {line}")
             print(f"   ▸ 下一步: {verdict['next_action']}")
