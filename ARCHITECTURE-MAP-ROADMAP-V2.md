@@ -334,7 +334,10 @@
 
 | 指标 | 实测值 | 再生命令 |
 |---|---|---|
-| Rust 文件 / LOC | 2,945 / 897,274 | `find neotrix-core/src crates apps src-tauri/src -name '*.rs'` |
+| Rust 文件 / LOC | 2,945 / 897,274 | `find neotrix-core/src crates -name '*.rs'` |
+<!-- 2026-09-28: `apps`（apps/neobot-desktop，d5413335 删除）与 `src-tauri/src`
+     （5c02e738 归档）已不在仓库里，留在命令里会让它直接报 no such file or directory。
+     桌面端见 docs/api/README.md 的说明。台账数字仍为历史值，R-P199 口径见 AGENTS.md。 -->
 | 0 字节 `.rs` | **0** | `find neotrix-core/src crates -name '*.rs' -size 0 \| wc -l` |
 | 真值面门禁基线 | **1** | `grep -vc '^#' scripts/truth-surface-baseline.txt` |
 | 门禁新增违规 | **0** | `bash scripts/check-truth-surface.sh --strict` |

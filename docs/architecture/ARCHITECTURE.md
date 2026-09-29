@@ -450,7 +450,11 @@ L0 Substrate ──────────────────────�
 ## 14. 版本迭代记录（2026-09-26 大清洗）
 
 - 基线：分支 `feat/capability-absorb-20260828` HEAD `8a11227a`；workspace 0.21.0 全员一致
-  （`apps/neobot-desktop` NeoBot 0.21.0 与 `src-tauri` NeoTrix 0.22.0 为不同产品，各自版本线）。
+  （当时 `apps/neobot-desktop` NeoBot 0.21.0 与 `src-tauri` NeoTrix 0.22.0 为不同产品，各自版本线）。
+- **2026-09-28 更正**：上句括号里的两个桌面端**都不在本仓了** —— `src-tauri` 于
+  `5c02e738` 归档、`apps/neobot-desktop` 于 `d5413335` 删除，桌面 App 统一到独立仓
+  `~/Downloads/Neo/neobot`。本仓只留 `crates/neotrix-neobot` 作库。故「两个产品各自
+  版本线」的说法已不适用于本仓；保留原句是为了让这段基线记录仍是当时的真话。
 - 整合：本仓 9 worktree 已全合入 HEAD（diff 0，无需再合；删留待各窗确认）。
 - 清洗：`sessions/handoff-global-todo-20260926.md` §8（G-01~G-11＋PARK）为唯一待修清单；
   §39 交接提示词见 `sessions/handoff-S39-20260926.md`。

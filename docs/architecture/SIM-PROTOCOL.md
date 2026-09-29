@@ -1530,3 +1530,8 @@ M7: drift 111 持平，fuzz 骨架不入 workspace（零回归面）。
 ---
 
 *End of SIM Protocol v1.0.0 —— 下一编号 SIM-53.*
+
+<!-- 路径说明（2026-09-28 追加，**不重写上文**）：上文出现的 `src-tauri` 与
+     `apps/neobot-desktop` 均为**当时的历史路径**。`src-tauri` 于 `5c02e738` 归档、
+     `apps/neobot-desktop` 于 `d5413335` 删除，桌面 App 统一到独立仓
+     `~/Downloads/Neo/neobot`。改写历史记录等于伪造当时的事实，故只加此注记。 -->

@@ -470,3 +470,8 @@
 6. **构建验证**: 每次修改 CSS/组件后，必须 `npx vite build` + `cargo build --release`，检查 dist 产物
 7. **Chat action 命名**: 前端 `neocodex_send_message_stream` → adapter 剥离前缀 → `send_message_stream`，chat plugin 必须有此 action
 8. **动态模型列表**: ModelSwitcher 必须并行加载 `providerConfig()` + `getModelPoolStatus()`，合并去重
+
+<!-- 路径说明（2026-09-28 追加，**不重写上文**）：上文出现的 `src-tauri` 与
+     `apps/neobot-desktop` 均为**当时的历史路径**。`src-tauri` 于 `5c02e738` 归档、
+     `apps/neobot-desktop` 于 `d5413335` 删除，桌面 App 统一到独立仓
+     `~/Downloads/Neo/neobot`。改写历史记录等于伪造当时的事实，故只加此注记。 -->

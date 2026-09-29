@@ -23,10 +23,21 @@ cargo fmt --check                    # Format check
 
 ### Desktop App
 
+桌面端已于 2026-09-28 迁到**独立仓库** `~/Downloads/Neo/neobot`（提交 `d5413335`
+移除了本仓的 `apps/neobot-desktop` 与 `src-tauri`）。本仓只保留
+`crates/neotrix-neobot` 作为**库** —— 其 `nt_llama` 是 CLI 与桌面端共用的
+本地推理唯一实现。
+
 ```bash
-cd src-tauri/frontend && npm install && npm run build
-cargo build -p neotrix-tauri
+# 在独立仓里构建
+cd ~/Downloads/Neo/neobot
+npm --prefix apps/neobot-desktop/frontend install && npm --prefix apps/neobot-desktop/frontend run build
+cargo build -p neobot-desktop
 ```
+
+`cd src-tauri/frontend` 那条命令自 `5c02e738`（2026-09-28 归档 src-tauri）起
+就已失效 —— 留着比删掉更糟：新人照做只会得到一个看不懂的
+`cd: no such file or directory`。
 
 ## Code Conventions
 
@@ -62,7 +73,10 @@ ci: add Windows runner to CI matrix
 
 - Unit tests inline with `#[cfg(test)] mod tests { use super::*; }`
 - Integration tests in `neotrix-core/tests/`
-- Frontend tests in `src-tauri/frontend/src/__tests__/`
+- Frontend tests live with the frontend, in the standalone desktop repo
+  (`~/Downloads/Neo/neobot/apps/neobot-desktop/tests/`) — that repo has no
+  `__tests__/` dir; its suites are plain `nt_smoke_*.rs` / `nt_live_*.rs`
+  integration tests plus the `registration_tests` module in `src/nt_commands.rs`
 - Aim for >80% coverage on new code
 - Tests must pass before merging
 

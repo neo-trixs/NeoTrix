@@ -179,9 +179,19 @@ neotrix/
 │   ├── neotrix-reasoning/      # Reasoning engines
 │   ├── neotrix-sysctl/         # System control
 │   ├── neotrix-types/          # Shared types
-│   └── nt-lang/                # DSL compiler
-└── src-tauri/              # Desktop application
+│   ├── neotrix-audit/               # Audit tooling
+│   ├── neotrix-neobot/              # 本地推理（nt_llama）—— 桌面端复用的库
+│   └── nt-core-capability-tree/     # 能力树
 ```
+
+**桌面端不在本仓。** `src-tauri` 于 `5c02e738`（2026-09-28）归档、
+`apps/neobot-desktop` 于 `d5413335`（同日）移除，桌面 App 统一到独立仓
+`~/Downloads/Neo/neobot`（独立 2 成员 workspace，零 `neotrix-core` 依赖）。
+本仓保留 `crates/neotrix-neobot` 作库：它的 `nt_llama` 是 CLI 与桌面端共用的
+**唯一**本地推理实现 —— 复制实现正是此前「装完开不了话」的根因。
+
+`nt-lang/`（DSL 编译器）亦已不在成员列表。当前 workspace 共 **10 个包**，
+以 `cargo metadata --no-deps` 为准，不要照抄本文的列表。
 
 ---
 

@@ -443,7 +443,7 @@
 
 ### ⏳ C 组 · 结构性（依赖 B 组）
 
-- [ ] **C-1** `UnifiedApiImpl` 脱 stub（`src-tauri/src/stub.rs:275`；`:289` 返回字面量；`main.rs:52` `:387` `:407`）—— 委派 `nt_crystal_core`
+- [x] ~~**C-1** `UnifiedApiImpl` 脱 stub（`src-tauri/src/stub.rs:275`）~~ **作废 2026-09-28**：`src-tauri` 已于 `5c02e738` 归档，该文件不存在，此任务不再可执行。留条目是为了让搜索得到的人知道它为什么没被做。
 - [ ] **C-2** 20 处 `Orchestrator*` 收敛（真典候选 `neotrix-core/src/pipeline/` 7 文件/1,130 行）
 - [ ] **C-3** 三棵记忆树裁决（`l4/nt_memory` 236 文件 · `l5/nt_mind` 422 文件 · `l6_meta/memory` 7 文件）
 - [ ] **C-4** `neotrix::neotrix::` 双命名消除（**20 处**）—— P1 层归属解耦后已降级为可选
@@ -468,7 +468,7 @@
 
 ### ⛔ 执行前硬闸
 
-- [ ] 无他窗在写：`find neotrix-core/src crates src-tauri/src -name '*.rs' -mmin -5 | head` **必须空**
+- [ ] 无他窗在写：`find neotrix-core/src crates -name '*.rs' -mmin -5 | head` **必须空**
 - [ ] 内存闸 OPEN：`sh scripts/ops/nt_mem_gate.sh; echo $?` **必须 0**（2026-09-28 实测 **exit 2**，两个 `rustc` 各 2.5 GB）
 - [ ] 禁 `git add -A` / `git reset --hard`（主树含他窗 441 个 `.rs` 改动）
 
@@ -478,8 +478,8 @@
 
 | # | 任务 | 支脉节点 | 状态 |
 |---|---|---|---|
-| 0.1 | **`UnifiedApi` 脱 stub**（⚠️ 2026-09-27 降级：**不是核弹级**）|
-  `src-tauri/src/stub.rs:275`（零状态单元结构体）· `:289`（返回字面量）|
+| 0.1 | ~~**`UnifiedApi` 脱 stub**~~ **作废 2026-09-28** | ~~`src-tauri/src/stub.rs:275`（零状态单元结构体）· `:289`（返回字面量）~~ — 随 `5c02e738` 一并归档，不再可执行 | 作废 |
+
   **纠正**：`main.rs:387` 与 `:407` 的调用方是 **CLI 子命令**（`Headless` / `Reason{prompt}`），
   **不是 GUI**。GUI 经 `domain/plugins/chat.rs:166`
  （真调 `consciousness_core::execute_task_loop`，零占位）与 `ntcode/commands.rs`
@@ -969,3 +969,9 @@ keywords("支付网关")                     -> ['支付网关']                
    而本轮**确实改了 Rust 码**，该理由已不成立 → 已重测并补记。
 5. **评估指标要给机会水平** —— 全零交集时若「同分保序取第一个」，等于白送 index 0
    一个正确（而金标常在 index 0），准确率虚高。须按 1/n 计入。
+
+<!-- 路径说明（2026-09-28 追加，**不重写上文**）：上文出现的 `src-tauri` 与
+     `apps/neobot-desktop` 多为**当时的历史路径**。`src-tauri` 于 `5c02e738` 归档、
+     `apps/neobot-desktop` 于 `d5413335` 删除，桌面 App 统一到独立仓
+     `~/Downloads/Neo/neobot`。改写历史台账等于伪造当时的事实，故只加此注记；
+     仅**活指示**（可直接复制执行的命令、指向已删文件的未完成任务）被逐条修正。 -->
