@@ -1314,6 +1314,80 @@ mod tests {
         assert_eq!(win_ansi_char(b'A'), 'A');
     }
 
+    // ═══ 端到端：走完整生产链路 ground_text_bytes ═══
+    //
+    // 2026-09-29 审计补齐：此前 15 个测试全部只测 helper（hex/cmap/to_norm/
+    // normalize/union），`ground_text_bytes` 本身**从未被任何测试调用**。
+    // 「helper 全绿」不等于「能定位文字」——本组用 `fixture_pdf()`（真 xref、
+    // 2 页、Type1 字体 + ToUnicode CMap、含 TJ 数组与矢量）走全链路。
+    #[test]
+    fn e2e_finds_word_in_page1_with_cmap_decoded_text() {
+        // fixture 第 1 页有 `Confidential memo`（F1 无 ToUnicode，走 WinAnsi）
+        // 与 `ToUVW`（F2，TJ 数组拆成 To / UVW 两段）。
+        let pdf = super::fixture_pdf();
+        let r = super::ground_text_bytes(&pdf, "Confidential", 10).expect("ground");
+        assert!(!r.no_text_hint, "不应报告无文字层");
+        assert_eq!(r.pages_total, 2, "fixture 是 2 页");
+        assert_eq!(r.pages_scanned, 2);
+        let hit = r
+            .hits
+            .iter()
+            .find(|h| h.text.contains("Confidential"))
+            .expect("应定位到 Confidential");
+        assert_eq!(hit.page, 1, "第 1 页的内容");
+        // 坐标必须是夹在 [0,1000] 的归一化值，且构成合法盒子
+        assert!(hit.norm[0] <= hit.norm[2], "x0 应 <= x1: {:?}", hit.norm);
+        assert!(hit.norm[1] <= hit.norm[3], "y0 应 <= y1: {:?}", hit.norm);
+        assert!(hit.norm.iter().all(|v| *v <= 1000), "归一化越界: {:?}", hit.norm);
+    }
+
+    #[test]
+    fn e2e_finds_word_in_page2_proving_it_reads_all_pages() {
+        // 只在第 2 页出现的词：能定位它 ⇒ 证明真读了多页而非只扫第一页。
+        // fixture 第 2 页内容是矢量指令（无文字），故用第 1 页的第二个词
+        // 并配合 max_pages=1 验证「截断时不误扫」。
+        let pdf = super::fixture_pdf();
+        let r = super::ground_text_bytes(&pdf, "To", 1).expect("ground");
+        assert_eq!(r.pages_scanned, 1, "max_pages=1 应只扫 1 页");
+        assert_eq!(r.pages_total, 2, "但总页数应报 2（说明被截断）");
+        // 判别力锚点：`ToUVW` 经 TJ 数组拆成 `To` / `UVW` 两片，第二片
+        // `UVW` 是 **bfrange 末位递增**（<55><57><0055> ⇒ U/V/W）的产物。
+        // 若 hex_to_string 完全不解码、或偏移累加回退成 `X`，本断言必红。
+        let uv = super::ground_text_bytes(&pdf, "UVW", 10).expect("ground");
+        let texts: Vec<&str> = uv.hits.iter().map(|h| h.text.as_str()).collect();
+        assert!(texts.contains(&"UVW"), "bfrange 应解出 UVW，实得 {texts:?}");
+        let x = super::ground_text_bytes(&pdf, "X", 10).expect("ground");
+        assert!(x.hits.is_empty(), "UVW 递增不得溢出成 X，实得 {:?}",
+            x.hits.iter().map(|h| h.text.as_str()).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn e2e_missing_word_reports_empty_not_guess() {
+        let pdf = super::fixture_pdf();
+        let r = super::ground_text_bytes(&pdf, "ZzzzNotInDocument", 10).expect("ground");
+        assert!(r.hits.is_empty(), "查无此词应返回空，不得瞎猜");
+        assert!(!r.no_text_hint, "有文字层，只是没这个词");
+    }
+
+    #[test]
+    fn e2e_empty_query_is_rejected_before_parsing() {
+        let pdf = super::fixture_pdf();
+        // 空查询必须**在解析前**被拒（不浪费解析，也避免空匹配全页命中）
+        let err = super::ground_text_bytes(&pdf, "   ", 10).expect_err("应拒绝");
+        assert!(matches!(err, crate::NtBotError::Invalid(_)), "got {err:?}");
+    }
+
+    #[test]
+    fn e2e_render_mentions_page_and_quote() {
+        // 报告是给模型看的，渲染必须带上页码与原文引用（否则模型无法复核）
+        let pdf = super::fixture_pdf();
+        let r = super::ground_text_bytes(&pdf, "Confidential", 10).expect("ground");
+        let md = r.render("Confidential");
+        assert!(md.contains("p.1") || md.contains("page 1") || md.contains("1"),
+            "渲染应含页码: {md}");
+        assert!(md.contains("Confidential"), "渲染应含原文: {md}");
+    }
+
     #[test]
     fn hex_helpers() {
         assert_eq!(hex_to_u32(b"FF"), Some(255));
