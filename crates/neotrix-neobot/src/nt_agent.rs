@@ -1248,12 +1248,14 @@ fn execute_pdf_ground_text(
         .unwrap_or(u64::from(ground::MAX_PAGES_DEFAULT))
         .clamp(1, 200) as u32;
     let report = ground::ground_text(&full, &query, max_pages)?;
-    let output = report.render(&query);
-    Ok(ToolResult {
-        ok: true,
-        truncated: output.len() > 8000,
-        output: truncate_output(output, true),
-    })
+    // 2026-09-29 审计修复（`ab1b9d96` 未编译）：本行原为
+    //   Ok(ToolResult { ok: true, truncated: output.len() > 8000,
+    //                   output: truncate_output(output, true) })
+    // 即**手工构造 ToolResult 又把 truncate_output 的整个返回值塞进 output 字段**
+    // —— 类型不匹配（expected String, found ToolResult），且语义双重截断。
+    // 正确写法与其余 4 个调用点一致：直接返回 truncate_output 的结果
+    // （截断判定与 `truncated` 标记由该函数统一负责，不要在外面重复算）。
+    Ok(truncate_output(report.render(&query), true))
 }
 
 /// agent 侧 bash 执行（P0 审计 F2 加固版）：///

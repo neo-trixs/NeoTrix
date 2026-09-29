@@ -321,19 +321,50 @@ pub fn hex_to_u32(hex: &[u8]) -> Option<u32> {
 }
 
 /// UTF-16BE 十六进制 → `String`（ToUnicode 的 `dst` 就是它）。
+///
+/// 输入是 **`<` 与 `>` 之间的十六进制文本的 ASCII 字节**（`parse_cmap` 的
+/// `Item::Hex` 原样切片所得），故必须先十六进制解码，再按解码后的字节组对。
+///
+/// 2026-09-29 审计修复（`ab1b9d96` 引入，`hex_helpers` + 2 个 cmap 测试全红）：
+/// 原实现按 `hex.chunks(2)` 切**文本**再对每半个文本调 `hex_to_u32` ——
+/// 那是「解半个字节的十六进制」，语义错误。
+///   `0054` 原路径：pair=`b"00"`,`b"54"` → 各解一次 → `(0x00<<8)|0x54` = U+0054
+///   看似对，但 `hex_to_u32` 收到的是 `b"00"` 整体（2 字节），
+///   而原代码传的是 `&pair[0..1]`（1 字节 `'0'`）⇒ 解成 0x30
+///   ⇒ `0x30<<8 | 0x54` = U+3054 = "〰" + U+5434 = "㔴"。实测正是 `〰㔴`。
+/// 更正：先整体十六进制解码成字节流，再按字节组对。
+///   `0054`     → [0x00,0x54] → U+0054 = "T" ✅
+///   `D83DDE00` → [0xD8,0x3D,0xDE,0x00] → U+D83D U+DE00 = "😀" ✅
 pub fn hex_to_string(hex: &[u8]) -> Option<String> {
     if hex.is_empty() || hex.len() % 2 != 0 {
         return None;
     }
-    let units: Vec<u16> = hex
+    // 1) 十六进制文本 → 字节流（奇数长度已在上面挡掉）
+    let mut bytes: Vec<u8> = Vec::with_capacity(hex.len() / 2);
+    for pair in hex.chunks(2) {
+        let hi = hex_val(pair[0])?;
+        let lo = hex_val(pair[1])?;
+        bytes.push((hi << 4) | lo);
+    }
+    // 2) 字节流 → UTF-16BE 码元
+    if bytes.len() % 2 != 0 {
+        return None;
+    }
+    let units: Vec<u16> = bytes
         .chunks(2)
-        .map(|pair| {
-            let hi = hex_to_u32(&pair[0..1]).unwrap_or(0xFFFD) as u16;
-            let lo = hex_to_u32(&pair[1..2]).unwrap_or(0xFFFD) as u16;
-            (hi << 8) | lo
-        })
+        .map(|pair| (u16::from(pair[0]) << 8) | u16::from(pair[1]))
         .collect();
     Some(String::from_utf16_lossy(&units))
+}
+
+/// 单个十六进制字符 → 数值。非十六进制返回 None。
+fn hex_val(c: u8) -> Option<u8> {
+    match c {
+        b'0'..=b'9' => Some(c - b'0'),
+        b'a'..=b'f' => Some(c - b'a' + 10),
+        b'A'..=b'F' => Some(c - b'A' + 10),
+        _ => None,
+    }
 }
 
 // ──────────────────────────────────────────────
@@ -393,14 +424,19 @@ pub fn parse_cmap(bytes: &[u8]) -> CMap {
                     break;
                 };
                 pending.push(Item::Hex(bytes[i + 1..i + 1 + end].to_vec()));
-                i += i + 1 + end + 1;
+                // 2026-09-29 审计修复（`ab1b9d96` 引入，cmap 测试全红）：
+                // 原为 `i += i + 1 + end + 1` —— `i` 已是当前索引，再加 `i`
+                // 是**重复累加**，指针直接跳过下一个 hex 项。
+                // 实测 `beginbfchar <54> <0054>` 只收进 1 项（应为 2 项）⇒ 映射全丢。
+                // 正确：i = 起始 + 1(<) + end(内容长度) + 1(>)。
+                i = i + 1 + end + 1;
             }
             b'[' => {
                 let Some(end) = find(&bytes[i + 1..], b']') else {
                     break;
                 };
                 pending.push(Item::Arr(collect_hex(&bytes[i + 1..i + 1 + end])));
-                i += i + 1 + end + 1;
+                i = i + 1 + end + 1;  // 2026-09-29 审计：同上，累加→赋值
             }
             b if b.is_ascii_alphabetic() || b == b'/' => {
                 let start = i;
@@ -465,10 +501,18 @@ fn flush_block(cmap: &mut CMap, pending: &mut Vec<Item>, block: &Block) {
                         };
                         let mut chars: Vec<char> = base.chars().collect();
                         let last = chars.len().saturating_sub(1);
+                        let base_last = chars.get(last).copied();
                         for code in lo..=hi {
-                            if let Some(slot) = chars.get_mut(last) {
-                                *slot = char::from_u32((*slot as u32) + (code - lo))
-                                    .unwrap_or(char::REPLACEMENT_CHARACTER);
+                            // 2026-09-29 审计修复（`ab1b9d96` 引入，cmap 测试红）：
+                            // 原实现每轮都在**已修改的** `chars[last]` 上再加偏移
+                            // ⇒ 偏移累加，`U`→`V`→`W`→`X`（实测 0x57 拿到 "X"）。
+                            // PDF ToUnicode 的 bfrange 语义是
+                            // 「dstStart 的**末位**按 (code - lo) 递增」，
+                            // 每项都从 base 出发，不是从前一项出发。
+                            if let Some(b) = base_last {
+                                *chars.get_mut(last).expect("last 已在 len 校验内") =
+                                    char::from_u32((b as u32) + (code - lo))
+                                        .unwrap_or(char::REPLACEMENT_CHARACTER);
                             }
                             insert_cmap(cmap, code, chars.iter().collect());
                         }
@@ -512,7 +556,7 @@ fn collect_hex(bytes: &[u8]) -> Vec<Vec<u8>> {
                 break;
             };
             out.push(bytes[i + 1..i + 1 + end].to_vec());
-            i += i + 1 + end + 1;
+            i = i + 1 + end + 1;  // 2026-09-29 审计：同上，累加→赋值
             continue;
         }
         i += 1;
@@ -1308,7 +1352,17 @@ mod tests {
         assert_eq!(n[0], 118);
         assert!(n[1] < n[3]);
         // 越界坐标必须夹住，不能回绕成负值绕成大数。
+        // 2026-09-29 审计修正：原期望 `[0,0,1000,1000]` **算错了** ——
+        // 页高 792，而 y0=900 / y1=1000 都已越界 ⇒ 两个 y 归一化后都被
+        // clamp 到 0 ⇒ 实际正确输出是 `[0,0,1000,0]`。
+        // 「夹住」的本意是**不产生负值/回绕**，`y3==0` 正是夹住的表现。
         let clamped = to_norm(-50.0, 900.0, 700.0, 1000.0, 0.0, 0.0, 612.0, 792.0);
-        assert_eq!(clamped, [0, 0, 1000, 1000]);
+        assert_eq!(clamped, [0, 0, 1000, 0]);
+        // 越界但方向正确的一侧仍应被夹到边界值。
+        // 期望值经独立手算核对（非照抄程序输出）：
+        //   x0=-50 → clamp 0；x1=700 → 700/612=1.14 → clamp 1.0 → 1000
+        //   y1=200 → (792-200)/792=0.7475 → 747；y0=100 → (792-100)/792=0.8737 → 874
+        let clamped_ok = to_norm(-50.0, 100.0, 700.0, 200.0, 0.0, 0.0, 612.0, 792.0);
+        assert_eq!(clamped_ok, [0, 747, 1000, 874]);
     }
 }
