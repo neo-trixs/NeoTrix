@@ -524,6 +524,23 @@
       "read_only": true,
       "when_not": "不要对**尚未全绿**的树跑变异（工具会拒：基线红则无法归因）；也别当覆盖率工具用 —— 它不测行覆盖，只测能否杀死变异。要真正跑请显式给 --fn --mutate --cargo（该模式会改文件再恢复）。",
       "spec": "R-MUT-1"
+    },
+    {
+      "id": "coverage-gaps",
+      "query": [
+        "零覆盖",
+        "测试覆盖",
+        "没被测过",
+        "死代码",
+        "哪些没测",
+        "coverage",
+        "零真实调用"
+      ],
+      "tool": "python3 scripts/ops/nt_coverage_gaps.py crates/neotrix-neobot/src",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "别把它当覆盖率工具 —— 它只找「测试从未触碰的 pub fn」，不度量行覆盖、不识别「调用了但没断言」（后者用 nt_mutation_check.py）。私有 helper 零覆盖是正常的，它只报 pub fn。",
+      "spec": "R-COV-1"
     }
   ],
   "excluded": {
