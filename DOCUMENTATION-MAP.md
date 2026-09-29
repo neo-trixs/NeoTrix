@@ -70,7 +70,10 @@ docs/
 │   ├── YYYY-MM-DD-{topic}.md
 │   └── 2026-09-22-wsd-wiki-index.md  # 外部挂载：WSD 企业 Wiki 索引（实体 /Users/neo/Downloads/wsd/wiki/docs/，19 篇，不复制内容进仓）
 └── 2-PLANS/                  # 路线图
-    └── ROADMAP-*.md
+    ├── ROADMAP-*.md          # 规约；⛔ 现实偏差：现存命名带日期后缀（ROADMAP-{scope}-YYYY-MM-DD.md）
+    └── README.md             # ⛔ 2026-09-29 起为空目录占位：原 2 份 09-20 路线图已归档至
+                              #    docs/architecture/_superseded/2-PLANS/（git mv，零删除）。
+                              #    排期正典是 docs/architecture/FINAL-ROADMAP-2026-09-29.md
 ```
 
 **规则**:

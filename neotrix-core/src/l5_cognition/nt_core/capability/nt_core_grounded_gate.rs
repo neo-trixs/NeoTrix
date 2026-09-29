@@ -1,6 +1,10 @@
 //! # GroundedGate — 外部接地验证门 + AgentContract 类型化契约
 //!
-//! 对应 `docs/2-PLANS/2026-07-01-multi-agent-orchestration-design.md` §6/§7（P0）。
+//! 设计依据：`docs/architecture/_superseded/2-PLANS/2026-07-01-multi-agent-orchestration-design.md`
+//! **§2.3 `nt_cap_orch_gate` — Supervisor Quality Gate**（P0）。
+//!
+//! 勘误 2026-09-29：此处原写「§6/§7」，但该设计文档只有 §1–§5，§6/§7 从未存在；
+//! 文档已于 `477bf669` 删除，本会话从 git 历史恢复并归档。
 //!
 //! ## GroundedGate
 //! 用**可执行证据**（cargo check / cargo test / 工具输出对比）验证子 agent 输出，

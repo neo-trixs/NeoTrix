@@ -1,3 +1,15 @@
+> ⛔ **已归档（2026-09-29）** — 原路径 `docs/2-PLANS/ROADMAP-FUSION-ULTIMATE-2026-09-20.md`。
+> **被取代者**：排期正典已迁至 `docs/architecture/FINAL-ROADMAP-2026-09-29.md`（§0 自称「排期与状态以本文件为准」，`AGENTS.md` §6「唯一排期真源」）；
+> 外部吸收的仓清单/许可/排名真源为 `docs/architecture/absorption-sources/`（483 仓 CSV + 436 条榜单 + 许可台账）与
+> `ABSORPTION-ARCH2-2026-09-29.md`（30 源，含 5 个被证伪前提）。
+> **归档依据（2026-09-29 实测）**：
+> ① §2「Layer Size」7 行**全部失效** —— L0 43→48 / L1 646→505 / L2 335→361 / L3 253→247 / **L4 19→255** / L5 656→701 / L6 207→234；
+> ② §5「成功指标」的 Current 列同样作废（L1 目标 ~400 未达、TODO/FIXME 260→实测 192）；
+> ③ P0 吸收目标 8 项中 6 项已落地（`nt_judgment` / `nt_harness` / `nt_web_perception` / `nt_routing` / `nt_council` / `nt_security` 实测存在），
+>    故其「待办」身份已消失；余下 2 项（`nt_ability_net` / `nt_agent/ode`）**全仓 `rg` 零命中**，是未落地条目而非现行排期。
+> **保留理由**：§1 的 35 仓吸收矩阵（star 数 + 目标模块 + 层归属映射）是 `absorption-sources/` 之外独有的溯源快照 —— 归档不删。
+> ⛔ **本文 star 数/文件数/LOC 均为 2026-09-20 快照，不得用于任何现状判断。**
+
 # NeoTrix Architecture Fusion - Ultimate Roadmap
 
 > 35 external repos reverse-engineered + full code audit + base model reasoning

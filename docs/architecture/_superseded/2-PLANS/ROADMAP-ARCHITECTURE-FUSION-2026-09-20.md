@@ -1,3 +1,14 @@
+> ⛔ **已归档（2026-09-29）** — 原路径 `docs/2-PLANS/ROADMAP-ARCHITECTURE-FUSION-2026-09-20.md`。
+> **被取代者**：排期正典已迁至 `docs/architecture/FINAL-ROADMAP-2026-09-29.md`（§0 自称「排期与状态以本文件为准」，`AGENTS.md` §6「唯一排期真源」）；
+> 跨层/重复类型的裁决已分别由 `docs/architecture/OWNERSHIP.md` + `.neotrix/layer-map.json`（层归属真源）与
+> `docs/architecture/FIVE-ENTITY-TASK-CHECKLIST.md` T42（重复类型 Top18 **零合并**，已裁决完成）接管。
+> **归档依据（2026-09-29 实测）**：
+> ① 本文「现状诊断」7 项度量全部失效 —— L4 文件数 19 → **255**（本文 Sprint 3 目标写 "~80"，方向与量级均未预见）；
+> ② 本文的 T1.2「合并 14 个 `TaskStatus` 版本」已被 T42 **实证否决**（同名多为正当领域分离，批量合并会破坏字段/变体/引用兼容性）；
+> ③ T4.3 提议的 `scripts/check_architecture.sh` **至今不存在**，实际由 `check-layer-deps.sh` / `check-doc-drift.sh` 等账本棘轮门承担。
+> **保留理由**：「重复类型 Top 10」逐项取证表是 `DIR-AUDIT-2026-09-27.md`（8 类家族）之外的独有溯源 —— 归档不删。
+> ⛔ **本文数字不得用于任何现状判断**（与 `_superseded/ANALYSIS_ARCHITECTURE-2026-09.md` 同病：方法论可抄，实测数据已作废）。
+
 # NeoTrix 架构熔炼 — 核心路线任务清单
 
 > 基于 10 个外部仓库技术逆向 + 全量架构审计 + 6 维度技术搜索

@@ -175,8 +175,12 @@ crates/
     Cargo.toml
 docs/
   2-PLANS/
-    ROADMAP-ARCHITECTURE-FUSION-2026-09-20.md
-    ROADMAP-FUSION-ULTIMATE-2026-09-20.md
+    README.md                      # 空目录占位：原 2 份路线图已于 2026-09-29 归档
+  architecture/
+    _superseded/
+      2-PLANS/
+        ROADMAP-ARCHITECTURE-FUSION-2026-09-20.md    # ⛔ 已归档 09-29
+        ROADMAP-FUSION-ULTIMATE-2026-09-20.md        # ⛔ 已归档 09-29
   api/
     README.md
     SUMMARY.md
