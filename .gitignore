@@ -276,3 +276,9 @@ neotrix-core/config/crystal.toml
 # worktree 兜底 patch（R-DISK-5，临时产物，确认已提交/已弃方可删）
 .neotrix/worktree-salvage/
 .cache/
+
+# .project-map/ = codemap 索引, 由 `python3 scripts/ops/nt_mapgen.py` **1 秒重建**的
+# 纯派生产物。2026-09-29 起不入库: v2 schema 带符号行号后 14MB, 而 git 不删旧
+# blob ⇒ 每次重建都往历史里永久塞一份。与 target/ / neotrix-core/TODO.md 同类。
+# 干净检出后跑一次即可恢复; map-project.sh 是封装入口。
+.project-map/

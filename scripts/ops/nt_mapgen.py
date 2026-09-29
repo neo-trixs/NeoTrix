@@ -24,7 +24,16 @@ import sys
 RS_ITEM = re.compile(
     r"^\s*pub\s+(?:unsafe\s+)?(struct|enum|trait|fn|mod|type|const|static)\s+([A-Za-z_][A-Za-z0-9_]*)"
 )
+# ⚠️ pub 之外的可见性也要收（bugfix 2026-09-29）：
+# 旧版只认 `pub`，漏掉 `pub(crate)` / `pub(super)`，而 neotrix-core 大量用
+# `pub(crate)`。同时收 `async fn` 与裸 `fn`（fn 的名字要给 nt_locate 定位用）。
+RS_ITEM_ANY = re.compile(
+    r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:default\s+)?(?:const\s+)?(?:async\s+)?"
+    r"(?:unsafe\s+)?(struct|enum|trait|fn|mod|type|const|static)\s+([A-Za-z_][A-Za-z0-9_]*)"
+)
 RS_MOD = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)")
+RS_IMPL = re.compile(r"^\s*impl(?:\s*<[^>]*>)?\s+([A-Za-z_][A-Za-z0-9_:<>, ]*)")
+RS_USE = re.compile(r"^\s*(?:pub\s+)?use\s+([A-Za-z_][A-Za-z0-9_:]*)")
 TS_ITEM = re.compile(
     r"^\s*export\s+(?:default\s+)?(function|class|const|interface|type|enum)\s+([A-Za-z_][A-Za-z0-9_]*)"
 )
@@ -40,10 +49,15 @@ LANGS = {".rs": "rs", ".ts": "ts", ".tsx": "tsx", ".js": "js", ".jsx": "jsx",
          ".html": "html", ".css": "css", ".scss": "scss", ".vue": "vue"}
 
 ROOT_AREAS = [
+    # ⚠️ 顺序敏感：长前缀必须在短前缀之前（bugfix 2026-09-29）
+    # 旧版把 ("crates", "crates") 排在 ("crates/neotrix-neobot", "neobot") 之前，
+    # 使 neobot 条目永远匹配不到 —— 那行是死代码（注释说"只为让 area 可读"，
+    # 实测 area 恒为 "crates"）。area_of() 从上往下首个命中即返回。
     ("neotrix-core/src", "neotrix-core"),
     ("neotrix-core/tests", "neotrix-core"),
     ("neotrix-core/benches", "neotrix-core"),
     ("neotrix-core/examples", "neotrix-core"),
+    ("crates/neotrix-neobot", "neobot"),
     ("crates", "crates"),
     # 2026-09-28 修正 6 条死引用（`nt_scan_surface.py` 定位）：
     #   src-tauri/src          → 桌面端随 5c02e738 归档（599 files）
@@ -53,9 +67,6 @@ ROOT_AREAS = [
     #   fuzz                   → 随 2bbed32c 归档，现居 neotrix-archive/fuzz
     #   ntos/src               → 该目录从来不存在（代码里的 "ntos" 只是普通词，
     #                            见 bin/nt_douyin_ingest.rs 等）
-    # 桌面端代码现居 `crates/neotrix-neobot`（已由 `("crates", "crates")` 覆盖，
-    # 故此处不重复列出；单列一个 neobot 条目只为让 area 标注可读）。
-    ("crates/neotrix-neobot", "neobot"),
     ("sessions", "sessions"),
     ("scripts", "scripts"),
     ("skills", "skills"),
@@ -131,6 +142,36 @@ def crate_name(root, d):
     return name
 
 
+def tree_of(area, sub):
+    """Which code TREE does this file belong to?
+
+    Why this exists (2026-09-29): `neotrix-core/src/neotrix/` is a SECOND
+    tree (129 files / 43,834 lines) that does NOT participate in L0–L6 and
+    completely escapes `check-layer-deps.sh` — see
+    `docs/architecture/DIR-REMEDY-2026-09-28.md` §2.5.
+
+    ⇒ Any directory-derived topology would render a tree that *looks*
+    layer-compliant while ignoring this subtree entirely. So the second
+    tree is tagged explicitly, never inferred from the directory name.
+
+    Returns one of: "layered" (L0–L6 tree) | "second-tree" | "crate" |
+                   "app" | "doc" | "other".
+    """
+    parts = sub.split("/") if sub else []
+    if area in ("docs", "sessions", "skills", "workflows"):
+        return "doc"
+    if area in ("neobot", "crates"):
+        return "crate"
+    if area == "neotrix-core":
+        if parts and parts[0] == "neotrix":
+            return "second-tree"
+        if any(re.match(r"^l[0-6]_", p) for p in parts):
+            return "layered"
+        # neotrix-core/src/{entry,bin,tests,examples} etc. sit outside L0–L6
+        return "core-outside-layers"
+    return "other"
+
+
 def modpath_of(root, rel, lang):
     if lang != "rs":
         return None
@@ -163,26 +204,72 @@ def _crate_src_dir(root, d):
 
 
 def items_of(path, lang):
+    """Extract symbols WITH LINE NUMBERS.
+
+    Schema change 2026-09-29 (bugfix): items were bare strings
+    ("fn foo") with no line number, so `nt_locate` could answer
+    "does fn foo exist" but never "where is it" — it silently fell back
+    to `--index=off` grep. Each item is now an object:
+        {name, kind, line, vis, sig}
+    `line` is 1-based and VERIFIED to point at the real declaration.
+
+    `kind` ∈ struct|enum|trait|fn|mod|type|const|static|impl|use
+    `vis`  ∈ pub|pub(crate)|pub(super)|"" (private)
+    """
     items = []
     try:
         with open(path, encoding="utf-8", errors="ignore") as fh:
-            for line in fh:
+            for lineno, line in enumerate(fh, 1):
                 if lang == "rs":
-                    m = RS_ITEM.match(line)
+                    # impl first: "impl Foo for Bar {" must not be read as a use
+                    m = RS_IMPL.match(line)
                     if m:
-                        items.append(m.group(1) + " " + m.group(2))
+                        items.append({
+                            "name": m.group(1).strip(), "kind": "impl",
+                            "line": lineno, "vis": "", "sig": line.strip()[:160],
+                        })
+                        continue
+                    m = RS_ITEM.match(line) or RS_ITEM_ANY.match(line)
+                    if m:
+                        vis = ""
+                        vm = re.match(r"^\s*(pub(?:\([^)]*\))?)", line)
+                        if vm:
+                            vis = vm.group(1)
+                        items.append({
+                            "name": m.group(2), "kind": m.group(1),
+                            "line": lineno, "vis": vis,
+                            "sig": line.strip()[:160],
+                        })
                         continue
                     m = RS_MOD.match(line)
-                    if m and len(items) < 400:
-                        items.append("mod " + m.group(1))
+                    if m:
+                        items.append({
+                            "name": m.group(1), "kind": "mod",
+                            "line": lineno, "vis": "", "sig": line.strip()[:160],
+                        })
+                        continue
+                    m = RS_USE.match(line)
+                    if m:
+                        items.append({
+                            "name": m.group(1), "kind": "use",
+                            "line": lineno, "vis": "", "sig": line.strip()[:160],
+                        })
                 elif lang in ("ts", "tsx", "js", "jsx"):
                     m = TS_ITEM.match(line)
                     if m:
-                        items.append(m.group(1) + " " + m.group(2))
+                        items.append({
+                            "name": m.group(2), "kind": m.group(1),
+                            "line": lineno, "vis": "export",
+                            "sig": line.strip()[:160],
+                        })
                 elif lang == "py":
                     m = PY_ITEM.match(line)
                     if m:
-                        items.append("def " + m.group(1))
+                        items.append({
+                            "name": m.group(1),
+                            "kind": "class" if re.search(r"\bclass\b", line) else "def",
+                            "line": lineno, "vis": "", "sig": line.strip()[:160],
+                        })
                 if len(items) >= 400:
                     break
     except OSError:
@@ -223,6 +310,11 @@ def main():
                 loc, broken = 0, True
             area, sub = area_of(rel)
             tags = layer_of(area, sub)
+            tree = tree_of(area, sub)
+            tags.append("tree:" + tree)
+            if tree == "second-tree":
+                # 该子树逃过 check-layer-deps.sh，任何分层拓扑必须显式分叉
+                tags.append("escapes-layer-gate")
             if broken:
                 tags.append("symlink-broken")
             files.append({
@@ -230,23 +322,35 @@ def main():
                 "lang": lang,
                 "loc": loc,
                 "area": area,
-                "tags": layer_of(area, sub),
+                "tree": tree,
+                "tags": tags,
                 "modpath": modpath_of(root, rel, lang),
                 "items": items_of(full, lang) if lang in ("rs", "ts", "tsx", "js", "jsx", "py") else [],
             })
     roots = {}
+    trees = {}
     for f in files:
         r = roots.setdefault(f["area"], {"files": 0, "loc": 0})
         r["files"] += 1
         r["loc"] += f["loc"]
+        t = trees.setdefault(f["tree"], {"files": 0, "loc": 0})
+        t["files"] += 1
+        t["loc"] += f["loc"]
     rs_total = sum(1 for f in files if f["lang"] == "rs")
+    rs_sym = sum(1 for f in files if f["lang"] == "rs" and f["items"])
     doc = {
         "meta": {
-            "tool": "nt_mapgen.py v1",
+            "tool": "nt_mapgen.py v2",
+            "schema": "items=[{name,kind,line,vis,sig}] (v2: 行号 + vis + impl/use)",
             "files": len(files),
-            "coverage": {"rs_total": rs_total, "rs_indexed": rs_total},
+            "coverage": {
+                "rs_total": rs_total,
+                "rs_indexed": rs_total,
+                "rs_with_symbols": rs_sym,
+            },
         },
         "roots": roots,
+        "trees": trees,
         "files": files,
     }
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
@@ -255,6 +359,9 @@ def main():
     print(f"[mapgen] {len(files)} files -> {out}")
     for area in sorted(roots):
         print(f"  {area}: {roots[area]['files']} files, {roots[area]['loc']} loc")
+    print("  --- trees ---")
+    for t in sorted(trees):
+        print(f"  {t}: {trees[t]['files']} files, {trees[t]['loc']} loc")
 
 
 if __name__ == "__main__":

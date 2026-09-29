@@ -42,16 +42,41 @@ def load_index(root):
     return None, None
 
 
+def item_text(item):
+    """Normalise an index item to (text, line).
+
+    v1 schema (2026-09-24): items were bare strings  -> "fn foo", 0
+    v2 schema (2026-09-29): items are dicts           -> "fn foo", 42
+
+    Both are accepted so an old codemap.json still works (R-EXIST: the
+    index is regenerated on a different cadence than the code).
+    """
+    if isinstance(item, dict):
+        name = item.get("name", "")
+        kind = item.get("kind", "")
+        vis = item.get("vis", "")
+        line = item.get("line", 0) or 0
+        sig = item.get("sig", "")
+        text = (kind + " " + name).strip()
+        if vis and vis not in ("pub", "export"):
+            text = vis + " " + text
+        if sig and len(sig) > len(text):
+            text = sig
+        return text, line
+    return str(item), 0
+
+
 def locate_index(doc, selector="", component="", source_file="", limit=15):
     """L0: 索引直查（毫秒级）。basename 全等 > item/modpath 包含 > token 覆盖。"""
     hits = []
     seen = set()
 
-    def add(score, path, text):
-        if path in seen:
+    def add(score, path, text, line=0):
+        key = (path, line)
+        if key in seen:
             return
-        seen.add(path)
-        hits.append((score, path, 0, text[:160]))
+        seen.add(key)
+        hits.append((score, path, line, text[:160]))
 
     files = doc.get("files", [])
     toks = ([component] if component else []) + tokens_of(selector)
@@ -61,26 +86,35 @@ def locate_index(doc, selector="", component="", source_file="", limit=15):
     if base:
         for f in files:
             if os.path.basename(f["path"]) == base:
-                add(100, f["path"], "<index-file> area=%s loc=%d" % (f["area"], f["loc"]))
-                # 行内定点：items 命中
+                add(100, f["path"], "<index-file> area=%s tree=%s loc=%d"
+                    % (f["area"], f.get("tree", "?"), f["loc"]))
+                # 行内定点：items 命中。v2 schema 的 item 带 line ⇒ 直接给行号。
                 for tok in ([component] + toks)[:4]:
                     if not tok:
                         continue
                     low = tok.lower()
                     for item in f.get("items", []):
-                        if low in item.lower():
-                            add(95, f["path"], "<index-item> " + item)
+                        s, line = item_text(item)
+                        if low in s.lower():
+                            loc = "<index-item%s> %s" % (("@L%d" % line) if line else "", s)
+                            add(95, f["path"], loc, line)
                             break
     if component:
         low = component.lower()
         for f in files:
-            if any(low in (it or "").lower() for it in f.get("items", [])):
-                add(90, f["path"], "<index-item> %s" % component)
-            elif f.get("modpath") and low in f["modpath"].lower():
+            matched = False
+            for item in f.get("items", []):
+                s, line = item_text(item)
+                if low in s.lower():
+                    add(90, f["path"], "<index-item%s> %s"
+                        % (("@L%d" % line) if line else "", s), line)
+                    matched = True
+            if not matched and f.get("modpath") and low in f["modpath"].lower():
                 add(80, f["path"], "<index-mod> " + (f["modpath"] or ""))
     if toks and len(hits) < limit:
         for f in files:
-            blob = " ".join(f.get("items", [])) + " " + (f.get("modpath") or "") + " " + f["path"]
+            blob = " ".join(item_text(i)[0] for i in f.get("items", [])) \
+                + " " + (f.get("modpath") or "") + " " + f["path"]
             low = blob.lower()
             c = sum(1 for t in toks if t.lower() in low)
             if c >= max(1, len(toks) - 1):
