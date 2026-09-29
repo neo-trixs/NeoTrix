@@ -1,35 +1,34 @@
-// L6 → L5 评测闸门工厂实现（B5b，2026-09-29）
-//
-// ## 为什么在 L6 而不是 L5
-//
-// `EvalHarness::new_default` 需要 `Vec<ModelSpec>` / `Vec<DatasetSpec>` /
-// `Arc<dyn LlmProvider>` —— 全是 L6/L1 的具体类型。
-// L5 若自己 new，会同时踩两条线：
-//   ① `l5_cognition/traits.rs:133-139` 明令禁止 `use crate::l6_meta::*`
-//   ② L5 无从取得 provider（L1 的 `create_provider_from_type` 虽在向下方向，
-//      但把它接进 brain 启动路径等于让 L5 承担 L6 的装配知识）
-//
-// ⇒ 本文件在 L6 内完成全部装配，只通过 trait 把 `Box<dyn>` 交出去。
-//
-// ## 默认装配是「空数据集 + 单基线」
-//
-// ⛔ 这不是完整评测配置，而是一个**可运行的骨架**：
-//    - `datasets` 为空 ⇒ `EvalHarness::run()` 返回空 Vec，不烧 token
-//    - `baselines` 留一个占位 ModelSpec，`run_regression_test`
-//      （真正被 `seal_loop` 调用的方法）**不依赖** baselines/datasets
-//
-// 理由：`seal_loop.rs` 的闭环钩子只用
-// `generate_regression_test` + `run_regression_test` 两个方法，
-// 而这两个是**纯确定性**的（`nt_regression.rs`，无 provider 调用）。
-// ⇒ 骨架已足够让闸门真正跑起来，而 `run()` 的能力评测留给后续配置。
-//
-// ## 诚实声明
-//
-// ⚠️ **本工厂返回的 harness 只覆盖「确定性回归」这一类判定**。
-//    它**不能**回答「这次进化让模型整体变好了吗」—— 那需要
-//    `nt_evolution_eval`（臂中立 A/B + 噪声地板）且需要 ≥2 次重复运行。
-//    ⛔ 不要因为「闸门接上了」就认为「进化已被验证」。
-//    详见 docs/architecture/DECISION-D3-EVOLUTION-EVAL.md §6。
+//! L6 → L5 评测闸门工厂实现（B5b，2026-09-29）
+//!
+//! ## 为什么在 L6 而不是 L5
+//!
+//! `EvalHarness::new_default` 需要 `Vec<ModelSpec>` / `Vec<DatasetSpec>` /
+//! `Arc<dyn LlmProvider>` —— 全是 L6/L1 的具体类型。
+//! L5 若自己 new，会同时踩两条线：
+//!   ① `l5_cognition/traits.rs:133-139` 明令禁止 `use crate::l6_meta::*`
+//!   ② L5 无从取得 provider（把它接进 brain 启动路径等于让 L5 承担 L6 的装配知识）
+//!
+//! ⇒ 本模块在 L6 内完成全部装配，只通过 trait 把 `Box<dyn>` 交出去。
+//!
+//! ## 默认装配是「空数据集 + 单基线」
+//!
+//! ⛔ 这不是完整评测配置，而是一个**可运行的骨架**：
+//!    - `datasets` 为空 ⇒ `EvalHarness::run()` 返回空 Vec，不烧 token
+//!    - `baselines` 留一个占位 ModelSpec，`run_regression_test`
+//!      （真正被 `seal_loop` 调用的方法）**不依赖** baselines/datasets
+//!
+//! 理由：`seal_loop.rs` 的闭环钩子只用
+//! `generate_regression_test` + `run_regression_test` 两个方法，
+//! 而这两个是**纯确定性**的（`nt_regression.rs`，无 provider 调用）。
+//! ⇒ 骨架已足够让闸门真正跑起来，而 `run()` 的能力评测留给后续配置。
+//!
+//! ## 诚实声明
+//!
+//! ⚠️ **本工厂返回的 harness 只覆盖「确定性回归」这一类判定**。
+//!    它**不能**回答「这次进化让模型整体变好了吗」—— 那需要
+//!    `nt_evolution_eval`（臂中立 A/B + 噪声地板）且需要 ≥2 次重复运行。
+//!    ⛔ 不要因为「闸门接上了」就认为「进化已被验证」。
+//!    详见 docs/architecture/DECISION-D3-EVOLUTION-EVAL.md §6。
 
 use std::sync::Arc;
 
