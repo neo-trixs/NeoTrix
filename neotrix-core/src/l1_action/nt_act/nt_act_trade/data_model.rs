@@ -158,42 +158,24 @@ pub enum InquiryStatus {
 // 保留 re-export 以兼容本文件内 `Product`(:260) / `Quote`(:353) 仍引用它 ——
 // 那两个类型与 unified_types 的同名类型**字段集不同**，不能一起融合。
 pub use super::unified_types::MaterialSpec;
+// 2026-09-29 自动融合（nt_fuse_types.py）：`PressureRating` 原在本文件与
+// `l1_action/nt_act/nt_act_trade/unified_types.rs` 各有一份，字段名+类型+impl 块完全相同。
+// 真源是后者（模块 mod.rs 的 re-export 指向它）⇒ 本文件改为 re-export，
+// 消除「两份同名类型」的歧义。
+pub use super::unified_types::PressureRating;
+// 2026-09-29 自动融合（nt_fuse_types.py）：`SizeSpec` 原在本文件与
+// `l1_action/nt_act/nt_act_trade/unified_types.rs` 各有一份，字段名+类型+impl 块完全相同。
+// 真源是后者（模块 mod.rs 的 re-export 指向它）⇒ 本文件改为 re-export，
+// 消除「两份同名类型」的歧义。
+pub use super::unified_types::SizeSpec;
 
 
-/// 压力等级
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct PressureRating {
-    /// 数值 (如 150, 300, 600)
-    pub value: u32,
-    /// 单位 (如 PN, CLASS)
-    pub unit: String,
-}
+// 2026-09-29 自动融合（nt_fuse_types.py）：`PriceInfo` 原在本文件与
+// `l1_action/nt_act/nt_act_trade/unified_types.rs` 各有一份，字段名+类型+impl 块完全相同。
+// 真源是后者（模块 mod.rs 的 re-export 指向它）⇒ 本文件改为 re-export，
+// 消除「两份同名类型」的歧义。
+pub use super::unified_types::PriceInfo;
 
-/// 尺寸规格
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SizeSpec {
-    /// 公称直径 (如 DN50, 2")
-    pub nominal: String,
-    /// 内径 (mm)
-    pub inner_diameter: Option<f64>,
-    /// 外径 (mm)
-    pub outer_diameter: Option<f64>,
-    /// 长度 (mm)
-    pub length: Option<f64>,
-}
-
-/// 价格信息
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct PriceInfo {
-    /// 单价
-    pub unit_price: f64,
-    /// 货币 (如 CNY, USD, EUR)
-    pub currency: String,
-    /// 折扣率 (0.0 ~ 1.0)
-    pub discount_rate: Option<f64>,
-    /// 含税标识
-    pub tax_included: bool,
-}
 
 /// 联系信息
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -209,21 +191,13 @@ pub struct ContactInfo {
     /// 微信
     pub wechat: Option<String>,
 }
+// 2026-09-29 自动融合（nt_fuse_types.py）：`PerformanceMetrics` 原在本文件与
+// `l1_action/nt_act/nt_act_trade/unified_types.rs` 各有一份，字段名+类型+impl 块完全相同。
+// 真源是后者（模块 mod.rs 的 re-export 指向它）⇒ 本文件改为 re-export，
+// 消除「两份同名类型」的歧义。
+pub use super::unified_types::PerformanceMetrics;
 
-/// 供应商绩效指标
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct PerformanceMetrics {
-    /// 交货准时率 (0.0 ~ 1.0)
-    pub on_time_delivery_rate: f64,
-    /// 质量合格率 (0.0 ~ 1.0)
-    pub quality_pass_rate: f64,
-    /// 响应时间 (小时)
-    pub response_time_hours: f64,
-    /// 历史合作次数
-    pub cooperation_count: u32,
-    /// 综合评分 (0.0 ~ 100.0)
-    pub overall_score: f64,
-}
+
 // 2026-09-29 自动融合（nt_fuse_types.py）：`InquiryMetadata` 原在本文件与
 // `l1_action/nt_act/nt_act_trade/unified_types.rs` 各有一份，字段名+类型+impl 块完全相同。
 // 真源是后者（模块 mod.rs 的 re-export 指向它）⇒ 本文件改为 re-export，

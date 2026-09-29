@@ -6,7 +6,7 @@
 ⇒ 同名同字段同层内 ⇒ **保留 `mod.rs` 已 re-export 的那一份**（它就是事实上的真源），
 另一份改为 re-export。
 
-## 六项判据（全过才动，缺一不动）
+## 七项判据（全过才动，缺一不动）
 ① 同名
 ② 字段**名 + 类型**完全相同（只比名字会把「高度相似的两个不同类型」误判成重复）
 ③ 无刻意镜像声明（注释里出现 mirror / stay stable / interface contract …）
@@ -14,6 +14,8 @@
 ⑤ **被删侧无固有 impl 方法** —— 否则融合后与真源侧同名方法撞成 E0592
    （2026-09-29 实测：`Verdict` 两侧各有 `is_blocked`）
 ⑥ **依赖安全** —— 被删那一侧的定义，其引用方仍能通过 re-export 拿到类型
+⑦ **字段类型闭包安全** —— 若某字段的类型名本身也是重复类型名，则同名背后
+   可能是不同类型（如 ConnectionType 4变体 vs 7变体），名义类型系统下不可自动融合 —— 被删那一侧的定义，其引用方仍能通过 re-export 拿到类型
 
 ## 为什么逐组编译
 2026-09-29 实测：批量执行第一组就炸（E0119 + E0560）——
@@ -210,7 +212,36 @@ def analyse(name, paths):
             return (False,
                     f"被删侧有 {len(om)} 个固有方法（{sorted(om)[:3]}）⇒ 需人工迁移",
                     None, [])
-    return True, "六项判据全过", src, others
+        # 字段类型闭包：若某字段的类型名本身也是重复类型，则同名背后可能
+        # 是不同类型（名义类型系统下同名 ≠ 同类型）。
+        # 2026-09-29 实测：Product.connection_type 两处都叫 ConnectionType，
+        # 但 data_model 版 4 变体、unified_types 版 7 变体 ⇒ 根本不是同一类型。
+        # 融合 Product 会把 data_model 的 4 变体语义偷换成 7 变体。必须人工裁决。
+        ftypes = {t.strip().split("<")[0].split("[")[0]
+                  for _, t in (f.split(":", 1) for f in fields_of(read(o), name) or [])}
+        dup_names = _dup_type_names()
+        clash = sorted(ftypes & dup_names - {name})
+        if clash:
+            return (False,
+                    f"字段类型闭包不安全：{clash[:3]} 本身也是重复类型名"
+                    f"（同名背后可能是不同类型，如 ConnectionType 4变体 vs 7变体）⇒ 需人工裁决",
+                    None, [])
+    return True, "七项判据全过", src, others
+
+
+def _dup_type_names():
+    """缓存的重复类型名集合（nt_dup_types.py 的检出结果）。"""
+    if not hasattr(_dup_type_names, "cache"):
+        try:
+            r = subprocess.run(
+                ["python3", os.path.join(REPO, "scripts/ops/nt_dup_types.py"), "--json"],
+                cwd=REPO, capture_output=True, text=True, timeout=300,
+            )
+            d = json.loads(r.stdout)
+            _dup_type_names.cache = {g["name"] for g in d["groups"]}
+        except Exception:
+            _dup_type_names.cache = set()
+    return _dup_type_names.cache
 
 
 def fuse(name, source, targets):
@@ -243,6 +274,29 @@ def fuse(name, source, targets):
     return changed
 
 
+def mem_gate_open():
+    """内存门自查。2026-09-29 实测教训：我在 mem-gate BLOCKED 时启动了构建，
+    构建因他窗文件破红而全部回滚 —— 白白消耗一轮编译且污染判断
+    （分不清是我的改动错还是树本身红）。门只在被遵守时才有效，
+    而人会忘，故工具自己查。"""
+    r = subprocess.run(
+        ["sh", "scripts/ops/nt_mem_gate.sh"],
+        cwd=REPO, capture_output=True, text=True, timeout=60,
+    )
+    out = (r.stdout or "") + (r.stderr or "")
+    return "OPEN" in out
+
+
+def tree_green_quick():
+    """动手前确认树本身是绿的。若树已红（他窗 WIP 破坏），我的逐组验证
+    会全部误报失败 —— 必须先停，而不是把红树当成我的改动有问题。"""
+    r = subprocess.run(
+        ["cargo", "check", "-p", "neotrix", "--lib"],
+        cwd=REPO, capture_output=True, text=True, timeout=1800,
+    )
+    return r.returncode == 0
+
+
 def cargo_ok():
     r = subprocess.run(
         ["cargo", "check", "-p", "neotrix", "--lib"],
@@ -252,7 +306,7 @@ def cargo_ok():
 
 
 def main():
-    ap = argparse.ArgumentParser(description="按六项判据自动融合重复类型")
+    ap = argparse.ArgumentParser(description="按七项判据自动融合重复类型")
     ap.add_argument("--dry-run", action="store_true", help="只报告不动手")
     ap.add_argument("--limit", type=int, default=10, help="最多处理几组")
     args = ap.parse_args()
@@ -260,6 +314,17 @@ def main():
     d = json.loads(subprocess.run(
         ["python3", os.path.join(REPO, "scripts/ops/nt_dup_types.py"), "--json"],
         capture_output=True, text=True, cwd=REPO).stdout)
+
+    if not args.dry_run:
+        if not mem_gate_open():
+            print("nt-fuse-types: ⛔ mem-gate BLOCKED —— 拒绝启动构建。"
+                  "等 OPEN 后再跑（强行跑会与他窗构建抢锁，且失败时分不清是谁的错）。")
+            return 2
+        print("nt-fuse-types: mem-gate OPEN，检查基线树状态…")
+        if not tree_green_quick():
+            print("nt-fuse-types: ⛔ 基线树本身是红的（他窗 WIP 破坏）。"
+                  "此时逐组验证会全部误报失败 —— 先停，等树绿。我的改动一个没动。")
+            return 3
 
     cands = [g for g in d["groups"] if g.get("automatable")]
     print(f"nt-fuse-types: 可自动 {len(cands)} 组，limit={args.limit}\n")
