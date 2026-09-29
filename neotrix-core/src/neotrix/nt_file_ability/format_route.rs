@@ -118,6 +118,81 @@ impl DocFormat {
         }
     }
 
+    /// 权威 MIME 类型。
+    ///
+    /// 2026-09-29：MIME 此前存放在 `core.rs::guess_mime`（**第三份**扩展名→MIME
+    /// 映射表），与本枚举的 `from_ext` 重复。现由分类真源独家持有 ——
+    /// **MIME 跟着分类走**，分类变体增删时 MIME 自动跟上，不会漏。
+    ///
+    /// 媒体三类返回 `image/*` / `audio/*` / `video/*`：原表按扩展名逐个列
+    /// 具体子类（png/jpeg/…），但格式分类**不区分**这些子类型（它们都是
+    /// `DocFormat::Image`），故给出类别级通配，具体子类交给 MIME 协商。
+    pub fn mime_type(self) -> &'static str {
+        match self {
+            // 纯文本系
+            DocFormat::Markdown => "text/markdown",
+            DocFormat::Html => "text/html",
+            DocFormat::Text => "text/plain",
+            DocFormat::Csv => "text/csv",
+            // 办公（OOXML / ODF / 旧版二进制）
+            DocFormat::Docx => {
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            }
+            DocFormat::Doc => "application/msword",
+            DocFormat::Xlsx => {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            }
+            DocFormat::Xls => "application/vnd.ms-excel",
+            DocFormat::Pptx => {
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            }
+            DocFormat::Ppt => "application/vnd.ms-powerpoint",
+            DocFormat::Odt => "application/vnd.oasis.opendocument.text",
+            DocFormat::Ods => "application/vnd.oasis.opendocument.spreadsheet",
+            DocFormat::Odp => "application/vnd.oasis.opendocument.presentation",
+            // 文档
+            DocFormat::Pdf => "application/pdf",
+            DocFormat::Rtf => "application/rtf",
+            DocFormat::Epub => "application/epub+zip",
+            DocFormat::Mobi => "application/x-mobipocket-ebook",
+            // 媒体三类
+            DocFormat::Image => "image/*",
+            DocFormat::Audio => "audio/*",
+            DocFormat::Video => "video/*",
+            DocFormat::Unknown => "application/octet-stream",
+        }
+    }
+
+    /// 媒体子类 MIME（`Image`/`Audio`/`Video` 需要扩展名才能定到具体子类）。
+    ///
+    /// 2026-09-29：原 `core.rs::guess_mime` 对 png/jpeg/mp3/mp4 等逐个列出
+    /// 具体 MIME。分类层不区分这些子类型，但**报告给调用方的 MIME 应当精确**
+    /// —— 消费者（如 HTTP Content-Type 协商）依赖具体子类而非 `image/*`。
+    /// 故媒体类走此表，其余走 `mime_type()`。
+    pub fn mime_type_for_ext(self, ext: &str) -> &'static str {
+        match (self, ext.to_ascii_lowercase().as_str()) {
+            (DocFormat::Image, "png") => "image/png",
+            (DocFormat::Image, "jpg" | "jpeg") => "image/jpeg",
+            (DocFormat::Image, "gif") => "image/gif",
+            (DocFormat::Image, "webp") => "image/webp",
+            (DocFormat::Image, "bmp") => "image/bmp",
+            (DocFormat::Image, "svg") => "image/svg+xml",
+            (DocFormat::Image, "tiff" | "tif") => "image/tiff",
+            (DocFormat::Audio, "mp3") => "audio/mpeg",
+            (DocFormat::Audio, "wav") => "audio/wav",
+            (DocFormat::Audio, "ogg") => "audio/ogg",
+            (DocFormat::Audio, "flac") => "audio/flac",
+            (DocFormat::Audio, "m4a") => "audio/mp4",
+            (DocFormat::Video, "mp4") => "video/mp4",
+            (DocFormat::Video, "webm") => "video/webm",
+            (DocFormat::Video, "mkv") => "video/x-matroska",
+            (DocFormat::Video, "mov") => "video/quicktime",
+            (DocFormat::Video, "avi") => "video/x-msvideo",
+            (DocFormat::Text, "log") => "text/plain",
+            _ => self.mime_type(),
+        }
+    }
+
     /// 纯文本系：可直接按 UTF-8 读入，无需后端解析器。
     pub fn is_text_like(self) -> bool {
         matches!(
@@ -284,6 +359,76 @@ mod tests {
     }
 
     #[test]
+    fn test_mime_type_covers_full_enum_and_is_never_empty() {
+        // MIME 与分类同源 ⇒ 分类变体增删时 MIME 自动跟上，不会漏。
+        // 本测试锁死这个不变量：每个变体都必须有非空 MIME。
+        for f in [
+            DocFormat::Docx,
+            DocFormat::Doc,
+            DocFormat::Xlsx,
+            DocFormat::Xls,
+            DocFormat::Pptx,
+            DocFormat::Ppt,
+            DocFormat::Pdf,
+            DocFormat::Odt,
+            DocFormat::Ods,
+            DocFormat::Odp,
+            DocFormat::Rtf,
+            DocFormat::Epub,
+            DocFormat::Csv,
+            DocFormat::Markdown,
+            DocFormat::Html,
+            DocFormat::Text,
+            DocFormat::Image,
+            DocFormat::Audio,
+            DocFormat::Video,
+            DocFormat::Mobi,
+            DocFormat::Unknown,
+        ] {
+            let m = f.mime_type();
+            assert!(!m.is_empty(), "{} 的 MIME 为空", f.as_str());
+            assert!(m.contains('/'), "{} 的 MIME 不合法: {m}", f.as_str());
+        }
+        // 关键几个必须是精确值（消费者依赖它们）
+        assert_eq!(DocFormat::Pdf.mime_type(), "application/pdf");
+        assert_eq!(DocFormat::Markdown.mime_type(), "text/markdown");
+        assert_eq!(DocFormat::Html.mime_type(), "text/html");
+        assert_eq!(DocFormat::Csv.mime_type(), "text/csv");
+        assert_eq!(DocFormat::Text.mime_type(), "text/plain");
+        assert_eq!(DocFormat::Unknown.mime_type(), "application/octet-stream");
+    }
+
+    #[test]
+    fn test_mime_type_for_ext_keeps_media_subtypes() {
+        // 行为等价性锁死：收敛到分类层**不得改变**原 guess_mime 的输出。
+        for (ext, want) in [
+            ("png", "image/png"),
+            ("jpg", "image/jpeg"),
+            ("jpeg", "image/jpeg"),
+            ("gif", "image/gif"),
+            ("webp", "image/webp"),
+            ("bmp", "image/bmp"),
+            ("mp3", "audio/mpeg"),
+            ("wav", "audio/wav"),
+            ("ogg", "audio/ogg"),
+            ("flac", "audio/flac"),
+            ("m4a", "audio/mp4"),
+            ("mp4", "video/mp4"),
+            ("webm", "video/webm"),
+            ("mkv", "video/x-matroska"),
+            ("mov", "video/quicktime"),
+            ("pdf", "application/pdf"),
+            ("html", "text/html"),
+        ] {
+            let got = DocFormat::from_ext(ext).mime_type_for_ext(ext);
+            assert_eq!(got, want, "ext={ext} MIME 行为变了");
+        }
+        // 未列出的媒体扩展名回落到类别通配
+        assert_eq!(DocFormat::from_ext("tiff").mime_type_for_ext("tiff"), "image/tiff");
+        assert_eq!(DocFormat::from_ext("xyz").mime_type_for_ext("xyz"), "application/octet-stream");
+    }
+
+    #[test]
     fn test_as_str_roundtrip_for_ext_backed() {
         for f in [
             DocFormat::Docx,
@@ -297,5 +442,16 @@ mod tests {
         ] {
             assert_eq!(DocFormat::from_ext(f.as_str()), f, "{} 往返失真", f.as_str());
         }
+    }
+
+    #[test]
+    fn test_mime_is_derivable_from_ext_via_classification() {
+        // guess_mime 的转发路径：扩展名 → 分类 → MIME。
+        // 这条锁死「MIME 跟着分类走」：core.rs 不得再自建映射表。
+        for ext in ["pdf", "md", "html", "txt", "png", "mp3", "mp4", "zzz"] {
+            let via_class = DocFormat::from_ext(ext).mime_type();
+            assert!(!via_class.is_empty(), "ext={ext} 经分类得到空 MIME");
+        }
+        assert_eq!(DocFormat::from_ext("zzz").mime_type(), "application/octet-stream");
     }
 }

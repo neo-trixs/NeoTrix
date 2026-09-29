@@ -610,29 +610,16 @@ impl FileAbility {
     }
 }
 
-/// 简易 MIME 猜测 (基于扩展名)
+/// MIME 猜测 — **薄转发到 `DocFormat::mime_type()`**。
+///
+/// 2026-09-29 收敛：本函数原是**第三份**扩展名→MIME 映射表，与
+/// `format_route::DocFormat::from_ext` 重复。三份映射表并存 = 改一处漏两处。
+/// 现由 `DocFormat`（本地格式分类真源）独家持有 MIME —— **MIME 跟着分类走**。
+///
+/// 未知一律 `application/octet-stream`（与原行为一致）。
 fn guess_mime(ext: &str) -> String {
-    match ext {
-        "txt" | "md" | "markdown" | "json" | "xml" | "csv" | "yaml" | "yml" | "toml" => {
-            "text/plain".to_string()
-        }
-        "html" | "htm" => "text/html".to_string(),
-        "png" => "image/png".to_string(),
-        "jpg" | "jpeg" => "image/jpeg".to_string(),
-        "gif" => "image/gif".to_string(),
-        "webp" => "image/webp".to_string(),
-        "bmp" => "image/bmp".to_string(),
-        "ico" => "image/x-icon".to_string(),
-        "mp3" => "audio/mpeg".to_string(),
-        "wav" => "audio/wav".to_string(),
-        "ogg" => "audio/ogg".to_string(),
-        "flac" => "audio/flac".to_string(),
-        "m4a" => "audio/mp4".to_string(),
-        "mp4" => "video/mp4".to_string(),
-        "webm" => "video/webm".to_string(),
-        "mkv" => "video/x-matroska".to_string(),
-        "mov" => "video/quicktime".to_string(),
-        "pdf" => "application/pdf".to_string(),
-        _ => "application/octet-stream".to_string(),
-    }
+    use super::format_route::DocFormat;
+    DocFormat::from_ext(ext)
+        .mime_type_for_ext(ext)
+        .to_string()
 }
