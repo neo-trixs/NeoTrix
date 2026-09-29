@@ -1,8 +1,9 @@
 #!/bin/bash
 # NeoTrix pre-commit hook (激活于 core.hooksPath=.githooks)。
-# 两层门禁:
+# 三层门禁:
 #   1) AGENTS.md 指针守恒 — 拒绝把 cycle 正文/增长区写回 AGENTS.md。
-#   2) P0 编译卡点 — 拒绝把红构建(comlib 或测试编译失败)提交入库。
+#   2) 删除声明门 — 拒绝把未在 commit message 声明的删除入库（多窗口共享 index 事故）。
+#   3) P0 编译卡点 — 拒绝把红构建(comlib 或测试编译失败)提交入库。
 #
 # 注意: 本 hook 仅拦"走 hook"的提交。openhands 等绕过 --no-verify / libgit2 的提交
 # 仍会绕过此处 —— 权威门禁是 CI (.github/workflows/ci.yml, push/PR 跑 cargo check+test)
@@ -34,6 +35,17 @@ if [ -f "$AGENTS" ] && git diff --cached --name-only | grep -qx "$AGENTS"; then
   if [ "$FAIL" -ne 0 ]; then
     echo "  Pointers live in KB: python3 ~/.agents/skills/experience-tree/scripts/absorb_session.py hub"
     echo "  Then revert AGENTS.md to HEAD and commit only pointer/rule changes."
+    exit 1
+  fi
+fi
+
+# ---------- 1.5) 删除声明门（2026-09-29 事故后置入） ----------
+# 事故：多窗口共享工作树 ⇒ 共享 index。`git add <显式文件> && git commit`
+# 连带提交了**别窗暂存区里的删除**（339 行他窗在途工作），从那扇窗看是凭空消失。
+# 显式 add 约束不了「暂存区里已有什么」，但那类事故的签名确定：**提交里有删除**。
+# ⇒ 任何 staged 删除必须在 commit message 里显式声明。写不出声明就得去看一眼。
+if [ -x scripts/check-commit-deletions.sh ] || [ -f scripts/check-commit-deletions.sh ]; then
+  if ! bash scripts/check-commit-deletions.sh "${1:-}"; then
     exit 1
   fi
 fi
