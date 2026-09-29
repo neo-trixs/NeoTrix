@@ -509,8 +509,6 @@ fn to_defs(
                 schema_version: None,
                 required_permission: None,
                 risk_level,
-                usage_count: 0,
-                avg_latency_ms: 0.0,
             }
         })
         .collect()

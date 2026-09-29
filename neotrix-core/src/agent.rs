@@ -434,12 +434,6 @@ pub mod tool {
             /// 风险等级（默认 Low）。
             #[serde(default)]
             pub risk_level: RiskLevel,
-            /// 累计调用次数（由调用侧回写统计）。
-            #[serde(default)]
-            pub usage_count: u64,
-            /// 均值延迟 ms（由调用侧回写统计）。
-            #[serde(default)]
-            pub avg_latency_ms: f64,
         }
         #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
         pub enum McpTransport {
@@ -730,15 +724,6 @@ pub mod tool {
                 .flat_map(|s| s.tools.iter())
                 .filter(|t| t.risk_level == level)
                 .cloned()
-                .collect()
-        }
-
-        /// 逐工具用量统计：`(tool_name, usage_count, avg_latency_ms)`。
-        pub fn usage_stats(&self) -> Vec<(String, u64, f64)> {
-            self.servers
-                .iter()
-                .flat_map(|s| s.tools.iter())
-                .map(|t| (t.name.clone(), t.usage_count, t.avg_latency_ms))
                 .collect()
         }
 
