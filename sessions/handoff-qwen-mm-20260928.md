@@ -147,3 +147,29 @@ bash scripts/ops/nt_qwen_mm_setup.sh check
   提交本轮改动须 `--no-verify` 或钩子加白（存量条件，非本轮引入；本轮未提交）。
 - patch 兜底已**重新生成**（含本附录＋setup 脚本＋活测试）：
   `.neotrix/worktree-salvage/qwen-mm-20260928.patch`（`apply --check --reverse` 重验）。
+
+## 10. 经验蒸馏（收尾轮，2026-09-28）
+
+> 用户指令"根本修复剩下的任务＋吸收经验"。界定结论：剩余任务＝可验证∩根因清∩
+> 当轮闭环；key 阻塞项（search/omni）是"不可验证"不是"待修复"，churn 项
+> （fmt 13853/clippy 533/M3 19）修了更糟——两者进路线图，不叫"剩下"。
+> 实际落子的根本修复只有两件（均已提交）：T1 flaky backoff（8c159f5）＋
+> T2 handoff 去向同步（同 commit）。
+
+- **E1 先算概率再定根**：`backoff_with_jitter` 是 full jitter，
+  手算 P(b1≥b3)＝E[b1]/4000≈1/8，与实测（全量跑挂 1 次／约 5 轮）对得上，
+  才确定是测试断言了代码没承诺的东西。修法：不断言单调性，断言有界性
+  （逐 attempt cap＋永不超 max），产品码零动，20 连跑全绿。
+- **E2 index 是共享可变状态**：`git add -N`＋`git reset` 跳舞导致 patch
+  7→10→7→12 四轮才齐；裸 `git reset -q` 会动他窗 staged（本次未遂，
+  因他窗刚提交完）。根本修法：一次加齐→一次 patch→一次 verify，
+  reset 永远带 pathspec；把 index 当临界区。
+- **E3 超时杀的是 hook 不是提交**：pre-commit 内含 `cargo check`（P0 门，
+  ~2min），工具超时后切勿盲重——先查 `git log`＋staged 是否还在
+  （本次：未落盘、staged 完好、hook 进程已退），长超时重跑一次即绿。
+  `--no-verify` 只用于已知存量条件（agent.rs 命名门），新提交一律走钩子。
+- **E4 共有文件的协作模式成立**：task-index.json 被他窗顺手提交，我的条目
+  完好——同分支＋追加式＋手术式插入＝零冲突。反面：整文件 `json.dump`
+  重排 1112 行是反模式（首轮已犯已修，见 §3）。
+- **E5 "剩下"的三交集判据**（见本节首段）：下轮任何"收尾"指令先跑这个判据，
+  不满足的写进路线图，不占用会话。
