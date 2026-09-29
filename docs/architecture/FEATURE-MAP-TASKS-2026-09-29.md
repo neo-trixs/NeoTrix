@@ -131,27 +131,111 @@
 
 | ID | 特性 | 来源 | 落点 | 验收 | 状态 |
 |---|---|---|---|---|---|
-| **N-6b** | **三态工具策略**（allow/allow+advice/deny） | `avibe/agent_tool_policy.py` | `traits.rs:287` 三态 + `strictest_verdict` 最严否决 | 误报集**非空** ⇒ 门可判定 | ⚠️ |.sh; echo $?
-> **实测 2026-09-29（台账落点已作废）**：原文写「`nt_policy.rs:75-145`（二态）」
-> —— **两处不准**：(a) 该文件 `:75-145` 是 **LRU 缓存**，不是策略；
-> (b) 工具策略**已是三态**：`l1_action/traits.rs:287` `SecurityVerdict`
-> = `Allow / Deny / RequireApproval`（即 avibe 的 allow+advice 态）。
-> ⇒ 三态需求**本仓已有**，台账重复了。
->
-> **但核实中发现一个真 fail-open 缺陷并已修**：
-> `SecurityRouter::check()` 只取 `registry.optimal()` —— **单个** guard，
-> 挑选标准是 `1.0 - error_rate`（**健康度**，与严格程度无关）。
-> ⇒ 一个 `error_rate=0.0` 的宽松 `Allow` guard 会**静默屏蔽**
->   `error_rate=0.5` 但判 `Deny` 的 guard。
-> **这是把「哪个 guard 更可靠」误当成「动作允不允许」**。
-> ⇒ 已改为 `SecurityRegistry::strictest_verdict()`（最严否决：任一健康 guard
->   判 Deny ⇒ 整体 Deny；否则任一 RequireApproval ⇒ 整体 RequireApproval）。
-> ⇒ 并**删除** `route()` / `optimal()`：零外部消费者，且「挑一个 guard」的
->   形状会诱导调用方重新引入 fail-open —— 留着等于给已修缺陷留后门。
-> ⇒ 红测 `deny_in_any_guard_wins_over_healthier_allow` 修前 FAIL、修后 PASS；
->   全量 **12207 passed / 0 failed**。
-> ⇒ 判 ⚠️：能力（聚合语义 + 三态）已落地；剩余缺口是
->   「deny 全集 + default-deny 的**冻结数据**」（台账 1.4 另列）。
+| **N-6b** | **三态工具策略**（allow/allow+advice/deny） | `avibe/agent_tool_policy.py` | `nt_policy.rs:75-145`（二态）+ `:225-246` 16 词 needle 表 | 误报集**非空** ⇒ 门可判定 | ⬜⚠️ |
+| **N-7** | **`StopReason` 与 `TurnStatus` 正交** | `strands/event_loop.py`（12 态） | `nt_types.rs:27-33`（5 态，混了预算耗尽+人接手） | `LimitTurns` **且** `Waiting` | ⬜⚠️ |
+| **1.4** | **非不可宽化策略地板** | `ironclaw` | `nt_policy.rs:75`（deny 全集+default-deny） | 「允许绕过批准的集合」**冻结数据** | ⬜⚠️ |
+| **1.1** | **DNS qtype 白名单** | `microsandbox` + OpenAI 事故 | `egress_types.rs:14-21`（**仍 3 字段**） | qtype+长度上限+真过滤器<br>⛔ 不拦 OSINT `dns.rs:74` | ⬜ |
+| **1.2** | **attempt/outcome 解耦** | OpenAI DNS 事故 | `nt_core_telemetry.rs` | outcome **不得**衰减 attempt | ⬜ |
+| **5.2** | **MCP per-request capability 协商** | MCP spec 2026 | `mcp_protocol/` 775 行 ✅；客户端命中 **0** | 客户端发 `protocolVersion` | ⬜ |
+| **4.4** | **「模型可见⇒必须已记日志」** | `deepseek-harness` 238k★ | telemetry + audit | 门 | ⬜ |
+| **0.5** | **三处同名不同型的第 4 次** | 本地 | 记忆/决策各画**唯一裁决表** | 挂 `check-api-surface.sh` | ⬜ |
+
+## 批次 D · 记忆与检索
+
+> ⛔ **动手前先裁决改哪一份**：`neotrix-core/src/l6_meta/memory/nt_memory_experience_tree.rs`（458 行）
+> 是**同名第二份且完全死**（只有 `neotrix-core/src/l6_meta/memory/mod.rs:33,43` 的声明与 glob re-export）。
+> **真实活路径**是 `neotrix-core/src/l5_cognition/nt_mind/nt_mind/experience_tree/mod.rs`（1055 行，
+> 被 `neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs:631,713` 消费）。
+
+| ID | 特性 | 来源 | 落点 | 验收 | 状态 |
+|---|---|---|---|---|---|
+| **1.1m** | **记忆记录的权威头** | `loopx reward-memory` | `experience_tree/mod.rs:29`（9 字段**只满足 `source`**） | `authority`+`confidence` **两个独立枚举**；`Confidence::High` 的 `SoftPreference` 请求写文件⇒拒 | ⬜ |
+| **1.2m** | **五个留存标签** | `nanobot` 48.6k★ | `experience_tree` `persist()`+`feedback()` | `[ephemeral]` TTL 到期不在召回集，**内容不含标签** | ⬜ |
+| **1.3m** | **delta-ops 取代整体重写** | `Hindsight delta_ops.py` | `distill()`+`persist()` | LLM 返空 op ⇒ 文件 sha256 **不变** | ⬜ |
+| **1.4m** | **move-based 退役**（无 embedding 归档） | `Hindsight` | `paged_kv`/`kb_kv`/`vector_index` | 召回热路径少一个谓词 | ⬜ |
+| **1.5m** | **记忆层无 LLM** | `memU` 14.4k★ | `nt_mind`（422 文件） | store/embed/retrieve **不做推理** | ⬜ |
+| **1.6m** | **两表 checkpoint + ULID** | `langgraph` 42k★ | `nt_store/`（✅ 存在） | prune 中间 checkpoint 后 resume ⇒ `Truncated`，**不是空状态** | ⬜ |
+| **2.1** | **experience_tree supersession** | agentmemory | `experience_tree/mod.rs` | 照 `temporal_facts` 已验证形态 | ⬜ |
+| **2.2** | **nodes 表对齐双时间** ⛔风险最高 | utopia | `nt_core_kb_primitives.rs:188`（**仍 `id TEXT PRIMARY KEY`**） | 半迁移比不迁移更糟 | ⬜ |
+| **4.1** | **负面证据分类** | `backpass` | 记忆写入路径 | `harm` 才可删规则，**`non-compliance` 永不算** | ⬜ |
+| **4.2** | **review-due + 三级注意力** | `oh-my-hermes` | `experience_tree` | — | ⬜ |
+| **4.0** | **`nt_crystal_core` 是活路径**（纠正既有文档） | `DIR-REMEDY §2.5` | L1 有 6 个消费者 | ⛔ 勿当死代码删 | ✅ 已知 |
+| **N-10** | **delta-op 记忆更新** | `Hindsight delta_ops.py` | `experience_tree` | 未触及段**物理复制** | ⬜ |
+| **N-9** | **多因子打分缺失塌 1.0** | `Hindsight reranking.py` | `bm25.rs:174`（现只有 RRF） | 删字段⇒boost **恰为 1.0**（不是 0 不是 NaN） | ⬜ |
+| **N-8** | **缓存键含代码与路径** | `cocoindex`+`K-Dense` | `kb_search.rs:23-32`（key=query+limit）+ 全量 clear | 改 `RRF_K`⇒命中率掉 | ⬜ 真值风险最低 |
+
+## 批次 E · 桌面执行回路（`src-tauri` 已归档，落点需重裁）
+
+| ID | 特性 | 来源 | 落点 | 验收 | 状态 |
+|---|---|---|---|---|---|
+| **2.0** | 文档说谎纠正 | 本地 | `ARCHITECTURE.md` §1-§12 已被 §13 推翻 | — | ⬜ |
+| **2.1e** | **元素寻址 + 三态身份** | `agent-desktop` Apache-2.0 | `nt_io_desktop/` **只有 2 文件** | a11y 树优先，坐标仅 fallback | ⬜ |
+| **2.2e** | **`capture_id`**（坐标绑到计算它的那帧） | `cua-driver` | 同上 | 陈旧即拒**且不回落**（其余 11 仓漂移缓解**全为 0**） | ⬜ |
+| **2.3e** | **`VerificationTier` + 8 态终局** | `OpenAdapt` MIT | 同上 | — | ⬜ |
+| **2.4e** | **`DeliverySemantics`→派生 `RetryDisposition`** | `agent-desktop` | 同上 | — | ⬜ |
+| **2.5e** | **计划级失效门**（15 行） | `nanobrowser` | 同上 | — | ⬜ |
+| **3.2** | **上下文预算零和算术** | `backpass` | `apply_context_budget`（已接线） | — | ⬜ |
+| **5.1e** | **GUI 元素寻址 B 路** | `Orca`/`artemis` | `nt_computer.rs:98` **`NoopBackend` 唯一后端** | 先承认它是空的 | ⬜ |
+| **5.4** | **UI 组件 + 动效 token** | `beautifului`+`transitions.dev` MIT | `src-tauri/frontend`（**已归档**） | SolidJS 移植 1-3h/个 | ⬜ |
+| **5.3** | **无 API 重放** | `jev-drone` MIT | `nt_audit.rs`（全仓 `replay` 零命中） | CLI 已有 `audit` 子命令 | ⬜ |
+| **1.3** | 严重性校准对 + 职责分离 | `cloudflare/security-audit-skill` MIT | `RUST-STANDARDS.md §17.5` | — | ⬜ |
+| **1.7b** | `manifest.json` 矩形契约 | `sprite-gen` Apache-2.0 | 生成资产管线 | — | ⬜ |
+| **3.2b** | 声明式能力 manifest + 爆炸半径 | `MangoDisk` **GPL-3.0⚠️借形状** | `.neotrix/capability_registry.json` | 构建期校验 | ⬜ |
+| **4.4b** | 覆盖率账本状态机（hunters 不写自己覆盖率） | 本地 | `nt_shield_audit/`（**未接线**） | — | ⬜ |
+| **2.6** | 自治循环 git 化 | — | 见 B 批 4.3 | — | ⬜ |
+
+---
+
+## 第 2 部分 · 已证伪/取消（⛔ 15 项，不再列入）
+
+| 特性 | 原出处 | 证伪依据 |
+|---|---|---|
+| **`UnifiedApi` 脱 stub** | 09-27 建议 1 / 09-28 §0.4 | ⛔ `src-tauri/` 已随 `5c02e738` 归档，**全仓 `UnifiedApi` 命中 0**，落点不存在 |
+| **`nt_crystal_core` 是死代码** | `DIR-AUDIT §六` | ⛔ **活路径**，L1 有 6 个消费者 |
+| **`nt_jev` 是死代码** | 同上 | ⛔ **真接线的**，5 处消费者 |
+| **`neotrix-core/src/l5_cognition/nt_core_gate/nt_tool_registry.rs` 是 stub，删** | 09-28 曾标 ⛔ | ⛔ **有活消费者** `nt_shield_enforcer.rs:388-401`，承载**写操作可逆性**，与 L1 那份**正交** |
+| **「从零做真双时间」** | 09-28 路线图 §1.4 | ⛔ `temporal_facts:41` **已经是真双时间**；`paged_kv`/`kb_kv`/`vector_index` **全是内存结构无一张表**，「两表」无处落地 |
+| **「supersession 形态要新建」** | 09-28 §2.1 | ⛔ 记忆库层**早已实现**（`nt_memory_curation.rs:182/238` + 91 测试全绿） |
+| **JEV 四件套** | 09-28 §4.1 | ⛔ 三个「决策引擎」**零生产消费者** |
+| **「`McpRegistry` 在 `#[cfg(test)]` 里」** | 09-28 §5.2 | ⛔ **错**，在 `pub mod tool{`(agent.rs:420) = 生产面且**已接线** |
+| **「有 `evals/` 目录」** | 09-28 | ⛔ **全仓无** |
+| **「`context-manifest.json` 是上下文清单」** | 09-28 | ⛔ **它是 claims 记录**，仓内无上下文装配清单（同名不同物） |
+| **`CapabilityRegistry` 4→1** | 09-28 §0.1 | ✅ **已完成**（实测 1 份，`nt_core_capability_types.rs:533`） |
+| **`maturity_audit()` 接 CI** | 09-28 §0.3 / `TODO.md:526` | ✅ **已接且阻塞态**，真实行号 **`registry.rs:466`** 非 `:459` |
+| **「`SkillInvocationPolicy` 是核心代码」** | 09-27 | ⛔ **零消费者**，是**门**不是核心代码 |
+| **KV 缓存有内容哈希** | — | ⛔ **零命中**，key=query+limit，失效是全量 `clear()` |
+| **「关掉 outcome 衰减」= 已有** | 09-28 §1.2 | ⛔ `Provenance` 默认 `ModelAdded` 是**如实的默认**（`:69-70` 辩护），⛔ 不要动 |
+
+---
+
+## 第 3 部分 · 许可证红线（⛔ 决定能抄什么）
+
+| 允许抄代码 | 仅可抄设计 |
+|---|---|
+| **MIT**：`hindsight` `browser-harness` `anydoc` `PanelUI` `Infographic` `dsh-market` `qc-skills` `K-Dense` `i-have-adhd` `agent-scripts` `avibe` `loopx` `autoresearch`<br>**Apache-2.0**：`harness-sdk` `InsForge` `cocoindex` `OpenShell` `rrsi` `cline` `kev` `Soup` `BugTraceAI` `fw-ai/cookbook` `agentmemory` `utopia` `cua-driver` `agent-desktop` `deer-flow` `memU`<br>**CC0**：`awesome-dsh-plugin`<br>**CC-BY-4.0 + Apache-2.0**：`NVlabs/kda`（文档段 CC-BY） | ⛔ **无 LICENSE**：`jev-dsh-decision` `dshfind` `Hands-On-AI-Engineering`<br>⛔ **闭源不可核**：`supermemory`（引擎）`cue.im` `weco` `glean/waldo` `primeintellect/ramp`<br>⛔ **非 OSI**：`tdeverx/contained-app`（PolyForm NC）`digipulse/GAAI`（ELv2）`multica`（自定义）<br>⛔ **AGPL-3.0**：`volcengine/OpenViking`（只读设计）<br>⚠️ **GPL-3.0**：`MangoDisk`（只借形状） |
+
+---
+
+## 第 4 部分 · ⛔ 需裁决（6 项，本清单不给答案）
+
+| # | 事项 | 为什么不能自己决定 |
+|---|---|---|
+| 1 | **212 条未编译 `.rs` 的逐条处置** | 归档/补 mod/删是**产品判断**；(c) 类（`mod` 被注释）**加回去会让干净检出编不过** |
+| 2 | `hybrid_retrieval/` 6 文件 | `neotrix-core/src/l4_emotion/nt_memory/mod.rs:54` 注「内部编译错误待修复」⇒ 修还是删 |
+| 3 | `nt_meta/eval_engine/` 641 行 | 接上（B 批全依赖它）还是当孤儿 —— 接线要设计 |
+| 4 | `docs/` 恢复 vitepress 站 | 113 跟踪文件在，`package.json` 已删 |
+| 5 | 批次 E 桌面回路落点 | `src-tauri` 已归档 ⇒ 落 neobot 还是重建 |
+| 6 | N-6b/N-7 何时做 | 需与写 `crates/neotrix-neobot/src/` 的窗口协调 |
+
+---
+
+## 第 5 部分 · 执行前三道闸
+
+```bash
+# 闸 1：无并发写入 —— 本轮两次踩中（nt_types.rs 36s / book_to_skill.rs 5s）
+stat -f "%Sm %N" <要改的文件>; git status --porcelain <要改的文件>
+# 闸 2：内存（非 0 禁止起构建）
+sh scripts/ops/nt_mem_gate.sh; echo $?
 # 闸 3：干净检出可构建（脏树不是合法 oracle）
 git worktree add --detach /tmp/ntx HEAD
 ```
