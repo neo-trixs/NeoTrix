@@ -29,6 +29,7 @@ use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 use crate::nt_channel::ChannelRegistry;
+use crate::nt_changes;
 use crate::nt_channel_dispatch::{
     self, InboundOutcome,
 };
@@ -49,7 +50,9 @@ pub fn registry() -> ChannelRegistry {
 }
 
 /// 一轮的处理统计。
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+// 2026-09-29：去掉 `Copy` —— 新增 `changes_prune_error: Option<String>`
+// 含堆数据，Copy 不可能实现。原代码用 Copy 是因为当时全是 i64。
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RoundStats {
     /// 收到的入站消息数。
     pub received: i64,
@@ -61,11 +64,31 @@ pub struct RoundStats {
     pub failed: i64,
     /// 补发成功的条数。
     pub deferred: i64,
+    /// 2026-09-29：账目留存期清理本轮删掉的行数。
+    ///
+    /// 此前清理函数**从未被调用**（R-P79 未接线），账目表无上限增长。
+    pub changes_pruned: i64,
+    /// 账目清理失败的原因（`None` = 本轮成功）。
+    ///
+    /// 存在的理由：原实现 `unwrap_or(0)` 把「删除失败」伪装成「删了 0 行」，
+    /// 无人能察觉账目在持续膨胀。**失败必须可观测**。
+    pub changes_prune_error: Option<String>,
 }
 
 impl RoundStats {
-    pub fn is_quiet(self) -> bool {
+    /// 2026-09-29：入参由 `self` 改 `&self`。
+    /// 加 `changes_prune_error: Option<String>` 后 `RoundStats` 不能再 `Copy`，
+    /// 而 `assert!(x.is_quiet(), "{x:?}")` 这类写法**先调方法再格式化 x** ——
+    /// 若方法收 `self` 会把 x 移走，格式化处借用即报 E0382。
+    /// 改收 `&self` 一次性修好全部 3 处消费方，调用点无需改动。
+    pub fn is_quiet(&self) -> bool {
         self.received == 0 && self.deferred == 0 && self.failed == 0
+    }
+
+    /// 本轮是否有**该被察觉但可能被忽略**的问题。
+    /// 与 `is_quiet` 分开：清理失败不阻断出站，但绝不能静默。
+    pub fn has_prune_error(&self) -> bool {
+        self.changes_prune_error.is_some()
     }
 }
 
@@ -250,6 +273,15 @@ pub fn run_once(
         nt_channel_dispatch::sweep_pending(store, &mut reg).map_err(|e| e.to_string())?;
     stats.deferred = deferred as i64;
     nt_channel_dispatch::upkeep_best_effort(store);
+    // 2026-09-29 接线（R-P79）：账目留存期清理此前**从未被调用**，
+    // 账目表无上限增长。与 upkeep 同一条调度路径。
+    // 失败不阻断本轮出站（best-effort 语义），但**不吞** ——
+    // 写进 stats 让调用方可观测（`unwrap_or(0)` 会伪装成「删了 0 行」）。
+    match nt_changes::prune_best_effort(store) {
+        Ok(n) if n > 0 => stats.changes_pruned = n as i64,
+        Ok(_) => {}
+        Err(err) => stats.changes_prune_error = Some(format!("{err:?}")),
+    }
     Ok(stats)
 }
 
