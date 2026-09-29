@@ -178,6 +178,67 @@ def audit_panics(rs):
     return out
 
 
+def audit_dup_types(rs):
+    """Structurally-identical duplicate type definitions.
+
+    ⚠️ Same name != same type (AGENTS.md L15 trap). Measured 2026-09-29:
+    1,166 type NAMES repeat, but after comparing field sets only **147 groups
+    are truly isomorphic** (174 redundant definitions, 9% of the name count).
+
+    The other 1,000+ are legitimately distinct types that happen to share a
+    name (`TaskStatus` appears 12 times as 10 different enums). Reporting the
+    raw name count would have been a false alarm on correct code — the same
+    mistake as the `unsafe` literal trap, one abstraction level up.
+    """
+    import collections
+    by = collections.defaultdict(list)
+    for f in rs:
+        for it in f["items"]:
+            if it["kind"] in ("struct", "enum", "type"):
+                by[it["name"]].append((f["path"], it["line"], it["kind"]))
+
+    def fields(path, ln):
+        try:
+            L = open(path, errors="ignore").read().splitlines()
+        except OSError:
+            return None
+        out, depth, started = [], 0, False
+        for line in L[max(0, ln - 1):max(0, ln - 1) + 60]:
+            depth += line.count("{") - line.count("}")
+            if "{" in line:
+                started = True
+            m = re.match(r"\s+(\w+)\s*[:,]", line)
+            if m:
+                out.append(m.group(1))
+            if started and depth <= 0:
+                break
+        return tuple(sorted(set(out)))
+
+    groups = []
+    for name, locs in by.items():
+        g = collections.defaultdict(list)
+        for p, l, k in locs:
+            s = fields(p, l)
+            if s:
+                g[(k, s)].append("%s:%d" % (p, l))
+        for (kind, sig), sites in g.items():
+            if len(sites) > 1:
+                groups.append({"name": name, "kind": kind,
+                               "nfields": len(sig), "sites": sites})
+    groups.sort(key=lambda g: (-len(g["sites"]), g["name"]))
+    # ⚠️ Three different numbers, and conflating them is the exact mistake
+    # this function exists to prevent. I shipped "1797 mergeable / 160%"
+    # once by reporting the *name* surplus as the mergeable count.
+    #   dup_names : how many NAMES repeat at all
+    #   name_extra: definitions beyond one-per-name (includes异构)
+    #   iso_extra : definitions that are STRUCTURALLY identical ⇒ the only
+    #               figure that means "could actually be merged"
+    dup_names = sum(1 for v in by.values() if len(v) > 1)
+    name_extra = sum(len(v) - 1 for v in by.values())
+    iso_extra = sum(len(g["sites"]) - 1 for g in groups)
+    return groups, dup_names, name_extra, iso_extra
+
+
 def load():
     with open(CM, encoding="utf-8") as fh:
         return json.load(fh)
@@ -404,6 +465,47 @@ def main():
     A("")
     A("⇒ 建议建 `scripts/check-unwrap.sh` + 基线棘轮（只卡新增，不强求归零），"
       "与 `check-layer-deps` 的 8 条 known 同构。")
+    A("")
+
+    A("### 5.4 重复类型 —— 同名 ≠ 同类型（L15 陷阱）")
+    A("")
+    groups, dupnames, name_extra, iso_extra = audit_dup_types(rs)
+    A("| 口径 | 数量 | 含义 |")
+    A("|---|---:|---|")
+    A("| 重复的**类型名** | %d | 同名出现 ≥2 次的**名字**数 |" % dupnames)
+    A("| 名义多余定义 | %d | 每名保留 1 份后余下的（**含异构**） |" % name_extra)
+    A("| **结构完全相同**的真重复组 | **%d** | 字段集合逐项相同 |" % len(groups))
+    A("| **真正可归并的定义** | **%d** | 只有这个数才叫「可归并」 |" % iso_extra)
+    A("")
+    A("⇒ %d 个同名里，**只有 %d 个结构真同构**（占名义多余的 %d%%）。"
+      % (dupnames, iso_extra, round(iso_extra / (name_extra or 1) * 100)))
+    A("其余是**合法的同名异构**（如 `TaskStatus` 出现 12 次却是 10 个不同枚举）"
+      "—— 报原始名数会是对正确代码的误报，与 `unsafe` 字面量陷阱同一层次。")
+    A("")
+    A("> ⚠️ 本表第一版把「名义多余 %d」误写成「可归并」并算出 160%% —— "
+      "**那正是本节警告的那个错误，我自己犯了一遍**。三个数已分列，逐个标明含义。"
+      % name_extra)
+    A("")
+    A("#### Top 12 真同构组（按可归并数）")
+    A("")
+    A("| # | 类型 | kind | 字段数 | 份数 | 跨层分布 |")
+    A("|---:|---|---|---:|---:|---|")
+    for i, g in enumerate(groups[:12], 1):
+        lays = sorted({re.search(r"(l[0-6]_[a-z_]+)", s).group(1)
+                       for s in g["sites"] if re.search(r"(l[0-6]_[a-z_]+)", s)})
+        A("| %d | `%s` | %s | %d | %d | %s |"
+          % (i, g["name"], g["kind"], g["nfields"], len(g["sites"]),
+             ", ".join(lays) if lays else "跨 crate"))
+    A("")
+    A("**逐处位置**（`nt_locate --component <名>` 可直查）：")
+    A("")
+    for g in groups[:6]:
+        A("- `%s` ×%d" % (g["name"], len(g["sites"])))
+        for s in g["sites"]:
+            A("  - `%s`" % s)
+    A("")
+    A("⚠️ **归并不是免费的**：`Severity` 散在 L1/L3 与两个 crate，"
+      "合并会改公开 API 与跨层依赖方向 ⇒ 需逐组评估，不宜批量脚本化。")
     A("")
 
     with open(OUT, "w", encoding="utf-8") as fh:
