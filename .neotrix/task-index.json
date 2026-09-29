@@ -584,5 +584,12 @@
     "cost": "秒级，只读 git grep，无 cargo",
     "when_not": "① 时点性断言（「上次跑是绿的」这类）判不了，需人工复核；② 历史交接件默认豁免（改它等于篡改历史），要查用 DOC_CLAIMS_SESSIONS=1；③ 短模块名/:: 记法碎片无法唯一解析，会跳过",
     "notes": "本会话「死记录」复发 6 次的产物。带 commit hash 的行视作时点陈述并豁免。"
+  },
+  "commit-deletions": {
+    "intent": "提交前核对暂存区里有没有别人的改动（多窗口共享 index 事故）",
+    "tool": "bash scripts/check-commit-deletions.sh  （已挂 .githooks/pre-commit，自动跑）",
+    "cost": "毫秒级，只读 git diff --cached",
+    "when_not": "① 无删除的提交直接 PASS，不必手动跑；② 想查已入库提交用 scripts/check-push-deletions.sh（pre-push 自动兜底，锚定在门自身提交，不追溯历史）；③ 想看共享暂存区全貌仍要 git diff --cached --name-only 对自己的文件清单",
+    "notes": "2026-09-29 事故：误删他窗 339 行在途工作。显式 add 只能约束我 add 什么，约束不了暂存区已有什么。"
   }
 }
