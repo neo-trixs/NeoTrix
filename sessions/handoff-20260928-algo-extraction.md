@@ -465,3 +465,52 @@ unused import」。**动手前复核那一行，内容已变、mtime 是 42 秒�
 > 交叉验证时先问「谁的判据更精确」，而不是「谁报少了」。
 
 已接 task-index（33 条），触发词「融合 / 精简 / 重复 / 去重」。
+
+## 14. 融合候选的筛选口径升级 + 首个真融合（`a29a5ab1` → `63104ff8`）
+
+### 14.1 上一组裁决：AwarenessReport **不融合**（`a29a5ab1`）
+三处字段+derive 完全一致，但 `l1_action/nt_act/nt_act_autonomy/types.rs:1-5`
+明写「L1-local type equivalents … **mirror** the L5 types … **L1 must NOT
+depend on L5**. When L5 evolves, these **stay stable** as the **interface
+contract** for the oracle gate」⇒ **刻意的接口隔离层**。
+改成 `use l0` 会让 L1 与 L5 共享同一类型 ⇒ L5 演进直接波及 L1。
+
+> **第一组候选就推翻了自动化的假设。** 字段集相同是**必要条件**不是充分条件 ——
+> 真正的判据还要读**注释里的意图**。这验证了「工具只给判据不自动改」的决定。
+
+### 14.2 把「读注释」这件事自动化（`63104ff8` 上半）
+既然作者写下的注释是权威判据，就不该让人工读 122 组注释。内建
+`DELIBERATE_MARKERS`（16 个标记：mirror / stay stable / interface contract /
+must NOT depend / l1-local / 刻意 / 故意 …），扫**定义紧邻窗口 + 文件头
+模块级说明**两处。
+
+**实现踩坑**：首版只扫紧邻窗口，而 `AwarenessReport` 的刻意声明在
+`types.rs:1-5`（文件头）、定义在第 28 行 ⇒ **漏判 False（错把刻意当疏忽）**。
+加文件头扫描后修正，并**顺带检出另一组此前未知的** `OriEvalCase`
+（`nt_io_provider/gateway/types.rs:1` 自证「L1-local benchmark types for
+challenge evaluation」）。
+
+### 14.3 首个真融合：ScoredDoc（`63104ff8` 下半）
+满足全部可动条件：字段集+derive 完全相同 / **同属一个模块** /
+**无任何刻意声明**。
+
+**代价证据（重复的实际成本）**：`fusion_engine.rs:6-8` 不得不写
+三条 import + 三个别名（`as BM25ScoredDoc` / `as EntScoredDoc` /
+`as SemScoredDoc`），于是融合函数三个参数是三个**不同类型** ——
+**字段完全一样却无法放进同一个 `Vec`**。
+
+改动：统一到 `mod.rs`；三个检索器改 `use super::ScoredDoc`；
+`fusion_engine` 三别名合并为一条。
+
+### 14.4 三档分类（当前）
+```
+✅ 真疏忽候选（无刻意声明）  118 组 ⬅ 可逐组取证
+⛔ 刻意镜像（注释自证）        2 组 别动
+⚖️  已人工裁决                1 组（AwarenessReport）
+```
+（融合前 122 组，ScoredDoc 融合后降为 118 ⇒ **工具自证修复生效**）
+
+### 14.5 验证
+`cargo check --lib` 通过 · `test --lib hybrid_retrieval` 1 passed ·
+`check-layer-deps --strict` 101known/**0new** ·
+`nt_dup_types --name ScoredDoc` 已不在候选。
