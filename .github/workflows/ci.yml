@@ -46,6 +46,16 @@ jobs:
       # 权衡后留在 `check` 的第一步之前（秒级，无需 cargo）。
       - name: "CI reference gate (no job may point at a path git does not track)"
         run: bash scripts/check-ci-refs.sh --strict
+      # 2026-09-29 加（B1 元门）。它是**检查其他门的门**：
+      #   ① 非空门   —— 注入已知违规，该门必须变红（否则是永远绿的假门）
+      #   ② 可满足性 —— 存在已知合规输入，该门必须变绿（否则是恒红的门）
+      # 依据：i-have-adhd 的发布门「永远无法通过」而**这件事是跑出来的，
+      # 不是看出来的**。本门让这类问题在 CI 可见。
+      #
+      # 耗时说明：10 道门，其中 3 道跑真探针（含注入+清理），7 道声明 opaque
+      # （需改产品码或跑 cargo，见 scripts/gate-registry.tsv 的 note 栏）。
+      - name: "Gate-satisfiability meta-gate (are the gates themselves trustworthy?)"
+        run: bash scripts/check-gate-satisfiable.sh --strict
 
   test:
     runs-on: ${{ matrix.os }}

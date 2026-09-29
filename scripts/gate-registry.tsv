@@ -1,0 +1,34 @@
+# 门登记表 — 供 scripts/check-gate-satisfiable.sh 消费
+#
+# 列（tab 分隔）：
+#   1 gate      门路径（相对仓库根）
+#   2 class     injectable | opaque
+#   3 probe     注入违规后要跑的探针命令；{GATE} 会被替换成门路径
+#   4 rc        预期退出码（注入违规时门应返回的码）
+#   5 note      为什么这样注入 / 为什么不可注入
+#
+# ── 两条纪律 ──────────────────────────────────────────────────────
+# 1. **登记 ≠ 通过。** 未登记 = 缺审（advisory 计数），不是失败。
+#    但 `--strict` 下缺审即红 —— 逼着每个门都被想一次。
+# 2. **opaque 必须是诚实的。** 「我测不了」是可接受答案，
+#    「我没测」不是。⛔ 不要为了清零而把 injectable 改成 opaque。
+#
+# ── 为什么 probe 用 eval 而不用固定脚本 ──────────────────────────────
+# 14 道门结构各异（纯文件型 13 / 需 cargo 1）。逐一写 14 份注入脚本
+# 会烂尾（`Agentero` 与本仓的 dependency 门都只有 3 条规则，
+# 正是因为规则一多就没人维护）。⇒ 登记表 + eval 是本门的实际解法。
+# ⛔ 代价：probe 里不能有未转义的 tab；复杂注入请写成 scripts/probes/<gate>.sh
+#   并在 probe 列写 `bash scripts/probes/<gate>.sh`。
+
+# gate	class	probe	rc	note
+scripts/check-ci-refs.sh	injectable	bash scripts/probes/check-ci-refs.sh	0	2026-09-29 固化为探针：注入幻影 CI job（working-dir 指向 gitignored 目录）⇒ 门 exit 1 并指名行号。探针自身 exit 0 = 证明成功
+scripts/check-truth-surface.sh	injectable	bash scripts/probes/check-truth-surface.sh	0	2026-09-29 固化为探针：注入未声明 .rs ⇒ UNDECLARED+UNREACHABLE 各 +1 ⇒ strict 红
+scripts/check-test-baseline.sh	opaque	—	—	需 cargo test（约 174s，超出元门预算）＋需改被测代码。2026-09-29 已人工验过：注入 assert_eq!(1+1,3) ⇒ --strict exit 1 并指名
+scripts/check-layer-deps.sh	opaque	—	—	注入需在 `.rs` 里加一层跨层 import（改产品码）。2026-09-28 建门时人工验过一次（注入 L5→L6 ⇒ exit 1 并精确报出），本轮未固化为探针
+scripts/check-skill-gate.sh	opaque	—	—	注入需改 `skills/index.json` 或 SKILL.md frontmatter（改产品资产）。**该门当前恒红**（32/59 缺 frontmatter），恒红门下做非空门证明无意义 ⇒ 先解恒红
+scripts/check-naming.sh	opaque	—	—	注入需新增一个无 `nt_` 前缀的 `.rs`。**该门当前恒红**（1629 offender），同上网。⚠️ 注意其 clean-HEAD 基线是 1646，主树 1629 是**未提交改名**所致 ⇒ 别拿主树数字当基线
+scripts/check-capability-manifests.sh	opaque	—	—	注入需改 `.neotrix/capability_registry.json` 的 description。**该门当前恒红**（M3 drift），同上网
+scripts/check-doc-drift.sh	injectable	bash scripts/probes/check-doc-drift.sh	0	2026-09-29 固化为探针：注入缺 module doc 的 .rs ⇒ 门红。注意该门**当前也恒红**（127 undocumented），探针证明的是「它能变红」，非「它只在注入时红」
+scripts/check-build-surface.sh	opaque	—	—	注入需在 Rust 源码里加编译期 exec 调用（改产品码 + 触发全量编译）。本轮未做
+scripts/check-gate-satisfiable.sh	opaque	—	—	⛔ 本门**不能探测自己**（{GATE} --strict 会无限递归，第一版实测 exit=124）。自检方式：临时从 gate-registry.tsv 删一行 ⇒ 未登记计数 +1
+scripts/check-fresh-build.sh	opaque	—	—	需 cargo worktree（检出级），单次 >2min；且**它不接受 --strict**（exit 2 = 用法错）。2026-09-29 实测 exit=2，见 note 栏外
