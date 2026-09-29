@@ -6,12 +6,14 @@
 ⇒ 同名同字段同层内 ⇒ **保留 `mod.rs` 已 re-export 的那一份**（它就是事实上的真源），
 另一份改为 re-export。
 
-## 五项判据（全过才动，缺一不动）
+## 六项判据（全过才动，缺一不动）
 ① 同名
 ② 字段**名 + 类型**完全相同（只比名字会把「高度相似的两个不同类型」误判成重复）
 ③ 无刻意镜像声明（注释里出现 mirror / stay stable / interface contract …）
-④ **两侧 impl 块一致** —— 工具查的，本脚本补上（否则 `impl Default` 冲突）
-⑤ **依赖安全** —— 被删那一侧的定义，其引用方仍能通过 re-export 拿到类型
+④ **两侧 trait impl 块一致** —— 否则 `impl Default` 冲突
+⑤ **被删侧无固有 impl 方法** —— 否则融合后与真源侧同名方法撞成 E0592
+   （2026-09-29 实测：`Verdict` 两侧各有 `is_blocked`）
+⑥ **依赖安全** —— 被删那一侧的定义，其引用方仍能通过 re-export 拿到类型
 
 ## 为什么逐组编译
 2026-09-29 实测：批量执行第一组就炸（E0119 + E0560）——
@@ -49,11 +51,17 @@ def read(rel):
 
 
 def block_bounds(text, name):
-    """返回该类型定义块的 (start, end)，**含前置的 derive/serde/cfg_attr 属性**，找不到返回 None。
+    """返回 (block_start, body_lbrace, block_end)，找不到返回 None。
 
-    2026-09-29 实测踩坑：初版只从 `pub struct X` 起删，**没连 derive 一起删**，
-    留下悬空的 `#[derive(...)]` ⇒ `E0774: derive may only be applied to
-    struct/enum/union`。16 组里 12 组因此编译失败（靠自动回滚兜住）。
+    block_start **含前置的 derive/serde/cfg_attr 属性与 doc 注释**——
+    删除时必须连它们一起删，否则留下悬空 `#[derive(...)]` ⇒ E0774。
+    body_lbrace 是结构体左大括号位置（供 fields_of 用，避免从更早的
+    block_start 往后找 `{` 时误中注释里的花括号）。
+
+    2026-09-29 两次踩坑：
+    ① 初版只从 `pub struct X` 起删，没连 derive 一起删 ⇒ 16 组里 12 组 E0774。
+    ② 修了吞回逻辑，却在 return 处写成 `m.start()`，把算好的 `start` 丢掉 ⇒
+       修正完全没生效，PressureRating 照样残留 derive。
     """
     m = re.search(r"pub (?:struct|enum|trait) " + re.escape(name) + r"\b[^{]*\{", text)
     if not m:
@@ -65,7 +73,15 @@ def block_bounds(text, name):
         if prev_nl < 0:
             break
         line = text[prev_nl + 1:start].strip()
-        if line.startswith("#["):
+        # 属性行（`#[derive(...)]` / `#[serde(...)]` / `#[cfg_attr(...)]`）**与
+        # doc 注释行（`/// ...` / `//! ...`）都要吞**。
+        # 2026-09-29 实测：初版只吞属性行，遇到
+        #     /// 尺寸规格
+        #     #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+        #     pub struct SizeSpec { … }
+        # 这种「doc 在 derive 上方」的排版时，`#[derive]` 上一行是 `/// …`
+        # ⇒ 循环立即 break ⇒ derive 残留 ⇒ `E0774` 依旧（12/16 组仍失败）。
+        if line.startswith(("#[", "///", "//!")) or line == "":
             start = prev_nl + 1
             continue
         break
@@ -78,7 +94,7 @@ def block_bounds(text, name):
         elif text[k] == "}":
             depth -= 1
             if depth == 0:
-                return m.start(), k + 1
+                return start, i, k + 1
         k += 1
     return None
 
@@ -87,7 +103,7 @@ def fields_of(text, name):
     b = block_bounds(text, name)
     if not b:
         return None
-    body = text[text.index("{", b[0]):b[1]]
+    body = text[b[1]:b[2]]
     return frozenset(
         f"{n}:{t.strip()}" for n, t in FIELD_TYPED_RE.findall(body)
     )
@@ -97,6 +113,37 @@ def impls_of(text, name):
     return frozenset(
         f"{tr.strip()} for {ty}" for tr, ty in IMPL_RE.findall(text) if ty == name
     )
+
+
+def inherent_methods(text, name):
+    """返回该类型在**本文件内**的固有 impl 方法名集合。
+
+    2026-09-29 实测踩坑：`impls_of` 只查 trait impl（`impl X for Y`），
+    漏掉了固有 impl（`impl Y { ... }`）。`evomal_guard.rs` 与
+    `self_poison.rs` 各有一份 `impl Verdict`（都有 `is_blocked`）——
+    融合后两个固有 impl 指向同一类型 ⇒ E0592 duplicate definitions。
+    故被删一侧**必须没有任何固有 impl 方法**，否则跳过（需人工迁移方法）。
+    """
+    methods = set()
+    for m in re.finditer(r"impl\s+" + re.escape(name) + r"\b[^{]*\{", text):
+        # 跳过 trait impl（`impl X for Y` 含 for，已由 impls_of 处理）
+        head = m.group(0)
+        if " for " in head:
+            continue
+        i = text.index("{", m.end() - 1)
+        depth, k = 0, i
+        while k < len(text):
+            if text[k] == "{":
+                depth += 1
+            elif text[k] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            k += 1
+        body = text[i:k]
+        for fm in re.finditer(r"(?:pub(?:\([^)]*\))?\s+)?fn (\w+)\s*(?:<[^>]*>)?\s*\(", body):
+            methods.add(fm.group(1))
+    return frozenset(methods)
 
 
 def module_of(rel):
@@ -156,7 +203,14 @@ def analyse(name, paths):
             return (False,
                     f"impl 块不同：真源有 {only_s or '无'} 多余，另一侧有 {only_o or '无'} 多余",
                     None, [])
-    return True, "五项判据全过", src, others
+        # 固有 impl：被删一侧若有自己的方法，融合后会与真源侧的同名方法
+        # 撞成 E0592（同一 crate 内同一类型的两个固有 impl）。必须人工迁移。
+        om = inherent_methods(read(o), name)
+        if om:
+            return (False,
+                    f"被删侧有 {len(om)} 个固有方法（{sorted(om)[:3]}）⇒ 需人工迁移",
+                    None, [])
+    return True, "六项判据全过", src, others
 
 
 def fuse(name, source, targets):
@@ -181,7 +235,7 @@ def fuse(name, source, targets):
                 f"// 真源是后者（模块 mod.rs 的 re-export 指向它）⇒ 本文件改为 re-export，\n"
                 f"// 消除「两份同名类型」的歧义。\n"
                 f"pub use {ref};\n\n")
-        new = text[: b[0]] + note + text[b[1]:]
+        new = text[: b[0]] + note + text[b[2]:]
         new = re.sub(r"\n{4,}", "\n\n\n", new)
         with open(p, "w", encoding="utf-8") as f:
             f.write(new)
@@ -198,7 +252,7 @@ def cargo_ok():
 
 
 def main():
-    ap = argparse.ArgumentParser(description="按五项判据自动融合重复类型")
+    ap = argparse.ArgumentParser(description="按六项判据自动融合重复类型")
     ap.add_argument("--dry-run", action="store_true", help="只报告不动手")
     ap.add_argument("--limit", type=int, default=10, help="最多处理几组")
     args = ap.parse_args()
@@ -225,13 +279,22 @@ def main():
         if args.dry_run:
             done.append((name, src, others, False))
             continue
+        # 快照本组触及的文件（只恢复这些，不碰文件内其他已成功的融合）。
+        # 2026-09-29 实测踩坑：初版用 `git checkout -- <file>` 整文件回滚，
+        # Product 组失败时把同文件里 4 个已成功的融合（InquiryMetadata /
+        # PerformanceMetrics / PressureRating / PriceInfo）一起 wipe。
+        snapshots = {}
+        for t in others:
+            p = os.path.join(SRC, t)
+            with open(p, encoding="utf-8") as f:
+                snapshots[t] = f.read()
         fuse(name, src, others)
         passed, err = cargo_ok()
         if not passed:
-            subprocess.run(["git", "checkout", "--"] +
-                           [os.path.join("neotrix-core/src", t) for t in others],
-                           cwd=REPO)
-            print(f"   ⛔ 编译失败 ⇒ 已回滚：{err[:200]}")
+            for t, content in snapshots.items():
+                with open(os.path.join(SRC, t), "w", encoding="utf-8") as f:
+                    f.write(content)
+            print(f"   ⛔ 编译失败 ⇒ 已回滚本组 {len(snapshots)} 个文件：{err[:200]}")
             skipped.append((name, f"编译失败（已回滚）"))
             continue
         print("   ✅ 编译通过")

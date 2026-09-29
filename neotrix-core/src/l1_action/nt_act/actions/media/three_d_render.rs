@@ -76,14 +76,12 @@ pub struct Face {
     pub normal: Vector3,
     pub material_index: Option<u32>,
 }
+// 2026-09-29 自动融合（nt_fuse_types.py）：`Vector3` 原在本文件与
+// `l1_action/nt_act/actions/media/three_d_dev.rs` 各有一份，字段名+类型+impl 块完全相同。
+// 真源是后者（模块 mod.rs 的 re-export 指向它）⇒ 本文件改为 re-export，
+// 消除「两份同名类型」的歧义。
+pub use super::three_d_dev::Vector3;
 
-/// 向量3
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Vector3 {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-}
 
 /// 向量2
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -141,14 +139,12 @@ pub struct SceneObject {
     pub transform: Transform,
     pub visible: bool,
 }
+// 2026-09-29 自动融合（nt_fuse_types.py）：`Transform` 原在本文件与
+// `l1_action/nt_act/actions/media/three_d_dev.rs` 各有一份，字段名+类型+impl 块完全相同。
+// 真源是后者（模块 mod.rs 的 re-export 指向它）⇒ 本文件改为 re-export，
+// 消除「两份同名类型」的歧义。
+pub use super::three_d_dev::Transform;
 
-/// 变换
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Transform {
-    pub position: Vector3,
-    pub rotation: Vector3,
-    pub scale: Vector3,
-}
 
 /// 相机
 #[derive(Debug, Clone, Serialize, Deserialize)]

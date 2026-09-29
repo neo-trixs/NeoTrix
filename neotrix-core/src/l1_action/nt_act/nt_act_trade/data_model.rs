@@ -224,21 +224,12 @@ pub struct PerformanceMetrics {
     /// 综合评分 (0.0 ~ 100.0)
     pub overall_score: f64,
 }
+// 2026-09-29 自动融合（nt_fuse_types.py）：`InquiryMetadata` 原在本文件与
+// `l1_action/nt_act/nt_act_trade/unified_types.rs` 各有一份，字段名+类型+impl 块完全相同。
+// 真源是后者（模块 mod.rs 的 re-export 指向它）⇒ 本文件改为 re-export，
+// 消除「两份同名类型」的歧义。
+pub use super::unified_types::InquiryMetadata;
 
-/// 询价元数据
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct InquiryMetadata {
-    /// 项目名称
-    pub project_name: Option<String>,
-    /// 项目编号
-    pub project_no: Option<String>,
-    /// 目的地
-    pub destination: Option<String>,
-    /// 交货期要求
-    pub delivery_requirement: Option<String>,
-    /// 备注
-    pub notes: Option<String>,
-}
 
 // ============================================================
 // 3. 核心数据结构

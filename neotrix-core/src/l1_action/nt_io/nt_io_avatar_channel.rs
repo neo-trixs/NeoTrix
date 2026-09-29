@@ -53,23 +53,19 @@ pub struct ChannelMessage {
     pub timestamp: i64,
     pub chain_index: u64,
 }
+// 2026-09-29 自动融合（nt_fuse_types.py）：`BrainCapability` 原在本文件与
+// `l1_action/nt_io/nt_io_user_avatar.rs` 各有一份，字段名+类型+impl 块完全相同。
+// 真源是后者（模块 mod.rs 的 re-export 指向它）⇒ 本文件改为 re-export，
+// 消除「两份同名类型」的歧义。
+pub use super::nt_io_user_avatar::BrainCapability;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BrainCapability {
-    pub name: String,
-    pub granted: bool,
-    pub grant_timestamp: i64,
-    pub expiry: Option<i64>,
-}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AuthRequest {
-    pub capability: String,
-    pub timestamp: i64,
-    pub reasoning: String,
-    pub granted: Option<bool>,
-    pub response_time: Option<i64>,
-}
+// 2026-09-29 自动融合（nt_fuse_types.py）：`AuthRequest` 原在本文件与
+// `l1_action/nt_io/nt_io_user_avatar.rs` 各有一份，字段名+类型+impl 块完全相同。
+// 真源是后者（模块 mod.rs 的 re-export 指向它）⇒ 本文件改为 re-export，
+// 消除「两份同名类型」的歧义。
+pub use super::nt_io_user_avatar::AuthRequest;
+
 
 const CAPABILITY_FILE: &str = "brain_capabilities.json";
 const AUTH_FILE: &str = "auth_requests.json";

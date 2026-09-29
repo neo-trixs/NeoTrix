@@ -91,19 +91,12 @@ impl QuoteGenerator {
         }
     }
 }
+// 2026-09-29 自动融合（nt_fuse_types.py）：`QuoteSheet` 原在本文件与
+// `l1_action/nt_act/nt_act_trade/full_cycle.rs` 各有一份，字段名+类型+impl 块完全相同。
+// 真源是后者（模块 mod.rs 的 re-export 指向它）⇒ 本文件改为 re-export，
+// 消除「两份同名类型」的歧义。
+pub use super::full_cycle::QuoteSheet;
 
-/// Quote Sheet Output
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QuoteSheet {
-    pub quote_id: String,
-    pub version: u32,
-    pub incoterms: String,
-    pub unit_price: f64,
-    pub total: f64,
-    pub currency: String,
-    pub validity_days: u32,
-    pub risk_flag: Option<String>,
-}
 
 // ── NegotiationEngine / Concession / CompetitorData 统一从 trade_core 引用 ──
 // 本模块仅定义外贸特有的异议处理逻辑 (handle_objection / generate_response)
