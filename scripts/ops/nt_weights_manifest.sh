@@ -132,8 +132,10 @@ do_backup() {
     || die "tar 失败" 1
   local sz; sz=$(du -h "$BACKUP_TAR" | cut -f1)
   ok "$(basename "$BACKUP_TAR")  $sz"
-  # 备份自身也要能被校验: 把它的 sha256 落到同名 .sha256
-  sha256 "$BACKUP_TAR" > "$BACKUP_TAR.sha256"
+  # 备份自身也要能被校验: 落标准格式 (`<hash>  <文件名>`)，`shasum -c` 可直接验。
+  # 只写裸 hash 的话标准工具认不出（2026-09-29 踩过：shasum -c 报
+  # "no properly formatted SHA checksum lines"）。
+  (cd "$(dirname "$BACKUP_TAR")" && shasum -a 256 "$(basename "$BACKUP_TAR")") > "$BACKUP_TAR.sha256"
   ok "备份校验和 $(basename "$BACKUP_TAR").sha256"
   printf '  ⚠ 与仓库同盘 —— 防误删, **不防磁盘故障**。跨盘请自行拷贝该文件。\n'
 }
