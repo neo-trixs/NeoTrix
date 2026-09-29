@@ -105,10 +105,11 @@ evals|数据|gaia_mini 评测任务与基线（tracked=0）
 # ⛔ 这些**不是合法目录**，是归档后的磁盘残留。列在此处只为「记账不阻断」——
 # 门仍会报它们（见下方 RESIDUAL 输出），但标为 known ⇒ 不计入新增违规。
 # 处置：确认无消费者后 `rm -rf`（R-DISK-1：它们是生成物/已删源码，删前确认 tracked=0）。
-RESIDUAL_KNOWN="
-apps
-src-tauri
-"
+# 2026-09-29：apps/ 与 src-tauri/ 已移出到
+#   /Users/neo/Downloads/Neo/neotrix-archive/desktop-residual-20260929/
+# （mv 非 rm，58/58 SHA-256 校验一致；含 2,496 行 git 已删的冒烟测试，
+#   详见该目录 README.md 的恢复说明）⇒ 本表当前为空。
+RESIDUAL_KNOWN=""
 
 # ── 收集现状（只取 git 跟踪的 + 未跟踪但存在的一级项）──────────────
 CUR=$(mktemp); trap 'rm -f "$CUR"' EXIT

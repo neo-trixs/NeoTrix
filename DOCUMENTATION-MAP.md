@@ -42,6 +42,11 @@
 
 **禁止**: 根目录放置临时文件、会话笔记、分析报告
 
+> ✅ **2026-09-29**：`apps/`（43 文件）与 `src-tauri/`（15 文件）两个残留
+> 目录已移出到 `Neo/neotrix-archive/desktop-residual-20260929/`（`mv` 非 `rm`，
+> 58/58 SHA-256 校验一致）。⛔ 其中 `src-tauri/` 那 15 个文件 **git 历史从无**，
+> 含 2,496 行已被 `d5413335` 删除的冒烟测试 —— 恢复说明见该目录 `README.md`。
+>
 > ⛔ **本节不是散文了** —— `scripts/check-layout.sh` 把「根目录白名单 +
 > `neotrix-core/docs/` 只许 `YYYY-MM-DD_` 前缀 + 与本文件的清单交叉校验」
 > 变成可执行门，已接 pre-commit（拦新增，既有债记账）。
