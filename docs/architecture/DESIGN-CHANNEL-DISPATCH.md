@@ -19,6 +19,46 @@
 
 ---
 
+
+## ⛔ 行号锚点已失效 —— 2026-09-29 重新实测（施工前必读）
+
+**本文件的所有行号引用都已腐化。** 文件自设计成文后仍在增长：
+`nt_channel_dispatch.rs` 由设计时的 1191 行涨到 **2123 行**（+78%），
+`nt_channel_telegram.rs` 1005→**2353** 行。
+
+⇒ **按章节号定位，不要按行号**（`AGENTS.md` 引用规则：⛔ 不用行号锚点）。
+下表是 2026-09-29 对当前 HEAD 的重新实测，**它同样会腐化**，
+用前请复验。
+
+| 设计原文引用 | 实测当前位置 | 偏移 | 状态 |
+|---|---|---:|---|
+| `nt_channel.rs:139` trait `ChannelAdapter` | `nt_channel.rs:151` | +12 | ✅ 约束仍成立 |
+| `nt_channel.rs:155` `poll` 要 `&mut self` | `nt_channel.rs:167` | +12 | ✅ 仍成立 |
+| `nt_channel.rs:194-196` `BTreeMap<String, Box<dyn …>>` | `nt_channel.rs:207` | +11 | ✅ 仍成立 |
+| `nt_channel_dispatch.rs:51-168` `on_inbound` | **`nt_channel_dispatch.rs:367`** | **+316** | ⚠️ 已漂移 |
+| `nt_channel_dispatch.rs:133`（`user_text` 拼好，分界线） | 需在 `on_inbound` 内重新定位 | — | ⚠️ 待重测 |
+| `nt_channel_dispatch.rs:135-138`（跑轮） | **`nt_channel_dispatch.rs:483`**（`run_local_turn_cancellable`） | +345 | ⚠️ 已漂移 |
+| `nt_channel_dispatch.rs:427-444` `enqueue_outbound_with_attachments` | **`nt_channel_dispatch.rs:791`** | **+350** | ⚠️ 已漂移 |
+| `nt_channel_dispatch.rs:496` `sweep_pending` | `nt_channel_dispatch.rs:904` | +408 | ⚠️ 已漂移 |
+
+### 复核：设计的核心架构判断是否仍然成立（2026-09-29 实测）
+
+| §11 的判据 | 实测结果 | 结论 |
+|---|---|---|
+| 「凡是碰适配器的代码必须在 T0」 | `poll(&mut self)` / `send(&self)` / `fetch_attachment(&self)` 三方法**均无 `Send`/`Sync`**，trait 无 supertrait | ✅ **仍成立**，切分判据不变 |
+| 「两处直连 `adapter.send` 必须改走出站」 | `deliver_result`（`:859`）签名仍为 `adapter: &dyn ChannelAdapter`，**outbox 迁移未做** | ⛔ **待做** |
+| 「`edit_of` 缺失会让「编辑原消息」静默退化成重复两条」 | `edit_of` 字段仍在用（`:24` 起），但**未进 outbox payload** | ⛔ **待做**，静默回归风险仍在 |
+
+### 阻塞规模（2026-09-29 实测）
+
+- `nt_channel_dispatch.rs` **2123 行** / `nt_channel.rs` 433 行 / `nt_channel_serve.rs` 640 行
+- 根因已确认：`on_inbound` 在**同步**调用 `run_local_turn_cancellable`（`:483`），
+  阻塞 poller 线程 ⇒ 单执行流 ⇒ `/stop` 无处落地
+- `cargo check -p neotrix-neobot` 当前 **Finished 0 error**（基线干净）
+
+⇒ **这是 4 文件的架构改造，不是局部修补。** 建议独立会话 + 先写施工计划，
+不要在共享工作树里边改边跑全量构建（`AGENTS.md` 并行公约）。
+
 ## 0. 先纠三处前提（含两处「现有注释在说谎」）
 
 派题里的框架我认为**一处偏小、两处偏大**。先把偏差摆出来，否则后面每个选项的
