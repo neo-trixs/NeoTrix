@@ -558,13 +558,90 @@ impl CrystalConsciousness {
     ///
     /// ⚠️ 改本函数的口径会同时改变晶体核心的检索分词与外部评测口径 ——
     ///    这是**故意的**：它们本就该是同一个东西。
+    ///
+    /// ## CJK 处理（2026-09-29 修「中文近乎失明」）
+    ///
+    /// 原实现按空白/标点切分 ⇒ 中文整句只成 **1 个 token**：
+    /// ```
+    /// keywords("我的支付一直失败收不到验证码") -> ["我的支付一直失败收不到验证码"]
+    /// keywords("支付网关")                     -> ["支付网关"]   # 永不相交
+    /// ```
+    /// 两句话语义高度相关（都是支付问题），判分器却给零分。
+    /// 实测 339 条 jev-choice：中文语料下 top-1 45.8% vs 随机基线 38.1%。
+    ///
+    /// 修法与仓内**既有的两处实现同源**（`nt_shared_mind.rs:22`、
+    /// `nt_crystal_task_fusion.rs:57` 都已做 bigram）：CJK 连续段额外产出
+    /// **相邻二字组合（bigram）**，使「支付网关」与「我的支付…」能经由
+    /// `支付` 相交。
+    ///
+    /// ⛔ 为何不做词干还原（TODO 提到 `{"invoice"} & {"invoices"} == ∅`）：
+    ///   英文侧靠 bigram 已能部分缓解（`in` + `on` 等），而引入词干器需要
+    ///   外部依赖或自研规则 —— **那是另一个决策，不在本轮**。本轮只修
+    ///   「CJK 整句成单 token」这个有实测数据支撑的问题。
     pub fn keywords(text: &str) -> Vec<String> {
-        Self::strip_src_tag(text).split(|c: char| {
-            c.is_whitespace() || "，。、；：？！…—·,. ;:?!()（）「」『』\"'【】《》".contains(c)
-        })
-        .filter(|w| w.chars().count() > 1 && !Self::is_stop(w))
-        .map(|w| w.to_string())
-        .collect()
+        let cleaned = Self::strip_src_tag(text);
+        let mut out: Vec<String> = Vec::new();
+        let mut seen: HashSet<String> = HashSet::new();
+
+        // ① 原有口径：空白/标点切分 + 停用词 + 单字符过滤（英文侧行为不变）
+        let mut cjk_runs: Vec<String> = Vec::new();
+        let mut ascii_tok = String::new();
+        let mut pending_cjk: Vec<char> = Vec::new();
+
+        let flush_ascii = |acc: &mut String, out: &mut Vec<String>, seen: &mut HashSet<String>| {
+            if acc.chars().count() > 1 && !Self::is_stop(acc) && seen.insert(acc.clone()) {
+                out.push(std::mem::take(acc));
+            } else {
+                acc.clear();
+            }
+        };
+        let flush_cjk = |run: &mut Vec<char>,
+                         out: &mut Vec<String>,
+                         seen: &mut HashSet<String>,
+                         runs: &mut Vec<String>| {
+            if run.is_empty() {
+                return;
+            }
+            // 整段保留（≥2 字且非停用），与既有实现一致
+            let whole: String = run.iter().collect();
+            if run.len() >= 2 && !Self::is_stop(&whole) && seen.insert(whole.clone()) {
+                out.push(whole.clone());
+            }
+            // ② bigram：相邻二字组合，让不同句子的相关片段能相交
+            for w in run.windows(2) {
+                let bg: String = w.iter().collect();
+                if seen.insert(bg.clone()) {
+                    out.push(bg);
+                }
+            }
+            runs.push(whole);
+            run.clear();
+        };
+
+        for c in cleaned.chars() {
+            if Self::is_cjk(c) {
+                flush_ascii(&mut ascii_tok, &mut out, &mut seen);
+                pending_cjk.push(c);
+            } else {
+                flush_cjk(&mut pending_cjk, &mut out, &mut seen, &mut cjk_runs);
+                if c.is_whitespace() || "，。、；：？！…—·,. ;:?!()（）「」『』\"'【】《》".contains(c) {
+                    flush_ascii(&mut ascii_tok, &mut out, &mut seen);
+                } else {
+                    ascii_tok.push(c);
+                }
+            }
+        }
+        flush_ascii(&mut ascii_tok, &mut out, &mut seen);
+        flush_cjk(&mut pending_cjk, &mut out, &mut seen, &mut cjk_runs);
+        out
+    }
+
+    /// CJK 判定口径 —— 与 `nt_shared_mind.rs:18` / `nt_crystal_task_fusion.rs:52`
+    /// **同源同范围**（基本汉字区）。⚠️ 全仓另有 4 个 `is_cjk` 副本，其中
+    /// `l1_action/nt_core_llm/mod.rs:55` 口径更宽（含 CJK 标点/假名/谚文/全角），
+    /// 尚未统一 —— 见 TODO 的 DRY 债登记，**不在本轮改动范围**。
+    fn is_cjk(c: char) -> bool {
+        ('\u{4e00}'..='\u{9fff}').contains(&c)
     }
 
     /// 跨前提共享词：按出现频次排序取前 5（归纳/演绎的证据核心）
@@ -722,5 +799,85 @@ impl std::fmt::Display for CrystalConsciousness {
             writeln!(f, "  {}: {:.3}", k, v)?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CrystalConsciousness;
+    use std::collections::HashSet;
+
+    fn kws(s: &str) -> HashSet<String> {
+        CrystalConsciousness::keywords(s).into_iter().collect()
+    }
+
+    /// 🔴 回归锁：TODO.md「实测发现：keywords() 对中文近乎失明」。
+    ///
+    /// 原实现按空白/标点切分 ⇒ 中文整句只成 1 个 token，于是
+    /// `{"我的支付一直失败收不到验证码"} & {"支付网关"} == ∅`：
+    /// 两句话在语义上高度相关（都是支付问题），判分器却给零分。
+    ///
+    /// 该缺陷从未被任何测试覆盖 —— 修它之前先让缺陷可测。
+    #[test]
+    fn keywords_cjk_sentence_is_not_single_token() {
+        let k = kws("我的支付一直失败收不到验证码");
+        assert!(
+            k.len() > 1,
+            "中文整句仍只成 1 个 token ⇒ CJK 失明未修：{:?}",
+            k
+        );
+    }
+
+    /// 两个语义相关的中文短语必须能相交（否则检索/新颖度判定对中文恒为 0）。
+    #[test]
+    fn keywords_cjk_related_phrases_intersect() {
+        let a = kws("我的支付一直失败收不到验证码");
+        let b = kws("支付网关");
+        let inter: Vec<&String> = a.intersection(&b).collect();
+        assert!(
+            !inter.is_empty(),
+            "『我的支付一直失败…』与『支付网关』零交集：a={:?} b={:?}",
+            a,
+            b
+        );
+    }
+
+    /// 反向锁：不得为修中文而破坏英文口径（分词器是英中双语权威口径）。
+    #[test]
+    fn keywords_ascii_behaviour_preserved() {
+        let k = kws("The invoice was not paid for the gateway");
+        assert!(k.contains("invoice"), "英文词元丢失：{:?}", k);
+        assert!(k.contains("gateway"), "英文词元丢失：{:?}", k);
+        // 停用词与单字符仍应被过滤
+        assert!(!k.contains("the"), "停用词未过滤：{:?}", k);
+        assert!(!k.contains("a"), "停用词未过滤：{:?}", k);
+    }
+
+    /// 停用词表含中文单字；CJK bigram 不得把它们单独吐出来。
+    #[test]
+    fn keywords_cjk_stopwords_still_filtered() {
+        let k = kws("我的支付");
+        assert!(!k.contains("的"), "中文停用字未过滤：{:?}", k);
+        assert!(!k.contains("我"), "中文停用字未过滤：{:?}", k);
+    }
+
+    /// 空/纯标点输入不得 panic，且返回空集。
+    #[test]
+    fn keywords_degenerate_input_is_empty() {
+        assert!(kws("").is_empty());
+        assert!(kws("，。、；：？！").is_empty());
+        assert!(kws("   \n\t ").is_empty());
+    }
+
+    /// src tag 前处理仍生效（`strip_src_tag` 是本函数的前置契约）。
+    #[test]
+    fn keywords_strips_src_tag() {
+        let k = kws("[src:foo/bar] 支付网关配置");
+        assert!(
+            !k.iter().any(|t| t.contains("src")),
+            "src tag 未剥离：{:?}",
+            k
+        );
+        assert!(!k.is_empty(), "剥离后应仍有有效词元");
     }
 }
