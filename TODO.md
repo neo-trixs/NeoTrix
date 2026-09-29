@@ -63,7 +63,58 @@
 | ~~9~~ | ~~收掉本会话的 2 处 worktree~~ | 收工 | ✅ **已完成**（2026-09-29）：根因不在时机、在门的判据 —— mtime 启发式分不清「他窗在写」与「我刚做完」。已修为「脏才看 mtime」（干净+已并入分支 ⇒ 可证无损），并**造真实反例自测**确认脏 worktree 保护未放松。3 支冗余分支（`f_merged_ratchet`/`f_integrated`/`fix/bitemporal-and-layer-ratchet`）已用 `git branch -d` 删除 |
 | ~~10~~ | ~~`noise_handshake` 接到生产（R-P79）~~ | 实现 | ✅ **已完成**（2026-09-29）：新增 `protocol/noise_ik.rs` —— C1 SANS-IO 协议引擎，作为 `noise_handshake` 的唯一生产消费者。分层方向合法（C1→C0），`noise_ik` 10 测试全绿，全量 **12207 passed / 0 failed**。⚠️ 接线时测试抓到我自己写死的错误断言（见下），已改为断言正确性质 |
 | 6 | 经验吸收：`neotrix-experience absorb` 把 L23–L26 入 KB | 收尾 | **待办** |
+| 11 | **统一 8 个 `is_cjk` 副本**（2026-09-29 修 `keywords()` CJK 失明时发现） | DRY | **待办，需编译验证**（详见下方登记） |
+| 12 | 重新实现 IPC 键名校验器（`nt_ipc_keys.py` 从未入库，缺口仍敞开） | 实现 | **待办**（详见下方登记） |
 | 7 | 收工：`nt_worktree_gate.sh check` → 自己开的 worktree 走 `prune`（**禁手删**） | 收工 | **待办**（硬规则） |
+
+### 待办 11 详案：8 个 `is_cjk` 副本，口径真不一致（2026-09-29 实测）
+
+修 `keywords()` CJK 失明时顺带发现。**8 个副本，4 种不同口径，且无一为 `pub`** ——
+所以没有任何一个能被复用，这正是重复的根因。
+
+| 位置 | 覆盖区间 | 备注 |
+|---|---|---|
+| `crates/neotrix-types/src/core/context_strategy.rs:49` | 标点/假名/ExtA/统一/谚文/全角（6 段） | 注释自称与 `neotrix-core::context_budget::is_cjk` 一致 |
+| `neotrix-core/src/l1_action/nt_core_llm/mod.rs:55` | 同上 6 段 | 注释称 `context_strategy::is_cjk` 是「单一事实源，两边不得发散」 |
+| `neotrix-core/src/l1_action/nt_core_embed/mod.rs:89` | 统一/ExtA/假名/谚文（4 段） | 无标点无全角 |
+| `neotrix-core/src/l1_action/nt_io/nt_io_output_style.rs:604` | 统一/ExtA/CJK 兼容表意（4 段） | 多 `0xF900..=0xFAFF` |
+| `neotrix-core/src/neotrix/nt_crystal_core/consciousness.rs:643` | 统一（1 段） | **本轮新加**，与同目录另两个同源 |
+| `…/nt_crystal_core/nt_shared_mind.rs:18` | 统一（1 段） | 既有 |
+| `…/nt_crystal_core/nt_crystal_task_fusion.rs:52` | 统一（1 段） | 既有 |
+| `neotrix-core/src/bin/nt_crystal_serve.rs:525` | 统一/ExtA（2 段） | |
+
+⛔ **「单一事实源」形成环形依赖**：`context_strategy.rs` 注释指向
+`neotrix-core::context_budget::is_cjk`，而 `context_budget` **模块不存在**
+（`rg -l context_budget` 只命中引用它的文件）。`nt_core_llm` 又反向指向
+`context_strategy` ⇒ 两边互指，且指针的一端是虚的。
+
+**方案**（需编译验证，本轮未做）：
+1. 在 `neotrix-types`（workspace 内、被全部 crate 依赖）导出 `pub fn is_cjk`，
+   取**最宽口径**（`nt_core_llm` 那 6 段 —— 假名/谚文/全角都属 CJK 书写系统，
+   窄口径会把它们错判为「英文 1 token/4char」）。
+2. 其余 7 个改为调用它，删本地副本。
+3. ⚠️ **改宽口径会改变 4 个既有调用点的行为**（`nt_core_embed` 的分词、
+   `nt_io_output_style` 的格式化判断等）⇒ 必须先跑受影响模块的测试，
+   逐条判读差异是否可接受。**这一步不能省。**
+
+⛔ 本轮**未动**：编译门红（他窗正重构 `tool_registry.rs` → `tool_contract/`），
+改 7 处跨 crate 引用却无法编译验证是冒险。且 §微操作公约要求「最小改动」。
+
+### 待办 12 详案：IPC 键名校验缺口仍敞开
+
+TODO 原 §156-162 记「新增 `scripts/ops/nt_ipc_keys.py`，实测 声明 97/注册 97/
+键名错配 0，已接成 `nt_smoke.sh` 第 6 步」。
+
+**2026-09-29 核实：两个文件从未存在于任何提交，也不在磁盘上**
+（`git log --all` 零命中、`find` 零命中）⇒ 那组数字是**未落地的推演，不是实测**。
+`scripts/` 下现存的冒烟脚本只有 `experience-smoke.sh`。
+
+⇒ 原始缺口「前端 invoke 键名 vs Rust 形参名没人守」**仍然敞开**。
+若重做，须覆盖：只到键名不到类型（`{taskId:123}` 键对型错不报）、
+只到静态不到运行时（serde 转换 / `Option` 缺省仍要真进程往返）。
+
+⚠️ 本条是 **R-SCAN-3 的反向样本**：门记录写「已验证」而实现从未入库，
+比没写更坏 —— 下一个 agent 会以为缺口已关。
 
 ### 本窗口已完成（勿重复做）
 
