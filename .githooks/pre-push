@@ -54,3 +54,13 @@ fi
 echo -e "\033[0;32m✅ Worktree 收工检查通过\033[0m"
 
 exit 0
+
+# ---- 删除声明门（推送级兜底） --------------------------------------
+# pre-commit 只拦"走 hook"的提交；--no-verify / libgit2 可绕过。
+# 这里对**即将推送的提交**再查一次：任何删除都必须在该提交 message 里声明过。
+# 作用域只限本地未推送的提交（`@{u}..HEAD`，无 upstream 时退化为全部本地提交）。
+echo -e "\033[1;33m🔍 pre-push deletion-declaration gate ...\033[0m"
+if ! bash scripts/check-push-deletions.sh; then
+    echo -e "\033[0;31m❌ 存在未声明删除的本地提交，拒绝推送\033[0m"
+    exit 1
+fi
