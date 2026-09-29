@@ -1,0 +1,123 @@
+# 交接：B-2 Noise IKpsk2 重写收口（2026-09-29）
+
+## 1. 会话标识
+
+- 窗口：B-2 Noise 车道（`f_merged_ratchet`）
+- 日期：2026-09-29
+- worktree：`.worktrees/merge-test`（detached，收工时已 `prune`）
+- 交付分支：**`f_merged_ratchet` @ `54e48f2e`**
+- 相关交接：`sessions/handoff-20260928-ratchet-final.md`、`sessions/handoff-20260928-merge-readiness.md`
+
+## 2. 目标（一句话）
+
+按官方测试向量重写 Noise IKpsk2 握手，修掉 6 处协议缺陷，使与任何 Noise 实现可互操作。
+
+## 3. 已完成
+
+- **B-2 6 处协议修正**（`a9d00624`）——明细见 `docs/architecture/B2-NOISE-IK-RESOLUTION-20260928.md` §7：
+  1. `h` / `ck` 未分离（一个 `hash` 字段兼两职）
+  2. AEAD 未传 associated data（`Aad::empty()`，而规范 AD 就是握手哈希 `h`）
+  3. `MixKeyAndHash` 写成两路 + 混 `psk` 本身（规范：三路 + `MixHash(temp_h)`）
+  4. `Split` 的 `zerolen` 用了 32 个零字节（规范：空切片）
+  5. responder 的 `se` 角色接反（应 `DH(e_r,s_i)`，误写 `DH(s_r,e_i)`）
+  6. 验收测试自身写错（`hellosubmarine` 14B vs 向量 `yellowsubmarine` 15B）
+- 附带：空 prologue `MixHash(&[])`、PSK `e` token 绑定 `MixKey(e.pub)`、
+  精确长度校验、X25519 小阶点全零共享秘密防护、`aead` 补 `seal_with_ad`/`open_with_ad`。
+- **生产代码 `expect`/`unwrap` 清零**（噪声模块 0 处；`hkdf_blake2s_3` 改 `Result` 消 3 处）。
+- **修 `blake2s_extract` 违反 RFC 5869**（Extract 须 `HMAC(salt, IKM)`，原为 `HASH(salt‖IKM)`）。
+- **订正一条假的「实测」注释**（`kdf.rs` 的 hmac crate 版本冲突结论，查 `Cargo.lock` 证伪）。
+- 文档（`54e48f2e`）：B-2 §7 落地证据 + §8 教训、`DECISIONS` 状态与首因证伪、
+  教训 L23–L26、`TODO.md` 本窗口总入口 + 4 处陈旧引用订正。
+- 经验入库：`neotrix-experience absorb` 9 条（cycle `2026-09-28-ratchet`），`route-verify` 0 幽灵。
+
+## 4. 正在改的文件（关键！逐个列）
+
+**无未提交改动。** 全部落在 `54e48f2e`。
+
+## 5. 下一步（按优先级排序）
+
+1. **把 `f_merged_ratchet` 合入主干**（`feat/capability-absorb-20260828`）。
+   ⚠️ 合并前必须先跑一次试合并：两者已分叉（`f_merged` 领先 27 笔 / 主干领先 30 笔，
+   共同祖先 `bc9fb704`）。历史上正是「不试合并直接合」导致基线静默退化（教训 L8）。
+2. 主干有 61 个他窗未提交文件 ⇒ 合并必须在**干净 worktree** 里做，别在主树上动手。
+3. 合并后刷分层门：`bash scripts/check-layer-deps.sh --strict`（期望 `PASS 0 new / 8 known`）。
+4. `neotrix/` 树受 `#[cfg(feature="ios-bridge")]` 门控，默认测试编不进；
+   改动该树须另跑 `cargo check -p neotrix --features ios-bridge`。
+
+## 6. 阻塞点
+
+- **无技术阻塞。** 唯一未做的是「合入主干」，那需要主树的 61 个他窗 WIP 先落定，属人为决策。
+- 内存门在本会话反复 `BLOCKED`（16G 机器，**另一个窗口正在跑 cargo**，`rustc` 占 2.8G）。
+  遇到 `GATE BLOCKED` 先看 `pgrep -x rustc`，别以为是自己的问题。
+
+## 7. 给接手会话的话
+
+- **`noise_handshake` 全仓零生产消费者**（仅 `crypto/mod.rs` 的 `pub mod` 声明 + 自身测试），
+  所以本轮改动**无生产敞口**。但也因此它是「唯一验收闸门」—— 改它必须让
+  `full_handshake_matches_official_vectors` 转绿，否则没有任何别的东西会告诉你坏了。
+- **别再手推协议。** 上一轮我手推出 2 条修正（空 prologue、PSK e 绑定），两条都真、
+  都不够，还剩 5 个缺陷。如果要再改这个文件：用 Python + 官方向量穷举定位，
+  别用「读代码觉得对」的方式。见教训 L23–L25。
+- **`kdf.rs` 的 `hkdf_blake2s` / `hkdf_blake2s_3` 是死代码**，且语义**不符合** Noise 的
+  `HKDF(ck, ikm, n)`（那是一次 temp + 连续 HMAC，不是多次独立 Extract+Expand）。
+  噪声握手直接用 `hmac_blake2s` 手写规范展开。新代码**不要**用那两个函数。
+- `sessions/handoff-*.md` 里有 5 处仍写旧测试名 `full_handshake` / 旧 API `create_message3`。
+  **故意不改** —— 那些是时点记录，改它等于篡改历史；本文件即为覆盖。
+
+## 8. 收工自查（2026-09-28 起**必填**，空着视为交接未完成）
+
+### 8.1 worktree 去向
+
+`sh scripts/ops/nt_worktree_gate.sh check` 输出（收工时）：
+
+```
+  [worktree-gate] repo=/Users/neo/Downloads/neotrix/.worktrees/merge-test mode=check
+  ------------------------------------------------------------
+  路径 | HEAD | 分支 | 脏 | 体积 | target | 近3h活动
+  --------------------------------------------------------------------------
+  /Users/neo/Downloads/neotrix | b9b08b80 | feat/capability-absorb-20260828 | 61 | 60004M | 55163M | YES
+  /private/tmp/nt-v4 | 25b23265 | HEAD | 4 | 6433M | 6383M | YES
+  /Users/neo/Downloads/neotrix/.worktrees/ratchet | 8d5b3ef1 | fix/bitemporal-and-layer-ratchet | 0 | 50M | 0M | no
+  ------------------------------------------------------------
+  [worktree-gate] worktree=3 个 | 合计 66487M | target 占 61546M
+  [worktree-gate] 带未提交改动: 2 个 | 近3h有改动: 2 个
+  [worktree-gate] ⚠️  2 个 worktree 近 3 小时仍有 .rs 改动 ⇒ 可能他窗在用，勿删
+```
+
+本会话**新建**的 worktree：
+
+| worktree | 用途 | 去向 |
+|---|---|---|
+| `.worktrees/merge-test` | B-2 隔离开发 + 合并探测 | 已 `prune --force` 移除（收工后，commit 全在 `f_merged_ratchet`） |
+| `.worktrees/ratchet` | 分层棘轮 102→8 | 已 `prune --force` 移除（`8d5b3ef1` 是 `f_merged_ratchet` 祖先，零丢失） |
+| `/private/tmp/nt-v4` | **非本会话**（他窗） | 未动 —— 门正确识别「近3h有改动」并跳过 |
+| 主工作树 `/Users/neo/Downloads/neotrix` | **非本会话** | 未动 —— 61 个他窗未提交文件 |
+
+### 8.2 未提交改动的去向
+
+**本会话结束时无任何未提交改动。**
+
+| 文件 | 改动内容 | 去向 |
+|---|---|---|
+| `crypto/noise_handshake.rs` | 6 处协议修正 + 附 hardening | ☑ `git add` 已提交（`a9d00624`） |
+| `crypto/aead.rs` | 补 `seal_with_ad`/`open_with_ad` + `EncryptionFailed` | ☑ 已提交（`a9d00624`） |
+| `crypto/kdf.rs` | `hmac_blake2s`、RFC 5869 修正、假实测订正 | ☑ 已提交（`a9d00624`） |
+| `TODO.md` | 本窗口总入口 + 4 处陈旧引用订正 | ☑ 已提交（`54e48f2e`） |
+| `docs/.../B2-NOISE-IK-RESOLUTION-20260928.md` | §7 落地证据 + §8 教训 | ☑ 已提交（`54e48f2e`） |
+| `docs/.../DECISIONS-2026-09-28.md` | B-2 状态 + 首因证伪 | ☑ 已提交（`54e48f2e`） |
+| `docs/.../LESSONS-…-consumer-audit.md` | L23–L26 | ☑ 已提交（`54e48f2e`） |
+
+### 8.3 门状态
+
+- `nt_worktree_gate.sh check` exit code：`0`（check 模式只报告，不阻断）
+- 提交前是否跑过 `cargo xl` / `cargo check`：
+  ☑ 是 —— 全部 4 道在**本 worktree 实测**，非沿用旧值：
+  - `full_handshake_matches_official_vectors ... ok`（官方向量 4/4 逐字节）
+  - `cargo check --tests -p neotrix` → **0 error**
+  - `cargo test -p neotrix --lib` → **12175 passed / 0 failed / 41 ignored**
+  - `cargo check -p neotrix --features ios-bridge` → **Finished，0 error**
+  - `bash scripts/check-layer-deps.sh --strict` → **PASS 0 new / 8 known / RC=0**
+- pre-commit P0 门（`.githooks/pre-commit` 的 `cargo check --tests`）：两笔提交均**通过**，未用 `--no-verify`。
+- 门红归因：内存门 `BLOCKED` 属**他窗正在编译**（`pgrep -x rustc` 可见），非本会话引入。
+- 分层门剩余 8 条全是**已记录不可改道项**（l0 无对应真实现 / 字符串字面量），
+  只能留基线；**删基线会让 CI 红**。明细见 `DECISIONS-2026-09-28.md`。
