@@ -541,6 +541,22 @@
       "read_only": true,
       "when_not": "别把它当覆盖率工具 —— 它只找「测试从未触碰的 pub fn」，不度量行覆盖、不识别「调用了但没断言」（后者用 nt_mutation_check.py）。私有 helper 零覆盖是正常的，它只报 pub fn。",
       "spec": "R-COV-1"
+    },
+    {
+      "id": "feature-matrix",
+      "query": [
+        "feature 编译",
+        "feature 腐烂",
+        "feature 组合",
+        "cargo feature",
+        "--all-features 失败",
+        "条件编译"
+      ],
+      "tool": "python3 scripts/ops/nt_feature_matrix.py --list",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "别拿它当「修好了」的证明 —— 它**只测量不修复**，报出 4 个失败 feature 后仍需产品决策（删 vs 修 vs 跟依赖升版）。也**别在未全绿的树加 CI 门**（会立刻红）。单 feature 编译 10s~6min，16 个全测很贵，先用 --list 零编译看名单。",
+      "spec": "R-FEAT-1"
     }
   ],
   "excluded": {

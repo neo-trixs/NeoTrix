@@ -267,3 +267,4 @@ neotrix-core/config/crystal.toml
 
 # worktree 兜底 patch（R-DISK-5，临时产物，确认已提交/已弃方可删）
 .neotrix/worktree-salvage/
+.cache/
