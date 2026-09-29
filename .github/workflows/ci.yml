@@ -89,6 +89,16 @@ jobs:
       - name: Egress privacy guard regression
         run: cargo test -p neotrix --lib egress_guard -- --nocapture
 
+      # 进化实验账本活性（2026-09-29）。
+      # 背景：本仓第三次「造了没人跑」——`nt_evolution_exp` bin 资产齐全
+      # （Preregistration / Veto / judge_ab / Ledger，27 测试，实测能 ACCEPT
+      # 也能三路 REJECT），却既不在 Makefile 也不在 CI ⇒ 没有任何门会跑它。
+      # 先补 Makefile 再补这里；两处都缺就等于没接线。
+      # ⛔ 本门**不跑 A/B 实验本身**（跑一次 ≈ 数十秒，每次提交都付不划算），
+      #   只判「账本是否活着」：有数据行 + **含拒绝记录** + bin 已注册。
+      - name: Evolution experiment ledger liveness
+        run: bash scripts/check-evolution-ledger.sh
+
   coverage:
     runs-on: ubuntu-latest
     steps:
