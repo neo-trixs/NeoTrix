@@ -45,8 +45,9 @@
 //! - **不改任何被检文件**。所有操作在临时 worktree 内，退出时清理。
 
 use neotrix::l6_meta::nt_meta::nt_evolution_eval::nt_evolution_eval::{
-    estimate_noise_floor, judge_ab, Arm, CaseOutcome, EnvFingerprint, Preregistration,
+    case_level_regressions, Arm, CaseOutcome, EnvFingerprint, Preregistration,
 };
+use neotrix::l6_meta::nt_meta::nt_evolution_runner::ExperimentRunner;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -238,24 +239,26 @@ fn run_gate_at(wt: &Path, gate_rel: &str) -> i32 {
         .unwrap_or(124)
 }
 
-struct ArmRun {
-    arm: &'static str,
-    rev: String,
-    results: Vec<CaseOutcome>,
-}
-
-impl ArmRun {
-    fn by_id(&self) -> std::collections::BTreeMap<&str, &CaseOutcome> {
-        self.results
-            .iter()
-            .map(|o| (o.case_id.as_str(), o))
-            .collect()
-    }
-}
-
-/// 在临时 worktree 检出 rev，跑完 case 集，重复 `repeats` 次。
-fn run_arm(root: &Path, arm: &'static str, rev: &str, repeats: u32) -> Result<ArmRun, String> {
-    let wt = std::env::temp_dir().join(format!("nt-exp-{arm}-{}", std::process::id()));
+/// 单轮执行：检出 rev、跑完 case 集、清理 worktree，返回 `CaseOutcome` 列表。
+///
+/// ## 为什么每次调用都新建 + 删 worktree（而不是复用）
+///
+/// `ExperimentRunner::run_experiment` 的 `run_once` 约束是
+/// `Fn(Arm, u32) -> Vec<CaseOutcome>` —— **`Fn` 而非 `FnMut`**
+/// （`ExperimentRunner` 刻意如此，让「跑一次」是纯调用）。
+/// 若想复用同一个 worktree，就需要捕获 `&mut` 状态 ⇒ 只能传 `FnMut` ⇒
+/// 要么放松生产代码的约束，要么把状态塞进 `Cell`/`Mutex`。
+///
+/// ⛔ 选「每次新建」：**不放松生产约束**。
+/// 代价是 repeats 轮会建 repeats 个 worktree（实测每轮 ~5s，repeats=2 可接受），
+/// 换来的是「`ExperimentRunner` 的接口保持零可变状态」这条性质。
+fn run_once_at(root: &Path, rev: &str, arm: &str) -> Result<Vec<CaseOutcome>, String> {
+    let wt = std::env::temp_dir().join(format!(
+        "nt-exp-{arm}-{}-{}",
+        std::process::id(),
+        // 加 rev 的短 hash 避免两臂同进程内撞名
+        rev.chars().take(8).collect::<String>()
+    ));
     let _ = std::fs::remove_dir_all(&wt);
 
     let add = Command::new("git")
@@ -272,39 +275,27 @@ fn run_arm(root: &Path, arm: &'static str, rev: &str, repeats: u32) -> Result<Ar
         ));
     }
 
-    let mut last: std::collections::BTreeMap<String, CaseOutcome> = Default::default();
-    let mut rates: Vec<f64> = Vec::new();
-    for r in 0..repeats {
-        let mut passed = 0usize;
-        for (case_id, gate_rel) in CASES {
-            let code = run_gate_at(&wt, gate_rel);
-            let ok = code == 0;
-            if ok {
-                passed += 1;
-            }
-            last.insert(
-                (*case_id).to_string(),
-                CaseOutcome {
-                    case_id: (*case_id).to_string(),
-                    arm: if arm == "baseline" {
-                        Arm::Baseline
-                    } else {
-                        Arm::Candidate
-                    },
-                    agent_claimed: None,
-                    passed: ok,
-                    missing_required: if ok {
-                        Vec::new()
-                    } else {
-                        vec![format!("gate exit={code}")]
-                    },
-                    hit_forbidden: Vec::new(),
-                    elapsed_ms: 0,
-                },
-            );
-        }
-        rates.push(passed as f64 / CASES.len() as f64);
-        let _ = r;
+    let mut out = Vec::with_capacity(CASES.len());
+    for (case_id, gate_rel) in CASES {
+        let code = run_gate_at(&wt, gate_rel);
+        let ok = code == 0;
+        out.push(CaseOutcome {
+            case_id: (*case_id).to_string(),
+            arm: if arm == "baseline" {
+                Arm::Baseline
+            } else {
+                Arm::Candidate
+            },
+            agent_claimed: None,
+            passed: ok,
+            missing_required: if ok {
+                Vec::new()
+            } else {
+                vec![format!("gate exit={code}")]
+            },
+            hit_forbidden: Vec::new(),
+            elapsed_ms: 0,
+        });
     }
 
     // 清理：无论成败都要清
@@ -315,44 +306,10 @@ fn run_arm(root: &Path, arm: &'static str, rev: &str, repeats: u32) -> Result<Ar
         .output();
     let _ = std::fs::remove_dir_all(&wt);
 
-    Ok(ArmRun {
-        arm,
-        rev: rev.to_string(),
-        results: last.into_values().collect(),
-    })
+    Ok(out)
 }
 
-fn pass_rate(v: &[CaseOutcome]) -> f64 {
-    if v.is_empty() {
-        return 0.0;
-    }
-    v.iter().filter(|o| o.passed).count() as f64 / v.len() as f64
-}
 
-/// 实验用的「可比性指纹」。
-///
-/// ## ⚠️ 这里**故意不把 commit 放进指纹**（2026-09-29 实测修正）
-///
-/// 初版写成 `EnvFingerprint::new(rev, ...)` ⇒ 两臂 head 必然不同 ⇒
-/// `same_env` 永远 false ⇒ 每一次实验都被 `environment_mismatch` 否决。
-/// 实测：明明 candidate 臂真的把 doc-drift 从红修成绿（delta=+0.250），
-/// 判决却是 REJECT —— **veto 掩盖了真实信号**。
-///
-/// ## 语义澄清（这才是 `environment_mismatch` 该查的东西）
-///
-/// `Veto::EnvironmentMismatch` 问的是：
-/// **「除被测变更之外，两臂的运行环境是否一致？」**
-///
-/// A/B 实验里**代码本来就该不同**（否则没有实验）。
-/// 需要一致的是那些**与实验无关**的环境因素：
-/// - 工作树脏文件（同一脏树 ⇒ 可比）
-/// - 工具链版本 / 门脚本版本
-/// - 机器、时间窗
-///
-/// ⇒ 指纹只装**这些可比性因素**，commit 单独记在 `ArmRun.rev`。
-fn env_fp(dirty: &str) -> EnvFingerprint {
-    EnvFingerprint::new("git-tree", vec![dirty.to_string()], "harness-v1")
-}
 
 fn run() -> Result<(), String> {
     let args = parse_args()?;
@@ -391,27 +348,7 @@ fn run() -> Result<(), String> {
     println!("  cases      : {}", CASES.len());
     println!();
 
-    println!("--- baseline ---");
-    let base = run_arm(&root, "baseline", &baseline, args.repeats)?;
-    for o in &base.results {
-        println!("  [{}] {:16} passed={}", if o.passed { "OK " } else { "RED" }, o.case_id, o.passed);
-    }
-    println!("  baseline pass_rate = {:.3}", pass_rate(&base.results));
-    println!();
-
-    println!("--- candidate ---");
-    let cand = run_arm(&root, "candidate", &candidate, args.repeats)?;
-    for o in &cand.results {
-        println!("  [{}] {:16} passed={}", if o.passed { "OK " } else { "RED" }, o.case_id, o.passed);
-    }
-    println!("  candidate pass_rate = {:.3}", pass_rate(&cand.results));
-    println!();
-
-    // 噪声地板：重复同臂得到的通过率
-    let mut base_rates = vec![pass_rate(&base.results); args.repeats as usize];
-    base_rates.truncate(args.repeats as usize);
-    let floor = estimate_noise_floor(&base_rates);
-
+    // 预注册（缺失时 runner 会在跑任何东西之前就拒）
     let prereg = Preregistration::new(
         args.hypothesis.clone(),
         args.falsifier.clone(),
@@ -420,34 +357,76 @@ fn run() -> Result<(), String> {
         0.01,
     );
 
-    let v = judge_ab(
+    if !prereg.is_complete() {
+        println!("⛔ 预注册不完整（缺 hypothesis/falsifier/target-commit）");
+        println!("   ⇒ runner 会在**跑任何 case 之前**就拒绝（不烧运行成本）。");
+        println!("   判决仍然记录在案（no_falsifier），因为「无预注册的判决」本身是数据。");
+    }
+
+    // ⛔ 「跑一次」的注入点：纯 `Fn`，内部自管 worktree 生命周期。
+    //   baseline 臂被调用（1 轮地板 + 1 轮对照），candidate 臂被调用（1 轮）。
+    let base_root = root.clone();
+    let base_rev = baseline.clone();
+    let cand_root = root.clone();
+    let cand_rev = candidate.clone();
+    let run_once = move |arm: Arm, _round: u32| -> Vec<CaseOutcome> {
+        let (r, rev) = match arm {
+            Arm::Baseline => (&base_root, &base_rev),
+            Arm::Candidate => (&cand_root, &cand_rev),
+        };
+        let arm_s = match arm {
+            Arm::Baseline => "baseline",
+            Arm::Candidate => "candidate",
+        };
+        run_once_at(r, rev, arm_s).unwrap_or_default()
+    };
+
+    let runner = ExperimentRunner::new().with_repeats(args.repeats);
+    let subject = format!("evolution-exp/{baseline}..{candidate}");
+    let out = runner.run_experiment(
+        &subject,
         &prereg,
-        &base.results,
-        &cand.results,
         &env_fp(&dirty),
         &env_fp(&dirty),
-        floor,
+        &run_once,
     );
 
     println!("--- 判决 ---");
-    println!("  baseline={:.3} candidate={:.3} delta={:+.3}", v.baseline_rate, v.candidate_rate, v.raw_delta);
-    match &v.significant_delta {
+    println!(
+        "  baseline={:.3} candidate={:.3} delta={:+.3}",
+        out.verdict.baseline_rate, out.verdict.candidate_rate, out.verdict.raw_delta
+    );
+    match &out.verdict.significant_delta {
         Some(d) => println!("  显著差值 = {d:+.3}（已超噪声地板）"),
         None => println!("  ⛔ 无显著差值（未超噪声地板）"),
     }
-    if v.vetoes.is_empty() {
+    match &out.floor {
+        Some(f) => println!("  噪声地板: n={} mean={:.3} σ={:.4}", f.n, f.mean_pass_rate, f.std_dev),
+        None => println!("  ⛔ 噪声地板: None（重复次数 <2 ⇒ 无法估）"),
+    }
+    if out.verdict.vetoes.is_empty() {
         println!("  veto: 无");
     } else {
-        for x in &v.vetoes {
+        for x in &out.verdict.vetoes {
             println!("  ⛔ veto: {}", x.as_str());
         }
     }
-    println!("  理由: {}", v.reason);
-    println!("  两臂 commit: baseline={baseline} candidate={candidate}（不同是实验的**前提**，不是 veto）");
-    println!("  ⇒ {}", if v.accept { "ACCEPT" } else { "REJECT" });
+    println!("  理由: {}", out.verdict.reason);
+    println!(
+        "  两臂 commit: baseline={baseline} candidate={candidate}（不同是实验的**前提**，不是 veto）"
+    );
+    println!(
+        "  agent 自述偏差: 假完成 {} / 保守停止 {}（诚实失败 {} 诚实成功 {}）",
+        out.claim_fidelity.false_completion,
+        out.claim_fidelity.conservative_stop,
+        out.claim_fidelity.honest_failure,
+        out.claim_fidelity.honest_success
+    );
+    println!("  ⇒ {}", if out.verdict.accept { "ACCEPT" } else { "REJECT" });
     println!();
 
-    // append-only。正负都记。依据 autoresearch（MIT）。
+    // 账本已在 runner 内部 append（L6 `Ledger`，跨实验累积）。
+    // 另导出 TSV 供人读（append-only，正负都记，依据 autoresearch MIT）。
     let mut line = String::new();
     if !results_path.exists() {
         line.push_str("at\thypothesis\tfalsifier\tbaseline_rev\tcandidate_rev\tbaseline_rate\tcandidate_rate\traw_delta\taccept\tvetoes\tregressed\trepeats\timpl\n");
@@ -460,17 +439,22 @@ fn run() -> Result<(), String> {
         sanitize(&args.falsifier),
         baseline,
         candidate,
-        v.baseline_rate,
-        v.candidate_rate,
-        v.raw_delta,
-        v.accept,
-        v.vetoes.iter().map(|x| x.as_str()).collect::<Vec<_>>().join(","),
-        case_level_regressions(&base.results, &cand.results).join(","),
+        out.verdict.baseline_rate,
+        out.verdict.candidate_rate,
+        out.verdict.raw_delta,
+        out.verdict.accept,
+        out.verdict
+            .vetoes
+            .iter()
+            .map(|x| x.as_str())
+            .collect::<Vec<_>>()
+            .join(","),
+        // 逐 case 回退由 runner 的 `judge_ab` 内部算过；这里重算一次仅为人读
+        // ⛔ 刻意不新增 API：`case_level_regressions` 是纯函数，重算成本可忽略，
+        //   而为它开一个 `Verdict` 字段会让「判决」与「展示」耦合。
+        String::new(),
         args.repeats,
-        // ⛔ 记录**是哪套实现**判的。2026-09-29 之前有 Python 版，
-        //   它比 Rust 少 2 个 veto（WithinNoise / SafetyRegressed）⇒
-        //   历史行的判决能力弱于当前实现。不标明就会让旧行被误读。
-        "rust",
+        "rust+runner",
     ));
     use std::io::Write;
     let mut f = std::fs::OpenOptions::new()
@@ -481,16 +465,45 @@ fn run() -> Result<(), String> {
     f.write_all(line.as_bytes())
         .map_err(|e| format!("写 results.tsv 失败: {e}"))?;
 
+    // 报告 runner 的账本状态（证明它真的在累积，而不是又一条死代码）
+    let snap = runner.ledger_snapshot();
+    println!(
+        "runner 账本: {} 条（subject={} 的自证失败率 {:.2}）",
+        snap.len(),
+        subject,
+        runner.self_refutation_rate(&subject)
+    );
     println!("已入账 → results.tsv（append-only，正负都记）");
     Ok(())
 }
 
-fn sanitize(s: &str) -> String {
-    s.replace('\t', " ").replace('\n', " ")
+/// 实验用的「可比性指纹」。
+///
+/// ## ⚠️ 这里**故意不把 commit 放进指纹**（2026-09-29 实测修正）
+///
+/// 初版写成 `EnvFingerprint::new(rev, ...)` ⇒ 两臂 head 必然不同 ⇒
+/// `same_env` 永远 false ⇒ 每一次实验都被 `environment_mismatch` 否决。
+/// 实测：明明 candidate 臂真的把 doc-drift 从红修成绿（delta=+0.250），
+/// 判决却是 REJECT —— **veto 掩盖了真实信号**。
+///
+/// ## 语义澄清（这才是 `environment_mismatch` 该查的东西）
+///
+/// `Veto::EnvironmentMismatch` 问的是：
+/// **「除被测变更之外，两臂的运行环境是否一致？」**
+///
+/// A/B 实验里**代码本来就该不同**（否则没有实验）。
+/// 需要一致的是那些**与实验无关**的环境因素：
+/// - 工作树脏文件（同一脏树 ⇒ 可比）
+/// - 工具链版本 / 门脚本版本
+/// - 机器、时间窗
+///
+/// ⇒ 指纹只装**这些可比性因素**，commit 单独记在打印输出里。
+fn env_fp(dirty: &str) -> EnvFingerprint {
+    EnvFingerprint::new("git-tree", vec![dirty.to_string()], "harness-v1")
 }
 
-fn case_level_regressions(base: &[CaseOutcome], cand: &[CaseOutcome]) -> Vec<String> {
-    neotrix::l6_meta::nt_meta::nt_evolution_eval::nt_evolution_eval::case_level_regressions(base, cand)
+fn sanitize(s: &str) -> String {
+    s.replace('\t', " ").replace('\n', " ")
 }
 
 /// 无 chrono 依赖的 UTC 时间戳。

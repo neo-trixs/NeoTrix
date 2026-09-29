@@ -11,7 +11,7 @@
 |---|---|---|---|---|
 | `ExperimentRegistry` / `Hypothesis` / `ABTestDesign` | `l5_cognition/nt_mind/nt_mind/evolution/experiment.rs` | — | **0** | ⛔ 备件 |
 | `judge_ab` / `Preregistration` / `Ledger` | `l6_meta/nt_meta/nt_evolution_eval.rs` | 754 行 + 19 测试 | **0**（本轮 B6 前） | ⛔ 备件 |
-| `ExperimentRunner` | `l6_meta/nt_meta/nt_evolution_runner.rs` | 238 行 + 8 测试 | **0** | ⛔ 备件（本轮 B6） |
+| `ExperimentRunner` | `l6_meta/nt_meta/nt_evolution_runner.rs` | 238 行 + 8 测试 | ✅ **bin 已调用** | ✅ 活（本轮统一后） |
 
 `seal_loop` 的闭环钩子**只做单点确定性回归**
 （`generate_regression_test` + `run_regression_test`），
@@ -101,7 +101,25 @@ candidate 臂的 `doc-drift` 由 exit=1 转 exit=0，pass_rate 0.500 → 0.750�
 ⇒ 新 bin **`neotrix-core/src/bin/nt_evolution_exp.rs`** 为唯一判决实现。
 ⇒ Python 版已 `git rm`。
 ⇒ `results.tsv` 加 `impl` 列，标明每行由哪套实现判的
-   （历史 4 行 = python，其后 4 行 = rust）。
+   （历史 4 行 = python，其后 = rust）。
+
+### ⛔ 统一后又发现：只统一了一半
+
+第一轮统一后实测发现：bin 自己实现了 `run_arm`（重复循环）、
+`pass_rate`（统计）、`results.tsv`（账本）——
+而 `ExperimentRunner` 提供**同样的三件**却**仍是零消费者**。
+
+⇒ **「统一为一套」如果只统一判决，等于没统一**：
+重复/统计/账本仍在两处。
+
+**第二轮统一（本次）**：bin 改为把 `run_once` **注入** `ExperimentRunner`，
+删掉本地的三份实现。代价是每次 `run_once_at` 自建自删 worktree
+（`run_once` 约束是 `Fn` 而非 `FnMut` ⇒ 不能捕获 `&mut` 复用 worktree）。
+⇒ 换来的是 `ExperimentRunner` 的接口保持零可变状态这条性质。
+
+**实测证据**：`coverage-gaps` 门对 `nt_evolution_runner.rs` 的
+`☠ 零真实调用者` **消失**；`judge_ab` 生产调用 = 3、`run_experiment` = 2；
+bin 输出新增 `runner 账本: N 条` 行（L6 `Ledger` 跨实验累积）。
 
 ### 🔴 统一过程中被自己的实现抓到的一个真 bug
 
@@ -141,6 +159,21 @@ A/B 实验里**代码本来就该不同**（否则没有实验）。
    `ExperimentRunner` 仍零消费者；**现在有的是 bin 在用 `judge_ab`**，
    `ExperimentRunner` 那一层（重复/统计/账本累积）仍未被调用。
 3. **case 集仍是 4 道纯文件型门**，不含 cargo 型门与模型级判据。
+
+## 仍为零消费者的部分（**L5 那套**）
+
+| 设施 | 位置 | 生产调用者 |
+|---|---|---|
+| `ExperimentRegistry` / `design_ab_test` / `estimate_sample_size` | `l5_cognition/nt_mind/nt_mind/evolution/experiment.rs` | **0** |
+
+⇒ **它与 L6 的 `nt_evolution_eval` 是同一件事的两套表达**
+（`Hypothesis.statement` vs `Preregistration.hypothesis`；
+`Hypothesis.null_hypothesis`（自动生成）vs `Preregistration.falsifier`（人工必填））。
+`nt_evolution_runner.rs` 的 `prereg_from_hypothesis` 提供了桥接函数，
+⛔ **但那个桥接函数也还没有调用者**（它是给未来接 L5 那套留的口子）。
+
+**处置建议**（需产品判断）：要么删 L5 那套，要么让 bin 走桥接。
+⛔ 本轮**不擅自决定** —— 见 `DECISIONS-REQUIRED-2026-09-29.md`。
 
 ## 若要让 Rust 侧也用上，需要什么（缺的不是代码）
 
