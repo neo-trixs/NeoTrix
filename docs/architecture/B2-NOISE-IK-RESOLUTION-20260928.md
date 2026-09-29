@@ -42,7 +42,7 @@ msg2 由 **responder** 写，token 序 `e, ee, se, psk`。
 | | 规范 IKpsk2 msg1 | 本仓实现 `_create_message1` |
 |---|---|---|
 | token 序 | `e, es, s, ss` | **只有 `e`** |
-| 产物长度 | 97 B（32+32+32 加密的 s 段 + 3×32 + 32 tag） | **32 B** |
+| 产物长度 | 96 B（32+32+32 加密的 s 段 + 3×32 + 32 tag） | **32 B** |
 | 关键操作 | 每次 DH 后 `MixKey` | **一次 `MixKey` 都没有** |
 
 代码事实（`noise_handshake.rs:133-146`）：`_create_message1` 只做
@@ -57,6 +57,10 @@ msg2 由 **responder** 写，token 序 `e, ee, se, psk`。
 msg1 的 `es/s/ss`、msg2 的 `ee/se/psk`、msg3 的 `s/se` 与 nonce 自增。
 
 ## 4. 可执行方案（三选一，推荐 A）
+
+> ⚠️ **本节已由 §7 取代**。方案 A 已执行完毕（2-message 形态，3-message 的
+> `create_message3` 等 API 已删除）。原文保留作决策留档，**不要再照它施工**。
+> 其中「补 3 个 token」只是必要条件 —— 实际还挖出 5 个更深缺陷，见 §7 表。
 
 ### A. 按官方向量重写并做**向量回归**（推荐，唯一能证明正确的路）
 
@@ -115,3 +119,51 @@ msg1 的 `es/s/ss`、msg2 的 `ee/se/psk`、msg3 的 `s/se` 与 nonce 自增。
 4. 同步 `DECISIONS-2026-09-28.md`：B-2 从「⛔ 需外部输入」改为
    「✅ 已解（原语齐备 + 官方向量已获取）」，并**订正 D-2 的错误诊断**
    （es 时序接反 → msg1 缺 token）。
+
+---
+
+## 7. 落地结果（2026-09-29）：6 处修正 + 可执行证据
+
+§3 只覆盖了 msg1 缺 token，**实际落地时又挖出 5 个更深的缺陷**，全部由
+官方向量逐字节比对抓出。凡「已实测」均指已用独立实现复现，非手推。
+
+| # | 缺陷 | 位置 | 症状 |
+|---|---|---|---|
+| 1 | **`h` / `ck` 未分离** —— 结构体只有一个 `hash` 字段兼两职 | `_NoiseHandshake.hash` | 每次 `MixHash` 污染 ck、每次 `MixKey` 污染 h。msg_0 自第 32B 起分叉 |
+| 2 | **AEAD 未传 associated data** —— `encrypt_and_hash` 调 `seal()`，内部是 `Aad::empty()` | `aead.rs` / `encrypt_and_hash` | 噪声的 AD 就是握手哈希 `h`；漏传则与任何 Noise 实现无法互操作 |
+| 3 | **`MixKeyAndHash` 实现错** —— 写成 `MixKey(ikm)` + `MixHash(ikm)`（两路，且混的是 psk 本身） | `mix_key_and_hash` | 规范是**三路** HKDF，`MixHash(temp_h)`。msg_1 tag 变 `311c6ddf…`，正确值 `8c46d966…` |
+| 4 | **`Split` 的 `zerolen` 用了 32 个零字节** —— 应为**空切片** | `split` | k1/k2 全错，传输轮两方向都不匹配 |
+| 5 | **responder 的 `se` 角色接反** —— 混 `DH(s_r,e_i)`，与 msg1 的 `es` 同值 | `_create_message2` | 规范 §10.3 responder 侧是 `DH(e_r,s_i)`。两侧 ck 立刻分叉，`Split` 永不可能一致 |
+| 6 | **验收测试自身写错** —— 期望明文 `b"hellosubmarine"`(14B) | 向量测试 | 向量 `msg_2_payload` 是 `"yellowsubmarine"`(15B)，密文 31B。原断言长度就不可能成立 |
+
+附带修正：空 prologue 的 `MixHash(&[])`、PSK 握手的 `e` token 绑定
+`MixKey(e.pub)`（`noise/state.py` 有同款实现，穷举 8 变体后它是唯一解）。
+
+### 验证证据
+
+- `noiseprotocol`（Python 第三方实现）固定 ephemeral 后复现官方向量 **msg_0 逐字节一致**，
+  可信度基准成立。
+- 按修正后的逻辑做**逐行等价**模拟 → 官方向量 **4/4 全部逐字节匹配**：
+  `msg_0` 96B、`msg_1` 48B、`msg_2` 31B、`msg_3` 31B，且
+  `h`/`ck` 两侧收敛一致、`init.send == resp.recv`。
+- 交叉验证：`se` / `psk` 组合穷举 8 变体，唯一命中为
+  `se = DH(e_r,s_i)` + `psk = HKDF3 + MixHash(temp_h)`；其中
+  `HKDF2+MixHash(psk)` 变体产出 `311c6ddf4e488057`，与独立审计代理
+  单独测得的值一致 ⇒ 两个独立证据互证。
+
+### 未决
+
+Rust 侧 `cargo test` 尚未执行（内存闸 `BLOCKED`，`free_pages` 远低于阈值，
+机器上有 5 个 opencode 窗口占 ~7GB）。**协议正确性已有可执行证据，
+但「编译通过 + 单测转绿」仍需一次 cargo 验证**，未验证前不得提交。
+
+## 8. 方法论教训
+
+- **L23 手推的「必要条件」远不等于「充分条件」**。本轮先手推出「空 prologue」
+  与「PSK e 绑定」两条，实测二者都真、但都不够，仍剩 5 个缺陷。协议类改动
+  不要停在「手推自洽」，必须逐字节对外部向量。
+- **L24 权威 oracle 要先自证**。先让第三方实现复现官方向量拿到可信基准，
+  再用它做穷举定位 —— 否则会出现「我的模型和我的实现一起错」，
+  永远收敛不到真值。
+- **L25 穷举优于辩论**。`se`/`psk` 的正确组合不是推理出来的，是 8 变体
+  穷举唯一命中出来的。争议点直接枚举。

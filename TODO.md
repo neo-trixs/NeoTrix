@@ -1,7 +1,48 @@
 # NeoTrix TODO 列表
-> 智能同步生成，最后更新：2026-09-28（人工重建）
+> 智能同步生成，最后更新：2026-09-29（B-2 窗口追加）
 
-> ## 🔖 剩余任务总入口（2026-09-28 收口 · 交给**单一汇总窗口**执行）
+> ## 🔖 剩余任务总入口（2026-09-29 · B-2 Noise / 分层棘轮窗口 · **最新**）
+>
+> **交接件**：`sessions/handoff-20260928-ratchet-final.md`（棘轮+B-1）、
+> `sessions/handoff-20260928-merge-readiness.md`（合并探测）、
+> `docs/architecture/B2-NOISE-IK-RESOLUTION-20260928.md`（B-2 根因与落地证据）
+>
+> **当前状态一句话**：分层棘轮 **102 → 8**、`PASS 0 new`；B-1 双时间已落地；
+> **B-2 Noise IKpsk2 已全绿** —— 协议修正经官方向量 4/4 逐字节验证，
+> 且 2026-09-29 完成编译验证：`12175 passed / 0 failed`、官方向量验收测试转绿、
+> `ios-bridge` 0 error、分层门 `PASS 0 new`。**剩提交与收工。**
+
+### 本窗口剩余任务
+
+| # | 任务 | 类型 | 阻塞 |
+|---|---|---|---|
+| ~~1~~ | ~~cargo 验证 B-2（官方向量验收测试）~~ | 验证 | ✅ **已完成**（2026-09-29）：`full_handshake_matches_official_vectors ... ok` |
+| ~~2~~ | ~~串行全量验证链~~ | 验证 | ✅ **已完成**：`check --tests` **0 error**；`lib` **12175 passed / 0 failed / 41 ignored**；`--features ios-bridge` **Finished 0 error**；`check-layer-deps.sh --strict` **PASS 0 new / 8 known / RC=0** |
+| ~~5~~ | ~~更新 `DECISIONS-2026-09-28.md` 的 B-2 状态~~ | 文档 | ✅ **已完成**（含订正「`es` 角色接反」这个被证伪的首因诊断） |
+| 3 | **提交** B-2 重写 + 文档（7 个文件） | 提交 | **待办**；**禁止 `git add -A`**（主树有他窗 WIP） |
+| 4 | 整合 `f_merged_ratchet@eb9373a4` + B-2 到干净分支 | 集成 | **待办**；主工作树有他窗 WIP，`git branch -f` 会失败 |
+| 6 | 经验吸收：`neotrix-experience absorb` 把 L23–L26 入 KB | 收尾 | **待办** |
+| 7 | 收工：`nt_worktree_gate.sh check` → 自己开的 worktree 走 `prune`（**禁手删**） | 收工 | **待办**（硬规则） |
+
+### 本窗口已完成（勿重复做）
+
+- B-1 真双时间（`71e1c412`）：`resolve_chain_root`/`nodes_as_of`/`node_history`，无 schema 迁移。
+- 分层棘轮 102→8，13 笔 commit；`f_merged_ratchet@eb9373a4` 含 B-1+棘轮+合并。
+- `seal_pipeline.rs` feature-gated E0433 修复；`nt_scan_surface.py` 的 `target` 误报修复。
+- B-2 向量落地 + 证据测试（`3a198596`）、L20–L22（`ee32e74e`）。
+- B-2 **6 处协议修正**（未编译验证，见 `B2-NOISE-IK-RESOLUTION-20260928.md` §7）：
+  `h`/`ck` 分离、AEAD 传 AD=`h`、`MixKeyAndHash` 改三路 HKDF、
+  `Split` 的 `zerolen` 改空切片、responder `se` 改 `DH(e_r,s_i)`、
+  向量测试明文改 `yellowsubmarine`。
+- 附带：空 prologue `MixHash(&[])`、PSK `e` token 绑定、禁 `expect`、精确长度校验、
+  X25519 小阶点全零共享秘密防护。
+- `noise_handshake` 全仓**零生产消费者**（`crypto/mod.rs:14` 之外仅测试）⇒ 本轮改动无生产敞口。
+
+> ⚠️ **本窗口的教训**：协议正确性先有可执行证据（官方向量 4/4 逐字节 + 第三方实现复现），
+> **后**才有编译验证 —— 两者缺一不可。首轮「手推 2 条修正」自洽但不足，
+> 逐字节比对后又挖出 5 个缺陷。教训见 `LESSONS-…-consumer-audit.md` L23–L26。
+
+> ## 🔖 剩余任务总入口（2026-09-28 收口 · DSH/neobot 窗口）
 >
 > **完整交接件**：`sessions/handoff-neobot-absorption-20260928.md`（自足，读它不用回看对话）
 > —— 含基线数字、文件归属表、3 个阻塞点与踩坑清单。**先读它再动手。**
@@ -296,7 +337,7 @@
 >      （`l2_perception/nt_world/osint/sweep.rs:225` 依赖它做 `min_severity` 过滤）→ 不要盲翻 `Ord`
 > - 🟡 **C 类·未接线 stub**（实现或显式 `#[ignore]`，禁止改松断言凑绿）：
 >   `nt_core_embed::TextEmbedder`（字节位置袋，任意文本相似度≈0.83）、
->   `nt_shield_ztnet/crypto/noise_handshake`（缺 `_create_message3`，握手无法完成）、
+>   `nt_shield_ztnet/crypto/noise_handshake`（**已解决**：已按官方向量重写为 2-message IKpsk2，`_create_message3` 已删除）、
 >   `publish_gateway`（YouTube 上传）、`nt_codegen::parse_yaml`（误用 serde_json，需引 serde_yaml）、
 >   `nt_memory_kb::nt_memory_distill`（测试 teacher 与 student 恒等，`after<before` 不可满足）
 > - 🟡 **环境依赖**（改确定性断言或 `#[ignore]`）：~~`l6_meta::runtime_monitor::test_get_health`（探针挂起）~~
@@ -336,7 +377,7 @@
 > **2026-09-27 第三轮（4 代理并行）已改未验 — 交接给下一对话，优先收口**
 > 30 项修改在 working tree，**全部未提交**（提交门禁需跑 cargo，当时内存门 BLOCKED）。
 > 验证进度：一次跑 **802 passed / 2 failed**（29 项中 28 项绿），补修后再跑 **65 passed / 1 failed**。
-> 唯一残留：`noise_handshake::full_handshake` —— 已从"构造即 panic"推进到
+> 唯一残留：`noise_handshake::full_handshake_matches_official_vectors`（已重写，待编译确认）—— 已从"构造即 panic"推进到
 > `_consume_message2` 处 unwrap 失败（`noise_handshake.rs:420`），是真 crypto 缺口。
 >
 > **🔧 接手第一步（务必按序）**
@@ -585,7 +626,7 @@ do not look like a full prefix match"）—— **工具集身份是缓存身份�
 | 测试 | 性质 |
 |---|---|
 | `kb_primitives::test_node_history` / `test_nodes_as_of_returns_committed` | **schema bug**：`nodes` 主键不含时间维 ⇒ 双时间无法存历史。改复合主键后暴露 `edges` 真外键失效 + `nodes_as_of` 文档与实现矛盾 + 既有 DB 需数据迁移 ⇒ 即 **2.2 真双时间迁移**，已回退不做半迁移 |
-| `noise_handshake::full_handshake` | **协议实现 bug**：responder 在 IK 模式下无法计算 `es`（对端 static 正是被加密送达的）。该模块无生产调用方且协议名与 spec 不一致，建议先决定「对齐 spec 还是明确降级」 |
+| `noise_handshake::full_handshake_matches_official_vectors` | **协议实现 bug（已修，待编译确认）**：responder 在 IK 模式下无法计算 `es`（对端 static 正是被加密送达的）。该模块无生产调用方且协议名与 spec 不一致，建议先决定「对齐 spec 还是明确降级」 |
 
 **账本已无 flaky** ⇒ `check-test-baseline.sh` 的 `--strict` 现在技术上可用，
 但**先只棘轮数据、不转 strict**：需先在 CI 上连跑数轮确认那 3 条不再进出
@@ -634,7 +675,7 @@ do not look like a full prefix match"）—— **工具集身份是缓存身份�
 | 测试 | 性质 |
 |---|---|
 | `kb_primitives::test_node_history` / `test_nodes_as_of_returns_committed` | **真 schema bug**：`nodes` 主键不含时间维 ⇒ 双时间**根本无法存历史**。已试改复合主键，又暴露 `edges` 真外键 `REFERENCES nodes(id) ON DELETE CASCADE` 失效 + `nodes_as_of` 文档写「latest version」**实现却返回全部版本**。这三项 + 既有 DB 数据迁移 = **TODO 2.2 真双时间迁移**，已回退，不做半迁移 |
-| `noise_handshake::full_handshake` | `InvalidState`，噪声握手状态机 |
+| ~~`noise_handshake::full_handshake`~~ | `InvalidState`，噪声握手状态机 —— **已重命名为 `full_handshake_matches_official_vectors` 并按官方向量重写** |
 | `nt_core_guardian::test_full_guardian_pipeline` | `results.len() <= 1`，修复编排返回数超预期 |
 | `nt_file_ability::selftest` ×2 | 自检依赖真实文件/环境 |
 | `proxy_heartbeat::test_heartbeat_twice_rotates` | **flaky**（连续运行间进出） |
