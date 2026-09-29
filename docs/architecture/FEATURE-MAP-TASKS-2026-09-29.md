@@ -133,6 +133,39 @@
 |---|---|---|---|---|---|
 | **N-6b** | **三态工具策略**（allow/allow+advice/deny） | `avibe/agent_tool_policy.py` | `nt_policy.rs:75-145`（二态）+ `:225-246` 16 词 needle 表 | 误报集**非空** ⇒ 门可判定 | ⬜⚠️ |
 | **N-7** | **`StopReason` 与 `TurnStatus` 正交** | `strands/event_loop.py`（12 态） | `nt_types.rs:27-33`（5 态，混了预算耗尽+人接手） | `LimitTurns` **且** `Waiting` | ⬜⚠️ |
+| **N-12b** | **L1 执行设施接线缺失（结构性）** | 本地实测 2026-09-29 | `ActionFacade` / `AsyncToolExecutor` / `ToolContract` / `SecurityRegistry` | 设施被**非测试、非自身**文件消费 ⇒ 各 1 条 | ⬔⚠️ |
+> **这是第 5 次同形复发，性质变了 ⇒ 单独立条**（前 4 次各自接线即可解决）。
+>
+> 实测（非测试、非自身文件的消费文件数）：
+>
+> | 设施 | 消费文件数 | 结论 |
+> |---|---|---|
+> | `ActionFacade` | 1（仅自身） | **纯备件** |
+> | `ToolContract` | 1（仅自身） | **纯备件** |
+> | `SecurityRegistry` / `SecurityRouter` | 1（仅自身） | **纯备件** |
+> | `AsyncToolExecutor` | 3（含门面） | 门面本身是备件 ⇒ **实际备件** |
+>
+> 前 4 次（`nt_jev` / `ExperimentRunner` / `tool_registry` / `SecurityRouter`）
+> 都能靠「找到活路径接上去」解决。本次不同：
+> `AsyncToolExecutor::new()` 全仓 7 处**全在 `#[cfg(test)]` 内**，
+> `ActionFacadeConfig` **全仓唯一构造点在 `test_facade()` 里** ——
+> **生产侧根本没有构造点**。
+>
+> ⇒ 继续一条条接线会一直撞到「下游也是备件」。
+> ⇒ 缺的不是某一处接线，是**接线机制**：
+>   没有任何强制点要求「新能力必须声明被谁调用」。
+>
+> **已做的部分（不是空谈）**：`AsyncToolExecutor::spawn()` 已接入
+> `ActionSandbox`（fail-closed 三态，门在 `tokio::spawn` **之前**），
+> 提供 `with_sandbox()` 注入 + `security_verdict()` 自查；
+> 红测修前 FAIL / 修后 PASS，全量 12209 passed。
+> ⇒ 这让「一旦被接线，安全默认正确」成为可能，
+>   但**接线本身仍缺**。
+>
+> ⛔ 下一刀的方向不是继续接 L1，而是**先找到生产侧的执行组装点**
+>   （可能在 `crates/neotrix-neobot` 或运行时初始化里），
+>   否则接了也不生效。
+
 | **1.4** | **非不可宽化策略地板** | `ironclaw` | `nt_policy.rs:75`（deny 全集+default-deny） | 「允许绕过批准的集合」**冻结数据** | ⬜⚠️ |
 | **1.1** | **DNS qtype 白名单** | `microsandbox` + OpenAI 事故 | `egress_types.rs:14-21`（**仍 3 字段**） | qtype+长度上限+真过滤器<br>⛔ 不拦 OSINT `dns.rs:74` | ⬜ |
 | **1.2** | **attempt/outcome 解耦** | OpenAI DNS 事故 | `nt_core_telemetry.rs` | outcome **不得**衰减 attempt | ⬜ |
