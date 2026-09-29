@@ -97,7 +97,74 @@
 
 | ID | 特性 | 来源 | 落点 | 验收 | 状态 |
 |---|---|---|---|---|---|
-| **N-11** | **门记录带 env 指纹** | `Soup/benchmarks/` | `nt_manifest.py:58-79`（地基已在） | 改 `Cargo.lock` 后 stale=1 | ✅ |ri` 已归档，落点需重裁）
+| **N-11** | **门记录带 env 指纹** | `Soup/benchmarks/` | `nt_manifest.py:58-79`（地基已在） | 改 `Cargo.lock` 后 stale=1 | ✅ |
+> **实测 2026-09-29（台账 ⬜ 已作废）**：`env_fingerprint()` 不只在地基 ——
+> 实测有 **3 个真实消费点**（`nt_manifest.py:98/120/143`），
+> `cmd_stale()` **实测可判定**，当前报 3 条 stale
+> （`skills_discoverable_claim_refuted` 等，`69f893b0… → 997c2af0…`）。
+> ⇒ 判 ✅。台账「地基已在」**低估了自己的实现**。
+| **N-12** | **门可满足性元门** | `i-have-adhd`（永远通不过的门） | 新建 `check-gate-satisfiable.sh` | 每门两条证明（红+绿） | ✅ |
+> **实测 2026-09-29**：`check-gate-satisfiable.sh` 存在，`.github/workflows/ci.yml` 有引用。
+> ⛔ 但注意本仓教训档 `…2026-09-27-scanner-trust`：门记录会腐化，此状态须随改动刷新。
+| **0.2** | **证伪门**（预注册/四事实/正负都提交/复杂度判据） | `harness-engineering` 协议 + `autoresearch` | `crates/neotrix-audit/` | 改记忆规则不改门 ⇒ 红 | 🔵 |
+> **2026-09-29 接线完成**：新增 `scripts/check-evolution-ledger.sh`（账本活性门，
+> 4 场景双向实测）+ `Makefile` 的 `evolution-gate` / `evolution-exp` 目标。
+> 同时给 bin 补了 **REJECT 退出码 = 1** —— 此前 REJECT 退 0，
+> 导致任何 `set -e` 流程**无法判定判决**（`--help` 报「未知参数」也退 0）。
+> ⇒ 本条可升 ✅（资产 + 接线 + 可判退出码三齐）。
+> **实测 2026-09-29**：`nt_evolution_eval.rs` 具备 `Preregistration` / `Veto` / `judge_ab` / `is_complete` / `Ledger`，
+> 27 测试通过；bin `nt_evolution_exp` 实测能 ACCEPT 也能因 `no_falsifier` / `within_noise` 三路拒绝。
+> **判为 🔵 而非 ✅ 的原因**：⛔ `nt_evolution_exp` **未进 `Makefile` 也未进 CI** ——
+> 进化实验能跑，但**没有任何门或流程会调用它**。这正是本仓反复出现的
+> 「造了不接线」老毛病（与 B6 ExperimentRunner 零消费者同类）。
+> ⇒ 接线是本条剩余的唯一缺口，接完即可升 ✅。
+| **0.3** | **maturity 降级落盘** | 本地 | `registry.rs:485` `demote_mislabeled()` | `claimed>supported` ⇒ 红/自动降 | ⬜ |
+| **3.1** | **成本归因：唯一插点已存在** | `cost-xray` | `anthropic.rs:93`（P0-4 prefix caching 边界） | `skill`/MCP 成一等维度 | ⬜ |
+| **1.7** | **取消：持久化请求而非就地取消** | `deer-flow` 83k★ | `crates/neotrix-neobot/src/nt_cancel.rs`（✅ 存在） | 取消请求可重放 | ⬜ |
+| **3.3** | **禁止声明学习加权** | `prime-agent` | 反馈判据 `experience_tree` `feedback()` | 门红 | ⬜ |
+| **4.3** | **自治循环 git 化**（`results.tsv` 5 列） | `karpathy/autoresearch` | `Makefile` `run:4` | 变好推进/变差 reset，**两种都记** | ⬜ |
+
+## 批次 C · 策略面（⚠️ 并发阻塞）
+
+> **实测 2026-09-29 10:43**：`nt_types.rs` mtime 距当时刻 **36 秒** ⇒ 另一窗口在写。
+> **动手前**：`stat -f "%Sm" crates/neotrix-neobot/src/nt_*.rs` + `git status --porcelain`
+
+| ID | 特性 | 来源 | 落点 | 验收 | 状态 |
+|---|---|---|---|---|---|
+| **N-6b** | **三态工具策略**（allow/allow+advice/deny） | `avibe/agent_tool_policy.py` | `nt_policy.rs:75-145`（二态）+ `:225-246` 16 词 needle 表 | 误报集**非空** ⇒ 门可判定 | ⬜⚠️ |
+| **N-7** | **`StopReason` 与 `TurnStatus` 正交** | `strands/event_loop.py`（12 态） | `nt_types.rs:27-33`（5 态，混了预算耗尽+人接手） | `LimitTurns` **且** `Waiting` | ⬜⚠️ |
+| **1.4** | **非不可宽化策略地板** | `ironclaw` | `nt_policy.rs:75`（deny 全集+default-deny） | 「允许绕过批准的集合」**冻结数据** | ⬜⚠️ |
+| **1.1** | **DNS qtype 白名单** | `microsandbox` + OpenAI 事故 | `egress_types.rs:14-21`（**仍 3 字段**） | qtype+长度上限+真过滤器<br>⛔ 不拦 OSINT `dns.rs:74` | ⬜ |
+| **1.2** | **attempt/outcome 解耦** | OpenAI DNS 事故 | `nt_core_telemetry.rs` | outcome **不得**衰减 attempt | ⬜ |
+| **5.2** | **MCP per-request capability 协商** | MCP spec 2026 | `mcp_protocol/` 775 行 ✅；客户端命中 **0** | 客户端发 `protocolVersion` | ⬜ |
+| **4.4** | **「模型可见⇒必须已记日志」** | `deepseek-harness` 238k★ | telemetry + audit | 门 | ⬜ |
+| **0.5** | **三处同名不同型的第 4 次** | 本地 | 记忆/决策各画**唯一裁决表** | 挂 `check-api-surface.sh` | ⬜ |
+
+## 批次 D · 记忆与检索
+
+> ⛔ **动手前先裁决改哪一份**：`neotrix-core/src/l6_meta/memory/nt_memory_experience_tree.rs`（458 行）
+> 是**同名第二份且完全死**（只有 `neotrix-core/src/l6_meta/memory/mod.rs:33,43` 的声明与 glob re-export）。
+> **真实活路径**是 `neotrix-core/src/l5_cognition/nt_mind/nt_mind/experience_tree/mod.rs`（1055 行，
+> 被 `neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs:631,713` 消费）。
+
+| ID | 特性 | 来源 | 落点 | 验收 | 状态 |
+|---|---|---|---|---|---|
+| **1.1m** | **记忆记录的权威头** | `loopx reward-memory` | `experience_tree/mod.rs:29`（9 字段**只满足 `source`**） | `authority`+`confidence` **两个独立枚举**；`Confidence::High` 的 `SoftPreference` 请求写文件⇒拒 | ⬜ |
+| **1.2m** | **五个留存标签** | `nanobot` 48.6k★ | `experience_tree` `persist()`+`feedback()` | `[ephemeral]` TTL 到期不在召回集，**内容不含标签** | ⬜ |
+| **1.3m** | **delta-ops 取代整体重写** | `Hindsight delta_ops.py` | `distill()`+`persist()` | LLM 返空 op ⇒ 文件 sha256 **不变** | ⬜ |
+| **1.4m** | **move-based 退役**（无 embedding 归档） | `Hindsight` | `paged_kv`/`kb_kv`/`vector_index` | 召回热路径少一个谓词 | ⬜ |
+| **1.5m** | **记忆层无 LLM** | `memU` 14.4k★ | `nt_mind`（422 文件） | store/embed/retrieve **不做推理** | ⬜ |
+| **1.6m** | **两表 checkpoint + ULID** | `langgraph` 42k★ | `nt_store/`（✅ 存在） | prune 中间 checkpoint 后 resume ⇒ `Truncated`，**不是空状态** | ⬜ |
+| **2.1** | **experience_tree supersession** | agentmemory | `experience_tree/mod.rs` | 照 `temporal_facts` 已验证形态 | ⬜ |
+| **2.2** | **nodes 表对齐双时间** ⛔风险最高 | utopia | `nt_core_kb_primitives.rs:188`（**仍 `id TEXT PRIMARY KEY`**） | 半迁移比不迁移更糟 | ⬜ |
+| **4.1** | **负面证据分类** | `backpass` | 记忆写入路径 | `harm` 才可删规则，**`non-compliance` 永不算** | ⬜ |
+| **4.2** | **review-due + 三级注意力** | `oh-my-hermes` | `experience_tree` | — | ⬜ |
+| **4.0** | **`nt_crystal_core` 是活路径**（纠正既有文档） | `DIR-REMEDY §2.5` | L1 有 6 个消费者 | ⛔ 勿当死代码删 | ✅ 已知 |
+| **N-10** | **delta-op 记忆更新** | `Hindsight delta_ops.py` | `experience_tree` | 未触及段**物理复制** | ⬜ |
+| **N-9** | **多因子打分缺失塌 1.0** | `Hindsight reranking.py` | `bm25.rs:174`（现只有 RRF） | 删字段⇒boost **恰为 1.0**（不是 0 不是 NaN） | ⬜ |
+| **N-8** | **缓存键含代码与路径** | `cocoindex`+`K-Dense` | `kb_search.rs:23-32`（key=query+limit）+ 全量 clear | 改 `RRF_K`⇒命中率掉 | ⬜ 真值风险最低 |
+
+## 批次 E · 桌面执行回路（`src-tauri` 已归档，落点需重裁）
 
 | ID | 特性 | 来源 | 落点 | 验收 | 状态 |
 |---|---|---|---|---|---|
