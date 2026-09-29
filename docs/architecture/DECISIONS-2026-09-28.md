@@ -104,7 +104,7 @@ B-11 与 C-2 都卡在这里。
 |---|---|---|---|---|
 | 1 | `nodes` 真双时间（B-1） | ✅ **已完成** `71e1c412` | 每版本独立 `id` + `supersedes` 链，**零 schema 变更**（L11：两列早已存在）；69 处生产写入 / 5 处外键未动 | 2 条 `#[ignore]` 已摘除；`12154 passed / 0 failed @4 线程` |
 | 2 | 分层违规棘轮 | ✅ **93/101**（101→92→89→80→50→47→40→26→25→8） | **必须经「消费方自己那层」的 facade** —— 走目标层 facade 无效（路径仍含层名）。`OneObserver` 等 14 个符号 l5 facade 已有；缺的按「消费方原本就在用的路径」补 `pub use` | 基线**只向下**：8/8 `PASS 0 new`、RC=0；**L1–L5 真引用全清，剩余 8 条均为已记录不可改道项** |
-| 3 | Noise IK 对齐 spec（B-2） | 🟡 **已修正，待编译确认**（2026-09-29） | 协议名 `Noise_IKpsk2_25519_ChaChaPoly_BLAKE2s`(39B)；按官方向量重写为 2-message IKpsk2，共修 6 处 | ⚠️ **尚未跑过 cargo**：协议正确性有可执行证据（官方向量 4/4 逐字节匹配 + 第三方实现复现），但「编译通过 + 单测转绿」还没有。内存门 BLOCKED。**未绿前不得提交** |
+| 3 | Noise IK 对齐 spec（B-2） | ✅ **已完成并合入主干**（2026-09-29） | 协议名 `Noise_IKpsk2_25519_ChaChaPoly_BLAKE2s`(39B)；按官方向量重写为 2-message IKpsk2，共修 6 处 | 验收：`full_handshake_matches_official_vectors` 转绿（官方向量 4/4 逐字节）、`cargo test --lib` 12194 passed / 0 failed、`ios-bridge` 0 error、分层门 PASS 0 new / 8 known。**遗留**：`noise_handshake` 仍零生产消费者，接线另开票（R-P79） |
 | 4 | CAD 假证据面（B-3） | ✅ **早已完成**（勿重做） | 判据从「路径含 `:`」改成「**文件真实存在**」 | 已改 `CARGO_MANIFEST_DIR` + `is_file()` |
 | 5 | `/stop` 过期测试前提（B-5） | ✅ **早已完成**（勿重做） | `nt_channel_cmd.rs` 已禁「按发送键」类假建议 | 4 条反撒谎契约绿 |
 

@@ -151,11 +151,28 @@ msg1 的 `es/s/ss`、msg2 的 `ee/se/psk`、msg3 的 `s/se` 与 nonce 自增。
   `HKDF2+MixHash(psk)` 变体产出 `311c6ddf4e488057`，与独立审计代理
   单独测得的值一致 ⇒ 两个独立证据互证。
 
-### 未决
+### 落地终态（2026-09-29 · 已收口）
 
-Rust 侧 `cargo test` 尚未执行（内存闸 `BLOCKED`，`free_pages` 远低于阈值，
-机器上有 5 个 opencode 窗口占 ~7GB）。**协议正确性已有可执行证据，
-但「编译通过 + 单测转绿」仍需一次 cargo 验证**，未验证前不得提交。
+**已合入主干 `feat/capability-absorb-20260828`。** 本节原为「未决：cargo 未验证」，
+该记录已于同日作废 —— 保留它会让下一个 agent 以为 B-2 仍未验证（R-SCAN-3：
+过期记录比没有记录更危险）。最终实测：
+
+| 项 | 值 |
+|---|---|
+| 提交 | `a9d00624`（代码）+ `54e48f2e`（文档） |
+| 验收测试 | `full_handshake_matches_official_vectors ... ok`（官方向量 4/4 逐字节） |
+| `cargo check --tests -p neotrix` | 0 error |
+| `cargo test -p neotrix --lib` | 12194 passed / 0 failed / 41 ignored |
+| `cargo check -p neotrix --features ios-bridge` | Finished，0 error |
+| `check-layer-deps.sh --strict` | PASS 0 new / 8 known |
+| 交接 | `sessions/handoff-20260929-b2-noise-final.md` |
+
+### 仍未决（唯一一项，需另开票）
+
+`noise_handshake` 仍是**零生产消费者** —— 全仓仅 `crypto/mod.rs` 的 `pub mod` 声明
+与文件内测试。**B-2 的范围是「实现对齐 spec 并可验证」，已达成**；但按
+R-P79「外部技术必须同会话接到生产可用」，把它接进 `nt_shield_ztnet` 的实际传输
+路径是**另一件事**，本会话未做，也不应悄悄算作已完成。已记入 `TODO.md`。
 
 ## 8. 方法论教训
 

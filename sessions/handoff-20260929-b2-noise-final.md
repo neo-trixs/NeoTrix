@@ -125,7 +125,9 @@
 
 - `nt_worktree_gate.sh check` exit code：`0`（check 模式只报告，不阻断）
 - 提交前是否跑过 `cargo xl` / `cargo check`：
-  ☑ 是 —— 全部 4 道在**本 worktree 实测**，非沿用旧值：
+  ☑ 是 —— 全部 4 道在**本 worktree 实测**，非沿用旧值。
+  ⚠️ **以下数字对应 B-2 提交（`a9d00624`/`54e48f2e`，合并前状态）；合并态的数字见 §9.1
+  （12194）。绿灯只对它记录的那个 commit 成立（R-SCAN-3）。**
   - `full_handshake_matches_official_vectors ... ok`（官方向量 4/4 逐字节）
   - `cargo check --tests -p neotrix` → **0 error**
   - `cargo test -p neotrix --lib` → **12175 passed / 0 failed / 41 ignored**
