@@ -187,22 +187,32 @@ module 目录）**是同一类缺陷的第三个实例**：门覆盖不全/解�
 
 ---
 
-## 6. 落地后仍需的接线（下一步，非本次范围）
+## 6. 落地后仍需的接线（2026-09-29 更新：B5b 已完成）
 
-本模块已可编译、可测试，但 **`seal_loop.rs:665` 仍未接**。接线需要：
+| 步骤 | 状态 |
+|---|---|
+| ① `impl EvalHarnessApi` | ✅ 早已存在（`nt_harness.rs:316`） |
+| ② `SelfIteratingBrain.eval_harness` 注入点 | ✅ A9 已加（默认 `None`） |
+| ③ **谁注入** | ✅ **B5b 已完成**：`l5_cognition::traits::EvalHarnessFactory`（L5 声明）+ `DefaultEvalHarnessFactory`（L6 实现）+ `entry/brain.rs::attach_eval_harness`（装配点） |
+| ④ `CaseSpec` 来源 | ⬜ 本模块的 `judge_case` 是**独立**的纯函数，与 `nt_verify_oracle` 平行。两者尚未合并（合并需统一 `required`/`forbidden` 语义） |
+| ⑤ 噪声地板的数据源 | ⬜ 需**同臂重复运行 ≥2 次** |
 
-1. `impl EvalHarnessApi for <某个 L6 类型>` ——
-   `generate_regression_test` / `run_regression_test` 的签名是
-   `(&self, &str) -> RegressionCase`（同步、无 provider），
-   与本模块的 `judge_case` 天然兼容（纯函数、无 I/O）。
-2. **噪声地板从哪来** —— `estimate_noise_floor` 需要同一臂重复运行 ≥2 次。
-   ⛔ 若只有一次运行，判决**必然**被 `insufficient_evidence` 否决。
-   这不是 bug，是「单次运行无法证明改进」的正确表达。
-3. **case 从哪来** —— `CaseSpec{required, forbidden}` 需从
-   `nt_verify_oracle::verify_deterministic` 的现有语义转写，或直接复用。
+### ⛔ 接线完成后**仍不能说**「进化已被验证」
 
-⛔ **不建议**在上述三点落地前把本模块标为「已验证进化有效」——
-那正是 `FINAL-ROADMAP-2026-09-29` §0 警告的「自证」。
+`DefaultEvalHarnessFactory` 返回的 harness **只覆盖「确定性回归」这一类判定**。
+
+| 它能回答 | 它**不能**回答 |
+|---|---|
+| 这次候选变更是否引入**确定性回退** | 这次进化是否让**模型整体**变好了 |
+| 候选是否触发了**禁止模式** | 臂中立 A/B 是否有**统计显著**的提升 |
+
+后者需要本模块（`nt_evolution_eval`）+ 噪声地板 + ≥2 次重复运行。
+
+> ⛔ **不要因为「闸门接上了」就认为「进化已被验证」。**
+> 那正是本文件开头引的 `prime-agent` 教训：
+> `RefinementEvent.outcome` 是**模型自己写的自由文本** ⇒ 日志闭环 ≠ 反馈闭环。
+> 一个只有确定性回归的闸门，是**真闸门但很窄**，不是伪证据 —— 区别在于
+> **别把它当成后者来引用**。
 
 ---
 
