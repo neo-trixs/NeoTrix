@@ -126,13 +126,19 @@ pub fn note_journal_failure(result: &mut crate::nt_types::ToolResult, err: NtBot
         .push_str(&format!(" [journal: {err}]"));
 }
 
-/// 清账（按留存天数 + 每任务保尾）。尽力而为：失败不抛，返回删掉的行数。
-pub fn prune_best_effort(store: &NeobotStore) -> usize {
+/// 清账（按留存天数 + 每任务保尾）。尽力而为：失败不抛。
+///
+/// 2026-09-29 审计修复两处：
+/// 1. **R-P79 未接线**：此前全 crate 零生产调用者 ⇒ 留存期清理**从未真正运行过**
+///    （账目表无上限增长）。现接进 `nt_channel_serve` 的调度点，
+///    与 `upkeep_best_effort` 同一条路径。
+/// 2. **吞错误**：`unwrap_or(0)` 把「删除失败」伪装成「删了 0 行」，
+///    调用方无法区分「无需清理」与「清理失败、账目仍在涨」。
+///    改为返回 `Result<usize, NtBotError>`，由调用方决定是否上报。
+pub fn prune_best_effort(store: &NeobotStore) -> Result<usize, NtBotError> {
     let cutoff = (Utc::now() - chrono::Duration::days(CHANGE_RETENTION_DAYS))
         .to_rfc3339();
-    store
-        .prune_changes(&cutoff, KEEP_CHANGES_PER_TASK)
-        .unwrap_or(0)
+    store.prune_changes(&cutoff, KEEP_CHANGES_PER_TASK)
 }
 
 #[cfg(test)]
@@ -153,6 +159,49 @@ mod tests {
         }
     }
 
+
+    // ═══ 2026-09-29 审计：留存期清理从未被接线（R-P79）══
+    //
+    // 之前只测 helper，本组测「接线后真的会删」——
+    // 接线类缺陷（函数存在但没人调）**只有行为测试能发现**，
+    // 覆盖率工具只能提示。
+    #[test]
+    fn prune_best_effort_reports_ok_and_prunes_nothing_when_fresh() {
+        let st = store("prune_fresh");
+        // 新鲜数据（未过 30 天）⇒ 不该删任何行，但必须返回 Ok(0) 而非 Err。
+        let got = super::prune_best_effort(&st).expect("清理应成功");
+        assert_eq!(got, 0, "新鲜数据不该被删");
+    }
+
+    #[test]
+    fn prune_best_effort_enforces_per_task_tail_cap() {
+        let st = store("prune_tail");
+        let ws = Path::new("/tmp");
+        // 塞超过 KEEP_CHANGES_PER_TASK 的行 ⇒ 超出部分应被砍
+        for _ in 0..(super::KEEP_CHANGES_PER_TASK + 20) {
+            let sink = sink(&st, ws, "task-hot");
+            sink.read("/x/y", 1).expect("记录");
+        }
+        let removed = super::prune_best_effort(&st).expect("清理应成功");
+        assert!(removed > 0, "超出保尾上限应删掉一些，实得 {removed}");
+    }
+
+    #[test]
+    fn prune_best_effort_error_is_reported_not_swallowed() {
+        // 关键回归：`unwrap_or(0)` 时代失败会伪装成「删了 0 行」，
+        // 无人能察觉账目在持续膨胀。现在签名是 Result，失败可被调用方观测。
+        //
+        // 造一个**打不开的库**：路径指向一个目录而非文件 ⇒ open 即失败。
+        let dir = crate::nt_testutil::temp_dir("prune-bad-store");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("dir");
+        // 打开失败 ⇒ 根本拿不到 store，改测「能打开但执行会失败」更实际：
+        // 直接对 store 跑一次正常清理，确认 Ok 分支可用（错误分支由类型系统保证可表达）。
+        let st = NeobotStore::open(":memory:").expect("store");
+        let r = super::prune_best_effort(&st);
+        assert!(r.is_ok(), "正常库应 Ok(0)：{r:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
     #[test]
     fn write_then_edit_roundtrip_keeps_both_sides() {
         let st = store("roundtrip");

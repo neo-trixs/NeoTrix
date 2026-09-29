@@ -242,13 +242,14 @@ impl NeobotStore {
     ///
     /// 先按时间切、再按任务保尾，两步都幂等。返回删掉的行数。
     pub fn prune_changes(&self, cutoff: &str, keep_per_task: i64) -> Result<usize, NtBotError> {
-        let mut removed = 0usize;
-        if let Ok(n) = self
+        // 2026-09-29 审计修复：两处 `if let Ok(n)` 让本函数**永不返回 Err** ——
+        // 签名承诺 `Result` 却把错误全吞了，等于「签名在撒谎」。
+        // 后果：SQL 失败时调用方看到 `Ok(0)`，以为「无需清理」，
+        // 而实际账目在持续膨胀且无人知晓（`prune_best_effort` 的
+        // `unwrap_or(0)` 又吞了第二层）。改为 `?` 传播。
+        let mut removed = self
             .conn
-            .execute("DELETE FROM file_changes WHERE at < ?1", params![cutoff])
-        {
-            removed = removed.saturating_add(n);
-        }
+            .execute("DELETE FROM file_changes WHERE at < ?1", params![cutoff])?;
         // 每任务保尾：`rowid` 不在「最近 keep 条」里的即删。
         //
         // `rid` 这个别名不是装饰：SQLite 里派生表没有真 `rowid` 列，
@@ -263,9 +264,8 @@ impl NeobotStore {
                        FROM file_changes
                      ) WHERE rn <= ?1
                    )";
-        if let Ok(n) = self.conn.execute(sql, params![keep_per_task]) {
-            removed = removed.saturating_add(n);
-        }
+        let by_tail = self.conn.execute(sql, params![keep_per_task])?;
+        removed = removed.saturating_add(by_tail);
         Ok(removed)
     }
 
