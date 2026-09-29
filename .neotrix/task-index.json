@@ -1,5 +1,5 @@
 {
-  "_about": "任务→工具机器索引。解决「日常任务要跑哪个脚本」需全文读 AGENTS.md 的问题。",
+  "_about": "任务→工具机器索引。解决「日常任务要跑哪个脚本」需全文读 AGENTS.md 的问题。 2026-09-29：check-doc-drift 增加根文档死链档。",
   "_schema": {
     "id": "任务意图的稳定 slug（小写连字符）",
     "query": "自然语言触发词数组 —— agent 用它做匹配",
@@ -109,12 +109,15 @@
         "文档漂移",
         "doc drift",
         "缺模块注释",
-        "//! 缺失"
+        "//! 缺失",
+        "根文档死链",
+        "README 死链"
       ],
       "tool": "bash scripts/check-doc-drift.sh",
       "kind": "gate",
       "read_only": true,
-      "when_not": "advisory，永不拦门"
+      "when_not": "advisory，永不拦门。两档：① nt_*.rs 缺 //! 模块文档（账本 scripts/doc-drift-baseline.txt）；② 根 6 文档（AGENTS/README/DOCUMENTATION-MAP/CONTRIBUTING/RUST-STANDARDS/TODO）里的仓库内路径死链。⛔ 命中「已删/已废止/已归档/已失效」语境的提及会被跳过 —— 那是 TODO.md 的历史记录，判红会逼人删历史。现存 14 条死链全来自 TODO.md 既存悬空指针，CI 与 pre-commit 均走 advisory，不阻断。",
+      "spec": "R-P232；2026-09-29 新增根文档死链档"
     },
     {
       "id": "audit-lock",

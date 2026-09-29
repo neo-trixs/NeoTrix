@@ -33,7 +33,7 @@
 | `docs/architecture/LESSONS-2026-09-27-scanner-trust.md` | 经验沉淀：扫描器告警 / 门记录腐化 / 并发写入 | Owner |
 | `docs/architecture/LESSONS-20260929-checked-is-not-verified.md` | 经验沉淀：「我推演过」≠「我验证过」/ 能力断言看签名必翻车 / 提方案前先查自有 / 删入口≠删覆盖 / fixture 自造 / 授权≠免记账 | Owner |
 | `sessions/HANDOFF-TEMPLATE.md` | 交接模板（**已入库**，`AGENTS.md` 引用） | 所有会话 |
-| `FUSION-ARCHITECTURE.md` | ⚠️ **已废止** —— 零有效引用，其"下一步"含已被证伪的"解决预存编译错误" | — |
+| ~~`FUSION-ARCHITECTURE.md`~~ | ✅ **已于 2026-09-29 删除**（未跟踪文件，其"下一步"含已被证伪的"解决预存编译错误"） | — |
 | `DOCUMENTATION-MAP.md` | 本文档 | Owner |
 
 **禁止**: 根目录放置临时文件、会话笔记、分析报告
@@ -42,7 +42,7 @@
 
 ```
 docs/
-├── dev-rules.md              # ARCHIVED桩 → 正典 docs/standards/NEOTRIX-STD-1.0.md
+（dev-rules.md 已删 → 正典 docs/standards/NEOTRIX-STD-1.0.md）
 ├── api/                      # API 文档 (mdbook)
 │   ├── SUMMARY.md
 │   ├── README.md
@@ -173,7 +173,7 @@ skills/
 新会话开始时检查:
 
 - [ ] 读取 `TODO.md` 了解当前任务
-- [ ] 读取 `docs/standards/NEOTRIX-STD-1.0.md` 了解开发规则（正典；旧 `docs/dev-rules.md` 已归档为桩）
+- [ ] 读取 `docs/standards/NEOTRIX-STD-1.0.md` 了解开发规则（正典；旧 `dev-rules.md` 已于 2026-09-29 删除）
 - [ ] 读取 `DOCUMENTATION-MAP.md` 了解文档标准
 - [ ] 不在禁止位置创建文件
 - [ ] 文件命名符合第二节规范

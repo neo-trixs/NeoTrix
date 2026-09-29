@@ -107,7 +107,7 @@
 
 ### 6.3 已废止（⛔ 勿读、勿实现）
 
-`FUSION-ARCHITECTURE.md`（"下一步"含已被证伪的"解决预存编译错误"）· `ARCHITECTURE-EVOLUTION-ROADMAP.md`（零引用）· `ARCHITECTURE.md` §1-§12 · `EVOLUTION-ROADMAP-CODE-NODES-*.md`（行号/计数已部分失效，留作取证）· 根 `dev-rules.md`（ARCHIVED 桩 → 正典 `docs/standards/NEOTRIX-STD-1.0.md`）
+`ARCHITECTURE.md` §1-§12（已被 §13 推翻）· `EVOLUTION-ROADMAP-CODE-NODES-*.md`（行号/计数已部分失效，留作取证）· 根 `dev-rules.md`（已于 2026-09-29 删除；代码 `nt_core_self_constitution.rs` 的 legacy companion 候选对「文件不存在」分支本就是 stub-safe ⇒ 正典 `docs/standards/NEOTRIX-STD-1.0.md`）
 
 ## 7. 本地模型
 

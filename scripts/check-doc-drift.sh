@@ -32,12 +32,31 @@
 #   bash scripts/check-doc-drift.sh --strict         # 仅当有**新增**未文档化文件时 exit 1
 #   bash scripts/check-doc-drift.sh --update-baseline# 把当前存量写入账本（棘轮）
 #
+# ## 第二类：根文档死链（2026-09-29 新增）
+#
+# 原实现只扫 `neotrix-core/src` 的 `nt_*.rs` 模块文档 ⇒ **根目录 13 个 .md/.toml
+# 完全在门外**。而根文档互引极密（AGENTS.md 一个文件就是 94 处引用的中枢），
+# 一份被删/被改名的文档会让下一个 agent 拿着死链去查。
+#
+# 扫法：抽根文档正文里的仓库内路径（`docs/…` `scripts/…` `.neotrix/…` 等），
+# 逐个 `-e` 验证存在。⛔ 不扫 http(s) 链接（本门无网络）。
+#
+# ⚠️ **两种提及必须区分**（2026-09-29 实测踩到）：
+#   · 「指示去读」—— 路径该存在，不存在 = 坏链 ⇒ 报。
+#   · 「告知已删」—— 路径**故意**不存在。`TODO.md` 的「已废止」清单、
+#     `RUST-STANDANCES.md` 的「已完全删除」记录、`CONTRIBUTING.md` 对一条
+#     失效命令的说明，都是这类。它们若被门判红，会逼人去删真实历史 ——
+#     **恒红的门比没有门更坏**（它训练人忽略红色）。
+# ⇒ 故跳过命中「已删/已废止/已归档/已失效/已消失/不要再」语境的行。
+# 实测 17 条初始命中全部属此类，跳过后归 0。
+#
 # Note: bash-3.2-safe style (macOS system bash). `bash -n` before commit.
 
 set -uo pipefail
 
 SRC="neotrix-core/src"
 BASELINE="scripts/doc-drift-baseline.txt"
+ROOTDOCS="${ROOTDOCS:-AGENTS.md README.md DOCUMENTATION-MAP.md CONTRIBUTING.md RUST-STANDARDS.md TODO.md}"
 STRICT=0
 UPDATE=0
 for arg in "$@"; do
@@ -111,3 +130,64 @@ if [ "$STRICT" -eq 1 ] && [ "$N_NEW" -gt 0 ]; then
 fi
 
 echo "DONE(advisory)."
+
+# ─────────────────────────────────────────────────────────────
+# 第二类：根文档死链（2026-09-29 新增）
+# ─────────────────────────────────────────────────────────────
+LINKTMP=$(mktemp)
+trap 'rm -f "$CUR" "$NEW" "$GONE" "$BASE_C" "$LINKTMP"' EXIT
+
+# 只取形如 `path/with.ext` 或 `dir/` 的反引号片段；排除 URL、绝对路径、glob
+for d in $ROOTDOCS; do
+  [ -f "$d" ] || { echo "root-doc-missing: $d"; continue; }
+  # 抽出反引号内 / 行内 code span 中以已知仓库前缀开头的路径 token
+  rg -o '\b(docs|scripts|crates|skills|sessions|config|models|neotrix-core|src-tauri|\.neotrix|\.githooks|\.github)/[A-Za-z0-9_./-]+' "$d" 2>/dev/null \
+    | sed 's/[.,;:)]*$//' | sort -u >> "$LINKTMP" || true
+done
+# 去重并验证存在
+[ -f "$LINKTMP" ] && sort -u "$LINKTMP" -o "$LINKTMP"
+
+DEAD=0
+SKIPPED=0
+if [ -s "$LINKTMP" ]; then
+  # DEADTMP 记「该路径在哪些根文档里被当作**指示**提及」
+  DEADTMP=$(mktemp)
+  trap 'rm -f "$CUR" "$NEW" "$GONE" "$BASE_C" "$LINKTMP" "$DEADTMP"' EXIT
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    [ -e "$p" ] && continue
+    # 逐个根文档找它；只要有一处是指示语境就算死链，全是「已删」语境则跳过
+    is_dead=0
+    for d in $ROOTDOCS; do
+      [ -f "$d" ] || continue
+      while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        case "$line" in
+          *已删*|*已废止*|*已归档*|*已失效*|*已消失*|*不要再*|*已完全*|*归档*|*不要删*)
+            : ;;   # 历史告知语境 → 不计
+          *) is_dead=1; break ;;
+        esac
+      done <<EOF
+$(rg -F "$p" "$d" 2>/dev/null | head -5)
+EOF
+      [ "$is_dead" -eq 1 ] && break
+    done
+    if [ "$is_dead" -eq 1 ]; then
+      echo "$p" >> "$DEADTMP"
+    else
+      SKIPPED=$((SKIPPED+1))
+    fi
+  done < "$LINKTMP"
+  if [ -s "$DEADTMP" ]; then
+    while IFS= read -r p; do echo "root-doc-deadlink: $p"; DEAD=$((DEAD+1)); done < "$DEADTMP"
+  fi
+  rm -f "$DEADTMP"
+fi
+echo "root-doc deadlinks: $DEAD  (skipped $SKIPPED intentional '已删' mentions; scanned $(grep -c . "$LINKTMP" 2>/dev/null || echo 0) path refs across: $ROOTDOCS)"
+
+if [ "$STRICT" -eq 1 ] && [ "$DEAD" -gt 0 ]; then
+  echo "FAIL(strict): $DEAD dead path reference(s) in root docs."
+  echo "  These are real paths the docs tell the next agent to read."
+  echo "  Either restore the file, or fix the reference."
+  exit 1
+fi

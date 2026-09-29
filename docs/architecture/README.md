@@ -22,7 +22,7 @@
 - `NEOTRIX-FULL-ARCHITECTURE.md` — 非本会话产物，未纳入索引，内容可能过期
 - `ARCHITECTURE.md` — L4-L5 合并写法，早于 L0-L6；围栏疑似失衡（SIM-22 finding，待主人重写）
 - `TODO.md` — 2026-09-20 基线已 STALE（横幅在案），P0 开工先重跑 check
-- `docs/dev-rules.md`、根 `dev-rules.md` — 桩，内容在 `../standards/archive/`，规则以正典为准
+- ~~`docs/dev-rules.md`、根 `dev-rules.md`~~ — ✅ 均已于 2026-09-29 删除；legacy 内容在 `../standards/archive/`，规则以正典为准
 
 ## 铁律
 
