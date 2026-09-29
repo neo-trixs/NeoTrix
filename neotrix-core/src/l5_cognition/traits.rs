@@ -161,6 +161,31 @@ pub trait EvalHarnessApi: Send + Sync {
     fn run_regression_test(&self, case: &RegressionCase) -> RegressionResult;
 }
 
+/// **L6 → L5 评测闸门工厂**（2026-09-29 加，B5b）
+///
+/// ## 为什么需要它
+///
+/// A9 已在 `SelfIteratingBrain` 加了 `eval_harness` 注入点，但**没人注入**
+/// —— 那正是本轮刚根治的 `check-doc-drift` 同一个病：
+/// 「实现了但永远收不到调用，等于没有」。
+///
+/// 而 L5 不能自己 `new` 一个 `EvalHarness`：
+/// ① 它是 L6 具体类型 ⇒ 违反本文件 :133-139 的跨层隔离约定
+/// ② `EvalHarness::new_default` 需要 `Vec<ModelSpec>` / `Arc<dyn LlmProvider>` /
+///    `judge_model` —— 全部是 L6/L1 的具体类型
+///
+/// ⇒ 本 trait 是**跨层工厂的既有模式**（与 :183 `GoldStandardApi`、
+/// :207 `EvolutionHarnessApi` 同族）：**L5 声明，L6 实现**。
+/// 与 `EvolutionHarnessApi::new_harness() -> Self where Self: Sized` 的区别：
+/// 那个返回具体类型（L5 仍需知道 L6 类型名），本 trait 返回
+/// `Box<dyn EvalHarnessApi>` ⇒ **L5 全程只见 trait，不见 L6 类型**。
+pub trait EvalHarnessFactory: Send + Sync {
+    /// 构造一个评测闸门。返回 `None` = 无法构造（无 provider / 未配置）。
+    ///
+    /// ⛔ **不得 panic、不得阻塞**。这是启动路径上的调用点。
+    fn make_eval_harness(&self) -> Option<Box<dyn EvalHarnessApi>>;
+}
+
 /// 回归测试用例 (L5 侧轻量数据结构, 与 L6 EvalHarness 解耦)
 #[derive(Debug, Clone)]
 pub struct RegressionCase {

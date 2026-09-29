@@ -7,6 +7,7 @@
 //! 本模块为纯搬移门面：行为零变更，外部路径 `nt_mind_eval_harness::X` 不变。
 
 pub mod nt_budget;
+pub mod nt_factory;
 pub mod nt_compliance;
 pub mod nt_harness;
 pub mod nt_pareto;
@@ -17,6 +18,7 @@ pub mod nt_verify_oracle;
 mod tests;
 
 pub use nt_budget::DEFAULT_BUDGET_GRID;
+pub use nt_factory::DefaultEvalHarnessFactory;
 pub use nt_compliance::{
     ap_acc_score, ComplianceGate, InstructionPlane, PlaneConflictCase, WithholdingResult,
     AP_ACC_EPSILON,

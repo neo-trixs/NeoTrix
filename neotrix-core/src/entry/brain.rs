@@ -96,7 +96,46 @@ pub(crate) fn build_brain(profile: &str) -> SelfIteratingBrain {
     set_default_model_from_config(&mut agent);
     ensure_provider_env_from_config();
     agent.init_reasoning_engine();
+    attach_eval_harness(&mut agent);
     agent
+}
+
+/// 把 L6 的评测闸门工厂装配进 brain（B5b，2026-09-29）。
+///
+/// ## 为什么在 `entry` 层接线
+///
+/// `entry` 是**顶层编排层** —— 它本就可以看见 L0–L6 全部。
+/// 而 L5（`SelfIteratingBrain`）与 L6（`EvalHarness`）**都不该**做这次接线：
+/// - L5 不能 `use crate::l6_meta::*`（`l5_cognition/traits.rs:133-139` 明令）
+/// - L6 若自己往 L5 的 brain 字段里塞东西，等于绕过 trait 依赖倒置
+///
+/// ⇒ 装配点必须在**同时认识两侧**的地方。`entry` 正是那个位置。
+///
+/// ## ⛔ 为什么这件事重要（不是「锦上添花」）
+///
+/// A9 之前，`seal_loop` 的自进化闭环钩子硬传 `None`，
+/// 而 `EvalHarnessApi` 的 impl 早已存在 ⇒ **实现了但永远收不到调用**。
+/// 效果上：**候选变更从不接受回归检验就直接持久化**。
+///
+/// 这与本轮根治的 `check-doc-drift` 恒红是**同一个病**：
+/// 一个「存在但不起作用」的东西，比不存在更危险 ——
+/// 它让人以为防护在位。
+fn attach_eval_harness(agent: &mut SelfIteratingBrain) {
+    use neotrix::l5_cognition::traits::EvalHarnessFactory;
+
+    let factory = neotrix::l6_meta::healing::nt_mind_eval_harness::DefaultEvalHarnessFactory;
+    match factory.make_eval_harness() {
+        Some(h) => {
+            agent.eval_harness = Some(h);
+        }
+        None => {
+            // ⛔ 显式告警：闸门缺失会让自进化闭环**静默退化为无验证**。
+            //   `seal_loop` 会打 debug 日志，但 debug 在生产常被关掉 ⇒ 这里升到 warn。
+            super::warn(
+                "评测闸门未能装配 ⇒ 自进化闭环的回归检验**不会运行**（候选变更将直接持久化）",
+            );
+        }
+    }
 }
 
 /// 将 config.toml 中的 provider/api_key 提升为环境变量，使 GatewayV2 能发现
