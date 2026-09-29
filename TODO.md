@@ -1,6 +1,38 @@
 # NeoTrix TODO 列表
-> 智能同步生成，最后更新：2026-09-28（人工重建）
-
+> 智能同步生成，最后更新：2026-09-29（本轮收尾）
+>
+> ## ✅ 本轮完成（2026-09-28/29 · 桌面端统一 + 缺口闭合）
+> >
+> > **桌面端统一到 `~/Downloads/Neo/neobot`**（独立 2 成员 workspace，零 neotrix-core 依赖）：
+> > `d5413335` 移除本仓 `apps/neobot-desktop`，本仓只留 `crates/neotrix-neobot` 作库
+> > （`nt_llama` 为 CLI 与桌面端共用的唯一本地推理实现）。
+> >
+> > **命令面 13 个全接入 UI**：llamacpp 6（设置面板）+ web/vision 7（侧边栏检索页签 +
+> > 图片查看器 + 端点代理提示）。111 命令 ↔ 111 类型条目，双向零缺口。
+> > **16 道防回归门**（`registration_tests`，全部 mutation-verified）；
+> > **483 测试全绿**（含 5 条对活 llama-server 的 E2E）。
+> > 版本 `v0.22.0` 已打 tag，bare + bundle 双备份已同步。
+> >
+> > **白屏根因找到并修复**：`tauri.conf.json` 配了 `devUrl` 则 release 内嵌零资源
+> > （tauri-codegen 2.7.0:178，`dev && dev_url` 分支；二进制大小对照法验证）。
+> > 修法：devUrl 置 null。另补 9 个缺失元素（一个缺失的 id 曾把整个应用打瞎，
+> > 侧边栏 1189 行从未挂载过）+ grid 缺失两态 + 标题居中。
+> >
+> > **权重账本闭合**：`[R]` 5 个逐字节锁定 repo@revision（LFS oid / git blob sha1）；
+> > `[I]` 55 个备份 57M，本地 + `/Volumes/NeoTrixBrain` 跨盘各一份（shasum -c OK）；
+> > 清单 60 项双向零缺口。工具 `scripts/ops/nt_weights_manifest.sh`。
+> >
+> > **CI 修三处旧债**：删每 PR 必红的 `desktop-e2e.yml`；`release.yml` 摘
+> > `build-desktop`；修 `ci.yml` 已提交的 YAML 语法错（整个文件无法加载）。
+> > **7 个正典文档**指向已删路径已修正（活指示改、历史加注记不重写）。
+> >
+> > **经验沉淀**：`docs/architecture/LESSONS-20260928-blank-window-and-embedding.md`
+> > （L1-L5 + 未闭合清单）。
+> >
+> > **诚实未闭合**：`stop`/真 `swap` 未执行（`#[ignore]` 占位，三重安全门已验证，
+> > 需内存宽裕时手动跑）；`thread.ts` 附件图片仍直载（只补 onerror）；
+> > `dev` 在 release 恒真的根本原因未查明；跨盘后 training/ 新增需重拷。
+>
 > ## 🔖 剩余任务总入口（2026-09-28 收口 · 交给**单一汇总窗口**执行）
 >
 > **完整交接件**：`sessions/handoff-neobot-absorption-20260928.md`（自足，读它不用回看对话）
