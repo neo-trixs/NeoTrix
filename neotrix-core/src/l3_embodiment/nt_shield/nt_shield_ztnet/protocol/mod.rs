@@ -2,4 +2,5 @@
 //!
 //! 所有协议引擎实现统一 `NtProtocol` trait，由外部事件循环驱动。
 
+pub mod noise_ik;
 pub mod traits;
