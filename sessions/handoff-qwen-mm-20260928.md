@@ -195,3 +195,27 @@ bash scripts/ops/nt_qwen_mm_setup.sh check
   重排 1112 行是反模式（首轮已犯已修，见 §3）。
 - **E5 "剩下"的三交集判据**（见本节首段）：下轮任何"收尾"指令先跑这个判据，
   不满足的写进路线图，不占用会话。
+
+## 12. 模型自主执行（2026-09-29 追加，用户：不要人执行链）
+
+> 定点结论：`ToolOrchestrator.call`／`AgentLoop.with_tools`／crystal 活环／
+> nt_act Registry 全 dormant 或他域；**唯一真在逐个执行模型点名工具的环是
+> neobot `nt_agent::execute_tool`**（turn loop：gate→audit→dispatch→history，
+> image 经 `TranscriptItem.image` 自动升级 `image_url`）。客户端随执行环下移。
+
+- **搬**：`nt_mcp_stdio_session.rs` → `crates/neotrix-neobot/src/nt_qwen_mm.rs`
+  （client＋resolve＋版本常量＋14 单测全搬；`McpSessionTool` 留 core 因
+  `NativeTool` 是 core trait）；core 原文件缩成 re-export＋adapter，
+  `agent.rs` **零改**；`nt_qwen_mm_manifests.rs` 改 import，agent/注册/单测全绿。
+- **4 变体**：`QwenMediaInfo/QwenReadVideo/QwenVisualize/QwenSaveView`
+  （模型名 `qwen_media_info` 等，裸名做别名；**刻意不碰 `read_image`**——
+  与本 crate `ReadImage` 撞名会绕过 vision 门，`visualize` 已覆盖）。
+- **三处接线**：`nt_policy.rs` Allow（读放行＋save_view 写盘注明窄范围）；
+  `nt_agent::gate` 收 `video_path`/`image_path` 键（否则 jail 第一步被绕过）；
+  `tool_schemas` 按"探测到服务器"挂载（`qwen_mm_mounted()` 与 prompt 共判据，
+  双向蕴含单测锁定）；`execute_qwen_mm`：vision 门→resolve→jail→call→
+  artifacts 进 workspace `.neotrix-mm/`→`load_image` 读回真部件。
+- **验证**：neobot 全量 390 绿；分发 3 单测（文本/jail/真部件）＋活测试走真服务器
+  全绿；core 全量 12170 绿；fmt 我的行净；lock 0；layer 0 new。
+- **诚实边界**：crop/draw_bbox 不挂载（要 grounding，无 key 做不出）；search 系
+  不进 neobot（要 key）；`save_view` output_dir 强制 workspace 内。

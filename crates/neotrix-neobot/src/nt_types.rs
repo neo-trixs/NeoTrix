@@ -169,6 +169,18 @@ pub enum ToolName {
     /// 开不开、开哪个 tab 永远由界面说了算 —— 与 better-sidebar 的
     /// `sidebar_open` 同构。
     SidebarOpen,
+    /// Qwen-MM-Plugins 会话工具：媒体/文档元数据（只读，ffprobe）。
+    ///
+    /// **不是** `read_image`（那个已存在且带 vision 门）：这 4 个工具名取自
+    /// 上游 core 的 `media_info`/`read_video`/`visualize`/`save_view`，
+    /// **刻意避开** `read_image` 重名（撞名会让模型随机挑并绕过视觉门）。
+    QwenMediaInfo,
+    /// 抽视频帧（只读；ffmpeg）。
+    QwenReadVideo,
+    /// 把任意文件渲染成图（只读；PDF/代码/NIfTI/3D/GIS…）。
+    QwenVisualize,
+    /// 文档页/视频帧落盘成文件（**写盘**；Medium 风险）。
+    QwenSaveView,
     Unknown(String),
 }
 
@@ -185,6 +197,10 @@ impl ToolName {
             Self::WebSearch => "web_search",
             Self::WebFetch => "web_fetch",
             Self::SidebarOpen => "sidebar_open",
+            Self::QwenMediaInfo => "qwen_media_info",
+            Self::QwenReadVideo => "qwen_read_video",
+            Self::QwenVisualize => "qwen_visualize",
+            Self::QwenSaveView => "qwen_save_view",
             Self::Unknown(_) => "unknown_tool",
         }
     }
@@ -204,6 +220,14 @@ impl ToolName {
             "web_search" | "search" => Self::WebSearch,
             "web_fetch" | "fetch" | "browse" => Self::WebFetch,
             "sidebar_open" | "open_sidebar" | "sidebar" => Self::SidebarOpen,
+            // Qwen-MM-Plugins 会话工具：名字**带 `qwen_` 前缀**是刻意的——
+            // 与上游 core 的裸名（`media_info` 等）区分开，避免与本 crate
+            // 既有工具撞名（`read_image`/`read_file`），也便于审计里一眼认出
+            // 哪一步走了外部 MCP 服务器。
+            "qwen_media_info" | "media_info" => Self::QwenMediaInfo,
+            "qwen_read_video" | "read_video" => Self::QwenReadVideo,
+            "qwen_visualize" | "visualize" => Self::QwenVisualize,
+            "qwen_save_view" | "save_view" => Self::QwenSaveView,
             _ => Self::Unknown(raw.to_owned()),
         }
     }
@@ -221,6 +245,10 @@ impl ToolName {
             Self::WebSearch => "web_search",
             Self::WebFetch => "web_fetch",
             Self::SidebarOpen => "navigate",
+            Self::QwenMediaInfo => "read_media_info",
+            Self::QwenReadVideo => "read_video_frames",
+            Self::QwenVisualize => "visualize_file",
+            Self::QwenSaveView => "write_view_file",
             Self::Unknown(_) => "unknown_tool",
         }
     }
@@ -335,6 +363,29 @@ mod tests {
         assert_eq!(ToolName::ReadImage.intent(), "read_image");
         // 别名不得过宽：裸 `image` 留给未来的别的语义。
         assert!(matches!(ToolName::parse("image"), ToolName::Unknown(_)));
+    }
+
+    #[test]
+    fn qwen_mm_names_wire_every_layer() {
+        // as_str ↔ parse 闭合 + intent 诚实（写盘的那个标 write）：
+        for (raw, variant, wire, intent) in [
+            ("qwen_media_info", ToolName::QwenMediaInfo, "qwen_media_info", "read_media_info"),
+            ("media_info", ToolName::QwenMediaInfo, "qwen_media_info", "read_media_info"),
+            ("qwen_read_video", ToolName::QwenReadVideo, "qwen_read_video", "read_video_frames"),
+            ("read_video", ToolName::QwenReadVideo, "qwen_read_video", "read_video_frames"),
+            ("qwen_visualize", ToolName::QwenVisualize, "qwen_visualize", "visualize_file"),
+            ("visualize", ToolName::QwenVisualize, "qwen_visualize", "visualize_file"),
+            ("qwen_save_view", ToolName::QwenSaveView, "qwen_save_view", "write_view_file"),
+            ("save_view", ToolName::QwenSaveView, "qwen_save_view", "write_view_file"),
+        ] {
+            let name = ToolName::parse(raw);
+            assert_eq!(name, variant, "alias '{raw}' must parse");
+            assert_eq!(name.as_str(), wire);
+            assert_eq!(name.intent(), intent);
+        }
+        // 撞名审计：`read_image` 仍是本 crate 那个（带 vision 门），
+        // Qwen 的同名工具**没**进来 —— 注释在 nt_qwen_mm.rs QWEN_MM_TOOL_NAMES。
+        assert_eq!(ToolName::parse("read_image"), ToolName::ReadImage);
     }
 
     #[test]

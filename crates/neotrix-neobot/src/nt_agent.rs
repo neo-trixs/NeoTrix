@@ -774,11 +774,22 @@ fn gate(
     actor: Actor,
     call: &crate::nt_types::ToolCall,
 ) -> Result<(PolicyDecision, Option<String>), NtBotError> {
-    let file_path = ["path", "file"]
-        .iter()
-        .find_map(|key| call.args.get(*key))
-        .and_then(|value| value.as_str())
-        .map(str::to_owned);
+    let file_path = [
+        "path",
+        "file",
+        "file_path",
+        // Qwen-MM-Plugins 工具的路径参数名（上游 schema 原文）：
+        // `media_info.path` / `read_video.video_path` / `visualize.file_path`。
+        // 不收这三个键，`qwen_read_video {"video_path": "/etc/shadow"}` 就会
+        // 绕过第 3 步的 `is_jailbreak_path` —— 收键与执行层的 `jail_join`
+        // 一起构成双保险（与 `ReadFile` 同惯例）。
+        "video_path",
+        "image_path",
+    ]
+    .iter()
+    .find_map(|key| call.args.get(*key))
+    .and_then(|value| value.as_str())
+    .map(str::to_owned);
     let command = call
         .args
         .get("command")
@@ -896,7 +907,157 @@ fn execute_tool(
         ToolName::WebSearch => Ok(execute_web_search(call)?.into()),
         ToolName::WebFetch => Ok(execute_web_fetch(call)?.into()),
         ToolName::SidebarOpen => Ok(execute_sidebar_open(call)?.into()),
+        ToolName::QwenMediaInfo
+        | ToolName::QwenReadVideo
+        | ToolName::QwenVisualize
+        | ToolName::QwenSaveView => execute_qwen_mm(config, engine, call, stop),
         ToolName::Unknown(raw) => Err(NtBotError::Invalid(format!("unknown tool '{raw}'"))),
+    }
+}
+
+/// Qwen-MM-Plugins 会话工具的执行（模型自主调，2026-09-29）。
+///
+/// 顺序不可换，每一步都有存在理由：
+/// 1. **先问有没有眼睛**（与 `execute_read_image` 同纪律）：这些工具会产出
+///    image 块（`read_video`/`visualize`/`save_view` 的预览帧），看不见图的
+///    模型只会拿到一串路径 —— 那比不给更糟，它会开始"描述"没看见的画面。
+/// 2. **再问服务器在不在**（`resolve_core_launch` 零 spawn 探测）；不在就把
+///    安装指引**原样**交给模型，让它能对用户说清缺什么，而不是谎称成功。
+/// 3. **最后才把路径参数 jail 化**：相对路径拼进 workspace；绝对路径必须落在
+///    workspace 内（`jail_join` 第二道）。上游服务器拿到的是**已验证**的
+///    绝对路径，不会自己去猜路径语义。
+/// 4. artifacts 落进 `workspace/.neotrix-mm/`（而非全局临时目录）：落在
+///    workspace 内 ⇒ 下一步 `read_image` 能合法读它，二段链（抽帧→看图）
+///    才真正闭得上；也顺带被 workspace jail 覆盖。
+fn execute_qwen_mm(
+    config: &NeobotConfig,
+    engine: &dyn EngineAdapter,
+    call: &crate::nt_types::ToolCall,
+    stop: &StopToken,
+) -> Result<ToolOutcome, NtBotError> {
+    use crate::nt_qwen_mm as mm;
+    if !engine.vision_capable() {
+        return Err(NtBotError::Denied {
+            rule: "no-vision-engine".to_owned(),
+            reason: format!(
+                "engine '{}' cannot deliver image parts to the model (model '{}'), so the \
+                 qwen-media tools would only hand back file paths — set NEOBOT_VISION=1 if \
+                 this model really is multimodal",
+                engine.engine_id(),
+                engine.model_name()
+            ),
+        });
+    }
+    if stop.is_cancelled() {
+        return Ok(ToolResult {
+            ok: false,
+            output: "(cancelled: not executed)".to_owned(),
+            truncated: false,
+        }
+        .into());
+    }
+    let launch = mm::resolve_core_launch().map_err(|e| NtBotError::Denied {
+        rule: "qwen-mm-unavailable".to_owned(),
+        reason: e.to_string(),
+    })?;
+    let artifacts = config.workspace_dir.join(".neotrix-mm");
+    let session = launch.session(mm::CORE_TIMEOUT_MS, artifacts.clone());
+    execute_qwen_mm_with_session(config, call, &session, &artifacts)
+}
+
+/// Qwen 会话工具的纯分发（可单测）：`session` 由调用方注入，
+/// 测试时喂伪造 stdio 服务器，生产时是真服务器 —— 同一 framing。
+fn execute_qwen_mm_with_session(
+    config: &NeobotConfig,
+    call: &crate::nt_types::ToolCall,
+    session: &crate::nt_qwen_mm::McpStdioSession,
+    artifacts: &std::path::Path,
+) -> Result<ToolOutcome, NtBotError> {
+    // 上游工具名 ← 我们的 ToolName。
+    let upstream = match call.name {
+        crate::nt_types::ToolName::QwenMediaInfo => "media_info",
+        crate::nt_types::ToolName::QwenReadVideo => "read_video",
+        crate::nt_types::ToolName::QwenVisualize => "visualize",
+        _ => "save_view",
+    };
+    // 路径参数 jail 化：走本 crate 的第二道 jail（`join_workspace` 拒绝对路径/
+    // `..`/`~`），把**已验证**的绝对路径交给上游服务器 —— 它不猜路径语义。
+    let mut args = call.args.clone();
+    for key in ["path", "file_path", "video_path", "image_path"] {
+        if let Some(raw) = args.get(key).and_then(|v| v.as_str()) {
+            let full = match join_workspace(&config.workspace_dir, raw) {
+                Ok(p) => p,
+                Err(e) => {
+                    return Ok(ToolResult {
+                        ok: false,
+                        output: format!("path refused: {e}"),
+                        truncated: false,
+                    }
+                    .into());
+                }
+            };
+            if let Some(obj) = args.as_object_mut() {
+                obj.insert(
+                    key.to_string(),
+                    serde_json::Value::String(full.to_string_lossy().to_string()),
+                );
+            }
+        }
+    }
+    if upstream == "save_view" {
+        // 落盘目录固定在 workspace 内，不接受模型指定别处。
+        if let Some(obj) = args.as_object_mut() {
+            obj.insert(
+                "output_dir".to_string(),
+                serde_json::Value::String(artifacts.to_string_lossy().to_string()),
+            );
+        }
+    }
+
+    match session.call_tool(upstream, &args) {
+        Ok(result) => {
+            // 产物路径写进 steps 账：人可点；模型可再用 `read_image` 读（它在
+            // workspace 内 ⇒ 合法），二段链（抽帧→看图）才真闭得上。
+            let mut output = result.text.clone();
+            let mut first_rel: Option<String> = None;
+            if !result.saved_images.is_empty() {
+                output.push_str("\n[saved under workspace .neotrix-mm/]");
+                for p in &result.saved_images {
+                    // 落盘目录就是 workspace 内的 artifacts（调用方定的），
+                    // strip_prefix 必成功 —— 万一哪天改了落盘位置，
+                    // 这里回退到绝对路径也不崩（只是不好点）。
+                    match p.strip_prefix(&config.workspace_dir) {
+                        Ok(rel) => {
+                            let rel = rel.to_string_lossy().to_string();
+                            output.push_str(&format!("\n- {rel}"));
+                            if first_rel.is_none() {
+                                first_rel = Some(rel);
+                            }
+                        }
+                        Err(_) => output.push_str(&format!("\n- {}", p.display())),
+                    }
+                }
+            }
+            let image = first_rel
+                .as_deref()
+                .and_then(|rel| crate::nt_vision::load_image(&config.workspace_dir, rel).ok())
+                .map(|(part, _kind)| part);
+            Ok(ToolOutcome {
+                result: ToolResult {
+                    ok: !result.is_error,
+                    output,
+                    truncated: false,
+                },
+                // 预览图作为真正的多模态部件随下一轮抵达模型。
+                image,
+            })
+        }
+        Err(e) => Ok(ToolResult {
+            ok: false,
+            output: format!("qwen tool '{upstream}' failed: {e}"),
+            truncated: false,
+        }
+        .into()),
     }
 }
 
@@ -2331,5 +2492,218 @@ mod tests {
                 "help 也不能承诺一个此刻停不下来的动作（命中 {claim:?}）：{help}"
             );
         }
+    }
+
+    // Qwen-MM-Plugins 会话工具的纯分发测试：伪造 stdio MCP 服务器，
+    // 不碰真实 Python、不改进程环境（PATH/checkout 全不碰 —— 并行测试安全）。
+    const QWEN_FAKE_SERVER: &str = r#"#!/usr/bin/env bash
+while IFS= read -r line; do
+  case "$line" in
+    *'"method":"initialize"'*)
+      printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{},"serverInfo":{"name":"fake","version":"0"}}}'
+      ;;
+    *'"method":"tools/call"'*)
+      if [[ "$line" == *'"save_view"'* ]]; then
+        printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"views ready"},{"type":"image","data":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","mimeType":"image/png"}],"isError":false}}'
+      else
+        printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"media ok"}],"isError":false}}'
+      fi
+      ;;
+  esac
+done
+"#;
+
+    /// 伪造会话＋workspace 夹具（artifacts 落进 workspace 内 `.neotrix-mm/`，
+    /// 与生产一致 —— 落临时目录就测不到 `load_image` 那条线）。
+    fn qwen_dispatch_fixture(
+        tag: &str,
+    ) -> (
+        std::path::PathBuf,
+        crate::nt_config::NeobotConfig,
+        crate::nt_qwen_mm::McpStdioSession,
+        std::path::PathBuf,
+    ) {
+        let dir = crate::nt_testutil::temp_dir(&format!("neobot-qwenmm-{tag}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        let workspace = dir.join("workspace");
+        std::fs::create_dir_all(&workspace).expect("mkdir workspace");
+        let script = dir.join("fake.sh");
+        std::fs::write(&script, QWEN_FAKE_SERVER).expect("write fake server");
+        let config = crate::nt_config::NeobotConfig {
+            data_dir: dir.clone(),
+            workspace_dir: workspace.clone(),
+            policy_mode: crate::nt_config::PolicyMode::Enforce,
+            human_has_control: false,
+            max_steps: 4,
+            engine: crate::nt_config::EngineKind::Echo,
+            computer_allow: Vec::new(),
+            computer_hosts: Vec::new(),
+            extra_deny: Vec::new(),
+            write_budget: crate::nt_config::default_write_budget(),
+        };
+        let artifacts = workspace.join(".neotrix-mm");
+        let session = crate::nt_qwen_mm::McpStdioSession::new(
+            if std::path::Path::new("/bin/bash").is_file() {
+                "/bin/bash".to_string()
+            } else {
+                "bash".to_string()
+            },
+            vec![script.to_string_lossy().to_string()],
+        )
+        .with_timeout_ms(10_000)
+        .with_artifacts_dir(artifacts.clone());
+        (dir, config, session, artifacts)
+    }
+
+    fn qwen_call(name: crate::nt_types::ToolName, args: serde_json::Value) -> crate::nt_types::ToolCall {
+        crate::nt_types::ToolCall {
+            id: "c-qwen".to_owned(),
+            name,
+            args,
+        }
+    }
+
+    #[test]
+    fn qwen_dispatch_text_flows_and_jail_holds() {
+        let (dir, config, session, artifacts) = qwen_dispatch_fixture("text");
+        // 文本流：media_info 的回包原样进 output。
+        let outcome = super::execute_qwen_mm_with_session(
+            &config,
+            &qwen_call(
+                crate::nt_types::ToolName::QwenMediaInfo,
+                serde_json::json!({"path": "clip.mp4"}),
+            ),
+            &session,
+            &artifacts,
+        )
+        .expect("dispatch");
+        assert!(outcome.result.ok);
+        assert!(outcome.result.output.contains("media ok"), "{}", outcome.result.output);
+        assert!(outcome.image.is_none());
+        // 越狱：video_path 绝对路径在执行层被拒（网关是第一道，这里是第二道）。
+        let denied = super::execute_qwen_mm_with_session(
+            &config,
+            &qwen_call(
+                crate::nt_types::ToolName::QwenReadVideo,
+                serde_json::json!({"video_path": "/etc/passwd"}),
+            ),
+            &session,
+            &artifacts,
+        )
+        .expect("refusal is a normal outcome, not a Rust error");
+        assert!(!denied.result.ok);
+        assert!(denied.result.output.contains("refused"), "{}", denied.result.output);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn qwen_dispatch_image_becomes_a_real_part() {
+        let (dir, config, session, artifacts) = qwen_dispatch_fixture("image");
+        // save_view 回 image 块 → 落盘进 workspace/.neotrix-mm → load_image 读回
+        // 真部件（魔数+4MiB 上限全走既有线），文本里只有路径没有 base64 墙。
+        let outcome = super::execute_qwen_mm_with_session(
+            &config,
+            &qwen_call(
+                crate::nt_types::ToolName::QwenSaveView,
+                serde_json::json!({"file_path": "doc.pdf", "pages": "1"}),
+            ),
+            &session,
+            &artifacts,
+        )
+        .expect("dispatch");
+        assert!(outcome.result.ok);
+        let image = outcome.image.expect("must carry the image part");
+        assert_eq!(image.media_type, "image/png");
+        assert!(!outcome.result.output.contains(&image.base64));
+        assert!(
+            outcome.result.output.contains(".neotrix-mm"),
+            "{}",
+            outcome.result.output
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 活测试（`#[ignore]`）：真 Qwen 服务器走 neobot 分发全链。
+    ///
+    /// 前置：`bash scripts/ops/nt_qwen_mm_setup.sh setup` + shim 进 PATH +
+    /// `ffmpeg` 在 PATH。跑法：
+    /// `NT_QWEN_MM_LIVE=1 cargo test -p neotrix-neobot --lib -- --ignored qwen_live_dispatch --nocapture`
+    /// 这是"模型自主调"链的最后一块拼图：分发（伪服务器已证）× 真服务器
+    /// （core 活测试已证）在这里合成一次。
+    #[test]
+    #[ignore]
+    fn qwen_live_dispatch_through_neobot() {
+        use std::process::Command;
+        assert_eq!(
+            std::env::var("NT_QWEN_MM_LIVE").as_deref(),
+            Ok("1"),
+            "live test needs NT_QWEN_MM_LIVE=1 (opt-in)"
+        );
+        let dir = crate::nt_testutil::temp_dir("neobot-qwenmm-live");
+        let _ = std::fs::remove_dir_all(&dir);
+        let workspace = dir.join("workspace");
+        std::fs::create_dir_all(&workspace).expect("mkdir workspace");
+        // ffmpeg 现场造 2 秒 mp4（SYSTEM_DEPS 声明的依赖，缺即 loud-fail）。
+        let mp4 = workspace.join("t.mp4");
+        let st = Command::new("ffmpeg")
+            .args([
+                "-y", "-v", "error", "-f", "lavfi",
+                "-i", "testsrc=duration=2:size=160x120:rate=5",
+                "-pix_fmt", "yuv420p",
+            ])
+            .arg(&mp4)
+            .output()
+            .expect("live test needs ffmpeg on PATH");
+        assert!(st.status.success(), "ffmpeg fixture failed");
+        let config = crate::nt_config::NeobotConfig {
+            data_dir: dir.clone(),
+            workspace_dir: workspace,
+            policy_mode: crate::nt_config::PolicyMode::Enforce,
+            human_has_control: false,
+            max_steps: 4,
+            engine: crate::nt_config::EngineKind::Echo,
+            computer_allow: Vec::new(),
+            computer_hosts: Vec::new(),
+            extra_deny: Vec::new(),
+            write_budget: crate::nt_config::default_write_budget(),
+        };
+        // 注意：这里故意走 `execute_qwen_mm`（含 resolve + vision 门），
+        // 不走 with_session —— 测的就是生产入口。
+        let outcome = super::execute_qwen_mm(
+            &config,
+            &VisionEngine,
+            &qwen_call(
+                crate::nt_types::ToolName::QwenMediaInfo,
+                serde_json::json!({"path": "t.mp4"}),
+            ),
+            &live_stop(),
+        )
+        .expect("live dispatch");
+        assert!(outcome.result.ok, "{}", outcome.result.output);
+        assert!(
+            outcome.result.output.contains("Video stream"),
+            "{}",
+            outcome.result.output
+        );
+        eprintln!("qwen live via neobot dispatch: ALL GREEN (no keys used)");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn qwen_blind_engine_is_denied_not_faked() {
+        // 看不见的引擎调 Qwen 工具 = 直接拒（与 read_image 同纪律）：
+        // 伪造服务器再真也不能让盲引擎"看见"。
+        let (_dir, config, session, artifacts) = qwen_dispatch_fixture("blind");
+        let err = super::execute_qwen_mm(
+            &config,
+            &LocalEchoEngine,
+            &qwen_call(
+                crate::nt_types::ToolName::QwenReadVideo,
+                serde_json::json!({"video_path": "clip.mp4"}),
+            ),
+            &live_stop(),
+        )
+        .expect_err("blind engine must not pretend to see");
+        assert!(err.to_string().contains("no-vision-engine"), "{err}");
     }
 }

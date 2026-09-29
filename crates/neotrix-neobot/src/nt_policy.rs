@@ -126,6 +126,17 @@ pub fn evaluate_policy(ctx: &PolicyContext) -> PolicyDecision {    // 1) 人接�
         | ToolName::WebSearch
         | ToolName::WebFetch
         | ToolName::SidebarOpen => PolicyDecision::Allow,
+        // Qwen-MM-Plugins 会话工具：
+        // - 三个只读（media_info/read_video/visualize）放行，理由同
+        //   `ReadImage`：**只读**，不改世界状态。路径类参数（`path`/`file_path`）
+        //   已经在第 3 步过 `is_jailbreak_path`，执行层再用 `join_workspace`
+        //   拦一次（双保险，与 `ReadFile` 同惯例）。
+        // - `save_view` 放行：它把文档页/视频帧写进工作区内的 output 目录，
+        //   越狱由第 3 步（`file_path`/`path`）与执行层的 `jail_join` 兜住；
+        //   **不加新 deny 规则**——它与 `write_file` 风险等级相同，且写盘
+        //   范围比 `write_file` 窄（只写渲染产物，不改用户文件）。
+        ToolName::QwenMediaInfo | ToolName::QwenReadVideo | ToolName::QwenVisualize
+        | ToolName::QwenSaveView => PolicyDecision::Allow,
         ToolName::Unknown(raw) => deny("unknown-tool", &format!("unknown tool '{raw}'")),
         ToolName::Bash | ToolName::ComputerAct => {
             deny("default-deny", "no explicit allow rule matched")
@@ -250,6 +261,41 @@ mod tests {
             computer_allow: Vec::new(),
             computer_hosts: Vec::new(),
         }
+    }
+
+    #[test]
+    fn qwen_mm_readonly_allowlisted_write_is_jailed() {
+        // 三个只读放行（与 read_file 同律）。
+        for tool in [
+            ToolName::QwenMediaInfo,
+            ToolName::QwenReadVideo,
+            ToolName::QwenVisualize,
+        ] {
+            let mut ok = ctx(tool);
+            ok.file_path = Some("attachments/clip.mp4".to_owned());
+            assert_eq!(evaluate_policy(&ok), PolicyDecision::Allow);
+        }
+        // save_view 也放行（写盘范围窄：只写渲染产物；越狱照样拦）。
+        let mut w = ctx(ToolName::QwenSaveView);
+        w.file_path = Some("lecture.mp4".to_owned());
+        assert_eq!(evaluate_policy(&w), PolicyDecision::Allow);
+        // 越狱路径一律拒（含 Qwen 的 video_path/image_path 键 ——
+        // 拒绝发生在网关，不等执行层）。
+        for bad in ["../secret.mp4", "/etc/passwd", "~/keys.mp4"] {
+            let mut bad_ctx = ctx(ToolName::QwenReadVideo);
+            bad_ctx.file_path = Some(bad.to_owned());
+            assert!(
+                matches!(evaluate_policy(&bad_ctx), PolicyDecision::Deny { .. }),
+                "qwen tool must refuse '{bad}'"
+            );
+        }
+        // 人接管时与其他工具一样拒一切 Bot 动作。
+        let mut controlled = ctx(ToolName::QwenMediaInfo);
+        controlled.human_has_control = true;
+        assert!(matches!(
+            evaluate_policy(&controlled),
+            PolicyDecision::Deny { .. }
+        ));
     }
 
     #[test]

@@ -4907,6 +4907,7 @@ dependencies = [
 name = "neotrix-neobot"
 version = "0.23.0"
 dependencies = [
+ "base64 0.21.7",
  "chrono",
  "clap",
  "log",

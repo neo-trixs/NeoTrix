@@ -43,6 +43,7 @@ pub mod nt_http_engine;
 pub mod nt_memory;
 pub mod nt_policy;
 pub mod nt_provider;
+pub mod nt_qwen_mm;
 pub mod nt_reply_tag;
 pub mod nt_routine;
 pub mod nt_side_chat;

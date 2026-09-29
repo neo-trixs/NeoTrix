@@ -13,6 +13,9 @@ path = "src/bin/neobot.rs"
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
+# Qwen-MM-Plugins 会话客户端解码 MCP image 块用（与 neotrix-core 同版本，
+# Cargo.lock 已有 base64 0.21.7，只加图边不加新包）。
+base64 = "0.21"
 tokio = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }

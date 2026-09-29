@@ -1,5 +1,11 @@
 //! Qwen-MM-Plugins 能力 manifest —— 把外部多模态能力注册进 NeoTrix。
 //!
+//! ⚠️ 2026-09-29 更新：**模型自主执行链不在本文件**。这里是 core 的 MCP
+//! 注册表（人经 CLI/`/mcp` 执行的供给面）；模型自主调的那条链落在
+//! `crates/neotrix-neobot/src/nt_qwen_mm.rs` + `nt_agent::execute_qwen_mm`
+//! —— 那里是唯一真在逐个执行模型点名工具的环。两者共用同一个上游
+//! （`qwen-mm-plugins-core`，同一 tag、同一起动探测），不重复实现。
+//!
 //! 吸收源: QwenLM/Qwen-MM-Plugins (Apache-2.0，2026-09-28 main)。
 //! 工具名/参数形状逐项核对过其源码（`TOOL` 声明与 Pydantic `Args` 模型）；
 //! 描述为转述（非逐字复制），出处见每工具注释。版本钉死
@@ -22,271 +28,16 @@
 //! - 启动约定：`src/capabilities/*/.mcp.json`（`uvx --from ...@tag`）
 //! - 系统依赖表：`.../core/__init__.py:SYSTEM_DEPS`
 
-use std::path::PathBuf;
-
 use crate::agent::tool::mcp::{McpToolDef, McpTransport, RiskLevel};
 use crate::agent::tool::{register_stdio_session_global, McpRegistry};
-use crate::nt_mcp_stdio_session::{McpListedTool, DEFAULT_TIMEOUT_MS};
-
-// ---------------------------------------------------------------------------
-// 版本与命名（钉死上游 `plugin-versions.json` + `.mcp.json` 约定）
-// ---------------------------------------------------------------------------
-
-/// core 能力：插件名 / 版本 / tag。
-pub const QWEN_MM_CORE_PLUGIN: &str = "qwen-mm-plugins-core";
-pub const QWEN_MM_CORE_VERSION: &str = "1.1.0";
-
-/// search 能力：插件名 / 版本 / tag。
-pub const QWEN_MM_SEARCH_PLUGIN: &str = "qwen-mm-plugins-search";
-pub const QWEN_MM_SEARCH_VERSION: &str = "1.1.0";
-
-/// 上游 tag 格式：`qwen-mm-plugins-{cap}-v{version}`。
-pub fn release_tag(capability: &str, version: &str) -> String {
-    format!("qwen-mm-plugins-{capability}-v{version}")
-}
-
-/// core 工具默认超时：帧渲染类有界但慢，90s（kill 开关仍在）。
-pub const CORE_TIMEOUT_MS: u64 = 90_000;
-
-/// search 工具超时：网络调用服务端自带超时，这里只做上限。
-pub const SEARCH_TIMEOUT_MS: u64 = DEFAULT_TIMEOUT_MS;
-
-/// 源码 checkout 定位环境变量（sparse-checkout 只需
-/// `src/capabilities/<cap>` + `src/shared` + `src/mcp_framework.py`）。
-pub const QWEN_MM_CHECKOUT_ENV: &str = "QWEN_MM_PLUGINS_CHECKOUT";
-
-// ---------------------------------------------------------------------------
-// 启动探测
-// ---------------------------------------------------------------------------
-
-/// 启动方式（探测结论，按优先级排序）。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LaunchVia {
-    /// `uvx --from "qwen-mm-plugins[<extra>] @ git+...@<tag>" <entry>`（官方方式）。
-    Uvx,
-    /// PATH 上的已安装入口（`qwen-mm-plugins-core`）。
-    Path,
-    /// 源码 checkout：`python3 <pkgdir>`（`__main__.py` 自带 sys.path 注入，
-    /// 零 PYTHONPATH 配置）。
-    SourceCheckout,
-}
-
-/// 探测到的启动方式。
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct QwenLaunch {
-    pub server_name: String,
-    pub command: String,
-    pub args: Vec<String>,
-    pub via: LaunchVia,
-}
-
-/// 探测失败：带可操作的安装指引（不注册、不断链）。
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct QwenResolveError {
-    pub server: String,
-    pub reason: String,
-    /// 用户照做即生产（精确命令）。
-    pub hint: String,
-}
-
-impl std::fmt::Display for QwenResolveError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} unavailable: {}. {}",
-            self.server, self.reason, self.hint
-        )
-    }
-}
-
-impl std::error::Error for QwenResolveError {}
-
-/// PATH 查找（只判存在性，不 spawn；可执行位不校验——家用机够用，误报由
-/// spawn 失败转为 `Spawn` 错误兜底）。
-fn path_lookup(name: &str) -> Option<PathBuf> {
-    path_lookup_in(name, None)
-}
-
-/// 可注入的环境 —— 生产走真实环境，测试走隔离值，**零全局变更**。
-///
-/// 背景：直接改 `PATH` 跑测试会和同进程并行测试（12k）竞态
-/// （`Command::new("bash")` 靠 PATH 解析）。本结构让探测逻辑可测，
-/// 又不碰进程全局状态。
-#[derive(Debug, Clone, Default)]
-pub struct ResolveEnv {
-    /// `None` = 读真实 `PATH`；`Some(dirs)` = 只在这些目录里找。
-    pub path_dirs: Option<Vec<PathBuf>>,
-    /// `None` = 读真实 `QWEN_MM_PLUGINS_CHECKOUT`；`Some(x)` = 覆盖
-    /// （`Some(None)` = 视为未设）。
-    pub checkout: Option<Option<PathBuf>>,
-}
-
-impl ResolveEnv {
-    /// 生产环境（读真实进程环境）。
-    pub fn live() -> Self {
-        Self::default()
-    }
-}
-
-fn path_lookup_in(name: &str, dirs: Option<&[PathBuf]>) -> Option<PathBuf> {
-    let owned: Vec<PathBuf>;
-    let search_dirs: &[PathBuf] = match dirs {
-        Some(d) => d,
-        None => {
-            let path_var = std::env::var_os("PATH")?;
-            owned = std::env::split_paths(&path_var).collect();
-            &owned
-        }
-    };
-    for dir in search_dirs {
-        if dir.as_os_str().is_empty() {
-            continue;
-        }
-        let cand = dir.join(name);
-        if cand.is_file() {
-            return Some(cand);
-        }
-    }
-    None
-}
-
-/// 通用探测：`plugin`（如 `qwen-mm-plugins-core`）+ `extra`（如 `core`）。
-fn resolve_launch(
-    plugin: &str,
-    extra: &str,
-    version: &str,
-) -> Result<QwenLaunch, QwenResolveError> {
-    resolve_launch_with(plugin, extra, version, &ResolveEnv::live())
-}
-
-/// 通用探测（环境可注入，供测试隔离——见 `ResolveEnv`）。
-fn resolve_launch_with(
-    plugin: &str,
-    extra: &str,
-    version: &str,
-    env: &ResolveEnv,
-) -> Result<QwenLaunch, QwenResolveError> {
-    let lookup = |name: &str| path_lookup_in(name, env.path_dirs.as_deref());
-    let checkout_dir: Option<PathBuf> = match &env.checkout {
-        None => std::env::var_os(QWEN_MM_CHECKOUT_ENV).map(PathBuf::from),
-        Some(o) => o.clone(),
-    };
-    let capability = plugin.strip_prefix("qwen-mm-plugins-").unwrap_or(plugin);
-    let install_hint = format!(
-        "install: uvx --from \"qwen-mm-plugins[{extra}] @ git+https://github.com/QwenLM/Qwen-MM-Plugins.git@{} \" {plugin} \
-         | or sparse-checkout the repo and set {QWEN_MM_CHECKOUT_ENV}=<dir>",
-        release_tag(capability, version),
-    );
-
-    // 1) 官方方式：uvx。
-    if lookup("uvx").is_some() {
-        return Ok(QwenLaunch {
-            server_name: plugin.to_string(),
-            command: "uvx".to_string(),
-            args: vec![
-                "--from".to_string(),
-                format!(
-                    "qwen-mm-plugins[{extra}] @ git+https://github.com/QwenLM/Qwen-MM-Plugins.git@{}",
-                    release_tag(capability, version)
-                ),
-                plugin.to_string(),
-            ],
-            via: LaunchVia::Uvx,
-        });
-    }
-    // 2) PATH 上已有入口。
-    if lookup(plugin).is_some() {
-        return Ok(QwenLaunch {
-            server_name: plugin.to_string(),
-            command: plugin.to_string(),
-            args: Vec::new(),
-            via: LaunchVia::Path,
-        });
-    }
-    // 3) 源码 checkout（`__main__.py` 自举 sys.path，直接 `python3 <pkgdir>`）。
-    if let Some(dir) = checkout_dir {
-        let pkg = dir
-            .join("src")
-            .join("capabilities")
-            .join(capability)
-            .join(plugin.replace('-', "_"));
-        if pkg.join("__main__.py").is_file() {
-            let python = lookup("python3")
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_else(|| "python3".to_string());
-            return Ok(QwenLaunch {
-                server_name: plugin.to_string(),
-                command: python,
-                args: vec![pkg.to_string_lossy().to_string()],
-                via: LaunchVia::SourceCheckout,
-            });
-        }
-    }
-    Err(QwenResolveError {
-        server: plugin.to_string(),
-        reason: "no uvx, no PATH entry, and no source checkout".to_string(),
-        hint: install_hint,
-    })
-}
-
-/// 探测 core 服务器启动方式。
-pub fn resolve_core_launch() -> Result<QwenLaunch, QwenResolveError> {
-    resolve_launch(QWEN_MM_CORE_PLUGIN, "core", QWEN_MM_CORE_VERSION)
-}
-
-/// 探测 search 服务器启动方式。
-pub fn resolve_search_launch() -> Result<QwenLaunch, QwenResolveError> {
-    resolve_launch(QWEN_MM_SEARCH_PLUGIN, "search", QWEN_MM_SEARCH_VERSION)
-}
-
-// ---------------------------------------------------------------------------
-// 系统依赖探测（对 `SYSTEM_DEPS` 表的诚实投影：只报二进制存在性）
-// ---------------------------------------------------------------------------
-
-/// 单个系统依赖的探测结论。
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SystemDep {
-    pub label: String,
-    pub present: bool,
-}
-
-/// core 能力需要的外部二进制（`__init__.py:SYSTEM_DEPS` 子集——只含
-/// "装即有、无需 pip" 的项；pip 包的存在性不探，避免 spawn python）。
-pub fn core_system_dep_status() -> Vec<SystemDep> {
-    let probe = |label: &str, bins: &[&str]| SystemDep {
-        label: label.to_string(),
-        // 任一候选存在即算满足（soffice 是 libreoffice 的别名式存在）。
-        present: bins.iter().any(|b| path_lookup(b).is_some()),
-    };
-    vec![
-        probe(
-            "read_video / media_info (video & audio)",
-            &["ffmpeg", "ffprobe"],
-        ),
-        probe(
-            "visualize: Office / DrawIO (LibreOffice)",
-            &["libreoffice", "soffice"],
-        ),
-        probe("visualize: LaTeX (.tex)", &["pdflatex"]),
-        probe("visualize: 3D best-quality render (Blender)", &["blender"]),
-    ]
-}
-
-/// search 后端 key 存在性（只返回"有/无"，值永不外露）。
-pub fn search_credential_status() -> Vec<(String, bool)> {
-    [
-        "SERPER_API_KEY",
-        "TAVILY_API_KEY",
-        "EXA_API_KEY",
-        "SERPLY_API_KEY",
-    ]
-    .iter()
-    .map(|k| {
-        let present = std::env::var_os(k).is_some_and(|v| !v.is_empty());
-        (k.to_string(), present)
-    })
-    .collect()
-}
+use crate::nt_mcp_stdio_session::McpListedTool;
+// 启动探测与版本常量已下移 neobot（2026-09-29，与模型自主执行链同住）；
+// 此处 import 保持本模块自洽，且不重复实现探测逻辑。
+use neotrix_neobot::nt_qwen_mm::{
+    resolve_core_launch, resolve_search_launch, search_credential_status, QwenLaunch,
+    QwenResolveError, CORE_TIMEOUT_MS, QWEN_MM_CORE_PLUGIN, QWEN_MM_SEARCH_PLUGIN,
+    SEARCH_TIMEOUT_MS,
+};
 
 // ---------------------------------------------------------------------------
 // Manifest：core 7 工具（转述自源码 docstring + Pydantic 字段，见模块头）
@@ -676,6 +427,9 @@ pub fn register_qwen_mm_all_global() -> Vec<QwenRegisterReport> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // 这几个符号的实现在 neobot（探测/版本随模型自主执行链同住），
+    // core 侧测试按需借来断言（tag 格式、探测形状仍是 core 契约的一部分）。
+    use neotrix_neobot::nt_qwen_mm::{core_system_dep_status, release_tag, LaunchVia};
 
     #[test]
     fn test_release_tag_format_matches_upstream() {
@@ -733,62 +487,6 @@ mod tests {
         assert!(names.contains(&"web_search"));
         assert!(names.contains(&"web_extractor"));
         assert!(names.contains(&"image_search"));
-    }
-
-    #[test]
-    fn test_path_lookup_missing_binary_is_none() {
-        assert!(path_lookup("definitely-not-a-real-binary-nt-xyz").is_none());
-    }
-
-    #[test]
-    fn test_resolve_without_anything_reports_install_hint() {
-        // 注入空环境 → 三路探测全灭，必须回可操作的 hint。零全局变更
-        // （改 PATH 会和同进程并行测试竞态，见 `ResolveEnv` 文档）。
-        let dir = std::env::temp_dir().join(format!(
-            "nt_qwen_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
-        std::fs::create_dir_all(&dir).expect("test temp dir");
-        let env = ResolveEnv {
-            path_dirs: Some(vec![dir.clone()]),
-            checkout: Some(None),
-        };
-        let e = resolve_launch_with(QWEN_MM_CORE_PLUGIN, "core", QWEN_MM_CORE_VERSION, &env)
-            .expect_err("must fail with empty env");
-        assert!(e.hint.contains("qwen-mm-plugins-core-v1.1.0"));
-        assert!(e.to_string().contains("unavailable"));
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn test_resolve_source_checkout_layout() {
-        // 伪造最小 checkout 树 → 必须走 SourceCheckout（同样零全局变更）。
-        let base = std::env::temp_dir().join(format!(
-            "nt_qwen_checkout_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
-        let pkg = base
-            .join("src")
-            .join("capabilities")
-            .join("core")
-            .join("qwen_mm_plugins_core");
-        std::fs::create_dir_all(&pkg).expect("fake checkout tree");
-        std::fs::write(pkg.join("__main__.py"), "# fake\n").expect("fake main");
-        let env = ResolveEnv {
-            path_dirs: Some(vec![base.join("no-such-bin-dir")]),
-            checkout: Some(Some(base.clone())),
-        };
-        let l = resolve_launch_with(QWEN_MM_CORE_PLUGIN, "core", QWEN_MM_CORE_VERSION, &env)
-            .expect("checkout resolves");
-        assert_eq!(l.via, LaunchVia::SourceCheckout);
-        assert!(l.args.iter().any(|a| a.contains("qwen_mm_plugins_core")));
-        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]
@@ -861,7 +559,7 @@ mod tests {
     fn test_system_dep_status_shape() {
         // 只断言形状（label 是能力描述，不是二进制名；present 位随本机变，不测）。
         let deps = core_system_dep_status();
-        let labels: Vec<&str> = deps.iter().map(|d| d.label.as_str()).collect();
+        let labels: Vec<&str> = deps.iter().map(|(l, _)| l.as_str()).collect();
         assert_eq!(
             labels,
             [

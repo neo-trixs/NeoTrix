@@ -193,6 +193,12 @@ impl HttpEngine {
         if self.vision_capable() {
             system.push_str(VISION_PROMPT);
         }
+        // Qwen-MM-Plugins 会话工具的挂载判据与 `tool_schemas` 同一函数
+        // （`resolve_core_launch().is_ok()`）——两处必须同时成立，否则会出现
+        // 「提示词教它用、schema 里却没有」或反向的空转。
+        if qwen_mm_mounted() {
+            system.push_str(QWEN_MM_PROMPT);
+        }
         if let Some(memory) = self.memory_context.as_deref() {
             system.push_str("\n\n");
             system.push_str(memory);
@@ -324,11 +330,36 @@ const VISION_PROMPT: &str = "\n\n视觉：你有 `read_image` 工具。工具结
 工具报错、或结果里只有路径而没有图像部件时，说明这张图没到你手上：直说「我看不到这张图」，\
 不要根据文件名、路径或上下文猜画面内容。\n";
 
+/// 多模态工具挂载后的附加条款 —— 只在 Qwen-MM 会话工具**已挂载**时接在
+/// 系统提示后面（挂载判据 = 探测到服务器，见 `tool_schemas`）。
+///
+/// 存在的理由：这些工具的能力来自外部 Python 进程，**可能缺依赖**（ffmpeg、
+/// LibreOffice…）。没挂载时模型压根看不见它们（不会浪费轮次）；挂载了但某个
+/// 工具运行期报缺依赖时，模型必须**转述那句错**而不是编一个结果 —— 与
+/// `VISION_PROMPT` 同一纪律：没看到就说没看到。
+const QWEN_MM_PROMPT: &str = "\n\n多模态文件工具（Qwen-MM-Plugins 会话）：\
+`qwen_media_info` / `qwen_read_video` / `qwen_visualize` 读媒体与文档，`qwen_save_view` 把页/帧落盘。\
+路径一律给 workspace 内的相对路径（绝对路径与 `..` 会被网关拒）。\
+看视频/长文档：先 `qwen_media_info`，再小步取帧或渲染页面，别一次要几十页。\
+任一工具报错（含「缺 ffmpeg / 缺 LibreOffice」）时，把那句错如实转述给用户，别假装成功、别用文字描述替代你没看到的画面。\n";
+
+/// Qwen-MM-Plugins 会话工具是否挂载（唯一判据，`tool_schemas` 与
+/// `chat_body` 共用——提示词与 schema 必须同步，否则模型会被教一个它调不到的
+/// 工具，或拿到一个没人教它的工具）。
+///
+/// 探测是**零 spawn** 的 PATH/目录检查（`nt_qwen_mm::resolve_core_launch`），
+/// 所以每请求做一次也就几次 syscall；探测失败 ⇒ 不挂载（fail-closed：
+/// 不支持 ≠ 已列出）。
+fn qwen_mm_mounted() -> bool {
+    crate::nt_qwen_mm::resolve_core_launch().is_ok()
+}
+
 /// OpenAI function schemas — 与本地网关工具 1:1 (`computer_act` 仅 opt-in).
 ///
 /// `read_image` 同样**按能力挂载**：引擎/模型看不见图时就不摆上桌。挂了却在
 /// 执行期才失败，模型会白白浪费一轮去发现「这台机器没有眼睛」。
 fn tool_schemas(offer_computer: bool, offer_vision: bool) -> Vec<serde_json::Value> {
+    let offer_qwen_mm = qwen_mm_mounted();
     let mut tools = vec![
         serde_json::json!({"type": "function", "function": {
             "name": "bash",
@@ -405,6 +436,52 @@ fn tool_schemas(offer_computer: bool, offer_vision: bool) -> Vec<serde_json::Val
             "parameters": {"type": "object", "properties": {
                 "path": {"type": "string", "description": "workspace 内相对路径（如 attachments/shot.png）"},
             }, "required": ["path"]},
+        }}));
+    }
+    // Qwen-MM-Plugins 会话工具（模型自主调；**按能力挂载**——探测不到服务器就
+    // 不摆上桌，理由同 `read_image`：挂了却在执行期才失败，模型会白白浪费
+    // 一轮去发现「这台机器没装」）。
+    //
+    // 全部 `required` 只留路径类参数：`budget`/`fps`/`pages` 交给上游默认值
+    // （core 的默认值是调过的：budget=normal、fps=0 自动按片长选）。
+    if offer_qwen_mm {
+        tools.push(serde_json::json!({"type": "function", "function": {
+            "name": "qwen_media_info",
+            "description": "先查媒体/文档元数据（ffprobe 读头，不解码整片，秒回）。视频/音频**先调这个**再看别处：拿 codec/fps/旋转/VFR 标志，否则时间戳算错。NIfTI 会给 shape/dtype/spacing/orientation。",
+            "parameters": {"type": "object", "properties": {
+                "path": {"type": "string", "description": "workspace 内相对路径"},
+                "raw": {"type": "boolean", "description": "返回原始 JSON（默认 false=人读摘要）"},
+            }, "required": ["path"]},
+        }}));
+        tools.push(serde_json::json!({"type": "function", "function": {
+            "name": "qwen_read_video",
+            "description": "抽视频帧（fps=0 按片长自动选采样率；预算 small/normal/large 控分辨率）。抽出的帧会作为图像部件随下一轮抵达你。**先调 qwen_media_info** 再调它。",
+            "parameters": {"type": "object", "properties": {
+                "video_path": {"type": "string", "description": "workspace 内相对路径"},
+                "fps": {"type": "number", "description": "采样率；0=自动（默认）"},
+                "budget": {"type": "string", "enum": ["small", "normal", "large"], "description": "分辨率预算（默认 normal）"},
+                "start_time": {"type": "number", "description": "窗口起（秒）"},
+                "end_time": {"type": "number", "description": "窗口止（秒）"},
+            }, "required": ["video_path"]},
+        }}));
+        tools.push(serde_json::json!({"type": "function", "function": {
+            "name": "qwen_visualize",
+            "description": "把任意文件渲染成图给你看：PDF/SVG 页、CSV/XLSX 表、代码高亮、DrawIO、字幕、NIfTI 体（本地只读，非诊断用途）、GIS、3D、notebook、LaTeX。**看文档/数据/代码用这个**，别只 read_file 读文本。",
+            "parameters": {"type": "object", "properties": {
+                "file_path": {"type": "string", "description": "workspace 内相对路径"},
+                "pages": {"type": "string", "description": "页码范围，如 \"1-5\""},
+                "budget": {"type": "string", "enum": ["small", "normal", "large"], "description": "分辨率预算（默认 large）"},
+                "max_pages": {"type": "integer", "description": "页数上限（默认 20）"},
+            }, "required": ["file_path"]},
+        }}));
+        tools.push(serde_json::json!({"type": "function", "function": {
+            "name": "qwen_save_view",
+            "description": "把文档页/视频帧**落盘**成 workspace 内 .neotrix-mm/ 下的图片文件（不直接回显图像）。要随后放大、标注或细看某几页/某几帧时用这个，再用 read_image 读产出的文件。",
+            "parameters": {"type": "object", "properties": {
+                "file_path": {"type": "string", "description": "workspace 内相对路径（源）"},
+                "pages": {"type": "string", "description": "页码范围，如 \"1,4,7\""},
+                "times": {"type": "array", "items": {"type": "number"}, "description": "视频时间点（秒）"},
+            }, "required": ["file_path"]},
         }}));
     }
     // 侧边栏导航：模型**提议**界面打开什么，Rust 侧只成文不执行。
@@ -1231,6 +1308,32 @@ mod tests {
         tools
             .iter()
             .find(|tool| tool.pointer("/function/name").and_then(|v| v.as_str()) == Some(name))
+    }
+
+    #[test]
+    fn qwen_mm_mounting_is_honest_both_ways() {
+        // 挂载判据与 schema 挂载**同一函数**：探测到服务器 ⟺ 4 个工具在列。
+        // 无论本机装没装，这个双向蕴含都成立（装了：两边真；没装：两边假），
+        // 所以测试是确定性的 —— 不会出现在 CI 没装、本机装了就红的那种 flake。
+        use super::{qwen_mm_mounted, tool_schemas};
+        let mounted = qwen_mm_mounted();
+        let schemas = tool_schemas(false, false);
+        for name in ["qwen_media_info", "qwen_read_video", "qwen_visualize", "qwen_save_view"] {
+            assert_eq!(
+                tool_named(&schemas, name).is_some(),
+                mounted,
+                "schema presence of '{name}' must track mount predicate"
+            );
+        }
+        if mounted {
+            // 挂载时：media_info 只读 1 个 required（path），别的不许偷偷加必填。
+            let mi = tool_named(&schemas, "qwen_media_info").expect("mounted");
+            let required = mi
+                .pointer("/function/parameters/required")
+                .and_then(serde_json::Value::as_array)
+                .map(Vec::len);
+            assert_eq!(required, Some(1));
+        }
     }
 
     #[test]
