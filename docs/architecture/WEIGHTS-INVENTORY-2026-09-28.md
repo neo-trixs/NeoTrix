@@ -27,6 +27,14 @@
 ~/Downloads/Neo/weights-backup/training-20260928.tar.gz.sha256  校验和
 ```
 
+**跨盘（本机无第二块盘，需手动）：**
+```bash
+cp ~/Downloads/Neo/weights-backup/training-20260928.tar.gz* /Volumes/<你的盘>/
+# 到那边后验一下：
+shasum -a 256 /Volumes/<你的盘>/training-20260928.tar.gz
+# 必须等于 training-20260928.tar.gz.sha256 里的值
+```
+
 55 个文件（已排除 `__pycache__` / `*.pyc`，那些是编译产物）。
 往返验证：解包到临时区，55 个文件与源 `diff -q` 无差异。
 

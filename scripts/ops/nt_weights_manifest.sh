@@ -34,7 +34,8 @@ MODELS_DIR="$REPO_ROOT/models"
 MANIFEST="$REPO_ROOT/docs/architecture/WEIGHTS-MANIFEST.sha256"
 # 不可再生产物的备份落点。与 bare 仓同盘: 防误删/误操作, **不防磁盘故障** ——
 # 真要跨盘, 把这个文件拷到另一块介质。
-BACKUP_DIR="${NT_WEIGHTS_BACKUP_DIR:-$REPO_ROOT/../Neo/weights-backup}"
+# 默认落点与 bare 仓同盘（防误删，不防磁盘故障）。跨盘见下。
+BACKUP_DIR="${NT_WEIGHTS_BACKUP_DIR:-/Users/neo/Downloads/Neo/weights-backup}"
 BACKUP_TAR="$BACKUP_DIR/training-$(date +%Y%m%d).tar.gz"
 
 # 不可再生 = 训练产物。可再生 = 任何可从 HF 重新拉取的权重文件。
@@ -161,6 +162,7 @@ do_status() {
   printf '  清单: %s\n' "$([ -f "$MANIFEST" ] && echo "在 ($(grep -c '^\[' "$MANIFEST") 项)" || echo '未生成')"
   printf '  备份: %s\n' "$(ls -1 "$BACKUP_DIR"/training-*.tar.gz 2>/dev/null | tail -1 || echo '无')"
   printf '  ⚠ 备份与仓库同盘, 不防磁盘物理故障。\n'
+  printf '  跨盘: cp %s/training-*.tar.gz* /Volumes/<你的盘>/\n' "$BACKUP_DIR"
 }
 
 # 已核实的上游来源。**键是本地相对路径，值是 "repo@revision|上游LFS-oid"**。
