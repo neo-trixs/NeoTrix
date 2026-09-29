@@ -166,7 +166,15 @@ def mods_of(f):
             if os.path.exists(c):
                 res.append(c)
                 break
-    for m in re.finditer(r'#\[path\s*=\s*"([^"]+)"\][^\n]*?\bmod\s+([A-Za-z0-9_]+)', src):
+    # 2026-09-29 修：`[^\n]*?` 只允许 `#[path = "..."]` 与 `mod NAME` **同行**。
+    # 实际代码常写成：
+    #     #[path = "tests/x.rs"]      ← 换行
+    #     mod x;
+    # 那种写法会让本正则整条不匹配 ⇒ 真实存在的文件被判为 UNREACHABLE
+    # （假阳性）。实测踩中：nt_evolution_eval_tests.rs。
+    #
+    # 改成 [\s\S]{0,200}? 并**限制窗口**，避免跨越到下一个 mod 声明。
+    for m in re.finditer(r'#\[path\s*=\s*"([^"]+)"\][\s\S]{0,200}?\bmod\s+([A-Za-z0-9_]+)', src):
         t = m.group(1)
         for c in (f'{d}/{t}', f'{stem}/{t}', t):
             if os.path.exists(c):

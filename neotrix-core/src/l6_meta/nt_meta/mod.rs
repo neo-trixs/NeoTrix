@@ -48,6 +48,35 @@ pub use knowledge_gap_detector::{
 };
 pub use monitor::{AlertSeverity, HealthCheck, HealthTrend, MetaAlert, MetaMonitor};
 
+/// 进化验证底座（D-3 裁决产物）。
+///
+/// ⛔ **未接线**：`eval_engine` 三个文件（650 行）仍在磁盘上但**不声明**。
+/// 它们零生产消费者，且 `llm_judge.rs:86` 是 `let normalized = 1.0;`
+/// —— **硬编码满分，从不调 LLM**，与它自己的文件名不符。
+/// ⛔ 接线前必须先修 judge（否则是「永远满分」的假测量）。
+/// 见 `docs/architecture/DECISIONS-REQUIRED-2026-09-29.md` D-3。
+// pub mod eval_engine;
+
+/// 自进化验证底座 —— 补上「改了一版，怎么知道变好了」这一层。
+///
+/// 与 `eval_engine` 的区别：那个是**通用评测原语**（数据集/变体/判官算术），
+/// 这个是**进化判决**（臂中立 A/B + 噪声地板 + veto + 预注册 + 账本）。
+///
+/// L5 通过 `l5_cognition::traits::EvalHarnessApi` 消费本层，
+/// **不直接 `use crate::l6_meta::*`**（见 traits.rs:133-139 的跨层隔离约定）。
+pub mod nt_evolution_eval;
+
+pub use nt_evolution_eval::nt_evolution_eval::{
+    case_level_regressions, estimate_noise_floor, judge_ab, judge_case, noise_threshold, pass_rate,
+    safety_regressions, Arm, CaseOutcome, CaseSpec, ClaimFidelity, EnvFingerprint, Ledger,
+    LedgerEntry, NoiseFloor, Preregistration, Unverified, Verdict, Veto,
+};
+
+/// 单元测试（`nt_evolution_eval` 的非空门证明）。
+#[cfg(test)]
+#[path = "tests/nt_evolution_eval_tests.rs"]
+mod nt_evolution_eval_tests;
+
 // NOTE: 以下模块已声明但内部编译错误待修复，暂时注释
 // pub mod otel_bridge;
 // pub mod session_replay;
