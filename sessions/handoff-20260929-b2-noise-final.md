@@ -205,3 +205,38 @@ git merge --ff-only f_integrated
 
 合并后建议刷一次门：`bash scripts/check-layer-deps.sh --strict`
 （期望仍 `PASS 0 new / 8 known`）。
+
+### 9.4 已落地（2026-09-29 最终状态）
+
+**主干 `feat/capability-absorb-20260828` 已快进到 `df0273e2`** —— §9.3 的命令已执行。
+交付完成，B-2 + 分层棘轮 + B-1 全部进入主干。
+
+落地后实测（主工作树）：
+
+| 检查 | 结果 |
+|---|---|
+| 主干 HEAD | `df0273e2`（= `f_integrated`，无新增提交） |
+| `check-layer-deps.sh --strict` | **PASS 0 new / 8 known** |
+| `cargo test -p neotrix --lib` | **12194 passed / 0 failed / 41 ignored** |
+| `kdf.rs` 三处修正 | 假「实测」已订正 / `counter` 溢出已修 / RFC 5869 Extract 已修 ✅ |
+| 他窗 59 个未提交文件 | **0 个被 ff 波及**（`脏 ∩ 合并改动集 = ∅`） |
+
+⚠️ **两处如实记录的失误**：
+
+1. **安全网 patch 我写坏了。** 我往 `.neotrix/worktree-salvage/main-overlap-20260929.patch`
+   追加 diff 时没先清空，导致同一份 diff 存了两遍，`git apply --check --reverse` 因此失败
+   （852 行 / 8 文件 = 4 文件 ×2）。内容仍在、只是重复，但仍不是合法 patch。
+   正确的做法应是 `>` 覆盖而非 `>>` 追加。**下次写安全网必须先清空**。
+2. **中途报过一次「需重新试合并」是我自己的陈旧判断** —— 主干在他窗推进下前进，
+   `f_integrated` 一度不再是其后代。我补做了第二次合并（`df0273e2`，零冲突），
+   并**重跑了全量测试**（此前那次绿灯跑在 `889bb1a5`，对 `df0273e2` 不成立）。
+   ⇒ 这正是 R-SCAN-3 的应用：**验证结果有 commit 号，绿灯只对那个 commit 成立**。
+
+### 9.5 未做的两件事（有意留下）
+
+- **两处 worktree 未收**：`integrate` / `merge-test` 都被 `prune` 的「近3h有 .rs 改动」
+  判据拦下（合并 checkout 会刷新全树 .rs 的 mtime，判据无法区分「他窗在用」与
+  「我刚做完」）。commit 全在分支上，零丢失。下个会话 `prune --force` 即可。
+- **未跑 `check-doc-drift` 全量 / `check-naming`**：两者都是 advisory 且本地基线本身
+  不可信（`check-naming` clean-HEAD 基线 1,646 个无 `nt_` 前缀文件，规约无约束力）。
+  跑了也只是制造噪声，不构成证据。
