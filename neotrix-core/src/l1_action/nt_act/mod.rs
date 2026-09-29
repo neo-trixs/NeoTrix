@@ -22,8 +22,10 @@ pub mod nt_act_crypto;
 
 // Types module
 pub mod nt_act_types;
-pub mod acp_protocol;
 pub mod async_tool_executor;
+pub mod tool_contract;
+pub use async_tool_executor::AsyncToolExecutor;
+pub mod acp_protocol;
 
 // Provider abstraction for model-agnostic LLM routing
 pub mod provider_abstraction;
@@ -32,7 +34,6 @@ pub mod provider_abstraction;
 pub mod nt_act_voice;
 
 // Tool contracts
-pub mod tool_contract;
 
 // ============================================================================
 // Backward-compat re-exports
@@ -42,7 +43,6 @@ pub use actions::core::action_cache as nt_act_action_cache;
 pub use actions::security::disk_guard as nt_act_disk_guard;
 pub use actions::media::media as nt_act_media;
 pub use actions::security::sandbox as nt_act_sandbox;
-pub use actions::security::security as nt_act_security;
 
 pub mod deferred_loader;
 pub use deferred_loader::DeferredLoader;
@@ -81,4 +81,3 @@ pub mod communication;
 // Re-exports for cross-module integration
 pub use reference_view::ReferenceManager;
 pub use acp_protocol::AcpProtocol;
-pub use async_tool_executor::AsyncToolExecutor;
