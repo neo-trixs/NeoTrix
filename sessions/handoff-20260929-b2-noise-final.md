@@ -88,9 +88,9 @@
 
 | worktree | 用途 | 去向 |
 |---|---|---|
-| `.worktrees/merge-test` | B-2 隔离开发 + 合并探测 | 已 `prune --force` 移除（收工后，commit 全在 `f_merged_ratchet`） |
-| `.worktrees/ratchet` | 分层棘轮 102→8 | 已 `prune --force` 移除（`8d5b3ef1` 是 `f_merged_ratchet` 祖先，零丢失） |
-| `/private/tmp/nt-v4` | **非本会话**（他窗） | 未动 —— 门正确识别「近3h有改动」并跳过 |
+| `.worktrees/ratchet` | 分层棘轮 102→8 | ✅ 已 `prune --force` 移除（`8d5b3ef1` 是 `f_merged_ratchet` 祖先，零丢失） |
+| `.worktrees/merge-test` | B-2 隔离开发 + 合并探测 | ⚠️ **仍在**。`prune` 的「近3h有 .rs 改动」判据把它判成他窗在用而跳过（本会话自己改的），且它无法从自身位置被 prune。commit 全在 `f_merged_ratchet`（`243d36d5`），零丢失。**下个会话顺手 `prune --force` 即可**（体积极小，无 `target/`） |
+| `/private/tmp/nt-v4` | **非本会话**（他窗） | 未动。它在本会话两次 prune 之间被**他窗自己**删除（主树 HEAD 同时从 `b9b08b80` 变到 `9799044c`）；本会话两次运行均未执行 `git worktree remove`（见下「`--force` 空转 bug」） |
 | 主工作树 `/Users/neo/Downloads/neotrix` | **非本会话** | 未动 —— 61 个他窗未提交文件 |
 
 ### 8.2 未提交改动的去向
@@ -106,6 +106,20 @@
 | `docs/.../B2-NOISE-IK-RESOLUTION-20260928.md` | §7 落地证据 + §8 教训 | ☑ 已提交（`54e48f2e`） |
 | `docs/.../DECISIONS-2026-09-28.md` | B-2 状态 + 首因证伪 | ☑ 已提交（`54e48f2e`） |
 | `docs/.../LESSONS-…-consumer-audit.md` | L23–L26 | ☑ 已提交（`54e48f2e`） |
+
+### 8.2.1 顺带修掉一个门脚本 bug（`prune --force` 静默空转）
+
+派发器是 `cmd_prune "${2:-}"`（把 flag 传成**函数内 `$1`**），而 `cmd_prune` 里读的是
+`FORCE=${2:-}` —— 函数内 `$2` 不存在 ⇒ `FORCE` **恒为空** ⇒ 永远走不到
+`git worktree remove`。**AGENTS.md 文档化的 `prune --force` 从来没生效过**，
+每次都只打印「加 --force 才实际执行」然后什么都不做。
+
+已修为 `FORCE=${1:-}`。判别方法（下次核对门是否真在跑）：
+看 mode 行是否含 `--force`，例如
+`mode=prune --force —— 双闸 + patch 兜底`；不含就说明 flag 没被解析。
+
+这是「门看起来在工作、实际是空转」的又一例 —— 与 R-SCAN-3（陈旧门记录）
+同类，但更隐蔽：它不产生错误，只让清理流程静默失效。
 
 ### 8.3 门状态
 

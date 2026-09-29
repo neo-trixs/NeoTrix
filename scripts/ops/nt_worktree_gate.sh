@@ -125,7 +125,11 @@ salvage_one() {
 }
 
 cmd_prune() {
-    FORCE=${2:-}   # set -u 下必须显式兜底，否则 $2 未传时报 unbound variable
+    # ⚠️ 派发器是 `cmd_prune "${2:-}"` —— flag 已被传成**函数内的 $1**。
+    #    原先这里读 $2（函数内不存在）⇒ FORCE 恒空 ⇒ `prune --force` 静默空转，
+    #    永远走不到 `git worktree remove`。文档化的 --force 实际从来没生效过。
+    #    2026-09-29 修复：改读 $1。改前请用 `prune` 输出核对 mode 行是否含 `--force`。
+    FORCE=${1:-}   # set -u 下必须显式兜底，否则未传时报 unbound variable
     say "[worktree-gate] mode=prune${FORCE:+ --force} —— 双闸 + patch 兜底（R-DISK-2/5）"
     for d in $(list_worktrees); do
         _name=$(basename "$d")
