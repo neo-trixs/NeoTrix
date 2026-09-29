@@ -6,11 +6,10 @@
 
 use std::collections::{HashMap, HashSet};
 
-#[derive(Debug, Clone)]
-pub struct ScoredDoc {
-    pub id: String,
-    pub score: f64,
-}
+// 2026-09-29: `ScoredDoc` 已统一到 `super::ScoredDoc`（本模块 mod.rs）。
+// 原先本文件有一份同名同字段的副本，导致 `fusion_engine.rs` 需要三条
+// `use ... as *ScoredDoc` 别名才能把三种检索结果拼起来。
+use super::ScoredDoc;
 
 pub struct EntityIndex {
     entity_to_docs: HashMap<String, HashSet<String>>,

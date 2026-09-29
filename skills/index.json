@@ -403,9 +403,24 @@
           "dependencies": []
         }
       }
+    },
+    "nt_multimodal": {
+      "description": "Multimodal perception bridge (Qwen-MM-Plugins absorption)",
+      "skills": {
+        "nt_multimodal": {
+          "description": "Multimodal file inspection via Qwen-MM-Plugins bridge — media_info first, dynamic-resolution read_image/read_video, visualize-anything, save_view chains, credential-gated web/image search",
+          "tags": ["multimodal", "vision", "video", "mcp", "qwen-mm-plugins"],
+          "triggers": ["multimodal", "image", "video", "visualize", "media_info", "read_image", "reverse-image"],
+          "exclusions": ["text-only document parsing (use nt_file_ability)", "model training (use models/training)"],
+          "output_contract": "tool calls return text plus saved-image file paths; search tools require backend API keys",
+          "license": "Apache-2.0 (upstream QwenLM/Qwen-MM-Plugins); glue code follows repo license",
+          "dependencies": ["mcp-gateway"]
+        }
+      }
     }
   },
   "skill_index": {
+    "nt_multimodal/nt_multimodal": {"category": "nt_multimodal", "file": "nt_multimodal/SKILL.md"},
     "architecture-auditor": {"category": "architecture-auditor", "file": "architecture-auditor/SKILL.md"},
     "architecture-auditor/diagnose": {"category": "architecture-auditor", "file": "architecture-auditor/diagnose/SKILL.md"},
     "architecture-auditor/domain-modeling": {"category": "architecture-auditor", "file": "architecture-auditor/domain-modeling/SKILL.md"},

@@ -15,6 +15,29 @@ pub mod fusion_engine;
 pub mod semantic_search;
 pub mod temporal_scoring;
 
+// 2026-09-29 融合三份重复的 `ScoredDoc` 定义（`bm25_search.rs` /
+// `entity_search.rs` / `semantic_search.rs`），统一到此处。
+//
+// 依据：三者字段集与 derive 完全相同（`{ id: String, score: f64 }`），
+// 且**同属本模块**（不是跨层的刻意镜像 —— 与 `AwarenessReport` 那组不同，
+// 那组三处横跨 L0/L1/L5 且 L1 侧注释自证是接口隔离层）。
+//
+// 代价证据（融合前）：`fusion_engine.rs:6-8` 不得不写三条 import + 三个别名
+//   use super::bm25_search::ScoredDoc     as BM25ScoredDoc;
+//   use super::entity_search::ScoredDoc   as EntScoredDoc;
+//   use super::semantic_search::ScoredDoc as SemScoredDoc;
+// 三个 `search()` 各自返回**不同类型**，于是融合函数的三个参数是
+// `&[SemScoredDoc]` / `&[BM25ScoredDoc]` / `&[EntScoredDoc]` —— 字段完全一样
+// 却无法放进同一个 `Vec`。这就是重复的实际成本。
+//
+// 融合后：三个检索器共享同一结果类型，融合函数可接收 `&[ScoredDoc]` 任意组合，
+// 未来新增检索策略无需再定义第四份。
+#[derive(Debug, Clone)]
+pub struct ScoredDoc {
+    pub id: String,
+    pub score: f64,
+}
+
 pub use bm25_search::BM25Index;
 pub use entity_search::EntityIndex;
 pub use fusion_engine::{FusedResult, FusionEngine, FusionWeights};

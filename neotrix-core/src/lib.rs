@@ -52,6 +52,8 @@ pub mod skill_loader;
 pub mod skill_registry;
 pub mod nt_route_features; // D1 深特征路由（纯规则，零模型）
 pub mod nt_reuse; // D2 结晶复用率仪表（kv 后端，零 migration）
+pub mod nt_mcp_stdio_session; // MCP stdio 会话客户端（Qwen-MM-Plugins 吸收，2026-09-28）
+pub mod nt_qwen_mm_manifests; // Qwen-MM-Plugins core/search manifest + 注册胶水（同上）
 pub mod neotrix;
 pub mod config;
 pub mod unified_cmd;

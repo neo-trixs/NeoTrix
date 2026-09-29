@@ -6,6 +6,22 @@ use super::{dim, err, info, init_brain, print_brain_stats, set_default_model_fro
 use neotrix::config::NeoTrixConfig;
 use super::{desktop, headless, standalone};
 
+/// Qwen-MM-Plugins 注册报告打印（吸收，2026-09-28）。
+///
+/// 已注册 → 报工具数；未注册 → 报原因 + 安装指引（`skipped` 的 hint），
+/// 不 panic、不中断启动（fail-closed：不支持≠已列出）。
+fn print_qwen_mm_report(rep: &neotrix::nt_qwen_mm_manifests::QwenRegisterReport) {
+    match &rep.skipped {
+        None => println!(
+            "{}: {} ({} tools)",
+            info(rep.server.clone()),
+            success("multimodal ready"),
+            rep.registered_tools,
+        ),
+        Some(e) => println!("{}: {}", info(rep.server.clone()), e.reason),
+    }
+}
+
 pub fn run_standalone_mode(stage: usize) {
     let rt = tokio_runtime();
     rt.block_on(async {
@@ -106,6 +122,11 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
         }];
         builtin_tools.extend(Vec::<neotrix::agent::tool::mcp::McpToolDef>::new());
         mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
+        // Qwen-MM-Plugins 吸收 (2026-09-28)：会话式注册 core/search 多模态工具。
+        // 探测不到启动方式时不注册、只报告（fail-closed）；探测零 spawn。
+        for rep in neotrix::nt_qwen_mm_manifests::register_qwen_mm_all(&mut mcp_registry) {
+            print_qwen_mm_report(&rep);
+        }
 
         let mut orchestrator = neotrix::agent::tool::ToolOrchestrator::default();
         orchestrator.register_native_all(mcp_registry.as_native_tools());
@@ -340,6 +361,10 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
         }];
         builtin_tools.extend(Vec::<neotrix::agent::tool::mcp::McpToolDef>::new());
         mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
+        // Qwen-MM-Plugins 吸收 (2026-09-28)：同上（ephemeral 路径同样接线）。
+        for rep in neotrix::nt_qwen_mm_manifests::register_qwen_mm_all(&mut mcp_registry) {
+            print_qwen_mm_report(&rep);
+        }
 
         let mut orchestrator = neotrix::agent::tool::ToolOrchestrator::default();
         orchestrator.register_native_all(mcp_registry.as_native_tools());

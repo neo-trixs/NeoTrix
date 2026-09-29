@@ -47,6 +47,7 @@ LIC_MISSING = []
 FM_MISSING = []       # SKILL.md 缺 frontmatter
 FM_FIELD_MISSING = [] # frontmatter 有但缺必填字段
 NO_FILE = []          # index 指向的 SKILL.md 不存在
+BROKEN_LINKS = []     # SKILL.md 内的相对链接指向不存在的路径
 
 # ---- 文件侧 frontmatter 解析（不引第三方依赖，容忍 YAML 不完整）----
 FM_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---", re.S)
@@ -97,6 +98,10 @@ for cat_name, cat in index.get("categories", {}).items():
             LIC_MISSING.append(label)
 
         # ---- 文件侧：解析 skill_index 指向的真实 SKILL.md ----
+        # ---- 文档侧：SKILL.md 里的相对链接是否指向真实路径 ----
+        # 2026-09-28 加：`skills/SKILL.md` 曾列 `src-tauri/`（已随 5c02e738 删除）
+        # 一年无人发现。分类表里的死链是**导航腐烂**的入口 —— 照着点进去才发现
+        # 目录不存在。判据同上：**路径不存在 ≠ 该面为空**。
         idx_entry = index.get("skill_index", {}).get(label) \
                     or index.get("skill_index", {}).get(skill_name)
         rel = (idx_entry or {}).get("file")
@@ -121,11 +126,32 @@ else:
     for f in FM_FIELD_MISSING:
         fails.append(f"{f}: FAIL frontmatter missing fields")
 
+# ---- 文档侧：扫**整棵 skills 树**的 SKILL.md 相对链接 ----
+# 2026-09-28：首版只在 index 覆盖的条目里查，而 `skills/SKILL.md`（顶层导航，
+# 含全部分类的链接表）**不在 index.json 里** ⇒ 循环漏掉它，死链照样过。
+# 教训与 nt_scan_surface 同源：检查的覆盖面本身也会漂。
+import glob as _glob
+for _md in _glob.glob(os.path.join(skills_root, "**", "SKILL.md"), recursive=True):
+    try:
+        with open(_md, encoding="utf-8", errors="replace") as _fh:
+            _body = _fh.read()
+    except OSError:
+        continue
+    _dir = os.path.dirname(_md)
+    for _lm in re.finditer(r"\[([^\]]+)\]\(([^)]+)\)", _body):
+        _t = _lm.group(2).split("#")[0].strip()
+        if not _t or _t.startswith(("http://", "https://", "mailto:")):
+            continue
+        if not os.path.exists(os.path.normpath(os.path.join(_dir, _t))):
+            BROKEN_LINKS.append(
+                f"{os.path.relpath(_md, skills_root)} -> {_t}")
+
 print(f"skill-gate: {total} skills, {three_part} three-part complete, "
       f"{len(fails)} gate findings, {len(LIC_MISSING)} missing license(advisory)")
 print(f"skill-gate: file-side — {len(NO_FILE)} index-path missing, "
       f"{len(FM_MISSING)}/{total} SKILL.md without frontmatter (advisory), "
-      f"{len(FM_FIELD_MISSING)} frontmatter incomplete")
+      f"{len(FM_FIELD_MISSING)} frontmatter incomplete, "
+      f"{len(BROKEN_LINKS)} broken doc links")
 for line in fails[:20]:
     print("  " + line)
 if len(fails) > 20:
@@ -134,6 +160,10 @@ if FM_MISSING:
     _fm_ex = ", ".join(FM_MISSING[:3])
     print(f"  advisory: {len(FM_MISSING)} SKILL.md lack frontmatter ⇒ "
           f"在 Agent Skills 规范的 agent 里不可自动发现 (e.g. {_fm_ex})")
+if BROKEN_LINKS:
+    _bl_ex = "; ".join(BROKEN_LINKS[:5])
+    print(f"  FAIL: {len(BROKEN_LINKS)} SKILL.md 内的相对链接指向不存在的路径 (e.g. {_bl_ex})")
+    print("       ⇒ 导航腐烂：照着点进去才发现目录不存在。路径不存在 ≠ 该面为空。")
 if NO_FILE:
     _nf_ex = ", ".join(NO_FILE[:3])
     print(f"  FAIL: {len(NO_FILE)} index entries point to missing files "

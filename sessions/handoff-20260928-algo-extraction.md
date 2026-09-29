@@ -377,3 +377,140 @@ unused import」。**动手前复核那一行，内容已变、mtime 是 42 秒�
 - 门：layer-deps 101known/0new · truth-surface EMPTY/UNDECLARED/TRACKED 全 0
   （UNCOMMITTED_DEP=2 是他窗新文件未入库，门如实报告）· find 31/31 ·
   manifest 5/5 · scan-surface 21/21 · lock-audit 0 · 全绿
+
+## 12. 收尾二：占位 skill 治理 + 死链门（2026-09-29）
+
+### 12.1 三个占位 skill：标注而非删除 `3e9e8783`
+`code-expert`/`law-expert`/`mcp-gateway` —— 只有 SKILL.md 一个文件、零实现、
+**仓内消费者 0 处**、84 天未动。
+
+**取证澄清一处误判**：初查 `mcp-gateway` 有"1 处引用"，实为
+`models/training/repo_meta.jsonl` 里某 GitHub repo 的 `topics` 字段恰好叫
+`mcp-gateway` —— 不是消费。**index.json 的引用是注册关系，也不等于使用。**
+
+**不删的四个理由**（删的证据齐了，但四条反证更硬）：
+① 删 skill 要同步改 index.json + skill_loader + check-skill-gate（多点风险）
+② `code-expert`/`law-expert` 是**真实能力领域**，只是内容待补
+   ⇒「待建设」而非「错误资产」
+③ 同类先例：`trending/` 5 个被 Rust 取代的 skill 本会话也没删
+④ 删除不可逆（git 之外无副本）
+
+⇒ 加 `disable-model-invocation: true`（模型不自动加载）+ 正文
+「状态：PLACEHOLDER」写明不承担职责与真实承接者（`mcp-gateway` →
+`crates/neotrix-gateway`）。**依据「导出 ≠ 调用」：0 消费者是删除的必要
+条件，不是充分条件。**
+
+### 12.2 `skills/SKILL.md`：死链存在一年无人发现
+- 移出 `src-tauri/`（已随 5c02e738 删除）
+- 解决自相矛盾：`crates/` 曾同时列在「skill 目录」与「非 skill 核心目录」
+- 补 11 个漏列分类（external-absorption / research-absorption /
+  self-iteration-agent / self-health / productivity / root + 3 占位 +
+  trending 移入废弃段并标注已被 L1/L3/L5 Rust 取代）
+
+### 12.3 根本预防：门加死链检查
+`check-skill-gate.sh` 新增文档侧相对链接校验。判据与 `nt_scan_surface` 同源：
+**路径不存在 ≠ 该面为空**（分类表里的死链是「导航腐烂」入口）。
+
+**首版有覆盖面盲区，靠注入法自测抓到**：初版只在 `index.json` 覆盖的条目里查，
+而 `skills/SKILL.md`（顶层导航，含全部链接表）**不在索引里** ⇒ 死链照样过。
+改为扫整棵树。⇒ 这是本会话**第 10 次**翻车，同型于 nt_scan_surface 盲区 #1
+（把「已注册的对象」当成了「全部对象」）。已补进 lessons 档第 10 条。
+
+### 12.4 收工自查（§8 最终）
+- worktree **2 个**（他窗新建 1 个 + ratchet），**本会话新建 0 个**
+- 主仓未提交 22 项，其中 6 项是他窗 multimodal 方向（QWEN-MM manifests /
+  nt_mcp_stdio_session / skills/nt_multimodal / check-capability-manifests.sh）
+  ⇒ **本会话零产物留在工作区**
+- 8 个门：layer-deps 101known/0new · truth-surface EMPTY/UNDECLARED/TRACKED
+  全 0（UNCOMMITTED_DEP=2 是他窗新文件未入库，门如实报告）·
+  skill-gate 0 broken doc links · find 32/32 · manifest 5/5 ·
+  scan-surface 21/21 · lock-audit 0
+
+## 13. 「哪些单文件该融合」—— 结论是**不该现在融合**，理由有实证（`20016818`）
+
+### 13.1 三种朴素判据，三种答案，全部不成立
+| 判据 | 指向 | 为什么错 |
+|---|---|---|
+| 文件行数排序 | `nt_channel_telegram.rs`(2353行) 等 15 个巨型文件 | 它内部结构完整（`TelegramChannel` 一个类型 + 9 个私有辅助函数），**不是"多件事塞一起"**。大 ≠ 该融合 |
+| 同名动词聚类 | 34 个 `*Score`、17 个 `*parse*` | `MergeStrategy` 在 xlsx、`RenderMode` 在游戏引擎 —— **领域不同的合理同名** |
+| 同类型名跨文件 | 871 个，看着全是问题 | **绝大多数字段集不同** |
+
+⇒ **「同名」不等于「重复」**。硬判据是 **同名 + 字段集完全相同**。
+
+### 13.2 实测规模
+```
+同名类型（分布多文件）        589 个
+  ├─ 同名 + 字段集完全相同    122 组  ⬅ 融合候选
+  └─ 合理同名（字段集不同）    467 个  ⬅ 不该动（改了会毁掉分层）
+```
+
+抽样：`AwarenessReport` 3 处（l0/l1/l5）**字段集完全相同** ⇒ 真重复；
+同名的第 4 处（`l6_meta/healing/nt_mind_consciousness_monitor.rs`）有
+**11 字段**而那 3 处各 6 字段 ⇒ 不同东西，工具正确排除。
+
+### 13.3 为什么交付工具而非直接融合
+三条实证理由：
+① 字段集相同 ≠ 语义相同 —— 本例 3 处 derive 确实一致，但**分属 L0/L1/L5
+   三层，各自 trait 实现与调用方都不同**
+② 跨层移动类型会触发 `check-layer-deps.sh` 的层归属裁决
+③ 本仓「导出 ≠ 调用」已误删 3~5 次；本会话刚因误删 `ratchet` 靠 patch 恢复
+
+把 122 组候选一次性自动改，会同时踩这三条。
+⇒ `scripts/ops/nt_dup_types.py` **只提供判据与证据**，改不改由人裁决。
+
+### 13.4 工具可信度的一次交叉验证
+与独立 `grep -rl` 核对时，我一度以为工具漏报（grep 4 处 / 工具 3 处）。
+逐字段复核确认**工具对、grep 太粗**。
+> 通则：**更精确的判据会把更粗判据的"错误"暴露成自己的"缺陷"**。
+> 交叉验证时先问「谁的判据更精确」，而不是「谁报少了」。
+
+已接 task-index（33 条），触发词「融合 / 精简 / 重复 / 去重」。
+
+## 14. 融合候选的筛选口径升级 + 首个真融合（`a29a5ab1` → `63104ff8`）
+
+### 14.1 上一组裁决：AwarenessReport **不融合**（`a29a5ab1`）
+三处字段+derive 完全一致，但 `l1_action/nt_act/nt_act_autonomy/types.rs:1-5`
+明写「L1-local type equivalents … **mirror** the L5 types … **L1 must NOT
+depend on L5**. When L5 evolves, these **stay stable** as the **interface
+contract** for the oracle gate」⇒ **刻意的接口隔离层**。
+改成 `use l0` 会让 L1 与 L5 共享同一类型 ⇒ L5 演进直接波及 L1。
+
+> **第一组候选就推翻了自动化的假设。** 字段集相同是**必要条件**不是充分条件 ——
+> 真正的判据还要读**注释里的意图**。这验证了「工具只给判据不自动改」的决定。
+
+### 14.2 把「读注释」这件事自动化（`63104ff8` 上半）
+既然作者写下的注释是权威判据，就不该让人工读 122 组注释。内建
+`DELIBERATE_MARKERS`（16 个标记：mirror / stay stable / interface contract /
+must NOT depend / l1-local / 刻意 / 故意 …），扫**定义紧邻窗口 + 文件头
+模块级说明**两处。
+
+**实现踩坑**：首版只扫紧邻窗口，而 `AwarenessReport` 的刻意声明在
+`types.rs:1-5`（文件头）、定义在第 28 行 ⇒ **漏判 False（错把刻意当疏忽）**。
+加文件头扫描后修正，并**顺带检出另一组此前未知的** `OriEvalCase`
+（`nt_io_provider/gateway/types.rs:1` 自证「L1-local benchmark types for
+challenge evaluation」）。
+
+### 14.3 首个真融合：ScoredDoc（`63104ff8` 下半）
+满足全部可动条件：字段集+derive 完全相同 / **同属一个模块** /
+**无任何刻意声明**。
+
+**代价证据（重复的实际成本）**：`fusion_engine.rs:6-8` 不得不写
+三条 import + 三个别名（`as BM25ScoredDoc` / `as EntScoredDoc` /
+`as SemScoredDoc`），于是融合函数三个参数是三个**不同类型** ——
+**字段完全一样却无法放进同一个 `Vec`**。
+
+改动：统一到 `mod.rs`；三个检索器改 `use super::ScoredDoc`；
+`fusion_engine` 三别名合并为一条。
+
+### 14.4 三档分类（当前）
+```
+✅ 真疏忽候选（无刻意声明）  118 组 ⬅ 可逐组取证
+⛔ 刻意镜像（注释自证）        2 组 别动
+⚖️  已人工裁决                1 组（AwarenessReport）
+```
+（融合前 122 组，ScoredDoc 融合后降为 118 ⇒ **工具自证修复生效**）
+
+### 14.5 验证
+`cargo check --lib` 通过 · `test --lib hybrid_retrieval` 1 passed ·
+`check-layer-deps --strict` 101known/**0new** ·
+`nt_dup_types --name ScoredDoc` 已不在候选。

@@ -15,17 +15,33 @@
 | [design](design/) | 前端设计 + UI 设计 | `design/` |
 | [e2e](e2e/) | 端到端测试 | `e2e/` |
 | [crates](crates/) | Rust 包管理 | `crates/` |
-| [trending](trending/) | 热门项目模式 | `skills/trending/` |
 | [architecture-auditor](architecture-auditor/) | 架构审计 + 工程技能 | `skills/architecture-auditor/` |
-| [docs-architecture](docs-architecture/) | 架构文档 + 重构方案 | `skills/docs-architecture/` |
+| [docs-architecture](docs-architecture/) | 架构文档 + 重构方案（v0.21 快照，已被 `docs/architecture/` 取代） | `skills/docs-architecture/` |
+| [external-absorption](external-absorption/) | 外部仓库功能吸收工作流 | `skills/external-absorption/` |
+| [research-absorption](research-absorption/) | 长循环研究吸收流水线 | `skills/research-absorption/` |
+| [self-iteration-agent](self-iteration-agent/) | 全栈自迭代协议 | `skills/self-iteration-agent/` |
+| [self-health](self-health/) | 5 维自健康协议（命令已被 `scripts/ops/*` 取代） | `skills/self-health/` |
+| [productivity](productivity/) | 表达效率技能 | `skills/productivity/` |
+| [root](root/) | 根级技能（如 `design-patrol`） | `skills/root/` |
+| [code-expert](code-expert/) | ⚠️ **占位**，零实现 | `skills/code-expert/` |
+| [law-expert](law-expert/) | ⚠️ **占位**，零实现 | `skills/law-expert/` |
+| [mcp-gateway](mcp-gateway/) | ⚠️ **占位**，真实实现见 `crates/neotrix-gateway` | `skills/mcp-gateway/` |
+| [trending](trending/) | ⚠️ 5 个模式卡均已被 L1/L3/L5 的 Rust 模块取代 | `skills/trending/` |
 
 ## Core Code Directories (Not Skills)
 
 | Directory | Purpose | Maintained By |
 |-----------|---------|---------------|
-| `neotrix-core/` | 核心库 | Rust 开发者 |
-| `src-tauri/` | Tauri 桌面应用 | Rust 开发者 |
-| `crates/` | Rust 包 | Rust 开发者 |
+| `neotrix-core/` | 核心库（L0–L6 分层） | Rust 开发者 |
+| `crates/` | Rust 包（workspace member） | Rust 开发者 |
+| `scripts/` | 门禁 + 运维脚本（**不是 skill**） | 见 `.neotrix/task-index.json` |
+| `docs/` | 架构正典 | — |
+
+> 2026-09-28 修正两处：
+> - **`src-tauri/` 已删除**（桌面端随 5c02e738 归档 599 files，现由
+>   `crates/neotrix-neobot` 承接）⇒ 移出本表。
+> - **`crates/` 本在上表「skill 目录」里也列过**（`skills/crates/` 是指向
+>   顶层 `crates/` 的**文档卡**，非第二套实现）⇒ 现只在此表列一次。
 
 ## Architecture Principles
 

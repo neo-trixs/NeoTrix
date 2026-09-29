@@ -471,6 +471,43 @@
       "read_only": true,
       "when_not": "退出码非 0 表示有扫描面已消失 ⇒ 该扫描器会输出**看似正常的 0**。先看 KNOWN-GONE 是否已解释；未解释的须人工确认",
       "spec": "路径不存在 ≠ 该面为空"
+    },
+    {
+      "id": "qwen-mm-setup",
+      "query": [
+        "多模态",
+        "看图",
+        "读视频",
+        "visualize",
+        "media_info",
+        "qwen-mm",
+        "无key",
+        "multimodal bridge",
+        "NIfTI",
+        "PDF渲染"
+      ],
+      "tool": "bash scripts/ops/nt_qwen_mm_setup.sh",
+      "kind": "ops",
+      "read_only": false,
+      "when_not": "需要联网（github＋pypi 各一次）；search/omni 系工具不在此列 —— 它们要 API key，走 credential 门",
+      "spec": "docs/architecture/ABSORPTION-QWEN-MM-2026-09-28.md §8"
+    },
+    {
+      "id": "dup-types",
+      "query": [
+        "重复类型",
+        "同名类型",
+        "融合",
+        "精简",
+        "该不该合并",
+        "去重",
+        "重复定义"
+      ],
+      "tool": "python3 scripts/ops/nt_dup_types.py",
+      "kind": "ops",
+      "read_only": true,
+      "when_not": "**同名 ≠ 重复** —— 实测 589 同名里只有 122 组字段集相同，其余 467 是领域不同的合理同名（改它们会毁掉分层）。且字段集相同只是**候选**，融合是架构决策：改层归属 + 动 trait 实现 + 「导出≠调用」已误删 3~5 次",
+      "spec": "提供判据，不自动改"
     }
   ],
   "excluded": {

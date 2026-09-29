@@ -137,16 +137,39 @@ pub fn setup_heartbeat(
 mod tests {
     use super::*;
 
+    /// Full jitter 下单次抽样的单调性是伪命题（b1∈[0,1000)、b3∈[0,4000)，
+    /// P(b1≥b3)≈1/8，2026-09-28 全量跑挂过一次）——测代码真正承诺的不变量：
+    /// 每次结果必在 [0, capped] 内，且永不超 max。
     #[test]
-    fn test_backoff_increases() {
+    fn test_backoff_bounded_by_cap() {
         let base = Duration::from_secs(1);
         let max = Duration::from_secs(60);
-        let b1 = backoff_with_jitter(base, 1, max);
-        let b2 = backoff_with_jitter(base, 2, max);
-        let b3 = backoff_with_jitter(base, 3, max);
-        // 平均值应该递增
-        assert!(b1.as_millis() < b3.as_millis());
-        assert!(b2.as_millis() <= max.as_millis());
+        for attempt in 1..=8u32 {
+            let cap_ms = (1000.0 * 2_f64.powi(attempt as i32 - 1)).min(60_000.0) as u128;
+            for _ in 0..200 {
+                let b = backoff_with_jitter(base, attempt, max);
+                assert!(
+                    b.as_millis() <= cap_ms,
+                    "attempt {attempt}: {}ms > cap {cap_ms}ms",
+                    b.as_millis()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_backoff_never_exceeds_max() {
+        let base = Duration::from_secs(1);
+        let max = Duration::from_secs(60);
+        // attempt 很大（指数早被 cap）时仍 ≤ max。
+        for _ in 0..200 {
+            let b = backoff_with_jitter(base, 100, max);
+            assert!(
+                b.as_millis() <= max.as_millis(),
+                "overflow max: {}ms",
+                b.as_millis()
+            );
+        }
     }
 
     #[test]
