@@ -41,6 +41,11 @@ jobs:
         run: bash scripts/check-layer-deps.sh --strict
       - name: "Truth-surface gate (ratchet: blocks NEW 0-byte .rs / undeclared test modules / tracked build artifacts)"
         run: bash scripts/check-truth-surface.sh --strict
+      # 2026-09-29 新增（N-1）。本 job 组同时跑 3 个 OS，但本门只读 git 索引与
+      # workflow 文本，跑一次即可 —— 放在 matrix 里是浪费，但放外面要多一个 job，
+      # 权衡后留在 `check` 的第一步之前（秒级，无需 cargo）。
+      - name: "CI reference gate (no job may point at a path git does not track)"
+        run: bash scripts/check-ci-refs.sh --strict
 
   test:
     runs-on: ${{ matrix.os }}
@@ -111,58 +116,24 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --check
 
-  frontend-tests:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: neocodex-frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: neocodex-frontend/package-lock.json
-      - run: npm ci
-      - run: npm test
-
-  frontend-coverage:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: neocodex-frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: neocodex-frontend/package-lock.json
-      - run: npm ci
-      - run: npm run coverage
-      - name: Upload frontend coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-coverage
-          path: neocodex-frontend/coverage
-          retention-days: 14
-          if-no-files-found: ignore
-
-  frontend-build:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: neocodex-frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: neocodex-frontend/package-lock.json
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run build
+  # ---------------------------------------------------------------------------
+  # 2026-09-29 移除 4 个幻影 job：frontend-tests / frontend-coverage /
+  # frontend-build / e2e。
+  #
+  # 实测依据（`EVOLUTION-ROADMAP-CODE-NODES-2026-09-29.md` N-1）：
+  #   - `neocodex-frontend/` 在 .gitignore:136 被整目录忽略，
+  #     `git ls-files` 跟踪 0 个文件，磁盘上不存在
+  #   - `e2e/` 同样 0 跟踪、磁盘上不存在
+  #   - `src-tauri/` 已于 5c02e738 归档（599 files）
+  #   ⇒ 这 4 个 job 在**任何干净检出上必然失败**（npm ci 在不存在的工作目录）。
+  #     它们不是"偶尔红"，是恒红 —— 而恒红的门会训练人忽略红色。
+  #
+  # 这与提交 3edf3be7「发布链路: 移除幻影CSS门禁 (脚本不存在, 构建恒失败)」
+  # 是同一类问题，那次修在 package.json，这次复发在 CI 层。
+  #
+  # 防复发：scripts/check-ci-refs.sh 在 CI 里检查每个 job 的
+  # working-directory / path 是否被 git 跟踪。见 ci.yml 的 `check` job。
+  # ---------------------------------------------------------------------------
 
   full-features:
     runs-on: ubuntu-latest
@@ -173,25 +144,6 @@ jobs:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --features full --lib -p neotrix
-
-  e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo build --release --bin neotrix
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm install
-        working-directory: e2e
-      - run: npx playwright install chromium
-        working-directory: e2e
-      - run: npm test
-        working-directory: e2e
-        env:
-          NEOTRIX_BIN: ${{ github.workspace }}/target/release/neotrix
 
   test-action:
     runs-on: ubuntu-latest

@@ -10,13 +10,300 @@
 #     extractors::{data_pipeline, platform_registry} — no such module
 #     nt_mind::sales_coaching — deleted in commit 3bba2507 "首批死码清除"
 #   => abandoned API scaffolding, not a working suite that was forgotten.
-#      Needs a keep/kill decision before it can be declared. See
-#      neotrix-core/src/l1_action/nt_act/nt_act_trade/tests/mod.rs header.
+# UNDECLARED / UNREACHABLE (2026-09-29 扩域后新增，见
+# EVOLUTION-ROADMAP-CODE-NODES-2026-09-29.md N-2)
 #
-# EMPTY (54) — the 4 extraction crates (neotrix-reasoning / -consciousness /
-#   -multi-agent / -gateway) shipped manifests + `pub mod` + L5 facade re-exports
-#   without moving the code. l5_cognition/mod.rs:127-201 re-exports 46 of them as
-#   if they were public API. Needs a fill-or-rollback decision.
+# 起因：本门 class 2 原范围是 `-path '*/tests/*'`，即**只有字面叫 tests 的目录**。
+# 而本门自己的动机注释（:4-9）描述的就是同一个病 —— `cargo test` 全绿而 311 个测试
+# 从未被编译。那次只修好了 nt_act_trade/tests/，同类问题在普通模块目录里从未被覆盖。
 #
-# TRACKED (3) — fixed 2026-09-27 via `git rm --cached`; these entries are stale and
-#   will drop out of the baseline on the next --update-baseline.
+# 实测口径：从每个 crate root（lib.rs / main.rs / bin/*.rs）出发做**传递 mod 可达性**
+# （含 mod X; / mod X {} / #[path=] / include! 四种形式），对磁盘上 2,774 个 .rs
+# 求差集。**不用 dep-info 当 oracle** —— `target/debug/deps/neotrix.d` 只覆盖单个
+# target（列 2,225 个，磁盘有 2,550），用它判会把 bin / integration-test 的文件
+# 大面积误报为「未编译」。
+#
+# ⛔ 这批**不是**待修的 bug，是**待裁决的存量**。实测 221 条全部是 git 已跟踪文件
+#   （干净检出同样存在），不是任何窗口的 WIP。三类，处置方式各不相同：
+#   (a) 已归档/被取代的旧引擎 —— 明显的有 nt_consciousness_core/archive/、
+#       nt_shield/defense/**（21 个）、nt_mind/nt_mind/{self_evolver,federation,
+#       dao_engine,knowledge_miner,ethical_intuition}.rs、multi_agent/**（15 个）
+#   (b) 忘了加 mod —— 如 nt_act/tool_registry.rs(770 行)、
+#       nt_memory_kb/{context_budget,process_skill_memory}.rs
+#       ⚠️ 补声明**之前**必须先问「它现在能编译吗」：见 (c)
+#   (c) **声明被注释掉** —— nt_memory/mod.rs:54 的 `pub mod hybrid_retrieval;`
+#       注「内部编译错误待修复」。那不是忘了声明，是**声明了但编译不过**，
+#       加回去会让干净检出编不过。hybrid_retrieval/**（6 个）属此类。
+#
+# ⛔ 盲删会打断活路径：DIR-REMEDY §2.5 记「导出 ≠ 调用」已错过 3 次。
+#   逐条裁决见 TODO.md；本门只负责**不让它继续增长**。
+#
+# 未列入本 baseline 的一条（故意）：
+#   UNCOMMITTED_DEP crates/neotrix-neobot/src/nt_qwen_mm.rs
+#   —— 那是**另一窗口的在制品**（`??` 未跟踪）。它不是 HEAD 的债，吸收进来等于
+#      把他人的中间态固化成「已知存量」。他自己提交时会被本门正常拦下。
+UNDECLARED crates/neotrix-types/src/core/nt_core_bank/compressor.rs
+UNDECLARED crates/neotrix-types/src/core/nt_core_knowledge/provider.rs
+UNDECLARED crates/neotrix-types/src/core/nt_crypto_util.rs
+UNDECLARED neotrix-core/src/l1_action/nt_act/actions/media/nt_3d_task_spec.rs
+UNDECLARED neotrix-core/src/l1_action/nt_act/nt_act_scheduler.rs
+UNDECLARED neotrix-core/src/l1_action/nt_act/nt_act_trade/orchestrator_compat.rs
+UNDECLARED neotrix-core/src/l1_action/nt_act/nt_act_trade/unified_types_compat.rs
+UNDECLARED neotrix-core/src/l1_action/nt_act/nt_act_workspace_isolator.rs
+UNDECLARED neotrix-core/src/l1_action/nt_act/provider_abstraction/models.rs
+UNDECLARED neotrix-core/src/l1_action/nt_act/tool_registry.rs
+UNDECLARED neotrix-core/src/l1_action/nt_infra_unified_search.rs
+UNDECLARED neotrix-core/src/l1_action/nt_io/nt_io_eli5.rs
+UNDECLARED neotrix-core/src/l1_action/nt_io/nt_io_protocol_bridge.rs
+UNDECLARED neotrix-core/src/l2_perception/error_conversions.rs
+UNDECLARED neotrix-core/src/l2_perception/nt_world/traits.rs
+UNDECLARED neotrix-core/src/l3_embodiment/nt_shield/adversarial_pipeline.rs
+UNDECLARED neotrix-core/src/l4_emotion/nt_memory/coverage_ledger.rs
+UNDECLARED neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/context_budget.rs
+UNDECLARED neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/process_skill_memory.rs
+UNDECLARED neotrix-core/src/l5_cognition/l1_facade_meta.rs
+UNDECLARED neotrix-core/src/l5_cognition/l1_facade_observer.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/consciousness_core.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/crystal_memory_distillation.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/unified_evolution.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/unified_learning.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/unified_memory.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/unified_pipeline.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/unified_state_machine.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/nt_mind/dao_engine.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/nt_mind/ethical_intuition.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/nt_mind/federation.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge_miner.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/core/execution_trace.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/nt_mind/self_evolver.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_absorption.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_consciousness.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_core.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_crystal.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_daily_intel.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_game.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_guard.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_maintenance.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/nt_mind_dual_track.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/seal/domain_mapper.rs
+UNDECLARED neotrix-core/src/l5_cognition/nt_mind/seal/source_adapter.rs
+UNDECLARED neotrix-core/src/l6_meta/lib.rs
+UNDECLARED neotrix-core/src/l6_meta/nt_core_qtest.rs
+UNDECLARED neotrix-core/src/l6_meta/nt_nexus/checkpoint.rs
+UNDECLARED neotrix-core/src/neotrix/nt_crystal_core/agent_orchestrator.rs
+UNDECLARED neotrix-core/src/neotrix/nt_crystal_core/memory_orchestrator.rs
+UNDECLARED neotrix-core/src/neotrix/nt_crystal_core/multi_graph_memory.rs
+UNDECLARED neotrix-core/src/neotrix/nt_crystal_core/observability.rs
+UNDECLARED neotrix-core/src/neotrix/nt_crystal_core/self_healing.rs
+UNREACHABLE crates/neotrix-types/src/cleanup_types.rs
+UNREACHABLE crates/neotrix-types/src/core/nt_core_bank/compressor.rs
+UNREACHABLE crates/neotrix-types/src/core/nt_core_knowledge/provider.rs
+UNREACHABLE crates/neotrix-types/src/core/nt_crypto_util.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/actions/media/nt_3d_task_spec.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/agent_loop/auditor.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/agent_loop/checker_executor.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/agent_loop/config.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/agent_loop/executor.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/agent_loop/manager.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/agent_loop/mod.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/agent_loop/operator_executor.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/agent_loop/planner_executor.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/agent_loop/trait_.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/geo_seo/geo.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/geo_seo/mod.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/geo_seo/search_engine.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/geo_seo/visibility.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/nt_act_dev_tools/build_desktop.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/nt_act_dev_tools/daemon_monitor.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/nt_act_dev_tools/git_hook.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/nt_act_dev_tools/mod.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/nt_act_scheduler.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/nt_act_trade/orchestrator_compat.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/nt_act_trade/unified_types_compat.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/nt_act_workspace_isolator.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/provider_abstraction/models.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/semantic_routing/catalog.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/semantic_routing/mod.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/semantic_routing/pattern.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/semantic_routing/router.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_act/tool_registry.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_infra_unified_search.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_io/nt_io_eli5.rs
+UNREACHABLE neotrix-core/src/l1_action/nt_io/nt_io_protocol_bridge.rs
+UNREACHABLE neotrix-core/src/l2_perception/error_conversions.rs
+UNREACHABLE neotrix-core/src/l2_perception/nt_world/crawl/dom_extractor/mod.rs
+UNREACHABLE neotrix-core/src/l2_perception/nt_world/crawl/ordered_backend_router/mod.rs
+UNREACHABLE neotrix-core/src/l2_perception/nt_world/sense/tests/integration.rs
+UNREACHABLE neotrix-core/src/l2_perception/nt_world/temporal_kg/entity.rs
+UNREACHABLE neotrix-core/src/l2_perception/nt_world/temporal_kg/fact_extractor.rs
+UNREACHABLE neotrix-core/src/l2_perception/nt_world/temporal_kg/graph_traversal.rs
+UNREACHABLE neotrix-core/src/l2_perception/nt_world/temporal_kg/knowledge_graph.rs
+UNREACHABLE neotrix-core/src/l2_perception/nt_world/temporal_kg/mod.rs
+UNREACHABLE neotrix-core/src/l2_perception/nt_world/temporal_kg/pagerank.rs
+UNREACHABLE neotrix-core/src/l2_perception/nt_world/temporal_kg/relation.rs
+UNREACHABLE neotrix-core/src/l2_perception/nt_world/temporal_kg/temporal_query.rs
+UNREACHABLE neotrix-core/src/l2_perception/nt_world/traits.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/adversarial_pipeline.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_boundary/circuit_breaker.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_boundary/containment.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_boundary/escape_detector.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_boundary/mod.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_core/asi_compliance.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_core/mod.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_core/reasoning_shield.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_core/trust_anchor.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_inner/input_sanitizer.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_inner/intent_remapper.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_inner/mod.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_inner/retrieval_gate.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_inner/trust_classifier.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_outer/behavior_monitor.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_outer/guardrail_sentinel.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_outer/mod.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_outer/output_filter.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/defense/ring_outer/resonance_detector.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/guard/agent_guardrails/input_validator.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/guard/agent_guardrails/mod.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/guard/agent_guardrails/output_validator.rs
+UNREACHABLE neotrix-core/src/l3_embodiment/nt_shield/guard/agent_guardrails/policy_engine.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_feel/cognition_bridge/config.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_feel/cognition_bridge/emotion_state.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/add_only_writes/memory_entry.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/add_only_writes/mod.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/add_only_writes/temporal_query.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/add_only_writes/temporal_store.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/admission_control/config.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/admission_control/gate.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/admission_control/mod.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/admission_control/policy.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/admission_control/scorer.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/coverage_ledger.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/decay_forgetting/config.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/decay_forgetting/curves.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/decay_forgetting/mod.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/decay_forgetting/pruner.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/decay_forgetting/salience.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/git_memory/mod.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/hybrid_retrieval/bm25_search.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/hybrid_retrieval/entity_search.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/hybrid_retrieval/fusion_engine.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/hybrid_retrieval/mod.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/hybrid_retrieval/semantic_search.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/hybrid_retrieval/temporal_scoring.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/nt_memory_cleanup/history_log.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/nt_memory_cleanup/mod.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/nt_memory_cleanup/rule_store.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/context_budget.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/process_skill_memory.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/nt_memory_knowledge_graph/audit_memory/mod.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/nt_memory_knowledge_graph/experience_memory/mod.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/nt_memory_knowledge_graph/mod.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/paged_kv/mod.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/tiered_memory/mod.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/tiered_memory/router.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/tiered_memory/tier_archival.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/tiered_memory/tier_core.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/tiered_memory/tier_recall.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/tiered_memory/traits.rs
+UNREACHABLE neotrix-core/src/l4_emotion/nt_memory/tiered_pipeline/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_consciousness/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/io_skills/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/io_skills/nt_io_eli5.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/knowledge/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/knowledge/nt_core_kg_traversal.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/knowledge/nt_core_knowledge_mgmt.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/knowledge/nt_core_knowledge_repr.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/knowledge/nt_core_rag.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/memory/consolidation.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/memory/emotional.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/memory/episodic.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/memory/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/memory/semantic.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/multi_agent/aggregation.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/multi_agent/coordinator/coordinator.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/multi_agent/coordinator/load_balancer.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/multi_agent/coordinator/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/multi_agent/coordinator/monitor.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/multi_agent/coordinator/task_routing.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/multi_agent/crew.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/multi_agent/delegation.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/multi_agent/graph_orch/dag.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/multi_agent/graph_orch/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/multi_agent/graph_orch/monitor.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/multi_agent/graph_orch/optimizer.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/multi_agent/graph_orch/scheduler.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/multi_agent/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/multi_agent/role.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/archive/crystal_consciousness_state_machine.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/archive/crystal_learning_loop.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/archive/crystal_unified_pipeline.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/consciousness_core.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/crystal_memory_distillation.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/unified_evolution.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/unified_learning.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/unified_memory.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/unified_pipeline.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/unified_state_machine.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core_gwt/cost_ladder/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core_gwt/decision_layer/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_core_gwt/evidence_gating/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/cross_domain/cross_domain_transfer.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/cross_domain/disagreement_gate.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/cross_domain/entity_mapping.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/cross_domain/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/cross_domain/reason_retrieve_refine.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/dual_track/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/jit_harness/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/nt_mind/dao_engine.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/nt_mind/ethical_intuition.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/nt_mind/federation.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge_miner.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/core/execution_trace.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/pipeline/tests.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/nt_mind/self_evolver.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_crystal.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/nt_mind_dual_track.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/nt_mind_skill_engine/domain_modeling/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/nt_mind_skill_engine/flow_router/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/nt_mind_skill_engine/progressive_disclosure/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/seal/domain_mapper.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/seal/source_adapter.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/self_improvement/memory_filesystem.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/self_improvement/mod.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/self_improvement/self_edit_loop.rs
+UNREACHABLE neotrix-core/src/l5_cognition/nt_mind/self_improvement/sleep_compute.rs
+UNREACHABLE neotrix-core/src/l6_meta/coordination/nt_meta_cleanup/concurrency_detector.rs
+UNREACHABLE neotrix-core/src/l6_meta/coordination/nt_meta_cleanup/coordinator.rs
+UNREACHABLE neotrix-core/src/l6_meta/coordination/nt_meta_cleanup/mod.rs
+UNREACHABLE neotrix-core/src/l6_meta/coordination/nt_meta_cleanup/runtime_monitor.rs
+UNREACHABLE neotrix-core/src/l6_meta/lib.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_core_qtest.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/dream_replay/mod.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/eval_engine/dataset_manager.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/eval_engine/experiment_tracker.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/eval_engine/llm_judge.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/eval_engine/mod.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/otel_bridge/cost_tracker.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/otel_bridge/health_monitor.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/otel_bridge/mod.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/otel_bridge/prompt_manager/mod.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/otel_bridge/prompt_manager/prompt_eval.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/otel_bridge/prompt_manager/prompt_registry.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/otel_bridge/prompt_manager/prompt_version.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/otel_bridge/trace_pipeline.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/session_replay/budget_manager.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/session_replay/context_router/analyzer.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/session_replay/context_router/context.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/session_replay/context_router/mod.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/session_replay/context_router/replay.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/session_replay/context_router/router.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/session_replay/cost_dashboard.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/session_replay/event_log.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/session_replay/mod.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_meta/session_replay/replay.rs
+UNREACHABLE neotrix-core/src/l6_meta/nt_nexus/checkpoint.rs
+UNREACHABLE neotrix-core/src/neotrix/nt_crystal_core/agent_orchestrator.rs
+UNREACHABLE neotrix-core/src/neotrix/nt_crystal_core/memory_orchestrator.rs
+UNREACHABLE neotrix-core/src/neotrix/nt_crystal_core/multi_graph_memory.rs
+UNREACHABLE neotrix-core/src/neotrix/nt_crystal_core/observability.rs
+UNREACHABLE neotrix-core/src/neotrix/nt_crystal_core/self_healing.rs

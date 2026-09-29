@@ -8,15 +8,29 @@
 # - repowise PR Bot 哲学：绿则静默，有问题才列清单
 #
 # 用法: check-skill-gate.sh [--strict] [--adopt] [skills/index.json]
-#   默认 advisory 模式：只报告，exit 0（不挡现有 58 条存量）。
+#   默认 advisory 模式：只报告，exit 0（不挡现有存量）。
 #   --strict：门禁项任一失败即 exit 1（供 CI 新 skill 增量门）。
 #   --adopt：只查**待接入**的 SKILL.md（frontmatter 缺失），供新 skill 增量门用。
 #
-# 2026-09-28 升级：门此前**只看 index.json，看不见 67 个真实 SKILL.md**。
+# 2026-09-28 升级：门此前**只看 index.json，看不见磁盘上真实存在的 SKILL.md**。
 # 而真正有判别力的门在文件侧：frontmatter（官方 Agent Skills 规范的发现依据）
-# 只有 24/67。故门改为**双侧**校验：
+# 覆盖不足。故门改为**双侧**校验：
 #   ① index 侧：description / triggers / exclusions / output_contract / license
 #   ② 文件侧：SKILL.md 存在 + frontmatter 完整（name/description/when_to_use）
+#
+# 2026-09-29 修正三处**已失效的数字**（实测，见 ABSORPTION-AGENT-ARCH2-2026-09-29.md §4）。
+# 这三处是「门记录里的数字本身会陈旧」的活样本 —— 它们不在 nt_manifest.py 的
+# 覆盖范围内（那门查 `file:line` 有效性，**不查数字**）：
+#   - 上面写的「67 个真实 SKILL.md」  -> 实测磁盘 **68** 个
+#   - 「只有 24/67 有 frontmatter」   -> 实测 **34/68**
+#   - 「58 条存量」                   -> 门自身报的是 **59**（= categories.*.skills 之和，
+#                                        即 SkillLoader::list_skills() 能看到的那部分；
+#                                        skill_index 有 60 条，差 1 条是顶层 skills/SKILL.md）
+# 修法不是把数字改对就完事 —— 是**每次改这个文件都重跑一遍**：
+#   find skills -name SKILL.md | wc -l                                    # 磁盘
+#   python3 -c "import json;d=json.load(open('skills/index.json'));\
+#     print(len(d['skill_index']), sum(len(v.get('skills',[])) for v in d['categories'].values()))"
+#   bash scripts/check-skill-gate.sh | head -2
 set -euo pipefail
 
 STRICT=0
