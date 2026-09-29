@@ -1,5 +1,5 @@
 {
-  "_about": "任务→工具机器索引。解决「日常任务要跑哪个脚本」需全文读 AGENTS.md 的问题。 2026-09-29：check-doc-drift 增加根文档死链档。 2026-09-29：新增 check-untracked-assets（R-EXIST-1 未入库资产门，39→40 条）。",
+  "_about": "任务→工具机器索引。解决「日常任务要跑哪个脚本」需全文读 AGENTS.md 的问题。 2026-09-29：check-doc-drift 增加根文档死链档。 2026-09-29：新增 check-untracked-assets（R-EXIST-1 未入库资产门，39→40 条）。 2026-09-29：新增 check-unwrap 生产 panic 棘轮（40→41 条）。",
   "_schema": {
     "id": "任务意图的稳定 slug（小写连字符）",
     "query": "自然语言触发词数组 —— agent 用它做匹配",
@@ -622,6 +622,23 @@
       "read_only": true,
       "when_not": "不要用它判「某文件该不该入库」—— 它只报清单，入库决策按 R-EXIST-3 逐条定性（编译产物/运行时DB/.bak/.disabled/含密钥一律不进）；也不要拿它替代 git status，它只扫受保护目录",
       "spec": "RUST-STANDARDS.md 17.8 / R-EXIST-1"
+    },
+    {
+      "id": "check-unwrap",
+      "query": [
+        "unwrap",
+        "expect",
+        "panic",
+        "生产禁 unwrap",
+        "panic-free",
+        "崩点",
+        "R-EXIST-4"
+      ],
+      "tool": "bash scripts/check-unwrap.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "不要用它判「某个 unwrap 该不该改成 ?」—— 它是棘轮，只卡新增、不判单点正当性；也不要期待它归零，712 站点存量是明知的独立工程",
+      "spec": "RUST-STANDARDS.md §1 + AGENTS.md 硬规则（实测 2026-09-29 此前零门管）"
     }
   ],
   "excluded": {

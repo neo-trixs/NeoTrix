@@ -335,6 +335,18 @@ fuzz:
 untracked-assets:
 	bash scripts/check-untracked-assets.sh
 
+# 生产 unwrap/expect/panic 棘轮 (2026-09-29; 零编译成本, 只读)
+# AGENTS/RUST-STANDARDS 明令生产禁三者, 但实测该规则**全仓无门无基线**,
+# 存量 712 站点裸奔。本门只卡新增, 不强求归零 (与 layer-deps 同构)。
+unwrap:
+	bash scripts/check-unwrap.sh
+
+unwrap-strict:
+	bash scripts/check-unwrap.sh --strict
+
+unwrap-baseline:
+	bash scripts/check-unwrap.sh --update-baseline
+
 # 全门禁聚合 (advisory 全家桶, 逐个返回码保留; SIM-30)
 audit-all:
 	bash scripts/check-layer-deps.sh; \
@@ -343,6 +355,7 @@ audit-all:
 	bash scripts/check-fuzz-ready.sh; \
 	bash scripts/check-api-surface.sh; \
 	bash scripts/check-untracked-assets.sh; \
+	bash scripts/check-unwrap.sh; \
 	bash scripts/check-truth-surface.sh
 
 # 架构环门 (NTS-B13; 需: cargo install cargo-modules)
