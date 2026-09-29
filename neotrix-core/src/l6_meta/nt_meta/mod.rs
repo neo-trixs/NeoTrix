@@ -83,7 +83,11 @@ pub use nt_evolution_eval::nt_evolution_eval::{
 #[path = "tests/nt_evolution_eval_tests.rs"]
 mod nt_evolution_eval_tests;
 
-/// 单元测试（ 的非空门证明）。
+pub use nt_evolution_runner::{
+    outcome_from_regression, prereg_from_hypothesis, ExperimentOutcome, ExperimentRunner,
+};
+
+/// 单元测试（`nt_evolution_runner` 的非空门证明）。
 #[cfg(test)]
 #[path = "tests/nt_evolution_runner_tests.rs"]
 mod nt_evolution_runner_tests;
