@@ -152,15 +152,68 @@ jobs:
   # working-directory / path 是否被 git 跟踪。见 ci.yml 的 `check` job。
   # ---------------------------------------------------------------------------
 
-  full-features:
+  # 2026-09-29 重构：原 `full-features` 只编 `full` 一个组合，而 `full` 只覆盖
+  # 17 个真门控 feature 中的 7 个。实测 `audio-decode` / `video-decode` /
+  # `self_model` / `desktop` 四个**全部编译失败却长期无人发现** ——
+  # 不在默认集 ⇒ `cargo check --lib` 编不到；原 job 无 `continue-on-error`
+  # ⇒ CI 红了也没人读结果。`audio-decode` 等连一条 workflow 都不编。
+  #
+  # 改为**逐 feature 矩阵**：每个真门控 feature 单独编一遍。
+  # 依据：2026-09-29 实测单 feature 编译 10s~6min，16 个串行不可接受；
+  # 靠矩阵并行使墙钟 ≈ 最慢单个。
+  # 数据来源：scripts/ops/nt_feature_matrix.py --list（零编译，0.16s）。
+  feature-matrix:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false          # 一个 feature 坏掉不影响其余报告
+      matrix:
+        feature:
+          - audio-decode
+          - desktop
+          - echo_bridge
+          - integration_tests
+          - ios-bridge
+          - keyring
+          - network_tests
+          - onnx
+          - rkyv-storage
+          - sandbox
+          - self-update
+          - self_model
+          - simd-vsa
+          - stealth-net
+          - telemetry
+          - video-decode
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
-      - run: cargo check --features full --lib -p neotrix
+        with:
+          key: feat-${{ matrix.feature }}
+      # 失败时打印具体 error 行，而不是只留一行 exit code。
+      - run: |
+          set -o pipefail
+          cargo check --features ${{ matrix.feature }} --lib -p neotrix 2>&1 | tail -40
+      # 门禁自检：矩阵清单与 Cargo.toml 实际 feature 漂移时报警。
+      # 新增 feature 而忘了进矩阵 = 又造一个永无人编的盲区（R-FEAT-1 的根因）。
+      - name: check matrix covers all gated features
+        run: |
+          python3 scripts/ops/nt_feature_matrix.py --list > /tmp/fm.txt
+          python3 - <<'PY' > /tmp/missing.txt
+          import re, pathlib
+          listed = open('/tmp/fm.txt', encoding='utf-8').read()
+          real = set(re.findall(r'^  (\S+)\s+\d+\s+真门控$', listed, re.M))
+          y = pathlib.Path('.github/workflows/ci.yml').read_text(encoding='utf-8')
+          block = y.split('  feature-matrix:')[1].split('  test-action:')[0]
+          inmatrix = set(re.findall(r'^          - (.+)$', block, re.M))
+          print(' '.join(sorted(real - inmatrix)))
+          PY
+          if [ -s /tmp/missing.txt ]; then
+            echo "::error::这些真门控 feature 不在 CI 矩阵里（=永无人编）: $(cat /tmp/missing.txt)"
+            exit 1
+          fi
+          echo "matrix covers all gated features OK"
+
 
   test-action:
     runs-on: ubuntu-latest
