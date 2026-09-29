@@ -1,0 +1,7 @@
+# 根目录/目录结构存量基线（棘轮）— 每行一项。
+# 生成于 check-layout.sh --update-baseline。
+# ⛔ 绝不要为了让门变绿而删条目 —— 那等于让违规永久合法化。
+# 处置正确姿势：把文件挪进合规目录，或把白名单扩到 ALLOW_FILES 并写明理由。
+neotrix-core/docs/architecture/FUSION_ARCHITECTURE.md
+neotrix-core/docs/architecture/ANALYSIS_ARCHITECTURE.md
+neotrix-core/docs/architecture/CRYSTAL_ARCHITECTURE.md

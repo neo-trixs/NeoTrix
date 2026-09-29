@@ -18,6 +18,10 @@
 | `TODO.md` | **唯一任务清单** (结构化) | 所有会话 |
 | `TODO.yml` | 任务机器可读格式。**由 `neotrix todo sync` 生成，禁止手改** —— `git_hook.rs:58-61` 提交时自动重新生成；被两个 pre-commit 钩子消费（`git_hook.rs:25-49`、`safety_tools/git-hook.sh:9`），**不可删** |
 | `Makefile` | 构建命令 | Owner |
+| `README.md` | 项目入口，500 字以内概述 | Owner |
+| `RUST-STANDARDS.md` | Rust 编码标准正典 | Owner |
+| `AGENTS.md` | Agent 守则（指针守恒） | 所有会话 |
+| `results.tsv` | **进化实验账本** —— 由 `nt_evolution_exp.rs` 写入、`scripts/check-evolution-ledger.sh` 消费。⛔ 不是临时文件，勿删 | 进化系统 |
 | `ARCHITECTURE-MAP-ROADMAP-V2.md` | 模块台账（更新规则为 **R-P199**，口径仅限 `neotrix-core` 的 L1–L6；`neotrix-neobot` 不占 L 层故不进此台账）；**§1-§7 数字永久陈旧，只取 §11 起** | Owner |
 | `docs/architecture/NEOTRIX-MASTER-BLUEPRINT.md` | **唯一图纸入口**（D-00~D-15） | Owner |
 | `docs/architecture/DIR-AUDIT-2026-09-27.md` | 目录架构审计（16 包依赖图 + 8 类重复类型）。**§六需加限定**：`nt_jev` 是活路径，勿当死代码 | Owner |
@@ -37,6 +41,12 @@
 | `DOCUMENTATION-MAP.md` | 本文档 | Owner |
 
 **禁止**: 根目录放置临时文件、会话笔记、分析报告
+
+> ⛔ **本节不是散文了** —— `scripts/check-layout.sh` 把「根目录白名单 +
+> `neotrix-core/docs/` 只许 `YYYY-MM-DD_` 前缀 + 与本文件的清单交叉校验」
+> 变成可执行门，已接 pre-commit（拦新增，既有债记账）。
+> **要在根目录放新东西前先跑它**：`bash scripts/check-layout.sh`。
+> 有理由就扩脚本里的 `ALLOW_FILES` 并写明消费者 —— 别用完就留。
 
 ### 2. `docs/` — 文档主目录
 

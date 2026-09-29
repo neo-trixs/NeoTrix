@@ -141,4 +141,25 @@ if [ -x scripts/check-doc-drift.sh ]; then
   scripts/check-doc-drift.sh 2>&1 | tail -2 || true
 fi
 
+# ---------- 4) 目录结构门（2026-09-29 立；blocking on NEW 违规）----------
+# DOCUMENTATION-MAP.md 的 4 条「禁止」此前**全是散文、无一道门执行**（实测：
+# 根目录放 SCRATCH-临时笔记.md，naming/doc-drift/truth-surface 三门全过）。
+# ⇒ 一次清扫是临时的，门才是长期的。
+# 只拦**新增**违规（账本 scripts/layout-baseline.txt 棘轮）：既存债记账不阻断
+# —— 恒红的门比没有门更坏（它训练人忽略红色）。
+if [ -x scripts/check-layout.sh ]; then
+  # ⚠️ 不可写成 `if ! cmd | tail -8; then` —— 管道退出码取自最后一个命令
+  #    （tail 恒 0），`!` 永远不成立 ⇒ 该分支是死代码，门形同虚设。
+  #    必须把门输出先落到文件再判它的退出码。
+  _lay_log=$(mktemp)
+  if scripts/check-layout.sh --strict >"$_lay_log" 2>&1; then
+    tail -3 "$_lay_log"
+  else
+    tail -12 "$_lay_log"
+    rm -f "$_lay_log"
+    exit 1
+  fi
+  rm -f "$_lay_log"
+fi
+
 exit 0

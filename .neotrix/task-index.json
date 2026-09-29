@@ -589,6 +589,22 @@
       "kind": "gate",
       "read_only": true,
       "when_not": "CI 里自动跑（secret-scan job 第 3 步，扫描**之前**）。手工跑的场合：① 升级了 CI 的 GITLEAKS_VERSION；② 用本机 gitleaks 重生成了基线；③ 怀疑密钥扫描结果异常。⛔ 规则集变 ⇒ 基线必重生成，且重生成前必须**逐条人工判读**新增项 —— 无脑重生成会把真泄漏写进基线。"
+    },
+    {
+      "id": "check-layout",
+      "query": [
+        "根目录",
+        "目录结构",
+        "乱建文件",
+        "临时文件",
+        "会话笔记",
+        "文档位置",
+        "放哪个目录"
+      ],
+      "tool": "bash scripts/check-layout.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "advisory 起步，账本 scripts/layout-baseline.txt 棘轮。拦**新增**违规、既有记账。三类检查：① 根目录文件/目录白名单（ALLOW_FILES / ALLOW_DIRS，每项附真实消费者）；② neotrix-core/docs/ 只许 YYYY-MM-DD_ 前缀；③ 与 DOCUMENTATION-MAP.md 交叉校验，规范点名但磁盘不存在 ⇒ 报「规范腐化」。⛔ 根目录要放新东西时**先查本门白名单**：有理由就扩 ALLOW_FILES 并写明消费者，别用完就留。⛔ apps/ 与 src-tauri/ 是已知残留（committed 已移除、磁盘 untracked 残留），处置后从 RESIDUAL_KNOWN 删。"
     }
   ],
   "excluded": {
