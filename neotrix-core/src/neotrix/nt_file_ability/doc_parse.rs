@@ -49,9 +49,141 @@ pub fn parse_bytes(bytes: &[u8], format: Format) -> ParseResult<FileModel> {
     if matches!(format, Format::Pdf) {
         return parse_pdf_bytes_enhanced(bytes);
     }
-    
+
     let doc = to_document(bytes, format).map_err(|e| ParseError::AnyDoc(e.to_string()))?;
     Ok(document_to_filemodel(doc))
+}
+
+/// PDF 字节 → FileModel。
+///
+/// 2026-09-29 修正：`parse_pdf_bytes_enhanced` 走 `to_document(bytes, Pdf)`，
+/// 而 anydoc 对 PDF **只支持 `to_markdown_bytes`**（无 document-model 形式，
+/// 见 anydoc `lib.rs:131-133`）⇒ 真实 PDF 一律报
+/// `unsupported input: PDF converts directly to Markdown`。
+/// 这不是「PDF 不支持」，而是**用错了入口**。此处改走 `to_markdown_bytes`，
+/// 保证 `parse_any` 的 PDF 路径真的能出内容。
+fn pdf_bytes_to_filemodel(bytes: &[u8], title: Option<String>) -> ParseResult<FileModel> {
+    let md = anydoc::to_markdown_bytes(bytes, Format::Pdf)
+        .map_err(|e| ParseError::AnyDoc(e.to_string()))?;
+    Ok(FileModel {
+        format: "pdf".to_string(),
+        title,
+        content: md,
+        tables: None,
+        metadata: Some(serde_json::json!({
+            "mode_used": "anydoc_to_markdown",
+            "reason": "PDF has no document-model form in anydoc",
+        })),
+        images: None,
+    })
+}
+
+/// 统一文件解析入口 — **通用文件解析能力的唯一正门**。
+///
+/// 2026-09-29 设立：此前存在两条互不知晓的路径 —— `parse_document`
+/// （扩展名优先，无嗅探）与 `FileAbility::open`（扩展名→office_oxide→FileParser
+/// 三段），且两者**零生产调用**（只有 selftest）。本函数是唯一的、
+/// 内容嗅探优先的正门：
+///
+/// ```text
+/// 读字节一次 → 魔法字节嗅探 → 扩展名回退 → 按 DocFormat 分类路由
+///   ├─ Pdf                    → parse_pdf_enhanced（既有增强路径）
+///   ├─ 有 anydoc 后端         → to_document（12 格式）
+///   ├─ 纯文本系               → UTF-8 直读
+///   ├─ 媒体系                 → 元数据模式（不做内容解析）
+///   └─ Unknown                → UTF-8 试探 → 不行报 UnsupportedFormat
+/// ```
+///
+/// 顺序即优先级：**内容嗅探永远优先于扩展名**（扩展名会撒谎，魔数不会）。
+pub fn parse_any(path: &Path) -> ParseResult<FileModel> {
+    use super::format_route::DocFormat;
+
+    let bytes = std::fs::read(path).map_err(ParseError::Io)?;
+    let title = path
+        .file_name()
+        .map(|s| s.to_string_lossy().into_owned());
+
+    // 1) 内容嗅探优先（魔数不会撒谎）
+    if let Some(sniffed) = Format::from_bytes(&bytes) {
+        if matches!(sniffed, Format::Pdf) {
+            return pdf_bytes_to_filemodel(&bytes, title);
+        }
+        let doc =
+            to_document(&bytes, sniffed).map_err(|e| ParseError::AnyDoc(e.to_string()))?;
+        let mut model = document_to_filemodel(doc);
+        model.title = title;
+        return Ok(model);
+    }
+
+    // 2) 扩展名回退（本地全集枚举）
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("");
+    match DocFormat::from_ext(ext) {
+        // 3a) 有后端：走 anydoc
+        f if f.to_anydoc().is_some() => {
+            let backend = f.to_anydoc().expect("checked");
+            if matches!(backend, Format::Pdf) {
+                return pdf_bytes_to_filemodel(&bytes, title);
+            }
+            let doc =
+                to_document(&bytes, backend).map_err(|e| ParseError::AnyDoc(e.to_string()))?;
+            let mut model = document_to_filemodel(doc);
+            model.format = f.as_str().to_string();
+            model.title = title;
+            Ok(model)
+        }
+        // 3b) 纯文本系：UTF-8 直读
+        f if f.is_text_like() => match String::from_utf8(bytes) {
+            Ok(text) => Ok(FileModel {
+                format: f.as_str().to_string(),
+                title,
+                content: text,
+                tables: None,
+                metadata: None,
+                images: None,
+            }),
+            Err(_) => Err(ParseError::UnsupportedFormat),
+        },
+        // 3c) 媒体系：元数据模式
+        f if f.is_media() => Ok(media_metadata_model(path, &bytes, f, title)),
+        // 3d) Unknown：UTF-8 试探
+        _ => match String::from_utf8(bytes) {
+            Ok(text) => Ok(FileModel {
+                format: "txt".to_string(),
+                title,
+                content: text,
+                tables: None,
+                metadata: None,
+                images: None,
+            }),
+            Err(_) => Err(ParseError::UnsupportedFormat),
+        },
+    }
+}
+
+/// 媒体系文件的元数据模式：不做内容解析，只记录可观测事实。
+fn media_metadata_model(
+    path: &Path,
+    bytes: &[u8],
+    format: super::format_route::DocFormat,
+    title: Option<String>,
+) -> FileModel {
+    let meta = serde_json::json!({
+        "path": path.to_string_lossy(),
+        "bytes": bytes.len(),
+        "kind": format.as_str(),
+        "mode": "metadata-only",
+    });
+    FileModel {
+        format: format.as_str().to_string(),
+        title,
+        content: String::new(),
+        tables: None,
+        metadata: Some(meta),
+        images: None,
+    }
 }
 
 /// Convert anydoc Document to NeoTrix FileModel.
@@ -351,6 +483,81 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_parse_any_content_sniff_beats_extension() {
+        // 核心契约：**魔数优先于扩展名**。扩展名会撒谎，魔数不会。
+        // 这里把 Markdown 内容命名成 .pdf —— 嗅探不到 PDF 魔数，
+        // 应回退扩展名→text 路径，而不是被 .pdf 骗去走 PDF 解析器。
+        let mut f = NamedTempFile::new().unwrap();
+        writeln!(f, "# Real Content\n\nnot a pdf").unwrap();
+        let renamed = f.path().with_extension("txt");
+        std::fs::copy(f.path(), &renamed).unwrap();
+        let m = super::parse_any(&renamed).expect("parse_any");
+        assert_eq!(m.format, "text");
+        assert!(m.content.contains("Real Content"));
+    }
+
+    #[test]
+    fn test_parse_any_sniffs_real_pdf() {
+        let mut f = NamedTempFile::new().unwrap();
+        // 最小但结构合法的 PDF：xref + trailer + startxref 必被 pdf-inspector 接受
+        let pdf = b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n\
+2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n\
+3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj\n\
+trailer\n<< /Root 1 0 R >>\n%%EOF\n";
+        f.write_all(pdf).unwrap();
+        // 文件名故意用 .txt：若实现只信扩展名就会判成 text
+        let renamed = f.path().with_extension("txt");
+        std::fs::copy(f.path(), &renamed).unwrap();
+        // 核心断言：嗅探判定为 pdf（**即使解析器随后报结构问题**，
+        // 错误信息也必须提到 PDF 而非 text —— 那就证明路由按魔数走了）。
+        match super::parse_any(&renamed) {
+            Ok(m) => assert_eq!(m.format, "pdf", "魔数应压过 .txt 扩展名"),
+            Err(ParseError::AnyDoc(e)) => {
+                assert!(e.to_lowercase().contains("pdf"), "应走 PDF 路径，实际: {e}")
+            }
+            Err(other) => panic!("错误类型不对: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_any_text_and_media_and_unknown() {
+        let mut txt = NamedTempFile::new().unwrap();
+        writeln!(txt, "plain body").unwrap();
+        let m = super::parse_any(txt.path()).expect("parse_any");
+        assert!(m.content.contains("plain body"));
+
+        // 媒体：元数据模式，content 空但 metadata 有 path/bytes/kind/mode
+        let mut bin = NamedTempFile::new().unwrap();
+        bin.write_all(&[0u8; 64]).unwrap();
+        let media = NamedTempFile::new().unwrap();
+        std::fs::copy(bin.path(), media.path().with_extension("mp3")).unwrap();
+        let m = super::parse_any(&media.path().with_extension("mp3")).expect("parse_any");
+        assert_eq!(m.format, "audio");
+        assert!(m.content.is_empty(), "媒体不应做内容解析");
+        let meta = m.metadata.expect("媒体应有元数据");
+        assert_eq!(meta["mode"], "metadata-only");
+        assert_eq!(meta["kind"], "audio");
+    }
+
+    #[test]
+    fn test_parse_any_binary_unknown_reports_unsupported() {
+        let mut f = NamedTempFile::new().unwrap();
+        f.write_all(&[0xFF, 0xFE, 0xFD, 0xFC, 0x00, 0x01, 0x02]).unwrap();
+        let err = super::parse_any(f.path()).expect_err("二进制未知格式应报错");
+        assert!(matches!(err, ParseError::UnsupportedFormat), "got {err:?}");
+    }
+
+    #[test]
+    fn test_parse_any_markdown_ext() {
+        let mut f = NamedTempFile::new().unwrap();
+        writeln!(f, "# Title\n\nbody").unwrap();
+        let renamed = f.path().with_extension("md");
+        std::fs::copy(f.path(), &renamed).unwrap();
+        let m = super::parse_any(&renamed).expect("parse_any");
+        assert_eq!(m.format, "markdown");
+    }
 
     #[test]
     fn test_parse_text_file() {

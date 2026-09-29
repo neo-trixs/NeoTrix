@@ -70,6 +70,132 @@ pub struct BookInput {
     pub chapters: Vec<DocChapter>,
 }
 
+impl BookInput {
+    /// 从真实文件构造输入 — **技能管线消费通用解析能力的接线点**。
+    ///
+    /// 2026-09-29 设立：此前 `BookInput` 只在测试里手工构造，
+    /// 生产路径上没有任何文件喂进来（`nt_file_ability` 的解析管线
+    /// 同样零生产调用）。本函数把两端接起来：
+    /// `parse_any`（通用解析，嗅探优先）→ 章节切分 → `BookInput`。
+    ///
+    /// 格式映射（本地全集 → 本模块书系子集）：映射不上的回退 Markdown，
+    /// 与既有 `infer_format` 的未知回退行为一致。
+    /// 章节切分：按 markdown 标题（`^#{1,3} `）切；无标题则按
+    /// `chunk_chars` 等长切分（默认 4000）。
+    pub fn from_file(
+        path: &std::path::Path,
+        chunk_chars: usize,
+    ) -> Result<Self, crate::neotrix::nt_file_ability::types::ParseError> {
+        use crate::neotrix::nt_file_ability::DocFormat as AbilityFormat;
+        use crate::neotrix::nt_file_ability::parse_any;
+
+        let model = parse_any(path)?;
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("");
+        let ability_fmt = AbilityFormat::from_ext(ext);
+        let format = match ability_fmt {
+            AbilityFormat::Pdf => DocFormat::Pdf,
+            AbilityFormat::Epub => DocFormat::Epub,
+            AbilityFormat::Docx | AbilityFormat::Doc => DocFormat::Docx,
+            AbilityFormat::Markdown => DocFormat::Markdown,
+            AbilityFormat::Html => DocFormat::Html,
+            AbilityFormat::Rtf => DocFormat::Rtf,
+            AbilityFormat::Mobi => DocFormat::Mobi,
+            _ => DocFormat::Markdown,
+        };
+        let title = model.title.clone().unwrap_or_else(|| {
+            path.file_name()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "untitled".to_string())
+        });
+        let chapters = split_chapters(&model.content, chunk_chars.max(1));
+        Ok(Self {
+            title,
+            format,
+            chapters,
+        })
+    }
+}
+
+/// 把解析出的纯文本切成章节：markdown 标题优先，无标题则等长切分。
+fn split_chapters(content: &str, chunk_chars: usize) -> Vec<DocChapter> {
+    let mut chapters: Vec<DocChapter> = Vec::new();
+    let mut cur_title = String::from("Chapter 1");
+    let mut cur = String::new();
+    let mut order = 0usize;
+
+    let flush = |title: &mut String, body: &mut String, order: &mut usize,
+                     out: &mut Vec<DocChapter>| {
+        let text = body.trim();
+        if text.is_empty() {
+            return;
+        }
+        let chars: Vec<char> = text.chars().collect();
+        if chars.len() <= chunk_chars {
+            out.push(DocChapter {
+                title: std::mem::take(title),
+                order: *order,
+                char_count: chars.len(),
+                summary: chars.iter().take(200).collect(),
+            });
+            *order += 1;
+        } else {
+            // 超长章节按字符数硬切（标题只保留在第一块）
+            for (i, piece) in chars.chunks(chunk_chars).enumerate() {
+                let base = if i == 0 { std::mem::take(title) } else { title.clone() };
+                let t = if i == 0 { base } else { format!("{} (cont. {})", base, i + 1) };
+                let s: String = piece.iter().collect();
+                out.push(DocChapter {
+                    title: t,
+                    order: *order,
+                    char_count: s.chars().count(),
+                    summary: s.chars().take(200).collect(),
+                });
+                *order += 1;
+            }
+        }
+        body.clear();
+        if title.is_empty() {
+            *title = format!("Chapter {}", *order + 1);
+        }
+    };
+
+    for line in content.lines() {
+        let t = line.trim_start();
+        if (t.starts_with("# ") || t.starts_with("## ") || t.starts_with("### "))
+            && !cur.trim().is_empty()
+        {
+            let mut next_title = t.trim_start_matches('#').trim().to_string();
+            if next_title.is_empty() {
+                next_title = format!("Chapter {}", order + 1);
+            }
+            flush(&mut cur_title, &mut cur, &mut order, &mut chapters);
+            cur_title = next_title;
+        } else if cur_title == "Chapter 1"
+            && cur.trim().is_empty()
+            && (t.starts_with("# ") || t.starts_with("## ") || t.starts_with("### "))
+        {
+            cur_title = t.trim_start_matches('#').trim().to_string();
+        } else {
+            cur.push_str(line);
+            cur.push('\n');
+        }
+    }
+    flush(&mut cur_title, &mut cur, &mut order, &mut chapters);
+    // 空文档也给一个空章节，保持「至少一切」的后置条件简单
+    if chapters.is_empty() {
+        chapters.push(DocChapter {
+            title: "Chapter 1".to_string(),
+            order: 0,
+            char_count: 0,
+            summary: String::new(),
+        });
+    }
+    chapters
+}
+
 /// 章节→技能候选映射结果。
 #[derive(Debug, Clone)]
 pub struct _SkillCandidate {
