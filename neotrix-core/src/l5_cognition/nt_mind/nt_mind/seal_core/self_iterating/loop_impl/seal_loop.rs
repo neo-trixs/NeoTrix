@@ -625,13 +625,36 @@ impl SelfIteratingBrain {
                 let final_reward = self._reward.clamp(0.0, 1.0);
                 self._reward = final_reward;
                 // ── E3 自改进闭环闭合钩子: 候选行为变更产出后跑回归/对抗测试 ──
-                // 默认 harness=None / bench_suite=None → 透传 persist=true (不改动既有逻辑);
-                // 由外部 (其他意识维度 agent) 注入 EvalHarness 或 BenchmarkSuite 触发真实回归闸门。
+                // 2026-09-29 修正：此前**硬传 `None, None`**，注释写「由外部注入」，
+                // 但全仓无任何注入点 ⇒ `EvalHarnessApi` 的 impl 虽存在于
+                // `nt_mind_eval_harness/nt_harness.rs:316`，**却永远收不到调用**。
+                // 效果上等于「候选变更从不接受回归检验就直接持久化」。
+                // 现改为读 `self.eval_harness`（新增字段，默认 None = 向后兼容）。
+                //
+                // ⚠️ 借用冲突：`self.eval_harness.as_deref()` 借 `self`（不可变），
+                // 而 `close_iteration_loop` 要 `&mut self` ⇒ 不能同时持有。
+                // 故用 `take()` 把 Box 取出，调用后再放回，保持「注入一次、长期有效」。
+                //
+                // ⛔ 为什么这里不自己 new 一个 EvalHarness：那是 L6 的具体类型，
+                //   在 L5 直接构造会违反 `l5_cognition/traits.rs:133-139` 的
+                //   跨层隔离约定（L5 不得 `use crate::l6_meta::*`）。
                 {
                     let cand = self._current_task.clone();
-                    if let Ok(false) = self.close_iteration_loop(&cand, None, None) {
-                        // 回归失败: E3 钩子内部已发 CritiqueResult 信号并回滚候选。
-                        log::warn!("[seal][E3] 候选未通过回归闸门 (默认透传不应触发)");
+                    if let Some(h) = self.eval_harness.take() {
+                        let harness: &dyn crate::l5_cognition::traits::EvalHarnessApi = &*h;
+                        let result = self.close_iteration_loop(&cand, Some(harness), None);
+                        self.eval_harness = Some(h);
+                        if let Ok(false) = result {
+                            // 回归失败: E3 钩子内部已发 CritiqueResult 信号并回滚候选。
+                            log::warn!("[seal][E3] 候选未通过回归闸门，已回滚");
+                        }
+                    } else {
+                        let _ = self.close_iteration_loop(&cand, None, None);
+                        // ⛔ 显式可观测：**不注入闸门时，回归检验从未发生。**
+                        // 静默跳过 = 读日志的人会以为「跑过了，没问题」。
+                        log::debug!(
+                            "[seal][E3] eval_harness 未注入 ⇒ 回归闸门**未运行**（候选已透传）"
+                        );
                     }
                 }
                 Ok(final_reward)

@@ -64,6 +64,37 @@ pub struct SelfIteratingBrain {
     pub goal_register: GoalRegister,
     pub entropy_crisis_level: f64,
     pub curiosity_bonus: f64,
+    /// 自进化闭环的**评测闸门注入点**（2026-09-29 加）。
+    ///
+    /// ## 为什么加这个字段
+    ///
+    /// `seal_loop.rs` 的自改进闭环钩子此前硬传 `None, None`：
+    /// `if let Ok(false) = self.close_iteration_loop(&cand, None, None)`
+    ///
+    /// 当时的注释写「由外部（其他意识维度 agent）注入」——
+    /// 但**全仓没有任何地方注入**。而 `EvalHarnessApi` 的 impl
+    /// 其实早已存在（`nt_mind_eval_harness/nt_harness.rs:316`）。
+    ///
+    /// ⇒ **这不是「没实现」，是「实现了但没有注入点」** ——
+    /// 一个实现了却永远收不到调用的闸门，和没有闸门效果完全相同：
+    /// 候选变更**从不接受回归检验**就直接持久化。
+    ///
+    /// ## 跨层约定
+    ///
+    /// 字段类型是 L5 的 trait（`l5_cognition::traits::EvalHarnessApi`），
+    /// **不是** L6 的具体类型（`EvalHarness`）。这遵循
+    /// `l5_cognition/traits.rs:133-139` 的跨层隔离约定：
+    /// *「L5 通过这些 trait 访问 L6 元认知层提供的能力，避免直接
+    /// `use crate::l6_meta::*` 造成向上依赖」*。
+    ///
+    /// ## 用法
+    ///
+    /// ```ignore
+    /// brain.eval_harness = Some(Box::new(my_l6_harness));
+    /// ```
+    ///
+    /// 保持 `None` = 维持既有行为（透传 persist=true），**向后兼容**。
+    pub eval_harness: Option<Box<dyn crate::l5_cognition::traits::EvalHarnessApi>>,
     pub(crate) _current_task: String,
     pub(crate) _current_task_type: TaskType,
     pub(crate) _task_embedding: Option<Vec<f64>>,
@@ -206,6 +237,9 @@ impl SelfIteratingBrain {
             goal_register: GoalRegister::new(),
             entropy_crisis_level: 0.0,
             curiosity_bonus: 0.0,
+            // 评测闸门默认不注入 ⇒ 维持既有行为（透传 persist=true）。
+            // 注入后 seal_loop 的自改进闭环才会真正跑回归检验。
+            eval_harness: None,
             _lr_scheduler: LrScheduler::default(),
             _validation_gate: ValidationGate::default(),
             _rejected_buffer: RejectedEditBuffer::default(),

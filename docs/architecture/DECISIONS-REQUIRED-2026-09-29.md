@@ -8,13 +8,65 @@
 
 ---
 
-## 决策速览
+## D-3 ⛔ 空账本？—— ✅ **已实证澄清：不是缺陷**（2026-09-29 更新）
+
+### 我此前的判断（**已证伪**）
+
+「`test-failures-baseline.txt` 0 字节 ⇒ `--strict` 下零容忍 ⇒ P0 缺陷」。
+
+### 实测结论
+
+```
+隔离工作树（干净 HEAD）跑 check-test-baseline.sh：
+  test result: ok. 12187 passed; 0 failed; 42 ignored
+  PASS: the whole suite is green.
+```
+
+再看脚本逻辑（`check-test-baseline.sh:95-102`）：
+
+```bash
+if [ "$RC" -eq 0 ]; then
+  echo "PASS: the whole suite is green."
+  ...
+  exit 0          # ← 全绿时**直接 exit 0**，压根不看账本
+fi
+```
+
+⇒ **空账本 + 全绿是正确的空基线，不是「零容忍陷阱」。**
+`handoff-20260928-consolidated §1` 记的那 57 条失败**早已被修好**。
+
+### 非空门证明（该门**是有效的**，不是空门）
+
+注入一条 `assert_eq!(1 + 1, 3)` 后：
+
+```
+failing now: 2   in ledger: 0
+NEW failing tests (not in the ledger): 2
+  l6_meta::...::deliberately_failing_probe
+--strict exit = 1        ← 正确变红并指名
+```
+
+⇒ **A3 关闭**。它不是待做项，是**已完成项**。
+
+### 教训
+
+⛔ 我把「文件是 0 字节」当成了缺陷信号，**没有先问「它本该非空吗」**。
+`check-truth-surface.sh` 的 baseline 有 265 条（真存量），
+`test-failures-baseline.txt` 有 0 条（**真已清零**）——
+**同样是 0 字节，含义完全相反**。
+
+**⇒ 「数字异常」不等于「缺陷」。必须问：这个数字本该是什么。**
+（同源于 09-28 那条：「先证伪提交的前提」—— 我对**自己的结论**也该这么做。）
+
+---
+
+## 决策速览（更新）
 
 | # | 事项 | 谁能定 | 体量 | 建议 | 阻塞谁 |
 |---|---|---|---|---|---|
 | **D-1** | 265 条未编译 `.rs` 逐条处置 | **产品** | 68,603 行 | 分三批，见下 | 批次 D 全部 |
 | **D-2** | `hybrid_retrieval` 等 4 个子树接线 | **技术**（我已实测） | 2,943 行 | ⭐ **可接** | D4 多因子打分 |
-| **D-3** | `nt_meta/eval_engine` 650 行接不接 | **产品** | 650 行 | 接 | 批次 B 全部 |
+| **D-3** | `nt_meta/eval_engine` 接不接 | — | **已裁决** | ⛔ 不接（`llm_judge.rs:86` 恒满分）· 改为补第四层 `nt_evolution_eval` | — |
 | **D-4** | `docs/` 要不要恢复 vitepress 站 | **产品** | 需重写 | 不恢复 | CI 路径（已修） |
 | **D-5** | 桌面回路落点 | **架构** | — | 落 neobot | 批次 E 全部 |
 | **D-6** | `qybaihe/mu` 署名链 | **法务/作者** | — | 澄清前不入正典 | 无（仅索引） |
@@ -158,7 +210,15 @@ neotrix-types/.../nt_core_bank/iteration.rs:128
 
 ---
 
-## D-3 🔴 `nt_meta/eval_engine` 650 行接不接
+## ~~D-3~~ ✅ 已裁决（2026-09-29）→ 见 `DECISION-D3-EVOLUTION-EVAL.md`
+
+**结论：⛔ 不接 `eval_engine`，改为补上缺失的第四层 `nt_evolution_eval`。**
+理由：`llm_judge.rs:86` 是 `let normalized = 1.0;`（恒满分、从不调 LLM）。
+以下为当时的原始分析，保留作取证。
+
+---
+
+## D-3 🔴 `nt_meta/eval_engine` 650 行接不接（已裁决，保留存档）
 
 ### 问题
 

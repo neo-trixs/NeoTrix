@@ -139,7 +139,24 @@ pub struct DistillationResult {
 // ═══════════════════════════════════════════════════════════════════════
 
 /// L6 EvalHarness 回归测试接口 — L5 SEAL 闭环消费
-pub trait EvalHarnessApi {
+///
+/// ## 为什么加 `Send + Sync`（2026-09-29）
+///
+/// `SelfIteratingBrain` 实现了 `l0_substrate::nt_core_traits::BrainHandle`，
+/// 而后者是 `trait BrainHandle: Send + Sync {}`。当把
+/// `Option<Box<dyn EvalHarnessApi>>` 存进 brain 字段时，
+/// 编译器报 `cannot be shared between threads safely`。
+///
+/// ⇒ 约束必须落在 **trait 定义**上，不能靠调用方自觉
+/// （`Box<dyn EvalHarnessApi>` 不会因为持有者需要 Send 就自动变 Send）。
+///
+/// 现有唯一实现 `nt_mind_eval_harness::EvalHarness` 持有
+/// `Arc<dyn LlmProvider>` 与 `Arc<ConsciousnessGoldStandard>`，
+/// 两者本身已是 `Send + Sync` ⇒ 加约束**不破坏既有实现**。
+///
+/// ⛔ 若将来出现需要内部可变状态（`Cell`/`RefCell`）的实现，
+///   正确做法是 `Mutex`，**不是**去掉这里的约束。
+pub trait EvalHarnessApi: Send + Sync {
     fn generate_regression_test(&self, candidate: &str) -> RegressionCase;
     fn run_regression_test(&self, case: &RegressionCase) -> RegressionResult;
 }
