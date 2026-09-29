@@ -154,8 +154,54 @@ def _wrap(text, width):
     return out or [""]
 
 
+def real_module(rel):
+    """模块边界 = 从文件往上最近的存在 `mod.rs` 的目录。
+
+    不能用「同一父目录」当模块判据 —— 2026-09-29 实测踩坑：
+    `provider_abstraction/{models.rs, provider.rs}` 的父目录是同一层，
+    但 `nt_io/{nt_io_avatar_channel.rs, nt_io_user_avatar.rs}` 的父目录
+    更大却**不在任何 mod.rs 下**。用父目录会把 40 组「跨模块」误判成
+    「同模块」。故必须走真实的 `mod.rs` 边界。
+    """
+    parts = rel.split("/")
+    for i in range(len(parts) - 1, 0, -1):
+        cand = "/".join(parts[:i])
+        if os.path.exists(os.path.join(SRC, cand, "mod.rs")):
+            return cand
+    return "/".join(parts[:-1])
+
+
+def layer_of(rel):
+    for seg in rel.split("/"):
+        if len(seg) > 1 and seg[0] == "l" and seg[1].isdigit():
+            return seg[:2]
+    return "xx"
+
+
+def automatable(grp):
+    """这一组能否按「同模块 + 同层 + 无刻意声明」自动处理。
+
+    返回 (bool, 理由)。**默认 False** —— 判不准时一律不动。
+    """
+    if grp["name"] in ADJUDICATED:
+        return False, "已人工裁决"
+    if grp["deliberate"]:
+        return False, "注释自证是刻意镜像"
+    mods = {real_module(p) for p in grp["paths"]}
+    if len(mods) > 1:
+        return False, f"跨模块（{len(mods)} 个真实 mod.rs 边界）⇒ 需定归属层"
+    layers = {layer_of(p) for p in grp["paths"]}
+    if len(layers) > 1:
+        return False, f"跨层（{'/'.join(sorted(layers))}）⇒ 会触发层归属裁决"
+    return True, "同模块 + 同层 + 无刻意声明"
+
+
 STRUCT_RE = re.compile(r"pub struct (\w+)\s*(?:<[^>]*>)?\s*\{([^}]*)\}")
 FIELD_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?([a-z_][a-z_0-9]*)\s*:", re.M)
+# 字段名 + 类型（融合判据必须比这个，见 collect() 里的注释）
+FIELD_TYPED_RE = re.compile(
+    r"^\s*(?:pub(?:\([^)]*\))?\s+)?([a-z_][a-z_0-9]*)\s*:\s*([^,\n]+)", re.M
+)
 DERIVE_RE = re.compile(r"#\[derive\(([^)]*)\)\]")
 
 
@@ -175,7 +221,18 @@ def collect():
             rel = os.path.relpath(p, SRC)
             for m in STRUCT_RE.finditer(text):
                 name, body = m.group(1), m.group(2)
-                fields = frozenset(FIELD_RE.findall(body))
+                # **必须比字段名+类型**，不能只比字段名 ——
+                # 2026-09-29 实测踩坑：`nt_act_trade::{data_model,unified_types}`
+                # 的 `Order`，dm 是 {id,order_no,payment_terms,status,…}、
+                # ut 是 {id,quote_id,items,created_at,…}，两者**交集 8/11**
+                # 但绝不相同。只比名字的判据会把它误判成「字段集相同」。
+                # 更糟的是它会诱导人去删 —— 实测按该判据删 15 个类型后
+                # cargo check 报 E0119（Default 冲突）+ E0560（no field order_no），
+                # 已回滚。
+                fields = frozenset(
+                    f"{n}:{t.strip()}"
+                    for n, t in FIELD_TYPED_RE.findall(body)
+                )
                 if not (1 <= len(fields) <= 20):
                     continue
                 # 往上找最近的 derive
@@ -243,10 +300,16 @@ def main():
                 hits.append((p, note))
         g["deliberate"] = bool(hits)
         g["deliberate_notes"] = hits
+        ok, why = automatable(g)
+        g["automatable"] = ok
+        g["automatable_reason"] = why
+        g["module"] = sorted({real_module(p) for p in g["paths"]})
+        g["layers"] = sorted({layer_of(p) for p in g["paths"]})
 
     # 排序：先真疏忽（可动）→ 刻意镜像（别动）→ 已裁决
+    # 排序：可自动 → 真疏忽(需人工) → 刻意 → 已裁决
     exact_groups.sort(key=lambda g: (
-        0 if (not g["deliberate"] and g["name"] not in ADJUDICATED) else 1,
+        0 if g["automatable"] else (1 if not g["deliberate"] and g["name"] not in ADJUDICATED else 2),
         -len(g["paths"]), g["name"]))
 
     if args.json:
@@ -257,6 +320,8 @@ def main():
         }, ensure_ascii=False, indent=2))
         return 0
 
+    n_auto = sum(1 for g in exact_groups if g["automatable"])
+    print(f"             ├─ 🤖 可自动处理（同模块+同层+无声明） {n_auto} 组")
     n_adj = sum(1 for g in exact_groups if g["name"] in ADJUDICATED)
     n_delib = sum(1 for g in exact_groups
                   if g["deliberate"] and g["name"] not in ADJUDICATED)
@@ -276,8 +341,10 @@ def main():
             tag = f"  ⚖️ 已裁决: {verdict['verdict']}"
         elif g["deliberate"]:
             tag = "  ⛔ 刻意镜像（注释自证设计）"
+        elif g["automatable"]:
+            tag = f"  🤖 可自动处理（{g['module'][0].split('/')[-1]}）"
         else:
-            tag = "  ✅ 无刻意声明 ⇒ 真疏忽候选"
+            tag = f"  ✅ 无刻意声明但需人工 —— {g['automatable_reason']}"
         print(f"── {g['name']}  ({len(g['paths'])} 处, {len(g['fields'])} 字段: "
               f"{', '.join(g['fields'][:5])}{'…' if len(g['fields']) > 5 else ''}){tag}")
         print(f"   derive: {', '.join(g['derives'])}")

@@ -151,15 +151,14 @@ pub enum InquiryStatus {
 // ============================================================
 
 /// 材质规格
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct MaterialSpec {
-    /// 材质名称 (如 WCB, CF8M, 316L)
-    pub name: String,
-    /// 标准 (如 ASTM A216, ASTM A351)
-    pub standard: String,
-    /// 牌号
-    pub grade: String,
-}
+// 2026-09-29 融合：`MaterialSpec` 原在本文件与 `unified_types` 各有一份，
+// 字段名+类型+顺序完全一致（`{name, standard, grade}: String`），且都无 impl 块。
+// `nt_act_trade/mod.rs:51` 的 re-export 早已指向 `unified_types` ⇒ 那里是真源。
+//
+// 保留 re-export 以兼容本文件内 `Product`(:260) / `Quote`(:353) 仍引用它 ——
+// 那两个类型与 unified_types 的同名类型**字段集不同**，不能一起融合。
+pub use super::unified_types::MaterialSpec;
+
 
 /// 压力等级
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
