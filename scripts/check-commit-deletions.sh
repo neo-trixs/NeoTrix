@@ -41,9 +41,36 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
 }
 cd "$ROOT" || exit 2
 
-# commit message 来源：pre-commit 时 git 把它作为 $1 传入；退回到 COMMIT_EDITMSG。
-MSG_FILE="${1:-}"
-if [ -z "$MSG_FILE" ] || [ ! -f "$MSG_FILE" ]; then
+# commit message 来源（2026-09-29 修一个实测缺陷）：
+#
+#   原注释写「pre-commit 时 git 把它作为 $1 传入」—— **这是错的**。
+#   git 对 pre-commit **传 0 个参数**（三种 commit 方式皆然，AGENTS.md 的
+#   「⛔ pre-commit 门防不了」记的正是这件事）。⇒ "$1" 恒为空。
+#   于是 MSG_FILE 恒走 COMMIT_EDITMSG 回退，而 **`git commit --only` 不写
+#   COMMIT_EDITMSG**（该文件只由编辑器提交路径写入）⇒ 门读到的是**上一次
+#   提交的消息**，本次声明永远判不出。
+#
+#   实测症状：`git commit --only ... -m "...DELETION-INTENT: x..."` 报
+#   「x 未声明」，而把同样内容写入 COMMIT_EDITMSG 后同一提交立刻 PASS。
+#   门与「--only 防共享 index 误提交」这两条纪律因此互锁死：正是最需要
+#   删除声明的场景（--only）让声明失效。
+#
+# 修法：按可靠性依次尝试三个来源。
+MSG_FILE=""
+# (a) 显式传入（供手动/CI 调用：`bash check-commit-deletions.sh <msgfile>`）
+if [ -n "${1:-}" ] && [ -f "$1" ]; then
+  MSG_FILE="$1"
+fi
+# (b) git 为本次提交准备的 MERGE_MSG/编辑缓冲（编辑器路径会写它）
+if [ -z "$MSG_FILE" ]; then
+  _mm="$(git rev-parse --git-path MERGE_MSG 2>/dev/null)"
+  if [ -f "$_mm" ] && [ -s "$_mm" ] && \
+     [ "$(git rev-parse --git-path MERGE_MSG 2>/dev/null)" != "$(git rev-parse --git-path COMMIT_EDITMSG 2>/dev/null)" ]; then
+    MSG_FILE="$_mm"
+  fi
+fi
+# (c) 回退 COMMIT_EDITMSG（--only 场景下可能是上一次提交的消息，见上）
+if [ -z "$MSG_FILE" ]; then
   MSG_FILE="$(git rev-parse --git-path COMMIT_EDITMSG)"
 fi
 [ -f "$MSG_FILE" ] || MSG_FILE=/dev/null
