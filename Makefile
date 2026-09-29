@@ -347,3 +347,11 @@ supply-iocs:
 	bash scripts/check-supply-iocs.sh
 
 .PHONY: sync-todo watch-todo daemon-todo install-hook install-launchd uninstall-launchd check-conflicts todo-stats shanhai-pipeline shanhai-stats shanhai-mappings shanhai-evidence shanhai-export shanhai-visualize shanhai-all build-shanhai desktop-check desktop-build desktop-package-dir desktop-package lint test check build layer-deps doc-drift doc-drift-strict coverage-gate bench-baseline bench-compare geiger machete build-surface build-surface-strict fuzz arch-acyclic audit-all supply-iocs
+
+# 进化实验账本活性门（防「造了没人跑」）
+evolution-gate:
+	@bash scripts/check-evolution-ledger.sh
+
+# 跑一次完整 A/B 进化实验（人工/CI 按需，不进默认 CI）
+evolution-exp:
+	@cargo run --bin nt-evolution-exp -- --help

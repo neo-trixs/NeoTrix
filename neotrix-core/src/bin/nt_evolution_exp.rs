@@ -62,10 +62,29 @@ const CASES: &[(&str, &str)] = &[
 ];
 
 const EXIT_USAGE: i32 = 2;
+/// REJECT 的退出码。
+///
+/// ## 为什么需要独立出口（2026-09-29 实测抓到）
+///
+/// 此前 REJECT 走 `Ok(())` ⇒ **退出码 0**。实测 `nt-evolution-exp --help`
+/// 打印「未知参数 --help」却 `exit=0`。
+///
+/// ⇒ 后果：任何 `set -e` 的流程/CI **无法判定判决结果**，
+///   「进化实验」变成了只会打印的旁挂工具。
+///
+/// ⇒ 判决本身仍是**数据**（`results.tsv` 照写不误），
+///   但**流程需要一个可判的出口** —— 二者不冲突。
+const EXIT_REJECT: i32 = 1;
 
 fn main() {
     let code = match run() {
-        Ok(()) => 0,
+        Ok(accepted) => {
+            if accepted {
+                0
+            } else {
+                EXIT_REJECT
+            }
+        }
         Err(e) => {
             eprintln!("nt-evolution-exp: {e}");
             EXIT_USAGE
@@ -144,6 +163,11 @@ fn parse_args() -> Result<Args, String> {
             "--show" => {
                 show = true;
                 i += 1;
+            }
+            // ⛔ 别把 --help 当「未知参数」：Makefile 的 `evolution-exp` 目标靠它做冒烟。
+            "--help" | "-h" => {
+                print_usage();
+                std::process::exit(0);
             }
             other => return Err(format!("未知参数 {other}")),
         }
@@ -239,6 +263,34 @@ fn run_gate_at(wt: &Path, gate_rel: &str) -> i32 {
         .unwrap_or(124)
 }
 
+fn print_usage() {
+    println!(
+        "nt-evolution-exp — 进化 A/B 实验（Rust 唯一判决实现）
+
+用法:
+  nt-evolution-exp [选项]
+
+选项:
+  --baseline <sha>      baseline 臂的 commit（默认 HEAD~1）
+  --candidate <sha>     candidate 臂的 commit（默认 HEAD）
+  --repeats <n>         每臂重复采样次数（<2 夹到 2，地板否则为 None）
+  --hypothesis <text>   假设（必填，缺则 no_falsifier 否决）
+  --falsifier <text>    证伪条件（必填，缺则 no_falsifier 否决）
+  --target-commit <sha> 目标 commit（必填）
+  --pinned-model <id>   钉住模型标识
+  --show                列出 case 集与账本，不跑实验
+  --help | -h           本帮助
+
+退出码:
+  0 = ACCEPT（或 --help / --show）
+  1 = REJECT（有 veto 或未过显著/地板）
+  2 = 用法错误
+
+⛔ 注意：REJECT 退出码为 **1**。判决始终写入 results.tsv（append-only）。
+   2026-09-29 起才有这个出口 —— 此前 REJECT 也退 0，导致 set -e 流程无法判定。"
+    );
+}
+
 /// 单轮执行：检出 rev、跑完 case 集、清理 worktree，返回 `CaseOutcome` 列表。
 ///
 /// ## 为什么每次调用都新建 + 删 worktree（而不是复用）
@@ -311,14 +363,14 @@ fn run_once_at(root: &Path, rev: &str, arm: &str) -> Result<Vec<CaseOutcome>, St
 
 
 
-fn run() -> Result<(), String> {
+fn run() -> Result<bool, String> {
     let args = parse_args()?;
     if args.list_cases {
         println!("case 集（纯文件型门，不 spawn cargo）：");
         for (cid, gate) in CASES {
             println!("  {cid:16} {gate}");
         }
-        return Ok(());
+        return Ok(true);
     }
     let root = repo_root()?;
     let results_path = root.join("results.tsv");
@@ -326,11 +378,11 @@ fn run() -> Result<(), String> {
         match std::fs::read_to_string(&results_path) {
             Ok(s) => {
                 print!("{s}");
-                return Ok(());
+                return Ok(true);
             }
             Err(_) => {
                 println!("results.tsv 不存在 —— 先跑一次实验");
-                return Ok(());
+                return Ok(true);
             }
         }
     }
@@ -490,7 +542,9 @@ fn run() -> Result<(), String> {
         runner.self_refutation_rate(&subject)
     );
     println!("已入账 → results.tsv（append-only，正负都记）");
-    Ok(())
+
+    // 判决是数据；退出码是给流程的判据。二者分别由账本与本行承担。
+    Ok(out.verdict.accept)
 }
 
 /// 实验用的「可比性指纹」。

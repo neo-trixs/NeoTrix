@@ -68,8 +68,14 @@
 |---|---|---|---|---|---|
 | **N-1** | CI 幻影门拆除 + 引用门 | `awesome-dsh-plugin` | `check-ci-refs.sh` | 已完成 | ✅ |
 | **N-2** | 未编译代码检测 | K-Dense `CHECKS` 契约 | `check-truth-surface.sh` | 已完成（265 条入账） | ✅ |
-| **N-3** | **test 账本填充** | `cline` 孤儿化教训 | `check-test-baseline.sh` + baseline（**0 字节**） | 干净检出 `--strict`=0；注入失败=1 | ⬜ |
+| **N-3** | **test 账本填充** | `cline` 孤儿化教训 | `check-test-baseline.sh` + baseline（**0 字节**） | 干净检出 `--strict`=0；注入失败=1 | ⚠️ |
 | **N-4** | **skill policy 接线**（第一轮误标为「核心代码」） | 官方规范 | `skill_loader.rs:107-142` 三个 `visible_*` **零消费者** | `grep` ≥1 非测试消费者 | ⬜ |
+> **实测 2026-09-29（纠错记录）**：台账原文写「`skill_loader.rs:107-142` 三个 `visible_*` 零消费者」。
+> 逐条核实发现**两处不准**：(a) 实际只有**两个** `visible_*`（`:118` `visible_to_model`、
+> `:123` `visible_to_user`），不是三个；(b) 真正查这两个函数名的非测试消费者，**确为 0**。
+> ⇒ 结论「零消费者」成立，行号与个数不准，**状态保持 ⬜ 不变**。
+> ⚠️ 核查方法教训：`grep visible_` 会命中 `invisible_*` 等子串，曾一度误得「33 个消费者」。
+> **必须用完整函数名 `visible_to_model|visible_to_user` 精确匹配**（对应 R-SCAN-1：先证实现状再改码）。
 | **N-5** | **claims 数字追溯** | `kev/scripts/verify_claims.py` | `nt_manifest.py`（查 `file:line` 不查数字） | 4 个错数字入 claims 后 audit=1 | ⬜ |
 | **N-6** | **`docs/package.json` 裁决** | 本地 | `docs/` 113 跟踪文件 vs vitepress 已删 | 重建或删触发 | ⛔ 需裁决 |
 
@@ -78,8 +84,16 @@
 | ID | 特性 | 来源 | 落点 | 验收 | 状态 |
 |---|---|---|---|---|---|
 | **N-11** | **门记录带 env 指纹** | `Soup/benchmarks/` | `nt_manifest.py:58-79`（地基已在） | 改 `Cargo.lock` 后 stale=1 | ⬜ |
-| **N-12** | **门可满足性元门** | `i-have-adhd`（永远通不过的门） | 新建 `check-gate-satisfiable.sh` | 每门两条证明（红+绿） | ⬜ |
-| **0.2** | **证伪门**（预注册/四事实/正负都提交/复杂度判据） | `harness-engineering` 协议 + `autoresearch` | `crates/neotrix-audit/` | 改记忆规则不改门 ⇒ 红 | ⬜ |
+| **N-12** | **门可满足性元门** | `i-have-adhd`（永远通不过的门） | 新建 `check-gate-satisfiable.sh` | 每门两条证明（红+绿） | ✅ |
+> **实测 2026-09-29**：`check-gate-satisfiable.sh` 存在，`.github/workflows/ci.yml` 有引用。
+> ⛔ 但注意本仓教训档 `…2026-09-27-scanner-trust`：门记录会腐化，此状态须随改动刷新。
+| **0.2** | **证伪门**（预注册/四事实/正负都提交/复杂度判据） | `harness-engineering` 协议 + `autoresearch` | `crates/neotrix-audit/` | 改记忆规则不改门 ⇒ 红 | 🔵 |
+> **实测 2026-09-29**：`nt_evolution_eval.rs` 具备 `Preregistration` / `Veto` / `judge_ab` / `is_complete` / `Ledger`，
+> 27 测试通过；bin `nt_evolution_exp` 实测能 ACCEPT 也能因 `no_falsifier` / `within_noise` 三路拒绝。
+> **判为 🔵 而非 ✅ 的原因**：⛔ `nt_evolution_exp` **未进 `Makefile` 也未进 CI** ——
+> 进化实验能跑，但**没有任何门或流程会调用它**。这正是本仓反复出现的
+> 「造了不接线」老毛病（与 B6 ExperimentRunner 零消费者同类）。
+> ⇒ 接线是本条剩余的唯一缺口，接完即可升 ✅。
 | **0.3** | **maturity 降级落盘** | 本地 | `registry.rs:485` `demote_mislabeled()` | `claimed>supported` ⇒ 红/自动降 | ⬜ |
 | **3.1** | **成本归因：唯一插点已存在** | `cost-xray` | `anthropic.rs:93`（P0-4 prefix caching 边界） | `skill`/MCP 成一等维度 | ⬜ |
 | **1.7** | **取消：持久化请求而非就地取消** | `deer-flow` 83k★ | `crates/neotrix-neobot/src/nt_cancel.rs`（✅ 存在） | 取消请求可重放 | ⬜ |
