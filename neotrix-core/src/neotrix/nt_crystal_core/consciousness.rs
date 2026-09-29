@@ -640,8 +640,10 @@ impl CrystalConsciousness {
     /// **同源同范围**（基本汉字区）。⚠️ 全仓另有 4 个 `is_cjk` 副本，其中
     /// `l1_action/nt_core_llm/mod.rs:55` 口径更宽（含 CJK 标点/假名/谚文/全角），
     /// 尚未统一 —— 见 TODO 的 DRY 债登记，**不在本轮改动范围**。
+    /// 2026-09-29：本地副本已删，改用唯一事实源（同 `nt_shared_mind.rs`）。
+    /// ⛔ 分词用**窄**口径；宽口径会把标点塞进 bigram。
     fn is_cjk(c: char) -> bool {
-        ('\u{4e00}'..='\u{9fff}').contains(&c)
+        neotrix_types::core::nt_cjk::is_cjk_han(c)
     }
 
     /// 跨前提共享词：按出现频次排序取前 5（归纳/演绎的证据核心）

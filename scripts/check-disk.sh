@@ -101,9 +101,18 @@ if [ "$T_GB" -ge "$WARN_GB" ]; then
   #    且当时有 4 个他窗 cargo 进程在跑。示例一律用普通引号。
   echo '  建议：优先局部回收（cargo clean -p <crate>）；全量 cargo clean 会让'
   echo '        下一轮全量重编（16G 机上约数十分钟，勿在他窗构建时做）。'
-  # 长期处方：profile.dev 里设 incremental = false 或 debug = 0，可省 60G+。
+  # 长期处方：`profile.dev` 设 incremental = false 或 debug = 0，可省 58% target 体积。
   #   [profile.dev]  incremental = false
-  # 代价：全量重编变慢。⇒ 这是取舍，不擅自改，交人决定。
+  #
+  # ⚠️ **2026-09-29 实测：此刻不要改**。数据如下，disk 紧张时再看：
+  #   · incremental 16G / target 28G = **58%**（实测构成，非估算）
+  #   · 磁盘可用 210Gi、占用仅 8% ⇒ **当前无 disk 压力**
+  #   · 改单文件 `cargo check --lib` = **33s**（开 incremental）
+  #   · 关掉后每次改码需全量重编 74 万行 ≈ 2–4 min ⇒ **慢 4–7 倍**
+  # ⇒ 判定：拿日常开发速度换一个暂时用不上的磁盘空间，是**净损失**。
+  #   正确触发条件：磁盘可用 < 80Gi 且 target > 80G 时再改，那时是净收益。
+  #   ⛔ 不要为了「省磁盘」这个数字本身去改 —— 它此刻不省任何东西。
+  echo '  长期处方（本会话实测：此刻不划算，见门内注释）：profile.dev 设 incremental=false'
 fi
 
 # advisory 恒绿（见头注：磁盘紧张时的正确动作由人决定，不是门替人决定）

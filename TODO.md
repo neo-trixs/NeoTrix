@@ -64,7 +64,9 @@
 | ~~10~~ | ~~`noise_handshake` 接到生产（R-P79）~~ | 实现 | ✅ **已完成**（2026-09-29）：新增 `protocol/noise_ik.rs` —— C1 SANS-IO 协议引擎，作为 `noise_handshake` 的唯一生产消费者。分层方向合法（C1→C0），`noise_ik` 10 测试全绿，全量 **12207 passed / 0 failed**。⚠️ 接线时测试抓到我自己写死的错误断言（见下），已改为断言正确性质 |
 | 6 | 经验吸收：`neotrix-experience absorb` 把 L23–L26 入 KB | 收尾 | **待办** |
 | ~~11~~ | ~~统一 8 个 `is_cjk` 副本~~ | DRY | ✅ **已完成**（2026-09-29）：裁决**不是统一成一个**，而是「两种语义各一个事实源」——`is_cjk_han`（分词，窄）/ `is_cjk_wide`（计量，宽）。7 个副本改薄转发，环形依赖解除。详见下方详案 |
-| 12 | 重新实现 IPC 键名校验器（`nt_ipc_keys.py` 从未入库，缺口仍敞开） | 实现 | **待办**（详见下方登记） |
+| 14 | 裁决 `neotrix-core/docs/` 3 份架构文档（744 行）存废 | 裁决 | 待逐份比对 |
+| 13 | **恢复 842 行丢失的冒烟测试**（落点 `Neo/neobot`，需授权） | 实现 | ⛔ 跨仓待授权 |
+| ~~12~~ | ~~重新实现 IPC 键名校验器~~ | 实现 | ⚠️ **改判**（2026-09-29）：验的契约**已整体迁出本仓**（桌面端 → 独立仓 `Neo/neobot`）⇒ 本仓实现不了，正确落点是那个仓。详见下方改判 |
 | 7 | 收工：`nt_worktree_gate.sh check` → 自己开的 worktree 走 `prune`（**禁手删**） | 收工 | **待办**（硬规则） |
 
 ### ~~待办 11~~ 详案：`is_cjk` 八副本 —— **裁决：不是重复，是两种语义**（2026-09-29 已完成）
@@ -141,6 +143,89 @@ TODO 原 §156-162 记「新增 `scripts/ops/nt_ipc_keys.py`，实测 声明 97/
 ⇒ 原始缺口「前端 invoke 键名 vs Rust 形参名没人守」**仍然敞开**。
 若重做，须覆盖：只到键名不到类型（`{taskId:123}` 键对型错不报）、
 只到静态不到运行时（serde 转换 / `Option` 缺省仍要真进程往返）。
+
+### 待办 14：`neotrix-core/docs/` 3 份架构文档的存废裁决（2026-09-29 已记账）
+
+`DOCUMENTATION-MAP.md:81` 明令「`neotrix-core/docs/` 禁止存研究笔记、
+分析报告」，而那里有 3 份 **744 行**的真实架构文档：
+
+| 文件 | 行数 | 主题 | 最后改动 |
+|---|---|---|---|
+| `FUSION_ARCHITECTURE.md` | 436 | 破限技术融合架构 × 能力骨架熔炼（分析日期 2026-09-11） | 2026-09-20 |
+| `ANALYSIS_ARCHITECTURE.md` | 178 | 架构分析报告 | 2026-09-20 |
+| `CRYSTAL_ARCHITECTURE.md` | 130 | 意识体晶体核心 — 架构文档 | 2026-09-20 |
+
+已计入 `scripts/layout-baseline.txt`（⇒ `check-layout.sh` 只拦新增，不阻断）。
+
+**未裁决的理由**：仓内 fusion 主题文档并存至少 6 份
+（`FIVE-ENTITY-ARCHITECTURE-FUSION` / `FIVE-ENTITY-FUSION` /
+`design-fusion-analysis-2026-09-20` / `IMPACT-ANALYSIS` /
+`all-capability-analysis` / `RFC-CRYSTAL-REASONING-CHAIN-20260928`），
+**要判定这 3 份是否已被取代，必须逐份比对内容** —— 那是独立任务，
+不能靠文件名或行数猜。误删 744 行真实架构文档的代价远高于留着。
+
+⇒ 若判定已取代：移到 `docs/architecture/_superseded/`（仓内既有惯例）
+或移出到 `Neo/neotrix-archive/`；若判定仍有效：改 `DOCUMENTATION-MAP.md`
+豁免 `neotrix-core/docs/architecture/`，并同步 `check-layout.sh` 的白名单。
+
+### ⚠️ 待办 13：842 行冒烟测试已丢失，恢复点在 git 历史（2026-09-29 取证）
+
+`620e9712`（neobot 线入库）里有 6 个冒烟测试共 2,496 行，`d5413335` 随
+内嵌 crate 一起删除。**逐个核对 `Neo/neobot` 仓的现状**：
+
+| 测试 | 620e9712 行数 | `Neo/neobot` 现状 | 判定 |
+|---|---|---|---|
+| `nt_smoke_cancel.rs` | 747 | 747 行 | ✅ 完整保留 |
+| `nt_smoke_slash_cmd.rs` | 710 | 710 行 | ✅ 完整保留 |
+| `nt_smoke_channels.rs` | 197 | **35 行** | ⚠️ 大幅缩水（原 197） |
+| `nt_smoke_changes.rs` | 470 | ⛔ 全仓无同名 | ❌ **丢失** |
+| `nt_smoke_files.rs` | 193 | ⛔ 全仓无同名 | ❌ **丢失** |
+| `nt_smoke_sidebar.rs` | 179 | ⛔ 全仓无同名 | ❌ **丢失** |
+
+⇒ **净丢失 842 行**（470+193+179），另有 `nt_smoke_channels` 缩了 162 行。
+
+**恢复点完好**（在本仓 git 历史里，未丢失）：
+```sh
+git show 620e9712:apps/neobot-desktop/tests/nt_smoke_changes.rs
+git show 620e9712:apps/neobot-desktop/tests/nt_smoke_files.rs
+git show 620e9712:apps/neobot-desktop/tests/nt_smoke_sidebar.rs
+```
+
+⚠️ **但不能直接在本仓恢复**：它们 `use neobot_desktop::nt_commands::…`，
+而该 crate 已迁到 `Neo/neobot`（本仓 workspace 不含 `neobot-desktop`）
+⇒ 放本仓编不过。**恢复必须落到 `Neo/neobot` 仓内**，且需核对
+`nt_commands` 的 API 是否已变（该仓在 `p0-llamacpp` 分支持续演进）。
+
+⛔ 本会话**未动** `Neo/neobot`（跨仓改动需主人授权）。
+⛔ 另注：`Neo/neobot/target/nt-smoke/nt_smoke_sidebar` 是**构建产物**
+（二进制），⛔ **不是**源码，别误判为「已恢复」。
+
+### 另：`nt_smoke_channels` 缩水的 162 行需查
+现 35 行 vs 原 197 行。是刻意重写还是截断？取证：
+```sh
+git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smoke_channels.rs
+```
+
+### ⚠️ 待办 12 改判：**本仓实现不了，正确落点是 `Neo/neobot`**
+
+2026-09-29 取证发现，这个缺口的两侧**都已不在本仓**：
+
+| 契约侧 | 现在的位置 | 本仓还有吗 |
+|---|---|---|
+| 前端 `invoke('xxx')` 键名 | `~/Downloads/Neo/neobot/apps/neobot-desktop/frontend/` | ⛔ 无 |
+| Rust `#[tauri::command]` 形参 | `~/Downloads/Neo/neobot/apps/neobot-desktop/src/nt_commands*.rs` | ⛔ 无（本仓 `rg 'tauri::command'` 零命中）|
+
+根因是 `d5413335`（移除内嵌 neobot-desktop）与 `5c02e738`（归档 src-tauri）
+—— 桌面端已统一到独立仓 `Neo/neobot`（分支 `p0-llamacpp`，有独立历史与
+`scripts/` 目录）。
+
+⇒ **在本仓写这个校验器是写不出来也不该写的**：两侧数据源都不在这里，
+硬做只能靠硬编码路径指向仓外，既不可移植也不可维护。
+⇒ 正确做法：在 `Neo/neobot` 仓内实现该校验器并接其 CI。
+⛔ **本会话未动那个仓** —— 跨仓改动需主人授权。
+
+⚠️ 另注：同族待办（原 §203）「前端 invoke 的**类型层**」是更强的做法 ——
+让键名错在编译期暴露，而不是靠事后抓。它同样落在 `Neo/neobot`。
 
 ⚠️ 本条是 **R-SCAN-3 的反向样本**：门记录写「已验证」而实现从未入库，
 比没写更坏 —— 下一个 agent 会以为缺口已关。
