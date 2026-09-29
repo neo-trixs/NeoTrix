@@ -508,6 +508,22 @@
       "read_only": true,
       "when_not": "**不要批量自动执行**（2026-09-29 实测失败）。工具的三条判据是必要非充分条件：它**不检查 impl 块**（unified_types 多 9 个 ⇒ Default 冲突）**也不查依赖链**。实测删 15 个类型后 cargo check 报 E0119+E0560。逐组人工验证",
       "spec": "提供判据，不自动改"
+    },
+    {
+      "id": "mutation-check",
+      "query": [
+        "变异测试",
+        "mutation",
+        "测试有效性",
+        "判别力",
+        "测试是否有效",
+        "杀死变异"
+      ],
+      "tool": "python3 scripts/ops/nt_mutation_check.py --audit <FILE.rs>",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "不要对**尚未全绿**的树跑变异（工具会拒：基线红则无法归因）；也别当覆盖率工具用 —— 它不测行覆盖，只测能否杀死变异。要真正跑请显式给 --fn --mutate --cargo（该模式会改文件再恢复）。",
+      "spec": "R-MUT-1"
     }
   ],
   "excluded": {
