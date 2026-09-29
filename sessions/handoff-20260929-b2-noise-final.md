@@ -234,9 +234,28 @@ git merge --ff-only f_integrated
 
 ### 9.5 未做的两件事（有意留下）
 
-- **两处 worktree 未收**：`integrate` / `merge-test` 都被 `prune` 的「近3h有 .rs 改动」
-  判据拦下（合并 checkout 会刷新全树 .rs 的 mtime，判据无法区分「他窗在用」与
-  「我刚做完」）。commit 全在分支上，零丢失。下个会话 `prune --force` 即可。
+- ~~**两处 worktree 未收**~~ ✅ **已收**（2026-09-29，`48e07e0d`）：根因**不在时机、
+  在门的判据**。`prune` 的「近3h有 .rs 改动」是 mtime 启发式，分不清「他窗在写」与
+  「我刚做完」——`git merge`/checkout 会刷新全树 .rs 的 mtime，于是自己刚收工、
+  干净、commit 已在分支上的 worktree 也被判成他窗在用，**永远清不掉**。
+  worktree 堆积正是这么来的。
+  修法不是等 3 小时，而是改判据顺序：**mtime 只在「有东西可能丢」时才有意义** ——
+  脏 worktree 才可能丢未提交改动；干净 + HEAD 已并入分支 ⇒ `git worktree remove`
+  可证无损。故改为先判脏：脏 → 走 mtime + patch 兜底；干净 → 跳过 mtime 直通双闸。
+  **脏 worktree 的保护完全未放松**，并已造真实反例（`/tmp/nt-gate-test`，1 行脏改动）
+  自测确认：输出「⏭ 脏(1 处) 且近3h有 2830 个 .rs 改动 ⇒ 跳过」，保护生效。
+  这是「机械化判据要自测」的兑现 —— 判据不靠推理，靠喂真实反例。
 - **未跑 `check-doc-drift` 全量 / `check-naming`**：两者都是 advisory 且本地基线本身
   不可信（`check-naming` clean-HEAD 基线 1,646 个无 `nt_` 前缀文件，规约无约束力）。
   跑了也只是制造噪声，不构成证据。
+
+
+### 9.6 收工终态（2026-09-29 最终）
+
+- worktree：**只剩主工作树一棵**（本会话开的 `merge-test` / `integrate` 已 `prune --force` 移除）
+- 冗余分支：3 支已用 `git branch -d` 删除（`f_merged_ratchet` / `f_integrated` /
+  `fix/bitemporal-and-layer-ratchet`）—— git 自身校验「已并入主干」通过才允许删
+- 主干：`feat/capability-absorb-20260828`，含 B-2 + 分层棘轮 102→8 + B-1 + 两笔门修复
+- 他窗未提交文件：**59 个，全程未触碰**（落地时核验 `脏 ∩ 合并改动集 = ∅`）
+- 本会话共修 2 个门脚本 bug：`prune --force` 静默空转（`64838ca3`）、
+  `prune` mtime 判据误伤（`48e07e0d`）—— 均为「门看起来在工作、实际失效」类
