@@ -41,6 +41,10 @@ jobs:
         run: bash scripts/check-layer-deps.sh --strict
       - name: "Truth-surface gate (ratchet: blocks NEW 0-byte .rs / undeclared test modules / tracked build artifacts)"
         run: bash scripts/check-truth-surface.sh --strict
+      - name: "Untracked-asset gate (R-EXIST-1 — a clean clone must contain every real asset)"
+        run: bash scripts/check-untracked-assets.sh
+      - name: "Production-panic ratchet (blocks NEW unwrap/expect/panic; 712-site debt baselined)"
+        run: bash scripts/check-unwrap.sh --strict
       # 2026-09-29 新增（N-1）。本 job 组同时跑 3 个 OS，但本门只读 git 索引与
       # workflow 文本，跑一次即可 —— 放在 matrix 里是浪费，但放外面要多一个 job，
       # 权衡后留在 `check` 的第一步之前（秒级，无需 cargo）。
