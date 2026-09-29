@@ -355,7 +355,7 @@ mod tests {
     #[test]
     fn test_ingest_both() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(dir.path().join("test.db"))).expect("open kb");
+        let kb = crate::l2_perception::nt_world::l1_facade::KnowledgeBase::open(Some(dir.path().join("test.db"))).expect("open kb");
         let r1 = UrlhausFetcher::new().ingest_from_json(&kb, URLHAUS_FIXTURE_JSON).expect("ingest urlhaus");
         assert_eq!(r1.nodes_created, 1);
         let r2 = CisaKevFetcher::ingest_events(&kb, &CisaKevFetcher::parse_json(CISA_KEV_FIXTURE_JSON).unwrap()).expect("ingest cisa");

@@ -323,14 +323,14 @@ pub async fn start_server_with(
     let mut app = build_router(state.clone());
 
     // Merge KB API routes if KnowledgeBase can be opened
-    if let Some(kb_state) = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_api::KbApiState::try_open_default() {
-        let kb_router = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_api::build_kb_router(kb_state);
+    if let Some(kb_state) = crate::l1_action::nt_action_facade::KbApiState::try_open_default() {
+        let kb_router = crate::l1_action::nt_action_facade::build_kb_router(kb_state);
         app = app.merge(kb_router);
     }
 
     // Merge EWHR API routes if KB can be opened
-    if let Some(ewhr_state) = crate::l4_emotion::nt_memory::nt_memory_historian::EvidenceApiState::try_open_default() {
-        let ewhr_router = crate::l4_emotion::nt_memory::nt_memory_historian::build_ewhr_router(ewhr_state);
+    if let Some(ewhr_state) = crate::l1_action::nt_action_facade::EvidenceApiState::try_open_default() {
+        let ewhr_router = crate::l1_action::nt_action_facade::build_ewhr_router(ewhr_state);
         app = app.merge(ewhr_router);
     }
 

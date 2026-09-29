@@ -10,7 +10,7 @@
 //! 完善阶段 (C1): AddressableStore 实际接入、token 精确计数。
 
 use std::collections::HashMap;
-use crate::l4_emotion::nt_memory::addressable_store::AddressableStore;
+use crate::l1_action::nt_action_facade::AddressableStore;
 
 /// 压缩级别
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

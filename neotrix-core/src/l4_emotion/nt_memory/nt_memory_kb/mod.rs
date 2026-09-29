@@ -389,7 +389,7 @@ impl crate::l0_substrate::nt_core_traits::KnowledgeSink for KnowledgeBase {
     }
 }
 
-impl crate::l5_cognition::nt_core::capability::nt_core_antidistil::AntiDistilStore
+impl crate::l4_emotion::nt_feel_facade::AntiDistilStore
     for KnowledgeBase
 {
     fn store_trace_data(&self, data: &serde_json::Value) -> Result<(), String> {

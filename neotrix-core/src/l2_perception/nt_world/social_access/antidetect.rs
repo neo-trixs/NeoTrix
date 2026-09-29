@@ -7,7 +7,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::{Response, StealthHttpClient};
+use crate::l2_perception::nt_world::l1_facade::{Response, StealthHttpClient};
 
 /// Anti-detect configuration for social media access.
 ///

@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use crate::l2_perception::nt_core_knowledge::AffectiveFeedback;
-use crate::l5_cognition::l1_facade::affective_interface::{
+use crate::l1_action::nt_action_facade::AffectiveFeedback;
+use crate::l1_action::nt_action_facade::{
     AffectiveInterface, AffectiveReadout, GuideMode, ResponseIntent,
 };
 
-pub use crate::l4_emotion::nt_feel_facade::{
+pub use crate::l1_action::nt_action_facade::nt_feel_facade::{
     DigitalHumanEmotion as Emotion, DigitalHumanEmotionEngine as EmotionEngine,
     emotion_from_expression,
 };
@@ -467,7 +467,7 @@ impl DigitalHumanPipeline {
             signal_weight: 0.3,
         });
         // Q2 P3: 经共享观测槽发布到 NT-MIND 奖励管线 (跨域旁路通道)。
-        crate::l2_perception::nt_core_knowledge::publish_affective_observation(self.last_affective_feedback);
+        crate::l1_action::nt_action_facade::publish_affective_observation(self.last_affective_feedback);
         PipelineResponse {
             reply: reply.clone(),
             emotion,

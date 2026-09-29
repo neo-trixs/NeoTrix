@@ -95,15 +95,16 @@ cargo build -p neotrix                  # 完整构建
   本体须过双闸：`status --porcelain` 为空 **且** `branch -a --contains HEAD` 非空。
   **有 cargo 在跑时不碰主 `target/`**
 - 目录/命名门（2026-09-28 新增，均 bash，无需 cargo）：
-  - `bash scripts/check-layer-deps.sh --strict` → **exit 0**，**101 known**
-    （基线 `scripts/layer-deps-baseline.txt`）。⚠️ **只信干净检出的数字**：
-    主工作树因未提交的 `.rs` 修复会让违规**变少**，照抄脏树值会让 CI 以
-    `FAIL: N new` 红。测量台 = `git worktree add --detach HEAD`。
-  - `bash scripts/check-naming.sh` → advisory，clean-HEAD 基线 **1,646** 个无 `nt_`
-    前缀文件（主工作树实测 **1,630**，差值即未提交改名所致）。
+  - `bash scripts/check-layer-deps.sh --strict` → **exit 0**，**8 known**
+    **测量台：`git worktree add --detach HEAD` 的干净检出**（脏树值会让违规变少，照抄会让 CI 以 `FAIL: N new` 红 —— 见 L8）。
+    - 2026-09-28 实测 8：棘轮 **101→92→89→80→50→47→40→26→25→8**，`PASS 0 new`、RC=0，**L1–L5 真引用全清**。
+    - 剩余 8 条全是**已记录不可改道项**（l0 无对应真实现 / 字符串字面量）⇒ 只能留基线，删会让 CI 红。明细见 `DECISIONS-2026-09-28.md`。
+    - ⚠️ `neotrix/` 树受 `#[cfg(feature="ios-bridge")]` 门控，默认测试编不进；该树改动须另跑 `cargo check -p neotrix --features ios-bridge`（2026-09-28 实测 exit=0）。
+    - ⚠️ 改跨层引用**唯一合法通道是「消费方自己那层」的 facade**；走目标层 facade 无效（路径仍含层名）。
+    - ⚠️ **同名 ≠ 同一符号**（换错了 `cargo check` 不报错，L15）；门**分不清字符串字面量**（L14）；批量改道须自查有无改到注释行（L13/L16）。
+  - `bash scripts/check-naming.sh` → advisory，clean-HEAD 基线 **1,646** 个无 `nt_` 前缀文件（主工作树实测 1,630，差值即未提交改名所致）。
     **规约 vs 现实差 1,646 ⇒ 该规约无约束力**，advisory PASS 不代表合规。
-  - 层归属真源 `.neotrix/layer-map.json`（`_rule` 里的重名计数 2026-09-28 已按实测
-    重写）；裁决表 `docs/architecture/OWNERSHIP.md`
+  - 层归属真源 `.neotrix/layer-map.json`（`_rule` 里的重名计数 2026-09-28 已按实测重写）；裁决表 `docs/architecture/OWNERSHIP.md`
   - ⛔ **`truth-surface` 本地红不是 CI 红**：他窗 WIP 造成 UNCOMMITTED_DEP；干净检出实测 exit=0
 - 硬规则细则见 `RUST-STANDARDS.md` §17（锁/构建/卡死判别/Git/修 bug 判据/字节安全）
 

@@ -8,7 +8,7 @@ use serde_json::Value;
 use super::nt_loop_types::{AgentLoop, ToolInvocation};
 use crate::l0_substrate::nt_core_traits::ToolOutput;
 use crate::l1_action::nt_io::nt_io_provider::types::{FinishReason, LlmError, Message, Role, ToolCallInfo};
-use crate::l6_meta::nt_approval::PendingAction;
+use crate::l1_action::nt_action_facade::PendingAction;
 
 impl AgentLoop {
     /// 执行一轮对话：用户输入 → (可能的多次工具调用) → 最终回答。
@@ -181,7 +181,7 @@ impl AgentLoop {
     ///   - `on_tool`：工具执行后回调 `(name, args, result, duration_ms, success)`，
     ///     返回 `false` 取消本轮生成（参考 nt_io_neocodex.rs `react_loop_stream` 签名）；
     ///   - `on_approval`：审批回调。`Some(cb)` 时启用审批门槛：每个工具执行前经
-    ///     `crate::l6_meta::nt_approval::global_approval()` 检查，`require_approval` 为 true 则
+    ///     `crate::l1_action::nt_action_facade::nt_approval::global_approval()` 检查，`require_approval` 为 true 则
     ///     提交 `PendingAction` 并调用 `cb(&PendingAction)` 等待决策（true=approve,
     ///     false=deny）。deny 时工具被跳过，模型收到明确的 "需审批" 错误。
     ///     `None` 时同样启用门槛，但无回调可问 → 需审批的工具一律跳过（返回 "需审批" 错误）。

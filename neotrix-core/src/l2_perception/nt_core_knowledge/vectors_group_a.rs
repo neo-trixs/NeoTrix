@@ -1,5 +1,5 @@
 use crate::l2_perception::nt_core_knowledge::KnowledgeSource;
-use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
+use crate::l2_perception::nt_world::l1_facade::CapabilityVector;
 
 pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<CapabilityVector> {
     match s {

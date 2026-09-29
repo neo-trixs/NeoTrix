@@ -613,14 +613,14 @@ impl NeoCodexAgent {
         // reason over, and we drop the raw image channel.
         let active_model = self.provider.active_model();
         let active_has_vision = self.provider.has_capability(ModelCapability::Vision)
-            || crate::l2_perception::nt_core_e8::nt_multimodal::model_supports_vision(&active_model);
+            || crate::l1_action::nt_action_facade::model_supports_vision(&active_model);
         let mut messages = messages;
         let mut image_data = image_data;
         if image_data.is_some() && !active_has_vision {
             if let Some(b64) = image_data.take() {
                 if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&b64) {
                     if let Ok((evidence, _feat)) =
-                        crate::l2_perception::nt_core_e8::nt_multimodal::VisionBridge::analyze_cached(&bytes)
+                        crate::l1_action::nt_action_facade::VisionBridge::analyze_cached(&bytes)
                     {
                         if let Some(last_user) =
                             messages.iter_mut().rev().find(|m| m.role == Role::User)

@@ -15,7 +15,7 @@ use crate::l1_action::nt_io::nt_io_output_style::{OutputStyleId, OutputStyleRegi
 use crate::l1_action::nt_io::nt_io_provider::context_budget::{apply_context_budget, estimate_messages_tokens, estimate_tokens};
 use crate::l1_action::nt_io::nt_io_provider::generation_classifier::{GenerationClassifier, TaskType};
 use crate::l1_action::nt_io::nt_io_provider::types::{LlmError, LlmRequest, Message, Role, ToolCallInfo};
-use crate::l6_meta::nt_approval::{ActionType, PendingAction};
+use crate::l1_action::nt_action_facade::nt_approval::{ActionType, PendingAction};
 
 /// P2 可逆命令输出蒸馏 (repowise absorbed 2026-08-19, R-P79):
 /// 超长工具输出压缩为 errors-first + `[ref#N]` 内联标记, 可展开回原文。
@@ -415,7 +415,7 @@ impl AgentLoop {
         args: &Value,
         on_approval: Option<&(dyn Fn(&PendingAction) -> bool + Send)>,
     ) -> Result<(), String> {
-        let engine = crate::l6_meta::nt_approval::global_approval();
+        let engine = crate::l1_action::nt_action_facade::nt_approval::global_approval();
         let action = Self::action_type_for_tool(name, args);
         let require = {
             let guard = engine.lock().map_err(|e| format!("approval lock: {}", e))?;

@@ -6,7 +6,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::l0_substrate::nt_core_platform::{Agent, AgentError as PlatformAgentError, AgentMetrics as PlatformAgentMetrics, AgentStatus as PlatformAgentStatus};
-use crate::l6_meta::nt_core_capability::{Layer, Domain, UnifiedCapability, CapabilityMeta, CapabilityHealth as PlatformCapabilityHealth, CapabilityState, CapabilityInput, CapabilityOutput, CapabilityError as PlatformCapabilityError};
+use crate::l5_cognition::l1_facade::{Layer, Domain, UnifiedCapability, CapabilityMeta, CapabilityHealth as PlatformCapabilityHealth, CapabilityState, CapabilityInput, CapabilityOutput, CapabilityError as PlatformCapabilityError};
 use crate::l1_action::traits::{
     L1Capability, Orchestrator as L1Orchestrator, CapabilityCategory, ConstellationLevel,
     CapabilityHealth, CapabilityStats, CapabilityError,
@@ -198,8 +198,8 @@ impl UnifiedCapability for SupervisorL1Bridge {
             version: "0.1.0".to_string(),
             description: "L7 orchestrator bridged to L1 trait".to_string(),
             tags: vec!["bridge".to_string(), "l7".to_string(), "l1".to_string()],
-            status: crate::l6_meta::nt_core_capability::CapabilityStatus::Healthy,
-            metrics: crate::l6_meta::nt_core_capability::CapabilityMetrics::default(),
+            status: crate::l5_cognition::l1_facade::CapabilityStatus::Healthy,
+            metrics: crate::l5_cognition::l1_facade::CapabilityMetrics::default(),
             cost_weight: 0.3,
             priority: 1.0,
         }
@@ -251,8 +251,8 @@ impl UnifiedCapability for L7OrchestratorRegistry {
             version: "0.1.0".to_string(),
             description: "L7 orchestrator registration center".to_string(),
             tags: vec!["registry".to_string(), "l7".to_string(), "orchestrator".to_string()],
-            status: crate::l6_meta::nt_core_capability::CapabilityStatus::Healthy,
-            metrics: crate::l6_meta::nt_core_capability::CapabilityMetrics::default(),
+            status: crate::l5_cognition::l1_facade::CapabilityStatus::Healthy,
+            metrics: crate::l5_cognition::l1_facade::CapabilityMetrics::default(),
             cost_weight: 0.3,
             priority: 1.0,
         }

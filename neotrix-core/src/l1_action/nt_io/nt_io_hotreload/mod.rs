@@ -229,21 +229,21 @@ impl HotReloadWatcher {
 #[cfg(feature = "stealth-net")]
 pub fn default_watcher(
     neotrix_dir: PathBuf,
-    rule_engine: Option<Arc<tokio::sync::RwLock<crate::l3_embodiment::nt_shield::nt_shield_stealth_net::rules::RuleEngine>>>,
-    proxy_pool: Option<std::sync::Arc<crate::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_pool::ProxyPool>>,
+    rule_engine: Option<Arc<tokio::sync::RwLock<crate::l1_action::nt_action_facade::RuleEngine>>>,
+    proxy_pool: Option<std::sync::Arc<crate::l1_action::nt_action_facade::ProxyPool>>,
 ) -> std::io::Result<HotReloadWatcher> {
     let mut watcher = HotReloadWatcher::new(neotrix_dir.clone())?;
 
     watcher.watch_effect(
         "config.toml",
         ReloadEffect::new("config", || {
-            crate::l3_embodiment::nt_shield::nt_shield_stealth_net::config::reload()
+            crate::l1_action::nt_action_facade::reload()
                 .map(|_| "config reloaded".to_string())
         })
         .with_revert(|| {
             // reload() 是原子的 (解析失败不替换 INSTANCE), 旧配置仍生效。
             // 逆变换只需确认状态未半应用即可。
-            let prev = crate::l3_embodiment::nt_shield::nt_shield_stealth_net::config::snapshot();
+            let prev = crate::l1_action::nt_action_facade::snapshot();
             Ok(format!("config retained (reverted): {:?}", prev.proxy.local_port))
         }),
     );

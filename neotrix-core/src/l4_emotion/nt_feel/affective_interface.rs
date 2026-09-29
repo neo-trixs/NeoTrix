@@ -905,7 +905,7 @@ mod tests {
         let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(tmp))
             .expect("open temp KB");
         let kb = std::sync::Arc::new(kb);
-        let mut sb = crate::l5_cognition::nt_core_second_brain::SecondBrain::new();
+        let mut sb = crate::l4_emotion::nt_feel_facade::SecondBrain::new();
         sb.attach_kb(kb.clone());
 
         // 2) 8 轮悲伤披露交互 → 关系推进出 Stranger。

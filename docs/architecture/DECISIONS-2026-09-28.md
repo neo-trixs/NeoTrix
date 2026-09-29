@@ -82,27 +82,66 @@ B-11 与 C-2 都卡在这里。
 
 # 后续待解决问题（按可执行顺序梳理）
 
-> 状态快照 2026-09-28 18:3x：`cargo check --lib -p neotrix` **exit=0**（已转绿），
-> 但共享 index 仍有 **177 个他窗暂存项**、最近 3 分钟仍有文件在被改
-> ⇒ **提交通道不安全**（`git commit` 会连他那 177 个一起卷走）。
+> 状态快照 **2026-09-28 20:0x**（较 18:3x 那版有实质变化）：
+> **P0「提交通道」已解除** —— 解法是 `.worktrees/ratchet` 独立 worktree
+> （L7-b）。B-1 + 分层棘轮首批已落 `71e1c412`（P0 门 ✅ 通过）。
+> 主工作树仍被另一 agent 的 WIP 占用（`nt_core_capability_tree` 断链等），
+> **我不在主树继续施工**。
 
-## P0 · 唯一阻塞：提交通道（不是代码问题）
+## P0 · ✅ 已解除：提交通道（L7-b 的真解）
 
-| 项 | 现状 | 我的处置 |
-|---|---|---|
-| 提交我这 5 个文件（TODO / OPEN-TASKS / DECISIONS / 新 LESSONS / handoff） | lib 已绿，但 index 被占 | **等 index 清空再提**。不 `--no-verify`、不在 177 个暂存上提交 |
+| 项 | 结论 |
+|---|---|
+| 解法 | `git worktree add --detach .worktrees/ratchet HEAD` + `git checkout -b` ⇒ **独立 index**，不再卷走他窗暂存项，且他窗搞红主树不影响本车道 P0 门 |
+| 效果 | 主树 P0 红 ×3 拒；同改动在 worktree 上 `cargo check --tests` **exit=0**、门 ✅、提交 `71e1c412` 一次成功 |
+| 当前车道 | 分支 `fix/bitemporal-and-layer-ratchet`，基于 `d5413335` |
+| 合入时机 | 待他窗重构收口后合（合入后**必须复核分层门数字**，见 L8「Auto-merging 静默降级」） |
+| 注意 | 独立 `CARGO_TARGET_DIR` 建议导出到 `/tmp/...`，避免与对方抢 cargo 锁 |
 
-> 判据：提交前 `git diff --cached --name-only \| wc -l` 必须是 **0**（或只含我的文件）。
+## P1 · 本车道可继续（已定方案，无需再决策）
 
-## P1 · 通道一开就做（已定方案，无需再决策）
+| 序 | 任务 | 状态 | 方案 | 验收 |
+|---|---|---|---|---|
+| 1 | `nodes` 真双时间（B-1） | ✅ **已完成** `71e1c412` | 每版本独立 `id` + `supersedes` 链，**零 schema 变更**（L11：两列早已存在）；69 处生产写入 / 5 处外键未动 | 2 条 `#[ignore]` 已摘除；`12154 passed / 0 failed @4 线程` |
+| 2 | 分层违规棘轮 | ✅ **93/101**（101→92→89→80→50→47→40→26→25→8） | **必须经「消费方自己那层」的 facade** —— 走目标层 facade 无效（路径仍含层名）。`OneObserver` 等 14 个符号 l5 facade 已有；缺的按「消费方原本就在用的路径」补 `pub use` | 基线**只向下**：8/8 `PASS 0 new`、RC=0；**L1–L5 真引用全清，剩余 8 条均为已记录不可改道项** |
+| 3 | Noise IK 对齐 spec（B-2） | ⛔ **阻塞于外部输入** | 改名到 `Noise_IKpsk2_25519_ChaChaPoly_SHA256`(39B)，用**官方测试向量**交叉验证 `es/ee/s` 派生次序 | `full_handshake` 绿并摘 `#[ignore]`；加**握手对称性**测试 |
+| 4 | CAD 假证据面（B-3） | ✅ **早已完成**（勿重做） | 判据从「路径含 `:`」改成「**文件真实存在**」 | 已改 `CARGO_MANIFEST_DIR` + `is_file()` |
+| 5 | `/stop` 过期测试前提（B-5） | ✅ **早已完成**（勿重做） | `nt_channel_cmd.rs` 已禁「按发送键」类假建议 | 4 条反撒谎契约绿 |
 
-| 序 | 任务 | 方案 | 验收 |
+### 分层违规剩余 8 条：全部是已记录不可改道项（真引用清零）
+
+| # | 条目 | 原因 | 处置 |
 |---|---|---|---|
-| 1 | `nodes` 真双时间（B-1） | 照 `nt_temporal_facts.rs`：**每版本独立 `id` + `supersedes`/`superseded_by` 指针链**，**不改主键、不动 5 处外键** | 两条 `#[ignore]` 测试转绿并**删掉 `#[ignore]`**；`nodes_as_of`/`node_history` 接到真实调用方 |
-| 2 | Noise IK 对齐 spec（B-2） | 改名到 `Noise_IKpsk2_25519_ChaChaPoly_SHA256`(39B)，用**官方测试向量**交叉验证 `es/ee/s` 派生次序 | `full_handshake` 绿且**删掉 `#[ignore]`**；加**握手对称性**测试（两侧 chaining key 必须相等） |
-| 3 | CAD 假证据面（B-3） | 删 `cad_wiring_map()`；判据从「路径含 `:`」改成「**文件真实存在**」 | 8 个指向不存在文件的条目不再被当"接线证据" |
-| 4 | `/stop` 过期测试前提（B-5） | 修 `nt_agent.rs:2283` 那条**假设"取消尚未接线"**的反向测试（现已接线） | 4 条反撒谎契约仍绿 |
-| 5 | 102 条分层违规（B-8） | **先做 84 个「单文件单规则」叶子**；能改走 `facade` 的优先（门已排除 `*facade*`/`*l1_facade*`/`traits.rs`） | 基线**只向下**：`check-layer-deps.sh --strict` 报数递减 |
+| 1 | `nt_file_ability/tests.rs [l2]` VSAEngine/VsaBackend 4 处 | l0 无 VSA，被引的是 l2 真实现 | 留基线 |
+| 2 | `ffi/consciousness_tree.rs [l5]` metacalib 2 处 | l0 无 brier/ece，真实现在 l5 | 留基线 |
+| 3 | `ffi/seal_pipeline.rs [l5]` training_cycle 3 处 | l0 无对应；且该文件 ios-bridge 下有预存 `types::` 解析错（未动） | 留基线 |
+| 4 | `nt_file_ability/tests.rs [l5]` BranchKind 2 处 | l0 无，真实现在 l5 | 留基线 |
+| 5 | `ffi/consciousness_tree.rs [l6]` register_absorbed_modules 1 处 | l6 本地真实现，不可下沉 | 留基线 |
+| 6-8 | nt_agent_session[l5]、arch_fitness[l6]、orchestration_taxonomy[l6] | 剥离后 0 命中：字符串/参数字面量 | 留基线（L14） |
+
+**累计** 101 → 92 → 89 → 80 → 50 → 47 → 40 → 26 → 25 → **8**（清 93 条）。
+真引用清零的验证口径：每批改道后门计数实际下降（L19），而非分类器断言。
+
+| 类别 | 文件 | 引用 | 状态 |
+|---|---|---|---|
+| **L1** | 36 | 70 | ⏳ 唯一剩余。`l1_action/nt_action_facade.rs` **0 条 `pub use`**（全是内部 `use`）⇒ 需**从零建 barrel**，一次导出数十符号，**撞名风险最高**。做法：按目标层分子批（先挑符号少、单目标层的叶子），每批 `check`+`test` 后棘轮 |
+| 不可改道误报 | 2 | — | ⛔ 保持原样，见 L14 |
+
+**累计** 101 → 92 → 89 → 80 → **50**（清 51 条）；四层（L2/L3/L4/L5）已清零。
+
+**已确立的做法（照做即可）**
+1. 提取映射的脚本**必须与门同口径**（都剥 `//` 与字符串）—— 见 L13；
+2. facade 按**消费方原本就在用的路径** `pub use`（原代码能编译 ⇒ 路径可证），
+   **不重新定位定义处**；
+3. 对 **facade 里已存在**的符号**必须核来源**（同名 ≠ 同一符号，换错了
+   `cargo check` 不报错）—— 见 L15；
+4. 改完自查 diff：注释内改道数须为 **0**（且**排除 facade 文件**）—— 见 L16；
+5. 每批 `cargo check --tests` + `cargo test` 全量，再棘轮下调。
+
+**独立待办（勿在棘轮批次里顺手做）**
+- 给 `check-layer-deps.sh` 加「剥离字符串字面量」过滤，使那 2 条真消失。
+  ⚠️ **不能**用 `-v '"[^"]*l6_meta[^"]*"'`：会连带滤掉同行真引用
+  （`l7_l1_bridge.rs:201-202` 即「字符串 + 真实路径」同行）。
 
 ## P2 · 阶段工程（单独立项，不混做）
 
@@ -110,24 +149,31 @@ B-11 与 C-2 都卡在这里。
 |---|---|
 | 185 个未核验删除 | 需逐条核验才能提交；全在 `stash@{0}` |
 | 32 个未跟踪 `scripts/ops` | 含活路径 `nt_graph_audit.py`；全在 stash |
-| 5 个陈旧 worktree | 实测全部 dirty（2/1/12/6/8 文件）⇒ 删=毁在制品；需先导出内容再删 |
+| 5 个陈旧 worktree | 实测全部 dirty ⇒ 删=毁在制品；需先导出内容再删 |
 | `TextEmbedder` 换真实现 | 5 个生产调用方，改 `embed` 会**重排全部检索结果**，须先评估影响面 |
 | `publish gateway` 真实上传 | 加 `dry_run` 是 B-4（低成本）；投 OAuth2+reqwest 是独立工程 |
 | `cascade` `length_score` 改分档 | 改的是记忆晋升评分，需领域评估，不宜顺手改 |
+| `edges` 绑定到具体版本 | B-1 的**明示取舍**：`edges` 仍按 `nodes.id` 绑定，不指向版本。要「边绑定到某版」是**独立 schema 议题** |
 
-## P3 · 需你拍板/外部输入
+## P3 · 需你拍板 / 外部输入
 
 | 项 | 状态 |
 |---|---|
-| 另一 agent 的并发重构 | 我全程避让，未在其半成品上提交 |
-| CI `--test-threads` 2→4 | **暂不改**。4 连绿是强证据**非证明**（修前 3 跑 2 崩）；再观察数轮 |
+| **Noise IK 官方测试向量** | ⛔ B-2 唯一卡点。**不接受手写"看起来能跑"的 crypto**；需从 spec 或参考实现取向量 |
+| 另一 agent 的并发重构 | 主树被占用（`nt_core_capability_tree` 断链 4+ 处、`d5413335` 删 `apps/neobot-desktop`）。**非我窗任务，我不去修**（L9） |
+| 分支合入时机 | `fix/bitemporal-and-layer-ratchet` 何时合入主干 |
+| CI `--test-threads` 2→4 | **暂不改**。4 连绿是强证据**非证明**；再观察数轮 |
 | `stash@{0}` 是否整体恢复 | 759 tracked + 240 untracked；B-11/C-2/阶段工程都卡在这里 |
 | 185 个删除是否恢复 | 同上 |
 
 ## 已彻底关闭（勿再翻）
 
 - ⛔ 12 项前提证伪 / 已被外部解决（见 A 组）
-- ✅ 9 个 commit 已落盘：分层门 102 基线 · 记录校正 · S-1 并车道 · 晶体入库+9 测试归零 ·
-  B-1/B-4 · streaming 去外网依赖 · 台账 §3 证伪 · 门清单/2 examples/HOME 竞态/测试门转严格 ·
-  4 条 flaky 归零（`12233 passed / 0 failed @4 线程` 4 连跑）
+- ✅ 本轮 commit：`bdf1e9f1`(门+102 基线) · `f23177de`(记录校正) · `a9ad48f5`(S-1 并车道) ·
+  `8eac716e`+`ecd10d3e`(晶体+9 测试归零) · `024c2ae0`(B-1 死 `CapabilityRegistry`/B-4) ·
+  `7676f6f8`(streaming 去外网) · `d5edd461`(门清单/2 examples/HOME 竞态/测试门转严格) ·
+  `89769661`(4 条 flaky 归零) · `26749ac0`(经验+裁决+Yootta 移除) ·
+  `71e1c412`(B-1 真双时间 + 棘轮 102→101) · `c02b2358`/`14db935d`/`67c83e7a`/`95cae243`
+  (分层棘轮 **101 → 50**，L2/L3/L4/L5 四层清零) · `c9c1da9d`/`40f5cdda`/`109028bb`(经验+待办)
 - ⛔ Yootta gated 401（用户指令移除，理由记录保留）
+- ⛔ B-2 之外，B-3 / B-4 / B-5 均**早已完成**，勿当待办重做

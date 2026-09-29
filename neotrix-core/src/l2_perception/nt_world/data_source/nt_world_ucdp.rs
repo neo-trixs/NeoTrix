@@ -349,7 +349,7 @@ mod tests {
     #[test]
     fn test_ingest_fixture() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(dir.path().join("test.db"))).expect("open kb");
+        let kb = crate::l2_perception::nt_world::l1_facade::KnowledgeBase::open(Some(dir.path().join("test.db"))).expect("open kb");
         let fetcher = UcdpFetcher::new();
         let report = fetcher.ingest_from_json(&kb, UCDP_FIXTURE_JSON).expect("ingest");
         assert_eq!(report.nodes_created, 2);

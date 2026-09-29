@@ -226,7 +226,7 @@ impl ConsciousnessCoreHandle {
         let base_cycle = latest.cycle;
         let n = cycles.max(1).min(10);
         let selftest_results =
-            crate::l6_meta::healing::nt_core_self_test_integration::run_lightweight_self_tests();
+            crate::l5_cognition::l1_facade::run_lightweight_self_tests();
         self.tree
             .set_branch_health_from_self_tests(&selftest_results);
         {

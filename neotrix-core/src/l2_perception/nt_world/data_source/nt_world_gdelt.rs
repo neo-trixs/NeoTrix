@@ -325,7 +325,7 @@ mod tests {
         assert!(!policy.check("evil.com", 443), "non-gdelt host denied");
         // deny-wins: 叠加 deny 规则应覆盖 allow
         let mut with_deny = _gdelt_egress_policy();
-        with_deny.rules.push(crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::deny(GDELT_HOST, "443"));
+        with_deny.rules.push(crate::l2_perception::nt_world::l1_facade::EgressRule::deny(GDELT_HOST, "443"));
         assert!(!with_deny.check(GDELT_HOST, 443), "explicit deny wins over allow");
     }
 
@@ -343,7 +343,7 @@ mod tests {
     fn test_ingest_fixture_to_kb_and_requery() {
         let dir = tempfile::tempdir().expect("tempdir");
         let db_path = dir.path().join("test_gdelt_kb.db");
-        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(db_path)).expect("open kb");
+        let kb = crate::l2_perception::nt_world::l1_facade::KnowledgeBase::open(Some(db_path)).expect("open kb");
         let fetcher = GdeltFetcher::new();
         // 用 fixture 纯内存 ingest，无网络
         let report = fetcher.ingest_from_json(&kb, GDELT_FIXTURE_JSON, "artificial intelligence").expect("ingest");
@@ -356,7 +356,7 @@ mod tests {
         assert_eq!(node.title, "AI breakthrough transforms healthcare");
         assert_eq!(node.domain.as_deref(), Some("gdelt"));
         // FTS 搜索可回查 (经 nodes_fts)
-        let hits = kb.search_permission_aware("healthcare", 10, crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_types::PermissionLevel::Public).expect("search");
+        let hits = kb.search_permission_aware("healthcare", 10, crate::l2_perception::nt_world::l1_facade::PermissionLevel::Public).expect("search");
         assert!(!hits.is_empty(), "FTS should recall ingested article by keyword");
 
         // 幂等：二次 ingest 同 fixture → nodes_reused
@@ -376,7 +376,7 @@ mod tests {
     fn test_ingest_skips_empty_url() {
         let dir = tempfile::tempdir().expect("tempdir");
         let db_path = dir.path().join("test_gdelt_skip.db");
-        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(db_path)).expect("open kb");
+        let kb = crate::l2_perception::nt_world::l1_facade::KnowledgeBase::open(Some(db_path)).expect("open kb");
         let fetcher = GdeltFetcher::new();
         let bad_json = r#"{"articles":[{"title":"has title but no url","url":"","seendate":"20260826T000000Z","domain":"x.com","language":"English"}]}"#;
         let report = fetcher.ingest_from_json(&kb, bad_json, "x").expect("ingest bad");

@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 
-use crate::l2_perception::nt_core_llm::{DataTrust, LlmError, LlmProvider, LlmRequest, LlmResponse};
+use crate::l1_action::nt_action_facade::nt_core_llm::{DataTrust, LlmError, LlmProvider, LlmRequest, LlmResponse};
 use crate::l1_action::nt_io::nt_io_provider::gemini::GeminiProvider;
 
 use super::traits::{ModelCapabilities, ModelHealth, ModelIdentifier, TaskType, UniversalModel};

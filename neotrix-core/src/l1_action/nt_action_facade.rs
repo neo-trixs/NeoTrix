@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use crate::l1_action::nt_act::async_tool_executor::AsyncToolExecutor;
 use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_store;
-use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 use crate::l1_action::traits::LlmRouter;
 
 // ════════════════════════════════════════════════════════════════
@@ -267,7 +267,7 @@ impl std::fmt::Debug for ActionFacade {
 mod tests {
     use super::*;
     use crate::l1_action::nt_act::async_tool_executor::AsyncToolExecutor;
-use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
+
     use crate::l1_action::traits::{
         CapabilityCategory, CapabilityHealth, ConstellationLevel, L1Capability, LlmRequest,
         LlmRoute,
@@ -397,3 +397,72 @@ use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
         assert_eq!(sr.title, sr2.title);
     }
 }
+
+// ─── L1→L3/L6 跨层引用收敛点（分层门 sanctioned channel）──────────────────────
+// 本文件此前**只有内部 `use`、0 条 `pub use`**，故 L1 业务文件一律直引
+// `crate::l3_embodiment::…` / `crate::l6_meta::…`，层名出现在业务代码里 ⇒
+// 门记违规。走目标层 facade 无效（路径仍含层名），必须经**本层**门面。
+//
+// 路径一律沿用消费方**原本就在用**的路径（原代码已能编译 ⇒ 路径可证），
+// 不重新定位定义处。ALLOW: 类型/函数直访，trait-object 不可行
+// （同 l5_cognition/l1_facade.rs:125-128 的既有说明）。
+// ⚠️ 本段按目标层**逐批追加**（先 L3/L6，再 L2/L4/L5），每批单独编译验证。
+pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::config::{reload, snapshot};
+pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_pool::ProxyPool;
+pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::rules::RuleEngine;
+pub use crate::l3_embodiment::nt_shield_enforcer::global_shield;
+pub use crate::l6_meta::nt_approval;
+pub use crate::l6_meta::nt_approval::PendingAction;
+
+// ─── L1→L4 跨层引用收敛（接上批 L3/L6 段）────────────────────────────────────
+// 路径沿用消费方原本就在用的路径（原代码已能编译 ⇒ 路径可证）。
+// ⚠️ `nt_memory` 与 `nt_feel_facade` 是**模块型**引用（L1 门面需要它们做
+// re-export 出口），故按模块整体转出；`InteractionType::Inquiry` /
+// `LeadStage` / `KnowledgeBase::open` 等是类型上的关联项，类型转出后即可用。
+pub use crate::l4_emotion::nt_feel_facade;
+pub use crate::l4_emotion::nt_memory;
+pub use crate::l4_emotion::nt_memory::addressable_store::AddressableStore;
+pub use crate::l4_emotion::nt_memory::nt_memory_historian::{
+    build_ewhr_router, EvidenceApiState,
+};
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_api::{
+    build_kb_router, KbApiState,
+};
+pub use crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_geo::query_bbox_with_cold;
+pub use crate::l4_emotion::nt_memory::nt_memory_lead;
+pub use crate::l4_emotion::nt_memory::nt_memory_lead::{InteractionType, LeadStage};
+
+// ─── L1→L2 跨层引用收敛 ──────────────────────────────────────────────────────
+// ⚠️ 模块型与类型型引用**都要查**（L4 子批与上上批各踩过一次 `E0432`）。
+// 本段涉及的 4 个 l2 **模块**（`nt_core_sense` / `nt_core_llm` /
+// `nt_core_code_search` / `nt_world::nt_world_mirror`）与 `nt_world::source` 均按
+// **模块整体**转出，消费方以 `facade::模块::…` 访问其下项。
+pub use crate::l2_perception::nt_core_code_search;
+pub use crate::l2_perception::nt_core_knowledge::{
+    publish_affective_observation, AffectiveFeedback, KnowledgeSource, TaskType,
+};
+pub use crate::l2_perception::nt_core_llm;
+pub use crate::l2_perception::nt_core_sense;
+pub use crate::l2_perception::nt_core_e8::nt_multimodal::model_supports_vision;
+pub use crate::l2_perception::nt_core_e8::nt_multimodal::VisionBridge;
+pub use crate::l2_perception::nt_world::nt_world_mirror;
+pub use crate::l2_perception::nt_world::source;
+pub use crate::l2_perception::nt_world::source::engine::MediaSource;
+
+// ─── L1→L5 跨层引用收敛 ──────────────────────────────────────────────────────
+// 路径沿用消费方原本就在用的路径（原代码已能编译 ⇒ 路径可证）。
+pub use crate::l5_cognition::l1_facade::affective_interface::{
+    AffectiveInterface, AffectiveReadout, GuideMode, ResponseIntent,
+};
+pub use crate::l5_cognition::l1_facade::self_audit::ToolGroundingMonitor;
+pub use crate::l5_cognition::nt_core::capability::nt_core_antidistil::decompose::{
+    DecomposeSuggestion, TaskDecomposer,
+};
+pub use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
+pub use crate::l5_cognition::nt_core::nt_crt::{CrtPlan, CrtTimeScale};
+pub use crate::l5_cognition::nt_core_consciousness_tree::{ConsciousnessTree, NodeSnapshot};
+pub use crate::l5_cognition::nt_core_context::revertible::{ClosureEffect, RevertibleContext};
+pub use crate::l5_cognition::nt_core_cot_generator::{CoTGenerator, CoTOutput, DefaultCoTGenerator};
+pub use crate::l5_cognition::nt_core_policy::E8Policy;
+pub use crate::l5_cognition::nt_core_walsh::WalshMemoryIndex;
+pub use crate::l5_cognition::reasoning_core::{ReasoningTrace, TraceSource};

@@ -52,4 +52,4 @@ pub mod nt_infra_ai;
 pub mod nt_core_graph_memory;
 
 // Backward-compatible re-export: nt_memory moved to L4 but binaries still reference l1_action::nt_memory
-pub use crate::l4_emotion::nt_memory;
+pub use crate::l1_action::nt_action_facade::nt_memory;

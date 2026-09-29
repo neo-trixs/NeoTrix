@@ -682,15 +682,44 @@ pub struct TemporalEdge {
 
 /// Transaction-time query: what did the KB look like at a given point in time?
 /// Returns nodes whose transaction_time <= as_of (latest version visible at that time).
-pub fn nodes_as_of(conn: &Connection, as_of: i64) -> rusqlite::Result<Vec<TemporalNode>> {
+/// 解析 `id` 所属**版本链的根**（最早那一版）。
+///
+/// 沿 `supersedes` 向后回溯直到 `NULL`。纯 Rust 循环而不是 SQL 递归：
+/// 链通常只有 2~5 版，逐跳查比构造 CTE 更好读，也便于单测。
+fn resolve_chain_root(conn: &Connection, id: &str) -> rusqlite::Result<String> {
+    let mut cur = id.to_string();
+    // 上限防御：链若成环（脏数据）也不能死循环
+    for _ in 0..1024 {
+        let next: Option<Option<String>> = conn
+            .query_row(
+                "SELECT supersedes FROM nodes WHERE id = ?1",
+                [&cur],
+                |r| r.get(0),
+            )
+            .ok();
+        match next.flatten() {
+            Some(prev) if !prev.is_empty() => cur = prev,
+            _ => break,
+        }
+    }
+    Ok(cur)
+}
+
+/// 某条版本链的全部版本（按 `transaction_time` 升序）。
+fn chain_members(conn: &Connection, root: &str) -> rusqlite::Result<Vec<TemporalNode>> {
     let mut stmt = conn.prepare(
-        "SELECT id, node_type, title, summary, content, url, domain,
-                confidence, importance, valid_start_time, valid_end_time, transaction_time
-         FROM nodes
-         WHERE transaction_time <= ?1
-         ORDER BY id, transaction_time DESC",
+        "WITH RECURSIVE fwd(id) AS (
+             SELECT ?1
+             UNION ALL
+             SELECT n.id FROM fwd f JOIN nodes n ON n.supersedes = f.id
+         )
+         SELECT n.id, n.node_type, n.title, n.summary, n.content, n.url, n.domain,
+                n.confidence, n.importance, n.valid_start_time, n.valid_end_time,
+                n.transaction_time
+         FROM fwd JOIN nodes n ON n.id = fwd.id
+         ORDER BY n.transaction_time ASC",
     )?;
-    let rows = stmt.query_map([as_of], |row| {
+    let rows = stmt.query_map([root], |row| {
         Ok(TemporalNode {
             id: row.get(0)?,
             node_type: row.get(1)?,
@@ -708,6 +737,73 @@ pub fn nodes_as_of(conn: &Connection, as_of: i64) -> rusqlite::Result<Vec<Tempor
     })?;
     rows.collect()
 }
+
+/// 截至 `as_of`（transaction time）可见的节点版本，**每个逻辑节点只返回最新版**。
+///
+/// # 版本模型（2026-09-28）
+///
+/// `nodes.id` 是**每版独立的 id**，版本之间用 `supersedes` 指回上一版
+/// —— 形态照 `nt_memory_historian::nt_temporal_facts`（该实现 91 测试全绿）。
+///
+/// **为什么不改主键**：`nodes` 表有 **69 处**生产写入
+/// （`bin/experience/exp_absorb.rs:898,945,1039` 是
+/// `UPDATE nodes SET metadata=? WHERE id=?`），且 `:237,238,258,277,347`
+/// 五处外键 `REFERENCES nodes(id)`。改成 `(id, transaction_time)` 复合主键会让
+/// 那些 UPDATE **同时改写所有版本**，并使外键失效（`foreign key mismatch`），
+/// 既有库还需真实数据迁移（`CREATE TABLE IF NOT EXISTS` 不改已存在的表）。
+/// 本会话已半迁移过一次并回退 —— **半迁移比不迁移更糟**。
+/// 新版本写**新 id** ⇒ 生产写入路径一行都不用改，也没有迁移。
+///
+/// 取舍（明示，不假装）：`edges` 仍按 `nodes.id` 绑定，**不指向具体版本**。
+/// 若将来需要"边绑定到某版本"，那是独立的 schema 议题。
+pub fn nodes_as_of(conn: &Connection, as_of: i64) -> rusqlite::Result<Vec<TemporalNode>> {
+    // 1) 收集截至 as_of 的所有 (root_id, id) 关系
+    let mut rel: Vec<(String, String)> = {
+        let mut stmt = conn.prepare(
+            "WITH RECURSIVE chain(root_id, id) AS (
+                 SELECT id, id FROM nodes WHERE supersedes IS NULL
+                 UNION ALL
+                 SELECT c.root_id, n.id FROM chain c JOIN nodes n ON n.supersedes = c.id
+             )
+             SELECT c.root_id, c.id FROM chain c
+             JOIN nodes n ON n.id = c.id
+             WHERE n.transaction_time <= ?1",
+        )?;
+        let rows = stmt.query_map([as_of], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    // 2) 每个 root 只留 transaction_time 最大者（= 截至 as_of 的最新版）
+    let mut best: std::collections::HashMap<String, (i64, String)> =
+        std::collections::HashMap::new();
+    for (root, id) in rel.drain(..) {
+        let tx: i64 = conn.query_row(
+            "SELECT transaction_time FROM nodes WHERE id = ?1",
+            [&id],
+            |r| r.get(0),
+        )?;
+        let e = best.entry(root).or_insert((i64::MIN, String::new()));
+        if tx > e.0 {
+            *e = (tx, id);
+        }
+    }
+    let mut ids: Vec<String> = best.into_values().map(|(_, id)| id).collect();
+    ids.sort();
+    let mut out = Vec::with_capacity(ids.len());
+    for id in ids {
+        out.extend(chain_members(conn, &id)?.into_iter().next());
+    }
+    Ok(out)
+}
+
+/// 某逻辑节点的完整版本链，按 `transaction_time` 升序（最早在前）。
+///
+/// `node_id` 可以是链上**任意一版**（内部先回溯到根再正向展开），
+/// 所以调用方不必知道哪个 id 是最新版。
+pub fn node_history(conn: &Connection, node_id: &str) -> rusqlite::Result<Vec<TemporalNode>> {
+    let root = resolve_chain_root(conn, node_id)?;
+    chain_members(conn, &root)
+}
+
 
 /// Valid-time query: what is true at a given point in valid time?
 /// Returns nodes where valid_start_time <= at_time AND (valid_end_time IS NULL OR valid_end_time > at_time).
@@ -830,34 +926,6 @@ pub fn edges_bitemporal(
     rows.collect()
 }
 
-/// Get the full history of a node across all transaction times.
-pub fn node_history(conn: &Connection, node_id: &str) -> rusqlite::Result<Vec<TemporalNode>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, node_type, title, summary, content, url, domain,
-                confidence, importance, valid_start_time, valid_end_time, transaction_time
-         FROM nodes
-         WHERE id = ?1
-         ORDER BY transaction_time ASC",
-    )?;
-    let rows = stmt.query_map([node_id], |row| {
-        Ok(TemporalNode {
-            id: row.get(0)?,
-            node_type: row.get(1)?,
-            title: row.get(2)?,
-            summary: row.get(3)?,
-            content: row.get(4)?,
-            url: row.get(5)?,
-            domain: row.get(6)?,
-            confidence: row.get(7)?,
-            importance: row.get(8)?,
-            valid_start_time: row.get(9)?,
-            valid_end_time: row.get(10)?,
-            transaction_time: row.get(11)?,
-        })
-    })?;
-    rows.collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -940,10 +1008,24 @@ mod tests {
     // ─── Bi-temporal tests ───────────────────────────────────────────────
 
     fn insert_node(conn: &Connection, id: &str, title: &str, vt_start: Option<i64>, vt_end: Option<i64>, tx_time: i64) {
+        insert_node_version(conn, id, title, vt_start, vt_end, tx_time, None);
+    }
+
+    /// 写一个**版本**：新版本用**自己的 id**，`supersedes` 指回上一版。
+    /// 这正是 `nodes_as_of` / `node_history` 期望的形态（每版独立 id + 指针链）。
+    fn insert_node_version(
+        conn: &Connection,
+        id: &str,
+        title: &str,
+        vt_start: Option<i64>,
+        vt_end: Option<i64>,
+        tx_time: i64,
+        supersedes: Option<&str>,
+    ) {
         conn.execute(
-            "INSERT INTO nodes (id, node_type, title, created_at, updated_at, transaction_time, valid_start_time, valid_end_time)
-             VALUES (?1, 'test', ?2, ?3, ?3, ?3, ?4, ?5)",
-            rusqlite::params![id, title, tx_time, vt_start, vt_end],
+            "INSERT INTO nodes (id, node_type, title, created_at, updated_at, transaction_time, valid_start_time, valid_end_time, supersedes)
+             VALUES (?1, 'test', ?2, ?3, ?3, ?3, ?4, ?5, ?6)",
+            rusqlite::params![id, title, tx_time, vt_start, vt_end, supersedes],
         )
         .unwrap();
     }
@@ -957,42 +1039,36 @@ mod tests {
         .unwrap();
     }
 
-    // ⛔ 本测试断言的是**当前 schema 结构上不可能存在的能力**，故按仓规
-    //    「实现或 `#[ignore]`，禁改松断言」挂起，而不是把断言改松。
-    //
-    // 根因：`nodes` 表 `:188` 是 `id TEXT PRIMARY KEY` ⇒ **同一 id 只能存一行**。
-    // 本测试要插 3 个版本（v1@tx100 / v2@tx200 / v3@tx300），第二行就撞
+    // 双时间：同一**逻辑节点**的 3 个版本，各用**独立 id**，`supersedes` 串成链。
+    // 不再是"同一个 id 插 3 次"——`nodes.id` 是单列主键，那样必撞
     // `UNIQUE constraint failed: nodes.id`（extended_code 1555）。
-    //
-    // 为什么不就地改主键（2026-09-28 评估）：
-    // - **爆炸半径 69 处**生产代码写 `nodes`（INSERT/UPDATE），其中
-    //   `bin/experience/exp_absorb.rs:898,945,1039` 是
-    //   `UPDATE nodes SET metadata=? WHERE id=?` ⇒ 复合主键下会**同时改写所有版本**；
-    // - **5 处外键**要重指：`:237,238,258,277,347` 均 `REFERENCES nodes(id)`，
-    //   复合主键下 SQLite 报 `foreign key mismatch`；
-    // - 既有 DB 需**真实数据迁移**（`CREATE TABLE IF NOT EXISTS` 不改已存在的表）；
-    // - 本会话已半迁移过一次并回退（「半迁移比不迁移更糟」）。
-    //
-    // 影响面：`nodes_as_of()` / `node_history()` **零生产调用方**（全仓仅本文件
-    // 定义处与这两个测试命中），故挂起不损失任何在用能力。
-    // 正典形态见 `l4_emotion/nt_memory/nt_memory_historian/nt_temporal_facts.rs`
-    // （每版本独立 id + `supersedes` 指针，91 测试全绿）—— 迁移时照该形态做，
-    // 可完全避开复合主键与外键问题。
-    // 台账：`docs/architecture/OPEN-TASKS-2026-09-28.md` §5 D-1。
     #[test]
-    #[ignore = "需要 nodes 表真双时间 schema 迁移（复合主键/外键重指/数据迁移），见上方说明"]
     fn test_nodes_as_of_returns_committed() {
         let conn = mem_conn();
-        insert_node(&conn, "n1", "v1", None, None, 100);
-        insert_node(&conn, "n1", "v2", None, None, 200);
+        // 链: n1 → n1#2 → n1#3
+        insert_node_version(&conn, "n1", "v1", None, None, 100, None);
+        insert_node_version(&conn, "n1#2", "v2", None, None, 200, Some("n1"));
+        insert_node_version(&conn, "n1#3", "v3", None, None, 300, Some("n1#2"));
 
+        // 截至 tx=150：只见 v1（v2/v3 尚未提交）
         let at_150 = nodes_as_of(&conn, 150).unwrap();
-        assert_eq!(at_150.len(), 1);
+        assert_eq!(at_150.len(), 1, "每个逻辑节点只返回最新版");
         assert_eq!(at_150[0].title, "v1");
 
+        // 截至 tx=250：v1 已被 v2 取代
         let at_250 = nodes_as_of(&conn, 250).unwrap();
-        assert_eq!(at_250.len(), 1);
+        assert_eq!(at_250.len(), 1, "新版本取代旧版本，不重复返回");
         assert_eq!(at_250[0].title, "v2");
+
+        // 截至 tx=350：v3
+        let at_350 = nodes_as_of(&conn, 350).unwrap();
+        assert_eq!(at_350.len(), 1);
+        assert_eq!(at_350[0].title, "v3");
+
+        // 多个逻辑节点互不干扰
+        insert_node_version(&conn, "m1", "other", None, None, 120, None);
+        let at_200 = nodes_as_of(&conn, 200).unwrap();
+        assert_eq!(at_200.len(), 2, "n1 与 m1 是两个逻辑节点");
     }
 
     #[test]
@@ -1044,22 +1120,35 @@ mod tests {
         assert_eq!(r.len(), 0);
     }
 
-    // ⛔ 同 `test_nodes_as_of_returns_committed`：`nodes.id` 是单列主键
-    //    （`:188`），同 id 存 3 个版本必撞 `UNIQUE constraint failed: nodes.id`。
-    //    真双时间需要 schema 迁移（69 处生产写入 / 5 处外键 / 真实数据迁移），
-    //    按仓规「实现或 `#[ignore]`」挂起。完整理由见上方那条测试的注释。
-    //    `node_history()` 零生产调用方，挂起不损失在用能力。
+    // 版本链回溯：给**链上任意一版**的 id，都应拿回整条链（最早在前）。
     #[test]
-    #[ignore = "需要 nodes 表真双时间 schema 迁移（复合主键/外键重指/数据迁移），见 test_nodes_as_of_returns_committed 的说明"]
     fn test_node_history() {
         let conn = mem_conn();
-        insert_node(&conn, "n1", "v1", None, None, 100);
-        insert_node(&conn, "n1", "v2", None, None, 200);
-        insert_node(&conn, "n1", "v3", None, None, 300);
+        insert_node_version(&conn, "n1", "v1", None, None, 100, None);
+        insert_node_version(&conn, "n1#2", "v2", None, None, 200, Some("n1"));
+        insert_node_version(&conn, "n1#3", "v3", None, None, 300, Some("n1#2"));
 
+        // 从头版查
         let hist = node_history(&conn, "n1").unwrap();
-        assert_eq!(hist.len(), 3);
+        assert_eq!(hist.len(), 3, "整条链 3 版");
         assert_eq!(hist[0].title, "v1");
+        assert_eq!(hist[1].title, "v2");
         assert_eq!(hist[2].title, "v3");
+
+        // 从**中间版**查也要拿回整条链（调用方不必知道哪个 id 最新）
+        let mid = node_history(&conn, "n1#2").unwrap();
+        assert_eq!(mid.len(), 3, "从链中任一版都回溯到根再正向展开");
+        assert_eq!(mid[0].title, "v1");
+        assert_eq!(mid[2].title, "v3");
+
+        // 从**尾版**查
+        let head = node_history(&conn, "n1#3").unwrap();
+        assert_eq!(head.len(), 3);
+
+        // 单版节点：链就是它自己
+        insert_node_version(&conn, "solo", "only", None, None, 50, None);
+        let one = node_history(&conn, "solo").unwrap();
+        assert_eq!(one.len(), 1);
+        assert_eq!(one[0].title, "only");
     }
 }

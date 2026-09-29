@@ -360,7 +360,7 @@ mod tests {
     #[test]
     fn test_ingest_fixture() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(dir.path().join("test.db"))).expect("open kb");
+        let kb = crate::l2_perception::nt_world::l1_facade::KnowledgeBase::open(Some(dir.path().join("test.db"))).expect("open kb");
         let monitor = AoiMonitor::new(default_fence());
         let report = monitor.ingest_from_json(&kb, AOI_FIXTURE_JSON).expect("ingest");
         // fixture 2 条事件均入库 (过滤在 search / 使用方侧，ingest 保留全量)

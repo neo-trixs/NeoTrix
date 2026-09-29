@@ -542,7 +542,7 @@ mod tests {
             calib_samples.push((conf, nodes[best.1].0 == ci));
         }
         let ece =
-            crate::l5_cognition::nt_core_consciousness_tree::metacalib::expected_calibration_error(
+            crate::l4_emotion::nt_feel_facade::expected_calibration_error(
                 &calib_samples,
                 10,
             );

@@ -15,7 +15,13 @@ use crate::l5_cognition::nt_goal::{
 };
 use crate::l5_cognition::nt_mind::evolution::autofixer::AutoFixer;
 use crate::l5_cognition::nt_mind::evolution::evolution_loop::EvolutionLoop;
-use crate::l6_meta::nt_core_absorb::spec_driven::{
+// 跨层引用改走本层的官方 facade：`l1_facade.rs:146` 已
+// `pub use self::l1_facade_meta::*`，而 `l1_facade_meta.rs:186` 从
+// `l6_meta::nt_core_absorb::spec_driven` 导出了这 8 个符号。
+// 原来直引 `crate::l6_meta::…` 让 L5 → L6 的跨层引用出现在业务文件里
+// （分层门记为违规）；facade 是官方认可的跨层通道（门排除 `!*facade*`），
+// 引用收敛到这一个点后，业务文件不再出现层名。
+use crate::l5_cognition::l1_facade::{
     EvolutionSpec, SpecDiff, SpecDrivenPipeline, SpecPipelineConfig, SpecStatus,
 };
 use std::path::PathBuf;
@@ -189,7 +195,7 @@ pub struct EvolutionDaemon {
     /// Causal-JEPA 相干性历史
     pub causal_coherence_history: Vec<f64>,
     /// 自我代码变更监控器 — 记录/回滚 AutoFixer 的每次真实变更
-    pub code_monitor: crate::l6_meta::nt_core_iter::self_ref_code::SelfCodeMonitor,
+    pub code_monitor: crate::l5_cognition::l1_facade::SelfCodeMonitor,
     /// Spec 驱动进化管线 — 目标约束验证 + 版本化演进
     pub spec_pipeline: SpecDrivenPipeline,
     /// 代码搜索引擎 — 修复前定位 / 修复后确认
@@ -212,7 +218,7 @@ impl EvolutionDaemon {
             phi_calculator: IITPhiCalculator::new(),
             phi_reward_history: Vec::new(),
             causal_coherence_history: Vec::new(),
-            code_monitor: crate::l6_meta::nt_core_iter::self_ref_code::SelfCodeMonitor::new(),
+            code_monitor: crate::l5_cognition::l1_facade::SelfCodeMonitor::new(),
             spec_pipeline: SpecDrivenPipeline::new(SpecPipelineConfig {
                 max_active_specs: 5,
                 review_required: true,
@@ -258,7 +264,7 @@ impl EvolutionDaemon {
                         // 记录真实变更到 SelfCodeMonitor (可回滚审计)
                         let mutation_id = format!("autofix-{}-{}", id, self.cycle_count);
                         self.code_monitor.record_result(
-                            crate::l6_meta::nt_core_iter::self_ref_code::MutationResult {
+                            crate::l5_cognition::l1_facade::MutationResult {
                                 mutation_id,
                                 success: true,
                                 error: None,
@@ -838,7 +844,7 @@ mod tests {
         assert_eq!(d.code_monitor.stats().total_mutations, 0);
         // 直接验证记录路径 (不触发真实 AutoFixer 文件系统写)
         d.code_monitor.record_result(
-            crate::l6_meta::nt_core_iter::self_ref_code::MutationResult {
+            crate::l5_cognition::l1_facade::MutationResult {
                 mutation_id: "autofix-test-1".into(),
                 success: true,
                 error: None,

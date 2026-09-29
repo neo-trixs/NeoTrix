@@ -11,7 +11,7 @@
 
 #[cfg(test)]
 use crate::l0_substrate::nt_core_hex::ReasoningHexagram;
-use crate::l5_cognition::nt_core_prm::AgentTrajectory;
+use crate::l2_perception::nt_world::l1_facade::AgentTrajectory;
 
 /// Step-attention weights for trajectory-level PRM scoring.
 ///
@@ -285,7 +285,7 @@ pub fn blended_trajectory_advantage(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l5_cognition::nt_core_prm::TrajectoryStep;
+    use crate::l2_perception::nt_world::l1_facade::TrajectoryStep;
 
     fn make_test_trajectory(n: usize) -> AgentTrajectory {
         let mut t = AgentTrajectory::new(1, "test".into());
