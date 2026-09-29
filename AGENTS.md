@@ -1,129 +1,114 @@
-# NeoTrix — Agent Guide (slim)
+# NeoTrix — Agent Guide
 
-> 全量 codebase 索引已归档：`docs/architecture/CODEBASE-WIKI-2026-09-21.md`
-> （2426 `.rs` / 798707 行快照，含文件树 / Domain 表 / Key Types / CLI 表）。
-> 查文件位置用 `glob`/`grep` 现查，不要把全量表塞回本文件。本文件保持 < 100 行。
+> **指针守恒**：本文件只存「判据 + 去哪读」，不存快照正文。全量索引 `docs/architecture/CODEBASE-WIKI-2026-09-21.md`；查文件用 `glob`/`grep` 现查。
+> **引用规则**：按**章节名**引用（如「三道闸」），⛔ 不用行号 —— 行号锚点必腐化（`TODO.md` 曾写 `AGENTS.md:53` 指 R-P199，实际漂到 65 行）。
 
-## Build & Test
+## 0. 决策树：任务 → 动作（先查这里，别全文读）
 
-```bash
-cargo xl                              # 最轻检查（= check -p neotrix --lib），日常只用这个
-cargo check --all-targets -p neotrix    # 快速检查
-cargo test -p neotrix --lib             # 单元测试
-cargo build -p neotrix                  # 完整构建
-```
+| 我要做的事 | 走哪条 | 判据在哪 |
+|---|---|---|
+| 日常改码 | 定点→最小改→`cargo xl`（`= cargo test -p neotrix --lib`）；全量档 `cargo check --all-targets -p neotrix` · `cargo build -p neotrix` | 硬规则 §1 · 微操作公约 §3 |
+| 结构性改动 | `cargo clean && cargo build` **跑两遍** | 硬规则 §1 |
+| 跑重型构建前 | `nt_mem_gate.sh` 非 0 则**禁止起构建** | 三道闸 §4 |
+| 改完 `.rs` | `nt_lock_audit.py` 重跑，**禁止沿用旧值** | 三道闸 §4 |
+| 找「该跑哪个脚本」 | `nt_find.py <意图>`（19 条索引，每条带「何时别用」） | 三道闸 §4 |
+| 删 worktree / 收工 | `nt_worktree_gate.sh prune`，**禁手删目录** | 硬规则 §1 · 三道闸 §4 |
+| 接外部技术 | 同会话接到生产可用，否则不算做完 | 硬规则 §1 |
+| 扫出告警 | **先读现场证实/证伪**，再决定动不动 | 扫描器告警 §5 |
+| 关窗口前 | 收工义务 3 步 | 硬规则 §1 |
 
-结构性改动后：`cargo clean && cargo build` 跑两遍，以拿到真实错误数。
+## 1. 硬规则
 
-## 并行公约（2026-09-21 事故复盘）
+- **`#![forbid(unsafe_code)]`** —— 永不加 `unsafe`。生产代码禁 `unwrap`/`expect`/`panic!`，错误用 `?` 传播。模块名一律 `nt_` 前缀；分层 `l0_substrate`→`l6_meta`。
+- **R-P16** 编辑后**必须重读文件**验证落盘；禁整文件覆写他人内容。**R-P79** 外部技术**必须同会话接到生产可用**（导出 ≠ 接入）。
+- **提交用 `git commit --only <我的文件...>`** —— 共享 index 下「暂存区核对」与「提交」**不原子**，2026-09-29 两次实测事故。⛔ pre-commit 门防不了（三种 commit 方式都只给 hook 传 0 个参数）。补救见 `sessions/handoff-commit-only-2026-09-29.md`。
+- **收工义务**（违反即阻塞）—— ① `nt_worktree_gate.sh check`；② 自己开的 worktree 走 `prune` 收掉；③ 写 `sessions/handoff-<窗口>.md`，模板 §8「收工自查」**必填**（worktree 去向 + 未提交改动去哪：`git add` 提交 / patch 兜底 / 明确声明弃用）。依据：2026-09-28 实测 22 worktree 占 28G、**850 处未提交改动不在任何提交里**，事后大扫除误删 `ratchet`（4 处）靠 patch 找回。**收工是自己的义务。**
+- 细则：锁/构建/卡死判别/Git/修 bug 判据/字节安全 → `RUST-STANDARDS.md` §17。
 
-- 同一工作区只留 1 个 watcher，多任务用单窗口 Task 子代理；真并行走 `.worktrees/` 隔离。
-- 禁多窗口同时跑 `--all-targets` / `--test` 全量构建（16G 机必爆 swap）。
-- 关窗口前写 `sessions/handoff-<窗口>.md`（模板见 `sessions/HANDOFF-TEMPLATE.md`），收齐 + stash 兜底后再关。
-- 写文件前重读（R-P16），禁整文件覆写他人内容；`stash pop / checkout -- <path>` 前先喊一声（2026-09-22 三次覆盖事故）。
-- **提交用 `git commit --only <我的文件...>`**（2026-09-29 两次实测事故）：共享 index 下「暂存区核对」与「提交」**不原子** —— 我两次都核对通过，仍在其间被他窗插入暂存。⛔ pre-commit 门防不了（三种 commit 方式都只给 hook 传 0 个参数）；补救见 `sessions/handoff-commit-only-2026-09-29.md`。
+## 2. 并行公约（2026-09-21 事故复盘）
 
-## 模块前缀规范
+- 同一工作区只留 **1 个 watcher**；多任务用单窗口 Task 子代理；真并行走 `.worktrees/`。⛔ 禁多窗口同时跑 `--all-targets` / `--test` 全量构建（16G 机必爆 swap）。
+- `stash pop` / `checkout -- <path>` 前**先喊一声**（2026-09-22 三次覆盖事故）。
+- 关窗口前写 `sessions/handoff-<窗口>.md`（模板 `sessions/HANDOFF-TEMPLATE.md`），收齐 + stash 兜底后再关。
 
-- 所有模块名用 `nt_` 前缀（如 `nt_core_cache`、`nt_mind`、`nt_shield`）。
-- 分层：`l0_substrate` / `l1_action` / `l2_perception` / `l3_embodiment` / `l4_emotion` / `l5_cognition` / `l6_meta`，详见 `docs/architecture/ARCHITECTURE.md`。
-- 编码标准见 `RUST-STANDARDS.md`（生产代码禁 `unwrap`/`expect`/`panic!`，错误用 `?` 传播）。
+## 3. 微操作公约（skill: nt-locate）
 
-## 硬规则
+**闭环**：点选/标注 → 定点 → 最小改动 → 单测验证。**无定点不改。** `python3 scripts/ops/nt_locate.py --component X --source-file Y`（选择器 → 文件:行）。
 
-- `#![forbid(unsafe_code)]` —— 永不加 `unsafe`。
-- 编辑后必须重读文件验证落盘（R-P16）。
-- 外部技术必须同会话接到生产可用（R-P79）。
-- **收工义务（2026-09-28 立，违反即阻塞）** —— 会话/任务结束前**必须**：
-  1. `sh scripts/ops/nt_worktree_gate.sh check` 看 worktree 现状；
-  2. 自己开的 worktree 走 `prune`（**禁止手删目录**）收掉，别留给下一个 agent；
-  3. 写 `sessions/handoff-<窗口>.md`，模板 §8「收工自查」**必填**（worktree 去向 +
-     未提交改动去了哪：`git add` 提交 / patch 兜底 / 明确声明弃用）。
-  依据：2026-09-28 实测 22 个 worktree 占 28G、**850 处未提交改动不在任何
-  提交里**（单个 758 处），全靠事后一个 agent 大扫除才救回来，而那次扫除
-  误删了 `ratchet`（4 处脏文件）靠 patch 才恢复。**收工是自己的义务，不是别人的。**
+- **下刀前查并发**：`git status --porcelain <file>` 看他窗改动 + `stat -f "%Sm"` 看 mtime。**mtime 数秒内变过 = 他方在写，换文件或先通报**（实测撞见另一窗口 12 秒前正在改同一文件）。
+- ⚠️ `nt_locate.py` 索引可能陈旧（`--audit` 曾显示 3 天前、476 缺失）⇒ 改用 grep 定点。
 
-## 微操作公约（Agentation 思想吸收，skill: nt-locate）
+## 4. 三道闸（2026-09-27 事故后置入，违反即阻塞）
 
-- 改码前先定点：`python3 scripts/ops/nt_locate.py --component X --source-file Y`（选择器→文件:行），读上下文再下刀，无定点不改。
-- 闭环：点选/标注 → 定点 → 最小改动 → 单测验证。
-- **下刀前查并发**：`git status --porcelain <file>` 看他窗改动 + `stat -f "%Sm"` 看
-  mtime 是否在数秒内变过。本轮撞见另一窗口正在用 python 改同一个文件 ——
-  `mtime` 比检查时间只早 12 秒。**mtime 近期变动 = 他方在写，换文件或先通报。**
-  （`nt_locate.py` 的索引可能陈旧：`--audit` 显示 3 天前、476 缺失时改用 grep 定点）
+### 4.1 内存 / 死锁 / sidecar
 
-## 正典索引
+| 闸 | 命令 | 判据 |
+|---|---|---|
+| 内存 | `sh scripts/ops/nt_mem_gate.sh; echo $?` | 非 0 禁起构建 |
+| 死锁 | `python3 scripts/ops/nt_lock_audit.py neotrix-core/src` | **2026-09-29 实测 0 条**（RC=0） |
+| sidecar | `sh scripts/ops/nt_sidecar.sh {start\|stop\|status}` | 用完即停 |
 
-- **唯一图纸入口**：`docs/architecture/NEOTRIX-MASTER-BLUEPRINT.md`（D-00~D-15，按图施工）
-- 架构现状：`docs/architecture/ARCHITECTURE.md`（⚠️ §1-§12 的 C4/分层设计已被 §13 neobot 融合推翻，读 §13 起的实测部分）
-- 模块拓扑实测：`docs/architecture/DIR-AUDIT-2026-09-27.md`（16 包依赖图 + 8 类重复类型）
-- **目录架构解法**：`docs/architecture/DIR-REMEDY-2026-09-28.md` —— `neotrix-core/src/neotrix/`（129 文件/43,834 行）是**不参与 L0–L6 的第二棵树且**完全逃过 `check-layer-deps.sh`；解法是**层归属显式化**（`.neotrix/layer-map.json`）而非搬目录。**其 §2.5 记录：`nt_jev` + `nt_crystal_core` 是活路径（L1 有 6 个消费者），勿当死代码删** —— 「导出 ≠ 调用」已错过 3 次
-- 外部吸收（agent 架构向）：**`ABSORPTION-AGENT-ARCH-2026-09-28.md`**（第一轮 8 源：CLI-Anything / deepseek-harness / aliyun-handbook / Understand-Anything / Horizon / ralph 等，**已落地 3 项**；病根在**接线**不在语言）+ **`ABSORPTION-AGENT-ARCH2-2026-09-29.md`**（第二轮 **30 源**，含 **5 个被证伪的提交前提**：`NVlabs/kda` 非 Kimi Delta Attention、`supermemory` 引擎闭源、`Infographic` 无约束求解器、`qc-skills` 无 QC 门、`dsh-market` 零自测量；**3 仓无 LICENSE ⇒ 只取设计**）。另有 `ABSORPTION-EXTERNAL-2026-09-27.md` · 执行记录 `BATCH-FIX-2026-09-29.md` · 交接 `sessions/handoff-20260929-absorption-round2.md`
-- **进化路线正典**：**`FINAL-ROADMAP-2026-09-29.md`**（**45 仓四轮吸收定稿，唯一排期与状态真源**）· 特性级清单 `FEATURE-MAP-TASKS-2026-09-29.md` · 合并路线图 `EVOLUTION-MAP-CONSOLIDATED-2026-09-29.md`。更早的 `EVOLUTION-ROADMAP-CODE-NODES-*.md` 保留作取证留档，⛔ 其行号/计数已部分失效
-- ⚠️ **本仓 `nt_judge.rs` 的教训**（2026-09-29 实测）：它标注「EVO-02 mu 式」，但 `qybaihe/mu` 自己的回测（`kyrn/docs/08-jev-retrospective.md`）显示 **admission/chunk 准入是它成本最高（54% token）、收益为零（2412 块 drop 0 个）的决策点**。⇒ `handoff-evo-20260926.md:68` 把 admission 列 P0 的表述需改判。**我们的实现是纯规则（无 I/O）故那些数字不适用，但方法论要抄**
-- 文档规范：`DOCUMENTATION-MAP.md`（目录导航以 `docs/architecture/README.md` 为准）
-- 模块台账：`ARCHITECTURE-MAP-ROADMAP-V2.md` —— **其 §1-§7 数字自述永久陈旧，只取 §11 起的可再生实测值**。台账更新规则是 **R-P199**（`docs/standards/archive/dev-rules-legacy-R-P161-257.md:259`，**非规范副本**；"R-P161-257" 只是该归档文件的编号区间，不是规则号），口径是 **`neotrix-core` 的 L1–L6**；`crates/neotrix-neobot` 是独立 crate、不占 L 层 ⇒ 本轮**不进**此台账，正典记录见 `docs/architecture/ABSORPTION-DSH-SIDEBAR-IM.md`
-- 已废止：`FUSION-ARCHITECTURE.md`（其"下一步"含已被证伪的"解决预存编译错误"）、`ARCHITECTURE-EVOLUTION-ROADMAP.md`（零引用）
-- 待办：`TODO.md`（顶部为人工摘要区）；事故与分诊：`sessions/handoff-disease-list-20260927.md`（模板 `sessions/HANDOFF-TEMPLATE.md`，两者均已入库）
-- **新窗口统一修复的**开头提示词**：`sessions/handoff-20260928-new-window-opening.md`（2026-09-28，接手前先读它 —— 含必读文档顺序、三条硬约束、以及「主工作树不是可信地面真相」这一最容易浪费数小时的前提）
-- **方法论教训档（`docs/architecture/LESSONS-*.md`，7 档；按主题挑读，**勿只读最新一档**）** —— 元教训统一是「**任何『X 是好的/坏的』断言都要问『我是在哪个环境里验证的』；答『我的工作树』就等于还没有证据**」：`…20260929-checked-is-not-verified`（**「我推演过」≠「我验证过」**／授权≠免记账／机械化判据要自测）、`…20260928-verification-must-be-executable`（验证只存在于文字里）、`…20260928-fresh-checkout`（干净检出≠本地绿）、`…2026-09-27-scanner-trust`（扫描器告警/门记录腐化）、`…2026-09-28-ledger-rot-and-consumer-audit`（台账腐化/消费者审计）、`…2026-09-28-measurement-and-dedup`（测量台纪律）、`…20260928-blank-window-and-embedding`
-- **本轮目录/算法改造的**交接**：`sessions/handoff-20260928-algo-extraction.md`（8 项算法萃取进 L0–L6 + 6 个目录归档 + 2 笔债裁决 + 删 4,640 行死引擎；含 5 个踩坑坑位与「反查消费者须一并 grep `.github/workflows/`」的方法论教训）
-- **剩余任务汇总交接**：`sessions/handoff-20260928-consolidated.md`（2026-09-28，**动手前必读其 §2 勘误表** —— 4.1/2.1/2.2/5.2/4.4 的台账前提均已被实测证伪，照原文做会重造已存在的东西或"修"已正确工作的机制）
+- **门记录纪律（R-SCAN-3）**：改 `.rs` 必须重跑；只改非 `.rs` 可沿用。历史：22:52 之前本文长期写「0 命中」而实际 12 条 —— **陈旧门记录会让下一个 agent 去「修」正确代码，比没有门更危险**。唯一一次非 0：2026-09-27 22:52 实测 3 条（1 真死锁 `kb_search.rs:549` + 2 误报），23:4x 修真死锁后归 0，此后每次复测均 0。
 
-## 三道闸（2026-09-27 事故后置入，违反即阻塞）
+### 4.2 目录 / 命名（纯 bash，无需 cargo）
 
-- 重型 cargo 前：`sh scripts/ops/nt_mem_gate.sh; echo $?` — 非 0 禁止起构建
-- 死锁静态扫描：`python3 scripts/ops/nt_lock_audit.py neotrix-core/src`
-  — 门记录（**每次改代码后必须刷新，禁止沿用旧值**）：
-  - **当前 0 条**，最近实测 **2026-09-28 18:4x**（`neotrix-core/src`，退出码 0；该次**改了产品码**：8 算法萃取入主代码 + 删 4,640 行死引擎 + 17 个同名类型消歧，故为重跑非沿用）。详见 `sessions/handoff-20260928-algo-extraction.md`
-  - 唯一一次非 0：**2026-09-27 22:52** 实测 3 条（1 真死锁 `kb_search.rs:549` + 2 扫描器误报），**23:4x 修真死锁并补 `drop()`/临时锁识别后归 0**，此后 15 次复测全 0
-  - 沿用规则：改动为**非 `.rs`**（脚本/JSON/TXT）可沿用上次值；改了 `.rs` 必须重跑
-  - 历史教训：22:52 之前本文长期写"当前 0 命中"而实际 12 条 —— **陈旧门记录会让下一个 agent 去"修"正确代码，比没有门更危险**（见 R-SCAN-3）
-- sidecar 按需：`sh scripts/ops/nt_sidecar.sh {start|stop|status}` — 用完即停
-- **任务→工具索引（2026-09-28 立，日常任务先查它再动手）**：
-  `make find QUERY="死锁"` / `python3 scripts/ops/nt_find.py 死锁`。
-  19 条意图索引在 `.neotrix/task-index.json`，**每条必带「何时别用」** ——
-  只写「何时用」agent 会用错（`check-naming` PASS 不代表合规；
-  `nt_lock_audit` 报 12 条里 2/3 是误报）。pre-commit 校验索引指向的工具存在。
-  动机：脚本发现机制此前散落在 AGENTS.md(10处)/RUST-STANDARDS.md(3处) 的散文里，
-  回答「该跑什么」需全文心智模型，且无单一权威。
-- **worktree 门**（2026-09-28 立，取代纯人工纪律）：`sh scripts/ops/nt_worktree_gate.sh {check|clean|prune [--force]}`
-  详见 `scripts/ops/WORKTREE-GATE.md`。**收工删 worktree 必须走 `prune`，禁止手删目录**
-  （`prune` 内建双闸 + patch 兜底 + 判据同向检查，见下条 R-DISK-1~7 细则）
-- 磁盘回收（R-DISK-1~7，细则见 `RUST-STANDARDS.md` §17.7）：**只删生成物，不删带
-  脏文件的 worktree**。`.worktrees/*/target` 常占 90%+ 体积（2026-09-28 实测
-  17G 中 16.6G 是 target）。删 `target/` 零风险（gitignore 已确认）；删 worktree
-  本体须过双闸：`status --porcelain` 为空 **且** `branch -a --contains HEAD` 非空。
-  **有 cargo 在跑时不碰主 `target/`**
-- 目录/命名门（2026-09-28 新增，均 bash，无需 cargo）：
-  - `bash scripts/check-layer-deps.sh --strict` → **exit 0**，**8 known**
-    **测量台：`git worktree add --detach HEAD` 的干净检出**（脏树值会让违规变少，照抄会让 CI 以 `FAIL: N new` 红 —— 见 L8）。
-    - 2026-09-28 实测 8：棘轮 **101→92→89→80→50→47→40→26→25→8**，`PASS 0 new`、RC=0，**L1–L5 真引用全清**。
-    - 剩余 8 条全是**已记录不可改道项**（l0 无对应真实现 / 字符串字面量）⇒ 只能留基线，删会让 CI 红。明细见 `DECISIONS-2026-09-28.md`。
-    - ⚠️ `neotrix/` 树受 `#[cfg(feature="ios-bridge")]` 门控，默认测试编不进；该树改动须另跑 `cargo check -p neotrix --features ios-bridge`（2026-09-28 实测 exit=0）。
-    - ⚠️ 改跨层引用**唯一合法通道是「消费方自己那层」的 facade**；走目标层 facade 无效（路径仍含层名）。
-    - ⚠️ **同名 ≠ 同一符号**（换错了 `cargo check` 不报错，L15）；门**分不清字符串字面量**（L14）；批量改道须自查有无改到注释行（L13/L16）。
-  - `bash scripts/check-naming.sh` → advisory，clean-HEAD 基线 **1,646** 个无 `nt_` 前缀文件（主工作树实测 1,630，差值即未提交改名所致）。
-    **规约 vs 现实差 1,646 ⇒ 该规约无约束力**，advisory PASS 不代表合规。
-  - 层归属真源 `.neotrix/layer-map.json`（`_rule` 里的重名计数 2026-09-28 已按实测重写）；裁决表 `docs/architecture/OWNERSHIP.md`
-  - ⛔ **`truth-surface` 本地红不是 CI 红**：他窗 WIP 造成 UNCOMMITTED_DEP；干净检出实测 exit=0
-- 硬规则细则见 `RUST-STANDARDS.md` §17（锁/构建/卡死判别/Git/修 bug 判据/字节安全）
+| 门 | 当前值 | ⛔ 怎么读这个值 |
+|---|---|---|
+| `check-layer-deps.sh --strict` | exit 0，**8 known** | 棘轮 101→…→8，`PASS 0 new`。剩余 8 条全是**已记录不可改道项**，删会让 CI 红。**测量台必须是 `git worktree add --detach HEAD` 的干净检出** —— 脏树值会让违规变少，照抄会让 CI 以 `FAIL: N new` 红 |
+| `check-naming.sh` | advisory，clean-HEAD **1,646** 无前缀文件 | **规约 vs 现实差 1,646 ⇒ 该规约无约束力，advisory PASS ≠ 合规** |
+| `check-truth-surface.sh` | — | ⛔ **本地红 ≠ CI 红**（他窗 WIP 造成 UNCOMMITTED_DEP）；干净检出 exit=0 |
 
-## 本地模型 — `docs/architecture/LOCAL-LLAMA-2026-09-28.md`
+- 层归属真源 `.neotrix/layer-map.json`；裁决表 `docs/architecture/OWNERSHIP.md`。
+- ⚠️ `neotrix/` 树受 `#[cfg(feature="ios-bridge")]` 门控，默认编不进 ⇒ 改它须另跑 `cargo check -p neotrix --features ios-bridge`。⚠️ 改跨层引用**唯一合法通道是「消费方自己那层」的 facade**；走目标层 facade 无效。
+- ⚠️ **同名 ≠ 同一符号**（换错了 `cargo check` 不报错，L15）；门**分不清字符串字面量**（L14）；批量改道须自查有无改到注释行（L13/L16）。
 
-权重 `<repo>/models/` ＋ 归档区兜底（均 gitignored，git 保护不到）。
-启动 llama.cpp **必须**带 `--jinja` `--reasoning off` `--ctx-size <N>` 显式值，
-否则 Qwen3.5 系「装完开不了话」。原因、KV 推导、实测数据见该文档。
+### 4.3 磁盘 / worktree
 
-## 扫描器告警 ≠ 缺陷（2026-09-27 差点把 bug 修进正确代码）
+- **只删生成物，不删带脏文件的 worktree**。`.worktrees/*/target` 常占 90%+ 体积。删 `target/` 零风险；删 worktree 本体须过双闸：`status --porcelain` 为空 **且** `branch -a --contains HEAD` 非空。**有 cargo 在跑时不碰主 `target/`**。细则 R-DISK-1~7 → `RUST-STANDARDS.md` §17.7；worktree 门 → `scripts/ops/WORKTREE-GATE.md`。
 
-- **R-SCAN-1 静态扫描告警必须先读现场证实或证伪，再动代码。** 本轮
-  `nt_lock_audit.py` 报 12 条，逐个读代码后 **2/3 是误报**：`tor_client.rs:324`
-  作者已显式 `drop(proc);`；`llama_process.rs:329` 的 `*self.x.lock().await = v;`
-  是赋值型临时锁（`;` 处即释放）。若照单全修，会把 bug 引进**正确**代码。
-  这是 `nt-locate` "无定点不改"对扫描器同样成立。
-- **R-SCAN-2 手推 ≠ 实证。** 判断扫描器行为必须把**真实代码形态**喂进去跑，
-  不要在脑子里模拟 —— 本轮手推 `audit_indirect` 不会误报，实测它确实误报。
-- **R-SCAN-3 门记录必须带核实时间戳。** 本文与 `RUST-STANDARDS.md §17.1`
-  都曾长期写着"0 命中"，而实际是 12 条 —— 陈旧的门记录会让下一个 agent
-  **去"修"正确代码**，比没有门更危险。
+### 4.4 任务 → 工具索引
+
+`make find QUERY="死锁"` / `python3 scripts/ops/nt_find.py 死锁` —— 19 条意图索引在 `.neotrix/task-index.json`，**每条必带「何时别用」**：只写「何时用」agent 会用错（`check-naming` PASS 不代表合规；`nt_lock_audit` 报 12 条里 2/3 是误报）。pre-commit 校验索引指向的工具存在。
+
+## 5. 扫描器告警 ≠ 缺陷（2026-09-27 差点把 bug 修进正确代码）
+
+- **R-SCAN-1** 扫描告警**先读现场证实/证伪再动代码**。本轮 `nt_lock_audit` 报 12 条，逐个读代码后 **2/3 是误报**：`tor_client.rs:324` 作者已显式 `drop(proc);`；`llama_process.rs:329` 的 `*self.x.lock().await = v;` 是赋值型临时锁。若照单全修，会把 bug 引进**正确**代码 —— 「无定点不改」对扫描器同样成立。
+- **R-SCAN-2** **手推 ≠ 实证**。判断扫描器行为必须把**真实代码形态**喂进去跑 —— 本轮手推 `audit_indirect` 不会误报，实测它确实误报。
+- **R-SCAN-3** **门记录必须带核实时间戳**（见 §4.1）。
+
+## 6. 正典索引
+
+> 裸文件名默认指**根目录**；其余全部位于 `docs/architecture/`。**先读 `docs/architecture/README.md`（阅读索引）。**
+
+| 主题 | 正典 |
+|---|---|
+| **唯一图纸** | `NEOTRIX-MASTER-BLUEPRINT.md`（D-00~D-15，按图施工） |
+| **唯一排期真源** | `FINAL-ROADMAP-2026-09-29.md`（45 仓四轮吸收定稿）· 特性级 `FEATURE-MAP-TASKS-2026-09-29.md` |
+| 架构现状 | `ARCHITECTURE.md` ⚠️ **§1-§12 已被 §13 推翻，只读 §13 起** |
+| 模块台账 | `ARCHITECTURE-MAP-ROADMAP-V2.md` ⚠️ **§1-§7 数字永久陈旧，只取 §11 起**。更新规则 **R-P199**，口径限 `neotrix-core` L1–L6；`neobot` 独立 crate 不占 L 层故不进 ⇒ 见 `ABSORPTION-DSH-SIDEBAR-IM.md` |
+| 模块拓扑实测 | `DIR-AUDIT-2026-09-27.md`（16 包依赖图 + 8 类重复类型）· **目录解法** `DIR-REMEDY-2026-09-28.md` |
+| 外部吸收 | `ABSORPTION-AGENT-ARCH-2026-09-28.md`（8 源）+ `…ARCH2-2026-09-29.md`（30 源，含 5 个被证伪前提，3 仓无 LICENSE ⇒ 只取设计）+ `BATCH-FIX-2026-09-29.md` · `ABSORPTION-EXTERNAL-2026-09-27.md` |
+| 方法论教训 | `LESSONS-*.md` **7 档，按主题挑读，勿只读最新** |
+| 文档规范 | `DOCUMENTATION-MAP.md` |
+| 本地模型 | `LOCAL-LLAMA-2026-09-28.md` |
+| 待办 | `TODO.md`（顶部人工摘要区）· 事故分诊 `sessions/handoff-disease-list-20260927.md` |
+
+### 6.1 承接前必读（省数小时）
+
+- `sessions/handoff-20260928-new-window-opening.md` —— 必读顺序 + 三条硬约束 + **「主工作树不是可信地面真相」**。
+- `sessions/handoff-20260928-consolidated.md` —— ⛔ **动手前必读其 §2 勘误表**：4.1/2.1/2.2/5.2/4.4 的台账前提均已被实测证伪，照原文做会重造已存在的东西或「修」已正确工作的机制。
+- `sessions/handoff-20260928-algo-extraction.md` —— 目录/算法改造交接（8 项算法萃取进 L0–L6 + 6 目录归档 + 删 4,640 行死引擎；含「反查消费者须一并 grep `.github/workflows/`」的方法论教训）。
+
+### 6.2 三条血泪教训（照抄结论，不照抄数字）
+
+- `DIR-REMEDY-2026-09-28.md` §2.5：`neotrix-core/src/neotrix/`（129 文件/43,834 行）是**不参与 L0–L6 的第二棵树**且完全逃过 `check-layer-deps.sh`；解法是**层归属显式化**（`layer-map.json`）而非搬目录。其 §2.5 记录 `nt_jev` + `nt_crystal_core` 是**活路径**（L1 有 6 个消费者），**勿当死代码删** ——「导出 ≠ 调用」已错过 3 次。
+- `LESSONS-20260929-checked-is-not-verified.md`：`nt_judge.rs` 标注「EVO-02 mu 式」，但 `qybaihe/mu` 自己的回测显示 **admission/chunk 准入是它成本最高（54% token）、收益为零（2412 块 drop 0 个）**。⇒ `handoff-evo-20260926.md:68` 把 admission 列 P0 的表述需改判。**我们是无 I/O 的纯规则实现，故那些数字不适用，但方法论要抄。**
+- 7 档 `LESSONS-*` 的元教训统一是：**任何「X 是好的/坏的」断言都要问「我是在哪个环境里验证的」；答「我的工作树」就等于还没有证据。**
+
+### 6.3 已废止（⛔ 勿读、勿实现）
+
+`FUSION-ARCHITECTURE.md`（"下一步"含已被证伪的"解决预存编译错误"）· `ARCHITECTURE-EVOLUTION-ROADMAP.md`（零引用）· `ARCHITECTURE.md` §1-§12 · `EVOLUTION-ROADMAP-CODE-NODES-*.md`（行号/计数已部分失效，留作取证）· 根 `dev-rules.md`（ARCHIVED 桩 → 正典 `docs/standards/NEOTRIX-STD-1.0.md`）
+
+## 7. 本地模型
+
+权重 `<repo>/models/` ＋ 归档区兜底（**均 gitignored，git 保护不到，删了只能重下**）。启动 llama.cpp **必须**带 `--jinja` `--reasoning off` `--ctx-size <N>` 显式值，否则 Qwen3.5 系「装完开不了话」。原因、KV 推导、实测数据 → `LOCAL-LLAMA-2026-09-28.md`。

@@ -1,0 +1,64 @@
+# gitleaks 存量基线（棘轮）— 每行一个 fingerprint。
+# 2026-09-29 实测：59 处发现，逐一读代码确认**全部为密钥扫描器自身的测试夹具/公开常量**
+#   （ghp_abc123… / xoxb-1234… / USDC 合约地址 0xA0b869… / reCAPTCHA 公钥 6LeIxAcTAAAAA…），无真实泄漏。
+# ⛔ 绝不要为了让门变绿而删条目 —— 那等于把真泄漏写进基线。
+# 用途：gitleaks 若报**基线之外**的 fingerprint 即 exit 1；存量修好一个就删一行（棘轮下降）。
+1c5ac1a9abda89cb8e1e2df52db4aa100faf6d6b:neotrix-core/src/l3_embodiment/nt_shield/nt_shield/redaction.rs:generic-api-key:243
+24809f477017a9de11ede946bffd7b6ebccbbffb:src-tauri/src/domain/model_pool.rs:generic-api-key:316
+477bf669270b72a49d316dc40590143402dbcb39:neotrix-core/src/l3_embodiment/nt_shield/defense/ring_outer/output_filter.rs:generic-api-key:106
+477bf669270b72a49d316dc40590143402dbcb39:neotrix-core/src/l3_embodiment/nt_shield/guard/agent_guardrails/input_validator.rs:generic-api-key:377
+477bf669270b72a49d316dc40590143402dbcb39:neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs:jwt:248
+477bf669270b72a49d316dc40590143402dbcb39:neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs:private-key:84
+477bf669270b72a49d316dc40590143402dbcb39:neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs:slack-bot-token:224
+477bf669270b72a49d316dc40590143402dbcb39:neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/finding.rs:github-pat:152
+477bf669270b72a49d316dc40590143402dbcb39:neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/validator.rs:slack-bot-token:274
+50799cccb5887b657bbd6f882c1401c35ccdf6bb:neotrix-core/src/l1_action/nt_act/evm.rs:generic-api-key:301
+63ea5f3e5d02414e295986ca0a3a0dd617043272:neotrix-core/src/l3_embodiment/nt_shield_enforcer.rs:generic-api-key:511
+63ea5f3e5d02414e295986ca0a3a0dd617043272:neotrix-core/src/l3_embodiment/nt_shield_enforcer.rs:generic-api-key:692
+6687d1ab1985316c4f52d5a98f0f78206fe2b1ab:src-tauri/src/util/masking.rs:generic-api-key:36
+831c32038043cbada4fe587317e2654c12be668b:crates/neotrix-body/src/security/prompt/tests.rs:generic-api-key:132
+831c32038043cbada4fe587317e2654c12be668b:crates/neotrix-body/src/security/prompt/tests.rs:github-pat:132
+831c32038043cbada4fe587317e2654c12be668b:crates/neotrix-body/src/security/prompt/tests.rs:private-key:124
+831c32038043cbada4fe587317e2654c12be668b:neotrix-core/src/cli/laws.rs:generic-api-key:220
+831c32038043cbada4fe587317e2654c12be668b:neotrix-core/src/cli/shield_enforcer.rs:generic-api-key:311
+831c32038043cbada4fe587317e2654c12be668b:neotrix-core/src/cli/shield_enforcer.rs:generic-api-key:494
+831c32038043cbada4fe587317e2654c12be668b:neotrix-core/src/neotrix/nt_act_crypto/evm.rs:generic-api-key:310
+831c32038043cbada4fe587317e2654c12be668b:neotrix-core/src/neotrix/nt_io_stealth_net/captcha/mod.rs:generic-api-key:859
+831c32038043cbada4fe587317e2654c12be668b:neotrix-core/src/neotrix/nt_io_stealth_net/captcha/mod.rs:generic-api-key:882
+831c32038043cbada4fe587317e2654c12be668b:neotrix-core/src/neotrix/nt_shield_prompt/tests.rs:generic-api-key:132
+831c32038043cbada4fe587317e2654c12be668b:neotrix-core/src/neotrix/nt_shield_prompt/tests.rs:github-pat:132
+831c32038043cbada4fe587317e2654c12be668b:neotrix-core/src/neotrix/nt_shield_prompt/tests.rs:private-key:124
+94a4770e5f27472394a7522ac3ddaf95c6d31b1f:neotrix-core/src/bin-archive/nt_shield_archived/scanning.rs:generic-api-key:398
+94a4770e5f27472394a7522ac3ddaf95c6d31b1f:neotrix-core/src/bin-archive/nt_shield_archived/scanning.rs:generic-api-key:514
+94a4770e5f27472394a7522ac3ddaf95c6d31b1f:neotrix-core/src/bin-archive/nt_shield_archived/scanning.rs:generic-api-key:550
+94a4770e5f27472394a7522ac3ddaf95c6d31b1f:neotrix-core/src/bin-archive/nt_shield_archived/scanning.rs:generic-api-key:652
+94a4770e5f27472394a7522ac3ddaf95c6d31b1f:neotrix-core/src/cli/laws.rs:generic-api-key:202
+94a4770e5f27472394a7522ac3ddaf95c6d31b1f:neotrix-core/src/cli/shield_enforcer.rs:generic-api-key:340
+94a4770e5f27472394a7522ac3ddaf95c6d31b1f:neotrix-core/src/cli/shield_enforcer.rs:generic-api-key:495
+94a4770e5f27472394a7522ac3ddaf95c6d31b1f:neotrix-core/src/neotrix/l1_body_impl/nt_act_crypto/evm.rs:generic-api-key:301
+94a4770e5f27472394a7522ac3ddaf95c6d31b1f:neotrix-core/src/neotrix/l1_body_impl/nt_shield_prompt/tests.rs:generic-api-key:129
+94a4770e5f27472394a7522ac3ddaf95c6d31b1f:neotrix-core/src/neotrix/l1_body_impl/nt_shield_prompt/tests.rs:github-pat:129
+94a4770e5f27472394a7522ac3ddaf95c6d31b1f:neotrix-core/src/neotrix/l1_body_impl/nt_shield_prompt/tests.rs:private-key:121
+94a4770e5f27472394a7522ac3ddaf95c6d31b1f:neotrix-core/src/neotrix/l1_body_impl/nt_shield_traffic/analyzer.rs:generic-api-key:539
+94a4770e5f27472394a7522ac3ddaf95c6d31b1f:src-tauri/frontend/src/components/PrivacyFilter.tsx:generic-api-key:34
+a4e9630ce0c986886f969cf7bdff96740fcff7ba:src-tauri/tauri.conf.json:generic-api-key:80
+af028efa972bae878e7dd37dc1b3037fe1b03897:neotrix-core/src/neotrix/l1_body_impl/nt_shield/redaction.rs:generic-api-key:192
+cea12d7a7136f7f0aa602040a878c8ba32549e6d:neotrix-core/src/neotrix/nt_consciousness_core/guardrail_pipeline.rs:generic-api-key:869
+db51a20ec612d94cc8017d38e29b9cffeb8763d4:neotrix-core/src/cli/laws.rs:generic-api-key:201
+db51a20ec612d94cc8017d38e29b9cffeb8763d4:neotrix-core/src/cli/shield_enforcer.rs:generic-api-key:291
+db51a20ec612d94cc8017d38e29b9cffeb8763d4:neotrix-core/src/cli/shield_enforcer.rs:generic-api-key:445
+e698fb41c251e1bf318b41d0c1439710cafc48c4:neotrix-core/tests/nt_shield_integration.rs:github-pat:1014
+e698fb41c251e1bf318b41d0c1439710cafc48c4:neotrix-core/tests/nt_shield_integration.rs:jwt:907
+e698fb41c251e1bf318b41d0c1439710cafc48c4:neotrix-core/tests/nt_shield_integration.rs:private-key:845
+e698fb41c251e1bf318b41d0c1439710cafc48c4:neotrix-core/tests/nt_shield_integration.rs:slack-bot-token:824
+e698fb41c251e1bf318b41d0c1439710cafc48c4:neotrix-core/tests/nt_shield_integration.rs:slack-webhook-url:835
+e698fb41c251e1bf318b41d0c1439710cafc48c4:neotrix-core/tests/security_pipeline.rs:generic-api-key:13
+e75272beafa2674230ad1bc7b697d40943e87123:neotrix-core/src/l6_meta/nt_laws.rs:generic-api-key:202
+eb4af142c6eab511864b9cc798371ca9f585e8b5:neotrix-core/src/neotrix/nt_act_crypto/evm.rs:generic-api-key:304
+eb4af142c6eab511864b9cc798371ca9f585e8b5:neotrix-core/src/neotrix/nt_shield/scanning.rs:generic-api-key:398
+eb4af142c6eab511864b9cc798371ca9f585e8b5:neotrix-core/src/neotrix/nt_shield/scanning.rs:generic-api-key:514
+eb4af142c6eab511864b9cc798371ca9f585e8b5:neotrix-core/src/neotrix/nt_shield/scanning.rs:generic-api-key:550
+eb4af142c6eab511864b9cc798371ca9f585e8b5:neotrix-core/src/neotrix/nt_shield/scanning.rs:generic-api-key:652
+eb4af142c6eab511864b9cc798371ca9f585e8b5:neotrix-core/src/neotrix/nt_shield_prompt/tests.rs:generic-api-key:129
+eb4af142c6eab511864b9cc798371ca9f585e8b5:neotrix-core/src/neotrix/nt_shield_prompt/tests.rs:github-pat:129
+eb4af142c6eab511864b9cc798371ca9f585e8b5:neotrix-core/src/neotrix/nt_shield_prompt/tests.rs:private-key:121

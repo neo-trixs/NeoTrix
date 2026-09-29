@@ -66,7 +66,22 @@ jobs:
 
       - name: Run gitleaks secret scan
         run: |
-          gitleaks detect --source . --config .gitleaks.toml --report-format json --report-path gitleaks-report.json --verbose 2>&1 | tee gitleaks-output.txt || true
+          # 2026-09-29 修两处恒绿幻影（实测，非手推）：
+          #   ① --config .gitleaks.toml 指向不存在的路径（真身在 config/.gitleaks.toml）
+          #      ⇒ gitleaks FTL 退出、不产出 report.json；
+          #   ② `|| true` 吞掉退出码，下一步 grep 读不到 report 便走 else 打印
+          #      "Gitleaks scan passed" ⇒ 任何密钥泄漏都报 PASS。
+          # 与 release.yml 用 `config: config/cliff.toml` 对齐（cliff 那条路径一直是对的）。
+          # `--exit-code 0` 是刻意的：「检出泄漏」不是扫描失败，交给下一步按基线判定；
+          # 而「扫描本身跑不起来」在这里就红 —— 两者不可再混为一谈。
+          gitleaks detect --source . --config config/.gitleaks.toml \
+            --report-format json --report-path gitleaks-report.json \
+            --exit-code 0 --verbose 2>&1 | tee gitleaks-output.txt
+          # 报告必须真的产出，否则「无泄漏」与「没扫成」不可区分（R-SCAN-2）
+          if [ ! -s gitleaks-report.json ]; then
+            echo "::error::gitleaks produced no report — scan did not run, refusing to pass"
+            exit 1
+          fi
 
       - name: Upload gitleaks results
         uses: actions/upload-artifact@v4
@@ -78,11 +93,27 @@ jobs:
 
       - name: Check for leaked secrets
         run: |
-          if grep -qi '"Severity":\s*"HIGH"\|"Severity":\s*"CRITICAL"' gitleaks-report.json 2>/dev/null; then
-            echo "::error::High or Critical severity secrets detected"
+          # 判据同 ①：文件缺失不再走 "passed"，而是明确失败。
+          # 原写法 `grep ... 2>/dev/null` + `|| echo passed` 在报告缺失时恒绿。
+          if [ ! -s gitleaks-report.json ]; then
+            echo "::error::gitleaks-report.json missing or empty — cannot conclude 'no leaks'"
             exit 1
           fi
-          echo "Gitleaks scan passed"
+          # 判据改为**基线棘轮**（2026-09-29）。原判据 `grep '"Severity"'` 恒不匹配：
+          # gitleaks 8.30.1 的 JSON 报告**没有 Severity 字段**（官方 jsonextra 模板
+          # 字段表可证），故那一步即使扫描成功也永远不会红。
+          # 存量 59 条已逐一读代码确认为扫描器自身测试夹具/公开常量 ⇒ 进基线放行；
+          # 报**基线之外**的 fingerprint 才算新泄漏。实测：存量 59 全在基线内、
+          # 新造 slack-bot-token 在基线外被判出（双向验证，非手推）。
+          new_leaks=$(jq -r '.[].Fingerprint' gitleaks-report.json \
+            | grep -vxFf config/.gitleaks-baseline.txt || true)
+          if [ -n "$new_leaks" ]; then
+            echo "::error::New secret(s) detected outside the audited baseline:"
+            echo "$new_leaks"
+            echo "::warning::If these are false positives, review them — never silence by adding to the baseline."
+            exit 1
+          fi
+          echo "Gitleaks scan passed (no leaks outside the audited baseline)"
 
   sbom:
     runs-on: ubuntu-latest

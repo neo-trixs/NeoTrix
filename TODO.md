@@ -160,7 +160,7 @@
 >    （它刚被关掉，留着就是新的说谎注释）。
 >    **仍不覆盖**：只到键名不到类型（`{taskId:123}` 键对型错不报）、只到静态不到运行时
 >    （serde 转换 / `Option` 缺省仍要真进程往返）。
-> ✅ **订正冻结规则引用**：`AGENTS.md:53` + `DOCUMENTATION-MAP.md:21` 的
+> ✅ **订正冻结规则引用**：`AGENTS.md` §6 正典索引（+ `DOCUMENTATION-MAP.md:21`）的
 >    「R-P161-257」实为归档文件编号区间，真实规则号是 **R-P199**
 >    （`archive/dev-rules-legacy-R-P161-257.md:259`，非规范副本，口径限 `neotrix-core` L1–L6）。
 > ✅ **门记录刷新**（R-SCAN-3：本轮改过码，旧值即陈旧）：`lock_audit` 两 scope 均 **0 条**，
