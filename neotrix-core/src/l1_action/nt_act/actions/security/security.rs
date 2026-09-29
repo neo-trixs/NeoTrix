@@ -195,16 +195,48 @@ impl SecurityRegistry {
             .map(|g| (g.capability_id().to_string(), g.health_check()))
             .collect()
     }
-    pub fn optimal(&self) -> Option<&dyn SecurityGuard> {
-        self.guards
-            .iter()
-            .filter(|g| g.health_check().healthy)
-            .max_by(|a, b| {
-                let a_s = 1.0 - a.health_check().error_rate;
-                let b_s = 1.0 - b.health_check().error_rate;
-                a_s.partial_cmp(&b_s).unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .map(|g| g.as_ref())
+    /// 最严否决：遍历**所有健康 guard**，取严格程度最高的那次判决。
+    ///
+    /// ## 为什么不取「最健康的那个」（2026-09-29 修）
+    ///
+    /// 原实现返回 `optimal()` = **单个** `1.0 - error_rate` 最高的 guard。
+    /// 那个标准回答的是「哪个 guard 更**可靠**」，
+    /// 而路由需要回答的是「这个动作**允不允许**」——
+    /// **两者不是同一个问题**。
+    ///
+    /// ⇒ 后果实测（`deny_in_any_guard_wins_over_healthier_allow` 为证）：
+    /// 一个 `error_rate=0.0` 的宽松 `Allow` guard 会**静默屏蔽**
+    /// `error_rate=0.5` 但判 `Deny` 的 guard ⇒ **fail-open**。
+    ///
+    /// ⇒ 正确语义 = 集合上的「最严否决」：
+    /// 任一健康 guard 判 `Deny` ⇒ 整体 `Deny`；
+    /// 否则任一判 `RequireApproval` ⇒ 整体 `RequireApproval`；
+    /// 否则 `Allow`。
+    ///
+    /// ⛔ 不健康 guard 仍被跳过 —— 那部分语义不变
+    ///   （宁可少一道 guard 也不要用一个正在误报的）。
+    pub fn strictest_verdict(&self, action: &ActionRequest) -> Option<SecurityVerdict> {
+        let mut seen_any = false;
+        let mut saw_approval = false;
+        for g in self.guards.iter().filter(|g| g.health_check().healthy) {
+            seen_any = true;
+            match g.check(action) {
+                SecurityVerdict::Deny(_) => return Some(SecurityVerdict::Deny(
+                    format!("guard `{}` 判拒绝", g.capability_id()),
+                )),
+                SecurityVerdict::RequireApproval(_) => saw_approval = true,
+                SecurityVerdict::Allow => {}
+            }
+        }
+        if !seen_any {
+            return None;
+        }
+        if saw_approval {
+            return Some(SecurityVerdict::RequireApproval(
+                "至少一个 guard 要求人工批准".into(),
+            ));
+        }
+        Some(SecurityVerdict::Allow)
     }
 }
 
@@ -217,13 +249,24 @@ impl SecurityRouter {
     pub fn new(registry: SecurityRegistry) -> Self {
         Self { registry }
     }
-    pub fn route(&self, _action: &ActionRequest) -> Option<&dyn SecurityGuard> {
-        self.registry.optimal()
-    }
+    /// 路由判定：遍历**所有**健康 guard，取最严的那次判决。
+    ///
+    /// ## 语义变更（2026-09-29）
+    ///
+    /// 旧实现走 `registry.optimal()` = **单个** `1.0 - error_rate` 最高的 guard。
+    /// 那个标准回答「哪个 guard 更**可靠**」，
+    /// 而路由要回答「这个动作**允不允许**」—— 两者不是同一个问题。
+    /// ⇒ 实测 fail-open：`error_rate=0.0` 的宽松 Allow 会静默屏蔽
+    ///   `error_rate=0.5` 的 Deny（见 `deny_in_any_guard_wins_over_healthier_allow`）。
+    ///
+    /// ⛔ 同时**删除了 `route()`**（返回单个 guard 引用）与 `optimal()`
+    ///   （按健康度选单个）：两者零外部消费者，而这个「挑一个 guard」
+    ///   的形状本身会**诱导调用方重新引入 fail-open** ——
+    ///   留着它等于把已修的缺陷留一个后门。
+    ///   需要**枚举** guard 用 `health_check_all()` / `get(id)`。
     pub fn check(&self, action: &ActionRequest) -> SecurityVerdict {
         self.registry
-            .optimal()
-            .map(|g| g.check(action))
+            .strictest_verdict(action)
             .unwrap_or(SecurityVerdict::Deny("No security guard".into()))
     }
 }
@@ -290,6 +333,105 @@ mod tests {
             parameters: HashMap::new(),
         };
         assert!(matches!(mgr.check(&req), SecurityVerdict::Deny(_)));
+    }
+
+    /// 多 guard 聚合：**Deny 必须优先**，不得被「更健康」的 Allow 屏蔽。
+    ///
+    /// ## 针对的缺陷（2026-09-29 实测发现）
+    ///
+    /// `SecurityRouter::check()` 只取 `registry.optimal()` —— **单个** guard，
+    /// 挑选标准是 `1.0 - error_rate`（**健康度**，与严格程度无关）。
+    /// ⇒ 注册 2 个 guard 时，一个 `error_rate=0.0` 的宽松 `Allow` guard
+    /// 会**静默屏蔽**掉 `error_rate=0.5` 但判 `Deny` 的 guard。
+    ///
+    /// ⛔ 这是 fail-open：**安全性被等同于「哪个 guard 更可靠」**。
+    /// 正确语义是集合的**最严否决**：任一健康 guard 判 Deny ⇒ 整体 Deny。
+    #[test]
+    fn deny_in_any_guard_wins_over_healthier_allow() {
+        struct LenientAllow {
+            h: CapabilityHealth,
+        }
+        impl L1Capability for LenientAllow {
+            fn capability_id(&self) -> &str {
+                "lenient-allow"
+            }
+            fn health_check(&self) -> CapabilityHealth {
+                self.h.clone()
+            }
+            fn category(&self) -> CapabilityCategory {
+                CapabilityCategory::Security
+            }
+            fn constellation(&self) -> ConstellationLevel {
+                ConstellationLevel::C1UnitTest
+            }
+            fn description(&self) -> &str {
+                "lenient"
+            }
+        }
+        impl SecurityGuard for LenientAllow {
+            fn check(&self, _a: &ActionRequest) -> SecurityVerdict {
+                SecurityVerdict::Allow
+            }
+            fn audit(&self, _e: &AuditEntry) -> Result<(), CapabilityError> {
+                Ok(())
+            }
+        }
+
+        struct StrictDeny {
+            h: CapabilityHealth,
+        }
+        impl L1Capability for StrictDeny {
+            fn capability_id(&self) -> &str {
+                "strict-deny"
+            }
+            fn health_check(&self) -> CapabilityHealth {
+                self.h.clone()
+            }
+            fn category(&self) -> CapabilityCategory {
+                CapabilityCategory::Security
+            }
+            fn constellation(&self) -> ConstellationLevel {
+                ConstellationLevel::C1UnitTest
+            }
+            fn description(&self) -> &str {
+                "strict"
+            }
+        }
+        impl SecurityGuard for StrictDeny {
+            fn check(&self, _a: &ActionRequest) -> SecurityVerdict {
+                SecurityVerdict::Deny("strict policy".into())
+            }
+            fn audit(&self, _e: &AuditEntry) -> Result<(), CapabilityError> {
+                Ok(())
+            }
+        }
+
+        let mut reg = SecurityRegistry::new();
+        reg.register(Box::new(LenientAllow {
+            h: CapabilityHealth {
+                healthy: true,
+                error_rate: 0.0, // 更"健康"
+                ..Default::default()
+            },
+        }));
+        reg.register(Box::new(StrictDeny {
+            h: CapabilityHealth {
+                healthy: true,
+                error_rate: 0.5, // 较不"健康"
+                ..Default::default()
+            },
+        }));
+
+        let router = SecurityRouter::new(reg);
+        let req = ActionRequest {
+            action: "delete".into(),
+            target: "important.db".into(),
+            parameters: HashMap::new(),
+        };
+        assert!(
+            matches!(router.check(&req), SecurityVerdict::Deny(_)),
+            "任一 guard 判 Deny ⇒ 整体必须 Deny；不得被 error_rate 更低的 Allow 屏蔽"
+        );
     }
 
     #[test]
