@@ -418,7 +418,7 @@
 > **2026-09-27 第三轮（4 代理并行）已改未验 — 交接给下一对话，优先收口**
 > 30 项修改在 working tree，**全部未提交**（提交门禁需跑 cargo，当时内存门 BLOCKED）。
 > 验证进度：一次跑 **802 passed / 2 failed**（29 项中 28 项绿），补修后再跑 **65 passed / 1 failed**。
-> 唯一残留：`noise_handshake::full_handshake_matches_official_vectors`（已重写，待编译确认）—— 已从"构造即 panic"推进到
+> 唯一残留：`noise_handshake::full_handshake_matches_official_vectors`（**已重写并转绿，2026-09-29 合入主干**）—— 已从"构造即 panic"推进到
 > `_consume_message2` 处 unwrap 失败（`noise_handshake.rs:420`），是真 crypto 缺口。
 >
 > **🔧 接手第一步（务必按序）**
@@ -667,7 +667,7 @@ do not look like a full prefix match"）—— **工具集身份是缓存身份�
 | 测试 | 性质 |
 |---|---|
 | `kb_primitives::test_node_history` / `test_nodes_as_of_returns_committed` | **schema bug**：`nodes` 主键不含时间维 ⇒ 双时间无法存历史。改复合主键后暴露 `edges` 真外键失效 + `nodes_as_of` 文档与实现矛盾 + 既有 DB 需数据迁移 ⇒ 即 **2.2 真双时间迁移**，已回退不做半迁移 |
-| `noise_handshake::full_handshake_matches_official_vectors` | **协议实现 bug（已修，待编译确认）**：responder 在 IK 模式下无法计算 `es`（对端 static 正是被加密送达的）。该模块无生产调用方且协议名与 spec 不一致，建议先决定「对齐 spec 还是明确降级」 |
+| `noise_handshake::full_handshake_matches_official_vectors` | **协议实现 bug（已修且转绿，2026-09-29 合入主干）**：responder 在 IK 模式下无法计算 `es`（对端 static 正是被加密送达的）。该模块无生产调用方且协议名与 spec 不一致，建议先决定「对齐 spec 还是明确降级」 |
 
 **账本已无 flaky** ⇒ `check-test-baseline.sh` 的 `--strict` 现在技术上可用，
 但**先只棘轮数据、不转 strict**：需先在 CI 上连跑数轮确认那 3 条不再进出
