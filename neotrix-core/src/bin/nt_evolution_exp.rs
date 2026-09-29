@@ -45,7 +45,7 @@
 //! - **不改任何被检文件**。所有操作在临时 worktree 内，退出时清理。
 
 use neotrix::l6_meta::nt_meta::nt_evolution_eval::nt_evolution_eval::{
-    case_level_regressions, Arm, CaseOutcome, EnvFingerprint, Preregistration,
+    estimate_required_repeats, Arm, CaseOutcome, EnvFingerprint, Preregistration,
 };
 use neotrix::l6_meta::nt_meta::nt_evolution_runner::ExperimentRunner;
 use std::path::{Path, PathBuf};
@@ -471,6 +471,43 @@ fn run() -> Result<bool, String> {
     match &out.floor {
         Some(f) => println!("  噪声地板: n={} mean={:.3} σ={:.4}", f.n, f.mean_pass_rate, f.std_dev),
         None => println!("  ⛔ 噪声地板: None（重复次数 <2 ⇒ 无法估）"),
+    }
+    // 采样预算：**只在统计假设成立时**才有意义。
+    //
+    // ⛔ 第一版我在这里无条件打印「n≈126 需每臂」——实测发现那是**假告警**：
+    //   `estimate_required_repeats` 的前提是「pass_rate 有非零抽样方差」。
+    //   但本 case 集是**确定性纯文件门** ⇒ 同一 worktree + 同一 commit
+    //   重复采样必然全同（实测 3 次 σ 恒为 0.0000）
+    //   ⇒ 方差为 0 时 n 公式**不适用**，报「需要 126 次」是误导：
+    //      跑 126 次得到的结果与跑 2 次**完全一样**。
+    //
+    // ⇒ 判据：**先看地板是否真的抖动**。
+    //   σ==0 ⇒ 打印「采样不构成约束」（真话：再采也不会有新信息）
+    //   σ>0  ⇒ 才报功效预算（真话：此时采样确实影响结论）
+    if let Some(f) = &out.floor {
+        let detectable = 1.0 / CASES.len() as f64;
+        let need = estimate_required_repeats(detectable, 0.05, 0.80);
+        if f.std_dev <= f64::EPSILON {
+            println!(
+                "  采样预算: σ=0 ⇒ **采样不构成约束**（确定性门，repeats={} 与任意值等价）",
+                args.repeats
+            );
+            println!(
+                "    ℹ️ 功效公式（检出 Δ={:.3} 需 n≈{}）在此**不适用**（方差为 0）",
+                detectable, need
+            );
+        } else {
+            println!(
+                "  采样预算: 要以 80% 功效检出 Δ={:.3}（翻一个 case）需每臂 n≈{}",
+                detectable, need
+            );
+            if (args.repeats as u64) < need {
+                println!(
+                    "    ⛔ 当前 repeats={} **低于**建议值 {} ⇒ 阴性结论（REJECT）**不充分**",
+                    args.repeats, need
+                );
+            }
+        }
     }
     if out.verdict.vetoes.is_empty() {
         println!("  veto: 无");

@@ -84,7 +84,7 @@ pub use nt_evolution_eval::nt_evolution_eval::{
 mod nt_evolution_eval_tests;
 
 pub use nt_evolution_runner::{
-    outcome_from_regression, prereg_from_hypothesis, ExperimentOutcome, ExperimentRunner,
+    outcome_from_regression, ExperimentOutcome, ExperimentRunner,
 };
 
 /// 单元测试（`nt_evolution_runner` 的非空门证明）。

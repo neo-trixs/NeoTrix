@@ -15,7 +15,6 @@ pub mod deliberation;
 pub mod dispatch_self_test;
 pub mod distillation;
 pub mod ethical_intuition;
-pub mod experiment;
 pub mod federation;
 pub mod goal_loop;
 pub mod meta_skill_evolve;

@@ -237,55 +237,15 @@ pub fn outcome_from_regression(
     }
 }
 
-/// 把 L5 的 `Hypothesis` 桥接成本模块的 `Preregistration`。
-///
-/// ## 为什么需要这个桥（2026-09-29）
-///
-/// 本仓**已有**一套实验登记设施：
-/// `l5_cognition/nt_mind/nt_mind/evolution/experiment.rs`
-/// —— `Hypothesis` / `ABTestDesign` / `ExperimentRegistry` / `estimate_sample_size`。
-///
-/// 而 `Preregistration`（同本模块）是**同一件事的第二套表达**：
-///
-/// | | L5 `Hypothesis` | 本模块 `Preregistration` |
-/// |---|---|---|
-/// | 待验命题 | `statement` | `hypothesis` |
-/// | 反命题 | `null_hypothesis`（自动生成） | `falsifier`（**必须人工填**） |
-/// | 最小效应 | `expected_effect` | `min_effect` |
-/// | 显著水平/功效 | `confidence_level` / `power` | ⛔ 无 |
-///
-/// ⇒ **两套并存正是 `DIR-AUDIT` 记的「同名不同型」病**。
-/// 与其再加第三套，本函数**把 L5 的既有结构接过来**：
-///
-/// ⛔ **语义映射要诚实**：
-/// - `Hypothesis::new` 的 `null_hypothesis` 是**自动拼的字符串**
-///   （`format!("The null hypothesis: {}", statement)`），
-///   **不是**「什么结果会削弱这个假设」——
-///   那是 `falsifier`，L5 那边**根本没有**。
-/// - 所以本函数**不从 `null_hypothesis` 伪造 falsifier**；
-///   没有真 falsifier 就返回 `None`，让调用方自己补。
-///   ⛔ 伪造一个「看起来填了」的 falsifier，会让
-///   `Veto::NoFalsifier` 永不触发 —— 那等于把证伪门关掉。
-///
-/// ## 分层
-///
-/// 本函数在 L6 引 L5 的类型，是**向下依赖**（合法，有先例：
-/// `nt_meta/arch_optimizer.rs:1` 已 `use crate::l5_cognition::nt_core::...`）。
-pub fn prereg_from_hypothesis(
-    h: &crate::l5_cognition::nt_mind::nt_mind::evolution::experiment::Hypothesis,
-    falsifier: &str,
-    target_commit: &str,
-    pinned_model: &str,
-) -> Option<Preregistration> {
-    if falsifier.trim().is_empty() {
-        return None;
-    }
-    let p = Preregistration::new(
-        h.statement.clone(),
-        falsifier,
-        target_commit,
-        pinned_model,
-        h.expected_effect,
-    );
-    p.is_complete().then_some(p)
-}
+// ⛔ `prereg_from_hypothesis` 已删（2026-09-29）。
+//
+// 它是给 `l5_cognition/.../evolution/experiment.rs`（`Hypothesis`）写的适配器。
+// 那套 314 行资产零消费者零测试、且每项能力都被本模块的
+// `Preregistration` / `judge_ab` / `NoiseFloor` / `Veto` / `Ledger` 严格覆盖，
+// 已删。⇒ 适配器随之失去唯一存在理由。
+//
+// 它当时唯一正确的设计（**不从自动生成的 `null_hypothesis` 伪造 falsifier**，
+// 而是返回 `None` 让调用方自己补）已随本次删除失去落地场景。
+// ⛔ 若日后重建 L5 侧实验设施，**先做的是人工填写的 `falsifier`** ——
+//    伪造 falsifier 会让 `Veto::NoFalsifier` 永不触发，等于把证伪门关掉。
+

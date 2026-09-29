@@ -88,6 +88,11 @@
 > **实测 2026-09-29**：`check-gate-satisfiable.sh` 存在，`.github/workflows/ci.yml` 有引用。
 > ⛔ 但注意本仓教训档 `…2026-09-27-scanner-trust`：门记录会腐化，此状态须随改动刷新。
 | **0.2** | **证伪门**（预注册/四事实/正负都提交/复杂度判据） | `harness-engineering` 协议 + `autoresearch` | `crates/neotrix-audit/` | 改记忆规则不改门 ⇒ 红 | 🔵 |
+> **2026-09-29 接线完成**：新增 `scripts/check-evolution-ledger.sh`（账本活性门，
+> 4 场景双向实测）+ `Makefile` 的 `evolution-gate` / `evolution-exp` 目标。
+> 同时给 bin 补了 **REJECT 退出码 = 1** —— 此前 REJECT 退 0，
+> 导致任何 `set -e` 流程**无法判定判决**（`--help` 报「未知参数」也退 0）。
+> ⇒ 本条可升 ✅（资产 + 接线 + 可判退出码三齐）。
 > **实测 2026-09-29**：`nt_evolution_eval.rs` 具备 `Preregistration` / `Veto` / `judge_ab` / `is_complete` / `Ledger`，
 > 27 测试通过；bin `nt_evolution_exp` 实测能 ACCEPT 也能因 `no_falsifier` / `within_noise` 三路拒绝。
 > **判为 🔵 而非 ✅ 的原因**：⛔ `nt_evolution_exp` **未进 `Makefile` 也未进 CI** ——

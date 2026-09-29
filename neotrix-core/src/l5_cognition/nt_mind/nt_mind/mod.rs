@@ -49,7 +49,6 @@ pub use reason::stagnation;              // StagnationDetector: 防止无效循�
 pub use reason::thinking_bridge;         // 硅基思维桥接: SiliconSelfModel → SEAL loop + skill crystallization
 pub use reason::cognitive_map;           // LLM→NeoTrix 认知映射表
 pub use evolution::distillation;            // 经验蒸馏 + 对比反思
-pub use evolution::experiment;              // 实验设计引擎 (Route D - A/B 测试+假设框架)
 pub use evolution::causal_inventor;         // 因果发明引擎(跨域创新)
 pub use evolution::creation_engine;         // 造物引擎(从理论到实体工具)
 pub use evolution::dao_engine;              // 道引擎(从本源规则逆推万物)

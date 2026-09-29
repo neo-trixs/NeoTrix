@@ -332,6 +332,49 @@ pub mod nt_evolution_eval {
     /// 差值必须 **> δ × std_dev** 才算真改进。
     /// `rrsi/calibrate.py` 的做法是由 bootstrap **重新估计** δ，
     /// 而非猜一个数 —— 本仓先用 `3.0`（保守），留 `None` 表示「尚未标定」。
+    /// 统计功效：检测出 `effect_size` 这么大幅差，**每臂**需要多少样本。
+    ///
+    /// ## 迁移说明（2026-09-29）
+    ///
+    /// 本函数从 `l5_cognition/.../evolution/experiment.rs` 抢救而来。
+    /// 那个文件 314 行、**零消费者零测试**，已删 —— 但这个算法本身是对的，
+    /// 且是 L6 判决链**唯一缺失的一环**，所以留。
+    ///
+    /// ## 为什么要它（不是「有总比没有好」）
+    ///
+    /// `judge_ab` 的显著判据是 `raw_delta > 3σ`，其中 `3` 是**硬编码**的
+    /// 保守倍数。硬编码倍数只回答「这个 delta 能否超过地板」，
+    /// **不回答「我采这么多次够不够检出它」**。
+    ///
+    /// ⛔ 真实后果：当前 bin 的 `repeats` 同样是随手填的，
+    /// 于是「跑了 2 次」与「跑了 200 次」在判决里**完全等价** ——
+    /// 采样预算对结论没有任何影响。这正是「花了力气但不改变结论」。
+    ///
+    /// ⇒ 有此函数后，调用方可以**自己判定**采样是否充分，
+    /// 而不是在拍脑袋的 `repeats` 上签字。
+    ///
+    /// 公式：二项比例的常规近似 `n ≈ (z_α/2 + z_β)² / effect²`。
+    pub fn estimate_required_repeats(effect_size: f64, alpha: f64, power: f64) -> u64 {
+        if effect_size <= 0.0 {
+            return 1000;
+        }
+        let z_alpha: f64 = match alpha {
+            a if a <= 0.001 => 3.29,
+            a if a <= 0.01 => 2.58,
+            a if a <= 0.05 => 1.96,
+            _ => 1.64,
+        };
+        let z_beta: f64 = match power {
+            p if p >= 0.99 => 2.33,
+            p if p >= 0.95 => 1.64,
+            p if p >= 0.90 => 1.28,
+            p if p >= 0.80 => 0.84,
+            _ => 0.67,
+        };
+        let n = (z_alpha + z_beta).powi(2) / (effect_size * effect_size);
+        (n.ceil() as u64).max(30)
+    }
+
     pub fn noise_threshold(floor: &NoiseFloor, delta_k: f64) -> Option<f64> {
         if delta_k <= 0.0 {
             return None;
