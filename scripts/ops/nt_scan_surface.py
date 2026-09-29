@@ -97,6 +97,7 @@ PROSE_PATHS = {
     ".next": "构建产物目录（next.js）",
     "__pycache__": "Python 构建产物，SKIP_DIRS 成员",
     "dist": "构建产物目录",
+    "target": "cargo 构建产物，nt_mapgen.py SKIP_DIRS 成员（跳过用，非扫描根）",
     "node_modules": "依赖目录，SKIP_DIRS 成员",
     "html": "lang/ext 映射值（nt_mapgen.py LANGS）",
     "json": "lang/ext 映射值",

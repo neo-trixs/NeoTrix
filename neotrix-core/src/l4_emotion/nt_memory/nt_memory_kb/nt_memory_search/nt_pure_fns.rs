@@ -699,7 +699,7 @@ fn build_walsh_ranklist(
     fts_results: &[SearchResult],
     limit: usize,
 ) -> Vec<(f64, String)> {
-    use crate::l5_cognition::nt_core_walsh::WalshMemoryIndex;
+    use crate::l4_emotion::nt_feel_facade::WalshMemoryIndex;
 
     if fts_results.is_empty() {
         return Vec::new();
@@ -794,7 +794,7 @@ mod tests {
 
     #[test]
     fn test_walsh_ranklist_ranks_similar_higher() {
-        use crate::l5_cognition::nt_core_walsh::WalshMemoryIndex;
+        use crate::l4_emotion::nt_feel_facade::WalshMemoryIndex;
         let walsh = WalshMemoryIndex::new();
         // 语义相似文档应比不相关文档得分更高
         let q = walsh.encode("neural network training");

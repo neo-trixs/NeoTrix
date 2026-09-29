@@ -1,6 +1,6 @@
 //! B3 HTTP 瓦片服务 — 以 bbox+zoom 提供 NT-Pack 冷层地理数据。
 //!
-//! 复用 [`crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_geo::query_bbox_with_cold`]
+//! 复用 [`crate::l1_action::nt_action_facade::query_bbox_with_cold`]
 //! (热表 + 冷层兜底, B1 透明读路径) 作为数据源, 避免二次实现解码。
 //! 端点: `GET /api/geo/tiles?bbox=w,s,e,n&limit=N&source=S`
 //!   - bbox: 逗号分隔 4 值 (west, south, east, north), 经纬度
@@ -78,7 +78,7 @@ pub async fn geo_tiles_handler(
         let kb = kb_path();
         let conn = rusqlite::Connection::open(&kb)
             .map_err(|e| format!("open kb: {}", e))?;
-        let (records, cold_hits) = crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_geo::query_bbox_with_cold(
+        let (records, cold_hits) = crate::l1_action::nt_action_facade::query_bbox_with_cold(
             &conn,
             s,
             w,

@@ -962,7 +962,7 @@ pub struct BackgroundLoopHandle {
 //     agent_discovery: Option<crate::neotrix::nt_agent_protocol::discovery::AgentDiscovery>,
     panorama: Option<PanoramaPipeline>,
     nt_world_model: Option<WorldModelV2>,
-    scheduler: Option<crate::l6_meta::nt_core_scheduler::SchedulerEngine>,
+    scheduler: Option<crate::l5_cognition::l1_facade::SchedulerEngine>,
     daemon: Option<EvolutionDaemon>,
     skill_engine: SkillEngine,
     /// G28 自维护巡检 healers (topics/code-health 吸收) — 多维度代码健康巡检。

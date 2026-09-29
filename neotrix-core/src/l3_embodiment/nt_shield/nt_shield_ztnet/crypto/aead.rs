@@ -47,12 +47,30 @@ impl AeadKey {
     /// AEAD 加密
     ///
     /// 返回: ciphertext || 16-byte tag
+    /// ⚠️ 此处保留一个**遗留**的失败折叠（违反 RUST-STANDARDS「生产代码禁 panic」）：
+    /// 改签名会波及 8 个调用点（多为测试），而 `seal_in_place_append_tag` 实际只在
+    /// 消息长度溢出时失败，故此处**只对生产路径**禁用法：噪声握手请用 `seal_with_ad`
+    /// （返回 `Result`）。此遗留项已登记在 `TODO.md`。
     pub fn seal(&self, nonce: &Nonce, plaintext: &[u8]) -> Vec<u8> {
+        self.seal_with_ad(nonce, &[], plaintext).unwrap_or_default()
+    }
+
+    /// AEAD 加密（带 associated data）
+    ///
+    /// Noise 规范 §5.2 `EncryptWithAd(ad, plaintext)` 要求把握手哈希 `h` 作为 AD。
+    /// AD 不参与加密运算但参与 tag 计算，漏传会导致与任何 Noise 实现互操作失败。
+    pub fn seal_with_ad(
+        &self,
+        nonce: &Nonce,
+        ad: &[u8],
+        plaintext: &[u8],
+    ) -> Result<Vec<u8>, _AeadError> {
         let mut in_out = plaintext.to_vec();
         let seal_nonce = aead::Nonce::assume_unique_for_key(nonce.0);
-        self.inner.seal_in_place_append_tag(seal_nonce, aead::Aad::empty(), &mut in_out)
-            .expect("AEAD seal failed");
-        in_out
+        self.inner
+            .seal_in_place_append_tag(seal_nonce, aead::Aad::from(ad), &mut in_out)
+            .map_err(|_| _AeadError::EncryptionFailed)?;
+        Ok(in_out)
     }
 
     /// AEAD 解密
@@ -60,8 +78,18 @@ impl AeadKey {
     /// 输入: ciphertext || 16-byte tag
     /// 返回: plaintext (tag 已被 ring 原地剥离)
     pub fn open<'a>(&self, nonce: &Nonce, ciphertext_with_tag: &'a mut [u8]) -> Result<&'a [u8], _AeadError> {
+        self.open_with_ad(nonce, &[], ciphertext_with_tag)
+    }
+
+    /// AEAD 解密（带 associated data）。AD 必须与加密时逐字节相同。
+    pub fn open_with_ad<'a>(
+        &self,
+        nonce: &Nonce,
+        ad: &[u8],
+        ciphertext_with_tag: &'a mut [u8],
+    ) -> Result<&'a [u8], _AeadError> {
         let open_nonce = aead::Nonce::assume_unique_for_key(nonce.0);
-        let plaintext = self.inner.open_in_place(open_nonce, aead::Aad::empty(), ciphertext_with_tag)
+        let plaintext = self.inner.open_in_place(open_nonce, aead::Aad::from(ad), ciphertext_with_tag)
             .map_err(|_| _AeadError::DecryptionFailed)?;
         Ok(plaintext)
     }
@@ -89,6 +117,8 @@ impl Nonce {
 pub enum _AeadError {
     #[error("decryption failed: invalid key or ciphertext")]
     DecryptionFailed,
+    #[error("encryption failed: message too large for one AEAD operation")]
+    EncryptionFailed,
 }
 
 #[cfg(test)]

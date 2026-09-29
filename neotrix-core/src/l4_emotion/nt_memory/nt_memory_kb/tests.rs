@@ -153,7 +153,7 @@ fn test_memory_provider_store_and_search() {
 
 #[test]
 fn test_consciousness_runtime_attaches_kb() {
-    use crate::l5_cognition::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime;
+    use crate::l4_emotion::nt_feel_facade::ConsciousnessRuntime;
     let dir = std::env::temp_dir().join(format!("nt_kb_cr_{}", std::process::id()));
     std::fs::create_dir_all(&dir).ok();
     let db_path = dir.join("test_cr_kb.db");

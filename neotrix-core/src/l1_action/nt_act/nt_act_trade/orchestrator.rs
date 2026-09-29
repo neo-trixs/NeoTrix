@@ -39,7 +39,7 @@ use crate::l1_action::nt_act::nt_act_trade::trade_core::{
 use crate::l1_action::nt_io::nt_io_messaging::{
     Channel, MessagingBridge, MessagingRegistry, MessagingRouter,
 };
-use crate::l4_emotion::nt_memory::nt_memory_lead::{Lead, LeadManager, LeadQuality, LeadSource};
+use crate::l1_action::nt_action_facade::nt_memory_lead::{Lead, LeadManager, LeadQuality, LeadSource};
 
 // ════════════════════════════════════════════════════════════════
 // 全链路状态机
@@ -511,7 +511,7 @@ impl TradeOrchestrator {
     ) -> Result<(), String> {
         self.leads.record_interaction(
             lead_id,
-            crate::l4_emotion::nt_memory::nt_memory_lead::InteractionType::Inquiry,
+            crate::l1_action::nt_action_facade::InteractionType::Inquiry,
             channel,
             direction,
             content,
@@ -588,7 +588,7 @@ impl TradeOrchestrator {
     /// 获取漏斗统计
     pub fn pipeline_summary(
         &self,
-    ) -> HashMap<crate::l4_emotion::nt_memory::nt_memory_lead::LeadStage, usize> {
+    ) -> HashMap<crate::l1_action::nt_action_facade::LeadStage, usize> {
         self.leads.pipeline_summary()
     }
 

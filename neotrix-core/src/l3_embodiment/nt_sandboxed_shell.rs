@@ -1,4 +1,4 @@
-use crate::l6_meta::nt_approval::ActionType;
+use crate::l3_embodiment::l1_facade::ActionType;
 use crate::l3_embodiment::nt_shield_enforcer::{global_shield, ShieldDecision};
 
 /// Execute a shell command through the ShieldEnforcer check chain.
@@ -82,7 +82,7 @@ pub fn is_shell_allowed(silent: bool) -> bool {
         Err(_) => return true,
     };
     let allowed = !shield.sandbox.is_read_only()
-        && shield.approval.mode() != crate::l6_meta::nt_approval::ApprovalMode::Suggest
+        && shield.approval.mode() != crate::l3_embodiment::l1_facade::ApprovalMode::Suggest
         && shield.guard.check("execute_command", "test").is_ok();
     drop(shield);
     if !allowed && !silent {

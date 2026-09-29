@@ -1,9 +1,9 @@
 use std::sync::LazyLock;
 use std::sync::Mutex;
 
-use crate::l6_meta::nt_approval::{ActionType, ApprovalEngine, ApprovalMode};
+use crate::l3_embodiment::l1_facade::{ActionType, ApprovalEngine, ApprovalMode};
 use crate::l3_embodiment::nt_sandbox::{SandboxEnforcer, SandboxMode};
-use crate::l6_meta::nt_laws::{LawViolation, ProjectLaws};
+use crate::l3_embodiment::l1_facade::{LawViolation, ProjectLaws};
 use crate::l3_embodiment::nt_shield::shield_core::guard::{GuardDecision, SecurityGuard};
 use crate::l3_embodiment::nt_shield::shield_core::guardrails::{GuardrailConfig, GuardrailSystem};
 use crate::l3_embodiment::nt_shield::shield_core::perm_chain::{PermissionChain, PermissionMode, PermissionResult};
@@ -385,19 +385,19 @@ impl ShieldEnforcer {
 
 /// 写操作单向事实源 — 由 ToolRegistry/ToolSpec 声明 (reversibility != ReadOnly → 写)。
 /// 与 nt_core_gate 风险分级共用同一规约, 不再维护第二份字符串清单。
-fn write_action_registry() -> &'static crate::l5_cognition::nt_core_gate::ToolRegistry {
-    static REG: LazyLock<crate::l5_cognition::nt_core_gate::ToolRegistry> = LazyLock::new(|| {
-        crate::l5_cognition::nt_core_gate::ToolRegistry::new()
-            .register(crate::l5_cognition::nt_core_gate::ToolSpec::reversible("write_file", "undo_file"))
-            .register(crate::l5_cognition::nt_core_gate::ToolSpec::reversible("file_write", "undo_file"))
-            .register(crate::l5_cognition::nt_core_gate::ToolSpec::irreversible("delete_file"))
-            .register(crate::l5_cognition::nt_core_gate::ToolSpec::irreversible("file_delete"))
-            .register(crate::l5_cognition::nt_core_gate::ToolSpec::irreversible("git_push"))
-            .register(crate::l5_cognition::nt_core_gate::ToolSpec::irreversible("git_force_push"))
-            .register(crate::l5_cognition::nt_core_gate::ToolSpec::reversible("execute_command", "undo_command"))
-            .register(crate::l5_cognition::nt_core_gate::ToolSpec::reversible("command_exec", "undo_command"))
-            .register(crate::l5_cognition::nt_core_gate::ToolSpec::irreversible("modify_dependency"))
-            .register(crate::l5_cognition::nt_core_gate::ToolSpec::irreversible("seal_iterate"))
+fn write_action_registry() -> &'static crate::l3_embodiment::l1_facade::ToolRegistry {
+    static REG: LazyLock<crate::l3_embodiment::l1_facade::ToolRegistry> = LazyLock::new(|| {
+        crate::l3_embodiment::l1_facade::ToolRegistry::new()
+            .register(crate::l3_embodiment::l1_facade::ToolSpec::reversible("write_file", "undo_file"))
+            .register(crate::l3_embodiment::l1_facade::ToolSpec::reversible("file_write", "undo_file"))
+            .register(crate::l3_embodiment::l1_facade::ToolSpec::irreversible("delete_file"))
+            .register(crate::l3_embodiment::l1_facade::ToolSpec::irreversible("file_delete"))
+            .register(crate::l3_embodiment::l1_facade::ToolSpec::irreversible("git_push"))
+            .register(crate::l3_embodiment::l1_facade::ToolSpec::irreversible("git_force_push"))
+            .register(crate::l3_embodiment::l1_facade::ToolSpec::reversible("execute_command", "undo_command"))
+            .register(crate::l3_embodiment::l1_facade::ToolSpec::reversible("command_exec", "undo_command"))
+            .register(crate::l3_embodiment::l1_facade::ToolSpec::irreversible("modify_dependency"))
+            .register(crate::l3_embodiment::l1_facade::ToolSpec::irreversible("seal_iterate"))
     });
     &REG
 }
@@ -408,7 +408,7 @@ fn is_write_action(action: &str) -> bool {
     match write_action_registry().get(action) {
         Some(spec) => {
             spec.authority_modifying
-                || spec.reversibility != crate::l5_cognition::nt_core_gate::ToolReversibility::ReadOnly
+                || spec.reversibility != crate::l3_embodiment::l1_facade::ToolReversibility::ReadOnly
         }
         None => false,
     }

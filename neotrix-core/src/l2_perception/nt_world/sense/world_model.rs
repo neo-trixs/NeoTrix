@@ -21,7 +21,7 @@ use super::types::LatentState;
 // ═══════════════════════════════════════════════════════════
 
 // LAYER-EXCEPTION: TD 流属认知域类型，JEPA 世界模型语义依赖它；下沉另立项。
-use crate::l5_cognition::nt_core_td::{TemporalDifferenceFlows, TDFlowsConfig};
+use crate::l2_perception::nt_world::l1_facade::nt_core_td::{TemporalDifferenceFlows, TDFlowsConfig};
 use super::types::{
     JEPA_LATENT_DIM, JEPA_HIDDEN_DIM, JEPA_LEARNING_RATE, JEPA_EMA_MOMENTUM,
     JEPA_GAUSS_WEIGHT, JEPA_GAUSS_STD_TARGET,

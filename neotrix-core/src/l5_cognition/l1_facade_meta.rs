@@ -197,3 +197,24 @@ pub use crate::l6_meta::nt_core_absorb::spec_driven::{
 
 // ─── L6 self-ref code ───────────────────────────────────────────────────────
 pub use crate::l6_meta::nt_core_iter::self_ref_code::{MutationResult, SelfCodeMonitor}; // ALLOW: nt_meta/进化/governance 字段直访（trait-object 不可行，见 l1_facade.rs 125-128 注释）
+
+// ─── L5 业务文件的 L6 直引收敛（分层门 sanctioned channel）──────────────────────
+// 以下符号此前由 L5 业务文件（consciousness_core / capability / meta_panel /
+// mind_background_loop 等 9 个文件）**直引** `crate::l6_meta::…`，层名出现在业务
+// 代码里 ⇒ 门记违规。走 L6 自己的 facade 无效（路径仍含 `l6_meta` 字样），
+// 必须经**本层**门面 —— `l1_facade.rs:146` 有 `pub use self::l1_facade_meta::*`，
+// 故消费方统一写 `crate::l5_cognition::l1_facade::Xxx`。
+//
+// 路径一律沿用消费方**原本就在用**的路径（原代码已能编译 ⇒ 路径可证），
+// 不重新定位定义处。ALLOW: 类型直访，trait-object 不可行（同上 125-128 注释）。
+// ⚠️ 其中 `CapabilityHealth` / `CapabilityError` 在消费方有 `as` 别名
+// （`as PlatformCapabilityHealth` / `as PlatformCapabilityError`），
+// 别名保留在消费方的 `use` 里，此处导出**未改名**的本名。
+pub use crate::l6_meta::healing::nt_core_self_test_integration::{
+    register_absorbed_modules, run_lightweight_self_tests,
+};
+pub use crate::l6_meta::nt_core_capability::{
+    CapabilityError, CapabilityHealth, CapabilityInput, CapabilityMeta, CapabilityMetrics,
+    CapabilityOutput, CapabilityState, CapabilityStatus, Domain, Layer, UnifiedCapability,
+};
+pub use crate::l6_meta::nt_core_self_review::{SelfReviewGate, SelfReviewReport, Severity};

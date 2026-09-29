@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::l5_cognition::nt_core_gate::{
     Claim, GuardrailReport, JudgeFamily, JudgeInput, JudgePanel, ToolSpec, GateDecision,
 };
-use crate::l6_meta::nt_core_self_review::{SelfReviewGate, Severity};
+use crate::l5_cognition::l1_facade::{SelfReviewGate, Severity};
 use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{PerspectiveLens, ReasoningTaxonomy};
 
 use super::fusion::FusionEngine;

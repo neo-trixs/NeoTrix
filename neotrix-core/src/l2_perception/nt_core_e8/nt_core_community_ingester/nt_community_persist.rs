@@ -186,7 +186,7 @@ impl CommunityDataIngester {
     /// E8 transition matrix. Returns the number of nodes written.
     pub fn persist_to_kb_store(
         &self,
-        kb: &crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase,
+        kb: &crate::l2_perception::nt_world::l1_facade::KnowledgeBase,
     ) -> Result<usize, String> {
         use neotrix_types::knowledge_access::{KnowledgeNode, NodeType, RelationType};
         let now = std::time::SystemTime::now()
@@ -350,7 +350,7 @@ mod tests {
         // 落盘为真实 KB 节点/边, 使 ConsciousnessTree soil 可观测。
         // 此前该方法无生产调用者, KB 全表 0 行。
         let tmp = std::env::temp_dir().join(format!("nt_kb_test_{}.db", std::process::id()));
-        let kb = crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(tmp.clone()))
+        let kb = crate::l2_perception::nt_world::l1_facade::KnowledgeBase::open(Some(tmp.clone()))
             .expect("open temp KB");
         let ingester = CommunityDataIngester::default();
         let n = ingester.persist_to_kb_store(&kb).expect("persist ok");
@@ -363,7 +363,7 @@ mod tests {
             .expect("hub node");
         assert_eq!(
             hub.node_type,
-            crate::l4_emotion::nt_memory::nt_memory_kb::NodeType::Concept
+            crate::l2_perception::nt_world::l1_facade::NodeType::Concept
         );
         // 至少一个数据集节点存在且为 Dataset 类型
         let ds = kb
@@ -372,7 +372,7 @@ mod tests {
             .expect("first dataset node");
         assert_eq!(
             ds.node_type,
-            crate::l4_emotion::nt_memory::nt_memory_kb::NodeType::Dataset
+            crate::l2_perception::nt_world::l1_facade::NodeType::Dataset
         );
         // 幂等: 再次落盘不重复
         let n2 = ingester.persist_to_kb_store(&kb).expect("persist again");

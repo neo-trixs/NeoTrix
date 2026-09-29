@@ -8,7 +8,7 @@ use tokio::sync::RwLock;
 use super::{Plugin, PluginEvent, PluginInfo, PluginSource, PluginStatus};
 // LAYER-EXCEPTION: L5 revertible 是 trait 化借用态版本（L0 同名类型是值语义，两套设计不可互换），
 // registry load_batch 原子回滚 + 单测断言其行为；统一另立项。
-use crate::l5_cognition::nt_core_context::revertible::{ClosureEffect, RevertibleContext};
+use crate::l1_action::nt_action_facade::{ClosureEffect, RevertibleContext};
 
 /// HMR 事务性热替换的结果分类 (§5.2.2 classify 不动点判定)。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

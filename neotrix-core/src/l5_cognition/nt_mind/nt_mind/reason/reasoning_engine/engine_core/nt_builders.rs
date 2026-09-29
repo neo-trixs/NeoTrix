@@ -23,8 +23,8 @@ use crate::l5_cognition::nt_mind::nt_mind::knowledge::context_artifacts::indexer
 use crate::l5_cognition::nt_core::capability::nt_act_orch_patterns::Orchestrator;
 use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::l0_substrate::nt_core_hex::{FullReasoningState, ReasoningHexagram};
-use crate::l6_meta::nt_core_observer::OneObserver;
-use crate::l6_meta::nt_core_observer_error::ObserverErrorRecovery;
+use crate::l5_cognition::l1_facade::OneObserver;
+use crate::l5_cognition::l1_facade::ObserverErrorRecovery;
 use crate::l5_cognition::l1_facade::silicon_self::SiliconSelfModel;
 use crate::l0_substrate::nt_core_span::{ ConsoleTracer, CostTracker,
 };

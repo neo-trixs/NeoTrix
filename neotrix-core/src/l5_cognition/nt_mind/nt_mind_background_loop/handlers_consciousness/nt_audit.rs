@@ -416,8 +416,8 @@ impl BackgroundLoopHandle {
         // evolution_harness::self_test 内部自建实例运行闭环, 可用作架构审计
         // registry 的检测件 (T1 impl + T2 注册 + T3 handle_awareness 接线齐全)。
         self_tests.register(Box::new(
-            crate::l6_meta::memory::evolution_harness::EvolutionHarness::new(
-                crate::l6_meta::memory::transcendent_loop::LoopConfig::default(),
+            crate::l5_cognition::l1_facade::EvolutionHarness::new(
+                crate::l5_cognition::l1_facade::LoopConfig::default(),
             ),
         ));
         self_tests.register(Box::new(ConsciousnessBridge::new()));
@@ -479,7 +479,7 @@ impl BackgroundLoopHandle {
         // data source exists.
 
         // ── Absorbed module SelfTests (Cycle 113) ──
-        crate::l6_meta::healing::nt_core_self_test_integration::register_absorbed_modules(&mut self_tests);
+        crate::l5_cognition::l1_facade::register_absorbed_modules(&mut self_tests);
 
         // ── Substrate + Engine SelfTests (Cycle 119 architecture refactor) ──
         self_tests.register(Box::new(
@@ -843,7 +843,7 @@ impl BackgroundLoopHandle {
         //     )
         // });
         let meta_ok =
-            crate::l6_meta::memory::meta_observer::MetaObserverSelfTest
+            crate::l5_cognition::l1_facade::MetaObserverSelfTest
                 .self_test()
                 .is_ok();
         results.push(if meta_ok {

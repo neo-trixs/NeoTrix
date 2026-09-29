@@ -308,7 +308,7 @@ pub fn register_cad_consciousness_self_tests(registry: &mut SelfTestRegistry) {
 mod verification {
     use crate::l0_substrate::nt_core_self_test::SelfTestRegistry;
     use crate::l0_substrate::nt_core_self_test::SelfTestResult;
-    use crate::l6_meta::healing::nt_core_self_test_integration::register_absorbed_modules;
+    use crate::l5_cognition::l1_facade::register_absorbed_modules;
     use crate::l5_cognition::nt_core_gwt::workspace::GlobalWorkspace;
     use crate::l5_cognition::nt_core_gwt::cad_route::register_cad_gwt;
     use crate::l2_perception::nt_core_knowledge::cad_absorb::absorb_cad_experience;

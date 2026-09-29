@@ -117,7 +117,7 @@ pub struct CodeSearchAdapter;
 
 impl CodeSearchBackend for CodeSearchAdapter {
     fn search(&self, query: &str, path: &Path, max_results: usize) -> Vec<UnifiedSearchResult> {
-        crate::l2_perception::nt_core_code_search::CodeSearchEngine::search(query, path)
+        crate::l1_action::nt_action_facade::nt_core_code_search::CodeSearchEngine::search(query, path)
             .into_iter()
             .take(max_results)
             .enumerate()

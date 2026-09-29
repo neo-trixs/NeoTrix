@@ -21,7 +21,7 @@
 //!   - ReasoningFlow (DAG-structured non-linear reasoning discovery)
 
 // LAYER-EXCEPTION: PRM 轨迹属认知域类型，Fable 模式评分语义依赖它；下沉另立项。
-use crate::l5_cognition::nt_core_prm::AgentTrajectory;
+use crate::l2_perception::nt_world::l1_facade::AgentTrajectory;
 
 /// The 9 named phases of Fable-5's reasoning pattern.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]

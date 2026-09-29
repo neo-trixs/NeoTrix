@@ -7,7 +7,7 @@
 
 // LAYER-EXCEPTION: GenCAD 静态经验载荷属领域知识下流（L2 吸收外部知识是本层职责），
 // 载荷生产方在 L5，消费链 background_loop → absorb_cad_experience 真调用；搬移另立项。
-use crate::l5_cognition::nt_core_cad_consciousness::cad_experience_payload;
+use crate::l2_perception::nt_world::l1_facade::cad_experience_payload;
 use crate::l2_perception::nt_core_knowledge::{AbsorptionRecord, KnowledgeSource};
 use crate::l2_perception::nt_world::l1_facade::KnowledgeBase;
 

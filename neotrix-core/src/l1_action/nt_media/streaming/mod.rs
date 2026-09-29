@@ -30,7 +30,7 @@
 // Mirror speed profiling — delegated to NT-WORLD (L2 Perception)
 // ═══════════════════════════════════════════════════════════════════════════
 
-pub use crate::l2_perception::nt_world::nt_world_mirror::{
+pub use crate::l1_action::nt_action_facade::nt_world_mirror::{
     ranked_mirrors, record_mirror_speed, resolve_mirror,
 };
 

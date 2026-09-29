@@ -4,9 +4,9 @@
 //! （T03c 类型本地化）+ `SubTask` / `DecompositionResult` /
 //! `SubTaskResult` / `TaskExecutionContext`。
 
-use crate::l5_cognition::nt_core::capability::nt_core_antidistil::decompose::DecomposeSuggestion;
-use crate::l5_cognition::nt_core::nt_crt::{CrtPlan, CrtTimeScale};
-use crate::l5_cognition::reasoning_core::TraceSource;
+use crate::l1_action::nt_action_facade::DecomposeSuggestion;
+use crate::l1_action::nt_action_facade::{CrtPlan, CrtTimeScale};
+use crate::l1_action::nt_action_facade::TraceSource;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -80,14 +80,14 @@ impl LocalTrace {
         }
     }
 
-    pub fn from_cot(o: &crate::l5_cognition::nt_core_cot_generator::CoTOutput) -> Self {
+    pub fn from_cot(o: &crate::l1_action::nt_action_facade::CoTOutput) -> Self {
         Self {
             source: "CoTOutput".to_string(),
             detail: o.final_answer.clone(),
         }
     }
 
-    pub fn from_reasoning_trace(t: &crate::l5_cognition::reasoning_core::ReasoningTrace) -> Self {
+    pub fn from_reasoning_trace(t: &crate::l1_action::nt_action_facade::ReasoningTrace) -> Self {
         Self {
             source: format!("{:?}", t.source),
             detail: t.task.clone(),
@@ -133,7 +133,7 @@ pub struct SubTaskResult {
     pub error: Option<String>,
     pub tokens_used: u32,
     pub duration_ms: u64,
-    pub cot_output: Option<crate::l5_cognition::nt_core_cot_generator::CoTOutput>,
+    pub cot_output: Option<crate::l1_action::nt_action_facade::CoTOutput>,
 }
 
 /// 任务执行上下文（在拆解和执行过程中传递）
@@ -150,9 +150,9 @@ pub struct TaskExecutionContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l5_cognition::nt_core::nt_crt::CrtPlan;
-    use crate::l5_cognition::nt_core::nt_crt::CrtTimeScale;
-    use crate::l5_cognition::reasoning_core::TraceSource;
+    use crate::l1_action::nt_action_facade::CrtPlan;
+    use crate::l1_action::nt_action_facade::CrtTimeScale;
+    use crate::l1_action::nt_action_facade::TraceSource;
     use neotrix_reasoning::kernel_types::ReasoningMethod;
 
     #[test]
@@ -198,7 +198,7 @@ mod tests {
         let local_t = LocalTrace::from_trace_source(&TraceSource::LLMDriven);
         assert_eq!(local_t.source, "LLMDriven");
 
-        let cot = crate::l5_cognition::nt_core_cot_generator::CoTOutput {
+        let cot = crate::l1_action::nt_action_facade::CoTOutput {
             reasoning_steps: Vec::new(),
             final_answer: "ans".to_string(),
             overall_confidence: 0.9,
@@ -208,7 +208,7 @@ mod tests {
         assert_eq!(local_c.source, "CoTOutput");
         assert_eq!(local_c.detail, "ans");
 
-        let trace = crate::l5_cognition::reasoning_core::ReasoningTrace {
+        let trace = crate::l1_action::nt_action_facade::ReasoningTrace {
             trace_id: "t".to_string(),
             task: "task".to_string(),
             method: ReasoningMethod::Deductive,
