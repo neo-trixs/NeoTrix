@@ -7,7 +7,11 @@
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer, Verifier};
+// 2026-09-29 审计修复：本仓声明 `ed25519-dalek = "1.0"`，但代码用的是 **2.0 的
+// 类型名**（`SigningKey` / `VerifyingKey`），1.0 里叫 `SecretKey` / `PublicKey`
+// （并以 `Keypair` 承载 sign+verify）。已按 docs.rs 的 1.0.1 文档逐个核实后改。
+// 症状：该 feature 从落地起就编不过（E0432 unresolved imports）。
+use ed25519_dalek::{Keypair, PublicKey, SecretKey, Signature, Signer, Verifier};
 use rand::rngs::OsRng;
 use rand::RngCore;
 use blake2::{Blake2b512, Digest};
@@ -86,11 +90,14 @@ impl UpdaterSigner {
         let mut csprng = OsRng;
         let mut secret_bytes = [0u8; 32];
         csprng.fill_bytes(&mut secret_bytes);
-        let signing_key = SigningKey::from_bytes(&secret_bytes);
-        let verifying_key = signing_key.verifying_key();
+        // 1.0 的等价路径：`Keypair::generate` 一步拿到 secret+public，
+        // `Keypair` 直接实现 `Signer`/`Verifier`（docs.rs 1.0.1 示例即如此）。
+        let signing_key = SecretKey::from_bytes(&secret_bytes)
+            .map_err(|e| SigningError::InvalidKeyFormat(e.to_string()))?;
+        let keypair = Keypair { public: (&signing_key).into(), secret: signing_key };
 
-        let pk_bytes = verifying_key.to_bytes();
-        let sk_bytes = signing_key.to_bytes();
+        let pk_bytes = keypair.public.to_bytes();
+        let sk_bytes = keypair.secret.to_bytes();
 
         // 生成 8 字节 key_id (取公钥前 8 字节的 hex)
         let key_id = hex::encode(&pk_bytes[..8]);
@@ -143,7 +150,19 @@ impl UpdaterSigner {
 
         let sk_bytes = general_purpose::STANDARD.decode(&keypair.secret_key)
             .map_err(|e| SigningError::Base64Decode(e.to_string()))?;
-        let signing_key = SigningKey::from_bytes(&sk_bytes.try_into().map_err(|_| SigningError::InvalidKeyFormat("secret key 长度错误".into()))?);
+        // 2026-09-29 审计修复（第二处编译错误后核实）：
+        // 1.0 里**只有 `Keypair` 实现 `Signer`**（keypair.rs:408），
+        // `SecretKey` 不实现 —— 签名必须同时持有公钥。
+        // 本函数的 `KeyPair` 结构里本就带 `public_key`，直接用；
+        // 早期我写「SecretKey 实现 Signer（签名不需公钥）」是**错的**。
+        let pk_bytes = general_purpose::STANDARD.decode(&keypair.public_key)
+            .map_err(|e| SigningError::Base64Decode(e.to_string()))?;
+        let signing_key = Keypair {
+            public: PublicKey::from_bytes(&pk_bytes)
+                .map_err(|e| SigningError::InvalidKeyFormat(e.to_string()))?,
+            secret: SecretKey::from_bytes(&sk_bytes)
+                .map_err(|e| SigningError::InvalidKeyFormat(e.to_string()))?,
+        };
 
         let signature = signing_key.sign(&message);
 
@@ -184,8 +203,11 @@ impl UpdaterSigner {
         let pk_bytes = general_purpose::STANDARD.decode(public_key)
             .map_err(|e| SigningError::Base64Decode(e.to_string()))?;
 
-        let verifying_key = VerifyingKey::from_bytes(&pk_bytes.try_into().map_err(|_| SigningError::InvalidKeyFormat("public key 长度错误".into()))?);
-        let sig = Signature::from_bytes(&sig_bytes.try_into().map_err(|_| SigningError::InvalidKeyFormat("signature 长度错误".into()))?);
+        // 1.0：`PublicKey` 实现 `Verifier`；`from_bytes` 返回 Result。
+        let verifying_key = PublicKey::from_bytes(&pk_bytes)
+            .map_err(|e| SigningError::InvalidKeyFormat(e.to_string()))?;
+        let sig = Signature::from_bytes(&sig_bytes)
+            .map_err(|e| SigningError::InvalidKeyFormat(e.to_string()))?;
 
         Ok(verifying_key.verify(&message, &sig).is_ok())
     }
@@ -262,7 +284,7 @@ pub fn execute_signing(input: CliInput) -> Result<CliOutput, SigningError> {
             let artifact = input.artifact.ok_or(SigningError::KeyNotFound("artifact 必填".into()))?;
             let keypair = input.key
                 .and_then(|k| k.existing)
-                .map(load_keypair)
+                .map(|path| load_keypair(&path))
                 .transpose()?
                 .ok_or(SigningError::KeyNotFound("签名需要密钥".into()))?;
 
