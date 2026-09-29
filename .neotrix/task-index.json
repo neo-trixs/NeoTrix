@@ -1,5 +1,5 @@
 {
-  "_about": "任务→工具机器索引。解决「日常任务要跑哪个脚本」需全文读 AGENTS.md 的问题。 2026-09-29：check-doc-drift 增加根文档死链档。",
+  "_about": "任务→工具机器索引。解决「日常任务要跑哪个脚本」需全文读 AGENTS.md 的问题。 2026-09-29：check-doc-drift 增加根文档死链档。 2026-09-29：新增 check-untracked-assets（R-EXIST-1 未入库资产门，39→40 条）。",
   "_schema": {
     "id": "任务意图的稳定 slug（小写连字符）",
     "query": "自然语言触发词数组 —— agent 用它做匹配",
@@ -605,6 +605,23 @@
       "kind": "gate",
       "read_only": true,
       "when_not": "advisory 起步，账本 scripts/layout-baseline.txt 棘轮。拦**新增**违规、既有记账。三类检查：① 根目录文件/目录白名单（ALLOW_FILES / ALLOW_DIRS，每项附真实消费者）；② neotrix-core/docs/ 只许 YYYY-MM-DD_ 前缀；③ 与 DOCUMENTATION-MAP.md 交叉校验，规范点名但磁盘不存在 ⇒ 报「规范腐化」。⛔ 根目录要放新东西时**先查本门白名单**：有理由就扩 ALLOW_FILES 并写明消费者，别用完就留。⛔ apps/ 与 src-tauri/ 是已知残留（committed 已移除、磁盘 untracked 残留），处置后从 RESIDUAL_KNOWN 删。"
+    },
+    {
+      "id": "check-untracked-assets",
+      "query": [
+        "未入库",
+        "没进git",
+        "没提交",
+        "磁盘上有仓库没有",
+        "干净检出缺文件",
+        "知识流失",
+        "untracked"
+      ],
+      "tool": "bash scripts/check-untracked-assets.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "不要用它判「某文件该不该入库」—— 它只报清单，入库决策按 R-EXIST-3 逐条定性（编译产物/运行时DB/.bak/.disabled/含密钥一律不进）；也不要拿它替代 git status，它只扫受保护目录",
+      "spec": "RUST-STANDARDS.md 17.8 / R-EXIST-1"
     }
   ],
   "excluded": {
