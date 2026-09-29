@@ -349,12 +349,28 @@ fn run() -> Result<(), String> {
     println!();
 
     // 预注册（缺失时 runner 会在跑任何东西之前就拒）
+    //
+    // ⛔ `min_effect` 必须由 case 数导出，**不能硬编码**（2026-09-29 实测修正）
+    //
+    // 我曾写死 `0.01`，看起来无害，实测发现它**恒不生效**：
+    // `judge_ab` 的显著性判据是
+    //     raw_delta > 3σ  &&  raw_delta >= prereg.min_effect
+    // N 个**二元**门的通过率只能取 k/N，最小非零 delta = 1/N。
+    // CASES.len()==4 ⇒ 1/N = 0.25 ≫ 0.01
+    // ⇒ `min_effect` 这道守卫被完全架空，判决实际只由 case 粒度决定。
+    //    **拦住小 delta 的是巧合，不是设计。**
+    //
+    // ⇒ 取 1/N：语义恰好是「至少要翻一个 case 才算改进」，
+    //    对二元 case 集这是**正确**的最小效应量，
+    //    且让 `min_effect` 真正成为第二道独立防线
+    //    （第一道是 σ 地板；当 case 集含非二元指标时两者不等价）。
+    let min_effect = 1.0 / CASES.len() as f64;
     let prereg = Preregistration::new(
         args.hypothesis.clone(),
         args.falsifier.clone(),
         args.target_commit.clone(),
         args.pinned_model.clone(),
-        0.01,
+        min_effect,
     );
 
     if !prereg.is_complete() {
