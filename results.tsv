@@ -1,5 +1,9 @@
-at	hypothesis	falsifier	baseline_rev	candidate_rev	baseline_rate	candidate_rate	raw_delta	accept	vetoes	regressed	repeats
-2026-09-29T07:20:22+00:00	(none)	(none)	9c303b07	ea74eddd	0.750	0.750	+0.000	False	no_falsifier		2
-2026-09-29T07:21:19+00:00	(none)	(none)	9c303b07	ea74eddd	0.750	0.750	+0.000	False	no_falsifier		2
-2026-09-29T07:23:03+00:00	ea74eddd 修 sandbox feature 的 import 缺失，不会引入新的 doc-drift/ci-refs/truth-surface 违规	若 candidate 臂在 doc-drift 或 truth-surface 上比 baseline 更红，则假设被削弱	9c303b07	ea74eddd	0.750	0.750	+0.000	False			2
-2026-09-29T07:24:42+00:00	f0120b02 把 check-doc-drift 从恒红改成账本棘轮，candidate 臂的 doc-drift 应由红转绿	若 candidate 臂的 doc-drift 仍为红，则假设被削弱	abe95ff3	f0120b02	0.500	0.750	+0.250	True			2
+at	hypothesis	falsifier	baseline_rev	candidate_rev	baseline_rate	candidate_rate	raw_delta	accept	vetoes	regressed	repeats	impl
+2026-09-29T07:20:22+00:00	(none)	(none)	9c303b07	ea74eddd	0.750	0.750	+0.000	False	no_falsifier		2	python
+2026-09-29T07:21:19+00:00	(none)	(none)	9c303b07	ea74eddd	0.750	0.750	+0.000	False	no_falsifier		2	python
+2026-09-29T07:23:03+00:00	ea74eddd 修 sandbox feature 的 import 缺失，不会引入新的 doc-drift/ci-refs/truth-surface 违规	若 candidate 臂在 doc-drift 或 truth-surface 上比 baseline 更红，则假设被削弱	9c303b07	ea74eddd	0.750	0.750	+0.000	False			2	python
+2026-09-29T07:24:42+00:00	f0120b02 把 check-doc-drift 从恒红改成账本棘轮，candidate 臂的 doc-drift 应由红转绿	若 candidate 臂的 doc-drift 仍为红，则假设被削弱	abe95ff3	f0120b02	0.500	0.750	+0.250	True			2	python
+2026-09-29T07:09:24Z	f0120b02 把 check-doc-drift 从恒红改成账本棘轮，candidate 臂的 doc-drift 应由红转绿	若 candidate 臂的 doc-drift 仍为红，则假设被削弱	abe95ff3	f0120b02	0.500	0.750	+0.250	false	environment_mismatch		2	rust	python
+2026-09-29T07:09:50Z	f0120b02 把 check-doc-drift 从恒红改成账本棘轮，candidate 臂的 doc-drift 应由红转绿	若 candidate 臂的 doc-drift 仍为红，则假设被削弱	abe95ff3	f0120b02	0.500	0.750	+0.250	true			2	rust	python
+2026-09-29T07:09:48Z			abe95ff3	f0120b02	0.500	0.750	+0.250	false	no_falsifier		2	rust	python
+2026-09-29T07:09:36Z	同一 commit 两臂应无差异	若 delta≠0 则假设被削弱	ea74eddd	ea74eddd	0.750	0.750	+0.000	false	within_noise		2	rust	python

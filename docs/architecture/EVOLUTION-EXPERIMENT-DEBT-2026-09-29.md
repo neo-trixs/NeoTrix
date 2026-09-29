@@ -82,15 +82,65 @@
 candidate 臂的 `doc-drift` 由 exit=1 转 exit=0，pass_rate 0.500 → 0.750。
 ⇒ **判决机制双向验证过**（既会拒也会接受，不是永远拒绝的假门）。
 
+### ✅ 已统一为一套（2026-09-29 晚，用户决策）
+
+初版是 Python CLI，理由是「独立实现可交叉验证 Rust」。**跑通后实测发现它不是等价物**：
+
+| veto | Rust `judge_ab` | Python `verdict` |
+|---|---|---|
+| `NoFalsifier` / `EnvironmentMismatch` / `InsufficientEvidence` / `DeterministicRegression` | ✅ | ✅ |
+| **`WithinNoise`** | ✅ | ⛔ **缺** |
+| **`SafetyRegressed`** | ✅ | ⛔ **缺** |
+
+⇒ **「两套实现」的真实代价不是维护成本，是判决规则漂移**：
+两套会**静默给出不同答案**，而没有任何东西会告诉你。
+实测证据：Python 版从未触发过 `within_noise`，
+而 Rust 版在「两臂相同」时正确触发了它。
+
+**决策（用户 2026-09-29）：统一为一套。**
+⇒ 新 bin **`neotrix-core/src/bin/nt_evolution_exp.rs`** 为唯一判决实现。
+⇒ Python 版已 `git rm`。
+⇒ `results.tsv` 加 `impl` 列，标明每行由哪套实现判的
+   （历史 4 行 = python，其后 4 行 = rust）。
+
+### 🔴 统一过程中被自己的实现抓到的一个真 bug
+
+初版 Rust bin 把 commit 写进 `EnvFingerprint`：
+
+```rust
+fn env_fp(rev: &str, dirty: &str) -> EnvFingerprint {
+    EnvFingerprint::new(rev.to_string(), ...)   // ⛔ 错
+}
+```
+
+⇒ 两臂 head 必然不同 ⇒ `same_env` 永远 false ⇒ **每一次实验都被
+`environment_mismatch` 否决**。实测表现：candidate 臂真的把 doc-drift
+从红修成绿（delta=+0.250），判决却是 REJECT ——
+**veto 掩盖了真实信号**。
+
+**语义澄清**（这才是 `EnvironmentMismatch` 该查的）：
+A/B 实验里**代码本来就该不同**（否则没有实验）。
+需要一致的是**与实验无关**的环境因素：工作树脏文件、工具链版本、机器。
+⇒ 指纹只装这些，commit 单独记在 `ArmRun.rev`。
+
+### Rust 版 4 次实测（双向验证）
+
+| 场景 | delta | accept | vetoes |
+|---|---|---|---|
+| f0120b02 修好 doc-drift | +0.250 | ✅ **ACCEPT** | 无 |
+| 同上但预注册缺 falsifier | +0.250 | ❌ | `no_falsifier` |
+| 两臂同一 commit | +0.000 | ❌ | **`within_noise`** |
+| （统一前的 bug 版本） | +0.250 | ❌ | `environment_mismatch`（误报） |
+
+⇒ 既会接受，也会因三种不同原因拒绝。**不是永远拒绝的假门。**
+
 ### ⛔ 仍然不能宣称的事
 
 1. **不能**说「进化已被验证」—— 这验证的是**判决机制**，不是模型能力。
-2. **不能**说「Rust 侧 `ExperimentRunner` 已被使用」—— 它仍是零消费者。
-   本 CLI 是**独立 Python 实现**，刻意不 import Rust：
-   ⛔ 直接调 Rust 就变成「用被测物测被测物」。
-3. **三套 Rust 设施仍零消费者**（本文的结论未变）。
-   ⇒ 若要让 Rust 侧也用上，需要把本 CLI 的 case 集与判决规则搬进 Rust ——
-   **那是产品判断（要不要维护两套实现）**，不是技术障碍。
+2. **不能**说「三套 Rust 设施已有生产消费者」——
+   `ExperimentRunner` 仍零消费者；**现在有的是 bin 在用 `judge_ab`**，
+   `ExperimentRunner` 那一层（重复/统计/账本累积）仍未被调用。
+3. **case 集仍是 4 道纯文件型门**，不含 cargo 型门与模型级判据。
 
 ## 若要让 Rust 侧也用上，需要什么（缺的不是代码）
 

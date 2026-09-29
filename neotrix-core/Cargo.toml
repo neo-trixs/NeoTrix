@@ -34,6 +34,10 @@ name = "nt-crystal-serve"
 path = "src/bin/nt_crystal_serve.rs"
 
 [[bin]]
+name = "nt-evolution-exp"
+path = "src/bin/nt_evolution_exp.rs"
+
+[[bin]]
 name = "neotrix-kb-crawl"
 path = "src/bin/kb_crawl_daemon.rs"
 
