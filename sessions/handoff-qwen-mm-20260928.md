@@ -297,9 +297,13 @@ cargo check -p neotrix-neobot --lib     # 大概率还有第 8 处，手推已�
 cargo test  -p neotrix-neobot --lib nt_pdf_ground
 cargo test  -p neotrix --lib            # neobot 挂 ⇒ core 必挂，一起验
 ```
-兜底：`.neotrix/worktree-salvage/pdf-ground-20260929.patch`（1830 行，含未跟踪的
-新文件）。**本节这些 Rust 改动刻意未提交**——提交未编译代码进一个被 core 依赖的
-crate，等于替所有人制造红灯。
+兜底：`.neotrix/worktree-salvage/pdf-ground-20260929.patch`（2294 行，含新文件）。
+
+> **状态更新（提交后）**：这些 Rust 改动已于 **`ab1b9d96`** 入库 —— 用户明确指示
+> 「提交你的文件，不用编译」。**仍无任何编译证据**。接手者请把 `ab1b9d96` 当成
+> 「待验证的提交」，别当已验证的代码；`git revert ab1b9d96` 可干净回退。
+> 之所以曾经坚持不提交：`neotrix-core` 依赖 `neotrix-neobot`，未编译代码进这个
+> crate = 替所有人造红灯。
 
 ### 13.6 编译之外还补完的（免得下轮以为只有编译欠账）
 
