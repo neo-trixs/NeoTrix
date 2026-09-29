@@ -159,7 +159,7 @@ B-11 与 C-2 都卡在这里。
 
 | 项 | 状态 |
 |---|---|
-| **Noise IK 官方测试向量** | ⛔ B-2 唯一卡点。**不接受手写"看起来能跑"的 crypto**；需从 spec 或参考实现取向量 |
+| ~~Noise IK 官方测试向量~~ | ✅ **已解除**（2026-09-28）：官方向量已取到 `Noise_IKpsk2_25519_ChaChaPoly_BLAKE2s`，原语齐备无需新依赖。方案与根因见 `B2-NOISE-IK-RESOLUTION-20260928.md`；**D-2 原诊断有误待订正** |
 | 另一 agent 的并发重构 | 主树被占用（`nt_core_capability_tree` 断链 4+ 处、`d5413335` 删 `apps/neobot-desktop`）。**非我窗任务，我不去修**（L9） |
 | 分支合入时机 | `fix/bitemporal-and-layer-ratchet` 何时合入主干 |
 | CI `--test-threads` 2→4 | **暂不改**。4 连绿是强证据**非证明**；再观察数轮 |

@@ -417,21 +417,96 @@ mod tests {
     //   握手在第 2 条消息就死，`Completed` 状态永不可达。
     //
     // 为何不就地"顺手修"（crypto，不宜）：
-    // - 这是**协议实现**而非局部逻辑，修对需要 Noise spec 的正式测试向量
-    //   （cavpn 官方 `noise-c` vectors）交叉验证；
+    // ⚠️ **2026-09-28 订正：本段原诊断「es 角色/时序接反」是错的**（R-SCAN-1：
+    //    先读现场再下结论）。用官方向量逐字节核对后的实测根因是：
+    //      规范 `Noise_IKpsk2_25519_ChaChaPoly_BLAKE2s` 的 msg1 token 序为
+    //      `e, es, s, ss`，官方向量 msg_0 长 **97B**；而 `_create_message1`
+    //      （:133）**只写裸 `e`、一次 `MixKey` 都没有** ⇒ 恒 32B。
+    //      即**协议实现缺 token**，不是参数或时序错误。
+    //    第二处独立缺陷：`encrypt()`（:367）nonce 恒零且不自增，违反规范
+    //      `EncryptAndHash`（4 字节零 || LE64(n)，每条 +1）。
+    //    官方向量已取到并落盘 `neotrix-core/testdata/noise_vectors_…txt`
+    //    ⇒ 「需外部向量」这个阻塞**已解除**，不再是「无解」。
     // - 手写一个"看起来能跑通"但密钥派生次序不对的实现，比红测试**更坏** ——
     //   它会把一个坏掉的握手伪装成可用的加密通道；
     // - 本模块**零生产调用方**（全仓仅 `crypto/mod.rs:14` 的 `pub mod`），
     //   挂起不损失任何在用能力，也没有安全敞口。
-    // - 另需一并决策：协议名字面量 `Noise_IKpsk2_25519_ChaCha`（25B）与 spec 的
-    //   `Noise_IKpsk2_25519_ChaChaPoly_SHA256`（39B）不一致（见 `:78` 的注释）——
-    //   要么对齐 spec，要么显式降级并改名/改注释。
+    // - 协议名：`Noise_IKpsk2_25519_ChaCha`（25B）**不是合法 Noise 名** —— 规范要求
+    //   4 段 `pattern_DH_cipher_hash`，且本仓 HASH 是 BLAKE2s（不是 SHA256），
+    //   故正确名为 `Noise_IKpsk2_25519_ChaChaPoly_BLAKE2s`（与向量 suite 一致）。
     //
     // 台账：`docs/architecture/OPEN-TASKS-2026-09-28.md` §5 D-2。
     // 正确形态参考同仓已验证的版本链实现：
     // `l4_emotion/nt_memory/nt_memory_historian/nt_temporal_facts.rs`（每版本独立 id）。
+    /// B-2 证据测试：对照 **Noise 官方测试向量** 断言 msg_0 的**长度**。
+    ///
+    /// 规范 `Noise_IKpsk2_25519_ChaChaPoly_BLAKE2s` 的 msg_1 token 序是
+    /// `e, es, s, ss`（`noise_spec/noise.md`），产物为 **97 字节**：
+    ///   e(32) + es→MixKey(32) + s 的 32B 密文 + s(32) + ss→MixKey 后 s 密文(32+16 tag)
+    /// 官方向量（`neotrix-core/testdata/noise_vectors_…txt`）msg_0 长度即 97。
+    ///
+    /// 本实现 `_create_message1` 只写裸 `e`（32 字节）且**不做任何 MixKey** ⇒ 恒 32。
+    /// 这条断言把「实现缺失 token」变成**可复现的红色证据**，而不是一句
+    /// 「疑似时序接反」的推测。
+    ///
+    /// 本测试**故意保持红色**直到按 `B2-NOISE-IK-RESOLUTION-20260928.md` §4-A
+    /// 补齐 msg1 的 `es`/`s`/`ss` 后才转绿。**不得改成"看起来能跑"的宽松断言**
+    /// （仓规：禁改松断言绕过）。
     #[test]
-    #[ignore = "Noise IK 的 es 角色/时序接反，握手恒 InvalidState；需按 spec + 官方测试向量重写，见上方说明"]
+    #[ignore = "B-2 证据：msg1 缺 es/s/ss token（规范要求 97B，本实现 32B）。修复方案见 B2-NOISE-IK-RESOLUTION-20260928.md §4-A"]
+    fn msg1_matches_official_vector_length() {
+        const OFFICIAL_MSG0_LEN: usize = 97; // Noise_IKpsk2_25519_ChaChaPoly_BLAKE2s
+        let initiator_key = PrivateKey::generate();
+        let responder_key = PrivateKey::generate();
+        let mut initiator = _NoiseHandshake::_initiator(
+            initiator_key,
+            responder_key.public(),
+            None,
+        );
+        let msg1 = initiator._create_message1().expect("msg1");
+        assert_eq!(
+            msg1.len(),
+            OFFICIAL_MSG0_LEN,
+            "msg1 应为规范 IKpsk2 的 e,es,s,ss 四 token 产物(97B)，实际 {}B —— 说明 es/s/ss 未实现",
+            msg1.len()
+        );
+    }
+
+    /// B-2 证据测试之二：`encrypt()` 的 nonce 必须按规范自增
+    /// （`EncryptAndHash`：nonce = 4 字节零 || LE64(n)，每条消息 n += 1）。
+    ///
+    /// 实现用 `Nonce::from_bytes(&[0u8; 12])` **恒零且不自增** ⇒ 同一 key 下
+    /// 两条不同明文会复用同一 (key, nonce) 对 —— 在 ChaCha20-Poly1305 上
+    /// 这是**严重误用**（nonce 复用可恢复明文关系）。
+    ///
+    /// 用同状态下两次加密不同明文来暴露：若 nonce 自增，密文前缀（ChaCha20
+    /// keystream）必不同；若恒零，密文前缀（同一 keystream）**必然相同**。
+    #[test]
+    #[ignore = "B-2 证据：encrypt() 的 nonce 恒为全零且不自增，违反规范 EncryptAndHash（4字节零||LE64(n)，每次+1）"]
+    fn encrypt_nonce_must_not_be_reused() {
+        // 直接构造一个 symmetric_key 已就绪的状态（绕开未完成的握手），
+        // 以便单独检验 encrypt 的 nonce 行为。
+        let initiator_key = PrivateKey::generate();
+        let responder_key = PrivateKey::generate();
+        let mut h = _NoiseHandshake::_initiator(initiator_key, responder_key.public(), None);
+        h._create_message1().expect("msg1");
+        // 手动置一个非零 symmetric_key，模拟 MixKey 已执行
+        h.symmetric_key = [7u8; 32];
+
+        // 同一明文加密两次：nonce 若复用 ⇒ ChaCha20 keystream 相同 ⇒ **密文逐字节相同**
+        // （这正是 nonce 复用的可观测后果）；nonce 若自增 ⇒ 密文必不同。
+        // ⚠️ 不能用『不同明文比首字节』来判：不同明文即使 keystream 相同，
+        //    p[0] XOR k 也不同 —— 那种写法恒通过，等于没测（本轮已踩过一次）。
+        let a = h.encrypt(b"same-plaintext").expect("encrypt a");
+        let b = h.encrypt(b"same-plaintext").expect("encrypt b");
+        assert_ne!(
+            a, b,
+            "同一明文两次加密得到完全相同的密文 ⇒ nonce 复用（keystream 复用），违反 Noise 规范 EncryptAndHash"
+        );
+    }
+
+    #[test]
+    #[ignore = "B-2：msg1 缺 es/s/ss token（规范 97B，本实现 32B）。方案见 docs/architecture/B2-NOISE-IK-RESOLUTION-20260928.md §4-A"]
     fn full_handshake() {
         let initiator_key = PrivateKey::generate();
         let responder_key = PrivateKey::generate();
