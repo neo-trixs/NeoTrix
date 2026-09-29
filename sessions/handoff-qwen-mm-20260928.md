@@ -148,6 +148,28 @@ bash scripts/ops/nt_qwen_mm_setup.sh check
 - patch 兜底已**重新生成**（含本附录＋setup 脚本＋活测试）：
   `.neotrix/worktree-salvage/qwen-mm-20260928.patch`（`apply --check --reverse` 重验）。
 
+## 11. O1 下链路打通（2026-09-29 追加，用户选 O1）
+
+> 验明：下链路断在执行环——`ToolOrchestrator.call` 仅测试在调；`/mcp` 无执行动词；
+> `AgentLoop.with_tools` 仅测试在用；crystal/neobot 活环零消费 NativeTool。
+> 纠正：nt_act `ToolRegistry` 同样 dormant（外部执行仅自有测试；agentic_browse
+> 用的是自建同名类型，R-SCAN-1 避坑；background_loop 引的是 gate 那份）。
+> 真正在执行的生产环只有 neobot `execute_tool`（另区）。
+
+- **落子**（`7b96ff82`）：① headless `/mcp call <tool> '<json>'`（`dispatch_mcp_call`
+  纯函数＋4 单测，经会话式真 framing，亮 risk 等级）——人类操作员同 session 可执行
+  已注册工具（含 Qwen 10 个），R-P79 消费者成立；② O3 止谎：删 `McpToolDef`
+  `usage_count`/`avg_latency_ms`＋`usage_stats()`（全仓零回写）。
+- **刻意不做**：B-`ToolExecutor` 适配器（给 dormant 系统造供给＝重蹈 4 注册表覆辙，
+  违反"不增第 5 套"）；neobot 分支（跨 crate＋跨区，提案：`ToolName` 加变体或
+  `Unknown` 命名空间路由，需 neobot 区协调＋vision 门 interplay）。
+- **验证**：lib check 绿；bin headless 4/4；lib 20/20；lock 0（重跑）；layer 0 new
+  （101/101）；fmt 我的行干净。**插曲**：验证中途被他窗 auto-fusion 的 E0774 连挂
+  两次（three_d_render→data_model，同病：derive 遗留在 re-export 上），未碰其文件，
+  等其落地后重验全绿。另有一次 lib-test 编译失败系其保存中途态，自愈。
+- **诚实边界**：`/mcp call` 是人执行，不是模型自主调——模型自主执行环仍是 neobot
+  分支提案（未做）。"打通"指人类可执行链，不含 agent 自主链。
+
 ## 10. 经验蒸馏（收尾轮，2026-09-28）
 
 > 用户指令"根本修复剩下的任务＋吸收经验"。界定结论：剩余任务＝可验证∩根因清∩
