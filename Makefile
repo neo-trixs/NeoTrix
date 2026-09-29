@@ -329,6 +329,12 @@ build-surface-strict:
 fuzz:
 	bash scripts/check-fuzz-ready.sh
 
+# 未入库真资产门 (R-EXIST-1, RUST-STANDARDS.md 17.8; 零编译成本, 只读)
+# 卡"在磁盘上但没进 git"的知识流失: 干净检出会缺文档/测试/脚本。
+# 2026-09-29 立: 一次性查出 78 份文档 + 26 个集成测试。
+untracked-assets:
+	bash scripts/check-untracked-assets.sh
+
 # 全门禁聚合 (advisory 全家桶, 逐个返回码保留; SIM-30)
 audit-all:
 	bash scripts/check-layer-deps.sh; \
@@ -336,6 +342,7 @@ audit-all:
 	bash scripts/check-build-surface.sh; \
 	bash scripts/check-fuzz-ready.sh; \
 	bash scripts/check-api-surface.sh; \
+	bash scripts/check-untracked-assets.sh; \
 	bash scripts/check-truth-surface.sh
 
 # 架构环门 (NTS-B13; 需: cargo install cargo-modules)
