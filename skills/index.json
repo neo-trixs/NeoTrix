@@ -408,7 +408,7 @@
       "description": "Multimodal perception bridge (Qwen-MM-Plugins absorption)",
       "skills": {
         "nt_multimodal": {
-          "description": "Multimodal file inspection via Qwen-MM-Plugins bridge — media_info first, dynamic-resolution read_image/read_video, visualize-anything, save_view chains, credential-gated web/image search",
+          "description": "Multimodal file inspection via Qwen-MM-Plugins bridge — media_info first, dynamic-resolution read_image/read_video, visualize-anything, save_view chains, credential-gated web/image search, plus local PDF text grounding",
           "tags": ["multimodal", "vision", "video", "mcp", "qwen-mm-plugins"],
           "triggers": ["multimodal", "image", "video", "visualize", "media_info", "read_image", "reverse-image"],
           "exclusions": ["text-only document parsing (use nt_file_ability)", "model training (use models/training)"],

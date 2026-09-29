@@ -12,8 +12,10 @@
 //!    与 `nt_qwen_mm_manifests.rs` 的 core 侧注册继续编译）；
 //! 2. 保留 `McpSessionTool` —— `NativeTool` 是 **core 侧**的 trait
 //!    （`l0_substrate::nt_core_traits`），所以这个适配器归 core，不进 neobot。
-//!    它服务 core 的 MCP 注册表（`as_native_tools` 会话分支），
-//!    即"人类操作员经 CLI 执行"这条路径；模型自主执行走 neobot 直调。
+//!    它服务 core 的 MCP 注册表 `as_native_tools` 会话分支。
+//!    2026-09-29：人类 CLI 入口 `/mcp call` 已按用户要求删除（"不要人类可执行链"，
+//!    自主执行在 neobot 侧），本适配器现存的价值是**给同一个 `McpStdioSession`
+//!    提供 core 侧回归保护** —— 它测的 framing 与 neobot 自主链跑的是同一套。
 
 use std::path::PathBuf;
 
@@ -117,7 +119,9 @@ done
         }
     }
 
-    /// core 侧适配器仍能驱动会话（`/mcp call` 路径的回归保护）。
+    /// 会话式 framing 的回归保护：core 适配器与 neobot 自主链共用
+    /// `McpStdioSession`，这里断的是**协议握手＋tools/call**，不是任何 CLI 入口
+    /// （人类 `/mcp call` 已删，见文件头）。
     #[test]
     fn test_native_adapter_drives_session() {
         use crate::l0_substrate::nt_core_traits::NativeTool;

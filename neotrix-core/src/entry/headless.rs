@@ -5,7 +5,7 @@ use tokio::sync::RwLock;
 
 use neotrix::agent::hooks::{EccHookRegistry, HookContext, HookEvent};
 use neotrix::agent::skills::SkillsEngine;
-use neotrix::agent::tool::{McpRegistry, ToolOrchestrator};
+use neotrix::agent::tool::McpRegistry;
 use neotrix::agent::workflow::{Workflow, WorkflowEngine, WorkflowStep};
 use neotrix::l5_cognition::nt_mind::nt_mind::goal_loop::{GoalLoop, GoalState};
 use neotrix::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
@@ -14,45 +14,6 @@ use neotrix::l6_meta::nt_auto_orchestrator::AutoOrchestrator;
 use neotrix_types::core::nt_core_cap::FIELD_NAMES;
 
 use super::brain::print_brain_stats;
-
-/// `/mcp call` 执行入口（纯函数，可单测）：从 McpRegistry 组装编排器并调用。
-///
-/// 人类操作员同 session 可执行的下链路（R-P79 消费者）：`/mcp call <tool> '<json>'`。
-/// args 缺省即 `{}`。返回人类可读结果（含 risk 等级行），永不 panic：
-/// 未知工具／坏 JSON／执行失败全部转为文本错误。
-fn dispatch_mcp_call(mcp: &McpRegistry, tool: &str, args_json: &str) -> String {
-    if tool.is_empty() {
-        return "Usage: /mcp call <tool> '<json-args>'".to_string();
-    }
-    let args_text = args_json.trim();
-    let args_text = if args_text.is_empty() {
-        "{}"
-    } else {
-        args_text
-    };
-    let args: serde_json::Value = match serde_json::from_str(args_text) {
-        Ok(v) => v,
-        Err(e) => {
-            return format!("Invalid JSON args: {e}\nUsage: /mcp call <tool> '<json-args>'");
-        }
-    };
-    let mut orch = ToolOrchestrator::default();
-    orch.register_native_all(mcp.as_native_tools());
-    // 诚实标注：执行前亮出该工具的 risk 等级（Medium+ 为写文件类）。
-    let risk = mcp
-        .recommend_tools(tool)
-        .into_iter()
-        .find(|d| d.name == tool)
-        .map(|d| format!("{:?}", d.risk_level))
-        .unwrap_or_else(|| "unknown".to_string());
-    match orch.call(tool, &args) {
-        Ok(out) => format!(
-            "[{}] risk={} success={}\n{}",
-            tool, risk, out.success, out.content
-        ),
-        Err(e) => format!("[{tool}] risk={risk} ERROR: {e}"),
-    }
-}
 
 /// Headless 模式 — 原始 stdin/stdout REPL（保留 V1 行为）
 pub(crate) async fn run_headless(
@@ -572,7 +533,6 @@ async fn handle_command_headless(
                     println!("Usage: /mcp status           - Show server health");
                     println!("       /mcp register <n> <c>  - Register Stdio server");
                     println!("       /mcp search <q>         - Search tools");
-                    println!("       /mcp call <t> '<json>'  - Execute a tool");
                 }
                 Some("status") => {
                     println!("╭─ MCP Server Status ─────────────────────╮");
@@ -598,15 +558,6 @@ async fn handle_command_headless(
                             println!("  {} - {}", t.name, t.description);
                         }
                     }
-                }
-                Some("call") => {
-                    // 下链路执行动词（O1，2026-09-29）：人类操作员同 session 可执行
-                    // 已注册工具。JSON 含空格请用单引号包起来。
-                    let tool = parts.get(2).copied().unwrap_or("");
-                    let args_json = parts.get(3..).unwrap_or(&[]).join(" ");
-                    // write guard 解引用为 &McpRegistry（方法调用 auto-deref，
-                    // 函数传参需显式借用）。
-                    println!("{}", dispatch_mcp_call(&mcp, tool, &args_json));
                 }
                 Some(other) => println!(
                     "Unknown mcp subcommand: {}. Try: list, status, register, search",
@@ -899,103 +850,4 @@ async fn handle_command_headless(
         }
     }
     false
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use neotrix::agent::tool::mcp::{McpToolDef, McpTransport, RiskLevel};
-    use std::path::Path;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    const FAKE_ECHO: &str = r#"#!/usr/bin/env bash
-while IFS= read -r line; do
-  case "$line" in
-    *'"method":"initialize"'*)
-      printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{},"serverInfo":{"name":"fake","version":"0"}}}'
-      ;;
-    *'"method":"tools/call"'*)
-      printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"echo-ok"}],"isError":false}}'
-      ;;
-  esac
-done
-"#;
-
-    fn bash_cmd() -> String {
-        if Path::new("/bin/bash").is_file() {
-            "/bin/bash".to_string()
-        } else {
-            "bash".to_string()
-        }
-    }
-
-    /// 伪造会话式服务器＋单工具注册，返回配好的 McpRegistry 与脚本目录（调用方清理）。
-    fn fake_registry() -> (McpRegistry, std::path::PathBuf) {
-        let dir = std::env::temp_dir().join(format!(
-            "nt_mcp_call_test_{}_{}",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
-        std::fs::create_dir_all(&dir).expect("test temp dir");
-        let script = dir.join("fake.sh");
-        std::fs::write(&script, FAKE_ECHO).expect("write fake server");
-        let script_arg = script.to_string_lossy().to_string();
-        let mut mcp = McpRegistry::new();
-        mcp.register_stdio_session(
-            "fake",
-            &bash_cmd(),
-            &[script_arg.as_str()],
-            10_000,
-            vec![McpToolDef {
-                name: "echo_text".to_string(),
-                description: "echo".to_string(),
-                input_schema: serde_json::json!({"type": "object"}),
-                transport: McpTransport::Stdio,
-                server_name: "fake".to_string(),
-                schema_version: None,
-                required_permission: None,
-                risk_level: RiskLevel::Medium,
-            }],
-        );
-        (mcp, dir)
-    }
-
-    #[test]
-    fn test_mcp_call_routes_session_tool() {
-        // /mcp call 经会话式真 framing 调通伪造服务器，并亮出 risk 等级。
-        let (mcp, dir) = fake_registry();
-        let out = dispatch_mcp_call(&mcp, "echo_text", r#"{"a": 1}"#);
-        assert!(out.contains("echo-ok"), "unexpected: {out}");
-        assert!(out.contains("risk=Medium"), "unexpected: {out}");
-        assert!(out.contains("success=true"), "unexpected: {out}");
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn test_mcp_call_bad_json_is_usage_error() {
-        let (mcp, dir) = fake_registry();
-        let out = dispatch_mcp_call(&mcp, "echo_text", "{oops");
-        assert!(out.contains("Invalid JSON"), "unexpected: {out}");
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn test_mcp_call_unknown_tool_errors() {
-        let (mcp, dir) = fake_registry();
-        let out = dispatch_mcp_call(&mcp, "ghost", "{}");
-        assert!(out.contains("ERROR"), "unexpected: {out}");
-        assert!(out.contains("not registered"), "unexpected: {out}");
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn test_mcp_call_missing_tool_is_usage() {
-        let (mcp, dir) = fake_registry();
-        let out = dispatch_mcp_call(&mcp, "", "{}");
-        assert!(out.contains("Usage"), "unexpected: {out}");
-        let _ = std::fs::remove_dir_all(&dir);
-    }
 }

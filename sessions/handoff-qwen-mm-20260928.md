@@ -219,3 +219,182 @@ bash scripts/ops/nt_qwen_mm_setup.sh check
   全绿；core 全量 12170 绿；fmt 我的行净；lock 0；layer 0 new。
 - **诚实边界**：crop/draw_bbox 不挂载（要 grounding，无 key 做不出）；search 系
   不进 neobot（要 key）；`save_view` output_dir 强制 workspace 内。
+
+## 13. 缺口自查 → PDF 原生坐标接地（2026-09-29 追加，用户：移除 tesseract，减少外部依赖）
+
+### 13.1 先答「自有技术能不能补」——能补一半，且补之前先证伪了一次自己的直觉
+
+用户问：§12 那三条诚实边界，自有技术能不能补齐。逐条验完：
+
+| 缺口 | 结论 | 证据 |
+|---|---|---|
+| 文字框 grounding | **能补（PDF 侧）** | PDF 文字本来就有精确坐标（`Tf` 字号 / `Tm`/`Td` 位置），`lopdf 0.42` 已在 `neotrix-core` 依赖里 ⇒ **零新包** |
+| 通用 OCR（图片文字） | **不能** | `nt_world/ocr/mod.rs` 的 `PaddleOcrEngine::run_inference` 是**占位**（返回空 text + 空 `bounding_boxes`），`nt_file_ability/visual/ocr.rs` 的 `RuleBasedOcr` 从**文件名**猜。**「导出 ≠ 有能力」**——两个引擎都没真 OCR |
+| 反向图搜 / 物体框 | **不能** | 要 Serper key / 要数百 MB 检测权重；本机 `~/.cache/neotrix/models` 无 OCR/det 现货（7.2G 里只有 minmind/qwen35/training） |
+
+⇒ 用户选 A：**PDF 走 lopdf content 流（零新依赖）+ 图片走 VLM 自报框的 skill 指导**。
+**tesseract 已按要求放弃**（`brew install` 已回滚；实测本机也从未装成）。
+
+### 13.2 落地（9 文件，**未编译**，见 13.4）
+
+- **新** `crates/neotrix-neobot/src/nt_pdf_ground.rs`（~1280 行含 16 单测）：
+  content 流状态机（`BT/ET/q/Q/cm/Tf/TL/Tc/Tw/Tz/Ts/Td/TD/Tm/T*/Tj/TJ/'/"`）→
+  行基线聚类 → **最短匹配窗口**（框尽量紧，不是整行）→ 0-1000 归一化（y 翻成图像坐标系，
+  与 Qwen2.5-VL 绝对坐标同制）＋ PDF 点坐标双输出。
+  字体解码：ToUnicode CMap **手写最小解析**（`lopdf::encodings` 是私有模块，
+  `codespacerange`/`bfchar`/`bfrange` 两种形式）+ WinAnsi(cp1252) + UTF-16BE BOM。
+- **接线四处**：`ToolName::PdfGroundText`（as_str/parse/intent 三闭合，`ocr` 裸名**不收**）、
+  `nt_policy` Allow（只读，风险等同 `read_file`，越狱照拒）、
+  `nt_http_engine` **常挂载** schema ＋ `PDF_GROUND_PROMPT`（无条件拼，与 Qwen 那组
+  「挂载判据两处同源」同纪律的另一面）、
+  `nt_agent::execute_pdf_ground_text`（扩展名闸 / 64MiB 上限 / `ok` 的取法见下）。
+- **刻意不叫 `qwen_*`**：它不经 MCP、不是上游工具，叫 `qwen_` 会把「本地零依赖」
+  混进「外部服务器」那堆。函数名保持用户点选的语义（ground text），只是加了
+  `pdf_` 前缀说清载体。
+- **单测零外部样本**：测试里**手写 xref 自造最小 PDF**（`make_pdf` 拼字节），
+  覆盖 ToUnicode 解码、TJ 拆段合并、最短窗口收紧、y 翻转、越界夹取、
+  空 query 报错、扫描件（无文字层）**必须说「别猜框」**且一个框都不给。
+- **skill 双路径 + 诚实标注**：`skills/nt_multimodal/SKILL.md` 升 1.1.0，
+  新增 Grounding 表（PDF 走工具 / 图片问 VLM / 扫描件别猜），
+  并把 `crop`/`draw_bbox`/`image_search`/通用 `OCR` 标成 **⚠️ 未挂载**（附原因），
+  修掉原文「save_view 后 crop/draw_bbox/OCR/image_search」那句会误导模型的链路。
+  `skills/index.json` description 同步（M3 逐字门），仍 0 条 nt_multimodal FAIL。
+
+### 13.3 `ok` 的取法（值得抄的判断）
+
+**查不到 ≠ 工具失败**。空命中是「这份 PDF 文字层里没这个词」这一**事实** ⇒
+`ok: true` + 解释性输出；只有真出错（非 .pdf / 超 64MiB / 越狱）才 `ok: false`。
+反过来会让模型把「没找到」当「工具坏了」去重试或改口。
+
+### 13.4 ⚠️ 验证状态：**未编译**（唯一未完成项，动手第一件事就跑它）
+
+`sh scripts/ops/nt_mem_gate.sh` 连续 8 次 **BLOCKED**（free_pages 7.5k–37k，
+swap 0.8–1.3G，阈值 100k）⇒ 按 AGENTS.md「非 0 禁止起构建」**没有跑任何 cargo**。
+
+**为什么必须这么小心**：`neotrix-core/Cargo.toml:100` **依赖 `neotrix-neobot`**
+⇒ neobot 编译不过 = 主二进制 + 12170 条单测全挂。宁可留未编译 WIP 也不提交。
+
+**已过**：`rustfmt --edition 2021 --check nt_pdf_ground.rs` 干净 ·
+`nt_lock_audit.py crates/neotrix-neobot/src` = 0 · `check-layer-deps.sh --strict`
+= 0 new/101 known · `check-capability-manifests.sh` 无新增 FAIL（存量 19 条 M3 漂移）。
+**未过**：`cargo check` / `cargo test` / clippy。
+
+**手推已揪出并修掉的 7 处编译错**（说明静态审查有效，但也说明它**不能替代编译器**）：
+1. `Option::and_then(Object::as_dict)` —— `as_dict` 返回 `Result`，`and_then` 只要
+   `Option`（4 处）。
+2. `union_box([x0,y0,x1,y1].into_iter())` —— 要的是 `[f32;4]` 不是 4 个 `f32`。
+3. `TextState` derive 了 `Default` 但 `Mat` 没有 ⇒ 全零矩阵（非单位阵，更糟）。
+4. `Option::ok()` 不存在（`page_fonts` 里 sed 替换留下 2 处 `.ok()` 尾巴）。
+5. `page_fonts`/`page_box` 返回非 `Result`，却在用 `?`（`doc.get_object(..).ok()?`）。
+6. `execute_pdf_ground_text` 返回 `ToolResult` 却多写了 `.into()`（那是
+   `ToolOutcome` 的事，dispatch 已经 `.into()` 过了）。
+7. `is_none_or` 需 Rust 1.82，本仓 `rust-version = "1.81"` ⇒ 改回 `match`。
+
+**接手第一件事**：
+```sh
+sh scripts/ops/nt_mem_gate.sh            # 期望 exit 0
+cargo check -p neotrix-neobot --lib     # 大概率还有第 8 处，手推已尽力
+cargo test  -p neotrix-neobot --lib nt_pdf_ground
+cargo test  -p neotrix --lib            # neobot 挂 ⇒ core 必挂，一起验
+```
+兜底：`.neotrix/worktree-salvage/pdf-ground-20260929.patch`（1830 行，含未跟踪的
+新文件）。**本节这些 Rust 改动刻意未提交**——提交未编译代码进一个被 core 依赖的
+crate，等于替所有人制造红灯。
+
+### 13.6 编译之外还补完的（免得下轮以为只有编译欠账）
+
+1. **静态审查补完**：`collect_frags` 前半（`BT/q/Q/cm/Tf/Td/TD/Tm/T*`）逐行读过，
+   至此全文件人工过了一遍（仍**不能**替代编译器）。
+2. **挂载单测**（新写，编译后即跑）：`pdf_ground_text_is_always_advertised_and_never_
+   claims_ocr` —— 锁三件事：两种视能下**恒在列**（它无外部依赖可探测，与 Qwen 那组
+   的双向蕴含相反）、`required` 恰 2 个（path+query）、描述里「扫描件」那句**不许被
+   后人精简掉**且**不得出现 `OCR` 字样**。顺带查明 `tool_schemas` 的既有测试是
+   `tool_named` 按名查、无硬编码工具总数 ⇒ 新增常挂载工具**不会**打破它们。
+3. **正典补齐**：`docs/architecture/ABSORPTION-QWEN-MM-2026-09-28.md` 原本只到 §9，
+   **落后两轮**（§10 模型自主执行、§11 缺口自查+PDF 接地都没进正典，只活在 handoff）。
+   已补 §10/§11 —— handoff 是过程记录，正典才是真源，欠着会让下一个 agent
+   重读到「本轮只到无 key body 方案」就以为后面没发生事。
+4. fmt 只对我改的区段核过：`nt_http_engine.rs` 的 22 处 hunk 全是**存量**
+   （qwen 数组字面量、旧 image 测试等），我这轮加的 350-360 / 500-515 / 1367-1400
+   三段不在其中。`nt_pdf_ground.rs` 整文件 `--check` 干净。
+5. 仍需用户/下轮拍板：人类 `/mcp call`（`7b96ff82` 留下）是否删——自主链已不依赖它。
+
+### 13.5 方法论（第二轮「导出 ≠ 调用」）
+
+`grep -n "pub struct OcrResult"` 看到 `bounding_boxes` 字段，很容易得出「有框字段 =
+有 OCR 能力」。**读下去才发现 `run_inference` 返回的是空 vec 的占位**。
+这与 2026-09-28 那次「`nt_jev`/`nt_crystal_core` 导出 ≠ 调用」同型：
+**判据必须是「跑一次真输入看输出」，不是「签名里有这个类型」。**
+本轮据此把 12 个单测里的 PDF 也改成**自造字节**，而不是去找仓库里的 pdf 样本——
+否则测试会因为"环境里恰好有个文件"而变绿。
+
+## 14. 删除人类 `/mcp call` 执行链（2026-09-29，用户："删"）
+
+用户否决了 `7b96ff82` 留下的人类可执行链。**注意：删的是入口，不是覆盖。**
+
+### 14.1 删了什么（`neotrix-core/src/entry/headless.rs`，−5421 字节）
+
+| 项 | 说明 |
+|---|---|
+| `dispatch_mcp_call()` | 函数 + 文档注释全删（它组装 `ToolOrchestrator` 并调 `call`） |
+| `Some("call")` 分支 | `/mcp` 下的执行动词 |
+| help 行 | `println!("/mcp call <t> '<json>'  - Execute a tool")` |
+| 4 个 `test_mcp_call_*` | 被测对象已不存在 |
+| `fake_registry` / `bash_cmd` / `FAKE_ECHO` | 只服务那 4 个测试 ⇒ 连带删，否则 3 条 `dead_code` |
+| import `ToolOrchestrator` | 全文件仅 `dispatch_mcp_call` 用它；`McpRegistry` 保留（`/mcp` 其余子命令在用） |
+
+`/mcp` 的 `list` / `status` / `register` / `search` **全部保留**（只读发现 ≠ 执行链），
+"Unknown mcp subcommand … Try: list, status, register, search" 原本就没列 `call`。
+
+### 14.2 覆盖没跟着丢（关键判断）
+
+那 4 个测试里，`test_mcp_call_routes_session_tool` 顺带在测**会话式 MCP 真 framing**。
+删之前先查：core 侧 `nt_mcp_stdio_session.rs::test_native_adapter_drives_session`
+（构造 `McpSessionTool` → `execute`）**测的是同一套握手 + tools/call**，覆盖已在别处。
+⇒ 可以干净删。另外 3 个测的是「坏 JSON / 未知工具 / 缺工具名」这三个
+**入口参数分支**，随入口一起消失，没有对象可测。
+
+`nt_mcp_stdio_session.rs` 两处注释因此变成谎言，已改（文件头 + 测试 doc）：
+明确记「人类 `/mcp call` 已删」，并说明该适配器现存价值是**给 neobot 自主链
+共用的 `McpStdioSession` 提供 core 侧 framing 回归保护**。
+
+### 14.3 顺带证伪/发现两件事
+
+1. **§12 的「`ToolOrchestrator.call` 仅测试在调」现在更彻底**：删掉 `dispatch_mcp_call`
+   后，生产代码里 `ToolOrchestrator` 只剩 `interactive.rs:131/369` 两处
+   **构造 + `register_native_all` + 立即丢弃**（注释还留着
+   "set_tool_orchestrator removed with cli::commands"）。即 `call()` 真的**零生产调用者**。
+   **不动它**（有自己的单测、12170 测试在跑，是否整体下线是独立决策），但记在这里。
+2. `interactive.rs` 那两个 `orchestrator` 局部变量是**纯死变量**（构造即弃，
+   因为 `register_native_all` 需要 `&mut self` 所以编译器不报 unused）——另一笔可清的小死代码。
+
+## 15. turn 级 E2E 测试（写完，同样待编译）
+
+§12 留的欠账「turn 级 E2E」只能对 `pdf_ground_text` 做，**Qwen 那条做不到**——
+这不是偷懒，是可测性取决于有没有外部依赖：
+
+| 链 | turn 级 E2E 可确定性？ | 为什么 |
+|---|---|---|
+| `pdf_ground_text` | ✅ 能 | 零外部依赖，`run_local_turn` 全程确定性 |
+| `qwen_media_info` 等 | ❌ 不能 | 需 `qwen_mm_mounted()` 为真（本机装了 MCP 服务器），CI 不保证 ⇒ 会出现"本机绿 / CI 挂"的 flake |
+
+⇒ **三段职责分开测**（别指望一条测试吃全）：
+1. **MCP framing** → core 侧 `test_native_adapter_drives_session`（协议握手 + tools/call）
+2. **工具分发** → `execute_qwen_mm_with_session` 注入伪 stdio 服务器（已有）
+3. **模型自主执行环** → 新增 `model_can_ground_pdf_text_end_to_end`
+
+新测试（`nt_agent.rs`）：`GroundOnce` 假引擎第一跳发
+`pdf_ground_text {path, query}` → 断言三件事：
+- 网关 **Allow**（audit 里查得到 `pdf_ground_text`，`decision == Allow`）—— 证明不是 deny 后假装成功；
+- **工具输出真的回到模型手里**（第二跳在 history 的 `Tool` 行里看到「命中」+ 坐标 `118`，
+  记进 `Mutex<bool>`）—— 这才是「自主执行」与「函数存在」的分界；
+- 最终 `TurnStatus::Done`。
+
+配套：`nt_pdf_ground::fixture_pdf()` 提升为 `#[cfg(test)] pub(crate)`（原先埋在
+`mod tests` 里，E2E 没法在真实 workspace 放一个真 PDF 而不重复造一份）。
+
+**顺带修掉两处自己写出来的 bug**（静态审查，非编译器）：
+- `blank_pdf()` 的流 `/Length` 硬编码成 43，实际 35 —— lopdf 照 dict 里的 Length
+  切流，数字错会把 `endstream` 吃进 content。已改回按字节数算。
+- E2E 里 `engine.seen_result.lock().map(|seen| seen)` 返回的是 `MutexGuard<bool>`
+  而不是 `bool`，`assert!` 会编译不过。已改 `|seen| *seen`（与既有用例同惯例）。

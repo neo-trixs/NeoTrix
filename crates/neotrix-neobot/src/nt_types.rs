@@ -181,6 +181,15 @@ pub enum ToolName {
     QwenVisualize,
     /// 文档页/视频帧落盘成文件（**写盘**；Medium 风险）。
     QwenSaveView,
+    /// PDF 文字定位：把一个词/短语换成分页坐标框（**只读、零外部依赖**）。
+    ///
+    /// **不叫 `qwen_*`**：它不是 Qwen-MM-Plugins 的工具，也不经 MCP —— 是
+    /// 本 crate 自己的 `nt_pdf_ground`（`lopdf` 读 content 流，PDF 文字本来
+    /// 就有精确坐标）。名字要能让人一眼看出能力来源，别混进外部服务器那堆。
+    ///
+    /// **不是通用 OCR**：只对有文字层的 PDF 有效；扫描件/文字转轮廓的 PDF
+    /// 会如实报「没找到文字层」，不给猜出来的框。
+    PdfGroundText,
     Unknown(String),
 }
 
@@ -201,6 +210,7 @@ impl ToolName {
             Self::QwenReadVideo => "qwen_read_video",
             Self::QwenVisualize => "qwen_visualize",
             Self::QwenSaveView => "qwen_save_view",
+            Self::PdfGroundText => "pdf_ground_text",
             Self::Unknown(_) => "unknown_tool",
         }
     }
@@ -228,6 +238,8 @@ impl ToolName {
             "qwen_read_video" | "read_video" => Self::QwenReadVideo,
             "qwen_visualize" | "visualize" => Self::QwenVisualize,
             "qwen_save_view" | "save_view" => Self::QwenSaveView,
+            // 裸名只收 `ground_text`（`pdf_` 前缀已在工具名里，`ground` 太泛不收）。
+            "pdf_ground_text" | "ground_text" => Self::PdfGroundText,
             _ => Self::Unknown(raw.to_owned()),
         }
     }
@@ -249,6 +261,7 @@ impl ToolName {
             Self::QwenReadVideo => "read_video_frames",
             Self::QwenVisualize => "visualize_file",
             Self::QwenSaveView => "write_view_file",
+            Self::PdfGroundText => "locate_text_in_pdf",
             Self::Unknown(_) => "unknown_tool",
         }
     }
@@ -363,6 +376,23 @@ mod tests {
         assert_eq!(ToolName::ReadImage.intent(), "read_image");
         // 别名不得过宽：裸 `image` 留给未来的别的语义。
         assert!(matches!(ToolName::parse("image"), ToolName::Unknown(_)));
+    }
+
+    #[test]
+    fn pdf_ground_text_wires_every_layer() {
+        // 本地工具，不是 Qwen 的：as_str ↔ parse 闭合，intent 不得写成
+        // 「ocr/识别」——它只定位文字位置，不识别图像。
+        for (raw, intent) in [
+            ("pdf_ground_text", "locate_text_in_pdf"),
+            ("ground_text", "locate_text_in_pdf"),
+        ] {
+            let name = ToolName::parse(raw);
+            assert_eq!(name, ToolName::PdfGroundText, "alias '{raw}' must parse");
+            assert_eq!(name.as_str(), "pdf_ground_text");
+            assert_eq!(name.intent(), intent);
+        }
+        // 裸 `ocr` 不认：那个词会让人以为是通用 OCR（图片也认），而它不是。
+        assert!(matches!(ToolName::parse("ocr"), ToolName::Unknown(_)));
     }
 
     #[test]

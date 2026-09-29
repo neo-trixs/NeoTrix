@@ -41,6 +41,7 @@ pub mod nt_export;
 pub mod nt_git;
 pub mod nt_http_engine;
 pub mod nt_memory;
+pub mod nt_pdf_ground;
 pub mod nt_policy;
 pub mod nt_provider;
 pub mod nt_qwen_mm;

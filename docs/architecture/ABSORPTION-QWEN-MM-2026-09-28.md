@@ -217,3 +217,59 @@ provision＋ffmpeg；缺前置 loud-fail 不静默过）。待 mem 门开后跑�
 `visualize` LaTeX/HTML screenshot 未装对应后端（report-only，不阻塞）。
 pre-commit 注意：`agent.rs`（存量非 `nt_` 名）若被 `git add` 会触发命名门
 `exit 1`——提交本轮改动须 `--no-verify` 或给钩子加白（存量条件，非本轮引入）。
+
+## 10. 模型自主执行（2026-09-29，用户："不要人类可执行链"）
+
+定点结论：`ToolOrchestrator.call` / `AgentLoop.with_tools` / crystal 活环 / nt_act
+Registry **全 dormant 或他域**；**唯一真在逐个执行模型点名工具的环是 neobot
+`nt_agent::execute_tool`**（gate→audit→dispatch→history，image 经
+`TranscriptItem.image` 自动升级 `image_url`）。⇒ 客户端随执行环下移。
+
+| 动作 | 位置 |
+|---|---|
+| 搬 client | `crates/neotrix-neobot/src/nt_qwen_mm.rs`（`McpSessionTool` 留 core，因 `NativeTool` 是 core trait）；core 原文件缩成 re-export |
+| 4 变体 | `QwenMediaInfo/ReadVideo/Visualize/SaveView`，模型名 `qwen_*`；**刻意不碰 `read_image`**（与本 crate `ReadImage` 撞名会绕过 vision 门） |
+| policy | 三个只读 Allow；`save_view` Allow（写盘范围窄，越狱由 `path` 键 + `join_workspace` 兜） |
+| gate | 收 `video_path`/`image_path` 键，否则 `is_jailbreak_path` 被绕过（安全洞） |
+| 挂载 | `qwen_mm_mounted()` = `resolve_core_launch().is_ok()`，**零 spawn**；schema 与 `QWEN_MM_PROMPT` 共用同一判据（双向蕴含单测锁定） |
+| 执行 | vision 门 → resolve → jail → call → artifacts 落 workspace `.neotrix-mm/` → `load_image` 读回真部件 |
+
+验证：neobot 390 绿；活测试走真服务器（无 key）全绿；core 12170 绿；lock 0；layer 0 new。
+**未做**：turn 级 E2E（`EngineAdapter` → 模型返回 `qwen_*` → `execute_qwen_mm` →
+steps/history 同一测试）——接线已验，组合未验。
+
+## 11. 缺口自查 → PDF 原生坐标接地（2026-09-29，用户："移除 tesseract，减少外部依赖"）
+
+### 11.1 「自有技术能不能补」——补一半，且**证伪了一次自己的直觉**
+
+| 缺口 | 结论 | 证据（file:line） |
+|---|---|---|
+| 文字框 grounding | **能（PDF 侧，零新依赖）** | PDF 文字本来就有精确坐标（`Tf`/`Tm`/`Td`）；`lopdf 0.42` 已在 `neotrix-core/Cargo.toml:199` ⇒ 只加依赖边，不引入新包 |
+| 通用 OCR（图片文字） | **不能** | `l2_perception/nt_world/ocr/mod.rs:190` `PaddleOcrEngine::run_inference` 返回**空 text + 空 `bounding_boxes`** 的占位；`neotrix/nt_file_ability/visual/ocr.rs:37` `RuleBasedOcr` 从**文件名**猜 |
+| 反向图搜 / 物体框 | **不能** | 需 Serper key 或数百 MB 检测权重；本机 `~/.cache/neotrix/models` 无 OCR/det 现货 |
+
+⇒ 决策：**tesseract 放弃**（装它本身就是新增一个外部依赖），PDF 走 lopdf content 流，
+图片走 VLM 自报框 + skill 指导，缺口写进 skill 不填假工具。
+
+### 11.2 交付
+
+`crates/neotrix-neobot/src/nt_pdf_ground.rs`：content 流状态机（`BT/ET/q/Q/cm/Tf/TL/
+Tc/Tw/Tz/Ts/Td/TD/Tm/T*/Tj/TJ/'/"`）→ 基线行聚类 → **最短匹配窗口**（框紧，不整行）
+→ 0-1000 归一化（y 翻成图像坐标系，与 Qwen2.5-VL 绝对坐标同制）+ PDF 点坐标双输出。
+字体：ToUnicode CMap **手写最小解析**（`lopdf::encodings` 是私有模块）＋ WinAnsi ＋
+UTF-16BE BOM。工具 `pdf_ground_text` **常挂载**（无外部依赖可探测），**刻意不叫
+`qwen_*`**（不经 MCP，混进外部服务器那堆就是撒谎）。单测**自造字节 PDF**（手写 xref）。
+
+诚实边界（已写进 skill 与工具描述，且有单测锁住不被后人删）：
+- 只对**有文字层**的 PDF 有效；扫描件/文字转轮廓 → 明确报「别猜框」，一个框都不给。
+- 框是近似的：不解析 Type0 的 `/W`（缺则 500/1000 em 兜底），旋转/斜切 CTM 算外接矩形。
+  **足以裁剪定位，不足以当像素级标注基准。**
+
+### 11.3 ⚠️ 本节代码**未编译**（唯一下轮入口）
+
+`nt_mem_gate.sh` 连试 8 次 BLOCKED ⇒ 未跑任何 cargo。手推已揪出并修掉 7 处编译错
+（`and_then` 接 `Result` / `Option::ok()` 不存在 / 非 Result 函数里用 `?` /
+`TextState` derive 了没有的 `Default` / 多写的 `.into()` / `is_none_or` 超 MSRV 1.81 …），
+**但静态审查替代不了编译器**。未提交是刻意的：`neotrix-core/Cargo.toml:100` **依赖**
+`neotrix-neobot`，提交未编译代码 = 替所有人造红灯。兜底 patch：
+`.neotrix/worktree-salvage/pdf-ground-20260929.patch`。

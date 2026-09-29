@@ -199,6 +199,9 @@ impl HttpEngine {
         if qwen_mm_mounted() {
             system.push_str(QWEN_MM_PROMPT);
         }
+        // PDF 定位工具是**常挂载**的（编译进二进制），所以提示词也无条件跟着上 ——
+        // 与 Qwen 那组「挂载判据必须两处同源」是同一条纪律的另一面。
+        system.push_str(PDF_GROUND_PROMPT);
         if let Some(memory) = self.memory_context.as_deref() {
             system.push_str("\n\n");
             system.push_str(memory);
@@ -343,6 +346,16 @@ const QWEN_MM_PROMPT: &str = "\n\n多模态文件工具（Qwen-MM-Plugins 会话
 看视频/长文档：先 `qwen_media_info`，再小步取帧或渲染页面，别一次要几十页。\
 任一工具报错（含「缺 ffmpeg / 缺 LibreOffice」）时，把那句错如实转述给用户，别假装成功、别用文字描述替代你没看到的画面。\n";
 
+/// PDF 文字定位（本地、零外部依赖，故**常挂载**）。
+///
+/// 存在的理由与 Qwen 那组相反：它不需要探测任何东西（`lopdf` 编译进二进制），
+/// 所以「按能力挂载」的成本为零、收益为零。两条纪律的共同点是**提示词与
+/// schema 必须同时到位**，否则模型会被教一个调不到的工具。
+const PDF_GROUND_PROMPT: &str = "\n\nPDF 定位：`pdf_ground_text` 在 PDF 文字层里按词定位，返回页码 + 0-1000 归一化框（y 已翻成图像坐标系）。\
+要指「这句话在哪」或要裁某段时先调它，别自己编坐标。\
+它只认 PDF 文字层：扫描件/文字转轮廓的 PDF 会明说没有文字层 —— 那时**如实说定位不到**，\
+改用 `qwen_visualize` 看渲染页，别拿估计的框当定位结果交差。\n";
+
 /// Qwen-MM-Plugins 会话工具是否挂载（唯一判据，`tool_schemas` 与
 /// `chat_body` 共用——提示词与 schema 必须同步，否则模型会被教一个它调不到的
 /// 工具，或拿到一个没人教它的工具）。
@@ -484,6 +497,17 @@ fn tool_schemas(offer_computer: bool, offer_vision: bool) -> Vec<serde_json::Val
             }, "required": ["file_path"]},
         }}));
     }
+    // PDF 文字定位：**常挂载**（编译进二进制，不 spawn、不探测外部依赖），
+    // 与 Qwen 那组按能力挂载的相反 —— 它唯一的外部条件是「文件是 PDF」。
+    tools.push(serde_json::json!({"type": "function", "function": {
+        "name": "pdf_ground_text",
+        "description": "在 **PDF** 里按词/短语定位，返回页码 + 0-1000 归一化坐标框（y 已翻成图像坐标系，可直接换算像素裁剪）。想「指出这句话在第几页哪个位置」「把含某个词的区域裁出来」先用它，别自己猜坐标。**只对有文字层的 PDF 有效**：扫描件/文字转轮廓的 PDF 会明确说没有文字层，那种情况改用 qwen_visualize 看图。",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string", "description": "workspace 内的 .pdf 相对路径"},
+            "query": {"type": "string", "description": "要找的词或短语（大小写不敏感，跨 Tj 拆字也能匹配）"},
+            "max_pages": {"type": "integer", "description": "扫描页数上限（默认 40）"},
+        }, "required": ["path", "query"]},
+    }}));
     // 侧边栏导航：模型**提议**界面打开什么，Rust 侧只成文不执行。
     tools.push(serde_json::json!({"type": "function", "function": {
         "name": "sidebar_open",
@@ -1333,6 +1357,33 @@ mod tests {
                 .and_then(serde_json::Value::as_array)
                 .map(Vec::len);
             assert_eq!(required, Some(1));
+        }
+    }
+
+    #[test]
+    fn pdf_ground_text_is_always_advertised_and_never_claims_ocr() {
+        use super::tool_schemas;
+        // 与 Qwen 那组**相反**：它编译进二进制，没有「装没装」这回事 ⇒ 恒挂载，
+        // 两种视能下都必须在列。哪天若改成依赖外部二进制，此断言必须改成
+        // `qwen_mm_mounting_is_honest_both_ways` 那样的双向蕴含。
+        for (computer, vision) in [(false, false), (false, true), (true, true)] {
+            let schemas = tool_schemas(computer, vision);
+            let schema = tool_named(&schemas, "pdf_ground_text")
+                .unwrap_or_else(|| panic!("must be advertised (computer={computer})"));
+            // 两个必填：不给 query 就不知道要定位什么词。
+            let required = schema
+                .pointer("/function/parameters/required")
+                .and_then(serde_json::Value::as_array)
+                .expect("required list");
+            assert_eq!(required.len(), 2, "required={required:?}");
+            // 描述里那两句诚实边界不许被后人「精简」掉：它只对有文字层的 PDF
+            // 有效，且**不是**通用 OCR。描述是模型唯一的能力说明书。
+            let desc = schema
+                .pointer("/function/description")
+                .and_then(|v| v.as_str())
+                .expect("description");
+            assert!(desc.contains("扫描件"), "诚实边界被删：{desc}");
+            assert!(!desc.contains("OCR"), "别把它说成通用 OCR：{desc}");
         }
     }
 

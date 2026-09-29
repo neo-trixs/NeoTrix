@@ -137,6 +137,10 @@ pub fn evaluate_policy(ctx: &PolicyContext) -> PolicyDecision {    // 1) 人接�
         //   范围比 `write_file` 窄（只写渲染产物，不改用户文件）。
         ToolName::QwenMediaInfo | ToolName::QwenReadVideo | ToolName::QwenVisualize
         | ToolName::QwenSaveView => PolicyDecision::Allow,
+        // `pdf_ground_text` 放行：只读（读 PDF 字节 + content 流，不写盘、
+        // 不 spawn、不发网络请求），风险等级等同 `read_file`；`path` 参数与
+        // 执行层 `join_workspace` 双保险同 `ReadFile`。
+        ToolName::PdfGroundText => PolicyDecision::Allow,
         ToolName::Unknown(raw) => deny("unknown-tool", &format!("unknown tool '{raw}'")),
         ToolName::Bash | ToolName::ComputerAct => {
             deny("default-deny", "no explicit allow rule matched")
@@ -287,6 +291,18 @@ mod tests {
             assert!(
                 matches!(evaluate_policy(&bad_ctx), PolicyDecision::Deny { .. }),
                 "qwen tool must refuse '{bad}'"
+            );
+        }
+        // 本地只读工具同一纪律：放行 workspace 内路径，越狱照拒。
+        let mut ground = ctx(ToolName::PdfGroundText);
+        ground.file_path = Some("papers/contract.pdf".to_owned());
+        assert_eq!(evaluate_policy(&ground), PolicyDecision::Allow);
+        for bad in ["../../etc/passwd", "/etc/passwd"] {
+            let mut bad_ctx = ctx(ToolName::PdfGroundText);
+            bad_ctx.file_path = Some(bad.to_owned());
+            assert!(
+                matches!(evaluate_policy(&bad_ctx), PolicyDecision::Deny { .. }),
+                "pdf_ground_text must refuse '{bad}'"
             );
         }
         // 人接管时与其他工具一样拒一切 Bot 动作。

@@ -911,6 +911,7 @@ fn execute_tool(
         | ToolName::QwenReadVideo
         | ToolName::QwenVisualize
         | ToolName::QwenSaveView => execute_qwen_mm(config, engine, call, stop),
+        ToolName::PdfGroundText => Ok(execute_pdf_ground_text(config, call)?.into()),
         ToolName::Unknown(raw) => Err(NtBotError::Invalid(format!("unknown tool '{raw}'"))),
     }
 }
@@ -1192,6 +1193,67 @@ fn execute_web_fetch(call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtB
     };
     let output = crate::nt_web::web_fetch(url)?;
     Ok(ToolResult { ok: true, output, truncated: true })
+}
+
+/// PDF 文字定位（本地只读，零外部依赖）。
+///
+/// 为什么**不用**通用 OCR 路线：外挂二进制（tesseract）或自带检测权重，
+/// 都比「PDF 文字本来就有精确坐标」贵得多 —— `nt_pdf_ground` 直接读
+/// content 流（`Tm`/`Tf`/`Tj`），不 spawn、不联网、不写盘。
+///
+/// `ok` 的取法要说清楚：**查不到 ≠ 工具失败**。空命中是「这份 PDF 的文字层里
+/// 没有这个词」这一事实，`ok: true` + 解释性输出；只有真的出错（越狱路径、
+/// 不是 PDF、超大文件）才 `ok: false`。反过来会让模型把「没找到」当「工具坏了」
+/// 去重试或改口。
+fn execute_pdf_ground_text(
+    config: &NeobotConfig,
+    call: &crate::nt_types::ToolCall,
+) -> Result<ToolResult, NtBotError> {
+    use crate::nt_pdf_ground as ground;
+    let rel = required_path(&call.args)?;
+    let full = join_workspace(&config.workspace_dir, &rel)?;
+    if !rel.to_ascii_lowercase().ends_with(".pdf") {
+        return Ok(ToolResult {
+            ok: false,
+            output: format!(
+                "pdf_ground_text: '{rel}' 不是 .pdf。这个工具只读 PDF 的文字层坐标，\
+                 对图片/文本文件无效 —— 图片请用 qwen_visualize 渲染或 read_image 看图。"
+            ),
+            truncated: false,
+        });
+    }
+    // lopdf 整篇进内存 ⇒ 必须有上限，否则一个超大 PDF 能把 daemon 吃穿。
+    let meta = std::fs::metadata(&full)?;
+    const PDF_CAP: u64 = 64 * 1024 * 1024;
+    if meta.len() > PDF_CAP {
+        return Ok(ToolResult {
+            ok: false,
+            output: format!(
+                "pdf_ground_text: 文件 {} 字节 > 上限 {PDF_CAP}（整篇需进内存），换小的或先用 qwen_save_view 拆页。",
+                meta.len()
+            ),
+            truncated: false,
+        });
+    }
+    let query = call
+        .args
+        .get("query")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_owned();
+    let max_pages = call
+        .args
+        .get("max_pages")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(u64::from(ground::MAX_PAGES_DEFAULT))
+        .clamp(1, 200) as u32;
+    let report = ground::ground_text(&full, &query, max_pages)?;
+    let output = report.render(&query);
+    Ok(ToolResult {
+        ok: true,
+        truncated: output.len() > 8000,
+        output: truncate_output(output, true),
+    })
 }
 
 /// agent 侧 bash 执行（P0 审计 F2 加固版）：///
@@ -1863,6 +1925,130 @@ mod tests {
         assert!(text.contains("no-vision-engine"), "{text}");
         assert!(text.contains("echo"), "{text}"); // 点名是哪个引擎
         assert!(text.contains("NEOBOT_VISION"), "{text}"); // 给可操作的出路
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// turn 级 E2E：**模型点名 → 网关放行 → 真解析 → 坐标回到模型手里**。
+    ///
+    /// 为什么这条能测、Qwen 那条不能：Qwen 链的 turn 级测试要求
+    /// `qwen_mm_mounted()` 为真（本机装了 MCP 服务器），CI 不保证 ⇒ 非确定性。
+    /// `pdf_ground_text` 零外部依赖，所以整条链可以确定性地端到端跑完。
+    /// 代价是它测不到 MCP framing —— 那部分由 core 侧
+    /// `test_native_adapter_drives_session` 与 neobot 的分发单测各自覆盖。
+    /// **三段职责分开测，别指望一条测试吃掉全部。**
+    struct GroundOnce {
+        seen_result: std::sync::Mutex<bool>,
+    }
+
+    impl GroundOnce {
+        fn turn(
+            &self,
+            history: &[TranscriptItem],
+        ) -> Result<crate::nt_engine::EngineTurn, crate::NtBotError> {
+            use crate::nt_types::{ToolCall, ToolName, TurnStatus};
+            // 关键断言点：工具输出**真的回到了模型**（命中数与坐标都在 history 里）。
+            // 只断言「audit 里有这条工具」是不够的 —— 那只证明网关放行了，
+            // 不证明模型拿到了结果。
+            let fed_back = history.iter().any(|item| {
+                item.role == TranscriptRole::Tool
+                    && item.content.contains("命中")
+                    && item.content.contains("118")
+            });
+            if let Ok(mut seen) = self.seen_result.lock() {
+                *seen = fed_back;
+            }
+            if fed_back {
+                return Ok(crate::nt_engine::EngineTurn {
+                    assistant_text: "在第 1 页偏上位置。".to_owned(),
+                    status: TurnStatus::Done,
+                    tool_calls: Vec::new(),
+                    usage: None,
+                    side_effects: Vec::new(),
+                });
+            }
+            Ok(crate::nt_engine::EngineTurn {
+                assistant_text: String::new(),
+                status: TurnStatus::Continue,
+                tool_calls: vec![ToolCall {
+                    id: "g1".to_owned(),
+                    name: ToolName::PdfGroundText,
+                    args: serde_json::json!({"path": "contract.pdf", "query": "Confidential"}),
+                }],
+                usage: None,
+                side_effects: Vec::new(),
+            })
+        }
+    }
+
+    impl crate::nt_engine::EngineAdapter for GroundOnce {
+        fn engine_id(&self) -> &str {
+            "ground-once"
+        }
+
+        fn probe(&self) -> Result<String, crate::NtBotError> {
+            Ok("ground-once".to_owned())
+        }
+
+        fn run_turn(
+            &self,
+            _prompt: &str,
+            _inbox: &[String],
+        ) -> Result<crate::nt_engine::EngineTurn, crate::NtBotError> {
+            self.turn(&[])
+        }
+
+        fn run_turn_with_history(
+            &self,
+            _prompt: &str,
+            history: &[TranscriptItem],
+        ) -> Result<crate::nt_engine::EngineTurn, crate::NtBotError> {
+            self.turn(history)
+        }
+    }
+
+    #[test]
+    fn model_can_ground_pdf_text_end_to_end() {
+        let dir = crate::nt_testutil::temp_dir("pdf-ground-e2e");
+        let _ = std::fs::remove_dir_all(&dir);
+        let workspace = dir.join("workspace");
+        std::fs::create_dir_all(&workspace).expect("workspace");
+        std::fs::write(
+            workspace.join("contract.pdf"),
+            crate::nt_pdf_ground::fixture_pdf(),
+        )
+        .expect("write pdf");
+        let config = NeobotConfig {
+            data_dir: dir.clone(),
+            workspace_dir: workspace,
+            policy_mode: crate::nt_config::PolicyMode::Enforce,
+            human_has_control: false,
+            max_steps: 4,
+            engine: crate::nt_config::EngineKind::Echo,
+            computer_allow: Vec::new(),
+            computer_hosts: Vec::new(),
+            extra_deny: Vec::new(),
+            write_budget: crate::nt_config::default_write_budget(),
+        };
+        config.validate().expect("validate");
+        let store = NeobotStore::open(":memory:").expect("open");
+        let engine = GroundOnce {
+            seen_result: std::sync::Mutex::new(false),
+        };
+        let status = run_local_turn(&store, &config, &engine, "e2e", "第几页提到 Confidential")
+            .expect("run");
+        assert_eq!(status, crate::nt_types::TurnStatus::Done);
+        // 网关放行了模型点的这个工具（不是 deny 后假装成功）。
+        let audits = store.list_audit(20).expect("audits");
+        let ground = audits
+            .iter()
+            .find(|event| event.tool == "pdf_ground_text")
+            .expect("pdf_ground_text must be audited");
+        assert_eq!(ground.decision, crate::nt_audit::AuditDecision::Allow);
+        // 「自主执行」与「函数存在」的分界就在这一行。
+        assert!(
+            engine.seen_result.lock().map(|seen| *seen).unwrap_or(false),
+            "tool output never reached the model"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
