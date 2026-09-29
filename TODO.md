@@ -702,6 +702,43 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 `config/*.toml`，**一律先确认忽略生效再 `git add` 周边文件** ——
 `git add .` 会把「刚被解禁的目录」连同密钥一起吞进去。
 
+### 🟡 P0 裁决：`neotrix-sysctl` 的 `#![forbid(unsafe_code)]` 声明失效（2026-09-29 立）
+
+**实测**（`scripts/ops/nt_topology.py` 剥离注释与字符串字面量后统计）：
+
+| 位置 | 形态 | 判定 |
+|---|---|---|
+| `crates/neotrix-sysctl/src/lib.rs:24` | `unsafe { libc::getpid() }` | FFI，**正当** |
+| `…/lib.rs:28` | `unsafe { libc::sysctl(…) }` | FFI + 裸指针，**正当** |
+| `…/lib.rs:33` | 同上 | 同上 |
+| `…/lib.rs:85` | `unsafe { &*(proc_info.as_ptr() as *const _) }` | 裸指针解引用，**正当** |
+| `…/lib.rs:119` | `unsafe { libc::sysctl(…) }` | FFI，同上 |
+
+⇒ **真实 unsafe = 5，全部集中在这一个 crate**（macOS `sysctl` 进程枚举）。
+**`neotrix-core` 内零违反**（R-P1 在主 crate 内成立）。
+
+⛔ **但该 crate 声明了 `#![forbid(unsafe_code)]`** —— 声明与实际代码**不一致**，
+`forbid` 形同虚设。这与 R-P1「永不加 unsafe」不是同一件事：5 处 FFI 需求本身正当，
+**问题在于声明说了「绝无」而实际有**。
+
+**待裁决（二选一）**：
+- **A. 移除该 crate 的 `forbid`**，改为显式 `// SAFETY:` 注释逐处说明
+  （符合 Rust 惯例：FFI crate 不该用 `forbid`，该用 `#![deny]` + 豁免）
+- **B. 保留 `forbid` 并重写为安全封装**（把 5 处 libc 调用收进一个 `unsafe` 内部模块）
+
+⇒ **需要你定**。在裁决前，该 crate 的 `forbid` 声明不可当作「已合规」的证据。
+
+**取证入口**：
+```sh
+python3 scripts/ops/nt_topology.py            # 维度 5.1，含逐处证据
+bash scripts/check-unwrap.sh                  # 另一类明令规则（712 站点）已建棘轮
+```
+
+**为什么记在 TODO 而不是我直接改**：`forbid` 的增删是**架构级裁决**，
+且该 crate 5 处 FFI 是否可重写我未逐行读证（`lib.rs` 内 sysctl 调用含
+可变长度 buffer 管理，改错会引入真实的内存安全缺陷）。
+按「无定点不改」，我只取证与立项，不动代码。
+
 ## 🆕 2026-09-28 单窗口汇总修复（架构侧吸收轮）
 
 > **唯一汇总入口**：`sessions/handoff-consolidate-all-windows-20260928.md`

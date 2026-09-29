@@ -169,3 +169,21 @@ cargo check -p neotrix-neobot     Finished 0 error
 - 门终态：`layout --strict` PASS · `doc-drift` 0 死链 · `unwrap --strict` rc=0 ·
   `untracked-assets` PASS · `nt_locate --audit` **0/0** · `audit-all` 8 条可解析 ·
   门自门恒红 0
+
+### 9.6 追加窗口第二轮（CI 接入 + 最后立项）
+
+- [x] **`check-untracked-assets` + `check-unwrap` 接入 CI**（`ci.yml` 的 `check` job
+      现 **10 道门**）⇒ 补上 R-P79 的「接入」半环：门能本地跑 ≠ PR 会自动跑
+- [x] `TODO.md` 立 `neotrix-sysctl` 的 `forbid` **声明失效**裁决项（附 5 处逐行证据）
+- [x] 写 IM `/stop` 5 阶段施工计划（`docs/plans/2026-09-29-im-stop-worker-pool-plan.md`）
+
+**⚠️ 计划里最重要的一条发现**：设计 §11.1 说「**两处**直连 `adapter.send`
+必须改走出站」，**实测是 4 处**（`:416 :502 :745 :872`）⇒ 设计低估了一倍。
+已在计划里写死「按 4 处核，不要按 2 处写」。
+
+### 9.7 追加窗口自踩的坑（累计 17 个）
+
+| # | 坑 | 代价 | 教训 |
+|---|---|---|---|
+| 16 | 编辑 `ci.yml` 缩进猜错两次 | ① 插进上一 step 的续行 ② `name:` 里含冒号未加引号 ⇒ `ScannerError` | **别信被我自己的 `sed 's/^/  /'` 加过缩进的输出**（本会话已因此打瞎 Makefile 六个 target）；用 `repr()` 看真实字节 + 改完 `yaml.safe_load` 验 |
+| 17 | 修了 5 个文件却漏 `.project-map` | `gitignore` **只对未跟踪文件生效**；`--only` 按工作树取 diff ⇒ 取消跟踪带不进去，需暂存区提交 | 「加了规则」≠「已生效」；取消跟踪必须走 `git rm --cached` + 暂存区提交 |
