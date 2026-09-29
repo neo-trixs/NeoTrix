@@ -16,11 +16,15 @@ Agent 自助健康检查。**不依赖 `./target/release/neotrix` TUI** — 因�
 
 | 已有机制 | 位置 | agent 可用性 |
 |----------|------|--------------|
-| `/self-audit` D31-D50 | `cli/commands/self_audit_cmds.rs` | ❌ 卡 provider wizard |
-| `/doctor` 环境检查 | `cli/commands/doctor_cmds.rs` | ❌ 同上 |
-| `neotrix status` ops | `entry/sysops.rs` | ⚠️ 绕 provider 但只读 brain.json,不含节点健康 |
-| SelfTest pass rate → branch health | `nt_core_consciousness_tree.rs:1298` | ⚠️ 内存中,仅日志 |
+| `neotrix status` ops | `entry/status.rs` · `entry/sysops.rs` | ⚠️ 绕 provider 但只读 brain.json,不含节点健康 |
+| SelfTest pass rate → branch health | `l5_cognition/nt_mind/` | ⚠️ 内存中,仅日志 |
 | `neotrix-experience hub/query` | `~/.local/bin/neotrix-experience` | ✅ 可用 |
+| 门禁脚本（本协议 D3 的主力） | `scripts/check-*.sh` · `scripts/ops/*` | ✅ 可用 |
+
+> 2026-09-29 订正：原表列的 `/self-audit`、`/doctor`（`cli/commands/*.rs`）与
+> `nt_core_consciousness_tree.rs` **均已随 `neotrix-core/src/cli/` 一并删除**。
+> 本表的「缺口」判断不变 —— TUI 仍会在非 ops 命令启动时强制 provider wizard
+> 阻塞自动化，故下面 D1–D6 全部走 `cargo`/`rg`/`sqlite3` 直连。
 
 ## 六维健康检查 (MUST run 每次会话收尾或用户请求)
 
@@ -44,7 +48,7 @@ const { readFileSync } = require("fs");
 const c = readFileSync("AGENTS.md", "utf8");
 const lines = c.replace(/\n$/, "").split("\n");
 const h2 = lines.filter((l) => l.startsWith("## ")).map((l) => l.replace(/^##\s+/, "").trim());
-const allowed = ["Skill Routing","Architecture","Always-On Core Rules","Shared Language","Build","Test","Key Locations"];
+const allowed = ["0. 决策树：任务 → 动作（先查这里，别全文读）","1. 硬规则","2. 并行公约（2026-09-21 事故复盘）","3. 微操作公约（skill: nt-locate）","4. 三道闸（2026-09-27 事故后置入，违反即阻塞）","5. 扫描器告警 ≠ 缺陷（2026-09-27 差点把 bug 修进正确代码）","6. 正典索引","7. 本地模型"];
 const bad = [];
 if (lines.length > 130) bad.push(`total ${lines.length}>130 lines`);
 if (Buffer.byteLength(c, "utf8") > 22000) bad.push(`total ${Buffer.byteLength(c, "utf8")}>22000 bytes`);
@@ -69,10 +73,13 @@ sqlite3 ~/.neotrix/knowledge.db "SELECT COUNT(*) FROM kv_store WHERE namespace='
 echo "Capability 构造点: $(rg -l 'Capability \{' neotrix-core/src --type rust | rg -v 'registry.rs|mod.rs' | wc -l | tr -d ' ') 文件"
 # SelfTest 生产注册点 (外部接线)
 echo "SelfTest 接线: $(rg -l 'register\(Box::new' neotrix-core/src --type rust | rg -v 'self_test.rs' | wc -l | tr -d ' ') 文件"
-# 各层模块数
-for d in l1_body_impl l2_world_impl l3_memory_impl l4_cognition_impl l5_consciousness_impl l6_self_impl l7_capability_impl l8_autonomic_impl l9_transcendent_impl; do
-  echo "$d: $(ls neotrix-core/src/neotrix/$d/ 2>/dev/null | wc -l | tr -d ' ') 模块"
+# 各层模块数 (2026-09-29 订正: 旧版的 l1_body_impl…l9_transcendent_impl 九层
+# 早已不是当前分层 —— 现为 l0_substrate → l6_meta 七层, 见 AGENTS.md §1)
+for d in l0_substrate l1_action l2_perception l3_embodiment l4_emotion l5_cognition l6_meta; do
+  echo "$d: $(ls neotrix-core/src/$d/ 2>/dev/null | wc -l | tr -d ' ') 模块"
 done
+# 第二棵逃逸树 (不参与 L0-L6, 见 DIR-REMEDY-2026-09-28.md §2.5)
+echo "neotrix/(逃逸树): $(ls neotrix-core/src/neotrix/ 2>/dev/null | wc -l | tr -d ' ') 项"
 ```
 
 ### D6 依赖/死代码健康

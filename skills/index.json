@@ -1,405 +1,828 @@
 {
   "version": "1.0.0",
-  "generated": "2026-09-19",
+  "generated": "2026-09-29",
   "categories": {
     "architecture-auditor": {
       "description": "持续架构审计+外部探索 agent",
-      "tags": ["audit", "architecture", "code-quality", "testing"],
+      "tags": [
+        "audit",
+        "architecture",
+        "code-quality",
+        "testing"
+      ],
       "skills": {
         "architecture-auditor": {
           "description": "持续架构审计+外部探索 agent — 自动扫描代码库缺陷、吸收外部研究、生成改进方案",
-          "tags": ["audit", "architecture", "exploration"],
-          "triggers": ["审计", "架构", "探索", "研究", "排行", "缺陷"],
-          "dependencies": ["external-absorption"]
+          "tags": [
+            "audit",
+            "architecture",
+            "exploration"
+          ],
+          "triggers": [
+            "审计",
+            "架构",
+            "探索",
+            "研究",
+            "排行",
+            "缺陷"
+          ],
+          "dependencies": [
+            "external-absorption"
+          ]
         },
         "diagnose": {
           "description": "架构诊断 — 识别系统级架构问题",
-          "tags": ["diagnosis", "architecture", "health"],
-          "triggers": ["诊断", "架构问题"],
-          "dependencies": ["architecture-auditor"]
+          "tags": [
+            "diagnosis",
+            "architecture",
+            "health"
+          ],
+          "triggers": [
+            "诊断",
+            "架构问题"
+          ],
+          "dependencies": [
+            "architecture-auditor"
+          ]
         },
         "domain-modeling": {
           "description": "领域建模 — DDD 风格领域分析",
-          "tags": ["ddd", "domain", "modeling"],
-          "triggers": ["领域", "建模", "DDD"],
+          "tags": [
+            "ddd",
+            "domain",
+            "modeling"
+          ],
+          "triggers": [
+            "领域",
+            "建模",
+            "DDD"
+          ],
           "dependencies": []
         },
         "grill-me": {
           "description": "代码审查 — 对话式代码审查和挑战",
-          "tags": ["review", "code-review", "challenge"],
-          "triggers": ["审查", "review", "挑战"],
+          "tags": [
+            "review",
+            "code-review",
+            "challenge"
+          ],
+          "triggers": [
+            "审查",
+            "review",
+            "挑战"
+          ],
           "dependencies": []
         },
         "improve-architecture": {
           "description": "架构改进 — 生成架构改进方案",
-          "tags": ["improvement", "architecture", "refactor"],
-          "triggers": ["改进", "优化", "重构"],
-          "dependencies": ["diagnose"]
+          "tags": [
+            "improvement",
+            "architecture",
+            "refactor"
+          ],
+          "triggers": [
+            "改进",
+            "优化",
+            "重构"
+          ],
+          "dependencies": [
+            "diagnose"
+          ]
         },
         "observability": {
           "description": "可观测性 — 监控和日志架构",
-          "tags": ["observability", "monitoring", "logging"],
-          "triggers": ["监控", "日志", "可观测"],
+          "tags": [
+            "observability",
+            "monitoring",
+            "logging"
+          ],
+          "triggers": [
+            "监控",
+            "日志",
+            "可观测"
+          ],
           "dependencies": []
         },
         "performance": {
           "description": "性能分析 — 性能瓶颈识别和优化",
-          "tags": ["performance", "optimization", "profiling"],
-          "triggers": ["性能", "优化", "瓶颈"],
+          "tags": [
+            "performance",
+            "optimization",
+            "profiling"
+          ],
+          "triggers": [
+            "性能",
+            "优化",
+            "瓶颈"
+          ],
           "dependencies": []
         },
         "tdd": {
           "description": "TDD 流程 — 测试驱动开发工作流",
-          "tags": ["tdd", "testing", "workflow"],
-          "triggers": ["TDD", "测试驱动"],
+          "tags": [
+            "tdd",
+            "testing",
+            "workflow"
+          ],
+          "triggers": [
+            "TDD",
+            "测试驱动"
+          ],
           "dependencies": []
         },
         "testing": {
           "description": "测试策略 — 测试架构和覆盖",
-          "tags": ["testing", "strategy", "coverage"],
-          "triggers": ["测试", "策略", "覆盖"],
+          "tags": [
+            "testing",
+            "strategy",
+            "coverage"
+          ],
+          "triggers": [
+            "测试",
+            "策略",
+            "覆盖"
+          ],
           "dependencies": []
         },
         "zoom-out": {
           "description": "宏观视角 — 系统级架构总览",
-          "tags": ["overview", "system", "architecture"],
-          "triggers": ["总览", "宏观", "系统级"],
+          "tags": [
+            "overview",
+            "system",
+            "architecture"
+          ],
+          "triggers": [
+            "总览",
+            "宏观",
+            "系统级"
+          ],
           "dependencies": []
         }
       }
     },
     "config": {
       "description": "配置文件管理",
-      "tags": ["config", "configuration", "settings"],
+      "tags": [
+        "config",
+        "configuration",
+        "settings"
+      ],
       "skills": {
         "config": {
           "description": "项目配置文件统一管理",
-          "tags": ["config", "management"],
-          "triggers": ["config", "配置", "配置文件"],
+          "tags": [
+            "config",
+            "management"
+          ],
+          "triggers": [
+            "config",
+            "配置",
+            "配置文件"
+          ],
           "dependencies": []
         },
         "cliff": {
           "description": "Changelog 生成配置",
-          "tags": ["changelog", "release"],
-          "triggers": ["changelog", "变更日志"],
+          "tags": [
+            "changelog",
+            "release"
+          ],
+          "triggers": [
+            "changelog",
+            "变更日志"
+          ],
           "dependencies": []
         },
         "deny": {
           "description": "依赖审计配置",
-          "tags": ["dependencies", "audit", "security"],
-          "triggers": ["依赖审计", "deny"],
+          "tags": [
+            "dependencies",
+            "audit",
+            "security"
+          ],
+          "triggers": [
+            "依赖审计",
+            "deny"
+          ],
           "dependencies": []
         },
         "env": {
           "description": "环境变量模板",
-          "tags": ["environment", "variables", "template"],
-          "triggers": ["环境变量", "env"],
+          "tags": [
+            "environment",
+            "variables",
+            "template"
+          ],
+          "triggers": [
+            "环境变量",
+            "env"
+          ],
           "dependencies": []
         },
         "gitleaks": {
           "description": "Secret 扫描配置",
-          "tags": ["security", "secrets", "scanning"],
-          "triggers": ["secret", "扫描", "gitleaks"],
+          "tags": [
+            "security",
+            "secrets",
+            "scanning"
+          ],
+          "triggers": [
+            "secret",
+            "扫描",
+            "gitleaks"
+          ],
           "dependencies": []
         },
         "package": {
           "description": "Node.js 依赖配置",
-          "tags": ["nodejs", "npm", "dependencies"],
-          "triggers": ["npm", "package", "node"],
+          "tags": [
+            "nodejs",
+            "npm",
+            "dependencies"
+          ],
+          "triggers": [
+            "npm",
+            "package",
+            "node"
+          ],
           "dependencies": []
         }
       }
     },
     "crates": {
       "description": "Rust 包管理",
-      "tags": ["rust", "crates", "packages"],
+      "tags": [
+        "rust",
+        "crates",
+        "packages"
+      ],
       "skills": {
         "crates": {
           "description": "Rust 包管理总览",
-          "tags": ["rust", "crates", "overview"],
-          "triggers": ["crate", "包管理"],
+          "tags": [
+            "rust",
+            "crates",
+            "overview"
+          ],
+          "triggers": [
+            "crate",
+            "包管理"
+          ],
           "dependencies": []
         },
         "neotrix-sysctl": {
           "description": "NeoTrix 系统控制库",
-          "tags": ["system", "control", "core"],
-          "triggers": ["sysctl", "系统控制"],
-          "dependencies": ["neotrix-types"]
+          "tags": [
+            "system",
+            "control",
+            "core"
+          ],
+          "triggers": [
+            "sysctl",
+            "系统控制"
+          ],
+          "dependencies": [
+            "neotrix-types"
+          ]
         },
         "neotrix-types": {
           "description": "NeoTrix 类型定义库",
-          "tags": ["types", "core", "definitions"],
-          "triggers": ["types", "类型"],
+          "tags": [
+            "types",
+            "core",
+            "definitions"
+          ],
+          "triggers": [
+            "types",
+            "类型"
+          ],
           "dependencies": []
         },
         "nt-lang": {
           "description": "NT 语言定义",
-          "tags": ["language", "dsl", "definition"],
-          "triggers": ["nt-lang", "语言定义"],
-          "dependencies": ["neotrix-types"]
+          "tags": [
+            "language",
+            "dsl",
+            "definition"
+          ],
+          "triggers": [
+            "nt-lang",
+            "语言定义"
+          ],
+          "dependencies": [
+            "neotrix-types"
+          ]
         }
       }
     },
     "design": {
       "description": "UI/UX 设计能力 — 组件实现 + 质量审计 + 品牌身份",
-      "tags": ["design", "ui", "ux", "frontend", "brand"],
+      "tags": [
+        "design",
+        "ui",
+        "ux",
+        "frontend",
+        "brand"
+      ],
       "skills": {
         "design-core": {
           "description": "组件实现 — architect/layout + build/components + theme/tokens + motion/animations + 3-pass validation",
-          "tags": ["component", "layout", "tokens", "motion", "build"],
-          "triggers": ["UI", "组件", "界面", "主题", "布局", "动画"],
+          "tags": [
+            "component",
+            "layout",
+            "tokens",
+            "motion",
+            "build"
+          ],
+          "triggers": [
+            "UI",
+            "组件",
+            "界面",
+            "主题",
+            "布局",
+            "动画"
+          ],
           "dependencies": []
         },
         "design-audit": {
           "description": "质量审计 — 10维度评估引擎: VI一致性/设计系统/8pt网格/WCAG/视觉层级/反模式/响应式/状态覆盖/行业适配/动效质量",
-          "tags": ["audit", "review", "accessibility", "anti-pattern", "quality"],
-          "triggers": ["审计", "审查", "无障碍", "反模式", "质量"],
+          "tags": [
+            "audit",
+            "review",
+            "accessibility",
+            "anti-pattern",
+            "quality"
+          ],
+          "triggers": [
+            "审计",
+            "审查",
+            "无障碍",
+            "反模式",
+            "质量"
+          ],
           "dependencies": []
         },
         "design-identity": {
           "description": "品牌身份 — VI-First + 3层设计上下文 + Guard Rules + 原型验证 + 设计语言蒸馏",
-          "tags": ["brand", "identity", "visual", "design-language", "context"],
-          "triggers": ["品牌", "身份", "视觉", "设计语言", "品味", "风格"],
+          "tags": [
+            "brand",
+            "identity",
+            "visual",
+            "design-language",
+            "context"
+          ],
+          "triggers": [
+            "品牌",
+            "身份",
+            "视觉",
+            "设计语言",
+            "品味",
+            "风格"
+          ],
           "dependencies": []
         }
       }
     },
     "dev-tools": {
       "description": "开发工具",
-      "tags": ["tools", "development", "automation"],
+      "tags": [
+        "tools",
+        "development",
+        "automation"
+      ],
       "skills": {
         "dev-tools": {
           "description": "开发工具技能集合",
-          "tags": ["tools", "collection"],
-          "triggers": ["工具", "开发工具"],
+          "tags": [
+            "tools",
+            "collection"
+          ],
+          "triggers": [
+            "工具",
+            "开发工具"
+          ],
           "dependencies": []
         },
         "build-desktop": {
           "description": "Tauri 桌面端构建",
-          "tags": ["build", "desktop", "tauri"],
-          "triggers": ["构建", "桌面", "tauri"],
+          "tags": [
+            "build",
+            "desktop",
+            "tauri"
+          ],
+          "triggers": [
+            "构建",
+            "桌面",
+            "tauri"
+          ],
           "dependencies": []
         },
         "daemon-monitor": {
           "description": "守护进程监控",
-          "tags": ["daemon", "monitor", "process"],
-          "triggers": ["守护进程", "监控"],
+          "tags": [
+            "daemon",
+            "monitor",
+            "process"
+          ],
+          "triggers": [
+            "守护进程",
+            "监控"
+          ],
           "dependencies": []
         },
         "git-hook": {
           "description": "Git 钩子管理",
-          "tags": ["git", "hooks", "automation"],
-          "triggers": ["git", "钩子", "hook"],
+          "tags": [
+            "git",
+            "hooks",
+            "automation"
+          ],
+          "triggers": [
+            "git",
+            "钩子",
+            "hook"
+          ],
           "dependencies": []
         },
         "launchd-service": {
           "description": "macOS 服务管理",
-          "tags": ["macos", "service", "launchd"],
-          "triggers": ["launchd", "服务", "macos"],
+          "tags": [
+            "macos",
+            "service",
+            "launchd"
+          ],
+          "triggers": [
+            "launchd",
+            "服务",
+            "macos"
+          ],
           "dependencies": []
         },
         "pre-build-check": {
           "description": "构建前检查",
-          "tags": ["build", "check", "validation"],
-          "triggers": ["构建前", "检查", "验证"],
+          "tags": [
+            "build",
+            "check",
+            "validation"
+          ],
+          "triggers": [
+            "构建前",
+            "检查",
+            "验证"
+          ],
           "dependencies": []
         },
         "project-map": {
           "description": "项目结构映射",
-          "tags": ["project", "structure", "map"],
-          "triggers": ["项目结构", "映射"],
+          "tags": [
+            "project",
+            "structure",
+            "map"
+          ],
+          "triggers": [
+            "项目结构",
+            "映射"
+          ],
           "dependencies": []
         }
       }
     },
     "docs": {
       "description": "项目文档",
-      "tags": ["documentation", "docs", "guides"],
+      "tags": [
+        "documentation",
+        "docs",
+        "guides"
+      ],
       "skills": {
         "docs": {
           "description": "文档技能集合",
-          "tags": ["docs", "collection"],
-          "triggers": ["文档", "docs"],
+          "tags": [
+            "docs",
+            "collection"
+          ],
+          "triggers": [
+            "文档",
+            "docs"
+          ],
           "dependencies": []
         },
         "adr": {
           "description": "架构决策记录",
-          "tags": ["adr", "architecture", "decisions"],
-          "triggers": ["ADR", "决策记录"],
+          "tags": [
+            "adr",
+            "architecture",
+            "decisions"
+          ],
+          "triggers": [
+            "ADR",
+            "决策记录"
+          ],
           "dependencies": []
         },
         "agent-instructions": {
           "description": "Agent 行为指令和路由",
-          "tags": ["agent", "instructions", "behavior"],
-          "triggers": ["agent指令", "行为"],
+          "tags": [
+            "agent",
+            "instructions",
+            "behavior"
+          ],
+          "triggers": [
+            "agent指令",
+            "行为"
+          ],
           "dependencies": []
         },
         "architecture": {
           "description": "架构文档",
-          "tags": ["architecture", "documentation"],
-          "triggers": ["架构", "文档"],
+          "tags": [
+            "architecture",
+            "documentation"
+          ],
+          "triggers": [
+            "架构",
+            "文档"
+          ],
           "dependencies": []
         },
         "changelog": {
           "description": "版本历史和发布记录",
-          "tags": ["changelog", "releases", "history"],
-          "triggers": ["changelog", "版本", "发布"],
+          "tags": [
+            "changelog",
+            "releases",
+            "history"
+          ],
+          "triggers": [
+            "changelog",
+            "版本",
+            "发布"
+          ],
           "dependencies": []
         },
         "contribution": {
           "description": "贡献指南和开发流程",
-          "tags": ["contribution", "workflow", "guide"],
-          "triggers": ["贡献", "流程", "指南"],
+          "tags": [
+            "contribution",
+            "workflow",
+            "guide"
+          ],
+          "triggers": [
+            "贡献",
+            "流程",
+            "指南"
+          ],
           "dependencies": []
         },
         "design": {
           "description": "设计文档",
-          "tags": ["design", "documentation"],
-          "triggers": ["设计", "文档"],
+          "tags": [
+            "design",
+            "documentation"
+          ],
+          "triggers": [
+            "设计",
+            "文档"
+          ],
           "dependencies": []
         },
         "development-rules": {
           "description": "开发规则和纪律",
-          "tags": ["rules", "discipline", "standards"],
-          "triggers": ["规则", "纪律", "标准"],
+          "tags": [
+            "rules",
+            "discipline",
+            "standards"
+          ],
+          "triggers": [
+            "规则",
+            "纪律",
+            "标准"
+          ],
           "dependencies": []
         },
         "domain-language": {
           "description": "领域术语和共享语言",
-          "tags": ["domain", "language", "terminology"],
-          "triggers": ["术语", "语言", "领域"],
+          "tags": [
+            "domain",
+            "language",
+            "terminology"
+          ],
+          "triggers": [
+            "术语",
+            "语言",
+            "领域"
+          ],
           "dependencies": []
         },
         "guides": {
           "description": "使用指南集合",
-          "tags": ["guides", "tutorials", "howto"],
-          "triggers": ["指南", "教程"],
+          "tags": [
+            "guides",
+            "tutorials",
+            "howto"
+          ],
+          "triggers": [
+            "指南",
+            "教程"
+          ],
           "dependencies": []
         },
         "license-exceptions": {
           "description": "专有模块许可例外",
-          "tags": ["license", "legal", "exceptions"],
-          "triggers": ["许可", "例外", "法律"],
+          "tags": [
+            "license",
+            "legal",
+            "exceptions"
+          ],
+          "triggers": [
+            "许可",
+            "例外",
+            "法律"
+          ],
           "dependencies": []
         },
         "project-overview": {
           "description": "项目概述和入门指南",
-          "tags": ["overview", "getting-started", "introduction"],
-          "triggers": ["概述", "入门", "介绍"],
+          "tags": [
+            "overview",
+            "getting-started",
+            "introduction"
+          ],
+          "triggers": [
+            "概述",
+            "入门",
+            "介绍"
+          ],
           "dependencies": []
         },
         "security": {
           "description": "安全策略和漏洞报告",
-          "tags": ["security", "policy", "vulnerability"],
-          "triggers": ["安全", "策略", "漏洞"],
+          "tags": [
+            "security",
+            "policy",
+            "vulnerability"
+          ],
+          "triggers": [
+            "安全",
+            "策略",
+            "漏洞"
+          ],
           "dependencies": []
         },
         "todo": {
           "description": "任务列表和项目管理",
-          "tags": ["todo", "tasks", "management"],
-          "triggers": ["任务", "列表", "管理"],
+          "tags": [
+            "todo",
+            "tasks",
+            "management"
+          ],
+          "triggers": [
+            "任务",
+            "列表",
+            "管理"
+          ],
           "dependencies": []
         }
       }
     },
     "productivity": {
       "description": "生产力工具",
-      "tags": ["productivity", "workflow", "automation"],
+      "tags": [
+        "productivity",
+        "workflow",
+        "automation"
+      ],
       "skills": {
         "caveman": {
           "description": "极简生产力方法",
-          "tags": ["minimal", "productivity", "method"],
-          "triggers": ["极简", "生产力"],
+          "tags": [
+            "minimal",
+            "productivity",
+            "method"
+          ],
+          "triggers": [
+            "极简",
+            "生产力"
+          ],
           "dependencies": []
         }
       }
     },
     "root": {
       "description": "根级技能",
-      "tags": ["root", "core"],
+      "tags": [
+        "root",
+        "core"
+      ],
       "skills": {
         "code-expert": {
           "description": "Code analysis, generation, and review capabilities",
-          "tags": ["code", "analysis", "generation", "review", "programming"],
-          "triggers": ["代码", "分析", "生成", "审查"],
+          "tags": [
+            "code",
+            "analysis",
+            "generation",
+            "review",
+            "programming"
+          ],
+          "triggers": [
+            "代码",
+            "分析",
+            "生成",
+            "审查"
+          ],
           "dependencies": []
         },
         "external-absorption": {
           "description": "外部仓库功能吸收工作流",
-          "tags": ["absorption", "architecture", "gap-analysis", "repo-analysis"],
-          "triggers": ["分析仓库", "吸收功能", "对比项目"],
+          "tags": [
+            "absorption",
+            "architecture",
+            "gap-analysis",
+            "repo-analysis"
+          ],
+          "triggers": [
+            "分析仓库",
+            "吸收功能",
+            "对比项目"
+          ],
           "dependencies": []
         },
         "law-expert": {
           "description": "法律专业知识",
-          "tags": ["law", "legal", "expertise"],
-          "triggers": ["法律", "合同", "法规"],
+          "tags": [
+            "law",
+            "legal",
+            "expertise"
+          ],
+          "triggers": [
+            "法律",
+            "合同",
+            "法规"
+          ],
           "dependencies": []
         },
         "mcp-gateway": {
           "description": "Unified MCP server gateway",
-          "tags": ["mcp", "gateway", "tools", "aggregation"],
-          "triggers": ["MCP", "网关", "工具聚合"],
+          "tags": [
+            "mcp",
+            "gateway",
+            "tools",
+            "aggregation"
+          ],
+          "triggers": [
+            "MCP",
+            "网关",
+            "工具聚合"
+          ],
           "dependencies": []
         },
         "self-health": {
           "description": "系统自健康检查",
-          "tags": ["health", "self-check", "diagnostics"],
-          "triggers": ["健康", "检查", "诊断"],
+          "tags": [
+            "health",
+            "self-check",
+            "diagnostics"
+          ],
+          "triggers": [
+            "健康",
+            "检查",
+            "诊断"
+          ],
           "dependencies": []
         },
         "self-iteration-agent": {
           "description": "Full-stack project iteration protocol",
-          "tags": ["iteration", "evolution", "absorption", "orchestration"],
-          "triggers": ["迭代", "进化", "吸收", "改进"],
-          "dependencies": ["external-absorption"]
+          "tags": [
+            "iteration",
+            "evolution",
+            "absorption",
+            "orchestration"
+          ],
+          "triggers": [
+            "迭代",
+            "进化",
+            "吸收",
+            "改进"
+          ],
+          "dependencies": [
+            "external-absorption"
+          ]
         },
         "design-patrol": {
           "description": "设计能力自动巡检 — 依赖环/孤岛/跨层违规/扁平缺陷/冗余/配置缺失 6规则检测",
-          "tags": ["patrol", "health", "auto-inspect", "redundancy", "flat-defect"],
-          "triggers": ["巡检", "检查", "健康", "冗余", "缺陷"],
-          "dependencies": []
-        }
-      }
-    },
-    "trending": {
-      "description": "热门项目模式",
-      "tags": ["trending", "patterns", "best-practices"],
-      "skills": {
-        "trending": {
-          "description": "GitHub 热门项目模式总览",
-          "tags": ["trending", "overview", "patterns"],
-          "triggers": ["热门", "模式", "趋势"],
-          "dependencies": []
-        },
-        "agent-skills": {
-          "description": "生产级工程技能模式",
-          "tags": ["production", "engineering", "skills"],
-          "triggers": ["生产级", "工程技能"],
-          "dependencies": []
-        },
-        "ai-infra": {
-          "description": "AI 基础设施模式",
-          "tags": ["ai", "infrastructure", "agents"],
-          "triggers": ["AI基础设施", "AI代理"],
-          "dependencies": []
-        },
-        "computer-use": {
-          "description": "计算机使用 2.0 模式",
-          "tags": ["computer", "use", "automation"],
-          "triggers": ["计算机使用", "自动化操作"],
-          "dependencies": []
-        },
-        "memory-engine": {
-          "description": "记忆和上下文引擎模式",
-          "tags": ["memory", "context", "rag", "engine"],
-          "triggers": ["记忆引擎", "上下文", "RAG"],
-          "dependencies": []
-        },
-        "security-audit": {
-          "description": "安全审计技能模式",
-          "tags": ["security", "audit", "vulnerability"],
-          "triggers": ["安全审计", "漏洞扫描"],
+          "tags": [
+            "patrol",
+            "health",
+            "auto-inspect",
+            "redundancy",
+            "flat-defect"
+          ],
+          "triggers": [
+            "巡检",
+            "检查",
+            "健康",
+            "冗余",
+            "缺陷"
+          ],
           "dependencies": []
         }
       }
@@ -409,76 +832,255 @@
       "skills": {
         "nt_multimodal": {
           "description": "Multimodal file inspection via Qwen-MM-Plugins bridge — media_info first, dynamic-resolution read_image/read_video, visualize-anything, save_view chains, credential-gated web/image search, plus local PDF text grounding",
-          "tags": ["multimodal", "vision", "video", "mcp", "qwen-mm-plugins"],
-          "triggers": ["multimodal", "image", "video", "visualize", "media_info", "read_image", "reverse-image"],
-          "exclusions": ["text-only document parsing (use nt_file_ability)", "model training (use models/training)"],
+          "tags": [
+            "multimodal",
+            "vision",
+            "video",
+            "mcp",
+            "qwen-mm-plugins"
+          ],
+          "triggers": [
+            "multimodal",
+            "image",
+            "video",
+            "visualize",
+            "media_info",
+            "read_image",
+            "reverse-image"
+          ],
+          "exclusions": [
+            "text-only document parsing (use nt_file_ability)",
+            "model training (use models/training)"
+          ],
           "output_contract": "tool calls return text plus saved-image file paths; search tools require backend API keys",
           "license": "Apache-2.0 (upstream QwenLM/Qwen-MM-Plugins); glue code follows repo license",
-          "dependencies": ["mcp-gateway"]
+          "dependencies": [
+            "mcp-gateway"
+          ]
         }
       }
     }
   },
   "skill_index": {
-    "nt_multimodal/nt_multimodal": {"category": "nt_multimodal", "file": "nt_multimodal/SKILL.md"},
-    "architecture-auditor": {"category": "architecture-auditor", "file": "architecture-auditor/SKILL.md"},
-    "architecture-auditor/diagnose": {"category": "architecture-auditor", "file": "architecture-auditor/diagnose/SKILL.md"},
-    "architecture-auditor/domain-modeling": {"category": "architecture-auditor", "file": "architecture-auditor/domain-modeling/SKILL.md"},
-    "architecture-auditor/grill-me": {"category": "architecture-auditor", "file": "architecture-auditor/grill-me/SKILL.md"},
-    "architecture-auditor/improve-architecture": {"category": "architecture-auditor", "file": "architecture-auditor/improve-architecture/SKILL.md"},
-    "architecture-auditor/observability": {"category": "architecture-auditor", "file": "architecture-auditor/observability/SKILL.md"},
-    "architecture-auditor/performance": {"category": "architecture-auditor", "file": "architecture-auditor/performance/SKILL.md"},
-    "architecture-auditor/tdd": {"category": "architecture-auditor", "file": "architecture-auditor/tdd/SKILL.md"},
-    "architecture-auditor/testing": {"category": "architecture-auditor", "file": "architecture-auditor/testing/SKILL.md"},
-    "architecture-auditor/zoom-out": {"category": "architecture-auditor", "file": "architecture-auditor/zoom-out/SKILL.md"},
-    "code-expert": {"category": "root", "file": "code-expert/SKILL.md"},
-    "config": {"category": "config", "file": "config/SKILL.md"},
-    "config/cliff": {"category": "config", "file": "config/cliff/SKILL.md"},
-    "config/deny": {"category": "config", "file": "config/deny/SKILL.md"},
-    "config/env": {"category": "config", "file": "config/env/SKILL.md"},
-    "config/gitleaks": {"category": "config", "file": "config/gitleaks/SKILL.md"},
-    "config/package": {"category": "config", "file": "config/package/SKILL.md"},
-    "crates": {"category": "crates", "file": "crates/SKILL.md"},
-    "crates/neotrix-sysctl": {"category": "crates", "file": "crates/neotrix-sysctl/SKILL.md"},
-    "crates/neotrix-types": {"category": "crates", "file": "crates/neotrix-types/SKILL.md"},
-    "crates/nt-lang": {"category": "crates", "file": "crates/nt-lang/SKILL.md"},
-    "design/design-core": {"category": "design", "file": "design/design-core/SKILL.md"},
-    "design/design-audit": {"category": "design", "file": "design/design-audit/SKILL.md"},
-    "design/design-identity": {"category": "design", "file": "design/design-identity/SKILL.md"},
-    "dev-tools": {"category": "dev-tools", "file": "dev-tools/SKILL.md"},
-    "dev-tools/build-desktop": {"category": "dev-tools", "file": "dev-tools/build-desktop/SKILL.md"},
-    "dev-tools/daemon-monitor": {"category": "dev-tools", "file": "dev-tools/daemon-monitor/SKILL.md"},
-    "dev-tools/git-hook": {"category": "dev-tools", "file": "dev-tools/git-hook/SKILL.md"},
-    "dev-tools/launchd-service": {"category": "dev-tools", "file": "dev-tools/launchd-service/SKILL.md"},
-    "dev-tools/pre-build-check": {"category": "dev-tools", "file": "dev-tools/pre-build-check/SKILL.md"},
-    "dev-tools/project-map": {"category": "dev-tools", "file": "dev-tools/project-map/SKILL.md"},
-    "docs": {"category": "docs", "file": "docs/SKILL.md"},
-    "docs/adr": {"category": "docs", "file": "docs/adr/SKILL.md"},
-    "docs/agent-instructions": {"category": "docs", "file": "docs/agent-instructions/SKILL.md"},
-    "docs/architecture": {"category": "docs", "file": "docs/architecture/SKILL.md"},
-    "docs/changelog": {"category": "docs", "file": "docs/changelog/SKILL.md"},
-    "docs/contribution": {"category": "docs", "file": "docs/contribution/SKILL.md"},
-    "docs/design": {"category": "docs", "file": "docs/design/SKILL.md"},
-    "docs/development-rules": {"category": "docs", "file": "docs/development-rules/SKILL.md"},
-    "docs/domain-language": {"category": "docs", "file": "docs/domain-language/SKILL.md"},
-    "docs/guides": {"category": "docs", "file": "docs/guides/SKILL.md"},
-    "docs/license-exceptions": {"category": "docs", "file": "docs/license-exceptions/SKILL.md"},
-    "docs/project-overview": {"category": "docs", "file": "docs/project-overview/SKILL.md"},
-    "docs/security": {"category": "docs", "file": "docs/security/SKILL.md"},
-    "docs/todo": {"category": "docs", "file": "docs/todo/SKILL.md"},
-    "external-absorption": {"category": "root", "file": "external-absorption/SKILL.md"},
-    "law-expert": {"category": "root", "file": "law-expert/SKILL.md"},
-    "mcp-gateway": {"category": "root", "file": "mcp-gateway/SKILL.md"},
-    "productivity/caveman": {"category": "productivity", "file": "productivity/caveman/SKILL.md"},
-    "self-health": {"category": "root", "file": "self-health/SKILL.md"},
-    "self-iteration-agent": {"category": "root", "file": "self-iteration-agent/SKILL.md"},
-    "self-iteration-agent/conversation-as-os": {"category": "root", "file": "self-iteration-agent/conversation-as-os/SKILL.md"},
-    "design-patrol": {"category": "root", "file": "root/design-patrol/SKILL.md"},
-    "trending": {"category": "trending", "file": "trending/SKILL.md"},
-    "trending/agent-skills": {"category": "trending", "file": "trending/agent-skills/SKILL.md"},
-    "trending/ai-infra": {"category": "trending", "file": "trending/ai-infra/SKILL.md"},
-    "trending/computer-use": {"category": "trending", "file": "trending/computer-use/SKILL.md"},
-    "trending/memory-engine": {"category": "trending", "file": "trending/memory-engine/SKILL.md"},
-    "trending/security-audit": {"category": "trending", "file": "trending/security-audit/SKILL.md"}
+    "nt_multimodal/nt_multimodal": {
+      "category": "nt_multimodal",
+      "file": "nt_multimodal/SKILL.md"
+    },
+    "architecture-auditor": {
+      "category": "architecture-auditor",
+      "file": "architecture-auditor/SKILL.md"
+    },
+    "architecture-auditor/diagnose": {
+      "category": "architecture-auditor",
+      "file": "architecture-auditor/diagnose/SKILL.md"
+    },
+    "architecture-auditor/domain-modeling": {
+      "category": "architecture-auditor",
+      "file": "architecture-auditor/domain-modeling/SKILL.md"
+    },
+    "architecture-auditor/grill-me": {
+      "category": "architecture-auditor",
+      "file": "architecture-auditor/grill-me/SKILL.md"
+    },
+    "architecture-auditor/improve-architecture": {
+      "category": "architecture-auditor",
+      "file": "architecture-auditor/improve-architecture/SKILL.md"
+    },
+    "architecture-auditor/observability": {
+      "category": "architecture-auditor",
+      "file": "architecture-auditor/observability/SKILL.md"
+    },
+    "architecture-auditor/performance": {
+      "category": "architecture-auditor",
+      "file": "architecture-auditor/performance/SKILL.md"
+    },
+    "architecture-auditor/tdd": {
+      "category": "architecture-auditor",
+      "file": "architecture-auditor/tdd/SKILL.md"
+    },
+    "architecture-auditor/testing": {
+      "category": "architecture-auditor",
+      "file": "architecture-auditor/testing/SKILL.md"
+    },
+    "architecture-auditor/zoom-out": {
+      "category": "architecture-auditor",
+      "file": "architecture-auditor/zoom-out/SKILL.md"
+    },
+    "config": {
+      "category": "config",
+      "file": "config/SKILL.md"
+    },
+    "config/cliff": {
+      "category": "config",
+      "file": "config/cliff/SKILL.md"
+    },
+    "config/deny": {
+      "category": "config",
+      "file": "config/deny/SKILL.md"
+    },
+    "config/env": {
+      "category": "config",
+      "file": "config/env/SKILL.md"
+    },
+    "config/gitleaks": {
+      "category": "config",
+      "file": "config/gitleaks/SKILL.md"
+    },
+    "config/package": {
+      "category": "config",
+      "file": "config/package/SKILL.md"
+    },
+    "crates": {
+      "category": "crates",
+      "file": "crates/SKILL.md"
+    },
+    "crates/neotrix-sysctl": {
+      "category": "crates",
+      "file": "crates/neotrix-sysctl/SKILL.md"
+    },
+    "crates/neotrix-types": {
+      "category": "crates",
+      "file": "crates/neotrix-types/SKILL.md"
+    },
+    "crates/nt-lang": {
+      "category": "crates",
+      "file": "crates/nt-lang/SKILL.md"
+    },
+    "design/design-core": {
+      "category": "design",
+      "file": "design/design-core/SKILL.md"
+    },
+    "design/design-audit": {
+      "category": "design",
+      "file": "design/design-audit/SKILL.md"
+    },
+    "design/design-identity": {
+      "category": "design",
+      "file": "design/design-identity/SKILL.md"
+    },
+    "dev-tools": {
+      "category": "dev-tools",
+      "file": "dev-tools/SKILL.md"
+    },
+    "dev-tools/build-desktop": {
+      "category": "dev-tools",
+      "file": "dev-tools/build-desktop/SKILL.md"
+    },
+    "dev-tools/daemon-monitor": {
+      "category": "dev-tools",
+      "file": "dev-tools/daemon-monitor/SKILL.md"
+    },
+    "dev-tools/git-hook": {
+      "category": "dev-tools",
+      "file": "dev-tools/git-hook/SKILL.md"
+    },
+    "dev-tools/launchd-service": {
+      "category": "dev-tools",
+      "file": "dev-tools/launchd-service/SKILL.md"
+    },
+    "dev-tools/pre-build-check": {
+      "category": "dev-tools",
+      "file": "dev-tools/pre-build-check/SKILL.md"
+    },
+    "dev-tools/project-map": {
+      "category": "dev-tools",
+      "file": "dev-tools/project-map/SKILL.md"
+    },
+    "docs": {
+      "category": "docs",
+      "file": "docs/SKILL.md"
+    },
+    "docs/adr": {
+      "category": "docs",
+      "file": "docs/adr/SKILL.md"
+    },
+    "docs/agent-instructions": {
+      "category": "docs",
+      "file": "docs/agent-instructions/SKILL.md"
+    },
+    "docs/architecture": {
+      "category": "docs",
+      "file": "docs/architecture/SKILL.md"
+    },
+    "docs/changelog": {
+      "category": "docs",
+      "file": "docs/changelog/SKILL.md"
+    },
+    "docs/contribution": {
+      "category": "docs",
+      "file": "docs/contribution/SKILL.md"
+    },
+    "docs/design": {
+      "category": "docs",
+      "file": "docs/design/SKILL.md"
+    },
+    "docs/development-rules": {
+      "category": "docs",
+      "file": "docs/development-rules/SKILL.md"
+    },
+    "docs/domain-language": {
+      "category": "docs",
+      "file": "docs/domain-language/SKILL.md"
+    },
+    "docs/guides": {
+      "category": "docs",
+      "file": "docs/guides/SKILL.md"
+    },
+    "docs/license-exceptions": {
+      "category": "docs",
+      "file": "docs/license-exceptions/SKILL.md"
+    },
+    "docs/project-overview": {
+      "category": "docs",
+      "file": "docs/project-overview/SKILL.md"
+    },
+    "docs/security": {
+      "category": "docs",
+      "file": "docs/security/SKILL.md"
+    },
+    "docs/todo": {
+      "category": "docs",
+      "file": "docs/todo/SKILL.md"
+    },
+    "external-absorption": {
+      "category": "root",
+      "file": "external-absorption/SKILL.md"
+    },
+    "productivity/caveman": {
+      "category": "productivity",
+      "file": "productivity/caveman/SKILL.md"
+    },
+    "self-health": {
+      "category": "root",
+      "file": "self-health/SKILL.md"
+    },
+    "self-iteration-agent": {
+      "category": "root",
+      "file": "self-iteration-agent/SKILL.md"
+    },
+    "self-iteration-agent/conversation-as-os": {
+      "category": "root",
+      "file": "self-iteration-agent/conversation-as-os/SKILL.md"
+    },
+    "design-patrol": {
+      "category": "root",
+      "file": "root/design-patrol/SKILL.md"
+    }
+  },
+  "_pruned_2026_09_29": {
+    "removed_from_skill_index": [
+      "code-expert",
+      "law-expert",
+      "mcp-gateway",
+      "trending",
+      "trending/agent-skills",
+      "trending/ai-infra",
+      "trending/computer-use",
+      "trending/memory-engine",
+      "trending/security-audit"
+    ],
+    "removed_category": "trending",
+    "reason": "trending 5 张模式卡 139 行全无 Usage/Script 段、纯元数据，其 memory-engine 卡出处 supermemory 引擎闭源（ABSORPTION-AGENT-ARCH2-2026-09-29 §证伪前提）；code-expert / law-expert 作者自标「占位，零实现」；mcp-gateway 是幻觉文档——其 Built-in Tools 的 gateway_status / add_server 在全仓 .rs 零命中。同步删除 skills/docs-architecture/（v0.21 快照）。",
+    "kept_deliberately": "self-health / self-iteration-agent / external-absorption 仍不在 skill_index 内——这是设计而非遗漏，见 skill_loader.rs:97-106 的 SkillInvocationPolicy（model_invocable / user_invocable 正交）。"
   }
 }
