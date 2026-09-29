@@ -21,6 +21,7 @@ cargo build -p neotrix                  # 完整构建
 - 禁多窗口同时跑 `--all-targets` / `--test` 全量构建（16G 机必爆 swap）。
 - 关窗口前写 `sessions/handoff-<窗口>.md`（模板见 `sessions/HANDOFF-TEMPLATE.md`），收齐 + stash 兜底后再关。
 - 写文件前重读（R-P16），禁整文件覆写他人内容；`stash pop / checkout -- <path>` 前先喊一声（2026-09-22 三次覆盖事故）。
+- **提交用 `git commit --only <我的文件...>`**（2026-09-29 两次实测事故）：共享 index 下「暂存区核对」与「提交」**不原子** —— 我两次都核对通过，仍在其间被他窗插入暂存。⛔ pre-commit 门防不了（三种 commit 方式都只给 hook 传 0 个参数）；补救见 `sessions/handoff-commit-only-2026-09-29.md`。
 
 ## 模块前缀规范
 
