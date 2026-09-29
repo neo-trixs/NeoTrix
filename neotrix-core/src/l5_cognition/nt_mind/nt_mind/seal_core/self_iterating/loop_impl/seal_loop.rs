@@ -694,10 +694,18 @@ impl SelfIteratingBrain {
         // ── NT-CORE 自我模型钩子 (T6): 候选行为变更产出后, 若 SelfModel 可用,
         //    评估其价值并回写自我状态。默认 feature 关闭 → 编译掉, 不影响既有逻辑;
         //    开启 `self_model` feature 后自动接线 (无需修改 brain 结构字段)。
-        //    真实启发式见 `l0_substrate::nt_core_cross_layer::SelfModel::value_function` TODO(T6)。
+        //    2026-09-29 审计修复：上一行注释指向
+        //    `l0_substrate::nt_core_cross_layer::SelfModel` 并标 TODO(T6) ——
+        //    **该文件里根本没有 SelfModel**（已 grep 确认），注释写于功能落地前且从未复核。
+        //    真实实现在 `l6_meta::nt_core_self_model::SelfModel`，facade 别名为
+        //    **`ValueSelfModel`**（l1_facade_meta.rs:183），已有完整 value_function
+        //    （关键词投影）与 update，被 17 处引用。原先用的 `l1_facade::SelfModel`
+        //    指向另一个类型（`nt_core_self::self_model::SelfModel`，facade:168），
+        //    **它没有这两个方法** ⇒ 该 feature 自落地起就编不过（E0599 ×2）。
+        //    结论：不是「未完成的功能」，是一行 facade 用错别名。
         #[cfg(feature = "self_model")]
         {
-            let mut model = crate::l5_cognition::l1_facade::SelfModel::new();
+            let mut model = crate::l5_cognition::l1_facade::ValueSelfModel::new();
             let v = model.value_function(candidate);
             log::debug!("[seal][self-model] candidate value={:.4}", v);
             if let Err(e) = model.update(candidate) {
