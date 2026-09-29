@@ -27,13 +27,14 @@
 ~/Downloads/Neo/weights-backup/training-20260928.tar.gz.sha256  校验和
 ```
 
-**跨盘（本机无第二块盘，需手动）：**
+**跨盘：已完成 2026-09-29。**
 ```bash
-cp ~/Downloads/Neo/weights-backup/training-20260928.tar.gz* /Volumes/<你的盘>/
-# 到那边后验一下：
-shasum -a 256 /Volumes/<你的盘>/training-20260928.tar.gz
-# 必须等于 training-20260928.tar.gz.sha256 里的值
+# 已执行：
+cp ~/Downloads/Neo/weights-backup/training-20260928.tar.gz* /Volumes/NeoTrixBrain/
+# 对端校验：training-20260928.tar.gz: OK（57M，shasum -c 通过）
 ```
+此后 training/ 若有新增成果，重跑 `backup` 后需重新拷贝（只拷新 tar.gz + sha256 即可）。
+新备份命名带日期，旧文件保留在盘上不删 —— 回滚时要知道哪个是最新的。
 
 55 个文件（已排除 `__pycache__` / `*.pyc`，那些是编译产物）。
 往返验证：解包到临时区，55 个文件与源 `diff -q` 无差异。
