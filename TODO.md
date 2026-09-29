@@ -59,7 +59,8 @@
 | ~~5~~ | ~~更新 `DECISIONS-2026-09-28.md` 的 B-2 状态~~ | 文档 | ✅ **已完成**（含订正「`es` 角色接反」这个被证伪的首因诊断） |
 | ~~3~~ | ~~提交 B-2 重写 + 文档~~ | 提交 | ✅ **已完成**：`a9d00624`（代码）+ `54e48f2e`（文档），P0 门通过，未用 `--no-verify` |
 | ~~4~~ | ~~整合 `f_merged_ratchet` 到干净分支~~ | 集成 | ✅ **已完成**：`f_merged_ratchet@64838ca3` |
-| 8 | **把 `f_integrated@889bb1a5` 快进进主干** | 集成 | ⏔ **待他窗落定**：主树 61 个未提交文件，其中 4 个与快进重叠。主树是活跃窗口，AGENTS.md 禁止我擅自 `checkout --`。安全网已存 `.neotrix/worktree-salvage/main-overlap-20260929.patch`；命令见 `sessions/handoff-20260929-b2-noise-final.md` §9.3 |
+| ~~8~~ | ~~把 `f_integrated` 快进进主干~~ | 集成 | ✅ **已完成**（2026-09-29）：主干 `feat/capability-absorb-20260828` 已快进到 `df0273e2`。分层门 **PASS 0 new / 8 known**、全量 **12194 passed / 0 failed**、他窗 59 个脏文件 **0 个被波及**。明细见 `sessions/handoff-20260929-b2-noise-final.md` §9.4 |
+| 9 | 收掉本会话的 2 处 worktree（`integrate` / `merge-test`） | 收工 | ⏔ `prune` 的「近3h有 .rs 改动」判据拦下（合并 checkout 刷新全树 mtime，判据无法区分他窗/自己）。commit 全在分支上，零丢失，下会话 `prune --force` 即可 |
 | 6 | 经验吸收：`neotrix-experience absorb` 把 L23–L26 入 KB | 收尾 | **待办** |
 | 7 | 收工：`nt_worktree_gate.sh check` → 自己开的 worktree 走 `prune`（**禁手删**） | 收工 | **待办**（硬规则） |
 
