@@ -135,3 +135,73 @@
 - 门红归因：内存门 `BLOCKED` 属**他窗正在编译**（`pgrep -x rustc` 可见），非本会话引入。
 - 分层门剩余 8 条全是**已记录不可改道项**（l0 无对应真实现 / 字符串字面量），
   只能留基线；**删基线会让 CI 红**。明细见 `DECISIONS-2026-09-28.md`。
+
+---
+
+## 9. 合并落地（2026-09-29 追加 · 自决推进）
+
+### 9.1 已在干净台子完成试合并并验证
+
+在 `git worktree add --detach <main-HEAD>`（AGENTS.md 规定的测量台）上合入
+`f_merged_ratchet`，**未触碰主工作树的任何文件**。
+
+- 合并提交：**`889bb1a5`**，交付分支 **`f_integrated`**
+- 冲突：**仅 1 处**（`TODO.md` —— 两个窗口都重写顶部摘要区），
+  按「无损保留两段」解决，三段（桌面端收尾 / B-2 窗口 / DSH-neobot）全在
+- `f_integrated` **可快进**主干（主干已是其祖先）
+
+合并态实测（干净检出，**非脏树**）：
+
+| 检查 | 结果 |
+|---|---|
+| `check-layer-deps.sh --strict` | **PASS 0 new / 8 known**（合并前主干为 102 known ⇒ 棘轮在合并中存活） |
+| `cargo test -p neotrix --lib` | **12194 passed / 0 failed / 41 ignored** |
+| `cargo check -p neotrix --features ios-bridge` | **Finished，0 error** |
+| pre-commit P0 门 | 通过（未用 `--no-verify`） |
+
+> 合并前在干净台子上量到主干是 **102 known**，脏树会给出不同数字 ——
+> 这就是教训 L8 的实际兑现：**不试合并就不知道基线会不会退化**。
+
+### 9.2 为什么没有直接落到主工作树
+
+主工作树是**另一个活跃窗口**（`AGENTS.md` mtime 12:40），有 61 个未提交文件。
+AGENTS.md 两次记录过覆盖事故（2026-09-22 三次覆盖），
+明确要求「`checkout -- <path>` 前先喊一声」⇒ **自决不碰主树文件**。
+
+已核实 4 个重叠文件（`layer-deps-baseline.txt` / `crypto/kdf.rs` /
+`nt_core_kb_primitives.rs` / `evolution_daemon.rs`）：
+
+- 其中 3 个，我的版本是主树工作区的**严格超集**（对方没有的行 = 0）
+- `kdf.rs`：主树工作区是**本会话 B-2 工作的早期快照**（mtime 11:07），
+  其独有的 26 行**全部**是我随后修掉的旧版 —— `counter += 1`、
+  旧 `blake2s_extract`（`HASH(salt‖ikm)`）、3 个 `.expect`、非 `Result` 返回、
+  以及那条**假「实测」注释**。**零信息损失。**
+- 其余 55 个脏文件与合并改动**不重叠**，快进不会碰它们
+
+**安全网**：那 4 个文件当前的未提交状态已存为
+`.neotrix/worktree-salvage/main-overlap-20260929.patch`（426 行 / 4 文件，
+`git apply --check --reverse` 通过）。
+
+### 9.3 落地命令（一条，零风险）
+
+等那个窗口提交或暂存自己的 61 个文件后：
+
+```sh
+cd /Users/neo/Downloads/neotrix
+git merge --ff-only f_integrated
+```
+
+若那 4 个重叠文件仍未落定，先兜底再快进：
+
+```sh
+git diff -- neotrix-core/src/l3_embodiment/nt_shield/nt_shield_ztnet/crypto/kdf.rs \
+           scripts/layer-deps-baseline.txt \
+           neotrix-core/src/l0_substrate/nt_core_kb_primitives.rs \
+           neotrix-core/src/l5_cognition/nt_mind/evolution/evolution_daemon.rs \
+  | tee /tmp/pre-ff-$(date +%H%M%S).patch
+git checkout -- <那 4 个文件>       # 已被 f_integrated 的更正版取代
+git merge --ff-only f_integrated
+```
+
+合并后建议刷一次门：`bash scripts/check-layer-deps.sh --strict`
+（期望仍 `PASS 0 new / 8 known`）。

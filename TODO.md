@@ -57,8 +57,9 @@
 | ~~1~~ | ~~cargo 验证 B-2（官方向量验收测试）~~ | 验证 | ✅ **已完成**（2026-09-29）：`full_handshake_matches_official_vectors ... ok` |
 | ~~2~~ | ~~串行全量验证链~~ | 验证 | ✅ **已完成**：`check --tests` **0 error**；`lib` **12175 passed / 0 failed / 41 ignored**；`--features ios-bridge` **Finished 0 error**；`check-layer-deps.sh --strict` **PASS 0 new / 8 known / RC=0** |
 | ~~5~~ | ~~更新 `DECISIONS-2026-09-28.md` 的 B-2 状态~~ | 文档 | ✅ **已完成**（含订正「`es` 角色接反」这个被证伪的首因诊断） |
-| 3 | **提交** B-2 重写 + 文档（7 个文件） | 提交 | **待办**；**禁止 `git add -A`**（主树有他窗 WIP） |
-| 4 | 整合 `f_merged_ratchet@eb9373a4` + B-2 到干净分支 | 集成 | **待办**；主工作树有他窗 WIP，`git branch -f` 会失败 |
+| ~~3~~ | ~~提交 B-2 重写 + 文档~~ | 提交 | ✅ **已完成**：`a9d00624`（代码）+ `54e48f2e`（文档），P0 门通过，未用 `--no-verify` |
+| ~~4~~ | ~~整合 `f_merged_ratchet` 到干净分支~~ | 集成 | ✅ **已完成**：`f_merged_ratchet@64838ca3` |
+| 8 | **把 `f_integrated@889bb1a5` 快进进主干** | 集成 | ⏔ **待他窗落定**：主树 61 个未提交文件，其中 4 个与快进重叠。主树是活跃窗口，AGENTS.md 禁止我擅自 `checkout --`。安全网已存 `.neotrix/worktree-salvage/main-overlap-20260929.patch`；命令见 `sessions/handoff-20260929-b2-noise-final.md` §9.3 |
 | 6 | 经验吸收：`neotrix-experience absorb` 把 L23–L26 入 KB | 收尾 | **待办** |
 | 7 | 收工：`nt_worktree_gate.sh check` → 自己开的 worktree 走 `prune`（**禁手删**） | 收工 | **待办**（硬规则） |
 
