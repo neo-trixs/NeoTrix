@@ -61,7 +61,7 @@
 | ~~4~~ | ~~整合 `f_merged_ratchet` 到干净分支~~ | 集成 | ✅ **已完成**：`f_merged_ratchet@64838ca3` |
 | ~~8~~ | ~~把 `f_integrated` 快进进主干~~ | 集成 | ✅ **已完成**（2026-09-29）：主干 `feat/capability-absorb-20260828` 已快进到 `df0273e2`。分层门 **PASS 0 new / 8 known**、全量 **12194 passed / 0 failed**、他窗 59 个脏文件 **0 个被波及**。明细见 `sessions/handoff-20260929-b2-noise-final.md` §9.4 |
 | ~~9~~ | ~~收掉本会话的 2 处 worktree~~ | 收工 | ✅ **已完成**（2026-09-29）：根因不在时机、在门的判据 —— mtime 启发式分不清「他窗在写」与「我刚做完」。已修为「脏才看 mtime」（干净+已并入分支 ⇒ 可证无损），并**造真实反例自测**确认脏 worktree 保护未放松。3 支冗余分支（`f_merged_ratchet`/`f_integrated`/`fix/bitemporal-and-layer-ratchet`）已用 `git branch -d` 删除 |
-| 10 | **`noise_handshake` 接到生产**（R-P79） | 实现 | 🟡 B-2 范围（对齐 spec）已完成并合入主干，但该模块**零生产消费者** —— 全仓仅 `crypto/mod.rs` 的 `pub mod` 声明 + 自身测试。接进 `nt_shield_ztnet` 实际传输路径是**另开票的工作**，本会话未做，也不应算作 B-2 已完成。Noise 协议已 spec-correct 且有官方向量验收，转生产无协议风险 |
+| ~~10~~ | ~~`noise_handshake` 接到生产（R-P79）~~ | 实现 | ✅ **已完成**（2026-09-29）：新增 `protocol/noise_ik.rs` —— C1 SANS-IO 协议引擎，作为 `noise_handshake` 的唯一生产消费者。分层方向合法（C1→C0），`noise_ik` 10 测试全绿，全量 **12207 passed / 0 failed**。⚠️ 接线时测试抓到我自己写死的错误断言（见下），已改为断言正确性质 |
 | 6 | 经验吸收：`neotrix-experience absorb` 把 L23–L26 入 KB | 收尾 | **待办** |
 | 7 | 收工：`nt_worktree_gate.sh check` → 自己开的 worktree 走 `prune`（**禁手删**） | 收工 | **待办**（硬规则） |
 
