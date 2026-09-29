@@ -43,7 +43,7 @@
 | 11 | `Epistemic{Exact,LowerBound}` 接线 | 本地资产 | `registry.rs:479` + `crates/nt-core-capability-tree/tests/epistemic_wiring.rs` | ✅ |
 | 12 | 干净检出可构建门 | 2026-09-27 事故 | `check-fresh-build.sh` | ✅ |
 | 13 | 分层依赖棘轮门 | 本地 | `check-layer-deps.sh --strict`（101 baseline） | ✅ |
-| 14 | test 失败账本 | 本地 | `check-test-baseline.sh` | ⚠️ **baseline 0 字节**（N-3） |
+| 14 | test 失败账本 | 本地 | `check-test-baseline.sh` | ✅ 全绿（12206/0 failed）；解析 bug 已修 |
 | 15 | `Epistemic` 默认 `LowerBound` | 本地 | `epistemic.rs:39` | ✅ |
 
 ### 0.3 记忆与知识类
@@ -68,7 +68,21 @@
 |---|---|---|---|---|---|
 | **N-1** | CI 幻影门拆除 + 引用门 | `awesome-dsh-plugin` | `check-ci-refs.sh` | 已完成 | ✅ |
 | **N-2** | 未编译代码检测 | K-Dense `CHECKS` 契约 | `check-truth-surface.sh` | 已完成（265 条入账） | ✅ |
-| **N-3** | **test 账本填充** | `cline` 孤儿化教训 | `check-test-baseline.sh` + baseline（**0 字节**） | 干净检出 `--strict`=0；注入失败=1 | ⚠️ |
+| **N-3** | **test 账本棘轮** | `cline` 孤儿化教训 | `check-test-baseline.sh` + baseline | 干净检出 `--strict`=0；注入失败=1 | ✅ |
+> **实测 2026-09-29（台账原记载已作废）**：原文「baseline **0 字节**」被标 ⚠️
+> 并列为待做。**实测证伪**：当前 `cargo test -p neotrix --lib` = **12206 passed / 0 failed**
+> ⇒ 脚本头注记的「12093 passed / 56 failed」是 **2026-09-28 的历史**，
+> 那 56 个断言失败**已还清**。
+> ⇒ 0 字节 baseline 是**真值（当前零债）**，不是「未填充的豁免缺口」。
+> ⛔ **不要**把 N-3 当待做项去「填充」它 —— 填出来的只会是虚构的债。
+>
+> 但核查过程中发现门**自身**有一个真 bug，已修（见 `check-test-baseline.sh`
+> 的 `extract_failing`）：失败名解析用 `grep -E "^test .* FAILED"`，
+> **会误中汇总行** `test result: FAILED. 12206 passed; ...`，
+> 把整行剥成一个**不存在的测试名**写进 baseline。
+> ⇒ 后果不只是脏数据：一旦被人手写进 baseline，等于**豁免了一个不存在的测试**。
+> ⇒ 已改为单点 `extract_failing`（两处重复逻辑合并为一处，防漂移），
+>   并用注入探针端到端验证：修复前 2 行（含汇总行），修复后**恰好 1 行**。
 | **N-4** | **skill policy 接线**（第一轮误标为「核心代码」） | 官方规范 | `skill_loader.rs:107-142` 三个 `visible_*` **零消费者** | `grep` ≥1 非测试消费者 | ⬜ |
 > **实测 2026-09-29（纠错记录）**：台账原文写「`skill_loader.rs:107-142` 三个 `visible_*` 零消费者」。
 > 逐条核实发现**两处不准**：(a) 实际只有**两个** `visible_*`（`:118` `visible_to_model`、

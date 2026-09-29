@@ -27,6 +27,27 @@
 
 set -uo pipefail
 
+# ── 失败测试名的唯一解析点（2026-09-29 修）──────────────────────────
+# ⛔ 原实现在两处重复写 `grep -E "^test .* FAILED"`，该正则**会误中汇总行**：
+#      test nt_foo::bar ... FAILED                 ← 真测试行
+#      test result: FAILED. 12206 passed; 1 failed   ← ⛔ 汇总行，被 sed 剥成
+#                                                       "result: FAILED. 12206 ..."，
+#                                                       作为一个**不存在的测试名**进 ledger。
+#
+# 后果不是"ledger 多一行脏数据"那么简单：`comm` 比对基线时，
+# 汇总行会与基线里的**任何**行都不同 ⇒ 每次都算 NEW（噪音），
+# 而一旦被人手写进基线，就等于**豁免了一个不存在的测试**。
+#
+# ⇒ 判据收紧为 `...` 分隔：cargo 的测试行恒为 `test <path> ... <状态>`，
+#   汇总行恒为 `test result: <状态>.`（点号紧跟状态、无 `...`）。
+extract_failing() {
+  # ⛔ 正则必须用**单引号**：双引号里 shell 会吃掉 `\`，使字符类中的 `[` 提前闭合并毁掉整个模式。
+  #   实测 `test a::b ... FAILED` 在双引号版下 grep 计数 = 0，单引号版 = 1。
+  grep -E '^test [^ ]+ \.\.\. FAILED$' "$1" \
+    | sed 's/^test //; s/ \.\.\. FAILED$//' \
+    | sort -u
+}
+
 BASELINE="scripts/test-failures-baseline.txt"
 STRICT=0
 UPDATE=0
@@ -68,8 +89,7 @@ if [ "$UPDATE" -eq 1 ]; then
     grep -E "^error" -A3 "$RAW" | head -12 | sed 's/^/  /'
     rm -f "$RAW"; exit 2
   fi
-  grep -E "^test .* FAILED" "$RAW" | sed 's/^test //; s/ \.\.\. FAILED$//' \
-    | sort -u > "$BASELINE"
+  extract_failing "$RAW" > "$BASELINE"
   echo "baseline updated: $(grep -c . "$BASELINE" || echo 0) failing test(s) -> $BASELINE"
   echo "NOTE: ratchet only downward. Each entry is a real assertion failure that"
   echo "      needs a product decision; this gate does not decide it for you."
@@ -102,8 +122,7 @@ if [ "$RC" -eq 0 ]; then
   exit 0
 fi
 
-grep -E "^test .* FAILED" "$RAW" | sed 's/^test //; s/ \.\.\. FAILED$//' \
-  | sort -u > "$CUR"
+extract_failing "$RAW" > "$CUR"
 TOTAL=$(grep -c . "$CUR" || true); TOTAL=${TOTAL:-0}
 
 if [ ! -f "$BASELINE" ]; then
