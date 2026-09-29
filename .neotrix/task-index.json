@@ -575,6 +575,20 @@
       "kind": "gate",
       "read_only": true,
       "when_not": "advisory，恒 exit 0。只报数不代劳。⛔ R-DISK-1：有 cargo 在跑时绝不可删 target/（会打断他窗构建），门会检测并提示。⛔⛔ 绝不可 rm -rf worktree 目录，走 nt_worktree_gate.sh prune。⚠️ 本门初版因在建议文案里写反引号包裹的 `cargo clean -p <crate>`，干跑时被 shell 当命令替换执行，删掉 115.2GiB —— 写示例命令一律用普通引号。"
+    },
+    {
+      "id": "check-gitleaks-version",
+      "query": [
+        "gitleaks 版本",
+        "密钥扫描版本",
+        "基线版本",
+        "版本错配",
+        "gitleaks 对齐"
+      ],
+      "tool": "bash scripts/check-gitleaks-version.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "CI 里自动跑（secret-scan job 第 3 步，扫描**之前**）。手工跑的场合：① 升级了 CI 的 GITLEAKS_VERSION；② 用本机 gitleaks 重生成了基线；③ 怀疑密钥扫描结果异常。⛔ 规则集变 ⇒ 基线必重生成，且重生成前必须**逐条人工判读**新增项 —— 无脑重生成会把真泄漏写进基线。"
     }
   ],
   "excluded": {

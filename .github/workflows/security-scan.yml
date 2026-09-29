@@ -58,11 +58,35 @@ jobs:
           fetch-depth: 0
 
       - name: Install gitleaks
+        # 版本必须与 config/.gitleaks-baseline.txt 的绑定版本一致（2026-09-29 对齐）。
+        # ⛔ 勿再降回 8.18.2：基线是按 8.30.1 生成的，而 8.18.2→8.30.1 之间规则集
+        # 有实质变更（v8.25 +clickhouse/perplexity · v8.28 +Anthropic +composite rules
+        # · v8.30 +Airtable/Looker）⇒ 新版报出的指纹不在基线内 ⇒ CI 首跑即红，
+        # 而那不是真泄漏，是版本错配。**规则集变 ⇒ 基线必重生成。**
+        env:
+          GITLEAKS_VERSION: 8.30.1
         run: |
-          curl -sLO https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz
-          tar -xzf gitleaks_8.18.2_linux_x64.tar.gz
-          sudo mv gitleaks /usr/local/bin/
-          gitleaks version
+          set -euo pipefail
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o gitleaks.tar.gz "$url"
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+          # 版本闸：装到的必须就是要的，否则基线错配、门形同虚设
+          installed="$(gitleaks version)"
+          echo "$installed"
+          case "$installed" in
+            *"$GITLEAKS_VERSION"*) ;;
+            *) echo "::error::gitleaks 版本错配：期望 ${GITLEAKS_VERSION}，实得 ${installed}"; exit 1 ;;
+          esac
+
+      - name: Verify gitleaks version matches baseline
+        run: |
+          # 版本错配 ⇒ 基线失效 ⇒ 门形同虚设。必须在**扫描之前**验，
+          # 否则等于用错版本的规则集去比对基线，结论没有意义。
+          if ! bash scripts/check-gitleaks-version.sh --strict; then
+            echo "::error::gitleaks 版本与基线不匹配 —— 基线由特定版本的规则集生成"
+            exit 1
+          fi
 
       - name: Run gitleaks secret scan
         run: |

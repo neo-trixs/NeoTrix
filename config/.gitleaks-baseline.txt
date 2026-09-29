@@ -1,4 +1,15 @@
 # gitleaks 存量基线（棘轮）— 每行一个 fingerprint。
+#
+# ⛔⛔ 本基线**绑定 gitleaks 8.30.1**（生成时的版本）。CI 的
+#   .github/workflows/security-scan.yml 已于 2026-09-29 对齐到同一版本，
+#   且加了版本闸（装到的版本不符即 exit 1）。
+#   **规则集变 ⇒ 基线必重生成**，否则新版报出的指纹不在基线内 ⇒ CI 假红。
+#   重生成：bash scripts/check-doc-drift.sh 无关；用
+#     gitleaks detect --source . --config config/.gitleaks.toml \
+#       --report-format json --report-path /tmp/r.json --exit-code 0
+#     jq -r '.[].Fingerprint' /tmp/r.json | sort -u
+#   ⚠️ 重生成前**必须**逐条人工判读新增项 —— 无脑重生成会把真泄漏写进基线。
+#
 # 2026-09-29 实测：59 处发现，逐一读代码确认**全部为密钥扫描器自身的测试夹具/公开常量**
 #   （ghp_abc123… / xoxb-1234… / USDC 合约地址 0xA0b869… / reCAPTCHA 公钥 6LeIxAcTAAAAA…），无真实泄漏。
 # ⛔ 绝不要为了让门变绿而删条目 —— 那等于把真泄漏写进基线。
