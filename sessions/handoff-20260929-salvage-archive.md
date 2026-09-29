@@ -113,3 +113,59 @@ check-fresh-build.sh --full       PASS (干净检出能构建)
 cargo check -p neotrix            Finished 0 error
 cargo check -p neotrix-neobot     Finished 0 error
 ```
+
+---
+
+## 9. 追加窗口（2026-09-29 23:0x）· 全域审计与映射
+
+### 9.1 已完成
+
+- [x] **codemap v2**：`items` 加行号/vis/impl/use，**82,737 符号 100% 命中真实声明行**
+- [x] 索引重建：`nt_locate --audit` **missing 541→0 / extra 900→0**
+- [x] 修 `area_of` 前缀顺序 bug（neobot crate 曾永不可达）
+- [x] 修正则只认 `pub` 的 bug（漏 `pub(crate)` 与裸 `fn`）
+- [x] **多维拓扑** `docs/architecture/CODE-TOPOLOGY.md`（6 维度，生成式）
+- [x] **全域审计**：unsafe 5 处（全 FFI）· panic 712 站点 · 重复类型 174 可归并
+- [x] **立 `check-unwrap.sh` + 712 站点基线棘轮**（此前明令规则零门管）
+- [x] 写 IM `/stop` 施工计划 `docs/plans/2026-09-29-im-stop-worker-pool-plan.md`
+- [x] `.project-map/` 取消跟踪（14MB 派生产物，1 秒重建）
+
+### 9.2 关键实测数据
+
+| 项 | 2026-09-24 (v1) | 2026-09-29 (v2) |
+|---|---|---|
+| 符号带行号 | **0** | **82,737（100% 实测）** |
+| neobot crate | **完全缺失（38 文件）** | ✅ |
+| 索引差集 | missing 541 / extra 900 | **0 / 0** |
+| 真实 unsafe | — | **5**（全在 `neotrix-sysctl` FFI） |
+| 生产 panic 站点 | **无门无基线** | **712 有基线棘轮** |
+| 重复类型 | — | 147 组真同构 / **174 可归并**（占名义多余 10%） |
+
+### 9.3 本窗口自踩的坑（追加 6 条，累计 15）
+
+| # | 坑 | 代价 | 教训 |
+|---|---|---|---|
+| 10 | 说「rust 无符号索引」 | 脚本用 `lang=='rust'`，实际值是 `'rs'` ⇒ 报错结论 | **先看数据结构的真实取值**再写过滤条件 |
+| 11 | 手写审计段落进生成物 | 重跑 `nt_topology.py` 会覆盖 | R-P79：生成内容必须**并进生成器** |
+| 12 | 字符串剥离写了 3 版 | ① 只跳注释(7/3/25 误报) ② 逐行(跨行 `r#""#` 漏 1) ③ 全局才对 | 每版都靠**读现场找反例**，不靠推理 |
+| 13 | 把「名义多余 1797」当「可归并」 | 输出「160%」荒谬值 | **三个相似口径的数必须分列**并各标含义 |
+| 14 | `check-unwrap.sh` 的 `if STRICT` 写在 heredoc 内 | **门恰在唯一该报警的输入上崩 = 失效开** | 作用域跨界要用**喂真实输入**验证，不能靠读 |
+| 15 | 测试文件识别只看目录 | `src/bin/experience/tests.rs` 被当生产，1,397 vs 1,398 | 目录**和** basename 都要匹配 |
+
+### 9.4 留给下一窗口
+
+1. 🔴 **轮换 9 个密钥** —— 只能用户做，单子在 `TODO.md` 🔴 P0
+2. 🟡 **裁决 `neotrix-sysctl` 的 `forbid` 声明**（含 5 处真 unsafe，声明失效）
+3. 🟡 **执行 IM `/stop` 计划** —— 需独立 worktree，勿在共享工作树原地改
+4. 🟢 **174 个重复类型归并** —— 逐组评估，`Severity` 跨层合并会改公开 API
+5. 🟢 `check-fresh-build.sh --full` 接进 CI（目前手动跑）
+6. 🟢 `DOCUMENTATION-MAP.md:157` 命名示例 / `docs/2-PLANS/` 占位 —— 待用户裁决
+
+### 9.5 收工自查（追加窗口）
+
+- 本窗口**新建 worktree**：无（全部原地 + 纯文档）
+- 我的未提交改动：**0**（逐笔 `git cat-file -e HEAD:<path>` 验证）
+- 他窗在途：7 项，全程零交叉（每笔提交前 `grep -vxF` 反查暂存区）
+- 门终态：`layout --strict` PASS · `doc-drift` 0 死链 · `unwrap --strict` rc=0 ·
+  `untracked-assets` PASS · `nt_locate --audit` **0/0** · `audit-all` 8 条可解析 ·
+  门自门恒红 0
