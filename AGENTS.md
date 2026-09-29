@@ -113,7 +113,7 @@
 
 ### 6.3 已废止（⛔ 勿读、勿实现）
 
-`ARCHITECTURE.md` §1-§12（已被 §13 推翻）· `EVOLUTION-ROADMAP-CODE-NODES-*.md`（行号/计数已部分失效，留作取证）· 根 `dev-rules.md`（已于 2026-09-29 删除；代码 `nt_core_self_constitution.rs` 的 legacy companion 候选对「文件不存在」分支本就是 stub-safe ⇒ 正典 `docs/standards/NEOTRIX-STD-1.0.md`）
+`ARCHITECTURE.md` §1-§12（已被 §13 推翻）· `EVOLUTION-ROADMAP-CODE-NODES-*.md`（行号/计数已部分失效，留作取证）· 根 `dev-rules.md`（已于 2026-09-29 删除。代码 `nt_core_self_constitution.rs` 的 legacy companion 候选对「文件不存在」分支本就是 stub-safe ⇒ 正典 `docs/standards/NEOTRIX-STD-1.0.md`。**删除等价性已实证**：`cargo test -p neotrix --lib self_constitution` 11 绿（含两个加载真实 AGENTS.md 的测试），且「桩存在」与「桩删除」两态结果完全相同；`--lib self_test` 60 绿。勿重跑）
 
 ## 7. 本地模型
 
