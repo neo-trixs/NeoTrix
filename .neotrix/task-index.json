@@ -561,5 +561,12 @@
       "files": "scripts/ops/__pycache__/ (7 个 .pyc)",
       "why": "悬空残影，源码已删（nt_docclaims/nt_foundation_laws/nt_hf_smelt_chains/nt_ipc_keys/nt_symbol_brain/nt_verify_sim）。建议 gitignore + 清理"
     }
+  },
+  "doc-claims": {
+    "intent": "文档里的断言被代码反驳（如「某模块零消费者」但其实有消费者）",
+    "tool": "bash scripts/check-doc-claims.sh",
+    "cost": "秒级，只读 git grep，无 cargo",
+    "when_not": "① 时点性断言（「上次跑是绿的」这类）判不了，需人工复核；② 历史交接件默认豁免（改它等于篡改历史），要查用 DOC_CLAIMS_SESSIONS=1；③ 短模块名/:: 记法碎片无法唯一解析，会跳过",
+    "notes": "本会话「死记录」复发 6 次的产物。带 commit hash 的行视作时点陈述并豁免。"
   }
 }

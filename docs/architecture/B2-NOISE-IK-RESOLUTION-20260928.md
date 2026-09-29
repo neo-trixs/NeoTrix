@@ -167,12 +167,17 @@ msg1 的 `es/s/ss`、msg2 的 `ee/se/psk`、msg3 的 `s/se` 与 nonce 自增。
 | `check-layer-deps.sh --strict` | PASS 0 new / 8 known |
 | 交接 | `sessions/handoff-20260929-b2-noise-final.md` |
 
-### 仍未决（唯一一项，需另开票）
+### 遗留项已闭环（2026-09-29 追加）
 
-`noise_handshake` 仍是**零生产消费者** —— 全仓仅 `crypto/mod.rs` 的 `pub mod` 声明
-与文件内测试。**B-2 的范围是「实现对齐 spec 并可验证」，已达成**；但按
-R-P79「外部技术必须同会话接到生产可用」，把它接进 `nt_shield_ztnet` 的实际传输
-路径是**另一件事**，本会话未做，也不应悄悄算作已完成。已记入 `TODO.md`。
+本节原写「唯一未决：`noise_handshake` 零生产消费者，需另开票」。**该记录已作废** ——
+同日新增 `protocol/noise_ik.rs`（C1 SANS-IO 协议引擎），把 C0 的 Noise 装配进
+实际路径，`noise_handshake` 现在**有生产消费者**，R-P79 闭环。
+
+⚠️ 此处保留一句自省：这段「未决」记于当天早些时候，闭环发生在同一天晚上，
+而**我没有回头改它**。同类「当前状态」记录本会话已作废 5 处
+（`DECISIONS` ×1、B-2 文档 ×1、TODO ×2、handoff §8.3 ×1）。
+⇒ 判据：**凡写着「当前/未决/遗留」的记录，写下当天就必须跟着每次提交复核**，
+否则它就是 R-SCAN-3 说的那种「比没有记录更危险」的死记录。
 
 ## 8. 方法论教训
 
