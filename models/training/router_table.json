@@ -1,0 +1,279 @@
+{
+ "time": "2026-09-24 22:01:37",
+ "elapsed": 380.9,
+ "default": "agentjev",
+ "table": {
+  "Agriculture___Food_(Essential)": {
+   "pick": "agentjev",
+   "n": 1,
+   "laya_acc": 0.0,
+   "jev_acc": 1.0,
+   "laya_brier": 0.222,
+   "jev_brier": 0.643
+  },
+  "Agriculture___Food_(Standard)_": {
+   "pick": "agentjev",
+   "n": 160,
+   "laya_acc": 0.269,
+   "jev_acc": 0.744,
+   "laya_brier": 0.238,
+   "jev_brier": 0.382
+  },
+  "Computing___Technology_(Compre": {
+   "pick": "agentjev",
+   "n": 94,
+   "laya_acc": 0.383,
+   "jev_acc": 0.809,
+   "laya_brier": 0.247,
+   "jev_brier": 0.389
+  },
+  "Computing___Technology_(Essent": {
+   "pick": "agentjev",
+   "n": 4,
+   "laya_acc": 0.5,
+   "jev_acc": 0.75,
+   "laya_brier": 0.252,
+   "jev_brier": 0.606
+  },
+  "Computing___Technology_(Standa": {
+   "pick": "agentjev",
+   "n": 124,
+   "laya_acc": 0.419,
+   "jev_acc": 0.758,
+   "laya_brier": 0.248,
+   "jev_brier": 0.366
+  },
+  "DIY___Repair_(Comprehensive)_-": {
+   "pick": "laya",
+   "n": 2,
+   "laya_acc": 1.0,
+   "jev_acc": 1.0,
+   "laya_brier": 0.263,
+   "jev_brier": 0.74
+  },
+  "DIY___Repair_(Essential)_-_Mot": {
+   "pick": "agentjev",
+   "n": 78,
+   "laya_acc": 0.359,
+   "jev_acc": 0.731,
+   "laya_brier": 0.245,
+   "jev_brier": 0.334
+  },
+  "DIY___Repair_(Essential)_-_Woo": {
+   "pick": "agentjev",
+   "n": 54,
+   "laya_acc": 0.278,
+   "jev_acc": 0.759,
+   "laya_brier": 0.236,
+   "jev_brier": 0.397
+  },
+  "DIY___Repair_(Standard)_-_DIY_": {
+   "pick": "agentjev",
+   "n": 93,
+   "laya_acc": 0.344,
+   "jev_acc": 0.763,
+   "laya_brier": 0.241,
+   "jev_brier": 0.368
+  },
+  "Education___Reference_(Compreh": {
+   "pick": "laya",
+   "n": 8,
+   "laya_acc": 0.75,
+   "jev_acc": 0.75,
+   "laya_brier": 0.275,
+   "jev_brier": 0.48
+  },
+  "Education___Reference_(Essenti": {
+   "pick": "agentjev",
+   "n": 2,
+   "laya_acc": 0.5,
+   "jev_acc": 1.0,
+   "laya_brier": 0.266,
+   "jev_brier": 0.362
+  },
+  "Education___Reference_(Standar": {
+   "pick": "laya",
+   "n": 1,
+   "laya_acc": 1.0,
+   "jev_acc": 1.0,
+   "laya_brier": 0.314,
+   "jev_brier": 0.604
+  },
+  "Medicine_(Comprehensive)_-_Lib": {
+   "pick": "laya",
+   "n": 14,
+   "laya_acc": 0.714,
+   "jev_acc": 0.714,
+   "laya_brier": 0.262,
+   "jev_brier": 0.452
+  },
+  "Medicine_(Comprehensive)_-_Wik": {
+   "pick": "agentjev",
+   "n": 7,
+   "laya_acc": 0.714,
+   "jev_acc": 0.857,
+   "laya_brier": 0.269,
+   "jev_brier": 0.555
+  },
+  "Medicine_(Essential)_-_CDC_Hea": {
+   "pick": "agentjev",
+   "n": 5,
+   "laya_acc": 0.4,
+   "jev_acc": 0.6,
+   "laya_brier": 0.251,
+   "jev_brier": 0.343
+  },
+  "Medicine_(Essential)_-_NHS_Med": {
+   "pick": "agentjev",
+   "n": 10,
+   "laya_acc": 0.5,
+   "jev_acc": 0.8,
+   "laya_brier": 0.259,
+   "jev_brier": 0.465
+  },
+  "Medicine_(Standard)_-_MedlineP": {
+   "pick": "agentjev",
+   "n": 37,
+   "laya_acc": 0.459,
+   "jev_acc": 0.73,
+   "laya_brier": 0.241,
+   "jev_brier": 0.442
+  },
+  "Survival___Preparedness_(Compr": {
+   "pick": "agentjev",
+   "n": 42,
+   "laya_acc": 0.214,
+   "jev_acc": 0.786,
+   "laya_brier": 0.231,
+   "jev_brier": 0.485
+  },
+  "Survival___Preparedness_(Stand": {
+   "pick": "agentjev",
+   "n": 123,
+   "laya_acc": 0.301,
+   "jev_acc": 0.764,
+   "laya_brier": 0.236,
+   "jev_brier": 0.377
+  },
+  "Wikipedia__Popular_Articles": {
+   "pick": "laya",
+   "n": 4,
+   "laya_acc": 1.0,
+   "jev_acc": 0.5,
+   "laya_brier": 0.285,
+   "jev_brier": 0.43
+  },
+  "Wikipedia__Quick_Reference": {
+   "pick": "agentjev",
+   "n": 66,
+   "laya_acc": 0.636,
+   "jev_acc": 0.697,
+   "laya_brier": 0.26,
+   "jev_brier": 0.482
+  },
+  "ampath.com": {
+   "pick": "agentjev",
+   "n": 1,
+   "laya_acc": 0.0,
+   "jev_acc": 1.0,
+   "laya_brier": 0.239,
+   "jev_brier": 0.589
+  },
+  "digitalcommons.law.uw.edu": {
+   "pick": "agentjev",
+   "n": 1,
+   "laya_acc": 0.0,
+   "jev_acc": 1.0,
+   "laya_brier": 0.234,
+   "jev_brier": 0.675
+  },
+  "github.com": {
+   "pick": "agentjev",
+   "n": 4,
+   "laya_acc": 0.25,
+   "jev_acc": 0.75,
+   "laya_brier": 0.245,
+   "jev_brier": 0.514
+  },
+  "insight": {
+   "pick": "agentjev",
+   "n": 2,
+   "laya_acc": 0.0,
+   "jev_acc": 1.0,
+   "laya_brier": 0.204,
+   "jev_brier": 0.513
+  },
+  "jev-builds": {
+   "pick": "agentjev",
+   "n": 1,
+   "laya_acc": 0.0,
+   "jev_acc": 1.0,
+   "laya_brier": 0.237,
+   "jev_brier": 0.592
+  },
+  "ka.wikipedia.org": {
+   "pick": "laya",
+   "n": 2,
+   "laya_acc": 0.5,
+   "jev_acc": 0.5,
+   "laya_brier": 0.254,
+   "jev_brier": 0.383
+  },
+  "kv_store": {
+   "pick": "laya",
+   "n": 8,
+   "laya_acc": 1.0,
+   "jev_acc": 0.75,
+   "laya_brier": 0.328,
+   "jev_brier": 0.304
+  },
+  "loopia.se?utm_medium=sitelink&utm_source=loopia_parkingweb&utm_campaign=parkingweb": {
+   "pick": "laya",
+   "n": 1,
+   "laya_acc": 1.0,
+   "jev_acc": 1.0,
+   "laya_brier": 0.255,
+   "jev_brier": 0.586
+  },
+  "prospector.neotrix": {
+   "pick": "laya",
+   "n": 2,
+   "laya_acc": 0.5,
+   "jev_acc": 0.5,
+   "laya_brier": 0.259,
+   "jev_brier": 0.356
+  },
+  "session_log": {
+   "pick": "laya",
+   "n": 2,
+   "laya_acc": 1.0,
+   "jev_acc": 1.0,
+   "laya_brier": 0.267,
+   "jev_brier": 0.45
+  },
+  "zim-archive": {
+   "pick": "agentjev",
+   "n": 8,
+   "laya_acc": 0.375,
+   "jev_acc": 0.875,
+   "laya_brier": 0.245,
+   "jev_brier": 0.568
+  },
+  "zim.kiwix": {
+   "pick": "agentjev",
+   "n": 167,
+   "laya_acc": 0.287,
+   "jev_acc": 0.737,
+   "laya_brier": 0.22,
+   "jev_brier": 0.492
+  },
+  "计算机科学": {
+   "pick": "laya",
+   "n": 2,
+   "laya_acc": 0.5,
+   "jev_acc": 0.5,
+   "laya_brier": 0.253,
+   "jev_brier": 0.38
+  }
+ }
+}

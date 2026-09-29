@@ -32,6 +32,14 @@ models/
 models/*
 !models/training/
 
+# models/training/ 里的 .py/.json 是真源码(140K+20K) → 入库;
+# 但 .jsonl 数据集(268M) 与 smelt/ 输出(5.1M) 是脚本生成的中间产物, 不入库。
+# 判据: 能由 models/training/*.py 重新生成 ⇒ 生成物。
+# 2026-09-29: 一次性定性 52 个文件 (23 .py + 3 .json 入库, 29 个生成物忽略)
+models/training/*.jsonl
+models/training/smelt/
+models/training/*.bak-*
+
 # Generated nt-test files (tracked integration tests are force-added explicitly;
 # keep the ignore for generated scratch, but never hide real test sources)
 neotrix-core/tests/*.rs

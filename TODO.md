@@ -670,6 +670,38 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 
 ---
 
+### 🔴 P0 密钥轮换：`neotrix-core/config/crystal.toml` 9 个真实密钥（2026-09-29 立）
+
+**背景**：该文件在工作树里放了 4 天，含 **8 个第三方 API key + 1 个自签 token**。
+`git log --all` 确认**从未进入任何提交**，`.gitignore:232` 正确忽略 ⇒ **git 未泄露**。
+但密钥本身在本地明文暴露，且第 91 行是 **NVIDIA** 官方 key。
+
+**已由我完成**：
+- ✅ 清除**注释里残留的 5 个真实 key**（第 21/28/35/66/98 行）—— 零功能影响，注释是死的
+- ✅ 确认 git 历史零泄露、`.gitignore` 有效
+- ✅ 原始副本备份在 `/var/folders/.../opencode/crystal.toml.pre-purge.bak`
+
+**⛔ 只能你做（需登录各家控制台，我无权限也无法代办）**：
+
+| 行 | 服务商 | 长度 | 操作 |
+|---:|---|---:|---|
+| 11 | 自签 crystal token | 48 | 重新生成，替换 |
+| 41 | `wzw.pp.ua` | 51 | 控制台吊销 + 重发 |
+| 47 | `ai.huan666.de` | 51 | 同上 |
+| 53 | `hotaruapi.com` | 51 | 同上 |
+| 59 | `ai.hybgzs.com` | 62 | 同上 |
+| 72 | `laoxi.ethan010203.online` | 51 | 同上 |
+| 78 | `goood.my` | 51 | 同上 |
+| 85 | `goood.my`（另一把） | 67 | 同上 |
+| 91 | **NVIDIA** `integrate.api.nvidia.com` | 70 | **build.nvidia.com 吊销优先** |
+
+**判据**：轮换完成后，把这 9 行换成新值 ⇒ 本条关闭。
+若确认某些 key 已废弃无需再用，**直接从文件删除该段**比轮换更省事。
+
+**纪律**（R-EXIST-3 的延伸）：新写 `.gitignore` 规则时，凡涉及含密钥的
+`config/*.toml`，**一律先确认忽略生效再 `git add` 周边文件** ——
+`git add .` 会把「刚被解禁的目录」连同密钥一起吞进去。
+
 ## 🆕 2026-09-28 单窗口汇总修复（架构侧吸收轮）
 
 > **唯一汇总入口**：`sessions/handoff-consolidate-all-windows-20260928.md`
