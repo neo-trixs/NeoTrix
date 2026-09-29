@@ -34,3 +34,4 @@ scripts/check-gate-satisfiable.sh	opaque	—	—	⛔ 本门**不能探测自己*
 scripts/check-fresh-build.sh	opaque	—	—	需 cargo worktree（检出级），单次 >2min；且**它不接受 --strict**（exit 2 = 用法错）。2026-09-29 实测 exit=2，见 note 栏外
 scripts/check-doc-claims.sh	injectable	bash scripts/probes/check-doc-claims.sh	0	2026-09-29 建门当日固化：注入 TODO.md 一条「noise_ik 零生产消费者」⇒ exit 1 且精确指向该行。探针 cleanup 用 .bak 整份恢复以保字节一致（初版 `grep -v > tmp` 会留 diff）。
 scripts/check-commit-deletions.sh	injectable	bash scripts/probes/check-commit-deletions.sh	0	2026-09-29 误删他窗 339 行后建：共享 index 使显式 git add 约束不了「暂存区里已有什么」，而该类事故签名确定＝提交含删除 ⇒ 任何删除必须在 message 写 DELETION-INTENT。探针在一次性 worktree 内自造文件验证（不依赖仓库文件存亡，不污染共享 index）。
+scripts/check-disk.sh	opaque	-	-	2026-09-29 诚实登记为 opaque：本门只读 du/df/ps，无注入点（刻意如此）。⛔ 它的初版在「建议」文案里写反引号包裹的 cargo clean，干跑时 shell 真的执行了 ⇒ 删掉 115.2GiB（当时 4 个他窗 cargo 在构建）。改用普通引号后已复核全门只读。该事故记入 AGENTS.md R-SCAN-4。

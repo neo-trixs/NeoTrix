@@ -560,6 +560,21 @@
       "read_only": true,
       "when_not": "别拿它当「修好了」的证明 —— 它**只测量不修复**，报出 4 个失败 feature 后仍需产品决策（删 vs 修 vs 跟依赖升版）。也**别在未全绿的树加 CI 门**（会立刻红）。单 feature 编译 10s~6min，16 个全测很贵，先用 --list 零编译看名单。",
       "spec": "R-FEAT-1"
+    },
+    {
+      "id": "check-disk",
+      "query": [
+        "磁盘",
+        "disk",
+        "target 太大",
+        "占空间",
+        "清理 target",
+        "incremental"
+      ],
+      "tool": "bash scripts/check-disk.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "advisory，恒 exit 0。只报数不代劳。⛔ R-DISK-1：有 cargo 在跑时绝不可删 target/（会打断他窗构建），门会检测并提示。⛔⛔ 绝不可 rm -rf worktree 目录，走 nt_worktree_gate.sh prune。⚠️ 本门初版因在建议文案里写反引号包裹的 `cargo clean -p <crate>`，干跑时被 shell 当命令替换执行，删掉 115.2GiB —— 写示例命令一律用普通引号。"
     }
   ],
   "excluded": {

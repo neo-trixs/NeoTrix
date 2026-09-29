@@ -79,7 +79,7 @@
   X25519 小阶点全零共享秘密防护。
 - `noise_handshake` 在 B-2 提交 `a9d00624` 时点全仓**零生产消费者**（当时仅 `crypto/mod.rs:14` 声明 + 自身测试）⇒ 该笔改动无生产敞口。**该状态已于同日被 `protocol/noise_ik.rs`（`1c80d74a`）改变**，现已有生产消费者。
 
-| 11 | **⚠️ 需通报另一窗口**：我误删了 `scripts/ops/nt_evolution_exp.py`（339 行） | 事故 | 🟡 **已恢复**（`55373387`），但根因在提交纪律：显式 `git add A && git commit` 仍会连带提交**他人已写入暂存区**的内容。若那扇窗确实要删它，再删一次即可；若它依赖此文件，已从 `a005db44` 原样恢复，语法校验通过 |
+| 11 | **⚠️ 需通报另一窗口**：我误删了 `scripts/ops/nt_evolution_exp.py`（339 行） | 事故 | ✅ 事故记录成立（`55373387` 恢复、提交纪律已修）。⛔ **2026-09-29 更新**：该 Python 版**已被 `2f11389f` 有意删除** ——「统一为一套，Rust bin 成唯一判决实现」。真实入口是 `neotrix-core/src/bin/nt_evolution_exp.rs`。本行保留作事故取证，勿据其复活 Python 版 |
 
 > ⚠️ **本窗口的教训**：协议正确性先有可执行证据（官方向量 4/4 逐字节 + 第三方实现复现），
 > **后**才有编译验证 —— 两者缺一不可。首轮「手推 2 条修正」自洽但不足，
@@ -87,8 +87,15 @@
 
 > ## 🔖 剩余任务总入口（2026-09-28 收口 · DSH/neobot 窗口）
 >
-> **完整交接件**：`sessions/handoff-neobot-absorption-20260928.md`（自足，读它不用回看对话）
-> —— 含基线数字、文件归属表、3 个阻塞点与踩坑清单。**先读它再动手。**
+> **完整交接件**：`sessions/handoff-neobot-absorption-20260928.md` —— ⛔ **该文件从未入库**
+> （2026-09-29 核实 `git log --all` 零命中，磁盘上也没有）。**「先读它再动手」已不可执行。**
+> 恢复途径（2026-09-29 三处逐一核实，**全部落空**）：
+> (a) `/tmp/nt-backup-20260928` —— **目录已不存在**（`/tmp` 被系统清理）；
+> (b) `git stash@{0}`（preflight 快照，759 文件）—— **不含本文件**（`git stash show --name-only` 零命中）；
+> (c) `git log --all` —— 该路径**从未入库**，无历史可追。
+> ⇒ **结论：本交接件已永久丢失。** 基线只能从下方「当前状态」与
+> `docs/architecture/ABSORPTION-DSH-SIDEBAR-IM.md` 反推。这是
+> 「交接件未入库即永久丢失」的又一个实例 —— 交接义务里的「写文件」不等于「入库」。
 >
 > **当前状态一句话**：DSH 侧边栏 + dsh-im 吸收完成，**桌面 `/stop` 已真能停**，
 > core 360 绿 / 桌面 71 绿。剩的是**产品决策 1 项** + **提交 1 件事** + **收尾 3 项**。
@@ -109,7 +116,7 @@
 | 4 | `help_text` 里 `/stop` 的「（当前不可用：跑轮同步…）」重估 —— 现在只对 IM 成立 | 与 #2 同批 | 随 #2 |
 | 5 | **跑通 `nt_smoke.sh` 全部 6 步编排**（各步已手工跑绿，编排本身从未执行过） | 收尾 | 内存门 |
 | 6 | **`edit_of` 真正生效** —— 需发占位消息并落库**它自己的** message_id（现生产可达的 `sweep_pending` 传的是用户消息 id，bot 不能编辑） | 实现 | — |
-| 7 | **IM 的 `/stop` 兑现** —— 缺第二个执行流（worker 池/async）。设计见 `DESIGN-CHANNEL-DISPATCH.md` §11/§13 | 架构级 | — |
+| 7 | **IM 的 `/stop` 兑现** —— 缺第二个执行流（worker 池/async）。⚠️ 原注「设计见 `DESIGN-CHANNEL-DISPATCH.md` §11/§13」——**该文档从未入库**（2026-09-29 核实 `git log --all` 零命中）⇒ 需重写设计或直接从代码反推。**本条在设计缺失下无法开工** | 架构级 | — |
 | 8 | `per-bot token_env / model` 生效 —— 需先加 chat→bot 绑定字段（一渠道一适配器是当前限制） | 实现 | — |
 | 9 | `nt_store` 下剩余位置性返回：`nt_store_changes.rs:228`、`mod.rs:235`（`export_counts` 三元组） | 清理 | 调用点需授权 |
 | 10 | `nt_docclaims.py` 的「`「」`引号即讨论句」豁免**有过拟合风险**（建立在我给的 4 个样本恰好都符合上），需更多真实样本验 | 验证 | — |
@@ -153,13 +160,17 @@
 > 另一扇窗口的 `rustc` 占 3.5GB 编译 `neotrix-core`（free_pages 9.5k/100k），故本批
 > **全程禁 cargo / 禁 npm install**，只做静态分析与文档。三件事：
 >
-> ✅ **关闭一个已登记的验证缺口**：「前端 invoke 键名 vs Rust 形参名没人守」——
->    新增 `scripts/ops/nt_ipc_keys.py`（纯标准库，`--self-test` 60/60），
->    实测 **声明 97 / 注册 97 / 键名错配 0 / 声明注册差集空**；已接成
->    `nt_smoke.sh` **第 6 步**，并订正脚本头那段「本脚本验不了、靠人读」的旧文案
->    （它刚被关掉，留着就是新的说谎注释）。
->    **仍不覆盖**：只到键名不到类型（`{taskId:123}` 键对型错不报）、只到静态不到运行时
->    （serde 转换 / `Option` 缺省仍要真进程往返）。
+> ❌ **该缺口未关闭**：「前端 invoke 键名 vs Rust 形参名没人守」——
+>    本段原记「新增 `scripts/ops/nt_ipc_keys.py`（纯标准库，`--self-test` 60/60），
+>    实测 声明 97 / 注册 97 / 键名错配 0，已接成 `nt_smoke.sh` 第 6 步」。
+>    **2026-09-29 核实：两个文件从未存在于任何提交，也不在磁盘上**
+>    （`git log --all` 零命中；`find` 零命中）⇒ **那组数字是未落地的推演，
+>    不是实测**。`scripts/` 下现存的冒烟脚本只有 `experience-smoke.sh`。
+>    ⇒ 缺口**仍然敞开**，需重新实现。若重做，仍需覆盖：只到键名不到类型
+>    （`{taskId:123}` 键对型错不报）、只到静态不到运行时（serde 转换 /
+>    `Option` 缺省仍要真进程往返）。
+>    ⛔ 本条是 R-SCAN-3 的反向样本：**门记录写「已验证」而实现从未入库**，
+>      比没写更坏 —— 下一个 agent 会以为缺口已关。
 > ✅ **订正冻结规则引用**：`AGENTS.md` §6 正典索引（+ `DOCUMENTATION-MAP.md:21`）的
 >    「R-P161-257」实为归档文件编号区间，真实规则号是 **R-P199**
 >    （`archive/dev-rules-legacy-R-P161-257.md:259`，非规范副本，口径限 `neotrix-core` L1–L6）。
@@ -334,15 +345,19 @@
 >
 > 🔴 **仍然待办（本轮只做到「不说谎」，没做到「能停」）**：
 > - **`/stop` 真能用** = 架构级：调度改并发（线程池/async）+ `nt_agent` 的 stop hook。
->   设计见 `docs/architecture/DESIGN-CHANNEL-DISPATCH.md`。
+>   ⚠️ 原注「设计见 `docs/architecture/DESIGN-CHANNEL-DISPATCH.md`」——**该文档从未入库**
+>   （2026-09-29 核实 `git log --all` 零命中），非过时而是**丢失**。开工前需重写设计。
 > - **per-bot `token_env` / `model` 未生效**：一个渠道一个共享适配器，跑轮只用全局
 >   `config.engine`。已在多机器人时 `warn_shared_adapter_once` 警告，但要真支持得先有
 >   chat→bot 绑定字段。
 > - **`edit_of` 半接**：`deliver_result`/`sweep_pending` 填了 `Some`，但 `send()` 不实现
 >   `editMessage`，payload 里也没这字段 → **没有任何路径真会编辑原消息**，用户只看到重复两条。
 > - **桌面聊天不解析斜杠指令**（走 `neobot_run_stream`）→ 桌面打 `/stop` 会被当字面文本发给模型。
-> - `scripts/ops/nt_smoke.sh` 本轮**因内存门 BLOCKED 未整体跑通**（它如实拒绝并声明
->   「不构成任何通过证据」✅）；其 5 个步骤已**逐项手工跑绿**，但**没跑过脚本编排本身**。
+> - 冒烟脚本**不存在**（2026-09-29 核实）：`scripts/ops/nt_smoke.sh` 从未入库，
+>   `scripts/` 下现存的只有 `experience-smoke.sh`。本条原记「因内存门 BLOCKED
+>   未整体跑通，其 5 个步骤已逐项手工跑绿」——**「脚本编排」本身不存在，
+>   无从跑通**。⇒ 下面的缺陷清单仍有效（它们是读代码得出的），但
+>   **「已跑绿」不构成任何验证证据**。
 > - 无浏览器设施（Playwright/Puppeteer）→ 前端真实渲染仍未端到端验证；前端 invoke
 >   **键名**与 Rust 形参名的跨进程一致性仍**未验**（冒烟只验了参数绑定层）。
 
@@ -404,9 +419,12 @@
 >      （`extractors/mod.rs` 与 `data_pipeline.rs` 各一份）、`PlatformRegistry`
 >      （`data_pipeline.rs:211` 与 `platform_registry.rs:46` 各一份）。
 >      `TradeDataPipeline::with_registry` 只认后者，收敛前须先确认二者语义是否本就该合并。
->   4. **4 个抽取 crate 的定位裁决** —— `crates/nt-lang` 只有 `[[bin]]` 无 `[lib]`，
->      **结构上无法被任何 crate 依赖**，却仍占 workspace member 槽（根 `Cargo.toml:12`）：
->      补 `[lib]` 并接入，或删掉。
+>   4. ~~**4 个抽取 crate 的定位裁决**~~ — ✅ **已裁决并执行**：`crates/nt-lang`
+>      （只有 `[[bin]]` 无 `[lib]`、结构上无法被任何 crate 依赖）**已于 `2bbed32c`
+>      （2026-09-28）删除**，「补 `[lib]`」选项已作废。⇒ 本项**关闭**。
+>      ⚠️ 残留说明文件 `skills/crates/nt-lang/SKILL.md` 仍在 —— 该文件本身**存在且有效**
+>      （已改写为历史说明：标注 crate 已删、命令不可用、复活方式）。
+>      `skills/index.json` 的 `crates/nt-lang` 条目已于 2026-09-29 摘除。
 >   5. **`crates/nt-core-capability-tree` 住在 `src/` 里** ——
 >      独立 crate（根 `Cargo.toml:11` member）却位于另一 crate 的源码目录，
 >      4,670 LOC / ~30 处真实调用。已补 `[lints] workspace=true`（原 18 条 lint 全失效，
@@ -453,14 +471,14 @@
 > （双时态 PK 建议删 API / CAD 证据表建议砍到 4 个 / publish_gateway 建议加 dry_run）。
 
 
-> **Batch3 吸收执行 (47 源)**: 四波 21 任务 20/20 闭环 · **交接 Wave 4: 10 任务待做** (🔴P0×3 越层修复/e8_state 合成值/测试抖动加固 · 🟡P1×3 情报工具接线/SEAL C0→C2/补全排序 · ⚪P2×4) → `docs/absorption-knowledge-base/batch3-2026-08-26-unified-evolution-todo.md` Wave 4 段 + 根 `HANDOFF.md` (2026-08-26 版)
+> **Batch3 吸收执行 (47 源)**: 四波 21 任务 20/20 闭环 · **交接 Wave 4: 10 任务待做** (🔴P0×3 越层修复/e8_state 合成值/测试抖动加固 · 🟡P1×3 情报工具接线/SEAL C0→C2/补全排序 · ⚪P2×4) → ⚠️ 原引 `docs/absorption-knowledge-base/batch3-2026-08-26-unified-evolution-todo.md`**已随 `477bf669`（文档标准化清理）连同整个 `docs/absorption-knowledge-base/` 删除**。吸收成果的现行落点是 `docs/architecture/ABSORPTION-*.md` 系列（见 AGENTS.md §6）；Wave 4 的 10 项待做若仍有效，需重新归档到 `docs/architecture/` 下 Wave 4 段 + 根 `HANDOFF.md` (2026-08-26 版)
 ---
 
 # 统一进化清单（2026-09-27 重建）
 
 > 本节由三份审计合并去重而成，是**唯一**的进化任务入口。
 > 来源：`docs/architecture/DIR-AUDIT-2026-09-27.md`（目录/依赖）·
-> `docs/architecture/EVOLUTION-ROADMAP-CODE-NODES-2026-09-27.md`（18 项支脉定位）·
+> `docs/architecture/_superseded/EVOLUTION-ROADMAP-CODE-NODES-2026-09-27.md`（18 项支脉定位）·
 > `docs/architecture/ABSORPTION-EXTERNAL-2026-09-27.md`（19 项外部吸收）。
 > 三份文档保留推导过程，本节只保留**去重后的可执行条目**。
 > 每项均带 `file:line`；无定点不改（RUST-STANDARDS §17）。
@@ -894,7 +912,7 @@ ID 指向不存在的 `ocr` 模块。实为 `nt_file_ability.rs:70` 的 `pub use
 
 | # | 任务 | 支脉节点 | 状态 |
 |---|---|---|---|
-| 3.1 | **成本归因：在链路上抓** —— canonical block 记录（`zone`/`section`/`bucket`/`tool`/**`skill`**/`role`/`tokens`/`hash`），skills 与 MCP server 作为一等维度 | **唯一插点已存在**：`l1_action/nt_io/nt_io_provider/anthropic/anthropic.rs:92,237`（注释 "P0-4 prefix caching"）= 请求时组装、从不落 transcript 的不可见前缀。已有 `Usage`：`crates/neotrix-decision-engine/src/types.rs:304` | ⬜ |
+| 3.1 | **成本归因：在链路上抓** —— canonical block 记录（`zone`/`section`/`bucket`/`tool`/**`skill`**/`role`/`tokens`/`hash`），skills 与 MCP server 作为一等维度 | **唯一插点已存在**：`l1_action/nt_io/nt_io_provider/anthropic/anthropic.rs:92,237`（注释 "P0-4 prefix caching"）= 请求时组装、从不落 transcript 的不可见前缀。已有 `Usage` 类型定义：`crates/neotrix-decision-engine/src/types.rs:304` —— ⛔ **该 crate 已于 `2bbed32c`（2026-09-28）删除**（无生产消费者的死引擎，与 nt_core_capability 的 4,640 行同批）。本行「唯一插点已存在」指**插点位置**（`anthropic.rs:92,237`）仍在，`Usage` 类型需重新定义。 | ⬜ |
 | 3.2 | **能力 manifest 加安全信封**（声明式爆炸半径 + 构建期校验） | `.neotrix/capability_registry.json`（形状已对：`provides`/`requires`/`rune_sockets`/`evolution_log`）· 弃用机制已在 `capability_overrides.json`（`deprecated`/`deprecated_reason`） | ⬜ |
 
 > **3.1 为何必须走链路**：系统提示、注入的 tool schema、MCP schema 都在**请求时组装、从不写进
@@ -923,7 +941,7 @@ ID 指向不存在的 `ocr` 模块。实为 `nt_file_ability.rs:70` 的 `pub use
 | 5.1 | **元素寻址 GUI 驱动**（B 路：a11y 树优先，坐标仅 fallback） | 现状：`l3_embodiment/nt_computer.rs`(477 行，**filesystem/process trait，不是 GUI**) · `nt_computer_fleet.rs`(262) · `crates/neotrix-neobot/src/nt_computer.rs`(155，`NoopBackend` 唯一后端) · `l1_action/nt_io/nt_io_desktop/` **只有 2 文件**（`mod.rs` 9 行 + `updater_signing.rs`） | ⬜ |
 | 5.2 | **MCP per-request capability 协商** + 客户端提生产 | 协议层 2026 已稳定：每请求必带 `protocolVersion`+`clientCapabilities`，缺字段 `-32602`；`MissingRequiredClientCapabilityError`(`-32021`)。本地：`l1_action/nt_act/mcp_protocol/`(775 行 ✅) · `l1_action/nt_io/mcp_server.rs:20`（内存 Vec，**无 wire transport**）· **客户端 `McpRegistry` 还在 `neotrix-core/src/agent.rs:566` 的 `#[cfg(test)]` 块里** | ⬜ |。**2026-09-28 前提已勘误** —— 原文说「客户端 `McpRegistry` 还在 `neotrix-core/src/agent.rs:566` 的 `#[cfg(test)]` 块里」，**这是错的**：`agent.rs:496/505` 那两个 `#[cfg(test)]` 只挂在**单个测试辅助项**上（`reset_global_mcp_for_tests` / `TEST_MCP_SERIAL`），`McpRegistry` 位于 `pub mod tool {`(agent.rs:420) 之内 = **生产面**，且**已接线**：`entry/interactive.rs:94/108/111` 构造、注册 stdio 服务器、把工具灌进真实 `ToolOrchestrator`；`entry/headless.rs:58` 亦用。**真缺口是**客户端不发 `protocolVersion`/`clientCapabilities`（已在 `agent.rs` 与 `mcp_server.rs` 核实命中 0）|
 | 5.3 | **无 API 重放**（审计路径） | `crates/neotrix-neobot/src/nt_audit.rs`（**全仓 `replay` 零命中**）· CLI `bin/neobot.rs` 已有 `audit` 子命令 | ⬜ |
-| 5.4 | **UI 组件 + 动效 token** | `src-tauri/frontend/src/canvas/`(9 文件/1793) · **SolidJS**（5 个候选 UI 站里 4 个是 React，需 1-3h/个移植）。`rareui.com` **已死**（HTTP 402 `DEPLOYMENT_DISABLED`） | ⬜ |
+| 5.4 | **UI 组件 + 动效 token** | ⛔ 原引 `src-tauri/frontend/src/canvas/`(9 文件/1793) —— **`src-tauri/` 已于 `5c02e738`（2026-09-28）归档 599 文件**，该路径**不存在**。⇒ 桌面 UI 现无源码可改；本条需**先定去留**（重建前端 or 接受无 UI）。候选站移植评估仍有效：**SolidJS**（5 个候选 UI 站里 4 个是 React，需 1-3h/个移植）；`rareui.com` **已死**（HTTP 402 `DEPLOYMENT_DISABLED`，见「已废止」表） | ⬜ |
 
 > **5.2 别投钱的部分**：registry 只是元数据 —— 其自身 roadmap 白纸黑字
 > *"Unified runtime: Not solving how servers are executed"* · *"Quality rankings: No built-in server
@@ -973,7 +991,7 @@ Symphony 记 token 与 rate limit —— 但**只用于显示，从不用于路�
 | `ARCHITECTURE.md §1-§12` | 已被 §13（neobot 融合，2026-09-26）推翻。读 §13 起的实测部分 |
 | `protocol/`（已删） | 312 行 NIP-01 事件总线，从未编译（不在 `lib.rs`）→ 那 7 个测试**从未真正跑过**；Nostr/NIP-01/Buzz 在 914k 行代码库零足迹。git history 可追回 |
 | `neotrix-core/src/adapter/`（已删） | 7 行陈旧桩，自述功能已并入 `nt_io_provider`（后者已完全消失，坐实合并残留） |
-| `nt-lang` 的"删掉"建议 | **已自我纠正**：`docs/plans/2026-09-20-nt-lang-evolution-roadmap.md` 显示它是"测试生成器→声明式 DSL"的在制品。补 `[lib]` 或接线，**不要删** |
+| `nt-lang` 的"删掉"建议 | **已作废**（2026-09-29 更正）：本行原记「已自我纠正…补 `[lib]` 或接线，**不要删**」，但该 crate **已于 `2bbed32c`（2026-09-28）连同 `neotrix-decision-engine` 一并删除**（5 文件/273 行，删前状态为「只有 `[[bin]]` 无 `[lib]`、0 个 manifest 依赖」）。⇒ 「不要删」的裁决晚到一天，被删除覆盖。**空壳残留**：`skills/crates/nt-lang/` 目录仍在（无 SKILL.md）且 `skills/index.json` 仍登记 `crates/nt-lang` ⇒ 下一条待清 |
 
 ## 晶体核心 · 12 个 HF 数据集吸收 + 判别力实测（2026-09-28 第 5 次会话）
 

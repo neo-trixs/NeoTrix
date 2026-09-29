@@ -942,10 +942,6 @@
       "category": "crates",
       "file": "crates/neotrix-types/SKILL.md"
     },
-    "crates/nt-lang": {
-      "category": "crates",
-      "file": "crates/nt-lang/SKILL.md"
-    },
     "design/design-core": {
       "category": "design",
       "file": "design/design-core/SKILL.md"
