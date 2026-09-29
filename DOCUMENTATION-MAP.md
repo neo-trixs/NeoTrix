@@ -95,6 +95,11 @@ neotrix-core/
 
 **禁止**: `neotrix-core/docs/` 存放研究笔记、分析报告
 
+> ✅ 2026-09-29 已清理：该目录原有 3 份架构文档（744 行）经逐份取证后
+> **全部移入 `docs/architecture/_superseded/`**（裁决依据见该目录 `README.md`）。
+> 现存仅 `plans/2026-09-14_*.md` 两份设计稿，符合日期前缀规约。
+> 本条由 `scripts/check-layout.sh` 执行（只许 `YYYY-MM-DD_` 前缀）。
+
 ### 4. `skills/` — Agent 技能系统
 
 ```

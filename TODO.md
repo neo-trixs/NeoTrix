@@ -64,7 +64,7 @@
 | ~~10~~ | ~~`noise_handshake` 接到生产（R-P79）~~ | 实现 | ✅ **已完成**（2026-09-29）：新增 `protocol/noise_ik.rs` —— C1 SANS-IO 协议引擎，作为 `noise_handshake` 的唯一生产消费者。分层方向合法（C1→C0），`noise_ik` 10 测试全绿，全量 **12207 passed / 0 failed**。⚠️ 接线时测试抓到我自己写死的错误断言（见下），已改为断言正确性质 |
 | 6 | 经验吸收：`neotrix-experience absorb` 把 L23–L26 入 KB | 收尾 | **待办** |
 | ~~11~~ | ~~统一 8 个 `is_cjk` 副本~~ | DRY | ✅ **已完成**（2026-09-29）：裁决**不是统一成一个**，而是「两种语义各一个事实源」——`is_cjk_han`（分词，窄）/ `is_cjk_wide`（计量，宽）。7 个副本改薄转发，环形依赖解除。详见下方详案 |
-| 14 | 裁决 `neotrix-core/docs/` 3 份架构文档（744 行）存废 | 裁决 | 待逐份比对 |
+| ~~14~~ | ~~裁决 `neotrix-core/docs/` 3 份架构文档（744 行）存废~~ | 裁决 | ✅ **已完成**（2026-09-29）：逐份取证后**三种不同处置**——1 份归档（含全仓独有的外部威胁溯源）、1 份归档（方法论被继承但数据作废）、1 份归档（8/8 类型全不存在）。全部移入 `docs/architecture/_superseded/` 并写明依据 |
 | 13 | **恢复 842 行丢失的冒烟测试**（落点 `Neo/neobot`，需授权） | 实现 | ⛔ 跨仓待授权 |
 | ~~12~~ | ~~重新实现 IPC 键名校验器~~ | 实现 | ⚠️ **改判**（2026-09-29）：验的契约**已整体迁出本仓**（桌面端 → 独立仓 `Neo/neobot`）⇒ 本仓实现不了，正确落点是那个仓。详见下方改判 |
 | 7 | 收工：`nt_worktree_gate.sh check` → 自己开的 worktree 走 `prune`（**禁手删**） | 收工 | **待办**（硬规则） |
@@ -144,29 +144,26 @@ TODO 原 §156-162 记「新增 `scripts/ops/nt_ipc_keys.py`，实测 声明 97/
 若重做，须覆盖：只到键名不到类型（`{taskId:123}` 键对型错不报）、
 只到静态不到运行时（serde 转换 / `Option` 缺省仍要真进程往返）。
 
-### 待办 14：`neotrix-core/docs/` 3 份架构文档的存废裁决（2026-09-29 已记账）
+### ~~待办 14~~ 详案：3 份文档存废裁决 —— **三种不同处置**（2026-09-29 已完成）
 
-`DOCUMENTATION-MAP.md:81` 明令「`neotrix-core/docs/` 禁止存研究笔记、
-分析报告」，而那里有 3 份 **744 行**的真实架构文档：
+⛔ **先前的判断是错的**：我原打算「逐份比对内容后决定删或留」。
+实际逐份读下来，**没有一份适合删**，但**也没有一份该继续占着
+`neotrix-core/docs/`**（`DOCUMENTATION-MAP.md:81` 明令禁止）⇒ 全部归档。
 
-| 文件 | 行数 | 主题 | 最后改动 |
-|---|---|---|---|
-| `FUSION_ARCHITECTURE.md` | 436 | 破限技术融合架构 × 能力骨架熔炼（分析日期 2026-09-11） | 2026-09-20 |
-| `ANALYSIS_ARCHITECTURE.md` | 178 | 架构分析报告 | 2026-09-20 |
-| `CRYSTAL_ARCHITECTURE.md` | 130 | 意识体晶体核心 — 架构文档 | 2026-09-20 |
+| 文件 | 裁决 | 取证依据 |
+|---|---|---|
+| `FUSION_ARCHITECTURE.md`（436 行） | 归档，**保留独有溯源** | 13 章被 `design-fusion-analysis-2026-09-20.md` 一一覆盖且后者更全；⛔ 但 `Bluehook` 破甲分析、「43 种攻击+15 种防御」、`Fable Dataset` **全仓别处没有**（`git grep` 确认只在本文）⇒ 删了永久丢失外部研究来源 |
+| `ANALYSIS_ARCHITECTURE.md`（178 行） | 归档，**方法论有效但数据作废** | 三维度「聚焦冗余/扁平缺陷/跨域错位」**已被现行文档沿用**（design-fusion / BATCH-FIX / capability-topology-map）⇒ 非孤例有继承；⛔ 其代码度量写 `931行`，实测 `neotrix-core` 已 **789,902 行** ⇒ 拿它判规模会错 |
+| `CRYSTAL_ARCHITECTURE.md`（130 行） | 归档，**架构完全不存在** | 其列的 8 个类型 `MeltingEngine`/`CrystalRouter`/`CrystalSpeculator`/`EcsSceneBridge`/`CrystalCard`/`CrystalStateMachine`/`CrystalWorld`/`CrystalError` 逐个 `rg` 实测 **8/8 已不存在** ⇒ 描述的是从未落地或已彻底重构的架构 |
 
-已计入 `scripts/layout-baseline.txt`（⇒ `check-layout.sh` 只拦新增，不阻断）。
+**为何不删**：`CRYSTAL_ARCHITECTURE` 描述的架构虽不存在，但「曾经这样设计过、
+后来变了」本身是有价值的考古信息；且删除不可逆。三份统一移入
+`docs/architecture/_superseded/`（仓内既有惯例），并在
+`_superseded/README.md` 写明每份的裁决依据与恢复线索。
 
-**未裁决的理由**：仓内 fusion 主题文档并存至少 6 份
-（`FIVE-ENTITY-ARCHITECTURE-FUSION` / `FIVE-ENTITY-FUSION` /
-`design-fusion-analysis-2026-09-20` / `IMPACT-ANALYSIS` /
-`all-capability-analysis` / `RFC-CRYSTAL-REASONING-CHAIN-20260928`），
-**要判定这 3 份是否已被取代，必须逐份比对内容** —— 那是独立任务，
-不能靠文件名或行数猜。误删 744 行真实架构文档的代价远高于留着。
-
-⇒ 若判定已取代：移到 `docs/architecture/_superseded/`（仓内既有惯例）
-或移出到 `Neo/neotrix-archive/`；若判定仍有效：改 `DOCUMENTATION-MAP.md`
-豁免 `neotrix-core/docs/architecture/`，并同步 `check-layout.sh` 的白名单。
+**门账本随之棘轮下降**：`neotrix-core/docs/` 违规 **3 → 0**，
+`scripts/layout-baseline.txt` 归零（这是 `--update-baseline` 的正当用途 ——
+修好一个删一行，而非为让门变绿而调大）。
 
 ### ⚠️ 待办 13：842 行冒烟测试已丢失，恢复点在 git 历史（2026-09-29 取证）
 
