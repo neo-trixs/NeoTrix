@@ -6,7 +6,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "sandbox")]
-use crate::l3_embodiment::nt_shield::vault::Vault;
+use crate::l3_embodiment::nt_shield::shield_core::vault::Vault;
 
 pub mod cli;
 pub mod device;
@@ -782,7 +782,7 @@ impl CallVerdict {
 #[cfg(all(test, feature = "sandbox"))]
 mod sandbox_vault_tests {
     use super::*;
-    use crate::l3_embodiment::nt_shield::vault::Vault;
+    use crate::l3_embodiment::nt_shield::shield_core::vault::Vault;
     use futures::StreamExt;
 
     /// Test-only provider: spawns a real child process that reads the injected
