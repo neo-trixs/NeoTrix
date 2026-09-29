@@ -300,7 +300,7 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 | 4 | `help_text` 里 `/stop` 的「（当前不可用：跑轮同步…）」重估 —— 现在只对 IM 成立 | 与 #2 同批 | 随 #2 |
 | 5 | **跑通 `nt_smoke.sh` 全部 6 步编排**（各步已手工跑绿，编排本身从未执行过） | 收尾 | 内存门 |
 | 6 | **`edit_of` 真正生效** —— 需发占位消息并落库**它自己的** message_id（现生产可达的 `sweep_pending` 传的是用户消息 id，bot 不能编辑） | 实现 | — |
-| 7 | **IM 的 `/stop` 兑现** —— 缺第二个执行流（worker 池/async）。⚠️ 原注「设计见 `DESIGN-CHANNEL-DISPATCH.md` §11/§13」——**该文档从未入库**（2026-09-29 核实 `git log --all` 零命中）⇒ 需重写设计或直接从代码反推。**本条在设计缺失下无法开工** | 架构级 | — |
+| 7 | **IM 的 `/stop` 兑现** —— 缺第二个执行流（worker 池/async）。设计见 `docs/architecture/DESIGN-CHANNEL-DISPATCH.md` §11/§13。✅ **2026-09-29 更正**：我此前判定该文档「从未入库、永久丢失」是**错的** —— 它一直在磁盘上（1445 行，§11「poller 单线程 + 有界 worker 池」与 §13 完好），只是不在 git 里。**现已入库** ⇒ **本条可开工，设计依据已在手** | 架构级 | — |
 | 8 | `per-bot token_env / model` 生效 —— 需先加 chat→bot 绑定字段（一渠道一适配器是当前限制） | 实现 | — |
 | 9 | `nt_store` 下剩余位置性返回：`nt_store_changes.rs:228`、`mod.rs:235`（`export_counts` 三元组） | 清理 | 调用点需授权 |
 | 10 | `nt_docclaims.py` 的「`「」`引号即讨论句」豁免**有过拟合风险**（建立在我给的 4 个样本恰好都符合上），需更多真实样本验 | 验证 | — |
@@ -529,8 +529,8 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 >
 > 🔴 **仍然待办（本轮只做到「不说谎」，没做到「能停」）**：
 > - **`/stop` 真能用** = 架构级：调度改并发（线程池/async）+ `nt_agent` 的 stop hook。
->   ⚠️ 原注「设计见 `docs/architecture/DESIGN-CHANNEL-DISPATCH.md`」——**该文档从未入库**
->   （2026-09-29 核实 `git log --all` 零命中），非过时而是**丢失**。开工前需重写设计。
+>   设计见 `docs/architecture/DESIGN-CHANNEL-DISPATCH.md`（✅ 2026-09-29 更正：此前判定它
+>   「从未入库、永久丢失」是**错的** —— 一直在磁盘上、1445 行完好，现已入库）。开工前读该文档。
 > - **per-bot `token_env` / `model` 未生效**：一个渠道一个共享适配器，跑轮只用全局
 >   `config.engine`。已在多机器人时 `warn_shared_adapter_once` 警告，但要真支持得先有
 >   chat→bot 绑定字段。
