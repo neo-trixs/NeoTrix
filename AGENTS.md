@@ -94,7 +94,7 @@
 | 模块台账 | `ARCHITECTURE-MAP-ROADMAP-V2.md` ⚠️ **§1-§7 数字永久陈旧，只取 §11 起**。更新规则 **R-P199**，口径限 `neotrix-core` L1–L6；`neobot` 独立 crate 不占 L 层故不进 ⇒ 见 `ABSORPTION-DSH-SIDEBAR-IM.md` |
 | 模块拓扑实测 | `DIR-AUDIT-2026-09-27.md`（16 包依赖图 + 8 类重复类型）· **目录解法** `DIR-REMEDY-2026-09-28.md` |
 | 外部吸收 | `ABSORPTION-AGENT-ARCH-2026-09-28.md`（8 源）+ `…ARCH2-2026-09-29.md`（30 源，含 5 个被证伪前提，3 仓无 LICENSE ⇒ 只取设计）+ `BATCH-FIX-2026-09-29.md` · `ABSORPTION-EXTERNAL-2026-09-27.md` |
-| 方法论教训 | `LESSONS-*.md` **7 档，按主题挑读，勿只读最新** |
+| 方法论教训 | `LESSONS-*.md` **8 档，按主题挑读，勿只读最新**。纪律类见 `…2026-09-24.md` §五（R36–R46：反引号当命令执行 / 门干跑有副作用 / `--only` 按路径取 diff / 全角标点吃字节 / 门记录声称已做而实现从未入库） |
 | 文档规范 | `DOCUMENTATION-MAP.md` |
 | 本地模型 | `LOCAL-LLAMA-2026-09-28.md` |
 | 待办 | `TODO.md`（顶部人工摘要区）· 事故分诊 `sessions/handoff-disease-list-20260927.md` |
@@ -109,7 +109,7 @@
 
 - `DIR-REMEDY-2026-09-28.md` §2.5：`neotrix-core/src/neotrix/`（129 文件/43,834 行）是**不参与 L0–L6 的第二棵树**且完全逃过 `check-layer-deps.sh`；解法是**层归属显式化**（`layer-map.json`）而非搬目录。其 §2.5 记录 `nt_jev` + `nt_crystal_core` 是**活路径**（L1 有 6 个消费者），**勿当死代码删** ——「导出 ≠ 调用」已错过 3 次。
 - `LESSONS-20260929-checked-is-not-verified.md`：`nt_judge.rs` 标注「EVO-02 mu 式」，但 `qybaihe/mu` 自己的回测显示 **admission/chunk 准入是它成本最高（54% token）、收益为零（2412 块 drop 0 个）**。⇒ `handoff-evo-20260926.md:68` 把 admission 列 P0 的表述需改判。**我们是无 I/O 的纯规则实现，故那些数字不适用，但方法论要抄。**
-- 7 档 `LESSONS-*` 的元教训统一是：**任何「X 是好的/坏的」断言都要问「我是在哪个环境里验证的」；答「我的工作树」就等于还没有证据。**
+- 8 档 `LESSONS-*` 的元教训统一是：**任何「X 是好的/坏的」断言都要问「我是在哪个环境里验证的」；答「我的工作树」就等于还没有证据。**
 
 ### 6.3 已废止（⛔ 勿读、勿实现）
 
