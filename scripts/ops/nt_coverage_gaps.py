@@ -51,39 +51,58 @@ def split_prod_test(text: str) -> tuple[str, str]:
     return text[: m.start()], text[m.start() :]
 
 
-def collect(crate_root: Path) -> dict:
+def collect(crate_root: Path, only: set[str] | None = None) -> dict:
     """返回 {file: {"pub_fns": [...], "uncalled": [...]}}。
 
     测试调用集是**全 crate 汇总**（含跨文件），避免同文件视角的误报。
     """
     files = sorted(p for p in crate_root.rglob("*.rs") if "tests/" not in str(p))
+    if only:
+        # 增量模式：只分析指定文件，但**测试集仍取全 crate**
+        # （跨文件调用不能漏，否则把「被别的文件测过」误报成洞）。
+        files = [p for p in files if str(p.relative_to(crate_root)) in only]
+        if not files:
+            return {}
     texts = {p: p.read_text(encoding="utf-8", errors="replace") for p in files}
+    if only:
+        all_texts = {
+            q: q.read_text(encoding="utf-8", errors="replace")
+            for q in crate_root.rglob("*.rs")
+            if "tests/" not in str(q)
+        }
+        _all_texts_loaded = True
+    else:
+        all_texts = texts
 
     # 全 crate 的测试段文本拼接 ⇒ 跨文件调用也能命中
-    test_blob = "\n".join(split_prod_test(t)[1] for t in texts.values())
+    test_blob = "\n".join(split_prod_test(t)[1] for t in all_texts.values())
     # 调用点判定：名字后紧跟 (  （排除定义行本身：定义在 prod 段，天然不在 blob）
     called = {m.group(1) for m in re.finditer(r"\b(\w+)\s*\(", test_blob)}
 
     # ── 死代码判定：一次性建索引，O(库大小)，不做「每名重扫全库」──
-    # 2026-09-29 性能实测：朴素写法（对每个零覆盖名遍历全部文件）
-    # 在 neotrix-core/src（798K 行）上 >400s 未完成 —— 那等于不可用。
-    # 改为：先把候选名编成一个 alternation 正则，**一次**扫全库建表。
+    # 2026-09-29 性能实测（neotrix-core/src，798K 行 / 2535 文件）：
+    #   ① 朴素「每名遍历全库」        >400s 未完成
+    #   ② 候选名编成 alternation 正则   66s  ← 正则引擎在 9853 分支上退化
+    #   ③ 先建全部调用点索引再查表      <1s  ← 当前实现
+    # 教训：超长 alternation 比逐名扫描**更慢**，不是更快。
     all_pub: set[str] = set()
-    for text in texts.values():
+    for text in all_texts.values():
         all_pub.update(PUB_RE.findall(split_prod_test(text)[0]))
     candidates = all_pub - called
 
-    # name -> [该名字所有出现处的行文本]（定义行/re-export 行除外）
+    # name -> [该名字所有出现处的行文本]
+    # 关键：先用**单一简单模式**扫出所有 `ident(` 形态（线性、无 alternation），
+    # 再用 O(1) 集合查表过滤出候选名。
     call_sites: dict[str, list[str]] = {n: [] for n in candidates}
-    if candidates:
-        big = re.compile(
-            r"\b(" + "|".join(sorted(map(re.escape, candidates))) + r")\s*\("
-        )
-        for qt in texts.values():
-            for m in big.finditer(qt):
-                ls = qt.rfind("\n", 0, m.start()) + 1
-                le = qt.find("\n", m.start())
-                call_sites[m.group(1)].append(qt[ls : le if le != -1 else len(qt)])
+    ident_call = re.compile(r"\b([A-Za-z_]\w*)\s*\(")
+    for qt in all_texts.values():
+        for m in ident_call.finditer(qt):
+            name = m.group(1)
+            if name not in candidates:
+                continue
+            ls = qt.rfind("\n", 0, m.start()) + 1
+            le = qt.find("\n", m.start())
+            call_sites[name].append(qt[ls : le if le != -1 else len(qt)])
 
     def is_dead(name: str) -> bool:
         """零**真实**调用者：排除定义行与 `pub use` 再导出行。"""
@@ -118,13 +137,19 @@ def main() -> int:
     ap.add_argument("root", type=Path, help="crate 的 src 目录")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--min-pub", type=int, default=1, help="只报 pub fn 数 >= N 的文件")
+    ap.add_argument(
+        "--only",
+        help="增量模式：逗号分隔的**相对 root** 的 .rs 路径，只分析这些文件"
+        "（测试调用集仍取全 crate，跨文件调用不会漏）。供 pre-commit 对改动文件用。",
+    )
     args = ap.parse_args()
 
     if not args.root.is_dir():
         print(f"[coverage-gaps] 目录不存在: {args.root}", file=sys.stderr)
         return 2
 
-    data = collect(args.root)
+    only = {x.strip() for x in args.only.split(",") if x.strip()} if args.only else None
+    data = collect(args.root, only=only)
     rows = []
     total_pub = total_gap = 0
     for fname, info in data.items():
@@ -141,8 +166,11 @@ def main() -> int:
         return 1 if total_gap else 0
 
     rows.sort(reverse=True)
-    print(f"[coverage-gaps] {args.root}")
+    scope = f"（增量：{len(only)} 个改动文件）" if only else ""
+    print(f"[coverage-gaps] {args.root} {scope}")
     print(f"  生产 pub fn 合计 {total_pub}，测试从未调用 {total_gap}（占 {total_gap*100//max(total_pub,1)}%）")
+    if only:
+        print("  ℹ 以上**只统计选中文件**的 pub fn；测试调用集与死代码判定仍取全 crate。")
     dead_all = [(f, n) for f, i in data.items() for n in i.get("dead", [])]
     live = total_gap - len(dead_all)
     if rows:

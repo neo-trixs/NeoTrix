@@ -592,6 +592,22 @@ fn cmd_channel_serve(channel: Option<&str>, interval: Option<i64>) -> Result<(),
                 stats.received, stats.ran, stats.ignored, stats.failed, stats.deferred
             );
         }
+        // 2026-09-29 接线（自 `nt_coverage_gaps` 报出的死代码）：
+        // 账目清理失败**不计入 `failed`**（它不阻断出站），所以 `is_quiet()`
+        // 仍为 true ⇒ 上面那行不会打印 ⇒ 错误会彻底静默。
+        // 这正是当初把它拆成独立方法的原因，此处补上消费点。
+        if stats.has_prune_error() {
+            eprintln!(
+                "[第 {round} 轮] ⚠ 账目清理失败（账目表可能在持续膨胀）：{}",
+                stats.changes_prune_error.as_deref().unwrap_or("未知原因")
+            );
+        }
+        if stats.changes_pruned > 0 {
+            eprintln!(
+                "[第 {round} 轮] 账目清理：删掉 {} 行（按留存期 + 每任务保尾）",
+                stats.changes_pruned
+            );
+        }
         // 节拍：显式 --interval > 该渠道的 poll_secs；多渠道取最小（最急的那个说话）。
         let secs = fixed.unwrap_or_else(|| {
             let table = neotrix_neobot::nt_channel_serve::intervals(&store, channel);

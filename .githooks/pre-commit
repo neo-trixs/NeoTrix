@@ -86,6 +86,42 @@ if [ -f .neotrix/task-index.json ] && [ -f scripts/ops/nt_find.py ]; then
   fi
 fi
 
+# ---------- 2.6) 覆盖率洞提示位（R-COV-1; advisory, 永不拦门）----------
+# 依据 R-P79 的自反版本：「工具写好了但没人调用」和「函数写好了但没人调用」
+# 是**同一类**缺陷。2026-09-29 实测：`nt_coverage_gaps.py` 造好后被 0 个门引用，
+# 而它当场就报出 `prune_best_effort` 零生产调用（R-P79 违规）——
+# 尺子自己也是「没人用的尺子」。故在此接线。
+#
+# 为什么 advisory 而非 blocking：存量基线是 4455 洞（neotrix-core 24%），
+# blocking 会让本门永久红 ⇒ 门一旦恒红就等于没有门（R-SCAN-3 同理）。
+# 只对**本次改动**的 .rs 跑增量模式，提示新增洞，死代码直接点名。
+STAGED_RS=$(git diff --cached --name-only --diff-filter=ACM | grep '\.rs$' || true)
+if [ -n "$STAGED_RS" ] && [ -f scripts/ops/nt_coverage_gaps.py ]; then
+  for crate_src in crates/neotrix-neobot/src neotrix-core/src; do
+    [ -d "$crate_src" ] || continue
+    only=""
+    for f in $STAGED_RS; do
+      case "$f" in
+        "$crate_src"/*) only="${only:+$only,}${f#"$crate_src"/}" ;;
+      esac
+    done
+    [ -n "$only" ] || continue
+    out=$(python3 scripts/ops/nt_coverage_gaps.py "$crate_src" --only "$only" 2>/dev/null) || true
+    # 2026-09-29 自修：`holeds` 曾写成 `[ "$holeds" -gt 0 ] && ...` 的短路形式，
+    # 而上一条 `grep -cE ... || true` 在**无匹配时返回 1** ⇒ `set -u` 下
+    # `holeds` 从未被赋值就���读取 ⇒ `unbound variable` ⇒ 整段门**静默不执行**。
+    # 教训（已记入 R-P79 自反条款）：门脚本里「赋值」不许出现在 `&&` 右侧。
+    holeds=$(echo "$out" | grep -cE '^[[:space:]]+[0-9]+[[:space:]]+[0-9]+[[:space:]]+\S+\.rs$' || true)
+    deads=$(echo "$out" | grep -cE '^[[:space:]]+☠ ' || true)
+    if [ "${holeds:-0}" -gt 0 ] || [ "${deads:-0}" -gt 0 ]; then
+      echo -e "\033[1;33m📊 coverage-gaps advisory（$crate_src:\033[0m"
+      echo "$out" | grep -E '^[[:space:]]+☠ ' | head -5 | sed 's|^|   |'
+      [ "${holeds:-0}" -gt 0 ] && echo "   （完整清单：python3 scripts/ops/nt_coverage_gaps.py ${crate_src})"
+      echo -e "\033[1;33m   ☠ = 零真实调用者（死代码候选）；其余为「测试从未触碰」的入口\033[0m"
+    fi
+  done
+fi
+
 # ---------- 3) doc-drift 提示位 (SIM-42/EQ-12; advisory, 永不拦门) ----------
 # check-doc-drift.sh 基线 111 (2026-09-21)。只提示不阻断：基线变化靠 CI audit-all 裁决。
 if [ -x scripts/check-doc-drift.sh ]; then
