@@ -91,7 +91,7 @@
 | **唯一图纸** | `NEOTRIX-MASTER-BLUEPRINT.md`（D-00~D-15，按图施工） |
 | **唯一排期真源** | `FINAL-ROADMAP-2026-09-29.md`（45 仓四轮吸收定稿）· 特性级 `FEATURE-MAP-TASKS-2026-09-29.md` |
 | 架构现状 | `ARCHITECTURE.md` ⚠️ **§1-§12 已被 §13 推翻，只读 §13 起** |
-| 模块台账 | `ARCHITECTURE-MAP-ROADMAP-V2.md` ⚠️ **§1-§7 数字永久陈旧，只取 §11 起**。更新规则 **R-P199**，口径限 `neotrix-core` L1–L6；`neobot` 独立 crate 不占 L 层故不进 ⇒ 见 `ABSORPTION-DSH-SIDEBAR-IM.md` |
+| 模块台账 | `ARCHITECTURE-MAP-ROADMAP-V2.md` —— **2026-09-29 已拆分，只留 §11 起的事实对账层**（可再生实测值）。§1–§7 的 308 行死数据已移入 `_superseded/ARCHITECTURE-MAP-ROADMAP-V2-deathsnap-2026-09-19.md`。更新规则 **R-P199**，口径限 `neotrix-core` L1–L6；`neobot` 独立 crate 不占 L 层故不进 ⇒ 见 `ABSORPTION-DSH-SIDEBAR-IM.md` |
 | 模块拓扑实测 | `DIR-AUDIT-2026-09-27.md`（16 包依赖图 + 8 类重复类型）· **目录解法** `DIR-REMEDY-2026-09-28.md` |
 | 外部吸收 | `ABSORPTION-AGENT-ARCH-2026-09-28.md`（8 源）+ `…ARCH2-2026-09-29.md`（30 源，含 5 个被证伪前提，3 仓无 LICENSE ⇒ 只取设计）+ `BATCH-FIX-2026-09-29.md` · `ABSORPTION-EXTERNAL-2026-09-27.md` |
 | 方法论教训 | `LESSONS-*.md` **8 档，按主题挑读，勿只读最新**。纪律类见 `…2026-09-24.md` §五（R36–R46：反引号当命令执行 / 门干跑有副作用 / `--only` 按路径取 diff / 全角标点吃字节 / 门记录声称已做而实现从未入库） |

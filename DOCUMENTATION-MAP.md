@@ -22,7 +22,7 @@
 | `RUST-STANDARDS.md` | Rust 编码标准正典 | Owner |
 | `AGENTS.md` | Agent 守则（指针守恒） | 所有会话 |
 | `results.tsv` | **进化实验账本** —— 由 `nt_evolution_exp.rs` 写入、`scripts/check-evolution-ledger.sh` 消费。⛔ 不是临时文件，勿删 | 进化系统 |
-| `ARCHITECTURE-MAP-ROADMAP-V2.md` | 模块台账（更新规则为 **R-P199**，口径仅限 `neotrix-core` 的 L1–L6；`neotrix-neobot` 不占 L 层故不进此台账）；**§1-§7 数字永久陈旧，只取 §11 起** | Owner |
+| `ARCHITECTURE-MAP-ROADMAP-V2.md` | 模块台账 —— **2026-09-29 拆分后只留 §11 起的事实对账层**（可再生实测值）。§1–§7 的 308 行死数据已移入 `docs/architecture/_superseded/ARCHITECTURE-MAP-ROADMAP-V2-deathsnap-2026-09-19.md`。更新规则 **R-P199**，口径仅限 `neotrix-core` 的 L1–L6；`neotrix-neobot` 不占 L 层故不进 | Owner |
 | `docs/architecture/NEOTRIX-MASTER-BLUEPRINT.md` | **唯一图纸入口**（D-00~D-15） | Owner |
 | `docs/architecture/DIR-AUDIT-2026-09-27.md` | 目录架构审计（16 包依赖图 + 8 类重复类型）。**§六需加限定**：`nt_jev` 是活路径，勿当死代码 | Owner |
 | `docs/architecture/DIR-REMEDY-2026-09-28.md` | **目录架构解法** —— 第二棵树 `neotrix/` 层归属显式化 + 唯一裁决表 | Owner |

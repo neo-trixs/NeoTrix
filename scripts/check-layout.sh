@@ -84,7 +84,8 @@ ALLOW_DIRS="
 .neotrix|状态|layer-map / task-index / capability registry（唯一真源）
 .project-map|状态|codemap 缓存
 .blueprint|状态|manifest
-.claude|状态|agent 记忆
+# ⛔ 2026-09-29 已删 .claude/ —— 1 个 7 月会话残留（71 行），零消费。
+#    曾考虑删 .neotrix-absorb/，实测其 20 条里 2 条尚未入 KB ⇒ 保留。
 .opencode|状态|opencode agent 定义
 .neotrix-absorb|状态|吸收轮快照
 .worktrees|运行期|worktree 目录（已 gitignore，允许存在）

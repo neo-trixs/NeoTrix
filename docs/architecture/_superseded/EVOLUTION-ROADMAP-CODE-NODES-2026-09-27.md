@@ -57,7 +57,7 @@
 |---|---|
 | **支脉节点** | ① `neotrix-core/src/l1_action/nt_act/nt_act_trade/orchestrator.rs`（1,471）+ `orchestrator_v2.rs`（1,510）<br>② `neotrix-core/src/l6_meta/nt_auto_orchestrator.rs`（1,037，含 `IntentClassifier` 15 类任务 + `AgentLifecycleManager`）<br>③ `neotrix-core/src/l0_substrate/nt_core_platform/{orchestrator,pipeline,pipeline_registry}.rs`<br>④ `neotrix-core/src/pipeline/`（7 文件 / 1,130，规范 D/E/B/A/R/X stage） |
 | **动作** | 留 ④（阶段命名与 `NEOTRIX-MASTER-BLUEPRINT` D-06 对齐）+ ②（有 `IntentClassifier`）。① 的 v1/v2 二选一后降级为薄适配。③ 走 `neotrix-core/src/nt_route_features.rs` 显式路由。 |
-| **已知遗留** | `ARCHITECTURE-MAP-ROADMAP-V2.md:364-370` 记录 3 个重复定义未解：`ExtractConfig` / `EmailConfig` / `PlatformRegistry` —— 一并清掉。 |
+| **已知遗留** | `ARCHITECTURE-MAP-ROADMAP-V2.md`（2026-09-29 拆分后）§11 事实对账层「门禁新增违规」条记录 3 个重复定义未解：`ExtractConfig` / `EmailConfig` / `PlatformRegistry` —— 一并清掉。⛔ 原 `:364-370` 行号锚点已随 §1–§7 归档而失效，按章节引用。 |
 
 ## 0.4 🔵 `maturity_audit()` 接 CI — **已有资产，纯接线**
 
