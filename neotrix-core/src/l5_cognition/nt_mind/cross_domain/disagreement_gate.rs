@@ -156,14 +156,12 @@ pub struct DisagreementPattern {
 
 /// 匹配条件
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MatchCondition {
-    /// 条件字段
-    pub field: String,
-    /// 操作符
-    pub operator: String,
-    /// 条件值
-    pub value: String,
-}
+// 2026-09-29 自动融合（nt_fuse_types.py）：`MatchCondition` 原在本文件与
+// `l5_cognition/nt_mind/cross_domain/entity_mapping.rs` 各有一份，字段名+类型+impl 块完全相同。
+// 真源是后者（模块 mod.rs 的 re-export 指向它）⇒ 本文件改为 re-export，
+// 消除「两份同名类型」的歧义。
+pub use super::entity_mapping::MatchCondition;
+
 
 impl DisagreementGate {
     /// 创建新的分歧门控

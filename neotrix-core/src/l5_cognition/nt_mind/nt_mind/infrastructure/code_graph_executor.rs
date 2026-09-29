@@ -232,7 +232,13 @@ mod tests {
         let files = [
             ("main.rs", "mod math;\nfn main() { math::add(1, 2); }\n"),
             ("math.rs", "pub fn add(a: i32, b: i32) -> i32 { a + b }\npub fn sub(a: i32, b: i32) -> i32 { a - b }\n"),
-            ("utils.rs", "pub struct Config { pub name: String }\npub fn greet(c: &Config) -> String { format!(\"Hello {}\", c.name) }\n"),
+            ("utils.rs", "// 2026-09-29 自动融合（nt_fuse_types.py）：`Config` 原在本文件与
+// `l5_cognition/nt_mind/nt_mind/infrastructure/code_graph.rs` 各有一份，字段名+类型+impl 块完全相同。
+// 真源是后者（模块 mod.rs 的 re-export 指向它）⇒ 本文件改为 re-export，
+// 消除「两份同名类型」的歧义。
+pub use super::code_graph::Config;
+
+\npub fn greet(c: &Config) -> String { format!(\"Hello {}\", c.name) }\n"),
             ("lib.rs", "pub mod math;\npub mod utils;\n"),
         ];
         for (name, content) in &files {

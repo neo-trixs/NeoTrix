@@ -8,17 +8,12 @@ use std::collections::HashMap;
 
 /// 晶体技能
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CrystalSkill {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub domain: String,
-    pub success_count: u32,
-    pub failure_count: u32,
-    pub last_used: Option<i64>,
-    pub version: u32,
-    pub importance: f64,
-}
+// 2026-09-29 自动融合（nt_fuse_types.py）：`CrystalSkill` 原在本文件与
+// `l5_cognition/nt_core/nt_consciousness_core/unified_learning.rs` 各有一份，字段名+类型+impl 块完全相同。
+// 真源是后者（模块 mod.rs 的 re-export 指向它）⇒ 本文件改为 re-export，
+// 消除「两份同名类型」的歧义。
+pub use super::unified_learning::CrystalSkill;
+
 
 /// 晶体学习反馈
 #[derive(Debug, Clone, Serialize, Deserialize)]
