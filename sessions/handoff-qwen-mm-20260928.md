@@ -402,3 +402,34 @@ cargo test  -p neotrix --lib            # neobot 挂 ⇒ core 必挂，一起验
   切流，数字错会把 `endstream` 吃进 content。已改回按字节数算。
 - E2E 里 `engine.seen_result.lock().map(|seen| seen)` 返回的是 `MutexGuard<bool>`
   而不是 `bool`，`assert!` 会编译不过。已改 `|seen| *seen`（与既有用例同惯例）。
+
+## 16. 收工自查（2026-09-29 本轮，§8 格式）
+
+**worktree 去向**：本轮**未新建**任何 worktree。`nt_worktree_gate.sh check` 报
+2 个（`merge-test` / `ratchet`），**都不是我建的**，近 3h 仍有 .rs 改动 ⇒ 他窗在用，
+**未删未碰**（R-DISK-1：只删生成物，不删带脏文件的 worktree）。
+
+**未提交改动去了哪**（AGENTS.md 收工义务第 2 条，必填）：
+
+| 类别 | 去向 |
+|---|---|
+| 本轮全部产品码/文档 | **已提交** `ab1b9d96`（13 文件）+ `606d42f7`（handoff 校正）+ 本节的 docs 提交 |
+| `crates/neotrix-neobot/src/nt_pdf_ground.rs`（新文件） | 随 `ab1b9d96` 入库（`create mode`） |
+| 兜底 patch | `.neotrix/worktree-salvage/pdf-ground-20260929.patch`（2294 行，gitignored） |
+| **他窗 WIP 61 项** | **原样未碰** —— 逐路径 `git add`，`git diff --cached --name-only \| wc -l` = 13 核对过 |
+| `Cargo.lock` | **不在我的提交里**（他窗在改；我新增的 lopdf 边要等下次 `cargo check` 自动补） |
+
+**工作树状态**：我的文件全部已入库（`git status --porcelain` 过滤我的路径 = 空）。
+**未 push**（该分支本就有 417 个本地未推送提交，非本轮造成）。
+
+**门记录（带核实时间，2026-09-29）**：
+- `nt_lock_audit.py crates/neotrix-neobot/src` = **0**、`neotrix-core/src` = **0**（改了 .rs，已重跑非沿用）
+- `check-layer-deps.sh --strict` = **0 new / 101 known**（clean 检出基线，见 AGENTS.md 警告）
+- `check-capability-manifests.sh` = **19 条存量 M3 漂移，本轮零新增**
+- `rustfmt --edition 2021 --check`：`nt_pdf_ground.rs` 整文件干净；`nt_agent.rs` hunk **40 == HEAD 基线 40**（零新增）；`nt_http_engine.rs` 我的 3 段不在 hunk 内；`headless.rs` 删后 CLEAN
+- `nt_mem_gate.sh` = **BLOCKED ×8** ⇒ **本轮无任何编译/测试证据**
+
+**经验蒸馏**：本档 `docs/architecture/LESSONS-20260929-checked-is-not-verified.md`
+（元教训：「我推演过」不是「我验证过」—— 9 处手推编译错被我自己当成了 diligence
+许可证，而 16 个单测的期望值一个都没跑过；含能力断言、提方案前先查自有、删入口
+≠删覆盖、fixture 自造、授权≠免记账 5 条机械化判据），已登记进 `DOCUMENTATION-MAP.md`。

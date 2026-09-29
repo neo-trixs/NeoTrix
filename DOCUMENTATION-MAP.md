@@ -31,6 +31,7 @@
 | `docs/architecture/absorption-sources/` | **吸收源清单** —— 483 仓 CSV + 436 条榜单排名 + 许可台账 + 5 论文；复核任何结论从这里开始 | Owner |
 | `docs/architecture/ABSORPTION-DSH-SIDEBAR-IM.md` | NeoBot 吸收正典记录（+12 模块 / IPC 97）；**neobot 改动的台账落点** | Owner |
 | `docs/architecture/LESSONS-2026-09-27-scanner-trust.md` | 经验沉淀：扫描器告警 / 门记录腐化 / 并发写入 | Owner |
+| `docs/architecture/LESSONS-20260929-checked-is-not-verified.md` | 经验沉淀：「我推演过」≠「我验证过」/ 能力断言看签名必翻车 / 提方案前先查自有 / 删入口≠删覆盖 / fixture 自造 / 授权≠免记账 | Owner |
 | `sessions/HANDOFF-TEMPLATE.md` | 交接模板（**已入库**，`AGENTS.md` 引用） | 所有会话 |
 | `FUSION-ARCHITECTURE.md` | ⚠️ **已废止** —— 零有效引用，其"下一步"含已被证伪的"解决预存编译错误" | — |
 | `DOCUMENTATION-MAP.md` | 本文档 | Owner |
