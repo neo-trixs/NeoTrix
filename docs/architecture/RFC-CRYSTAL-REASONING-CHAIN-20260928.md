@@ -85,7 +85,7 @@
 
 ## 5. 进度
 
-- [x] **步 1 邻接索引已写完**：`neotrix-core/src/neotrix/nt_crystal_core/nt_graph_index.rs`
+- [x] **步 1 邻接索引已写完**：`neotrix-core/src/l5_cognition/nt_crystal_core/nt_graph_index.rs`
       （`Adjacency`：双向邻接 / `facet_cluster` 域多样性贪心 / `cross_domain_edges`
       相位门代理量 / `hubs` / `degree_histogram`）+ 6 个单测
       + `mod.rs` 注册（**未改动任何既有文件本体**，仅加 1 行 `pub mod`）

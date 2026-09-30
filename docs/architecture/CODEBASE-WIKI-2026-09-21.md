@@ -1001,7 +1001,7 @@ cargo check --lib -p neotrix
 | nt_agent_gallery.rs | `src/l6_meta/nt_agent_gallery.rs` | 1 | 316 |
 | nt_agent_identity.rs | `src/l6_meta/nt_agent_identity.rs` | 1 | 631 |
 | nt_astar.rs | `src/l3_embodiment/nt_astar.rs` | 1 | 295 |
-| nt_capability_bridge.rs | `src/neotrix/nt_capability_bridge.rs` | 1 | 601 |
+| nt_capability_bridge.rs | `src/l1_action/nt_capability_bridge.rs` | 1 | 601 |
 | nt_codegen.rs | `src/l5_cognition/nt_codegen.rs` | 1 | 226 |
 | nt_cognition_facade.rs | `src/l5_cognition/nt_cognition_facade.rs` | 1 | 327 |
 | nt_computer.rs | `src/l3_embodiment/nt_computer.rs` | 1 | 477 |
@@ -1045,9 +1045,9 @@ cargo check --lib -p neotrix
 | nt_core_edit | `src/l1_action/nt_core_edit/mod.rs` | 1 | 3 |
 | nt_core_embed | `src/l1_action/nt_core_embed/mod.rs` | 1 | 48 |
 | nt_core_error | `src/l0_substrate/nt_core_error/recovery.rs` | 3 | 1695 |
-| nt_core_error.rs | `src/neotrix/nt_core_error.rs` | 1 | 3 |
+| nt_core_error.rs | `src/l0_substrate/nt_core_error.rs` | 1 | 3 |
 | nt_core_event.rs | `src/l0_substrate/nt_core_event.rs` | 1 | 471 |
-| nt_core_event_bus.rs | `src/neotrix/nt_core_event_bus.rs` | 1 | 666 |
+| nt_core_event_bus.rs | `src/l0_substrate/nt_core_event_bus.rs` | 1 | 666 |
 | nt_core_evidence_gating.rs | `src/l6_meta/nt_core_evidence_gating.rs` | 1 | 250 |
 | nt_core_gate | `src/l5_cognition/nt_core_gate/mod.rs` | 2 | 3108 |
 | nt_core_graph.rs | `src/l1_action/nt_core_graph.rs` | 1 | 584 |
@@ -1118,7 +1118,7 @@ cargo check --lib -p neotrix
 | nt_core_walsh.rs | `src/l5_cognition/nt_core_walsh.rs` | 1 | 415 |
 | nt_core_ws.rs | `src/l0_substrate/nt_core_ws.rs` | 1 | 248 |
 | nt_council | `src/l5_cognition/nt_council/mod.rs` | 1 | 110 |
-| nt_crystal_core | `src/neotrix/nt_crystal_core/developmental_training.rs` | 44 | 12714 |
+| nt_crystal_core | `src/l5_cognition/nt_crystal_core/developmental_training.rs` | 44 | 12714 |
 | nt_decision_engine.rs | `src/l5_cognition/nt_decision_engine.rs` | 1 | 686 |
 | nt_ecs.rs | `src/l0_substrate/nt_ecs.rs` | 1 | 1362 |
 | nt_emergence_detector.rs | `src/l6_meta/nt_emergence_detector.rs` | 1 | 662 |
@@ -1128,8 +1128,8 @@ cargo check --lib -p neotrix
 | nt_entry_tests.rs | `src/entry/nt_entry_tests.rs` | 1 | 144 |
 | nt_feel | `src/l4_emotion/nt_feel/digital_human.rs` | 15 | 5492 |
 | nt_feel_facade.rs | `src/l4_emotion/nt_feel_facade.rs` | 1 | 15 |
-| nt_file_ability | `src/neotrix/nt_file_ability/core.rs` | 37 | 11852 |
-| nt_file_ability.rs | `src/neotrix/nt_file_ability.rs` | 1 | 2008 |
+| nt_file_ability | `src/l1_action/nt_file_ability/core.rs` | 37 | 11852 |
+| nt_file_ability.rs | `src/l1_action/nt_file_ability.rs` | 1 | 2008 |
 | nt_goal | `src/l5_cognition/nt_goal/behavioral_verifier.rs` | 8 | 2073 |
 | nt_governance | `src/l6_meta/coordination/nt_governance/mod.rs` | 5 | 907 |
 | nt_harness | `src/l1_action/nt_harness/mod.rs` | 2 | 239 |
@@ -1224,7 +1224,7 @@ cargo check --lib -p neotrix
 | `AbsorbedRule` | `src/l6_meta/evolution/evolution_loop/absorber.rs` | struct |
 | `AbsorberConfig` | `src/l5_cognition/nt_core/nt_consciousness_core/information_absorber.rs` | struct |
 | `AbsorberStatus` | `src/l2_perception/nt_world/osint/mod.rs` | struct |
-| `AbsorptionProgress` | `src/neotrix/ffi/types.rs` | struct |
+| `AbsorptionProgress` | `src/l0_substrate/ffi/types.rs` | struct |
 | `AbsorptionRecord` | `src/l5_cognition/nt_core/nt_consciousness_core/information_absorber.rs` | struct |
 | `AbsorptionResult` | `src/l5_cognition/nt_mind/nt_mind/experience_tree/mod.rs` | struct |
 | `AbsorptionStats` | `src/l5_cognition/nt_mind/mind_modules/knowledge/experience_knowledge_bridge.rs` | struct |
@@ -1239,7 +1239,7 @@ cargo check --lib -p neotrix
 | `AccountClustering` | `src/l3_embodiment/nt_shield/defense/anti_distillation/account_clustering.rs` | struct |
 | `AccountHealth` | `src/l1_action/nt_io/nt_io_provider/pool/account_pool.rs` | enum |
 | `AccountLease` | `src/l1_action/nt_io/nt_io_provider/pool/account_pool.rs` | struct |
-| `AccountMatch` | `src/neotrix/nt_crystal_core/osint_perception.rs` | struct |
+| `AccountMatch` | `src/l5_cognition/nt_crystal_core/osint_perception.rs` | struct |
 
 ## CLI Commands
 

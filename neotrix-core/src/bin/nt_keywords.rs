@@ -7,7 +7,7 @@
 //! 脚本**当前跑不起来**（断链 import）。
 //!
 //! ## 为什么不「在 Python 里重写一份」
-//! `CrystalConsciousness::keywords`（`neotrix/nt_crystal_core/consciousness.rs:546`）
+//! `CrystalConsciousness::keywords`（`l5_cognition/nt_crystal_core/consciousness.rs:546`）
 //! 是晶体核心的**权威分词**：它带 `strip_src_tag` 前处理 + 停用词表 +
 //! 单字符过滤，且**同一口径被觉醒循环的新颖度验证复用**。Python 重写一份
 //! 就会立刻产生第二套分词 —— 那正是本仓反复治的病（「第二份真源会漂」，

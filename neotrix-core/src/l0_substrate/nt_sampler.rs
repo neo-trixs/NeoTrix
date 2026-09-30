@@ -14,7 +14,7 @@
 //! 为什么落 L0：主代码此前**只有采样参数、没有采样实现**——
 //! `repetition_penalty` / `top_k` / `top_p` 全部是 `nt_io_inference` 里的
 //! config 透传字段，从不在本地 logits 上生效；唯一类别采样器
-//! `neotrix/nt_crystal_core/ctm.rs` 用 `rand::random()`，非确定、无 top-k、
+//! `l5_cognition/nt_crystal_core/ctm.rs` 用 `rand::random()`，非确定、无 top-k、
 //! 无 top-p、无重复惩罚。本模块补的就是这个空缺。
 
 /// 采样参数（MiniMind Pattern 8 映射）

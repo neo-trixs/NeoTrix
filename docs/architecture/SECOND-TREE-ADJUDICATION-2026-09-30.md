@@ -108,7 +108,7 @@ pub static CONSCIOUSNESS_THRESHOLDS: LazyLock<_ConsciousnessThresholds> =
 **消费者 5 个文件 / 7 处**：
 | 文件 | 处数 |
 |---|---:|
-| `neotrix/nt_core_event_bus.rs` | 2 |
+| `l0_substrate/nt_core_event_bus.rs` | 2 |
 | `…/nt_mind_background_loop/run.rs`（真身） | 1 |
 | `…/nt_mind_background_loop/mod.rs`（`pub use`） | 1 |
 | `…/handlers_consciousness/nt_event_bus.rs` | 1 |

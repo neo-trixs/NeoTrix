@@ -124,4 +124,3 @@ neotrix-core/src/l6_meta/nt_meta/nt_core_arch_lint.rs
 neotrix-core/src/l6_meta/nt_meta/nt_core_meta_auditor.rs
 neotrix-core/src/l6_meta/nt_meta/nt_evolution_eval.rs
 neotrix-core/src/l6_meta/nt_permission_profiles.rs
-neotrix-core/src/neotrix/nt_core_event_bus.rs

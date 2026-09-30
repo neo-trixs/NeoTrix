@@ -80,7 +80,7 @@
 | `neotrix-core/src/l1_action/nt_core_llm/mod.rs:55` | 同上 6 段 | 注释称 `context_strategy::is_cjk` 是「单一事实源，两边不得发散」 |
 | `neotrix-core/src/l1_action/nt_core_embed/mod.rs:89` | 统一/ExtA/假名/谚文（4 段） | 无标点无全角 |
 | `neotrix-core/src/l1_action/nt_io/nt_io_output_style.rs:604` | 统一/ExtA/CJK 兼容表意（4 段） | 多 `0xF900..=0xFAFF` |
-| `neotrix-core/src/neotrix/nt_crystal_core/consciousness.rs:643` | 统一（1 段） | **本轮新加**，与同目录另两个同源 |
+| `neotrix-core/src/l5_cognition/nt_crystal_core/consciousness.rs:643` | 统一（1 段） | **本轮新加**，与同目录另两个同源 |
 | `…/nt_crystal_core/nt_shared_mind.rs:18` | 统一（1 段） | 既有 |
 | `…/nt_crystal_core/nt_crystal_task_fusion.rs:52` | 统一（1 段） | 既有 |
 | `neotrix-core/src/bin/nt_crystal_serve.rs:525` | 统一/ExtA（2 段） | |

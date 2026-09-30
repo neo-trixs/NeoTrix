@@ -50,7 +50,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 #
 # 修法（遵守本文件「不重写」纪律）：改为调 Rust 侧新导出的 `nt_keywords` bin，
 # 它直接调用晶体核心的权威实现 `CrystalConsciousness::keywords`
-# （neotrix/nt_crystal_core/consciousness.rs:546）。**不在 Python 里重写分词** ——
+# （l5_cognition/nt_crystal_core/consciousness.rs:546）。**不在 Python 里重写分词** ——
 # 重写会立刻产生第二套口径，而「第二份真源会漂」是本仓反复治的病。
 #
 # 代价：首次调用要 cargo build（可能数分钟）。用 --selftest 预热。

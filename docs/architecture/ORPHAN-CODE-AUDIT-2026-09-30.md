@@ -56,7 +56,7 @@
 
 ## 3. 「看起来死、其实是活的」实例（附证据原文行）
 
-### 3.1 `neotrix-core/src/neotrix/ffi/*` —— 12 个文件 / 2,752 行（D 类）
+### 3.1 `neotrix-core/src/l0_substrate/ffi/*` —— 12 个文件 / 2,752 行（D 类）
 
 证据原文（`neotrix-core/src/neotrix/mod.rs:15-16`）：
 ```
@@ -276,18 +276,18 @@ $ git log --oneline -1 -- neotrix-core/src/l6_meta/mod.rs
 | `neotrix-core/src/l2_perception/nt_core_hcube/vsa_holon.rs` | 113 | D | `.../l2_perception/nt_core_hcube/mod.rs:23-24` → `#[cfg(feature = "simd-vsa")]` / `pub mod vsa_holon;` | 保留（活的；改动须带 feature 复验） |
 | `neotrix-core/src/l3_embodiment/nt_shield/shield_core/keyvault.rs` | 343 | D | `.../nt_shield/shield_core/mod.rs:15-16` → `#[cfg(feature = "sandbox")]` / `pub mod keyvault;` | 保留（活的；改动须带 feature 复验） |
 | `neotrix-core/src/l3_embodiment/nt_shield/shield_core/vault.rs` | 325 | D | `.../nt_shield/shield_core/mod.rs:17-18` → `#[cfg(feature = "sandbox")]` / `pub mod vault;` | 保留（活的；改动须带 feature 复验） |
-| `neotrix-core/src/neotrix/ffi/consciousness_tree.rs` | 476 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
-| `neotrix-core/src/neotrix/ffi/constellation_system.rs` | 85 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
-| `neotrix-core/src/neotrix/ffi/dual_specialization.rs` | 91 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
-| `neotrix-core/src/neotrix/ffi/e8_reasoning.rs` | 206 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
-| `neotrix-core/src/neotrix/ffi/gwt_attention.rs` | 251 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
-| `neotrix-core/src/neotrix/ffi/kb_bridge.rs` | 172 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
-| `neotrix-core/src/neotrix/ffi/mod.rs` | 343 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
-| `neotrix-core/src/neotrix/ffi/rune_socketing.rs` | 77 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
-| `neotrix-core/src/neotrix/ffi/seal_pipeline.rs` | 209 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
-| `neotrix-core/src/neotrix/ffi/skill_tree.rs` | 352 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
-| `neotrix-core/src/neotrix/ffi/types.rs` | 490 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
-| `neotrix-core/src/neotrix/ffi/vsa_hypercube.rs` | 171 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
+| `neotrix-core/src/l0_substrate/ffi/consciousness_tree.rs` | 476 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
+| `neotrix-core/src/l0_substrate/ffi/constellation_system.rs` | 85 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
+| `neotrix-core/src/l0_substrate/ffi/dual_specialization.rs` | 91 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
+| `neotrix-core/src/l0_substrate/ffi/e8_reasoning.rs` | 206 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
+| `neotrix-core/src/l0_substrate/ffi/gwt_attention.rs` | 251 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
+| `neotrix-core/src/l0_substrate/ffi/kb_bridge.rs` | 172 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
+| `neotrix-core/src/l0_substrate/ffi/mod.rs` | 343 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
+| `neotrix-core/src/l0_substrate/ffi/rune_socketing.rs` | 77 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
+| `neotrix-core/src/l0_substrate/ffi/seal_pipeline.rs` | 209 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
+| `neotrix-core/src/l0_substrate/ffi/skill_tree.rs` | 352 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
+| `neotrix-core/src/l0_substrate/ffi/types.rs` | 490 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
+| `neotrix-core/src/l0_substrate/ffi/vsa_hypercube.rs` | 171 | D | `neotrix-core/src/neotrix/mod.rs:15-16` → `#[cfg(feature = "ios-bridge")]` / `pub mod ffi;` | 保留（活的；改动须带 feature 复验） |
 
 ### 5.3 X 类 —— 口径产物（1 个 / 10 行）
 
@@ -394,11 +394,11 @@ A 类共 **98 棵**孤儿子树。下表每行一棵；子文件逐条列在 §5
 | `neotrix-core/src/l5_cognition/nt_mind/seal/domain_mapper.rs` | 1 | 653 | `NEVER` | 待裁决（先确认 `docs/` 无引用再动） |
 | `neotrix-core/src/l5_cognition/nt_mind/seal/source_adapter.rs` | 1 | 329 | `NEVER` | 待裁决（先确认 `docs/` 无引用再动） |
 | `neotrix-core/src/l6_meta/nt_meta/dream_replay/mod.rs` | 1 | 186 | `NEVER` | 待裁决（先确认 `docs/` 无引用再动） |
-| `neotrix-core/src/neotrix/nt_crystal_core/agent_orchestrator.rs` | 1 | 192 | `d3b58247` | 待裁决（先确认 `docs/` 无引用再动） |
-| `neotrix-core/src/neotrix/nt_crystal_core/memory_orchestrator.rs` | 1 | 311 | `e20ebe34` | 待裁决（先确认 `docs/` 无引用再动） |
-| `neotrix-core/src/neotrix/nt_crystal_core/multi_graph_memory.rs` | 1 | 545 | `NEVER` | 待裁决（先确认 `docs/` 无引用再动） |
-| `neotrix-core/src/neotrix/nt_crystal_core/observability.rs` | 1 | 152 | `1e97e730` | 待裁决（先确认 `docs/` 无引用再动） |
-| `neotrix-core/src/neotrix/nt_crystal_core/self_healing.rs` | 1 | 372 | `477bf669` | 待裁决（先确认 `docs/` 无引用再动） |
+| `neotrix-core/src/l5_cognition/nt_crystal_core/agent_orchestrator.rs` | 1 | 192 | `d3b58247` | 待裁决（先确认 `docs/` 无引用再动） |
+| `neotrix-core/src/l5_cognition/nt_crystal_core/memory_orchestrator.rs` | 1 | 311 | `e20ebe34` | 待裁决（先确认 `docs/` 无引用再动） |
+| `neotrix-core/src/l5_cognition/nt_crystal_core/multi_graph_memory.rs` | 1 | 545 | `NEVER` | 待裁决（先确认 `docs/` 无引用再动） |
+| `neotrix-core/src/l5_cognition/nt_crystal_core/observability.rs` | 1 | 152 | `1e97e730` | 待裁决（先确认 `docs/` 无引用再动） |
+| `neotrix-core/src/l5_cognition/nt_crystal_core/self_healing.rs` | 1 | 372 | `477bf669` | 待裁决（先确认 `docs/` 无引用再动） |
 
 > ⛔ `docs/standards/templates/FITNESS-FN-TEMPLATE.rs`（40 行）虽落在 A 类，
 > 但它**不是死代码** —— 文件头第 1 行原文 `//! TEMPLATE — do NOT compile standalone.`，
@@ -618,11 +618,11 @@ A 类共 **98 棵**孤儿子树。下表每行一棵；子文件逐条列在 §5
 | `neotrix-core/src/l6_meta/nt_meta/session_replay/mod.rs` | 14 | A | `git log -S "mod session_replay;"` → 最后一次改动该声明的 commit `8aab76f6` (2026-09-21) neotrix-core编译修复 + 清理；文件由 `477bf669` (2026-09-20) 落地 | 可删候选（**本任务不删**） |
 | `neotrix-core/src/l6_meta/nt_meta/session_replay/replay.rs` | 298 | A | `git log -S "mod replay;"` → 最后一次改动该声明的 commit `477bf669` (2026-09-20) docs: establish documentation standard and cleanup；文件由 `477bf669` (2026-09-20) 落地 | 可删候选（**本任务不删**） |
 | `neotrix-core/src/l6_meta/nt_nexus/checkpoint.rs` | 686 | A | `git log -S "mod checkpoint;"` → 最后一次改动该声明的 commit `b291f3d5` (2026-08-28) Delete neotrix-core directory；文件由 `13dfd9a8` (2026-09-17) 落地 | 可删候选（**本任务不删**） |
-| `neotrix-core/src/neotrix/nt_crystal_core/agent_orchestrator.rs` | 192 | A | `git log -S "mod agent_orchestrator;"` → 最后一次改动该声明的 commit `d3b58247` (2026-08-05) chore(cleanup): remove archive_star dead-code zone (152 files, -34.9k lines)；文件由 `477bf669` (2026-09-20) 落地 | 可删候选（**本任务不删**） |
-| `neotrix-core/src/neotrix/nt_crystal_core/memory_orchestrator.rs` | 311 | A | `git log -S "mod memory_orchestrator;"` → 最后一次改动该声明的 commit `e20ebe34` (2026-09-16) Fusion v2 baseline: dual architecture state before merge；文件由 `477bf669` (2026-09-20) 落地 | 可删候选（**本任务不删**） |
-| `neotrix-core/src/neotrix/nt_crystal_core/multi_graph_memory.rs` | 545 | A | `git log -S` 全历史**从未**有过该 `mod` 声明 ⇒ 生下来未接线；文件由 `477bf669` (2026-09-20) 落地 | 可删候选（**本任务不删**） |
-| `neotrix-core/src/neotrix/nt_crystal_core/observability.rs` | 152 | A | `git log -S "mod observability;"` → 最后一次改动该声明的 commit `1e97e730` (2026-09-12) docs: targeted research cycle 475 — 3 more internal pain points；文件由 `477bf669` (2026-09-20) 落地 | 可删候选（**本任务不删**） |
-| `neotrix-core/src/neotrix/nt_crystal_core/self_healing.rs` | 372 | A | `git log -S "mod self_healing;"` → 最后一次改动该声明的 commit `477bf669` (2026-09-20) docs: establish documentation standard and cleanup；文件由 `477bf669` (2026-09-20) 落地 | 可删候选（**本任务不删**） |
+| `neotrix-core/src/l5_cognition/nt_crystal_core/agent_orchestrator.rs` | 192 | A | `git log -S "mod agent_orchestrator;"` → 最后一次改动该声明的 commit `d3b58247` (2026-08-05) chore(cleanup): remove archive_star dead-code zone (152 files, -34.9k lines)；文件由 `477bf669` (2026-09-20) 落地 | 可删候选（**本任务不删**） |
+| `neotrix-core/src/l5_cognition/nt_crystal_core/memory_orchestrator.rs` | 311 | A | `git log -S "mod memory_orchestrator;"` → 最后一次改动该声明的 commit `e20ebe34` (2026-09-16) Fusion v2 baseline: dual architecture state before merge；文件由 `477bf669` (2026-09-20) 落地 | 可删候选（**本任务不删**） |
+| `neotrix-core/src/l5_cognition/nt_crystal_core/multi_graph_memory.rs` | 545 | A | `git log -S` 全历史**从未**有过该 `mod` 声明 ⇒ 生下来未接线；文件由 `477bf669` (2026-09-20) 落地 | 可删候选（**本任务不删**） |
+| `neotrix-core/src/l5_cognition/nt_crystal_core/observability.rs` | 152 | A | `git log -S "mod observability;"` → 最后一次改动该声明的 commit `1e97e730` (2026-09-12) docs: targeted research cycle 475 — 3 more internal pain points；文件由 `477bf669` (2026-09-20) 落地 | 可删候选（**本任务不删**） |
+| `neotrix-core/src/l5_cognition/nt_crystal_core/self_healing.rs` | 372 | A | `git log -S "mod self_healing;"` → 最后一次改动该声明的 commit `477bf669` (2026-09-20) docs: establish documentation standard and cleanup；文件由 `477bf669` (2026-09-20) 落地 | 可删候选（**本任务不删**） |
 
 </details>
 
@@ -655,7 +655,7 @@ A 类共 **98 棵**孤儿子树。下表每行一棵；子文件逐条列在 §5
 
 ### 6.3 残余不确定性
 
-- **1 个文件解析不可信**：`neotrix-core/src/neotrix/nt_file_ability/test_helpers.rs`
+- **1 个文件解析不可信**：`neotrix-core/src/l1_action/nt_file_ability/test_helpers.rs`
   （词法器报 unterminated）。它**在 dep-info 里、且不在幽灵清单内** ⇒ 对本次结论无影响。
 - A 类判据依赖 `mod` 声明的**文本**。若存在 `include!()` 拼接模块，本工具会漏；
   已全仓验证：**`include!()` 出现 0 次**。

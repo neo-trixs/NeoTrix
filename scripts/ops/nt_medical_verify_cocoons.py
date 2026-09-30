@@ -3,7 +3,7 @@
 """nt_medical_verify_cocoons — 医患集吸收结果验收（结构 / 幂等 / 连边 / 语义）.
 
 对 `nt_medical_distill_to_cocoons.py` 的产出做**独立**验收：不复用生产代码的
-任何函数，只按 `neotrix-core/src/neotrix/nt_crystal_core/{consciousness,cocoons}.rs`
+任何函数，只按 `neotrix-core/src/l5_cognition/nt_crystal_core/{consciousness,cocoons}.rs`
 的 `Memory` / `PersistentCocoon` / `StoreData` 契约重新解析判定。
 
 验收项:

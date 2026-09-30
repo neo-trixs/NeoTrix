@@ -360,12 +360,20 @@ impl Default for PlattParams {
 }
 
 impl PlattParams {
-    pub fn apply(&self, p: f64) -> f64 {
-        let pc = p.clamp(1e-6, 1.0 - 1e-6);
-        let logit = (pc / (1.0 - pc)).ln().clamp(-6.0, 6.0);
-        let z = self.a * logit + self.b;
-        1.0 / (1.0 + (-z).exp())
-    }
+        pub fn apply(&self, p: f64) -> f64 {
+            let pc = p.clamp(1e-6, 1.0 - 1e-6);
+            // 恒等参数（a=1, b=0）数学上就是恒等映射，但 `sigmoid(logit(p))`
+            // 这个往返在 f64 下**非逐位精确**：实测 0.49342403628117926 经往返
+            // 得 0.4934240362811792（1 ULP 漂移）。这打破了「空桶穿线零行为变化」
+            // 的不变量（见 test_decide_calibrated_identity_matches_plain）。
+            // ⇒ 恒等情形直接返回，同时省掉两次超越函数。
+            if self.a == 1.0 && self.b == 0.0 {
+                return pc;
+            }
+            let logit = (pc / (1.0 - pc)).ln().clamp(-6.0, 6.0);
+            let z = self.a * logit + self.b;
+            1.0 / (1.0 + (-z).exp())
+        }
 
     /// 坐标下降拟合（最小化 NLL，无外部优化依赖）。
     /// items: (预测概率, 是否正确)。
