@@ -8,7 +8,7 @@
 
 ## §1 已建成（可点可验）
 
-### 1.1 前端 —— 4,445 行
+### 1.1 前端 —— 4,523 行
 
 | 文件 | 行 | 职责 |
 |---|---:|---|
@@ -38,14 +38,13 @@
 | `crates/neotrix-neobot/src/nt_evidence.rs` | 329 | 8 | 证据审计：断言有无出处 / 过度断言 / `sourced_ratio` 缺席≠0 |
 | `crates/neotrix-neobot/src/nt_panel.rs` | 440 | **18** | 决策面板契约 + **过期作答检测** + **面板注册表** |
 
-### 1.3 命令（10 个，前后端两侧一致）
+### 1.3 命令（12 个，前后端两侧一致）
 
 ```
-neobot_agent_run           neobot_convo_group        neobot_convo_dm
-neobot_send                neobot_evidence_summary   neobot_core_capabilities
-neobot_panel_answer
-neobot_panel_publish              neobot_panel_clear              neobot_panel_demo_publish
-```
+neobot_agent_run            neobot_convo_list           neobot_member_list        
+neobot_convo_group          neobot_convo_dm             neobot_send               
+neobot_evidence_summary     neobot_core_capabilities    neobot_panel_answer       
+neobot_panel_publish        neobot_panel_clear          neobot_panel_demo_publish 
 
 ### 1.4 资产
 
@@ -64,7 +63,7 @@ neobot_panel_publish              neobot_panel_clear              neobot_panel_d
 | `nt_shot.mjs` | 界面截图（HTTP 服务方式） | — |
 | `nt_check_status.mjs` | **本文件与实测是否一致** | 见 §4 |
 
-**前端 7 组自测 + 库测试38 条（库 26 + command 层 12）Rust 测试。**
+**前端 7 组自测 + 库测试45 条（库 26 + command 层 19）Rust 测试。**
 
 > 复现：`node scripts/ops/nt_check_{tokens,bytes,ipc,layout,status}.mjs` ·
 > `cd apps/neobot-desktop/frontend && node selftest.mjs` ·
@@ -96,7 +95,9 @@ neobot_panel_publish              neobot_panel_clear              neobot_panel_d
 | 1 | ~~骨架无面板注册表~~ **已闭合** | 已有 `nt_panel::Registry`（18 测试）。`neobot_panel_answer` 现在**只收 answer**，基准由骨架持有；面板经 `neobot_panel_publish` 登记后由 `neobot:panel` 事件下发 | — |
 | 2 | **骨架侧尚无面板下发器** | 通道已通（publish → 事件 → 界面 → answer → 注册表校验），但**没有真实骨架在发面板**。浏览器预览下因此没有待答面板 —— 这是正确的，不是缺陷 | 需骨架侧实现下发 |
 | 3 | **无法在 Tauri 里做端到端验证** | Tauri on macOS 用 WKWebView，**不是 Chrome** ⇒ 布局门那套 CDP 接不上运行中的 app。真实点击链路仍未验证 | 需 Web Inspector 协议或骨架侧集成测试 |
-| 4 | **列表仍是 `MOCK_ITEMS`** | 会话列表未接真实 store。`neobot_convo_group`/`convo_dm` 已能建会话，但列表不从库里读 | `main.ts` |
+| 4 | ~~列表仍是 `MOCK_ITEMS`~~ **已闭合** | 已有 `neobot_convo_list` / `neobot_member_list` 读 `~/.neobot/neobot.db`，投影成 `ConvoView`。界面读不到时**如实报错**，不回退假数据 | — |
+| 5 | **`neobot_send` 仍无会话上下文** | 发送只是 `agent_run` 的包装，不带 `convo_id`，消息不进 store。列表已是真数据，消息流还是假的 | `commands.rs` |
+| 6 | **骨架侧面板下发器** | 通道通（publish→事件→answer），app 内有演示下发器；真实下发器应在骨架运行进程里 | 需骨架侧实现 |
 
 ### 🟡 应当修
 

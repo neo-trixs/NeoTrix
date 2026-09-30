@@ -118,6 +118,10 @@ export interface Commands {
   neobot_agent_run: { args: { goal: string; context?: string | null }; ret: AgentRunResult };
   // @rust main.rs::neobot_send
   neobot_send: { args: { text: string }; ret: AgentRunResult };
+  // @rust commands.rs::neobot_convo_list —— 真列表（读 ~/.neobot/neobot.db）
+  neobot_convo_list: { args: Record<string, never>; ret: ConvoViewWire[] };
+  // @rust commands.rs::neobot_member_list
+  neobot_member_list: { args: Record<string, never>; ret: MemberViewWire[] };
   // @rust main.rs::neobot_convo_group
   neobot_convo_group: { args: { title: string; members: string[] }; ret: string };
   // @rust main.rs::neobot_convo_dm
@@ -146,6 +150,13 @@ export interface Commands {
   // 不是「界面自造面板」的后门（那是前一轮已删掉的漏洞）。
   neobot_panel_demo_publish: { args: Record<string, never>; ret: number };
 };
+
+/** 会话投影。⚠️ 是 store 的**投影**，不是 sqlite row —— 改 SQL 不会波及前端。 */
+export interface ConvoViewWire {
+  id: string; kind: string; title: string; members: string[];
+  task_count: number; last_active: string; muted: boolean; unread: number;
+}
+export interface MemberViewWire { id: string; kind: string; display: string }
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 

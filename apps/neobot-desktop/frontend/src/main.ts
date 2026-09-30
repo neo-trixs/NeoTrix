@@ -22,7 +22,7 @@ import { openSheet } from "./ui/sheet.ts";
 import { appendBlock } from "./ui/blocks.ts";
 import type { AnswerView } from "./ui/panel-view.ts";
 import type { DecisionPanel } from "./ui/block-model.ts";
-import type { DecisionPanelWire, EvidenceReport } from "./ipc.ts";
+import type { ConvoViewWire, DecisionPanelWire, EvidenceReport, MemberViewWire } from "./ipc.ts";
 import { renderIsland } from "./ui/island.ts";
 import { deriveIsland } from "./ui/island-model.ts";
 import { hasPendingPanel } from "./ui/block-model.ts";
@@ -290,7 +290,8 @@ function newGroup(): void {
       { kind: "text", id: "title", label: "群名", hint: "留空则用成员名拼", placeholder: "例如：发布值班" },
       {
         kind: "pick", id: "members", label: "成员", multiple: true,
-        options: MOCK_MEMBERS.map((m) => ({ id: m, label: m })),
+        // 成员也来自 store，不用硬编码名单。
+        options: members.map((m) => ({ id: m.id, label: m.display || m.id })),
       },
     ],
     onSubmit: async (v) => {
@@ -418,35 +419,96 @@ function showEvidence(rep: EvidenceReport): void {
   }
 }
 
-// ── 演示数据（接真后端前先把界面跑起来；真数据到位后删） ──────────
-// ⛔ 全是假数据时**不要**让界面看起来像真的：panel/rail 上标了「演示」，
-//    空态文案也说明这一点。演示数据冒充真实是这个项目的原罪之一
-//    （`nt_send` 那条链路至今还是 MOCK）。
-const MOCK_MEMBERS = ["neo", "ada", "lin", "kiro"];
-const MOCK_ITEMS: ListItem[] = [
-  { id: "c1", title: "发布值班", sub: "已确认回滚脚本，等评审", tail: "14:02", unread: 2, when: "今天" },
-  { id: "c4", title: "性能回归排查", sub: "火焰图已贴上来", tail: "13:20", when: "今天" },
-  { id: "c5", title: "周会纪要", sub: "待你补第 3 节", tail: "11:05", when: "今天" },
-  { id: "c2", title: "架构评审", sub: "三栏布局方案已定", tail: "昨天", pinned: true, when: "昨天" },
-  { id: "c3", title: "与 ada", sub: "关于证据模块的接口", tail: "9-28", when: "更早" },
-  { id: "c6", title: "长任务：全仓死代码清扫", sub: "已扫 279 个文件，212 真死", tail: "9-27", when: "更早" },
-];
+// ── 会话列表：真数据 ──────────────────────────────────────────
+//
+// ⛔ **`MOCK_ITEMS` 已删。** 上一轮它和 `neobot_convo_group` 各说各话：
+//    用户建了真会话，列表里**看不到**，而界面看上去一切正常。
+//    演示数据与真数据并存时，**演示数据会把真数据的 bug 盖住** —— 这是
+//    它最坏的地方，不是「不好看」，是**遮住了要修的东西**。
+//
+// 浏览器预览（HOST !== "tauri"）下没有 store ⇒ 列表为空并**明说原因**，
+// 不用假数据填充。
+
+/** store 里的会话 → 列表条目。`tail`/`when` 由真实时间戳分组算出。 */
+function toListItem(c: ConvoViewWire): ListItem {
+  const at = Date.parse(c.last_active);
+  const d = Number.isNaN(at) ? null : new Date(at);
+  return {
+    id: c.id,
+    title: c.title || c.id,
+    sub: c.members.length
+      ? `${c.members.length} 人 · ${c.kind === "group" ? "群" : "私聊"}`
+      : c.kind === "group" ? "群" : "私聊",
+    tail: d ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : "",
+    unread: Number(c.unread) || 0,
+    pinned: !Number.isNaN(at) && nowDay().getTime() - at < 864e5 && Number(c.unread) > 0,
+    when: c.muted ? "免打扰" : bucketOf(at),
+  };
+}
+
+function nowDay(): Date {
+  return new Date();
+}
+
+/** 相对时间分桶。与 list.ts 的分组同名，跨两处改要一起改。 */
+function bucketOf(at: number | null): string {
+  if (at === null) return "更早";
+  const days = (nowDay().getTime() - at) / 864e5;
+  if (days < 1) return "今天";
+  if (days < 2) return "昨天";
+  if (days < 7) return "本周";
+  return "更早";
+}
+
+let convos: ConvoViewWire[] = [];
+let members: MemberViewWire[] = [];
+
+/** 从 store 读会话。失败时**如实报错**，不回退到假数据。 */
+function loadConvos(): void {
+  if (HOST !== "tauri") {
+    convos = [];
+    renderConvos();
+    return;
+  }
+  void call("neobot_convo_list", {}).then((r) => {
+    if (!r.ok) {
+      // ⛔ 不回退到 MOCK。报错就是报错 —— 回退等于把「读不到 store」
+      //    伪装成「你有 6 个会话」。
+      convos = [];
+      renderConvos();
+      note("error", `读会话列表失败：${r.error}`, undefined, true);
+      return;
+    }
+    convos = r.value;
+    if (selectedId === null && convos.length > 0) selectedId = convos[0].id;
+    renderConvos();
+  });
+}
 
 let selectedId: string | null = null;
 
 /** 渲染侧栏列表。分组/条目解剖见 list.ts（交集来源）。 */
 function renderConvos(): void {
+  const items = convos.map(toListItem);
   renderList($("convs"), {
-    items: MOCK_ITEMS,
+    items,
     selected: selectedId,
     query: ($("search") as HTMLInputElement).value,
-    emptyText: "还没有会话 —— 上面点「群」建一个",
+    emptyText:
+      HOST === "tauri"
+        ? "store 里还没有会话 —— 点上面「群」建一个"
+        : "浏览器预览无 store（无 Tauri 后端）—— 这里不放假数据",
     onPick: (id) => {
       selectedId = id;
-      const it = MOCK_ITEMS.find((x) => x.id === id);
+      const it = items.find((x) => x.id === id);
       mark(`会话 · ${it?.title ?? id}`);
       renderConvos();
       openInspector(it);
+      // 换会话 ⇒ 清面板注册表。不清的话旧会话的面板仍可被作答，
+      // 而作答会被记到新会话的流里（串台）。
+      void call("neobot_panel_clear", {}).then((r) => {
+        if (r.ok && r.value > 0) note("info", `已清 ${r.value} 块旧面板（换会话）`);
+      });
     },
   });
 }
@@ -602,6 +664,11 @@ renderConvos();
 }
 
 void listenPanels();
+loadConvos();
+void call("neobot_member_list", {}).then((r) => {
+  if (r.ok) members = r.value;
+  else if (HOST === "tauri") note("warn", `读成员失败：${r.error}`);
+});
 
 // 侧栏面板可用性：让测试/调试能直接看到判定结果，不靠猜。
 if (import.meta.env?.DEV) {

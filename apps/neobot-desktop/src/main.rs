@@ -41,6 +41,8 @@ pub fn run() {
             neobot_desktop::commands::neobot_panel_demo_publish,
             neobot_desktop::commands::neobot_agent_run,
             neobot_desktop::commands::neobot_send,
+            neobot_desktop::commands::neobot_convo_list,
+            neobot_desktop::commands::neobot_member_list,
             neobot_desktop::commands::neobot_convo_group,
             neobot_desktop::commands::neobot_convo_dm,
             neobot_desktop::commands::neobot_core_capabilities,

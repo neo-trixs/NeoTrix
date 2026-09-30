@@ -105,6 +105,83 @@ fn demo_panel() -> Panel {
     }
 }
 
+/// `neobot_convo_list() -> Vec<ConvoView>`
+///
+/// 真列表 —— 读 store，不再是界面的 `MOCK_ITEMS`。
+///
+/// ⚠️ **为什么这条重要**：上一轮之前，界面上那 7 条会话是**硬编码的**
+///    `MOCK_ITEMS`，而 `neobot_convo_group` 真的往 `~/.neobot/neobot.db`
+///    里写了会话。两边各说各话 ⇒ 用户建了会话，回到列表**看不到**，
+///    而界面看上去一切正常。演示数据与真数据并存时，
+///    **演示数据会把真数据的 bug 盖住**。
+#[tauri::command]
+pub fn neobot_convo_list() -> Result<Vec<ConvoView>, String> {
+    let store = open_store()?;
+    project_convos(&store)
+}
+
+/// 列表投影。命令与测试**共用**这一个函数。
+///
+/// ⛔ 上一版测试直接 `store.list_conversations()`，于是命令体里被塞一条
+///    「空库就报错」或「返回空 vec」的逻辑，测试**照样全绿** ——
+///    测的是 store，不是命令。变异验证抓到了这一条。
+fn project_convos(store: &NeobotStore) -> Result<Vec<ConvoView>, String> {
+    let convos = store.list_conversations().map_err(|e| e.to_string())?;
+    Ok(convos
+        .into_iter()
+        .map(|c| ConvoView {
+            id: c.id,
+            kind: c.kind,
+            title: c.title,
+            members: c.members,
+            task_count: c.task_count,
+            last_active: c.last_active,
+            muted: c.muted,
+            unread: c.unread,
+        })
+        .collect())
+}
+
+/// `neobot_member_list() -> Vec<MemberView>`
+///
+/// 成员也来自 store（`list_members` 返回三元组）。界面的 `MOCK_MEMBERS`
+/// 同属演示数据，一并换掉。
+#[tauri::command]
+pub fn neobot_member_list() -> Result<Vec<MemberView>, String> {
+    let store = open_store()?;
+    let members = store.list_members().map_err(|e| e.to_string())?;
+    Ok(members
+        .into_iter()
+        .map(|(id, kind, display)| MemberView { id, kind, display })
+        .collect())
+}
+
+/// 会话的**投影**：只带界面要的字段。
+///
+/// ⛔ 刻意**不**返回整个 `Conversation`（sqlite row + 一堆内部字段）。
+///    直接透传会让 store 的内部结构变成前端的隐式契约 ——
+///    之后改一行 SQL 就得同步改 TS 类型，而没有任何门会提醒你。
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct ConvoView {
+    pub id: String,
+    pub kind: String,
+    pub title: String,
+    pub members: Vec<String>,
+    pub task_count: i64,
+    pub last_active: String,
+    pub muted: bool,
+    pub unread: i64,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct MemberView {
+    pub id: String,
+    pub kind: String,
+    pub display: String,
+}
+
 /// `neobot_convo_group(title, members) -> convo_id`
 #[tauri::command]
 pub fn neobot_convo_group(title: String, members: Vec<String>) -> Result<String, String> {
@@ -435,5 +512,118 @@ mod panel_state_tests {
         let mut bad = panel(1);
         bad.options[0].sources.clear();
         assert!(st.publish(&bad).unwrap_err().contains("非法"));
+    }
+}
+
+#[cfg(test)]
+mod convo_list_tests {
+    use super::*;
+
+    /// 真实 store 往返：建会话 → 读列表 → 成员。
+    ///
+    /// ⛔ 这条测试**必须**用真 `NeobotStore`，不能用 mock。
+    ///    上一轮的 `MOCK_ITEMS` 之所以能长期冒充真实列表，正是因为
+    ///    **没有任何测试跨越过 store** —— mock 和真数据各自绿，
+    ///    而两者对不上这件事，只有真 store 才看得出来。
+    fn temp_store() -> (tempdir::TempDir, NeobotStore) {
+        let d = tempdir::TempDir::new("nb-convo").expect("临时目录");
+        let store = NeobotStore::open(d.path().join("nb.db").to_str().unwrap()).expect("开库");
+        (d, store)
+    }
+
+    /// store 强制成员外键：`create_conversation` 遇到不存在的成员会报
+    /// `no such member`。这是**对的设计**（防止会话里挂着幽灵成员），
+    /// 但第一版测试直接塞成员名单就炸了 —— 说明这条约束以前没人测过，
+    /// 因为界面用的是 `MOCK_MEMBERS`，根本不经过 store。
+    fn store_with_members() -> (tempdir::TempDir, NeobotStore) {
+        let (d, store) = temp_store();
+        for m in ["neo", "ada", "lin"] {
+            // kind 只认 human|agent（store 有校验）。第一版我写 "person"
+            // 被拒 —— 这条校验以前也没被测过，同属「界面走 mock 所以没碰到」。
+            store.upsert_member(m, "human").expect("登记成员");
+        }
+        (d, store)
+    }
+
+    #[test]
+    fn 建的会话能被列表读到() {
+        let (_d, store) = store_with_members();
+        let id = store.create_conversation("group", "发布值班", &["neo".into(), "ada".into()]).unwrap();
+        let list = store.list_conversations().unwrap();
+        assert_eq!(list.len(), 1, "刚建的会话必须出现在列表里");
+        assert_eq!(list[0].id, id);
+        assert_eq!(list[0].title, "发布值班");
+        assert_eq!(list[0].kind, "group");
+    }
+
+    /// 这条约束以前没被测过（界面用 MOCK_MEMBERS，压根不走 store）。
+    /// 补上，免得后人以为「塞名单就行」。
+    #[test]
+    fn 成员必须先存在() {
+        let (_d, store) = temp_store();
+        let e = store
+            .create_conversation("group", "t", &["幽灵".into()])
+            .expect_err("不存在的成员必须被拒");
+        assert!(e.to_string().contains("no such member"), "实际：{e}");
+    }
+
+    #[test]
+    fn 命令体在空库时返回空列表() {
+        // 走命令的**同一个**函数。界面据此显示「还没有会话」；
+        // 若这里返回 Err，界面显示「读失败」——对用户是两种处境。
+        let (_d, store) = temp_store();
+        assert!(project_convos(&store).expect("空库不该报错").is_empty());
+    }
+
+    #[test]
+    fn 命令体不漏掉刚建的会话() {
+        // MOCK_ITEMS 那个病的直接反证：建了会话，列表里必须看得到。
+        let (_d, store) = store_with_members();
+        store.create_conversation("group", "发布值班", &["neo".into()]).unwrap();
+        let v = project_convos(&store).expect("读列表");
+        assert_eq!(v.len(), 1, "建的会话必须出现在列表里");
+        assert_eq!(v[0].title, "发布值班");
+    }
+
+    #[test]
+    fn 空库时列表为空而不是报错() {
+        // 界面据此显示「还没有会话」。若这里报错，界面就会显示「读失败」，
+        // 两者对用户是两种完全不同的处境。
+        let (_d, store) = temp_store();
+        assert!(store.list_conversations().unwrap().is_empty());
+    }
+
+    #[test]
+    fn 投影不泄漏store内部字段() {
+        // ConvoView 刻意不含 created_at / origin / parent_id。
+        // 直接透传 Conversation 会让 store 结构变成前端隐式契约 ——
+        // 之后改一行 SQL 就要同步改 TS 类型，而没有任何门会提醒。
+        let (_d, store) = store_with_members();
+        store.create_conversation("dm", "与 ada", &["neo".into()]).unwrap();
+        let c = store.list_conversations().unwrap().remove(0);
+        let v = ConvoView {
+            id: c.id, kind: c.kind, title: c.title, members: c.members,
+            task_count: c.task_count, last_active: c.last_active,
+            muted: c.muted, unread: c.unread,
+        };
+        let json = serde_json::to_value(&v).unwrap();
+        let keys: Vec<&str> = json.as_object().unwrap().keys().map(|s| s.as_str()).collect();
+        for leaked in ["created_at", "origin", "parent_id"] {
+            assert!(!keys.contains(&leaked), "投影泄漏了 {leaked}：{keys:?}");
+        }
+        // 字段名是 snake_case（serde 声明），不是 Rust 的 camelCase
+        assert!(keys.contains(&"last_active") && keys.contains(&"task_count"));
+    }
+
+    #[test]
+    fn 投影可序列化往返() {
+        let v = ConvoView {
+            id: "c1".into(), kind: "group".into(), title: "t".into(),
+            members: vec!["a".into()], task_count: 3, last_active: "2026-09-30T10:00:00Z".into(),
+            muted: false, unread: 2,
+        };
+        let s = serde_json::to_string(&v).unwrap();
+        assert!(s.contains("\"last_active\""), "实际：{s}");
+        assert!(s.contains("\"task_count\":3"), "实际：{s}");
     }
 }
