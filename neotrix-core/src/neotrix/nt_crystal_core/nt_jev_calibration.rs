@@ -15,8 +15,8 @@ use std::collections::HashMap;
 
 use super::consciousness::{CrystalConsciousness, ReasoningType};
 use super::nt_awaken_loop::{NtAwakenLoop, VerifyScores};
-use crate::neotrix::nt_jev::eval::{EvalCase, EvalPrediction, GoldAnswer};
-use crate::neotrix::nt_jev::primitives::{ChoiceAnswer, DecisionStatus, JevDecision, NoulAnswer};
+use crate::l5_cognition::nt_jev::eval::{EvalCase, EvalPrediction, GoldAnswer};
+use crate::l5_cognition::nt_jev::primitives::{ChoiceAnswer, DecisionStatus, JevDecision, NoulAnswer};
 
 /// 置信度金标准门（与 archive_train pattern_conf_floor 对齐）
 pub const GOLD_FLOOR: f64 = 0.7;
@@ -602,7 +602,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decide_plugs_into_eval() {        use crate::neotrix::nt_jev::eval::evaluate;
+    fn test_decide_plugs_into_eval() {        use crate::l5_cognition::nt_jev::eval::evaluate;
         let c = seeded();
         let id = c.reasoning_chains.first().map(|ch| ch.id.clone()).unwrap();
         let (case, pred) = NtJevCalibration::decide(&c, &id).unwrap();

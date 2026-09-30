@@ -3,7 +3,7 @@
 
 use uniffi;
 use std::sync::{Arc, RwLock};
-use crate::neotrix::ffi::types::*;
+use crate::l0_substrate::ffi::types::*;
 use std::collections::HashMap;
 use std::time::Instant;
 

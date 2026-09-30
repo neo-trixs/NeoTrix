@@ -14,7 +14,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use crate::neotrix::nt_jev::primitives::{
+use crate::l5_cognition::nt_jev::primitives::{
     ChoiceAnswer, DecisionStatus, JevDecision, NoulAnswer, ScoreAnswer,
 };
 

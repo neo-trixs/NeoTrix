@@ -39,7 +39,7 @@ uniffi::setup_scaffolding!();
 
 // Re-export FFI types for uniffi scaffolding visibility
 #[cfg(feature = "ios-bridge")]
-pub use neotrix::ffi::{
+pub use l0_substrate::ffi::{
     E8ReasoningImpl, VSAHyperCubeImpl, GWTAttentionRouterImpl,
     ConsciousnessTreeImpl, SEALPipelineImpl, KBBridgeImpl,
     SkillTreeImpl, RuneSocketingImpl, ConstellationSystemImpl,

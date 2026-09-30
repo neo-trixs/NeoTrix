@@ -711,6 +711,6 @@ neotrix-core/src/neotrix/nt_crystal_core/nt_shared_mind.rs:182	unwrap
 neotrix-core/src/neotrix/nt_crystal_core/nt_shared_mind.rs:99	unwrap
 neotrix-core/src/neotrix/nt_crystal_core/retention_policy.rs:157	unwrap
 neotrix-core/src/neotrix/nt_crystal_core/retention_policy.rs:222	unwrap
-neotrix-core/src/neotrix/nt_jev/primitives.rs:84	unwrap
+neotrix-core/src/l5_cognition/nt_jev/primitives.rs:84	unwrap
 neotrix-core/src/skill_loader.rs:279	unwrap
 neotrix-core/src/skill_loader.rs:290	unwrap

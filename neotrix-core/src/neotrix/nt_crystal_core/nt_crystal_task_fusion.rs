@@ -38,7 +38,7 @@
 //! - 单条 LLM 失败只记 `failed`，不掀翻整轮（弹性）。
 
 use super::CrystalCore;
-use crate::neotrix::nt_jev::{
+use crate::l5_cognition::nt_jev::{
     abstain_if_contested, brier_score, is_abstained, ChoiceAnswer, JevDecision, JevResultSet,
     NoulAnswer, RiskDecision, RiskTier,
 };

@@ -103,7 +103,7 @@ pub fn cad_rune_slots_for(level: u8) -> Vec<RuneSocket> {
     all[..n].to_vec()
 }
 
-/// 由星座等级推导涌现的 runeword (对齐 `neotrix/ffi/rune_socketing.rs` 语义:
+/// 由星座等级推导涌现的 runeword (对齐 `l0_substrate/ffi/rune_socketing.rs` 语义:
 /// Scry = 完整 ETL, Aegis = 恢复+监控)。
 pub fn cad_runeword_for(level: u8) -> Option<String> {
     match level {

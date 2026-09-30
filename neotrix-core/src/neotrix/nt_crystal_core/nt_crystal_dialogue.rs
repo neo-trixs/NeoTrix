@@ -37,7 +37,7 @@ use super::nt_crystal_task_fusion::{
 };
 use super::CrystalCore;
 use crate::neotrix::nt_crystal_core::NtLlmAsk;
-use crate::neotrix::nt_jev::NoulAnswer;
+use crate::l5_cognition::nt_jev::NoulAnswer;
 use std::collections::HashSet;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
@@ -272,7 +272,7 @@ impl NtInnerLoop {
                     engine.follow_ups(goal, &report.subtasks, &report.fused, &report.failed);
                 report
                     .decisions
-                    .insert("fused".to_string(), crate::neotrix::nt_jev::JevDecision::Noul(report.fused.verdict.clone()));
+                    .insert("fused".to_string(), crate::l5_cognition::nt_jev::JevDecision::Noul(report.fused.verdict.clone()));
             }
 
             let demands = NtDialogueWindow::demands_from(&report, &resolved);

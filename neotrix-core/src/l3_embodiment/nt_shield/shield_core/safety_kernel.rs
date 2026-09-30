@@ -9,7 +9,7 @@ use sha2::Sha256;
 use super::policy::{ActionPolicy, PolicyDecision};
 
 use crate::l0_substrate::nt_core_self_test::SelfTest;
-use crate::neotrix::nt_jev::{DecisionStatus, JevDecision, NoulAnswer, ToJev};
+use crate::l5_cognition::nt_jev::{DecisionStatus, JevDecision, NoulAnswer, ToJev};
 
 type HmacSha256 = Hmac<Sha256>;
 

@@ -48,11 +48,11 @@ fn calib_pairs(
     rows: Vec<CalibRow>,
     round: u64,
 ) -> (
-    Vec<crate::neotrix::nt_jev::eval::EvalCase>,
-    Vec<crate::neotrix::nt_jev::eval::EvalPrediction>,
+    Vec<crate::l5_cognition::nt_jev::eval::EvalCase>,
+    Vec<crate::l5_cognition::nt_jev::eval::EvalPrediction>,
 ) {
-    use crate::neotrix::nt_jev::eval::{EvalCase, EvalPrediction, GoldAnswer};
-    use crate::neotrix::nt_jev::primitives::{DecisionStatus, JevDecision, NoulAnswer};
+    use crate::l5_cognition::nt_jev::eval::{EvalCase, EvalPrediction, GoldAnswer};
+    use crate::l5_cognition::nt_jev::primitives::{DecisionStatus, JevDecision, NoulAnswer};
     let table = PlattBucketTable::embedded();
     let mut cs = Vec::new();
     let mut ps = Vec::new();

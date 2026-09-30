@@ -51,6 +51,8 @@ pub mod nt_core_agents_md;
 // ============================================================================
 pub mod nt_core_quantum_fusion;
 pub mod nt_core_scoring_substrate;
+/// 决策三原语 Noul/Choice/Score + 评估/门控（第二棵树回流，自 neotrix/nt_jev 迁入）
+pub mod nt_jev;
 pub mod nt_core_sae;
 pub mod nt_core_sae_bridge;
 pub mod nt_core_arch_diagram;

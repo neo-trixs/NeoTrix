@@ -10,7 +10,7 @@
 //! 无 unwrap / expect / panic；无 `[]` 索引。
 
 use super::CrystalCore;
-use crate::neotrix::nt_jev::eval::{evaluate, EvalCase, EvalPrediction, EvalReport};
+use crate::l5_cognition::nt_jev::eval::{evaluate, EvalCase, EvalPrediction, EvalReport};
 
 /// ECE 失准线（高于此值认为校准坏了）
 pub const ECE_BAD_FLOOR: f64 = 0.15;
@@ -163,8 +163,8 @@ impl NtEvalLoop {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_jev::eval::GoldAnswer;
-    use crate::neotrix::nt_jev::primitives::{DecisionStatus, JevDecision, NoulAnswer};
+    use crate::l5_cognition::nt_jev::eval::GoldAnswer;
+    use crate::l5_cognition::nt_jev::primitives::{DecisionStatus, JevDecision, NoulAnswer};
 
     fn noul_case(id: &str, gold: bool, p: f64) -> (EvalCase, EvalPrediction) {
         (

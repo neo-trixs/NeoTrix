@@ -11,7 +11,7 @@ use super::self_evolver::{EvolutionPlan, SelfEvolver};
 use super::verifier::{EvolutionVerifier, VerificationResult};
 
 use crate::l6_meta::evolving_evaluator::EvolvingEvaluator;
-use crate::neotrix::nt_jev::eval::EvalReport;
+use crate::l5_cognition::nt_jev::eval::EvalReport;
 
 /// 进化闭环配置
 #[derive(Debug, Clone, Serialize, Deserialize)]

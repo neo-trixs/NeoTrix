@@ -14,7 +14,7 @@
 use super::consciousness::{CrystalConsciousness, MemoryType};
 use super::nt_eval_loop::{NtEvalLoop, THRESHOLD_MAX, THRESHOLD_MIN};
 use super::{CrystalCore, NtOrchestrator};
-use crate::neotrix::nt_jev::eval::{EvalCase, EvalPrediction};
+use crate::l5_cognition::nt_jev::eval::{EvalCase, EvalPrediction};
 
 /// 自迭代配置
 #[derive(Debug, Clone)]
@@ -206,8 +206,8 @@ impl NtSelfIterate {
 mod tests {
     use super::*;
     use crate::neotrix::nt_crystal_core::NtOrchestratorConfig;
-    use crate::neotrix::nt_jev::eval::GoldAnswer;
-    use crate::neotrix::nt_jev::primitives::{DecisionStatus, JevDecision, NoulAnswer};
+    use crate::l5_cognition::nt_jev::eval::GoldAnswer;
+    use crate::l5_cognition::nt_jev::primitives::{DecisionStatus, JevDecision, NoulAnswer};
 
     fn noul_pair(id: &str, gold: bool, p: f64) -> (EvalCase, EvalPrediction) {
         (

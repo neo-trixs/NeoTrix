@@ -7,7 +7,7 @@
 
 use uniffi;
 use std::sync::{Arc, RwLock};
-use crate::neotrix::ffi::types::*;
+use crate::l0_substrate::ffi::types::*;
 use crate::neotrix::{CapabilityTreeRegistry, NodeLayer};
 
 /// capability_tree 注册表路径 (与 nt_core_capability_tree CLI 默认值一致)。

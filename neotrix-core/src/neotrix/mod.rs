@@ -2,6 +2,8 @@
 //!
 //! 本地模块：nt_crystal_core, nt_file_ability,
 //! nt_core_error, nt_core_event_bus
+//!
+//! 2026-09-30 第二棵树 B 方案回流：`nt_jev` 已迁至 `crate::l5_cognition::nt_jev`
 
 #![forbid(unsafe_code)]
 
@@ -14,7 +16,6 @@ pub mod nt_core_error;
 pub mod nt_core_event_bus;
 pub mod nt_file_ability;
 pub mod nt_crystal_core;
-pub mod nt_jev;
 /// neotrix → L0 error conversions (moved from l0_substrate to respect L0 ← neotrix direction)
 pub mod error_conversions;
 

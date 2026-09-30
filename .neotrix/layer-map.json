@@ -19,7 +19,7 @@
    ],
    "note": "全系统决策/意识主干。CrystalConsciousness + JEV 决策。⛔ 禁止当死代码清理 —— DIR-AUDIT §6 曾把它归入「未接线」，实测是活路径。"
   },
-  "neotrix/nt_jev": {
+  "l5_cognition/nt_jev": {
    "layer": "l5_cognition",
    "role": "primary",
    "lines": 4312,
@@ -29,9 +29,16 @@
     "neotrix/nt_crystal_core/nt_jev_agentjev.rs:17",
     "neotrix/nt_crystal_core/nt_jev_calibration.rs:18",
     "neotrix/nt_crystal_core/nt_crystal_dialogue.rs:40",
-    "neotrix/nt_crystal_core/nt_crystal_task_fusion.rs:41"
+    "neotrix/nt_crystal_core/nt_crystal_task_fusion.rs:41",
+    "neotrix/nt_crystal_core/nt_self_iterate.rs:17",
+    "l3_embodiment/nt_shield/shield_core/guard.rs:16",
+    "l3_embodiment/nt_shield/shield_core/safety_kernel.rs:12",
+    "l5_cognition/nt_mind/nt_mind_background_loop/handlers_crystal.rs:51",
+    "l6_meta/evolving_evaluator.rs:13",
+    "l6_meta/evolution/evolution_loop/absorber.rs:7",
+    "l6_meta/evolution/evolution_loop/loop_runner.rs:14"
    ],
-   "note": "决策三原语（primitives.rs 481 行 / gate.rs 480 / eval.rs 569）。⛔ 同上，勿删。"
+   "note": "决策三原语（primitives.rs 481 行 / gate.rs 480 / eval.rs 569）。⛔ 同上，勿删。2026-09-30 第二棵树 B 方案回流：原路径 neotrix/nt_jev 已搬至 l5_cognition/nt_jev（内容零改动，14 文件/4312 行实测不变）。live_consumers 由 5 条补全为 12 条（2026-09-30 rg 全量普查，30 处引用跨 l3/l5/l6 + 晶体核）。⛔ 其 2 处 l3_embodiment→l5 消费是既存架构边，已棘轮进 layer-deps-baseline。"
   },
   "neotrix/nt_file_ability": {
    "layer": "l1_action",

@@ -4,9 +4,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::neotrix::nt_jev::audit::JEV_POLICY_VERSION;
-use crate::neotrix::nt_jev::eval::EvalReport;
-use crate::neotrix::nt_jev::evolve::report_scores;
+use crate::l5_cognition::nt_jev::audit::JEV_POLICY_VERSION;
+use crate::l5_cognition::nt_jev::eval::EvalReport;
+use crate::l5_cognition::nt_jev::evolve::report_scores;
 
 /// 吸收结果
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -12,8 +12,8 @@ use std::sync::RwLock;
 // `types::Xxx` 限定需要模块名本身在作用域内 —— glob 导入只带入成员，
 // 不带入模块名 ⇒ 预存 E0433（unresolved module `types`）的根因。
 // 补具名导入，语义不变（原 glob 保留，供 `Xxx` 裸名使用）。
-use crate::neotrix::ffi::types;
-use crate::neotrix::ffi::types::*;
+use crate::l0_substrate::ffi::types;
+use crate::l0_substrate::ffi::types::*;
 use std::collections::HashMap;
 
 #[derive(Clone)]

@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 
-use crate::neotrix::nt_jev::eval::EvalReport;
-use crate::neotrix::nt_jev::evolve::report_scores;
+use crate::l5_cognition::nt_jev::eval::EvalReport;
+use crate::l5_cognition::nt_jev::evolve::report_scores;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationCriteria {
@@ -195,7 +195,7 @@ mod tests {
     #[test] fn test_get_score() { let e = EvolvingEvaluator::default(); assert_eq!(e.get_score(), 0.0); }
 
     #[test] fn test_jev_criteria_names_match_bridge() {
-        use crate::neotrix::nt_jev::evolve::JEV_CRITERIA;
+        use crate::l5_cognition::nt_jev::evolve::JEV_CRITERIA;
         let names: Vec<String> = EvolvingEvaluator::jev_criteria().iter().map(|c| c.name.clone()).collect();
         for k in JEV_CRITERIA {
             assert!(names.contains(&k.to_string()), "criterion {} missing", k);
@@ -205,8 +205,8 @@ mod tests {
     }
 
     #[test] fn test_nightly_loop_two_cycles() {
-        use crate::neotrix::nt_jev::eval::EvalReport;
-        use crate::neotrix::nt_jev::evolve::JEV_CRITERIA;
+        use crate::l5_cognition::nt_jev::eval::EvalReport;
+        use crate::l5_cognition::nt_jev::evolve::JEV_CRITERIA;
         let e = EvolvingEvaluator::new(EvolvingEvaluator::jev_criteria(), 0.05);
         // Cycle 1: weak night.
         let weak = EvalReport { n: 50, accuracy: 0.6, brier: 0.3, ece: 0.25, coverage_at_p90: 0.4, mean_latency_ms: 200.0 };
