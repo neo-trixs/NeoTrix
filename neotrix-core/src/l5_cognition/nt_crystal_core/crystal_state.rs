@@ -470,9 +470,19 @@ impl CrystalState {
         // 先删超限最旧代（chain 之外一代）
         let _ = std::fs::remove_file(root.join(format!("{stem}.bak.{}", generations - 1)));
         // 自旧向新平移：chain[k] ← chain[k-1]
+        // 2026-09-30: rename 失败原先被吞。平移落盘一半会让代际链不一致
+        // （新代缺失、旧代残留），而加载侧只认主文件+legacy .bak ——
+        // 平移失败 ⇒ 崩溃恢复可能读到过期代。只补可观测性，不改平移逻辑。
         for k in (1..chain.len()).rev() {
             if chain[k - 1].exists() {
-                let _ = std::fs::rename(&chain[k - 1], &chain[k]);
+                if let Err(e) = std::fs::rename(&chain[k - 1], &chain[k]) {
+                    log::error!(
+                        "[crystal-state] 代际平移失败 {} -> {}: {} —— 代际链可能不一致",
+                        chain[k - 1].display(),
+                        chain[k].display(),
+                        e
+                    );
+                }
             }
         }
     }

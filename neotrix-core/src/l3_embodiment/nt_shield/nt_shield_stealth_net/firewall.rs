@@ -102,7 +102,12 @@ impl FirewallManager {
             "anchor \"{}\"\nload anchor \"{}\" from \"/tmp/neotrix_pf_anchor.conf\"\n",
             PF_ANCHOR_PATH, PF_ANCHOR_PATH
         );
-        let _ = std::fs::write("/tmp/neotrix_pf_main.conf", &anchor_rules);
+        // 2026-09-30: 原为 `let _ = std::fs::write("/tmp/neotrix_pf_main.conf", …)`。
+        // 写失败时 pfctl 会去加载一个过期或缺失的 main.conf：缺失 ⇒ pfctl 报错
+        // （下游能观察到）；但**过期文件 + 成功的 pfctl = 静默应用了错误规则集**。
+        // 本函数本就返回 Result，直接把写失败转成 Err，消掉这个角落。
+        std::fs::write("/tmp/neotrix_pf_main.conf", &anchor_rules)
+            .map_err(|e| format!("pf main.conf 写入失败: {e}"))?;
         let output = std::process::Command::new("pfctl")
             .args(["-f", "/tmp/neotrix_pf_main.conf", "-q"]).output();
         match output {
@@ -135,7 +140,10 @@ impl FirewallManager {
         }
         pf_text.push_str(&format!("pass out quick proto tcp from any to any divert-to 127.0.0.1 port {} no-state\n", DIVERT_PORT));
         pf_text.push_str("pass out quick proto udp from any to any port 53 divert-to 127.0.0.1 port 11053\n");
-        let _ = std::fs::write("/tmp/neotrix_pf_anchor.conf", &pf_text);
+        // 2026-09-30: 同上。写 anchor.conf 失败时 pfctl 可能加载过期规则集并成功 ——
+        // 静默错误规则。本函数返回 Result，直接传播。
+        std::fs::write("/tmp/neotrix_pf_anchor.conf", &pf_text)
+            .map_err(|e| format!("pf anchor.conf 写入失败: {e}"))?;
         let output = std::process::Command::new("pfctl")
             .args(["-a", PF_ANCHOR_PATH, "-f", "/tmp/neotrix_pf_anchor.conf", "-q"]).output();
         match output {

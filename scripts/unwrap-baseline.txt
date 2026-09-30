@@ -226,8 +226,8 @@ neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_brain.rs:327	expect
 neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_cortex_sync.rs:310	expect
 neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_cortex_sync.rs:95	expect
 neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_gwt_router.rs:115	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_knowledge_assets.rs:1033	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_knowledge_assets.rs:728	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_knowledge_assets.rs:1044	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_knowledge_assets.rs:739	expect
 neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_pack.rs:492	expect
 neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_pack_chunked.rs:200	expect
 neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_provenance.rs:142	expect
@@ -375,11 +375,11 @@ neotrix-core/src/l0_substrate/ffi/seal_pipeline.rs:36	expect
 neotrix-core/src/l0_substrate/ffi/seal_pipeline.rs:78	expect
 neotrix-core/src/l0_substrate/ffi/seal_pipeline.rs:82	expect
 neotrix-core/src/l0_substrate/ffi/seal_pipeline.rs:97	expect
-neotrix-core/src/l0_substrate/ffi/skill_tree.rs:42	expect
-neotrix-core/src/l0_substrate/ffi/skill_tree.rs:52	expect
-neotrix-core/src/l0_substrate/ffi/skill_tree.rs:71	expect
-neotrix-core/src/l0_substrate/ffi/skill_tree.rs:87	expect
+neotrix-core/src/l0_substrate/ffi/skill_tree.rs:46	expect
+neotrix-core/src/l0_substrate/ffi/skill_tree.rs:56	expect
+neotrix-core/src/l0_substrate/ffi/skill_tree.rs:75	expect
 neotrix-core/src/l0_substrate/ffi/skill_tree.rs:91	expect
+neotrix-core/src/l0_substrate/ffi/skill_tree.rs:95	expect
 neotrix-core/src/l0_substrate/ffi/vsa_hypercube.rs:131	expect
 neotrix-core/src/l0_substrate/ffi/vsa_hypercube.rs:136	expect
 neotrix-core/src/l0_substrate/ffi/vsa_hypercube.rs:39	expect

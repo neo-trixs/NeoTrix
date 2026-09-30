@@ -201,10 +201,23 @@ impl DomainModelingContext {
         self.adrs.insert(id.clone(), adr.clone());
         
         // 写入文件
-        let _ = std::fs::create_dir_all(&self.adr_dir);
+        // 2026-09-30: 两处 `let _ =` 原先被吞，函数无条件返回 `Created(id)`。
+        // 文件没落盘而调用方拿到 Created —— 与 safe_applier 的「已回滚」、
+        // knowledge_assets 的 `imported += 1` 同一缺陷类。
+        // 本枚举已有 `Skipped { reason }` 变体（上文 criteria 未满足时用），
+        // 且测试覆盖两种变体 —— 照既有纪律改，不发明新 API。
+        if let Err(e) = std::fs::create_dir_all(&self.adr_dir) {
+            return ADRResult::Skipped {
+                reason: format!("ADR 目录不可用 {}: {e}", self.adr_dir.display()),
+            };
+        }
         let adr_path = self.adr_dir.join(&id);
         let adr_content = self.render_adr(&adr);
-        let _ = std::fs::write(adr_path, adr_content);
+        if let Err(e) = std::fs::write(&adr_path, adr_content) {
+            return ADRResult::Skipped {
+                reason: format!("ADR 落盘失败 {}: {e}", adr_path.display()),
+            };
+        }
 
         ADRResult::Created(id)
     }

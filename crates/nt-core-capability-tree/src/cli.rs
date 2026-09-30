@@ -375,11 +375,17 @@ impl CapabilityCli {
         // Durable 层: 把完整注册表镜像写入提交的 overlay (capability_overrides.json),
         // 使手动 durable 写入在基础被重新生成后仍生效。overlay 与基础文件同步,
         // 加载时 overlay 节点优先合并 (merge_overlay), 故手动变更永不被覆盖丢弃。
+        // 2026-09-30: 原为两处 `let _ =`（create_dir_all + write）后无条件 `Ok(())`。
+        // 上方注释承诺「手动变更永不被覆盖丢弃」—— 写失败时 overlay 没落盘，
+        // 手动变更在基础重生成后即丢失，而调用方拿到 Ok。**注释的承诺被代码违反。**
+        // 本函数本就返回 Result，且 3 行之上主文件写入即用 `?` —— 照既有纪律改。
         let overlay = self.overlay_path();
         if let Some(parent) = overlay.parent() {
-            let _ = fs::create_dir_all(parent);
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("overlay 目录不可用 {}: {e}", parent.display()))?;
         }
-        let _ = fs::write(&overlay, &content);
+        fs::write(&overlay, &content)
+            .map_err(|e| format!("overlay 落盘失败 {}: {e}", overlay.display()))?;
         Ok(())
     }
 

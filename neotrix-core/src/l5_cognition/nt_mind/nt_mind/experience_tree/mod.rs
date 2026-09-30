@@ -465,9 +465,16 @@ pub fn feedback(
         "updated": now_ts(),
         "branches": persist_result
     });
-    let _ = _kb.kv_set("experience", &route_table_key, &serde_json::to_string(&route_data).unwrap_or_default());
-
-    true
+    // 2026-09-30: 原为 `let _ = _kb.kv_set(…);` 紧接无条件 `true`。
+    // 该 bool 落进 `AbsorptionResult.feedback_applied` —— 写失败时它撒谎。
+    // 同文件 `update_hub` 用 `?` 传播 kv_set 错误，说明本文件的纪律本就是传播；
+    // 此处把写结果直接作为返回值，不改 API、不改调用方。
+    _kb.kv_set(
+        "experience",
+        &route_table_key,
+        &serde_json::to_string(&route_data).unwrap_or_default(),
+    )
+    .is_ok()
 }
 
 // ============================================================================
