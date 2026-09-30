@@ -10,13 +10,61 @@
 
 pub use crate::l1_action::nt_act::nt_act_types::ProjectSnapshot;
 
-/// 进化目标优先级
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+use serde::{Deserialize, Serialize};
+
+/// 目标优先级 —— 进化目标 / 目标库 / 目标循环 三处共用的同一类型
+///
+/// 2026-09-30 归并（重复类型台账 tier=1 组，3 份同层同 crate 定义）：
+///   - `nt_goal::goal_generator`（本处，进化目标）—— 保留点：跨子系统 fanin 最高
+///     （`nt_goal::conflict_resolver` + `nt_goal` 侧 `pub use` + `nt_mind::meta_goal_generator`）
+///   - `nt_core::nt_consciousness_core::goal_setter`（目标库）→ 改 `pub use` 指向本处
+///   - `nt_mind::nt_mind::evolution::goal_loop::types`（目标循环）→ 改 `pub use` 指向本处，
+///     其 `rank()` / `label()` / `Ord` / `PartialOrd` impl 一并移入本处
+///
+/// 变体集合与序关系三处一致：Low < Medium < High < Critical。声明顺序保留本处原样
+/// （Critical 优先），**排序语义由 `rank()` 承担、不依赖声明顺序** —— 故
+/// `goal_loop` 的 `sort_by_key(|b| Reverse(b.priority))` 行为不变。
+///
+/// trait 取三处并集（各自所需能力都是子集）：`Serialize`/`Deserialize` 来自目标库的
+/// `Goal`，`Hash` 同源，`Copy`/`Ord` 来自进化目标与目标循环。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum GoalPriority {
     Critical,
     High,
     Medium,
     Low,
+}
+
+impl GoalPriority {
+    pub fn rank(&self) -> u8 {
+        match self {
+            GoalPriority::Low => 0,
+            GoalPriority::Medium => 1,
+            GoalPriority::High => 2,
+            GoalPriority::Critical => 3,
+        }
+    }
+
+    pub fn label(&self) -> &str {
+        match self {
+            GoalPriority::Low => "low",
+            GoalPriority::Medium => "medium",
+            GoalPriority::High => "high",
+            GoalPriority::Critical => "critical",
+        }
+    }
+}
+
+impl PartialOrd for GoalPriority {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for GoalPriority {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.rank().cmp(&other.rank())
+    }
 }
 
 /// 进化目标类别
@@ -305,5 +353,20 @@ mod tests {
             test_failures: 0,
         };
         assert!(AutoGoalGenerator::generate_from_snapshot(&empty).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod dup_merge_tests {
+    use super::*;
+
+    /// 归并前编译不过：goal_setter / goal_loop 各自持有独立的同名类型。
+    #[test]
+    fn goal_priority_is_one_type_across_modules() {
+        let a: GoalPriority = GoalPriority::High;
+        let b: crate::l5_cognition::nt_core::nt_consciousness_core::goal_setter::GoalPriority = a;
+        let c: crate::l5_cognition::nt_mind::nt_mind::evolution::goal_loop::types::GoalPriority =
+            b;
+        assert_eq!(c, GoalPriority::High);
     }
 }

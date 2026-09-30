@@ -36,14 +36,8 @@ pub enum GoalType {
     Maintenance,
 }
 
-/// 目标优先级
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub enum GoalPriority {
-    Low,
-    Medium,
-    High,
-    Critical,
-}
+/// 目标优先级 —— 归并至 `nt_goal::goal_generator::GoalPriority`（2026-09-30）。
+pub use crate::l5_cognition::nt_goal::goal_generator::GoalPriority;
 
 /// 目标状态
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

@@ -9,45 +9,9 @@ pub enum GoalScheduleStrategy {
     MotivationDriven,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum GoalPriority {
-    Low,
-    Medium,
-    High,
-    Critical,
-}
-
-impl GoalPriority {
-    pub fn rank(&self) -> u8 {
-        match self {
-            GoalPriority::Low => 0,
-            GoalPriority::Medium => 1,
-            GoalPriority::High => 2,
-            GoalPriority::Critical => 3,
-        }
-    }
-
-    pub fn label(&self) -> &str {
-        match self {
-            GoalPriority::Low => "low",
-            GoalPriority::Medium => "medium",
-            GoalPriority::High => "high",
-            GoalPriority::Critical => "critical",
-        }
-    }
-}
-
-impl PartialOrd for GoalPriority {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for GoalPriority {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.rank().cmp(&other.rank())
-    }
-}
+/// 目标优先级 —— 归并至 `nt_goal::goal_generator::GoalPriority`（2026-09-30）。
+/// `rank()` / `label()` / `Ord` / `PartialOrd` impl 已随之移入保留点。
+pub use crate::l5_cognition::nt_goal::goal_generator::GoalPriority;
 
 pub struct RateLimiter {
     pub max_calls_per_hour: u64,
