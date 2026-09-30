@@ -1,0 +1,41 @@
+{
+  "schema": "nt-parity/vectors/1",
+  "capability": "levenshtein",
+  "why": "第二个行为对位目标，用来证明 harness 是通用的而不是为 ResponseCache 写死的。对方 = strsim@0.11.1（MIT OR Apache-2.0，本机 registry 已 vendor）的 levenshtein；我方 = neotrix-core entity_linking::linker::levenshtein。",
+  "hypothesis": "⚠️ 我方实现按**字节**（a.len()）算，strsim 按**字符**算。ASCII 下两者必然一致，CJK 下应分歧。这个假设可被本文件证伪 —— 若 CJK 用例也一致，则我方实现在这些用例上按字符等价（需要另找解释，不是假设成立）。",
+  "ops_supported": ["dist"],
+  "cases": [
+    {
+      "name": "lev-ascii-basic",
+      "why": "ASCII 基线：任何按字节/按字符实现都必须在这里一致，否则连基本语义都不对",
+      "ops": [
+        { "op": "dist", "k": "kitten", "v": "sitting" },
+        { "op": "dist", "k": "", "v": "abc" },
+        { "op": "dist", "k": "abc", "v": "" },
+        { "op": "dist", "k": "same", "v": "same" },
+        { "op": "dist", "k": "flaw", "v": "lawn" },
+        { "op": "dist", "k": "a", "v": "b" }
+      ]
+    },
+    {
+      "name": "lev-cjk-single-char-substitution",
+      "why": "核心用例：中文只差一个字。字符距离=1；若我方按字节，会变成 3（一个汉字=3 字节，每字节都不同）",
+      "ops": [
+        { "op": "dist", "k": "中文", "v": "中文" },
+        { "op": "dist", "k": "中文", "v": "中化" },
+        { "op": "dist", "k": "北京", "v": "京城" },
+        { "op": "dist", "k": "知识库", "v": "知识" }
+      ]
+    },
+    {
+      "name": "lev-mixed-width",
+      "why": "混合宽度：一个汉字的插入/删除在两种计数下差 3 倍",
+      "ops": [
+        { "op": "dist", "k": "a中b", "v": "ab" },
+        { "op": "dist", "k": "ab", "v": "a中b" },
+        { "op": "dist", "k": "東京都", "v": "京都" },
+        { "op": "dist", "k": "café", "v": "cafe" }
+      ]
+    }
+  ]
+}

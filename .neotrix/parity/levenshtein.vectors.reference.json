@@ -1,0 +1,30 @@
+{
+  "schema": "nt-parity/reference/1",
+  "capability": "levenshtein",
+  "generated_by": "scripts/ops/nt_parity_ref.py",
+  "reference_impl": {
+    "crate": "strsim@0.11.1",
+    "source": "local cargo registry (vendored dependency, offline)",
+    "license": "MIT License"
+  },
+  "vectors": ".neotrix/parity/levenshtein.vectors.json",
+  "observations": [
+    "lev-ascii-basic",
+    "dist:3",
+    "dist:3",
+    "dist:3",
+    "dist:0",
+    "dist:2",
+    "dist:1",
+    "lev-cjk-single-char-substitution",
+    "dist:0",
+    "dist:1",
+    "dist:2",
+    "dist:1",
+    "lev-mixed-width",
+    "dist:1",
+    "dist:1",
+    "dist:1",
+    "dist:1"
+  ]
+}

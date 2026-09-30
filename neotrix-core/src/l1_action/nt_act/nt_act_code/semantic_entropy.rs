@@ -244,7 +244,11 @@ fn char_similarity(a: &str, b: &str) -> f32 {
         return 0.0;
     }
     let dist = levenshtein_distance(a, b);
-    let max_len = a.len().max(b.len()) as f32;
+    // Same unit as `dist` (chars). This used to be `a.len()` = bytes, so for CJK
+    // the ratio was divided by ~3x too much and similarity came out too HIGH
+    // (e.g. "中文"/"中化" → 1 - 1/6 = 0.83 instead of 1 - 1/2 = 0.5).
+    // Behavioural-parity finding, see entity_linking::linker::levenshtein.
+    let max_len = a.chars().count().max(b.chars().count()) as f32;
     1.0 - (dist as f32 / max_len)
 }
 
@@ -353,6 +357,28 @@ mod tests {
     fn test_empty_context_zero_entropy() {
         let entropy = SemanticEntropyGate::compute_entropy("", &[]);
         assert!((entropy - 0.0).abs() < 1e-6);
+    }
+
+    /// Regression: `char_similarity` divided a **char** distance by a **byte**
+    /// length, so CJK similarity came out far too high and near-duplicate
+    /// Chinese strings were treated as diverse. Found by behavioural parity
+    /// against strsim (see `.neotrix/parity/levenshtein.vectors.json`).
+    #[test]
+    fn test_char_similarity_counts_chars_not_bytes() {
+        // One character apart out of two ⇒ 0.5. With a byte denominator (6)
+        // this used to be 1 - 1/6 = 0.833, i.e. "clearly different" looked
+        // "nearly identical" in reverse.
+        let s = char_similarity("中文", "中化");
+        assert!(
+            (s - 0.5).abs() < 1e-6,
+            "char_similarity(\"中文\",\"中化\") = {} — expected 0.5 \
+             (denominator must be chars, not bytes)",
+            s
+        );
+        // ASCII unchanged.
+        assert!((char_similarity("kitten", "sitting") - (1.0 - 3.0 / 7.0)).abs() < 1e-6);
+        // Mixed width: one CJK char removed from three chars ⇒ 2/3.
+        assert!((char_similarity("a中b", "ab") - (1.0 - 1.0 / 3.0)).abs() < 1e-6);
     }
 
     // ─── Pairwise SemanticEntropy tests (SE‑08 / ConSelf) ───

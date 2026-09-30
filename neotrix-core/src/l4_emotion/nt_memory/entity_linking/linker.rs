@@ -149,7 +149,11 @@ impl EntityLinker {
 
         // Levenshtein distance
         let dist = levenshtein(&a_lower, &b_lower);
-        let max_len = a.len().max(b.len());
+        // max_len must be in the SAME unit as `dist` (chars). It used to be
+        // `a.len()` = bytes, which silently made the ratio unit-mixed once
+        // `levenshtein` became char-based — and it was already wrong for
+        // mixed-width strings before that. Same reasoning as the distance.
+        let max_len = a_lower.chars().count().max(b_lower.chars().count());
         if max_len == 0 {
             return true;
         }
@@ -187,19 +191,28 @@ fn acronym_matches(acronym: &str, full: &str) -> bool {
     initials.len() >= 2 && initials.len() == acr.len() && initials == acr
 }
 
-/// Compute Levenshtein edit distance between two strings.
+/// Compute Levenshtein edit distance between two strings, in **characters**.
+///
+/// 2026-09-30 改为按 `char` 而非 `byte`（行为对位实测抓到，见
+/// `.neotrix/parity/levenshtein.vectors.json` 与 strsim@0.11.1 的 oracle）：
+/// 旧实现用 `a.len()`/`as_bytes()`，即**按 UTF-8 字节**计数，于是
+/// 「中文」vs「中化」得 3（一个汉字=3 字节，每字节都不同）而不是 1。
+/// 纯 CJK 字符串的 `dist/max_len` 比值恰好被约掉，但**中英混排**不会：
+/// `"a中b"` vs `"ab"` 旧实现算 3/5 → 相似度 0.4，按字符应是 1/3 → 0.667
+/// ⇒ 阈值 0.6 一类的配置会**系统性漏合并**只差一个汉字的实体。
+/// 参考实现同仓已有字符版（`nt_act_code/semantic_entropy.rs` 的
+/// `levenshtein_distance`），本函数此前是**同名的第二份、且语义不同**。
 pub fn levenshtein(a: &str, b: &str) -> usize {
-    let a_len = a.len();
-    let b_len = b.len();
+    let a_chars: Vec<char> = a.chars().collect();
+    let b_chars: Vec<char> = b.chars().collect();
+    let a_len = a_chars.len();
+    let b_len = b_chars.len();
     if a_len == 0 {
         return b_len;
     }
     if b_len == 0 {
         return a_len;
     }
-
-    let a_bytes = a.as_bytes();
-    let b_bytes = b.as_bytes();
 
     let mut prev = vec![0usize; b_len + 1];
     let mut curr = vec![0usize; b_len + 1];
@@ -211,7 +224,7 @@ pub fn levenshtein(a: &str, b: &str) -> usize {
     for i in 1..=a_len {
         curr[0] = i;
         for j in 1..=b_len {
-            let cost = if a_bytes[i - 1] == b_bytes[j - 1] {
+            let cost = if a_chars[i - 1] == b_chars[j - 1] {
                 0
             } else {
                 1
@@ -316,6 +329,61 @@ mod tests {
         assert_eq!(levenshtein("abc", "abc"), 0);
         assert_eq!(levenshtein("abc", "abd"), 1);
         assert_eq!(levenshtein("kitten", "sitting"), 3);
+    }
+
+    /// Regression: this whole test module was ASCII-only, which is exactly why a
+    /// **byte**-based implementation survived here (a CJK character is 3 UTF-8
+    /// bytes, so "中文"/"中化" scored 3 instead of 1). Found by behavioural
+    /// parity against strsim@0.11.1 — see `.neotrix/parity/levenshtein.vectors.json`.
+    #[test]
+    fn levenshtein_counts_chars_not_bytes() {
+        assert_eq!(levenshtein("中文", "中文"), 0);
+        assert_eq!(levenshtein("中文", "中化"), 1);
+        assert_eq!(levenshtein("知识库", "知识"), 1);
+        // Mixed width: one CJK char is one edit, not three.
+        assert_eq!(levenshtein("a中b", "ab"), 1);
+        assert_eq!(levenshtein("ab", "a中b"), 1);
+    }
+
+    /// The similarity ratio must use the same unit as the distance. Before the
+    /// 2026-09-30 fix it was `dist(chars) / len(bytes)`.
+    ///
+    /// Pair choice matters and cost me one wrong test first: "知识库"/"知识库务"
+    /// is a **substring** pair, so `names_match` returns true at the containment
+    /// branch and never reaches the Levenshtein ratio at all. A pair that differs
+    /// in the *last* character and is not contained is required.
+    ///
+    /// Threshold 0.7 discriminates: char semantics ⇒ 1 - 1/3 = 0.667 (no merge);
+    /// byte denominator ⇒ 1 - 1/9 = 0.889 (merge). Verified by reverting the fix
+    /// and watching this test fail.
+    #[test]
+    fn similarity_ratio_uses_chars_not_bytes() {
+        let mut linker = EntityLinker::new(LinkerConfig {
+            min_name_overlap: 0.7,
+            ..LinkerConfig::default()
+        });
+        let e1 = Entity::new("知识库", EntityType::Concept, 0, ts());
+        let e2 = Entity::new("知识阁", EntityType::Concept, 10, ts());
+
+        let linked = linker.link(vec![e1, e2]);
+        assert_eq!(
+            linked.len(),
+            2,
+            "'知识库' vs '知识阁' is 1 edit of 3 chars ⇒ similarity 0.667 < 0.7 ⇒ \
+             must NOT merge. If this merges, the denominator is bytes again."
+        );
+    }
+
+    /// Same pair, default threshold: 0.667 ≥ 0.6 ⇒ merges. Proves the test above
+    /// pins semantics rather than switching CJK linking off.
+    #[test]
+    fn should_link_cjk_names_differing_by_one_char() {
+        let mut linker = EntityLinker::with_default_config();
+        let e1 = Entity::new("知识库", EntityType::Concept, 0, ts());
+        let e2 = Entity::new("知识阁", EntityType::Concept, 10, ts());
+
+        let linked = linker.link(vec![e1, e2]);
+        assert_eq!(linked.len(), 1, "default 0.6 threshold should merge these");
     }
 
     #[test]

@@ -1,5 +1,6 @@
 {
   "schema": "nt-parity/vectors/1",
+  "capability": "lru_core",
   "target": "lru-core-semantics",
   "why": "行为对位（不是名字对位）的输入。判据：同一 op 脚本分别喂给我方 ResponseCache 与对方 lru crate（MIT），逐步观测必须逐条相同。op 只取两边语义可映射的公共子集（put/get/len/contains）；pinning/hit_count 是我方扩展，不进对位（进则必分歧，且那是扩展不是缺陷）。",
   "ops_supported": ["put", "get", "len", "contains"],

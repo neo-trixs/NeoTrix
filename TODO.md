@@ -1,35 +1,68 @@
 > # NeoTrix TODO 列表
-> 智能同步生成，最后更新：**2026-09-30（原子拆解 + 行为对位落地，建议 2 关闭）**
+> 智能同步生成，最后更新：**2026-09-30（行为对位通用化 + 抓到 2 处 char/byte 单位缺陷）**
 >
-> ## ✅ 2026-09-30 行为对位已落地（37/37 步与 lru@0.18.5 一致）⇒ 上面 P0 **降 P1**
+> ## 🔴 P0 已修（2026-09-30 行为对位抓到的真 bug）中文实体链接按**字节**算编辑距离
 > >
-> > `neotrix-core/tests/response_cache_parity.rs` + `scripts/ops/nt_parity_ref.py`：
-> > op 脚本 `.neotrix/parity/response-cache.vectors.json` 是唯一事实源，
-> > 对方 oracle 由**跑对方实现**采集（离线、registry 已 vendor 副本、LICENSE 直读 MIT）。
-> > ⇒ **语义等价已证**（put/get/len/contains 全子集零分歧），
-> > 剩下的只是**复杂度劣势**（每次写 O(capacity) 扫描）⇒ 属性能债不是正确性债。
-> > 两条证伪用例都实测过：篡改 oracle ⇒ 测试红且 `--check` rc=1。
-> > 顺带补了有消费者的生产 API `ResponseCache::contains()`（非变更式，不扰动淘汰序）。
-> > 详见 `docs/architecture/DECOMPOSE-PARITY-2026-09-30.md` §4。
+> > **怎么发现的**：把行为对位 harness 通用化后加第二个目标（`levenshtein` ↔
+> > `strsim@0.11.1`），首跑就红 **7 步**：`[lev-cjk-…] ours=dist:3 reference=dist:1`。
+> > ⇒ ASCII 6 步全一致，**CJK 步全部分歧** ⇒ 我方按 UTF-8 **字节**计数。
 > >
-> > ## 🔴 P1（原 P0，性能债）`ResponseCache::insert` 淘汰是 O(capacity) 全扫描
+> > **两处缺陷，同一个病根（单位混用）**：
+> > 1. `entity_linking/linker.rs::levenshtein` —— `a.len()`/`as_bytes()` 按字节。
+> >    已改为 `chars()`。
+> > 2. **消费者** `names_match` 的 `max_len = a.len().max(b.len())` 也是字节，
+> >    与 char 距离做比值 = **单位混用**。纯 CJK 时比值恰好被约掉（中英混排不会），
+> >    修一半会留下更隐蔽的错，故两处同改。
+> > 3. 同仓 `nt_act_code/semantic_entropy.rs::char_similarity` **同一个病**：
+> >    char 距离 ÷ byte 长度，方向相反（相似度**偏高**）：
+> >    `"中文"/"中化"` 得 0.833 而非 0.5。**函数名承诺 char 语义而实现没有**。
 > >
-> > **证据**：`nt_decompose.py parity` 对位 `lru-0.18.5`（MIT，同一抽取器生成对方
-> > 原子集）↔ 我方 `ResponseCache::insert`：我方原子集含 `iter`+`filter`+
-> > `min_by_key`+`remove`（= 每次写扫全表），对方含 `attach`/`detach`/`swap`/
-> > `replace_or_create_node`（= O(1) promote）。**已读源码逐行确认**（`nt_policy.rs:94-111`），
-> > 且 §4 行为对位证明语义本身正确 ⇒ 定性为**性能债**。
-> > 位置在网关 `resilience` 层**热路径**（响应缓存写放）。
+> > **为什么以前没被发现**：两个模块的 `levenshtein` 单元测试**全是 ASCII**
+> > （`levenshtein_basic` 只测 kitten/sitting）⇒ 汉字=3 字节这件事永远测不到。
+> > 且同仓有**两份同名实现、语义不同**（linker 字节版 / semantic_entropy 字符版）——
+> > 这就是「八副本」老问题的复发。
 > >
-> > **本仓约束下的裁决**：引第三方 `lru`（MIT，已在 registry）是唯一可行解 ——
-> > 自建侵入式链表需手写 `unsafe`，`#![forbid(unsafe_code)]` 直接排除。
-> > 独立一轮做，带基准（before/after 写放大）。
+> > **已补的判据**：`levenshtein_counts_chars_not_bytes` +
+> > `similarity_ratio_uses_chars_not_bytes`（阈值 0.7 专门选成**可判别**的：
+> > char 语义 0.667 不合并 / byte 分母 0.889 合并）+ `test_char_similarity_counts_chars_not_bytes`。
+> > 三条都做过**证伪**：回退修复后必须转红（已实测）。
+> > ⚠️ 第一版测试**不判别**（阈值取默认 0.6 时两种语义都合），
+> > 且第一版选的「知识库/知识库务」是**子串对** ⇒ `names_match` 在包含分支就
+> > return true，根本走不到 Levenshtein。两处都靠证伪才发现。
+> >
+> > ### 🟡 P1 同类扫描未做：还有几份字符串相似度实现？
+> > `l2_perception/nt_world/source/search_scorer.rs::fuzzy_match`、
+> > `l4_emotion/nt_feel/writing_style.rs::fuzzy_similarity`（词重叠，非编辑距离）
+> > **未取证**，不预设有 bug。按本轮方法：给每个能力一份 vectors + 找得到参考实现的
+> > crate，跑一次对位。**不要靠读代码猜。**
+>
+> ## ✅ 2026-09-30 行为对位已通用化（不再是单目标手写测试）
+> >
+> > 采集器 `nt_parity_ref.py` 改成 **capability 注册表**（`--list` 可列）：
+> > `lru_core`→lru@0.18.5、`levenshtein`→strsim@0.11.1。
+> > 我方侧合并为**一个数据驱动 harness** `neotrix-core/tests/nt_capability_parity.rs`
+> > （旧 `response_cache_parity.rs` 已删，内容并入）。
+> > ⇒ **加一个新目标 = 一份 vectors + 一个 adapter 分支**，不再写新测试文件。
+> >
+> > op 脚本 `.neotrix/parity/<name>.vectors.json` 是唯一事实源，
+> > 对方 oracle 由**跑对方实现**采集（离线、registry 已 vendor 副本、LICENSE 直读）。
+> > ⇒ 语义等价可执行判定，37/37（lru）+ 17/17（levenshtein）。
+> > 详见 `docs/architecture/DECOMPOSE-PARITY-2026-09-30.md` §4/§7。
+> >
+> > ⚠️ 采集器新增能力时若 vectors 没登记 capability ⇒ **响亮报错**（本轮当场抓到我自己
+> > 的旧 vectors 缺该字段）；`--check` 区分「观测漂移」与「仅元数据漂移」，
+> > 后者会明说「observations IDENTICAL」而不是假装 oracle 说谎。
+> >
+> > ## 🟡 P1（性能债，非正确性债）`ResponseCache::insert` 淘汰是 O(capacity) 全扫描
+> > 我方 `iter+filter+min_by_key+remove` vs 对方 `attach/detach/swap`（O(1) promote）。
+> > 行为对位证明**语义等价**（37/37），故只是复杂度劣势。
+> > 本仓 `#![forbid(unsafe_code)]` 排除自建侵入式链表 ⇒ 引第三方 `lru` 是唯一可行解。
+> > **动手前先测基准**：「O(n) 更差」≠「真的慢」，本会话未测绝对耗时。
 > >
 > > ### 🟡 P1 doc-claim 门的下一个类目：模板残留的假「未实现」声明
 > > `nt_policy.rs` 单文件 **23 处** `/// Note: Real implementation needs — …`，
-> > 其中已逐行核实至少 4 处（`new` / `key_for` / `key_for_request` / `cache`）**函数体完整**
-> > ⇒ 假声明。`check-doc-claims.sh` 只查「zero consumers」类断言，**抓不到这一类**。
-> > ⇒ 门若要加此类，须先确认模式足够窄（否则按 G7 不建门）。
+> > 已逐行核实 ≥4 处（`new`/`key_for`/`key_for_request`/`cache`）**函数体完整**。
+> > `check-doc-claims.sh` 只查「zero consumers」类断言，抓不到这一类。
 >
 > ## ⚠️ 共享工作树事故（2026-09-30，`519d78b9`）
 > `git commit --only <path>` 取**工作树状态** ⇒ 另一窗口并发改写

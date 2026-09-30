@@ -220,7 +220,98 @@ cargo test -p neotrix --test response_cache_parity
 
 ---
 
-## 6. 复跑清单（判据可证伪）
+## 7. 通用化 + 第一个真 bug（同日第三轮）
+
+§4 的 harness 只服务 `ResponseCache`（我方侧是**手写测试**）。这意味着「复现对方产品」
+**不可扩展**——加第二个目标就要再写一个测试文件。故本轮做两件事：**通用化**，然后
+**用它抓到第一个真实正确性 bug**。
+
+### 7.1 通用化（两处，都改成注册表驱动）
+
+| 侧 | 改法 |
+|---|---|
+| 对方采集器 `nt_parity_ref.py` | `CAPABILITIES = {capability: (模板, 默认 crate, 是否需要 capacity)}`；`--list` 可列。**vectors 缺 `capability` 字段 ⇒ 响亮报错**（不允许无适配器地编造 oracle） |
+| 我方 harness | 合并为**一个**数据驱动文件 `neotrix-core/tests/nt_capability_parity.rs`（`run_ours(capability, cases)` 按 capability 分派）。旧 `response_cache_parity.rs` 已删，内容并入 |
+
+⇒ **加一个新目标 = 一份 vectors + 一个 adapter 分支**，不再写新测试文件。
+
+已注册能力：`lru_core`→`lru@0.18.5`（MIT）· `levenshtein`→`strsim@0.11.1`。
+
+### 7.2 抓到的 bug：中文实体链接按**字节**算编辑距离
+
+第二个目标选 `levenshtein`（我方 `entity_linking::linker::levenshtein` ↔ 对方
+`strsim::levenshtein`）的选型理由：**ASCII 下两者必然一致**，所以任何分歧都必然是
+语义分歧，而不是「实现不同但都对」。
+
+首跑结果 —— **7 步分歧，ASCII 6 步全一致**：
+
+```
+[lev-ascii-basic]              6 步全一致 ✅
+[lev-cjk-single-char-substitution] ours=dist:3 reference=dist:1
+                               ours=dist:6 reference=dist:2
+                               ours=dist:3 reference=dist:1
+[lev-mixed-width]              ours=dist:3 reference=dist:1  (×3)
+```
+
+**病根：单位混用。** 我方实现用 `a.len()` / `as_bytes()` ⇒ **按 UTF-8 字节**计数
+（一个汉字 3 字节，所以差一个字记 3）。
+
+已核实的三处（逐处读源码，非凭符号名）：
+
+| # | 位置 | 问题 | 状态 |
+|---|---|---|---|
+| 1 | `entity_linking/linker.rs::levenshtein` | 字节版距离 | ✅ 改 `chars()` |
+| 2 | **消费者** `names_match` 的 `max_len` | char 距离 ÷ **byte** 长度 = 单位混用 | ✅ 改 `chars().count()` |
+| 3 | `nt_act_code/semantic_entropy.rs::char_similarity` | **同一个病**，方向相反（相似度**偏高**：`"中文"/"中化"` = 0.833 而非 0.5）。**函数名承诺 char 语义而实现没有** | ✅ 改 `chars().count()` |
+
+**纯 CJK 时 #2 的比值恰好被约掉**（分子分母都 ×3），**中英混排不会**：
+`"a中b"/"ab"` 旧值 3/5 = 0.4，按字符应是 1/3 = 0.667 ⇒ 阈值 0.6 一类的配置
+**系统性漏合并**只差一个汉字的实体。⇒ 修 #1 不修 #2 会留下更隐蔽的错，故同改。
+
+### 7.3 为什么这个 bug 活到现在（根因，不是「谁写错了」）
+
+- 两个模块的 `levenshtein` 单元测试**全是 ASCII**（`levenshtein_basic` 只测
+  kitten/sitting）⇒ 「汉字 = 3 字节」这件事在测试里**永远测不到**。
+- 同仓有**两份同名实现、语义不同**（linker 字节版 / semantic_entropy 字符版）
+  —— 这就是 `is_cjk` 八副本老问题的复发：副本之间**连语义都不一致**。
+
+### 7.4 我自己写的第一版测试是**不判别**的（两次都被证伪抓住）
+
+| 坑 | 现象 | 怎么发现 |
+|---|---|---|
+| 阈值取默认 0.6 | 两种语义下都合并 ⇒ 测试恒绿 | 回退修复后测试仍绿 |
+| 选了「知识库/知识库务」 | 这是**子串对** ⇒ `names_match` 在**包含分支**就 `return true`，**根本走不到 Levenshtein** | 同上 |
+
+修正后选「知识库/知识阁」（非子串、差末字）并把阈值定成 **0.7**：
+char 语义 1−1/3 = 0.667 ⇒ 不合并；byte 分母 1−1/9 = 0.889 ⇒ 合并。
+⇒ 现在**回退修复必红**（已实测）。
+
+**这正是本仓反复吃过的那口药**：`checked ≠ verified`。测试存在、测试通过、
+测试什么都没证明。
+
+### 7.5 采集器自身的两个真 bug（本轮当场修）
+
+1. **新增能力后旧 vectors 缺 `capability` 字段** ⇒ 响亮报错，当场抓到我自己漏改的文件。
+2. `--check` 原来只比文本 ⇒ **仅元数据变化也被报成「oracle 说谎」**。改为区分
+   「observations 漂移」与「仅元数据漂移（observations IDENTICAL）」。
+
+---
+
+## 8. 本轮之后的判据状态
+
+| 能力 | oracle | 步数 | 结果 |
+|---|---|---:|---|
+| `lru_core` | lru@0.18.5（MIT） | 37 | ✅ 37/37 |
+| `levenshtein` | strsim@0.11.1（MIT OR Apache-2.0） | 17 | ✅ 17/17（**修复后**；修复前 7 步红） |
+
+未对位（诚实边界）：`key_for` 哈希稳定性 · `prefetch` / `prefetch_lookahead` ·
+`fuzzy_match`（`l2_perception/nt_world/source/search_scorer.rs`）·
+`fuzzy_similarity`（`l4_emotion/nt_feel/writing_style.rs`）。
+⇒ **后两个未取证，不预设有 bug**；按本轮方法（给 vectors + 找参考 crate 跑对位）处理。
+
+---
+
+## 9. 复跑清单（判据可证伪）
 
 ```sh
 python3 scripts/ops/nt_decompose.py selftest                 # 6 正例 + 3 证伪
@@ -228,10 +319,14 @@ python3 scripts/ops/nt_decompose.py atoms --db .project-map/edges-neotrix-neobot
     --root 'nt_channel_serve::run_once' --depth 3             # 193 原子 / 未截断
 python3 scripts/ops/nt_parity_ref.py \
     --vectors .neotrix/parity/response-cache.vectors.json --check   # oracle 未漂移
-cargo test -p neotrix --test response_cache_parity                  # 2 绿（含 37 步对位）
+python3 scripts/ops/nt_parity_ref.py --list                          # 已注册能力
+python3 scripts/ops/nt_parity_ref.py --vectors .neotrix/parity/levenshtein.vectors.json --check
+cargo test -p neotrix --test nt_capability_parity                   # 3 绿（54 步对位）
 ```
 
 ⇒ 若 `selftest` 转红，或 `atoms` 在**同一输入**上给出**不同原子数**，
 说明工具坏了，**不是仓库变了**。
+⇒ 若 `nt_capability_parity` 转红：**先当真 bug 处理**（本仓已有两个实例：
+字节版 Levenshtein、unit-mixed 相似度），确认不是 vectors/oracle 不同步再改代码。
 ⇒ 若 `--check` rc=1：**先信它**（对方实现变了，或有人手改了 oracle），
 再决定是重采还是改 vectors —— 不要直接 `--out` 覆盖掉证据。

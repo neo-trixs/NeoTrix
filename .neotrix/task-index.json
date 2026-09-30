@@ -787,11 +787,11 @@
     "behavioural parity",
     "oracle 采集"
    ],
-   "tool": "python3 scripts/ops/nt_parity_ref.py --vectors .neotrix/parity/<name>.vectors.json [--crate lru@0.18.5] [--check]",
+   "tool": "python3 scripts/ops/nt_parity_ref.py --vectors .neotrix/parity/<name>.vectors.json [--check] | --list",
    "kind": "report",
    "read_only": false,
-   "when_not": "① 写模式只在本机 cargo registry 里找对方 crate 的已 vendor 副本，找不到就退出 —— 它不联网、不 clone；② 只有 --check 可当门（重跑对方实现并比对已存 oracle，rc=1 = oracle 漂移或说谎）；③ PASS 只覆盖 vectors 写了的 op 集合，vectors 没写的语义**未被验证**，别读成「行为完全一致」",
-   "spec": "DECOMPOSE-PARITY-2026-09-30 §4；neotrix-core/tests/response_cache_parity.rs"
+   "when_not": "① 写模式只在本机 cargo registry 里找对方 crate 的已 vendor 副本，找不到就退出 —— 它不联网、不 clone；② 只有 --check 可当门（重跑对方实现并比对已存 oracle，rc=1 = oracle 漂移或说谎；观测一致但元数据变了会明说 IDENTICAL，不算漂移）；③ PASS 只覆盖 vectors 写了的 op 集合，vectors 没写的语义**未被验证**；④ 加新能力必须在 CAPABILITIES 注册适配器，vectors 缺 capability 字段会响亮报错（不许无适配器地编 oracle）",
+   "spec": "DECOMPOSE-PARITY-2026-09-30 §4/§7；neotrix-core/tests/nt_capability_parity.rs（我方侧注册表）"
   },
   {
    "id": "check-license",

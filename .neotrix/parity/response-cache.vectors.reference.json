@@ -1,5 +1,6 @@
 {
   "schema": "nt-parity/reference/1",
+  "capability": "lru_core",
   "generated_by": "scripts/ops/nt_parity_ref.py",
   "reference_impl": {
     "crate": "lru@0.18.5",
