@@ -105,9 +105,17 @@
   而本仓的主要工程动作（第二棵树迁移、层重构、跨 crate 搬迁）**恰好全在这一档**
 - 本仓已有 82,835 符号的**成熟底座**，加边是增量而非重建
 
-**技术路径（按「不重写类型检查器」原则）**：
-1. 先探 `cargo +nightly rustc -Zunpretty=…` 与 `RUSTC_BOOTSTRAP=1 cargo rustc -- -Zemit=…`
-   是否能在本机拿到编译器自己的元数据（**先验证可行再动手**）
+**技术路径（按「不重写类型检查器」原则）** —— ⛔ **本段已于同日实测，见
+`CALLGRAPH-FEASIBILITY-2026-09-30.md`；原措辞过于乐观，此处只留结论：**
+> 机制 ✅ 成立（本机 `RUSTC_BOOTSTRAP=1` 即可，**不需要 nightly**；
+> `-Zunpretty=hir-tree` 的 `res: Def(Kind, DefId(crate ~ path))` 即编译器自己的解析，
+> 4,858 行实测 34,478 处，同名诱饵结构上不可能）。
+> ⛔ 但**未证**的是「把它变成边表」：文本传输 31 KB/源码行 ⇒ 全树约 27 GB，
+> 且我的行级正则抽取器实测 #CALLS 0（找错字段，不是没有边）。
+> ⇒ 需要真正的解析器 + 更紧凑的传输（`.rmeta` 或 rust-analyzer 索引）。**这是主要工作量。**
+
+原路径草案（保留供追溯，**已被上述实测取代**）：
+1. ~~先探 `cargo +nightly rustc -Zunpretty=…`~~ —— 不需要 nightly
 2. 若不可得 → 走 `scip-rust`（对应 codegraph 的 `scip-typescript` 路线）
 3. 再退一步：`syn` 解析 + **显式标注「未解析边」**（照抄「宁缺勿错」判据，
    绝不猜边）
