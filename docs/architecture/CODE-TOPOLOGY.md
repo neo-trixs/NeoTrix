@@ -11,11 +11,11 @@
 | 树 | 文件 | 行数 | 占比 | |
 |---|---:|---:|---:|---|
 | 主分层树 (L0–L6) | 2362 | 722,833 | ██████████████████ | `layered` |
-| 文档/会话 | 370 | 77,109 | ██ | `doc` |
+| 文档/会话 | 373 | 77,950 | ██ | `doc` |
 | 独立 crate | 243 | 75,386 | ██ | `crate` |
 | ⚠️ 第二棵树 (逃过 check-layer-deps.sh) | 130 | 44,908 | █ | `second-tree` |
 | core 内、层外 (entry/bin/examples) | 148 | 40,102 | █ | `core-outside-layers` |
-| 其他 | 131 | 27,568 | █ | `other` |
+| 其他 | 145 | 29,864 | █ | `other` |
 
 > ⛔ **第二棵树 = 130 文件 / 44,908 行**，不参与 L0–L6，**逃过 `check-layer-deps.sh`**。
 > 任何「目录 → 层」的自动推导都会漏掉它，故本图显式分叉。
@@ -157,10 +157,10 @@ python3 scripts/ops/nt_topology.py   # → 本文件
 |---|---:|---|
 | 重复的**类型名** | 1121 | 同名出现 ≥2 次的**名字**数 |
 | 名义多余定义 | 1797 | 每名保留 1 份后余下的（**含异构**） |
-| **结构完全相同**的真重复组 | **147** | 字段集合逐项相同 |
-| **真正可归并的定义** | **174** | 只有这个数才叫「可归并」 |
+| **结构完全相同**的真重复组 | **261** | 字段集合逐项相同 |
+| **真正可归并的定义** | **278** | 只有这个数才叫「可归并」 |
 
-⇒ 1121 个同名里，**只有 174 个结构真同构**（占名义多余的 10%）。
+⇒ 1121 个同名里，**只有 278 个结构真同构**（占名义多余的 15%）。
 其余是**合法的同名异构**（如 `TaskStatus` 出现 12 次却是 10 个不同枚举）—— 报原始名数会是对正确代码的误报，与 `unsafe` 字面量陷阱同一层次。
 
 > ⚠️ 本表第一版把「名义多余 1797」误写成「可归并」并算出 160% —— **那正是本节警告的那个错误，我自己犯了一遍**。三个数已分列，逐个标明含义。
@@ -169,54 +169,44 @@ python3 scripts/ops/nt_topology.py   # → 本文件
 
 | # | 类型 | kind | 字段数 | 份数 | 跨层分布 |
 |---:|---|---|---:|---:|---|
-| 1 | `CircuitState` | enum | 3 | 6 | l1_action, l3_embodiment, l5_cognition, l6_meta |
-| 2 | `RiskLevel` | enum | 4 | 5 | l1_action, l3_embodiment |
-| 3 | `Severity` | enum | 5 | 5 | l1_action, l3_embodiment |
-| 4 | `Severity` | enum | 4 | 4 | l3_embodiment |
-| 5 | `StepStatus` | enum | 5 | 4 | l1_action, l5_cognition |
-| 6 | `ThreatLevel` | enum | 5 | 4 | l3_embodiment |
-| 7 | `Cli` | struct | 1 | 3 | 跨 crate |
-| 8 | `CrtTimeScale` | enum | 3 | 3 | l0_substrate, l5_cognition |
-| 9 | `DepKind` | enum | 3 | 3 | l6_meta |
-| 10 | `EventKind` | enum | 8 | 3 | l6_meta |
-| 11 | `GapSeverity` | enum | 4 | 3 | l0_substrate, l1_action, l5_cognition |
-| 12 | `GoalPriority` | enum | 4 | 3 | l5_cognition |
+| 1 | `AwarenessReport` | struct | 6 | 3 | l0_substrate, l1_action, l5_cognition |
+| 2 | `Bm25Document` | struct | 2 | 3 | l1_action, l4_emotion |
+| 3 | `CapabilityGap` | struct | 5 | 3 | l0_substrate, l1_action, l5_cognition |
+| 4 | `Cli` | struct | 1 | 3 | 跨 crate |
+| 5 | `CompilationHealth` | struct | 3 | 3 | l6_meta |
+| 6 | `ComponentMap` | struct | 2 | 3 | l6_meta |
+| 7 | `ComponentNode` | struct | 6 | 3 | l6_meta |
+| 8 | `DecomposeSuggestion` | struct | 2 | 3 | l0_substrate, l1_action, l5_cognition |
+| 9 | `DepEdge` | struct | 3 | 3 | l6_meta |
+| 10 | `DepGraph` | struct | 1 | 3 | l6_meta |
+| 11 | `EvolutionEvent` | struct | 4 | 3 | l6_meta |
+| 12 | `FileInfo` | struct | 8 | 3 | l6_meta |
 
 **逐处位置**（`nt_locate --component <名>` 可直查）：
 
-- `CircuitState` ×6
-  - `neotrix-core/src/l1_action/nt_act/actions/core/nt_act_circuit_breaker.rs:47`
-  - `neotrix-core/src/l1_action/nt_io/nt_io_provider/gateway/resilience/nt_resilience_types.rs:8`
-  - `neotrix-core/src/l3_embodiment/nt_shield/defense/ring_boundary/mod.rs:23`
-  - `neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/goal_loop/types.rs:91`
-  - `neotrix-core/src/l6_meta/healing/self_healing/circuit_breaker.rs:9`
-  - `neotrix-core/src/l6_meta/nt_core_guardian/circuit_breaker.rs:20`
-- `RiskLevel` ×5
-  - `neotrix-core/src/agent.rs:450`
-  - `neotrix-core/src/l1_action/nt_act/nt_act_trade/production_logistics.rs:308`
-  - `neotrix-core/src/l1_action/nt_act/nt_act_trade/capabilities/risk_assessor.rs:47`
-  - `neotrix-core/src/l3_embodiment/nt_shield/guard/agent_guardrails/mod.rs:59`
-  - `neotrix-core/src/l3_embodiment/nt_shield/nt_shield_approval/human_approval.rs:24`
-- `Severity` ×5
-  - `neotrix-core/src/l1_action/nt_infra_ai/inspection.rs:15`
-  - `neotrix-core/src/l3_embodiment/nt_shield/vulnerability_pipeline.rs:24`
-  - `neotrix-core/src/l3_embodiment/nt_shield/nt_shield_audit/threat_modeler.rs:29`
-  - `neotrix-core/src/l3_embodiment/nt_shield/scanners/container_scan/vulnerability.rs:5`
-  - `neotrix-core/src/l3_embodiment/nt_shield/scanners/red_team/result.rs:6`
-- `Severity` ×4
-  - `crates/neotrix-audit/src/nt_finding.rs:53`
-  - `neotrix-core/src/l3_embodiment/nt_shield/compliance/requirement.rs:9`
-  - `neotrix-core/src/l3_embodiment/nt_shield/safety/nt_safety_alignment.rs:78`
-  - `neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/finding.rs:12`
-- `StepStatus` ×4
-  - `neotrix-core/src/l1_action/nt_act/actions/orchestration/operator_runbook.rs:15`
-  - `neotrix-core/src/l1_action/nt_act/actions/orchestration/provider_migration_router.rs:122`
-  - `neotrix-core/src/l1_action/nt_act/nt_act_autonomy/per_agent.rs:24`
-  - `neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/self_evolver.rs:142`
-- `ThreatLevel` ×4
-  - `neotrix-core/src/l3_embodiment/nt_shield/dual_evidence.rs:25`
-  - `neotrix-core/src/l3_embodiment/nt_shield/defense/unified_defense.rs:33`
-  - `neotrix-core/src/l3_embodiment/nt_shield/guard/input_gatekeeper.rs:19`
-  - `neotrix-core/src/l3_embodiment/nt_shield/guard/output_sentinel.rs:20`
+- `AwarenessReport` ×3
+  - `neotrix-core/src/l0_substrate/nt_core_consciousness_types.rs:171`
+  - `neotrix-core/src/l1_action/nt_act/nt_act_autonomy/types.rs:28`
+  - `neotrix-core/src/l5_cognition/nt_core/awareness_monitor.rs:24`
+- `Bm25Document` ×3
+  - `crates/neotrix-types/src/core/nt_core_bank/iteration.rs:39`
+  - `neotrix-core/src/l1_action/nt_core_bank/iteration.rs:20`
+  - `neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/bm25.rs:8`
+- `CapabilityGap` ×3
+  - `neotrix-core/src/l0_substrate/nt_core_consciousness_types.rs:153`
+  - `neotrix-core/src/l1_action/nt_act/nt_act_autonomy/types.rs:18`
+  - `neotrix-core/src/l5_cognition/nt_core/awareness_monitor.rs:6`
+- `Cli` ×3
+  - `crates/neotrix-audit/src/bin/nt_audit.rs:22`
+  - `crates/neotrix-neobot/src/bin/neobot.rs:35`
+  - `neotrix-core/src/bin/experience.rs:101`
+- `CompilationHealth` ×3
+  - `crates/neotrix-types/src/core/nt_core_meta/self_model.rs:234`
+  - `crates/neotrix-types/src/core/nt_core_meta/unified_self_model.rs:170`
+  - `neotrix-core/src/l6_meta/nt_meta/self_model.rs:273`
+- `ComponentMap` ×3
+  - `crates/neotrix-types/src/core/nt_core_meta/self_model.rs:184`
+  - `crates/neotrix-types/src/core/nt_core_meta/unified_self_model.rs:133`
+  - `neotrix-core/src/l6_meta/nt_meta/self_model.rs:220`
 
 ⚠️ **归并不是免费的**：`Severity` 散在 L1/L3 与两个 crate，合并会改公开 API 与跨层依赖方向 ⇒ 需逐组评估，不宜批量脚本化。
