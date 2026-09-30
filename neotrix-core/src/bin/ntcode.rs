@@ -16,7 +16,7 @@ use neotrix::l1_action::nt_io::nt_io_provider::catalog::model_pool::{ModelSource
 use neotrix::l1_action::nt_io::nt_io_provider::catalog::cli_free_source::CliFreeSource;
 use neotrix::l1_action::nt_model_cli::NtModelCliAsk;
 use neotrix::l1_action::nt_stdin_human::NtStdinHuman;
-use neotrix::neotrix::nt_crystal_core::{
+use neotrix::l5_cognition::nt_crystal_core::{
     CrystalCore, NtInnerLoop, NtLlmAsk, NtLoopStatus, NtTaskLoopConfig,
 };
 use std::path::PathBuf;

@@ -170,10 +170,10 @@ impl TaskDecomposerDispatcher {
     pub fn crystal_loop_report(
         &self,
         goal: &str,
-        core: &crate::neotrix::nt_crystal_core::CrystalCore,
+        core: &crate::l5_cognition::nt_crystal_core::CrystalCore,
         model: &str,
-    ) -> Result<crate::neotrix::nt_crystal_core::NtTaskLoopReport, TaskDispatchError> {
-        use crate::neotrix::nt_crystal_core::{NtCrystalTaskLoop, NtTaskLoopConfig};
+    ) -> Result<crate::l5_cognition::nt_crystal_core::NtTaskLoopReport, TaskDispatchError> {
+        use crate::l5_cognition::nt_crystal_core::{NtCrystalTaskLoop, NtTaskLoopConfig};
         let bridge = crate::l1_action::nt_crystal_llm_bridge::NtLlmProviderBridge::new(
             self.provider.clone(),
             model,

@@ -1304,7 +1304,7 @@ mod tests {
     /// 并行分发 + SharedMind 基础功能验证。
     #[test]
     fn test_dispatch_parallel_basic() {
-        use crate::neotrix::nt_crystal_core::SharedMind;
+        use crate::l5_cognition::nt_crystal_core::SharedMind;
         let eng = engine();
         let subtasks = vec![
             NtCrystalSubtask {
@@ -1343,7 +1343,7 @@ mod tests {
     /// 跳过与重叠：子任务二的问题被子任务一的答案覆盖 → 跳过。
     #[test]
     fn test_dispatch_parallel_overlap_skips() {
-        use crate::neotrix::nt_crystal_core::SharedMind;
+        use crate::l5_cognition::nt_crystal_core::SharedMind;
         // 阈值 0.05：中文 Jaccard 天然低，0.05 即可检测同领域重叠
         let eng = NtCrystalTaskLoop::new(NtTaskLoopConfig {
             parallel: true,
@@ -1388,7 +1388,7 @@ mod tests {
     /// Deterministic + Reasoning 混合并行。
     #[test]
     fn test_dispatch_parallel_mixed() {
-        use crate::neotrix::nt_crystal_core::SharedMind;
+        use crate::l5_cognition::nt_crystal_core::SharedMind;
         let eng = engine();
         let subtasks = vec![
             NtCrystalSubtask {
@@ -1449,7 +1449,7 @@ mod tests {
     /// panic 安全：LLM 线程 panic 不炸整轮，转为 failed 记录。
     #[test]
     fn test_dispatch_parallel_panic_safety() {
-        use crate::neotrix::nt_crystal_core::SharedMind;
+        use crate::l5_cognition::nt_crystal_core::SharedMind;
         struct PanicAsk;
         impl NtLlmAsk for PanicAsk {
             fn ask(&self, _: &str) -> Result<NtLlmReply, NtTaskFusionError> {
@@ -1508,7 +1508,7 @@ mod tests {
     /// max_concurrent=1 串行执行（并行但实际单线程）。
     #[test]
     fn test_dispatch_parallel_max_concurrent_1() {
-        use crate::neotrix::nt_crystal_core::SharedMind;
+        use crate::l5_cognition::nt_crystal_core::SharedMind;
         use std::sync::atomic::{AtomicUsize, Ordering};
         let eng = NtCrystalTaskLoop::new(NtTaskLoopConfig {
             parallel: true,

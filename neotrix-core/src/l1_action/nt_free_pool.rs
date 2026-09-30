@@ -20,7 +20,7 @@
 //! - 生产代码无 `unwrap/expect/panic`。
 
 use crate::l1_action::nt_model_cli::NtModelCliAsk;
-use crate::neotrix::nt_crystal_core::{NtLlmAsk, NtLlmReply, NtTaskFusionError};
+use crate::l5_cognition::nt_crystal_core::{NtLlmAsk, NtLlmReply, NtTaskFusionError};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;

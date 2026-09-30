@@ -16,7 +16,7 @@
 //! # Safety
 //! - 只读 stdin，无 unsafe (R-P1)；生产代码无 `unwrap/expect/panic`。
 
-use crate::neotrix::nt_crystal_core::{NtDemand, NtHumanChannel, NtHumanReply};
+use crate::l5_cognition::nt_crystal_core::{NtDemand, NtHumanChannel, NtHumanReply};
 use std::io::BufRead;
 
 /// 终端人类通道。

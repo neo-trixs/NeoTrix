@@ -4,21 +4,6 @@
  "_measurement_台_correction": "本文件首版的全部 files/lines 数字是在**主工作树（脏，含他窗未提交 .rs）**上量的，7/8 与干净检出不符，最大偏差 nt_crystal_core 21,134 -> 19,371（-1,763，-8%）。已在本次提交按干净检出全部校正。教训见 docs/architecture/LESSONS-20260928-fresh-checkout.md：脏树不是合法测量台。",
  "_rule": "「导出 ≠ 调用」已错过 4 次（CapabilityRegistry / SearchResult / 决策引擎 / JEV 反向）。本文件的 role 字段必须有构造点证据支撑，改动前先 grep 复核。\n⚠️ 2026-09-28 19:2x 按实测重数（**本条已两次过期，教训见下**）：\n  - **同名类已消歧完成**（2afcbcc2 / fce025ce）：CapabilityRegistry 4→3 后再 3→1，\n    现 L0 版 `CapabilityRegistry`（nt_core_capability_types.rs:533，活，16 处 trait 实现）\n    为唯一保留名；另两套改名 `CapabilityCatalog`（l5 nt_core/capability/registry.rs:473，\n    仅自审）与 `CapabilityTreeRegistry`（crates/nt-core-capability-tree，318 节点 CI 门）。\n    同批消歧：ReasoningTrace 4→1 / ReasoningMethod 3→1 / ReasoningStep 5→1 /\n    TraceSource 2→1 / LoadBalancer 2→1（GWT 版 MoELoadBalancer 已删，被同目录\n    moe_router 的 DeepSeek-V3 无辅助损失方案取代，f52238d2）。\n  - **SearchResult 实为 7 处**（历史文档先写 4 处低估；2026-09-28 19:4x 删掉\n    两份零消费者 hybrid 副本后由 9 降至 7）：\n    l2_perception/nt_world/rag_pipeline/document.rs:31、l1_action/nt_act/geo_seo/search_engine.rs:102、\n    l1_action/nt_action_facade.rs:21、skill_loader.rs:160、l5_cognition/nt_core_hybrid_search.rs（**已删**）、\n    l4_emotion/nt_memory/vector_index.rs:27、l4_emotion/nt_memory/nt_memory_kb/vector_index.rs:11、\n    crates/neotrix-types/src/search_backend.rs:12、crates/neotrix-gateway/src/hybrid_search.rs（**已删**）。\n    余 7 处字段集两两不交（doc_id/chunk_text、title/url、title/score/snippet、skill/score、\n    id+similarity+metadata、id+score、id+title），**非重复，无需消歧**。\n  - **RagEngine 同名 2 份已消歧**（2026-09-28 19:5x）：`l2/rag_pipeline/rag_engine.rs`\n    改名 `DocumentRagEngine`（文档级 RAG：切分/索引/过滤/落盘），`l1/bank/rag_engine.rs`\n    保留 `RagEngine`（记忆层级管理）。**两者非重复**：22 个公开符号仅 `RagEngine`/\n    `new`/`ingest` 三名相同，`find_duplicates`/`should_promote`/`tier_counts`/\n    `MemoryConsolidation` 仅 bank 侧有。两侧均为重负载活代码（A 35 处 / B 16 处调用）\n    ⇒ 不可合并，只能消歧。\n  - **`bank::RagEngine` 与 `nt_scoring.rs` 的打分不可互换**（2026-09-28 19:5x 评估两次）：\n    前者对象是 `ReasoningMemory`，3 信号线性加权（bm25+embedding+关键词重叠），\n    **无 temporal/confidence/relational 数据源**；后者面向 KB 节点，4 维可调融合，\n    依赖 `updated_at`/`node_confidence`/图边。硬接只能传 0 或造假值 ⇒ 退化。\n    两侧文件顶部均已立「能力边界」文档（含正确升级顺序：先补数据源，再换算法）。\n  - VersionManager **1 处**（l2_perception/nt_core_knowledge/versioning.rs:141；\n    l6_meta/nt_core_capability/versioning.rs 随 14 死引擎删除）。\n  - 决策引擎 **1 活 2 死**（crates/neotrix-decision-engine 已归档）。\n  - ⚠️ **本条自身在两小时内过期两次**（102→101、CapabilityRegistry 4→3→1）。\n    任何治理记录在**改完同名类型后必须同步重写**，否则即制造下一个 R-SCAN-3 陷阱。\n  - **层归属裁决的证据门槛**（2026-09-28 定）：`role`/`subroles` 必须有\n    ① 构造点或消费点证据（不是 mod 声明位置）；② 物理位置与逻辑职责一致性的\n    独立判断；③ 零消费模块单列 `dead_modules` 不混入裁决。裁决只改数字/role，\n    搬动文件属独立任务，需另行验证序列化与路径兼容。\n",
  "trees": {
-  "neotrix/nt_crystal_core": {
-   "layer": "l5_cognition",
-   "role": "primary",
-   "lines": 21247,
-   "files": 52,
-   "live_consumers": [
-    "neotrix-core/src/l1_action/nt_dialogue_tui.rs",
-    "neotrix-core/src/l1_action/nt_tui_app.rs",
-    "neotrix-core/src/l1_action/nt_stdin_human.rs",
-    "neotrix-core/src/l1_action/nt_crystal_llm_bridge.rs",
-    "neotrix-core/src/l1_action/nt_free_pool.rs",
-    "neotrix-core/src/l1_action/nt_core_task_dispatcher/nt_dispatcher_core.rs"
-   ],
-   "note": "全系统决策/意识主干。CrystalConsciousness + JEV 决策。⛔ 禁止当死代码清理 —— DIR-AUDIT §6 曾把它归入「未接线」，实测是活路径。"
-  },
   "l5_cognition/nt_jev": {
    "layer": "l5_cognition",
    "role": "primary",
@@ -68,13 +53,6 @@
    ],
    "note": "2026-09-28 裁决。依据：① 4 个超越层组件自称 `nt_mind::transcendent::` 但物理在 L6 —— 其 doc 写明源自 nt_mind 的超越层，l5/nt_mind 下无同名文件（非重复），而 L5 意识循环（nt_transcendent.rs / nt_audit.rs）**主动消费**它们 12 处，依赖方向是 L6→L5，故层归属留在 L6 正确（meta 观察/共鸣/进化闭环本属元层职责）。② 另 3 个是**记忆存储**（Experience/Capsule/PipelineStage/KnowledgeLayer/Skill），不是元能力，层归属错位，且全部零外部引用 + 0 或 3 个测试 ⇒ 迁移或归档待定，**本轮不擅自搬动**（搬动涉及其 data 路径与序列化格式）。"
   },
-  "neotrix/nt_core_event_bus": {
-   "layer": "l0_substrate",
-   "role": "primary",
-   "files": 1,
-   "lines": 666,
-   "note": "⚠️ 实测引用了 l5_cognition（:6 use Dispatcher）与 l3_embodiment（:111 redact）⇒ 登记为 l0 后门**应当报违规**。这正是盲区的代价：此前门看不见。登记它是为了让违规显形，不是为了让它变绿。"
-  },
   "l1_action/nt_capability_bridge": {
    "layer": "l1_action",
    "role": "primary",
@@ -95,6 +73,28 @@
    "lines": 13993,
    "files": 44,
    "note": "文件能力。其 capability.rs:185 的 CapabilityRegistry 零消费者（真冗余，见 BATCH-FIX-CHECKLIST B-1），但本子树整体是活的（l2_perception/nt_world/ocr/mod.rs:283 消费 OcrEngine）。 [2026-09-30 B 方案回流：原路径 neotrix/nt_file_ability 已搬至 l1_action/nt_file_ability（门面 + 子树）]"
+  },
+  "l5_cognition/nt_crystal_core": {
+   "layer": "l5_cognition",
+   "role": "primary",
+   "lines": 21247,
+   "files": 52,
+   "live_consumers": [
+    "neotrix-core/src/l1_action/nt_dialogue_tui.rs",
+    "neotrix-core/src/l1_action/nt_tui_app.rs",
+    "neotrix-core/src/l1_action/nt_stdin_human.rs",
+    "neotrix-core/src/l1_action/nt_crystal_llm_bridge.rs",
+    "neotrix-core/src/l1_action/nt_free_pool.rs",
+    "neotrix-core/src/l1_action/nt_core_task_dispatcher/nt_dispatcher_core.rs"
+   ],
+   "note": "全系统决策/意识主干。CrystalConsciousness + JEV 决策。⛔ 禁止当死代码清理 —— DIR-AUDIT §6 曾把它归入「未接线」，实测是活路径。 [2026-09-30 B 方案回流：neotrix/nt_crystal_core → l5_cognition/nt_crystal_core。⚠️ 搬迁使 22 处 L1→L5 既存违规显形（此前引用写作 crate::neotrix::… 不含层名字面量，门的正则匹配不到）。已记账，性质= L1 调度器直接持有 L5 引擎 CrystalCore 作参数（nt_dispatcher_core.rs:173），非接口可反转。]"
+  },
+  "l0_substrate/nt_core_event_bus": {
+   "layer": "l0_substrate",
+   "role": "primary",
+   "files": 1,
+   "lines": 666,
+   "note": "⚠️ 实测引用了 l5_cognition（:6 use Dispatcher）与 l3_embodiment（:111 redact）⇒ 登记为 l0 后门**应当报违规**。这正是盲区的代价：此前门看不见。登记它是为了让违规显形，不是为了让它变绿。 [2026-09-30 B 方案回流：→ l0_substrate/nt_core_event_bus。4 处既存违规已记账。裁决=不修：:337/:407 读的 eventbus_critical 只是 _ConsciousnessThresholds 的一个字段（另两个 warn_quality/critical_quality 是意识层专用），为它把整个常量下沉 L0 会拖 2 个无关阈值进 L0 = 过度工程；:6 Dispatcher 与 :111 redact_json_line 是真实调用。]"
   }
  },
  "unresolved": {

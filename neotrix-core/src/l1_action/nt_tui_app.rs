@@ -32,7 +32,7 @@ use crate::l1_action::nt_dialogue_tui::{
 };
 use crate::l1_action::nt_free_pool::NtFreePoolAsk;
 use crate::l1_action::nt_stdin_human::NtStdinHuman;
-use crate::neotrix::nt_crystal_core::{
+use crate::l5_cognition::nt_crystal_core::{
     CrystalCore, NtDemand, NtHumanChannel, NtHumanReply, NtInnerLoop, NtInnerLoopOutcome,
     NtLlmAsk, NtProgressSink, NtTaskLoopConfig,
 };
@@ -884,7 +884,7 @@ mod tests {
                 "目标：G",
                 &[NtDemand {
                     id: "d1".to_string(),
-                    kind: crate::neotrix::nt_crystal_core::NtDemandKind::ReviewFusion,
+                    kind: crate::l5_cognition::nt_crystal_core::NtDemandKind::ReviewFusion,
                     text: "复核".to_string(),
                 }],
             )
@@ -956,18 +956,18 @@ mod tests {
         fail: bool,
     }
 
-    impl crate::neotrix::nt_crystal_core::NtLlmAsk for ScriptAsk {
+    impl crate::l5_cognition::nt_crystal_core::NtLlmAsk for ScriptAsk {
         fn ask(
             &self,
             _prompt: &str,
-        ) -> Result<crate::neotrix::nt_crystal_core::NtLlmReply, crate::neotrix::nt_crystal_core::NtTaskFusionError>
+        ) -> Result<crate::l5_cognition::nt_crystal_core::NtLlmReply, crate::l5_cognition::nt_crystal_core::NtTaskFusionError>
         {
             if self.fail {
-                return Err(crate::neotrix::nt_crystal_core::NtTaskFusionError::Llm(
+                return Err(crate::l5_cognition::nt_crystal_core::NtTaskFusionError::Llm(
                     "boom".to_string(),
                 ));
             }
-            Ok(crate::neotrix::nt_crystal_core::NtLlmReply {
+            Ok(crate::l5_cognition::nt_crystal_core::NtLlmReply {
                 text: self.chunks.concat(),
                 confidence: 0.8,
                 model: "script".to_string(),
@@ -978,10 +978,10 @@ mod tests {
             &self,
             prompt: &str,
             on_chunk: &dyn Fn(&str) -> bool,
-        ) -> Result<crate::neotrix::nt_crystal_core::NtLlmReply, crate::neotrix::nt_crystal_core::NtTaskFusionError>
+        ) -> Result<crate::l5_cognition::nt_crystal_core::NtLlmReply, crate::l5_cognition::nt_crystal_core::NtTaskFusionError>
         {
             if self.fail {
-                return Err(crate::neotrix::nt_crystal_core::NtTaskFusionError::Llm(
+                return Err(crate::l5_cognition::nt_crystal_core::NtTaskFusionError::Llm(
                     "boom".to_string(),
                 ));
             }
@@ -989,13 +989,13 @@ mod tests {
             for c in &self.chunks {
                 full.push_str(c);
                 if !on_chunk(c) {
-                    return Err(crate::neotrix::nt_crystal_core::NtTaskFusionError::Llm(
+                    return Err(crate::l5_cognition::nt_crystal_core::NtTaskFusionError::Llm(
                         "cancelled".to_string(),
                     ));
                 }
             }
             let _ = prompt;
-            Ok(crate::neotrix::nt_crystal_core::NtLlmReply {
+            Ok(crate::l5_cognition::nt_crystal_core::NtLlmReply {
                 text: full,
                 confidence: 0.8,
                 model: "script".to_string(),
@@ -1008,7 +1008,7 @@ mod tests {
         events: Mutex<Vec<String>>,
     }
 
-    impl crate::neotrix::nt_crystal_core::NtProgressSink for RecSink {
+    impl crate::l5_cognition::nt_crystal_core::NtProgressSink for RecSink {
         fn on_subtask_start(&self, id: &str, _title: &str) {
             self.events.lock().unwrap().push(format!("start:{id}"));
         }
@@ -1022,7 +1022,7 @@ mod tests {
 
     #[test]
     fn test_threaded_drive_streams_and_converges() {
-        use crate::neotrix::nt_crystal_core::{NtCrystalTaskLoop, NtTaskLoopConfig};
+        use crate::l5_cognition::nt_crystal_core::{NtCrystalTaskLoop, NtTaskLoopConfig};
         // 成功路径：chunks 流式到达 sink，单答案共识收敛，无需人类介入
         let ask = ScriptAsk {
             chunks: vec!["甲乙丙丁戊己庚辛".to_string(), "壬癸子丑".to_string()],
@@ -1044,7 +1044,7 @@ mod tests {
 
     #[test]
     fn test_threaded_channel_human_full_loop() {
-        use crate::neotrix::nt_crystal_core::{
+        use crate::l5_cognition::nt_crystal_core::{
             NtDemandKind, NtInnerLoop, NtLoopStatus, NtTaskLoopConfig,
         };
         // 失败路径：retry 需求单经通道发给"UI"，人带 id 批准后关闭需求单，

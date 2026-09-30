@@ -25,7 +25,7 @@
 //! - 生产代码无 `unwrap/expect/panic`。
 
 use crate::l1_action::nt_stdin_human::NtStdinHuman;
-use crate::neotrix::nt_crystal_core::{NtDemand, NtDemandKind, NtHumanChannel, NtHumanReply};
+use crate::l5_cognition::nt_crystal_core::{NtDemand, NtDemandKind, NtHumanChannel, NtHumanReply};
 use std::sync::Mutex;
 
 use crossterm::{
@@ -812,7 +812,7 @@ fn render_help(f: &mut ratatui::Frame, area: ratatui::layout::Rect) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_crystal_core::NtDemandKind;
+    use crate::l5_cognition::nt_crystal_core::NtDemandKind;
 
     fn demand(id: &str) -> NtDemand {
         NtDemand {

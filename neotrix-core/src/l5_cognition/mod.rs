@@ -160,3 +160,4 @@ pub use neotrix_multi_agent::god_agent;
 /// 不含任何游戏类型；`fail-open` 语义同 nt_route_features.rs（失败落到
 /// 调用方给定的 fallback，而非放行请求）。
 pub mod nt_utility;
+pub mod nt_crystal_core;

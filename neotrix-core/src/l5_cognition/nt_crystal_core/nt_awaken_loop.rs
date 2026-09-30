@@ -793,7 +793,7 @@ mod tests {
 #[cfg(test)]
 mod verify_incentive_tests {
     use super::*;
-    use crate::neotrix::nt_crystal_core::consciousness::{Memory, MemoryType};
+    use crate::l5_cognition::nt_crystal_core::consciousness::{Memory, MemoryType};
 
     fn mem(id: &str, domain: &str, content: &str, conns: &[&str]) -> Memory {
         Memory {

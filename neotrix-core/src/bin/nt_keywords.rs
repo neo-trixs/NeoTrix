@@ -31,7 +31,7 @@
 
 use std::io::{self, BufRead, Write};
 
-use neotrix::neotrix::nt_crystal_core::consciousness::CrystalConsciousness;
+use neotrix::l5_cognition::nt_crystal_core::consciousness::CrystalConsciousness;
 
 fn main() {
     let stdin = io::stdin();

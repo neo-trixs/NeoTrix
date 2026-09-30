@@ -87,7 +87,7 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
                 .map(|d| d.as_millis() as u64)
                 .unwrap_or(e2_start_ms);
             let mut e2_crystal =
-                neotrix::neotrix::nt_crystal_core::crystal_state::CrystalState::new("entry");
+                neotrix::l5_cognition::nt_crystal_core::crystal_state::CrystalState::new("entry");
             e2_crystal.record_execution(
                 "skills_engine.init".to_string(),
                 "entry".to_string(),
@@ -326,7 +326,7 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
                 .map(|d| d.as_millis() as u64)
                 .unwrap_or(e2_start_ms);
             let mut e2_crystal =
-                neotrix::neotrix::nt_crystal_core::crystal_state::CrystalState::new("entry");
+                neotrix::l5_cognition::nt_crystal_core::crystal_state::CrystalState::new("entry");
             e2_crystal.record_execution(
                 "skills_engine.init".to_string(),
                 "entry".to_string(),

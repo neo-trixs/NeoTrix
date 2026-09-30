@@ -266,7 +266,7 @@ impl Adjacency {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_crystal_core::consciousness::MemoryType;
+    use crate::l5_cognition::nt_crystal_core::consciousness::MemoryType;
 
     fn mem(id: &str, domain: &str, content: &str, conns: &[&str]) -> Memory {
         Memory {
@@ -452,7 +452,7 @@ mod tests {
 #[cfg(test)]
 mod live {
     use super::*;
-    use crate::neotrix::nt_crystal_core::cocoons::CocoonStore;
+    use crate::l5_cognition::nt_crystal_core::cocoons::CocoonStore;
 
     #[test]
     #[ignore = "reads real 52MB cocoons.json, seconds"]

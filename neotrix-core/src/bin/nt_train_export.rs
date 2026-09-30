@@ -17,9 +17,9 @@
 //! - think.jsonl（推理链 → <think> 痕迹，需 archive_train 后才有内容）
 //! - dpo.jsonl（成功 vs 失败配对，需 experience 数据）
 
-use neotrix::neotrix::nt_crystal_core::cocoons::CocoonStore;
-use neotrix::neotrix::nt_crystal_core::consciousness::CrystalConsciousness;
-use neotrix::neotrix::nt_crystal_core::{AwakenBudget, CrystalCore, CrystalEngine, NtTrainExport};
+use neotrix::l5_cognition::nt_crystal_core::cocoons::CocoonStore;
+use neotrix::l5_cognition::nt_crystal_core::consciousness::CrystalConsciousness;
+use neotrix::l5_cognition::nt_crystal_core::{AwakenBudget, CrystalCore, CrystalEngine, NtTrainExport};
 use std::path::PathBuf;
 
 /// 缺陷 #8 修复：增量水位文件（上次导出的最大 created_at）
@@ -40,7 +40,7 @@ fn write_state(dir: &std::path::Path, ts: u64) {
 /// 每行 {url, title, content, domain}；content 为空则用 title 兜底；
 /// 去重靠 sync（同 id 跳过）+ 内容哈希（同 content 不同源跳过）。
 fn ingest_file(path: &std::path::Path) {
-    use neotrix::neotrix::nt_crystal_core::consciousness::MemoryType;
+    use neotrix::l5_cognition::nt_crystal_core::consciousness::MemoryType;
     use std::collections::HashSet;
 
     let data = std::fs::read_to_string(path).expect("read ingest jsonl");
@@ -109,7 +109,7 @@ fn content_hash(s: &str) -> String {
 /// 经验预算提到 20000，确保蒸馏新行（rowid 尾部）能被 mirror 到；
 /// mirror 按 (title, action) 去重，可重复跑。
 fn refine_crystal() {
-    use neotrix::neotrix::nt_crystal_core::consciousness::CrystalConsciousness;
+    use neotrix::l5_cognition::nt_crystal_core::consciousness::CrystalConsciousness;
     let db_path = dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join(".neotrix")

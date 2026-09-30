@@ -24,7 +24,7 @@ impl NeoCodexAgent {
         self.consciousness = Some(tree);
     }
 
-    pub(crate) fn _set_event_bus(&mut self, bus: crate::neotrix::nt_core_event_bus::EventBus) {
+    pub(crate) fn _set_event_bus(&mut self, bus: crate::l0_substrate::nt_core_event_bus::EventBus) {
         self.event_bus = Some(bus);
     }
 

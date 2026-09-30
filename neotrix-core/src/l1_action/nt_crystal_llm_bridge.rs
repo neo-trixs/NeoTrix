@@ -29,7 +29,7 @@
 //! - 无 unsafe (R-P1)；生产代码无 `unwrap/expect/panic`。
 
 use crate::l1_action::nt_core_llm::{LlmProvider, LlmRequest};
-use crate::neotrix::nt_crystal_core::{NtLlmAsk, NtLlmReply, NtTaskFusionError};
+use crate::l5_cognition::nt_crystal_core::{NtLlmAsk, NtLlmReply, NtTaskFusionError};
 use std::sync::Arc;
 
 /// L1 Provider → 晶体问答桥。

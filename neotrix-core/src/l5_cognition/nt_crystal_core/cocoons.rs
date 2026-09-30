@@ -522,7 +522,7 @@ impl std::fmt::Display for CocoonStore {
 #[cfg(test)]
 mod sync_dedup_tests {
     use super::*;
-    use crate::neotrix::nt_crystal_core::consciousness::MemoryType;
+    use crate::l5_cognition::nt_crystal_core::consciousness::MemoryType;
 
     fn mem(id: &str, domain: &str, content: &str) -> Memory {
         Memory {
@@ -617,7 +617,7 @@ mod sync_dedup_tests {
 #[cfg(test)]
 mod chain_persist_tests {
     use super::*;
-    use crate::neotrix::nt_crystal_core::consciousness::{MemoryType, ReasoningType};
+    use crate::l5_cognition::nt_crystal_core::consciousness::{MemoryType, ReasoningType};
 
     fn chain(id: &str, concl: &str) -> ReasoningChain {
         ReasoningChain {

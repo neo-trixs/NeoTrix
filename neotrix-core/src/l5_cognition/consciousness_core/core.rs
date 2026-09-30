@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::l5_cognition::nt_core_consciousness_tree::{BranchKind, ConsciousnessTree};
 use crate::l0_substrate::nt_core_self_test::{SelfTest, SelfTestRegistry};
-use crate::neotrix::nt_crystal_core::crystal_state::CrystalState;
+use crate::l5_cognition::nt_crystal_core::crystal_state::CrystalState;
 
 
 /// KB 最短路径管道 — 意识体读写端直达 (R-P42: 强化现有节点, 禁止平行适配器)
@@ -125,7 +125,7 @@ pub struct FruitRecord {
 /// 工作区上下文（蓝图 V3 §4 E2 / FIVE-ENTITY-FUSION §2.1）。
 ///
 /// E2 注记：`projections`（旧，CrystalState 临时投影）与 `agents`（新，常驻目录）
-/// 并存于 `crate::neotrix::nt_crystal_core::crystal_state::CrystalState`；
+/// 并存于 `crate::l5_cognition::nt_crystal_core::crystal_state::CrystalState`；
 /// E2 以 `agents` 为准，`projections` 冻结只读、待后续标记 deprecated。
 /// 本文件不动其读写逻辑。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

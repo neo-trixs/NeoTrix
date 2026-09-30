@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use crate::neotrix::nt_crystal_core::*;
-    use crate::neotrix::nt_crystal_core::cross_source::CrossSourceFusionEngine;
+    use crate::l5_cognition::nt_crystal_core::*;
+    use crate::l5_cognition::nt_crystal_core::cross_source::CrossSourceFusionEngine;
     use std::collections::HashMap;
 
     #[test]

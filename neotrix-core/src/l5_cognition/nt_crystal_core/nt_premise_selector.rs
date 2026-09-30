@@ -473,7 +473,7 @@ impl<'m, 'a> PremiseSelector<'m, 'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_crystal_core::consciousness::MemoryType;
+    use crate::l5_cognition::nt_crystal_core::consciousness::MemoryType;
 
     fn mem(id: &str, domain: &str, content: &str, conns: &[&str]) -> Memory {
         Memory {

@@ -1,8 +1,7 @@
 //! # NeoTrix 核心模块
 //!
-//! 本地模块：nt_crystal_core,
-//! nt_core_event_bus
-//!
+//! 本地模块：
+//! //!
 //! 2026-09-30 第二棵树 B 方案回流：`nt_jev` 已迁至 `crate::l5_cognition::nt_jev`
 //! 2026-09-30 第二棵树 B 方案回流：`nt_file_ability` 已迁至
 //! `crate::l1_action::nt_file_ability`（门面 + 子树），本模块保留其 re-export 面
@@ -12,18 +11,6 @@
 // ─── Minimal re-exports for binary/entry crates ──────────────────────────
 pub use crate::l2_perception::nt_world::nt_world_model;
 pub use crate::l1_action::nt_io::nt_io_hotreload;
-
-// ─── Local modules ────────────────────────────────────────────────────────
-pub mod nt_core_event_bus;
-pub mod nt_crystal_core;
-/// neotrix → L0 error conversions (moved from l0_substrate to respect L0 ← neotrix direction)
-pub mod error_conversions;
-
-// ─── Standalone crate re-export ──────────────────────────────────────────
-pub use nt_core_capability_tree::{
-    CapabilityNode, CapabilityTreeRegistry, ConstellationLevel, Domain as CapabilityDomain,
-    EvolutionAction, EvolutionEngine, EvolutionOp, EvolutionPlan, NodeLayer, RuneSocket,
-};
 
 // ─── Unified File Ability re-export ──────────────────────────────────────
 pub use crate::l1_action::nt_file_ability::{

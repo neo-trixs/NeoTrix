@@ -1,5 +1,5 @@
 use super::*;
-use crate::neotrix::nt_crystal_core::{
+use crate::l5_cognition::nt_crystal_core::{
     CalibRow, CocoonStore, CrystalConsciousness, CrystalCore, NtJevCalibration, NtOrchestrator,
     PlattBucketTable, GOLD_FLOOR,
 };
@@ -85,7 +85,7 @@ fn calib_pairs(
 impl BackgroundLoopHandle {
     /// 晶体自我迭代 — 每 tick 最多 2 轮（控占锁时长），状态跨 tick 累积。
     pub(crate) async fn handle_crystal_self_iterate(&mut self) {
-        use crate::neotrix::nt_crystal_core::{NtSelfIterate, NtSelfIterateConfig};
+        use crate::l5_cognition::nt_crystal_core::{NtSelfIterate, NtSelfIterateConfig};
 
         if self.crystal_iter.is_none() {
             self.crystal_iter = Some(CrystalIterState::load());

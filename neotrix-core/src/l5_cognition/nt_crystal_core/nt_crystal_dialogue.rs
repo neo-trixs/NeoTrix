@@ -36,7 +36,7 @@ use super::nt_crystal_task_fusion::{
     NtCrystalTaskLoop, NtProgressSink, NtScoredAnswer, NtTaskLoopConfig, NtTaskLoopReport,
 };
 use super::CrystalCore;
-use crate::neotrix::nt_crystal_core::NtLlmAsk;
+use crate::l5_cognition::nt_crystal_core::NtLlmAsk;
 use crate::l5_cognition::nt_jev::NoulAnswer;
 use std::collections::HashSet;
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -482,7 +482,7 @@ fn trunc(s: &str, n: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_crystal_core::NtTaskFusionError;
+    use crate::l5_cognition::nt_crystal_core::NtTaskFusionError;
     use std::sync::Mutex;
 
     struct StubLlm {

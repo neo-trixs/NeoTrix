@@ -99,7 +99,7 @@ pub struct NeoCodexAgent {
     pub wire: WireSession,
     pub markdown: StreamingMarkdown,
     pub consciousness: Option<crate::l1_action::nt_action_facade::ConsciousnessTree>,
-    pub event_bus: Option<crate::neotrix::nt_core_event_bus::EventBus>,
+    pub event_bus: Option<crate::l0_substrate::nt_core_event_bus::EventBus>,
     pub brain: Option<
         Arc<tokio::sync::RwLock<dyn crate::l0_substrate::nt_core_traits::BrainHandle>>,
     >,

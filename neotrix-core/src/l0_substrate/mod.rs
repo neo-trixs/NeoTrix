@@ -103,3 +103,4 @@ pub mod proxy_daemon_wrapper;
 /// 保留原 `ios-bridge` 门控：默认 feature 集不编译该目录。
 #[cfg(feature = "ios-bridge")]
 pub mod ffi;
+pub mod nt_core_event_bus;

@@ -205,7 +205,7 @@ impl NtSelfIterate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_crystal_core::NtOrchestratorConfig;
+    use crate::l5_cognition::nt_crystal_core::NtOrchestratorConfig;
     use crate::l5_cognition::nt_jev::eval::GoldAnswer;
     use crate::l5_cognition::nt_jev::primitives::{DecisionStatus, JevDecision, NoulAnswer};
 

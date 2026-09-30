@@ -240,7 +240,7 @@ use crate::l5_cognition::nt_mind::nt_mind_skill_engine::SkillEngine;
 use crate::l5_cognition::nt_mind::nt_mind_hook::{HookEvent, MindHookRegistry, LogHook};
 use crate::l5_cognition::nt_mind::nt_mind_background_loop::knowledge_pipeline::KnowledgeAbsorptionPipeline;
 use crate::l5_cognition::nt_mind::foundation::l1_wrappers::SessionRecoveryWrapper;
-use crate::neotrix::nt_core_event_bus::{EventBus, flood_guard, subscribe_all_layers_sync};
+use crate::l0_substrate::nt_core_event_bus::{EventBus, flood_guard, subscribe_all_layers_sync};
 use crate::l5_cognition::nt_mind::nt_mind::distillation::MetaCognitionBridge;
 use crate::l0_substrate::nt_core_event::CoreEvent;
 use crate::l5_cognition::nt_core::nt_state_substrate::StateSubstrate;

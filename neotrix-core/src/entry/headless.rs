@@ -289,7 +289,7 @@ async fn handle_command_headless(
                                 .map(|d| d.as_millis() as u64)
                                 .unwrap_or(e2_start_ms);
                             let mut e2_crystal =
-                                neotrix::neotrix::nt_crystal_core::crystal_state::CrystalState::new(
+                                neotrix::l5_cognition::nt_crystal_core::crystal_state::CrystalState::new(
                                     "entry",
                                 );
                             e2_crystal.record_execution(
