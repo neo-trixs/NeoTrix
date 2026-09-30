@@ -318,9 +318,20 @@ pub fn import_reasoning_memories(kb: &KnowledgeBase, path: &Path) -> Result<Impo
             "_reasoning_id": tid,
             "source": "reasoning_bank.json",
         });
-        let _ = kb.update_node_metadata(&node_id, &meta);
+          // 2026-09-30: 原为 `let _ = kb.update_node_metadata(&node_id, &meta);`
+          // 紧接无条件 `report.imported += 1;`。
+          // 后果：节点建成但**永久缺元数据**（success/reward/lifecycle/task_type 全无），
+          // 而这些字段正是「按结果/奖励检索思维轨迹」的依据
+          // ⇒ 轨迹存在却查不出来；同时 report.imported 照常 +1、errors 无条目
+          // ⇒ **导入报告显示全部成功**。
+          // 本函数 7 行之上已有正确范式（`report.errors.push` + `continue`），
+          // 此处是漏网。照它改：元数据写失败即不计入 imported。
+          if let Err(e) = kb.update_node_metadata(&node_id, &meta) {
+              report.errors.push(format!("metadata {node_id}: {e}"));
+              continue;
+          }
 
-        report.imported += 1;
+          report.imported += 1;
     }
 
     Ok(report)

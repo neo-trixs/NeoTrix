@@ -170,3 +170,37 @@ res: Def(
    抽 0 条 = 提取器坏；抽到 Call 数的高比例 = 可用。
 3. 若字段定位仍不成，转 `.rmeta`（二进制）或 rust-analyzer 索引，
    **不要**继续在 HIR 文本上投入。
+
+---
+
+## 附录 · `check-silent-failure` 的**实测盲区**（2026-09-30）
+
+量化（不是推测）：把 `GATED` 的 `fs::` / `kv_set` 形态换成**方法调用形态**
+（`self.x(...)`、`kb.y(...)`）后，新增候选 **304 处**。
+
+其中**命中全量审计已点名的 6 个高危点**：
+
+| 位置 | 丢弃的调用 | 审计结论 |
+|---|---|---|
+| `tiered_memory/tier_archival.rs:305` | `self.remove(id)` | `prune()` 返回候选数而非删除数 ⇒ 报告虚假删除量 |
+| `nt_memory_knowledge_assets.rs:321/398/473` | `kb.update_node_metadata(...)` | 丢弃后无条件 `report.imported += 1` ⇒ **导入报告显示全部成功** |
+| `nt_world_github_absorber.rs:730` | `self.kb.upsert_edge(...)` | GraphRAG 关系边丢失 ⇒ 多跳查询静默少召回 |
+| `nt_memory_pipeline.rs:687` | `kb.upsert_edge(...)` | 同上 |
+
+⇒ **审计发现真 bug 的那一类形态，恰好是本门覆盖不到的那一类。**
+这不是巧合：门按「看起来像落库/落盘」写，审计按「丢弃后调用方会误信什么」找。
+
+### 为什么不无脑扩到 304
+
+304 里含大量**非 `Result` 返回**的调用（`cache.get_semantic(&emb)`、
+`self.entries.pop_front()`、`server_handle.join()` 语义各异）。
+直接扩 ⇒ 噪声门 ⇒ 又是「亮而无效」。
+
+### 已做与建议
+
+- ✅ 已修 `knowledge_assets.rs:321`（同函数 7 行之上就有正确范式，
+  `report.errors.push` + `continue`，此处是漏网）
+- ⛔ 其余 298 处**不在本轮动** —— 逐条判「丢弃后调用方是否会误信」是语义判断，
+  不是模式匹配；与本轮否掉「死代码门」「doc 承诺门」同理。
+- 📌 若要做，判据必须是「**调用方是否据此改变行为**」，
+  而非「这是不是落库调用」。
