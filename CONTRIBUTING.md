@@ -23,10 +23,14 @@ cargo fmt --check                    # Format check
 
 ### Desktop App
 
-桌面端已于 2026-09-28 迁到**独立仓库** `~/Downloads/Neo/neobot`（提交 `d5413335`
-移除了本仓的 `apps/neobot-desktop` 与 `src-tauri`）。本仓只保留
-`crates/neotrix-neobot` 作为**库** —— 其 `nt_llama` 是 CLI 与桌面端共用的
-本地推理唯一实现。
+桌面端曾于 2026-09-28 迁到独立仓 `~/Downloads/Neo/neobot`（`d5413335`
+移除了本仓的 `apps/neobot-desktop` 与 `src-tauri`），**但该决策已于
+2026-09-30 推翻**：`apps/neobot-desktop` **回流本仓**，理由见
+`docs/architecture/APPS-DESKTOP-DECISION-2026-09-30.md`。
+
+现状：`src-tauri/` 仍在归档区未回流；`crates/neotrix-neobot` 继续作为
+**库**存在 —— 其 `nt_llama` 是 CLI 与桌面端共用的本地推理唯一实现。
+⚠️ `apps/` 目前 **tracked=0**（63 个文件未入库），干净检出会缺整个桌面 App。
 
 ```bash
 # 在独立仓里构建

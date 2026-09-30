@@ -90,6 +90,7 @@ ALLOW_DIRS="
 .neotrix-absorb|状态|吸收轮快照
 .worktrees|运行期|worktree 目录（已 gitignore，允许存在）
 config|构建|真配置：cliff.toml / .gitleaks.toml / .env.example（根配置已收敛到本目录）
+apps|源码|桌面 App（apps/neobot-desktop：tauri.conf.json + frontend/ + icons/）
 crates|源码|workspace 9 个 crate（neotrix-types / -sysctl / -consciousness / -reasoning / -gateway / -multi-agent / -neobot / -audit / nt-core-capability-tree）
 docs|文档|文档主目录（architecture/ 标准 / plans/ 方案 / adr/ 决策 / standards/ 规范 / api/）
 models|数据|模型权重 + 训练脚本（gitignored，删了只能重下）
@@ -110,6 +111,10 @@ evals|数据|gaia_mini 评测任务与基线（tracked=0）
 #   /Users/neo/Downloads/Neo/neotrix-archive/desktop-residual-20260929/
 # （mv 非 rm，58/58 SHA-256 校验一致；含 2,496 行 git 已删的冒烟测试，
 #   详见该目录 README.md 的恢复说明）⇒ 本表当前为空。
+  # ⚠️ 2026-09-30 决策反转：apps/ 已回到 ALLOW_DIRS（见上方），桌面 App 回流本仓。
+  #   `d5413335` 当初的「移出」裁决被推翻 —— 理由见
+  #   `docs/architecture/APPS-DESKTOP-DECISION-2026-09-30.md`。
+  #   src-tauri/ 仍在归档区未回流 ⇒ 本表对其保持空。
 RESIDUAL_KNOWN=""
 
 # ── 收集现状（只取 git 跟踪的 + 未跟踪但存在的一级项）──────────────

@@ -40,6 +40,9 @@ PROTECTED=(
   sessions
   evals
   config
+  # 2026-09-30: apps/ 回流本仓（APPS-DESKTOP-DECISION-2026-09-30.md）。
+  # 桌面 App 63 个文件当时 tracked=0 ⇒ 干净检出会缺整个 App。
+  apps
   neotrix-core/src
   neotrix-core/tests
   neotrix-core/examples
