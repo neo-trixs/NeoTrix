@@ -52,6 +52,59 @@ pub async fn neobot_agent_run(goal: String, context: Option<String>) -> Result<A
         .map_err(|e| format!("跑轮任务异常：{e}"))?
 }
 
+/// `neobot_panel_demo_publish()` —— 演示骨架：登记一块面板并推给界面。
+///
+/// # 定位要说清楚，否则会被当成「已经有骨架了」
+///
+/// 这是**接口连通性证明**，不是产品功能。真实下发器在骨架侧
+/// （`neotrix-neobot` 的运行进程），本仓 app 只是终端。
+/// 它存在的唯一价值：让「publish → 事件 → 界面 → answer → 注册表校验」
+/// 这条链在**没有骨架进程**时也能被人点一次。
+///
+/// ⛔ 它**不**绕过校验：面板照样走 `Registry::publish`，作答照样按 id 查。
+///    若有人把它当成「界面可以自己造面板」的后门，那就白做了 ——
+///    它在 Rust 侧，走的是和真实骨架完全相同的那条路。
+#[tauri::command]
+pub async fn neobot_panel_demo_publish(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<u64, String> {
+    neobot_panel_publish(app, state, demo_panel()).await
+}
+
+/// 演示面板的内容。
+///
+/// `Mode::Sample` 而非 `Live` —— 它是合成的，标 Live 就是谎报（§2 决定 2）。
+fn demo_panel() -> Panel {
+    let src = |t: &str| neotrix_neobot::nt_panel::Source {
+        title: t.to_owned(),
+        url: format!("https://example.com/{t}"),
+    };
+    Panel {
+        id: "p-demo".into(),
+        thread_id: "demo".into(),
+        turn_id: "demo-1".into(),
+        candidate_set_version: 1,
+        kind: neotrix_neobot::nt_panel::PanelKind::Comparison,
+        title: "接口迁移方案定哪个".into(),
+        mode: neotrix_neobot::nt_panel::Mode::Sample,
+        options: vec![
+            neotrix_neobot::nt_panel::PanelOption {
+                id: "inplace".into(),
+                label: "原地迁移".into(),
+                details: vec!["改动集中，但回滚困难".into()],
+                sources: vec![src("inplace")],
+            },
+            neotrix_neobot::nt_panel::PanelOption {
+                id: "strangle".into(),
+                label: "绞杀者模式".into(),
+                details: vec!["可灰度，回滚容易".into()],
+                sources: vec![src("strangle")],
+            },
+        ],
+    }
+}
+
 /// `neobot_convo_group(title, members) -> convo_id`
 #[tauri::command]
 pub fn neobot_convo_group(title: String, members: Vec<String>) -> Result<String, String> {
@@ -109,7 +162,52 @@ pub struct AppState {
     pub panels: std::sync::Mutex<Registry>,
 }
 
-/// `neobot_panel_publish(panel) -> ()`
+// ── AppState 的方法：真正的逻辑放这里 ──────────────────────────
+//
+// 为什么拆开：Tauri 的 `tauri::State<'_, AppState>` 在 Tauri 运行时之外
+// **构造不出来**，所以逻辑若写在 command 里就**无法单测** —— 而
+// 「作答是否真的查了注册表」正是最该被测的一件事。
+// command 退化成薄壳，方法可测。这与本仓既有的「可测命令层」约定一致。
+
+impl AppState {
+    /// 登记一块面板。返回候选集版本。
+    pub fn publish(&self, panel: &Panel) -> Result<u64, String> {
+        let version = panel.candidate_set_version;
+        let mut reg = self
+            .panels
+            .lock()
+            .map_err(|_| "面板注册表锁中毒（此前有命令 panic）".to_owned())?;
+        reg.publish(panel.clone()).map_err(|e| match e {
+            PublishError::Invalid(why) => format!("面板非法：{why}"),
+            PublishError::VersionWentBack { current, incoming } => {
+                format!("候选集版本倒退（{incoming} < {current}）")
+            }
+        })?;
+        Ok(version)
+    }
+
+    /// ⛔ 按 id 校验作答。**只收 answer** —— 基准由注册表持有。
+    pub fn answer(&self, a: &Answer) -> Result<AnswerOutcome, String> {
+        let reg = self
+            .panels
+            .lock()
+            .map_err(|_| "面板注册表锁中毒（此前有命令 panic）".to_owned())?;
+        Ok(reg.answer(a))
+    }
+
+    /// 清空。返回清掉了几块。
+    pub fn clear(&self) -> Result<usize, String> {
+        let mut reg = self
+            .panels
+            .lock()
+            .map_err(|_| "面板注册表锁中毒（此前有命令 panic）".to_owned())?;
+        let n = reg.len();
+        *reg = Registry::new();
+        Ok(n)
+    }
+}
+
+/// `neobot_panel_publish(panel) -> u64`
 ///
 /// 骨架下发一个决策面板：校验 → 登记 → 推给界面。
 ///
@@ -122,19 +220,7 @@ pub async fn neobot_panel_publish(
     state: tauri::State<'_, AppState>,
     panel: Panel,
 ) -> Result<u64, String> {
-    let version = panel.candidate_set_version;
-    {
-        let mut reg = state
-            .panels
-            .lock()
-            .map_err(|_| "面板注册表锁中毒（此前有命令 panic）".to_owned())?;
-        reg.publish(panel.clone()).map_err(|e| match e {
-            PublishError::Invalid(why) => format!("面板非法：{why}"),
-            PublishError::VersionWentBack { current, incoming } => {
-                format!("候选集版本倒退（{incoming} < {current}）")
-            }
-        })?;
-    }
+    let version = state.publish(&panel)?;
     // 推给界面。发不出去就报 —— 界面收不到与「面板没发」同样表现为无响应。
     tauri::Emitter::emit(&app, PANEL_EVENT, &panel)
         .map_err(|e| format!("推送面板到界面失败：{e}"))?;
@@ -152,26 +238,16 @@ pub fn neobot_panel_answer(
     state: tauri::State<'_, AppState>,
     answer: Answer,
 ) -> Result<AnswerOutcome, String> {
-    let reg = state
-        .panels
-        .lock()
-        .map_err(|_| "面板注册表锁中毒（此前有命令 panic）".to_owned())?;
-    Ok(reg.answer(&answer))
+    state.answer(&answer)
 }
 
-/// `neobot_panel_clear()` —— 清空注册表。
+/// `neobot_panel_clear() -> usize` —— 清空注册表。
 ///
 /// 用途：切换会话。换会话不清的话，旧会话的面板仍可被作答 ——
 /// 而作答会被记到新会话的流里，属于串台。
 #[tauri::command]
 pub fn neobot_panel_clear(state: tauri::State<'_, AppState>) -> Result<usize, String> {
-    let mut reg = state
-        .panels
-        .lock()
-        .map_err(|_| "面板注册表锁中毒（此前有命令 panic）".to_owned())?;
-    let n = reg.len();
-    *reg = Registry::new();
-    Ok(n)
+    state.clear()
 }
 
 /// 能力快照 —— 前端能力矩阵的**真源**。
@@ -232,5 +308,132 @@ mod tests {
             store.create_conversation("party", "x", &[]).is_err(),
             "未知 kind 必须被拒"
         );
+    }
+}
+
+#[cfg(test)]
+mod panel_state_tests {
+    use super::*;
+    use neotrix_neobot::nt_panel::{
+        Answer, AnswerOutcome, Mode, Panel, PanelKind, PanelOption, PublishError, Reject, Source,
+    };
+
+    fn src(t: &str) -> Source {
+        Source { title: t.to_owned(), url: format!("https://example.com/{t}") }
+    }
+
+    fn panel(version: u64) -> Panel {
+        Panel {
+            id: "p1".into(),
+            thread_id: "t1".into(),
+            turn_id: "tu1".into(),
+            candidate_set_version: version,
+            kind: PanelKind::Comparison,
+            title: "选哪个".into(),
+            mode: Mode::Live,
+            options: vec![
+                PanelOption { id: "a".into(), label: "A".into(), details: vec![], sources: vec![src("a")] },
+                PanelOption { id: "b".into(), label: "B".into(), details: vec![], sources: vec![src("b")] },
+            ],
+        }
+    }
+
+    fn answer(v: u64) -> Answer {
+        Answer { panel_id: "p1".into(), option_id: "a".into(), candidate_set_version: v }
+    }
+
+    #[test]
+    fn 登记后作答走注册表() {
+        let st = AppState::default();
+        assert_eq!(st.publish(&panel(1)), Ok(1));
+        assert_eq!(st.answer(&answer(1)), Ok(AnswerOutcome::Accepted));
+    }
+
+    /// ⛔ 这条是「面板基准改由骨架持有」这个改动的**核心断言**。
+    ///    在 command 层（不是库层）再验一次：Tauri 薄壳**没有偷偷**加回
+    ///    「接受界面传来的 panel」这条路。
+    #[test]
+    fn command层也不能接受界面自带的面板() {
+        // 状态是空的 ⇒ 无论界面怎么说，都得拒
+        let st = AppState::default();
+        assert_eq!(
+            st.answer(&answer(1)),
+            Ok(AnswerOutcome::Rejected(Reject::NoSuchPanel)),
+            "注册表为空时必须拒 —— 界面无从提供基准"
+        );
+    }
+
+    #[test]
+    fn 换批后旧版本作答被拒() {
+        let st = AppState::default();
+        st.publish(&panel(1)).unwrap();
+        st.publish(&panel(2)).unwrap();
+        assert_eq!(
+            st.answer(&answer(1)),
+            Ok(AnswerOutcome::Rejected(Reject::Stale { current: 2, answered: 1 }))
+        );
+        assert_eq!(st.answer(&answer(2)), Ok(AnswerOutcome::Accepted));
+    }
+
+    #[test]
+    fn 版本倒退不污染注册表() {
+        let st = AppState::default();
+        st.publish(&panel(2)).unwrap();
+        assert!(matches!(
+            st.publish(&panel(1)),
+            Err(ref e) if e.contains("版本倒退")
+        ));
+        // 倒退被拒后，v2 仍在
+        assert_eq!(st.answer(&answer(2)), Ok(AnswerOutcome::Accepted));
+    }
+
+    #[test]
+    fn 非法面板不登记() {
+        let st = AppState::default();
+        let mut p = panel(1);
+        p.options[0].sources.clear();
+        assert!(st.publish(&p).is_err());
+        assert_eq!(
+            st.answer(&answer(1)),
+            Ok(AnswerOutcome::Rejected(Reject::NoSuchPanel)),
+            "被拒的面板不该留下任何可作答的基准"
+        );
+    }
+
+    #[test]
+    fn 换会话清空后旧面板不可答() {
+        // 不清的危害：作答会被记到**新**会话的流里（串台）。
+        let st = AppState::default();
+        st.publish(&panel(1)).unwrap();
+        assert_eq!(st.clear(), Ok(1));
+        assert_eq!(st.answer(&answer(1)), Ok(AnswerOutcome::Rejected(Reject::NoSuchPanel)));
+        assert_eq!(st.clear(), Ok(0), "再清应是 0，不该报错");
+    }
+
+    #[test]
+    fn 演示面板必须标Sample() {
+        // 合成的东西标 Live 就是谎报。
+        assert_eq!(demo_panel().mode, Mode::Sample);
+        assert!(matches!(demo_panel().mode, Mode::Sample));
+    }
+
+    #[test]
+    fn 演示面板能被注册表接受() {
+        let st = AppState::default();
+        // 走与真实骨架完全相同的那条路 —— 它不是后门。
+        assert!(st.publish(&demo_panel()).is_ok());
+    }
+
+    #[test]
+    fn PublishError两个变体都有文案() {
+        // 门只抓到「Invalid」；这条确保「版本倒退」也有可读文案，
+        // 否则界面上会显示一个裸的枚举名。
+        let st = AppState::default();
+        st.publish(&panel(2)).unwrap();
+        let e = st.publish(&panel(1)).unwrap_err();
+        assert!(e.contains("倒退"), "实际文案：{e}");
+        let mut bad = panel(1);
+        bad.options[0].sources.clear();
+        assert!(st.publish(&bad).unwrap_err().contains("非法"));
     }
 }

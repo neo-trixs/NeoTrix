@@ -332,7 +332,18 @@ function runOnce(): void {
 function evidence(): void {
   const text = thread.textContent ?? "";
   if (!text.trim()) { note("warn", "这一轮还没有内容可审"); return; }
-  void call("neobot_evidence_summary", { text }).then((r) => {
+  // 演示骨架下发一块面板，验证「publish → 事件 → 界面 → answer → 注册表校验」全链。
+// ⛔ 浏览器预览（HOST !== tauri）下无骨架 ⇒ 按钮不出现，避免让人以为它坏了。
+if (HOST === "tauri") {
+  $("#demo-panel")?.addEventListener("click", () => {
+    void call("neobot_panel_demo_publish", {}).then((r) => {
+      if (!r.ok) { note("error", `面板下发失败：${r.error}`, undefined, true); return; }
+      note("info", `骨架已登记候选集 v${r.value}，面板正从 neobot:panel 事件过来。`);
+    });
+  });
+}
+
+void call("neobot_evidence_summary", { text }).then((r) => {
     if (!r.ok) { note("error", r.error, undefined, true); return; }
     const rep = r.value;
     const steps: ToolStep[] = rep.findings.map((f) => ({

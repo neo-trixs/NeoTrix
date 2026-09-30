@@ -139,6 +139,12 @@ export interface Commands {
   neobot_panel_answer: { args: { answer: Answer }; ret: AnswerOutcomeWire };
   // @rust commands.rs::neobot_panel_clear —— 换会话时清，避免旧面板被答到新会话
   neobot_panel_clear: { args: Record<string, never>; ret: number };
+  // @rust commands.rs::neobot_panel_demo_publish
+  //
+  // 演示骨架的**唯一**作用是证明 publish→事件→answer 这条链通。
+  // 它在 Rust 侧走 Registry::publish，与真实下发器同一条路 ——
+  // 不是「界面自造面板」的后门（那是前一轮已删掉的漏洞）。
+  neobot_panel_demo_publish: { args: Record<string, never>; ret: number };
 };
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };

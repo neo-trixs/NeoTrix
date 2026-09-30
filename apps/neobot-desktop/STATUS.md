@@ -8,7 +8,7 @@
 
 ## §1 已建成（可点可验）
 
-### 1.1 前端 —— 4,428 行
+### 1.1 前端 —— 4,445 行
 
 | 文件 | 行 | 职责 |
 |---|---:|---|
@@ -38,13 +38,13 @@
 | `crates/neotrix-neobot/src/nt_evidence.rs` | 329 | 8 | 证据审计：断言有无出处 / 过度断言 / `sourced_ratio` 缺席≠0 |
 | `crates/neotrix-neobot/src/nt_panel.rs` | 440 | **18** | 决策面板契约 + **过期作答检测** + **面板注册表** |
 
-### 1.3 命令（9 个，前后端两侧一致）
+### 1.3 命令（10 个，前后端两侧一致）
 
 ```
 neobot_agent_run           neobot_convo_group        neobot_convo_dm
 neobot_send                neobot_evidence_summary   neobot_core_capabilities
 neobot_panel_answer
-neobot_panel_publish              neobot_panel_clear
+neobot_panel_publish              neobot_panel_clear              neobot_panel_demo_publish
 ```
 
 ### 1.4 资产
@@ -64,7 +64,7 @@ neobot_panel_publish              neobot_panel_clear
 | `nt_shot.mjs` | 界面截图（HTTP 服务方式） | — |
 | `nt_check_status.mjs` | **本文件与实测是否一致** | 见 §4 |
 
-**前端 7 组自测 + 库测试26 条 Rust 测试。**
+**前端 7 组自测 + 库测试38 条（库 26 + command 层 12）Rust 测试。**
 
 > 复现：`node scripts/ops/nt_check_{tokens,bytes,ipc,layout,status}.mjs` ·
 > `cd apps/neobot-desktop/frontend && node selftest.mjs` ·

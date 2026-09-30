@@ -19,7 +19,7 @@
  *   ① 前端代码总行数
  *   ② 图标 PNG 数
  *   ③ IPC 命令数（前后端两侧一致的那份）
- *   ④ 库测试条数（nt_evidence + nt_panel）
+ *   ④ Rust 测试条数（nt_evidence + nt_panel + command 层）
  *   ⑤ 门禁脚本数
  *   ⑥ 前端自测分组数
  *   ⑦ STATUS 里「缺口」小节列出的条目数与实际文件对得上
@@ -100,13 +100,25 @@ for (const line of cmdList.split("\n")) {
   if (m && !uniqCmds.has(m[1])) problems.push(`§1.3 列了后端不存在的命令：${m[1]}`);
 }
 
-// ④ 库测试条数
+// ④ Rust 测试条数（库 + app 两个 crate）
+//
+// ⚠️ **两个都要数。** 原来只数 `nt_evidence` + `nt_panel`，
+//    于是 app 层新加的 12 条测试（command 层的作答/登记/清理断言）
+//    完全在门的视野之外 —— 文档写 26，门也数 26，都对，但**加起来不是 38**。
+//    一个只覆盖一半的门比不覆盖更难发现，因为它报 PASS。
 const libTests = ["nt_evidence", "nt_panel"]
   .map((m) => {
     const p = join(CRATE, `${m}.rs`);
     return existsSync(p) ? (readFileSync(p, "utf8").match(/#\[test\]/g) ?? []).length : 0;
   })
   .reduce((a, b) => a + b, 0);
+const appTests = ["commands.rs", "nt_evidence_bridge.rs"]
+  .map((m) => {
+    const p = join(ROOT, "apps/neobot-desktop/src", m);
+    return existsSync(p) ? (readFileSync(p, "utf8").match(/#\[test\]/g) ?? []).length : 0;
+  })
+  .reduce((a, b) => a + b, 0);
+const rustTests = libTests + appTests;
 // ⚠️ 匹配不上时**必须 FAIL**，不能跳过。
 //    「找不到我要核对的那句话」说明文档结构变了，此时静默跳过等于
 //    这道检查已经不存在了 —— 而它看起来还在。仓里已有同款教训：
@@ -114,8 +126,8 @@ const libTests = ["nt_evidence", "nt_panel"]
 const claimedLib = doc.match(/库测试(\d+)\s*条/);
 if (!claimedLib) {
   problems.push("STATUS 里找不到「库测试N 条」这句，无法核对（结构变了？）");
-} else if (Number(claimedLib[1]) !== libTests) {
-  problems.push(`库测试数：文档 ${claimedLib[1]} vs 实测 ${libTests}`);
+} else if (Number(claimedLib[1]) !== rustTests) {
+  problems.push(`库测试数：文档 ${claimedLib[1]} vs 实测 ${rustTests}（库 ${libTests} + app ${appTests}）`);
 }
 
 // ⑤ 门禁脚本
@@ -151,5 +163,5 @@ if (problems.length) {
 }
 console.log(
   `STATUS 自校验 PASS（前端 ${feLines} 行 / PNG ${pngs.length} / 命令 ${uniqCmds.size} / ` +
-    `库测试 ${libTests} / 门禁 ${gates.length} / 自测分组 ${groups.length}）`,
+    `Rust 测试 ${rustTests}（库 ${libTests} + app ${appTests}） / 门禁 ${gates.length} / 自测分组 ${groups.length}）`,
 );
