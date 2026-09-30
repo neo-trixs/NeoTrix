@@ -154,7 +154,7 @@ impl BackgroundLoopHandle {
     /// 形成 意识树 ↔ 能力网 双向自动融合 (能力网健康度 → 意识核心果实质量)。
     /// 无能力网/节流跳过/无计划时返回 None (不回流, 保持土壤现状)。
     async fn handle_capability_auto_evolve(&mut self) -> Option<u64> {
-        use crate::neotrix::nt_capability_bridge::{
+        use crate::l1_action::nt_capability_bridge::{
             ExperienceEntry, ExperienceRouter, parse_domain,
         };
         use nt_core_capability_tree::evolution::EvolutionEngine;

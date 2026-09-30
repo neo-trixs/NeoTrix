@@ -240,7 +240,7 @@ pub(crate) fn cmd_distill(conn: &mut Connection, domain: Option<&str>, min_group
 
 
 pub(crate) fn immediate_promote_entries(entries: &[Value]) -> usize {
-    use neotrix::neotrix::nt_capability_bridge::{
+    use neotrix::l1_action::nt_capability_bridge::{
         ExperienceDimension, ExperienceEntry, ExperienceRouter, promote_to_file,
     };
     let mut dims: Vec<ExperienceDimension> = Vec::new();
@@ -309,7 +309,7 @@ pub(crate) fn immediate_promote_entries(entries: &[Value]) -> usize {
 
 
 pub(crate) fn distill_promote_to_capability(distilled: &[(String, String, Vec<String>)]) -> Vec<String> {
-    use neotrix::neotrix::nt_capability_bridge::{
+    use neotrix::l1_action::nt_capability_bridge::{
         ExperienceDimension, ExperienceEntry, ExperienceRouter, promote_to_file,
     };
     let mut promoted = Vec::new();

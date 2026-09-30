@@ -207,7 +207,7 @@ fn default_health_map() -> std::collections::HashMap<String, bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::ffi::types::*;
+    use crate::l0_substrate::ffi::types::*;
 
     fn test_config() -> NeoTrixConfig {
         NeoTrixConfig {

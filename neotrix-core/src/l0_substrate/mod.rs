@@ -99,3 +99,7 @@ pub mod nt_data_gateway;
 /// 实现」的空缺——此前 top_k/top_p/repetition_penalty 均为 config 透传。
 pub mod nt_sampler;
 pub mod proxy_daemon_wrapper;
+/// uniffi 绑定（GWT attention / types）—— 第二棵树回流，自 neotrix/ffi 迁入。
+/// 保留原 `ios-bridge` 门控：默认 feature 集不编译该目录。
+#[cfg(feature = "ios-bridge")]
+pub mod ffi;

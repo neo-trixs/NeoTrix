@@ -1,7 +1,7 @@
 //! # NeoTrix 核心模块
 //!
-//! 本地模块：nt_crystal_core, nt_file_ability, nt_capability_bridge,
-//! nt_core_error, nt_core_event_bus, ffi
+//! 本地模块：nt_crystal_core, nt_file_ability,
+//! nt_core_error, nt_core_event_bus
 
 #![forbid(unsafe_code)]
 
@@ -10,11 +10,6 @@ pub use crate::l2_perception::nt_world::nt_world_model;
 pub use crate::l1_action::nt_io::nt_io_hotreload;
 
 // ─── Local modules ────────────────────────────────────────────────────────
-pub mod nt_capability_bridge;
-
-#[cfg(feature = "ios-bridge")]
-pub mod ffi;
-
 pub mod nt_core_error;
 pub mod nt_core_event_bus;
 pub mod nt_file_ability;

@@ -23,6 +23,7 @@ pub mod nt_core_llm;
 pub mod nt_core_task_dispatcher;
 pub mod nt_task_decomposition; // L1 任务拆解 trait（孤儿接线 T45+2；L5 实现侧）
 pub mod nt_crystal_llm_bridge; // L1 Provider → 晶体 NtLlmAsk（dispatcher 直调晶体闭环）
+pub mod nt_capability_bridge; // 经验 → 能力节点迭代目标桥（第二棵树回流，自 neotrix/ 迁入）
 pub mod nt_model_cli; // 模型 CLI 问答桥 → 晶体 NtLlmAsk（外部命令仅为资源）
 pub mod nt_free_pool; // 池免费模型智能调用 → 晶体 NtLlmAsk（轮转+故障转移+冷却）
 pub mod nt_stdin_human; // 终端里的人 → 晶体 NtHumanChannel（窗口回话）
