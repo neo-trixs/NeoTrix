@@ -15,6 +15,9 @@ pub struct _LspSession {
     seq_id: u64,
 }
 
+/// 等待 id 匹配时最多跳过多少条非本请求的响应（通知 / 乱序回包）。
+const MAX_LSP_SKIPS: usize = 32;
+
 impl Default for LspManager {
     fn default() -> Self {
         Self::new()
@@ -114,29 +117,49 @@ impl LspManager {
         if let Some(ref mut process) = session.process {
             if let Some(ref mut stdin) = process.stdin {
                 let msg = format!("Content-Length: {}\r\n\r\n{}", request.to_string().len(), request);
-                let _ = writeln!(stdin, "{}", msg);
+                // 2026-09-30: 原为 `let _ = writeln!(stdin, "{}", msg);`。
+                // 请求写失败（server 已死 / 管道关闭）后代码**仍继续去读 stdout**，
+                // 若缓冲区里还躺着上一次请求的响应，会把它当作本次的返回值交给
+                // 调用方 ⇒ 静默返回一个错误但貌似合理的结果。
+                // 写失败时本次请求根本没发出，读到的任何东西都不是它的回应
+                // ⇒ 立即返回 None，不给陈旧响应冒充的机会。
+                if let Err(e) = writeln!(stdin, "{}", msg) {
+                    log::error!("[lsp] 请求写入失败 server={server} id={id}: {e}");
+                    return None;
+                }
             }
             if let Some(ref mut stdout) = process.stdout {
                 let mut reader = BufReader::new(stdout);
-                let mut header = String::new();
-                let mut content_length = 0;
-                loop {
-                    header.clear();
-                    if reader.read_line(&mut header).ok()? == 0 {
-                        return None;
+                // 2026-09-30: 原为读一条就 `return Some(resp)`，**从不校验 resp["id"]**。
+                // JSON-RPC 允许服务端乱序/带通知地回包，不匹配就返回 = 串台。
+                // 改为循环直到 id 对上，带上限防死循环。
+                for _ in 0..MAX_LSP_SKIPS {
+                    let mut header = String::new();
+                    let mut content_length = 0;
+                    loop {
+                        header.clear();
+                        if reader.read_line(&mut header).ok()? == 0 {
+                            return None;
+                        }
+                        let h = header.trim();
+                        if h.is_empty() {
+                            break;
+                        }
+                        if let Some(len) = h.strip_prefix("Content-Length: ") {
+                            content_length = len.trim().parse().ok()?;
+                        }
                     }
-                    let h = header.trim();
-                    if h.is_empty() {
-                        break;
-                    }
-                    if let Some(len) = h.strip_prefix("Content-Length: ") {
-                        content_length = len.trim().parse().ok()?;
+                    let mut buf = vec![0u8; content_length];
+                    reader.read_exact(&mut buf).ok()?;
+                    let resp: Value = serde_json::from_slice(&buf).ok()?;
+                    // 通知（无 id）不是对本请求的回应，跳过继续读。
+                    match resp.get("id").and_then(Value::as_u64) {
+                        Some(got) if got == id => return Some(resp),
+                        Some(_) => continue,
+                        None => continue,
                     }
                 }
-                let mut buf = vec![0u8; content_length];
-                reader.read_exact(&mut buf).ok()?;
-                let resp: Value = serde_json::from_slice(&buf).ok()?;
-                return Some(resp);
+                log::error!("[lsp] 连续 {MAX_LSP_SKIPS} 条未等到 id={id} 的回应 server={server}");
             }
         }
         None

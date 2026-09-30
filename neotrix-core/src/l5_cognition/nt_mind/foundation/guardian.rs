@@ -366,12 +366,29 @@ impl MapeGate {
             log::warn!("[mape-gate] mkdir {}: {e}", dir.display());
             return;
         }
-        if let Ok(json) = serde_json::to_string(state) {
-            let tmp = self.state_path(candidate).with_extension("tmp");
-            if std::fs::write(&tmp, json).is_ok() {
-                let _ = std::fs::rename(tmp, self.state_path(candidate));
-            }
-        }
+          if let Ok(json) = serde_json::to_string(state) {
+              let tmp = self.state_path(candidate).with_extension("tmp");
+              // 2026-09-30: 作者刻意用 tmp+rename 做原子落盘（正确设计），
+              // 却在 `.is_ok()` 与 `let _ = rename` 两处把结果静音 ——
+              // **交付原子性的那一步不留痕**。失败时状态未安装、无日志，
+              // 而调用方照发 `promoted: true`；下一轮 evaluate 读到默认值
+              // ⇒ 已晋升的 candidate 静默跌回 burn-in 零点（反方向：删不掉
+              // 则已回滚的 candidate 静默复活）。mkdir 失败有 log::warn!，
+              // 说明作者知道怎么报，只是没报在这两处。
+              if let Err(e) = std::fs::write(&tmp, json) {
+                  log::error!(
+                      "[mape-gate] 状态暂存写入失败 {}: {e} —— 晋升/回滚判定将丢失",
+                      tmp.display()
+                  );
+                  return;
+              }
+              if let Err(e) = std::fs::rename(&tmp, self.state_path(candidate)) {
+                  log::error!(
+                      "[mape-gate] 状态落盘失败 {}: {e} —— 晋升/回滚判定将丢失",
+                      candidate
+                  );
+              }
+          }
     }
 
     /// 记录一次评估, 累计 burn-in; 达到阈值晋升, 未达回滚。幂等: 同一 candidate

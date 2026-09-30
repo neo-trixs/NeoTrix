@@ -1450,11 +1450,23 @@ keywords("支付网关")                     -> ['支付网关']                
 
 </details>
 
-### P1 · 9 条（按危害排序）—— ⏳ 待办，优先级低于已修的 4 条 P0
+### P1 · 9 条 —— 🚧 **2026-09-30 已修 4 条**（基线 44→38）
+
+> 已修：`dispatch_loop.rs` 治理计数 ×3（`:517` 阶梯永不推进 / `:918` 探测计数不增 /
+> `:247` 反思记录静默丢失）、`guardian.rs` MAPE 原子落盘两处、
+> `cleanup_engine/nt_types.rs` 删除审计轨迹两处、`lsp_client/client.rs` 无 `id` 匹配。
+> 剩余：`kb_write.rs` 丢 GraphRAG 边、`nt_event_bus.rs` GlobalHalt 恢复目标被丢、
+> `nt_permission_profiles.rs` 权限配置读侧三段折叠、`knowledge_assets.rs` 导入报告虚报、
+> `tier_archival.rs` prune 返回候选数、`history_log.rs` 清理记录落盘。
+
+#### 已修明细（点击展开）
+
+<details><summary>原始清单</summary>
 
 - `nt_dispatch_loop.rs:500-517`（同型 `:904-918`）治理违规计数：读失败→0、写失败→停在 N，
   而 `:898` 就在 20 行外写着正确范式 `Err(e) => (false, …)` ⇒ **升级阶梯永不推进**。
-- `guardian.rs:371-372` MAPE 门：作者刻意用 tmp+rename 做原子落盘，**却把交付原子性的那一步静音**
+- ✅ `guardian.rs:371-372` **已修** —— `.is_ok()` 无 else 与 `let _ = rename` 两处都补 `log::error!`
+- 原 MAPE 门：作者刻意用 tmp+rename 做原子落盘，**却把交付原子性的那一步静音**
   ⇒ 晋升/回滚两个方向都可静默反转。
 - `kb_write.rs:294`（`:195`）统一写入总线丢弃 GraphRAG 关系边与决策溯源，仍 `Ok(node_id)`
   ⇒ 多跳查询静默少召回，无任何指标下降可观测。
@@ -1467,7 +1479,7 @@ keywords("支付网关")                     -> ['支付网关']                
   ⇒ 导入报告显示全部成功。同文件另有 8 处 `report.errors.push` ⇒ **本文件纪律存在，`:321` 是漏网**。
 - `cleanup_engine/nt_types.rs:28-31,37-39` + `history_log.rs:49,85` 删除操作的审计轨迹：
   写失败静默、`recent()` 把「日志不存在」报成「从未清理过」，两者完全同形。
-- `lsp_client/client.rs:117,138-139` LSP 无 `id` 匹配 ⇒ 可能返回上一次请求的答案。
+- ✅ `lsp_client/client.rs:117,138-139` **已修** —— 写失败立即返回（不给陈旧响应冒充机会）+ 循环等 `id` 匹配（上限 `MAX_LSP_SKIPS=32`）。另注：`BufReader::new(stdout)` 每次调用新建，跨调用会丢已缓冲字节，属独立问题未在本次动 ⇒ 可能返回上一次请求的答案。
   ⛔ **当前不可达**（`LspManager` 零消费者，`send_request` 唯一调用者是 `#[test]`）⇒ 潜伏 P0。
 - `tier_archival.rs:305,307` `prune()` 返回候选数而非删除数 ⇒ 报告虚假删除量。
   ⛔ 无生产调用者（潜伏 P1），且其测试用 `in_memory` **恰好只覆盖了错误不可能发生的那条分支**

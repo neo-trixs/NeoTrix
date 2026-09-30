@@ -21,23 +21,51 @@ pub struct _CleanupLogEntry {
 
 pub struct _CleanupLog;
 
-impl _CleanupLog {
-    pub fn log(log_dir: &Path, entry: &_CleanupLogEntry) {
-        let file = log_dir.join("history.jsonl");
-        let line = serde_json::to_string(&entry).unwrap_or_default();
-        if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(&file) {
-            use std::io::Write;
-            let _ = writeln!(f, "{}", line);
-        }
-    }
+  impl _CleanupLog {
+      pub fn log(log_dir: &Path, entry: &_CleanupLogEntry) {
+          let file = log_dir.join("history.jsonl");
+          let line = serde_json::to_string(&entry).unwrap_or_default();
+          // 2026-09-30: 这是**删除操作的审计轨迹**（entry 含 action/kind/items/
+          // success/error）。原实现在 open 失败与写失败两处都静默 ——
+          // 日志目录不存在、或磁盘满，于是没有任何痕迹。
+          // 而 `recent()` 读不到文件时返回空 Vec，与「从未清理过任何东西」
+          // **完全同形** ⇒ 审计方拿到一个虚假的「历史为空」。
+          //
+          // ⚠️ 这里**刻意不**加 `create_dir_all`：首次尝试时加上过，被
+          // `test_molt_project_detection` 抓出 —— 它会创建原本不存在的
+          // `.cleanup` 目录，而该测试正是断言这个目录**不**存在。
+          // 补可观测性不应改变副作用面；目录不存在时报错即可。
+          match fs::OpenOptions::new().create(true).append(true).open(&file) {
+              Ok(mut f) => {
+                  use std::io::Write;
+                  if let Err(e) = writeln!(f, "{}", line) {
+                      log::error!("[cleanup-log] 追加失败 {}: {e} —— 该条清理轨迹将丢失", file.display());
+                  }
+              }
+              Err(e) => log::error!(
+                  "[cleanup-log] 打开失败 {}: {e} —— 该条清理轨迹将丢失",
+                  file.display()
+              ),
+          }
+      }
 
-    /// 读取最近 N 条日志
-    pub fn recent(log_dir: &Path, n: usize) -> Vec<_CleanupLogEntry> {
-        let file = log_dir.join("history.jsonl");
-        let content = match fs::read_to_string(&file) {
-            Ok(c) => c,
-            Err(_) => return Vec::new(),
-        };
+      /// 读取最近 N 条日志
+      pub fn recent(log_dir: &Path, n: usize) -> Vec<_CleanupLogEntry> {
+          let file = log_dir.join("history.jsonl");
+          let content = match fs::read_to_string(&file) {
+              Ok(c) => c,
+              Err(e) => {
+                  // 「文件不存在」是合法的空历史；「存在但读不出来」不是。
+                  // 两者都返回空 Vec 会让审计方无法区分。
+                  if e.kind() != std::io::ErrorKind::NotFound {
+                      log::error!(
+                          "[cleanup-log] 读取失败 {}: {e} —— 返回空列表，勿当作「从未清理过」",
+                          file.display()
+                      );
+                  }
+                  return Vec::new();
+              }
+          };
         content
             .lines()
             .filter_map(|l| serde_json::from_str(l).ok())

@@ -244,7 +244,13 @@ impl ConsciousnessCoreHandle {
                             "provider_path": r.provider_path,
                             "timestamp": chrono::Utc::now().to_rfc3339(),
                         });
-                        let _ = kb.kv_set("experience", &key, &value.to_string());
+                        // 2026-09-30: 原为 `let _ = kb.kv_set(…)`。
+                        // 本函数返回 `()`，没有 `(false, …)` 可返（同 :517 那处有），
+                        // 故用日志作为观测通道：反思记录没落库 ⇒ 后续读不到，
+                        // 而调用方无从得知。静默丢失即认知层的历史盲区。
+                        if let Err(e) = kb.kv_set("experience", &key, &value.to_string()) {
+                            log::error!("[dispatch] 反思记录落库失败 {key} —— 该条经验将不可召回: {e}");
+                        }
                     }
                 }
             }
@@ -508,13 +514,28 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                     let violations = kb.kv_get("governance", violations_key)
                         .ok().flatten().and_then(|v| v.parse::<u64>().ok())
                         .unwrap_or(0);
-                    let graduated = match violations {
-                        0 => "无违规",
-                        1..=5 => "警告",
-                        6..=20 => "降级",
-                        _ => "封禁",
-                    };
-                    let _ = kb.kv_set("governance", violations_key, &(violations + 1).to_string());
+                      let graduated = match violations {
+                          0 => "无违规",
+                          1..=5 => "警告",
+                          6..=20 => "降级",
+                          _ => "封禁",
+                      };
+                      // 2026-09-30: 原为 `let _ = kb.kv_set(…)` 后无条件 `(true, …)`。
+                      // 落库失败（SQLITE_BUSY / 只读 / 磁盘满）时计数器**永远停在 N**，
+                      // 下轮读回 N、再报 N，任务仍返回 true ⇒
+                      // 「无违规→警告→降级→封禁」阶梯**永不推进**，
+                      // 一个持续失败的治理探针会永远显示「无违规」并被判成功。
+                      // 同文件 :898 已有正确范式（`Err(e) => (false, …)`），照它改。
+                      if let Err(e) =
+                          kb.kv_set("governance", violations_key, &(violations + 1).to_string())
+                      {
+                          return (
+                              false,
+                              format!(
+                                  "kb_governance_ostrom 违规计数落库失败 — 升级阶梯无法推进: {e}"
+                              ),
+                          );
+                      }
                     (
                         true,
                         format!(
@@ -915,7 +936,19 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                     let blocked = kb.kv_get("experience", "adversarial:blocked")
                         .ok().flatten().and_then(|v| v.parse::<u64>().ok())
                         .unwrap_or(0);
-                    let _ = kb.kv_set("experience", "adversarial:total_probes", &(probes + 1).to_string());
+                    // 2026-09-30: 同 :517 的治理计数。探测计数落库失败时
+                    // `probes` 永远停在 N 而任务仍返回 true ⇒ 对抗探针的
+                    // 「已探测 N 次」永不增长，趋势判断失效。照 :942 的范式改。
+                    if let Err(e) = kb.kv_set(
+                        "experience",
+                        "adversarial:total_probes",
+                        &(probes + 1).to_string(),
+                    ) {
+                        return (
+                            false,
+                            format!("adversarial_router 探测计数落库失败: {e}"),
+                        );
+                    }
                     (
                         true,
                         format!(
