@@ -1,0 +1,97 @@
+/*
+ * API 面板样式。
+ *
+ * ⛔ 三态用**颜色**区分是刻意的：Stub（灰=结论）与 Planned（琥珀=欠账）
+ * 行为上都是不可用，含义却相反。只用文字标签时，扫一眼分不出
+ * 「这 44 个是不需要」还是「这 44 个没排期」⇒ 路线图失真。
+ */
+.api-panel { padding: var(--nb-space-3, 12px); font-size: 13px; }
+
+.api-loading, .api-error { padding: 24px 12px; color: #71717a; text-align: center; }
+.api-error-title { color: #c33b38; font-weight: 600; margin-bottom: 4px; }
+.api-error-msg { font-size: 12px; word-break: break-all; }
+
+/* ── 数字条 ── */
+.api-summary { display: flex; gap: 8px; margin-bottom: 12px; }
+.api-stat {
+  flex: 1; text-align: center; padding: 8px 4px;
+  border-radius: 10px; background: #f5f6f7;
+}
+.api-stat-n { font-size: 20px; font-weight: 650; line-height: 1.1; }
+.api-stat-l { font-size: 11px; color: #71717a; margin-top: 2px; }
+.api-stat--ok   .api-stat-n { color: #267a4a; }
+.api-stat--todo .api-stat-n { color: #a45b00; }
+.api-stat--skip .api-stat-n { color: #a1a1aa; }
+.api-stat--dim  .api-stat-n { color: #71717a; }
+
+.api-lead {
+  font-size: 12px; color: #71717a; line-height: 1.6;
+  padding: 8px 10px; margin-bottom: 12px;
+  border-radius: 8px; background: #f9fafb; border: 1px solid #e4e4e7;
+}
+
+/* ── 分组 ── */
+.api-group { margin-bottom: 14px; }
+.api-group-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 0 2px 6px; border-bottom: 1px solid #e4e4e7; margin-bottom: 6px;
+}
+.api-group-name { font-size: 12px; font-weight: 600; color: #18181b; }
+.api-group-counts { display: flex; gap: 4px; }
+
+.api-pill {
+  font-size: 10px; padding: 1px 6px; border-radius: 999px; white-space: nowrap;
+}
+.api-pill--implemented { background: rgba(38,122,74,.12); color: #267a4a; }
+.api-pill--planned     { background: rgba(164,91,0,.12);  color: #a45b00; }
+.api-pill--stub        { background: rgba(161,161,170,.16); color: #71717a; }
+
+/* ── 条目 ── */
+.api-row {
+  display: flex; gap: 8px; padding: 7px 4px; border-radius: 8px;
+  cursor: pointer; align-items: flex-start;
+}
+.api-row:hover { background: #f5f6f7; }
+.api-row:focus-visible { outline: 2px solid #2468f2; outline-offset: 1px; }
+
+.api-dot { width: 6px; height: 6px; border-radius: 999px; margin-top: 6px; flex: 0 0 6px; }
+.api-dot--implemented { background: #267a4a; }
+.api-dot--planned     { background: #a45b00; }
+.api-dot--stub        { background: #a1a1aa; }
+
+.api-row-body { min-width: 0; flex: 1; }
+.api-row-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.api-name {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px; color: #18181b;
+}
+.api-status { font-size: 10px; padding: 1px 5px; border-radius: 4px; }
+.api-status--implemented { background: rgba(38,122,74,.12); color: #267a4a; }
+.api-status--planned     { background: rgba(164,91,0,.12);  color: #a45b00; }
+.api-status--stub        { background: rgba(161,161,170,.16); color: #71717a; }
+
+.api-sig {
+  font-size: 11px; color: #a1a1aa; margin-top: 2px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+.api-sig-arrow { color: #d4d4d8; }
+
+.api-note { font-size: 11px; color: #71717a; line-height: 1.5; margin-top: 3px; }
+.api-call-out {
+  font-size: 10px; color: #267a4a; margin-top: 4px;
+  font-family: ui-monospace, Menlo, monospace;
+  word-break: break-all; padding: 4px 6px; border-radius: 4px; background: #f5f6f7;
+}
+.api-call-out--err { color: #c33b38; }
+
+/* ── 上游未展开 ── */
+.api-unlisted { margin-top: 8px; font-size: 12px; }
+.api-unlisted-sum { cursor: pointer; color: #71717a; padding: 4px 2px; }
+.api-unlisted-list {
+  display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 2px;
+}
+.api-unlisted-item {
+  font-family: ui-monospace, Menlo, monospace; font-size: 10px;
+  color: #a1a1aa; background: #f5f6f7; padding: 1px 5px; border-radius: 4px;
+}

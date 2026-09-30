@@ -285,6 +285,64 @@ impl AppState {
     }
 }
 
+/// `neobot_api_specs() -> ApiCatalog`
+///
+/// 契约全量清单。界面据此渲染「后端到底有什么」——
+/// **前端是后端的可视化交互**，这句话的字面实现就是这条命令。
+#[tauri::command]
+pub fn neobot_api_specs() -> crate::api::ApiCatalog {
+    crate::api::catalog()
+}
+
+/// `neobot_api_call(name, args) -> ApiCallResult`
+///
+/// 按名字分派。
+///
+/// ⛔ **未实现的不抛错，返回结构化说明。** 抛错的话，调用方看到的是
+///    「这个命令不存在」和「这个命令存在但失败」**同一种东西** ——
+///    缺口就永远隐性存在。返回 `{ ok: false, reason, status }` 之后，
+///    界面能把「本仓不做」「还没做」「真出错」三态分开显示。
+#[tauri::command]
+pub fn neobot_api_call(
+    name: String,
+    args: Option<serde_json::Value>,
+) -> Result<crate::api::ApiCallResult, String> {
+    let _ = args; // 真正的分派留给各命令自己的实现；这里只做「状态查询」语义
+    match crate::api::SPECS.iter().find(|s| s.name == name) {
+        None => {
+            if crate::api::UPSTREAM_UNLISTED.contains(&name.as_str()) {
+                Ok(crate::api::ApiCallResult {
+                    ok: false,
+                    status: "unlisted".into(),
+                    reason: format!(
+                        "上游命令，已登记为未逐条展开：{name}。平台保证不漏，理由待补。"
+                    ),
+                    data: serde_json::Value::Null,
+                })
+            } else {
+                // 真的不在契约里 ⇒ 这才是「不存在」，与上面两种必须可区分
+                Err(format!("命令不在契约内：{name}"))
+            }
+        }
+        Some(spec) if spec.status != crate::api::Status::Implemented => Ok(crate::api::ApiCallResult {
+            ok: false,
+            status: match spec.status {
+                crate::api::Status::Stub => "stub".into(),
+                crate::api::Status::Planned => "planned".into(),
+                crate::api::Status::Implemented => unreachable!("已在上层拦掉"),
+            },
+            reason: spec.note.to_owned(),
+            data: serde_json::Value::Null,
+        }),
+        Some(spec) => Ok(crate::api::ApiCallResult {
+            ok: true,
+            status: "implemented".into(),
+            reason: String::new(),
+            data: serde_json::json!({ "hint": "已实现，请直接 invoke 该命令" , "name": spec.name }),
+        }),
+    }
+}
+
 /// `neobot_panel_publish(panel) -> u64`
 ///
 /// 骨架下发一个决策面板：校验 → 登记 → 推给界面。

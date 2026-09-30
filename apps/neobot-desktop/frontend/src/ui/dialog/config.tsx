@@ -1,6 +1,8 @@
 import type { PropsWithOverlays } from '@overlastic/react'
 import type { DshPlugin } from '@/types'
-import { Cpu, LogoWindows, PersonPencil, Puzzle } from '@gravity-ui/icons'
+import { Code, Cpu, LogoWindows, PersonPencil, Puzzle } from '@gravity-ui/icons'
+import { useEffect } from 'react'
+import { loadApiPanel } from '@/api-panel'
 import { cn, Modal } from '@heroui/react'
 import { useDisclosure } from '@overlastic/react'
 import { useListener } from '@reause/core'
@@ -17,7 +19,31 @@ import { ConfigPlugin } from '@/ui/config/plugin'
 import { ConfigProfile } from '@/ui/config/profile'
 
 /** 配置面板标识（左侧导航与顶部「配置」菜单共用同一组值） */
-export type ConfigTab = 'application' | 'profiles' | 'plugins' | 'harness'
+/**
+ * 配置面板的页签。`api` 是本仓加的 —— **后端契约的可视化**。
+ *
+ * 放在这里而不是另开入口：配置面板本来就是「这个应用有什么、是什么状态」的
+ * 容器，接口清单属于同一类信息。单独造一个入口会让「应用到底有哪些接口」
+ * 变成要找两处才能回答的问题。
+ */
+export type ConfigTab = 'application' | 'profiles' | 'plugins' | 'harness' | 'api'
+
+/**
+ * API 契约页。
+ *
+ * ⛔ 它**读契约而不是硬编码清单** —— 硬编码的清单必然腐化，
+ * 而本仓已经吃过一次亏（CAPABILITY-MAP 声称 111 条命令，46 条不存在）。
+ * 数据源是 Rust 侧 `src/api.rs` 的 SPECS，经 `neobot_api_specs` 取出。
+ */
+function ConfigApi() {
+  const [host, setHost] = useState<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (host) void loadApiPanel(host)
+  }, [host])
+  return (
+    <div className="api-panel" ref={setHost} />
+  )
+}
 
 export interface ConfigDialogProps extends PropsWithOverlays {
   /** 打开时定位到的面板；缺省为「应用」 */
@@ -40,6 +66,9 @@ export function ConfigDialog(props: ConfigDialogProps) {
     { label: t('config.profiles'), value: 'profiles', icon: PersonPencil },
     { label: t('config.plugins'), value: 'plugins', icon: Puzzle },
     { label: t('config.harness'), value: 'harness', icon: Cpu },
+    // i18n key 故意用字面量而非 t()：接口清单是**开发者面板**，
+    // 走 i18n 会让 6 份语言文件都要加一条，而它并不面向终端用户。
+    { label: 'API', value: 'api', icon: Code },
   ]
 
   const [activeTab, setActiveTab] = useState<ConfigTab>(props.tab ?? 'application')
@@ -99,6 +128,10 @@ export function ConfigDialog(props: ConfigDialogProps) {
                   </Case>
                   <Case cond="harness">
                     <ConfigCore />
+                  </Case>
+                  {/* API 契约：后端的可视化。本仓加的页签。 */}
+                  <Case cond="api">
+                    <ConfigApi />
                   </Case>
                 </Switch>
               </div>
