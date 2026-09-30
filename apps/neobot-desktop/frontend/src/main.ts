@@ -18,6 +18,8 @@ import { defaultCapabilities } from "./host/host.ts";
 import type { HostKind } from "./plugin/contract.ts";
 import { openSheet } from "./ui/sheet.ts";
 import { appendBlock } from "./ui/blocks.ts";
+import { renderIsland } from "./ui/island.ts";
+import { deriveIsland } from "./ui/island-model.ts";
 import type { Block, ToolStep } from "./ui/block-model.ts";
 
 // ── 宿主判定：只问「有没有 Tauri 运行时」，不问平台 ──────────────
@@ -29,7 +31,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
 
 const thread = $("thread");
 const input = $<HTMLTextAreaElement>("input");
-const statusEl = $("status");
+const islandEl = $("island");
 
 // ── 能力矩阵 ────────────────────────────────────────────────
 const caps = new CapabilityRegistry();
@@ -114,12 +116,19 @@ function selectPanel(id: string): void {
 
 /** 线程内已渲染的块数。用作 blockKey 的稳定序号。 */
 let blockSeq = 0;
+/**
+ * 已入流的块。活动岛**从它推导状态**，所以岛不会与线程脱节 ——
+ * 一个只看 DOM 的岛，在块被重绘/折叠时就会失准。
+ */
+const blocks: Block[] = [];
 
 /** 唯一的追加入口。界面**不得**再手写 thread.appendChild。 */
 function pushBlock(b: Block): void {
+  blocks.push(b);
   appendBlock(thread, b, blockSeq);
   blockSeq += 1;
   thread.scrollTop = thread.scrollHeight;
+  refreshIsland();
 }
 
 /** 会话身份标记。独立于内容 —— 一条消息可承载多种块。 */
@@ -141,9 +150,24 @@ function note(level: "error" | "warn" | "info", text: string, detail?: string, d
   pushBlock({ kind: "system", level, text, detail, dataIntact });
 }
 
-function setStatus(text: string, state: "idle" | "running" | "ok" | "error"): void {
-  statusEl.textContent = text;
-  statusEl.dataset["state"] = state;
+/** 是否正在跑。岛的状态由它 + 块流**推导**，不手工指定。 */
+let busy = false;
+
+/**
+ * 重算活动岛。
+ *
+ * ⛔ 不接受「把岛设成某状态」这种接口 —— 那样状态就有两个来源
+ *    （人手设一次、块流推一次），迟早不一致。现在它只从
+ *    「忙碌标记 + 块流 + 能力矩阵」推，人改不了。
+ */
+function refreshIsland(): void {
+  renderIsland(islandEl, deriveIsland(blocks, { caps, host: HOST, busy, seq: blockSeq }));
+}
+
+/** 忙碌标记。语义上属于「跑轮在飞」，故与块流分开但在同一处翻。 */
+function setBusy(v: boolean): void {
+  busy = v;
+  refreshIsland();
 }
 
 // ── 宿主调用（规则 ①：只在这里碰 invoke） ──────────────────────
@@ -201,10 +225,10 @@ function runOnce(): void {
       const goal = String(v["goal"] ?? "").trim();
       if (!goal) return "「目标」不能为空";
       const ctx = String(v["context"] ?? "").trim();
-      setStatus("运行中", "running");
+      setBusy(true);
       const r = await call<{ status: string; output: string; model_used?: string }>(
         "neobot_agent_run", ctx ? { goal, context: ctx } : { goal });
-      setStatus("空闲", r.ok ? "ok" : "error");
+      setBusy(false);
       if (!r.ok) return r.error;
       say("bot", r.value.output || `（${r.value.status}，无输出）`, r.value.model_used);
       return undefined;
@@ -275,10 +299,10 @@ $("btn-send").addEventListener("click", () => {
   if (!text) return;
   say("user", text);
   input.value = "";
-  setStatus("运行中", "running");
+  setBusy(true);
   void call<{ output?: string; status?: string; trace?: unknown[] }>("neobot_send", { text })
     .then((r) => {
-      setStatus("空闲", r.ok ? "ok" : "error");
+      setBusy(false);
       if (!r.ok) { note("error", `发送失败：${r.error}`, undefined, true); return; }
       // 工具步骤若随结果一起回来，就落成折叠卡；没有就只显示回复。
       const steps = Array.isArray(r.value.trace) ? r.value.trace : [];
@@ -303,7 +327,7 @@ renderConvos("");
 // 能力门控把「当前宿主不支持」的部分整块隐藏，并给出可读理由。
 $("host-badge").textContent =
   HOST === "tauri" ? "本地运行时" : "浏览器预览（部分能力不可用）";
-setStatus(HOST === "tauri" ? "空闲" : "预览模式", HOST === "tauri" ? "idle" : "error");
+refreshIsland();   // 启动也走推导路径，不手工置初值
 
 // 侧栏面板可用性：让测试/调试能直接看到判定结果，不靠猜。
 if (import.meta.env?.DEV) {

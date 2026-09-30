@@ -8,6 +8,7 @@
 
 import { CapabilityRegistry, validateActor, type ActorContext } from "./plugin/contract.ts";
 import { MemoryHost, defaultCapabilities } from "./host/host.ts";
+import { deriveIsland, islandLabel, islandIsLive } from "./ui/island-model.ts";
 import { blockKey, summarizeTool, validatePanel, validateAnswer, hasPendingPanel,
   type DecisionPanel, type Block } from "./ui/block-model.ts";
 
@@ -448,6 +449,68 @@ const eq = (a: unknown, b: unknown, what: string): void => {
       "本轮工具 1 步",
       "无产出物不影响摘要",
     );
+  }
+
+
+  // ── 2026-09-30 活动岛：状态只能被推导，不能被手设 ──
+  console.log("  · 活动岛状态推导");
+  {
+    const rc = new CapabilityRegistry();
+    rc.provideAll(defaultCapabilities("tauri"));
+    const O = { caps: rc, host: "tauri" as const, busy: false, seq: 1 };
+    const panel = basePanel();
+
+    eq(deriveIsland([], O).kind, "idle", "无块且不忙 ⇒ 空闲");
+
+    // ⛔ 优先级：等决策 > 出错 > 运行中 > 空闲。
+    //    球在**用户**那边时显示「运行中」，用户会以为系统还在算而继续等 ——
+    //    那是最坏的错，因为他等不到任何后续。
+    eq(
+      deriveIsland([{ kind: "panel", panel }], { ...O, busy: true }).kind,
+      "awaiting",
+      "有决策面板时，即使忙也显示 awaiting（优先级高于 running）",
+    );
+    eq(
+      deriveIsland([{ kind: "panel", panel }, { kind: "system", level: "error", text: "炸了" }], O).kind,
+      "awaiting",
+      "awaiting 高于 error（先处理球在我这边的）",
+    );
+    eq(
+      deriveIsland([{ kind: "system", level: "error", text: "炸了" }], { ...O, busy: true }).kind,
+      "error",
+      "error 高于 running（出错时不该显示运行中）",
+    );
+    eq(deriveIsland([], { ...O, busy: true }).kind, "running", "仅忙 ⇒ running");
+
+    // 非法面板不算待答 ⇒ 岛不会因为一个坏面板就宣称「等你选择」
+    eq(
+      deriveIsland([{ kind: "panel", panel: { ...panel, options: [] } }], O).kind,
+      "idle",
+      "非法面板不算待答（界面不能宣称在等一个不存在的选择）",
+    );
+
+    // 能力门控：缺能力 ⇒ unavailable 且带**注册表给的**理由
+    const rc2 = new CapabilityRegistry();
+    rc2.provideAll(defaultCapabilities("browser"));   // browser 无 local-model，但有 chat
+    // ⛔ 不能先 provideAll(defaultCapabilities("tauri")) 再把 chat 声明为不支持：
+    //    注册表会抛「被重复声明且结论相反」—— 那是它自己的不变量在正常工作，
+    //    是**这个夹具**写错了。正确做法是从空表只声明需要的那一条。
+    const noChat = new CapabilityRegistry();
+    noChat.provide({ id: "chat", label: "对话", supported: false, reason: "宿主禁用了对话" });
+    eq(
+      deriveIsland([], { caps: noChat, host: "tauri", busy: true, seq: 1 }),
+      { kind: "unavailable", label: "运行一轮", reason: "宿主禁用了对话" },
+      "缺能力 ⇒ unavailable，理由取自注册表而不是本文件编的",
+    );
+
+    // 文案与 a11y 播报
+    eq(islandLabel({ kind: "idle" }), "空闲", "idle 文案");
+    eq(islandLabel({ kind: "awaiting", panel, seq: 1 }), "等你选择", "awaiting 文案点明是用户在等");
+    eq(islandLabel({ kind: "unavailable", label: "X", reason: "Y" }), "X · 不可用", "unavailable 文案");
+    eq(islandIsLive({ kind: "error", label: "e" }), "alert", "出错要 alert");
+    eq(islandIsLive({ kind: "awaiting", panel, seq: 1 }), "status", "等决策要 status");
+    eq(islandIsLive({ kind: "running", label: "r", seq: 1 }), "none",
+      "运行中**不播报**（否则读屏每帧念一次）");
   }
 
   return failures;

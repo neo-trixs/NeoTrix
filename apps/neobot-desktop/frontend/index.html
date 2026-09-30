@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="/src/ui/base.css" />
     <link rel="stylesheet" href="/src/ui/primitives.css" />
 <link rel="stylesheet" href="/src/ui/blocks.css" />
+<link rel="stylesheet" href="/src/ui/island.css" />
     <link rel="stylesheet" href="/src/ui/sheet.css" />
   </head>
   <body>
@@ -50,7 +51,7 @@
             <button id="btn-evidence" class="nb-btn nb-btn--ghost nb-btn--sm" type="button" title="证据汇总">证据</button>
             <button id="btn-agent-run" class="nb-btn nb-btn--ghost nb-btn--sm" type="button" title="手动跑一轮 agent">跑一轮</button>
             <span class="composer-spacer"></span>
-            <span id="status" class="status" data-state="idle">空闲</span>
+            <span id="island" class="island is-island--idle"></span>
           </div>
           <div class="composer-input">
             <textarea id="input" rows="1" placeholder="消息…（Enter 发送，Shift+Enter 换行）" aria-label="消息"></textarea>
