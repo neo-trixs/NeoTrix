@@ -16,3 +16,4 @@ pub const FRONTEND_DIST: &str = "../frontend/dist";
 pub mod api;
 pub mod commands;
 pub mod desktop;
+pub mod platform;

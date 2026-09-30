@@ -25,6 +25,12 @@ tauri-plugin-fs = "2"
 #    两者的排查方向完全不同，所以它们必须**在**而不是靠 stub。
 tauri-plugin-opener = "2"
 tauri-plugin-store = "2"
+# 优先级 1 的 9 个「纯接线」命令所需。
+# 这四个都是**平台能力**，不是 agent 能力 —— 所以自己接比自己写便宜得多，
+# 也比自己写可靠（剪贴板/通知/开机自启都有系统级细节）。
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-autostart = "2"
 # ⛔ 逻辑**不在这里复制**。本 app 是薄壳，能力全部来自同仓的库。
 #    d5413335 删除内嵌 app 的理由之一就是「桌面端曾是两份同源物」；
 #    这次重建若复制 crates/neotrix-neobot 的代码，等于把那个问题原样造回来。

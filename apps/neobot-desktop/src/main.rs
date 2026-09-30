@@ -36,11 +36,26 @@ pub fn run() {
         //    前者去查 capabilities，后者去查命令注册表。
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--minimized"]),
+        ))
         // 命令实现在 `commands`（pub，可被集成测试直接调用）；
         // 本文件只负责注册与生命周期。
         // 面板注册表由应用持有：骨架下发时登记，界面作答时按 id 查。
         .manage(neobot_desktop::commands::AppState::default())
         .invoke_handler(tauri::generate_handler![
+            neobot_desktop::platform::open_external_url,
+            neobot_desktop::platform::write_clipboard_text,
+            neobot_desktop::platform::read_clipboard_image,
+            neobot_desktop::platform::show_native_notification,
+            neobot_desktop::platform::get_launch_on_login,
+            neobot_desktop::platform::set_launch_on_login,
+            neobot_desktop::platform::create_app_window,
+            neobot_desktop::platform::remote_open_window,
+            neobot_desktop::platform::move_pet_window,
             neobot_desktop::desktop::get_runtime_info,
             neobot_desktop::desktop::runtime_ready,
             neobot_desktop::desktop::install_dependencies,

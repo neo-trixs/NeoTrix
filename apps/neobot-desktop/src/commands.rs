@@ -451,7 +451,7 @@ mod tests {
 mod panel_state_tests {
     use super::*;
     use neotrix_neobot::nt_panel::{
-        Answer, AnswerOutcome, Mode, Panel, PanelKind, PanelOption, PublishError, Reject, Source,
+        Answer, AnswerOutcome, Mode, Panel, PanelKind, PanelOption, Reject, Source,
     };
 
     fn src(t: &str) -> Source {
