@@ -99,7 +99,9 @@ def run_crate(crate_dir, out_path):
     return n, calls
 
 
-def query(db_path, direction, substr):
+def query(db_path, direction, substr, compact=False):
+    """compact=True: 单行 TSV（caller\tcallee\tspan），省 token（CodeGraphContext
+    的 GCF 同理：图查询结果正是省 token 收益最大的形状）。默认人类可读形。"""
     hits = []
     with open(db_path, encoding='utf-8') as fh:
         for line in fh:
@@ -115,7 +117,10 @@ def query(db_path, direction, substr):
     for other, span, kind in sorted(hits):
         if (other, span) not in seen:
             seen.add((other, span))
-            print(f"{other}  @ {span}  [{kind}]")
+            if compact:
+                print(f"{other}\t{span}")
+            else:
+                print(f"{other}  @ {span}  [{kind}]")
     print(f"[calledges] {len(seen)} unique {direction} for '{substr}'",
           file=sys.stderr)
 
@@ -127,10 +132,10 @@ def main(argv):
         run_crate(d, out)
     elif '--callers' in argv or '--callees' in argv:
         direction = 'callers' if '--callers' in argv else 'callees'
-        flag = '--callers' if direction == 'callers' else '--callees'
+        flag = '--callers' if direction == 'callers' else 'callees'
         substr = argv[argv.index(flag) + 1]
         db = argv[argv.index('--db') + 1]
-        query(db, direction, substr)
+        query(db, direction, substr, compact='--compact' in argv)
     else:
         print(__doc__)
         return 2

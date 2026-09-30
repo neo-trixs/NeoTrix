@@ -30,12 +30,13 @@
 | `microsoft/autogen` | **CC-BY-4.0**（API 核实，**非 MIT**） | 且已**维护模式**（README: *"New users should start with Microsoft Agent Framework"*）。勿指向 `autogen-agentchat` | ✅ API |
 | `PrimeIntellect-ai/prime-agent` | MIT | ⚠️ LICENSE 头写 `Copyright (c) 2025 Mario Zechner`（继承自 `pi` 基座）—— vendor 前查清归属 | ✅ |
 | `letta-ai/letta` | — | ⚠️ **`main` 只有 10 个文件、零代码**（README 自述真码已迁 `letta-code`）。24.9k 星衡量的是 MemGPT V1 历史 | ⚠️ README 自述 |
+| `trailofbits/skills` | **CC-BY-SA-4.0** | **只取思想（rust-review/insecure-defaults/fp-check 等审计纪律），不抄代码不抄文本**；相同署名-相同方式共享，沾上即传染 | ⚠️ 页面徽标自述 |
 
 ## ✅ 可抄（已核实）
 
 | 许可 | 仓 |
 |---|---|
-| **MIT** | `NousResearch/hermes-agent` · `kunchenguid/backpass` · `PrimeIntellect-ai/prime-agent` · `rlaope/oh-my-hermes` · `orwa-mahmoud/nightshift` · `lidge-jun/opencodex` · `FoundationAgents/MetaGPT` · `HKUDS/nanobot` · `bytedance/deer-flow` · `BAAI-Agents/Cradle` · `langchain-ai/langgraph` · `crewAIInc/crewAI` |
+| **MIT** | `NousResearch/hermes-agent` · `kunchenguid/backpass` · `PrimeIntellect-ai/prime-agent` · `rlaope/oh-my-hermes` · `orwa-mahmoud/nightshift` · `lidge-jun/opencodex` · `FoundationAgents/MetaGPT` · `HKUDS/nanobot` · `bytedance/deer-flow` · `BAAI-Agents/Cradle` · `langchain-ai/langgraph` · `crewAIInc/crewAI` · `oil-oil/oil-ui`（LICENSE 文件直读 ✅） · `vitali87/code-graph-rag` · `CodeGraphContext/CodeGraphContext` · `vercel-labs/agent-skills`（三者页面徽标自述 ⚠️，抄码前需 LICENSE 直读复核） |
 | **Apache-2.0** | `loopx-project/loopx` · `mvschwarz/openrig` · `simular-ai/Agent-S` · `nanobrowser/nanobrowser` · `xlang-ai/OSWorld` |
 
 **⚠️ 上表只列已用 `LICENSE` 文件直读或研究期 API 核实过的。** 其余仓的许可**未逐一核实** ——
