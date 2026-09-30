@@ -40,12 +40,12 @@
    "files": 44,
    "note": "文件能力。其 capability.rs:185 的 CapabilityRegistry 零消费者（真冗余，见 BATCH-FIX-CHECKLIST B-1），但本子树整体是活的（l2_perception/nt_world/ocr/mod.rs:283 消费 OcrEngine）。"
   },
-  "neotrix/ffi": {
+  "l0_substrate/ffi": {
    "layer": "l0_substrate",
    "role": "primary",
    "lines": 2919,
    "files": 12,
-   "note": "uniffi 绑定（GWT attention / types）。属 L0 基座。"
+   "note": "uniffi 绑定（GWT attention / types）。属 L0 基座。2026-09-30 第二棵树 B 方案回流：自 neotrix/ffi 迁入 l0_substrate/ffi（ios-bridge 门控保留）。"
   },
   "l6_meta/memory": {
    "layer": "l6_meta",
@@ -82,19 +82,19 @@
    "lines": 666,
    "note": "⚠️ 实测引用了 l5_cognition（:6 use Dispatcher）与 l3_embodiment（:111 redact）⇒ 登记为 l0 后门**应当报违规**。这正是盲区的代价：此前门看不见。登记它是为了让违规显形，不是为了让它变绿。"
   },
-  "neotrix/nt_capability_bridge": {
+  "l1_action/nt_capability_bridge": {
    "layer": "l1_action",
    "role": "primary",
    "files": 1,
    "lines": 601,
-   "note": "能力桥接，无跨层引用。"
+   "note": "能力桥接，无跨层引用。2026-09-30 第二棵树 B 方案回流：自 neotrix/ 迁入 l1_action/。"
   },
-  "neotrix/proxy_daemon_wrapper": {
+  "l0_substrate/proxy_daemon_wrapper": {
    "layer": "l0_substrate",
    "role": "primary",
    "files": 1,
    "lines": 22,
-   "note": "daemon 代理薄封装，无跨层引用。"
+   "note": "daemon 代理薄封装，无跨层引用。 [2026-09-30 B 方案回流：原路径 neotrix/proxy_daemon_wrapper 已搬至 l0_substrate/proxy_daemon_wrapper]"
   }
  },
  "unresolved": {
