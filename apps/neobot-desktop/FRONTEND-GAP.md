@@ -56,6 +56,32 @@ cargo check -p neobot-desktop --all-targets -j2
 **待定**：是把证据/发送能力搬进本仓的库（则 neotrix 成为唯一真源），
 还是这个 app 继续依赖另一仓的库。**这是产品/架构决策，不该由我替你定。**
 
+## §1b ⛔ 本 app 的 `.rs` **未入库**（patch 兜底）
+
+写入时 mem 闸 BLOCKED（exit 2）⇒ 无法编译 ⇒ P0 pre-commit 门
+（对任何 `.rs` 跑 `cargo check --tests -p neotrix`）一旦跑必然受阻，
+而 `--no-verify` 是**明令禁止**的（hook 自己写着「会破坏 P0」）。
+
+⇒ 已入库的 `7dc72188` **只含** icons / frontend / tauri.conf / Cargo.toml /
+FRONTEND-GAP / 图标族 / 2 道门 / 文档字节修复，**不含任何 .rs**。
+未入库的 5 个 .rs（4 处字节修复 + main.rs / lib.rs / build.rs）的兜底在：
+
+```
+.neotrix/patches/neobot-uncommitted-rs-20260930.patch
+```
+
+**处置（闸解除后按序做）**：
+
+```sh
+sh scripts/ops/nt_mem_gate.sh            # 必须 exit 0
+git apply .neotrix/patches/neobot-uncommitted-rs-20260930.patch   # 若工作树已无这些改动
+cargo check -p neobot-desktop --all-targets -j2
+git add <上面那几个 .rs> && git commit      # 同一命令，勿拆（阻塞1）
+```
+
+> ⚠️ 这 3 个新 `.rs` 从未编译过。**入第一个 commit 之前先跑上面那条 cargo check** ——
+> 现在它们既不在提交里、也没被编译器看过，是全仓最脆的一批文件。
+
 ## §3 数据目录未与 CLI 对齐
 
 `main.rs` 的 `data_dir()` 目前按 `~/.neobot` 拼，**未核对 CLI 的实际解析**
