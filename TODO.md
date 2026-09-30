@@ -1,25 +1,41 @@
 > # NeoTrix TODO 列表
-> 智能同步生成，最后更新：**2026-09-30（原子拆解 + 跨仓对位落地，建议 2 部分关闭）**
+> 智能同步生成，最后更新：**2026-09-30（原子拆解 + 行为对位落地，建议 2 关闭）**
 >
-> ## 🔴 P0（2026-09-30 原子对位抓到）`ResponseCache::insert` 淘汰是 O(capacity) 全扫描
+> ## ✅ 2026-09-30 行为对位已落地（37/37 步与 lru@0.18.5 一致）⇒ 上面 P0 **降 P1**
 > >
-> > **证据**：`nt_decompose.py parity` 对位 `lru-0.18.5`（MIT，registry 已有，
-> > 同一抽取器生成对方原子集）↔ 我方 `ResponseCache::insert`：
-> > 我方原子集含 `iter`+`filter`+`min_by_key`+`remove`（= 每次写扫全表），
-> > 对方原子集含 `attach`/`detach`/`swap`/`replace_or_create_node`（= O(1) promote）。
-> > **已读源码逐行确认**（`nt_policy.rs:94-111`），非仅凭符号名下结论。
-> > ⇒ 功能等价、复杂度劣势，且位置在网关 `resilience` 层**热路径**。
+> > `neotrix-core/tests/response_cache_parity.rs` + `scripts/ops/nt_parity_ref.py`：
+> > op 脚本 `.neotrix/parity/response-cache.vectors.json` 是唯一事实源，
+> > 对方 oracle 由**跑对方实现**采集（离线、registry 已 vendor 副本、LICENSE 直读 MIT）。
+> > ⇒ **语义等价已证**（put/get/len/contains 全子集零分歧），
+> > 剩下的只是**复杂度劣势**（每次写 O(capacity) 扫描）⇒ 属性能债不是正确性债。
+> > 两条证伪用例都实测过：篡改 oracle ⇒ 测试红且 `--check` rc=1。
+> > 顺带补了有消费者的生产 API `ResponseCache::contains()`（非变更式，不扰动淘汰序）。
+> > 详见 `docs/architecture/DECOMPOSE-PARITY-2026-09-30.md` §4。
 > >
-> > **候选修法（本仓约束下的裁决）**：(a) 引第三方 `lru`（MIT，已在 registry；
-> > 最小改动，代价是它的 slab/unsafe 依赖）；(b) 自建侵入式链表 —— 需手写
-> > `unsafe`，**`#![forbid(unsafe_code)]` 直接排除** ⇒ **(a) 是唯一可行解**。
-> > 独立一轮做，带测试。详见 `docs/architecture/DECOMPOSE-PARITY-2026-09-30.md` §3。
+> > ## 🔴 P1（原 P0，性能债）`ResponseCache::insert` 淘汰是 O(capacity) 全扫描
+> >
+> > **证据**：`nt_decompose.py parity` 对位 `lru-0.18.5`（MIT，同一抽取器生成对方
+> > 原子集）↔ 我方 `ResponseCache::insert`：我方原子集含 `iter`+`filter`+
+> > `min_by_key`+`remove`（= 每次写扫全表），对方含 `attach`/`detach`/`swap`/
+> > `replace_or_create_node`（= O(1) promote）。**已读源码逐行确认**（`nt_policy.rs:94-111`），
+> > 且 §4 行为对位证明语义本身正确 ⇒ 定性为**性能债**。
+> > 位置在网关 `resilience` 层**热路径**（响应缓存写放）。
+> >
+> > **本仓约束下的裁决**：引第三方 `lru`（MIT，已在 registry）是唯一可行解 ——
+> > 自建侵入式链表需手写 `unsafe`，`#![forbid(unsafe_code)]` 直接排除。
+> > 独立一轮做，带基准（before/after 写放大）。
 > >
 > > ### 🟡 P1 doc-claim 门的下一个类目：模板残留的假「未实现」声明
-> > `nt_policy.rs` 的 `pin` / `unpin` / `pinned_count` 三个 doc comment 写着
-> > `/// Note: Real implementation needed — …`，但函数体是**完整实现** ⇒ 假声明。
-> > `check-doc-claims.sh` 只查「zero consumers」类断言，**抓不到这一类**。
+> > `nt_policy.rs` 单文件 **23 处** `/// Note: Real implementation needs — …`，
+> > 其中已逐行核实至少 4 处（`new` / `key_for` / `key_for_request` / `cache`）**函数体完整**
+> > ⇒ 假声明。`check-doc-claims.sh` 只查「zero consumers」类断言，**抓不到这一类**。
 > > ⇒ 门若要加此类，须先确认模式足够窄（否则按 G7 不建门）。
+>
+> ## ⚠️ 共享工作树事故（2026-09-30，`519d78b9`）
+> `git commit --only <path>` 取**工作树状态** ⇒ 另一窗口并发改写
+> `.neotrix/task-index.json` 时，我把他们的内容提交进了我的 commit，我自己的 3 条索引丢失。
+> ⇒ `--only` 隔离「哪些文件」，**不隔离「文件里是什么」**。共享单文件
+> （task-index / baseline / layer-map）提交前须 `stat -f '%Sm'` + 重 grep 自己的条目。
 >
 > ## ✅ 2026-09-30 调用边落地（建议 1 关闭）
 > >

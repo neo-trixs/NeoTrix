@@ -747,6 +747,53 @@
    "spec": "CAPABILITY-GAP-2026-09-30 G5；ABSORPTION-ROUND24"
   },
   {
+   "id": "nt-decompose-atoms",
+   "query": [
+    "原子级拆解",
+    "拆解技术逻辑",
+    "原子能力单元",
+    "这个入口由哪些原子组成",
+    "外部项目拆解",
+    "decompose"
+   ],
+   "tool": "python3 scripts/ops/nt_decompose.py atoms --db <edges.jsonl> --root <DefId子串> [--depth N] [--out FILE]",
+   "kind": "report",
+   "read_only": true,
+   "when_not": "① root 子串命中多个节点会 rc=2 拒答（宁缺勿错）—— 加长 root 再跑，不要靠 --depth 硬试；② oracle 分类只反映**边表与路径可测信号**：K3 = 符号绑定已证、语义未判，别当语义结论；③ 与 nt_callgraph --deps 遍历重叠，本工具独有的是原子记录（file:line + oracle）与机器可读输出",
+   "spec": "docs/architecture/DECOMPOSE-PARITY-2026-09-30.md §1；selftest 6 正例 + 3 证伪"
+  },
+  {
+   "id": "nt-decompose-parity",
+   "query": [
+    "对方有这个能力吗",
+    "能力矩阵",
+    "差距表",
+    "对位矩阵",
+    "parity"
+   ],
+   "tool": "python3 scripts/ops/nt_decompose.py parity --mine <atoms.json> --theirs <atoms.json> [--out matrix.md]",
+   "kind": "report",
+   "read_only": true,
+   "when_not": "① **名字级对位，不是语义对位** —— 实测已误报（把对方 get 报成「仅对方有」，我方同义方法叫 cache）。异名不等于缺能力，要判行为用 nt-parity-ref；② 不要把它的输出做成门（G7：名字级对位必误报）；③ 对方原子集必须由同一工具在对方代码上生成，手写 JSON 会让矩阵变成自证",
+   "spec": "DECOMPOSE-PARITY-2026-09-30 §2；首次实跑 lru(MIT) vs ResponseCache 抓到 O(n) 淘汰"
+  },
+  {
+   "id": "nt-parity-ref",
+   "query": [
+    "行为对位",
+    "对方产品行为 oracle",
+    "复现对方产品",
+    "参考实现漂移",
+    "behavioural parity",
+    "oracle 采集"
+   ],
+   "tool": "python3 scripts/ops/nt_parity_ref.py --vectors .neotrix/parity/<name>.vectors.json [--crate lru@0.18.5] [--check]",
+   "kind": "report",
+   "read_only": false,
+   "when_not": "① 写模式只在本机 cargo registry 里找对方 crate 的已 vendor 副本，找不到就退出 —— 它不联网、不 clone；② 只有 --check 可当门（重跑对方实现并比对已存 oracle，rc=1 = oracle 漂移或说谎）；③ PASS 只覆盖 vectors 写了的 op 集合，vectors 没写的语义**未被验证**，别读成「行为完全一致」",
+   "spec": "DECOMPOSE-PARITY-2026-09-30 §4；neotrix-core/tests/response_cache_parity.rs"
+  },
+  {
    "id": "check-license",
    "query": [
     "许可",

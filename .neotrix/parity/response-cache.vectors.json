@@ -1,0 +1,75 @@
+{
+  "schema": "nt-parity/vectors/1",
+  "target": "lru-core-semantics",
+  "why": "行为对位（不是名字对位）的输入。判据：同一 op 脚本分别喂给我方 ResponseCache 与对方 lru crate（MIT），逐步观测必须逐条相同。op 只取两边语义可映射的公共子集（put/get/len/contains）；pinning/hit_count 是我方扩展，不进对位（进则必分歧，且那是扩展不是缺陷）。",
+  "ops_supported": ["put", "get", "len", "contains"],
+  "cases": [
+    {
+      "name": "c1-basic-hit-miss",
+      "why": "命中/未命中 + 计数无关的基本路径",
+      "capacity": 3,
+      "ops": [
+        { "op": "put", "k": "a", "v": "1" },
+        { "op": "get", "k": "a" },
+        { "op": "get", "k": "zzz" },
+        { "op": "len" },
+        { "op": "contains", "k": "a" },
+        { "op": "contains", "k": "b" }
+      ]
+    },
+    {
+      "name": "c2-evict-oldest",
+      "why": "容量打满后淘汰最久未用：这是 LRU 的定义性行为",
+      "capacity": 3,
+      "ops": [
+        { "op": "put", "k": "a", "v": "1" },
+        { "op": "put", "k": "b", "v": "2" },
+        { "op": "put", "k": "c", "v": "3" },
+        { "op": "put", "k": "d", "v": "4" },
+        { "op": "contains", "k": "a" },
+        { "op": "contains", "k": "d" },
+        { "op": "len" }
+      ]
+    },
+    {
+      "name": "c3-get-promotes",
+      "why": "读命中必须刷新最近使用顺序（否则 FIFO 冒充 LRU）",
+      "capacity": 3,
+      "ops": [
+        { "op": "put", "k": "a", "v": "1" },
+        { "op": "put", "k": "b", "v": "2" },
+        { "op": "put", "k": "c", "v": "3" },
+        { "op": "get", "k": "a" },
+        { "op": "put", "k": "d", "v": "4" },
+        { "op": "contains", "k": "a" },
+        { "op": "contains", "k": "b" },
+        { "op": "contains", "k": "d" }
+      ]
+    },
+    {
+      "name": "c4-update-existing-no-growth",
+      "why": "更新已存在键不得增长容量",
+      "capacity": 3,
+      "ops": [
+        { "op": "put", "k": "a", "v": "1" },
+        { "op": "put", "k": "a", "v": "9" },
+        { "op": "len" },
+        { "op": "get", "k": "a" }
+      ]
+    },
+    {
+      "name": "c5-reinsert-after-eviction",
+      "why": "被淘汰的键重新写入应重新进入并可再次淘汰",
+      "capacity": 2,
+      "ops": [
+        { "op": "put", "k": "a", "v": "1" },
+        { "op": "put", "k": "b", "v": "2" },
+        { "op": "put", "k": "c", "v": "3" },
+        { "op": "contains", "k": "a" },
+        { "op": "put", "k": "a", "v": "1b" },
+        { "op": "get", "k": "a" },
+        { "op": "len" }
+      ]
+    }
+  ]
+}

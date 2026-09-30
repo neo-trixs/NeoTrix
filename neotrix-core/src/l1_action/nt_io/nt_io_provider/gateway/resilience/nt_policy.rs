@@ -202,6 +202,17 @@ impl ResponseCache {
         self.entries.len()
     }
 
+    /// Non-mutating membership test.
+    ///
+    /// Deliberately does **not** refresh the LRU timestamp, unlike [`Self::cache`]:
+    /// asking "is it cached?" must not change what gets evicted next. Added for the
+    /// behavioural parity harness (`.neotrix/parity/response-cache.vectors.json`),
+    /// whose `contains` step needs to observe presence without perturbing order —
+    /// the reference implementation's `contains` is likewise non-promoting.
+    pub fn contains(&self, key: &str) -> bool {
+        self.entries.contains_key(&Self::hash_key(key))
+    }
+
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }

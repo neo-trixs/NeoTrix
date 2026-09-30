@@ -143,26 +143,95 @@ doc comment 都写着 `/// Note: Real implementation needed — …`，但函数
 
 ---
 
-## 4. 本轮没做的（边界声明）
+## 4. 行为对位：把「复现对方产品」从名字级推到行为级（同日补做）
 
-- **没做语义等价判定**：矩阵是名字级。语义等价需给每个原子配外部 oracle
-  （K4），本次只有 0 个 K4 命中 ⇒ **当前矩阵只能回答「同名项是否都在」**。
-- **没给 parity 建门**：名字级对位会误报（异名 ≠ 缺能力），按 G7 裁决，
-  工具输出**不做硬门**，只作报告。
-- **没重跑全量测试**：本轮**零 `.rs` 改动**（只加脚本/文档/task-index），
-  按 R-SCAN-3 不需要重跑门链；但 `check-feature-gates` 未触发（无 feature 改动）。
-- **没删 `/tmp/nt-parity`**：外部源副本在仓外、MIT、非入库资产；
-  按 R-DISK-1「只删生成物」原则保留可复跑证据，会话收尾时清理。
+§0 承诺的目标是「复现他方产品」，而 §2 的矩阵是**名字级**的。当天实测即**自证其局限**：
+矩阵把 `get` 报成「仅对方有」，而我方同义方法叫 `cache`（读源码确认 `cache()` 会刷新
+时间戳，语义与 `get` 一致）⇒ **名字级矩阵确实会误报**，§1.2 的警告当天就兑现了。
+⇒ 补上行为级那一腿。
+
+### 4.1 三件套（单一事实源 = vectors JSON）
+
+| 件 | 路径 | 作用 |
+|---|---|---|
+| op 脚本 | `.neotrix/parity/response-cache.vectors.json` | 5 个 case / 37 步，**唯一事实源**，两侧都读它 |
+| 对方 oracle | `.neotrix/parity/response-cache.vectors.reference.json` | **跑对方实现采集**的逐步观测（`lru@0.18.5`，LICENSE 直读 = MIT） |
+| 采集器 | `scripts/ops/nt_parity_ref.py` | 临时 cargo 工程 + `--offline` 跑对方 crate；`--check` = 漂移门 |
+| 我方对位 | `neotrix-core/tests/response_cache_parity.rs` | 同一 op 脚本跑 `ResponseCache`，逐步比对 |
+
+**为什么 oracle 不会自证**：reference.json 的每一行都是**对方实现自己吐的**，
+不是人手写的期望值。`nt_parity_ref.py --check` 每次都**重跑对方实现**并逐行比对，
+说谎即 rc=1。
+
+### 4.2 实跑结论
+
+```
+cargo test -p neotrix --test response_cache_parity
+  test contains_does_not_disturb_lru_order ... ok
+  test response_cache_behaviour_matches_reference_lru ... ok
+```
+
+⇒ **37/37 步行为一致**。也就是说 §3 那个 P0 缺口的定性要**改判**：
+
+| 项 | 结论 |
+|---|---|
+| 语义是否等价 | ✅ **等价**（put/get/len/contains 全子集 37 步零分歧） |
+| 复杂度是否等价 | ❌ **不等价**：我方 O(capacity) 扫描 vs 对方 O(1) promote（§3.1） |
+| ⇒ 修法优先级 | 属**性能债**而非**正确性债**。P0 降 P1 仍要做（热路径每次写扫全表），但**不是 bug** |
+
+### 4.3 顺带补的一个生产 API（有消费者，非导出）
+
+`ResponseCache::contains(&self, key) -> bool`（`nt_policy.rs`）：非变更式存在性检查，
+**故意不刷新时间戳**（否则「问一下在不在」会改变下次淘汰谁）。
+消费者 = 对位测试的 `contains` 步骤需要**不扰动顺序**的观测，而对方 `contains` 同样不提升。
+配套测试 `contains_does_not_disturb_lru_order` 守着这个语义。
+
+> **该测试第一版是我手推错的**（把 `insert a; insert b` 后的 LRU 写成 `b`）。
+> 实跑失败后读实现 + 外部 oracle（case c2 淘汰 `a`）确认**实现是对的、我的期望是错的**，
+> 已改期望并把这段写进注释留档。⇒ 又一次「手推 ≠ 实证」。
+
+### 4.4 两条证伪用例（都实测过）
+
+| 证伪 | 做法 | 结果 |
+|---|---|---|
+| 测试能否发现分歧 | 把 reference 第 13 行 `contains:false` 改成 `true` | ❌ 测试红：`step 13: ours=contains:false reference=contains:true` |
+| oracle 能否说谎 | 同上改 + 跑 `--check` | ❌ rc=**1**：`line 13: stored=contains:true live=contains:false` |
+
+### 4.5 本节边界
+
+- 只对位 `put/get/len/contains`；**pinning / hit_count / miss_count 刻意不对位**
+  （我方扩展，进则必分歧，那是扩展不是缺陷）。
+- 37 步通过**不等于**「行为完全一致」：vectors 没写的语义未被验证。
+  （例：`key_for` 的哈希稳定性、`prefetch` 路径都未纳入。）
 
 ---
 
-## 5. 复跑清单（判据可证伪）
+## 5. 共享工作树事故记录（必须留档）
+
+**`519d78b9` 把另一窗口的 `.neotrix/task-index.json` 内容提交进了我的 commit。**
+成因链：我在自己工作树加了 3 条索引条目并验证 `nt_find` 能命中；提交前另一窗口
+同时改写该文件（加 `nt-callgraph-impact` 等），`git commit --only <path>` 取的是
+**工作树状态** ⇒ 我提交了他们的内容，而我的 3 条丢失。
+⇒ 与 `sessions/handoff-commit-only-20260929.md` 记录的是**不同**事故：
+那次是暂存区核对与提交不原子，这次是**共享单文件本身被并发改写**。
+⇒ 教训：`--only` 只隔离「哪些文件」，**不隔离「文件里是什么」**；
+共享索引文件（task-index / baseline / layer-map）提交前必须
+`stat -f '%Sm'` + 重新 `grep` 自己的条目仍在。
+
+---
+
+## 6. 复跑清单（判据可证伪）
 
 ```sh
 python3 scripts/ops/nt_decompose.py selftest                 # 6 正例 + 3 证伪
 python3 scripts/ops/nt_decompose.py atoms --db .project-map/edges-neotrix-neobot.jsonl \
     --root 'nt_channel_serve::run_once' --depth 3             # 193 原子 / 未截断
+python3 scripts/ops/nt_parity_ref.py \
+    --vectors .neotrix/parity/response-cache.vectors.json --check   # oracle 未漂移
+cargo test -p neotrix --test response_cache_parity                  # 2 绿（含 37 步对位）
 ```
 
 ⇒ 若 `selftest` 转红，或 `atoms` 在**同一输入**上给出**不同原子数**，
 说明工具坏了，**不是仓库变了**。
+⇒ 若 `--check` rc=1：**先信它**（对方实现变了，或有人手改了 oracle），
+再决定是重采还是改 vectors —— 不要直接 `--out` 覆盖掉证据。
