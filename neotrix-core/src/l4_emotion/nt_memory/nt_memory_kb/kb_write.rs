@@ -192,13 +192,19 @@ impl KnowledgeBase {
         // PROV-O 决策溯源 (semantica 吸收): 每次覆盖解决记录谁/做什么/基于什么证据。
         // 锁已释放, 避免非重入 Mutex 死锁。
         for e in &ledger.entries {
-            let _ = self.record_decision_provenance(
+            // 2026-09-30: 原为 `let _ = self.record_decision_provenance(…)`。
+            // PROV-O 决策溯源是「谁覆盖了什么」的证据链；上面 :186 段刚把 `applied`
+            // 记成成功、节点已被覆盖，此处失败被吞 ⇒ 证据链就此断掉，且不可事后重建。
+            // 同段 :176 有 log::warn!、:216 有 log::debug! ⇒ 这里曾是唯一无日志的失败点。
+            if let Err(e) = self.record_decision_provenance(
                 "nt_memory_curation",
                 crate::l4_emotion::nt_memory::nt_memory_kb::nt_memory_provenance::ProvActivity::Supersede,
                 &e.older_id,
                 &format!("superseded by {}", e.newer_id),
                 vec![e.newer_id.clone(), format!("sim={:.3}", e.sim)],
-            );
+            ) {
+                log::warn!("[kb-write] 决策溯源写入失败（覆盖已发生，证据将缺失）: {e}");
+            }
             // 时序事实账本 (R-P79): 旧节点事实沿版本链 supersede
             // (append-only 更正), 新对象 = 胜出新节点正文。
             if let Ok(Some(newer)) = self.get_node(&e.newer_id) {
