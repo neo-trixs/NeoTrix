@@ -737,6 +737,65 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 `_strip_noncode` 剥离）或 `nt_locate --component`。
 **⇒ 建议：把「裸 grep 结论一律先读现场」写进 R-SCAN-1，它现在有第 2 个实例。**
 
+### 🔴 P0 outbox 队列堵塞：`nt_agent` 写的行没有 `channel` 键（2026-09-30 子代理取证）
+
+**症状**：`nt_agent.rs:393` / `:420` 用 topic `CH_MESSAGE_NEW` 写 outbox，
+payload 是 `{"task_id","status"}` —— **没有 `channel` 键**。
+而 `drain_outbox_once`（`nt_channel_dispatch.rs:708-712`）对缺 `channel` 的行
+**直接 `fail_outbox` 退避重试**；且 `drain_outbox` **不按 topic 过滤**。
+
+⇒ **这些行会被取出、退避、永远堵在队列里**，并持续消耗重试预算。
+
+**为什么是真问题**：`drain_outbox` 不按 topic 过滤 ⇒ 它会把
+`CH_MESSAGE_NEW` 的行当 `CH_CHANNEL_SEND` 取出来，缺 `channel` 必失败。
+**这与 `edit_of` 无关，是独立缺陷。**
+
+**修法方向**（二选一，未实施）：
+- **A. payload 补 `channel`** —— 但 `nt_agent` 那时未必有渠道概念
+- **B. `drain_outbox` 按 topic 过滤** —— 更正，outbox 本该按 topic 分派
+
+**取证**：`docs/architecture/ORPHAN-CODE-AUDIT-2026-09-30.md` 同批
+（子代理读实际行，非 grep 命中）。
+
+### 🟡 P0 `edit_of` 在生产里永不生效（原 P0 #7 的前提需改写）
+
+派子代理执行 IM/stop 计划 Task 2 时**证伪了我的前提**：
+
+- **写入侧是完整的** —— `enqueue_outbound_full`（`nt_channel_dispatch.rs:824`）
+  已在写 `edit_of` 键，4 个测试已锁死该行为
+  （`enqueue_writes_the_edit_of_key_only_when_asked_to` 等）
+- ⛔ **真正的问题是这条链在生产里永远不成功**：
+  1. `deliver_result` **零生产调用点** —— 只有定义 + 4 处 `#[cfg(test)]`
+     = 测试充分但**生产死代码**
+  2. `sweep_pending`（生产可达，`nt_channel_serve.rs:232` 调用）传的是
+     **用户那条入站消息的 id** —— bot 不能编辑用户的消息 ⇒ 平台回
+     `message to edit not found` ⇒ 每次补发先浪费一次 API 调用再降级
+  3. `enqueue_outbound_editing` 同样**零生产调用点**
+     —— 没人往 outbox 写带编辑意图的行
+
+⇒ **我原计划「补 `edit_of` 进 payload」是伪任务**（已撤销）。
+真要生效需：先发占位消息 → 把**它自己的** message_id 落库
+（**要改 `nt_store` schema**）→ 给 `enqueue_outbound_editing` 补生产调用点。
+
+⇒ **风险表里「`edit_of` 静默退化」那一行的前提也要改**：
+退化**不可能**来自写入侧缺失，而是**取值指向了不可编辑的消息**。
+
+### 🟡 P0 恢复可构建性只验了 lib 一条腿（`9bbc9dc2` 漏网）
+
+`cargo check --all-targets` 立即失败：
+```
+error[E0432]: unresolved import `neotrix::l5_cognition::nt_mind::nt_mind::evolution::experiment`
+error: could not compile `neotrix` (bench "neotrix_benchmarks")
+  --> neotrix-core/benches/neotrix_benchmarks.rs:20
+```
+`nt_mind/nt_mind/evolution/` 下**没有 `experiment` 模块** ⇒ **bench 编译不过**。
+
+`9bbc9dc2`（09-28「补齐 HEAD 缺失文件…恢复干净检出的可构建性」）
+恢复了 **lib** 却漏了 **bench**。
+⇒ 与 `R-DISK-8`「测逻辑 ≠ 测可达性」同族：验了「lib 能编」，
+没验「**`cargo bench` 能编**」。
+⇒ **建议**：`check-fresh-build.sh` 加 `--all-targets` 档。
+
 ## 🆕 2026-09-28 单窗口汇总修复（架构侧吸收轮）
 
 > **唯一汇总入口**：`sessions/handoff-consolidate-all-windows-20260928.md`

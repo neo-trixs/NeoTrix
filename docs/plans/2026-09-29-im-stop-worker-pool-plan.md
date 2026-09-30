@@ -389,3 +389,57 @@ python3 scripts/ops/nt_mapgen.py && python3 scripts/ops/nt_topology.py
 - ⛔ 勿把 in-flight 粒度定成 channel 或 bot —— 已决断 `conversation_id`
 - ⛔ 勿只断言「令牌送达」当作 `/stop` 成功 —— 要回库核对 `turn_stop_state`
 - ⛔ 勿在共享工作树原地改这 4 个文件
+
+---
+
+# ⛔ 2026-09-30 Task 2 撤销：它是伪任务（子代理证伪）
+
+派子代理执行 Task 2，结论：**写入侧早已完整，无需改动。**
+
+- `enqueue_outbound_full`（`nt_channel_dispatch.rs:824`）**已在写 `edit_of` 键**，
+  用 `as_object_mut` 而非 `payload["edit_of"] = …`（本 crate 开
+  `-W clippy::indexing_slicing`，`Value` 下标插入在键类型不对时会 panic），
+  且 `:820-823` 的文档明说这是**故意**「有值才插键」，
+  为的是让老 payload 与新 payload 字节相同、避免历史队列雪崩。
+- `payload_edit_of`（`:681`）读的键 `"edit_of"` 与写入侧**逐字一致**。
+- **4 个测试已锁死该行为**：`enqueue_writes_the_edit_of_key_only_when_asked_to`（`:1451`）、
+  `outbox_drain_passes_edit_of_through_to_the_channel`（`:1415`）、
+  `payload_edit_of_treats_a_missing_key_as_no_edit`（`:1389`）、
+  `direct_delivery_paths_still_ask_the_channel_to_edit`（`:1484`）。
+
+## ⛔ 本计划 Task 2 的两条指令若执行会造成回归
+
+| 计划原文 | 若执行 |
+|---|---|
+| 「`None` 时写 `null`」 | **直接打破** `enqueue_writes_the_edit_of_key_only_when_asked_to`（`:1468-1471` 断言 `plain_payload.get("edit_of").is_none()`），并违背「有值才插键」的设计意图 |
+| Step 1 的测试模板 | **编不过**：虚构了 `OutboundMessage { channel, … }`（该结构体无 `channel` 字段）与 `enqueue_outbound_with_attachments(&store, &msg)`（真实签名 5 个位置参数、无 `edit_of`） |
+
+⇒ **Task 2 撤销。** 教训：计划里的「现状」断言与代码不符时，
+**先读代码再改**；子代理拒绝执行并如实报告，**比造一个「修复」有价值**。
+
+## Step 4（统一 `edit_of` 口径）也撤销
+
+`:416`/`:502` 在 `on_inbound` 里发的是**全新消息**（斜杠指令回执、跑轮结果），
+此时不存在「要编辑的那条出站消息」⇒ `None` **语义正确**。
+`deliver_result`/`sweep_pending` 填 `Some` 是因为它们**确实**在替换用户原消息。
+**两种取值对应两种意图，不是「两处各写一套」** —— 统一掉会让 `on_inbound`
+去编辑一个不存在的东西。
+
+## 真正的问题（三条，已进 `TODO.md`）
+
+1. `deliver_result` **零生产调用点**（只有定义 + 4 个 `#[cfg(test)]`）
+2. `sweep_pending` 传的是**用户那条入站消息的 id** ⇒ bot 不能编辑用户的消息
+   ⇒ 平台回 `message to edit not found`
+3. `enqueue_outbound_editing` **零生产调用点**
+
+⇒ 真要生效需「先发占位消息 → 把**它自己的** message_id 落库（改 `nt_store` schema）
+→ 给 `enqueue_outbound_editing` 补生产调用点」。**远超 Task 2 范围。**
+
+⇒ **风险表「`edit_of` 静默退化」那一行的前提要改**：退化**不可能**来自写入侧缺失，
+而是**取值指向了不可编辑的消息**。
+
+## ⛔ 另一个独立缺陷（与 `edit_of` 无关，更紧急）
+
+`nt_agent.rs:393`/`:420` 用 `CH_MESSAGE_NEW` 写 outbox，payload **没有 `channel` 键**；
+而 `drain_outbox_once`（`:708-712`）对缺 `channel` 的行**直接 `fail_outbox` 退避重试**，
+且 `drain_outbox` **不按 topic 过滤** ⇒ **这些行永远堵在队列里**。已进 `TODO.md` 🔴 P0。
