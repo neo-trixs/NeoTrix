@@ -15,17 +15,18 @@ use neotrix_neobot::nt_panel::{Answer, AnswerOutcome, Panel, PublishError, Regis
 use neotrix_neobot::nt_store::NeobotStore;
 use serde::Serialize;
 
-/// 数据目录。**待与 CLI 对齐**（见下方 TODO）。
+/// 数据目录。**已与 CLI 对齐**（原 TODO 已闭合）。
 ///
-/// CLI 侧的实际解析逻辑我没在本次核对中确认，所以这里只写约定
-/// `~/.neobot` 并显式标注，而不是假装已经一致 —— 两处不一致会导致
-/// 「桌面建了会话、CLI 看不见」这类极难查的问题。
-fn data_dir() -> Result<PathBuf, String> {
-    // TODO(2026-09-30): 与 crates/neotrix-neobot/src/bin/neobot.rs 的
-    // 数据目录解析对齐（含 `NEOTRIX_HOME` / `NEOBOT_HOME` 之类覆盖变量）。
-    // 未对齐前不要当成已验证行为。
-    let home = std::env::var_os("HOME").ok_or("HOME 未设置")?;
-    Ok(PathBuf::from(home).join(".neobot"))
+/// 之前这里硬编码 `~/.neobot`，而 CLI 走 `NeobotConfig::from_env()`，
+/// 后者认 `NEOBOT_DATA_DIR` / `NEOBOT_POLICY` / `NEOBOT_ENGINE`。
+/// ⇒ 设了 `NEOBOT_DATA_DIR` 时，**CLI 和桌面端会打开两个不同的库**：
+///    桌面建了会话、CLI 看不见。这类问题极难查，所以口径必须**单一**。
+///
+/// 现在两处都问库要，桌面端不再自己拼路径。
+pub fn data_dir() -> Result<PathBuf, String> {
+    neotrix_neobot::NeobotConfig::from_env()
+        .map(|c| c.data_dir)
+        .map_err(|e| format!("解析数据目录失败（检查 NEOBOT_DATA_DIR 等环境变量）：{e}"))
 }
 
 fn open_store() -> Result<NeobotStore, String> {
@@ -625,5 +626,37 @@ mod convo_list_tests {
         let s = serde_json::to_string(&v).unwrap();
         assert!(s.contains("\"last_active\""), "实际：{s}");
         assert!(s.contains("\"task_count\":3"), "实际：{s}");
+    }
+}
+
+#[cfg(test)]
+mod data_dir_tests {
+    use super::*;
+
+    /// ⚠️ 「设了 NEOBOT_DATA_DIR」那条**不在这里**。
+    ///
+    /// 上一版把它放在单元测试里，锁只串行了本模块的 3 条测试 ——
+    /// 而另外 19 条（`open_store` 会间接调 `data_dir`）**并行跑**，
+    /// 于是它们看见了我设的临时目录 ⇒ 3 条失败。
+    ///
+    /// ⇒ 改环境变量的测试必须**换进程**（`tests/data_dir_env.rs`）。
+    ///    锁只能保护**自己那几条**，保护不了别人。
+    #[test]
+    fn 与库的配置口径一致() {
+        // 同一环境下两边必须一致（防止将来有人又自己拼路径）。
+        assert_eq!(
+            data_dir().expect("桌面端"),
+            neotrix_neobot::NeobotConfig::from_env().expect("库侧").data_dir
+        );
+    }
+
+    #[test]
+    fn 未设时落在家目录下的点neobot() {
+        if std::env::var("NEOBOT_DATA_DIR").is_ok() {
+            eprintln!("跳过：外部已设 NEOBOT_DATA_DIR");
+            return;
+        }
+        let d = data_dir().expect("解析");
+        assert!(d.ends_with(".neobot"), "实际：{d:?}");
     }
 }

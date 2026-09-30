@@ -63,7 +63,7 @@ neobot_panel_publish        neobot_panel_clear          neobot_panel_demo_publis
 | `nt_shot.mjs` | 界面截图（HTTP 服务方式） | — |
 | `nt_check_status.mjs` | **本文件与实测是否一致** | 见 §4 |
 
-**前端 7 组自测 + 库测试45 条（库 26 + command 层 19）Rust 测试。**
+**前端 7 组自测 + 库测试47 条（库 26 + app 21，另有 3 条进程隔离集成测试）Rust 测试。**
 
 > 复现：`node scripts/ops/nt_check_{tokens,bytes,ipc,layout,status}.mjs` ·
 > `cd apps/neobot-desktop/frontend && node selftest.mjs` ·
