@@ -111,6 +111,18 @@ pub const SPECS: &[ApiSpec] = &[
         "契约全量清单，界面据此渲染"),
     ApiSpec::new("neobot_api_call", "API", &["name", "args"], "ApiCallResult", Status::Implemented,
         "按名字分派；Stub/Planned 返回结构化说明而不抛错"),
+    // ── 核心/备份/配置（优先级 2：接线，neotrix 库已有底层能力） ──
+    ApiSpec::new("get_cores", "核心", &[], "HarnessCore[]", Status::Implemented,
+        "⚠️ neotrix 的 core = provider+model，**不是** DSH 的引擎二进制"),
+    ApiSpec::new("set_active_core", "核心", &["core"], "void", Status::Implemented,
+        "按 id 查库，⛔ 不用界面回传整包（那份可能已过期）"),
+    ApiSpec::new("remove_core", "核心", &["id"], "void", Status::Implemented, ""),
+    ApiSpec::new("list_backups", "备份", &[], "BackupInfo[]", Status::Implemented,
+        "⛔ 必须排序：目录遍历顺序不保证是时间序"),
+    ApiSpec::new("delete_backup", "备份", &["path"], "void", Status::Implemented,
+        "⛔ 只允许删备份目录内的路径，否则「删备份」=「删任意文件」"),
+    ApiSpec::new("update_app_config", "配置", &["config"], "void", Status::Implemented,
+        "⛔ **合并**写入。覆盖会把调用方没带的字段清成默认值"),
     // ── 平台接线（优先级 1：不是 agent 能力，是操作系统能力） ──
     ApiSpec::new("open_external_url", "平台", &["url"], "void", Status::Implemented,
         "⛔ 只放行 http/https —— file:// 会让对话里的链接变成任意本地文件读取入口"),

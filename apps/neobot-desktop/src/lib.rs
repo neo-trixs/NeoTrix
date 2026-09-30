@@ -15,5 +15,6 @@ pub const FRONTEND_DIST: &str = "../frontend/dist";
 /// 「命令名 → 函数 → 库」这段接线就只能在发布后才第一次被执行。
 pub mod api;
 pub mod commands;
+pub mod core;
 pub mod desktop;
 pub mod platform;

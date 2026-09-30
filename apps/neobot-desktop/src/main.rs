@@ -47,6 +47,12 @@ pub fn run() {
         // 面板注册表由应用持有：骨架下发时登记，界面作答时按 id 查。
         .manage(neobot_desktop::commands::AppState::default())
         .invoke_handler(tauri::generate_handler![
+            neobot_desktop::core::get_cores,
+            neobot_desktop::core::set_active_core,
+            neobot_desktop::core::remove_core,
+            neobot_desktop::core::list_backups,
+            neobot_desktop::core::delete_backup,
+            neobot_desktop::core::update_app_config,
             neobot_desktop::platform::open_external_url,
             neobot_desktop::platform::write_clipboard_text,
             neobot_desktop::platform::read_clipboard_image,
