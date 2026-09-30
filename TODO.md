@@ -1538,3 +1538,25 @@ keywords("支付网关")                     -> ['支付网关']                
 - 与现有 `check-unwrap.sh` 棘轮**同构**，可复用其「基线 + 只报新增」形态，增量成本极低
 - 与 `nt_dispatch_loop.rs:898`、`nt_channel_serve.rs:278` 这类**仓内已有的正确范式**对齐，
   不是新发明 —— 规约来自代码自身
+
+## 🆕 2026-09-30 吸收存活率（G5 关闭一环）
+
+> 工具 `scripts/ops/nt_absorption_live.py`（已注册 task-index `absorb-live`，44 条）。
+> 把 `ABSORPTION-MAP-TASKS-2026-09-29.md` 当单一事实源（不另建基线文件防漂移），
+> 核对 §1.1「已落地」断言今天是否成立 + §1.3「已拒绝」名字是否复活。
+> 只用 `rg -F`（本机 `rg -E` 静默返回 0，已有门训）。
+
+### 实测结果（2026-09-30 首跑，25 token）
+
+- alive-or-consistent=9 · moved=0 · **dead（已落地）=0** · needs-review=5 · external=2 · unparseable=9
+- 5 条 needs-review **全部人工核实完毕**，无复活：
+  - `supermemory`（3 文件）：doc 注释引用（"参照/patterns from"），引擎本身未复制 —— 符合"思想吸收、代码不抄"的拒绝结论 ✅
+  - `Aegis`（5 文件）：注释引用 + 自家 `AegisEngine`（HarnessX 四阶段进化引擎，与被拒的"安全防护"前提**同名不同物**，无传承）✅
+  - `typesafe`（2 文件）：benchmark 数据格式引用 ✅
+  - `CapabilityRegistry`、`maturity_audit`：属 §1.3"前提已满足"子类，本来就该在 ✅
+- 修掉的工具 bug（先证伪再修）：多命中判死（`check-ci-refs.sh` 有 scripts/ 与 scripts/probes/ 两份）；`org/repo` 外部名误判路径；连字符裸名未补扩展名；拒绝区语义反转（absent=一致，present=待审）。
+
+### 方法论沉淀
+
+- **判据设计本身也要先证伪**：第一版"搜索体含 doc"导致自满足（0 候选、假装无问题）；正确版去注释后 2,423 候选中英文单词淹没 ⇒ 通用门不可行，遂收窄为"单一文档已落地断言核对"。
+- **已证否不建的门**（与死代码门、doc 承诺门同理）：跨 crate 全集符号匹配。

@@ -1,5 +1,5 @@
 {
- "_about": "任务→工具机器索引。解决「日常任务要跑哪个脚本」需全文读 AGENTS.md 的问题。 2026-09-29：check-doc-drift 增加根文档死链档。 2026-09-29：新增 check-untracked-assets（R-EXIST-1 未入库资产门，39→40 条）。 2026-09-29：新增 check-unwrap 生产 panic 棘轮（40→41 条）。\n2026-09-30：新增 check-feature-gates（feature 门控编译门，6 个非默认 feature）。\n2026-09-30：新增 check-silent-failure（静默失败棘轮，44 条基线）。",
+ "_about": "任务→工具机器索引。解决「日常任务要跑哪个脚本」需全文读 AGENTS.md 的问题。 2026-09-29：check-doc-drift 增加根文档死链档。 2026-09-29：新增 check-untracked-assets（R-EXIST-1 未入库资产门，39→40 条）。 2026-09-29：新增 check-unwrap 生产 panic 棘轮（40→41 条）。\n2026-09-30：新增 check-feature-gates（feature 门控编译门，6 个非默认 feature）。\n2026-09-30：新增 check-silent-failure（静默失败棘轮，44 条基线）。\n2026-09-30：新增 absorb-live（已吸收技术存活率，MAP-TASKS 为单一事实源）。",
  "_schema": {
   "id": "任务意图的稳定 slug（小写连字符）",
   "query": "自然语言触发词数组 —— agent 用它做匹配",
@@ -675,6 +675,22 @@
    "read_only": true,
    "when_not": "日常改码不必跑（纯静态分析，秒级）；改了落库/发送/落盘的错误处理、或新增 `let _ =` 时跑。也别拿它判 best-effort 策略对错 —— 基线里的 44 条是「已知且有意」，判据在 TODO.md §全量审计",
    "spec": "2026-09-30 新增。规约来自仓内已有答案 nt_channel_serve.rs:278。门内高信号 44 条，范围外 209 条（remove_file/.send*）显式报出不静默漏。首次运行抓到 4 条 P0，已修 3 条 + agent.rs 1 条"
+  },
+  {
+   "id": "absorb-live",
+   "query": [
+    "吸收存活率",
+    "已落地断言",
+    "吸收审计",
+    "MAP-TASKS 核验",
+    "技术还活着吗",
+    "G5 存活率"
+   ],
+   "tool": "python3 scripts/ops/nt_absorption_live.py [--strict] [--doc PATH]",
+   "kind": "absorb",
+   "read_only": true,
+   "when_not": "只认 MAP-TASKS §1.1（已落地）与 §1.3（已拒绝）两节的反引号 token；ROUND 系列文档不在默认范围。拒绝区名字出现≠复活（多为证伪记录注释），见输出 needs-review 人工复核，不要直接判死",
+   "spec": "docs/architecture/GLOBAL-MAP-DEFECTS-2026-09-30.md 第五部分；只用 rg -F（本机 rg -E 静默返回 0）"
   }
  ],
  "excluded": {
