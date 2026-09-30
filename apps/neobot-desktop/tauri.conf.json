@@ -4,7 +4,7 @@
   "version": "0.24.0",
   "identifier": "com.neotrix.neobot",
   "build": {
-    "frontendDist": "../frontend/dist",
+    "frontendDist": "frontend/dist",
     "devUrl": null,
     "beforeDevCommand": "npm --prefix ../frontend run dev",
     "beforeBuildCommand": "npm --prefix ../frontend run build"

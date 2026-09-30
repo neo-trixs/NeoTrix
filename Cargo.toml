@@ -10,6 +10,7 @@ members = [
     "crates/nt-core-capability-tree",
     "crates/neotrix-neobot",
     "crates/neotrix-audit",
+    "apps/neobot-desktop",
 ]
 
 resolver = "2"
