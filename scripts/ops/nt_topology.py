@@ -227,13 +227,31 @@ def audit_dup_types(rs):
             if m and not body.lstrip().startswith("//"):
                 out.append("%s:%s" % (m.group(1), m.group(2).rstrip(",")))
                 continue
-            # enum variant:  Name  /  Name {..}  /  Name(..)
-            m = re.match(r"\s*(\w+)\s*(?:\{|\(|$)", body)
+            # enum variant:  Name  /  Name,  /  Name {..}  /  Name(..)
+            # ⚠️ 2026-09-30 bugfix #2. The old tail was `(?:\{|\(|$)` which
+            # does NOT match `Low,` — a unit variant written with a trailing
+            # comma (which is what rustfmt produces for every multi-variant
+            # enum). Result: `fields()` returned `()` for **every payload-free
+            # enum**, `if s:` was false, and the whole group was silently
+            # dropped. Proved on GoalPriority: 3 real copies, audit saw 0.
+            # Accept `,` as a terminator too.
+            m = re.match(r"\s*(\w+)\s*(?:\{|\(|,|$)", body)
             if m and not body.lstrip().startswith(("//", "#[", "}")):
-                out.append(m.group(1) + "*")   # * = carries a payload/shape
+                out.append(m.group(1) + "*")   # * = variant name (payload-bearing or not)
             if started and depth <= 0:
                 break
-        return tuple(out)
+        # ⚠️ 2026-09-30 bugfix #3. The signature was an ORDERED tuple, so two
+        # enums with the same variants written in a different order were judged
+        # different types. On GoalPriority that split 3 copies into 2+1 and
+        # the odd one out was dropped. Enum declaration order is not part of
+        # type identity (it only sets the `Ord` default, which we must not
+        # treat as identity either — see note below).
+        #   => sort, so order-insensitive.
+        # NOTE: a custom `Ord` impl (e.g. `rank()`) may deliberately differ
+        # from declaration order. Sorting hides that. It is a *candidate*
+        # signal, not a verdict — every group still needs a doc-comment read
+        # before merging (see docs/plans/2026-09-29-dup-types-consolidation-plan.md).
+        return tuple(sorted(out))
 
     groups = []
     for name, locs in by.items():
@@ -497,6 +515,22 @@ def main():
     A("| 名义多余定义 | %d | 每名保留 1 份后余下的（**含异构**） |" % name_extra)
     A("| **结构完全相同**的真重复组 | **%d** | 字段集合逐项相同 |" % len(groups))
     A("| **真正可归并的定义** | **%d** | 只有这个数才叫「可归并」 |" % iso_extra)
+    A("")
+    A("> ⚠️ **本表数字是「候选」，不是「结论」** —— 三次判据缺陷已修（2026-09-30），"
+      "每次都显著抬高数字，说明历史上每次都在**漏判**：")
+    A(">")
+    A("> 1. `fields()` 只认无负载私有字段 ⇒ 把 `Position{f32}` 与 `Position{f64}` 判同构")
+    A("> 2. 变体正则不认尾逗号 ⇒ **所有无负载 enum 被静默丢弃**（`GoalPriority` 3 份，审计看见 0）")
+    A("> 3. 签名顺序敏感 ⇒ 声明序相反的同枚举被判异构")
+    A(">")
+    A("> 三处修完：147 → **%d** 组 / 174 → **%d** 可归并。**下一个同类缺陷仍可能存在。**" % (len(groups), iso_extra))
+    A(">")
+    A("> ⛔ **顺序敏感那条是双刃**：排序让「声明序不同」判同构了，但 enum 的"
+      "**自定义 `Ord` 实现可能刻意不同于声明序**（如 `rank()`）—— 排序会把这种差异隐藏掉。")
+    A("> ⇒ **每一组在归并前必须读 doc comment 判语义**，本表只负责缩小候选范围。")
+    A("> 已验证的误报样例：`Position`（f32/f64，已排除）、`Output`（`Add`/`Sub`/`Mul` 的"
+      "**强制**关联类型 `type Output = Self;`，不可合）、`ThreatLevel` 的 2 份组"
+      "（带注释「mirrors anti_distillation for module independence」= 刻意重复）。")
     A("")
     A("⇒ %d 个同名里，**只有 %d 个结构真同构**（占名义多余的 %d%%）。"
       % (dupnames, iso_extra, round(iso_extra / (name_extra or 1) * 100)))
