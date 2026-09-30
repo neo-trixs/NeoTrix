@@ -11,6 +11,7 @@ use std::path::PathBuf;
 
 use neotrix_neobot::nt_core::{agent_run, capabilities_or_default, CapabilitiesInfo, AgentRunResult};
 use neotrix_neobot::nt_evidence::{audit, EvidenceReport};
+use neotrix_neobot::nt_panel::{validate_answer, Answer, AnswerOutcome, Panel};
 use neotrix_neobot::nt_store::NeobotStore;
 use serde::Serialize;
 use tauri::Manager;
@@ -98,6 +99,20 @@ pub async fn neobot_send(text: String) -> Result<AgentRunResult, String> {
     })
     .await
     .map_err(|e| format!("发送任务异常：{e}"))?
+}
+
+/// `neobot_panel_answer(answer, panel) -> AnswerOutcome`
+///
+/// 决策面板的作答入口。骨架侧的过期检测在这里，而**不只在前端** ——
+/// 前端那份校验发生在用户的浏览器里，真正的状态判定不能建立在
+/// 一个调用方可以改的检查上。
+///
+/// ⚠️ 签名刻意把 **panel 一并传入**而不是让服务端去查：当前骨架尚未维护
+///    面板注册表（面板是随事件下发的）。等它有了真源，这里改成只收
+///    `answer` 并按 id 查 —— 那时这条注释与签名一起改，且有测试盯着。
+#[tauri::command]
+pub fn neobot_panel_answer(answer: Answer, panel: Panel) -> AnswerOutcome {
+    validate_answer(&panel, &answer)
 }
 
 /// 能力快照 —— 前端能力矩阵的**真源**。

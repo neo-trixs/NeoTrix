@@ -40,6 +40,7 @@ pub fn run() {
             neobot_desktop::commands::neobot_convo_dm,
             neobot_desktop::commands::neobot_core_capabilities,
             neobot_desktop::commands::neobot_evidence_summary,
+            neobot_desktop::commands::neobot_panel_answer,
         ])
         .run(tauri::generate_context!())
         .expect("启动 NeoBot 失败");

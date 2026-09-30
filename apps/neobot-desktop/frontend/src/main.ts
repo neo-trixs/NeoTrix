@@ -20,7 +20,7 @@ import { invoke, type Commands, type TraceRow } from "./ipc.ts";
 import { renderList, type ListItem } from "./list.ts";
 import { openSheet } from "./ui/sheet.ts";
 import { appendBlock } from "./ui/blocks.ts";
-import { answerToText } from "./ui/panel-view.ts";
+import type { AnswerView } from "./ui/panel-view.ts";
 import type { DecisionPanel } from "./ui/block-model.ts";
 import type { EvidenceReport } from "./ipc.ts";
 import { renderIsland } from "./ui/island.ts";
@@ -152,31 +152,56 @@ function pushTool(steps: ToolStep[]): void {
 }
 
 /**
- * 决策面板的作答回流。
+ * 决策面板的作答回流 —— 走**骨架侧**的校验命令。
  *
- * ⛔ 真实实现应调 `neobot_panel_answer` 把 `candidateSetVersion` 一起送回，
- *    骨架据此判断这是不是**过期作答**。当前后端尚无该命令
- *    （见 FRONTEND-GAP），故先落成本地回显并**显式说明**，
- *    不假装骨架已经收到。
+ * ⛔ 上一版用 `neobot_send` 把答案当普通文本发出去，等于**绕过了过期检测**：
+ *     骨架收到的是一句「[选择] A（候选集 v1）」，它无从判断 v1 是不是过期。
+ *     现在发 `neobot_panel_answer`，由 `nt_panel::validate_answer` 判定。
+ *     前端那份校验仍在（要即时反馈），但它**只是体验，不是保护** ——
+ *     真正的状态判定必须在骨架这侧。
  */
-function onPanelAnswer(a: { optionId: string; candidateSetVersion: number; label: string }): void {
-  // ⚠️ 必须把 selectedId 写回块流，否则活动岛会一直说「等你选择」，
-  //    用户以为没提交成功就会再点一次。
+function onPanelAnswer(a: AnswerView): void {
   const pend = hasPendingPanel(blocks);
-  if (pend) {
-    for (const b of blocks) {
-      if (b.kind === "panel" && b.panel.id === pend.id) b.panel.selectedId = a.optionId;
-    }
-  }
-  setBusy(true);
-  void call("neobot_send", { text: answerToText(a) }).then((r) => {
-    setBusy(false);
-    if (r.ok) {
-      say("bot", r.value.output || "（已记录你的选择）", r.value.model_used);
+  if (!pend) return;
+  const res = call("neobot_panel_answer", {
+    answer: {
+      panel_id: pend.id,
+      option_id: a.optionId,
+      candidate_set_version: a.candidateSetVersion,
+    },
+    // 线格式：库类型未开 camelCase，跨 IPC 用 snake_case。
+    panel: {
+      id: pend.id,
+      thread_id: pend.threadId,
+      turn_id: pend.turnId,
+      candidate_set_version: pend.candidateSetVersion,
+      kind: pend.type,
+      title: pend.title,
+      options: pend.options.map((o) => ({
+        id: o.id, label: o.label, details: [...o.details],
+        sources: o.sources.map((x) => ({ title: x.title, url: x.url })),
+      })),
+      mode: pend.mode,
+    },
+  });
+  void res.then((r) => {
+    if (!r.ok) { note("error", r.error, undefined, true); return; }
+    const out = r.value;
+    if ("accepted" in out) {
+      for (const b of blocks) {
+        if (b.kind === "panel" && b.panel.id === pend.id) b.panel.selectedId = a.optionId;
+      }
+      setBusy(false);
+      say("bot", `已记录你的选择：${a.label}`, `候选集 v${a.candidateSetVersion}`);
     } else {
-      // 骨架还没实现该命令 ⇒ 明确说出来，不假装送达
-      note("warn", `选择已记在本机，骨架尚未接收：${r.error}`);
-      say("user", answerToText(a));
+      // 骨架拒收 ⇒ 提示重选，**不要**把选择标成已答（那是谎报状态）
+      const rej = out.rejected;
+      const why = "stale" in rej
+        ? `候选集已更新（v${rej.stale.answered} → v${rej.stale.current}），请重新选择`
+        : "no_such_option" in rej ? "该选项已不在候选集里，请重新选择"
+        : "no_such_panel" in rej ? "该面板已失效，请重新发起"
+        : `骨架拒绝了该面板：${rej.panel_invalid}`;
+      note("warn", why);
     }
   });
 }

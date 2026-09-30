@@ -37,6 +37,7 @@ pub mod nt_cost;
 pub mod nt_daemon;
 pub mod nt_engine;
 pub mod nt_evidence;
+pub mod nt_panel;
 pub mod nt_error;
 pub mod nt_export;
 pub mod nt_git;

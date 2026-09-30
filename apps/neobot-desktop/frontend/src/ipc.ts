@@ -79,6 +79,39 @@ export interface CapabilitySnapshot {
   model_source: string;
 }
 
+/** Rust: nt_panel::Answer（serde 默认字段名） */
+export interface Answer {
+  panel_id: string;
+  option_id: string;
+  /** 界面**看到**的候选集版本。骨架拿它和自己当前的比，对不上即过期。 */
+  candidate_set_version: number;
+}
+
+/** Rust: nt_panel::Panel —— 跨 IPC 用 snake_case（库类型未开 camelCase）。 */
+export interface DecisionPanelWire {
+  id: string;
+  thread_id: string;
+  turn_id: string;
+  candidate_set_version: number;
+  kind: "clarification" | "comparison";
+  title: string;
+  options: { id: string; label: string; details?: string[]; sources: { title: string; url: string }[] }[];
+  mode?: "sample" | "live";
+}
+
+/**
+ * Rust: nt_panel::AnswerOutcome
+ *
+ * ⛔ `accepted` 用小写 `accepted` 而不是「两个变体」：
+ *    骨架侧 `Accepted`/`Rejected(Reject)` 经 serde 变成
+ *    `{ "accepted": null }` / `{ "rejected": {...} }`（externally tagged）。
+ *    界面**必须**按这个形状读，不能假设 `ok: boolean`。
+ */
+export type AnswerOutcomeWire =
+  | { accepted: null }
+  | { rejected: { no_such_panel: null } | { stale: { current: number; answered: number } }
+      | { no_such_option: null } | { panel_invalid: string } };
+
 /** 命令表：键=命令名，值={args, ret}。 */
 export interface Commands {
   // @rust main.rs::neobot_agent_run
@@ -93,6 +126,14 @@ export interface Commands {
   neobot_evidence_summary: { args: { text: string }; ret: EvidenceReport };
   // @rust main.rs::neobot_core_capabilities
   neobot_core_capabilities: { args: Record<string, never>; ret: CapabilitySnapshot };
+  // @rust commands.rs::neobot_panel_answer
+  //
+  // ⚠️ 签名里**panel 一并传入**，不是服务端按 id 查 —— 当前骨架尚未维护
+  //    面板注册表（面板随事件下发）。等它有真源后改签名，此处与 Rust 同步改。
+  neobot_panel_answer: {
+    args: { answer: Answer; panel: DecisionPanelWire };
+    ret: AnswerOutcomeWire;
+  };
 }
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
