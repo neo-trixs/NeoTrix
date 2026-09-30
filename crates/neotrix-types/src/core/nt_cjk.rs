@@ -20,7 +20,7 @@
 //!
 //! 假名/谚文/全角同理：把它们塞进 bigram 会得到跨文字系统的无意义二字组。
 //!
-//! ## 环��依赖已解除
+//! ## 环形依赖已解除
 //!
 //! `context_strategy.rs` 的 `is_cjk` 曾注释「与 `neotrix-core::context_budget::is_cjk`
 //! 口径一致」，而 **`context_budget` 模块根本不存在**；`nt_core_llm/mod.rs` 又反向

@@ -299,7 +299,7 @@ pub fn admit_reason(access: AccessMode, allow_list: &[String], is_dm: bool, send
 /// **必须带 chat**：平台的 `message_id` 是**按聊天各自编号**的
 /// （每个 chat 都从 1 开始）。早先的键只有 `channel:message_id`，
 /// 于是 A 群的 5 号与 B 群的 5 号撞成同一个键，**后一条被当成重复静默丢掉** ——
-/// 多机器人/多群正是这套设计要支持���场景，丢的却是真消息。
+/// 多机器人/多群正是这套设计要支持的场景，丢的却是真消息。
 pub fn dedup_key(channel: &str, chat: &str, message_id: &str) -> String {
     format!("{channel}:{chat}:{message_id}")
 }
@@ -360,7 +360,7 @@ mod tests {
         // 同一条消息 id 在两个渠道上不串。
         assert_ne!(dedup_key("tg", "c1", "42"), dedup_key("dc", "c1", "42"));
         // **回归锁**：同一渠道、同一个 message_id，但在**不同聊天**里
-        // 必须是两条不同的键 —— 否则两个群各自��� 5 号消息会互相顶掉。
+        // 必须是两条不同的键 —— 否则两个群各自发 5 号消息会互相顶掉。
         assert_ne!(
             dedup_key("telegram", "chatA", "5"),
             dedup_key("telegram", "chatB", "5"),
