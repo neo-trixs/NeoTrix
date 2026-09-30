@@ -16,6 +16,7 @@
 import { CapabilityRegistry, type PluginSelf } from "./plugin/contract.ts";
 import { defaultCapabilities } from "./host/host.ts";
 import type { HostKind } from "./plugin/contract.ts";
+import { invoke, type Commands, type TraceRow } from "./ipc.ts";
 import { openSheet } from "./ui/sheet.ts";
 import { appendBlock } from "./ui/blocks.ts";
 import { renderIsland } from "./ui/island.ts";
@@ -171,20 +172,22 @@ function setBusy(v: boolean): void {
 }
 
 // ── 宿主调用（规则 ①：只在这里碰 invoke） ──────────────────────
-type Result<T> = { ok: true; value: T } | { ok: false; error: string };
-
-/** Tauri 存在时走 IPC，否则返回一个**可读**的失败原因而不是崩。 */
-async function call<T>(cmd: string, args: Record<string, unknown> = {}): Promise<Result<T>> {
-  if (HOST !== "tauri") {
-    return { ok: false, error: `浏览器预览下无法调用 ${cmd}（没有 Tauri 运行时）` };
-  }
-  try {
-    const core = await import("@tauri-apps/api/core");
-    return { ok: true, value: (await core.invoke(cmd, args)) as T };
-  } catch (e) {
-    return { ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 200) };
-  }
-}
+/**
+ * 薄封装：把「是否 Tauri 宿主」这层判断收在这里，调用点只管业务。
+ *
+ * ⛔ 旧版是 `call<T>(cmd, args) { ... as T }` —— 返回类型由**调用方断言**，
+ *    于是 `call<string>("neobot_evidence_summary")` 编译通过而运行时炸
+ *    （后端返回的是对象）。
+ *
+ * ⚠️ 这里**必须**直接写 `<K extends keyof Commands>` 并用 `Commands[K][...]`。
+ *    第一版写成 `call<K extends Parameters<typeof invoke>[0]>`，K 被拓宽成
+ *    键的并集 ⇒ 按键的 args/ret 推导全部失效（tsc 报 5 处），
+ *    等于把「推导」悄悄退回「union 后什么也推不出来」。
+ */
+const call = <K extends keyof Commands>(
+  cmd: K,
+  args: Commands[K]["args"],
+): ReturnType<typeof invoke<K>> => invoke(cmd, args, HOST === "tauri");
 
 // ── 能力入口 ────────────────────────────────────────────────
 /** convo_group：建群（DSH sheet 形态：标题 + 多选成员） */
@@ -203,7 +206,7 @@ function newGroup(): void {
     onSubmit: async (v) => {
       const title = String(v["title"] ?? "").trim() || "新群";
       const members = (v["members"] as string[] | undefined) ?? [];
-      const r = await call<string>("neobot_convo_group", { title, members });
+      const r = await call("neobot_convo_group", { title, members });
       if (!r.ok) return r.error;          // 失败留在弹层里，不静默关闭
       mark(`群组 · ${title}`);
       return undefined;
@@ -226,8 +229,7 @@ function runOnce(): void {
       if (!goal) return "「目标」不能为空";
       const ctx = String(v["context"] ?? "").trim();
       setBusy(true);
-      const r = await call<{ status: string; output: string; model_used?: string }>(
-        "neobot_agent_run", ctx ? { goal, context: ctx } : { goal });
+      const r = await call("neobot_agent_run", ctx ? { goal, context: ctx } : { goal });
       setBusy(false);
       if (!r.ok) return r.error;
       say("bot", r.value.output || `（${r.value.status}，无输出）`, r.value.model_used);
@@ -240,12 +242,24 @@ function runOnce(): void {
 function evidence(): void {
   const text = thread.textContent ?? "";
   if (!text.trim()) { note("warn", "这一轮还没有内容可审"); return; }
-  void call<string>("neobot_evidence_summary", { text }).then((r) => {
+  void call("neobot_evidence_summary", { text }).then((r) => {
     if (!r.ok) { note("error", r.error, undefined, true); return; }
-    const ok = r.value.includes("齐备");
-    // 证据是「对整轮的判断」，不是一句回复 ⇒ 走 tool 卡（可折叠、可追溯步骤），
-    // 而不是伪装成一条消息。
-    pushTool([{ kind: ok ? "证据齐备" : "证据不足", detail: r.value, failed: !ok }]);
+    const rep = r.value;
+    // 证据是「对整轮的判断」，不是一句回复 ⇒ 走 tool 卡（可折叠、步骤可逐条看）。
+    // ⛔ 不再伪装成 string：后端返回的是完整报告，把 findings 逐条列出来
+    //    才知道「哪一句有问题」。只回一句「证据不足」等于把问题藏起来。
+    const steps: ToolStep[] = rep.findings.map((f) => ({
+      kind: f.kind === "overclaim" ? "过度断言" : f.kind === "unsourced" ? "断言无出处" : "数值不符",
+      detail: f.excerpt,
+      failed: true,
+    }));
+    if (rep.clean) steps.unshift({ kind: "证据齐备", detail: rep.summary });
+    else steps.unshift({ kind: "证据不足", detail: rep.summary, failed: true });
+    // ratio 为 null 表示「没断言过」—— 不能显示成 0%
+    if (rep.sourced_ratio !== null) {
+      steps.push({ kind: "有出处比例", detail: `${Math.round(rep.sourced_ratio * 100)}%` });
+    }
+    pushTool(steps);
   });
 }
 
@@ -300,19 +314,19 @@ $("btn-send").addEventListener("click", () => {
   say("user", text);
   input.value = "";
   setBusy(true);
-  void call<{ output?: string; status?: string; trace?: unknown[] }>("neobot_send", { text })
+  void call("neobot_send", { text })
     .then((r) => {
       setBusy(false);
       if (!r.ok) { note("error", `发送失败：${r.error}`, undefined, true); return; }
       // 工具步骤若随结果一起回来，就落成折叠卡；没有就只显示回复。
-      const steps = Array.isArray(r.value.trace) ? r.value.trace : [];
-      if (steps.length > 0) {
-        pushTool(steps.map((t) => {
-          const o = t as { kind?: string; detail?: string; failed?: boolean };
-          return { kind: o.kind ?? "tool", detail: o.detail ?? "", failed: o.failed };
-        }));
+      if (r.value.trace.length > 0) {
+        pushTool(r.value.trace.map((t: TraceRow) => ({
+          kind: t.kind,
+          detail: t.detail,
+          failed: t.failed,
+        })));
       }
-      say("bot", r.value.output ?? "（无输出）");
+      say("bot", r.value.output || "（无输出）", r.value.model_used);
     });
 });
 input.addEventListener("keydown", (e) => {

@@ -754,7 +754,7 @@ $ git show --numstat --format='' 477bf669 | awk '$3 ~ /\.rs$/ …'
 
 ## 7. 附带发现：`cargo check --all-targets` 编译不过（与本审计同源）
 
-### 7.1 `neotrix-core/benches/` 引��不存在的模块
+### 7.1 `neotrix-core/benches/` 引用不存在的模块
 
 ```
 error[E0432]: unresolved import `neotrix::l5_cognition::nt_mind::nt_mind::evolution::experiment`
