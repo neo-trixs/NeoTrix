@@ -170,16 +170,44 @@ fn profiles_path() -> PathBuf {
 /// Global profile manager fallback — prefer `CliContext` injection instead.
 pub static PROFILE_MANAGER: LazyLock<Mutex<ProfileStore>> = LazyLock::new(|| {
     let path = profiles_path();
-    let store = if path.exists() {
-        std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| toml::from_str::<ProfileStore>(&s).ok())
-            .unwrap_or_default()
-    } else {
-        let store = ProfileStore::builtin();
-        let _ = save_profiles_to_disk(&store);
-        store
-    };
+      let store = if path.exists() {
+          // 2026-09-30: 原为 `.ok().and_then(…ok()).unwrap_or_default()` 三段折叠 ——
+          // 「文件存在但读不出来（权限）」与「内容解析失败（写入被截断 / 磁盘满 / 手改）」
+          // 两种情况都静默替换为 `ProfileStore::default()`（= builtin），
+          // **用户的自定义档全部消失且无备份、无日志**。而随后任一
+          // `switch_profile` / `create_profile` / `remove_profile` / `set_rule`
+          // 都会 `save_profiles_to_disk` 用 builtin+增量**整文件覆写**
+          // ⇒ 损坏文件里尚可抢救的内容被永久销毁。
+          // ⛔ 此处**只补可观测性，不加 `create_dir_all` 之类「顺手修复」** ——
+          //    补可观测性与行为变更必须分开，否则会像 cleanup 那次一样
+          //    凭空创建原本不存在的东西（那次被测试当场抓出）。
+          let store = match std::fs::read_to_string(&path) {
+              Ok(text) => match toml::from_str::<ProfileStore>(&text) {
+                  Ok(s) => s,
+                  Err(e) => {
+                      log::error!(
+                          "[profiles] 解析失败 {}: {e} —— 已退回内置档；\
+                               首次写入将整文件覆写，损坏内容不可抢救",
+                          path.display()
+                      );
+                      ProfileStore::builtin()
+                  }
+              },
+              Err(e) => {
+                  log::error!(
+                      "[profiles] 读取失败 {}: {e} —— 已退回内置档；\
+                       首次写入将整文件覆写",
+                      path.display()
+                  );
+                  ProfileStore::builtin()
+              }
+          };
+          store
+      } else {
+          let store = ProfileStore::builtin();
+          let _ = save_profiles_to_disk(&store);
+          store
+      };
     Mutex::new(store)
 });
 

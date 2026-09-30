@@ -291,14 +291,33 @@ impl KnowledgeBase {
                             "source": domain.unwrap_or("unknown"),
                             "extractor": "graphrag",
                         });
-                        let _ = self.upsert_edge_with_metadata(
+                        // 2026-09-30: 原为 `let _ = self.upsert_edge_with_metadata(…)`。
+                        // 该文件 :229-235 的文档把 `write_memory_entry` 定义为
+                        // 「记忆写入的**唯一入口**」并承诺「杜绝平行写入管线」。
+                        // 丢弃这批边 ⇒ 调用方照常拿到成功的 node_id，
+                        // 而语义图缺边 ⇒ **GraphRAG 多跳查询静默少召回，
+                        // 且没有任何指标下降可观测**。
+                        // 同函数 :176 有 `log::warn!`、:216 有 `log::debug!`
+                        // ⇒ 这里是这一段唯一无日志的失败点。照它们改。
+                        let mut dropped_edges = 0usize;
+                        if let Err(e) = self.upsert_edge_with_metadata(
                             &node_id,
                             &target_id,
                             rtype,
                             rel.weight,
                             Some(&rel.evidence),
                             Some(edge_meta),
-                        );
+                        ) {
+                            dropped_edges += 1;
+                            log::warn!(
+                                "[kb-write] GraphRAG 边写入失败 {node_id}->{target_id}: {e}"
+                            );
+                        }
+                        if dropped_edges > 0 {
+                            log::warn!(
+                                "[kb-write] 本次写入有 {dropped_edges} 条 GraphRAG 边未落库 —— 多跳检索将少召回"
+                            );
+                        }
                     }
                 }
                 let _ = entities.len(); // 实体已入 graphrag_store, 主库边来自关系

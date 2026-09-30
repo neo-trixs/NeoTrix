@@ -47,13 +47,23 @@ impl BackgroundLoopHandle {
                         .to_string(),
                     );
                 }
-                if let Ok(mut brain) = self.brain.try_write() {
-                        self.goal_loop.enqueue_goal(
-                            &mut brain,
-                            &format!("event_bus_recovery: {} - {}", source, reason),
-                            None,
-                        );
-                }
+                  // 2026-09-30: 原来只有 `if let Ok(mut brain) = self.brain.try_write()`，
+                  // **无 else**。`GlobalHalt` 是全系统停机事件，其恢复动作就是这个
+                  // `event_bus_recovery` 目标；`try_write()` 在 brain 锁被持有时返回 Err
+                  // ⇒ 恢复目标不入队、无日志、事件处理继续。用户看到
+                  // `GLOBAL HALT` 的 error 日志却等不到任何恢复，日志里也找不到
+                  // 「恢复目标未入队」这一句。⇒ 补 else 分支显式告警。
+                  if let Ok(mut brain) = self.brain.try_write() {
+                      self.goal_loop.enqueue_goal(
+                          &mut brain,
+                          &format!("event_bus_recovery: {} - {}", source, reason),
+                          None,
+                      );
+                  } else {
+                      log::error!(
+                          "[bg] GlobalHalt 恢复目标未入队（brain 锁被占）—— 需人工触发恢复: {source} - {reason}"
+                      );
+                  }
             }
             CoreEvent::ConsciousnessCritique { quality, .. }
                 if *quality < CONSCIOUSNESS_THRESHOLDS.eventbus_critical =>

@@ -300,11 +300,22 @@ impl ArchivalStore {
             .map(|item| item.id.clone())
             .collect();
 
-        let count = to_remove.len();
+        // 2026-09-30: 原为 `let _ = self.remove(id);` 循环完返回 `to_remove.len()`。
+        // `remove` 走 SQLite（SQLITE_BUSY / 只读 / 磁盘满均可失败），失败被吞，
+        // 而返回值是**候选数**不是**删除数** ⇒ 「已清理 N 项」在 0 项被删时同样成立。
+        // 附带：该文件的 `#[cfg(test)]` 用 `ArchivalStore::in_memory`，
+        // **恰好只覆盖了错误不可能发生的那条分支**（in_memory 的 remove 不返回 Err），
+        // 这就是 12,209 测试全绿却抓不到它的原因。
+        // ⇒ 按实际删除数计数，并对失败给出可观测通道。
+        let mut removed = 0usize;
         for id in &to_remove {
-            let _ = self.remove(id);
+            match self.remove(id) {
+                Ok(true) => removed += 1,
+                Ok(false) => {}
+                Err(e) => log::warn!("[archival] 清理失败 {id}: {e}"),
+            }
         }
-        count
+        removed
     }
 
     pub fn len(&self) -> usize {
