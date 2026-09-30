@@ -10,6 +10,7 @@
 
 | 提交 | 内容 |
 |---|---|
+| `144c59a8` | **行为对位通用化 + 第一个真 bug**：中文实体链接按字节算编辑距离（三处单位混用）|
 | `6a4309fb` | 行为对位腿：37/37 步与 `lru@0.18.5` 一致；`ResponseCache::contains()`；P0→P1 改判 |
 | `519d78b9` | `nt_decompose.py`（原子拆解 + 名字级对位）；首次跨仓对位抓到 O(n) 淘汰 |
 | `6a91b77b` | ROUND23 吸收 5 源（oil-ui 已在前一笔 `8810b0dc`）；`nt_calledges --compact` |
@@ -19,8 +20,10 @@
 ```
 原子级拆解  = nt_decompose.py atoms  --db <edges> --root <sym>   （入口 → 原子记录 + oracle）
 名字级对位  = nt_decompose.py parity --mine A --theirs B         （能力矩阵）
-行为级对位  = nt_parity_ref.py（采对方 oracle） + neotrix-core/tests/response_cache_parity.rs
+行为级对位  = nt_parity_ref.py --vectors <f> [--check|--list]    （采对方 oracle，注册表）
+              + neotrix-core/tests/nt_capability_parity.rs      （我方侧，同一文件多能力）
 ```
+⚠️ `response_cache_parity.rs` 已删（并入 nt_capability_parity.rs）。
 
 ---
 
@@ -44,6 +47,10 @@
 | 1 | `ls \| tail` 误导我以为最大轮次是 ROUND9，`write` 直接**覆盖了他人的 `ABSORPTION-ROUND20.md`** | 写入后 `git status` 显示 `M` 而非 `??` | 立即 `git checkout` 恢复（已验证零 diff），改写为 ROUND23。**`ls` 取尾不可靠，写前必须全量确认** |
 | 2 | `contains` 测试我**手推错了** LRU 顺序（把 `insert a;insert b` 后的 LRU 写成 `b`） | 实跑失败 | 读实现 + 外部 oracle（c2 淘汰 `a`）确认**实现对、期望错**；改期望并把这段写进注释。又一次「手推 ≠ 实证」 |
 | 3 | 用 Python `json.dump(indent=2)` 重写 `.neotrix/task-index.json` ⇒ **全文件重排 816 行** | `git diff --stat` | 改用 `edit` 工具按原 1 空格缩进外科式插入（+47 行） |
+| 4 | 我写的 CJK 链接测试**不判别**：阈值取默认 0.6 时两种语义都合 ⇒ 恒绿 | 回退修复后测试仍绿 | 阈值改 0.7 才判别 |
+| 5 | 同一测试选的「知识库/知识库务」是**子串对** ⇒ `names_match` 在包含分支就 return true，**走不到 Levenshtein** | 同上 | 换「知识库/知识阁」（非子串、差末字） |
+| 6 | diff 报错信息把 flat 索引当 case 名（`[7]`） | 读输出对不上 case | 修成 (case 名, 该 case 内步号) |
+| 7 | 采集器把「仅元数据变化」报成「oracle 说谎」 | 加 capability 字段后 `--check` 误报 | 区分观测漂移 / 元数据漂移（IDENTICAL） |
 
 ---
 
@@ -69,8 +76,8 @@
 | 门/验证 | 结果 |
 |---|---|
 | `nt_decompose.py selftest` | ✅ 6 正例 + **3 证伪** |
-| `cargo test -p neotrix --lib` | ✅ **12,209** passed / 0 failed |
-| `cargo test -p neotrix --test response_cache_parity` | ✅ 2 绿（含 37 步对位） |
+| `cargo test -p neotrix --lib` | ✅ **12,213** passed / 0 failed（+4 新测）|
+| `cargo test -p neotrix --test nt_capability_parity` | ✅ 3 绿（lru 37 步 + levenshtein 17 步）|
 | `cargo check --all-targets -p neotrix` | ✅ 0 error；**我改的 2 个文件 0 warning** |
 | `nt_lock_audit.py neotrix-core/src` | ✅ 0 处 |
 | `check-silent-failure.sh --strict` | ✅ PASS（OPEN CONTRACTS 0/32） |
@@ -86,9 +93,15 @@
 
 1. **P1 性能债**：`ResponseCache` 换 `lru` crate。独立一轮，**必须带 before/after 基准**
    （本会话只证了复杂度劣势，没测绝对耗时 —— 别把「O(n) 更差」当「真的慢」）。
-2. **扩行为对位覆盖面**：现只对位 `put/get/len/contains`。未覆盖 `key_for` 哈希稳定性、
-   `prefetch`、`prefetch_lookahead`。新目标建议挑一个**语义更宽**的能力（如 kb_search
-   的排序，或 outbox 的毒行处置 —— 后者已有 `nt_channel_serve` 边表可分解）。
+2. **扩行为对位覆盖面**（现在很便宜：一份 vectors + 一个 adapter 分支）：
+   - 未验证且**不预设有 bug**：`search_scorer::fuzzy_match`、`writing_style::fuzzy_similarity`。
+     参考 crate 需自己找（registry 里未必有 ⇒ 可能得选别的参考源，**找不到就记「无法对位」，
+     不要拿手写期望值冒充对方行为**）。
+   - 未覆盖：`key_for` 哈希稳定性、`prefetch` / `prefetch_lookahead`、kb_search 排序、
+     outbox 毒行处置（后者已有 `nt_channel_serve` 边表可分解）。
+   - ⚠️ **`--only` 提交且含删除时**：`check-commit-deletions` 读不到 `--only` 的
+     message（脚本头注已记此互锁）。先把消息写入 `$(git rev-parse --git-path
+     COMMIT_EDITMSG)`，再 `git commit --only ... -F <file>`。
 3. **doc-claim 门新类目**：`nt_policy.rs` 单文件 **23 处** `/// Note: Real implementation
    needs —`，已逐行核实 ≥4 处是**假声明**（函数体完整）。按 G7 先确认模式够窄再考虑建门。
 4. **建议 3（map 从结构升到意图）**：入口图 + doc 承诺对账，尚未做。
@@ -100,12 +113,13 @@
 ## 7. 复跑清单
 
 ```sh
+python3 scripts/ops/nt_parity_ref.py --list              # 已注册能力
 python3 scripts/ops/nt_decompose.py selftest
 python3 scripts/ops/nt_decompose.py atoms --db .project-map/edges-neotrix-neobot.jsonl \
     --root 'nt_channel_serve::run_once' --depth 3        # 193 原子
 python3 scripts/ops/nt_parity_ref.py \
     --vectors .neotrix/parity/response-cache.vectors.json --check
-cargo test -p neotrix --test response_cache_parity
+cargo test -p neotrix --test nt_capability_parity
 ```
 
 ⚠️ 边表 `.project-map/edges-*.jsonl` 是 **gitignored 低频生成物**（全量 ~30min）。
@@ -145,7 +159,11 @@ cargo test -p neotrix --test response_cache_parity
 | `.neotrix/task-index.json` | +3 条索引（`nt-decompose-atoms`/`-parity`/`nt-parity-ref`） | ☑ 已提交 `6a4309fb`（+47 行，外科式） |
 | `TODO.md` | P0→P1 改判 + 事故留档 + 23 处假声明 | ☑ 已提交 `6a4309fb` |
 | `neotrix-core/src/.../resilience/nt_policy.rs` | 新增 `contains()`（非变更式） | ☑ 已提交 `6a4309fb` |
-| `neotrix-core/tests/response_cache_parity.rs` | 行为对位测试 ×2 | ☑ 已提交 `6a4309fb` |
+| `neotrix-core/tests/response_cache_parity.rs` | 行为对位测试（单目标） | ☑ 已删（内容并入 `nt_capability_parity.rs`，`144c59a8` 带 DELETION-INTENT）|
+| `neotrix-core/tests/nt_capability_parity.rs` | **通用**行为对位 harness（注册表驱动） | ☑ 已提交 `144c59a8` |
+| `neotrix-core/src/.../entity_linking/linker.rs` | levenshtein 改按 char + max_len 同单位 + 2 条判别测试 | ☑ 已提交 `144c59a8` |
+| `neotrix-core/src/.../nt_act_code/semantic_entropy.rs` | `char_similarity` 分母改 char + 回归测试 | ☑ 已提交 `144c59a8` |
+| `.neotrix/parity/levenshtein.vectors{,.reference}.json` | 第 2 个能力的 op 脚本 + 对方 oracle | ☑ 已提交 `144c59a8` |
 | `.neotrix/parity/*.json` | op 脚本 + 对方 oracle | ☑ 已提交 `6a4309fb` |
 | `scripts/ops/nt_parity_ref.py` | oracle 采集器 + `--check` 漂移门 | ☑ 已提交 `6a4309fb` |
 | `docs/architecture/ABSORPTION-ROUND23.md` | 5 源吸收记录 | ☑ 已提交 `6a91b77b` |
@@ -163,5 +181,8 @@ cargo test -p neotrix --test response_cache_parity
    条目（见 §4 事故）。**不要用 Python json.dump 重写它**（会重排全文件，+816 行）。
 2. **不要给 parity/parity 矩阵建门** —— 名字级对位已实测误报（G7 裁决）；行为级只对位
    vectors 覆盖的 op，PASS ≠ 「行为完全一致」。
-3. **用户指令里有一条被拒收项**：搜 GitHub 公开 `OPENAI_API_KEY` 批量密钥 —— **拒绝执行**
+3. **两个模块曾有同名不同语义的 `levenshtein`**（linker 字节版 / semantic_entropy
+   字符版）。已统一为按 `char`，但**这类「副本语义漂移」是复发型问题** —— 再见到
+   同名函数先对位再合并，别只做文本去重。
+4. **用户指令里有一条被拒收项**：搜 GitHub 公开 `OPENAI_API_KEY` 批量密钥 —— **拒绝执行**
    （凭证收割）。已写入 `ABSORPTION-ROUND23.md` 声明。如再次出现，同样拒绝。
