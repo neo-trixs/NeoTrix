@@ -47,7 +47,7 @@
 | 内存 | `sh scripts/ops/nt_mem_gate.sh; echo $?` | 非 0 禁起构建 |
 | 死锁 | `python3 scripts/ops/nt_lock_audit.py neotrix-core/src` | **2026-09-29 实测 0 条**（RC=0） |
 | sidecar | `sh scripts/ops/nt_sidecar.sh {start\|stop\|status}` | 用完即停 |
-| **feature 门控** | `bash scripts/check-feature-gates.sh [--list\|--quick]` | **2026-09-30 核实 rc=0（6 个非默认 feature 全过）**。改了 feature 门控的 `mod` / `Cargo.toml` features / 提交前才跑（6 次 cargo check）；⛔ 禁用 `--lib` 单跑 |
+| **feature 门控** | `bash scripts/check-feature-gates.sh [--list\|--quick]` | **2026-09-30 核实 rc=0（6 个非默认 feature）**。改了 feature 门控的 `mod` / `Cargo.toml` features / 提交前跑（6 次 cargo check）。`--quick` = `--lib --tests`；`--all-targets` 另覆盖 examples/benches |
 
 - **门记录纪律（R-SCAN-3）**：改 `.rs` 必须重跑；只改非 `.rs` 可沿用。历史：22:52 之前本文长期写「0 命中」而实际 12 条 —— **陈旧门记录会让下一个 agent 去「修」正确代码，比没有门更危险**。唯一一次非 0：2026-09-27 22:52 实测 3 条（1 真死锁 `kb_search.rs:549` + 2 误报），23:4x 修真死锁后归 0，此后每次复测均 0。
 
@@ -59,7 +59,7 @@
 | `check-naming.sh` | advisory，clean-HEAD **1,646** 无前缀文件 | **规约 vs 现实差 1,646 ⇒ 该规约无约束力，advisory PASS ≠ 合规** |
 | `check-truth-surface.sh` | — | ⛔ **本地红 ≠ CI 红**（他窗 WIP 造成 UNCOMMITTED_DEP）；干净检出 exit=0 |
 
-- 层归属真源 `.neotrix/layer-map.json`；裁决表 `docs/architecture/OWNERSHIP.md`。⚠️ `neotrix/` 树受 `#[cfg(feature="ios-bridge")]` 门控，默认编不进 ⇒ 改它须另跑 `--features ios-bridge`，已由 `check-feature-gates.sh` 兜住。⛔ **零命中不是零消费的证据**（2026-09-30 实测：花括号导入 `neotrix::{A,B}` 击穿 `mod::Name` 搜索式，我据此删了活代码，而默认 `--lib`/`--all-targets`/12,209 测试/全部门**全绿**）⇒ 删任何 `pub use` 前必须用能匹配花括号的形式复查，且**非默认 feature 与 CI matrix 用 `--lib` 时同样瞎**（`ci.yml` 已改 `--all-targets`）。
+- 层归属真源 `.neotrix/layer-map.json`；裁决表 `docs/architecture/OWNERSHIP.md`。改 feature 门控的 `mod` 宿主（含 `neotrix/` 树的 `ios-bridge` 门控）后跑 `check-feature-gates.sh`，它按 `--all-targets` 覆盖 6 个非默认 feature。删 `pub use` 前用能匹配花括号的形式查消费方 —— `neotrix::{A,B}` 不匹配 `mod::Name` 搜索式（2026-09-30 据此删掉活代码，而默认 `--lib`/`--all-targets`/12,209 测试/全部门均绿）。
 - ⚠️ **同名 ≠ 同一符号**（换错了 `cargo check` 不报错，L15）；门**分不清字符串字面量**（L14）；批量改道须自查有无改到注释行（L13/L16）。改跨层引用**唯一合法通道是「消费方自己那层」的 facade**；走目标层 facade 无效。
 
 ### 4.3 磁盘 / worktree
