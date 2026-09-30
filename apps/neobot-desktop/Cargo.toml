@@ -1,0 +1,32 @@
+[package]
+name = "neobot-desktop"
+description = "NeoBot — 本地优先的 agent 沟通界面（Tauri 薄壳）"
+version = "0.24.0"
+edition = "2021"
+rust-version = "1.77"
+
+[[bin]]
+name = "neobot-desktop"
+path = "src/main.rs"
+
+[lib]
+name = "neobot_desktop"
+path = "src/lib.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+# ⛔ 逻辑**不在这里复制**。本 app 是薄壳，能力全部来自同仓的库。
+#    d5413335 删除内嵌 app 的理由之一就是「桌面端曾是两份同源物」；
+#    这次重建若复制 crates/neotrix-neobot 的代码，等于把那个问题原样造回来。
+#    故只做 path 依赖，逻辑单一真源仍在库里。
+neotrix-neobot = { path = "../../crates/neotrix-neobot" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[lints.rust]
+unsafe_code = "forbid"

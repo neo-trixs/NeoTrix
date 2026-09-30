@@ -89,7 +89,7 @@ NEW failing tests (not in the ledger): 2
 ```
 baseline 条目:  265
 总行数:      68,603
-最��� 10 大文件:
+最大 10 大文件:
   1,301  nt_mind/self_improvement/sleep_compute.rs
   1,077  nt_mind_background_loop/handlers_maintenance.rs
     819  nt_mind/cross_domain/entity_mapping.rs

@@ -14,7 +14,7 @@
 | 清空记录 `ClearUserConversationMsg` | `rpc/msg/delete.go` | 仅清**本地转录**（localStorage 该会话线程），任务/账本不动 | 服务端删消息是多端同步语义；本地删任务=改写历史，禁止 |
 | 撤回 `RevokeMsg`（限时） | `rpc/msg/revoke.go` | 不做：本地转录删除即撤回，已有；限时窗口无对手端，无意义 | — |
 | 正在输入 `Typing` | `rpc/msg/verify.go:Typing` | 不做：无对手客户端协议，靠心跳猜输入=造假 | — |
-| �阅后即焚 `destructTime` | `conversation.go` | 不做：本地单机无泄密通道，属伪需求 | — |
+| 阅后即焚 `destructTime` | `conversation.go` | 不做：本地单机无泄密通道，属伪需求 | — |
 | 消息搜索服务端版 | `rpc/msg` | 已有全局搜索覆盖，不动 | — |
 
 ## 语义诚实声明

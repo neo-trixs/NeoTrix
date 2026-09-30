@@ -1,0 +1,230 @@
+/*
+ * NeoBot 基础标签组件 —— 只引用 **semantic** token 层。
+ *
+ * # 为什么组件层要单独成文件（而不是继续往 styles.css 追加）
+ *
+ * 改版前 styles.css 已 1500 行，各种 `--ink-500` / `--sky-100` 散落各处。
+ * 组件长在这个文件里会出现两个老问题：
+ *   ① 同一个按钮在设置窗和聊天窗长得不一样（各写各的）；
+ *   ② 没人能回答「这个 app 一共有哪些组件、每种有哪几个变体」。
+ *
+ * 这里把每个组件收敛成**一组变体**，变体名用同一套词（primary/secondary/danger/
+ * small/ghost），跨窗口含义固定。新增组件必须登记在这里，否则是「野生组件」。
+ *
+ * # 变体词的约定（改动前先想清楚，因为组件之间要互相对齐）
+ *
+ *   tone     primary | secondary | ghost | danger     —— 强调程度与危险性
+ *   size     sm | md | lg                           —— 高度档（组件不各自定 px）
+ *   state    默认 / disabled / busy                 —— 只由交互驱动，不由业务驱动
+ *
+ * ⚠️ 不提供 `tone="secondary"` 之外的第四个色调，也不提供自定义颜色入参。
+ *    组件一旦开放颜色入参，语义就又漏回 primitive 层了。
+ */
+
+/* ── Button ─────────────────────────────────────────────────────── */
+.nb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nb-space-2);
+  min-height: 34px;
+  padding: 0 var(--nb-space-4);
+  border: 1px solid transparent;
+  border-radius: var(--nb-radius-control);
+  font: inherit;
+  font-size: var(--nb-type-muted);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--nb-motion-fast) var(--nb-ease),
+    border-color var(--nb-motion-fast) var(--nb-ease),
+    color var(--nb-motion-fast) var(--nb-ease),
+    transform var(--nb-motion-fast) var(--nb-ease);
+}
+.nb-btn:active:not(:disabled) { transform: scale(0.98); }
+.nb-btn:focus-visible { outline: 2px solid var(--nb-border-accent); outline-offset: 2px; }
+.nb-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.nb-btn[data-tone="primary"] { background: var(--nb-c-accent); color: var(--nb-text-on-accent); }
+.nb-btn[data-tone="primary"]:hover:not(:disabled) { background: var(--nb-c-accent-deep); }
+.nb-btn[data-tone="secondary"] { background: var(--nb-bg-surface-sunken); color: var(--nb-text-primary); }
+.nb-btn[data-tone="secondary"]:hover:not(:disabled) { border-color: var(--nb-border); }
+.nb-btn[data-tone="ghost"] { background: transparent; color: var(--nb-text-secondary); }
+.nb-btn[data-tone="ghost"]:hover:not(:disabled) { background: var(--nb-bg-surface-sunken); color: var(--nb-text-primary); }
+.nb-btn[data-tone="danger"] { background: transparent; color: var(--nb-state-error); }
+.nb-btn[data-tone="danger"]:hover:not(:disabled) { background: var(--nb-bg-surface-sunken); }
+
+.nb-btn[data-size="sm"] { min-height: 28px; padding: 0 var(--nb-space-3); font-size: var(--nb-type-micro); }
+.nb-btn[data-size="lg"] { min-height: 42px; padding: 0 20px; font-size: var(--nb-type-muted); }
+.nb-btn[data-block="1"] { width: 100%; }
+
+/* busy：图标位被**替换**而不是叠加。叠加会让人以为有两件事在发生。 */
+.nb-btn[data-busy="1"] { cursor: progress; }
+.nb-btn[data-busy="1"] .nb-btn-ico { display: none; }
+.nb-btn-spin {
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: nb-btn-spin 0.7s linear infinite;
+}
+@keyframes nb-btn-spin { to { transform: rotate(360deg); } }
+
+/* ── Card ───────────────────────────────────────────────────────── */
+.nb-card {
+  background: var(--nb-bg-surface);
+  border: 1px solid var(--nb-border-hairline);
+  border-radius: var(--nb-radius-card);
+  padding: var(--nb-space-3) var(--nb-space-4);
+  box-shadow: var(--nb-elev-1);
+  transition: box-shadow var(--nb-motion-base) var(--nb-ease);
+}
+.nb-card[data-interactive="1"] { cursor: pointer; }
+.nb-card[data-interactive="1"]:hover { box-shadow: var(--nb-elev-2); }
+
+/* ── Chip ───────────────────────────────────────────────────────── */
+.nb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nb-space-1);
+  align-self: flex-start;
+  padding: 2px var(--nb-space-3);
+  border-radius: var(--nb-radius-pill);
+  background: var(--nb-bg-surface-sunken);
+  font-size: var(--nb-type-label);
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--nb-text-secondary);
+}
+.nb-chip[data-state="busy"] { background: var(--nb-state-busy); color: var(--nb-text-on-accent); }
+.nb-chip[data-state="ok"] { background: var(--nb-state-ok); color: var(--nb-text-on-accent); }
+.nb-chip[data-state="warn"] { background: var(--nb-state-warn); color: var(--nb-text-on-accent); }
+.nb-chip[data-state="error"] { background: var(--nb-state-error); color: var(--nb-text-on-accent); }
+
+/* ── Field ──────────────────────────────────────────────────────── */
+.nb-field { display: flex; flex-direction: column; gap: var(--nb-space-2); min-width: 0; }
+.nb-field > label { font-size: var(--nb-type-micro); font-weight: 600; color: var(--nb-text-secondary); }
+.nb-field input,
+.nb-field select,
+.nb-field textarea {
+  min-height: 34px;
+  padding: 0 var(--nb-space-3);
+  border: 1px solid var(--nb-border);
+  border-radius: var(--nb-radius-control);
+  background: var(--nb-bg-surface);
+  color: var(--nb-text-primary);
+  font: inherit;
+  font-size: var(--nb-type-muted);
+  outline: none;
+  transition: border-color var(--nb-motion-base) var(--nb-ease), background var(--nb-motion-base) var(--nb-ease);
+}
+.nb-field input:hover { border-color: var(--nb-border-strong); }
+.nb-field input:focus { border-color: var(--nb-border-accent); }
+.nb-field input:disabled { opacity: 0.5; cursor: not-allowed; }
+.nb-field-hint { font-size: var(--nb-type-micro); color: var(--nb-text-tertiary); }
+
+/* ── Switch ─────────────────────────────────────────────────────── */
+.nb-switch { position: relative; display: inline-flex; align-items: center; flex: 0 0 auto; }
+.nb-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.nb-switch-track {
+  width: 34px; height: 20px;
+  border-radius: var(--nb-radius-pill);
+  background: var(--nb-border);
+  transition: background var(--nb-motion-base) var(--nb-ease);
+}
+.nb-switch-thumb {
+  position: absolute; left: 2px; top: 50%;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--nb-bg-surface);
+  box-shadow: var(--nb-elev-1);
+  transform: translateY(-50%);
+  transition: transform var(--nb-motion-base) var(--nb-ease);
+}
+.nb-switch input:checked ~ .nb-switch-track { background: var(--nb-c-accent); }
+.nb-switch input:checked ~ .nb-switch-thumb { transform: translate(-14px, -50%); }
+.nb-switch input:focus-visible ~ .nb-switch-track { outline: 2px solid var(--nb-border-accent); outline-offset: 2px; }
+.nb-switch input:disabled ~ .nb-switch-track { opacity: 0.5; }
+
+/* ── Section（设置页分段：标题 + 一句说明 + 内容槽）───────────────── */
+.nb-section { margin-block: var(--nb-space-4); }
+.nb-section-head { margin-bottom: var(--nb-space-2); }
+.nb-section-title { font-size: var(--nb-type-mini); font-weight: 700; color: var(--nb-text-primary); }
+.nb-section-desc { font-size: var(--nb-type-micro); color: var(--nb-text-tertiary); margin-top: 2px; }
+.nb-section-body { display: flex; flex-direction: column; gap: var(--nb-space-1); }
+
+/* ── Row（设置项一行：左标签 + 右控件；标签宽度统一 ⇒ 右边缘对齐）──
+   min-width 而不是 width：窄窗里标签列可以缩，控件仍右对齐。 */
+.nb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nb-space-4);
+  padding: var(--nb-space-2) 0;
+  min-height: 44px;
+}
+.nb-row + .nb-row { border-top: 1px solid var(--nb-border-hairline); }
+.nb-row-label { min-width: 96px; flex: 0 1 auto; color: var(--nb-text-secondary); font-size: var(--nb-type-muted); }
+.nb-row-control { display: flex; align-items: center; gap: var(--nb-space-2); flex: 0 0 auto; }
+/* 不可用项：置灰但**保留占位** —— 隐藏会让整页高度跳一下。 */
+.nb-row[data-enabled="0"] { opacity: 0.5; }
+.nb-row[data-enabled="0"] .nb-row-control { cursor: not-allowed; }
+
+/* ── List（统一「标题 + 计数 + 行」的三段式，压过三处不同实现）── */
+.nb-list { list-style: none; margin: 0; padding: 0; }
+.nb-list-head {
+  display: flex; align-items: center; gap: var(--nb-space-2);
+  margin-top: var(--nb-space-3); padding-top: var(--nb-space-3);
+  border-top: 1px solid var(--nb-border-hairline);
+}
+.nb-list-title { font-size: var(--nb-type-micro); font-weight: 700; color: var(--nb-text-primary); }
+.nb-list-count {
+  margin-left: auto;
+  font-size: var(--nb-type-micro); font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--nb-text-tertiary);
+  background: var(--nb-bg-surface-sunken);
+  border-radius: var(--nb-radius-pill);
+  padding: 1px var(--nb-space-2);
+}
+.nb-list li {
+  display: flex; align-items: center; gap: var(--nb-space-3);
+  padding: var(--nb-space-2) 0;
+  min-height: 40px;
+}
+.nb-list li + li { border-top: 1px solid var(--nb-border-hairline); }
+.nb-list-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 1 auto; }
+.nb-list-name { font-size: var(--nb-type-muted); font-weight: 600; color: var(--nb-text-primary); }
+.nb-list-sub {
+  font-size: var(--nb-type-micro); color: var(--nb-text-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nb-list-actions { display: flex; gap: var(--nb-space-2); margin-left: auto; flex: 0 0 auto; }
+.nb-list-empty { padding: var(--nb-space-3) 0; color: var(--nb-text-tertiary); font-size: var(--nb-type-micro); }
+
+/* ── 能力不可用时的统一提示 ───────────────────────────────────────
+   吸收 DSH 的处理：不给「不解释的隐藏」，给「一句说明 + 一个去处」。 */
+.nb-gate-hint {
+  display: flex; align-items: center; gap: var(--nb-space-2);
+  padding: var(--nb-space-2) var(--nb-space-3);
+  border-radius: var(--nb-radius-control);
+  background: var(--nb-bg-surface-sunken);
+  font-size: var(--nb-type-micro);
+  color: var(--nb-text-secondary);
+}
+.nb-gate-hint::before {
+  content: "";
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--nb-state-warn);
+  flex: 0 0 auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nb-btn, .nb-card, .nb-switch-track, .nb-switch-thumb, .nb-field input {
+    transition-duration: 0s;
+  }
+  .nb-btn-spin { animation: none; }
+}

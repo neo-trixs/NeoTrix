@@ -1,0 +1,185 @@
+/* NeoBot 设计 token —— 两层：primitive（颜色本身）→ semantic（用途）。
+ *
+ * # 为什么要两层
+ *
+ * 组件只准引用 semantic。改主题 = 重映射 semantic 一层，primitive 不动；
+ * 若组件直连具体色（`#0F5A9E`），换主题就变成逐组件改 —— 而没人改得全。
+ *
+ * # 与 Neo/neobot 版的差别（有意为之，不是抄漏了）
+ *
+ * 那边 tokens.css 是**派生**的：`--nb-c-accent: var(--skype)`，底座是旧
+ * styles.css 的 token。这边是**自足**的 —— 本仓没有旧样式表，primitive 就是
+ * 真实色值。好处是这套 token 可以整体搬走，不依赖任何遗留文件。
+ *
+ * 坏处要说清：没有旧 token 兜底，任何一处 primitive 拼错**不会**静默回落，
+ * 而是该属性失效。所以本仓把 token 门一并搬来（scripts/check-tokens.mjs）。
+ *
+ * 浅金品牌色（#F0E3C4 → #D6AC58 → #C2933F）取自 icon-design 规范，
+ * 与 apps/neobot-desktop/icons/icon.svg 同源 —— 图标与界面的金是同一个金。
+ */
+
+:root {
+  /* ═══ ① primitive：颜色本身 ═══════════════════════════════ */
+  --nb-c-canvas:        #F7F5F0;
+  --nb-c-surface:       #FFFFFF;
+  --nb-c-surface-sunken:#F1EEE7;
+  --nb-c-surface-raised:#FBFAF7;
+
+  --nb-c-ink-900:       #11191C;   /* 主文字 */
+  --nb-c-ink-700:       #3D4A50;   /* 次级文字 */
+  --nb-c-ink-500:       #6B7A82;   /* 辅助文字 */
+  --nb-c-ink-300:       #A3AEB4;   /* 占位/禁用 */
+
+  --nb-c-accent:        #1473C8;   /* skype 主色 */
+  --nb-c-accent-deep:   #0F5A9E;
+  --nb-c-accent-wash:   rgba(20, 115, 200, 0.08);
+
+  --nb-c-positive:      #1F9D55;
+  --nb-c-critical:      #C4432B;
+  --nb-c-critical-deep: #9A3320;
+  --nb-c-warning:       #B8860B;
+  --nb-c-gold:          #D6AC58;
+  --nb-c-gold-light:    #F0E3C4;
+  --nb-c-gold-deep:     #C2933F;
+
+  --nb-c-line-hairline: rgba(17, 25, 28, 0.06);
+  --nb-c-line:          rgba(17, 25, 28, 0.12);
+  --nb-c-line-strong:   rgba(17, 25, 28, 0.28);
+  --nb-c-overlay:       rgba(17, 25, 28, 0.32);
+  --nb-c-focus:         rgba(20, 115, 200, 0.55);
+
+  /* 字号刻度（primitive） */
+  --nb-c-fs-label: 10px;
+  --nb-c-fs-micro: 10.5px;
+  --nb-c-fs-mini:  11.5px;
+  --nb-c-fs-sub:   12.5px;
+  --nb-c-fs-body:  13.5px;
+  --nb-c-fs-msg:   16px;
+
+  --nb-c-dur-fast: 120ms;
+  --nb-c-dur-base: 200ms;
+  --nb-c-dur-slow: 320ms;
+  --nb-c-ease: cubic-bezier(0.2, 0, 0, 1);
+
+  --nb-c-shadow-soft: 0 2px 8px -2px rgba(17, 25, 28, 0.08);
+  --nb-c-elev-2:      0 6px 20px rgba(17, 25, 28, 0.10);
+  --nb-c-elev-pop:    0 20px 70px rgba(17, 25, 28, 0.20);
+
+  /* ═══ ② semantic：用途（组件只准引用这一层） ═══════════════ */
+  --nb-bg-canvas:         var(--nb-c-canvas);
+  --nb-bg-surface:        var(--nb-c-surface);
+  --nb-bg-surface-sunken: var(--nb-c-surface-sunken);
+  --nb-bg-surface-raised: var(--nb-c-surface-raised);
+  --nb-bg-accent-wash:    var(--nb-c-accent-wash);
+  --nb-bg-gold-wash:      var(--nb-c-accent-wash);
+
+  --nb-text-primary:   var(--nb-c-ink-900);
+  --nb-text-secondary: var(--nb-c-ink-700);
+  --nb-text-tertiary:  var(--nb-c-ink-500);
+  --nb-text-faint:     var(--nb-c-ink-300);
+  --nb-text-on-accent: #FFFFFF;
+  --nb-text-link:      var(--nb-c-accent-deep);
+
+  --nb-border-hairline: var(--nb-c-line-hairline);
+  --nb-border:          var(--nb-c-line);
+  --nb-border-strong:   var(--nb-c-line-strong);
+  --nb-border-accent:   var(--nb-c-focus);
+
+  --nb-state-idle:   var(--nb-c-ink-300);
+  --nb-state-busy:   var(--nb-c-accent);
+  --nb-state-ok:     var(--nb-c-positive);
+  --nb-state-warn:   var(--nb-c-warning);
+  --nb-state-error:  var(--nb-c-critical);
+
+  /* 壳层形状（取自 dsh-tauri 的 canvas/panel/panel-2/line/ink/info/ok 命名） */
+  --nb-panel:        var(--nb-bg-surface);
+  --nb-panel-2:      var(--nb-bg-surface-raised);
+  --nb-panel-hover:  var(--nb-bg-accent-wash);
+  --nb-info:         var(--nb-c-accent);
+  --nb-info-hover:   var(--nb-c-accent-deep);
+  --nb-ok:           var(--nb-c-positive);
+  --nb-mask:         var(--nb-c-overlay);
+
+  --nb-radius-pill:    999px;
+  --nb-radius-control: 10px;
+  --nb-radius-card:    14px;
+  --nb-radius-surface: 20px;
+
+  --nb-type-label: var(--nb-c-fs-label);
+  --nb-type-micro: var(--nb-c-fs-micro);
+  --nb-type-mini:  var(--nb-c-fs-mini);
+  --nb-type-sub:   var(--nb-c-fs-sub);
+  --nb-type-body:  var(--nb-c-fs-body);
+  --nb-type-msg:   var(--nb-c-fs-msg);
+  --nb-type-muted: var(--nb-c-fs-body);  /* base.css 的正文档位 */
+
+  --nb-space-1: 4px;
+  --nb-space-2: 8px;
+  --nb-space-3: 12px;
+  --nb-space-4: 16px;
+  --nb-space-6: 24px;
+
+  --nb-elev-0:   none;
+  --nb-elev-1:   var(--nb-c-shadow-soft);
+  --nb-elev-2:   var(--nb-c-elev-2);
+  --nb-elev-pop: var(--nb-c-elev-pop);
+
+  --nb-motion-fast: var(--nb-c-dur-fast);
+  --nb-motion-base: var(--nb-c-dur-base);
+  --nb-motion-slow: var(--nb-c-dur-slow);
+  --nb-ease:        var(--nb-c-ease);
+
+  /* 等宽栈：刻意省略裸 `monospace` —— Windows 会回退 SimSun（宋体），代码块发虚。
+     这条负向知识抄自 DSH 侧 tailwind.config.js 的注释。 */
+  --nb-font-mono: "SF Mono", "JetBrains Mono", "Fira Code", Consolas, Menlo,
+    "Liberation Mono", "Courier New", "PingFang SC", "Microsoft YaHei", ui-monospace;
+  --nb-font-body: "Manrope", system-ui, -apple-system, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+/* ═══ 深色 ═══
+ * 只重映射 semantic 层，primitive 一律不动 —— 这正是两层结构的回报。
+ */
+:root[data-theme="dark"] {
+  --nb-bg-canvas:         #14181D;
+  --nb-bg-surface:        #1A1F26;
+  --nb-bg-surface-sunken: #12161A;
+  --nb-bg-surface-raised: #21272F;
+  --nb-bg-accent-wash:    rgba(122, 170, 255, 0.14);
+  --nb-bg-gold-wash:      rgba(214, 172, 88, 0.16);
+
+  --nb-text-primary:   #E8EAED;
+  --nb-text-secondary: #A8B0B8;
+  --nb-text-tertiary:  #6F7880;
+  --nb-text-faint:     #4E565E;
+  --nb-text-on-accent: #0E1216;
+  --nb-text-link:      #7AA8E0;
+
+  --nb-border-hairline: rgba(255, 255, 255, 0.08);
+  --nb-border:          rgba(255, 255, 255, 0.14);
+  --nb-border-strong:   rgba(255, 255, 255, 0.28);
+  --nb-border-accent:   rgba(122, 170, 255, 0.6);
+
+  --nb-state-error: #E4795F;
+  --nb-info:       #7AA8E0;
+  --nb-info-hover: #A8C4EC;
+
+  --nb-elev-1:   0 1px 2px rgba(0, 0, 0, 0.4);
+  --nb-elev-2:   0 6px 20px rgba(0, 0, 0, 0.45);
+  --nb-elev-pop: 0 20px 70px rgba(0, 0, 0, 0.6);
+  --nb-mask:     rgba(0, 0, 0, 0.55);
+}
+
+/* 动效偏好：全局一次性关掉。放在语义层之后，优先级最高。 */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --nb-motion-fast: 0ms;
+    --nb-motion-base: 0ms;
+    --nb-motion-slow: 0ms;
+  }
+}
+:root[data-motion="reduced"] {
+  --nb-motion-fast: 0ms;
+  --nb-motion-base: 0ms;
+  --nb-motion-slow: 0ms;
+}

@@ -69,7 +69,7 @@
 | `thedotmack/claude-mem` | ❌ | 纯 append-only 行，无版本、无冲突处理、无衰减 |
 | NeoTrix | ❌ | 主键阻断 + `cascade.rs:216,126` `length_score = len/200` 且 `tick()` 永久丢弃低于阈值样本 |
 
-> `utopia` 有一个 NeoTrix 立刻可抄的细节：`valid_to_precision = 'unknown'` 三态 —— "已结束但日期未知"与"仍在持续"用同一个 `NULL` 无法区分，该项目**显式拒绝**教科书做法（把文档日期塞进 `valid_to` 当上界），理由是*"看起来像个确定的��间戳；每个读者都得先查精度，而不撒谎才是产品"*。
+> `utopia` 有一个 NeoTrix 立刻可抄的细节：`valid_to_precision = 'unknown'` 三态 —— "已结束但日期未知"与"仍在持续"用同一个 `NULL` 无法区分，该项目**显式拒绝**教科书做法（把文档日期塞进 `valid_to` 当上界），理由是*"看起来像个确定的时间戳；每个读者都得先查精度，而不撒谎才是产品"*。
 
 ---
 

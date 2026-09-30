@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="NeoBot">
+  <title>NeoBot</title>
+  <!--
+    NeoBot 应用图标 —— shark-cute-cartoon（可爱卡通鲨）。
+
+    模板沿用 neotrix 既有的图标生成规范（skills/assets/icons/neotrix/neotrix-icon.svg）：
+      1024×1024 构造网格 · Mac squircle 遮罩 · 径向渐变底 · 顶部辉光 ·
+      主图形带投影 · 高光椭圆 · 前景细节。
+    **只换主图形与配色**，不换骨架 —— 这是「各平台各画一份」的反面：
+    改主稿重跑栅格化管线即可全平台同步。
+
+    配色：深海底蓝青（鲨鱼住的地方）。neotrix 用的是橙（水滴），
+    这里是同一套骨架换色，不是新模板。
+
+    造型决策（cute 的判据是「圆 + 大眼 + 腮红 + 微笑」，四条都上了）：
+      · 身子是**圆胖**的椭圆而不是纺锤形流线 —— 纺锤形在图标尺寸下
+        读成「一条鱼」，圆胖才读成「一只」。
+      · 眼睛**大**（占脸宽约 1/5）并带高光点 —— 卡通角色的亲和力主要来自这里。
+      · 腮红两坨 —— 同一职责，廉价但有效。
+      · 背鳍/尾鳍全部**圆角**处理，尖端不扎 —— 尖角会破坏「无害」的印象。
+      · 微笑用一段开口向上的弧，不画嘴线 —— 闭合嘴在小尺寸会读成中性脸。
+  -->
+  <defs>
+    <clipPath id="squircle">
+      <path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64z"/>
+    </clipPath>
+
+    <!-- 深海径向渐变（模板同位，对应 neotrix 的 #FFB040/#FF8C00/#CC6600） -->
+    <radialGradient id="bg" cx="50%" cy="42%" r="62%">
+      <stop offset="0%" stop-color="#5FD0E8"/>
+      <stop offset="58%" stop-color="#2A9CC4"/>
+      <stop offset="100%" stop-color="#12566F"/>
+    </radialGradient>
+
+    <!-- 鲨鱼主体渐变：背深腹浅，这是鲨的天然保护色，也让圆胖身子有体积感 -->
+    <linearGradient id="shark" x1="0.15" y1="0" x2="0.6" y2="1">
+      <stop offset="0%" stop-color="#BFE9F5"/>
+      <stop offset="52%" stop-color="#7CC9E0"/>
+      <stop offset="100%" stop-color="#4E9FBC"/>
+    </linearGradient>
+    <linearGradient id="belly" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#E4F4FA" stop-opacity="0.75"/>
+    </linearGradient>
+    <linearGradient id="fin" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0%" stop-color="#9AD8EA"/>
+      <stop offset="100%" stop-color="#3E8CAC"/>
+    </linearGradient>
+
+    <radialGradient id="glow" cx="50%" cy="34%" r="42%">
+      <stop offset="0%" stop-color="#CFF2FC" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#7CC9E0" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="shadow" x="-15%" y="-15%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#06222E" flood-opacity="0.38"/>
+    </filter>
+    <filter id="glow-filter" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g clip-path="url(#squircle)">
+    <rect width="1024" height="1024" fill="url(#bg)"/>
+    <rect width="1024" height="1024" fill="url(#glow)"/>
+
+    <!-- 气泡：模板对应 neotrix 的「散布水滴」。水里就该是气泡，不是水滴。 -->
+    <g filter="url(#glow-filter)">
+      <circle cx="806" cy="250" r="20" fill="#CFF2FC" opacity="0.75"/>
+      <circle cx="806" cy="250" r="9"  fill="#FFFFFF" opacity="0.45"/>
+      <circle cx="884" cy="352" r="13" fill="#CFF2FC" opacity="0.6"/>
+      <circle cx="196" cy="286" r="16" fill="#CFF2FC" opacity="0.6"/>
+      <circle cx="148" cy="392" r="10" fill="#FFFFFF" opacity="0.4"/>
+      <circle cx="700" cy="806" r="14" fill="#CFF2FC" opacity="0.45"/>
+      <circle cx="268" cy="772" r="11" fill="#CFF2FC" opacity="0.45"/>
+      <circle cx="512" cy="152" r="9"  fill="#FFFFFF" opacity="0.35"/>
+    </g>
+
+    <!-- ── 主图形：可爱卡通鲨（朝左） ─────────────────────────── -->
+    <g filter="url(#shadow)">
+
+      <!-- 尾鳍：在身子之后画，所以根部被盖住 ⇒ 看起来是连着的 -->
+      <path fill="url(#fin)" d="M726 588
+               C782 556 826 494 850 420
+               C858 390 894 396 890 430
+               C882 502 870 552 860 594
+               C854 628 872 652 900 678
+               C922 698 900 726 872 706
+               C812 664 766 630 730 606 Z"/>
+
+      <!-- 背鳍：独立形状，先画 ⇒ 根部必被身体盖住，看起来天然是连着的。
+           ⛔ 之前把它内嵌进身体路径，导致「底宽只有 90 / 高 148」，
+              比例上就是一根**竖直窄条**——渲染出来读成兔子耳朵（实测两次）。
+           现在底宽 ~150、尖明显后掠、顶圆，才有鳍的形态。 -->
+      <path fill="url(#fin)" d="M592 414
+               C602 342 634 280 700 248
+               C748 224 782 258 762 296
+               C742 334 720 374 700 410 Z"/>
+
+      <!-- 身体：圆胖 -->
+      <path fill="url(#shark)" d="M232 592
+               C232 470 320 392 452 386
+               C520 383 566 388 606 398
+               C766 432 812 482 832 542
+               C812 608 742 654 638 666
+               C520 680 386 682 306 656
+               C258 640 232 620 232 592 Z"/>
+
+      <!-- 腹：浅色隆起，圆胖脸的下半，给「肚子」的存在感 -->
+      <path fill="url(#belly)" d="M300 596
+               C300 654 400 682 528 678
+               C648 674 736 634 752 580
+               C740 630 660 660 552 664
+               C440 668 340 646 300 596 Z"/>
+
+      <!-- 背鳍内侧的深色分界：让鳍与身分开，否则一体色下鳍会消失 -->
+      <path fill="#3E8CAC" opacity="0.42" d="M600 410 C610 344 640 282 700 250 C714 242 728 250 722 264 C678 296 640 348 614 406 Z"/>
+
+      <!-- 胸鳍：圆角短鳍 -->
+      <path fill="url(#fin)" d="M470 664 C492 700 528 730 570 744 C586 750 580 726 566 712 C536 682 512 664 494 654 Z"/>
+    </g>
+
+    <!-- 眼睛：大 + 高光点。cute 的主要来源。 -->
+    <g>
+      <ellipse cx="352" cy="520" rx="46" ry="50" fill="#FFFFFF"/>
+      <ellipse cx="356" cy="524" rx="26" ry="29" fill="#12303C"/>
+      <circle cx="346" cy="512" r="10" fill="#FFFFFF"/>
+      <circle cx="364" cy="534" r="5"  fill="#FFFFFF" opacity="0.8"/>
+    </g>
+
+    <!-- 腮红 -->
+    <ellipse cx="286" cy="588" rx="34" ry="20" fill="#FF9AA8" opacity="0.5"/>
+    <ellipse cx="452" cy="600" rx="28" ry="16" fill="#FF9AA8" opacity="0.38"/>
+
+    <!-- 微笑：开口向上的弧，不闭合 -->
+    <path d="M300 606 C322 630 358 634 380 612"
+          fill="none" stroke="#12303C" stroke-width="14" stroke-linecap="round" opacity="0.85"/>
+
+    <!-- 鳃：三道短线，贴吻端 -->
+    <g stroke="#3E8CAC" stroke-width="10" stroke-linecap="round" opacity="0.6" fill="none">
+      <path d="M432 528 C424 552 424 574 430 594"/>
+      <path d="M466 530 C459 554 459 576 464 596"/>
+      <path d="M500 534 C494 556 494 576 499 594"/>
+    </g>
+
+    <!-- 身体高光：左上受光 -->
+    <ellipse cx="470" cy="416" rx="104" ry="26" fill="#FFFFFF" opacity="0.3" transform="rotate(-11 470 416)"/>
+    <ellipse cx="452" cy="408" rx="42" ry="11" fill="#FFFFFF" opacity="0.34" transform="rotate(-11 452 408)"/>
+  </g>
+</svg>

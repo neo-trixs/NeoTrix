@@ -1,0 +1,248 @@
+/* NeoBot 壳层布局。
+ *
+ * 纪律（来自本仓两次实测事故，不是抄规范）：
+ *  · 三栏高度链上**每一环**都要 `min-height: 0`。grid/flex item 默认
+ *    `min-height: auto`，会拒绝收缩到内容以下，把父级撑高，于是
+ *    `overflow-y: auto` 永不触发 —— 表现是「列表滚不动、输入框被顶出视口」。
+ *  · 侧栏行内出现「顶/免」等文字按钮等于隐形（悬停才出现 ⇒ 触控板不可达）。
+ *    这类操作收进右键菜单，菜单项**带当前状态**（`置顶 ✓`），因为菜单是一次性的。
+ */
+
+.app {
+  display: grid;
+  grid-template-columns: 264px 1fr;
+  height: 100vh;
+  height: 100dvh;          /* 移动端/带 dock 的环境用动态视口高 */
+  overflow: hidden;
+}
+
+/* ── 会话栏 ────────────────────────────────────────────── */
+.side {
+  display: grid;
+  grid-template-rows: auto auto auto 1fr auto;   /* head / search / panels / convs / foot */
+  min-height: 0;                                /* ← 高度链第 1 环 */
+  background: var(--nb-bg-surface-sunken);
+  border-right: 1px solid var(--nb-border);
+}
+
+.side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nb-space-2);
+  padding: var(--nb-space-3) var(--nb-space-4);
+}
+.brand { display: flex; align-items: center; gap: var(--nb-space-2); min-width: 0; }
+.brand-mark { flex: none; }
+.brand-name {
+  font-size: var(--nb-type-msg);
+  font-weight: 600;
+  color: var(--nb-text-primary);
+  /* 「NeoBot」在 264px 侧栏 + 未来换长本地化名时不能撑破 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-search { padding: 0 var(--nb-space-4) var(--nb-space-2); }
+.side-search input {
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--nb-space-3);
+  font: inherit;
+  font-size: var(--nb-type-body);
+  color: var(--nb-text-primary);
+  background: var(--nb-bg-surface);
+  border: 1px solid var(--nb-border);
+  border-radius: var(--nb-radius-control);
+}
+.side-search input::placeholder { color: var(--nb-text-faint); }
+.side-search input:focus-visible {
+  outline: 2px solid var(--nb-border-accent);
+  outline-offset: 1px;
+}
+
+/* 能力面板容器：面板由注册表驱动，不是写死的 */
+.side-panels { padding: 0 var(--nb-space-2); }
+.side-panels:empty { display: none; }
+.side-panel-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-2);
+  width: 100%;
+  padding: 7px var(--nb-space-2);
+  margin-bottom: 2px;
+  font: inherit;
+  font-size: var(--nb-type-body);
+  color: var(--nb-text-secondary);
+  background: none;
+  border: none;
+  border-radius: var(--nb-radius-control);
+  text-align: left;
+  cursor: pointer;
+}
+.side-panel-btn:hover { background: var(--nb-panel-hover); color: var(--nb-text-primary); }
+.side-panel-btn[aria-current="true"] {
+  color: var(--nb-text-primary);
+  background: var(--nb-bg-accent-wash);
+}
+
+.convs {
+  min-height: 0;                 /* ← 高度链第 2 环：这环缺了，列表就滚不动 */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--nb-space-1) var(--nb-space-2);
+}
+.convo {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-2);
+  padding: 7px var(--nb-space-2);
+  border-radius: var(--nb-radius-control);
+  cursor: pointer;
+}
+.convo:hover { background: var(--nb-panel-hover); }
+.convo[aria-selected="true"] { background: var(--nb-bg-accent-wash); }
+.convo-txt { min-width: 0; }     /* ← 与右侧时间 flex:none 成对，见 primitives 纪律 */
+.convo-title {
+  font-size: var(--nb-type-body);
+  color: var(--nb-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.convo-time {
+  flex: none;
+  font-size: var(--nb-type-micro);
+  color: var(--nb-text-faint);
+  font-variant-numeric: tabular-nums;   /* 活的数字等宽，否则每帧宽度都跳 */
+}
+
+.side-foot {
+  padding: var(--nb-space-2) var(--nb-space-4) var(--nb-space-3);
+  border-top: 1px solid var(--nb-border-hairline);
+}
+.side-badge {
+  font-size: var(--nb-type-micro);
+  color: var(--nb-text-tertiary);
+}
+
+/* ── 对话栏 ────────────────────────────────────────────── */
+.thread-col {
+  display: grid;
+  grid-template-rows: 1fr auto;      /* thread / composer */
+  min-height: 0;                     /* ← 高度链第 0 环 */
+  min-width: 0;
+  background: var(--nb-bg-canvas);
+}
+.thread {
+  min-height: 0;                     /* ← 高度链关键环 */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--nb-space-6) var(--nb-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-3);
+}
+.thread:empty::before {
+  content: "还没有对话。上面点「跑一轮」可以直接给 agent 一个目标。";
+  margin: auto;
+  max-width: 42ch;
+  font-size: var(--nb-type-body);
+  line-height: 1.7;
+  color: var(--nb-text-tertiary);
+  text-align: center;
+}
+
+.msg { max-width: 68ch; }
+.msg--user { align-self: flex-end; }
+.msg-bubble {
+  padding: 9px 13px;
+  border-radius: var(--nb-radius-card);
+  font-size: var(--nb-type-msg);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.msg--user .msg-bubble {
+  background: var(--nb-bg-accent-wash);
+  border: 1px solid var(--nb-border);
+}
+.msg--bot .msg-bubble {
+  background: var(--nb-bg-surface);
+  border: 1px solid var(--nb-border);
+}
+/* 署名与元信息在气泡**下方**（会话身份已下沉为流内标记） */
+.msg-meta {
+  margin-top: 4px;
+  font-size: var(--nb-type-micro);
+  color: var(--nb-text-faint);
+}
+
+.session-mark {
+  align-self: center;
+  font-size: var(--nb-type-mini);
+  color: var(--nb-text-faint);
+}
+
+/* ── composer ──────────────────────────────────────────── */
+.composer {
+  padding: var(--nb-space-3) var(--nb-space-4) var(--nb-space-4);
+  background: var(--nb-bg-surface);
+  border-top: 1px solid var(--nb-border);
+}
+.composer-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-2);
+  margin-bottom: var(--nb-space-2);
+}
+.composer-spacer { flex: 1; }
+.composer-input { display: flex; align-items: flex-end; gap: var(--nb-space-2); }
+.composer-input textarea {
+  flex: 1;
+  min-width: 0;
+  max-height: 180px;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: var(--nb-type-msg);
+  line-height: 1.55;
+  color: var(--nb-text-primary);
+  background: var(--nb-bg-surface-sunken);
+  border: 1px solid var(--nb-border);
+  border-radius: var(--nb-radius-control);
+  resize: none;
+}
+.composer-input textarea:focus-visible {
+  outline: 2px solid var(--nb-border-accent);
+  outline-offset: 1px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--nb-type-micro);
+  color: var(--nb-text-tertiary);
+}
+.status::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-radius: var(--nb-radius-pill);
+  background: var(--nb-state-idle);
+}
+.status[data-state="running"]::before { background: var(--nb-state-busy); }
+.status[data-state="ok"]::before      { background: var(--nb-state-ok); }
+.status[data-state="error"]::before   { background: var(--nb-state-error); }
+
+/* 窄屏：侧栏收成抽屉。断点写在最后，避免被前面的规则覆盖。 */
+@media (max-width: 880px) {
+  .app { grid-template-columns: 1fr; }
+  .side {
+    position: fixed; inset: 0 auto 0 0; z-index: 20;
+    width: min(300px, 86vw);
+    transform: translateX(-100%);
+    transition: transform var(--nb-motion-base) var(--nb-ease);
+  }
+  .app[data-drawer="open"] .side { transform: none; }
+}
