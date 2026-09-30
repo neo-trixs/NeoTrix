@@ -280,10 +280,10 @@ pub fn create_ocr_engine(#[allow(unused_variables)] config: OcrConfig) -> Arc<dy
 
     // 回退到启发式引擎 — RuleBasedOcr 只实现 nt_file_ability 的 OcrEngine,
     // 需要一个适配器来桥接到 nt_world 的 OcrEngine trait
-    use crate::neotrix::nt_file_ability::visual::OcrEngine as FileAbilityOcrEngine;
+    use crate::l1_action::nt_file_ability::visual::OcrEngine as FileAbilityOcrEngine;
 
     struct FallbackOcr {
-        inner: crate::neotrix::nt_file_ability::visual::RuleBasedOcr,
+        inner: crate::l1_action::nt_file_ability::visual::RuleBasedOcr,
     }
 
     impl OcrEngine for FallbackOcr {
@@ -311,7 +311,7 @@ pub fn create_ocr_engine(#[allow(unused_variables)] config: OcrConfig) -> Arc<dy
     }
 
     Arc::new(FallbackOcr {
-        inner: crate::neotrix::nt_file_ability::visual::RuleBasedOcr,
+        inner: crate::l1_action::nt_file_ability::visual::RuleBasedOcr,
     })
 }
 

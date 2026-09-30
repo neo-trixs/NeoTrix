@@ -40,13 +40,6 @@
    ],
    "note": "决策三原语（primitives.rs 481 行 / gate.rs 480 / eval.rs 569）。⛔ 同上，勿删。2026-09-30 第二棵树 B 方案回流：原路径 neotrix/nt_jev 已搬至 l5_cognition/nt_jev（内容零改动，14 文件/4312 行实测不变）。live_consumers 由 5 条补全为 12 条（2026-09-30 rg 全量普查，30 处引用跨 l3/l5/l6 + 晶体核）。⛔ 其 2 处 l3_embodiment→l5 消费是既存架构边，已棘轮进 layer-deps-baseline。"
   },
-  "neotrix/nt_file_ability": {
-   "layer": "l1_action",
-   "role": "primary",
-   "lines": 13993,
-   "files": 44,
-   "note": "文件能力。其 capability.rs:185 的 CapabilityRegistry 零消费者（真冗余，见 BATCH-FIX-CHECKLIST B-1），但本子树整体是活的（l2_perception/nt_world/ocr/mod.rs:283 消费 OcrEngine）。"
-  },
   "l0_substrate/ffi": {
    "layer": "l0_substrate",
    "role": "primary",
@@ -102,6 +95,13 @@
    "files": 1,
    "lines": 22,
    "note": "daemon 代理薄封装，无跨层引用。 [2026-09-30 B 方案回流：原路径 neotrix/proxy_daemon_wrapper 已搬至 l0_substrate/proxy_daemon_wrapper]"
+  },
+  "l1_action/nt_file_ability": {
+   "layer": "l1_action",
+   "role": "primary",
+   "lines": 13993,
+   "files": 44,
+   "note": "文件能力。其 capability.rs:185 的 CapabilityRegistry 零消费者（真冗余，见 BATCH-FIX-CHECKLIST B-1），但本子树整体是活的（l2_perception/nt_world/ocr/mod.rs:283 消费 OcrEngine）。 [2026-09-30 B 方案回流：原路径 neotrix/nt_file_ability 已搬至 l1_action/nt_file_ability（门面 + 子树）]"
   }
  },
  "unresolved": {

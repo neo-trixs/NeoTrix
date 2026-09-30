@@ -1,12 +1,12 @@
-l2_perception	neotrix-core/src/neotrix/nt_file_ability/tests.rs
+l2_perception	neotrix-core/src/l1_action/nt_file_ability/tests.rs
 l3_embodiment	neotrix-core/src/neotrix/nt_core_event_bus.rs
 l5_cognition	neotrix-core/src/l0_substrate/ffi/consciousness_tree.rs
 l5_cognition	neotrix-core/src/l0_substrate/ffi/seal_pipeline.rs
+l5_cognition	neotrix-core/src/l1_action/nt_file_ability/tests.rs
 l5_cognition	neotrix-core/src/l1_action/nt_io/nt_io_neocodex/agent/nt_agent_session.rs
 l5_cognition	neotrix-core/src/l3_embodiment/nt_shield/shield_core/guard.rs
 l5_cognition	neotrix-core/src/l3_embodiment/nt_shield/shield_core/safety_kernel.rs
 l5_cognition	neotrix-core/src/neotrix/nt_core_event_bus.rs
-l5_cognition	neotrix-core/src/neotrix/nt_file_ability/tests.rs
 l6_meta	neotrix-core/src/l0_substrate/ffi/consciousness_tree.rs
 l6_meta	neotrix-core/src/l5_cognition/nt_core_arch_fitness.rs
 l6_meta	neotrix-core/src/l5_cognition/nt_core_orchestration_failure_taxonomy.rs

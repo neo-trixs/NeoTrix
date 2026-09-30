@@ -521,7 +521,7 @@ impl BrainStage for SelfTestStage {
             crate::l5_cognition::nt_mind::foundation::cleanup_engine::CleanupEngineSelfTest,
         ));
         registry.register(Box::new(
-            crate::neotrix::nt_file_ability::FileAbilitySelfTest,
+            crate::l1_action::nt_file_ability::FileAbilitySelfTest,
         ));
         // registry.register(Box::new(
         //     crate::l5_cognition::nt_core::nt_core_parallel::CapabilityClusterSelfTest,

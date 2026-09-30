@@ -7,20 +7,20 @@
 
 use crate::l0_substrate::nt_core_error::NeoTrixError;
 
-impl From<crate::neotrix::nt_file_ability::capability::CapabilityError> for NeoTrixError {
-    fn from(e: crate::neotrix::nt_file_ability::capability::CapabilityError) -> Self {
+impl From<crate::l1_action::nt_file_ability::capability::CapabilityError> for NeoTrixError {
+    fn from(e: crate::l1_action::nt_file_ability::capability::CapabilityError) -> Self {
         NeoTrixError::OperationFailed(e.to_string())
     }
 }
 
-impl From<crate::neotrix::nt_file_ability::types::FileAbilityError> for NeoTrixError {
-    fn from(e: crate::neotrix::nt_file_ability::types::FileAbilityError) -> Self {
+impl From<crate::l1_action::nt_file_ability::types::FileAbilityError> for NeoTrixError {
+    fn from(e: crate::l1_action::nt_file_ability::types::FileAbilityError) -> Self {
         NeoTrixError::OperationFailed(e.to_string())
     }
 }
 
-impl From<crate::neotrix::nt_file_ability::image_super_resolution::SuperResolutionError> for NeoTrixError {
-    fn from(e: crate::neotrix::nt_file_ability::image_super_resolution::SuperResolutionError) -> Self {
+impl From<crate::l1_action::nt_file_ability::image_super_resolution::SuperResolutionError> for NeoTrixError {
+    fn from(e: crate::l1_action::nt_file_ability::image_super_resolution::SuperResolutionError) -> Self {
         NeoTrixError::OperationFailed(e.to_string())
     }
 }

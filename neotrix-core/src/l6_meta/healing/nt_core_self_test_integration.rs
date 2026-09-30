@@ -45,7 +45,7 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     // 2026-08-29 外部吸收 (archify/diagram-design): NT-CORE 可验证架构图原语
     crate::l5_cognition::nt_core_arch_diagram::register_arch_diagram_self_tests(&mut registry);
     // 2026-08-29 外部吸收 (firecrawl/anydoc): NT-WORLD 文档格式路由
-    crate::neotrix::nt_file_ability::register_format_route_self_tests(&mut registry);
+    crate::l1_action::nt_file_ability::register_format_route_self_tests(&mut registry);
     // 2026-08-29 外部吸收 (reverse-skill): NT-SHIELD 安全技能路由
     crate::l3_embodiment::nt_shield::shield_core::nt_shield_skill_router::register_skill_router_self_tests(&mut registry);
     // 2026-08-29 外部吸收 (affaan-m/ECC): NT-MIND SEAL 进化维度 instincts/security
@@ -179,7 +179,7 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     // 2026-08-28 外部吸收 (arXiv:2608.23642): NT-GOVERNANCE 人类监督治理 affordance + 萎缩对策
     crate::l6_meta::coordination::nt_governance::register_human_oversight_self_tests(registry);
     // 2026-09-11 PDF图像能力熔炼: SelfTest T2 注册
-    crate::neotrix::nt_file_ability::register_pdf_sr_self_tests(registry);
+    crate::l1_action::nt_file_ability::register_pdf_sr_self_tests(registry);
 }
 
 /// C5 自愈回路检测件 (检测异常 → 自动恢复)。纯内存, 无网络/磁盘/env IO。

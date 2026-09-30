@@ -85,9 +85,9 @@ impl BookInput {
     pub fn from_file(
         path: &std::path::Path,
         chunk_chars: usize,
-    ) -> Result<Self, crate::neotrix::nt_file_ability::types::ParseError> {
-        use crate::neotrix::nt_file_ability::DocFormat as AbilityFormat;
-        use crate::neotrix::nt_file_ability::parse_any;
+    ) -> Result<Self, crate::l1_action::nt_file_ability::types::ParseError> {
+        use crate::l1_action::nt_file_ability::DocFormat as AbilityFormat;
+        use crate::l1_action::nt_file_ability::parse_any;
 
         let model = parse_any(path)?;
         let ext = path

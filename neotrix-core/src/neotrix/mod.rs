@@ -1,9 +1,11 @@
 //! # NeoTrix 核心模块
 //!
-//! 本地模块：nt_crystal_core, nt_file_ability,
+//! 本地模块：nt_crystal_core,
 //! nt_core_error, nt_core_event_bus
 //!
 //! 2026-09-30 第二棵树 B 方案回流：`nt_jev` 已迁至 `crate::l5_cognition::nt_jev`
+//! 2026-09-30 第二棵树 B 方案回流：`nt_file_ability` 已迁至
+//! `crate::l1_action::nt_file_ability`（门面 + 子树），本模块保留其 re-export 面
 
 #![forbid(unsafe_code)]
 
@@ -14,7 +16,6 @@ pub use crate::l1_action::nt_io::nt_io_hotreload;
 // ─── Local modules ────────────────────────────────────────────────────────
 pub mod nt_core_error;
 pub mod nt_core_event_bus;
-pub mod nt_file_ability;
 pub mod nt_crystal_core;
 /// neotrix → L0 error conversions (moved from l0_substrate to respect L0 ← neotrix direction)
 pub mod error_conversions;
@@ -26,7 +27,7 @@ pub use nt_core_capability_tree::{
 };
 
 // ─── Unified File Ability re-export ──────────────────────────────────────
-pub use nt_file_ability::{
+pub use crate::l1_action::nt_file_ability::{
     check_health,
     consolidate_tables_with_mode, content_similarity,
     create_from_markdown, decode_bytes,
@@ -50,4 +51,4 @@ pub use nt_file_ability::{
     E8StateTransition, GwtAttentionRouter, VsaEmbedding,
 };
 
-pub use nt_file_ability::merge_docx;
+pub use crate::l1_action::nt_file_ability::merge_docx;

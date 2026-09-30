@@ -13,8 +13,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::l2_perception::nt_world::ocr::{OcrConfig, OcrEngine, OcrResult};
-use crate::neotrix::nt_file_ability::pdf::pdf_image_extract;
-use crate::neotrix::nt_file_ability::{ImageSuperResolver, SuperResolutionConfig, SuperResolutionModel};
+use crate::l1_action::nt_file_ability::pdf::pdf_image_extract;
+use crate::l1_action::nt_file_ability::{ImageSuperResolver, SuperResolutionConfig, SuperResolutionModel};
 
 /// PDF→文本管线
 pub struct PdfToTextPipeline {
