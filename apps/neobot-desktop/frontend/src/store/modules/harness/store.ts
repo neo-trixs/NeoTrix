@@ -95,6 +95,17 @@ export const harness = defineStore({
     patchLayerHint: '',
     heapOomHint: '',
     serviceUrl: 'http://127.0.0.1:3080',
+    /**
+     * 自持界面：后端说没有可 iframe 的服务。
+     *
+     * 这不是「降级」，是本仓的**正常形态** —— 上游 99% 屏幕时间在 iframe 里，
+     * 而 iframe 内容来自 `source/deepseek-harness`（空 submodule），那个运行时
+     * 不在本仓。NeoBot 的对话区由本仓自己实现，中间区域直接渲染自己的根组件。
+     *
+     * 若这里硬造一个 `http://127.0.0.1:3080`，壳会 ready、iframe 去加载不存在
+     * 的东西，错误报在离原因很远的地方。
+     */
+    selfHosted: false,
     /** 带时间戳的 iframe 地址（boot 时生成一次，避免缓存） */
     iframeSrc: '',
     iframeLoaded: false,
@@ -409,15 +420,23 @@ export const harness = defineStore({
         throw startupError(phase, reason, 'exited')
       }
 
-      const readyInfo = await invoke<{ service_url: string }>('get_runtime_info')
-      if (token !== bootToken)
-        return false
+        const readyInfo = await invoke<{
+          service_url: string
+          has_service?: boolean
+          host?: string
+        }>('get_runtime_info')
+        if (token !== bootToken)
+          return false
 
-      this.serviceUrl = readyInfo.service_url
-      this.iframeSrc = generateTimestampedUrl(readyInfo.service_url)
-      this.serviceHealthy = true
-      this.serviceRunning = true
-      this.status = 'ready'
+        // 先判有没有服务，再决定 iframe 形态。顺序反了就会去 iframe 一个空 URL，
+        // 而「iframe 加载失败」与「服务没起来」在界面上几乎一样，排查会走错方向。
+        const hasService = readyInfo.has_service ?? readyInfo.service_url.length > 0
+        this.serviceUrl = readyInfo.service_url
+        this.selfHosted = !hasService
+        this.iframeSrc = hasService ? generateTimestampedUrl(readyInfo.service_url) : ''
+        this.serviceHealthy = hasService
+        this.serviceRunning = hasService
+        this.status = 'ready'
       this.errorMsg = ''
       this.errorLogs = []
       this.pluginConflictHint = ''
@@ -552,11 +571,31 @@ export const harness = defineStore({
         catch (err) {
           console.error('[Harness] failed to listen install-progress:', err)
         }
-        const runtimeInfo = await invoke<{ service_url: string }>('get_runtime_info')
-        this.serviceUrl = runtimeInfo.service_url
-        this.iframeSrc = generateTimestampedUrl(runtimeInfo.service_url)
+          const runtimeInfo = await invoke<{
+            service_url: string
+            has_service?: boolean
+          }>('get_runtime_info')
+          this.serviceUrl = runtimeInfo.service_url
+          const hasService = runtimeInfo.has_service ?? runtimeInfo.service_url.length > 0
+          this.selfHosted = !hasService
+          this.iframeSrc = hasService ? generateTimestampedUrl(runtimeInfo.service_url) : ''
 
-        // 已安装过则跳过安装界面，避免每次启动都闪现"正在安装依赖..."
+          // ⛔ 自持模式到此为止。
+          //
+          // 下面那一整段（装依赖 → 内置插件自愈 → 预装清单 → launchAndWait）
+          // 全是围绕 `source/deepseek-harness` 那个运行时设计的。NeoBot 没有它：
+          // 不装 Node/MinGit、没有内置插件、没有社区预装清单、也没有进程要拉起。
+          //
+          // 逐条 stub 那些命令是**错的做法** —— 那会让壳「走完一段没有意义的流程」，
+          // 而 `waitForActivityTask` 那类带超时的等待在永远不来心跳时会一直等到
+          // 绝对超时。**跳过整段**比**假装走完**既快又诚实。
+          if (this.selfHosted) {
+            this.serviceHealthy = false
+            this.serviceRunning = false
+            this.status = 'ready'
+            return
+          }
+
         // 设置由 setting store 持有（与 Rust 共享同一份 .store.dat）。必须先等水合
         // 完成再读，否则会把默认值当成真实安装状态：多跑一次安装，还漏掉更新检查。
         await setting.$persist.rehydrate()

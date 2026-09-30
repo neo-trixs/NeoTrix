@@ -79,6 +79,10 @@ impl ApiSpec {
 /// 插件安装/版本策略、profile 备份恢复、updater、core 下载、BongoCat 桌宠。
 /// 本仓的骨架是 `crates/neotrix-neobot`（超集，30k 行），不跑 DSH 运行时。
 const DSH_ONLY: &str = "DSH 运行时专属（插件/profile/updater/core/桌宠），NeoBot 不跑该运行时";
+/// 目前没有 Planned 条目（5 个已全部实现），但**保留**这个常量：
+/// 加回 Planned 时直接用。若此时把它删掉，下次写 Planned 会临时造一个措辞不同的
+/// 理由，而理由措辞的漂移会让「欠账清单」的可比性下降。
+#[allow(dead_code)]
 const TODO: &str = "NeoBot 该有，尚未实现";
 
 /// 全部命令契约。**新增命令必须在此登记** —— `nt_check_api.mjs` 守这条。
@@ -108,19 +112,27 @@ pub const SPECS: &[ApiSpec] = &[
     ApiSpec::new("neobot_api_call", "API", &["name", "args"], "ApiCallResult", Status::Implemented,
         "按名字分派；Stub/Planned 返回结构化说明而不抛错"),
     // ── 上游 79 个：分状态登记 ──
-    ApiSpec::new("get_runtime_info", "harness", &[], "{ service_url: string }", Status::Stub, DSH_ONLY),
+    ApiSpec::new("runtime_ready", "harness", &[], "boolean", Status::Implemented,
+        "恒 true：返回 false 会把壳推进 installing 去装不需要的依赖"),
+    ApiSpec::new("set_language", "其它", &["lang"], "void", Status::Implemented, "持久化界面语言"),
+    ApiSpec::new("get_runtime_info", "harness", &[], "RuntimeInfo", Status::Implemented,
+        "⛔ 刻意返回**空** service_url + has_service=false：NeoBot 不跑 DSH 运行时。
+        壳据此切自持界面；编造 URL 会把失败搬到离原因很远的地方"),
     ApiSpec::new("launch_harness", "harness", &[], "void", Status::Stub, DSH_ONLY),
     ApiSpec::new("shutdown_harness", "harness", &[], "void", Status::Stub, DSH_ONLY),
     ApiSpec::new("copy_service_url", "harness", &[], "void", Status::Stub, DSH_ONLY),
-    ApiSpec::new("install_dependencies", "harness", &[], "void", Status::Stub, DSH_ONLY),
-    ApiSpec::new("get_dsh_theme", "其它", &[], "'dark' | 'light' | 'system'", Status::Planned,
-        "主题读取，界面要用"),
+    ApiSpec::new("install_dependencies", "harness", &[], "void", Status::Implemented,
+        "空操作：NeoBot 无外部依赖。壳在 !installed 时会调到，缺命令会卡在 installing"),
+    ApiSpec::new("get_dsh_theme", "桌面", &[], "'dark' | 'light' | 'system'", Status::Implemented, ""),
     ApiSpec::new("get_cli_link_status", "其它", &[], "CliLinkStatus", Status::Stub, DSH_ONLY),
-    ApiSpec::new("is_dev_build", "其它", &[], "boolean", Status::Planned, "构建模式标识"),
-    ApiSpec::new("log_frontend", "日志", &["level", "message"], "void", Status::Planned, "前端日志落盘"),
-    ApiSpec::new("read_run_logs", "日志", &[], "string", Status::Planned, "运行日志读取"),
+    ApiSpec::new("is_dev_build", "桌面", &[], "boolean", Status::Implemented,
+        "编译期事实，**不**读环境变量（打包后误判会让开发菜单出现在正式版）"),
+    ApiSpec::new("log_frontend", "日志", &["level", "target", "message"], "void", Status::Implemented,
+        "⚠️ 3 个参数。契约最初写成 2 个而门没抓到 —— 门当时只对命令名不对参数"),
+    ApiSpec::new("read_run_logs", "日志", &[], "string", Status::Implemented,
+        "⛔ 不返空串：前端直接塞 <pre>，空串会被读成「没有日志」"),
     ApiSpec::new("read_service_logs", "日志", &[], "string", Status::Stub, DSH_ONLY),
-    ApiSpec::new("get_desktop_about", "其它", &[], "AboutInfo", Status::Planned, "关于页数据"),
+    ApiSpec::new("get_desktop_about", "桌面", &[], "DesktopAboutInfo", Status::Implemented, ""),
 ];
 
 /// 未逐条登记的上游命令。**只登记名字**，让缺口可数。

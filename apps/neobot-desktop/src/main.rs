@@ -31,11 +31,25 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        // 壳启动必用。⛔ 少注册哪个都会报「not allowed by ACL」——
+        //    而「ACL 不允许」与「命令不存在」是两个完全不同的病因，
+        //    前者去查 capabilities，后者去查命令注册表。
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
         // 命令实现在 `commands`（pub，可被集成测试直接调用）；
         // 本文件只负责注册与生命周期。
         // 面板注册表由应用持有：骨架下发时登记，界面作答时按 id 查。
         .manage(neobot_desktop::commands::AppState::default())
         .invoke_handler(tauri::generate_handler![
+            neobot_desktop::desktop::get_runtime_info,
+            neobot_desktop::desktop::runtime_ready,
+            neobot_desktop::desktop::install_dependencies,
+            neobot_desktop::desktop::set_language,
+            neobot_desktop::desktop::get_dsh_theme,
+            neobot_desktop::desktop::is_dev_build,
+            neobot_desktop::desktop::log_frontend,
+            neobot_desktop::desktop::read_run_logs,
+            neobot_desktop::desktop::get_desktop_about,
             neobot_desktop::commands::neobot_api_specs,
             neobot_desktop::commands::neobot_api_call,
             neobot_desktop::commands::neobot_panel_publish,

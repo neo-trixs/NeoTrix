@@ -20,6 +20,11 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+# 壳启动必用：`opener` 开外链，`store` 读配置/状态。
+# ⛔ 缺哪个都会报「not allowed by ACL」而不是「命令不存在」——
+#    两者的排查方向完全不同，所以它们必须**在**而不是靠 stub。
+tauri-plugin-opener = "2"
+tauri-plugin-store = "2"
 # ⛔ 逻辑**不在这里复制**。本 app 是薄壳，能力全部来自同仓的库。
 #    d5413335 删除内嵌 app 的理由之一就是「桌面端曾是两份同源物」；
 #    这次重建若复制 crates/neotrix-neobot 的代码，等于把那个问题原样造回来。

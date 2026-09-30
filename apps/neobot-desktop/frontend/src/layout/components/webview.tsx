@@ -10,6 +10,7 @@ import { store } from '@/store'
 import { borderTintOf } from '@/store/modules/remote'
 import { Recovery } from '@/ui/plugin/recovery'
 import { Iframe } from './iframe'
+import { NeoBotRoot } from '@/neobot-root'
 import { Navbar } from './navbar'
 import { Setup } from './setup'
 import { PreinstallSetup } from './setup-preinstall'
@@ -39,7 +40,7 @@ export function Webview() {
   const [dshStyle] = useDshStyle()
   const [, setDshShortcuts] = useDshShortcuts()
 
-  const { status, serviceHealthy } = useStore(store.harness)
+  const { status, serviceHealthy, selfHosted } = useStore(store.harness)
   const { recovery } = useStore(store.recovery)
   const { machines, activeId, activeTunnelUrl } = useStore(store.remote)
   // 远端模式：活动机器的隧道 URL 就绪才切换（不指向空端口）；重连窗口内
@@ -68,14 +69,18 @@ export function Webview() {
         )
       case 'preinstall':
         return <PreinstallSetup />
-      case 'ready':
-        return (
-          <Iframe
-            iframeRef={iframeRef}
-            srcOverride={remoteMode ? activeTunnelUrl : null}
-            borderTint={borderTint}
-          />
-        )
+        case 'ready':
+          // 自持模式：没有可 iframe 的服务，中间区域由本仓自己渲染。
+          // ⛔ 与 iframe 分支互斥，且判定只用 `selfHosted` ——
+          //    不用 `serviceHealthy`：那个字段在 shutdown 后可能仍为 true
+          //    （上游自己的注释就写了这点），会渲染出一个空 iframe。
+          return selfHosted ? <NeoBotRoot /> : (
+            <Iframe
+              iframeRef={iframeRef}
+              srcOverride={remoteMode ? activeTunnelUrl : null}
+              borderTint={borderTint}
+            />
+          )
       default:
         return <Setup />
     }

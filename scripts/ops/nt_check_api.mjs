@@ -67,7 +67,12 @@ const registered = new Set(
     .map((m) => m[1])
     // ⛔ 必须滤掉宏名。上游写法是 `tauri::generate_handler![...]`，
     //   正则会把 `generate_handler` 当成一条命令收进来 ⇒ 门自己报假警。
-    .filter((c) => c !== "neobot_desktop" && c !== "commands" && !c.endsWith("_handler")),
+    // ⛔ 必须滤掉**模块路径段**。注册写成
+    //   neobot_desktop::desktop::get_dsh_theme 时，正则会连
+    //   `desktop` 一起收进来 ⇒ 门把它当成一条未登记的命令。
+    //   判据：出现在 `::` 之后 ⇒ 那就是命令名；出现在之前 ⇒ 路径段。
+    .filter((c) => c !== "neobot_desktop" && c !== "commands" && !c.endsWith("_handler")
+      && !["desktop", "api", "host", "core"].includes(c)),
 );
 
 console.log(`  契约条目 ${specs.length} · 未展开上游 ${unlisted.length} · Rust 注册 ${registered.size}`);
@@ -163,6 +168,55 @@ if (!process.env.NB_API_GATE_SELFTEST && specs.length > 0) {
           " ⇒ ③ 的判定写错了，这道门抓不住隐性接口",
       );
       process.exit(4);
+    }
+  }
+}
+
+// ── ⑦ 参数对账：契约声明的每个参数名，必须出现在 Rust 的 fn 签名里 ──
+//
+// ⛔ **这条是被真实的错误逼出来的。** 契约里 `log_frontend` 写成 2 个参数
+//    （level, message），而前端实际 invoke 传的是 3 个
+//    （`{ level, target, message }`，见 src/utils/logger.ts:81）。
+//    ①②③④⑤ 全绿 —— 因为它们只对**命令名**，不对**参数**。
+//
+// ⇒ 「按名传参」的 Tauri 接口，参数名写错的后果是**静默的**：
+//   Rust 侧少一个字段就反序列化失败，但那个 invoke 是 `.catch(() => {})`
+//   吞掉的 ⇒ 日志静默不落盘，界面无任何异常。
+//   只靠「跑一次看看」发现不了，因为「不报错」正是症状。
+const cmdsRs = readFileSync(join(APP, "src/commands.rs"), "utf8") +
+  readFileSync(join(APP, "src/desktop.rs"), "utf8") + apiRs;
+for (const s of specs) {
+  if (s.status !== "Implemented") continue;
+  // 找该命令的 fn 签名（允许跨行，允许 #[tauri::command] 在上一行）
+  const sigRe = new RegExp(
+    `fn\\s+${s.name}\\s*\\(([\\s\\S]{0,400}?)\\)\\s*(->[^\\{]*)?\\{`,
+  );
+  const m = cmdsRs.match(sigRe);
+  if (!m) continue; // 签名形态特殊（如 main.rs 里直接引用），跳过而非误报
+  const sig = m[1];
+  for (const want of s.params) {
+    if (!new RegExp(`\\b${want}\\s*:`).test(sig)) {
+      problems.push(
+        `契约说 ${s.name} 有参数 ${want}，但 Rust fn 签名里找不到` +
+          " ⇒ 按名传参会反序列化失败，而前端常把 invoke 的错误 .catch 掉" +
+          " ⇒ 症状是「静默不生效」，不是报错",
+      );
+    }
+  }
+  // ⛔ **反向**也要查：Rust 有、契约没写。
+  //   只查正向的话，「契约少写一个参数」这个**最常见的错法**反而漏 ——
+  //   而那正是 log_frontend 真实的错法（契约 2 个、实际 3 个）。
+  //   变异验证：摘掉契约里的 target ⇒ 门必须 FAIL。
+  for (const decl of sig.matchAll(/(\w+)\s*:\s*(?:String|Option<[^>]+>|bool|u64|i64|Value|\w+)/g)) {
+    const name = decl[1];
+    // 跳过 Tauri 注入的固定形参（AppHandle / State / tauri::…）
+    if (/^(app|state|window|webview)$/i.test(name)) continue;
+    if (name === "tauri" ) continue;
+    if (!s.params.includes(name)) {
+      problems.push(
+        `${s.name} 的 Rust 签名有参数 ${name}，契约 SPECS 没写` +
+          " ⇒ 契约漏项，读这份清单的人会以为该接口不收它",
+      );
     }
   }
 }
