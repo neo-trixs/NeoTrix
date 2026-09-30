@@ -285,3 +285,19 @@ neotrix-core/config/crystal.toml
 
 # Tauri 自动生成的 schema（每次 cargo check 都会重写，入库只增历史噪声）
 apps/neobot-desktop/gen/
+
+# apps/neobot-desktop/frontend/dist/ —— vite build 的输出（index.html + assets/*.js|css）
+# 2026-09-30 取证：tauri.conf.json:10 `beforeBuildCommand: npm run build`
+# ⇒ 每次 Tauri 构建都自动再生，入库只会在仓里留一份**必然陈旧**的副本。
+# 且 tauri.conf.json:32-34 的 icon 路径指向 **`icons/`**（已入库 53 个），
+# **不是** dist/ ⇒ dist 里的 49 个 png 纯属复制过去的冗余。
+# 实测 59 文件 / 1.4M，其中真产物只有 index.html + assets/ 3 个文件。
+apps/neobot-desktop/frontend/dist/
+
+# apps/neobot-desktop/gen/schemas/ —— Tauri CLI 的自动生成物（924K）
+# 2026-09-30 取证：四个文件名全是 tauri-cli 标准产物
+# （capabilities / desktop-schema / macOS-schema / acl-manifests），
+# `capabilities.json` 内容为空 `{}`；全仓**唯一**引用是
+# sessions/handoff-dialog-spec-20260927.md 的一句散文，**无任何代码消费**。
+# ⇒ 仓 `tauri dev/build` 时自动再生，入库只留陈旧副本。
+apps/neobot-desktop/gen/schemas/
