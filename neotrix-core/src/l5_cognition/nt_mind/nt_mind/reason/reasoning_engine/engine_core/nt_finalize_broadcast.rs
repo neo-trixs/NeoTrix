@@ -11,7 +11,7 @@ use crate::l5_cognition::nt_mind::nt_mind::control_distillation::{
     AlternatingSequence, ControlTrainer, CsppoReport, ControlDistillStep, SftReport,
 };
 use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{ReasoningRecord, ReasoningType};
-use crate::neotrix::nt_core_error::{ NeoTrixResult};
+use crate::l0_substrate::nt_core_error::{ NeoTrixResult};
 use super::nt_builders::{ReasoningEngine, CONTROL_TRAIN_BATCH, MAX_TRACES};
 
 impl ReasoningEngine {

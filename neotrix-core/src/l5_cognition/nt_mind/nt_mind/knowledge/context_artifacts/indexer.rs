@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use log::warn;
-use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
+use crate::l0_substrate::nt_core_error::{NeoTrixError, NeoTrixResult};
 
 use super::store::{ArtifactBuilder, ArtifactStore};
 use super::types::{ArtifactType, ArtifactsConfig};

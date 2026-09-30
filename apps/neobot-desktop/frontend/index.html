@@ -19,6 +19,9 @@
     <link rel="stylesheet" href="/src/ui/primitives.css" />
     <link rel="stylesheet" href="/src/ui/blocks.css" />
     <link rel="stylesheet" href="/src/ui/sheet.css" />
+    <link rel="stylesheet" href="/src/ui/primitives.css" />
+    <link rel="stylesheet" href="/src/ui/capsule.css" />
+    <link rel="stylesheet" href="/src/ui/settings.css" />
     <link rel="stylesheet" href="/src/ui/island.css" />
   </head>
   <body>
@@ -30,27 +33,26 @@
 
       <!-- ① Rail：图标导航。入口由能力门控，缺能力不出现 -->
       <nav class="rail" aria-label="主导航">
-        <span class="rail-mark">
-          <img src="/icon.svg" alt="NeoBot" width="28" height="28" />
-        </span>
+        <button class="rail-mark" type="button" id="rail-mark" title="NeoBot" aria-label="NeoBot 主页">
+          <img src="/icon.svg" alt="" width="26" height="26" />
+        </button>
         <div id="rail" class="rail-items" style="display:contents"></div>
         <span class="rail-spacer"></span>
-        <button id="btn-settings" class="rail-btn" type="button" title="设置" aria-label="设置">⚙</button>
+        <div id="rail-bottom" class="rail-items rail-items--bottom" style="display:contents"></div>
       </nav>
 
       <!-- ② Panel：搜索 + 分组列表 -->
       <aside class="side" aria-label="列表">
         <header class="side-head">
-          <span class="side-title" id="panel-title">对话</span>
           <span class="side-head-actions">
-            <button id="btn-new-group" class="nb-icon-btn" type="button" title="新建群组" aria-label="新建群组">群</button>
-            <button id="btn-panel-toggle" class="nb-icon-btn" type="button" title="折叠侧栏" aria-label="折叠侧栏">⟨</button>
+            <button id="btn-new-group" type="button" title="新建群组" aria-label="新建群组"></button>
+            <button id="btn-panel-toggle" type="button" title="折叠侧栏" aria-label="折叠侧栏"></button>
           </span>
         </header>
         <div class="side-search">
           <input id="search" type="search" placeholder="搜索…" aria-label="搜索" />
         </div>
-        <nav class="convs" id="convs" aria-label="会话列表"></nav>
+        <div id="convs-host" class="convs-host"></div>
         <footer class="side-foot">
           <span id="host-badge" class="side-badge"></span>
         </footer>
@@ -58,18 +60,26 @@
 
       <!-- ③ Content：块序列 + composer -->
       <main class="thread-col">
+        <header class="thread-head">
+          <span class="thread-title" id="thread-title">NeoBot</span>
+          <button id="btn-more" type="button" class="composer-tool" title="更多" aria-label="更多"></button>
+        </header>
         <div id="thread" class="thread" role="log" aria-live="polite" aria-label="对话"></div>
+        <!--
+          composer。
+          ⛔ **没有**「证据 / 跑一轮 / 详情」三个文字按钮了。
+          它们原来挤在输入框上方，是三个**常驻文字标签** —— 而这三个都不是
+          高频动作，是「偶尔要用的工具入口」。常驻的文字标签会把输入框
+          压成整个界面里最不像主控件的东西。
+          现在：证据 / 跑一轮 收进右侧设置面板，详情收成一个图标按钮。
+          ⛔ 发送**保留文字**：它是动作不是目的地，图标化之后没人敢按。
+        -->
         <div class="composer">
-          <div class="composer-row">
-            <button id="btn-evidence" class="nb-btn nb-btn--ghost nb-btn--sm" type="button" title="证据汇总">证据</button>
-            <button id="btn-agent-run" class="nb-btn nb-btn--ghost nb-btn--sm" type="button" title="手动跑一轮 agent">跑一轮</button>
-            <button id="btn-inspector" class="nb-btn nb-btn--ghost nb-btn--sm" type="button" title="详情面板">详情</button>
-            <span class="composer-spacer"></span>
-            <span id="island" class="island is-island--idle"></span>
-          </div>
           <div class="composer-input">
-            <textarea id="input" rows="1" placeholder="消息…（Enter 发送，Shift+Enter 换行）" aria-label="消息"></textarea>
-            <button id="btn-send" class="nb-btn nb-btn--primary" type="button">发送</button>
+            <textarea id="input" rows="1" placeholder="消息…" aria-label="消息"></textarea>
+            <span id="island" class="island is-island--idle"></span>
+            <button id="btn-detail" type="button" class="composer-tool" title="详情" aria-label="详情"></button>
+            <button id="btn-send" class="nb-btn nb-btn--md nb-btn--primary" type="button">发送</button>
           </div>
         </div>
       </main>
@@ -79,7 +89,7 @@
         <div class="inspector-inner">
           <header class="inspector-head">
             <span class="inspector-title" id="inspector-title">详情</span>
-            <button id="btn-inspector-close" class="nb-icon-btn" type="button" aria-label="关闭详情">✕</button>
+            <button id="btn-inspector-close" class="nb-icon-btn" type="button" aria-label="关闭详情"></button>
           </header>
           <div class="inspector-body" id="inspector-body"></div>
         </div>

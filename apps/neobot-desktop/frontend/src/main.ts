@@ -18,6 +18,9 @@ import { defaultCapabilities } from "./host/host.ts";
 import type { HostKind } from "./plugin/contract.ts";
 import { invoke, type Commands, type TraceRow } from "./ipc.ts";
 import { renderList, type ListItem } from "./list.ts";
+import { icon, iconButton, ICON_NAMES } from "./ui/icons.ts";
+import { el } from "./ui/dom.ts";
+import { threeState } from "./ui/primitives.ts";
 import { openSheet } from "./ui/sheet.ts";
 import { appendBlock } from "./ui/blocks.ts";
 import type { AnswerView } from "./ui/panel-view.ts";
@@ -461,55 +464,94 @@ function bucketOf(at: number | null): string {
 }
 
 let convos: ConvoViewWire[] = [];
+let convoLoading = false;
+let convoError = "";
 let members: MemberViewWire[] = [];
 
 /** 从 store 读会话。失败时**如实报错**，不回退到假数据。 */
 function loadConvos(): void {
   if (HOST !== "tauri") {
     convos = [];
+    convoLoading = false;
+    convoError = "";
     renderConvos();
     return;
   }
+  convoLoading = true;
+  convoError = "";
+  renderConvos();
   void call("neobot_convo_list", {}).then((r) => {
+    convoLoading = false;
     if (!r.ok) {
       // ⛔ 不回退到 MOCK。报错就是报错 —— 回退等于把「读不到 store」
       //    伪装成「你有 6 个会话」。
       convos = [];
+      convoError = r.error;
       renderConvos();
-      note("error", `读会话列表失败：${r.error}`, undefined, true);
       return;
     }
     convos = r.value;
+    convoError = "";
     if (selectedId === null && convos.length > 0) selectedId = convos[0].id;
     renderConvos();
   });
 }
 
+
 let selectedId: string | null = null;
 
-/** 渲染侧栏列表。分组/条目解剖见 list.ts（交集来源）。 */
+/**
+ * 渲染侧栏列表。
+ *
+ * ⛔ **三态必须分开**：加载中 / 读取失败 / 没有数据。
+ * 上一版只有「有数据就渲染，没数据显示空态」，于是
+ * 「store 读不了」与「用户没建过会话」落到**同一个分支** ——
+ * 前者会显示成后者，用户以为是自己没建过，去建了还是同样的提示，无从排查。
+ * tsc 过、build 过、界面看上去正常 —— **状态语义被压扁了**。
+ * 形态与 dsh-desktop 的 `Panel.Loadable` 一致（见 ui/primitives.ts 注释）。
+ */
 function renderConvos(): void {
   const items = convos.map(toListItem);
-  renderList($("convs"), {
-    items,
-    selected: selectedId,
-    query: ($("search") as HTMLInputElement).value,
-    emptyText:
-      HOST === "tauri"
-        ? "store 里还没有会话 —— 点上面「群」建一个"
-        : "浏览器预览无 store（无 Tauri 后端）—— 这里不放假数据",
-    onPick: (id) => {
-      selectedId = id;
-      const it = items.find((x) => x.id === id);
-      mark(`会话 · ${it?.title ?? id}`);
-      renderConvos();
-      openInspector(it);
-      // 换会话 ⇒ 清面板注册表。不清的话旧会话的面板仍可被作答，
-      // 而作答会被记到新会话的流里（串台）。
-      void call("neobot_panel_clear", {}).then((r) => {
-        if (r.ok && r.value > 0) note("info", `已清 ${r.value} 块旧面板（换会话）`);
+  const body = threeState({
+    loading: convoLoading,
+    error: convoError,
+    isEmpty: items.length === 0,
+    onRetry: loadConvos,
+    render: () => {
+      const nav = document.createElement("nav");
+      nav.className = "convs";
+      nav.id = "convs";
+      nav.setAttribute("aria-label", "会话列表");
+      renderList(nav, {
+        items,
+        selected: selectedId,
+        query: ($("search") as HTMLInputElement).value,
+        emptyText: "还没有会话",
+        onPick: onPickConvo,
       });
+      return nav;
     },
+    emptyText: HOST === "tauri" ? "还没有会话" : "浏览器预览无 store",
+    emptyHint:
+      HOST === "tauri"
+        ? "点上面「＋」建一个"
+        : "这里不放假数据 —— 没有 store 就是没有会话",
+  });
+  const host = $("convs-host");
+  host.replaceChildren();
+  host.appendChild(body);
+}
+
+function onPickConvo(id: string): void {
+  selectedId = id;
+  const it = convos.map(toListItem).find((x) => x.id === id);
+  mark(`会话 · ${it?.title ?? id}`);
+  renderConvos();
+  openDetail();
+  // 换会话 ⇒ 清面板注册表。不清则旧面板仍可被作答，
+  // 而作答会被记到新会话的流里（串台）。
+  void call("neobot_panel_clear", {}).then((r) => {
+    if (r.ok && r.value > 0) note("info", `已清 ${r.value} 块旧面板（换会话）`);
   });
 }
 
@@ -601,18 +643,47 @@ function railGlyph(id: string): string {
 
 // ── 事件绑定 ────────────────────────────────────────────────
 $("btn-new-group").addEventListener("click", () => newGroup());
-$("btn-agent-run").addEventListener("click", () => runOnce());
-$("btn-evidence").addEventListener("click", () => evidence());
+// ⛔ 「跑一轮」「证据」不再是 composer 里的常驻文字按钮。
+//    它们是**偶尔用的工具入口**，常驻文字标签会把输入框压成全界面
+//    最不像主控件的东西。现在：图标留在 rail，文字入口进设置面板。
+// rail 底部：设置。douchat 的齿轮就在最左 rail 的最下角 ——
+// 它是「整应用」级设置，不该混在会话级操作里。
+$("rail-bottom").appendChild(iconButton("settings", "设置", openSettings));
+$("rail-mark").addEventListener("click", () => {
+  // 点 logo 回列表顶部：这是「回家」，不是新会话
+  const first = convos[0];
+  if (first) {
+    selectedId = first.id;
+    renderConvos();
+    openDetail();
+  } else {
+    note("info", "还没有会话。");
+  }
+});
+
+$("btn-more").appendChild(icon("run", 16));
+$("btn-more").addEventListener("click", () => {
+  runOnce();
+});
+$("btn-detail").appendChild(icon("detail", 16));
+$("btn-detail").addEventListener("click", () => toggleInspector());
+$("btn-new-group").appendChild(icon("group", 16));
+$("btn-panel-toggle").appendChild(icon("collapse", 16));
 $("search").addEventListener("input", () => renderConvos());
 $("btn-panel-toggle").addEventListener("click", () => {
   const app = $("app");
   app.dataset["panel"] = app.dataset["panel"] === "open" ? "collapsed" : "open";
 });
-$("btn-inspector").addEventListener("click", () => {
+/** 详情/设置面板开合。单一入口 —— ⛔ 不得让多处各写一遍开合逻辑，
+ *  那样迟早有一处漏了同步 `data-open`，面板会「关了但还占位」。 */
+function toggleInspector(): void {
   const app = $("app");
-  app.dataset["inspector"] = app.dataset["inspector"] === "open" ? "closed" : "open";
-  $("inspector").dataset["open"] = app.dataset["inspector"] === "open" ? "true" : "false";
-});
+  const open = app.dataset["inspector"] !== "open";
+  app.dataset["inspector"] = open ? "open" : "closed";
+  $("inspector").dataset["open"] = open ? "true" : "false";
+}
+
+$("btn-inspector-close").appendChild(icon("close", 16));
 $("btn-inspector-close").addEventListener("click", () => {
   $("app").dataset["inspector"] = "closed";
   $("inspector").dataset["open"] = "false";
@@ -673,4 +744,227 @@ void call("neobot_member_list", {}).then((r) => {
 // 侧栏面板可用性：让测试/调试能直接看到判定结果，不靠猜。
 if (import.meta.env?.DEV) {
   (window as unknown as { __nb: unknown }).__nb = { caps, HOST, renderRail, renderConvos };
+}
+
+// ════════════════════════════════════════════════════════════════
+// 设置面板
+// ════════════════════════════════════════════════════════════════
+//
+// 形态对标 douchat 右栏：分区标题 + 开关行 + 「只显示当前值」的行 + 红色破坏性动作。
+//
+// # 「按钮只显示当前值」这条从哪来
+//
+// dsh-desktop `docs/workbench-standard.zh.md` §7 原文：
+// 「宿主在侧栏顶部提供**单一模式切换器：按钮只显示当前模式**」。
+// ⇒ 不把所有可选项并列在按钮上，只显示当前值，点开再选。
+// 并列显示的代价：按钮宽度随选项数量变化，且用户要在一堆里找「现在是什么」。
+//
+// # 开关为什么不是复选框
+//
+// 开关回答「**现在是什么**」，复选框回答「要不要勾」。
+// 设置项九成是状态而非待办，所以用开关。
+//
+// # ⛔ 不做的事
+//
+// · 不在这里放「跑一轮」「证据」这类**动作**的说明文字 —— 设置只管状态。
+// · 不给每个开关配「恢复默认」：没有默认值的开关，恢复默认无从谈起。
+
+/** 开关行。`hint` 是标签下的第二行小字 —— 不是每个开关都需要。 */
+function setSwitch(
+  label: string,
+  hint: string | undefined,
+  initial: boolean,
+  onChange: (v: boolean) => void,
+): HTMLElement {
+  const row = el("div", "set-row");
+  const lab = el("div", "set-row-label");
+  lab.appendChild(document.createTextNode(label));
+  if (hint) lab.appendChild(el("span", "set-row-hint", hint));
+  row.appendChild(lab);
+
+  const sw = el("button", "set-switch");
+  sw.type = "button";
+  sw.setAttribute("role", "switch");
+  sw.setAttribute("aria-checked", initial ? "true" : "false");
+  sw.setAttribute("aria-label", label);
+  sw.title = label;
+  sw.addEventListener("click", () => {
+    const next = sw.getAttribute("aria-checked") !== "true";
+    sw.setAttribute("aria-checked", next ? "true" : "false");
+    onChange(next);
+  });
+  row.appendChild(sw);
+
+  // 整行可点：点标签也该生效，否则开关那么小、难点
+  row.addEventListener("click", (e) => {
+    if (e.target === sw) return;   // 点开关本体已由上面处理
+    sw.click();
+  });
+  return row;
+}
+
+/** 值行：左标签 + 右当前值 + 箭头。点击时回调给出可选项。 */
+function setValue(
+  label: string,
+  value: string,
+  onPick: () => void,
+): HTMLElement {
+  const row = el("button", "set-row");
+  row.type = "button";
+  row.appendChild(el("span", "set-row-label", label));
+  row.appendChild(el("span", "set-value", value));
+  const ch = el("span", "set-chevron");
+  ch.appendChild(icon("collapse", 14));
+  row.appendChild(ch);
+  row.addEventListener("click", onPick);
+  return row;
+}
+
+/** 危险动作：红字，不用红底。实心红 = 主操作，而「清空」永远不是主操作。 */
+function setDanger(label: string, onClick: () => void): HTMLElement {
+  const b = el("button", "set-danger", label);
+  b.type = "button";
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+function setGroup(title: string, rows: HTMLElement[]): HTMLElement {
+  const g = el("div", "set-group");
+  g.appendChild(el("div", "set-group-title", title));
+  for (const r of rows) g.appendChild(r);
+  return g;
+}
+
+/** 本地偏好。刻意**只**存这三项**：偏好项越多，越容易出现「改了但没生效」。 */
+const PREF_KEY = "neobot.pref.v1";
+type Prefs = { density: "roomy" | "compact"; motion: boolean; notifications: boolean };
+
+function loadPrefs(): Prefs {
+  const base: Prefs = { density: "roomy", motion: true, notifications: true };
+  try {
+    const raw = localStorage.getItem(PREF_KEY);
+    return raw ? { ...base, ...(JSON.parse(raw) as Partial<Prefs>) } : base;
+  } catch {
+    // ⛔ 解析失败**不抛**：一个坏掉的偏好不该让整个界面打不开
+    return base;
+  }
+}
+
+function savePrefs(p: Prefs): void {
+  try {
+    localStorage.setItem(PREF_KEY, JSON.stringify(p));
+  } catch {
+    /* 隐私模式下 localStorage 会抛。偏好存不下不该影响使用 */
+  }
+}
+
+const prefs = loadPrefs();
+
+/** 渲染设置面板。`back` 是返回详情的回调。 */
+function renderSettings(): void {
+  const body = $("inspector-body");
+  body.replaceChildren();
+  $("inspector-title").textContent = "设置";
+
+  // ── 外观 ──
+  body.appendChild(
+    setGroup("外观", [
+      setValue("信息密度", prefs.density === "roomy" ? "宽松" : "紧凑", () => {
+        prefs.density = prefs.density === "roomy" ? "compact" : "roomy";
+        savePrefs(prefs);
+        // 紧凑 = 缩小胶囊圆角与内边距。一处真源，token 门会核对。
+        document.documentElement.dataset["density"] = prefs.density;
+        renderSettings();
+        note("info", `信息密度：${prefs.density === "roomy" ? "宽松" : "紧凑"}`);
+      }),
+      setSwitch("动效", "关闭后所有过渡立即结束", prefs.motion, (v) => {
+        prefs.motion = v;
+        savePrefs(prefs);
+        // reduced-motion 是无障碍要求，不能只存偏好就完事
+        document.documentElement.dataset["motion"] = v ? "full" : "reduced";
+      }),
+    ]),
+  );
+
+  // ── 通知 ──
+  body.appendChild(
+    setGroup("通知", [
+      setSwitch("会话免打扰", "不亮未读数，也不提醒", !prefs.notifications, (v) => {
+        prefs.notifications = !v;
+        savePrefs(prefs);
+        note("info", v ? "已免打扰" : "已取消免打扰");
+      }),
+    ]),
+  );
+
+  // ── 数据 ──
+  body.appendChild(
+    setGroup("数据", [
+      setValue("数据目录", dataDirLabel(), () => {
+        note("info", `数据目录由 NEOBOT_DATA_DIR 决定；当前：${dataDirLabel()}`);
+      }),
+      setDanger("清空当前会话", () => {
+        // ⛔ 破坏性动作**必须**有确认。直接清空是数据丢失的常见成因。
+        if (!confirm("清空当前会话的界面内容？\n（只清界面，不动 store 里的数据）")) return;
+        blocks.length = 0;
+        blockSeq = 0;
+        thread.replaceChildren();
+        note("info", "界面已清空。store 里的数据未被改动。");
+      }),
+    ]),
+  );
+
+  // ── 关于 ──
+  const about = el("div", "set-about");
+  const mark = el("img", "set-about-mark") as HTMLImageElement;
+  mark.src = "/icon.svg";
+  mark.alt = "";
+  about.appendChild(mark);
+  about.appendChild(el("div", "set-about-name", "NeoBot"));
+  about.appendChild(el("div", "set-about-meta", `本地优先 · 能力 ${capabilityCount()} 项`));
+  about.appendChild(el("div", "set-about-meta", HOST === "tauri" ? "Tauri 桌面端" : "浏览器预览（无骨架）"));
+  body.appendChild(setGroup("关于", [about]));
+
+  // 详情页在顶上留一个「返回」
+  const back = el("button", "set-row");
+  back.type = "button";
+  back.appendChild(el("span", "set-row-label", "← 返回详情"));
+  back.addEventListener("click", () => openDetail());
+  body.insertBefore(back, body.firstChild);
+}
+
+function dataDirLabel(): string {
+  // 界面不直接问后端路径（那会多加一条命令只为显示一个字符串）。
+  // 这里显示**可确认的**事实：store 存在与否。
+  return HOST === "tauri" ? "~/.neobot" : "无（浏览器预览）";
+}
+
+function capabilityCount(): number {
+  // 字段是 `supported` 不是 `enabled`，且要走宿主种类参数。
+  return defaultCapabilities(HOST).filter((c) => c.supported).length;
+}
+
+function openSettings(): void {
+  renderSettings();
+  const app = $("app");
+  app.dataset["inspector"] = "open";
+  $("inspector").dataset["open"] = "true";
+}
+
+/** 详情页（原来的 inspector 内容）。`openInspector` 复用它。 */
+function openDetail(): void {
+  $("inspector-title").textContent = "详情";
+  const it = convos.map(toListItem).find((x) => x.id === selectedId);
+  const body = $("inspector-body");
+  body.replaceChildren();
+  if (!it) {
+    body.appendChild(el("div", "set-row-hint", "没选中会话。"));
+  } else {
+    body.appendChild(el("div", "set-row-label", it.title));
+    if (it.sub) body.appendChild(el("div", "set-row-hint", it.sub));
+    if (it.unread) body.appendChild(el("div", "set-row-hint", `${it.unread} 条未读`));
+  }
+  const app = $("app");
+  app.dataset["inspector"] = "open";
+  $("inspector").dataset["open"] = "true";
 }

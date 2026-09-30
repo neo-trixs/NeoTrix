@@ -14,7 +14,7 @@ use crate::l5_cognition::nt_mind::foundation::distiller::{
     CommandDistiller, DistilledOutput, SessionDistiller,
 };
 use crate::l1_action::nt_act::nt_act_orchestrator::Orchestrator;
-use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
+use crate::l0_substrate::nt_core_error::{NeoTrixError, NeoTrixResult};
 use crate::l2_perception::nt_world::nt_world_model::TaskType;
 
 fn state_icon(state: &GoalState) -> &str {

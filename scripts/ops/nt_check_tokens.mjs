@@ -114,6 +114,25 @@ for (const f of uiFiles) {
     // 允许透明度写法 rgb(...)/rgba(...) 不含 #，此处只管 #
     problems.push(`apps/neobot-desktop/frontend/src/ui/${f} 含裸 hex ${hex}（应经 --nb-* 语义层）`);
   }
+  // ③ 引用了但**从未定义**的 --nb-*
+  //
+  // ⛔ 本门最该有、却一直缺的一条。写 `var(--nb-accent)` 而 tokens.css 里
+  //    只有 `--nb-c-accent` 时：tsc 过、build 过、截图能出、看起来「有颜色」，
+  //    **但那一条属性静默失效**，落回浏览器默认/继承。
+  //    本轮就踩了：capsule.css 与 settings.css 用了 `--nb-accent`，
+  //    语义层根本没有它 ⇒ 开关开启色、选中强调色全丢，而**所有门都报绿**。
+  //    ⇒ CSS 变量解析失败不报错，所以只能由门来查。
+  for (const f of uiFiles) {
+    const css = readFileSync(join(UI_DIR, f), "utf8");
+    for (const m of css.matchAll(/var\(\s*(--nb-[a-z0-9-]+)/g)) {
+      if (!definedNb.has(m[1])) {
+        problems.push(
+          `apps/neobot-desktop/frontend/src/ui/${f} 引用了 ${m[1]}，但 tokens.css 从未定义它` +
+            " ⇒ 该属性会**静默失效**",
+        );
+      }
+    }
+  }
 }
 
 if (problems.length) {

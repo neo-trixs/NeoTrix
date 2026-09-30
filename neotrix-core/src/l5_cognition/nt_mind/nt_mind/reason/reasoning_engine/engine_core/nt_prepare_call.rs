@@ -8,7 +8,7 @@ use crate::l0_substrate::nt_core_span::{
 };
 use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{ ReasoningType};
 use crate::l1_action::nt_io::nt_io_provider::{ LlmRequest};
-use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
+use crate::l0_substrate::nt_core_error::{NeoTrixError, NeoTrixResult};
 use super::nt_builders::ReasoningEngine;
 
 impl ReasoningEngine {

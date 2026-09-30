@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 use super::{BrainStage, SelfIteratingBrain, StageDecision};
-use crate::neotrix::nt_core_error::NeoTrixError;
+use crate::l0_substrate::nt_core_error::NeoTrixError;
 
 // ── MetaRSI Three Operators ────────────────────────────────────────
 // Source: MetaRSI/RSI2 (arXiv:2609.06396)

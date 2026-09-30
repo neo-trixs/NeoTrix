@@ -1,6 +1,6 @@
 use super::SelfIteratingBrain;
 use super::pipeline::{BrainStage, StageDecision};
-use crate::neotrix::nt_core_error::NeoTrixError;
+use crate::l0_substrate::nt_core_error::NeoTrixError;
 use std::collections::VecDeque;
 
 /// Tracks agent degradation over deployment — the four aging mechanisms

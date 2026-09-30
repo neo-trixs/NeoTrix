@@ -7,7 +7,7 @@ use super::pipeline::{AutonomyLevel, BrainSnapshot, BrainStage, PermissionLevel,
 use super::SelfIteratingBrain;
 use crate::l5_cognition::nt_core::capability::types::CapabilityVector;
 use crate::make_stage;
-use crate::neotrix::nt_core_error::NeoTrixError;
+use crate::l0_substrate::nt_core_error::NeoTrixError;
 
 /// ScienceFlow 持久化 re-anchor 桥接 (absorbed 2026-08-19, P3):
 /// 内存环形 checkpoint (CheckpointManager) 之外, 把最高奖励锚点序列化写入

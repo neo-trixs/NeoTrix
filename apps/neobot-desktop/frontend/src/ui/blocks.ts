@@ -17,6 +17,7 @@
  * 唯一用 innerHTML 的是图标（来自本仓静态表，非外部输入）。
  */
 
+import { el } from "./dom.ts";
 import type { Block, DecisionPanel } from "./block-model.ts";
 import { validatePanel, summarizeTool } from "./block-model.ts";
 import { renderPanelView, type AnswerView } from "./panel-view.ts";
@@ -26,25 +27,35 @@ export interface BlockContext {
   onAnswer?: (a: AnswerView) => void;
 }
 
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  cls?: string,
-  text?: string,
-): HTMLElementTagNameMap[K] {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined) n.textContent = text;
-  return n;
-}
-
 function renderMark(b: Extract<Block, { kind: "mark" }>): HTMLElement {
   return el("div", "session-mark", b.text);
 }
 
+/**
+ * 对话胶囊。
+ *
+ * 结构（自外向内）：行 → 头像 + 列 → 发送者名 + 气泡。
+ *
+ * ⚠️ 三个「不得」都是踩出来的：
+ *   · 头像**不得**放进气泡 —— 短消息会被头像顶成窄柱（见 capsule.css 头注）
+ *   · 发送者名**不得**放进气泡 —— 会把气泡撑成两行不齐的怪东西
+ *   · 气泡**不得**带尾 —— 圆角矩形在长文本下会被读成「卡片」而非「一句话」
+ */
 function renderText(b: Extract<Block, { kind: "text" }>): HTMLElement {
-  const wrap = el("div", `msg msg--${b.role === "user" ? "user" : "bot"}`);
-  wrap.appendChild(el("div", "msg-bubble", b.text));
-  if (b.meta) wrap.appendChild(el("div", "msg-meta", b.meta));
+  const me = b.role === "user";
+  const wrap = el("div", `msg ${me ? "msg--me" : "msg--you"}`);
+
+  const av = el("div", "msg-avatar", me ? "我" : "N");
+  av.setAttribute("aria-hidden", "true");
+  wrap.appendChild(av);
+
+  const col = el("div", "msg-col");
+  // 对方气泡上方有名字，我方没有 —— 这是「谁在说」的唯一线索
+  if (!me) col.appendChild(el("div", "msg-who", b.role === "bot" ? "NeoBot" : b.role));
+  col.appendChild(el("div", "msg-bubble", b.text));
+  // meta 走气泡**下方**小字，不进气泡
+  if (b.meta) col.appendChild(el("div", "msg-meta", b.meta));
+  wrap.appendChild(col);
   return wrap;
 }
 

@@ -20,33 +20,48 @@
 
 :root {
   /* ═══ ① primitive：颜色本身 ═══════════════════════════════ */
-  --nb-c-canvas:        #F7F5F0;
+  /*
+   * 中性色改用 **Zinc 家族**（dsh-desktop 的 build/*.html `:root` 实测值）。
+   * 原来这套是暖白（#F7F5F0 奶油底 + #11191C 偏青墨），偏「有气氛」；
+   * 对标的两家都是**冷灰**。差别不只是色相：暖底会让「极简」读成「复古」，
+   * 而冷灰 + 低对比分隔线才是「克制」。
+   *   canvas #f7f7f8 · surface #ffffff · soft #f5f6f7
+   *   ink #18181b · muted #71717a · faint #a1a1aa
+   *   line #e4e4e7 · strong #d4d4d8
+   */
+  --nb-c-canvas:        #F7F7F8;
   --nb-c-surface:       #FFFFFF;
-  --nb-c-surface-sunken:#F1EEE7;
-  --nb-c-surface-raised:#FBFAF7;
+  --nb-c-surface-sunken:#F5F6F7;
+  --nb-c-surface-raised:#FBFBFC;
 
-  --nb-c-ink-900:       #11191C;   /* 主文字 */
-  --nb-c-ink-700:       #3D4A50;   /* 次级文字 */
-  --nb-c-ink-500:       #6B7A82;   /* 辅助文字 */
-  --nb-c-ink-300:       #A3AEB4;   /* 占位/禁用 */
+  --nb-c-ink-900:       #18181B;   /* 主文字 */
+  --nb-c-ink-700:       #3F3F46;   /* 次级文字 */
+  --nb-c-ink-500:       #71717A;   /* 辅助文字 */
+  --nb-c-ink-300:       #A1A1AA;   /* 占位/禁用 */
 
-  --nb-c-accent:        #1473C8;   /* skype 主色 */
-  --nb-c-accent-deep:   #0F5A9E;
-  --nb-c-accent-wash:   rgba(20, 115, 200, 0.08);
+  --nb-c-accent:        #2468F2;   /* 与 dsh-desktop --accent 同值 */
+  --nb-c-accent-deep:   #1B54CC;
+  --nb-c-accent-wash:   rgba(36, 104, 242, 0.08);
 
-  --nb-c-positive:      #1F9D55;
-  --nb-c-critical:      #C4432B;
-  --nb-c-critical-deep: #9A3320;
-  --nb-c-warning:       #B8860B;
+  /* 气泡：用户侧淡蓝、对方侧淡灰。取自 douchat 截图的目视取值 */
+  --nb-c-bubble-me:     #D6E4FB;
+  --nb-c-bubble-me-ink: #12325C;
+  --nb-c-bubble-you:    #EDEDEF;
+  --nb-c-bubble-you-ink:#18181B;
+
+  --nb-c-positive:      #267A4A;
+  --nb-c-critical:      #C33B38;
+  --nb-c-critical-deep: #A32F2C;
+  --nb-c-warning:       #A45B00;
   --nb-c-gold:          #D6AC58;
   --nb-c-gold-light:    #F0E3C4;
   --nb-c-gold-deep:     #C2933F;
 
-  --nb-c-line-hairline: rgba(17, 25, 28, 0.06);
-  --nb-c-line:          rgba(17, 25, 28, 0.12);
-  --nb-c-line-strong:   rgba(17, 25, 28, 0.28);
-  --nb-c-overlay:       rgba(17, 25, 28, 0.32);
-  --nb-c-focus:         rgba(20, 115, 200, 0.55);
+  --nb-c-line-hairline: #EFEFF1;
+  --nb-c-line:          #E4E4E7;
+  --nb-c-line-strong:   #D4D4D8;
+  --nb-c-overlay:       rgba(24, 24, 27, 0.32);
+  --nb-c-focus:         rgba(36, 104, 242, 0.55);
 
   /* 字号刻度（primitive） */
   --nb-c-fs-label: 10px;
@@ -71,6 +86,38 @@
   --nb-bg-surface-sunken: var(--nb-c-surface-sunken);
   --nb-bg-surface-raised: var(--nb-c-surface-raised);
   --nb-bg-accent-wash:    var(--nb-c-accent-wash);
+  /* ⚠️ 语义层此前**没有** accent 本身，只有 wash。
+   *    而 capsule.css / settings.css 都在用 `var(--nb-accent)` ——
+   *    CSS 变量解析失败**不报错**，那几条属性静默失效：
+   *    开关的开启色、选中态的强调色全部落回浏览器默认。
+   *    界面上看不出「报错」，只会觉得「颜色不太对」。
+   *    ⇒ 这就是为什么 nt_check_tokens.mjs 现在多了一道「引用了但没定义」的检查。
+   */
+  /* ── 按钮：中性反色，不是品牌蓝 ──
+   * 取自 dsh-desktop `src/styles/main.css`：
+   *   light: --color-btn-fill #0f1115 / --color-btn-ink #ffffff
+   *   dark : --color-btn-fill #f9fafb / --color-btn-ink #0f1115
+   * ⛔ 之前主按钮是品牌蓝。极简里主操作**不靠颜色吸引**，靠对比 ——
+   *    一个蓝按钮会变成「界面上唯一的彩色」，眼睛先看到它，
+   *    于是它在抢「当前最重要的事」这个位置，而那不该由它决定。
+   */
+  --nb-btn-fill:        #0F1115;
+  --nb-btn-fill-hover:  #43454A;
+  --nb-btn-ink:         #FFFFFF;
+  --nb-btn-border:      rgba(0, 0, 0, 0.1);
+  --nb-btn-hover:       rgba(38, 49, 72, 0.06);
+  --nb-btn-active:      rgba(38, 49, 72, 0.1);
+  --nb-btn-danger-hover:rgba(236, 19, 19, 0.05);
+
+  /* 主文字语义别名。dsh-desktop 叫 --color-ink；本仓叫 --nb-ink */
+  --nb-ink:          var(--nb-c-ink-900);
+  /* 焦点环。⛔ 焦点可见性是**无障碍要求**，不是装饰 ——
+   * 缺了它，键盘用户看不到自己在哪。所以单独设一个 token，
+   * 不让各组件随手写 outline 颜色（写错就静默失效）。 */
+  --nb-focus:         var(--nb-c-focus);
+
+  --nb-accent:       var(--nb-c-accent);
+  --nb-accent-hover: var(--nb-c-accent-deep);
   --nb-bg-gold-wash:      var(--nb-c-accent-wash);
 
   --nb-text-primary:   var(--nb-c-ink-900);
@@ -125,6 +172,49 @@
   --nb-panel-w: 260px;
   --nb-inspector-w: 320px;
 
+  /* ── 圆角梯子（dsh-desktop 实测出现的全部值：2 3 4 6 7 8 9 10 14 20 999）──
+   * 关键在**只有 5 档**。圆角一多，「简洁」就没了 —— 因为每多一档就多一次
+   * 「这里为什么用这个」的判断。8 为主力，10 给控件，14 给卡片，
+   * 20 给最外层，999 给药丸。
+   */
+  --nb-r-xs:   6px;    /* 密集区小图标按钮 */
+  --nb-r-sm:   8px;    /* 主力：列表项、输入框、菜单行 */
+  --nb-r-md:   10px;   /* 按钮 */
+  --nb-r-lg:   14px;   /* 卡片容器 */
+  --nb-r-xl:   20px;   /* 最外层 shell */
+  --nb-r-pill: 999px;  /* 药丸 / 徽标 / 头像 */
+  --nb-r-bubble: 18px; /* 对话胶囊（见 blocks.css） */
+  /* 阅读列宽。理由见 capsule.css 末尾那段的引用出处 */
+  --nb-reading-w: 760px;
+
+  /* ── 字号：13px 为主 ──
+   * dsh-desktop 四个壳页里 13px 出现 13 次、12px 次之，而 10/28px 各只一次。
+   * ⇒ 「密」的信息用小字、「疏」的信息用大字，中间不铺档。
+   */
+  --nb-fs-xs:   11px;
+  --nb-fs-sm:   12px;
+  --nb-fs-base: 13px;
+  --nb-fs-md:   15px;
+  --nb-fs-lg:   20px;
+  --nb-fs-xl:   28px;
+
+  /* ── 字重：只有 3 档 ──
+   * dsh-desktop 全量统计只有 600 / 620 / 650，**没有 400/500/700**。
+   * 层级靠**字号 + 颜色**拉开，不靠字重堆叠 ——
+   * 用满 400→700 会让每处都要挑一个「中间偏重」的数，最后全用 500/600，
+   * 等于没分级。浅色界面里 400 与 600 的对比本来就够。
+   */
+  --nb-fw-normal: 400;
+  --nb-fw-medium: 600;
+  --nb-fw-strong: 650;
+
+  /* ── 线性图标规格（dsh-desktop packages/*/client.js 实测）──
+   * 24 网格 · 描边 1.7px（**不是 Lucide 的 2**）· 圆头圆角 · 不填充 · 随文字色。
+   * 1.7 比 2 细，在 13px 字号旁边不会抢戏；2 在小尺寸下会糊成一团。
+   */
+  --nb-icon-stroke: 1.7;
+  --nb-icon-box: 16px;
+
   --nb-space-1: 4px;
   --nb-space-2: 8px;
   --nb-space-3: 12px;
@@ -158,6 +248,14 @@
   --nb-bg-surface-sunken: #12161A;
   --nb-bg-surface-raised: #21272F;
   --nb-bg-accent-wash:    rgba(122, 170, 255, 0.14);
+  --nb-accent:       #7AA8E0;
+  --nb-btn-fill:        #F9FAFB;
+  --nb-btn-fill-hover:  #EBEEF2;
+  --nb-btn-ink:         #0F1115;
+  --nb-btn-hover:       rgba(255, 255, 255, 0.08);
+  --nb-btn-active:      rgba(255, 255, 255, 0.14);
+  --nb-btn-danger-hover:rgba(242, 90, 90, 0.12);
+  --nb-accent-hover: #A8C4EC;
   --nb-bg-gold-wash:      rgba(214, 172, 88, 0.16);
 
   --nb-text-primary:   #E8EAED;

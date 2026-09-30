@@ -95,14 +95,14 @@ impl BrainStage for DpSgdStage {
         1
     }
 
-    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, crate::neotrix::nt_core_error::NeoTrixError> {
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, crate::l0_substrate::nt_core_error::NeoTrixError> {
         let mut state = self.state.lock().map_err(|e| {
-            crate::neotrix::nt_core_error::NeoTrixError::Io(format!("dp_sgd state lock: {e}"))
+            crate::l0_substrate::nt_core_error::NeoTrixError::Io(format!("dp_sgd state lock: {e}"))
         })?;
 
         if state._privacy_budget_exhausted() {
             let mut notified = self.notified_policy.lock().map_err(|e| {
-                crate::neotrix::nt_core_error::NeoTrixError::Io(format!("dp_sgd notified lock: {e}"))
+                crate::l0_substrate::nt_core_error::NeoTrixError::Io(format!("dp_sgd notified lock: {e}"))
             })?;
             if !*notified {
                 let completed = state.total_steps;

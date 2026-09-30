@@ -137,6 +137,13 @@
 }
 
 /* 分组：交集里四个仓都有「列表分组」 */
+.convs-host {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .convs {
   min-width: 0;
   min-height: 0;                    /* 高度链关键环：这环缺了列表就滚不动 */
@@ -242,7 +249,7 @@
   gap: var(--nb-space-3);
 }
 .thread:empty::before {
-  content: "还没有对话。上面点「跑一轮」可以直接给 agent 一个目标。";
+  content: "还没有对话。发一条消息，或点右上角让 agent 跑一轮。";
   margin: auto;
   max-width: 42ch;
   font-size: var(--nb-type-body);
@@ -250,29 +257,18 @@
   color: var(--nb-text-tertiary);
   text-align: center;
 }
-.msg { max-width: 68ch; }
-.msg--user { align-self: flex-end; }
-.msg-bubble {
-  padding: 9px 13px;
-  border-radius: var(--nb-radius-card);
-  font-size: var(--nb-type-msg);
-  line-height: 1.65;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.msg--user .msg-bubble {
-  background: var(--nb-bg-accent-wash);
-  border: 1px solid var(--nb-border);
-}
-.msg--bot .msg-bubble {
-  background: var(--nb-bg-surface);
-  border: 1px solid var(--nb-border);
-}
-.msg-meta {
-  margin-top: 4px;
-  font-size: var(--nb-type-micro);
-  color: var(--nb-text-faint);
-}
+/* ⛔ `.msg` / `.msg-bubble` / `.msg-meta` 的**旧定义已删除**。
+ *
+ * 胶囊形态现在只有一个真源：`ui/capsule.css`。
+ *
+ * 为什么必须删而不是「留着被覆盖」：CSS 是**层叠**，不是**互斥**。
+ * 两处都定义 `.msg-bubble` 时，后来者赢 —— 但「后来」由 `<link>` 顺序决定，
+ * 而顺序是 HTML 里一行容易被无意识挪动的行。更糟的是**旧定义里用到的 token
+ * 若已不存在，CSS 变量解析失败不报错**，那几条属性会静默失效：
+ * 界面上看不出问题，只会觉得「怎么有点怪」。删掉是唯一能让
+ * 「胶囊形态只有一处」成立的做法。
+ */
+
 .session-mark {
   align-self: center;
   font-size: var(--nb-type-mini);

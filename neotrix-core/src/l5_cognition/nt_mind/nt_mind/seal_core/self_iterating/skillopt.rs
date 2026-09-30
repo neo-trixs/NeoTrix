@@ -1,7 +1,7 @@
 use super::SelfIteratingBrain;
 use super::super::self_edit::MicroEdit;
 use super::pipeline::{BrainStage, StageDecision};
-use crate::neotrix::nt_core_error::NeoTrixError;
+use crate::l0_substrate::nt_core_error::NeoTrixError;
 use std::collections::VecDeque;
 
 /// Concrete edit budget: bounds the L1 edit count per step.

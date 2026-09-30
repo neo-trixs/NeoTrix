@@ -1,144 +1,193 @@
-/* 壳层原语 —— dsh-tauri/deepseek-harness-desktop（MIT）的 Item / Empty / Panel.Loadable
- * / Panel.Progress 在 vanilla TS + CSS 里的等价物。
+/*
+ * 基础控件样式 —— 几何与取值对齐 dsh-tauri/deepseek-harness-desktop（MIT）。
+ * 源：src/components/primitives.ts（button 的 size/tone 变体）
  *
- * # 为什么抄这一组
- *
- * 壳层页面（设置、插件、profile、侧栏）反复出现同样三件事：一条可点的列表行、
- * 一句空态提示、一个「加载中/失败/有内容」的三态容器。原仓把这三件收敛成
- * Item / Empty / Panel.Loadable 三个原语，避免每个面板各写一遍 —— 这正是我要的。
- *
- * # 抄了哪几条具体纪律（这些是值钱的，样式本身不值钱）
- *
- * 1. **`min-w-0` 与 `shrink-0` 成对出现**（Item 的 left / right）。
- *    左边允许截断、右边**永不**被压缩。这是 flex 溢出唯一可靠的写法：
- *    只给一边加，另一边就会把长文本挤出容器。2026-09-29 本仓的布局门
- *    记过一次同类事故（`min-height: 0` 缺失导致整条高度链塌掉）。
- * 2. **空态只有一种长相**（Empty：`border-line` + `bg-panel-2/40` + `text-xs`）。
- *    空态一旦每个页面各写一种，整屏就散。
- * 3. **错误框只有一种长相**（`danger/30` 描边 + `danger/5` 底 + `text-xs`），
- *    且必须 `role="alert"`。
- * 4. **活的数字用 `tabular-nums`**（进度百分比）—— 否则每帧宽度都在跳。
- * 5. **加载态用 currentColor 的 spinner**，不硬编码颜色，跟着所在行的文字色走。
- *
- * # 形状来源与差异
- *
- * 原仓是 React + HeroUI + Tailwind；这里是命令式 DOM + CSS。
- * 组件签名保留（left/right/footer/onClick），因为**接口一致比实现一致重要** ——
- * 将来若上 React，调用方不用重写。
+ * ⛔ **不要**把这里的东西改成「更圆/更方/更蓝」而不同步改那句话。
+ * 这套值是从一个 10.9k star 项目的**在用**样式里取的，理由写在
+ * ui/primitives.ts 顶部：胶囊按钮 + 中性反色主按钮 + 三档色调 + 三态面板。
  */
 
-.nb-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
-  background: var(--nb-panel-2);
-  border-radius: var(--nb-radius-control);
-}
-.nb-item--click { cursor: pointer; transition: background var(--nb-motion-fast) var(--nb-ease); }
-.nb-item--click:hover { background: var(--nb-panel-hover); }
-.nb-item:focus-visible { outline: 2px solid var(--nb-c-focus); outline-offset: 1px; }
-
-.nb-item-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-/* 纪律 1：min-w-0 + shrink-0 成对。少任何一个都会让长文本撑破容器。 */
-.nb-item-left  { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.nb-item-right { display: flex; align-items: center; gap: 6px; flex: none; }
-
-.nb-item-title {
-  font-size: var(--nb-type-body);
-  color: var(--nb-text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.nb-item-sub { font-size: var(--nb-type-sub); color: var(--nb-text-secondary); }
-
-.nb-item-footer { margin-top: 2px; }
-
-/* ── Empty：全仓唯一空态长相 ─────────────────────────────── */
-.nb-empty {
-  padding: 12px 14px;
-  font-size: var(--nb-type-sub);
-  line-height: 1.6;
-  color: var(--nb-text-secondary);
-  background: color-mix(in srgb, var(--nb-panel-2) 40%, transparent);
-  border: 1px solid var(--nb-border-hairline);
-  border-radius: var(--nb-radius-control);
-}
-
-/* ── 三态容器（Panel.Loadable） ─────────────────────────── */
-.nb-loadable { display: block; }
-.nb-loadable-loading {
-  display: flex;
+/* ── 按钮：胶囊 ── */
+.nb-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 16px;
-  font-size: var(--nb-type-sub);
-  color: var(--nb-text-secondary);
+  gap: 4px;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  /* ⛔ 圆角是胶囊，不是 8px 圆角矩形。
+   * 「胶囊」是这套设计语言最显眼的特征，它**同时**用在按钮与消息气泡上。
+   * 只改气泡不改按钮，界面会像两套设计拼起来的。 */
+  border-radius: var(--nb-r-pill);
+  transition: background var(--nb-motion-fast) var(--nb-ease),
+              color var(--nb-motion-fast) var(--nb-ease);
+  white-space: nowrap;
 }
-/* 纪律 5：转圈用 currentColor，不写死颜色 */
-.nb-spinner {
-  width: 13px;
-  height: 13px;
-  flex: none;
-  border: 1.5px solid currentColor;
-  border-top-color: transparent;
-  border-radius: var(--nb-radius-pill);
-  animation: nb-spin 0.7s linear infinite;
-}
-@keyframes nb-spin { to { transform: rotate(360deg); } }
 
-/* 纪律 3：全仓唯一错误框长相 */
-.nb-error {
-  padding: 12px 14px;
-  font-size: var(--nb-type-sub);
-  line-height: 1.6;
+.nb-btn:focus-visible {
+  outline: 2px solid var(--nb-focus);
+  outline-offset: 2px;
+}
+
+.nb-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.nb-btn--sm {
+  height: 28px;
+  padding: 0 10px;
+  font-size: var(--nb-fs-sm);
+}
+
+.nb-btn--md {
+  height: 36px;
+  padding: 0 14px;
+  font-size: var(--nb-fs-base);
+}
+
+/* ── 色调：三档，没有 accent ── */
+/* 主按钮 = **与背景反差最大的那个**，不是品牌色。
+ * 浅色下近黑底白字；深色下近白底深字（反相）。见 tokens.css 的 --nb-btn-* */
+.nb-btn--primary {
+  background: var(--nb-btn-fill);
+  color: var(--nb-btn-ink);
+}
+
+.nb-btn--primary:hover:not(:disabled) {
+  background: var(--nb-btn-fill-hover);
+}
+
+.nb-btn--ghost {
+  background: none;
+  color: var(--nb-ink);
+}
+
+.nb-btn--ghost:hover:not(:disabled) {
+  background: var(--nb-btn-hover);
+}
+
+.nb-btn--ghost:active:not(:disabled) {
+  background: var(--nb-btn-active);
+}
+
+.nb-btn--danger {
+  background: none;
   color: var(--nb-state-error);
-  background: color-mix(in srgb, var(--nb-state-error) 5%, transparent);
-  border: 1px solid color-mix(in srgb, var(--nb-state-error) 30%, transparent);
-  border-radius: var(--nb-radius-control);
 }
 
-/* ── 进度（Panel.Progress） ──────────────────────────────── */
-.nb-progress-row { display: flex; align-items: center; gap: 12px; width: 100%; }
-.nb-progress-track {
-  flex: 1;
-  height: 8px;
-  overflow: hidden;
-  background: var(--nb-panel-2);
-  border-radius: var(--nb-radius-pill);
-}
-.nb-progress-fill {
-  height: 100%;
-  background: linear-gradient(to right, var(--nb-info), var(--nb-info-hover));
-  transition: width 150ms linear;
-}
-/* 纪律 4：活的数字等宽，否则每帧宽度都在跳 */
-.nb-progress-num {
-  flex: none;
-  min-width: 44px;
-  text-align: right;
-  font-size: var(--nb-type-body);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--nb-info-hover);
+.nb-btn--danger:hover:not(:disabled) {
+  background: var(--nb-btn-danger-hover);
 }
 
-/* ── 日志面板（logs 组件的壳层版） ───────────────────────── */
-.nb-logs {
-  margin: 0;
-  max-height: 184px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 10px 12px;
-  list-style: none;
-  font-family: var(--nb-font-mono);
-  font-size: var(--nb-type-mini);
-  line-height: 1.7;
+/* ── 图标按钮 ── */
+.nb-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--nb-r-pill);
+  background: none;
+  color: var(--nb-ink);
+  cursor: pointer;
+  transition: background var(--nb-motion-fast) var(--nb-ease);
+}
+
+.nb-icon-btn:hover {
+  background: var(--nb-btn-hover);
+}
+
+.nb-icon-btn:focus-visible {
+  outline: 2px solid var(--nb-focus);
+  outline-offset: 2px;
+}
+
+/* ── 三态 ── */
+.nb-state {
+  padding: var(--nb-space-3);
+}
+
+.nb-state-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-2);
+  justify-content: center;
+  padding: var(--nb-space-4);
+  color: var(--nb-text-tertiary);
+  font-size: var(--nb-fs-base);
+}
+
+.nb-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--nb-border);
+  border-top-color: var(--nb-accent);
+  border-radius: var(--nb-r-pill);
+  animation: nb-spin 700ms linear infinite;
+}
+
+@keyframes nb-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* ⛔ 少了这条，转圈在 reduce 下会**永远转**——
+   * 而「永远在动」正是 reduce 想避免的。 */
+  .nb-spinner { animation-duration: 2.4s; }
+}
+
+.nb-state--error {
+  color: var(--nb-state-error);
+}
+
+.nb-state-title {
+  font-size: var(--nb-fs-base);
+  font-weight: var(--nb-fw-medium);
+  margin-bottom: 2px;
+}
+
+.nb-state-text {
+  font-size: var(--nb-fs-base);
   color: var(--nb-text-secondary);
-  background: var(--nb-panel);
-  border: 1px solid var(--nb-border-hairline);
-  border-radius: var(--nb-radius-control);
+  text-align: center;
+  line-height: 1.6;
 }
-.nb-logs li { white-space: pre-wrap; word-break: break-word; }
+
+.nb-state--error .nb-state-text {
+  color: var(--nb-state-error);
+  text-align: left;
+}
+
+.nb-state-hint {
+  font-size: var(--nb-fs-sm);
+  color: var(--nb-text-tertiary);
+  text-align: center;
+  margin-top: 2px;
+}
+
+/* ── 面板头 ── */
+.nb-panel-head {
+  padding: var(--nb-space-3);
+}
+
+.nb-panel-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nb-space-2);
+}
+
+.nb-panel-title {
+  font-size: var(--nb-fs-md);
+  font-weight: var(--nb-fw-medium);
+  color: var(--nb-ink);
+}
+
+.nb-panel-desc {
+  font-size: var(--nb-fs-sm);
+  color: var(--nb-text-tertiary);
+  margin-top: 2px;
+}

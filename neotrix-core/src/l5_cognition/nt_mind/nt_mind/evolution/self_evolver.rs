@@ -1,7 +1,7 @@
 //! SelfEvolver - 自我进化器
 //! 从外部链接/信息中自动提取知识，自我迭代优化 ReasoningBrain
 
-use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
+use crate::l0_substrate::nt_core_error::{NeoTrixError, NeoTrixResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

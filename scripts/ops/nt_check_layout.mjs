@@ -25,6 +25,11 @@
  *
  *   ① 高度链每一环 min-height 必须是 0（否则纵向滚动失效）
  *   ② 侧栏列表与线程在内容超出时**真的**可滚（scrollHeight > clientHeight）
+ *
+ *   ⚠️ 侧栏选择器是 `.convs-host` 而**不是** `.convs`：
+ *      列表被三态容器（加载/失败/空/内容）包住，滚动责任在 host 上。
+ *      换成三态那轮忘了改这里，门立刻报「不存在」——
+ *      门报「不存在」时先怀疑**自己代码结构变了**，而不是门过时了。
  *   ③ 语义 token 在**计算样式**里真的解析出值（不是空串/未解析）
  *   ④ 关键元素不溢出视口（输入框必须在视口内可见）
  *   ⑤ 无横向溢出（横向滚动条通常是布局 bug 的症状）
@@ -93,7 +98,7 @@ const PROBE = `(() => {
   //    那种 bug 只有在内容**真的超出**时才显形。
   const CONVOS = 40, MSGS = 60;
   try {
-    const convs = g(".convs");
+    const convs = g(".convs-host");
     if (convs) {
       convs.replaceChildren();
       for (let i = 0; i < CONVOS; i++) {
@@ -123,7 +128,7 @@ const PROBE = `(() => {
     }
   } catch (e) { /* 注入失败照常量，判据里会体现 */ }
   const cs = (s, p) => { const e = g(s); return e ? getComputedStyle(e)[p] : "MISSING"; };
-  const chain = [".app", ".side", ".convs", ".thread-col", ".thread"].map((sel) => {
+  const chain = [".app", ".side", ".convs-host", ".thread-col", ".thread"].map((sel) => {
     const e = g(sel);
     if (!e) return { sel, missing: true };
     const c = getComputedStyle(e);
@@ -148,7 +153,7 @@ const PROBE = `(() => {
   return {
     ready: !!g(".app"),
     chain,
-    convs: scrollable(".convs"),
+    convs: scrollable(".convs-host"),
     thread: scrollable(".thread"),
     tokens,
     hostBadge: g("#host-badge") ? g("#host-badge").textContent : null,
@@ -277,7 +282,7 @@ try {
   for (const c of d.chain) {
     console.log(`    ${c.sel.padEnd(12)} min-height=${String(c.minHeight).padEnd(5)} h=${c.h ?? "-"}`);
   }
-  for (const [nm, r] of [["convs", d.convs], ["thread", d.thread]])
+  for (const [nm, r] of [["convs-host", d.convs], ["thread", d.thread]])
     console.log(`    .${nm.padEnd(6)} overflow-y=${String(r?.overflowY).padEnd(7)} 超出=${r?.overflowing} (${r?.sh}/${r?.ch})`);
   console.log(`    .app 高 ${d.appH} / 视口高 ${d.vh}`);
 

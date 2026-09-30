@@ -3,7 +3,7 @@
 
 use super::super::super::core::CapabilityVector;
 use super::super::SelfIteratingBrain;
-use crate::neotrix::nt_core_error::NeoTrixError;
+use crate::l0_substrate::nt_core_error::NeoTrixError;
 use crate::l2_perception::nt_world::nt_world_model::TaskType;
 
 pub(crate) fn compute_capability_deltas(brain: &SelfIteratingBrain) -> Vec<(String, f64)> {

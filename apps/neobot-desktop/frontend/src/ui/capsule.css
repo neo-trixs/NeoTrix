@@ -1,0 +1,194 @@
+/*
+ * 对话胶囊（capsule bubble）—— 形态取自 douchat 截图的目视取值。
+ *
+ * # 胶囊的三个必要条件，缺一个就退回「圆角矩形」
+ *
+ *   1. **带尾**：气泡在头像那一侧伸出一个 8px 的小凸起。
+ *      没有尾 ⇒ 只是一个圆角矩形，而圆角矩形在长文本下会读成「卡片」。
+ *   2. **发送者名在气泡外**：对方的气泡上方有名字，我方没有。
+ *      名字在**气泡内**会把气泡撑成两行不齐的怪东西。
+ *   3. **头像在气泡外**：我方头像在右、对方在左。头像在气泡内会让
+ *      气泡宽度被头像顶开，短消息就变成一条窄柱。
+ *
+ * # 宽度
+ *   max-width 72% —— 太宽则一行太长（约 90 字符以上就开始难读），
+ *   太窄则中文一行只剩十来个字，右侧留出大片空白。
+ *
+ * # 颜色
+ *   我方淡蓝（--nb-c-bubble-me）、对方淡灰（--nb-c-bubble-you），
+ *   两者明度接近而色相不同，在一屏里不会互相干扰。
+ *
+ * # 为什么不用「引用块 + 左侧竖线」
+ *   那是文档排版的做法，读起来是「引文」；聊天要读起来是「某个人说的话」。
+ *   竖线给不出「谁说的」，气泡加头像给得出。
+ */
+
+.msg {
+  display: flex;
+  gap: var(--nb-space-2);
+  margin-block: var(--nb-space-2);
+  align-items: flex-start;
+}
+
+.msg--me {
+  flex-direction: row-reverse;
+}
+
+.msg-avatar {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: var(--nb-r-pill);
+  background: var(--nb-bg-surface-sunken);
+  color: var(--nb-text-tertiary);
+  display: grid;
+  place-items: center;
+  font-size: var(--nb-fs-sm);
+  font-weight: var(--nb-fw-medium);
+  margin-top: 18px;   /* 与「有名字」的气泡顶对齐；无名气泡自然下沉 */
+  user-select: none;
+}
+
+.msg--me .msg-avatar {
+  background: var(--nb-bg-accent-wash);
+  color: var(--nb-accent);
+}
+
+.msg-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  max-width: 72%;
+}
+
+.msg--me .msg-col {
+  align-items: flex-end;
+}
+
+/* 发送者名：气泡**外**。13px 灰，比气泡文字小一号。 */
+.msg-who {
+  font-size: var(--nb-fs-sm);
+  color: var(--nb-text-tertiary);
+  padding-inline: var(--nb-space-1);
+}
+
+.msg-bubble {
+  position: relative;
+  padding: var(--nb-space-2) var(--nb-space-3);
+  border-radius: var(--nb-r-bubble);
+  font-size: var(--nb-fs-base);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+/* 尾：头像那一侧的小凸起。
+ * ⛔ 不用 ::before + border 画三角 —— 那样在 8px 尺寸下边缘会锯齿；
+ *    直接用伪元素的圆角方块 + 与气泡同色，缩放时不掉画质。 */
+.msg-bubble::before {
+  content: "";
+  position: absolute;
+  top: 11px;
+  width: 11px;
+  height: 15px;
+}
+
+.msg--you .msg-bubble {
+  background: var(--nb-c-bubble-you);
+  color: var(--nb-c-bubble-you-ink);
+  border-bottom-left-radius: var(--nb-r-xs);
+}
+
+.msg--you .msg-bubble::before {
+  left: -8px;
+  background: var(--nb-c-bubble-you);
+  border-bottom-left-radius: var(--nb-r-pill);
+}
+
+.msg--me .msg-bubble {
+  background: var(--nb-c-bubble-me);
+  color: var(--nb-c-bubble-me-ink);
+  border-bottom-right-radius: var(--nb-r-xs);
+}
+
+.msg--me .msg-bubble::before {
+  right: -8px;
+  background: var(--nb-c-bubble-me);
+  border-bottom-right-radius: var(--nb-r-pill);
+}
+
+/* 群聊里同一个人连发多条：气泡间距收紧，头像下沉，
+ * 否则连续三条会看成三个独立的人在说话。 */
+.msg + .msg--same .msg-col {
+  margin-top: calc(var(--nb-space-1) * -1 + 2px);
+}
+
+.msg--same .msg-avatar {
+  visibility: hidden;
+}
+
+/* meta：气泡**下方**的小字。不是气泡的一部分。
+ * ⛔ 上一轮从 shell.css 删旧 `.msg` 块时把这个规则一起删掉了，
+ *    而这里没补 ⇒ 浏览器回落到 16px 默认字号，比气泡正文还大。
+ *    「删掉旧定义」必须同时确认「新定义覆盖到了每一个旧 class」。 */
+.msg-meta {
+  font-size: var(--nb-fs-sm);
+  color: var(--nb-text-faint);
+  padding-inline: var(--nb-space-1);
+  line-height: 1.4;
+}
+
+/* ── 系统/工具消息：不进胶囊 ──
+ * 工具跑了几步、失败了几步 —— 那是**元信息**，不是某人说的话。
+ * 塞进气泡会让人误以为那是 agent 的发言。
+ */
+.msg-sys {
+  font-size: var(--nb-fs-sm);
+  color: var(--nb-text-tertiary);
+  padding: var(--nb-space-1) var(--nb-space-2);
+  margin-block: var(--nb-space-1);
+  border-radius: var(--nb-r-sm);
+  background: var(--nb-bg-surface-sunken);
+  align-self: center;
+  max-width: 80%;
+  text-align: center;
+}
+
+.msg-sys--error {
+  color: var(--nb-state-error);
+  background: var(--nb-bg-accent-wash);
+}
+
+.msg-sys--warn {
+  color: var(--nb-text-secondary);
+}
+
+/* ── 阅读列宽：固定而非百分比 ──
+ * dsh-desktop `plugin-recovery.html` 的注释写明了理由：
+ * 「Reading column … fixed, not a share of the window, so lines stay a
+ *  readable length on wide displays and the column simply collapses to
+ *  the window on narrow ones.」
+ * ⇒ 宽屏时**居中并收窄**，窄屏时塌陷到整宽。
+ * 不这么做的话，1920 宽下一行能塞 140 个字符，而人眼回扫一行超过 90 就费劲。
+ */
+.msg {
+  width: 100%;
+  max-width: var(--nb-reading-w);
+  margin-inline: auto;
+}
+
+.msg--me {
+  justify-content: flex-end;
+}
+
+/* ── 阅读列宽：管住 thread 的每一个子元素 ──
+ * ⛔ 上一版只给 `.msg` 加了 `max-width: var(--nb-reading-w)`，
+ *    于是工具卡、来源块、系统提示这些**非 .msg** 的块仍是整宽 ——
+ *    对话被收窄了，中间的元信息却铺满全屏，看起来比对话还重。
+ *    `.thread > *` 才是正确的选择器：它是「这一列的宽度」的唯一定义处。
+ */
+.thread > * {
+  width: 100%;
+  max-width: var(--nb-reading-w);
+  margin-inline: auto;
+}

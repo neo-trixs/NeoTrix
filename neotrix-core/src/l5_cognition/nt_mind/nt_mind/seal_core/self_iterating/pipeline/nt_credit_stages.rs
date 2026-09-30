@@ -3,7 +3,7 @@
 
 use super::nt_types::*;
 use super::super::SelfIteratingBrain;
-use crate::neotrix::nt_core_error::NeoTrixError;
+use crate::l0_substrate::nt_core_error::NeoTrixError;
 use crate::make_stage;
 use crate::l5_cognition::nt_mind::nt_mind::seal_core::core::PerformanceEvaluator;
 use crate::l5_cognition::nt_mind::nt_mind::seal_core::core::ExecutionFeedback;

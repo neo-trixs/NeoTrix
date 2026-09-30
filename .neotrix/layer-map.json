@@ -68,13 +68,6 @@
    ],
    "note": "2026-09-28 裁决。依据：① 4 个超越层组件自称 `nt_mind::transcendent::` 但物理在 L6 —— 其 doc 写明源自 nt_mind 的超越层，l5/nt_mind 下无同名文件（非重复），而 L5 意识循环（nt_transcendent.rs / nt_audit.rs）**主动消费**它们 12 处，依赖方向是 L6→L5，故层归属留在 L6 正确（meta 观察/共鸣/进化闭环本属元层职责）。② 另 3 个是**记忆存储**（Experience/Capsule/PipelineStage/KnowledgeLayer/Skill），不是元能力，层归属错位，且全部零外部引用 + 0 或 3 个测试 ⇒ 迁移或归档待定，**本轮不擅自搬动**（搬动涉及其 data 路径与序列化格式）。"
   },
-  "neotrix/nt_core_error": {
-   "layer": "l0_substrate",
-   "role": "primary",
-   "files": 1,
-   "lines": 3,
-   "note": "全局错误类型，只引用 l0_substrate。登记为 l0 使门能验它不引用更高层。"
-  },
   "neotrix/nt_core_event_bus": {
    "layer": "l0_substrate",
    "role": "primary",
@@ -116,5 +109,6 @@
    "note": "经验树真典候选（425 文件 / 133,817 行；2026-09-28 20:0x 按 HEAD 口径复核，原记 422 / 133,019）"
   }
  },
- "_comment_2026-09-30": "A 方案补齐：src/neotrix/ 下 8 个模块全部显式登记，让 check-layer-deps 看得见第二棵树。每条的 layer 按「实际引用了哪些层」定，不凭名字猜。"
+ "_comment_2026-09-30": "A 方案补齐：src/neotrix/ 下 8 个模块全部显式登记，让 check-layer-deps 看得见第二棵树。每条的 layer 按「实际引用了哪些层」定，不凭名字猜。",
+ "_comment_2026-09-30_nt_core_error": "neotrix/nt_core_error 原为 3 行转发壳（pub use crate::l0_substrate::nt_core_error::{…}），真身在 l0_substrate/nt_core_error/。2026-09-30 B 方案：48 处引用直接重定向到真身，壳已删除 ⇒ 从 trees 移除。"
 }

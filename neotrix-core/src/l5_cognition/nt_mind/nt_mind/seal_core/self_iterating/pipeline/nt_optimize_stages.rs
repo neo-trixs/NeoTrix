@@ -4,7 +4,7 @@
 use super::nt_types::*;
 use std::collections::VecDeque;
 use super::super::SelfIteratingBrain;
-use crate::neotrix::nt_core_error::NeoTrixError;
+use crate::l0_substrate::nt_core_error::NeoTrixError;
 use crate::l2_perception::nt_world::nt_world_model::TaskType;
 
 /// Ornith-1-style Scaffold-Aware Reinforcement Learning stage.

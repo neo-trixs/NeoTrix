@@ -5,7 +5,7 @@ use crate::l0_substrate::nt_core_hex::{FullReasoningState};
 use crate::l0_substrate::nt_core_span::{
     AttributeValue, NoopTracer, SpanKind, Tracer,
 };
-use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
+use crate::l0_substrate::nt_core_error::{NeoTrixError, NeoTrixResult};
 use super::nt_builders::ReasoningEngine;
 
 impl ReasoningEngine {

@@ -21,7 +21,7 @@ use crate::l2_perception::nt_world::nt_world_model::{TaskType, Context};
 use crate::l1_action::nt_io::nt_io_provider::create_gateway;
 use crate::l5_cognition::nt_core_sae_bridge::SAEBridge;
 use crate::l5_cognition::nt_core_sae::SparseAutoencoder;
-use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
+use crate::l0_substrate::nt_core_error::{NeoTrixError, NeoTrixResult};
 // // use crate::core::// nt_core_signal::select::SelectableOperator;
 // // use crate::core::// nt_core_signal::SelectiveState;
 use crate::l2_perception::nt_core_e8::ewhr_bridge::E8EwhrBridge;
@@ -1224,7 +1224,7 @@ mod tests {
     use crate::SelfIteratingBrain;
     use crate::l5_cognition::nt_mind::nt_mind::element::registry::RegistryState;
     use crate::l2_perception::nt_world::nt_world_model::TaskType;
-    use crate::neotrix::nt_core_error::NeoTrixResult;
+    use crate::l0_substrate::nt_core_error::NeoTrixResult;
 
     // 1. 构造：核心字段在构建后被正确初始化。
     #[test]

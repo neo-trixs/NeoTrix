@@ -3,7 +3,7 @@
 
 use super::nt_types::*;
 use super::super::SelfIteratingBrain;
-use crate::neotrix::nt_core_error::NeoTrixError;
+use crate::l0_substrate::nt_core_error::NeoTrixError;
 use super::super::constitutional_stage::ConstitutionalSelfCritiqueStage;
 use super::super::hypercore::SafetyCheckResult;
 use super::super::process_stage::ProcessExample;

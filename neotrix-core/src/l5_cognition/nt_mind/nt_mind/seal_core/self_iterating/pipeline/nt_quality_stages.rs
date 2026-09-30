@@ -3,7 +3,7 @@
 
 use super::nt_types::*;
 use super::super::SelfIteratingBrain;
-use crate::neotrix::nt_core_error::NeoTrixError;
+use crate::l0_substrate::nt_core_error::NeoTrixError;
 use crate::l4_emotion::nt_memory::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus;
 use crate::l4_emotion::nt_memory::nt_memory_kb::GraphRagConfig;
 use super::super::secret_scanner::SecretScanner;

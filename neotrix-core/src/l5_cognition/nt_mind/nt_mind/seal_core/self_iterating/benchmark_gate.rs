@@ -1,7 +1,7 @@
 use super::pipeline::{BrainStage, StageDecision};
 use super::SelfIteratingBrain;
 use crate::l2_perception::nt_core_knowledge::TaskType;
-use crate::neotrix::nt_core_error::NeoTrixError;
+use crate::l0_substrate::nt_core_error::NeoTrixError;
 use std::collections::HashMap;
 
 /// A benchmark task consisting of a prompt and an expected output pattern.

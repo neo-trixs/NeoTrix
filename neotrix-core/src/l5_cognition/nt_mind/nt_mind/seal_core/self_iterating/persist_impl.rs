@@ -1,6 +1,6 @@
 use super::brain_impl::{ReasoningBrain, BrainMetadata, DefaultSealStrategy};
 use crate::l2_perception::nt_core_knowledge::SourceAccessTracker;
-use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
+use crate::l0_substrate::nt_core_error::{NeoTrixError, NeoTrixResult};
 
 impl ReasoningBrain {
     /// 保存ReasoningBrain状态 (KB 直写, 双 key: brain=capability, brain_metadata=元数据)

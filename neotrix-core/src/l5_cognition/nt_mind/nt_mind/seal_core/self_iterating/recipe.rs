@@ -1,6 +1,6 @@
 use super::pipeline::{BrainStage, StageDecision};
 use super::SelfIteratingBrain;
-use crate::neotrix::nt_core_error::NeoTrixError;
+use crate::l0_substrate::nt_core_error::NeoTrixError;
 
 /// Runtime stage wrapper with recipe-level configuration.
 pub struct RecipeStage {
