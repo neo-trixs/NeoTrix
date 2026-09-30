@@ -37,7 +37,7 @@ LAYERS = ["l0_substrate", "l1_action", "l2_perception",
 
 TREE_LABEL = {
     "layered": "主分层树 (L0–L6)",
-    "second-tree": "第二棵树 (层归属已显式登记，门可见)",
+    "second-tree": "第二棵树（2026-09-30 B 方案后仅剩门面 re-export 面）",
     "crate": "独立 crate",
     "core-outside-layers": "core 内、层外 (entry/bin/examples)",
     "doc": "文档/会话",
@@ -406,7 +406,15 @@ def main():
              bar(m["loc"] / maxl), t))
     A("")
     st = trees.get("second-tree")
-    if st:
+    if st and st["files"] <= 1:
+        A(f"> ✅ **第二棵树已清空**：仅剩 `neotrix-core/src/neotrix/mod.rs`"
+          f"（{st['loc']} 行，纯 re-export 面，无实现）。")
+        A("> 8 个模块全部回流至其声明层；另清掉两批死代码"
+          "（`error_conversions.rs` 4 个无人触发的 `From` impl、"
+          "`nt_core_capability_tree` 10 个零消费 re-export）。")
+        A("> 搬迁过程记账 **19 条**层债（`layer-deps-baseline.txt`）。")
+        A("")
+    elif st:
         A(f"> **第二棵树 = {st['files']} 文件 / {st['loc']:,} 行**，不参与 L0–L6。")
         A(">")
         A("> ✅ **2026-09-30 起不再逃过 `check-layer-deps.sh`**：8 个模块全部在")

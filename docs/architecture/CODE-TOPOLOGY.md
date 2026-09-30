@@ -3,8 +3,8 @@
 > 生成器 `scripts/ops/nt_topology.py`，索引 `scripts/ops/nt_mapgen.py`（1 秒重建）。
 > **⛔ 本文件由代码生成，改它会被下次重建覆盖 —— 要改判据请改生成器。**
 
-- **rs 文件** 2,861 · **代码行** 881,108 · **符号** 82,800
-- 符号行号已全量核对：**82,800 个符号 100% 命中真实声明行**
+- **rs 文件** 2,860 · **代码行** 881,805 · **符号** 82,835
+- 符号行号已全量核对：**82,835 个符号 100% 命中真实声明行**
 
 ## 维度 2 · 代码树分叉（⛔ 不可从目录名推断）
 
@@ -16,46 +16,35 @@
 
 | 树 | 文件 | 行数 | 占比 | |
 |---|---:|---:|---:|---|
-| 主分层树 (L0–L6) | 2362 | 722,827 | ██████████████████ | `layered` |
-| 文档/会话 | 374 | 78,870 | ██ | `doc` |
-| 独立 crate | 245 | 76,063 | ██ | `crate` |
-| 第二棵树 (层归属已显式登记，门可见) | 130 | 44,908 | █ | `second-tree` |
+| 主分层树 (L0–L6) | 2489 | 767,654 | ███████████████████ | `layered` |
+| 文档/会话 | 375 | 79,032 | ██ | `doc` |
+| 独立 crate | 245 | 76,249 | ██ | `crate` |
 | core 内、层外 (entry/bin/examples) | 148 | 39,985 | █ | `core-outside-layers` |
-| 其他 | 161 | 34,148 | █ | `other` |
+| 其他 | 169 | 36,202 | █ | `other` |
+| 第二棵树（2026-09-30 B 方案后仅剩门面 re-export 面） | 1 | 40 |  | `second-tree` |
 
-> **第二棵树 = 130 文件 / 44,908 行**，不参与 L0–L6。
->
-> ✅ **2026-09-30 起不再逃过 `check-layer-deps.sh`**：8 个模块全部在
-> `.neotrix/layer-map.json` 显式登记层归属，门修两处缺陷后能真正扫到
-> （① 接受单文件树 ② `rg -n` 对单文件不输出文件名，旧的 `cut -d: -f1`
-> 会把**行号**当文件名写进 baseline）。
->
-> 开门后**现形 2 处真实违规**（`nt_core_event_bus` 引用 l3/l5），已记账。
-> ⇒ 这一行不再是「盲区」，而是「**已知且被盯住的** legacy 区域」。
->
-> 物理并入 L0–L6 目录属 B 方案，未做。依据：
-> `docs/architecture/DIR-REMEDY-2026-09-28.md` §2.5 —— 8 个模块**全部有
-> 真实消费者**（合计约 69 处引用，`nt_crystal_core` 20 / `nt_jev` 15 /
-> `nt_file_ability` 17），搬目录 = 改 69 处调用点 + 130 个文件。
+> ✅ **第二棵树已清空**：仅剩 `neotrix-core/src/neotrix/mod.rs`（40 行，纯 re-export 面，无实现）。
+> 8 个模块全部回流至其声明层；另清掉两批死代码（`error_conversions.rs` 4 个无人触发的 `From` impl、`nt_core_capability_tree` 10 个零消费 re-export）。
+> 搬迁过程记账 **19 条**层债（`layer-deps-baseline.txt`）。
 
 ### 2.1 L0–L6 分层明细（layered 树）
 
 | 层 | 文件 | 行数 | 符号 | 占比 |
 |---|---:|---:|---:|---|
-| `l0_substrate` | 48 | 20,261 | 2,341 | `█` |
-| `l1_action` | 505 | 156,780 | 15,008 | `████` |
+| `l0_substrate` | 62 | 23,878 | 2,718 | `█` |
+| `l1_action` | 551 | 171,987 | 16,177 | `████` |
 | `l2_perception` | 360 | 92,295 | 9,784 | `██` |
 | `l3_embodiment` | 247 | 68,114 | 7,045 | `██` |
 | `l4_emotion` | 255 | 86,945 | 6,977 | `██` |
-| `l5_cognition` | 698 | 223,726 | 21,887 | `██████` |
+| `l5_cognition` | 764 | 249,467 | 23,932 | `██████` |
 | `l6_meta` | 234 | 72,732 | 6,903 | `██` |
 
 ## 维度 1 · 物理目录树
 
 ```
-neotrix-core/  (2625 文件, 805,494 行)
-crates/  (231 文件, 75,324 行)
-apps/  (4 文件, 250 行)
+neotrix-core/  (2623 文件, 805,453 行)
+crates/  (231 文件, 75,510 行)
+apps/  (5 文件, 802 行)
 docs/  (1 文件, 40 行)
 ```
 
@@ -86,7 +75,7 @@ docs/  (1 文件, 40 行)
 | 19 | `neotrix-core/src/l0_substrate/nt_core_telemetry.rs` | 1,572 | 135 | 60 | `neotrix::l0_substrate::nt_core_telemetry` |
 | 20 | `neotrix-core/src/l5_cognition/nt_mind/nt_game/render/components.rs` | 910 | 135 | 78 | `neotrix::l5_cognition::nt_mind::nt_game::render::components` |
 | 21 | `crates/neotrix-neobot/src/nt_channel_telegram.rs` | 2,353 | 134 | 18 | `neotrix_neobot::nt_channel_telegram` |
-| 22 | `neotrix-core/src/neotrix/nt_file_ability/image_super_resolution.rs` | 1,672 | 134 | 66 | `neotrix::neotrix::nt_file_ability::image_super_resolution` |
+| 22 | `neotrix-core/src/l1_action/nt_file_ability/image_super_resolution.rs` | 1,672 | 134 | 66 | `neotrix::l1_action::nt_file_ability::image_super_resolution` |
 | 23 | `neotrix-core/src/l0_substrate/nt_core_cross_layer.rs` | 1,036 | 133 | 75 | `neotrix::l0_substrate::nt_core_cross_layer` |
 | 24 | `neotrix-core/src/l1_action/nt_io/nt_io_provider/gateway/mod.rs` | 1,685 | 132 | 12 | `neotrix::l1_action::nt_io::nt_io_provider::gateway` |
 | 25 | `neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs` | 1,345 | 131 | 26 | `neotrix::l5_cognition::nt_mind::nt_mind_background_loop::run` |
@@ -102,7 +91,7 @@ docs/  (1 文件, 40 行)
 |---|---:|---|---|
 | 无 modpath | 1 | 推不出 `crate::path` | 不在任何 Cargo crate 下（或路径异常）|
 | 零符号 | 2 | items 为空 | 纯数据/宏/纯 impl 块，无可命名符号 |
-| ⛔ 逃过层门 | 129 | `escapes-layer-gate` | **第二棵树，分层拓扑的盲区** |
+| ⛔ 逃过层门 | 1 | `escapes-layer-gate` | **第二棵树，分层拓扑的盲区** |
 
 **无 modpath 的 rs 文件（Top 15）** —— 这些是「精准定位」的死角：
 
@@ -161,9 +150,9 @@ python3 scripts/ops/nt_topology.py   # → 本文件
 
 | 位置 | `.unwrap()` | `.expect()` | `panic!` |
 |---|---:|---:|---:|
-| 全仓 | 5121 | 2912 | 173 |
-| 测试目录内 | 1011 | 391 | 44 |
-| **生产代码** | **4110** | **2521** | **129** |
+| 全仓 | 5140 | 2926 | 173 |
+| 测试目录内 | 1011 | 395 | 44 |
+| **生产代码** | **4129** | **2531** | **129** |
 
 **⛔ `AGENTS.md` / `RUST-STANDARDS.md` 明令生产代码禁这三者，但全仓无任何门或基线在度量** ⇒ 一次性历史债，存量裸奔，随时可能新增而无报警。
 
@@ -191,7 +180,7 @@ python3 scripts/ops/nt_topology.py   # → 本文件
 | 口径 | 数量 | 含义 |
 |---|---:|---|
 | 重复的**类型名** | 1120 | 同名出现 ≥2 次的**名字**数 |
-| 名义多余定义 | 1796 | 每名保留 1 份后余下的（**含异构**） |
+| 名义多余定义 | 1797 | 每名保留 1 份后余下的（**含异构**） |
 | **结构完全相同**的真重复组 | **351** | 字段集合逐项相同 |
 | **真正可归并的定义** | **393** | 只有这个数才叫「可归并」 |
 
@@ -210,7 +199,7 @@ python3 scripts/ops/nt_topology.py   # → 本文件
 ⇒ 1120 个同名里，**只有 393 个结构真同构**（占名义多余的 22%）。
 其余是**合法的同名异构**（如 `TaskStatus` 出现 12 次却是 10 个不同枚举）—— 报原始名数会是对正确代码的误报，与 `unsafe` 字面量陷阱同一层次。
 
-> ⚠️ 本表第一版把「名义多余 1796」误写成「可归并」并算出 160% —— **那正是本节警告的那个错误，我自己犯了一遍**。三个数已分列，逐个标明含义。
+> ⚠️ 本表第一版把「名义多余 1797」误写成「可归并」并算出 160% —— **那正是本节警告的那个错误，我自己犯了一遍**。三个数已分列，逐个标明含义。
 
 #### Top 12 真同构组（按可归并数）
 
