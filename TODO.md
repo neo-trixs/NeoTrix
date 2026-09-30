@@ -1,7 +1,33 @@
-# NeoTrix TODO 列表
-> 智能同步生成，最后更新：2026-09-29（本轮收尾）
+> # NeoTrix TODO 列表
+> 智能同步生成，最后更新：**2026-09-30（全量审计 + 第二棵树收官）**
 >
-> ## ✅ 本轮完成（2026-09-28/29 · 桌面端统一 + 缺口闭合）
+> ## 🔴 2026-09-30 全量审计结论（先读这段）
+> >
+> > **结构判断：局部有制度、中枢有缺口。** 消息投递层（outbox/channel）是全仓最强的 ——
+> > 有成文「降级律」+ 测试兜底；认知/记忆/自演化层是全仓最弱的。同一套纪律在
+> > `kb_write` / `guardian` / `write_guard` / `dispatch_loop` 完全没出现。
+> > **不是不知道，是没推广** —— `nt_dispatch_loop.rs:898` 就在 20 行外写着正确范式。
+> >
+> > **4 条静默失败 P0（全部已人工读现场核实，非 grep 命中）**：
+> > 1. `agent.rs:823,833` —— stdio MCP 工具通道请求写失败 / 输出非 UTF-8 被丢弃，
+> >    仍返回 `Ok(success:true, content:"")` ⇒ **LLM 收到空的成功结果**并据此继续推理。
+> > 2. `safe_applier.rs:102,110` —— 回滚写失败被丢弃，却无条件宣称「已回滚」⇒
+> >    用户看到已回滚，磁盘留着编译不过的新内容。
+> > 3. `experience_tree/mod.rs:583` —— 会话证据落盘失败无任何 log，却返回 `ok("queued")`。
+> > 4. `nt_memory_write_guard.rs:171` —— doc 写「失败仅告警」，代码是 `let _ =`（**零告警**）；
+> >    证据缺失 ⇒ `nt_audit.rs` 统计出的拦截数变少 ⇒ **NT-SHIELD 审计输出假绿灯**。
+> >
+> > **后果的系统性表述**：这不是四个孤立 bug，而是
+> > **认知系统对自己的历史存在系统性盲区** —— 它会在 KV 写失败时持续输出一份
+> > 「一切正常」的自我报告。这类失效不会被 `--all-targets` 全绿或 12,209 测试抓到，
+> > 因为**失败分支根本没有断言**。
+> >
+> > **一条 lint 可覆盖 11/13**：把 `nt_channel_serve.rs:278` 那句判据
+> >（失败用 `unwrap_or(0)` 会伪装成「删了 0 行」）提成规约 ——
+> > 对 `let _ = <落库/发送/落盘调用>` 要求同函数内存在 `log::warn!` / `eprintln!` /
+> > report 计数三者之一，否则告警。与现有 unwrap 棘轮同构，增量成本极低。
+> > 详见 §「2026-09-30 全量审计：静默失败」。
+> ## ✅ 上轮完成（2026-09-28/29 · 桌面端统一 + 缺口闭合）
 > >
 > > **桌面端统一到 `~/Downloads/Neo/neobot`**（独立 2 成员 workspace，零 neotrix-core 依赖）：
 > > `d5413335` 移除本仓 `apps/neobot-desktop`，本仓只留 `crates/neotrix-neobot` 作库
@@ -722,7 +748,7 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 `_strip_noncode` 剥离）或 `nt_locate --component`。
 **⇒ 建议：把「裸 grep 结论一律先读现场」写进 R-SCAN-1，它现在有第 2 个实例。**
 
-### 🔴 P0 outbox 队列堵塞：`nt_agent` 写的行没有 `channel` 键（2026-09-30 子代理取证）
+### 🟡 P1（2026-09-30 复核：**缺陷为真，定级 P0 过高**）outbox 队列堵塞：`nt_agent` 写的行没有 `channel` 键
 
 **症状**：`nt_agent.rs:393` / `:420` 用 topic `CH_MESSAGE_NEW` 写 outbox，
 payload 是 `{"task_id","status"}` —— **没有 `channel` 键**。
@@ -741,6 +767,18 @@ payload 是 `{"task_id","status"}` —— **没有 `channel` 键**。
 
 **取证**：`docs/architecture/ORPHAN-CODE-AUDIT-2026-09-30.md` 同批
 （子代理读实际行，非 grep 命中）。
+
+**2026-09-30 复核裁决：缺陷为真，但定级 P0 过高 → P1。**
+- ✅ 机制成立：`drain_outbox` 的 SQL 是 `WHERE claimed=0 AND available_at<=?1`，
+  **确无 topic 过滤** ⇒ `CH_MESSAGE_NEW` 的行必被取出、必失败。
+  写入侧核实：`nt_agent.rs:393` / `:420` payload 确为 `{"task_id","status"}`，**无 `channel`**。
+- ✅ 无限重试成立：`fail_outbox` 只做 `claimed=0` + 推迟 `available_at`；`attempts` **只增不读**；
+  `prune_outbox` 只删 `claimed=1`（已交付）⇒ **失败行永不清理**。
+- ⛔ **但 P0 定级过高**：失败后 `available_at` 按指数退避推移 ⇒ 占用 drain 预算的频率
+  **随时间衰减**；无数据丢失、无消息丢失（正常行仍会被取出发送），
+  实际影响是「预算被稀释 + 表膨胀」，不是「队列堵死 / 用户发不出消息」。
+- ⇒ **修法不变（`drain_outbox` 按 topic 过滤，或区分通知 topic 与发送 topic），
+  但它不该排在认知层静默失败前面。**
 
 ### 🟡 P0 `edit_of` 在生产里永不生效（原 P0 #7 的前提需改写）
 
@@ -765,7 +803,13 @@ payload 是 `{"task_id","status"}` —— **没有 `channel` 键**。
 ⇒ **风险表里「`edit_of` 静默退化」那一行的前提也要改**：
 退化**不可能**来自写入侧缺失，而是**取值指向了不可编辑的消息**。
 
-### 🟡 P0 恢复可构建性只验了 lib 一条腿（`9bbc9dc2` 漏网）
+**2026-09-30 独立复核：结论成立，维持 P0。**
+- `deliver_result` —— 出现于 2 个文件，**非测试调用点 0 个**（唯一生产定义处即定义本身）
+- `enqueue_outbound_editing` —— 出现于 1 个文件，**非测试调用点 0 个**
+⇒ 「测试充分但生产死代码」为真：写入侧与编辑入口都没有生产接线。
+⇒ 与 §「全量审计：静默失败」无重叠（本条是**缺失的接线**，那节是**被丢弃的 Result**）。
+
+### ✅ 已完成（2026-09-30 核实）恢复可构建性只验了 lib 一条腿（`9bbc9dc2` 漏网）
 
 `cargo check --all-targets` 立即失败：
 ```
@@ -780,6 +824,11 @@ error: could not compile `neotrix` (bench "neotrix_benchmarks")
 ⇒ 与 `R-DISK-8`「测逻辑 ≠ 测可达性」同族：验了「lib 能编」，
 没验「**`cargo bench` 能编**」。
 ⇒ **建议**：`check-fresh-build.sh` 加 `--all-targets` 档。
+
+**2026-09-30 核实：已闭合。** `experiment` 引用已降为 `neotrix_benchmarks.rs:10` 的
+`//!` 注释行；`cargo check -p neotrix --all-targets` **0 error**（`fe93f754` 加的
+`--targets` 档已覆盖 bench）。同批另发现 `--all-targets` 之外还有
+**feature 维度**的盲区，已由 `scripts/check-feature-gates.sh` 补上。
 
 ## 🆕 2026-09-28 单窗口汇总修复（架构侧吸收轮）
 
@@ -1372,3 +1421,80 @@ keywords("支付网关")                     -> ['支付网关']                
      `apps/neobot-desktop` 于 `d5413335` 删除，桌面 App 统一到独立仓
      `~/Downloads/Neo/neobot`。改写历史台账等于伪造当时的事实，故只加此注记；
      仅**活指示**（可直接复制执行的命令、指向已删文件的未完成任务）被逐条修正。 -->
+
+---
+
+## 🆕 2026-09-30 全量审计：静默失败（Silent Failure）
+
+> 维度：`--all-targets` 全绿、12,209 测试全绿、7 个门全 rc=0、`forbid(unsafe_code)` 之下，
+> **唯一未被任何门覆盖的失效模式**。已有门全部作用在「语法可见的失效」上
+> （会崩的代码），静默失败是「语义不可见」的（不崩但说谎的代码）。
+> 4 条 P0 + 9 条 P1 + 2 条 P2 全部**已人工读现场核实**（R-SCAN-1），
+> 且每条都做了可达性核验（导出 ≠ 调用）。
+
+### P0 · 4 条（建议本轮修）
+
+| # | 位置 | 失效 | 后果 |
+|---|---|---|---|
+| 1 | `agent.rs:823,833` | `let _ = writeln!(stdin,…)` / `let _ = stdout.read_to_string(&mut out)` | 子进程已死或输出非 UTF-8 ⇒ 仍返回 `Ok(success:true, content:"")`，`success` 只看进程退出码 ⇒ **LLM 收到空的成功结果**并据此继续推理 |
+| 2 | `safe_applier.rs:102,110` | `let _ = std::fs::write(file, &old_content)`（回滚） | 回滚失败被吞，而 `:110` 错误串**无论回滚是否发生都写死「已回滚」** ⇒ 用户看到已回滚，磁盘留着编译不过的新内容。另 `:194-200` 的 `Err(_) => false` 把「cargo 起不来」判成「编译失败」 |
+| 3 | `experience_tree/mod.rs:583` | `let _ = fs::write(&pending, …)` | 落盘失败**无任何 log**，`:585` 却返回 `ok("queued for absorption")` 描述一件可证明没发生的事。该文件是 ledger 的唯一耐久载体 ⇒ 证据彻底消失 |
+| 4 | `nt_memory_write_guard.rs:171` | doc 写「失败仅告警」，代码是 `let _ = kb.kv_set(…)` = **零告警** | 守卫证据缺失 ⇒ `nt_audit.rs:339` 统计出的拦截数变少 ⇒ status 不为 Failed ⇒ **NT-SHIELD 审计输出假绿灯**。另有 `nt_memory_api.rs:91,103` 的 `if let Ok(kb) = lock()` 无 `else` —— 锁争用时静默跳过，而锁争用恰恰最需要审计 |
+
+### P1 · 9 条（按危害排序）
+
+- `nt_dispatch_loop.rs:500-517`（同型 `:904-918`）治理违规计数：读失败→0、写失败→停在 N，
+  而 `:898` 就在 20 行外写着正确范式 `Err(e) => (false, …)` ⇒ **升级阶梯永不推进**。
+- `guardian.rs:371-372` MAPE 门：作者刻意用 tmp+rename 做原子落盘，**却把交付原子性的那一步静音**
+  ⇒ 晋升/回滚两个方向都可静默反转。
+- `kb_write.rs:294`（`:195`）统一写入总线丢弃 GraphRAG 关系边与决策溯源，仍 `Ok(node_id)`
+  ⇒ 多跳查询静默少召回，无任何指标下降可观测。
+- `nt_event_bus.rs:50`（`:27`）`GlobalHalt` 的**恢复目标**在 `try_write()` 锁争用时静默不入队
+  ⇒ 用户看到 `GLOBAL HALT` 日志却等不到恢复。
+- `nt_permission_profiles.rs:174-176` **权限配置**读侧三段折叠 `.ok().and_then().unwrap_or_default()`
+  ⇒ 文件存在但读/解析失败时静默退回 builtin，用户自定义档全消失，随后任一写操作把损坏文件
+  整文件覆写、不可抢救内容永久销毁。（写侧 4 个调用点全部 `?` 正确传播 ⇒ 纯读侧问题）
+- `nt_memory_knowledge_assets.rs:321` 丢弃 `update_node_metadata` 后 `report.imported += 1`
+  ⇒ 导入报告显示全部成功。同文件另有 8 处 `report.errors.push` ⇒ **本文件纪律存在，`:321` 是漏网**。
+- `cleanup_engine/nt_types.rs:28-31,37-39` + `history_log.rs:49,85` 删除操作的审计轨迹：
+  写失败静默、`recent()` 把「日志不存在」报成「从未清理过」，两者完全同形。
+- `lsp_client/client.rs:117,138-139` LSP 无 `id` 匹配 ⇒ 可能返回上一次请求的答案。
+  ⛔ **当前不可达**（`LspManager` 零消费者，`send_request` 唯一调用者是 `#[test]`）⇒ 潜伏 P0。
+- `tier_archival.rs:305,307` `prune()` 返回候选数而非删除数 ⇒ 报告虚假删除量。
+  ⛔ 无生产调用者（潜伏 P1），且其测试用 `in_memory` **恰好只覆盖了错误不可能发生的那条分支**
+  —— 这正是 12,209 测试全绿却抓不到它的原因。
+
+### P2 · 2 条
+
+- `nt_memory_kb/mod.rs:245-246` `Drop` 里丢弃 `unlock()` 结果后**下一行无条件**打印「released file lock」
+  ⇒ 可观测性反了：唯一需要排查锁没释放干净时，这条 `info!` 恰在说「释放了」。
+- `crates/neotrix-types/src/core/wal.rs:158` WAL 的 `Drop` 是退出前最后落盘机会，
+  错误被丢且无日志（主路径 `append`/`commit`/`rotate` 全部 `?` 正确传播 ⇒ 只有这一个降级点）。
+
+### ✅ 证伪清单（本仓处理得**正确**的静默失败 —— 比多报几条更有价值）
+
+- `nt_channel_dispatch.rs:12` **成文降级律** + `:1346-1367` 可执行测试：渠道不支持附件 ⇒
+  `(sent,failed)==(0,1)`，一个字都不发。**这就是 P0 类的正解范本。**
+- `nt_channel_serve.rs:276-284` `:278-279` 注释已诊断出本节核心问题并明确拒绝
+  「`unwrap_or(0)` 会伪装成『删了 0 行』」⇒ **本仓知道正确答案的书面证据。**
+- `nt_memory_kb/nt_http.rs:96-111` 教科书级：10s `recv_timeout` + 注释写明根因与取舍，
+  `.map_err` 把「发送端已死」也归入超时错误 ⇒ 调用方拿到**真错误**而非 `None`。
+- `nt_capability_bridge.rs:375-382`、`nt-core-capability-tree/src/fusion.rs:116-120`、
+  `wal.rs:109/120/151`、`nt_permission_profiles.rs:215/253/271/295` 写路径：全部正确传播或汇入 report。
+- `nt_crystal_task_fusion.rs:749` 的 `let _ = tx.send(…)` **不是丢弃** ——
+  `thread::scope` + `drop(tx)` 先于接收循环 ⇒ 接收端全程存活。⛔ 不要改。
+- `nt_audit.rs:339-364` 表面同型但有三重可观测路径（`log::info!` + `record_finding` + `log::warn!`）。
+- 误报（不可达）：`nt_media/persistence.rs:724-731` `AutoSave` 零消费者；
+  `lsp_client` `LspManager` 零消费者；daemon 路径自产自消的 pid 文件写入。
+
+### 建议的唯一动作：一条 lint
+
+`nt_channel_serve.rs:278` 那句判据已经是本仓的书面答案，把它提成规约即可：
+
+> 对 `let _ = <落库 / 发送 / 落盘调用>`，要求同函数内存在
+> `log::warn!` / `eprintln!` / report 计数 三者之一，否则告警。
+
+- 可覆盖本节 13 条中的 **11 条**（P0 全 4 条 + P1 的 7 条）
+- 与现有 `check-unwrap.sh` 棘轮**同构**，可复用其「基线 + 只报新增」形态，增量成本极低
+- 与 `nt_dispatch_loop.rs:898`、`nt_channel_serve.rs:278` 这类**仓内已有的正确范式**对齐，
+  不是新发明 —— 规约来自代码自身
