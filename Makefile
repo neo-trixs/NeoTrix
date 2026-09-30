@@ -338,6 +338,15 @@ untracked-assets:
 # 生产 unwrap/expect/panic 棘轮 (2026-09-29; 零编译成本, 只读)
 # AGENTS/RUST-STANDARDS 明令生产禁三者, 但实测该规则**全仓无门无基线**,
 # 存量 712 站点裸奔。本门只卡新增, 不强求归零 (与 layer-deps 同构)。
+# 干净检出可构建性三档（2026-09-30 加 --targets）
+# --targets 是新档：`--lib` 只证 lib 能编，2026-09-29 的 9bbc9dc2 正是
+# 只验了 lib ⇒ `cargo bench` 一直坏着没人发现（bench 引用 e5e30bb3 删掉的模块）。
+fresh-build:
+	bash scripts/check-fresh-build.sh --full
+
+fresh-build-targets:
+	bash scripts/check-fresh-build.sh --targets
+
 unwrap:
 	bash scripts/check-unwrap.sh
 

@@ -29,6 +29,8 @@ jobs:
       # this gate's --full tier is the same oracle with grouped diagnostics.
       - name: "Fresh-build gate (a clean clone must load the workspace)"
         run: bash scripts/check-fresh-build.sh --metadata
+      - name: "Fresh-build, all targets (lib + tests + benches + examples)"
+        run: bash scripts/check-fresh-build.sh --targets
       - run: cargo check --lib -p neotrix
       - run: cargo check -p neotrix
       # --strict blocks NEW layer violations only. The gate previously failed

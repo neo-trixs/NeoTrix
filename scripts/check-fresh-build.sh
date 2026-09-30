@@ -30,6 +30,7 @@
 # Usage:
 #   bash scripts/check-fresh-build.sh              # cheap tier: cargo metadata
 #   bash scripts/check-fresh-build.sh --full       # + cargo check --lib -p neotrix
+#   bash scripts/check-fresh-build.sh --targets   # + cargo check --workspace --all-targets
 #
 # Tiers:
 #   metadata  cargo metadata --no-deps
@@ -58,9 +59,10 @@ PKG="neotrix"
 case "${1:-}" in
   "")           TIER="metadata" ;;
   --full)       TIER="full" ;;
+  --targets)    TIER="targets" ;;
   --metadata)   TIER="metadata" ;;
   -h|--help)    sed -n '2,45p' "$0"; exit 0 ;;
-  *) echo "unknown arg: $1 (use --metadata | --full)" >&2; exit 2 ;;
+  *) echo "unknown arg: $1 (use --metadata | --full | --targets)" >&2; exit 2 ;;
 esac
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -127,6 +129,51 @@ fi
 # ---------- tier 2: the lib actually compiles ----------
 CHK_LOG=$(mktemp)
 if (cd "$ROOT" && cargo check --lib -p "$PKG") >"$CHK_LOG" 2>&1; then
+    if [ "$TIER" = "targets" ]; then
+      # ---------- tier 3: tests / benches / examples also compile ----------
+      # 2026-09-30. `cargo check --lib` only proves the LIB compiles.
+      # On 2026-09-29 `9bbc9dc2` ("restore clean-checkout buildability") fixed
+      # the lib and left `neotrix_benchmarks` importing a module deleted in
+      # e5e30bb3 — so `cargo bench` did not compile and NO gate noticed.
+      # This is R-DISK-8's twin: verifying what you MEANT to verify is not
+      # verifying the thing that broke.
+      TGT_LOG=$(mktemp)
+      # -j is overridable: on a 16G box a FRESH worktree (no target/) compiling
+      # 2,858 files from scratch gets OOM-killed even at -j4. That is a
+      # RESOURCE failure, not a code failure — see the OOM branch below.
+      TGT_JOBS="${FRESH_BUILD_JOBS:-4}"
+      if (cd "$ROOT" && cargo check --workspace --all-targets -j"$TGT_JOBS") >"$TGT_LOG" 2>&1; then
+        rm -f "$TGT_LOG"
+        echo "  ${GRN}ok${NC}  cargo check --workspace --all-targets"
+        echo "${GRN}PASS${NC} (targets tier: lib + tests + benches + examples all compile)"
+        exit 0
+      fi
+      # ⛔ Distinguish OOM from a real compile error. Reporting "code is
+      # broken" when the kernel killed rustc trains people to ignore the gate
+      # — the same "a permanently-red gate is worse than no gate" lesson.
+      if grep -qiE 'signal: 9|out of memory| Killed$|memory exhausted' "$TGT_LOG"; then
+        echo
+        echo "${RED}INCONCLUSIVE: rustc was killed (OOM), not a code error.${NC}"
+        echo "  A fresh worktree compiles 2,858 .rs from scratch; at -j$TGT_JOBS"
+        echo "  that OOMs on a 16G box. Retry with fewer jobs:"
+        echo "    FRESH_BUILD_JOBS=1 bash scripts/check-fresh-build.sh --targets"
+        echo "  Do NOT read this as 'the code compiles' either — it is UNKNOWN."
+        cp "$TGT_LOG" /tmp/check-fresh-build-targets.log 2>/dev/null
+        rm -f "$TGT_LOG"
+        exit 3
+      fi
+      echo
+      echo "${RED}FAIL: lib compiles but some target does not (bench/test/example).${NC}"
+      echo "  This is the 9bbc9dc2 failure mode: 'buildability restored' was"
+      echo "  verified against --lib only, so \`cargo bench\` stayed broken."
+      echo "  --- first errors ---"
+      grep -E '^error' -A3 "$TGT_LOG" | sed -n '1,30p' | sed 's/^/  /'
+      echo "  --- target files with errors ---"
+      grep -oE -- '--> [^:]+' "$TGT_LOG" | sed 's/--> //' | sort -u | head -20 | sed 's/^/  /'
+      cp "$TGT_LOG" /tmp/check-fresh-build-targets.log 2>/dev/null
+      rm -f "$TGT_LOG"
+      exit 1
+    fi
   rm -f "$CHK_LOG"
   echo "  ${GRN}ok${NC}  cargo check --lib -p $PKG"
   echo "${GRN}PASS${NC} (full tier: a fresh clone builds)"

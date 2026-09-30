@@ -5,8 +5,11 @@
 //!
 //! NOTE: Some target modules (ExperimentTree, ActionFusion, ContextCompactor,
 //! SkillState, TieredStore) exist as files but aren't compiled into the crate
-//! (not declared in parent mod.rs). This benchmark uses:
-//! - Compiled modules: search_fts, ExperimentRegistry, ExperimentDesigner
+//! (not declared in parent mod.rs), so those paths are benchmarked via
+//! inline implementations here rather than by calling the real modules.
+//! (The 4 `evolution::experiment` benches were REMOVED 2026-09-30: their
+//! module was deleted as dead code in e5e30bb3, so they could never compile.)
+//! - Compiled module: search_fts
 //! - Inline implementations: LRU hot tier, bounded context, action fusion patterns
 //!
 //! Run: `cargo bench --bench neotrix_benchmarks`
@@ -17,9 +20,6 @@ use std::time::{Duration, Instant};
 
 use lru::LruCache;
 use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_search::search_fts;
-use neotrix::l5_cognition::nt_mind::nt_mind::evolution::experiment::{
-    ABTestDesign, ExperimentDesigner, ExperimentRegistry, ExperimentResult, Hypothesis,
-};
 use rusqlite::Connection;
 
 const ITERS: usize = 1000;
@@ -481,91 +481,6 @@ fn bench_context_compactor() -> BenchResult {
     compute_result("SoL-Pi ContextCompactor (20 chunks)", &mut timings)
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// 6. Experiment Tree — registry operations (compiled module)
-//    Uses ExperimentRegistry + ExperimentDesigner from evolution::experiment
-// ═══════════════════════════════════════════════════════════════════════════════
-
-fn bench_experiment_registry_add() -> BenchResult {
-    let mut timings = Vec::with_capacity(ITERS);
-    for i in 0..ITERS {
-        let mut registry = ExperimentRegistry::new();
-        let start = Instant::now();
-        let h = Hypothesis::new(
-            &format!("H-{}", i),
-            &format!("Hypothesis {} about optimization", i),
-            vec!["metric_a".into(), "metric_b".into()],
-            0.1 + (i as f64) * 0.001,
-        );
-        registry.register_hypothesis(h);
-        let design = ExperimentDesigner::design_ab_test(&registry.hypotheses[&format!("H-{}", i)]);
-        registry.register_design(design);
-        timings.push(start.elapsed().as_micros());
-    }
-    compute_result("Experiment Registry (add+design)", &mut timings)
-}
-
-fn bench_experiment_analyze() -> BenchResult {
-    let mut timings = Vec::with_capacity(ITERS);
-    for i in 0..ITERS {
-        let control: Vec<f64> = (0..50).map(|j| 1.0 + (j as f64) * 0.01).collect();
-        let treatment: Vec<f64> = (0..50).map(|j| 1.2 + (j as f64) * 0.01 + (i as f64) * 0.0001).collect();
-
-        let start = Instant::now();
-        let _result = ExperimentDesigner::analyze_results(&control, &treatment, &format!("H-{}", i));
-        timings.push(start.elapsed().as_micros());
-    }
-    compute_result("Experiment analyze_results (n=100)", &mut timings)
-}
-
-fn bench_experiment_registry_full_cycle() -> BenchResult {
-    let mut timings = Vec::with_capacity(ITERS);
-    for i in 0..ITERS {
-        let mut registry = ExperimentRegistry::new();
-        let start = Instant::now();
-
-        // Register hypothesis
-        let h = Hypothesis::new(
-            &format!("H-{}", i),
-            &format!("Test hypothesis {}", i),
-            vec!["latency".into()],
-            0.3,
-        );
-        registry.register_hypothesis(h);
-
-        // Design A/B test
-        let design = ExperimentDesigner::design_ab_test(
-            &registry.hypotheses[&format!("H-{}", i)],
-        );
-        registry.register_design(design);
-
-        // Mark active
-        registry.mark_active(&format!("H-{}", i));
-
-        // Analyze results
-        let control: Vec<f64> = (0..30).map(|j| 1.0 + (j as f64) * 0.01).collect();
-        let treatment: Vec<f64> = (0..30).map(|j| 1.5 + (j as f64) * 0.01).collect();
-        let result = ExperimentDesigner::analyze_results(&control, &treatment, &format!("H-{}", i));
-
-        // Record result
-        registry.record_result(result);
-
-        timings.push(start.elapsed().as_micros());
-    }
-    compute_result("Experiment full cycle (register->design->analyze)", &mut timings)
-}
-
-fn bench_sample_size_estimation() -> BenchResult {
-    let mut timings = Vec::with_capacity(ITERS);
-    let effect_sizes = [0.1, 0.2, 0.3, 0.5, 0.8, 1.0];
-    for i in 0..ITERS {
-        let effect = effect_sizes[i % effect_sizes.len()];
-        let start = Instant::now();
-        let _n = ExperimentDesigner::estimate_sample_size(effect, 0.05, 0.80);
-        timings.push(start.elapsed().as_micros());
-    }
-    compute_result("Experiment estimate_sample_size", &mut timings)
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Main
@@ -586,10 +501,6 @@ fn main() {
         bench_skill_state_context(),
         bench_action_fusion(),
         bench_context_compactor(),
-        bench_experiment_registry_add(),
-        bench_experiment_analyze(),
-        bench_experiment_registry_full_cycle(),
-        bench_sample_size_estimation(),
     ];
 
     println!(
@@ -784,32 +695,4 @@ mod tests {
         assert_eq!(fusion.pending.len(), 4);
     }
 
-    #[test]
-    fn experiment_registry_full_lifecycle() {
-        let mut registry = ExperimentRegistry::new();
-
-        let h = Hypothesis::new("H-001", "Test hypothesis", vec!["metric".into()], 0.5);
-        registry.register_hypothesis(h);
-        assert_eq!(registry.hypotheses.len(), 1);
-
-        let design = ExperimentDesigner::design_ab_test(&registry.hypotheses["H-001"]);
-        registry.register_design(design);
-        assert_eq!(registry.designs.len(), 1);
-
-        registry.mark_active("H-001");
-        assert_eq!(registry.active.len(), 1);
-
-        let result = ExperimentResult {
-            hypothesis_id: "H-001".into(),
-            p_value: 0.01,
-            effect_size: 0.5,
-            significant: true,
-            control_mean: 1.0,
-            treatment_mean: 1.5,
-            sample_size: 100,
-        };
-        registry.record_result(result);
-        assert!(registry.active.is_empty());
-        assert!(registry.results.contains_key("H-001"));
-    }
 }
