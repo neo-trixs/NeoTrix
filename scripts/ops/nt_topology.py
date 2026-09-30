@@ -37,7 +37,7 @@ LAYERS = ["l0_substrate", "l1_action", "l2_perception",
 
 TREE_LABEL = {
     "layered": "主分层树 (L0–L6)",
-    "second-tree": "⚠️ 第二棵树 (逃过 check-layer-deps.sh)",
+    "second-tree": "第二棵树 (层归属已显式登记，门可见)",
     "crate": "独立 crate",
     "core-outside-layers": "core 内、层外 (entry/bin/examples)",
     "doc": "文档/会话",
@@ -391,6 +391,12 @@ def main():
     # ---------- 维度 2: 代码树分叉 ----------
     A("## 维度 2 · 代码树分叉（⛔ 不可从目录名推断）")
     A("")
+    A("> **2026-09-30 A 方案**：第二棵树的 8 个模块已在 `.neotrix/layer-map.json`")
+    A("> **全部显式登记**（原 4 + 本轮补 4），`check-layer-deps` 修了两处缺陷后")
+    A("> **真正扫得到它们** ⇒ 盲区已关。下方仍按 `tree` 分列，但 `second-tree`")
+    A("> 一行现在**不再是「门看不见的地方」，而是「门看得见、且已记账 2 处违规」的地方**」。")
+    A("> 物理并成一棵目录属 B 方案（进行中，见 `docs/architecture/DIR-REMEDY-2026-09-28.md`）。")
+    A("")
     A("| 树 | 文件 | 行数 | 占比 | |")
     A("|---|---:|---:|---:|---|")
     trees = doc.get("trees", {})
@@ -401,10 +407,20 @@ def main():
     A("")
     st = trees.get("second-tree")
     if st:
-        A(f"> ⛔ **第二棵树 = {st['files']} 文件 / {st['loc']:,} 行**，"
-          "不参与 L0–L6，**逃过 `check-layer-deps.sh`**。")
-        A("> 任何「目录 → 层」的自动推导都会漏掉它，故本图显式分叉。")
-        A("> 依据：`docs/architecture/DIR-REMEDY-2026-09-28.md` §2.5。")
+        A(f"> **第二棵树 = {st['files']} 文件 / {st['loc']:,} 行**，不参与 L0–L6。")
+        A(">")
+        A("> ✅ **2026-09-30 起不再逃过 `check-layer-deps.sh`**：8 个模块全部在")
+        A("> `.neotrix/layer-map.json` 显式登记层归属，门修两处缺陷后能真正扫到")
+        A("> （① 接受单文件树 ② `rg -n` 对单文件不输出文件名，旧的 `cut -d: -f1`")
+        A("> 会把**行号**当文件名写进 baseline）。")
+        A(">")
+        A("> 开门后**现形 2 处真实违规**（`nt_core_event_bus` 引用 l3/l5），已记账。")
+        A("> ⇒ 这一行不再是「盲区」，而是「**已知且被盯住的** legacy 区域」。")
+        A(">")
+        A("> 物理并入 L0–L6 目录属 B 方案，未做。依据：")
+        A("> `docs/architecture/DIR-REMEDY-2026-09-28.md` §2.5 —— 8 个模块**全部有")
+        A("> 真实消费者**（合计约 69 处引用，`nt_crystal_core` 20 / `nt_jev` 15 /")
+        A("> `nt_file_ability` 17），搬目录 = 改 69 处调用点 + 130 个文件。")
         A("")
 
     # ---------- L0-L6 明细 ----------
