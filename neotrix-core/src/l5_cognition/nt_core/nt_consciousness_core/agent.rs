@@ -9,6 +9,7 @@ use super::probes::{ProbeEngine, Gap, GapSeverity};
 use super::patches::{PatchGenerator, Patch};
 use super::convergence::ConvergenceChecker;
 use super::state::StateSnapshot;
+use crate::l5_cognition::nt_core::nt_consciousness_core::convergence::ConvergenceProof;
 
 /// 迭代验证 Agent
 pub struct IterationAgent {
@@ -154,22 +155,6 @@ pub struct _IterationReport {
     pub patch_history_summary: Vec<PatchRecord>,
     /// 收敛证明
     pub convergence_proof: ConvergenceProof,
-}
-
-/// 收敛证明
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConvergenceProof {
-    /// 连续无漏洞次数
-    pub consecutive_no_gap_cycles: u32,
-    /// 覆盖的维度数
-    pub covered_dimensions: u32,
-    /// 总维度数
-    pub total_dimensions: u32,
-    /// 意识指标
-    pub consciousness_phi: f64,
-    pub consciousness_coherence: f64,
-    /// 是否收敛
-    pub converged: bool,
 }
 
 impl IterationAgent {
