@@ -53,7 +53,30 @@ function renderTool(b: Extract<Block, { kind: "tool" }>): HTMLElement {
     row.appendChild(left);
     row.appendChild(el("span", "nb-item-sub", s.detail));
     box.appendChild(row);
+    // outputs 一律按「名字 + 值」渲染，不认识具体类型 —— 这样加第 20 种工具
+    // 产出时**界面不用改**（依据 cua ComputerCallOutputMessage 的「always a
+    // screenshot」：输出形状统一 ⇒ 渲染器只有一套）。
+    const outputs: Readonly<Record<string, string>> = s.outputs ?? {};
+    for (const [name, val] of Object.entries<string>(outputs)) {
+      const out = el("div", "tool-out");
+      out.appendChild(el("span", "tool-out-name", name));
+      out.appendChild(el("span", "tool-out-val", val));
+      box.appendChild(out);
+    }
   }
+  return box;
+}
+
+function renderReasoning(b: Extract<Block, { kind: "reasoning" }>): HTMLElement {
+  // 默认收起：思考展开会把对话变成日志。但**内容完整保留**，可随时查 ——
+  // 排障时「它当时为什么这么选」看不到，等于没有推理块。
+  const box = el("details", "nb-item reason-card");
+  const sum = el("summary", "tool-sum");
+  sum.textContent = b.tokens === undefined ? "思考过程" : `思考过程（${b.tokens} tokens）`;
+  box.appendChild(sum);
+  const pre = el("pre", "reason-body");
+  pre.textContent = b.text;
+  box.appendChild(pre);
   return box;
 }
 
@@ -141,6 +164,7 @@ const RENDERERS: { [K in Block["kind"]]: (b: Extract<Block, { kind: K }>) => HTM
   mark: renderMark,
   text: renderText,
   tool: renderTool,
+  reasoning: renderReasoning,
   artifact: renderArtifact,
   system: renderSystem,
   panel: renderPanel,

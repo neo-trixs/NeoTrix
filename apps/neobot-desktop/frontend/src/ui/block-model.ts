@@ -45,10 +45,41 @@ export interface ToolStep {
   readonly detail: string;
   /** 该步是否失败。失败步不折叠时也要一眼看见。 */
   readonly failed?: boolean;
+  /**
+   * 产出物（截图、文件、diff…）。键是展示用的短名。
+   *
+   * 依据 trycua/cua（MIT）的 `ComputerCallOutputMessage` 注释「always a
+   * screenshot」：它的工具输出**形状统一**，于是界面只有一套渲染器。
+   * 反例是每种工具各带各的载荷，界面就得为每种工具写一个分支 ——
+   * 加第 20 种工具时界面必炸。
+   */
+  readonly outputs?: Readonly<Record<string, string>>;
 }
 export interface ToolBlock {
   readonly kind: "tool";
   readonly steps: readonly ToolStep[];
+}
+
+/**
+ * 推理块 —— 模型的思考过程，**一等块，不混进正文**。
+ *
+ * 来源 trycua/cua（MIT）的 `ReasoningMessage`：它的 `AgentMessage` 判别联合里
+ * `reasoning` 与 `computer_call`/`function_call` **平级**，思考是消息类型之一，
+ * 不是某条消息里的一段文字。
+ *
+ * 为什么要补这个：没有它，模型输出里的思考只能
+ *  ① 塞进正文 → 用户要在一段话里分辨哪句是结论、哪句是自言自语
+ *  ② 直接丢掉 → 排障时看不到「它当时为什么这么选」
+ * 两条都不可接受。折叠起来单独一块，是唯一同时满足「默认不打扰」与
+ * 「需要时可查」的做法。
+ *
+ * ⚠️ 折叠且**默认收起**。思考默认展开会把对话变成日志。
+ */
+export interface ReasoningBlock {
+  readonly kind: "reasoning";
+  readonly text: string;
+  /** token 数（若骨架提供）。只用于折叠标题上的量级提示。 */
+  readonly tokens?: number;
 }
 
 /** 产物：代码/文档/大段输出，独立于正文。 */
@@ -119,6 +150,7 @@ export type Block =
   | MarkBlock
   | TextBlock
   | ToolBlock
+  | ReasoningBlock
   | ArtifactBlock
   | PanelBlock
   | SystemBlock;
@@ -133,6 +165,7 @@ export function blockKey(b: Block, index: number): string {
     case "mark": return `m:${index}:${b.text}`;
     case "text": return `t:${index}:${b.role}`;
     case "tool": return `o:${index}:${b.steps.length}`;
+    case "reasoning": return `r:${index}:${b.tokens ?? 0}`;
     case "artifact": return `a:${index}:${b.title}`;
     case "panel": return `p:${b.panel.id}:${b.panel.candidateSetVersion}`;
     case "system": return `s:${index}:${b.level}`;

@@ -90,6 +90,23 @@ git add <上面那几个 .rs> && git commit      # 同一命令，勿拆（阻�
 两处不一致的后果是「桌面建的会话，CLI 看不见」—— 极难查。
 **这是当前最该先验的一条**，因为它不报错。
 
+## §3b 新增不变量与其把关方式（2026-09-30 吸收 workdsh/cua 后）
+
+`capability_registry` + `block_model` 现有 **13 组**变异验证，全抓到。
+harness 同时跑 **tsc 与运行时自测**，因为部分不变量只有类型检查能抓：
+
+| 变异 | 抓到它的关卡 |
+|---|---|
+| resolvedBy 空串放行 / 不 trim / actor 缺省填假身份 | 运行时自测 |
+| `setActor` 不校验就写入 / 自委派放行 / 空 requestId 放行 | 运行时自测 |
+| **`ReasoningBlock` 从联合类型移除** | **tsc（运行时擦除类型，抓不到）** |
+| `ToolStep.outputs` 退化为 `unknown` | **tsc** |
+| 比较型不要求出处 / 允许非 http(s) 出处 / 版本不拦 / 失败步不进摘要 | 运行时自测 |
+
+> ⛔ 只跑 `node selftest.mjs` 时，上面两条 tsc 才抓的变异**全报「0 失败」**。
+> node 对 TS 只擦除不做检查 —— 这是与「被掩盖的门」同类的假绿。
+> 所以：**纯类型不变量必须由 tsc 把关，运行时自测抓不到它们。**
+
 ## §4 能力矩阵仍是静态的
 
 `defaultCapabilities()` 给了一份默认矩阵。`neobot_core_capabilities` 命令已就位

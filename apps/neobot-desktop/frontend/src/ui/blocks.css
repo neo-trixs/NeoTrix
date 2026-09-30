@@ -86,3 +86,40 @@
   border-bottom: 1px dotted currentColor;
 }
 .opt-src:hover { color: var(--nb-text-primary); }
+
+/* ── 推理块（trycua/cua 的 ReasoningMessage 揭示的缺口） ──────
+   默认收起。思考展开会把对话变成日志，但内容必须完整保留 ——
+   排障时看不到「它当时为什么这么选」，等于没有这个块。 */
+.reason-card { padding: 0; overflow: hidden; }
+.reason-body {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 280px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  font-size: var(--nb-type-sub);
+  line-height: 1.7;
+  color: var(--nb-text-secondary);
+  background: var(--nb-bg-surface-sunken);
+  border-top: 1px solid var(--nb-border-hairline);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 工具产出物：名字 + 值。刻意不认识具体类型（cua 的「always a screenshot」：
+   输出形状统一 ⇒ 渲染器只有一套 ⇒ 加新工具产出时界面不用改）。 */
+.tool-out {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 12px;
+  font-size: var(--nb-type-mini);
+  border-top: 1px solid var(--nb-border-hairline);
+}
+.tool-out-name { flex: none; color: var(--nb-text-tertiary); }
+.tool-out-val {
+  min-width: 0;
+  color: var(--nb-text-primary);
+  font-family: var(--nb-font-mono);
+  word-break: break-all;
+}

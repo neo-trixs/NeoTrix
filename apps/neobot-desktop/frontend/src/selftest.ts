@@ -6,9 +6,10 @@
  * 契约出错不会编译报错，只会在某个宿主上「功能莫名不出现」。
  */
 
-import { CapabilityRegistry } from "./plugin/contract.ts";
+import { CapabilityRegistry, validateActor, type ActorContext } from "./plugin/contract.ts";
 import { MemoryHost, defaultCapabilities } from "./host/host.ts";
-import { blockKey, summarizeTool, validatePanel, validateAnswer, hasPendingPanel, type DecisionPanel } from "./ui/block-model.ts";
+import { blockKey, summarizeTool, validatePanel, validateAnswer, hasPendingPanel,
+  type DecisionPanel, type Block } from "./ui/block-model.ts";
 
 /** 决策面板基线夹具：合法。任何不变量测试都从它的**变体**出发，
  *  而不是从空白出发 —— 空对象几乎总能通过，测不出约束。 */
@@ -359,6 +360,93 @@ const eq = (a: unknown, b: unknown, what: string): void => {
       hasPendingPanel([{ kind: "text", role: "bot", text: "hi" }]),
       undefined,
       "没有面板时返回 undefined",
+    );
+  }
+
+
+  // ── 2026-09-30 吸收 workdsh：主体身份必须由可信边界解析 ──
+  console.log("  · 主体身份（防自报提权）");
+  {
+    const good: ActorContext = {
+      principalId: "neo", requestId: "r1", resolvedBy: "tauri-host",
+      sessionId: "s1", delegatedByPrincipalId: "root",
+    };
+    eq(validateActor(good), null, "宿主在可信边界解析的身份通过");
+
+    // ⛔ 这是整组最重要的一条：resolvedBy 为空 = 身份未核实 = 自报。
+    eq(
+      validateActor({ ...good, resolvedBy: "" }),
+      "resolvedBy 不能为空：身份必须由宿主身份提供方解析，不能自报",
+      "resolvedBy 为空被硬拒（模型/前端自报身份的入口就在这里）",
+    );
+    eq(
+      validateActor({ ...good, resolvedBy: "   " }),
+      "resolvedBy 不能为空：身份必须由宿主身份提供方解析，不能自报",
+      "空白串也视为未解析（trim 后判定，防 ' ' 绕过）",
+    );
+    eq(validateActor({ ...good, principalId: "" }), "principalId 不能为空", "空主体被拒");
+    eq(validateActor({ ...good, requestId: "" }), "requestId 不能为空", "空 requestId 被拒（无法追溯）");
+    eq(
+      validateActor({ ...good, delegatedByPrincipalId: "neo" }),
+      "delegatedByPrincipalId 不能等于 principalId（自委派没有意义）",
+      "自委派被拒",
+    );
+
+    // 注册表：未设主体时必须仍是「未解析」，而不是编一个
+    const rr = new CapabilityRegistry();
+    eq(rr.currentActor().resolvedBy, "", "未设主体时 resolvedBy 为空（未解析），不是占位身份");
+    eq(validateActor(rr.currentActor())?.startsWith("principalId"), true, "未设主体的 actor 不可用");
+
+    // setActor：非法主体要被拒，且**不改现状**
+    eq(rr.setActor({ principalId: "neo", requestId: "r", resolvedBy: "" }) !== null, true,
+      "setActor 拒绝未解析身份");
+    eq(rr.currentActor().resolvedBy, "", "被拒后现状不变（不会留下半套身份）");
+    eq(rr.setActor(good), null, "setActor 接受合法身份");
+    eq(rr.currentActor().resolvedBy, "tauri-host", "setActor 后可读回");
+    eq(rr.currentActor().delegatedByPrincipalId, "root", "委派链被保留（审计要能区分代人与亲为）");
+
+    // 谓词拿到的 actor 与注册表持有的是同一份
+    let seen: ActorContext | undefined;
+    rr.register({
+      self: {
+        id: "who", name: "谁", summary: "s", hosts: ["tauri"],
+        requires: { tauri: [], browser: [], node: [] },
+        available: (ctx) => { seen = ctx.actor; return true; },
+      },
+      provides: [],
+    });
+    rr.isAvailable("who", "tauri");
+    eq(seen?.resolvedBy, "tauri-host", "谓词读到的是注册表持有的同一份 actor（不是另造一个）");
+    eq(seen?.delegatedByPrincipalId, "root", "委派链对谓词可见");
+  }
+
+
+  // ── 2026-09-30 吸收 trycua/cua：reasoning 是一等块 + 工具输出形状统一 ──
+  console.log("  · reasoning 块与工具产出物");
+  {
+    // ⛔ 这组是补测：上一版把 ReasoningBlock 加进联合类型却**没写任何断言**，
+    //    变异验证时「把 reasoning 从联合里去掉」竟然 0 失败 —— 类型改了、
+    //    行为没被任何东西钉住。补上。
+    const r: Block = { kind: "reasoning", text: "先看目录再决定", tokens: 128 };
+    eq(r.kind, "reasoning", "reasoning 是一等块（与 text/tool 平级，不是正文里的一段）");
+    eq(blockKey(r, 2), "r:2:128", "reasoning 的 key 含 token 量级");
+    eq(blockKey({ kind: "reasoning", text: "x" }, 0), "r:0:0", "无 token 时 key 仍稳定");
+
+    // 产出物：形状统一 ⇒ 界面只有一套渲染器（cua: always a screenshot）
+    const withOut: Block = {
+      kind: "tool",
+      steps: [{ kind: "screenshot", detail: "读取屏幕", outputs: { screenshot: "shot-1.png" } }],
+    };
+    eq(withOut.kind, "tool", "带产出物的 tool 块构造成功");
+    const b = withOut as Extract<Block, { kind: "tool" }>;
+    eq(Object.keys(b.steps[0].outputs ?? {}), ["screenshot"], "产出物是名字→值的记录（不认识具体类型）");
+    // 无产出物时不应崩（渲染器会兜到空对象）
+    const noOut: Block = { kind: "tool", steps: [{ kind: "a", detail: "b" }] };
+    eq((noOut as Extract<Block, { kind: "tool" }>).steps[0].outputs, undefined, "无产出物时为 undefined 而非 {}");
+    eq(
+      summarizeTool((noOut as Extract<Block, { kind: "tool" }>).steps),
+      "本轮工具 1 步",
+      "无产出物不影响摘要",
     );
   }
 

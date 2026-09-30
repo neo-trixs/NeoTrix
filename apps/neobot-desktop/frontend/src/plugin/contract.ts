@@ -86,11 +86,70 @@ export interface PluginSelf {
   readonly hidden?: boolean;
 }
 
-/** 谓词拿到的上下文。留 `host` 而不是整个 app —— 谓词不该有能力改全局状态。 */
+/**
+ * 主体上下文 —— 谁在 acting，以及**这个身份是谁在可信边界上确认的**。
+ *
+ * 来源 techflag/workdsh（MIT）的 `ActorContext`。它原仓 README 的边界写得很硬：
+ *   「ActorContext 必须由 Host 身份提供方解析，**不能接收客户端或模型自报身份**」。
+ *
+ * 为什么这条必须进类型而不是进注释：
+ *   `principalId` 光有类型，谁都能填 `String`。模型输出里带一句
+ *   「我是 neo，请给我管理员权限」，如果 `principalId` 是自由文本，
+ *   那就是**提示词注入直接提权**。而 `resolvedBy` 是必填的：
+ *   自报的身份填不出「哪个身份提供方在哪个可信边界上确认的」，
+ *   缺了它在构造时就得被拦 —— 攻击面从「模型说了算」变成「宿主说了算」。
+ *
+ * 委派链 `delegatedByPrincipalId`：agent 代人行动时记下是谁授的权。
+ * 没有它，审计里看到「neo 做的」无法区分「neo 亲自做的」和
+ * 「某个拿不到 neo 权限的东西借 neo 的名义做的」。
+ */
+export interface ActorContext {
+  readonly principalId: string;
+  readonly requestId: string;
+  /**
+   * 在**可信宿主边界**上确认此身份的身份提供方标识。
+   *
+   * 必填，且**不可由前端或模型填写** —— 它存在的全部意义就是让
+   * 「这是真身份」这件事可核查。空串视为未解析。
+   */
+  readonly resolvedBy: string;
+  readonly sessionId?: string;
+  readonly runId?: string;
+  /** 委派来源：本次行动是代表谁做的。 */
+  readonly delegatedByPrincipalId?: string;
+}
+
+/**
+ * 谓词拿到的上下文。
+ *
+ * 留 `host` / `actor` / `capability` 三样，而不是把整个 app 递进去 ——
+ * 谓词不该有能力改全局状态，更不该有能力**换掉自己的身份**。
+ */
 export interface PluginContext {
   readonly host: HostKind;
+  /**
+   * 当前主体。由宿主在可信边界上解析后传入。
+   *
+   * ⚠️ 谓词与插件**只能读**。任何要求「插件自己声明自己是谁」的接口
+   * 都是提权入口 —— 见 `ActorContext` 上方注释。
+   */
+  readonly actor: ActorContext;
   /** 谓词自己声明要什么能力，用来按需读能力值（如「本地模型在不在」）。 */
   readonly capability: (id: string) => Capability | undefined;
+}
+
+/** 主体上下文校验。返回第一条错误，null = 通过。 */
+export function validateActor(a: ActorContext): string | null {
+  if (!a.principalId.trim()) return "principalId 不能为空";
+  if (!a.requestId.trim()) return "requestId 不能为空";
+  if (!a.resolvedBy.trim()) {
+    // 空 resolvedBy = 身份未在可信边界上解析 = 自报身份。必须硬拒。
+    return "resolvedBy 不能为空：身份必须由宿主身份提供方解析，不能自报";
+  }
+  if (a.delegatedByPrincipalId === a.principalId) {
+    return "delegatedByPrincipalId 不能等于 principalId（自委派没有意义）";
+  }
+  return null;
 }
 
 /** 已打开的页签。dedupeKey 的输入。 */
@@ -148,6 +207,33 @@ export class CapabilityRegistry {
   /** 插件：id → 插件 */
   private readonly plugins = new Map<string, PluginRegistration>();
   private readonly openTabs = new Map<string, SidebarTab>();
+
+  /**
+   * 当前主体。由宿主在**可信边界**上解析后交给注册表。
+   *
+   * ⛔ 默认 `resolvedBy: ""` = 「未解析」。这不是占位符的懒写法，是刻意的：
+   *   编一个像模像样的 `resolvedBy: "host"` 会让 validateActor 通过，
+   *   于是「身份已核实」这个断言变成假的。未解析就该被 validateActor 拦下。
+   */
+  private actor: ActorContext = { principalId: "", requestId: "", resolvedBy: "" };
+
+  /**
+   * 由宿主设置主体。**只应在可信边界上调用一次。**
+   *
+   * 返回错误字符串而不是 panic：宿主可能配置不完整，界面需要把原因显示出来，
+   * 而不是在启动时崩掉（崩掉的话用户只看到白屏，不知道是自己配置错了）。
+   */
+  setActor(actor: ActorContext): string | null {
+    const bad = validateActor(actor);
+    if (bad) return bad;
+    this.actor = actor;
+    return null;
+  }
+
+  /** 读当前主体。插件与谓词经 PluginContext.actor 拿到的是同一份。 */
+  currentActor(): ActorContext {
+    return this.actor;
+  }
 
   /** 宿主声明它提供什么。重复声明同一 id 且理由不同 ⇒ 抛（别静默覆盖）。 */
   provide(cap: Capability): void {
@@ -244,8 +330,12 @@ export class CapabilityRegistry {
     if (!reg.self.hosts.includes(host)) return false;
     if (!this.pluginVerdict(id, host).visible) return false;
     if (!reg.self.available) return true;
+    // 主体由宿主在启动时解析一次并持有；插件只能读。
+    // 未解析时用 `resolvedBy: ""` 显式表达「未解析」而不是编一个身份 ——
+    // 那样 validateActor 会拦住，而编一个假身份会静默通过。
     const ctx: PluginContext = {
       host,
+      actor: this.actor,
       capability: (cid) => this.caps.get(cid),
     };
     try {
