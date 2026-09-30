@@ -513,5 +513,36 @@ const eq = (a: unknown, b: unknown, what: string): void => {
       "运行中**不播报**（否则读屏每帧念一次）");
   }
 
+
+  // ── 决策面板「已回答」不算待办（实测发现的 bug） ──
+  console.log("  · 面板已回答后不算待办");
+  {
+    const p0 = basePanel();
+    eq(hasPendingPanel([{ kind: "panel", panel: p0 }])?.id, p0.id, "未回答的面板算待办");
+    // ⚠️ 已回答的面板**不算**待办：否则活动岛会一直说「等你选择」，
+    //    用户以为没提交成功就会再点一次。
+    const answered: Block = { kind: "panel", panel: { ...p0, selectedId: "clar-a" } };
+    eq(hasPendingPanel([answered]), undefined, "已回答的面板不算待办");
+    // 多个面板：只有**最后一个未答的**算待办
+    const p1 = { ...p0, id: "p2" };
+    eq(
+      hasPendingPanel([answered, { kind: "panel", panel: p1 }])?.id,
+      "p2",
+      "多个面板时取最后一个未答的",
+    );
+    // 非法面板仍然不算待办（覆盖在优先级上）
+    eq(
+      hasPendingPanel([{ kind: "panel", panel: p1 }, { kind: "panel", panel: { ...p0, options: [] } }]),
+      undefined,
+      "流末尾是非法面板 ⇒ 不当作待答（暴露问题优先）",
+    );
+    // 活动岛随之变化
+    const rc2 = new CapabilityRegistry();
+    rc2.provideAll(defaultCapabilities("tauri"));
+    const O2 = { caps: rc2, host: "tauri" as const, busy: false, seq: 1 };
+    eq(deriveIsland([answered], O2).kind, "idle", "回答后面板 ⇒ 岛回到空闲（不是等你选择）");
+    eq(deriveIsland([{ kind: "panel", panel: p1 }], O2).kind, "awaiting", "还有未答面板 ⇒ 岛显示等你选择");
+  }
+
   return failures;
 }

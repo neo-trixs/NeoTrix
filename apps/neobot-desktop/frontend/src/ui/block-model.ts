@@ -110,7 +110,14 @@ export interface DecisionPanel {
   readonly type: "clarification" | "comparison";
   readonly title: string;
   readonly options: readonly DecisionOption[];
-  readonly selectedId?: string;
+  /**
+   * 已选项。
+   *
+   * ⛔ 不是 `readonly`：它记录的是**本机用户已回答**这件事 —— 骨架下发时
+   *    是 undefined，用户点完之后要写回去，否则活动岛会一直说「等你选择」。
+   *    刻意区别于 `options`/`title` 等骨架下发的只读数据。
+   */
+  selectedId?: string;
   /** sample = 演示数据；live = 真实候选。界面必须区分，不能拿样本冒充。 */
   readonly mode: "sample" | "live";
 }
@@ -232,16 +239,23 @@ export function validateAnswer(
   return null;
 }
 
-/** 一组块里是否含决策面板（决定线程要不要显示作答区）。 */
+/**
+ * 一组块里是否有**尚未回答**的决策面板。
+ *
+ * ⚠️ 「有面板」≠「在等你答」。已带 `selectedId` 的面板是**已回答**的：
+ *    实测发现确认之后活动岛仍显示「等你选择」，用户会以为没提交成功
+ *    而再点一次 —— 活动岛说的必须是**现在**的状态，不是这轮曾经的状态。
+ *    同理，块流里可以有多个面板，只有**最后一个未答的**才算待办。
+ */
 export function hasPendingPanel(blocks: readonly Block[]): DecisionPanel | undefined {
+  let pending: DecisionPanel | undefined;
   for (const b of blocks) {
-    if (b.kind === "panel") {
-      const bad = validatePanel(b.panel);
-      // 骨架发了非法面板时**不能当作有效待答** —— 界面得暴露问题，而不是
-      // 渲染一张坏卡让人以为能用。
-      if (bad) return undefined;
-      return b.panel;
-    }
+    if (b.kind !== "panel") continue;
+    const bad = validatePanel(b.panel);
+    // 骨架发了非法面板时**不能当作有效待答** —— 界面得暴露问题，而不是
+    // 渲染一张坏卡让人以为能用。
+    if (bad) return undefined;
+    if (b.panel.selectedId === undefined) pending = b.panel;
   }
-  return undefined;
+  return pending;
 }

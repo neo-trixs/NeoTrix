@@ -20,8 +20,12 @@ import { invoke, type Commands, type TraceRow } from "./ipc.ts";
 import { renderList, type ListItem } from "./list.ts";
 import { openSheet } from "./ui/sheet.ts";
 import { appendBlock } from "./ui/blocks.ts";
+import { answerToText } from "./ui/panel-view.ts";
+import type { DecisionPanel } from "./ui/block-model.ts";
+import type { EvidenceReport } from "./ipc.ts";
 import { renderIsland } from "./ui/island.ts";
 import { deriveIsland } from "./ui/island-model.ts";
+import { hasPendingPanel } from "./ui/block-model.ts";
 import type { Block, ToolStep } from "./ui/block-model.ts";
 
 // ── 宿主判定：只问「有没有 Tauri 运行时」，不问平台 ──────────────
@@ -127,7 +131,7 @@ const blocks: Block[] = [];
 /** 唯一的追加入口。界面**不得**再手写 thread.appendChild。 */
 function pushBlock(b: Block): void {
   blocks.push(b);
-  appendBlock(thread, b, blockSeq);
+  appendBlock(thread, b, blockSeq, { onAnswer: onPanelAnswer });
   blockSeq += 1;
   thread.scrollTop = thread.scrollHeight;
   refreshIsland();
@@ -145,6 +149,36 @@ function say(role: "user" | "bot", text: string, meta?: string): void {
 /** 工具调用折叠卡。失败步在展开前就能看见（summarize 会带「N 步失败」）。 */
 function pushTool(steps: ToolStep[]): void {
   pushBlock({ kind: "tool", steps });
+}
+
+/**
+ * 决策面板的作答回流。
+ *
+ * ⛔ 真实实现应调 `neobot_panel_answer` 把 `candidateSetVersion` 一起送回，
+ *    骨架据此判断这是不是**过期作答**。当前后端尚无该命令
+ *    （见 FRONTEND-GAP），故先落成本地回显并**显式说明**，
+ *    不假装骨架已经收到。
+ */
+function onPanelAnswer(a: { optionId: string; candidateSetVersion: number; label: string }): void {
+  // ⚠️ 必须把 selectedId 写回块流，否则活动岛会一直说「等你选择」，
+  //    用户以为没提交成功就会再点一次。
+  const pend = hasPendingPanel(blocks);
+  if (pend) {
+    for (const b of blocks) {
+      if (b.kind === "panel" && b.panel.id === pend.id) b.panel.selectedId = a.optionId;
+    }
+  }
+  setBusy(true);
+  void call("neobot_send", { text: answerToText(a) }).then((r) => {
+    setBusy(false);
+    if (r.ok) {
+      say("bot", r.value.output || "（已记录你的选择）", r.value.model_used);
+    } else {
+      // 骨架还没实现该命令 ⇒ 明确说出来，不假装送达
+      note("warn", `选择已记在本机，骨架尚未接收：${r.error}`);
+      say("user", answerToText(a));
+    }
+  });
 }
 
 /** 系统消息。`dataIntact` 显式声明数据是否还在 —— 宁可写死也不让用户猜。 */
@@ -246,22 +280,76 @@ function evidence(): void {
   void call("neobot_evidence_summary", { text }).then((r) => {
     if (!r.ok) { note("error", r.error, undefined, true); return; }
     const rep = r.value;
-    // 证据是「对整轮的判断」，不是一句回复 ⇒ 走 tool 卡（可折叠、步骤可逐条看）。
-    // ⛔ 不再伪装成 string：后端返回的是完整报告，把 findings 逐条列出来
-    //    才知道「哪一句有问题」。只回一句「证据不足」等于把问题藏起来。
     const steps: ToolStep[] = rep.findings.map((f) => ({
       kind: f.kind === "overclaim" ? "过度断言" : f.kind === "unsourced" ? "断言无出处" : "数值不符",
       detail: f.excerpt,
       failed: true,
     }));
-    if (rep.clean) steps.unshift({ kind: "证据齐备", detail: rep.summary });
-    else steps.unshift({ kind: "证据不足", detail: rep.summary, failed: true });
-    // ratio 为 null 表示「没断言过」—— 不能显示成 0%
+    steps.unshift(rep.clean
+      ? { kind: "证据齐备", detail: rep.summary }
+      : { kind: "证据不足", detail: rep.summary, failed: true });
     if (rep.sourced_ratio !== null) {
       steps.push({ kind: "有出处比例", detail: `${Math.round(rep.sourced_ratio * 100)}%` });
     }
     pushTool(steps);
+    // 逐条明细进 Inspector：流里只是摘要，「哪一句有问题」得能展开看。
+    showEvidence(rep);
   });
+}
+
+/** Inspector 显示证据明细。 */
+function showEvidence(rep: EvidenceReport): void {
+  $("app").dataset["inspector"] = "open";
+  $("inspector").dataset["open"] = "true";
+  $("inspector-title").textContent = "证据";
+  const body = $("inspector-body");
+  body.replaceChildren();
+
+  const head = document.createElement("p");
+  head.className = rep.clean ? "nb-item-title" : "nb-error";
+  head.textContent = rep.summary;
+  body.appendChild(head);
+
+  const kv = (k: string, v: string) => {
+    const row = document.createElement("div");
+    row.className = "nb-item-row";
+    const l = document.createElement("div");
+    l.className = "nb-item-left";
+    const ks = document.createElement("span");
+    ks.className = "nb-item-sub";
+    ks.textContent = k;
+    l.appendChild(ks);
+    const val = document.createElement("span");
+    val.className = "nb-item-title";
+    val.textContent = v;
+    row.append(l, val);
+    return row;
+  };
+  // ⛔ ratio 为 null 表示「没断言过」，显示「未检查」而不是 0%
+  body.append(kv("有出处比例", rep.sourced_ratio === null
+    ? "未检查（本轮无断言）"
+    : `${Math.round(rep.sourced_ratio * 100)}%`));
+  body.append(kv("问题数", String(rep.findings.length)));
+
+  for (const f of rep.findings) {
+    const card = document.createElement("div");
+    card.className = "nb-item";
+    const h = document.createElement("div");
+    h.className = "nb-item-row";
+    const l = document.createElement("div");
+    l.className = "nb-item-left";
+    const k = document.createElement("span");
+    k.className = "nb-item-title";
+    k.textContent = f.kind === "overclaim" ? "过度断言" : f.kind === "unsourced" ? "断言无出处" : "数值不符";
+    l.appendChild(k);
+    h.appendChild(l);
+    card.appendChild(h);
+    const ex = document.createElement("div");
+    ex.className = "nb-item-sub";
+    ex.textContent = f.excerpt;
+    card.appendChild(ex);
+    body.appendChild(card);
+  }
 }
 
 // ── 演示数据（接真后端前先把界面跑起来；真数据到位后删） ──────────
@@ -431,6 +519,52 @@ $("btn-send").addEventListener("click", () => input.focus());
 // ── 启动 ────────────────────────────────────────────────────
 renderRail(null);
 renderConvos();
+
+// ── 演示内容（让空态被真实形状替代；真数据到位后整段删） ──
+// ⛔ 全部标 mode:"sample" / 显式文案，不让它看起来像真的产出。
+{
+  mark("演示 · 决策面板");
+  say("user", "把接口迁移方案定下来");
+  say("bot", "有两处不一致，需要你定一下方向。", "DeepSeek-Chat · fallback");
+  pushTool([
+    { kind: "读取", detail: "frontend/src/ipc.ts（118 行）" },
+    { kind: "读取", detail: "crates/neotrix-neobot/src/nt_evidence.rs（329 行）" },
+    { kind: "比对", detail: "发现 3 处命令名不一致", failed: true },
+  ]);
+  const panel: DecisionPanel = {
+    id: "p-migrate-1",
+    threadId: "c1",
+    turnId: "tu-7",
+    candidateSetVersion: 1,
+    type: "comparison",
+    title: "接口不一致怎么处理？",
+    mode: "sample",
+    options: [
+      {
+        id: "opt-rename",
+        label: "改前端跟随后端",
+        details: ["3 处都是前端写错", "后端不动，风险最低"],
+        sources: [{ title: "ipc.ts 对照表", url: "https://example.com/nb/ipc" }],
+      },
+      {
+        id: "opt-alias",
+        label: "后端加别名兼容",
+        details: ["两侧都不用改", "会留下长期别名债务"],
+        sources: [
+          { title: "对齐门", url: "https://example.com/nb/gate" },
+          { title: "债务清单", url: "https://example.com/nb/debt" },
+        ],
+      },
+      {
+        id: "opt-gen",
+        label: "从 Rust 生成前端类型",
+        details: ["根治", "要引入 build 步骤，本轮不做"],
+        sources: [{ title: "设计稿", url: "https://example.com/nb/codegen" }],
+      },
+    ],
+  };
+  pushBlock({ kind: "panel", panel });
+}
 // 能力门控把「当前宿主不支持」的部分整块隐藏，并给出可读理由。
 /**
  * 宿主徽标：**说清「少了什么、为什么少」**。
@@ -456,6 +590,24 @@ renderConvos();
   }
 }
 refreshIsland();   // 启动也走推导路径，不手工置初值
+
+// ── 交互自检（dev only）：决策面板必须真能选、能确认 ──
+// ⛔ 面板是纯 UI，若「单选点不动」这类问题只有肉眼能发现，
+//    那它就会活到用户手上。挂一个可断言的钩子给 e2e/手测用。
+if (import.meta.env?.DEV) {
+  (window as unknown as { __nbPanel: unknown }).__nbPanel = () => {
+    const card = document.querySelector<HTMLElement>(".panel-card");
+    if (!card) return { found: false };
+    const input = card.querySelector<HTMLInputElement>("input[type=radio]");
+    const btn = card.querySelector<HTMLButtonElement>(".panel-foot button");
+    const before = btn?.disabled ?? null;
+    input?.click();
+    const after = btn?.disabled ?? null;
+    return { found: true, optionCount: card.querySelectorAll("input[type=radio]").length,
+             submitBefore: before, submitAfter: after,
+             unlocked: before === true && after === false };
+  };
+}
 
 // 侧栏面板可用性：让测试/调试能直接看到判定结果，不靠猜。
 if (import.meta.env?.DEV) {

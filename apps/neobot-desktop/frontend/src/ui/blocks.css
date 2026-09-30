@@ -123,3 +123,42 @@
   font-family: var(--nb-font-mono);
   word-break: break-all;
 }
+
+/* ── 决策面板：交互部分（静态骨架在 blocks.css 上方） ────────── */
+.panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nb-space-2);
+  margin-top: var(--nb-space-2);
+  padding-top: var(--nb-space-2);
+  border-top: 1px solid var(--nb-border-hairline);
+}
+.panel-picked {
+  font-size: var(--nb-type-micro);
+  color: var(--nb-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 校验反馈：留在面板里，不弹窗。
+   弹窗会把用户的注意力从「要重选」上移开，而这里要传达的恰恰是
+   「你选的那批已经过期了，请在**这里**重选」。 */
+.panel-note {
+  margin: var(--nb-space-2) 0 0;
+  padding: 7px 10px;
+  font-size: var(--nb-type-micro);
+  line-height: 1.6;
+  color: var(--nb-state-error);
+  background: color-mix(in srgb, var(--nb-state-error) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--nb-state-error) 30%, transparent);
+  border-radius: var(--nb-radius-control);
+}
+
+/* 决策面板的选项区：给足高度。
+ * ⛔ `.nb-opts` 的 `max-height: 240px` 是给**弹层里的长选择列表**用的。
+ *    决策面板常见 2~3 个选项、每个带说明+出处，240px 不够 ——
+ *    第三个被**截断**，看起来像渲染坏了而不像「可以滚动」。
+ *    面板是当前焦点，套一层滚动条只添乱；兜底交给外层 .thread 的滚动。
+ */
+.panel-card .nb-opts { max-height: none; overflow: visible; }

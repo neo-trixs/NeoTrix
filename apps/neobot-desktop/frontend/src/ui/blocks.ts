@@ -19,6 +19,12 @@
 
 import type { Block, DecisionPanel } from "./block-model.ts";
 import { validatePanel, summarizeTool } from "./block-model.ts";
+import { renderPanelView, type AnswerView } from "./panel-view.ts";
+
+/** 渲染上下文：只放「需要外部参与」的东西（目前只有面板作答）。 */
+export interface BlockContext {
+  onAnswer?: (a: AnswerView) => void;
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -109,58 +115,25 @@ function renderSystem(b: Extract<Block, { kind: "system" }>): HTMLElement {
   return box;
 }
 
-function renderPanel(b: Extract<Block, { kind: "panel" }>): HTMLElement {
-  const p = b.panel;
-  const bad = validatePanel(p);
-  if (bad) {
-    // 骨架发了非法面板：**暴露问题**，不渲染一张看着能用的坏卡。
-    const box = el("div", "nb-error");
-    box.setAttribute("role", "alert");
-    box.appendChild(el("div", "nb-item-title", "决策面板无效，未能显示"));
-    box.appendChild(el("div", "nb-item-sub", bad));
-    return box;
+/**
+ * 决策面板的静态入口。
+ *
+ * 无回调时（纯渲染路径）画成**只读**卡片：选项可见但不可选。
+ * 有回调时交给 `panel-view.ts` 的交互版本。
+ * ⛔ 绝不在这里另画一张卡 —— 面板有两个版本就会有两处「何时失效」的逻辑。
+ */
+function renderPanel(b: Extract<Block, { kind: "panel" }>, ctx?: BlockContext): HTMLElement {
+  if (!ctx?.onAnswer) {
+    const ro = renderPanelView(b.panel, { onAnswer: () => {} });
+    ro.querySelectorAll("input").forEach((i) => { (i as HTMLInputElement).disabled = true; });
+    ro.querySelectorAll("button").forEach((x) => { (x as HTMLButtonElement).disabled = true; });
+    return ro;
   }
-  const box = el("div", "nb-item panel-card");
-  if (p.mode === "sample") {
-    // sample ≠ live。混为一谈就是把「演示」说成「真实」。
-    const w = el("div", "panel-warn", "示例数据（非真实候选）");
-    box.appendChild(w);
-  }
-  const head = el("div", "nb-item-row");
-  head.appendChild(el("div", "nb-item-left", ));
-  head.querySelector(".nb-item-left")!.appendChild(el("span", "nb-item-title", p.title));
-  head.appendChild(el("span", "nb-item-sub", `v${p.candidateSetVersion}`));
-  box.appendChild(head);
-
-  for (const o of p.options) {
-    const opt = el("label", "nb-opt");
-    const input = el("input");
-    input.type = "radio";
-    input.name = `panel-${p.id}`;
-    input.value = o.id;
-    input.checked = o.id === p.selectedId;
-    // 过期作答：候选集版本对不上时，高亮提示「选项已更新」
-    const body = el("div", "opt-body");
-    body.appendChild(el("div", "nb-opt-label", o.label));
-    for (const d of o.details) body.appendChild(el("div", "nb-item-sub", d));
-    if (o.sources.length > 0) {
-      const srcs = el("div", "opt-srcs");
-      for (const s of o.sources) {
-        const a = el("a", "opt-src", s.title);
-        a.href = s.url;
-        a.rel = "noopener noreferrer";
-        a.target = "_blank";
-        srcs.appendChild(a);
-      }
-      body.appendChild(srcs);
-    }
-    opt.append(input, body);
-    box.appendChild(opt);
-  }
-  return box;
+  return renderPanelView(b.panel, { onAnswer: ctx.onAnswer });
 }
 
-const RENDERERS: { [K in Block["kind"]]: (b: Extract<Block, { kind: K }>) => HTMLElement } = {
+type R<T extends Block["kind"]> = (b: Extract<Block, { kind: T }>, ctx?: BlockContext) => HTMLElement;
+const RENDERERS: { [K in Block["kind"]]: R<K> } = {
   mark: renderMark,
   text: renderText,
   tool: renderTool,
@@ -176,9 +149,9 @@ const RENDERERS: { [K in Block["kind"]]: (b: Extract<Block, { kind: K }>) => HTM
  * 失败时返回一个用原始文本兜底的系统块 —— 这样「渲染失败」本身
  * 也是一条可读的信息，而不是线程变空白。
  */
-export function renderBlock(b: Block, index: number): HTMLElement {
+export function renderBlock(b: Block, index: number, ctx?: BlockContext): HTMLElement {
   try {
-    const node = RENDERERS[b.kind](b as never);
+    const node = RENDERERS[b.kind](b as never, ctx);
     node.dataset["bk"] = `${index}:${b.kind}`;
     return node;
   } catch (e) {
@@ -196,8 +169,8 @@ export function renderBlock(b: Block, index: number): HTMLElement {
 }
 
 /** 挂到线程末尾（追加，不整体重绘 ⇒ 滚动位置与折叠状态都保住）。 */
-export function appendBlock(thread: HTMLElement, b: Block, index: number): void {
-  thread.appendChild(renderBlock(b, index));
+export function appendBlock(thread: HTMLElement, b: Block, index: number, ctx?: BlockContext): void {
+  thread.appendChild(renderBlock(b, index, ctx));
 }
 
 export type { DecisionPanel };
