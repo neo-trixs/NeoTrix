@@ -49,7 +49,7 @@ neobot_panel_publish        neobot_panel_clear          neobot_panel_demo_publis
 ### 1.4 资产
 
 - 图标主稿 2 份（`icon.svg` 透明底孩童鲨 / `mark-mono.svg` 16px UI 档）
-- 栅格 **56 PNG + ico + icns**（Tauri/iOS/Android 全套）
+- 栅格 **61 PNG + ico + icns**（Tauri/iOS/Android 全套）
 - 同步 `skills/assets/icons/neobot/` 10 个（16→1024 全档）
 
 ### 1.5 门禁（6 个，全部经变异验证）
