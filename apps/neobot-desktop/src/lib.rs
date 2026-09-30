@@ -9,3 +9,8 @@
 
 /// 前端资源目录（由 vite build 产出）。
 pub const FRONTEND_DIST: &str = "../frontend/dist";
+
+/// Tauri 命令层。`pub` 是为了**让集成测试够得着** ——
+/// 命令函数留在 `main.rs` 里的话，`tests/` 访问不到，
+/// 「命令名 → 函数 → 库」这段接线就只能在发布后才第一次被执行。
+pub mod commands;

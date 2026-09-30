@@ -113,6 +113,18 @@
   --nb-type-msg:   var(--nb-c-fs-msg);
   --nb-type-muted: var(--nb-c-fs-body);  /* base.css 的正文档位 */
 
+  /* 栅格刻度 —— 2026-09-30（四栏骨架时补）
+   *
+   * ⛔ 头一版把 `--nb-panel-w` / `--nb-inspector-w` 直接写在 `.app` 里，
+   *    于是 token 门报「引用了未定义的 --nb-panel-w」—— **门是对的**：
+   *    栏宽是设计刻度（和间距、圆角同一类），写在组件里就等于
+   *    「宽度只有一个地方说了算」，换个断点想统一调就得翻 CSS。
+   *    门第一次派上实际用场就在自己写的代码上。
+   */
+  --nb-rail-w: 56px;
+  --nb-panel-w: 260px;
+  --nb-inspector-w: 320px;
+
   --nb-space-1: 4px;
   --nb-space-2: 8px;
   --nb-space-3: 12px;

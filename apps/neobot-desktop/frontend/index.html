@@ -3,53 +3,67 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/svg+xml" href="/neobot/icons/mark-mono.svg" />
+    <link rel="icon" type="image/svg+xml" href="/mark-mono.svg" />
     <title>NeoBot</title>
     <!--
       样式加载顺序**不可颠倒**：
-        tokens.css  → 定义 primitive + semantic
-        shell.css   → 壳层布局，只引用 semantic
-        base/primitives/sheet → 基础组件，只引用 semantic
-      乱序的后果是「组件里的 var() 解析不到」，而 CSS 变量解析失败**不报错**，
-      只会让该属性静默失效（颜色变透明 / 继承）。所以本仓有 check-tokens.mjs 守这条。
+        tokens.css  → primitive + semantic
+        shell.css   → 四栏骨架，只引用 semantic
+        base/primitives/blocks/sheet/island → 组件层
+      乱序 ⇒ 组件里的 var() 解析不到，而 **CSS 变量解析失败不报错**，
+      只会让该属性静默失效。scripts/ops/nt_check_tokens.mjs 守这条。
     -->
     <link rel="stylesheet" href="/src/ui/tokens.css" />
     <link rel="stylesheet" href="/src/ui/shell.css" />
     <link rel="stylesheet" href="/src/ui/base.css" />
     <link rel="stylesheet" href="/src/ui/primitives.css" />
-<link rel="stylesheet" href="/src/ui/blocks.css" />
-<link rel="stylesheet" href="/src/ui/island.css" />
+    <link rel="stylesheet" href="/src/ui/blocks.css" />
     <link rel="stylesheet" href="/src/ui/sheet.css" />
+    <link rel="stylesheet" href="/src/ui/island.css" />
   </head>
   <body>
-    <div class="app">
-      <!-- ── 左：会话栏 ─────────────────────────────────── -->
-      <aside class="side" aria-label="会话">
+    <!--
+      四栏骨架：Rail / Panel / Content / Inspector。
+      结构取自四个参考仓的**交集**（见 shell.css 顶部表格），不是任一家的照搬。
+    -->
+    <div class="app" id="app" data-panel="open" data-inspector="closed">
+
+      <!-- ① Rail：图标导航。入口由能力门控，缺能力不出现 -->
+      <nav class="rail" aria-label="主导航">
+        <span class="rail-mark">
+          <img src="/icon.svg" alt="NeoBot" width="28" height="28" />
+        </span>
+        <div id="rail" class="rail-items" style="display:contents"></div>
+        <span class="rail-spacer"></span>
+        <button id="btn-settings" class="rail-btn" type="button" title="设置" aria-label="设置">⚙</button>
+      </nav>
+
+      <!-- ② Panel：搜索 + 分组列表 -->
+      <aside class="side" aria-label="列表">
         <header class="side-head">
-          <span class="brand">
-            <img src="/mark-mono.svg" alt="" class="brand-mark" width="20" height="20" />
-            <span class="brand-name">NeoBot</span>
+          <span class="side-title" id="panel-title">对话</span>
+          <span class="side-head-actions">
+            <button id="btn-new-group" class="nb-icon-btn" type="button" title="新建群组" aria-label="新建群组">群</button>
+            <button id="btn-panel-toggle" class="nb-icon-btn" type="button" title="折叠侧栏" aria-label="折叠侧栏">⟨</button>
           </span>
-          <button id="btn-new-group" class="nb-icon-btn" type="button" title="新建群组" aria-label="新建群组">群</button>
         </header>
         <div class="side-search">
-          <input id="search" type="search" placeholder="搜索会话与成员…" aria-label="搜索会话" />
+          <input id="search" type="search" placeholder="搜索…" aria-label="搜索" />
         </div>
-        <div id="side-panels" class="side-panels"></div>
         <nav class="convs" id="convs" aria-label="会话列表"></nav>
         <footer class="side-foot">
           <span id="host-badge" class="side-badge"></span>
         </footer>
       </aside>
 
-      <!-- ── 右：对话栏 ─────────────────────────────────── -->
+      <!-- ③ Content：块序列 + composer -->
       <main class="thread-col">
         <div id="thread" class="thread" role="log" aria-live="polite" aria-label="对话"></div>
-
         <div class="composer">
           <div class="composer-row">
             <button id="btn-evidence" class="nb-btn nb-btn--ghost nb-btn--sm" type="button" title="证据汇总">证据</button>
             <button id="btn-agent-run" class="nb-btn nb-btn--ghost nb-btn--sm" type="button" title="手动跑一轮 agent">跑一轮</button>
+            <button id="btn-inspector" class="nb-btn nb-btn--ghost nb-btn--sm" type="button" title="详情面板">详情</button>
             <span class="composer-spacer"></span>
             <span id="island" class="island is-island--idle"></span>
           </div>
@@ -59,6 +73,17 @@
           </div>
         </div>
       </main>
+
+      <!-- ④ Inspector：右侧详情，按需开（交集：详情不内联） -->
+      <aside class="inspector" id="inspector" data-open="false" aria-label="详情">
+        <div class="inspector-inner">
+          <header class="inspector-head">
+            <span class="inspector-title" id="inspector-title">详情</span>
+            <button id="btn-inspector-close" class="nb-icon-btn" type="button" aria-label="关闭详情">✕</button>
+          </header>
+          <div class="inspector-body" id="inspector-body"></div>
+        </div>
+      </aside>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

@@ -1,54 +1,128 @@
-/* NeoBot 壳层布局。
+/* NeoBot 壳层 —— Rail / Panel / Content / Inspector 四栏。
  *
- * 纪律（来自本仓两次实测事故，不是抄规范）：
- *  · 三栏高度链上**每一环**都要 `min-height: 0`。grid/flex item 默认
- *    `min-height: auto`，会拒绝收缩到内容以下，把父级撑高，于是
- *    `overflow-y: auto` 永不触发 —— 表现是「列表滚不动、输入框被顶出视口」。
- *  · 侧栏行内出现「顶/免」等文字按钮等于隐形（悬停才出现 ⇒ 触控板不可达）。
- *    这类操作收进右键菜单，菜单项**带当前状态**（`置顶 ✓`），因为菜单是一次性的。
+ * # 骨架来源：四个参考仓的**交集**，不是任何一家的照搬
+ *
+ * | 交集              | 证据（四家都有）                                    |
+ * |-------------------|----------------------------------------------------|
+ * | Rail + Panel +    | douchat AppRail/InspectorRail/ChatPane；           |
+ * | Content           | better-sidebar Sidebar+面板；harness navbar+content |
+ * | `minmax(0,1fr)`   | douchat 全部布局用它；**防溢出的唯一可靠写法**     |
+ * | 详情开在右侧      | douchat InspectorRail（357 行独立组件）            |
+ * | 空态是一等组件    | harness `Empty`、douchat 各 Panel                   |
+ *
+ * `minmax(0, 1fr)` 的作用 == 纵向的 `min-height: 0`：
+ * grid item 默认 `min-width: auto`，会拒绝收缩到内容以下，把轨道撑开，
+ * 于是内部 `overflow-y: auto` 永不触发。**这是本仓踩过的最贵的 bug。**
+ *
+ * # NeoBot 自己的特点（交集里没有的）
+ *
+ *  · Rail 上的入口由 `CapabilityRegistry` 门控 —— 缺能力时**不出现**，
+ *    并在 Panel 顶部给出理由，而不是摆一排点了没反应的按钮。
+ *  · 内容是**块序列**（text/tool/artifact/panel/system），不是一条消息流。
+ *  · 右上常驻**活动岛**，由块流推导状态，不接受手工设置。
  */
 
 .app {
   display: grid;
-  grid-template-columns: 264px 1fr;
+  /* rail 固定 / panel 可折叠 / content 撑开 / inspector 按需 */
+  grid-template-columns: auto var(--nb-panel-w, 260px) minmax(0, 1fr) auto;
   height: 100vh;
-  height: 100dvh;          /* 移动端/带 dock 的环境用动态视口高 */
+  height: 100dvh;
   overflow: hidden;
 }
+.app[data-panel="collapsed"] { --nb-panel-w: 0px; }
+.app[data-inspector="closed"] { --nb-inspector-w: 0px; }
 
-/* ── 会话栏 ────────────────────────────────────────────── */
+/* ── ① Rail：图标导航（最窄的一列） ──────────────────────── */
+.rail {
+  grid-row: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nb-space-1);
+  width: var(--nb-rail-w);
+  padding: var(--nb-space-3) 0;
+  background: var(--nb-bg-surface-sunken);
+  border-right: 1px solid var(--nb-border-hairline);
+}
+.rail-mark {
+  display: grid;
+  place-items: center;
+  width: 32px; height: 32px;
+  margin-bottom: var(--nb-space-3);
+}
+.rail-mark img { width: 28px; height: 28px; }
+
+.rail-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px; height: 40px;
+  font-size: 15px;
+  color: var(--nb-text-tertiary);
+  background: none;
+  border: none;
+  border-radius: var(--nb-radius-control);
+  cursor: pointer;
+  transition: background var(--nb-motion-fast) var(--nb-ease),
+              color var(--nb-motion-fast) var(--nb-ease);
+}
+.rail-btn:hover { background: var(--nb-panel-hover); color: var(--nb-text-primary); }
+.rail-btn[aria-current="true"] {
+  color: var(--nb-text-primary);
+  background: var(--nb-bg-accent-wash);
+}
+/* 选中态除底色外再加一条左侧指示条：不靠颜色单独承载状态 */
+.rail-btn[aria-current="true"]::before {
+  content: "";
+  position: absolute;
+  left: -8px; top: 50%;
+  width: 3px; height: 18px;
+  transform: translateY(-50%);
+  background: var(--nb-c-accent);
+  border-radius: var(--nb-radius-pill);
+}
+/* 能力门控：不可用的入口不渲染。若真要显示，用虚线边 + 标题说明 */
+.rail-btn--blocked {
+  border: 1px dashed var(--nb-border);
+  color: var(--nb-text-faint);
+}
+.rail-spacer { flex: 1; }
+
+/* ── ② Panel：列表栏 ─────────────────────────────────────── */
 .side {
   display: grid;
-  grid-template-rows: auto auto auto 1fr auto;   /* head / search / panels / convs / foot */
-  min-height: 0;                                /* ← 高度链第 1 环 */
+  /* head / search / groups(可滚) / foot */
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
   background: var(--nb-bg-surface-sunken);
   border-right: 1px solid var(--nb-border);
+  overflow: hidden;   /* panel 宽 0 时内部也不撑开 */
 }
-
 .side-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--nb-space-2);
-  padding: var(--nb-space-3) var(--nb-space-4);
+  padding: var(--nb-space-3) var(--nb-space-3) var(--nb-space-2);
 }
-.brand { display: flex; align-items: center; gap: var(--nb-space-2); min-width: 0; }
-.brand-mark { flex: none; }
-.brand-name {
-  font-size: var(--nb-type-msg);
+.side-title {
+  font-size: var(--nb-type-body);
   font-weight: 600;
   color: var(--nb-text-primary);
-  /* 「NeoBot」在 264px 侧栏 + 未来换长本地化名时不能撑破 */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
+.side-head-actions { display: flex; align-items: center; gap: 2px; flex: none; }
 
-.side-search { padding: 0 var(--nb-space-4) var(--nb-space-2); }
+.side-search { padding: 0 var(--nb-space-3) var(--nb-space-2); }
 .side-search input {
   width: 100%;
-  height: 32px;
-  padding: 0 var(--nb-space-3);
+  height: 30px;
+  padding: 0 var(--nb-space-2) var(--nb-space-1);
   font: inherit;
   font-size: var(--nb-type-body);
   color: var(--nb-text-primary);
@@ -62,39 +136,29 @@
   outline-offset: 1px;
 }
 
-/* 能力面板容器：面板由注册表驱动，不是写死的 */
-.side-panels { padding: 0 var(--nb-space-2); }
-.side-panels:empty { display: none; }
-.side-panel-btn {
-  display: flex;
-  align-items: center;
-  gap: var(--nb-space-2);
-  width: 100%;
-  padding: 7px var(--nb-space-2);
-  margin-bottom: 2px;
-  font: inherit;
-  font-size: var(--nb-type-body);
-  color: var(--nb-text-secondary);
-  background: none;
-  border: none;
-  border-radius: var(--nb-radius-control);
-  text-align: left;
-  cursor: pointer;
-}
-.side-panel-btn:hover { background: var(--nb-panel-hover); color: var(--nb-text-primary); }
-.side-panel-btn[aria-current="true"] {
-  color: var(--nb-text-primary);
-  background: var(--nb-bg-accent-wash);
-}
-
+/* 分组：交集里四个仓都有「列表分组」 */
 .convs {
-  min-height: 0;                 /* ← 高度链第 2 环：这环缺了，列表就滚不动 */
+  min-width: 0;
+  min-height: 0;                    /* 高度链关键环：这环缺了列表就滚不动 */
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: var(--nb-space-1) var(--nb-space-2);
+  padding: 0 var(--nb-space-2) var(--nb-space-2);
 }
+.group-label {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--nb-space-2) var(--nb-space-2) var(--nb-space-1);
+  font-size: var(--nb-type-micro);
+  color: var(--nb-text-faint);
+  background: var(--nb-bg-surface-sunken);
+  user-select: none;
+}
+
+/* 条目行：交集的四家一致解剖 —— 主标 + 副标 + 尾部元信息 */
 .convo {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;   /* 头像 | 文本 | 尾部 */
   align-items: center;
   gap: var(--nb-space-2);
   padding: 7px var(--nb-space-2);
@@ -103,7 +167,19 @@
 }
 .convo:hover { background: var(--nb-panel-hover); }
 .convo[aria-selected="true"] { background: var(--nb-bg-accent-wash); }
-.convo-txt { min-width: 0; }     /* ← 与右侧时间 flex:none 成对，见 primitives 纪律 */
+.convo:focus-visible { outline: 2px solid var(--nb-border-accent); outline-offset: -2px; }
+
+.convo-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px; height: 24px;
+  font-size: 11px;
+  color: var(--nb-text-on-accent);
+  background: var(--nb-c-accent);
+  border-radius: var(--nb-radius-pill);
+}
+.convo-txt { min-width: 0; }      /* ← 与尾部 auto 成对，缺任一长文本就撑破 */
 .convo-title {
   font-size: var(--nb-type-body);
   color: var(--nb-text-primary);
@@ -111,32 +187,53 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.convo-sub {
+  font-size: var(--nb-type-micro);
+  color: var(--nb-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.convo-tail { flex: none; }
 .convo-time {
-  flex: none;
   font-size: var(--nb-type-micro);
   color: var(--nb-text-faint);
   font-variant-numeric: tabular-nums;   /* 活的数字等宽，否则每帧宽度都跳 */
 }
+.convo-unread {
+  min-width: 16px;
+  padding: 0 5px;
+  font-size: var(--nb-type-micro);
+  text-align: center;
+  color: var(--nb-text-on-accent);
+  background: var(--nb-c-accent);
+  border-radius: var(--nb-radius-pill);
+}
 
 .side-foot {
-  padding: var(--nb-space-2) var(--nb-space-4) var(--nb-space-3);
+  padding: var(--nb-space-2) var(--nb-space-3);
   border-top: 1px solid var(--nb-border-hairline);
 }
 .side-badge {
   font-size: var(--nb-type-micro);
   color: var(--nb-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 
-/* ── 对话栏 ────────────────────────────────────────────── */
+/* ── ③ Content：对话栏 ──────────────────────────────────── */
 .thread-col {
   display: grid;
-  grid-template-rows: 1fr auto;      /* thread / composer */
-  min-height: 0;                     /* ← 高度链第 0 环 */
-  min-width: 0;
+  grid-template-rows: minmax(0, 1fr) auto;   /* thread / composer */
+  min-width: 0;                              /* ← 关键：允许收缩 */
+  min-height: 0;
   background: var(--nb-bg-canvas);
 }
 .thread {
-  min-height: 0;                     /* ← 高度链关键环 */
+  min-width: 0;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--nb-space-6) var(--nb-space-4);
@@ -153,7 +250,6 @@
   color: var(--nb-text-tertiary);
   text-align: center;
 }
-
 .msg { max-width: 68ch; }
 .msg--user { align-self: flex-end; }
 .msg-bubble {
@@ -172,22 +268,57 @@
   background: var(--nb-bg-surface);
   border: 1px solid var(--nb-border);
 }
-/* 署名与元信息在气泡**下方**（会话身份已下沉为流内标记） */
 .msg-meta {
   margin-top: 4px;
   font-size: var(--nb-type-micro);
   color: var(--nb-text-faint);
 }
-
 .session-mark {
   align-self: center;
   font-size: var(--nb-type-mini);
   color: var(--nb-text-faint);
 }
 
-/* ── composer ──────────────────────────────────────────── */
+/* ── ④ Inspector：右侧详情（按需开，不内联） ─────────────── */
+.inspector {
+  width: var(--nb-inspector-w, 0px);
+  min-width: 0;
+  overflow: hidden;
+  border-left: 1px solid var(--nb-border-hairline);
+  background: var(--nb-bg-surface-sunken);
+}
+.inspector:not([data-open="true"]) { border-left-color: transparent; }
+.inspector-inner {
+  width: var(--nb-inspector-w);
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.inspector-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--nb-space-3);
+  border-bottom: 1px solid var(--nb-border-hairline);
+}
+.inspector-title {
+  font-size: var(--nb-type-body);
+  font-weight: 600;
+  color: var(--nb-text-primary);
+}
+.inspector-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--nb-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-2);
+}
+
+/* ── composer：工具行 + 输入（交集里四家一致） ────────────── */
 .composer {
-  padding: var(--nb-space-3) var(--nb-space-4) var(--nb-space-4);
+  padding: var(--nb-space-2) var(--nb-space-4) var(--nb-space-4);
   background: var(--nb-bg-surface);
   border-top: 1px solid var(--nb-border);
 }
@@ -218,31 +349,15 @@
   outline-offset: 1px;
 }
 
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--nb-type-micro);
-  color: var(--nb-text-tertiary);
-}
-.status::before {
-  content: "";
-  width: 6px; height: 6px;
-  border-radius: var(--nb-radius-pill);
-  background: var(--nb-state-idle);
-}
-.status[data-state="running"]::before { background: var(--nb-state-busy); }
-.status[data-state="ok"]::before      { background: var(--nb-state-ok); }
-.status[data-state="error"]::before   { background: var(--nb-state-error); }
-
-/* 窄屏：侧栏收成抽屉。断点写在最后，避免被前面的规则覆盖。 */
-@media (max-width: 880px) {
-  .app { grid-template-columns: 1fr; }
+/* ── 窄屏：panel 变抽屉 ─────────────────────────────────── */
+@media (max-width: 900px) {
+  .app { grid-template-columns: auto minmax(0, 1fr); }
   .side {
-    position: fixed; inset: 0 auto 0 0; z-index: 20;
-    width: min(300px, 86vw);
+    position: fixed; inset: 0 auto 0 56px; z-index: 20;
+    width: min(300px, 84vw);
     transform: translateX(-100%);
     transition: transform var(--nb-motion-base) var(--nb-ease);
   }
-  .app[data-drawer="open"] .side { transform: none; }
+  .app[data-panel="open"] .side { transform: none; }
+  .inspector { display: none; }
 }

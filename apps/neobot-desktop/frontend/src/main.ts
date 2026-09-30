@@ -17,6 +17,7 @@ import { CapabilityRegistry, type PluginSelf } from "./plugin/contract.ts";
 import { defaultCapabilities } from "./host/host.ts";
 import type { HostKind } from "./plugin/contract.ts";
 import { invoke, type Commands, type TraceRow } from "./ipc.ts";
+import { renderList, type ListItem } from "./list.ts";
 import { openSheet } from "./ui/sheet.ts";
 import { appendBlock } from "./ui/blocks.ts";
 import { renderIsland } from "./ui/island.ts";
@@ -264,40 +265,121 @@ function evidence(): void {
 }
 
 // ── 演示数据（接真后端前先把界面跑起来；真数据到位后删） ──────────
+// ⛔ 全是假数据时**不要**让界面看起来像真的：panel/rail 上标了「演示」，
+//    空态文案也说明这一点。演示数据冒充真实是这个项目的原罪之一
+//    （`nt_send` 那条链路至今还是 MOCK）。
 const MOCK_MEMBERS = ["neo", "ada", "lin", "kiro"];
-const MOCK_CONVOS = [
-  { id: "c1", title: "发布值班", time: "14:02" },
-  { id: "c2", title: "架构评审", time: "昨天" },
-  { id: "c3", title: "与 ada", time: "9-28" },
+const MOCK_ITEMS: ListItem[] = [
+  { id: "c1", title: "发布值班", sub: "已确认回滚脚本，等评审", tail: "14:02", unread: 2, when: "今天" },
+  { id: "c4", title: "性能回归排查", sub: "火焰图已贴上来", tail: "13:20", when: "今天" },
+  { id: "c5", title: "周会纪要", sub: "待你补第 3 节", tail: "11:05", when: "今天" },
+  { id: "c2", title: "架构评审", sub: "三栏布局方案已定", tail: "昨天", pinned: true, when: "昨天" },
+  { id: "c3", title: "与 ada", sub: "关于证据模块的接口", tail: "9-28", when: "更早" },
+  { id: "c6", title: "长任务：全仓死代码清扫", sub: "已扫 279 个文件，212 真死", tail: "9-27", when: "更早" },
 ];
 
-function renderConvos(q: string): void {
-  const box = $("convs");
-  box.replaceChildren();
-  const hits = MOCK_CONVOS.filter((c) => c.title.toLowerCase().includes(q.toLowerCase()));
-  if (hits.length === 0) {
-    const e = document.createElement("div");
-    e.className = "nb-empty";
-    e.textContent = q ? `没有匹配「${q}」的会话` : "还没有会话";
-    box.appendChild(e);
+let selectedId: string | null = null;
+
+/** 渲染侧栏列表。分组/条目解剖见 list.ts（交集来源）。 */
+function renderConvos(): void {
+  renderList($("convs"), {
+    items: MOCK_ITEMS,
+    selected: selectedId,
+    query: ($("search") as HTMLInputElement).value,
+    emptyText: "还没有会话 —— 上面点「群」建一个",
+    onPick: (id) => {
+      selectedId = id;
+      const it = MOCK_ITEMS.find((x) => x.id === id);
+      mark(`会话 · ${it?.title ?? id}`);
+      renderConvos();
+      openInspector(it);
+    },
+  });
+}
+
+// ── Inspector：详情开在右侧（交集：详情不内联） ───────────────
+function openInspector(it: ListItem | undefined): void {
+  const app = $("app");
+  const insp = $("inspector");
+  const body = $("inspector-body");
+  if (!it) {
+    app.dataset["inspector"] = "closed";
+    insp.dataset["open"] = "false";
     return;
   }
-  for (const c of hits) {
+  app.dataset["inspector"] = "open";
+  insp.dataset["open"] = "true";
+  $("inspector-title").textContent = it.title;
+  body.replaceChildren();
+
+  const kv = (k: string, v: string) => {
     const row = document.createElement("div");
-    row.className = "convo";
-    row.setAttribute("role", "option");
-    const txt = document.createElement("div");
-    txt.className = "convo-txt";
-    const t = document.createElement("div");
-    t.className = "convo-title";
-    t.textContent = c.title;
-    txt.appendChild(t);
-    const time = document.createElement("span");
-    time.className = "convo-time";
-    time.textContent = c.time;
-    row.append(txt, time);
-    row.addEventListener("click", () => mark(`会话 · ${c.title}`));
-    box.appendChild(row);
+    row.className = "nb-item-row";
+    const l = document.createElement("div");
+    l.className = "nb-item-left";
+    l.appendChild(Object.assign(document.createElement("span"),
+      { className: "nb-item-sub", textContent: k }));
+    const val = document.createElement("span");
+    val.className = "nb-item-title";
+    val.textContent = v;
+    row.append(l, val);
+    return row;
+  };
+
+  body.append(kv("条目", it.id));
+  body.append(kv("时间", it.tail ?? "—"));
+  if (it.pinned) body.append(kv("置顶", "是"));
+  if (it.unread) body.append(kv("未读", String(it.unread)));
+  if (it.sub) {
+    const p = document.createElement("p");
+    p.className = "nb-item-sub";
+    p.textContent = it.sub;
+    body.append(p);
+  }
+  // ⛔ 明说这是演示数据。空态/详情都标出来，避免「看起来在工作」。
+  const demo = document.createElement("p");
+  demo.className = "nb-empty";
+  demo.textContent = "演示数据：尚未接入真实会话列表";
+  body.append(demo);
+}
+
+// ── Rail：能力门控的导航入口 ────────────────────────────────
+/**
+ * 渲染 Rail 入口。
+ *
+ * ⛔ **不可用的入口不渲染**（而不是渲染成灰的）。理由：四家参考仓都有
+ *    「灰按钮」，但用户点它得不到任何反馈，只能猜。
+ *    这里直接不出现 ⇒ 界面上不存在「点了没反应」的东西。
+ *    若某能力重要到必须可见，改成 `rail-btn--blocked` + title 说明，
+ *    而不是留一个哑按钮。
+ */
+function renderRail(active: string | null): void {
+  const box = $("rail");
+  for (const p of caps.menuFor(HOST)) {
+    if (p.hidden) continue;
+    const b = document.createElement("button");
+    b.className = "rail-btn";
+    b.type = "button";
+    b.title = p.summary;
+    b.setAttribute("aria-label", p.name);
+    b.setAttribute("aria-current", String(p.id === active));
+    b.textContent = railGlyph(p.id);
+    b.addEventListener("click", () => {
+      $("panel-title").textContent = p.name;
+      renderRail(p.id);
+      mark(`面板 · ${p.name}`);
+    });
+    box.appendChild(b);
+  }
+}
+
+/** Rail 上的字形。用字符而非图标资源：省一次请求，且不依赖图标表。 */
+function railGlyph(id: string): string {
+  switch (id) {
+    case "chat": return "◍";
+    case "local": return "◉";
+    case "audit": return "▤";
+    default: return "◻";
   }
 }
 
@@ -305,8 +387,19 @@ function renderConvos(q: string): void {
 $("btn-new-group").addEventListener("click", () => newGroup());
 $("btn-agent-run").addEventListener("click", () => runOnce());
 $("btn-evidence").addEventListener("click", () => evidence());
-$("search").addEventListener("input", (e) => {
-  renderConvos((e.target as HTMLInputElement).value);
+$("search").addEventListener("input", () => renderConvos());
+$("btn-panel-toggle").addEventListener("click", () => {
+  const app = $("app");
+  app.dataset["panel"] = app.dataset["panel"] === "open" ? "collapsed" : "open";
+});
+$("btn-inspector").addEventListener("click", () => {
+  const app = $("app");
+  app.dataset["inspector"] = app.dataset["inspector"] === "open" ? "closed" : "open";
+  $("inspector").dataset["open"] = app.dataset["inspector"] === "open" ? "true" : "false";
+});
+$("btn-inspector-close").addEventListener("click", () => {
+  $("app").dataset["inspector"] = "closed";
+  $("inspector").dataset["open"] = "false";
 });
 $("btn-send").addEventListener("click", () => {
   const text = input.value.trim();
@@ -336,14 +429,35 @@ input.addEventListener("keydown", (e) => {
 $("btn-send").addEventListener("click", () => input.focus());
 
 // ── 启动 ────────────────────────────────────────────────────
-renderPanels(null);
-renderConvos("");
+renderRail(null);
+renderConvos();
 // 能力门控把「当前宿主不支持」的部分整块隐藏，并给出可读理由。
-$("host-badge").textContent =
-  HOST === "tauri" ? "本地运行时" : "浏览器预览（部分能力不可用）";
+/**
+ * 宿主徽标：**说清「少了什么、为什么少」**。
+ *
+ * ⛔ 只写「部分能力不可用」是不够的 —— 用户看到 Rail 上少了入口，
+ *    只会以为功能没做完。把被门控掉的面板与理由直接列出来。
+ *    理由取自注册表，不在本文件编（否则「为什么这个没出现」会有两套答案）。
+ */
+{
+  const badge = $("host-badge");
+  const blocked = caps
+    .pluginsFor(HOST)
+    .filter((p) => !caps.isAvailable(p.id, HOST));
+  if (blocked.length === 0) {
+    badge.textContent = HOST === "tauri" ? "本地运行时 · 全部能力可用" : "浏览器预览";
+    badge.removeAttribute("title");
+  } else {
+    const why = blocked
+      .map((p) => `${p.name}（${caps.pluginVerdict(p.id, HOST).hint ?? "宿主不支持"}）`)
+      .join("；");
+    badge.textContent = `演示数据 · ${blocked.length} 个面板在本宿主不可用`;
+    badge.title = why;
+  }
+}
 refreshIsland();   // 启动也走推导路径，不手工置初值
 
 // 侧栏面板可用性：让测试/调试能直接看到判定结果，不靠猜。
 if (import.meta.env?.DEV) {
-  (window as unknown as { __nb: unknown }).__nb = { caps, HOST, renderPanels };
+  (window as unknown as { __nb: unknown }).__nb = { caps, HOST, renderRail, renderConvos };
 }
