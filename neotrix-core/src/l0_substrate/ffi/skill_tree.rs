@@ -8,7 +8,11 @@
 use uniffi;
 use std::sync::{Arc, RwLock};
 use crate::l0_substrate::ffi::types::*;
-use crate::neotrix::{CapabilityTreeRegistry, NodeLayer};
+// 直指 crate，不再借 `crate::neotrix::` 转发面。
+// 2026-09-30: 那个转发面被当作「全仓零消费」删除，但本行是花括号导入
+// （`neotrix::{A, B}`），只搜 `neotrix::Name` 的正则匹配不到 ⇒ 默认构建
+// 全绿、12,209 测试全绿，却漏掉了只有 `--features ios-bridge` 才编译的此处。
+use nt_core_capability_tree::{CapabilityTreeRegistry, NodeLayer};
 
 /// capability_tree 注册表路径 (与 nt_core_capability_tree CLI 默认值一致)。
 const REGISTRY_PATH: &str = ".neotrix/capability_registry.json";
