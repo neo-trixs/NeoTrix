@@ -126,15 +126,20 @@ export interface Commands {
   neobot_evidence_summary: { args: { text: string }; ret: EvidenceReport };
   // @rust main.rs::neobot_core_capabilities
   neobot_core_capabilities: { args: Record<string, never>; ret: CapabilitySnapshot };
+  // @rust commands.rs::neobot_panel_publish
+  //
+  // ⚠️ 骨架下发面板的**唯一**入口。界面不能自己造面板 ——
+  //    否则「能力门控」与「过期检测」都失去意义（基准由界面提供时，
+  //    任何校验都能被绕过）。上一轮那段硬编码的演示面板已删除。
+  neobot_panel_publish: { args: { panel: DecisionPanelWire }; ret: number };
   // @rust commands.rs::neobot_panel_answer
   //
-  // ⚠️ 签名里**panel 一并传入**，不是服务端按 id 查 —— 当前骨架尚未维护
-  //    面板注册表（面板随事件下发）。等它有真源后改签名，此处与 Rust 同步改。
-  neobot_panel_answer: {
-    args: { answer: Answer; panel: DecisionPanelWire };
-    ret: AnswerOutcomeWire;
-  };
-}
+  // ⛔ **只收 answer，不收 panel。** 基准由骨架侧的注册表持有；
+  //    旧签名让调用方一并传 panel，等于「被判定的一方自带基准」。
+  neobot_panel_answer: { args: { answer: Answer }; ret: AnswerOutcomeWire };
+  // @rust commands.rs::neobot_panel_clear —— 换会话时清，避免旧面板被答到新会话
+  neobot_panel_clear: { args: Record<string, never>; ret: number };
+};
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 

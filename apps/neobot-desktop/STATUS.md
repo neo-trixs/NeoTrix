@@ -8,7 +8,7 @@
 
 ## §1 已建成（可点可验）
 
-### 1.1 前端 —— 4,462 行
+### 1.1 前端 —— 4,428 行
 
 | 文件 | 行 | 职责 |
 |---|---:|---|
@@ -36,14 +36,15 @@
 | 模块 | 行 | 测试 | 内容 |
 |---|---:|---:|---|
 | `crates/neotrix-neobot/src/nt_evidence.rs` | 329 | 8 | 证据审计：断言有无出处 / 过度断言 / `sourced_ratio` 缺席≠0 |
-| `crates/neotrix-neobot/src/nt_panel.rs` | 346 | 12 | 决策面板契约 + **过期作答检测** |
+| `crates/neotrix-neobot/src/nt_panel.rs` | 440 | **18** | 决策面板契约 + **过期作答检测** + **面板注册表** |
 
-### 1.3 命令（7 个，前后端两侧一致）
+### 1.3 命令（9 个，前后端两侧一致）
 
 ```
 neobot_agent_run           neobot_convo_group        neobot_convo_dm
 neobot_send                neobot_evidence_summary   neobot_core_capabilities
 neobot_panel_answer
+neobot_panel_publish              neobot_panel_clear
 ```
 
 ### 1.4 资产
@@ -63,7 +64,7 @@ neobot_panel_answer
 | `nt_shot.mjs` | 界面截图（HTTP 服务方式） | — |
 | `nt_check_status.mjs` | **本文件与实测是否一致** | 见 §4 |
 
-**前端 7 组自测 + 库测试20 条 Rust 测试。**
+**前端 7 组自测 + 库测试26 条 Rust 测试。**
 
 > 复现：`node scripts/ops/nt_check_{tokens,bytes,ipc,layout,status}.mjs` ·
 > `cd apps/neobot-desktop/frontend && node selftest.mjs` ·
@@ -92,9 +93,10 @@ neobot_panel_answer
 
 | # | 缺口 | 影响 | 位置 |
 |---|---|---|---|
-| 1 | **骨架无面板注册表** | `neobot_panel_answer` 的签名把 `panel` **一并传入**，不是服务端按 id 查。骨架若自行发一个与界面不同的面板，校验就是对着错的基准做的 | `commands.rs` + `ipc.ts` 两处需同步改签名 |
-| 2 | **数据全是演示** | 列表 `MOCK_ITEMS`、面板 `mode:"sample"`。骨架与界面**从未真实联调** | `main.ts` 启动块 |
-| 3 | **无法在 Tauri 里做端到端验证** | Tauri on macOS 用 WKWebView，**不是 Chrome** ⇒ 布局门那套 CDP 接不上运行中的 app。真实点击链路未验证 | — |
+| 1 | ~~骨架无面板注册表~~ **已闭合** | 已有 `nt_panel::Registry`（18 测试）。`neobot_panel_answer` 现在**只收 answer**，基准由骨架持有；面板经 `neobot_panel_publish` 登记后由 `neobot:panel` 事件下发 | — |
+| 2 | **骨架侧尚无面板下发器** | 通道已通（publish → 事件 → 界面 → answer → 注册表校验），但**没有真实骨架在发面板**。浏览器预览下因此没有待答面板 —— 这是正确的，不是缺陷 | 需骨架侧实现下发 |
+| 3 | **无法在 Tauri 里做端到端验证** | Tauri on macOS 用 WKWebView，**不是 Chrome** ⇒ 布局门那套 CDP 接不上运行中的 app。真实点击链路仍未验证 | 需 Web Inspector 协议或骨架侧集成测试 |
+| 4 | **列表仍是 `MOCK_ITEMS`** | 会话列表未接真实 store。`neobot_convo_group`/`convo_dm` 已能建会话，但列表不从库里读 | `main.ts` |
 
 ### 🟡 应当修
 
@@ -130,7 +132,7 @@ neobot_panel_answer
 （walk 不递归，漏掉 `src/ui/` 与 `icons/android|ios/`），
 是**门自己先报错**逼我修门，而不是反过来。
 
-## §4 已知的假绿教训（本会话累计 5 次）
+## §4 已知的假绿教训（本会话累计 7 次）
 
 这一节比上面的功能清单更值钱 —— 每一条都是**「没看到失败」被当成「验证通过」**：
 
@@ -141,9 +143,12 @@ neobot_panel_answer
 | 3 | 只跑运行时自测、漏 tsc | 2 个纯类型变异全报「0 失败」 |
 | 4 | 改源码不重建（**测的是产物**） | 2 处 `min-height` 移除全报 PASS，差点去改门 |
 | 5 | shell 变量没 `export` | 5 个 Rust 变异一个都没写入却全报「8 passed」 |
+| 6 | 变异 harness 把**编译失败**读成「测试通过」 | `找不到("test result", "")` 后 `"FAILED" in ""` 为假 ⇒ 变异没编过却判 PASS。「抓到 2/3」里有一条其实是无效变异 |
+| 7 | 空洞的测试：断言「不该发生的事」却**没构造那件事** | `版本倒退被拒` 先写 `version=0`（非法）又改回 `1`，而当前就是 `1` ⇒ 根本没发生倒退，测试却绿着。看起来覆盖了「版本倒退」，实际什么都没测 |
 
 **共同根因**：把「没有观察到失败」当成了「验证通过」。这两件事在
-`grep` 无匹配、`&&` 短路、类型擦除、产物未重建、env 未传递 五种情况下都会分叉。
+`grep` 无匹配、`&&` 短路、类型擦除、产物未重建、env 未传递、
+**变异没编过**、**前提没被构造** 七种情况下都会分叉。
 
 ⇒ 现有对策：变异 harness **自证变异真的写进去了**；纯类型不变量由
 tsc 把关；静态门跑产物就跑产物。

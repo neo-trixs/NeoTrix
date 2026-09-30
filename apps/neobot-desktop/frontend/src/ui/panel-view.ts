@@ -23,6 +23,8 @@ import { validateAnswer, validatePanel } from "./block-model.ts";
 import { esc } from "./core.ts";
 
 export interface AnswerView {
+  /** 面板 id —— ⛔ 必填：骨架要靠它定位校验基准（注册表按 id 查）。 */
+  panelId: string;
   optionId: string;
   candidateSetVersion: number;
   label: string;
@@ -185,6 +187,7 @@ export function renderPanelView(p: DecisionPanel, cb: PanelCallbacks): HTMLEleme
     }
     note.hidden = true;
     cb.onAnswer({
+      panelId: p.id,
       optionId: sel.value,
       candidateSetVersion: p.candidateSetVersion,
       label: p.options.find((o) => o.id === sel.value)?.label ?? sel.value,

@@ -33,7 +33,11 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         // 命令实现在 `commands`（pub，可被集成测试直接调用）；
         // 本文件只负责注册与生命周期。
+        // 面板注册表由应用持有：骨架下发时登记，界面作答时按 id 查。
+        .manage(neobot_desktop::commands::AppState::default())
         .invoke_handler(tauri::generate_handler![
+            neobot_desktop::commands::neobot_panel_publish,
+            neobot_desktop::commands::neobot_panel_clear,
             neobot_desktop::commands::neobot_agent_run,
             neobot_desktop::commands::neobot_send,
             neobot_desktop::commands::neobot_convo_group,

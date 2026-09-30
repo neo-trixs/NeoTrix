@@ -62,7 +62,13 @@ if (hStart < 0 || hEnd < 0) {
   process.exit(1);
 }
 const handler = main.slice(hStart, hEnd);
-const backend = [...handler.matchAll(/\b(neobot_[a-z0-9_]+)\b/g)].map((m) => m[1]);
+// 取 `::` 之后的最后一段：注册表里写的是 `neobot_desktop::commands::neobot_send`，
+// 命令名是尾段。
+const CRATE = "neobot_desktop";
+const backend = [...handler.matchAll(/\b(neobot_[a-z0-9_]+)\b/g)]
+  .map((m) => m[1])
+  // 去掉模块/crate 前缀留下的误匹配
+  .filter((c) => c !== CRATE);
 
 if (frontend.length === 0) problems.push("前端命令表解析出 0 条 —— 门会虚假通过");
 if (backend.length === 0) problems.push("后端 generate_handler 解析出 0 条 —— 门会虚假通过");

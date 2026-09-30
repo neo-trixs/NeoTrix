@@ -11,10 +11,9 @@ use std::path::PathBuf;
 
 use neotrix_neobot::nt_core::{agent_run, capabilities_or_default, CapabilitiesInfo, AgentRunResult};
 use neotrix_neobot::nt_evidence::{audit, EvidenceReport};
-use neotrix_neobot::nt_panel::{validate_answer, Answer, AnswerOutcome, Panel};
+use neotrix_neobot::nt_panel::{Answer, AnswerOutcome, Panel, PublishError, Registry};
 use neotrix_neobot::nt_store::NeobotStore;
 use serde::Serialize;
-use tauri::Manager;
 
 /// 数据目录。**待与 CLI 对齐**（见下方 TODO）。
 ///
@@ -101,18 +100,78 @@ pub async fn neobot_send(text: String) -> Result<AgentRunResult, String> {
     .map_err(|e| format!("发送任务异常：{e}"))?
 }
 
-/// `neobot_panel_answer(answer, panel) -> AnswerOutcome`
+/// 骨架下发给界面的面板事件名。前端 `listen` 同一个名字。
+pub const PANEL_EVENT: &str = "neobot:panel";
+
+/// 应用状态：面板注册表。**由骨架持有，界面只能报 id。**
+#[derive(Default)]
+pub struct AppState {
+    pub panels: std::sync::Mutex<Registry>,
+}
+
+/// `neobot_panel_publish(panel) -> ()`
 ///
-/// 决策面板的作答入口。骨架侧的过期检测在这里，而**不只在前端** ——
-/// 前端那份校验发生在用户的浏览器里，真正的状态判定不能建立在
-/// 一个调用方可以改的检查上。
+/// 骨架下发一个决策面板：校验 → 登记 → 推给界面。
 ///
-/// ⚠️ 签名刻意把 **panel 一并传入**而不是让服务端去查：当前骨架尚未维护
-///    面板注册表（面板是随事件下发的）。等它有了真源，这里改成只收
-///    `answer` 并按 id 查 —— 那时这条注释与签名一起改，且有测试盯着。
+/// ⛔ 登记失败（面板非法/版本倒退）时**返回错误而不静默丢弃** ——
+///    静默丢弃等于骨架以为自己发出了、界面永远等不到，表现为「卡住不动」，
+///    而两端都没有报错。
 #[tauri::command]
-pub fn neobot_panel_answer(answer: Answer, panel: Panel) -> AnswerOutcome {
-    validate_answer(&panel, &answer)
+pub async fn neobot_panel_publish(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    panel: Panel,
+) -> Result<u64, String> {
+    let version = panel.candidate_set_version;
+    {
+        let mut reg = state
+            .panels
+            .lock()
+            .map_err(|_| "面板注册表锁中毒（此前有命令 panic）".to_owned())?;
+        reg.publish(panel.clone()).map_err(|e| match e {
+            PublishError::Invalid(why) => format!("面板非法：{why}"),
+            PublishError::VersionWentBack { current, incoming } => {
+                format!("候选集版本倒退（{incoming} < {current}）")
+            }
+        })?;
+    }
+    // 推给界面。发不出去就报 —— 界面收不到与「面板没发」同样表现为无响应。
+    tauri::Emitter::emit(&app, PANEL_EVENT, &panel)
+        .map_err(|e| format!("推送面板到界面失败：{e}"))?;
+    Ok(version)
+}
+
+/// `neobot_panel_answer(answer) -> AnswerOutcome`
+///
+/// ⚠️ **只收 answer，不收 panel。** 基准由 `AppState.panels` 持有。
+///    旧签名让调用方一并传 panel，等于「被判定的一方自带基准」——
+///    界面伪造一个同 id 的面板就能通过校验。这与 `ActorContext.resolvedBy`
+///    是同一条纪律：**基准不能由被判定方提供。**
+#[tauri::command]
+pub fn neobot_panel_answer(
+    state: tauri::State<'_, AppState>,
+    answer: Answer,
+) -> Result<AnswerOutcome, String> {
+    let reg = state
+        .panels
+        .lock()
+        .map_err(|_| "面板注册表锁中毒（此前有命令 panic）".to_owned())?;
+    Ok(reg.answer(&answer))
+}
+
+/// `neobot_panel_clear()` —— 清空注册表。
+///
+/// 用途：切换会话。换会话不清的话，旧会话的面板仍可被作答 ——
+/// 而作答会被记到新会话的流里，属于串台。
+#[tauri::command]
+pub fn neobot_panel_clear(state: tauri::State<'_, AppState>) -> Result<usize, String> {
+    let mut reg = state
+        .panels
+        .lock()
+        .map_err(|_| "面板注册表锁中毒（此前有命令 panic）".to_owned())?;
+    let n = reg.len();
+    *reg = Registry::new();
+    Ok(n)
 }
 
 /// 能力快照 —— 前端能力矩阵的**真源**。

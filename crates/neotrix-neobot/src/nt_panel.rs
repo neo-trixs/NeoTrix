@@ -344,3 +344,189 @@ mod tests {
         assert!(err.contains("重复"), "{err}");
     }
 }
+
+// ════════════════════════════════════════════════════════════════
+// 注册表
+// ════════════════════════════════════════════════════════════════
+
+/// 面板注册表 —— 骨架下发的面板存在这里，作答时**按 id 查**。
+///
+/// # 为什么必须有它
+///
+/// 第一版 `neobot_panel_answer(answer, panel)` 把面板**由调用方一并传入**。
+/// 那样校验的基准是**界面手上的那份面板**，而不是骨架真正的那份 ——
+/// 界面若被伪造请求喂了一个对得上的面板，校验就通过了。
+/// 授权判定的基准**必须**由骨架持有，界面只能报 id。
+///
+/// 这与本仓 `ActorContext.resolvedBy` 是同一条纪律：
+/// **身份/基准不能由被判定的一方提供。**
+#[derive(Debug, Default)]
+pub struct Registry {
+    panels: std::collections::HashMap<String, Panel>,
+}
+
+impl Registry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 登记一个面板。同 id 再登记 ⇒ **替换**（骨架换批候选是正常的），
+    /// 但**候选集版本不得倒退** —— 倒退意味着有人拿了旧骨架的结果在覆盖新的。
+    pub fn publish(&mut self, panel: Panel) -> Result<(), PublishError> {
+        validate_panel(&panel).map_err(PublishError::Invalid)?;
+        if let Some(prev) = self.panels.get(&panel.id) {
+            if panel.candidate_set_version < prev.candidate_set_version {
+                return Err(PublishError::VersionWentBack {
+                    current: prev.candidate_set_version,
+                    incoming: panel.candidate_set_version,
+                });
+            }
+        }
+        self.panels.insert(panel.id.clone(), panel);
+        Ok(())
+    }
+
+    pub fn get(&self, id: &str) -> Option<&Panel> {
+        self.panels.get(id)
+    }
+
+    /// 登记了几块面板。
+    pub fn len(&self) -> usize {
+        self.panels.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.panels.is_empty()
+    }
+
+    /// 按 id 校验作答。面板不存在即拒 —— **绝不用调用方传来的面板兜底**。
+    pub fn answer(&self, a: &Answer) -> AnswerOutcome {
+        match self.panels.get(&a.panel_id) {
+            Some(p) => validate_answer(p, a),
+            None => AnswerOutcome::Rejected(Reject::NoSuchPanel),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PublishError {
+    Invalid(String),
+    /// 候选集版本倒退。
+    VersionWentBack { current: u64, incoming: u64 },
+}
+
+#[cfg(test)]
+mod registry_tests {
+    use super::tests_support::*;
+    use super::{AnswerOutcome, PanelOption, PublishError, Reject, Registry};
+
+    #[test]
+    fn 登记后可按id作答() {
+        let mut r = Registry::new();
+        r.publish(panel()).expect("合法面板应可登记");
+        assert_eq!(r.len(), 1);
+        assert_eq!(r.answer(&answer("p1", "a", 1)), AnswerOutcome::Accepted);
+    }
+
+    #[test]
+    fn 未登记的面板一律拒() {
+        // ⛔ 这是注册表存在的**全部理由**：界面不能自带基准。
+        //    旧签名（answer + panel 由调用方一起传）在这里会被绕过 ——
+        //    只要界面编一个同 id 的面板，校验就对着一份假基准做了。
+        let r = Registry::new();
+        assert_eq!(r.answer(&answer("p1", "a", 1)), AnswerOutcome::Rejected(Reject::NoSuchPanel));
+    }
+
+    #[test]
+    fn 换批后旧选择失效() {
+        let mut r = Registry::new();
+        r.publish(panel()).unwrap();
+        let mut p2 = panel();
+        p2.candidate_set_version = 2;
+        p2.options.push(PanelOption {
+            id: "c".into(), label: "C".into(), details: vec![], sources: vec![src("c")],
+        });
+        r.publish(p2).unwrap();
+        // 界面拿着 v1 的认知来选
+        assert_eq!(
+            r.answer(&answer("p1", "a", 1)),
+            AnswerOutcome::Rejected(Reject::Stale { current: 2, answered: 1 })
+        );
+        // v2 之后它就合法了
+        assert_eq!(r.answer(&answer("p1", "c", 2)), AnswerOutcome::Accepted);
+    }
+
+    #[test]
+    fn 非法面板不予登记() {
+        let mut r = Registry::new();
+        let mut p = panel();
+        p.options[0].sources.clear();       // 比较型缺出处
+        assert!(matches!(r.publish(p), Err(PublishError::Invalid(_))));
+        assert_eq!(r.len(), 0, "被拒的面板不该进注册表");
+    }
+
+    #[test]
+    fn 版本倒退被拒() {
+        // ⛔ 上一版这条测试是**空洞的**：我先写 `version = 0`（非法），
+        //    紧接着又改成 `1` —— 而当前版本就是 1，于是**根本没有发生倒退**，
+        //    测试却绿着。看起来覆盖了「版本倒退」，实际什么都没测。
+        //    教训：断言「不该发生的事」时，必须先确认那件事**真的被构造出来了**。
+        let mut r = Registry::new();
+        let mut v2 = panel();
+        v2.candidate_set_version = 2;
+        r.publish(v2).expect("v2 应可登记");
+
+        // 现在拿 v1 来 —— 这才是真正的倒退
+        let mut v1 = panel();
+        v1.candidate_set_version = 1;
+        assert!(matches!(
+            r.publish(v1),
+            Err(PublishError::VersionWentBack { current: 2, incoming: 1 })
+        ));
+        // 倒退必须**没有污染**注册表：仍是 v2
+        assert_eq!(r.get("p1").map(|p| p.candidate_set_version), Some(2));
+        // v2 的作答仍按 v2 判定
+        assert_eq!(r.answer(&answer("p1", "a", 2)), AnswerOutcome::Accepted);
+        assert!(matches!(
+            r.answer(&answer("p1", "a", 1)),
+            AnswerOutcome::Rejected(Reject::Stale { current: 2, answered: 1 })
+        ));
+    }
+
+    #[test]
+    fn 同版本重复登记是幂等刷新() {
+        let mut r = Registry::new();
+        r.publish(panel()).unwrap();
+        r.publish(panel()).unwrap();
+        assert_eq!(r.len(), 1, "同 id 同版本不该产生第二块面板");
+    }
+}
+
+#[cfg(test)]
+mod tests_support {
+    use super::*;
+
+    pub fn src(t: &str) -> Source {
+        Source { title: t.to_owned(), url: format!("https://example.com/{t}") }
+    }
+
+    pub fn panel() -> Panel {
+        Panel {
+            id: "p1".into(), thread_id: "t1".into(), turn_id: "tu1".into(),
+            candidate_set_version: 1,
+            kind: PanelKind::Comparison,
+            title: "选哪个".into(),
+            mode: Mode::Live,
+            options: vec![
+                PanelOption { id: "a".into(), label: "A".into(), details: vec![], sources: vec![src("a")] },
+                PanelOption { id: "b".into(), label: "B".into(), details: vec![], sources: vec![src("b")] },
+            ],
+        }
+    }
+
+    pub fn answer(panel_id: &str, option_id: &str, v: u64) -> Answer {
+        Answer {
+            panel_id: panel_id.into(), option_id: option_id.into(), candidate_set_version: v,
+        }
+    }
+}

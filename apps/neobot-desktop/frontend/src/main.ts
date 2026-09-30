@@ -22,7 +22,7 @@ import { openSheet } from "./ui/sheet.ts";
 import { appendBlock } from "./ui/blocks.ts";
 import type { AnswerView } from "./ui/panel-view.ts";
 import type { DecisionPanel } from "./ui/block-model.ts";
-import type { EvidenceReport } from "./ipc.ts";
+import type { DecisionPanelWire, EvidenceReport } from "./ipc.ts";
 import { renderIsland } from "./ui/island.ts";
 import { deriveIsland } from "./ui/island-model.ts";
 import { hasPendingPanel } from "./ui/block-model.ts";
@@ -161,49 +161,79 @@ function pushTool(steps: ToolStep[]): void {
  *     真正的状态判定必须在骨架这侧。
  */
 function onPanelAnswer(a: AnswerView): void {
-  const pend = hasPendingPanel(blocks);
-  if (!pend) return;
+  // ⛔ 只送 answer，**不送 panel**。基准由骨架侧的注册表持有 ——
+  //    界面自带基准的话，任何校验都能被绕过（编一个同 id 的面板即可）。
+  //    这与 ActorContext.resolvedBy 是同一条纪律。
   const res = call("neobot_panel_answer", {
     answer: {
-      panel_id: pend.id,
+      panel_id: a.panelId,
       option_id: a.optionId,
       candidate_set_version: a.candidateSetVersion,
-    },
-    // 线格式：库类型未开 camelCase，跨 IPC 用 snake_case。
-    panel: {
-      id: pend.id,
-      thread_id: pend.threadId,
-      turn_id: pend.turnId,
-      candidate_set_version: pend.candidateSetVersion,
-      kind: pend.type,
-      title: pend.title,
-      options: pend.options.map((o) => ({
-        id: o.id, label: o.label, details: [...o.details],
-        sources: o.sources.map((x) => ({ title: x.title, url: x.url })),
-      })),
-      mode: pend.mode,
     },
   });
   void res.then((r) => {
     if (!r.ok) { note("error", r.error, undefined, true); return; }
     const out = r.value;
     if ("accepted" in out) {
-      for (const b of blocks) {
-        if (b.kind === "panel" && b.panel.id === pend.id) b.panel.selectedId = a.optionId;
-      }
+      const blk = blocks.find(
+        (b): b is Extract<Block, { kind: "panel" }> =>
+          b.kind === "panel" && b.panel.id === a.panelId,
+      );
+      if (blk) blk.panel.selectedId = a.optionId;
       setBusy(false);
       say("bot", `已记录你的选择：${a.label}`, `候选集 v${a.candidateSetVersion}`);
     } else {
-      // 骨架拒收 ⇒ 提示重选，**不要**把选择标成已答（那是谎报状态）
+      // 骨架拒收 ⇒ 不把选择标成已答（那是谎报状态）
       const rej = out.rejected;
       const why = "stale" in rej
         ? `候选集已更新（v${rej.stale.answered} → v${rej.stale.current}），请重新选择`
         : "no_such_option" in rej ? "该选项已不在候选集里，请重新选择"
-        : "no_such_panel" in rej ? "该面板已失效，请重新发起"
+        : "no_such_panel" in rej ? "该面板已失效（骨架未登记或已清理）"
         : `骨架拒绝了该面板：${rej.panel_invalid}`;
       note("warn", why);
     }
   });
+}
+
+/**
+ * 订阅骨架下发的决策面板事件。
+ *
+ * ⛔ 这是面板进入界面的**唯一**通道。上一轮界面在启动时自己造了一个演示面板，
+ *    那条路已删 —— 界面造面板 = 基准由被判定方提供，过期检测与能力门控同时失效。
+ *    现在没有骨架就没有面板，界面上只出现「没有待答事项」，这是**正确**的。
+ */
+async function listenPanels(): Promise<void> {
+  if (HOST !== "tauri") return;
+  try {
+    const { listen } = await import("@tauri-apps/api/event");
+    await listen<DecisionPanelWire>("neobot:panel", (e) => {
+      const w = e.payload;
+      const panel: DecisionPanel = {
+        id: w.id,
+        threadId: w.thread_id,
+        turnId: w.turn_id,
+        candidateSetVersion: w.candidate_set_version,
+        type: w.kind,
+        title: w.title,
+        mode: w.mode ?? "sample",
+        options: w.options.map((o) => ({
+          id: o.id,
+          label: o.label,
+          details: o.details ?? [],
+          sources: (o.sources ?? []).map((x) => ({ title: x.title, url: x.url })),
+        })),
+      };
+      // 同 id 再来一块 ⇒ 替换（骨架换批候选）。旧块从流里移除，
+      // 留着两张同 id 的卡会让人以为有两件事在等他答。
+      const at = blocks.findIndex((b) => b.kind === "panel" && b.panel.id === panel.id);
+      if (at >= 0) blocks.splice(at, 1);
+      thread.replaceChildren();
+      blocks.forEach((b, i) => appendBlock(thread, b, i, { onAnswer: onPanelAnswer }));
+      pushBlock({ kind: "panel", panel });
+    });
+  } catch (e) {
+    note("warn", `无法订阅面板事件：${String(e).slice(0, 120)}`);
+  }
 }
 
 /** 系统消息。`dataIntact` 显式声明数据是否还在 —— 宁可写死也不让用户猜。 */
@@ -545,94 +575,22 @@ $("btn-send").addEventListener("click", () => input.focus());
 renderRail(null);
 renderConvos();
 
-// ── 演示内容（让空态被真实形状替代；真数据到位后整段删） ──
-// ⛔ 全部标 mode:"sample" / 显式文案，不让它看起来像真的产出。
+// ── 演示内容 ──
+// ⛔ **不再造决策面板**。面板只能来自骨架（`neobot:panel` 事件）；
+//    界面自造面板会让过期检测与能力门控同时失去基准。
+//    浏览器预览下没有骨架 ⇒ 没有面板 ⇒ 空态提示「暂无待答事项」，这是正确的。
 {
-  mark("演示 · 决策面板");
+  mark("演示");
   say("user", "把接口迁移方案定下来");
-  say("bot", "有两处不一致，需要你定一下方向。", "DeepSeek-Chat · fallback");
+  say("bot", "我需要你定一个方向。", "本地模型 · local-model");
   pushTool([
-    { kind: "读取", detail: "frontend/src/ipc.ts（118 行）" },
-    { kind: "读取", detail: "crates/neotrix-neobot/src/nt_evidence.rs（329 行）" },
-    { kind: "比对", detail: "发现 3 处命令名不一致", failed: true },
+    { kind: "读取", detail: "frontend/src/ipc.ts（165 行）" },
+    { kind: "比对", detail: "3 处命令名不一致", failed: true },
   ]);
-  const panel: DecisionPanel = {
-    id: "p-migrate-1",
-    threadId: "c1",
-    turnId: "tu-7",
-    candidateSetVersion: 1,
-    type: "comparison",
-    title: "接口不一致怎么处理？",
-    mode: "sample",
-    options: [
-      {
-        id: "opt-rename",
-        label: "改前端跟随后端",
-        details: ["3 处都是前端写错", "后端不动，风险最低"],
-        sources: [{ title: "ipc.ts 对照表", url: "https://example.com/nb/ipc" }],
-      },
-      {
-        id: "opt-alias",
-        label: "后端加别名兼容",
-        details: ["两侧都不用改", "会留下长期别名债务"],
-        sources: [
-          { title: "对齐门", url: "https://example.com/nb/gate" },
-          { title: "债务清单", url: "https://example.com/nb/debt" },
-        ],
-      },
-      {
-        id: "opt-gen",
-        label: "从 Rust 生成前端类型",
-        details: ["根治", "要引入 build 步骤，本轮不做"],
-        sources: [{ title: "设计稿", url: "https://example.com/nb/codegen" }],
-      },
-    ],
-  };
-  pushBlock({ kind: "panel", panel });
+  note("info", "决策面板由骨架通过 neobot:panel 事件下发。浏览器预览下无骨架，故此处没有待答面板。");
 }
-// 能力门控把「当前宿主不支持」的部分整块隐藏，并给出可读理由。
-/**
- * 宿主徽标：**说清「少了什么、为什么少」**。
- *
- * ⛔ 只写「部分能力不可用」是不够的 —— 用户看到 Rail 上少了入口，
- *    只会以为功能没做完。把被门控掉的面板与理由直接列出来。
- *    理由取自注册表，不在本文件编（否则「为什么这个没出现」会有两套答案）。
- */
-{
-  const badge = $("host-badge");
-  const blocked = caps
-    .pluginsFor(HOST)
-    .filter((p) => !caps.isAvailable(p.id, HOST));
-  if (blocked.length === 0) {
-    badge.textContent = HOST === "tauri" ? "本地运行时 · 全部能力可用" : "浏览器预览";
-    badge.removeAttribute("title");
-  } else {
-    const why = blocked
-      .map((p) => `${p.name}（${caps.pluginVerdict(p.id, HOST).hint ?? "宿主不支持"}）`)
-      .join("；");
-    badge.textContent = `演示数据 · ${blocked.length} 个面板在本宿主不可用`;
-    badge.title = why;
-  }
-}
-refreshIsland();   // 启动也走推导路径，不手工置初值
 
-// ── 交互自检（dev only）：决策面板必须真能选、能确认 ──
-// ⛔ 面板是纯 UI，若「单选点不动」这类问题只有肉眼能发现，
-//    那它就会活到用户手上。挂一个可断言的钩子给 e2e/手测用。
-if (import.meta.env?.DEV) {
-  (window as unknown as { __nbPanel: unknown }).__nbPanel = () => {
-    const card = document.querySelector<HTMLElement>(".panel-card");
-    if (!card) return { found: false };
-    const input = card.querySelector<HTMLInputElement>("input[type=radio]");
-    const btn = card.querySelector<HTMLButtonElement>(".panel-foot button");
-    const before = btn?.disabled ?? null;
-    input?.click();
-    const after = btn?.disabled ?? null;
-    return { found: true, optionCount: card.querySelectorAll("input[type=radio]").length,
-             submitBefore: before, submitAfter: after,
-             unlocked: before === true && after === false };
-  };
-}
+void listenPanels();
 
 // 侧栏面板可用性：让测试/调试能直接看到判定结果，不靠猜。
 if (import.meta.env?.DEV) {
