@@ -59,7 +59,7 @@
 | `check-naming.sh` | advisory，clean-HEAD **1,646** 无前缀文件 | **规约 vs 现实差 1,646 ⇒ 该规约无约束力，advisory PASS ≠ 合规** |
 | `check-truth-surface.sh` | — | ⛔ **本地红 ≠ CI 红**（他窗 WIP 造成 UNCOMMITTED_DEP）；干净检出 exit=0 |
 
-- 层归属真源 `.neotrix/layer-map.json`；裁决表 `docs/architecture/OWNERSHIP.md`。改 feature 门控的 `mod` 宿主（含 `neotrix/` 树的 `ios-bridge` 门控）后跑 `check-feature-gates.sh`，它按 `--all-targets` 覆盖 6 个非默认 feature。删 `pub use` 前用能匹配花括号的形式查消费方 —— `neotrix::{A,B}` 不匹配 `mod::Name` 搜索式（2026-09-30 据此删掉活代码，而默认 `--lib`/`--all-targets`/12,209 测试/全部门均绿）。
+- 层归属真源 `.neotrix/layer-map.json`；裁决表 `docs/architecture/OWNERSHIP.md`。改 feature 门控的 `mod` 宿主（含 `neotrix/` 树的 `ios-bridge` 门控）后跑 `check-feature-gates.sh`，它按 `--all-targets` 覆盖 6 个非默认 feature。删 `pub use` 前用能匹配花括号的形式查消费方 —— `neotrix::{A,B}` 不匹配 `mod::Name` 搜索式（2026-09-30 据此删掉活代码，而默认 `--lib`/`--all-targets`/12,209 测试/全部门均绿）。⛔ **`rg -E` 在本机静默返回 0**（`error parsing flag -E: … unknown encoding`），`rg` 不带 `-E` 正常（蓝图 `D-[0-9]{2}` 实测 87 vs 0）⇒ 命令一律用 `rg -n '…'`，且**不得用 `2>/dev/null` 吞 stderr**，零命中先确认退出码 1 而非 2。缺口诊断见 `docs/architecture/CAPABILITY-GAP-2026-09-30.md`。
 - ⚠️ **同名 ≠ 同一符号**（换错了 `cargo check` 不报错，L15）；门**分不清字符串字面量**（L14）；批量改道须自查有无改到注释行（L13/L16）。改跨层引用**唯一合法通道是「消费方自己那层」的 facade**；走目标层 facade 无效。
 
 ### 4.3 磁盘 / worktree
