@@ -217,11 +217,25 @@ def audit_dup_types(rs):
         except OSError:
             return None
         out, depth, started = [], 0, False
-        for line in L[max(0, ln - 1):max(0, ln - 1) + 80]:
+        for idx, raw in enumerate(L[max(0, ln - 1):max(0, ln - 1) + 80]):
+            # strip comments/literals per line — the module already has
+            # `_strip_noncode` but it is whole-text; here we need line-at-a-time
+            line = re.sub(r"//.*$", "", raw.rstrip())
             depth += line.count("{") - line.count("}")
             if "{" in line:
                 started = True
             body = re.sub(r"^\s*(pub(?:\([^)]*\))?\s+)?", "", line.rstrip())
+            # ⚠️ 2026-09-30 bugfix #4 (found by adversarial audit, not by me):
+            #   a definition whose header has NO `{` — `struct X;`
+            #   / `struct X(u8);` / `type X = ...;` / one-line body — never sets
+            #   `started`, so the loop ran the full 80-line window and harvested
+            #   whatever followed. 7 groups had signatures belonging to *other*
+            #   code. `started` was computed but only used to permit stopping,
+            #   never to force it. Fix the root, not the symptom: a headerless
+            #   definition has no comparable body, so return nothing rather
+            #   than lie.
+            if idx == 0 and "{" not in line:
+                return ()
             # struct field:  name: Type
             m = re.match(r"\s*(\w+)\s*:\s*(.+?),?\s*$", body)
             if m and not body.lstrip().startswith("//"):
@@ -240,19 +254,42 @@ def audit_dup_types(rs):
                 out.append(m.group(1) + "*")   # * = variant name (payload-bearing or not)
             if started and depth <= 0:
                 break
-        # ⚠️ 2026-09-30 bugfix #3. The signature was an ORDERED tuple, so two
-        # enums with the same variants written in a different order were judged
-        # different types. On GoalPriority that split 3 copies into 2+1 and
-        # the odd one out was dropped. Enum declaration order is not part of
-        # type identity (it only sets the `Ord` default, which we must not
-        # treat as identity either — see note below).
-        #   => sort, so order-insensitive.
-        # NOTE: a custom `Ord` impl (e.g. `rank()`) may deliberately differ
-        # from declaration order. Sorting hides that. It is a *candidate*
-        # signal, not a verdict — every group still needs a doc-comment read
-        # before merging (see docs/plans/2026-09-29-dup-types-consolidation-plan.md).
+        # ⚠️ 2026-09-30 bugfix #3. Sorted, so declaration order does not affect
+        # identity (GoalPriority had one copy written in reverse).
+        #
+        # ⚠️ BUT SORTING HIDES THE ONE THING THAT MATTERS (adversarial audit,
+        # 2026-09-30): two `Severity` groups are `derive(PartialOrd, Ord)` with
+        # **exactly reversed declaration order**. For a derived `Ord`, that
+        # order IS the comparison. Sorting makes them look identical, and
+        # merging them silently flips every `<` / `>` / `max()` / threshold
+        # check — **zero compile errors, zero test failures**.
+        # => we now ALSO return an ordered signature + a flag.
         return tuple(sorted(out))
 
+    def order_sensitive(p, ln, name):
+        """Does this definition's *declared order* carry meaning?
+
+        True when the type derives (or hand-implements) Ord/PartialOrd, because
+        for those the declaration order IS the comparison. The adversarial
+        audit found two `Severity` groups that are structurally identical but
+        declare the variants in exactly opposite order, both with
+        `derive(PartialOrd, Ord)`. Merging them flips every comparison
+        silently.
+        """
+        try:
+            L = open(p, errors="ignore").read().splitlines()
+        except OSError:
+            return False
+        head = "\n".join(L[max(0, ln - 14):ln + 30])   # attrs sit above decl
+        return bool(re.search(r"derive\([^)]*\b(Ord|PartialOrd)\b", head)) \
+            or "fn cmp(&self" in "\n".join(L[ln:ln + 120])
+
+    def decl_order(p, ln):
+        try:
+            L = open(p, errors="ignore").read().splitlines()
+        except OSError:
+            return ()
+        return fields(p, ln)          # sorted, for membership
     groups = []
     for name, locs in by.items():
         g = collections.defaultdict(list)
@@ -262,8 +299,21 @@ def audit_dup_types(rs):
                 g[(k, s)].append("%s:%d" % (p, l))
         for (kind, sig), sites in g.items():
             if len(sites) > 1:
+                # ⚠️ load-bearing facts the signature cannot see (adversarial
+                # audit 2026-09-30). These do NOT disqualify the group; they
+                # mark it as "needs a human/agent read before merging".
+                def _parts(s):
+                    _p, _l = s.rsplit(":", 1)
+                    return _p, int(_l)
+                ord_sensitive = any(order_sensitive(*_parts(s), name)
+                                    for s in sites)
+                local = any("test" in os.path.basename(_parts(s)[0]).lower()
+                            or re.search(r"tests?_\d*[:/]", _parts(s)[0])
+                            for s in sites)
                 groups.append({"name": name, "kind": kind,
-                               "nfields": len(sig), "sites": sites})
+                               "nfields": len(sig), "sites": sites,
+                               "order_sensitive": ord_sensitive,
+                               "suspect_local": local})
     groups.sort(key=lambda g: (-len(g["sites"]), g["name"]))
     # ⚠️ Three different numbers, and conflating them is the exact mistake
     # this function exists to prevent. I shipped "1797 mergeable / 160%"
@@ -507,6 +557,27 @@ def main():
     A("")
 
     A("### 5.4 重复类型 —— 同名 ≠ 同类型（L15 陷阱）")
+    A("")
+    A("> ⛔ **判据是「筛子」不是「判据」** —— 2026-09-30 对抗性审计（子代理独立解析器"
+      "交叉验证 + 28 个变异形态测试）得出：**353 组里 341 组（96.6%）归一化文本逐字节相同**，")
+    A("> 但签名表示**看不见三类承重事实**，按它批量归并会**静默出错**：")
+    A(">")
+    A("> | 看不见 | 危害 | 已标记 |")
+    A("> |---|---|---|")
+    A("> | **派生 `Ord` 的声明序** | 两个 `Severity` 组 `derive(PartialOrd, Ord)` 且**声明序完全相反**"
+      " ⇒ 合并后 `<`/`>`/`max()`/阈值**全部静默翻转**，零编译错误零测试失败 | `order_sensitive` |")
+    A("> | **变体负载类型** | `X(u32)` 与 `X(f64)` 签名相同 | 需逐组读 |")
+    A("> | **属性** | `#[default]` / `#[cfg]` / `#[repr]` 不可见（`RiskLevel` 5 份里两份 `#[default]` 不同）"
+      " ⇒ `default()` 静默改变 | 需逐组读 |")
+    A("> | **测试/函数内局部类型** | 归并做不到也不该做 | `suspect_local` |")
+    A(">")
+    A("> ⇒ **只有「无标记」的组才可批量归并**；enum 一律逐组读原文。")
+    A(">")
+    A("> 判据已修 **4 处**（每处都把数字抬高，说明历史每次都在**漏判**）：")
+    A("> ① 只认无负载私有字段（`Position{f32}`≡`{f64}`）② 变体正则不认尾逗号"
+      "（**所有无负载 enum 整体丢弃**）③ 签名顺序敏感 ④ **无 `{` 头部不终止，返回后面 80 行的代码**。")
+    A("> ④ 是 ② 的根因：同一个缺失的守卫，在单行 enum 上表现为丢弃、在无 `{` 头上表现为**越界采集**。")
+    A("")
     A("")
     groups, dupnames, name_extra, iso_extra = audit_dup_types(rs)
     A("| 口径 | 数量 | 含义 |")

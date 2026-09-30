@@ -10,6 +10,68 @@
 
 ---
 
+---
+
+# ⛔ 2026-09-30 对抗性审计结论 —— 本计划已被否决（除 T1 无标记子集外）
+
+**派子代理做 adversarial 验证（独立解析器交叉比对 + 28 个变异形态测试），
+结论：判据是「筛子」不是「归并判据」。本计划 Task 3「T1 剩余 51 组批量归并」
+被否决 —— 若照做，会引入静默错误。**
+
+## 判据看不见的三类承重事实
+
+| 看不见 | 具体危害 | 已证实例 |
+|---|---|---|
+| **派生 `Ord` 的声明序** | 合并后 `<`/`>`/`max()`/阈值**全部静默翻转**，**零编译错误、零测试失败** | 两个 `Severity` 组：`derive(PartialOrd, Ord)` + **声明序完全相反**（`Critical,High,Medium,Low,Info` vs `Info,Low,Medium,High,Critical`）。`secret_scanner/finding.rs:8` 的 doccomment 明写「fail-closed: **Critical sorts highest**」—— 注释里写明的正是工具看不见的东西 |
+| **变体负载类型** | `X(u32)` ≡ `X(f64)` | `StepStatus` 5 份中 `Failed`（unit）与 `Failed(String)` 签名相同 |
+| **属性** | `default()` 静默改变 | `RiskLevel` 5 份里 `agent.rs:450` 是 `#[default] Low`、`agent_guardrails/mod.rs:59` 是 `#[default] Medium` |
+
+## 另两类不可归并
+
+- **测试/函数内局部类型**（`AlwaysFailExecutor` 在 `#[test]` 体内、
+  `PersistedState` 分别在 `persist_to_json`/`restore_from_json` 体内且
+  `derive(Serialize)` vs `derive(Deserialize)` **不一样**）⇒ 归并做不到也不该做
+- **7 组「证据为空」**：`fields()` 对无 `{` 头部的定义（`struct X;` / `struct X(u8);` /
+  `type X = ...;`）**不终止**，返回的是**后面 80 行**的代码。
+  `Lcg` 的「签名」其实是下面 impl 块的内容，其 doccomment 自述「与
+  `unified_latent::SeededProjection` **同模式**」= 刻意平行。
+  **已修（缺陷 ④），这 7 组现正确丢弃。**
+
+## 判据已修 4 处 —— 每处都把数字抬高 ⇒ 历史每次都在漏判
+
+| # | 缺陷 | 修后组数 |
+|---|---|---:|
+| 1 | 只认无负载私有字段（`Position{f32}` ≡ `{f64}`） | 147→261 |
+| 2 | 变体正则不认尾逗号 ⇒ **所有无负载 enum 整体丢弃** | 261→353 |
+| 3 | 签名顺序敏感 | 同上 |
+| 4 | **无 `{` 头部不终止（②的根因）** | 353→**352**（丢弃 7 组空证据） |
+
+## 独立验证给出的正面结论
+
+- **341/352 组（96.6%）归一化文本逐字节相同** ⇒ 「结构同构」是**证明**，不是估计
+- **748 个 site 的正文成员，0 个字段/变体名对判据不可见**（漏判率 0）
+- 字段类型跨行折断（`Box<`）在当前语料 **0 例**
+
+## 修订后的执行规则
+
+| 原计划 | 修订 |
+|---|---|
+| Task 2 `ThreatLevel` 4→1 | ✅ **可做**（审计逐字节确认 4 份相同、属性相同、同序同 derive） |
+| Task 3 「T1 剩余 51 组，每组一个 commit」 | ⛔ **否决**。改为：**352 组里只有 318 组「无标记」可批量**；**28 组 `order_sensitive` + 6 组 `suspect_local` 必须逐组读原文**；**全部 enum 组一律逐组读**（负载类型/属性/序三重不可见） |
+| Task 4/5 | 同样适用上述三分 |
+
+⇒ **执行顺序**：先做「无标记的 struct 组」（可批量），
+再做「无标记的 enum 组」（逐组），最后才碰 tier=2/3。
+**每批之后跑 `check-layer-deps --strict` + `check-unwrap --strict`，
+一旦出现 new violation 立即停，不改基线。**
+
+## 本会话已完成的实际归并
+
+**1 组**：`GoalPriority` 3→1（`f9b4b1c3`）——
+保留点 `nt_goal/goal_generator.rs`（fanin 3 且跨子系统，经 `mod.rs:12` 对外 `pub use`），
+`rank`/`label`/`Ord` 随类型搬走，三个既有 public 路径全保留、零调用方改动，
+49 个 `goal_loop` 测试跑绿。
+
 ## ⛔ 施工前必读：三个会让人栽跟头的实测事实
 
 **1. 「同名」≠「可归并」。** 1,121 个类型名重复，但只有 **174 个结构真同构**。
