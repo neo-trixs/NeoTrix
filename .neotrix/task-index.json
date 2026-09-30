@@ -691,6 +691,79 @@
    "read_only": true,
    "when_not": "只认 MAP-TASKS §1.1（已落地）与 §1.3（已拒绝）两节的反引号 token；ROUND 系列文档不在默认范围。拒绝区名字出现≠复活（多为证伪记录注释），见输出 needs-review 人工复核，不要直接判死",
    "spec": "docs/architecture/GLOBAL-MAP-DEFECTS-2026-09-30.md 第五部分；只用 rg -F（本机 rg -E 静默返回 0）"
+  },
+  {
+   "id": "nt-callgraph-impact",
+   "query": [
+    "影响面",
+    "blast radius",
+    "爆炸半径",
+    "改这里炸不炸",
+    "谁依赖我",
+    "传递可达",
+    "可达性",
+    "impact_of",
+    "死链",
+    "不可达",
+    "零入边"
+   ],
+   "tool": "python3 scripts/ops/nt_callgraph.py --impact <sym> --db .project-map/edges-all.jsonl [--files]",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "不要把它当精确答案 —— 报的是静态可达下界：async 派发/trait 动态派发/宏展开看不见，真实影响面 ⊇ 本结果（实测 run_once 反向闭包在深度 1 即终止）。也不要给它的输出建门（G7 裁决）",
+   "spec": "CAPABILITY-GAP-2026-09-30 G4；ABSORPTION-ROUND24"
+  },
+  {
+   "id": "nt-callgraph-unreachable",
+   "query": [
+    "死代码",
+    "死链",
+    "没人调用",
+    "未接线",
+    "导出≠接入",
+    "unreachable",
+    "dead code"
+   ],
+   "tool": "python3 scripts/ops/nt_callgraph.py --unreachable --db .project-map/edges-all.jsonl --crate neotrix",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "⛔ 不要据它直接删代码。no-callsite 桶含 F3(fn-as-value) 与 F6(图盲区) 假阳性；F1–F6 六类误报源见脚本 docstring。动手前必须逐条读代码证实/证伪（R-SCAN-1）。textual-prod 桶多为同名词碰撞，不是缺陷",
+   "spec": "ABSORPTION-ROUND24"
+  },
+  {
+   "id": "nt-absorption-live-graph",
+   "query": [
+    "吸收存活率",
+    "吸收的技术还活着吗",
+    "导出≠接入",
+    "G5",
+    "存活率",
+    "R-P79 验证"
+   ],
+   "tool": "python3 scripts/ops/nt_absorption_live.py --graph",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "图判据对 shell 脚本/类型名静默（不是调用目标），覆盖面仍靠文本判据 —— 两者互补不是替代。⚠ 该工具默认模式会报 PASS 而其 docstring 自述「若报全部存活说明判据无效」：默认 PASS 不可当健康证明，必须加 --graph 看接线层",
+   "spec": "CAPABILITY-GAP-2026-09-30 G5；ABSORPTION-ROUND24"
+  },
+  {
+   "id": "check-license",
+   "query": [
+    "许可",
+    "license",
+    "授权",
+    "商用",
+    "版权",
+    "G6",
+    "SPDX",
+    "vendored 来源",
+    "附加条款"
+   ],
+   "tool": "bash scripts/check-license.sh",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "⛔ 当前 rc=1 是正确状态，不是待修 bug：apps/neobot-desktop/frontend 上游附加条款 No Commercial Secondary Development 待项目所有者裁决（.neotrix/LICENSE-EXCEPTIONS.md）。⛔ 不要为了让门变绿而删 deny 名单或改脚本。门只校验记录一致性，不做法律判断",
+   "spec": "ABSORPTION-ROUND24 G6"
   }
  ],
  "excluded": {

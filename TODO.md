@@ -1,5 +1,25 @@
 > # NeoTrix TODO 列表
-> 智能同步生成，最后更新：**2026-09-30（调用边落地 + 全量审计 + 第二棵树收官）**
+> 智能同步生成，最后更新：**2026-09-30（原子拆解 + 跨仓对位落地，建议 2 部分关闭）**
+>
+> ## 🔴 P0（2026-09-30 原子对位抓到）`ResponseCache::insert` 淘汰是 O(capacity) 全扫描
+> >
+> > **证据**：`nt_decompose.py parity` 对位 `lru-0.18.5`（MIT，registry 已有，
+> > 同一抽取器生成对方原子集）↔ 我方 `ResponseCache::insert`：
+> > 我方原子集含 `iter`+`filter`+`min_by_key`+`remove`（= 每次写扫全表），
+> > 对方原子集含 `attach`/`detach`/`swap`/`replace_or_create_node`（= O(1) promote）。
+> > **已读源码逐行确认**（`nt_policy.rs:94-111`），非仅凭符号名下结论。
+> > ⇒ 功能等价、复杂度劣势，且位置在网关 `resilience` 层**热路径**。
+> >
+> > **候选修法（本仓约束下的裁决）**：(a) 引第三方 `lru`（MIT，已在 registry；
+> > 最小改动，代价是它的 slab/unsafe 依赖）；(b) 自建侵入式链表 —— 需手写
+> > `unsafe`，**`#![forbid(unsafe_code)]` 直接排除** ⇒ **(a) 是唯一可行解**。
+> > 独立一轮做，带测试。详见 `docs/architecture/DECOMPOSE-PARITY-2026-09-30.md` §3。
+> >
+> > ### 🟡 P1 doc-claim 门的下一个类目：模板残留的假「未实现」声明
+> > `nt_policy.rs` 的 `pin` / `unpin` / `pinned_count` 三个 doc comment 写着
+> > `/// Note: Real implementation needed — …`，但函数体是**完整实现** ⇒ 假声明。
+> > `check-doc-claims.sh` 只查「zero consumers」类断言，**抓不到这一类**。
+> > ⇒ 门若要加此类，须先确认模式足够窄（否则按 G7 不建门）。
 >
 > ## ✅ 2026-09-30 调用边落地（建议 1 关闭）
 > >
