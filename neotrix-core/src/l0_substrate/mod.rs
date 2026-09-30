@@ -98,3 +98,4 @@ pub mod nt_data_gateway;
 /// crates/neotrix-decision-engine 萃取）。补主代码「只有采样参数、没有采样
 /// 实现」的空缺——此前 top_k/top_p/repetition_penalty 均为 config 透传。
 pub mod nt_sampler;
+pub mod proxy_daemon_wrapper;

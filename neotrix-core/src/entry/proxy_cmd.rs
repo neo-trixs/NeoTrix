@@ -7,7 +7,7 @@ pub async fn run_proxy_cmd(cmd_str: &str) {
     use neotrix::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_control::{
         DaemonMode, ProxyClient,
     };
-    use neotrix::neotrix::proxy_daemon_wrapper;
+    use neotrix::l0_substrate::proxy_daemon_wrapper;
 
     let client = ProxyClient::new();
     let parts: Vec<&str> = cmd_str.split_whitespace().collect();

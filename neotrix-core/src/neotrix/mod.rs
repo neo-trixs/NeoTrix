@@ -1,7 +1,7 @@
 //! # NeoTrix 核心模块
 //!
 //! 本地模块：nt_crystal_core, nt_file_ability, nt_capability_bridge,
-//! nt_core_error, nt_core_event_bus, ffi, proxy_daemon_wrapper
+//! nt_core_error, nt_core_event_bus, ffi
 
 #![forbid(unsafe_code)]
 
@@ -20,7 +20,6 @@ pub mod nt_core_event_bus;
 pub mod nt_file_ability;
 pub mod nt_crystal_core;
 pub mod nt_jev;
-pub mod proxy_daemon_wrapper;
 /// neotrix → L0 error conversions (moved from l0_substrate to respect L0 ← neotrix direction)
 pub mod error_conversions;
 
