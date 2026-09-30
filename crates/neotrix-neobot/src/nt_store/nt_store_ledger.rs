@@ -145,6 +145,20 @@ impl NeobotStore {
         Ok(())
     }
 
+    /// 丢弃确定性坏行（2026-09-30 新增）。
+    ///
+    /// payload 一旦写入即不可变（本表只 UPDATE claimed/available_at），
+    /// 所以解析失败 / 缺 channel / 无发送方的 topic 的行**永远**不可能变可发。
+    /// 重试不是恢复 —— `fail_outbox` 只会让它无限占用 drain 预算
+    /// （20 行一批），并污染 sent/failed 计数。
+    /// 调用方必须先留痕（eprintln!，本 crate 无 logger 初始化）再调；
+    /// 证据在 stderr，不静默吞。任务本体不受影响（agent 侧 `save_task`
+    /// 先于通知行落库，通知只是通知）。
+    pub fn drop_poison_outbox_row(&self, id: &str) -> Result<(), NtBotError> {
+        self.conn.execute("DELETE FROM outbox WHERE id=?1", params![id])?;
+        Ok(())
+    }
+
     /// 清理已交付旧行：删 claimed=1 且认领时刻早于 cutoff 的（纯时间水位）。
     pub fn prune_outbox(&self, cutoff: &str) -> Result<usize, NtBotError> {
         let n = self.conn.execute(

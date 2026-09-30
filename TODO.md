@@ -333,6 +333,7 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 | 11 | 前端 invoke 的**类型层**（比静态核对更强：让键名错在编译期而非靠 `nt_ipc_keys.py` 事后抓） | 增强 | — |
 | 12 | Telegram **真实平台**联调（鉴权/限流/长轮询；当前只有本地 fake server） | 联调 | 需真 token |
 | 13 | 其余 906 路径（neotrix-core 393 / src-tauri 246 / skills 78 / games 38 …）**不属本会话**，含 185 个未核验删除 | 归主 | — |
+| 14 | ✅ **2026-09-30 outbox 毒行已修**：`nt_agent.rs:393/420` 写无 channel 的 `CH_MESSAGE_NEW` 行（全仓零消费者）+ drainer 无限退避（`fail_outbox` 无上限、`prune` 只删 claimed=1）。修法：drainer 按 topic 路由（只有 `CH_CHANNEL_SEND` 有发送方），确定性坏行删+`eprintln!` 留痕；删两处毒写入（任务本体已有 `save_task` 持久化）。**未注册渠道仍退避重试**（有测试锁定 `outbox_drain_does_not_drop_unknown_channel`，行为不变）+ 3 个新回归测试。`neotrix-neobot --lib` 457 绿。`deliver_result` 生产零调用已核实，但它是 worker 池计划的未来基础，**不删**。`edit_of` 传用户消息 id 问题仍在（#6），需占位+schema 变更，属 P1 未动 | 已修/已裁决 | — |
 
 > 智能同步生成，最后更新：2026-09-28（人工重建）
 

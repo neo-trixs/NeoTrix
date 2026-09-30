@@ -699,14 +699,30 @@ pub fn drain_outbox_once(
     let rows = store.drain_outbox(20, &now)?;
     let (mut sent, mut failed) = (0usize, 0usize);
     for (id, topic, payload) in rows {
+        // 只有 CH_CHANNEL_SEND 有发送方（本函数）。别的 topic（历史遗留的
+        // CH_MESSAGE_NEW 通知行等）本 drainer 永远发不出去；payload 不可变，
+        // 故永远不会变可发。退回重试只会让它永久占位 → 删 + 留痕。
+        if topic != "CH_CHANNEL_SEND" {
+            eprintln!("neobot: outbox 丢弃无发送方的行 id={id} topic={topic}");
+            drop(store.drop_poison_outbox_row(&id));
+            failed += 1;
+            continue;
+        }
         let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&payload) else {
-            // 解析不了的 payload 直接退避一次；不静默吞（免得坏行永远堵着队列）。
-            drop(store.fail_outbox(&id, &retry_at(&now)));
+            // 解析失败的行永远解析不了（payload 不可变）。
+            // 原先退避重试，但重试不是恢复 —— 它无限占用 drain 预算。
+            // 删 + 留痕（证据在 stderr，不静默吞）。
+            eprintln!("neobot: outbox 丢弃坏 payload 行 id={id}");
+            drop(store.drop_poison_outbox_row(&id));
             failed += 1;
             continue;
         };
         let Some(channel) = parsed.get("channel").and_then(|v| v.as_str()) else {
-            drop(store.fail_outbox(&id, &retry_at(&now)));
+            // 同上：缺 channel 的行永远不可路由（payload 不可变）。
+            // 注意与「渠道未注册」区分 —— 后者是暂时的（用户可能稍后启用渠道），
+            // 仍退避重试（见 outbox_drain_does_not_drop_unknown_channel）。
+            eprintln!("neobot: outbox 丢弃缺 channel 行 id={id}");
+            drop(store.drop_poison_outbox_row(&id));
             failed += 1;
             continue;
         };
@@ -757,7 +773,6 @@ pub fn drain_outbox_once(
                 failed += 1;
             }
         }
-        drop(topic);
     }
     Ok((sent, failed))
 }
@@ -1239,6 +1254,53 @@ mod tests {
             .drain_outbox(10, &(chrono::Utc::now() + chrono::Duration::seconds(120)).to_rfc3339())
             .expect("drain later");
         assert_eq!(later.len(), 1, "渠道没注册不该丢消息");
+    }
+
+    #[test]
+    fn outbox_drain_drops_row_without_channel() {
+        // 缺 channel 的行永远不可路由（payload 不可变），重试不是恢复。
+        // 2026-09-30 前它是无限退避占位（nt_agent 的 CH_MESSAGE_NEW 毒行即此类）。
+        let st = store("nochannel");
+        let mut reg = crate::nt_channel::ChannelRegistry::new();
+        st.enqueue_outbox("nc1", "CH_CHANNEL_SEND", r#"{"text":"没渠道"}"#)
+            .expect("enqueue");
+        let (sent, failed) = drain_outbox_once(&st, &mut reg).expect("drain");
+        assert_eq!((sent, failed), (0, 1));
+        let later = st
+            .drain_outbox(10, &(chrono::Utc::now() + chrono::Duration::seconds(120)).to_rfc3339())
+            .expect("drain later");
+        assert!(later.is_empty(), "缺 channel 的行必须被删，不能无限退避占位");
+    }
+
+    #[test]
+    fn outbox_drain_drops_unparseable_payload() {
+        // 解析失败的行永远解析不了。删 + 留痕，而不是无限退避。
+        let st = store("badpayload");
+        let mut reg = crate::nt_channel::ChannelRegistry::new();
+        st.enqueue_outbox("bp1", "CH_CHANNEL_SEND", "这不是 json{")
+            .expect("enqueue");
+        let (sent, failed) = drain_outbox_once(&st, &mut reg).expect("drain");
+        assert_eq!((sent, failed), (0, 1));
+        let later = st
+            .drain_outbox(10, &(chrono::Utc::now() + chrono::Duration::seconds(120)).to_rfc3339())
+            .expect("drain later");
+        assert!(later.is_empty(), "坏 payload 行必须被删，不能无限退避占位");
+    }
+
+    #[test]
+    fn outbox_drain_drops_row_with_unknown_topic() {
+        // 非 CH_CHANNEL_SEND 的 topic 没有发送方（drainer 只认发送 topic）。
+        // 留着既发不出去，prune 又只删 claimed=1 —— 不删就是永久堆积。
+        let st = store("badtopic");
+        let mut reg = crate::nt_channel::ChannelRegistry::new();
+        st.enqueue_outbox("bt1", "CH_MESSAGE_NEW", r#"{"task_id":"t1","status":"done"}"#)
+            .expect("enqueue");
+        let (sent, failed) = drain_outbox_once(&st, &mut reg).expect("drain");
+        assert_eq!((sent, failed), (0, 1));
+        let later = st
+            .drain_outbox(10, &(chrono::Utc::now() + chrono::Duration::seconds(120)).to_rfc3339())
+            .expect("drain later");
+        assert!(later.is_empty(), "无发送方的 topic 行必须被删");
     }
 
     // ---- 出站附件（model → user）----

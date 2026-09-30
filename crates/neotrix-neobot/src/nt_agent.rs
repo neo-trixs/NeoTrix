@@ -390,12 +390,10 @@ fn run_local_turn_inner(
             ..task.clone()
         };
         store.save_task(&cancelled)?;
-        store.enqueue_outbox(
-            &Uuid::new_v4().to_string(),
-            "CH_MESSAGE_NEW",
-            &serde_json::json!({"task_id": cancelled.id, "status": cancelled.status.as_str()})
-                .to_string(),
-        )?;
+        // 2026-09-30: 删掉原先写在这里的 CH_MESSAGE_NEW outbox 行。
+        // 该 topic 全仓无任何消费者（drainer 只认 CH_CHANNEL_SEND），
+        // 且 payload 无 channel 键 ⇒ 行一进队列就永远发不出去、无限退避占位。
+        // 任务本体已由上一行 save_task 持久化，通知行不承载任何额外信息。
         return Ok(TurnStatus::Waiting);
     }
     let finished = AgentTask {
@@ -417,11 +415,7 @@ fn run_local_turn_inner(
         ..task
     };
     store.save_task(&finished)?;
-    store.enqueue_outbox(
-        &Uuid::new_v4().to_string(),
-        "CH_MESSAGE_NEW",
-        &serde_json::json!({"task_id": finished.id, "status": finished.status.as_str()}).to_string(),
-    )?;
+    // 2026-09-30: 同上，删掉无消费者的 CH_MESSAGE_NEW 毒行（见上一处注释）。
     Ok(status)
 }
 
