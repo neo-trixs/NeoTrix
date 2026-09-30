@@ -8,6 +8,18 @@
 
 import { CapabilityRegistry } from "./plugin/contract.ts";
 import { MemoryHost, defaultCapabilities } from "./host/host.ts";
+import { blockKey, summarizeTool, validatePanel, validateAnswer, hasPendingPanel, type DecisionPanel } from "./ui/block-model.ts";
+
+/** 决策面板基线夹具：合法。任何不变量测试都从它的**变体**出发，
+ *  而不是从空白出发 —— 空对象几乎总能通过，测不出约束。 */
+function basePanel(): DecisionPanel {
+  return {
+    id: "p1", threadId: "t1", turnId: "tu1",
+    candidateSetVersion: 1, type: "clarification",
+    title: "选哪个", mode: "live",
+    options: [{ id: "clar-a", label: "方案 A", details: ["更快"], sources: [{ title: "doc", url: "https://example.com/a" }] }],
+  };
+}
 
 export interface Failure { what: string; got?: unknown; want?: unknown; }
 export async function runSelfTest(): Promise<Failure[]> {
@@ -236,6 +248,118 @@ const eq = (a: unknown, b: unknown, what: string): void => {
       provides: [], capabilities: [],
     });
     eq(r4.get("q")?.capabilities, [], "capabilities:[] = 扫过未检出（与缺席不同）");
+  }
+
+
+  // ── 2026-09-30 会话流块模型 ──────────────────────────────
+  console.log("  · 块模型与决策面板不变量");
+  {
+    // 块 key 必须稳定且按 kind 区分
+    const k1 = blockKey({ kind: "mark", text: "A" }, 0);
+    eq(k1, "m:0:A", "mark 的 key 含内容与序号");
+    eq(blockKey({ kind: "text", role: "bot", text: "x" }, 3), "t:3:bot", "text 的 key 含 role");
+    eq(
+      blockKey({ kind: "panel", panel: basePanel() }, 9),
+      `p:${basePanel().id}:1`,
+      "panel 的 key 用 id+版本（不看序号），版本变了 key 就变 ⇒ DOM 换新",
+    );
+
+    // 工具卡摘要
+    eq(summarizeTool([]), "本轮没有工具调用", "空步骤给明确说法，不渲染空卡");
+    eq(summarizeTool([{ kind: "a", detail: "" }, { kind: "b", detail: "" }]), "本轮工具 2 步",
+      "全成功不带失败数");
+    eq(
+      summarizeTool([{ kind: "a", detail: "" }, { kind: "b", detail: "", failed: true }]),
+      "本轮工具 2 步（1 步失败）",
+      "有失败必须出现在摘要里（不展开也能看见）",
+    );
+
+    // 决策面板：合法基线必须通过
+    eq(validatePanel(basePanel()), null, "合法面板通过校验");
+
+    // 五条不变量逐条
+    eq(
+      validatePanel({ ...basePanel(), candidateSetVersion: 0 }),
+      "candidateSetVersion 必须 ≥ 1",
+      "版本号必须 ≥1",
+    );
+    eq(
+      validatePanel({ ...basePanel(), options: [] }),
+      "决策面板至少要一个选项",
+      "空选项被拒",
+    );
+    const dup = basePanel();
+    eq(
+      validatePanel({ ...dup, options: [dup.options[0], dup.options[0]] }),
+      "选项 id 重复：clar-a",
+      "重复选项 id 被拒",
+    );
+    const noSrc = basePanel();
+    eq(
+      validatePanel({
+        ...noSrc,
+        type: "comparison",
+        options: [{ id: "x", label: "X", details: [], sources: [] }],
+      }),
+      "比较型面板的选项「X」必须给出处",
+      "比较型的选项必须给出处（否则「比较」只是在比没有依据的断言）",
+    );
+    eq(
+      validatePanel({ ...basePanel(), type: "comparison", options: [
+        { id: "1", label: "1", details: [], sources: [{ title: "s", url: "https://a" }] },
+        { id: "2", label: "2", details: [], sources: [{ title: "s", url: "https://a" }] },
+        { id: "3", label: "3", details: [], sources: [{ title: "s", url: "https://a" }] },
+        { id: "4", label: "4", details: [], sources: [{ title: "s", url: "https://a" }] },
+      ] }),
+      "比较型面板最多 3 个选项（超过就失去「比较」的意义）",
+      "比较型最多 3 项",
+    );
+    // ⛔ 非 http(s) 的「出处」不是出处 —— 拿到点击位上就是注入点
+    eq(
+      validatePanel({
+        ...basePanel(),
+        options: [{ id: "x", label: "X", details: [], sources: [{ title: "t", url: "javascript:alert(1)" }] }],
+      }),
+      "选项「X」的出处必须是 http(s)：javascript:alert(1)",
+      "非 http(s) 出处被硬拒（这是注入点，不是可降级的警告）",
+    );
+    eq(
+      validatePanel({ ...basePanel(), selectedId: "不存在" }),
+      "selectedId 不在选项里：不存在",
+      "selectedId 必须落在选项内",
+    );
+
+    // 过期作答：版本对不上必须拦住
+    eq(validateAnswer(basePanel(), { optionId: "clar-a", candidateSetVersion: 1 }), null, "同版本作答通过");
+    const stale = validateAnswer(basePanel(), { optionId: "clar-a", candidateSetVersion: 0 });
+    eq(
+      stale,
+      "选项已更新（v0 → v1），请重新选择",
+      "候选集版本对不上 ⇒ 拦下（否则骨架把旧选择当新选择，界面看不出异常）",
+    );
+    eq(
+      validateAnswer(basePanel(), { optionId: "nope", candidateSetVersion: 1 }),
+      "选项 nope 不在当前候选集里",
+      "作答指向不存在的选项被拦",
+    );
+
+    // 非法面板**不能**被当作待答
+    eq(
+      hasPendingPanel([{ kind: "panel", panel: { ...basePanel(), options: [] } }]),
+      undefined,
+      "非法面板不算待答（界面得暴露问题，而不是渲染一张看着能用的坏卡）",
+    );
+    eq(
+      hasPendingPanel([{ kind: "text", role: "bot", text: "hi" }, { kind: "panel", panel: basePanel() }])
+        ?.id,
+      basePanel().id,
+      "合法面板被识别为待答",
+    );
+    eq(
+      hasPendingPanel([{ kind: "text", role: "bot", text: "hi" }]),
+      undefined,
+      "没有面板时返回 undefined",
+    );
   }
 
   return failures;

@@ -17,6 +17,8 @@ import { CapabilityRegistry, type PluginSelf } from "./plugin/contract.ts";
 import { defaultCapabilities } from "./host/host.ts";
 import type { HostKind } from "./plugin/contract.ts";
 import { openSheet } from "./ui/sheet.ts";
+import { appendBlock } from "./ui/blocks.ts";
+import type { Block, ToolStep } from "./ui/block-model.ts";
 
 // ── 宿主判定：只问「有没有 Tauri 运行时」，不问平台 ──────────────
 const w = window as unknown as { __TAURI_INTERNALS__?: unknown; __TAURI__?: unknown };
@@ -94,48 +96,54 @@ function selectPanel(id: string): void {
   renderPanels(id);
   // unavailable 面板不该走到这里（菜单里根本不会出现），但仍做一次防御
   if (!caps.isAvailable(id, HOST)) {
-    toast(caps.pluginVerdict(id, HOST).hint ?? "当前宿主不支持", "err");
+    note("warn", caps.pluginVerdict(id, HOST).hint ?? "当前宿主不支持");
     return;
   }
   mark(`面板 · ${p.name}`);
 }
 
-// ── 消息渲染 ────────────────────────────────────────────────
-interface Line { role: "user" | "bot"; text: string; meta?: string; }
+// ── 会话流：一切都是块 ─────────────────────────────────────────
+// 2026-09-30 读三个参考仓后做的结构升级。它们的 .tsx 全在 mobile（CopilotKit
+// + React Native），故**组件不可移植，可移植的是模型**：
+// openmuse 的 jev.ts（结构化决策面板）、DSH TUI 的 block-stream-writer（块序列 +
+// tool-card）、douchat 的 CodeArtifact（产物块）—— 三条独立路径，同一结论：
+// 扁平 text 管子装不下 agent 实际要表达的东西。
+//
+// 唯一代码可吸收的 openmuse 是 MIT；另两个是 AGPL / PolyForm Noncommercial，
+// 只取思路不取码（见 ABSORPTION 记录）。
 
-function mark(text: string): void {
-  const el = document.createElement("div");
-  el.className = "session-mark";
-  el.textContent = text;
-  thread.appendChild(el);
-}
-function pushLine(role: "user" | "bot", text: string, meta?: string): void {
-  const wrap = document.createElement("div");
-  wrap.className = `msg msg--${role === "user" ? "user" : "bot"}`;
-  const bubble = document.createElement("div");
-  bubble.className = "msg-bubble";
-  bubble.textContent = text;               // 永不用 innerHTML 拼用户内容
-  wrap.appendChild(bubble);
-  if (meta) {
-    const m = document.createElement("div");
-    m.className = "msg-meta";
-    m.textContent = meta;
-    wrap.appendChild(m);
-  }
-  thread.appendChild(wrap);
+/** 线程内已渲染的块数。用作 blockKey 的稳定序号。 */
+let blockSeq = 0;
+
+/** 唯一的追加入口。界面**不得**再手写 thread.appendChild。 */
+function pushBlock(b: Block): void {
+  appendBlock(thread, b, blockSeq);
+  blockSeq += 1;
   thread.scrollTop = thread.scrollHeight;
 }
+
+/** 会话身份标记。独立于内容 —— 一条消息可承载多种块。 */
+function mark(text: string): void {
+  pushBlock({ kind: "mark", text });
+}
+
+function say(role: "user" | "bot", text: string, meta?: string): void {
+  pushBlock({ kind: "text", role, text, meta });
+}
+
+/** 工具调用折叠卡。失败步在展开前就能看见（summarize 会带「N 步失败」）。 */
+function pushTool(steps: ToolStep[]): void {
+  pushBlock({ kind: "tool", steps });
+}
+
+/** 系统消息。`dataIntact` 显式声明数据是否还在 —— 宁可写死也不让用户猜。 */
+function note(level: "error" | "warn" | "info", text: string, detail?: string, dataIntact?: boolean): void {
+  pushBlock({ kind: "system", level, text, detail, dataIntact });
+}
+
 function setStatus(text: string, state: "idle" | "running" | "ok" | "error"): void {
   statusEl.textContent = text;
   statusEl.dataset["state"] = state;
-}
-function toast(text: string, kind: "ok" | "err" = "ok"): void {
-  const box = document.createElement("div");
-  box.className = kind === "err" ? "nb-error" : "nb-empty";
-  box.setAttribute("role", kind === "err" ? "alert" : "status");
-  box.textContent = text;
-  thread.appendChild(box);
-  box.scrollIntoView({ block: "nearest" });
 }
 
 // ── 宿主调用（规则 ①：只在这里碰 invoke） ──────────────────────
@@ -198,7 +206,7 @@ function runOnce(): void {
         "neobot_agent_run", ctx ? { goal, context: ctx } : { goal });
       setStatus("空闲", r.ok ? "ok" : "error");
       if (!r.ok) return r.error;
-      pushLine("bot", r.value.output || `（${r.value.status}，无输出）`, r.value.model_used);
+      say("bot", r.value.output || `（${r.value.status}，无输出）`, r.value.model_used);
       return undefined;
     },
   });
@@ -207,19 +215,13 @@ function runOnce(): void {
 /** evidence_summary：一句话结论 */
 function evidence(): void {
   const text = thread.textContent ?? "";
-  if (!text.trim()) { toast("这一轮还没有内容可审", "err"); return; }
+  if (!text.trim()) { note("warn", "这一轮还没有内容可审"); return; }
   void call<string>("neobot_evidence_summary", { text }).then((r) => {
-    if (!r.ok) { toast(r.error, "err"); return; }
+    if (!r.ok) { note("error", r.error, undefined, true); return; }
     const ok = r.value.includes("齐备");
-    const box = document.createElement("div");
-    box.className = ok ? "nb-item" : "nb-error";
-    box.setAttribute("role", "status");
-    const t = document.createElement("div");
-    t.className = "nb-item-title";
-    t.textContent = `证据：${r.value}`;
-    box.appendChild(t);
-    thread.appendChild(box);
-    box.scrollIntoView({ block: "nearest" });
+    // 证据是「对整轮的判断」，不是一句回复 ⇒ 走 tool 卡（可折叠、可追溯步骤），
+    // 而不是伪装成一条消息。
+    pushTool([{ kind: ok ? "证据齐备" : "证据不足", detail: r.value, failed: !ok }]);
   });
 }
 
@@ -271,13 +273,22 @@ $("search").addEventListener("input", (e) => {
 $("btn-send").addEventListener("click", () => {
   const text = input.value.trim();
   if (!text) return;
-  pushLine("user", text);
+  say("user", text);
   input.value = "";
   setStatus("运行中", "running");
-  void call<{ output?: string; status?: string }>("neobot_send", { text })
+  void call<{ output?: string; status?: string; trace?: unknown[] }>("neobot_send", { text })
     .then((r) => {
       setStatus("空闲", r.ok ? "ok" : "error");
-      pushLine("bot", r.ok ? (r.value.output ?? "（无输出）") : `发送失败：${r.error}`);
+      if (!r.ok) { note("error", `发送失败：${r.error}`, undefined, true); return; }
+      // 工具步骤若随结果一起回来，就落成折叠卡；没有就只显示回复。
+      const steps = Array.isArray(r.value.trace) ? r.value.trace : [];
+      if (steps.length > 0) {
+        pushTool(steps.map((t) => {
+          const o = t as { kind?: string; detail?: string; failed?: boolean };
+          return { kind: o.kind ?? "tool", detail: o.detail ?? "", failed: o.failed };
+        }));
+      }
+      say("bot", r.value.output ?? "（无输出）");
     });
 });
 input.addEventListener("keydown", (e) => {
