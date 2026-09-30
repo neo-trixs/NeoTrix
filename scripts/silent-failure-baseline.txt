@@ -1,45 +1,53 @@
 # Silent-failure baseline — a LIST, never a count (same rationale as
 # unwrap/layer-deps): a count would let 'delete one, add one' hide.
-# Format: <path>:<line>	<discarded call>
+# Format: <path>:<line>	<discarded call>	<criterion|->	<oracle|->
+#
+# Contract columns (2026-09-30, GLOBAL-MAP-DEFECTS 建议 A 第一刀):
+#   criterion = WHY this discard is acceptable OR what would make it a bug.
+#              '-' means UNJUDGED -> the gate reports it as an open contract.
+#   oracle    = WHAT proves it still holds (a test name, a command, or a
+#              manual verification note). '-' means UNVERIFIED.
+#   Rationale: a baseline row is a CLAIM. Without criterion+oracle it is
+#   indistinguishable from an unexamined leftover.
 # Regenerate: bash scripts/check-silent-failure.sh --update-baseline
 #
 # A baseline entry means: KNOWN, and deliberately best-effort. The audit
 # that produced it (docs: TODO.md §2026-09-30 全量审计) lists why per site.
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/experience_tree/mod.rs:468	_kb.kv_set("", &route_table_key, &serde_json::to_string(&route_data).unwrap_or_default()
-neotrix-core/src/l1_action/nt_media/streaming/dl_fs.rs:72	f.set_len(probe_needed)
-neotrix-core/src/l1_action/nt_media/persistence.rs:451	f.set_len(required_bytes)
-crates/nt-core-capability-tree/src/cli.rs:382	fs::write(&overlay, &content)
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/geo_proxy.rs:330	fs::write(&path, data)
-neotrix-core/src/l1_action/nt_io/nt_io_avatar_channel.rs:107	fs::write(dir.join(AUTH_FILE), &json)
-neotrix-core/src/l1_action/nt_io/nt_io_avatar_channel.rs:88	fs::write(dir.join(CAPABILITY_FILE), &json)
-neotrix-core/src/l5_cognition/nt_core_second_brain.rs:110	kb.kv_set("", "", &json)
-neotrix-core/src/l5_cognition/nt_core_second_brain.rs:124	kb.kv_set("", "", &json)
-neotrix-core/src/l5_cognition/nt_core_second_brain.rs:131	kb.kv_set("", "", &json)
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/pipeline/nt_credit_stages.rs:88	kb.kv_set("", "", &json)
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/pipeline/nt_quality_stages.rs:445	kb.kv_set("", "", &json_str)
-neotrix-core/src/l5_cognition/nt_core_second_brain.rs:113	kb.kv_set("", "", &report_json)
-neotrix-core/src/l5_cognition/nt_core_second_brain.rs:134	kb.kv_set("", "", &report_json)
-neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_consciousness/nt_audit.rs:347	kb.kv_set("", "", evidence)
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/pipeline/nt_credit_stages.rs:177	kb.kv_set("", "", json.to_string().as_str())
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/pipeline/nt_credit_stages.rs:89	kb.kv_set("", &format!("", brain.iteration), &json)
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/hyperstage.rs:102	kb.kv_set("", &format!("", brain.iteration), &prop_json.to_string())
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/hyperstage.rs:53	kb.kv_set("", &format!("", brain.iteration), &prop_json.to_string())
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/pipeline/nt_core_stages.rs:418	kb.kv_set("", &format!("", iteration), &summary)
-neotrix-core/src/l5_cognition/nt_core_second_brain.rs:171	kb.kv_set("", &note_key, note)
-neotrix-core/src/l5_cognition/nt_crystal_core/crystal_state.rs:475	std::fs::rename(&chain[k - 1], &chain[k])
-neotrix-core/src/l6_meta/nt_core_guardian/heartbeat.rs:111	std::fs::rename(&tmp, &path)
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/firewall.rs:105	std::fs::write("", &anchor_rules)
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/firewall.rs:138	std::fs::write("", &pf_text)
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/crawler_core.rs:219	std::fs::write(&file_path, &json)
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/tor_crawler.rs:259	std::fs::write(&path, &json)
-neotrix-core/src/l5_cognition/nt_mind/evolution/autofixer.rs:55	std::fs::write(&path2, &original_for_inverse)
-neotrix-core/src/l5_cognition/nt_mind/nt_mind_skill_engine/domain_modeling/mod.rs:207	std::fs::write(adr_path, adr_content)
-neotrix-core/src/l1_action/nt_io/nt_io_user_avatar.rs:607	std::fs::write(dir.join(""), &json)
-neotrix-core/src/l1_action/nt_io/nt_io_user_avatar.rs:626	std::fs::write(dir.join(""), &json)
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/rule_api.rs:60	std::fs::write(dir.join(RULES_API_PORT_FILE), port.to_string())
-neotrix-core/src/bin/nt_train_export.rs:36	std::fs::write(dir.join(STATE_FILE), ts.to_string())
-neotrix-core/src/l1_action/nt_io/nt_io_neocodex/provider.rs:258	std::fs::write(path, text)
-neotrix-core/src/l5_cognition/nt_crystal_core/nt_train_export.rs:111	writeln!(buf, "")
-neotrix-core/src/l5_cognition/nt_crystal_core/nt_train_export.rs:86	writeln!(buf, "")
-neotrix-core/src/l0_substrate/nt_core_event_bus.rs:112	writeln!(file, "", redacted)
-neotrix-core/src/l1_action/nt_io/nt_io_neocodex/acp.rs:138	writeln!(out, "", json)
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/experience_tree/mod.rs:468	_kb.kv_set("", &route_table_key, &serde_json::to_string(&route_data).unwrap_or_default()	route_table 更新失败不阻断本次 session（session 已落 pending-absorb 证据）；但检索侧会缺失该 cycle	⚠️ 需复核：同文件 :583 我今日已改为 log::error! + HookResult::err；本条 :468 仍静默，同类问题
+neotrix-core/src/l1_action/nt_media/streaming/dl_fs.rs:72	f.set_len(probe_needed)	磁盘探测用的临时文件：set_len 与 remove_file 都在 .ok() 分支内，且函数返回 Ok(()) 后探测结果即丢弃——探测本身不承载业务状态	cargo test -p neotrix --lib dl_fs
+neotrix-core/src/l1_action/nt_media/persistence.rs:451	f.set_len(required_bytes)	auto-save 预分配：set_len 失败时后续写入仍会报错，不构成静默数据丢失	⚠️ 需复核：coverage-gaps 报 AutoSave 零真实调用者 ⇒ 若真无消费者则本条应转 dead-code 而非静默失败豁免
+crates/nt-core-capability-tree/src/cli.rs:382	fs::write(&overlay, &content)	-	-
+neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/geo_proxy.rs:330	fs::write(&path, data)	-	-
+neotrix-core/src/l1_action/nt_io/nt_io_avatar_channel.rs:107	fs::write(dir.join(AUTH_FILE), &json)	-	-
+neotrix-core/src/l1_action/nt_io/nt_io_avatar_channel.rs:88	fs::write(dir.join(CAPABILITY_FILE), &json)	-	-
+neotrix-core/src/l5_cognition/nt_core_second_brain.rs:110	kb.kv_set("", "", &json)	-	-
+neotrix-core/src/l5_cognition/nt_core_second_brain.rs:124	kb.kv_set("", "", &json)	-	-
+neotrix-core/src/l5_cognition/nt_core_second_brain.rs:131	kb.kv_set("", "", &json)	-	-
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/pipeline/nt_credit_stages.rs:88	kb.kv_set("", "", &json)	-	-
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/pipeline/nt_quality_stages.rs:445	kb.kv_set("", "", &json_str)	-	-
+neotrix-core/src/l5_cognition/nt_core_second_brain.rs:113	kb.kv_set("", "", &report_json)	-	-
+neotrix-core/src/l5_cognition/nt_core_second_brain.rs:134	kb.kv_set("", "", &report_json)	-	-
+neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_consciousness/nt_audit.rs:347	kb.kv_set("", "", evidence)	-	-
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/pipeline/nt_credit_stages.rs:177	kb.kv_set("", "", json.to_string().as_str())	-	-
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/pipeline/nt_credit_stages.rs:89	kb.kv_set("", &format!("", brain.iteration), &json)	-	-
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/hyperstage.rs:102	kb.kv_set("", &format!("", brain.iteration), &prop_json.to_string())	-	-
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/hyperstage.rs:53	kb.kv_set("", &format!("", brain.iteration), &prop_json.to_string())	-	-
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/pipeline/nt_core_stages.rs:418	kb.kv_set("", &format!("", iteration), &summary)	-	-
+neotrix-core/src/l5_cognition/nt_core_second_brain.rs:171	kb.kv_set("", &note_key, note)	-	-
+neotrix-core/src/l5_cognition/nt_crystal_core/crystal_state.rs:475	std::fs::rename(&chain[k - 1], &chain[k])	-	-
+neotrix-core/src/l6_meta/nt_core_guardian/heartbeat.rs:111	std::fs::rename(&tmp, &path)	-	-
+neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/firewall.rs:105	std::fs::write("", &anchor_rules)	-	-
+neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/firewall.rs:138	std::fs::write("", &pf_text)	-	-
+neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/crawler_core.rs:219	std::fs::write(&file_path, &json)	-	-
+neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/tor_crawler.rs:259	std::fs::write(&path, &json)	-	-
+neotrix-core/src/l5_cognition/nt_mind/evolution/autofixer.rs:55	std::fs::write(&path2, &original_for_inverse)	-	-
+neotrix-core/src/l5_cognition/nt_mind/nt_mind_skill_engine/domain_modeling/mod.rs:207	std::fs::write(adr_path, adr_content)	-	-
+neotrix-core/src/l1_action/nt_io/nt_io_user_avatar.rs:607	std::fs::write(dir.join(""), &json)	-	-
+neotrix-core/src/l1_action/nt_io/nt_io_user_avatar.rs:626	std::fs::write(dir.join(""), &json)	-	-
+neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/rule_api.rs:60	std::fs::write(dir.join(RULES_API_PORT_FILE), port.to_string())	-	-
+neotrix-core/src/bin/nt_train_export.rs:36	std::fs::write(dir.join(STATE_FILE), ts.to_string())	-	-
+neotrix-core/src/l1_action/nt_io/nt_io_neocodex/provider.rs:258	std::fs::write(path, text)	-	-
+neotrix-core/src/l5_cognition/nt_crystal_core/nt_train_export.rs:111	writeln!(buf, "")	-	-
+neotrix-core/src/l5_cognition/nt_crystal_core/nt_train_export.rs:86	writeln!(buf, "")	-	-
+neotrix-core/src/l0_substrate/nt_core_event_bus.rs:112	writeln!(file, "", redacted)	-	-
+neotrix-core/src/l1_action/nt_io/nt_io_neocodex/acp.rs:138	writeln!(out, "", json)	-	-

@@ -236,12 +236,18 @@ for root in ROOTS:
                     continue          # observed => not silent, by definition
                 hits["%s:%d" % (p, i + 1)] = rhs.strip()[:88]
 
-have = set()
+have, judged = set(), {}
 if os.path.exists(baseline_path):
     for line in open(baseline_path, encoding="utf-8"):
         line = line.rstrip("\n")
         if line and not line.startswith("#"):
-            have.add(line.split("\t")[0])
+            parts = line.split("\t")
+            have.add(parts[0])
+            crit = parts[2] if len(parts) > 2 and parts[2] else "-"
+            orc = parts[3] if len(parts) > 3 and parts[3] else "-"
+            judged[parts[0]] = (crit, orc)
+
+unjudged = sorted(k for k in have if judged.get(k, ("-", "-"))[0] == "-")
 
 new = sorted(set(hits) - have)
 stale = sorted(have - set(hits))
@@ -249,6 +255,9 @@ stale = sorted(have - set(hits))
 print("  [silent-failure] discarded IO/persistence results: %d" % len(hits))
 print("  [silent-failure] baselined (recorded, not silent-by-omission): %d" % len(have))
 print("  [silent-failure] out of scope by design (remove_file/.send*): %d" % ambiguous)
+if mode != "list":
+    print("  [silent-failure] OPEN CONTRACTS (baseline row with no criterion): %d/%d"
+          % (len(unjudged), len(have)))
 
 if mode == "list":
     for k in sorted(hits):
@@ -260,12 +269,23 @@ if mode == "update":
     with open(baseline_path, "w", encoding="utf-8") as fh:
         fh.write("# Silent-failure baseline — a LIST, never a count (same rationale as\n")
         fh.write("# unwrap/layer-deps): a count would let 'delete one, add one' hide.\n")
-        fh.write("# Format: <path>:<line>\t<discarded call>\n")
+        fh.write("# Format: <path>:<line>\t<discarded call>\t<criterion|->\t<oracle|->\n")
+        fh.write("#\n# Contract columns (2026-09-30, GLOBAL-MAP-DEFECTS 建议 A 第一刀):\n")
+        fh.write("#   criterion = WHY this discard is acceptable OR what would make it a bug.\n")
+        fh.write("#              '-' means UNJUDGED -> the gate reports it as an open contract.\n")
+        fh.write("#   oracle    = WHAT proves it still holds (a test name, a command, or a\n")
+        fh.write("#              manual verification note). '-' means UNVERIFIED.\n")
+        fh.write("#   Rationale: a baseline row is a CLAIM. Without criterion+oracle it is\n")
+        fh.write("#   indistinguishable from an unexamined leftover.\n")
         fh.write("# Regenerate: bash scripts/check-silent-failure.sh --update-baseline\n")
         fh.write("#\n# A baseline entry means: KNOWN, and deliberately best-effort. The audit\n")
         fh.write("# that produced it (docs: TODO.md §2026-09-30 全量审计) lists why per site.\n")
         for k in sorted(hits, key=lambda k: (hits[k], k)):
-            fh.write("%s\t%s\n" % (k, hits[k]))
+            # Preserve any judgement already recorded, so re-running
+            # --update-baseline never silently discards a reviewed contract.
+            fh.write("%s\t%s\t%s\t%s\n" % (k, hits[k],
+                                               judged.get(k, ("-", "-"))[0],
+                                               judged.get(k, ("-", "-"))[1]))
     print("  [silent-failure] baseline written: %d sites" % len(hits))
     sys.exit(0)
 
