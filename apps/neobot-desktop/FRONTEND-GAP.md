@@ -118,6 +118,14 @@ harness 同时跑 **tsc 与运行时自测**，因为部分不变量只有类型
 - **16px 不可读**：完整卡通图标栅格化到 16px 只是一团。对照组：neotrix 自家
   `nt-core-icon-16.png` 同样不可读（这族图标 16px 是凑档位，不是使用尺寸）。
   UI（侧栏/托盘/favicon）另用 `mark-mono.svg` 简化档，该档在 16px 仍读得出轮廓。
-- **无 headless 渲染验证**：本轮 `--dump-dom` 两次挂死（各 30 分钟），
-  故界面**未做实测盒模型校验**，只做了静态校验（token 解析、组件进包、
-  typecheck、架构自测）。`scripts/check-layout.mjs` 那套实测门**尚未移植过来**。
+- ✅ **headless 渲染验证已补**（2026-09-30）：`scripts/ops/nt_check_layout.mjs`。
+  此前 `--dump-dom` / `--screenshot` / `--headless=new` 在本机**全部挂死**
+  （各烧掉一次 30 分钟超时），故改用 **CDP**（`--remote-debugging-port`）——
+  实测 1s 就绪，且生命周期由脚本显式 `kill`，不靠浏览器自己退出。
+  Node 22+ 原生 WebSocket ⇒ **零依赖**。
+  视口用 `Emulation.setDeviceMetricsOverride` 设（`--window-size` 只改窗口，
+  headless 下内容视口不跟着变，实测 820 → innerHeight 仍 413）。
+  判据五条：高度链每环 `min-height=0` · 注入 40 会话/60 消息后真的可滚 ·
+  token 在**计算样式**里非空 · 输入框在视口内 · 无横向溢出。
+  变异验证 **5/5**，含**本仓历史上那次真实 bug**（摘掉 `.convs` 的 `min-height:0`
+  ⇒ 门报 `.convs 的 min-height=auto`）。
