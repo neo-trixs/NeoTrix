@@ -124,12 +124,32 @@ PY
     echo "--- neotrix/ second tree (layer declared in $LAYER_MAP) ---"
     while IFS=$'\t' read -r tree higher; do
       [ -n "$tree" ] && [ -n "$higher" ] || continue
-      [ -d "$SRC/$tree" ] || { echo "WARN: declared tree missing: $SRC/$tree"; continue; }
+      # A declared tree is not necessarily a directory: layer-map.json also
+      # registers SINGLE-FILE modules (files:1), e.g. nt_core_error.rs,
+      # nt_core_event_bus.rs, nt_capability_bridge.rs, proxy_daemon_wrapper.rs.
+      # The old `-d`-only test failed on all of them and `continue`d, so
+      # registering them was equivalent to NOT registering them — the blind spot
+      # was silent (23 WARNs, 4 trees never scanned). Resolve all three on-disk
+      # shapes here; only a genuine miss is worth a WARN.
+      _tpath=""
+      if [ -d "$SRC/$tree" ]; then
+        _tpath="$SRC/$tree"
+      elif [ -f "$SRC/$tree.rs" ]; then
+        _tpath="$SRC/$tree.rs"
+      elif [ -f "$SRC/$tree/mod.rs" ]; then
+        _tpath="$SRC/$tree/mod.rs"
+      else
+        echo "WARN: declared tree missing: $SRC/$tree (tried dir, .rs, /mod.rs)"
+        continue
+      fi
       # Recover the declared layer from the map for the human-readable message.
       decl=$(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(d['trees'][sys.argv[2]].get('layer','?'))" \
              "$LAYER_MAP" "$tree" 2>/dev/null || echo "?")
       # Match either the bare layer name or its absolute crate path.
-      hits=$(rg --no-heading -n "(crate::)?$higher" "$SRC/$tree" \
+      # Search the RESOLVED path, not "$SRC/$tree": for a single-file tree that
+      # path does not exist and rg errors out (the `|| true` below would then
+      # swallow the failure into an empty hit set — a silent false PASS).
+      hits=$(rg --no-heading -n "(crate::)?$higher" "$_tpath" \
         -g '!*facade*' -g '!traits.rs' 2>/dev/null \
         | rg -v ':[0-9]+:\s*//' | rg -v ':[0-9]+:\s*/\*' || true)
       [ -n "$hits" ] || continue
@@ -138,7 +158,18 @@ PY
       printf '%s\n' "$hits" | head -n 10 | sed 's/^/  /'
       [ "$n" -gt 10 ] && echo "  ... and $((n - 10)) more"
       echo "---"
-      printf '%s\n' "$hits" | cut -d: -f1 | sort -u | while read -r f; do
+      # rg -n prints "file:line:text" ONLY when the target is a DIRECTORY; on a
+      # single file it prints "line:text" with no filename column, so the plain
+      # `cut -d: -f1` would take the LINE NUMBER and write it to the ledger as
+      # if it were a path (garbage rows like "l3_embodiment<TAB>111"). The
+      # baseline is documented as `pattern<TAB>file` with no line numbers
+      # (see header), so re-attach the filename before cutting.
+      if [ -f "$_tpath" ]; then
+        _fset=$(printf '%s\n' "$hits" | sed "s|^|$_tpath:|" | cut -d: -f1)
+      else
+        _fset=$(printf '%s\n' "$hits" | cut -d: -f1)
+      fi
+      printf '%s\n' "$_fset" | sort -u | while read -r f; do
         printf '%s\t%s\n' "$higher" "$f"
       done >> "$CUR"
     done <<< "$mapfile_layers"
