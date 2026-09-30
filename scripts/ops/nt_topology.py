@@ -198,21 +198,42 @@ def audit_dup_types(rs):
                 by[it["name"]].append((f["path"], it["line"], it["kind"]))
 
     def fields(path, ln):
+        """Full body signature: name + type of every variant/field.
+
+        ⚠️ 2026-09-30 bugfix. The old regex was `\\s+(\\w+)\\s*[:,]` which
+        only matched *private, payload-free* items. It therefore compared
+        `Position { x: f32, y: f32 }` equal to `Position { x: f64, y: f64 }`
+        and `HookDecision::Deny{reason}` equal to `HookDecision::Deny(String)`
+        — i.e. it reported **semantically different types as mergeable**.
+        An independent re-extraction showed 13 of 147 groups were unsound;
+        8 of those are `f32` vs `f64` or lifetime/variant-shape differences
+        where merging would **silently change precision or semantics**.
+
+        Now: strip `pub`/visibility, keep the TYPE annotation, and keep
+        variant names even when they carry a payload `{..}` / `(..)`.
+        """
         try:
             L = open(path, errors="ignore").read().splitlines()
         except OSError:
             return None
         out, depth, started = [], 0, False
-        for line in L[max(0, ln - 1):max(0, ln - 1) + 60]:
+        for line in L[max(0, ln - 1):max(0, ln - 1) + 80]:
             depth += line.count("{") - line.count("}")
             if "{" in line:
                 started = True
-            m = re.match(r"\s+(\w+)\s*[:,]", line)
-            if m:
-                out.append(m.group(1))
+            body = re.sub(r"^\s*(pub(?:\([^)]*\))?\s+)?", "", line.rstrip())
+            # struct field:  name: Type
+            m = re.match(r"\s*(\w+)\s*:\s*(.+?),?\s*$", body)
+            if m and not body.lstrip().startswith("//"):
+                out.append("%s:%s" % (m.group(1), m.group(2).rstrip(",")))
+                continue
+            # enum variant:  Name  /  Name {..}  /  Name(..)
+            m = re.match(r"\s*(\w+)\s*(?:\{|\(|$)", body)
+            if m and not body.lstrip().startswith(("//", "#[", "}")):
+                out.append(m.group(1) + "*")   # * = carries a payload/shape
             if started and depth <= 0:
                 break
-        return tuple(sorted(set(out)))
+        return tuple(out)
 
     groups = []
     for name, locs in by.items():
