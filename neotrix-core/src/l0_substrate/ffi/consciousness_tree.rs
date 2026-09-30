@@ -395,6 +395,10 @@ mod tests {
             server_url: "".into(), api_key: "".into(),
             enable_ai_features: false, enable_premium_features: false,
             log_level: "info".into(), data_directory: "/tmp".into(), cache_size_mb: 0,
+              // 2026-09-30: 字段由 dcccecb6 的 NeoTrixConfig 加入时漏改此处
+              // （只 `--features ios-bridge` 编译 ⇒ 默认构建与 12,209 测试全绿）。
+              // 与同处 enable_premium_features: false 自洽；此路径不读它，值惰性。
+              prefer_free: true,
         };
         let impl_obj = ConsciousnessTreeImpl::init(cfg).unwrap();
         let mut m = HashMap::new();
@@ -418,6 +422,10 @@ mod tests {
             server_url: "".into(), api_key: "".into(),
             enable_ai_features: false, enable_premium_features: false,
             log_level: "info".into(), data_directory: "/tmp".into(), cache_size_mb: 0,
+              // 2026-09-30: 字段由 dcccecb6 的 NeoTrixConfig 加入时漏改此处
+              // （只 `--features ios-bridge` 编译 ⇒ 默认构建与 12,209 测试全绿）。
+              // 与同处 enable_premium_features: false 自洽；此路径不读它，值惰性。
+              prefer_free: true,
         };
         let impl_obj = ConsciousnessTreeImpl::init(cfg).unwrap();
         let before = impl_obj.get_state().phi_score;

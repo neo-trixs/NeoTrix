@@ -207,9 +207,24 @@ jobs:
         with:
           key: feat-${{ matrix.feature }}
       # 失败时打印具体 error 行，而不是只留一行 exit code。
+      #
+      # 2026-09-30: was `--lib`. That made this matrix blind to two real breaks
+      # that were sitting in the tree:
+      #   1. ffi/consciousness_tree.rs + ffi/mod.rs — NeoTrixConfig.prefer_free
+      #      missing from 3 initializers. All three are in #[cfg(test)] blocks,
+      #      which `--lib` does not compile. Introduced by dcccecb6.
+      #   2. examples/nt_whisper_spike.rs — read the now-private `Outlet.name` /
+      #      `.input_type` / `.output_type` after the ort upgrade. Examples are
+      #      not part of `--lib` either.
+      # Both are invisible to the default build too (they sit behind
+      # #[cfg(feature = "ios-bridge")] / onnx), so the default job, the 12,209
+      # lib tests and this matrix were ALL green while the code did not build.
+      # A feature matrix whose job is "does this feature build" must therefore
+      # cover every target, not just the lib. Local mirror of this exact
+      # coverage: scripts/check-feature-gates.sh
       - run: |
           set -o pipefail
-          cargo check --features ${{ matrix.feature }} --lib -p neotrix 2>&1 | tail -40
+          cargo check --features ${{ matrix.feature }} --all-targets -p neotrix 2>&1 | tail -40
       # 门禁自检：矩阵清单与 Cargo.toml 实际 feature 漂移时报警。
       # 新增 feature 而忘了进矩阵 = 又造一个永无人编的盲区（R-FEAT-1 的根因）。
       - name: check matrix covers all gated features

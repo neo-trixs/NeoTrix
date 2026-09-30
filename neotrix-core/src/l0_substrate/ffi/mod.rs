@@ -218,6 +218,11 @@ mod tests {
             log_level: "info".into(),
             data_directory: "/tmp/neotrix-ffi-test".into(),
             cache_size_mb: 64,
+            // 2026-09-30: prefer_free 由 dcccecb6 加入 NeoTrixConfig 时漏改此处。
+            // ffi/ 受 #[cfg(feature = "ios-bridge")] 门控 ⇒ 默认构建与全套
+            // 12,209 测试都看不见这个破口。是 scripts/check-feature-gates.sh
+            // 首次抓到。与上方 enable_premium_features: false 自洽；此路径不读它。
+            prefer_free: true,
         }
     }
 

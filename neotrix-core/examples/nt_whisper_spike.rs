@@ -19,11 +19,15 @@ fn main() -> ort::Result<()> {
         "datasets/_models/sherpa-onnx-whisper-tiny.en/tiny.en-encoder.int8.onnx",
     )?;
     println!("session loaded in {:.1}s", t0.elapsed().as_secs_f32());
+    // 2026-09-30: 原来读 `input.name` / `input.input_type` / `output.output_type`。
+    // ort 新版把 `Outlet` 的这些字段收成私有 ⇒ E0616 私有字段 + E0609 字段不存在。
+    // 改走 Debug：形状验证要的是「有哪些 input/output」，Debug 已经给全，
+    // 且不把编译绑死在 ort 的字段可见性上。
     for input in session.inputs().iter() {
-        println!("input: {} {:?}", input.name, input.input_type);
+        println!("input: {input:?}");
     }
     for output in session.outputs().iter() {
-        println!("output: {} {:?}", output.name, output.output_type);
+        println!("output: {output:?}");
     }
     // 30s 静音等价输入：全 -1.5（与 nt_speech_transcribe 静音基线一致）
     let mel = vec![-1.5f32; 1 * 80 * 3000];
