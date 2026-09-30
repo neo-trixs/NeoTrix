@@ -727,7 +727,10 @@ impl GitHubAbsorber {
                 Some("programming_language"),
             ).unwrap_or_default();
             if !lang_id.is_empty() {
-                let _ = self.kb.upsert_edge(&node_id, &lang_id, RelationType::ImplementedIn, 0.6, None);
+                // 2026-09-30: 原为 `let _ = self.kb.upsert_edge(…)`。GraphRAG 语言↔实现关系边丢失 ⇒ 关系查询静默少召回，无指标可观测。
+                if let Err(e) = self.kb.upsert_edge(&node_id, &lang_id, RelationType::ImplementedIn, 0.6, None) {
+                    log::warn!("[graphrag] 关系边写入失败: {e}");
+                }
             }
         }
 

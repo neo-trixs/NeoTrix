@@ -684,7 +684,10 @@ mod tests {
                 .expect("gwt")
                 .id;
         drop(conn);
-        let _ = kb.upsert_edge(&gid, &rb.node_id, RelationType::RelatedTo, 1.0, None);
+        // 2026-09-30: 原为 `let _ = kb.upsert_edge(…)`。GraphRAG 关系边丢失 ⇒ 随后的「关系查询路由 Graph 通道」拿不到刚写的边。
+        if let Err(e) = kb.upsert_edge(&gid, &rb.node_id, RelationType::RelatedTo, 1.0, None) {
+            log::warn!("[graphrag] 关系边写入失败: {e}");
+        }
         // 关系查询路由 Graph 通道
         let served = kb
             .serve_core("E8 如何影响 GWT 注意力路由的关系", 5)
