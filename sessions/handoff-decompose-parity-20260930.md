@@ -1,0 +1,167 @@
+# 交接：原子拆解 + 行为对位（建议 2 关闭）— 2026-09-30
+
+> 窗口任务：外部技术检索 → 逆向推理 NeoTrix 审计等基础能力缺失 → 完善全域 map 每链路
+> 缺陷与进化路线 → 目标能力「**原子级拆解任何技术逻辑**」+「**复现对方产品**」。
+> 分支 `feat/capability-absorb-20260828`，本会话 3 笔提交（均**仅本地，未推送**）。
+
+---
+
+## 1. 做了什么（3 笔提交）
+
+| 提交 | 内容 |
+|---|---|
+| `6a4309fb` | 行为对位腿：37/37 步与 `lru@0.18.5` 一致；`ResponseCache::contains()`；P0→P1 改判 |
+| `519d78b9` | `nt_decompose.py`（原子拆解 + 名字级对位）；首次跨仓对位抓到 O(n) 淘汰 |
+| `6a91b77b` | ROUND23 吸收 5 源（oil-ui 已在前一笔 `8810b0dc`）；`nt_calledges --compact` |
+
+**净能力增量**（此前只有文档、无工具）：
+
+```
+原子级拆解  = nt_decompose.py atoms  --db <edges> --root <sym>   （入口 → 原子记录 + oracle）
+名字级对位  = nt_decompose.py parity --mine A --theirs B         （能力矩阵）
+行为级对位  = nt_parity_ref.py（采对方 oracle） + neotrix-core/tests/response_cache_parity.rs
+```
+
+---
+
+## 2. 关键结论（都可复跑证伪）
+
+1. **语义等价已证**：`ResponseCache` 与 MIT `lru` 在 `put/get/len/contains` 全子集
+   **37 步零分歧**（oracle 由跑对方实现采集，非人手写）。
+2. **复杂度不等价**：我方淘汰 `iter+filter+min_by_key+remove` = 每次写 O(capacity)
+   全扫描；对方 `attach/detach/swap` = O(1) promote。⇒ **性能债，非正确性债**（P0→P1）。
+3. **名字级对位会误报，已实测**：它把对方 `get` 报成「仅对方有」，我方同义方法叫
+   `cache`。⇒ 文档与 task-index 的 `when_not` 都已写明「异名 ≠ 缺能力」。
+4. **本仓约束下的唯一可行修法**：引第三方 `lru`（MIT，已在 registry）。自建侵入式
+   链表需手写 `unsafe`，被 `#![forbid(unsafe_code)]` 直接排除 —— 这本身是架构结论。
+
+---
+
+## 3. 三次自证错误（全部留档，别重犯）
+
+| # | 错误 | 怎么发现的 | 处置 |
+|---|---|---|---|
+| 1 | `ls \| tail` 误导我以为最大轮次是 ROUND9，`write` 直接**覆盖了他人的 `ABSORPTION-ROUND20.md`** | 写入后 `git status` 显示 `M` 而非 `??` | 立即 `git checkout` 恢复（已验证零 diff），改写为 ROUND23。**`ls` 取尾不可靠，写前必须全量确认** |
+| 2 | `contains` 测试我**手推错了** LRU 顺序（把 `insert a;insert b` 后的 LRU 写成 `b`） | 实跑失败 | 读实现 + 外部 oracle（c2 淘汰 `a`）确认**实现对、期望错**；改期望并把这段写进注释。又一次「手推 ≠ 实证」 |
+| 3 | 用 Python `json.dump(indent=2)` 重写 `.neotrix/task-index.json` ⇒ **全文件重排 816 行** | `git diff --stat` | 改用 `edit` 工具按原 1 空格缩进外科式插入（+47 行） |
+
+---
+
+## 4. ⚠️ 共享工作树事故（`519d78b9`，必须让其他窗口知道）
+
+**我的 commit 把另一窗口的 `.neotrix/task-index.json` 内容提交了，我自己的 3 条索引丢失。**
+
+- 成因：`git commit --only <path>` 取的是**工作树状态**。我加完条目并验证
+  `nt_find` 能命中；提交前另一窗口并发改写该文件（加 `nt-callgraph-impact` 等）
+  ⇒ 我提交了他们的内容。
+- 与 `sessions/handoff-commit-only-20260929.md` 是**不同**事故：那次是「暂存区核对与
+  提交不原子」，这次是「**共享单文件本身被并发改写**」。
+- ⇒ **教训**：`--only` 隔离「哪些文件」，**不隔离「文件里是什么」**。
+- ⇒ 共享单文件（`task-index.json` / baseline / `layer-map.json`）提交前必须：
+  `stat -f '%Sm'` 看 mtime + 重新 `grep` 自己的条目仍在。
+- 现状：他们的条目**未丢失**（在我的 commit 里，工作树干净）；我的 3 条已在 `6a4309fb`
+  补回。**他们若以为还没提交，会发现 `git status` 干净** —— 需要知会。
+
+---
+
+## 5. 门与验证（全部本会话实跑）
+
+| 门/验证 | 结果 |
+|---|---|
+| `nt_decompose.py selftest` | ✅ 6 正例 + **3 证伪** |
+| `cargo test -p neotrix --lib` | ✅ **12,209** passed / 0 failed |
+| `cargo test -p neotrix --test response_cache_parity` | ✅ 2 绿（含 37 步对位） |
+| `cargo check --all-targets -p neotrix` | ✅ 0 error；**我改的 2 个文件 0 warning** |
+| `nt_lock_audit.py neotrix-core/src` | ✅ 0 处 |
+| `check-silent-failure.sh --strict` | ✅ PASS（OPEN CONTRACTS 0/32） |
+| `check-doc-drift.sh` / `check-layout.sh --strict` | ✅ 0 死链 / rc=0 |
+| `check-unwrap.sh --strict` | ❌ **4 条红 = 他窗 WIP**：`apps/neobot-desktop/src/core.rs:205`、`main.rs:124`、`crates/neotrix-neobot/src/nt_pet.rs:225`/`:226`。**未代改、未代记账** |
+| `check-license.sh` | ❌ rc=1 = **正确状态**（他窗待裁决 `apps/neobot-desktop/frontend` 附加条款）。⛔ 不要为了让门变绿删 deny 名单 |
+| 证伪：篡改 oracle | ✅ 测试红（`step 13: ours=… reference=…`） |
+| 证伪：oracle 说谎 | ✅ `--check` rc=**1** |
+
+---
+
+## 6. 下一步（按杠杆，建议接手者按序做）
+
+1. **P1 性能债**：`ResponseCache` 换 `lru` crate。独立一轮，**必须带 before/after 基准**
+   （本会话只证了复杂度劣势，没测绝对耗时 —— 别把「O(n) 更差」当「真的慢」）。
+2. **扩行为对位覆盖面**：现只对位 `put/get/len/contains`。未覆盖 `key_for` 哈希稳定性、
+   `prefetch`、`prefetch_lookahead`。新目标建议挑一个**语义更宽**的能力（如 kb_search
+   的排序，或 outbox 的毒行处置 —— 后者已有 `nt_channel_serve` 边表可分解）。
+3. **doc-claim 门新类目**：`nt_policy.rs` 单文件 **23 处** `/// Note: Real implementation
+   needs —`，已逐行核实 ≥4 处是**假声明**（函数体完整）。按 G7 先确认模式够窄再考虑建门。
+4. **建议 3（map 从结构升到意图）**：入口图 + doc 承诺对账，尚未做。
+5. **G3 跨仓查询合并**：`nt_callgraph.py`（他窗建的）仍是单库；跨库只在 `nt_decompose parity`
+   里以「两个 DB 各跑一遍」的形式成立。
+
+---
+
+## 7. 复跑清单
+
+```sh
+python3 scripts/ops/nt_decompose.py selftest
+python3 scripts/ops/nt_decompose.py atoms --db .project-map/edges-neotrix-neobot.jsonl \
+    --root 'nt_channel_serve::run_once' --depth 3        # 193 原子
+python3 scripts/ops/nt_parity_ref.py \
+    --vectors .neotrix/parity/response-cache.vectors.json --check
+cargo test -p neotrix --test response_cache_parity
+```
+
+⚠️ 边表 `.project-map/edges-*.jsonl` 是 **gitignored 低频生成物**（全量 ~30min）。
+干净检出上**没有**它 ⇒ `nt_decompose` / `nt_parity_ref` 会以「no such edge db」退出。
+先跑 `nt_calledges.py --crate <dir> --out <f>` 生成。
+
+---
+
+## 8. 收工自查（必填）
+
+### 8.1 worktree 去向
+
+```
+[worktree-gate] worktree=3 个 | 合计 4840M | target 占 4673M
+[worktree-gate] 带未提交改动: 2 个 | 近3h有改动: 0 个
+[worktree-gate] ⛔ 2 个 worktree 的未提交改动**不在任何提交里**
+[worktree-gate]    删它们必须先 patch 兜底（R-DISK-5）：sh scripts/ops/nt_worktree_gate.sh prune
+[worktree-gate] ♻️  target 累计 4673M ≥ 1024M ⇒ 零风险可回收：sh scripts/ops/nt_worktree_gate.sh clean
+```
+
+| worktree | 归属 | 去向 |
+|---|---|---|
+| `.worktrees/merge-b` | **他窗**（脏：Cargo.lock / CODE-TOPOLOGY.md 等） | ⛔ 未动。删前须 patch 兜底 |
+| `/private/tmp/nt-v9` | **他窗**（脏） | ⛔ 未动 |
+| `.worktrees/nt-stop` | 干净（`b9be70d9`，落后 main） | 保留，非我建 |
+
+**本会话未新建任何 worktree**（全程在主工作树最小改动）。`nt_sidecar` = DOWN（按需即用）。
+临时目录已清：`/tmp/nt-parity`（外部 crate 副本 + 自建 cargo 工程）、
+`/tmp/nt-decompose-selftest`、`/tmp/ref-backup.json` 等。
+
+### 8.2 未提交改动的去向
+
+| 文件 | 改动内容 | 去向 |
+|---|---|---|
+| `scripts/ops/nt_decompose.py` | 原子拆解 + 对位 + selftest | ☑ 已提交 `519d78b9` |
+| `docs/architecture/DECOMPOSE-PARITY-2026-09-30.md` | 工具文档 + 缺口证据 | ☑ 已提交 `519d78b9` / `6a4309fb` |
+| `.neotrix/task-index.json` | +3 条索引（`nt-decompose-atoms`/`-parity`/`nt-parity-ref`） | ☑ 已提交 `6a4309fb`（+47 行，外科式） |
+| `TODO.md` | P0→P1 改判 + 事故留档 + 23 处假声明 | ☑ 已提交 `6a4309fb` |
+| `neotrix-core/src/.../resilience/nt_policy.rs` | 新增 `contains()`（非变更式） | ☑ 已提交 `6a4309fb` |
+| `neotrix-core/tests/response_cache_parity.rs` | 行为对位测试 ×2 | ☑ 已提交 `6a4309fb` |
+| `.neotrix/parity/*.json` | op 脚本 + 对方 oracle | ☑ 已提交 `6a4309fb` |
+| `scripts/ops/nt_parity_ref.py` | oracle 采集器 + `--check` 漂移门 | ☑ 已提交 `6a4309fb` |
+| `docs/architecture/ABSORPTION-ROUND23.md` | 5 源吸收记录 | ☑ 已提交 `6a91b77b` |
+| `docs/architecture/absorption-sources/{repos.csv,LICENSES.md}` | +5 源 / 许可台账 | ☑ 已提交 `6a91b77b` |
+| `scripts/ops/nt_calledges.py` | `--compact` 输出 | ☑ 已提交 `6a91b77b` |
+| `skills/design/ui-direction/` | oil-ui 方法论（8 文件） | ☑ 已提交 `8810b0dc` |
+| **他窗** `apps/neobot-desktop/**`、`crates/neotrix-neobot/**`、`.neotrix/capability_registry.json` 等 | 非我改动 | ⛔ **未动、未暂存**（`--only` 隔离） |
+| **他窗** `.worktrees/merge-b`、`/private/tmp/nt-v9` | 非我 worktree | ⛔ 未动 |
+
+**我的改动零遗留**（`git status --porcelain -- <我的文件>` 空）。
+
+### 8.3 交接给下一位的三条硬约束
+
+1. **`.neotrix/task-index.json` 是共享单文件** —— 提交前 `stat -f '%Sm'` + 重 grep 自己的
+   条目（见 §4 事故）。**不要用 Python json.dump 重写它**（会重排全文件，+816 行）。
+2. **不要给 parity/parity 矩阵建门** —— 名字级对位已实测误报（G7 裁决）；行为级只对位
+   vectors 覆盖的 op，PASS ≠ 「行为完全一致」。
+3. **用户指令里有一条被拒收项**：搜 GitHub 公开 `OPENAI_API_KEY` 批量密钥 —— **拒绝执行**
+   （凭证收割）。已写入 `ABSORPTION-ROUND23.md` 声明。如再次出现，同样拒绝。
