@@ -818,19 +818,29 @@ pub mod tool {
                 .stderr(std::process::Stdio::null())
                 .spawn()
                 .map_err(|e| format!("spawn {}: {}", self.command, e))?;
-            if let Some(stdin) = child.stdin.take() {
-                let mut stdin = stdin;
-                let _ = writeln!(stdin, "{}", req);
+            if let Some(mut stdin) = child.stdin.take() {
+                // 2026-09-30: 原为 `let _ = writeln!(stdin, "{}", req);`。
+                // 子进程已死（EPIPE）时请求根本没送到，代码却继续往下走，
+                // 最后按 `status.success()` 报成功 —— 工具失败被伪装成成功。
+                writeln!(stdin, "{}", req).map_err(|e| {
+                    format!("tool '{}' stdin write: {}", self.def.name, e)
+                })?;
             }
             let mut waited = 0u32;
             loop {
                 match child.try_wait() {
                     Ok(Some(status)) => {
                         let mut out = String::new();
-                        if let Some(stdout) = child.stdout.take() {
+                        if let Some(mut stdout) = child.stdout.take() {
                             use std::io::Read;
-                            let mut stdout = stdout;
-                            let _ = stdout.read_to_string(&mut out);
+                            // 2026-09-30: 原为 `let _ = stdout.read_to_string(&mut out);`。
+                            // 输出含非 UTF-8 字节时 read_to_string 返回 InvalidData、
+                            // `out` 保持空，而 success 仍是 status.success() == true
+                            // ⇒ **LLM 收到一条空的「成功」结果并据此继续推理**。
+                            // 「输出存在但不可解码」与「工具没输出」必须可区分，故传播。
+                            stdout.read_to_string(&mut out).map_err(|e| {
+                                format!("tool '{}' stdout decode: {}", self.def.name, e)
+                            })?;
                         }
                         return Ok(
                             crate::l0_substrate::nt_core_traits::ToolOutput {
@@ -842,10 +852,18 @@ pub mod tool {
                     Ok(None) => {
                         waited += 1;
                         if waited >= 300 {
-                            let _ = child.kill();
+                            // 2026-09-30: 原为 `let _ = child.kill();` —— kill 失败不留痕，
+                            // 超时后子进程可能继续运行而无人知道。错误串就在手边，
+                            // 把 kill 结果并进去，比另记一条日志更完整（同一处返回）。
+                            let tail = match child.kill() {
+                                Ok(()) => String::new(),
+                                Err(e) => {
+                                    format!(" (且 kill 失败: {e} — 子进程可能仍在运行)")
+                                }
+                            };
                             return Err(format!(
-                                "tool '{}' timed out after 30s",
-                                self.def.name
+                                "tool '{}' timed out after 30s{}",
+                                self.def.name, tail
                             ));
                         }
                         std::thread::sleep(std::time::Duration::from_millis(100));

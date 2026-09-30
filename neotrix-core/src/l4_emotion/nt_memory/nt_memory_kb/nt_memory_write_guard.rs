@@ -168,7 +168,16 @@ pub fn record_write_evidence(
         "ts_ms": ts,
     })
     .to_string();
-    let _ = kb.kv_set(WRITE_GUARD_NS, &key, &value);
+    // 2026-09-30: 原为 `let _ = kb.kv_set(WRITE_GUARD_NS, &key, &value);`，
+    // 而上面 149 行的 doc 承诺「失败仅告警不阻断主路径」—— 承诺的告警并不存在。
+    // 后果链：证据缺失 ⇒ nt_audit.rs 统计出的拦截数变少 ⇒ check.status 不为
+    // Failed ⇒ 不产生 finding、不 warn ⇒ **NT-SHIELD 审计输出假绿灯**。
+    // 「不阻断主路径」保持不变（不返回 Err），但必须留下痕迹。
+    if let Err(e) = kb.kv_set(WRITE_GUARD_NS, &key, &value) {
+        log::error!(
+            "[write-guard] 证据落库失败 {key} —— 审计链将出现缺口，拦截统计会偏低: {e}"
+        );
+    }
 }
 
 // ────────────────────────────────────────────────────────────────

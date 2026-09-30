@@ -97,20 +97,35 @@ impl SafeCodeApplier {
 
         // 4. 验证 (cargo check)
         let check_ok = Self::run_cargo_check();
-        if !check_ok {
-            // 回滚
-            let _ = std::fs::write(file, &old_content);
-            self.tracker
-                .record_change(file, issue_type, &old_content, new_content, false)
-                .ok();
-            return ApplyResult {
-                file: file.to_string(),
-                success: false,
-                backup_path: Some(backup_path),
-                error: Some("cargo check 失败, 已回滚".into()),
-                deferred: None,
-            };
-        }
+            if !check_ok {
+                // 2026-09-30: 原为 `let _ = std::fs::write(file, &old_content);`，
+                // 而下面的错误串**无论回滚是否真的发生都写死「已回滚」**
+                // ⇒ 回滚失败时用户看到「已回滚」，磁盘上留着编译不过的新内容。
+                // 系统报告了一个它没有验证过的状态。
+                let rollback = std::fs::write(file, &old_content);
+                if let Err(e) = self.tracker.record_change(
+                    file,
+                    issue_type,
+                    &old_content,
+                    new_content,
+                    false,
+                ) {
+                    log::error!("[safe-applier] 回滚记录落库失败 {}: {e}", file);
+                }
+                let error = match &rollback {
+                    Ok(()) => "cargo check 失败, 已回滚".to_string(),
+                    Err(e) => format!(
+                        "cargo check 失败, 且回滚失败({e}) —— 需从备份 {backup_path} 手动恢复"
+                    ),
+                };
+                return ApplyResult {
+                    file: file.to_string(),
+                    success: false,
+                    backup_path: Some(backup_path),
+                    error: Some(error),
+                    deferred: None,
+                };
+            }
 
         // 5. 记录成功
         self.tracker

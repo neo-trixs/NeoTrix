@@ -47,6 +47,13 @@ jobs:
         run: bash scripts/check-untracked-assets.sh
       - name: "Production-panic ratchet (blocks NEW unwrap/expect/panic; 712-site debt baselined)"
         run: bash scripts/check-unwrap.sh --strict
+      # 2026-09-30 新增。静默失败棘轮：绿构建 + 全绿测试 + 全部门 rc=0 之下，
+      # 唯一仍未被覆盖的失效模式 —— 丢弃 Result 且同块内无任何观测通道。
+      # 首轮抓到 4 条 P0（agent.rs stdio 工具通道 / safe_applier 回滚 /
+      # experience_tree 会话证据 / write_guard 审计证据），均已修。
+      # 规约不是外来发明，是仓内 nt_channel_serve.rs:278 已有的答案。
+      - name: "Silent-failure ratchet (discarded Result with no observation channel)"
+        run: bash scripts/check-silent-failure.sh --strict
       # 2026-09-29 新增（N-1）。本 job 组同时跑 3 个 OS，但本门只读 git 索引与
       # workflow 文本，跑一次即可 —— 放在 matrix 里是浪费，但放外面要多一个 job，
       # 权衡后留在 `check` 的第一步之前（秒级，无需 cargo）。

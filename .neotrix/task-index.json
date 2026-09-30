@@ -1,5 +1,5 @@
 {
- "_about": "任务→工具机器索引。解决「日常任务要跑哪个脚本」需全文读 AGENTS.md 的问题。 2026-09-29：check-doc-drift 增加根文档死链档。 2026-09-29：新增 check-untracked-assets（R-EXIST-1 未入库资产门，39→40 条）。 2026-09-29：新增 check-unwrap 生产 panic 棘轮（40→41 条）。\n2026-09-30：新增 check-feature-gates（feature 门控编译门，6 个非默认 feature）。",
+ "_about": "任务→工具机器索引。解决「日常任务要跑哪个脚本」需全文读 AGENTS.md 的问题。 2026-09-29：check-doc-drift 增加根文档死链档。 2026-09-29：新增 check-untracked-assets（R-EXIST-1 未入库资产门，39→40 条）。 2026-09-29：新增 check-unwrap 生产 panic 棘轮（40→41 条）。\n2026-09-30：新增 check-feature-gates（feature 门控编译门，6 个非默认 feature）。\n2026-09-30：新增 check-silent-failure（静默失败棘轮，44 条基线）。",
  "_schema": {
   "id": "任务意图的稳定 slug（小写连字符）",
   "query": "自然语言触发词数组 —— agent 用它做匹配",
@@ -657,6 +657,24 @@
    "read_only": false,
    "when_not": "不要在日常改码后跑（要 6 次 cargo check）；只有改了 feature 门控的 mod、或改过 Cargo.toml features、或准备提交时跑。也不要拿它判层归属 —— 那是 check-layer-deps 的职责",
    "spec": "2026-09-30 新增。零命中≠零消费：默认 feature 集不编译的 mod 对默认构建与全套测试完全失明。2026-09-30 由它首次抓到 2 个既存破口（NeoTrixConfig.prefer_free 漏改 3 处，全在 #[cfg(test)]；ort Outlet 私有字段，examples/nt_whisper_spike.rs）。同批把 CI matrix 从 --lib 改成 --all-targets —— 两者原本同样瞎"
+  },
+  {
+   "id": "check-silent-failure",
+   "query": [
+    "静默失败",
+    "silent failure",
+    "吞错误",
+    "let _ =",
+    "丢弃 Result",
+    "假绿灯",
+    "降级",
+    "审计缺口"
+   ],
+   "tool": "bash scripts/check-silent-failure.sh --strict",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "日常改码不必跑（纯静态分析，秒级）；改了落库/发送/落盘的错误处理、或新增 `let _ =` 时跑。也别拿它判 best-effort 策略对错 —— 基线里的 44 条是「已知且有意」，判据在 TODO.md §全量审计",
+   "spec": "2026-09-30 新增。规约来自仓内已有答案 nt_channel_serve.rs:278。门内高信号 44 条，范围外 209 条（remove_file/.send*）显式报出不静默漏。首次运行抓到 4 条 P0，已修 3 条 + agent.rs 1 条"
   }
  ],
  "excluded": {

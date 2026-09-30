@@ -580,11 +580,27 @@ impl crate::l5_cognition::nt_mind::nt_mind_hook::HookAction for SessionEndHook {
             "domain": "NT-MIND",
             "entries": []
         });
-        let _ = std::fs::write(&pending, serde_json::to_string_pretty(&entry).unwrap_or_default());
+            // 2026-09-30: 原为 `let _ = std::fs::write(&pending, …);` 紧接
+            // `HookResult::ok("… queued for absorption")`。写失败无任何 log，
+            // 而 ok() 描述了一件可证明没发生的事。上面的 entries 为空 ⇒
+            // 刚构造好的 SessionLedger 从未被序列化，这个文件是它唯一的耐久载体
+            // ⇒ 写失败即证据彻底消失。失败必须与成功可区分。
+            if let Err(e) = std::fs::write(
+                &pending,
+                serde_json::to_string_pretty(&entry).unwrap_or_default(),
+            ) {
+                log::error!(
+                    "[experience-tree] pending-absorb 写入失败 {}: {e} —— 本轮证据未落盘",
+                    pending.display()
+                );
+                return crate::l5_cognition::nt_mind::nt_mind_hook::HookResult::err(&format!(
+                    "experience-tree: session {session_id} cycle {cycle} 证据未落盘 ({e})"
+                ));
+            }
 
-        crate::l5_cognition::nt_mind::nt_mind_hook::HookResult::ok(&format!(
-            "experience-tree: session {session_id} cycle {cycle} queued for absorption"
-        ))
+            crate::l5_cognition::nt_mind::nt_mind_hook::HookResult::ok(&format!(
+                "experience-tree: session {session_id} cycle {cycle} queued for absorption"
+            ))
     }
 }
 

@@ -1432,16 +1432,25 @@ keywords("支付网关")                     -> ['支付网关']                
 > 4 条 P0 + 9 条 P1 + 2 条 P2 全部**已人工读现场核实**（R-SCAN-1），
 > 且每条都做了可达性核验（导出 ≠ 调用）。
 
-### P0 · 4 条（建议本轮修）
+### P0 · 4 条 —— ✅ **2026-09-30 全部已修**
+
+> 修法不是逐点打补丁，而是先立门（`scripts/check-silent-failure.sh`，44 条基线 + 棘轮，
+> 已进 CI）再修点 —— 门在修点之前先跑一遍，4 条 P0 全部落在门内，
+> 修完基线从 47 收缩到 44。规约取自仓内已有的答案 `nt_channel_serve.rs:278`。
+
+<details><summary>原始清单（点击展开）</summary>
+
 
 | # | 位置 | 失效 | 后果 |
 |---|---|---|---|
-| 1 | `agent.rs:823,833` | `let _ = writeln!(stdin,…)` / `let _ = stdout.read_to_string(&mut out)` | 子进程已死或输出非 UTF-8 ⇒ 仍返回 `Ok(success:true, content:"")`，`success` 只看进程退出码 ⇒ **LLM 收到空的成功结果**并据此继续推理 |
-| 2 | `safe_applier.rs:102,110` | `let _ = std::fs::write(file, &old_content)`（回滚） | 回滚失败被吞，而 `:110` 错误串**无论回滚是否发生都写死「已回滚」** ⇒ 用户看到已回滚，磁盘留着编译不过的新内容。另 `:194-200` 的 `Err(_) => false` 把「cargo 起不来」判成「编译失败」 |
-| 3 | `experience_tree/mod.rs:583` | `let _ = fs::write(&pending, …)` | 落盘失败**无任何 log**，`:585` 却返回 `ok("queued for absorption")` 描述一件可证明没发生的事。该文件是 ledger 的唯一耐久载体 ⇒ 证据彻底消失 |
-| 4 | `nt_memory_write_guard.rs:171` | doc 写「失败仅告警」，代码是 `let _ = kb.kv_set(…)` = **零告警** | 守卫证据缺失 ⇒ `nt_audit.rs:339` 统计出的拦截数变少 ⇒ status 不为 Failed ⇒ **NT-SHIELD 审计输出假绿灯**。另有 `nt_memory_api.rs:91,103` 的 `if let Ok(kb) = lock()` 无 `else` —— 锁争用时静默跳过，而锁争用恰恰最需要审计 |
+| 1 | `agent.rs:823,833` ✅已修 | `let _ = writeln!(stdin,…)` / `let _ = stdout.read_to_string(&mut out)` | 子进程已死或输出非 UTF-8 ⇒ 仍返回 `Ok(success:true, content:"")`，`success` 只看进程退出码 ⇒ **LLM 收到空的成功结果**并据此继续推理 |
+| 2 | `safe_applier.rs:102,110` ✅已修 | `let _ = std::fs::write(file, &old_content)`（回滚） | 回滚失败被吞，而 `:110` 错误串**无论回滚是否发生都写死「已回滚」** ⇒ 用户看到已回滚，磁盘留着编译不过的新内容。另 `:194-200` 的 `Err(_) => false` 把「cargo 起不来」判成「编译失败」 |
+| 3 | `experience_tree/mod.rs:583` ✅已修 | `let _ = fs::write(&pending, …)` | 落盘失败**无任何 log**，`:585` 却返回 `ok("queued for absorption")` 描述一件可证明没发生的事。该文件是 ledger 的唯一耐久载体 ⇒ 证据彻底消失 |
+| 4 | `nt_memory_write_guard.rs:171` ✅已修 | doc 写「失败仅告警」，代码是 `let _ = kb.kv_set(…)` = **零告警** | 守卫证据缺失 ⇒ `nt_audit.rs:339` 统计出的拦截数变少 ⇒ status 不为 Failed ⇒ **NT-SHIELD 审计输出假绿灯**。另有 `nt_memory_api.rs:91,103` 的 `if let Ok(kb) = lock()` 无 `else` —— 锁争用时静默跳过，而锁争用恰恰最需要审计 |
 
-### P1 · 9 条（按危害排序）
+</details>
+
+### P1 · 9 条（按危害排序）—— ⏳ 待办，优先级低于已修的 4 条 P0
 
 - `nt_dispatch_loop.rs:500-517`（同型 `:904-918`）治理违规计数：读失败→0、写失败→停在 N，
   而 `:898` 就在 20 行外写着正确范式 `Err(e) => (false, …)` ⇒ **升级阶梯永不推进**。
