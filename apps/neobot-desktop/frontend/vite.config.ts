@@ -1,19 +1,55 @@
-import { defineConfig } from "vite";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import process from 'node:process'
+import tailwindcss from '@tailwindcss/vite'
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
 
-const root = dirname(fileURLToPath(import.meta.url));
-// 源码在 frontend/src，图标在 frontend/../icons —— Vite 默认只服务 root 之下，
-// 不配 fs.allow 的话 /neobot/icons/*.svg 会 404，而 404 只在运行期出现，
-// tsc 那关拦不住。
-// 图标源在 frontend/../icons（tauri.conf.json 也引用同一份）。
-// 用 publicDir 直挂，而不是拷一份进 frontend/public ——
-// 「各平台各画/各存一份」正是本仓 icon-design 明令禁止的。
-const icons = resolve(root, "..", "icons");
+const host = process.env.TAURI_DEV_HOST
 
-export default defineConfig({
+// https://vitejs.dev/config/
+export default defineConfig(async () => ({
+  plugins: [
+    react({
+      babel: {
+        plugins: [['babel-plugin-react-compiler', { target: '19' }]],
+      },
+    }),
+    tailwindcss(),
+  ],
+
+  // 多页入口：主窗口（index.html）与桌宠外置窗口（pet.html，独立透明窗口）。
+  build: {
+    rollupOptions: {
+      input: {
+        main: '/index.html',
+        pet: '/pet.html',
+      },
+    },
+  },
+
+  resolve: {
+    alias: {
+      '@': '/src',
+    },
+  },
+
+  // Vite options tailored for Tauri development.
+  // 1. prevent vite from obscuring rust errors
   clearScreen: false,
-  publicDir: icons,
-  server: { port: 1423, strictPort: true, fs: { allow: [root, icons] } },
-  build: { outDir: "dist", target: "es2022", emptyOutDir: true },
-});
+  // 2. tauri expects a fixed port, fail if that port is not available
+  server: {
+    port: 1420,
+    strictPort: true,
+    host: host || false,
+    hmr: host
+      ? {
+          protocol: 'ws',
+          host,
+          port: 1421,
+        }
+      : undefined,
+    watch: {
+      // 3. tell vite to ignore watching `src-tauri`
+      ignored: ['**/src-tauri/**'],
+    },
+  },
+}))

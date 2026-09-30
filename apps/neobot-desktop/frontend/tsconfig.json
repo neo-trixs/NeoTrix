@@ -1,14 +1,35 @@
 {
   "compilerOptions": {
     "target": "ES2022",
+    "jsx": "react-jsx",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "useDefineForClassFields": true,
+    "baseUrl": ".",
     "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "strict": true,
-    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "paths": { "@/*": ["src/*"] },
+    "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
+
+    /* Linting */
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noEmit": true,
-    "types": ["vite/client", "node"]
+    "isolatedModules": true,
+    "skipLibCheck": true
   },
-  "include": ["src", "selftest.ts"]
+  "references": [{ "path": "./tsconfig.node.json" }],
+  "include": [
+    "src",
+    "test",
+    "packages/*/src",
+    "packages/*/scripts",
+    "types",
+    "packages/.test/test-utils.ts",
+    "scripts/build-plugins.ts"
+  ]
 }

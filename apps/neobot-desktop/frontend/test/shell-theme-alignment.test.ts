@@ -1,0 +1,76 @@
+/**
+ * shell-theme-alignment.test.ts — 壳层主题与 dsh alias token 的对齐契约。
+ *
+ * HeroUI 的 `@theme inline` 会把语义变量（`--accent`、`--surface` …）内联进 Tailwind
+ * 工具类，所以壳层只需改写品牌主色 `--accent`：HeroUI 官方 variables.css 已按
+ * `data-theme` 提供明暗两套取值，多写反而会让组件外观偏离官方。这里把「只改
+ * accent、其余语义变量一律不覆盖」钉死。取值同源：官方 design-platform.css。
+ */
+import { readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
+
+const css = readFileSync(new URL('../src/styles/main.css', import.meta.url), 'utf8')
+const [darkTheme = '', lightTheme = ''] = css.split(/^html\[data-theme="light"\] \{/m)
+
+const herouiSemanticTokens = [
+  'background',
+  'foreground',
+  'surface',
+  'surface-secondary',
+  'surface-tertiary',
+  'overlay',
+  'muted',
+  'default',
+  'default-foreground',
+  'field-background',
+  'field-border',
+  'field-border-width',
+  'success',
+  'success-foreground',
+  'warning',
+  'warning-foreground',
+  'danger',
+  'danger-foreground',
+  'segment',
+  'segment-foreground',
+  'border',
+  'separator',
+  'link',
+  'scrollbar-thumb',
+  'backdrop',
+]
+
+function declares(block: string, token: string) {
+  return new RegExp(`^\\s*--${token}:`, 'm').test(block)
+}
+
+describe('壳层主题对齐 dsh alias token', () => {
+  it('--accent 取 dsw brand-primary（深色白、浅色黑），不再复用蓝色业务色', () => {
+    expect(darkTheme).toMatch(/^\s*--accent:\s*#f9fafb;/m)
+    expect(lightTheme).toMatch(/^\s*--accent:\s*#0f1115;/m)
+    expect(darkTheme).toMatch(/^\s*--accent-foreground:\s*#0f1115;/m)
+    expect(lightTheme).toMatch(/^\s*--accent-foreground:\s*#ffffff;/m)
+  })
+
+  it('除 brand-primary 外不覆盖任何 HeroUI 语义变量，保持官方明暗取值', () => {
+    const overridden = herouiSemanticTokens.filter(
+      token => declares(darkTheme, token) || declares(lightTheme, token),
+    )
+    expect(overridden).toEqual([])
+  })
+
+  it('不再声明与 HeroUI 同名的 --color-accent/--color-muted/--color-danger（会被内联层覆盖成死值）', () => {
+    for (const token of ['--color-accent:', '--color-muted:', '--color-danger:']) {
+      expect(css).not.toContain(token)
+    }
+  })
+
+  it('tailwind.config 把同名颜色指向 HeroUI 语义变量，业务蓝改走 info', () => {
+    const config = readFileSync(new URL('../tailwind.config.js', import.meta.url), 'utf8')
+    expect(config).toContain('\'muted\': \'var(--muted)\'')
+    expect(config).toContain('\'accent\': \'var(--accent)\'')
+    expect(config).toContain('\'danger\': \'var(--danger)\'')
+    expect(config).toContain('\'info\': \'var(--color-info)\'')
+    expect(config).toContain('\'info-hover\': \'var(--color-info-hover)\'')
+  })
+})
