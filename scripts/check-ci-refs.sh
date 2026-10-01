@@ -134,13 +134,56 @@ sort -u "$BAD" -o "$BAD" 2>/dev/null || : > "$BAD"
 sort -u "$EXPR" -o "$EXPR" 2>/dev/null || : > "$EXPR"
 sort -u "$ART" -o "$ART" 2>/dev/null || : > "$ART"
 
+# --- 第 4 类引用：run: 行里调用的脚本（2026-09-30 补齐）------------------
+# 动机：本门原先只查 working-directory / cache-dependency-path / artifact path
+# 三类，**完全没查 run: 调用的脚本**。实测注入
+#   `- name: probe` + `run: bash scripts/DOES-NOT-EXIST-zzz.sh`
+# 本门仍 rc=0 —— 即「job 指向不存在的脚本」这一**最常见的幻影门形态完全没覆盖**。
+# 而这恰是本仓已付出过两次代价的同一类病（见文件头 3edf3be7 与 2026-09-29 复发）。
+#
+# 判据（宁缺勿错）：只取**看起来确是我仓脚本**的 token ——
+#   路径以 scripts/ .github/ tools/ bin/ 开头，且扩展名是 .sh/.py/.mjs/.js/.ts
+#   且该行不含 ${{（运行期表达式求不出值）。
+# 刻意**不**查：cargo/npm/make/curl/系统命令 —— 它们不是仓库路径，
+# 按字符串猜会制造噪声；而噪声会让门被忽略（门一旦被忽略就等于没有门）。
+RUNBAD=$(mktemp)
+trap 'rm -f "$TRACKED" "$EXPR" "$BAD" "$ART" "$RUNBAD"' EXIT
+: > "$RUNBAD"
+for wf in "$WF_DIR"/*.yml "$WF_DIR"/*.yaml; do
+  [ -f "$wf" ] || continue
+  grep -nE '^[[:space:]]*(-[[:space:]]+)?run:[[:space:]]' "$wf" 2>/dev/null |
+  while IFS= read -r line; do
+    ln=${line%%:*}
+    body=${line#*:}
+    body=$(printf '%s' "$body" | sed -E 's/^[[:space:]]*(-[[:space:]]+)?run:[[:space:]]*//')
+    case "$body" in *'${{'*) continue ;; esac   # 运行期表达式，跳过并交人核对
+    printf '%s\n' "$body" | tr '|&;<>()' '\n\n\n\n\n\n' |
+    # 判据（2026-09-30 两轮修正后定稿）：
+    #  ① 必须**含至少一个 `/`** —— 否则 `echo foo.sh` 这类纯词会被误判。
+    #     实测：13 个真实 workflow 在此判据下 0 命中（无噪声），而收窄版
+    #     （只认 scripts|.github|tools|bin 前缀）会漏掉 `foo/bar/x.sh` 这类
+    #     任意目录下的幻影脚本 —— 而那正是最常见的幻影门形态。
+    #  ② 必须在**组件边界**起头 —— 否则 `.../safety_tools/provenance_check.sh`
+    #     会被从 `tools/` 截成 `tools/provenance_check.sh`（假阳性，实测踩过）。
+    #  ③ 跳过含 `${{` 的行（运行期表达式求不出值）。
+    grep -oE '(^|[[:space:]])(\./)?[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+\.(sh|py|mjs|js|ts)' |
+    sed -E 's/^[[:space:]]+//; s/^\.\///' |
+    while read -r sp; do
+      tracked_somewhere "$sp" || echo "$wf:$ln run-script=$sp" >> "$RUNBAD"
+    done
+  done
+done
+sort -u "$RUNBAD" -o "$RUNBAD" 2>/dev/null || : > "$RUNBAD"
+N_RUN=$(grep -c . "$RUNBAD" 2>/dev/null); N_RUN=${N_RUN:-0}
+[ "$N_RUN" -gt 0 ] && cat "$RUNBAD" >> "$BAD"
+
 N_BAD=$(grep -c . "$BAD" 2>/dev/null); N_BAD=${N_BAD:-0}
 N_EXPR=$(grep -c . "$EXPR" 2>/dev/null); N_EXPR=${N_EXPR:-0}
 N_ART=$(grep -c . "$ART" 2>/dev/null); N_ART=${N_ART:-0}
 
 echo "=== CI reference gate ==="
 echo "workflows scanned: $(ls "$WF_DIR"/*.yml "$WF_DIR"/*.yaml 2>/dev/null | wc -l | tr -d ' ')"
-echo "bad refs (untracked target): $N_BAD    runtime-expression refs (not checked): $N_EXPR    artifact paths (not gated): $N_ART"
+echo "bad refs (untracked target or run-script): $N_BAD    runtime-expression refs (not checked): $N_EXPR    artifact paths (not gated): $N_ART"
 
 if [ "$N_ART" -gt 0 ] && [ "${CHECK_ARTIFACTS:-0}" -eq 1 ]; then
   echo "--- artifact paths (--check-artifacts): these are produced by the job, NOT in git ---"
@@ -155,7 +198,7 @@ if [ "$N_EXPR" -gt 0 ]; then
 fi
 
 if [ "$N_BAD" -gt 0 ]; then
-  echo "--- offenders: path not tracked by git => job fails on every clean checkout ---"
+  echo "--- offenders: path/script not tracked by git => job fails on every clean checkout ---"
   cat "$BAD"
   if [ "$STRICT" -eq 1 ]; then
     echo "FAIL(strict): $N_BAD CI reference(s) point at paths git does not track."

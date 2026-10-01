@@ -46,7 +46,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify external input provenance
-        run: bash scripts/provenance_check.sh
+        # 2026-09-30 修正路径。此前写 `scripts/provenance_check.sh`，该路径**从未存在**
+        # （脚本被移到 nt_shield/safety_tools/，但 workflow 与脚本自身 usage 都没跟着改），
+        # ⇒ 本 job 在任何干净检出上必然在这里崩掉，二进制永远传不上去。
+        # 这是本仓第三次同族幻影门事故（见 scripts/check-ci-refs.sh 文件头）。
+        #
+        # 现在该门是 fail-closed 的：清单不存在 ⇒ 明确报错并 exit 1。
+        # ⇒ 发布需要先提交
+        # neotrix-core/src/l3_embodiment/nt_shield/provenance/external-inputs.json
+        # （schema 见同目录 external-inputs.example.json）。这是**真实的待办**，
+        # 不要为了让发布通过而删掉这个 step 或把门改回 fail-open。
+        run: bash neotrix-core/src/l3_embodiment/nt_shield/safety_tools/provenance_check.sh
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
           bin: neotrix

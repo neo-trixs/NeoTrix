@@ -1,0 +1,32 @@
+{
+  "_comment": [
+    "SCHEMA TEMPLATE — this file is NOT read by provenance_check.sh.",
+    "The gate reads external-inputs.json (no .example).",
+    "",
+    "Why the sha256 placeholders are 'unpinned:...' on purpose: the gate treats an",
+    "unpinned: prefix as an HONEST deferral and prints it verbatim as",
+    "'honest-unpinned (<reason>)'. So if this template is ever copied verbatim into",
+    "external-inputs.json, the gate CANNOT report a hash as verified — it reports",
+    "why it did not verify. That is deliberate: a template that could be mistaken",
+    "for real verified data is worse than no template.",
+    "",
+    "To make the gate actually verify: place the fetched artifact at",
+    "provenance/cache/<name with / replaced by _> and put its real sha256 here."
+  ],
+  "inputs": [
+    {
+      "name": "actions/checkout",
+      "kind": "github-action",
+      "version": "v4",
+      "sha256": "unpinned:replace-me-with-real-sha256",
+      "purpose": "CI: 检出源码"
+    },
+    {
+      "name": "taiki-e/upload-rust-binary-action",
+      "kind": "github-action",
+      "version": "v1",
+      "sha256": "unpinned:replace-me-with-real-sha256",
+      "purpose": "release: 上传各平台二进制"
+    }
+  ]
+}

@@ -124,6 +124,15 @@ datasets/
 vendor/
 profile/
 provenance/
+# 溯源清单必须入库（2026-09-30）。理由：上面 `provenance/` 这条把
+# provenance_check.sh 的**输入**也忽略了 ⇒ 干净检出里清单永远不存在 ⇒
+# release.yml 上那道供应链门**永远无法通过**（恒红 = 训练人忽略红）。
+# 范式同本文件已有的 `!crates/neotrix-abilities/data/` 那组解除忽略。
+# 清单是「pinned build input」，天然该被 review 并入库。
+!neotrix-core/src/l3_embodiment/nt_shield/provenance/
+!neotrix-core/src/l3_embodiment/nt_shield/provenance/*.json
+# 但 cache/ 里是取回的构件（可能很大）⇒ 仍然忽略（放在解除忽略之后才能生效）
+neotrix-core/src/l3_embodiment/nt_shield/provenance/cache/
 tools/
 # 开发工具脚本 (import/shot 审计): 解除忽略
 !crates/neotrix-abilities/tools/
