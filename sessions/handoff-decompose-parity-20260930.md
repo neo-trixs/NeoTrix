@@ -10,6 +10,7 @@
 
 | 提交 | 内容 |
 |---|---|
+| `a13837b2` | 「纯重复 × 零接线」交叉判定（`nt_dup_dead`）⇒ **结论：一条都不删** |
 | `4f2bc704` | `--units` 逐族分诊 + 修**字节估 token**（喂给 T4 档位门槛）+ 修一个**稳定复现**的测试竞态 |
 | `0459494b` | **副本漂移审计器**（`nt_fn_drift`）+ 抓到 3 个真缺陷：2 处**中文 panic** + 1 处时钟 panic |
 | `1db3234f` | 登记 `map-reconcile` + TODO 记边界澄清（**并非所有能力都可复现**）|
@@ -61,6 +62,8 @@
 | 11 | `nt_fn_drift` 输出把 tuple 解包成 `(mod,path,body,line)` 却按 `(mod,path,line,body)` 用 ⇒ `%d` 收到 str 首跑即崩 | TypeError | 改正解包顺序 |
 | 12 | 把「字节估 token」的缺陷方向**算反**（说早 2/3 篇幅升档，实为该升没升） | 实测 bytes×0.3 中 bytes=chars×3 与 0.3 抵消 | 三处文档按实测更正 |
 | 13 | `evm` 竞态的**第一次加固无效**：在 uses_default 开头 `remove_var`，实测仍 6/6 红 | remove 的仍是共享变量 | 消除共享（换变量名+换 chain）⇒ 8/8 绿 |
+| 14 | `fn_drift` v1 归一化偏严：`x + 1` ≠ `x+1` ⇒ IDENTICAL 29 是**下界** | 自证里「`x+1` 应等于 `x + 1`」用例红 | 加 `normalize_code()`（折叠空白+去标点邻接空格）⇒ 30 |
+| 15 | `nt_dup_dead` v1 先 `discover()` 再判 db 存在 ⇒ 缺边表时崩栈而非 rc=2 | 自证用例暴露 FileNotFoundError | 调换顺序 |
 
 ---
 
@@ -92,8 +95,9 @@
 | `nt_lock_audit.py neotrix-core/src` | ✅ 0 处 |
 | `check-silent-failure.sh --strict` | ✅ PASS（OPEN CONTRACTS 0/32） |
 | `check-doc-drift.sh` / `check-layout.sh --strict` | ✅ 0 死链 / rc=0 |
-| `nt_map_reconcile.py --strict` | ✅ **18/18 HOLDS**；证伪：植入 3 条假声明全部被抓（实测）|
-| `nt_fn_drift.py selftest` | ✅ 7 例（含 3 例证伪）；实跑 DIFFERENT 160 / IDENTICAL 29 / UNRESOLVED 24 / 形状命中 7 |
+| `nt_map_reconcile.py --strict` | ✅ **20/20 HOLDS**；证伪：植入 3 条假声明全部被抓（实测）|
+| `nt_fn_drift.py selftest` | ✅ 7 例（含 3 例证伪）；实跑 DIFFERENT 159 / IDENTICAL 30 / UNRESOLVED 24 / 形状命中 7 |
+| `nt_dup_dead.py selftest` | ✅ 4 例（含 3 例证伪）；实跑 **62 IDENTICAL / 10 零接线 / 0 可删** |
 | truncate 两处修复的证伪 | ✅ 回退后分别以 `byte index 5 is not a char boundary` 与 `attempt to subtract with overflow` 转红 |
 | model_router 修复的证伪 | ✅ 回退后 `left: 30 right: 25`、`left: 504 right: 560` 转红；恢复后 13 绿 |
 | evm 竞态的复现与验证 | ✅ 回退我的改动 6/6 红（稳定复现）；修法 8/8 绿 |
@@ -134,6 +138,7 @@ python3 scripts/ops/nt_fn_drift.py selftest                 # 副本漂移审计
 python3 scripts/ops/nt_fn_drift.py --only-different         # 分诊单（[SHAPE] 优先）
 python3 scripts/ops/nt_fn_drift.py --list-units             # 待分诊的族
 python3 scripts/ops/nt_fn_drift.py --units estimate_tokens # 该族每份副本的计数单位
+python3 scripts/ops/nt_dup_dead.py                   # 纯重复 × 零接线（**别据此删代码**）
 python3 scripts/ops/nt_decompose.py selftest
 python3 scripts/ops/nt_decompose.py atoms --db .project-map/edges-neotrix-neobot.jsonl \
     --root 'nt_channel_serve::run_once' --depth 3        # 193 原子
@@ -209,11 +214,14 @@ cargo test -p neotrix --test nt_capability_parity
    （`truncate_chars` 的字节快路径无害、`tokenize` 规则有意不同）。
 5. **⛔ 清理测试的共享全局状态（env/单例/全局计数器）时，
    必须消除「共享」本身** —— 仅 `remove_var` 开头无效（本轮实测 6/6 红）。
-6. **⛔ 不要照 fn-drift 的 `[SHAPE]` 标记批量改代码** —— DIFFERENT 里绝大多数是
+6. **⛔ 不要据「零入边」删任何代码** —— 本仓边表已有已知假阴性
+   （`nt_callgraph --unreachable` 的 `textual-prod` 桶：文本有生产调用点但图零入边）。
+   `nt_dup_dead` 实测 62 份 IDENTICAL / 10 份零接线，**逐条读源码后 0 条可删**。
+7. **⛔ 不要照 fn-drift 的 `[SHAPE]` 标记批量改代码** —— DIFFERENT 里绝大多数是
    「同名不同域」的合法重复（`osint::investigate` ×15）。形状标记只用于**排序优先级**。
    同理 `306 处 "Real implementation needs"`（49 文件）**不得批量删**：抽查 5 处全假，
    但其余 283 处未取证 ⇒ 局部修改会让文件一半真一半假，更难判断。
-7. **地图/台账的断言只写在 ```assert 围栏块里**，且**绝不可自指**
+8. **地图/台账的断言只写在 ```assert 围栏块里**，且**绝不可自指**
    （不自检自己、不用 nlit 检查所在文件）。工具 `map-reconcile` 在索引里。
-8. **用户指令里有一条被拒收项**：搜 GitHub 公开 `OPENAI_API_KEY` 批量密钥 —— **拒绝执行**
+9. **用户指令里有一条被拒收项**：搜 GitHub 公开 `OPENAI_API_KEY` 批量密钥 —— **拒绝执行**
    （凭证收割）。已写入 `ABSORPTION-ROUND23.md` 声明。如再次出现，同样拒绝。
