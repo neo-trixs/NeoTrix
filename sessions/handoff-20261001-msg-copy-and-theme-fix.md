@@ -9,10 +9,34 @@
 | 项 | 状态 |
 |---|---|
 | worktree 去向 | ⛔ **未开新 worktree**。`nt_worktree_gate.sh check` rc=0；现存 4 个（含主树）**均为他窗/历史**，我一个都没动。门提示「2 个 worktree 的未提交改动不在任何提交里」+「target 累计 4673M 可回收」—— **⛔ 都不是我的改动，我未执行 prune/clean** |
-| 我的未提交改动 | **无**。本窗提交均已落盘：`7ce88e27`、`c3b99dc5`、`9255f294`、`287d9614`、`2b9b610a`、`abf0bd08`、`b788da8f` |
+| 我的未提交改动 | **无**。本窗提交均已落盘：`7ce88e27`、`c3b99dc5`、`9255f294`、`287d9614`、`2b9b610a`、`abf0bd08`、`b788da8f`、`94e6606f` |
 | 我开的 worktree | 本轮为验证「干净检出可构建」建了 `/tmp/opencode/clean`（`--detach`）⇒ **已 `git worktree remove --force` 移除**。现存 4 个 worktree **均非我所开**，门提示的「2 个未提交改动」「4673M target」**都不是我的**，我未执行 prune/clean |
 | patch 兜底 | 不适用（无未提交改动） |
 | 弃用声明 | ⛔ **已作废**：上一轮删掉的 `neobot-check-msg-copy.mjs` 已在 `2b9b610a` **重做并做绿**（A~F，3/3 稳定） |
+
+## §0c ⭐ 快捷键：负向测试揭示「Esc 是**双防线**」（`94e6606f`）
+
+加了 `Cmd/Ctrl+K` 聚焦搜索（**全选**，不选=打字会插入而非覆盖）+ `Esc` 清空搜索。
+新门 E/F 守「与弹窗的 Esc 归属」——**一次按键改两个无关状态**用户不会预期。
+
+⓰⭐ **负向测试最有价值的产出**：只拆掉我方的 `dialogOpen` 检查 ⇒ **E 仍绿**。
+真因：`shell.tsx` 的弹窗 Esc 走 **`capture` + `stopPropagation`**，先执行并阻断
+传播 ⇒ 我方检查**根本没被触达**。**两道同时拆**才红（rc=1，精确报出
+「一次按键改了两个无关状态」）。
+⇒ 如实记录：**我方检查是第二道防线**。这不是「门没测到」，是纵深防御生效 ——
+   但**必须写下来**，否则下个人会以为「E 绿 = 我的检查在起作用」。
+
+ⓘ 本轮我犯的四个错**全是判据/夹具错，不是代码错**：
+1. ⛔ invoke 桩**传参与读取不一致**（传 `{t:STUB}` 读 `t[c]`）⇒ 全命令返 null
+   ⇒ 应用读 `null[0]`。**本次会话 invoke 桩第三次咬我**（漏 listen / 改桩形状 /
+   传参不一致）⇒ 门必须先跑**环境诊断**，`root=0` 先怀疑桩，别改被测代码。
+2. 虚拟化列表 DOM 恒 ~20 行 ⇒ 不能用行数判过滤。
+3. ⛔ 量错 sizer（`nb-msg-sizer` 是消息列表，搜索不改变消息）。
+4. F 条件写反（`fInDialog===true` 是**正确**行为，我判它失败）。
+
+⛔ **又一次 R-P16**：我自创「JSON 最小插入」⇒ 产出**非法 JSON**（19 增 42 删）。
+已回退。实测仓库现行格式**就是** `json.dumps(indent=1)`（与他窗 `8d079756` 对齐后
+逐字相同）⇒ 用它只产生 **17 增 0 删**。**别自创最小插入。**
 
 ## §0b ⭐ 代码块：「先测量」救了这一轮（`b788da8f`）
 
@@ -62,6 +86,7 @@ md5 三个全部与文档吻合 ⇒ vendored 文件未被改动过。
 | `2b9b610a` | 气泡复制门 A~F 做绿（3/3 稳定）；全门 18 道 rc=0 |
 | `abf0bd08` | ⭐ 修「干净克隆构建不出自持 UI」+ 新增自持性门；全门 19 道 rc=0 |
 | `b788da8f` | 代码块复制按钮语言脱钩（真缺陷）+ 新增 markdown 门；全门 20 道 rc=0 |
+| `94e6606f` | Cmd/Ctrl+K 聚焦搜索 + Esc 清空；新门 E/F 守弹窗 Esc 归属；全门 21 道 rc=0 |
 
 ### `7ce88e26` 的实质：队列 #5 背后是真缺陷
 `desktop.rs:33` `get_dsh_theme()` **恒返回 `Theme::System`**（写死常量、零信息量）。
@@ -127,12 +152,12 @@ CSS 注释里写清了这全过程。⏳ **未验证项**：浮在盒外是否�
 ⓘ 元教训：**「我造的门跑红」先怀疑门，再怀疑产品** —— 但要**给出证据**（本窗用
 「同一 dist 下他门 rc=0」+「产物含该字符串」两条把产品嫌疑排除掉），不能靠猜。
 
-## §4 门状态（收工实测，20 道全绿 + license 预期红）
+## §4 门状态（收工实测，21 道全绿 + license 预期红）
 
 本侧 10（含 `neobot-check-msg-copy`）：`api_contract` / `ui_wiring` / `feature_viability` / `absorption_audit` /
 `ui-smoke` / `msg-virtual` / `check-contrast` / `check-convo-groups` /
 `check-theme-persist` / `check-msg-copy` / `check-selfcontained` /
-`check-markdown` — 全 rc=0
+`check-markdown` / `check-shortcuts` — 全 rc=0
 他侧 4：`check_visual` / `check_ship_ui` / `check_ui_calls` / `check_upstream_1to1` — 上轮实测 rc=0
 `check-license` rc=1 **正确**（受限 vendored 树未删）
 
