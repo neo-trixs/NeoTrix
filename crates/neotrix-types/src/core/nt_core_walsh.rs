@@ -10,6 +10,12 @@ const WH_DIM: usize = 64;
 ///
 /// The Hadamard transform spreads information across all dimensions,
 /// providing graceful degradation under noise (holographic encoding).
+// 2026-09-30：`text_signature` / `wh_transform` / `wh_inverse` / `wh_dot`
+// 由**私有**提升为 `pub`。原因：L5 侧 `nt_core_walsh` 的 12 个测试直接调用
+// 这 4 个方法；本轮把该实现收敛为引用本文件的唯一真身后，跨 crate 不可见
+// ⇒ 编译报 E0624（由 `cargo test` 而非 `cargo check` 抓到 ——
+// **只跑 check 会漏掉这类错误**，因为测试代码只在 test 目标里编译）。
+// 这 4 个都是自洽的 Walsh-Hadamard 数学原语，公开不扩大语义面。
 pub struct WalshMemoryIndex {
     /// 64×64 Hadamard matrix as f64
     hadamard: Vec<Vec<f64>>,
@@ -40,7 +46,7 @@ impl WalshMemoryIndex {
 
     /// Build a 64-dim signature vector from text.
     /// Each word is hashed to a position 0..63 with sign ±1.
-    fn text_signature(&self, text: &str) -> Vec<f64> {
+    pub fn text_signature(&self, text: &str) -> Vec<f64> {
         let mut sig = vec![0.0; WH_DIM];
         for token in text.split(|c: char| !c.is_alphanumeric()) {
             if token.is_empty() || token.len() < 2 { continue; }
@@ -57,7 +63,7 @@ impl WalshMemoryIndex {
     }
 
     /// WH-transform: y = H @ x (orthogonal projection)
-    fn wh_transform(&self, x: &[f64]) -> Vec<f64> {
+    pub fn wh_transform(&self, x: &[f64]) -> Vec<f64> {
         let mut y = vec![0.0; WH_DIM];
         for (i, item) in y.iter_mut().enumerate().take(WH_DIM) {
             *item = self.hadamard[i].iter().zip(x.iter()).map(|(h, xv)| h * xv).sum();
@@ -66,7 +72,7 @@ impl WalshMemoryIndex {
     }
 
     /// Inverse WH-transform: x = (1/WH_DIM) × H @ y
-    fn wh_inverse(&self, y: &[f64]) -> Vec<f64> {
+    pub fn wh_inverse(&self, y: &[f64]) -> Vec<f64> {
         let mut x = vec![0.0; WH_DIM];
         for (i, item) in x.iter_mut().enumerate().take(WH_DIM) {
             *item = self.hadamard[i].iter().zip(y.iter()).map(|(h, yv)| h * yv).sum::<f64>() / WH_DIM as f64;
@@ -125,7 +131,7 @@ impl WalshMemoryIndex {
     }
 
     /// Dot product in WH space (preserves L2 up to scale).
-    fn wh_dot(a: &[f64], b: &[f64]) -> f64 {
+    pub fn wh_dot(a: &[f64], b: &[f64]) -> f64 {
         a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
     }
 

@@ -1,205 +1,25 @@
-use crate::l2_perception::nt_core_e8::hexagram_hadamard;
-use std::collections::HashMap;
-
-const WH_DIM: usize = 64;
-
-/// Orthogonal memory index using 64×64 Walsh-Hadamard basis.
-///
-/// Each memory is encoded as a 64-dim vector via:
-///   signature → H(6) transform → orthogonal embedding
-///
-/// The Hadamard transform spreads information across all dimensions,
-/// providing graceful degradation under noise (holographic encoding).
-pub struct WalshMemoryIndex {
-    /// 64×64 Hadamard matrix as f64
-    hadamard: Vec<Vec<f64>>,
-    /// Stored orthogonal embeddings: (memory_id, 64-dim vector)
-    embeddings: Vec<(String, Vec<f64>)>,
-    /// memory_id → index in embeddings
-    id_map: HashMap<String, usize>,
-}
-
-impl Default for WalshMemoryIndex {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl WalshMemoryIndex {
-    pub fn new() -> Self {
-        let raw = hexagram_hadamard();
-        let hadamard: Vec<Vec<f64>> = raw
-            .iter()
-            .map(|row| row.iter().map(|&x| x as f64).collect())
-            .collect();
-        Self {
-            hadamard,
-            embeddings: Vec::new(),
-            id_map: HashMap::new(),
-        }
-    }
-
-    /// Build a 64-dim signature vector from text.
-    /// Each word is hashed to a position 0..63 with sign ±1.
-    fn text_signature(&self, text: &str) -> Vec<f64> {
-        let mut sig = vec![0.0; WH_DIM];
-        for token in text.split(|c: char| !c.is_alphanumeric()) {
-            if token.is_empty() || token.len() < 2 {
-                continue;
-            }
-            let h1: usize = token
-                .bytes()
-                .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
-                as usize
-                % WH_DIM;
-            let sign: f64 = if (token
-                .bytes()
-                .fold(0u64, |acc, b| acc.wrapping_mul(37).wrapping_add(b as u64))
-                as usize)
-                .is_multiple_of(2)
-            {
-                1.0
-            } else {
-                -1.0
-            };
-            sig[h1] += sign;
-        }
-        // Normalize to unit vector in signature space
-        let norm: f64 = sig.iter().map(|x| x * x).sum::<f64>().sqrt();
-        if norm > 0.0 {
-            for x in sig.iter_mut() {
-                *x /= norm;
-            }
-        }
-        sig
-    }
-
-    /// WH-transform: y = H @ x (orthogonal projection)
-    fn wh_transform(&self, x: &[f64]) -> Vec<f64> {
-        let mut y = vec![0.0; WH_DIM];
-        for (i, item) in y.iter_mut().enumerate() {
-            *item = self.hadamard[i]
-                .iter()
-                .zip(x.iter())
-                .map(|(h, xv)| h * xv)
-                .sum();
-        }
-        y
-    }
-
-    /// Inverse WH-transform: x = (1/WH_DIM) × H @ y
-    fn wh_inverse(&self, y: &[f64]) -> Vec<f64> {
-        let mut x = vec![0.0; WH_DIM];
-        for (i, item) in x.iter_mut().enumerate() {
-            *item = self.hadamard[i]
-                .iter()
-                .zip(y.iter())
-                .map(|(h, yv)| h * yv)
-                .sum::<f64>()
-                / WH_DIM as f64;
-        }
-        x
-    }
-
-    /// Encode text into a 64-dim orthogonal embedding.
-    /// Pipeline: signature → WH-transform → normalize
-    pub fn encode(&self, text: &str) -> Vec<f64> {
-        let sig = self.text_signature(text);
-
-        self.wh_transform(&sig)
-    }
-
-    /// Store a memory by encoding its text content.
-    pub fn store(&mut self, id: &str, text: &str) {
-        let emb = self.encode(text);
-        let id_s = id.to_string();
-        if let Some(&old_idx) = self.id_map.get(&id_s) {
-            self.embeddings[old_idx] = (id_s.clone(), emb);
-        } else {
-            let idx = self.embeddings.len();
-            self.id_map.insert(id_s.clone(), idx);
-            self.embeddings.push((id_s, emb));
-        }
-    }
-
-    /// Remove a stored memory by ID.
-    pub fn remove(&mut self, id: &str) -> bool {
-        if let Some(idx) = self.id_map.remove(id) {
-            self.embeddings.swap_remove(idx);
-            if idx < self.embeddings.len() {
-                let moved_id = self.embeddings[idx].0.clone();
-                self.id_map.insert(moved_id, idx);
-            }
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Search for top-k most similar memories by WH-encoded dot product.
-    pub fn search(&self, query: &str, k: usize) -> Vec<(f64, String)> {
-        if self.embeddings.is_empty() {
-            return Vec::new();
-        }
-        let q_emb = self.encode(query);
-        let mut scored: Vec<(f64, &str)> = self
-            .embeddings
-            .iter()
-            .map(|(id, emb)| {
-                let sim = Self::wh_dot(&q_emb, emb);
-                (sim, id.as_str())
-            })
-            .collect();
-        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-        let k = k.min(scored.len());
-        scored
-            .into_iter()
-            .take(k)
-            .map(|(s, id)| (s, id.to_string()))
-            .collect()
-    }
-
-    /// Dot product in WH space (preserves L2 up to scale).
-    fn wh_dot(a: &[f64], b: &[f64]) -> f64 {
-        a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
-    }
-
-    /// Denoise a WH-encoded vector using the WH self-inverse property.
-    /// y_noisy → x_recovered = (1/64) × H @ y_noisy → y_cleaned = H @ x_recovered
-    pub fn denoise(&self, noisy: &[f64]) -> Vec<f64> {
-        let x_recovered = self.wh_inverse(noisy);
-        // Threshold small values (below 1/64 of max signal) to zero
-        let max_val: f64 = x_recovered.iter().copied().fold(0.0f64, f64::max);
-        let threshold = max_val / 64.0;
-        let x_clean: Vec<f64> = x_recovered
-            .iter()
-            .map(|&v| if v.abs() < threshold { 0.0 } else { v })
-            .collect();
-        self.wh_transform(&x_clean)
-    }
-
-    /// Measure recovery quality: cosine similarity between original and recovered.
-    pub fn recovery_ratio(original: &[f64], recovered: &[f64]) -> f64 {
-        let dot: f64 = original
-            .iter()
-            .zip(recovered.iter())
-            .map(|(a, b)| a * b)
-            .sum();
-        let norm_o: f64 = original.iter().map(|x| x * x).sum::<f64>().sqrt();
-        let norm_r: f64 = recovered.iter().map(|x| x * x).sum::<f64>().sqrt();
-        if norm_o == 0.0 || norm_r == 0.0 {
-            return 0.0;
-        }
-        dot / (norm_o * norm_r)
-    }
-
-    pub fn len(&self) -> usize {
-        self.embeddings.len()
-    }
-    pub fn is_empty(&self) -> bool {
-        self.embeddings.is_empty()
-    }
-}
+// ── 单点真身收敛（2026-09-30）────────────────────────────────────────
+// `WalshMemoryIndex` 的实现真身统一在 `neotrix-types`：
+// `crates/neotrix-types/src/core/nt_core_walsh.rs`。
+//
+// 收敛依据（逐方法比对，非目测）：
+// · 两侧 impl 各 **13 个方法**，其中 **11 个归一化后逐字相同**；
+// · 仅 `wh_inverse` / `wh_transform` 两处不同，差异是 types 侧多了
+//   `.take(WH_DIM)`。⚠️ 该 `.take()` 在当前代码里是**空操作** ——
+//   `y`/`x` 都由 `vec![0.0; WH_DIM]` 构造，长度本就是 WH_DIM。
+//   ⇒ **不是 bug 修复**，我没有据此报缺陷（差点误报，已核实）。
+// · 两侧的 hadamard 矩阵都来自 `hexagram_hadamard()`，而该函数本身
+//   已在同一轮收敛为 types 真身 ⇒ 两侧本就是同源。
+//
+// 为什么本模块整块删除而不是各自保留：
+// 实现完全等价却存在两份，其中一份还是「冻结快照」，只会各自漂移。
+//
+// ⛔ 公开路径**全部保住**（不破坏任何调用方）：
+// · `l5_cognition::nt_core_walsh::WalshMemoryIndex`（本模块路径）
+// · `nt_action_facade::WalshMemoryIndex`（re-export）
+// · `nt_feel_facade::WalshMemoryIndex`（re-export）
+// 以上三条都经由本处的 `pub use` 继续可用。
+pub use neotrix_types::core::nt_core_walsh::WalshMemoryIndex;
 
 #[cfg(test)]
 mod tests {
