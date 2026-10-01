@@ -32,6 +32,24 @@
    "llms"
   ]
  },
+ "NevaMind-AI/memU": {
+  "archived": false,
+  "description": "Personal memory across agents",
+  "language": "Python",
+  "license": "NOASSERTION",
+  "pushed_at": "2026-09-21T11:46:16Z",
+  "stars": 14496,
+  "topics": [
+   "agent-memory",
+   "claude-skills",
+   "harness",
+   "loop-engineering",
+   "mcp",
+   "memory",
+   "openclaw",
+   "openclaw-skills"
+  ]
+ },
  "NousResearch/hermes-agent": {
   "archived": false,
   "description": "The agent that grows with you",
@@ -49,6 +67,15 @@
    "claude-code",
    "codex"
   ]
+ },
+ "PrimeIntellect-ai/prime-agent": {
+  "archived": false,
+  "description": "A self-improving RLM agent for coding workflows and long-running autonomous tasks.",
+  "language": "Rust",
+  "license": "NOASSERTION",
+  "pushed_at": "2026-10-01T07:50:40Z",
+  "stars": 21435,
+  "topics": []
  },
  "QwenLM/qwen-code": {
   "archived": false,
@@ -84,6 +111,42 @@
    "grouping",
    "hooks",
    "javascript"
+  ]
+ },
+ "Vincentwei1021/video-shotcraft": {
+  "archived": false,
+  "description": "AI video skill for Claude Code & Codex — cinematic product videos with Remotion: 152 shot recipe cards, 209 motion previews, a production-ready template",
+  "language": "TypeScript",
+  "license": "Apache-2.0",
+  "pushed_at": "2026-09-28T16:15:03Z",
+  "stars": 10083,
+  "topics": [
+   "agent-skills",
+   "ai-agents",
+   "ai-video",
+   "claude-code",
+   "claude-code-skills",
+   "claude-skills",
+   "codex",
+   "motion-design"
+  ]
+ },
+ "alibaba/zvec": {
+  "archived": false,
+  "description": "A lightweight, lightning-fast, in-process vector database",
+  "language": "C++",
+  "license": "Apache-2.0",
+  "pushed_at": "2026-09-29T05:56:15Z",
+  "stars": 16030,
+  "topics": [
+   "agent-skills",
+   "db",
+   "embedded",
+   "faiss",
+   "fts",
+   "fulltext-search",
+   "hnsw",
+   "llm-memory"
   ]
  },
  "ant-design/ant-design": {
@@ -123,6 +186,33 @@
  },
  "browser-use/browser-use": {
   "_error": "URLError"
+ },
+ "browser-use/jev-ultrafast": {
+  "archived": false,
+  "description": "Fastest and cheapest web agent",
+  "language": "Python",
+  "license": "MIT",
+  "pushed_at": "2026-09-30T01:24:38Z",
+  "stars": 21613,
+  "topics": []
+ },
+ "bytebot-ai/bytebot": {
+  "archived": true,
+  "description": "Bytebot is a self-hosted AI desktop agent that automates computer tasks through natural language commands, operating within a containerized Linux desktop enviro",
+  "language": "TypeScript",
+  "license": "Apache-2.0",
+  "pushed_at": "2025-09-12T19:35:46Z",
+  "stars": 11083,
+  "topics": [
+   "agent",
+   "agentic-ai",
+   "agents",
+   "ai",
+   "ai-agents",
+   "ai-tools",
+   "anthropic",
+   "automation"
+  ]
  },
  "bytedance/UI-TARS-desktop": {
   "archived": false,
@@ -203,6 +293,24 @@
    "rag"
   ]
  },
+ "guillaumemeyer/watermarks-remover": {
+  "archived": false,
+  "description": "A privacy-first app that strips AI watermarks from content you own.",
+  "language": "Python",
+  "license": "MIT",
+  "pushed_at": "2026-09-28T20:26:20Z",
+  "stars": 23166,
+  "topics": [
+   "agent-skill",
+   "ai",
+   "anthropic",
+   "c2pa",
+   "chatgpt",
+   "claude",
+   "gemini",
+   "openai"
+  ]
+ },
  "harry0703/MoneyPrinterTurbo": {
   "archived": false,
   "description": "利用 AI 大模型和自动化工作流，根据主题或关键词一键生成高清短视频。Generate HD short videos from a topic or keyword with an automated AI workflow.",
@@ -248,6 +356,38 @@
    "gemini"
   ]
  },
+ "letta-ai/letta": {
+  "archived": false,
+  "description": "Platform for stateful agents: AI with advanced memory that can learn and self-improve over time.",
+  "language": null,
+  "license": "Apache-2.0",
+  "pushed_at": "2026-09-10T17:59:08Z",
+  "stars": 24988,
+  "topics": [
+   "ai",
+   "ai-agents",
+   "llm",
+   "llm-agent"
+  ]
+ },
+ "lidge-jun/opencodex": {
+  "archived": false,
+  "description": "Universal provider proxy for OpenAI Codex & Claude Code — use any LLM (Claude, Gemini, Grok, DeepSeek, Ollama…) with Codex CLI, App, SDK, and Claude Code",
+  "language": "TypeScript",
+  "license": "MIT",
+  "pushed_at": "2026-10-01T07:58:36Z",
+  "stars": 16731,
+  "topics": [
+   "ai-gateway",
+   "ai-tools",
+   "anthropic",
+   "chatgpt",
+   "claude",
+   "claude-code",
+   "codex",
+   "codex-cli"
+  ]
+ },
  "mem0ai/mem0": {
   "archived": false,
   "description": "The Memory Layer for AI Agents - Drop-in memory infrastructure for AI agents and apps. Context that persists. Built for production.",
@@ -284,6 +424,15 @@
    "framework"
   ]
  },
+ "microsoft/data-formulator": {
+  "archived": false,
+  "description": "🪄 Data Formulator is an interactive AI-powered data analysis system makes it easy to connect, explore and visualize data.",
+  "language": "Python",
+  "license": "MIT",
+  "pushed_at": "2026-10-01T06:37:16Z",
+  "stars": 17505,
+  "topics": []
+ },
  "multica-ai/multica": {
   "archived": false,
   "description": "Make humans and AI agents work as one team — open-source and self-hostable.",
@@ -292,6 +441,24 @@
   "pushed_at": "2026-10-01T04:39:07Z",
   "stars": 51774,
   "topics": []
+ },
+ "nanobrowser/nanobrowser": {
+  "archived": false,
+  "description": "Open-Source Chrome extension for AI-powered web automation. Run multi-agent workflows using your own LLM API key. Alternative to OpenAI Operator.",
+  "language": "TypeScript",
+  "license": "Apache-2.0",
+  "pushed_at": "2026-08-18T00:42:48Z",
+  "stars": 13855,
+  "topics": [
+   "agent",
+   "ai",
+   "ai-agents",
+   "ai-tools",
+   "automation",
+   "browser",
+   "browser-automation",
+   "browser-use"
+  ]
  },
  "openai/skills": {
   "archived": false,
@@ -311,6 +478,24 @@
   "stars": 95440,
   "topics": []
  },
+ "plait-board/drawnix": {
+  "archived": false,
+  "description": "开源白板工具（SaaS），一体化白板，包含思维导图、流程图、自由画等。All in one open-source whiteboard tool with mind, flowchart, freehand and etc.",
+  "language": "TypeScript",
+  "license": "MIT",
+  "pushed_at": "2026-09-08T03:15:08Z",
+  "stars": 14880,
+  "topics": [
+   "collaboration",
+   "drawing",
+   "flowchart",
+   "localfirst",
+   "mind-map",
+   "mindmap",
+   "productivity",
+   "whiteboard"
+  ]
+ },
  "ruvnet/ruflo": {
   "archived": false,
   "description": "🌊 The original agent harness. Deploy intelligent multi-player swarms, coordinate autonomous workflows, and build conversational AI systems. Features adaptive me",
@@ -329,6 +514,24 @@
    "autonomous-agents"
   ]
  },
+ "simular-ai/Agent-S": {
+  "archived": false,
+  "description": "Agent S: an open agentic framework that uses computers like a human",
+  "language": "Python",
+  "license": "Apache-2.0",
+  "pushed_at": "2026-09-05T22:02:40Z",
+  "stars": 12482,
+  "topics": [
+   "agent-computer-interface",
+   "ai-agents",
+   "computer-automation",
+   "computer-use",
+   "computer-use-agent",
+   "cua",
+   "grounding",
+   "gui-agents"
+  ]
+ },
  "topoteretes/cognee": {
   "archived": false,
   "description": "Cognee is the open-source AI memory platform for agents. Give your AI agents persistent long-term memory with small models for free",
@@ -345,6 +548,24 @@
    "cognitive-architecture",
    "cognitive-memory",
    "context-engineering"
+  ]
+ },
+ "trycua/cua": {
+  "archived": false,
+  "description": "Scale computer-use 2.0 with open-source drivers, cross-OS fleets, and benchmarks for training, evaluation, and data generation.",
+  "language": "HTML",
+  "license": "MIT",
+  "pushed_at": "2026-09-30T19:24:54Z",
+  "stars": 27613,
+  "topics": [
+   "agent",
+   "ai-agent",
+   "apple",
+   "computer-use",
+   "computer-use-agent",
+   "containerization",
+   "cua",
+   "desktop-automation"
   ]
  },
  "vectorize-io/hindsight": {
@@ -376,5 +597,14 @@
    "dsh-plugin",
    "self-evolving"
   ]
+ },
+ "zhishile/codex-auth-helper": {
+  "archived": false,
+  "description": "Codex登陆助手：安全地在本地导出您的已登录 ChatGPT 会话配置，生成符合 Codex 规范的 auth.json 本地备份文件。",
+  "language": "CSS",
+  "license": null,
+  "pushed_at": "2026-06-07T07:58:54Z",
+  "stars": 17260,
+  "topics": []
  }
 }

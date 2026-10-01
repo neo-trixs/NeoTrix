@@ -124,7 +124,9 @@ REVIEW_LICENSES = {'agpl-3.0', 'agpl-3.0-only', 'sspl-1.0', 'sspl-1.0.txt',
                    'prosperity-public-license-3.0.0', 'bsl-1.0', 'elastic-2.0',
                    'epl-2.0', 'eupl-1.2', 'osl-3.0', 'cc-by-sa-4.0',
                    # GitHub 无法判定 ⇒ **按需复核处理**，绝不当作「无限制」
-                   'noassertion', 'other', 'null'}
+                   'noassertion', 'other', 'null',
+                   # CC-BY 可商用但**须署名** ⇒ 不算宽松，归人工复核
+                   'cc-by-4.0', 'cc-by-3.0', 'cc-by-2.0', 'cc-by-sa-3.0'}
 PERMISSIVE = {'mit', 'apache-2.0', 'bsd-2-clause', 'bsd-3-clause', 'isc',
               'unlicense', '0bsd', 'mit-0', 'apache-2.0-with-llvm-exception'}
 
@@ -199,15 +201,50 @@ def main() -> int:
     print(f'  已抓 {done} 条并落盘。')
 
     lic = [c for c in cache.values() if isinstance(c, dict) and c.get('license')]
-    review = [s for s, c in cache.items()
-              if isinstance(c, dict) and c.get('license') in REVIEW_LICENSES]
-    permissive = [s for s, c in cache.items()
-                  if isinstance(c, dict) and c.get('license') in PERMISSIVE]
-    print(f'\n  有 license：{len(lic)}/{len(rows)}')
-    print(f'  宽松许可（可商用吸收，仅作**初筛**）：{len(permissive)}')
-    print(f'  ⚠️ 需**人工复核**的 copyleft / 源码可见：{len(review)}')
-    for s in review[:10]:
-        print(f'     · {s} — {cache[s]["license"]}')
+    # ⛔⛔ 必须走 `norm_lic()`：GitHub 返回**大写** SPDX（'MIT'/'AGPL-3.0'），
+    #   直接用 `in REVIEW_LICENSES`（小写集合）比较 ⇒ **恒为 0**。
+    #   ⓘ 我"修"过这个问题一次，但**只加了 norm_lic 函数、报告段的替换没落盘**
+    #   （Python 字符串 replace 的锚点没匹配），而我没验证 ⇒ 工具继续报假数据。
+    #   ⇒ 这也是本项目第 3 次栽在「字符串替换未落盘却以为成功」。
+    #   ⇒ 对策：**每次改完必须比对输出与原始分布**，不能只看 rc。
+    # ⛔⛔ 必须显式跳过 `_error`（404 / 网络失败）条目：
+    #   `norm_lic(None)` 会返回 'noassertion' 落进 REVIEW ⇒ 把
+    #   「**从未取到数据**」与「**取到了、GitHub 判不出**」混为一谈。
+    #   后者更有误导性：它让人以为「查过了，结论是判不出」，
+    #   而真相是「根本没查成」。这是我自检刚抓出来的。
+    ok = {s: c for s, c in cache.items() if isinstance(c, dict) and not c.get('_error')}
+    failed = [s for s, c in cache.items() if isinstance(c, dict) and c.get('_error')]
+    review = [s for s, c in ok.items()
+              if norm_lic(c.get('license')) in REVIEW_LICENSES]
+    permissive = [s for s, c in ok.items()
+                  if norm_lic(c.get('license')) in PERMISSIVE]
+    nolic = [s for s, c in ok.items() if not c.get('license')]
+    print(f'\n  覆盖：{len(cache)}/{len(rows)} 条已抓 · 有 license {len(lic)}')
+    print(f'  🟢 宽松许可（可商用吸收，**仅初筛**）：{len(permissive)}')
+    print(f'  🔴 需**人工复核**（copyleft / 源码可见 / GitHub 判不出）：{len(review)}')
+    for s in review[:12]:
+        print(f'     · {s} — {cache[s].get("license")}')
+    print(f'  ⚪ 无 license 字段（须人工查 LICENSE 文件）：{len(nolic)}')
+    print(f'  ⚫ 抓取失败（**无数据**，非「判不出」）：{len(failed)}')
+    for s in failed[:8]:
+        print(f'     · {s} — {cache[s].get("_error")}')
+
+    # ── 自检：分类数必须与原始分布对得上，否则说明分类逻辑又坏了 ──
+    import collections
+    raw = collections.Counter(
+        (v.get('license') or '').strip().lower() for v in cache.values()
+        if isinstance(v, dict))
+    unclassified = sum(n for k, n in raw.items()
+                       if k and k not in REVIEW_LICENSES and k not in PERMISSIVE)
+    print(f'\n  ℹ️ 原始分布 {dict(raw)}')
+    print(f'  ℹ️ 未归类 {unclassified} 种'
+          + ('（⚠️ 应为 0，否则 PERMISSIVE/REVIEW 集合漏了取值）'
+             if unclassified else ' ✅'))
+    if unclassified:
+        print('     ⇒ 这些 license 既不在「宽松」也不在「需复核」里 ⇒ **被静默漏过**')
+        for k in raw:
+            if k and k not in REVIEW_LICENSES and k not in PERMISSIVE:
+                print(f'       · {k}')
     return 0
 
 
