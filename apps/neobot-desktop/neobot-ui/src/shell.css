@@ -18,42 +18,70 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 10px 16px;
+  gap: var(--nb-gap-4);
+  /* ⛔ 改用固定 height：此前 `padding: 10px 16px` 让栏高由内容决定，
+     而按钮与 select 高度不同 ⇒ 整簇上下边缘参差，「挤在一起」。 */
+  height: var(--nb-bar-h);
+  padding: 0 var(--nb-gap-4);
   border-bottom: 1px solid var(--nb-color-line);
-  background: var(--nb-color-panel);
+  background: var(--nb-color-canvas);
   flex: 0 0 auto;
 }
 
-.nb-brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
-.nb-wordmark { font-weight: 650; font-size: 15px; letter-spacing: .2px; }
+.nb-brand { display: flex; align-items: baseline; gap: var(--nb-gap-2); min-width: 0; }
+.nb-wordmark { font-weight: 650; font-size: var(--nb-fs-lg); letter-spacing: .2px; color: var(--nb-color-ink); }
 .nb-tagline {
   color: var(--nb-muted);
-  font-size: 12px;
+  font-size: var(--nb-fs-sm);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.nb-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
-.nb-lang { display: flex; align-items: center; gap: 6px; }
-.nb-lang-label { color: var(--nb-muted); font-size: 12px; }
+.nb-actions { display: flex; align-items: center; gap: var(--nb-gap-2); flex: 0 0 auto; }
+/* 簇内竖分隔：把「信息类」与「动作类」分开，减少一整排同权按钮的噪声。 */
+.nb-actions-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: calc((var(--nb-ctl-h) - 14px) / 2) var(--nb-gap-1);
+  background: var(--nb-color-line);
+}
+.nb-lang { display: flex; align-items: center; gap: var(--nb-gap-2); }
+.nb-lang-label { color: var(--nb-muted); font-size: var(--nb-fs-sm); }
 
 .nb-actions button,
 .nb-actions select,
 .nb-modal-box button {
   font: inherit;
-  padding: 4px 10px;
+  font-size: var(--nb-fs-sm);
+  /* ⛔ 固定 height 而非 padding 撑高：padding 会因盒模型/浏览器默认差异
+     算出不同高度（实测按钮 26px、select 更高），整簇因此上下参差。 */
+  height: var(--nb-ctl-h);
+  padding: 0 10px;
   border: 1px solid var(--nb-color-line);
-  border-radius: 6px;
+  border-radius: var(--nb-r-ctl);
   background: var(--nb-color-panel-2);
-  color: inherit;
+  color: var(--nb-color-ink);
   cursor: pointer;
+  transition: background-color .12s ease, border-color .12s ease;
 }
 .nb-actions button:hover:not(:disabled),
-.nb-modal-box button:hover { background: var(--nb-color-panel-hover); }
+.nb-modal-box button:hover:not(:disabled) {
+  background: var(--nb-color-panel-hover);
+  border-color: var(--nb-color-line-strong);
+}
 .nb-actions button:disabled,
-.nb-actions select:disabled { opacity: .5; cursor: default; }
+.nb-actions select:disabled { opacity: .45; cursor: default; }
+/* 危险动作只在 hover 染色：常驻红色会让「退出」和普通按钮抢注意力。 */
+.nb-actions .nb-danger:hover:not(:disabled) { background: var(--nb-color-btn-danger-hover); }
+/* 主操作（设置）实心，与幽灵按钮拉开层级。 */
+.nb-actions .nb-primary {
+  background: var(--nb-color-btn-fill);
+  color: var(--nb-color-btn-ink);
+  border-color: transparent;
+  font-weight: 600;
+}
+.nb-actions .nb-primary:hover:not(:disabled) { background: var(--nb-color-btn-fill-hover); }
 
 /* ⛔ `display: flex` 不是可选的 —— 缺它导致**整页布局坏掉**（实测）：
  *   main 是 block 时，其子 `nb-neobot-root`（`flex:1 1 0%`）**没有 flex
@@ -62,7 +90,36 @@
  *   下方留大片空白 ③ 记忆面板「钉在底部」失效。
  *   —— 一个 `display` 声明引发三处布局缺陷，且**构建/类型/渲染全绿**。
  */
-.nb-main { display: flex; min-height: 0; overflow: hidden; }
+/* ⛔ `flex: 1 1 auto` 与 `display: flex` **两个都不可少**（实测，两个都栽过）：
+ *   ① 缺 `display:flex` ⇒ main 是 block，其子 `nb-neobot-root`（`flex:1 1 0%`）
+ *      没有 flex 容器可分配空间 ⇒ 高度退化为 auto ⇒ 实测 3168px（视口仅 820），
+ *      连带三个后果：会话列表不滚动把容器撑破、输入框浮在页面中部、
+ *      记忆面板「钉在底部」失效。
+ *   ② 缺 `flex: 1 1 auto` ⇒ **这就是下面这条注释被改掉的那次**：
+ *      `display:flex` 加上了、`flex: 1 1 auto` 却在同一次编辑里被删掉，
+ *      于是 `flex-grow` 停在初始值 **0** ⇒ main 停在内容高度。
+ *      实测：shell 840px / main **213px**，grow=0 ⇒ 页面下半屏全黑、
+ *      侧栏右边框在半途断掉、输入框浮在半空。
+ *
+ *   一句话：`display:flex` 解决「谁来分配空间」，`flex:1 1 auto` 解决
+ *   「分到多少」。两个都在，构建/类型/渲染仍然全绿。
+ */
+.nb-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 高度链：`.nb-shell` 用 100vh，而 `100vh` 在 WKWebView 里含滚动条高度，
+ * 会比内容区高那么几像素 ⇒ 底部偶发一条可滚动残边。
+ * 显式把 html/body/#root 拉成 100%，让 100% 链条与视口严格一致。 */
+html,
+body,
+#root {
+  height: 100%;
+}
 
 .nb-modal {
   position: fixed;
@@ -138,3 +195,12 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .nb-logs-title { margin: 2px 0 0; font-size: 12px; color: var(--nb-muted); }
+
+/* 设置对话框：比日志框宽（契约表列多），正文区自己滚。 */
+.nb-modal-wide { width: min(880px, calc(100vw - 48px)); }
+.nb-settings-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--nb-gap-3) 0 0;
+}

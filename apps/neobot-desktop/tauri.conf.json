@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "neobot-ui/dist",
     "devUrl": null,
-    "beforeDevCommand": "pnpm --prefix neobot-ui run dev",
-    "beforeBuildCommand": "pnpm --prefix neobot-ui run build"
+    "beforeDevCommand": "pnpm --prefix ../neobot-ui run dev",
+    "beforeBuildCommand": "pnpm --prefix ../neobot-ui run build"
   },
   "app": {
     "macOSPrivateApi": true,

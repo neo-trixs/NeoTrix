@@ -178,3 +178,47 @@ html[data-theme="light"] {
   --color-scroll-thumb: var(--nb-color-scroll-thumb);
   --color-scroll-thumb-strong: var(--nb-color-scroll-thumb-strong);
 }
+
+/* ───────────────────────── 尺度（spacing / control / type） ─────────────────────────
+ *
+ * ⛔ 这套变量存在的理由不是「整洁」，是**可判据**：此前每个组件各自写
+ *    `padding: 4px 10px` / `height: 26px`，于是「按钮高度不一致」
+ *    「间距没有节奏」这类缺陷**没有任何数字可断言** —— 门只能截图给人看。
+ *    有了尺度，同类缺陷可以写成断言：顶栏所有控件高度必须等于
+ *    `--nb-ctl-h`，间距必须是 `--nb-gap-*` 之一。
+ *
+ * 命名：ctl = control（可点控件），gap = 间距档，fs = 字号档。
+ * 档位取 2 的倍数便于像素对齐；只保留**实际用到的**档（不预置空洞枚举）。
+ */
+:root {
+  /* 控件高度。⛔ 顶栏内所有 button/select/input 必须相等 —— 差 2px 就会被读成「挤在一起」。 */
+  --nb-ctl-h: 28px;
+  /* 侧栏与会话项（比顶栏控件高，因为它要放两行文字 + 可点整行）。 */
+  --nb-row-h: 30px;
+  --nb-row-2-h: 44px;
+
+  /* 间距节奏：4 / 8 / 12 / 16 / 24。 */
+  --nb-gap-1: 4px;
+  --nb-gap-2: 8px;
+  --nb-gap-3: 12px;
+  --nb-gap-4: 16px;
+  --nb-gap-6: 24px;
+
+  /* 圆角：小控件 6px / 卡片与输入 10px / 药丸 999px。 */
+  --nb-r-ctl: 6px;
+  --nb-r-card: 10px;
+  --nb-r-pill: 999px;
+
+  /* 字号：11 小注 / 12 次要 / 13 正文 / 15 标题。 */
+  --nb-fs-xs: 11px;
+  --nb-fs-sm: 12px;
+  --nb-fs-md: 13px;
+  --nb-fs-lg: 15px;
+
+  /* 栏高：顶栏与对话区头必须等高，否则左右两栏在同一水平线上「错位」。 */
+  --nb-bar-h: 48px;
+  /* 对话正文列宽。⛔ 不设上限时超宽屏上气泡会拉到一行几百字，无法阅读。 */
+  --nb-col-w: 760px;
+  /* 侧栏宽。 */
+  --nb-side-w: 260px;
+}

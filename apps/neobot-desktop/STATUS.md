@@ -81,13 +81,14 @@ Rust 侧共注册 74 个（22 neobot_ + 41 上游同名 + 11 显式拒绝）；
   留在库里只会让人以为要维护。本数字是 STATUS 自校验门算出来的，删完即红。
 - 同步 `skills/assets/icons/neobot/`（16→1024 全档 + ico）。
 
-### 1.5 门禁（9 个，2 个已删除）
+### 1.5 门禁（10 个，2 个已删除）
 
 `nt_check_api`（契约三方对账）· `nt_check_bytes`（U+FFFD）·
 `nt_check_status`（本文件与实测一致）· `nt_shot`（界面截图）·
 `nt_check_upstream_1to1`（**vendored 前端与上游的差集 = 白名单**，含 macOS 菜单/窗口 chrome 断言）·
 `nt_check_ui_calls`（**界面可达模块里的每个 invoke 都有已注册命令**，守 `frontend/`）·
 `nt_check_ship_ui`（**交付路径门**：tauri 指向 neobot-ui + pet.html 在产物里 + 原生菜单已接线）·
+`nt_check_visual`（**视觉门**：高度链/控件等高/行高下限/列宽上限/无溢出 —— 治「全绿但界面不能用」）·
 `nt_check_layout` v2（stub-boot 真渲染：分支/几何/暗色/a11y/零异常/零未登记）·
 `nt_check_interact`（真点：发送链参数/切会话换历史/记忆面板三步/宠物渲染/两页零异常）。
 ~~以下 2 个守旧自研 UI~~ **已删除**（2026-10-01 蜕皮）：

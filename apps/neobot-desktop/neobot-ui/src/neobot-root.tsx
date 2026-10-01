@@ -524,6 +524,12 @@ export function NeoBotRoot() {
           )}
         </div>
 
+        {/* 分组标题：⛔ 没有它，搜索框与第一条会话之间没有层级，
+            列表看起来像「搜索框下面的东西」而不是「一组会话」。 */}
+        <div className="shrink-0 px-2.5 pb-1 pt-1 text-[11px] uppercase tracking-wide text-muted">
+          {t('chat.section')}
+        </div>
+
         <div
           data-testid="nb-convo-list"
           className="nb-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2"
@@ -564,7 +570,7 @@ export function NeoBotRoot() {
                 // 选中态：底色 + 左侧强调条。⛔ 只给 font-semibold 不够 ——
                 // 字号权重的差别在 13px 下几乎看不出来，用户会以为没选中。
                 style={active ? { boxShadow: 'inset 2px 0 0 var(--color-info)' } : undefined}
-                className={`mb-0.5 block w-full rounded-lg px-2 py-1.5 text-left hover:bg-btn-hover ${
+                className={`mb-1 block w-full rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-btn-hover ${
                   active ? 'bg-btn-active' : ''
                 }`}
               >
@@ -573,12 +579,18 @@ export function NeoBotRoot() {
                     {c.title || c.id}
                   </span>
                   {c.muted && (
-                    <span className="shrink-0 text-[10px] text-muted" title={t('chat.muted')}>
-                      🔇
+                    <span
+                      className="shrink-0 text-[10px] leading-none text-muted"
+                      title={t('chat.muted')}
+                      aria-label={t('chat.muted')}
+                    >
+                      {/* ⛔ 不用 emoji：彩色字形在深色侧栏里是唯一的彩色噪点，
+                          且各平台字形不一致。短横杠即「静音条」，与文字同色。 */}
+                      ▬
                     </span>
                   )}
                   {c.unread > 0 && (
-                    <span className="ml-auto shrink-0 rounded-full bg-info px-1.5 text-[10px] text-btn-ink">
+                    <span className="ml-auto shrink-0 rounded-full bg-info px-1.5 text-[10px] tabular-nums text-btn-ink">
                       {c.unread}
                     </span>
                   )}
