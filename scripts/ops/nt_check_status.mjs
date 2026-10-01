@@ -57,7 +57,15 @@ const feFiles = [];
   }
 })(join(FE, "src"));
 const feLines = feFiles.reduce((n, f) => n + readFileSync(f, "utf8").split("\n").length, 0);
-const claimedFe = doc.match(/([\d,]+)\s*行/);
+// ⛔ 必须锚在 `### 1.1 前端 —— N 行` 这个**声明位**，不能用全文首个 `N 行`：
+//    文档里任何一处提到「731 行 navbar.tsx」都会把声明顶掉 —— 2026-10-01 实测：
+//    我在 §0 写「不是那 731 行」⇒ 门报「文档 731 vs 实测 16405」，
+//    差了一个数量级。**判据不锚定 ⇒ 文档任何改动都能挪动它。**
+const feAnchor = doc.match(/###\s*1\.1\s*前端[^\n]*?([\d,]+)\s*行/);
+const claimedFe = feAnchor ? [feAnchor[0], feAnchor[1]] : null;
+if (!feAnchor) {
+  problems.push("STATUS 里找不到「### 1.1 前端 —— N 行」这句，无法核对前端行数");
+}
 if (claimedFe && Number(claimedFe[1].replace(/,/g, "")) !== feLines) {
   problems.push(`前端总行数：文档 ${claimedFe[1]} vs 实测 ${feLines}`);
 }

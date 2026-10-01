@@ -68,5 +68,9 @@
   "shell.theme": "Theme",
   "shell.themeSystem": "System",
   "shell.themeDark": "Dark",
-  "shell.themeLight": "Light"
+  "shell.themeLight": "Light",
+  "chat.emptyTitle": "No messages yet",
+  "chat.emptyHint": "Send a message, or pick a conversation on the left.",
+  "chat.groupToday": "Today",
+  "chat.groupEarlier": "Earlier"
 }
