@@ -31,7 +31,41 @@ evidence:    <授权书/法务意见/商业属性判定 的链接或路径>
 
 ---
 
-## 当前状态：**已重新签署 ACKNOWLEDGE-2**（取代已失效的 ACKNOWLEDGE-1）
+## 当前状态：**无有效签署** —— ACKNOWLEDGE-2 已于 2026-10-01 失效
+
+### 认定变更时间线（不可删除）
+
+| # | 日期 | 认定 | 后果 |
+|---|---|---|---|
+| 1 | 2026-10-01 | **商用** | ACKNOWLEDGE-1 的 `condition #3` 触发 → 失效 |
+| 2 | 2026-10-01 | **开源非商用** | 触发条件消失 → 签 ACKNOWLEDGE-2 |
+| 3 | 2026-10-01 | **商用**（再次） | ACKNOWLEDGE-2 的 `condition #1` 触发 → **再次失效** |
+
+⚠️ **同日三次认定、两次反转。** 这不是「记录没维护好」，而是：
+**当前状态缺少一个能自动判定「是否商用」的机器信号**，
+所以每次认定变化都只能靠人重新说一遍，而人会变。
+⇒ 这正是 ACKNOWLEDGE-2 `condition #1` 存在的原因：它让失效**可被复现**，
+不需要临场判断。三次认定全部留痕，便于事后复盘。
+
+### 商用认定下的处置（与前次不同：这次有重构方案）
+
+`ACKNOWLEDG-1`/`-2` 均不适用于商用。商用要合规只有两条路：
+**(A) 取得上游书面授权**（保留 vendored 树）
+**(B) 自研重构，不带 vendored 代码**（`docs/architecture/FRONTEND-REBUILD-2026-10-01.md`）
+
+**事实基线（实测，支持 B 可行）**：我方自有前端仅 **3 个 ts + 1 个 css / 684 行**，
+依赖只有 `react` + `@tauri-apps/api/core` + 自有 `shim.ts`，
+调用仅 **2 个** Tauri 命令（`log_frontend` / `neobot_api_call`），
+对上游 `store`/`hooks` **零依赖**。
+⇒ B 不是「重写 86K 行」，而是**逐能力裁决**：绝大多数 vendored 能力
+（ssh / worktree / scheduler / model 切换 / 插件市场）是 **DSH 的功能，不是 NeoBot 的功能**。
+
+---
+
+<details>
+<summary>历史条目（ACKNOWLEDG-1 / ACKNOWLEDGE-2 原文，保留以便追溯）</summary>
+
+## 当前状态（历史）：曾签署 ACKNOWLEDGE-2（现已失效，见上）
 
 ### 事实变更记录（不可删除）
 
@@ -61,6 +95,7 @@ paid tier / pricing page / per-seat` ⇒ **8 条命中，逐条读原文全部�
 
 tree:        apps/neobot-desktop/frontend
 clause:      No Commercial Secondary Development (frontend/LICENSE.details)
+status:      void            ← 2026-10-01 第三次认定（商用）触发 condition #1，作废
 decision:    accepted-with-condition
 owner:       NeoTrix 项目所有者 —— 决定由所有者作出，agent 于 2026-10-01 代为记录
              （不填具体人名：agent 不得冒充个人签署）
@@ -106,3 +141,4 @@ condition:
 ⛔ 禁止的处置：为了让门变绿而删 deny 名单、改门脚本、或删除失效/变更记录。
 门转绿的唯一正当原因是「取得了上游书面授权」并据此新签。
 
+</details>

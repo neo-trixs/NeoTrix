@@ -1,0 +1,139 @@
+# NeoBot 前端自研重构清单（商用合规路径 B）· 2026-10-01
+
+> 触发：项目所有者确认 **商用** ⇒ 上游 `deepseek-harness-desktop` 的
+> 「No Commercial Secondary Development」附加条款**生效** ⇒ 若继续使用
+> 1:1 vendored 且已修改的前端，即构成未授权的商用二次开发。
+> 本文件给出**路径 B（自研重构）**的逐能力裁决与工作量。
+> 路径 A（取得上游书面授权）见 §6。
+
+## 0. 一句话结论
+
+**范围不是「重写 86K 行」。** 实测：我方自有前端只有 **3 个 ts + 1 个 css / 684 行**，
+依赖只有 `react` + `@tauri-apps/api/core` + 自有 `shim.ts`，
+只调 **2 个** Tauri 命令，对上游 `store`/`hooks` **零依赖**。
+vendored 的 86K 行里，**绝大部分是 DSH 的功能，不是 NeoBot 的功能**。
+⇒ 真正要裁决的是「哪些能力 NeoBot 要」，而不是「怎么重写 86K 行」。
+
+## 1. 事实基线【实测，2026-10-01】
+
+| 组成 | 文件 | 行数 | 归属 |
+|---|---|---|---|
+| 我方自有前端 | 4（3 ts + 1 css） | **684** | NeoTrix 原创 |
+| `src/`（vendored） | 128 | 14,596 | dsh-tauri |
+| `packages/`（vendored，13 包） | 766 | 71,807 | dsh-tauri |
+| `src/vendor/openghost/` | 3 js | ~2,200 | ANDRETRIPOL/OpenGhost（**独立授权链**） |
+| **vendored 合计** | **~897** | **~88,600** | — |
+| 构建硬依赖 | `tauri.conf.json`: `frontendDist=frontend/dist` · `beforeBuildCommand=pnpm run build` | | |
+
+### 1.1 我方自有代码的依赖面（这是 B 可行的关键证据）
+
+| 文件 | 行 | import | 调用的 Tauri 命令 |
+|---|---|---|---|
+| `src/neobot-root.tsx` | 477 | `react` · `@tauri-apps/api/core` · `./vendor/openghost/shim.ts` | `log_frontend` · `neobot_api_call` |
+| `src/api-panel.ts` | 184 | **无** | — |
+| `src/dom.ts` | 23 | **无** | — |
+| `src/api-panel.css` | — | — | — |
+
+⇒ **对上游 `store`(4,230 行) / `hooks`(1,151 行) 零依赖。**
+自研 UI 不需要重建状态管理层。
+
+## 2. 逐能力裁决
+
+判据三问：① NeoBot 商用是否需要？② 需要的话，自研成本 vs 授权成本？
+③ 是否已被我方代码绕过？
+
+### 2.1 必做（阻断商用合规）
+
+| # | 项 | 现状规模 | 自研工作量 | 说明 |
+|---|---|---|---|---|
+| **R1** | **应用外壳**（`index.html` 入口 · `main.tsx` → `neobot-root`） | 上游 `main.tsx` | **0.5 人日** | 我方 root 已在，只需换入口。这是 B 的**唯一硬阻断项** |
+| **R2** | **最小 chrome**（窗口/滚动/快捷键） | `src/layout` 2,948 行 | **2–3 人日** | 自研。**不抄上游布局代码**（它在 no-commercial 范围内） |
+| **R3** | `neobot_api_call` 后端契约固化 | 已在 Rust 侧 | **1 人日** | 把当前仅有的 2 个命令固化为版本化契约；UI 重写期间不许漂移 |
+| **R4** | i18n（zh-CN / en-US） | `src/i18n` 70 行 + 两份 locale | **1 人日** | 词典小，自写成本低于剥离上游 |
+| **R5** | `vendor/openghost` **独立裁决** | 3 js / ~2,200 行 | **0 或 2 人日** | 它是 **MIT（渲染引擎）且无附加条款** ⇒ **可保留**，但须从 vendored#1 的目录里**物理迁出**，否则仍被打包进受限树。见 §4 |
+
+**R1–R4 合计约 5.5–6.5 人日。** 这是让 NeoBot **不含任何 no-commercial 代码**的最小代价。
+
+### 2.2 需你裁决（要或不要，决定后才有工作量）
+
+| # | 能力 | vendored 规模 | 我的建议 | 理由 |
+|---|---|---|---|---|
+| **D1** | 桌面宠物 `dsh-tauri-pet` | 3,703 行 + `src/pet` 1,283 | **暂不做** | 5,000 行自研不划算；商用前先下架该功能 |
+| **D2** | 插件/Skill/MCP 市场 `dsh-tauri-extension` | 5,272 | **不自研** | 这是 DSH 生态功能，NeoTrix 有自己的 capability 体系（`nt_policy`） |
+| **D3** | 远程机 SSH `dsh-tauri-ssh` | **19,052（最大）** | **不自研** | 体量最大且与 NeoTrix 定位无关 |
+| **D4** | worktree 管理 `dsh-tauri-worktree` | 8,541 | **不自研** | DSH 专属；NeoTrix 用 `nt_worktree_gate.sh` |
+| **D5** | 调度器 `dsh-tauri-scheduler` | 5,056 | **不自研** | NeoTrix 有 `l6_meta` 运行时 |
+| **D6** | 模型切换 `dsh-tauri-model` | 7,601 | **不自研** | NeoTrix 有 `nt_llm` |
+| **D7** | 变更追踪 `dsh-tauri-experimental` | 7,387 | **不自研** | 与 NeoTrix 无关 |
+| **D8** | 归档 `dsh-tauri-archive` | 2,187 | **不自研** | 同上 |
+| **D9** | 右键菜单 `dsh-tauri-rightclick` | 2,404 | **暂不做** | 体量小但需原生集成；先下架 |
+| **D10** | 组件库 `dsh-tauri-ui` + `src/ui` | 5,503 + 3,545 | **部分自研** | 只保留 R2 真正用到的组件；逐个评估，不整包搬 |
+
+> **D1–D10 全部「不自研」的话，总工作量 = 0**。它们是**功能取舍**，不是重构任务。
+> 这是本文件最重要的判断：**商用合规的成本主要不是写代码，是砍功能。**
+
+### 2.3 明确不做
+
+| 项 | 理由 |
+|---|---|
+| 抄上游任何代码「再改」 | 仍在 no-commercial 条款内，改不改都违规 |
+| 保留 `dsh-` 包名 | 包名是标识符不是品牌（VENDOR.md 已注明），但自研后应整体去掉以免混淆 |
+
+## 3. 执行顺序与里程碑
+
+```
+M1  R3 后端契约固化（先锁接口，否则 UI 重写会漂移）        1 人日
+M2  R1 换入口 + R4 i18n → 跑通「最小 NeoBot」               1.5 人日
+M3  R2 自研 chrome（不抄上游）                             2–3 人日
+M4  R5 vendor/openghost 迁出 + 独立记录                     0.5 人日
+M5  砍掉 D1–D10（功能下架，不是重构）                       逐项
+M6  删除 vendored#1 整树 + 移除 tauri.conf 的 pnpm 链路     0.5 人日
+    ─────────────────────────────────────────────
+    合计                                                    约 6 人日（不含砍功能的连带测试）
+```
+
+**M6 之前不能商用分发。** M1–M5 期间 NeoBot 可继续内部使用
+（内部使用不构成分发，但**条款的"直接使用"边界仍需上游确认**）。
+
+## 4. ⛔ 最容易漏掉的一步：R5 的「物理迁出」
+
+`src/vendor/openghost/` 是 **MIT**（渲染引擎在 MIT 内，非商用保留只覆盖
+名字/徽标/视觉设计），**没有附加条款** ⇒ 技术上可保留。
+
+**但它现在住在 `apps/neobot-desktop/frontend/` 内部**，
+而该目录整体是 vendored#1。⇒ 只要打包 `frontend/dist`，
+MIT 文件与 no-commercial 文件就混在同一个产物里。
+
+必须做的：
+1. 把 `src/vendor/openghost/` **迁到 `apps/neobot-desktop/` 之外**
+   （如 `apps/neobot-desktop/neobot-ui/vendor/openghost/`）
+2. 保留其 `VENDOR-OPENGHOST.md`（逐文件 md5 锁，是本仓最好的 vendor 记录范例）
+3. 重跑 `check-license.sh` 确认它作为**独立树**被正确管辖
+
+⛔ 不做这一步 = 商用产物里仍混有受限来源，R1–R4 全白做。
+
+## 5. 风险
+
+| 风险 | 判据 | 缓解 |
+|---|---|---|
+| 「重写」时不自觉抄了上游 | 检索新代码与 vendored 树的**标识符/字符串/注释**重合 | 门：新增 `check-derivation` 扫新 UI 与 vendored#1 的文本重合 |
+| 砍功能连带打断测试 | `vitest.*.config.ts` 4 份 + `test/` | 每个 M 步跑一次前端测试；连带失败逐项判定 |
+| `pnpm-lock.yaml` 与上游耦合 | 迁出后 workspace 解析可能失效 | M4 单独验证 `pnpm install && pnpm build` |
+| 条款边界仍模糊 | 「内部使用」是否算 direct use 未定 | 需上游书面答复（§6） |
+
+## 6. 路径 A（取得授权）——建议同时推进
+
+自研 6 人日 vs 授权沟通成本未知。**建议两条并行**：
+- **A**：向 `dsh-tauri/deepseek-harness-desktop` 提 issue 问
+  「MIT + no-commercial-secondary-development 的前提下，
+  非商用内部使用 / 商用自研重构，是否允许保留渲染层以外的接口设计？」
+  （**问设计而非代码**，上游通常对接口/理念比实现更宽容）
+- **B**：按 §3 执行
+
+若 A 成功且上游愿意放宽，B 的 R1/R2 可降级为「按授权范围裁剪」，
+省下 3–4 人日。
+
+---
+
+*依据：`.neotrix/LICENSE-EXCEPTIONS.md` 认定时间线 · `VENDOR.md` 条款原文对照 ·
+`check-license.sh` 实时判定。所有数字为 2026-10-01 实测。*
