@@ -794,6 +794,22 @@
    "spec": "DECOMPOSE-PARITY-2026-09-30 §4/§7；neotrix-core/tests/nt_capability_parity.rs（我方侧注册表）"
   },
   {
+   "id": "map-reconcile",
+   "query": [
+    "地图过期了",
+    "台账陈旧",
+    "文档数字对不对",
+    "现状还成立吗",
+    "自检文档",
+    "断言核对"
+   ],
+   "tool": "python3 scripts/ops/nt_map_reconcile.py [--doc <path>] [--strict] [--list-predicates]",
+   "kind": "report",
+   "read_only": true,
+   "when_not": "① 谓词只认 ```assert 围栏块里的 6 种廉价确定形式（file/nfile/lit/nlit/test/cmd）—— 行内代码里的 file:xxx 不算；② **不要把「正在自检的工具」写进它自己的断言**（实测无限递归 120s 超时），也不要用 nlit 检查本文件（为解释改动必须引用旧措辞 ⇒ 永远失败）；③ 默认只报告不失败：谓词可能写错，门建在错谓词上比没门更危险（G7），要 rc=1 得显式 --strict；④ file: 谓词含「被 git 跟踪」判定 ⇒ 天然排除他窗在途未提交的工作，地图不该记别人的在途成果",
+   "spec": "docs/architecture/GLOBAL-MAP-DEFECTS-2026-09-30.md §3 断言块（9 条，当日 9/9 HOLDS）"
+  },
+  {
    "id": "check-license",
    "query": [
     "许可",
