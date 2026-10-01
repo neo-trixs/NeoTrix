@@ -562,3 +562,58 @@ pub struct Hexagram { pub bits: u8 }   // ← 同名，但是**不同**类型
 
 ⇒ 这四次都是「**误报量异常大**」暴露的：343 → 242 → 212。
 **误报率高就立即查判据，不要靠调阈值掩盖**（§7.5 同源纪律）。
+
+### 9.6 ⛔ `multi_agent/` 不接线 —— 接线它立刻暴露 8 个编译错误（3 个真 bug）
+
+本轮尝试按 `nt_core_cost_ladder` 的先例给它**接线**（`pub mod multi_agent;`），
+结果立即编译失败，实测 **8 个错误**：
+
+| 错误 | 性质 | 位置 |
+|---|---|---|
+| `E0382: use of moved value: worker_results` | **真 bug** | `graph_orch/scheduler.rs` |
+| `E0308: mismatched types` | **真 bug** | `graph_orch/dag.rs` |
+| `E0277: the size for values of type str cannot be known` | **真 bug** | `graph_orch/dag.rs` |
+| `E0277: the trait bound str: Into<String>` | 真 bug | `coordinator/load_balancer.rs` |
+| `unused import: super::coordinator::AgentEntry` / `super::load_balancer::AgentStats` / `HashSet` | 卫生问题 | `coordinator/*.rs`、`crew.rs` |
+| `unused variable: total` | 卫生问题 | `coordinator/monitor.rs` |
+
+⇒ **这是「历史绿灯是假的」的最强实证**：这 4,655 行从未参与编译，
+所以里面的 move-after-use、类型不匹配、unsized `str` 一直存在却无人发现。
+
+⛔ **本轮因此回退接线**，只保留取证。理由：
+接线等于**立刻改动一批从未验证过的代码**（修 3 个真 bug + 3 处卫生问题），
+那是另一个范围的工作，不该夹带在「孤儿清理」里。
+
+### 9.7 为什么这簇**不该删**（与 `nt_consciousness_core` 的 7 个孤儿相反）
+
+实测独立 crate `neotrix-multi-agent` 只覆盖
+`multi_agent` / `coordinator` / `coordination` / `hive` / `god_agent`，
+而旧目录里：
+
+| 模块 | 行数 | crate 是否有对应物 |
+|---|---|---|
+| `role` | 209 | ❌ 无（`AgentRole` 在 crate 里有，但 `RoleConfig` 等不在） |
+| `crew` | 436 | ❌ **无**（`Crew` 定义数 = 0） |
+| `delegation` | 389 | ❌ **无**（`Delegation` 定义数 = 0） |
+| `aggregation` | 410 | ❌ **无**（`Aggregation` 定义数 = 0） |
+| `graph_orch/` | — | ❌ **无**（DAG 编排：`Dag` `DagNode` `DagMonitor` `DagOptimizer`） |
+
+⇒ 这 1,444 行 + `graph_orch` 是**未被取代的独一份能力**，删除 = 丢能力。
+⚠️ 另注：`l1_action/.../state_graph::DagEdge` 与 `graph_orch::DagEdge` 是
+**同名不同类型**（R-P42 注释明说复用另一套），**不构成替代**。
+
+⇒ 三类孤儿必须**分别处置**，不能一把删：
+| 类型 | 判据 | 处置 |
+|---|---|---|
+| 已被取代的副本 | 新版有对应物且更完整 | **删**（`nt_core_qtest.rs` 538 行、`nt_consciousness_core/` 7 文件） |
+| 独一份但从未编译 | 无对应物，且接线即编译失败 | **记录 + 单独排期修**（本节） |
+| 有意的归档区 | 名字即语义（`archive/`） | **不动**（`nt_consciousness_core/archive/` 3 文件） |
+
+### 9.8 一条偶发测试失败的记录（避免下轮误判）
+本轮某次 `cargo test -p neotrix --lib` 出现 `12216 passed / 1 failed`，
+**紧接着两次连续跑均为 12,217 全绿**。
+已核实我对 `nt_core/mod.rs` 的改动是 **9 行纯注释、零代码变更**
+⇒ 该失败与本轮无关，是**既有的偶发测试**（仓内 587 个文件含
+时间/随机/并发原语，是这类偶发的常见来源）。
+⚠️ 记录在此是为了：**下次看到单次失败不要立刻归因于自己的改动**，
+应先复跑确认是否可复现。

@@ -5,6 +5,15 @@
 pub mod capability;
 pub mod nt_crt;
 pub mod nt_core_cost_ladder; // 成本阶梯（孤儿接线 T45+2）
+// ⛔ `multi_agent` **本轮不接线**，理由是实测证据（2026-09-30）：
+// 尝试接线后立即暴露 **8 个编译错误**（3 个是真 bug：`E0382` move 后使用、
+// `E0308` 类型不匹配、`E0277` unsized `str`），分布在
+// `graph_orch/{scheduler,dag}.rs`、`coordinator/{load_balancer,monitor}.rs`、`crew.rs`。
+// ⇒ 这 4,655 行**从未被编译过**，「历史绿灯」是假的；接线它等于
+//    **立刻改动一批从未验证过的代码**，属另一个范围的工作。
+// ⛔ 故本轮只保留取证，不接线。完整记录见
+//    docs/architecture/MIRROR-BANK-2026-09-30.md §9.6。
+
 pub mod nt_iit_phi;
 pub mod nt_meta;
 pub mod nt_forecast;
