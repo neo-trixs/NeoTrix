@@ -88,16 +88,41 @@ DROPPED: Dict[str, str] = {
            '**显式决策**，恢复只需删本行',
 }
 
+# 逐命令的「不在本产品范围内」登记 —— **最细粒度**。
+#
+# 与 DROPPED/PENDING 的区别：
+#   DROPPED[域]  = 整个域随 vendored 树删除
+#   PENDING[域]  = 该域功能挂里程碑、尚未建
+#   NOT_NEEDED[] = **后端已实现**，但本产品**没有它的 UI 场景**
+#
+# ⛔ 判据纪律：写进这里必须有**站得住的理由**，不能是「暂时没空」。
+#    下面每条都指明「为什么这个产品不需要它」或「接了会更糟」。
+NOT_NEEDED: Dict[str, str] = {
+    # 多窗口：自持 UI 是**单窗口**应用（一个 #root 挂 NeoBotRoot），
+    # 无第二个窗口可开。接了只能做出「点了没反应」的按钮。
+    'create_app_window': '多窗口：自持 UI 为单窗口架构，无第二窗口可开',
+    'remote_open_window': '多窗口：同上',
+    # ⛔ 契约表自注：「arboard 未暴露像素读取（image-data feature 未开）
+    #    ⇒ **诚实报错**而非返空 data URL」。
+    #    ⇒ 命令在、调用必失败。接它 = 交付一个点了就报错的按钮，
+    #    比不接更糟（用户会以为功能坏了）。
+    'read_clipboard_image': '后端 arboard 未开 image-data feature，调用**必然失败**；'
+                            '接它等于交付「点了就报错」的按钮',
+    # 以下两条后端确实可用，但当前自持产品（chat + api-panel + 顶栏）
+    # **没有对应 UI 场景**。不是「做不到」，是「不在范围内」。
+    # 若日后加「导出日志到文件」「有新消息时原生通知」再接线即可。
+    'reveal_in_folder': '后端可用，但本产品无「在访达中显示」场景（无文件导出/打开路径 UI）',
+    'show_native_notification': '后端可用，但本产品无「原生通知」场景'
+                                '（chat 在应用内，无后台提醒需求）',
+}
+
 # 「已建但未建」的显式登记 —— 挂里程碑，不挂意愿。
 # 语义：该域的命令在契约表里可用，但该功能在自持树**还没实现**（非「被移除」）。
 # 删除某行 = 承诺「不再做它」，届时门会因「活着且无自持对应物」而转红。
-PENDING: Dict[str, str] = {
-    'layout': 'R2 自研 chrome 未做：菜单/多窗口/读日志等外壳命令（create_app_window、'
-              'remote_open_window、open_external_url、quit_app、read_run_logs、'
-              'read_clipboard_image）属应用外壳，自持树尚无此层',
-    'i18n': 'R4 i18n 未做：set_language 需先有语言切换入口（自持树已备词条文件，'
-            '尚无切换 UI）',
-}
+# R2（外壳）与 R4（i18n）**已实现并经运行时验证**（见 neobot-ui-smoke.mjs：
+# 语言切换实测 documentElement.lang zh-CN→en-US 且按钮文案随之改变；
+# read_run_logs 弹窗返回真实内容）⇒ 两个域已从 PENDING 移出。
+PENDING: Dict[str, str] = {}
 
 # `invoke` 提取正则 —— **刻意复用 nt_api_contract.py 的那一条**。
 # 教训（M3）：本仓已两次因自写正则抽不出调用点而误判（一次报 32 条假缺陷、
@@ -244,7 +269,8 @@ def main() -> int:
         # ── 唯一不变量：不允许静默丢弃「今天真能用」的功能 ──
         if state in ('ALIVE', 'MIXED') and dom not in DROPPED and dom not in PENDING:
             covered = alive & mine
-            missing = alive - mine
+            # 逐命令豁免：NOT_NEEDED 里登记过的**不算「丢失」**
+            missing = alive - mine - set(NOT_NEEDED)
             if dom == '(根·我方已迁入)':
                 continue  # 我方自持代码本身，逐字已进自持树
             if missing:
@@ -267,6 +293,11 @@ def main() -> int:
             n = len(doms[dom])
             a = len([c for c in doms[dom] if contract.get(c) == 'Implemented'])
             print(f'⏳ 待建 {dom}（{a}/{n} 可用，尚未实现而非被移除）：{why}')
+    if NOT_NEEDED:
+        print(f'\n逐命令「不在本产品范围」{len(NOT_NEEDED)} 条（后端已实现但无 UI 场景）：')
+        for cmd, why in sorted(NOT_NEEDED.items()):
+            st = contract.get(cmd, '?')
+            print(f'  · {cmd} [{st}] —— {why}')
 
     if fail:
         print(f'\nFAIL: {len(fail)} 项')

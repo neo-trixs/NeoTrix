@@ -5,8 +5,10 @@
   "type": "module",
   "description": "NeoBot 自持前端 UI —— 零 vendored 依赖（商用重构产物，R1/R3/R5）",
   "scripts": {
+    "dev": "vite",
     "typecheck": "tsc --noEmit",
-    "build": "vite build"
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.0",

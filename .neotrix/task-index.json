@@ -906,12 +906,18 @@
     "自持入口",
     "商用重构",
     "M4",
-    "M1"
+    "M1",
+    "R2",
+    "外壳",
+    "语言切换",
+    "入口切换",
+    "tauri.conf",
+    "删树"
    ],
    "tool": "python3 scripts/ops/nt_neobot_ui_wiring.py",
    "kind": "gate",
    "read_only": true,
-   "when_not": "改 vendored frontend 内部逻辑时不要用它（那是上游代码，不归本门）；漂移报警且**原件 mtime 更新**时不要贸然同步 —— 他窗在途改动，同步会竞速",
+   "when_not": "改 vendored frontend 内部逻辑时不要用它（那是上游代码，不归本门）；漂移报警且**原件 mtime 更新**时不要贸然同步 —— 他窗在途改动，同步会竞速 入口已切到 neobot-ui 后，**别再用 `pnpm run build`（无 --prefix）** —— Tauri 在 tauri.conf.json 所在目录执行，那里没有 package.json",
    "spec": "FRONTEND-REBUILD R1/R5；rc=0 才算接线完整，5 项检查：复制件漂移 / 入口无 @/ 上游别名与 ../ 逃逸 / vite base 为相对路径（默认 '/' 在 file:// 下白屏且构建不报错）/ 产物无上游特征符 / openghost 已迁出受限树"
   },
   {

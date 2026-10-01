@@ -104,14 +104,27 @@ const STUB_RETURNS = {
     crystal_version: '0.0.0', tool_count: 0, model: '', model_source: '',
   },
   neobot_send: {},
+  // R2 外壳用到的已实现命令
+  set_language: null,
+  read_run_logs: 'line-1 harness ready\nline-2 self-hosted ui mounted\n',
+  quit_app: null,
+  open_external_url: null,
   // 无返回值命令
   log_frontend: null,
   neobot_api_call: null,
 }
 
-const TAURI_STUB = () => {
+/**
+ * ⚠️ 这里**必须**把词表当**参数**传进来，不能用闭包。
+ * `page.addInitScript(fn)` 只序列化 `fn.toString()` —— Node 侧的模块级
+ * `const STUB_RETURNS` 在浏览器里是 `undefined`，于是每次 invoke 都抛
+ * `ReferenceError`，而 UI 把错误 `.catch` 掉照样渲染 ⇒ **测出的是错误态**。
+ * 这个坑我踩过一次：首版桩内联（无闭包）是对的，改成查表后反而错，
+ * 且因为错误被吞，「渲染通过」的假象一直到我加功能断言才暴露。
+ */
+const TAURI_STUB = (table) => {
   window.__TAURI_INTERNALS__ = {
-    invoke: (cmd) => Promise.resolve(STUB_RETURNS[cmd] ?? null),
+    invoke: (cmd) => Promise.resolve(table[cmd] ?? null),
     transformCallback: (cb) => {
       const id = Math.floor(Math.random() * 1e9)
       window[`_${id}`] = cb
@@ -143,10 +156,11 @@ async function probe(browser, label) {
   })
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
 
-  await page.addInitScript(TAURI_STUB)
+  await page.addInitScript(TAURI_STUB, STUB_RETURNS)
   let httpStatus = 0
   let children = 0
   let textLen = 0
+  let r_children = 0
   try {
     const resp = await page.goto(`http://127.0.0.1:${PORT}/app/index.html`, {
       waitUntil: 'load',
@@ -161,11 +175,37 @@ async function probe(browser, label) {
     })
     children = info.children
     textLen = info.textLen
+    r_children = info.children
   } catch (e) {
     errors.push(`navigation: ${e.message}`)
   }
+  // ── R2/R4 功能断言：外壳渲染 + 语言切换**真的生效** ──
+  const feat = {}
+  if (r_children > 0) {
+    feat.shell = await page.evaluate(() => ({
+      wordmark: document.querySelector('.nb-wordmark')?.textContent ?? null,
+      hasLangSelect: !!document.querySelector('.nb-lang select'),
+      buttons: [...document.querySelectorAll('.nb-actions button')].map((b) => b.textContent),
+    })).catch(() => null)
+    // 语言切换：改 select → 断言 documentElement.lang 与可见文案都变了
+    feat.langBefore = await page.evaluate(() => document.documentElement.lang)
+    feat.textBefore = await page.evaluate(
+      () => document.querySelector('.nb-actions button')?.textContent ?? '')
+    await page.selectOption('.nb-lang select', 'en-US').catch(() => {})
+    await page.waitForTimeout(500)
+    feat.langAfter = await page.evaluate(() => document.documentElement.lang)
+    feat.textAfter = await page.evaluate(
+      () => document.querySelector('.nb-actions button')?.textContent ?? '')
+    // 日志弹窗（走 read_run_logs）
+    await page.click('.nb-actions button').catch(() => {})
+    await page.waitForTimeout(400)
+    feat.logsModal = await page.evaluate(() => {
+      const pre = document.querySelector('.nb-modal-box pre')
+      return pre ? pre.textContent.slice(0, 40) : null
+    })
+  }
   await page.close()
-  return { label, httpStatus, children, textLen, errors, badUrls }
+  return { label, httpStatus, children: r_children, textLen, textLen, errors, badUrls, feat }
 }
 
 // 用系统 Chrome：免去 npx playwright install 的 150MB 下载（本仓已装 Chrome）
@@ -185,7 +225,7 @@ try {
     const errors = []
     page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
     page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
-    await page.addInitScript(TAURI_STUB)
+    await page.addInitScript(TAURI_STUB, STUB_RETURNS)
     let children = 0
     try {
       const resp = await page.goto(`http://127.0.0.1:${PORT}/app/index.abs.html`, {
@@ -229,6 +269,22 @@ for (const r of rows) {
   if (r.errors.length) {
     console.log(`     console/page error × ${r.errors.length}:`)
     for (const e of r.errors.slice(0, 3)) console.log(`       · ${e.slice(0, 110)}`)
+  }
+  if (r.feat && r.feat.shell) {
+    const f = r.feat
+    console.log(`     外壳：wordmark=${JSON.stringify(f.shell.wordmark)} `
+      + `语言选择器=${f.shell.hasLangSelect ? '✅' : '⛔'} `
+      + `按钮=${JSON.stringify(f.shell.buttons)}`)
+    console.log(`     语言切换：documentElement.lang ${f.langBefore} → ${f.langAfter}`
+      + ` · 按钮文案 ${JSON.stringify(f.textBefore)} → ${JSON.stringify(f.textAfter)}`)
+    console.log(`     日志弹窗：${f.logsModal === null ? '⛔ 未打开' : '✅ ' + JSON.stringify(f.logsModal)}`)
+    if (r.label.startsWith("base:'./'")) {
+      if (!f.shell.wordmark) { console.log('     ⛔ 外壳未渲染'); fail++ }
+      if (!f.shell.hasLangSelect) { console.log('     ⛔ 语言选择器缺失'); fail++ }
+      if (f.langAfter !== 'en-US') { console.log('     ⛔ 语言切换未改 document lang'); fail++ }
+      if (f.textBefore === f.textAfter) { console.log('     ⛔ 语言切换未改可见文案'); fail++ }
+      if (f.logsModal === null) { console.log('     ⛔ 日志弹窗未打开'); fail++ }
+    }
   }
   if (r.label.startsWith("base:'./'")) {
     if (!rendered) {

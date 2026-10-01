@@ -1,0 +1,85 @@
+/* 自持外壳样式（R2）。刻意用中性灰阶 + 一个强调色，
+   不引入任何 vendored 主题变量 —— 那些是 DSH 概念（get_dsh_theme）。 */
+
+.nb-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font: 14px/1.55 -apple-system, "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
+  color: #1c1c1e;
+  background: #fbfbfd;
+}
+
+.nb-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #e3e3e8;
+  background: #fff;
+  flex: 0 0 auto;
+}
+
+.nb-brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.nb-wordmark { font-weight: 650; font-size: 15px; letter-spacing: .2px; }
+.nb-tagline {
+  color: #78787d;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nb-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.nb-lang { display: flex; align-items: center; gap: 6px; }
+.nb-lang-label { color: #78787d; font-size: 12px; }
+
+.nb-actions button,
+.nb-actions select,
+.nb-modal-box button {
+  font: inherit;
+  padding: 4px 10px;
+  border: 1px solid #d3d3d8;
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+}
+.nb-actions button:hover:not(:disabled),
+.nb-modal-box button:hover { background: #f2f2f5; }
+.nb-actions button:disabled,
+.nb-actions select:disabled { opacity: .5; cursor: default; }
+
+.nb-main { flex: 1 1 auto; min-height: 0; overflow: auto; }
+
+.nb-modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / .32);
+  padding: 24px;
+}
+.nb-modal-box {
+  width: min(880px, 100%);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 40px rgb(0 0 0 / .22);
+}
+.nb-modal-box header { display: flex; align-items: center; justify-content: space-between; }
+.nb-modal-box pre {
+  margin: 0;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 6px;
+  background: #f5f5f7;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

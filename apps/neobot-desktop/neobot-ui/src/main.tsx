@@ -18,7 +18,7 @@
  * # 与上游入口的差别
  *
  * 上游 `main.tsx` 挂 `QueryClientProvider` / `ToastProvider` /
- * `OverlaysProvider`（三个上游 provider）。我方 UI **不依赖** 其中任何一个
+ * `OverlaysProvider`（三个上游 provider）。我方 UI **不依赖**其中任何一个
  * ——它只用 react 内建 hooks + `@tauri-apps/api/core` 的 `invoke`。
  * 故此处不挂 provider，避免把 vendored 依赖重新引进自持树。
  *
@@ -28,20 +28,23 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 
 import { NeoBotRoot } from './neobot-root'
+import { Shell, useExternalLinks } from './shell'
+// 副作用导入：模块加载即同步 `document.documentElement.lang`，
+// openghost 垫片读它决定代码块复制按钮的 aria-label。
+import './i18n'
 
 /**
- * 设定 `document.documentElement.lang`。
- *
- * 不是装饰：`vendor/openghost/shim.ts` 的 `lang()` 读
- * `document.documentElement.lang.startsWith('zh')` 来决定代码块复制按钮
- * 的中/英 aria-label（`code.copy`）。不设则该按钮失名。
- * 优先级刻意为「显式 lang 属性 > 浏览器语言」，因为 Tauri 窗口环境下
- * `navigator.language` 可能与用户实际选择不一致。
+ * 外链拦截（`open_external_url`）。必须在**任何**内容挂载前注册，
+ * 且用捕获阶段（`useExternalLinks` 内 `addEventListener(..., true)`）——
+ * 否则已被 React 处理的点击不会冒泡到 document。
  */
-function applyDocumentLang(): void {
-  const fromNavigator = typeof navigator !== 'undefined' ? navigator.language || '' : ''
-  const lang = fromNavigator.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US'
-  document.documentElement.lang = lang
+function Root() {
+  useExternalLinks()
+  return (
+    <Shell>
+      <NeoBotRoot />
+    </Shell>
+  )
 }
 
 const host = document.getElementById('root')
@@ -51,9 +54,8 @@ if (!host) {
   throw new Error('neobot-ui: #root not found in index.html — 入口与宿主页不同源')
 }
 
-applyDocumentLang()
 ReactDOM.createRoot(host).render(
   <React.StrictMode>
-    <NeoBotRoot />
+    <Root />
   </React.StrictMode>,
 )

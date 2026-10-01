@@ -35,8 +35,9 @@ PAIRS: list[tuple[str, str]] = [
     ('api-panel.ts', 'api-panel.ts'),
     ('dom.ts', 'dom.ts'),
     ('ui/nb-markdown.css', 'ui/nb-markdown.css'),
-    ('i18n/zh-CN.json', 'i18n/locales/zh-CN.json'),
-    ('i18n/en-US.json', 'i18n/locales/en-US.json'),
+    # ⚠️ i18n **刻意不在漂移对照内**：我方词条是**自有集合**（实测与上游
+    # 452 键零重合），不再是上游文件的复制件。把它纳入漂移检查会强迫我方
+    # 词条永久跟随上游 DSH 词汇表 —— 那等于把 DSH 概念重新引进自持树。
     ('vendor/openghost/shim.ts', 'vendor/openghost/shim.ts'),
     ('vendor/openghost/markdown.js', 'vendor/openghost/markdown.js'),
     ('vendor/openghost/highlight.js', 'vendor/openghost/highlight.js'),
@@ -106,7 +107,8 @@ for mine, orig in PAIRS:
             f'       归属：{newer}'
         )
 if not drift:
-    print(f'✅ 1 漂移门：{len(PAIRS)} 个复制件与原件逐字一致')
+    print(f'✅ 1 漂移门：{len(PAIRS)} 个复制件与原件逐字一致'
+          f'（i18n 不在对照内：我方词条为自有集合，与上游 452 键零重合）')
 
 # ── 2 入口纯净门：main.tsx 不得引用 vendored 路径 ───────────────────────
 entry = os.path.join(UI, 'src/main.tsx')
