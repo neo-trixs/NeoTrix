@@ -1057,6 +1057,23 @@
    "read_only": true,
    "when_not": "调消息气泡布局/间距前跑它取基线；它只验复制按钮的显隐/可达/落剪贴板，**不验**气泡长文本排版",
    "spec": "A 默认 opacity:0+pointer-events:none+position:absolute · B 悬停**气泡**后浮现 · C focus-within 也浮现（⛔ 只做 hover 则键盘用户永远看不到）· D 读回**真剪贴板**含该条原文 · D2 成功有 is-copied 反馈 · E 气泡高度不变（⛔ measureElement 量的就是它）· F 零未捕获异常。⛔ 三个必踩坑：① invoke 桩漏 plugin:event|listen⇒listen 返回 null⇒挂载期崩「reading '0'」；② 用 .first() 会选到**已滚出视口**那条（列表自动滚到底），须挑「中心点最顶层」的那条；③ 期望值不能取气泡 innerText（含 ⧉ 字形），要取消息正文"
+  },
+  {
+   "id": "neobot-check-selfcontained",
+   "query": [
+    "自持",
+    "干净克隆",
+    "克隆后构建失败",
+    "vendor 没进版本控制",
+    "未跟踪依赖",
+    "neobot-ui 依赖参考树",
+    "删 frontend 会崩"
+   ],
+   "tool": "node scripts/ops/neobot-check-selfcontained.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "⛔ 别在**脏树**上判定「已跟踪」—— 它查的是 git 索引；未提交的新文件仍算未跟踪（这是设计如此）",
+   "spec": "A 每个相对 import 解析到的文件**都已被 git 跟踪** ⭐ · B 无 import 逃出 neobot-ui/（伸进 ../frontend/ 即崩）· C 无悬空 import。ⓘ 判据必须查**版本控制**而非文件系统：文件在磁盘上但不在 git 里等于不存在，而**所有既有门都测不出来**（它们和产物读同一份未跟踪文件，本机照样绿）。ⓘ 按文件逐条收集 import（api-panel.ts 用双引号），别拍平成 Set 再反查导入方"
   }
  ],
  "excluded": {

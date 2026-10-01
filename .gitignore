@@ -122,6 +122,21 @@ datasets/
 !crates/neotrix-abilities/data/
 !crates/neotrix-abilities/data/**
 vendor/
+
+# ⛔⛔ 但**自持 UI 的 vendored 渲染器必须进版本控制**。
+# `neobot-root.tsx` 直接 import 它（tex → markdown → highlight + shim），
+# 而上面那条 blanket `vendor/` 把它连目录一起排除了 ⇒
+# **干净克隆根本构建不出 neobot-ui**（无 prebuild 拷贝步骤，
+# `build` 就是 `tsc --noEmit && vite build`）。
+# 实测：`git ls-files apps/neobot-desktop/neobot-ui/src/vendor/` = **0**。
+#
+# 这几个文件是**故意 vendored** 的：MIT 许可（渲染引擎在 MIT 内，
+# 视觉设计禁取 —— 边界见 src/vendor/openghost/VENDOR-OPENGHOST.md），
+# 有 md5 锁、有版权声明载体。唯一的 bug 就是被 gitignore 顺手排除。
+#
+# ⛔ 引用「禁取的视觉设计」不是理由：那些文件**不在**这个目录里。
+#    `neobot-ui` 里的 CSS/TSX 全部自写。
+!apps/neobot-desktop/neobot-ui/src/vendor/
 profile/
 provenance/
 # 溯源清单必须入库（2026-09-30）。理由：上面 `provenance/` 这条把
