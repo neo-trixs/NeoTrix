@@ -2113,3 +2113,86 @@ crates/neotrix-neobot/src/nt_pet.rs:225 / :226
 实测 `--strict` rc=0：32 命中 / 基线 32 / **NEW 0** / STALE 0，
 「out of scope by design」207 处（`remove_file`/`send*` 等，设计上不判）。
 ⇒ 它的探针证明是**有效**的（不是「本来就红」那种自证）。
+
+## Telegram Desktop（tdesktop）架构研究 —— 边界与结论（2026-10-01）
+
+### ⛔ 许可边界（实测，非推测）
+`raw.githubusercontent.com/telegramdesktop/tdesktop/dev/LICENSE` = **GPL-3.0 全文**；
+`README.md` 原文「published under GPLv3 with OpenSSL exception」；
+`LEGAL` = **GPL-3.0-only** + OpenSSL **linking** exception。
+ⓘ **该 exception 只豁免「链接 OpenSSL」，不豁免 copyleft** —— ⛔ 不得当作「所以可商用」的理由。
+
+⇒ **本仓是商用**，`deny.toml` 的 allow 名单不含 GPL
+⇒ **一行代码都不取**；只研究架构思路。
+本仓既有先例（格式范本）：`neobot-ui/src/vendor/openghost/VENDOR-OPENGHOST.md`。
+
+### ⛔ 三个被实测推翻的前提（⛔ 记下来防止再犯）
+1. **`telegramdesktop/lib_rust` 不存在** —— 4 分支 + HEAD 全 404；
+   且 `Telegram/CMakeLists.txt` 全文搜 `rust|cargo|rlib` ⇒ **零命中**。
+   ⛔ 「取 tdesktop 的 Rust 部分」是**幻觉目标**，不得立项。
+2. **`SourceFiles/` / `lib_ui/` / `lib_base/` 都不在 tdesktop 仓里** ——
+   `.gitmodules` 里 30+ 条全指向 `github.com/desktop-app/*`，而**这些仓对匿名请求一律 404**。
+   ⇒ 实际只读到 `Telegram/CMakeLists.txt` 显式枚举的 **2,096 个文件路径**，
+   **实现代码 0 行**（连头注释都没读）。
+3. **`check-license.sh` 的 DENY **曾经**没有 `GPL-3.0`** ⇒ **本轮已修**（见下）。
+
+### ⭐ 本轮修掉的真实门缺口：GPL-3.0 曾被放行
+负向实测：一棵 `LICENSE` 写「GNU GENERAL PUBLIC LICENSE / Version 3」、
+`VENDOR.md` 声明 `GPL-3.0` 的 vendor 树，原门判 **`ok:`（放行）**。
+两个原因：
+- ⛔ deny 扫描是 `rg -g 'LICENSE*' -e "$DENY" "$tree"` ⇒ **只扫 LICENSE 文件**，
+  而 **`GPL-3.0` 这个 SPDX 串根本不出现在 GPL 的 LICENSE 全文里**（全文是散文）。
+- ⛔ 此前 DENY **只有 AGPL**，GPL/LGPL 全部缺失。
+
+修：DENY 补 `GPL-1/2/3.0`、`LGPL-2.0/2.1/3.0` **与** `GNU GENERAL PUBLIC LICENSE`。
+复测：同一棵树从 `ok:` 变成 **`FAIL ... 命中禁止 vendoring 的许可条款`**。
+ⓘ **仍未修**（更大的一处，已在「check-license.sh 三处修」里）：`$record`
+（VENDOR.md / PROVENANCE.md）**不在扫描范围**内。
+
+ⓘ 教训：**「门拦住了 AGPL」≠「门拦住了 copyleft」** ——
+AGPL 是 DENY 里的字面项，而 GPL 曾经是「**不写就默认放行**」的。
+
+### 12 项能力清单与我们的差距（每项都有我方 `文件:行` 证据）
+| 能力 | 我们的判定 | 关键证据 |
+|---|---|---|
+| 差量同步（pts/补差） | ❌ 无 | `messages` 表 5 列，**无 `seq`/水位**（`nt_store/mod.rs:384-393`） |
+| 存储三层 facade/account/domain | 🟡 有但弱 | 19 张表**共用一个 `Connection`**（`mod.rs:208`）；无 account 概念 |
+| 发送队列 outbox 三态 | ✅ **已有且质量不低**，但有真 bug | 见下方🥇 |
+| 入站幂等 dedup | ✅ **已有**，证据比 Telegram 那侧更硬 | `dedup_key(channel,chat,msg_id)` + 逐维度测试（`nt_channel.rs:359`） |
+| 密钥存储切分 | 🟡 **分裂成两套** | 密码走 keyring，**模型/IM token 只存 env 变量名**（`nt_store/mod.rs:283,292,331`） |
+| 媒体管线 | 🟡 弱 | 附件**只有元数据**，无哈希/缩略图/引用计数（`nt_store_files.rs:8-35`） |
+| 输入层 composer | 🟡 剪贴板有、**拖放为零** | 全仓 `drag/drop` 搜索**实质零命中** |
+| 草稿同步 | ❌ 无 | `draft` 是纯 `useState`（`neobot-root.tsx:190`）⇒ 刷新即失 |
+| 本地搜索 | ❌ 无 | 无 FTS5、无 `LIKE` 查询 ⇒ **用户找不回三个月前的一句话** |
+| 更新器 + 崩溃上报 | ❌ 无 | `updater`/`panic.?hook` 在两个 Cargo.toml 里**零命中** |
+| 多账号→多会话→多窗口 | 🟡 有多机器人、无多账号 | `channel_bots` 复合主键 ✅；但 `conversations`/`messages` **无账号维度** |
+| 诊断三件套（死锁/崩溃/日志） | 🟡 单测扎实、**诊断空** | `emit_log_line` 只是 `eprintln!`（`desktop.rs:65-68`） |
+
+### 🥇 头号发现：**我们自己的两条重试路径策略不一致**（与 Telegram 无关）
+- `nt_store_ledger.rs:109` 注释写「**指数退避由调用方算**」，
+  而唯一调用方 `nt_channel_dispatch.rs:780-787` 的 `retry_at` **写死 `now + 60s`**，不看 `attempts`。
+- `fail_outbox`（`nt_store_ledger.rs:140-146`）**从不因超限而放弃**；
+  而 `pending_deliveries` 路径**有** `MAX_SEND_ATTEMPTS = 3`（`nt_store/mod.rs:13`，
+  测试 `sweep_pending_gives_up_after_max_attempts` 在 `nt_channel_dispatch.rs:2154`）。
+⇒ **延迟投递 3 次放弃，实时 outbox 无限重试。** 一条被平台永久拒绝的消息
+（如文本超限且无法降级）会**永远占用每轮 20 条的 drain 预算**（`nt_channel_dispatch.rs:699`），
+用户侧表现为「**机器人偶尔不回话**」。
+⇒ 处置：先加上限（3 行），指数退避第二步。⛔ 不得为清零而调大基线。
+
+### 🏈 其余高投入产出比项（按子代理排序，均有 `文件:行`）
+- `list_messages` **无 `LIMIT/OFFSET`**（`nt_store_messages.rs:85-103`）——
+  ⭐ **我们在虚拟化地渲染一份没分页拉的全量数据**：虚拟化省了 DOM，没省 DB/内存。
+- 日志只到 `eprintln!`；`read_run_logs`（`desktop.rs:79-91`）读的是**环境信息头、不是日志行**（**名实不符**）；无 `panic::set_hook`。
+- `remove_attachment`（`nt_store_files.rs:61-72`）**只删行、不删盘上文件、不查引用** ⇒ **确定性磁盘泄漏**。
+- GUI 内凭据只存 env 变量名 ⇒ **从 Finder/Dock 启动不继承 shell 环境 ⇒ 配了但静默失效**。
+
+### ⛔ 明确**不建议**做（附理由）
+完整差量同步（无多端并发写的真实场景）· 存储三层（单账号下是纯开销）·
+媒体缩略图/转码管线（**我们没有那些功能**，会闲置）· 任何形式的代码移植（GPL）。
+
+### ⏳ 子代理明确「无法确定」的（⛔ 不猜）
+`lib_base/lib_ui/lib_storage/lib_rpl/lib_tl` 内部架构（**全 404，一个字没读到**）·
+`lib_rust` 是被删还是从未公开 · Telegram 的 pts/补差**机制细节**（在实现体里，**没读**）·
+`desktop-app/*` 是否私有（404 与「不存在」在 raw 上无法区分）·
+iOS/Android **完全没抓**（⇒ 「移动端怎么做差量同步与草稿」**无一手依据**）。
+⚠️ 配额耗尽 ⇒ `Telegram/docs/` 未取；**若那里有自述架构文档，会比这份「从文件名反推」的报告可靠得多**。

@@ -32,7 +32,21 @@ cd "$(dirname "$0")/.." || exit 2
 FAIL=0
 
 # 非许可、禁止 vendoring 的标识（大小写不敏感按字面 rg）
-DENY='PolyForm Noncommercial|PolyForm Shield|Sustainable Use License|BSL-1\.1|Business Source License|FSL-1\.1|AGPL-3\.0|AGPL-3\.0-only|SSPL-1\.0|Commons Clause|No Commercial Secondary Development|No Commercial Use|Elastic License|Commons-Clause'
+# ⛔ 2026-10-01 补 GPL/LGPL 系列。**此前 DENY 只有 AGPL-3.0，没有 GPL**
+#    ⇒ GPL-3.0 代码若被 vendored 进本仓（**非 Cargo 依赖，走不到 `cargo deny`**），
+#    本门会**放行**。而 GPL-3.0 是传染性 copyleft，进商用产品即违规。
+#
+# ⛔ 同时补 `GNU GENERAL PUBLIC LICENSE`：**实测**一棵树若 `LICENSE` 写的是
+#    「GNU GENERAL PUBLIC LICENSE / Version 3」而 `VENDOR.md` 声明 `GPL-3.0`，
+#    原 DENY **判它 ok（放行）** —— 因为
+#    ⛔ deny 扫描是 `rg -g 'LICENSE*' -e "$DENY" "$tree"`，**只扫 LICENSE 文件**，
+#       而 `GPL-3.0` 这个 SPDX 串**根本不出现在 GPL 的 LICENSE 全文里**（全文是散文）。
+#    ⇒ SPDX 写法与散文写法**两种都要在 DENY 里**，否则总有一种形态漏过去。
+#    ⓘ 仍未修：`$record`（VENDOR.md/PROVENANCE.md）**不在扫描范围**内
+#    （见 TODO「check-license.sh 三处修」的扩面项）—— 那是更大的一处。
+#    ⓘ 教训：「门拦住了 AGPL」≠「门拦住了 copyleft」：
+#       AGPL 是 DENY 里的字面项，而 GPL 曾经是「不写就默认放行」。
+DENY='PolyForm Noncommercial|PolyForm Shield|Sustainable Use License|BSL-1\.1|Business Source License|FSL-1\.1|GPL-1\.0|GPL-2\.0|GPL-3\.0|LGPL-2\.0|LGPL-2\.1|LGPL-3\.0|GNU GENERAL PUBLIC LICENSE|AGPL-3\.0|AGPL-3\.0-only|SSPL-1\.0|Commons Clause|No Commercial Secondary Development|No Commercial Use|Elastic License|Commons-Clause'
 
 # 「附加条款」载体文件名。存在即表示基础 SPDX 之外还有限制。
 ADDITIONAL_PAT='^LICENSE\.(details|additional|extra|addendum|terms)$|^LICENSE-[a-z]*terms'
