@@ -47,13 +47,25 @@
 所在目录（`apps/neobot-desktop/`）执行该命令，而那里**没有 package.json**。
 我写的正确形式是 `pnpm --prefix neobot-ui run build`。
 
-## 5. 下一步（按优先级排序）
+## 5. 下一步（2026-09-30 晚更新；⛔ 上一版的多数条目已完成）
 
-1. **删 `apps/neobot-desktop/frontend/src/vendor/`**（他窗已提交其桌宠工作后可做）⇒
-   `check-license.sh` 由 rc=1 转绿。**删前必看** §7 的两条理由。
-2. 收敛 `nt_feature_viability.py` 里 `pet → DROPPED`（**由桌宠作者本人做**，见 §7）。
-3. `neobot-root.tsx` 的 `get_dsh_theme`：上游入口遗留的 DSH 概念泄漏，删树后成孤儿命令。
-4. `api-panel.ts` 的硬编码文案未迁 i18n（术语多为英文命令名，优先级低）。
+**已完成（原 §5 的条目）**：R1/R2/R4/R5 全部落地并经运行时验证；
+入口已切 `tauri.conf.json`；浅色盘接活为可切换主题；
+会话列表与消息列表**均已虚拟化**并各有常驻门。
+
+**仍待做**：
+
+1. ⛔ **删 `apps/neobot-desktop/frontend/src/vendor/`**（`check-license` 转绿的最后一步）。
+   ⛔ **必须等另一窗口收工**：该树尚有他窗在途工作，删它=销毁别人的工作
+   （AGENTS.md 记载的 2026-09-28 事故）。
+2. **收敛 `nt_feature_viability.py` 的 `pet → DROPPED`** —— 该条已过期
+   （另一窗口已提交自研桌宠 `efe75ded`），但按用户指示「由他窗自己改」，
+   我只加了 🚩 标记。**不要由旁人改。**
+3. **`get_dsh_theme` 的 DSH 命名债** —— 自持 UI 依赖一个 DSH 命名的 API。
+   改名涉及 Rust + 契约表，**须两侧同时改**，前端单方面改会造成两套真源。
+4. **补 trendshift 台账元数据**（375 条仍无 license）—— 工具
+   `nt_absorption_enrich.py` 就绪，GitHub 未认证配额 60/h，需增量跑数小时。
+5. `api-panel.ts` 的硬编码文案未迁 i18n。
 
 ## 6. 阻塞点
 
@@ -101,7 +113,35 @@
   其中 `tauri.conf.json` 与 `frontend/src/neobot-root.tsx` 曾因混有他窗改动
   而由我保留在工作树，后被另一窗口提交一并带走（见 §4.1）—— 非弃用，无遗失。
   接手会话**无遗留未提交改动需要认领**。
-- **门状态（2026-10-01 实测）**：
+- **门状态（2026-09-30 晚 实测，七道）**：
   `nt_api_contract` 0 · `nt_neobot_ui_wiring` 0 · `nt_feature_viability` 0 ·
-  `runtime smoke` 0 · `check-license` **1（正确**：受限 vendored 树仍在仓库，
-  删树后转绿）。
+  `nt_absorption_audit` 0 · `runtime smoke` 0 · `neobot-msg-virtual` 0 ·
+  `check-license` **1（正确**：受限 vendored 树仍在仓库，删树后转绿）。
+
+## 9. 补记：本会话后半段的**元教训**（比功能清单更重要）
+
+我在**同一个文件里反复栽在「用字面匹配改结构」**上，共 5 次：
+作用域错误 ×2（把 `await page.evaluate` 写进报告循环，`page` 只在 `probe` 内有）、
+括号失衡 ×2（在 600 行文件里按缩进切片删 JSX）、位置选择器 ×1
+（加主题选择器后，语言探针静默改去操作它 ⇒ 报「语言切换坏了」而**产品没坏**）。
+
+每一次都是被 `tsc --noEmit` 或**新写的门**抓到的。归纳出三条：
+
+1. **判据与实现要同时设计。** 我曾先改代码再补判据，结果判据与场景打架
+   （千条消息时应用正确地停在底部，我却拿「首条可见」去测），
+   只能回退重做。⇒ **先定判据，再写实现。**
+2. **一个门只管一件事。** 往 600 行的冒烟文件里塞断言导致反复失衡，
+   且一度出现「报告层被 `if (mvz)` 跳过 ⇒ rc=0 其实是**没跑**」——
+   **比红更坏**。⇒ 拆成独立小门（`neobot-msg-virtual.mjs`）。
+3. **门必须先证明它会红。** 我栽过「绿色的谎言」：
+   正则写成 `[\b]t\(`（字符类里的 `\b` 是**退格符**不是词边界）
+   ⇒ 扫出 0 个键却判 PASS。已加最小数量断言兜底。
+   同理，**负向测试抓到了我自己上一轮的错误结论**：
+   我声称「窗口化后不能用 `scrollTop = scrollHeight`」，
+   注入后门仍 PASS ⇒ 浏览器会把它钳到底部，该说法**夸大**，已订正。
+
+⚠️ 最后一件事：用户问「吸收了多少项目」时，我能给出的**唯一诚实答案**是
+「真读过并落地 2 条」——因为在此之前**吸收不可审计**。
+现已建 `.neotrix/absorption-audited.json` + `nt_absorption_audit.py`
+（每条须附 `read_evidence` 与落地物/未采纳原因，license 与 GitHub API 交叉核对）。
+**下一个会话若要回答这个问题，请直接跑那个门，不要凭印象报数字。**
