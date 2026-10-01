@@ -60,5 +60,7 @@
   "chat.capsFailedHint": "读取能力信息失败（不是「没有」）",
   "shell.activity": "活动（IPC 调用）",
   "shell.activityClear": "清空",
-  "shell.activityEmpty": "尚无调用记录"
+  "shell.activityEmpty": "尚无调用记录",
+  "chat.historyPaused": "历史加载中，先不让你发（免得与迟到消息重排）。",
+  "chat.inputPlaceholder": "消息…（Enter 发送，Shift+Enter 换行）"
 }

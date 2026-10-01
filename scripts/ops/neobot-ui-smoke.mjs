@@ -229,8 +229,10 @@ async function probe(browser, label, failList, act, convoCount = 0) {
       return {
         scrollH: el.scrollHeight,
         clientH: el.clientHeight,
-        attr: el.getAttribute('data-overflow'),
-        overflowing: el.getAttribute('data-overflow') === 'true',
+        // 纯 CSS scroll-shadow 探针：应有 4 层 background（2 local + 2 scroll）
+        bgLayers: (getComputedStyle(el).backgroundImage.match(/gradient\(/g) || []).length,
+        hasLocal: (getComputedStyle(el).backgroundImage.match(/local/g) || []).length,
+        scrolls: el.scrollHeight > el.clientHeight,
         opacity: cs.opacity,
         hasScrollClass: el.classList.contains('nb-scroll'),
       }
@@ -446,13 +448,17 @@ for (const r of rows) {
     if (!o) { console.log('     ⛔ 未取到溢出状态'); fail++ }
     else {
       const want = r.label.includes('长列表')
-      const ok = o.overflowing === want
+      // 判据：长列表必须**真的可滚**（高度被约束），短列表不必
+      const ok = o.scrolls === want
       console.log(`     ${r.label}：scrollH=${o.scrollH} clientH=${o.clientH} `
-        + `data-overflow=${o.attr} 伪元素opacity=${o.opacity} ⇒ `
+        + `可滚=${o.scrolls ? '✅' : '⛔'} · scroll-shadow 层=${o.bgLayers}(local ${o.hasLocal}) ⇒ `
         + (ok ? '✅ 符合预期' : '⛔ 不符合预期'))
       if (!ok) fail++
-      if (o.scrollH <= o.clientH && want) {
-        console.log('     ⛔ 60 条会话仍未溢出 ⇒ 测的不是渐隐逻辑'); fail++
+      if (o.bgLayers < 4) {
+        console.log(`     ⛔ scroll-shadow 层不足（${o.bgLayers} < 4）⇒ 溢出无视觉提示`); fail++
+      }
+      if (want && o.scrollH <= o.clientH) {
+        console.log('     ⛔ 60 条会话仍未受高度约束 ⇒ 布局回归（列表会撑破页面）'); fail++
       }
     }
   }
@@ -527,13 +533,17 @@ for (const r of rows) {
     if (!o) { console.log('     ⛔ 未取到溢出状态'); fail++ }
     else {
       const want = r.label.includes('长列表')
-      const ok = o.overflowing === want
+      // 判据：长列表必须**真的可滚**（高度被约束），短列表不必
+      const ok = o.scrolls === want
       console.log(`     ${r.label}：scrollH=${o.scrollH} clientH=${o.clientH} `
-        + `data-overflow=${o.attr} 伪元素opacity=${o.opacity} ⇒ `
+        + `可滚=${o.scrolls ? '✅' : '⛔'} · scroll-shadow 层=${o.bgLayers}(local ${o.hasLocal}) ⇒ `
         + (ok ? '✅ 符合预期' : '⛔ 不符合预期'))
       if (!ok) fail++
-      if (o.scrollH <= o.clientH && want) {
-        console.log('     ⛔ 60 条会话仍未溢出 ⇒ 测的不是渐隐逻辑'); fail++
+      if (o.bgLayers < 4) {
+        console.log(`     ⛔ scroll-shadow 层不足（${o.bgLayers} < 4）⇒ 溢出无视觉提示`); fail++
+      }
+      if (want && o.scrollH <= o.clientH) {
+        console.log('     ⛔ 60 条会话仍未受高度约束 ⇒ 布局回归（列表会撑破页面）'); fail++
       }
     }
   }

@@ -249,6 +249,57 @@ else:
         print(f'✅ 4c 工具类守卫：抽样的 {len(used)} 个工具类均已编译进产物 CSS'
               f'（产物 {len(css_text)} 字节）')
 
+# ── 4d i18n 键完整性（**注释感知**）────────────────────────────────────
+# ⛔ 这条门来自我亲手犯的缺陷：i18n 迁移时改了 42 处 `t('...')` 调用，
+#    却漏加 2 个键（chat.historyPaused / chat.inputPlaceholder）⇒
+#    界面**显示原始键名**。我此前只验「有文本、无报错」⇒ 放过了。
+#    而 `t()` 的诚实回退（缺键返回键名）**让缺陷看起来像功能**。
+#
+# ⚠️ 扫描必须**去注释**：本门第一版不感知注释 ⇒ 把注释里的 `t('x')`
+#    当成缺失键（我今天第三次栽在「用字面匹配解析代码」上）。
+def _strip_js_comments(src: str) -> str:
+    src = re.sub(r'/\*.*?\*/', '', src, flags=re.S)
+    return re.sub(r'//[^\n]*', '', src)
+
+_locales = {}
+for _loc in ('zh-CN', 'en-US'):
+    _p = os.path.join(UI, 'src/i18n/locales', f'{_loc}.json')
+    if os.path.isfile(_p):
+        try:
+            _locales[_loc] = __import__('json').load(open(_p, encoding='utf-8'))
+        except ValueError:
+            fail.append(f'i18n 词条 {_loc}.json **不是合法 JSON**')
+
+_used_keys = set()
+for _root, _dirs, _files in os.walk(os.path.join(UI, 'src')):
+    _dirs[:] = [x for x in _dirs if x not in ('node_modules', 'dist', 'vendor')]
+    for _fn in _files:
+        if _fn.endswith(('.ts', '.tsx')):
+            _used_keys |= set(re.findall(
+                # ⛔ 词边界必须在字符类**外面**：写成 `[\b]` 是**退格符**(0x08)
+                #    不是锚点 ⇒ 永不匹配 ⇒ 扫出 0 键却判 PASS（绿色的谎言）。
+                #    且下方有最小数量断言兜底。
+                r"""\bt\(\s*['"]([A-Za-z0-9_.]+)['"]""",
+                _strip_js_comments(read(os.path.join(_root, _fn)))))
+# ⛔ 扫出 0 个键几乎必然是**扫描器坏了**（我已栽：`[\b]` 误写）。
+#    0 结果若判 PASS，门就成了「绿色的谎言」—— 比没有门更坏。
+if len(_used_keys) < 10:
+    fail.append(
+        f'i18n 键扫描只找到 **{len(_used_keys)}** 个调用键（预期 ≥10）\n'
+        f'       ⇒ **扫描器本身坏了**，不是「没有缺失键」。\n'
+        f'       本门第一版即栽在此：`[\\b]` 写成字符类里的退格符，扫出 0 键却判 PASS。'
+    )
+elif _locales:
+    for _loc, _tbl in sorted(_locales.items()):
+        _missing = sorted(_k for _k in _used_keys if _k not in _tbl)
+        if _missing:
+            fail.append(
+                f'i18n[{_loc}] 源码用了但**词条缺失**：{_missing}\n'
+                f'       ⇒ 界面会显示原始键名（t() 的诚实回退把它伪装成正常文案）'
+            )
+        else:
+            print(f'✅ 4d i18n 键完整性[{_loc}]：{len(_used_keys)} 个调用键全部有词条')
+
 # ── 5 openghost 独立授权（MIT 无附加条款）───────────────────────────────
 og = os.path.join(UI, 'src/vendor/openghost')
 if os.path.isdir(og):

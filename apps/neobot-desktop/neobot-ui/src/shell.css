@@ -6,8 +6,12 @@
   flex-direction: column;
   height: 100vh;
   font: 14px/1.55 -apple-system, "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
-  color: #1c1c1e;
-  background: #fbfbfd;
+  /* ⛔ 此前外壳是**浅色**（#fbfbfd/#1c1c1e），而移植进来的组件用的是
+   *    `bg-canvas`/`bg-panel` 等**深色** token ⇒ 深色输入框浮在浅色外壳上，
+   *    视觉上是两个应用拼在一起。改为与组件同源的深色 token。
+   *    （变量的**本体**在 theme.css，这里只消费。） */
+  color: var(--nb-color-ink);
+  background: var(--nb-color-canvas);
 }
 
 .nb-bar {
@@ -16,15 +20,15 @@
   justify-content: space-between;
   gap: 16px;
   padding: 10px 16px;
-  border-bottom: 1px solid #e3e3e8;
-  background: #fff;
+  border-bottom: 1px solid var(--nb-color-line);
+  background: var(--nb-color-panel);
   flex: 0 0 auto;
 }
 
 .nb-brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .nb-wordmark { font-weight: 650; font-size: 15px; letter-spacing: .2px; }
 .nb-tagline {
-  color: #78787d;
+  color: var(--nb-muted);
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
@@ -33,32 +37,39 @@
 
 .nb-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .nb-lang { display: flex; align-items: center; gap: 6px; }
-.nb-lang-label { color: #78787d; font-size: 12px; }
+.nb-lang-label { color: var(--nb-muted); font-size: 12px; }
 
 .nb-actions button,
 .nb-actions select,
 .nb-modal-box button {
   font: inherit;
   padding: 4px 10px;
-  border: 1px solid #d3d3d8;
+  border: 1px solid var(--nb-color-line);
   border-radius: 6px;
-  background: #fff;
+  background: var(--nb-color-panel-2);
   color: inherit;
   cursor: pointer;
 }
 .nb-actions button:hover:not(:disabled),
-.nb-modal-box button:hover { background: #f2f2f5; }
+.nb-modal-box button:hover { background: var(--nb-color-panel-hover); }
 .nb-actions button:disabled,
 .nb-actions select:disabled { opacity: .5; cursor: default; }
 
-.nb-main { flex: 1 1 auto; min-height: 0; overflow: auto; }
+/* ⛔ `display: flex` 不是可选的 —— 缺它导致**整页布局坏掉**（实测）：
+ *   main 是 block 时，其子 `nb-neobot-root`（`flex:1 1 0%`）**没有 flex
+ *   容器可分配空间** ⇒ 高度退化为 auto ⇒ 实测 3168px（视口仅 820），
+ *   连带三个后果：① 会话列表不滚动、把容器撑破 ② 输入框浮在页面中部、
+ *   下方留大片空白 ③ 记忆面板「钉在底部」失效。
+ *   —— 一个 `display` 声明引发三处布局缺陷，且**构建/类型/渲染全绿**。
+ */
+.nb-main { display: flex; min-height: 0; overflow: hidden; }
 
 .nb-modal {
   position: fixed;
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgb(0 0 0 / .32);
+  background: rgb(0 0 0 / .55);
   padding: 24px;
 }
 .nb-modal-box {
@@ -69,8 +80,9 @@
   gap: 10px;
   padding: 14px 16px;
   border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 12px 40px rgb(0 0 0 / .22);
+  background: var(--nb-color-panel);
+  border: 1px solid var(--nb-color-line);
+  box-shadow: 0 12px 40px rgb(0 0 0 / .45);
 }
 .nb-modal-box header { display: flex; align-items: center; justify-content: space-between; }
 .nb-modal-box pre {
@@ -78,7 +90,7 @@
   overflow: auto;
   padding: 10px;
   border-radius: 6px;
-  background: #f5f5f7;
+  background: var(--nb-color-canvas);
   font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
   white-space: pre-wrap;
   word-break: break-word;
@@ -89,8 +101,8 @@
   margin: 0;
   padding: 6px 16px;
   border-bottom: 1px solid #f0c9c9;
-  background: #fdf1f1;
-  color: #a3272b;
+  background: rgb(248 113 113 / .12);
+  color: #f87171;
   font-size: 12px;
   flex: 0 0 auto;
 }
@@ -103,9 +115,9 @@
 .nb-act-head { display: flex; align-items: center; gap: 8px; }
 .nb-act-count {
   min-width: 20px; padding: 0 6px; border-radius: 8px;
-  background: #eeeef2; color: #56565b; font-size: 11px; text-align: center;
+  background: var(--nb-color-panel-2); color: var(--nb-muted); font-size: 11px; text-align: center;
 }
-.nb-act-empty { margin: 0; color: #86868b; font-size: 12px; }
+.nb-act-empty { margin: 0; color: var(--nb-muted); font-size: 12px; }
 .nb-act-list {
   margin: 0; padding: 0; list-style: none; overflow: auto;
   max-height: 30vh; border: 1px solid #e8e8ed; border-radius: 6px;
@@ -117,12 +129,12 @@
 .nb-act-list li:last-child { border-bottom: none; }
 .nb-act-list li.bad { background: #fdf3f3; }
 .nb-act-list code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
-.nb-act-ms { color: #86868b; margin-left: auto; white-space: nowrap; }
+.nb-act-ms { color: var(--nb-muted); margin-left: auto; white-space: nowrap; }
 .nb-act-st { font-weight: 600; }
-.nb-act-list li.ok .nb-act-st { color: #1a7f37; }
-.nb-act-list li.bad .nb-act-st { color: #a3272b; }
+.nb-act-list li.ok .nb-act-st { color: var(--nb-color-ok); }
+.nb-act-list li.bad .nb-act-st { color: #f87171; }
 .nb-act-err {
-  color: #a3272b; font-size: 11px; max-width: 46ch;
+  color: #f87171; font-size: 11px; max-width: 46ch;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.nb-logs-title { margin: 2px 0 0; font-size: 12px; color: #56565b; }
+.nb-logs-title { margin: 2px 0 0; font-size: 12px; color: var(--nb-muted); }

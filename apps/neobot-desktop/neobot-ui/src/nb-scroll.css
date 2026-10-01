@@ -20,7 +20,7 @@
 .nb-scroll,
 .nb-scroll * {
   scrollbar-width: thin;
-  scrollbar-color: rgb(0 0 0 / .22) transparent;
+  scrollbar-color: var(--nb-color-scroll-thumb, rgb(255 255 255 / .22)) transparent;
 }
 .nb-scroll::-webkit-scrollbar,
 .nb-scroll *::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -28,15 +28,40 @@
 .nb-scroll *::-webkit-scrollbar-track { background: transparent; }
 .nb-scroll::-webkit-scrollbar-thumb,
 .nb-scroll *::-webkit-scrollbar-thumb {
-  background: rgb(0 0 0 / .18);
+  background: var(--nb-color-scroll-thumb, rgb(255 255 255 / .18));
   border: 3px solid transparent;
   background-clip: content-box;
   border-radius: 999px;
 }
 .nb-scroll:hover::-webkit-scrollbar-thumb,
-.nb-scroll *:hover::-webkit-scrollbar-thumb { background: rgb(0 0 0 / .3); background-clip: content-box; }
+.nb-scroll *:hover::-webkit-scrollbar-thumb { background: var(--nb-color-scroll-thumb-strong, rgb(255 255 255 / .3)); background-clip: content-box; }
 
-/* ③ 溢出渐隐：底缘一道极淡的阴影，暗示「下面还有」 */
+/* ③ 溢出渐隐 —— **纯 CSS scroll-shadow**（`background-attachment: local`）
+ *
+ *   ⛔ 前一版用「JS 实测 + 外包一层 relative 定位上下文」，两个问题：
+ *      ① 为了加渐隐我**改了滚动容器的 DOM 结构** ⇒ 顺手丢掉了原有的
+ *         `min-h-0 flex-1` 高度约束 ⇒ 列表从「不滚动」变成「撑高 3079px」。
+ *         我先误判成「原始代码也这样」，靠**回退实测**才纠正。
+ *      ② 渐隐伪元素在滚动容器**内部** ⇒ 会随内容一起滚走，本就不该放那。
+ *   ⇒ 改用经典 scroll-shadow：`local` 层的渐变**固定在容器边缘**，
+ *      `scroll` 层的阴影**随滚动进出**。纯 CSS、零 JS、零结构改动。
+ *
+ *   语义：顶部/底部各两层。`local` 层用面板色盖住 `scroll` 层的阴影 ——
+ *   滚到顶时顶部阴影被盖掉、滚到底时底部阴影被盖掉 ⇒ 阴影**只在
+ *   「那个方向还有内容」时出现**。这正是我们要的 affordance。 */
+.nb-scroll {
+  background:
+    /* 上：local 盖罩（滚到顶则显现） + scroll 阴影 */
+    linear-gradient(var(--nb-color-panel, #1b1b1c) 30%, transparent) top / 100% 18px local no-repeat,
+    radial-gradient(farthest-side at 50% 0, rgb(0 0 0 / .28), transparent) top / 100% 7px scroll no-repeat,
+    /* 下：local 盖罩 + scroll 阴影 */
+    linear-gradient(transparent, var(--nb-color-panel, #1b1b1c) 70%) bottom / 100% 18px local no-repeat,
+    radial-gradient(farthest-side at 50% 100%, rgb(0 0 0 / .28), transparent) bottom / 100% 7px scroll no-repeat;
+}
+
+/* 旧方案（JS + 定位上下文）保留但不再挂 class：留档以免后人重蹈
+   「为加提示而改结构、丢掉高度约束」。见上方 ①②。 */
+.nb-overflow-hint { position: relative; }
 .nb-overflow-hint { position: relative; }
 .nb-overflow-hint::after {
   content: '';

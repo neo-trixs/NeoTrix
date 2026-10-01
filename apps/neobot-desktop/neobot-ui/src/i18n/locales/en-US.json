@@ -60,5 +60,7 @@
   "chat.capsFailedHint": "Could not read capabilities (not \"none\")",
   "shell.activity": "Activity (IPC calls)",
   "shell.activityClear": "Clear",
-  "shell.activityEmpty": "No calls recorded yet"
+  "shell.activityEmpty": "No calls recorded yet",
+  "chat.historyPaused": "Loading history — sending is paused to avoid reordering late messages.",
+  "chat.inputPlaceholder": "Message… (Enter to send, Shift+Enter for newline)"
 }
