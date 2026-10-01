@@ -23,7 +23,7 @@ pub use core::nt_core_event as event;
 pub use core::context;
 pub use core::nt_core_gwt as consciousness;
 pub use core::nt_core_hcube as hypercube;
-pub use core::nt_core_meta as metacognition;
+// 2026-09-30: nt_core_meta 冻结镜像已删，`metacognition` 别名随之移除（外部消费者 0）
 pub use core::skills;
 pub use core::tools;
 pub use core::fs_util;
@@ -76,13 +76,9 @@ pub use core::{
     OneObserver, ObserverReport, TrajectoryPattern, StepQuality,
     WalshMemoryIndex,
     // 2026-09-30: nt_core_self 冻结镜像的类型随镜像一并移除（真身在 neotrix-core l6_meta）
-    SelfModel, ModuleInfo, FileInfo, DepGraph, DepEdge, DepKind,
-    TechDebtInventory, TechDebtItem, TechDebtKind, DebtSeverity,
-    EvolutionEvent, EventKind, ComponentMap, ComponentNode,
-    TestCoverage, CompilationHealth,
-    CodeScanner, MetaMonitor, MetaAlert, AlertSeverity, HealthCheck, HealthTrend,
-    WeaknessAnalyzer, Weakness, WeaknessReport, WeaknessSummary,
-    EvolutionPlanner, PlannedEvolution, ImpactEstimate, RiskLevel, EvolutionAction, ActionStatus,
+    // 2026-09-30: nt_core_meta 冻结镜像整簇的类型随之移除（真身在 neotrix-core l6_meta/nt_meta）。
+    // ⚠️ 其中 RiskLevel 与 core l3_embodiment/nt_shield_approval 的 RiskLevel **同名不同源**
+    //   （两边各自 pub enum 定义）—— core 用的是 shield 那个，删此处不影响 core。
 };
 pub use core::shared_types as shared;
 
@@ -97,8 +93,4 @@ pub use core::nt_core_gwt::unified_consciousness::{
     LegacyConsciousnessPhase, CrystalConsciousnessState, EvolutionPhase,
 };
 
-// Re-export unified self-model types
-pub use core::nt_core_meta::unified_self_model::{
-    StaticIdentityModel, DynamicPerformanceModel, ValueFunctionModel,
-    SelfState, ValueWeight, SELF_HISTORY,
-};
+// 2026-09-30: unified_self_model 随 nt_core_meta 整簇移除（外部消费者 0）

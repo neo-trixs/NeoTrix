@@ -17,7 +17,6 @@ pub mod skill;
 pub mod nt_core_gwt;
 pub mod context;
 pub mod nt_core_accessor;
-pub mod nt_core_meta;
 pub mod nt_core_e8;
 pub mod nt_core_hex;
 pub mod nt_core_observer;
@@ -111,15 +110,7 @@ pub use tools::{ToolRisk, ToolClassification};
 pub use nt_core_self_org::{AgentMetadata, AgentStatus, DeadEndRecord, DeadEndRegistry, Heartbeat, SharedState, SelfOrgProtocol};
 
 // Re-export metacognition types
-pub use nt_core_meta::{
-    SelfModel, ModuleInfo, FileInfo, DepGraph, DepEdge, DepKind,
-    TechDebtInventory, TechDebtItem, TechDebtKind, DebtSeverity,
-    EvolutionEvent, EventKind, ComponentMap, ComponentNode,
-    TestCoverage, CompilationHealth,
-    CodeScanner, MetaMonitor, MetaAlert, AlertSeverity, HealthCheck, HealthTrend,
-    WeaknessAnalyzer, Weakness, WeaknessReport, WeaknessSummary,
-    EvolutionPlanner, PlannedEvolution, ImpactEstimate, RiskLevel, EvolutionAction, ActionStatus,
-};  // 2026-09-30: MetaCognitiveLoop/MetaCycleResult 随冻结镜像移除
+// 2026-09-30: nt_core_meta 冻结镜像整簇已删（真身在 neotrix-core l6_meta/nt_meta）
 
 pub mod governance;
 pub mod meta_rules;
@@ -134,17 +125,7 @@ pub mod shared_types;
 pub mod nt_core_approval;
 
 // Re-export unified SelfModel types
-pub use nt_core_meta::unified_self_model::{
-    StaticIdentityModel, DynamicPerformanceModel, ValueFunctionModel, SelfState, ValueWeight,
-    ModuleInfo as UnifiedModuleInfo, FileInfo as UnifiedFileInfo,
-    DepGraph as UnifiedDepGraph, DepEdge as UnifiedDepEdge, DepKind as UnifiedDepKind,
-    ComponentMap as UnifiedComponentMap, ComponentNode as UnifiedComponentNode,
-    TestCoverage as UnifiedTestCoverage, CompilationHealth as UnifiedCompilationHealth,
-    TechDebtInventory as UnifiedTechDebtInventory, TechDebtItem as UnifiedTechDebtItem,
-    TechDebtKind as UnifiedTechDebtKind, DebtSeverity as UnifiedDebtSeverity,
-    EvolutionEvent as UnifiedEvolutionEvent, EventKind as UnifiedEventKind,
-    SELF_HISTORY,
-};
+// 2026-09-30: unified_self_model 随 nt_core_meta 整簇移除（外部消费者 0）
 
 // Re-export unified ConsciousnessState types
 pub use nt_core_gwt::unified_consciousness::{

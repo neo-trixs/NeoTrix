@@ -1,5 +1,5 @@
 > # NeoTrix TODO 列表
-> 智能同步生成，最后更新：**2026-09-30（已删 types 侧冻结镜像 91.3KB / 14 文件）**
+> 智能同步生成，最后更新：**2026-09-30（累计删 types 冻结镜像 20 文件 / 3.1 千行）**
 >
 > ## 🔴 P0 待裁决：`neotrix-types` 携带 `neotrix-core` 的**冻结旧分叉**（185.8 KB）
 > >
@@ -39,17 +39,34 @@
 > > ⛔ `neotrix-types` 有 2 个既存失败，已用 **pristine 对照证伪**（stash 掉我的删除
 > > 同样是 566 passed / 2 failed）⇒ 既存债，未代修也未代记账。
 > >
-> > ### 🟡 剩余 7 片：为何**不能**照同法删（逐个取证）
-> > | 模块 | 阻塞 |
-> > |---|---|
-> > | `nt_core_hex` | types 侧被 `nt_core_gwt/{resonance,workspace}.rs` 真实使用 |
-> > | `nt_core_walsh` | 被 `nt_core_bank/bank/{mod,bank_impl/core}.rs` 真实使用 |
-> > | `vectors_group_a` | 被 `nt_core_knowledge/sources.rs` 真实使用 |
-> > | `nt_core_graph`/`offload`/`scanner`/`weakness` | types 侧有**独有 pub 名**（17/9/5/7）⇒ 删除即丢公开 API |
+> > ### ✅ 第二批已删：`nt_core_meta` **整簇**（7 文件 / 2,292 行）
+> > 上一轮说 scanner/weakness 被「types 有独有 pub 名」挡住 —— **那是我判据用错**：
+> > 子集性只看 pub 名差集，**漏了「独有 pub 名是否真被外部使用」**；
+> > 且我还写错了 core 侧路径（`nt_core_meta/` 实为 `nt_meta/`），
+> > 导致 core 侧集合为空、假报「types 独有」。修正后 scanner/weakness **都是严格子集**。
+> > 整簇 13 个公开类型外部引用**全为 0**（逐个查）。
+> > ⚠️ **同名不同源的坑**：types 的 `RiskLevel`（planner 定义）与 core 的
+> > `RiskLevel`（`nt_shield_approval` 定义）是两个独立 `pub enum`；
+> > 逐处核实 core 用的是 shield 那个 ⇒ 删 planner 不影响 core。
+> > 外部那 4 处 `neotrix_types::RiskLevel` 也全是**注释里的文档引用**。
 > >
-> > ⚠️ 注意 `vectors_group_a` 那类的**方向陷阱**：想让它改走 core 也不行 ——
-> > **types 不能依赖 core**（core 依赖 types）⇒ 只能「把该函数下沉进 types 并让
-> > core 共用」，那是**设计**不是清理。清单见 MIRROR-FORK-2026-09-30 §5。
+> > **删除量对账**：types 测试 463 → **435**，差 28。逐测试名比对：28 个全在
+> > `core::nt_core_meta::*` 下（scanner 8 + weakness 7 + self_model 6 + planner 5
+> > + monitor 4 = 30 个声明，其中 scanner 的 2 个已在上一批随文件删除）⇒ **零误删**。
+> > ⚠️ 第一次只按 `#[test]` 属性数得 22，与 28 差 6 ⇒ 改用**测试全名**逐条比对才定位。
+> >
+> > **累计两批**：删 **20 文件 / 约 3.1 千行**；镜像 **18 对 → 5 对，185.8 KB → 67.7 KB**。
+> >
+> > ### 🟡 剩余 5 片：不是「冗余」，是 types 自己的低层依赖
+> > `nt_core_graph` / `nt_core_hex` / `nt_core_walsh` / `offload` / `vectors_group_a`
+> > **全部已是严格子集**（types 无任何独占 pub 名），唯一阻塞是**在 types 内部被真实使用**
+> > （分别被 `nt_core_bank` / `nt_core_gwt` / `nt_core_knowledge` 使用）。
+> > ⇒ 唯一出路是**把被用到的函数移到真正的公共位置让 core 共用**（单点真身），
+> > 那是**架构设计**不是清理。
+> >
+> > ⛔ **别再重复我犯的错**：判「可删」必须查两件事 ——
+> > ① types 侧 pub 名是否为 core 的子集；② 那些独有名字**外部有没有人用**。
+> > 清单见 MIRROR-FORK-2026-09-30 §5。
 > >
 > > ### 🟡 P1 与「第二棵树」同源：这是同一病在 **crate 之间**的复发
 > > 2026-09-30 刚把 `neotrix-core/src/neotrix/`（130 文件）收成 40 行门面；

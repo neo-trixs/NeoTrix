@@ -145,19 +145,68 @@ neotrix_types[dbe0] core::nt_core_walsh::new          → types 的 nt_core_e8
 
 ---
 
-## 5. 剩余部分的执行清单（下一轮）
+## 4.5 ✅ 第二批：`nt_core_meta` 整簇 —— 再删 **2.2 千行 / 7 文件**
+
+上一轮说 scanner/weakness 因「types 侧有独有 pub 名 ⇒ 删则丢 API」而被挡住。
+**那是我的判据用错了**：子集性只看 pub 名差集，**漏了「独有 pub 名是否真被外部使用」**。
+
+修正判据后重测（并修正一处**路径错误**：core 侧是 `l6_meta/nt_meta/`，
+我上轮写成了 `nt_core_meta/` —— 该目录下并无 scanner/weakness 同名文件，
+导致 core 侧集合为空、假报「types 独有」）：
+
+| 模块 | types pub | core pub | 结论 |
+|---|---:|---:|---|
+| `scanner` | 5 | 5 | **严格子集** ⇒ 可删 |
+| `weakness` | 7 | 7 | **严格子集** ⇒ 可删 |
+
+且 `nt_core_meta` **整簇**（scanner / weakness / planner / monitor / self_model /
+unified_self_model）的 13 个公开类型外部引用**全为 0**
+（`MetaMonitor` `WeaknessAnalyzer` `EvolutionPlanner` `UnifiedSelfModel` … 逐个查）。
+
+⚠️ **同名不同源的坑**：types 的 `RiskLevel`（planner 定义）与 core 的 `RiskLevel`
+（`l3_embodiment/nt_shield_approval` 定义）是**两个独立的 `pub enum`**。
+若 core 实际用的是 types 那个，删 types 就会打断 core ⇒ 逐处核实：
+core 的 `RiskLevel` 来自 `nt_shield_approval::human_approval`，**与 planner 无关** ⇒ 删安全。
+（外部那 4 处 `neotrix_types::RiskLevel` 也全是**注释里的文档引用**，非代码。）
+
+### 删除量核对（不放过任何对不上的数字）
+`neotrix-types --lib`：**463 → 435**，差 **28**。
+逐测试名对账：28 个全部落在 `core::nt_core_meta::*` 下 ——
+scanner 8 + weakness 7 + self_model 6 + planner 5 + monitor 4 = 30 个声明，
+其中 scanner 的 8 个里已有 2 个在上一批随文件删除 ⇒ **28 精确对齐，零误删**。
+（第一次对账只按 `#[test]` 属性数得到 22，与 28 差 6 ⇒ 改用**测试全名**逐条比对才定位，
+这就是「数字对不上必须追到底」而不是含糊过去的实例。）
+
+**门**：`cargo check --workspace` **0 error** · `neotrix --lib` **12,217 绿** ·
+layer-deps rc=0 · silent-failure PASS · lock-audit 0。
+⛔ `neotrix-types` 仍有 2 个既存失败（`nt_core_bank` / `nt_core_gwt`），
+已用 pristine 对照证伪，与本次无关。
+
+**累计**：两批共删 **20 文件 / 约 3.1 千行**；镜像 **18 对 → 5 对，185.8 KB → 67.7 KB**。
+
+---
+
+## 5. 剩余 5 片的执行清单（下一轮）
 
 **方向已定（§4.4 子集性判据）**：core 是唯一真身，删 types 侧冻结镜像。
 
-**剩余 7 片清单**（按「删除前必须先解开什么」分组）：
-1. `metacognition_loop` 类（已删完）—— 无前置
-2. **`vectors_group_a`**：前置 = 把 `nt_core_knowledge/sources.rs` 的调用改走 core。
-   但 core 依赖 types ⇒ **types 不能依赖 core** ⇒ 此路不通，
-   只能把该函数**下沉**进 types 并让 core 也用它（真正需要设计的点）
-3. **`nt_core_walsh` / `nt_core_hex`**：同上，`nt_core_bank` / `nt_core_gwt` 依赖它们。
-   解法同样是「下沉 + 双向共用」，**不是删除**
-4. **`nt_core_graph` / `offload` / `scanner` / `weakness`**：types 侧有独有公开 API
-   ⇒ 先决定这些 API 的归属（迁走 or 废弃），再谈删除
+**剩余 5 片**（`nt_core_graph` / `nt_core_hex` / `nt_core_walsh` / `offload` /
+`vectors_group_a`）：**全部已是严格子集**（types 侧无任何独占 pub 名），
+唯一阻塞是**它们在 types 内部被真实使用**：
+
+| 片 | 被谁用 |
+|---|---|
+| `nt_core_graph` | `nt_core_bank/bank/{mod,bank_impl/persist}.rs` |
+| `nt_core_walsh` | `nt_core_bank/bank/{mod,bank_impl/core}.rs` |
+| `nt_core_hex` | `nt_core_gwt/{resonance,workspace}.rs` |
+| `vectors_group_a` | `nt_core_knowledge/sources.rs` |
+| `offload` | `nt_core_bank/bank/bank_impl/store.rs` |
+
+⇒ **这 5 片不是「冗余」，是「types 自己的低层依赖」**。core 依赖 types ⇒
+types 不能反向依赖 core，所以唯一出路是**把被用到的那些函数下沉/上移到真正的公共位置，
+让 core 也改用它**（单点真身）—— 那是**架构设计**，不是清理。
+⚠️ 别再重复我本轮的错误：判「可删」时**必须查两件事**：
+① types 侧 pub 名是否为 core 的子集；② 那些独有名字**外部有没有人用**。
 
 **每片的验证序列（不变）**
 1. `python3 scripts/ops/nt_mirror_scan.py --min-overlap 0.5` 冻结清单
