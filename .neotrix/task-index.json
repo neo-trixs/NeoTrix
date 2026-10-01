@@ -827,6 +827,22 @@
    "spec": "GLOBAL-MAP-DEFECTS-2026-09-30 §3.1b；首轮抓到 now_ts 13 副本 2 panic + 2 处 truncate 字节切 panic"
   },
   {
+   "id": "mirror-scan",
+   "query": [
+    "跨 crate 重复",
+    "镜像分叉",
+    "两个真身",
+    "types 和 core 重复",
+    "同名模块",
+    "冻结副本"
+   ],
+   "tool": "python3 scripts/ops/nt_mirror_scan.py [--min-overlap 0.5] [--limit N] | selftest",
+   "kind": "report",
+   "read_only": true,
+   "when_not": "⛔ **不要照它删代码**：2026-09-30 实测 neotrix-types 是 core 的冻结旧分叉（18 对 / 185.8 KB / 全部 added=2026-07-06，外部零引用），但 `neotrix-core` 依赖 `neotrix-types` ⇒ **types 无法依赖 core**，所以 types 内部消费者拿不到 core 那份；收敛方向（A: core 为真身 / B: types 为真身）是**架构决策，判据是意图不是文本相似度**。执行清单见 docs/architecture/MIRROR-FORK-2026-09-30.md §5，需 cargo clean 双跑验证",
+   "spec": "MIRROR-FORK-2026-09-30 §3；selftest 4 例（含 2 例证伪：异体不得判同、git 取不到日期必须降级为 ?）"
+  },
+  {
    "id": "dup-dead",
    "query": [
     "纯重复又零接线",

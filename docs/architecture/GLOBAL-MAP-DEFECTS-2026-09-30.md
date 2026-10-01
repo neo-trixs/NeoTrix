@@ -210,6 +210,36 @@ cmd:python3 scripts/ops/nt_decompose.py selftest   # ⑥ 拆解器自证仍绿�
 | `truncate_chars` | 4 | 1 / 3 | 名字叫 chars 但按字节判长度（快路径无害，主体用 `char_indices`）| ⛔ 未动（**不判为 bug**：其 `s.len() <= max` 只是保守快路径，主体边界安全） |
 | `tokenize` | 6 | — | 分词规则各异（`is_ascii_alphanumeric` vs 含 CJK 切分）⇒ **多数是有意差异** | ⛔ 未动（未取证） |
 
+### 3.1e 🔴🔴 跨域错位的真身：**`neotrix-types` 是 `neotrix-core` 的冻结旧分叉**
+
+`nt_dup_dead` 判「重复但不可删」，而 `fn_drift` 又报出 22 个**跨层**同名副本 ——
+两个结论互相矛盾 ⇒ 说明**「按函数名去重」这个视角本身不够**，
+需要**模块级 + 跨 crate** 视角。顺藤摸下去发现的是结构性分叉，不是零散重复。
+
+**铁证**（编译器边，非 grep）：`hexagram_hadamard` 的 4 个调用者里有
+`neotrix[7f32]::l5_cognition::nt_core_walsh` 与
+`neotrix_types[dbe0]::core::nt_core_walsh` ⇒ **`nt_core_walsh` 在两个 crate 各有一份**，
+各自依赖自己那棵里的实现。**两个真身并存。**
+
+【实测规模】`nt_mirror_scan.py`（模块名跨 crate 配对 + 函数体归一化比对）：
+同名模块跨 crate **72 对** · 重叠 ≥50% 的 **19 对** · 涉及 `neotrix-types` **18 对** ·
+**types 侧 185.8 KB，全部 `added=2026-07-06`**，而对侧（真身）是 2026-09-17…09-25。
+重叠 100% 的有 `self_referential`(15/15)、`vectors_group_a`(1/1，整个文件就一个函数)。
+
+⚠️ **可删性证据两面**：
+- 支持删：外部按**模块路径**引用 0 命中；按**类型名**（路径无关，`AGENTS.md` 警告的坑）
+  引用也 **0 命中**（55 个公开类型全查）。⚠️ 第一版统计「外部命中 81/37/44」是**假阳性** ——
+  匹配到的是 core 侧同名模块；裸名统计 1,318 次里绝大多数是 core 侧同名类型 + `.worktrees/` 副本。
+- 但**级联**：18 个模块全部在 types 内部有依赖者 ⇒ 动一个改 6 个 `mod.rs`，约 25 文件 / 186 KB。
+- ⛔ **且收敛方向是架构决策**：`neotrix-core` 依赖 `neotrix-types` ⇒ **types 无法依赖 core**，
+  所以 `nt_core_walsh` 这类 types 内部消费者拿不到 core 那份。
+  两条合法路（A: core 为真身 / B: types 为真身、core 改从 types 取）都成立，
+  **判据是意图不是文本相似度** ⇒ 不由工具裁决。
+
+**本轮一行都没删**，理由与下一步清单见 `MIRROR-FORK-2026-09-30.md` §4.3/§5。
+与 §3.1c「0 条可删」不矛盾：那轮证据只够判「不可据零入边删」；
+这轮证据够判「这 185.8 KB 是冻结旧分叉」，但**不够替 owner 决定收敛方向**。
+
 ### 3.1d ⚠️⚠️ 最重要的结构性发现：**我交付的审计能力别人用不了**
 
 本会话共交付 6 个审计/拆解工具：`nt_decompose` · `nt_parity_ref` · `nt_fn_drift` ·
@@ -230,6 +260,8 @@ cmd:python3 scripts/ops/nt_decompose.py selftest   # ⑥ 拆解器自证仍绿�
 **已修**：`scripts/ops/nt_audit_bootstrap.sh` + Makefile 目标（一条命令）：
 
 ```assert
+file:scripts/ops/nt_mirror_scan.py                # 跨 crate 模块级镜像（分叉）审计
+cmd:python3 scripts/ops/nt_mirror_scan.py selftest  # 自证 4 例（含 2 例证伪）
 file:scripts/ops/nt_audit_bootstrap.sh   # 审计能力的前置引导（本节的结构性修复）
 cmd:make audit-edges-list                 # 列出 member 与将产出的边表（亚秒级）
 cmd:bash scripts/ops/nt_audit_bootstrap.sh --list  # 同一入口，脱离 make 也能用

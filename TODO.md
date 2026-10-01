@@ -1,6 +1,42 @@
 > # NeoTrix TODO 列表
-> 智能同步生成，最后更新：**2026-09-30（审计能力前置引导：修「能力不可分发」）**
+> 智能同步生成，最后更新：**2026-09-30（发现 `neotrix-types` 是 core 的冻结旧分叉：185.8KB）**
 >
+> ## 🔴 P0 待裁决：`neotrix-types` 携带 `neotrix-core` 的**冻结旧分叉**（185.8 KB）
+> >
+> > **铁证**（编译器边，非 grep）：`nt_core_walsh` 在 **两个 crate 各有一份**
+> > （`neotrix::l5_cognition::` 与 `neotrix_types::core::`），
+> > 各自依赖自己那棵里的 `hexagram_hadamard` ⇒ **两个真身并存**。
+> >
+> > **规模【实测】**：`nt_mirror_scan.py` ⇒ 同名模块跨 crate **72 对**、
+> > 重叠 ≥50% 的 **19 对**、涉及 neotrix-types **18 对**；
+> > types 侧合计 **185.8 KB，全部 `added=2026-07-06`**，
+> > 而真身在 `neotrix-core` 2026-09-17…09-25。重叠 100% 的如 `self_referential`(15/15)、
+> > `vectors_group_a`（整个文件就一个函数、逐字相同）。
+> >
+> > **可删性证据齐了，但方向要 owner 裁决**：
+> > - 外部按**模块路径**引用 types 侧 = **0 命中**；
+> >   按**类型名**（路径无关）= **0 命中**（55 个公开类型全查）。
+> >   ⚠️ 第一版统计「外部命中 81/37/44」是**假阳性**（匹配到 core 侧同名模块），
+> >   裸名统计 1,318 次里绝大多数是 core 侧同名类型 + `.worktrees/` 副本。
+> > - 但 **18 个模块全部在 types 内部有依赖者** ⇒ 级联改 6 个 `mod.rs`、约 25 文件。
+> > - ⛔ `neotrix-core` 依赖 `neotrix-types` ⇒ **types 无法依赖 core**，
+> >   所以 types 内部消费者（`nt_core_walsh` 等）拿不到 core 那份。
+> >   ⇒ 合法收敛方向有两条，**判据是意图不是文本相似度**：
+> >     **A（推荐）** core 为真身，types 只留内部必需的少数，其余删；
+> >     **B** types 为真身，core 改 `use neotrix_types::…`（合法，因 core 依赖 types）。
+> >
+> > **本轮一行未删**：结构性改动需 `cargo clean && cargo build` **两遍**（AGENTS.md），
+> > 且当前有他窗并行构建（apps/neobot-desktop、crates/neotrix-neobot 有未提交 WIP），
+> > 此刻起 186 KB 级联删除无法干净验证。
+> > 执行清单（含「先删依赖者仅 mod.rs 声明的 8 个 ≈68KB」与每步判据）见
+> > `docs/architecture/MIRROR-FORK-2026-09-30.md` §5。
+> >
+> > ### 🟡 P1 与「第二棵树」同源：这是同一病在 **crate 之间**的复发
+> > 2026-09-30 刚把 `neotrix-core/src/neotrix/`（130 文件）收成 40 行门面；
+> > 同一模式在 **crate 边界**上原样复发（types ⊃ core/L2 的镜像）。
+> > ⇒ 本仓的冗余治理若只做「目录级」，就会在 crate 级漏掉同一类问题。
+> >
+
 > ## 🔴 P0 已修（本会话最重要的结构性缺陷）审计能力**别人用不了**
 > >
 > > 本会话交付的 6 个工具（`nt_decompose` · `nt_parity_ref` · `nt_fn_drift` ·
