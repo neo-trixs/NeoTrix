@@ -1,0 +1,180 @@
+@import "tailwindcss";
+/**
+ * 自持 UI 主题 token —— 从 vendored `frontend/src/styles/main.css` **移植**。
+ *
+ * # 为什么必须移植（实测发现的严重缺陷）
+ *
+ * `neobot-root.tsx` 逐字复制自 vendored 树，那边**有 Tailwind v4**，主题色
+ * 走 CSS 变量（`bg-panel` → `var(--nb-color-panel)` 等）。而本自持树
+ * **既没有 Tailwind、也没有这套变量** ⇒ 实测产物 CSS 里 **Tailwind 工具类
+ * 命中 0**，而该文件用了 **230 个工具类 token** ⇒ **全部是死的**。
+ *
+ * 后果不是"不好看"，是**布局坏掉**：实测 `nb-convo-list` 的计算值
+ * `flex: 0 1 auto`（= 初始值，`flex-1` 未生效），于是 60 条会话把容器
+ * **撑高 660px 而不滚动**（scrollHeight == clientHeight）。
+ *
+ * ⛔ 我的冒烟测试当时只验了「有文本 + 无 console 报错」就放过 ——
+ *    「渲染通过」不等于「样式生效」。教训与「构建绿≠产物可用」同源，
+ *    但更隐蔽：**它连编译产物里的一个类都没有**。
+ *
+ * 变量取值逐字沿用上游（含注释），仅补两项自持 UI 需要而上游未定义的：
+ * `--nb-hint-bg`（溢出渐隐用，nb-scroll.css 消费）。
+ *
+ * 授权：CSS 变量取值属事实性设计 token；本文件保留上游出处标注。
+ */
+
+:root {
+  /* === 壳层自有 token === */
+  --nb-color-canvas: #151517;             /* bg-base (bluish-950) */
+  --nb-color-panel: #1b1b1c;              /* specific-sidebar-fill (bluish-900) */
+  --nb-color-panel-2: #2c2c2e;            /* bg-layer-2 (bluish-850) */
+  --nb-color-panel-hover: #2c2c2e;        /* sidebar-nav-item-hover (bluish-850) */
+  --nb-color-line: rgba(255, 255, 255, 0.12);   /* border-l2 #ffffff1f */
+  --nb-color-line-strong: rgba(255, 255, 255, 0.2); /* border-l4 #fff3 */
+  --nb-color-ink: #f9fafb;                /* label-primary (bluish-50) */
+  --nb-color-info: #7aaaff;               /* state-business-primary (deepseek-400) */
+  --nb-color-info-hover: #4176e6;         /* button-info-hover (deepseek-500) */
+  --nb-color-ok: #22c55e;                 /* state-success-primary (green-500) */
+  --nb-color-log-bg: #1b1b1c;             /* markdown-code-block (bluish-900) */
+  --nb-color-log-ink: #cfd3d6;            /* label-secondary (bluish-300) */
+  /* 滚动条 thumb（官方 scrollbar-bg/hover 的 neutral 值） */
+  --nb-color-scroll-thumb: rgba(84, 85, 87, 0.45);     /* neutral-600 */
+  --nb-color-scroll-thumb-strong: rgba(60, 60, 61, 0.6); /* neutral-700 */
+  /* 加载页 token：取值与官方 web shell boot 页（dsw alias token）逐项一致 */
+  --nb-color-load-bg: #151517;
+  --nb-color-load-ink: #f9fafb;
+  --nb-color-load-muted: #adb2b8;
+  --nb-color-load-ring: rgba(255, 255, 255, 0.12);
+  /* 按钮 token：官方 button-primary-fill 为中性反色（深色下白底深字、
+     浅色下深底白字），hover/active 取 official interactive-bg-* */
+  --nb-color-btn-fill: #f9fafb;           /* button-primary-fill (bluish-50) */
+  --nb-color-btn-fill-hover: #ebeef2;     /* button-primary-hover (bluish-100) */
+  --nb-color-btn-ink: #0f1115;            /* label-primary-foreground (bluish-1000) */
+  --nb-color-btn-border: rgba(255, 255, 255, 0.12);  /* border-l2 */
+  --nb-color-btn-hover: rgba(255, 255, 255, 0.08);   /* interactive-bg-hover #ffffff14 */
+  --nb-color-btn-active: rgba(255, 255, 255, 0.14);  /* interactive-bg-active #ffffff24 */
+  --nb-color-btn-danger-hover: rgba(242, 90, 90, 0.12); /* interactive-bg-hover-danger #f25a5a26 */
+  /* 壳层导航栏 token：ShellNavBar 按钮 hover/active 覆盖层（浅色主题同下） */
+  --nb-color-nav-hover: rgba(255, 255, 255, 0.08);
+  --nb-color-nav-active: rgba(255, 255, 255, 0.14);
+
+  /* === HeroUI 品牌主色 → dsw brand-primary（中性反色） === */
+  --nb-accent: #f9fafb;                   /* brand-primary (bluish-50) */
+  --nb-accent-foreground: #0f1115;        /* label-primary-foreground (bluish-1000) */
+}
+
+html[data-theme="light"] {
+  --nb-color-canvas: #ffffff;             /* bg-base (bluish-00) */
+  --nb-color-panel: #f9fafb;              /* specific-sidebar-fill (bluish-50) */
+  --nb-color-panel-2: #f5f6f7;            /* bg-module-platform / selector (bluish-60) */
+  --nb-color-panel-hover: #f1f3f5;        /* sidebar-nav-item-hover (bluish-75) */
+  --nb-color-line: rgba(0, 0, 0, 0.1);    /* border-l2 #0000001a */
+  --nb-color-line-strong: rgba(0, 0, 0, 0.16); /* border-l4 #00000029 */
+  --nb-color-ink: #0f1115;                /* label-primary (bluish-1000) */
+  --nb-color-info: #4176e6;               /* state-business-primary (deepseek-500) */
+  --nb-color-info-hover: #7aaaff;         /* button-info-hover (deepseek-400) */
+  --nb-color-ok: #22c55e;                 /* state-success-primary (green-500) */
+  --nb-color-log-bg: #f9fafb;             /* markdown-code-block (bluish-50) */
+  --nb-color-log-ink: #61666b;            /* label-secondary (bluish-700) */
+  --nb-color-scroll-thumb: rgba(212, 212, 212, 0.8);   /* neutral-300 */
+  --nb-color-scroll-thumb-strong: rgba(229, 229, 229, 0.9); /* neutral-200 */
+  /* 加载页 token：light 主题对应官方 alias 值 */
+  --nb-color-load-bg: #ffffff;
+  --nb-color-load-ink: #0f1115;
+  --nb-color-load-muted: #81858c;
+  --nb-color-load-ring: rgba(0, 0, 0, 0.1);
+  /* 按钮 token：light 主题对应官方 alias 值 */
+  --nb-color-btn-fill: #0f1115;           /* button-primary-fill (bluish-1000) */
+  --nb-color-btn-fill-hover: #43454a;     /* button-primary-hover (bluish-750) */
+  --nb-color-btn-ink: #ffffff;            /* label-primary-foreground (bluish-00) */
+  --nb-color-btn-border: rgba(0, 0, 0, 0.1);        /* border-l2 */
+  --nb-color-btn-hover: rgba(38, 49, 72, 0.06);     /* interactive-bg-hover #2631480f */
+  --nb-color-btn-active: rgba(38, 49, 72, 0.1);     /* interactive-bg-active #2631481a */
+  --nb-color-btn-danger-hover: rgba(236, 19, 19, 0.05); /* interactive-bg-hover-danger #ec13130d */
+  /* 壳层导航栏 token：浅色主题对应官方交互覆盖层 */
+  --nb-color-nav-hover: rgba(38, 49, 72, 0.06);
+  --nb-color-nav-active: rgba(38, 49, 72, 0.1);
+
+  /* === HeroUI 品牌主色 → dsw brand-primary（浅色中性反色） === */
+  --nb-accent: #0f1115;                   /* brand-primary (bluish-1000) */
+  --nb-accent-foreground: #ffffff;        /* label-primary-foreground (bluish-00) */
+}
+
+/* 自持 UI 专用：溢出渐隐的底色（nb-scroll.css 的 --nb-hint-bg） */
+:root { --nb-hint-bg: #151517; }
+
+/* Tailwind v4 的设计 token 入口：@theme inline 让 `bg-panel`/`text-ink` 等
+   工具类**真的存在**。没有这一段，源码里的语义色 class 会静默失效 ——
+   这正是 4c 守卫要防的那类缺陷。变量本体已改名 --nb-* 以避免自引用。 */
+
+/* Tailwind v4 设计 token 入口：@theme inline 让 bg-panel / text-ink 等语义色
+   工具类**真的存在**。没有这段，源码里的语义色 class 会静默失效 ——
+   正是 nt_neobot_ui_wiring 4c 守卫要防的那类缺陷。
+   变量本体改名 --nb-* 是为避免 @theme 与 :root 的自引用。 */
+/* ── HeroUI 语义色替代 ────────────────────────────────────────────────
+ * vendored 树里 `text-muted` / `text-accent` / `text-danger` 来自 **HeroUI**
+ * （其 `@theme inline` 把变量内联进工具类）。自持树**不引入 HeroUI**
+ * （组件库 = 许可 + 体积 + 行为三道闸），故按**已移植的同一深色盘**
+ * 自行定义这三个语义色，让 class **存在**而不是静默失效。
+ * 取值对齐上游注释所述的语义（次要文字 / 强调 / 危险）。
+ */
+:root {
+  --nb-muted: #8b8d93;
+  --nb-accent: #7aaaff;
+  --nb-accent-foreground: #0b1020;
+  --nb-danger: #f87171;
+  --nb-danger-foreground: #2a0e0e;
+}
+
+:root {
+  --nb-btn-active: #2c2c2e;
+  --nb-btn-border: rgba(255,255,255,0.14);
+  --nb-btn-danger-hover: rgba(248,113,113,0.16);
+  --nb-btn-fill: #2c2c2e;
+  --nb-btn-fill-hover: #3a3a3c;
+  --nb-btn-hover: #2c2c2e;
+  --nb-btn-ink: #f9fafb;
+  --nb-nav-active: #23324d;
+  --nb-info-hover: #4176e6;
+}
+
+/* ═══ Tailwind v4 设计 token ═══════════════════════════════════════
+ * 显式写全**源码实际用到**的语义色（bg-panel / text-ink / text-muted …）。
+ * ⛔ 缺这一段 = 这些 class 在产物里**根本不存在** ⇒ 样式静默失效。
+ * 门 nt_neobot_ui_wiring 的 **4c 守卫**就是为这件事设的。
+ * ⚠️ `@theme` 只认带命名空间的自定义属性（--color-*），
+ *    写成裸 `muted:` 不会生成任何工具类 —— 我踩过。
+ */
+@theme inline {
+  --color-canvas: var(--nb-color-canvas);
+  --color-panel: var(--nb-color-panel);
+  --color-panel-2: var(--nb-color-panel-2);
+  --color-panel-hover: var(--nb-color-panel-hover);
+  --color-line: var(--nb-color-line);
+  --color-line-strong: var(--nb-color-line-strong);
+  --color-ink: var(--nb-color-ink);
+  --color-muted: var(--nb-muted);
+  --color-accent: var(--nb-accent);
+  --color-accent-foreground: var(--nb-accent-foreground);
+  --color-danger: var(--nb-danger);
+  --color-danger-foreground: var(--nb-danger-foreground);
+  --color-info: var(--nb-color-info);
+  --color-info-hover: var(--nb-info-hover);
+  --color-ok: var(--nb-color-ok);
+  --color-log-bg: var(--nb-color-log-bg);
+  --color-log-ink: var(--nb-color-log-ink);
+  --color-load-bg: var(--nb-color-load-bg);
+  --color-load-ink: var(--nb-color-load-ink);
+  --color-load-muted: var(--nb-color-load-muted);
+  --color-load-ring: var(--nb-color-load-ring);
+  --color-btn-active: var(--nb-btn-active);
+  --color-btn-border: var(--nb-btn-border);
+  --color-btn-danger-hover: var(--nb-btn-danger-hover);
+  --color-btn-fill: var(--nb-btn-fill);
+  --color-btn-fill-hover: var(--nb-btn-fill-hover);
+  --color-btn-hover: var(--nb-btn-hover);
+  --color-btn-ink: var(--nb-btn-ink);
+  --color-nav-active: var(--nb-nav-active);
+  --color-scroll-thumb: var(--nb-color-scroll-thumb);
+  --color-scroll-thumb-strong: var(--nb-color-scroll-thumb-strong);
+}

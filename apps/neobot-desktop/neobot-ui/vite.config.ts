@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 
 /**
  * 自持 UI 构建配置。
@@ -19,7 +20,9 @@ export default defineConfig({
   //   · 仍取相对路径：它在「根挂载」与「子路径」下**都**正确，
   //     是不依赖未验证前提的唯一选择。
   base: './',
-  plugins: [react()],
+  // ⛔ Tailwind 不是可选优化，是**必需**：neobot-root.tsx 用了 230 个
+  //    工具类 token，无它则全部失效（实测 flex-1 计算值 = 初始值）。
+  plugins: [react(), tailwindcss()],
   build: {
     outDir: 'dist',
     emptyOutDir: true,

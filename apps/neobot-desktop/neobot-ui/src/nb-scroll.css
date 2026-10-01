@@ -1,0 +1,59 @@
+/* ── 滚动条与「还有更多」affordance ─────────────────────────────────────
+ *
+ * 设计吸收自 KingSora/OverlayScrollbars（5,216★）所针对的问题，但
+ * **不引第三方依赖**（本轮商用路径上新增依赖需过许可与体积两道闸）。
+ * 只取其设计意图：**可滚动必须有可见迹象**。
+ *
+ * ⛔ 为什么这是真缺陷：Tauri/macOS 走 WKWebView，用**覆盖式滚动条** ——
+ *   不滚动时滚动条**完全不可见**。于是「有 50 个会话但只显示 6 个」这件事
+ *   对用户**没有任何提示**，他会以为只有 6 个。
+ *   实测：本目录 5 个滚动容器此前**零滚动条样式**。
+ *
+ * 三层保障（互相独立，任一生效即可）：
+ *   ① 有轨道的细滚动条（WebKit/Blink 支持 ::-webkit-scrollbar）
+ *   ② 容器滚动时 ::-webkit-scrollbar-thumb 加深（:hover / 滚动中）
+ *   ③ 溢出时容器底部渐隐 —— 由 JS 实测驱动（见 useOverflowHint），
+ *      因为**纯 CSS 无法检测溢出**。
+ */
+
+/* ① 有轨道的细滚动条：默认即隐约可见，不等用户去滚 */
+.nb-scroll,
+.nb-scroll * {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(0 0 0 / .22) transparent;
+}
+.nb-scroll::-webkit-scrollbar,
+.nb-scroll *::-webkit-scrollbar { width: 10px; height: 10px; }
+.nb-scroll::-webkit-scrollbar-track,
+.nb-scroll *::-webkit-scrollbar-track { background: transparent; }
+.nb-scroll::-webkit-scrollbar-thumb,
+.nb-scroll *::-webkit-scrollbar-thumb {
+  background: rgb(0 0 0 / .18);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+.nb-scroll:hover::-webkit-scrollbar-thumb,
+.nb-scroll *:hover::-webkit-scrollbar-thumb { background: rgb(0 0 0 / .3); background-clip: content-box; }
+
+/* ③ 溢出渐隐：底缘一道极淡的阴影，暗示「下面还有」 */
+.nb-overflow-hint { position: relative; }
+.nb-overflow-hint::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 22px;
+  pointer-events: none;   /* ⛔ 绝不挡点击/滚动 */
+  background: linear-gradient(to top, var(--nb-hint-bg, #fbfbfd), transparent);
+  opacity: 0;
+  transition: opacity .12s ease-out;
+}
+.nb-overflow-hint[data-overflow='true']::after { opacity: 1; }
+
+/* 键盘用户不需要视觉提示：滚动容器自身要可聚焦，否则无法用键盘滚动。
+   这是 ① 与 a11y 的交叉点 —— 渐隐对键盘用户等于不存在。 */
+.nb-scroll:focus-visible { outline: 2px solid #6b8afd; outline-offset: -2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nb-overflow-hint::after { transition: none; }
+}

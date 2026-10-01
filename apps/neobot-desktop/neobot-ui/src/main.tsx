@@ -32,6 +32,8 @@ import { Shell, useExternalLinks } from './shell'
 // 副作用导入：模块加载即同步 `document.documentElement.lang`，
 // openghost 垫片读它决定代码块复制按钮的 aria-label。
 import './i18n'
+import './theme.css'
+import './nb-scroll.css'
 
 /**
  * 外链拦截（`open_external_url`）。必须在**任何**内容挂载前注册，

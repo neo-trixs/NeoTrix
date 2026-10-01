@@ -86,6 +86,8 @@ await new Promise((r) => server.listen(PORT, '127.0.0.1', r))
  */
 const STUB_RETURNS = {
   // 数组型（声明为 T[]，Rust 侧 serde 序列化为 []）
+  // 长列表用于验证「溢出渐隐」：__LONG_CONVOS__ 是开关占位，
+  // 由 probe 按需替换为 60 条，触发容器溢出。
   neobot_convo_list: [],
   neobot_member_list: [],
   neobot_convo_messages: [],
@@ -156,7 +158,7 @@ const TAURI_STUB = ({ table, failList }) => {
 }
 
 /** 加载一页并返回渲染事实。 */
-async function probe(browser, label, failList, act) {
+async function probe(browser, label, failList, act, convoCount = 0) {
   const page = await browser.newPage()
   const errors = []
   const badUrls = []
@@ -177,7 +179,20 @@ async function probe(browser, label, failList, act) {
   })
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
 
-  await page.addInitScript(TAURI_STUB, { table: STUB_RETURNS, failList: failList || [] })
+  const table = { ...STUB_RETURNS }
+  if (convoCount > 0) {
+    // 造足够多的会话把列表撑出容器 —— 用**合法字段**，
+    // 避免用一个前端没预期的形状制造出与本题无关的崩溃。
+    table.neobot_convo_list = Array.from({ length: convoCount }, (_, i) => ({
+      id: `c${i}`,
+      title: `会话 ${i} —— 一个足够长以便在列表里换行的标题`,
+      kind: i % 3 === 0 ? 'group' : 'direct',
+      members: [1, 2, 3],
+      last_active: new Date(Date.now() - i * 60000).toISOString(),
+      unread: 0,
+    }))
+  }
+  await page.addInitScript(TAURI_STUB, { table, failList: failList || [] })
   let httpStatus = 0
   let children = 0
   let textLen = 0
@@ -206,6 +221,21 @@ async function probe(browser, label, failList, act) {
   //    探针自己把被测证据抹掉了（我第一版就这么错，误判成「无失败提示」）。
   const feat = {}
   const isFailCase = label.startsWith('失败路径：')
+  if (label.startsWith('溢出渐隐：')) {
+    feat.overflow = await page.evaluate(() => {
+      const el = document.querySelector('[data-testid="nb-convo-list"]')
+      if (!el) return null
+      const cs = getComputedStyle(el, '::after')
+      return {
+        scrollH: el.scrollHeight,
+        clientH: el.clientHeight,
+        attr: el.getAttribute('data-overflow'),
+        overflowing: el.getAttribute('data-overflow') === 'true',
+        opacity: cs.opacity,
+        hasScrollClass: el.classList.contains('nb-scroll'),
+      }
+    }).catch(() => null)
+  }
   if (isFailCase) {
     // 只跑该案例自己的动作（功能断言会 Esc 关弹窗、抹掉失败证据，故不走）
     if (act) await act(page)
@@ -348,6 +378,13 @@ try {
       badUrls: [],
     })
   }
+  // ── 溢出渐隐探针（吸收 OverlayScrollbars 的设计意图）──
+  // 判据：短列表**不**显示渐隐；60 条列表**显示**渐隐。
+  // ⛔ 若只测长列表，「渐隐恒显」也会通过 —— 必须两个方向都测。
+  for (const [name, n] of [['短列表(3)', 3], ['长列表(60)', 60]]) {
+    rows.push(await probe(browser, `溢出渐隐：${name}`, [], null, n))
+  }
+
   // ── 失败路径探针（此前**完全没有覆盖**：桩对每个命令都返回成功）──
   // 诚实性检查：故障时 UI 必须**说清失败**，不得静默空白或崩溃。
   // ⛔ 每个案例必须自带 **act**：有些故障只在**用户动手**时才发生
@@ -404,7 +441,22 @@ for (const r of rows) {
       console.log(`     活动面板：行数=${a.count} 最新=${a.firstCmd} ${a.firstMs}`
         + ` 有失败行=${a.hasBad ? '是' : '否'}`)
     }
-    if (r.label.startsWith('失败路径：')) {
+    if (r.label.startsWith('溢出渐隐：')) {
+    const o = r.feat?.overflow
+    if (!o) { console.log('     ⛔ 未取到溢出状态'); fail++ }
+    else {
+      const want = r.label.includes('长列表')
+      const ok = o.overflowing === want
+      console.log(`     ${r.label}：scrollH=${o.scrollH} clientH=${o.clientH} `
+        + `data-overflow=${o.attr} 伪元素opacity=${o.opacity} ⇒ `
+        + (ok ? '✅ 符合预期' : '⛔ 不符合预期'))
+      if (!ok) fail++
+      if (o.scrollH <= o.clientH && want) {
+        console.log('     ⛔ 60 条会话仍未溢出 ⇒ 测的不是渐隐逻辑'); fail++
+      }
+    }
+  }
+  if (r.label.startsWith('失败路径：')) {
     // 判据：① 仍渲染出内容（不是白屏）② 无未捕获 pageerror
     //      ③ 页面文本里能看到失败痕迹（说明**说清了**，而非静默）
     const hasCrash = r.errors.some((e) => e.startsWith('pageerror:'))
@@ -467,6 +519,21 @@ for (const r of rows) {
       } else {
         console.log(`     聊天区语言：zh=${JSON.stringify(f.chatZh)}`)
         console.log(`                    en=${JSON.stringify(f.chatEn)}`)
+      }
+    }
+  }
+  if (r.label.startsWith('溢出渐隐：')) {
+    const o = r.feat?.overflow
+    if (!o) { console.log('     ⛔ 未取到溢出状态'); fail++ }
+    else {
+      const want = r.label.includes('长列表')
+      const ok = o.overflowing === want
+      console.log(`     ${r.label}：scrollH=${o.scrollH} clientH=${o.clientH} `
+        + `data-overflow=${o.attr} 伪元素opacity=${o.opacity} ⇒ `
+        + (ok ? '✅ 符合预期' : '⛔ 不符合预期'))
+      if (!ok) fail++
+      if (o.scrollH <= o.clientH && want) {
+        console.log('     ⛔ 60 条会话仍未溢出 ⇒ 测的不是渐隐逻辑'); fail++
       }
     }
   }

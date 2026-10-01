@@ -208,6 +208,47 @@ if DIRECT:
 else:
     print('✅ 4b IPC 单一出口：全部经 src/ipc.ts（活动面板完整）')
 
+# ── 4c 工具类是否**真的编译进产物**（Tailwind 缺失守卫）───────────────
+# ⛔ 这条门来自一次**严重自伤**：neobot-root.tsx 逐字复制自 vendored 树，
+#    那边有 Tailwind v4 + CSS 变量主题；本自持树起初**两者都没有** ⇒
+#    实测产物 CSS 里工具类命中 **0**，而该文件用了 **230 个 token** ⇒
+#    全部是死的。表现不是"不好看"，是**布局坏掉**：
+#    `flex-1` 计算值为初始值 `0 1 auto` ⇒ 会话列表不滚动、把容器撑破。
+#    而我当时的冒烟测试只验「有文本 + 无 console 报错」⇒ **放过了**。
+# ⇒ 「渲染通过」≠「样式生效」。本门把这件事变成可红的判据。
+UTIL_SAMPLE = [
+    'flex-1', 'flex-col', 'min-h-0', 'overflow-y-auto', 'truncate',
+    'shrink-0', 'text-muted', 'border-line', 'bg-panel', 'text-ink',
+]
+css_text = ''
+for root, _d, files in os.walk(os.path.join(UI, 'dist')):
+    for fn in files:
+        if fn.endswith('.css'):
+            css_text += read(os.path.join(root, fn))
+if not css_text:
+    print('ℹ️  4c 工具类守卫：dist/ 无 CSS（未构建）—— 跳过')
+else:
+    # 统计源码里实际用到的工具类 token 数（粗口径：出现在 className 里的）
+    src_all = ''
+    for root, dirs, files in os.walk(os.path.join(UI, 'src')):
+        dirs[:] = [x for x in dirs if x not in ('node_modules', 'dist', 'vendor')]
+        for fn in files:
+            if fn.endswith(('.ts', '.tsx')):
+                src_all += read(os.path.join(root, fn))
+    used = [u for u in UTIL_SAMPLE if u in src_all]
+    missing = [u for u in used if f'.{u}' not in css_text]
+    if missing:
+        fail.append(
+            f'源码使用了工具类但**产物 CSS 里没有**：{missing}\n'
+            f'       ⇒ 这些 class 是**死的**（浏览器找不到规则 ⇒ 布局静默失效）。\n'
+            f'       常见病因：自持树缺 Tailwind（vendored 树有，本树曾没有）。\n'
+            f'       处置：确认 vite 插件含 tailwindcss()，且入口 CSS 有 '
+            f'@import "tailwindcss"；语义色还需 CSS 变量（见 src/theme.css）'
+        )
+    else:
+        print(f'✅ 4c 工具类守卫：抽样的 {len(used)} 个工具类均已编译进产物 CSS'
+              f'（产物 {len(css_text)} 字节）')
+
 # ── 5 openghost 独立授权（MIT 无附加条款）───────────────────────────────
 og = os.path.join(UI, 'src/vendor/openghost')
 if os.path.isdir(og):

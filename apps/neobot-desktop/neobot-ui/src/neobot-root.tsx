@@ -526,7 +526,7 @@ export function NeoBotRoot() {
 
         <div
           data-testid="nb-convo-list"
-          className="min-h-0 flex-1 overflow-y-auto px-2 pb-2"
+          className="nb-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2"
         >
           {err && (
             <div className="m-1 rounded-lg bg-btn-danger-hover p-2 text-xs text-[#c33b38]">
