@@ -83,5 +83,6 @@
   "api.unlistedSummary": "Upstream not itemized ({n})",
   "convo.group.today": "Today",
   "convo.group.week": "This week",
-  "convo.group.older": "Older"
+  "convo.group.older": "Older",
+  "chat.copyMessage": "Copy message"
 }

@@ -83,5 +83,6 @@
   "api.unlistedSummary": "上游未逐条展开（{n}）",
   "convo.group.today": "今天",
   "convo.group.week": "一周内",
-  "convo.group.older": "更早"
+  "convo.group.older": "更早",
+  "chat.copyMessage": "复制消息"
 }

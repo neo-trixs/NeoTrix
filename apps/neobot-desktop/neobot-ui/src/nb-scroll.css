@@ -82,3 +82,41 @@
 @media (prefers-reduced-motion: reduce) {
   .nb-overflow-hint::after { transition: none; }
 }
+
+/* ── 气泡悬停复制 ──────────────────────────────────────────────────────
+ * 默认 `opacity: 0` 且 `pointer-events: none` ⇒ 不占视觉、也不吃点击。
+ * ⛔ **必须同时覆盖 `focus-within`**：只做 `:hover` 的话，
+ *    键盘用户永远看不到这个按钮（`opacity: 0` 的元素仍在 Tab 序里，
+ *    但完全不可见 ⇒ 比没有更糟）。
+ * ⛔ 用 `opacity` 而非 `display: none`：后者会把元素移出无障碍树。
+ */
+.nb-msg-copy {
+  position: absolute;
+  top: -9px;
+  inset-inline-end: -10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--nb-color-line, rgb(0 0 0 / .12));
+  border-radius: 6px;
+  background: var(--nb-color-panel, #fff);
+  color: var(--nb-muted, #6b6d73);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s ease-out;
+}
+.group:hover .nb-msg-copy,
+.group:focus-within .nb-msg-copy { opacity: 1; pointer-events: auto; }
+.nb-msg-copy:hover { background: var(--nb-color-panel-hover, #eee); }
+.nb-msg-copy:focus-visible { outline: 2px solid var(--nb-color-info, #7aaaff); outline-offset: 1px; opacity: 1; }
+.nb-msg-copy.is-copied { color: var(--nb-color-ok, #22c55e); }
+
+@media (prefers-reduced-motion: reduce) {
+  .nb-msg-copy { transition: none; }
+}

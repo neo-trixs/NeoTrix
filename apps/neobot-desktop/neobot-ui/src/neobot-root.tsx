@@ -114,28 +114,42 @@ function sendFailedPrefixRe(): RegExp {
   return new RegExp('^' + t('chat.sendFailedPrefix').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
 }
 
-async function copyCode(button: HTMLButtonElement): Promise<void> {
-  const pre = button.closest('.md-code')?.querySelector('pre code')
-  const text = pre?.textContent ?? ''
-  if (!text) return
-  // 优先浏览器 Clipboard API；被拒时**回落**到 Tauri 命令。
-  // ⛔ 原实现在 catch 里直接 `return`，而 Tauri 走自定义协议（未必是安全
-  //    上下文），`navigator.clipboard` 可能整个不可用 ⇒ 复制按钮**无声失效**，
-  //    用户只看到「按了没反应」。而后端 `write_clipboard_text` 是
-  //    `Status::Implemented` 且已在 invoke_handler 注册（main.rs）⇒ 回落可用。
-  //    这不是「多加一条命令让门变绿」，是补一条真实缺失的降级路径。
+/**
+ * 复制文本到剪贴板，**带降级链**。
+ *
+ * 优先浏览器 Clipboard API；被拒时**回落**到 Tauri 命令
+ * `write_clipboard_text`（`Status::Implemented` 且已注册）。
+ * ⛔ 只用 `navigator.clipboard` 会在 Tauri 自定义协议（非安全上下文）下
+ * **无声失效** —— 用户只看到「按了没反应」。
+ *
+ * @returns 是否复制成功（调用方据此给反馈，⛔ 不吞失败）
+ */
+async function copyText(text: string): Promise<boolean> {
+  if (!text) return false
   try {
     await navigator.clipboard.writeText(text)
+    return true
   } catch {
     try {
       await invoke('write_clipboard_text', { text })
+      return true
     } catch {
-      // 两条路都被拒：静默收手，不弹错（沿用原注释的理由）。
-      return
+      return false // 两条路都被拒 ⇒ 如实返回 false，由调用方提示
     }
   }
+}
+
+/** 给按钮一个 1.2s 的「已复制」视觉反馈。 */
+function flashCopied(button: HTMLElement): void {
   button.classList.add('is-copied')
   window.setTimeout(() => button.classList.remove('is-copied'), 1200)
+}
+
+async function copyCode(button: HTMLButtonElement): Promise<void> {
+  const pre = button.closest('.md-code')?.querySelector('pre code')
+  const text = pre?.textContent ?? ''
+  // ⛔ 复制失败**不静默**：按钮不给反馈会让用户以为是自己按错了
+  if (await copyText(text)) flashCopied(button)
 }
 
 function relTime(iso: string): string {
@@ -929,7 +943,12 @@ export function NeoBotRoot() {
                     paddingTop: `${groupStart ? 10 : 2}px`,
                   }}
                 >
-                  <div className="flex max-w-[76%] flex-col">
+                  {/* ⛔ `group` 是悬停钩子：复制按钮默认**不可见**（不占视觉），
+                      悬停/聚焦才出现。⛔ 刻意**不用 React state** 控制显隐 ——
+                      纯视觉的东西交给 CSS，否则每次悬停都触发一次重渲染，
+                      而消息列表是**虚拟化**的（重渲染代价随可见条数放大）。
+                      键盘可达性用 `focus-within` 一并覆盖，不只 `hover`。 */}
+                  <div className="group relative flex max-w-[76%] flex-col">
                     <div
                       className={`rounded-2xl px-3 py-2 text-[13px] leading-relaxed ${
                         m.who === 'me'
@@ -937,6 +956,25 @@ export function NeoBotRoot() {
                           : 'rounded-bl-md bg-[#ededef] text-[#18181b]'
                       }`}
                     >
+                      {/* 悬停/聚焦复制：绝对定位到气泡右上角外侧，
+                          ⛔ 不参与文档流 ⇒ 不改变气泡高度（measureElement
+                          测到的仍是纯文本高度，虚拟化高度不受影响）。 */}
+                      <button
+                        type="button"
+                        data-testid="nb-msg-copy"
+                        aria-label={t('chat.copyMessage')}
+                        title={t('chat.copyMessage')}
+                        onClick={async (e) => {
+                          // ⛔ 显式取事件对象：写 `event?.currentTarget` 会落到
+                          //    DOM lib 的**全局 event**（遗留全局），tsc 不报错
+                          //    但语义错、且未来 lib 收紧就会断。
+                          const btn = e.currentTarget
+                          if (await copyText(m.text)) flashCopied(btn)
+                        }}
+                        className="nb-msg-copy"
+                      >
+                        <span aria-hidden="true">⧉</span>
+                      </button>
                       {m.who === 'me' || renderBot(m.text) === null ? (
                         <span className="whitespace-pre-wrap break-words">{m.text}</span>
                       ) : (
