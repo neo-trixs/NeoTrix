@@ -1142,6 +1142,23 @@
    "read_only": true,
    "when_not": "⛔ 别用 DOM 行数判过滤效果（虚拟化下列表恒 ~20 行）；改搜索框/弹窗/Esc 行为前跑它取基线",
    "spec": "A Cmd+K 聚焦搜索并**全选**（不选=打字会插入而非覆盖）· B 过滤生效（量 nb-convo-sizer 高度 + 可见标题全命中；⛔ 别量 nb-msg-sizer，那是消息列表）· C Esc 清空 · D 空搜索 Esc 不误伤 · E ⭐ 弹窗开时 Esc **只关弹窗**、搜索保持（防「一次按键改两个无关状态」）· F ⭐ 弹窗开时 Cmd+K **不抢焦点**（抢走=读屏用户丢模态内位置）· G 搜索框有 aria-label · H 零异常。ⓘ **E 是双防线**：shell.tsx 的 capture+stopPropagation 先阻断，我方 dialogOpen 检查是第二道 ⇒ 只拆我方那道 E 仍绿（负向实测），须**两道同拆**才红。ⓘ 本门开头打印环境诊断：invoke 桩传参与读取不一致时全命令返 null ⇒ root=0，症状伪装成「选择器找不到」"
+  },
+  {
+   "id": "neobot-check-convo-keys",
+   "query": [
+    "方向键",
+    "会话列表键盘",
+    "焦点陷阱",
+    "roving tabindex",
+    "Tab 出不去",
+    "键盘导航会话",
+    "Home End"
+   ],
+   "tool": "node scripts/ops/neobot-check-convo-keys.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "⛔ 别在少于 30 个会话的桩上跑 D（必须 > 渲染窗口才有意义）；改会话项/侧栏结构/选中态前跑它取基线",
+   "spec": "A ↓ 移到下一项 · B ↑ 移回 · C Home/End 跳到**当时**渲染窗口首尾 ⭐（聚焦会触发重渲染⇒窗口会变，别硬编码首项）· D ⭐⭐ 连按 ↓ **超过窗口**（实测 20+5=25）焦点仍在移动 ⭐⭐ 这是虚拟化边缘断链的**唯一**测法（第 21 个起无声失效，界面看起来完全正常）· E ⭐ 连按 Tab 须能**离开**列表（roving tabindex；⛔ 一次 Tab 出不去是正常的——下一项也是 button，判据要测「出不去」而非「按一次就出」）· G 搜索框内 ↑↓ 不抢列表焦点 · H 零异常。ⓘ 负向测试：去掉 roving ⇒ E 红（Tab 61 次出不去）"
   }
  ],
  "excluded": {

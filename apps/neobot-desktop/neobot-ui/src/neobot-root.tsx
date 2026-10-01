@@ -406,6 +406,84 @@ export function NeoBotRoot() {
     return () => document.removeEventListener('keydown', onKey)
   }, [])
 
+  // ── 会话列表方向键导航 ────────────────────────────────────────────
+  //
+  // ⛔⛔ **虚拟化是这个功能的全部难点**：DOM 里**永远只有约 20 个**
+  // `nb-convo-item`（1000 个会话时实测 20），其余 980 个**不存在于 DOM**。
+  // ⇒ 天真的「找下一个兄弟节点并 focus」在第 21 个就**走到尽头**：
+  //   用户按 21 次 ↓ 之后什么都不会发生，而界面看起来完全正常。
+  // ⇒ 到达**渲染窗口边缘**时必须**滚动列表**让虚拟化器渲染下一批，
+  //   然后在下一帧再对焦。⛔ 滚动后 React 还没重渲染 ⇒ 不能同步 focus，
+  //   必须 `requestAnimationFrame` 等一帧。
+  //
+  // ⛔ **不劫持 Tab**：Tab 仍是「离开这个列表」的标准方式。
+  //   只处理 ↑/↓/Home/End —— 这是 listbox 的既有约定，不发明新键。
+  const onConvoListKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return
+    const list = e.currentTarget
+    const items = () => [...list.querySelectorAll<HTMLElement>('[data-testid="nb-convo-item"]')]
+    const rendered = items()
+    if (rendered.length === 0) return
+    e.preventDefault()
+
+    const cur = rendered.indexOf(document.activeElement as HTMLElement)
+    const atEnd = cur === rendered.length - 1
+    const atStart = cur <= 0
+
+    // Home / End：跳到**当前渲染窗口**的首/尾（ⓘ 不是整个列表 ——
+    //   虚拟化下「整个列表的末尾」得先滚过去，Home/End 只处理可见区间，
+    //   否则一次 End 要等 1000 项全部渲染，延迟不可接受）。
+    // 同步 roving：方向键移到哪一项，Tab 的停靠点就跟到哪一项
+    // （否则方向键移过、随后按 Tab 会跳回旧选中项，行为自相矛盾）。
+    const focusAt = (el: HTMLElement | undefined) => {
+      if (!el) return
+      const id = el.dataset.convoId
+      if (id) setRoving(id)
+      el.focus()
+    }
+    if (e.key === 'Home') { focusAt(rendered[0]); return }
+    if (e.key === 'End') { focusAt(rendered[rendered.length - 1]); return }
+
+    // 越过边缘 ⇒ 滚动加载下一批，下一帧再对焦
+    if ((e.key === 'ArrowDown' && atEnd) || (e.key === 'ArrowUp' && atStart)) {
+      const before = list.scrollTop
+      list.scrollTop += e.key === 'ArrowDown' ? list.clientHeight : -list.clientHeight
+      // 已在顶部/底部且滚不动 ⇒ 没有下一批，如实什么都不做
+      if (list.scrollTop === before) return
+      requestAnimationFrame(() => {
+        const now = items()
+        if (now.length === 0) return
+        const t = e.key === 'ArrowDown' ? now[0] : now[now.length - 1]
+        if (t?.dataset.convoId) setRoving(t.dataset.convoId)
+        t?.focus()
+      })
+      return
+    }
+    const next = e.key === 'ArrowDown' ? cur + 1 : cur - 1
+    focusAt(rendered[next])
+  }, [])
+
+  // ── roving tabindex：解决虚拟化列表的**焦点陷阱** ────────────────
+  //
+  // ⛔⛔ 这是我在写方向键时**实测发现的既存缺陷**（与方向键无关）：
+  //   会话项全是 `<button>`，而列表是**虚拟化**的（1000 项只渲染 ~20）。
+  //   Tab 聚焦某项会把它**滚进视口** ⇒ 虚拟化器渲染**下一批** ⇒
+  //   于是「Tab 的下一个可聚焦元素」**永远存在** ⇒
+  //   连按 61 次 Tab 都**出不去列表**（门实测）⇒ **焦点陷阱**。
+  //   ⇒ 标准解法 **roving tabindex**：整张列表**只允许一个** `tabIndex=0`，
+  //   其余全 `-1`。Tab 于是「进入列表（落在当前项）→ 再按即离开」，
+  //   而不是逐项爬 1000 次。方向键在列表**内部**移动焦点并更新 roving 项。
+  const [roving, setRoving] = useState<string | null>(null)
+  /**
+   * 整张列表的**唯一** Tab 停靠点：roving 项 → 当前选中项 → 首个会话。
+   * ⛔ 绝不能「每项都 0」：虚拟化会让 Tab 变成出不去的焦点陷阱（见上）。
+   * ⛔ 也绝不能「全 -1」：那样列表**根本进不去**（键盘用户无法触达会话）。
+   *    ⇒ 必须**恰好一个** 0。
+   */
+  const tabStopId = roving ?? sel ?? shown[0]?.id ?? null
+  const convoTabIndex = useCallback(
+    (id: string) => (tabStopId ? (id === tabStopId ? 0 : -1) : -1), [tabStopId])
+
   const [newOpen, setNewOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newMember, setNewMember] = useState('')
@@ -611,7 +689,11 @@ export function NeoBotRoot() {
               //    只不过这次是**别人加功能**暴露了选择器的位置假设）。
               data-testid="nb-convo-item"
               type="button"
-              onClick={() => setSel(c.id)}
+              // ⛔ roving tabindex：见上方注释。整张列表只有一个 0，
+              //   否则虚拟化会让 Tab 变成出不去的焦点陷阱。
+              tabIndex={convoTabIndex(c.id)}
+              data-convo-id={c.id}
+              onClick={() => { setRoving(c.id); setSel(c.id) }}
               aria-current={active ? 'true' : undefined}
               // 选中态：底色 + 左侧强调条。⛔ 只给 font-semibold 不够 ——
               // 字号权重的差别在 13px 下几乎看不出来，用户会以为没选中。
@@ -738,6 +820,7 @@ export function NeoBotRoot() {
           ref={listRef}
           data-testid="nb-convo-list"
           className="nb-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2"
+          onKeyDown={onConvoListKeyDown}
         >
           {err && (
             <div className="m-1 rounded-lg bg-btn-danger-hover p-2 text-xs text-[#c33b38]">
