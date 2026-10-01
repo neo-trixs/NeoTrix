@@ -210,6 +210,44 @@ cmd:python3 scripts/ops/nt_decompose.py selftest   # ⑥ 拆解器自证仍绿�
 | `truncate_chars` | 4 | 1 / 3 | 名字叫 chars 但按字节判长度（快路径无害，主体用 `char_indices`）| ⛔ 未动（**不判为 bug**：其 `s.len() <= max` 只是保守快路径，主体边界安全） |
 | `tokenize` | 6 | — | 分词规则各异（`is_ascii_alphanumeric` vs 含 CJK 切分）⇒ **多数是有意差异** | ⛔ 未动（未取证） |
 
+### 3.1d ⚠️⚠️ 最重要的结构性发现：**我交付的审计能力别人用不了**
+
+本会话共交付 6 个审计/拆解工具：`nt_decompose` · `nt_parity_ref` · `nt_fn_drift` ·
+`nt_dup_dead` · `nt_callgraph` · `nt_calledges`。
+
+**它们全部依赖 `.project-map/edges-*.jsonl`** —— 而：
+
+| 事实【实测】 | 后果 |
+|---|---|
+| `.gitignore:293` 忽略整个 `.project-map/` | 干净检出上**一个边表都没有** |
+| Makefile **没有任何目标**生成它 | 不知道该跑什么才能拿到 |
+| 全量抽取 ~30min / 168MB | 即使知道也太贵，默认不会做 |
+
+⇒ **我交付的审计能力只有我这台机器能用**。别人 clone 下来，6 个工具全部是死工具。
+这不是「低频生成物」的小事，是**能力不可分发** —— 而本仓的整个方法论
+（证据优先、判据可复跑）都建立在这些工具能跑的前提上。
+
+**已修**：`scripts/ops/nt_audit_bootstrap.sh` + Makefile 目标（一条命令）：
+
+```assert
+file:scripts/ops/nt_audit_bootstrap.sh   # 审计能力的前置引导（本节的结构性修复）
+cmd:make audit-edges-list                 # 列出 member 与将产出的边表（亚秒级）
+cmd:bash scripts/ops/nt_audit_bootstrap.sh --list  # 同一入口，脱离 make 也能用
+cmd:python3 scripts/ops/nt_fn_drift.py selftest     # 引导后的工具自证仍绿
+```
+
+| scope | 实测 | 用途 |
+|---|---|---|
+| `quick`（默认） | 11 member **约 2-4 分钟**，单 crate ~13s | 逐 crate 边表；够跑单 crate 的拆解/漂移/存活率分诊（已实测 per-crate db 上三工具均可用） |
+| `full` | ~30min / 168MB | 合并成 `edges-all.jsonl`；只有**跨 crate** 全局分诊才值得（815 对里大量跨 crate）。⛔ 不进 CI |
+| `merge-only` | 秒级 | 已有 per-crate 边表时只做合并，不重抽 |
+
+**顺带记一个我自己写出的静默失败**：v1 的 member 解析用 `os.getcwd()`，
+于是从别的目录调用时解析出 0 个 member 并**报告「0 成功 / 0 失败」**
+—— 零产出伪装成成功。改为**从脚本自身位置推导 REPO**，
+并让「列出的 member 一个都不存在」成为 **rc≠0 的显式错误**。
+（与本仓既有教训同源：`checked ≠ verified`，以及「零命中不是零消费」。）
+
 ### 3.1c 「纯重复 × 零接线」交叉判定（dup-dead）—— 结论是**不删**
 
 `nt_fn_drift` 给出 IDENTICAL 后仍缺一环：**「重复」不等于「该动手」**。

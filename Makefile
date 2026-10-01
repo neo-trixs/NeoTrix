@@ -128,6 +128,28 @@ project-map:
 	@bash skills/dev-tools/project-map/map-project.sh
 	@echo "✅ 项目映射已生成: .project-map/"
 
+# ── 审计工具前置：调用边表（2026-09-30 新增）────────────────────────────
+# ⛔ 为什么必须存在：`.project-map/` 是 gitignored，而 nt_decompose /
+#   nt_parity_ref / nt_fn_drift / nt_dup_dead / nt_callgraph **全部**依赖
+#   `edges-*.jsonl`。没有这个目标，**干净检出上这套审计能力等于零**
+#   （2026-09-30 实测发现：本会话交付的 6 个工具只有原机器能用）。
+#
+# quick（默认）逐 crate 抽取：实测 11 member 约 2-4 分钟，单 crate ~13s。
+#   产出 per-crate 边表，够跑单 crate 的原子拆解/副本漂移/存活率分诊。
+# full 全量合并：实测 ~30min / 168MB，只有跨 crate 全局分诊才值得。⛔ 不进 CI。
+audit-edges:
+	@bash scripts/ops/nt_audit_bootstrap.sh
+
+audit-edges-quick:
+	@bash scripts/ops/nt_audit_bootstrap.sh --scope quick
+
+audit-edges-full:
+	@echo "[MAKEFILE] ⚠️ 约 30min / 168MB。⛔ 不要在 CI 跑。"
+	@bash scripts/ops/nt_audit_bootstrap.sh --scope full
+
+audit-edges-list:
+	@bash scripts/ops/nt_audit_bootstrap.sh --list
+
 # 查看项目结构
 project-view:
 	@echo "[MAKEFILE] 项目结构概览:"
