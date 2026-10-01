@@ -305,6 +305,213 @@ def report_dup_impls(fd, roots, limit):
         print('    实例与三条处置建议见 docs/architecture/MIRROR-BANK-2026-09-30.md §7')
     return len(rows)
 
+
+# ── 「低层复制高层算法」检测（2026-09-30 新增）─────────────────────────
+# 起因：MIRROR-BANK §7 的 IIT Phi 案例。根因是**层规则**：
+#   L0 全层实测 **0 处**引用 L2-L6 ⇒ L0 不能直接用 L5 的真身
+#   ⇒ 只能手工复制一份到 L0（于是有了那份陈旧分叉）。
+# ⇒ 这个缺陷的**成因**是架构约束，靠「找重复」发现不了，
+#   必须显式检查「低层是否持有高层算法的副本」。
+# 判据：某类型在 L0 有定义，且在更高层也有同名定义（方法集重叠 ⇒ 同源）。
+# 与 dup-impl 的区别：那个只看「方法集差异」，这个专门盯**层级倒挂**。
+
+_LAYER_ORDER = ['l0_substrate', 'l1_action', 'l2_perception', 'l3_embodiment',
+                'l4_emotion', 'l5_cognition', 'l6_meta']
+
+
+def report_inverted_hierarchy(fd, roots, limit):
+    """L0（或低层）持有高层同名类型 ⇒ 层规则迫使的复制，报告成因。"""
+    low, high = {}, {}
+    for root in roots:
+        base = os.path.join(REPO, root) if not os.path.isabs(root) else root
+        if not os.path.isdir(base):
+            continue
+        for dirpath, _dirs, files in os.walk(base):
+            norm = dirpath.replace(os.sep, '/')
+            if '/target' in norm or '/.worktrees' in norm:
+                continue
+            for f in sorted(files):
+                if not f.endswith('.rs'):
+                    continue
+                p = os.path.relpath(os.path.join(dirpath, f), REPO)
+                ly = layer_of(p)
+                if ly not in _LAYER_ORDER:
+                    continue
+                bucket = low if ly == 'l0_substrate' else high
+                for ty, ms in impl_methods(fd, p, all_visibility=True).items():
+                    bucket.setdefault(ty, []).append((ly, p, ms))
+    rows = []
+    for ty, lsites in low.items():
+        hsites = high.get(ty, [])
+        if not hsites:
+            continue
+        for ly, lp, lms in lsites:
+            for hy, hp, hms in hsites:
+                if hy == 'l0_substrate':
+                    continue
+                inter = len(lms & hms)
+                if inter < 3:
+                    continue  # 共享面过小 ⇒ 同名巧合，不是复制
+                rows.append({
+                    'ty': ty, 'low': (ly, lp, len(lms)),
+                    'high': (hy, hp, len(hms)),
+                    'inter': inter, 'jac': inter / len(lms | hms),
+                })
+    rows.sort(key=lambda r: -r['inter'])
+    print('[inverted] L0 持有高层同名类型（层规则迫使的复制）：%d 组' % len(rows))
+    for r in rows[:limit]:
+        print('== %s   L0(%d 方法, %s) ↔ %s(%d 方法, %s)   共享 %d 方法 J=%.2f'
+              % (r['ty'], r['low'][2], r['low'][1].split('/')[-1],
+                 r['high'][0], r['high'][2], r['high'][1].split('/')[-1],
+                 r['inter'], r['jac']))
+    if rows:
+        print('[inverted] 判读要点：')
+        print('  · 成因是**架构约束**而非疏忽：实测 L0 全层 0 处引用 L2-L6，')
+        print('    所以 L0 无法直接用高层真身，只能复制。⇒ 光「去重」修不了，')
+        print('    必须先决定真身该落在哪一层（或下沉到契约层）。')
+        print('  · ⛔ 本工具**不判删**：真身归属属架构决策。')
+        print('    实例与三条处置建议见 docs/architecture/MIRROR-BANK-2026-09-30.md §7')
+    return len(rows)
+
+
+# ── 孤儿文件检测（2026-09-30 新增）───────────────────────────────────
+# 起因：删掉 `l6_meta/nt_core_qtest.rs`（538 行，含 15 个测试）后发现 ——
+# 那个文件**从未被编译**，因为 `l6_meta/mod.rs` 里根本没有 `pub mod nt_core_qtest`。
+#
+# ⚠️ 这是**另外两个工具都看不见的盲区**：
+# `nt_dup_dead` / `nt_pub_dead` 都基于源码**文本**分析「有什么」，
+# 而孤儿文件的问题是「**是否被编译**」—— 文本再丰富也不回答这个问题。
+# ⇒ 只能沿 **mod 声明链**核实：从 crate 根（lib.rs/main.rs）出发，
+#    递归跟随 `mod X;` / `pub mod X;` / `#[path=...] mod X;`，
+#    走不到的文件就是孤儿。
+#
+# 边界（诚实声明）：
+# · `include!` 宏引入的文件**不在本检查覆盖范围**（不是 `mod` 声明）；
+# · `cfg_attr` / 宏生成的 `mod` 声明无法静态判定；
+# · 跨 crate 的 `#[path]` 相对路径按声明所在文件解析。
+# ⇒ 本检查**只报候选**，且只报「在磁盘上存在、但从 crate 根走不到」的文件。
+
+_MOD_DECL = re.compile(
+    r'(?:^|\n)\s*(?:pub(?:\([^)]*\))?\s+)?(?:'
+    r'\#\s*\[\s*path\s*=\s*"([^"]+)"[^\]]*\]\s*'
+    r'|mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:;|\{)'
+    r')'
+)
+
+
+def reachable_mods(entry: str, fd=None):
+    """从 crate 入口出发沿 mod 声明链走一遍，返回可达的 .rs 绝对路径集合。"""
+    seen, queue, out = set(), [os.path.abspath(entry)], set()
+    while queue:
+        f = queue.pop()
+        if f in seen:
+            continue
+        seen.add(f)
+        out.add(f)
+        if not f.endswith('.rs') or not os.path.isfile(f):
+            continue
+        try:
+            with open(f, encoding='utf-8', errors='replace') as fh:
+                clean = fd.strip_noise(fh.read())
+        except OSError:
+            continue
+        base_dir = os.path.dirname(f)
+        for m in _MOD_DECL.finditer(clean):
+            path_attr, name = m.group(1), m.group(2)
+            if path_attr:
+                cand = os.path.normpath(os.path.join(base_dir, path_attr))
+                if cand.endswith('.rs'):
+                    queue.append(cand)
+                continue
+            if not name:
+                continue
+            # ── Rust 2018 模块解析（这里踩了两次坑，都已修）──────────────
+            # 坑 1：两个候选都不存在时**没有 break**，路径沿用上一轮继续拼，
+            #       产出 `l4_emotion/mod.rs/nt_memory.rs` 这种假路径。
+            # 坑 2：**忽略了「同名 .rs 与同名目录并存」**。本仓真实存在
+            #       `nt_memory_search.rs` + `nt_memory_search/` 并存；
+            #       对**非 mod.rs** 文件内的 `mod bar;`，Rust 优先找
+            #       **同名子目录**下的 `bar.rs`，其次才是同级 `bar.rs`。
+            #       漏掉这条 ⇒ `nt_pure_fns.rs` 等被误判成孤儿
+            #       （实测 343 个假孤儿，真孤儿只有 1 个）。
+            #
+            # 正确顺序：
+            #   若当前文件是 `X/mod.rs`  ⇒ 候选 `X/name.rs`、`X/name/mod.rs`
+            #   若当前文件是 `X.rs`        ⇒ 候选 `X/name.rs`（同名子目录优先）、
+            #                                  `name.rs`（同级）
+            # ⚠️ 坑 3（首版修正时引入）：`lib.rs`/`main.rs` 是**特例** ——
+            #   它们没有同名目录，若按「去掉 .rs 得 x_stem」处理，
+            #   `lib.rs` 会算出 `src/li/` 这个不存在的目录，
+            #   候选全落空 ⇒ 可达数从 2187 掉到 **10**。
+            stem = os.path.basename(f)
+            if stem in ('mod.rs', 'lib.rs', 'main.rs'):
+                mod_root = base_dir
+                cands = [os.path.join(mod_root, name + '.rs'),
+                         os.path.join(mod_root, name, 'mod.rs')]
+            else:
+                x_stem = stem[:-3]  # 去掉 .rs
+                sibling_dir = os.path.join(base_dir, x_stem)
+                cands = [os.path.join(sibling_dir, name + '.rs'),
+                         os.path.join(sibling_dir, name, 'mod.rs'),
+                         os.path.join(base_dir, name + '.rs')]
+            found = False
+            for cand in cands:
+                if os.path.isfile(cand):
+                    queue.append(cand)
+                    found = True
+                    break
+            if not found:
+                continue
+    return out
+
+
+def report_orphan_files(roots, limit, fd=None):
+    """磁盘上存在、但从 crate 根沿 mod 链走不到的 .rs 文件。"""
+    entries = []
+    for root in roots:
+        base = os.path.join(REPO, root) if not os.path.isabs(root) else root
+        if not os.path.isdir(base):
+            continue
+        for cand in (os.path.join(base, 'lib.rs'), os.path.join(base, 'main.rs')):
+            if os.path.isfile(cand):
+                entries.append(cand)
+    reach = set()
+    for e in entries:
+        reach |= reachable_mods(e, fd)
+    on_disk = set()
+    for root in roots:
+        base = os.path.join(REPO, root) if not os.path.isabs(root) else root
+        if not os.path.isdir(base):
+            continue
+        for dirpath, _dirs, files in os.walk(base):
+            norm = dirpath.replace(os.sep, '/')
+            if '/target' in norm or '/.worktrees' in norm:
+                continue
+            for f in files:
+                if f.endswith('.rs'):
+                    on_disk.add(os.path.abspath(os.path.join(dirpath, f)))
+    orphans = sorted(on_disk - reach)
+    print('[orphan] 磁盘上的 .rs: %d，从 crate 根沿 mod 链可达: %d，**孤儿 %d**'
+          % (len(on_disk), len(on_disk) - len(orphans), len(orphans)))
+    rows = []
+    for o in orphans:
+        try:
+            n = len(re.findall(r'#\[test\]', open(o, encoding='utf-8',
+                                                 errors='replace').read()))
+        except OSError:
+            n = 0
+        rows.append((o, n))
+    rows.sort(key=lambda r: -r[1])
+    for o, n in rows[:limit]:
+        print('   %-88s 测试 %d' % (os.path.relpath(o, REPO), n))
+    if rows:
+        print('[orphan] 判读要点：')
+        print('  · 孤儿文件**不参与编译**，其测试也从不运行 ⇒ 它们的历史绿灯是假的；')
+        print('  · ⛔ **不代表可以删**：可能被 `include!` 引入，或被 feature 门控的')
+        print('    `mod` 声明引用（静态不可判定）⇒ 逐条核实后再动。')
+        print('  · 实例：neotrix-core/src/l6_meta/nt_core_qtest.rs（538 行 / 15 测试）')
+    return len(orphans)
+
 def added_date(path):
     """git 首次提交日期（YYYY-MM-DD）。拿不到就返回 '?'，**不猜**。"""
     try:
@@ -390,6 +597,10 @@ def report(args):
     print('  · ⛔ 本工具**不判删**：「删哪份」是架构决策，判据是意图而非文本相似度。')
     print()
     report_dup_impls(fd, [root for _c, root in CRATES], args.limit)
+    print()
+    report_inverted_hierarchy(fd, [root for _c, root in CRATES], args.limit)
+    print()
+    report_orphan_files([root for _c, root in CRATES], args.limit, fd)
     return 0
 
 
