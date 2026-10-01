@@ -2058,3 +2058,58 @@ AGPL/GPL/SSPL/Elastic/BUSL 全部不在 allow；`deny.yml:24` 只对 `advisories
   `SELF_SKIP` 判断**之前** ⇒ **`SELF_SKIP` 恒 0、那段不可达**（无害但误导）。
 - `check-license.sh` 的 `find` **不 prune `.worktrees/`** ⇒ 未来任一带 vendored 树的
   worktree 检出都会虚增分数。
+
+## ✅ 两个未登记门已补登记（元门的 `UNREGISTERED=2` 已清零）
+
+`check-silent-failure.sh` 与 `check-unwrap.sh` 原在 `--strict` 枚举集内但未登记
+⇒ `UNREGISTERED=2` ⇒ `ci.yml:81` 的元门**阻断 step** 必红。
+现已各自固化为 `injectable` 探针并登记（`gate-registry.tsv` 17 → **19** 条），
+`--list` 实测**枚举集内已无未登记**。
+
+### 两个探针都**指名注入文件**，而不只判 rc≠0
+ⓘ `assert_gate_red` 只证明「有东西红了」。若门**因别的原因**已经红，探针照样通过
+⇒ **什么都没证明**。grep 门自己输出的 `+ <path>:<line>` 才能把「红」**绑定到
+本次注入**。对 `check-unwrap` 这一点**尤其关键**——它当前就是恒红的（见下），
+不指名就是**自证循环**。
+
+| 门 | 注入点 | 为何选它 | 实测探针 |
+|---|---|---|---|
+| `check-silent-failure` | `neotrix-core/src/nt_probe_sf.rs`（新文件） | 该门 `ROOTS` 硬编码为 `neotrix-core/src` + `crates/*/src`（`os.walk`，**不看 .gitignore**）⇒ 注入点必须落在这些根内 | **PROBE-OK** |
+| `check-unwrap` | `scripts/nt_probe_unwrap.rs`（新文件） | ⭐ 爆炸半径最小：**不在任何 cargo crate 里** ⇒ 对构建零影响；`scripts/` 在 `check-layout` 的 ALLOW_DIRS 内；`nt_` 前缀满足命名门 | **PROBE-OK** |
+
+两个新注入器已加进 `scripts/probes/_lib.sh`：
+`inject_silent_discard`（⛔ 内容里绝不能有 `log::`/`println!`/`errors.push`
+等 OBSERVE 标记，否则所在块被判「已观察」⇒ 门保持绿）、`inject_unwrap_rs`
+（⛔ 不能有 `#[cfg(test)]`，否则 `is_production` 整段跳过）。
+
+## ⛔⛔ 实测确认：`ci.yml` 的 `check` job 有**三条**独立红因
+
+| # | 阻断 step | 位置 | 实测 rc | 原因 |
+|---|---|---|---|---|
+| ① | `check-unwrap.sh` | `ci.yml:49` | **1** | **NEW 5 / STALE 6** |
+| ② | 元门 `--strict` | `ci.yml:81` | 曾因 `UNREGISTERED=2` 必红 | **本轮已清零** |
+| ③ | `check-license.sh` | `ci.yml:71` | **1** | `frontend/LICENSE.details` 命中 deny，而 `ACKNOWLEDGE-2` 已 `status: void` |
+
+### ① `check-unwrap` 的 5 处 NEW —— **已逐行读现场证实，非扫描器误报**
+```
+apps/neobot-desktop/src/core.rs:205
+apps/neobot-desktop/src/main.rs:146
+neotrix-core/src/l2_perception/nt_core_code_search.rs:503   ← 系 55dd1989 的行号漂移
+crates/neotrix-neobot/src/nt_pet.rs:225 / :226
+```
+四个文件 `git status` **均干净**（已提交，不是他窗 WIP）。
+ⓘ 另有 **6 处 STALE**（基线行已不存在），`check-unwrap.sh:158` 只打印、**不影响退出码**。
+⚠️ **范围问题待裁决**：基线里 `apps/` 有 **0** 行，而 `apps/` 是 2026-09-30
+才重新进仓的（`check-layout.sh` 注释记载「决定反转」）⇒ 那 2 处 NEW 到底是
+「2 个 bug」还是「范围该收窄」是**策略问题**。见
+`docs/architecture/APPS-DESKTOP-DECISION-2026-09-30.md`。
+
+⛔ **处置纪律**：`check-gate-satisfiable.sh:183` 明确禁止「为清零而调大基线」。
+那 5 处须**补基线（带 criterion+oracle）或改代码**，不得为让 CI 变绿而放宽。
+ⓘ 2 处 STALE 的处置（`--update-baseline` 会重写文件）需人判断：是已修、
+还是改名后需重写行。
+
+## ✅ `check-silent-failure` 当前是绿的（且非空绿）
+实测 `--strict` rc=0：32 命中 / 基线 32 / **NEW 0** / STALE 0，
+「out of scope by design」207 处（`remove_file`/`send*` 等，设计上不判）。
+⇒ 它的探针证明是**有效**的（不是「本来就红」那种自证）。

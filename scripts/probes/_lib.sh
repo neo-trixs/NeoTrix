@@ -84,3 +84,31 @@ assert_gate_red() {
   echo "PROBE-OK: ${gate} 注入违规后 exit=${rc}（正确变红）"
   exit 0
 }
+
+# 注入一处「无观察通道的落盘丢弃」—— 触发 check-silent-failure。
+# ⛔ 内容里**绝不能**出现 log::/println!/errors.push 等 OBSERVE 标记，
+#    否则所在块被判定「已观察」⇒ 门保持绿 ⇒ 探针会正确地失败。
+# ⛔ 落点必须在 neotrix-core/src 或 crates/*/src（该门的 ROOTS 硬编码于此）。
+inject_silent_discard() {
+  local target="$1"
+  [ -n "$target" ] || PROBE_FAIL "inject_silent_discard 需要目标路径"
+  [ -e "$target" ] && PROBE_FAIL "注入目标已存在: $target"
+  cat > "$target" <<'INNER'
+//! probe injection
+pub fn nt_probe_sf(p: &std::path::Path) {
+    let _ = std::fs::write(p, b"x");
+}
+INNER
+}
+
+# 注入一处 `.unwrap()`（生产代码）—— 触发 check-unwrap 棘轮。
+# ⛔ 落点选 scripts/ 是**爆炸半径最小**的位置：不在任何 cargo crate 里
+#    ⇒ 对构建零影响；`scripts/` 在 check-layout 的 ALLOW_DIRS 内；
+#    `nt_` 前缀满足 check-naming；且不被 .gitignore 排除。
+# ⛔ 文件里**绝不能**出现 #[cfg(test)]，否则 is_production 会把它整段跳过。
+inject_unwrap_rs() {
+  local target="$1"
+  [ -n "$target" ] || PROBE_FAIL "inject_unwrap_rs 需要目标路径"
+  [ -e "$target" ] && PROBE_FAIL "注入目标已存在: $target"
+  printf 'pub fn nt_probe_unwrap() -> u8 {\n    let v: Option<u8> = None;\n    v.unwrap()\n}\n' > "$target"
+}
