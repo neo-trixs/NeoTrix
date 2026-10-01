@@ -59,14 +59,15 @@ jobs:
       # 权衡后留在 `check` 的第一步之前（秒级，无需 cargo）。
       - name: "CI reference gate (no job may point at a path git does not track)"
         run: bash scripts/check-ci-refs.sh --strict
-      # 2026-09-30 新增（G6）。**故意 non-blocking**：
-      #   本门当前 FAIL 是**正确状态** —— apps/neobot-desktop/frontend 的上游
-      #   附加条款「No Commercial Secondary Development」尚未被项目所有者裁决。
-      #   那是商业/法务决定，agent 不代签，也不该用它堵住整条流水线。
-      #   但**不许静默**：每轮 CI 都会打印当前状态，追问「那个条款解决了吗」。
-      #   待 .neotrix/LICENSE-EXCEPTIONS.md 有完整签署后，再去掉 continue-on-error。
-      - name: "License/provenance gate (advisory — see LICENSE-EXCEPTIONS.md)"
-        continue-on-error: true
+      # 2026-09-30 新增（G6）。**已从 continue-on-error 改为阻断**：
+      # 原为 advisory，因为 .neotrix/LICENSE-EXCEPTIONS.md 尚无人签署。
+      # 现已签署 ACKNOWLEDGE-1（accepted-with-condition，review_by 2026-12-01），
+      # 且其 condition #1「上游 LICENSE 与 LICENSE.details 逐字保留」正是由本门
+      # 强制 ⇒ 门与条件互为担保，具备阻断资格。
+      #
+      # ⚠ 到 2026-12-01 该例外到期：若无人重审重签，本门会重新变红并阻断 CI ——
+      #   **这是设计意图**（强制重审），不是故障。
+      - name: "License/provenance gate (signed exception; re-review due 2026-12-01)"
         run: bash scripts/check-license.sh
       # 2026-09-29 加（B1 元门）。它是**检查其他门的门**：
       #   ① 非空门   —— 注入已知违规，该门必须变红（否则是永远绿的假门）

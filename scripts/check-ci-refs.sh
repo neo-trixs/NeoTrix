@@ -177,6 +177,41 @@ sort -u "$RUNBAD" -o "$RUNBAD" 2>/dev/null || : > "$RUNBAD"
 N_RUN=$(grep -c . "$RUNBAD" 2>/dev/null); N_RUN=${N_RUN:-0}
 [ "$N_RUN" -gt 0 ] && cat "$RUNBAD" >> "$BAD"
 
+# --- 第 5 类：uses: 的 action 引用是否在溯源清单登记（2026-09-30）--------
+# 动机：`audit.yml` 长期写 `rustsec/audit-action@v2.0.0`，而**该仓库不存在**
+# （git ls-remote: Repository not found）⇒ 供应链审计 job 每次必失败，
+# 长期静默失效。本门的前 4 类都查不到它（它不是路径、不是 run 脚本）。
+# 判据：**离线**核对 —— 每个 uses: 的 name 必须在
+# neotrix-core/.../nt_shield/provenance/external-inputs.json 里登记。
+# 不联网（CI 里 13 次 git ls-remote 太慢且会因网络抖动误红）；
+# 真正的哈希/存在性校验由 provenance_check.sh 在 release 时做。
+MANIFEST="neotrix-core/src/l3_embodiment/nt_shield/provenance/external-inputs.json"
+USESBAD=$(mktemp)
+trap 'rm -f "$TRACKED" "$EXPR" "$BAD" "$ART" "$RUNBAD" "$USESBAD"' EXIT
+: > "$USESBAD"
+if [ -f "$MANIFEST" ]; then
+  for wf in "$WF_DIR"/*.yml "$WF_DIR"/*.yaml; do
+    [ -f "$wf" ] || continue
+    grep -oE '^[[:space:]]*-?[[:space:]]*uses:[[:space:]]*[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+@[^[:space:]]+' "$wf" 2>/dev/null |
+    sed -E 's/^[[:space:]]*-?[[:space:]]*uses:[[:space:]]*//' |
+    while IFS= read -r ref; do
+      name="${ref%@*}"
+      grep -q "\"$name\"" "$MANIFEST" || echo "$wf uses=$ref (未登记于 $MANIFEST)" >> "$USESBAD"
+    done
+  done
+  sort -u "$USESBAD" -o "$USESBAD" 2>/dev/null || : > "$USESBAD"
+  N_USES=$(grep -c . "$USESBAD" 2>/dev/null); N_USES=${N_USES:-0}
+  N_DECL=$(grep -cE '"name"[[:space:]]*:[[:space:]]*"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"' "$MANIFEST" 2>/dev/null)
+  N_DECL=${N_DECL:-0}
+  if [ "$N_USES" -gt 0 ]; then
+    cat "$USESBAD" >> "$BAD"
+  else
+    echo "uses: 全部已登记于溯源清单（清单声明 $N_DECL 条）。"
+  fi
+else
+  echo "WARN: 溯源清单缺失，跳过 uses: 登记核对：$MANIFEST"
+fi
+
 N_BAD=$(grep -c . "$BAD" 2>/dev/null); N_BAD=${N_BAD:-0}
 N_EXPR=$(grep -c . "$EXPR" 2>/dev/null); N_EXPR=${N_EXPR:-0}
 N_ART=$(grep -c . "$ART" 2>/dev/null); N_ART=${N_ART:-0}

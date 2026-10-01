@@ -17,6 +17,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: rustsec/audit-action@v2.0.0
+      # 2026-09-30 修正。此前写 `rustsec/audit-action@v2.0.0` ——
+      # **该仓库不存在**（git ls-remote: "Repository not found"），
+      # ⇒ 本 job（每周日 + 任何 Cargo.toml/Cargo.lock 变更的 PR）**每次必然失败**。
+        # 这是供应链审计门长期静默失效，也是本仓第 4 次「幻影引用」事故
+        # （前三次：3edf3be7 幻影 CSS 门 / 2026-09-28 CI 层 / release.yml 的
+        # scripts/provenance_check.sh）。
+        # 真实仓库是 `rustsec/audit-check`。⛔ 注意它**没有浮动 `v2` tag**
+        # （只有 v2.0.0），所以 @v2 同样会失败 —— 必须写全版本。
+        # 同类事故的兜底：所有 uses: 的 name/ref/commit 已在
+        # neotrix-core/.../nt_shield/provenance/external-inputs.json 登记，
+        # 由 scripts/check-ci-refs.sh 离线核对（未登记的 uses: 即离线失败）。
+      - uses: rustsec/audit-check@v2.0.0
         with:
           allow-warnings: true

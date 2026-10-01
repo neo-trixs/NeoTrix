@@ -1,0 +1,137 @@
+{
+  "_comment": [
+    "外部构建输入清单 —— provenance_check.sh 的输入（fail-closed，缺此文件门即红）。",
+    "",
+    "本文件所有值均为**实测真实数据**，非编造：",
+    "  commit        = git ls-remote 解析该 ref 得到的不可变 commit SHA",
+    "  sha256        = 实际下载 codeload.github.com/<repo>/tar.gz/<commit> 后的 sha256（可复现）",
+    "  tarball_bytes = 该 tarball 的字节数（用于人工复核 sha256 是否算错对象）",
+    "",
+    "校验方式（离线可复现）：",
+    "  git ls-remote --tags https://github.com/<name> refs/tags/<version>   应等于 commit",
+    "  curl -sL https://codeload.github.com/<name>/tar.gz/<commit> | shasum -a 256  应等于 sha256",
+    "",
+    "⚠ 浮动 ref 的风险：dtolnay/rust-toolchain@stable 与多个 @v2/@v4 是**可移动 tag**，",
+    "  同一 ref 今天与明天解析到不同 commit ⇒ 上表的 commit/sha256 只对**记录那一刻**成立。",
+    "  真要不可变，须把 workflow 里的 uses: 改成 @<commit SHA>（本轮未做，属独立决策）。"
+  ],
+  "inputs": [
+    {
+      "name": "EmbarkStudios/cargo-deny-action",
+      "kind": "github-action",
+      "version": "v2",
+      "sha256": "173370e3eefb24f66c39a1112eb059006474f4024955397653297fb9bbfda5aa",
+      "commit": "b66acf5e9fe20f8aba065be86778a8a4c846f902",
+      "tarball_bytes": 13130,
+      "purpose": "cargo-deny：依赖许可/公告/来源审计（用于 deny）"
+    },
+    {
+      "name": "Swatinem/rust-cache",
+      "kind": "github-action",
+      "version": "v2",
+      "sha256": "133fded6afaa245a4e6de2522a7386dd37478624384df5f02f03e06de861eedb",
+      "commit": "49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c",
+      "tarball_bytes": 2065958,
+      "purpose": "cargo 构建缓存（bench）（用于 bench, ci, nt-audit, performance, security-scan., security-scan）"
+    },
+    {
+      "name": "actions-rust-lang/setup-rust-toolchain",
+      "kind": "github-action",
+      "version": "v1",
+      "sha256": "8549c16d13f05044d011880d28ecdbeca3fdeec7bfd510a925576573e419468a",
+      "commit": "166cdcfd11aee3cb47222f9ddb555ce30ddb9659",
+      "tarball_bytes": 11426,
+      "purpose": "Rust 工具链安装（ci）（用于 ci, nt-audit, security-audit, security-scan., security-scan）"
+    },
+    {
+      "name": "actions/cache",
+      "kind": "github-action",
+      "version": "v4",
+      "sha256": "be6686f05c5415b735c22b64f32e27de9c6fb98f9d25421efff087ac99089e39",
+      "commit": "0057852bfaa89a56745cba8c7296529d2fc39830",
+      "tarball_bytes": 2136814,
+      "purpose": "缓存依赖与构建产物（lint）（用于 lint）"
+    },
+    {
+      "name": "actions/checkout",
+      "kind": "github-action",
+      "version": "v4",
+      "sha256": "0f48a50cf2edeea3d6e270f8dae645529128ca8b2954993891a2fb8f7b16145a",
+      "commit": "11d5960a326750d5838078e36cf38b85af677262",
+      "tarball_bytes": 434773,
+      "purpose": "检出源码（全部 13 个 workflow 的首步）（用于 audit, bench, ci, deny, evolution-release, lint, nt-audit, performance, release, security-audit, security-scan., security-scan）"
+    },
+    {
+      "name": "actions/download-artifact",
+      "kind": "github-action",
+      "version": "v4",
+      "sha256": "ede236531fa097435a9ecd9c2f75ad1eb43cbfced4d9c8d472e617751f40c452",
+      "commit": "d3f86a106a0bac45b974a628896c90dbdf5c8093",
+      "tarball_bytes": 1198533,
+      "purpose": "下载 bench 产物做对比（release）（用于 release）"
+    },
+    {
+      "name": "actions/github-script",
+      "kind": "github-action",
+      "version": "v7",
+      "sha256": "a9b4df6dbf211b5b998748ef5cb6cf092bfd4dcf93a634195840f787c4a26906",
+      "commit": "f28e40c7f34bde8b3046d885e986cb6290c5673b",
+      "tarball_bytes": 433478,
+      "purpose": "内联脚本编排（performance）（用于 performance）"
+    },
+    {
+      "name": "actions/upload-artifact",
+      "kind": "github-action",
+      "version": "v4",
+      "sha256": "b7e8bdaab718e6bd4b78925b8880a96bfc0272338005017453e24ab3f83149d0",
+      "commit": "ea165f8d65b6e75b540449e92b4886f43607fa02",
+      "tarball_bytes": 2222593,
+      "purpose": "上传 bench/覆盖率等产物（用于 bench, ci, performance, security-scan., security-scan）"
+    },
+    {
+      "name": "dtolnay/rust-toolchain",
+      "kind": "github-action",
+      "version": "stable",
+      "sha256": "811f99c33df07e89eaaab59eafd4b513db3021c5d2f37d7dce3a3b82d9de729c",
+      "commit": "6bed0761d98439e5a578e2877258200ad565ba87",
+      "tarball_bytes": 5432,
+      "purpose": "Rust 工具链安装（bench，浮动 stable）（用于 bench, lint, performance）"
+    },
+    {
+      "name": "orhun/git-cliff-action",
+      "kind": "github-action",
+      "version": "v4",
+      "sha256": "dfec052c6c22eebf16cb27a2bc12ae0834a96fa9245f839710883c107020f3f1",
+      "commit": "a9a95522b26fe6403f7bb24031f21fb573d0f5ff",
+      "tarball_bytes": 9704,
+      "purpose": "由 CHANGELOG 生成 release notes（用于 release）"
+    },
+    {
+      "name": "rustsec/audit-check",
+      "kind": "github-action",
+      "version": "v2.0.0",
+      "sha256": "47b42ecc104561e0d32298a70a0368c59dbbf2dbee6b128fde9e3d4d317ee2eb",
+      "commit": "69366f33c96575abad1ee0dba8212993eecbe998",
+      "tarball_bytes": 468269,
+      "purpose": "RustSec advisory 审计（原引用不存在的 rustsec/audit-action）（用于 ）"
+    },
+    {
+      "name": "softprops/action-gh-release",
+      "kind": "github-action",
+      "version": "v2",
+      "sha256": "36547aa3fde9d349ad1b05b0b78c76c48632168143422a87f5b468e0bea608ba",
+      "commit": "3bb12739c298aeb8a4eeaf626c5b8d85266b0e65",
+      "tarball_bytes": 314365,
+      "purpose": "创建 GitHub Release 并上传资产（用于 release）"
+    },
+    {
+      "name": "taiki-e/upload-rust-binary-action",
+      "kind": "github-action",
+      "version": "v1",
+      "sha256": "285e35762a28201196b95596a944b0723c56bded8fd2b42299a21c41ba198037",
+      "commit": "f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6",
+      "tarball_bytes": 24303,
+      "purpose": "上传各平台 Rust 二进制到 Release（用于 release）"
+    }
+  ]
+}
