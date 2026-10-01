@@ -28,11 +28,20 @@ SALVAGE_ROOT=${NT_WT_SALVAGE:-$REPO/.neotrix/worktree-salvage}
 say() { echo "$@"; }
 hr() { say "------------------------------------------------------------"; }
 
+# ⛔⛔ **主树必须取 `git worktree list` 的第一个条目**，不能靠
+#   `REPO=$(git rev-parse --show-toplevel)` + `grep -v "^$REPO$"`。
+#   旧写法有个**潜伏危险**：`--show-toplevel` **依赖 cwd** ——
+#   在某个 worktree 里调用本脚本时，REPO 变成**那个 worktree**，
+#   被排除的也是它 ⇒ **真正的��树会进入 `clean`（rm -rf target）和
+#   `prune`（git worktree remove）的循环**。
+#   ⓘ `git worktree list` 的**首条恒为主树**，这是规范位置，与 cwd 无关。
+MAIN_WT=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print substr($0,10); exit}')
+
 # 列出全部 worktree 路径（主仓除外）
 list_worktrees() {
     git worktree list --porcelain 2>/dev/null \
         | awk '/^worktree /{print substr($0,10)}' \
-        | grep -v "^$REPO\$"
+        | grep -v "^${MAIN_WT}\$"
 }
 
 # 单个 worktree 的取证：路径|HEAD|分支|脏数|体积MB|targetMB|mtime
@@ -55,7 +64,7 @@ cmd_check() {
     hr
     say "路径 | HEAD | 分支 | 脏 | 体积 | target | 近3h活动"
     say "$(printf -- '-%.0s' {1..74})"
-    tot_mb=0; tot_tmb=0; n_dirty=0; n_active=0
+    tot_mb=0; tot_tmb=0; n_dirty=0; n_active=0; dirty_paths=""
     for d in $(list_worktrees); do
         line=$(probe "$d") || continue
         IFS='|' read -r p h br dirty mb tmb act <<EOF
@@ -63,9 +72,29 @@ $line
 EOF
         say "$p | $h | $br | $dirty | ${mb}M | ${tmb}M | $act"
         tot_mb=$((tot_mb + mb)); tot_tmb=$((tot_tmb + tmb))
-        [ "$dirty" != "0" ] && n_dirty=$((n_dirty + 1))
+        # ⛔ 记**具体路径**：原实现只报个数 ⇒ 门说「2 个 worktree 脏」，
+        #   要定位是哪两个**只能手工重跑一遍**（本次实测：确实只能手工）。
+        [ "$dirty" != "0" ] && { n_dirty=$((n_dirty + 1)); dirty_paths="$dirty_paths $p"; }
         [ "$act" = "YES" ] && n_active=$((n_active + 1))
     done
+
+    # ⭐ 主树**只报告、不阻断**。
+    # ⛔ 刻意**不**把它计入 n_dirty / tot_tmb：实测主树有 13 处未提交
+    #   与 ~164GB target ⇒ 若纳入，退出码会**永久**是 4/3，
+    #   而 `.githooks/pre-push` 会在**几乎每一次 push** 上硬失败。
+    #   ⇒ 那是把一个诊断改进变成流程阻断，超出「让门更可观测」的范围，
+    #   必须由人决定怎么处理那些改动，不能由门替人决定。
+    main_line=$(probe "$MAIN_WT" 2>/dev/null || true)
+    if [ -n "$main_line" ]; then
+        IFS='|' read -r mp mh mbr mdirty mmb mtmb mact <<EOF
+$main_line
+EOF
+        if [ "$mdirty" != "0" ] || [ "$mtmb" != "0" ]; then
+            say "[worktree-gate] ℹ️  **主树**：$mdirty 处未提交 | target ${mtmb}M（**只报告，不影响退出码**）"
+            say "[worktree-gate]    ⛔ 主树未提交改动**不在任何提交里**（AGENTS.md §1 收工义务）"
+            say "[worktree-gate]    提交：git add <显式路径> && git commit --only <同一批>（⛔ 共享 index 下禁 -A）"
+        fi
+    fi
     hr
     say "[worktree-gate] worktree=$(( $(list_worktrees | wc -l) )) 个 | 合计 ${tot_mb}M | target 占 ${tot_tmb}M"
     say "[worktree-gate] 带未提交改动: $n_dirty 个 | 近3h有改动: $n_active 个"
@@ -73,14 +102,25 @@ EOF
         say "[worktree-gate] ⚠️  $n_active 个 worktree 近 3 小时仍有 .rs 改动 ⇒ 可能他窗在用，勿删"
     fi
     if [ "$n_dirty" -gt 0 ]; then
-        say "[worktree-gate] ⛔ $n_dirty 个 worktree 的未提交改动**不在任何提交里**"
+        say "[worktree-gate] ⛔ $n_dirty 个 worktree 的未提交改动**不在任何提交里**："
+        for dp in $dirty_paths; do say "[worktree-gate]      ⛔ $dp"; done
         say "[worktree-gate]    删它们必须先 patch 兜底（R-DISK-5）：sh $0 prune"
     fi
     if [ "$tot_tmb" -ge "$TARGET_WARN_MB" ]; then
         say "[worktree-gate] ♻️  target 累计 ${tot_tmb}M ≥ ${TARGET_WARN_MB}M ⇒ 零风险可回收：sh $0 clean"
-        exit 3
     fi
-    [ "$n_dirty" -gt 0 ] && exit 4
+
+    # ⭐⭐ 退出码：**两条判据都报完再定，且「脏」优先于「体积」**。
+    # ⛔⛔ 旧实现是 `体积 ⇒ exit 3` **先命中并 return**，于是脏判据的
+    #   `exit 4` **永远到不了** ⇒ 退出码**只反映体积**。
+    #   实测这不是理论问题：2 个脏 worktree、6 处未提交改动时 rc=3，
+    #   而 `.githooks/pre-push` 的 `case` 里 `3)` 只打印建议、`LEAK=0`
+    #   ⇒ **pre-push 当时正在放行**这些改动。掩盖 bug 是**活的**。
+    # ⇒ 语义定为：脏 ⇒ 4（体积信息仍会打印）；仅体积 ⇒ 3；都无 ⇒ 0。
+    #   ⓘ 行为变化：两者同时成立时 rc 由 3 变 4 ⇒ pre-push **开始真正拦截**。
+    #     这是修复，但属「突然变严」，已写入 WORKTREE-GATE.md 与交接。
+    if [ "$n_dirty" -gt 0 ]; then exit 4; fi
+    if [ "$tot_tmb" -ge "$TARGET_WARN_MB" ]; then exit 3; fi
     exit 0
 }
 

@@ -37,13 +37,26 @@ else
     WT_CODE=$?
 fi
 LEAK=0
+# ⛔⛔ `case` **必须**有 `*)` 兜底。原实现没有 ⇒ 任何**未知**退出码
+#   （门的判据新增、码值调整、脚本 `exit 1`）都会**静默落空**：
+#   LEAK 保持 0、且**不打印任何告警** ⇒ 脏 worktree 拦截**无声消失**。
+#   ⓘ 这比报错危险得多 —— 门失效时没有任何征兆。
+#   ⇒ 未知码按「**拦住**」处理（fail-closed）：宁可误拦一次让人看见，
+#      也不能悄悄放行「不在任何提交里的改动」。
 case "$WT_CODE" in
+    0) ;;
     4) LEAK=1 ;;
     3) echo -e "\033[1;33m   ♻️  worktree target 累计偏大，建议 push 前跑 nt_worktree_gate.sh clean\033[0m" ;;
+    *) LEAK=1
+        echo -e "\033[1;31m   ⛔ worktree 门返回**未预期**的退出码 $WT_CODE（fail-closed 拦截）\033[0m"
+        echo -e "\033[1;33m   若门刚改过判据，请同步更新本 hook 的 case 分支。\033[0m" ;;
 esac
 if [ "$LEAK" -eq 1 ]; then
     echo -e "\033[0;31m❌ WORKTREE GATE: 存在带未提交改动的 worktree\033[0m"
-    echo "$WT_OUT" | grep -E 'worktree=|未提交改动' | sed 's|^|   |'
+    # ⛔ `set -euo pipefail` 下，若 grep **一个都没匹配**（措辞变了/输出为空）
+    #   整条管道返回非 0 ⇒ `set -e` 直接中止 hook ⇒ 用户只看到**裸失败**、
+    #   指引全丢。⇒ 加 `|| true` 兜底，并额外**无条件**打印门输出摘要。
+    echo "$WT_OUT" | grep -E 'worktree=|未提交改动|⛔' | sed 's|^|   |' || true
     echo -e "\033[1;33m   这些改动**不在任何提交里**，删目录即永久丢失。收工三选一：\033[0m"
     echo -e "\033[1;33m   1) 提交：cd <worktree> && git add -A && git commit\033[0m"
     echo -e "\033[1;33m   2) 兜底：sh scripts/ops/nt_worktree_gate.sh prune --force（导出 patch 后移除）\033[0m"
