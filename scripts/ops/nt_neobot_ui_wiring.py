@@ -31,7 +31,15 @@ SRC = os.path.join(REPO, 'apps/neobot-desktop/frontend/src')
 
 # 复制件 → 原件（相对 neobot-ui/src 与 frontend/src）
 PAIRS: list[tuple[str, str]] = [
-    ('neobot-root.tsx', 'neobot-root.tsx'),
+    # ⚠️ neobot-root.tsx **刻意不在漂移对照内**。
+    #   我方副本已完成 R4 i18n 迁移（24 处硬编码中文 → t()，56 键词条），
+    #   而 `frontend/src/neobot-root.tsx` **不能**跟着改，两个硬理由：
+    #   ① 上游 `frontend/src/i18n/index.ts` 只导出 `i18n`（i18next 实例），
+    #      **没有 `t()`** ⇒ 在那边 `import { t } from '@/i18n'` 编译不过，
+    #      会**打断另一窗口正在推进的构建**。
+    #   ② M6 的结局是 vendored 树被删 —— 给一棵即将退役的树做 i18n 迁移
+    #      是纯浪费，且要改他窗有 600+ 行在途改动的共享文件。
+    #   ⇒ 迁移只落在自持树。原件保持 md5 5909ee44（仅含剪贴板降级修复）。
     ('api-panel.ts', 'api-panel.ts'),
     ('dom.ts', 'dom.ts'),
     ('ui/nb-markdown.css', 'ui/nb-markdown.css'),

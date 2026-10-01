@@ -17,7 +17,7 @@
  * （api.rs:277，参数 `lang`）。语言选择**必须经它落到后端**，
  * 否则下次启动会回退 —— 只存 localStorage 是不够的。
  *
- * # 与 openghost 的联动（这��切换是**已接线**的，非空壳）
+ * # 与 openghost 的联动（这里的切换是**已接线**的，非空壳）
  *
  * `vendor/openghost/shim.ts` 的 `lang()` 读
  * `document.documentElement.lang` 决定代码块复制按钮的 aria-label
@@ -25,6 +25,7 @@
  * 复制按钮的可访问名。这是切换器当前**可观测**的效果。
  */
 import { invoke } from '@tauri-apps/api/core'
+import { useEffect, useReducer } from 'react'
 import zhCN from './locales/zh-CN.json'
 import enUS from './locales/en-US.json'
 
@@ -78,9 +79,19 @@ export function availableLangs(): { value: Lang; label: string }[] {
 /**
  * 取词条。**诚实回退**：缺键时返回键名本身，不返回空串 ——
  * 空串会让按钮/标签**失名**，而键名至少可被搜索定位。
+ *
+ * @param vars 插值变量，替换 `{name}` 占位符。
+ *
+ * ⚠️ 缺变量时**保留占位符原样**（输出 `撤一版（{n}）`）而**不是**塞空串或
+ * `undefined`：前者一眼看得出是词条/调用不匹配，后者会渲染成
+ * 「撤一版（）」这种看不出错的坏 UI。这与「缺键回键名」是同一条原则。
  */
-export function t(key: string): string {
-  return TABLES[current][key] ?? key
+export function t(key: string, vars?: Record<string, string | number>): string {
+  const raw = TABLES[current][key] ?? key
+  if (!vars) return raw
+  return raw.replace(/\{(\w+)\}/g, (whole, name: string) =>
+    Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : whole,
+  )
 }
 
 /**
@@ -126,6 +137,24 @@ const listeners = new Set<(l: Lang) => void>()
 export function onLangChange(fn: (l: Lang) => void): () => void {
   listeners.add(fn)
   return () => listeners.delete(fn)
+}
+
+/**
+ * 订阅语言变化并**强制重渲染**的 `t`。
+ *
+ * ⛔ 只导出模块级 `t` 是不够的 —— 那是「导出 ≠ 接入」的又一形态：
+ *    `setLang` 确实会通知订阅者，但若**只有外壳**订阅，聊天区组件
+ *    永不重渲染，它的 `t()` 调用就不会重新求值 ⇒ 语言切换器**只换外壳、
+ *    不换正文**，是个半成品（实测：切 en-US 后聊天区仍是中文）。
+ *
+ * 用法：组件顶部 `const t = useT()`。它返回的 `t` 读的是**实时** `current`，
+ * 而模块级函数（如 `relTime`）继续用导入的 `t` 即可 —— 二者读同一个 `current`，
+ * 只要组件重渲染，渲染期内的模块级调用同样拿到新语言。
+ */
+export function useT(): typeof t {
+  const [, force] = useReducer((x: number) => x + 1, 0)
+  useEffect(() => onLangChange(() => force()), [])
+  return t
 }
 
 // 模块加载即同步 document lang —— 与 main.tsx 的 applyDocumentLang 同义，

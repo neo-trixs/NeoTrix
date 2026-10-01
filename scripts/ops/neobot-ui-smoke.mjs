@@ -228,6 +228,20 @@ async function probe(browser, label) {
       const a = document.activeElement
       return { tag: a?.tagName ?? null, inBar: !!a?.closest?.('.nb-actions') }
     })
+    // ⛔ 关键缺陷探测：切到 en-US 后，**聊天区**是否也变了？
+    //    只换外壳不换正文 = 语言切换器是半成品。
+    await page.selectOption('.nb-lang select', 'zh-CN').catch(() => {})
+    await page.waitForTimeout(400)
+    feat.chatZh = await page.evaluate(() => {
+      const m = document.querySelector('.nb-main')
+      return (m?.innerText ?? '').replace(/\s+/g, ' ').slice(0, 60)
+    })
+    await page.selectOption('.nb-lang select', 'en-US').catch(() => {})
+    await page.waitForTimeout(400)
+    feat.chatEn = await page.evaluate(() => {
+      const m = document.querySelector('.nb-main')
+      return (m?.innerText ?? '').replace(/\s+/g, ' ').slice(0, 60)
+    })
   }
   await page.close()
   return { label, httpStatus, children: r_children, textLen, textLen, errors, badUrls, feat }
@@ -327,6 +341,15 @@ for (const r of rows) {
       if (!f.escClosed) { console.log('     ⛔ Esc 关不掉对话框'); fail++ }
       if (!f.focusRestored?.inBar) {
         console.log('     ⛔ 关闭后焦点未归还给触发元素'); fail++
+      }
+      if (f.chatZh === f.chatEn) {
+        console.log(`     ⛔ 聊天区语言未随切换变化（半成品切换器）`)
+        console.log(`        zh: ${JSON.stringify(f.chatZh)}`)
+        console.log(`        en: ${JSON.stringify(f.chatEn)}`)
+        fail++
+      } else {
+        console.log(`     聊天区语言：zh=${JSON.stringify(f.chatZh)}`)
+        console.log(`                    en=${JSON.stringify(f.chatEn)}`)
       }
     }
   }

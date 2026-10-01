@@ -25,6 +25,8 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
+
+import { t, useT } from './i18n'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './vendor/openghost/tex.js'
 import './vendor/openghost/markdown.js'
@@ -102,6 +104,14 @@ function renderBot(text: string): string | null {
   }
 }
 
+/**
+ * 失败消息的**本地化前缀**正则。`重发` 要剥掉自己加的前缀，
+ * 而前缀随语言变 ⇒ 不能写死 `/^发送失败：/`。
+ */
+function sendFailedPrefixRe(): RegExp {
+  return new RegExp('^' + t('chat.sendFailedPrefix').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+}
+
 async function copyCode(button: HTMLButtonElement): Promise<void> {
   const pre = button.closest('.md-code')?.querySelector('pre code')
   const text = pre?.textContent ?? ''
@@ -127,14 +137,17 @@ async function copyCode(button: HTMLButtonElement): Promise<void> {
 }
 
 function relTime(iso: string): string {
-  const t = Date.parse(iso)
-  if (Number.isNaN(t)) return ''
-  const mins = Math.floor((Date.now() - t) / 60000)
-  if (mins < 1) return '刚刚'
-  if (mins < 60) return `${mins} 分钟前`
-  if (mins < 1440) return `${Math.floor(mins / 60)} 小时前`
-  if (mins < 2880) return '昨天'
-  return `${Math.floor(mins / 1440)} 天前`
+  // ⚠️ 局部变量**不可**再叫 `t`：本文件已 `import { t } from './i18n'`，
+  //    同名局部会把它遮住 ⇒ t('x') 变成「对数字调用」，
+  //    编译期报 `Type 'Number' has no call signatures`（tsc 抓到的，不是我看出来的）。
+  const parsed = Date.parse(iso)
+  if (Number.isNaN(parsed)) return ''
+  const mins = Math.floor((Date.now() - parsed) / 60000)
+  if (mins < 1) return t('time.justNow')
+  if (mins < 60) return t('time.minutesAgo', { n: mins })
+  if (mins < 1440) return t('time.hoursAgo', { n: Math.floor(mins / 60) })
+  if (mins < 2880) return t('time.yesterday')
+  return t('time.daysAgo', { n: Math.floor(mins / 1440) })
 }
 
 /** 气泡上的时刻（`HH:MM`；跨天补日期）。 */
@@ -150,6 +163,10 @@ function clockOf(iso: string): string {
 const nowIso = (): string => new Date().toISOString()
 
 export function NeoBotRoot() {
+  // ⛔ 不可只用模块级 `t`：那样本组件**不订阅**语言变化 ⇒ 切换时
+  //    外壳变了、聊天区不变（半成品切换器）。`useT()` 负责订阅并触发重渲染。
+  const t = useT()
+
   const [convos, setConvos] = useState<ConvoView[] | null>(null)
   const [err, setErr] = useState('')
   const [sel, setSel] = useState<string | null>(null)
@@ -339,10 +356,10 @@ export function NeoBotRoot() {
     try {
       // convo_id 缺席（无会话时）= 脱离会话手动跑，后端不落库。
       const r = await invoke<{ output?: string, text?: string }>('neobot_send', { convo_id: sel ?? undefined, text })
-      setMsgs(m => [...m, { who: 'bot', text: r?.output ?? r?.text ?? '（无输出）', ts: nowIso() }])
+      setMsgs(m => [...m, { who: 'bot', text: r?.output ?? r?.text ?? t('chat.noOutput'), ts: nowIso() }])
     } catch (e) {
       // ⛔ 失败气泡标成 failed：那样才能给「重发」，也不至于和正常回复混淆。
-      setMsgs(m => [...m, { who: 'bot', text: `发送失败：${String(e).slice(0, 200)}`, ts: nowIso(), failed: true }])
+      setMsgs(m => [...m, { who: 'bot', text: `${t('chat.sendFailedPrefix')}${String(e).slice(0, 200)}`, ts: nowIso(), failed: true }])
     } finally {
       setBusy(false)
       reloadUsage()
@@ -359,11 +376,11 @@ export function NeoBotRoot() {
       try {
         const r = await invoke<{ output?: string, text?: string }>('neobot_send', {
           convo_id: sel ?? undefined,
-          text: bad.text.replace(/^发送失败：/, ''),
+          text: bad.text.replace(sendFailedPrefixRe(), ''),
         })
-        setMsgs(m => [...m, { who: 'bot', text: r?.output ?? r?.text ?? '（无输出）', ts: nowIso() }])
+        setMsgs(m => [...m, { who: 'bot', text: r?.output ?? r?.text ?? t('chat.noOutput'), ts: nowIso() }])
       } catch (e) {
-        setMsgs(m => [...m, { who: 'bot', text: `发送失败：${String(e).slice(0, 200)}`, ts: nowIso(), failed: true }])
+        setMsgs(m => [...m, { who: 'bot', text: `${t('chat.sendFailedPrefix')}${String(e).slice(0, 200)}`, ts: nowIso(), failed: true }])
       } finally {
         setBusy(false)
         reloadUsage()
@@ -432,8 +449,8 @@ export function NeoBotRoot() {
             <input
               value={q}
               onChange={e => setQ(e.target.value)}
-              placeholder="搜索会话…"
-              aria-label="搜索会话"
+              placeholder={t('chat.searchPlaceholder')}
+              aria-label={t('chat.searchLabel')}
               className="min-w-0 flex-1 rounded-lg border border-line bg-panel px-2 py-1 text-[12px] text-ink outline-none focus:border-info-hover"
             />
             <button
@@ -443,7 +460,7 @@ export function NeoBotRoot() {
                 if (!newOpen) reloadMembers()
               }}
               aria-expanded={newOpen}
-              title="新建对话"
+              title={t('chat.newConversation')}
               className="h-[26px] w-[26px] shrink-0 rounded-lg border border-line text-[15px] leading-none text-muted hover:bg-panel-hover"
             >
               {newOpen ? '×' : '+'}
@@ -460,8 +477,8 @@ export function NeoBotRoot() {
                     void createConvo()
                   }
                 }}
-                placeholder="标题（如：海豚调试）"
-                aria-label="会话标题"
+                placeholder={t('chat.titlePlaceholder')}
+                aria-label={t('chat.titleLabel')}
                 className="w-full rounded-lg border border-line bg-canvas px-2 py-1 text-[12px] text-ink outline-none focus:border-info-hover"
               />
               <input
@@ -474,8 +491,8 @@ export function NeoBotRoot() {
                   }
                 }}
                 list="nb-members"
-                placeholder="成员 id（可空）"
-                aria-label="成员 id"
+                placeholder={t('chat.memberIdOptional')}
+                aria-label={t('chat.memberIdLabel')}
                 className="w-full rounded-lg border border-line bg-canvas px-2 py-1 text-[12px] text-ink outline-none focus:border-info-hover"
               />
               <datalist id="nb-members">
@@ -490,7 +507,7 @@ export function NeoBotRoot() {
                 disabled={creating || !newTitle.trim()}
                 className="w-full rounded-lg bg-btn-fill py-1 text-[12px] text-btn-ink disabled:opacity-40"
               >
-                {creating ? '建着…' : '建会话'}
+                {creating ? t('chat.creating') : t('chat.create')}
               </button>
             </div>
           )}
@@ -502,26 +519,26 @@ export function NeoBotRoot() {
         >
           {err && (
             <div className="m-1 rounded-lg bg-btn-danger-hover p-2 text-xs text-[#c33b38]">
-              <div className="font-semibold">读取会话失败</div>
+              <div className="font-semibold">{t('chat.loadFailed')}</div>
               <div className="mt-1 break-all">{err.slice(0, 160)}</div>
               <button
                 type="button"
                 className="mt-2 rounded-full border border-[#c33b38]/30 px-2 py-0.5 text-[11px]"
                 onClick={reload}
               >
-                重试
+                {t('chat.retry')}
               </button>
             </div>
           )}
           {!err && convos?.length === 0 && (
             <p className="p-3 text-center text-xs text-muted">
-              还没有会话。
+              {t('chat.noConvos')}
               <br />
-              点右上角 + 建一个。
+              {t('chat.createHint')}
             </p>
           )}
           {!err && (convos?.length ?? 0) > 0 && shown.length === 0 && (
-            <p className="p-3 text-center text-xs text-muted">没有匹配「{q}」的会话。</p>
+            <p className="p-3 text-center text-xs text-muted">{t('chat.noMatch', { q })}</p>
           )}
           {shown.map(c => {
             // ⛔ 选中态用 `bg-nav-active` 而不是 `bg-panel-hover` ——
@@ -545,7 +562,7 @@ export function NeoBotRoot() {
                     {c.title || c.id}
                   </span>
                   {c.muted && (
-                    <span className="shrink-0 text-[10px] text-muted" title="已静音">
+                    <span className="shrink-0 text-[10px] text-muted" title={t('chat.muted')}>
                       🔇
                     </span>
                   )}
@@ -556,7 +573,7 @@ export function NeoBotRoot() {
                   )}
                 </div>
                 <div className="truncate text-[11px] text-muted">
-                  {c.kind === 'group' ? `${c.members.length} 人群聊` : '私聊'} · {relTime(c.last_active)}
+                  {c.kind === 'group' ? t('chat.kindGroup', { n: c.members.length }) : t('chat.kindPrivate')} · {relTime(c.last_active)}
                 </div>
               </button>
             )
@@ -573,7 +590,7 @@ export function NeoBotRoot() {
             className="flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-left text-[11px] text-muted hover:bg-panel-hover"
           >
             <span>{memOpen ? '▾' : '▸'}</span>
-            <span>记忆{mem && mem.lines.length > 0 ? ` ${mem.lines.length}` : ''}</span>
+            <span>{t('chat.memory')}{mem && mem.lines.length > 0 ? ` ${mem.lines.length}` : ''}</span>
             {mem && mem.bytes > 0 && (
               <span className="ml-auto tabular-nums">
                 {mem.bytes}/{mem.cap}
@@ -585,7 +602,7 @@ export function NeoBotRoot() {
               {memErr && <div className="mb-1 break-all text-[11px] text-[#c33b38]">{memErr}</div>}
               {mem && mem.lines.length === 0 && !memErr && (
                 <p className="mb-1 text-[11px] text-muted">
-                  还没有记忆。记下的事实会逐轮注入对话（只存你写的，不自动抓取）。
+                  {t('chat.noMemory')}
                 </p>
               )}
               {mem && mem.lines.length > 0 && (
@@ -607,8 +624,8 @@ export function NeoBotRoot() {
                       void addMemory()
                     }
                   }}
-                  placeholder="记一条…"
-                  aria-label="新增记忆"
+                  placeholder={t('chat.memoryPlaceholder')}
+                  aria-label={t('chat.addMemory')}
                   className="min-w-0 flex-1 rounded-lg border border-line bg-panel px-2 py-1 text-[11px] text-ink outline-none focus:border-[#2468f2]"
                 />
                 <button
@@ -617,17 +634,17 @@ export function NeoBotRoot() {
                   disabled={memBusy || !memDraft.trim()}
                   className="shrink-0 rounded-lg bg-btn-fill px-2 py-1 text-[11px] text-btn-ink disabled:opacity-40"
                 >
-                  记下
+                  {t('chat.memorySave')}
                 </button>
               </div>
               <button
                 type="button"
                 onClick={() => void undoMemory()}
                 disabled={memBusy || !mem || mem.revisions === 0}
-                title="回到上一版记忆（可再撤）"
+                title={t('chat.memoryUndoTitle')}
                 className="mt-1 w-full rounded-lg border border-line px-2 py-1 text-[11px] text-muted hover:bg-panel-hover disabled:opacity-40"
               >
-                撤一版（{mem?.revisions ?? 0}）
+                {t('chat.memoryUndo', { n: mem?.revisions ?? 0 })}
               </button>
             </div>
           )}
@@ -641,17 +658,17 @@ export function NeoBotRoot() {
           </span>
           {current && (
             <span className="ml-2 text-xs text-muted">
-              {current.task_count} 个任务
+              {t('chat.taskCount', { n: current.task_count })}
             </span>
           )}
           {caps && (
             <span className="ml-2 truncate text-xs text-muted" title={caps.model_source}>
-              {caps.model} · {caps.tool_count} 工具
+              {caps.model} · {t('chat.toolCount', { n: caps.tool_count })}
             </span>
           )}
           {usageToday !== null && usageToday > 0 && (
-            <span className="ml-2 truncate text-xs text-muted" title="今日 tokens（输入+输出）">
-              今日 {usageToday.toLocaleString()} tokens
+            <span className="ml-2 truncate text-xs text-muted" title={t('chat.tokensTitle')}>
+              {t('chat.tokensToday', { n: usageToday.toLocaleString() })}
             </span>
           )}
         </header>
@@ -659,7 +676,7 @@ export function NeoBotRoot() {
         <div ref={msgsRef} className="relative min-h-0 flex-1 overflow-y-auto px-4 py-3">
           {msgs.length === 0 ? (
             <p className="pt-16 text-center text-xs text-muted">
-              {histLoading ? '正在读历史…' : '发一句话开始。Enter 发送，Shift+Enter 换行。'}
+              {histLoading ? t('chat.historyLoading') : t('chat.empty')}
             </p>
           ) : (
             <div className="mx-auto max-w-[760px] space-y-2">
@@ -695,7 +712,7 @@ export function NeoBotRoot() {
                           disabled={busy}
                           className="rounded border border-line px-1 hover:bg-panel-hover disabled:opacity-40"
                         >
-                          重发
+                          {t('chat.resend')}
                         </button>
                       )}
                     </div>
@@ -707,7 +724,7 @@ export function NeoBotRoot() {
                   <div className="rounded-2xl rounded-bl-md bg-[#ededef] px-3 py-2 text-[13px] text-[#61666b]">
                     <span className="inline-flex items-center gap-1">
                       <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#8a8f98]" />
-                      正在想…
+                      {t('chat.thinking')}
                     </span>
                   </div>
                 </div>
@@ -721,7 +738,7 @@ export function NeoBotRoot() {
               onClick={scrollToEnd}
               className="sticky bottom-2 mx-auto block rounded-full border border-line bg-panel px-3 py-1 text-[11px] text-muted shadow-sm hover:bg-panel-hover"
             >
-              回到底部 ↓
+              {t('chat.backToBottom')}
             </button>
           )}
         </div>
@@ -739,8 +756,8 @@ export function NeoBotRoot() {
                 }
               }}
               rows={1}
-              placeholder="消息…（Enter 发送，Shift+Enter 换行）"
-              aria-label="消息输入框"
+              placeholder={t('chat.inputPlaceholder')}
+              aria-label={t('chat.inputLabel')}
               className="max-h-40 min-h-[36px] flex-1 resize-none overflow-y-auto rounded-2xl border border-line bg-panel px-3 py-2 text-[13px] text-ink outline-none focus:border-info-hover"
             />
             <button
@@ -749,11 +766,11 @@ export function NeoBotRoot() {
               disabled={busy || histLoading || !draft.trim()}
               className="h-9 shrink-0 rounded-full bg-btn-fill px-4 text-[13px] text-btn-ink transition-colors hover:bg-btn-fill-hover disabled:opacity-40"
             >
-              {busy ? '…' : '发送'}
+              {busy ? t('chat.sendEllipsis') : t('chat.send')}
             </button>
           </div>
           {histLoading && (
-            <p className="mx-auto mt-1 max-w-[760px] text-[11px] text-muted">历史加载中，先不让你发（免得与迟到消息重排）。</p>
+            <p className="mx-auto mt-1 max-w-[760px] text-[11px] text-muted">{t('chat.historyPaused')}</p>
           )}
         </div>
       </section>
