@@ -26,6 +26,8 @@
 
 import { invokeCmd as invoke } from './ipc'
 
+import { useVirtualizer } from '@tanstack/react-virtual'
+
 import { t, useT } from './i18n'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './vendor/openghost/tex.js'
@@ -272,6 +274,25 @@ export function NeoBotRoot() {
     )
   }, [convos, q])
 
+  // ── 会话列表虚拟化 ──────────────────────────────────────────────────
+  // 设计吸收自 @tanstack/react-virtual（MIT, 3.14.13）：**先读其 .d.ts 确认
+  // API**（count / getScrollElement / estimateSize 必需，overscan 可选；
+  // 实例提供 getVirtualItems / getTotalSize / measureElement）再动手。
+  //
+  // ⛔ 为什么现在做：此前 `shown.map(...)` **全量渲染** —— 会话上千则 DOM
+  //    节点上千，打开侧栏就要建上千个按钮。
+  //    而这一层**已**因 `display:flex` 修好高度约束、**真的在滚**
+  //    （实测 clientH=578），所以窗口化才有可滚容器可用。
+  // ⚠️ estimateSize 是**初估**：会话项两行、标题会换行 ⇒ 必须挂
+  //    `measureElement` 实测校正，否则滚动条长度会跳。
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const virtualizer = useVirtualizer({
+    count: shown.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: () => 58,
+    overscan: 8,
+  })
+
   // 新建对话：⛔ 成员必须已登记（库侧 `create_conversation` 会校验），
   // 而建会话前得先有成员 —— 所以表单里能就地登记，不必去设置面板绕一圈。
   const [newOpen, setNewOpen] = useState(false)
@@ -449,6 +470,52 @@ export function NeoBotRoot() {
     ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`
   }, [draft])
 
+  /** 会话行：抽成独立渲染函数，供 virtualizer 逐项调用。 */
+  const renderConvoRow = (c: ConvoView) => {
+    // ⛔ 选中态用 `bg-nav-active` 而不是 `bg-panel-hover` ——
+    //    两者同色时，指针划过和选中**看起来一模一样**，等于没有选中态。
+    const active = sel === c.id
+    return (
+      <button
+              key={c.id}
+              type="button"
+              onClick={() => setSel(c.id)}
+              aria-current={active ? 'true' : undefined}
+              // 选中态：底色 + 左侧强调条。⛔ 只给 font-semibold 不够 ——
+              // 字号权重的差别在 13px 下几乎看不出来，用户会以为没选中。
+              style={active ? { boxShadow: 'inset 2px 0 0 var(--color-info)' } : undefined}
+              className={`mb-1 block w-full rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-btn-hover ${
+                active ? 'bg-btn-active' : ''
+              }`}
+            >
+              <div className="flex items-center gap-1">
+                <span className={`truncate text-[13px] ${active ? 'font-semibold text-ink' : 'text-ink'}`}>
+                  {c.title || c.id}
+                </span>
+                {c.muted && (
+                  <span
+                    className="shrink-0 text-[10px] leading-none text-muted"
+                    title={t('chat.muted')}
+                    aria-label={t('chat.muted')}
+                  >
+                    {/* ⛔ 不用 emoji：彩色字形在深色侧栏里是唯一的彩色噪点，
+                        且各平台字形不一致。短横杠即「静音条」，与文字同色。 */}
+                    ▬
+                  </span>
+                )}
+                {c.unread > 0 && (
+                  <span className="ml-auto shrink-0 rounded-full bg-info px-1.5 text-[10px] tabular-nums text-btn-ink">
+                    {c.unread}
+                  </span>
+                )}
+              </div>
+              <div className="truncate text-[11px] text-muted">
+                {c.kind === 'group' ? t('chat.kindGroup', { n: c.members.length }) : t('chat.kindPrivate')} · {relTime(c.last_active)}
+              </div>
+            </button>
+    )
+  }
+
   return (
     <div className="flex min-h-0 flex-1" data-testid="neobot-root">
       {/* 侧栏：筛选 + 新建在上，列表独立滚动，记忆面板钉在底部。
@@ -531,6 +598,7 @@ export function NeoBotRoot() {
         </div>
 
         <div
+          ref={listRef}
           data-testid="nb-convo-list"
           className="nb-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-2"
         >
@@ -557,50 +625,39 @@ export function NeoBotRoot() {
           {!err && (convos?.length ?? 0) > 0 && shown.length === 0 && (
             <p className="p-3 text-center text-xs text-muted">{t('chat.noMatch', { q })}</p>
           )}
-          {shown.map(c => {
-            // ⛔ 选中态用 `bg-nav-active` 而不是 `bg-panel-hover` ——
-            //    两者同色时，指针划过和选中**看起来一模一样**，等于没有选中态。
-            const active = sel === c.id
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setSel(c.id)}
-                aria-current={active ? 'true' : undefined}
-                // 选中态：底色 + 左侧强调条。⛔ 只给 font-semibold 不够 ——
-                // 字号权重的差别在 13px 下几乎看不出来，用户会以为没选中。
-                style={active ? { boxShadow: 'inset 2px 0 0 var(--color-info)' } : undefined}
-                className={`mb-1 block w-full rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-btn-hover ${
-                  active ? 'bg-btn-active' : ''
-                }`}
-              >
-                <div className="flex items-center gap-1">
-                  <span className={`truncate text-[13px] ${active ? 'font-semibold text-ink' : 'text-ink'}`}>
-                    {c.title || c.id}
-                  </span>
-                  {c.muted && (
-                    <span
-                      className="shrink-0 text-[10px] leading-none text-muted"
-                      title={t('chat.muted')}
-                      aria-label={t('chat.muted')}
-                    >
-                      {/* ⛔ 不用 emoji：彩色字形在深色侧栏里是唯一的彩色噪点，
-                          且各平台字形不一致。短横杠即「静音条」，与文字同色。 */}
-                      ▬
-                    </span>
-                  )}
-                  {c.unread > 0 && (
-                    <span className="ml-auto shrink-0 rounded-full bg-info px-1.5 text-[10px] tabular-nums text-btn-ink">
-                      {c.unread}
-                    </span>
-                  )}
-                </div>
-                <div className="truncate text-[11px] text-muted">
-                  {c.kind === 'group' ? t('chat.kindGroup', { n: c.members.length }) : t('chat.kindPrivate')} · {relTime(c.last_active)}
-                </div>
-              </button>
-            )
-          })}
+          {/* 窗口化渲染。
+              ⛔ 外层**必须**撑出 `getTotalSize()`：省了它，滚动条会按
+                 「可见项数」算高度 ⇒ 根本滚不动（这是窗口化最常见的错）。
+              ⛔ 每项**必须** `ref={virtualizer.measureElement}`：会话项两行、
+                 标题会换行，高度不等；只靠 estimateSize 滚动条会跳。 */}
+          {shown.length > 0 && (
+            <div
+              data-testid="nb-convo-sizer"
+              style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}
+            >
+              {virtualizer.getVirtualItems().map((vi) => {
+                const c = shown[vi.index]
+                if (!c) return null
+                return (
+                  <div
+                    key={c.id}
+                    data-index={vi.index}
+                    ref={virtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${vi.start}px)`,
+                    }}
+                  >
+                    {renderConvoRow(c)}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
         </div>
 
         {/* 记忆：只放自己写下的事实（库侧拒密钥行）；默认收起。
@@ -706,10 +763,28 @@ export function NeoBotRoot() {
         </header>
 
         <div ref={msgsRef} className="relative min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          {/* ⛔ 空状态之前只有一行 12px 小字浮在上方：既没有视觉重心，
+              也读不出「我现在能做什么」。空状态是唯一一次能告诉用户下一步
+              的机会，占位不足等于浪费。
+              ⛔ 本注释必须放在三元表达式**外面**：写在 `? (` 与 `)` 之间的
+              裸注释不是合法 JSX。踩过一次。 */}
           {msgs.length === 0 ? (
-            <p className="pt-16 text-center text-xs text-muted">
-              {histLoading ? t('chat.historyLoading') : t('chat.empty')}
-            </p>
+            <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+              <div
+                className="mb-1 flex h-11 w-11 items-center justify-center rounded-full border border-line text-[18px] text-muted"
+                aria-hidden="true"
+              >
+                💬
+              </div>
+              <div className="text-[13px] font-medium text-ink">
+                {histLoading ? t('chat.historyLoading') : t('chat.emptyTitle')}
+              </div>
+              {!histLoading && (
+                <div className="max-w-[320px] text-[12px] leading-relaxed text-muted">
+                  {t('chat.emptyHint')}
+                </div>
+              )}
+            </div>
           ) : (
             <div className="mx-auto max-w-[760px] space-y-2">
               {msgs.map((m, i) => (

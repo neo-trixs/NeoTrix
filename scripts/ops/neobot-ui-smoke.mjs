@@ -243,6 +243,9 @@ async function probe(browser, label, failList, act, convoCount = 0) {
     feat.overflow = await page.evaluate(() => {
       const el = document.querySelector('[data-testid="nb-convo-list"]')
       if (!el) return null
+      // 窗口化事实：撑高容器的高度 vs 实际渲染出的行数
+      const sizer = document.querySelector('[data-testid="nb-convo-sizer"]')
+      const rowsNow = el.querySelectorAll('[data-index]').length
       const cs = getComputedStyle(el, '::after')
       return {
         scrollH: el.scrollHeight,
@@ -253,6 +256,8 @@ async function probe(browser, label, failList, act, convoCount = 0) {
         scrolls: el.scrollHeight > el.clientHeight,
         opacity: cs.opacity,
         hasScrollClass: el.classList.contains('nb-scroll'),
+        sizerH: sizer ? Math.round(sizer.getBoundingClientRect().height) : 0,
+        renderedRows: rowsNow,
       }
     }).catch(() => null)
   }
@@ -442,7 +447,8 @@ try {
   // ── 溢出渐隐探针（吸收 OverlayScrollbars 的设计意图）──
   // 判据：短列表**不**显示渐隐；60 条列表**显示**渐隐。
   // ⛔ 若只测长列表，「渐隐恒显」也会通过 —— 必须两个方向都测。
-  for (const [name, n] of [['短列表(3)', 3], ['长列表(60)', 60]]) {
+  // 窗口化：1000 条时 DOM 节点数必须远小于条数
+  for (const [name, n] of [['短列表(3)', 3], ['长列表(60)', 60], ['千条(1000)', 1000]]) {
     rows.push(await probe(browser, `溢出渐隐：${name}`, [], null, n))
   }
 
@@ -520,13 +526,24 @@ for (const r of rows) {
     const o = r.feat?.overflow
     if (!o) { console.log('     ⛔ 未取到溢出状态'); fail++ }
     else {
-      const want = r.label.includes('长列表')
+      const want = r.label.includes('长列表') || r.label.includes('千条')
+      const isBig = r.label.includes('千条')
       // 判据：长列表必须**真的可滚**（高度被约束），短列表不必
       const ok = o.scrolls === want
       console.log(`     ${r.label}：scrollH=${o.scrollH} clientH=${o.clientH} `
         + `可滚=${o.scrolls ? '✅' : '⛔'} · scroll-shadow 层=${o.bgLayers}(local ${o.hasLocal}) ⇒ `
         + (ok ? '✅ 符合预期' : '⛔ 不符合预期'))
       if (!ok) fail++
+      if (isBig) {
+        console.log(`     窗口化：撑高 ${o.sizerH}px · 实际渲染 ${o.renderedRows} 行 `
+          + `⇒ ${o.renderedRows < 120 && o.sizerH > 2000 ? '✅ 已窗口化' : '⛔ 仍在全量渲染'}`)
+        if (o.renderedRows >= 1000) {
+          console.log('     ⛔ 1000 条全部渲染 ⇒ 窗口化未生效'); fail++
+        }
+        if (o.sizerH <= 2000) {
+          console.log('     ⛔ 撑高容器不足 2000px ⇒ 滚动条会算错，滚不动'); fail++
+        }
+      }
       if (o.bgLayers < 4) {
         console.log(`     ⛔ scroll-shadow 层不足（${o.bgLayers} < 4）⇒ 溢出无视觉提示`); fail++
       }
@@ -613,13 +630,24 @@ for (const r of rows) {
     const o = r.feat?.overflow
     if (!o) { console.log('     ⛔ 未取到溢出状态'); fail++ }
     else {
-      const want = r.label.includes('长列表')
+      const want = r.label.includes('长列表') || r.label.includes('千条')
+      const isBig = r.label.includes('千条')
       // 判据：长列表必须**真的可滚**（高度被约束），短列表不必
       const ok = o.scrolls === want
       console.log(`     ${r.label}：scrollH=${o.scrollH} clientH=${o.clientH} `
         + `可滚=${o.scrolls ? '✅' : '⛔'} · scroll-shadow 层=${o.bgLayers}(local ${o.hasLocal}) ⇒ `
         + (ok ? '✅ 符合预期' : '⛔ 不符合预期'))
       if (!ok) fail++
+      if (isBig) {
+        console.log(`     窗口化：撑高 ${o.sizerH}px · 实际渲染 ${o.renderedRows} 行 `
+          + `⇒ ${o.renderedRows < 120 && o.sizerH > 2000 ? '✅ 已窗口化' : '⛔ 仍在全量渲染'}`)
+        if (o.renderedRows >= 1000) {
+          console.log('     ⛔ 1000 条全部渲染 ⇒ 窗口化未生效'); fail++
+        }
+        if (o.sizerH <= 2000) {
+          console.log('     ⛔ 撑高容器不足 2000px ⇒ 滚动条会算错，滚不动'); fail++
+        }
+      }
       if (o.bgLayers < 4) {
         console.log(`     ⛔ scroll-shadow 层不足（${o.bgLayers} < 4）⇒ 溢出无视觉提示`); fail++
       }
