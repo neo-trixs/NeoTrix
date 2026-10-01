@@ -33,7 +33,14 @@ impl std::ops::Deref for ConsolidationReport {
 
 pub(crate) const K1: f64 = 1.5;
 pub(crate) const B: f64 = 0.75;
-pub(crate) const RRF_K: f64 = 60.0;
+/// Reciprocal Rank Fusion 平滑常数（RRF_K，Cormack et al. 2009 的标准取值 60.0）。
+///
+/// **唯一真身**：全仓曾有 **5 份**同值副本（`neotrix-types` 本文件、
+/// `neotrix-core` 的 `nt_core_bank/iteration.rs`、`nt_core_code_search.rs`、
+/// `fusion_engine.rs`、`nt_memory_kb/bm25.rs`）。5 份各自漂移的风险已实测存在
+/// （`now_ts` 13 份里 2 份 panic）。现以本处为真身，其余改为引用。
+/// 方向合法性：`neotrix-core` 依赖 `neotrix-types` ⇒「高层引用低层」唯一合法。
+pub const RRF_K: f64 = 60.0;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Bm25Document {

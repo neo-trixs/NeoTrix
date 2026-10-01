@@ -144,7 +144,11 @@ pub struct SymbolIndex {
 // ────────────────────────────────────────────────────────────────
 
 /// A4 RRF 常数 (Reciprocal Rank Fusion 标准 60)。
-pub const RRF_K: f64 = 60.0;
+/// RRF 平滑常数。全仓曾有 **5 份**同值副本，真身现统一在
+/// `neotrix_types::core::nt_core_bank::RRF_K`（Cormack et al. 2009 标准值 60.0）。
+/// 这里改为**转出**而非删除 —— 本常量经 `nt_world_code_search` 公开 re-export，
+/// 是既有对外 API 路径，转出可消除重复**且**不破坏任何调用方。
+pub use neotrix_types::core::nt_core_bank::RRF_K;
 
 /// A4 冲击深度 — 被变更影响的程度 (Axon 的 will/may/review 分组)。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

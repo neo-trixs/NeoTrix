@@ -35,7 +35,7 @@ pub use stats::{ReasoningBankStats, MemoryDetailedStats};
 pub use bank::ReasoningBank;
 pub use iteration::{MemoryIterationResult, ConsolidationReport};
 // 2026-09-30：`tokenize` / `rrf_fuse` 自此为单点真身，上层 neotrix-core 直接引用此处。
-pub use iteration::{rrf_fuse, tokenize};
+pub use iteration::{rrf_fuse, tokenize, RRF_K};
 pub use pipeline::{PipelineConfig, PipelineState};
 pub use offload::OffloadManager;
 pub use l1::{L1Memory, SceneBlock, Persona, ExtractionPrompt};

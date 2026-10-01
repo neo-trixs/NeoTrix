@@ -2,7 +2,11 @@ use std::collections::HashMap;
 
 const K1: f64 = 1.5;
 const B: f64 = 0.75;
-const RRF_K: f64 = 60.0;
+// 本模块原有的 `const RRF_K: f64 = 60.0` 已删除（2026-09-30）：真身统一在
+// `neotrix_types::core::nt_core_bank::RRF_K`（全仓曾有 5 份同值副本）。
+// 它此前只被本模块那份 `rrf_fuse` 副本使用；该副本收敛为引用 types 实现后，
+// 此处即成零使用的重复常量。RRF_K 是公开标准常数（Cormack et al. 2009），
+// 不属于 BM25 的 K1/B 参数，故 K1/B 保留本地定义（它们是本实现的调参面）。
 
 #[derive(Debug, Clone)]
 pub struct Bm25Document {
@@ -163,28 +167,14 @@ impl Bm25Index {
     }
 }
 
-fn tokenize(text: &str) -> Vec<String> {
-    text.to_lowercase()
-        .split(|c: char| !c.is_alphanumeric() && c != '_' && c != '-')
-        .filter(|s| !s.is_empty() && s.len() >= 2)
-        .map(|s| s.to_string())
-        .collect()
-}
+// `tokenize` 与 `rrf_fuse` 此前与 `neotrix-types` 各有一份**逐字相同**的副本
+// （`nt_diverge.py` 实测 owner 同为 `(free)`、归一化后全等）⇒ 收敛为单一真身。
+// 必要性：逐字相同的副本**只会各自漂移**（本会话已实测 `now_ts` 13 份里 2 份 panic）。
+// 本模块下方的 `mod tests` **保留未删** —— 它验的是行为，改实现不该让测试消失。
+// `pub` 而非 `use`：`rrf_fuse` 经 `bm25::rrf_fuse` 被 `nt_pure_fns.rs` 调用，
+// 是本模块的公开 API（首版写成私有 `use` 触发 E0603，由编译器抓出）。
+pub use neotrix_types::core::nt_core_bank::{rrf_fuse, tokenize};
 
-pub fn rrf_fuse(results: &[Vec<(f64, String)>]) -> Vec<(f64, String)> {
-    if results.is_empty() {
-        return Vec::new();
-    }
-    let mut agg: HashMap<String, f64> = HashMap::new();
-    for ranklist in results {
-        for (rank, (_score, id)) in ranklist.iter().enumerate() {
-            *agg.entry(id.clone()).or_insert(0.0) += 1.0 / (RRF_K + rank as f64 + 1.0);
-        }
-    }
-    let mut fused: Vec<(f64, String)> = agg.into_iter().map(|(id, score)| (score, id)).collect();
-    fused.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-    fused
-}
 
 #[cfg(test)]
 mod tests {

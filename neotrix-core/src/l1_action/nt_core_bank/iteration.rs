@@ -14,7 +14,14 @@ pub struct MemoryIterationResult {
 
 pub const K1: f64 = 1.5;
 pub const B: f64 = 0.75;
-pub const RRF_K: f64 = 60.0;
+// 本模块原有的 `pub const RRF_K: f64 = 60.0` 已删除（2026-09-30）：
+// ① 真身已统一到 `neotrix-types`（全仓曾有 5 份同值副本）；
+// ② 上一轮本模块的 `rrf_fuse` 收敛为引用低层实现后，这里的本地副本变成
+//    **零使用的重复定义** —— 但它是 `pub`，编译器不报 unused，于是静默留存；
+// ③ 本模块在 `nt_core_bank/mod.rs` 里是 `mod iteration;`（**私有**），
+//    且 `mod.rs` 只转出了 `rrf_fuse` / `Bm25Document` / `Bm25Index` 等，
+//    从未转出 `RRF_K` ⇒ 该常量从未是公开 API，删除不破坏任何调用方。
+// 需要该常量请用 `neotrix_types::core::nt_core_bank::RRF_K`（唯一真身）。
 
 #[derive(Debug, Clone)]
 pub struct Bm25Document {

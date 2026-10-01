@@ -44,7 +44,17 @@ pub const RESONANCE_THRESHOLD: u32 = 2;
 /// Number of specialist modules.
 pub const MODULE_COUNT: usize = 15;
 
-/// Pre-computed resonance matrix: 14×14 pairwise resonance strengths (D6: 12×12 → MODULE_COUNT=14 对齐)。
+/// Pre-computed resonance matrix: 15×15 pairwise resonance strengths.
+///
+/// ⚠️ 此前本注释写「14×14 …（D6: 12×12 → MODULE_COUNT=14 对齐）」，与上一行的
+/// `MODULE_COUNT = 15` **自相矛盾** —— 注释自 `13dfd9a8` 建文件起就是错的
+/// （第 15 个 specialist `CADGeneration` 与常量一起进来，注释没跟上）。
+/// 由 `nt_const_dup.py` 扫出「同名 `MODULE_COUNT` 两侧 14 vs 15」后逐行核实发现。
+/// 本侧自洽性已实测：`default_specialist_states()` 恰好返回 **15** 个元素。
+///
+/// ⛔ core=15 与 `neotrix-types` 的 14 **不是**待修分歧：core 多出 `CADGeneration`
+/// 一个 specialist，属有意的域扩展；强行拉平会删掉一个专家模块。
+/// 详见 `docs/architecture/MIRROR-BANK-2026-09-30.md` §6。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResonanceMatrix {
     /// resonance[i][j] = resonance strength between module i and j (0-6).
