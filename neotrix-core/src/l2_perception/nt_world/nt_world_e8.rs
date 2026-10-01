@@ -25,17 +25,18 @@ use serde::{Deserialize, Serialize};
 /// 卦空间维度 = 64
 pub const HEXAGRAM_DIM: usize = 64;
 
-/// E₈ 维数
-pub const E8_DIM: usize = 248;
-
-/// 大衍之数 = 系统总自由度
-pub const DAYAN_NUMBER: usize = 50;
-
-/// 可用自由度 = 49
-pub const OBSERVABLE_DOF: usize = 49;
-
-/// 观察者自由度 = 1
-pub const OBSERVER_DOF: usize = 1;
+// ─── 单点真身收敛（2026-09-30）────────────────────────────────────────
+// 下面 4 个常量此前在本文件与 `nt_core_e8/nt_e8_constants.rs` **各定义一次**，
+// 实测 4/4 **值完全相同**（`E8_DIM=248` `DAYAN_NUMBER=50`
+// `OBSERVABLE_DOF=49` `OBSERVER_DOF=1`）。E₈ 数学常量属于 `nt_core_e8` 域的真源，
+// `nt_world` 只是**消费方** ⇒ 这里改为引用，不再重复定义。
+//
+// 顺带记录：这 4 个里有 3 个（`E8_DIM` `DAYAN_NUMBER` `OBSERVABLE_DOF`）
+// 在本文件内**只出现定义处、零使用**，即重复的还包含死常量。
+// 同层引用（同属 `l2_perception`），不涉及跨层依赖。
+pub use super::super::nt_core_e8::nt_e8_constants::{
+    DAYAN_NUMBER, E8_DIM, OBSERVABLE_DOF, OBSERVER_DOF,
+};
 
 /// 时间周期: 12 (地支)
 pub const PERIOD_12: f64 = 12.0;

@@ -49,7 +49,7 @@
 > > 再逐个定性 —— **先有判据，再动代码**。
 > >
 > > ### 🟡 P2 待你判断：19 条**无理由**被注释掉的种子
-> > `neotrix-core/l1_action/nt_core_bank/bank/seeds.rs` 有 **18 条**种子被注释，
+> > `neotrix-core/src/l1_action/nt_core_bank/bank/seeds.rs` 有 **18 条**种子被注释，
 > > `maintenance.rs` 的 `initialize_with_everos_knowledge` 有 **1 条**被注释。
 > > 已核实：
 > > - **无任何注释说明原因**；
