@@ -51,12 +51,77 @@ export function useExternalLinks(): void {
   }, [])
 }
 
+/**
+ * 模态对话框的**真模态行为**。
+ *
+ * ⛔ 上一版只写了 `role="dialog" aria-modal="true"` 与一个用于点遮罩判断的
+ *    ref，却**没有实现任何模态行为** —— 无 Esc 关闭、无初始焦点、无焦点陷阱、
+ *    关闭后不还焦。那不是「细节没做完」，而是 **`aria-modal` 是一句谎话**：
+ *    向辅助技术宣告模态，却不实现模态语义。
+ *    后果具体：键盘用户打开日志后**按 Esc 出不来**，Tab 会跑到背后的
+ *    顶栏与聊天区，焦点落到看不见的地方。
+ *
+ * 这里补齐四件：Esc 关闭 / 初始焦点 / Tab 陷阱 / 关闭后归还焦点给触发元素。
+ */
+function useModalBehaviour(open: boolean, onClose: () => void) {
+  const boxRef = useRef<HTMLDivElement | null>(null)
+  const restoreTo = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    // 记住打开前的焦点元素，关闭后归还（否则焦点掉回 body，键盘用户失位）
+    restoreTo.current = document.activeElement as HTMLElement | null
+
+    const box = boxRef.current
+    // 初始焦点：优先取标记了 data-autofocus 的控件，否则退到关闭按钮。
+    // ⛔ 不 autofocus 到日志正文：它是 <pre>，可聚焦但无操作价值。
+    const first = (box?.querySelector('[data-autofocus]') as HTMLElement | null) ??
+      (box?.querySelector('button') as HTMLElement | null)
+    first?.focus()
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation() // 别让 Esc 同时冒泡去关掉别的层
+        onClose()
+        return
+      }
+      if (e.key !== 'Tab') return
+      // Tab 陷阱：只在对话框内可用的元素间循环
+      const items = box
+        ? [...box.querySelectorAll<HTMLElement>(
+            'button,select,input,textarea,a[href],[tabindex]:not([tabindex="-1"])',
+          )].filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null)
+        : []
+      if (items.length === 0) {
+        e.preventDefault()
+        return
+      }
+      const firstEl = items[0]
+      const lastEl = items[items.length - 1]
+      const active = document.activeElement
+      if (e.shiftKey && (active === firstEl || !box?.contains(active))) {
+        e.preventDefault()
+        lastEl.focus()
+      } else if (!e.shiftKey && (active === lastEl || !box?.contains(active))) {
+        e.preventDefault()
+        firstEl.focus()
+      }
+    }
+    document.addEventListener('keydown', onKey, true)
+    return () => {
+      document.removeEventListener('keydown', onKey, true)
+      restoreTo.current?.focus?.()
+    }
+  }, [open, onClose])
+
+  return boxRef
+}
+
 /** 顶栏：字标 + 语言切换 + 日志 + 退出。 */
 export function Shell({ children }: { children?: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>(getLang)
   const [logs, setLogs] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const dialogRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => onLangChange(setLangState), [])
 
@@ -72,6 +137,9 @@ export function Shell({ children }: { children?: React.ReactNode }) {
       setBusy(false)
     }
   }, [lang])
+
+  const closeLogs = useCallback(() => setLogs(null), [])
+  const dialogRef = useModalBehaviour(logs !== null, closeLogs)
 
   const openLogs = useCallback(async () => {
     setBusy(true)
@@ -120,25 +188,32 @@ export function Shell({ children }: { children?: React.ReactNode }) {
 
       <main className="nb-main">{children}</main>
 
+      {/* 遮罩只是 backdrop，**不是** dialog —— role/aria 必须落在 box 上，
+          否则辅助技术会把整块遮罩当成对话框，读屏体验是错的。
+          （注释必须在 `{cond && (` **外面**：括号内 `&&` 只接受一个表达式，
+            写成「注释 + 元素」是语法错误 —— 我第一版就这么写错了。） */}
       {logs !== null && (
         <div
           className="nb-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-label={t('shell.logs.title')}
-          ref={dialogRef}
           onClick={(e) => {
-            if (e.target === dialogRef.current) setLogs(null) // 点遮罩关闭
+            if (e.target === e.currentTarget) closeLogs() // 点遮罩关闭
           }}
         >
-          <section className="nb-modal-box">
+          <section
+            className="nb-modal-box"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('shell.logs.title')}
+            ref={dialogRef}
+          >
             <header>
               <strong>{t('shell.logs.title')}</strong>
-              <button type="button" onClick={() => setLogs(null)}>
+              <button type="button" data-autofocus onClick={closeLogs}>
                 {t('shell.logs.close')}
               </button>
             </header>
-            <pre>{logs.trim() ? logs : t('shell.logs.empty')}</pre>
+            {/* 日志正文可滚：让它可聚焦，键盘用户才能滚动读日志 */}
+            <pre tabIndex={0}>{logs.trim() ? logs : t('shell.logs.empty')}</pre>
           </section>
         </div>
       )}

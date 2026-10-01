@@ -196,12 +196,37 @@ async function probe(browser, label) {
     feat.langAfter = await page.evaluate(() => document.documentElement.lang)
     feat.textAfter = await page.evaluate(
       () => document.querySelector('.nb-actions button')?.textContent ?? '')
-    // 日志弹窗（走 read_run_logs）
-    await page.click('.nb-actions button').catch(() => {})
+    // ── 日志弹窗（走 read_run_logs）+ 模态行为**实证** ──
+    const trigger = await page.$('.nb-actions button')
+    await trigger?.click().catch(() => {})
     await page.waitForTimeout(400)
     feat.logsModal = await page.evaluate(() => {
       const pre = document.querySelector('.nb-modal-box pre')
       return pre ? pre.textContent.slice(0, 40) : null
+    })
+    // a11y-1 role/aria 必须落在 box 上，**不是**遮罩
+    feat.dialogOnBox = await page.evaluate(() => {
+      const box = document.querySelector('.nb-modal-box')
+      const mask = document.querySelector('.nb-modal')
+      return {
+        boxRole: box?.getAttribute('role') ?? null,
+        boxAriaModal: box?.getAttribute('aria-modal') ?? null,
+        maskRole: mask?.getAttribute('role') ?? null,
+      }
+    })
+    // a11y-2 初始焦点应落在 data-autofocus（关闭按钮）上
+    feat.initialFocus = await page.evaluate(() => {
+      const a = document.activeElement
+      return { tag: a?.tagName ?? null, isAutofocus: a?.hasAttribute('data-autofocus') ?? false }
+    })
+    // a11y3 Esc 必须能关（键盘用户出得来）
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(300)
+    feat.escClosed = await page.evaluate(() => document.querySelector('.nb-modal-box') === null)
+    // a11y-4 关闭后焦点须归还给触发元素，否则键盘用户失位
+    feat.focusRestored = await page.evaluate(() => {
+      const a = document.activeElement
+      return { tag: a?.tagName ?? null, inBar: !!a?.closest?.('.nb-actions') }
     })
   }
   await page.close()
@@ -278,12 +303,31 @@ for (const r of rows) {
     console.log(`     语言切换：documentElement.lang ${f.langBefore} → ${f.langAfter}`
       + ` · 按钮文案 ${JSON.stringify(f.textBefore)} → ${JSON.stringify(f.textAfter)}`)
     console.log(`     日志弹窗：${f.logsModal === null ? '⛔ 未打开' : '✅ ' + JSON.stringify(f.logsModal)}`)
+    const d = f.dialogOnBox || {}
+    console.log(`     模态语义：box[role=${d.boxRole} aria-modal=${d.boxAriaModal}] `
+      + `遮罩[role=${d.maskRole ?? '（无，正确）'}]`)
+    console.log(`     初始焦点：${JSON.stringify(f.initialFocus)}`)
+    console.log(`     Esc 关闭：${f.escClosed ? '✅' : '⛔ 键盘用户出不来'}`
+      + ` · 焦点归还：${JSON.stringify(f.focusRestored)}`)
     if (r.label.startsWith("base:'./'")) {
       if (!f.shell.wordmark) { console.log('     ⛔ 外壳未渲染'); fail++ }
       if (!f.shell.hasLangSelect) { console.log('     ⛔ 语言选择器缺失'); fail++ }
       if (f.langAfter !== 'en-US') { console.log('     ⛔ 语言切换未改 document lang'); fail++ }
       if (f.textBefore === f.textAfter) { console.log('     ⛔ 语言切换未改可见文案'); fail++ }
       if (f.logsModal === null) { console.log('     ⛔ 日志弹窗未打开'); fail++ }
+      if (d.boxRole !== 'dialog' || d.boxAriaModal !== 'true') {
+        console.log('     ⛔ role/aria-modal 未落在 box 上'); fail++
+      }
+      if (d.maskRole !== null) {
+        console.log('     ⛔ 遮罩被当成 dialog（读屏会读错）'); fail++
+      }
+      if (!f.initialFocus?.isAutofocus) {
+        console.log('     ⛔ 无初始焦点（data-autofocus 未生效）'); fail++
+      }
+      if (!f.escClosed) { console.log('     ⛔ Esc 关不掉对话框'); fail++ }
+      if (!f.focusRestored?.inBar) {
+        console.log('     ⛔ 关闭后焦点未归还给触发元素'); fail++
+      }
     }
   }
   if (r.label.startsWith("base:'./'")) {
