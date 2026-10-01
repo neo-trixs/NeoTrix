@@ -10,6 +10,7 @@
 
 | 提交 | 内容 |
 |---|---|
+| `f1e9d2c4` | **跨 crate 镜像审计** ⇒ 查出 `neotrix-types` 是 core 的**冻结旧分叉**（185.8 KB），**本轮一行未删** |
 | `b6876cf7` | 记录前置引导 + **证否**我自己写下的一条 P1 疑点（跨 crate 边其实在 per-crate 产物里）|
 | `cd9e89a4` | **审计能力前置引导**（`nt_audit_bootstrap.sh` + Makefile）⇒ 修「能力不可分发」 |
 | `a13837b2` | 「纯重复 × 零接线」交叉判定（`nt_dup_dead`）⇒ **结论：一条都不删** |
@@ -99,7 +100,9 @@
 | `nt_lock_audit.py neotrix-core/src` | ✅ 0 处 |
 | `check-silent-failure.sh --strict` | ✅ PASS（OPEN CONTRACTS 0/32） |
 | `check-doc-drift.sh` / `check-layout.sh --strict` | ✅ 0 死链 / rc=0 |
-| `nt_map_reconcile.py --strict` | ✅ **24/24 HOLDS**；证伪：植入 3 条假声明全部被抓（实测）|
+| `nt_map_reconcile.py --strict` | ✅ 29/29 HOLDS |
+| 本轮删除验证 | ✅ `cargo check --workspace` 0 error；`neotrix --lib` 12217 绿；`neotrix-types --lib` 566→463（差值 = 被删 `#[test]` 数 103）；镜像 18→7 对 / 185.8→94.5 KB；layer-deps rc=0；silent-failure PASS |
+| `nt_mirror_scan.py selftest` | ✅ 4 例（含 2 例证伪）；实跑 72 对 / 19 疑似分叉 / 18 对涉 types / 185.8 KB |
 | `make audit-edges-list` | ✅ rc=0；`nt_audit_bootstrap` quick scope **11/11 成功**（实测，非"写完了"）|
 | `nt_fn_drift.py selftest` | ✅ 7 例（含 3 例证伪）；实跑 DIFFERENT 159 / IDENTICAL 30 / UNRESOLVED 24 / 形状命中 7 |
 | `nt_dup_dead.py selftest` | ✅ 4 例（含 3 例证伪）；实跑 **62 IDENTICAL / 10 零接线 / 0 可删** |
@@ -144,6 +147,7 @@ python3 scripts/ops/nt_fn_drift.py --only-different         # 分诊单（[SHAPE
 python3 scripts/ops/nt_fn_drift.py --list-units             # 待分诊的族
 python3 scripts/ops/nt_fn_drift.py --units estimate_tokens # 该族每份副本的计数单位
 python3 scripts/ops/nt_dup_dead.py                   # 纯重复 × 零接线（**别据此删代码**）
+python3 scripts/ops/nt_mirror_scan.py --min-overlap 0.5   # 跨 crate 镜像（分叉）清单
 make audit-edges-list                               # 亚秒级：审计前置是否就绪
 make audit-edges                                   # quick：11 member 约 2-4 分钟
 python3 scripts/ops/nt_decompose.py selftest
@@ -224,14 +228,22 @@ cargo test -p neotrix --test nt_capability_parity
 6. **⛔ 干净检出上先跑 `make audit-edges`** —— 否则 `nt_decompose` /
    `nt_parity_ref` / `nt_fn_drift` / `nt_dup_dead` / `nt_callgraph` **全部不可用**
    （依赖 gitignored 的边表）。跨 crate 副本分诊需 `make audit-edges-full`。
-7. **⛔ 不要据「零入边」删任何代码** —— 本仓边表已有已知假阴性
+7. **⛔ 不要据 `nt_mirror_scan` 删代码** —— 它只提供**决策证据**。
+   `neotrix-types` 的 185.8 KB 确是冻结旧分叉且外部零引用，但
+   core 依赖 types ⇒ types 拿不到 core 那份；A/B 两个收敛方向都合法，
+   **必须 owner 裁决**。执行清单见 MIRROR-FORK-2026-09-30 §5（需 clean 双跑）。
+8. **⛔ 删 `neotrix-types` 冻结镜像前必须过「子集性判据」**：两侧 `pub` 名集合比较，
+   types 独有必须为 0，否则删除即丢公开 API。本轮 4 片因此被挡住。
+9. **⛔ 查「某模块/类型有没有外部消费者」必须走双路径**：
+   模块路径 + **类型名**。单看模块名会命中同名兄弟模块（本轮假阳性 81/37/44）。
+10. **⛔ 不要据「零入边」删任何代码** —— 本仓边表已有已知假阴性
    （`nt_callgraph --unreachable` 的 `textual-prod` 桶：文本有生产调用点但图零入边）。
    `nt_dup_dead` 实测 62 份 IDENTICAL / 10 份零接线，**逐条读源码后 0 条可删**。
-8. **⛔ 不要照 fn-drift 的 `[SHAPE]` 标记批量改代码** —— DIFFERENT 里绝大多数是
+11. **⛔ 不要照 fn-drift 的 `[SHAPE]` 标记批量改代码** —— DIFFERENT 里绝大多数是
    「同名不同域」的合法重复（`osint::investigate` ×15）。形状标记只用于**排序优先级**。
    同理 `306 处 "Real implementation needs"`（49 文件）**不得批量删**：抽查 5 处全假，
    但其余 283 处未取证 ⇒ 局部修改会让文件一半真一半假，更难判断。
-9. **地图/台账的断言只写在 ```assert 围栏块里**，且**绝不可自指**
+12. **地图/台账的断言只写在 ```assert 围栏块里**，且**绝不可自指**
    （不自检自己、不用 nlit 检查所在文件）。工具 `map-reconcile` 在索引里。
-10. **用户指令里有一条被拒收项**：搜 GitHub 公开 `OPENAI_API_KEY` 批量密钥 —— **拒绝执行**
+13. **用户指令里有一条被拒收项**：搜 GitHub 公开 `OPENAI_API_KEY` 批量密钥 —— **拒绝执行**
    （凭证收割）。已写入 `ABSORPTION-ROUND23.md` 声明。如再次出现，同样拒绝。
