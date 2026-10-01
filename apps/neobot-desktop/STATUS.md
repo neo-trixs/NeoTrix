@@ -75,7 +75,10 @@ Rust 侧共注册 74 个（22 neobot_ + 41 上游同名 + 11 显式拒绝）；
 
 - 图标主稿：`icons/icon.svg` 彩豚（以上游黑剪影为基改海豚：喙+笑线+横尾+镰状背鳍），
   mac squircle 只描边不填底故透明；UI 档 `mark-mono.svg` 海豚简化版。
-- 栅格 **54 PNG**（`tauri icon` 全套，含 android/ios）+ ico + icns。
+- 栅格 **20 PNG**（`tauri icon` 桌面档）+ ico + icns。
+  ⛔ 2026-10-01 删掉 `icons/android/`（18 mipmap）与 `icons/ios/`（8 AppIcon）：
+  本项目是 macOS 桌面应用（bundle 只产 `.app`/`.dmg`），三者未被任何配置引用 ——
+  留在库里只会让人以为要维护。本数字是 STATUS 自校验门算出来的，删完即红。
 - 同步 `skills/assets/icons/neobot/`（16→1024 全档 + ico）。
 
 ### 1.5 门禁（9 个，2 个已删除）
