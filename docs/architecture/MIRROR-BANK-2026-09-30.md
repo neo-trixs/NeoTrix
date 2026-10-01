@@ -404,3 +404,62 @@ pub struct Hexagram { pub bits: u8 }   // ← 同名，但是**不同**类型
 
 新增自证（3b）把这四个坑全部固化：判据必须判陈旧分叉为分叉、
 且必须**不**把同名巧合判成分叉。
+
+---
+
+## 8. 跨层陈旧分叉 16 组：优先级分诊（2026-09-30）
+
+`nt_mirror_scan --dup-impl` 输出的全部 16 组。**本节只做分诊，不动代码** ——
+每一组的「真身该放哪」都是架构决策，且多数涉及类型统一（同 §6.2 的阻塞）。
+
+### 8.1 按「共享面 Jaccard」分层（实测值，非估计）
+
+**A 类 — J ≥ 0.71，同源性极强，最可能是真冻结分叉（4 组）**
+
+| 类型 | 基准（方法数） | 陈旧侧 | J | 缺的方法 |
+|---|---|---|---|---|
+| `IITPhiCalculator` | l5 `nt_iit_phi.rs` (8) | l0 `nt_core_consciousness_types.rs` (6) | 0.75 | `compute_from_state` `subsystem_analysis` |
+| | | l2 `nt_world_model_v2.rs` (4) | 0.50 | `compute_phi` `record` `resonance_matrix` `subsystem_analysis` |
+| `WalshMemoryIndex` | l0 `nt_core_cross_layer.rs` (12) | types `nt_core_walsh.rs` (9) | 0.75 | `wh_dot` `wh_inverse` `wh_transform` |
+| | | l5 `nt_core_walsh.rs` (9) | 0.75 | 同上 |
+| `QuantumSuperposition` | l5 `nt_core_quantum_fusion.rs` (14) | l0 `nt_core_consciousness_types.rs` (10) | 0.71 | `fuse_evidence` `fuse_with` `decoherence_factor` `collapse_evidence` |
+| `BoundingBox` | l2 `nt_world/explore/types.rs` (8) | l1 `nt_memory_spatial/types.rs` (6) | 0.75 | `_width_deg` `_height_deg` |
+
+⚠️ `WalshMemoryIndex` 与本会话已收敛的 `hexagram_hadamard` 同属
+**Walsh-Hadamard 家族**，值得作为同一主题一起处理。
+⚠️ 但它的消费者分布**反直觉**：types 那份有 **2 个**消费者，
+而基准 l0 与 l5 各 **0 个** ⇒ 「方法多的是基准」这个假设在此例不成立。
+⇒ **A 类也不等于「基准就是真身」**，仍须逐个核实谁是活的。
+
+**B 类 — J 0.50~0.71，中等共享，可能是真分叉也可能只是相关实现（5 组）**
+`SelfTestRegistry`(0.44) `KnowledgeHyperCube`(0.42) `Vec2`(0.42)
+`OneObserver`(0.40) `MicCapture`(0.40)
+
+**C 类 — J 0.50，缺 2 个方法，多半是同名不同域（7 组）**
+`AuditTrail` `AgentTrajectory` `CrtTimeScale` `FullReasoningState`
+`GateDecision` `HyperCoord` `SpecialistModule`
+
+### 8.2 分诊方法论（本节最可复用的部分）
+
+1. **方法集差异只是「候选」，不是「缺陷」**。`Vec2` 同时出现在 ECS 数学库与
+   游戏渲染组件里 —— 那是两个合理同名类型。**J=0.40 已是判据下界**，
+   再低就是巧合。
+2. **「方法最多的那份」不等于真身**。`WalshMemoryIndex` 的实测消费者
+   与方法数量**相反** ⇒ 下一轮判断必须以**消费者计数**为准，方法数只用来
+   选比较基准。
+3. **每个候选都要落到两个计数上**（本轮只对 `IITPhiCalculator` 与
+   `WalshMemoryIndex` 做了，其余 14 组**未核实**）：
+   - 缺失方法**有没有人调**（`wh_dot`/`wh_inverse`/`wh_transform` 实测各 3 个文件在用
+     ⇒ 说明活的是**有这些方法的那份**，即 l0）
+   - 每个副本**各有多少消费者**
+   两个计数任一为 0 ⇒ 才可能是死副本；两个都 >0 ⇒ 是活的双实现，**必须迁移**。
+4. ⛔ **不要用本节的表直接删代码**。§6.2 与 §7 已两次证明：
+   「看着是重复」删掉会**破坏 feature 门控**或**删掉一个能力**。
+
+### 8.3 建议的下一步顺序（按「收益/风险」排序）
+
+1. `WalshMemoryIndex` —— 与本会话已做的 `hexagram_hadamard` 同主题，
+   且缺的那 3 个方法**实测有 3 个文件在用** ⇒ 收敛收益明确。
+2. `QuantumSuperposition` —— J=0.71，l0 是纯接收侧（低层持有高层算法的副本）。
+3. `IITPhiCalculator` —— 见 §7，**需先决定 `ios-bridge` 的 ABI 契约**，成本最高。
+4. B/C 两类先不动：共享面小，很可能是同名不同域，改动收益低、误伤风险高。
