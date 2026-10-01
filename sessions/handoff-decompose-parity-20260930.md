@@ -6,10 +6,19 @@
 
 ---
 
-## 1. 做了什么（3 笔提交）
+## 1. 做了什么（提交表）
+
+> ⚠️ 2026-09-30 说明：本文件在共享工作树中被另一窗口合并过，下面的提交表是
+> 历史快照；**最新的三轮结论已移入** `docs/architecture/MIRROR-FORK-2026-09-30.md`
+> 与 `MIRROR-BANK-2026-09-30.md`（架构结论以那两份为准，本表仅供追溯）。
 
 | 提交 | 内容 |
 |---|---|
+| `3b48a3d7` | **单点真身收敛**：`tokenize`/`rrf_fuse` 两份逐字相同实现 → 一份（高层改 `pub use`）|
+| `10f6bcca` | 修正我自己上一轮的分歧数（26→**12**，且 **0 个是 bug**）+ 类型感知工具 `nt_diverge.py` |
+| `ce155ec1` | **否决删除** `nt_core_bank`（不是冗余，是两个各自演化的记忆库）+ 分层设计第①步 |
+| `ac3000bf` | **实际删除** `nt_core_meta` 冻结镜像整簇 —— 7 文件 / 2292 行 |
+| `ba245773` | **实际删除** types 侧冻结镜像两片 —— 91.3 KB / 14 文件 |
 | `f1e9d2c4` | **跨 crate 镜像审计** ⇒ 查出 `neotrix-types` 是 core 的**冻结旧分叉**（185.8 KB），**本轮一行未删** |
 | `b6876cf7` | 记录前置引导 + **证否**我自己写下的一条 P1 疑点（跨 crate 边其实在 per-crate 产物里）|
 | `cd9e89a4` | **审计能力前置引导**（`nt_audit_bootstrap.sh` + Makefile）⇒ 修「能力不可分发」 |
@@ -152,6 +161,9 @@ python3 scripts/ops/nt_dup_dead.py                   # 纯重复 × 零接线（
 python3 scripts/ops/nt_mirror_scan.py --min-overlap 0.5   # 跨 crate 镜像（分叉）清单
 make audit-edges-list                               # 亚秒级：审计前置是否就绪
 make audit-edges                                   # quick：11 member 约 2-4 分钟
+python3 scripts/ops/nt_diverge.py --selftest                  # 类型感知分歧定性
+python3 scripts/ops/nt_diverge.py --ours crates/neotrix-types/src/core/nt_core_bank \
+    --theirs neotrix-core/src/l1_action/nt_core_bank           # nt_core_bank 分歧清单
 python3 scripts/ops/nt_decompose.py selftest
 python3 scripts/ops/nt_decompose.py atoms --db .project-map/edges-neotrix-neobot.jsonl \
     --root 'nt_channel_serve::run_once' --depth 3        # 193 原子
