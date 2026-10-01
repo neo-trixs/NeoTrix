@@ -1916,3 +1916,76 @@ keywords("支付网关")                     -> ['支付网关']                
 - ⓘ 元教训：**R-DISK-8 说过「mock 全对 ≠ 分支可达」，本条是它的同型复发** ——
   区别是这次连 mock 都没有，是**纯死代码**。判别手段只有一个：
   **从 `exit 0` 之后找代码**。
+
+## 许可门**拦不住 AGPL** —— 三条独立原因（2026-10-01 源码级审计）
+
+子代理只读审计发现：`sh scripts/check-license.sh` **无法**拦住一个 AGPL 依赖。
+ⓘ 证据是源码，不是推测：
+
+1. **依赖树被 prune**：`:78` `:89` 都带 `-name node_modules -prune` ⇒ pnpm 装的包对本门**完全不可见**；全脚本 250 行**无任何依赖清单解析**。
+2. **deny 名单只作用于 `LICENSE*` 文件**：`:221` 是 `rg -g 'LICENSE*' -e "$DENY" "$tree"`
+   ⇒ `$record` 与 `$declared` **都不在搜索范围**内。
+   ⓘ 而 `:220` 的注释写的是「deny 名单（**对记录与树内许可证文件都查**）」——
+   **注释与代码矛盾**，实测注释不成立。
+3. **`declared` 只被提取、从不比对**：第 4 步提取出来仅用于展示，⛔ 从不与 `DENY` 比较。
+
+⇒ **实测后果**：`neobot-ui/src/vendor/openghost` 的记录里白纸黑字写着
+「⛔ **非商用保留（禁取）**…明文含 rebrand」，而该树**今天零 FAIL 通过**。
+门槛形同虚设。
+
+### ⛔ AGPL 被静默隐藏的确切机制（已实证）
+`nt_absorption_audit.py`：
+- `:102` `if os.path.isfile(CACHE)` 把整段 license 交叉核对包在 guard 里；
+- `:108-109` 缓存条目缺 `license` 键 ⇒ **`continue` 静默跳过**；
+- `:118` 仍可能打印「✅ license 与 GitHub API 缓存一致」。
+⇒ 把 `absorption-cache.json` 回退到修复前版本（**实测那条就是旧快照回退**），
+   门就输出「一致」并 **PASS**。
+⇒ **本次已恢复**（见提交），恢复后 40 条中 **37 条**带 `license`，核对真正生效。
+
+### ✅ 建议的补测（子代理给出，按投入排序）
+- **A｜`check-license.sh` 三处修**（最小、当天可做）：`:221` 扩面到
+  `("$tree" "$record" "$declared")` 并把 `DENY` 补中文标记（`非商用|禁取|不得商用|二次开发|rebrand`）；
+  新增「`declared` 命中 `DENY` ⇒ FAIL」；`:79` 发现名单加 `-name 'PROVENANCE.md'`
+  （否则 `neobot-ui` 本体不受管辖、`PROVENANCE.md:36` 的低报永远看不到）；修 `:220` 的矛盾注释。
+- **B｜新增 npm 侧许可门**（填补理由 1 的真空）：⛔ `pnpm-lock.yaml`
+  **不含任何 license 字段**（实测零命中）⇒ 数据源必须在版本控制里。
+  建议**基线棘轮**（本仓已有范式：`check-gitleaks-version.sh` + `config/.gitleaks-baseline.txt`）。
+  ⭐ 判据要点：`license` 缺失/`NOASSERTION` ⇒ **FAIL 不静默跳过**；
+  `node_modules` 不存在 ⇒ **FAIL**（「没扫成」与「没问题」必须可区分）。
+- **C｜出货物许可声明门**（见下 C1）。
+- **D｜修 `nt_absorption_audit.py` 静默失败**（见上）。
+- **E｜`check-license.sh` 与 `check-supply-iocs.sh` 补登记进 `gate-registry.tsv`**
+  —— 二者**当前均未登记** ⇒ 元门 `check-gate-satisfiable.sh --strict` 从未验证它们非空门。
+- **G｜`check-license.sh` 的 `find` 加 `-name .worktrees -prune`** ⇒ 未来任一带
+  vendored 树的 worktree 检出都会虚增分数。
+
+### ⛔ 3 项发货前必修义务（子代理实测，非推测）
+- **C1 出产物零许可声明**：`dist/assets/*.js` 三个 chunk 搜
+  `Copyright|@license|MIT|Apache-2.0` ⇒ **markers=[]**。
+  MIT 要求再分发保留版权声明、Apache-2.0 §4 同理；
+  ⓘ 这**直接违反本仓自订的** `LICENSE-EXCEPTIONS.md` ACKNOWLEDGE-2 `condition #3`。
+- **C2 openghost 许可不可核 + 记录自相矛盾**：上游 LICENSE 未 vendored、
+  上游检出已消失；且 `PROVENANCE.md:36`「MIT（**无附加条款**）」与
+  `VENDOR-OPENGHOST.md:18`「⛔ 非商用保留」**直接冲突**。⇒ 需取回上游 LICENSE 原文并裁决分歧。
+- **C3 `frontend/` 仍在 MIT 仓库内**：`ACKNOWLEDG-2` 已 `status: void`（同日第三次改判为商用）。
+  该树**不进产物**，但它留在 MIT 许可的发行物里。`frontend/VENDOR.md:74-79`
+  自列两个出路（取得上游书面授权 / 移出 MIT 再分发范围）⇒ **只能由所有者决定**。
+
+### ✅ 依赖轴结论：可以商用（但有上面 3 项义务）
+- 85 个 npm 包**零** AGPL/GPL/SSPL/Elastic/PolyForm/NC；
+- openghost 三文件 md5 与记录**逐字吻合**（实测）；
+- 出货 bundle 无上游特征符（`overlastic|deepseek|dsh-|@/i18n` 零命中）；
+- **AGPL 仓 `OpenViking` 从未落地**（台账 `landed: "-"`）；
+- Rust 侧有**真门**：`deny.toml` 的 allow 名单**不含** AGPL/GPL/SSPL，`exceptions = []`。
+
+### ⏳ 未验证（需命令，非推测）
+- `cargo deny check licenses` 当前是否绿（需 `cargo install cargo-deny`）
+- 1265 个 Rust 传递依赖的完整许可（`Cargo.lock` **不含 license 字段**）
+- 干净 `pnpm build` 产物是否仍零许可标记（本次审的是本地 dist，且含实验遗留 `index.abs.html`）
+- `lightningcss`（MPL-2.0）是否真未被执行（只读了 `vite.config.ts` 缺 `css.transformer`）
+
+### ⚠️ 需所有者知情（非违规，但不利证据）
+`neotrix-core/src/l4_emotion/nt_memory/context_fs.rs:1` 与 `mod.rs:27` 的注释
+写着「基于 OpenViking 模式」（AGPL 项目的**设计模式**）。
+著作权保护表达不保护思想（idea-expression 二分）⇒ **本身不构成许可违规**；
+但 AGPL 仓的名字挂在出货代码注释上，若被质疑是否衍生，会成为不利证据。
