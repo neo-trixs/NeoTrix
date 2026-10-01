@@ -184,6 +184,30 @@ if js:
 else:
     print('ℹ️  4 产物纯净门：dist/ 不存在（未构建）—— 跳过')
 
+# ── 4b IPC 单一出口检查（**报告式**：不因他窗文件而判失败）─────────────
+# 吸收 bytedance/UI-TARS-desktop 的 Event Stream Viewer / 工具调用耗时统计：
+# 活动面板依赖「所有 invoke 都经 src/ipc.ts」。直连者**不进入面板**
+# ⇒ 命令失败时用户看不到是哪条命令、多耗时。
+# ⛔ 刻意**不判失败**：唯一已知直连方 `src/pet/pet.tsx` 属另一窗口，
+#    把它做成红灯只会被忽略（本仓门纪律：恒红的门 = 没有门）。
+DIRECT = []
+for root, dirs, files in os.walk(os.path.join(UI, 'src')):
+    dirs[:] = [x for x in dirs if x not in ('node_modules', 'dist', 'vendor')]
+    for fn in files:
+        if not fn.endswith(('.ts', '.tsx')):
+            continue
+        p_ = os.path.join(root, fn)
+        rel = os.path.relpath(p_, UI)
+        if rel == os.path.join('src', 'ipc.ts'):
+            continue  # 单一出口本身
+        if "from '@tauri-apps/api/core'" in read(p_):
+            DIRECT.append(rel)
+if DIRECT:
+    print(f"ℹ️  4b IPC 单一出口：{len(DIRECT)} 个文件仍直连 @tauri-apps/api/core"
+          f" ⇒ 其调用不进活动面板（不判失败，属他窗文件）：{', '.join(DIRECT)}")
+else:
+    print('✅ 4b IPC 单一出口：全部经 src/ipc.ts（活动面板完整）')
+
 # ── 5 openghost 独立授权（MIT 无附加条款）───────────────────────────────
 og = os.path.join(UI, 'src/vendor/openghost')
 if os.path.isdir(og):

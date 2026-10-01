@@ -24,7 +24,7 @@
  * 而应用只写 `dataset.theme`），裸 hex 只许出现在气泡/徽标两处。
  */
 
-import { invoke } from '@tauri-apps/api/core'
+import { invokeCmd as invoke } from './ipc'
 
 import { t, useT } from './i18n'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'

@@ -170,3 +170,42 @@ vite build    35 modules → 249.17 kB (gzip 81.93 kB) + 2.48 kB CSS
 （850 处未提交改动凭空消失、事后靠 patch 找回）。
 ⇒ **入口已切、vendored 树保留**，产品已走自持路径且可回滚。
 待他窗收工提交后，删树即可清掉 `check-license` 的最后一条受限来源。
+
+## 8. 吸收对标项目：UI-TARS 的 Event Stream Viewer → 活动面板
+
+**来源**：`bytedance/UI-TARS-desktop`（39,137★，Apache-2.0，本仓台账星数最高项）。
+采纳其两条设计：**Event Stream Viewer**（v0.3.0 特性：数据流追踪与调试）
+与 **timing statistics for tool calls**（工具调用耗时统计）。
+
+⛔ **不照搬它的「Event Stream」本身**：那是协议驱动的 agent 事件流，
+而 `neobot_send` 返回单值 `AgentRunResult` —— **后端没有可流的东西**。
+引入事件协议是对不存在能力的投机实现（AGENTS.md：不做投机工作）。
+
+**改为记录「我们自己发出的 IPC」**（可行且有真实价值的等价物）：
+新增 `src/ipc.ts` 作为 **IPC 单一出口**，记录每次调用的
+**命令名 / 耗时 / 成功失败 / 错误摘要**（环形缓冲 60 条），在日志弹窗
+上半部以表格呈现、订阅式刷新、失败行排最前。
+
+### 这补的是一个真缺陷
+
+改之前：命令失败时界面只显示「读取失败」，用户既不知道**是哪条命令**，
+也不知道**耗时多久**（是超时还是立刻失败）。而 `read_run_logs` 的文本
+**不一定包含前端 IPC 的失败** —— 后端没被调到就不会记。
+
+实测（冒烟测试，失败路径）：
+
+```
+活动面板失败行：1 条 例：set_language    1 ms err="Error: induced failure: set_language"
+活动面板失败行：1 条 例：read_run_logs  1 ms err="Error: induced failure: read_run_logs"
+```
+
+### 为什么走单一出口而不是「记得写」
+
+各组件原本各自 `import { invoke } from '@tauri-apps/api/core'`，无处插桩。
+单一出口让「记录」成为**默认行为**而非可选纪律 —— 不靠记得写，靠结构。
+
+⛔ **已知缺口（如实记录）**：`src/pet/pet.tsx` 仍直连，属**另一窗口**文件，
+按共享工作树纪律**未擅改** ⇒ 桌宠的调用不进本面板。
+收敛方式：该文件改 `import { invokeCmd as invoke } from '../ipc'`（一行）。
+`nt_neobot_ui_wiring.py` 新增 **4b 报告式检查**列出该缺口 ——
+**刻意不判失败**（恒红的门会被忽略）。

@@ -57,5 +57,8 @@
   "chat.sendEllipsis": "…",
   "shell.langFailed": "语言未切换：{msg}",
   "chat.capsFailed": "能力信息读取失败",
-  "chat.capsFailedHint": "读取能力信息失败（不是「没有」）"
+  "chat.capsFailedHint": "读取能力信息失败（不是「没有」）",
+  "shell.activity": "活动（IPC 调用）",
+  "shell.activityClear": "清空",
+  "shell.activityEmpty": "尚无调用记录"
 }

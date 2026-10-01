@@ -24,7 +24,7 @@
  * （`code.copy`）。`setLang()` 同步写该属性 ⇒ 切语言会**立刻**改变
  * 复制按钮的可访问名。这是切换器当前**可观测**的效果。
  */
-import { invoke } from '@tauri-apps/api/core'
+import { invokeCmd } from '../ipc'
 import { useEffect, useReducer } from 'react'
 import zhCN from './locales/zh-CN.json'
 import enUS from './locales/en-US.json'
@@ -117,7 +117,7 @@ export async function setLang(next: Lang): Promise<void> {
     /* 存不下不影响本次会话，后端已持久化 */
   }
   try {
-    await invoke('set_language', { lang: target })
+    await invokeCmd('set_language', { lang: target })
   } catch (e) {
     current = prev // 回滚：不让 UI 显示一个后端没记住的语言
     applyDocumentLang(prev)

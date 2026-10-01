@@ -94,3 +94,35 @@
   font-size: 12px;
   flex: 0 0 auto;
 }
+
+/* ── 活动面板（IPC 调用记录）──────────────────────────────────────────
+   设计吸收自 bytedance/UI-TARS-desktop 的 Event Stream Viewer 与
+   「tool calls 耗时统计」。失败行排在最前（reverse），因为排查时
+   先看的就是它。 */
+.nb-act { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.nb-act-head { display: flex; align-items: center; gap: 8px; }
+.nb-act-count {
+  min-width: 20px; padding: 0 6px; border-radius: 8px;
+  background: #eeeef2; color: #56565b; font-size: 11px; text-align: center;
+}
+.nb-act-empty { margin: 0; color: #86868b; font-size: 12px; }
+.nb-act-list {
+  margin: 0; padding: 0; list-style: none; overflow: auto;
+  max-height: 30vh; border: 1px solid #e8e8ed; border-radius: 6px;
+}
+.nb-act-list li {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 4px 8px; border-bottom: 1px solid #f2f2f5; font-size: 12px;
+}
+.nb-act-list li:last-child { border-bottom: none; }
+.nb-act-list li.bad { background: #fdf3f3; }
+.nb-act-list code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.nb-act-ms { color: #86868b; margin-left: auto; white-space: nowrap; }
+.nb-act-st { font-weight: 600; }
+.nb-act-list li.ok .nb-act-st { color: #1a7f37; }
+.nb-act-list li.bad .nb-act-st { color: #a3272b; }
+.nb-act-err {
+  color: #a3272b; font-size: 11px; max-width: 46ch;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nb-logs-title { margin: 2px 0 0; font-size: 12px; color: #56565b; }

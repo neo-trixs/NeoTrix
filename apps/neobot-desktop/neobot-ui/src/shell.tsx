@@ -19,11 +19,12 @@
  * （image-data feature 未开）⇒ **诚实报错**而非返空 data URL」。
  * ⇒ 命令存在但**必然失败**。接它等于交付一个点了就报错的按钮。
  */
-import { invoke } from '@tauri-apps/api/core'
+import { invokeCmd as invoke } from './ipc'
 import { listen } from '@tauri-apps/api/event'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { getLang, onLangChange, setLang, t, availableLangs, type Lang } from './i18n'
+import { clearActivity, getActivity, onActivity, type ActivityEntry } from './ipc'
 import './shell.css'
 
 /**
@@ -173,6 +174,13 @@ function useMacosMenu(onLogs: () => void, onNote: (msg: string) => void) {
 export function Shell({ children }: { children?: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>(getLang)
   const [logs, setLogs] = useState<string | null>(null)
+  // 活动面板：吸收 UI-TARS 的 Event Stream Viewer / 工具调用耗时统计。
+  // 订阅式更新 —— 新调用进来时面板**自己**刷新，不靠轮询。
+  const [activity, setActivity] = useState<ActivityEntry[]>(() => getActivity())
+  useEffect(() => {
+    setActivity(getActivity())
+    return onActivity(() => setActivity(getActivity()))
+  }, [])
   const [busy, setBusy] = useState(false)
   // 顶栏内联错误位：⛔ 不能没有它。
   //   原实现在 setLang 失败时 `catch {}` 空处理，注释还写着
@@ -286,6 +294,35 @@ export function Shell({ children }: { children?: React.ReactNode }) {
                 {t('shell.logs.close')}
               </button>
             </header>
+            {/* ── 活动面板（先于原始日志）：失败时**先看这里** ──
+                它能回答两个日志文本回答不了的问题：
+                「是哪条命令失败」与「它耗时多久」。 */}
+            <section className="nb-act">
+              <header className="nb-act-head">
+                <strong>{t('shell.activity')}</strong>
+                <span className="nb-act-count">{activity.length}</span>
+                <button type="button" onClick={() => { clearActivity(); setActivity([]) }}>
+                  {t('shell.activityClear')}
+                </button>
+              </header>
+              {activity.length === 0 ? (
+                <p className="nb-act-empty">{t('shell.activityEmpty')}</p>
+              ) : (
+                <ol className="nb-act-list" tabIndex={0}>
+                  {[...activity].reverse().map((e, i) => (
+                    <li key={`${e.at}-${i}`} className={e.ok ? 'ok' : 'bad'}>
+                      <code>{e.cmd}</code>
+                      <span className="nb-act-ms">{e.ms} ms</span>
+                      <span className="nb-act-st">{e.ok ? '✓' : '✗'}</span>
+                      {e.error !== undefined && (
+                        <span className="nb-act-err">{e.error}</span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+            <h4 className="nb-logs-title">{t('shell.logs.title')}</h4>
             {/* 日志正文可滚：让它可聚焦，键盘用户才能滚动读日志 */}
             <pre tabIndex={0}>{logs.trim() ? logs : t('shell.logs.empty')}</pre>
           </section>

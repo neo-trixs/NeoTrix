@@ -57,5 +57,8 @@
   "chat.sendEllipsis": "…",
   "shell.langFailed": "Language not changed: {msg}",
   "chat.capsFailed": "capability info unavailable",
-  "chat.capsFailedHint": "Could not read capabilities (not \"none\")"
+  "chat.capsFailedHint": "Could not read capabilities (not \"none\")",
+  "shell.activity": "Activity (IPC calls)",
+  "shell.activityClear": "Clear",
+  "shell.activityEmpty": "No calls recorded yet"
 }

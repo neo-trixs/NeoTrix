@@ -135,9 +135,19 @@ NOT_NEEDED: Dict[str, str] = {
 # read_run_logs 弹窗返回真实内容）⇒ 两个域已从 PENDING 移出。
 PENDING: Dict[str, str] = {}
 
-# `invoke` 提取正则 —— **刻意复用 nt_api_contract.py 的那一条**。
-# 教训（M3）：本仓已两次因自写正则抽不出调用点而误判（一次报 32 条假缺陷、
-# 一次各域全 0 调用）。同一事实只允许有一个提取实现。
+# ── 调用点提取：**名称无关**，不再按函数名找 ──────────────────────────
+# ⛔ 这是本门第三次栽在同一个坑上（同一事实只允许有一个提取实现）。
+#   我把 `invoke(` 统一改成 `invokeCmd(`（走 src/ipc.ts 单一出口）后，
+#   `set_language` 从门的视野里消失 ⇒ 误报「自持树未覆盖」。
+#   ⇒ 门**绑死在函数名**上：一次无害重构就能让命令隐形。
+#     这是「导出 ≠ 调用」失明的又一形态：不是漏看调用，而是**看不见调用**。
+#
+#   修法：**反转逻辑** —— 不问「哪里调了 invoke」，而问
+#   「契约表里的每条命令，其名是否作为某次调用的首个字符串实参出现」。
+#   与包装层叫什么**完全无关**：`invokeCmd(` / `tauriInvoke(` / `send(` 都能命中。
+CALL_ARG_RE = re.compile(r"""\(\s*['"]([A-Za-z0-9_]+)['"]""")
+
+# 旧正则仅保留用于兼容输出（按函数名的调用点），**不参与任何判定**。
 INVOKE_RE = re.compile(r'invoke(?:<[^>]*>)?\s*\(\s*[\'"]([A-Za-z0-9_]+)[\'"]')
 
 # 归属判据：**md5 内容同一性**，不是「文件名是否存在」。
@@ -202,6 +212,26 @@ def load_contract() -> Dict[str, str]:
     return out
 
 
+def scan_called(known: Set[str]) -> Set[str]:
+    """整棵 vendored 前端 + 自持树里，**被调用过**的命令名集合。
+
+    判据是「命令名是否作为调用的首个字符串实参出现」，**不看调用者叫什么**。
+    """
+    found: Set[str] = set()
+    for base in (FRONTEND, SELF_HOSTED):
+        for root, dirs, files in os.walk(base):
+            dirs[:] = [d for d in dirs if d not in ('node_modules', 'dist', 'vendor')]
+            for fn in files:
+                if not fn.endswith(('.ts', '.tsx')):
+                    continue
+                txt = open(os.path.join(root, fn), encoding='utf-8', errors='ignore').read()
+                for m in CALL_ARG_RE.finditer(txt):
+                    name = m.group(1)
+                    if name in known:
+                        found.add(name)
+    return found
+
+
 def domain_commands() -> Dict[str, Set[str]]:
     out: Dict[str, Set[str]] = {}
     for root, dirs, files in os.walk(FRONTEND):
@@ -221,7 +251,14 @@ def domain_commands() -> Dict[str, Set[str]]:
     return out
 
 
-def self_hosted_commands() -> Set[str]:
+def self_hosted_commands(known: Set[str] | None = None) -> Set[str]:
+    """自持树里被调用的命令。
+
+    传入 `known`（契约表命令集）时走**名称无关**的 `scan_called`；
+    否则退回按函数名的旧正则（仅兼容输出用）。
+    """
+    if known is not None:
+        return {c for c in scan_called(known) if _in_self_hosted(c)}
     out: Set[str] = set()
     for root, dirs, files in os.walk(SELF_HOSTED):
         dirs[:] = [d for d in dirs if d not in ('node_modules', 'dist', 'vendor')]
@@ -232,11 +269,23 @@ def self_hosted_commands() -> Set[str]:
     return out
 
 
+def _in_self_hosted(cmd: str) -> bool:
+    for root, dirs, files in os.walk(SELF_HOSTED):
+        dirs[:] = [d for d in dirs if d not in ('node_modules', 'dist', 'vendor')]
+        for fn in files:
+            if not fn.endswith(('.ts', '.tsx')):
+                continue
+            txt = open(os.path.join(root, fn), encoding='utf-8', errors='ignore').read()
+            if re.search(r"""\(\s*['"]""" + re.escape(cmd) + r"""['"]""", txt):
+                return True
+    return False
+
+
 def main() -> int:
     contract = load_contract()
     doms = domain_commands()
     init_migrated()
-    mine = self_hosted_commands()
+    mine = self_hosted_commands(set(contract))
 
     counts = {k: sum(1 for v in contract.values() if v == k)
               for k in ('Implemented', 'Planned', 'Stub')}

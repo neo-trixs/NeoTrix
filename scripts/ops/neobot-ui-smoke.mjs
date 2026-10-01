@@ -210,6 +210,20 @@ async function probe(browser, label, failList, act) {
     // 只跑该案例自己的动作（功能断言会 Esc 关弹窗、抹掉失败证据，故不走）
     if (act) await act(page)
     await page.waitForTimeout(600)
+    // 活动面板的**核心价值**是暴露失败：开日志弹窗看是否有失败行。
+    // ⛔ 只有经 src/ipc.ts 的调用才会被记录；桌宠页仍直连（他窗文件），
+    //    故只对「已知走单一出口」的失败命令断言。
+    if (act) {
+      await page.click('.nb-actions button').catch(() => {})
+      await page.waitForTimeout(400)
+      feat.badRows = await page.evaluate(() =>
+        [...document.querySelectorAll('.nb-act-list li.bad')].map((li) => ({
+          cmd: li.querySelector('code')?.textContent ?? null,
+          ms: li.querySelector('.nb-act-ms')?.textContent ?? null,
+          err: li.querySelector('.nb-act-err')?.textContent ?? null,
+        })),
+      ).catch(() => [])
+    }
   } else if (r_children > 0) {
     feat.shell = await page.evaluate(() => ({
       wordmark: document.querySelector('.nb-wordmark')?.textContent ?? null,
@@ -248,6 +262,21 @@ async function probe(browser, label, failList, act) {
       const a = document.activeElement
       return { tag: a?.tagName ?? null, isAutofocus: a?.hasAttribute('data-autofocus') ?? false }
     })
+    // ⚠️ 顺序纪律：活动面板**必须在此处（Esc 之前）**查 —— 弹窗里的
+    //    DOM 在 Esc 之后已卸载。我第一版放在 Esc 之后 ⇒ 报「未渲染」，
+    //    那是探针顺序错，不是面板没做。（与 read_run_logs 那次同源。）
+    // ── 活动面板（吸收 UI-TARS 的 Event Stream Viewer / 耗时统计）──
+    // 判据：挂载时 neobot_convo_list 等已发过 ⇒ 面板须有行、须带命令名与耗时
+    feat.activity = await page.evaluate(() => {
+      const rows = [...document.querySelectorAll('.nb-act-list li')]
+      return {
+        open: !!document.querySelector('.nb-act'),
+        count: rows.length,
+        firstCmd: rows[0]?.querySelector('code')?.textContent ?? null,
+        firstMs: rows[0]?.querySelector('.nb-act-ms')?.textContent ?? null,
+        hasBad: !!document.querySelector('.nb-act-list li.bad'),
+      }
+    }).catch(() => null)
     // a11y3 Esc 必须能关（键盘用户出得来）
     await page.keyboard.press('Escape')
     await page.waitForTimeout(300)
@@ -370,16 +399,34 @@ for (const r of rows) {
     console.log(`     初始焦点：${JSON.stringify(f.initialFocus)}`)
     console.log(`     Esc 关闭：${f.escClosed ? '✅' : '⛔ 键盘用户出不来'}`
       + ` · 焦点归还：${JSON.stringify(f.focusRestored)}`)
+    const a = f.activity
+    if (a) {
+      console.log(`     活动面板：行数=${a.count} 最新=${a.firstCmd} ${a.firstMs}`
+        + ` 有失败行=${a.hasBad ? '是' : '否'}`)
+    }
     if (r.label.startsWith('失败路径：')) {
     // 判据：① 仍渲染出内容（不是白屏）② 无未捕获 pageerror
     //      ③ 页面文本里能看到失败痕迹（说明**说清了**，而非静默）
     const hasCrash = r.errors.some((e) => e.startsWith('pageerror:'))
+    if (r.feat?.badRows) {
+      console.log(`     活动面板失败行：${r.feat.badRows.length} 条`
+        + (r.feat.badRows[0]
+          ? ` 例：${r.feat.badRows[0].cmd} ${r.feat.badRows[0].ms} `
+            + `err=${JSON.stringify((r.feat.badRows[0].err || '').slice(0, 40))}`
+          : '（无 —— 面板未暴露本次失败）'))
+    }
     const saysFail = /失败|failed|诱导|induced|错误|error/i.test(r.errText || '')
     console.log(`     仍渲染=${r.children > 0 ? '✅' : '⛔ 白屏'} `
       + `未捕获异常=${hasCrash ? '⛔ ' + r.errors.find((e) => e.startsWith('pageerror:')) : '✅ 无'} `
       + `可见失败提示=${saysFail ? '✅' : '⚠️ 未见'}`)
     if (r.children <= 0) { console.log('     ⛔ 故障导致白屏'); fail++ }
     if (hasCrash) { console.log('     ⛔ 故障导致未捕获异常'); fail++ }
+    // ⛔ `act` 不在报告循环的作用域（它是 probe 的参数）—— 我第一版
+    //    在这里写 `act &&` ⇒ ReferenceError。判据应只看 r.feat。
+    if (r.feat && Array.isArray(r.feat.badRows) && r.feat.badRows.length === 0) {
+      console.log('     ⛔ 活动面板未暴露本次失败 —— 面板的核心价值失效')
+      fail++
+    }
     if (!saysFail) {
       console.log(`     ⛔ 故障**静默**：用户看不到任何失败提示`)
       console.log(`        可见文本：${JSON.stringify((r.errText || '').slice(0, 90))}`)
@@ -405,6 +452,13 @@ for (const r of rows) {
       if (!f.focusRestored?.inBar) {
         console.log('     ⛔ 关闭后焦点未归还给触发元素'); fail++
       }
+      const a = f.activity
+      if (!a || !a.open) { console.log('     ⛔ 活动面板未渲染'); fail++ }
+      else if (a.count === 0) {
+        console.log('     ⛔ 活动面板无记录（挂载时已发过 neobot_convo_list 等）'); fail++
+      } else if (!a.firstMs || !/\d+\s*ms/.test(a.firstMs)) {
+        console.log(`     ⛔ 活动行缺耗时统计：${JSON.stringify(a.firstMs)}`); fail++
+      }
       if (f.chatZh === f.chatEn) {
         console.log(`     ⛔ 聊天区语言未随切换变化（半成品切换器）`)
         console.log(`        zh: ${JSON.stringify(f.chatZh)}`)
@@ -420,12 +474,25 @@ for (const r of rows) {
     // 判据：① 仍渲染出内容（不是白屏）② 无未捕获 pageerror
     //      ③ 页面文本里能看到失败痕迹（说明**说清了**，而非静默）
     const hasCrash = r.errors.some((e) => e.startsWith('pageerror:'))
+    if (r.feat?.badRows) {
+      console.log(`     活动面板失败行：${r.feat.badRows.length} 条`
+        + (r.feat.badRows[0]
+          ? ` 例：${r.feat.badRows[0].cmd} ${r.feat.badRows[0].ms} `
+            + `err=${JSON.stringify((r.feat.badRows[0].err || '').slice(0, 40))}`
+          : '（无 —— 面板未暴露本次失败）'))
+    }
     const saysFail = /失败|failed|诱导|induced|错误|error/i.test(r.errText || '')
     console.log(`     仍渲染=${r.children > 0 ? '✅' : '⛔ 白屏'} `
       + `未捕获异常=${hasCrash ? '⛔ ' + r.errors.find((e) => e.startsWith('pageerror:')) : '✅ 无'} `
       + `可见失败提示=${saysFail ? '✅' : '⚠️ 未见'}`)
     if (r.children <= 0) { console.log('     ⛔ 故障导致白屏'); fail++ }
     if (hasCrash) { console.log('     ⛔ 故障导致未捕获异常'); fail++ }
+    // ⛔ `act` 不在报告循环的作用域（它是 probe 的参数）—— 我第一版
+    //    在这里写 `act &&` ⇒ ReferenceError。判据应只看 r.feat。
+    if (r.feat && Array.isArray(r.feat.badRows) && r.feat.badRows.length === 0) {
+      console.log('     ⛔ 活动面板未暴露本次失败 —— 面板的核心价值失效')
+      fail++
+    }
     if (!saysFail) {
       console.log(`     ⛔ 故障**静默**：用户看不到任何失败提示`)
       console.log(`        可见文本：${JSON.stringify((r.errText || '').slice(0, 90))}`)
