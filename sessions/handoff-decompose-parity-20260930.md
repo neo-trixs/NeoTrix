@@ -10,6 +10,7 @@
 
 | 提交 | 内容 |
 |---|---|
+| `0459494b` | **副本漂移审计器**（`nt_fn_drift`）+ 抓到 3 个真缺陷：2 处**中文 panic** + 1 处时钟 panic |
 | `1db3234f` | 登记 `map-reconcile` + TODO 记边界澄清（**并非所有能力都可复现**）|
 | `e9f74b4c` | **全域 map 装上自检器**：每条「现状」带可执行断言（9/9 HOLDS）+ 3.2 边界章 |
 | `144c59a8` | **行为对位通用化 + 第一个真 bug**：中文实体链接按字节算编辑距离（三处单位混用）|
@@ -56,6 +57,7 @@
 | 8 | `nt_map_reconcile` v1 用**行内正则**匹配谓词 ⇒ 全仓 **18 条假阳性**（把 `package.json` 的 `test:headed` 脚本名当断言） | 跑出来 18 条 FAIL，逐条看上下文才发现全是假的 | 改为只认 ```assert 围栏块 |
 | 9 | 我写的 `nlit:…@本文件` 是**自指断言**：为解释改动必须引用旧措辞 ⇒ 永远失败 | 工具自己报「literal present」 | 删该断言 |
 | 10 | 我写的 `cmd:nt_map_reconcile.py`（自检调用正在自检的工具）⇒ **无限递归**，120s 超时 | 工具自己超时 | 删该断言 |
+| 11 | `nt_fn_drift` 输出把 tuple 解包成 `(mod,path,body,line)` 却按 `(mod,path,line,body)` 用 ⇒ `%d` 收到 str 首跑即崩 | TypeError | 改正解包顺序 |
 
 ---
 
@@ -87,7 +89,9 @@
 | `nt_lock_audit.py neotrix-core/src` | ✅ 0 处 |
 | `check-silent-failure.sh --strict` | ✅ PASS（OPEN CONTRACTS 0/32） |
 | `check-doc-drift.sh` / `check-layout.sh --strict` | ✅ 0 死链 / rc=0 |
-| `nt_map_reconcile.py --strict` | ✅ **9/9 HOLDS**；证伪：植入 3 条假声明全部被抓（实测）|
+| `nt_map_reconcile.py --strict` | ✅ **15/15 HOLDS**；证伪：植入 3 条假声明全部被抓（实测）|
+| `nt_fn_drift.py selftest` | ✅ 7 例（含 3 例证伪）；实跑 DIFFERENT 160 / IDENTICAL 29 / UNRESOLVED 24 / 形状命中 7 |
+| truncate 两处修复的证伪 | ✅ 回退后分别以 `byte index 5 is not a char boundary` 与 `attempt to subtract with overflow` 转红 |
 | `check-unwrap.sh --strict` | ❌ **4 条红 = 他窗 WIP**：`apps/neobot-desktop/src/core.rs:205`、`main.rs:124`、`crates/neotrix-neobot/src/nt_pet.rs:225`/`:226`。**未代改、未代记账** |
 | `check-license.sh` | ❌ rc=1 = **正确状态**（他窗待裁决 `apps/neobot-desktop/frontend` 附加条款）。⛔ 不要为了让门变绿删 deny 名单 |
 | 证伪：篡改 oracle | ✅ 测试红（`step 13: ours=… reference=…`） |
@@ -121,6 +125,8 @@
 ```sh
 python3 scripts/ops/nt_parity_ref.py --list              # 已注册能力
 python3 scripts/ops/nt_map_reconcile.py --strict            # 地图自检（0 断言 ⇒ rc=2）
+python3 scripts/ops/nt_fn_drift.py selftest                 # 副本漂移审计器自证
+python3 scripts/ops/nt_fn_drift.py --only-different         # 分诊单（[SHAPE] 优先）
 python3 scripts/ops/nt_decompose.py selftest
 python3 scripts/ops/nt_decompose.py atoms --db .project-map/edges-neotrix-neobot.jsonl \
     --root 'nt_channel_serve::run_once' --depth 3        # 193 原子
@@ -191,7 +197,11 @@ cargo test -p neotrix --test nt_capability_parity
 3. **两个模块曾有同名不同语义的 `levenshtein`**（linker 字节版 / semantic_entropy
    字符版）。已统一为按 `char`，但**这类「副本语义漂移」是复发型问题** —— 再见到
    同名函数先对位再合并，别只做文本去重。
-4. **地图/台账的断言只写在 ```assert 围栏块里**，且**绝不可自指**
+4. **⛔ 不要照 fn-drift 的 `[SHAPE]` 标记批量改代码** —— DIFFERENT 里绝大多数是
+   「同名不同域」的合法重复（`osint::investigate` ×15）。形状标记只用于**排序优先级**。
+   同理 `306 处 "Real implementation needs"`（49 文件）**不得批量删**：抽查 5 处全假，
+   但其余 283 处未取证 ⇒ 局部修改会让文件一半真一半假，更难判断。
+5. **地图/台账的断言只写在 ```assert 围栏块里**，且**绝不可自指**
    （不自检自己、不用 nlit 检查所在文件）。工具 `map-reconcile` 在索引里。
-5. **用户指令里有一条被拒收项**：搜 GitHub 公开 `OPENAI_API_KEY` 批量密钥 —— **拒绝执行**
+6. **用户指令里有一条被拒收项**：搜 GitHub 公开 `OPENAI_API_KEY` 批量密钥 —— **拒绝执行**
    （凭证收割）。已写入 `ABSORPTION-ROUND23.md` 声明。如再次出现，同样拒绝。
