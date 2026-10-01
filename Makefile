@@ -375,7 +375,14 @@ arch-acyclic:
 supply-iocs:
 	bash scripts/check-supply-iocs.sh
 
-.PHONY: sync-todo watch-todo daemon-todo install-hook install-launchd uninstall-launchd check-conflicts todo-stats shanhai-pipeline shanhai-stats shanhai-mappings shanhai-evidence shanhai-export shanhai-visualize shanhai-all build-shanhai desktop-check desktop-build desktop-package-dir desktop-package lint test check build layer-deps doc-drift doc-drift-strict coverage-gate bench-baseline bench-compare geiger machete build-surface build-surface-strict fuzz arch-acyclic audit-all supply-iocs
+# 外部来源与许可门 (G6; 校验 vendored 树的来源记录与实际条款一致)
+# ⚠️ 当前 **FAIL 是正确状态**：apps/neobot-desktop/frontend 的上游附加条款
+#    「No Commercial Secondary Development」尚未被项目所有者裁决/签署。
+#    详见 .neotrix/LICENSE-EXCEPTIONS.md 与该树 VENDOR.md 的许可节。
+license-gate:
+	bash scripts/check-license.sh
+
+.PHONY: sync-todo watch-todo daemon-todo install-hook install-launchd uninstall-launchd check-conflicts todo-stats shanhai-pipeline shanhai-stats shanhai-mappings shanhai-evidence shanhai-export shanhai-visualize shanhai-all build-shanhai desktop-check desktop-build desktop-package-dir desktop-package lint test check build layer-deps doc-drift doc-drift-strict coverage-gate bench-baseline bench-compare geiger machete build-surface build-surface-strict fuzz arch-acyclic audit-all supply-iocs license-gate
 
 # 进化实验账本活性门（防「造了没人跑」）
 evolution-gate:
