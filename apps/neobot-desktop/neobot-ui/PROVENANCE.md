@@ -60,10 +60,36 @@ vite build    35 modules → 249.17 kB (gzip 81.93 kB) + 2.48 kB CSS
               openghost 全局（Markdown/Tex/Highlight/code.copy）= 在
 ```
 
-⚠️ **踩过的坑（已固化进门）**：`vite` 默认 `base:'/'` 产出
-`src="/assets/index-xxx.js"`，而 Tauri 走 `file://` 加载 ⇒ `/assets`
-解析到**文件系统根** ⇒ **白屏**，且 `vite build` **成功、tsc 通过、零报错**。
-⇒ 「构建通过」不等于「产物可用」。本目录 `base:'./'`，并由门守住。
+## 4.1 运行时冒烟测试（构建绿 ≠ 产物可用）
+
+`scripts/ops/neobot-ui-smoke.mjs` —— headless Chrome（系统 `channel:'chrome'`，
+免 `npx playwright install` 的 150MB 下载）在 **HTTP 子路径 `/app/`** 下加载
+`dist/index.html`，注入契约忠实的 Tauri IPC 桩，断言
+**① `#root` 被真实填充 ② 无未捕获错误 ③ 无资源加载失败**。
+
+**实测**：`#root` 子元素 = 1，文本长度 = 103，零错误 ⇒ **自持 UI 真的渲染**。
+
+ⓘ **本测试第一版报「未渲染」，核验后确认是【桩】的错，不是产品的错**：
+桩对所有命令返回 `null`，而 `neobot_root.tsx:215` 声明
+`invoke<ConvoView[]>`、Rust 侧返回 `Vec` 序列化成 `[]`，**永不为 null**
+⇒ `v[0]` 抛 `Cannot read properties of null`。
+⇒ **冒烟测试的桩必须按声明类型建模，否则测的是桩的 bug。**
+（顺带记录一处真实脆弱性：`:219` 写 `v[0]?.id` 而非 `v?.[0]?.id` ——
+ 可选链只护住了 `.id`，没护住 `v`。**属原件问题，未在本副本改动**，
+ 以免造成漂移分叉。）
+
+### 关于 `base` 的证据边界
+
+| 断言 | 状态 |
+|---|---|
+| `base:'./'`（相对）在子路径下正确加载并渲染 | ✅ **已实证** |
+| `base:'/'`（根相对）在 Tauri v2 自定义协议下必白屏 | ⚠️ **未实证，已降级** |
+
+初版对照实验把路径改写成 `/app/assets/…`（顺手"修好"了）⇒ 那不是
+`base:'/'` 的真实输出，**证明不了任何事**；改为**字面**根相对后，
+子路径下确实渲染失败（`#root` 子元素 = 0）。但 Tauri 把 `frontendDist`
+挂在**协议根**，`/assets/…` 未必失效 —— 故「必白屏」是**手推**，已降级。
+仍取 `base:'./'`：它在两种挂载下**都**正确，是不依赖未验证前提的唯一选择。
 
 ## 5. 切换方式（M6，尚未执行）
 

@@ -9,9 +9,14 @@ import react from '@vitejs/plugin-react'
  * `tauri.conf.json` 的 `frontendDist` 指向，不动 vendored 树。
  */
 export default defineConfig({
-  // ⚠️ Tauri 以 `file://` 加载 dist。默认 `base:'/'` 会产出
-  // `src="/assets/index-xxx.js"`，在 file:// 下 `/assets` 解析到**文件系统根**
-  // ⇒ 白屏，且**构建成功不报错**（实测踩到过）。必须相对路径。
+  // 相对路径。**证据边界**（勿越读）：
+  //   · 已实证：`base:'./'` 在**子路径**挂载下正确加载并真实渲染
+  //     （scripts/ops/neobot-ui-smoke.mjs，headless Chrome）。
+  //   · 未实证：`base:'/'` 在 Tauri v2 自定义协议下是否失效 —— Tauri 把
+  //     frontendDist 挂在协议根，`/assets/…` 未必失效。我最初写的
+  //     「file:// 下必白屏」属**手推未验证**，已降级为上述边界。
+  //   · 仍取相对路径：它在「根挂载」与「子路径」下**都**正确，
+  //     是不依赖未验证前提的唯一选择。
   base: './',
   plugins: [react()],
   build: {

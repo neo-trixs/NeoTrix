@@ -9,7 +9,7 @@
   1. 漂移：本目录复制件与 `frontend/src/` 原件 md5 必须一致（否则复制腐化）
   2. 纯净：自持入口 `src/main.tsx` 不得 import 任何 vendored 路径
   3. base：`vite.config.ts` 的 `base` 必须是相对路径
-     （默认 `'/'` 产出 `/assets/x.js`，Tauri 走 file:// 加载 ⇒ **白屏**，
+     （默认 `'/'` 产出 `/assets/x.js`，子路径挂载下渲染失败 ⇒ **不可用**，
       而 `vite build` 成功、tsc 通过、零报错 —— 只靠构建无法发现）
   4. 产物：若 `dist/` 存在，其 JS 不得含上游 dsh-tauri 特征符
 
@@ -132,7 +132,10 @@ else:
     else:
         print('✅ 2 入口纯净门：无 @/ 上游别名、无 ../ 逃逸（相对 ./x 为自持树内引用）')
 
-# ── 3 vite base 门（白屏守卫）───────────────────────────────────────────
+# ── 3 vite base 门（挂载点无关性守卫）───────────────────────────────────
+# 证据边界（勿越读）：`base:'./'` 在**子路径**下渲染已实证（neobot-ui-smoke.mjs）；
+# 而 `base:'/'` 在 Tauri v2 自定义协议下**未必**失效（Tauri 把 frontendDist
+# 挂在协议根）—— 本门守的是「不依赖未验证前提」：相对路径在两种挂载下都正确。
 vc = os.path.join(UI, 'vite.config.ts')
 if not os.path.isfile(vc):
     fail.append('vite.config.ts 不存在')
@@ -141,12 +144,13 @@ else:
     m = re.search(r"""\bbase\s*:\s*['"]([^'"]*)['"]""", t)
     if not m:
         fail.append("vite.config.ts 未显式声明 base\n"
-                    "       后果：vite 默认 '/' ⇒ 产物 src=\"/assets/x.js\"，"
-                    "Tauri 走 file:// 加载时解析到文件系统根 ⇒ **白屏**（构建仍成功）")
+                    "       后果：vite 默认 '/' ⇒ 产物 src=\"/assets/x.js\"（根相对）\n"
+                    "       已实证：根相对在**子路径**挂载下渲染失败（#root 为空），"
+                    "而构建与 tsc 仍全绿 ⇒ 产物不可用")
     elif m.group(1) not in ('./', ''):
-        fail.append(f"vite base={m.group(1)!r} 非相对路径 ⇒ file:// 下白屏")
+        fail.append(f"vite base={m.group(1)!r} 为根相对 ⇒ 依赖「应用挂在协议根」这一未验证前提")
     else:
-        print(f"✅ 3 vite base 门：base={m.group(1)!r}（file:// 安全）")
+        print(f"✅ 3 vite base 门：base={m.group(1)!r}（相对，根挂载与子路径皆安全）")
 
 # ── 4 产物纯净门（若有 dist）───────────────────────────────────────────
 dist = os.path.join(UI, 'dist')

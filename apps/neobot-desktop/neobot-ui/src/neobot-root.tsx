@@ -524,6 +524,9 @@ export function NeoBotRoot() {
                 type="button"
                 onClick={() => setSel(c.id)}
                 aria-current={active ? 'true' : undefined}
+                // 选中态：底色 + 左侧强调条。⛔ 只给 font-semibold 不够 ——
+                // 字号权重的差别在 13px 下几乎看不出来，用户会以为没选中。
+                style={active ? { boxShadow: 'inset 2px 0 0 var(--color-info)' } : undefined}
                 className={`mb-0.5 block w-full rounded-lg px-2 py-1.5 text-left hover:bg-btn-hover ${
                   active ? 'bg-btn-active' : ''
                 }`}

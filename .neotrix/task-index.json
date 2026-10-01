@@ -820,10 +820,25 @@
     "字节切 panic",
     "字符边界"
    ],
-   "tool": "python3 scripts/ops/nt_fn_drift.py [--db .project-map/edges-all.jsonl] [--only-different] | selftest",
+   "tool": "python3 scripts/ops/nt_fn_drift.py [--db .project-map/edges-all.jsonl] [--only-different|--units NAME|--list-units] | selftest",
    "kind": "report",
    "read_only": true,
-   "when_not": "① 只能发现**同名**副本 —— 跨名漂移（本会话的字节/char levenshtein）抓不到，那种只能靠 nt-parity-ref 的行为对位；② DIFFERENT 里绝大多数是「同名不同域」的合法重复（如 osint::investigate ×15），**不要照 [SHAPE] 标记批量改**，那正是「23 处模板残留被当真缺陷」那类风险；③ 不是门：判据是文本相等，不足以当正确性判据（G7）；④ 需要 .project-map/edges-*.jsonl（gitignored 低频生成物）",
+   "when_not": "① 只能发现**同名**副本 —— 跨名漂移（本会话的字节/char levenshtein）抓不到，那种只能靠 nt-parity-ref 的行为对位；② DIFFERENT 里绝大多数是「同名不同域」的合法重复（如 osint::investigate ×15），**不要照 [SHAPE] 或 --units 的 BYTE 标记批量改**（本轮据此判 2 族无罪：truncate_chars 的字节快路径无害、tokenize 规则有意不同）；③ 不是门：判据是文本相等，不足以当正确性判据（G7）；④ 需要 .project-map/edges-*.jsonl（gitignored 低频生成物）",
+   "spec": "GLOBAL-MAP-DEFECTS-2026-09-30 §3.1b；首轮抓到 now_ts 13 副本 2 panic + 2 处 truncate 字节切 panic"
+  },
+  {
+   "id": "dup-dead",
+   "query": [
+    "纯重复又零接线",
+    "该删哪个副本",
+    "重复函数候选",
+    "零入边",
+    "重复实现清理"
+   ],
+   "tool": "python3 scripts/ops/nt_dup_dead.py [--verbose] | selftest",
+   "kind": "report",
+   "read_only": true,
+   "when_not": "⛔ **不要据此删代码** —— 本轮实测 62 份 IDENTICAL / 10 份零接线，逐条读源码后 **0 条可删**（6 份是 neotrix-types 跨 crate 镜像、4 份签名或域不同）。决定性反证：本仓 nt_callgraph 已有 textual-prod 桶（文本有生产调用点但图零入边）⇒ 静态边表有已知假阴性，「零入边」连「是否有调用点」都不能证明。输出是分诊单，不是删除清单",
    "spec": "GLOBAL-MAP-DEFECTS-2026-09-30 §3.1b；首轮抓到 now_ts 13 副本 2 panic + 2 处 truncate 字节切 panic"
   },
   {
@@ -898,6 +913,26 @@
    "read_only": true,
    "when_not": "改 vendored frontend 内部逻辑时不要用它（那是上游代码，不归本门）；漂移报警且**原件 mtime 更新**时不要贸然同步 —— 他窗在途改动，同步会竞速",
    "spec": "FRONTEND-REBUILD R1/R5；rc=0 才算接线完整，5 项检查：复制件漂移 / 入口无 @/ 上游别名与 ../ 逃逸 / vite base 为相对路径（默认 '/' 在 file:// 下白屏且构建不报错）/ 产物无上游特征符 / openghost 已迁出受限树"
+  },
+  {
+   "id": "neobot-ui-smoke",
+   "query": [
+    "白屏",
+    "渲染",
+    "运行时",
+    "冒烟",
+    "产物可用",
+    "构建绿",
+    "base",
+    "favicon",
+    "渲染失败",
+    "#root为空"
+   ],
+   "tool": "node scripts/ops/neobot-ui-smoke.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "改 Rust 后端或 Tauri 桥时不要用它（浏览器里没有 Tauri IPC，桩只验渲染不验桥接）；产物没构建过（dist/ 不存在）时先 `vite build`",
+   "spec": "判据三条：#root 被真实填充 / 无未捕获错误 / 无资源加载失败（按 URL 判定，不靠 console 文本——文本是泛化的不含 URL）。首次报「未渲染」是桩返回 null 而契约声明 T[] 所致，非产品缺陷"
   }
  ],
  "excluded": {
