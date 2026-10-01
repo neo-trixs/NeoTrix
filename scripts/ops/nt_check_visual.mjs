@@ -217,6 +217,26 @@ try {
         maxCol: col.length ? Math.round(Math.max(...col)) : null,
         composerInView: tr ? tr.bottom <= window.innerHeight + 1 && tr.top >= 0 : null,
         hOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+        // 消息分组：连续同作者应聚合 ⇒ 间距必须**不等**（组内小、组间大）。
+        gaps: (() => {
+          // ⛔ 必须限定在消息列内：data-index 是**两个虚拟化列表共用**的属性
+          //    （会话列表 + 消息列表），不限定就会把两列的 top 混在一起排序，
+          //    算出「负间距」（实测 -53/-61…）—— 门于是对着垃圾数据判 PASS。
+          //    这与之前「量错对象」是同一类错：根/侧栏、列宽、[data-index] 各犯一次。
+          // ⛔ 量**气泡**而不是 item 外框：虚拟化下 item 是 absolute 定位、
+          //    首尾相接（vi.start 累加高度），所以外框之间的间距**恒为 0**，
+          //    分组间距实际写在 item 自己的 paddingTop 里 ⇒ 量外框永远量不到。
+          const items = [...document.querySelectorAll('[data-testid="nb-msg-sizer"] [data-index]')]
+            .map(el => el.firstElementChild?.firstElementChild)
+            .filter(Boolean)
+            .map(el => el.getBoundingClientRect())
+            .sort((a, b) => a.top - b.top);
+          const out = [];
+          for (let i = 1; i < items.length; i++) {
+            out.push(Math.round(items[i].top - items[i - 1].bottom));
+          }
+          return out;
+        })(),
         errors: window.__ERRORS__ || [],
       });
     })()`,
@@ -265,6 +285,7 @@ try {
 
   console.log(`  视口 ${d.viewport} · shell ${d.shell} · main ${d.main}(grow=${d.mainGrow}) · 根 ${d.root} · 侧栏 ${d.aside} · 顶栏 ${d.bar}`);
   console.log(`  顶栏控件 ${d.ctrls.length} 个，高度 ${[...new Set(d.ctrls.map((c) => c.h))].join("/")} · 会话行高 ${d.rows.length ? Math.min(...d.rows) + ".." + Math.max(...d.rows) : "n/a"} · 列宽 ${d.maxCol}`);
+  if (d.gaps && d.gaps.length) console.log(`  消息间距 ${d.gaps.join("/")}（组内小/组间大）`);
   console.log(`  截图 → ${OUT}`);
 
   if (bad.length) {
