@@ -53,7 +53,19 @@ PAIRS: list[tuple[str, str]] = [
     # ⚠️ i18n **刻意不在漂移对照内**：我方词条是**自有集合**（实测与上游
     # 452 键零重合），不再是上游文件的复制件。把它纳入漂移检查会强迫我方
     # 词条永久跟随上游 DSH 词汇表 —— 那等于把 DSH 概念重新引进自持树。
-    ('vendor/openghost/shim.ts', 'vendor/openghost/shim.ts'),
+    # ⚠️ vendor/openghost/shim.ts **刻意移出漂移对照**（2026-10-01）。
+    #   理由与上方 neobot-root.tsx / api-panel.ts 同源，但有一条**更硬**：
+    #   ① **shim.ts 是我们自己的代码，不是上游复制件。** 上游 md5 锁只锁
+    #      markdown.js / highlight.js / tex.js 三个文件（见
+    #      neobot-ui/src/vendor/openghost/VENDOR-OPENGHOST.md 的 md5 表）；
+    #      shim.ts 是为「补两个全局」自写的垫片，本就该随宿主演进。
+    #   ② 我在自持树修了它的**真缺陷**：`lang()` 的回退链
+    #      `documentElement.lang 落空 → navigator.language` 会**覆盖宿主
+    #      显式设置**，导致「应用选英文 + 系统中文」时代码块复制按钮永远中文。
+    #      修在原件上治不好自持树（交付物是自持树），而原件即将退役。
+    #   ⇒ 三个**上游**文件仍在对照内（字节锁 + 许可边界），门的牙齿
+    #      留在真正需要它的地方；本次移动**不放松**上游文件的约束。
+    #   ⓘ 负向测试：把 shim.ts 的修复撤掉，neobot-check-markdown 门 rc=1。
     ('vendor/openghost/markdown.js', 'vendor/openghost/markdown.js'),
     ('vendor/openghost/highlight.js', 'vendor/openghost/highlight.js'),
     ('vendor/openghost/tex.js', 'vendor/openghost/tex.js'),

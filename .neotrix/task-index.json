@@ -1107,6 +1107,24 @@
    "read_only": true,
    "when_not": "别按函数叶子名直接数「多少处分歧」—— 必须 owner 相同才是同一函数的两个版本；同名**不同 owner** 是 COLLISION（无关）。且**逐字相同 ≠ 可收敛**：若返回值是 crate 本地类型（Hexagram/FermionState 等），收敛=类型统一，须先做架构决策。owner 判据以「签名含 self」为地面真相。",
    "spec": "docs/architecture/MIRROR-BANK-2026-09-30.md §5 §6"
+  },
+  {
+   "id": "neobot-check-markdown",
+   "query": [
+    "markdown 没渲染",
+    "代码块",
+    "原始标记",
+    "代码块对比度",
+    "复制按钮语言",
+    "md-code",
+    "代码块样式",
+    "消息显示源码"
+   ],
+   "tool": "node scripts/ops/neobot-check-markdown.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "⛔ 别在**只有 user 消息**的桩上判 A —— user 消息按设计显示原文；调消息渲染/代码块/语言切换前跑它取基线",
+   "spec": "A markdown 真渲染成 HTML 且 .nb-md 内**看不到原始标记** ⭐（window.Markdown 一没就静默退化成纯文本，界面不报错、那 100 行 .nb-md CSS 变死 CSS，此前**只有人眼**能发现）· B 标题/粗体/列表/表格/引用/链接/行内码都产生元素 · C 代码块不撑破气泡 · D 长行 overflow-x:auto 且 scrollW>clientW（⛔ overflow:hidden 会把内容**裁掉**，不算过）· E 复制按钮 aria-label 非空 · F 代码文字对比度≥4.5 **深浅都查**（ⓘ 既有对比度门完全没覆盖代码块）· G 文案跟随应用语言 · H 零异常。ⓘ 夹具坑：markdown 只能放 assistant 消息；selectOption 别 .catch 吞错（select 带 disabled={busy}，超时会伪装成「文案没变」）"
   }
  ],
  "excluded": {
