@@ -974,6 +974,23 @@
    "read_only": true,
    "when_not": "判断某个具体函数怎么实现时不要用它（那是 locate 的事）；契约表大改后第一次跑要同时看 DROPPED/PENDING 是否需重估——本门是**后端实现的函数**，实现了新命令会让相关域从 DEAD 转向不可下架",
    "spec": "判据：按域聚合 invoke 调用 × 契约表状态；ALIVE/DEAD/MIXED 三态 + DROPPED(显式下架)/PENDING(挂里程碑未建)/未登记(门红) 分类。归属按 md5 内容同一性，**不按文件名**（同名≠同符号）"
+  },
+  {
+   "id": "neobot-msg-virtual",
+   "query": [
+    "消息窗口化",
+    "消息虚拟化",
+    "滚不回去",
+    "自动滚底",
+    "长会话",
+    "消息列表卡",
+    "虚拟列表"
+   ],
+   "tool": "node scripts/ops/neobot-msg-virtual.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "改 neobot-root 的消息渲染前先跑它取基线；**判据 C 区分不出 scrollToIndex 与 scrollTop**（浏览器会把 scrollTop 钳到底部），要验「用的是哪种」得另设判据",
+   "spec": "1000 条消息下判据 A(渲染行数) B(撑高>2000px) C(末条在视口) D(滚顶后首条可见=内容可达，最不可替代) + 无未捕获异常"
   }
  ],
  "excluded": {

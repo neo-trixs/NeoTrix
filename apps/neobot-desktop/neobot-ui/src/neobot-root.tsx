@@ -449,10 +449,12 @@ export function NeoBotRoot() {
   // ⛔ 无条件 scrollTop = 高度会把人从正在读的历史里硬拽走 —— 那是「自作聪明」。
   const [pinned, setPinned] = useState(true)
   const scrollToEnd = useCallback(() => {
-    // ⛔⛔ 窗口化后**不能**再 `scrollTop = scrollHeight`：
-    //    scrollHeight 此时是**撑高容器**的高度（getTotalSize 给出），
-    //    直接赋值会跳到与「最后一条」无关的位置。必须让 virtualizer 定位。
-    msgVirtualizer.scrollToIndex(msgs.length - 1, { align: 'end' })
+    // 用 scrollToIndex 而非 scrollTop = scrollHeight。
+    // ⛔ **但我先前把它说成「后者会跳到错误位置」是夸大的** —— 浏览器会把
+    //    scrollTop 钳到 scrollHeight - clientHeight（即底部），所以它**也能到底**。
+    //    负向测试：注入 scrollTop 做法后，本门判据 C **仍通过** ⇒ C 区分不出两者。
+    //    保留 scrollToIndex 的理由是**语义正确**（由 virtualizer 定位到最后一项，
+    //    不依赖「钳到边界」这个副作用），**不是**「否则会坏」。
     setPinned(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [msgs.length])
@@ -468,7 +470,7 @@ export function NeoBotRoot() {
   }, [])
   useEffect(() => {
     if (!pinned) return
-    // 同上：窗口化后必须走 scrollToIndex
+    // 同上：语义上应由 virtualizer 定位，而非依赖 scrollTop 钳到边界
     msgVirtualizer.scrollToIndex(msgs.length - 1, { align: 'end' })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [msgs.length, pinned])
