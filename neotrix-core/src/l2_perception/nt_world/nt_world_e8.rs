@@ -38,6 +38,13 @@ pub use super::super::nt_core_e8::nt_e8_constants::{
     DAYAN_NUMBER, E8_DIM, OBSERVABLE_DOF, OBSERVER_DOF,
 };
 
+// `RESONANCE_THRESHOLD` 同样收敛（2026-09-30）：全仓曾有 4 份同值副本，本文件
+// 是其中一份。语义与 gwt 侧一致（「hamming ≤ 2 即共振」），真身在
+// `neotrix_types::core::nt_core_gwt::resonance`。⛔ 注意本文件另有 7 个
+// `PERIOD_*` / `RESONANCE_THRESHOLD` 之外的 world 自有周期量（如 `PERIOD_360`），
+// 那些**不重复**，保留本地定义。
+pub use neotrix_types::core::nt_core_gwt::resonance::RESONANCE_THRESHOLD;
+
 /// 时间周期: 12 (地支)
 pub const PERIOD_12: f64 = 12.0;
 
@@ -52,9 +59,6 @@ pub const PERIOD_360: f64 = 360.0;
 
 /// 时间周期: 129600 (元)
 pub const PERIOD_129600: f64 = 129600.0;
-
-/// 共振阈值 (汉明距离 ≤ 2)
-pub const RESONANCE_THRESHOLD: u32 = 2;
 
 // ============================================================
 // Hadamard 变换 (内部用定长数组)

@@ -39,7 +39,15 @@ pub fn compute_semantic_entropy(data: &[f64]) -> f64 {
 }
 
 /// Maximum resonance distance (hamming dist ≤ 2 → in resonance).
-pub const RESONANCE_THRESHOLD: u32 = 2;
+/// 最大共振距离（hamming ≤ 2 → 共振）。真身统一在
+/// `neotrix_types::core::nt_core_gwt::resonance::RESONANCE_THRESHOLD`。
+///
+/// 单点真身收敛（2026-09-30）：全仓曾有 **4 份**同值同概念的副本
+/// （types 侧 gwt、本文件、`nt_world_e8.rs`、`nt_game/hex_crucible.rs`），
+/// 语义都是「hamming 距离 ≤ 阈值即共振」⇒ 属同一概念的影子复写。
+/// 由 `nt_const_dup.py` 扫出（同名同类型同值，4 文件）后逐处核实语义一致。
+/// 转出而非删除：它是既有公开 API 路径（`pub`），转出消除重复且不破坏调用方。
+pub use neotrix_types::core::nt_core_gwt::resonance::RESONANCE_THRESHOLD;
 
 /// Number of specialist modules.
 pub const MODULE_COUNT: usize = 15;

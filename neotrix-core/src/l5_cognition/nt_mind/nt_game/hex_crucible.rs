@@ -41,8 +41,12 @@ use super::framework::{Action, Actor, ActorId, Observation, Role, StepResult, Tu
 
 /// Maximum number of lines (bits) per hexagram cell.
 pub const MAX_LINES: usize = 6;
-/// Resonance threshold — two cells resonate if hamming distance ≤ threshold.
-pub const RESONANCE_THRESHOLD: u32 = 2;
+/// 共振阈值 —— 两格 hamming 距离 ≤ 阈值即共振。
+///
+/// 单点真身收敛（2026-09-30）：本常量曾与 GWT 侧各定义一次（全仓 4 份副本）。
+/// 本游戏的「共振」规则与 GWT 的模块共振**是同一条规则**（hamming ≤ 2）
+/// ⇒ 引用真身而非复制定义。转出以保留既有公开路径。
+pub use neotrix_types::core::nt_core_gwt::resonance::RESONANCE_THRESHOLD;
 /// Energy cost for claiming a cell.
 pub const CLAIM_COST: f64 = 1.0;
 /// Energy cost for transforming a hexagram line.
