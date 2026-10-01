@@ -1,6 +1,35 @@
 > # NeoTrix TODO 列表
-> 智能同步生成，最后更新：**2026-09-30（副本漂移审计器 + 抓到 3 个真缺陷）**
+> 智能同步生成，最后更新：**2026-09-30（审计能力前置引导：修「能力不可分发」）**
 >
+> ## 🔴 P0 已修（本会话最重要的结构性缺陷）审计能力**别人用不了**
+> >
+> > 本会话交付的 6 个工具（`nt_decompose` · `nt_parity_ref` · `nt_fn_drift` ·
+> > `nt_dup_dead` · `nt_callgraph` · `nt_calledges`）**全部**依赖
+> > `.project-map/edges-*.jsonl`，而该目录 **gitignored**（.gitignore:293）
+> > 且 **Makefile 无任何生成目标**、全量抽取 ~30min/168MB
+> > ⇒ **干净检出上这套能力等于零** —— 只有原机器能用。
+> >
+> > 已修：`scripts/ops/nt_audit_bootstrap.sh` + Makefile `audit-edges*` 目标。
+> > 实测 quick scope **11/11 成功**（约 2-4 分钟，单 crate ~13s），
+> > 并在 per-crate db 上实测 fn_drift / dup_dead 均可用。
+> > full scope（~30min）只用于跨 crate 全局分诊，⛔ 不进 CI；`--list` 亚秒级可进 CI。
+> >
+> > ⚠️ 顺带记一个我写出的**静默失败**：v1 用 `os.getcwd()` 解析 member，
+> > 换目录调用时解析出 0 个并报「0 成功 / 0 失败」——**零产出伪装成成功**。
+> > 已改为从脚本自身位置推导 REPO，且「一个 member 都不存在」变成 rc≠0。
+> >
+> > ### ✅ 我自己写下的 P1 疑点，实测**证否**（留下结论，不留误导）
+> > 我一度怀疑「quick 的 per-crate 边表不含跨 crate 边 ⇒ 只跑 quick 会低估影响面」。
+> > **实测否掉**：per-crate 边表里**跨 crate 边占绝大多数** ——
+> > neobot-desktop: same-crate 226 / cross-crate **2008**；
+> > neotrix-audit: 13 / **726**。
+> > 原因：THIR 的 `FnDef(DefId)` 对**被调方**照样解析，抽取不需要被调方源码
+> > 与调用方同 crate ⇒ 单 crate 一趟就把跨 crate 调用边全拿到了。
+> > ⇒ **quick scope 不低估影响面**。`full` 的真正用途是
+> > **合并 11 个 crate 的调用者侧**，让 fn_drift 的副本发现能跨 crate 比对
+> > （815 对里大量跨 crate，单 crate db 看不到）。
+> >
+
 > ## ✅ 2026-09-30 副本漂移审计（fn-drift）—— 首轮即抓到 3 个真缺陷
 > >
 > > **审计缺口**：本仓有 `nt_dup_types`（重复**类型**），
