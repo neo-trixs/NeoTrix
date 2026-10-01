@@ -1,1145 +1,1145 @@
 {
-  "_about": "任务→工具机器索引。解决「日常任务要跑哪个脚本」需全文读 AGENTS.md 的问题。 2026-09-29：check-doc-drift 增加根文档死链档。 2026-09-29：新增 check-untracked-assets（R-EXIST-1 未入库资产门，39→40 条）。 2026-09-29：新增 check-unwrap 生产 panic 棘轮（40→41 条）。\n2026-09-30：新增 check-feature-gates（feature 门控编译门，6 个非默认 feature）。\n2026-09-30：新增 check-silent-failure（静默失败棘轮，44 条基线）。\n2026-09-30：新增 absorb-live（已吸收技术存活率，MAP-TASKS 为单一事实源）。",
-  "_schema": {
-    "id": "任务意图的稳定 slug（小写连字符）",
-    "query": "自然语言触发词数组 —— agent 用它做匹配",
-    "tool": "可直接执行的命令（相对仓库根）",
-    "kind": "gate | locate | ops | absorb | oneoff",
-    "read_only": "true 表示不产生副作用，可放心试跑",
-    "when_not": "明确的禁用条件 —— 吸收 awesome-autoresearch「领养前检查表」的反面：不列何时别用，agent 会误用",
-    "spec": "可选，指向规范条目（如 R-DISK-1）"
+ "_about": "任务→工具机器索引。解决「日常任务要跑哪个脚本」需全文读 AGENTS.md 的问题。 2026-09-29：check-doc-drift 增加根文档死链档。 2026-09-29：新增 check-untracked-assets（R-EXIST-1 未入库资产门，39→40 条）。 2026-09-29：新增 check-unwrap 生产 panic 棘轮（40→41 条）。\n2026-09-30：新增 check-feature-gates（feature 门控编译门，6 个非默认 feature）。\n2026-09-30：新增 check-silent-failure（静默失败棘轮，44 条基线）。\n2026-09-30：新增 absorb-live（已吸收技术存活率，MAP-TASKS 为单一事实源）。",
+ "_schema": {
+  "id": "任务意图的稳定 slug（小写连字符）",
+  "query": "自然语言触发词数组 —— agent 用它做匹配",
+  "tool": "可直接执行的命令（相对仓库根）",
+  "kind": "gate | locate | ops | absorb | oneoff",
+  "read_only": "true 表示不产生副作用，可放心试跑",
+  "when_not": "明确的禁用条件 —— 吸收 awesome-autoresearch「领养前检查表」的反面：不列何时别用，agent 会误用",
+  "spec": "可选，指向规范条目（如 R-DISK-1）"
+ },
+ "tasks": [
+  {
+   "id": "check-layer-deps",
+   "query": [
+    "分层",
+    "层依赖",
+    "layer",
+    "架构分层",
+    "L0 L6",
+    "依赖方向",
+    "层归属违规"
+   ],
+   "tool": "bash scripts/check-layer-deps.sh --strict",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "不要用它判层归属对错 —— 那是 .neotrix/layer-map.json 的职责；本门只查依赖方向",
+   "spec": "AGENTS.md 三道闸"
   },
-  "tasks": [
-    {
-      "id": "check-layer-deps",
-      "query": [
-        "分层",
-        "层依赖",
-        "layer",
-        "架构分层",
-        "L0 L6",
-        "依赖方向",
-        "层归属违规"
-      ],
-      "tool": "bash scripts/check-layer-deps.sh --strict",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "不要用它判层归属对错 —— 那是 .neotrix/layer-map.json 的职责；本门只查依赖方向",
-      "spec": "AGENTS.md 三道闸"
-    },
-    {
-      "id": "check-truth-surface",
-      "query": [
-        "truth",
-        "空文件",
-        "0字节",
-        "未声明测试",
-        "假实现",
-        "stub",
-        "空壳"
-      ],
-      "tool": "bash scripts/check-truth-surface.sh --strict",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "",
-      "spec": "AGENTS.md 三道闸"
-    },
-    {
-      "id": "check-naming",
-      "query": [
-        "命名",
-        "naming",
-        "nt_前缀",
-        "前缀规范",
-        "文件名规范"
-      ],
-      "tool": "bash scripts/check-naming.sh",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "advisory 而已 —— 规约 vs 现实差 1,646 个文件，该规约无约束力，PASS 不代表合规",
-      "spec": "AGENTS.md 三道闸"
-    },
-    {
-      "id": "check-forbid-coverage",
-      "query": [
-        "unsafe",
-        "forbid",
-        "安全边界",
-        "unsafe_code"
-      ],
-      "tool": "bash scripts/check-forbid-coverage.sh",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "",
-      "spec": "R-P1 零 unsafe"
-    },
-    {
-      "id": "check-skill-gate",
-      "query": [
-        "skill 门",
-        "技能门",
-        "三段式",
-        "frontmatter",
-        "skill 合规"
-      ],
-      "tool": "bash scripts/check-skill-gate.sh",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "别用 --strict —— 存量 58/58 全红会逼你批量改存量而非修真问题；要卡新接入用 --adopt",
-      "spec": "P0-2"
-    },
-    {
-      "id": "check-fresh-build",
-      "query": [
-        "干净构建",
-        "fresh build",
-        "能不能编译",
-        "CI 会不会红",
-        "干净检出"
-      ],
-      "tool": "bash scripts/check-fresh-build.sh",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "脏工作树下测出的结论**不可信** —— 本脚本会自动开临时 worktree 当测量台，必须让它跑完",
-      "spec": "LESSONS-20260928-fresh-checkout.md"
-    },
-    {
-      "id": "check-doc-drift",
-      "query": [
-        "文档漂移",
-        "doc drift",
-        "缺模块注释",
-        "//! 缺失",
-        "根文档死链",
-        "README 死链"
-      ],
-      "tool": "bash scripts/check-doc-drift.sh",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "advisory，永不拦门。两档：① nt_*.rs 缺 //! 模块文档（账本 scripts/doc-drift-baseline.txt）；② 根 6 文档（AGENTS/README/DOCUMENTATION-MAP/CONTRIBUTING/RUST-STANDARDS/TODO）里的仓库内路径死链。⛔ 命中「已删/已废止/已归档/已失效」语境的提及会被跳过 —— 那是 TODO.md 的历史记录，判红会逼人删历史。现存 14 条死链全来自 TODO.md 既存悬空指针，CI 与 pre-commit 均走 advisory，不阻断。",
-      "spec": "R-P232；2026-09-29 新增根文档死链档"
-    },
-    {
-      "id": "audit-lock",
-      "query": [
-        "死锁",
-        "deadlock",
-        "自死锁",
-        "锁审计",
-        "mutex 卡死",
-        "锁没释放"
-      ],
-      "tool": "python3 scripts/ops/nt_lock_audit.py neotrix-core/src",
-      "kind": "ops",
-      "read_only": true,
-      "when_not": "**报了不等于有 bug** —— 2026-09-27 实测 12 条里 2/3 是误报（作者已显式 drop()）。必须逐条读现场证实或证伪再动代码",
-      "spec": "R-SCAN-1 / R-SCAN-2 / R-SCAN-3"
-    },
-    {
-      "id": "locate",
-      "query": [
-        "在哪",
-        "找文件",
-        "定位",
-        "定点",
-        "这个函数在哪",
-        "locate",
-        "哪个文件"
-      ],
-      "tool": "python3 scripts/ops/nt_locate.py --component <组件名>",
-      "kind": "locate",
-      "read_only": true,
-      "when_not": "索引可能陈旧（--audit 会显示几天前 + N 条缺失）；**陈旧时改用 grep 定点**，别信索引",
-      "spec": "AGENTS.md 微操作公约"
-    },
-    {
-      "id": "worktree-gate",
-      "query": [
-        "worktree",
-        "工作树",
-        "磁盘满",
-        "占空间",
-        "收工",
-        "清理",
-        "脏文件",
-        "未提交改动"
-      ],
-      "tool": "sh scripts/ops/nt_worktree_gate.sh check",
-      "kind": "ops",
-      "read_only": true,
-      "when_not": "**禁止手删 worktree 目录**（rm -rf .worktrees/*）—— 850 处未提交改动不在任何提交里。删必须走 prune（内建双闸 + patch 兜底）",
-      "spec": "R-DISK-1~8 / 收工义务"
-    },
-    {
-      "id": "worktree-clean",
-      "query": [
-        "worktree 清 target",
-        "删编译产物",
-        "释放磁盘"
-      ],
-      "tool": "sh scripts/ops/nt_worktree_gate.sh clean",
-      "kind": "ops",
-      "read_only": false,
-      "when_not": "有 cargo 在跑时脚本会让位（R-DISK-4）；主 target 会立刻被 build gate 重建",
-      "spec": "R-DISK-4"
-    },
-    {
-      "id": "worktree-prune",
-      "query": [
-        "删 worktree",
-        "移除工作树",
-        "prune"
-      ],
-      "tool": "sh scripts/ops/nt_worktree_gate.sh prune --force",
-      "kind": "ops",
-      "read_only": false,
-      "when_not": "只删**双闸通过**的（脏=0 且 HEAD 已合入）；近 3h 有改动的会被跳过（疑似他窗在用）",
-      "spec": "R-DISK-2/5/7"
-    },
-    {
-      "id": "mem-gate",
-      "query": [
-        "内存",
-        "OOM",
-        "swap",
-        "跑不动",
-        "内存不够",
-        "重型构建"
-      ],
-      "tool": "sh scripts/ops/nt_mem_gate.sh; echo $?",
-      "kind": "ops",
-      "read_only": true,
-      "when_not": "exit 2 = BLOCKED，此时**禁止**起重型 cargo（先停重活或等 sidecar）",
-      "spec": "AGENTS.md 三道闸"
-    },
-    {
-      "id": "sidecar",
-      "query": [
-        "sidecar",
-        "推理服务",
-        "llama",
-        "本地模型",
-        "8149"
-      ],
-      "tool": "sh scripts/ops/nt_sidecar.sh status",
-      "kind": "ops",
-      "read_only": true,
-      "when_not": "用完即停；常驻会挤占 16G 机器内存导致 cargo 被 OOM 杀",
-      "spec": "LOCAL-LLAMA-2026-09-28.md"
-    },
-    {
-      "id": "project-map",
-      "query": [
-        "项目地图",
-        "codemap",
-        "全仓索引",
-        "代码地图",
-        "map"
-      ],
-      "tool": "make project-map",
-      "kind": "locate",
-      "read_only": true,
-      "when_not": "产物在 .project-map/，同样是快照 —— 会随编辑漂移，重要结论要重新生成"
-    },
-    {
-      "id": "crystal-graph-audit",
-      "query": [
-        "晶体图",
-        "记忆图",
-        "crystal",
-        "知识图谱体检",
-        "hubs",
-        "度数"
-      ],
-      "tool": "python3 scripts/ops/nt_graph_audit.py",
-      "kind": "ops",
-      "read_only": true,
-      "when_not": "口径刻意与 Rust nt_graph_index::Adjacency 对齐做**交叉验证** —— 两边数字不一致才是真信号，单边看会误判"
-    },
-    {
-      "id": "weights-manifest",
-      "query": [
-        "模型权重",
-        "weights",
-        "models 账本",
-        "权重校验",
-        "备份权重"
-      ],
-      "tool": "bash scripts/ops/nt_weights_manifest.sh status",
-      "kind": "ops",
-      "read_only": true,
-      "when_not": "models/ 是 gitignored 的 ⇒ **git 保护不到它**，任何删除都不可恢复。provenance 子命令可对照上游 LFS oid 逐字节验证"
-    },
-    {
-      "id": "experience-smoke",
-      "query": [
-        "经验树冒烟",
-        "KB 回路",
-        "experience 冒烟"
-      ],
-      "tool": "bash scripts/experience-smoke.sh",
-      "kind": "ops",
-      "read_only": false,
-      "when_not": "它会写临时 HOME（隔离），不会污染真实 KB"
-    },
-    {
-      "id": "audit-all",
-      "query": [
-        "全部检查",
-        "跑所有门",
-        "全量审计",
-        "提交前检查"
-      ],
-      "tool": "make audit-all",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "6 个门聚合，其中多数 advisory；要 blocking 结论请逐个跑对应 --strict"
-    },
-    {
-      "id": "check-test-baseline",
-      "query": [
-        "测试基线",
-        "test baseline",
-        "红测试",
-        "新增失败",
-        "测试挂了"
-      ],
-      "tool": "bash scripts/check-test-baseline.sh --strict",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "账本为空（0 字节）⇒ 任何新失败即红。若你有意的 flaky 未登记，会被打回；先修或明确 ignore",
-      "spec": "CI ci.yml"
-    },
-    {
-      "id": "check-supply-iocs",
-      "query": [
-        "供应链",
-        "IOC",
-        "恶意包",
-        "依赖投毒",
-        "license 卫生",
-        "cargo-deny"
-      ],
-      "tool": "bash scripts/check-supply-iocs.sh",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "其 advisory B（license 卫生）已被 deny.toml + .github/workflows/deny.yml 覆盖 ⇒ 别两边都当权威",
-      "spec": "deny.toml"
-    },
-    {
-      "id": "check-build-surface",
-      "query": [
-        "build.rs",
-        "proc-macro",
-        "build 依赖",
-        "构建面"
-      ],
-      "tool": "bash scripts/check-build-surface.sh",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "advisory；--strict 备用"
-    },
-    {
-      "id": "check-fuzz-ready",
-      "query": [
-        "fuzz",
-        "模糊测试",
-        "cargo-fuzz",
-        "语料"
-      ],
-      "tool": "bash scripts/check-fuzz-ready.sh",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "恒 exit 0 的探针，只报告就绪度"
-    },
-    {
-      "id": "check-api-surface",
-      "query": [
-        "API 盘点",
-        "tauri command",
-        "axum route",
-        "OpenAPI",
-        "api 面"
-      ],
-      "tool": "bash scripts/check-api-surface.sh",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "面缺失时脚本报 `?` 并 exit 3 —— **标 ? 的数字不可解读，别当 0 用**。若看到 tauri=0，那是事实（桌面端已随 5c02e738 归档），不是扫描失败",
-      "spec": "已知缺陷，待修"
-    },
-    {
-      "id": "wait-for-cargo",
-      "query": [
-        "等构建",
-        "cargo 在跑",
-        "构建锁",
-        "等编译完",
-        "轮询构建"
-      ],
-      "tool": "bash scripts/wait-for-cargo.sh",
-      "kind": "ops",
-      "read_only": true,
-      "when_not": "它只轮询不 kill；真要停用 nt_mem_gate.sh 或人工判断",
-      "spec": "R-ENV-1"
-    },
-    {
-      "id": "git-safe-reset",
-      "query": [
-        "安全 reset",
-        "误 checkout",
-        "误 stash pop",
-        "恢复误删",
-        "覆盖事故"
-      ],
-      "tool": "bash scripts/git-safe-reset.sh",
-      "kind": "ops",
-      "read_only": false,
-      "when_not": "**改前先读 git status --porcelain** —— 2026-09-22 三次覆盖事故的教训：stash pop / checkout -- 会静默吞掉未提交改动",
-      "spec": "AGENTS.md 并行公约"
-    },
-    {
-      "id": "manifest",
-      "query": [
-        "结论记录",
-        "环境指纹",
-        "stale",
-        "假证据",
-        "在哪个环境验证",
-        "manifest"
-      ],
-      "tool": "python3 scripts/ops/nt_manifest.py list",
-      "kind": "ops",
-      "read_only": true,
-      "when_not": "别用它当任务索引用（那是 nt_find.py 的活）；它记的是**结论 + 其环境**",
-      "spec": "Context Manifest"
-    },
-    {
-      "id": "find",
-      "query": [
-        "该跑什么",
-        "用什么工具",
-        "查工具",
-        "怎么查",
-        "找脚本",
-        "任务索引"
-      ],
-      "tool": "python3 scripts/ops/nt_find.py <你的问题>",
-      "kind": "ops",
-      "read_only": true,
-      "when_not": "**先查它再动手** —— 索引外的手写重复实现是本仓反复出现的问题（nt_mapgen.py vs nt_core_code_search.rs）",
-      "spec": "task-index"
-    },
-    {
-      "id": "crystal-ingest-verify",
-      "query": [
-        "吸收验收",
-        "cocoons 验收",
-        "摄入校验",
-        "8 项验收",
-        "M-id 唯一"
-      ],
-      "tool": "python3 scripts/ops/nt_cocoons_verify_absorb.py",
-      "kind": "absorb",
-      "read_only": true,
-      "when_not": "**刻意不复用生产代码函数** —— 生产脚本自证 ≠ 独立验收。这是设计不是缺陷，别去「重构」它",
-      "spec": "consciousness.rs:39-56 为权威枚举"
-    },
-    {
-      "id": "jev-live-eval",
-      "query": [
-        "jev 评测",
-        "判分器准确率",
-        "MRR",
-        "随机基线",
-        "真实标答"
-      ],
-      "tool": "python3 scripts/ops/nt_jev_live_eval.py",
-      "kind": "absorb",
-      "read_only": true,
-      "when_not": "首次调用需 `cargo build -p neotrix --bin nt_keywords`（数分钟）——断链 import 已修为调 Rust 权威分词，**不要**改回 Python 重写",
-      "spec": "已知缺陷，待修"
-    },
-    {
-      "id": "scan-surface",
-      "query": [
-        "扫描面",
-        "扫描器失效",
-        "假 0",
-        "路径不存在",
-        "死引用",
-        "扫描面缺失"
-      ],
-      "tool": "python3 scripts/ops/nt_scan_surface.py",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "退出码非 0 表示有扫描面已消失 ⇒ 该扫描器会输出**看似正常的 0**。先看 KNOWN-GONE 是否已解释；未解释的须人工确认",
-      "spec": "路径不存在 ≠ 该面为空"
-    },
-    {
-      "id": "qwen-mm-setup",
-      "query": [
-        "多模态",
-        "看图",
-        "读视频",
-        "visualize",
-        "media_info",
-        "qwen-mm",
-        "无key",
-        "multimodal bridge",
-        "NIfTI",
-        "PDF渲染"
-      ],
-      "tool": "bash scripts/ops/nt_qwen_mm_setup.sh",
-      "kind": "ops",
-      "read_only": false,
-      "when_not": "需要联网（github＋pypi 各一次）；search/omni 系工具不在此列 —— 它们要 API key，走 credential 门",
-      "spec": "docs/architecture/ABSORPTION-QWEN-MM-2026-09-28.md §8"
-    },
-    {
-      "id": "dup-types",
-      "query": [
-        "重复类型",
-        "同名类型",
-        "融合",
-        "精简",
-        "该不该合并",
-        "去重",
-        "重复定义"
-      ],
-      "tool": "python3 scripts/ops/nt_dup_types.py",
-      "kind": "ops",
-      "read_only": true,
-      "when_not": "**不要批量自动执行**（2026-09-29 实测失败）。工具的三条判据是必要非充分条件：它**不检查 impl 块**（unified_types 多 9 个 ⇒ Default 冲突）**也不查依赖链**。实测删 15 个类型后 cargo check 报 E0119+E0560。逐组人工验证",
-      "spec": "提供判据，不自动改"
-    },
-    {
-      "id": "mutation-check",
-      "query": [
-        "变异测试",
-        "mutation",
-        "测试有效性",
-        "判别力",
-        "测试是否有效",
-        "杀死变异"
-      ],
-      "tool": "python3 scripts/ops/nt_mutation_check.py --audit <FILE.rs>",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "不要对**尚未全绿**的树跑变异（工具会拒：基线红则无法归因）；也别当覆盖率工具用 —— 它不测行覆盖，只测能否杀死变异。要真正跑请显式给 --fn --mutate --cargo（该模式会改文件再恢复）。",
-      "spec": "R-MUT-1"
-    },
-    {
-      "id": "coverage-gaps",
-      "query": [
-        "零覆盖",
-        "测试覆盖",
-        "没被测过",
-        "死代码",
-        "哪些没测",
-        "coverage",
-        "零真实调用"
-      ],
-      "tool": "python3 scripts/ops/nt_coverage_gaps.py crates/neotrix-neobot/src",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "别把它当覆盖率工具 —— 它只找「测试从未触碰的 pub fn」，不度量行覆盖、不识别「调用了但没断言」（后者用 nt_mutation_check.py）。私有 helper 零覆盖是正常的，它只报 pub fn。",
-      "spec": "R-COV-1"
-    },
-    {
-      "id": "feature-matrix",
-      "query": [
-        "feature 编译",
-        "feature 腐烂",
-        "feature 组合",
-        "cargo feature",
-        "--all-features 失败",
-        "条件编译"
-      ],
-      "tool": "python3 scripts/ops/nt_feature_matrix.py --list",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "别拿它当「修好了」的证明 —— 它**只测量不修复**，报出 4 个失败 feature 后仍需产品决策（删 vs 修 vs 跟依赖升版）。也**别在未全绿的树加 CI 门**（会立刻红）。单 feature 编译 10s~6min，16 个全测很贵，先用 --list 零编译看名单。",
-      "spec": "R-FEAT-1"
-    },
-    {
-      "id": "check-disk",
-      "query": [
-        "磁盘",
-        "disk",
-        "target 太大",
-        "占空间",
-        "清理 target",
-        "incremental"
-      ],
-      "tool": "bash scripts/check-disk.sh",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "advisory，恒 exit 0。只报数不代劳。⛔ R-DISK-1：有 cargo 在跑时绝不可删 target/（会打断他窗构建），门会检测并提示。⛔⛔ 绝不可 rm -rf worktree 目录，走 nt_worktree_gate.sh prune。⚠️ 本门初版因在建议文案里写反引号包裹的 `cargo clean -p <crate>`，干跑时被 shell 当命令替换执行，删掉 115.2GiB —— 写示例命令一律用普通引号。"
-    },
-    {
-      "id": "check-gitleaks-version",
-      "query": [
-        "gitleaks 版本",
-        "密钥扫描版本",
-        "基线版本",
-        "版本错配",
-        "gitleaks 对齐"
-      ],
-      "tool": "bash scripts/check-gitleaks-version.sh",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "CI 里自动跑（secret-scan job 第 3 步，扫描**之前**）。手工跑的场合：① 升级了 CI 的 GITLEAKS_VERSION；② 用本机 gitleaks 重生成了基线；③ 怀疑密钥扫描结果异常。⛔ 规则集变 ⇒ 基线必重生成，且重生成前必须**逐条人工判读**新增项 —— 无脑重生成会把真泄漏写进基线。"
-    },
-    {
-      "id": "check-layout",
-      "query": [
-        "根目录",
-        "目录结构",
-        "乱建文件",
-        "临时文件",
-        "会话笔记",
-        "文档位置",
-        "放哪个目录"
-      ],
-      "tool": "bash scripts/check-layout.sh",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "advisory 起步，账本 scripts/layout-baseline.txt 棘轮。拦**新增**违规、既有记账。三类检查：① 根目录文件/目录白名单（ALLOW_FILES / ALLOW_DIRS，每项附真实消费者）；② neotrix-core/docs/ 只许 YYYY-MM-DD_ 前缀；③ 与 DOCUMENTATION-MAP.md 交叉校验，规范点名但磁盘不存在 ⇒ 报「规范腐化」。⛔ 根目录要放新东西时**先查本门白名单**：有理由就扩 ALLOW_FILES 并写明消费者，别用完就留。⛔ apps/ 与 src-tauri/ 是已知残留（committed 已移除、磁盘 untracked 残留），处置后从 RESIDUAL_KNOWN 删。"
-    },
-    {
-      "id": "check-untracked-assets",
-      "query": [
-        "未入库",
-        "没进git",
-        "没提交",
-        "磁盘上有仓库没有",
-        "干净检出缺文件",
-        "知识流失",
-        "untracked"
-      ],
-      "tool": "bash scripts/check-untracked-assets.sh",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "不要用它判「某文件该不该入库」—— 它只报清单，入库决策按 R-EXIST-3 逐条定性（编译产物/运行时DB/.bak/.disabled/含密钥一律不进）；也不要拿它替代 git status，它只扫受保护目录",
-      "spec": "RUST-STANDARDS.md 17.8 / R-EXIST-1"
-    },
-    {
-      "id": "check-unwrap",
-      "query": [
-        "unwrap",
-        "expect",
-        "panic",
-        "生产禁 unwrap",
-        "panic-free",
-        "崩点",
-        "R-EXIST-4"
-      ],
-      "tool": "bash scripts/check-unwrap.sh",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "不要用它判「某个 unwrap 该不该改成 ?」—— 它是棘轮，只卡新增、不判单点正当性；也不要期待它归零，712 站点存量是明知的独立工程",
-      "spec": "RUST-STANDARDS.md §1 + AGENTS.md 硬规则（实测 2026-09-29 此前零门管）"
-    },
-    {
-      "id": "check-feature-gates",
-      "query": [
-        "feature",
-        "特性",
-        "门控",
-        "cfg feature",
-        "非默认构建",
-        "ios-bridge",
-        "onnx",
-        "编译盲区"
-      ],
-      "tool": "bash scripts/check-feature-gates.sh",
-      "kind": "gate",
-      "read_only": false,
-      "when_not": "不要在日常改码后跑（要 6 次 cargo check）；只有改了 feature 门控的 mod、或改过 Cargo.toml features、或准备提交时跑。也不要拿它判层归属 —— 那是 check-layer-deps 的职责",
-      "spec": "2026-09-30 新增。零命中≠零消费：默认 feature 集不编译的 mod 对默认构建与全套测试完全失明。2026-09-30 由它首次抓到 2 个既存破口（NeoTrixConfig.prefer_free 漏改 3 处，全在 #[cfg(test)]；ort Outlet 私有字段，examples/nt_whisper_spike.rs）。同批把 CI matrix 从 --lib 改成 --all-targets —— 两者原本同样瞎"
-    },
-    {
-      "id": "check-silent-failure",
-      "query": [
-        "静默失败",
-        "silent failure",
-        "吞错误",
-        "let _ =",
-        "丢弃 Result",
-        "假绿灯",
-        "降级",
-        "审计缺口"
-      ],
-      "tool": "bash scripts/check-silent-failure.sh --strict",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "日常改码不必跑（纯静态分析，秒级）；改了落库/发送/落盘的错误处理、或新增 `let _ =` 时跑。也别拿它判 best-effort 策略对错 —— 基线里的 44 条是「已知且有意」，判据在 TODO.md §全量审计",
-      "spec": "2026-09-30 新增。规约来自仓内已有答案 nt_channel_serve.rs:278。门内高信号 44 条，范围外 209 条（remove_file/.send*）显式报出不静默漏。首次运行抓到 4 条 P0，已修 3 条 + agent.rs 1 条"
-    },
-    {
-      "id": "absorb-live",
-      "query": [
-        "吸收存活率",
-        "已落地断言",
-        "吸收审计",
-        "MAP-TASKS 核验",
-        "技术还活着吗",
-        "G5 存活率"
-      ],
-      "tool": "python3 scripts/ops/nt_absorption_live.py [--strict] [--doc PATH]",
-      "kind": "absorb",
-      "read_only": true,
-      "when_not": "只认 MAP-TASKS §1.1（已落地）与 §1.3（已拒绝）两节的反引号 token；ROUND 系列文档不在默认范围。拒绝区名字出现≠复活（多为证伪记录注释），见输出 needs-review 人工复核，不要直接判死",
-      "spec": "docs/architecture/GLOBAL-MAP-DEFECTS-2026-09-30.md 第五部分；只用 rg -F（本机 rg -E 静默返回 0）"
-    },
-    {
-      "id": "nt-callgraph-impact",
-      "query": [
-        "影响面",
-        "blast radius",
-        "爆炸半径",
-        "改这里炸不炸",
-        "谁依赖我",
-        "传递可达",
-        "可达性",
-        "impact_of",
-        "死链",
-        "不可达",
-        "零入边"
-      ],
-      "tool": "python3 scripts/ops/nt_callgraph.py --impact <sym> --db .project-map/edges-all.jsonl [--files]",
-      "kind": "ops",
-      "read_only": true,
-      "when_not": "不要把它当精确答案 —— 报的是静态可达下界：async 派发/trait 动态派发/宏展开看不见，真实影响面 ⊇ 本结果（实测 run_once 反向闭包在深度 1 即终止）。也不要给它的输出建门（G7 裁决）",
-      "spec": "CAPABILITY-GAP-2026-09-30 G4；ABSORPTION-ROUND24"
-    },
-    {
-      "id": "nt-callgraph-unreachable",
-      "query": [
-        "死代码",
-        "死链",
-        "没人调用",
-        "未接线",
-        "导出≠接入",
-        "unreachable",
-        "dead code"
-      ],
-      "tool": "python3 scripts/ops/nt_callgraph.py --unreachable --db .project-map/edges-all.jsonl --crate neotrix",
-      "kind": "ops",
-      "read_only": true,
-      "when_not": "⛔ 不要据它直接删代码。no-callsite 桶含 F3(fn-as-value) 与 F6(图盲区) 假阳性；F1–F6 六类误报源见脚本 docstring。动手前必须逐条读代码证实/证伪（R-SCAN-1）。textual-prod 桶多为同名词碰撞，不是缺陷",
-      "spec": "ABSORPTION-ROUND24"
-    },
-    {
-      "id": "nt-absorption-live-graph",
-      "query": [
-        "吸收存活率",
-        "吸收的技术还活着吗",
-        "导出≠接入",
-        "G5",
-        "存活率",
-        "R-P79 验证"
-      ],
-      "tool": "python3 scripts/ops/nt_absorption_live.py --graph",
-      "kind": "ops",
-      "read_only": true,
-      "when_not": "图判据对 shell 脚本/类型名静默（不是调用目标），覆盖面仍靠文本判据 —— 两者互补不是替代。⚠ 该工具默认模式会报 PASS 而其 docstring 自述「若报全部存活说明判据无效」：默认 PASS 不可当健康证明，必须加 --graph 看接线层",
-      "spec": "CAPABILITY-GAP-2026-09-30 G5；ABSORPTION-ROUND24"
-    },
-    {
-      "id": "nt-decompose-atoms",
-      "query": [
-        "原子级拆解",
-        "拆解技术逻辑",
-        "原子能力单元",
-        "这个入口由哪些原子组成",
-        "外部项目拆解",
-        "decompose"
-      ],
-      "tool": "python3 scripts/ops/nt_decompose.py atoms --db <edges.jsonl> --root <DefId子串> [--depth N] [--out FILE]",
-      "kind": "report",
-      "read_only": true,
-      "when_not": "① root 子串命中多个节点会 rc=2 拒答（宁缺勿错）—— 加长 root 再跑，不要靠 --depth 硬试；② oracle 分类只反映**边表与路径可测信号**：K3 = 符号绑定已证、语义未判，别当语义结论；③ 与 nt_callgraph --deps 遍历重叠，本工具独有的是原子记录（file:line + oracle）与机器可读输出",
-      "spec": "docs/architecture/DECOMPOSE-PARITY-2026-09-30.md §1；selftest 6 正例 + 3 证伪"
-    },
-    {
-      "id": "nt-decompose-parity",
-      "query": [
-        "对方有这个能力吗",
-        "能力矩阵",
-        "差距表",
-        "对位矩阵",
-        "parity"
-      ],
-      "tool": "python3 scripts/ops/nt_decompose.py parity --mine <atoms.json> --theirs <atoms.json> [--out matrix.md]",
-      "kind": "report",
-      "read_only": true,
-      "when_not": "① **名字级对位，不是语义对位** —— 实测已误报（把对方 get 报成「仅对方有」，我方同义方法叫 cache）。异名不等于缺能力，要判行为用 nt-parity-ref；② 不要把它的输出做成门（G7：名字级对位必误报）；③ 对方原子集必须由同一工具在对方代码上生成，手写 JSON 会让矩阵变成自证",
-      "spec": "DECOMPOSE-PARITY-2026-09-30 §2；首次实跑 lru(MIT) vs ResponseCache 抓到 O(n) 淘汰"
-    },
-    {
-      "id": "nt-parity-ref",
-      "query": [
-        "行为对位",
-        "对方产品行为 oracle",
-        "复现对方产品",
-        "参考实现漂移",
-        "behavioural parity",
-        "oracle 采集"
-      ],
-      "tool": "python3 scripts/ops/nt_parity_ref.py --vectors .neotrix/parity/<name>.vectors.json [--check] | --list",
-      "kind": "report",
-      "read_only": false,
-      "when_not": "① 写模式只在本机 cargo registry 里找对方 crate 的已 vendor 副本，找不到就退出 —— 它不联网、不 clone；② 只有 --check 可当门（重跑对方实现并比对已存 oracle，rc=1 = oracle 漂移或说谎；观测一致但元数据变了会明说 IDENTICAL，不算漂移）；③ PASS 只覆盖 vectors 写了的 op 集合，vectors 没写的语义**未被验证**；④ 加新能力必须在 CAPABILITIES 注册适配器，vectors 缺 capability 字段会响亮报错（不许无适配器地编 oracle）",
-      "spec": "DECOMPOSE-PARITY-2026-09-30 §4/§7；neotrix-core/tests/nt_capability_parity.rs（我方侧注册表）"
-    },
-    {
-      "id": "map-reconcile",
-      "query": [
-        "地图过期了",
-        "台账陈旧",
-        "文档数字对不对",
-        "现状还成立吗",
-        "自检文档",
-        "断言核对"
-      ],
-      "tool": "python3 scripts/ops/nt_map_reconcile.py [--doc <path>] [--strict] [--list-predicates]",
-      "kind": "report",
-      "read_only": true,
-      "when_not": "① 谓词只认 ```assert 围栏块里的 6 种廉价确定形式（file/nfile/lit/nlit/test/cmd）—— 行内代码里的 file:xxx 不算；② **不要把「正在自检的工具」写进它自己的断言**（实测无限递归 120s 超时），也不要用 nlit 检查本文件（为解释改动必须引用旧措辞 ⇒ 永远失败）；③ 默认只报告不失败：谓词可能写错，门建在错谓词上比没门更危险（G7），要 rc=1 得显式 --strict；④ file: 谓词含「被 git 跟踪」判定 ⇒ 天然排除他窗在途未提交的工作，地图不该记别人的在途成果",
-      "spec": "docs/architecture/GLOBAL-MAP-DEFECTS-2026-09-30.md §3 断言块（9 条，当日 9/9 HOLDS）"
-    },
-    {
-      "id": "fn-drift",
-      "query": [
-        "重复实现",
-        "函数副本",
-        "副本漂移",
-        "同名不同语义",
-        "语义漂移",
-        "字节切 panic",
-        "字符边界"
-      ],
-      "tool": "python3 scripts/ops/nt_fn_drift.py [--db .project-map/edges-all.jsonl] [--only-different|--units NAME|--list-units] | selftest",
-      "kind": "report",
-      "read_only": true,
-      "when_not": "① 只能发现**同名**副本 —— 跨名漂移（本会话的字节/char levenshtein）抓不到，那种只能靠 nt-parity-ref 的行为对位；② DIFFERENT 里绝大多数是「同名不同域」的合法重复（如 osint::investigate ×15），**不要照 [SHAPE] 或 --units 的 BYTE 标记批量改**（本轮据此判 2 族无罪：truncate_chars 的字节快路径无害、tokenize 规则有意不同）；③ 不是门：判据是文本相等，不足以当正确性判据（G7）；④ 需要 .project-map/edges-*.jsonl（gitignored 低频生成物）",
-      "spec": "GLOBAL-MAP-DEFECTS-2026-09-30 §3.1b；首轮抓到 now_ts 13 副本 2 panic + 2 处 truncate 字节切 panic"
-    },
-    {
-      "id": "mirror-scan",
-      "query": [
-        "跨 crate 重复",
-        "镜像分叉",
-        "两个真身",
-        "types 和 core 重复",
-        "同名模块",
-        "冻结副本"
-      ],
-      "tool": "python3 scripts/ops/nt_mirror_scan.py [--min-overlap 0.5] [--limit N] | selftest",
-      "kind": "report",
-      "read_only": true,
-      "when_not": "⛔ **不要照它删代码**：2026-09-30 实测 neotrix-types 是 core 的冻结旧分叉（18 对 / 185.8 KB / 全部 added=2026-07-06，外部零引用），但 `neotrix-core` 依赖 `neotrix-types` ⇒ **types 无法依赖 core**，所以 types 内部消费者拿不到 core 那份；收敛方向（A: core 为真身 / B: types 为真身）是**架构决策，判据是意图不是文本相似度**。执行清单见 docs/architecture/MIRROR-FORK-2026-09-30.md §5，需 cargo clean 双跑验证",
-      "spec": "MIRROR-FORK-2026-09-30 §3；selftest 4 例（含 2 例证伪：异体不得判同、git 取不到日期必须降级为 ?）"
-    },
-    {
-      "id": "dup-dead",
-      "query": [
-        "纯重复又零接线",
-        "该删哪个副本",
-        "重复函数候选",
-        "零入边",
-        "重复实现清理"
-      ],
-      "tool": "python3 scripts/ops/nt_dup_dead.py [--verbose] | selftest",
-      "kind": "report",
-      "read_only": true,
-      "when_not": "⛔ **不要据此删代码** —— 本轮实测 62 份 IDENTICAL / 10 份零接线，逐条读源码后 **0 条可删**（6 份是 neotrix-types 跨 crate 镜像、4 份签名或域不同）。决定性反证：本仓 nt_callgraph 已有 textual-prod 桶（文本有生产调用点但图零入边）⇒ 静态边表有已知假阴性，「零入边」连「是否有调用点」都不能证明。输出是分诊单，不是删除清单",
-      "spec": "GLOBAL-MAP-DEFECTS-2026-09-30 §3.1b；首轮抓到 now_ts 13 副本 2 panic + 2 处 truncate 字节切 panic"
-    },
-    {
-      "id": "check-license",
-      "query": [
-        "许可",
-        "license",
-        "授权",
-        "商用",
-        "版权",
-        "G6",
-        "SPDX",
-        "vendored 来源",
-        "附加条款"
-      ],
-      "tool": "bash scripts/check-license.sh",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "⛔ 当前 rc=1 是正确状态，不是待修 bug：apps/neobot-desktop/frontend 上游附加条款 No Commercial Secondary Development 待项目所有者裁决（.neotrix/LICENSE-EXCEPTIONS.md）。⛔ 不要为了让门变绿而删 deny 名单或改脚本。门只校验记录一致性，不做法律判断",
-      "spec": "ABSORPTION-ROUND24 G6"
-    },
-    {
-      "id": "nt-absorption-live-all",
-      "query": [
-        "全域存活率",
-        "所有吸收文档",
-        "落地断言有没有活",
-        "31 份没验证",
-        "吸收轮次核对"
-      ],
-      "tool": "python3 scripts/ops/nt_absorption_live.py --all-docs [--graph]",
-      "kind": "ops",
-      "read_only": true,
-      "when_not": "⚠ 报「0 死亡」**不等于**健康：find_file 用「任意 basename 存在即算存活」，判据偏宽（17 条其实是 bare-basename 搬迁，不是死亡）。真信号是 --graph 标出的「导出未接线」项，且那批仍需手验（已实测 5 条里 3 条是文档 token 不精确：mod 声明/英文单词）。C 级文档（无 L-xx 也无 Landings 段，13 份）**故意不凑数**，不参与统计",
-      "spec": "ABSORPTION-ROUND25"
-    },
-    {
-      "id": "nt-api-contract",
-      "query": [
-        "API 契约",
-        "契约表",
-        "前端调不到",
-        "invoke 失败",
-        "SPECS",
-        "接口漂移",
-        "前端重写前",
-        "M3"
-      ],
-      "tool": "python3 scripts/ops/nt_api_contract.py [--advisory|--json]",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "A/B/C 三类才是缺陷；「前端调了契约表标 Stub/Planned 的命令」单列为 C-info，**不是缺陷**（实测 48 条全属刻意不实现的 DSH_ONLY）。⛔ 不要把它当失败项 —— 48 次误报的门会被忽略。另：本门用括号配平解析 Rust，⛔ 勿改回正则（曾因此报出「60 条只注册 1 条」的假警）",
-      "spec": "FRONTEND-REBUILD-2026-10-01 M3"
-    },
-    {
-      "id": "nt-neobot-ui-wiring",
-      "query": [
-        "自持UI",
-        "neobot-ui",
-        "接线",
-        "漂移",
-        "白屏",
-        "openghost",
-        "frontendDist",
-        "自持入口",
-        "商用重构",
-        "M4",
-        "M1",
-        "R2",
-        "外壳",
-        "语言切换",
-        "入口切换",
-        "tauri.conf",
-        "删树"
-      ],
-      "tool": "python3 scripts/ops/nt_neobot_ui_wiring.py",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "改 vendored frontend 内部逻辑时不要用它（那是上游代码，不归本门）；漂移报警且**原件 mtime 更新**时不要贸然同步 —— 他窗在途改动，同步会竞速 入口已切到 neobot-ui 后，**别再用 `pnpm run build`（无 --prefix）** —— Tauri 在 tauri.conf.json 所在目录执行，那里没有 package.json",
-      "spec": "FRONTEND-REBUILD R1/R5；rc=0 才算接线完整，5 项检查：复制件漂移 / 入口无 @/ 上游别名与 ../ 逃逸 / vite base 为相对路径（默认 '/' 在 file:// 下白屏且构建不报错）/ 产物无上游特征符 / openghost 已迁出受限树"
-    },
-    {
-      "id": "neobot-ui-smoke",
-      "query": [
-        "白屏",
-        "渲染",
-        "运行时",
-        "冒烟",
-        "产物可用",
-        "构建绿",
-        "base",
-        "favicon",
-        "渲染失败",
-        "#root为空"
-      ],
-      "tool": "node scripts/ops/neobot-ui-smoke.mjs",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "改 Rust 后端或 Tauri 桥时不要用它（浏览器里没有 Tauri IPC，桩只验渲染不验桥接）；产物没构建过（dist/ 不存在）时先 `vite build`",
-      "spec": "判据三条：#root 被真实填充 / 无未捕获错误 / 无资源加载失败（按 URL 判定，不靠 console 文本——文本是泛化的不含 URL）。首次报「未渲染」是桩返回 null 而契约声明 T[] 所致，非产品缺陷"
-    },
-    {
-      "id": "nt-feature-viability",
-      "query": [
-        "功能下架",
-        "会丢功能",
-        "功能平价",
-        "pet",
-        "下架决策",
-        "切入口",
-        "M6",
-        "功能存活",
-        "静默丢弃"
-      ],
-      "tool": "python3 scripts/ops/nt_feature_viability.py",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "判断某个具体函数怎么实现时不要用它（那是 locate 的事）；契约表大改后第一次跑要同时看 DROPPED/PENDING 是否需重估——本门是**后端实现的函数**，实现了新命令会让相关域从 DEAD 转向不可下架",
-      "spec": "判据：按域聚合 invoke 调用 × 契约表状态；ALIVE/DEAD/MIXED 三态 + DROPPED(显式下架)/PENDING(挂里程碑未建)/未登记(门红) 分类。归属按 md5 内容同一性，**不按文件名**（同名≠同符号）"
-    },
-    {
-      "id": "neobot-msg-virtual",
-      "query": [
-        "消息窗口化",
-        "消息虚拟化",
-        "滚不回去",
-        "自动滚底",
-        "长会话",
-        "消息列表卡",
-        "虚拟列表"
-      ],
-      "tool": "node scripts/ops/neobot-msg-virtual.mjs",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "改 neobot-root 的消息渲染前先跑它取基线；**判据 C 区分不出 scrollToIndex 与 scrollTop**（浏览器会把 scrollTop 钳到底部），要验「用的是哪种」得另设判据",
-      "spec": "1000 条消息下判据 A(渲染行数) B(撑高>2000px) C(末条在视口) D(滚顶后首条可见=内容可达，最不可替代) + 无未捕获异常"
-    },
-    {
-      "id": "neobot-check-contrast",
-      "query": [
-        "对比度",
-        "可读性",
-        "深浅两档",
-        "浅色看不清",
-        "WCAG",
-        "AA",
-        "暗色分级",
-        "文字太淡"
-      ],
-      "tool": "node scripts/ops/neobot-check-contrast.mjs",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "调色**前**先跑它取基线；它只量选定选择器，新增文案若不在 TARGETS 里不会被量到（要量别的得先加进 TARGETS）",
-      "spec": "WCAG 相对亮度比；正文≥4.5:1、大字/UI≥3.0:1；深浅两档都过。量 computed color vs 实际生效背景（向上找首个非透明 bg），不是 CSS 变量值"
-    },
-    {
-      "id": "neobot-check-convo-groups",
-      "query": [
-        "侧栏分组",
-        "最近活跃",
-        "折叠",
-        "会话列表",
-        "找不到会话",
-        "组头"
-      ],
-      "tool": "node scripts/ops/neobot-check-convo-groups.mjs",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "改侧栏**项**样式前跑它取基线；它的 D 项（虚拟化）只在大列表下生效，小列表由 neobot-ui-smoke 的「千条」场景把关",
-      "spec": "A 组头出现且带计数 / B 默认展开 / C 折叠**局部**生效（减少数必须等于该组条数，'全部消失'也会被抓）/ D 大列表下虚拟化成立 / E 组头是 BUTTON 且 aria-expanded 正确"
-    },
-    {
-      "id": "neobot-check-theme-persist",
-      "query": [
-        "主题不持久",
-        "主题重置",
-        "深色又变浅",
-        "主题选择丢失",
-        "get_dsh_theme",
-        "DSH 命名债"
-      ],
-      "tool": "node scripts/ops/neobot-check-theme-persist.mjs",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "调主题**默认档**前跑它取基线；它只验「跨刷新持久」与「不再调 get_dsh_theme」，不验色值本身（那是 neobot-check-contrast 的事）",
-      "spec": "A/B 选深/浅后**刷新**仍在（⛔ 必须跨刷新：覆盖 bug 发生在挂载时，同会话比较看不出）· C 选择器存在 · D 自持树 invoke 里 get_dsh_theme = 0 次。ⓘ 实测：headless 系统默认浅 ⇒ 只测「浅色」会假通过，双向才抓得到"
-    },
-    {
-      "id": "neobot-check-msg-copy",
-      "query": [
-        "气泡复制",
-        "悬停复制",
-        "消息复制按钮",
-        "复制没反应",
-        "键盘复制",
-        "is-copied"
-      ],
-      "tool": "node scripts/ops/neobot-check-msg-copy.mjs",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "调消息气泡布局/间距前跑它取基线；它只验复制按钮的显隐/可达/落剪贴板，**不验**气泡长文本排版",
-      "spec": "A 默认 opacity:0+pointer-events:none+position:absolute · B 悬停**气泡**后浮现 · C focus-within 也浮现（⛔ 只做 hover 则键盘用户永远看不到）· D 读回**真剪贴板**含该条原文 · D2 成功有 is-copied 反馈 · E 气泡高度不变（⛔ measureElement 量的就是它）· F 零未捕获异常。⛔ 三个必踩坑：① invoke 桩漏 plugin:event|listen⇒listen 返回 null⇒挂载期崩「reading '0'」；② 用 .first() 会选到**已滚出视口**那条（列表自动滚到底），须挑「中心点最顶层」的那条；③ 期望值不能取气泡 innerText（含 ⧉ 字形），要取消息正文"
-    },
-    {
-      "id": "neobot-check-selfcontained",
-      "query": [
-        "自持",
-        "干净克隆",
-        "克隆后构建失败",
-        "vendor 没进版本控制",
-        "未跟踪依赖",
-        "neobot-ui 依赖参考树",
-        "删 frontend 会崩"
-      ],
-      "tool": "node scripts/ops/neobot-check-selfcontained.mjs",
-      "kind": "gate",
-      "read_only": true,
-      "when_not": "⛔ 别在**脏树**上判定「已跟踪」—— 它查的是 git 索引；未提交的新文件仍算未跟踪（这是设计如此）",
-      "spec": "A 每个相对 import 解析到的文件**都已被 git 跟踪** ⭐ · B 无 import 逃出 neobot-ui/（伸进 ../frontend/ 即崩）· C 无悬空 import。ⓘ 判据必须查**版本控制**而非文件系统：文件在磁盘上但不在 git 里等于不存在，而**所有既有门都测不出来**（它们和产物读同一份未跟踪文件，本机照样绿）。ⓘ 按文件逐条收集 import（api-panel.ts 用双引号），别拍平成 Set 再反查导入方"
-    },
-    {
-      "id": "nt-const-dup",
-      "query": [
-        "常量重复",
-        "同域常量",
-        "常量影子副本",
-        "跨域错位",
-        "const 冗余",
-        "同名不同值",
-        "magic number"
-      ],
-      "tool": "python3 scripts/ops/nt_const_dup.py --only-divergent",
-      "kind": "audit",
-      "read_only": true,
-      "when_not": "别拿它当「删重复」的一键清单 —— IDENTICAL 组里绝大多数是**不同模块各自的局部常量**（如 BATCH/GRID/DIM），合法存在；只有当两处**同名同类型同值且语义同源**才是影子副本。每个命中都要读那一行本身再决定（R-SCAN-1b）。也别拿它判死代码：它发现不了「单份却已无人使用」。",
-      "spec": "docs/architecture/MIRROR-BANK-2026-09-30.md §6"
-    },
-    {
-      "id": "nt-diverge",
-      "query": [
-        "函数分歧",
-        "同名不同实现",
-        "逐字相同",
-        "跨 crate 重复函数",
-        "收敛候选",
-        "IDENTICAL"
-      ],
-      "tool": "python3 scripts/ops/nt_diverge.py --selftest",
-      "kind": "audit",
-      "read_only": true,
-      "when_not": "别按函数叶子名直接数「多少处分歧」—— 必须 owner 相同才是同一函数的两个版本；同名**不同 owner** 是 COLLISION（无关）。且**逐字相同 ≠ 可收敛**：若返回值是 crate 本地类型（Hexagram/FermionState 等），收敛=类型统一，须先做架构决策。owner 判据以「签名含 self」为地面真相。",
-      "spec": "docs/architecture/MIRROR-BANK-2026-09-30.md §5 §6"
-    }
-  ],
-  "excluded": {
-    "_about": "刻意不进入日常索引的脚本 —— 它们是一次性数据管道，日常任务不该找到它们。",
-    "platform_scrapers": {
-      "files": "scripts/ops/nt_douyin_*.py (6), nt_deepseek_*.py (2), nt_doubao_batch.py",
-      "why": "playwright/faster-whisper 的一次性采集管道，Rust 无等价形态；进日常索引会污染 nt_find 的排序（它们有 1~2 个触发词但几乎不会被日常问起）"
-    },
-    "hf_absorption": {
-      "files": "scripts/ops/nt_hf_survey.py, nt_hf_batch_absorb.py, nt_hf_digest_to_cocoons.py",
-      "why": "数据集批量吸收，跑一次即完成；nt_cocoons_verify_absorb.py 已单列（它是**验收器**，会被重复调用）"
-    },
-    "mapgen": {
-      "files": "scripts/ops/nt_mapgen.py",
-      "why": "**与 neotrix-core/src/l2_perception/nt_core_code_search.rs 强重复且 Rust 更强**（670 行含 RRF 融合）。task-index 的 project-map 条目指向 make project-map 即可。**合并前勿删此文件** —— 它仍是 Makefile 的实际后端"
-    },
-    "orphan_misc": {
-      "files": "scripts/ops/__pycache__/ (7 个 .pyc)",
-      "why": "悬空残影，源码已删（nt_docclaims/nt_foundation_laws/nt_hf_smelt_chains/nt_ipc_keys/nt_symbol_brain/nt_verify_sim）。建议 gitignore + 清理"
-    }
+  {
+   "id": "check-truth-surface",
+   "query": [
+    "truth",
+    "空文件",
+    "0字节",
+    "未声明测试",
+    "假实现",
+    "stub",
+    "空壳"
+   ],
+   "tool": "bash scripts/check-truth-surface.sh --strict",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "",
+   "spec": "AGENTS.md 三道闸"
   },
-  "doc-claims": {
-    "intent": "文档里的断言被代码反驳（如「某模块零消费者」但其实有消费者）",
-    "tool": "bash scripts/check-doc-claims.sh",
-    "cost": "秒级，只读 git grep，无 cargo",
-    "when_not": "① 时点性断言（「上次跑是绿的」这类）判不了，需人工复核；② 历史交接件默认豁免（改它等于篡改历史），要查用 DOC_CLAIMS_SESSIONS=1；③ 短模块名/:: 记法碎片无法唯一解析，会跳过",
-    "notes": "本会话「死记录」复发 6 次的产物。带 commit hash 的行视作时点陈述并豁免。"
+  {
+   "id": "check-naming",
+   "query": [
+    "命名",
+    "naming",
+    "nt_前缀",
+    "前缀规范",
+    "文件名规范"
+   ],
+   "tool": "bash scripts/check-naming.sh",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "advisory 而已 —— 规约 vs 现实差 1,646 个文件，该规约无约束力，PASS 不代表合规",
+   "spec": "AGENTS.md 三道闸"
   },
-  "commit-deletions": {
-    "intent": "提交前核对暂存区里有没有别人的改动（多窗口共享 index 事故）",
-    "tool": "bash scripts/check-commit-deletions.sh  （已挂 .githooks/pre-commit，自动跑）",
-    "cost": "毫秒级，只读 git diff --cached",
-    "when_not": "① 无删除的提交直接 PASS，不必手动跑；② 想查已入库提交用 scripts/check-push-deletions.sh（pre-push 自动兜底，锚定在门自身提交，不追溯历史）；③ 想看共享暂存区全貌仍要 git diff --cached --name-only 对自己的文件清单",
-    "notes": "2026-09-29 事故：误删他窗 339 行在途工作。显式 add 只能约束我 add 什么，约束不了暂存区已有什么。"
+  {
+   "id": "check-forbid-coverage",
+   "query": [
+    "unsafe",
+    "forbid",
+    "安全边界",
+    "unsafe_code"
+   ],
+   "tool": "bash scripts/check-forbid-coverage.sh",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "",
+   "spec": "R-P1 零 unsafe"
+  },
+  {
+   "id": "check-skill-gate",
+   "query": [
+    "skill 门",
+    "技能门",
+    "三段式",
+    "frontmatter",
+    "skill 合规"
+   ],
+   "tool": "bash scripts/check-skill-gate.sh",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "别用 --strict —— 存量 58/58 全红会逼你批量改存量而非修真问题；要卡新接入用 --adopt",
+   "spec": "P0-2"
+  },
+  {
+   "id": "check-fresh-build",
+   "query": [
+    "干净构建",
+    "fresh build",
+    "能不能编译",
+    "CI 会不会红",
+    "干净检出"
+   ],
+   "tool": "bash scripts/check-fresh-build.sh",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "脏工作树下测出的结论**不可信** —— 本脚本会自动开临时 worktree 当测量台，必须让它跑完",
+   "spec": "LESSONS-20260928-fresh-checkout.md"
+  },
+  {
+   "id": "check-doc-drift",
+   "query": [
+    "文档漂移",
+    "doc drift",
+    "缺模块注释",
+    "//! 缺失",
+    "根文档死链",
+    "README 死链"
+   ],
+   "tool": "bash scripts/check-doc-drift.sh",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "advisory，永不拦门。两档：① nt_*.rs 缺 //! 模块文档（账本 scripts/doc-drift-baseline.txt）；② 根 6 文档（AGENTS/README/DOCUMENTATION-MAP/CONTRIBUTING/RUST-STANDARDS/TODO）里的仓库内路径死链。⛔ 命中「已删/已废止/已归档/已失效」语境的提及会被跳过 —— 那是 TODO.md 的历史记录，判红会逼人删历史。现存 14 条死链全来自 TODO.md 既存悬空指针，CI 与 pre-commit 均走 advisory，不阻断。",
+   "spec": "R-P232；2026-09-29 新增根文档死链档"
+  },
+  {
+   "id": "audit-lock",
+   "query": [
+    "死锁",
+    "deadlock",
+    "自死锁",
+    "锁审计",
+    "mutex 卡死",
+    "锁没释放"
+   ],
+   "tool": "python3 scripts/ops/nt_lock_audit.py neotrix-core/src",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "**报了不等于有 bug** —— 2026-09-27 实测 12 条里 2/3 是误报（作者已显式 drop()）。必须逐条读现场证实或证伪再动代码",
+   "spec": "R-SCAN-1 / R-SCAN-2 / R-SCAN-3"
+  },
+  {
+   "id": "locate",
+   "query": [
+    "在哪",
+    "找文件",
+    "定位",
+    "定点",
+    "这个函数在哪",
+    "locate",
+    "哪个文件"
+   ],
+   "tool": "python3 scripts/ops/nt_locate.py --component <组件名>",
+   "kind": "locate",
+   "read_only": true,
+   "when_not": "索引可能陈旧（--audit 会显示几天前 + N 条缺失）；**陈旧时改用 grep 定点**，别信索引",
+   "spec": "AGENTS.md 微操作公约"
+  },
+  {
+   "id": "worktree-gate",
+   "query": [
+    "worktree",
+    "工作树",
+    "磁盘满",
+    "占空间",
+    "收工",
+    "清理",
+    "脏文件",
+    "未提交改动"
+   ],
+   "tool": "sh scripts/ops/nt_worktree_gate.sh check",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "**禁止手删 worktree 目录**（rm -rf .worktrees/*）—— 850 处未提交改动不在任何提交里。删必须走 prune（内建双闸 + patch 兜底）",
+   "spec": "R-DISK-1~8 / 收工义务"
+  },
+  {
+   "id": "worktree-clean",
+   "query": [
+    "worktree 清 target",
+    "删编译产物",
+    "释放磁盘"
+   ],
+   "tool": "sh scripts/ops/nt_worktree_gate.sh clean",
+   "kind": "ops",
+   "read_only": false,
+   "when_not": "有 cargo 在跑时脚本会让位（R-DISK-4）；主 target 会立刻被 build gate 重建",
+   "spec": "R-DISK-4"
+  },
+  {
+   "id": "worktree-prune",
+   "query": [
+    "删 worktree",
+    "移除工作树",
+    "prune"
+   ],
+   "tool": "sh scripts/ops/nt_worktree_gate.sh prune --force",
+   "kind": "ops",
+   "read_only": false,
+   "when_not": "只删**双闸通过**的（脏=0 且 HEAD 已合入）；近 3h 有改动的会被跳过（疑似他窗在用）",
+   "spec": "R-DISK-2/5/7"
+  },
+  {
+   "id": "mem-gate",
+   "query": [
+    "内存",
+    "OOM",
+    "swap",
+    "跑不动",
+    "内存不够",
+    "重型构建"
+   ],
+   "tool": "sh scripts/ops/nt_mem_gate.sh; echo $?",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "exit 2 = BLOCKED，此时**禁止**起重型 cargo（先停重活或等 sidecar）",
+   "spec": "AGENTS.md 三道闸"
+  },
+  {
+   "id": "sidecar",
+   "query": [
+    "sidecar",
+    "推理服务",
+    "llama",
+    "本地模型",
+    "8149"
+   ],
+   "tool": "sh scripts/ops/nt_sidecar.sh status",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "用完即停；常驻会挤占 16G 机器内存导致 cargo 被 OOM 杀",
+   "spec": "LOCAL-LLAMA-2026-09-28.md"
+  },
+  {
+   "id": "project-map",
+   "query": [
+    "项目地图",
+    "codemap",
+    "全仓索引",
+    "代码地图",
+    "map"
+   ],
+   "tool": "make project-map",
+   "kind": "locate",
+   "read_only": true,
+   "when_not": "产物在 .project-map/，同样是快照 —— 会随编辑漂移，重要结论要重新生成"
+  },
+  {
+   "id": "crystal-graph-audit",
+   "query": [
+    "晶体图",
+    "记忆图",
+    "crystal",
+    "知识图谱体检",
+    "hubs",
+    "度数"
+   ],
+   "tool": "python3 scripts/ops/nt_graph_audit.py",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "口径刻意与 Rust nt_graph_index::Adjacency 对齐做**交叉验证** —— 两边数字不一致才是真信号，单边看会误判"
+  },
+  {
+   "id": "weights-manifest",
+   "query": [
+    "模型权重",
+    "weights",
+    "models 账本",
+    "权重校验",
+    "备份权重"
+   ],
+   "tool": "bash scripts/ops/nt_weights_manifest.sh status",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "models/ 是 gitignored 的 ⇒ **git 保护不到它**，任何删除都不可恢复。provenance 子命令可对照上游 LFS oid 逐字节验证"
+  },
+  {
+   "id": "experience-smoke",
+   "query": [
+    "经验树冒烟",
+    "KB 回路",
+    "experience 冒烟"
+   ],
+   "tool": "bash scripts/experience-smoke.sh",
+   "kind": "ops",
+   "read_only": false,
+   "when_not": "它会写临时 HOME（隔离），不会污染真实 KB"
+  },
+  {
+   "id": "audit-all",
+   "query": [
+    "全部检查",
+    "跑所有门",
+    "全量审计",
+    "提交前检查"
+   ],
+   "tool": "make audit-all",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "6 个门聚合，其中多数 advisory；要 blocking 结论请逐个跑对应 --strict"
+  },
+  {
+   "id": "check-test-baseline",
+   "query": [
+    "测试基线",
+    "test baseline",
+    "红测试",
+    "新增失败",
+    "测试挂了"
+   ],
+   "tool": "bash scripts/check-test-baseline.sh --strict",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "账本为空（0 字节）⇒ 任何新失败即红。若你有意的 flaky 未登记，会被打回；先修或明确 ignore",
+   "spec": "CI ci.yml"
+  },
+  {
+   "id": "check-supply-iocs",
+   "query": [
+    "供应链",
+    "IOC",
+    "恶意包",
+    "依赖投毒",
+    "license 卫生",
+    "cargo-deny"
+   ],
+   "tool": "bash scripts/check-supply-iocs.sh",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "其 advisory B（license 卫生）已被 deny.toml + .github/workflows/deny.yml 覆盖 ⇒ 别两边都当权威",
+   "spec": "deny.toml"
+  },
+  {
+   "id": "check-build-surface",
+   "query": [
+    "build.rs",
+    "proc-macro",
+    "build 依赖",
+    "构建面"
+   ],
+   "tool": "bash scripts/check-build-surface.sh",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "advisory；--strict 备用"
+  },
+  {
+   "id": "check-fuzz-ready",
+   "query": [
+    "fuzz",
+    "模糊测试",
+    "cargo-fuzz",
+    "语料"
+   ],
+   "tool": "bash scripts/check-fuzz-ready.sh",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "恒 exit 0 的探针，只报告就绪度"
+  },
+  {
+   "id": "check-api-surface",
+   "query": [
+    "API 盘点",
+    "tauri command",
+    "axum route",
+    "OpenAPI",
+    "api 面"
+   ],
+   "tool": "bash scripts/check-api-surface.sh",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "面缺失时脚本报 `?` 并 exit 3 —— **标 ? 的数字不可解读，别当 0 用**。若看到 tauri=0，那是事实（桌面端已随 5c02e738 归档），不是扫描失败",
+   "spec": "已知缺陷，待修"
+  },
+  {
+   "id": "wait-for-cargo",
+   "query": [
+    "等构建",
+    "cargo 在跑",
+    "构建锁",
+    "等编译完",
+    "轮询构建"
+   ],
+   "tool": "bash scripts/wait-for-cargo.sh",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "它只轮询不 kill；真要停用 nt_mem_gate.sh 或人工判断",
+   "spec": "R-ENV-1"
+  },
+  {
+   "id": "git-safe-reset",
+   "query": [
+    "安全 reset",
+    "误 checkout",
+    "误 stash pop",
+    "恢复误删",
+    "覆盖事故"
+   ],
+   "tool": "bash scripts/git-safe-reset.sh",
+   "kind": "ops",
+   "read_only": false,
+   "when_not": "**改前先读 git status --porcelain** —— 2026-09-22 三次覆盖事故的教训：stash pop / checkout -- 会静默吞掉未提交改动",
+   "spec": "AGENTS.md 并行公约"
+  },
+  {
+   "id": "manifest",
+   "query": [
+    "结论记录",
+    "环境指纹",
+    "stale",
+    "假证据",
+    "在哪个环境验证",
+    "manifest"
+   ],
+   "tool": "python3 scripts/ops/nt_manifest.py list",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "别用它当任务索引用（那是 nt_find.py 的活）；它记的是**结论 + 其环境**",
+   "spec": "Context Manifest"
+  },
+  {
+   "id": "find",
+   "query": [
+    "该跑什么",
+    "用什么工具",
+    "查工具",
+    "怎么查",
+    "找脚本",
+    "任务索引"
+   ],
+   "tool": "python3 scripts/ops/nt_find.py <你的问题>",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "**先查它再动手** —— 索引外的手写重复实现是本仓反复出现的问题（nt_mapgen.py vs nt_core_code_search.rs）",
+   "spec": "task-index"
+  },
+  {
+   "id": "crystal-ingest-verify",
+   "query": [
+    "吸收验收",
+    "cocoons 验收",
+    "摄入校验",
+    "8 项验收",
+    "M-id 唯一"
+   ],
+   "tool": "python3 scripts/ops/nt_cocoons_verify_absorb.py",
+   "kind": "absorb",
+   "read_only": true,
+   "when_not": "**刻意不复用生产代码函数** —— 生产脚本自证 ≠ 独立验收。这是设计不是缺陷，别去「重构」它",
+   "spec": "consciousness.rs:39-56 为权威枚举"
+  },
+  {
+   "id": "jev-live-eval",
+   "query": [
+    "jev 评测",
+    "判分器准确率",
+    "MRR",
+    "随机基线",
+    "真实标答"
+   ],
+   "tool": "python3 scripts/ops/nt_jev_live_eval.py",
+   "kind": "absorb",
+   "read_only": true,
+   "when_not": "首次调用需 `cargo build -p neotrix --bin nt_keywords`（数分钟）——断链 import 已修为调 Rust 权威分词，**不要**改回 Python 重写",
+   "spec": "已知缺陷，待修"
+  },
+  {
+   "id": "scan-surface",
+   "query": [
+    "扫描面",
+    "扫描器失效",
+    "假 0",
+    "路径不存在",
+    "死引用",
+    "扫描面缺失"
+   ],
+   "tool": "python3 scripts/ops/nt_scan_surface.py",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "退出码非 0 表示有扫描面已消失 ⇒ 该扫描器会输出**看似正常的 0**。先看 KNOWN-GONE 是否已解释；未解释的须人工确认",
+   "spec": "路径不存在 ≠ 该面为空"
+  },
+  {
+   "id": "qwen-mm-setup",
+   "query": [
+    "多模态",
+    "看图",
+    "读视频",
+    "visualize",
+    "media_info",
+    "qwen-mm",
+    "无key",
+    "multimodal bridge",
+    "NIfTI",
+    "PDF渲染"
+   ],
+   "tool": "bash scripts/ops/nt_qwen_mm_setup.sh",
+   "kind": "ops",
+   "read_only": false,
+   "when_not": "需要联网（github＋pypi 各一次）；search/omni 系工具不在此列 —— 它们要 API key，走 credential 门",
+   "spec": "docs/architecture/ABSORPTION-QWEN-MM-2026-09-28.md §8"
+  },
+  {
+   "id": "dup-types",
+   "query": [
+    "重复类型",
+    "同名类型",
+    "融合",
+    "精简",
+    "该不该合并",
+    "去重",
+    "重复定义"
+   ],
+   "tool": "python3 scripts/ops/nt_dup_types.py",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "**不要批量自动执行**（2026-09-29 实测失败）。工具的三条判据是必要非充分条件：它**不检查 impl 块**（unified_types 多 9 个 ⇒ Default 冲突）**也不查依赖链**。实测删 15 个类型后 cargo check 报 E0119+E0560。逐组人工验证",
+   "spec": "提供判据，不自动改"
+  },
+  {
+   "id": "mutation-check",
+   "query": [
+    "变异测试",
+    "mutation",
+    "测试有效性",
+    "判别力",
+    "测试是否有效",
+    "杀死变异"
+   ],
+   "tool": "python3 scripts/ops/nt_mutation_check.py --audit <FILE.rs>",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "不要对**尚未全绿**的树跑变异（工具会拒：基线红则无法归因）；也别当覆盖率工具用 —— 它不测行覆盖，只测能否杀死变异。要真正跑请显式给 --fn --mutate --cargo（该模式会改文件再恢复）。",
+   "spec": "R-MUT-1"
+  },
+  {
+   "id": "coverage-gaps",
+   "query": [
+    "零覆盖",
+    "测试覆盖",
+    "没被测过",
+    "死代码",
+    "哪些没测",
+    "coverage",
+    "零真实调用"
+   ],
+   "tool": "python3 scripts/ops/nt_coverage_gaps.py crates/neotrix-neobot/src",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "别把它当覆盖率工具 —— 它只找「测试从未触碰的 pub fn」，不度量行覆盖、不识别「调用了但没断言」（后者用 nt_mutation_check.py）。私有 helper 零覆盖是正常的，它只报 pub fn。",
+   "spec": "R-COV-1"
+  },
+  {
+   "id": "feature-matrix",
+   "query": [
+    "feature 编译",
+    "feature 腐烂",
+    "feature 组合",
+    "cargo feature",
+    "--all-features 失败",
+    "条件编译"
+   ],
+   "tool": "python3 scripts/ops/nt_feature_matrix.py --list",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "别拿它当「修好了」的证明 —— 它**只测量不修复**，报出 4 个失败 feature 后仍需产品决策（删 vs 修 vs 跟依赖升版）。也**别在未全绿的树加 CI 门**（会立刻红）。单 feature 编译 10s~6min，16 个全测很贵，先用 --list 零编译看名单。",
+   "spec": "R-FEAT-1"
+  },
+  {
+   "id": "check-disk",
+   "query": [
+    "磁盘",
+    "disk",
+    "target 太大",
+    "占空间",
+    "清理 target",
+    "incremental"
+   ],
+   "tool": "bash scripts/check-disk.sh",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "advisory，恒 exit 0。只报数不代劳。⛔ R-DISK-1：有 cargo 在跑时绝不可删 target/（会打断他窗构建），门会检测并提示。⛔⛔ 绝不可 rm -rf worktree 目录，走 nt_worktree_gate.sh prune。⚠️ 本门初版因在建议文案里写反引号包裹的 `cargo clean -p <crate>`，干跑时被 shell 当命令替换执行，删掉 115.2GiB —— 写示例命令一律用普通引号。"
+  },
+  {
+   "id": "check-gitleaks-version",
+   "query": [
+    "gitleaks 版本",
+    "密钥扫描版本",
+    "基线版本",
+    "版本错配",
+    "gitleaks 对齐"
+   ],
+   "tool": "bash scripts/check-gitleaks-version.sh",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "CI 里自动跑（secret-scan job 第 3 步，扫描**之前**）。手工跑的场合：① 升级了 CI 的 GITLEAKS_VERSION；② 用本机 gitleaks 重生成了基线；③ 怀疑密钥扫描结果异常。⛔ 规则集变 ⇒ 基线必重生成，且重生成前必须**逐条人工判读**新增项 —— 无脑重生成会把真泄漏写进基线。"
+  },
+  {
+   "id": "check-layout",
+   "query": [
+    "根目录",
+    "目录结构",
+    "乱建文件",
+    "临时文件",
+    "会话笔记",
+    "文档位置",
+    "放哪个目录"
+   ],
+   "tool": "bash scripts/check-layout.sh",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "advisory 起步，账本 scripts/layout-baseline.txt 棘轮。拦**新增**违规、既有记账。三类检查：① 根目录文件/目录白名单（ALLOW_FILES / ALLOW_DIRS，每项附真实消费者）；② neotrix-core/docs/ 只许 YYYY-MM-DD_ 前缀；③ 与 DOCUMENTATION-MAP.md 交叉校验，规范点名但磁盘不存在 ⇒ 报「规范腐化」。⛔ 根目录要放新东西时**先查本门白名单**：有理由就扩 ALLOW_FILES 并写明消费者，别用完就留。⛔ apps/ 与 src-tauri/ 是已知残留（committed 已移除、磁盘 untracked 残留），处置后从 RESIDUAL_KNOWN 删。"
+  },
+  {
+   "id": "check-untracked-assets",
+   "query": [
+    "未入库",
+    "没进git",
+    "没提交",
+    "磁盘上有仓库没有",
+    "干净检出缺文件",
+    "知识流失",
+    "untracked"
+   ],
+   "tool": "bash scripts/check-untracked-assets.sh",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "不要用它判「某文件该不该入库」—— 它只报清单，入库决策按 R-EXIST-3 逐条定性（编译产物/运行时DB/.bak/.disabled/含密钥一律不进）；也不要拿它替代 git status，它只扫受保护目录",
+   "spec": "RUST-STANDARDS.md 17.8 / R-EXIST-1"
+  },
+  {
+   "id": "check-unwrap",
+   "query": [
+    "unwrap",
+    "expect",
+    "panic",
+    "生产禁 unwrap",
+    "panic-free",
+    "崩点",
+    "R-EXIST-4"
+   ],
+   "tool": "bash scripts/check-unwrap.sh",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "不要用它判「某个 unwrap 该不该改成 ?」—— 它是棘轮，只卡新增、不判单点正当性；也不要期待它归零，712 站点存量是明知的独立工程",
+   "spec": "RUST-STANDARDS.md §1 + AGENTS.md 硬规则（实测 2026-09-29 此前零门管）"
+  },
+  {
+   "id": "check-feature-gates",
+   "query": [
+    "feature",
+    "特性",
+    "门控",
+    "cfg feature",
+    "非默认构建",
+    "ios-bridge",
+    "onnx",
+    "编译盲区"
+   ],
+   "tool": "bash scripts/check-feature-gates.sh",
+   "kind": "gate",
+   "read_only": false,
+   "when_not": "不要在日常改码后跑（要 6 次 cargo check）；只有改了 feature 门控的 mod、或改过 Cargo.toml features、或准备提交时跑。也不要拿它判层归属 —— 那是 check-layer-deps 的职责",
+   "spec": "2026-09-30 新增。零命中≠零消费：默认 feature 集不编译的 mod 对默认构建与全套测试完全失明。2026-09-30 由它首次抓到 2 个既存破口（NeoTrixConfig.prefer_free 漏改 3 处，全在 #[cfg(test)]；ort Outlet 私有字段，examples/nt_whisper_spike.rs）。同批把 CI matrix 从 --lib 改成 --all-targets —— 两者原本同样瞎"
+  },
+  {
+   "id": "check-silent-failure",
+   "query": [
+    "静默失败",
+    "silent failure",
+    "吞错误",
+    "let _ =",
+    "丢弃 Result",
+    "假绿灯",
+    "降级",
+    "审计缺口"
+   ],
+   "tool": "bash scripts/check-silent-failure.sh --strict",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "日常改码不必跑（纯静态分析，秒级）；改了落库/发送/落盘的错误处理、或新增 `let _ =` 时跑。也别拿它判 best-effort 策略对错 —— 基线里的 44 条是「已知且有意」，判据在 TODO.md §全量审计",
+   "spec": "2026-09-30 新增。规约来自仓内已有答案 nt_channel_serve.rs:278。门内高信号 44 条，范围外 209 条（remove_file/.send*）显式报出不静默漏。首次运行抓到 4 条 P0，已修 3 条 + agent.rs 1 条"
+  },
+  {
+   "id": "absorb-live",
+   "query": [
+    "吸收存活率",
+    "已落地断言",
+    "吸收审计",
+    "MAP-TASKS 核验",
+    "技术还活着吗",
+    "G5 存活率"
+   ],
+   "tool": "python3 scripts/ops/nt_absorption_live.py [--strict] [--doc PATH]",
+   "kind": "absorb",
+   "read_only": true,
+   "when_not": "只认 MAP-TASKS §1.1（已落地）与 §1.3（已拒绝）两节的反引号 token；ROUND 系列文档不在默认范围。拒绝区名字出现≠复活（多为证伪记录注释），见输出 needs-review 人工复核，不要直接判死",
+   "spec": "docs/architecture/GLOBAL-MAP-DEFECTS-2026-09-30.md 第五部分；只用 rg -F（本机 rg -E 静默返回 0）"
+  },
+  {
+   "id": "nt-callgraph-impact",
+   "query": [
+    "影响面",
+    "blast radius",
+    "爆炸半径",
+    "改这里炸不炸",
+    "谁依赖我",
+    "传递可达",
+    "可达性",
+    "impact_of",
+    "死链",
+    "不可达",
+    "零入边"
+   ],
+   "tool": "python3 scripts/ops/nt_callgraph.py --impact <sym> --db .project-map/edges-all.jsonl [--files]",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "不要把它当精确答案 —— 报的是静态可达下界：async 派发/trait 动态派发/宏展开看不见，真实影响面 ⊇ 本结果（实测 run_once 反向闭包在深度 1 即终止）。也不要给它的输出建门（G7 裁决）",
+   "spec": "CAPABILITY-GAP-2026-09-30 G4；ABSORPTION-ROUND24"
+  },
+  {
+   "id": "nt-callgraph-unreachable",
+   "query": [
+    "死代码",
+    "死链",
+    "没人调用",
+    "未接线",
+    "导出≠接入",
+    "unreachable",
+    "dead code"
+   ],
+   "tool": "python3 scripts/ops/nt_callgraph.py --unreachable --db .project-map/edges-all.jsonl --crate neotrix",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "⛔ 不要据它直接删代码。no-callsite 桶含 F3(fn-as-value) 与 F6(图盲区) 假阳性；F1–F6 六类误报源见脚本 docstring。动手前必须逐条读代码证实/证伪（R-SCAN-1）。textual-prod 桶多为同名词碰撞，不是缺陷",
+   "spec": "ABSORPTION-ROUND24"
+  },
+  {
+   "id": "nt-absorption-live-graph",
+   "query": [
+    "吸收存活率",
+    "吸收的技术还活着吗",
+    "导出≠接入",
+    "G5",
+    "存活率",
+    "R-P79 验证"
+   ],
+   "tool": "python3 scripts/ops/nt_absorption_live.py --graph",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "图判据对 shell 脚本/类型名静默（不是调用目标），覆盖面仍靠文本判据 —— 两者互补不是替代。⚠ 该工具默认模式会报 PASS 而其 docstring 自述「若报全部存活说明判据无效」：默认 PASS 不可当健康证明，必须加 --graph 看接线层",
+   "spec": "CAPABILITY-GAP-2026-09-30 G5；ABSORPTION-ROUND24"
+  },
+  {
+   "id": "nt-decompose-atoms",
+   "query": [
+    "原子级拆解",
+    "拆解技术逻辑",
+    "原子能力单元",
+    "这个入口由哪些原子组成",
+    "外部项目拆解",
+    "decompose"
+   ],
+   "tool": "python3 scripts/ops/nt_decompose.py atoms --db <edges.jsonl> --root <DefId子串> [--depth N] [--out FILE]",
+   "kind": "report",
+   "read_only": true,
+   "when_not": "① root 子串命中多个节点会 rc=2 拒答（宁缺勿错）—— 加长 root 再跑，不要靠 --depth 硬试；② oracle 分类只反映**边表与路径可测信号**：K3 = 符号绑定已证、语义未判，别当语义结论；③ 与 nt_callgraph --deps 遍历重叠，本工具独有的是原子记录（file:line + oracle）与机器可读输出",
+   "spec": "docs/architecture/DECOMPOSE-PARITY-2026-09-30.md §1；selftest 6 正例 + 3 证伪"
+  },
+  {
+   "id": "nt-decompose-parity",
+   "query": [
+    "对方有这个能力吗",
+    "能力矩阵",
+    "差距表",
+    "对位矩阵",
+    "parity"
+   ],
+   "tool": "python3 scripts/ops/nt_decompose.py parity --mine <atoms.json> --theirs <atoms.json> [--out matrix.md]",
+   "kind": "report",
+   "read_only": true,
+   "when_not": "① **名字级对位，不是语义对位** —— 实测已误报（把对方 get 报成「仅对方有」，我方同义方法叫 cache）。异名不等于缺能力，要判行为用 nt-parity-ref；② 不要把它的输出做成门（G7：名字级对位必误报）；③ 对方原子集必须由同一工具在对方代码上生成，手写 JSON 会让矩阵变成自证",
+   "spec": "DECOMPOSE-PARITY-2026-09-30 §2；首次实跑 lru(MIT) vs ResponseCache 抓到 O(n) 淘汰"
+  },
+  {
+   "id": "nt-parity-ref",
+   "query": [
+    "行为对位",
+    "对方产品行为 oracle",
+    "复现对方产品",
+    "参考实现漂移",
+    "behavioural parity",
+    "oracle 采集"
+   ],
+   "tool": "python3 scripts/ops/nt_parity_ref.py --vectors .neotrix/parity/<name>.vectors.json [--check] | --list",
+   "kind": "report",
+   "read_only": false,
+   "when_not": "① 写模式只在本机 cargo registry 里找对方 crate 的已 vendor 副本，找不到就退出 —— 它不联网、不 clone；② 只有 --check 可当门（重跑对方实现并比对已存 oracle，rc=1 = oracle 漂移或说谎；观测一致但元数据变了会明说 IDENTICAL，不算漂移）；③ PASS 只覆盖 vectors 写了的 op 集合，vectors 没写的语义**未被验证**；④ 加新能力必须在 CAPABILITIES 注册适配器，vectors 缺 capability 字段会响亮报错（不许无适配器地编 oracle）",
+   "spec": "DECOMPOSE-PARITY-2026-09-30 §4/§7；neotrix-core/tests/nt_capability_parity.rs（我方侧注册表）"
+  },
+  {
+   "id": "map-reconcile",
+   "query": [
+    "地图过期了",
+    "台账陈旧",
+    "文档数字对不对",
+    "现状还成立吗",
+    "自检文档",
+    "断言核对"
+   ],
+   "tool": "python3 scripts/ops/nt_map_reconcile.py [--doc <path>] [--strict] [--list-predicates]",
+   "kind": "report",
+   "read_only": true,
+   "when_not": "① 谓词只认 ```assert 围栏块里的 6 种廉价确定形式（file/nfile/lit/nlit/test/cmd）—— 行内代码里的 file:xxx 不算；② **不要把「正在自检的工具」写进它自己的断言**（实测无限递归 120s 超时），也不要用 nlit 检查本文件（为解释改动必须引用旧措辞 ⇒ 永远失败）；③ 默认只报告不失败：谓词可能写错，门建在错谓词上比没门更危险（G7），要 rc=1 得显式 --strict；④ file: 谓词含「被 git 跟踪」判定 ⇒ 天然排除他窗在途未提交的工作，地图不该记别人的在途成果",
+   "spec": "docs/architecture/GLOBAL-MAP-DEFECTS-2026-09-30.md §3 断言块（9 条，当日 9/9 HOLDS）"
+  },
+  {
+   "id": "fn-drift",
+   "query": [
+    "重复实现",
+    "函数副本",
+    "副本漂移",
+    "同名不同语义",
+    "语义漂移",
+    "字节切 panic",
+    "字符边界"
+   ],
+   "tool": "python3 scripts/ops/nt_fn_drift.py [--db .project-map/edges-all.jsonl] [--only-different|--units NAME|--list-units] | selftest",
+   "kind": "report",
+   "read_only": true,
+   "when_not": "① 只能发现**同名**副本 —— 跨名漂移（本会话的字节/char levenshtein）抓不到，那种只能靠 nt-parity-ref 的行为对位；② DIFFERENT 里绝大多数是「同名不同域」的合法重复（如 osint::investigate ×15），**不要照 [SHAPE] 或 --units 的 BYTE 标记批量改**（本轮据此判 2 族无罪：truncate_chars 的字节快路径无害、tokenize 规则有意不同）；③ 不是门：判据是文本相等，不足以当正确性判据（G7）；④ 需要 .project-map/edges-*.jsonl（gitignored 低频生成物）",
+   "spec": "GLOBAL-MAP-DEFECTS-2026-09-30 §3.1b；首轮抓到 now_ts 13 副本 2 panic + 2 处 truncate 字节切 panic"
+  },
+  {
+   "id": "mirror-scan",
+   "query": [
+    "跨 crate 重复",
+    "镜像分叉",
+    "两个真身",
+    "types 和 core 重复",
+    "同名模块",
+    "冻结副本"
+   ],
+   "tool": "python3 scripts/ops/nt_mirror_scan.py [--min-overlap 0.5] [--limit N] | selftest",
+   "kind": "report",
+   "read_only": true,
+   "when_not": "⛔ **不要照它删代码**：2026-09-30 实测 neotrix-types 是 core 的冻结旧分叉（18 对 / 185.8 KB / 全部 added=2026-07-06，外部零引用），但 `neotrix-core` 依赖 `neotrix-types` ⇒ **types 无法依赖 core**，所以 types 内部消费者拿不到 core 那份；收敛方向（A: core 为真身 / B: types 为真身）是**架构决策，判据是意图不是文本相似度**。执行清单见 docs/architecture/MIRROR-FORK-2026-09-30.md §5，需 cargo clean 双跑验证",
+   "spec": "MIRROR-FORK-2026-09-30 §3；selftest 4 例（含 2 例证伪：异体不得判同、git 取不到日期必须降级为 ?）"
+  },
+  {
+   "id": "dup-dead",
+   "query": [
+    "纯重复又零接线",
+    "该删哪个副本",
+    "重复函数候选",
+    "零入边",
+    "重复实现清理"
+   ],
+   "tool": "python3 scripts/ops/nt_dup_dead.py [--verbose] | selftest",
+   "kind": "report",
+   "read_only": true,
+   "when_not": "⛔ **不要据此删代码** —— 本轮实测 62 份 IDENTICAL / 10 份零接线，逐条读源码后 **0 条可删**（6 份是 neotrix-types 跨 crate 镜像、4 份签名或域不同）。决定性反证：本仓 nt_callgraph 已有 textual-prod 桶（文本有生产调用点但图零入边）⇒ 静态边表有已知假阴性，「零入边」连「是否有调用点」都不能证明。输出是分诊单，不是删除清单",
+   "spec": "GLOBAL-MAP-DEFECTS-2026-09-30 §3.1b；首轮抓到 now_ts 13 副本 2 panic + 2 处 truncate 字节切 panic"
+  },
+  {
+   "id": "check-license",
+   "query": [
+    "许可",
+    "license",
+    "授权",
+    "商用",
+    "版权",
+    "G6",
+    "SPDX",
+    "vendored 来源",
+    "附加条款"
+   ],
+   "tool": "bash scripts/check-license.sh",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "⛔ 当前 rc=1 是正确状态，不是待修 bug：apps/neobot-desktop/frontend 上游附加条款 No Commercial Secondary Development 待项目所有者裁决（.neotrix/LICENSE-EXCEPTIONS.md）。⛔ 不要为了让门变绿而删 deny 名单或改脚本。门只校验记录一致性，不做法律判断",
+   "spec": "ABSORPTION-ROUND24 G6"
+  },
+  {
+   "id": "nt-absorption-live-all",
+   "query": [
+    "全域存活率",
+    "所有吸收文档",
+    "落地断言有没有活",
+    "31 份没验证",
+    "吸收轮次核对"
+   ],
+   "tool": "python3 scripts/ops/nt_absorption_live.py --all-docs [--graph]",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "⚠ 报「0 死亡」**不等于**健康：find_file 用「任意 basename 存在即算存活」，判据偏宽（17 条其实是 bare-basename 搬迁，不是死亡）。真信号是 --graph 标出的「导出未接线」项，且那批仍需手验（已实测 5 条里 3 条是文档 token 不精确：mod 声明/英文单词）。C 级文档（无 L-xx 也无 Landings 段，13 份）**故意不凑数**，不参与统计",
+   "spec": "ABSORPTION-ROUND25"
+  },
+  {
+   "id": "nt-api-contract",
+   "query": [
+    "API 契约",
+    "契约表",
+    "前端调不到",
+    "invoke 失败",
+    "SPECS",
+    "接口漂移",
+    "前端重写前",
+    "M3"
+   ],
+   "tool": "python3 scripts/ops/nt_api_contract.py [--advisory|--json]",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "A/B/C 三类才是缺陷；「前端调了契约表标 Stub/Planned 的命令」单列为 C-info，**不是缺陷**（实测 48 条全属刻意不实现的 DSH_ONLY）。⛔ 不要把它当失败项 —— 48 次误报的门会被忽略。另：本门用括号配平解析 Rust，⛔ 勿改回正则（曾因此报出「60 条只注册 1 条」的假警）",
+   "spec": "FRONTEND-REBUILD-2026-10-01 M3"
+  },
+  {
+   "id": "nt-neobot-ui-wiring",
+   "query": [
+    "自持UI",
+    "neobot-ui",
+    "接线",
+    "漂移",
+    "白屏",
+    "openghost",
+    "frontendDist",
+    "自持入口",
+    "商用重构",
+    "M4",
+    "M1",
+    "R2",
+    "外壳",
+    "语言切换",
+    "入口切换",
+    "tauri.conf",
+    "删树"
+   ],
+   "tool": "python3 scripts/ops/nt_neobot_ui_wiring.py",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "改 vendored frontend 内部逻辑时不要用它（那是上游代码，不归本门）；漂移报警且**原件 mtime 更新**时不要贸然同步 —— 他窗在途改动，同步会竞速 入口已切到 neobot-ui 后，**别再用 `pnpm run build`（无 --prefix）** —— Tauri 在 tauri.conf.json 所在目录执行，那里没有 package.json",
+   "spec": "FRONTEND-REBUILD R1/R5；rc=0 才算接线完整，5 项检查：复制件漂移 / 入口无 @/ 上游别名与 ../ 逃逸 / vite base 为相对路径（默认 '/' 在 file:// 下白屏且构建不报错）/ 产物无上游特征符 / openghost 已迁出受限树"
+  },
+  {
+   "id": "neobot-ui-smoke",
+   "query": [
+    "白屏",
+    "渲染",
+    "运行时",
+    "冒烟",
+    "产物可用",
+    "构建绿",
+    "base",
+    "favicon",
+    "渲染失败",
+    "#root为空"
+   ],
+   "tool": "node scripts/ops/neobot-ui-smoke.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "改 Rust 后端或 Tauri 桥时不要用它（浏览器里没有 Tauri IPC，桩只验渲染不验桥接）；产物没构建过（dist/ 不存在）时先 `vite build`",
+   "spec": "判据三条：#root 被真实填充 / 无未捕获错误 / 无资源加载失败（按 URL 判定，不靠 console 文本——文本是泛化的不含 URL）。首次报「未渲染」是桩返回 null 而契约声明 T[] 所致，非产品缺陷"
+  },
+  {
+   "id": "nt-feature-viability",
+   "query": [
+    "功能下架",
+    "会丢功能",
+    "功能平价",
+    "pet",
+    "下架决策",
+    "切入口",
+    "M6",
+    "功能存活",
+    "静默丢弃"
+   ],
+   "tool": "python3 scripts/ops/nt_feature_viability.py",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "判断某个具体函数怎么实现时不要用它（那是 locate 的事）；契约表大改后第一次跑要同时看 DROPPED/PENDING 是否需重估——本门是**后端实现的函数**，实现了新命令会让相关域从 DEAD 转向不可下架",
+   "spec": "判据：按域聚合 invoke 调用 × 契约表状态；ALIVE/DEAD/MIXED 三态 + DROPPED(显式下架)/PENDING(挂里程碑未建)/未登记(门红) 分类。归属按 md5 内容同一性，**不按文件名**（同名≠同符号）"
+  },
+  {
+   "id": "neobot-msg-virtual",
+   "query": [
+    "消息窗口化",
+    "消息虚拟化",
+    "滚不回去",
+    "自动滚底",
+    "长会话",
+    "消息列表卡",
+    "虚拟列表"
+   ],
+   "tool": "node scripts/ops/neobot-msg-virtual.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "改 neobot-root 的消息渲染前先跑它取基线；**判据 C 区分不出 scrollToIndex 与 scrollTop**（浏览器会把 scrollTop 钳到底部），要验「用的是哪种」得另设判据",
+   "spec": "1000 条消息下判据 A(渲染行数) B(撑高>2000px) C(末条在视口) D(滚顶后首条可见=内容可达，最不可替代) + 无未捕获异常"
+  },
+  {
+   "id": "neobot-check-contrast",
+   "query": [
+    "对比度",
+    "可读性",
+    "深浅两档",
+    "浅色看不清",
+    "WCAG",
+    "AA",
+    "暗色分级",
+    "文字太淡"
+   ],
+   "tool": "node scripts/ops/neobot-check-contrast.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "调色**前**先跑它取基线；它只量选定选择器，新增文案若不在 TARGETS 里不会被量到（要量别的得先加进 TARGETS）",
+   "spec": "WCAG 相对亮度比；正文≥4.5:1、大字/UI≥3.0:1；深浅两档都过。量 computed color vs 实际生效背景（向上找首个非透明 bg），不是 CSS 变量值"
+  },
+  {
+   "id": "neobot-check-convo-groups",
+   "query": [
+    "侧栏分组",
+    "最近活跃",
+    "折叠",
+    "会话列表",
+    "找不到会话",
+    "组头"
+   ],
+   "tool": "node scripts/ops/neobot-check-convo-groups.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "改侧栏**项**样式前跑它取基线；它的 D 项（虚拟化）只在大列表下生效，小列表由 neobot-ui-smoke 的「千条」场景把关",
+   "spec": "A 组头出现且带计数 / B 默认展开 / C 折叠**局部**生效（减少数必须等于该组条数，'全部消失'也会被抓）/ D 大列表下虚拟化成立 / E 组头是 BUTTON 且 aria-expanded 正确"
+  },
+  {
+   "id": "neobot-check-theme-persist",
+   "query": [
+    "主题不持久",
+    "主题重置",
+    "深色又变浅",
+    "主题选择丢失",
+    "get_dsh_theme",
+    "DSH 命名债"
+   ],
+   "tool": "node scripts/ops/neobot-check-theme-persist.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "调主题**默认档**前跑它取基线；它只验「跨刷新持久」与「不再调 get_dsh_theme」，不验色值本身（那是 neobot-check-contrast 的事）",
+   "spec": "A/B 选深/浅后**刷新**仍在（⛔ 必须跨刷新：覆盖 bug 发生在挂载时，同会话比较看不出）· C 选择器存在 · D 自持树 invoke 里 get_dsh_theme = 0 次。ⓘ 实测：headless 系统默认浅 ⇒ 只测「浅色」会假通过，双向才抓得到"
+  },
+  {
+   "id": "neobot-check-msg-copy",
+   "query": [
+    "气泡复制",
+    "悬停复制",
+    "消息复制按钮",
+    "复制没反应",
+    "键盘复制",
+    "is-copied"
+   ],
+   "tool": "node scripts/ops/neobot-check-msg-copy.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "调消息气泡布局/间距前跑它取基线；它只验复制按钮的显隐/可达/落剪贴板，**不验**气泡长文本排版",
+   "spec": "A 默认 opacity:0+pointer-events:none+position:absolute · B 悬停**气泡**后浮现 · C focus-within 也浮现（⛔ 只做 hover 则键盘用户永远看不到）· D 读回**真剪贴板**含该条原文 · D2 成功有 is-copied 反馈 · E 气泡高度不变（⛔ measureElement 量的就是它）· F 零未捕获异常。⛔ 三个必踩坑：① invoke 桩漏 plugin:event|listen⇒listen 返回 null⇒挂载期崩「reading '0'」；② 用 .first() 会选到**已滚出视口**那条（列表自动滚到底），须挑「中心点最顶层」的那条；③ 期望值不能取气泡 innerText（含 ⧉ 字形），要取消息正文"
+  },
+  {
+   "id": "neobot-check-selfcontained",
+   "query": [
+    "自持",
+    "干净克隆",
+    "克隆后构建失败",
+    "vendor 没进版本控制",
+    "未跟踪依赖",
+    "neobot-ui 依赖参考树",
+    "删 frontend 会崩"
+   ],
+   "tool": "node scripts/ops/neobot-check-selfcontained.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "⛔ 别在**脏树**上判定「已跟踪」—— 它查的是 git 索引；未提交的新文件仍算未跟踪（这是设计如此）",
+   "spec": "A 每个相对 import 解析到的文件**都已被 git 跟踪** ⭐ · B 无 import 逃出 neobot-ui/（伸进 ../frontend/ 即崩）· C 无悬空 import。ⓘ 判据必须查**版本控制**而非文件系统：文件在磁盘上但不在 git 里等于不存在，而**所有既有门都测不出来**（它们和产物读同一份未跟踪文件，本机照样绿）。ⓘ 按文件逐条收集 import（api-panel.ts 用双引号），别拍平成 Set 再反查导入方"
+  },
+  {
+   "id": "nt-const-dup",
+   "query": [
+    "常量重复",
+    "同域常量",
+    "常量影子副本",
+    "跨域错位",
+    "const 冗余",
+    "同名不同值",
+    "magic number"
+   ],
+   "tool": "python3 scripts/ops/nt_const_dup.py --only-divergent",
+   "kind": "audit",
+   "read_only": true,
+   "when_not": "别拿它当「删重复」的一键清单 —— IDENTICAL 组里绝大多数是**不同模块各自的局部常量**（如 BATCH/GRID/DIM），合法存在；只有当两处**同名同类型同值且语义同源**才是影子副本。每个命中都要读那一行本身再决定（R-SCAN-1b）。也别拿它判死代码：它发现不了「单份却已无人使用」。",
+   "spec": "docs/architecture/MIRROR-BANK-2026-09-30.md §6"
+  },
+  {
+   "id": "nt-diverge",
+   "query": [
+    "函数分歧",
+    "同名不同实现",
+    "逐字相同",
+    "跨 crate 重复函数",
+    "收敛候选",
+    "IDENTICAL"
+   ],
+   "tool": "python3 scripts/ops/nt_diverge.py --selftest",
+   "kind": "audit",
+   "read_only": true,
+   "when_not": "别按函数叶子名直接数「多少处分歧」—— 必须 owner 相同才是同一函数的两个版本；同名**不同 owner** 是 COLLISION（无关）。且**逐字相同 ≠ 可收敛**：若返回值是 crate 本地类型（Hexagram/FermionState 等），收敛=类型统一，须先做架构决策。owner 判据以「签名含 self」为地面真相。",
+   "spec": "docs/architecture/MIRROR-BANK-2026-09-30.md §5 §6"
   }
+ ],
+ "excluded": {
+  "_about": "刻意不进入日常索引的脚本 —— 它们是一次性数据管道，日常任务不该找到它们。",
+  "platform_scrapers": {
+   "files": "scripts/ops/nt_douyin_*.py (6), nt_deepseek_*.py (2), nt_doubao_batch.py",
+   "why": "playwright/faster-whisper 的一次性采集管道，Rust 无等价形态；进日常索引会污染 nt_find 的排序（它们有 1~2 个触发词但几乎不会被日常问起）"
+  },
+  "hf_absorption": {
+   "files": "scripts/ops/nt_hf_survey.py, nt_hf_batch_absorb.py, nt_hf_digest_to_cocoons.py",
+   "why": "数据集批量吸收，跑一次即完成；nt_cocoons_verify_absorb.py 已单列（它是**验收器**，会被重复调用）"
+  },
+  "mapgen": {
+   "files": "scripts/ops/nt_mapgen.py",
+   "why": "**与 neotrix-core/src/l2_perception/nt_core_code_search.rs 强重复且 Rust 更强**（670 行含 RRF 融合）。task-index 的 project-map 条目指向 make project-map 即可。**合并前勿删此文件** —— 它仍是 Makefile 的实际后端"
+  },
+  "orphan_misc": {
+   "files": "scripts/ops/__pycache__/ (7 个 .pyc)",
+   "why": "悬空残影，源码已删（nt_docclaims/nt_foundation_laws/nt_hf_smelt_chains/nt_ipc_keys/nt_symbol_brain/nt_verify_sim）。建议 gitignore + 清理"
+  }
+ },
+ "doc-claims": {
+  "intent": "文档里的断言被代码反驳（如「某模块零消费者」但其实有消费者）",
+  "tool": "bash scripts/check-doc-claims.sh",
+  "cost": "秒级，只读 git grep，无 cargo",
+  "when_not": "① 时点性断言（「上次跑是绿的」这类）判不了，需人工复核；② 历史交接件默认豁免（改它等于篡改历史），要查用 DOC_CLAIMS_SESSIONS=1；③ 短模块名/:: 记法碎片无法唯一解析，会跳过",
+  "notes": "本会话「死记录」复发 6 次的产物。带 commit hash 的行视作时点陈述并豁免。"
+ },
+ "commit-deletions": {
+  "intent": "提交前核对暂存区里有没有别人的改动（多窗口共享 index 事故）",
+  "tool": "bash scripts/check-commit-deletions.sh  （已挂 .githooks/pre-commit，自动跑）",
+  "cost": "毫秒级，只读 git diff --cached",
+  "when_not": "① 无删除的提交直接 PASS，不必手动跑；② 想查已入库提交用 scripts/check-push-deletions.sh（pre-push 自动兜底，锚定在门自身提交，不追溯历史）；③ 想看共享暂存区全貌仍要 git diff --cached --name-only 对自己的文件清单",
+  "notes": "2026-09-29 事故：误删他窗 339 行在途工作。显式 add 只能约束我 add 什么，约束不了暂存区已有什么。"
+ }
 }
