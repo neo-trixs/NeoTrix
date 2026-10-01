@@ -1025,6 +1025,22 @@
    "read_only": true,
    "when_not": "改侧栏**项**样式前跑它取基线；它的 D 项（虚拟化）只在大列表下生效，小列表由 neobot-ui-smoke 的「千条」场景把关",
    "spec": "A 组头出现且带计数 / B 默认展开 / C 折叠**局部**生效（减少数必须等于该组条数，'全部消失'也会被抓）/ D 大列表下虚拟化成立 / E 组头是 BUTTON 且 aria-expanded 正确"
+  },
+  {
+   "id": "neobot-check-theme-persist",
+   "query": [
+    "主题不持久",
+    "主题重置",
+    "深色又变浅",
+    "主题选择丢失",
+    "get_dsh_theme",
+    "DSH 命名债"
+   ],
+   "tool": "node scripts/ops/neobot-check-theme-persist.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "调主题**默认档**前跑它取基线；它只验「跨刷新持久」与「不再调 get_dsh_theme」，不验色值本身（那是 neobot-check-contrast 的事）",
+   "spec": "A/B 选深/浅后**刷新**仍在（⛔ 必须跨刷新：覆盖 bug 发生在挂载时，同会话比较看不出）· C 选择器存在 · D 自持树 invoke 里 get_dsh_theme = 0 次。ⓘ 实测：headless 系统默认浅 ⇒ 只测「浅色」会假通过，双向才抓得到"
   }
  ],
  "excluded": {

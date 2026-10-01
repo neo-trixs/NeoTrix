@@ -23,7 +23,6 @@
  * 跟随系统，并**监听变化**——桌面应用该跟随系统，用户不该被迫手选。
  */
 import { useEffect, useState } from 'react'
-import { invokeCmd } from './ipc'
 
 export type ThemeMode = 'dark' | 'light' | 'system'
 
@@ -74,24 +73,29 @@ export function setThemeMode(next: ThemeMode): void {
 }
 
 /**
- * 挂载时用后端的 `get_dsh_theme` 校准一次。
- * ⛔ **失败不阻塞**：主题不是关键路径，取不到就用前端默认（system）。
- *   「主题读不到」不该让整个界面起不来。
+ * 订阅当前模式，并让 `system` 档跟随系统变化。
+ *
+ * # ⛔ 刻意**不再读** `get_dsh_theme`：那是个**真缺陷**（我自己引入的）
+ *
+ * `desktop.rs:33` 的 `get_dsh_theme()` **恒返回 `Theme::System`**（写死的常量，
+ * 零信息量；注释还写着「写死 Dark/Light 会在另一种系统上直接错色」）。
+ * 而本模块原先在挂载时 `setThemeMode(后端值)` ⇒ **每次启动都把用户存的主题
+ * 覆盖成「跟随系统」** ⇒ **主题选择根本不持久**，用户选了深色，下次开又变浅。
+ *
+ * 实测依据：契约表里**没有 `set_theme`** ⇒ 后端**没有**写入口 ⇒
+ * 前端才是唯一真源（这本来就是本模块自己写下的结论，却没贯彻到实现）。
+ *
+ * ⇒ **删掉这次调用**。它带来零信息，还顺手：
+ *   ① 修好持久化；
+ *   ② **清掉 DSH 概念泄漏**（自持 UI 不再依赖 `get_dsh_theme` 这个 DSH 命名的 API）
+ *      —— 这正是统一队列里挂了很久的那一项。
+ *
+ * `get_dsh_theme` 在 Rust 侧**保持注册不动**（不碰另一窗口的代码），
+ * 只是自持 UI 不再调用它。
  */
 export function useThemeBootstrap(): ThemeMode {
   const [mode, setMode] = useState<ThemeMode>(current)
   useEffect(() => onThemeChange(setMode), [])
-  useEffect(() => {
-    let alive = true
-    void invokeCmd<string | null>('get_dsh_theme')
-      .then((v: string | null) => {
-        if (!alive) return
-        // 后端只认 dark/light/system；'system' 时保留前端的跟随逻辑
-        if (v === 'dark' || v === 'light' || v === 'system') setThemeMode(v)
-      })
-      .catch(() => { /* 保持前端默认，不报错 */ })
-    return () => { alive = false }
-  }, [])
   // 跟随系统：系统切换时重算（仅 system 档需要）
   useEffect(() => {
     if (mode !== 'system' || typeof matchMedia === 'undefined') return
