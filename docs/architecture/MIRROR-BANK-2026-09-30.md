@@ -420,16 +420,12 @@ pub struct Hexagram { pub bits: u8 }   // ← 同名，但是**不同**类型
 |---|---|---|---|---|
 | `IITPhiCalculator` | l5 `nt_iit_phi.rs` (8) | l0 `nt_core_consciousness_types.rs` (6) | 0.75 | `compute_from_state` `subsystem_analysis` |
 | | | l2 `nt_world_model_v2.rs` (4) | 0.50 | `compute_phi` `record` `resonance_matrix` `subsystem_analysis` |
-| `WalshMemoryIndex` | l0 `nt_core_cross_layer.rs` (12) | types `nt_core_walsh.rs` (9) | 0.75 | `wh_dot` `wh_inverse` `wh_transform` |
-| | | l5 `nt_core_walsh.rs` (9) | 0.75 | 同上 |
+| ~~`WalshMemoryIndex`~~ | ~~l0 `nt_core_cross_layer.rs` (12)~~ | ~~types (9) / l5 (9)~~ | ~~0.75~~ | ⛔ **本行是错的，已剔除**（见 §8.4） |
 | `QuantumSuperposition` | l5 `nt_core_quantum_fusion.rs` (14) | l0 `nt_core_consciousness_types.rs` (10) | 0.71 | `fuse_evidence` `fuse_with` `decoherence_factor` `collapse_evidence` |
 | `BoundingBox` | l2 `nt_world/explore/types.rs` (8) | l1 `nt_memory_spatial/types.rs` (6) | 0.75 | `_width_deg` `_height_deg` |
 
-⚠️ `WalshMemoryIndex` 与本会话已收敛的 `hexagram_hadamard` 同属
-**Walsh-Hadamard 家族**，值得作为同一主题一起处理。
-⚠️ 但它的消费者分布**反直觉**：types 那份有 **2 个**消费者，
-而基准 l0 与 l5 各 **0 个** ⇒ 「方法多的是基准」这个假设在此例不成立。
 ⇒ **A 类也不等于「基准就是真身」**，仍须逐个核实谁是活的。
+（`WalshMemoryIndex` 曾被列在这里，**后经核实剔除** —— 见 §8.4。）
 
 **B 类 — J 0.50~0.71，中等共享，可能是真分叉也可能只是相关实现（5 组）**
 `SelfTestRegistry`(0.44) `KnowledgeHyperCube`(0.42) `Vec2`(0.42)
@@ -463,3 +459,37 @@ pub struct Hexagram { pub bits: u8 }   // ← 同名，但是**不同**类型
 2. `QuantumSuperposition` —— J=0.71，l0 是纯接收侧（低层持有高层算法的副本）。
 3. `IITPhiCalculator` —— 见 §7，**需先决定 `ios-bridge` 的 ABI 契约**，成本最高。
 4. B/C 两类先不动：共享面小，很可能是同名不同域，改动收益低、误伤风险高。
+
+### 8.4 ⛔ 纠正：§8 里 `WalshMemoryIndex` 一行是**错的**（已剔除）
+
+§8 初稿把它列为 A 类「types/l5 各缺 3 个方法」。**核实后不成立**：
+
+* `wh_dot` / `wh_inverse` / `wh_transform` 在 types 与 l5 **都存在**，
+  只是**私有** `fn`；我的工具 `impl_methods` 首版**只收 `pub fn`**
+  ⇒ 把「**可见性不同**」误报成「**缺方法**」。
+* 实际方法数：types **13**（9 pub + 4 私有）、l5 **13**（同）、
+  l0 **12**（全 pub）。types 与 l5 **完全一致** ⇒ 不构成分叉。
+* 已修工具：新增 `all_visibility` 参数与 `impl_visibility()`，
+  「缺方法」与「可见性不同」**分开报告**；修正后该组判据不成立，已从名单消失。
+
+**但核实过程产生了真结论**：types 与 l5 的 `WalshMemoryIndex` 是
+**功能等价的两份实现**（11/13 方法逐字相同，2 处差异是 types 侧多一个
+`.take(WH_DIM)` —— 而它在当前代码里是**空操作**，因为
+`x`/`y` 都由 `vec![0.0; WH_DIM]` 构造）。
+⇒ 已把 l5 的 416 行重复实现收敛为 `pub use` 引用 types 真身（提交 `25e02c99`）。
+
+### 8.5 两条新的方法论教训（本轮付出代价换来的）
+
+1. **「有差异」≠「有缺陷」**。我一度想把那个 `.take(WH_DIM)` 报成
+   「l5 缺边界保护 ⇒ 潜在 panic」，核实后发现是**空操作** ⇒ **不报**。
+   差异存在只说明实现不同，不说明一方有害。
+2. **⛔ 消费者计数必须含「重导出链」**。我用路径限定 grep 得出
+   「l5 那份 0 消费者」，实际它有 **2 个**消费者
+   （`nt_action_facade` / `nt_feel_facade` 都 `pub use` 了它）——
+   属正当豁免⑥。⇒ 只搜 `模块::符号` 这种直接形式会**系统性漏掉**
+   经 facade 的间接引用，**据此判死代码会误杀**。
+
+⚠️ 附带一条工程纪律：这次收敛里我犯的错误（跨 crate 私有成员不可见导致
+**12 个测试编译失败**）**只有 `cargo test` 能抓到**，`cargo check` 抓不到
+—— 测试代码只在 test 目标里编译。⇒ 涉及改实现或改可见性时，
+`cargo check` 通过**不能**作为完成依据。

@@ -143,8 +143,18 @@ def _brace_end(clean: str, open_at: int) -> int:
     return -1
 
 
-def impl_methods(fd, path):
-    """该文件里每个 `impl <Type>` 的方法名集合。返回 {Type: {method,...}}。"""
+def impl_methods(fd, path, all_visibility=False):
+    """该文件里每个 `impl <Type>` 的方法集合。返回 {Type: {method,...}}。
+
+    ⚠️ 2026-09-30 修正（真实误报）：首版**只收 `pub fn`**，于是把
+    「方法存在但可见性不同」误报成「缺方法」。
+    实测踩中：`WalshMemoryIndex` 的 l0 版把 `wh_dot`/`wh_inverse`/
+    `wh_transform` 设为 `pub fn`（12 个全 pub），而 types 与 l5 版
+    把它们设为**私有** `fn`（13 个 = 9 pub + 4 私有）。
+    ⇒ 首版报「types/l5 缺 3 个方法」是**错的**，它们存在，只是私有。
+    默认只收 `pub fn`（比较**公开 API 面**）；`all_visibility=True` 时
+    连私有一起收（比较**实现完整度**）。可见性差异另行报告，不混进「缺方法」。
+    """
     src = fd.read(path)
     if src is None:
         return {}
@@ -158,10 +168,34 @@ def impl_methods(fd, path):
         if e == -1:
             continue
         body = clean[b:e]
-        # 只收 `pub fn`；trait impl（`impl ... for ...`）不在此处匹配 _IMPL_RE
-        ms = set(re.findall(r'\n\s*pub\s+fn\s+([a-z_][A-Za-z0-9_]*)', body))
+        pat = (r'\n\s*(?:pub\s+)?fn\s+([a-z_][A-Za-z0-9_]*)'
+               if all_visibility else r'\n\s*pub\s+fn\s+([a-z_][A-Za-z0-9_]*)')
+        ms = set(re.findall(pat, body))
         if ms:
             out.setdefault(m.group(1), set()).update(ms)
+    return out
+
+
+def impl_visibility(fd, path):
+    """该文件里每个 impl 方法的可见性。返回 {Type: {method: 'pub'|'priv'}}。"""
+    src = fd.read(path)
+    if src is None:
+        return {}
+    clean = fd.strip_noise(src)
+    out = {}
+    for m in _IMPL_RE.finditer(clean):
+        b = clean.find('{', m.end() - 1)
+        if b == -1:
+            continue
+        e = _brace_end(clean, b)
+        if e == -1:
+            continue
+        body = clean[b:e]
+        vis = {}
+        for mm in re.finditer(r'\n\s*(pub\s+)?fn\s+([a-z_][A-Za-z0-9_]*)', body):
+            vis[mm.group(2)] = 'pub' if mm.group(1) else 'priv'
+        if vis:
+            out.setdefault(m.group(1), {}).update(vis)
     return out
 
 
@@ -180,7 +214,7 @@ def report_dup_impls(fd, roots, limit):
                 if not f.endswith('.rs'):
                     continue
                 p = os.path.relpath(os.path.join(dirpath, f), REPO)
-                for ty, ms in impl_methods(fd, p).items():
+                for ty, ms in impl_methods(fd, p, all_visibility=True).items():
                     where[ty].append((p, ms))
     rows = []
     for ty, sites in sorted(where.items()):
@@ -253,6 +287,14 @@ def report_dup_impls(fd, roots, limit):
         for p, ms, miss, jac in r['forks']:
             print('   %-13s %-46s %2d 方法  J=%.2f  缺: %s'
                   % (layer_of(p), p, len(ms), jac, ', '.join(miss)))
+            # 可见性差异单列，**不混进「缺方法」**（见 impl_methods 文档）
+            pv = impl_visibility(fd, p).get(r['ty'], {})
+            rv = impl_visibility(fd, r['ref'][0]).get(r['ty'], {})
+            visdiff = sorted(m for m in (set(pv) & set(rv)) if pv[m] != rv[m])
+            if visdiff:
+                print('      %s可见性不同: %s'
+                      % ('私有' if pv.get(visdiff[0]) == 'priv' else '公开',
+                         ', '.join(visdiff)))
         print()
     rows = forks
     if rows:
@@ -419,6 +461,34 @@ def selftest(_a):
         jac_co = len(m_ref & m_co) / len(m_ref | m_co)
         check(jac_co < 0.4,
               'coincidental same-name must NOT satisfy criterion: jac=%.2f' % jac_co)
+
+    # 3c) 可见性回归（2026-09-30 真实误报）：首版只收 `pub fn`，
+    # 把「方法存在但私有」误报成「缺方法」。实测踩中 `WalshMemoryIndex`：
+    # l0 全 12 个 pub，types/l5 各 9 pub + 4 私有 ⇒ 首版报「缺 3 个」是错的。
+    src_pub = "pub struct %s {}\nimpl %s {\n  pub fn a(&self){}\n  pub fn b(&self){}\n}\n"
+    src_priv = "pub struct %s {}\nimpl %s {\n  pub fn a(&self){}\n  fn b(&self){}\n}\n"
+    with tempfile.TemporaryDirectory() as td:
+        def _w2(fn, txt):
+            fp = os.path.join(td, fn)
+            with open(fp, 'w', encoding='utf-8') as fh:
+                fh.write(txt % ('T', 'T'))
+            return fp
+        pp = _w2('pub.rs', src_pub)
+        pr = _w2('priv.rs', src_priv)
+        pub_only = impl_methods(fd, pp).get('T', set())
+        full = impl_methods(fd, pr, all_visibility=True).get('T', set())
+        pub_only2 = impl_methods(fd, pr).get('T', set())
+        vis = impl_visibility(fd, pr).get('T', {})
+        check(len(pub_only) == 2, 'pub-only 抽取错: %r' % pub_only)
+        check(len(full) == 2, 'all_visibility 抽取错: %r' % full)
+        check(pub_only2 == {'a'},
+              '私有方法不得进 pub-only 集合: %r' % pub_only2)
+        check(vis.get('b') == 'priv' and vis.get('a') == 'pub',
+              '可见性标注错: %r' % vis)
+        # 关键回归：默认口径下两者 pub 集不同，但**全量口径下方法集相同**
+        # ⇒ 「缺方法」不成立，只能报「可见性不同」
+        check(len(full) == len(pub_only) and pub_only2 != pub_only,
+              '可见性场景未被区分')
 
     # 4) added_date 不可达路径 ⇒ 返回 '?' 而不是崩或编造日期
     check(added_date('no/such/file.rs') == '?',
