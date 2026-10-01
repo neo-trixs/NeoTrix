@@ -218,7 +218,7 @@ cmd:python3 scripts/ops/nt_decompose.py selftest   # ⑥ 拆解器自证仍绿�
 | 判据【实测】 | 值 | 含义 |
 |---|---:|---|
 | 同名函数 / 其中逐字相同 | 99 / **73** | 这部分是真空冗余 |
-| 同名但**实现不同** | **26** | ⚠️ 同名不同语义 |
+| 同名但**实现不同** | **12**（上一轮误报 **26**，已修正） | ⚠️ 逐条定性后 **0 个是 bug**：4 处纯格式化、1 处仅路径、4 处结构已分叉（高层确实没有那个字段）、1 处是**被两侧测试分别断言**的产品决策 |
 | types 独有（core 全仓无同名） | **51**（16 个只是搬了模块） | core 缺 35 个函数 |
 | types 独有 **pub 类型** | **39** | 删则丢公开 API |
 
@@ -226,6 +226,9 @@ cmd:python3 scripts/ops/nt_decompose.py selftest   # ⑥ 拆解器自证仍绿�
 rg 实测 types 全仓零调用 91 个（生产 89 + 测试 2），其中 **25 个是 pub** ⇒
 「仓内零调用」在本仓**不是**死代码判据（与 `nt_dup_dead` 的 `textual-prod` 桶结论一致）。
 
+⇒ ⚠️ **本轮修正了我自己上一轮的数字**：26 个「分歧」虚高，真实 12 个，
+且 **0 个是 bug**（成因逐条定性见 MIRROR-BANK §1.5）。顺带修掉两个工具缺陷：
+尾逗号未归一（fn_drift v3）、同名不同类型被误算分歧 + 同名取错函数体（新增 nt_diverge）。
 ⇒ **真正的问题不是「有两份」，而是两套记忆系统没有分工、没人知道该用哪个。**
 设计方案：**分层 + 显式归属，不删代码** —— types 作契约层（基类）、core 作实现层；
 ① 标注归属（1 行注释，消除歧义）② 把该簇纳入镜像观察名单（只报告不失败），
@@ -284,6 +287,8 @@ rg 实测 types 全仓零调用 91 个（生产 89 + 测试 2），其中 **25 �
 ```assert
 file:scripts/ops/nt_mirror_scan.py                # 跨 crate 模块级镜像（分叉）审计
 file:docs/architecture/MIRROR-BANK-2026-09-30.md # nt_core_bank 否决删除的取证 + 分层设计方案
+file:scripts/ops/nt_diverge.py                   # 类型感知的分歧定性（owner 配对 + 格式化感知）
+cmd:python3 scripts/ops/nt_diverge.py --selftest # 自证 4 例（含 3 例证伪）
 cmd:python3 scripts/ops/nt_mirror_scan.py selftest  # 自证 4 例（含 2 例证伪）
 file:scripts/ops/nt_audit_bootstrap.sh   # 审计能力的前置引导（本节的结构性修复）
 cmd:make audit-edges-list                 # 列出 member 与将产出的边表（亚秒级）

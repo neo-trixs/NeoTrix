@@ -140,13 +140,28 @@ def normalize_code(body):
     v1 只做 `re.sub(r'\\s+', ' ')` ⇒ `x + 1` 与 `x+1` 判为不同。
     实测这是**误报方向**（偏严）：格式化工具（rustfmt 的空格风格、
     手写习惯）会制造纯空格差异，而那不是语义差异。
-    ⇒ 现在把「空白 + 标点邻接空格」都归一，使 IDENTICAL 反映语义相等。
+
+    v2 补「空白 + 标点邻接空格」⇒ IDENTICAL 反映语义相等（30 → 上轮 62 份口径）。
+
+    ⚠️ **v3 修一个系统性假阳性（2026-09-30 实测）**：仅折叠标点邻接空格**不够** ——
+    `None=>return v()};` 与 `None=>return v(),};`、`&[A,B]` 与 `&[A,B,]` 都是
+    **尾逗号**差异，语义完全相同，却被判成 DIFFERENT。
+    在 nt_core_bank 上这造成 **26 个「分歧点」里绝大多数是假的**
+    ⇒ 直接导致「两侧有多少真语义差异」这个架构结论被高估。
+    ⇒ 现在**先去闭合定界符前的尾逗号**（连同其后空白反复处理），再折叠标点空格。
 
     ⚠️ 仍然**不做**的事：不删标识符、不重排语句、不做常量折叠。
     只归一排版 ⇒ 判据仍是「同形」，不是「等价」（工具定位是分诊单，非判决）。
     """
     s = re.sub(r'\s+', ' ', body).strip()
-    # 去掉所有标识符/字面量**内部以外**的空格：让 `a + b` == `a+b` == `a  +  b`
+    # 先消尾逗号：`,` 紧跟（或隔空白）闭合定界符 ⇒ 纯排版产物
+    for _ in range(3):
+        s2 = re.sub(r',(\s*[}\)\]])', r'\1', s)
+        s2 = re.sub(r'\s+', ' ', s2).strip()
+        if s2 == s:
+            break
+        s = s2
+    # 再折叠标点邻接空格：让 `a + b` == `a+b` == `a  +  b`
     s = re.sub(r'\s*([^\w\s])\s*', r'\1', s)
     return s.strip()
 
@@ -361,6 +376,21 @@ fn probe2(x: usize) -> usize {
     check(ba is not None and ba == bb,
           'whitespace-normalised identical bodies not equal: %r vs %r' % (ba, bb))
 
+    # 3.5) 尾逗号差异**必须**判为相同（2026-09-30 实测的系统性假阳性：
+    #      nt_core_bank 上「26 个分歧点」绝大多数只是尾逗号 ⇒ 架构结论被高估）
+    c1 = 'fn g(x: u32) -> u32 { match x { 0 => return 0, _ => 1 } }'
+    c2 = 'fn g(x: u32) -> u32 { match x { 0 => return 0, _ => 1, } }'
+    d1, _ = extract_fn(c1, 'g')
+    d2, _ = extract_fn(c2, 'g')
+    check(d1 is not None and d1 == d2,
+          'trailing comma must not count as a difference: %r vs %r' % (d1, d2))
+    e1 = 'fn h() -> Vec<u8> { &[1, 2, 3] }'
+    e2 = 'fn h() -> Vec<u8> { &[1, 2, 3,] }'
+    f1, _ = extract_fn(e1, 'h')
+    f2, _ = extract_fn(e2, 'h')
+    check(f1 is not None and f1 == f2,
+          'trailing comma in array literal must not count: %r vs %r' % (f1, f2))
+
     # 4) 注释差异不算差异（有意为之：注释不是语义）
     c1 = 'fn calc2(a: u32) -> u32 { /* 中文说明 */ a }'
     c2 = 'fn calc2(a: u32) -> u32 { a }'
@@ -393,8 +423,8 @@ fn probe2(x: usize) -> usize {
         for f in fails:
             sys.stderr.write('  - %s\n' % f)
         return 1
-    sys.stdout.write('selftest PASS: 7 例（含 3 例证伪：字符串/注释花括号、'
-                     'lifetime、声明-only）\n')
+    sys.stdout.write('selftest PASS: 9 例（含 5 例证伪：字符串/注释花括号、lifetime、'
+                     '声明-only、尾逗号×2）\n')
     return 0
 
 
