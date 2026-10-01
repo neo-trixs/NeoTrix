@@ -113,10 +113,24 @@ def fetch(slug: str) -> dict | None:
 
 
 # ⛔ 商用吸收必须警惕的许可（不构成法律意见，是**人工复核触发器**）
+# ⛔⛔ **必须小写归一化** —— 这是我自己的工具里一个**危险假阴性**：
+#   GitHub API 返回**大写** SPDX（'MIT' / 'Apache-2.0' / 'AGPL-3.0'），
+#   而我初版集合用小写 ⇒ 三个分类**全部恒为 0**，报告遂称
+#   「宽松 0 / 需复核 0」——**其中实际藏着一个 AGPL-3.0（copyleft，商用有风险）**。
+#   ⇒ 假阴性的代价：让不能商用的代码被当成可商用吸收。
+#   ⇒ 教训：枚举外部取值比较时，**归一化大小写**不是洁癖，是正确性。
 REVIEW_LICENSES = {'agpl-3.0', 'agpl-3.0-only', 'sspl-1.0', 'sspl-1.0.txt',
-                   'cc-by-nc-4.0', 'cc-by-nc-sa-4.0', 'cc-by-nc-3.0',
-                   'prosperity-public-license-3.0.0', 'bsl-1.0', 'elastic-2.0'}
-PERMISSIVE = {'mit', 'apache-2.0', 'bsd-2-clause', 'bsd-3-clause', 'isc', 'unlicense', '0bsd'}
+                   'cc-by-nc-4.0', 'cc-by-nc-sa-4.0', 'cc-by-nc-3.0', 'cc-by-nc-2.0',
+                   'prosperity-public-license-3.0.0', 'bsl-1.0', 'elastic-2.0',
+                   'epl-2.0', 'eupl-1.2', 'osl-3.0', 'cc-by-sa-4.0',
+                   # GitHub 无法判定 ⇒ **按需复核处理**，绝不当作「无限制」
+                   'noassertion', 'other', 'null'}
+PERMISSIVE = {'mit', 'apache-2.0', 'bsd-2-clause', 'bsd-3-clause', 'isc',
+              'unlicense', '0bsd', 'mit-0', 'apache-2.0-with-llvm-exception'}
+
+
+def norm_lic(v):
+    return (v or '').strip().lower() or 'noassertion'
 
 
 def main() -> int:
@@ -129,7 +143,19 @@ def main() -> int:
         rows = list(csv.DictReader(f))
     cache = load_cache()
 
-    todo = [r['repo'] for r in rows if r['repo'] not in cache]
+    # 优先级：user-list 优先（用户明确给的，最可能被吸收），
+    # 其次按星数降序（星数高的先抓，因为它们最值得判 license）。
+    # ⛔ 不按台账原序 —— 原序会把 375 条 trendshift 噪声排前面，
+    #    配额宝贵时先抓它们等于浪费。
+    def _prio(r):
+        st = r.get('stars') or ''
+        try:
+            st = int(st)
+        except ValueError:
+            st = 0
+        user_first = 0 if r['source'].startswith('user') else 1
+        return (user_first, -st)
+    todo = [r['repo'] for r in sorted(rows, key=_prio) if r['repo'] not in cache]
     covered = len(rows) - len(todo)
 
     print('台账元数据补全器\n')

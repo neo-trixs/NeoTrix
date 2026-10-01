@@ -1,0 +1,74 @@
+{
+  "_about": "吸收台账 —— **只登记真读过**的项目，可审计。解决「你吸收了多少」无法核对的问题。",
+  "_schema": {
+    "repo": "owner/name",
+    "read_level": "readme | source | design-doc | issue | none —— 读到哪一层（不是「看过」）",
+    "read_evidence": "**必填**：具体读了哪个文件/哪一节。填不出来 ⇒ 不许登记为已读",
+    "took": "取走了什么设计/思路（不是「参考了」）",
+    "landed": "落成哪个**文件:符号**；填 '-' 表示未落地",
+    "not_adopted_reason": "若未落地，**必填**原因（能力不存在 / 许可阻断 / 重复已有机制 …）",
+    "license": "SPDX，来自 GitHub API（.neotrix/absorption-cache.json）",
+    "commercial_ok": "true / false / unknown —— 商用吸收是否允许"
+  },
+  "_rules": [
+    "⛔ read_level=none 的条目不得计入「已吸收」数字。",
+    "⛔ landed='-' 时必须写 not_adopted_reason，否则门红。",
+    "⛔ 门会把「登记了但无 read_evidence」的条目报出来 —— 那类等于凑数。",
+    "⛔ 本文件**不统计** trendshift 批量登记的 375 条：那批只有名字、无元数据，不可评估。"
+  ],
+  "entries": [
+    {
+      "repo": "bytedance/UI-TARS-desktop",
+      "read_level": "readme",
+      "read_evidence": "README.md「News 2025-11-05 v0.3.0」与「Core Features」两节：Event Stream Viewer、timing statistics for tool calls",
+      "took": "① 工具调用耗时统计 ② 事件流可观测面板的形态",
+      "landed": "apps/neobot-desktop/neobot-ui/src/ipc.ts:invokeCmd + shell.tsx 活动面板",
+      "not_adopted_reason": "",
+      "license": "Apache-2.0",
+      "commercial_ok": true,
+      "note": "⛔ **未照搬其 Event Stream 本身**：那是协议驱动的 agent 事件流，而 neobot_send 返回单值 AgentRunResult ⇒ 后端无可流之物。改为记录自持 UI 自己的 IPC（可行且补了真缺陷）。"
+    },
+    {
+      "repo": "KingSora/OverlayScrollbars",
+      "read_level": "design-doc",
+      "read_evidence": "问题域（可滚动内容在覆盖式滚动条下无可见迹象），**未读源码**",
+      "took": "「可滚动必须有可见 affordance」这一设计意图",
+      "landed": "apps/neobot-desktop/neobot-ui/src/nb-scroll.css（纯 CSS scroll-shadow，background-attachment: local）",
+      "not_adopted_reason": "",
+      "license": "MIT",
+      "commercial_ok": true,
+      "note": "⛔ **不引该库**：新增依赖在商用路径上要过许可+体积+行为三道闸，而收益（一个阴影）小于引入面。纯 CSS 达成同一目的。"
+    },
+    {
+      "repo": "CopilotKit/OpenMuse",
+      "read_level": "none",
+      "read_evidence": "",
+      "took": "",
+      "landed": "-",
+      "not_adopted_reason": "**能力不存在**：其 AG-UI 事件流协议要求后端可流式推送；实测 neobot_send 返回单值 AgentRunResult（api.rs 契约表），无流可推 ⇒ 引入即是对不存在能力的投机实现",
+      "license": "MIT",
+      "commercial_ok": true
+    },
+    {
+      "repo": "omdsh-dev/DSH-better-sidebar",
+      "read_level": "none",
+      "read_evidence": "",
+      "took": "",
+      "landed": "-",
+      "not_adopted_reason": "**是插件平台能力**：三方注册侧边栏页面依赖插件体系，而插件域（store/ui）已随 DSH 显式下架（见 nt_feature_viability DROPPED）⇒ 引入等于把 DSH 概念搬回自持树。侧边栏本身 neobot-root 已自带（nb-convo-list）",
+      "license": "MIT",
+      "commercial_ok": true
+    },
+    {
+      "repo": "volcengine/OpenViking",
+      "read_level": "none",
+      "read_evidence": "",
+      "took": "",
+      "landed": "-",
+      "not_adopted_reason": "⛔ **许可阻断**：GitHub API 实测 **AGPL-3.0**（copyleft + 网络条款）。本项目走商用路径 ⇒ 未读完即排除，**不因星数高而破例**",
+      "license": "AGPL-3.0",
+      "commercial_ok": false
+    }
+  ],
+  "_stats_note": "本文件刻意**不含** 375 条 trendshift 批量登记：那批 ★=0、无 language、无 license，不可评估。它们的元数据补全由 scripts/ops/nt_absorption_enrich.py 负责（GitHub 配额 60/h，需增量跑）。"
+}

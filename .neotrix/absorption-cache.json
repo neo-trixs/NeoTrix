@@ -1,0 +1,380 @@
+{
+ "FoundationAgents/MetaGPT": {
+  "archived": false,
+  "description": "🌟 The Multi-Agent Framework: First AI Software Company, Towards Natural Language Programming",
+  "language": "Python",
+  "license": "MIT",
+  "pushed_at": "2026-01-21T10:12:33Z",
+  "stars": 70712,
+  "topics": [
+   "agent",
+   "gpt",
+   "llm",
+   "metagpt",
+   "multi-agent"
+  ]
+ },
+ "HKUDS/nanobot": {
+  "archived": false,
+  "description": "Ultra-lightweight, open-source, self-hosted personal AI agent framework in Python with WebUI, tools, memory, MCP, multi-agent workflows, automation, and chat ap",
+  "language": "Python",
+  "license": "MIT",
+  "pushed_at": "2026-10-01T06:13:40Z",
+  "stars": 48707,
+  "topics": [
+   "agent-framework",
+   "ai-agent",
+   "ai-agents",
+   "chatbot",
+   "chatops",
+   "discord-bot",
+   "llm-agents",
+   "llms"
+  ]
+ },
+ "NousResearch/hermes-agent": {
+  "archived": false,
+  "description": "The agent that grows with you",
+  "language": "Python",
+  "license": "MIT",
+  "pushed_at": "2026-10-01T06:14:37Z",
+  "stars": 250403,
+  "topics": [
+   "ai",
+   "ai-agent",
+   "ai-agents",
+   "anthropic",
+   "chatgpt",
+   "claude",
+   "claude-code",
+   "codex"
+  ]
+ },
+ "QwenLM/qwen-code": {
+  "archived": false,
+  "description": "An open-source AI coding agent that lives in your terminal.",
+  "language": "TypeScript",
+  "license": "Apache-2.0",
+  "pushed_at": "2026-10-01T06:15:47Z",
+  "stars": 28250,
+  "topics": [
+   "agentic",
+   "ai",
+   "ai-agent",
+   "ai-coding",
+   "cli",
+   "coding-agent",
+   "developer-tools",
+   "llm"
+  ]
+ },
+ "TanStack/table": {
+  "archived": false,
+  "description": "🤖 Headless UI for building powerful tables & datagrids for TS/JS -  React-Table, Vue-Table, Solid-Table, Svelte-Table",
+  "language": "TypeScript",
+  "license": "MIT",
+  "pushed_at": "2026-09-16T14:43:01Z",
+  "stars": 28474,
+  "topics": [
+   "datagrid",
+   "datagrids",
+   "datatable",
+   "filtering",
+   "grid",
+   "grouping",
+   "hooks",
+   "javascript"
+  ]
+ },
+ "ant-design/ant-design": {
+  "archived": false,
+  "description": "An enterprise-class UI design language and React UI library",
+  "language": "TypeScript",
+  "license": "MIT",
+  "pushed_at": "2026-10-01T01:52:46Z",
+  "stars": 99650,
+  "topics": [
+   "ant-design",
+   "antd",
+   "design-systems",
+   "react",
+   "typescript",
+   "ui-kit",
+   "ui-library"
+  ]
+ },
+ "bilawalsidhu/gods-eye-view": {
+  "archived": false,
+  "description": "A spy satellite simulator in your browser, except the data is real. Live open source spatial intelligence on a photorealistic 3D globe.",
+  "language": "JavaScript",
+  "license": "NOASSERTION",
+  "pushed_at": "2026-09-29T04:48:57Z",
+  "stars": 45805,
+  "topics": [
+   "3d-globe",
+   "cesium",
+   "flight-tracking",
+   "geospatial",
+   "geospatial-intelligence",
+   "gis",
+   "osint",
+   "photogrammetry"
+  ]
+ },
+ "browser-use/browser-use": {
+  "_error": "URLError"
+ },
+ "bytedance/UI-TARS-desktop": {
+  "archived": false,
+  "description": "The Open-Source Multimodal AI Agent Stack: Connecting Cutting-Edge AI Models and Agent Infra",
+  "language": "TypeScript",
+  "license": "Apache-2.0",
+  "pushed_at": "2026-09-24T06:48:56Z",
+  "stars": 39174,
+  "topics": [
+   "agent",
+   "agent-tars",
+   "browser-use",
+   "computer-use",
+   "cowork",
+   "gui-agent",
+   "gui-operator",
+   "mcp"
+  ]
+ },
+ "bytedance/deer-flow": {
+  "archived": false,
+  "description": "An open-source long-horizon SuperAgent harness that researches, codes, and creates. With the help of sandboxes, memories, tools, skill, subagents and message ga",
+  "language": "Python",
+  "license": "MIT",
+  "pushed_at": "2026-10-01T02:52:49Z",
+  "stars": 83290,
+  "topics": [
+   "agent",
+   "agentic",
+   "agentic-framework",
+   "agentic-workflow",
+   "ai",
+   "ai-agents",
+   "deep-research",
+   "harness"
+  ]
+ },
+ "crewAIInc/crewAI": {
+  "archived": false,
+  "description": "Framework for orchestrating role-playing, autonomous AI agents. By fostering collaborative intelligence, CrewAI empowers agents to work together seamlessly, tac",
+  "language": "Python",
+  "license": "MIT",
+  "pushed_at": "2026-10-01T05:12:58Z",
+  "stars": 59246,
+  "topics": [
+   "agents",
+   "ai",
+   "ai-agents",
+   "aiagentframework",
+   "llms"
+  ]
+ },
+ "deepseek-ai/deepseek-harness": {
+  "archived": false,
+  "description": "DeepSeek Harness: Everything is a Plugin.",
+  "language": "TypeScript",
+  "license": "MIT",
+  "pushed_at": "2026-09-29T09:41:57Z",
+  "stars": 241250,
+  "topics": [
+   "ai-agents",
+   "cordis",
+   "dsh",
+   "dsh-plugin"
+  ]
+ },
+ "getzep/graphiti": {
+  "archived": false,
+  "description": "Build Real-Time Knowledge Graphs for AI Agents",
+  "language": "Python",
+  "license": "Apache-2.0",
+  "pushed_at": "2026-09-30T08:02:29Z",
+  "stars": 31332,
+  "topics": [
+   "agents",
+   "graph",
+   "llms",
+   "rag"
+  ]
+ },
+ "harry0703/MoneyPrinterTurbo": {
+  "archived": false,
+  "description": "利用 AI 大模型和自动化工作流，根据主题或关键词一键生成高清短视频。Generate HD short videos from a topic or keyword with an automated AI workflow.",
+  "language": "Python",
+  "license": "MIT",
+  "pushed_at": "2026-10-01T02:14:45Z",
+  "stars": 127671,
+  "topics": [
+   "ai-video-generator",
+   "content-creation",
+   "ffmpeg",
+   "instagram-reels",
+   "llm",
+   "python",
+   "short-video",
+   "subtitles"
+  ]
+ },
+ "huggingface/smolagents": {
+  "archived": false,
+  "description": "🤗 smolagents: a barebones library for agents that think in code.",
+  "language": "Python",
+  "license": "Apache-2.0",
+  "pushed_at": "2026-09-30T05:07:25Z",
+  "stars": 29614,
+  "topics": []
+ },
+ "langchain-ai/langgraph": {
+  "archived": false,
+  "description": "Build resilient agents.",
+  "language": "Python",
+  "license": "MIT",
+  "pushed_at": "2026-10-01T06:16:53Z",
+  "stars": 42540,
+  "topics": [
+   "agents",
+   "ai",
+   "ai-agents",
+   "chatgpt",
+   "deepagents",
+   "enterprise",
+   "framework",
+   "gemini"
+  ]
+ },
+ "mem0ai/mem0": {
+  "archived": false,
+  "description": "The Memory Layer for AI Agents - Drop-in memory infrastructure for AI agents and apps. Context that persists. Built for production.",
+  "language": "Python",
+  "license": "Apache-2.0",
+  "pushed_at": "2026-09-30T10:03:23Z",
+  "stars": 66397,
+  "topics": [
+   "agentic-memory",
+   "agentic-memory-system",
+   "agents",
+   "ai",
+   "ai-agents",
+   "chatgpt",
+   "genai",
+   "llm"
+  ]
+ },
+ "microsoft/autogen": {
+  "archived": false,
+  "description": "A programming framework for agentic AI",
+  "language": "Python",
+  "license": "CC-BY-4.0",
+  "pushed_at": "2026-04-15T11:59:09Z",
+  "stars": 61248,
+  "topics": [
+   "agentic",
+   "agentic-agi",
+   "agents",
+   "ai",
+   "autogen",
+   "autogen-ecosystem",
+   "chatgpt",
+   "framework"
+  ]
+ },
+ "multica-ai/multica": {
+  "archived": false,
+  "description": "Make humans and AI agents work as one team — open-source and self-hostable.",
+  "language": "Go",
+  "license": "NOASSERTION",
+  "pushed_at": "2026-10-01T04:39:07Z",
+  "stars": 51774,
+  "topics": []
+ },
+ "openai/skills": {
+  "archived": false,
+  "description": "Skills Catalog for Codex",
+  "language": "Python",
+  "license": null,
+  "pushed_at": "2026-09-08T20:35:26Z",
+  "stars": 27833,
+  "topics": []
+ },
+ "paperclipai/paperclip": {
+  "archived": false,
+  "description": "The open-source app everyone uses to manage agents at work",
+  "language": "TypeScript",
+  "license": "MIT",
+  "pushed_at": "2026-10-01T06:13:49Z",
+  "stars": 95440,
+  "topics": []
+ },
+ "ruvnet/ruflo": {
+  "archived": false,
+  "description": "🌊 The original agent harness. Deploy intelligent multi-player swarms, coordinate autonomous workflows, and build conversational AI systems. Features adaptive me",
+  "language": "TypeScript",
+  "license": "MIT",
+  "pushed_at": "2026-10-01T00:12:04Z",
+  "stars": 73594,
+  "topics": [
+   "agentic-ai",
+   "agentic-framework",
+   "agentic-workflow",
+   "agents",
+   "ai-agents",
+   "ai-assistant",
+   "ai-skills",
+   "autonomous-agents"
+  ]
+ },
+ "topoteretes/cognee": {
+  "archived": false,
+  "description": "Cognee is the open-source AI memory platform for agents. Give your AI agents persistent long-term memory with small models for free",
+  "language": "Python",
+  "license": "Apache-2.0",
+  "pushed_at": "2026-10-01T00:30:34Z",
+  "stars": 31250,
+  "topics": [
+   "agent-memory",
+   "agent-skills",
+   "ai",
+   "ai-agents",
+   "ai-memory",
+   "cognitive-architecture",
+   "cognitive-memory",
+   "context-engineering"
+  ]
+ },
+ "vectorize-io/hindsight": {
+  "archived": false,
+  "description": "Hindsight: Agent Memory That Learns",
+  "language": "Python",
+  "license": "MIT",
+  "pushed_at": "2026-10-01T04:38:41Z",
+  "stars": 44020,
+  "topics": [
+   "agentic-ai",
+   "agents",
+   "ai-memory",
+   "memory"
+  ]
+ },
+ "volcengine/OpenViking": {
+  "archived": false,
+  "description": "Self-evolving Context Database for AI Agents. Unify Agent Memory, Knowledge RAG and Skills.",
+  "language": "Python",
+  "license": "AGPL-3.0",
+  "pushed_at": "2026-10-01T03:53:35Z",
+  "stars": 39066,
+  "topics": [
+   "agent-memory",
+   "agent-plugins",
+   "agentic-rag",
+   "context-database",
+   "dsh-plugin",
+   "self-evolving"
+  ]
+ }
+}
