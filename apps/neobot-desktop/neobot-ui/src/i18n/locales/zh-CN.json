@@ -4,11 +4,13 @@
   "shell.tagline": "自持前端 · 零 vendored 依赖",
   "shell.language": "语言",
   "shell.openLogs": "查看运行日志",
+  "shell.settings": "设置",
   "shell.quit": "退出",
   "shell.logs.title": "运行日志",
   "shell.logs.empty": "（无输出）",
   "shell.logs.close": "关闭",
   "chat.newConversation": "新建对话",
+  "chat.section": "会话",
   "chat.placeholder": "消息…（Enter 发送，Shift+Enter 换行）",
   "chat.send": "发送",
   "chat.creating": "建着…",
@@ -62,5 +64,9 @@
   "shell.activityClear": "清空",
   "shell.activityEmpty": "尚无调用记录",
   "chat.historyPaused": "历史加载中，先不让你发（免得与迟到消息重排）。",
-  "chat.inputPlaceholder": "消息…（Enter 发送，Shift+Enter 换行）"
+  "chat.inputPlaceholder": "消息…（Enter 发送，Shift+Enter 换行）",
+  "shell.theme": "主题",
+  "shell.themeSystem": "跟随系统",
+  "shell.themeDark": "深色",
+  "shell.themeLight": "浅色"
 }

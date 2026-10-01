@@ -122,6 +122,8 @@ const STUB_RETURNS = {
     crystal_version: '0.0.0', tool_count: 0, model: '', model_source: '',
   },
   neobot_send: {},
+  // 主题：契约表只有 get_dsh_theme（能报不能改），返回 'system' 让前端跟随系统
+  get_dsh_theme: 'system',
   // R2 外壳用到的已实现命令
   set_language: null,
   read_run_logs: 'line-1 harness ready\nline-2 self-hosted ui mounted\n',
@@ -282,7 +284,7 @@ async function probe(browser, label, failList, act, convoCount = 0) {
     feat.langBefore = await page.evaluate(() => document.documentElement.lang)
     feat.textBefore = await page.evaluate(
       () => document.querySelector('.nb-actions button')?.textContent ?? '')
-    await page.selectOption('.nb-lang select', 'en-US').catch(() => {})
+    await page.selectOption('[data-testid="nb-lang-select"]', 'en-US').catch(() => {})
     await page.waitForTimeout(500)
     feat.langAfter = await page.evaluate(() => document.documentElement.lang)
     feat.textAfter = await page.evaluate(
@@ -309,6 +311,32 @@ async function probe(browser, label, failList, act, convoCount = 0) {
         seesBotText: txt.includes('flex 失去约束'),
       }
     }).catch(() => null)
+
+    // ── 主题切换（把已移植却够不着的浅色盘接活）──
+    // ⛔ 双向：浅→深必须**真的**变。单向只测「能变浅」的话，
+    //    「恒为 dark」也能通过。
+    feat.theme = await page.evaluate(() => {
+      const q = () => document.documentElement.getAttribute('data-theme')
+      const cs = () => getComputedStyle(document.body).backgroundColor
+      return { initial: q(), initialBg: cs() }
+    }).catch(() => null)
+    // ⚠️ 必须用 **稳定钩子**（data-testid），不能用位置或文本匹配：
+    //    我加主题选择器时，语言选择器从第 1 个变成第 2 个 ⇒
+    //    位置式探针**静默地**改去操作主题选择器 ⇒ 报「语言切换坏了」，
+    //    而产品没坏。**选择器要抗布局变化。**
+    await page.selectOption('[data-testid="nb-theme-select"]', 'light').catch(() => {})
+    const sels = { theme: null, lang: null }
+    await page.waitForTimeout(400)
+    feat.themeLight = await page.evaluate(() => ({
+      attr: document.documentElement.getAttribute('data-theme'),
+      bg: getComputedStyle(document.querySelector('.nb-shell') || document.body).backgroundColor,
+    })).catch(() => null)
+    await page.selectOption('[data-testid="nb-theme-select"]', 'dark').catch(() => {})
+    await page.waitForTimeout(400)
+    feat.themeDark = await page.evaluate(() => ({
+      attr: document.documentElement.getAttribute('data-theme'),
+      bg: getComputedStyle(document.querySelector('.nb-shell') || document.body).backgroundColor,
+    })).catch(() => null)
 
     // a11y-1 role/aria 必须落在 box 上，**不是**遮罩
     feat.dialogOnBox = await page.evaluate(() => {
@@ -351,13 +379,13 @@ async function probe(browser, label, failList, act, convoCount = 0) {
     })
     // ⛔ 关键缺陷探测：切到 en-US 后，**聊天区**是否也变了？
     //    只换外壳不换正文 = 语言切换器是半成品。
-    await page.selectOption('.nb-lang select', 'zh-CN').catch(() => {})
+    await page.selectOption('[data-testid="nb-lang-select"]', 'zh-CN').catch(() => {})
     await page.waitForTimeout(400)
     feat.chatZh = await page.evaluate(() => {
       const m = document.querySelector('.nb-main')
       return (m?.innerText ?? '').replace(/\s+/g, ' ').slice(0, 60)
     })
-    await page.selectOption('.nb-lang select', 'en-US').catch(() => {})
+    await page.selectOption('[data-testid="nb-lang-select"]', 'en-US').catch(() => {})
     await page.waitForTimeout(400)
     feat.chatEn = await page.evaluate(() => {
       const m = document.querySelector('.nb-main')
@@ -427,7 +455,7 @@ try {
   const FAIL_CASES = [
     { name: 'neobot_convo_list 失败（挂载即触发）', fail: ['neobot_convo_list'] },
     { name: 'set_language 失败（需点切换）', fail: ['set_language'],
-      act: async (pg) => { await pg.selectOption('.nb-lang select', 'en-US').catch(() => {}) } },
+      act: async (pg) => { await pg.selectOption('[data-testid="nb-lang-select"]', 'en-US').catch(() => {}) } },
     { name: 'read_run_logs 失败（需点按钮）', fail: ['read_run_logs'],
       act: async (pg) => { await pg.click('.nb-actions button').catch(() => {}) } },
     { name: 'neobot_core_capabilities 失败（挂载即触发）', fail: ['neobot_core_capabilities'] },
@@ -463,6 +491,12 @@ for (const r of rows) {
     console.log(`     语言切换：documentElement.lang ${f.langBefore} → ${f.langAfter}`
       + ` · 按钮文案 ${JSON.stringify(f.textBefore)} → ${JSON.stringify(f.textAfter)}`)
     console.log(`     日志弹窗：${f.logsModal === null ? '⛔ 未打开' : '✅ ' + JSON.stringify(f.logsModal)}`)
+    const th = f.theme
+    if (th) {
+      console.log(`     主题：初始 ${th.initial} (${th.initialBg})`
+        + ` → 浅 ${f.themeLight?.attr} (${f.themeLight?.bg})`
+        + ` → 深 ${f.themeDark?.attr} (${f.themeDark?.bg})`)
+    }
     const mv = f.msgVisible
     console.log(`     消息可见性：可见文本 ${mv?.mainTextLen ?? '?'} 字 · `
       + `含用户原文=${mv?.seesUserText ? '✅' : '⛔'} 含 bot 原文=${mv?.seesBotText ? '✅' : '⛔'}`)
@@ -548,6 +582,14 @@ for (const r of rows) {
       if (!f.escClosed) { console.log('     ⛔ Esc 关不掉对话框'); fail++ }
       if (!f.focusRestored?.inBar) {
         console.log('     ⛔ 关闭后焦点未归还给触发元素'); fail++
+      }
+      const L = f.themeLight, D = f.themeDark
+      if (!L || L.attr !== 'light') {
+        console.log(`     ⛔ 切浅色未生效：${JSON.stringify(L)}`); fail++
+      } else if (!D || D.attr !== 'dark') {
+        console.log(`     ⛔ 切深色未生效：${JSON.stringify(D)}`); fail++
+      } else if (L.bg === D.bg) {
+        console.log('     ⛔ 深浅两档背景色相同 ⇒ 浅色盘仍是死代码'); fail++
       }
       const a = f.activity
       if (!a || !a.open) { console.log('     ⛔ 活动面板未渲染'); fail++ }

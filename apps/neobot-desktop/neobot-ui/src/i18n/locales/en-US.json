@@ -4,11 +4,13 @@
   "shell.tagline": "Self-hosted UI · zero vendored deps",
   "shell.language": "Language",
   "shell.openLogs": "View run logs",
+  "shell.settings": "Settings",
   "shell.quit": "Quit",
   "shell.logs.title": "Run logs",
   "shell.logs.empty": "(no output)",
   "shell.logs.close": "Close",
   "chat.newConversation": "New conversation",
+  "chat.section": "Conversations",
   "chat.placeholder": "Message… (Enter to send, Shift+Enter for newline)",
   "chat.send": "Send",
   "chat.creating": "Creating…",
@@ -62,5 +64,9 @@
   "shell.activityClear": "Clear",
   "shell.activityEmpty": "No calls recorded yet",
   "chat.historyPaused": "Loading history — sending is paused to avoid reordering late messages.",
-  "chat.inputPlaceholder": "Message… (Enter to send, Shift+Enter for newline)"
+  "chat.inputPlaceholder": "Message… (Enter to send, Shift+Enter for newline)",
+  "shell.theme": "Theme",
+  "shell.themeSystem": "System",
+  "shell.themeDark": "Dark",
+  "shell.themeLight": "Light"
 }

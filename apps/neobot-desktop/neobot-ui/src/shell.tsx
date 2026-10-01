@@ -23,8 +23,10 @@ import { invokeCmd as invoke } from './ipc'
 import { listen } from '@tauri-apps/api/event'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { loadApiPanel } from './api-panel'
 import { getLang, onLangChange, setLang, t, availableLangs, type Lang } from './i18n'
 import { clearActivity, getActivity, onActivity, type ActivityEntry } from './ipc'
+import { setThemeMode, useThemeBootstrap, type ThemeMode } from './theme-mode'
 import './shell.css'
 
 /**
@@ -138,7 +140,6 @@ function useModalBehaviour(open: boolean, onClose: () => void) {
  *    已接：`desktop-copy-run-logs`（顶栏已有日志面板，直接复用）。
  */
 const MENU_NOT_WIRED: Record<string, string> = {
-  'desktop-config': '设置面板',
   'desktop-about': '关于',
   'desktop-check-update': '检查更新',
   'desktop-restart': '重启',
@@ -148,7 +149,7 @@ const MENU_NOT_WIRED: Record<string, string> = {
   'desktop-documentation': '文档',
 }
 
-function useMacosMenu(onLogs: () => void, onNote: (msg: string) => void) {
+function useMacosMenu(onLogs: () => void, onNote: (msg: string) => void, onSettings: () => void) {
   useEffect(() => {
     if (!navigator.userAgent.includes('Macintosh')) return
     let stop: (() => void) | undefined
@@ -156,6 +157,10 @@ function useMacosMenu(onLogs: () => void, onNote: (msg: string) => void) {
       const id = event.payload
       if (id === 'desktop-copy-run-logs') {
         onLogs()
+        return
+      }
+      if (id === 'desktop-config') {
+        onSettings()
         return
       }
       const name = MENU_NOT_WIRED[id]
@@ -167,7 +172,7 @@ function useMacosMenu(onLogs: () => void, onNote: (msg: string) => void) {
       onNote(`原生菜单接线失败：${String(e).slice(0, 80)}`)
     })
     return () => stop?.()
-  }, [onLogs, onNote])
+  }, [onLogs, onNote, onSettings])
 }
 
 /** 顶栏：字标 + 语言切换 + 日志 + 退出。 */
@@ -182,11 +187,25 @@ export function Shell({ children }: { children?: React.ReactNode }) {
     return onActivity(() => setActivity(getActivity()))
   }, [])
   const [busy, setBusy] = useState(false)
+  // 深/浅切换：把 theme.css 里已移植但够不着的浅色盘接活
+  const theme = useThemeBootstrap()
   // 顶栏内联错误位：⛔ 不能没有它。
   //   原实现在 setLang 失败时 `catch {}` 空处理，注释还写着
   //   「不静默：语言没切成功就是没切成功」—— **注释与代码自相矛盾**：
   //   用户点了语言、界面静默回退、零解释，只能反复点。
   const [barErr, setBarErr] = useState<string | null>(null)
+
+  // 设置：数据源是后端契约面板（`api-panel.ts` 此前是**孤儿文件** ——
+  // 没有任何入口引用它，于是 macOS「设置…」只能回一句「尚未接入」）。
+  // 把它接成真正的设置面：既给了顶栏一个设置入口，也让那份清单有归宿。
+  const [settings, setSettings] = useState(false)
+  const settingsHost = useRef<HTMLDivElement | null>(null)
+  const openSettings = useCallback(() => setSettings(true), [])
+  const closeSettings = useCallback(() => setSettings(false), [])
+  const settingsModal = useModalBehaviour(settings, closeSettings)
+  useEffect(() => {
+    if (settingsHost.current) void loadApiPanel(settingsHost.current)
+  }, [settings])
 
   const [menuNote, setMenuNote] = useState<string | null>(null)
   const noteMenu = useCallback((msg: string) => {
@@ -212,7 +231,7 @@ export function Shell({ children }: { children?: React.ReactNode }) {
   }, [lang])
 
   // macOS 原生菜单 → 复用既有实现（日志面板）；其余动作给一句「尚未接入」。
-  useMacosMenu(() => void openLogs(), noteMenu)
+  useMacosMenu(() => void openLogs(), noteMenu, openSettings)
 
   const closeLogs = useCallback(() => setLogs(null), [])
   const dialogRef = useModalBehaviour(logs !== null, closeLogs)
@@ -239,8 +258,23 @@ export function Shell({ children }: { children?: React.ReactNode }) {
 
         <div className="nb-actions">
           <label className="nb-lang">
+            <span className="nb-lang-label">{t('shell.theme')}</span>
+            <select
+              data-testid="nb-theme-select"
+              value={theme}
+              disabled={busy}
+              onChange={(e) => setThemeMode(e.target.value as ThemeMode)}
+            >
+              <option value="system">{t('shell.themeSystem')}</option>
+              <option value="dark">{t('shell.themeDark')}</option>
+              <option value="light">{t('shell.themeLight')}</option>
+            </select>
+          </label>
+
+          <label className="nb-lang">
             <span className="nb-lang-label">{t('shell.language')}</span>
             <select
+              data-testid="nb-lang-select"
               value={lang}
               disabled={busy}
               onChange={(e) => void choose(e.target.value as Lang)}
@@ -256,7 +290,11 @@ export function Shell({ children }: { children?: React.ReactNode }) {
           <button type="button" disabled={busy} onClick={() => void openLogs()}>
             {t('shell.openLogs')}
           </button>
-          <button type="button" disabled={busy} onClick={() => void invoke('quit_app')}>
+          <span className="nb-actions-sep" aria-hidden="true" />
+          <button type="button" className="nb-primary" onClick={openSettings}>
+            {t('shell.settings')}
+          </button>
+          <button type="button" className="nb-danger" disabled={busy} onClick={() => void invoke('quit_app')}>
             {t('shell.quit')}
           </button>
         </div>
@@ -269,6 +307,34 @@ export function Shell({ children }: { children?: React.ReactNode }) {
       )}
 
       <main className="nb-main">{children}</main>
+
+      {/* 设置：内容是**后端契约面板**（读 `neobot_api_specs`，不硬编码清单）。
+          此前 `api-panel.ts` 是孤儿文件 —— 没有任何入口引用它，
+          于是 macOS「设置…」只能回「尚未接入」，顶栏也没有设置入口。 */}
+      {settings && (
+        <div
+          className="nb-modal"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeSettings()
+          }}
+        >
+          <section
+            className="nb-modal-box nb-modal-wide"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('shell.settings')}
+            ref={settingsModal}
+          >
+            <header>
+              <strong>{t('shell.settings')}</strong>
+              <button type="button" data-autofocus onClick={closeSettings}>
+                {t('shell.logs.close')}
+              </button>
+            </header>
+            <div className="nb-scroll nb-settings-body" ref={settingsHost} />
+          </section>
+        </div>
+      )}
 
       {/* 遮罩只是 backdrop，**不是** dialog —— role/aria 必须落在 box 上，
           否则辅助技术会把整块遮罩当成对话框，读屏体验是错的。
