@@ -517,9 +517,27 @@ pub struct Hexagram { pub bits: u8 }   // ← 同名，但是**不同**类型
 | `l5_cognition/nt_core/multi_agent/`（含 coordinator/ graph_orch/） | 15 | **被独立 crate 取代**：`l5_cognition/mod.rs` 用 `pub use neotrix_multi_agent::multi_agent;`，全仓无 `mod multi_agent` 声明 ⇒ **15 文件 / 4,655 行 / 177 测试**全部从未编译 |
 | `l1_action/nt_act/agent_loop/` | 9 | 待核实 |
 | `l2_perception/nt_world/temporal_kg/` | 8 | 待核实 |
-| `l5_cognition/nt_core/nt_consciousness_core/` | 7 | 待核实 |
+| `l5_cognition/nt_core/nt_consciousness_core/` | 7 | ✅ **已清理**（见 §9.5） |
 | `l4_emotion/nt_memory/{hybrid_retrieval,tiered_memory,decay_forgetting}` | 17 | 待核实 |
-| 其他零散 | 156 | 待核实 |
+| 其他零散 | 138 | 待核实 |
+
+⚠️ **孤儿是「文件级」事实，不是「目录级」判决**。我一度把
+`nt_consciousness_core/` 整个目录（33 文件 / 8,637 行）当成孤儿，
+**这是错的** —— 该目录 `mod.rs` 声明了 **25 个活模块**
+（且 `nt_consciousness/mod.rs:25` 还 `pub use ... as engine;`），
+真孤儿只有 **7 个**。⇒ **必须先读 `mod.rs` 的声明列表，再谈删除。**
+
+### 9.5 ✅ 已清理一处：`nt_consciousness_core/` 的 7 个孤儿（2,130 行 / 12 测试）
+
+删除依据（三条都实测）：① 未被 `mod` 声明 ⇒ 不参与编译；
+② 7 个文件的**全部** `pub` 符号在簇外引用数为 **0**（逐文件提取后全仓搜索）；
+③ 并发安全（mtime 非今日、git status 干净）。
+**最强证据**：删后 `neotrix --lib` 仍 **12,217 绿**（守恒）——
+若曾被编译，删掉必然掉测试数。
+
+⛔ 同目录下**刻意保留** `archive/`（3 文件 / 1,079 行 / 19 测试）：
+它是**有意的归档区**（名字即语义），不是遗漏的声明。
+⇒ 这正是「孤儿 ≠ 该删」的例子：同目录 33 个文件里只有 7 个是缺陷。
 
 ### 9.3 ⛔ 本轮**不删**任何孤儿（本节只取证）
 
