@@ -10,7 +10,7 @@
 //! 凭据律：`channel_bots` 只存 `token_env`（**变量名**），不存 token 值。
 //! 值由适配器发送/接收时从环境现读，状态接口因此永不回传凭据。
 
-use rusqlite::params;
+use rusqlite::{OptionalExtension, params};
 
 use crate::nt_channel::AccessMode;
 use crate::nt_error::NtBotError;
@@ -240,6 +240,19 @@ impl NeobotStore {
             ],
         )?;
         Ok(())
+    }
+
+    /// 待补发是否存在（补发去重用：同一意图只留一行）。
+    pub fn has_pending_delivery(&self, id: &str) -> Result<bool, NtBotError> {
+        let found: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT id FROM pending_deliveries WHERE id=?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .optional()?;
+        Ok(found.is_some())
     }
 
     /// 到期的待补发（按创建时间正序，先到先补）。

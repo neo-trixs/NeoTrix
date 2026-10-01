@@ -896,17 +896,36 @@ pub fn deliver_result(
         }
         Err(err) => {
             // 发不出去就记一条待补发（而不是丢）。
-            store.enqueue_delivery(&crate::nt_store::PendingDelivery {
-                id: uuid::Uuid::new_v4().to_string(),
-                channel: channel.to_owned(),
-                bot_id: bot_id.to_owned(),
-                chat: chat.to_owned(),
-                origin_message: origin_message.to_owned(),
-                text: text.to_owned(),
-                task_id: task_id.to_owned(),
-                attempts: 0,
-                created_at: Utc::now().to_rfc3339(),
-            })?;
+            //
+            // ⛔ id 是效果键（任务 + 内容），不是 uuid：同一任务同一文本
+            // 重试只留一行 —— 否则扫补发时会把同一条结果发两遍（用户收到
+            // 两条 identical 回复，而那是重试抖动，不是两个结果）。
+            // 已在队里（重试撞上上次）不重复记，但仍返回 Err ——
+            // 这次确实没发出去，调用方有权知道。
+            let key = crate::nt_effect_key::effect_key(
+                &format!("task/{task_id}"),
+                "deliver_result",
+                &serde_json::json!({
+                    "channel": channel,
+                    "chat": chat,
+                    "origin_message": origin_message,
+                    "text": text,
+                }),
+            )
+            .map_err(crate::nt_error::NtBotError::Invalid)?;
+            if !store.has_pending_delivery(&key)? {
+                store.enqueue_delivery(&crate::nt_store::PendingDelivery {
+                    id: key,
+                    channel: channel.to_owned(),
+                    bot_id: bot_id.to_owned(),
+                    chat: chat.to_owned(),
+                    origin_message: origin_message.to_owned(),
+                    text: text.to_owned(),
+                    task_id: task_id.to_owned(),
+                    attempts: 0,
+                    created_at: Utc::now().to_rfc3339(),
+                })?;
+            }
             Err(err)
         }
     }
@@ -1490,6 +1509,35 @@ mod tests {
             Some("555"),
             "payload 的 edit_of 必须原样送到渠道（不能被 None 顶掉）"
         );
+    }
+
+    #[test]
+    fn 补发重试同一任务同一文本只留一行() {
+        // ⛔ 超时重试/调用方重入时，同一结果不能进两行 ——
+        // 否则扫补发会把同一条发两遍。id 是效果键（任务 + 内容），不是 uuid。
+        let st = store("dedup-delivery");
+        let fail = FakeChannel { sent: std::cell::RefCell::new(Vec::new()), fail: true };
+        for _ in 0..2 {
+            assert!(
+                deliver_result(&st, &fail, "fake", "b1", "42", "111", "t1", "结果正文").is_err(),
+                "发送失败必须返回 Err（这次确实没发出去）"
+            );
+        }
+        let rows = st.due_deliveries(100).expect("读补发队列");
+        assert_eq!(rows.len(), 1, "同一意图重试只留一行，实际：{}", rows.len());
+        assert_eq!(rows[0].task_id, "t1");
+    }
+
+    #[test]
+    fn 补发文本变了就是新意图() {
+        // 同一任务、不同文本 = 两次不同的事，必须各留一行。
+        // 反例：若按 task_id 去重，编辑后的重发会被吞掉。
+        let st = store("dedup-delivery-text");
+        let fail = FakeChannel { sent: std::cell::RefCell::new(Vec::new()), fail: true };
+        assert!(deliver_result(&st, &fail, "fake", "b1", "42", "111", "t1", "第一版").is_err());
+        assert!(deliver_result(&st, &fail, "fake", "b1", "42", "111", "t1", "第二版").is_err());
+        let rows = st.due_deliveries(100).expect("读补发队列");
+        assert_eq!(rows.len(), 2, "文本不同必须各留一行，实际：{}", rows.len());
     }
 
     #[test]

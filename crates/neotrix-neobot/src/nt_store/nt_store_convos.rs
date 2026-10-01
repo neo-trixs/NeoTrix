@@ -117,7 +117,7 @@ impl NeobotStore {
         let sql = format!(
             "SELECT c.id,c.kind,c.title,c.created_at,c.muted,
                (SELECT COUNT(*) FROM tasks t WHERE t.conversation_id=c.id),
-               COALESCE((SELECT MAX(t.created_at) FROM tasks t WHERE t.conversation_id=c.id), c.created_at),
+               COALESCE((SELECT MAX(t.created_at) FROM tasks t WHERE t.conversation_id=c.id), (SELECT MAX(m.created_at) FROM messages m WHERE m.convo_id=c.id), c.created_at),
                (SELECT COUNT(*) FROM tasks t WHERE t.conversation_id=c.id
                  AND t.created_at > COALESCE((SELECT last_read_at FROM read_marks WHERE convo_id=c.id), c.created_at)),
                c.parent_id, c.origin
@@ -381,7 +381,7 @@ impl NeobotStore {
         Ok(())
     }
 
-    fn touch_conversation(&self, convo_id: &str) -> Result<(), NtBotError> {
+    pub(crate) fn touch_conversation(&self, convo_id: &str) -> Result<(), NtBotError> {
         let now = chrono::Utc::now().to_rfc3339();
         self.conn.execute(
             "UPDATE conversations SET updated_at=?1 WHERE id=?2",

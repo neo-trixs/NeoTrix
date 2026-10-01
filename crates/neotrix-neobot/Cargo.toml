@@ -16,6 +16,8 @@ serde_json = { workspace = true }
 # Qwen-MM-Plugins 会话客户端解码 MCP image 块用（与 neotrix-core 同版本，
 # Cargo.lock 已有 base64 0.21.7，只加图边不加新包）。
 base64 = "0.21"
+# 效果键 sha256（`nt_effect_key`；lock 已有 sha2 0.10.9，只加图边不加新包）。
+sha2 = "0.10"
 # PDF 原生坐标 grounding（`nt_pdf_ground` 读 content 流取文字位置 homage：
 # 与 neotrix-core 同为 lopdf 0.42，lock 已有，只加图边）。
 lopdf = "0.42"

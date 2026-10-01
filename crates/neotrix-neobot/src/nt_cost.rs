@@ -100,6 +100,160 @@ pub fn cost_for(
     (0.0, false)
 }
 
+// ── 用量账本（按天按模型；口径取自 OpenGhost `usage.js`，MIT） ──
+//
+// 计价回答「多少钱」，账本回答「花在哪」：哪天、哪个 provider/model、
+// 发了多少、命中多少缓存、回了多少、几次请求。两者是同一枚硬币的两面，
+// 故同住 `nt_cost` 而不另开模块。
+//
+// 与上游同口径处：五列（input/cached/written/output/requests）、
+// cached 钳制 ≤ input、全零不记、按本地日历天切分、`since` 为首条 epoch 毫秒。
+// 偏离处（有意）：
+//   ① provider 不限死 4 家 —— `[a-z0-9_-]{1,32}` 即认（本仓 provider 会长）；
+//   ② 落盘是显式路径的 JSON 文件（原子 rename），不是 localStorage ——
+//      库不拼路径（`data_dir` 是 app 壳的事），调用方传 path；
+//   ③ 坏文件 Err 不回默认 —— 静默重置等于銷账，而调用方以为「还没花过」。
+
+/// 单日单模型行。
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct DayUsage {
+    pub input: u64,
+    pub cached: u64,
+    pub written: u64,
+    pub output: u64,
+    pub requests: u64,
+}
+
+/// 用量账本。
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct UsageLedger {
+    pub version: u32,
+    /// 首条记录的 epoch 毫秒（0 = 空账本）。
+    pub since: i64,
+    /// 天（本地 `YYYY-MM-DD`）→ `provider|model` → 行。
+    pub days: std::collections::BTreeMap<String, std::collections::BTreeMap<String, DayUsage>>,
+    /// `provider|model` → 展示名。
+    pub names: std::collections::BTreeMap<String, String>,
+}
+
+/// 汇总口径。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct UsageTotals {
+    pub input: u64,
+    pub cached: u64,
+    pub written: u64,
+    pub output: u64,
+    pub requests: u64,
+}
+
+impl UsageTotals {
+    /// 计费 token（input + output；cached/written 是 input 的子集，不另计）。
+    pub fn tokens(self) -> u64 {
+        self.input.saturating_add(self.output)
+    }
+}
+
+fn valid_provider(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 32
+        && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+}
+
+fn today_key() -> String {
+    chrono::Local::now().format("%Y-%m-%d").to_string()
+}
+
+impl UsageLedger {
+    /// 记一轮问答的用量。全零不记（上游同）；cached 钳制 ≤ input。
+    pub fn record(
+        &mut self,
+        provider: &str,
+        model: &str,
+        name: Option<&str>,
+        input: u64,
+        cached: u64,
+        written: u64,
+        output: u64,
+    ) -> Result<(), String> {
+        if !valid_provider(provider) {
+            return Err(format!("bad usage provider '{provider}'"));
+        }
+        if model.trim().is_empty() {
+            return Err("usage model is empty".to_owned());
+        }
+        if input == 0 && output == 0 {
+            return Ok(());
+        }
+        if self.since == 0 {
+            self.since = chrono::Utc::now().timestamp_millis();
+            self.version = 1;
+        }
+        let id = format!("{provider}|{model}");
+        let row = self.days.entry(today_key()).or_default().entry(id.clone()).or_default();
+        row.input = row.input.saturating_add(input);
+        row.cached = row.cached.saturating_add(cached.min(input));
+        row.written = row.written.saturating_add(written);
+        row.output = row.output.saturating_add(output);
+        row.requests = row.requests.saturating_add(1);
+        if let Some(name) = name {
+            if !name.trim().is_empty() {
+                self.names.insert(id, name.trim().to_owned());
+            }
+        }
+        Ok(())
+    }
+
+    /// 最近 `days` 个本地日历天（含今天）的汇总；`days == 0` = 有史以来。
+    pub fn totals(&self, days: u64) -> UsageTotals {
+        let cutoff = if days == 0 {
+            String::new()
+        } else {
+            let mut date = chrono::Local::now().date_naive();
+            for _ in 1..days {
+                date = date.pred_opt().unwrap_or(date);
+            }
+            date.format("%Y-%m-%d").to_string()
+        };
+        let mut out = UsageTotals::default();
+        for (day, models) in &self.days {
+            if !cutoff.is_empty() && day.as_str() < cutoff.as_str() {
+                continue;
+            }
+            for row in models.values() {
+                out.input = out.input.saturating_add(row.input);
+                out.cached = out.cached.saturating_add(row.cached);
+                out.written = out.written.saturating_add(row.written);
+                out.output = out.output.saturating_add(row.output);
+                out.requests = out.requests.saturating_add(row.requests);
+            }
+        }
+        out
+    }
+
+    /// 读盘：缺文件 = 空账本；坏文件 = Err（静默重置等于銷账）。
+    pub fn load(path: &std::path::Path) -> Result<Self, String> {
+        match std::fs::read_to_string(path) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
+            Err(e) => Err(format!("读用量账本失败：{e}")),
+            Ok(s) => serde_json::from_str(&s).map_err(|e| format!("用量账本不是合法 JSON：{e}")),
+        }
+    }
+
+    /// 写盘（临时文件 + 原子 rename；半截文件不合法，必须换名）。
+    pub fn save(&self, path: &std::path::Path) -> Result<(), String> {
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent).map_err(|e| format!("建用量目录失败：{e}"))?;
+            }
+        }
+        let body =
+            serde_json::to_string_pretty(self).map_err(|e| format!("用量账本序列化失败：{e}"))?;
+        let tmp = path.with_extension("tmp");
+        std::fs::write(&tmp, body).map_err(|e| format!("写用量账本失败：{e}"))?;
+        std::fs::rename(&tmp, path).map_err(|e| format!("用量账本换名失败：{e}"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{CostPolicy, cost_for, price_for};
@@ -138,5 +292,65 @@ mod tests {
         // 运维配置优先于官方表
         let policy = CostPolicy { price_in_per_m: Some(100.0), price_out_per_m: None };
         assert_eq!(cost_for(policy, "claude-sonnet-5", 1_000_000, 0), (100.0, true));
+    }
+
+    #[test]
+    fn 账本校验与汇总() {
+        use super::UsageLedger;
+        let mut ledger = UsageLedger::default();
+        // 非法 provider / 空模型被拒。
+        assert!(ledger.record("DeepSeek", "m", None, 1, 0, 0, 1).is_err());
+        assert!(ledger.record("deepseek", "  ", None, 1, 0, 0, 1).is_err());
+        // 全零不记（since 保持 0，还是空账本）。
+        ledger.record("deepseek", "deepseek-chat", None, 0, 0, 0, 0).expect("全零不报错");
+        assert_eq!(ledger.since, 0);
+        // 正常记：cached 钳制 ≤ input。
+        ledger
+            .record("deepseek", "deepseek-chat", Some("DeepSeek"), 100, 999, 10, 50)
+            .expect("记");
+        let all = ledger.totals(0);
+        assert_eq!((all.input, all.cached, all.written, all.output, all.requests), (100, 100, 10, 50, 1));
+        assert_eq!(all.tokens(), 150);
+        // 今天窗口与有史以来一致（只有今天有数）。
+        assert_eq!(ledger.totals(1), all);
+        assert_eq!(ledger.totals(30), all);
+    }
+
+    #[test]
+    fn 账本窗口按日历天切分() {
+        use super::{DayUsage, UsageLedger};
+        let mut ledger = UsageLedger::default();
+        ledger.record("qwen", "qwen-plus", None, 10, 0, 0, 5).expect("记今天");
+        // 手工塞一条昨天（直写 map，不走 record 的今天键）。
+        let yesterday = (chrono::Local::now().date_naive().pred_opt().unwrap()).format("%Y-%m-%d").to_string();
+        ledger.days.entry(yesterday).or_default().insert(
+            "qwen|qwen-plus".to_owned(),
+            DayUsage { input: 20, cached: 0, written: 0, output: 0, requests: 1 },
+        );
+        assert_eq!(ledger.totals(1).input, 10);
+        assert_eq!(ledger.totals(2).input, 30);
+        assert_eq!(ledger.totals(0).input, 30);
+    }
+
+    #[test]
+    fn 账本落盘往返与坏文件() {
+        use super::UsageLedger;
+        let dir = std::env::temp_dir().join(format!("nt-cost-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("建目录");
+        let path = dir.join("usage.json");
+        // 缺文件 = 空账本，不报错。
+        assert_eq!(UsageLedger::load(&path).expect("缺文件").since, 0);
+        let mut ledger = UsageLedger::load(&path).expect("空账");
+        ledger.record("ollama", "llama", None, 7, 0, 0, 3).expect("记");
+        ledger.save(&path).expect("存");
+        // 换名是原子的：tmp 不该留下。
+        assert!(!path.with_extension("tmp").exists());
+        let back = UsageLedger::load(&path).expect("读回");
+        assert_eq!(back.totals(0).input, 7);
+        // 坏文件 Err 不回默认（静默重置等于銷账）。
+        std::fs::write(&path, "{broken").expect("写坏");
+        assert!(UsageLedger::load(&path).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

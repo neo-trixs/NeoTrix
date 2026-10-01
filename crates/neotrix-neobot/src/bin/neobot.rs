@@ -248,6 +248,8 @@ enum MemoryCmd {
         #[arg(long, default_value_t = false)]
         yes: bool,
     },
+    /// 撤一版（回到上一次记忆；无历史时是 no-op，不是错）.
+    Undo,
 }
 
 #[derive(Debug, Subcommand)]
@@ -429,6 +431,7 @@ fn real_main() -> Result<(), NtBotError> {
             MemoryCmd::Set { text } => cmd_memory_set(&text),
             MemoryCmd::Get => cmd_memory_get(),
             MemoryCmd::Clear { yes } => cmd_memory_clear(yes),
+            MemoryCmd::Undo => cmd_memory_undo(),
         },
         Cmd::Member { cmd } => match cmd {
             MemberCmd::Add { id, kind } => cmd_member_add(&id, &kind),
@@ -1069,6 +1072,16 @@ fn cmd_memory_clear(yes: bool) -> Result<(), NtBotError> {
     let cfg = load_config()?;
     std::fs::remove_file(neotrix_neobot::nt_memory::memory_path(&cfg.data_dir))?;
     println!("neobot memory cleared");
+    Ok(())
+}
+
+/// 撤一版记忆。回退本身也可再撤（撤前先把当前存进历史）。
+fn cmd_memory_undo() -> Result<(), NtBotError> {
+    let cfg = load_config()?;
+    match neotrix_neobot::nt_memory::memory_undo(&cfg.data_dir)? {
+        Some(_) => println!("neobot memory undone"),
+        None => println!("neobot memory nothing to undo"),
+    }
     Ok(())
 }
 

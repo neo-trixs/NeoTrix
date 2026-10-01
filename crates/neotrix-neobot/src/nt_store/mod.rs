@@ -379,6 +379,18 @@ impl NeobotStore {
                convo_id TEXT PRIMARY KEY, last_read_at TEXT NOT NULL)",
             [],
         )?;
+        // 聊天消息表（会话内问答落库；见 nt_store_messages）。
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS messages(
+               id TEXT PRIMARY KEY, convo_id TEXT NOT NULL, role TEXT NOT NULL,
+               text TEXT NOT NULL, created_at TEXT NOT NULL)",
+            [],
+        )?;
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_messages_convo
+             ON messages(convo_id, created_at)",
+            [],
+        )?;
         // 存量任务回填默认群组（仅当有无归属任务时；用户删掉全体后不再复活）。
         let now = chrono::Utc::now().to_rfc3339();
         let orphans: i64 = self
@@ -435,6 +447,8 @@ pub use nt_store_channels::{
 mod nt_store_convos;
 mod nt_store_files;
 mod nt_store_ledger;
+mod nt_store_messages;
+pub use nt_store_messages::{ChatMessage, MESSAGE_MAX_CHARS};
 mod nt_store_providers;
 mod nt_store_reply_tag;
 mod nt_store_routines;
