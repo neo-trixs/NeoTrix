@@ -493,3 +493,54 @@ pub struct Hexagram { pub bits: u8 }   // ← 同名，但是**不同**类型
 **12 个测试编译失败**）**只有 `cargo test` 能抓到**，`cargo check` 抓不到
 —— 测试代码只在 test 目标里编译。⇒ 涉及改实现或改可见性时，
 `cargo check` 通过**不能**作为完成依据。
+
+---
+
+## 9. ⛔ 新发现的盲区：242 个文件**从未被编译**（含 994 个从不运行的测试）
+
+### 9.1 为什么这重要：它们的「绿灯」是假的
+`nt_dup_dead` / `nt_pub_dead` 都基于源码**文本**分析「有什么」，
+而这类文件的问题是「**是否被编译**」—— 文本再丰富也不回答这个问题。
+⇒ 本轮新增 `nt_mirror_scan --orphan`：从 crate 根（`lib.rs`/`main.rs`）
+沿 **mod 声明链**走一遍，走不到的文件即候选。
+
+**规模（实测）**：磁盘 2,762 个 `.rs`，可达 2,550，**孤儿 212 个**，
+其中含 **994 个 `#[test]`** —— 这些测试**从未运行过**。
+
+⚠️ 它们在 CI/本地 `cargo test` 输出里**根本不出现**，
+所以「12,217 全绿」并不代表它们被验证过。
+
+### 9.2 成因分类（按目录聚合，均为实测）
+
+| 目录 | 文件数 | 说明 |
+|---|---|---|
+| `l5_cognition/nt_core/multi_agent/`（含 coordinator/ graph_orch/） | 15 | **被独立 crate 取代**：`l5_cognition/mod.rs` 用 `pub use neotrix_multi_agent::multi_agent;`，全仓无 `mod multi_agent` 声明 ⇒ **15 文件 / 4,655 行 / 177 测试**全部从未编译 |
+| `l1_action/nt_act/agent_loop/` | 9 | 待核实 |
+| `l2_perception/nt_world/temporal_kg/` | 8 | 待核实 |
+| `l5_cognition/nt_core/nt_consciousness_core/` | 7 | 待核实 |
+| `l4_emotion/nt_memory/{hybrid_retrieval,tiered_memory,decay_forgetting}` | 17 | 待核实 |
+| 其他零散 | 156 | 待核实 |
+
+### 9.3 ⛔ 本轮**不删**任何孤儿（本节只取证）
+
+理由：
+1. **规模** —— 212 文件 + 994 个测试远超一次清理的合理范围；
+2. **可能有正当引用** —— `include!` 宏、feature 门控下的 `mod`、
+   外部路径依赖，静态不可判定；
+3. **`multi_agent` 那 15 文件**虽然成因已查实（被独立 crate 取代），
+   但仍需确认独立 crate **功能完全覆盖**旧目录（4,655 行不是小数目）。
+
+⇒ 处置方式：清单已由工具固化（`nt_mirror_scan --orphan --limit 400`），
+可按目录分批逐个核实后处置。
+
+### 9.4 工具实现中踩的四个坑（记录下来，因为都很反直觉）
+
+| 坑 | 现象 | 修法 |
+|---|---|---|
+| 1 | 候选路径都不存在时**没有 break**，沿用上一轮路径继续拼 | 两个候选都落空即 `continue` |
+| 2 | 漏了 Rust 2018 **「同名 .rs 与同名目录并存」**规则（`nt_memory_search.rs` + `nt_memory_search/`） | 非 `mod.rs` 文件内的 `mod`，**优先找同名子目录** |
+| 3 | 修坑 2 时把 `lib.rs` 也按「去 `.rs` 得 x_stem」处理 ⇒ 算出 `src/li/`（不存在），可达数 **2187 → 10** | `lib.rs`/`main.rs` 列为**特例** |
+| 4 | 漏了 **cargo 自动发现 `src/bin/*.rs`** ⇒ 20 个 bin 全成假孤儿 | 把 bin 目录纳入入口 |
+
+⇒ 这四次都是「**误报量异常大**」暴露的：343 → 242 → 212。
+**误报率高就立即查判据，不要靠调阈值掩盖**（§7.5 同源纪律）。

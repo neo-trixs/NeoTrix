@@ -475,6 +475,17 @@ def report_orphan_files(roots, limit, fd=None):
         for cand in (os.path.join(base, 'lib.rs'), os.path.join(base, 'main.rs')):
             if os.path.isfile(cand):
                 entries.append(cand)
+        # ⚠️ 坑 4：`src/bin/*.rs` 与 `src/bin/<name>/main.rs` 由 **cargo 自动发现**，
+        #    **不经 `mod` 声明**。漏掉这条 ⇒ 每个 bin 都被误报成孤儿
+        #    （实测 `src/bin` 下 20 个文件全是假孤儿）。
+        binroot = os.path.join(base, 'bin')
+        if os.path.isdir(binroot):
+            for n in sorted(os.listdir(binroot)):
+                cand = os.path.join(binroot, n)
+                if os.path.isfile(cand) and n.endswith('.rs'):
+                    entries.append(cand)
+                elif os.path.isdir(cand) and os.path.isfile(os.path.join(cand, 'main.rs')):
+                    entries.append(os.path.join(cand, 'main.rs'))
     reach = set()
     for e in entries:
         reach |= reachable_mods(e, fd)
@@ -491,8 +502,8 @@ def report_orphan_files(roots, limit, fd=None):
                 if f.endswith('.rs'):
                     on_disk.add(os.path.abspath(os.path.join(dirpath, f)))
     orphans = sorted(on_disk - reach)
-    print('[orphan] 磁盘上的 .rs: %d，从 crate 根沿 mod 链可达: %d，**孤儿 %d**'
-          % (len(on_disk), len(on_disk) - len(orphans), len(orphans)))
+    print('[orphan] 磁盘上的 .rs: %d，从 crate 根沿 mod 链 + cargo 自动发现的 bin 可达: %d，'
+          '**孤儿 %d**' % (len(on_disk), len(on_disk) - len(orphans), len(orphans)))
     rows = []
     for o in orphans:
         try:
