@@ -72,5 +72,13 @@
   "chat.emptyTitle": "No messages yet",
   "chat.emptyHint": "Send a message, or pick a conversation on the left.",
   "chat.groupToday": "Today",
-  "chat.groupEarlier": "Earlier"
+  "chat.groupEarlier": "Earlier",
+  "api.statusImplemented": "available",
+  "api.statusStub": "not implemented here",
+  "api.statusPlanned": "planned",
+  "api.loading": "Loading API contract…",
+  "api.loadFailed": "Cannot read API contract",
+  "api.upstreamUnlisted": "upstream unlisted",
+  "api.lead": "All {total} upstream Rust commands are registered. We do not run the DSH runtime; plugin/profile/updater/core/pet commands are deliberately skipped or pending, the rest are wired.",
+  "api.unlistedSummary": "Upstream not itemized ({n})"
 }

@@ -40,7 +40,14 @@ PAIRS: list[tuple[str, str]] = [
     #   ② M6 的结局是 vendored 树被删 —— 给一棵即将退役的树做 i18n 迁移
     #      是纯浪费，且要改他窗有 600+ 行在途改动的共享文件。
     #   ⇒ 迁移只落在自持树。原件保持 md5 5909ee44（仅含剪贴板降级修复）。
-    ('api-panel.ts', 'api-panel.ts'),
+    # ⚠️ api-panel.ts **刻意不在漂移对照内**（与 neobot-root.tsx 同理）。
+    #   我方副本已完成 R4 i18n 迁移（用户可见文案 8 处 → t()，8 个新键），
+    #   且已改走 src/ipc.ts 单一出口。`frontend/src/api-panel.ts` **不能**跟着改：
+    #   ① 它 import 的是 `@/i18n`（上游模块，只导出 i18next 实例、无 `t()`），
+    #      跟着改会**打断另一窗口的构建**；
+    #   ② M6 结局是 vendored 树被删，给即将退役的树做迁移是纯浪费。
+    #   ⇒ 迁移只落自持树。此条曾被漂移门正确报出（md5 不同），
+    #     故在此登记为**有意分叉**，不是静默漂移。
     ('dom.ts', 'dom.ts'),
     ('ui/nb-markdown.css', 'ui/nb-markdown.css'),
     # ⚠️ i18n **刻意不在漂移对照内**：我方词条是**自有集合**（实测与上游
@@ -200,7 +207,10 @@ for root, dirs, files in os.walk(os.path.join(UI, 'src')):
         rel = os.path.relpath(p_, UI)
         if rel == os.path.join('src', 'ipc.ts'):
             continue  # 单一出口本身
-        if "from '@tauri-apps/api/core'" in read(p_):
+        # ⛔⛔ 原来只匹配**单引号** ⇒ `api-panel.ts` 用双引号 ⇒ **门漏报**。
+        #   这正是本项目反复出现的「按字面匹配 ⇒ 假阴性」：门说了「1 个文件直连」，
+        #   实际有 2 个。**判据要覆盖写法变体，不能假设引号统一。**
+        if re.search(r"""from\s+['"]@tauri-apps/api/core['"]""", read(p_)):
             DIRECT.append(rel)
 if DIRECT:
     print(f"ℹ️  4b IPC 单一出口：{len(DIRECT)} 个文件仍直连 @tauri-apps/api/core"

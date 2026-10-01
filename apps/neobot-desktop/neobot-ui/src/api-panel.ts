@@ -18,7 +18,8 @@
  * ⇒ Stub 灰（这是结论）、Planned 琥珀（这是欠账）、Implemented 绿（这是能力）。
  */
 
-import { invoke } from "@tauri-apps/api/core";
+import { invokeCmd as invoke } from "./ipc";
+import { t } from "./i18n";
 import { el, span } from "./dom.ts";
 
 type Status = "implemented" | "stub" | "planned";
@@ -47,15 +48,20 @@ interface ApiCatalog {
   upstream_unlisted: string[];
 }
 
-const STATUS_TEXT: Record<Status, string> = {
-  implemented: "可用",
-  stub: "本仓不做",
-  planned: "待实现",
-};
+/**
+ * 状态标签。⛔ 刻意做成**函数**而非模块级常量：
+ * 若写成 `Record<Status, string> = { implemented: t('api.status.implemented'), ... }`，
+ * 它在**模块加载时求值一次** ⇒ 之后切语言**永不更新**。
+ * —— 与我此前在 neobot-root 犯的错同类（模块级 `t` 不订阅语言变化）。
+ */
+const statusText = (st: Status): string =>
+  st === "implemented" ? t("api.statusImplemented")
+  : st === "planned" ? t("api.statusPlanned")
+  : t("api.statusStub");
 
 /** 拉契约。失败要**说清原因**，不能静默空面板。 */
 export async function loadApiPanel(host: HTMLElement): Promise<void> {
-  host.replaceChildren(el("div", "api-loading", "读取 API 契约…"));
+  host.replaceChildren(el("div", "api-loading", t("api.loading")));
   let cat: ApiCatalog;
   try {
     cat = await invoke<ApiCatalog>("neobot_api_specs");
@@ -63,7 +69,7 @@ export async function loadApiPanel(host: HTMLElement): Promise<void> {
     // ⛔ 契约都读不到 ⇒ 这个面板没有存在意义了，必须显式说出来。
     //    静默留空白会被读成「后端没有接口」。
     const box = el("div", "api-error");
-    box.appendChild(el("div", "api-error-title", "读不到 API 契约"));
+    box.appendChild(el("div", "api-error-title", t("api.loadFailed")));
     box.appendChild(el("div", "api-error-msg", String(e).slice(0, 200)));
     host.replaceChildren(box);
     return;
@@ -83,10 +89,10 @@ function renderApiPanel(host: HTMLElement, cat: ApiCatalog): void {
     d.appendChild(el("div", "api-stat-l", label));
     return d;
   };
-  sum.appendChild(stat(s.implemented, "可用", "ok"));
-  sum.appendChild(stat(s.planned, "待实现", "todo"));
-  sum.appendChild(stat(s.stub, "本仓不做", "skip"));
-  sum.appendChild(stat(s.upstream_unlisted, "上游未展开", "dim"));
+  sum.appendChild(stat(s.implemented, t("api.statusImplemented"), "ok"));
+  sum.appendChild(stat(s.planned, t("api.statusPlanned"), "todo"));
+  sum.appendChild(stat(s.stub, t("api.statusStub"), "skip"));
+  sum.appendChild(stat(s.upstream_unlisted, t("api.upstreamUnlisted"), "dim"));
   host.appendChild(sum);
 
   // ── 一句话结论：把「为什么有这么多不做」讲在前面 ──
@@ -95,8 +101,7 @@ function renderApiPanel(host: HTMLElement, cat: ApiCatalog): void {
     el(
       "div",
       "api-lead-text",
-      `上游 Rust 侧 ${s.upstream_total} 个命令已逐条登记。本仓不跑 DSH 运行时，` +
-        `其中插件/profile/updater/core/桌宠内容一类决定不做或待接，其余已接线。`,
+      t("api.lead", { total: s.upstream_total }),
     ),
   );
   host.appendChild(lead);
@@ -115,7 +120,7 @@ function renderApiPanel(host: HTMLElement, cat: ApiCatalog): void {
     for (const st of ["implemented", "planned", "stub"] as Status[]) {
       const n = items.filter((x) => x.status === st).length;
       if (n > 0) {
-        const c = span(`api-pill api-pill--${st}`, `${STATUS_TEXT[st]} ${n}`);
+        const c = span(`api-pill api-pill--${st}`, `${statusText(st)} ${n}`);
         counts.appendChild(c);
       }
     }
@@ -131,7 +136,7 @@ function renderApiPanel(host: HTMLElement, cat: ApiCatalog): void {
   // ── 上游未展开的清单：折叠，但**必须可展开** ──
   if (cat.upstream_unlisted.length > 0) {
     const d = el("details", "api-unlisted");
-    d.appendChild(el("summary", "api-unlisted-sum", `上游未逐条展开（${cat.upstream_unlisted.length}）`));
+    d.appendChild(el("summary", "api-unlisted-sum", t("api.unlistedSummary", { n: cat.upstream_unlisted.length })));
     const ul = el("div", "api-unlisted-list");
     for (const n of cat.upstream_unlisted) ul.appendChild(span("api-unlisted-item", n));
     d.appendChild(ul);
@@ -146,7 +151,7 @@ function apiRow(sp: ApiSpec): HTMLElement {
   const body = el("div", "api-row-body");
   const top = el("div", "api-row-top");
   top.appendChild(el("code", "api-name", sp.name));
-  top.appendChild(span(`api-status api-status--${sp.status}`, STATUS_TEXT[sp.status]));
+  top.appendChild(span(`api-status api-status--${sp.status}`, statusText(sp.status)));
   body.appendChild(top);
 
   const sig = el("div", "api-sig");
