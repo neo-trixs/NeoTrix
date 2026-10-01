@@ -119,6 +119,49 @@ vite 入口 = 上游 src/main.tsx          ← 不是我们的 neobot-root
 （校验 ① 我方 root 至少有一处 import ② 后端 `has_service` 不是 true）。
 双向敏感度已验证：断开 import ⇒ rc=1；md5 逐字节还原 ⇒ rc=0。
 
+## 1.4 ✅ 自持 UI 已建成并**构建通过**（2026-09-30，选项 2 产物）
+
+`apps/neobot-desktop/neobot-ui/` —— **零 vendored 依赖**的独立前端树。
+因 `frontend/src/` 有他窗在途改动，采用**逐字复制**而非移动（切换 = 改一个配置项）。
+
+**实测（非推断）：**
+
+```
+tsc --noEmit   strict + noUnusedLocals/Parameters    rc=0   零错误
+vite build     35 modules → 249.17 kB (gzip 81.93 kB) + 2.48 kB CSS
+产物纯净度      上游特征符(overlastic/tanstack/toast-provider/store/modules) = 0 命中
+               我方特征(neobot_api_call/log_frontend)                        = 在
+               openghost 全局(Markdown/Tex/Highlight/code.copy)               = 在
+```
+
+**R5（openghost 迁出）✅ 完成**：已在受限树外独立存在，许可门**独立**审计这棵树
+（实测两处 openghost 均判「无附加条款」= MIT 正确）。
+
+**R1（换入口）部分完成**：自持入口 `src/main.tsx` 已建（刻意不挂上游
+`QueryClientProvider` / `ToastProvider` / `OverlaysProvider` —— 我方 UI 不依赖其中任一，
+挂了等于把 vendored 依赖重新引进自持树）。
+**尚未切 `tauri.conf.json`**：两套 UI 并存、切换可回滚；待 §1.3 列的三处上游
+（入口 / `webview.tsx` 容器 / `harness/store.ts` 开关）一并自持后才切（M6）。
+
+⚠️ **本轮踩到并已固化成门的坑**：vite 默认 `base:'/'` 产出
+`src="/assets/index-xxx.js"`，Tauri 走 `file://` 加载 ⇒ `/assets` 解析到
+**文件系统根** ⇒ **白屏**，而 `vite build` 成功、`tsc` 通过、**零报错**、退出码 0。
+⇒ 「构建通过」≠「产物可用」。已设 `base:'./'`，并由门的第 3 项守住。
+
+**新门 `scripts/ops/nt_neobot_ui_wiring.py`**（5 项，rc=0 才算完整）：
+1. 复制件漂移（md5 对照 + **mtime 归属判定**：原件更新 ⇒ 他窗在途，勿竞速同步）
+2. 入口纯净：无 `@/` 上游别名、无 `../` 逃逸
+3. `vite base` 为相对路径（白屏守卫）
+4. 产物无上游特征符
+5. openghost 已迁出受限树
+
+**门自身被实测打脸两次（均修门而非改代码）**：
+- 初版把一切 `./x` 判违规 ⇒ 误报 `./neobot-root`（**那正是自持文件**）。
+  物理分离的两棵树里相对 import 必然落在自持树内；真正危险的是 `@/` 与 `../..`。
+- `base` 检查不感知注释 ⇒ 匹配到注释里举例的 `base:'/'`，把已修正的配置报成缺陷。
+  ⇒ 已加 `strip_comments`。
+- ⇒ 与 M3 同源教训第三次复现：**门的判据要按结构写，不按字面写。**
+
 ## 2. 逐能力裁决
 
 判据三问：① NeoBot 商用是否需要？② 需要的话，自研成本 vs 授权成本？
