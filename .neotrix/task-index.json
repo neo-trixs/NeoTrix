@@ -1041,6 +1041,22 @@
    "read_only": true,
    "when_not": "调主题**默认档**前跑它取基线；它只验「跨刷新持久」与「不再调 get_dsh_theme」，不验色值本身（那是 neobot-check-contrast 的事）",
    "spec": "A/B 选深/浅后**刷新**仍在（⛔ 必须跨刷新：覆盖 bug 发生在挂载时，同会话比较看不出）· C 选择器存在 · D 自持树 invoke 里 get_dsh_theme = 0 次。ⓘ 实测：headless 系统默认浅 ⇒ 只测「浅色」会假通过，双向才抓得到"
+  },
+  {
+   "id": "neobot-check-msg-copy",
+   "query": [
+    "气泡复制",
+    "悬停复制",
+    "消息复制按钮",
+    "复制没反应",
+    "键盘复制",
+    "is-copied"
+   ],
+   "tool": "node scripts/ops/neobot-check-msg-copy.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "调消息气泡布局/间距前跑它取基线；它只验复制按钮的显隐/可达/落剪贴板，**不验**气泡长文本排版",
+   "spec": "A 默认 opacity:0+pointer-events:none+position:absolute · B 悬停**气泡**后浮现 · C focus-within 也浮现（⛔ 只做 hover 则键盘用户永远看不到）· D 读回**真剪贴板**含该条原文 · D2 成功有 is-copied 反馈 · E 气泡高度不变（⛔ measureElement 量的就是它）· F 零未捕获异常。⛔ 三个必踩坑：① invoke 桩漏 plugin:event|listen⇒listen 返回 null⇒挂载期崩「reading '0'」；② 用 .first() 会选到**已滚出视口**那条（列表自动滚到底），须挑「中心点最顶层」的那条；③ 期望值不能取气泡 innerText（含 ⧉ 字形），要取消息正文"
   }
  ],
  "excluded": {
