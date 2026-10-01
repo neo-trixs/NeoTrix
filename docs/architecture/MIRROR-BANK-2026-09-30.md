@@ -167,3 +167,65 @@ oracle，再逐个判定 26 个分歧点谁对。**先有判据，再动代码�
 ⚠️ 本文件**不含**删除断言 —— 因为本轮**否决了删除**。
 若将来执行 §4.2 第 3 步，须把「26 个分歧点已定性」写成可核对清单，
 而不是直接合并。
+---
+
+## 5. 单点真身收敛：判据、已做范围、以及**为什么不能全做**（2026-09-30 补充）
+
+### 5.1 筛选判据（三道，缺一不可）
+
+对「`neotrix-types` ⇄ `neotrix-core` 各层」的 **183 个「同 owner + 归一化后逐字相同」**
+的函数（其中 owner 为自由函数者 35 个，剔除 8 个 `test_*` 后 27 个）：
+
+| 道 | 判据 | 实测结果 |
+|---|---|---|
+| ① 类型感知确认 | `nt_diverge.py`：owner 相同 + 归一化后全等 | 排除「同名不同 owner」的假重复 |
+| ② **返回类型可跨 crate** | 返回值不能是 crate 本地类型 | **这是决定性一道** |
+| ③ 常量/外部依赖一致 | 函数体引用的常量必须逐个比对相等 | E8：16 常量三方全一致 |
+
+### 5.2 ②为什么是决定性的（本轮最重要的架构结论）
+
+`Hexagram`、`FermionState` 在两个 crate 里是**各自独立定义的同名类型**：
+
+```rust
+// crates/neotrix-types/src/core/nt_core_e8.rs:139
+pub struct Hexagram { pub bits: u8 }
+// neotrix-core/src/l2_perception/nt_core_e8/nt_e8_hexagram.rs:14
+pub struct Hexagram { pub bits: u8 }   // ← 同名，但是**不同**类型
+```
+
+收敛 `-> Vec<Hexagram>` 的函数，会把 core 侧返回类型**换成 types 的类型**。
+那**不再是函数收敛，而是类型统一**，爆炸半径 = core 内 **57 个**引用 `Hexagram` 的文件。
+
+⛔ 因此**「逐字相同的自由函数」不等于「可收敛」**。
+必须先问：返回值是不是跨 crate 的同一类型？
+
+### 5.3 本轮实际收敛（12 个函数 + 4 个常量）
+
+| 文件 | 数量 | 返回类型 | 处置 |
+|---|---|---|---|
+| `nt_e8_roots.rs` | 4 | `Vec<Vec<i8>>`/`(usize,usize)`/`bool` | ✅ 收敛（`62cb175f`） |
+| `nt_e8_homology.rs` | 8 | `bool`/`Vec<(&str,bool)>` | ✅ 收敛（`62cb175f`） |
+| `nt_world/nt_world_e8.rs` | 4 常量 | `usize` | ✅ 收敛（`4326bda2`） |
+| `nt_e8_hexagram.rs` | 3 | `Vec<Hexagram>` | ⛔ 类型统一是另一决策 |
+| `nt_e8_fermion.rs` | 2 | `Vec<FermionState>` | ⛔ 同上 |
+
+**净效果**：`nt_e8_roots.rs` 与 `nt_e8_homology.rs` 消除 **124 行**重复实现
+（`62cb175f`：+37/−124），core 侧不再有第二份真身。
+
+### 5.4 顺带查出的跨域错位与死常量
+
+* **跨域错位**：`nt_world` 域重复定义 `nt_core_e8` 域的 E₈ 数学常量（同名 4、值 4/4 相同）。
+  E₈ 常量真源唯一在 `nt_core_e8`，`nt_world` 是消费方却影子式复写。
+* **死常量**：上述重复的 4 个里有 3 个（`E8_DIM` `DAYAN_NUMBER` `OBSERVABLE_DOF`）
+  在 `nt_world_e8.rs` 内**只出现定义处、零使用** —— 不只是重复，还是没人用的重复。
+* **第三份副本**：E₈ 常量另有 `nt_world/nt_world_e8.rs` 一份 ⇒ 实为
+  types / `nt_e8_constants.rs` / `nt_world_e8.rs` **三方**，本轮做了三方逐值比对。
+
+### 5.5 两条可复用的操作纪律（本轮我自己踩出来的）
+
+1. **按字符串切片改代码会留残渣**：首版脚本切函数后残留半截 `────` 分隔线，
+   编译报 `unknown start of token: ─`。**方框制表符出现在代码位置**是很好定位的信号。
+2. **计数式判断必须读那一行本身（R-SCAN-1b）**：删导入时 `TOTAL_LINES` /
+   `LO_SHU_CONSTANT` 显示「仍被引用」，实为**我自己写的说明注释里提到了它们**。
+   同理，我写文档时漏了 `src/` 被 `check-doc-drift` 抓出 ⇒
+   **文档里的路径是会被门校验的，不是纯排版**。
