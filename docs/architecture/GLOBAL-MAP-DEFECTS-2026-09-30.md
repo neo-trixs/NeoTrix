@@ -140,6 +140,7 @@ AutoReproduce 警告的「LLM judge 高估」正是 K4 缺失的病症。
 
 ```assert
 file:scripts/ops/nt_calledges.py            # ① 调用边抽取器存在（THIR 委托编译器）
+file:scripts/ops/nt_callgraph.py           # ①④ 可达性/影响面查询（G4，已入库 7940f13c）
 file:scripts/ops/nt_absorption_live.py     # ⑤ 吸收存活率（G5）
 file:scripts/ops/nt_decompose.py           # ⑥ 原子拆解 + 名字级对位
 file:scripts/ops/nt_parity_ref.py          # ⑥ 行为级对位采集器
@@ -154,18 +155,24 @@ cmd:python3 scripts/ops/nt_decompose.py selftest   # ⑥ 拆解器自证仍绿�
 
 | 抓到 | 真相 | 处置 |
 |---|---|---|
-| `file:nt_callgraph.py` → **exists but not in git index** | G4 的可达性工具是**另一窗口的在途未提交工作** | 从本节断言里删掉 —— **不是我的能力，不进我的地图**（另见 3.4） |
+| `file:nt_callgraph.py` → **exists but not in git index** | 当时 G4 的可达性工具是**另一窗口的在途未提交工作** | 当时从断言里删掉；**数分钟后该窗口提交了（`7940f13c`）⇒ 已加回断言**（见下） |
 | `file:nt_map_reconcile.py` 未入库 | 提交前必然如此 | 提交后复跑转 HOLDS（实测） |
 | `nlit:…@本文件` → **literal present** | ⛔ **我写的断言是自指的**：为了解释改动，文档必须引用旧措辞，于是 `nlit` 永远失败 | 删掉该断言。**教训：谓词会因解释它自己而失效** |
 | `cmd:nt_map_reconcile.py` → **超时 120s** | ⛔ **自检断言调用了正在自检的工具 ⇒ 无限递归** | 删掉该断言。**教训：自检不能把自己写进自己的判据**（与上一条同源：凡「为解释而写」的东西都会污染判据） |
 
 ### 3.4 边界：谁的能力算进这张地图
 
-`nt_callgraph.py`（G4 可达性/影响面）与 `check-license.sh`（G6 许可门）由**其他窗口**
-在建，其中 `nt_callgraph.py` 在本节编写时**尚未入库**。
-⇒ 本节只对**已入库**的能力做断言（`file:` 谓词含「被 git 跟踪」判定，
-天然把在途工作排除在外）—— 地图不能把别人的在途成果记成既成事实，
+**判据是「已入库」，不是「谁写的」。** `file:` 谓词含「被 git 跟踪」判定，
+天然把在途未提交的工作排除在外 —— 地图不能把别人的在途成果记成既成事实，
 那正是本文件第 3.3 节第 4 条自己刚犯的错。
+
+⏱ **这条边界当场自证了一次**：写 3.4 时 `nt_callgraph.py`（G4 可达性/影响面）
+尚未入库，我据此把它排除；**几分钟后另一窗口提交了 `7940f13c`**
+（`ede6ea7f` 提交了 G6 的 `check-license.sh`）⇒ 断言已加回，两者现均 HOLDS。
+
+⇒ 教训：**「未入库」是时点状态，不是结论。** 散文里写「某某还没入库」这类
+时点判断时，应当**只写进断言、不写进散文** —— 断言会在入库那一刻自动转 HOLDS，
+而散文不会自己更新（这正是本工具存在的理由）。
 
 ### 3.2 「复现对方产品」现在能做到什么、做不到什么【实测边界】
 
