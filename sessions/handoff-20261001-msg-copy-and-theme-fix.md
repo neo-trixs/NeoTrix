@@ -9,10 +9,30 @@
 | 项 | 状态 |
 |---|---|
 | worktree 去向 | ⛔ **未开新 worktree**。`nt_worktree_gate.sh check` rc=0；现存 4 个（含主树）**均为他窗/历史**，我一个都没动。门提示「2 个 worktree 的未提交改动不在任何提交里」+「target 累计 4673M 可回收」—— **⛔ 都不是我的改动，我未执行 prune/clean** |
-| 我的未提交改动 | **无**。本窗提交均已落盘：`7ce88e27`、`c3b99dc5`、`9255f294`、`287d9614`、`2b9b610a`、`abf0bd08` |
+| 我的未提交改动 | **无**。本窗提交均已落盘：`7ce88e27`、`c3b99dc5`、`9255f294`、`287d9614`、`2b9b610a`、`abf0bd08`、`b788da8f` |
 | 我开的 worktree | 本轮为验证「干净检出可构建」建了 `/tmp/opencode/clean`（`--detach`）⇒ **已 `git worktree remove --force` 移除**。现存 4 个 worktree **均非我所开**，门提示的「2 个未提交改动」「4673M target」**都不是我的**，我未执行 prune/clean |
 | patch 兜底 | 不适用（无未提交改动） |
 | 弃用声明 | ⛔ **已作废**：上一轮删掉的 `neobot-check-msg-copy.mjs` 已在 `2b9b610a` **重做并做绿**（A~F，3/3 稳定） |
+
+## §0b ⭐ 代码块：「先测量」救了这一轮（`b788da8f`）
+
+原任务是「代码块视觉统一」。**实测**后才发现样式基本健全
+（浅色 5.55:1 / 深色 11.43:1、不撑破 554 vs 578、长行可滚 1150/552），
+**缺的是门** + 一个**真缺陷**：垫片 `shim.ts` 的 `lang()` 回退链会
+**覆盖宿主显式设置** ⇒ **应用选英文 + 系统中文 ⇒ 复制按钮永远中文**
+（实测 `documentElement.lang=en-US` 而 aria-label 未变）。
+⇒ 修法：宿主显式设置权威，`navigator.language` 只在宿主未设值时兜底。
+
+ⓘ ⓘ **两处错都是「门/判据自己错」，不是代码错**：
+1. A 判据被**自己的夹具**推翻 —— 我把 markdown 放进 6 条消息，
+   其中 3 条是 `user`，而 **user 消息按设计显示原文**。
+   ⇒ **判据错 ≠ 代码有缺陷，夹具错同理。**
+2. ⛔ `selectOption(...).catch(() => {})` 吞掉失败（select 带 `disabled={busy}`）
+   ⇒ 伪装成「文案没变」的假象。**验证动作一律不吞错。**
+
+ⓘ 改了漂移门（把 `shim.ts` 移出两树逐字对照，按该文件既有先例），
+故**证明了它仍有牙齿**：改 1 字节进 `markdown.js` ⇒ rc=1，还原 ⇒ rc=0，
+md5 回到 `0b7576b6…`。⇒ 三个**上游**文件仍在对照内。
 
 ## §0 ⭐ 本窗最重发现：自持 UI **干净克隆构建不出来**（`abf0bd08`）
 
@@ -41,6 +61,7 @@ md5 三个全部与文档吻合 ⇒ vendored 文件未被改动过。
 | `c3b99dc5` | 气泡悬停/键盘复制；抽出 `copyText()` 共用降级链 |
 | `2b9b610a` | 气泡复制门 A~F 做绿（3/3 稳定）；全门 18 道 rc=0 |
 | `abf0bd08` | ⭐ 修「干净克隆构建不出自持 UI」+ 新增自持性门；全门 19 道 rc=0 |
+| `b788da8f` | 代码块复制按钮语言脱钩（真缺陷）+ 新增 markdown 门；全门 20 道 rc=0 |
 
 ### `7ce88e26` 的实质：队列 #5 背后是真缺陷
 `desktop.rs:33` `get_dsh_theme()` **恒返回 `Theme::System`**（写死常量、零信息量）。
@@ -106,11 +127,12 @@ CSS 注释里写清了这全过程。⏳ **未验证项**：浮在盒外是否�
 ⓘ 元教训：**「我造的门跑红」先怀疑门，再怀疑产品** —— 但要**给出证据**（本窗用
 「同一 dist 下他门 rc=0」+「产物含该字符串」两条把产品嫌疑排除掉），不能靠猜。
 
-## §4 门状态（收工实测，19 道全绿 + license 预期红）
+## §4 门状态（收工实测，20 道全绿 + license 预期红）
 
 本侧 10（含 `neobot-check-msg-copy`）：`api_contract` / `ui_wiring` / `feature_viability` / `absorption_audit` /
 `ui-smoke` / `msg-virtual` / `check-contrast` / `check-convo-groups` /
-`check-theme-persist` / `check-msg-copy` / `check-selfcontained` — 全 rc=0
+`check-theme-persist` / `check-msg-copy` / `check-selfcontained` /
+`check-markdown` — 全 rc=0
 他侧 4：`check_visual` / `check_ship_ui` / `check_ui_calls` / `check_upstream_1to1` — 上轮实测 rc=0
 `check-license` rc=1 **正确**（受限 vendored 树未删）
 
