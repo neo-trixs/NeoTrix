@@ -101,6 +101,7 @@
 | `check-silent-failure.sh --strict` | ✅ PASS（OPEN CONTRACTS 0/32） |
 | `check-doc-drift.sh` / `check-layout.sh --strict` | ✅ 0 死链 / rc=0 |
 | `nt_map_reconcile.py --strict` | ✅ 29/29 HOLDS |
+| 本轮设计步验证 | ✅ workspace 0 error；`neotrix --lib` 12217 绿；layer-deps rc=0；doc-drift 0（**门抓到我在 TODO 写错路径，少 `src/`，已修**）；**0 行代码逻辑改动** |
 | 两批删除验证 | ✅ `cargo check --workspace` 0 error；`neotrix --lib` 12217 绿；`neotrix-types --lib` 566→463→**435**（两批差值 103 + 28，均按**测试全名**逐条对账 = 零误删）；镜像 **18→7→5 对 / 185.8→94.5→67.7 KB**；layer-deps rc=0；silent-failure PASS；lock-audit 0 |
 | `nt_mirror_scan.py selftest` | ✅ 4 例（含 2 例证伪）；实跑 72 对 / 19 疑似分叉 / 18 对涉 types / 185.8 KB |
 | `make audit-edges-list` | ✅ rc=0；`nt_audit_bootstrap` quick scope **11/11 成功**（实测，非"写完了"）|
