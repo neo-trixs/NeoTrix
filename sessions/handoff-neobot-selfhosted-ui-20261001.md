@@ -31,12 +31,21 @@
 
 ## 4. 正在改的文件（关键！逐个列）
 
-**我本会话未提交、留在工作树的**（原因逐条）：
+### 4.1 曾在工作树、现已由另一窗口提交时一并带走（**订正 4.2 之前的记录**）
 
-| 文件 | 原因 |
+| 文件 | 现状（2026-10-01 实测） |
 |---|---|
-| `apps/neobot-desktop/tauri.conf.json` | **混有他窗改动**（`macOSPrivateApi`/窗口尺寸/label）。我只改了 `build` 段 3 项（`frontendDist` → `neobot-ui/dist`、两个命令加 `--prefix neobot-ui`）。⛔ 他窗那版裸 `pnpm run build` 是**坏的** —— Tauri 在本目录执行，而此处无 package.json |
-| `apps/neobot-desktop/frontend/src/neobot-root.tsx` | md5 `5909ee44`，仅含我的**剪贴板降级修复**（`navigator.clipboard` 失败时回落 `write_clipboard_text`）。该文件有他窗 615 行在途改动，提交它=连带提交他的工作 |
+| `apps/neobot-desktop/tauri.conf.json` | **已入库**（`frontendDist: neobot-ui/dist` 等 3 项随之落库） |
+| `apps/neobot-desktop/frontend/src/neobot-root.tsx` | **已入库**（含我的**剪贴板降级修复**，文件内 `write_clipboard_text` 2 处） |
+
+⚠️ 我写这份交接时它们还是未提交状态，随后被另一窗口的提交一并带走。
+**这是共享 index 的第三次互相吞并**（前两次见 §7）。**均未丢内容**，
+只是提交归属与他窗混在一起。接手会话**不必再去找这两处未提交改动**。
+
+⚠️ 另一处仍需留意：`tauri.conf.json` 里他窗的 `beforeBuildCommand`
+若仍是裸 `pnpm run build`，那是**坏的** —— Tauri 在 `tauri.conf.json`
+所在目录（`apps/neobot-desktop/`）执行该命令，而那里**没有 package.json**。
+我写的正确形式是 `pnpm --prefix neobot-ui run build`。
 
 ## 5. 下一步（按优先级排序）
 
@@ -88,11 +97,10 @@
 
 - **worktree 去向**：本会话**未创建任何 worktree**（全程在主工作树，
   `git worktree list` 无我新增项）。
-- **未提交改动的去向**：
-  - `tauri.conf.json`、`frontend/src/neobot-root.tsx` —— **明确声明保留在工作树**，
-    原因是与另一窗口改动混杂，提交会造成越权；内容已在本文件 §4 逐条列明，
-    接手会话可直接取用。**非弃用。**
-  - 其余本会话产出**全部已提交**。
+- **未提交改动的去向**：**本会话产出已全部入库**。
+  其中 `tauri.conf.json` 与 `frontend/src/neobot-root.tsx` 曾因混有他窗改动
+  而由我保留在工作树，后被另一窗口提交一并带走（见 §4.1）—— 非弃用，无遗失。
+  接手会话**无遗留未提交改动需要认领**。
 - **门状态（2026-10-01 实测）**：
   `nt_api_contract` 0 · `nt_neobot_ui_wiring` 0 · `nt_feature_viability` 0 ·
   `runtime smoke` 0 · `check-license` **1（正确**：受限 vendored 树仍在仓库，
