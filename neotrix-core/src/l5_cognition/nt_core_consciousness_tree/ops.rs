@@ -2,9 +2,21 @@ use std::collections::HashMap;
 
 use super::types::*;
 
-// Phase 5 元认知校准权重 (与 ffi/consciousness_tree.rs 一致): ECE 惩罚权重 + 惩罚上限。
-const CALIB_W_ECE: f32 = 0.6;
-const CALIB_MAX_PENALTY: f32 = 0.35;
+// 元认知校准权重：**引用 l0 真身**，不再本地复制。
+// 此前此处复制了一份 `CALIB_W_ECE` / `CALIB_MAX_PENALTY`，靠注释「与
+// ffi/consciousness_tree.rs 一致」提醒人工同步 —— 这正是漂移的温床。
+//
+// ⚠️ 但两条路径**从来就不完全一致**，别再把它们当同一件事：
+// · l0 `apply_metacognitive_calibration`：penalty = w_ece*ece + **w_hce*hce**，
+//   输入含 `ece` 与 `high_conf_error_rate` 两个指标；
+// · 本处（l5）：penalty = **只** w_ece*ece —— 因为该路径的 ece 由
+//   `metacalib::expected_calibration_error` 从 SelfTest 样本算出，
+//   **没有 hce 指标可取**，故省略该项。
+// ⇒ 旧注释「一致」是**错的**，会误导后来者把两者「修成一样」（那会引入 hce 依赖）。
+// 现在权重取同一真身，但**公式差异是有意的**，在此显式记录。
+// 真身在契约层 `neotrix-types`（不是 L0/ffi —— 那个目录受 `ios-bridge`
+// feature 门控、默认构建不编译，无法作为总编译侧的真身）。
+use neotrix_types::core::self_measure::{CALIB_MAX_PENALTY, CALIB_W_ECE};
 
 impl ConsciousnessTree {
     /// 枚举全部 7 域节点快照供遥测/健康面板消费

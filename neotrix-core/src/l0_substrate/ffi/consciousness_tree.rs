@@ -297,9 +297,12 @@ fn compute_phi_from_branches(branches: &HashMap<String, BranchState>) -> f32 {
 /// ECE (Expected Calibration Error) 0=完美校准, 1=完全错误自信。
 /// 高置信错误率 = 置信度高但答错的占比。
 /// 惩罚 = w_ece * ece + w_hce * high_conf_error_rate, 上限 max_penalty。
-const CALIB_W_ECE: f32 = 0.6;
-const CALIB_W_HCE: f32 = 0.4;
-const CALIB_MAX_PENALTY: f32 = 0.35;
+// 元认知校准权重：真身在 `neotrix_types::core::self_measure::calib_weights`。
+// 本模块与 L5 `nt_core_consciousness_tree/ops.rs` 曾各定义一份，靠注释
+// 「与 ffi/consciousness_tree.rs 一致」**人工同步**魔数 ⇒ 漂移温床。
+// 真身不能放本模块的原因：本目录整体在 `#[cfg(feature = "ios-bridge")]` 之下，
+// **默认构建不编译**，而 L5 侧是总编译的 ⇒ 共享常量必须落在契约层。
+use neotrix_types::core::self_measure::{CALIB_MAX_PENALTY, CALIB_W_ECE, CALIB_W_HCE};
 
 /// 元认知校准: 根据模块的置信度校准质量调整健康分。
 /// 若 metrics 提供 ece / high_conf_error_rate, 则惩罚"过度自信"模块:
