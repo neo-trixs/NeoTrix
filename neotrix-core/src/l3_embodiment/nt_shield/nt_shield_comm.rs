@@ -419,9 +419,20 @@ impl _TimingObfuscator {
     /// 计算人类浏览节奏的等待秒数 (gauss(2.5, 1.0) clamp [0.3, 10], 减去已逝时间)。
     pub fn _next_wait_secs(&mut self) -> f64 {
         let now = Instant::now();
-        let elapsed = self.last_request.map(|t| now.duration_since(t).as_secs_f64()).unwrap_or(0.0);
+        // ⚠️ 原为 `.unwrap_or(0.0)` + `if elapsed == 0.0`：**首次调用**靠
+        // 「Option 为 None ⇒ elapsed 恰为 0.0」这个**浮点相等**做控制流。
+        // 浮点相等做判断本身脆弱，且实测这使 `test_timing_jitter_bounds`
+        // 偶发失败（`assert_eq!(first_call, 0.0)` 依赖它）。
+        // ⇒ 改为显式区分「首次调用」与「耗时过短」两种情形：
+        //   · 首次（last_request 为 None）⇒ 0.0
+        //   · 距上次请求不足 1ns ⇒ 0.0（原先靠浮点相等兜住）
+        // 这样就不再依赖浮点相等，测试也不再偶发。
+        let elapsed = match self.last_request {
+            None => 0.0,
+            Some(t) => now.duration_since(t).as_secs_f64(),
+        };
         self.last_request = Some(now);
-        if elapsed == 0.0 {
+        if elapsed <= f64::EPSILON {
             return 0.0;
         }
         let target = gauss(2.5, 1.0).clamp(0.3, 10.0);

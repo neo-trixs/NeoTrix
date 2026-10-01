@@ -47,11 +47,20 @@ pub mod vector_index;
 /// Entity Linking — extraction, dedup, and indexing of named entities (R-P117 ADD-only).
 pub mod entity_linking;
 
-// NOTE: 以下模块已声明但内部编译错误待修复，暂时注释
+// NOTE: 以下模块内部有**实测存在**的编译错误，暂时注释（2026-09-30 逐个实测）。
+// 开启后的错误数：
+//   add_only_writes  → 8    admission_control → 2    decay_forgetting → 6
+// ⚠️ `hybrid_retrieval` **原被列在此处，但实测 0 错误 —— 属笼统注释的误伤**，
+//    已于 2026-09-30 恢复声明（6 文件 / 1,028 行，零外部依赖，
+//    `EntityIndex`/`FusionEngine` 的簇外同名命中经核实是
+//    `entity_linking::EntityIndex` 与 `meta_panel::fusion::FusionEngine`
+//    两个**不同类型**，不构成依赖）。
+// ⇒ 该注释原先把「有错」与「无错」混在一起写，会让后来者以为
+//    四个都不能碰。现逐个标注实测结果。
 // pub mod add_only_writes;
 // pub mod admission_control;
 // pub mod decay_forgetting;
-// pub mod hybrid_retrieval;
+pub mod hybrid_retrieval; // 实测 0 编译错误 ⇒ 恢复（2026-09-30）
 
 // Re-exports for cross-module integration
 pub use addressable_store::AddressableStore;

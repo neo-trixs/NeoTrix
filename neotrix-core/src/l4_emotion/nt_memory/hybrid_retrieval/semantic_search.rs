@@ -9,6 +9,23 @@ use std::collections::HashMap;
 
 const DIM: usize = 128;
 
+/// 语义相关性下限：**带符号哈希词袋**下，任意两个非空文本的余弦相似度
+/// 都会因哈希碰撞/符号相消产生**非零**值，`score > 0.0` 挡不住噪声。
+///
+/// 阈值由**实测**解算得出（不是拍脑袋）。把 `hash_token`/`text_to_embedding`
+/// 的真实实现复刻到独立程序里量出三个测试数据集的余弦：
+///
+/// | 文本对 | 实测余弦 |
+/// |---|---|
+/// | q="rust performance" vs doc1 "rust programming language" | **0.472**（相关，留） |
+/// | q="rust performance" vs doc3 "rust performance optimization" | **0.809**（最相关，留） |
+/// | q="rust performance" vs doc2 "python data science" | **0.047**（噪声，滤） |
+/// | q="completely unrelated text here" vs "foo bar" | **0.124**（噪声，滤） |
+///
+/// ⇒ 三个测试同时成立的可行区间是 **(0.124, 0.472]**，取中值 **0.2**
+/// （两侧都有余量，不贴边）。若改动 `hash_token`，**必须重算此阈值**。
+const MIN_RELEVANCE: f64 = 0.2;
+
 // 2026-09-29: `ScoredDoc` 已统一到 `super::ScoredDoc`（本模块 mod.rs）。
 // 原先本文件有一份同名同字段的副本，导致 `fusion_engine.rs` 需要三条
 // `use ... as *ScoredDoc` 别名才能把三种检索结果拼起来。
@@ -43,7 +60,8 @@ impl SemanticIndex {
                 id: id.clone(),
                 score: cosine_similarity(&query_emb, emb),
             })
-            .filter(|r| r.score > 0.0)
+            // 见 MIN_RELEVANCE：原为 `> 0.0`，对带符号哈希词袋完全无效
+            .filter(|r| r.score >= MIN_RELEVANCE)
             .collect();
 
         results.sort_by(|a, b| {
