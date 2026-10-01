@@ -83,3 +83,14 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* 顶栏内联错误位：说清失败，但不弹窗、不长期占位。 */
+.nb-bar-err {
+  margin: 0;
+  padding: 6px 16px;
+  border-bottom: 1px solid #f0c9c9;
+  background: #fdf1f1;
+  color: #a3272b;
+  font-size: 12px;
+  flex: 0 0 auto;
+}

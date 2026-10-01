@@ -122,6 +122,11 @@ export function Shell({ children }: { children?: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>(getLang)
   const [logs, setLogs] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // 顶栏内联错误位：⛔ 不能没有它。
+  //   原实现在 setLang 失败时 `catch {}` 空处理，注释还写着
+  //   「不静默：语言没切成功就是没切成功」—— **注释与代码自相矛盾**：
+  //   用户点了语言、界面静默回退、零解释，只能反复点。
+  const [barErr, setBarErr] = useState<string | null>(null)
 
   useEffect(() => onLangChange(setLangState), [])
 
@@ -129,10 +134,13 @@ export function Shell({ children }: { children?: React.ReactNode }) {
     if (next === lang) return
     setBusy(true)
     try {
+      setBarErr(null)
       await setLang(next) // 失败会自行回滚并抛出
-    } catch {
-      // ⛔ 不静默：语言没切成功就是没切成功。
-      // 但也不弹窗 —— 顶栏空间小，且聊天区已有错误位。保持按钮可再点即可。
+    } catch (e) {
+      // 说清「没切成」+ 为什么，**但用内联一行**而不是弹窗（顶栏空间小）。
+      // `setLang` 已回滚，故这里只需如实报告，语言显示仍是当前生效的那个。
+      setBarErr(t('shell.langFailed', { msg: String(e).slice(0, 80) }))
+      window.setTimeout(() => setBarErr(null), 6000) // 自动消失，不长期占位
     } finally {
       setBusy(false)
     }
@@ -185,6 +193,12 @@ export function Shell({ children }: { children?: React.ReactNode }) {
           </button>
         </div>
       </header>
+
+      {barErr !== null && (
+        <p className="nb-bar-err" role="alert">
+          {barErr}
+        </p>
+      )}
 
       <main className="nb-main">{children}</main>
 

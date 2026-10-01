@@ -54,5 +54,8 @@
   "chat.thinking": "Thinking…",
   "chat.backToBottom": "Back to bottom ↓",
   "chat.inputLabel": "Message input",
-  "chat.sendEllipsis": "…"
+  "chat.sendEllipsis": "…",
+  "shell.langFailed": "Language not changed: {msg}",
+  "chat.capsFailed": "capability info unavailable",
+  "chat.capsFailedHint": "Could not read capabilities (not \"none\")"
 }

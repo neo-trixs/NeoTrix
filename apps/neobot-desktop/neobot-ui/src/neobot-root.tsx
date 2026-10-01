@@ -177,6 +177,11 @@ export function NeoBotRoot() {
   // 能力快照：调不到就 null，顶栏直接不渲染 —— 「不可用就不渲染」。
   // ⛔ 不设静态默认值：两处默认值各自猜，正是本缺口的病因。
   const [caps, setCaps] = useState<CapabilitySnapshot | null>(null)
+  // ⛔ 「读失败」与「本来就没有」是**两种处境**，混起来会让人白折腾 ——
+  //    这正是本文件对会话列表已有的原则，此处曾**违反**它：
+  //    `neobot_core_capabilities` 失败时 `setCaps(null)`，于是模型/工具数
+  //    凭空消失、无任何解释，用户以为「就是没有」。失败路径实测抓到。
+  const [capsErr, setCapsErr] = useState(false)
   // 今日用量：同上，缺席不渲染。发送完成后重拉（send 落库在后）。
   const [usageToday, setUsageToday] = useState<number | null>(null)
   const reloadUsage = useCallback(() => {
@@ -343,8 +348,14 @@ export function NeoBotRoot() {
     void invoke('log_frontend', { level: 'info', target: 'neobot-root', message: 'mounted' }).catch(() => {})
     // 能力矩阵以此为准（旧自研 UI 的静态默认矩阵已随旧 UI 删除）。
     void invoke<CapabilitySnapshot>('neobot_core_capabilities')
-      .then(setCaps)
-      .catch(() => setCaps(null))
+      .then((v) => {
+        setCaps(v)
+        setCapsErr(false)
+      })
+      .catch(() => {
+        setCaps(null)
+        setCapsErr(true) // 说清「读失败」，而不是假装「没有」
+      })
   }, [])
 
   async function send() {
@@ -664,6 +675,15 @@ export function NeoBotRoot() {
           {caps && (
             <span className="ml-2 truncate text-xs text-muted" title={caps.model_source}>
               {caps.model} · {t('chat.toolCount', { n: caps.tool_count })}
+            </span>
+          )}
+          {capsErr && (
+            <span
+              className="ml-2 truncate text-xs text-muted"
+              style={{ color: '#a3272b' }}
+              title={t('chat.capsFailedHint')}
+            >
+              {t('chat.capsFailed')}
             </span>
           )}
           {usageToday !== null && usageToday > 0 && (

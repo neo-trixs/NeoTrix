@@ -54,5 +54,8 @@
   "chat.thinking": "正在想…",
   "chat.backToBottom": "回到底部 ↓",
   "chat.inputLabel": "消息输入框",
-  "chat.sendEllipsis": "…"
+  "chat.sendEllipsis": "…",
+  "shell.langFailed": "语言未切换：{msg}",
+  "chat.capsFailed": "能力信息读取失败",
+  "chat.capsFailedHint": "读取能力信息失败（不是「没有」）"
 }

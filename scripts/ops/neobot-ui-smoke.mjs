@@ -122,9 +122,18 @@ const STUB_RETURNS = {
  * 这个坑我踩过一次：首版桩内联（无闭包）是对的，改成查表后反而错，
  * 且因为错误被吞，「渲染通过」的假象一直到我加功能断言才暴露。
  */
-const TAURI_STUB = (table) => {
+// ⚠️ `addInitScript(fn, arg)` 只接受**一个** arg（Playwright 限制）。
+//   我曾传 `[table, failList]` ⇒ 形参 table 收到整个数组 ⇒ `table[cmd]` 恒
+//   undefined ⇒ 全部返回 null ⇒ 复现了 `v[0]` 崩溃 ⇒ **测的是 harness 的 bug**。
+//   故合并成单个对象传递。
+const TAURI_STUB = ({ table, failList }) => {
   window.__TAURI_INTERNALS__ = {
-    invoke: (cmd) => Promise.resolve(table[cmd] ?? null),
+    invoke: (cmd) => {
+      if (failList && failList.includes(cmd)) {
+        return Promise.reject(new Error(`induced failure: ${cmd}`))
+      }
+      return Promise.resolve(table[cmd] ?? null)
+    },
     transformCallback: (cb) => {
       const id = Math.floor(Math.random() * 1e9)
       window[`_${id}`] = cb
@@ -135,7 +144,7 @@ const TAURI_STUB = (table) => {
 }
 
 /** 加载一页并返回渲染事实。 */
-async function probe(browser, label) {
+async function probe(browser, label, failList, act) {
   const page = await browser.newPage()
   const errors = []
   const badUrls = []
@@ -156,7 +165,7 @@ async function probe(browser, label) {
   })
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
 
-  await page.addInitScript(TAURI_STUB, STUB_RETURNS)
+  await page.addInitScript(TAURI_STUB, { table: STUB_RETURNS, failList: failList || [] })
   let httpStatus = 0
   let children = 0
   let textLen = 0
@@ -180,8 +189,16 @@ async function probe(browser, label) {
     errors.push(`navigation: ${e.message}`)
   }
   // ── R2/R4 功能断言：外壳渲染 + 语言切换**真的生效** ──
+  // ⛔ 失败路径**跳过**功能断言：那些断言会 Esc 关掉日志弹窗，之后再取
+  //    body.innerText 就取不到 `read_run_logs` 的失败文本了 ——
+  //    探针自己把被测证据抹掉了（我第一版就这么错，误判成「无失败提示」）。
   const feat = {}
-  if (r_children > 0) {
+  const isFailCase = label.startsWith('失败路径：')
+  if (isFailCase) {
+    // 只跑该案例自己的动作（功能断言会 Esc 关弹窗、抹掉失败证据，故不走）
+    if (act) await act(page)
+    await page.waitForTimeout(600)
+  } else if (r_children > 0) {
     feat.shell = await page.evaluate(() => ({
       wordmark: document.querySelector('.nb-wordmark')?.textContent ?? null,
       hasLangSelect: !!document.querySelector('.nb-lang select'),
@@ -243,8 +260,9 @@ async function probe(browser, label) {
       return (m?.innerText ?? '').replace(/\s+/g, ' ').slice(0, 60)
     })
   }
+  const errText = await page.evaluate(() => document.body.innerText).catch(() => '')
   await page.close()
-  return { label, httpStatus, children: r_children, textLen, textLen, errors, badUrls, feat }
+  return { label, httpStatus, children: r_children, textLen, errors, badUrls, feat, errText }
 }
 
 // 用系统 Chrome：免去 npx playwright install 的 150MB 下载（本仓已装 Chrome）
@@ -264,7 +282,7 @@ try {
     const errors = []
     page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
     page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
-    await page.addInitScript(TAURI_STUB, STUB_RETURNS)
+    await page.addInitScript(TAURI_STUB, { table: STUB_RETURNS, failList: [] })
     let children = 0
     try {
       const resp = await page.goto(`http://127.0.0.1:${PORT}/app/index.abs.html`, {
@@ -288,6 +306,23 @@ try {
       errors,
       badUrls: [],
     })
+  }
+  // ── 失败路径探针（此前**完全没有覆盖**：桩对每个命令都返回成功）──
+  // 诚实性检查：故障时 UI 必须**说清失败**，不得静默空白或崩溃。
+  // ⛔ 每个案例必须自带 **act**：有些故障只在**用户动手**时才发生
+  //   （set_language 不点就不调、read_run_logs 不点就不调）。
+  //   我曾一刀切「失败路径跳过全部断言」⇒ 动作没执行 ⇒ 误判成「无失败提示」。
+  //   —— 探针自己没触发故障，却报告故障处理有问题。
+  const FAIL_CASES = [
+    { name: 'neobot_convo_list 失败（挂载即触发）', fail: ['neobot_convo_list'] },
+    { name: 'set_language 失败（需点切换）', fail: ['set_language'],
+      act: async (pg) => { await pg.selectOption('.nb-lang select', 'en-US').catch(() => {}) } },
+    { name: 'read_run_logs 失败（需点按钮）', fail: ['read_run_logs'],
+      act: async (pg) => { await pg.click('.nb-actions button').catch(() => {}) } },
+    { name: 'neobot_core_capabilities 失败（挂载即触发）', fail: ['neobot_core_capabilities'] },
+  ]
+  for (const c of FAIL_CASES) {
+    rows.push(await probe(browser, `失败路径：${c.name}`, c.fail, c.act))
   }
 } finally {
   await browser.close()
@@ -323,7 +358,23 @@ for (const r of rows) {
     console.log(`     初始焦点：${JSON.stringify(f.initialFocus)}`)
     console.log(`     Esc 关闭：${f.escClosed ? '✅' : '⛔ 键盘用户出不来'}`
       + ` · 焦点归还：${JSON.stringify(f.focusRestored)}`)
-    if (r.label.startsWith("base:'./'")) {
+    if (r.label.startsWith('失败路径：')) {
+    // 判据：① 仍渲染出内容（不是白屏）② 无未捕获 pageerror
+    //      ③ 页面文本里能看到失败痕迹（说明**说清了**，而非静默）
+    const hasCrash = r.errors.some((e) => e.startsWith('pageerror:'))
+    const saysFail = /失败|failed|诱导|induced|错误|error/i.test(r.errText || '')
+    console.log(`     仍渲染=${r.children > 0 ? '✅' : '⛔ 白屏'} `
+      + `未捕获异常=${hasCrash ? '⛔ ' + r.errors.find((e) => e.startsWith('pageerror:')) : '✅ 无'} `
+      + `可见失败提示=${saysFail ? '✅' : '⚠️ 未见'}`)
+    if (r.children <= 0) { console.log('     ⛔ 故障导致白屏'); fail++ }
+    if (hasCrash) { console.log('     ⛔ 故障导致未捕获异常'); fail++ }
+    if (!saysFail) {
+      console.log(`     ⛔ 故障**静默**：用户看不到任何失败提示`)
+      console.log(`        可见文本：${JSON.stringify((r.errText || '').slice(0, 90))}`)
+      fail++
+    }
+  }
+  if (r.label.startsWith("base:'./'")) {
       if (!f.shell.wordmark) { console.log('     ⛔ 外壳未渲染'); fail++ }
       if (!f.shell.hasLangSelect) { console.log('     ⛔ 语言选择器缺失'); fail++ }
       if (f.langAfter !== 'en-US') { console.log('     ⛔ 语言切换未改 document lang'); fail++ }
@@ -351,6 +402,22 @@ for (const r of rows) {
         console.log(`     聊天区语言：zh=${JSON.stringify(f.chatZh)}`)
         console.log(`                    en=${JSON.stringify(f.chatEn)}`)
       }
+    }
+  }
+  if (r.label.startsWith('失败路径：')) {
+    // 判据：① 仍渲染出内容（不是白屏）② 无未捕获 pageerror
+    //      ③ 页面文本里能看到失败痕迹（说明**说清了**，而非静默）
+    const hasCrash = r.errors.some((e) => e.startsWith('pageerror:'))
+    const saysFail = /失败|failed|诱导|induced|错误|error/i.test(r.errText || '')
+    console.log(`     仍渲染=${r.children > 0 ? '✅' : '⛔ 白屏'} `
+      + `未捕获异常=${hasCrash ? '⛔ ' + r.errors.find((e) => e.startsWith('pageerror:')) : '✅ 无'} `
+      + `可见失败提示=${saysFail ? '✅' : '⚠️ 未见'}`)
+    if (r.children <= 0) { console.log('     ⛔ 故障导致白屏'); fail++ }
+    if (hasCrash) { console.log('     ⛔ 故障导致未捕获异常'); fail++ }
+    if (!saysFail) {
+      console.log(`     ⛔ 故障**静默**：用户看不到任何失败提示`)
+      console.log(`        可见文本：${JSON.stringify((r.errText || '').slice(0, 90))}`)
+      fail++
     }
   }
   if (r.label.startsWith("base:'./'")) {
