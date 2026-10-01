@@ -9,16 +9,17 @@
 | 项 | 状态 |
 |---|---|
 | worktree 去向 | ⛔ **未开新 worktree**。`nt_worktree_gate.sh check` rc=0；现存 4 个（含主树）**均为他窗/历史**，我一个都没动。门提示「2 个 worktree 的未提交改动不在任何提交里」+「target 累计 4673M 可回收」—— **⛔ 都不是我的改动，我未执行 prune/clean** |
-| 我的未提交改动 | **无**。本窗两笔提交均已落盘：`7ce88e27`、`c3b99dc5` |
+| 我的未提交改动 | **无**。本窗提交均已落盘：`7ce88e27`、`c3b99dc5`、`cc1d8886`(amend→`9255f294`)、`2b9b610a` |
 | patch 兜底 | 不适用（无未提交改动） |
-| 弃用声明 | `scripts/ops/neobot-check-msg-copy.mjs` **已 `rm`**：功能门跑不绿，按「不提交红门」处理。**不是**遗忘，见 §2 |
+| 弃用声明 | ⛔ **已作废**：上一轮删掉的 `neobot-check-msg-copy.mjs` 已在 `2b9b610a` **重做并做绿**（A~F，3/3 稳定） |
 
-## §1 本窗两笔提交
+## §1 本窗提交
 
 | 提交 | 内容 |
 |---|---|
 | `7ce88e27` | 修**我自己引入的**主题不持久缺陷 + 清 DSH 命名债；新增 `neobot-check-theme-persist.mjs`（A/B/C/D + 负向测试） |
 | `c3b99dc5` | 气泡悬停/键盘复制；抽出 `copyText()` 共用降级链 |
+| `2b9b610a` | 气泡复制门 A~F 做绿（3/3 稳定）；全门 18 道 rc=0 |
 
 ### `7ce88e26` 的实质：队列 #5 背后是真缺陷
 `desktop.rs:33` `get_dsh_theme()` **恒返回 `Theme::System`**（写死常量、零信息量）。
@@ -29,38 +30,35 @@
 修法 = **删掉该调用**（Rust 侧保持注册不动，不碰他窗代码）。
 实测本会话 invoke 6 次、`get_dsh_theme` **0 次** ⇒ 命名债同时清掉。
 
-## §2 ⛔ 交接给下一窗口的未闭环项
+## §2 ✅ 已闭环（`2b9b610a`）：气泡复制门 A~F 落地
 
-### 2.1 气泡复制**没有专属门**（唯一硬缺口）
-功能已实现、tsc rc=0、构建通过、**7 道现有门全绿**、且**曾观测到实际渲染**
-（`copyBtns: 1`）。但**当前不可复现**，故删门而非提交红门。
+**上一轮那个「应用崩溃」的真凶是门自己的桩，不是产品。**
+`invoke` 桩漏了 Tauri 事件插件：`plugin:event|listen` 必须返回**数字**事件 id，
+我的 `Promise.resolve(t[c] ?? null)` 返回了 `null` ⇒ 应用挂载期解引用即崩
+（`reading '0'`）。`neobot-msg-virtual.mjs` 注释写着**这坑作者栽过第 4 次**，
+我照搬时丢了。⇒ 由此加判据 **F 零未捕获异常**（桩错会先在这里报，
+而不是伪装成「功能没渲染」）；且**不再从零造 harness**，片段直接提取复用。
 
-崩溃签名（本窗 harness 独有；无/有 `permissions`、单/双 init 脚本**三种变体全部**复现同一点）：
-```
-TypeError: Cannot read properties of null (reading '0')
-  at main-*.js:31:2575     ⇒ React 未挂载（#root 为空）
-```
+写门踩的三个坑（已写进 `task-index` 的 spec）：
+1. 桩漏 listen（上面）。
+2. ⛔ `.first()` 会选到**已滚出视口**那条（列表自动滚到底，DOM 第一个在 `y=-312`）
+   ⇒ 鼠标落空 ⇒ 看起来像「悬停坏了」。须挑「**中心点最顶层**就是它」那条，
+   并排除被吸顶栏盖住的。
+3. ⛔ 期望值不能取气泡 `innerText`（含 `⧉` 字形），必须取**消息正文**，
+   否则门明明复制成功却报「未写入」。
 
-**已排除**：
-- ⛔ 不是产品回归 —— 同一 `dist` 下 `neobot-ui-smoke`、`neobot-msg-virtual` 均 **rc=0**，
-  且产物 `main-*.js` 内**确实含** `nb-msg-copy`。
-- ⛔ 桩内容 —— 与 `neobot-msg-virtual.mjs` 的 `STUB` **逐字段相同**。
+判据：A 默认隐藏/不吃点击/绝对定位 · B 悬停浮现 · C `focus-within` 浮现 ·
+D 读回**真剪贴板** · D2 成功有 `is-copied` · E 气泡高度不变 · F 零异常。
+实测 **3/3 稳定**（非 flaky）。全门 **18 道 rc=0**。
 
-**我自己的两个错误（别重犯）**：
-1. 伪造 `navigator.clipboard`（`Object.defineProperty`）会**改变被测代码控制流**；
-   已改用授真权限 + `readText()` 读回。
-2. `page.$()` **不支持** `>> nth=0` 引擎语法（当普通 CSS 落空）；
-   取「第一条」须用 `page.locator(sel).first()`。
-
-**未闭环线索**：崩溃似与桩**规模**相关（1 会话+1 消息崩；1000+1000 在他窗门里正常）。
-若成立 ⇒ **「单会话/单消息」路径当前无任何门覆盖**，`neobot-ui-smoke` 桩覆盖面有缺口。
-改用 1000 规模后我的门**仍**报 0 个按钮，故此线索**未证实**。
-
-### 2.2 建议的判据（已想清，可直接实现）
-`neobot-check-msg-copy.mjs` 应含 A 默认 `opacity:0`+`pointer-events:none` ·
-B 悬停出现 · C **`focus-within`** 也出现（⛔ 只做 hover 则键盘用户永远看不到）·
-D **读回真剪贴板**（⛔ 不能只看点击不报错）· E **气泡高度不变**
-（⛔ `measureElement` 量的就是它，按钮进流会污染虚拟化）。
+### ⭐⭐ 负向测试**证伪了我自己的「缺陷」判断**（R-SCAN-2 当场复发）
+我曾断言「按钮浮在 `.group` 盒外 ⇒ 鼠标移向它就离开 `.group` ⇒ 用户永远点不到」，
+据此把 `top` 从 `-9px` 改成 `4px`。
+**注入 `-9px` 后门全过（rc=0）** ⇒ 断言是错的：按钮中心落在 `groupTop+2`，
+**仍在 `.group` 内**。仍保留 `4px`，但**如实标注为防御性选择、非已证实的修 bug**
+（盒内 ⇒ 结构上不可能被滚动容器裁掉；「浮在盒外会被裁」我**测不出来** ——
+从 sizer 上溯找不到 `overflow-y:auto/scroll` 祖先 ⇒ 不下结论）。
+CSS 注释里写清了这全过程。⏳ **未验证项**：浮在盒外是否真会被裁。
 
 ## §3 本窗方法论（第三次「单向断言假通过」）
 
@@ -69,16 +67,19 @@ D **读回真剪贴板**（⛔ 不能只看点击不报错）· E **气泡高度
 | 1 | 主题门只测「浅色」⇒ 负向测试**假通过**（headless 系统默认就是浅色，恰好与选择一致） | **双向必测**；实测是「深色」那档抓到 rc=1 |
 | 2 | 折叠门只测正向 ⇒ 前向不能红 | 负向注入 + 断言锚点 |
 | 3 | 主题门 A/B 只在**同一会话**内比较 ⇒ 覆盖 bug（发生在**挂载时**）根本不显现 | 必须**跨刷新** |
-| 4 | 固定 `waitForTimeout` 当等待 ⇒ 随机红/绿，等于没门 | 改 `waitForSelector` 确定性等待 |
+| 4 | 固定 `waitForTimeout` 当等待 ⇒ 随机红/绿，等于没门 | 改确定性等待 |
 | 5 | 伪造宿主 API（`navigator.clipboard`）改变被测控制流 | 授真权限 + 真 API 读回 |
+| 6 | **手推「鼠标会离开 .group」⇒ 当成缺陷去「修」** ⇒ 负向测试直接推翻 | ⭐ 改前先做负向测试；被推翻就如实写「防御性选择」而非「修 bug」 |
+| 7 | 门挑「DOM 第一个」元素 ⇒ 选中已滚出视口那条 | 挑「中心点最顶层」的那条 |
 
 ⓘ 元教训：**「我造的门跑红」先怀疑门，再怀疑产品** —— 但要**给出证据**（本窗用
 「同一 dist 下他门 rc=0」+「产物含该字符串」两条把产品嫌疑排除掉），不能靠猜。
 
-## §4 门状态（收工实测，13 道）
+## §4 门状态（收工实测，18 道全绿）
 
-本侧 9：`api_contract` / `ui_wiring` / `feature_viability` / `absorption_audit` /
-`ui-smoke` / `msg-virtual` / `check-contrast` / `check-convo-groups` / `check-theme-persist` — 全 rc=0
+本侧 10（含 `neobot-check-msg-copy`）：`api_contract` / `ui_wiring` / `feature_viability` / `absorption_audit` /
+`ui-smoke` / `msg-virtual` / `check-contrast` / `check-convo-groups` /
+`check-theme-persist` / `check-msg-copy` — 全 rc=0
 他侧 4：`check_visual` / `check_ship_ui` / `check_ui_calls` / `check_upstream_1to1` — 上轮实测 rc=0
 `check-license` rc=1 **正确**（受限 vendored 树未删）
 
