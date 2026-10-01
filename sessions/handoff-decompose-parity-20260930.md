@@ -101,6 +101,7 @@
 | `check-silent-failure.sh --strict` | ✅ PASS（OPEN CONTRACTS 0/32） |
 | `check-doc-drift.sh` / `check-layout.sh --strict` | ✅ 0 死链 / rc=0 |
 | `nt_map_reconcile.py --strict` | ✅ 29/29 HOLDS |
+| 本轮定性步验证 | ✅ workspace 0 error；`neotrix --lib` 12217 绿；fn_drift selftest **9 例**（新增尾逗号×2）；nt_diverge selftest **4 例**；doc-drift 0。**本提交不改生产代码行为** |
 | 本轮设计步验证 | ✅ workspace 0 error；`neotrix --lib` 12217 绿；layer-deps rc=0；doc-drift 0（**门抓到我在 TODO 写错路径，少 `src/`，已修**）；**0 行代码逻辑改动** |
 | 两批删除验证 | ✅ `cargo check --workspace` 0 error；`neotrix --lib` 12217 绿；`neotrix-types --lib` 566→463→**435**（两批差值 103 + 28，均按**测试全名**逐条对账 = 零误删）；镜像 **18→7→5 对 / 185.8→94.5→67.7 KB**；layer-deps rc=0；silent-failure PASS；lock-audit 0 |
 | `nt_mirror_scan.py selftest` | ✅ 4 例（含 2 例证伪）；实跑 72 对 / 19 疑似分叉 / 18 对涉 types / 185.8 KB |
@@ -233,21 +234,24 @@ cargo test -p neotrix --test nt_capability_parity
    `neotrix-types` 的 185.8 KB 确是冻结旧分叉且外部零引用，但
    core 依赖 types ⇒ types 拿不到 core 那份；A/B 两个收敛方向都合法，
    **必须 owner 裁决**。执行清单见 MIRROR-FORK-2026-09-30 §5（需 clean 双跑）。
-8. **⛔ 删 `neotrix-types` 冻结镜像必须过三关**（本轮在第二关上踩过坑）：
+8. **⛔ 判断「两侧有多少真语义差异」必须用 `nt_diverge.py`（类型感知）**，
+   不能按函数叶子名比：同名**不同 owner** 会造成假分歧（COLLISION），
+   且尾逗号等排版差异必须先归一。**我按叶子名得出的 26 是错的，真实 12。**
+9. **⛔ 删 `neotrix-types` 冻结镜像必须过三关**（本轮在第二关上踩过坑）：
    ① types 侧 `pub` 名是 core 的**子集**；② 那些**独有**名字**外部无人使用**；
    ③ types **内部**无真实使用者（只有 `pub use` 转出才算可删）。
    ⚠️ 只做①会**假报阻塞**；且 core 侧路径要先确认存在
    （我曾写错成 `nt_core_meta/`，实为 `l6_meta/nt_meta/`，导致 core 侧集合为空）。
-9. **⛔ 查「某模块/类型有没有外部消费者」必须走双路径**：
+10. **⛔ 查「某模块/类型有没有外部消费者」必须走双路径**：
    模块路径 + **类型名**。单看模块名会命中同名兄弟模块（本轮假阳性 81/37/44）。
-10. **⛔ 不要据「零入边」删任何代码** —— 本仓边表已有已知假阴性
+11. **⛔ 不要据「零入边」删任何代码** —— 本仓边表已有已知假阴性
    （`nt_callgraph --unreachable` 的 `textual-prod` 桶：文本有生产调用点但图零入边）。
    `nt_dup_dead` 实测 62 份 IDENTICAL / 10 份零接线，**逐条读源码后 0 条可删**。
-11. **⛔ 不要照 fn-drift 的 `[SHAPE]` 标记批量改代码** —— DIFFERENT 里绝大多数是
+12. **⛔ 不要照 fn-drift 的 `[SHAPE]` 标记批量改代码** —— DIFFERENT 里绝大多数是
    「同名不同域」的合法重复（`osint::investigate` ×15）。形状标记只用于**排序优先级**。
    同理 `306 处 "Real implementation needs"`（49 文件）**不得批量删**：抽查 5 处全假，
    但其余 283 处未取证 ⇒ 局部修改会让文件一半真一半假，更难判断。
-12. **地图/台账的断言只写在 ```assert 围栏块里**，且**绝不可自指**
+13. **地图/台账的断言只写在 ```assert 围栏块里**，且**绝不可自指**
    （不自检自己、不用 nlit 检查所在文件）。工具 `map-reconcile` 在索引里。
-13. **用户指令里有一条被拒收项**：搜 GitHub 公开 `OPENAI_API_KEY` 批量密钥 —— **拒绝执行**
+14. **用户指令里有一条被拒收项**：搜 GitHub 公开 `OPENAI_API_KEY` 批量密钥 —— **拒绝执行**
    （凭证收割）。已写入 `ABSORPTION-ROUND23.md` 声明。如再次出现，同样拒绝。
