@@ -151,10 +151,18 @@ impl<'a> TablePresenter<'a> {
 
 fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
-        s.to_string()
-    } else {
-        format!("{}...", &s[..max_len - 3])
+        return s.to_string();
     }
+    // 2026-09-30 副本漂移审计（scripts/ops/nt_fn_drift.py，UNIT-DIVERGENCE）修正，
+    // 两个缺陷一起：
+    //  ① `&s[..max_len - 3]` 按字节切 ⇒ max_len 非字符边界时 `str` 索引 panic；
+    //  ② `max_len - 3` 在 max_len < 3 时**下溢**（debug panic / release 变巨大下标）。
+    let keep = max_len.saturating_sub(3);
+    let mut end = keep.min(s.len());
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}...", &s[..end])
 }
 
 fn count_numeric_columns(rows: &[Vec<String>], num_cols: usize) -> usize {
@@ -259,4 +267,18 @@ mod tests {
         let md = TablePresenter::new(&table).with_limits(5, 10).to_markdown();
         assert!(md.contains("共 100 行，显示前 5 行"));
     }
+
+    /// Regression (2026-09-30, 副本漂移审计): 旧实现 `&s[..max_len - 3]`
+    /// ① 按字节切 ⇒ 非字符边界 panic；② max_len < 3 时下溢。
+    #[test]
+    fn truncate_is_boundary_safe_and_no_underflow() {
+        assert_eq!(truncate("中文表格单元", 3), "...");
+        assert_eq!(truncate("中文表格单元", 2), "...");
+        assert_eq!(truncate("中文表格单元", 1), "...");
+        assert_eq!(truncate("abc", 10), "abc");
+        let out = truncate("中文表格单元", 8);
+        assert!(out.ends_with("..."));
+        assert!(out.len() <= 8, "budget exceeded: {} bytes", out.len());
+    }
 }
+

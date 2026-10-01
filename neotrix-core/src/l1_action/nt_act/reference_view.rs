@@ -95,8 +95,13 @@ impl ReferenceManager {
 }
 
 fn now_ts() -> i64 {
+    // 2026-09-30 副本漂移审计（scripts/ops/nt_fn_drift.py）后统一：
+    // 全仓 `now_ts` 有 13 份副本，其中 11 份对时钟错误**宽容**（返回 0），
+    // 2 份用 `.expect(...)` **panic** —— 同一个操作两种失败语义。
+    // 容器/虚机时钟早于 1970 时 `duration_since` 会真的返回 Err，
+    // 于是一条只读的时间戳helper能把进程打崩。此处按多数派改为宽容。
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .expect("system time after UNIX epoch")
-        .as_secs() as i64
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or_default()
 }

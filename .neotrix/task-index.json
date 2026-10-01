@@ -810,6 +810,23 @@
    "spec": "docs/architecture/GLOBAL-MAP-DEFECTS-2026-09-30.md §3 断言块（9 条，当日 9/9 HOLDS）"
   },
   {
+   "id": "fn-drift",
+   "query": [
+    "重复实现",
+    "函数副本",
+    "副本漂移",
+    "同名不同语义",
+    "语义漂移",
+    "字节切 panic",
+    "字符边界"
+   ],
+   "tool": "python3 scripts/ops/nt_fn_drift.py [--db .project-map/edges-all.jsonl] [--only-different] | selftest",
+   "kind": "report",
+   "read_only": true,
+   "when_not": "① 只能发现**同名**副本 —— 跨名漂移（本会话的字节/char levenshtein）抓不到，那种只能靠 nt-parity-ref 的行为对位；② DIFFERENT 里绝大多数是「同名不同域」的合法重复（如 osint::investigate ×15），**不要照 [SHAPE] 标记批量改**，那正是「23 处模板残留被当真缺陷」那类风险；③ 不是门：判据是文本相等，不足以当正确性判据（G7）；④ 需要 .project-map/edges-*.jsonl（gitignored 低频生成物）",
+   "spec": "GLOBAL-MAP-DEFECTS-2026-09-30 §3.1b；首轮抓到 now_ts 13 副本 2 panic + 2 处 truncate 字节切 panic"
+  },
+  {
    "id": "check-license",
    "query": [
     "许可",

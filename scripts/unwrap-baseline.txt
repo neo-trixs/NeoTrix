@@ -138,7 +138,6 @@ neotrix-core/src/l1_action/nt_act/nt_act_trade/full_cycle.rs:771	expect
 neotrix-core/src/l1_action/nt_act/nt_act_trade/orchestrator_v2.rs:464	expect
 neotrix-core/src/l1_action/nt_act/nt_act_trade/production_logistics.rs:660	expect
 neotrix-core/src/l1_action/nt_act/nt_act_trade/quote_negotiation.rs:298	expect
-neotrix-core/src/l1_action/nt_act/reference_view.rs:100	expect
 neotrix-core/src/l1_action/nt_io/nt_io_avatar_channel.rs:251	expect
 neotrix-core/src/l1_action/nt_io/nt_io_browser_engine/mod.rs:52	expect
 neotrix-core/src/l1_action/nt_io/nt_io_inference/quantization_engine.rs:454	expect
@@ -248,7 +247,6 @@ neotrix-core/src/l4_emotion/nt_memory/nt_trade_product_spec.rs:955	expect
 neotrix-core/src/l5_cognition/nt_core/knowledge/nt_core_rag.rs:217	expect
 neotrix-core/src/l5_cognition/nt_core_arch_fitness.rs:193	expect
 neotrix-core/src/l5_cognition/nt_core_gate/nt_panel_debate.rs:524	expect
-neotrix-core/src/l5_cognition/nt_mind/harness/refinement.rs:136	expect
 neotrix-core/src/l5_cognition/nt_mind/mind_modules/other/rsi_exam.rs:86	expect
 neotrix-core/src/l5_cognition/nt_mind/nt_game/play/self_play_loop.rs:169	expect
 neotrix-core/src/l5_cognition/nt_mind/nt_mind/consciousness/bbrain_monitor.rs:322	expect

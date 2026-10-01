@@ -258,10 +258,20 @@ impl HiveAgentLoop {
 
 fn truncate(s: &str, max: usize) -> &str {
     if s.len() <= max {
-        s
-    } else {
-        &s[..max]
+        return s;
     }
+    // 2026-09-30 副本漂移审计（scripts/ops/nt_fn_drift.py，UNIT-DIVERGENCE）修正：
+    // 原来是 `&s[..max]` —— **按字节切**，而 `max` 落在非字符边界时
+    // `str` 切片索引**直接 panic**。调用点是 `truncate(&response, 200)`，
+    // response 是模型输出；一个汉字 3 字节，200 不是 3 的倍数
+    // ⇒ 中文回复有约 2/3 概率在此 panic。全仓 8 份 truncate 副本里
+    // `nt_memory_integration::truncate_chars` 与 `panoramic::truncate` 本来就是
+    // 边界安全的，只有这份是字节切。
+    let mut end = max.min(s.len());
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    &s[..end]
 }
 
 use crate::l0_substrate::nt_core_time::now_secs;
@@ -312,4 +322,19 @@ mod tests {
         let val = router.lock().unwrap().blackboard.read("agent-1/status").map(|e| e.value);
         assert_eq!(val.as_deref(), Some("busy"));
     }
+
+    /// Regression (2026-09-30, 副本漂移审计): `&s[..max]` 按字节切，
+    /// max 落在非字符边界时 `str` 索引 panic。调用点是 truncate(&response, 200)，
+    /// 而 200 不是 3 的倍数 ⇒ 中文模型回复曾有约 2/3 概率在此 panic。
+    #[test]
+    fn truncate_never_panics_on_cjk() {
+        assert_eq!(truncate("中文回复", 200), "中文回复");
+        // 3 字节汉字 + 切点 5：字节 5 是「回」的首字节，非边界
+        let out = truncate("中文回复", 5);
+        assert!(out.len() <= 5, "must not exceed the byte budget");
+        assert!(out.chars().count() >= 1);
+        assert_eq!(truncate("abc", 1), "a");
+        assert_eq!(truncate("abc", 0), "");
+    }
 }
+

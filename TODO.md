@@ -1,6 +1,57 @@
 > # NeoTrix TODO 列表
-> 智能同步生成，最后更新：**2026-09-30（全域 map 装上自检器 + 边界澄清：并非所有能力都可复现）**
+> 智能同步生成，最后更新：**2026-09-30（副本漂移审计器 + 抓到 3 个真缺陷）**
 >
+> ## ✅ 2026-09-30 副本漂移审计（fn-drift）—— 首轮即抓到 3 个真缺陷
+> >
+> > **审计缺口**：本仓有 `nt_dup_types`（重复**类型**），
+> > **但没有「重复函数实现」审计** —— 而本会话两个真 bug 都是副本漂移。
+> > `scripts/ops/nt_fn_drift.py`：候选来自**编译器解析过的调用边**（非正则扫源码），
+> > 逐对提取函数体、归一化（去注释与字符串内容）后判定
+> > DIFFERENT 160 / IDENTICAL 29 / UNRESOLVED 24 / **命中缺陷形状 7**（name）。
+> > 两个形状是本会话**踩过两次**的复发型缺陷：
+> > `ERR-DIVERGENCE`（一侧 panic 一侧宽容）、`UNIT-DIVERGENCE`（字节 `.len()` vs `.chars().count()`）。
+> >
+> > ### ✅ 已修 3 个（全部逐处读源码确认 + 证伪测试）
+> > 1. **`now_ts` 错误处理漂移**：全仓 **13 份副本**，11 份宽容、**2 份 panic**
+> >    （`reference_view.rs:97`、`harness/refinement.rs:133`）⇒ 容器/虚机时钟早于 1970 时
+> >    一个只读时间戳 helper 能打崩进程。已统一为宽容，`unwrap-baseline` 716→**714**。
+> > 2. **`truncate` 按字节切**（`nt_io/nt_io_hive_agent_loop.rs:259`）：
+> >    `&s[..max]` 非字符边界 **panic**。调用点 `truncate(&response, 200)` 是**模型输出**，
+> >    200 不是 3 的倍数 ⇒ **中文回复约 2/3 概率 panic**。已改边界安全。
+> > 3. **`truncate` 字节切 + 下溢**（`nt_file_ability/table_presenter.rs:152`）：
+> >    `&s[..max_len - 3]` ① 非边界 panic；② `max_len < 3` 下溢。
+> >
+> > **证伪实测**：回退两份 truncate 到旧实现后，测试分别以
+> > `byte index 5 is not a char boundary` 与 `attempt to subtract with overflow` 转红；
+> > 恢复后 24 个 truncate 相关测试全绿。
+> >
+> > ### ⛔ 工具的已知局限（写下来防误用）
+> > 只能发现**同名**副本。本会话那个字节/char `levenshtein` 是
+> > `levenshtein` vs `levenshtein_distance` **不同名** ⇒ 本工具抓不到。
+> > ⇒ **两套互补**：同名查 fn-drift，跨名查行为对位（`nt_parity_ref`）。
+> >
+> > ### 🟡 P1 未分诊：7 个「命中形状」的其余 6 个
+> > `truncate`×8、`estimate_tokens`×7 等尚在分诊单里。⚠️ **多数可能是合法的**
+> > （如 `osint::investigate` ×15 是同名不同域）。**不要照形状批量改** ——
+> > 与「23 处模板残留被当真缺陷」是同一类风险。逐个读源码裁决。
+> >
+> ## 🔴 P1（未取证，**勿当 bug**）306 处 `/// Note: Real implementation needs` 声称未实现
+> >
+> > **实测规模**：`rg -c 'Real implementation needs' --glob '*.rs'` ⇒ **306 处 / 49 文件**
+> > （最多：`self_improvement.rs` 32、`nt_policy.rs` 23、`execution.rs` 17）。
+> > 抽查 `nt_policy.rs` 5 处（`evaluate` / `summarize` / `enable_response_cache` /
+> > `response_cache_enabled` / `response_cache_hits`）⇒ **5/5 全是假声明**：
+> > 注释说「Real implementation needs — returns X」，而函数体**就在下面完整实现了 X**。
+> >
+> > **⛔ 明确不做的事**：
+> > - **不批量删**。283 处未取证 ≠ 283 处为假；批量改会把「未取证」变成「已改错」。
+> >   正确做法是**逐个读源码裁决**，且这属于机械劳动，适合派子代理而非本窗口硬做。
+> > - **不建门**。按 G7：`Real implementation needs` 模式**太宽**（无法区分真假），
+> >   建在它上面的门会立刻失去可信度。本仓已有 2 次 doc-claim 判据被证否的记录。
+> > - **不改那 23 处**（`nt_policy.rs`）。它是我的文件、我读过 5 处确认是假，
+> >   但**剩余 18 处未读** ⇒ 局部修改会让文件内一半真一半假，更难判断。
+> >   等一次性裁决完 306 处再统一清理。
+> >
 > ## ✅ 2026-09-30 全域 map 装上自检器（地图不再静默腐烂）
 > >
 > > **起因**：核对 `GLOBAL-MAP-DEFECTS` 第三部分时发现它**已陈旧** —— 仍按

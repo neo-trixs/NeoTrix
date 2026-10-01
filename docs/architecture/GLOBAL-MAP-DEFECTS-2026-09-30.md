@@ -174,6 +174,46 @@ cmd:python3 scripts/ops/nt_decompose.py selftest   # ⑥ 拆解器自证仍绿�
 时点判断时，应当**只写进断言、不写进散文** —— 断言会在入库那一刻自动转 HOLDS，
 而散文不会自己更新（这正是本工具存在的理由）。
 
+### 3.1b 副本漂移审计（fn-drift）—— 新增能力，且已抓到 3 个真缺陷
+
+**审计缺口**：本仓有 `nt_dup_types`（重复**类型**），但**没有「重复函数实现」审计**。
+而本会话的两个真 bug 都是**副本漂移**（同名/同用途实现语义不一致）。
+
+工具 `scripts/ops/nt_fn_drift.py`：候选来自**编译器解析过的调用边**（不是正则扫源码），
+逐对提取函数体并归一化（去注释与字符串内容）后判定：
+
+| 判定 | 数量【实测】 | 含义 |
+|---|---:|---|
+| DIFFERENT | 160 name / 815 pairs | 同名不同语义 ⇒ **需人工裁决**（多数是「同名不同域」的合法重复，如 `osint::investigate` ×15） |
+| IDENTICAL | 29 name | 归一化后逐字相同 ⇒ 纯重复，可合并 |
+| UNRESOLVED | 24 name | 抽不出定义 ⇒ **不猜** |
+| **命中缺陷形状** | **7 name** | 自动标注本会话已实证过的两类形状，优先分诊 |
+
+两个形状（都是本会话**踩过两次**的复发型缺陷）：
+- `ERR-DIVERGENCE` 一侧 panic、另一侧宽容 ⇒ 同一操作两种失败语义
+- `UNIT-DIVERGENCE` 一侧 `.len()`（字节）、另一侧 `.chars().count()` ⇒ 单位混用
+
+**首轮实跑即抓到 3 个真缺陷**（全部逐处读源码确认，非凭工具输出）：
+
+| 缺陷 | 位置 | 后果 | 状态 |
+|---|---|---|---|
+| `now_ts` 错误处理漂移 | 全仓 **13 份副本**：11 份宽容、**2 份 panic**（`reference_view.rs:97`、`harness/refinement.rs:133`）| 容器/虚机时钟早于 1970 时，一个只读时间戳 helper 能打崩进程 | ✅ 已统一为宽容，基线 716→714 |
+| `truncate` 按**字节**切 | `nt_io/nt_io_hive_agent_loop.rs:259` | `&s[..max]` 在非字符边界 **panic**。调用点 `truncate(&response, 200)` 是**模型输出**，200 不是 3 的倍数 ⇒ **中文回复约 2/3 概率 panic** | ✅ 已改边界安全 + 回归测试 |
+| `truncate` 字节切 + **下溢** | `nt_file_ability/table_presenter.rs:152` | `&s[..max_len - 3]`：① 非边界 panic；② `max_len < 3` 时下溢 | ✅ 同上 |
+
+⚠️ **工具的已知局限（写在这里以防后人误用）**：只能发现**同名**副本。
+本会话那个字节/字符 `levenshtein` bug 是 `levenshtein` vs `levenshtein_distance`
+**不同名** ⇒ 本工具抓不到，只能靠行为对位（`nt_parity_ref`）。
+⇒ **两套工具互补，不互相替代**：同名查 fn-drift，跨名查行为对位。
+
+```assert
+file:scripts/ops/nt_fn_drift.py             # 副本漂移审计器
+cmd:python3 scripts/ops/nt_fn_drift.py selftest   # 自证 7 例（含 3 例证伪：字符串/注释花括号、lifetime、声明-only）
+test:truncate_never_panics_on_cjk@neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rs  # 字节切 panic 回归测试仍在
+test:truncate_is_boundary_safe_and_no_underflow@neotrix-core/src/l1_action/nt_file_ability/table_presenter.rs  # 下溢回归测试仍在
+nlit:.expect("system time after UNIX epoch")@neotrix-core/src/l1_action/nt_act/reference_view.rs  # now_ts 已不再 panic
+```
+
 ### 3.2 「复现对方产品」现在能做到什么、做不到什么【实测边界】
 
 | 能力形态 | 能否对位 | 实例 |

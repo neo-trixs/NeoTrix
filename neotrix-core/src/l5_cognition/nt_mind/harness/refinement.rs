@@ -131,8 +131,11 @@ impl ContinualRefiner {
 }
 
 fn now_ts() -> i64 {
+    // 2026-09-30 副本漂移审计（scripts/ops/nt_fn_drift.py）后统一：
+    // 全仓 `now_ts` 13 份副本里 11 份对时钟错误宽容、2 份 panic（此处与
+    // `reference_view.rs`）。同一个操作不应有两种失败语义；按多数派改为宽容。
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .expect("system time after UNIX epoch")
-        .as_secs() as i64
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or_default()
 }
