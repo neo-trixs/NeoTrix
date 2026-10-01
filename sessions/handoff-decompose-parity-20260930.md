@@ -101,7 +101,7 @@
 | `check-silent-failure.sh --strict` | ✅ PASS（OPEN CONTRACTS 0/32） |
 | `check-doc-drift.sh` / `check-layout.sh --strict` | ✅ 0 死链 / rc=0 |
 | `nt_map_reconcile.py --strict` | ✅ 29/29 HOLDS |
-| 本轮删除验证 | ✅ `cargo check --workspace` 0 error；`neotrix --lib` 12217 绿；`neotrix-types --lib` 566→463（差值 = 被删 `#[test]` 数 103）；镜像 18→7 对 / 185.8→94.5 KB；layer-deps rc=0；silent-failure PASS |
+| 两批删除验证 | ✅ `cargo check --workspace` 0 error；`neotrix --lib` 12217 绿；`neotrix-types --lib` 566→463→**435**（两批差值 103 + 28，均按**测试全名**逐条对账 = 零误删）；镜像 **18→7→5 对 / 185.8→94.5→67.7 KB**；layer-deps rc=0；silent-failure PASS；lock-audit 0 |
 | `nt_mirror_scan.py selftest` | ✅ 4 例（含 2 例证伪）；实跑 72 对 / 19 疑似分叉 / 18 对涉 types / 185.8 KB |
 | `make audit-edges-list` | ✅ rc=0；`nt_audit_bootstrap` quick scope **11/11 成功**（实测，非"写完了"）|
 | `nt_fn_drift.py selftest` | ✅ 7 例（含 3 例证伪）；实跑 DIFFERENT 159 / IDENTICAL 30 / UNRESOLVED 24 / 形状命中 7 |
@@ -232,8 +232,11 @@ cargo test -p neotrix --test nt_capability_parity
    `neotrix-types` 的 185.8 KB 确是冻结旧分叉且外部零引用，但
    core 依赖 types ⇒ types 拿不到 core 那份；A/B 两个收敛方向都合法，
    **必须 owner 裁决**。执行清单见 MIRROR-FORK-2026-09-30 §5（需 clean 双跑）。
-8. **⛔ 删 `neotrix-types` 冻结镜像前必须过「子集性判据」**：两侧 `pub` 名集合比较，
-   types 独有必须为 0，否则删除即丢公开 API。本轮 4 片因此被挡住。
+8. **⛔ 删 `neotrix-types` 冻结镜像必须过三关**（本轮在第二关上踩过坑）：
+   ① types 侧 `pub` 名是 core 的**子集**；② 那些**独有**名字**外部无人使用**；
+   ③ types **内部**无真实使用者（只有 `pub use` 转出才算可删）。
+   ⚠️ 只做①会**假报阻塞**；且 core 侧路径要先确认存在
+   （我曾写错成 `nt_core_meta/`，实为 `l6_meta/nt_meta/`，导致 core 侧集合为空）。
 9. **⛔ 查「某模块/类型有没有外部消费者」必须走双路径**：
    模块路径 + **类型名**。单看模块名会命中同名兄弟模块（本轮假阳性 81/37/44）。
 10. **⛔ 不要据「零入边」删任何代码** —— 本仓边表已有已知假阴性
