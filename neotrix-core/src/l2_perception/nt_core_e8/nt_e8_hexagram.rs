@@ -78,19 +78,14 @@ pub fn hexagram_matrix() -> [[Hexagram; 8]; 8] {
 
 /// The 8 generators of SU(3) = 8 trigrams.
 /// Represented as Gell-Mann matrices (symbolic structure constants).
-pub fn su3_generators() -> Vec<&'static str> {
-    vec![
-        "λ₁ (gluon R̄G)",
-        "λ₂ (gluon RḠ)",
-        "λ₃ (gluon R̄R-ḠG)",
-        "λ₄ (gluon R̄B)",
-        "λ₅ (gluon RB̄)",
-        "λ₆ (gluon ḠB)",
-        "λ₇ (gluon GB̄)",
-        "λ₈ (gluon R̄R+ḠG-2B̄B)/√3",
-    ]
-}
-
+/// SU(3) Gell-Mann 生成元名称（8 个）。
+///
+/// 单点真身收敛（2026-09-30）：此前本文件与 `neotrix-types/core/nt_core_e8.rs`
+/// 各有一份**逐字相同**的实现 ⇒ 收敛为引用低层唯一实现。
+/// 判定依据：返回值 `Vec<&'static str>` 是**跨 crate 同一类型** ⇒ 可安全收敛。
+/// ⚠️ 同文件的 `king_wen_sequence` / `shao_yong_sequence` 返回 `Vec<Hexagram>`，
+/// 而 `Hexagram` 在两 crate 各自定义 ⇒ 那两个**不可**收敛，保留本地实现。
+pub use neotrix_types::core::nt_core_e8::su3_generators;
 /// Map each trigram to a specific SU(3) root/coroot.
 /// 乾 ☰ → gluon g₁ (R̄R), 坤 ☷ → gluon g₂ (ḠG), etc.
 pub fn trigram_to_su3_root(trigram: u8) -> (i8, i8) {

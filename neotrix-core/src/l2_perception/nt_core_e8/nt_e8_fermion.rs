@@ -4,7 +4,9 @@
 
 use serde::Deserialize;
 
-use super::TOTAL_SM_FERMIONS;
+// `TOTAL_SM_FERMIONS` 的导入已删（2026-09-30）：它只被本模块那份已收敛走的
+// `verify_total_fermions` 函数体使用；真身实现自带该常量（types 侧）。
+// 由编译器 unused 警告抓出（该 crate 开了 `deny(warnings)`，不会静默通过）。
 
 // ─── Spin(11,3) 64-Fermion Decomposition ────────────────────────────
 
@@ -86,7 +88,11 @@ pub fn all_sm_fermions() -> Vec<FermionState> {
     all
 }
 
-/// Verify: exactly 192 fermions across 3 generations.
-pub fn verify_total_fermions() -> bool {
-    all_sm_fermions().len() == TOTAL_SM_FERMIONS
-}
+// 单点真身收敛（2026-09-30）：此前本文件与 `neotrix-types/core/nt_core_e8.rs`
+// 各有一份**逐字相同**的 `verify_total_fermions`（`nt_diverge.py` 实测 owner 同为
+// `(free)`、归一化后全等）⇒ 收敛为引用低层唯一实现。
+// 判定依据：返回值是 `bool`，**跨 crate 同一类型** ⇒ 可安全收敛。
+//（同文件的 `all_sm_fermions` 返回 `Vec<FermionState>`，而 `FermionState` 在两
+//  crate 是各自定义的同名类型 ⇒ 那一个**不可**收敛，保留本地实现。）
+// 必要性：逐字相同的副本只会各自漂移（本会话已实测 `now_ts` 13 份里 2 份 panic）。
+pub use neotrix_types::core::nt_core_e8::verify_total_fermions;
