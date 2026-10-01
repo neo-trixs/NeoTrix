@@ -1,113 +1,88 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="NeoBot">
   <title>NeoBot</title>
-  <!--
-    NeoBot 图标 —— 圆角 mac 轮廓 + 透明底 + 可爱卡通鲨（侧视）。
-
-    设计取值来源：
-      · 轮廓/网格：本仓图标规范（1024 构造网格、Mac squircle 曲线）
-      · 配色：与前端 accent 同一套青蓝，Dock 图标与界面强调色同源
-
-    为什么内部透明（用户要求「背景透明」）：
-      macOS 上不透底的图标在浅/深壁纸之间切换时像「贴上去的一块方砖」。
-      现在只有轮廓 + 鲨鱼剪影，squircle 形状仍在（那是 mac 图标该有的形）。
-
-    与 UI 图标的分工：
-      这是品牌标记（面性、有体积感）；界面功能图标是 24 网格 / 1.7px 圆头线性。
-      品牌要一眼认出，功能图标要一眼读懂。
-
-    ⚠️ 四轮渲染才收敛，留档避免后人重犯：
-      1. XML 注释不能有连续两个连字符（原用「────」分节 → 解析失败）。
-         字节门查不出（只查 U+FFFD，不查 XML 语法），qlmanage 才报得出来。
-      2. ⛔ 鳍的根部必须压进身体。第一版三片鳍全在轮廓之外，渲染是漂浮碎片。
-      3. ⛔ 光有鳍还不够。第二轮鳍接上了，仍像「鱼」——
-         正视 + 双眼的圆脸**读不出鲨**，无论加多少鳍。
-      4. ⛔ 正视圆脸上的白色腹部弧线会被读成「下巴线」，
-         卡通脸上一旦有横向分割线，表情就断了。
-      ⇒ 解法是**改侧视**：尖吻 + 三角背鳍 + 分叉尾这套轮廓本身就是「鲨」的字，
-         不必靠五官去暗示。侧视配**单只大眼**才可爱（双眼是正面才有的）。
-      ⇒ 以上四条只能靠**看渲染图**发现，静态检查一个都查不出。
-      ⇒ 因此这个文件的分节一律用 ═，不用 -。
-  -->
+  <!-- NeoBot 彩豚：以上游 dsh 0.19.1 黑剪影为基，改侧视海豚（喙+笑线+横尾+镰状背鳍，鲨为尖吻+鳃+竖尾）。
+       mac squircle 只描边不填底故透明；液态玻璃 = 体表高光 + 虹彩背线 + 气泡 + 淡辉。原创不临摹。 -->
   <defs>
-    <linearGradient id="nbBody" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#7fd4e8"/>
-      <stop offset="0.5" stop-color="#4bb3d4"/>
-      <stop offset="1" stop-color="#3899c0"/>
+    <linearGradient id="nbSea" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#8fe9f5"/>
+      <stop offset="0.38" stop-color="#45bde0"/>
+      <stop offset="0.72" stop-color="#2b8fd0"/>
+      <stop offset="1" stop-color="#2b5fb8"/>
+    </linearGradient>
+    <linearGradient id="nbBelly" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#cdeef7" stop-opacity="0.9"/>
     </linearGradient>
     <linearGradient id="nbFin" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#63c6e2"/>
-      <stop offset="1" stop-color="#3d9fc4"/>
+      <stop offset="0" stop-color="#5cc8ea"/>
+      <stop offset="1" stop-color="#2f7fc4"/>
     </linearGradient>
+    <linearGradient id="nbRainbow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#67e8f9"/>
+      <stop offset="0.35" stop-color="#818cf8"/>
+      <stop offset="0.65" stop-color="#c084fc"/>
+      <stop offset="1" stop-color="#f9a8d4"/>
+    </linearGradient>
+    <linearGradient id="nbGlass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="0.45" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="nbGlow" cx="0.5" cy="0.42" r="0.55">
+      <stop offset="0" stop-color="#bff3ff" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#7fd4e8" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="nbBodyClip">
+      <path d="M196 528 C 210 478 252 438 302 430 C 382 418 462 378 562 370 C 642 364 702 378 742 408 L 822 378 C 832 374 838 382 830 390 L 752 440 L 830 470 C 838 474 832 484 822 480 L 732 458 C 662 520 582 600 470 620 C 360 638 260 600 210 560 C 196 550 190 540 196 528 Z"/>
+    </clipPath>
   </defs>
 
-  <!-- ① Mac squircle 轮廓：只描边不填充 ⇒ 背景透明 -->
-  <rect x="64" y="64" width="896" height="896" rx="212" ry="212"
-        fill="none" stroke="#c9d2d8" stroke-width="10" opacity="0.55"/>
+  <ellipse cx="512" cy="470" rx="360" ry="300" fill="url(#nbGlow)"/>
 
-  <!-- ② 尾鳍：分叉新月形，根部压进身体尾柄 -->
-  <path d="M676 434
-           C 738 392 790 340 804 288
-           C 754 274 700 314 676 372
-           C 696 412 702 452 698 490
-           C 694 528 696 568 676 608
-           C 700 666 754 706 804 692
-           C 790 640 738 588 676 546 Z"
-        fill="url(#nbFin)"/>
+  <rect x="64" y="64" width="896" height="896" rx="212" ry="212" fill="#ffffff" fill-opacity="0.05"/>
+  <rect x="64" y="64" width="896" height="896" rx="212" ry="212" fill="none" stroke="#c9d2d8" stroke-width="10" opacity="0.55"/>
+  <rect x="80" y="80" width="864" height="864" rx="200" ry="200" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.35"/>
 
-  <!-- ③ 背鳍：三角带圆角顶，根部压进背部 -->
-  <path d="M462 348
-           C 486 252 542 200 616 214
-           C 592 264 586 302 596 336
-           C 550 346 502 350 462 348 Z"
-        fill="url(#nbFin)"/>
-
-  <!-- ④ 身体：侧视水滴。吻部尖、背脊斜、腹部圆 —— 这三条线就是「鲨」 -->
-  <path d="M232 494
-           C 236 400 316 332 442 330
-           C 578 328 674 386 700 466
-           C 708 494 708 512 700 540
-           C 674 620 578 672 442 670
-           C 316 668 236 600 232 494 Z"
-        fill="url(#nbBody)"/>
-
-  <!-- ⑤ 胸鳍：斜向后下，根部压进腹部 -->
-  <path d="M398 618
-           C 362 654 348 696 356 730
-           C 398 718 434 690 450 650
-           C 430 638 414 628 398 618 Z"
-        fill="url(#nbFin)" opacity="0.9"/>
-
-  <!-- ⑥ 眼：侧视用**单只**大眼靠吻部。双眼是正面才有的 -->
   <g>
-    <ellipse cx="336" cy="470" rx="48" ry="52" fill="#ffffff"/>
-    <circle cx="344" cy="476" r="25" fill="#1b3a4a"/>
-    <circle cx="355" cy="462" r="9" fill="#ffffff"/>
-    <circle cx="331" cy="490" r="4.5" fill="#ffffff" opacity="0.75"/>
+    <ellipse cx="842" cy="700" rx="26" ry="26" fill="#9be3f2" opacity="0.55"/>
+    <ellipse cx="836" cy="694" rx="9" ry="9" fill="#ffffff" opacity="0.7"/>
+    <ellipse cx="892" cy="620" rx="17" ry="17" fill="#a8b8f8" opacity="0.5"/>
+    <ellipse cx="887" cy="615" rx="6" ry="6" fill="#ffffff" opacity="0.65"/>
+    <ellipse cx="800" cy="768" rx="13" ry="13" fill="#f9a8d4" opacity="0.45"/>
   </g>
 
-  <!-- ⑦ 鳃：三道短弧。少了它，吻部到腹部的过渡会显得平 -->
-  <g fill="none" stroke="#2f88ab" stroke-width="9" stroke-linecap="round" opacity="0.6">
-    <path d="M424 424 C 436 452 436 490 426 518"/>
-    <path d="M462 416 C 476 450 476 496 464 528"/>
-    <path d="M500 410 C 514 448 514 500 500 536"/>
+  <path d="M676 560 C 700 620 660 690 590 730 C 520 770 430 770 360 730" fill="none" stroke="#5cc8ea" stroke-width="14" stroke-linecap="round" opacity="0.28"/>
+  <path d="M700 590 C 716 640 680 696 620 726" fill="none" stroke="#818cf8" stroke-width="7" stroke-linecap="round" opacity="0.22"/>
+
+  <path d="M482 382 C 502 300 544 248 604 238 C 594 280 586 322 586 362 C 552 374 512 380 482 382 Z" fill="url(#nbFin)"/>
+  <path d="M502 340 C 516 296 542 264 578 250" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" opacity="0.4"/>
+
+  <path d="M196 528 C 210 478 252 438 302 430 C 382 418 462 378 562 370 C 642 364 702 378 742 408 L 822 378 C 832 374 838 382 830 390 L 752 440 L 830 470 C 838 474 832 484 822 480 L 732 458 C 662 520 582 600 470 620 C 360 638 260 600 210 560 C 196 550 190 540 196 528 Z" fill="url(#nbSea)"/>
+
+  <path d="M230 556 C 300 600 400 622 500 606 C 600 590 680 530 730 470 C 690 540 600 610 490 628 C 380 646 280 620 224 566 Z" fill="url(#nbBelly)" opacity="0.85"/>
+
+  <path d="M270 452 C 360 436 460 400 560 392 C 620 388 680 392 724 408" fill="none" stroke="url(#nbRainbow)" stroke-width="10" stroke-linecap="round" opacity="0.75"/>
+
+  <g clip-path="url(#nbBodyClip)">
+    <path d="M180 420 C 320 380 520 360 740 400 L 740 470 C 520 430 320 450 180 490 Z" fill="url(#nbGlass)" opacity="0.55"/>
+    <ellipse cx="420" cy="440" rx="180" ry="42" fill="#ffffff" opacity="0.35" transform="rotate(-8 420 440)"/>
   </g>
 
-  <!-- ⑧ 腮红：放在吻部**上方**。原先放在嘴下方，与嘴叠在一起糊成一团 -->
-  <ellipse cx="300" cy="512" rx="32" ry="20" fill="#ff9fb0" opacity="0.4"/>
+  <path d="M382 582 C 352 622 332 662 332 702 C 372 692 402 662 417 622 C 405 608 394 594 382 582 Z" fill="url(#nbFin)" opacity="0.95"/>
+  <path d="M360 620 C 348 644 342 664 342 682" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" opacity="0.35"/>
 
-  <!-- ⑨ 鼻孔 -->
-  <ellipse cx="252" cy="512" rx="6" ry="8" fill="#1b3a4a" opacity="0.45"
-           transform="rotate(-18 252 512)"/>
+  <g>
+    <ellipse cx="312" cy="494" rx="46" ry="50" fill="#ffffff"/>
+    <circle cx="320" cy="500" r="24" fill="#1b3a4a"/>
+    <circle cx="331" cy="486" r="9" fill="#ffffff"/>
+    <circle cx="307" cy="514" r="4.5" fill="#ffffff" opacity="0.75"/>
+  </g>
 
-  <!-- ⑩ 嘴：一条干净的上扬弧 + 前端小开口。
-       第三版这里叠了「深色开口 + 舌」两层，渲染出来是一团污迹 ——
-       侧视的吻部太窄，容不下两层形状。拆开反而更像表情。 -->
-  <path d="M236 534 C 272 580 342 596 392 578" fill="none"
-        stroke="#1b3a4a" stroke-width="12" stroke-linecap="round"/>
-  <path d="M240 528
-           C 262 566 306 584 340 580
-           C 320 600 268 582 240 540 Z" fill="#1b3a4a"/>
-  <path d="M250 536
-           C 268 558 292 570 310 568
-           C 294 578 264 566 250 540 Z" fill="#ff7a95"/>
+  <ellipse cx="276" cy="540" rx="30" ry="19" fill="#ff9fb0" opacity="0.4"/>
+
+  <ellipse cx="222" cy="532" rx="6" ry="8" fill="#1b3a4a" opacity="0.5" transform="rotate(-14 222 532)"/>
+
+  <path d="M198 540 C 240 560 300 572 352 566" fill="none" stroke="#1b3a4a" stroke-width="11" stroke-linecap="round"/>
+  <path d="M202 534 C 232 548 280 558 318 556 C 296 570 236 562 202 542 Z" fill="#1b3a4a"/>
+  <path d="M214 542 C 236 551 264 556 286 555 C 268 562 230 556 214 544 Z" fill="#ff7a95"/>
 </svg>

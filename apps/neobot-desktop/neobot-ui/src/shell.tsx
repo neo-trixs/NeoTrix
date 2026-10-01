@@ -20,6 +20,7 @@
  * ⇒ 命令存在但**必然失败**。接它等于交付一个点了就报错的按钮。
  */
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { getLang, onLangChange, setLang, t, availableLangs, type Lang } from './i18n'
@@ -117,6 +118,57 @@ function useModalBehaviour(open: boolean, onClose: () => void) {
   return boxRef
 }
 
+
+/**
+ * macOS 原生菜单动作 —— 自研壳的接线。
+ *
+ * # 为什么必须有这段
+ *
+ * Rust 侧 `menu::install`（上游 `install_macos_menu` 移植）装的是**原生菜单栏**。
+ * ⛔ 上游壳把「文件/运行/帮助」整组隐藏并假定由原生菜单承载，而原生菜单只发
+ *    `macos-menu-action` 事件 —— **前端不 `listen` 就一个都收不到**。
+ *    neobot-ui 落地时没有这段，于是 macOS 上：菜单在、点了没反应。
+ *
+ * # 诚实边界
+ *
+ * ⛔ 只接**本壳真有实现**的动作；其余一律回一句「尚未接入」，
+ *    而不是静默 return —— 静默 return 与「菜单项不存在」在用户眼里一样，
+ *    但后者他能看见这个功能存在（那是产品缺口，不是 bug）。
+ *    已接：`desktop-copy-run-logs`（顶栏已有日志面板，直接复用）。
+ */
+const MENU_NOT_WIRED: Record<string, string> = {
+  'desktop-config': '设置面板',
+  'desktop-about': '关于',
+  'desktop-check-update': '检查更新',
+  'desktop-restart': '重启',
+  'desktop-new-window': '新建窗口',
+  'desktop-new-chat': '新聊天',
+  'desktop-open-folder': '打开文件夹',
+  'desktop-documentation': '文档',
+}
+
+function useMacosMenu(onLogs: () => void, onNote: (msg: string) => void) {
+  useEffect(() => {
+    if (!navigator.userAgent.includes('Macintosh')) return
+    let stop: (() => void) | undefined
+    void listen<string>('macos-menu-action', (event) => {
+      const id = event.payload
+      if (id === 'desktop-copy-run-logs') {
+        onLogs()
+        return
+      }
+      const name = MENU_NOT_WIRED[id]
+      // 未登记的 id：也说一句。静默是最差的一种。
+      onNote(name ? `「${name}」在自研版尚未接入` : `菜单动作 ${id} 尚未接入`)
+    }).then((un) => {
+      stop = un
+    }).catch((e) => {
+      onNote(`原生菜单接线失败：${String(e).slice(0, 80)}`)
+    })
+    return () => stop?.()
+  }, [onLogs, onNote])
+}
+
 /** 顶栏：字标 + 语言切换 + 日志 + 退出。 */
 export function Shell({ children }: { children?: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>(getLang)
@@ -128,6 +180,11 @@ export function Shell({ children }: { children?: React.ReactNode }) {
   //   用户点了语言、界面静默回退、零解释，只能反复点。
   const [barErr, setBarErr] = useState<string | null>(null)
 
+  const [menuNote, setMenuNote] = useState<string | null>(null)
+  const noteMenu = useCallback((msg: string) => {
+    setMenuNote(msg)
+    window.setTimeout(() => setMenuNote(null), 6000)
+  }, [])
   useEffect(() => onLangChange(setLangState), [])
 
   const choose = useCallback(async (next: Lang) => {
@@ -145,6 +202,9 @@ export function Shell({ children }: { children?: React.ReactNode }) {
       setBusy(false)
     }
   }, [lang])
+
+  // macOS 原生菜单 → 复用既有实现（日志面板）；其余动作给一句「尚未接入」。
+  useMacosMenu(() => void openLogs(), noteMenu)
 
   const closeLogs = useCallback(() => setLogs(null), [])
   const dialogRef = useModalBehaviour(logs !== null, closeLogs)
@@ -194,9 +254,9 @@ export function Shell({ children }: { children?: React.ReactNode }) {
         </div>
       </header>
 
-      {barErr !== null && (
+      {(barErr ?? menuNote) !== null && (
         <p className="nb-bar-err" role="alert">
-          {barErr}
+          {barErr ?? menuNote}
         </p>
       )}
 

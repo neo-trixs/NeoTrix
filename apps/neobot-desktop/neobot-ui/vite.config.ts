@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -24,5 +25,15 @@ export default defineConfig({
     emptyOutDir: true,
     // Tauri 以 file:// 加载，必须用相对路径，否则资源解析会挂
     assetsDir: 'assets',
+    // ⛔ 必须显式列两个入口：vite 默认只把 index.html 当入口，
+    //    根目录放着 pet.html **不会**进 dist —— 而 pet.rs 建的是
+    //    `WebviewUrl::App("pet.html")`，于是桌宠窗指向一个不存在的页面。
+    //    （这个坑在 neobot-ui 落地时就已经存在：自研壳第一天就没有桌宠页。）
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        pet: resolve(__dirname, 'pet.html'),
+      },
+    },
   },
 })
