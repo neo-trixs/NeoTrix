@@ -513,184 +513,29 @@ impl OscillatorNetwork {
     }
 }
 
-// ============================================================
-// Quantum Fusion — 量子态检测与最优融合
-// ============================================================
-
-/// 单个检测源的输出 — 叠加态的一个分量。
-#[derive(Debug, Clone, PartialEq)]
-pub struct QuantumSignal {
-    pub value: f64,
-    pub confidence: f64,
-    pub source: String,
-}
-
-impl QuantumSignal {
-    pub fn new(value: f64, confidence: f64, source: impl Into<String>) -> Self {
-        Self {
-            value: value.clamp(0.0, 1.0),
-            confidence: confidence.clamp(0.0, 1.0),
-            source: source.into(),
-        }
-    }
-}
-
-/// 融合超参数。
-#[derive(Debug, Clone, PartialEq)]
-pub struct QuantumFusionConfig {
-    pub confidence_floor: f64,
-    pub high_entanglement: f64,
-    pub conflict_threshold: f64,
-}
-
-impl Default for QuantumFusionConfig {
-    fn default() -> Self {
-        Self {
-            confidence_floor: 0.2,
-            high_entanglement: 0.75,
-            conflict_threshold: 0.6,
-        }
-    }
-}
-
-/// 最优融合坍缩后的单一高可靠信号。
-#[derive(Debug, Clone, PartialEq)]
-pub struct FusedSignal {
-    pub value: f64,
-    pub confidence: f64,
-    pub entropy: f64,
-    pub entanglement: f64,
-    pub dominant_source: Option<String>,
-    pub fused_count: usize,
-}
-
-/// 多源信号的叠加态，提供纠缠度量与最优融合坍缩。
-#[derive(Debug, Clone, Default)]
-pub struct QuantumSuperposition {
-    signals: Vec<QuantumSignal>,
-}
-
-impl QuantumSuperposition {
-    pub fn new() -> Self {
-        Self {
-            signals: Vec::new(),
-        }
-    }
-
-    pub fn push(&mut self, sig: QuantumSignal) {
-        self.signals.push(sig);
-    }
-
-    pub fn from_signals(signals: impl IntoIterator<Item = QuantumSignal>) -> Self {
-        Self {
-            signals: signals.into_iter().collect(),
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.signals.is_empty()
-    }
-
-    pub fn len(&self) -> usize {
-        self.signals.len()
-    }
-
-    pub fn signals(&self) -> &[QuantumSignal] {
-        &self.signals
-    }
-
-    pub fn entanglement_dispersion(&self) -> f64 {
-        if self.signals.is_empty() {
-            return 0.0;
-        }
-        let total_conf: f64 = self.signals.iter().map(|s| s.confidence).sum();
-        if total_conf <= 0.0 {
-            return 0.0;
-        }
-        let mean: f64 = self
-            .signals
-            .iter()
-            .map(|s| s.value * s.confidence)
-            .sum::<f64>()
-            / total_conf;
-        let variance: f64 = self
-            .signals
-            .iter()
-            .map(|s| s.confidence * (s.value - mean).powi(2))
-            .sum::<f64>()
-            / total_conf;
-        (variance.sqrt()).clamp(0.0, 1.0)
-    }
-
-    pub fn entanglement(&self) -> f64 {
-        1.0 - self.entanglement_dispersion()
-    }
-
-    pub fn entropy(&self) -> f64 {
-        let effective: Vec<f64> = self.signals.iter().map(|s| s.value).collect();
-        if effective.is_empty() {
-            return 0.0;
-        }
-        const BUCKETS: usize = 8;
-        let mut counts = [0usize; BUCKETS];
-        for v in &effective {
-            let idx = ((v * BUCKETS as f64) as usize).min(BUCKETS - 1);
-            counts[idx] += 1;
-        }
-        let n = effective.len() as f64;
-        let mut entropy = 0.0f64;
-        for c in counts.iter().filter(|&&c| c > 0) {
-            let p = *c as f64 / n;
-            entropy -= p * p.ln();
-        }
-        (entropy / (BUCKETS as f64).ln()).clamp(0.0, 1.0)
-    }
-
-    pub fn fuse(&self) -> FusedSignal {
-        let config = QuantumFusionConfig::default();
-        let filtered: Vec<&QuantumSignal> = self
-            .signals
-            .iter()
-            .filter(|s| s.confidence >= config.confidence_floor)
-            .collect();
-        if filtered.is_empty() {
-            return FusedSignal {
-                value: 0.0,
-                confidence: 0.0,
-                entropy: 1.0,
-                entanglement: 0.0,
-                dominant_source: None,
-                fused_count: 0,
-            };
-        }
-        let total_conf: f64 = filtered.iter().map(|s| s.confidence).sum();
-        let base_value: f64 = filtered
-            .iter()
-            .map(|s| s.value * s.confidence)
-            .sum::<f64>()
-            / total_conf;
-        let entanglement = self.entanglement();
-        let confidence = if entanglement >= config.high_entanglement {
-            (total_conf / filtered.len() as f64 * 1.1).min(1.0)
-        } else if entanglement <= config.conflict_threshold {
-            (total_conf / filtered.len() as f64 * 0.7).max(0.0)
-        } else {
-            total_conf / filtered.len() as f64
-        };
-        let dominant = filtered
-            .iter()
-            .max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap())
-            .map(|s| s.source.clone());
-        FusedSignal {
-            value: base_value,
-            confidence,
-            entropy: self.entropy(),
-            entanglement,
-            dominant_source: dominant,
-            fused_count: filtered.len(),
-        }
-    }
-}
+// ── 单点真身收敛（2026-09-30）────────────────────────────────────────
+// Quantum Fusion（`QuantumSignal` / `QuantumFusionConfig` / `FusedSignal`
+// / `QuantumSuperposition`）的实现真身统一在
+// `neotrix-core/src/l5_cognition/nt_core_quantum_fusion.rs`。
+//
+// 收敛依据（逐项实测，非目测）：
+// · 4 个 struct 的**字段完全一致**（逐字段比对）⇒ 可纯转出；
+// · `QuantumSuperposition` 的 6 个方法里 **5 个逐字相同**
+//   （`new` `len` `is_empty` `entanglement` `entropy`），
+//   仅 `fuse` 不同（l5 多 4 个方法：`fuse_with` `fuse_evidence`
+//   `decoherence_factor` `collapse_evidence`；且 `fuse` 内部已演化，
+//   变量名 `config/filtered` → `cfg/effective`）；
+// · 本模块（l0）那份的**消费者为零** —— 唯一用到 `.fuse()` 的
+//   `nt_core_self_test_integration.rs` 是经
+//   `use ...l5_cognition::nt_core_quantum_fusion::...` 拿的**活的那份**；
+// · 本模块下方的测试验的是**行为**，其中 `fuse` 的空输入断言
+//   （`fused_count == 0`）在 l5 实现下同样成立（已核对其空分支）。
+//
+// ⛔ 这是**低层持有高层算法副本**的典型形态：L0 不该拥有 Quantum Fusion，
+// 它的真身属于 L5。本笔只做「转出」，**不删 l5 的真身**。
+pub use crate::l5_cognition::nt_core_quantum_fusion::{
+    FusedSignal, QuantumFusionConfig, QuantumSignal, QuantumSuperposition,
+};
 
 // ============================================================
 // Narrative Types — 叙事/节奏共享类型
