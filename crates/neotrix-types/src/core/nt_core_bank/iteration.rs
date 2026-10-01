@@ -117,7 +117,13 @@ impl Bm25Index {
     }
 }
 
-pub(crate) fn tokenize(text: &str) -> Vec<String> {
+// 2026-09-30 单点真身收敛：`tokenize` 与 `rrf_fuse` 曾在本文件与
+// `neotrix-core/src/l1_action/nt_core_bank/iteration.rs` 各有一份**逐字相同**的
+// 实现（`nt_diverge.py` 实测：owner 同为 `(free)`、归一化后完全相同）。
+// 现以本处为**唯一实现**，高层改为 `pub use neotrix_types::…`。
+// 依据：core 依赖 types（`Cargo.toml:97`），所以「高层引用低层」是唯一合法方向。
+
+pub fn tokenize(text: &str) -> Vec<String> {
     text.to_lowercase()
         .split(|c: char| !c.is_alphanumeric() && c != '_' && c != '-')
         .filter(|s| !s.is_empty() && s.len() >= 2)
@@ -125,7 +131,7 @@ pub(crate) fn tokenize(text: &str) -> Vec<String> {
         .collect()
 }
 
-pub(crate) fn rrf_fuse(results: &[Vec<(f64, String)>]) -> Vec<(f64, String)> {
+pub fn rrf_fuse(results: &[Vec<(f64, String)>]) -> Vec<(f64, String)> {
     if results.is_empty() { return Vec::new(); }
     let mut agg: HashMap<String, f64> = HashMap::new();
     for ranklist in results {

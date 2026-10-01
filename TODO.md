@@ -1,5 +1,5 @@
 > # NeoTrix TODO 列表
-> 智能同步生成，最后更新：**2026-09-30（否决删除 nt_core_bank：不是冗余，是两个记忆库）**
+> 智能同步生成，最后更新：**2026-09-30（单点真身收敛：tokenize/rrf_fuse 两份→一份）**
 >
 > ## ⚠️ 已否决删除：`nt_core_bank`（types 侧）不是镜像冗余
 > >
@@ -31,8 +31,13 @@
 > > ① **标注**：types 侧写明「本模块是低层契约库，上层实现在
 > >    neotrix-core/src/l1_action/nt_core_bank；新增能力请加上层」——1 行注释消除歧义
 > > ② **冻结**：把该簇纳入 `nt_mirror_scan` 观察名单，CI **只报告不失败**（G7）
-> > ③ **收敛**（需 owner 决策）：73 个逐字相同函数提取到公共位置，
-> >    core 改 `use` 它。⛔ **前置**：26 个同名不同实现的函数必须先逐个定性。
+> > ③ **收敛**：✅ 本轮已做**可做的部分** —— 41 个「同 owner + 逐字相同」里，
+> >    **owner 为自由函数的 2 个**（`tokenize` `rrf_fuse`）已收敛为单点真身：
+> >    实现留在 `neotrix-types`，高层 `neotrix-core` 改 `pub use` 引用。
+> >    方向合法性：core 依赖 types ⇒「高层引用低层」唯一合法。
+> >    **高层那 2 个函数各自的测试保留未删**（验行为，不因改实现而消失）。
+> >    ⛔ 其余 39 个是**结构体方法**，两侧 `ReasoningBank`/`Bm25Index` 已结构分叉
+> >    （高层无 `last_used_at`、无 `idf`）⇒ 收敛它们必须先统一结构体，属更大重构。
 > > 完整取证与设计见 `docs/architecture/MIRROR-BANK-2026-09-30.md`。
 > >
 > > ### 🟡 P1（真正的架构债）：26 个「同名不同语义」的点
@@ -42,6 +47,20 @@
 > > ⛔ 不修：改动波及 40+ 文件且无实测收益。
 > > ✅ 要动它，先给这些函数配 **行为对位**（`nt_parity_ref` 取 oracle），
 > > 再逐个定性 —— **先有判据，再动代码**。
+> >
+> > ### 🟡 P2 待你判断：19 条**无理由**被注释掉的种子
+> > `neotrix-core/l1_action/nt_core_bank/bank/seeds.rs` 有 **18 条**种子被注释，
+> > `maintenance.rs` 的 `initialize_with_everos_knowledge` 有 **1 条**被注释。
+> > 已核实：
+> > - **无任何注释说明原因**；
+> > - **不是编译原因**（被注的用 `TaskType::Research`，两侧共用同一枚举，变体存在）；
+> > - **不是「第三方品牌」规律** —— 生效的 68 条里大量是第三方（CortexUI、Cairn、
+> >   SkillsGate、OpenClaude…），被注的 18 条里又混着 NeoTrix 自有概念
+> >   （E8Theory、T3Memory、GlobalWorkspace、AdamsLaw*）。
+> > ⇒ 无一致规则，像是**手工逐条删除且未记录理由**。
+> > ⛔ 本轮**不擅自恢复**：19 条种子是「NeoTrix 该携带哪些知识」的产品判断。
+> > 需要你回答的是：**这些删除是有意的，还是应该恢复？** 有意则应在两侧同步
+> > （低层 `neotrix-types` 仍是全量生效的），否则两侧会继续漂移。
 > >
 
 >

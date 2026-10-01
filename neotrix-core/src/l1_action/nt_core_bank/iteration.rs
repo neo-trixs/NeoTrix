@@ -129,28 +129,12 @@ impl Bm25Index {
     }
 }
 
-pub fn tokenize(text: &str) -> Vec<String> {
-    text.to_lowercase()
-        .split(|c: char| !c.is_alphanumeric() && c != '_' && c != '-')
-        .filter(|s| !s.is_empty() && s.len() >= 2)
-        .map(|s| s.to_string())
-        .collect()
-}
-
-pub fn rrf_fuse(results: &[Vec<(f64, String)>]) -> Vec<(f64, String)> {
-    if results.is_empty() {
-        return Vec::new();
-    }
-    let mut agg: HashMap<String, f64> = HashMap::new();
-    for ranklist in results {
-        for (rank, (_score, id)) in ranklist.iter().enumerate() {
-            *agg.entry(id.clone()).or_insert(0.0) += 1.0 / (RRF_K + rank as f64 + 1.0);
-        }
-    }
-    let mut fused: Vec<(f64, String)> = agg.into_iter().map(|(id, score)| (score, id)).collect();
-    fused.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-    fused
-}
+// 2026-09-30 单点真身收敛：`tokenize` / `rrf_fuse` 的实现已移至
+// `neotrix-types`（低层），此处改为引用 —— core 依赖 types，故这是唯一合法方向。
+// 两份实现此前**逐字相同**（`nt_diverge.py` 实测 owner 同为 `(free)`、归一化后全等），
+// 保留两份只会各自漂移（本会话已实测同类漂移：`now_ts` 13 份里 2 份 panic）。
+// 下方 `mod tests` 保留：它验证的是**行为**，改实现不应让这些测试消失。
+pub use neotrix_types::core::nt_core_bank::{rrf_fuse, tokenize};
 
 #[cfg(test)]
 mod tests {
