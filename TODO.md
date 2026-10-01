@@ -30,10 +30,30 @@
 > > `levenshtein` vs `levenshtein_distance` **不同名** ⇒ 本工具抓不到。
 > > ⇒ **两套互补**：同名查 fn-drift，跨名查行为对位（`nt_parity_ref`）。
 > >
-> > ### 🟡 P1 未分诊：7 个「命中形状」的其余 6 个
-> > `truncate`×8、`estimate_tokens`×7 等尚在分诊单里。⚠️ **多数可能是合法的**
-> > （如 `osint::investigate` ×15 是同名不同域）。**不要照形状批量改** ——
-> > 与「23 处模板残留被当真缺陷」是同一类风险。逐个读源码裁决。
+> > ### ✅ 第二轮 `--units`：逐族量化，7 个形状命中已裁决 4 族
+> > `estimate_tokens`×7（字节 3 / 字符 3）、`truncate`×8（字节 2）、
+> > `truncate_chars`×4（字节 1，**判定为无害快路径，不改**）、
+> > `tokenize`×6（分词规则有意不同，**不改**）。
+> >
+> > ### 🔴 已修：`seal_core/model_router::estimate_tokens` 按字节估 token
+> > 旧 `(s.len() as f64 * 0.3).ceil()` 直接喂给 `classify_tier` 的
+> > `tokens>800/1500` 门槛（T4 = 最贵模型档）⇒ **对中文低估约 10%**，
+> > 该升档时没升。已改为复用 CJK 感知单一事实源 `nt_core_llm::estimate_tokens`
+> > （不再自己发明系数）。证伪实测：回退后 2 个测试转红（`left: 30 right: 25`、
+> > `left: 504 right: 560`），恢复后 13 绿。
+> > ⚠️ **我自己把缺陷方向算反过一次**（原写「早 2/3 篇幅升 T4」，实为「该升没升」），
+> > 已在代码注释与文档里按实测更正 —— 留档防后人照抄错的方向。
+> >
+> > ### 🔴 顺带抓到并修：一个**稳定复现**的测试竞态
+> > `evm.rs` 的 `test_resolve_rpc_url_uses_default` 与 `..._env_override`
+> > 共用**进程级** env 变量名，`cargo test` 多线程 ⇒ 竞态。
+> > 实测原始版本 **6/6 次全红**（不是偶发）。
+> > ⛔ **我的第一次加固（开头加 `remove_var`）实测仍 6/6 全红** ——
+> > 因为 remove 的仍是**共享那个**变量，与 override 的 set_var 写同一格。
+> > ✅ 真正的修法是**让两测试不再共享变量名**（本测试改用 `NEOTRIX_BSC_RPC_URL`
+> > + 换 chain），实测 **8/8 全绿**。
+> > ⇒ 教训：`remove_var` 有用与否取决于**目标变量**；清理共享全局状态
+> > 必须消除**共享本身**，否则只是把竞态窗口挪了个位置。
 > >
 > ## 🔴 P1（未取证，**勿当 bug**）306 处 `/// Note: Real implementation needs` 声称未实现
 > >

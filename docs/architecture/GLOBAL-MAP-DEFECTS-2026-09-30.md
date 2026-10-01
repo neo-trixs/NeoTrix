@@ -201,6 +201,19 @@ cmd:python3 scripts/ops/nt_decompose.py selftest   # ⑥ 拆解器自证仍绿�
 | `truncate` 按**字节**切 | `nt_io/nt_io_hive_agent_loop.rs:259` | `&s[..max]` 在非字符边界 **panic**。调用点 `truncate(&response, 200)` 是**模型输出**，200 不是 3 的倍数 ⇒ **中文回复约 2/3 概率 panic** | ✅ 已改边界安全 + 回归测试 |
 | `truncate` 字节切 + **下溢** | `nt_file_ability/table_presenter.rs:152` | `&s[..max_len - 3]`：① 非边界 panic；② `max_len < 3` 时下溢 | ✅ 同上 |
 
+**第二轮（`--units` 子命令）把 7 个形状命中逐族量化**，并已修其中影响最重的一处：
+
+| 族 | 副本数 | 字节版 / 字符版 | 后果【实测】 | 状态 |
+|---|---:|---|---|---|
+| `estimate_tokens` | 7 | 3 / 3 | `seal_core/model_router` 用 `(bytes × 0.3)`，喂给 `classify_tier` 的 `tokens>800/1500` 门槛（T4=最贵档）⇒ **对中文低估约 10%**（0.9 vs 1.0 token/字），该升档时没升 | ✅ 已改为复用 CJK 感知单一事实源 |
+| `truncate` | 8 | 2 / 4 + 2 混合 | 见 §3.1b 首轮 | ✅ 已修 2 处 panic |
+| `truncate_chars` | 4 | 1 / 3 | 名字叫 chars 但按字节判长度（快路径无害，主体用 `char_indices`）| ⛔ 未动（**不判为 bug**：其 `s.len() <= max` 只是保守快路径，主体边界安全） |
+| `tokenize` | 6 | — | 分词规则各异（`is_ascii_alphanumeric` vs 含 CJK 切分）⇒ **多数是有意差异** | ⛔ 未动（未取证） |
+
+⚠️ **我自己也算错过一次并已更正**：最初注释写「中文会比英文早 2/3 篇幅升到 T4」。
+实测算的是 `(bytes×0.3)` 中 bytes=chars×3 **与 0.3 抵消** ⇒ 旧口径**偏低**，
+后果是**该升没升**。方向与我最初写的相反，已按实测改。
+
 ⚠️ **工具的已知局限（写在这里以防后人误用）**：只能发现**同名**副本。
 本会话那个字节/字符 `levenshtein` bug 是 `levenshtein` vs `levenshtein_distance`
 **不同名** ⇒ 本工具抓不到，只能靠行为对位（`nt_parity_ref`）。
@@ -208,6 +221,9 @@ cmd:python3 scripts/ops/nt_decompose.py selftest   # ⑥ 拆解器自证仍绿�
 
 ```assert
 file:scripts/ops/nt_fn_drift.py             # 副本漂移审计器
+cmd:python3 scripts/ops/nt_fn_drift.py --units estimate_tokens   # 单位一致性分诊可复跑
+test:estimate_tokens_is_cjk_aware@neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/model_router.rs  # 字节估 token 回归测试仍在
+test:test_resolve_rpc_url_uses_default@neotrix-core/src/l1_action/nt_act/nt_act_crypto/evm.rs  # env 竞态测试仍在
 cmd:python3 scripts/ops/nt_fn_drift.py selftest   # 自证 7 例（含 3 例证伪：字符串/注释花括号、lifetime、声明-only）
 test:truncate_never_panics_on_cjk@neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rs  # 字节切 panic 回归测试仍在
 test:truncate_is_boundary_safe_and_no_underflow@neotrix-core/src/l1_action/nt_file_ability/table_presenter.rs  # 下溢回归测试仍在

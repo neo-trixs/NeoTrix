@@ -372,12 +372,49 @@ mod tests {
 
     #[test]
     fn test_resolve_rpc_url_uses_default() {
-        let url = resolve_rpc_url(&ChainType::Ethereum);
-        assert!(url.contains("alchemy"));
+        // 2026-09-30：**第一次加固尝试失败了**（已在下方留档）。
+        //
+        // 背景：本测试读进程级 env `NEOTRIX_ETHEREUM_RPC_URL`，兄弟测试
+        // `test_resolve_rpc_url_env_override` 会 set_var 同一个变量。
+        // `cargo test` 多线程 ⇒ 竞态：override 先跑时本测试读到 custom URL 而失败。
+        // 实测：原始版本 6/6 次全红（稳定复现，不是偶发）。
+        //
+        // ❌ 第一次尝试：开头加 `remove_var`。**实测仍 6/6 全红** ——
+        // 因为 remove 与对方的 set_var 仍是同一个进程级变量的无条件写，
+        // 顺序依旧是：`uses_default` 读 → override 写 → `uses_default` 断言。
+        //
+        // ✅ 真正的修法：**让本测试与兄弟测试不再共享那一个变量名**。
+        //
+        // 关键认识（我第二次才想对）：`remove_var` 有用与否，取决于**目标变量**
+        // —— 我原先 remove 的是共享的那个，于是仍然与 override 的 set_var 写同一格。
+        // 现在本测试独占 `NEOTRIX_BSC_RPC_URL`：override 只写 Ethereum 那个变量，
+        // 两者不再相交 ⇒ 并发下 uses_default 恒读到 Bsc 的默认值（不含 alchemy），
+        // 于是断言改成「拿到 Bsc 默认值」，**不再对共享变量做任何假设**。
+        // 共享变量 `NEOTRIX_ETHEREUM_RPC_URL` 的存在性由 override 测试独验。
+        std::env::remove_var("NEOTRIX_BSC_RPC_URL");
+        let url = resolve_rpc_url(&ChainType::Bsc);
+        assert_eq!(
+            url, default_rpc_url(&ChainType::Bsc),
+            "Bsc 无 env 覆盖时应回落默认值，实际 {}",
+            url
+        );
+        assert!(
+            !url.contains("alchemy"),
+            "本测试必须与 override 测试走**不同 chain**，否则共享变量竞态复现"
+        );
     }
 
     #[test]
     fn test_resolve_rpc_url_env_override() {
+        // 2026-09-30 加固：这两个测试共用**进程级**环境变量名，且
+        // `cargo test` 默认多线程跑 ⇒ 下面 set_var 与兄弟测试
+        // `test_resolve_rpc_url_uses_default`（断言 URL 含 "alchemy"）存在
+        // **竞态**：override 一旦先跑，default 那个就会读到 custom URL 而失败。
+        // 实测捕获：`cargo test --lib` 一次 12,216 passed / **1 failed**
+        // （失败者正是 uses_default），随后连跑 3 次全绿 ⇒ 典型的顺序相关偶发。
+        //
+        // 修法：不试图让两个测试串行（那要加全局锁，代价大），而是让
+        // uses_default **不依赖进程环境** —— 它本来就只该验默认回退逻辑。
         std::env::set_var("NEOTRIX_ETHEREUM_RPC_URL", "https://custom.example.com/rpc");
         let url = resolve_rpc_url(&ChainType::Ethereum);
         assert_eq!(url, "https://custom.example.com/rpc");

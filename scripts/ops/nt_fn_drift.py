@@ -381,15 +381,100 @@ fn probe2(x: usize) -> usize {
     return 0
 
 
+def selftest_units(_args):
+    """对**同名函数族的单位一致性**给出可复跑判据。
+
+    为什么需要它（实测动因）：fn-drift 只会说「这 7 个名字命中了
+    UNIT-DIVERGENCE 形状」，但**不裁决哪个对**。要裁决就必须能对同一族副本
+    逐个分类「按字节计数 / 按字符计数 / 混合」，否则分诊只能靠人眼读 7×N 份源码。
+    ⇒ 本子命令给出该分类，并让调用方对**具体某一份**取判定。
+
+    判据（全部可机械核对，不含语义猜测）：
+      BYTE   体内有 `.len()` 且无 `.chars()`
+      CHAR   体内有 `.chars()`
+      MIXED  两者都有（如 `max(chars/4, words)` 里 chars 其实是字节）
+      NONE   两者都没有（无法归类 ⇒ 不猜）
+
+    ⚠️ **已知不可靠处**：`.len()` 也可能是「集合长度」而非字符串字节数。
+    因此 BYTE 判定只作**候选**，必须读那一行确认（R-SCAN-1b）。
+    这与本工具整体定位一致：输出是分诊单，不是判决。
+    """
+    db = _args.db or os.path.join(REPO, '.project-map/edges-all.jsonl')
+    if not os.path.isfile(db):
+        sys.stderr.write('no edge db at %s\n' % db)
+        return 2
+    cands = discover(db)
+    wanted = _args.units or []
+    if not wanted:
+        sys.stderr.write('--units is required, e.g. --units estimate_tokens '
+                         '--units truncate\n(list candidates with --list-units)\n')
+        return 2
+
+    rc = 0
+    for leaf in wanted:
+        mods = cands.get(leaf)
+        if not mods:
+            sys.stderr.write('%-22s no duplicate copies found (nothing to '
+                             'compare — that is a fact, not a pass)\n' % leaf)
+            rc = 2
+            continue
+        tally = defaultdict(list)
+        for mod, path in sorted(mods.items()):
+            src = read(path)
+            body, line = extract_fn(src, leaf) if src else (None, 0)
+            if body is None:
+                tally['UNPARSED'].append('%s:%d  %s' % (path, line, mod))
+                continue
+            byt = '.len()' in body
+            chr_ = '.chars()' in body
+            kind = 'MIXED' if (byt and chr_) else ('CHAR' if chr_ else
+                                                   ('BYTE' if byt else 'NONE'))
+            tally[kind].append('%s:%d  %s' % (path, line, mod))
+        print('== %s  (%d copies)' % (leaf, len(mods)))
+        for kind in ('BYTE', 'CHAR', 'MIXED', 'NONE', 'UNPARSED'):
+            if not tally[kind]:
+                continue
+            print('   %-9s %d' % (kind, len(tally[kind])))
+            for loc in tally[kind]:
+                print('        %s' % loc)
+        if 'BYTE' in tally and 'CHAR' in tally:
+            print('   ⚠ 同一族同时存在 BYTE 与 CHAR ⇒ 判定输入相同时结果不同。'
+                  'BYTE 侧逐个读源码确认后再改（本工具只给候选）。')
+    return rc
+
+
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[1])
     ap.add_argument('--db', default=None)
     ap.add_argument('--limit', type=int, default=40)
     ap.add_argument('--only-different', action='store_true')
+    ap.add_argument('--units', action='append', default=[],
+                    help='classify every copy of this function name by counting unit')
+    ap.add_argument('--list-units', action='store_true',
+                    help='list candidate duplicate names worth --units triage')
     ap.add_argument('cmd_positional', nargs='?', default=None)
     args = ap.parse_args(argv[1:])
     if args.cmd_positional == 'selftest':
         return selftest(args)
+    if args.units:
+        return selftest_units(args)
+    if args.list_units:
+        db = args.db or os.path.join(REPO, '.project-map/edges-all.jsonl')
+        if not os.path.isfile(db):
+            sys.stderr.write('no edge db at %s\n' % db)
+            return 2
+        cands = discover(db)
+        rows = []
+        for leaf, mods in cands.items():
+            v, _, _, r = compare_pair(leaf, mods)
+            if v != DIFFERENT:
+                continue
+            shape, _why = classify_drift(r)
+            if shape == 'UNIT-DIVERGENCE':
+                rows.append((len(mods), leaf))
+        for n, leaf in sorted(rows, reverse=True):
+            print('%-24s %d copies' % (leaf, n))
+        return 0
     return report(args)
 
 

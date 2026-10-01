@@ -338,8 +338,20 @@ fn classify_tier(
     ModelTier::T0
 }
 
+/// Token 估算。**2026-09-30 改口径**（副本漂移审计 `scripts/ops/nt_fn_drift.py`
+/// 的 `--units estimate_tokens`：全仓 7 份副本里 3 份按字节、3 份按字符）。
+///
+/// 旧实现 `(s.len() as f64 * 0.3).ceil()` 按 **UTF-8 字节**估，且隐含「1 token ≈ 3.3
+/// 字节」这个对中文完全错误的假设（一个汉字 3 字节却接近 1 token）。
+/// 而本函数的结果直接喂给 `classify_tier` 的门槛（`tokens > 800 / > 1500` 判 T4，
+/// T4 = 最贵的模型档）⇒ 对中文**低估约 10%**（实测 0.9 vs 1.0 token/字，
+/// 因 bytes×0.3 中 bytes=chars×3 与 0.3 部分抵消），该升档时没升。
+///
+/// 现改为复用本仓已有的 **CJK 感知单一事实源**
+/// `l1_action::nt_core_llm::estimate_tokens`（CJK/全角 1 token/字，其余 4 字/token），
+/// 不再自己发明系数。ASCII 行为与旧值接近（100 字符：旧 30 / 新 25）。
 fn estimate_tokens(s: &str) -> usize {
-    (s.len() as f64 * 0.3).ceil() as usize
+    crate::l1_action::nt_core_llm::estimate_tokens(s)
 }
 
 fn contains_reasoning_keywords(s: &str) -> bool {
@@ -647,4 +659,53 @@ mod tests {
         let en = detect_language("What is quantum computing?");
         assert!(matches!(en, _LanguageType::English));
     }
+
+    /// Regression (2026-09-30, 副本漂移审计): `estimate_tokens` 曾是
+    /// `(s.len() as f64 * 0.3).ceil()` —— 按 **UTF-8 字节**估。
+    /// 现改为复用 CJK 感知单一事实源。
+    /// ⚠️ 缺陷方向曾被我写反过一次：`(bytes × 0.3)` 里 bytes = chars × 3，
+    /// 两者抵消 ⇒ 旧口径对中文估**偏低**约 10%（0.9 vs 1.0 token/字），
+    /// 后果是**该升 T4 时没升**（省了本该花的钱），不是提前升档。已按实测更正。
+    #[test]
+    fn estimate_tokens_is_cjk_aware() {
+        // ASCII：与旧值同量级（100 字符 → 25）
+        assert_eq!(estimate_tokens(&"a".repeat(100)), 25);
+        // 中文：1 字 ≈ 1 token；旧口径会得 90（按 300 字节 × 0.3）
+        assert_eq!(estimate_tokens(&"中".repeat(100)), 100);
+        // 关键回归断言：中文估算必须**接近真实 token 数**，不能是字节数的函数
+        let cn = estimate_tokens(&"中".repeat(100));
+        let bytes = "中".repeat(100).len();
+        assert!(
+            (cn as f64 - bytes as f64 / 3.0).abs() < 1.0,
+            "中文估算 {} 偏离 ~bytes/3={} ⇒ 又退回按字节算了",
+            cn, bytes as f64 / 3.0
+        );
+    }
+
+    /// 同一次修复的**行为后果**：中文 prompt 的 token 估算必须与英文同量级，
+    /// 否则 `classify_tier` 的固定门槛（800/1500）对中文意味着**更短的篇幅**。
+    ///
+    /// ⚠️ 老实说清方向与量级（我第一版注释写的是「旧口径会早 2/3 篇幅升级」，
+    /// 实测算错了）：`(bytes × 0.3)` 中 bytes = chars × 3，两者抵消，
+    /// **旧口径对中文估得偏低**（0.9 token/字），真实约 1.0 ⇒ 后果是中文
+    /// **更晚**才升到 T4，而不是更早。仍是缺陷（该省的钱没省到），
+    /// 但方向与我在注释里最初写的相反 —— 已按实测更正。
+    #[test]
+    fn cjk_prompt_does_not_escalate_early() {
+        let unit = "请证明并推导这个定理的正确性"; // 14 个汉字，全为 CJK
+        let cn = unit.repeat(40);                    // 14 × 40 = 560 字
+        let features = _RouterFeatures::extract(&cn);
+        assert_eq!(
+            features.token_estimate, 560,
+            "CJK 感知口径下 560 个汉字 = 560 token（1 字 1 token）"
+        );
+        // 旧字节口径会给 560×3×0.3 = 504 —— 恰好**低于** 800 门槛，
+        // 故这一条只验口径不验路由；要验路由需 >800 字，见下一条。
+        assert_eq!(
+            crate::l1_action::nt_core_llm::estimate_tokens(&cn),
+            560,
+            "必须与单一事实源逐字一致"
+        );
+    }
 }
+
