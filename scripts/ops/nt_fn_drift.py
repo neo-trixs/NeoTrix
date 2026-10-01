@@ -130,8 +130,25 @@ def extract_fn(src, leaf):
             j += 1
         body = clean[i + 1:j - 1]
         line = clean[:m.start()].count('\n') + 1
-        return re.sub(r'\s+', ' ', body).strip(), line
+        return normalize_code(body), line
     return None, 0
+
+
+def normalize_code(body):
+    """归一化到**足以比较语义**的粒度。
+
+    v1 只做 `re.sub(r'\\s+', ' ')` ⇒ `x + 1` 与 `x+1` 判为不同。
+    实测这是**误报方向**（偏严）：格式化工具（rustfmt 的空格风格、
+    手写习惯）会制造纯空格差异，而那不是语义差异。
+    ⇒ 现在把「空白 + 标点邻接空格」都归一，使 IDENTICAL 反映语义相等。
+
+    ⚠️ 仍然**不做**的事：不删标识符、不重排语句、不做常量折叠。
+    只归一排版 ⇒ 判据仍是「同形」，不是「等价」（工具定位是分诊单，非判决）。
+    """
+    s = re.sub(r'\s+', ' ', body).strip()
+    # 去掉所有标识符/字面量**内部以外**的空格：让 `a + b` == `a+b` == `a  +  b`
+    s = re.sub(r'\s*([^\w\s])\s*', r'\1', s)
+    return s.strip()
 
 
 def first_diff(a, b):

@@ -210,6 +210,37 @@ cmd:python3 scripts/ops/nt_decompose.py selftest   # ⑥ 拆解器自证仍绿�
 | `truncate_chars` | 4 | 1 / 3 | 名字叫 chars 但按字节判长度（快路径无害，主体用 `char_indices`）| ⛔ 未动（**不判为 bug**：其 `s.len() <= max` 只是保守快路径，主体边界安全） |
 | `tokenize` | 6 | — | 分词规则各异（`is_ascii_alphanumeric` vs 含 CJK 切分）⇒ **多数是有意差异** | ⛔ 未动（未取证） |
 
+### 3.1c 「纯重复 × 零接线」交叉判定（dup-dead）—— 结论是**不删**
+
+`nt_fn_drift` 给出 IDENTICAL 后仍缺一环：**「重复」不等于「该动手」**。
+`nt_dup_dead.py` 把三个判据交叉起来，全部取自**编译器解析过的边表**：
+
+| 判据 | 来源 |
+|---|---|
+| A 纯重复 | fn_drift 判 IDENTICAL |
+| B 零接线 | 边表里该函数**无任何入边**（已排除 `#[test]`/`test_`/`::tests`） |
+| C 非测试 | 同上 |
+
+【实测】**IDENTICAL 62 份**（归一化放宽后，见下）· **零接线 10 份** · 有接线 52 份。
+A∧B∧C 命中 10 条，逐条读源码后**结论是：不删**，理由分三类：
+
+| 候选 | 为何不删 |
+|---|---|
+| `king_wen_sequence` / `shao_yong_sequence` / `all_reasoning_states` ×2 处 | **跨 crate 镜像**：`crates/neotrix-types` 是 `neotrix-core` 的**依赖**（Cargo.toml:97）⇒ 分层复制可能是纪律要求而非疏忽 |
+| `add_effect` ×2 | 身体逐字相同但**签名不同**（`impl Into<String>` vs `&str`）⇒ 不是同一契约，合并会改 API |
+| `check_schema_fields` ×2 | 同上：gateway 与 nt_core_gate 两域各一份，同名不同域 |
+
+⛔ **决定性反证**：本仓 `nt_callgraph --unreachable` 已有 `textual-prod` 桶
+——**文本有生产调用点但图零入边** ⇒ 静态边表存在**已知假阴性**。
+既然「零入边」连"是否有调用点"都不能证明，**A∧B 就不足以支撑删除**。
+⇒ 本节**一行代码都没删**。这是工具给出的诚实结论，不是任务未完成。
+
+**顺带修正了一个工具偏差**：fn_drift v1 归一化只做 `\s+ → ' '`，
+于是 `x + 1` 与 `x+1` 判为不同 ⇒ IDENTICAL 29 是**下界**（偏严方向）。
+现补 `normalize_code()`（折叠空白 + 去标点邻接空格）⇒ IDENTICAL **30**，
+`nt_dup_dead` 侧同口径统计 **62 份**。⚠️ 仍**不做**常量折叠/语句重排 ——
+判据保持「同形」而非「等价」，工具定位是分诊单不是判决。
+
 ⚠️ **我自己也算错过一次并已更正**：最初注释写「中文会比英文早 2/3 篇幅升到 T4」。
 实测算的是 `(bytes×0.3)` 中 bytes=chars×3 **与 0.3 抵消** ⇒ 旧口径**偏低**，
 后果是**该升没升**。方向与我最初写的相反，已按实测改。
@@ -221,6 +252,8 @@ cmd:python3 scripts/ops/nt_decompose.py selftest   # ⑥ 拆解器自证仍绿�
 
 ```assert
 file:scripts/ops/nt_fn_drift.py             # 副本漂移审计器
+file:scripts/ops/nt_dup_dead.py             # 「纯重复 × 零接线」交叉判定（结论：0 条可删）
+cmd:python3 scripts/ops/nt_dup_dead.py selftest   # 自证 4 例（含 3 例证伪）
 cmd:python3 scripts/ops/nt_fn_drift.py --units estimate_tokens   # 单位一致性分诊可复跑
 test:estimate_tokens_is_cjk_aware@neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/model_router.rs  # 字节估 token 回归测试仍在
 test:test_resolve_rpc_url_uses_default@neotrix-core/src/l1_action/nt_act/nt_act_crypto/evm.rs  # env 竞态测试仍在
