@@ -20,7 +20,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DIST = join(ROOT, "apps/neobot-desktop/frontend/dist");
 const OUT = process.argv[2] || "/tmp/opencode/nb-ui.png";
 const W = Number(process.argv[3] || 1280);
-const H = Number(process.argv[4] || 820);
+const H = Number(process.argv[4] || 840);
 const PORT = 9345;
 
 if (!existsSync(join(DIST, "index.html"))) {

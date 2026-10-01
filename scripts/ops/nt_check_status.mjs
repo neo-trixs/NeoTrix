@@ -46,12 +46,14 @@ const problems = [];
 // ⚠️ 必须**递归**。第一版只扫一层，漏掉 src/ui/ src/plugin/ src/host/，
 //    于是报「前端 1490 行」而实际 4442 —— 门自己先报错，
 //    差点让我去改文档去迎合一个错的门。
+// ⚠️ 必须含 `.tsx`。`endsWith(".ts")` 匹配不到 `.tsx`（末三位是 `tsx`），
+//    2026-09-30 实测漏掉 35 个文件、7,163 行 —— 同款「以为自己查了」。
 const feFiles = [];
 (function walk(d) {
   for (const n of readdirSync(d, { withFileTypes: true })) {
     const p = join(d, n.name);
     if (n.isDirectory()) { walk(p); continue; }
-    if (p.endsWith(".ts") || p.endsWith(".css")) feFiles.push(p);
+    if (p.endsWith(".ts") || p.endsWith(".tsx") || p.endsWith(".css")) feFiles.push(p);
   }
 })(join(FE, "src"));
 const feLines = feFiles.reduce((n, f) => n + readFileSync(f, "utf8").split("\n").length, 0);
@@ -102,21 +104,33 @@ for (const line of cmdList.split("\n")) {
 
 // ④ Rust 测试条数（库 + app 两个 crate）
 //
-// ⚠️ **两个都要数。** 原来只数 `nt_evidence` + `nt_panel`，
+// ⚠️ **两个都要数，全文件都要数。** 原来只数 `nt_evidence` + `nt_panel`，
 //    于是 app 层新加的 12 条测试（command 层的作答/登记/清理断言）
 //    完全在门的视野之外 —— 文档写 26，门也数 26，都对，但**加起来不是 38**。
 //    一个只覆盖一半的门比不覆盖更难发现，因为它报 PASS。
+//    2026-09-30：app 侧新增 api/core/platform/desktop/pet 五个模块，
+//    若只数 commands.rs 会再漏 31 条 —— 同款教训，故此处按文件列表全数。
 const libTests = ["nt_evidence", "nt_panel"]
   .map((m) => {
     const p = join(CRATE, `${m}.rs`);
     return existsSync(p) ? (readFileSync(p, "utf8").match(/#\[test\]/g) ?? []).length : 0;
   })
   .reduce((a, b) => a + b, 0);
-const appTests = ["commands.rs", "nt_evidence_bridge.rs"]
-  .map((m) => {
-    const p = join(ROOT, "apps/neobot-desktop/src", m);
-    return existsSync(p) ? (readFileSync(p, "utf8").match(/#\[test\]/g) ?? []).length : 0;
-  })
+// ⛔ 文件清单改为**从磁盘扫**，不再手写。
+//    这门已经吃过两次同款亏（2026-09-30：只数 commands.rs 漏 12 条；再加五个模块
+//    又漏 31 条）—— 手写的清单每加一个模块就会再漂一次，而漂了不报错（它报 PASS）。
+//    本轮新增 `menu.rs` 时它第三次漂了：67 条实测被数成 65。
+const APP_SRC = join(ROOT, "apps/neobot-desktop/src");
+const appFiles = [];
+(function walk(dir) {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) walk(p);
+    else if (e.name.endsWith(".rs")) appFiles.push(p);
+  }
+})(APP_SRC);
+const appTests = appFiles
+  .map((p) => (readFileSync(p, "utf8").match(/#\[test\]/g) ?? []).length)
   .reduce((a, b) => a + b, 0);
 const rustTests = libTests + appTests;
 // ⚠️ 匹配不上时**必须 FAIL**，不能跳过。
@@ -141,9 +155,17 @@ if (!claimedGates) {
   problems.push(`门禁数：文档 ${claimedGates[1]} vs 实测 ${gates.length}`);
 }
 
-// ⑥ 前端自测分组
-const selftest = readFileSync(join(FE, "src/selftest.ts"), "utf8");
-const groups = [...selftest.matchAll(/console\.log\("\s*·\s*([^"]+)"/g)].map((m) => m[1]);
+// ⑥ 前端自测分组（旧自研 UI 的 selftest.ts；已随旧 UI 退役）
+//
+// ⚠️ 文件不存在**不能崩**。2026-09-30 之前这里直接 readFileSync，
+//    文件删掉后整道门 ENOENT 崩掉 —— 而崩掉的门看起来像「没跑过」，
+//    不是「没通过」。缺席必须是一个明确的 0，而不是一次崩溃。
+let groups = [];
+const selftestPath = join(FE, "src/selftest.ts");
+if (existsSync(selftestPath)) {
+  const selftest = readFileSync(selftestPath, "utf8");
+  groups = [...selftest.matchAll(/console\.log\("\s*·\s*([^"]+)"/g)].map((m) => m[1]);
+}
 const claimedGroups = doc.match(/前端\s*(\d+)\s*组自测/);
 if (!claimedGroups) {
   problems.push("STATUS 里找不到「前端 N 组自测」，无法核对");

@@ -128,10 +128,14 @@ const STUB_RETURNS = {
 //   故合并成单个对象传递。
 const TAURI_STUB = ({ table, failList }) => {
   window.__TAURI_INTERNALS__ = {
-    invoke: (cmd) => {
+    invoke: (cmd, args) => {
       if (failList && failList.includes(cmd)) {
         return Promise.reject(new Error(`induced failure: ${cmd}`))
       }
+      // Tauri 事件插件：`listen` 必须回一个数字 id，`unlisten` 回 null
+      if (cmd === 'plugin:event|listen') return Promise.resolve(1)
+      if (cmd === 'plugin:event|unlisten') return Promise.resolve(null)
+      void args
       return Promise.resolve(table[cmd] ?? null)
     },
     transformCallback: (cb) => {
@@ -140,6 +144,14 @@ const TAURI_STUB = ({ table, failList }) => {
       return id
     },
     metadata: { currentWindow: { label: 'main' } },
+  }
+  // ⛔ Tauri **事件插件**内部对象：缺它会让 `listen()` 的 unlisten 抛
+  //    `Cannot read properties of undefined (reading 'unregisterListener')`。
+  //    实测教训：另一窗口给 shell 加了 `listen('macos-menu-action')`
+  //    （macOS 原生菜单必需，**它的实现是对的**），我的桩没提供这个对象
+  //    ⇒ 两个门误报红。**是我 harness 不完整，不是产品缺陷。**
+  window.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+    unregisterListener: () => {},
   }
 }
 

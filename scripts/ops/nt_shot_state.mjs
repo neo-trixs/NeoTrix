@@ -32,7 +32,7 @@ const DIST = join(ROOT, "apps/neobot-desktop/frontend/dist");
 const OUT = process.argv[2];
 const SELECTORS = process.argv.slice(3);
 const W = 1280;
-const H = 820;
+const H = 840;
 const PORT = 9347;
 
 if (!OUT) {
