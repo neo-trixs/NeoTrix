@@ -1989,3 +1989,72 @@ keywords("支付网关")                     -> ['支付网关']                
 写着「基于 OpenViking 模式」（AGPL 项目的**设计模式**）。
 著作权保护表达不保护思想（idea-expression 二分）⇒ **本身不构成许可违规**；
 但 AGPL 仓的名字挂在出货代码注释上，若被质疑是否衍生，会成为不利证据。
+
+## ✅ npm 侧许可门已落地（`scripts/check-license-js.sh`，2026-10-01）
+
+填补上面「许可防护真空」的 npm 侧。**数据源必须在版本控制里**是关键决定：
+⛔ `pnpm-lock.yaml` 实测**零 license 字段**（结构上无法回答许可问题），
+而 `node_modules` 被 gitignore ⇒ 真源若放那儿，它就是**下一个会静默回退的载体**
+（`.neotrix/absorption-cache.json` 刚刚就是这么把 AGPL 藏起来的）。
+⇒ 基线 `config/node-license-baseline.txt`（`name<TAB>version<TAB>license`），
+本仓已有同款范式（`config/.gitleaks-baseline.txt`）。
+
+### 判据 A~F（B/C/D/E 逐条注入验证过会红）
+A 枚举 `neobot-ui/node_modules` 每个包 · **B deny 名单命中 ⇒ FAIL，零例外通道**
+（AGPL/GPL/SSPL/BUSL/Elastic-2.0/PolyForm-NC/Commons-Clause/CC-BY-NC/NOASSERTION）
+· **C 缺 license ⇒ FAIL**（⛔ 不静默跳过 —— `nt_absorption_audit.py:109` 犯过的错）
+· **D 基线外的新包 ⇒ FAIL**（新包不被自动放行）· **E `node_modules` 不存在 ⇒ FAIL**
+（⛔「没扫成」与「没问题」必须可区分）· F 基线腐化仅提示。
+
+**负向测试**：注入 AGPL-3.0 假包 ⇒ rc=1；无 license 字段 ⇒ rc=1；
+基线外 MIT 包 ⇒ rc=1；`node_modules` 移走 ⇒ rc=1；还原 ⇒ rc=0。**四条判据逐个注入全部变红。**
+实测 85 个包：MIT 71 / ISC 6 / Apache-2.0 3 / MPL-2.0 2 / 双许可 1 / BSD-3-Clause 1 /
+CC-BY-4.0 1，**零缺 license、零 deny 命中**。
+
+已登记进 `gate-registry.tsv`（17 条，`injectable`），探针
+`scripts/probes/check-license-js.sh`（实测 **PROBE-OK**）⇒ 元门 `--list` 已能枚举到它。
+⏳ **尚未接入 `ci.yml`** —— 接线需要与另一侧的改动一并决定，未夹带。
+
+## ⛔⛔ `ci.yml` 的 `check` job 极可能**已经红了**（两条独立原因，静态核实）
+
+1. **元门**：`ci.yml:81` 把 `bash scripts/check-gate-satisfiable.sh --strict` 接成**阻断 step**。
+   而 `--strict` 枚举集里 **`check-silent-failure.sh` 与 `check-unwrap.sh` 未登记**
+   （登记表原 16 条，两者都不在；`--list` 实测确认在枚举集内）
+   ⇒ `UNREGISTERED=2` ⇒ strict **exit 1**。
+2. **许可门**：`ci.yml:71` 接 `check-license.sh`，当前 **rc=1**
+   （触发原因是 `frontend/LICENSE.details` 命中 deny，而 `ACKNOWLEDGE-2` 已 `status: void`）。
+   `frontend/VENDOR.md:50` 自称「= FAIL（**正确状态**）」。
+
+⚠️ **两者矛盾且都写在配置里**：`Makefile:400` 说「FAIL 是正确状态」，
+而 `ci.yml:71` 把它当阻断 step ⇒ 若真恒红，CI 就恒红 ⇒
+按元门 doctrine「训练人忽略红色」，比没有门更坏。**需你裁决**：
+是让它红着（并把门移出阻断），还是补签署 / 删受限树让它绿。
+
+## ⛔ 三处文件互斥（需你裁决谁过期）
+- `ci.yml:64` 注释称「现已签署 **ACKNOWLEDGE-1**（accepted-with-condition）」
+- `.neotrix/LICENSE-EXCEPTIONS.md` 唯一真实签署段是 **ACKNOWLEDGE-2** 且 `status: void`
+  （`:98`，理由「2026-10-01 第三次认定（商用）触发 condition #1，作废」）
+- `apps/neobot-desktop/frontend/VENDOR.md:50` 自称 `check-license.sh` = FAIL（正确状态）
+⇒ 注释与实际内容矛盾，正是 `AGENTS.md` LESSONS 记的「门记录声称已做而实现从未入库」。
+
+## ⏳ Rust 侧结论（子代理核实，非推测）
+**Rust 侧不是真空**：`deny.toml` 的 allow 穷举 15 项、`exceptions = []`、
+AGPL/GPL/SSPL/Elastic/BUSL 全部不在 allow；`deny.yml:24` 只对 `advisories` 开
+`continue-on-error`，含 `licenses` 的 leg **阻断**；`security-audit.yml:22` 的
+`cargo deny check all` 是**第二条独立阻断路径**且 `pull_request` **无 paths filter**。
+⛔ **但「变红」≠「挡住合并」**：仓库内**没有任何分支保护/required-checks 声明文件**
+⇒ 是否真阻断取决于 GitHub 设置，**不在代码里**，需实查。
+⏳ `cargo-deny` 已装（`~/.cargo/bin/cargo-deny`）但**不在本仓 shell 的 PATH** ⇒
+需 `PATH="$HOME/.cargo/bin:$PATH" cargo deny check licenses` 实测当前是否绿。
+⛔ `EmbarkStudios/cargo-deny-action@v2` 是 **tag 引用非 SHA**（供应链可移动），
+而 `security-audit.yml:20` 用 `cargo install --locked` ⇒ 两条路径引入**不同版本**。
+
+## 其他顺带发现（子代理，均未处理）
+- `check-supply-iocs.sh` **完全不在任何 workflow 里**（只挂 `Makefile:398`），
+  且其许可卫生扫描**自述 WARN only, never FAIL**。
+- `gate-registry.tsv` 有 **2 条死条目**（`check-fresh-build` / `check-commit-deletions`）——
+  它们无 `--strict` ⇒ 不被枚举 ⇒ 登记从未被消费。
+- `check-gate-satisfiable.sh:113-116` 的 `opaque → continue` 在 `:121-124` 的
+  `SELF_SKIP` 判断**之前** ⇒ **`SELF_SKIP` 恒 0、那段不可达**（无害但误导）。
+- `check-license.sh` 的 `find` **不 prune `.worktrees/`** ⇒ 未来任一带 vendored 树的
+  worktree 检出都会虚增分数。
