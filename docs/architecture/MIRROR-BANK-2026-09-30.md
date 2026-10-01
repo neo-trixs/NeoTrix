@@ -229,3 +229,90 @@ pub struct Hexagram { pub bits: u8 }   // ← 同名，但是**不同**类型
    `LO_SHU_CONSTANT` 显示「仍被引用」，实为**我自己写的说明注释里提到了它们**。
    同理，我写文档时漏了 `src/` 被 `check-doc-drift` 抓出 ⇒
    **文档里的路径是会被门校验的，不是纯排版**。
+
+---
+
+## 6. 收敛战役：已做范围、剩余阻塞、以及两条新工具（2026-09-30 汇总）
+
+### 6.1 最终成绩
+
+| 对象 | 收敛前 | 收敛后 |
+|---|---|---|
+| 跨 crate 逐字相同的**自由函数** | 27 个候选 | **6 个已收敛**，7 个确认阻塞 |
+| `RRF_K`（同值常量） | 5 份定义 | **1 份**（唯一真身在 types） |
+| `RESONANCE_THRESHOLD` | 4 份定义 | **1 份** |
+| `nt_world_e8.rs` 里的 E8 数学常量 | 4 份影子复写 | **0**（改为引用） |
+| net 消除重复实现 | — | **约 160 行** |
+
+已收敛清单：`tokenize` `rrf_fuse`（bank + l4 bm25 两处）、
+`hadamard_matrix` `hexagram_hadamard` `e8_root_norm_counts`
+`verify_hadamard_orthogonality` + 8 个 `verify_*` 身份校验、
+`verify_total_fermions` `su3_generators`。
+
+### 6.2 剩余 7 个为何全部阻塞（这是**类型统一**问题，不是冗余问题）
+
+`all_reasoning_states` `all_sm_fermions` `king_wen_sequence`
+`shao_yong_sequence` `evolve_strategy_entry` `create_backend`
+`capability_vector_group_a`
+
+全部因为返回值/参数是 **crate 本地类型**：`ReasoningHexagram` `FermionState`
+`Hexagram` `Box<dyn VsaBackend>` `CapabilityVector`。收敛它们 = 把两 crate 的
+同名类型**统一**，爆炸半径：core 内 **57 个**文件引用 `Hexagram`。
+
+⛔ 这是**架构决策**，不是重构收尾。要做需先回答：E8/GWT 的领域类型真源放
+`neotrix-types`（契约层）还是各层自持（实现层）？当前仓库的分层意图
+（types = 跨后端契约）指向前者，但需要一次显式决策 + 分阶段迁移，
+不能夹带在清理提交里。
+
+### 6.3 新增两条工具（都有自证，且都被真实代码验证过）
+
+| 工具 | 覆盖维度 | 自证 |
+|---|---|---|
+| `scripts/ops/nt_const_dup.py` | **常量**：同名同类型 → `IDENTICAL`/`DIVERGENT` | 9 例（含 5 证伪） |
+| `scripts/ops/nt_diverge.py`（已修） | 函数：owner 感知的 `IDENTICAL`/`DIVERGENT`/`COLLISION` | 4 例（含 3 证伪） |
+
+`nt_const_dup` 存在的理由：常量级重复**函数级工具看不见**，而本轮最好的两个
+发现（`nt_world_e8` 的 E8 常量、`RESONANCE_THRESHOLD`）**都是常量级**的。
+
+### 6.4 修 `nt_diverge` 的 owner 误判（本轮最有价值的一条工具修复）
+
+**症状**：`entry_count` 被报成「逐字相同的自由函数」，但两侧明明都是 `&self`
+方法（`KnowledgeProvider::entry_count` vs `KnowledgeStorage::entry_count`）。
+
+**根因**：`owner_before` 靠花括号配平判断「最近的 `impl` 是否已闭合」。若某个
+`impl` 在**本 fn 之前**已闭合，它返回 `(free)` ⇒ 两个**不同结构体**的同名方法
+被当成「同一函数的两个副本」。
+
+**危害**：把**不可收敛的方法**混进收敛候选清单 —— 清单看起来「还有 27 个可做」，
+实际只有 10 个，其中仅 4 个可动。**工具的误判会直接放大决策错误。**
+
+**修法**：地面真相是**签名里有没有 `self`**（有 self 绝不可能是自由函数）。
+宿主类型不可确定时标 `(method:unknown)` 且**不参与配对**，避免二次错配。
+已补**回归自证**（真实踩中形态），并同时验证「真自由函数仍须正常识别」，
+防止判据做过火。
+
+**修复效果**：候选 27 → 17 对（剔 `test_*` 后 10 个真候选）。
+
+### 6.5 本轮我自己的三次误判（全部由工具/编译器抓出，已留档）
+
+1. **断言 `MODULE_COUNT=15` 是 bug** → 读代码发现数组实为 15 个（我手数漏了
+   `CADGeneration`）⇒ 两侧各自自洽，真缺陷只是**注释与代码矛盾**。
+2. **把 `RESONANCE_THRESHOLD` 误归为「world 自有、不重复」** → 实际与 gwt 侧
+   同值同概念，下一笔已补收敛。
+3. **以为该常量定义在 E8 块内** → 实际在文件 64 行 ⇒ E0255 重复定义。
+
+⇒ 三次的共同教训：**命中项必须读那一行本身**，且「归入大概率不重复」与
+「判定为缺陷」一样需要证据（R-SCAN-1b）。
+
+### 6.6 自查清理：`pub` 死副本编译器不会报
+
+`bank/iteration.rs` 的 `pub const RRF_K` 在我上一轮收敛 `rrf_fuse` 后变成
+**零使用的重复定义**，但因为是 `pub`，**编译器不报 unused** ⇒ 静默留存。
+
+三条删除依据：① 真身已统一；② 零使用；③ 该模块在 `mod.rs` 里是
+`mod iteration;`（**私有**）且从未转出该常量 ⇒ 从来不是公开 API。
+
+⚠️ 一般教训：**收敛一个函数后要回头看它留下的常量/辅助函数** ——
+`pub` 修饰会让编译器失去检查能力，这类残留只能靠人工/工具发现。
+`nt_const_dup.py` 能发现「同名多份定义」，但**发现不了「单份却已无人使用」**
+⇒ 后者仍需 `dead_code` 类工具或人工核对。
