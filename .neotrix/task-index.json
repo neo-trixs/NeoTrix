@@ -933,6 +933,25 @@
    "read_only": true,
    "when_not": "改 Rust 后端或 Tauri 桥时不要用它（浏览器里没有 Tauri IPC，桩只验渲染不验桥接）；产物没构建过（dist/ 不存在）时先 `vite build`",
    "spec": "判据三条：#root 被真实填充 / 无未捕获错误 / 无资源加载失败（按 URL 判定，不靠 console 文本——文本是泛化的不含 URL）。首次报「未渲染」是桩返回 null 而契约声明 T[] 所致，非产品缺陷"
+  },
+  {
+   "id": "nt-feature-viability",
+   "query": [
+    "功能下架",
+    "会丢功能",
+    "功能平价",
+    "pet",
+    "下架决策",
+    "切入口",
+    "M6",
+    "功能存活",
+    "静默丢弃"
+   ],
+   "tool": "python3 scripts/ops/nt_feature_viability.py",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "判断某个具体函数怎么实现时不要用它（那是 locate 的事）；契约表大改后第一次跑要同时看 DROPPED/PENDING 是否需重估——本门是**后端实现的函数**，实现了新命令会让相关域从 DEAD 转向不可下架",
+   "spec": "判据：按域聚合 invoke 调用 × 契约表状态；ALIVE/DEAD/MIXED 三态 + DROPPED(显式下架)/PENDING(挂里程碑未建)/未登记(门红) 分类。归属按 md5 内容同一性，**不按文件名**（同名≠同符号）"
   }
  ],
  "excluded": {

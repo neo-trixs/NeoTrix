@@ -106,12 +106,21 @@ async function copyCode(button: HTMLButtonElement): Promise<void> {
   const pre = button.closest('.md-code')?.querySelector('pre code')
   const text = pre?.textContent ?? ''
   if (!text) return
+  // 优先浏览器 Clipboard API；被拒时**回落**到 Tauri 命令。
+  // ⛔ 原实现在 catch 里直接 `return`，而 Tauri 走自定义协议（未必是安全
+  //    上下文），`navigator.clipboard` 可能整个不可用 ⇒ 复制按钮**无声失效**，
+  //    用户只看到「按了没反应」。而后端 `write_clipboard_text` 是
+  //    `Status::Implemented` 且已在 invoke_handler 注册（main.rs）⇒ 回落可用。
+  //    这不是「多加一条命令让门变绿」，是补一条真实缺失的降级路径。
   try {
     await navigator.clipboard.writeText(text)
   } catch {
-    // 剪贴板被拒（非安全上下文等）：静默收手，不弹错。
-    // 报错会让用户以为「复制功能坏了」，而实际只是这次不许写。
-    return
+    try {
+      await invoke('write_clipboard_text', { text })
+    } catch {
+      // 两条路都被拒：静默收手，不弹错（沿用原注释的理由）。
+      return
+    }
   }
   button.classList.add('is-copied')
   window.setTimeout(() => button.classList.remove('is-copied'), 1200)
