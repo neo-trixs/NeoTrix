@@ -85,6 +85,40 @@ invoke_handler 注册 60 个 · 前端 invoke 89 个唯一命令
 ⇒ **对上游 `store`(4,230 行) / `hooks`(1,151 行) 零依赖。**
 自研 UI 不需要重建状态管理层。
 
+### 1.3 ⚠️ 修正：文件级零依赖 ≠ **渲染路径**零依赖（实测，2026-09-30）
+
+我上一轮说「684 行对上游零依赖」——**就文件 import 而言成立，但渲染路径不是。**
+实测真实链路：
+
+```
+vite 入口 = 上游 src/main.tsx          ← 不是我们的 neobot-root
+   └→ 上游组件树 …
+        └→ 上游 src/layout/components/webview.tsx:13
+              import { NeoBotRoot } from '@/neobot-root'     ← 引用我方
+              第 77 行： selfHosted ? <NeoBotRoot/> : <iframe/>
+                        ▲
+                        └─ selfHosted = !hasService
+                             ▲
+                             └─ 后端 get_runtime_info() 返回 has_service: false
+                                （desktop.rs:185 注释明写「返回空的 service_url
+                                  + has_service: false」；:205 硬编码 false）
+```
+
+**两个反直觉但正确的事实：**
+
+1. **我方 684 行就是当前在跑的 UI** —— 正因为我们**没有** DSH 服务，
+   `has_service:false` ⇒ `selfHosted=true` ⇒ 走我方分支，iframe/DSH 路径是死的。
+2. **但它是被上游"请"来渲染的** —— 入口是上游 `main.tsx`，
+   开关由上游 `harness/store.ts` 计算，容器是上游 `webview.tsx`。
+
+⇒ **M1（换入口）不只是"换个入口"**：删 vendored 树时必须一并自持
+`main.tsx` 入口 + `webview.tsx` 容器 + `harness/store.ts` 的 selfHosted 判定。
+否则我方 UI 会**静默变成死代码**，界面上没有任何异常。
+
+⇒ 已把这道风险做成门：`nt_api_contract.py` 的 **D 自持 UI 接线检查**
+（校验 ① 我方 root 至少有一处 import ② 后端 `has_service` 不是 true）。
+双向敏感度已验证：断开 import ⇒ rc=1；md5 逐字节还原 ⇒ rc=0。
+
 ## 2. 逐能力裁决
 
 判据三问：① NeoBot 商用是否需要？② 需要的话，自研成本 vs 授权成本？
@@ -98,7 +132,7 @@ invoke_handler 注册 60 个 · 前端 invoke 89 个唯一命令
 | **R2** | **最小 chrome**（窗口/滚动/快捷键） | `src/layout` 2,948 行 | **2–3 人日** | 自研。**不抄上游布局代码**（它在 no-commercial 范围内） |
 | **R3** | `neobot_api_call` 后端契约固化 | ✅ **已完成** | **0（已交付）** | `scripts/ops/nt_api_contract.py` 门已建立：契约表 115 / 注册 60 / 前端 89 三方一致，A=B=C=0，敏感度双向验证通过 |
 | **R4** | i18n（zh-CN / en-US） | `src/i18n` 70 行 + 两份 locale | **1 人日** | 词典小，自写成本低于剥离上游 |
-| **R5** | `vendor/openghost` **独立裁决** | 3 js / ~2,200 行 | **0 或 2 人日** | 它是 **MIT（渲染引擎）且无附加条款** ⇒ **可保留**，但须从 vendored#1 的目录里**物理迁出**，否则仍被打包进受限树。见 §4 |
+| **R5** | `vendor/openghost` **独立裁决** | 3 js / ~2,200 行 | **0 或 2 人日** | MIT 无附加条款 ⇒ 可保留，但须**物理迁出** vendored#1。见 §4。⛔ **当前被并发阻断**：`src/neobot-root.tsx` mtime 实时变动（他窗在写），改 import 会冲突 |
 
 **R1–R4 合计约 5.5–6.5 人日。** 这是让 NeoBot **不含任何 no-commercial 代码**的最小代价。
 

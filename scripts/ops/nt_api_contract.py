@@ -265,8 +265,56 @@ def main(argv):
         print(f"ℹ️  C-info 前端调用了契约表里标 Stub/Planned 的命令：{len(c_info)}"
               f"（刻意不实现，非缺陷；其中 DSH_ONLY 占多数）")
 
+    # ── D 自持 UI 接线（R-P79「导出≠接入」守卫，2026-09-30 加）────────────
+    # 实测架构：`neobot-root.tsx`（我方 684 行）**不是** vite 入口，入口是上游
+    # `src/main.tsx`；我方 UI 只能经
+    #   上游 main.tsx → … → 上游 layout/components/webview.tsx
+    #     → selfHosted ? <NeoBotRoot/> : <iframe/>
+    # 到达。后端 `get_runtime_info` 刻意返回 `has_service:false`
+    # （desktop.rs:185 注释明写「返回空的 service_url + has_service: false」），
+    # ⇒ `selfHosted = !hasService = true` ⇒ 走我方分支。
+    #
+    # ⚠️ 这条链上任一环断了，我方 UI 就**静默变成死代码**，界面上无任何异常。
+    # ⇒ 做成门，不写进文档。（这也是我上一轮说法的修正：文件级 import 零上游依赖
+    #   属实，但**渲染路径**穿过上游 webview.tsx + harness/store.ts。）
+    d_fail = []
+    ui = os.path.join(VENDORED, 'src/neobot-root.tsx')
+    if not os.path.isfile(ui):
+        d_fail.append(('neobot-root.tsx 不存在', '自持 UI 无从渲染'))
+    else:
+        refs = []
+        for root, dirs, files in os.walk(os.path.join(VENDORED, 'src')):
+            dirs[:] = [x for x in dirs if x not in ('node_modules', 'dist', 'vendor')]
+            for fn in files:
+                if not fn.endswith(('.ts', '.tsx')) or fn == 'neobot-root.tsx':
+                    continue
+                p = os.path.join(root, fn)
+                t = open(p, encoding='utf-8', errors='ignore').read()
+                if re.search(r'from\s+[\'"]@/neobot-root[\'"]', t) or \
+                   re.search(r'from\s+[\'"][^\'"]*neobot-root[\'"]', t):
+                    refs.append(os.path.relpath(p, REPO))
+        if not refs:
+            d_fail.append(('neobot-root.tsx 零 import', '自持 UI 永不被渲染（死代码）'))
+        else:
+            print(f"ℹ️  D 自持 UI 引用点：{len(refs)} 处 → {', '.join(refs[:3])}")
+        rt = os.path.join(REPO, 'apps/neobot-desktop/src/desktop.rs')
+        if os.path.isfile(rt):
+            t = open(rt, encoding='utf-8', errors='ignore').read()
+            if re.search(r'has_service:\s*true', t):
+                d_fail.append(('get_runtime_info 返回 has_service: true',
+                               '前端 selfHosted 恒为 false ⇒ 我方 UI 永不渲染'))
+            else:
+                print("ℹ️  D 后端 has_service 为 false ⇒ selfHosted 可为真（我方分支可达）")
+    if d_fail:
+        print(f"⛔ D 自持 UI 接线断裂：{len(d_fail)}")
+        for why, cons in d_fail:
+            print(f"     · {why}")
+            print(f"       后果：{cons}")
+    else:
+        print("✅ D 自持 UI 接线完整")
+
     print()
-    total = len(a_fail) + len(b_fail) + len(c_fail)
+    total = len(a_fail) + len(b_fail) + len(c_fail) + len(d_fail)
     if total == 0:
         print("PASS: 契约表 / 注册 / 前端实调 三方一致。")
         return 0
