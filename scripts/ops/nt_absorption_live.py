@@ -29,6 +29,8 @@
     （注释/同名词/散文/prose 命中）。可达性只认编译期边，见 nt_callgraph.py
     的 F1–F6 误报源清单。
 """
+import collections
+import glob
 import os
 import re
 import subprocess
@@ -42,6 +44,8 @@ DOC_DEFAULT = os.path.join(
 # backtick token；测试数 "91 测试" / "6 单测"
 RE_TOKEN = re.compile(r'`([^`]+)`')
 RE_TESTS = re.compile(r'(\d+)\s*(单测|测试)')
+RE_L_ROW = re.compile(r'^\|\s*(L-[A-Za-z0-9-]+)\s*\|(.*)$')
+RE_LANDING_H = re.compile(r'^#{2,3} .*?(Landings|已落地|落地|Landed)', re.I)
 
 
 def rg_count(pattern):
@@ -68,7 +72,15 @@ def find_file(token):
         for ext in ('.sh', '.py', '.rs'):
             cands.append(token + ext)
     for c in cands:
-        if os.path.isfile(os.path.join(REPO, c)):
+        ap = os.path.join(REPO, c)
+        # ⚠️ 2026-09-30 实测 bug（由 --all-docs 撞出）：原实现用 `os.path.isfile`，
+        # 而 skill / 门 / 目录型落地的 token **是目录** ⇒ isfile=False ⇒
+        # `skills/design/ui-direction/` 被误报 dead-or-moved，而它明明存在
+        # （commit 8810b0dc 落地，HEAD 至今在）。
+        # ⇒ 目录型落地是吸收产物的主要形态之一，必须认目录。
+        if os.path.isdir(ap):
+            return c.rstrip('/'), False
+        if os.path.isfile(ap):
             return c, False
     base = os.path.basename(token)
     try:
@@ -102,6 +114,10 @@ def check_token(token):
     status ∈ alive/dead-or-moved/moved/unparseable/external。
     注意：调用方按 section 解读（gone-section 的 absent = 与拒绝结论一致）。"""
     t = token.strip()
+    # 尾斜杠归一（2026-09-30 实测）：`skills/x/` 与 `skills/x` 是同一物。
+    # 不归一时，目录型落地会全被误报成「搬迁」——只差一个斜杠。
+    if len(t) > 1 and t.endswith('/'):
+        t = t.rstrip('/')
     # 外部仓库名（org/repo，无扩展名）：不是本地路径，不可判
     # （2026-09-30 实测：NVlabs/kda、qybaihe/mu 被误判为 dead 路径）
     if re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', t) \
@@ -175,12 +191,139 @@ def graph_verdicts(tokens, db):
     return out
 
 
+def extract_all_docs():
+    """扫全部吸收文档，抽取「已落地」断言。返回 [(doc, lid|None, section, [token…])]。
+
+    为什么要做这个（2026-09-30 实测）：存活率门原先只跑 MAP-TASKS 一份，
+    因为抽取器硬编码了 `### 1.1` / `### 1.3` 这两个**该文档专有**的章节标记。
+    ⇒ 32 份吸收文档里 **31 份的落地断言从未被验证过**。
+
+    判据分级（宁缺勿错，**不猜**）：
+      A 级 `| L-xxx | 产物 | 验证 |` 表格行 —— 结构化，取第 2 列的反引号 token
+      B 级 `## N. Landings` 段正文 —— 取该段全部反引号 token
+      C 级 两者都无 → 记 **unverifiable**，**不用其它段落凑数**
+        （凑数会把「源清单」「Deferred」「引用」当成落地，制造假阳性）
+    """
+    out = []
+    for path in sorted(glob.glob(os.path.join(REPO, 'ABSORBED-*'))):
+        pass
+    docdir = os.path.join(REPO, 'docs/architecture')
+    for path in sorted(glob.glob(os.path.join(docdir, 'ABSORPTION-*.md'))):
+        name = os.path.basename(path)
+        try:
+            with open(path, encoding='utf-8', errors='ignore') as fh:
+                lines = fh.read().splitlines()
+        except OSError:
+            continue
+        a_rows, b_body, in_land = [], [], False
+        for ln in lines:
+            if RE_LANDING_H.match(ln):
+                in_land = True
+                continue
+            if ln.startswith('#') and in_land and not RE_LANDING_H.match(ln):
+                in_land = False                      # 下一节 ⇒ 收
+            m = RE_L_ROW.match(ln)
+            if m:
+                a_rows.append((m.group(1), m.group(2)))
+            elif in_land:
+                b_body.append(ln)
+        if a_rows:
+            for lid, cell in a_rows:
+                out.append((name, lid, 'A', RE_TOKEN.findall(cell)))
+        elif b_body:
+            toks = []
+            for ln in b_body:
+                toks.extend(RE_TOKEN.findall(ln))
+            out.append((name, None, 'B', toks))
+        else:
+            out.append((name, None, 'C', []))
+    return out
+
+
+def classify_token(tok):
+    """单个落地 token 的双判据裁决。返回 (verdict, detail)。
+    verdict ∈ alive / moved / dead / unparsable / external / not-call-target
+                 / no-callers / reachable
+    """
+    tok = tok.strip()
+    if not tok or tok.startswith('#'):
+        return ('unparsable', '空/注释 token')
+    # 纯自然语言短语（含空格且无路径/标识符特征）不可判
+    if ' ' in tok and '/' not in tok and '.' not in tok and not tok.endswith('()'):
+        return ('unparsable', f'自然语言短语，不可判：{tok[:40]}')
+    return check_token(tok)
+
+
+def main_all_docs(strict, use_graph, db):
+    """全域存活率：32 份吸收文档的落地断言逐条核对。"""
+    rows = extract_all_docs()
+    gv_all = {}
+    if use_graph:
+        toks = [t for _, _, _, ts in rows for t in ts]
+        uniq = list(dict.fromkeys(t.strip() for t in toks if t and not t.startswith('#')))
+        gv_all = graph_verdicts(uniq, db) or {}
+        print(f"[absorb-live] 图判据：{len(gv_all)} 个唯一 token 进入可达性裁决")
+    print(f"[absorb-live] 扫描吸收文档 {len(rows)} 份"
+          f"（A=结构化 L-xx 行 / B=Landings 段 / C=无落地段，不可判）")
+    stats = collections.Counter()
+    dead_items, unwired = [], []
+    for name, lid, grade, toks in rows:
+        if grade == 'C':
+            stats['doc-unverifiable'] += 1
+            print(f"  [C 不可判] {name} —— 无 L-xx 行也无 Landings 段；"
+                  f"不凑数（宁缺勿错）")
+            continue
+        stats[f'doc-grade{grade}'] += 1
+        clean = [t.strip() for t in toks if t and not t.strip().startswith('#')]
+        seen = set()
+        for tok in clean:
+            if tok in seen:
+                continue
+            seen.add(tok)
+            verdict, detail = classify_token(tok)
+            gtag = ''
+            if tok in gv_all:
+                gv = gv_all[tok]
+                gtag = f' |graph:{gv[0]}'
+                if verdict == 'alive' and gv[0] == 'no-callers':
+                    unwired.append((name, lid, tok))
+                    verdict = 'unwired'
+            stats[verdict] += 1
+            if verdict in ('dead', 'moved'):
+                dead_items.append((name, lid, tok, detail))
+            tag = f"{grade}/{verdict}{gtag}"
+            print(f"  [{tag}] {name[:34]:34} {lid or '-':9} {tok[:52]:52} — {detail[:56]}")
+    print()
+    print(f"[absorb-live] 全域汇总："
+          f"文档 A/B/C = {stats['doc-gradeA']}/{stats['doc-gradeB']}/{stats['doc-unverifiable']}  "
+          f"token 存活={stats['alive']} 搬迁={stats['moved']} "
+          f"死亡={stats['dead']} 导出未接线={stats['unwired']} "
+          f"不可判={stats['unparsable']} 外部={stats['external']} "
+          f"非调用目标={stats['not-call-target']}")
+    if unwired:
+        print(f"[absorb-live] ⚠ 文本存活但**生产不可达**（R-P79「导出≠接入」）：{len(unwired)}")
+        for n, l, t in unwired[:20]:
+            print(f"    ⊘ {n[:30]:30} {l or '-':9} {t[:50]}")
+    if dead_items:
+        print(f"[absorb-live] ⛔ 死亡/搬迁项 {len(dead_items)}：")
+        for n, l, t, d in dead_items[:25]:
+            print(f"    ⛔ {n[:30]:30} {l or '-':9} {t[:46]:46} — {d[:44]}")
+    if strict and stats['dead']:
+        print(f"[absorb-live] FAIL: {stats['dead']} 条落地断言已死亡")
+        return 1
+    print("[absorb-live] 全域报告完成（不加 --strict 时不断言）")
+    return 0
+
+
 def main(argv):
     strict = '--strict' in argv
     use_graph = '--graph' in argv
+    all_docs = '--all-docs' in argv
     db = os.path.join(REPO, '.project-map/edges-all.jsonl')
     if '--db' in argv:
         db = argv[argv.index('--db') + 1]
+    if all_docs:
+        return main_all_docs(strict, use_graph, db)
     doc = DOC_DEFAULT
     if '--doc' in argv:
         doc = argv[argv.index('--doc') + 1]

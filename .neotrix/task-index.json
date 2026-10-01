@@ -827,6 +827,21 @@
    "read_only": true,
    "when_not": "⛔ 当前 rc=1 是正确状态，不是待修 bug：apps/neobot-desktop/frontend 上游附加条款 No Commercial Secondary Development 待项目所有者裁决（.neotrix/LICENSE-EXCEPTIONS.md）。⛔ 不要为了让门变绿而删 deny 名单或改脚本。门只校验记录一致性，不做法律判断",
    "spec": "ABSORPTION-ROUND24 G6"
+  },
+  {
+   "id": "nt-absorption-live-all",
+   "query": [
+    "全域存活率",
+    "所有吸收文档",
+    "落地断言有没有活",
+    "31 份没验证",
+    "吸收轮次核对"
+   ],
+   "tool": "python3 scripts/ops/nt_absorption_live.py --all-docs [--graph]",
+   "kind": "ops",
+   "read_only": true,
+   "when_not": "⚠ 报「0 死亡」**不等于**健康：find_file 用「任意 basename 存在即算存活」，判据偏宽（17 条其实是 bare-basename 搬迁，不是死亡）。真信号是 --graph 标出的「导出未接线」项，且那批仍需手验（已实测 5 条里 3 条是文档 token 不精确：mod 声明/英文单词）。C 级文档（无 L-xx 也无 Landings 段，13 份）**故意不凑数**，不参与统计",
+   "spec": "ABSORPTION-ROUND25"
   }
  ],
  "excluded": {
