@@ -436,14 +436,26 @@ export function NeoBotRoot() {
     return () => host.removeEventListener('click', onClick)
   }, [])
 
+  // 消息列表窗口化（与会话列表同一模式）。
+  // estimateSize 是**初估**：气泡高度随内容换行而变 ⇒ 必须 measureElement 校正。
+  const msgVirtualizer = useVirtualizer({
+    count: msgs.length,
+    getScrollElement: () => msgsRef.current,
+    estimateSize: () => 64,
+    overscan: 6,
+  })
+
   // 自动滚到底：**只在用户本来就在底部时**才滚。
   // ⛔ 无条件 scrollTop = 高度会把人从正在读的历史里硬拽走 —— 那是「自作聪明」。
   const [pinned, setPinned] = useState(true)
   const scrollToEnd = useCallback(() => {
-    const host = msgsRef.current
-    if (host) host.scrollTop = host.scrollHeight
+    // ⛔⛔ 窗口化后**不能**再 `scrollTop = scrollHeight`：
+    //    scrollHeight 此时是**撑高容器**的高度（getTotalSize 给出），
+    //    直接赋值会跳到与「最后一条」无关的位置。必须让 virtualizer 定位。
+    msgVirtualizer.scrollToIndex(msgs.length - 1, { align: 'end' })
     setPinned(true)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [msgs.length])
   useEffect(() => {
     const host = msgsRef.current
     if (!host) return
@@ -456,9 +468,10 @@ export function NeoBotRoot() {
   }, [])
   useEffect(() => {
     if (!pinned) return
-    const host = msgsRef.current
-    if (host) host.scrollTop = host.scrollHeight
-  }, [msgs, pinned])
+    // 同上：窗口化后必须走 scrollToIndex
+    msgVirtualizer.scrollToIndex(msgs.length - 1, { align: 'end' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [msgs.length, pinned])
 
   // 输入框随内容增高（上限 5 行后转为滚动）。
   // ⛔ 占位符承诺了「Shift+Enter 换行」，框却永远一行 ⇒ 用户看不见自己打的第二行。
@@ -787,8 +800,37 @@ export function NeoBotRoot() {
             </div>
           ) : (
             <div className="mx-auto max-w-[760px] space-y-2">
-              {msgs.map((m, i) => (
-                <div key={i} className={m.who === 'me' ? 'flex justify-end' : 'flex'}>
+              {/* 消息窗口化。⛔ 外层**必须**撑出 getTotalSize()：省了它，
+                  滚动条按「可见项数」算高度 ⇒ 根本滚不动。 */}
+              {msgs.length > 0 && (
+              <div
+                data-testid="nb-msg-sizer"
+                style={{ height: `${msgVirtualizer.getTotalSize()}px`, position: 'relative' }}
+              >
+              {msgVirtualizer.getVirtualItems().map((vi) => {
+                const m = msgs[vi.index]
+                if (!m) return null
+                // ⛔ 连续同作者的消息**聚成一组**：组内只留 2px、组间留 10px。
+                //    此前每条都等距（外层 space-y-2，且虚拟化后外层间距根本不生效），
+                //    于是 6 条消息读起来像 6 个独立事件，而不是「一问一答」两段。
+                //    间距必须写在**被测量的元素内**（paddingTop）——
+                //    绝对定位 + measureElement 的布局下，外部 margin 不会被计入高度。
+                const prev = msgs[vi.index - 1]
+                const next = msgs[vi.index + 1]
+                const groupStart = !prev || prev.who !== m.who
+                const groupEnd = !next || next.who !== m.who
+                return (
+                <div
+                  key={vi.index}
+                  data-index={vi.index}
+                  ref={msgVirtualizer.measureElement}
+                  className={m.who === 'me' ? 'flex justify-end' : 'flex'}
+                  style={{
+                    position: 'absolute', top: 0, left: 0, width: '100%',
+                    transform: `translateY(${vi.start}px)`,
+                    paddingTop: `${groupStart ? 10 : 2}px`,
+                  }}
+                >
                   <div className="flex max-w-[76%] flex-col">
                     <div
                       className={`rounded-2xl px-3 py-2 text-[13px] leading-relaxed ${
@@ -806,16 +848,22 @@ export function NeoBotRoot() {
                         />
                       )}
                     </div>
+                    {/* ⛔ 时刻**只在组末**显示：每条都挂一个 10px 时间戳时，
+                        一组三条会出现三个几乎相同的时间，读起来是噪声而不是信息。
+                        组末一条代表「这段话说完于何时」。失败重发按钮不受此限 ——
+                        它必须跟着失败的那一条。 */}
                     <div
-                      className={`mt-0.5 flex items-center gap-2 px-1 text-[10px] text-muted ${
-                        m.who === 'me' ? 'justify-end' : ''
+                      className={`flex items-center gap-2 px-1 text-[10px] text-muted ${
+                        groupEnd ? 'mt-0.5' : 'mt-0'
+                      } ${m.who === 'me' ? 'justify-end' : ''} ${
+                        !groupEnd && !m.failed ? 'invisible' : ''
                       }`}
                     >
-                      <span>{clockOf(m.ts)}</span>
+                      {clockOf(m.ts)}
                       {m.failed && (
                         <button
                           type="button"
-                          onClick={() => void retry(i)}
+                          onClick={() => void retry(vi.index)}
                           disabled={busy}
                           className="rounded border border-line px-1 hover:bg-panel-hover disabled:opacity-40"
                         >
@@ -825,7 +873,10 @@ export function NeoBotRoot() {
                     </div>
                   </div>
                 </div>
-              ))}
+              )
+              })}
+              </div>
+              )}
               {busy && (
                 <div className="flex">
                   <div className="rounded-2xl rounded-bl-md bg-[#ededef] px-3 py-2 text-[13px] text-[#61666b]">

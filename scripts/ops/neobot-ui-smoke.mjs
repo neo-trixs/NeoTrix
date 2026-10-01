@@ -343,6 +343,34 @@ async function probe(browser, label, failList, act, convoCount = 0) {
       bg: getComputedStyle(document.querySelector('.nb-shell') || document.body).backgroundColor,
     })).catch(() => null)
 
+    // ── 消息窗口化 A/B/C/D（判据**先定后写**，见 commit 说明）────────
+    if (label.includes('千条')) {
+      feat.msgVirtual = await page.evaluate(() => {
+        const sizer = document.querySelector('[data-testid="nb-msg-sizer"]')
+        if (!sizer) return null
+        return {
+          sizerH: Math.round(sizer.getBoundingClientRect().height),
+          rows: sizer.querySelectorAll('[data-index]').length,
+          txt: (document.querySelector('.nb-main')?.innerText || '').replace(/\s+/g, ' '),
+        }
+      }).catch(() => null)
+      // C：加载后应停在**底部** ⇒ 末条在视口内（⛔ 不是首条！上一轮就是这里写错）
+      const cOk = feat.msgVirtual?.txt.includes('LASTMSG')
+      // D：滚到顶 ⇒ 首条可见（内容**可达**）
+      await page.evaluate(() => {
+        const el = document.querySelector('[class*="overflow-y-auto"][class*="relative"]')
+        if (el) el.scrollTop = 0
+      }).catch(() => {})
+      await page.waitForTimeout(500)
+      const dTxt = await page.evaluate(() =>
+        (document.querySelector('.nb-main')?.innerText || '').replace(/\s+/g, ' ')).catch(() => '')
+      feat.msgVirtual = {
+        ...(feat.msgVirtual ?? {}),
+        seesLast: !!cOk,
+        seesFirstAfterScrollTop: dTxt.includes('FIRSTMSG'),
+      }
+    }
+
     // a11y-1 role/aria 必须落在 box 上，**不是**遮罩
     feat.dialogOnBox = await page.evaluate(() => {
       const box = document.querySelector('.nb-modal-box')
