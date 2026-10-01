@@ -155,7 +155,7 @@ neotrix-core/src/l1_action/nt_io/nt_io_plugin/registry.rs:169	expect
 neotrix-core/src/l1_action/nt_io/nt_io_plugin/registry.rs:174	expect
 neotrix-core/src/l1_action/nt_io/nt_io_plugin/registry.rs:201	expect
 neotrix-core/src/l1_action/nt_io/nt_io_web/server.rs:40	expect
-neotrix-core/src/l2_perception/nt_core_code_search.rs:495	expect
+neotrix-core/src/l2_perception/nt_core_code_search.rs:503	expect
 neotrix-core/src/l2_perception/nt_core_code_search.rs:499	expect
 neotrix-core/src/l2_perception/nt_core_e8/nt_latent_transformer.rs:214	expect
 neotrix-core/src/l2_perception/nt_world/crawl/discover.rs:122	expect

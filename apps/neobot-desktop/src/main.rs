@@ -26,8 +26,8 @@
 //! 还带看起来在工作的假象」。2026-09-30 用户决定搬进本仓（证据模块已落
 //! `crates/neotrix-neobot/src/nt_evidence.rs`），故现在正常注册。
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
+/// 组装 Tauri 应用（与 [`run`] 分离，好让 `run` 能用 `if let` 而不必 panic）。
+fn build_app() -> tauri::Builder<tauri::Wry> {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -142,8 +142,22 @@ pub fn run() {
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("启动 NeoBot 失败");
+}
+
+/// 启动应用。
+///
+/// ⛔⛔ **签名必须是 `fn run() -> ()`**：上面的
+/// `#[cfg_attr(mobile, tauri::mobile_entry_point)]` 要求这一点，
+/// 改成 `-> Result` 在 mobile 下直接破。
+/// ⛔ 原先这里是 `.expect("启动 NeoBot 失败")`。现在改成
+/// **报错 + 退出**：保留「启动失败必须致命」的语义，去掉 unwinding
+/// （panic 会往 stdout/stderr 打一条 Rust backtrace，对用户是噪声）。
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    if let Err(e) = build_app().run(tauri::generate_context!()) {
+        eprintln!("启动 NeoBot 失败：{e}");
+        std::process::exit(1);
+    }
 }
 
 // 二进制入口。`run()` 与本文件同处（bin 侧）—— lib.rs 只暴露常量，

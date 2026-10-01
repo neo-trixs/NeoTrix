@@ -202,7 +202,14 @@ pub fn update_app_config(config: serde_json::Value) -> Result<(), String> {
     let obj = config
         .as_object()
         .ok_or_else(|| "config 必须是 JSON 对象".to_owned())?;
-    let map = cur.as_object_mut().expect("上面已确认是对象");
+    // ⛔ 原先这里是 `.expect("上面已确认是对象")`。
+    //    上面的 `if !cur.is_object() { return Err(..) }` 确实让它**可证不发散**，
+    //    但 `expect` 仍是 panic —— 而这是 `#[tauri::command]` 的**配置写盘路径**，
+    //    panic 会让前端拿到一个无信息的错误。
+    //    ⇒ 与上面 `ok_or_else(...)?` 同款：把不变量交给类型，返回可读错误。
+    let map = cur
+        .as_object_mut()
+        .ok_or_else(|| "合并前配置对象不再是对象".to_owned())?;
     for (k, v) in obj {
         map.insert(k.clone(), v.clone());
     }

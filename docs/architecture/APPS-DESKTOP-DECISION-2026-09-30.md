@@ -58,3 +58,46 @@
 3. 改**文档里会被当现状读的句子**（`CONTRIBUTING.md`）
 
 ⇒ 三处互相指向，才能让 `git log`、门输出、文档三者一致。
+
+## 追加（2026-10-01）：`apps/` 的**棘轮范围**与「零存量豁免」的不对称
+
+### 事实（读源码核实，非印象）
+| 门 | 扫描根 | 覆盖 `apps/`？ |
+|---|---|---|
+| `scripts/check-unwrap.sh` | `os.walk(".")`，`SKIP` 只含 target/.git/models/node_modules/.worktrees | ✅ **是**（全仓门） |
+| `scripts/check-silent-failure.sh` | `ROOTS = ["neotrix-core/src"] + crates/*/src` | ❌ 否 |
+| `scripts/check-truth-surface.sh` | `SCAN_ROOTS = "neotrix-core/src crates"` | ❌ 否 |
+
+⇒ **不是「两个门不一致」，是两档策略**：core+crates 是「已治理区」，
+`check-unwrap.sh` 是**唯一的全仓门**。
+
+### ⛔ 订正一处「零存量豁免」的误解
+`unwrap-baseline.txt` 里 `apps/` **0 行** —— ⛔ **不是**「`apps/` 被排除在范围外」，
+而是**时间差**：`apps/` 于 2026-09-30 进仓并成为 workspace member
+（`Cargo.toml:13`），而基线最后一次**定点维护**在 2026-10-01 08:45，
+两次改动都没顺带扫 `apps/` ⇒ **是遗漏，不是策略**。
+
+⇒ **裁决：`apps/` 自进仓起即在全仓棘轮内，且不享有存量豁免。**
+其余代码有 **710 条**祖父债，`apps/` 从 **0** 开始。
+⭐ 收窄范围是**反方向**：它已是 tracked + 参与编译，收窄会降低覆盖，
+且与本文件「2026-09-30 恢复 `apps/`」的裁决直接冲突。
+
+### ⛔ 订正 ⛔未决 #3
+原文写 workspace 归属「未定」—— ⛔ **已被 `Cargo.toml:13` 的
+`"apps/neobot-desktop"` 推翻**（它是 workspace member、参与编译）。此项不再是未决。
+
+## ⚠️ 附带发现：`check-unwrap` 的 `path:line` 键会**静默换身份**（比范围问题更重要）
+
+门以 `"%s:%d" % (path, line)` 为键，**不校验该行的 token 身份**。
+⇒ 一次行号位移可同时产出 **1 处假 NEW + 1 处假 STALE**，而报告里看不出它们同源。
+
+**已实证的一例**（`nt_core_code_search.rs`）：
+- 基线原 `:495` / `:499`；`55dd1989`（2026-10-01）在**其上方 147 行**处 1 行换 5 行（+4）
+  ⇒ 两处 expect 真实位置变成 499 / 503
+- ⭐ 而 `499` **恰好被另一条 expect 填上** ⇒ 字符串键相等 ⇒ 门认为「499 依旧合规」
+  ⇒ **静默把身份换到了另一个违规上**，同时对 503 报假 NEW。
+
+⇒ **推论：「0 new violation」不能证明代码没退化。**
+任何在违规之上的插入都会伪造或吞掉信号 —— 这是 `path:line` 键的固有代价。
+⏳ 待办：是否给基线行加 token 指纹（如 `path:line:token`）以堵住身份调包，
+尚未评估迁移成本。
