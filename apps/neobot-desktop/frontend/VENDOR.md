@@ -52,9 +52,27 @@
 `.neotrix/LICENSE-EXCEPTIONS.md` 的 `ACKNOWLEDG-1` 已按其 `condition #3`
 **自动失效**，失效记录不可删除。
 
-**这不是「已解决」，是「已确诊」。** 处置选项与代价见该文件。
-在取得上游书面授权（或完成选项 B/D）之前，
-**本 vendored 树不得随商业产品分发修改版**。
+## ✅ 2026-10-01 第二次评估：改为**开源非商用** ⇒ 以 ACKNOWLEDGE-2 重新签署
+
+所有者于**同一日**推翻上一条商用认定，改为**开源非商用**。
+`condition #3` 的触发条件（商用）消失，故以 `ACKNOWLEDG-2` 重新签署，
+并新增 `condition #1`：**一旦出现任何商用迹象立即自动失效**——
+鉴于认定在同日已反转一次，不能依赖「记得回来改」。
+
+**机器核验**：全仓搜 8 个商用信号（stripe/paddle/lemonsqueezy/
+subscription plan/enterprise license/paid tier/pricing page/per-seat）
+⇒ 8 条命中逐条读原文**全为假阳性**（7 条是 `PaddleOCR` 子串，
+1 条是 `nt_mcp_scan_secrets.rs:70` 的密钥扫描黑名单 `"stripe-api-key"`）。
+⇒ 认定与仓库内容一致，非口头声明。
+
+**依据**：条款禁止的是「以获取**商业利益**为目的的二次开发」；
+本项目非商用 ⇒ 不落入禁止范围 ⇒ 回到基础 MIT（允许修改与再分发）。
+
+⚠️ **残留风险（ACKNOWLEDG-2 未解决）**：根 `LICENSE` 是 MIT ⇒
+NeoBot 以 MIT 发布后，**下游获得整棵树（含本 vendored 部分）**，
+而**商业下游用户**所做的正是条款禁止的事。该限制随文件走，
+**我们的非商用认定管不住下游**。出路只有两条：
+(a) 上游书面确认；(b) 把 vendored 部分排除出 MIT 可再分发范围（架构级决定）。
 
 ⛔ 不得为了让门变绿而删 `check-license.sh` 的 deny 名单或改门脚本。
 
