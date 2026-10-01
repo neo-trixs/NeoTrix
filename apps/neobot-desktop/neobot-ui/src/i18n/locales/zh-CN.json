@@ -84,5 +84,6 @@
   "convo.group.today": "今天",
   "convo.group.week": "一周内",
   "convo.group.older": "更早",
-  "chat.copyMessage": "复制消息"
+  "chat.copyMessage": "复制消息",
+  "chat.searchShortcut": "⌘K / Ctrl+K"
 }

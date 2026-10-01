@@ -373,6 +373,39 @@ export function NeoBotRoot() {
 
   // 新建对话：⛔ 成员必须已登记（库侧 `create_conversation` 会校验），
   // 而建会话前得先有成员 —— 所以表单里能就地登记，不必去设置面板绕一圈。
+  // ── 键盘快捷键：Cmd/Ctrl+K 聚焦搜索 · Esc 清空搜索 ──────────────────
+  //
+  // ⛔ **Esc 必须让路给对话框**：日志/记忆弹窗自己处理 Esc（`shell.tsx`
+  //   用 capture + `stopPropagation`）。若这里无条件清空搜索，
+  //   用户关弹窗的同一个 Esc 会**顺手把搜索也清掉** —— 那是两个无关状态
+  //   被一次按键改掉，用户不会预期。
+  //   ⛔ 判据用 `stopPropagation` 的**顺序**是脆的（依赖监听器注册次序），
+  //   所以显式检查 `[role=dialog]` 是否存在，让路条件写进代码而不是靠时序。
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const dialogOpen = document.querySelector('[role="dialog"]') !== null
+      // Cmd/Ctrl+K：聚焦搜索。⛔ 弹窗打开时**不抢焦点** ——
+      //   把焦点从模态里抢走会让读屏用户丢失当前位置。
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        if (dialogOpen) return
+        e.preventDefault()
+        const el = document.querySelector<HTMLInputElement>('[data-testid="nb-search"]')
+        if (!el) return
+        el.focus()
+        el.select() // ⭐ 选中全部：直接打字即覆盖，符合「搜索框」惯例
+        return
+      }
+      if (e.key !== 'Escape') return
+      if (dialogOpen) return // ⛔ 弹窗的 Esc 归弹窗
+      // Esc：只在**有内容**时清空，且保持焦点（用户还要继续输入）
+      setQ((prev) => (prev ? '' : prev))
+      const el = document.querySelector<HTMLInputElement>('[data-testid="nb-search"]')
+      if (el && el.value) el.focus()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
+
   const [newOpen, setNewOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newMember, setNewMember] = useState('')
@@ -624,10 +657,15 @@ export function NeoBotRoot() {
         <div className="shrink-0 space-y-1.5 p-2">
           <div className="flex gap-1.5">
             <input
+              // ⛔ 门需要稳定选择器：`aria-label` 是**随语言变**的
+              //   （zh「搜索会话」/ en「Search conversations」），
+              //   拿它当选择器会让门在切语言后失效。
+              data-testid="nb-search"
               value={q}
               onChange={e => setQ(e.target.value)}
               placeholder={t('chat.searchPlaceholder')}
               aria-label={t('chat.searchLabel')}
+              title={`${t('chat.searchLabel')} · ${t('chat.searchShortcut')}`}
               className="min-w-0 flex-1 rounded-lg border border-line bg-panel px-2 py-1 text-[12px] text-ink outline-none focus:border-info-hover"
             />
             <button

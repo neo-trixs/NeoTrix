@@ -84,5 +84,6 @@
   "convo.group.today": "Today",
   "convo.group.week": "This week",
   "convo.group.older": "Older",
-  "chat.copyMessage": "Copy message"
+  "chat.copyMessage": "Copy message",
+  "chat.searchShortcut": "⌘K / Ctrl+K"
 }

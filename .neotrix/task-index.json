@@ -1125,6 +1125,23 @@
    "read_only": true,
    "when_not": "⛔ 别在**只有 user 消息**的桩上判 A —— user 消息按设计显示原文；调消息渲染/代码块/语言切换前跑它取基线",
    "spec": "A markdown 真渲染成 HTML 且 .nb-md 内**看不到原始标记** ⭐（window.Markdown 一没就静默退化成纯文本，界面不报错、那 100 行 .nb-md CSS 变死 CSS，此前**只有人眼**能发现）· B 标题/粗体/列表/表格/引用/链接/行内码都产生元素 · C 代码块不撑破气泡 · D 长行 overflow-x:auto 且 scrollW>clientW（⛔ overflow:hidden 会把内容**裁掉**，不算过）· E 复制按钮 aria-label 非空 · F 代码文字对比度≥4.5 **深浅都查**（ⓘ 既有对比度门完全没覆盖代码块）· G 文案跟随应用语言 · H 零异常。ⓘ 夹具坑：markdown 只能放 assistant 消息；selectOption 别 .catch 吞错（select 带 disabled={busy}，超时会伪装成「文案没变」）"
+  },
+  {
+   "id": "neobot-check-shortcuts",
+   "query": [
+    "快捷键",
+    "Cmd+K",
+    "Ctrl+K",
+    "搜索快捷键",
+    "Esc 清空",
+    "键盘导航",
+    "键盘操作"
+   ],
+   "tool": "node scripts/ops/neobot-check-shortcuts.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "⛔ 别用 DOM 行数判过滤效果（虚拟化下列表恒 ~20 行）；改搜索框/弹窗/Esc 行为前跑它取基线",
+   "spec": "A Cmd+K 聚焦搜索并**全选**（不选=打字会插入而非覆盖）· B 过滤生效（量 nb-convo-sizer 高度 + 可见标题全命中；⛔ 别量 nb-msg-sizer，那是消息列表）· C Esc 清空 · D 空搜索 Esc 不误伤 · E ⭐ 弹窗开时 Esc **只关弹窗**、搜索保持（防「一次按键改两个无关状态」）· F ⭐ 弹窗开时 Cmd+K **不抢焦点**（抢走=读屏用户丢模态内位置）· G 搜索框有 aria-label · H 零异常。ⓘ **E 是双防线**：shell.tsx 的 capture+stopPropagation 先阻断，我方 dialogOpen 检查是第二道 ⇒ 只拆我方那道 E 仍绿（负向实测），须**两道同拆**才红。ⓘ 本门开头打印环境诊断：invoke 桩传参与读取不一致时全命令返 null ⇒ root=0，症状伪装成「选择器找不到」"
   }
  ],
  "excluded": {
