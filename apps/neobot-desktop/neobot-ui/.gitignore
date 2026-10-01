@@ -1,2 +1,4 @@
-node_modules/
+# 注意：不能写 node_modules/（带斜杠只匹配目录），本目录的 node_modules 是**软链**
+# 指向 ../frontend/node_modules 供本地验证用；不带斜杠才能同时匹配目录与软链。
+node_modules
 dist/
