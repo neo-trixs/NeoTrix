@@ -487,3 +487,8 @@ repo,source,stars,language,boards
 "CodeGraphContext/CodeGraphContext","user-batch-20260930","4.2k","","codemap/graph"
 "vercel-labs/agent-skills","user-batch-20260930","31.8k","","skills-convention"
 "trailofbits/skills","user-batch-20260930","7.3k","","skills-security"
+"microsoft/tgrep","user-batch-2026-09-30","3383","Rust","round24-lexical-search"
+"zvec-ai/zvec-grep","user-batch-2026-09-30","3844","TypeScript","round24-hybrid-search"
+"alibaba/zvec","user-batch-2026-09-30","16030","C++","round24-vector-engine"
+"alibaba/skill-up","user-batch-2026-09-30","1125","Go","round24-skill-eval"
+"humanlayer/advanced-context-engineering-for-coding-agents","user-batch-2026-09-30","2676","-","round24-UNLICENSED"

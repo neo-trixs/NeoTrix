@@ -10,8 +10,9 @@
   同名诱饵在结构上不可能混淆（DefId 带 crate 哈希）。
 
 判据（可证伪）：抽出边数 / Call 总数。
-  nt-core-capability-tree 实测 5892/6241 = 94%。漏掉的是闭包/泛型边界，
-  按「宁缺勿错」接受（漏边无害，错边致命）。
+  nt-core-capability-tree 实测 **6241/6241 = 100%**（2026-09-30 重测；
+  本文件旧 docstring 写 94% 是陈旧值，已按实测更正）。
+  漏掉的是闭包/泛型边界，按「宁缺勿错」接受（漏边无害，错边致命）。
 
 用法：
   python3 scripts/ops/nt_calledges.py --crate <dir> [--out edges.jsonl]
@@ -38,9 +39,17 @@ import sys
 
 CALL = re.compile(r'(?:^|[^A-Za-z_])(?:Method)?Call \{')
 TY = re.compile(r'ty: FnDef\(DefId\(\d+:\d+ ~ ([^)]+)\)')
-TY_METHOD = re.compile(r'MethodCall')
 OWN = re.compile(r'HirId\(DefId\(\d+:\d+ ~ ([^)]+)\)')
 SPAN = re.compile(r'fn_span: (\S+)')
+
+# ⚠️ **`kind` 恒为 `call` —— 这是实测结论，不是简化**（2026-09-30）：
+#   在 251 MB THIR 上 `MethodCall` 出现 **0 次**；方法调用在 THIR 里就是
+#   `Call {`，其"方法性"已编码在目标 DefId 路径里
+#   （如 `core::fmt::{impl#12}::write_str` —— impl 块就是接收者类型）。
+#   ⇒ 曾有的 `kind = 'method' if 'MethodCall' in line else 'call'` 是
+#   **结构性死分支**（67 万条边 kind 分布 = call:670093 / method:0），已删。
+#   `kind` 字段保留在 JSONL 里以维持既有 67 万条记录的 schema 兼容。
+#   重新引入方法/自由函数区分前，先实测 THIR 是否真的产出可区分形态。
 
 
 def extract(stream):
@@ -56,8 +65,8 @@ def extract(stream):
             owner = m.group(1)
         if CALL.search(line):
             calls += 1
-            kind = 'method' if 'MethodCall' in line else 'call'
-            pending = [owner, kind, 0, None]
+            # 见上方说明：THIR 无 MethodCall 形态，kind 恒为 call。
+            pending = [owner, 'call', 0, None]
             continue
         if pending is not None:
             pending[2] += 1

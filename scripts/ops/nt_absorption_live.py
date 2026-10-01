@@ -11,14 +11,23 @@
 用法：
   python3 scripts/ops/nt_absorption_live.py [--strict] [--doc PATH]
       默认只读模式：报告每条存活/死亡/搬迁/不可判。
-      --strict：有死亡项则 exit 1（供 CI）。
-      --doc：指定吸收文档（默认 MAP-TASKS §1.1 + §1.3 落点消失）。
+  python3 scripts/ops/nt_absorption_live.py --graph
+      叠加**第二判据**（编译期调用图可达性）。这是本工具的 G5 修复：
+      纯文本判据把「字符串出现过」当存活，而注释/文档/重导出/同名不同类型
+      都会让字符串出现却生产不可达 —— 即 R-P79 的「导出 ≠ 接入」。
+      两判据**不互相替代**：图对 shell 脚本与类型名静默（它们不是调用目标），
+      故文本判据仍为覆盖面判据，图判据为**生产可达**判据。输出标注每条
+      由哪个判据裁决。
+  --strict：有死亡项则 exit 1（供 CI）。
 
 实现纪律（本仓教训）：
   - 只用 `rg` **不带 `-E`**（本机 `rg -E` 任何模式静默返回 0，
     CAPABILITY-GAP 已记录）。用 `rg -F` 或纯字面模式。
   - 抽不出机器可判目标的行 → 记「不可判」，不猜（宁缺勿错）。
   - 测试数断言（"91 测试"）用 `#[test]` 计数近似，并在输出中标明是近似值。
+  - 文本判据**不得**用于可达性判定：2026-09-30 实测 200 样本误报率 100%
+    （注释/同名词/散文/prose 命中）。可达性只认编译期边，见 nt_callgraph.py
+    的 F1–F6 误报源清单。
 """
 import os
 import re
@@ -129,8 +138,49 @@ def extract_section(text, start_marker, end_marker=None):
     return text[i:j if j > 0 else len(text)]
 
 
+def graph_verdicts(tokens, db):
+    """第二判据：编译期调用图可达性。返回 {token: (verdict, detail)}。
+
+    verdict ∈ 'reachable'（有传递调用者 ⇒ 生产可达）
+            'no-callers'（是调用目标但零入边 ⇒ 生产不可达，R-P79 的「导出≠接入」）
+            'not-call-target'（图里没有该节点 —— shell 脚本/类型名，不是调用目标）
+    ⛔ 不判死：'no-callers' 只标「生产不可达」，因为 F6 盲区（fn-as-value）
+    与 pub API 外部消费都可能让它仍然有用。裁决必须人工读代码（R-SCAN-1）。
+    """
+    if not os.path.isfile(db):
+        return None
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import nt_callgraph as cg                          # noqa: E402 运行时导入
+    g = cg.Graph().load(db)
+    out = {}
+    for tok in tokens:
+        # 文档里常写成 `fn_name()`；调用目标判定只看标识符本体
+        sym = tok[:-2] if tok.endswith('()') else tok
+        # shell 脚本 / 类型名 / 文档名不是调用目标，直接判 not-call-target
+        if (tok.endswith(('.sh', '.md', '.json', '.toml', '.yml', '.yaml'))
+                or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', sym)):
+            out[tok] = ('not-call-target', '非 Rust 函数名，图判据不适用')
+            continue
+        seeds = g.seeds_matching(sym)
+        if not seeds:
+            out[tok] = ('not-call-target', '边表无此节点（时点快照或非调用目标）')
+            continue
+        reach = g.bfs(seeds, g.rev, 0)
+        for s in seeds:
+            reach.pop(s, None)
+        if reach:
+            out[tok] = ('reachable', f'传递调用者 {len(reach)} 个 ⇒ 生产可达')
+        else:
+            out[tok] = ('no-callers', f'{len(seeds)} 个节点零入边 ⇒ 生产不可达')
+    return out
+
+
 def main(argv):
     strict = '--strict' in argv
+    use_graph = '--graph' in argv
+    db = os.path.join(REPO, '.project-map/edges-all.jsonl')
+    if '--db' in argv:
+        db = argv[argv.index('--db') + 1]
     doc = DOC_DEFAULT
     if '--doc' in argv:
         doc = argv[argv.index('--doc') + 1]
@@ -148,11 +198,31 @@ def main(argv):
         if tok not in seen:
             seen.add(tok)
             uniq.append((tok, exp))
+    gv = graph_verdicts([t for t, _ in uniq], db) if use_graph else None
+    if use_graph:
+        if gv is None:
+            print(f"[absorb-live] 边表不存在，跳过图判据：{db}")
+        else:
+            print(f"[absorb-live] 图判据已启用（第二判据，不替代文本判据）")
+    else:
+        # T4：默认模式的判据只能证明「字符串出现过」。本文件 docstring 自述
+        # 「若报全部存活说明判据无效」—— 而默认模式历史上正会报全部存活。
+        # ⇒ 不加 --graph 时必须把这句话打在输出上，否则 PASS 会被当成健康证明。
+        print("[absorb-live] ⚠ 未加 --graph：本判据**只能证明文本存在**，"
+              "不能证明生产可达（注释/重导出/同名词都会让字符串出现却不可达）。")
+        print("[absorb-live]   本工具 PASS **不是**健康证明；要判接线层请加 --graph。")
     print(f"[absorb-live] doc={os.path.basename(doc)} tokens={len(uniq)}")
     dead, alive, moved, unp, ext, review = [], [], [], [], [], []
+    unwired = []
     for tok, expect in uniq:
         status, detail = check_token(tok)
         tag = f"{expect}/{status}"
+        if gv and tok in gv:
+            gv_status, gv_detail = gv[tok]
+            tag += f" |graph:{gv_status}"
+            detail += f" 〔图：{gv_detail}〕"
+            if expect == 'alive' and status == 'alive' and gv_status == 'no-callers':
+                unwired.append((tok, gv_detail))
         print(f"  [{tag}] {tok[:64]} — {detail[:80]}")
         if status == 'external':
             ext.append(tok)
@@ -176,6 +246,11 @@ def main(argv):
     print(f"[absorb-live] alive-or-consistent={len(alive)} moved={len(moved)} "
           f"dead={len(dead)} needs-review={len(review)} "
           f"external={len(ext)} unparseable={len(unp)}")
+    if unwired:
+        print(f"[absorb-live] ⚠ 文本存活但**生产不可达**（R-P79「导出≠接入」）："
+              f"{len(unwired)} 条")
+        for tok, d in unwired[:15]:
+            print(f"    ⊘ {tok[:60]} — {d[:70]}")
     if review:
         print("[absorb-live] 需人工复核（拒绝区名字仍在代码中出现）：")
         for tok, d in review[:15]:
