@@ -991,6 +991,24 @@
    "read_only": true,
    "when_not": "改 neobot-root 的消息渲染前先跑它取基线；**判据 C 区分不出 scrollToIndex 与 scrollTop**（浏览器会把 scrollTop 钳到底部），要验「用的是哪种」得另设判据",
    "spec": "1000 条消息下判据 A(渲染行数) B(撑高>2000px) C(末条在视口) D(滚顶后首条可见=内容可达，最不可替代) + 无未捕获异常"
+  },
+  {
+   "id": "neobot-check-contrast",
+   "query": [
+    "对比度",
+    "可读性",
+    "深浅两档",
+    "浅色看不清",
+    "WCAG",
+    "AA",
+    "暗色分级",
+    "文字太淡"
+   ],
+   "tool": "node scripts/ops/neobot-check-contrast.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "调色**前**先跑它取基线；它只量选定选择器，新增文案若不在 TARGETS 里不会被量到（要量别的得先加进 TARGETS）",
+   "spec": "WCAG 相对亮度比；正文≥4.5:1、大字/UI≥3.0:1；深浅两档都过。量 computed color vs 实际生效背景（向上找首个非透明 bg），不是 CSS 变量值"
   }
  ],
  "excluded": {

@@ -126,6 +126,20 @@ html[data-theme="light"] {
   --nb-danger-foreground: #2a0e0e;
 }
 
+/* ── 浅色档的次要文字：按 WCAG 反推，不是「看着差不多」───────────────
+ * ⛔ 我最初把 `--nb-muted: #8b8d93` 同时用在深浅两档，**没量对比度**。
+ *    实测（headless Chrome 量 computed color/bg）：
+ *      深色 5.50:1 ✅ ／ **浅色 3.32:1 ⛔**（AA 正文需 4.5:1）
+ *    ⇒ 浅色下 `.nb-tagline` / `.text-muted` **不达可读对比**。
+ *    而 `STATUS.md` §0 判据② 明写「深浅两套都达可读对比」。
+ * ⇒ 浅色档单独给一个更暗的值：按 4.5:1 与浅面板 `#f9fafb` 反推得
+ *    亮度上限 ≈0.173 ⇒ 灰阶需 ≤ ≈#737373，取 #6b6d73（略带蓝以贴合色板）。
+ *    由 `nt_check_contrast.mjs` 常驻把守，不靠本注释。
+ */
+html[data-theme='light'] {
+  --nb-muted: #6b6d73;
+}
+
 :root {
   --nb-btn-active: #2c2c2e;
   --nb-btn-border: rgba(255,255,255,0.14);
