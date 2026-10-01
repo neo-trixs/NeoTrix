@@ -18,7 +18,6 @@ pub mod nt_core_gwt;
 pub mod context;
 pub mod nt_core_accessor;
 pub mod nt_core_meta;
-pub mod nt_core_self;
 pub mod nt_core_e8;
 pub mod nt_core_hex;
 pub mod nt_core_observer;
@@ -103,15 +102,7 @@ pub use nt_core_observer::{OneObserver, ObserverReport, TrajectoryPattern, StepQ
 // Re-export Walsh memory index
 pub use nt_core_walsh::WalshMemoryIndex;
 
-// Re-export thinking_model types
-pub use nt_core_self::{
-    SiliconSelfModel, SiliconSelfState, ContextWindow, CognitiveUnit, CognitiveUnitKind,
-    AttentionHead, AttentionDomain, AttentionProfile, AttentionManager,
-    SystemIdentity, CognitiveCapability, ValueConstraint,
-    ReasoningStrategy, ReasoningStrategyRegistry, StrategyKind,
-    ThinkingTrace, ThinkingStep, ReflectionGrade,
-};
-
+// 2026-09-30: nt_core_self 冻结镜像已删（真身在 neotrix-core l6_meta/nt_core_self）。
 // Re-export skills & tools types
 pub use skills::{SkillTier, SkillDefinition, SkillRegistry};
 pub use tools::{ToolRisk, ToolClassification};
@@ -128,8 +119,7 @@ pub use nt_core_meta::{
     CodeScanner, MetaMonitor, MetaAlert, AlertSeverity, HealthCheck, HealthTrend,
     WeaknessAnalyzer, Weakness, WeaknessReport, WeaknessSummary,
     EvolutionPlanner, PlannedEvolution, ImpactEstimate, RiskLevel, EvolutionAction, ActionStatus,
-    MetaCognitiveLoop, MetaCycleResult,
-};
+};  // 2026-09-30: MetaCognitiveLoop/MetaCycleResult 随冻结镜像移除
 
 pub mod governance;
 pub mod meta_rules;

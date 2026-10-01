@@ -24,7 +24,6 @@ pub use core::context;
 pub use core::nt_core_gwt as consciousness;
 pub use core::nt_core_hcube as hypercube;
 pub use core::nt_core_meta as metacognition;
-pub use core::nt_core_self as thinking_model;
 pub use core::skills;
 pub use core::tools;
 pub use core::fs_util;
@@ -76,11 +75,7 @@ pub use core::{
     CrtTimeScale, CrtPlan, CrtTimeline, CrtGoal,
     OneObserver, ObserverReport, TrajectoryPattern, StepQuality,
     WalshMemoryIndex,
-    SiliconSelfModel, SiliconSelfState, ContextWindow, CognitiveUnit, CognitiveUnitKind,
-    AttentionHead, AttentionDomain, AttentionProfile, AttentionManager,
-    SystemIdentity, CognitiveCapability, ValueConstraint,
-    ReasoningStrategy, ReasoningStrategyRegistry, StrategyKind,
-    ThinkingTrace, ThinkingStep, ReflectionGrade,
+    // 2026-09-30: nt_core_self 冻结镜像的类型随镜像一并移除（真身在 neotrix-core l6_meta）
     SelfModel, ModuleInfo, FileInfo, DepGraph, DepEdge, DepKind,
     TechDebtInventory, TechDebtItem, TechDebtKind, DebtSeverity,
     EvolutionEvent, EventKind, ComponentMap, ComponentNode,
@@ -88,7 +83,6 @@ pub use core::{
     CodeScanner, MetaMonitor, MetaAlert, AlertSeverity, HealthCheck, HealthTrend,
     WeaknessAnalyzer, Weakness, WeaknessReport, WeaknessSummary,
     EvolutionPlanner, PlannedEvolution, ImpactEstimate, RiskLevel, EvolutionAction, ActionStatus,
-    MetaCognitiveLoop, MetaCycleResult,
 };
 pub use core::shared_types as shared;
 

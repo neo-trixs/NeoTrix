@@ -1,5 +1,5 @@
 > # NeoTrix TODO 列表
-> 智能同步生成，最后更新：**2026-09-30（发现 `neotrix-types` 是 core 的冻结旧分叉：185.8KB）**
+> 智能同步生成，最后更新：**2026-09-30（已删 types 侧冻结镜像 91.3KB / 14 文件）**
 >
 > ## 🔴 P0 待裁决：`neotrix-types` 携带 `neotrix-core` 的**冻结旧分叉**（185.8 KB）
 > >
@@ -25,11 +25,31 @@
 > >     **A（推荐）** core 为真身，types 只留内部必需的少数，其余删；
 > >     **B** types 为真身，core 改 `use neotrix_types::…`（合法，因 core 依赖 types）。
 > >
-> > **本轮一行未删**：结构性改动需 `cargo clean && cargo build` **两遍**（AGENTS.md），
-> > 且当前有他窗并行构建（apps/neobot-desktop、crates/neotrix-neobot 有未提交 WIP），
-> > 此刻起 186 KB 级联删除无法干净验证。
-> > 执行清单（含「先删依赖者仅 mod.rs 声明的 8 个 ≈68KB」与每步判据）见
-> > `docs/architecture/MIRROR-FORK-2026-09-30.md` §5。
+> > ### ✅ 方向已被**内容强制**，并已删两片：**91.3 KB / 14 文件**
+> > 上一轮说「方向要 owner 裁决」。本轮补上**能替裁决定向的证据** ——
+> > **子集性判据**：`nt_core_self` 的 types 独有 `pub` 名 = **0**，core 独有 = **332**
+> > ⇒ types 侧是 core 的**严格子集** ⇒「types 为真身」在内容上**不可能**
+> > （core 缺 332 个公开项，切过去即丢 API）⇒ **core 是真身，方向被内容强制**。
+> >
+> > 已删：`nt_core_self/`（整簇 12 文件）+ `metacognition_loop` + `vsa_holon`。
+> > 验证：`cargo check --workspace` 0 error；`neotrix --lib` 12,217 绿；
+> > `neotrix-types --lib` 566 → **463**，差 **103 = 被删文件里的 `#[test]` 数**
+> > （簇 97 + 两文件 6）⇒ **删除量与测试量精确对齐**，未误删别处；
+> > 镜像工具复跑 **18 对 → 7 对，185.8 KB → 94.5 KB**。
+> > ⛔ `neotrix-types` 有 2 个既存失败，已用 **pristine 对照证伪**（stash 掉我的删除
+> > 同样是 566 passed / 2 failed）⇒ 既存债，未代修也未代记账。
+> >
+> > ### 🟡 剩余 7 片：为何**不能**照同法删（逐个取证）
+> > | 模块 | 阻塞 |
+> > |---|---|
+> > | `nt_core_hex` | types 侧被 `nt_core_gwt/{resonance,workspace}.rs` 真实使用 |
+> > | `nt_core_walsh` | 被 `nt_core_bank/bank/{mod,bank_impl/core}.rs` 真实使用 |
+> > | `vectors_group_a` | 被 `nt_core_knowledge/sources.rs` 真实使用 |
+> > | `nt_core_graph`/`offload`/`scanner`/`weakness` | types 侧有**独有 pub 名**（17/9/5/7）⇒ 删除即丢公开 API |
+> >
+> > ⚠️ 注意 `vectors_group_a` 那类的**方向陷阱**：想让它改走 core 也不行 ——
+> > **types 不能依赖 core**（core 依赖 types）⇒ 只能「把该函数下沉进 types 并让
+> > core 共用」，那是**设计**不是清理。清单见 MIRROR-FORK-2026-09-30 §5。
 > >
 > > ### 🟡 P1 与「第二棵树」同源：这是同一病在 **crate 之间**的复发
 > > 2026-09-30 刚把 `neotrix-core/src/neotrix/`（130 文件）收成 40 行门面；

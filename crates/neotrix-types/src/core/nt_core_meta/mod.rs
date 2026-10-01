@@ -4,7 +4,6 @@ pub mod scanner;
 pub mod monitor;
 pub mod weakness;
 pub mod planner;
-pub mod metacognition_loop;
 
 pub use self_model::{
     SelfModel, ModuleInfo, FileInfo, DepGraph, DepEdge, DepKind,
@@ -16,7 +15,8 @@ pub use scanner::CodeScanner;
 pub use monitor::{MetaMonitor, MetaAlert, AlertSeverity, HealthCheck, HealthTrend};
 pub use weakness::{WeaknessAnalyzer, Weakness, WeaknessReport, WeaknessSummary};
 pub use planner::{EvolutionPlanner, PlannedEvolution, ImpactEstimate, RiskLevel, EvolutionAction, ActionStatus};
-pub use metacognition_loop::{MetaCognitiveLoop, MetaCycleResult};
+// 2026-09-30: metacognition_loop 冻结镜像已删（真身在 neotrix-core l6_meta/nt_core_meta，
+// 且 types 侧为严格子集：独有 pub 名 0 个）。
 
 // Unified self-model types
 pub use unified_self_model::{

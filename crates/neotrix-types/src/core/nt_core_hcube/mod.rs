@@ -5,12 +5,11 @@ pub mod gap;
 pub mod vsa;
 
 #[cfg(feature = "simd-vsa")]
-pub mod vsa_holon;
 
 pub use vsa::{VsaBackend, VSAEngine};
 
 #[cfg(feature = "simd-vsa")]
-pub use vsa_holon::HolonBackend;
+// 2026-09-30: vsa_holon 冻结镜像已删（真身在 neotrix-core l2_perception/nt_core_hcube）。
 
 pub fn create_backend(dim: usize) -> Box<dyn VsaBackend> {
     #[cfg(feature = "simd-vsa")]

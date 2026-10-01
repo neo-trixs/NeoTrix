@@ -103,23 +103,70 @@ neotrix_types[dbe0] core::nt_core_walsh::new          → types 的 nt_core_e8
 
 ---
 
-## 5. 可执行计划（下一轮/owner 裁决后照做）
+## 4.4 ✅ 已执行：删掉两片，**91.3 KB / 14 个文件**
 
-**前置**：裁决 A 或 B
-- **A（推荐）** core 是唯一真身 ⇒ types 内部只保留确有内部消费者的少数模块，
-  其余删除；core 侧不动。收益：types 回到「低层原语」定位。
-- **B** types 是唯一真身 ⇒ core 改 `use neotrix_types::…`，删除 core 侧同名模块。
-  收益：单点真身且低层化。风险：触及 L2/L5/L6 的 40+ 文件，层依赖门需复核。
+上一轮说「方向要 owner 裁决」。本轮补上了**能替裁决定向的那条证据**：
 
-**执行清单（两条路共用）**
-1. `python3 scripts/ops/nt_mirror_scan.py --min-overlap 0.5` 冻结清单（工具已在库）
-2. 按 §4.2 表格逐模块列出内部依赖者，逐个确认是「仅 mod.rs 声明」还是「真实使用」
-3. 先删**依赖者只有 mod.rs 声明**的 8 个（context_window / intrinsic_motivation /
-   metacognition_loop / metacognitive_evaluator / self_referential / silicon_self /
-   system_identity / vsa_holon，合计约 68 KB）
-4. `cargo clean && cargo build` **跑两遍**；再 `cargo test -p neotrix --lib`
-5. `bash scripts/check-layer-deps.sh --strict`（现有 19 条已知债不得增加）
-6. `python3 scripts/ops/nt_mirror_scan.py --min-overlap 0.5` 复跑，镜像对数应下降
+> **子集性判据**：逐模块比较两侧的 `pub` 名集合。
+> `nt_core_self`：**types 独有 pub 名 = 0**，core 独有 = **332**
+> ⇒ types 侧是 core 的**严格子集** ⇒ 「types 为真身」在内容上**不可能**
+> （core 缺 332 个公开项，切过去即丢 API）⇒ **core 是真身，方向被内容强制**。
+
+于是两片的删除各自只需删文件 + 摘 re-export，无需改任何调用方：
+
+| 删除 | 文件 | 内部依赖者 | 外部引用 |
+|---|---|---|---|
+| `nt_core_self/`（整簇） | 12 | 仅簇内互引（`silicon_self`→`context_window`/`system_identity` 等） | 模块路径 0 / 类型名 0（55 个类型全查）|
+| `metacognition_loop` + `vsa_holon` | 2 | 仅 `pub use` 转出，无真实使用 | 3 个类型名各 0 命中 |
+
+**验证（全部实测，非推断）**
+- `cargo check --workspace` **0 error**
+- `cargo test -p neotrix --lib` **12,217 绿**（不受影响：本就在 types 侧）
+- `cargo test -p neotrix-types --lib`：566 → **463**，差的 **103 个测试 = 被删文件里的
+  `#[test]`**（`nt_core_self` 簇 97 + 两个文件 6）⇒ **删除量与测试量精确对齐**，
+  没有误删到别处
+- ⛔ 该 crate 有 **2 个既存失败**（`nt_core_bank::test_cosine_similarity_zero`、
+  `nt_core_gwt::test_resonate_cycle_with_budget_changes_winner`）。
+  **已用 pristine 对照证伪**：把我的删除 stash 掉后同样是 `566 passed / 2 failed`
+  ⇒ **既存债，与本次无关**（未代修，也未代记账）
+- 镜像工具复跑：**18 对 → 7 对，185.8 KB → 94.5 KB**
+
+### 剩下 7 片为什么**不能**照同法删（已逐个取证）
+
+| 模块 | 阻塞原因【实测】 |
+|---|---|
+| `nt_core_hex` | types 侧被 `nt_core_gwt/{resonance,workspace}.rs` **真实使用**（`use …::ReasoningHexagram`）|
+| `nt_core_walsh` | 被 `nt_core_bank/bank/{mod,bank_impl/core}.rs` **真实使用** |
+| `vectors_group_a` | 被 `nt_core_knowledge/sources.rs` **真实使用** |
+| `nt_core_graph` / `offload` / `scanner` / `weakness` | types 侧有**独有 pub 名**（17 / 9 / 5 / 7 个）⇒ 删除即丢公开 API |
+
+⇒ 这 4 片要删，得先把 types 侧那 4 个独有 API 的**调用方**迁走 —— 那是**有产品含义的
+重构**，不在「清理」范围内。已留在 TODO P0 待排期。
+
+---
+
+## 5. 剩余部分的执行清单（下一轮）
+
+**方向已定（§4.4 子集性判据）**：core 是唯一真身，删 types 侧冻结镜像。
+
+**剩余 7 片清单**（按「删除前必须先解开什么」分组）：
+1. `metacognition_loop` 类（已删完）—— 无前置
+2. **`vectors_group_a`**：前置 = 把 `nt_core_knowledge/sources.rs` 的调用改走 core。
+   但 core 依赖 types ⇒ **types 不能依赖 core** ⇒ 此路不通，
+   只能把该函数**下沉**进 types 并让 core 也用它（真正需要设计的点）
+3. **`nt_core_walsh` / `nt_core_hex`**：同上，`nt_core_bank` / `nt_core_gwt` 依赖它们。
+   解法同样是「下沉 + 双向共用」，**不是删除**
+4. **`nt_core_graph` / `offload` / `scanner` / `weakness`**：types 侧有独有公开 API
+   ⇒ 先决定这些 API 的归属（迁走 or 废弃），再谈删除
+
+**每片的验证序列（不变）**
+1. `python3 scripts/ops/nt_mirror_scan.py --min-overlap 0.5` 冻结清单
+2. 逐模块取证：① types 独有 pub 名是否为 0 ② 内部是否有**真实使用**（非 `pub use`）
+3. 改完 `cargo check --workspace` 必须 0 error
+4. `cargo test -p neotrix --lib` + `cargo test -p neotrix-types --lib`，
+   **测试数减少量必须等于被删文件的 `#[test]` 数**（本轮已用此法自证）
+5. `bash scripts/check-layer-deps.sh --strict`（19 条已知债不得增加）
+6. 镜像工具复跑，对数/KB 应下降
 
 **每步的判据**：`cargo build` 两遍都 0 error 且测试数不低于删除前 −（删除文件的测试数）。
 
