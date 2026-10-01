@@ -106,7 +106,18 @@ impl NeobotStore {
 
     /// 取出到期未领行（available_at<=now），顺手认领、attempts 加一并
     /// 把 available_at 记为 now（认领时刻；`prune_outbox` 凭它删已交付旧行）。
-    /// 调用方投递失败时调 `fail_outbox` 推迟重试（指数退避由调用方算）。
+    /// 调用方投递失败时调 `fail_outbox` 推迟重试。
+    ///
+    /// ⚠️ **「指数退避由调用方算」是一句陈旧声明**（2026-10-01 更正）：
+    /// 唯一调用方的 `retry_at` 实际是**定值 +60s**，
+    /// 从未按 `attempts` 指数增长。⇒ **别照这句话去推断行为**。
+    ///    ⓘ 真正实现指数退避是独立改动，不在本次范围内。
+    ///
+    /// ⛔ **本函数本身不是原子的**：「SELECT … WHERE claimed=0 收集到 Vec，
+    ///    再 for 循环逐条 UPDATE」且**全程无事务**（本 crate 零事务）
+    ///    ⇒ 两个进程可同时通过 SELECT、拿到同一批行、**都发**。
+    ///    `pending_deliveries` 侧的**条件 UPDATE + 判 rows_affected**
+    ///    才是正确写法（见 `claim_delivery`）。
     pub fn drain_outbox(
         &self,
         limit: i64,

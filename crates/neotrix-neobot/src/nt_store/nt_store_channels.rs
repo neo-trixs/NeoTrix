@@ -258,34 +258,89 @@ impl NeobotStore {
     /// 到期的待补发（按创建时间正序，先到先补）。
     pub fn due_deliveries(
         &self,
+        now: &str,
         limit: i64,
     ) -> Result<Vec<PendingDelivery>, NtBotError> {
+        // ⛔ `claimed=0` 排除**已被别人认领**的行：CLI 与桌面 App 是**两个进程同库**
+        //    （见 nt_store/mod.rs 的双进程说明），没有这一过滤则两个进程各发一遍。
+        // ⛔ `available_at <= ?` 实现**时间退避**：失败后推迟到期，
+        //    而不再「下一轮（秒级）立刻重试」。
+        //    ⓘ 显式 9 列清单**不追加**新列 ⇒ `delivery_row()` 的 `r.get(0..8)`
+        //        语义不变（表末尾多两列不影响 SELECT 清单决定的位置）。
         let mut stmt = self.conn.prepare(
             "SELECT id,channel,bot_id,chat,origin_message,text,task_id,attempts,created_at
-             FROM pending_deliveries WHERE attempts < ?1 ORDER BY created_at, rowid LIMIT ?2",
+             FROM pending_deliveries
+             WHERE attempts < ?1 AND claimed = 0 AND available_at <= ?2
+             ORDER BY created_at, rowid LIMIT ?3",
         )?;
-        let rows = stmt.query_map(params![MAX_SEND_ATTEMPTS, limit.clamp(1, 200)], delivery_row)?;
+        let rows = stmt.query_map(
+            params![MAX_SEND_ATTEMPTS, now, limit.clamp(1, 200)],
+            delivery_row,
+        )?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
+    /// ⭐ **原子认领**一行补发：成功返回 `true`，被别人抢走返回 `false`。
+    ///
+    /// ⛔⛔ **刻意不照抄 `drain_outbox`**：它是「SELECT … WHERE claimed=0 收集到 Vec，
+    ///    再 for 循环逐条 UPDATE」且**全程无事务**（本 crate 零事务）
+    ///    ⇒ 两个进程可同时通过 SELECT、拿到同一批行、**都发**。
+    /// ⇒ 正确写法是**条件 UPDATE + 判 `rows_affected`**：单条
+    ///   `UPDATE … WHERE id=? AND claimed=0` 自带写锁，原子。
+    pub fn claim_delivery(&self, id: &str) -> Result<bool, NtBotError> {
+        let n = self
+            .conn
+            .execute(
+                "UPDATE pending_deliveries SET claimed = 1 WHERE id = ?1 AND claimed = 0",
+                params![id],
+            )?;
+        Ok(n == 1)
+    }
+
     /// 一条补发成功了 → 删掉。
+    ///
+    /// ⛔ `AND claimed=1`：**只删自己认领的那一行**。
+    ///    无条件 DELETE 会删掉别人正在处理/已处理完的行 ⇒ 补发结果丢失。
+    ///    附带好处：**天然幂等**（重复调用第二次影响 0 行，不报错）。
     pub fn complete_delivery(&self, id: &str) -> Result<(), NtBotError> {
-        self.conn
-            .execute("DELETE FROM pending_deliveries WHERE id=?1", params![id])?;
+        self.conn.execute(
+            "DELETE FROM pending_deliveries WHERE id=?1 AND claimed=1",
+            params![id],
+        )?;
         Ok(())
     }
 
     /// 一条补发失败了 → 记一次尝试；**到顶就不再自动重试**
     /// （避免平台返回不确定时无限重发，把同一条结果发好几遍）。
-    pub fn fail_delivery(&self, id: &str) -> Result<i64, NtBotError> {
+    pub fn fail_delivery(&self, id: &str, retry_at: &str) -> Result<i64, NtBotError> {
+        // ⛔ **必须同时把 `claimed` 归 0**，否则这一行永久卡在「已认领」状态
+        //    ⇒ 再也不会被 `due_deliveries` 捞到（静默丢消息）。
+        //    与 outbox 的 `fail_outbox` 同款语义。
         self.conn.execute(
-            "UPDATE pending_deliveries SET attempts = attempts + 1 WHERE id=?1",
-            params![id],
+            "UPDATE pending_deliveries
+             SET attempts = attempts + 1, claimed = 0, available_at = ?2 WHERE id=?1",
+            params![id, retry_at],
         )?;
         Ok(self.conn.query_row(
             "SELECT attempts FROM pending_deliveries WHERE id=?1",
             params![id],
             |r| r.get(0),
+        )?)
+    }
+
+    /// ⛔ **仅测试用**：把所有补发行标记为「已到期」。
+    ///
+    /// # 为什么需要它
+    /// 补发现在带**时间退避**（失败后推迟 `available_at`，默认 +60s）。
+    /// ⓘ 于是「跑 N 轮 sweep ⇒ attempts 到顶 ⇒ 放弃」这类测试**不能只靠循环**：
+    ///    第一轮失败后该行就不再到期，后面 N-1 轮什么也捞不到 ⇒ 永远到不了上限。
+    ///    而真实世界里那 60s 是会过去的 —— 测试里必须**显式模拟时间流逝**，
+    ///    否则测试的**意图**（到顶放弃）与**假设**（立即重试）会被混为一谈。
+    #[cfg(test)]
+    pub fn force_deliveries_due(&self) -> Result<usize, NtBotError> {
+        Ok(self.conn.execute(
+            "UPDATE pending_deliveries SET available_at = '1970-01-01T00:00:00Z', claimed = 0",
+            [],
         )?)
     }
 
@@ -334,6 +389,14 @@ pub fn parse_allow_list(raw: &str) -> Vec<String> {
         .map(str::to_owned)
         .collect()
 }
+
+/// 测试用「永远到期」的 now：列默认值是 1970 ⇒ 传远期未来即等价于「全都到期」，
+/// 保持这些用例「读完整个队列」的原有语义。
+const ALL_DUE_NOW: &str = "9999-12-31T23:59:59Z";
+/// 与 [`ALL_DUE_NOW`] 相对：判「**尚未到期**」时用它。
+/// ⛔ 不能拿 `ALL_DUE_NOW` 去判「未到期」—— 它是 9999 年，
+///    比任何 `retry_at` 都晚 ⇒ 会被判成**已到期**（我第一版就栽在这）。
+const NOT_YET_DUE: &str = "2000-01-01T00:00:00Z";
 
 #[cfg(test)]
 mod tests {
@@ -491,15 +554,108 @@ mod tests {
             created_at: chrono::Utc::now().to_rfc3339(),
         };
         st.enqueue_delivery(&item).expect("enqueue");
-        assert_eq!(st.due_deliveries(10).expect("due").len(), 1);
+        assert_eq!(st.due_deliveries(ALL_DUE_NOW, 10).expect("due").len(), 1);
         // 连试三次；到顶后不再自动重试（防重复发送）。
         for expected in 1..=MAX_SEND_ATTEMPTS {
-            let got = st.fail_delivery("d1").expect("fail");
+            let got = st.fail_delivery("d1", ALL_DUE_NOW).expect("fail");
             assert_eq!(got, expected);
         }
-        assert!(st.due_deliveries(10).expect("due").is_empty(), "到顶后不该再到期");
+        assert!(st.due_deliveries(ALL_DUE_NOW, 10).expect("due").is_empty(), "到顶后不该再到期");
         st.complete_delivery("d1").expect("complete");
-        assert!(st.due_deliveries(10).expect("due").is_empty());
+        assert!(st.due_deliveries(ALL_DUE_NOW, 10).expect("due").is_empty());
+    }
+
+    /// ⭐ 本轮修复的核心判据：补发行**只能被认领一次**。
+    ///
+    /// # 为什么这条测试必须存在
+    /// CLI 与桌面 App 是**两个进程打开同一个库文件**。修复前
+    /// `due_deliveries` 既无 `claimed=0` 过滤、也无原子认领
+    /// ⇒ 两个进程可读到同一批行、**各发一遍** ⇒ 用户收到重复消息。
+    /// ⛔ 而 `sweep_pending` 的**并发场景此前零测试覆盖** ——
+    ///    「单进程跑两次 sweep」测不出重复发送，因为单进程是顺序的。
+    #[test]
+    fn delivery_claim_is_exclusive() {
+        let st = store("claim");
+        st.enqueue_delivery(&crate::nt_store::PendingDelivery {
+            id: "d1".to_owned(),
+            channel: "fake".to_owned(),
+            bot_id: "b1".to_owned(),
+            chat: "42".to_owned(),
+            origin_message: "m1".to_owned(),
+            text: "只该被发一次".to_owned(),
+            task_id: "t1".to_owned(),
+            attempts: 0,
+            created_at: chrono::Utc::now().to_rfc3339(),
+        })
+        .expect("enqueue");
+        // 认领前可见
+        assert_eq!(st.due_deliveries(ALL_DUE_NOW, 10).expect("due").len(), 1);
+        // 第一个「进程」认领成功
+        assert!(st.claim_delivery("d1").expect("claim"), "首次认领应成功");
+        // 第二个「进程」必须失败，且**看不到这行**
+        assert!(!st.claim_delivery("d1").expect("claim2"), "重复认领必须失败");
+        assert!(
+            st.due_deliveries(ALL_DUE_NOW, 10).expect("due").is_empty(),
+            "已认领的行不该再出现在待发集合里"
+        );
+    }
+
+    /// ⭐ 失败必须把 `claimed` 归 0，否则该行**永久卡住** ⇒ 静默丢消息。
+    #[test]
+    fn failed_delivery_releases_claim() {
+        let st = store("release");
+        st.enqueue_delivery(&crate::nt_store::PendingDelivery {
+            id: "d1".to_owned(),
+            channel: "fake".to_owned(),
+            bot_id: "b1".to_owned(),
+            chat: "42".to_owned(),
+            origin_message: "m1".to_owned(),
+            text: "失败后要能重来".to_owned(),
+            task_id: "t1".to_owned(),
+            attempts: 0,
+            created_at: chrono::Utc::now().to_rfc3339(),
+        })
+        .expect("enqueue");
+        assert!(st.claim_delivery("d1").expect("claim"));
+        // 失败：归 claimed=0，并按 retry_at 推迟到期
+        let attempts = st.fail_delivery("d1", "2099-01-01T00:00:00Z").expect("fail");
+        assert_eq!(attempts, 1, "失败应记一次尝试");
+        // ⛔ 关键：行**没被永久藏起来** —— 只是「尚未到期」，且仍可再认领
+        assert!(
+            st.due_deliveries(NOT_YET_DUE, 10).expect("due").is_empty(),
+            "推迟到期的行不该现在就能捞到"
+        );
+        assert!(st.claim_delivery("d1").expect("re-claim"), "失败后必须能再认领，否则消息永久卡住");
+    }
+
+    /// ⭐ `complete_delivery` 只删**自己认领**的行，且**重复调用无害**。
+    #[test]
+    fn complete_delivery_is_scoped_and_idempotent() {
+        let st = store("complete");
+        st.enqueue_delivery(&crate::nt_store::PendingDelivery {
+            id: "d1".to_owned(),
+            channel: "fake".to_owned(),
+            bot_id: "b1".to_owned(),
+            chat: "42".to_owned(),
+            origin_message: "m1".to_owned(),
+            text: "幂等删除".to_owned(),
+            task_id: "t1".to_owned(),
+            attempts: 0,
+            created_at: chrono::Utc::now().to_rfc3339(),
+        })
+        .expect("enqueue");
+        // ⛔ 没认领就 complete ⇒ 不应删掉（可能属于别人正在处理的行）
+        st.complete_delivery("d1").expect("complete-unclaimed");
+        assert_eq!(
+            st.due_deliveries(ALL_DUE_NOW, 10).expect("due").len(),
+            1,
+            "未认领的行不该被删"
+        );
+        // 认领后 complete ⇒ 删掉；再调一次仍不报错（幂等）
+        assert!(st.claim_delivery("d1").expect("claim"));
+        st.complete_delivery("d1").expect("complete");
+        st.complete_delivery("d1").expect("complete-again");
+        assert!(st.due_deliveries(ALL_DUE_NOW, 10).expect("due").is_empty());
     }
 
     #[test]

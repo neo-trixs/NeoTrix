@@ -940,10 +940,21 @@ pub fn sweep_pending(
     adapters: &mut crate::nt_channel::ChannelRegistry,
 ) -> Result<(usize, usize), NtBotError> {
     let (mut done, mut gave_up) = (0usize, 0usize);
-    for item in store.due_deliveries(20)? {
+    // ⛔ 认领 + 退避都需要「现在」。ⓘ 逐轮取一次即可（本函数是短循环）。
+    let now = Utc::now();
+    for item in store.due_deliveries(&now.to_rfc3339(), 20)? {
+        // ⭐ **先原子认领，再发**。
+        // ⛔ 认领失败 = 已被**另一个进程**抢走（CLI 与桌面同库）⇒ 直接跳过。
+        //    不做这一步的话，两个进程会读到同一批行、各发一遍
+        //    ⇒ 用户收到**重复消息**。
+        // ⛔ 渠道未注册也要**认领后再放回**：否则两个进程都会去跑
+        //    `fail_delivery`（同一行被 +2 次 attempts，白烧一次重试机会）。
+        if !store.claim_delivery(&item.id)? {
+            continue;
+        }
         let Some(adapter) = adapters.get(&item.channel) else {
             // 渠道还没注册：记一次尝试，退避，别放弃（用户可能待会儿就启了）。
-            store.fail_delivery(&item.id)?;
+            store.fail_delivery(&item.id, retry_at(&now.to_rfc3339()).as_str())?;
             continue;
         };
         match adapter.send(&OutboundMessage {
@@ -958,7 +969,7 @@ pub fn sweep_pending(
                 done += 1;
             }
             Err(_) => {
-                let attempts = store.fail_delivery(&item.id)?;
+                let attempts = store.fail_delivery(&item.id, retry_at(&now.to_rfc3339()).as_str())?;
                 if attempts >= crate::nt_store::MAX_SEND_ATTEMPTS {
                     gave_up += 1;
                 }
@@ -981,6 +992,10 @@ pub fn upkeep_best_effort(store: &NeobotStore) {
     .to_rfc3339();
     drop(store.prune_deliveries(&pending_cutoff));
 }
+
+/// 测试用「永远到期」的 now：列的默认值是 1970 ⇒ 传远期未来即等价于「全都到期」，
+/// 保持这些用例「读完整个队列」的原有语义。
+const ALL_DUE_NOW: &str = "9999-12-31T23:59:59Z";
 
 #[cfg(test)]
 mod tests {
@@ -1523,7 +1538,7 @@ mod tests {
                 "发送失败必须返回 Err（这次确实没发出去）"
             );
         }
-        let rows = st.due_deliveries(100).expect("读补发队列");
+        let rows = st.due_deliveries(ALL_DUE_NOW, 100).expect("读补发队列");
         assert_eq!(rows.len(), 1, "同一意图重试只留一行，实际：{}", rows.len());
         assert_eq!(rows[0].task_id, "t1");
     }
@@ -1536,7 +1551,7 @@ mod tests {
         let fail = FakeChannel { sent: std::cell::RefCell::new(Vec::new()), fail: true };
         assert!(deliver_result(&st, &fail, "fake", "b1", "42", "111", "t1", "第一版").is_err());
         assert!(deliver_result(&st, &fail, "fake", "b1", "42", "111", "t1", "第二版").is_err());
-        let rows = st.due_deliveries(100).expect("读补发队列");
+        let rows = st.due_deliveries(ALL_DUE_NOW, 100).expect("读补发队列");
         assert_eq!(rows.len(), 2, "文本不同必须各留一行，实际：{}", rows.len());
     }
 
@@ -2121,7 +2136,7 @@ mod tests {
         assert_eq!(ch.sent.borrow().len(), 1);
         assert_eq!(ch.sent.borrow()[0].edit_of.as_deref(), Some("m1"));
         // 直接发成了就不该留待补发。
-        assert!(st.due_deliveries(10).expect("due").is_empty());
+        assert!(st.due_deliveries(ALL_DUE_NOW, 10).expect("due").is_empty());
     }
 
     #[test]
@@ -2133,7 +2148,7 @@ mod tests {
         let failed = deliver_result(&st, &ch, "fake", "b1", "42", "m1", "t1", "结果在这");
         assert!(failed.is_err(), "发不出去要如实报错");
         // 但消息进了待补发，不是丢了。
-        let due = st.due_deliveries(10).expect("due");
+        let due = st.due_deliveries(ALL_DUE_NOW, 10).expect("due");
         assert_eq!(due.len(), 1);
         assert_eq!(due[0].text, "结果在这");
         assert_eq!(due[0].origin_message, "m1");
@@ -2170,11 +2185,17 @@ mod tests {
         .expect("enqueue");
         let mut gave_up_total = 0;
         for _ in 0..5 {
+            // ⏰ 补发现有**时间退避**（+60s），真实世界那 60s 会过去；
+            //    测试里必须显式模拟时间流逝，否则第 1 轮失败后该行就不再到期，
+            //    后面 4 轮捞不到任何东西 ⇒ 永远到不了上限 ⇒ 测的就不是「到顶放弃」了。
+            //    ⓘ 这不是「把测试改到能过」—— 是把**意图**（到顶放弃）
+            //       与**假设**（立即重试）分开，假设变了就得显式说出来。
+            st.force_deliveries_due().expect("force due");
             let (_done, gave_up) = sweep_pending(&st, &mut reg).expect("sweep");
             gave_up_total += gave_up;
         }
         assert_eq!(gave_up_total, 1, "到顶后只该放弃一次，不该反复放弃");
-        assert!(st.due_deliveries(10).expect("due").is_empty());
+        assert!(st.due_deliveries(ALL_DUE_NOW, 10).expect("due").is_empty());
     }
 
     #[test]
@@ -2196,13 +2217,17 @@ mod tests {
         // 渠道还没注册 → 只记尝试、不放弃。
         let (done, gave_up) = sweep_pending(&st, &mut reg).expect("sweep");
         assert_eq!((done, gave_up), (0, 0), "渠道没注册不该算放弃");
-        assert_eq!(st.due_deliveries(10).expect("due").len(), 1);
+        // ⏰ 上面那次「记尝试」**同时推进了退避**（available_at = now+60s）。
+        //    真实世界那 60s 会过去；测试里必须显式模拟，否则下面两步会看到
+        //    一个**尚未到期**的队列 ⇒ 测的就不再是「渠道恢复后能补发出去」。
+        st.force_deliveries_due().expect("force due");
+        assert_eq!(st.due_deliveries(ALL_DUE_NOW, 10).expect("due").len(), 1);
         // 渠道注册回来了。
         reg.register(Box::new(FakeChannel { sent: std::cell::RefCell::new(Vec::new()), fail: false }))
             .expect("register");
         let (done, _) = sweep_pending(&st, &mut reg).expect("sweep");
         assert_eq!(done, 1);
-        assert!(st.due_deliveries(10).expect("due").is_empty());
+        assert!(st.due_deliveries(ALL_DUE_NOW, 10).expect("due").is_empty());
     }
 
     #[test]

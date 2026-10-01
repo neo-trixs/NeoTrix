@@ -339,7 +339,14 @@ impl NeobotStore {
               id TEXT PRIMARY KEY, channel TEXT NOT NULL, bot_id TEXT NOT NULL,
               chat TEXT NOT NULL, origin_message TEXT NOT NULL DEFAULT '',
               text TEXT NOT NULL, task_id TEXT NOT NULL DEFAULT '',
-              attempts INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);",
+              attempts INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
+              -- ⛔ 下面两列**必须追加在末尾**：`delivery_row()` 按 `r.get(0..8)`
+              --    取列，若插在 `created_at` 之前会**静默错位**
+              --    （类型都是 String/i64，`r.get` 不报错 ⇒ 编译过、测试可能也绿、
+              --      线上读出垃圾 —— R-SCAN-1 家族的事故形态）。
+              -- 与 outbox 的同名列**保持一致**，两条投递路径策略统一。
+              available_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z',
+              claimed INTEGER NOT NULL DEFAULT 0);",
         )?;
         // 存量库补列（新库建表已含；ALTER 重复报错吞掉，保证幂等；
         // 单机本地库，补列失败不影响本次调用——返回时统一 Ok）。
@@ -370,6 +377,12 @@ impl NeobotStore {
             "ALTER TABLE conversations ADD COLUMN origin TEXT NOT NULL DEFAULT 'chat'",
             "ALTER TABLE core_pair ADD COLUMN via TEXT NOT NULL DEFAULT 'http'",
             "ALTER TABLE core_pair ADD COLUMN token_env TEXT NOT NULL DEFAULT 'CRYSTAL_TOKEN'",
+            // ⛔ 存量库补列：`CREATE TABLE IF NOT EXISTS` 对**已有表静默跳过**，
+            //    SQLite 又不支持 `ADD COLUMN IF NOT EXISTS` ⇒ 只有 ALTER 一条路。
+            //    照抄上面 outbox 的同款语句；重复执行报 duplicate column，
+            //    由下面的 `.ok()` 吞掉 ⇒ 幂等成立（同 mod.rs:361-362 的先例）。
+            "ALTER TABLE pending_deliveries ADD COLUMN available_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
+            "ALTER TABLE pending_deliveries ADD COLUMN claimed INTEGER NOT NULL DEFAULT 0",
         ] {
             let _applied: Option<usize> = self.conn.execute(alter, []).ok();
         }
