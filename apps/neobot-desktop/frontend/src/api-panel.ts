@@ -95,8 +95,8 @@ function renderApiPanel(host: HTMLElement, cat: ApiCatalog): void {
     el(
       "div",
       "api-lead-text",
-      `上游 1:1 过来的前端 invoke 了 ${s.upstream_total} 个命令。本仓不跑 DSH 运行时，` +
-        `其中插件/profile/updater/core/桌宠一类决定不做，其余逐条登记。`,
+      `上游 Rust 侧 ${s.upstream_total} 个命令已逐条登记。本仓不跑 DSH 运行时，` +
+        `其中插件/profile/updater/core/桌宠内容一类决定不做或待接，其余已接线。`,
     ),
   );
   host.appendChild(lead);

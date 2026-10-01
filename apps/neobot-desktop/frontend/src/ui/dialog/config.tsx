@@ -1,6 +1,5 @@
 import type { PropsWithOverlays } from '@overlastic/react'
-import type { DshPlugin } from '@/types'
-import { Code, Cpu, LogoWindows, PersonPencil, Puzzle } from '@gravity-ui/icons'
+import { Code, Cpu, LogoWindows, Puzzle } from '@gravity-ui/icons'
 import { useEffect } from 'react'
 import { loadApiPanel } from '@/api-panel'
 import { cn, Modal } from '@heroui/react'
@@ -15,18 +14,25 @@ import { hooks } from '@/config/hooks'
 import { queryKeys } from '@/config/query-keys'
 import { ConfigCore } from '@/ui/config/core'
 import { ConfigDebug } from '@/ui/config/debug'
-import { ConfigPlugin } from '@/ui/config/plugin'
-import { ConfigProfile } from '@/ui/config/profile'
+import { ConfigSkills } from '@/ui/skills-panel'
 
 /** 配置面板标识（左侧导航与顶部「配置」菜单共用同一组值） */
 /**
- * 配置面板的页签。`api` 是本仓加的 —— **后端契约的可视化**。
+ * 配置面板的页签。`api` 与 `skills` 是本仓加的 —— **后端契约的可视化** 与
+ * **NeoBot 真正的扩展件（技能）**。
  *
  * 放在这里而不是另开入口：配置面板本来就是「这个应用有什么、是什么状态」的
- * 容器，接口清单属于同一类信息。单独造一个入口会让「应用到底有哪些接口」
- * 变成要找两处才能回答的问题。
+ * 容器，接口清单与技能属于同一类信息。单独造入口会让「应用到底有哪些接口 /
+ * 能装哪些扩展」变成要找两处才能回答的问题。
+ *
+ * ⛔ 自持形态**不渲染** `profiles` 与 `plugins` 两个页签：
+ *    - profiles：`get_profiles` / `create_profile` / `set_active_profile` … 一条都没注册，
+ *      面板只会画出一个空列表 + 一排点了报错的按钮 —— 「安静地坏掉」比不显示更糟。
+ *    - plugins：DSH 插件体系整条不存在（本仓不加载那个运行时）。
+ *    两者都有真实替代或明确不存在，所以是**裁决**，不是欠实现。
+ *    门 `nt_check_ui_calls.mjs` 守着这件事：可达模块里不得再调未注册命令。
  */
-export type ConfigTab = 'application' | 'profiles' | 'plugins' | 'harness' | 'api'
+export type ConfigTab = 'application' | 'profiles' | 'plugins' | 'harness' | 'api' | 'skills'
 
 /**
  * API 契约页。
@@ -53,19 +59,21 @@ export interface ConfigDialogProps extends PropsWithOverlays {
 export function ConfigDialog(props: ConfigDialogProps) {
   const disclosure = useDisclosure({ props })
   const { t } = useTranslation()
-  // 异常插件数：在「插件」Tab 上给出红点/角标，方便用户直接感知出问题的插件。
-  // 与「插件」面板共用同一份查询缓存（根布局订阅后端事件写入）。
-  const { data: plugins = [] } = useQuery({
+  // 坏技能数：在「技能」Tab 上给出角标，方便直接感知装坏的技能。
+  // ⛔ 数据源是技能清单，**不是** `get_dsh_plugins` —— 那条命令本仓不存在，
+  //    而它在 react-query 里 reject 后会静默回落到 `[]`，于是「0 个异常插件」
+  //    这个结论看起来像事实，实际是「压根没读到过」。
+  const { data: skills } = useQuery({
     queryKey: queryKeys.plugins,
-    queryFn: () => invoke<DshPlugin[]>('get_dsh_plugins'),
+    queryFn: () => invoke<{ skills: { name: string }[], skipped: number }>('neobot_skill_list'),
   })
-  const abnormalCount = plugins.filter(p => p.error != null).length
+  const abnormalCount = skills?.skipped ?? 0
 
   const navs: { label: string, value: ConfigTab, icon: typeof Cpu }[] = [
     { label: t('config.application'), value: 'application', icon: LogoWindows },
-    { label: t('config.profiles'), value: 'profiles', icon: PersonPencil },
-    { label: t('config.plugins'), value: 'plugins', icon: Puzzle },
+    // 「档案」按上面的裁决不渲染；保留在类型里是为了不动上游的 ConfigTab 定义面。
     { label: t('config.harness'), value: 'harness', icon: Cpu },
+    { label: '技能', value: 'skills', icon: Puzzle },
     // i18n key 故意用字面量而非 t()：接口清单是**开发者面板**，
     // 走 i18n 会让 6 份语言文件都要加一条，而它并不面向终端用户。
     { label: 'API', value: 'api', icon: Code },
@@ -105,8 +113,8 @@ export function ConfigDialog(props: ConfigDialogProps) {
                       >
                         <item.icon className="w-5 h-5 mr-2" />
                         <span>{item.label}</span>
-                        <If cond={item.value === 'plugins' && abnormalCount > 0}>
-                          <span data-testid="dsh-config-nav-plugins-badge" className="ml-auto flex size-5 items-center justify-center rounded-full bg-danger text-[10px] font-semibold leading-none text-white">
+                        <If cond={item.value === 'skills' && abnormalCount > 0}>
+                          <span data-testid="dsh-config-nav-skills-badge" className="ml-auto flex size-5 items-center justify-center rounded-full bg-danger text-[10px] font-semibold leading-none text-white">
                             {abnormalCount}
                           </span>
                         </If>
@@ -120,14 +128,11 @@ export function ConfigDialog(props: ConfigDialogProps) {
                   <Case cond="application">
                     <ConfigDebug />
                   </Case>
-                  <Case cond="profiles">
-                    <ConfigProfile />
-                  </Case>
-                  <Case cond="plugins">
-                    <ConfigPlugin />
-                  </Case>
                   <Case cond="harness">
                     <ConfigCore />
+                  </Case>
+                  <Case cond="skills">
+                    <ConfigSkills />
                   </Case>
                   {/* API 契约：后端的可视化。本仓加的页签。 */}
                   <Case cond="api">

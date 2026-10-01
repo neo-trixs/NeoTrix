@@ -111,7 +111,7 @@ catalog:
   '@genapi/presets': ^4.1.4
   '@genapi/shared': ^4.1.4
   '@tauri-apps/plugin-os': ^2.3.2
-  '@tauri-apps/plugin-store': ^2.4.4
+  '@tauri-apps/plugin-store': ^2.5.0
   h3: 2.0.1-rc.31
   valtio: ^2.3.2
 
@@ -182,8 +182,8 @@ catalogs:
     tailwind-variants: ^3.3.1
     valtio-define: ^1.4.1
   tauri:
-    '@tauri-apps/api': ^2.11.1
-    '@tauri-apps/cli': ^2.11.4
+    '@tauri-apps/api': ^2.12.0
+    '@tauri-apps/cli': ^2.12.0
     '@tauri-apps/plugin-http': ^2.6.0
   testing:
     '@testing-library/dom': ^10.4.0
