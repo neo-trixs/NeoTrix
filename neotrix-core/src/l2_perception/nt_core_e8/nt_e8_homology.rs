@@ -5,73 +5,30 @@
 use serde::Deserialize;
 
 use super::{
-    DAYAN_NUMBER, E8_DIM, E8_RANK, E8_ROOTS, FERMIONS_PER_GENERATION,
-    FERMION_GENERATIONS, HEXAGRAM_COUNT, HE_TU_SUM, LINES_PER_HEXAGRAM, LO_SHU_CONSTANT,
-    OBSERVABLE_DOF, OBSERVER_DOF, REMAINING_E8_GENERATORS, SEVEN_SQUARED, TOTAL_LINES,
-    TOTAL_SM_FERMIONS, e8_root_norm_counts, verify_hadamard_orthogonality,
-    verify_total_fermions,
+    E8_DIM, FERMIONS_PER_GENERATION, FERMION_GENERATIONS, HEXAGRAM_COUNT,
+    REMAINING_E8_GENERATORS, TOTAL_SM_FERMIONS, e8_root_norm_counts,
+    verify_hadamard_orthogonality, verify_total_fermions,
 };
 
-// ─── Core Verifiers ──────────────────────────────────────────────────
+// ─── Core Verifiers ──
 
-/// Verify: E₈ = rank (Cartan) + non-zero roots = 8 + 240 = 248.
-pub fn verify_e8_dimension() -> bool {
-    E8_RANK + E8_ROOTS == E8_DIM
-}
-
-/// Verify: 3 generations × 64 fermions = 248 - 56.
-pub fn verify_three_generations() -> bool {
-    FERMION_GENERATIONS * FERMIONS_PER_GENERATION == E8_DIM - REMAINING_E8_GENERATORS
-}
-
-/// Verify: 64 × 6 = 384 total lines.
-pub fn verify_total_lines() -> bool {
-    HEXAGRAM_COUNT * LINES_PER_HEXAGRAM == TOTAL_LINES
-}
-
-/// Verify: Dayan = 50, observable = 49, observer = 1.
-pub fn verify_dayan_identity() -> bool {
-    DAYAN_NUMBER == OBSERVABLE_DOF + OBSERVER_DOF
-}
-
-/// Verify: 7² = 49.
-pub fn verify_seven_squared() -> bool {
-    7 * 7 == SEVEN_SQUARED
-}
-
-/// Verify: Lo Shu 3×3 sum = 15 (every row/col/diag).
-pub fn verify_lo_shu() -> bool {
-    // Standard Lo Shu: 4 9 2 / 3 5 7 / 8 1 6
-    let square = [[4, 9, 2], [3, 5, 7], [8, 1, 6]];
-    for i in 0..3 {
-        let row_sum: usize = square[i].iter().sum();
-        let col_sum: usize = square.iter().map(|r| r[i]).sum();
-        if row_sum != LO_SHU_CONSTANT || col_sum != LO_SHU_CONSTANT {
-            return false;
-        }
-    }
-    let diag1: usize = (0..3).map(|i| square[i][i]).sum();
-    let diag2: usize = (0..3).map(|i| square[i][2 - i]).sum();
-    diag1 == LO_SHU_CONSTANT && diag2 == LO_SHU_CONSTANT
-}
-
-/// Verify: He Tu sum = 1+2+...+10 = 55.
-pub fn verify_he_tu_sum() -> bool {
-    (1..=10).sum::<usize>() == HE_TU_SUM
-}
-
-/// Run all identity verifications.
-pub fn verify_all_identities() -> Vec<(&'static str, bool)> {
-    vec![
-        ("E8_dimension", verify_e8_dimension()),
-        ("three_generations", verify_three_generations()),
-        ("total_lines", verify_total_lines()),
-        ("dayan_identity", verify_dayan_identity()),
-        ("seven_squared", verify_seven_squared()),
-        ("lo_shu", verify_lo_shu()),
-        ("he_tu_sum", verify_he_tu_sum()),
-    ]
-}
+// ─── 单点真身收敛（2026-09-30）────────────────────────────────────────
+// 下面 8 个身份校验函数此前在 `neotrix-types/src/core/nt_core_e8.rs` 与本文件
+// 各有一份**逐字相同**的实现（`nt_diverge.py` 实测：owner 同为 `(free)`、归一化后
+// 完全相同）。现以 types 侧为**唯一实现**，本模块直接引用。
+//
+// 收敛前已验证**行为中性**（关键一步，不能靠「看起来一样」）：
+// 函数体依赖的 16 个常量（`E8_DIM` `LO_SHU_CONSTANT` `TOTAL_LINES` …）在
+// types / `nt_e8_constants.rs` / `nt_world_e8.rs` **三方逐个比对全一致**
+// （`TOTAL_LINES` 连表达式写法 `64 * 6` 都相同）⇒ 换实现不会换行为。
+//
+// 方向合法性：`neotrix-core` 依赖 `neotrix-types`（`Cargo.toml:97`）
+// ⇒「高层引用低层」唯一合法。必要原因：两份逐字相同的实现**只会各自漂移**
+//（本会话已实测 `now_ts` 13 份里 2 份 panic、`truncate` 8 份里 2 份字节切 panic）。
+pub use neotrix_types::core::nt_core_e8::{
+    verify_all_identities, verify_dayan_identity, verify_e8_dimension, verify_he_tu_sum,
+    verify_lo_shu, verify_seven_squared, verify_three_generations, verify_total_lines,
+};
 
 // ─── E₈ × 64 Model ──────────────────────────────────────────────────
 

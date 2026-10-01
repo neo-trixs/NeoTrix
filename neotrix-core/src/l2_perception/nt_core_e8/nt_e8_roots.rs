@@ -73,62 +73,18 @@ pub fn e8_root_system() -> Vec<E8Weight> {
     roots
 }
 
-/// Count roots by squared norm.
-/// E₈ has 240 roots: all have norm² = 2 (simply laced).
-pub fn e8_root_norm_counts() -> (usize, usize) {
-    let mut norm2_count: usize = 0;
-    let eps = 1e-10;
-    for root in e8_root_system() {
-        let ns = root.norm_sq();
-        if (ns - 2.0).abs() < eps {
-            norm2_count += 1;
-        }
-    }
-    (norm2_count, 240 - norm2_count)
-}
-
-// ─── Walsh-Hadamard Connection ───────────────────────────────────────
-
-/// Generate the 8×8 Walsh-Hadamard matrix H(3) = H₂ ⊗ H₂ ⊗ H₂.
-/// Sylvester construction: H(1) = [1 1; 1 -1]; H(n+1) = H(n) ⊗ H(1).
-pub fn hadamard_matrix(n: usize) -> Vec<Vec<i8>> {
-    if n == 0 {
-        return vec![vec![1]];
-    }
-    let prev = hadamard_matrix(n - 1);
-    let size = prev.len();
-    let mut result = vec![vec![0i8; size * 2]; size * 2];
-    for i in 0..size {
-        for j in 0..size {
-            result[i][j] = prev[i][j];
-            result[i][j + size] = prev[i][j];
-            result[i + size][j] = prev[i][j];
-            result[i + size][j + size] = -prev[i][j];
-        }
-    }
-    result
-}
-
-/// The 64×64 Walsh-Hadamard matrix H(6) — each row corresponds to a hexagram.
-pub fn hexagram_hadamard() -> Vec<Vec<i8>> {
-    hadamard_matrix(6)
-}
-
-/// Verify: Walsh-Hadamard rows are pairwise orthogonal.
-pub fn verify_hadamard_orthogonality() -> bool {
-    let h = hexagram_hadamard();
-    let n = h.len();
-    for i in 0..n {
-        for j in (i + 1)..n {
-            let dot: i32 = h[i]
-                .iter()
-                .zip(h[j].iter())
-                .map(|(&a, &b)| a as i32 * b as i32)
-                .sum();
-            if dot != 0 {
-                return false;
-            }
-        }
-    }
-    true
-}
+// ─── 单点真身收敛（2026-09-30）────────────────────────────────────────
+// 以下 4 个函数此前在 `neotrix-types/src/core/nt_core_e8.rs` 与本文件
+// 各有一份**逐字相同**的实现（`nt_diverge.py` 实测：owner 同为 `(free)`、
+// 归一化后完全相同）。现以 types 侧为**唯一实现**，本模块直接引用。
+//
+// 方向合法性：`neotrix-core` 依赖 `neotrix-types`（`Cargo.toml:97`），
+// 所以「高层引用低层」是唯一合法方向（types 不能反向依赖 core）。
+// 为什么必须做：两份逐字相同的实现**只会各自漂移** —— 本会话已实测同类漂移
+// （`now_ts` 13 份副本里 2 份 panic、`truncate` 8 份里 2 份字节切 panic）。
+//
+// ⚠️ 本模块下方的 `mod tests` 保留：它验证的是**行为**，
+// 实现位置改变不应让这些测试消失（否则就成了「删测试让门变绿」）。
+pub use neotrix_types::core::nt_core_e8::{
+    e8_root_norm_counts, hadamard_matrix, hexagram_hadamard, verify_hadamard_orthogonality,
+};
