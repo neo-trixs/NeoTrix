@@ -88,9 +88,25 @@ const STUB_RETURNS = {
   // 数组型（声明为 T[]，Rust 侧 serde 序列化为 []）
   // 长列表用于验证「溢出渐隐」：__LONG_CONVOS__ 是开关占位，
   // 由 probe 按需替换为 60 条，触发容器溢出。
-  neobot_convo_list: [],
+  // ⚠️ 基础夹具**必须有会话**：否则不会选中任何 convo ⇒ 消息永远不加载
+  //    ⇒ 5b 断言报「消息不可见」，而那是**夹具缺口**不是产品缺陷。
+  //    （我第一次就踩了：空列表 + 真断言 = 假失败。夹具与判据要一起设计。）
+  //    字段严格对齐 Rust 的 ConvoView：id/kind/title/members/task_count/
+  //    last_active/muted/unread —— 少字段会出现 `undefined 个任务` 这类假象。
+  neobot_convo_list: [{
+    id: 'c0', kind: 'direct', title: '海豚调试', members: ['u1'],
+    task_count: 2, last_active: '2026-10-01T00:00:00Z', muted: false, unread: 0,
+  }],
   neobot_member_list: [],
-  neobot_convo_messages: [],
+  // ⛔ 这里曾是 `[]`，于是**消息区从未被真正断言过** —— 我据此交付过一个
+  //    「消息区渲染出空白气泡」的界面而全门绿（当时桩把 ChatMessage 的
+  //    `text` 写成 `content`，产品没坏、桩坏了，但**门没能力发现**）。
+  //    现给两条真实消息，字段严格对齐 neobot-root.tsx 的 interface：
+  //      { id, convo_id, role, text, created_at }
+  neobot_convo_messages: [
+    { id: 'm1', convo_id: 'c0', role: 'user', text: '为什么界面是乱的', created_at: '2026-10-01T00:00:00Z' },
+    { id: 'm2', convo_id: 'c0', role: 'assistant', text: 'main 是 display:block，flex 失去约束', created_at: '2026-10-01T00:00:01Z' },
+  ],
   // 布尔型
   neobot_memory_add: true,
   neobot_memory_undo: true,
@@ -279,6 +295,21 @@ async function probe(browser, label, failList, act, convoCount = 0) {
       const pre = document.querySelector('.nb-modal-box pre')
       return pre ? pre.textContent.slice(0, 40) : null
     })
+    // ── 5b 消息正文**真的看得见**（此前完全没断言）──
+    // ⛔ 来自真实事故：我交付过一个「消息区只有空白气泡」的聊天界面，
+    //    而门全绿 —— 因为我只验「#root 有子元素 + 无 console 报错」。
+    //    **「渲染了」与「用户看得到内容」是两件事，必须分别断言。**
+    // ⚠️ 采集必须写在 probe 内（`page` 只在这里有）；写进报告循环是作用域错误，
+    //    我今天在同一个文件里已犯过两次。
+    feat.msgVisible = await page.evaluate(() => {
+      const txt = (document.querySelector('.nb-main')?.innerText || '').replace(/\s+/g, ' ')
+      return {
+        mainTextLen: txt.length,
+        seesUserText: txt.includes('为什么界面是乱的'),
+        seesBotText: txt.includes('flex 失去约束'),
+      }
+    }).catch(() => null)
+
     // a11y-1 role/aria 必须落在 box 上，**不是**遮罩
     feat.dialogOnBox = await page.evaluate(() => {
       const box = document.querySelector('.nb-modal-box')
@@ -432,6 +463,14 @@ for (const r of rows) {
     console.log(`     语言切换：documentElement.lang ${f.langBefore} → ${f.langAfter}`
       + ` · 按钮文案 ${JSON.stringify(f.textBefore)} → ${JSON.stringify(f.textAfter)}`)
     console.log(`     日志弹窗：${f.logsModal === null ? '⛔ 未打开' : '✅ ' + JSON.stringify(f.logsModal)}`)
+    const mv = f.msgVisible
+    console.log(`     消息可见性：可见文本 ${mv?.mainTextLen ?? '?'} 字 · `
+      + `含用户原文=${mv?.seesUserText ? '✅' : '⛔'} 含 bot 原文=${mv?.seesBotText ? '✅' : '⛔'}`)
+    if (!mv) {
+      console.log('     ⛔ 未取到消息可见性事实'); fail++
+    } else if (!mv.seesUserText || !mv.seesBotText) {
+      console.log('     ⛔ 消息正文**不可见** —— 界面渲染了但用户看不到内容'); fail++
+    }
     const d = f.dialogOnBox || {}
     console.log(`     模态语义：box[role=${d.boxRole} aria-modal=${d.boxAriaModal}] `
       + `遮罩[role=${d.maskRole ?? '（无，正确）'}]`)
