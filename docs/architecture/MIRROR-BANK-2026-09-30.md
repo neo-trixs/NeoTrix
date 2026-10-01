@@ -316,3 +316,64 @@ pub struct Hexagram { pub bits: u8 }   // ← 同名，但是**不同**类型
 `pub` 修饰会让编译器失去检查能力，这类残留只能靠人工/工具发现。
 `nt_const_dup.py` 能发现「同名多份定义」，但**发现不了「单份却已无人使用」**
 ⇒ 后者仍需 `dead_code` 类工具或人工核对。
+
+---
+
+## 7. ⛔ P1 跨域错位（未修，需架构决策）：L0 里藏着 L5 的 IIT Phi 陈旧分叉
+
+### 7.1 事实（全部实测，非推断）
+
+| 事实 | 证据 |
+|---|---|
+| l5 有**活**的 IIT Phi | `l5_cognition/nt_core/nt_iit_phi.rs`（481 行），**6+ 个消费者**（l5 `evolution_loop` `evolution_daemon`、l6 `healing`×3） |
+| l0 有**陈旧副本** | `l0_substrate/nt_core_consciousness_types.rs`：同名 `PhiReport` `IITPhiCalculator` + 3 个 `PHI_*` 常量 |
+| 两份**已经漂移** | l5 impl 块 **5,920 字符 / 8 方法**；l0 impl 块 **3,634 字符 / 6 方法**。l0 **缺** `compute_from_state` `subsystem_analysis`，块小 **38%** |
+| 副本的**唯一**非测试消费者 | `l0_substrate/ffi/consciousness_tree.rs:290`，而 `ffi` 整体在 `#[cfg(feature = "ios-bridge")]` 之下 ⇒ **默认构建下这份副本无人使用** |
+| 副本为何被「保活」 | `nt_core_consciousness_types.rs` 内一条测试 `iit_phi_calculator_new` 只断言构造函数字段 ⇒ **测试给了它一条假命** |
+| 为何要复制 | l0 全仓 **0 处**引用 l5/l6 ⇒ 层规则禁止 l0→l5。**这份副本是绕过层规则的手工变通** |
+
+### 7.2 严重性：不是「重复」，是「同一算法有两个会分叉的实现」
+
+`compute_phi` 存在于两份中。若两份的数值逻辑有任何差异，则**同一个 IIT Φ
+指标在 FFI 路径与正常路径下会给出不同的值**，且没有任何机制会报错。
+而现状已经证明它们**确实在分叉**（方法集合不同、块大小差 38%）。
+
+### 7.3 为什么本轮**不**直接修（三个理由，都不是「懒得修」）
+
+1. **直接删会破坏 `ios-bridge` feature**：`check-feature-gates.sh` 覆盖该feature，
+   删掉副本会让 `--features ios-bridge` 编译失败 ⇒ 不是「删了没人发现」的死代码。
+2. **正解是架构迁移而非清理**：把 IIT Phi 移到契约层 `neotrix-types`
+   （与 §7.1 中 `CALIB_*` 同一判据：真身必须落在**两个约束都能满足**的位置）。
+   这要动 481 行 + l5/l6 的 6 个消费者 + FFI，**是迁移不是收敛**。
+3. **工作树共享**：`l6_meta/healing/` 等消费者是活跃区域，跨窗改动风险高。
+
+⇒ 正确处置是**把它记成显式架构债**（本节），而不是夹带进清理提交。
+
+### 7.4 给后续决策者的具体建议（按风险从低到高）
+
+1. 先补一条**门**：把「同一算法名在 L0 与 L5/L6 两侧各有一份 `impl`」
+   加进 `nt_mirror_scan` 的检查项（当前它只比同名**类型**，不比同名 `impl` 方法集）。
+2. 若要保留 FFI 路径：把 `IITPhiCalculator` 迁到 `neotrix-types`，
+   让 `ffi/consciousness_tree.rs` 与 l5 消费者**共用同一实现**，
+   然后删掉 l0 副本及其那条保活测试。
+3. 若判定 FFI 不需要 Φ：直接从 `ffi/consciousness_tree.rs:290` 摘掉该调用，
+   删 l0 副本 + 保活测试（改动最小，但需确认 FFI 的 ABI 契约是否依赖 Φ 输出）。
+
+⚠️ 三条路都要求先确认 `ios-bridge` 的对外 ABI 契约 —— 这属于产品/接口决策，
+不是重构能单方面决定的。
+
+### 7.5 附带产出：新工具 `nt_pub_dead.py`
+
+本节正是它扫出来的。补上另两个工具的**已知盲区**：
+
+* `nt_const_dup` / `nt_diverge` 只能发现「**同名多份定义**」，
+  发现不了「只有一份、但没人用」。
+* 实测代价：2026-09-30 收敛 `rrf_fuse` 后，core 侧留下一份
+  `pub const RRF_K`，变成零使用的重复定义 —— 但 `pub` 项**编译器不报 unused**，
+  于是静默留存。
+* `nt_pub_dead.py` 找的正是这一类（16,779 条 `pub` 定义 → 1,858 条零引用候选）。
+
+⛔ 但**零引用 ≠ 死代码**（6 类正当豁免见其 `--help`），且实测命中率约 11%
+⇒ 它是**人工分诊的输入**，不是自动判决。工具首版就把 `impl Trait for X`
+的方法全报成候选（命中率因此虚高），已加作用域识别修正 —— 记录这件事是因为
+**「工具命中率过高」本身就是工具不可用的信号**，应当立即修而不是调阈值。
