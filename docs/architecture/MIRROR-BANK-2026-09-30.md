@@ -326,7 +326,7 @@ pub struct Hexagram { pub bits: u8 }   // ← 同名，但是**不同**类型
 | 事实 | 证据 |
 |---|---|
 | l5 有**活**的 IIT Phi | `l5_cognition/nt_core/nt_iit_phi.rs`（481 行），**6+ 个消费者**（l5 `evolution_loop` `evolution_daemon`、l6 `healing`×3） |
-| l0 有**陈旧副本** | `l0_substrate/nt_core_consciousness_types.rs`：同名 `PhiReport` `IITPhiCalculator` + 3 个 `PHI_*` 常量 |
+| l0/l2 有**陈旧副本** | `l0_substrate/nt_core_consciousness_types.rs`：同名 `PhiReport` `IITPhiCalculator` + 3 个 `PHI_*` 常量。⛔ **本节初稿只查到 2 份，是不完整的** —— 后续用 §7.6 的新门查出实为**三份**，`l2_perception/nt_world/nt_world_model_v2.rs` 还有第 3 份（4 方法，缺 `compute_phi` `record` `resonance_matrix` `subsystem_analysis`）|
 | 两份**已经漂移** | l5 impl 块 **5,920 字符 / 8 方法**；l0 impl 块 **3,634 字符 / 6 方法**。l0 **缺** `compute_from_state` `subsystem_analysis`，块小 **38%** |
 | 副本的**唯一**非测试消费者 | `l0_substrate/ffi/consciousness_tree.rs:290`，而 `ffi` 整体在 `#[cfg(feature = "ios-bridge")]` 之下 ⇒ **默认构建下这份副本无人使用** |
 | 副本为何被「保活」 | `nt_core_consciousness_types.rs` 内一条测试 `iit_phi_calculator_new` 只断言构造函数字段 ⇒ **测试给了它一条假命** |
@@ -377,3 +377,30 @@ pub struct Hexagram { pub bits: u8 }   // ← 同名，但是**不同**类型
 ⇒ 它是**人工分诊的输入**，不是自动判决。工具首版就把 `impl Trait for X`
 的方法全报成候选（命中率因此虚高），已加作用域识别修正 —— 记录这件事是因为
 **「工具命中率过高」本身就是工具不可用的信号**，应当立即修而不是调阈值。
+
+### 7.6 建议第 1 条已落地：`nt_mirror_scan` 新增「跨层同名 impl 方法集」检查
+
+新增 `report_dup_impls()`，扫「跨层同名 `struct`/`impl` 且方法集不一致」。
+**原工具看不见 §7 这类缺陷**：它按**模块名**匹配，而该分叉藏在两个
+不同模块名的文件里（`nt_core_consciousness_types.rs` vs `nt_iit_phi.rs`）。
+
+**判据经四次修正才可用，每一版都有实测数字**（这也是本节最值得留档的部分）：
+
+| 版本 | 判据 | 命中 | 问题 |
+|---|---|---|---|
+| v1 | 方法集不相等即报 | **135** | `Actor`/`Channel` 等 J=0 的**同名巧合**全报 |
+| v2 | 0 < Jaccard < 1 | **94** | J=0.08 实测只共享 1 个方法（`new` 撞名） |
+| v3 | 交集 ≥3 且 J ≥ 0.5 | 13 | ⛔ **漏掉已知真例** `IITPhiCalculator` |
+| **v4（现用）** | 以方法最多者为基准 + **缺 ≥2 个方法** + **pairwise J ≥ 0.4** | **16** | 可操作 |
+
+⛔ **v3 漏报的原因值得单独记**：`IITPhiCalculator` 实为**三份**副本，
+用「所有站点的共同交集」时，交集被离群副本拉低到 3 个（J=0.38）⇒
+**度量本身有缺陷**，不是阈值没调好。
+⇒ 改成**与最大站点比**（`max` 而非 `all-intersection`），离群副本不再拉低指标。
+
+⚠️ 这条与 §7.5 的教训同源：**判据错时不要靠调阈值掩盖，要改度量**。
+四次修正中 v1→v2→v4 都在加**语义条件**（是否同源、是否缺方法），
+而不是单纯挪数字；v3→v4 则是**换了度量方式**。
+
+新增自证（3b）把这四个坑全部固化：判据必须判陈旧分叉为分叉、
+且必须**不**把同名巧合判成分叉。
