@@ -145,8 +145,41 @@ def harvest(fd, root):
             for m in re.finditer(r'\bfn\s+([a-z_][a-z0-9_]*)\s*(?:<[^>]*>)?\s*\(', clean):
                 name = m.group(1)
                 owner = owner_before(clean, m.start())
+                # ── 2026-09-30 修正（真实误判，见下）────────────────────────
+                # `owner_before` 靠花括号配平判断「最近的 impl 是否已闭合」。
+                # 若某个 `impl` 块在**本 fn 之前**已闭合，它会返回 `(free)`。
+                # 于是 `&self` **方法**被误标成自由函数 ⇒ 两个**不同结构体**的
+                # 同名方法会被当成「同一函数的两个副本」报成 IDENTICAL。
+                # 实测踩中：`KnowledgeProvider::entry_count` 与
+                # `KnowledgeStorage::entry_count` 被判成逐字相同的自由函数。
+                #
+                # 地面真相是**签名里有没有 self**：有 self 就绝不可能是自由函数。
+                # 故在此用签名覆写 owner，并把无法确定宿主类型的情形标成
+                # `(method:unknown)` —— 该标记**不参与配对**，避免把两个不同
+                # 结构体的同名方法再次错配。
+                i = clean.index('(', m.end() - 1)
+                depth, j = 0, i
+                while j < len(clean):
+                    if clean[j] == '(':
+                        depth += 1
+                    elif clean[j] == ')':
+                        depth -= 1
+                        if depth == 0:
+                            break
+                    j += 1
+                sig = clean[i:j + 1]
+                has_self = re.search(r'(^|[(,]\s*&?\s*(mut\s+)?)self\b', sig) is not None
+                if has_self and owner == '(free)':
+                    owner = '(method:unknown)'
                 if owner == '(free)':
                     body, _ = fd.extract_fn(src, name)
+                    if body is not None:
+                        out.setdefault(name, {})[(owner, body)] = path
+                    continue
+                if owner == '(method:unknown)':
+                    body, _line = extract_owner_fn(fd, src, name, owner)
+                    if body is None:
+                        body, _ = fd.extract_fn(src, name)
                     if body is not None:
                         out.setdefault(name, {})[(owner, body)] = path
                     continue
@@ -243,6 +276,38 @@ def selftest(args):
           'owner_before(impl) got %r' % owner_before(clean, bar_at))
     check(owner_before(clean, baz_at) == '(free)',
           'owner_before(free fn) got %r' % owner_before(clean, baz_at))
+
+    # 1b) 回归（2026-09-30 真实误判）：`&self` 方法**不得**被判成自由函数。
+    # 真实形态：`struct`/`impl` 块在方法**之前**已闭合时，owner_before 的
+    # 花括号配平会返回 `(free)`。曾导致两个**不同结构体**的同名方法被报成
+    # 「逐字相同的自由函数」。地面真相 = 签名里有没有 self。
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        # 两个不同结构体、恰好有同名同体方法 —— 真实踩中的形态
+        for fn, ty in (('a.rs', 'AlphaStore'), ('b.rs', 'BetaVault')):
+            body = (
+                "pub struct {ty} {{ entries: Vec<u32> }}\n"
+                "impl {ty} {{\n"
+                "    pub fn entry_count(&self) -> usize {{\n"
+                "        self.entries.len()\n"
+                "    }}\n"
+                "}}\n"
+                "fn unrelated_top_level() -> u32 {{ 7 }}\n"
+            ).format(ty=ty)
+            with open(os.path.join(td, fn), 'w', encoding='utf-8') as fh:
+                fh.write(body)
+        ha = harvest(fd, td)
+        owners = {o for (o, _b) in ha.get('entry_count', {})}
+        check(owners and all(o != '(free)' for o in owners),
+              'self-method misclassified as (free): %r' % owners)
+        # 且两个不同结构体的同名方法不得被配成「同一函数的两个副本」
+        check(len(ha.get('entry_count', {})) == 2,
+              'unrelated same-name methods must stay 2 distinct entries, got %d'
+              % len(ha.get('entry_count', {})))
+        # 真自由函数仍须正常识别（别把判据做过火）
+        check('unrelated_top_level' in ha and
+              any(o == '(free)' for (o, _b) in ha['unrelated_top_level']),
+              'genuine free fn must still be (free)')
 
     # 2) 归一化后尾逗号不产生分歧（v3 修的系统性假阳性）
     a, _ = fd.extract_fn('fn g(x: u32) -> u32 { match x { 0 => return 0, _ => 1 } }', 'g')
