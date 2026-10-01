@@ -287,3 +287,94 @@ mod runtime_tests {
         assert!(v.get("host").is_some());
     }
 }
+
+// ───────────────────────── 自持形态的「不存在」声明 ─────────────────────────
+//
+// ⛔ **下面这些不是桩实现，是「本仓不提供」的显式声明。**
+//
+// 起因：上游 5 个配置面板共有 26 处 `invoke('X')` 在本仓从未注册。它们的失效方式
+// 极其安静 —— react-query 拿到 reject 后回落到默认值 `[]`，面板画出**空列表**，
+// 于是「没有插件/没有档案」看起来像事实，而不是「这个功能在本仓不存在」；
+// 按钮点了才报 `command X not found`，而没人会为空白面板点按钮。
+//
+// 已裁决不提供（详见 `frontend/src/ui/dialog/config.tsx` 的页签裁决）：
+//   · DSH 插件体系 —— 本仓不加载那个运行时，插件/备份/更新整条不存在；
+//   · DSH 档案体系 —— 库侧没有 profile 能力（`nt_config` 无 profile API）。
+// 下面保留注册是为了让**误入路径**得到一句人话，而不是一个像 bug 的报错。
+//
+// 门 `nt_check_ui_calls.mjs` 守着「可达模块里不得调未注册命令」，
+// 所以这份清单不该增长 —— 要增长就必须同时给出真实能力。
+
+/// 插件清单（本仓不提供 DSH 插件）。
+///
+/// ⛔ 旧前端 `navbar.tsx`（逐字未改的上游文件）会用它算侧边栏折叠图标与
+///    「dsh-tauri 是否启用」。返回空数组 = 侧边栏开关不渲染 —— 这正是自持形态
+///    应有的样子：没有 iframe 侧边栏可操控，留按钮就是死按钮。
+#[tauri::command]
+pub fn get_dsh_plugins() -> Vec<serde_json::Value> {
+    Vec::new()
+}
+
+/// DSH CLI 链接状态（本仓不提供：那是 DSH 官方 CLI 的凭据链）。
+#[tauri::command]
+pub fn get_cli_link_status() -> Result<serde_json::Value, String> {
+    Err("NeoBot 不使用 DSH CLI 链接".to_owned())
+}
+
+/// 复制服务地址（本仓无 iframe 服务地址可复制）。
+#[tauri::command]
+pub fn copy_service_url() -> Result<(), String> {
+    Err("NeoBot 自持形态没有 iframe 服务地址".to_owned())
+}
+
+/// 插件备份快照：插件体系不存在，快照无对象。
+#[tauri::command]
+pub fn get_plugin_backup(name: String) -> Result<serde_json::Value, String> {
+    Err(format!("插件体系不存在，无从取 {name} 的备份"))
+}
+
+/// 下载 DSH 核心（本仓核心来自本地 provider，不从网上拉核心包）。
+#[tauri::command]
+pub fn download_core(_version: String) -> Result<(), String> {
+    Err("NeoBot 不下载 DSH 核心；模型接入走「核心」页里的本地 provider".to_owned())
+}
+
+/// 更新本地核心（同上）。
+#[tauri::command]
+pub fn update_local_core(_id: String) -> Result<(), String> {
+    Err("NeoBot 没有可更新的核心包；provider 直接改配置即可".to_owned())
+}
+
+/// 上报插件异常（本仓不跑插件，异常由应用自身日志承载）。
+#[tauri::command]
+pub fn report_plugin_error(_plugin: String, _message: String) {}
+
+/// 打开预装插件仓库（本仓无插件预装流程）。
+#[tauri::command]
+pub fn open_preinstall_repo() -> Result<(), String> {
+    Err("NeoBot 无插件预装流程".to_owned())
+}
+
+/// 档案清单（本仓不提供 DSH 档案体系；库侧 `nt_config` 没有 profile API）。
+///
+/// ⛔ 这条仍需注册的原因：上游 `layout/index.tsx`（逐字未改）import 的
+///    `useCoreProfileSwitch` 在**静态 import 图**上仍可达，其
+///    `guardCoreUpgrade` 里会调 `get_profiles`。运行期它走不到（更新流程本身
+///    没有命令），但门 `nt_check_ui_calls.mjs` 走的是 import 图 ——
+///    而「静态可达」正是「哪天有人接了更新流程就会真的调它」的准确预言。
+#[tauri::command]
+pub fn get_profiles() -> Result<Vec<serde_json::Value>, String> {
+    Err("NeoBot 不提供档案（profile）体系：模型接入走 provider".to_owned())
+}
+
+/// 同上：新建档案（本仓不提供）。
+#[tauri::command]
+pub fn create_profile(_name: String) -> Result<serde_json::Value, String> {
+    Err("NeoBot 不提供档案体系".to_owned())
+}
+
+/// 同上：切换档案（本仓不提供）。
+#[tauri::command]
+pub fn set_active_profile(_id: String) -> Result<(), String> {
+    Err("NeoBot 不提供档案体系".to_owned())
+}

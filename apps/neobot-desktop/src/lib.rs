@@ -17,4 +17,6 @@ pub mod api;
 pub mod commands;
 pub mod core;
 pub mod desktop;
+pub mod menu;
+pub mod pet;
 pub mod platform;

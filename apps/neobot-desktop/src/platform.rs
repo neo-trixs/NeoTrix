@@ -154,20 +154,64 @@ pub fn remote_open_window(app: AppHandle, label: String, url: String) -> Result<
     tauri::async_runtime::block_on(create_app_window(app, spec))
 }
 
-/// `move_pet_window(app, x, y, always_on_top)`
+/// `quit_app()` —— 退出应用（上游 `desktop/window.rs quit_app`).
 ///
-/// 桌宠窗口定位。独立成命令是因为它带 `always_on_top` 这个**语义参数**：
-/// 桌宠要置顶，普通窗口不要 —— 混在一个通用 move 里，前端得自己记住该传什么。
+/// ⛔ 桌宠移动命令曾住在这里（绝对定位版），2026-09-30 搬进 `pet.rs`
+/// 并改成与上游同形的相对增量 —— pet 窗自己的调用是 `{ deltaX, deltaY }`，
+/// 旧形状调上去静默失败。见 `pet.rs move_pet_window`.
+///
+/// ⛔ 返回 `()` 而不是 `Result`：调用后进程即退出，
+/// 返回错误除了让调用方多写一个 `.catch` 之外没有任何意义。
 #[tauri::command]
-pub fn move_pet_window(app: AppHandle, x: f64, y: f64, always_on_top: bool) -> Result<(), String> {
-    let w = app
-        .get_webview_window("pet")
-        .ok_or_else(|| "桌宠窗口未创建".to_owned())?;
-    w.set_position(tauri::PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
-    if always_on_top {
-        w.set_always_on_top(true).map_err(|e| e.to_string())?;
+pub fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
+/// `reveal_data_dir()` —— 在文件管理器里定位数据目录。
+///
+/// 目录不存在就先建（全新安装，学上游 `system_os.rs reveal_data_dir`）。
+#[tauri::command]
+pub fn reveal_data_dir(app: AppHandle) -> Result<(), String> {
+    let dir = data_dir()?;
+    std::fs::create_dir_all(&dir).map_err(|e| format!("创建数据目录失败：{e}"))?;
+    reveal(&app, &dir)
+}
+
+/// `reveal_in_folder(path)` —— 在文件管理器里定位一个文件/目录。
+///
+/// ⛔ 只揭示**存在**的路径：不存在的路径调过去，
+/// Finder/资源管理器各弹各的错，症状不统一。
+/// 揭示（选中但不打开）本身不读取内容，风险止于「看到文件名」。
+#[tauri::command]
+pub fn reveal_in_folder(app: AppHandle, path: String) -> Result<(), String> {
+    let p = std::path::PathBuf::from(path.trim());
+    if !p.exists() {
+        return Err("路径不存在，无法定位".to_owned());
     }
-    Ok(())
+    reveal(&app, &p)
+}
+
+fn reveal(app: &AppHandle, p: &std::path::Path) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .reveal_item_in_dir(p.to_string_lossy().into_owned())
+        .map_err(|e| format!("定位失败：{e}"))
+}
+
+/// `open_dir(path)` —— 用系统文件管理器打开一个目录。
+///
+/// ⛔ 必须是**已存在的目录**：文件/不存在的路径调过去，
+/// 各平台行为不一（有的打开父目录、有的报错、有的没反应）。
+#[tauri::command]
+pub fn open_dir(app: AppHandle, path: String) -> Result<(), String> {
+    let p = std::path::PathBuf::from(path.trim());
+    if !p.is_dir() {
+        return Err("不是已存在的目录".to_owned());
+    }
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_path(p.to_string_lossy().into_owned(), None::<String>)
+        .map_err(|e| format!("打开目录失败：{e}"))
 }
 
 #[cfg(test)]

@@ -210,6 +210,23 @@ pub fn update_app_config(config: serde_json::Value) -> Result<(), String> {
     std::fs::write(&path, body).map_err(|e| format!("写配置失败：{e}"))
 }
 
+/// `get_app_config() -> AppConfig`（JSON 对象）
+///
+/// `update_app_config` 的读侧。缺文件返回 `{}` 而不是报错 ——
+/// 全新安装本来就没有配置文件，报错会让设置页首屏就红。
+/// 文件坏了（不是合法 JSON）则**报错而不回 `{}`**：
+/// 回空对象会让设置页显示一堆默认值，而用户原有配置其实还在盘上。
+#[tauri::command]
+pub fn get_app_config() -> Result<serde_json::Value, String> {
+    let path = data_dir()?.join("app-config.json");
+    match std::fs::read_to_string(&path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(serde_json::json!({})),
+        Err(e) => Err(format!("读应用配置失败：{e}")),
+        Ok(s) => serde_json::from_str(&s)
+            .map_err(|e| format!("应用配置不是合法 JSON（请先人工检查 {}）：{e}", path.display())),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -284,5 +301,148 @@ mod tests {
         let c: HarnessCoreIn = serde_json::from_str(r#"{"id":"openai"}"#).unwrap();
         assert_eq!(c.id, "openai");
         assert!(c.enabled, "省略 enabled 时默认启用 —— 上游的调用点依赖这个默认");
+    }
+}
+
+/// 技能清单（`neobot_skill_list` 返回值）。
+///
+/// 顶替上游「插件」页签的数据源：技能才是 NeoBot 真正的扩展件。
+/// `skipped` 是坏包数 —— 坏包不炸列表，但必须能让人看见（静默跳过 = 少了技能
+/// 却没人知道）。
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct SkillListView {
+    pub skills: Vec<SkillRow>,
+    pub skipped: usize,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct SkillRow {
+    pub name: String,
+    pub description: String,
+    pub path: String,
+}
+
+/// `neobot_skill_list() -> SkillListView`
+#[tauri::command]
+pub fn neobot_skill_list() -> Result<SkillListView, String> {
+    // ⛔ 技能目录挂在 `data_dir()` 下（与 store/usage.json 同根），不用
+    //    `NeobotConfig::from_env` 再解一次 —— 两处解析同一件事时，
+    //    环境变量一旦不一致，界面读的就是另一个目录（而没人发现）。
+    Ok(skill_list_view(&data_dir()?))
+}
+
+/// 技能清单纯函数（命令薄壳；逻辑可测，不碰真实 HOME）。
+fn skill_list_view(data_dir: &std::path::Path) -> SkillListView {
+    let (skills, skipped) = neotrix_neobot::nt_skills::scan_skills(data_dir);
+    SkillListView {
+        skills: skills
+            .into_iter()
+            .map(|s| SkillRow {
+                name: s.name,
+                description: s.description,
+                path: s.path.to_string_lossy().into_owned(),
+            })
+            .collect(),
+        skipped,
+    }
+}
+
+/// `neobot_skill_install(path) -> ()`
+///
+/// ⛔ 只接受**绝对路径**且必须已存在：路径不存在时给一句人话，
+/// 而不是让库去造一个空目录然后报告成功。
+#[tauri::command]
+pub fn neobot_skill_install(path: String) -> Result<(), String> {
+    let src = check_skill_src(&path)?;
+    let skill =
+        neotrix_neobot::nt_skills::install_skill(&data_dir()?, &src).map_err(|e| e.to_string())?;
+    println!("neobot skill installed: {}", skill.name);
+    Ok(())
+}
+
+/// 技能来源路径校验（纯函数，可测）。
+///
+/// ⛔ 拒绝相对路径与不存在目录：否则库会去 `skills/<名字>` 造一个空目录，
+/// 然后报告「装好了」—— 用户拿到一个永远不会被加载的空技能。
+fn check_skill_src(path: &str) -> Result<std::path::PathBuf, String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err("技能路径为空".to_owned());
+    }
+    let src = std::path::PathBuf::from(trimmed);
+    if !src.is_absolute() {
+        return Err("技能路径必须是绝对路径".to_owned());
+    }
+    if !src.is_dir() {
+        return Err(format!("技能目录不存在：{}", src.display()));
+    }
+    Ok(src)
+}
+
+#[cfg(test)]
+mod skill_tests {
+    use super::{check_skill_src, skill_list_view, SkillListView, SkillRow};
+
+    /// 临时目录（app crate 不依赖库的 testutil —— 那是库内部的测试设施）。
+    fn tmp(case: &str) -> std::path::PathBuf {
+        let d = tempdir::TempDir::new(&format!("nb-skill-{case}")).expect("临时目录");
+        let p = d.path().to_path_buf();
+        // TempDir 析构会删目录；测试内已显式清理，这里保活到函数结束即可。
+        std::mem::forget(d);
+        p
+    }
+
+    #[test]
+    fn 空目录读出零技能零坏包() {
+        let dir = tmp("empty");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let v = skill_list_view(&dir);
+        assert!(v.skills.is_empty());
+        assert_eq!(v.skipped, 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn 技能装上后能被读到() {
+        let dir = tmp("list");
+        let _ = std::fs::remove_dir_all(&dir);
+        let src = dir.join("src-skill");
+        std::fs::create_dir_all(&src).expect("mkdir");
+        // 装：库侧要求目录里有技能清单/文档，缺了会被拒 —— 这里只验「读得出来」。
+        std::fs::write(src.join("SKILL.md"), "# test\n\n说明\n").expect("写");
+        let installed = neotrix_neobot::nt_skills::install_skill(&dir, &src).expect("装技能");
+        let v = skill_list_view(&dir);
+        assert_eq!(v.skills.len(), 1, "读到 {:?}", v.skills);
+        assert_eq!(v.skills[0].name, installed.name);
+        assert_eq!(v.skipped, 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn 路径校验拒绝相对与不存在() {
+        assert!(check_skill_src("").is_err());
+        assert!(check_skill_src("  ").is_err());
+        assert!(check_skill_src("relative/path").is_err());
+        assert!(check_skill_src("/definitely/not/here-12345").is_err());
+        // 真目录才放行（绝对路径）。
+        let d = tmp("src");
+        std::fs::create_dir_all(&d).expect("mkdir");
+        assert!(check_skill_src(d.to_str().expect("utf-8")).is_ok());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn 技能行字段是投影不是整个结构体() {
+        // ⛔ SkillRow 刻意只带界面要用的三个字段：直接把库的 Skill 序列化过去
+        //    会让库内部结构变成前端隐式契约，改一行就得分改 TS，而没人会提醒。
+        let row = SkillRow { name: "a".into(), description: String::new(), path: "/p".into() };
+        let json = serde_json::to_string(&row).expect("序列化");
+        assert!(json.contains("\"name\""));
+        assert!(json.contains("\"path\""));
+        assert!(!json.contains("created_at"));
+        let _ = SkillListView { skills: vec![row], skipped: 0 };
     }
 }

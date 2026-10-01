@@ -183,6 +183,18 @@ pub struct MemberView {
     pub display: String,
 }
 
+/// `neobot_member_add(id, kind) -> ()`（`kind` = `human` | `agent`，幂等 upsert）
+///
+/// ⛔ 存在的理由不是「补个 CRUD」：**会话创建要求成员已登记**
+/// （`create_conversation` 会逐个校验），而 GUI 此前只有 `neobot_member_list`
+/// —— 也就是「能看不能建」，于是空态只能把人赶去设置面板，而那里也没有。
+#[tauri::command]
+pub fn neobot_member_add(id: String, kind: String) -> Result<(), String> {
+    open_store()?
+        .upsert_member(id.trim(), kind.trim())
+        .map_err(|e| e.to_string())
+}
+
 /// `neobot_convo_group(title, members) -> convo_id`
 #[tauri::command]
 pub fn neobot_convo_group(title: String, members: Vec<String>) -> Result<String, String> {
@@ -211,24 +223,341 @@ pub fn neobot_evidence_summary(text: String) -> EvidenceReport {
     audit(&text)
 }
 
-/// `neobot_send(text) -> AgentRunResult`
+/// `neobot_send(convo_id?, text) -> AgentRunResult`
 ///
-/// 前端按 Enter 发送时走这条。注意它与 `neobot_agent_run` 的区别：
-/// 前者是**会话内**的一轮（带 convo_id 上下文），后者是脱离会话手动跑。
-/// 两者曾在前端被混用（都落到同一个「跑一轮」），这里保持分离。
+/// 会话内的一轮：问落库 → 跑 → 答落库，全进 `messages` 表。
+/// `convo_id` 缺席/空白 = 脱离会话手动跑（旧行为保留，不落库）。
+///
+/// 失败语义（故意不对称，丢数据比报错贵得多）：
+///   · 问落库失败 ⇒ 直接 Err，不跑（跑了也记不住问了什么）。
+///   · 跑失败 ⇒ Err，问句已在库里（它确实问过）。
+///   · 答落库失败 ⇒ Err，但**把回复内容嵌进错误里** ——
+///     回复已经算出来了，吞掉等于白跑一次还拿不到结果。
 #[tauri::command]
-pub async fn neobot_send(text: String) -> Result<AgentRunResult, String> {
+pub async fn neobot_send(convo_id: Option<String>, text: String) -> Result<AgentRunResult, String> {
     if text.trim().is_empty() {
         // 空白消息不是「跑了但没输出」，是**请求本身不成立**。给它一个
         // 明确错误，比跑一轮再回一句空强。
         return Err("消息为空".to_owned());
     }
-    let store = open_store()?;
-    tauri::async_runtime::spawn_blocking(move || {
-        agent_run(&store, &text, None).map_err(|e| e.to_string())
+    let convo = normalize_convo_arg(convo_id);
+    // ⛔ 三个阶段各开一次库，不共用一个 handle：跑轮在 `spawn_blocking` 里，
+    //    handle move 进闭包后外层用不得（E0382）；而文件库 + WAL 下多开一次
+    //    是廉价的。共用一个看似省，实则借用跨不过闭包边界。
+    if let Some(ref id) = convo {
+        let store = open_store()?;
+        check_convo_exists(&store, id)?;
+        store
+            .append_message(id, "user", text.trim())
+            .map_err(|e| e.to_string())?;
+    }
+    // context 必须**整个 move 进闭包**：agent_run 收 Option<&str>，
+    // 而借用跨不过 spawn_blocking 的 'static 边界（E0597 的教训）。
+    let goal = text.clone();
+    let out = tauri::async_runtime::spawn_blocking(move || {
+        let store = open_store()?;
+        agent_run(&store, &goal, None).map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| format!("发送任务异常：{e}"))?
+    .map_err(|e| format!("发送任务异常：{e}"))??;
+    if let Some(ref id) = convo {
+        let store = open_store()?;
+        store
+            .append_message(id, "assistant", &out.output)
+            .map_err(|e| format!("回复落库失败（回复内容：{}）：{e}", out.output))?;
+    }
+    // 用量记账（best-effort，见 record_send_usage）。
+    if let Ok(dir) = data_dir() {
+        record_send_usage(&dir, &out);
+    }
+    Ok(out)
+}
+
+/// 用量账本文件（`<data_dir>/usage.json`，与库 `UsageLedger` 同形）。
+fn usage_file(data_dir: &std::path::Path) -> std::path::PathBuf {
+    data_dir.join("usage.json")
+}
+
+/// 按模型反查 provider 名（`providers.model` 精确命中；否则 `unknown`）。
+///
+/// ⛔ 命中了还要过账本字符集：provider 名是用户起的（64 字符自由形），
+/// 账本键只认 `[a-z0-9_-]{1,32}`。 washed 掉的（如大小写）统一小写归并 ——
+/// 这是展示桶，不是身份，不断言它等于库里的原名。
+/// ⛔ 宁要 `unknown` 不要猜：把 qwen 的量记到 openai 头上，比「不知道」坏得多。
+fn resolve_provider(store: &NeobotStore, model_used: &str) -> String {
+    let model = model_used.trim();
+    if model.is_empty() {
+        return "unknown".to_owned();
+    }
+    let hit = store
+        .list_providers()
+        .unwrap_or_default()
+        .into_iter()
+        .find(|p| p.model.trim() == model)
+        .map(|p| p.name.trim().to_ascii_lowercase());
+    match hit {
+        Some(name)
+            if !name.is_empty()
+                && name.len() <= 32
+                && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_') =>
+        {
+            name
+        }
+        _ => "unknown".to_owned(),
+    }
+}
+
+/// 发送轮的用量落库（best-effort）。
+///
+/// ⛔ 失败不拦发送：回复已算出、已落库，进了用户界面 ——
+///
+/// 为账本报错等于把到手的结果又收回去。失败走 `eprintln`
+/// （Tauri 日志可见），不吞。
+/// ⛔ 引擎没报的（cached/written）按 0 记，不猜 ——
+///
+/// 猜缓存命中率就是编账本。
+/// ⛔ usage 缺席且模型为空 = 无数据，直接跳过（不是 Err）：
+///
+/// 第一版返回 Err，被上游「缺字段降级」逻辑反杀 ——
+///
+/// 空是合法状态，不是失败。
+fn record_send_usage(data_dir: &std::path::Path, out: &AgentRunResult) {
+    use neotrix_neobot::nt_cost::UsageLedger;
+    let path = usage_file(data_dir);
+    let mut ledger = match UsageLedger::load(&path) {
+        Ok(ledger) => ledger,
+        Err(e) => {
+            eprintln!("[neobot] 用量账本读失败（本次不记）：{e}");
+            return;
+        }
+    };
+    let usage = out.usage.as_ref();
+    let prompt = usage.map(|u| u.prompt_tokens.max(0) as u64).unwrap_or(0);
+    let completion = usage.map(|u| u.completion_tokens.max(0) as u64).unwrap_or(0);
+    if prompt == 0 && completion == 0 && out.model_used.trim().is_empty() {
+        return;
+    }
+    let provider = match open_store() {
+        Ok(store) => resolve_provider(&store, &out.model_used),
+        Err(_) => "unknown".to_owned(),
+    };
+    // ⛔ 模型名空但用量在 = 服务端报了数没报名。键不能空（账本拒），
+    // 用显式的 `(unknown)` 占位，不借别人的名字。
+    let model = if out.model_used.trim().is_empty() {
+        "(unknown)"
+    } else {
+        out.model_used.trim()
+    };
+    if let Err(e) = ledger.record(
+        &provider,
+        model,
+        None,
+        prompt,
+        0,
+        0,
+        completion,
+    ) {
+        eprintln!("[neobot] 用量记账失败（本次不记）：{e}");
+        return;
+    }
+    if let Err(e) = ledger.save(&path) {
+        eprintln!("[neobot] 用量账本写失败（本次不记）：{e}");
+    }
+}
+
+/// 用量汇总行（`provider|model` 粒度）。
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct UsageRow {
+    pub id: String,
+    pub name: Option<String>,
+    pub input: u64,
+    pub cached: u64,
+    pub written: u64,
+    pub output: u64,
+    pub requests: u64,
+}
+
+/// `neobot_usage_summary(days?) -> UsageSummary`
+///
+/// 日/周/月三档由调用方传 `days`（1/7/30）；缺席/0 = 有史以来。
+/// 文件缺席 = 零（还没花过）；文件坏了 = Err（静默归零等于銷账）。
+///
+/// ⛔ `days` 上限 3650（十年）：账本窗口是逐天回退的循环，
+///
+/// 传 `u64::MAX` 会原地转到天荒地老 —— 而调用方传多大本是它的自由。
+#[tauri::command]
+pub fn neobot_usage_summary(days: Option<u64>) -> Result<UsageSummary, String> {
+    use neotrix_neobot::nt_cost::UsageLedger;
+    let days = days.unwrap_or(0).min(3650);
+    let path = data_dir()?.join("usage.json");
+    let ledger = UsageLedger::load(&path)?;
+    Ok(summarize_usage(&ledger, days))
+}
+
+/// 汇总纯函数（命令薄壳，逻辑可测；`days` 已钳制）。
+fn summarize_usage(
+    ledger: &neotrix_neobot::nt_cost::UsageLedger,
+    days: u64,
+) -> UsageSummary {
+    use std::collections::BTreeMap;
+    let cutoff = usage_cutoff(days);
+    let mut rows: BTreeMap<String, UsageRow> = BTreeMap::new();
+    let mut total = UsageSummary {
+        days,
+        input: 0,
+        cached: 0,
+        written: 0,
+        output: 0,
+        requests: 0,
+        tokens: 0,
+        rows: Vec::new(),
+    };
+    for (day, models) in &ledger.days {
+        if !cutoff.is_empty() && day.as_str() < cutoff.as_str() {
+            continue;
+        }
+        for (id, row) in models {
+            let entry = rows.entry(id.clone()).or_insert(UsageRow {
+                id: id.clone(),
+                name: ledger.names.get(id).cloned(),
+                input: 0,
+                cached: 0,
+                written: 0,
+                output: 0,
+                requests: 0,
+            });
+            entry.input = entry.input.saturating_add(row.input);
+            entry.cached = entry.cached.saturating_add(row.cached);
+            entry.written = entry.written.saturating_add(row.written);
+            entry.output = entry.output.saturating_add(row.output);
+            entry.requests = entry.requests.saturating_add(row.requests);
+        }
+    }
+    for row in rows.into_values() {
+        total.input = total.input.saturating_add(row.input);
+        total.cached = total.cached.saturating_add(row.cached);
+        total.written = total.written.saturating_add(row.written);
+        total.output = total.output.saturating_add(row.output);
+        total.requests = total.requests.saturating_add(row.requests);
+        total.rows.push(row);
+    }
+    total.tokens = total.input.saturating_add(total.output);
+    total
+}
+
+/// 窗口下界（本地日历；空串 = 不限）。与库 `totals` 同口径 ——
+///
+/// ⛔ 两处各算各的 cutoff 是分叉之源：将来一边改口径另一边静默错。
+/// 抽出来共用本来最干净，但库函数签名已定（`totals(days)` 内算），
+/// 这里只做「读侧展示」，重复三行比改库签名便宜且无风险。差异写死在这句注释里。
+fn usage_cutoff(days: u64) -> String {
+    if days == 0 {
+        return String::new();
+    }
+    let mut date = chrono::Local::now().date_naive();
+    for _ in 1..days {
+        date = date.pred_opt().unwrap_or(date);
+    }
+    date.format("%Y-%m-%d").to_string()
+}
+
+/// 用量汇总体。
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct UsageSummary {
+    pub days: u64,
+    pub input: u64,
+    pub cached: u64,
+    pub written: u64,
+    pub output: u64,
+    pub requests: u64,
+    pub tokens: u64,
+    pub rows: Vec<UsageRow>,
+}
+///
+/// ⛔ 空串与 None 必须同义：前端 `sel` 为 null 时有时传缺席有时传 `""`
+/// （JSON 里 `undefined` 字段会被整个丢掉），两条路必须同归。
+fn normalize_convo_arg(convo_id: Option<String>) -> Option<String> {
+    convo_id.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty())
+}
+
+/// 记忆视图（`neobot_memory_list` 返回值）。
+///
+/// 一并给出 `bytes`/`cap`/`revisions`：只给行列表的话，用户撞上 8KiB 上限时
+/// 只会看到「记不进去了」而不知道为什么（不可解释的失败＝没有失败原因）。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct MemoryView {
+    pub lines: Vec<String>,
+    pub bytes: usize,
+    pub cap: usize,
+    pub revisions: usize,
+}
+
+/// `neobot_memory_list() -> MemoryView`
+///
+/// 读跨会话记忆（`MEMORY.md`，逐轮注入 system prompt 尾部）。
+/// 历史损坏 = Err —— 与 `memory undo` 同一口径：坏历史不静默当空。
+#[tauri::command]
+pub fn neobot_memory_list() -> Result<MemoryView, String> {
+    memory_view(&data_dir()?)
+}
+
+/// 记忆视图纯函数（逻辑可测，不碰真实 HOME）。
+fn memory_view(data_dir: &std::path::Path) -> Result<MemoryView, String> {
+    use neotrix_neobot::nt_memory;
+    let text = nt_memory::read_memory(data_dir);
+    Ok(MemoryView {
+        lines: text.lines().map(str::trim).filter(|l| !l.is_empty()).map(str::to_owned).collect(),
+        bytes: text.len(),
+        cap: nt_memory::MEMORY_CAP,
+        revisions: nt_memory::memory_revisions(data_dir)
+            .map(|r| r.len())
+            .map_err(|e| format!("读记忆历史失败：{e}"))?,
+    })
+}
+
+/// `neobot_memory_add(text) -> bool`（`true` = 记下；`false` = 已有这行）
+///
+/// 秘密律仍在库侧生效（含密钥行拒绝），这里不重复实现一遍。
+#[tauri::command]
+pub fn neobot_memory_add(text: String) -> Result<bool, String> {
+    neotrix_neobot::nt_memory::append_memory(&data_dir()?, &text).map_err(|e| e.to_string())
+}
+
+/// `neobot_memory_undo() -> bool`（`true` = 撤了一版；`false` = 无可撤）
+#[tauri::command]
+pub fn neobot_memory_undo() -> Result<bool, String> {
+    neotrix_neobot::nt_memory::memory_undo(&data_dir()?)
+        .map(|restored| restored.is_some())
+        .map_err(|e| e.to_string())
+}
+
+/// 会话存在性校验。`None` 由 `get_conversation` 表达「不存在」——
+///
+/// ⛔ 不存在必须 Err 而不是「顺手建一个」：自动建会让打错 id 的调用
+/// 在库里留下一个永远没人打开的空会话，而调用方以为发出去了。
+fn check_convo_exists(store: &NeobotStore, id: &str) -> Result<(), String> {
+    let found = store.get_conversation(id).map_err(|e| e.to_string())?;
+    if found.is_none() {
+        return Err(format!("会话不存在：{id}"));
+    }
+    Ok(())
+}
+
+/// `neobot_convo_messages(convo_id) -> ChatMessage[]`
+///
+/// 一个会话的全部消息（时间正序）。切会话时界面调这条换历史 ——
+///
+/// ⛔ 之前切会话只换了标题，消息流还留着上一个会话的（串台）。
+/// 历史由库出，界面只负责渲染，不做合并/去重/截断。
+#[tauri::command]
+pub fn neobot_convo_messages(
+    convo_id: String,
+) -> Result<Vec<neotrix_neobot::nt_store::ChatMessage>, String> {
+    let store = open_store()?;
+    store.list_messages(convo_id.trim()).map_err(|e| e.to_string())
 }
 
 /// 骨架下发给界面的面板事件名。前端 `listen` 同一个名字。
@@ -329,6 +658,10 @@ pub fn neobot_api_call(
             status: match spec.status {
                 crate::api::Status::Stub => "stub".into(),
                 crate::api::Status::Planned => "planned".into(),
+                // ⛔ `Refused` 在这里也走不通路：它是**已注册**的，直接 invoke 会
+                //    得到一句人话（比这里返回理由更好）。这里给同一状态是为了让
+                //    「API 面板里点它」也不至于显示成一个不存在的命令。
+                crate::api::Status::Refused => "refused".into(),
                 crate::api::Status::Implemented => unreachable!("已在上层拦掉"),
             },
             reason: spec.note.to_owned(),
@@ -684,6 +1017,190 @@ mod convo_list_tests {
         let s = serde_json::to_string(&v).unwrap();
         assert!(s.contains("\"last_active\""), "实际：{s}");
         assert!(s.contains("\"task_count\":3"), "实际：{s}");
+    }
+}
+
+#[cfg(test)]
+mod send_tests {
+    use super::*;
+
+    fn temp_store() -> (tempdir::TempDir, NeobotStore) {
+        let d = tempdir::TempDir::new("nb-send").expect("临时目录");
+        let store = NeobotStore::open(d.path().join("nb.db").to_str().unwrap()).expect("开库");
+        (d, store)
+    }
+
+    #[test]
+    fn 空串与缺席同义() {
+        assert_eq!(normalize_convo_arg(None), None);
+        assert_eq!(normalize_convo_arg(Some("".into())), None);
+        assert_eq!(normalize_convo_arg(Some("   ".into())), None);
+        assert_eq!(normalize_convo_arg(Some(" c1 ".into())), Some("c1".into()));
+    }
+
+    #[test]
+    fn 不存在的会话不让发() {
+        let (_d, store) = temp_store();
+        assert!(check_convo_exists(&store, "ghost").is_err());
+    }
+
+    #[test]
+    fn 记忆视图给出容量与历史数() {
+        use neotrix_neobot::nt_memory;
+        let dir = tempdir::TempDir::new("nb-memview").expect("临时目录");
+        let d = dir.path();
+        // 初始：无行、无历史（bytes 0，因为文件不存在）。
+        let v0 = memory_view(d).expect("读");
+        assert!(v0.lines.is_empty());
+        assert_eq!(v0.bytes, 0);
+        assert_eq!(v0.revisions, 0);
+        assert_eq!(v0.cap, nt_memory::MEMORY_CAP);
+        nt_memory::append_memory(d, "喜欢深色模式").expect("记");
+        nt_memory::append_memory(d, "用 pnpm").expect("记");
+        let v = memory_view(d).expect("读");
+        assert_eq!(v.lines, vec!["喜欢深色模式", "用 pnpm"]);
+        assert!(v.bytes > 0);
+        // 两次 append = 两条历史（含首次写入前的空版）。
+        assert_eq!(v.revisions, 2);
+        // 坏历史 = Err（不静默当空）。
+        std::fs::write(nt_memory::memory_history_path(d), "{断的\n").expect("造坏行");
+        assert!(memory_view(d).is_err());
+    }
+
+    #[test]
+    fn 记忆视图滤掉空行但容量算原文() {
+        use neotrix_neobot::nt_memory;
+        let dir = tempdir::TempDir::new("nb-memview2").expect("临时目录");
+        let d = dir.path();
+        std::fs::write(nt_memory::memory_path(d), "  a  \n\n\n  b\n").expect("造");
+        let v = memory_view(d).expect("读");
+        // 行是 trim 后的非空行；bytes 是原文长度（容量按原文算，不是按行数）。
+        assert_eq!(v.lines, vec!["a", "b"]);
+        assert_eq!(v.bytes, "  a  \n\n\n  b\n".len());
+    }
+
+    #[test]
+    fn 存在的会话放行且问答都能落库() {
+        // ⛔ 这条不断言 agent_run（那会真跑一轮）：只验「落库这半边」。
+        //    跑轮由库侧测试覆盖；这里守的是「存在性校验 + 消息表往返」。
+        let (_d, store) = temp_store();
+        store.upsert_member("neo", "human").expect("成员");
+        let id = store.create_conversation("group", "t", &["neo".into()]).expect("会话");
+        check_convo_exists(&store, &id).expect("存在必须放行");
+        store.append_message(&id, "user", "hi").expect("问落库");
+        store.append_message(&id, "assistant", "在").expect("答落库");
+        let v = store.list_messages(&id).expect("读回");
+        assert_eq!(v.len(), 2);
+        assert_eq!(v[0].role, "user");
+    }
+
+    fn result_with(model: &str, prompt: i64, completion: i64) -> AgentRunResult {
+        AgentRunResult {
+            status: "ok".into(),
+            output: "o".into(),
+            trace: Vec::new(),
+            model_used: model.into(),
+            mode: "passthrough".into(),
+            tools: Vec::new(),
+            usage: Some(neotrix_neobot::nt_types::TokenUsage {
+                prompt_tokens: prompt,
+                completion_tokens: completion,
+                cost_usd: 0.0,
+            }),
+        }
+    }
+
+    #[test]
+    fn provider按模型精确命中否则unknown() {
+        let (_d, store) = temp_store();
+        // 空库、无模型 —— 都是 unknown，不猜。
+        assert_eq!(resolve_provider(&store, ""), "unknown");
+        assert_eq!(resolve_provider(&store, "qwen-plus"), "unknown");
+        store
+            .upsert_provider(&neotrix_neobot::nt_provider::Provider {
+                name: "Qwen".into(),
+                base_url: "https://x.dev/v1".into(),
+                key_env: "QWEN_API_KEY".into(),
+                model: "qwen-plus".into(),
+                enabled: true,
+            })
+            .expect("provider");
+        // 命中且归并小写；未命中仍 unknown。
+        assert_eq!(resolve_provider(&store, "qwen-plus"), "qwen");
+        assert_eq!(resolve_provider(&store, "gpt-x"), "unknown");
+    }
+
+    #[test]
+    fn 用量落库往返与空跳过() {
+        use neotrix_neobot::nt_cost::UsageLedger;
+        let dir = tempdir::TempDir::new("nb-usage").expect("临时目录");
+        let path = usage_file(dir.path());
+        assert_eq!(path.file_name().unwrap(), "usage.json");
+        // 有数即记。
+        record_send_usage(dir.path(), &result_with("qwen-plus", 100, 50));
+        let back = UsageLedger::load(&path).expect("读回");
+        assert_eq!(back.totals(0).input, 100);
+        assert_eq!(back.totals(0).output, 50);
+        // 无数无模型即跳过（不报错、不建行）。
+        let empty = AgentRunResult {
+            status: "ok".into(),
+            output: "o".into(),
+            trace: Vec::new(),
+            model_used: String::new(),
+            mode: "passthrough".into(),
+            tools: Vec::new(),
+            usage: None,
+        };
+        record_send_usage(dir.path(), &empty);
+        let back2 = UsageLedger::load(&path).expect("读回");
+        assert_eq!(back2.totals(0).requests, 1);
+    }
+
+    fn usage_ledger_two_days() -> neotrix_neobot::nt_cost::UsageLedger {
+        use neotrix_neobot::nt_cost::{DayUsage, UsageLedger};
+        let mut ledger = UsageLedger::default();
+        ledger
+            .record("deepseek", "deepseek-chat", Some("DeepSeek"), 100, 10, 0, 50)
+            .expect("记今天");
+        let yesterday = chrono::Local::now()
+            .date_naive()
+            .pred_opt()
+            .unwrap()
+            .format("%Y-%m-%d")
+            .to_string();
+        ledger.days.entry(yesterday).or_default().insert(
+            "qwen|qwen-plus".to_owned(),
+            DayUsage { input: 20, cached: 0, written: 0, output: 5, requests: 1 },
+        );
+        ledger
+    }
+
+    #[test]
+    fn 汇总窗口与分行正确() {
+        let ledger = usage_ledger_two_days();
+        // 今天一档只有 deepseek 行。
+        let one = summarize_usage(&ledger, 1);
+        assert_eq!(one.days, 1);
+        assert_eq!(one.rows.len(), 1);
+        assert_eq!(one.rows[0].id, "deepseek|deepseek-chat");
+        assert_eq!(one.rows[0].name.as_deref(), Some("DeepSeek"));
+        assert_eq!((one.input, one.output, one.requests), (100, 50, 1));
+        assert_eq!(one.tokens, 150);
+        // 两天两行都进。
+        let all = summarize_usage(&ledger, 0);
+        assert_eq!(all.rows.len(), 2);
+        assert_eq!((all.input, all.output, all.requests), (120, 55, 2));
+        // days 缺席即 0（有史以来），与显式 0 同义。
+        assert_eq!(summarize_usage(&ledger, 0).tokens, all.tokens);
+    }
+
+    #[test]
+    fn 超大days被钳制不转圈() {
+        // ⛔ 窗口是逐天回退循环：u64::MAX 会转到天荒地老。
+        // 命令层钳 3650，这里断言钳制后的汇总仍正常（不断言耗时，只断言正确）。
+        let ledger = usage_ledger_two_days();
+        let s = summarize_usage(&ledger, 3650);
+        assert_eq!(s.tokens, 175);
     }
 }
 

@@ -10,13 +10,13 @@
 //! 删除内嵌 app 就是为了消除那个问题。这次重建若在这里重写一遍
 //! 逻辑，等于把它原样造回来。
 //!
-//! # ⛔ 本文件尚未通过编译验证
+//! # 编译状态
 //!
-//! 写入时 `scripts/ops/nt_mem_gate.sh` 返回 2（BLOCKED），
-//! 按仓库纪律禁止起 cargo 构建；且 pre-commit 门对**任何** `.rs`
-//! 跑 `cargo check --tests -p neotrix`（验的是 neotrix-core，不是本 app）。
-//! 故本文件的正确性来自**逐个核对库签名**，不是来自编译器。
-//! 内存闸解除后必须补跑 `cargo check -p neobot-desktop --all-targets`。
+//! `cargo check -p neobot-desktop --all-targets` 0 error，
+//! `cargo test -p neobot-desktop` 52+3 全绿（2026-09-30）。
+//! pre-commit 门对**任何** `.rs` 跑的是 `cargo check --tests -p neotrix`
+//!（验的是 neotrix-core，不是本 app）—— 故本 app 的编译正确性
+//! 由上两条命令保证，改完 `.rs` 必跑。
 //!
 //! # 命令清单为什么这么短
 //!
@@ -53,6 +53,7 @@ pub fn run() {
             neobot_desktop::core::list_backups,
             neobot_desktop::core::delete_backup,
             neobot_desktop::core::update_app_config,
+            neobot_desktop::core::get_app_config,
             neobot_desktop::platform::open_external_url,
             neobot_desktop::platform::write_clipboard_text,
             neobot_desktop::platform::read_clipboard_image,
@@ -61,7 +62,23 @@ pub fn run() {
             neobot_desktop::platform::set_launch_on_login,
             neobot_desktop::platform::create_app_window,
             neobot_desktop::platform::remote_open_window,
-            neobot_desktop::platform::move_pet_window,
+            neobot_desktop::pet::move_pet_window,
+            neobot_desktop::pet::list_pets,
+            neobot_desktop::pet::import_pet,
+            neobot_desktop::pet::get_pet_asset,
+            neobot_desktop::pet::list_preset_pets,
+            neobot_desktop::platform::quit_app,
+            neobot_desktop::platform::reveal_data_dir,
+            neobot_desktop::platform::reveal_in_folder,
+            neobot_desktop::platform::open_dir,
+            neobot_desktop::pet::get_pet_status,
+            neobot_desktop::pet::set_pet_enabled,
+            neobot_desktop::pet::set_active_pet,
+            neobot_desktop::pet::set_pet_size,
+            neobot_desktop::pet::get_pet_overlay_supported,
+            neobot_desktop::pet::get_force_xwayland,
+            neobot_desktop::pet::set_force_xwayland,
+            neobot_desktop::pet::set_pet_ignore_cursor_events,
             neobot_desktop::desktop::get_runtime_info,
             neobot_desktop::desktop::runtime_ready,
             neobot_desktop::desktop::install_dependencies,
@@ -78,15 +95,53 @@ pub fn run() {
             neobot_desktop::commands::neobot_panel_demo_publish,
             neobot_desktop::commands::neobot_agent_run,
             neobot_desktop::commands::neobot_send,
+            neobot_desktop::commands::neobot_usage_summary,
+            neobot_desktop::commands::neobot_memory_list,
+            neobot_desktop::commands::neobot_memory_add,
+            neobot_desktop::commands::neobot_memory_undo,
+            neobot_desktop::commands::neobot_convo_messages,
             neobot_desktop::commands::neobot_convo_list,
             neobot_desktop::commands::neobot_member_list,
+            neobot_desktop::commands::neobot_member_add,
             neobot_desktop::commands::neobot_convo_group,
             neobot_desktop::commands::neobot_convo_dm,
             neobot_desktop::commands::neobot_core_capabilities,
             neobot_desktop::commands::neobot_evidence_summary,
-            neobot_desktop::commands::neobot_send,
             neobot_desktop::commands::neobot_panel_answer,
+            neobot_desktop::core::neobot_skill_list,
+            neobot_desktop::core::neobot_skill_install,
+            // 「本仓不提供」的显式声明（理由见 desktop 模块段头注释）。
+            neobot_desktop::desktop::get_dsh_plugins,
+            neobot_desktop::desktop::get_cli_link_status,
+            neobot_desktop::desktop::copy_service_url,
+            neobot_desktop::desktop::get_plugin_backup,
+            neobot_desktop::desktop::download_core,
+            neobot_desktop::desktop::update_local_core,
+            neobot_desktop::desktop::report_plugin_error,
+            neobot_desktop::desktop::open_preinstall_repo,
+            neobot_desktop::desktop::get_profiles,
+            neobot_desktop::desktop::create_profile,
+            neobot_desktop::desktop::set_active_profile,
         ])
+        .setup(|app| {
+            // macOS 原生菜单栏。⛔ 不是可选项：
+            //    `navbar.tsx`（逐字未改）在 macOS 上把「文件/运行/帮助」整组隐藏，
+            //    假定它们由原生菜单承载。不装这一段，配置/关于/日志/更新/文档/
+            //    新建窗口就全都没有入口，而前端那段 `macos-menu-action` 分发是死代码。
+            if let Err(e) = neobot_desktop::menu::install(app.handle()) {
+                eprintln!("[menu] 安装 macOS 原生菜单失败：{e}");
+            }
+            // 桌宠窗口恢复：上次开着，这次接着开。
+            // ⛔ 建不起不拦主窗启动（`let _`）：桌宠是点缀，主窗是正餐；
+            // 为点缀失败而让整个应用起不来是本末倒置。失败时状态保持 enabled，
+            // 用户在设置页开关一次即重建。
+            if neobot_desktop::pet::get_pet_status().enabled {
+                if let Ok(w) = neobot_desktop::pet::ensure_pet_window(app.handle()) {
+                    let _ = w.show();
+                }
+            }
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("启动 NeoBot 失败");
 }
