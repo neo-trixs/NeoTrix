@@ -80,5 +80,8 @@
   "api.loadFailed": "读不到 API 契约",
   "api.upstreamUnlisted": "上游未展开",
   "api.lead": "上游 Rust 侧 {total} 个命令已逐条登记。本仓不跑 DSH 运行时，其中插件/profile/updater/core/桌宠内容一类决定不做或待接，其余已接线。",
-  "api.unlistedSummary": "上游未逐条展开（{n}）"
+  "api.unlistedSummary": "上游未逐条展开（{n}）",
+  "convo.group.today": "今天",
+  "convo.group.week": "一周内",
+  "convo.group.older": "更早"
 }

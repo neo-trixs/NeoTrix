@@ -1009,6 +1009,22 @@
    "read_only": true,
    "when_not": "调色**前**先跑它取基线；它只量选定选择器，新增文案若不在 TARGETS 里不会被量到（要量别的得先加进 TARGETS）",
    "spec": "WCAG 相对亮度比；正文≥4.5:1、大字/UI≥3.0:1；深浅两档都过。量 computed color vs 实际生效背景（向上找首个非透明 bg），不是 CSS 变量值"
+  },
+  {
+   "id": "neobot-check-convo-groups",
+   "query": [
+    "侧栏分组",
+    "最近活跃",
+    "折叠",
+    "会话列表",
+    "找不到会话",
+    "组头"
+   ],
+   "tool": "node scripts/ops/neobot-check-convo-groups.mjs",
+   "kind": "gate",
+   "read_only": true,
+   "when_not": "改侧栏**项**样式前跑它取基线；它的 D 项（虚拟化）只在大列表下生效，小列表由 neobot-ui-smoke 的「千条」场景把关",
+   "spec": "A 组头出现且带计数 / B 默认展开 / C 折叠**局部**生效（减少数必须等于该组条数，'全部消失'也会被抓）/ D 大列表下虚拟化成立 / E 组头是 BUTTON 且 aria-expanded 正确"
   }
  ],
  "excluded": {

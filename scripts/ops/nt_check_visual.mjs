@@ -199,7 +199,17 @@ try {
       const ctrls = [...document.querySelectorAll('.nb-bar button, .nb-bar select')]
         .filter(el => el.offsetParent !== null)
         .map(el => { const r = el.getBoundingClientRect(); return { h: Math.round(r.height), cy: Math.round(r.top + r.height / 2) }; });
-      const rows = [...document.querySelectorAll('[data-testid="nb-convo-list"] button')]
+      // ⛔⛔ 原来量「nb-convo-list 下所有 button」。侧栏新增「按最近活跃分组」的
+      //   **组头**（py-1 text-[11px]，约 25px）后，组头被当成「会话项」
+      //   ⇒ 本门报「行高 25px < 40px」。
+      //   **门没错在阈值，是量错了对象** —— 与本文件头 §7.2 同一纪律，
+      //   只不过这次是**另一侧加功能**暴露了选择器的位置假设。
+      // ⇒ 改量会话项专属钩子；钩子不存在时回退旧选择器（避免选择器失效 ⇒ 恒 0 判过）。
+      // ⚠️ 本段在**模板字符串**内 ⇒ 注释里**绝不可用反引号**，
+      //    否则提前终止模板 ⇒ SyntaxError（本轮踩过）。用「」代替。
+      const nbItems = document.querySelectorAll('[data-testid="nb-convo-item"]')
+      const rowSel = nbItems.length ? '[data-testid="nb-convo-item"]' : '[data-testid="nb-convo-list"] button'
+      const rows = [...document.querySelectorAll(rowSel)]
         .map(el => Math.round(el.getBoundingClientRect().height));
       // ⛔ 上一版量「section 下所有 div 的宽度」，量到的是**滚动容器本身**
       //    （1024px 全宽）—— 那不是正文列。真正决定可读性的是居中那列

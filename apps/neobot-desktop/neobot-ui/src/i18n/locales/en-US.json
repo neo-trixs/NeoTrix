@@ -80,5 +80,8 @@
   "api.loadFailed": "Cannot read API contract",
   "api.upstreamUnlisted": "upstream unlisted",
   "api.lead": "All {total} upstream Rust commands are registered. We do not run the DSH runtime; plugin/profile/updater/core/pet commands are deliberately skipped or pending, the rest are wired.",
-  "api.unlistedSummary": "Upstream not itemized ({n})"
+  "api.unlistedSummary": "Upstream not itemized ({n})",
+  "convo.group.today": "Today",
+  "convo.group.week": "This week",
+  "convo.group.older": "Older"
 }

@@ -274,6 +274,68 @@ export function NeoBotRoot() {
     )
   }, [convos, q])
 
+  // ── 侧栏：按最近活跃分组 + 可折叠（统一队列 #2）─────────────────────
+  // 为什么分组：会话多起来后，「找不到上周那个对话」是最痛的点，而
+  // 一列平铺的时间戳只有秒级信息量。
+  // 为什么**可折叠**：分组解决了「找得到」，但**分组本身**会让长列表更长，
+  // 所以必须能收起 —— 否则只是把问题挪了位置。
+  //
+  // ⚠️ 与虚拟化共存的关键：把「组头 + 组内条目」**拍平成一个数组**再交给
+  //    virtualizer。若直接虚拟化 convos 再插组头，index→item 的映射就错位。
+  type ConvoRow =
+    | { kind: 'header'; key: string; label: string; count: number; collapsed: boolean }
+    | { kind: 'item'; key: string; c: ConvoView }
+
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const GROUP_LABEL: Record<'today' | 'week' | 'older', () => string> = {
+    today: () => t('convo.group.today'),
+    week: () => t('convo.group.week'),
+    older: () => t('convo.group.older'),
+  }
+  const convoRows = useMemo<ConvoRow[]>(() => {
+    const now = Date.now()
+    const bucketOf = (iso: string): string => {
+      const t = Date.parse(iso)
+      if (Number.isNaN(t)) return 'older'
+      const age = now - t
+      if (age < 864e5) return 'today'                 // 24h 内
+      if (age < 7 * 864e5) return 'week'              // 一周内
+      return 'older'
+    }
+    const order = ['today', 'week', 'older'] as const
+    const groups = new Map<string, ConvoView[]>()
+    for (const c of shown) {
+      const k = bucketOf(c.last_active)
+      const arr = groups.get(k)
+      if (arr) arr.push(c)
+      else groups.set(k, [c])
+    }
+    const out: ConvoRow[] = []
+    for (const k of order) {
+      const items = groups.get(k)
+      if (!items || items.length === 0) continue
+      // 组内按最近活跃在前 —— 分组后组内顺序才是主要的导航线索
+      items.sort((a, b) => Date.parse(b.last_active) - Date.parse(a.last_active))
+      const isCollapsed = collapsed[k] ?? false
+      out.push({
+        kind: 'header', key: k, count: items.length,
+        // ⛔ 刻意用**显式映射**而非模板字面量 `t(\`convo.group.${k}\`)`：
+        //    模板字面量的键**不在** 4d 门的正则视野内（它只认 'x' 与 "x"）
+        //    ⇒ 键拼错不会被门发现，且无法 grep。
+        //    显式映射可被门覆盖、可被搜索、拼错即编译期可见。
+        label: GROUP_LABEL[k](), collapsed: isCollapsed,
+      })
+      if (!isCollapsed) {
+        for (const c of items) out.push({ kind: 'item', key: c.id, c })
+      }
+    }
+    return out
+  }, [shown, collapsed, msgs.length, t])
+
+  const toggleGroup = useCallback((k: string) => {
+    setCollapsed((prev) => ({ ...prev, [k]: !(prev[k] ?? false) }))
+  }, [])
+
   // ── 会话列表虚拟化 ──────────────────────────────────────────────────
   // 设计吸收自 @tanstack/react-virtual（MIT, 3.14.13）：**先读其 .d.ts 确认
   // API**（count / getScrollElement / estimateSize 必需，overscan 可选；
@@ -287,7 +349,9 @@ export function NeoBotRoot() {
   //    `measureElement` 实测校正，否则滚动条长度会跳。
   const listRef = useRef<HTMLDivElement | null>(null)
   const virtualizer = useVirtualizer({
-    count: shown.length,
+    // ⛔ 吃**拍平后的 rows**（含组头），不是 convos —— 否则组头与条目
+    //    在 index 空间里对不上，virtualizer 会把组头当条目渲染。
+    count: convoRows.length,
     getScrollElement: () => listRef.current,
     estimateSize: () => 58,
     overscan: 8,
@@ -493,6 +557,12 @@ export function NeoBotRoot() {
     return (
       <button
               key={c.id}
+              // ⛔ 稳定钩子：视觉门原先量 `[data-testid="nb-convo-list"] button` 的
+              //    **全部** button ⇒ 侧栏加「按最近活跃分组」的组头（~25px）后，
+              //    组头被当成「会话项」⇒ 门报「行高 25px < 40px」。
+              //    门没错在阈值，是**量错了对象**（同 f38acb0f §7.2 同一纪律，
+              //    只不过这次是**别人加功能**暴露了选择器的位置假设）。
+              data-testid="nb-convo-item"
               type="button"
               onClick={() => setSel(c.id)}
               aria-current={active ? 'true' : undefined}
@@ -651,8 +721,34 @@ export function NeoBotRoot() {
               style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}
             >
               {virtualizer.getVirtualItems().map((vi) => {
-                const c = shown[vi.index]
-                if (!c) return null
+                const row = convoRows[vi.index]
+                if (!row) return null
+                if (row.kind === 'header') {
+                  return (
+                    <div
+                      key={row.key}
+                      data-index={vi.index}
+                      ref={virtualizer.measureElement}
+                      style={{
+                        position: 'absolute', top: 0, left: 0, width: '100%',
+                        transform: `translateY(${vi.start}px)`,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        data-testid={`nb-group-${row.key}`}
+                        aria-expanded={!row.collapsed}
+                        onClick={() => toggleGroup(row.key)}
+                        className="w-full px-2 py-1 text-left text-[11px] font-medium text-muted"
+                      >
+                        <span aria-hidden="true">{row.collapsed ? '▸' : '▾'}</span>{' '}
+                        {row.label}
+                        <span className="ml-1 opacity-70">({row.count})</span>
+                      </button>
+                    </div>
+                  )
+                }
+                const c = row.c
                 return (
                   <div
                     key={c.id}
