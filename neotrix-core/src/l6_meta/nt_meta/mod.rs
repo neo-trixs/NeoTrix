@@ -52,10 +52,23 @@ pub use monitor::{AlertSeverity, HealthCheck, HealthTrend, MetaAlert, MetaMonito
 ///
 /// ⛔ **未接线**：`eval_engine` 三个文件（650 行）仍在磁盘上但**不声明**。
 /// 它们零生产消费者，且 `llm_judge.rs:86` 是 `let normalized = 1.0;`
-/// —— **硬编码满分，从不调 LLM**，与它自己的文件名不符。
-/// ⛔ 接线前必须先修 judge（否则是「永远满分」的假测量）。
-/// 见 `docs/architecture/DECISIONS-REQUIRED-2026-09-29.md` D-3。
-// pub mod eval_engine;
+/// —— 原为「**硬编码满分，从不调 LLM**」，与它自己的文件名不符。
+///
+/// ✅ **该问题已于 2026-10-02 修复**（P0，见
+/// `docs/architecture/EMERGENCE-PLAN-2026-10-02.md`）：
+/// `llm_judge::evaluate_response` 曾用 `let _ = (prompt, response);`
+/// 丢弃入参、恒给 `config.max_score`、理由硬编码 `"Full score"`
+/// ⇒ **任何输入都返回满分**，等于自动为「已涌现」提供证据。
+///
+/// 现在它**显式拒绝评分**：签名返回 `Option<JudgeResult>`，
+/// 有判据但无 rubric 信号时返回 `None` + `REFUSAL_REASON`，
+/// 只有「无判据」/「总权重为 0」两个退化配置才给出良定义的 0 分。
+/// 由 `test_no_input_can_ever_score_max` **反向锁**保证：
+/// 36 组（判据数 × max × 响应）**无一能拿到 max**。
+///
+/// ⚠️ 本模块仍**未接入生产调用方**（`evaluate_response` 零外部引用）。
+/// 接入前需注意：它现在**拒绝**评分，所以任何依赖它给分的上游都会拿到 `None`。
+pub mod eval_engine;
 
 /// 自进化验证底座 —— 补上「改了一版，怎么知道变好了」这一层。
 ///
