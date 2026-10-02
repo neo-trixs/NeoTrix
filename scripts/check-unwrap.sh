@@ -117,7 +117,24 @@ for dirpath, dirnames, filenames in os.walk("."):
         in_test_block = False
         depth = 0
         for i, line in enumerate(code, 1):
-            if re.search(r"#\[cfg\(test\)\]", line):
+            # ⭐⭐ 2026-10-02 修的**假阳性**：原先只认**字面** `#[cfg(test)]`，
+            #    而 `#[cfg(all(test, feature = "…"))]` / `#[cfg(any(test, …))]`
+            #    同样是「仅测试期编译」，却不被识别 ⇒ 该模块里的 unwrap 被算成**生产代码**。
+            #    实测受害者：`nt_shield_sandbox/mod.rs:782` 的
+            #    `#[cfg(all(test, feature = "sandbox"))] mod sandbox_vault_tests`
+            #    ⇒ 850 那条测试里的 `expect("tempdir")` 被误报为生产违规。
+            # ⭐ 判据口径：`#[cfg(…)]` 里**出现** `test` 这个 ident 即算测试边界。
+            # ⓰ 注意：`_strip_noncode` 会**抹掉字符串字面量内容**，故门看到的
+            #   `#[cfg(all(test, feature = "sandbox"))]` 实际是 `feature = ""`。
+            #   本判据不依赖字面量内容 ⇒ 不受影响。
+            #   ⛔ 刻意不改成「任何 cfg 都算」——那会把 feature 门（`#[cfg(feature=…)]`）
+            #   的生产分支也吞掉，等于放过整片生产代码。
+            #   ⛔ 曾试过 `re.match(r"#\[cfg\(([^)]*)\)\]")` 取 cfg 体 ——
+            #     **失配**：`all(test, …)` 的 cfg 体里**自带括号**，`[^)]*` 匹配不到
+            #     闭合的 `)]` ⇒ 整个正则不命中（实测：修完仍 26，850 仍在名单）。
+            #   ⇒ 改为「是 cfg 属性」+「该行含 `test` ident」两条独立判据。
+            is_cfg_attr = re.match(r"\s*#\[cfg\(", line) is not None
+            if is_cfg_attr and re.search(r"\btest\b", line):
                 in_test_block = True
             if in_test_block:
                 continue
