@@ -8,8 +8,11 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::curves::{DecayCurve, ExponentialDecay};
-use super::pruner::{MemoryPruner, PruneMode};
+// 2026-09-30：`DecayCurve` 原被导入但本文件**未使用**（只调固有方法
+// `ExponentialDecay::from_half_life`）⇒ 移除，避免 unused 警告。
+use super::curves::ExponentialDecay;
+// 2026-09-30：`PruneMode` 在本文件未使用 ⇒ 移除（类型本身已在 pruner 中补齐）。
+use super::pruner::MemoryPruner;
 use super::salience::SalienceCalculator;
 
 /// Configuration for the decay-based forgetting system.

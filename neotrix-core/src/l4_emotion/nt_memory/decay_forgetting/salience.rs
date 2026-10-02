@@ -41,6 +41,9 @@ impl Default for SalienceWeights {
 }
 
 /// Computes a composite salience score for memory entries.
+// 2026-09-30 加 derive：`MemoryPruner` 需持有本类型并要求 Debug/Clone。
+// 字段 `decay`/`weights` 均已 `Debug+Clone+Copy`，`max_access_count` 是 f64 ⇒ 派生成立。
+#[derive(Debug, Clone)]
 pub struct SalienceCalculator {
     pub decay: ExponentialDecay,
     pub weights: SalienceWeights,

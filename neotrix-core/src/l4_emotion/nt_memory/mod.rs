@@ -51,7 +51,10 @@ pub mod entity_linking;
 // 开启后的错误数：
 //   ~~add_only_writes → 8~~ ✅ **已修并恢复**（2026-09-30：根因是未完成的
 //     批量改名把类型写成 `AddOnlyAddOnlyMemoryEntry`，修 1 处定义即自洽）
-//   admission_control → 2    decay_forgetting → 6
+//   admission_control → 2（仍待处理）
+//   ~~decay_forgetting → 6~~ ✅ **已修并恢复**（2026-09-30：根因是一次**未完成的
+//     API 迁移** —— 自由函数形态已写好，但 config.rs/salience.rs 仍在用 trait 形态，
+//     而那些 trait 类型全仓不存在。已补齐 trait 层并复用既有自由函数作默认实现）
 // ⚠️ `hybrid_retrieval` **原被列在此处，但实测 0 错误 —— 属笼统注释的误伤**，
 //    已于 2026-09-30 恢复声明（6 文件 / 1,028 行，零外部依赖，
 //    `EntityIndex`/`FusionEngine` 的簇外同名命中经核实是
@@ -61,7 +64,7 @@ pub mod entity_linking;
 //    四个都不能碰。现逐个标注实测结果。
 pub mod add_only_writes;
 // pub mod admission_control;
-// pub mod decay_forgetting;
+pub mod decay_forgetting;
 pub mod hybrid_retrieval; // 实测 0 编译错误 ⇒ 恢复（2026-09-30）
 
 // Re-exports for cross-module integration
