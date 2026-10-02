@@ -44,19 +44,34 @@
 ⇒ 它在恶意版本**已发布**后才报警，无法阻止解析。
 ⇒ **pi 贡献的是「预防」，而本仓只有「检测」。这是真正的缺口，不是重复建设。**
 
-### 落地（本节唯一的实际动作）
-
-新增仓库根 `.npmrc`：
+### 落地：仓库根 `.npmrc`（只含一条）
 
 ```ini
 save-exact=true
-min-release-age=2
 ```
 
-* 本机 npm **11.12.1**（`npm -v` 实测）≥ 11.6 ⇒ 支持 `min-release-age`。
-* 未设置时 `npm config get min-release-age` 返回 `null`（`null` = 未设，非不支持）。
+* ✅ **已实测**：`npm config get save-exact` → `true`。
 * 与既有纪律一致：`frontend/package.json` 的 22+66 依赖本就**全部精确锁定**，
-  `save-exact=true` 只是把该既有事实**固定下来**，不改变既定行为。
+  `save-exact=true` 只是把该既有事实**固定下来**。
+* ⛔ **刻意不加** pi 同款的 `min-release-age`（同日新版本不参与解析）：
+  实测 `npm config get min-release-age` 返回 **`null`**，而同文件里
+  `save-exact` 返回 `true` ⇒ npm **读了本文件但不认识这个键**，
+  在本机 npm 11.12.1 上是**空转的**。
+  ⇒ 留 no-op 键 = **假防御**（读 .npmrc 的人会以为冷却期已生效）。
+  ⇒ 等本机 npm 真正支持且能回读验证时再加。
+
+### ⛔ 顺带实测到的前置问题（非本轮引入）
+
+`npm install --dry-run` 在 `neobot-ui` 下**本就崩溃**：
+
+```
+npm error Cannot read properties of null (reading 'matches')
+```
+
+对照实验：把本轮新增的 `.npmrc` **移走**后**同样报错** ⇒ 与本轮改动无关，
+是该应用**无 `package-lock.json`** 条件下 npm 11.12.1 的既有行为。
+⚠️ 记录在此以免**下一个 agent 把它误归因给最近的改动** ——
+「最近改过」不等于「是我改坏的」，R-SCAN-2 的反例。
 
 ### ⛔ 明确不做（留给下一批，需先定 canonical）
 
