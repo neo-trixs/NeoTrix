@@ -142,6 +142,7 @@ if (b[b.length - 1] !== 'test-normal') bad(`发送内容不对：${JSON.stringif
 //    且 `重发` 必须**按 id 寻址**、且**不得**再出现「剥前缀」方案。
 //    ⓘ 这是**结构性**判据：它不依赖运行时状态，却能钉住「一个字段承载两份信息」
 //    这个根因（子代理指出的真缺陷）。
+// ⭐ C/D/F 三条结构性判据共用这份源码，一次读完。
 const src = await readFile(fileURLToPath(new URL(
   '../../apps/neobot-desktop/neobot-ui/src/neobot-root.tsx', import.meta.url)), 'utf8')
 const c1 = /prompt\?:\s*string/.test(src) && /prompt:\s*text/.test(src)
@@ -161,6 +162,20 @@ if (!c1) bad('Msg 类型/失败分支没有独立的 prompt 字段 ⇒ 重发仍
 if (!c2) bad('sendFailedPrefixRe 仍在 ⇒ 剥前缀的错方案还在（切语言必错）')
 if (!d1) bad('retry 仍以数组下标为参数')
 if (!d2) bad('retry 未按 id 查找消息 ⇒ 列表变动即错位')
+
+// ── F ⭐：`send()` 的**串台护栏**（结构性判据）─────────────────
+// ⛔⛔ `msgs` 是**当前会话**的列表。若用户在 `await neobot_send` 期间切了会话，
+//   `setMsgs(m => [...m, …])` 会把迟到回复追加进**新会话**的消息流。
+//   ⓘ 历史加载那条路径**有** `alive` 守卫，但它只护历史加载的 setMsgs；
+//   `send()` 的 then/catch 此前**无任何守卫**。
+// ⇒ 修法：记下发起时的 convoId，回来后比对，不符就丢弃。
+// ⭐ 判据是**结构性**的：源码里必须有「发起时取值」+「回来后比对」这两处事实。
+//   ⛔ 不断言运行时（那要造一次真实跨会话切换，脆弱）。
+const f1 = /const sendConvo = sel \?\? null/.test(src)
+const f2 = /\(sel \?\? null\) !== sendConvo/.test(src)
+console.log(`  F ⭐ send 串台护栏：发起时取值=${f1 ? '✅' : '⛔'}；回来后比对=${f2 ? '✅' : '⛔'}`)
+if (!f1) bad('send() 未在发起时抓住会话 ⇒ 无法判断回复属于哪个会话')
+if (!f2) bad('send() 的 then/catch 无会话比对守卫 ⇒ 迟到回复会串进新会话')
 
 // ── E：输入框高度同步布局 ────────────────────────────────────────
 const e = await page.evaluate(() => {

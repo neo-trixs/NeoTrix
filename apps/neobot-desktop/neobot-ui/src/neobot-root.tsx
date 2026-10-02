@@ -579,14 +579,27 @@ export function NeoBotRoot() {
   async function send() {
     const text = draft.trim()
     if (!text || busy || histLoading) return
+    // ⛔⛔ **抓住发起时的会话**，别用 resolve 时的 `sel`。
+    //    `msgs` 是**当前会话**的列表；而 `setMsgs(m => [...m, …])` 在 resolve
+    //    那一刻作用在**当时**的列表上。若用户在 `await` 期间切了会话
+    //    （`:540` 那条路径正是切会话时 `setMsgs([])` + 重载历史），
+    //    ⇒ 迟到的回复/失败气泡会**被追加进新会话的消息流**。
+    //    ⓘ 历史加载有 `alive` 守卫（`:540`），**但它只护历史加载那几处**，
+    //    `send()` 的 then/catch 此前**无任何守卫** ⇒ 这条路径是裸的。
+    //    ⇒ 解法：记下发起时的 convoId，回来后比对，不符就**丢弃**（不串台）。
+    const sendConvo = sel ?? null
     setDraft('')
     setMsgs(m => [...m, { who: 'me', text, ts: nowIso() }])
     setBusy(true)
     try {
       // convo_id 缺席（无会话时）= 脱离会话手动跑，后端不落库。
       const r = await invoke<{ output?: string, text?: string }>('neobot_send', { convo_id: sel ?? undefined, text })
+      // ⛔ 串台守卫：会话已变 ⇒ 这条回复属于**旧会话**，追加到新会话就是错的。
+      if ((sel ?? null) !== sendConvo) return
       setMsgs(m => [...m, { who: 'bot', text: r?.output ?? r?.text ?? t('chat.noOutput'), ts: nowIso() }])
     } catch (e) {
+      // ⛔ 同样要守：失败气泡串到别的会话同样是错的。
+      if ((sel ?? null) !== sendConvo) return
       // ⛔ 失败气泡标成 failed：那样才能给「重发」，也不至于和正常回复混淆。
       setMsgs(m => [...m, {
         who: 'bot',
