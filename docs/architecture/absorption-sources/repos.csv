@@ -1,494 +1,498 @@
 repo,source,stars,language,boards
-"2yuri/opencatt","trendshift","","","topics_ai-agent"
-"666ghj/MiroFish","trendshift","","","yearly#25"
-"7-hello007/AICore-Showcase","trendshift","","","topics_ai-infrastructure"
-"A0707/opscontrol","trendshift","","","topics_self-hosted"
-"AcrimoniousMirth/stremio-jellyfin","trendshift","","","topics_self-hosted"
-"Adityavardhanjain/WikiCrawl","user-list","22","TypeScript | Interactive Wikipedia knowledge graph - crawl topics, visualize connections, and explore unexpected paths.",""
-"AgentsLoop/awesome-gpt-astra-games","trendshift","","","topics_curated-list"
-"Akar1881/GardenEase","trendshift","","","topics_workflow-automation"
-"AnmolSaini16/morph-ui","trendshift","","","topics_ui-components"
-"Avinash-jetwani/jevmem","trendshift","","","topics_ai-memory"
-"BAAI-Agents/Cradle","user-list","2589","Python | The Cradle framework is a first attempt at General Computer Control (GCC). Cradle supports agents to ace any c",""
-"BY571/paper2audiobook","trendshift","","","topics_ai-voice;topics_text-to-speech"
-"BahaMert/VisualHelperForVisualNovels-VHVN-","trendshift","","","topics_text-to-speech"
-"BeauchampAndrew/shopify-lookbook-gallery","trendshift","","","topics_ui-components"
-"BjoernSchotte/agentglass","trendshift","","","topics_ai-coding"
-"Bobjonesgood/ethbuild","trendshift","","","topics_mcp"
-"BruzWJ/Audio2Face-blender-addon","trendshift","","","topics_digital-human"
-"Cairn-ink/cairn-jev-lab","trendshift","","","topics_ai-memory"
-"Chaarangan/stepgate","trendshift","","","topics_mcp"
-"ChanceMarine/Tabz","trendshift","","","topics_ui-components"
-"CopilotKit/OpenMuse","user-list","2674","TypeScript | A personal agent with a browser, terminal, files, and work that keeps going built with CopilotKit and AG-UI.",""
-"Cranot/super-hermes","user-list","480","PowerShell | Skills that teach Hermes Agent to write its own analytical prompts",""
-"Cuongyd196/cit-voice-studio","trendshift","","","topics_text-to-speech"
-"D4Vinci/Scrapling","trendshift","","","yearly#24"
-"DNSBunker/ZenitiumDNS","trendshift","","","topics_self-hosted"
-"DV0x/explainer-studio","trendshift","","","topics_ai-voice;topics_text-to-speech"
-"DanFessler/trellis","trendshift","","","topics_ui-components"
-"DesarrolladorWebFrias/jarvis-ide-voice-telemetry","trendshift","","","topics_ai-coding;topics_ai-voice;topics_text-to-speech"
-"DietrichGebert/ponytail","trendshift","","","monthly#10;yearly#18"
-"Drix10/agent-flow","trendshift","","","topics_ai-coding;topics_workflow-automation"
-"Dudu-001/kleros-case-closed-video","trendshift","","","topics_ai-video"
-"EbookFoundation/free-programming-books","trendshift","","","github-trending-repositories"
-"EthanYoQ/Invoice-Downloader","user-list-append","","",""
-"FeSens/openTPU","trendshift","","","topics_ai-infrastructure"
-"Finderchangchang/brewreel","user-list+trendshift","84","TypeScript | 精酿 BrewReel：让 DeepSeek 这类便宜模型也能做出好看的竖版宣传片。写一份产品简报，AI 挑镜头、写文案，一条命令出片。3 种配方、6 个行业、广告法校验，开源可商用。","topics_ai-video"
-"FoundationAgents/MetaGPT","user-list","70662","Python | 🌟 The Multi-Agent Framework: First AI Software Company, Towards Natural Language Programming",""
-"Graphify-Labs/graphify","trendshift","","","yearly#22"
-"GreyforgeLabs/slopbrake","trendshift","","","topics_ai-coding"
-"Guilhermerisu/island","trendshift","","","topics_ui-components"
-"HKUDS/nanobot","user-list","48627","Python | Ultra-lightweight, open-source, self-hosted personal AI agent framework in Python with WebUI, tools, memory, M",""
-"HimanshurajNimse/AI-Gym-Coach","trendshift","","","topics_text-to-speech"
-"Hirdaya-Shrestha/haudiotagger_fingerprint","trendshift","","","topics_audio-processing"
-"Human-Agent-Society/reef","trendshift","","","weekly#12"
-"IAgentic-LLC/voice-agents","trendshift","","","topics_ai-agent;topics_ai-voice"
-"IceCodeNew/claude-code-plugins-setup","trendshift","","","topics_curated-list"
-"Itzmedev7/S.P.A.R.K.-AI","trendshift","","","topics_chatbot"
-"IvanAdriazola/overspill","trendshift","","","topics_ai-infrastructure"
-"IzumiSatoshi/vox-arcana","trendshift","","","topics_ai-voice"
-"Janson79jc/antigravity-100b-telemetry-audit","trendshift","","","topics_ai-agent"
-"Jason-Fay/jevulon","trendshift","","","topics_ai-agent;topics_ai-coding;topics_mcp"
-"Jhuster/interest-calendar","trendshift","","","topics_ai-agent;topics_self-hosted"
-"JoasASantos/Offensive-Security-AI-Models","user-list","55","None | Uncensored AI models or those fine-tuned for cybersecurity tasks.",""
-"Joyouou/Auralis","trendshift","","","topics_audio-processing"
-"JustVugg/colibri","trendshift","","","monthly#24"
-"K-Dense-AI/lab-instrument-mcps","trendshift","","","topics_mcp"
-"Khr0mZ/magnus-dm","trendshift","","","topics_self-hosted"
-"KingSora/OverlayScrollbars","user-list","5216","TypeScript | A javascript scrollbar plugin that hides the native scrollbars, provides custom styleable overlay scrollbars, ",""
-"Koushik890/higgsfield-api-skill","trendshift","","","topics_ai-video"
-"Lainholic/Synapse_Eegine","trendshift","","","topics_ai-agent"
-"LogicIncZo/zcode-setup","trendshift","","","topics_workflow-automation"
-"LvcIDPsyche/auto-browser","user-list","816","Python | Give your AI agent a real browser — with a human in the loop. Open-source MCP-native browser agent.",""
-"MDZubair01/opsmind-incident-agent","trendshift","","","topics_ai-agent;topics_ai-memory"
-"MartinDelophy/awesome-gpt-6-astra","user-list","263","JavaScript | A curated collection of fun games built with GPT-6 Astra, with source code, demos, and prompts. | GPT-6 Astra ",""
-"MartinForsterNL/Yvette","trendshift","","","topics_digital-human;topics_text-to-speech"
-"MaxLiu22/Motion2MixamoRig","trendshift","","","topics_digital-human"
-"MayurUbarhande0/Pipesync","trendshift","","","topics_audio-processing"
-"MervinPraison/PraisonAI","user-list","9104","Python | PraisonAI 🦞 — Hire a 24/7 AI Workforce. Stop writing boilerplate and start shipping autonomous self-improving ",""
-"MinsiAI/voicebox","trendshift","","","topics_ai-voice;topics_text-to-speech"
-"ModelMschief/GradioSpaces","trendshift","","","topics_programming-examples"
-"Mr-hunt-007/portlist","user-list","18","Python | Find what's using a port, who started it (Claude Code, Cursor, Docker…), whether your network can reach it, an",""
-"MushroomMan321/moddecoded","trendshift","","","topics_mcp"
-"NASIRCISSISTIC/chatgpt-triage","trendshift","","","topics_chatbot"
-"NVlabs/Skill2Env","user-list","134","Python | Democratizing Collective Intelligence",""
-"NaiveAI-Labs/Naive-N0.5-Flash","trendshift","","","topics_ai-coding"
-"NandhaKishorM/laya","trendshift","","","monthly#9;weekly#19"
-"NevaMind-AI/memU","user-list","14453","Python | Personal memory across agents",""
-"NickZik/n8n-docker-npm-packages","trendshift","","","topics_workflow-automation"
-"Niko1221/Strata","trendshift","","","topics_chatbot"
-"NousResearch/hermes-agent","user-list+trendshift","249565","Python | The agent that grows with you","yearly#3"
-"NovaSky-AI/SkyRL","user-list-append","","",""
-"OmniJev/OneJev","trendshift","","","topics_ai-agent"
-"OneMana-Soft/OneCamp-fe","user-list","65","TypeScript | OneCamp: self-hosted all-in-one workspace (chat, tasks, video calls, docs, calendar & AI)",""
-"OneMoh/html-explainer","trendshift","","","topics_text-to-speech"
-"OpenAdaptAI/OpenAdapt","user-list","1746","Python | Compiles a demonstrated GUI task into a program that reports VERIFIED only if an independent check agrees. pip",""
-"OpenDCAI/DataFlow","user-list","8212","Python | [SIGMOD'27] Easy Data Preparation with latest LLMs-based Operators and Pipelines.",""
-"OpenInterpreter/open-interpreter","user-list","","",""
-"PerArneng/strands-sdk-tutorial","trendshift","","","topics_ai-agent;topics_programming-examples"
-"PetShopBros/lowdown-proxy","trendshift","","","topics_mcp"
-"PeterWron/TypeFast","trendshift","","","topics_ai-voice"
-"PointAntStorm/grok-self","trendshift","","","topics_chatbot"
-"Praket7/codex-mcp-hotload","trendshift","","","topics_mcp"
-"PraveenAShukla/polyjev","trendshift","","","topics_ai-infrastructure"
-"Prevolut/askr","trendshift","","","topics_programming-examples"
-"PrimeIntellect-ai/prime-agent","user-list","21344","TypeScript | A self-improving RLM agent for coding workflows and long-running autonomous tasks.",""
-"QwenLM/Qwen-MM-Plugins","user-list","3048","Python | Make any agent harness multimodal-native.",""
-"QwenLM/qwen-code","user-list","28179","TypeScript | An open-source AI coding agent that lives in your terminal.",""
-"RK-BoilingPoint/H3-Visual-Marker-Control","trendshift","","","topics_ai-video"
-"Rahat-ch/livekitjev","trendshift","","","topics_chatbot"
-"RayVelez27/landing-page-fire","trendshift","","","topics_ui-components"
-"RomanSlack/jev-drone","user-list","217","Python | Camera-only autonomous drone in MuJoCo with a small judgment model (TypeSafe Jev) in the loop at 2.5Hz",""
-"Roshendz/semantic_zoom","trendshift","","","topics_ui-components"
-"RoyWiggins/jevlang","trendshift","","","topics_programming-examples"
-"SUZ-tsinghua/awesome-humanoid-ball-sports","trendshift","","","topics_curated-list"
-"Sdkhan01/TrueCA","trendshift","","","topics_chatbot"
-"ServiceNow/AgentLab","user-list","639","Python | AgentLab: An open-source framework for developing, testing, and benchmarking web agents on diverse tasks, desi",""
-"Shubhamsaboo/awesome-llm-apps","trendshift","","","github-trending-repositories"
-"Sidiora-Labs/Paxeer-X-Network","trendshift","","","weekly#17"
-"SkylarKitchen/skills","trendshift","","","topics_ai-agent"
-"Slaker19/webkvm","trendshift","","","topics_self-hosted"
-"Sorami-Consulting-AU/ai-kubernetes-helm-chart-security","trendshift","","","topics_ai-infrastructure"
-"Stirling-Tools/Stirling-PDF","trendshift","","","github-trending-repositories"
-"StuGRua/PDoomVideo","trendshift","","","topics_ai-video"
-"TanStack/table","user-list","28461","TypeScript | 🤖 Headless UI for building powerful tables & datagrids for TS/JS -  React-Table, Vue-Table, Solid-Table, Svelt",""
-"TapXWorld/ChinaTextbook","trendshift","","","github-trending-repositories"
-"TauricResearch/TradingAgents","trendshift","","","yearly#21"
-"Tencent/WeKnora","trendshift","","","monthly#18"
-"The-Product-Shelf/technical-product-manager-resources","trendshift","","","topics_curated-list"
-"TheCommishDeuce/ridge-helio-strap","trendshift","","","topics_self-hosted"
-"TheRealRajdeep/jev2048","trendshift","","","topics_programming-examples"
-"Tihkal96/Ogle","trendshift","","","topics_chatbot"
-"Vincentwei1021/video-shotcraft","user-list","9745","TypeScript | AI video skill for Claude Code & Codex — cinematic product videos with Remotion: 152 shot recipe cards, 209 mo",""
-"VladUZH/intents-mcp","trendshift","","","topics_mcp"
-"VoltAgent/awesome-design-md","trendshift","","","yearly#23"
-"W61k3r/LexiPanel","trendshift","","","topics_ai-infrastructure"
-"Wreeper/beginner-resources","trendshift","","","topics_curated-list"
-"YT0383/Aquarelle-Visual-audio","trendshift","","","topics_audio-processing"
-"Yazid-ELBOUACHI/ai-data-service-samples","trendshift","","","topics_programming-examples"
-"YeJe-cpu/SeeCut","trendshift","","","topics_digital-human"
-"Yehielamor/provenance-gate","trendshift","","","topics_ai-agent"
-"Yuriloll/qifeng-ip-visual","trendshift","","","topics_digital-human"
-"ZJU-REAL/Easel","user-list","1941","Python | An open-source AI agent for social media — discover trends, create content, publish everywhere, and learn what",""
-"Zhou-Shilin/Aether","user-list-append","","",""
-"a3ro-dev/qenlo-memory","trendshift","","","topics_ai-coding;topics_ai-memory;topics_mcp"
-"admte/orc-claude-plugin","trendshift","","","topics_mcp"
-"adnankhan46/jev-voice-browser-agent","trendshift","","","topics_ai-voice"
-"adolfousier/opencrabs","user-list","956","Rust | The all-in-one AI agent living in your terminal. Build landing, mobile apps, backends, manages files, deep res",""
-"affaan-m/ECC","trendshift","","","monthly#3;yearly#4"
-"aginfers/local-ai-signal-feed","trendshift","","","topics_curated-list"
-"ahmtsahin/deutsch-dna","trendshift","","","topics_ai-memory"
-"aibunny/ownstate","trendshift","","","topics_ai-memory"
-"akha-security/akca","user-list","181","Go | AKCA Advanced Web Security Scanner",""
-"aldegad/sprite-gen","user-list","2078","Python | Generate clean 2D game sprites & animation atlases — component-row pipeline: state rows, alpha cleanup, frame ",""
-"alexgreensh/token-optimizer","user-list","2418","Python | Find the ghost tokens. Fix them. Survive compaction. Avoid context quality decay. ",""
-"alibaba/open-code-review","trendshift","","","monthly#5"
-"allenpeng0705/EnvoyMesh","trendshift","","","weekly#24"
-"ameshkov/dnslookup","user-list-append","","",""
-"amitpatjoshidesign/tablekit","trendshift","","","topics_ui-components"
-"amitshekhariitbhu/ai-system-design","trendshift","","","topics_ai-memory"
-"amrgnedy/file-organizer-demo","trendshift","","","topics_workflow-automation"
-"amrutejr/shipcheck","trendshift","","","topics_workflow-automation"
-"ankurCES/Mahout","trendshift","","","topics_workflow-automation"
-"anomalyco/opencode","trendshift","","","yearly#6"
-"ant-design/ant-design","user-list","99629","TypeScript | An enterprise-class UI design language and React UI library",""
-"anthropics/claude-code","trendshift","","","github-trending-repositories;yearly#20"
-"anthropics/skills","trendshift","","","yearly#9"
-"anvaka/city-roads","user-list-append","","",""
-"aranorde-reddit/R36S-V20-20250518-2551-darkos-audio-fix","trendshift","","","topics_audio-processing"
-"aryan8434/claude-code-ai-face","trendshift","","","topics_digital-human"
-"ashishsinha1602/oci-sandbox-factory","trendshift","","","topics_workflow-automation"
-"avinash201199/System-Design-KIT","trendshift","","","topics_curated-list"
-"aws-samples/sample-voice-ai-agent-studio","trendshift","","","topics_ai-voice"
-"ayghri/i-have-adhd","trendshift","","","monthly#4"
-"baberjaved/marko-md","user-list","8","HTML | A Lightweight and Elegant Markdown viewer for MD files",""
-"baketnk/frame-yap","trendshift","","","topics_ai-voice"
-"bilawalsidhu/gods-eye-view","user-list+trendshift","44164","JavaScript | A spy satellite simulator in your browser, except the data is real. Live open source spatial intelligence on a","monthly#2"
-"blader/humanizer","trendshift","","","monthly#22"
-"bluemoondom/primes-sieve-bydomi","trendshift","","","topics_programming-examples"
-"breakstageaxe61/genspark-claw","trendshift","","","topics_mcp"
-"browser-use/browser-use","user-list","116545","Python | Agents that use the browser.",""
-"browser-use/jev-ultrafast","user-list+trendshift","20910","Python | Fastest and cheapest web agent","monthly#13"
-"brumar/chess-postmortem-skills","trendshift","","","topics_ai-video"
-"buybitart/eye-for-an-eye","trendshift","","","topics_self-hosted"
-"bytebot-ai/bytebot","user-list","11085","TypeScript | Bytebot is a self-hosted AI desktop agent that automates computer tasks through natural language commands, ope",""
-"bytedance/UI-TARS-desktop","user-list","39137","TypeScript | The Open-Source Multimodal AI Agent Stack: Connecting Cutting-Edge AI Models and Agent Infra",""
-"bytedance/deer-flow","user-list","83101","Python | An open-source long-horizon SuperAgent harness that researches, codes, and creates. With the help of sandboxes",""
-"caiovicentino/jev-risk-check-provider","trendshift","","","topics_ai-agent"
-"cdyforever/how-to-live-better","trendshift","","","weekly#8"
-"chadhurley25075-png/TensorFold","trendshift","","","topics_ai-infrastructure"
-"character-factory/character-factory","trendshift","","","topics_digital-human"
-"chatainsim/nike-sportwatch-recovery","trendshift","","","topics_programming-examples"
-"chibs3529/ai-meeting-intelligence-system","trendshift","","","topics_ai-voice;topics_workflow-automation"
-"chobits-lab/iphone-use","trendshift","","","topics_ai-agent"
-"chrichuang218/claude-desktop-cn","trendshift","","","topics_chatbot"
-"chuspeeism/awesome-opus-5-5-videos","trendshift","","","topics_ai-video;topics_curated-list"
-"cloudflare/security-audit-skill","trendshift","","","monthly#6"
-"cmkmteam-blip/open-seo-toolkit","trendshift","","","topics_self-hosted"
-"cnazk/recall-mac","trendshift","","","topics_ai-memory"
-"codecrafters-io/build-your-own-x","trendshift","","","github-trending-repositories"
-"codepawl/tacet","trendshift","","","topics_ai-infrastructure"
-"codingnoye/gksdud","trendshift","","","weekly#22"
-"compiledthoughts/Inferred-Thoughts","trendshift","","","topics_ai-infrastructure"
-"crewAIInc/crewAI","user-list","59114","Python | Framework for orchestrating role-playing, autonomous AI agents. By fostering collaborative intelligence, CrewA",""
-"czg86389-hub/muse2api","trendshift","","","topics_ai-video"
-"d-hubel/relay","trendshift","","","topics_ai-memory"
-"damienen/jev-as-llm","trendshift","","","topics_chatbot"
-"damienjerry/jml-automation","trendshift","","","topics_workflow-automation"
-"dangdang-tech/ai-event-research-data","trendshift","","","topics_curated-list"
-"danielmiessler/typeless-pedal","trendshift","","","topics_workflow-automation"
-"daniiarabdiev/so101-vlm-agent","trendshift","","","topics_ai-agent"
-"darkhorseprojects/zinc","trendshift","","","topics_ai-memory"
-"davekiss/agent-contact-policy","trendshift","","","topics_mcp"
-"davidsonff/asimov4laws","trendshift","","","topics_ai-infrastructure"
-"dccsillag/experiments-adaptive-fgd","trendshift","","","topics_programming-examples"
-"debpalash/VoiceStudio","trendshift","","","monthly#1;weekly#5"
-"deepfates/imp","trendshift","","","weekly#20"
-"deeplethe/utopia","trendshift","","","monthly#21"
-"deepseek-ai/deepseek-harness","user-list+trendshift","238032","TypeScript | DeepSeek Harness: Everything is a Plugin.","monthly#23;weekly#11;yearly#13"
-"demetriuszhomir/lame-reader","trendshift","","","topics_text-to-speech"
-"dentiny/duckdb-distributed-execution","user-list-append","","",""
-"deskgate-app/deskgate-operator-2.6.8-public","trendshift","","","topics_workflow-automation"
-"dexarxbt/Novera","trendshift","","","topics_ai-memory;topics_chatbot"
-"digipulse-engineering/GAAI-framework","user-list","162","Shell | Turns AI coding tools into reliable software delivery systems. Drop a .gaai/ folder into any project — Discove",""
-"dmoshehun-prog/learn-from-materials","user-list","681","Python | Turn PDFs, books and papers into interactive learning webpages｜将复杂材料转化为可追溯、可测验、可做笔记的学习网页",""
-"donnemartin/system-design-primer","trendshift","","","github-trending-repositories"
-"dream-num/univer","trendshift","","","weekly#6"
-"dream-num/univer-workspace","trendshift","","","weekly#7"
-"drewk312/VantaMusic","trendshift","","","topics_audio-processing"
-"dvar0/autochart","trendshift","","","topics_audio-processing;topics_self-hosted"
-"earendil-works/pi","trendshift","","","yearly#14"
-"emir/claude-s40","trendshift","","","topics_chatbot"
-"esacodeorg/docker-odoo-20","trendshift","","","topics_self-hosted"
-"eternity4719/HowToLiveBetter","trendshift","","","monthly#12;weekly#1"
-"exsesx/helium-new-tab","user-list-append","","",""
-"farion1231/cc-switch","trendshift","","","weekly#13;yearly#11"
-"federicomameli1/sugarglass","trendshift","","","topics_ui-components"
-"feitangyuan/onetake","trendshift","","","topics_ai-video"
-"fer-git/opencode-plugins","trendshift","","","topics_text-to-speech"
-"ferndesk/no-slop-motion","trendshift","","","topics_ai-video"
-"fgq668-lab/XUnFollow","trendshift","","","topics_self-hosted"
-"firecrawl/firecrawl","trendshift","","","yearly#16"
-"franckverrot/grouille","trendshift","","","topics_ai-infrastructure"
-"fraserbrownirl/reintro-ai","trendshift","","","topics_text-to-speech"
-"freeCodeCamp/freeCodeCamp","trendshift","","","github-trending-repositories"
-"frolleks/soter","trendshift","","","topics_chatbot"
-"from-developers-for-developers/agentic-workflows","trendshift","","","topics_workflow-automation"
-"fueledximagination/fxi-frame-chain","trendshift","","","topics_ai-video"
-"ganbuscovick/Sound-Words","trendshift","","","topics_audio-processing"
-"garrytan/gstack","trendshift","","","yearly#15"
-"georgeding/Relate","trendshift","","","topics_ai-memory"
-"getzep/graphiti","user-list","31235","Python | Build Real-Time Knowledge Graphs for AI Agents",""
-"ghetea-patrick/jjl","trendshift","","","topics_programming-examples"
-"glanderness/BeefTV","user-list","264","TypeScript | Local-first, lightweight, AI-native video workspace.",""
-"gmorb/mpc-vst-dragonfly","trendshift","","","topics_audio-processing;topics_mcp"
-"gnekt/My-Brain-Is-Full-Crew","user-list","3815","Shell | Built by a PhD whose memory was failing, whose diet was a mess, and whose anxiety had its own agenda. Most sec",""
-"google/artemis","trendshift","","","monthly#15"
-"google/ax","trendshift","","","monthly#17"
-"graygnatconsole/mcp-audit-tool","trendshift","","","topics_mcp"
-"guilherme-vasques-ltda/omp-ov-memory","trendshift","","","topics_ai-memory"
-"guillaumemeyer/watermarks-remover","user-list","22968","Python | A privacy-first app that strips AI watermarks from content you own.",""
-"guoyuanjing540-wq/-ai","trendshift","","","topics_chatbot"
-"hacksider/Deep-Live-Cam","trendshift","","","github-trending-repositories"
-"harry0703/MangoDisk","user-list","3406","Rust | Safety-first disk cleaner and space analyzer for macOS and Windows, with duplicate cleanup, app uninstall, sta",""
-"harry0703/MoneyPrinterTurbo","user-list+trendshift","126393","Python | 利用 AI 大模型和自动化工作流，根据主题或关键词一键生成高清短视频。Generate HD short videos from a topic or keyword with an automated AI workf","github-trending-repositories"
-"harshavarma02/system1-jev-laya-agent","trendshift","","","topics_ai-memory"
-"heartmade-studio/skryba","trendshift","","","topics_ai-voice"
-"herhu/archon-specs","trendshift","","","topics_ai-infrastructure"
-"heygen-com/liveavatar-gpt-live-demos","trendshift","","","topics_digital-human"
-"hfassold/JrsVision","trendshift","","","topics_digital-human"
-"howseen-ai/claude-motion-design","trendshift","","","topics_ai-video"
-"htsecurity/macvibe","trendshift","","","topics_ai-coding"
-"huaizhi123/meixinji","trendshift","","","topics_chatbot"
-"huggingface/smolagents","user-list","29534","Python | 🤗 smolagents: a barebones library for agents that think in code.",""
-"hughmadden/mimo26f-afd","trendshift","","","topics_ai-infrastructure"
-"hydra-db/hydradb","trendshift","","","monthly#19"
-"hypit-ai/hypit","trendshift","","","monthly#11"
-"hyppe-cc/video-maker","trendshift","","","topics_ai-video;topics_ai-voice"
-"ianmasterpro01-del/tts-engine-collection","trendshift","","","topics_text-to-speech"
-"ifixai-ai/iFixAi","trendshift","","","weekly#2"
-"igu1/hiblob","trendshift","","","topics_ui-components"
-"ilkerzg/storycast","user-list","225","TypeScript | Type a topic. Get a story.",""
-"immich-app/immich","trendshift","","","github-trending-repositories"
-"ipfizz/bunmaska","user-list","17","TypeScript | Electron minus Chromium, powered by Bun and WebKit. A drop-in Electron replacement: same APIs, no bundled Chro",""
-"iptv-org/iptv","trendshift","","","github-trending-repositories"
-"isaacfhu/spotify-to-jellyfin","trendshift","","","topics_self-hosted"
-"jamescantco-de/taste-as-code","trendshift","","","topics_ai-coding"
-"jamesmcginnis/crow-entity-card","trendshift","","","topics_ui-components"
-"jaredwray/mockhttp","user-list","23","TypeScript | A simple HTTP server that can be used to mock HTTP responses for testing purposes. Inspired by httpbin and bui",""
-"jasonkneen/fm-with-jev","user-list","5","None | ",""
-"jethac/slint","trendshift","","","topics_ui-components"
-"jianruntech/geo-score","user-list","576","Python | Can AI engines cite your site, and do they? Free 0–100 readiness score on an open GEO rubric, plus citation tr",""
-"jiukemi/JY_IPAgent","trendshift","","","topics_digital-human"
-"jmcblane/PiG","trendshift","","","topics_ai-agent"
-"joeseesun/opus-video-prompts","trendshift","","","topics_ai-video;topics_curated-list;topics_programming-examples"
-"joeseesun/qiaomu-home","trendshift","","","topics_ui-components"
-"johnmosesventura06/qwen38-hybrid-vmm-lru","trendshift","","","topics_ai-infrastructure"
-"jonathanroomer/NightBloodRemote","trendshift","","","topics_digital-human"
-"jordan-gibbs/hyperresearch","user-list","3699","Python | Convert Claude Code or Codex into the most intelligent Deep Research Agent. Collect, search, and synthesize we",""
-"jrgrafisk/ha-ev-smart-charging","trendshift","","","topics_self-hosted"
-"juspay/hyperswitch","trendshift","","","github-trending-repositories"
-"justxor/sobesrazborgoogle","trendshift","","","topics_curated-list"
-"jwasham/coding-interview-university","trendshift","","","github-trending-repositories"
-"k4ditano/marea-plm","trendshift","","","topics_ui-components"
-"kabarza/angry-slider","trendshift","","","topics_ui-components"
-"kadirb4rut/video-dubbing-translator","trendshift","","","topics_ai-video;topics_ai-voice"
-"karthikvetrivel/Daybow","trendshift","","","topics_workflow-automation"
-"kdrcoding/easy-fsc-e3-bot","trendshift","","","topics_chatbot"
-"kenac99/tv-episode-ai-rename","trendshift","","","topics_audio-processing"
-"kernel-cracker/sakura-print","trendshift","","","topics_self-hosted"
-"korengast/angelia","trendshift","","","topics_chatbot"
-"krahets/hello-algo","trendshift","","","github-trending-repositories"
-"krakenunbound/speaker-studio","trendshift","","","topics_ai-voice"
-"kunchenguid/backpass","user-list","1216","JavaScript | You don't write AGENTS.md. You train it with gradient descent.",""
-"kushagarwal2910-lang/chalkie","trendshift","","","topics_text-to-speech"
-"kyleoliveiro/claude-speak","trendshift","","","topics_text-to-speech"
-"lahfir/agent-desktop","user-list-append","","",""
-"langchain-ai/langgraph","user-list","42387","Python | Build resilient agents.",""
-"langgenius/dify","trendshift","","","github-trending-repositories"
-"latent-spaces/brag","trendshift","","","monthly#20"
-"lava/withmcp","trendshift","","","topics_mcp"
-"leontloveless/dead-ai-products","trendshift","","","topics_curated-list"
-"lestercoyoyjr/AIMessage","trendshift","","","topics_ai-infrastructure"
-"letta-ai/letta","user-list","24923","None | Platform for stateful agents: AI with advanced memory that can learn and self-improve over time.",""
-"letta-ai/letta-code","user-list","3447","TypeScript | Stateful agents that are like people, with memory, identity, and the ability to learn and adapt",""
-"leymish01-oss/claude-code-agent-team-starter","trendshift","","","topics_workflow-automation"
-"lhlGitHub/threejs-architecture-effects","user-list","362","TypeScript | An Agent Skill for building interactive, self-assembling 3D architecture with Three.js.  一个用 Three.js 生成可交互、可动",""
-"lidge-jun/opencodex","user-list","16506","TypeScript | Universal provider proxy for OpenAI Codex & Claude Code — use any LLM (Claude, Gemini, Grok, DeepSeek, Ollama…",""
-"lifez/voxa","trendshift","","","topics_ai-voice;topics_audio-processing"
-"lightningpixel/modly","user-list","7856","TypeScript | Desktop app to generate 3D models from images or prompt using local AI — runs entirely on your GPU",""
-"lizzzhh/awesome-bip39","trendshift","","","topics_curated-list"
-"lobehub/lobehub","trendshift","","","github-trending-repositories"
-"localai-org/gem-x.cpp","trendshift","","","topics_digital-human"
-"locallaunchsc-cloud/ReleaselyStudio","trendshift","","","topics_audio-processing"
-"loopx-project/loopx","user-list","6076","Python | A control plane with a durable state kernel for long-horizon agents and teams. Keep work moving and improving ",""
-"lopopolo/harness-engineering","user-list","2705","Python | 🐎 Ryan Lopopolo’s anthology, field guide, and agent context bundle for harness engineering",""
-"lucoa-conf-dev/mommy-pulsy","trendshift","","","topics_audio-processing"
-"lukeTheNeuromancer/agentic-ai-system-design-primer-zh","trendshift","","","topics_curated-list"
-"lukerm/whisper-clip","trendshift","","","topics_ai-voice"
-"luomo66ccff/Amahane-Hikari-Live2D","trendshift","","","topics_digital-human"
-"m-ahmed-elbeskeri/pinpoint","trendshift","","","topics_ai-coding"
-"mah3uz/darwan","trendshift","","","topics_ui-components"
-"makevoid/motion-graphics-music-video-skill","trendshift","","","topics_ai-video"
-"malhashemi/opencode-gpt-live","trendshift","","","topics_chatbot"
-"marciob/agenttab","trendshift","","","topics_ai-agent"
-"markkkkkkkkkkkkkkkkkkkkkkkkk/ai-restart","trendshift","","","topics_ai-voice"
-"martin-olivier/airgorah","user-list","3628","Rust | A WiFi security auditing software",""
-"math-fournity/AI-Math-Competition-Problem-Solving-System","trendshift","","","topics_ai-agent"
-"mathieuworoniecki/HUman","trendshift","","","topics_digital-human"
-"mattpocock/skills","trendshift","","","monthly#14;yearly#5"
-"mdmudassirahmed/liftoff","trendshift","","","topics_ai-coding;topics_ai-infrastructure"
-"mehrang0/playcut-brush","trendshift","","","topics_ai-coding"
-"mem0ai/dolphinbench","trendshift","","","topics_ai-memory"
-"mem0ai/mem0","user-list","66145","Python | The Memory Layer for AI Agents - Drop-in memory infrastructure for AI agents and apps. Context that persists. ",""
-"mem0ai/openmemory","user-list","55","TypeScript | Open-source CLI & TUI to port AI coding sessions across Claude Code, Codex, and OpenCode.",""
-"meshinthesky/hillsidehermitage_subtitles","trendshift","","","topics_audio-processing"
-"mexicat/pdoom-video","trendshift","","","weekly#14"
-"microsoft/autogen","user-list","61195","Python | A programming framework for agentic AI",""
-"microsoft/data-formulator","user-list","17457","Python | 🪄 Data Formulator is an interactive AI-powered data analysis system makes it easy to connect, explore and visu",""
-"microsoft/generative-ai-for-beginners","trendshift","","","github-trending-repositories"
-"mikehasa/golive-skill","user-list","1019","TypeScript | Take your agent-built product live: hosting, database, domain, email, payments — on your own accounts. Open-so",""
-"mlevinmail/cedar-server","trendshift","","","topics_text-to-speech"
-"mokahq/mokalabs","trendshift","","","topics_mcp"
-"mov-bx-0xb800/agent-monitor","trendshift","","","topics_ai-coding"
-"mowgly11/code-review-skill","trendshift","","","topics_ai-coding"
-"mrchatam/Grok-workhorse","trendshift","","","topics_ai-coding;topics_ai-infrastructure;topics_mcp"
-"msitarzewski/agency-agents","trendshift","","","yearly#8"
-"msunbot/humanoid-atlas","trendshift","","","topics_digital-human"
-"multica-ai/andrej-karpathy-skills","trendshift","","","yearly#7"
-"multica-ai/multica","user-list","51495","Go | Make humans and AI agents work as one team — open-source and self-hostable.",""
-"mvschwarz/openrig","user-list+trendshift","1163","TypeScript | Multi-agent harness that runs Claude Code and Codex together as one system","weekly#18"
-"my-chiefmind/ai-maestro","trendshift","","","topics_ai-coding"
-"nanobrowser/nanobrowser","user-list","13836","TypeScript | Open-Source Chrome extension for AI-powered web automation. Run multi-agent workflows using your own LLM API k",""
-"nautahakk/aphasia-word-finder","trendshift","","","topics_text-to-speech"
-"neural-beat/human-eyes","trendshift","","","topics_ai-memory"
-"newsbubbles/ismail","trendshift","","","topics_audio-processing"
-"nextlevelbuilder/ui-ux-pro-max-skill","trendshift","","","yearly#12"
-"nickrannikko-hub/Hey-Claude-","trendshift","","","topics_ai-voice"
-"nmorton13/edward","trendshift","","","topics_ai-memory"
-"numericalworks/esh","trendshift","","","topics_ai-coding"
-"nvm-sh/nvm","trendshift","","","github-trending-repositories"
-"oblien/openship","trendshift","","","weekly#21"
-"obra/superpowers","trendshift","","","github-trending-repositories;yearly#2"
-"ollama/ollama","trendshift","","","github-trending-repositories"
-"omdsh-dev/DSH-better-sidebar","user-list","3840","TypeScript | 开放的侧边栏底座，支持三方拓展注册新侧边栏页面。内置文件渲染编辑/终端/侧边对话/Git/子代理页面 ｜ Open sidebar foundation, supports third-party extensions ",""
-"openai/skills","user-list","27734","Python | Skills Catalog for Codex",""
-"openclaw/openclaw","trendshift","","","yearly#1"
-"opusvideo/awesome-claude-video","trendshift","","","topics_ai-video;topics_curated-list"
-"orwa-mahmoud/nightshift","user-list","71","Shell | Accountable long-running coding shifts for Cursor, Codex, and Claude Code. Safe autonomy, recovery, persistent",""
-"paperclipai/paperclip","user-list+trendshift","90674","TypeScript | The open-source app everyone uses to manage agents at work","monthly#25;weekly#4"
-"paranjaymundra/task-lantern","trendshift","","","topics_ai-coding"
-"pcyone/hypit-food-comedy-remake","trendshift","","","topics_ai-video"
-"pdmtt/claude-code-nix-plugin","trendshift","","","topics_ai-coding"
-"pegainfer-project/pega-omni","trendshift","","","topics_text-to-speech"
-"petergpt/claude-interview","trendshift","","","topics_ai-voice;topics_text-to-speech"
-"pf67j9nwfh-web/Tiger-Build","trendshift","","","topics_chatbot"
-"phoiex/AAAAGENT","trendshift","","","topics_digital-human"
-"plait-board/drawnix","user-list","14850","TypeScript | 开源白板工具（SaaS），一体化白板，包含思维导图、流程图、自由画等。All in one open-source whiteboard tool with mind, flowchart, freehand and e",""
-"plusminushalf/rot-guard","trendshift","","","topics_ai-agent"
-"practical-tutorials/project-based-learning","trendshift","","","github-trending-repositories"
-"prathyvsh/comics","trendshift","","","topics_curated-list"
-"public-apis/public-apis","trendshift","","","github-trending-repositories"
-"publicExcess/splish","trendshift","","","topics_ai-infrastructure"
-"pukno/pukno-benchmarks","trendshift","","","topics_programming-examples"
-"purankuton2001/ai-oshibloom","trendshift","","","topics_digital-human"
-"purankuton2001/castconjure","trendshift","","","topics_digital-human"
-"pythongiant/SlamLM","trendshift","","","topics_chatbot"
-"q3dresearch/youtube-cpm","trendshift","","","topics_curated-list"
-"rdurica/quiet-ui","trendshift","","","topics_ui-components"
-"reconurge/flowsint","user-list","8981","TypeScript | A modern platform for visual, flexible, and extensible graph-based investigations. For cybersecurity analysts ",""
-"reindent/jauvex","trendshift","","","topics_ai-voice"
-"rhyelt/Rhyel-Assembly-Documentary","trendshift","","","topics_programming-examples"
-"rit3zh/expo-composer-hold-menu","trendshift","","","topics_ui-components"
-"rlaope/oh-my-hermes","user-list","2997","Python | All in one plugin for Hermes Agent ⚚ the coding intelligence, a long-term memory system and model optimized wo",""
-"robotaitai/NoteNode","trendshift","","","topics_audio-processing"
-"rodhnin/kotoba-companion","trendshift","","","topics_digital-human"
-"rohitg00/ai-engineering-from-scratch","trendshift","","","weekly#9"
-"runkids/agents-context-router","trendshift","","","topics_ai-infrastructure"
-"ruvnet/RuView","trendshift","","","yearly#17"
-"ruvnet/ruflo","user-list","73412","TypeScript | 🌊 The original agent harness. Deploy intelligent multi-player swarms, coordinate autonomous workflows, and bui",""
-"saccojoseph/you","trendshift","","","topics_ai-memory"
-"safzanpirani/juna","trendshift","","","topics_ai-coding"
-"salman-tamboli/social-second-brain","trendshift","","","topics_workflow-automation"
-"sanny1724/memoryops-hindsight","trendshift","","","topics_ai-memory"
-"sebastiancarlos/shobr","trendshift","","","topics_workflow-automation"
-"selmant/jellyfin-plugin-foreseerr","trendshift","","","topics_self-hosted"
-"shicheng5589-oss/Codex-desktop-pet","trendshift","","","topics_digital-human"
-"shikidmsh-rgb/mochibot","user-list","92","Python | 陪伴型ai agent-人机恋适用",""
-"shuhdonk/DeskPilot","trendshift","","","topics_text-to-speech"
-"shuvrajeetkamila/model-factory-command-center","trendshift","","","topics_workflow-automation"
-"shuvrajeetkamila/model-factory-gpu-commander","trendshift","","","topics_ai-infrastructure;topics_workflow-automation"
-"simular-ai/Agent-S","user-list","12400","Python | Agent S: an open agentic framework that uses computers like a human",""
-"sinat50/OSRSBubbleTool","trendshift","","","topics_self-hosted"
-"smukh/skill-adapter","trendshift","","","topics_ai-agent"
-"solo938/numpy-house-price-regression","trendshift","","","topics_programming-examples"
-"stablyai/orca","trendshift","","","monthly#16;weekly#10"
-"standchat/examples","trendshift","","","topics_programming-examples"
-"stas4000/scriptcut","trendshift","","","topics_ai-agent;topics_ai-video"
-"stas4000/what-could-break","trendshift","","","topics_ai-coding"
-"stbenjam/cronex","trendshift","","","topics_workflow-automation"
-"stevej52/threadsatchel","trendshift","","","topics_ai-memory;topics_mcp"
-"stur86/claude-pixet","trendshift","","","topics_mcp"
-"supermemoryai/company-brain","trendshift","","","topics_ai-memory"
-"surya-koritala/Glyd","trendshift","","","weekly#16"
-"suryansh-gg/ncert-maths-tracker","trendshift","","","topics_self-hosted"
-"t8y2/dbx","trendshift","","","weekly#15"
-"talkincode/PyPlay","trendshift","","","topics_programming-examples"
-"tdav/MAUI-Yandex-Map","trendshift","","","topics_ui-components"
-"tdeverx/contained-app","user-list","846","Swift | A native macOS app for Apple's Container CLI",""
-"tech-artist92/open-skill-registry","trendshift","","","topics_ai-agent;topics_mcp"
-"thareekanvar/replyloom","trendshift","","","topics_self-hosted"
-"thedotmack/claude-mem","trendshift","","","yearly#19"
-"theswerd/brainless","user-list-append","","",""
-"tintlang/tint","trendshift","","","topics_ui-components"
-"tlouvart/songsurf","trendshift","","","topics_audio-processing"
-"togg53192-cmd/jailbreaks","user-list+user-list-append+trendshift","1332","None | LIST OF ALL MY JAILBREAKS","weekly#25"
-"toniwillberg/wordpress-elementor-with-mcp-container","trendshift","","","topics_mcp"
-"topoteretes/cognee","user-list","31093","Python | Cognee is the open-source AI memory platform for agents. Give your AI agents persistent long-term memory with ",""
-"trustfuture/simon-skills","trendshift","","","topics_text-to-speech"
-"trycua/cua","user-list","26696","HTML | Scale computer-use 2.0 with open-source drivers, cross-OS fleets, and benchmarks for training, evaluation, and",""
-"tt-a1i/archify","trendshift","","","monthly#7;weekly#23"
-"tupicython/tupicython","trendshift","","","topics_programming-examples"
-"twentyhq/twenty","trendshift","","","github-trending-repositories"
-"uber/ADR","user-list","1602","Python | ADR secures enterprise AI agents through observability, security benchmarking, and threat detection. Deployed ",""
-"ublockauto/pythonhell","trendshift","","","topics_programming-examples"
-"udit/silakka54-aio-layout","trendshift","","","topics_ui-components"
-"ufo-ai/ufo-core","trendshift","","","topics_self-hosted"
-"ultraworkers/claw-code","trendshift","","","yearly#10"
-"vectorize-io/agent-memory-benchmark","user-list","98","Python | Agent Memory Benchmark",""
-"vectorize-io/hindsight","user-list+trendshift","38275","Python | Hindsight: Agent Memory That Learns","monthly#8;weekly#3"
-"vidalmaxime/fluoddity-music","trendshift","","","topics_audio-processing"
-"virattt/ai-hedge-fund","trendshift","","","github-trending-repositories"
-"vlastimilcerveny34/guitar-audio-tools","trendshift","","","topics_audio-processing"
-"vodhash/one-page-papers","trendshift","","","topics_curated-list"
-"volcengine/OpenViking","user-list","38829","Python | Self-evolving Context Database for AI Agents. Unify Agent Memory, Knowledge RAG and Skills.",""
-"vulbsti/BioSim","trendshift","","","topics_digital-human"
-"wakamex/bend-bench","trendshift","","","topics_programming-examples"
-"wapratama/ml-zc2026","trendshift","","","topics_programming-examples"
-"will127534/cf-mp3-player","trendshift","","","topics_audio-processing"
-"williamlabdev/ai-gap-radar","trendshift","","","topics_curated-list"
-"win4r/MuseAI-Skills","user-list","282","HTML | muse.ai (Muse AI) skills and runtime snapshot: 68 skills, workflow guides, connector manifests. muse.ai 技能与运行环",""
-"www222fff/muse2api","trendshift","","","topics_ai-infrastructure"
-"xlang-ai/OSWorld","user-list","3159","Python | [NeurIPS 2024] OSWorld: Benchmarking Multimodal Agents for Open-Ended Tasks in Real Computer Environments",""
-"xmanrui/dsh-im","user-list","1519","JavaScript | 通过扫码或机器人凭据把IM机器人接入DeepSeek Harness（支持飞书、微信、钉钉、企业微信、QQ、Slack、Telegram、Discord和WhatsApp）。 Connect IM bots to Dee",""
-"yang0/handraw-style","user-list","3457","HTML | 手绘风格编号画廊与双语提示词 Skill",""
-"yihui-dev/awesome-opus5-5-videos","trendshift","","","topics_ai-video;topics_curated-list"
-"yliuai/laya-eval","trendshift","","","topics_programming-examples"
-"zevro-ai/sunshine","trendshift","","","topics_self-hosted"
-"zhangleo-1983/Dialogue_Coach","trendshift","","","topics_chatbot"
-"zhishile/codex-auth-helper","user-list","16978","CSS | Codex登陆助手：安全地在本地导出您的已登录 ChatGPT 会话配置，生成符合 Codex 规范的 auth.json 本地备份文件。",""
-"zhuyansen/awesome-claude-video-skills","trendshift","","","topics_ai-video;topics_curated-list"
-"zo4u/n8n-serv00","trendshift","","","topics_workflow-automation"
-"zouyuxuan122/dsh-our-free-model","trendshift","","","topics_chatbot"
-"zudochkin/awesome-newsletters","user-list","4485","None | A list of amazing Newsletters",""
-"zurasaaa/MKW-VoiceChat","trendshift","","","topics_audio-processing"
-"oil-oil/oil-ui","user-local-20260930","","","skills/ui-direction"
-"vitali87/code-graph-rag","user-batch-20260930","5.2k","","codemap/graph"
-"CodeGraphContext/CodeGraphContext","user-batch-20260930","4.2k","","codemap/graph"
-"vercel-labs/agent-skills","user-batch-20260930","31.8k","","skills-convention"
-"trailofbits/skills","user-batch-20260930","7.3k","","skills-security"
-"microsoft/tgrep","user-batch-2026-09-30","3383","Rust","round24-lexical-search"
-"zvec-ai/zvec-grep","user-batch-2026-09-30","3844","TypeScript","round24-hybrid-search"
-"alibaba/zvec","user-batch-2026-09-30","16030","C++","round24-vector-engine"
-"alibaba/skill-up","user-batch-2026-09-30","1125","Go","round24-skill-eval"
-"humanlayer/advanced-context-engineering-for-coding-agents","user-batch-2026-09-30","2676","-","round24-UNLICENSED"
+2yuri/opencatt,trendshift,,,topics_ai-agent
+666ghj/MiroFish,trendshift,,,yearly#25
+7-hello007/AICore-Showcase,trendshift,,,topics_ai-infrastructure
+A0707/opscontrol,trendshift,,,topics_self-hosted
+AcrimoniousMirth/stremio-jellyfin,trendshift,,,topics_self-hosted
+Adityavardhanjain/WikiCrawl,user-list,22,"TypeScript | Interactive Wikipedia knowledge graph - crawl topics, visualize connections, and explore unexpected paths.",
+AgentsLoop/awesome-gpt-astra-games,trendshift,,,topics_curated-list
+Akar1881/GardenEase,trendshift,,,topics_workflow-automation
+AnmolSaini16/morph-ui,trendshift,,,topics_ui-components
+Avinash-jetwani/jevmem,trendshift,,,topics_ai-memory
+BAAI-Agents/Cradle,user-list,2589,Python | The Cradle framework is a first attempt at General Computer Control (GCC). Cradle supports agents to ace any c,
+BY571/paper2audiobook,trendshift,,,topics_ai-voice;topics_text-to-speech
+BahaMert/VisualHelperForVisualNovels-VHVN-,trendshift,,,topics_text-to-speech
+BeauchampAndrew/shopify-lookbook-gallery,trendshift,,,topics_ui-components
+BjoernSchotte/agentglass,trendshift,,,topics_ai-coding
+Bobjonesgood/ethbuild,trendshift,,,topics_mcp
+BruzWJ/Audio2Face-blender-addon,trendshift,,,topics_digital-human
+Cairn-ink/cairn-jev-lab,trendshift,,,topics_ai-memory
+Chaarangan/stepgate,trendshift,,,topics_mcp
+ChanceMarine/Tabz,trendshift,,,topics_ui-components
+CopilotKit/OpenMuse,user-list,2674,"TypeScript | A personal agent with a browser, terminal, files, and work that keeps going built with CopilotKit and AG-UI.",
+Cranot/super-hermes,user-list,480,PowerShell | Skills that teach Hermes Agent to write its own analytical prompts,
+Cuongyd196/cit-voice-studio,trendshift,,,topics_text-to-speech
+D4Vinci/Scrapling,trendshift,,,yearly#24
+DNSBunker/ZenitiumDNS,trendshift,,,topics_self-hosted
+DV0x/explainer-studio,trendshift,,,topics_ai-voice;topics_text-to-speech
+DanFessler/trellis,trendshift,,,topics_ui-components
+DesarrolladorWebFrias/jarvis-ide-voice-telemetry,trendshift,,,topics_ai-coding;topics_ai-voice;topics_text-to-speech
+DietrichGebert/ponytail,trendshift,,,monthly#10;yearly#18
+Drix10/agent-flow,trendshift,,,topics_ai-coding;topics_workflow-automation
+Dudu-001/kleros-case-closed-video,trendshift,,,topics_ai-video
+EbookFoundation/free-programming-books,trendshift,,,github-trending-repositories
+EthanYoQ/Invoice-Downloader,user-list-append,,,
+FeSens/openTPU,trendshift,,,topics_ai-infrastructure
+Finderchangchang/brewreel,user-list+trendshift,84,TypeScript | 精酿 BrewReel：让 DeepSeek 这类便宜模型也能做出好看的竖版宣传片。写一份产品简报，AI 挑镜头、写文案，一条命令出片。3 种配方、6 个行业、广告法校验，开源可商用。,topics_ai-video
+FoundationAgents/MetaGPT,user-list,70662,"Python | 🌟 The Multi-Agent Framework: First AI Software Company, Towards Natural Language Programming",
+Graphify-Labs/graphify,trendshift,,,yearly#22
+GreyforgeLabs/slopbrake,trendshift,,,topics_ai-coding
+Guilhermerisu/island,trendshift,,,topics_ui-components
+HKUDS/nanobot,user-list,48627,"Python | Ultra-lightweight, open-source, self-hosted personal AI agent framework in Python with WebUI, tools, memory, M",
+HimanshurajNimse/AI-Gym-Coach,trendshift,,,topics_text-to-speech
+Hirdaya-Shrestha/haudiotagger_fingerprint,trendshift,,,topics_audio-processing
+Human-Agent-Society/reef,trendshift,,,weekly#12
+IAgentic-LLC/voice-agents,trendshift,,,topics_ai-agent;topics_ai-voice
+IceCodeNew/claude-code-plugins-setup,trendshift,,,topics_curated-list
+Itzmedev7/S.P.A.R.K.-AI,trendshift,,,topics_chatbot
+IvanAdriazola/overspill,trendshift,,,topics_ai-infrastructure
+IzumiSatoshi/vox-arcana,trendshift,,,topics_ai-voice
+Janson79jc/antigravity-100b-telemetry-audit,trendshift,,,topics_ai-agent
+Jason-Fay/jevulon,trendshift,,,topics_ai-agent;topics_ai-coding;topics_mcp
+Jhuster/interest-calendar,trendshift,,,topics_ai-agent;topics_self-hosted
+JoasASantos/Offensive-Security-AI-Models,user-list,55,None | Uncensored AI models or those fine-tuned for cybersecurity tasks.,
+Joyouou/Auralis,trendshift,,,topics_audio-processing
+JustVugg/colibri,trendshift,,,monthly#24
+K-Dense-AI/lab-instrument-mcps,trendshift,,,topics_mcp
+Khr0mZ/magnus-dm,trendshift,,,topics_self-hosted
+KingSora/OverlayScrollbars,user-list,5216,"TypeScript | A javascript scrollbar plugin that hides the native scrollbars, provides custom styleable overlay scrollbars, ",
+Koushik890/higgsfield-api-skill,trendshift,,,topics_ai-video
+Lainholic/Synapse_Eegine,trendshift,,,topics_ai-agent
+LogicIncZo/zcode-setup,trendshift,,,topics_workflow-automation
+LvcIDPsyche/auto-browser,user-list,816,Python | Give your AI agent a real browser — with a human in the loop. Open-source MCP-native browser agent.,
+MDZubair01/opsmind-incident-agent,trendshift,,,topics_ai-agent;topics_ai-memory
+MartinDelophy/awesome-gpt-6-astra,user-list,263,"JavaScript | A curated collection of fun games built with GPT-6 Astra, with source code, demos, and prompts. | GPT-6 Astra ",
+MartinForsterNL/Yvette,trendshift,,,topics_digital-human;topics_text-to-speech
+MaxLiu22/Motion2MixamoRig,trendshift,,,topics_digital-human
+MayurUbarhande0/Pipesync,trendshift,,,topics_audio-processing
+MervinPraison/PraisonAI,user-list,9104,Python | PraisonAI 🦞 — Hire a 24/7 AI Workforce. Stop writing boilerplate and start shipping autonomous self-improving ,
+MinsiAI/voicebox,trendshift,,,topics_ai-voice;topics_text-to-speech
+ModelMschief/GradioSpaces,trendshift,,,topics_programming-examples
+Mr-hunt-007/portlist,user-list,18,"Python | Find what's using a port, who started it (Claude Code, Cursor, Docker…), whether your network can reach it, an",
+MushroomMan321/moddecoded,trendshift,,,topics_mcp
+NASIRCISSISTIC/chatgpt-triage,trendshift,,,topics_chatbot
+NVlabs/Skill2Env,user-list,134,Python | Democratizing Collective Intelligence,
+NaiveAI-Labs/Naive-N0.5-Flash,trendshift,,,topics_ai-coding
+NandhaKishorM/laya,trendshift,,,monthly#9;weekly#19
+NevaMind-AI/memU,user-list,14453,Python | Personal memory across agents,
+NickZik/n8n-docker-npm-packages,trendshift,,,topics_workflow-automation
+Niko1221/Strata,trendshift,,,topics_chatbot
+NousResearch/hermes-agent,user-list+trendshift,249565,Python | The agent that grows with you,yearly#3
+NovaSky-AI/SkyRL,user-list-append,,,
+OmniJev/OneJev,trendshift,,,topics_ai-agent
+OneMana-Soft/OneCamp-fe,user-list,65,"TypeScript | OneCamp: self-hosted all-in-one workspace (chat, tasks, video calls, docs, calendar & AI)",
+OneMoh/html-explainer,trendshift,,,topics_text-to-speech
+OpenAdaptAI/OpenAdapt,user-list,1746,Python | Compiles a demonstrated GUI task into a program that reports VERIFIED only if an independent check agrees. pip,
+OpenDCAI/DataFlow,user-list,8212,Python | [SIGMOD'27] Easy Data Preparation with latest LLMs-based Operators and Pipelines.,
+OpenInterpreter/open-interpreter,user-list,,,
+PerArneng/strands-sdk-tutorial,trendshift,,,topics_ai-agent;topics_programming-examples
+PetShopBros/lowdown-proxy,trendshift,,,topics_mcp
+PeterWron/TypeFast,trendshift,,,topics_ai-voice
+PointAntStorm/grok-self,trendshift,,,topics_chatbot
+Praket7/codex-mcp-hotload,trendshift,,,topics_mcp
+PraveenAShukla/polyjev,trendshift,,,topics_ai-infrastructure
+Prevolut/askr,trendshift,,,topics_programming-examples
+PrimeIntellect-ai/prime-agent,user-list,21344,TypeScript | A self-improving RLM agent for coding workflows and long-running autonomous tasks.,
+QwenLM/Qwen-MM-Plugins,user-list,3048,Python | Make any agent harness multimodal-native.,
+QwenLM/qwen-code,user-list,28179,TypeScript | An open-source AI coding agent that lives in your terminal.,
+RK-BoilingPoint/H3-Visual-Marker-Control,trendshift,,,topics_ai-video
+Rahat-ch/livekitjev,trendshift,,,topics_chatbot
+RayVelez27/landing-page-fire,trendshift,,,topics_ui-components
+RomanSlack/jev-drone,user-list,217,Python | Camera-only autonomous drone in MuJoCo with a small judgment model (TypeSafe Jev) in the loop at 2.5Hz,
+Roshendz/semantic_zoom,trendshift,,,topics_ui-components
+RoyWiggins/jevlang,trendshift,,,topics_programming-examples
+SUZ-tsinghua/awesome-humanoid-ball-sports,trendshift,,,topics_curated-list
+Sdkhan01/TrueCA,trendshift,,,topics_chatbot
+ServiceNow/AgentLab,user-list,639,"Python | AgentLab: An open-source framework for developing, testing, and benchmarking web agents on diverse tasks, desi",
+Shubhamsaboo/awesome-llm-apps,trendshift,,,github-trending-repositories
+Sidiora-Labs/Paxeer-X-Network,trendshift,,,weekly#17
+SkylarKitchen/skills,trendshift,,,topics_ai-agent
+Slaker19/webkvm,trendshift,,,topics_self-hosted
+Sorami-Consulting-AU/ai-kubernetes-helm-chart-security,trendshift,,,topics_ai-infrastructure
+Stirling-Tools/Stirling-PDF,trendshift,,,github-trending-repositories
+StuGRua/PDoomVideo,trendshift,,,topics_ai-video
+TanStack/table,user-list,28461,"TypeScript | 🤖 Headless UI for building powerful tables & datagrids for TS/JS -  React-Table, Vue-Table, Solid-Table, Svelt",
+TapXWorld/ChinaTextbook,trendshift,,,github-trending-repositories
+TauricResearch/TradingAgents,trendshift,,,yearly#21
+Tencent/WeKnora,trendshift,,,monthly#18
+The-Product-Shelf/technical-product-manager-resources,trendshift,,,topics_curated-list
+TheCommishDeuce/ridge-helio-strap,trendshift,,,topics_self-hosted
+TheRealRajdeep/jev2048,trendshift,,,topics_programming-examples
+Tihkal96/Ogle,trendshift,,,topics_chatbot
+Vincentwei1021/video-shotcraft,user-list,9745,"TypeScript | AI video skill for Claude Code & Codex — cinematic product videos with Remotion: 152 shot recipe cards, 209 mo",
+VladUZH/intents-mcp,trendshift,,,topics_mcp
+VoltAgent/awesome-design-md,trendshift,,,yearly#23
+W61k3r/LexiPanel,trendshift,,,topics_ai-infrastructure
+Wreeper/beginner-resources,trendshift,,,topics_curated-list
+YT0383/Aquarelle-Visual-audio,trendshift,,,topics_audio-processing
+Yazid-ELBOUACHI/ai-data-service-samples,trendshift,,,topics_programming-examples
+YeJe-cpu/SeeCut,trendshift,,,topics_digital-human
+Yehielamor/provenance-gate,trendshift,,,topics_ai-agent
+Yuriloll/qifeng-ip-visual,trendshift,,,topics_digital-human
+ZJU-REAL/Easel,user-list,1941,"Python | An open-source AI agent for social media — discover trends, create content, publish everywhere, and learn what",
+Zhou-Shilin/Aether,user-list-append,,,
+a3ro-dev/qenlo-memory,trendshift,,,topics_ai-coding;topics_ai-memory;topics_mcp
+admte/orc-claude-plugin,trendshift,,,topics_mcp
+adnankhan46/jev-voice-browser-agent,trendshift,,,topics_ai-voice
+adolfousier/opencrabs,user-list,956,"Rust | The all-in-one AI agent living in your terminal. Build landing, mobile apps, backends, manages files, deep res",
+affaan-m/ECC,trendshift,,,monthly#3;yearly#4
+aginfers/local-ai-signal-feed,trendshift,,,topics_curated-list
+ahmtsahin/deutsch-dna,trendshift,,,topics_ai-memory
+aibunny/ownstate,trendshift,,,topics_ai-memory
+akha-security/akca,user-list,181,Go | AKCA Advanced Web Security Scanner,
+aldegad/sprite-gen,user-list,2078,"Python | Generate clean 2D game sprites & animation atlases — component-row pipeline: state rows, alpha cleanup, frame ",
+alexgreensh/token-optimizer,user-list,2418,Python | Find the ghost tokens. Fix them. Survive compaction. Avoid context quality decay. ,
+alibaba/open-code-review,trendshift,,,monthly#5
+allenpeng0705/EnvoyMesh,trendshift,,,weekly#24
+ameshkov/dnslookup,user-list-append,,,
+amitpatjoshidesign/tablekit,trendshift,,,topics_ui-components
+amitshekhariitbhu/ai-system-design,trendshift,,,topics_ai-memory
+amrgnedy/file-organizer-demo,trendshift,,,topics_workflow-automation
+amrutejr/shipcheck,trendshift,,,topics_workflow-automation
+ankurCES/Mahout,trendshift,,,topics_workflow-automation
+anomalyco/opencode,trendshift,,,yearly#6
+ant-design/ant-design,user-list,99629,TypeScript | An enterprise-class UI design language and React UI library,
+anthropics/claude-code,trendshift,,,github-trending-repositories;yearly#20
+anthropics/skills,trendshift,,,yearly#9
+anvaka/city-roads,user-list-append,,,
+aranorde-reddit/R36S-V20-20250518-2551-darkos-audio-fix,trendshift,,,topics_audio-processing
+aryan8434/claude-code-ai-face,trendshift,,,topics_digital-human
+ashishsinha1602/oci-sandbox-factory,trendshift,,,topics_workflow-automation
+avinash201199/System-Design-KIT,trendshift,,,topics_curated-list
+aws-samples/sample-voice-ai-agent-studio,trendshift,,,topics_ai-voice
+ayghri/i-have-adhd,trendshift,,,monthly#4
+baberjaved/marko-md,user-list,8,HTML | A Lightweight and Elegant Markdown viewer for MD files,
+baketnk/frame-yap,trendshift,,,topics_ai-voice
+bilawalsidhu/gods-eye-view,user-list+trendshift,44164,"JavaScript | A spy satellite simulator in your browser, except the data is real. Live open source spatial intelligence on a",monthly#2
+blader/humanizer,trendshift,,,monthly#22
+bluemoondom/primes-sieve-bydomi,trendshift,,,topics_programming-examples
+breakstageaxe61/genspark-claw,trendshift,,,topics_mcp
+browser-use/browser-use,user-list,116545,Python | Agents that use the browser.,
+browser-use/jev-ultrafast,user-list+trendshift,20910,Python | Fastest and cheapest web agent,monthly#13
+brumar/chess-postmortem-skills,trendshift,,,topics_ai-video
+buybitart/eye-for-an-eye,trendshift,,,topics_self-hosted
+bytebot-ai/bytebot,user-list,11085,"TypeScript | Bytebot is a self-hosted AI desktop agent that automates computer tasks through natural language commands, ope",
+bytedance/UI-TARS-desktop,user-list,39137,TypeScript | The Open-Source Multimodal AI Agent Stack: Connecting Cutting-Edge AI Models and Agent Infra,
+bytedance/deer-flow,user-list,83101,"Python | An open-source long-horizon SuperAgent harness that researches, codes, and creates. With the help of sandboxes",
+caiovicentino/jev-risk-check-provider,trendshift,,,topics_ai-agent
+cdyforever/how-to-live-better,trendshift,,,weekly#8
+chadhurley25075-png/TensorFold,trendshift,,,topics_ai-infrastructure
+character-factory/character-factory,trendshift,,,topics_digital-human
+chatainsim/nike-sportwatch-recovery,trendshift,,,topics_programming-examples
+chibs3529/ai-meeting-intelligence-system,trendshift,,,topics_ai-voice;topics_workflow-automation
+chobits-lab/iphone-use,trendshift,,,topics_ai-agent
+chrichuang218/claude-desktop-cn,trendshift,,,topics_chatbot
+chuspeeism/awesome-opus-5-5-videos,trendshift,,,topics_ai-video;topics_curated-list
+cloudflare/security-audit-skill,trendshift,,,monthly#6
+cmkmteam-blip/open-seo-toolkit,trendshift,,,topics_self-hosted
+cnazk/recall-mac,trendshift,,,topics_ai-memory
+codecrafters-io/build-your-own-x,trendshift,,,github-trending-repositories
+codepawl/tacet,trendshift,,,topics_ai-infrastructure
+codingnoye/gksdud,trendshift,,,weekly#22
+compiledthoughts/Inferred-Thoughts,trendshift,,,topics_ai-infrastructure
+crewAIInc/crewAI,user-list,59114,"Python | Framework for orchestrating role-playing, autonomous AI agents. By fostering collaborative intelligence, CrewA",
+czg86389-hub/muse2api,trendshift,,,topics_ai-video
+d-hubel/relay,trendshift,,,topics_ai-memory
+damienen/jev-as-llm,trendshift,,,topics_chatbot
+damienjerry/jml-automation,trendshift,,,topics_workflow-automation
+dangdang-tech/ai-event-research-data,trendshift,,,topics_curated-list
+danielmiessler/typeless-pedal,trendshift,,,topics_workflow-automation
+daniiarabdiev/so101-vlm-agent,trendshift,,,topics_ai-agent
+darkhorseprojects/zinc,trendshift,,,topics_ai-memory
+davekiss/agent-contact-policy,trendshift,,,topics_mcp
+davidsonff/asimov4laws,trendshift,,,topics_ai-infrastructure
+dccsillag/experiments-adaptive-fgd,trendshift,,,topics_programming-examples
+debpalash/VoiceStudio,trendshift,,,monthly#1;weekly#5
+deepfates/imp,trendshift,,,weekly#20
+deeplethe/utopia,trendshift,,,monthly#21
+deepseek-ai/deepseek-harness,user-list+trendshift,238032,TypeScript | DeepSeek Harness: Everything is a Plugin.,monthly#23;weekly#11;yearly#13
+demetriuszhomir/lame-reader,trendshift,,,topics_text-to-speech
+dentiny/duckdb-distributed-execution,user-list-append,,,
+deskgate-app/deskgate-operator-2.6.8-public,trendshift,,,topics_workflow-automation
+dexarxbt/Novera,trendshift,,,topics_ai-memory;topics_chatbot
+digipulse-engineering/GAAI-framework,user-list,162,Shell | Turns AI coding tools into reliable software delivery systems. Drop a .gaai/ folder into any project — Discove,
+dmoshehun-prog/learn-from-materials,user-list,681,"Python | Turn PDFs, books and papers into interactive learning webpages｜将复杂材料转化为可追溯、可测验、可做笔记的学习网页",
+donnemartin/system-design-primer,trendshift,,,github-trending-repositories
+dream-num/univer,trendshift,,,weekly#6
+dream-num/univer-workspace,trendshift,,,weekly#7
+drewk312/VantaMusic,trendshift,,,topics_audio-processing
+dvar0/autochart,trendshift,,,topics_audio-processing;topics_self-hosted
+earendil-works/pi,trendshift,,,yearly#14
+emir/claude-s40,trendshift,,,topics_chatbot
+esacodeorg/docker-odoo-20,trendshift,,,topics_self-hosted
+eternity4719/HowToLiveBetter,trendshift,,,monthly#12;weekly#1
+exsesx/helium-new-tab,user-list-append,,,
+farion1231/cc-switch,trendshift,,,weekly#13;yearly#11
+federicomameli1/sugarglass,trendshift,,,topics_ui-components
+feitangyuan/onetake,trendshift,,,topics_ai-video
+fer-git/opencode-plugins,trendshift,,,topics_text-to-speech
+ferndesk/no-slop-motion,trendshift,,,topics_ai-video
+fgq668-lab/XUnFollow,trendshift,,,topics_self-hosted
+firecrawl/firecrawl,trendshift,,,yearly#16
+franckverrot/grouille,trendshift,,,topics_ai-infrastructure
+fraserbrownirl/reintro-ai,trendshift,,,topics_text-to-speech
+freeCodeCamp/freeCodeCamp,trendshift,,,github-trending-repositories
+frolleks/soter,trendshift,,,topics_chatbot
+from-developers-for-developers/agentic-workflows,trendshift,,,topics_workflow-automation
+fueledximagination/fxi-frame-chain,trendshift,,,topics_ai-video
+ganbuscovick/Sound-Words,trendshift,,,topics_audio-processing
+garrytan/gstack,trendshift,,,yearly#15
+georgeding/Relate,trendshift,,,topics_ai-memory
+getzep/graphiti,user-list,31235,Python | Build Real-Time Knowledge Graphs for AI Agents,
+ghetea-patrick/jjl,trendshift,,,topics_programming-examples
+glanderness/BeefTV,user-list,264,"TypeScript | Local-first, lightweight, AI-native video workspace.",
+gmorb/mpc-vst-dragonfly,trendshift,,,topics_audio-processing;topics_mcp
+gnekt/My-Brain-Is-Full-Crew,user-list,3815,"Shell | Built by a PhD whose memory was failing, whose diet was a mess, and whose anxiety had its own agenda. Most sec",
+google/artemis,trendshift,,,monthly#15
+google/ax,trendshift,,,monthly#17
+graygnatconsole/mcp-audit-tool,trendshift,,,topics_mcp
+guilherme-vasques-ltda/omp-ov-memory,trendshift,,,topics_ai-memory
+guillaumemeyer/watermarks-remover,user-list,22968,Python | A privacy-first app that strips AI watermarks from content you own.,
+guoyuanjing540-wq/-ai,trendshift,,,topics_chatbot
+hacksider/Deep-Live-Cam,trendshift,,,github-trending-repositories
+harry0703/MangoDisk,user-list,3406,"Rust | Safety-first disk cleaner and space analyzer for macOS and Windows, with duplicate cleanup, app uninstall, sta",
+harry0703/MoneyPrinterTurbo,user-list+trendshift,126393,Python | 利用 AI 大模型和自动化工作流，根据主题或关键词一键生成高清短视频。Generate HD short videos from a topic or keyword with an automated AI workf,github-trending-repositories
+harshavarma02/system1-jev-laya-agent,trendshift,,,topics_ai-memory
+heartmade-studio/skryba,trendshift,,,topics_ai-voice
+herhu/archon-specs,trendshift,,,topics_ai-infrastructure
+heygen-com/liveavatar-gpt-live-demos,trendshift,,,topics_digital-human
+hfassold/JrsVision,trendshift,,,topics_digital-human
+howseen-ai/claude-motion-design,trendshift,,,topics_ai-video
+htsecurity/macvibe,trendshift,,,topics_ai-coding
+huaizhi123/meixinji,trendshift,,,topics_chatbot
+huggingface/smolagents,user-list,29534,Python | 🤗 smolagents: a barebones library for agents that think in code.,
+hughmadden/mimo26f-afd,trendshift,,,topics_ai-infrastructure
+hydra-db/hydradb,trendshift,,,monthly#19
+hypit-ai/hypit,trendshift,,,monthly#11
+hyppe-cc/video-maker,trendshift,,,topics_ai-video;topics_ai-voice
+ianmasterpro01-del/tts-engine-collection,trendshift,,,topics_text-to-speech
+ifixai-ai/iFixAi,trendshift,,,weekly#2
+igu1/hiblob,trendshift,,,topics_ui-components
+ilkerzg/storycast,user-list,225,TypeScript | Type a topic. Get a story.,
+immich-app/immich,trendshift,,,github-trending-repositories
+ipfizz/bunmaska,user-list,17,"TypeScript | Electron minus Chromium, powered by Bun and WebKit. A drop-in Electron replacement: same APIs, no bundled Chro",
+iptv-org/iptv,trendshift,,,github-trending-repositories
+isaacfhu/spotify-to-jellyfin,trendshift,,,topics_self-hosted
+jamescantco-de/taste-as-code,trendshift,,,topics_ai-coding
+jamesmcginnis/crow-entity-card,trendshift,,,topics_ui-components
+jaredwray/mockhttp,user-list,23,TypeScript | A simple HTTP server that can be used to mock HTTP responses for testing purposes. Inspired by httpbin and bui,
+jasonkneen/fm-with-jev,user-list,5,None | ,
+jethac/slint,trendshift,,,topics_ui-components
+jianruntech/geo-score,user-list,576,"Python | Can AI engines cite your site, and do they? Free 0–100 readiness score on an open GEO rubric, plus citation tr",
+jiukemi/JY_IPAgent,trendshift,,,topics_digital-human
+jmcblane/PiG,trendshift,,,topics_ai-agent
+joeseesun/opus-video-prompts,trendshift,,,topics_ai-video;topics_curated-list;topics_programming-examples
+joeseesun/qiaomu-home,trendshift,,,topics_ui-components
+johnmosesventura06/qwen38-hybrid-vmm-lru,trendshift,,,topics_ai-infrastructure
+jonathanroomer/NightBloodRemote,trendshift,,,topics_digital-human
+jordan-gibbs/hyperresearch,user-list,3699,"Python | Convert Claude Code or Codex into the most intelligent Deep Research Agent. Collect, search, and synthesize we",
+jrgrafisk/ha-ev-smart-charging,trendshift,,,topics_self-hosted
+juspay/hyperswitch,trendshift,,,github-trending-repositories
+justxor/sobesrazborgoogle,trendshift,,,topics_curated-list
+jwasham/coding-interview-university,trendshift,,,github-trending-repositories
+k4ditano/marea-plm,trendshift,,,topics_ui-components
+kabarza/angry-slider,trendshift,,,topics_ui-components
+kadirb4rut/video-dubbing-translator,trendshift,,,topics_ai-video;topics_ai-voice
+karthikvetrivel/Daybow,trendshift,,,topics_workflow-automation
+kdrcoding/easy-fsc-e3-bot,trendshift,,,topics_chatbot
+kenac99/tv-episode-ai-rename,trendshift,,,topics_audio-processing
+kernel-cracker/sakura-print,trendshift,,,topics_self-hosted
+korengast/angelia,trendshift,,,topics_chatbot
+krahets/hello-algo,trendshift,,,github-trending-repositories
+krakenunbound/speaker-studio,trendshift,,,topics_ai-voice
+kunchenguid/backpass,user-list,1216,JavaScript | You don't write AGENTS.md. You train it with gradient descent.,
+kushagarwal2910-lang/chalkie,trendshift,,,topics_text-to-speech
+kyleoliveiro/claude-speak,trendshift,,,topics_text-to-speech
+lahfir/agent-desktop,user-list-append,,,
+langchain-ai/langgraph,user-list,42387,Python | Build resilient agents.,
+langgenius/dify,trendshift,,,github-trending-repositories
+latent-spaces/brag,trendshift,,,monthly#20
+lava/withmcp,trendshift,,,topics_mcp
+leontloveless/dead-ai-products,trendshift,,,topics_curated-list
+lestercoyoyjr/AIMessage,trendshift,,,topics_ai-infrastructure
+letta-ai/letta,user-list,24923,None | Platform for stateful agents: AI with advanced memory that can learn and self-improve over time.,
+letta-ai/letta-code,user-list,3447,"TypeScript | Stateful agents that are like people, with memory, identity, and the ability to learn and adapt",
+leymish01-oss/claude-code-agent-team-starter,trendshift,,,topics_workflow-automation
+lhlGitHub/threejs-architecture-effects,user-list,362,"TypeScript | An Agent Skill for building interactive, self-assembling 3D architecture with Three.js.  一个用 Three.js 生成可交互、可动",
+lidge-jun/opencodex,user-list,16506,"TypeScript | Universal provider proxy for OpenAI Codex & Claude Code — use any LLM (Claude, Gemini, Grok, DeepSeek, Ollama…",
+lifez/voxa,trendshift,,,topics_ai-voice;topics_audio-processing
+lightningpixel/modly,user-list,7856,TypeScript | Desktop app to generate 3D models from images or prompt using local AI — runs entirely on your GPU,
+lizzzhh/awesome-bip39,trendshift,,,topics_curated-list
+lobehub/lobehub,trendshift,,,github-trending-repositories
+localai-org/gem-x.cpp,trendshift,,,topics_digital-human
+locallaunchsc-cloud/ReleaselyStudio,trendshift,,,topics_audio-processing
+loopx-project/loopx,user-list,6076,Python | A control plane with a durable state kernel for long-horizon agents and teams. Keep work moving and improving ,
+lopopolo/harness-engineering,user-list,2705,"Python | 🐎 Ryan Lopopolo’s anthology, field guide, and agent context bundle for harness engineering",
+lucoa-conf-dev/mommy-pulsy,trendshift,,,topics_audio-processing
+lukeTheNeuromancer/agentic-ai-system-design-primer-zh,trendshift,,,topics_curated-list
+lukerm/whisper-clip,trendshift,,,topics_ai-voice
+luomo66ccff/Amahane-Hikari-Live2D,trendshift,,,topics_digital-human
+m-ahmed-elbeskeri/pinpoint,trendshift,,,topics_ai-coding
+mah3uz/darwan,trendshift,,,topics_ui-components
+makevoid/motion-graphics-music-video-skill,trendshift,,,topics_ai-video
+malhashemi/opencode-gpt-live,trendshift,,,topics_chatbot
+marciob/agenttab,trendshift,,,topics_ai-agent
+markkkkkkkkkkkkkkkkkkkkkkkkk/ai-restart,trendshift,,,topics_ai-voice
+martin-olivier/airgorah,user-list,3628,Rust | A WiFi security auditing software,
+math-fournity/AI-Math-Competition-Problem-Solving-System,trendshift,,,topics_ai-agent
+mathieuworoniecki/HUman,trendshift,,,topics_digital-human
+mattpocock/skills,trendshift,,,monthly#14;yearly#5
+mdmudassirahmed/liftoff,trendshift,,,topics_ai-coding;topics_ai-infrastructure
+mehrang0/playcut-brush,trendshift,,,topics_ai-coding
+mem0ai/dolphinbench,trendshift,,,topics_ai-memory
+mem0ai/mem0,user-list,66145,Python | The Memory Layer for AI Agents - Drop-in memory infrastructure for AI agents and apps. Context that persists. ,
+mem0ai/openmemory,user-list,55,"TypeScript | Open-source CLI & TUI to port AI coding sessions across Claude Code, Codex, and OpenCode.",
+meshinthesky/hillsidehermitage_subtitles,trendshift,,,topics_audio-processing
+mexicat/pdoom-video,trendshift,,,weekly#14
+microsoft/autogen,user-list,61195,Python | A programming framework for agentic AI,
+microsoft/data-formulator,user-list,17457,"Python | 🪄 Data Formulator is an interactive AI-powered data analysis system makes it easy to connect, explore and visu",
+microsoft/generative-ai-for-beginners,trendshift,,,github-trending-repositories
+mikehasa/golive-skill,user-list,1019,"TypeScript | Take your agent-built product live: hosting, database, domain, email, payments — on your own accounts. Open-so",
+mlevinmail/cedar-server,trendshift,,,topics_text-to-speech
+mokahq/mokalabs,trendshift,,,topics_mcp
+mov-bx-0xb800/agent-monitor,trendshift,,,topics_ai-coding
+mowgly11/code-review-skill,trendshift,,,topics_ai-coding
+mrchatam/Grok-workhorse,trendshift,,,topics_ai-coding;topics_ai-infrastructure;topics_mcp
+msitarzewski/agency-agents,trendshift,,,yearly#8
+msunbot/humanoid-atlas,trendshift,,,topics_digital-human
+multica-ai/andrej-karpathy-skills,trendshift,,,yearly#7
+multica-ai/multica,user-list,51495,Go | Make humans and AI agents work as one team — open-source and self-hostable.,
+mvschwarz/openrig,user-list+trendshift,1163,TypeScript | Multi-agent harness that runs Claude Code and Codex together as one system,weekly#18
+my-chiefmind/ai-maestro,trendshift,,,topics_ai-coding
+nanobrowser/nanobrowser,user-list,13836,TypeScript | Open-Source Chrome extension for AI-powered web automation. Run multi-agent workflows using your own LLM API k,
+nautahakk/aphasia-word-finder,trendshift,,,topics_text-to-speech
+neural-beat/human-eyes,trendshift,,,topics_ai-memory
+newsbubbles/ismail,trendshift,,,topics_audio-processing
+nextlevelbuilder/ui-ux-pro-max-skill,trendshift,,,yearly#12
+nickrannikko-hub/Hey-Claude-,trendshift,,,topics_ai-voice
+nmorton13/edward,trendshift,,,topics_ai-memory
+numericalworks/esh,trendshift,,,topics_ai-coding
+nvm-sh/nvm,trendshift,,,github-trending-repositories
+oblien/openship,trendshift,,,weekly#21
+obra/superpowers,trendshift,,,github-trending-repositories;yearly#2
+ollama/ollama,trendshift,,,github-trending-repositories
+omdsh-dev/DSH-better-sidebar,user-list,3840,"TypeScript | 开放的侧边栏底座，支持三方拓展注册新侧边栏页面。内置文件渲染编辑/终端/侧边对话/Git/子代理页面 ｜ Open sidebar foundation, supports third-party extensions ",
+openai/skills,user-list,27734,Python | Skills Catalog for Codex,
+openclaw/openclaw,trendshift,,,yearly#1
+opusvideo/awesome-claude-video,trendshift,,,topics_ai-video;topics_curated-list
+orwa-mahmoud/nightshift,user-list,71,"Shell | Accountable long-running coding shifts for Cursor, Codex, and Claude Code. Safe autonomy, recovery, persistent",
+paperclipai/paperclip,user-list+trendshift,90674,TypeScript | The open-source app everyone uses to manage agents at work,monthly#25;weekly#4
+paranjaymundra/task-lantern,trendshift,,,topics_ai-coding
+pcyone/hypit-food-comedy-remake,trendshift,,,topics_ai-video
+pdmtt/claude-code-nix-plugin,trendshift,,,topics_ai-coding
+pegainfer-project/pega-omni,trendshift,,,topics_text-to-speech
+petergpt/claude-interview,trendshift,,,topics_ai-voice;topics_text-to-speech
+pf67j9nwfh-web/Tiger-Build,trendshift,,,topics_chatbot
+phoiex/AAAAGENT,trendshift,,,topics_digital-human
+plait-board/drawnix,user-list,14850,"TypeScript | 开源白板工具（SaaS），一体化白板，包含思维导图、流程图、自由画等。All in one open-source whiteboard tool with mind, flowchart, freehand and e",
+plusminushalf/rot-guard,trendshift,,,topics_ai-agent
+practical-tutorials/project-based-learning,trendshift,,,github-trending-repositories
+prathyvsh/comics,trendshift,,,topics_curated-list
+public-apis/public-apis,trendshift,,,github-trending-repositories
+publicExcess/splish,trendshift,,,topics_ai-infrastructure
+pukno/pukno-benchmarks,trendshift,,,topics_programming-examples
+purankuton2001/ai-oshibloom,trendshift,,,topics_digital-human
+purankuton2001/castconjure,trendshift,,,topics_digital-human
+pythongiant/SlamLM,trendshift,,,topics_chatbot
+q3dresearch/youtube-cpm,trendshift,,,topics_curated-list
+rdurica/quiet-ui,trendshift,,,topics_ui-components
+reconurge/flowsint,user-list,8981,"TypeScript | A modern platform for visual, flexible, and extensible graph-based investigations. For cybersecurity analysts ",
+reindent/jauvex,trendshift,,,topics_ai-voice
+rhyelt/Rhyel-Assembly-Documentary,trendshift,,,topics_programming-examples
+rit3zh/expo-composer-hold-menu,trendshift,,,topics_ui-components
+rlaope/oh-my-hermes,user-list,2997,"Python | All in one plugin for Hermes Agent ⚚ the coding intelligence, a long-term memory system and model optimized wo",
+robotaitai/NoteNode,trendshift,,,topics_audio-processing
+rodhnin/kotoba-companion,trendshift,,,topics_digital-human
+rohitg00/ai-engineering-from-scratch,trendshift,,,weekly#9
+runkids/agents-context-router,trendshift,,,topics_ai-infrastructure
+ruvnet/RuView,trendshift,,,yearly#17
+ruvnet/ruflo,user-list,73412,"TypeScript | 🌊 The original agent harness. Deploy intelligent multi-player swarms, coordinate autonomous workflows, and bui",
+saccojoseph/you,trendshift,,,topics_ai-memory
+safzanpirani/juna,trendshift,,,topics_ai-coding
+salman-tamboli/social-second-brain,trendshift,,,topics_workflow-automation
+sanny1724/memoryops-hindsight,trendshift,,,topics_ai-memory
+sebastiancarlos/shobr,trendshift,,,topics_workflow-automation
+selmant/jellyfin-plugin-foreseerr,trendshift,,,topics_self-hosted
+shicheng5589-oss/Codex-desktop-pet,trendshift,,,topics_digital-human
+shikidmsh-rgb/mochibot,user-list,92,Python | 陪伴型ai agent-人机恋适用,
+shuhdonk/DeskPilot,trendshift,,,topics_text-to-speech
+shuvrajeetkamila/model-factory-command-center,trendshift,,,topics_workflow-automation
+shuvrajeetkamila/model-factory-gpu-commander,trendshift,,,topics_ai-infrastructure;topics_workflow-automation
+simular-ai/Agent-S,user-list,12400,Python | Agent S: an open agentic framework that uses computers like a human,
+sinat50/OSRSBubbleTool,trendshift,,,topics_self-hosted
+smukh/skill-adapter,trendshift,,,topics_ai-agent
+solo938/numpy-house-price-regression,trendshift,,,topics_programming-examples
+stablyai/orca,trendshift,,,monthly#16;weekly#10
+standchat/examples,trendshift,,,topics_programming-examples
+stas4000/scriptcut,trendshift,,,topics_ai-agent;topics_ai-video
+stas4000/what-could-break,trendshift,,,topics_ai-coding
+stbenjam/cronex,trendshift,,,topics_workflow-automation
+stevej52/threadsatchel,trendshift,,,topics_ai-memory;topics_mcp
+stur86/claude-pixet,trendshift,,,topics_mcp
+supermemoryai/company-brain,trendshift,,,topics_ai-memory
+surya-koritala/Glyd,trendshift,,,weekly#16
+suryansh-gg/ncert-maths-tracker,trendshift,,,topics_self-hosted
+t8y2/dbx,trendshift,,,weekly#15
+talkincode/PyPlay,trendshift,,,topics_programming-examples
+tdav/MAUI-Yandex-Map,trendshift,,,topics_ui-components
+tdeverx/contained-app,user-list,846,Swift | A native macOS app for Apple's Container CLI,
+tech-artist92/open-skill-registry,trendshift,,,topics_ai-agent;topics_mcp
+thareekanvar/replyloom,trendshift,,,topics_self-hosted
+thedotmack/claude-mem,trendshift,,,yearly#19
+theswerd/brainless,user-list-append,,,
+tintlang/tint,trendshift,,,topics_ui-components
+tlouvart/songsurf,trendshift,,,topics_audio-processing
+togg53192-cmd/jailbreaks,user-list+user-list-append+trendshift,1332,None | LIST OF ALL MY JAILBREAKS,weekly#25
+toniwillberg/wordpress-elementor-with-mcp-container,trendshift,,,topics_mcp
+topoteretes/cognee,user-list,31093,Python | Cognee is the open-source AI memory platform for agents. Give your AI agents persistent long-term memory with ,
+trustfuture/simon-skills,trendshift,,,topics_text-to-speech
+trycua/cua,user-list,26696,"HTML | Scale computer-use 2.0 with open-source drivers, cross-OS fleets, and benchmarks for training, evaluation, and",
+tt-a1i/archify,trendshift,,,monthly#7;weekly#23
+tupicython/tupicython,trendshift,,,topics_programming-examples
+twentyhq/twenty,trendshift,,,github-trending-repositories
+uber/ADR,user-list,1602,"Python | ADR secures enterprise AI agents through observability, security benchmarking, and threat detection. Deployed ",
+ublockauto/pythonhell,trendshift,,,topics_programming-examples
+udit/silakka54-aio-layout,trendshift,,,topics_ui-components
+ufo-ai/ufo-core,trendshift,,,topics_self-hosted
+ultraworkers/claw-code,trendshift,,,yearly#10
+vectorize-io/agent-memory-benchmark,user-list,98,Python | Agent Memory Benchmark,
+vectorize-io/hindsight,user-list+trendshift,38275,Python | Hindsight: Agent Memory That Learns,monthly#8;weekly#3
+vidalmaxime/fluoddity-music,trendshift,,,topics_audio-processing
+virattt/ai-hedge-fund,trendshift,,,github-trending-repositories
+vlastimilcerveny34/guitar-audio-tools,trendshift,,,topics_audio-processing
+vodhash/one-page-papers,trendshift,,,topics_curated-list
+volcengine/OpenViking,user-list,38829,"Python | Self-evolving Context Database for AI Agents. Unify Agent Memory, Knowledge RAG and Skills.",
+vulbsti/BioSim,trendshift,,,topics_digital-human
+wakamex/bend-bench,trendshift,,,topics_programming-examples
+wapratama/ml-zc2026,trendshift,,,topics_programming-examples
+will127534/cf-mp3-player,trendshift,,,topics_audio-processing
+williamlabdev/ai-gap-radar,trendshift,,,topics_curated-list
+win4r/MuseAI-Skills,user-list,282,"HTML | muse.ai (Muse AI) skills and runtime snapshot: 68 skills, workflow guides, connector manifests. muse.ai 技能与运行环",
+www222fff/muse2api,trendshift,,,topics_ai-infrastructure
+xlang-ai/OSWorld,user-list,3159,Python | [NeurIPS 2024] OSWorld: Benchmarking Multimodal Agents for Open-Ended Tasks in Real Computer Environments,
+xmanrui/dsh-im,user-list,1519,JavaScript | 通过扫码或机器人凭据把IM机器人接入DeepSeek Harness（支持飞书、微信、钉钉、企业微信、QQ、Slack、Telegram、Discord和WhatsApp）。 Connect IM bots to Dee,
+yang0/handraw-style,user-list,3457,HTML | 手绘风格编号画廊与双语提示词 Skill,
+yihui-dev/awesome-opus5-5-videos,trendshift,,,topics_ai-video;topics_curated-list
+yliuai/laya-eval,trendshift,,,topics_programming-examples
+zevro-ai/sunshine,trendshift,,,topics_self-hosted
+zhangleo-1983/Dialogue_Coach,trendshift,,,topics_chatbot
+zhishile/codex-auth-helper,user-list,16978,CSS | Codex登陆助手：安全地在本地导出您的已登录 ChatGPT 会话配置，生成符合 Codex 规范的 auth.json 本地备份文件。,
+zhuyansen/awesome-claude-video-skills,trendshift,,,topics_ai-video;topics_curated-list
+zo4u/n8n-serv00,trendshift,,,topics_workflow-automation
+zouyuxuan122/dsh-our-free-model,trendshift,,,topics_chatbot
+zudochkin/awesome-newsletters,user-list,4485,None | A list of amazing Newsletters,
+zurasaaa/MKW-VoiceChat,trendshift,,,topics_audio-processing
+oil-oil/oil-ui,user-local-20260930,,,skills/ui-direction
+vitali87/code-graph-rag,user-batch-20260930,5.2k,,codemap/graph
+CodeGraphContext/CodeGraphContext,user-batch-20260930,4.2k,,codemap/graph
+vercel-labs/agent-skills,user-batch-20260930,31.8k,,skills-convention
+trailofbits/skills,user-batch-20260930,7.3k,,skills-security
+microsoft/tgrep,user-batch-2026-09-30,3383,Rust,round24-lexical-search
+zvec-ai/zvec-grep,user-batch-2026-09-30,3844,TypeScript,round24-hybrid-search
+alibaba/zvec,user-batch-2026-09-30,16030,C++,round24-vector-engine
+alibaba/skill-up,user-batch-2026-09-30,1125,Go,round24-skill-eval
+humanlayer/advanced-context-engineering-for-coding-agents,user-batch-2026-09-30,2676,-,round24-UNLICENSED
+liseami/ChunUI,user-submitted,495,Swift,design_system#ios#skill
+GetBrew/growth-engineer,user-submitted,122,TypeScript,catalog#agent_skill#mcp
+KKKKhazix/AIHOT,user-submitted,,,pending
+trendshift.io,user-submitted,,,trends,leaderboard

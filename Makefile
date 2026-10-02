@@ -413,3 +413,23 @@ evolution-gate:
 # 跑一次完整 A/B 进化实验（人工/CI 按需，不进默认 CI）
 evolution-exp:
 	@cargo run --bin nt-evolution-exp -- --help
+
+# ── 重型命令串行（2026-09-30）────────────────────────────────────────
+# 吸收 GetBrew/growth-engineer（MIT）时读到其设计：「Heavy commands wait
+# their turn behind a lock, so several worktrees can run checks without
+# running out of memory」—— 这正是本仓反复踩的坑：AGENTS.md §2 的
+# 「⛔ 禁并行全量构建」是**散文纪律**，无机制保证；2026-09-30 一个会话内
+# 因此两次因他窗 cargo 而超时。nt_mem_gate.sh 只报告、不串行。
+build-lock:
+	@bash scripts/ops/nt_build_lock.sh --status
+
+# 串行跑全量测试（多 worktree 安全）
+test-locked:
+	bash scripts/ops/nt_build_lock.sh -- cargo test -p neotrix --lib
+
+check-locked:
+	bash scripts/ops/nt_build_lock.sh -- cargo check --workspace --all-targets
+
+build-lock-selftest:
+	@bash scripts/ops/nt_worktree_gate_selftest.sh >/dev/null 2>&1 || true
+	@bash scripts/ops/nt_build_lock.sh --status

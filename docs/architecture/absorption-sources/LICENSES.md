@@ -70,3 +70,12 @@ curl -s "https://raw.githubusercontent.com/<owner>/<repo>/HEAD/LICENSE" | head -
 
 **⇒ 教训**：写许可台账时，**每个 `owner/repo` 都必须来自已抓取的数据文件**，
 不能凭印象补全 —— 与「导出 ≠ 调用」同源。
+
+## 2026-09-30 新增（用户提交，吸收判定见 ABSORPTION-2026-10-01-CHUNUI-GROWTH.md）
+
+| 仓库 | SPDX | 可吸收性 |
+|---|---|---|
+| `liseami/ChunUI` | **MIT** | ⛔ 代码不可（SwiftUI/iOS）；✅ 2 条设计原则可 |
+| `GetBrew/growth-engineer` | **MIT** | ⛔ 域内容不可（GTM/销售）；✅ 1 条构建基础设施模式可 |
+
+两者均为 MIT ⇒ 可自由取用思路与代码片段（本轮实际**未复制任何代码**）。
