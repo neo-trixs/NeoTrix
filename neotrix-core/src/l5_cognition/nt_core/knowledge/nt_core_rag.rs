@@ -84,6 +84,16 @@ pub struct Reranker {
 }
 
 /// 上下文压缩器
+///
+/// ⚠️ **本类型是全仓唯一活着的 `ContextCompressor`**（2026-10-02 核实）。
+/// 低层 `neotrix-types/.../nt_core_bank/compressor.rs` 曾有一个**同名**的
+/// 4 策略完整设计稿，但它 `mod` 从未声明 ⇒ 从未编译，且依赖 API 已漂移
+/// （`MemoryLayer::L2Session` 等变体消失、`MemoryEntry.importance` 已改名
+/// `priority`、`clear_layer` 已删除）⇒ 实测 4 个编译错误，属**化石**，
+/// 已于同日删除。
+///
+/// ⇒ 读低层源码时曾会误以为存在完整压缩器；本注记消除该误导。
+/// ⛔ 若日后要复活「按价值压缩」，那是**按新 API 重写**，不是恢复旧文件。
 pub struct ContextCompressor {
     max_tokens: usize,
 }
