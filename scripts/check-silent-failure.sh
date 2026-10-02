@@ -219,10 +219,44 @@ for root in ROOTS:
                 continue
             lines = _strip_noncode(text).splitlines()
             for i, line in enumerate(lines):
-                m = re.search(r"let\s+_\s*=\s*(.+?);\s*$", line)
+                # ⭐⭐⭐ 2026-10-02 修的**盲区 B1**：原正则
+                #   `let\s+_\s*=\s*(.+?);\s*$` 要求分号在**同一行行尾**，
+                #   而本仓大量调用是**多行**形态，例如：
+                #       let _applied: Option<usize> =
+                #           self.conn.execute(alter, []).ok();
+                #   ⇒ 这些行**结构上**永远不匹配 ⇒ GATED 判据再严也看不到。
+                #   实测规模：全仓 `let _ = ` 1493 行，单行形态仅 1235 行
+                #   ⇒ **258 处多行开头全部隐形**（其中 22 处同时满足
+                #   「GATED 调用 + 块内无观察通道 + 非测试」，即**语义上已是
+                #   静默失败但门看不见」）⇒ 门少算 39%。
+                #
+                # ⭐ 单调性论证：`_strip_noncode` 自述「preserving line structure」，
+                #   只删行内内容、**不会追加 `;`** ⇒ 原始行不匹配 ⇒ 剥离后也不可能匹配。
+                #
+                #   ⇒ 改为：先认 opener，再**沿后续行按括号配平**累积到收尾的 `;`。
+                m = re.search(r"let\s+_\s*=\s*(.*)$", line)
                 if not m:
                     continue
                 rhs = m.group(1)
+                if not rhs.rstrip().endswith(";"):
+                    # 多行形态：向下累积直到括号配平且该行以 `;` 收尾。
+                    depth = rhs.count("(") - rhs.count(")")
+                    j = i
+                    while j + 1 < len(lines) and (depth > 0 or not rhs.rstrip().endswith(";")):
+                        j += 1
+                        nxt = lines[j]
+                        rhs += " " + nxt.strip()
+                        depth += nxt.count("(") - nxt.count(")")
+                        if depth <= 0 and nxt.rstrip().endswith(";"):
+                            break
+                    else:
+                        # 未在文件内闭合 ⇒ 交给下一行重新起判，**不**误报。
+                        continue
+                    if depth > 0:
+                        continue
+                    rhs = rhs.rstrip()
+                    if rhs.endswith(";"):
+                        rhs = rhs[:-1]
                 # strip a leading `mut ` and the receiver chain noise
                 if AMBIGUOUS.search(rhs):
                     ambiguous += 1
