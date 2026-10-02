@@ -26,6 +26,27 @@ pub struct ReasoningBankStats {
 /// Inherent methods (`name`, `capability_vector`, `source_weight`) live in
 /// `l2_perception::nt_core_knowledge::sources` to avoid L0→L2 coupling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+// ⛔⛔ **不要与 `neotrix-types` 的同名 enum 收敛**（2026-10-02 实测）
+//
+// 两者**同名，但不是同一个 enum**：
+// · 交集 51 个变体
+// · 本侧独有 **14** 个：全是**认知科学理论** —— ActiveInference /
+//   GlobalWorkspaceTheory / IntegratedInformationTheory / PredictiveCoding /
+//   JEPAWorldModel / OrchOR / HyperAgents / AttentionSchema …
+// · 低层独有 **40** 个：全是**外部工具/项目** —— LangMem / LettaMemory /
+//   HindsightMemory / OpenSwe / QwenCode / Maigret / Crush / ClawCode …
+// ⇒ 两个集合**语义正交**，不是「一份漂移成两份」。
+// ⇒ 收敛会造成：把 40 个工具名灌进认知理论枚举（语义污染），
+//   或从低层删掉 14 个理论变体（丢能力）。
+// 且低层那 40 个**被重度使用**（`core/nt_core_knowledge/sources.rs` 有 250 处
+// `KnowledgeSource::` 引用）⇒ 不是死变体。
+//
+// ⛔ 正确处置是**改名**（如 `CognitiveTheorySource` vs `ToolSource`），
+//   不是收敛。改名涉及 39 个文件，需独立批次裁决。
+//
+// ⚠️ 本条是实测结论，不是推断 —— 见
+//    `docs/architecture/MIRROR-BANK-2026-10-02-NAMECOLLISION.md`。
+
 pub enum KnowledgeSource {
     HeroUI,
     BaseUI,
