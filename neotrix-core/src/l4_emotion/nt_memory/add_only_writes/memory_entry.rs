@@ -32,7 +32,18 @@ pub type EntryId = String;
 /// - `superseded_by`: if invalidated, the entry that replaced this one
 /// - `source`: provenance tag (session id, tool name, etc.)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct AddOnlyAddOnlyMemoryEntry {
+/// ⚠️ 2026-09-30 修正：此处原为 `pub struct AddOnlyAddOnlyMemoryEntry` ——
+/// **「AddOnly」前缀被重复拼接了两次**，是一次未完成的批量改名事故
+/// （`AddOnlyMemoryEntry` → `AddOnlyMemoryEntry` 改名时对已改名类型又改了一次）。
+///
+/// 后果：同目录另外 3 个文件都 `use super::memory_entry::AddOnlyMemoryEntry`
+/// （期望 `AddOnlyMemoryEntry`），而全仓**正确拼法 `AddOnlyMemoryEntry` 出现 0 处**
+/// ⇒ 该模块因此产生 8 个编译错误，被 `nt_memory/mod.rs` 整簇注释掉，
+/// 从此再不参与编译（4 文件 / 789 行）。
+///
+/// 判定：其余 3 个文件一律用 `AddOnlyMemoryEntry`，且 `AddOnlyMemoryEntry` 全仓 0 处
+/// ⇒ 真实意图就是 `AddOnlyMemoryEntry`，改**定义处这一处**即完全自洽。
+pub struct AddOnlyMemoryEntry {
     pub id: EntryId,
     pub content: String,
     pub created_at: i64,
@@ -77,6 +88,30 @@ impl AddOnlyMemoryEntry {
     }
 
     /// Builder: set id explicitly (for deterministic ids).
+    /// **显式时间**构造（2026-09-30 新增）。
+    ///
+    /// ⛔ 为什么需要它：`new()` 用 `now_ts()`（**真实时钟**）当 `valid_from`，
+    /// 于是「刚创建」这条事实在**过去的时间点**上无效。本模块两个自带测试
+    /// 正是因此失败：
+    /// · `entry_with_no_valid_to_is_always_valid` 断言 `is_valid_at(0)`，
+    ///   但 `valid_from ≈ 1.7e9` ⇒ 必假；
+    /// · `query_at_point_in_time` 同理。
+    ///
+    /// ⚠️ 这不只是测试问题：**时态数据的构造必须可控**，
+    /// 否则任何「在某历史时刻查询」的调用都无法复现。
+    /// ⇒ 提供显式时间入口，生产侧也该用它做回放/导入/迁移。
+    pub fn at(content: impl Into<String>, source: impl Into<String>, ts: i64) -> Self {
+        Self {
+            id: String::new(), // caller assigns
+            content: content.into(),
+            created_at: ts,
+            valid_from: ts,
+            valid_to: None,
+            superseded_by: None,
+            source: source.into(),
+        }
+    }
+
     pub fn with_id(mut self, id: impl Into<String>) -> Self {
         self.id = id.into();
         self
@@ -144,7 +179,9 @@ mod tests {
 
     #[test]
     fn entry_with_no_valid_to_is_always_valid() {
-        let e = AddOnlyMemoryEntry::new("fact", "test").with_id("e2");
+        // 用**显式时间**构造（`new()` 走真实时钟，见 `at()` 的文档）：
+        // ts=0 ⇒ 整条时间轴上「始终有效」才是可断言的。
+        let e = AddOnlyMemoryEntry::at("fact", "test", 0).with_id("e2");
         assert!(e.is_valid_at(0));
         assert!(e.is_valid_at(i64::MAX));
     }

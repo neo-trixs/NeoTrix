@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::memory_entry::MemoryEntry;
+use super::memory_entry::AddOnlyMemoryEntry;
 
 /// A time-travel query descriptor.
 ///
@@ -54,8 +54,18 @@ impl TemporalQuery {
         Self::All
     }
 
-    /// Test whether a `MemoryEntry` satisfies this query.
-    pub fn matches(&self, entry: &MemoryEntry, now: i64) -> bool {
+    /// Test whether a `AddOnlyMemoryEntry` satisfies this query.
+    ///
+    /// ⚠️ **`now` 只对 [`Self::Now`] 分支生效**（2026-09-30 补注）。
+    /// 其余分支各用**自己的**时间语义：`At(t)` 看 `t`、`Range` 看自身区间、
+    /// `LatestByPrefix`/`All` 与时间无关。
+    ///
+    /// 这曾是一个**真实 API 陷阱**：模块自带测试
+    /// `query_at_point_in_time` 断言 `!at(150).matches(&e, 250)`
+    /// （以为 `now=250` 会参与判断），实际实现忽略 `now`
+    /// ⇒ 该断言**期望写错**，已按实现语义修正。
+    /// 传 `now` 给非 `Now` 分支是无意义的，但为保持调用点签名统一而保留。
+    pub fn matches(&self, entry: &AddOnlyMemoryEntry, now: i64) -> bool {
         match self {
             Self::Now => entry.is_valid_at(now),
             Self::At(t) => entry.is_valid_at(*t),
@@ -73,7 +83,7 @@ impl TemporalQuery {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryResult {
     /// Entries that matched, ordered by `created_at` ascending.
-    pub entries: Vec<MemoryEntry>,
+    pub entries: Vec<AddOnlyMemoryEntry>,
     /// The query that produced this result (for auditing).
     pub query: TemporalQuery,
     /// Wall-clock time at which the query was evaluated.
@@ -103,10 +113,10 @@ impl QueryResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l4_emotion::nt_memory::add_only_writes::memory_entry::MemoryEntry;
+    use crate::l4_emotion::nt_memory::add_only_writes::memory_entry::AddOnlyMemoryEntry;
 
-    fn entry(id: &str, from: i64, to: Option<i64>) -> MemoryEntry {
-        MemoryEntry::new(format!("content-{id}"), "test")
+    fn entry(id: &str, from: i64, to: Option<i64>) -> AddOnlyMemoryEntry {
+        AddOnlyMemoryEntry::new(format!("content-{id}"), "test")
             .with_id(id)
             .valid_window(from, to.unwrap_or(i64::MAX))
     }
@@ -127,10 +137,15 @@ mod tests {
 
     #[test]
     fn query_at_point_in_time() {
+        // entry 有效期 [100, 200)；查询锚点 150 ⇒ 命中。
+        // ⚠️ `now` 参数只对 `Now` 分支生效，此处传什么都不影响 `At` 的判定。
         let e = entry("a", 100, Some(200));
         let q = TemporalQuery::at(150);
         assert!(q.matches(&e, 0));
-        assert!(!q.matches(&e, 250));
+        assert!(q.matches(&e, 250));
+        // 真正的「不命中」要换查询锚点，而不是换 `now`：
+        assert!(!TemporalQuery::at(250).matches(&e, 0));
+        assert!(!TemporalQuery::at(50).matches(&e, 0));
     }
 
     #[test]

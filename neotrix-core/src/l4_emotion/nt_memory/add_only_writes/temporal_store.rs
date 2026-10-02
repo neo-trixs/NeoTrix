@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use super::memory_entry::{EntryId, MemoryEntry};
+use super::memory_entry::{EntryId, AddOnlyMemoryEntry};
 use super::temporal_query::{QueryResult, TemporalQuery};
 use crate::l4_emotion::nt_memory::shared_utils::now_ts;
 
@@ -52,10 +52,10 @@ impl IdGenerator {
 
 /// ADD-only temporal memory store (R-P117, R-P120, R-P122).
 ///
-/// All entries live in a `Vec<MemoryEntry>` (append-ordered). A secondary
+/// All entries live in a `Vec<AddOnlyMemoryEntry>` (append-ordered). A secondary
 /// index maps entry ids to their position for O(1) lookup.
 pub struct TemporalStore {
-    entries: Vec<MemoryEntry>,
+    entries: Vec<AddOnlyMemoryEntry>,
     index: HashMap<EntryId, usize>,
     id_gen: IdGenerator,
 }
@@ -82,7 +82,7 @@ impl TemporalStore {
     /// an auto-generated id is assigned.
     ///
     /// Returns `Err(DuplicateId)` if the id already exists.
-    pub fn add(&mut self, mut entry: MemoryEntry) -> Result<&MemoryEntry, StoreError> {
+    pub fn add(&mut self, mut entry: AddOnlyMemoryEntry) -> Result<&AddOnlyMemoryEntry, StoreError> {
         if entry.id.is_empty() {
             entry.id = self.id_gen.next();
         }
@@ -104,7 +104,7 @@ impl TemporalStore {
         old_id: &str,
         new_content: impl Into<String>,
         source: impl Into<String>,
-    ) -> Result<&MemoryEntry, StoreError> {
+    ) -> Result<&AddOnlyMemoryEntry, StoreError> {
         let old_pos = *self
             .index
             .get(old_id)
@@ -120,7 +120,7 @@ impl TemporalStore {
         self.entries[old_pos].invalidate(&new_id);
 
         // Build new entry
-        let new_entry = MemoryEntry::new(new_content, source)
+        let new_entry = AddOnlyMemoryEntry::new(new_content, source)
             .with_id(&new_id)
             .valid_from(cut);
 
@@ -133,7 +133,7 @@ impl TemporalStore {
     /// R-P120: Query by a `TemporalQuery`.
     pub fn query(&self, q: &TemporalQuery) -> QueryResult {
         let now = now_ts();
-        let matched: Vec<MemoryEntry> = self
+        let matched: Vec<AddOnlyMemoryEntry> = self
             .entries
             .iter()
             .filter(|e| q.matches(e, now))
@@ -164,7 +164,7 @@ impl TemporalStore {
     }
 
     /// Get a specific entry by id.
-    pub fn get(&self, id: &str) -> Option<&MemoryEntry> {
+    pub fn get(&self, id: &str) -> Option<&AddOnlyMemoryEntry> {
         self.index.get(id).map(|&pos| &self.entries[pos])
     }
 
@@ -187,7 +187,7 @@ impl TemporalStore {
     /// `old.superseded_by = new_id` means "new replaced old". To walk backwards
     /// from newest to oldest, we find the entry whose `superseded_by` points to
     /// the current id (O(n) scan, acceptable for chain walking).
-    pub fn history_chain(&self, entry_id: &str) -> Vec<&MemoryEntry> {
+    pub fn history_chain(&self, entry_id: &str) -> Vec<&AddOnlyMemoryEntry> {
         let mut chain = Vec::new();
         let mut current = Some(entry_id);
         let mut guard = 0;
@@ -229,7 +229,7 @@ mod tests {
     #[test]
     fn add_and_get() {
         let mut s = store();
-        let e = MemoryEntry::new("hello", "test").with_id("e1");
+        let e = AddOnlyMemoryEntry::new("hello", "test").with_id("e1");
         s.add(e).unwrap();
         assert_eq!(s.len(), 1);
         assert!(s.get("e1").is_some());
@@ -239,15 +239,15 @@ mod tests {
     #[test]
     fn add_duplicate_rejects() {
         let mut s = store();
-        s.add(MemoryEntry::new("a", "test").with_id("e1")).unwrap();
-        let dup = s.add(MemoryEntry::new("b", "test").with_id("e1"));
+        s.add(AddOnlyMemoryEntry::new("a", "test").with_id("e1")).unwrap();
+        let dup = s.add(AddOnlyMemoryEntry::new("b", "test").with_id("e1"));
         assert_eq!(dup.unwrap_err(), StoreError::DuplicateId("e1".into()));
     }
 
     #[test]
     fn add_auto_generates_id() {
         let mut s = store();
-        let e = s.add(MemoryEntry::new("auto", "test")).unwrap();
+        let e = s.add(AddOnlyMemoryEntry::new("auto", "test")).unwrap();
         assert!(!e.id.is_empty());
         assert!(e.id.starts_with("ae_"));
     }
@@ -255,7 +255,7 @@ mod tests {
     #[test]
     fn supersede_closes_old_window() {
         let mut s = store();
-        s.add(MemoryEntry::new("old", "test").with_id("e1"))
+        s.add(AddOnlyMemoryEntry::new("old", "test").with_id("e1"))
             .unwrap();
         let new = s.supersede("e1", "new", "test").unwrap().clone();
         assert!(!new.id.is_empty());
@@ -276,7 +276,7 @@ mod tests {
     #[test]
     fn supersede_already_superseded() {
         let mut s = store();
-        s.add(MemoryEntry::new("a", "test").with_id("e1")).unwrap();
+        s.add(AddOnlyMemoryEntry::new("a", "test").with_id("e1")).unwrap();
         s.supersede("e1", "b", "test").unwrap();
         let r = s.supersede("e1", "c", "test");
         assert_eq!(r.unwrap_err(), StoreError::AlreadySuperseded("e1".into()));
@@ -285,9 +285,9 @@ mod tests {
     #[test]
     fn query_now_returns_active_entries() {
         let mut s = store();
-        s.add(MemoryEntry::new("active", "test").with_id("e1"))
+        s.add(AddOnlyMemoryEntry::new("active", "test").with_id("e1"))
             .unwrap();
-        let mut expired = MemoryEntry::new("expired", "test").with_id("e2");
+        let mut expired = AddOnlyMemoryEntry::new("expired", "test").with_id("e2");
         expired.valid_to = Some(1); // expired long ago
         s.add(expired).unwrap();
 
@@ -300,13 +300,13 @@ mod tests {
     fn query_at_point_in_time() {
         let mut s = store();
         s.add(
-            MemoryEntry::new("a", "test")
+            AddOnlyMemoryEntry::new("a", "test")
                 .with_id("e1")
                 .valid_window(100, 200),
         )
         .unwrap();
         s.add(
-            MemoryEntry::new("b", "test")
+            AddOnlyMemoryEntry::new("b", "test")
                 .with_id("e2")
                 .valid_from(150),
         )
@@ -327,8 +327,8 @@ mod tests {
     #[test]
     fn active_count_excludes_superseded() {
         let mut s = store();
-        s.add(MemoryEntry::new("a", "test").with_id("e1")).unwrap();
-        s.add(MemoryEntry::new("b", "test").with_id("e2")).unwrap();
+        s.add(AddOnlyMemoryEntry::new("a", "test").with_id("e1")).unwrap();
+        s.add(AddOnlyMemoryEntry::new("b", "test").with_id("e2")).unwrap();
         assert_eq!(s.active_count(), 2);
         s.supersede("e1", "c", "test").unwrap();
         assert_eq!(s.active_count(), 2); // new entry added, old superseded
@@ -338,7 +338,7 @@ mod tests {
     #[test]
     fn history_chain_walks_correctly() {
         let mut s = store();
-        s.add(MemoryEntry::new("v1", "test").with_id("e1")).unwrap();
+        s.add(AddOnlyMemoryEntry::new("v1", "test").with_id("e1")).unwrap();
         s.supersede("e1", "v2", "test").unwrap();
         let new = s.supersede("e1", "v3", "test").unwrap_err(); // e1 already superseded
                                                                 // Walk from e1 (the original)

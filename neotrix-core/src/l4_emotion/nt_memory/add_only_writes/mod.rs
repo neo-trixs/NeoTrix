@@ -15,6 +15,6 @@ pub mod memory_entry;
 pub mod temporal_query;
 pub mod temporal_store;
 
-pub use memory_entry::MemoryEntry;
+pub use memory_entry::AddOnlyMemoryEntry;
 pub use temporal_query::{QueryResult, TemporalQuery};
 pub use temporal_store::{StoreError, TemporalStore};
