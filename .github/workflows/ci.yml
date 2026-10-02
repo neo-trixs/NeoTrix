@@ -5,6 +5,16 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # ⭐ 2026-10-02 补：原来**没有**手动触发入口 ⇒ 想验证一个 CI 改动
+  #   只能推空 commit 或改 workflow 文件。加 dispatch 是为了让「门能不能变绿」
+  #   本身可验证，而不是只能等下次 push。
+  workflow_dispatch:
+
+# ⭐ 2026-10-02 补：原来**完全没有** concurrency ⇒ 同一分支连推几次，
+#   3 OS × 多 job 全部叠加重跑且不取消旧run。加它之后新 push 会取消在跑的。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -121,6 +131,76 @@ jobs:
       #   只判「账本是否活着」：有数据行 + **含拒绝记录** + bin 已注册。
       - name: Evolution experiment ledger liveness
         run: bash scripts/check-evolution-ledger.sh
+
+  # ── 桌面端 + 前端（2026-10-02 补的洞）─────────────────────────────
+  # ⭐⭐ 为什么单开一个 job 而不是塞进 `test`：
+  #   `test` job 用 `cargo test --lib -p neotrix`，`--lib` **不编译 `tests/`**
+  #   ⇒ neotrix-core/tests/ 的 445 条集成测试、neotrix-neobot 的 479 条、
+  #   neobot-desktop 的 79 条，**从未在任何可绿的 CI 路径上执行过**。
+  #   ⓰ 仓里唯一一行全工作区测试是 `lint.yml:56 cargo test --all`，
+  #   而它在 **ubuntu-latest** 上按下面「系统依赖」那段必然红 ⇒ 结构性的假门。
+  #   ⇒ 本 job 是把那行「恒红」换成真绿的第一块。
+  desktop:
+    # ⭐ 为什么只跑 macOS：`neobot-desktop` 依赖 `tauri`（**未关默认 feature**）
+    #   ⇒ 默认带 `wry` ⇒ Linux 侧要 `webkit2gtk-4.1` 等系统库
+    #   （`tauri-2.12.0/Cargo.toml:135-140` → `webkit2gtk-sys-2.0.2/build.rs`
+    #   的 `system_deps::probe()` 缺库即失败）。仓里**零** apt/brew 步骤
+    #   （`rg 'apt-get install|brew install' .github/` 零命中），
+    #   而 `CONTRIBUTING.md:10` 已写好配方却从未接进 CI。
+    #   ⇒ 先在 macOS 上把覆盖做实；Linux 侧等有配方再开第二格 matrix。
+    runs-on: macos-latest
+    # ⭐ 原来 ci.yml **一个 job 都没有** timeout-minutes ⇒ 卡住要等 GitHub 默认 6h。
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: Swatinem/rust-cache@v2
+
+      # ⭐⭐ **必须先建前端产物，否则 cargo 编译期就 panic**（实测链条）：
+      #   `tauri.conf.json:6` 的 `frontendDist` 指向 `neobot-ui/dist`，
+      #   而 `neobot-ui/.gitignore:4` 忽略了 `dist/`（`git ls-files` 实测 0 文件入库）
+      #   ⇒ 干净检出里该路径**不存在**；
+      #   `tauri-codegen-2.7.0/src/context.rs:186-191` 对不存在的路径**直接 panic**；
+      #   `generate_context!()` 只出现在 `src/main.rs:81`（bin target），
+      #   而 `cargo test -p <pkg>` 会连带编译 bin target（为了 CARGO_BIN_EXE_*）
+      #   ⇒ **不加这一步，本 job 必红**。
+      #   ⭐ 顺带白拿前端类型门：`neobot-ui/package.json:8` 的 build 就是
+      #   `tsc --noEmit && vite build` ⇒ 这一步同时给 1,241 行 TS 上了类型检查。
+      #   ⛔ `beforeBuildCommand` **不会**被 `cargo test` 触发（那是 `tauri build` CLI 的事）。
+      # ⭐ 刻意**不用** `pnpm/action-setup` 与 `actions/setup-node`：
+      #   仓里的 `provenance/external-inputs.json` 要求每个第三方 action 登记
+      #   **sha256 + commit**（供应链 pin），而 GitHub API 配额已 0/60 ⇒ 我无法取到真值。
+      #   ⛔ 更不能伪造 ⇒ `check-ci-refs.sh --strict` 会红（它当场抓到了我）。
+      #   ⇒ 改用**runner 自带 Node** + `npm i -g pnpm`，**不新增任何第三方依赖**。
+      #   ⓰ 代价：Node/pnpm 版本不再由 workflow 钉死 ⇒ 用下面那步把**实际版本打进日志**，
+      #   免得「用的什么版本」只能靠猜（这是 R-SCAN-3 的同一条纪律）。
+      - name: Record toolchain versions actually used
+        run: |
+          set -euo pipefail
+          echo "node $(node --version)  npm $(npm --version)"
+          npm install -g pnpm@10
+          echo "pnpm $(pnpm --version)"
+      - name: Install frontend deps
+        run: pnpm install --frozen-lockfile
+        working-directory: apps/neobot-desktop/neobot-ui
+      - name: Build frontend (tsc --noEmit + vite build)
+        run: pnpm run build
+        working-directory: apps/neobot-desktop/neobot-ui
+
+      # ⭐⭐ `neobot-desktop`：本次补的核心。此前 CI 一次都没跑过它，
+      #   后果是 2026-10-02 那个 P0（前端载荷键 snake_case vs Tauri camelCase ⇒
+      #   **消息从不落库、切会话历史永远空**）能带着「全部 UI 门全绿」活下来。
+      #   ⓰ 现有测试：`src/` 71 条 + `tests/data_dir_env.rs` 3 条
+      #   + `tests/ipc_roundtrip.rs` 5 条（真实命令分发，无桩）。
+      - name: Desktop IPC + shell tests (real dispatch, no stubs)
+        run: cargo test -p neobot-desktop
+
+      # ⭐ 顺手把 `neotrix-neobot` 也拉进来：它是**叶子 crate**（无 `neotrix` 依赖）
+      #   ⇒ 依赖子树已被上一条编好，几乎不额外花时间，却白拿 479 条测试
+      #   —— 而这 479 条此前**从未**在任何 CI 路径上跑过
+      #   （仓里唯一的 `cargo test --all` 在 ubuntu 上必然红）。
+      - name: neobot library tests (479, previously never run in CI)
+        run: cargo test -p neotrix-neobot
 
   coverage:
     runs-on: ubuntu-latest
