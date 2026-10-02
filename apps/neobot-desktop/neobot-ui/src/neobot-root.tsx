@@ -47,7 +47,22 @@ interface ConvoView {
   unread: number
 }
 
-type Msg = { who: 'me' | 'bot'; text: string; ts: string; failed?: boolean }
+type Msg = {
+  who: 'me' | 'bot'
+  text: string
+  ts: string
+  failed?: boolean
+  /** ⭐ 稳定标识。⛔ 旧实现用**数组下标**寻址重发，而 `msgs` 是可变列表 ⇒
+   *  「点击 → promise resolve」之间任何 `setMsgs` 都会让下标错位
+   *  ⇒ **可能重发另一条消息的内容**。 */
+  id?: string
+  /** ⭐ 发送时的**原始正文**（失败时才有）。
+   *  ⛔⛔ 旧实现把「本地化错误前缀 + 正文」塞进同一个 `text`，`重发` 再用
+   *    **当前语言的前缀正则**剥回去 ⇒ **切换语言后重发会把前缀一起当正文发出去**；
+   *    且 `String(e).slice(0, 200)` 截断会让前缀正则失配。
+   *  ⇒ 根因是**一个显示字段承载了两份信息**。存一份原文即可根除。 */
+  prompt?: string
+}
 
 /** 库侧记忆视图（`neobot_memory_list` 返回值，蛇形同名）。 */
 interface MemoryView {
@@ -106,13 +121,6 @@ function renderBot(text: string): string | null {
   }
 }
 
-/**
- * 失败消息的**本地化前缀**正则。`重发` 要剥掉自己加的前缀，
- * 而前缀随语言变 ⇒ 不能写死 `/^发送失败：/`。
- */
-function sendFailedPrefixRe(): RegExp {
-  return new RegExp('^' + t('chat.sendFailedPrefix').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-}
 
 /**
  * 复制文本到剪贴板，**带降级链**。
@@ -580,7 +588,15 @@ export function NeoBotRoot() {
       setMsgs(m => [...m, { who: 'bot', text: r?.output ?? r?.text ?? t('chat.noOutput'), ts: nowIso() }])
     } catch (e) {
       // ⛔ 失败气泡标成 failed：那样才能给「重发」，也不至于和正常回复混淆。
-      setMsgs(m => [...m, { who: 'bot', text: `${t('chat.sendFailedPrefix')}${String(e).slice(0, 200)}`, ts: nowIso(), failed: true }])
+      setMsgs(m => [...m, {
+        who: 'bot',
+        text: `${t('chat.sendFailedPrefix')}${String(e).slice(0, 200)}`,
+        ts: nowIso(), failed: true,
+        // ⭐ 存下**原始正文**：`重发` 直接用它，不必剥本地化前缀
+        //    （切语言后剥前缀会把前缀一起发出去）。
+        prompt: text,
+        id: `f${nowIso()}-${m.length}`,
+      }])
     } finally {
       setBusy(false)
       reloadUsage()
@@ -589,19 +605,29 @@ export function NeoBotRoot() {
 
   /** 重发：拿失败气泡的原文再发一次（失败那条替换掉，不留残骸）。 */
   const retry = useCallback(
-    async (idx: number) => {
-      const bad = msgs[idx]
+    async (msgId: string) => {
+      // ⭐⭐ **按 id 寻址，不用数组下标**（理由见 `Msg.id` 的注释）。
+      const bad = msgs.find(x => x.id === msgId)
       if (!bad?.failed || busy) return
-      setMsgs(m => m.filter((_, i) => i !== idx))
+      setMsgs(m => m.filter(x => x.id !== msgId))
       setBusy(true)
       try {
         const r = await invoke<{ output?: string, text?: string }>('neobot_send', {
           convo_id: sel ?? undefined,
-          text: bad.text.replace(sendFailedPrefixRe(), ''),
+          // ⛔ 不再「剥本地化前缀」还原正文：改用发送时存下的原文。
+          //    旧写法在切换语言后必然把前缀一起发出去。
+          text: bad.prompt ?? bad.text,
         })
         setMsgs(m => [...m, { who: 'bot', text: r?.output ?? r?.text ?? t('chat.noOutput'), ts: nowIso() }])
       } catch (e) {
-        setMsgs(m => [...m, { who: 'bot', text: `${t('chat.sendFailedPrefix')}${String(e).slice(0, 200)}`, ts: nowIso(), failed: true }])
+        setMsgs(m => [...m, {
+          who: 'bot',
+          text: `${t('chat.sendFailedPrefix')}${String(e).slice(0, 200)}`,
+          ts: nowIso(), failed: true,
+          // ⭐ 重发仍要能再重发 ⇒ 沿用**同一份原文**。
+          prompt: bad.prompt ?? bad.text,
+          id: `f${nowIso()}-${m.length}`,
+        }])
       } finally {
         setBusy(false)
         reloadUsage()
@@ -1120,7 +1146,7 @@ export function NeoBotRoot() {
                       {m.failed && (
                         <button
                           type="button"
-                          onClick={() => void retry(vi.index)}
+                          onClick={() => void retry(m.id ?? String(vi.index))}
                           disabled={busy}
                           className="rounded border border-line px-1 hover:bg-panel-hover disabled:opacity-40"
                         >
@@ -1165,7 +1191,15 @@ export function NeoBotRoot() {
               value={draft}
               onChange={e => setDraft(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
+                // ⛔⛔⛔ **必须有 IME 守卫**：`isComposing` 为真时，回车是
+                //    **输入法选词确认**，不是发送。
+                //    ⓘ 后果不是「多发一次」而是**灾难性的**：选词确认被当发送 ⇒
+                //    拼音串（还在 preedit、未上屏）被当成正文发出去。
+                //    ⓘ 而 `zh-CN` 是本仓的**默认语言** ⇒ 中文用户必遇。
+                //    ⓘ `nativeEvent.isComposing` 与 `e.isComposing` 在 React
+                //    的合成事件里等价，但用 native 更明确（不被池化影响）。
+                //    ⛔ 也**不能**只判 `e.keyCode === 229`（老 hack，部分 IME 不触发）。
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault()
                   void send()
                 }
