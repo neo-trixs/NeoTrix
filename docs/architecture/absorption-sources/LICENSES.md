@@ -71,11 +71,19 @@ curl -s "https://raw.githubusercontent.com/<owner>/<repo>/HEAD/LICENSE" | head -
 **⇒ 教训**：写许可台账时，**每个 `owner/repo` 都必须来自已抓取的数据文件**，
 不能凭印象补全 —— 与「导出 ≠ 调用」同源。
 
-## 2026-09-30 新增（用户提交，吸收判定见 ABSORPTION-2026-10-01-CHUNUI-GROWTH.md）
+## 2026-10-01 新增（用户提交，吸收判定见 [ABSORPTION-2026-10-01-CHUNUI-GROWTH-PI.md](../ABSORPTION-2026-10-01-CHUNUI-GROWTH-PI.md)）
 
 | 仓库 | SPDX | 可吸收性 |
 |---|---|---|
-| `liseami/ChunUI` | **MIT** | ⛔ 代码不可（SwiftUI/iOS）；✅ 2 条设计原则可 |
-| `GetBrew/growth-engineer` | **MIT** | ⛔ 域内容不可（GTM/销售）；✅ 1 条构建基础设施模式可 |
+| `liseami/ChunUI` | **MIT** | ⛔ 代码不可（SwiftUI/iOS）；✅ 硬约束定档写法 → 已落地为 `neobot-check-typography.mjs` |
+| `GetBrew/growth-engineer` | **MIT** | ⛔ 域内容不可（GTM/销售）；✅ 1 条构建基础设施模式 → 已落地为 `nt_build_lock.sh` |
+| `earendil-works/pi` | **MIT** | ⛔ 代码不可（agent harness）；✅ 供应链预防手段 → 部分落地（仓库根 `.npmrc`） |
 
-两者均为 MIT ⇒ 可自由取用思路与代码片段（本轮实际**未复制任何代码**）。
+三者均为 MIT ⇒ 可自由取用思路与代码片段（**实际未复制任何代码**）。
+
+⛔ **未核实故未吸收**：`KKKKhazix/AIHOT`（许可证未核）。
+⛔ **未逐仓核验**：`trendshift.io` 榜单 —— 榜单条目本身**不等于**已核实的许可/可移植性。
+
+⚠️ **本仓 vendored 第三方代码的许可另记**：`apps/neobot-desktop/frontend/`
+是 dsh-harness-desktop 0.19.1（**MIT**，vendored，含 2 处本地改动，详见其 `VENDOR.md`）。
+⛔ 它**不是**冗余副本 —— 不得按「重复文件」删除，且其字号等规范**不适用**本仓排版门。

@@ -747,7 +747,7 @@ export function NeoBotRoot() {
                 </span>
                 {c.muted && (
                   <span
-                    className="shrink-0 text-[10px] leading-none text-muted"
+                    className="shrink-0 text-[12px] leading-none text-muted"
                     title={t('chat.muted')}
                     aria-label={t('chat.muted')}
                   >
@@ -757,12 +757,12 @@ export function NeoBotRoot() {
                   </span>
                 )}
                 {c.unread > 0 && (
-                  <span className="ml-auto shrink-0 rounded-full bg-info px-1.5 text-[10px] tabular-nums text-btn-ink">
+                  <span className="ml-auto shrink-0 rounded-full bg-info px-1.5 text-[12px] tabular-nums text-btn-ink">
                     {c.unread}
                   </span>
                 )}
               </div>
-              <div className="truncate text-[11px] text-muted">
+              <div className="truncate text-[12px] text-muted">
                 {c.kind === 'group' ? t('chat.kindGroup', { n: c.members.length }) : t('chat.kindPrivate')} · {relTime(c.last_active)}
               </div>
             </button>
@@ -797,7 +797,7 @@ export function NeoBotRoot() {
               }}
               aria-expanded={newOpen}
               title={t('chat.newConversation')}
-              className="h-[26px] w-[26px] shrink-0 rounded-lg border border-line text-[15px] leading-none text-muted hover:bg-panel-hover"
+              className="h-[26px] w-[26px] shrink-0 rounded-lg border border-line text-[16px] leading-none text-muted hover:bg-panel-hover"
             >
               {newOpen ? '×' : '+'}
             </button>
@@ -836,7 +836,7 @@ export function NeoBotRoot() {
                   <option key={m.id} value={m.id}>{m.display}</option>
                 ))}
               </datalist>
-              {newErr && <div className="break-all text-[11px] text-[#c33b38]">{newErr}</div>}
+              {newErr && <div className="break-all text-[12px] text-[#c33b38]">{newErr}</div>}
               <button
                 type="button"
                 onClick={() => void createConvo()}
@@ -851,7 +851,7 @@ export function NeoBotRoot() {
 
         {/* 分组标题：⛔ 没有它，搜索框与第一条会话之间没有层级，
             列表看起来像「搜索框下面的东西」而不是「一组会话」。 */}
-        <div className="shrink-0 px-2.5 pb-1 pt-1 text-[11px] uppercase tracking-wide text-muted">
+        <div className="shrink-0 px-2.5 pb-1 pt-1 text-[12px] uppercase tracking-wide text-muted">
           {t('chat.section')}
         </div>
 
@@ -867,7 +867,7 @@ export function NeoBotRoot() {
               <div className="mt-1 break-all">{err.slice(0, 160)}</div>
               <button
                 type="button"
-                className="mt-2 rounded-full border border-[#c33b38]/30 px-2 py-0.5 text-[11px]"
+                className="mt-2 rounded-full border border-[#c33b38]/30 px-2 py-0.5 text-[12px]"
                 onClick={reload}
               >
                 {t('chat.retry')}
@@ -913,7 +913,7 @@ export function NeoBotRoot() {
                         data-testid={`nb-group-${row.key}`}
                         aria-expanded={!row.collapsed}
                         onClick={() => toggleGroup(row.key)}
-                        className="w-full px-2 py-1 text-left text-[11px] font-medium text-muted"
+                        className="w-full px-2 py-1 text-left text-[12px] font-medium text-muted"
                       >
                         <span aria-hidden="true">{row.collapsed ? '▸' : '▾'}</span>{' '}
                         {row.label}
@@ -952,7 +952,7 @@ export function NeoBotRoot() {
             type="button"
             onClick={() => setMemOpen(o => !o)}
             aria-expanded={memOpen}
-            className="flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-left text-[11px] text-muted hover:bg-panel-hover"
+            className="flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-left text-[12px] text-muted hover:bg-panel-hover"
           >
             <span>{memOpen ? '▾' : '▸'}</span>
             <span>{t('chat.memory')}{mem && mem.lines.length > 0 ? ` ${mem.lines.length}` : ''}</span>
@@ -964,16 +964,16 @@ export function NeoBotRoot() {
           </button>
           {memOpen && (
             <div className="px-2 pb-2">
-              {memErr && <div className="mb-1 break-all text-[11px] text-[#c33b38]">{memErr}</div>}
+              {memErr && <div className="mb-1 break-all text-[12px] text-[#c33b38]">{memErr}</div>}
               {mem && mem.lines.length === 0 && !memErr && (
-                <p className="mb-1 text-[11px] text-muted">
+                <p className="mb-1 text-[12px] text-muted">
                   {t('chat.noMemory')}
                 </p>
               )}
               {mem && mem.lines.length > 0 && (
                 <ul className="mb-1 max-h-32 space-y-0.5 overflow-y-auto">
                   {mem.lines.map((l, i) => (
-                    <li key={i} className="break-words text-[11px] leading-snug text-ink">
+                    <li key={i} className="break-words text-[12px] leading-snug text-ink">
                       {l}
                     </li>
                   ))}
@@ -991,13 +991,13 @@ export function NeoBotRoot() {
                   }}
                   placeholder={t('chat.memoryPlaceholder')}
                   aria-label={t('chat.addMemory')}
-                  className="min-w-0 flex-1 rounded-lg border border-line bg-panel px-2 py-1 text-[11px] text-ink outline-none focus:border-[#2468f2]"
+                  className="min-w-0 flex-1 rounded-lg border border-line bg-panel px-2 py-1 text-[12px] text-ink outline-none focus:border-[#2468f2]"
                 />
                 <button
                   type="button"
                   onClick={() => void addMemory()}
                   disabled={memBusy || !memDraft.trim()}
-                  className="shrink-0 rounded-lg bg-btn-fill px-2 py-1 text-[11px] text-btn-ink disabled:opacity-40"
+                  className="shrink-0 rounded-lg bg-btn-fill px-2 py-1 text-[12px] text-btn-ink disabled:opacity-40"
                 >
                   {t('chat.memorySave')}
                 </button>
@@ -1007,7 +1007,7 @@ export function NeoBotRoot() {
                 onClick={() => void undoMemory()}
                 disabled={memBusy || !mem || mem.revisions === 0}
                 title={t('chat.memoryUndoTitle')}
-                className="mt-1 w-full rounded-lg border border-line px-2 py-1 text-[11px] text-muted hover:bg-panel-hover disabled:opacity-40"
+                className="mt-1 w-full rounded-lg border border-line px-2 py-1 text-[12px] text-muted hover:bg-panel-hover disabled:opacity-40"
               >
                 {t('chat.memoryUndo', { n: mem?.revisions ?? 0 })}
               </button>
@@ -1149,7 +1149,7 @@ export function NeoBotRoot() {
                         组末一条代表「这段话说完于何时」。失败重发按钮不受此限 ——
                         它必须跟着失败的那一条。 */}
                     <div
-                      className={`flex items-center gap-2 px-1 text-[10px] text-muted ${
+                      className={`flex items-center gap-2 px-1 text-[12px] text-muted ${
                         groupEnd ? 'mt-0.5' : 'mt-0'
                       } ${m.who === 'me' ? 'justify-end' : ''} ${
                         !groupEnd && !m.failed ? 'invisible' : ''
@@ -1190,7 +1190,7 @@ export function NeoBotRoot() {
             <button
               type="button"
               onClick={scrollToEnd}
-              className="sticky bottom-2 mx-auto block rounded-full border border-line bg-panel px-3 py-1 text-[11px] text-muted shadow-sm hover:bg-panel-hover"
+              className="sticky bottom-2 mx-auto block rounded-full border border-line bg-panel px-3 py-1 text-[12px] text-muted shadow-sm hover:bg-panel-hover"
             >
               {t('chat.backToBottom')}
             </button>
@@ -1232,7 +1232,7 @@ export function NeoBotRoot() {
             </button>
           </div>
           {histLoading && (
-            <p className="mx-auto mt-1 max-w-[760px] text-[11px] text-muted">{t('chat.historyPaused')}</p>
+            <p className="mx-auto mt-1 max-w-[760px] text-[12px] text-muted">{t('chat.historyPaused')}</p>
           )}
         </div>
       </section>

@@ -1228,5 +1228,14 @@
     "cost": "毫秒级，只读 git diff --cached",
     "when_not": "① 无删除的提交直接 PASS，不必手动跑；② 想查已入库提交用 scripts/check-push-deletions.sh（pre-push 自动兜底，锚定在门自身提交，不追溯历史）；③ 想看共享暂存区全貌仍要 git diff --cached --name-only 对自己的文件清单",
     "notes": "2026-09-29 事故：误删他窗 339 行在途工作。显式 add 只能约束我 add 什么，约束不了暂存区已有什么。"
+  },
+  "scripts": {
+    "neobot-ui-typography": {
+      "run": "node scripts/ops/neobot-check-typography.mjs",
+      "category": "门禁",
+      "read_only": true,
+      "desc": "字号阶梯门：px 须在定档内（下限12px）· em 须在 0.8~2.0 带内 · Tailwind text-* 须在允许集合。吸收 ChunUI(MIT) 硬约束写法。⛔ 不扫 vendored 的 frontend/。",
+      "when_not_to_use": "要改 vendored 第三方代码的字号时——它需走 vendor 流程，不适用本门定档。"
+    }
   }
 }

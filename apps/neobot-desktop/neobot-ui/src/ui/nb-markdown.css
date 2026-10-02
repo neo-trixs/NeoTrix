@@ -81,7 +81,7 @@
   border-bottom: 1px solid var(--color-line);
 }
 .nb-md .md-code-lang {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-log-ink);
   margin-right: auto;
   text-transform: lowercase;
@@ -96,7 +96,7 @@
   cursor: pointer;
   border-radius: 6px;
   padding: 2px 4px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .nb-md .md-copy:hover { background: var(--color-btn-hover); color: var(--color-ink); }
 .nb-md .md-copy.is-copied { color: var(--color-ok); }
