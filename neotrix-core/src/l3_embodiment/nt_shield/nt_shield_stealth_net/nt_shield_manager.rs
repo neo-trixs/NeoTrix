@@ -181,17 +181,40 @@ impl IdentityPool {
 
         let idx = match self.rotation_strategy {
             _RotationStrategy::LeastUsed => {
-                candidates.into_iter()
-                    .min_by_key(|id| self.identities[*id].use_count)
+                // ⚠️ 2026-09-30 修正：原先 `min_by_key(|id| …use_count)`。
+                // `min_by_key` **签名里没有 tie-break 的位置** ⇒ `use_count`
+                // 并列时返回**任意一个**。
+                // 而**并列是常态**：新建身份的 `use_count` 全为 0
+                // （见 `test_strategy_rotation` 里的多身份池）。
+                // ⇒ 「用哪个身份」不确定 ⇒ 轮换行为不可复现。
+                // ⇒ 加确定性 tie-break：`use_count` 相同时取**较小 id**。
+                candidates
+                    .into_iter()
+                    .min_by(|a, b| {
+                        self.identities[*a]
+                            .use_count
+                            .cmp(&self.identities[*b].use_count)
+                            .then_with(|| a.cmp(b))
+                    })
                     .unwrap_or(0)
             }
             _RotationStrategy::RoundRobin => {
-                let next = candidates.iter()
-                    .min_by_key(|id| {
-                        self.identities[**id].last_used
+                // 同上：`last_used` 并列（多个身份从未用过 ⇒ 全是 epoch）时
+                // 选哪个身份不确定 ⇒ 轮换不可复现 ⇒ 加 id tie-break。
+                let next = candidates
+                    .iter()
+                    .min_by(|a, b| {
+                        let ta = self.identities[**a]
+                            .last_used
                             .duration_since(UNIX_EPOCH)
                             .unwrap_or_default()
-                            .as_secs()
+                            .as_secs();
+                        let tb = self.identities[**b]
+                            .last_used
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
+                        ta.cmp(&tb).then_with(|| a.cmp(b))
                     })
                     .copied()
                     .unwrap_or(0);
@@ -505,5 +528,46 @@ mod tests {
         let stats = pool.stats();
         assert_eq!(stats.total_identities, 4);
         assert_eq!(stats.active_count, 4);
+    }
+
+    /// 回归（2026-09-30）：身份轮换在**并列**时必须可复现。
+    ///
+    /// 原实现用 `min_by_key(use_count)` / `min_by_key(last_used)`，
+    /// 而 `min_by_key` **签名里没有 tie-break 的位置** ⇒ 并列时返回任意一个。
+    /// **并列是常态**：新建身份的 `use_count` 全为 0、`last_used` 全是 epoch。
+    ///
+    /// 该池是**反检测身份轮换**的基础设施 ⇒ 「用哪个身份」不确定
+    /// 意味着轮换行为不可复现。
+    ///
+    /// ⇒ 断言：**两个同样配置的池**，各取一次身份，**结果必须相同**。
+    /// 取一次身份，返回其稳定标识（`Identity` 的 `id`）。
+    fn pick_same_identity_twice(pool: &mut IdentityPool) -> usize {
+        pool.select(&[])
+            .expect("池非空时应能取到身份")
+            .id
+    }
+
+    #[test]
+    fn test_least_used_rotation_is_reproducible_on_ties() {
+        let mut a = IdentityPool::new(4, _RotationStrategy::LeastUsed);
+        let mut b = IdentityPool::new(4, _RotationStrategy::LeastUsed);
+        // 全新身份池 ⇒ 所有身份 use_count 相同（并列）
+        assert_eq!(
+            pick_same_identity_twice(&mut a),
+            pick_same_identity_twice(&mut b),
+            "全新池 use_count 全并列时，选中的身份必须可复现"
+        );
+    }
+
+    #[test]
+    fn test_round_robin_rotation_is_reproducible_on_ties() {
+        let mut a = IdentityPool::new(4, _RotationStrategy::RoundRobin);
+        let mut b = IdentityPool::new(4, _RotationStrategy::RoundRobin);
+        // 全新池 ⇒ 所有身份 last_used 都是 epoch（并列）
+        assert_eq!(
+            pick_same_identity_twice(&mut a),
+            pick_same_identity_twice(&mut b),
+            "全新池 last_used 全并列时，选中的身份必须可复现"
+        );
     }
 }
