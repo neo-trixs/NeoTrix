@@ -292,12 +292,14 @@ fn hybrid_retrieval_full_pipeline() {
 // ── TTL cache + store integration ──────────────────────────────────────────────
 
 #[test]
-    #[ignore = "已知行为差异：实测 6 ≠ 期望 5（缓存包装后条目数比断言多 1）。
-     // ⛔ 属**待裁决**的真实差异，非编译残留 —— 断言保持原样不改写。"]
-    
 fn cache_wraps_store_for_hot_entries() {
     let mut store = TemporalStore::new();
-    let mut cache = MemoryCache::new(10, 5);
+    // ⚠️ 2026-10-02 修正：原为 `new(10, 5)`（容量 10），而本测试只放入 6 条
+    // ⇒ 永远达不到容量上限，**淘汰路径从未被执行** ⇒ 它没有验证自己声称要验证的
+    // 「Adding beyond capacity evicts oldest」。
+    // 容量 10 时实测 `cache.len()` 为 6，与断言 5 矛盾。
+    // ⇒ 改为 5（测试自称的意图），让它真的走淘汰分支。
+    let mut cache = MemoryCache::new(5, 5);
 
     for i in 0..5 {
         let entry =
@@ -311,6 +313,8 @@ fn cache_wraps_store_for_hot_entries() {
     assert_eq!(cache.len(), 5);
     assert_eq!(cache.get("e/0"), Some("content-0".to_string()));
 
+    // ⛔ 反向自查：断言 len==5 只有在**淘汰真的发生**时才有意义。
+    // 若 put 未淘汰，这里会因 len==6 而红 ⇒ 该断言自带「淘汰已生效」的保证。
     // Adding beyond capacity evicts oldest
     let entry = AddOnlyMemoryEntry::new("overflow", "test").with_id("e/5");
     store.add(entry).unwrap();
