@@ -240,17 +240,28 @@ impl DownloadEngine {
         // HEAD for size
         let total_size = self.head_size(&url).await.unwrap_or(0);
 
-        // Disk space pre-check + pre-allocate
+        // Disk space pre-check（**只查，不预分配**）
+        //
+        // ⭐⭐ 2026-10-02 删除了原来的 `dest` 预分配（`File::…set_len(total_size)`），
+        //    它是一个 **P0 正确性缺陷**，链条闭合：
+        //      ① 预分配把 `dest` 撑成 `total_size` 字节零填充
+        //      ② 下面的 `existing = metadata(dest).len()` 于是 **恒等于 total_size**
+        //      ③ 紧跟的早退条件 `existing >= total_size` **必然成立**
+        //      ④ ⇒ **一个字节都没下**就 `write_done_marker` + `return Ok(existing)`
+        //      ⑤ `.done` 落盘 ⇒ `is_done()` 此后**永久**返回 `Some`
+        //      ⑥ ⇒ `:293` 起的分块下载与 `merge_chunks` **永不可达**
+        //    触发条件只是 HEAD 返回 `Content-Length`（`head_size()` 成功），
+        //    即**绝大多数媒体文件**。
+        //
+        // ⭐ 为什么预分配本就多余：`merge_chunks`（`dl_fs.rs:127`）用
+        //   `File::create(dest)` **整体覆写** `dest` ⇒ 预分配的内容必被丢弃。
+        //   真正的「早失败」价值由上面的 `check_disk_space` 提供；
+        //   真 ENOSPC 会在 `merge_chunks` 的 `create` 处以可读错误浮出。
+        // ⛔ 不用 let-chain（本仓 edition < 2024， 编译不过）。
         if total_size > 0 && !dest.exists() {
             if let Err(e) = check_disk_space(&dest, total_size, self.config.min_disk_space) {
                 return Err(e);
             }
-            let _ = std::fs::File::options()
-                .write(true)
-                .create(true)
-                .truncate(false)
-                .open(&dest)
-                .and_then(|f| f.set_len(total_size));
         }
 
         // Resume: existing bytes
@@ -260,10 +271,14 @@ impl DownloadEngine {
             0
         };
 
-        if total_size > 0 && existing >= total_size {
-            write_done_marker(&dest, total_size, &task.url).await;
-            return Ok(existing);
-        }
+        // ⛔⛔ 2026-10-02 **删除**了这里的「长度够就算完成」早退。
+        //    原码：`if total_size > 0 && existing >= total_size { write_done_marker(…); return Ok(existing); }`
+        //    ⭐ 它本意是「续传时发现已经下完」；但在上面预分配被删之后，
+        //    这个条件仍会在**上一次崩溃留下半截 dest** 时误判为完成
+        //    —— 「文件够长」从来**不是**完成的证据，**`.done` 才是**。
+        //    ⓰ 「已完成」的权威判据在函数开头 `:236` 的 `is_done(&dest)`，
+        //       它读 `.done` marker ⇒ 那里已覆盖真正的完成态，**这里不需要第二份**。
+        //    ⛔ 保留它就是保留一个「零字节下载报成功」的入口。
 
         // Chunk sizing
         let remaining = total_size.saturating_sub(existing);
@@ -424,5 +439,83 @@ impl DownloadEngine {
 impl Default for DownloadEngine {
     fn default() -> Self {
         Self::new(DownloadConfig::default())
+    }
+}
+
+#[cfg(test)]
+mod p0_regression_tests {
+    use super::*;
+    use crate::l1_action::nt_media::streaming::types::DownloadTask;
+
+    /// ⭐⭐⭐ P0 回归（2026-10-02）：**HEAD 返回 Content-Length 时，
+    /// 一次字节都不许下就报 `Completed`**。
+    ///
+    /// ## 原缺陷的链条（闭合）
+    /// `dest` 预分配 `set_len(total_size)` → `existing = metadata.len()` 恒等于
+    /// `total_size` → 早退条件 `existing >= total_size` 必然成立 →
+    /// `write_done_marker` + `return Ok(existing)` ⇒ 零字节下载报成功，
+    /// 且 `.done` 让 `is_done()` 此后永久返回 `Some` ⇒ 分块下载永不可达。
+    ///
+    /// ⭐ 判据用**「服务端实际发出的字节数」**而不是「落盘文件大小」：
+    /// 前者是「有没有真的传输」的**唯一**可观测信号 —— 落盘大小可以被
+    /// 预分配/零填充伪造，正是原缺陷能藏住的原因。
+    #[tokio::test]
+    async fn 有ContentLength时必须真的传输字节() {
+        use axum::routing::get;
+        use axum::Router;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        const N: usize = 4096;
+        let served = Arc::new(AtomicUsize::new(0));
+        let body: Vec<u8> = (0..N as u32).map(|i| (i % 251) as u8).collect();
+        let served_c = Arc::clone(&served);
+        let app = Router::new().route(
+            "/blob",
+            get(move || {
+                let b = body.clone();
+                let s = Arc::clone(&served_c);
+                async move {
+                    s.fetch_add(b.len(), Ordering::SeqCst);
+                    b
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind loopback");
+        let addr = listener.local_addr().expect("local_addr");
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let dest = dir.path().join("blob.bin");
+        let url = format!("http://{addr}/blob");
+        let status = DownloadEngine::default()
+            .download(&DownloadTask::new(url, &dest))
+            .await;
+
+        assert!(
+            served.load(Ordering::SeqCst) >= N,
+            "服务端只发出 {} 字节，期望 ≥ {N} ⇒ 客户端**零字节下载却报成功**（原 P0）",
+            served.load(Ordering::SeqCst)
+        );
+        match status {
+            DownloadStatus::Completed { .. } => {}
+            other => panic!("期望 Completed，实际 {other:?}"),
+        }
+        // ⭐⭐ 落盘内容必须**真的是那份 blob** —— 这条比「大小相等」更强：
+        // 零填充文件的前 N 字节是 0，与 blob 的 `(i % 251)` 必然不同。
+        let bytes = std::fs::read(&dest).expect("read dest");
+        assert!(
+            bytes.len() >= N,
+            "落盘 {on_disk} 字节 < Content-Length {N} ⇒ 内容不完整",
+            on_disk = bytes.len()
+        );
+        assert!(
+            bytes[..N].iter().enumerate().all(|(i, b)| *b == (i as u32 % 251) as u8),
+            "落盘前 {N} 字节与 blob 不符 ⇒ 很可能是零填充而非真实传输（原 P0 的伪装形态）"
+        );
     }
 }
