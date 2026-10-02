@@ -404,6 +404,16 @@ impl NeobotStore {
              ON messages(convo_id, created_at)",
             [],
         )?;
+        // ⛔⛔ **这里刻意没有 `(convo_id, rowid)` 索引**，而且**加不了**：
+        //    `rowid` 是 SQLite 的**隐式** rowid 列，在 `SELECT`/`WHERE`/`ORDER BY`
+        //    里可用（别名 `_rowid_`、`oid`），但 **索引定义看不见它** ⇒
+        //    `CREATE INDEX … ON messages(convo_id, rowid)` 直接报
+        //    `no such column: rowid`（实测：`nt_store_messages` 4 个测试当场红）。
+        //    ⭐ 故 `ORDER BY rowid` 仍需 SQLite 排序 —— 但那是**性能**问题，
+        //    而游标分页的**正确性**来自「`rowid` 是全序整数」，与此无关。
+        //    ⛔ 若日后要索引覆盖，必须新增**真实列** `seq INTEGER` 并把
+        //    `rowid` 的值写进去（见 `nt_store_messages.rs` 里 seq 游标的取舍注释）。
+
         // 存量任务回填默认群组（仅当有无归属任务时；用户删掉全体后不再复活）。
         let now = chrono::Utc::now().to_rfc3339();
         let orphans: i64 = self
