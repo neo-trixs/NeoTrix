@@ -187,26 +187,33 @@ impl TemporalStore {
     /// `old.superseded_by = new_id` means "new replaced old". To walk backwards
     /// from newest to oldest, we find the entry whose `superseded_by` points to
     /// the current id (O(n) scan, acceptable for chain walking).
+    /// 从 `entry_id` **向前**走取代链：v1 → v2 → v3 …
+    ///
+    /// ⚠️ 2026-10-02 修正（原实现方向反了，恒只返回起始那一条）：
+    /// 原代码注释写「Walk reverse: find entry whose superseded_by == current id」，
+    /// 即去找「`superseded_by` **指向我**」的条目 —— 那是**前驱**（往过去走）。
+    /// 而 `supersede` 写的是 `old.superseded_by = new_id`
+    /// （字段自述：「if invalidated, **the entry that replaced this one**」），
+    /// ⇒ 没有任何条目的 `superseded_by` 等于 `v1`
+    /// ⇒ 循环第一轮就断，`history_chain("v1")` 恒返回 `[v1]`。
+    /// ⇒ 原作者把「反向扫描」误当成了「反向遍历链」。
+    ///
+    /// ⛔ 方向契约与同族的 `nt_temporal_facts::history_chain` **相反**且都正确：
+    /// · 本函数收**最旧** id，沿 `superseded_by` **向前**（旧→新）；
+    /// · 那份收**最新** id(`leaf_id`)，沿 `supersedes` **向后**（新→旧）。
     pub fn history_chain(&self, entry_id: &str) -> Vec<&AddOnlyMemoryEntry> {
-        let mut chain = Vec::new();
-        let mut current = Some(entry_id);
-        let mut guard = 0;
+        let mut chain: Vec<&AddOnlyMemoryEntry> = Vec::new();
+        let mut current: Option<&str> = Some(entry_id);
+        let mut guard = 0u32;
         while let Some(id) = current {
             if guard > 256 {
                 break;
             }
-            if let Some(entry) = self.get(id) {
-                chain.push(entry);
-                // Walk reverse: find entry whose superseded_by == current id
-                current = self
-                    .entries
-                    .iter()
-                    .find(|e| e.superseded_by.as_deref() == Some(id))
-                    .map(|e| e.id.as_str());
-                guard += 1;
-            } else {
-                break;
-            }
+            let Some(entry) = self.get(id) else { break };
+            chain.push(entry);
+            // 顺着自己的 `superseded_by` 往前走
+            current = entry.superseded_by.as_deref();
+            guard += 1;
         }
         chain
     }
@@ -343,7 +350,23 @@ mod tests {
         let new = s.supersede("e1", "v3", "test").unwrap_err(); // e1 already superseded
                                                                 // Walk from e1 (the original)
         let chain = s.history_chain("e1");
-        assert!(chain.len() >= 1);
+        // ⚠️ 原为 `>= 1` —— 那个断言在**方向反了的坏实现下也通过**
+        // （坏实现恒返回 `[e1]`）⇒ 弱测试正是该 bug 长期存活的第二层原因。
+        // 现在链必须真的走完 e1 → e2。
+        assert!(
+            chain.len() >= 2,
+            "supersession 链必须向前走完（e1→e2），实得 {:?}",
+            chain.iter().map(|e| e.id.as_str()).collect::<Vec<_>>()
+        );
         assert_eq!(chain[0].id, "e1");
+        // ⛔ 不断言 `chain[1].id == "e2"`：`supersede` 用 `id_gen.next()`
+        // **自生成** id（实测 `ae_00000001`），并不采用调用方给的内容当 id。
+        // ⇒ 断言真实不变量：次条**就是** e1 的继任者（`superseded_by` 指向它），
+        //    且它不是 e1 自己。
+        let successor = chain[0].superseded_by.as_deref().expect("e1 应已被取代");
+        assert_eq!(chain[1].id.as_str(), successor);
+        assert_ne!(chain[1].id, chain[0].id);
+        // 末端无继任者 ⇒ 链在此终止（不是被 guard 截断）
+        assert!(chain[1].superseded_by.is_none());
     }
 }

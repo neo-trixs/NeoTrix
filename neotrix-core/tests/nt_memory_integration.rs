@@ -523,8 +523,6 @@ fn fusion_weight_profiles_produce_different_rankings() {
 // ── Store supersession chain ───────────────────────────────────────────────────
 
 #[test]
-    #[ignore = "已知缺陷：supersession 链只剩 <2 条 ⇒ 疑似**前驱被丢弃**。
-     // ⛔ 待查 `temporal_store` 的 supersession 链构建，断言保持原样。"]
     
 fn store_supersession_chain_walk() {
     let mut store = TemporalStore::new();
