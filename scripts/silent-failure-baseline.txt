@@ -25,7 +25,7 @@ neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/pipeline/
 neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/pipeline/nt_quality_stages.rs:445	kb.kv_set("", "", &json_str)	写-only 趋势快照；无仓内读取方；blast 风险计算不依赖落盘结果	2026-09-30 人工读现场；rg 确认无仓内读取方
 neotrix-core/src/l5_cognition/nt_core_second_brain.rs:113	kb.kv_set("", "", &report_json)	同上（last_report）	同上
 neotrix-core/src/l5_cognition/nt_core_second_brain.rs:134	kb.kv_set("", "", &report_json)	同上（last_report）	同上
-neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_consciousness/nt_audit.rs:347	kb.kv_set("", "", evidence)	耐久副本：结论已由同函数 log::info（常态）与 record_finding+log::warn（Failed 路径）两条通道送出；kv_set 丢失只影响事后可查询性	同函数三重路径，2026-09-30 人工读现场核实（非 grep 命中）
+neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_consciousness/nt_audit.rs:350	kb.kv_set("", "", evidence)	耐久副本：结论已由同函数 log::info（常态）与 record_finding+log::warn（Failed 路径）两条通道送出；kv_set 丢失只影响事后可查询性	同函数三重路径，2026-09-30 人工读现场核实（非 grep 命中）
 neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/pipeline/nt_credit_stages.rs:177	kb.kv_set("", "", json.to_string().as_str())	同上（credit_audit 快照）	同上
 neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/pipeline/nt_credit_stages.rs:89	kb.kv_set("", &format!("", brain.iteration), &json)	同上（iter_N 快照）；缺失在读侧表现为缺失，不伪装成功	同上
 neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/hyperstage.rs:102	kb.kv_set("", &format!("", brain.iteration), &prop_json.to_string())	同上（meta_proposal）	同上
