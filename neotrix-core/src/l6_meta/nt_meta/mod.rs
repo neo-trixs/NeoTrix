@@ -92,6 +92,15 @@ pub use nt_evolution_runner::{
 #[path = "tests/nt_evolution_runner_tests.rs"]
 mod nt_evolution_runner_tests;
 
-// NOTE: 以下模块已声明但内部编译错误待修复，暂时注释
-// pub mod otel_bridge;
-// pub mod session_replay;
+// 2026-09-30 逐个实测后的状态（原先是两行笼统注释「已声明但内部编译错误」）：
+// · `otel_bridge`（8 文件 / 1,781 行 / **19 个测试**）实测 **0 编译错误**
+//   ⇒ 属笼统注释的**误伤**，已恢复声明。⚠️ 它目前**零生产消费者**
+//   （仅本文件提及），恢复是为了让那 19 个测试真正参与验证，
+//   而不是宣称它已被业务使用 —— 后者是另一个判断。
+// · `session_replay`（10 文件 / 2,079 行 / **23 个测试**）实测 **7 个错误**
+//   ⇒ 保持注释，待修。
+// · 上方的 `eval_engine` 注释掉了**另一个**模块（`case_level_regressions`
+//   等），它有**明确前置条件**（`llm_judge.rs` 硬编码满分，属假测量）
+//   ⇒ 那是**有意的**停用，不是误伤，两者不要混为一谈。
+// pub mod session_replay; // 实测 7 错误 ⇒ 仍待修（2026-09-30）
+pub mod otel_bridge; // 实测 0 错误 ⇒ 恢复（2026-09-30）

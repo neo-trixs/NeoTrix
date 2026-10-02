@@ -66,10 +66,21 @@ mod tests {
     use super::*;
     use crate::l6_meta::nt_meta::otel_bridge::prompt_manager::prompt_version::PromptVersion;
 
-    fn make_prompt(id: &str, template: &str) -> PromptVersion {
+    /// ⚠️ 2026-09-30 修正：本辅助函数原签名是 `make_prompt(id, template)`，
+    /// 并把首参传给 `PromptVersion::new` 的 **`id`** 位。
+    /// 但 `register` 是按 **`name`** 建索引的（`self.prompts.entry(prompt.name…)`），
+    /// 而测试又用 `eval.evaluate(&reg, "p1", …)` 按 **`"p1"`** 取
+    /// ⇒ `"p1"` 落在 `id` 上、`name` 是 `"test_prompt"`，
+    /// `get_latest("p1")` 返回 `None` ⇒ 所有用例都被判 fail。
+    ///
+    /// 这是**测试辅助函数的参数错位**，不是 `evaluate` 的实现缺陷 ——
+    /// `evaluate` 的 `to_lowercase()` 两侧匹配逻辑本身是对的。
+    /// 恢复本模块声明后，这 4 个测试立刻暴露了它（此前从不运行）。
+    fn make_prompt(name: &str, template: &str) -> PromptVersion {
         PromptVersion::new(
-            id.into(),
-            "test_prompt".into(),
+            // id 与 name 保持一致，避免再次出现「按 name 查却把值放进 id」的错位。
+            name.into(),
+            name.into(),
             1,
             template.into(),
             vec![],
