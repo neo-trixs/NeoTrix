@@ -539,7 +539,7 @@ export function NeoBotRoot() {
     }
     let alive = true
     setHistLoading(true)
-    void invoke<ChatMessage[]>('neobot_convo_messages', { convo_id: sel })
+    void invoke<ChatMessage[]>('neobot_convo_messages', { convoId: sel })
       .then((rows) => {
         if (!alive) return
         setMsgs(rows.map((r): Msg => ({
@@ -593,7 +593,7 @@ export function NeoBotRoot() {
     setBusy(true)
     try {
       // convo_id 缺席（无会话时）= 脱离会话手动跑，后端不落库。
-      const r = await invoke<{ output?: string, text?: string }>('neobot_send', { convo_id: sel ?? undefined, text })
+      const r = await invoke<{ output?: string, text?: string }>('neobot_send', { convoId: sel ?? undefined, text })
       // ⛔ 串台守卫：会话已变 ⇒ 这条回复属于**旧会话**，追加到新会话就是错的。
       if ((sel ?? null) !== sendConvo) return
       setMsgs(m => [...m, { who: 'bot', text: r?.output ?? r?.text ?? t('chat.noOutput'), ts: nowIso() }])
@@ -626,7 +626,7 @@ export function NeoBotRoot() {
       setBusy(true)
       try {
         const r = await invoke<{ output?: string, text?: string }>('neobot_send', {
-          convo_id: sel ?? undefined,
+          convoId: sel ?? undefined,
           // ⛔ 不再「剥本地化前缀」还原正文：改用发送时存下的原文。
           //    旧写法在切换语言后必然把前缀一起发出去。
           text: bad.prompt ?? bad.text,

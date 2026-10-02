@@ -110,7 +110,7 @@ export function Pet() {
     const dy = Math.round(e.clientY - from.y)
     if (dx === 0 && dy === 0) return
     dragRef.current = { x: e.clientX, y: e.clientY }
-    void invoke('move_pet_window', { delta_x: dx, delta_y: dy }).catch(() => {})
+    void invoke('move_pet_window', { deltaX: dx, deltaY: dy }).catch(() => {})
   }, [])
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
