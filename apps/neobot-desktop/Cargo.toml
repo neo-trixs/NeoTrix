@@ -47,6 +47,14 @@ chrono = { workspace = true }
 # 真 store 往返测试用的临时目录。刻意不用 mock —— mock 与真数据
 # 各自绿而彼此对不上，正是 MOCK_ITEMS 能长期冒充真实列表的原因。
 tempdir = "0.3"
+# ⭐ Tauri 官方 IPC 测试工具（`mock_builder` / `assert_ipc_response` /
+#   `get_ipc_response`）—— 走**真实命令分发**，含 camelCase 载荷键映射。
+#   ⛔ 放 dev-dependencies 而非 dependencies：`tauri-2.12.0/Cargo.toml:123`
+#   的 `test = []` 是**空 feature** ⇒ 零新增依赖，且 release 构建不编
+#   `src/test/`（门控见 `tauri-2.12.0/src/lib.rs:1129`）。
+#   ⭐ 这一层是静态门 `neobot-check-ipc-keys` 抓不到的：它读源码算期望键名，
+#   而本 feature 走**真实的反序列化与取键**（`ipc/command.rs:109`）。
+tauri = { version = "2", features = ["test"] }
 
 [lints.rust]
 unsafe_code = "forbid"

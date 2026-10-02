@@ -162,26 +162,48 @@ def load_specs():
 
 
 def load_registered():
-    if not os.path.isfile(MAIN):
-        sys.exit(f"[contract] 找不到 main.rs：{MAIN}")
-    text = open(MAIN, encoding='utf-8', errors='ignore').read()
+    """扫**所有**持有 `generate_handler![…]` 裸路径清单的文件。
+
+    ⭐ 2026-10-02：命令注册表已抽成 `src/lib.rs` 的 `neobot_commands!` 宏，
+    `main.rs` 改为 `.invoke_handler(neobot_desktop::neobot_commands!())`。
+    ⛔ 本函数原先**只**读 `main.rs`，于是 63 条 Implemented 命令被判「未注册」——
+    门红了，但**门是对的、真源也还在**：注册表只是搬了家。
+    ⇒ 改扫「main.rs + lib.rs」并取**并集**。
+    ⭐ 这是**扩大**覆盖（多一个文件被扫），不是放宽判据：
+    `neobot_desktop::<mod>::<name>` 仍必须逐字出现在某个 `generate_handler![]` 块里。
+    ⓰ 日后若注册表再搬家，请一并更新此处的文件列表 —— 漏一个文件的后果是
+    **假红**（报「未注册」），不是假绿。
+    """
+    files = [MAIN]
+    lib = os.path.join(os.path.dirname(MAIN), 'lib.rs')
+    if os.path.isfile(lib):
+        files.append(lib)
     names = set()
-    for m in re.finditer(r'invoke_handler\s*\(\s*tauri::generate_handler!\s*\[', text):
-        i = m.end()          # 指向 `[` **之后**
-        depth = 1            # 数组已开启
-        j = i
-        while j < len(text) and depth:
-            if text[j] == '[':
-                depth += 1
-            elif text[j] == ']':
-                depth -= 1
-            j += 1
-        block = text[i:j]
-        # 只取形如 `neobot_desktop::<mod>::<name>` 的**裸路径条目**（generate_handler
-        # 数组的元素），排除块内注释/文档里出现的同名调用。
-        block_nc = re.sub(r'//[^\n]*', '', block)
-        for mm in re.finditer(r'neobot_desktop::\w+::(\w+)', block_nc):
-            names.add(mm.group(1))
+    for path in files:
+        if not os.path.isfile(path):
+            sys.exit(f"[contract] 找不到 {path}")
+        text = open(path, encoding='utf-8', errors='ignore').read()
+        # ⭐ 两种形态都接受：
+        #   ① `.invoke_handler(tauri::generate_handler![ … ])`  —— `main.rs` 旧写法
+        #   ② `tauri::generate_handler![ … ]`                     —— `lib.rs` 宏体里
+        #    （`neobot_commands!` 宏**吐出整个** `generate_handler!` 调用，
+        #      因为宏调用写在另一个宏的参数位里不会先展开。）
+        for m in re.finditer(r'(?:invoke_handler\s*\(\s*)?tauri::generate_handler!\s*\[', text):
+            i = m.end()      # 指向 `[` **之后**
+            depth = 1        # 数组已开启
+            j = i
+            while j < len(text) and depth:
+                if text[j] == '[':
+                    depth += 1
+                elif text[j] == ']':
+                    depth -= 1
+                j += 1
+            block = text[i:j]
+            # 只取形如 `neobot_desktop::<mod>::<name>` 的**裸路径条目**
+            # （generate_handler 数组的元素），排除块内注释/文档里出现的同名调用。
+            block_nc = re.sub(r'//[^\n]*', '', block)
+            for mm in re.finditer(r'neobot_desktop::\w+::(\w+)', block_nc):
+                names.add(mm.group(1))
     return names
 
 
