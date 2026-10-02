@@ -1245,6 +1245,13 @@
       "read_only": true,
       "desc": "字号阶梯门：px 须在定档内（下限12px）· em 须在 0.8~2.0 带内 · Tailwind text-* 须在允许集合。吸收 ChunUI(MIT) 硬约束写法。⛔ 不扫 vendored 的 frontend/。",
       "when_not_to_use": "要改 vendored 第三方代码的字号时——它需走 vendor 流程，不适用本门定档。"
+    },
+    "discarded-inputs": {
+      "run": "python3 scripts/ops/check-discarded-inputs.py",
+      "category": "门禁",
+      "read_only": true,
+      "desc": "自评函数丢弃入参门：evaluate/judge/score 类函数若丢弃形参且**返回类型不是 Option** ⇒ 无法表达拒绝 ⇒ 只能撒谎。FAIL 档=无法拒绝；WARN 档=Option 返回型，确认它真走 None 路径。⛔ 不是拦所有 let _ =（那合法），只拦「自称评判却不看输入」。",
+      "when_not_to_use": "要新写「刻意不读入参但会返回诚实分数」的函数时——门会 FAIL，那是设计问题不是误报，改设计别改门。"
     }
   }
 }

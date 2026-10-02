@@ -87,7 +87,6 @@ pub fn evaluate_response(
     prompt: &str,
     response: &str,
 ) -> Option<JudgeResult> {
-    let _ = (prompt, response);
 
     if config.criteria.is_empty() {
         return Some(JudgeResult {
