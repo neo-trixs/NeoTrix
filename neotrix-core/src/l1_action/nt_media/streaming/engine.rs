@@ -523,3 +523,94 @@ mod p0_regression_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod range_honoured_tests {
+    use super::*;
+    use crate::l1_action::nt_media::streaming::types::DownloadTask;
+
+    /// ⭐⭐ 补上「服务端**遵守** Range」那一半的覆盖。
+    ///
+    /// ## 为什么必须有这条（这是上一个 bug 能长期存活的根因）
+    /// `aa921122` 修的「N 倍长损坏文件」之所以长期没人发现：
+    /// 现有 20 个 streaming 测试的回环端点**全都忽略 Range**（返回 `200` + 完整实体），
+    /// 而**代码的默认假设恰恰是「服务端会遵守 Range」（206）**。
+    /// ⇒ 测试只覆盖了它**不成立**的那一半 ⇒ 真 compliant 服务端那条路径
+    /// **从来没被执行过**，里面的任何错都不会被门抓到。
+    /// ⭐ 这条测试让两端都被钉住：`aa921122` 的测试钉「忽略 Range」，
+    /// 本条钉「遵守 Range」。
+    #[tokio::test]
+    async fn 服务端遵守Range时按区间精确落盘() {
+        use axum::http::{header, HeaderMap, StatusCode};
+        use axum::response::Response;
+        use axum::routing::get;
+        use axum::Router;
+
+        const N: usize = 8192;
+        let body: Vec<u8> = (0..N as u32).map(|i| (i % 251) as u8).collect();
+        // ⭐ 真·支持 Range 的 handler：解析 `bytes=start-end` ⇒ 回 206 + Content-Range。
+        let app = Router::new().route(
+            "/blob",
+            get(move |h: HeaderMap| {
+                let b = body.clone();
+                async move {
+                    let full = b.len();
+                    let rng = h
+                        .get(header::RANGE)
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|s| s.strip_prefix("bytes="))
+                        .and_then(|s| s.split_once('-'))
+                        .and_then(|(a, z)| {
+                            let start: usize = a.parse().ok()?;
+                            let end: usize = if z.is_empty() { full - 1 } else { z.parse().ok()? };
+                            Some((start, end.min(full - 1)))
+                        });
+                    match rng {
+                        // ⭐ 206：告诉客户端这是**部分内容**，且给出确切区间。
+                        Some((start, end)) => {
+                            let slice = b[start..=end].to_vec();
+                            let mut resp = Response::new(axum::body::Body::from(slice));
+                            *resp.status_mut() = StatusCode::PARTIAL_CONTENT;
+                            resp.headers_mut().insert(
+                                header::CONTENT_RANGE,
+                                format!("bytes {start}-{end}/{full}").parse().unwrap(),
+                            );
+                            resp.headers_mut().insert(
+                                header::CONTENT_LENGTH,
+                                (end - start + 1).to_string().parse().unwrap(),
+                            );
+                            resp
+                        }
+                        None => Response::new(axum::body::Body::from(b)),
+                    }
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let dest = dir.path().join("blob.bin");
+        let status = DownloadEngine::default()
+            .download(&DownloadTask::new(format!("http://{addr}/blob"), &dest))
+            .await;
+
+        match status {
+            DownloadStatus::Completed { .. } => {}
+            other => panic!("期望 Completed，实际 {other:?}"),
+        }
+        let bytes = std::fs::read(&dest).expect("read dest");
+        assert_eq!(
+            bytes.len(),
+            N,
+            "遵守 Range 时落盘应恰为 {N} 字节；不等说明区间拼接有错"
+        );
+        assert!(
+            bytes.iter().enumerate().all(|(i, b)| *b == (i as u32 % 251) as u8),
+            "落盘内容与源不符（区间顺序或偏移拼错）"
+        );
+    }
+}
