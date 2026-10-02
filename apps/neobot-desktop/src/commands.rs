@@ -29,7 +29,14 @@ pub fn data_dir() -> Result<PathBuf, String> {
         .map_err(|e| format!("解析数据目录失败（检查 NEOBOT_DATA_DIR 等环境变量）：{e}"))
 }
 
-fn open_store() -> Result<NeobotStore, String> {
+/// ⭐ 开库（**桌面端唯一的开库口径**）。
+///
+/// ⛔ 2026-10-02 提为 `pub`：A1 要在 `main.rs` 的 `.setup` 里启动刷崩溃残留，
+///    而**复制**第二份开库代码等于制造第二条 `data_dir` → `neobot.db` 路径 ——
+///    两者一旦漂移，桌面端就会与 CLI 打开两个不同的库
+///    （`tests/data_dir_env.rs` 记的正是那个事故：「CLI 与桌面端打开两个不同的库」）。
+///    ⇒ 复用本函数，而不是新写一份。
+pub fn open_store() -> Result<NeobotStore, String> {
     let dir = data_dir()?;
     std::fs::create_dir_all(&dir).map_err(|e| format!("创建数据目录失败：{e}"))?;
     let db = dir.join("neobot.db");

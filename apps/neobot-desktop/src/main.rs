@@ -64,6 +64,32 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
                     let _ = w.show();
                 }
             }
+            // ⭐⭐ A1：启动刷一次崩溃残留（`mark_outcome_unknown`）。
+            //
+            // ⛔ **为什么必须在这里**：A1 只挂了 `bin/neobot.rs` 的
+            //    `cmd_doctor` 与 `cmd_channel_serve` —— 但**桌面端不 spawn `neobot`
+            //    子进程**（`apps/neobot-desktop/src` 内无 `Command::new`/`sidecar`）。
+            //    ⇒ 不挂这里，桌面端启动就**永不刷残留**，崩溃后经桌面端打开仍会
+            //    看到 `running` 悬挂行，而它本该落 `outcome_unknown` 等人工裁决。
+            //
+            // ⛔ 刻意**不**挂进 `commands::open_store()`：那个函数在每个 IPC 命令里
+            //    都被调用（`neobot_convo_messages` 等全都开一次库），挂那里会让
+            //    **每次读命令**都触发一次 UPDATE，「启动一次」名不副实。
+            //
+            // ⛔ best-effort 语义（与上方桌宠同一档）：开不起库不拦主窗启动 ——
+            //    为一次维护动作而让整个应用起不来是本末倒置。
+            // ⭐ 用 `let _marked: usize` 而非 `let _ =`：避开
+            //    `check-silent-failure` 的 opener（虽然 `mark_outcome_unknown`
+            //    不在 GATED 动词表里，属双保险）。
+            match neobot_desktop::commands::open_store() {
+                Ok(store) => {
+                    let now = chrono::Utc::now().to_rfc3339();
+                    let _marked: usize = store
+                        .mark_outcome_unknown(&now, "startup sweep (desktop)")
+                        .unwrap_or(0);
+                }
+                Err(e) => eprintln!("[a1] 启动刷崩溃残留失败（不拦主窗启动）：{e}"),
+            }
             Ok(())
         })
 }
