@@ -61,6 +61,8 @@ pub struct EventLogMetadata {
 /// Thread-safe event log for recording and querying agent events.
 #[derive(Debug, Clone)]
 pub struct EventLog {
+    /// 2026-09-30 新增：已记录事件的**最大**时间戳，保证写入单调。
+    last_ts: Arc<Mutex<u128>>,
     session_id: String,
     events: Arc<Mutex<Vec<TimestampedEvent>>>,
     metadata: Arc<Mutex<EventLogMetadata>>,
@@ -72,6 +74,8 @@ impl EventLog {
             session_id: session_id.into(),
             events: Arc::new(Mutex::new(Vec::new())),
             metadata: Arc::new(Mutex::new(EventLogMetadata::default())),
+            // 2026-09-30 新增：单调时间戳游标（见 `record_with_metadata`）。
+            last_ts: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -80,6 +84,8 @@ impl EventLog {
             session_id: session_id.into(),
             events: Arc::new(Mutex::new(Vec::new())),
             metadata: Arc::new(Mutex::new(meta)),
+            // 2026-09-30 新增：与 `new()` 一致（见 `record_with_metadata`）。
+            last_ts: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -94,7 +100,24 @@ impl EventLog {
 
     /// Record an event with custom metadata.
     pub fn record_with_metadata(&self, event: AgentEvent, metadata: HashMap<String, String>) {
-        let ts = now_ms();
+        // ⚠️ 2026-09-30 修正：原先直接用 `now_ms()`。但 `now_ms()` 是**毫秒**精度，
+        // 同一进程内快速连续 record（测试里一连 4 条）会拿到**完全相同**的时间戳
+        // ⇒ `get_events_in_range(mid, mid)` 一次返回**多条**事件，
+        // 而调用方（按时间定位单条事件）期望恰好 1 条。
+        // 实测症状：自带测试 `test_get_events_in_range` 期望 1 条、实得 3 条。
+        //
+        // ⇒ 改为**单调递增**时间戳：严格大于此前所有已记录事件；
+        // 仍保留毫秒语义（不引入新单位），并用 `max` 保证时钟回拨时也不倒退。
+        // ⚠️ 这里必须 `max(now) + 1` 而**不是** `max(now)`：
+        // 后者只保证「不倒退」，**不保证递增** —— 同一毫秒内连写 4 条时
+        // `now_ms()` 4 次都返回同一个值，`max` 结果仍是同一个值
+        // ⇒ 时间戳依旧重复（我第一版就这么写，测试仍然返回 3 条）。
+        let ts = {
+            let mut last = self.last_ts.lock().expect("event_log lock poisoned");
+            let next = now_ms().max(*last + 1);
+            *last = next;
+            next
+        };
         let entry = TimestampedEvent {
             timestamp_ms: ts,
             event,

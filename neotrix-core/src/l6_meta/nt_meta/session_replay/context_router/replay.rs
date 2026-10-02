@@ -1,7 +1,9 @@
 #![deny(clippy::unwrap_used)]
 
+// 2026-09-30 修正导入：恢复本模块声明后编译器报 unused。
+// 逐个核实后：`ContextSnapshot` **确实在用**（`snapshots: Vec<ContextSnapshot>` 等 4 处）
+// ⇒ 保留；只有 `serde::{Deserialize, Serialize}` 真未使用 ⇒ 去掉。
 use super::context::{ContextSnapshot, ContextState};
-use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
 /// R-P130 compliant session replay logger.

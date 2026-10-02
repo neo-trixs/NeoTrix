@@ -1,6 +1,10 @@
 #![deny(clippy::unwrap_used)]
 
-use super::event_log::{AgentEvent, EventLog, TimestampedEvent};
+// 2026-09-30 修正导入：编译器报 `TimestampedEvent` unused（核实为真）⇒ 去掉；
+// 而 serde 的一行报告是**误报** —— 它在下方 `#[derive(Serialize, Deserialize)]`
+// 里被使用（我曾据 grep 结论删掉它，编译器立即报「cannot find derive macro」）。
+// ⇒ 教训：**与编译器冲突时以编译器为准**，别用自己的 grep 覆盖它。
+use super::event_log::{AgentEvent, EventLog};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -85,7 +89,24 @@ impl SessionReplay {
             });
         }
 
-        self.cursor = self.snapshots.len();
+        // ⚠️ 2026-09-30 修正：原先 `self.cursor = self.snapshots.len()`，
+        // 即**构造完成即把游标置于末尾**（「已处理全部事件」状态）。
+        // 但 `new()` 的字段初值是 `0`，且没有任何方法把游标送回起点
+        // ⇒ 刚构造出的 `SessionReplay` **无法从头回放**：
+        // `step_forward()` 立刻返回 `None`（已在最后一项）。
+        //
+        // 实测症状：自带测试 `test_step_forward_back` 里
+        // `replay.step_forward().unwrap()` 直接 panic（None）。
+        //
+        // 判定为**真缺陷**而非「测试写错」：
+        // · `final_state()` 已单独提供「取末态」的语义，
+        //   构造即末尾让「从起点逐步前进」这一**主要用途**无法使用；
+        // · `SessionReplay` 全仓**零生产消费者**
+        //   （`anti_distillation` 里的 `SessionReplayGuard` 是**同名不同类型**，
+        //   已核实二者无关）⇒ 改动不影响任何生产行为。
+        //
+        // ⇒ 改为从**起点**开始；需要末态用 `final_state()`。
+        self.cursor = 0;
     }
 
     /// Replay state at a given event index (0-based).
@@ -151,7 +172,13 @@ impl SessionReplay {
             let summary = event_summary(&te.event);
             out.push_str(&format!("[{ts}] #{idx}: {summary}\n"));
 
-            if let Some(meta) = &te.metadata {
+            // ⚠️ 2026-09-30 修正：`te.metadata` 的类型是
+            // `HashMap<String, String>`（**不是** `Option<_>`），
+            // 原代码按 `Option` 写 `if let Some(meta) = …`
+            // ⇒ `E0308: expected HashMap<…>, found Option<_>`。
+            // ⇒ 直接用 `is_empty()` 判空即可（空 map 自然跳过）。
+            {
+                let meta = &te.metadata;
                 if !meta.is_empty() {
                     let pairs: Vec<String> = meta.iter().map(|(k, v)| format!("{k}={v}")).collect();
                     out.push_str(&format!("         meta: {}\n", pairs.join(", ")));
@@ -260,10 +287,22 @@ mod tests {
         let log = populate_log();
         let mut replay = SessionReplay::new(log);
         let initial = replay.cursor();
+        // ⚠️ 2026-09-30 修正：原断言是
+        //   `fwd.index == initial` 且 `back.index == initial.saturating_sub(1)`，
+        // 即「前进后 index 不变、后退后 index 减一」——
+        // 这**既与实现不符、自身也自相矛盾**（前进本就该改变 index）。
+        // 实现语义（已逐行核实 `step_forward` / `step_back`）：
+        //   `cursor += 1` 后返回 `snapshots[cursor]` ⇒ index **加一**；
+        //   `cursor -= 1` 后返回 `snapshots[cursor]` ⇒ index **减一**。
+        // ⇒ 按实现语义断言，并补上「回到起点」的往返校验。
         let fwd = replay.step_forward().unwrap();
-        assert_eq!(fwd.index, initial);
+        assert_eq!(fwd.index, initial + 1);
+        assert_eq!(replay.cursor(), initial + 1);
         let back = replay.step_back().unwrap();
-        assert_eq!(back.index, initial.saturating_sub(1));
+        assert_eq!(back.index, initial);
+        assert_eq!(replay.cursor(), initial);
+        // 在起点再后退应返回 None（不可越界）
+        assert!(replay.step_back().is_none());
     }
 
     #[test]
@@ -295,4 +334,5 @@ mod tests {
         assert!(replay.jump_to(2).is_some());
         assert!(replay.jump_to(100).is_none());
     }
+
 }

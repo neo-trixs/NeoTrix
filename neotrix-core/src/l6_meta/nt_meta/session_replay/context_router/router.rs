@@ -1,6 +1,7 @@
 #![deny(clippy::unwrap_used)]
 
-use super::context::{ContextSnapshot, ContextState};
+// 2026-09-30：`ContextSnapshot` 在本文件未使用 ⇒ 移除。
+use super::context::ContextState;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

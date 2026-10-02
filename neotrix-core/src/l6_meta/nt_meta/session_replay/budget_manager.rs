@@ -31,7 +31,13 @@ pub struct BudgetUsage {
 }
 
 /// Budget alert severity.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+///
+/// 2026-09-30 修正：原先 `derive(..., Eq)`，但变体 `Warning` 含 **`f64` 字段**
+/// ⇒ `f64` **不满足** `Eq`（IEEE754 的 `NaN != NaN`，`Eq` 要求自反），
+/// 导致 `E0277: the trait bound f64: std::cmp::Eq is not satisfied`。
+/// ⇒ 去掉 `Eq`，保留 `PartialEq`（本类型未被用作 `HashSet`/`BTreeSet` 的键，
+/// 已全模块核实，故 `Eq` 本就是多余的）。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum BudgetAlert {
     None,
     Warning { metric: String, usage_pct: f64 },
@@ -167,7 +173,7 @@ impl BudgetTracker {
                 });
             } else if pct >= self.config.alert_threshold {
                 self.alerts.push(BudgetAlert::Warning {
-                    metric: "cost_usd".into,
+                    metric: "cost_usd".into(),
                     usage_pct: pct * 100.0,
                 });
             }

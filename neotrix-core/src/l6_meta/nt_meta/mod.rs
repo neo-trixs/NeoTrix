@@ -97,10 +97,11 @@ mod nt_evolution_runner_tests;
 //   ⇒ 属笼统注释的**误伤**，已恢复声明。⚠️ 它目前**零生产消费者**
 //   （仅本文件提及），恢复是为了让那 19 个测试真正参与验证，
 //   而不是宣称它已被业务使用 —— 后者是另一个判断。
-// · `session_replay`（10 文件 / 2,079 行 / **23 个测试**）实测 **7 个错误**
-//   ⇒ 保持注释，待修。
+// · ~~`session_replay` → 7 错误~~ ✅ **已修并恢复**（2026-09-30：
+//   `BudgetAlert` 含 f64 却 derive(Eq)；`.into` 少括号；`metadata` 误当 Option；
+//   另有时间戳重复、主导者选取不确定、游标起点三处真缺陷）
 // · 上方的 `eval_engine` 注释掉了**另一个**模块（`case_level_regressions`
 //   等），它有**明确前置条件**（`llm_judge.rs` 硬编码满分，属假测量）
 //   ⇒ 那是**有意的**停用，不是误伤，两者不要混为一谈。
-// pub mod session_replay; // 实测 7 错误 ⇒ 仍待修（2026-09-30）
+pub mod session_replay;
 pub mod otel_bridge; // 实测 0 错误 ⇒ 恢复（2026-09-30）

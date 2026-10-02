@@ -69,9 +69,18 @@ impl ContextAnalyzer {
         // Build common patterns
         let mut common_patterns = Vec::new();
 
+        // ⚠️ `HashMap::iter().max_by_key()` 在**计数并列**时返回**任意一个**
+        // （取决于哈希迭代序）⇒ 「主导者」不确定。
+        // 实测症状：3 个快照里 agent_a / agent_b 计数**相同**（各 3 次），
+        // 输出的 `common_patterns` 有时含 agent_a、有时含 agent_b
+        // ⇒ 自带测试 `test_analyze_agent_tracking` **随机失败**。
+        //
+        // ⇒ 加**确定性 tie-break**：计数相同时按 key 字典序升序取小者，
+        // 使同样的输入永远得到同样的输出（同 `nt_core_bank` 的
+        // `RRF_K` 排序不稳定问题，同一处置）。
         let dominant_task = task_counts
             .iter()
-            .max_by_key(|(_, c)| *c)
+            .max_by(|a, b| a.1.cmp(b.1).then_with(|| b.0.cmp(a.0)))
             .map(|(t, c)| (t.clone(), *c));
         if let Some((task, count)) = dominant_task {
             if count > 1 {
@@ -79,9 +88,10 @@ impl ContextAnalyzer {
             }
         }
 
+        // 同上：计数并列时按字典序取小者，保证确定性。
         let dominant_agent = active_agent_counts
             .iter()
-            .max_by_key(|(_, c)| *c)
+            .max_by(|a, b| a.1.cmp(b.1).then_with(|| b.0.cmp(a.0)))
             .map(|(a, c)| (a.clone(), *c));
         if let Some((agent, count)) = dominant_agent {
             if count > 1 {
