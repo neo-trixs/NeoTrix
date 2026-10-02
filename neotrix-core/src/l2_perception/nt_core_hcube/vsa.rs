@@ -1,14 +1,23 @@
 use serde::{Deserialize, Serialize};
 
-/// Trait abstracting VSA operations over different backends.
-pub trait VsaBackend {
-    fn bind(&self, a: &[f64], b: &[f64]) -> Vec<f64>;
-    fn bundle(&self, vectors: &[&[f64]]) -> Vec<f64>;
-    fn permute(&self, v: &[f64], shift: isize) -> Vec<f64>;
-    fn similarity(&self, a: &[f64], b: &[f64]) -> f64;
-    fn dimensions(&self) -> usize;
-    fn name(&self) -> &str;
-}
+/// `VsaBackend` 收敛到低层唯一实现（2026-10-02）。
+///
+/// 与本批前三个类型同法：先逐项核实，再只收敛**能收敛的那部分**。
+/// · 该 trait 两侧**逐字相同**（`diff` 实测无输出）⇒ 可安全收敛。
+/// · core 侧两个 impl（`VSAEngine` / `HolonBackend`）在收敛后
+///   变为「为本地类型实现外来 trait」⇒ 符合 orphan 规则，可编译。
+///
+/// ⛔ **但同文件的 `VSAEngine` 刻意不收敛**（与 trait 不同处理）：
+/// core 的 `impl VsaBackend for VSAEngine`（:76）与
+/// `impl crate::neotrix::VsaEmbedding for VSAEngine`（:87,:91,:96）
+/// **都要读 `self.dim`**，而 `dim` 在两个 crate 里**都是私有字段**（无 `pub`）。
+/// ⇒ 若把 `VSAEngine` 收敛到低层，core 这两个 impl **访问不到该字段，编译失败**。
+/// 该模块另有 7 个 core 文件同样触达 `VSAEngine`。
+/// ⇒ 解开它必须先决定「`dim` 是否属于公开契约」（把私有字段改 `pub`
+/// 是**低层 API 面变更**，不是顺手能做的去重）⇒ 留独立批次。
+///
+/// ⇒ 本笔只收敛 trait：**能收敛的收敛，不能的写明为什么不能。**
+pub use neotrix_types::core::nt_core_hcube::vsa::VsaBackend;
 
 /// Default MAP-based VSA engine on real-valued vectors.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
