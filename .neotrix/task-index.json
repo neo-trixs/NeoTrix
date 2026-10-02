@@ -1194,6 +1194,15 @@
       "spec": "扫一份外部仓库清单（文件或 stdin），挑出命中黑名单的条目并判红。分 poison（SEO 投毒簇：browser-use/jev-*、typesafe.ai 叙述簇、vinilana/jev-* 用例仓库）与 noise（游戏引擎/jailbreak/排行榜站）两类。⛔ 不删数据、不做相关性判断、无白名单。",
       "tool": "python3 scripts/ops/nt_absorb_denylist.py <清单文件|->",
       "when_not": "⛔ 不是相关性判据——只挑「已知的坏」，放行不代表该吸收（相关性要读源码，超静态门能力）。⛔ 空清单判红是设计，防永远绿的假门。⛔ 新增噪声类别要往 RULES 里加窄正则，不要放宽现有规则。"
+    },
+    {
+      "id": "neobot-check-a1-recovery",
+      "kind": "gate",
+      "query": "A1 崩溃恢复 running sweep 支配 outcome_unknown 第二个生产者 裸SQL",
+      "read_only": true,
+      "spec": "断言「running 行必被 sweep 支配」：C1 同一函数体内 sweep 行号 < Running 写入行号；C2 非测试代码里 Running 构造点恰好 1 个；C3 无裸 SQL 写 tasks.status；C4 能开库的 bin 花名册。⭐ 判据锚在「写」而非「入口」——入口是投影，按入口枚举会造出 22 条假要求（实测 25 个 bin 里只有 3 个能开库）。",
+      "tool": "node scripts/ops/neobot-check-a1-recovery.mjs",
+      "when_not": "⛔ 抓不到 Rust workspace 外的写入（sqlite3 CLI 或别的语言写同一个 neobot.db）。⛔ C1 是行序判据不是数据流证明——sweep 若被移进不覆盖写路径的条件分支，行号仍「小于」⇒ 假绿。⛔ C4 的 bin→opener 可达性是文本推导不是真编译图。"
     }
   ],
   "excluded": {
