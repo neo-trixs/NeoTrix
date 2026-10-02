@@ -113,7 +113,17 @@ impl EventLog {
         // `now_ms()` 4 次都返回同一个值，`max` 结果仍是同一个值
         // ⇒ 时间戳依旧重复（我第一版就这么写，测试仍然返回 3 条）。
         let ts = {
-            let mut last = self.last_ts.lock().expect("event_log lock poisoned");
+                        // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02）。
+            // 判据：锁内是**只增/只清**的日志数据（`Vec<…>` / `u128` 计数），
+            // 元素之间没有「长度与索引匹配」型耦合不变量 ⇒ 某个线程 panic 后
+            // 可能只丢一条日志，**不会读到不一致状态** ⇒ 恢复是安全的。
+            // ⛔ 反之，若锁内是互相约束的多字段结构，保持 panic 才是对的 ——
+            //    那种场景下 `into_inner()` 会把「不一致」读成有效数据。
+            // ⇒ 一次瞬时 panic 不再升级成该 logger 的**永久拒绝服务**。
+
+            let mut last = self.last_ts
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             let next = now_ms().max(*last + 1);
             *last = next;
             next
@@ -123,19 +133,49 @@ impl EventLog {
             event,
             metadata,
         };
-        let mut events = self.events.lock().expect("event_log lock poisoned");
+                    // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02）。
+            // 判据：锁内是**只增/只清**的日志数据（`Vec<…>` / `u128` 计数），
+            // 元素之间没有「长度与索引匹配」型耦合不变量 ⇒ 某个线程 panic 后
+            // 可能只丢一条日志，**不会读到不一致状态** ⇒ 恢复是安全的。
+            // ⛔ 反之，若锁内是互相约束的多字段结构，保持 panic 才是对的 ——
+            //    那种场景下 `into_inner()` 会把「不一致」读成有效数据。
+            // ⇒ 一次瞬时 panic 不再升级成该 logger 的**永久拒绝服务**。
+
+        let mut events = self.events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         events.push(entry);
     }
 
     /// Get all events in chronological order.
     pub fn get_events(&self) -> Vec<TimestampedEvent> {
-        let events = self.events.lock().expect("event_log lock poisoned");
+                    // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02）。
+            // 判据：锁内是**只增/只清**的日志数据（`Vec<…>` / `u128` 计数），
+            // 元素之间没有「长度与索引匹配」型耦合不变量 ⇒ 某个线程 panic 后
+            // 可能只丢一条日志，**不会读到不一致状态** ⇒ 恢复是安全的。
+            // ⛔ 反之，若锁内是互相约束的多字段结构，保持 panic 才是对的 ——
+            //    那种场景下 `into_inner()` 会把「不一致」读成有效数据。
+            // ⇒ 一次瞬时 panic 不再升级成该 logger 的**永久拒绝服务**。
+
+        let events = self.events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         events.clone()
     }
 
     /// Get events within a timestamp range (inclusive).
     pub fn get_events_in_range(&self, start_ms: u128, end_ms: u128) -> Vec<TimestampedEvent> {
-        let events = self.events.lock().expect("event_log lock poisoned");
+                    // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02）。
+            // 判据：锁内是**只增/只清**的日志数据（`Vec<…>` / `u128` 计数），
+            // 元素之间没有「长度与索引匹配」型耦合不变量 ⇒ 某个线程 panic 后
+            // 可能只丢一条日志，**不会读到不一致状态** ⇒ 恢复是安全的。
+            // ⛔ 反之，若锁内是互相约束的多字段结构，保持 panic 才是对的 ——
+            //    那种场景下 `into_inner()` 会把「不一致」读成有效数据。
+            // ⇒ 一次瞬时 panic 不再升级成该 logger 的**永久拒绝服务**。
+
+        let events = self.events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         events
             .iter()
             .filter(|e| e.timestamp_ms >= start_ms && e.timestamp_ms <= end_ms)
@@ -145,7 +185,17 @@ impl EventLog {
 
     /// Get events by kind.
     pub fn get_events_by_kind(&self, kind: &str) -> Vec<TimestampedEvent> {
-        let events = self.events.lock().expect("event_log lock poisoned");
+                    // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02）。
+            // 判据：锁内是**只增/只清**的日志数据（`Vec<…>` / `u128` 计数），
+            // 元素之间没有「长度与索引匹配」型耦合不变量 ⇒ 某个线程 panic 后
+            // 可能只丢一条日志，**不会读到不一致状态** ⇒ 恢复是安全的。
+            // ⛔ 反之，若锁内是互相约束的多字段结构，保持 panic 才是对的 ——
+            //    那种场景下 `into_inner()` 会把「不一致」读成有效数据。
+            // ⇒ 一次瞬时 panic 不再升级成该 logger 的**永久拒绝服务**。
+
+        let events = self.events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         events
             .iter()
             .filter(|e| e.event.kind_name() == kind)
@@ -155,7 +205,17 @@ impl EventLog {
 
     /// Total event count.
     pub fn len(&self) -> usize {
-        let events = self.events.lock().expect("event_log lock poisoned");
+                    // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02）。
+            // 判据：锁内是**只增/只清**的日志数据（`Vec<…>` / `u128` 计数），
+            // 元素之间没有「长度与索引匹配」型耦合不变量 ⇒ 某个线程 panic 后
+            // 可能只丢一条日志，**不会读到不一致状态** ⇒ 恢复是安全的。
+            // ⛔ 反之，若锁内是互相约束的多字段结构，保持 panic 才是对的 ——
+            //    那种场景下 `into_inner()` 会把「不一致」读成有效数据。
+            // ⇒ 一次瞬时 panic 不再升级成该 logger 的**永久拒绝服务**。
+
+        let events = self.events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         events.len()
     }
 
@@ -169,7 +229,7 @@ impl EventLog {
         let mut m = self
             .metadata
             .lock()
-            .expect("event_log metadata lock poisoned");
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
         *m = meta;
     }
 
@@ -178,19 +238,39 @@ impl EventLog {
         let m = self
             .metadata
             .lock()
-            .expect("event_log metadata lock poisoned");
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
         m.clone()
     }
 
     /// Clear all events.
     pub fn clear(&self) {
-        let mut events = self.events.lock().expect("event_log lock poisoned");
+                    // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02）。
+            // 判据：锁内是**只增/只清**的日志数据（`Vec<…>` / `u128` 计数），
+            // 元素之间没有「长度与索引匹配」型耦合不变量 ⇒ 某个线程 panic 后
+            // 可能只丢一条日志，**不会读到不一致状态** ⇒ 恢复是安全的。
+            // ⛔ 反之，若锁内是互相约束的多字段结构，保持 panic 才是对的 ——
+            //    那种场景下 `into_inner()` 会把「不一致」读成有效数据。
+            // ⇒ 一次瞬时 panic 不再升级成该 logger 的**永久拒绝服务**。
+
+        let mut events = self.events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         events.clear();
     }
 
     /// Drain events, returning them and clearing the log.
     pub fn drain(&self) -> Vec<TimestampedEvent> {
-        let mut events = self.events.lock().expect("event_log lock poisoned");
+                    // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02）。
+            // 判据：锁内是**只增/只清**的日志数据（`Vec<…>` / `u128` 计数），
+            // 元素之间没有「长度与索引匹配」型耦合不变量 ⇒ 某个线程 panic 后
+            // 可能只丢一条日志，**不会读到不一致状态** ⇒ 恢复是安全的。
+            // ⛔ 反之，若锁内是互相约束的多字段结构，保持 panic 才是对的 ——
+            //    那种场景下 `into_inner()` 会把「不一致」读成有效数据。
+            // ⇒ 一次瞬时 panic 不再升级成该 logger 的**永久拒绝服务**。
+
+        let mut events = self.events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         std::mem::take(&mut *events)
     }
 }

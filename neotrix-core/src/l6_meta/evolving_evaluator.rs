@@ -60,7 +60,19 @@ impl EvolvingEvaluator {
     }
 
     pub fn evaluate(&self, _target: &str, actual: &HashMap<String, f64>) -> ScoreBreakdown {
-        let criteria = self.criteria.lock().unwrap();
+        // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02），本文件 10 处**一致**处理。
+// 判据：锁内是 `Vec<EvaluationCriteria>` / `HashMap` / `Vec<EvolutionEvent>`，
+// 而 `EvaluationCriteria` 的 4 个字段（name/weight/threshold/description）**互相独立**，
+// 且 `evolve_criteria` 用 `.clamp(min_weight, max_weight)` 写回
+// ⇒ 「权重恒在区间内」这个不变量**与是否投毒无关**，元素不会撕裂。
+// ⭐⭐ 同批改的必要性：`:80`/`:100` 在**已持有** `criteria`(+`scores`) 时再取第三把锁。
+//    一旦那里 panic，是在**持锁状态**下 panic ⇒ 同时毒化多个锁
+//    ⇒ 之后每个 `.unwrap()` 都 panic ⇒ **一次瞬时失败升级为该 evaluator 的永久拒绝服务**。
+//    只修 `:168`（`remove_criterion`，实测 0 调用者）等于没修。
+// ⛔ 若将来锁内引入互相约束的多字段结构，则应改回 panic（`into_inner()` 会把
+//    「不一致」读成有效数据）。这条判据已写在 `session_replay` 的同批改动里。
+let criteria = self.criteria.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut criteria_scores = HashMap::new();
         let mut weighted_score = 0.0;
         let mut total_weight = 0.0;
@@ -77,13 +89,16 @@ impl EvolvingEvaluator {
         let weighted_score = if total_weight > 0.0 { weighted_score / total_weight } else { 0.0 };
         let confidence = self.compute_confidence(&criteria_scores, &criteria);
         let breakdown = ScoreBreakdown { criteria_scores, weighted_score, raw_score, confidence };
-        self.scores.lock().unwrap().push(breakdown.clone());
+        self.scores.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner).push(breakdown.clone());
         breakdown
     }
 
     pub fn evolve_criteria(&self) {
-        let mut criteria = self.criteria.lock().unwrap();
-        let scores = self.scores.lock().unwrap();
+        let mut criteria = self.criteria.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let scores = self.scores.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if scores.is_empty() { return; }
         let recent_scores: Vec<&ScoreBreakdown> = scores.iter().rev().take(10).collect();
         for crit in criteria.iter_mut() {
@@ -97,7 +112,8 @@ impl EvolvingEvaluator {
             crit.weight = (crit.weight + adjustment).clamp(self.min_weight, self.max_weight);
             crit.threshold = (crit.threshold + adjustment * 0.5).clamp(0.0, 1.0);
             if (crit.weight - old_weight).abs() > 0.001 {
-                self.evolution_log.lock().unwrap().push(EvolutionEvent {
+                self.evolution_log.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner).push(EvolutionEvent {
                     criteria_name: crit.name.clone(),
                     old_weight,
                     new_weight: crit.weight,
@@ -109,7 +125,8 @@ impl EvolvingEvaluator {
     }
 
     pub fn get_score(&self) -> f64 {
-        let scores = self.scores.lock().unwrap();
+        let scores = self.scores.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         scores.last().map(|s| s.weighted_score).unwrap_or(0.0)
     }
 
@@ -127,15 +144,18 @@ impl EvolvingEvaluator {
     }
 
     pub fn get_evolution_log(&self) -> Vec<EvolutionEvent> {
-        self.evolution_log.lock().unwrap().clone()
+        self.evolution_log.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner).clone()
     }
 
     pub fn evaluation_count(&self) -> usize {
-        self.scores.lock().unwrap().len()
+        self.scores.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner).len()
     }
 
     pub fn add_criterion(&self, name: String, weight: f64, threshold: f64, description: String) {
-        let mut criteria = self.criteria.lock().unwrap();
+        let mut criteria = self.criteria.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         criteria.push(EvaluationCriteria { name, weight, threshold, description });
     }
 
@@ -165,7 +185,8 @@ impl EvolvingEvaluator {
     }
 
     pub fn remove_criterion(&self, name: &str) -> bool {
-        let mut criteria = self.criteria.lock().unwrap();
+        let mut criteria = self.criteria.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let len_before = criteria.len();
         criteria.retain(|c| c.name != name);
         criteria.len() < len_before

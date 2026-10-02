@@ -41,7 +41,15 @@ impl UniversalRecommender {
         for post in &mut posts {
             post.score = self.score_post(&post.actions);
         }
-        posts.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+        // ⭐ `total_cmp` 而非 `partial_cmp(..).unwrap()`（2026-10-02）。
+// ⛔ `partial_cmp` 遇 **NaN 返 None** ⇒ `.unwrap()` 直接 panic。
+//    今天所有内置 adapter 的 `actions` 都是空 map（实测 7 个实现）⇒ 不可达，
+//    ⛔ 但 `SocialPlatformAdapter` 是 `pub trait` 且 `social_access` 是 `pub mod`
+//    ⇒ 外部可实现、`actions` 是 `pub` 字段 ⇒ 「今天空」不等于「契约上空」。
+//    一旦某 action 权重查不到（走 `unwrap_or(&0.0)`）而 count 是 ±inf，
+//    `0.0 * inf = NaN` —— **不需要字面量 NaN 就能触发**。
+// ⭐ `total_cmp` 全序化（含 NaN）且是本仓既有惯例（`nt_act_crypto` 已多处）。
+posts.sort_by(|a, b| b.score.total_cmp(&a.score));
         let mut result = Vec::new();
         let mut author_count: HashMap<String, usize> = HashMap::new();
         for post in posts {

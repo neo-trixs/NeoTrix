@@ -313,18 +313,6 @@ neotrix-core/src/l6_meta/nt_meta/otel_bridge/trace_pipeline.rs:72	expect
 neotrix-core/src/l6_meta/nt_meta/otel_bridge/trace_pipeline.rs:77	expect
 neotrix-core/src/l6_meta/nt_meta/otel_bridge/trace_pipeline.rs:82	expect
 neotrix-core/src/l6_meta/nt_meta/otel_bridge/trace_pipeline.rs:87	expect
-neotrix-core/src/l6_meta/nt_meta/session_replay/context_router/replay.rs:22	expect
-neotrix-core/src/l6_meta/nt_meta/session_replay/context_router/replay.rs:34	expect
-neotrix-core/src/l6_meta/nt_meta/session_replay/context_router/replay.rs:46	expect
-neotrix-core/src/l6_meta/nt_meta/session_replay/context_router/replay.rs:52	expect
-neotrix-core/src/l6_meta/nt_meta/session_replay/event_log.rs:109	expect
-neotrix-core/src/l6_meta/nt_meta/session_replay/event_log.rs:115	expect
-neotrix-core/src/l6_meta/nt_meta/session_replay/event_log.rs:125	expect
-neotrix-core/src/l6_meta/nt_meta/session_replay/event_log.rs:135	expect
-neotrix-core/src/l6_meta/nt_meta/session_replay/event_log.rs:149	expect
-neotrix-core/src/l6_meta/nt_meta/session_replay/event_log.rs:158	expect
-neotrix-core/src/l6_meta/nt_meta/session_replay/event_log.rs:164	expect
-neotrix-core/src/l6_meta/nt_meta/session_replay/event_log.rs:170	expect
 neotrix-core/src/main.rs:642	expect
 neotrix-core/src/l0_substrate/ffi/consciousness_tree.rs:110	expect
 neotrix-core/src/l0_substrate/ffi/consciousness_tree.rs:146	expect
@@ -712,3 +700,10 @@ neotrix-core/src/l5_cognition/nt_crystal_core/retention_policy.rs:222	unwrap
 neotrix-core/src/l5_cognition/nt_jev/primitives.rs:84	unwrap
 neotrix-core/src/skill_loader.rs:279	unwrap
 neotrix-core/src/skill_loader.rs:290	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_crypto/dex.rs:207	expect	# 编译期字面量 "0902f1ac"：偶数长度且全为 hex 位 ⇒ hex::decode 恒 Ok，expect 分支不可达。同形态全仓 9 处（4 处已在此基线）。
+neotrix-core/src/l1_action/nt_act/nt_act_crypto/token.rs:46	expect	# 编译期字面量 "a9059cbb"（ERC-20 transfer selector）⇒ 同上，运行期不可能失败。
+neotrix-core/src/l1_action/nt_act/nt_act_crypto/token.rs:56	expect	# 编译期字面量 "095ea7b3"（approve selector）⇒ 同上。
+neotrix-core/src/l1_action/nt_act/nt_act_crypto/token.rs:66	expect	# 编译期字面量 "dd62ed3e" ⇒ 同上。
+neotrix-core/src/l1_action/nt_act/nt_act_crypto/tx.rs:170	expect	# 编译期字面量 "095ea7b3" ⇒ 同上。
+neotrix-core/src/l3_embodiment/nt_shield/nt_shield_approval/human_approval.rs:180	expect	# 不可达的不变量断言：上方 :157-160 已用 get_mut(...).ok_or("Request not found")? 校验过同一 key，且 make_decision 非 async、全文件 0 个 .await ⇒ 无 TOCTOU。⛔ 刻意不改 if let —— 那会在真有 bug 时静默吞掉请求，比 panic 更坏。
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/rise_reflector.rs:42	unwrap	# 紧接上一行 push 之后的 last()：reflect(&mut self) 独占可变借用（编译期排除并发），Vec::push 只在 OOM 时 abort 不 unwind ⇒ last 必为 Some。⛔ 无法在 forbid(unsafe_code) 下无 unwrap 表达「刚 push 的末元素」（签名返回 &Reference）。

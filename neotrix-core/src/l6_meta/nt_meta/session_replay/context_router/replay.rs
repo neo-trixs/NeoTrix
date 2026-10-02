@@ -21,7 +21,17 @@ impl SessionReplayLogger {
 
     /// Log a context snapshot for the current turn (R-P130).
     pub fn log_turn(&self, snapshot: ContextSnapshot) {
-        let mut snaps = self.snapshots.lock().expect("replay lock poisoned");
+                    // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02）。
+            // 判据：锁内是**只增/只清**的日志数据（`Vec<…>` / `u128` 计数），
+            // 元素之间没有「长度与索引匹配」型耦合不变量 ⇒ 某个线程 panic 后
+            // 可能只丢一条日志，**不会读到不一致状态** ⇒ 恢复是安全的。
+            // ⛔ 反之，若锁内是互相约束的多字段结构，保持 panic 才是对的 ——
+            //    那种场景下 `into_inner()` 会把「不一致」读成有效数据。
+            // ⇒ 一次瞬时 panic 不再升级成该 logger 的**永久拒绝服务**。
+
+        let mut snaps = self.snapshots
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         snaps.push(snapshot);
     }
 
@@ -33,7 +43,17 @@ impl SessionReplayLogger {
 
     /// Retrieve all recorded snapshots.
     pub fn get_replay(&self) -> Vec<ContextSnapshot> {
-        let snaps = self.snapshots.lock().expect("replay lock poisoned");
+                    // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02）。
+            // 判据：锁内是**只增/只清**的日志数据（`Vec<…>` / `u128` 计数），
+            // 元素之间没有「长度与索引匹配」型耦合不变量 ⇒ 某个线程 panic 后
+            // 可能只丢一条日志，**不会读到不一致状态** ⇒ 恢复是安全的。
+            // ⛔ 反之，若锁内是互相约束的多字段结构，保持 panic 才是对的 ——
+            //    那种场景下 `into_inner()` 会把「不一致」读成有效数据。
+            // ⇒ 一次瞬时 panic 不再升级成该 logger 的**永久拒绝服务**。
+
+        let snaps = self.snapshots
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         snaps.clone()
     }
 
@@ -45,13 +65,33 @@ impl SessionReplayLogger {
 
     /// Number of recorded turns.
     pub fn turn_count(&self) -> usize {
-        let snaps = self.snapshots.lock().expect("replay lock poisoned");
+                    // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02）。
+            // 判据：锁内是**只增/只清**的日志数据（`Vec<…>` / `u128` 计数），
+            // 元素之间没有「长度与索引匹配」型耦合不变量 ⇒ 某个线程 panic 后
+            // 可能只丢一条日志，**不会读到不一致状态** ⇒ 恢复是安全的。
+            // ⛔ 反之，若锁内是互相约束的多字段结构，保持 panic 才是对的 ——
+            //    那种场景下 `into_inner()` 会把「不一致」读成有效数据。
+            // ⇒ 一次瞬时 panic 不再升级成该 logger 的**永久拒绝服务**。
+
+        let snaps = self.snapshots
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         snaps.len()
     }
 
     /// Clear all recorded snapshots.
     pub fn clear(&self) {
-        let mut snaps = self.snapshots.lock().expect("replay lock poisoned");
+                    // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02）。
+            // 判据：锁内是**只增/只清**的日志数据（`Vec<…>` / `u128` 计数），
+            // 元素之间没有「长度与索引匹配」型耦合不变量 ⇒ 某个线程 panic 后
+            // 可能只丢一条日志，**不会读到不一致状态** ⇒ 恢复是安全的。
+            // ⛔ 反之，若锁内是互相约束的多字段结构，保持 panic 才是对的 ——
+            //    那种场景下 `into_inner()` 会把「不一致」读成有效数据。
+            // ⇒ 一次瞬时 panic 不再升级成该 logger 的**永久拒绝服务**。
+
+        let mut snaps = self.snapshots
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         snaps.clear();
     }
 }
