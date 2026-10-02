@@ -1132,7 +1132,14 @@ impl UnifiedAbsorber {
 
     fn persist_cycle_report(&self, report: &AbsorbCycleReport) -> Result<(), String> {
         let json = serde_json::to_string(report).map_err(|e| format!("serde: {}", e))?;
-        let _ = self.kb.kv_set("absorber", "last_cycle", &json);
+        // ⭐ 2026-10-02：原 `let _ =` 丢弃 ⇒ 写失败与「没有上一轮」**不可区分**
+        //    （读侧 `:1094` 的 `unwrap_or(None)` 会把它当成首轮）。
+        // ⭐ 本函数签名**已经是** `Result<(), String>` 且三个调用方全用 `?`
+        //    ⇒ 传播通道现成，无需改任何调用方。
+        // ⛔ 不用 `.ok()`/`.unwrap_or()`：那正是本门要抓的「伪装成功」。
+        self.kb
+            .kv_set("absorber", "last_cycle", &json)
+            .map_err(|e| format!("persist last_cycle: {e}"))?;
         Ok(())
     }
 

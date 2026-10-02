@@ -232,14 +232,17 @@ impl BackgroundLoopHandle {
             ));
             let verdict = eval.evaluate(signals);
             if let Some(ref kb) = self.kb {
-                let _ = kb.kv_set(
+                // ⭐ 2026-10-02：原 `let _ =` 丢弃 ⇒ 落库失败无痕。⭐ 写的是**意识架构健康裁决本身**；`:245` 的 `log::warn!` 在块外且触发条件是 `!verdict.all_passed`（另一件事）⇒ 观察不到这里的落库失败。
+                // ⭐ 范式抄**同目录** `nt_awareness.rs:73/91`（该文件已是 `if let Err(e) = kb.kv_set(…) { log::warn!(…) }`）
+                //    —— 本目录里 `nt_event_bus.rs` / `nt_audit.rs` 是仅剩的漏网，同一次修复应一起改。
+                if let Err(e) = kb.kv_set(
                     "consciousness",
                     "multi_signal_verdict",
                     &format!(
                         "{{\"pass_ratio\":{:.3},\"all_passed\":{},\"findings\":{},\"gaps\":{}}}",
                         verdict.pass_ratio, verdict.all_passed, report.findings.len(), gaps
                     ),
-                );
+                ) { log::warn!("[bg] multi_signal_verdict 落库失败: {e}"); }
             }
             if !verdict.all_passed {
                 log::warn!(

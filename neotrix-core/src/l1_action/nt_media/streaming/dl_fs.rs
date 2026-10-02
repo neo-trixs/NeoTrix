@@ -160,7 +160,11 @@ pub(crate) async fn write_done_marker(
     url: &str,
 ) {
     let done_marker = dest.with_extension("done");
-    let _ = fs::write(
+    // ⭐ 2026-10-02：原 `let _ =` 丢弃 ⇒ marker 写失败时 `is_done()` 返回 `None`
+    // ⇒ **下次重下整个媒体文件**，而用户只看到「下载完成了」。
+    // ⭐ 范式抄**同目录** `engine.rs:108-110`（同一 streaming 模块）。
+    // ⛔ 不 return Err：内容已下完，不该因 marker 写失败把整次下载判为失败。
+    if let Err(e) = fs::write(
         &done_marker,
         format!(
             "size={}\nurl={}\ntimestamp={}\n",
@@ -172,7 +176,10 @@ pub(crate) async fn write_done_marker(
                 .as_secs()
         ),
     )
-    .await;
+        .await
+    {
+        eprintln!("[dl] .done marker 落盘失败 {}（下次将重下整个文件）: {e}", done_marker.display());
+    }
 }
 
 /// Check if a .done marker indicates the file is already complete.
