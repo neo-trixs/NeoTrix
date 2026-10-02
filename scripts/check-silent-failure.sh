@@ -291,7 +291,18 @@ new = sorted(set(hits) - have)
 stale = sorted(have - set(hits))
 
 print("  [silent-failure] discarded IO/persistence results: %d" % len(hits))
-print("  [silent-failure] baselined (recorded, not silent-by-omission): %d" % len(have))
+# ⭐⭐ 2026-10-02 修**误导性标签**（不是记账错，是标签把两个不同的数混为一谈）：
+#   旧标签打的是 `len(have)`（**基线条目总数**），却写成
+#   「baselined (recorded…): N」，读起来像「有 N 个命中被基线覆盖」。
+#   ⭐ 真实恒等式是：`hits = |命中∩基线| + len(new)`、`have = |命中∩基线| + len(stale)`。
+#   例：hits=57 / have=48 / new=22 ⇒ 交集 = 35，stale = 13。
+#   ⛔ 旧标签让人（⓰ 包括我自己）算出「48 + 22 = 70 ≠ 57」，
+#      误以为存在**记账差异**，并为此追查了预算 —— 真账一直是自洽的。
+#   ⇒ 现在把三个数各打各的，并显式打出交集。
+matched = len(set(hits) & have)
+print("  [silent-failure] baseline entries: %d（其中 %d 条**命中当前代码**，%d 条已失效/stale）"
+      % (len(have), matched, len(stale)))
+print("  [silent-failure] NEW (未基线、--strict 下阻断): %d" % len(new))
 print("  [silent-failure] out of scope by design (remove_file/.send*): %d" % ambiguous)
 if mode != "list":
     print("  [silent-failure] OPEN CONTRACTS (baseline row with no criterion): %d/%d"
