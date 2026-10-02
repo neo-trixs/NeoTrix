@@ -109,7 +109,16 @@ def _strip_noncode(txt):
                 close = '"' + "#" * hashes
                 end = txt.find(close, j + 1)
                 if end < 0:
-                    out_txt.append(_blank_span(txt[i:], i, n))
+                    # ⛔⛔ 原来这里传的是 **子串** `txt[i:]` 却用**绝对下标** i..n。
+                    #    `_blank_span` 内部做 `txt[start:end]` ⇒ 它涂的是
+                    #    `txt[i:][i:n]` = **`txt[2i:n]`**，且只产出 `n-2i` 个字符。
+                    #    ⇒ **换行被静默丢弃**（该分支的语义正是「保行号」）
+                    #    ⇒ 该文件此后**所有行号全错**。
+                    #    ⓘ 与本函数另一处 `_blank_span(txt, j+1, end)` 对照即知：
+                    #       那处传的是**完整** txt ⇒ 同一函数内两种写法不一致。
+                    #    ⚠️ 最小复现（修完词边界守卫后**仍然**触发）：
+                    #       `fn a(){ let s = r#"abc`（未闭合）3 行 ⇒ 塌成 2 行。
+                    out_txt.append(_blank_span(txt, i, n))
                     break
                 out_txt.append(txt[i:j + 1])
                 out_txt.append(_blank_span(txt, j + 1, end))

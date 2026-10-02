@@ -2257,3 +2257,55 @@ iOS/Android **完全没抓**（⇒ 「移动端怎么做差量同步与草稿」
 ⇒ **每个 agent 照 `AGENTS.md` 的「日常档」跑都会直接报 no such command。**
 ⇒ 应订正为 `cargo xt`，或在 `.cargo/config.toml` 里补上 `xl` 别名。
 ⓘ 我未擅自改 `AGENTS.md`（它是纪律正典，改动应由你确认）。
+
+## ⭐⭐ `_strip_noncode` 的**第二个**缺陷（同函数，修完第一个才暴露）
+`nt_topology.py` 未闭合 raw string 分支传的是 **子串** `txt[i:]` 却用**绝对下标** `i..n`
+⇒ `_blank_span` 内部做 `txt[start:end]` ⇒ 实际涂 `txt[2i:n]`、只产出 `n-2i` 个字符
+⇒ **换行被静默丢弃**（而该分支的语义正是「保行号」）
+⇒ **该文件此后所有行号全错**。
+ⓘ 同函数另一处 `_blank_span(txt, j+1, end)` 传的是完整 `txt` ⇒ **同函数内两种写法不一致**。
+⚠️ **修完词边界守卫后仍然触发**：未闭合 `r#"abc` 3 行会塌成 2 行。**已修并验证行数守恒。**
+⇒ ⭐ **这条比第一个更关键**：不修它，重生成出来的基线**行号仍然不可信**。
+
+## ⭐ 修复的真实影响面（子代理独立复刻 OLD/NEW 对拍，复刻与仓库 0 差异）
+| 消费者 | 影响 |
+|---|---|
+| `check-unwrap.sh` | ⭐ **基线已被污染**：NEW 2→14、STALE 7→59 |
+| `check-silent-failure.sh` | ⭐⭐ **基线也被污染**：浮出 **2 处真违规** |
+| `nt_topology.audit_unsafe` | ✅ **未被污染**（OLD/NEW 完全相同：`fn:0 impl:0 block:5 trait:0`）—— 我原先的担心**不成立** |
+| `nt_const_dup.py` / `nt_pub_dead.py` | 自带副本。`nt_const_dup` 免疫；`nt_pub_dead` **有同类缺陷**（见下） |
+
+### ⭐ STALE 59 条的真因：**53 条不是删除，是 `#[cfg(test)]` 栅栏曾被涂白**
+26 个文件的测试栅栏在旧口径下**完全不可见** ⇒ 旧口径**把整个 `#[cfg(test)]` 模块
+当生产代码审计** ⇒ 基线里**混进了测试代码的条目**。
+⇒ 「基线过期」这个说法是错的，真相是「**基线按错误的测试/生产划分生成**」。
+
+### ⭐ 2 处真实的新违规（silent-failure，已读现场核实）
+`neotrix-core/src/l2_perception/nt_world/osint/mod.rs`：
+- `persist_cycle_report` 里 `let _ = self.kb.kv_set("absorber", "last_cycle", &json);`
+- 另一处 `let _ = self.kb.kv_set("absorber", "last_video_production", &summary);`
+两处都是「**丢弃 Result 且块内无任何观察通道**」⇒ 状态写入被静默吞掉。
+
+## ⛔ 三个尚未处理、但已定位的问题（我没做，需裁决）
+
+1. ⛔ **`nt_pub_dead.py:50` 有同类词边界缺陷**，且更重：它在**原始源码**上单独跑第二遍
+   （不看前面是否已涂白）⇒ 会匹配普通字符串里的 `r"` 并**跨行涂掉真代码**
+   （实测 `nt_llama.rs` 上它只剩 408/863 行可见，而 `nt_topology` 是 645）。
+   ⇒ **它的「死 pub」裁决在这些文件上不可信**。
+   ✅ 好消息：它不被任何门/CI 引用，**无基线可污染**。
+2. ⛔ **`unwrap-baseline.txt:1` 的生成日期是硬编码的** `generated 2026-09-29`，
+   而文件 mtime 差 3 天 ⇒ **基线自报的出处不可信**（违反 R-SCAN-3）。
+3. ⛔ **`docs/architecture/CODE-TOPOLOGY.md` 里的「`neobot-sysctl` 声明 `forbid` 却含
+   5 处 unsafe ⇒ 声明失效」是错的**：该文件第 12 行是 `allow(unsafe_code, reason=…)`
+   **不是 `forbid`**。而这段裁决**硬编码在生成器里**（`nt_topology.py` 的拓扑报告段）
+   ⇒ **重跑生成器也改不掉**。这正是 `AGENTS.md` §5 R-SCAN-1b 记录的那次事故，
+   **而生成器至今仍在吐错误裁决**。
+
+## ✅ 建议的处置顺序（都不需要 cargo）
+1. ✅ 已修：两个 stripper 缺陷（含子串 bug）
+2. 裁决 `osint/mod.rs` 那 2 处真违规（补基线带 criterion+oracle，或修代码）
+3. 处置 unwrap 新暴露的 12 处（**逐行读现场**，⛔ 别只看 grep 命中）
+4. 此时才重生成 `unwrap-baseline.txt` 与 `silent-failure-baseline.txt`
+   —— ⛔ **顺序不能颠倒**：先重生成会把上面那些真违规一并洗白
+5. 修 `nt_pub_dead.py:50` 的同类缺陷 + 去掉基线里的硬编码日期
+6. 把生成器里那段硬编码的「声明失效」裁决改成**实测** `allow`/`forbid`
