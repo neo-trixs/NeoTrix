@@ -213,14 +213,39 @@ impl NeobotStore {
     }
 
     /// 崩溃恢复（租约过期回收）：
-    /// running 且租约过期（或无租约）→ pending + error 注记，返回恢复条数。
+    /// running 且租约过期（或无租约）→ **`outcome_unknown`** + error 注记，返回回收条数。
     /// 调用方在每次 run 起点调一次即可（单机，代价一次 UPDATE）。
+    ///
+    /// ⭐⭐ **2026-10-02 语义变更：不再打回 `pending`。**
+    /// 原实现 `SET status='pending'` 隐含一个假设：**重跑是安全的**。
+    /// ⛔ 但崩溃窗口里存在「**外部副作用已落地、结果未落库**」的缝隙
+    /// （例：`neobot_send` 已把消息发出去、还没写进 `messages`），
+    /// 此时打回 `pending` ⇒ 重跑**二次执行**该副作用，而界面完全看不出异常。
+    ///
+    /// ⇒ 改为落到 `TaskStatus::OutcomeUnknown`：**不自动重试，等人工裁决**。
+    /// ⓘ `lease_id/lease_until` 仍清空 —— 不清的话 `renew_lease`（`:173`）
+    /// 会把已死进程的租约续活，那才是真正的泄漏。
+    /// ⛔ `error` 仍是**硬编码覆盖**（原值丢失）：这是既有性质，本笔不改，
+    ///    但它是下一个可查的缺陷（真实原因被这句常量吃掉）。
     pub fn recover_stale_running(&self, now: &str) -> Result<usize, NtBotError> {
+        self.mark_outcome_unknown(now, "lease expired (crash recovery)")
+    }
+
+    /// 把 `running` 且租约过期（或无租约）的行刷成 `outcome_unknown`。
+    ///
+    /// ⭐ 这是「启动刷残留」的**唯一**入口：`bin/neobot.rs` 的 `cmd_doctor` 与
+    /// `cmd_channel_serve` 各调一次（真·启动一次，不是每轮）。
+    /// ⛔ 刻意**不挂** `lib.rs:76 open_store()` —— 那会让 `task list` 这类纯读命令
+    /// 也触发一次 UPDATE，「启动一次」的语义名不副实。
+    /// ⛔ 刻意**不复用** `nt_stale_guard.rs:43 recover_stale_best_effort` ——
+    ///    实测它**零调用方**，是死代码；挂上去等于让死代码复活，那是「新增接线」
+    ///    不是「复用」，得让属主知道。
+    pub fn mark_outcome_unknown(&self, now: &str, note: &str) -> Result<usize, NtBotError> {
         let n = self.conn.execute(
-            "UPDATE tasks SET status='pending', lease_id=NULL, lease_until=NULL,
-              error='lease expired (crash recovery)', updated_at=?1
+            "UPDATE tasks SET status='outcome_unknown', lease_id=NULL, lease_until=NULL,
+              error=?2, updated_at=?1
              WHERE status='running' AND (lease_until IS NULL OR lease_until < ?1)",
-            params![now],
+            params![now, note],
         )?;
         Ok(n)
     }
@@ -338,28 +363,94 @@ mod tests {
             conversation_id: None,
         };
         store.save_task(&mk("a")).expect("save");
-        // 租约过期 → 恢复为 pending；未来租约不动
+        // ⭐ A1 语义变更（2026-10-02）：租约过期 → **`outcome_unknown`**，不再 pending。
+        //    理由：崩溃窗口里可能「外部副作用已落地、结果未落库」，
+        //    打回 pending 会让重跑**二次执行**该副作用。
         let recovered = store
             .recover_stale_running("2026-09-24T01:00:00Z")
             .expect("recover");
         assert_eq!(recovered, 1);
         let got = store.get_task("a").expect("get").expect("exists");
-        assert_eq!(got.status, TaskStatus::Pending);
+        assert_eq!(
+            got.status,
+            TaskStatus::OutcomeUnknown,
+            "租约过期的任务必须落 outcome_unknown（不可自动重试），不能是 Pending"
+        );
         assert!(got.lease_id.is_none());
         assert!(got.error.is_some());
-        // cancel 仅 pending/running；retry 仅 failed/cancelled
-        store.cancel_task("a").expect("cancel");
+        // ⭐ A1：`outcome_unknown` 是**终态** —— cancel 与 retry 皆不接它。
+        //    这是有意的：「等人工裁决」意味着调度器不会碰它，但也不假装它被取消过。
+        assert!(
+            store.cancel_task("a").is_err(),
+            "outcome_unknown 不该被 cancel 悄悄改成 Cancelled（那会丢掉『副作用未知』这个事实）"
+        );
+        assert!(
+            store.retry_task("a").is_err(),
+            "outcome_unknown 绝不可被 retry —— 那正是 A1 要防的二次执行"
+        );
+        // cancel / retry 的原有口径改用另一个 pending 任务验，避免与 A1 语义耦合
+        let mut p2 = mk("b");
+        p2.lease_until = None;
+        store.save_task(&p2).expect("save pending");
+        store.cancel_task("b").expect("cancel pending");
         assert_eq!(
-            store.get_task("a").expect("get").expect("exists").status,
+            store.get_task("b").expect("get").expect("exists").status,
             TaskStatus::Cancelled
         );
-        assert!(store.cancel_task("a").is_err());
-        store.retry_task("a").expect("retry");
+        assert!(store.cancel_task("b").is_err());
+        store.retry_task("b").expect("retry cancelled");
         assert_eq!(
-            store.get_task("a").expect("get").expect("exists").status,
+            store.get_task("b").expect("get").expect("exists").status,
             TaskStatus::Pending
         );
-        assert!(store.retry_task("a").is_err());
+        assert!(store.retry_task("b").is_err());
+    }
+
+    /// ⭐⭐ A1 的核心回归：租约过期**不再**自动重排队。
+    ///
+    /// ⛔ 这条测试的存在理由是「防止有人把 `mark_outcome_unknown` 改回 `pending`」——
+    /// 那不会让任何现有测试变红（它们断言的是 lease/error，不是终态），
+    /// 但会把二次执行的 bug 原样放回来。
+    #[test]
+    fn 租约过期不自动重排队而是落终态() {
+        let store = NeobotStore::open(":memory:").expect("open");
+        let task = |id: &str, status: TaskStatus| AgentTask {
+            id: id.to_owned(),
+            title: id.to_owned(),
+            status,
+            created_at: "2026-10-02T00:00:00Z".to_owned(),
+            updated_at: "2026-10-02T00:00:00Z".to_owned(),
+            claimed_by: None,
+            claimed_at: None,
+            visibility: crate::nt_types::default_visibility(),
+            lease_id: Some("lease".to_owned()),
+            lease_until: Some("2026-10-02T00:00:00Z".to_owned()),
+            attempts: 1,
+            error: None,
+            conversation_id: None,
+        };
+        store.save_task(&task("x", TaskStatus::Running)).expect("save running");
+        let n = store
+            .mark_outcome_unknown("2026-10-02T01:00:00Z", "test note")
+            .expect("sweep");
+        assert_eq!(n, 1);
+        let got = store.get_task("x").expect("get").expect("exists");
+        assert_eq!(got.status, TaskStatus::OutcomeUnknown);
+        assert_eq!(got.error.as_deref(), Some("test note"), "note 应可自定义");
+        // ⭐ 幂等：第二次扫不应再命中（已不是 running）
+        assert_eq!(
+            store
+                .mark_outcome_unknown("2026-10-02T02:00:00Z", "again")
+                .expect("sweep2"),
+            0,
+            "已落 outcome_unknown 的行不该被再次扫中"
+        );
+        // ⭐⭐ 读回不能丢行：`parse` 漏了 "outcome_unknown" 会让 list_* 静默丢行。
+        let all = store.list_tasks(10).expect("list");
+        assert!(
+            all.iter().any(|t| t.id == "x"),
+            "outcome_unknown 的任务必须在 list_tasks 里可见（parse 漏分支会静默丢行）"
+        );
     }
 
 

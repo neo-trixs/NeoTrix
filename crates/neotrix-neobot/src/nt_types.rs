@@ -57,7 +57,27 @@ impl TurnStatus {
     }
 }
 
-/// 任务状态（pending/running/done/failed/cancelled，租约机简化版）.
+/// 任务状态（pending/running/done/failed/cancelled/outcome_unknown，租约机简化版）.
+///
+/// ⭐⭐ `OutcomeUnknown` 是**不可自动重试**的终态，含义是：
+/// **「这个任务的外部副作用是否已经落地，无法判定」**。
+///
+/// ## 为什么需要它（2026-10-02，OpenMuse / pi / Telegram 三方交叉印证）
+///
+/// 崩溃窗口里存在这样一个缝隙：**外部副作用已落地，但结果还没落库**。
+/// 此时若把租约过期的 `running` 无条件打回 `pending`（本仓 `recover_stale_running`
+/// 修复前的行为），重跑就会**二次执行**那个副作用 —— 而界面上完全看不出异常。
+///
+/// ⭐ 本仓此前是**三家里唯一假设「重跑是安全的」**的那个：
+/// · pi 的答法：先落「意图」再执行（effect sandwich）
+/// · OpenMuse 的答法：新增一个**不可重试的终态**，启动时把残留的 executing 刷成它
+/// · Telegram 的答法：失败必须能关联到**具体那一次尝试**
+///
+/// ## 语义边界
+/// · **不自动重试**，但**允许人工裁决**（见 `nt_store_tasks.rs` 的 `retry_task`：
+///   它目前只接 `failed`/`cancelled`，本状态需显式改 SQL 才放开 —— 有意如此）。
+/// · ⭐ **不会**由 `TurnStatus` 产出（`nt_agent.rs:400-406` 的映射表不含它）
+///   ⇒ 只能由「启动刷残留」与显式 API 产生，这是自洽的。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskStatus {
@@ -66,6 +86,8 @@ pub enum TaskStatus {
     Done,
     Failed,
     Cancelled,
+    /// 外部副作用是否落地**无法判定** —— 禁止自动重试，等人工裁决。
+    OutcomeUnknown,
 }
 
 impl TaskStatus {
@@ -76,6 +98,7 @@ impl TaskStatus {
             Self::Done => "done",
             Self::Failed => "failed",
             Self::Cancelled => "cancelled",
+            Self::OutcomeUnknown => "outcome_unknown",
         }
     }
 
@@ -86,6 +109,14 @@ impl TaskStatus {
             "done" => Some(Self::Done),
             "failed" => Some(Self::Failed),
             "cancelled" => Some(Self::Cancelled),
+            // ⛔⛔ 这一支**必须**与 `as_str` 同批加。只改 `as_str` 会**编译通过、
+            //    测试也可能过**（现有测试库里没有 outcome_unknown 行），
+            //    然后在生产上让新状态的任务：
+            //    · `get_task`（nt_store_routines.rs:245）直接返 `Err`
+            //      ⇒ 炸掉 `nt_side_chat.rs:72` 的 `inherit_context`；
+            //    · `list_tasks` / `list_convo_tasks`（:304 / :371）**静默丢行**
+            //      ⇒ 任务在列表里**消失**而不是报错 —— 比报错更难查。
+            "outcome_unknown" => Some(Self::OutcomeUnknown),
             _ => None,
         }
     }

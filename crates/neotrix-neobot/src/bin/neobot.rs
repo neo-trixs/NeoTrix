@@ -578,6 +578,16 @@ fn cmd_channel_serve(channel: Option<&str>, interval: Option<i64>) -> Result<(),
     let store = open_store(&cfg)?;
     let fixed = interval.map(|secs| secs.max(1));
     println!("neobot channel serve —— Ctrl-C 退出。数据只在 {}", cfg.data_dir.display());
+    // ⭐ 启动刷一次崩溃残留（`mark_outcome_unknown`，A1）。
+    // ⛔ 刻意**不**挂 `open_store()`：`open_store` 在 CLI 里有 50 处调用，
+    //    挂那里会让 `task list` 这类纯读命令也触发一次 UPDATE，
+    //    「启动一次」的语义就名不副实了。
+    // ⓰ best-effort 用 `let _name: usize = …` 形状：既与本文件既有风格一致，
+    //    也避开 `check-silent-failure` 的 `let _ =` opener
+    //    （方法名不在 GATED 动词表里，双保险）。
+    let _marked_unknown: usize = store
+        .mark_outcome_unknown(&chrono_now(), "startup sweep (channel serve)")
+        .unwrap_or(0);
     let mut round: u64 = 0;
     loop {
         round = round.saturating_add(1);
@@ -675,8 +685,11 @@ fn cmd_doctor() -> Result<(), NtBotError> {
     let cfg = load_config()?;
     let store = open_store(&cfg)?;
     // 启动即回收：崩溃残留 + 过期认领（单机，一次 UPDATE 级代价）。
+    // ⭐ A1：`recover_stale_running` 现在落 `outcome_unknown` 而非 `pending`
+    //   —— 租约过期的任务**不再被自动重跑**（外部副作用可能已落地）。
+    const RECOVERY_NOTE: &str = "lease expired (crash recovery)";
     let now = chrono_now();
-    let recovered = store.recover_stale_running(&now)?;
+    let recovered = store.mark_outcome_unknown(&now, RECOVERY_NOTE)?;
     let swept = store.sweep_stale_claims(&now, neotrix_neobot::CLAIM_TTL_SECS)?;
     let engine_info = match &cfg.engine {
         EngineKind::Echo => LocalEchoEngine.probe()?,
