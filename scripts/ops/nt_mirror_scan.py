@@ -513,8 +513,20 @@ def report_orphan_files(roots, limit, fd=None):
             n = 0
         rows.append((o, n))
     rows.sort(key=lambda r: -r[1])
-    for o, n in rows[:limit]:
+    shown = rows[:limit]
+    for o, n in shown:
         print('   %-88s 测试 %d' % (os.path.relpath(o, REPO), n))
+    # ⛔ 计数与展示必须一致：否则读的人看到「孤儿 167」却只看到 21 行，
+    # 会把 21 当成全部 —— 这就是「声称 vs 实际」的失真。
+    # 本轮实测：默认 limit 下报告 167、实显 21，差 146 条看不见。
+    # 而 `compressor.rs`(7 测试) / `nt_crypto_util.rs`(3 测试) 恰好在被截断的那段里
+    # ⇒ 不提高 limit 就等于「工具没发现」。
+    if len(shown) < len(rows):
+        print('   ⛔ **仅显示前 %d 条，共 %d 个孤儿**（另 %d 条未显示）。'
+              % (len(shown), len(rows), len(rows) - len(shown)))
+        print('      看全部请加 `--limit %d`（或更大）；**上面那个「孤儿 %d」才是总数**，'
+              % (len(rows), len(orphans)))
+        print('      本行数字才是你实际看到的 —— 别把显示条数当总数。')
     if rows:
         print('[orphan] 判读要点：')
         print('  · 孤儿文件**不参与编译**，其测试也从不运行 ⇒ 它们的历史绿灯是假的；')
