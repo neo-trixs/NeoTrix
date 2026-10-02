@@ -264,10 +264,22 @@ impl SemanticCache {
         }
         match self.eviction_policy {
             EvictionPolicy::Lfu => {
+                // ⚠️ 2026-09-30 修正：原先用 `min_by_key(|(_, e)| e.hit_count)`。
+                // `min_by_key` 的**签名里没有 tie-break 的位置** ⇒ 计数并列时
+                // 返回**任意一个**。而缓存里大量条目 `hit_count` 相同
+                // （新建条目全为 0）⇒ 淘汰哪个键**不确定**。
+                //
+                // 危害：同一个缓存、同样的插入顺序，多次运行可能淘汰**不同**的键
+                // ⇒ 行为不可复现，且「淘汰最该淘汰的那个」这一语义无法保证。
+                //
+                // ⇒ 加确定性 tie-break：计数相同时按 key 字典序取小者，
+                // 使结果可复现。（由 `nt_nondet.py` 扫出：全仓同类 85 处候选。）
                 let victim = self
                     .embedding_entries
                     .iter()
-                    .min_by_key(|(_, e)| e.hit_count)
+                    .min_by(|a, b| {
+                        a.1.hit_count.cmp(&b.1.hit_count).then_with(|| b.0.cmp(a.0))
+                    })
                     .map(|(k, _)| *k);
                 if let Some(key) = victim {
                     self.embedding_entries.remove(&key);
@@ -275,10 +287,14 @@ impl SemanticCache {
                 }
             }
             EvictionPolicy::Lru => {
+                // 同上：LRU 也必须确定。`inserted_at` 并列（同一毫秒写入多个键）
+                // 时原先返回任意一个 ⇒ 加同样的 tie-break。
                 let victim = self
                     .embedding_entries
                     .iter()
-                    .min_by_key(|(_, e)| e.inserted_at)
+                    .min_by(|a, b| {
+                        a.1.inserted_at.cmp(&b.1.inserted_at).then_with(|| b.0.cmp(a.0))
+                    })
                     .map(|(k, _)| *k);
                 if let Some(key) = victim {
                     self.embedding_entries.remove(&key);
@@ -414,6 +430,68 @@ mod tests {
         let similar: Vec<f64> = emb.iter().map(|v| v + 0.01).collect();
         let result = cache.get_semantic(&similar);
         assert_eq!(result, Some("reference"));
+    }
+
+    /// 回归（2026-09-30）：淘汰对象在**完全并列**时必须可复现。
+    ///
+    /// 原实现用 `min_by_key(|(_, e)| e.hit_count)`，而 `min_by_key` **签名里
+    /// 没有 tie-break 的位置** ⇒ 计数并列时返回任意一个。缓存里新建条目
+    /// `hit_count` 全为 0 ⇒ **并列是常态而非特例**。
+    ///
+    /// ⚠️ 注意语义层的细节：`embedding_entries` 的键是
+    /// **`hash_embedding(&embedding)`（u64）**，不是调用方传的 `key: &str`
+    /// ⇒ 所以不能断言「淘汰了字典序最小的业务键」。
+    /// 本测试断言的是**可复现性**这条真正的不变量：
+    /// 两个内容完全相同的缓存，各淘汰一次 ⇒ 淘汰的键必须相同。
+    /// （若仍有并列未定，两次淘汰可能选到不同键 ⇒ 该断言会失败。）
+    fn build_parallel_tied_cache(policy: EvictionPolicy) -> SemanticCache {
+        let mut cache = SemanticCache::new(CoreCacheConfig {
+            capacity: 2,
+            ttl_secs: 300,
+            eviction_policy: policy,
+        });
+        // 三个**不同**的 embedding ⇒ 三个不同的 hash 键；
+        // 都不被 get_semantic 命中 ⇒ hit_count 全为 0（LFU 并列）。
+        let emb_a = make_embedding(0.0, 16);
+        let emb_b = make_embedding(3.0, 16);
+        let emb_c = make_embedding(9.0, 16);
+        cache.set_with_embedding("ns", "a", "v0".into(), emb_a);
+        cache.set_with_embedding("ns", "b", "v1".into(), emb_b);
+        cache.set_with_embedding("ns", "c", "v2".into(), emb_c);
+        cache
+    }
+
+    fn surviving_keys(cache: &SemanticCache) -> Vec<u64> {
+        let mut ks: Vec<u64> = cache.embedding_entries.keys().copied().collect();
+        ks.sort_unstable();
+        ks
+    }
+
+    #[test]
+    fn test_lfu_eviction_reproducible_on_full_tie() {
+        // ⚠️ `set_with_embedding` 内部在 `total >= capacity*2` 时**已自动淘汰一次**
+        // ⇒ 构造第 3 个键时就已经淘汰过了，这里**不能**再手动调
+        // `evict_semantic()`（我第一版多调了一次，导致「剩 1 条」的假失败）。
+        let c1 = build_parallel_tied_cache(EvictionPolicy::Lfu);
+        let c2 = build_parallel_tied_cache(EvictionPolicy::Lfu);
+        assert_eq!(
+            surviving_keys(&c1),
+            surviving_keys(&c2),
+            "全并列时两次构造的幸存键必须一致（可复现）；不一致说明仍在任意选取"
+        );
+        assert_eq!(c1.embedding_entries.len(), 2, "容量 2 ⇒ 淘汰后应剩 2 条");
+    }
+
+    #[test]
+    fn test_lru_eviction_reproducible_on_full_tie() {
+        // 同上：不再手动调 `evict_semantic()`（构造时已自动淘汰一次）。
+        let c1 = build_parallel_tied_cache(EvictionPolicy::Lru);
+        let c2 = build_parallel_tied_cache(EvictionPolicy::Lru);
+        assert_eq!(
+            surviving_keys(&c1),
+            surviving_keys(&c2),
+            "全并列时两次构造的幸存键必须一致（可复现）"
+        );
     }
 
     #[test]
