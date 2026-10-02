@@ -91,9 +91,25 @@ impl EntityLinker {
                 Some(target) => {
                     // Merge mentions
                     for mention in entity.mentions {
-                        // 2026-09-27 修复: 去重键含 offset → 同一实体在文中不同
-                        // 位置各留一条, 合并后提及数虚高 (同文两个 "Alice" 不合并)。
-                        // 提及列表的语义是"出现过哪些提及", 按 surface 去重。
+                        // ⚠️ 2026-10-02：下面这段去重规则的**语义存在未裁决冲突**，
+                        // 两种读法都被测试断言着，详见
+                        // `docs/architecture/MENTION-SEMANTICS-CONFLICT-2026-10-02.md`：
+                        //
+                        // · **当前实现（读法 A）**：`mentions` = 不同 **surface 形式**的集合。
+                        //   被 `linker_merges_exact_duplicates`(断言 2) 与
+                        //   `merge_entities_no_new_duplicates`(断言 2) 钉住。
+                        // · **另一读法 B**：集成测试 `entity_linking_dedup_across_mentions`
+                        //   期望 `mentions.len() >= 2`（两个 "Alice Smith" 在 offset 0/35
+                        //   应记两次）⇒ `mentions` = **出现次数**。
+                        //
+                        // ⚠️ 2026-09-27 那次改动把注释写成「去重键含 offset 是问题」，
+                        // 紧接着又按 surface 去重 —— **那段注释自相矛盾**，
+                        // 会让下一个 agent 按错误读法理解代码。
+                        //
+                        // 倾向 B 的理由：`Mention` 带 `offset` 字段，其自述为
+                        // 「在源文本中的偏移」⇒ 该字段**只为区分同 surface 的不同次出现**
+                        // 而存在；按 surface 去重等于丢弃它携带的信息。
+                        // ⛔ 但改动需同时重写上面 2 条绿测，故**不在此处单方面裁决**。
                         let already_present = target
                             .mentions
                             .iter()
