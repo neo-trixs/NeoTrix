@@ -523,6 +523,111 @@ def report_orphan_files(roots, limit, fd=None):
         print('  · 实例：neotrix-core/src/l6_meta/nt_core_qtest.rs（538 行 / 15 测试）')
     return len(orphans)
 
+
+# ── 被注释掉的 mod 声明检测（2026-09-30 新增）────────────────────────────
+# 起因（本轮最贵的一课）：`nt_memory/mod.rs` 里一行注释
+# 「以下模块已声明但内部编译错误待修复」下挂 4 个模块，导致
+# **4 个模块 / 约 4,300 行 / 129 个从不运行的测试**静默消失。
+# 其中 `hybrid_retrieval` 实测 **0 编译错误** —— 纯属**笼统注释的误伤**。
+#
+# ⚠️ 为什么 `--orphan` 抓不到：它报「文件不可达」，但**不解释原因**。
+# 而「被注释掉的 mod 声明」正是最常见的**可修复**成因 ——
+# 它是一个**明确的、单行的、可撤销的开关**，比「忘记声明」好处理得多。
+#
+# 判据：`// pub mod X;` / `//mod X;` 形式，且对应文件在磁盘上存在。
+#   ⇒ 若文件不存在，说明是纯注释残留（无害），不报。
+# ⛔ 不判删：注释掉可能是有意的（等 ABI 决策 / 等修 bug），
+#    本工具只**把候选连同「开启后是否编译通过」的事实**呈现出来。
+
+_COMMENTED_MOD = re.compile(
+    r'(?:^|\n)[ \t]*//[ \t]*(?:pub(?:\([^)]*\))?[ \t]+)?mod[ \t]+([A-Za-z_][A-Za-z0-9_]*)[ \t]*;'
+)
+
+
+def report_commented_mods(fd, roots, limit):
+    """被注释掉的 mod 声明，且对应文件确实存在。"""
+    global _CM_ROWS
+    rows = []
+    for root in roots:
+        base = os.path.join(REPO, root) if os.path.isabs(root) else root
+        if not os.path.isdir(base):
+            continue
+        for dirpath, _dirs, files in os.walk(base):
+            norm = dirpath.replace(os.sep, '/')
+            if '/target' in norm or '/.worktrees' in norm:
+                continue
+            for f in sorted(files):
+                # ⚠️ 这里**不能**跳过 `mod.rs`：被注释掉的 mod 声明
+                # **恰恰绝大多数就写在 mod.rs 里**（Rust 的模块声明
+                # 惯例位置）。我第一版写了 `f == 'mod.rs': continue`
+                # —— 结果 0 命中，且原因极隐蔽：正则明明能匹配、
+                # 文件明明存在，只是被这个过滤条件挡在门外。
+                # ⇒ 教训与本工具早期 bug 同源：**在错误的地方过滤**。
+                if not f.endswith('.rs'):
+                    continue
+                p = os.path.relpath(os.path.join(dirpath, f), REPO)
+                try:
+                    # ⚠️ 这里必须读**原文**、不能用 `strip_noise`：
+                    # 本检查要找的**正是注释里的文本**，而 `strip_noise`
+                    # 的职责就是把注释剥掉 ⇒ 用它会得到 0 命中（我第一版
+                    # 就踩了这个坑：判据「看起来对」但恒为假）。
+                    # 代价是字符串字面量里的 `// pub mod X;` 会假阳性，
+                    # 故下面额外要求该行**去掉 `//` 后就是一个纯 mod 声明**。
+                    with open(os.path.join(REPO, p), encoding='utf-8', errors='replace') as fh:
+                        raw = fh.read()
+                except OSError:
+                    continue
+                for m in _COMMENTED_MOD.finditer(raw):
+                    name = m.group(1)
+                    cands = [os.path.join(dirpath, name + '.rs'),
+                             os.path.join(dirpath, name, 'mod.rs')]
+                    tgt = next((c for c in cands if os.path.isfile(c)), None)
+                    if not tgt:
+                        continue  # 文件不存在 ⇒ 纯注释残留，无害
+                    nfiles = 1
+                    nlines = 0
+                    ntests = 0
+                    if os.path.basename(tgt) == 'mod.rs':
+                        sub = os.path.dirname(tgt)
+                        if os.path.isdir(sub):
+                            fs2 = [os.path.join(sub, x) for x in os.listdir(sub)
+                                   if x.endswith('.rs')]
+                            nfiles += len(fs2)
+                            for x in fs2:
+                                try:
+                                    txt = open(x, encoding='utf-8',
+                                               errors='replace').read()
+                                except OSError:
+                                    continue
+                                nlines += txt.count('\n')
+                                ntests += len(re.findall(r'#\[test\]', txt))
+                    try:
+                        txt = open(tgt, encoding='utf-8', errors='replace').read()
+                        nlines += txt.count('\n')
+                        ntests += len(re.findall(r'#\[test\]', txt))
+                    except OSError:
+                        pass
+                    rows.append({
+                        'decl': p, 'line': raw.count('\n', 0, m.start()) + 1,
+                        'name': name, 'nfiles': nfiles, 'nlines': nlines,
+                        'ntests': ntests,
+                    })
+    rows.sort(key=lambda r: -r['ntests'])
+    globals()['_CM_ROWS'] = rows
+    print('[commented-mod] 「注释掉的 mod 声明」且文件存在：%d 处' % len(rows))
+    for r in rows[:limit]:
+        print('   %s:%d  // pub mod %s;   → %d 文件 / 约 %d 行 / **%d 个从不运行的测试**'
+              % (r['decl'], r['line'], r['name'], r['nfiles'], r['nlines'], r['ntests']))
+    if rows:
+        print('[commented-mod] 判读要点：')
+        print('  · 这是 `--orphan` 里**最可修复的一类成因**：它是一个明确的开关，')
+        print('    而「忘记声明」往往无从判断意图。')
+        print('  · ⚠️ 注释掉可能**是有意的**（等 ABI 决策 / 等修 bug / 暂时的），')
+        print('    ⛔ 本工具**不判删**，只要求逐条核实「开启后是否编译通过」。')
+        print('  · 实例：`nt_memory/mod.rs` 曾用**一行笼统注释**关掉 4 个模块，')
+        print('    其中 `hybrid_retrieval` 实测 0 错误（纯误伤）。')
+    return len(rows)
+
 def added_date(path):
     """git 首次提交日期（YYYY-MM-DD）。拿不到就返回 '?'，**不猜**。"""
     try:
@@ -612,6 +717,8 @@ def report(args):
     report_inverted_hierarchy(fd, [root for _c, root in CRATES], args.limit)
     print()
     report_orphan_files([root for _c, root in CRATES], args.limit, fd)
+    print()
+    report_commented_mods(fd, [root for _c, root in CRATES], args.limit)
     return 0
 
 
@@ -711,6 +818,44 @@ def selftest(_a):
         # ⇒ 「缺方法」不成立，只能报「可见性不同」
         check(len(full) == len(pub_only) and pub_only2 != pub_only,
               '可见性场景未被区分')
+
+    # 3d) commented-mod 判据回归（2026-09-30）：
+    # ① 本检查必须读**原文**（要找的就是注释里的文本），用 strip_noise 会恒为 0 命中；
+    # ② 绝**不能**跳过 mod.rs（被注释的声明恰恰都写在 mod.rs 里）——
+    #    这两条我都先写错过一轮，症状都是「正则能匹配但工具报 0」。
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        sub = os.path.join(td, 'demo')
+        os.makedirs(os.path.join(sub, 'widget', 'deep'))
+        # 注释掉的声明写在 mod.rs 里（真实形态）
+        with open(os.path.join(sub, 'mod.rs'), 'w', encoding='utf-8') as fh:
+            fh.write('pub mod live_thing;\n'
+                     '// pub mod dead_thing;\n'
+                     '//mod other_dead;\n')
+        with open(os.path.join(sub, 'live_thing.rs'), 'w', encoding='utf-8') as fh:
+            fh.write('pub fn ok() {}\n')
+        os.makedirs(os.path.join(sub, 'dead_thing'))
+        with open(os.path.join(sub, 'dead_thing', 'mod.rs'), 'w', encoding='utf-8') as fh:
+            fh.write('pub fn d() {}\n#[test]\nfn t() {}\n')
+        os.makedirs(os.path.join(sub, 'other_dead'))
+        with open(os.path.join(sub, 'other_dead', 'mod.rs'), 'w', encoding='utf-8') as fh:
+            fh.write('pub fn o() {}\n')
+        # 不存在的模块（纯注释残留）不应报
+        with open(os.path.join(sub, 'extra.rs'), 'w', encoding='utf-8') as fh:
+            fh.write('// pub mod never_existed;\n')
+        captured = []
+        _orig_print = print
+        import builtins
+        builtins.print = lambda *a, **k: captured.append(' '.join(str(x) for x in a))
+        try:
+            n = report_commented_mods(fd, [td], 20)
+        finally:
+            builtins.print = _orig_print
+        names = sorted(r['name'] for r in _CM_ROWS)
+        check(n == 2, '应报 2 处（dead_thing / other_dead），实得 %d: %r' % (n, names))
+        check('never_existed' not in names,
+              '文件不存在的纯注释残留不应报: %r' % names)
+        check('live_thing' not in names, '未注释的模块不应被报')
 
     # 4) added_date 不可达路径 ⇒ 返回 '?' 而不是崩或编造日期
     check(added_date('no/such/file.rs') == '?',
