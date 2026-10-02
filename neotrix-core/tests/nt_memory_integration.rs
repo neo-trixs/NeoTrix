@@ -430,8 +430,6 @@ fn scorer_feeds_gate_decision() {
 // ── Entity linking dedup integration ───────────────────────────────────────────
 
 #[test]
-    #[ignore = "已知缺陷：实体链接去重后 mentions 少于 2 ⇒ 疑似**被丢弃**。
-     // ⛔ 待查 `decay`/`admission` 是否误删条目，断言保持原样。"]
     
 fn entity_linking_dedup_across_mentions() {
     let text = "Alice Smith joined Google Inc. Dr. Alice Smith presented at Google Inc. conference.";

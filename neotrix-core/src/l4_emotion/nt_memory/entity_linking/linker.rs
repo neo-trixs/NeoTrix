@@ -113,7 +113,7 @@ impl EntityLinker {
                         let already_present = target
                             .mentions
                             .iter()
-                            .any(|existing| existing.surface == mention.surface);
+                            .any(|existing| existing.surface == mention.surface && existing.offset == mention.offset);
                         if !already_present {
                             target.mentions.push(mention);
                         }
@@ -256,8 +256,15 @@ pub fn levenshtein(a: &str, b: &str) -> usize {
 /// Merge two entities by consolidating their mentions and temporal windows.
 pub fn merge_entities(mut a: Entity, b: Entity) -> Entity {
     for mention in b.mentions {
-        // 2026-09-27 同上: 自由函数版按 surface 去重
-        let already_present = a.mentions.iter().any(|existing| existing.surface == mention.surface);
+        // 2026-10-02：与 `merge_group` **同一判据**，去重键为 (surface, offset)。
+        // ⚠️ 这条规则此前在**两处各有一份副本**（此处 + `merge_group` 内），
+        // 改一处漏一处 —— 上一次改 `merge_group` 时它仍是旧的 surface 去重，
+        // 实测表现为「同一规则两种行为」。⇒ 现已两处一致；
+        // 若日后要再改判据，**必须同时改这两处**（或把它们收敛成单一函数）。
+        let already_present = a
+            .mentions
+            .iter()
+            .any(|existing| existing.surface == mention.surface && existing.offset == mention.offset);
         if !already_present {
             a.mentions.push(mention);
         }
@@ -295,7 +302,20 @@ mod tests {
 
         let linked = linker.link(vec![e1, e2]);
         assert_eq!(linked.len(), 1);
-        assert_eq!(linked[0].mentions.len(), 2);
+        // 2026-10-02 语义裁决：`mentions` = **出现次数**。
+        // 原断言 `== 2`（surface 去重：{Alice} ∪ {Alice, Alice Smith}）
+        // 在 occurrence 语义下应为 3 —— Alice 出现在 offset 0 与 50，
+        // 是**两次不同的出现**（这正是 `Mention.offset` 存在的理由）。
+        assert_eq!(
+            linked[0].mentions.len(),
+            3,
+            "occurrence 语义：Alice@0、Alice@50、Alice Smith@60 共 3 次"
+        );
+        // 「出现过哪些不同写法」仍可得 —— 由派生方法提供，未丢失。
+        let surfaces = linked[0].unique_surfaces();
+        assert_eq!(surfaces.len(), 2, "不同 surface 形式仍是 2 种");
+        assert!(surfaces.contains(&"Alice"));
+        assert!(surfaces.contains(&"Alice Smith"));
         assert_eq!(linked[0].first_seen, ts());
         assert_eq!(linked[0].last_seen, ts() + 100);
     }
@@ -439,9 +459,17 @@ mod tests {
         let mut b = Entity::new("Foo", EntityType::Org, 10, 150);
         b.add_mention("Foo Inc", 55, 250);
         let merged = merge_entities(a, b);
-        let unique_surfaces: Vec<&str> =
-            merged.mentions.iter().map(|m| m.surface.as_str()).collect();
-        assert_eq!(merged.mentions.len(), 2);
+        // 2026-10-02：本测试的**原始意图**是「合并不产生重复写法」。
+        // occurrence 语义下 `mentions` 保留全部出现（4 次），
+        // 而「不重复的写法」改由派生方法 `unique_surfaces()` 提供
+        // ⇒ **意图完全保留，且不再需要在 merge 时销毁数据**。
+        assert_eq!(merged.mentions.len(), 4, "Foo@0、FooInc@50、Foo@10、FooInc@55");
+        let unique_surfaces = merged.unique_surfaces();
+        assert_eq!(
+            unique_surfaces.len(),
+            2,
+            "不同 surface 形式去重后仍为 2"
+        );
         assert!(unique_surfaces.contains(&"Foo"));
         assert!(unique_surfaces.contains(&"Foo Inc"));
     }

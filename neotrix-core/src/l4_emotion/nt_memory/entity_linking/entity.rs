@@ -111,8 +111,32 @@ impl Entity {
     }
 
     /// Return the number of observed mentions.
+    ///
+    /// ⚠️ 2026-10-02：`mentions` 的语义已定为 **occurrence（出现次数）** ——
+    /// 同 surface 在不同 `offset` 各算一次。理由：`Mention.offset`
+    /// 的字段自述就是「在源文本中的偏移」，它**只为区分同 surface 的
+    /// 不同次出现**而存在；按 surface 去重会丢弃它携带的信息。
+    /// 详见 `docs/architecture/MENTION-SEMANTICS-CONFLICT-2026-10-02.md`。
+    /// ⇒ 若你要的是「出现过哪些不同的表面形式」，用 [`Self::unique_surfaces`]。
     pub fn mention_count(&self) -> usize {
         self.mentions.len()
+    }
+
+    /// 派生出「出现过的**不同** surface 形式」，按首次出现顺序去重。
+    ///
+    /// 用途：原 `linker` 的合并逻辑按 surface 去重（因此
+    /// 「有哪些不同写法」这个信息在 merge 时就被销毁了）。
+    /// 现在改为**保留全部 occurrence**，把「去重」推迟到使用处 ——
+    /// 这样「出现次数」与「不同写法集合」两种读法**同时成立**，
+    /// 不需要牺牲任何一方。
+    pub fn unique_surfaces(&self) -> Vec<&str> {
+        let mut out: Vec<&str> = Vec::with_capacity(self.mentions.len());
+        for m in &self.mentions {
+            if !out.contains(&m.surface.as_str()) {
+                out.push(m.surface.as_str());
+            }
+        }
+        out
     }
 
     /// Return the canonical surface form (longest mention, ties broken by frequency).
