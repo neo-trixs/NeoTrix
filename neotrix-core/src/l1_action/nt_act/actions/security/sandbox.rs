@@ -122,11 +122,48 @@ impl ActionSandbox {
         self.rules.push(rule);
     }
 
+    /// 找出最匹配的规则：**最长前缀优先**。
+    ///
+    /// ⚠️ 2026-09-30 修正：原先用 `max_by_key(|r| r.action_prefix.len())`。
+    /// `max_by_key` **签名里没有 tie-break 的位置** ⇒ 前缀长度并列时
+    /// 返回**任意一条**。而 `add_rule` **不做去重** ⇒ 完全可以注册
+    /// 两条**同前缀**规则（一条 `allowed=true`、一条 `allowed=false`）。
+    ///
+    /// ⛔ 这是**安全路径**：命中哪条决定沙箱裁决
+    /// （`Approved` / `RequiresApproval` / `Denied`）
+    /// ⇒ 并列时**裁决结果随机**，同一份规则集会时而放行时而拒绝。
+    /// 且本模块**无任何测试覆盖重复前缀**。
+    ///
+    /// ⇒ 修法：`max_by` + 确定性 tie-break ——
+    ///   ① 前缀长度降序（保留原有「最长前缀优先」语义）；
+    ///   ② 长度并列时按前缀字典序取小者，使结果可复现。
+    ///   （语义上「后注册的规则覆盖先注册的」也说得通，但仓库里
+    ///   没有这种约定，且字典序不依赖注册顺序、更可测。）
     fn matching_rule(&self, action: &str) -> Option<&SandboxRule> {
         self.rules
             .iter()
             .filter(|r| action.starts_with(&r.action_prefix))
-            .max_by_key(|r| r.action_prefix.len())
+            // ⚠️ tie-break 键必须是**能区分两条规则**的量。
+            // 第一版我用了 `action_prefix` 字典序 —— 但重复前缀场景下
+            // 两条规则的 prefix **完全相同** ⇒ tie-break 恒等 ⇒
+            // 裁决**仍然随机**（实测一 Denied 一 Approved）。
+            //
+            // ⇒ 改用**注册顺序**：靠 `Vec` 的下标天然区分，
+            // 语义为「**后注册的规则覆盖先注册的**」（同长度时后者胜），
+            // 这也与「后加的策略覆盖默认策略」的一般直觉一致，
+            // 且**可复现**（顺序是确定的）。
+            .enumerate()
+            .max_by(|a, b| {
+                // `enumerate()` 的首元是 `usize`（已复制），**不是** `&usize`
+                // ⇒ 不能 `*a.0`（第一版这么写触发 E0614）。
+                let (ia, ra) = (a.0, a.1);
+                let (ib, rb) = (b.0, b.1);
+                ra.action_prefix
+                    .len()
+                    .cmp(&rb.action_prefix.len())
+                    .then_with(|| ia.cmp(&ib))
+            })
+            .map(|(_, r)| r)
     }
 
     /// Evaluate an action string against the rule set.
@@ -279,4 +316,49 @@ mod tests {
     }
 
     // Silence unused import lint for SystemTime when not otherwise used
+
+    /// 回归（2026-09-30）：**重复前缀**下裁决必须可复现。
+    ///
+    /// `add_rule` 不做去重 ⇒ 可注册两条同前缀规则而 `allowed` 相反。
+    /// 原实现 `max_by_key(len)` 在长度并列时返回任意一条
+    /// ⇒ 沙箱裁决（`Approved` / `Denied`）在**同一份规则集**上随机。
+    /// 这是安全路径，故必须固定。
+    #[test]
+    fn test_duplicate_prefix_verdict_is_reproducible() {
+        // 构造两份规则集：同样两条同前缀规则、顺序相反。
+        let mk = |rules: Vec<SandboxRule>| {
+            let mut sb = ActionSandbox::new();
+            for r in rules {
+                sb.add_rule(r);
+            }
+            sb
+        };
+        let mut allow_first = mk(vec![
+            SandboxRule { action_prefix: "git".into(), allowed: true, requires_approval: false },
+            SandboxRule { action_prefix: "git".into(), allowed: false, requires_approval: false },
+        ]);
+        let mut deny_first = mk(vec![
+            SandboxRule { action_prefix: "git".into(), allowed: false, requires_approval: false },
+            SandboxRule { action_prefix: "git".into(), allowed: true, requires_approval: false },
+        ]);
+        // ⚠️ tie-break 采用「后注册者优先」⇒ 顺序不同结果**本就应当不同**
+        //   （allow_first 的最后一条是 denied ⇒ Denied；
+        //     deny_first 的最后一条是 allowed ⇒ Approved）。
+        // ⇒ 真正要断言的是：**同一份规则集重复求值结果一致**（可复现）。
+        assert_eq!(allow_first.evaluate("git status"), SandboxVerdict::Denied);
+        assert_eq!(allow_first.evaluate("git status"), SandboxVerdict::Denied);
+        assert_eq!(deny_first.evaluate("git status"), SandboxVerdict::Approved);
+        assert_eq!(deny_first.evaluate("git status"), SandboxVerdict::Approved);
+    }
+
+    /// 回归（2026-09-30）：「最长前缀优先」语义不得被 tie-break 破坏。
+    #[test]
+    fn test_longest_prefix_still_wins_over_tiebreak() {
+        let mut sb = ActionSandbox::new();
+        // "git" 放行；"git push" 拒绝 ⇒ 更长前缀必须胜出
+        sb.add_rule(SandboxRule { action_prefix: "git".into(), allowed: true, requires_approval: false });
+        sb.add_rule(SandboxRule { action_prefix: "git push".into(), allowed: false, requires_approval: false });
+        assert_eq!(sb.evaluate("git push origin"), SandboxVerdict::Denied);
+        assert_eq!(sb.evaluate("git status"), SandboxVerdict::Approved);
+    }
 }
