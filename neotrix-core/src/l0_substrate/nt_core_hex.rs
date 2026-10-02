@@ -19,129 +19,29 @@ use serde::{Deserialize, Serialize};
 #[cfg(test)]
 use std::collections::HashSet;
 
-/// A reasoning state represented as a 6-bit value (0-63), isomorphic to a hexagram.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct ReasoningHexagram(pub u8);
-
-impl ReasoningHexagram {
-    /// Create a new reasoning state (masked to 6 bits).
-    pub fn new(bits: u8) -> Self {
-        Self(bits & 0x3F)
-    }
-
-    /// Get the value of a specific reasoning axis (0=LSB, 5=MSB).
-    pub fn axis(&self, i: usize) -> u8 {
-        (self.0 >> (i & 7)) & 1
-    }
-
-    // ─── Axis accessors ───
-
-    /// Abstraction: 0=Concrete, 1=Abstract.
-    pub fn abstraction(&self) -> u8 {
-        self.axis(5)
-    }
-    /// Scope: 0=Focused, 1=Broad.
-    pub fn scope(&self) -> u8 {
-        self.axis(4)
-    }
-    /// Method: 0=Analytical, 1=Generative.
-    pub fn method(&self) -> u8 {
-        self.axis(3)
-    }
-    /// Depth: 0=Deep, 1=Fast.
-    pub fn depth(&self) -> u8 {
-        self.axis(2)
-    }
-    /// Mode: 0=Solo, 1=Collaborative.
-    pub fn reasoning_mode(&self) -> u8 {
-        self.axis(1)
-    }
-    /// Stance: 0=Certain, 1=Exploratory.
-    pub fn stance(&self) -> u8 {
-        self.axis(0)
-    }
-
-    // ─── State transitions ───
-
-    /// Flip a single reasoning axis (爻变).
-    pub fn flip_axis(&self, i: usize) -> Self {
-        let mask = 1u8 << (i & 7);
-        Self(self.0 ^ (mask & 0x3F))
-    }
-
-    /// Flip multiple axes at once.
-    pub fn flip_axes(&self, bits_to_flip: u8) -> Self {
-        Self(self.0 ^ (bits_to_flip & 0x3F))
-    }
-
-    /// Complement (错卦): flip all 6 axes.
-    pub fn complement(&self) -> Self {
-        Self(!self.0 & 0x3F)
-    }
-
-    /// Reverse (综卦): reverse the bit order (top↔bottom).
-    pub fn reverse(&self) -> Self {
-        let mut r = 0u8;
-        for i in 0..6 {
-            if (self.0 >> i) & 1 == 1 {
-                r |= 1 << (5 - i);
-            }
-        }
-        Self(r)
-    }
-
-    // ─── Resonance ───
-
-    /// Hamming distance to another state.
-    pub fn hamming_dist(&self, other: &Self) -> u32 {
-        (self.0 ^ other.0).count_ones()
-    }
-
-    /// Two states are in resonance if they share ≥4 axes (hamming dist ≤ 2).
-    pub fn resonance_with(&self, other: &Self) -> bool {
-        self.hamming_dist(other) <= 2
-    }
-
-    /// Resonance strength: 6 - hamming distance (max=6, min=0).
-    pub fn resonance_strength(&self, other: &Self) -> u32 {
-        6 - self.hamming_dist(other)
-    }
-
-    /// Generate all 6 neighboring states (one flip each).
-    pub fn neighbors(&self) -> Vec<Self> {
-        (0..6).map(|i| self.flip_axis(i)).collect()
-    }
-
-    /// Generate all states within `dist` flips.
-    pub fn neighborhood(&self, dist: u32) -> Vec<Self> {
-        let mut result = Vec::new();
-        for bits in 0..64u8 {
-            let candidate = Self(bits);
-            if self.hamming_dist(&candidate) <= dist {
-                result.push(candidate);
-            }
-        }
-        result
-    }
-
-    /// Human-readable mode name.
-    pub fn mode_name(&self) -> &'static str {
-        let idx = self.0 as usize;
-        MODE_NAMES[idx]
-    }
-
-    /// Detailed mode description.
-    pub fn mode_description(&self) -> &'static str {
-        let idx = self.0 as usize;
-        MODE_DESCRIPTIONS[idx]
-    }
-
-    /// Recommended for which task type keywords.
-    pub fn task_recommendation(&self) -> &'static [&'static str] {
-        let idx = self.0 as usize;
-        MODE_TASKS[idx]
-    }
-}
+// ─── ReasoningHexagram：收敛到 neotrix-types 的唯一定义 ───────────────
+//
+// 2026-10-02：本文件原有一份**独立副本**（struct + 121 行 impl）。
+// 与 `crates/neotrix-types/src/core/nt_core_hex.rs` 同名同结构，
+// 但**契约相反**（逐行核实，非 grep 推断）：
+//   · `new()`  types=`assert!(bits<64)` panic  vs  core=`bits & 0x3F` 静默掩码
+//   · `axis()` types=`self.0 >> i`      vs  core=`self.0 >> (i & 7)`
+// ⇒ 若照字面「去重」，行为会从「静默掩码」变成「panic」。
+// 故先核实三件事再收敛：
+//   ① core 的 20 个方法**全部**存在于 types（types 另有 15 个，
+//      收敛后 core 直接多出这些能力）；
+//   ② 生产代码无任何调用方会给 `new()` 传 ≥64
+//      （`mk_step` 在 `#[cfg(test)]` 内、`MODULE_COUNT=15`、
+//      `nt_core_observer.rs:878` 显式 `mode % 64`）；
+//   ③ `axis()` 全仓只传 0–5 ⇒ 两版行为等价，
+//      取 types 的**不做 `i&7` 包装**版本（包装会掩盖调用方 bug，
+//      且 `u8 >> i` 在 i≥8 时 debug 段 panic、release 段回绕，
+//      跨 profile 不一致）。
+//
+// ⛔ 已知未修：字段是 `pub u8` ⇒ 94 处直接元组构造可绕过 `new()`，
+//    `new()` 不是真正的值域闸门。改私有化会波及 320 处引用，
+//    留作独立批次。
+pub use neotrix_types::core::nt_core_hex::ReasoningHexagram;
 
 /// All 64 reasoning mode names.
 pub const MODE_NAMES: [&str; 64] = [
