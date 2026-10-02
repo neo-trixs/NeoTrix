@@ -87,7 +87,19 @@ def _strip_noncode(txt):
     out_txt, i, n = [], 0, len(txt)
     while i < n:
         c = txt[i]
-        if c == "r" and i + 1 < n and txt[i + 1] in '#"':
+        # ⛔⛔ **必须有词边界守卫**：`r` 只有在**标识符之外**才是 raw string 起手。
+        #
+        # ⭐ 实证缺陷（喂真实输入，R-SCAN-2）：字符串里出现 `Err"` 时，
+        #   `Err` 的尾字母 `r` + 紧跟的 `"` 被当成 raw string 起手
+        #   ⇒ 去找闭合引号找不到 ⇒ `_blank_span(txt[i:], i, n)` **把从那里到文末全涂白**
+        #   ⇒ 后面**真实的 `.unwrap()` 整行消失**。
+        #   ⇒ 这是**假阴性**（漏报），不是假阳性 —— 比误报更危险：
+        #      它让 `check-unwrap` 与本函数共用的 `unsafe` 审计**看不见**真实违规。
+        #
+        # ⓘ 该守卫同时修掉一类**假阳性**：字符串字面量里的 `.unwrap()`
+        #    （曾有一行 `suggestion: "Replace .unwrap() ..."` 被记进基线）。
+        _prev_is_ident = i > 0 and (txt[i - 1].isalnum() or txt[i - 1] == "_")
+        if c == "r" and not _prev_is_ident and i + 1 < n and txt[i + 1] in '#"':
             j = i + 1
             hashes = 0
             while j < n and txt[j] == "#":
