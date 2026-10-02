@@ -47,11 +47,14 @@ pub mod vector_index;
 /// Entity Linking — extraction, dedup, and indexing of named entities (R-P117 ADD-only).
 pub mod entity_linking;
 
-// NOTE: 以下模块内部有**实测存在**的编译错误，暂时注释（2026-09-30 逐个实测）。
+// NOTE: 以下 4 个模块曾因内部编译错误被注释（2026-09-30 逐个实测并**全部修复恢复**）。
+// 保留本注记作为「为什么会有一批模块集体消失」的取证：它们当时是**笼统**写在一处，
+// 导致 0 错误的 hybrid_retrieval 被误伤。逐项结果见下方各行。
 // 开启后的错误数：
 //   ~~add_only_writes → 8~~ ✅ **已修并恢复**（2026-09-30：根因是未完成的
 //     批量改名把类型写成 `AddOnlyAddOnlyMemoryEntry`，修 1 处定义即自洽）
-//   admission_control → 2（仍待处理）
+//   ~~admission_control → 2~~ ✅ **已修并恢复**（2026-09-30：缺 ScoreWeights/
+//     TypePriorWeights 两个权重类型，已补齐；另修一处**测试名与断言自相矛盾**）
 //   ~~decay_forgetting → 6~~ ✅ **已修并恢复**（2026-09-30：根因是一次**未完成的
 //     API 迁移** —— 自由函数形态已写好，但 config.rs/salience.rs 仍在用 trait 形态，
 //     而那些 trait 类型全仓不存在。已补齐 trait 层并复用既有自由函数作默认实现）
@@ -63,7 +66,7 @@ pub mod entity_linking;
 // ⇒ 该注释原先把「有错」与「无错」混在一起写，会让后来者以为
 //    四个都不能碰。现逐个标注实测结果。
 pub mod add_only_writes;
-// pub mod admission_control;
+pub mod admission_control;
 pub mod decay_forgetting;
 pub mod hybrid_retrieval; // 实测 0 编译错误 ⇒ 恢复（2026-09-30）
 
