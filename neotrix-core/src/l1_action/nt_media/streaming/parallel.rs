@@ -601,17 +601,67 @@ pub(crate) async fn http_chunk_download(
 
     let mut writer = BufWriter::with_capacity(256 * 1024, file);
     let mut downloaded = already;
+
+    // ⭐⭐ 2026-10-02 修的**数据损坏 bug**：原实现把服务端发的**每一块**都写进文件，
+    // 对 `end` **没有任何上限**。⇒ 只要服务端**忽略 `Range` 头**（回环/自建源/
+    // 部分 CDN/反代都会），每个 chunk 请求都会拿到**整个响应体**
+    // ⇒ N 个 chunk 各写全量 ⇒ 合并出 **N 倍长**的损坏文件。
+    // ⭐ 实测：`DownloadEngine` 默认 `max_concurrent=16`，一个 4096 字节的源
+    // 落盘成 **65536**（= 16 × 4096）—— 由 P0 回归测试当场抓到。
+    //
+    // ✅ 修法按 HTTP 语义**取正确切片**，⛔ 不是「截断」（截断会静默产出错内容）：
+    // · `206 Partial Content` ⇒ 服务端**遵守了** Range ⇒ 原样收。
+    // · `200 OK` ⇒ 服务端**忽略了** Range、返回整个实体 ⇒ 需要的字节位于
+    //   响应体内偏移 `actual_start` 处 ⇒ 跳过它，之后最多只收 `expected` 字节。
+    let honored = resp.status() == reqwest::StatusCode::PARTIAL_CONTENT;
+    let expected: Option<u64> = if honored {
+        None
+    } else if end != 0 {
+        Some(end.saturating_sub(actual_start) + 1)
+    } else {
+        None
+    };
+    let mut to_skip: u64 = if honored { 0 } else { actual_start };
+    let mut taken: u64 = 0;
     loop {
         match resp.chunk().await {
             Ok(Some(chunk)) => {
+                let mut slice: &[u8] = &chunk;
+                if to_skip > 0 {
+                    let sk = to_skip.min(slice.len() as u64) as usize;
+                    slice = &slice[sk..];
+                    to_skip -= sk as u64;
+                    if slice.is_empty() {
+                        continue;
+                    }
+                }
+                if let Some(cap) = expected {
+                    if taken >= cap {
+                        break;
+                    }
+                    let room = (cap - taken) as usize;
+                    if slice.len() > room {
+                        slice = &slice[..room];
+                    }
+                }
                 writer
-                    .write_all(&chunk)
+                    .write_all(slice)
                     .await
-                    .map_err(|e| format!("write: {}", e))?;
-                downloaded += chunk.len() as u64;
+                    .map_err(|e| format!("write: {e}"))?;
+                downloaded += slice.len() as u64;
+                taken += slice.len() as u64;
             }
             Ok(None) => break,
-            Err(e) => return Err(format!("stream: {}", e)),
+            Err(e) => return Err(format!("stream: {e}")),
+        }
+    }
+    // ⛔ 收少了 ⇒ 落盘将短于 Content-Length ⇒ **必须报错**，
+    //    不能默默继续（否则会写出一个短了却标着完成的文件）。
+    if let Some(cap) = expected {
+        if taken < cap {
+            return Err(format!(
+                "range short read: 请求 [{actual_start}..={end}] 期望 {cap} 字节，实收 {taken}（服务端可能不支持 Range）"
+            ));
         }
     }
     writer

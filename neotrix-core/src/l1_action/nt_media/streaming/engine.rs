@@ -508,10 +508,14 @@ mod p0_regression_tests {
         // ⭐⭐ 落盘内容必须**真的是那份 blob** —— 这条比「大小相等」更强：
         // 零填充文件的前 N 字节是 0，与 blob 的 `(i % 251)` 必然不同。
         let bytes = std::fs::read(&dest).expect("read dest");
-        assert!(
-            bytes.len() >= N,
-            "落盘 {on_disk} 字节 < Content-Length {N} ⇒ 内容不完整",
-            on_disk = bytes.len()
+        // ⭐⭐ 这条断言在 parallel.rs 的 Range 修复**之前**是失败的
+        //（实测落盘 65536 = 16 chunk × 4096，服务端忽略 Range 导致每块写全量）。
+        // ⭐ 加回来是因为它才是「文件没被撑大」的**直接**判据；
+        //   只断「传输 ≥ N」会漏掉「传输过量」这个方向的损坏。
+        assert_eq!(
+            bytes.len(), N,
+            "落盘 {} 字节 ≠ Content-Length {N} ⇒ chunk 未按 Range 切片（服务端忽略 Range 时会成倍写长）",
+            bytes.len()
         );
         assert!(
             bytes[..N].iter().enumerate().all(|(i, b)| *b == (i as u32 % 251) as u8),
