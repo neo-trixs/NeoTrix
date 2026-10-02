@@ -372,10 +372,11 @@ impl std::fmt::Display for ReasoningEffort {
     }
 }
 
-/// Generate all 64 reasoning states.
-pub fn all_reasoning_states() -> Vec<ReasoningHexagram> {
-    (0..64).map(ReasoningHexagram).collect()
-}
+/// 64 个推理态 —— 转出低层唯一实现（2026-10-02）。
+/// 此前 core 与 types 各有一份；`62cb175f` 判为「不可收敛」是因为返回类型
+/// `ReasoningHexagram` 在两 crate 各自定义 ⇒ 类型收敛（`c3617d53`）后本函数解锁。
+/// 归一化比对（去注释 + 归空白）**0 差异** ⇒ 可安全转出。
+pub use neotrix_types::core::nt_core_hex::all_reasoning_states;
 
 /// Fable 5-style intention context: Goal → Reason → Boundaries → Verification.
 ///

@@ -361,7 +361,7 @@ pub fn fermion_states_for_generation(_gen: usize) -> Vec<FermionState> {
             5 => ("antiblue", 0, 0, -1),
             6 => ("white", 0, 0, 0),
             7 => ("black", 0, 0, 0),
-            _ => unreachable!(),
+            _ => ("unknown", 0, 0, 0),
         };
 
         let (i3, q) = match weak_bits {
@@ -369,7 +369,10 @@ pub fn fermion_states_for_generation(_gen: usize) -> Vec<FermionState> {
             1 => (-0.5, -1.0 / 3.0),  // down-type left
             2 => (0.0, 2.0 / 3.0),    // up-type right
             3 => (0.0, -1.0 / 3.0),   // down-type right
-            _ => unreachable!(),
+            // ⛔ 原为 `unreachable!()`：AGENTS.md 明禁生产 panic，且本臂**可证明不可达**
+            // （`color_bits` 恒 0..7 且臂齐全 / `weak_bits` 恒 0..3 且臂齐全）。
+            // 与 core 侧原实现 `("unknown",0,0,0)` 逐字对齐，消除「同名函数两套契约」。
+            _ => (0.0, 0.0),
         };
 
         let q_adj = if hyper_sign == 1 { q } else { -q };

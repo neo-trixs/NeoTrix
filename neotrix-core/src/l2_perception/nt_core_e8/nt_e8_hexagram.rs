@@ -3,62 +3,36 @@
 //!
 //! Moved out of `nt_core_e8/mod.rs` (facade slimming, behaviour-neutral).
 
-use serde::Deserialize;
-
-use super::WEN_SEQUENCE;
 
 // ─── Hexagram System ─────────────────────────────────────────────────
 
-/// A single hexagram: 6-bit binary state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, Deserialize)]
-pub struct Hexagram {
-    /// 6 bits, MSB = top line (yang=1, yin=0), per Shao Yong ordering.
-    pub bits: u8,
-}
+/// `Hexagram` 收敛到低层唯一实现（2026-10-02）。
+///
+/// 此前本文件与 `neotrix-types/core/nt_core_e8.rs` **各定义一份同名类型**
+/// —— 这正是 `62cb175f` 记下的阻塞点：
+/// > 同文件的 `king_wen_sequence` / `shao_yong_sequence` 返回 `Vec<Hexagram>`，
+/// > 而 `Hexagram` 在两 crate 各自定义 ⇒ 那两个**不可**收敛。
+/// ⇒ **阻塞根因是类型，不是函数**。本笔收敛类型，两个函数随之解锁。
+///
+/// 收敛前核实（沿用 `ReasoningHexagram` 那次的纪律：契约才是判据）：
+/// · 字段逐字相同（`pub bits: u8`），方法集相同（6 个，无缺失）；
+/// · 唯一语义差异在 `new()`：types=`assert!(bits<64)` panic，
+///   core=`bits & 0x3F` 静默掩码 ⇒ 照字面去重会把掩码变成 panic；
+/// · panic **不可达**：core 侧 `Hexagram::new` 只有 1 个生产调用方
+///   `nt_memory_e8_agent.rs:56`，其值来自 `E8Phase::bits()` ——
+///   那是**编译期字面量 match**（0x3F/23/5/7/53/20/25…）⇒ 恒 < 64。
+/// ⇒ 取 types 的**带检查**版：静默掩码会把越界值变成「看似合理的错值」。
+///
+/// ⛔ 连带删除 `use super::WEN_SEQUENCE;` —— 它仅被本处删除的
+/// `wen_index()` 与 `king_wen_sequence()` 使用，删后成为未用项。
+/// 常量本身在 `nt_e8_constants.rs` 仍有他用，不动。
+pub use neotrix_types::core::nt_core_e8::Hexagram;
 
-impl Hexagram {
-    pub fn new(bits: u8) -> Self {
-        Self { bits: bits & 0x3F }
-    }
+/// 64 卦先天图（Shao Yong 二进制序）—— 转出低层唯一实现。
+pub use neotrix_types::core::nt_core_e8::shao_yong_sequence;
 
-    /// Line value at position i (0=bottom, 5=top). 1=yang, 0=yin.
-    pub fn line(&self, i: usize) -> u8 {
-        (self.bits >> (5 - i)) & 1
-    }
-
-    /// Bitwise NOT = 错卦 (opposite hexagram).
-    pub fn opposite(&self) -> Self {
-        Self {
-            bits: !self.bits & 0x3F,
-        }
-    }
-
-    /// Is this hexagram pure yang (all 1s) = 乾 ☰.
-    pub fn is_pure_yang(&self) -> bool {
-        self.bits == 0x3F
-    }
-
-    /// Is this hexagram pure yin (all 0s) = 坤 ☷.
-    pub fn is_pure_yin(&self) -> bool {
-        self.bits == 0x00
-    }
-
-    /// King Wen sequence index in the standard 64-hexagram ordering.
-    /// The standard King Wen ordering can be represented as a lookup table.
-    pub fn wen_index(&self) -> Option<usize> {
-        WEN_SEQUENCE.iter().position(|&b| b == self.bits)
-    }
-}
-
-/// Generate all 64 hexagrams in Shao Yong binary order (先天图).
-pub fn shao_yong_sequence() -> Vec<Hexagram> {
-    (0..64).map(|i| Hexagram::new(i as u8)).collect()
-}
-
-/// Generate all 64 hexagrams in King Wen order (周易).
-pub fn king_wen_sequence() -> Vec<Hexagram> {
-    WEN_SEQUENCE.iter().map(|&b| Hexagram::new(b)).collect()
-}
+/// 64 卦周易序（King Wen）—— 转出低层唯一实现。
+pub use neotrix_types::core::nt_core_e8::king_wen_sequence;
 
 /// 8×8 hexagram matrix: rows and columns indexed by trigram (0-7).
 /// Cell [i][j] = hexagram composed of upper trigram i, lower trigram j.
