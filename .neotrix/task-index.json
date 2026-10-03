@@ -1,5 +1,5 @@
 {
-  "_about": "任务→工具机器索引。解决「日常任务要跑哪个脚本」需全文读 AGENTS.md 的问题。 2026-09-29：check-doc-drift 增加根文档死链档。 2026-09-29：新增 check-untracked-assets（R-EXIST-1 未入库资产门，39→40 条）。 2026-09-29：新增 check-unwrap 生产 panic 棘轮（40→41 条）。\n2026-09-30：新增 check-feature-gates（feature 门控编译门，6 个非默认 feature）。\n2026-09-30：新增 check-silent-failure（静默失败棘轮，44 条基线）。\n2026-09-30：新增 absorb-live（已吸收技术存活率，MAP-TASKS 为单一事实源）。",
+  "_about": "任务→工具机器索引。解决「日常任务要跑哪个脚本」需全文读 AGENTS.md 的问题。 2026-09-29：check-doc-drift 增加根文档死链档。 2026-09-29：新增 check-untracked-assets（R-EXIST-1 未入库资产门，39→40 条）。 2026-09-29：新增 check-unwrap 生产 panic 棘轮（40→41 条）。\n2026-09-30：新增 check-feature-gates（feature 门控编译门，6 个非默认 feature）。\n2026-09-30：新增 check-silent-failure（静默失败棘轮，44 条基线）。\n2026-09-30：新增 absorb-live（已吸收技术存活率，MAP-TASKS 为单一事实源）。\n2026-10-03：scripts 表补录 build-lock（此前只在 Makefile 有目标，索引未登记 ⇒ 违背「索引是可发现性入口」）。\n2026-10-03：审计「零引用脚本」37 个 ⇒ 其中 34 个已被 excluded 覆盖（刻意排除的采集管道），真正未分类仅 3 个：check-license-js / map-check（两个真门，已登记，且前者 CI 从未运行）/ cargo-clean-locks（危险，已显式排除并写明理由）。",
   "_schema": {
     "id": "任务意图的稳定 slug（小写连字符）",
     "query": "自然语言触发词数组 —— agent 用它做匹配",
@@ -1222,6 +1222,11 @@
     "orphan_misc": {
       "files": "scripts/ops/__pycache__/ (7 个 .pyc)",
       "why": "悬空残影，源码已删（nt_docclaims/nt_foundation_laws/nt_hf_smelt_chains/nt_ipc_keys/nt_symbol_brain/nt_verify_sim）。建议 gitignore + 清理"
+    },
+    "dangerous_ops": {
+      "files": "scripts/cargo-clean-locks.sh",
+      "why": "⛔ **删 cargo 锁文件**。共享工作树下他窗正在构建时执行会破坏其编译（\"Blocking waiting for file lock\" 的反面：直接砸锁）。⛔ **零引用反而是安全的** —— 不要为了「完整性」把它登记进可用索引。",
+      "how_to_use": "真被锁住时：先 `sh scripts/ops/nt_build_lock.sh --status` 看锁状态，等锁释放，而不是删锁。"
     }
   },
   "doc-claims": {
@@ -1252,6 +1257,28 @@
       "read_only": true,
       "desc": "自评函数丢弃入参门：evaluate/judge/score 类函数若丢弃形参且**返回类型不是 Option** ⇒ 无法表达拒绝 ⇒ 只能撒谎。FAIL 档=无法拒绝；WARN 档=Option 返回型，确认它真走 None 路径。⛔ 不是拦所有 let _ =（那合法），只拦「自称评判却不看输入」。",
       "when_not_to_use": "要新写「刻意不读入参但会返回诚实分数」的函数时——门会 FAIL，那是设计问题不是误报，改设计别改门。"
+    },
+    "build-lock": {
+      "run": "bash scripts/ops/nt_build_lock.sh -- <cmd>",
+      "category": "门禁",
+      "read_only": false,
+      "desc": "跨 worktree 重型命令原子串行锁（原子 mkdir + 陈旧 PID/时间戳回收 + 退出码透传 + --strict）。⛔ 禁止手删锁目录。吸收 growth-engineer 重型命令串行模式。",
+      "when_not_to_use": "轻量只读命令（rg/git status/单文件 wc）不必加锁；门脚本本身已自证时用 nt_build_lock_selftest.sh 而非加锁跑 cargo。",
+      "selftest": "bash scripts/ops/nt_build_lock_selftest.sh  # 8/8"
+    },
+    "check-license-js": {
+      "run": "bash scripts/check-license-js.sh",
+      "category": "门禁",
+      "read_only": true,
+      "desc": "npm 依赖许可门 —— 填补 Rust 侧 deny.toml 之外的 npm 侧许可真空（AGPL/GPL/SSPL/Elastic/BUSL）。⛔ 2026-10-03 实测：CI 零引用 ⇒ **此门从未运行**，属「有防护但未接线」。",
+      "when_not_to_use": "只看 Rust 依赖许可时用 cargo-deny（CI 已接）；本门只管 npm 侧。"
+    },
+    "map-check": {
+      "run": "bash scripts/map-check.sh [--strict]",
+      "category": "门禁",
+      "read_only": true,
+      "desc": "前端 MAP 表三向对账：frontend invoke(\"neobot_*\") vs nt_commands.rs #[tauri::command] vs MAP.md 表格。默认只报警，--strict 则漂移即非零退出。",
+      "when_not_to_use": "只改前端不碰 MAP.md 时可只报警；发布前对账用 --strict。"
     }
   }
 }

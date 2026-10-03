@@ -11,7 +11,7 @@
 | 结构性改动 | `cargo clean && cargo build` **跑两遍** | 硬规则 §1 |
 | 跑重型构建前 | `nt_mem_gate.sh` 非 0 则**禁止起构建** | 三道闸 §4 |
 | 改完 `.rs` | `nt_lock_audit.py` 重跑，**禁止沿用旧值** | 三道闸 §4 |
-| 找「该跑哪个脚本」 | `nt_find.py <意图>`（19 条索引，每条带「何时别用」） | 三道闸 §4 |
+| 找「该跑哪个脚本」 | `nt_find.py <意图>`（75 条索引，每条带「何时别用」） | 三道闸 §4 |
 | 删 worktree / 收工 | `nt_worktree_gate.sh prune`，**禁手删目录** | 硬规则 §1 · 三道闸 §4 |
 | 接外部技术 | 同会话接到生产可用，否则不算做完 | 硬规则 §1 |
 | 扫出告警 | **先读现场证实/证伪**，再决定动不动 | 扫描器告警 §5 |
@@ -68,7 +68,7 @@
 
 ### 4.4 任务 → 工具索引
 
-`make find QUERY="死锁"` / `python3 scripts/ops/nt_find.py 死锁` —— 19 条意图索引在 `.neotrix/task-index.json`，**每条必带「何时别用」**：只写「何时用」agent 会用错（`check-naming` PASS 不代表合规；`nt_lock_audit` 报 12 条里 2/3 是误报）。pre-commit 校验索引指向的工具存在。
+`make find QUERY="死锁"` / `python3 scripts/ops/nt_find.py 死锁` —— 75 条意图索引在 `.neotrix/task-index.json`（2026-10-03 实测；原文写 19，已漂移），**每条必带「何时别用」**：只写「何时用」agent 会用错（`check-naming` PASS 不代表合规；`nt_lock_audit` 报 12 条里 2/3 是误报）。pre-commit 校验索引指向的工具存在。
 
 ## 5. 扫描器告警 ≠ 缺陷（2026-09-27 差点把 bug 修进正确代码）
 
