@@ -126,12 +126,7 @@ impl NtModelCliAsk {
 
     fn run_once(&self, prompt: &str) -> Result<String, String> {
         let argv = self.build_argv(prompt);
-        let mut cmd = Command::new(&self.command);
-        cmd.args(&argv)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        run_with_timeout(&mut cmd, self.timeout)
+        capture_model_command(&self.command, &argv, self.timeout)
     }
 
     /// 流式 argv：在标准参数前插入 `--format json`（模板模式下不适用，回退整包）。
@@ -310,74 +305,58 @@ pub(crate) fn run_capture(
     args: &[String],
     timeout: Duration,
 ) -> Result<String, String> {
-    let mut cmd = Command::new(program);
-    cmd.args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    run_with_timeout(&mut cmd, timeout)
+    capture_model_command(program, args, timeout)
 }
 
-/// ⭐⭐ 带超时的同步执行：**并发读取两条管道** + 超时 kill，不留僵尸。
+/// ⭐⭐⭐ **本文件唯一的进程执行出口**（2026-10-03 重整）
 ///
-/// ## ⭐⭐⭐ 2026-10-03 重写：修「大输出 = 假超时」
+/// ⭐⭐ 它刻意**只做三件事**，且都是模型询问语义**特有**的：
+/// 1. ⭐ **去 ANSI**（窗口展示与 `-free` 后缀判定都依赖干净文本）
+/// 2. ⭐ **空 stdout 视为失败**（模型命令静默退出不算成功）
+/// 3. ⭐ 超时 / 非零退出 → **可区分**的两类错误串
 ///
-/// ⛔ **旧实现**（轮询 `try_wait()`，**从不并发读管道**）：
-/// ```ignore
-/// loop { match child.try_wait()? {
-///   Some(_) => { let out = child.wait_with_output()?; … }
-///   None => { if 超时 { kill; return Err("timed out") } sleep(50ms) } } }
-/// ```
-/// ⭐⭐ **缺陷形态**：子进程 stdout/stderr 若填满管道缓冲区（macOS/Linux 通常 64 KiB）
-/// 就会**永久阻塞在 write 上** ⇒ `try_wait()` 于是**永远**返回 `Ok(None)`
-/// ⇒ 最后被判成超时 ⭐⭐ **即「输出越大越容易被误判超时」**。
+/// ⭐⭐ 而 ⭐**并发读管道**这件事**不在这里** —— 它由
+/// `l2_perception/…/social_access/probe.rs::run_with_timeout` 提供
+/// （⭐⭐ 那边有回归测试 `test_large_output_does_not_deadlock` 守着
+/// 「大输出 = 假超时」那个坑）。
 ///
-/// ⭐ **本仓已有一份写对的实现**：`l2_perception/nt_world/social_access/probe.rs:50`
-/// 的 `run_with_timeout` —— 它的 doc 逐字记录了这个 bug
-/// （「本实现第一版把读取放在等待循环**之后**，被自测抓到」），
-/// ⭐ 且带回归测试 `test_large_output_does_not_deadlock`（`probe.rs:363`）。
+/// ## ⭐⭐ 为什么必须是**一个**出口（而不是两个调用方各写一份）
+/// ⛔ 2026-10-03 教训：我删掉旧的转发层时**没查全部调用方**
+/// ⇒ `run_once`（模型询问主路径）被一起打断。
+/// ⇒ ⭐⭐ 所以本函数是**唯一**实现，`run_once` 与 `run_capture` **共用**它。
 ///
-/// ⇒ ⭐⭐ **本函数此前是同一语义的「差版本」**（重复实现 + 缺陷）。
-/// ⭐ 现改为**复用那份写对的实现**，⛔ 不再自带一份。
-/// ⭐ 影响面：`run_capture` → `nt_io_provider/catalog/cli_free_source.rs`
-/// （⭐ 免费模型发现路径会误判超时）。
-fn run_with_timeout(cmd: &mut Command, timeout: Duration) -> Result<String, String> {
-    // ⭐ 复用 `probe.rs` 的并发读实现（它返回 stdout/stderr/成功与否）。
-    // ⭐ `get_program()` 给 `&OsStr`，而目标签名要 `&str`
-    // ⛔ 非 UTF-8 的 program 名**不能静默替换成别的值** ⇒ 显式拒绝。
-    let program = cmd
-        .get_program()
-        .to_str()
-        .ok_or_else(|| "model command program is not valid UTF-8".to_string())?;
-    let args: Vec<String> = cmd
-        .get_args()
-        .filter_map(|a| a.to_str().map(|s| s.to_owned()))
-        .collect();
+/// # Errors
+/// · `"spawn failed: …"` —— 起不来
+/// · `"model command timed out after {s}s"` —— ⭐ **超时被 kill**（可与失败区分）
+/// · `"model command failed: {stderr}"` —— 非零退出
+/// · `"empty stdout from model command"` —— 成功但无输出
+fn capture_model_command(
+    program: &str,
+    args: &[String],
+    timeout: Duration,
+) -> Result<String, String> {
     let outcome = crate::l2_perception::nt_world::social_access::probe::run_with_timeout(
-        program, &args, timeout,
+        program, args, timeout,
     )
     .map_err(|e| format!("spawn failed: {e}"))?;
-    // ⭐⭐⭐ **必须先判 `timed_out`** —— 我第一版替换时漏了它，
-    // 导致 `test_ask_timeout_kills` 失败（实际文案 `model command failed: ` 而非
-    // `timed out`）。⭐ `RunOutcome` 有 `timed_out: bool`（`probe.rs:124`），
-    // ⭐⭐ **它排在 `success` 之前是有原因的**：超时被 kill 的子进程
-    // **必然** `success == false`，⛔ 不先判它就会把「超时」误报成「命令失败」。
+    // ⭐⭐ **必须先判 `timed_out`**：超时被 kill 的子进程**必然** `success == false`
+    // ⇒ ⛔ 不先判就会把「超时」误报成「命令失败」（我第一版正是这样，
+    //    被既有测试 `test_ask_timeout_kills` 当场抓住）。
     if outcome.timed_out {
         return Err(format!(
             "model command timed out after {}s",
             timeout.as_secs()
         ));
     }
-    if outcome.success {
-        let text = strip_ansi(&outcome.stdout).trim().to_string();
-        if text.is_empty() {
-            return Err("empty stdout from model command".to_string());
-        }
-        Ok(text)
-    } else {
+    if !outcome.success {
         let err = strip_ansi(&outcome.stderr).trim().to_string();
-        Err(format!("model command failed: {err}"))
+        return Err(format!("model command failed: {err}"));
     }
+    let text = strip_ansi(&outcome.stdout).trim().to_string();
+    if text.is_empty() {
+        return Err("empty stdout from model command".to_string());
+    }
+    Ok(text)
 }
 
 /// 去 ANSI 转义（`\x1b[...<字母>` CSI 序列 + 残留 ESC）：窗口展示与 `-free` 后缀
