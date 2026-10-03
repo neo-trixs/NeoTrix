@@ -50,3 +50,5 @@ pub mod nt_core_agent_config;
 
 /// Trade Intelligence — market analysis, strategy recommendation engine.
 pub mod trade_intelligence;
+
+pub mod multi_agent;

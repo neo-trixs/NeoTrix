@@ -285,14 +285,37 @@ mod tests {
 
     #[test]
     fn delegation_request_builder() {
+        // ⚠️ 2026-10-02 修正：原测试传 `with_deadline(1000)`。
+        // `deadline` 的字段自述是「**Unix timestamp** deadline (0 = no deadline)」
+        // ⇒ 绝对时间。Unix 秒 1000 = 1970-01-01 ⇒ **那个请求确实已过期**
+        // ⇒ `is_expired() == true` 是**正确行为**，而断言写的是 `!req.is_expired()`
+        // ⇒ **是测试与字段语义矛盾**，不是实现缺陷。
+        // （同仓惯例见 `nt_act_crypto/airdrop.rs:48` 用 `1700000000`。）
+        //
+        // 改为「从 now 起 1 小时」⇒ 既符合字段语义，也**不会随时间腐坏**。
+        let future = chrono::Utc::now().timestamp() + 3_600;
         let req = DelegationRequest::new("manager", "worker", "do task")
             .with_context("prior output")
-            .with_deadline(1000);
+            .with_deadline(future);
         assert_eq!(req.from_agent, "manager");
         assert_eq!(req.to_agent, "worker");
         assert_eq!(req.context, "prior output");
-        assert_eq!(req.deadline, 1000);
+        assert_eq!(req.deadline, future);
         assert!(!req.is_expired());
+    }
+
+    /// 补上**从未被测过**的对称分支：过去的 deadline 必须判为已过期。
+    /// ⛔ 旧测试只测了「未过期」一侧，且因用 1970 时间戳而**两侧都测错**。
+    #[test]
+    fn delegation_request_expiry_is_asymmetric() {
+        let past = chrono::Utc::now().timestamp() - 1;
+        let req = DelegationRequest::new("m", "w", "t").with_deadline(past);
+        assert!(req.is_expired(), "过去的 deadline 必须判为已过期");
+
+        // deadline == 0 ⇒ 按字段自述「0 = no deadline」⇒ 永不过期
+        let never = DelegationRequest::new("m", "w", "t");
+        assert_eq!(never.deadline, 0);
+        assert!(!never.is_expired(), "deadline=0 表示无期限，不应过期");
     }
 
     #[test]

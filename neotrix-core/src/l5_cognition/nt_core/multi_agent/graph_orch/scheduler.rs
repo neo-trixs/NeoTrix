@@ -63,7 +63,24 @@ impl DagScheduler {
             let max_pred_depth = dag
                 .incoming_edges(id)
                 .iter()
-                .filter(|e| matches!(e.edge_type, EdgeType::Sequential))
+                // ⚠️ 2026-10-02 修正（**真实缺陷**，由 177 个从未运行的测试抓出）：
+                // 原代码只认 `Sequential` 边 ⇒ **Parallel 依赖边被忽略**。
+                // 而 `EdgeType::Parallel` 的自述是「both branches execute
+                // concurrently」—— 说的是**b 与 c 相互并发**，
+                // **不是**「b 不必等 a」⇒ a→b 仍是**依赖边**，必须计入深度。
+                // 后果（实测）：diamond `a -Parallel-> {b,c} -Sequential-> d`
+                //   被算成 depth[a]=0, depth[b]=0, depth[c]=0, depth[d]=1
+                //   ⇒ d 被排到 turn 1（期望 turn 2），`makespan` 随之少算 1（2 vs 3）。
+                //
+                // 计入 `Sequential | Parallel`；**排除 `Conditional`**
+                // ——其自述「runs only if condition is met」⇒ 该依赖**可能不发生**，
+                // 不能作为顺序约束的依据（否则会过度串行化）。
+                .filter(|e| {
+                    matches!(
+                        e.edge_type,
+                        EdgeType::Sequential | EdgeType::Parallel
+                    )
+                })
                 .filter_map(|e| depth.get(e.from.as_str()))
                 .copied()
                 .max();
