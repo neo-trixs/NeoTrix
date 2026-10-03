@@ -919,18 +919,22 @@ mod tests {
 ///
 /// ## ⭐⭐⭐ 为什么必须**按 id 预检**（本函数第一版最大的坑，由测试抓出）
 /// 第一版直接顺序调用 5 个 registrar，⭐ **两条测试当场炸出**：
-/// ```text
-/// ⛔ 2026-10-03 该 panic 已**消除**：5 个生产者签名改为
-///     Result<CapabilityNode, RegistryError>，内部用 `?` 传播，不再 panic。
-/// ```
-/// ⭐ 根因（实测 5 个 registrar **全部**如此）：它们都写成
+/// ⭐ 根因（当时实测 5 个 registrar **全部**如此）：它们都写成
 /// `registry.register(node).expect("Failed to register …")`
 /// ⇒ ⭐ **对已存在的 id 会 `panic!`**，而 **panic 会毒化注册表的 `Mutex`**
 /// ⇒ 第二次调用直接拿到 `poisoned lock` ⇒ ⭐ **bootstrap 完全不幂等**。
+/// 该 panic **已实际发生过一次**，原文记录于
+/// `EMERGENCE-WIRING-DEFECT-2026-10-03.md`。
 ///
-/// ⇒ 解法：**先按 id 预检，已存在就跳过**。
-/// ⛔ 刻意**不**去改那 5 处 `.expect()`（那是生产代码，且它们**假设拿到全新
-/// 注册表**这个前提在本场景下是合理的）——⭐ 本函数只需**不把重复的注册喂给它们**。
+/// ## ⛔ 2026-10-03 两处修正（本文档的旧结论已被推翻，勿照旧结论改代码）
+/// ① 旧结论「⛔ 刻意**不**去改那 5 处 `.expect()`（本函数只需不把重复注册喂给它们）」
+///    ⛔ **已作废**：5 个生产者已改为 `Result<CapabilityNode, RegistryError>`，
+///    内部 `registry.register(node.clone())?`，**不再 panic**。
+///    只把 `AlreadyExists` 当幂等成功是不够的 —— 那样 `CircularDependency`
+///    只能被 `eprintln!` 放过 ⛔ 那是**吞错误**，而它恰是**真bug 信号**（依赖成环）。
+/// ② 「先按 id 预检」**仍然保留**，但它已从「唯一防线」降为**第二道防线**：
+///    第一道是 registrar 自身的 `?` 传播。保留 `already()` 的理由变了——
+///    现在是为了让重复 bootstrap 保持 `newly = 0`（合法），而非报错。
 ///
 /// ## ⭐⭐ 拓扑序是**实测得来**的，不是猜的
 /// ```text
