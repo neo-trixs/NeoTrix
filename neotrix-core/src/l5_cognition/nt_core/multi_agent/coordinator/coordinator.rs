@@ -235,29 +235,39 @@ mod tests {
         assert_eq!(assignments.len(), 2);
     }
 
-    /// ⛔ 已知缺陷：`assign_task` 后 `get_agent_load("a1")` 仍为 0.0。
+    /// ⛔ **原断言失败的原因是测试的夹具假设错误，不是产品缺陷**（2026-10-02 查清）。
     ///
-    /// 已核实的链路（都正确）：
-    /// · `register_agent` → `load_balancer.register_agent` → `stats.push` ✅
-    /// · `assign_task` → `load_balancer.task_started` → `active_tasks += 1` ✅
-    /// · `get_load` → `(active_tasks / 10.0).min(1.0)` ⇒ 1/10 = 0.1 > 0 ✅
-    /// ⇒ 只可能 **`assign_task` 返回了 `None`**（`TaskRouter::route` 未产出分配），
-    ///    于是 `task_started` **根本没被调用**。
-    /// ⛔ **本轮未继续追 `TaskRouter::route`** —— 已超出本批预算，
-    ///    且可疑点已定位（`route` 内 `agent_loads` 全部初始化为 0，
-    ///    不读 `load_balancer` 的真实负载）。
-    /// ⇒ 标 `#[ignore]` 并记录可查起点，**不改实现也不改断言**。
+    /// 探针实测（临时 test + `--nocapture`）：
+    /// ```
+    /// assign_task -> true
+    /// get_agent_load(a1) = 0.1      ← 正是 > 0.0
+    /// ```
+    /// 差异在于探针**只注册了 a1**，而 `make_coordinator()` 已注册：
+    /// `"coder"["code","review"]` 与 `"researcher"["research","code"]`
+    /// ⇒ **三个 agent 都能接 "code"**。
+    /// `find_best_agent` 的平局规则是 `load < best_load`（**严格小于**）
+    /// ⇒ 平局**保留先注册者** ⇒ `coder` 胜出 ⇒ `a1` 从未接到任务
+    /// ⇒ `task_started("a1")` 从未被调用 ⇒ load 0.0。
+    /// ⇒ **产品行为正确**（平局偏向先注册者是合理且稳定的策略）。
+    ///
+    /// 修法：给 a1 一个**只有它有**的能力，使测试不再依赖平局结果。
     #[test]
-    #[ignore = "assign_task 未产生分配 => task_started 未调用；待查 TaskRouter::route"]
     fn complete_task_updates_load() {
         let mut coord = make_coordinator();
-        coord.register_agent("a1", vec!["code".into()]);
+        // ⛔ 能力必须是 **a1 独有**：`make_coordinator()` 里 coder/researcher
+        // 都带 "code"，原测试用 "code" 会命中平局分支（见上方说明）。
+        coord.register_agent("a1", vec!["rust".into()]);
 
-        let task = TaskDescription::new("t1", vec!["code".into()]);
-        coord.assign_task(task);
+        let task = TaskDescription::new("t1", vec!["rust".into()]);
+        let assigned = coord.assign_task(task).expect("a1 独有 rust，应接到任务");
+        assert_eq!(assigned.agent_id, "a1");
 
         // Agent should now have some load
-        assert!(coord.get_agent_load("a1") > 0.0);
+        assert!(
+            coord.get_agent_load("a1") > 0.0,
+            "实际 load = {}",
+            coord.get_agent_load("a1")
+        );
 
         // Complete the task
         coord.complete_task("a1", 3.0);

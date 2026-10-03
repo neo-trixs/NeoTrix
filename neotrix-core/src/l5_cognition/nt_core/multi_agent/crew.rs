@@ -197,7 +197,23 @@ impl Crew {
 
         for task in tasks {
             let eligible = self.eligible_agents(task);
-            for agent in eligible {
+            // ⚠️ 2026-10-02 修正（**真实缺陷**，由 177 个从未运行的测试抓出）：
+            // 原实现对**每个 task × 每个合格 agent**各 spawn 一次
+            // ⇒ 结果数 = 任务数 × 合格 agent 数（实测 2 × 3 = 6）
+            // ⇒ 工作量 O(|tasks| × |agents|)，且同一任务被重复执行、返回重复结果。
+            //
+            // 而 `CrewStrategy::Parallel` 的字段自述是
+            // 「**Tasks** run concurrently via tokio_underscore spawn」⇒
+            // 并发单位是**任务**，每个任务应产出**一个**结果。
+            //
+            // 修法：每个任务只选**一个** agent 执行。
+            // ⛔ 选择策略暂用「合格者中第一个」（按注册序，**确定性**）——
+            //    「最优 agent 选择」需要 coordinator 的 `TaskRouter`（其
+            //    `find_best_agent` 目前是私有的），属跨模块设计，不在此臆造。
+            // ⚛ 先克隆再取：`eligible.first()` 会借用自临时 `eligible`，
+            // 而 spawn 要求 'static 所有权 ⇒ 直接用会触发 E0521。
+            let chosen = eligible.first().cloned();
+            if let Some(agent) = chosen {
                 let agent_clone = agent.clone();
                 let task_clone = task.clone();
                 let max_iter = self.max_iterations;
@@ -346,16 +362,12 @@ mod tests {
         assert!(results.iter().all(|r| r.success));
     }
 
-    /// ⛔ 已知缺陷：期望 2 个聚合结果，实得 6。
+    /// ✅ 2026-10-02 已修复（`execute_parallel` 的任务×agent 爆炸，详见该函数注释）。
     ///
-    /// 6 = 未聚合（每条 worker 结果各推一次）；2 = 按意图聚合后的数量
-    /// ⇒ 聚合路径没有生效。注意：本会话修过本文件 `crew.rs:246`
-    /// （原 `else if` 分支因 `into_iter()` 提前消耗而**不可达**），
-    /// ⛔ 但**本条在修复前就已失败**（它在最初 11 条失败清单里）
-    /// ⇒ **不是该修复引入的**。
-    /// ⇒ 标 `#[ignore]` 并记录，**不改断言**。
+    /// 当时症状是「期望 2 个结果、实得 6」：`sample_tasks()` 只有 2 个任务，
+    /// 而 `execute_parallel` 对**每个 task × 每个合格 agent**各 spawn 一次
+    /// ⇒ 2 × 3 = 6。
     #[tokio::test]
-    #[ignore = "聚合未生效：期望 2 实得 6；修复前已失败，非本轮引入"]
     async fn parallel_execution() {
         let crew = test_crew(CrewStrategy::Parallel);
         let results = crew.execute(&sample_tasks()).await;
