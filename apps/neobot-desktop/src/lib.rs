@@ -95,6 +95,9 @@ macro_rules! neobot_commands {
             neobot_desktop::commands::neobot_memory_add,
             neobot_desktop::commands::neobot_memory_undo,
             neobot_desktop::commands::neobot_convo_messages,
+            // ⭐ 2026-10-03：分页拉取（增量式，治长会话全量渲染）。加法式新增，
+            // ⛔ 不改 neobot_convo_messages 的签名 ⇒ 旧路径仍可用。
+            neobot_desktop::commands::neobot_convo_messages_page,
             neobot_desktop::commands::neobot_convo_list,
             neobot_desktop::commands::neobot_member_list,
             neobot_desktop::commands::neobot_member_add,

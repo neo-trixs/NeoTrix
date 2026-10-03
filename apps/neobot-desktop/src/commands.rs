@@ -567,6 +567,69 @@ pub fn neobot_convo_messages(
     store.list_messages(convo_id.trim()).map_err(|e| e.to_string())
 }
 
+/// ⭐⭐ 分页拉取一页消息（**增量式**，治长会话一次性全量渲染）。
+///
+/// `neobot_convo_messages_page(convo_id, before_seq, limit) -> MessagePage`
+///
+/// ## 为什么加这条（2026-10-03 实测的「建成未用」第三实例）
+/// ⭐ `NeobotStore::list_messages_page`（`nt_store_messages.rs:137`）早已存在，
+/// 且有 `created_at` 并列/不漏不重测试，⭐ 但**全仓消费者只有它自己**
+/// ⇒ 命令层只有全量的 `neobot_convo_messages`，界面 `:542` 也是一次性全量拉取。
+/// ⇒ ⭐ 三层都缺接线，长会话会把整段历史一次性塞进 DOM。
+///
+/// ## ⭐ 为什么用**新命令**而不是改 `neobot_convo_messages` 的签名
+/// ⛔ 改既有命令会破坏 UI 的 `invoke<ChatMessage[]>`（返回类型变了）
+/// ⇒ ⭐ **加法式**新增，旧路径保持可用 ⇒ 界面可**渐进**切换。
+///
+/// ## ⭐ 游标语义（实测 store 层）
+/// `after_seq` 是 `messages.seq`，即 SQLite `rowid`（`a0243425` 起）
+/// ⇒ ⭐ **按 seq 严格递增翻页**，⛔ 不用 `created_at`（同秒消息会并列漏掉）。
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessagePage {
+    /// 本页消息（时间正序，与 `neobot_convo_messages` 一致）
+    pub messages: Vec<neotrix_neobot::nt_store::ChatMessage>,
+    /// ⭐ 是否还有更早的消息（用 `limit + 1` 探测，见实现）
+    pub has_more: bool,
+    /// ⭐ 下一页游标：把本页**最小** `seq` 回传（继续往更早翻）
+    pub next_seq: Option<i64>,
+}
+
+/// ⭐⭐ 分页整形（**生产与测试共用同一份**）。
+///
+/// ⭐ 刻意抽成自由函数：否则测试会复制一份逻辑，
+/// ⭐⭐ **测的就不是命令真正跑的那段代码**（本日已在
+/// `neobot-check-emergence.mjs` 上踩过「自测重写正则 ⇒ 假通过」的同型坑）。
+fn shape_page(
+    mut probe: Vec<neotrix_neobot::nt_store::ChatMessage>,
+    take: i64,
+) -> MessagePage {
+    // ⭐ 多取 1 条 ⇒ 有余量即「还有更早的」
+    let has_more = probe.len() as i64 > take;
+    probe.truncate(take as usize);
+    // ⭐ 游标 = 本页**最小** seq（消息正序 ⇒ 最后一条 seq 最小）
+    let next_seq = probe.last().map(|m| m.seq).filter(|_| has_more);
+    MessagePage { messages: probe, has_more, next_seq }
+}
+
+#[tauri::command]
+pub fn neobot_convo_messages_page(
+    convo_id: String,
+    before_seq: Option<i64>,
+    limit: Option<i64>,
+) -> Result<MessagePage, String> {
+    let store = open_store()?;
+    let convo = convo_id.trim();
+    // ⭐ 夹紧 limit：⛔ 不接受 0/负数（会让 `has_more` 探测失真），
+    // ⛔ 也不接受超大值（界面 bug 不该拖垮库）。
+    let take = limit.unwrap_or(200).clamp(1, 1000);
+    // ⭐ 多取 1 条用于探测 has_more ⇒ 界面不需要知道「怎么算还有没有」
+    let probe = store
+        .list_messages_page(convo, before_seq, take + 1)
+        .map_err(|e| e.to_string())?;
+    Ok(shape_page(probe, take))
+}
+
 /// 骨架下发给界面的面板事件名。前端 `listen` 同一个名字。
 pub const PANEL_EVENT: &str = "neobot:panel";
 
@@ -1240,5 +1303,46 @@ mod data_dir_tests {
         }
         let d = data_dir().expect("解析");
         assert!(d.ends_with(".neobot"), "实际：{d:?}");
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // ⭐⭐ 分页命令的**纯逻辑**测试（2026-10-03）
+    // ⭐ 刻意**不**调 `open_store()`（它走全局 HOME）⇒ 测纯函数化后的分页整形。
+    // ════════════════════════════════════════════════════════════════
+
+    fn msg(seq: i64) -> neotrix_neobot::nt_store::ChatMessage {
+        neotrix_neobot::nt_store::ChatMessage {
+            seq,
+            id: format!("m{seq}"),
+            convo_id: "c1".into(),
+            role: "assistant".into(),
+            text: format!("body {seq}"),
+            created_at: "2026-10-03T00:00:00Z".into(),
+        }
+    }
+
+    /// ⭐⭐ `has_more` 探测正确：多取 1 条 ⇒ 有余量即 true
+    #[test]
+    fn 分页探测出还有更多() {
+        let p = shape_page((1..=6).map(msg).collect(), 5);
+        assert!(p.has_more, "6 条取 5 条 ⇒ 必须报告还有更多");
+        assert_eq!(p.messages.len(), 5, "实际返回条数必须等于 limit");
+    }
+
+    /// ⭐⭐ 最后一页：`has_more=false` 且 ⭐ **`next_seq` 必须为 None**
+    /// （否则界面会拿着陈旧游标反复请求同一页 ⇒ 死循环）
+    #[test]
+    fn 最后一页无更多且游标为空() {
+        let p = shape_page((1..=3).map(msg).collect(), 5);
+        assert!(!p.has_more, "3 条取 5 条 ⇒ 没有更多");
+        assert_eq!(p.next_seq, None, "无更多时不得回传游标，否则界面会死循环");
+    }
+
+    /// ⭐⭐ 游标 = 本页**最小** seq（正序 ⇒ 最后一条），⭐ 不是最大
+    /// —— 用错方向会让「加载更早」变成「加载更晚」，静默错误。
+    #[test]
+    fn 游标取本页最小seq() {
+        let p = shape_page((1..=6).map(msg).collect(), 5);
+        assert_eq!(p.next_seq, Some(5), "本页是 seq 1..5 ⇒ 游标应是 5（最小值）");
     }
 }
