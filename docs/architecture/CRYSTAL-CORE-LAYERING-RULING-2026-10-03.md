@@ -139,3 +139,67 @@
    （b）移到独立的 `apps/` 壳层、⭐（c）接受它们就是 L1 的门面、
    ⭐⭐ **但 (c) 必须同时把 facade 阈值调高并记录理由**（否则等于自我豁免）
 3. ⭐⭐ **门保持红**直到裁决更新 ⇒ ⭐ 不为了让门绿而调高阈值
+
+
+---
+
+## 7. 方案甲第 1 步：**真实调用面**已核实（⛔ 不靠文件名计数）
+
+### 7.1 方法修正
+⛔ §6.4 用 `rg` 数**文件名字符串**（得 1/1/0）⇒ ⭐ **不可信**，已在 §6.4 自我标注。
+⇒ 本步改按 ⭐ **模块路径**（`l1_action::<mod>`）统计。
+
+| shell | 文件名计数（不可信） | ⭐ **模块路径计数** |
+|---|---|---|
+| `nt_tui_app` | 1 | **1** |
+| `nt_model_cli` | — | **3** |
+| `nt_stdin_human` | — | **3** |
+| `nt_free_pool` | — | **2** |
+| `nt_crystal_llm_bridge` | 0 | **1** |
+
+### 7.2 ⭐⭐⭐ 决定性事实：**4 个 shell 的主要消费者是同一个二进制**
+
+| 消费者 | 引用的 shell |
+|---|---|
+| ⭐ **`neotrix-core/src/bin/ntcode.rs`** | `nt_tui_app` · `nt_model_cli` · `nt_stdin_human` · `nt_free_pool` |
+| `l1_action/nt_dialogue_tui.rs` | `nt_stdin_human`（与 `nt_tui_app` 互相引用） |
+| `l1_action/nt_io/nt_io_provider/catalog/cli_free_source.rs` | `nt_free_pool` |
+| `l1_action/nt_core_task_dispatcher/nt_dispatcher_core.rs` | `nt_crystal_llm_bridge` |
+
+⭐⭐ 而 `bin/ntcode.rs` 只有 **332 行**，文件头自述：
+> `//! # ntcode — NeoTrix 对话终端（产品名）`
+
+且它对 shell 的引用**只有一处**：`l1_action::nt_tui_app::run_tui_session`。
+
+### 7.3 ⭐⭐ 由 7.2 得出的结论
+
+⭐⭐ **这些文件是「一个对话终端二进制的壳」，⛔ 不是「行动层」。**
+
+- ⭐ `nt_tui_app` = TUI 会话 · `nt_stdin_human` = 终端里的人 · `nt_model_cli` =
+  模型 CLI · `nt_free_pool` = 免费模型池调用
+⇒ 四者**共同服务于一个产品形态（终端）**，且**主要消费者是那个终端的 bin**。
+
+⇒ ⭐⭐ **这解释了为什么方案乙必然到顶**：它们需要的
+（`CrystalCore` / `NtCrystalTaskLoop` / `NtProgressSink` / `NtInnerLoop*`）
+⭐ **正是终端驱动认知循环所需的全套** ⇒ ⭐ 它们是**「认知的驱动方」**，
+而 L1 的层名是「**行动**」⇒ ⭐⭐ **层名与职责从一开始就对不上。**
+
+⇒ ⭐⭐ **裁决更新的方向（§8）**：不是「把认知塞进 L1 的 facade」，
+而是 ⭐ **承认这些是壳层**，其与 L5 的依赖 ⭐**根本不是违规**。
+
+### 7.4 一个**例外**，不能一并处理
+`nt_crystal_llm_bridge` 的消费者是 ⭐ `nt_dispatcher_core.rs`（**L1 内部**），
+⛔ **不是** `ntcode` ⇒ 它是**真正的 L1 内部依赖** ⇒ ⭐ 不适用 §7.3 的结论。
+
+## 8. ⭐⭐ 裁决更新（§9 之前的正式修正）
+
+**原 §3③ 的推荐（乙）已作废**（§6 已证伪）。修正为：
+
+| shell | 归属裁决 | 理由 |
+|---|---|---|
+| `nt_tui_app` `nt_stdin_human` `nt_model_cli` `nt_free_pool` | ⭐⭐ **移出 L1，成为壳层** | §7.3：它们是 `ntcode` 这个**对话终端的壳**，主要消费者是该 bin |
+| `nt_crystal_llm_bridge` | ⭐ **暂留 L1** | §7.4：消费者是 L1 内部的 `nt_dispatcher_core`，是真内部依赖 |
+
+⇒ ⭐⭐ **随之必须解决的是「壳层放哪」**，而不是「L1 怎么转出」。
+⇒ ⭐ 门 `nt_crystal_core_judge.py` ⭐**保持红**，直到本裁决落成 + 门据新裁决改写。
+⇒ ⭐⭐ **明确不做**：为了让门变绿而调高阈值（⭐ 那是自我豁免）。
