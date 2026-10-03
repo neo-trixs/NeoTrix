@@ -439,11 +439,27 @@ impl _TimingObfuscator {
         (target - elapsed).max(0.0)
     }
 
-    /// 页面渲染抖动 (ms), gauss(200, 100)。
+    /// 页面渲染抖动 (ms), gauss(200, 100) **钳位到 [JITTER_MIN_MS, JITTER_MAX_MS]**。
+    ///
+    /// ⛔ 2026-10-03 修复一个**真实缺陷**（非测试问题）：
+    /// 原实现 `gauss(200.0, 100.0)` **无钳位**，而高斯的**尾巴无界**
+    /// ⇒ `P(z <= -2) ≈ 2.28%` ⇒ 返回值 `<= 0.0`
+    /// ⇒ 使 `test_timing_jitter_bounds` 以**约 1/44 的概率**随机失败。
+    ///
+    /// ⭐ 证据表明这是**漏写**而非设计：同文件的 `_next_wait_secs`
+    /// 写的是 `gauss(2.5, 1.0).clamp(0.3, 10.0)`，**同一模式**；
+    /// 且 `_next_wait_secs` 的注释记载它**也曾**因同类问题偶发失败并已修复
+    /// ⇒ **本函数是同一类问题的漏网之处**。
+    ///
+    /// 区间取 `[20, 1000]`：约 ±2σ包住 95% 的分布，且**恒为正**。
     pub fn _page_load_jitter_ms(&self) -> f64 {
-        gauss(200.0, 100.0)
+        gauss(200.0, 100.0).clamp(JITTER_MIN_MS, JITTER_MAX_MS)
     }
 }
+
+/// ⭐ 页面渲染抖动的**契约区间**（毫秒）。`_page_load_jitter_ms` 恒在此区间内。
+pub const JITTER_MIN_MS: f64 = 20.0;
+pub const JITTER_MAX_MS: f64 = 1000.0;
 
 fn gauss(mean: f64, std: f64) -> f64 {
     let mut rng = rand::thread_rng();
@@ -771,8 +787,16 @@ mod tests {
             let w = t._next_wait_secs();
             assert!((0.0..=10.0).contains(&w));
         }
-        let j = t._page_load_jitter_ms();
-        assert!(j > 0.0 && j < 2000.0);
+        // ⭐ 断言**契约区间**（`_page_load_jitter_ms` 的真实保证），
+        // 而非魔法数 —— 原断言 `j > 0.0 && j < 2000.0` 只是**碰巧**
+        // 与钳位区间兼容，且无法表达「恒为正」这条真正的约束。
+        for _ in 0..200 {
+            let j = t._page_load_jitter_ms();
+            assert!(
+                (JITTER_MIN_MS..=JITTER_MAX_MS).contains(&j),
+                "抖动 {j}ms 越出契约区间 [{JITTER_MIN_MS}, {JITTER_MAX_MS}]"
+            );
+        }
     }
 
     #[test]
