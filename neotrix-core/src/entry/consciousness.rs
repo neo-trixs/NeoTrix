@@ -3,6 +3,9 @@
 
 
 use super::{info, warn};
+use nt_term_viz::table::{pad_to, Align};
+use nt_term_viz::panel::{content_line, panel_bottom, panel_top};
+use nt_term_viz::display_width;
 use neotrix::l1_action::nt_core_bank::bank::ReasoningBank;
 
 pub fn run_consciousness_core(sub: Option<&str>, want_json: bool, cycles: usize) {
@@ -133,28 +136,49 @@ pub fn run_consciousness_core(sub: Option<&str>, want_json: bool, cycles: usize)
 
     match sub {
         "status" => {
-            println!("╭─ NeoTrix 意识核心 (ConsciousnessCore) ───────────────╮");
-            println!("│ 周期      {:>54}", cycle);
-            println!("│ 相位(Φ)   {:>53.4}", phi);
-            println!("│ 相干性    {:>53.4}", coherence);
-            println!("│ 谐振周期  {:>54}", resonance_cycle);
-            println!(
-                "│ GWT 谐振  {:>54}",
-                if snap.gwt_resonance_active {
-                    "active"
-                } else {
-                    "idle"
-                }
-            );
-            println!("│ 分支数    {:>54}", branch_count);
-            println!("│ 已消化果实{:>54}", fruits);
-            println!("│ 雾(加权)  {:>53.3}", fog);
-            println!("│ MARS S1激活{:>53}", snap.mars_system1_activations);
-            println!("│ MARS S2迭代{:>53}", snap.mars_system2_iterations);
-            println!("│ MARS 桥接  {:>54}", snap.mars_bridge_hits);
-            println!("│ 治理合规  {:>53.3}", snap.governance_compliance);
-            println!("│ 持久化    {:>54}", "KB kv_store consciousness/core");
-            println!("╰──────────────────────────────────────────────────────╯");
+            // ⚠️ 2026-10-02 迁移到 nt_term_viz::panel。
+            //
+            // 原实现 15 行全部手写 `{:>N}` 对齐 + 手写边框长度，实测错位：
+            //   `│ 周期      `     字符10 / 视觉12 ⇒ +2 列
+            //   `│ 相干性    `     字符 9 / 视觉12 ⇒ +3 列
+            //   `│ 谐振周期  `     字符 8 / 视觉12 ⇒ +4 列
+            // ⇒ 每行错位量**不同** ⇒ **右边框参差不齐**。
+            //
+            // ⛔ 顺带修一个格式不一致：原代码 `│ 已消化果实{:>54}` 的标签
+            //    与数值之间**没有空格**（其它行都有），这里统一成「标签列 +
+            //    一个空格 + 值」。
+            let rows: Vec<(&str, String)> = vec![
+                ("周期", cycle.to_string()),
+                ("相位(Φ)", format!("{phi:.4}")),
+                ("相干性", format!("{coherence:.4}")),
+                ("谐振周期", resonance_cycle.to_string()),
+                (
+                    "GWT 谐振",
+                    if snap.gwt_resonance_active { "active" } else { "idle" }.to_string(),
+                ),
+                ("分支数", branch_count.to_string()),
+                ("已消化果实", fruits.to_string()),
+                ("雾(加权)", format!("{fog:.3}")),
+                ("MARS S1激活", snap.mars_system1_activations.to_string()),
+                ("MARS S2迭代", snap.mars_system2_iterations.to_string()),
+                ("MARS 桥接", snap.mars_bridge_hits.to_string()),
+                ("治理合规", format!("{:.3}", snap.governance_compliance)),
+                ("持久化", "KB kv_store consciousness/core".to_string()),
+            ];
+
+            // 标签列宽按**列宽**算（中文占 2 列），不是 `chars().count()`
+            let label_w = rows.iter().map(|(l, _)| display_width(l)).max().unwrap_or(0);
+            let lines: Vec<String> = rows
+                .iter()
+                .map(|(l, v)| format!("{} {v}", pad_to(l, label_w, Align::Left)))
+                .collect();
+            let content_w = lines.iter().map(|l| display_width(l)).max().unwrap_or(0);
+
+            println!("{}", info(&panel_top("NeoTrix 意识核心 (ConsciousnessCore)", content_w)));
+            for l in &lines {
+                println!("{}", info(&content_line(l, content_w)));
+            }
+            println!("{}", info(&panel_bottom(content_w)));
         }
         "health" => {
             println!("┌─ 分支健康 ──────────────────────────────────────┐");

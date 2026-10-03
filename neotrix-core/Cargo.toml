@@ -95,6 +95,8 @@ path = "src/bin/nt_hf_catalog_download.rs"
 
 [dependencies]
 neotrix-types = { workspace = true }
+# 终端面板/对齐原语（宽度感知，修中文错位）
+nt-term-viz = { path = "../crates/nt-term-viz" }
 neotrix-sysctl = { workspace = true }
 neotrix-consciousness = { workspace = true }
 neotrix-reasoning = { workspace = true }
