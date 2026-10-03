@@ -49,6 +49,20 @@ PAIRS: list[tuple[str, str]] = [
     #   ⇒ 迁移只落自持树。此条曾被漂移门正确报出（md5 不同），
     #     故在此登记为**有意分叉**，不是静默漂移。
     ('dom.ts', 'dom.ts'),
+    # ⚠️ `ui/nb-markdown.css`：**锚点已改到自持树**（2026-10-03 裁决，见 ANCHORED）。
+    #   实测差异**只有 2 行**：`.md-code-lang` 与 `.md-copy` 的
+    #   `font-size: 11px → 12px`。
+    #   ⭐⭐ 裁决依据（实测，非品味）：自持树 `src/` 的 font-size 分布是
+    #   **12px × 9 / 13px × 1 / 11px × 0** ⇒ ⭐ **11px 是离群值**，
+    #   副本的 12px **对齐设计系统** ⇒ **副本是修正，不是回归**。
+    #   ⇒ ⭐ **从原件重新同步反而会引入离群值**（那正是门建议的动作 ⛔ 不做）。
+    #   ⛔ 刻意**不**把修改推到 `frontend/src/`：该树是**他窗在途**资产
+    #   （门自己写着「勿贸然同步（会与其竞速）」），且「M6 结局是 vendored 树被删」
+    #   ⇒ ⭐ 给即将退役的树做同步是纯浪费。
+    #   ⓘ 时间证据：副本 2026-10-02 20:11 **新于** 原件 2026-09-30 21:21（**2 天**）
+    #   ⇒ 门判「复制件更新 ⇒ 应从原件重新同步」在**归属上是对的**，
+    #   ⛔ 但**建议本身在这里是错的**（会退回离群值）。
+    #   ⇒ 故登记为有意分叉，保留该文件在对照内（门继续盯其它可能的漂移）。
     ('ui/nb-markdown.css', 'ui/nb-markdown.css'),
     # ⚠️ i18n **刻意不在漂移对照内**：我方词条是**自有集合**（实测与上游
     # 452 键零重合），不再是上游文件的复制件。把它纳入漂移检查会强迫我方
@@ -90,6 +104,20 @@ def strip_comments(src: str) -> str:
     return re.sub(r'//[^\n]*', '', src)
 
 
+# ── ⭐ 锚点覆盖：PAIRS 里仍有该文件，但比对基准从「原件」改为「自持树的期望 md5」──
+# ⭐ 理由：把文件移出 PAIRS（既有先例）会**丢掉这颗牙**；改锚点则**牙还在**
+# —— 任何人再改这个文件都会被抓，而**刻意的那 2 行修正**不会误报。
+# ⭐ 裁决依据（实测，非品味）：自持树 `src/` 的 font-size 分布为
+# **12px × 9 / 13px × 1 / 11px × 0** ⇒ **11px 是离群值**，自持树的 12px
+# **对齐设计系统** ⇒ ⭐ **从原件重新同步反而会引入离群值**
+# ⇒ ⭐ 故同步**方向**是错的。⛔ 刻意**不**推到 `frontend/src/`（他窗在途，
+# 且「M6 结局是 vendored 树被删」）。
+ANCHORED: dict[str, str] = {
+    # 上面的登记块记录了完整裁决与时间证据
+    'ui/nb-markdown.css': '9c0b5ae2179ee59f50471219b906b165',
+}
+
+
 def md5(path: str) -> str:
     with open(path, 'rb') as f:
         return hashlib.md5(f.read()).hexdigest()
@@ -117,6 +145,21 @@ for mine, orig in PAIRS:
         continue
     if not os.path.isfile(b):
         warn.append(f'原件已不在 frontend/src/{orig}（他窗已删/已移）⇒ 需确认去留')
+        continue
+    # ⭐ 锚点覆盖优先（见 ANCHORED 的裁决记录）
+    expect = ANCHORED.get(mine)
+    if expect is not None:
+        got = md5(a)
+        if not got.startswith(expect):
+            drift += 1
+            fail.append(
+                f'锚点漂移 src/{mine}\n'
+                f'       期望前缀={expect[:8]}  实际={got[:8]}\n'
+                f'       ⇒ 该文件已登记为「有意分叉」并锚定自持树期望值；\n'
+                f'         任何人再改动它都会被抓 ⇒ 若改动是有意的，请同步更新 ANCHORED。'
+            )
+        else:
+            print(f'✅ 1b 锚点一致 src/{mine}（有意分叉，基准=自持树期望值）')
         continue
     if md5(a) != md5(b):
         drift += 1
