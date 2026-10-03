@@ -81,7 +81,17 @@ curl -s "https://raw.githubusercontent.com/<owner>/<repo>/HEAD/LICENSE" | head -
 
 三者均为 MIT ⇒ 可自由取用思路与代码片段（**实际未复制任何代码**）。
 
-## 2026-10-03 新增
+## 2026-10-03 新增（第二批）
+
+| 仓库 | SPDX | 可吸收性 |
+|---|---|---|
+| `Niko1221/Strata` | **MIT** | ✅ 可吸收（MoE 跨层级卸载 / 投机解码 / MCP 自管理） |
+| `yetone/magpie` | **MIT** | ✅ 可吸收（一网关四协议 / 凭据单一收口 / 历史不按今天配置回填） |
+| `yetone/cumora` | **MIT** | ✅ 可吸收（seen-cursor 新鲜度闸 / 默认 fail-closed 沙箱） |
+
+判据见 [ABSORPTION-2026-10-03-STRATA-MAGPIE-CUMORA.md](../ABSORPTION-2026-10-03-STRATA-MAGPIE-CUMORA.md)。
+
+## 2026-10-03 新增（第一批）
 
 | 仓库 | SPDX | 可吸收性 |
 |---|---|---|
