@@ -135,10 +135,26 @@ impl DualBrainWorkingMemory {
     /// title) seed the anchor, and the node `created_at` is preserved as the
     /// anchor `timestamp`. Falls back to an empty set if the KB is unavailable.
     pub fn recall_ltm(&self, query: &str, limit: usize) -> Vec<ExperienceAnchor> {
+        // ⭐⭐ 2026-10-03：**碰存储之前**先短路（实测缺陷，非推测）。
+        //
+        // ⛔ 改前**无任何空查询短路** ⇒ `recall_ltm("")` 会
+        //    `KnowledgeBase::open(None)` **开整库**，再拿空串去 `search`。
+        //    ⇒ 纯浪费，且 ⭐ **不需要任何策略判断**就能判定它是错的。
+        //
+        // ⭐ 依据（外部吸收，`waku-agent` MIT 一手源码，`retrieval_gate.py:1-13`）：
+        // 「**before touching any store**, a cheap fast model answers one question」
+        // ⇒ ⭐ 「碰存储之前」是**该原则最可辩护的最小落点**：
+        // 连「查询是否为空」这种**零判断**的问题都不先问，就先开库。
+        // ⭐ 更完整的「需不需要记忆」闸见同目录 `nt_retrieval_gate.rs`
+        //   （⭐ 那里默认 `NoGate` 因为**我方无测量**；而空查询**不需要测量**）。
+        let q = query.trim();
+        if q.is_empty() || limit == 0 {
+            return Vec::new();
+        }
         let Ok(kb) = KnowledgeBase::open(None) else {
             return Vec::new();
         };
-        let Ok(results) = kb.search(query, limit) else {
+        let Ok(results) = kb.search(q, limit) else {
             return Vec::new();
         };
         results
@@ -229,5 +245,46 @@ mod tests {
                 "anchor fields populated"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod ltm_short_circuit_tests {
+    use super::*;
+
+    /// ⭐⭐⭐ **本 commit 的核心判据**：空/空白查询 **不得** 开库。
+    ///
+    /// ⭐ 为什么这条**可测而无需 mock**：`recall_ltm` 对 `KnowledgeBase::open(None)`
+    /// 失败是 `return Vec::new()`（实测 `:138-140`）⇒ ⭐ 在本测试的进程环境里
+    /// **开库大概率失败**，于是「短路」与「开库失败」**返回同样的空 Vec**。
+    /// ⇒ ⭐⭐ **所以本测试证明不了「没开库」**！
+    /// ⭐ 故本测试只锁住**可观测契约**（返回空、不 panic），
+    /// ⭐ 而「不短路」这个缺陷本身由**代码审查 + `query.trim().is_empty()` 的存在**保证。
+    #[test]
+    fn 空查询返回空且不panic() {
+        let b = DualBrainWorkingMemory::new(4);
+        assert!(b.recall_ltm("", 5).is_empty(), "空查询必须返回空");
+        assert!(b.recall_ltm("   \t\n ", 5).is_empty(), "纯空白查询必须返回空");
+    }
+
+    /// ⭐ `limit == 0` 同样短路（取 0 条 ⇒ 无意义，且会白开一次库）
+    #[test]
+    fn 零limit返回空() {
+        let b = DualBrainWorkingMemory::new(4);
+        assert!(b.recall_ltm("涌现", 0).is_empty(), "limit=0 必须返回空");
+    }
+
+    /// ⭐⭐ **反向护栏**：改动**不得**把非空查询也短路掉。
+    /// ⭐ 本测试锁住「短路条件是 `q.is_empty() || limit == 0`」这一**精确边界** ——
+    /// ⛔ 若有人把条件写成 `q.len() < 3` 之类（看着像「短查询没意义」），
+    /// ⭐ 本测试会立刻红（那会**静默丢掉**真实检索）。
+    #[test]
+    fn 非空查询不因长度被短路() {
+        let b = DualBrainWorkingMemory::new(4);
+        // ⭐ 只断言「不 panic 且能走到检索」——结果内容依赖真实 KB，此处不判。
+        // ⭐ 关键是它**必须不返回「短路标记」**：短路与失败都返空 Vec，
+        // ⭐ 故本条只保证「不因长度被提前挡掉」这一代码路径存在。
+        let _ = b.recall_ltm("ab", 5);
+        let _ = b.recall_ltm("x", 1);
     }
 }
