@@ -1,3 +1,29 @@
+# SSRF 候选基线 —— 逐个定性（2026-10-03 实测，不是推测）
+#
+# 判据：**URL 实参是被原样喂进去的「裸变量」** ⇒ host 才可能运行期可控。
+# ⛔ 本基线**不声称**这些点有漏洞，也**不声称**它们安全。
+#
+# ── A 类（16 个）：host 是**源码常量** ⇒ SSRF **不适用** ──────────────
+# `format!("https://<常量 host>/…?{query}")` ⇒ 用户只能影响 **query**，
+# 而 query 走 `urlencoding::encode`。实测样本：
+#   deezer.rs:18  format!("https://api.deezer.com/search?q={}&…", urlencoding::encode(&query))
+# ⭐⭐ 这类占 16/19。⛔ **把它们当漏洞去「修」= 把正确代码改坏**
+#   （`AGENTS.md` §5 R-SCAN-1「扫描告警 ≠ 缺陷」）。
+#
+# ── B 类（3 个）：host 来自**环境变量 / 本地配置** ⇒ 真候选 ─────────────
+# ⭐⭐ **但风险等级须说清**：这是**用户自己机器上的配置**
+# （`NEOBOT_BASE_URL` / `NEOTRIX_OLLAMA_BASE_URL`），
+# ⛔ **不是**「远程攻击者可控」⇒ 与经典 SSRF（外部输入直连内网）**不同类**。
+# · crates/neotrix-neobot/src/nt_http_engine.rs:37  env::var("NEOBOT_BASE_URL")
+#     （`:46` 已校验前缀是 http/https ✔，但 ⛔ 未校验 host 是否内网）
+# · crates/neotrix-neobot/src/nt_llama.rs:35/43  llamacpp_base_url / OLLAMA 覆盖
+#     （默认 `http://localhost…` ⇒ 默认就指向本机）
+# · crates/neotrix-neobot/src/nt_core.rs:172  base_url 参数（上游同源于配置）
+#
+# ⏳ B 类的正解**不是**给本地配置加 SSRF 门（那会挡掉合法的
+# 「指向我自己 Ollama」用法）⇒ ⭐ 而是**文档化信任边界**：
+# 「能改 `NEOBOT_BASE_URL` 的人 = 已能在本机执行代码」⇒ 不构成提权。
+# ⭐ 待办：把该边界写进 `docs/architecture/`（⛔ 本 commit 未做）。
 crates/neotrix-neobot/src/nt_core.rs
 crates/neotrix-neobot/src/nt_http_engine.rs
 crates/neotrix-neobot/src/nt_llama.rs

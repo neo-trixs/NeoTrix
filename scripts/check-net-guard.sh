@@ -40,10 +40,18 @@ cd "$REPO" || exit 2
 BASELINE="scripts/net-guard-baseline.txt"
 
 # 发起点 + 裸变量实参。用 grep -E 一步筛出候选（⛔ 不用 rg -E：本机静默返回 0，见 AGENTS.md §4.2）
+#
+# ⭐⭐ 必须剥掉**注释行**（`grep -v ':[[:space:]]*//'`）：
+# ⭐ 本基线文件里写了大量「定性说明」注释，其中提到
+# `format!("https://<常量>/…?{query}")` ⇒ ⭐ 若不剥，**说明文字会被当成发起点**。
+# ⭐⭐ 这是**本门自己的假阳性**（2026-10-03 实测：26 行注释被计入），
+# ⭐ 与 `check-ext-wiring.py` 的注释假阳性**同型** —— ⭐ 而那个门我当天已修过，
+# ⭐⭐ **说明我没有把上一处的教训推广到第二个门。**
 scan() {
   grep -rnE '(reqwest|ureq)::(get|post|request)\(&?[a-z_][a-z0-9_]*\)' \
     neotrix-core/src crates --include='*.rs' 2>/dev/null \
   | grep -v '/tests/' \
+  | grep -v ':[[:space:]]*//' \
   | sed 's/:.*//' | sort -u
 }
 
@@ -51,7 +59,9 @@ current="$(scan)"
 [ -z "$current" ] && { echo "FAIL: 扫描不到任何发起点（选择器失效？本门会假绿）"; exit 2; }
 
 if [ "${1:-}" = "--rebaseline" ]; then
-  printf '%s\n' "$current" > "$BASELINE"
+  keep=$(grep '^[[:space:]]*#' "$BASELINE" 2>/dev/null || true)
+  { [ -n "$keep" ] && printf '%s\n' "$keep"; printf '%s\n' "$current"; } > "$BASELINE.tmp2"
+  mv "$BASELINE.tmp2" "$BASELINE"
   echo "基线已重建: $(printf '%s\n' "$current" | wc -l | tr -d ' ') 个文件"
   exit 0
 fi
@@ -62,8 +72,12 @@ if [ ! -f "$BASELINE" ]; then
 fi
 
 cur_n=$(printf '%s\n' "$current" | wc -l | tr -d ' ')
-base_n=$(wc -l < "$BASELINE" | tr -d ' ')
-fresh=$(comm -23 <(printf '%s\n' "$current") <(sort -u "$BASELINE"))
+# ⭐⭐ 基线支持 `#` 理由注释（对齐 `check-ext-wiring.py` 的既有处理）：
+# ⭐ 理由：⭐ **定性理由必须与清单同处一地**，否则下一个读到
+# 「这个候选没被处理」却不知道它是否已定性。
+grep -v '^[[:space:]]*#' "$BASELINE" | grep -v '^[[:space:]]*$' | sort -u > "$BASELINE.tmp"
+base_n=$(wc -l < "$BASELINE.tmp" | tr -d ' ')
+fresh=$(comm -23 <(printf '%s\n' "$current") "$BASELINE.tmp")
 
 echo "运行期可控 URL 候选文件: $cur_n · 基线: $base_n"
 if [ -n "$fresh" ]; then
@@ -80,8 +94,9 @@ TXT
   exit 1
 fi
 
-stale=$(comm -13 <(printf '%s\n' "$current") <(sort -u "$BASELINE"))
+stale=$(comm -13 <(printf '%s\n' "$current") "$BASELINE.tmp")
 [ -n "$stale" ] && echo "ℹ️ 基线中 $(printf '%s\n' "$stale" | wc -l | tr -d ' ') 条已消失（可清理，不判红）"
+rm -f "$BASELINE.tmp"
 echo "PASS: 无新增运行期可控 URL 发起点"
 echo "⛔ 本门不判定基线内的候选是否有漏洞 —— 静态匹配无法解析 provenance。"
 
