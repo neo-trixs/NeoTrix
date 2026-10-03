@@ -152,3 +152,74 @@ F3 | ⭐⭐ **但运行时不消费它** | 全仓 `nt-core-capability-tree` 只�
 - ⛔ 未实现第 1 步（等 §6 第 2 条裁决）
 - ⛔ 未写 `neobot-check-emergence` 门（等第 1 步落地，否则门只能钉「不存在的东西」）
 - ⛔ 未定阈值（§6 第 1 条）
+
+---
+
+## 附录 A（2026-10-03 晚补）：⭐⭐ 运行时能力树为空的**根因已定位**
+
+§1 的判据是「涌现 = 能力树**新增节点**」。本轮把该判据**第一次**接进运行期
+（`ee2cc276` 注册表 + `ae3b3644` 意识侧生产 + `dc5b3e41` 门）之后，
+⭐⭐ **发现了更根本的一层**：
+
+### A.1 能力树在启动时是**空的**——因为 8 个节点生产者**零生产调用方**
+
+实测（`scripts/check-ext-wiring.py` 基线，209 个注册 API 中 50 个零调用）
+筛出这 8 个**能力节点生产者**，它们的签名一致：
+
+```rust
+pub fn register_xxx_capability(registry: &mut CapabilityTreeRegistry) -> CapabilityNode
+```
+
+⛔ 而 `grep` 全工作区：**零个生产调用方** ⇒ ⭐ **启动时没有任何代码往能力树里放节点。**
+⇒ §1 的判据虽然通了（`consciousness::gap::q*` 会新增节点），
+但那些节点是**意识自己长出来的缺口**，**不是系统真实能力的目录**。
+
+### A.2 ⭐ 依赖链已解出 ⇒ 接线是**确定的拓扑序**，不是猜
+
+实测各节点的 `requires`（`CapabilityNode::new_*` 第二/三参数）：
+
+```
+  trade_product_spec        requires=[]                                        ← 根
+        ↓
+  trade_quote_negotiation   requires=[trade_product_spec]
+        ↓
+  ├─ trade_production_logistics  requires=[trade_product_spec, trade_quote_negotiation]
+  └─ trade_finance_compliance    requires=[trade_product_spec, trade_quote_negotiation]
+        ↓
+  foreign_trade_full_cycle  requires=[trade_quote_negotiation,
+                                      trade_production_logistics,
+                                      trade_finance_compliance]
+```
+
+⭐ **这是一个 4 层 DAG，拓扑序唯一**（`product_spec` 必须最先，
+`full_cycle` 必须最后）⇒ 接线可以写成一段**确定性启动序列**，
+⛔ 而不是「挨个试着调」。
+
+### A.3 其余 4 个（同族但形态不同，需单独定性）
+
+| 函数 | 状态 |
+|---|---|
+| `register_social_access_capability` | ⛔ 未匹配到 `CapabilityNode::new_*` ⇒ **可能不是同一形态**，需先定性 |
+| `register_ocr_capability` | ⛔ 同上 |
+| `seo.rs::register_capability` | ✅ `id=nt_act::seo::analyze`，`requires=[seo.visibility]` |
+| `excel_capability.rs::register_nodes` | ✅ `id=nt_file_ability::excel::xlsx_read`，`requires=[]` |
+
+### A.4 ⭐ 因此下一步**不是**再设计，而是「按拓扑序接线 + 让门盯住」
+
+1. ⭐ 在**启动路径**（`ConsciousnessRuntime` 装配处或某个明确的 boot 序列）
+   按 A.2 的拓扑序调用这 4 个 trade 生产者 ⇒ ⭐ **能力树第一次被真实能力填满**。
+2. ⭐ 注册**必须**经 `nt_capability_registry`（而非各自 `&mut` 局部 registry），
+   否则它们填的是**临时树**，运行期查询仍为空。
+3. ⭐ 加门：断言「启动后能力树节点数 ≥ 预期下限」⇒ ⭐ 与 `neobot-check-emergence`
+   的 `COLD_START` 三态配合（接线到位后 `COLD_START` 应转为 `PASS`）。
+4. ⛔ **不得**用「直接把 8 个函数塞进某个 mod 就完事」的方式 ——
+   `register()` 对同 id 返回 `AlreadyExists`（实测 `registry.rs:169-171`），
+   拓扑序错了会**静默失败**（幂等成功）⇒ ⭐ 必须**按序**且**有断言**。
+
+### A.5 与 §5 的关系
+
+§5 第 1 步（运行期注册表）✅ `ee2cc276`
+§5 第 2 步（意识侧生产）✅ `ae3b3644`
+§5 第 3 步（涌现门，三态）✅ `dc5b3e41`
+⭐ **新增第 4 步：把「系统真实能力」灌进树**（本附录）。
+⇒ 在这一步完成前，涌现判据只在**意识自生缺口**这一条窄路径上成立。
