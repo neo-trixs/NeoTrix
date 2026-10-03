@@ -149,10 +149,53 @@ ipv4-mapped-IPv6 / bad scheme+unparseable / allows-public），
 | **能力清单产物** | ⛔ 无 | ✅ `calls:` |
 | **反虚标** | ✅ **`maturity_audit()`** | ⛔ 无 |
 
-⭐ **我们在「能力的形式化与反虚标」上更强，在「运行期可被扩展」上完全空白。**
-而后者正是「涌现」缺的另一半 —— ⭐ **能力树能长节点，但长出来的能力没法被就地接入系统。**
-⇒ 这是 §3.2 第 2 条（自举防腐）成为下一步首选的原因：**先让一个内建能力走扩展点**，
-扩展点才第一次被真实使用，也才第一次可能腐烂。
+⭐ 我们在「能力的形式化与反虚标」上更强。
+⭐⭐ 而「运行期可被扩展」这一侧 —— ⛔ **本节原写「完全空白」，是错的**，见 §3.4 订正。
+
+### 3.4 ⛔⛔ 订正：「完全空白」是错的 —— 扩展点**已建成且从未接线**
+
+2026-10-03 晚，同一 session 内自查发现（实测，非推测）：
+
+`neotrix-core/src/l5_cognition/nt_core_dispatch.rs`（**354 行**）是一个**完整的
+事件拦截扩展点**，其文件头自述：
+
+> 事件派发调度器 —— 吸收自 **deepseek-harness `vendor/cordis/src/events.ts`**
+> （4+1 dispatch modes: emit / waterfall / parallel / serial）
+> 机制: `Waterfall` 链式中间件: 每个 handler 可调 `next()` 委托给下一环
+> (around middleware), 或返回 `true` 短路
+> ⭐ **NeoTrix 消费方 (R-P79)**: McpServer 工具调用 pre/post 钩子 (Waterfall 中间件链)
+
+⇒ ⭐⭐ **这就是 Claude Code mods 的同一种东西**（事件拦截 + around 中间件 + 可短路），
+**我们早就有了，而且是从 cordis 吸收来的**。我此前说「未找到 hook/event 总线」
+⇒ **那句是错的**（我当时只 grep 了 `l1_action` 与 `handlers_consciousness` 两个目录）。
+
+**核实「R-P79 声明」**（`AGENTS.md` §4.4：「导出 ≠ 接入」；且历史上已错过 3 次）：
+
+| 核实项 | 结果 |
+|---|---|
+| McpServer 存在？ | ✅ 真实（`l1_action/nt_io/nt_io_mcp_bridge.rs` 等 5+ 文件） |
+| 其中有谁用 `Dispatcher` / `Waterfall`？ | ⛔ **零**（唯一同时命中两者的文件是 `nt_core_dispatch.rs` 自己的文档注释） |
+| `Dispatcher::new()` 构造点 | **仅 4 处，全部在** `l0_substrate/nt_core_event_bus.rs` |
+
+⇒ ⛔ **那 354 行 waterfall 扩展机制的真实消费者为零**，
+而文件头**声称**已接入 McpServer 并标注 R-P79。
+⭐ 这正是 `AGENTS.md` §4.4 点名的失效形态：
+**「门记录声称已做而实现从未入库」** —— ⭐ 而这次连门都没有，是注释里的声明。
+
+### 3.5 ⭐⭐ 本日最重要的模式发现：**瓶颈不是「没建」，是「没接」**
+
+今天在两个子系统上撞见**同一个形状**：
+
+| 子系统 | 规模 | 状态 |
+|---|---|---|
+| `nt-core-capability-tree`（能力树） | 节点模型 + registry + 成熟度 + 反虚标 + CLI + CI 门 | **零运行期消费者** → 今天 `ee2cc276` + `ae3b3644` 接线 |
+| `nt_core_dispatch`（waterfall 扩展点） | **354 行**，cordis 吸收，4 种派发模式 | ⛔ **零真实消费者**（R-P79 声明为假） |
+
+⇒ ⭐⭐ **结论：NeoTrix 的涌现瓶颈不在「缺引擎」，在「接线」。**
+⇒ 这比任何单点设计都更该指导优先级：
+**不要再去建第三套机制；先把已建的两套接进生产，并给「接线」加门。**
+⇒ ⚠️ 可直接复用的判据（今天已两次实证）：
+**凡看到「吸收自 X」+「消费方 (R-P79)」的注释，一律先核实消费者计数，再谈它已落地。**
 
 ---
 
