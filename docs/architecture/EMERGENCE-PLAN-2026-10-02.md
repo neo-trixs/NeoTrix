@@ -158,6 +158,32 @@ criterion_scores.push(CriterionScore {
   `7dda1e88`（饱和修复，附 7 组输入的探针实测表）与
   `ABSORPTION-INDEX` §「6 源显式命名看起来正常其实是坏」。
 
+### 6.7.1 ⭐ 已证明：LLM 调用点**在结构上**无法产出涌现级证据
+
+**查证（本轮实测，非推测）**：
+`nt_io_llm/mod.rs:64` 的 `trait UnifiedLlm` 只有
+`fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError>`。
+⇒ 任何调用点都**同时握有** request（含prompt）与 response。
+
+⇒ ⭐ **但这恰好证明判官挂在那里必然同源**：那个调用点**在产出它的
+agent loop 内部** ⇒ rubric 若也来自该 agent，即 `CriteriaSource::SelfReported`
+⇒ 按 §6.4，**永远不可计入涌现证据**（`11ee3a13` 已把该判定做成
+`JudgeResult::is_emergence_evidence()`）。
+
+⇒ **结论（架构级，非风格）**：
+· 在 `complete()` 处接判官 ⇒ **只能**用于**诊断与回归**，
+  产出 `SelfReported` 结果并被 `is_emergence_evidence()` 挡住。
+· 要拿到涌现级证据，判官**必须是另一次调用**：
+  独立模型实例，或固定外部基准，且 rubric **不由被评agent 提供**。
+
+⇒ ⭐ 因此 `evaluate_response` **至今零生产调用方是正确的**，
+不是「还没接上」，而是**接到 `complete()` 上就不该用于涌现判据**。
+真正的接线点是「**独立判官进程**」，那需要跨进程边界，属独立设计。
+
+⚠️ 由此也修正了一处措辞：§5.2 第1 条写「不给 `eval_engine` 任何生产调用方」，
+理由原是「没有真实模型输入」；**更准确的理由是本条** ——
+即便有了真实输入，若判官与产出同源，它**按定义**就不能当涌现证据。
+
 ### 6.8 本节的失效条件（元）
 若本节本身长期不更新、而上面 1–7 条已与代码脱节 ⇒
 **本计划已经变成叙述而非约束**，应删除重建，而不是继续修补。
