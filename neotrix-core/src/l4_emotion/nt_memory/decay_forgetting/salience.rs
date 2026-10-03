@@ -48,7 +48,29 @@ pub struct SalienceCalculator {
     pub decay: ExponentialDecay,
     pub weights: SalienceWeights,
     /// Normalization factor for access count: score = min(count/max, 1.0).
-    pub max_access_count: f64,
+    ///
+    /// ⛔ 2026-10-03 由 `pub` 收为**私有**。这不是风格问题，是**堵死一条绕过守卫的路径**。
+    ///
+    /// 【为什么必须有守卫】`:76` 是 `(access_count / max_access_count).min(1.0)`。
+    /// 分母为 0 时：`acc > 0` ⇒ `inf.min(1.0)` = 1.0；`acc == 0` ⇒ `NaN.min(1.0)` = **1.0**
+    /// （Rust 的 `f64::min` 返回非 NaN 那个操作数 ⇒ NaN 被**静默**吃掉）。
+    /// ⇒ 两种情况**都给出 1.0** ⇒ `access_factor` 对所有条目**恒为 1.0**
+    /// ⇒ 该维度**完全失去区分能力**，且调用处**收不到任何信号**。
+    ///
+    /// 【守卫已存在，但曾可被绕过】`with_max_access_count`（`:63`）有 `.max(1.0)`，
+    /// 配置文件路径（`config.rs:80`）也**走这个 setter**，默认值 `100.0`。
+    /// ⇒ 唯一绕过方式是**直接给字段赋值**（此前字段是 `pub`）。
+    ///
+    /// 【实测依据】`rg -ln 'max_access_count'` 全仓 4 个文件命中，但**逐条看**：
+    /// · `salience.rs` 本文件内 6 处（声明/默认值/setter/除法/注释/测试）
+    /// · `config.rs:34` 是**另一个结构体**的 serde 字段，`:80` 经 setter 传入 ⇒ 已守住
+    /// · `compressor.rs:11` 只是注释里的公式文字
+    /// · `kv_cache_optimizer.rs:320` 只是注释里的交叉引用
+    /// ⇒ **本字段零外部读写** ⇒ 收私有不破坏任何调用方。
+    ///
+    /// 与 `nt_io_inference/kv_cache_optimizer.rs:312` 的 `sparsity_threshold`
+    /// 属**同一类系统性问题**：守卫写在 setter，字段却声明为 `pub`。
+    max_access_count: f64,
 }
 
 impl SalienceCalculator {
