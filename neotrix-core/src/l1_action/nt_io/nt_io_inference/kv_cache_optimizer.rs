@@ -309,7 +309,16 @@ pub struct _KvCacheCompressor {
     /// Bits per element after quantization (3 or 4 recommended)
     pub quant_bits: u8,
     /// Sparsity threshold: attention heads with variance below this are zeroed
-    pub sparsity_threshold: f64,
+    ///
+    /// ⛔ 2026-10-03 由 `pub` 收为**私有**。依据（实测，非推断）：
+    /// 全仓 `rg -ln 'sparsity_threshold'` 只命中**本文件** ⇒ **零外部读者、
+    /// 零外部写入**。三个构造器分别给 `0.01` / `0.01` / `0.05`，**均 > 0**。
+    /// ⭐ 收窄的真实收益不是"风格"，而是**堵死一条可绕过守卫的写入路径**：
+    /// `:353` 的 `variance / self.sparsity_threshold` 一旦分母为 0，
+    /// `keep_ratio` 恒 1.0 ⇒ `sparse_count` 变 **0** ⇒ 静默丢掉整个块的元素。
+    /// 既然无人从外部写，把 `pub` 去掉即让该状态**不可达**。
+    /// （与 `decay_forgetting/salience.rs:51` 的 `pub max_access_count` 同类问题。）
+    sparsity_threshold: f64,
 }
 
 impl _KvCacheCompressor {
