@@ -333,3 +333,67 @@ $ grep -c 'pub mod' neotrix-core/src/entry/mod.rs
 ⇒ ⭐⭐ **甲-2 从「代价比想象大」翻转为「可执行」**。
 ⛔ **本轮仍不做实施**（预算已尽）—— ⭐ 但 ⭐⭐ **现在做它的三个前置条件都已实测通过**：
 可见性（§9）· 依赖面（§13.2）· 门算术（§13.3）。
+
+
+---
+
+## 14. ⛔⭐⭐ 甲-2 **实施失败并已回退** —— §13.2 的「完全自包含」**第三次被证伪**
+
+### 14.1 我做了什么
+建 `apps/ntcode/`（`Cargo.toml` + `lib.rs`，依赖仅 `crossterm`/`ratatui`），
+用 `git mv` 移动 **5 个文件 / 3,261 行**，改写 `crate::l1_action::*` → `crate::*`，
+并移除 `l1_action/mod.rs` 的 4 条注册。
+
+### 14.2 ⛔ 编译立刻抓到 **2 个我漏掉的东西**
+```text
+error[E0583]: file not found for module `nt_dialogue_tui`
+  --> neotrix-core/src/l1_action/mod.rs:29:1
+error[E0432]: unresolved import `crate::l1_action::nt_model_cli`
+  --> neotrix-core/src/l1_action/nt_io/nt_io_provider/catalog/cli_free_source.rs:21:23
+  = note: could not find `nt_model_cli` in `l1_action`
+```
+
+### 14.3 ⭐⭐ 漏项的**性质**（这才是关键）
+`cli_free_source.rs:21` 依赖 `nt_model_cli::run_capture`，而 `run_capture` 是
+```rust
+// apps/ntcode/src/nt_model_cli.rs:307
+/// crate 内复用：跑任意命令并取 stdout（发现源等调用方共用超时可杀语义）。
+pub(crate) fn run_capture(...)
+```
+
+⇒ ⭐⭐⭐ **`pub(crate)` 意味着它本来就不属于「壳」，它是 `neotrix-core` 的 crate 内设施。**
+⇒ ⛔⭐⭐ **§13.2 的「集群零依赖 L1 其他子系统」是错的。**
+⭐ **为什么我的测量漏了它**：我按 `crate::l1_action::` 这个**字面前缀**统计依赖
+⇒ ⭐⭐ **`pub(crate)` 的 crate 内引用天然不含这个前缀 ⇒ 被系统性漏掉。**
+
+### 14.4 ⭐⭐ 这是本会话**第三次**代价估算失败，且**根因相同**
+| 轮次 | 我的说法 | 被什么推翻 |
+|---|---|---|
+| 1 | 「乙第 3 批风险最低」 | ⭐ **门算术**（7+7=14 > 8） |
+| 2 | 「甲-1 代价最小」 | ⭐ **可见性**（`entry/` 是 `main.rs` 私有） |
+| 3 | 「甲-2 可执行、零循环依赖风险」 | ⭐ **编译**（`pub(crate)` 跨子系统依赖） |
+
+⇒ ⭐⭐⭐ **三次都因为「只看了可见的那一面」**：
+名字 / 前缀 / 模块头。⇒ ⭐⭐ **真正的对策不是「更小心」，是换一个判据**：
+
+> ⭐⭐⭐ **依赖面必须用编译器验证，不能用文本统计。**
+> ⭐ **最便宜的可靠做法**：`git mv` 之后**先 `cargo check -p <受影响 crate>`**，
+> ⭐ 成本 ≈ 50 秒，而文本统计的成本是**又一次错误结论 + 一轮回退**。
+
+### 14.5 ✅ 回退已完成并验证
+· `apps/ntcode/` 已删除（5 文件 / Cargo.toml / lib.rs 全清）
+· 5 个文件**行数复原**（1091 / 1061 / 617 / 296 / 196 = 3,261）
+· `l1_action/mod.rs` 已还原
+· `cargo check -p neotrix --lib` → ⭐ **Finished, 0 error**
+
+### 14.6 ⭐ 甲-2 若要继续，**必须先解决的真问题
+**`run_capture`（及其依赖的 `run_with_timeout`）该归属何处：**
+· ⭐ 选项一：留在 `neotrix-core`（它本是 crate 内设施）⇒ **抽 crate 时不动它**，
+  ⭐⭐ 只需让 `cli_free_source.rs` 保持引用 `neotrix-core` 侧的它
+  ⇒ ⭐ **这要求把 `run_capture` 从 `nt_model_cli.rs` 拆出去**（它与「模型 CLI」无关，
+  ⭐ 是**通用进程执行 + 超时可杀**工具）
+· ⛔ 选项二：让 `neotrix-core` 依赖 `ntcode` ⇒ ⭐⭐ **循环依赖**（ntcode 要用 neotrix 的类型）⇒ 不可行
+
+⇒ ⭐ **选项一是唯一可行解**，且它 ⭐⭐ **顺带暴露一个真实的模块边界问题**：
+`run_capture` ⭐ 本来就不该住在 `nt_model_cli` 里。
+⇒ ⭐ **这件事本身值得单独做**（比抽 crate 小得多、价值更明确）。
