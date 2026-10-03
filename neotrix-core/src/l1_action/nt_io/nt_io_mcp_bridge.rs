@@ -4,6 +4,8 @@
 //! 调用外部 MCP 服务器的工具
 
 use serde::{Deserialize, Serialize};
+// ⭐ 2026-10-03：接入 waterfall 扩展点（兑现该文件自称的 R-P79，见 tool_hooks 字段注释）。
+use crate::l5_cognition::nt_core_dispatch::Dispatcher;
 use std::collections::HashMap;
 
 /// MCP 工具定义
@@ -39,6 +41,22 @@ pub struct McpBridge {
     local_tools: HashMap<String, McpTool>,
     /// 外部 MCP 服务器
     servers: HashMap<String, McpServer>,
+    /// ⭐⭐ 工具调用 waterfall 钩子链（2026-10-03 接线）
+    ///
+    /// ⭐ **兑现 `nt_core_dispatch.rs` 文件头自称的 R-P79**：
+    /// 该文件（**354 行**，吸收自 deepseek-harness `vendor/cordis/src/events.ts`）
+    /// 写着「NeoTrix 消费方 (R-P79): McpServer 工具调用 pre/post 钩子
+    /// (Waterfall 中间件链)」。
+    /// ⛔ **但实测那 174 处 R-P79 注释里，声明与实现脱节的不止一处**：
+    ///   全仓对 `nt_core_dispatch` 的引用只有 `mod.rs`（声明）与
+    ///   `l0_substrate/nt_core_event_bus.rs`（字段类型），**本文件零引用**
+    ///   ⇒ 那句 R-P79 是**未兑现的声明**（`AGENTS.md` §4.4「导出 ≠ 接入」）。
+    /// ⇒ 本 commit 让它**第一次**为真。
+    ///
+    /// ⭐ 语义（取自 `Dispatcher::dispatch_waterfall` 的文档，非猜）：
+    /// 任一 handler 返回 `true` 即**短路**，剩余链不运行
+    /// ⇒ **短路 = 拦截**（阻止工具真正执行），与该文档「用于守卫链」的表述一致。
+    tool_hooks: Dispatcher<McpToolCall>,
 }
 
 /// 外部 MCP 服务器
@@ -70,7 +88,27 @@ impl McpBridge {
         Self {
             local_tools: HashMap::new(),
             servers: HashMap::new(),
+            tool_hooks: Dispatcher::new(),
         }
+    }
+
+    /// ⭐⭐ 注册工具调用 waterfall 钩子（2026-10-03 接线，见 `tool_hooks` 字段注释）
+    ///
+    /// - 返回 `true` ⇒ **拦截**：本次调用不会进入真实工具执行。
+    /// - 调用 `next()` ⇒ 委托给链上剩余钩子（around 中间件语义）。
+    ///
+    /// ⛔ 这不是「把已有能力换个地方放」——接线前 `nt_core_dispatch` 的
+    /// 354 行 waterfall 机制**真实消费者为零**，本方法是它**第一个**生产入口。
+    pub fn on_tool_call<F>(&mut self, handler: F) -> usize
+    where
+        F: Fn(&McpToolCall, &dyn Fn()) -> bool + Send + Sync + 'static,
+    {
+        self.tool_hooks.register(handler)
+    }
+
+    /// 当前已注册的工具钩子数（可观测 ⇒ 接线可证伪）
+    pub fn tool_hook_count(&self) -> usize {
+        self.tool_hooks.len()
     }
 
     /// 注册本地工具
@@ -94,7 +132,17 @@ impl McpBridge {
     }
 
     /// 调用本地工具 (供外部 MCP 客户端)
+    ///
+    /// ⭐ 2026-10-03：先过 `tool_hooks` waterfall 链（守卫/中间件），
+    /// 任一钩子返回 `true` 即短路，**不进入真实工具执行**。
     pub fn call_local_tool(&self, call: &McpToolCall) -> McpToolResult {
+        if self.tool_hooks.dispatch_waterfall(call) {
+            return McpToolResult {
+                call_id: call.id.clone(),
+                content: format!("Tool '{}' blocked by hook", call.name),
+                is_error: true,
+            };
+        }
         match self.local_tools.get(&call.name) {
             Some(_tool) => {
                 // 实际调用逻辑需要根据工具类型实现
@@ -255,5 +303,65 @@ mod tests {
         assert_eq!(result.call_id, "call1");
         assert!(!result.is_error);
         assert!(result.content.contains("test_tool"));
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // ⭐⭐ waterfall 接线回归（2026-10-03）
+    // ⭐ 这三条测试的价值不在「钩子能跑」，而在**证伪那句未兑现的 R-P79 声明**：
+    //   接线前 `nt_core_dispatch` 的 354 行 waterfall 机制真实消费者为零。
+    //   ⇒ 若将来有人把 `tool_hooks` 摘掉，这三条会立刻红。
+    // ════════════════════════════════════════════════════════════════
+
+    /// ⭐ 建一个**已注册**工具的 bridge —— 否则 `call_local_tool` 会走
+    /// 「工具未找到」分支返回 `is_error=true`，我的「无钩子不改变行为」
+    /// 就会因为**前提错误**而失败（⭐ 第一版就这样翻车了）。
+    fn bridge_with_tool() -> McpBridge {
+        let mut b = McpBridge::new();
+        b.register_local_tool(McpTool {
+            name: "test_tool".to_owned(),
+            description: "A test tool".to_owned(),
+            parameters: serde_json::json!({}),
+        });
+        b
+    }
+
+    fn sample_call() -> McpToolCall {
+        McpToolCall {
+            id: "c1".to_owned(),
+            name: "test_tool".to_owned(),
+            arguments: serde_json::json!({}),
+        }
+    }
+
+    /// ⭐ 无钩子时行为**不变**（接线不能改变既有语义）
+    #[test]
+    fn 无钩子时不改变原有行为() {
+        let b = bridge_with_tool();
+        assert_eq!(b.tool_hook_count(), 0);
+        let r = b.call_local_tool(&sample_call());
+        assert!(!r.is_error, "无钩子时不应被拦截");
+    }
+
+    /// ⭐ 返回 `true` ⇒ **拦截**，工具不执行（守卫语义）
+    #[test]
+    fn 钩子返回true则短路拦截() {
+        let mut b = bridge_with_tool();
+        b.on_tool_call(|_c, _next| true);
+        assert_eq!(b.tool_hook_count(), 1);
+        let r = b.call_local_tool(&sample_call());
+        assert!(r.is_error, "被拦截的结果必须是错误");
+        assert!(r.content.contains("blocked by hook"), "实际: {}", r.content);
+    }
+
+    /// ⭐ 守卫链：前面的放行、后面的拦截 ⇒ **任一**返回 true 即拦截
+    /// （语义取自 `Dispatcher::dispatch_waterfall` 文档，非猜）
+    #[test]
+    fn 守卫链任一返回true即拦截() {
+        let mut b = bridge_with_tool();
+        b.on_tool_call(|_c, _next| false); // 放行
+        b.on_tool_call(|_c, _next| true); // 拦截
+        assert_eq!(b.tool_hook_count(), 2);
+        let r = b.call_local_tool(&sample_call());
+        assert!(r.is_error, "链上后段拦截应生效");
     }
 }
