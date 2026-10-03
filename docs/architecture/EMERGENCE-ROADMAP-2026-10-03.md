@@ -47,6 +47,30 @@ F1 | ⭐ **能力树可新增节点** | `registry.rs:168 pub fn register(&mut se
 F2 | ⭐ **成熟度虚标已被门拦** | `cli.rs:945 registry.maturity_audit()`；CI 在 `ci.yml:368-377` 跑 `audit-maturity --strict` |
 F3 | ⭐⭐ **但运行时不消费它** | 全仓 `nt-core-capability-tree` 只出现在：自身 crate 文件、`Cargo.toml`、`ARCHITECTURE-MAP-ROADMAP-V2.md`、`scripts/check-doc-claims.sh`、`scripts/dup-types-baseline.txt`、`TODO.yml`、handoff 文档。⛔ `neotrix-core/src` 与 `crates/neotrix-neobot/src` **零引用** |
 
+### 2.1 ⛔ 勘误（2026-10-03，接线时实测发现）
+
+⛔ **commit `ee2cc276` 的 message 里有一句假陈述**：「`nt-core-capability-tree`
+**无任何 crate 依赖它**」。
+
+**真相**：`neotrix-core/Cargo.toml:103` **早就有** `nt_core_capability_tree = { workspace = true }`。
+
+**根因**：该句是用 `grep 'nt-core-capability-tree'`（**连字符**）得出 0 命中，
+而 Cargo 依赖项里写的是 `nt_core_capability_tree`（**下划线**）
+⇒ ⛔ 我把「一次拼错分隔符的 grep 没命中」升级成了「架构结论」。
+
+⭐ 这正是 `AGENTS.md` **R-SCAN-1b** 的形态，我自己踩了：**裸 grep 的零命中不构成证据**。
+
+**逐条复核后，其余结论全部成立**：
+
+| 陈述 | 判定 | 依据 |
+|---|---|---|
+| `crates/neotrix-neobot` 之前**没有**该依赖 | ✅ 真 | `git show ee2cc276~1:…/Cargo.toml` = 0 命中 ⇒ 加依赖**必要非冗余** |
+| `neotrix-core/src` **零源码引用** | ✅ 真 | `rg -c 'nt_core_capability_tree\|CapabilityTreeRegistry' neotrix-core/src` = 0（28 MB 全扫）⇒ **F3 缺口成立** |
+| 本表 F3 行 | ✅ **写得对** | 它列了 `Cargo.toml`，且断言限定在 **源码零引用**，未越界 |
+
+⭐ **教训沉淀**：Cargo 包名在 `[[package]] name` 里是**连字符**、在依赖键里是**下划线**
+⇒ 查依赖必须**两种分隔符都查**，或直接 `grep workspace = true` / 查 `[workspace.dependencies]`。
+
 ---
 
 ## 3. ⭐ 现状判定：不是「还没做」，是「**做了一半且那半没接线**」
