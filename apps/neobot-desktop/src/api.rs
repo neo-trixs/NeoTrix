@@ -290,7 +290,16 @@ pub const SPECS: &[ApiSpec] = &[
     ApiSpec::new("clear_service_logs", "日志", &[], "void", Status::Stub, DSH_ONLY),
     ApiSpec::new("get_desktop_about", "桌面", &[], "DesktopAboutInfo", Status::Implemented, ""),
     ApiSpec::new("remote_bridge_ping", "远端", &[], "string", Status::Planned,
-        "出口：SSH 后端（远端起停 + 隧道）。ssh2 在 devDeps 只是引子，无后端的心跳是假心跳"),
+        // ⭐ 2026-10-02 更正两处**失真声明**（原文：「ssh2 在 devDeps 只是引子，
+        // 无后端的心跳是假心跳」）：
+        // ① `ssh2` 在**整个 workspace 的 Cargo.toml 里零出现**（实测）⇒ 不是引子，
+        //    是**根本没加**；
+        // ② 且本命令**无任何实现、未注册**（实测全仓仅本行命中）⇒ 不是「假心跳」，
+        //    是**连心跳都没有**。
+        // ⭐ 订正后的口径：未接线。调用它会得到 `command not found`。
+        //    前端当前**无调用方**（实测），故这是「出口声明」而非「坏掉的功能」。
+        "出口：SSH 后端（远端起停 + 隧道）。⛔ 未接线：无实现、未注册、ssh2 未引入；前端无调用方"),
+
     ApiSpec::new("check_desktop_update", "更新", &[], "DesktopUpdateInfo", Status::Planned,
         "出口：发布通道存在（releases.atom + 平台包命名）+ ureq/semver/atom 解析。
         未接前回 None 与抛错在界面同效果（静默无提示），且 desktop 从未发版，无物可对"),
