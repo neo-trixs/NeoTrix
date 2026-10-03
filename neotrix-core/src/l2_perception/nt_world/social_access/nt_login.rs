@@ -157,97 +157,50 @@ impl LoginRegistry {
     }
 }
 
-/// 构造默认注册表。
+/// 构造默认登录注册表 —— **由 [`PlatformCatalog`] 派生，不重复维护**。
 ///
-/// ⭐ 每个平台的探针都取自**实测**而非猜测：
+/// # ⛔ 2026-10-03：此前这里是**第二份手写平台清单**
 ///
-/// | 平台 | 判据 | 依据 |
-/// |---|---|---|
-/// | x | cookie `auth_token` + URL `/home` | bird/gobird README 记录 `auth_token`(40 hex) 与 `ct0`；`login_manual` 原实现也用它 |
-/// | github | cookie `user_session` + URL 段 | GitHub 会话 cookie 名 |
-/// | reddit | cookie `reddit_session` + URL 段 | Reddit 会话 cookie 名 |
-/// | bilibili | cookie `SESSDATA` + URL 段 | B 站标准会话 cookie |
-/// | zhihu | cookie `z_c0` + URL 段 | 知乎的 `z_c0` 即登录态 cookie |
+/// 上一个版本本函数硬编码 5 个 [`LoginTarget`]，而
+/// [`crate::l2_perception::nt_world::social_access::nt_catalog::default_catalog`]
+/// 有 10 个。审计实证的漂移后果：
 ///
-/// ⚠️ 除 x 外，其余 cookie 名**未经本机实测**（那些站点本机未登录）。
-/// 它们是各自社区的公开惯例，但若将来发现不对，
-/// 修 [`LoginRegistry::register`] 里的一条数据即可 —— 无需改控制流。
+/// ```text
+/// $ neotrix social catalog --json  → 10 个平台（含 instagram/tiktok/…）
+/// $ neotrix social sites    --json  →  5 个平台
+/// ```
+///
+/// ⛔ 即 `catalog` 声称支持某平台，`auth` 却拒接它 —— 用户看到的是
+/// 「自相矛盾的工具」，而非「明确不支持」。
+///
+/// ⇒ 现改为**从目录派生**：登录能力是平台的**属性**，不是独立清单。
+/// 新增平台只需 [`PlatformCatalog::register`]，登录表自动跟随。
 pub fn default_registry() -> LoginRegistry {
+    let catalog = crate::l2_perception::nt_world::social_access::nt_catalog::default_catalog();
     let mut r = LoginRegistry::new();
-
-    r.register(LoginTarget {
-        id: "x".into(),
-        display_name: "X (Twitter)".into(),
-        login_url: "https://x.com/login".into(),
-        success_url: Some("https://x.com/home".into()),
-        probes: vec![
-            // ⭐ 存在性检查，不读值（HttpOnly）
-            SuccessProbe::CookiePresent { name: "auth_token".into() },
-            SuccessProbe::UrlContains { needle: "/home".into() },
-        ],
-        cookie_file: "x.json".into(),
-        timeout: Duration::from_secs(300),
-        requires_session: true,
-    });
-
-    r.register(LoginTarget {
-        id: "github".into(),
-        display_name: "GitHub".into(),
-        login_url: "https://github.com/login".into(),
-        success_url: Some("https://github.com/".into()),
-        probes: vec![
-            SuccessProbe::CookiePresent { name: "user_session".into() },
-            SuccessProbe::UrlContains { needle: "github.com/".into() },
-        ],
-        cookie_file: "github.json".into(),
-        timeout: Duration::from_secs(300),
-        requires_session: true,
-    });
-
-    r.register(LoginTarget {
-        id: "reddit".into(),
-        display_name: "Reddit".into(),
-        login_url: "https://www.reddit.com/login".into(),
-        success_url: Some("https://www.reddit.com/".into()),
-        probes: vec![
-            SuccessProbe::CookiePresent { name: "reddit_session".into() },
-            SuccessProbe::UrlContains { needle: "reddit.com/".into() },
-        ],
-        cookie_file: "reddit.json".into(),
-        timeout: Duration::from_secs(300),
-        requires_session: true,
-    });
-
-    r.register(LoginTarget {
-        id: "bilibili".into(),
-        display_name: "Bilibili".into(),
-        login_url: "https://passport.bilibili.com/login".into(),
-        success_url: Some("https://www.bilibili.com/".into()),
-        probes: vec![
-            SuccessProbe::CookiePresent { name: "SESSDATA".into() },
-            SuccessProbe::UrlContains { needle: "bilibili.com/".into() },
-        ],
-        cookie_file: "bilibili.json".into(),
-        timeout: Duration::from_secs(300),
-        requires_session: true,
-    });
-
-    r.register(LoginTarget {
-        id: "zhihu".into(),
-        display_name: "知乎".into(),
-        login_url: "https://www.zhihu.com/signin".into(),
-        success_url: Some("https://www.zhihu.com/".into()),
-        probes: vec![
-            SuccessProbe::CookiePresent { name: "z_c0".into() },
-            SuccessProbe::UrlContains { needle: "zhihu.com/".into() },
-        ],
-        cookie_file: "zhihu.json".into(),
-        timeout: Duration::from_secs(300),
-        requires_session: true,
-    });
-
+    for spec in catalog.all() {
+        // ⛔ 无探针 / 无登录 URL 的平台**不注册**到登录表：
+        //    「没有可验证的登录判据」与「有判据但未登录」必须可区分。
+        let (Some(login_url), false) = (spec.login_url.clone(), spec.login_probes.is_empty()) else {
+            continue;
+        };
+        let cookie_file = spec.cookie_file.clone().unwrap_or_else(|| format!("{}.json", spec.id));
+        r.register(LoginTarget {
+            id: spec.id.clone(),
+            display_name: spec.display_name.clone(),
+            login_url,
+            success_url: spec.success_url_for_channel(),
+            probes: spec.login_probes.clone(),
+            cookie_file,
+            timeout: spec.login_timeout.unwrap_or(DEFAULT_LOGIN_TIMEOUT),
+            requires_session: spec.requires_session,
+        });
+    }
     r
 }
+
+/// 默认登录超时（目录未指定时）。
+pub const DEFAULT_LOGIN_TIMEOUT: Duration = Duration::from_secs(300);
 
 /// 对一次观测执行全部探针。
 ///
@@ -553,5 +506,88 @@ mod tests {
             assert!(p.ends_with("github.json"), "got {:?}", p);
             assert!(p.to_string_lossy().contains(".neotrix"));
         }
+    }
+}
+#[cfg(test)]
+mod drift_guard_tests {
+    use super::*;
+
+    /// ⭐⭐ **漂移守卫** —— 本轮审计的核心缺陷。
+    ///
+    /// ⛔ 此前 `default_registry()` 是**第二份手写平台清单**，与
+    /// `nt_catalog` 的漂移后果已实测：
+    /// ```text
+    /// $ social catalog --json → 10 个平台
+    /// $ social sites    --json →  5 个平台
+    /// ```
+    /// 即 `catalog` 声称支持、`auth` 拒接 —— 用户看到自相矛盾的工具。
+    #[test]
+    fn login_table_is_derived_from_catalog_not_handwritten() {
+        use crate::l2_perception::nt_world::social_access::nt_catalog::default_catalog;
+
+        let catalog = default_catalog();
+        let login = default_registry();
+
+        // ⭐ 登录表 ⊆ 目录（无探针的平台理应缺席）
+        for id in login.ids() {
+            assert!(
+                catalog.get(id).is_some(),
+                "login table has `{}` but catalog does not ⇒ drifted",
+                id
+            );
+        }
+
+        // ⭐ 目录里凡「有探针且有 login_url」的平台，登录表**必须**有
+        for spec in catalog.all() {
+            if !spec.login_probes.is_empty() && spec.login_url.is_some() {
+                assert!(
+                    login.get(&spec.id).is_some(),
+                    "catalog says `{}` supports login but the login table lacks it ⇒ drifted",
+                    spec.id
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn platforms_without_probes_are_absent_from_login_table() {
+        // ⭐ 关键区分：「无可验证判据」≠「已判未登录」
+        let login = default_registry();
+        for id in ["instagram", "tiktok", "linkedin", "youtube", "web"] {
+            assert!(
+                login.get(id).is_none(),
+                "{} has no probe; it must NOT appear in the login table",
+                id
+            );
+        }
+    }
+
+    #[test]
+    fn derived_login_targets_are_consistent_with_their_specs() {
+        use crate::l2_perception::nt_world::social_access::nt_catalog::default_catalog;
+
+        let catalog = default_catalog();
+        let login = default_registry();
+        for id in login.ids() {
+            let spec = catalog.get(id).expect("checked above");
+            let t = login.get(id).expect("present");
+            assert_eq!(t.display_name, spec.display_name, "{} display_name drift", id);
+            assert_eq!(t.probes, spec.login_probes, "{} probes drift", id);
+            assert_eq!(t.login_url, spec.login_url.clone().unwrap_or_default());
+            // ⭐ cookie 文件名也必须同源，否则会出现两套路径
+            assert_eq!(t.cookie_file, spec.cookie_file.clone().unwrap_or_else(|| format!("{}.json", spec.id)));
+            assert_eq!(t.requires_session, spec.requires_session);
+        }
+    }
+
+    #[test]
+    fn success_url_falls_back_to_url_probe() {
+        use crate::l2_perception::nt_world::social_access::nt_catalog::default_catalog;
+        // x 的 success_url 显式配置为 /home
+        let x = default_catalog().get("x").expect("x present").clone();
+        assert_eq!(x.success_url_for_channel().as_deref(), Some("/home"));
+        // 无显式配置的，probe 派生为 None（该平台探针里无 UrlContains）
+        let yt = default_catalog().get("youtube").expect("yt present").clone();
+        assert_eq!(yt.success_url_for_channel(), None);
     }
 }

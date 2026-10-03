@@ -621,9 +621,14 @@ pub fn run_social_catalog(json: bool) -> i32 {
             serde_json::json!({
                 "id": spec.id,
                 "name": spec.display_name,
+                "aliases": spec.aliases(),
                 "url_patterns": spec.url_patterns,
                 "channel": ch.map(|c| c.name.clone()),
                 "backends": ch.map(|c| c.backends.iter().map(|b| b.name.clone()).collect::<Vec<_>>()),
+                // ⭐ 报告 adapter 接线状态 —— 审计发现 6 个 extractor
+                //    曾全部零生产调用方，这条让该状态可从外部观测
+                "adapter": neotrix::l2_perception::nt_world::social_access::adapter_for(&spec.platform_id())
+                    .map(|a| a.id()),
                 "supports_login": spec.supports_login(),
                 "requires_session": spec.requires_session,
                 "env_vars": {
@@ -637,17 +642,24 @@ pub fn run_social_catalog(json: bool) -> i32 {
     if json {
         println!("{}", serde_json::json!({ "platforms": rows }));
     } else {
-        println!("{:<11} {:<13} {:<9} {:<8} {}", "ID", "NAME", "LOGIN", "SESSION", "CHANNEL");
+        println!(
+            "{:<11} {:<13} {:<9} {:<9} {:<10} {}",
+            "ID", "NAME", "ADAPTER", "LOGIN", "SESSION", "CHANNEL"
+        );
         for r in &rows {
             println!(
-                "{:<11} {:<13} {:<9} {:<8} {}",
+                "{:<11} {:<13} {:<9} {:<9} {:<10} {}",
                 r["id"].as_str().unwrap_or("?"),
                 r["name"].as_str().unwrap_or("?"),
+                r["adapter"].as_str().unwrap_or("none"),
                 if r["supports_login"].as_bool().unwrap_or(false) { "yes" } else { "-" },
                 if r["requires_session"].as_bool().unwrap_or(false) { "required" } else { "optional" },
                 r["channel"].as_str().unwrap_or("none")
             );
         }
+        println!();
+        println!("ⓘ  ADAPTER=none means no extractor is wired for that platform yet.");
+        println!("   ALIASES (json) are legacy ids kept for backward compatibility.");
         println!();
         println!("ⓘ  LOGIN=-  means no verified success probe for that platform yet.");
         println!("   Adding a platform is data-only: `PlatformCatalog::register`,");

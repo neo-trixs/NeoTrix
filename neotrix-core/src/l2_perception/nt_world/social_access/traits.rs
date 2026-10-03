@@ -19,7 +19,7 @@ impl SocialPlatform {
         &[SocialPlatform::Twitter, SocialPlatform::Reddit, SocialPlatform::Instagram, SocialPlatform::TikTok, SocialPlatform::Youtube, SocialPlatform::Linkedin]
     }
 
-    pub fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::Twitter => "twitter",
             Self::Reddit => "reddit",
@@ -27,7 +27,16 @@ impl SocialPlatform {
             Self::TikTok => "tiktok",
             Self::Youtube => "youtube",
             Self::Linkedin => "linkedin",
-            Self::Other(_) => "other",
+            // ⭐ 2026-10-03 修复：原为 `Self::Other(_) => "other"`，
+            // 返回类型是 `&'static str`，故**丢弃了内部的名字**。
+            //
+            // ⛔ 后果实测：`SocialPlatform::Other("web".into()).as_str()`
+            //    == "other" ⇒ 所有非枚举平台都无法按自身 id 被寻址。
+            //    表现：`social catalog` 里 `web` 的 ADAPTER 显示 `none`，
+            //    尽管 `web_jina` extractor 就在清单里。
+            //
+            //    改签名 `&'static str` → `&str` 以便返回内部 String。
+            Self::Other(ref name) => name.as_str(),
         }
     }
     pub fn from_str(s: &str) -> Self {
@@ -293,4 +302,45 @@ pub fn build_headers(session: &SessionEntry) -> reqwest::header::HeaderMap {
         }
     }
     headers
+}
+
+
+#[cfg(test)]
+mod other_variant_tests {
+    use super::*;
+
+    /// ⭐⭐ 回归：原 `as_str()` 对 `Other(_)` 返回字面量 `"other"`
+    /// 并丢弃内部名字（签名是 `&'static str` 逼出了这个 bug）。
+    /// 后果：所有非枚举平台无法按自身 id 寻址 ——
+    /// 实测 `social catalog` 把 `web` 的 ADAPTER 报成 none。
+    #[test]
+    fn other_variant_returns_its_own_name_not_the_literal_other() {
+        assert_eq!(SocialPlatform::Other("web".into()).as_str(), "web");
+        assert_eq!(SocialPlatform::Other("mastodon".into()).as_str(), "mastodon");
+        // ⛔ 绝不能是 "other"
+        assert_ne!(SocialPlatform::Other("web".into()).as_str(), "other");
+    }
+
+    #[test]
+    fn from_str_roundtrips_for_other_variants() {
+        for id in ["web", "mastodon", "github", "zhihu"] {
+            let p = SocialPlatform::from_str(id);
+            assert_eq!(p.as_str(), id, "`{}` must round-trip through from_str", id);
+        }
+    }
+
+    #[test]
+    fn from_str_maps_known_ids_to_variants() {
+        // 既有 6 个枚举映射不得被本次改动破坏
+        assert_eq!(SocialPlatform::from_str("twitter"), SocialPlatform::Twitter);
+        assert_eq!(SocialPlatform::from_str("youtube"), SocialPlatform::Youtube);
+        assert_eq!(SocialPlatform::from_str("linkedin"), SocialPlatform::Linkedin);
+    }
+
+    #[test]
+    fn from_str_is_case_insensitive_through_the_From_impl() {
+        // From<&str> 走 to_lowercase，From<String> 委托给它
+        assert_eq!(SocialPlatform::from("X"), SocialPlatform::Twitter);
+        assert_eq!(SocialPlatform::from("GitHub".to_string()), SocialPlatform::Other("github".into()));
+    }
 }

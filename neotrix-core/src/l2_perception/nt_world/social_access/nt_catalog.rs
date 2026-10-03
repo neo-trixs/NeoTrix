@@ -55,6 +55,11 @@ pub struct PlatformSpec {
     pub login_probes: Vec<SuccessProbe>,
     /// 登录页 URL。
     pub login_url: Option<String>,
+    /// 登录成功后应出现的 URL 前缀（可空）。
+    ///
+    /// ⭐ 与 [`SuccessProbe::UrlContains`] 语义重叠但用途不同：
+    /// 探针是**判据**（可多条），这里是给用户看的「成功后会看到什么」。
+    pub success_url: Option<String>,
     /// 登录等待超时。
     pub login_timeout: Option<Duration>,
     /// cookie 存储文件名。
@@ -70,6 +75,33 @@ impl PlatformSpec {
     /// 是否支持交互登录。
     pub fn supports_login(&self) -> bool {
         !self.login_probes.is_empty()
+    }
+
+    /// 登录成功后的 URL 前缀。
+    ///
+    /// ⭐ 若未显式配置，从 [`SuccessProbe::UrlContains`] 派生 ——
+    /// 这样「判据」与「展示给用户的成功标志」不会各说各话。
+    pub fn success_url_for_channel(&self) -> Option<String> {
+        if let Some(ref s) = self.success_url {
+            return Some(s.clone());
+        }
+        self.login_probes.iter().find_map(|p| match p {
+            SuccessProbe::UrlContains { needle } => Some(needle.clone()),
+            _ => None,
+        })
+    }
+
+    /// 本平台的**别名**（历史遗留的其他 id）。
+    ///
+    /// ⭐ 存在的理由：`TwitterExtractor::id()` 返回 `"twitter"`（既有契约），
+    /// 而目录主键是 `"x"`（登录/cookie 路径）。强行统一任一侧都会破坏
+    /// 另一侧的既有调用方 ⇒ 改为**显式声明别名**，让
+    /// `adapter_for` / `login_table_is_derived` 等跨表查找能解析。
+    pub fn aliases(&self) -> &'static [&'static str] {
+        match self.id.as_str() {
+            "x" => &["twitter"],
+            _ => &[],
+        }
     }
 
     /// 本平台对应的 [`SocialPlatform`](super::traits::SocialPlatform)。
@@ -127,6 +159,24 @@ impl PlatformCatalog {
 
     pub fn is_empty(&self) -> bool {
         self.specs.is_empty()
+    }
+
+    /// ⭐ 由 id **或别名**解析平台。
+    ///
+    /// ⛔ 只按主键查会漏：`adapter_for(&SocialPlatform::Twitter)` 用
+    /// `SocialPlatform::as_str()` 得到 `"twitter"`，而目录主键是 `"x"`
+    /// —— 二者不一致会让 X 的 adapter 永远查不到（自测抓到）。
+    pub fn resolve(&self, id: &str) -> Option<&PlatformSpec> {
+        if let Some(s) = self.specs.get(id) {
+            return Some(s);
+        }
+        self.all_ids()
+            .into_iter()
+            .find_map(|key| {
+                self.specs
+                    .get(key)
+                    .filter(|s| s.aliases().iter().any(|a| *a == id))
+            })
     }
 
     /// 认领一个 URL。
@@ -266,6 +316,7 @@ pub fn default_catalog() -> PlatformCatalog {
             SuccessProbe::UrlContains { needle: "/home".into() },
         ],
         login_url: Some("https://x.com/login".into()),
+        success_url: Some("/home".into()),
         login_timeout: Some(Duration::from_secs(300)),
         cookie_file: Some("x.json".into()),
         requires_session: true,
@@ -279,6 +330,7 @@ pub fn default_catalog() -> PlatformCatalog {
             SuccessProbe::CookiePresent { name: "reddit_session".into() },
         ],
         login_url: Some("https://www.reddit.com/login".into()),
+        success_url: Some("/".into()),
         login_timeout: Some(Duration::from_secs(300)),
         cookie_file: Some("reddit.json".into()),
         requires_session: true,
@@ -293,6 +345,7 @@ pub fn default_catalog() -> PlatformCatalog {
         //    机制未在本仓实测过。
         login_probes: vec![],
         login_url: None,
+        success_url: None,
         login_timeout: None,
         cookie_file: None,
         requires_session: true,
@@ -304,6 +357,7 @@ pub fn default_catalog() -> PlatformCatalog {
         url_patterns: vec!["tiktok.com".into(), "vm.tiktok.com".into()],
         login_probes: vec![],
         login_url: None,
+        success_url: None,
         login_timeout: None,
         cookie_file: None,
         requires_session: true,
@@ -315,6 +369,7 @@ pub fn default_catalog() -> PlatformCatalog {
         url_patterns: vec!["youtube.com".into(), "youtu.be".into()],
         login_probes: vec![],
         login_url: None,
+        success_url: None,
         login_timeout: None,
         cookie_file: None,
         // ⭐ YouTube 靠 yt-dlp **零配置**可用（实测 `yt-dlp --version` rc=0）
@@ -327,6 +382,7 @@ pub fn default_catalog() -> PlatformCatalog {
         url_patterns: vec!["linkedin.com".into()],
         login_probes: vec![],
         login_url: None,
+        success_url: None,
         login_timeout: None,
         cookie_file: None,
         requires_session: true,
@@ -341,6 +397,7 @@ pub fn default_catalog() -> PlatformCatalog {
             SuccessProbe::CookiePresent { name: "user_session".into() },
         ],
         login_url: Some("https://github.com/login".into()),
+        success_url: Some("/".into()),
         login_timeout: Some(Duration::from_secs(300)),
         cookie_file: Some("github.json".into()),
         requires_session: true,
@@ -354,6 +411,7 @@ pub fn default_catalog() -> PlatformCatalog {
             SuccessProbe::CookiePresent { name: "SESSDATA".into() },
         ],
         login_url: Some("https://passport.bilibili.com/login".into()),
+        success_url: Some("/".into()),
         login_timeout: Some(Duration::from_secs(300)),
         cookie_file: Some("bilibili.json".into()),
         requires_session: true,
@@ -367,6 +425,7 @@ pub fn default_catalog() -> PlatformCatalog {
             SuccessProbe::CookiePresent { name: "z_c0".into() },
         ],
         login_url: Some("https://www.zhihu.com/signin".into()),
+        success_url: Some("/".into()),
         login_timeout: Some(Duration::from_secs(300)),
         cookie_file: Some("zhihu.json".into()),
         requires_session: true,
@@ -378,6 +437,7 @@ pub fn default_catalog() -> PlatformCatalog {
         url_patterns: vec![],
         login_probes: vec![],
         login_url: None,
+        success_url: None,
         login_timeout: None,
         cookie_file: None,
         // ⭐ 通用网页靠 Jina Reader，零配置
@@ -403,6 +463,7 @@ mod tests {
             url_patterns: vec!["mastodon.social".into()],
             login_probes: vec![],
             login_url: None,
+            success_url: None,
             login_timeout: None,
             cookie_file: None,
             requires_session: true,
