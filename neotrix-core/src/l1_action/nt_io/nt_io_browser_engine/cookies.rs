@@ -6,15 +6,48 @@ use std::collections::HashMap;
 use super::error::BrowserError;
 
 /// 自研 CookieJar：host → cookies（支持 Domain 后缀匹配 + Secure 语义简化版）
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+//⛔ 不`derive(Debug)`：它会递归打印 `entries` 里的每个 `CookieEntry`。
+//   改用手工实现（见文件末尾），保证 `{:?}` 只出现 host 与条目**数**。
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct CookieJar {    pub(crate) entries: HashMap<String, Vec<CookieEntry>>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct CookieEntry {
     pub(crate) name: String,
     pub(crate) value: String,
     secure_only: bool,
+}
+
+/// ⭐⭐ 手工实现 `Debug`：**`value` 永不打印**。
+///
+/// 【为什么不能用 `derive(Debug)`】
+/// `value` 就是 cookie 的**凭据本身**（等价于 `Set-Cookie` 里的值）。
+/// `derive(Debug)` 会让它出现在：任何 `{:?}`、`unwrap()`/`expect()` 的 panic 消息、
+/// 结构体被塞进错误类型后的 `Display`/`Debug` 链。
+///
+/// 【实测现状（2026-10-03）】
+/// 全仓当前**没有**任何 `{:?}` 打印 `CookieJar`/`CookieEntry`
+/// ⇒泄漏是**潜在的**，不是活的。
+/// ⛔ 但「当前没人打印」**不是**护栏：将来任何人给错误类型加一个
+/// `CookieJar` 字段、或在日志里打一个 `{:?}`，就会**静默**开始泄露，
+/// 而 `cookiejar`/`CookieJar` 这种类型名**不会提醒他**。
+///
+/// 【吸收来源】`markfulton/agent-cookie-sync`（MIT）的核心主张：
+/// 注入脚本 **never prints cookie values**。
+/// ⇒ 与本仓既有纪律同向：`Provider::key_env` 只存环境变量**名**，
+///   `Provider::looks_like_secret` 对明文形态告警。
+///
+/// 【代价】调试时看不到值 —— 这是**刻意的**。
+/// 需要核对值时请在**受控环境**里直接看字段，不要把它加回`Debug`。
+impl std::fmt::Debug for CookieEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CookieEntry")
+            .field("name", &self.name)
+            .field("value", &"<redacted>")
+            .field("secure_only", &self.secure_only)
+            .finish()
+    }
 }
 
 impl CookieJar {
@@ -261,3 +294,49 @@ pub(crate) fn now_ms() -> u64 {
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
 }
+
+/// ⭐ `CookieJar` 的 `Debug`：**只暴露 host 与条目数**，不含任何值。
+impl std::fmt::Debug for CookieJar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut hosts: Vec<&String> = self.entries.keys().collect();
+        hosts.sort();
+        let mut m = f.debug_map();
+        for h in hosts {
+            let n = self.entries.get(h).map(|v| v.len()).unwrap_or(0);
+            m.entry(h, &n);
+        }
+        m.finish()
+    }
+}
+
+#[cfg(test)]
+mod redacted_debug_tests {
+    use super::*;
+
+    /// ⭐⭐ 反向锁：`{:?}` **绝不**包含 cookie 值。
+    /// 吸收 `agent-cookie-sync`（MIT）的「注入脚本从不打印凭据值」。
+    #[test]
+    fn debug_never_prints_cookie_value() {
+        let e = CookieEntry { name: "session".into(), value: "SUPER_SECRET_VALUE".into(), secure_only: true };
+        let shown = format!("{e:?}");
+        assert!(!shown.contains("SUPER_SECRET_VALUE"), "⛔ Debug 泄露了 cookie 值：{shown}");
+        assert!(shown.contains("redacted"), "应显示占位符：{shown}");
+        // name 不是秘密，应当可见（否则调试价值为零）
+        assert!(shown.contains("session"));
+    }
+
+    /// `CookieJar` 的 `{:?}` 同样不得含值，且应给出 host 与条目数。
+    #[test]
+    fn jar_debug_never_prints_cookie_value() {
+        let mut jar = CookieJar::new();
+        jar.entries.insert(
+            "example.com".to_string(),
+            vec![CookieEntry { name: "sid".into(), value: "JAR_SECRET".into(), secure_only: false }],
+        );
+        let shown = format!("{jar:?}");
+        assert!(!shown.contains("JAR_SECRET"), "⛔ CookieJar Debug 泄露了值：{shown}");
+        assert!(shown.contains("example.com"), "host 应可见：{shown}");
+        assert!(shown.contains('1'), "条目数应可见：{shown}");
+    }
+}
+
