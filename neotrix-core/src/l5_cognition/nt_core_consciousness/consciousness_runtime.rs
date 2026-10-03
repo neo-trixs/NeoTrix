@@ -277,6 +277,41 @@ impl ConsciousnessRuntime {
                 0.7 - quality,
                 "low_quality_critique",
             );
+            // ⭐⭐ 2026-10-03：**能力树运行期接线（第 1 步）**
+            //
+            // 判据（`docs/architecture/EMERGENCE-ROADMAP-2026-10-03.md` §1）：
+            //   **涌现 = 能力树在无人工干预下新增了节点，且该节点通过
+            //   `audit-maturity --strict`。**
+            //
+            // ⭐ **为什么挂在这里**：本分支是整个 runtime 里**唯一**「观察到自己做不好」
+            // 的判据（`quality < 0.3`）⇒ 它就是「**缺口**」的可观测形式。
+            // ⇒ 这是路线 §5 第 3 步「先发现自己不会，再造工具」的机器形态。
+            //
+            // ⭐⭐ 为什么这样**不违反分层**：`nt_core_capability_registry` 落在
+            // `crates/neotrix-neobot/`，而 `neotrix-core/Cargo.toml:104` **依赖**
+            // neotrix-neobot ⇒ L5 可以直接调它，而 `check-layer-deps.sh:36` 的
+            // `SRC` 只扫 `neotrix-core/src` 内部的**相对层引用** ⇒ 不受影响。
+            //
+            // ⛔ 刻意**不因登记失败而中断**自愈流程（那会让「记录缺口」反过来
+            // 损害「修复缺口」）⇒ 但**不静默**：失败走 `log::warn!`。
+            // ⛔ 刻意用 `new_primitive`（最低档 `C0Compile`）：登记时我们只知道
+            // 「有缺口」，还不知道新能力是否真被造出来 ⇒ 由 `maturity_audit()`
+            // 拒绝任何虚标。这是判据的后半段。
+            {
+                use neotrix_neobot::nt_capability_registry::register_node;
+                use nt_core_capability_tree::node::{CapabilityNode, Domain};
+                let node = CapabilityNode::new_primitive(
+                    // ⭐ id 含 quality 档位 ⇒ 同一档位只登记一个节点（注册是
+                    // 幂等的），不同档位各一个 ⇒ 节点数随「缺口严重度」增长，
+                    // ⭐ 这正是 `neobot-check-emergence` 要盯的那个数。
+                    format!("consciousness::gap::q{}", (quality * 100.0) as u64),
+                    Domain::Mind,
+                    vec!["consciousness.capability_gap".to_owned()],
+                );
+                if let Err(e) = register_node(node) {
+                    log::warn!("[consciousness] 能力缺口登记失败（不阻断自愈）: {e}");
+                }
+            }
         }
         if let Some(ref action) = critique.selected_action {
             if action.contains("explore") || action.contains("curious") {
