@@ -9,6 +9,7 @@
 //! 2. trade_production_logistics — 生产物流闭环 (FT07-FT13)
 //! 3. trade_finance_compliance — 财务合规闭环 (FT05-FT06, FT14-FT16)
 
+use nt_core_capability_tree::RegistryError;
 use nt_core_capability_tree::{
     CapabilityNode, CapabilityTreeRegistry, Domain, NodeLayer,
 };
@@ -755,7 +756,9 @@ pub fn execute_trade_full_cycle(context: TradeContext) -> TradeResult {
 }
 
 /// Register the Keystone capability node in the CapabilityTreeRegistry
-pub fn register_trade_full_cycle_capability(registry: &mut CapabilityTreeRegistry) -> CapabilityNode {
+pub fn register_trade_full_cycle_capability(
+    registry: &mut CapabilityTreeRegistry,
+) -> Result<CapabilityNode, RegistryError> {
     let node = CapabilityNode::new_constellation(
         "NT-MIND::trade::foreign_trade_full_cycle".to_string(),
         Domain::Mind,
@@ -768,8 +771,8 @@ pub fn register_trade_full_cycle_capability(registry: &mut CapabilityTreeRegistr
             "trade_product_spec".to_string(),
         ],
     );
-    registry.register(node.clone()).expect("Failed to register trade_full_cycle capability");
-    node
+    registry.register(node.clone())?;
+    Ok(node)
 }
 
 /// Get the capability specification for external consumers

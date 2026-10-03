@@ -5,6 +5,7 @@
 //!
 //! This is a NOTABLE skill (域级突破) under the foreign_trade_full_cycle Keystone.
 
+use nt_core_capability_tree::RegistryError;
 use nt_core_capability_tree::{
     CapabilityNode, CapabilityTreeRegistry, Domain, NodeLayer,
 };
@@ -287,7 +288,9 @@ fn calculate_cost_breakdown(
 }
 
 /// Register the Notable capability node
-pub fn register_quote_negotiation_capability(registry: &mut CapabilityTreeRegistry) -> CapabilityNode {
+pub fn register_quote_negotiation_capability(
+    registry: &mut CapabilityTreeRegistry,
+) -> Result<CapabilityNode, RegistryError> {
     let node = CapabilityNode::new_composite(
         "NT-MIND::trade::trade_quote_negotiation".to_string(),
         Domain::Mind,
@@ -295,8 +298,8 @@ pub fn register_quote_negotiation_capability(registry: &mut CapabilityTreeRegist
         vec!["trade_quote_negotiation".to_string()],
         vec!["trade_product_spec".to_string()],
     );
-    registry.register(node.clone()).expect("Failed to register quote_negotiation capability");
-    node
+    registry.register(node.clone())?;
+    Ok(node)
 }
 
 #[cfg(test)]

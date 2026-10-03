@@ -920,8 +920,8 @@ mod tests {
 /// ## ⭐⭐⭐ 为什么必须**按 id 预检**（本函数第一版最大的坑，由测试抓出）
 /// 第一版直接顺序调用 5 个 registrar，⭐ **两条测试当场炸出**：
 /// ```text
-/// panicked at nt_trade_product_spec.rs:955:
-/// Failed to register product_spec capability: AlreadyExists("NT-MEMORY::trade::trade_product_spec")
+/// ⛔ 2026-10-03 该 panic 已**消除**：5 个生产者签名改为
+///     Result<CapabilityNode, RegistryError>，内部用 `?` 传播，不再 panic。
 /// ```
 /// ⭐ 根因（实测 5 个 registrar **全部**如此）：它们都写成
 /// `registry.register(node).expect("Failed to register …")`
@@ -965,12 +965,17 @@ pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
     const ID_FINANCE: &str = "NT-MIND::trade::trade_finance_compliance";
     const ID_FULL_CYCLE: &str = "NT-MIND::trade::foreign_trade_full_cycle";
 
-    /// ⭐ 已注册则跳过（幂等的唯一手段 —— 上游 registrar 见函数头说明会 panic）
+    /// ⭐ 已注册则跳过。
+    /// ⛔ 2026-10-03 起这**不再是**唯一手段：5 个 registrar 已改用 `?` 传播
+    ///    `RegistryError`（`AlreadyExists` / `CircularDependency`），**不再 panic**。
+    ///    但 `already()` 仍保留：它让重复 bootstrap 保持 `newly=0`（合法）而非报错。
     fn already(reg: &CapabilityTreeRegistry, id: &str) -> bool {
         reg.nodes.contains_key(id)
     }
 
-    /// ⭐ 注册后回查：registrar 返回 `CapabilityNode`（**不是 Result**，实测签名）
+    /// ⭐ 注册后回查。
+    /// ⛔ 2026-10-03 起 registrar 返回 `Result<CapabilityNode, RegistryError>`，
+    ///    调用点已用 `?` 传播错误，故此处拿到的 `node` 必已注册成功。
     fn must_be_registered(
         reg: &CapabilityTreeRegistry,
         node: &CapabilityNode,
@@ -983,7 +988,7 @@ pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
         }
     }
 
-    let (total, newly) = with_registry(|reg| -> (usize, usize) {
+    let (total, newly) = with_registry(|reg| -> Result<(usize, usize), String> {
         let mut newly = 0usize;
 
         // ① 根：trade_product_spec（requires=[]）
@@ -991,39 +996,39 @@ pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
         //    **不同模块路径**。
         if !already(reg, ID_PRODUCT_SPEC) {
             let n =
-                crate::l4_emotion::nt_memory::nt_trade_product_spec::register_product_spec_capability(reg);
+                crate::l4_emotion::nt_memory::nt_trade_product_spec::register_product_spec_capability(reg).map_err(|e| e.to_string())?;
             debug_assert!(must_be_registered(reg, &n, "① trade_product_spec").is_ok());
             newly += 1;
         }
 
         // ② requires=[trade_product_spec]
         if !already(reg, ID_QUOTE) {
-            let n = register_quote_negotiation_capability(reg);
+            let n = register_quote_negotiation_capability(reg).map_err(|e| e.to_string())?;
             debug_assert!(must_be_registered(reg, &n, "② trade_quote_negotiation").is_ok());
             newly += 1;
         }
 
         // ③ requires=[trade_product_spec, trade_quote_negotiation]（两支可并列）
         if !already(reg, ID_LOGISTICS) {
-            let n = register_production_logistics_capability(reg);
+            let n = register_production_logistics_capability(reg).map_err(|e| e.to_string())?;
             debug_assert!(must_be_registered(reg, &n, "③ trade_production_logistics").is_ok());
             newly += 1;
         }
         if !already(reg, ID_FINANCE) {
-            let n = register_finance_compliance_capability(reg);
+            let n = register_finance_compliance_capability(reg).map_err(|e| e.to_string())?;
             debug_assert!(must_be_registered(reg, &n, "③ trade_finance_compliance").is_ok());
             newly += 1;
         }
 
         // ④ requires=[quote_negotiation, production_logistics, finance_compliance]
         if !already(reg, ID_FULL_CYCLE) {
-            let n = register_trade_full_cycle_capability(reg);
+            let n = register_trade_full_cycle_capability(reg).map_err(|e| e.to_string())?;
             debug_assert!(must_be_registered(reg, &n, "④ foreign_trade_full_cycle").is_ok());
             newly += 1;
         }
 
-        (reg.nodes.len(), newly)
-    })?;
+        Ok((reg.nodes.len(), newly))
+    })??;
 
     // ⭐⭐ 用「本次新增数」而非「总数」当失败信号 —— ⭐ 因为**锁投毒/回查失败**
     // 都会让 newly 达不到 5，而重复调用则 newly=0（**合法**，不是失败）。

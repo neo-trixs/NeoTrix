@@ -5,6 +5,7 @@
 //! its own knowledge pack with BOM, routing, certifications, HS codes,
 //! inspection standards, document templates, risk rules, and compliance maps.
 
+use nt_core_capability_tree::RegistryError;
 use nt_core_capability_tree::{
     CapabilityNode, CapabilityTreeRegistry, Domain,
 };
@@ -946,14 +947,16 @@ impl ProductKnowledgePack for GenericKnowledgePack {
 }
 
 /// Register the ProductSpec capability node
-pub fn register_product_spec_capability(registry: &mut CapabilityTreeRegistry) -> CapabilityNode {
+pub fn register_product_spec_capability(
+    registry: &mut CapabilityTreeRegistry,
+) -> Result<CapabilityNode, RegistryError> {
     let node = CapabilityNode::new_primitive(
         "NT-MEMORY::trade::trade_product_spec".to_string(),
         Domain::Memory,
         vec!["trade_product_spec".to_string()],
     );
-    registry.register(node.clone()).expect("Failed to register product_spec capability");
-    node
+    registry.register(node.clone())?;
+    Ok(node)
 }
 
 /// KB Persistence for ProductKnowledgePack
