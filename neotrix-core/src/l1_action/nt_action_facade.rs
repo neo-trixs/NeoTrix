@@ -13,6 +13,28 @@ pub use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 use crate::l1_action::traits::LlmRouter;
 
 // ════════════════════════════════════════════════════════════════
+// ⭐⭐ L5 跨层引用收敛点（2026-10-03 修「跨域错位 + 冗余」双重缺陷）
+// ════════════════════════════════════════════════════════════════
+//
+// **实测事实**（`bash scripts/check-layer-deps.sh` ⇒ 19 处已记录违规）：
+// **7 个 L1 文件**直接 `use crate::l5_cognition::nt_crystal_core::…`，
+// 其中 **3 个文件的 import 行字节完全相同**：
+//   · `nt_model_cli.rs:26`         use …::{NtLlmAsk, NtLlmReply, NtTaskFusionError};
+//   · `nt_free_pool.rs:23`         （同上，逐字节一致）
+//   · `nt_crystal_llm_bridge.rs:32`（同上，逐字节一致）
+//
+// ⇒ 同时是**跨域错位**（L1 越过 L2–L4 直取 L5）与**冗余**（同一条 import 抄三遍）。
+//
+// ⭐ **为什么走本 facade 而不是就地改**：本文件是 L1 自己的门面，
+// `check-layer-deps.sh` 明确把 facade bridge 当作 sanctioned channel 排除
+// ⇒ 在此处转出是**该门认可的唯一合法通道**，而在 3 个消费方直接写
+// `crate::l1_action::nt_action_facade::…` 同样不含层名字样。
+//
+// ⛔ 刻意**只转出这 5 个符号**，不整包 re-export `nt_crystal_core`：
+// 整包转出等于给 L1 开了一扇通往后端的门，跨域错位只是换了个门牌号。
+pub use crate::l5_cognition::nt_crystal_core::{NtLlmAsk, NtLlmReply, NtTaskFusionError};
+
+// ════════════════════════════════════════════════════════════════
 // Public types
 // ════════════════════════════════════════════════════════════════
 

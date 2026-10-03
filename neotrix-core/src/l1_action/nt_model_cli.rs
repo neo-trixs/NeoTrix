@@ -23,7 +23,10 @@
 //! - 只用 `std::process`，无 shell 拼接（prompt 整体作单个 argv 传参），
 //!   无 unsafe (R-P1)；生产代码无 `unwrap/expect/panic`。
 
-use crate::l5_cognition::nt_crystal_core::{NtLlmAsk, NtLlmReply, NtTaskFusionError};
+// ⭐ 2026-10-03 跨域错位收敛：原先直取 `crate::l5_cognition::nt_crystal_core::…`
+// （L1 越过 L2–L4），且本行在 3 个文件里逐字节重复。现经 **L1 自己的 facade** 转出
+// —— `AGENTS.md` §4.2：「改跨层引用唯一合法通道是消费方自己那层的 facade」。
+use crate::l1_action::nt_action_facade::{NtLlmAsk, NtLlmReply, NtTaskFusionError};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::Duration;
