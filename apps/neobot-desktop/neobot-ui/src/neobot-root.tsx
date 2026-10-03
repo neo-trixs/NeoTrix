@@ -1145,7 +1145,7 @@ export function NeoBotRoot() {
                   disabled={loadingMore}
                   onClick={() => { void loadOlder() }}
                 >
-                  {loadingMore ? '…' : '加载更早的消息'}
+                  {loadingMore ? t('chat.loadingOlder') : t('chat.loadOlder')}
                 </button>
               )}
               {/* 消息窗口化。⛔ 外层**必须**撑出 getTotalSize()：省了它，

@@ -19,6 +19,8 @@
   "chat.titlePlaceholder": "标题（如：海豚调试）",
   "chat.empty": "发一句话开始。Enter 发送，Shift+Enter 换行。",
   "chat.historyLoading": "正在读历史…",
+  "chat.loadOlder": "加载更早的消息",
+  "chat.loadingOlder": "正在读更早…",
   "chat.noMatch": "没有匹配该关键词的会话。",
   "chat.loadFailed": "读取会话失败",
   "chat.groupCount": "人群聊",

@@ -19,6 +19,8 @@
   "chat.titlePlaceholder": "Title (e.g. Dolphin debugging)",
   "chat.empty": "Say something to begin. Enter sends, Shift+Enter adds a line.",
   "chat.historyLoading": "Loading history…",
+  "chat.loadOlder": "Load earlier messages",
+  "chat.loadingOlder": "Loading earlier…",
   "chat.noMatch": "No conversation matches that search.",
   "chat.loadFailed": "Failed to load conversations",
   "chat.groupCount": "in group",
