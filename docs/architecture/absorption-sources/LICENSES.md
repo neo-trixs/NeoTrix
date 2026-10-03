@@ -90,6 +90,76 @@ curl -s "https://raw.githubusercontent.com/<owner>/<repo>/HEAD/LICENSE" | head -
 
 判据见 [ABSORPTION-2026-10-01-CHUNUI-GROWTH-PI.md](../ABSORPTION-2026-10-01-CHUNUI-GROWTH-PI.md) 末节。
 
+### ⚠️ 2026-10-03 复核：上表「4 条设计可移植」的落地率
+
+复核方法：`rg` **按代码概念**查（不是按台账里的措辞查），结论如下。
+
+| 声称可移植的设计 | 是否真落地 | 证据 |
+|---|---|---|
+| robots 开关 | ✅ 已落地 | `nt_io_browser_engine/engine/nt_politeness.rs:42-45` 真实解析并阻断 |
+| CDP 契约（能力声明） | ✅ **早已落地** | `nt_io_browser_engine/types.rs:87-127` `BackendCaps{javascript,screenshot,form_submit,cookie_persist}` + `BackendKind::caps()`。⚠️ **上一轮我记为「未落地」是搜错了字符串**（搜 `CDP契约` 而非 `BackendCaps`），已更正 |
+| MCP 会话隔离 | ❌ 未落地 | 无对应实现 |
+| PandaScript 零 token 执行 | ❌ 未落地 | `rg -i PandaScript` 命中 0 |
+
+⛔ **上一轮「1/4」的结论本身是错的**（因搜索词照抄台账措辞）。
+教训：**核实落地率必须搜代码里的概念名，不能搜台账里的标签名** ——
+台账用自己的话命名，代码用另一套话命名，按标签搜必然 0 命中，
+然后就会得出「文档说 ✅ 但代码没有」的错误结论。**这本身又是一次
+「台账/标签不可信，代码才是真相」。**
+
+### ✅ 2026-10-03 新增落地：`nt_selector_contract.rs`
+
+lightpanda 的「声明能力面」补到了**它没有的一层**：
+`BackendCaps` 声明的是「后端能不能执行 JS」，而 X 抽取真正会坏的是
+「JS 里的选择器还能不能命中」—— 后者没有任何机制守护。
+
+新增 `social_access/nt_selector_contract.rs`：
+- `X_SELECTOR_CONTRACT` 声明每个选择器的**页面形态**与**是否 essential**；
+- `verify()` / `check()` 在运行时核对，漂移即报 `Parse` 错误；
+- ⭐ 顺序语义：**先判形态再验契约**（未登录页天然 0 推文，
+  反序会把「请登录」误报成「X 改版了」）；
+- 已接进 `nt_x_browser::parse()`，修掉了该函数原先**无条件返回空列表**的假成功。
+
+⇒ 顺带吸收 open-slide（MIT）「约束画布而非内容」：
+不给「抽取结果」加内容校验，而是约束**抽取面**，
+用探针让越界在结构上不可能。
+
+### ⚠️ 2026-10-03 实测：lightpanda 的能力边界（不可替代 chromiumoxide）
+
+本机已装 `lightpanda`（`~/.local/bin/lightpanda`），实测结论：
+
+| 项 | 实测结果 |
+|---|---|
+| CDP 服务 | ✅ 起得来，`/json/version` 正常，`Target.*` 可用 |
+| `Runtime.evaluate` | ✅ 可用（`example.com` 取到 `document.title`） |
+| `fetch --dump markdown` | ✅ 可用，输出干净正文 |
+| **`Page.navigate` 实测** | ⛔ `BrowserContextNotLoaded`（-31998）—— 直接 navigate 失败 |
+| **抓 x.com（无 cookie）** | ⛔ **只拿到登录页**（实测输出全是 Log in / Sign up） |
+| `--load-resources` 默认 | ⛔ **不加载** image/iframe/worker/stylesheet |
+| `Emulation.setAutomationDisabled` | ⛔ 源码零引用（研究已证） |
+| 指纹一致性 | ⛔ `navigator.product="Gecko"` 与 Chrome UA 不自洽（反检测反噬） |
+| License | **AGPL-3.0** vs 本仓 **MIT** ⇒ 代码层不可引入 |
+
+⇒ 结论：**它是高吞吐正文抽取器，不是 stealth 浏览器**。
+`nt_io/universal_browser.rs` 依赖的 `enable_stealth_mode`（= 设置
+`Emulation.setAutomationDisabled` 一类）它没有 ⇒ **不能作为
+`chromiumoxide` 的后端替换**。AGPL 单独即可否决代码引入。
+
+### ⚠️ 2026-10-03 澄清：`open-slide/open-slide` ≠ `openslide/openslide`
+
+若按「openslide」去找数字病理库，会**找错仓库**：
+
+| | `open-slide/open-slide` | `openslide/openslide` |
+|---|---|---|
+| 是什么 | React 幻灯片框架 | C 库，读虚拟切片图像（数字病理） |
+| 语言 | TypeScript | C |
+| ★ | **8,718** | 518 |
+| License | MIT | **LGPL-2.1**（不是 MIT） |
+
+前者 star 数是后者 17 倍，**任何「搜 openslide」或模型回忆都会先命中它**。
+非恶意抢注，只是无关项目在搜索可见性上胜出。⚠️ 注意真实 openslide 是
+**LGPL-2.1**，此前若按 MIT 记录需更正。
+
 ⛔ **未核实故未吸收**：`KKKKhazix/AIHOT`（许可证未核）。
 ⛔ **未逐仓核验**：`trendshift.io` 榜单 —— 榜单条目本身**不等于**已核实的许可/可移植性。
 

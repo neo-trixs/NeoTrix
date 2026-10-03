@@ -106,7 +106,8 @@ impl SocialPlatformAdapter for YtdlpExtractor {
                         author: json["uploader"].as_str().unwrap_or("").to_string(),
                         metrics: EngagementMetrics::default(),
                         score: 0.0,
-                        actions: std::collections::HashMap::new(),
+                        predicted: Default::default(),
+                        bidirectional_eligible: false,
                     });
                 }
             }

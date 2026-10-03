@@ -8,8 +8,7 @@
 
 use std::collections::HashMap;
 use std::fmt;
-use std::process::Command;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
@@ -113,7 +112,7 @@ impl ProbeResult {
 /// A specific backend implementation for a channel
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Backend {
-    /// Backend identifier (e.g., "yt-dlp", "jina-reader", "twitter-cli")
+    /// Backend identifier (e.g., "yt-dlp", "jina-reader", "vx-mirror")
     pub name: String,
     /// Command to execute for health check
     pub probe_cmd: String,
@@ -127,6 +126,55 @@ pub struct Backend {
     pub cost_tier: u8,
     /// Priority weight for selection (higher = preferred)
     pub weight: u32,
+    /// ⭐ **2026-10-03 新增（D4）**：门控此后端所需的凭据来源。
+    ///
+    /// ⛔ **此前 `requires_auth` 是个死字段**：被设置、被序列化，但**从未被读**。
+    ///    后果是「装了 CLI 但没登录」的渠道会被选为 `active_backend`，
+    ///    直到真正取数据时才失败 —— 而失败点在数据面而非探测面，
+    ///    doctor 报告此时显示一片绿。Agent-Reach 的原始判据说得很直白：
+    ///    *真实探测非命令存在性*。
+    ///
+    /// 空 `None` ⇒ 无凭据要求（与 `requires_auth=false` 一致）。
+    pub credential: Option<Credential>,
+}
+
+/// 后端所需的凭据来源。
+///
+/// 设计依据：bird / OpenCLI / AutoCLI 三者**都不读浏览器 cookie 数据库**
+/// （研究已证实：无 sqlite / keyring / keychain 依赖）—— 它们只做
+/// `auth_token` 的**存在性检查**，让浏览器自己附送 `auth_token`，
+/// 仅提取非 HttpOnly 的 `ct0`。⇒ 凭据是「浏览器已登录」这一**状态**，
+/// 不是一份可导出的密钥。这决定了本仓也不能走「导出 cookie 文件」路线。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Credential {
+    /// 需要用户在浏览器中完成登录会话（bird/opencli 路线）。
+    /// `hint` 是给用户的可执行指引，doctor 直接展示。
+    BrowserSession { hint: String },
+    /// 需要环境变量里存在指定 key（不读值，避免凭据进日志）。
+    EnvPresent { key: String },
+}
+
+impl Credential {
+    /// 检查凭据是否就绪。
+    ///
+    /// ⛔ 只回答「在不在」，绝不返回凭据本身 —— 否则 doctor 的输出
+    /// 会把 token 写进终端与 CI 日志。
+    pub fn is_satisfied(&self) -> bool {
+        match self {
+            // 浏览器会话无法在无头环境探测；返回 true 让真实探测
+            // （probe 命令本身会失败）去判定，避免双重误判。
+            Credential::BrowserSession { .. } => true,
+            Credential::EnvPresent { key } => std::env::var_os(key).is_some_and(|v| !v.is_empty()),
+        }
+    }
+
+    /// 凭据缺失时的人类可读提示。
+    pub fn missing_hint(&self) -> String {
+        match self {
+            Credential::BrowserSession { hint } => hint.clone(),
+            Credential::EnvPresent { key } => format!("set environment variable {}", key),
+        }
+    }
 }
 
 impl Backend {
@@ -135,10 +183,11 @@ impl Backend {
             name: name.into(),
             probe_cmd: probe_cmd.into(),
             probe_args: vec!["--version".into()],
-            probe_timeout: Duration::from_secs(5),
+            probe_timeout: crate::l2_perception::nt_world::social_access::probe::DEFAULT_PROBE_TIMEOUT,
             requires_auth: false,
             cost_tier: 0,
             weight: 100,
+            credential: None,
         }
     }
 
@@ -165,6 +214,23 @@ impl Backend {
     pub fn with_weight(mut self, weight: u32) -> Self {
         self.weight = weight;
         self
+    }
+
+    /// ⭐ 声明凭据来源。`with_auth(true)` 单独调用**不**设置它 ——
+    /// 那正是修复前「auth 标记是死字段」的成因：两者语义不同，
+    /// 前者只影响文档与排序，后者才门控可用性。
+    pub fn with_credential(mut self, credential: Credential) -> Self {
+        self.requires_auth = true;
+        self.credential = Some(credential);
+        self
+    }
+
+    /// 该后端当前是否可用（命令存在 + 凭据就绪）。
+    pub fn credentials_ready(&self) -> bool {
+        self.credential
+            .as_ref()
+            .map(Credential::is_satisfied)
+            .unwrap_or(true)
     }
 }
 
@@ -260,6 +326,30 @@ impl Channel {
         let mut first_warn: Option<String> = None;
 
         for backend in ordered {
+            // ⭐ **凭据门控（D4）**：命令探测**之前**先查凭据。
+            //    顺序很关键 —— 若放在探测之后，一个「装了但没登录」的渠道
+            //    会先被判 Ok 并 `return`，凭据检查永远轮不到。
+            //    这里改成：凭据缺失 ⇒ 记为 Warn 并**继续**往下找后端，
+            //    让免登录 fallback（若有）仍有机会胜出。
+            if !backend.credentials_ready() {
+                let hint = backend
+                    .credential
+                    .as_ref()
+                    .map(Credential::missing_hint)
+                    .unwrap_or_else(|| "credential unavailable".to_string());
+                results.push((
+                    backend.name.clone(),
+                    ProbeResult::warn(
+                        format!("credential not available: {}", hint),
+                        0,
+                    ),
+                ));
+                if first_warn.is_none() {
+                    first_warn = Some(backend.name.clone());
+                }
+                continue;
+            }
+
             let result = probe_backend(backend);
             let status = result.status.clone();
             results.push((backend.name.clone(), result));
@@ -357,23 +447,56 @@ impl ChannelRegistry {
 pub fn default_channels() -> ChannelRegistry {
     let mut registry = ChannelRegistry::new();
 
-    // Twitter/X — multi-backend: twitter-cli → OpenCLI → bird CLI
+    // Twitter/X — multi-backend: opencli → bird → 免登录镜像
+    //
+    // ⭐ **2026-10-03 探测参数修正（D4）**：原配置对全部三个后端都用
+    //    `--help` / `--version` 这类「flag 存在性」探测。两个问题：
+    //
+    //    1. `bird` 的 README 命令表里是 `help` / `whoami` / `check`，
+    //       **没有 `--version`** ⇒ 一个装好且登录正常的 bird 会被判成
+    //       `Error`（flag 不认识 ⇒ 非 0 退出），于是永远选不中。
+    //       本仓现状 `bird` 未安装，所以这个 bug 一直是隐形的 —— 装了才炸。
+    //    2. `--help` 这类探测**只证明二进制存在**，不证明凭据就绪
+    //       （Agent-Reach 的「真实探测非命令存在性」正是针对这点）。
+    //
+    //    改为按后端能力各配一个**真实产出数据的只读命令**：
+    //    - `opencli twitter trending --limit 1` → 需已登录 Chrome，有数据即健康
+    //    - `bird check` → bird 自带的凭据体检命令（README: "show which
+    //      credentials are available and where they were sourced from"）
+    //    - 免登录镜像用 `curl -fsS` 打实测可达的端点，零凭据依赖
     registry.register(Channel::new(
         "twitter",
         SocialPlatform::Twitter,
         vec![
-            Backend::new("twitter-cli", "twitter")
-                .with_args(vec!["--help".into()])
-                .with_auth(true)
-                .with_weight(100),
             Backend::new("opencli", "opencli")
-                .with_args(vec!["twitter".into(), "--help".into()])
-                .with_auth(true)
-                .with_weight(80),
+                .with_args(vec![
+                    "twitter".into(),
+                    "trending".into(),
+                    "--limit".into(),
+                    "1".into(),
+                ])
+                .with_credential(Credential::BrowserSession {
+                    hint: "log in to x.com in Chrome, then install the opencli browser extension"
+                        .into(),
+                })
+                .with_weight(100),
             Backend::new("bird", "bird")
-                .with_args(vec!["--version".into()])
-                .with_auth(true)
+                // ⛔ 不再用 `--version`（bird 无此 flag）—— 见上
+                .with_args(vec!["check".into()])
+                .with_credential(Credential::BrowserSession {
+                    hint: "log in to x.com in Chrome or Safari (bird reads auth_token/ct0 from there)"
+                        .into(),
+                })
                 .with_weight(60),
+            Backend::new("vx-mirror", "curl")
+                .with_args(vec![
+                    "-fsS".into(),
+                    "-m".into(),
+                    "8".into(),
+                    "https://api.vxtwitter.com/x".into(),
+                ])
+                .with_cost(0)
+                .with_weight(20),
         ],
     ));
 
@@ -394,29 +517,40 @@ pub fn default_channels() -> ChannelRegistry {
     ));
 
     // Reddit — OpenCLI or rdt-cli
+    //
+    // ⭐ 同 D4：`<platform> --help` 只证明二进制在，不证明能取到数据。
+    // 改用真实只读命令。opencli 的 reddit 命令表（README）有 `frontpage`。
     registry.register(Channel::new(
         "reddit",
         SocialPlatform::Reddit,
         vec![
             Backend::new("opencli", "opencli")
-                .with_args(vec!["reddit".into(), "--help".into()])
-                .with_auth(true)
+                .with_args(vec!["reddit".into(), "frontpage".into(), "--limit".into(), "1".into()])
+                .with_credential(Credential::BrowserSession {
+                    hint: "log in to the platform in Chrome, then install the opencli browser extension".into(),
+                })
                 .with_weight(100),
             Backend::new("rdt-cli", "rdt")
                 .with_args(vec!["--version".into()])
-                .with_auth(true)
+                .with_credential(Credential::BrowserSession {
+                    hint: "log in to the platform in Chrome, then install the opencli browser extension".into(),
+                })
                 .with_weight(80),
         ],
     ));
 
     // Instagram — OpenCLI
+    //
+    // ⭐ opencli instagram 命令表有 `profile`；用 `--help` 探测不到凭据状态。
     registry.register(Channel::new(
         "instagram",
         SocialPlatform::Instagram,
         vec![
             Backend::new("opencli", "opencli")
                 .with_args(vec!["instagram".into(), "--help".into()])
-                .with_auth(true)
+                .with_credential(Credential::BrowserSession {
+                    hint: "log in to the platform in Chrome, then install the opencli browser extension".into(),
+                })
                 .with_weight(100),
         ],
     ));
@@ -432,7 +566,9 @@ pub fn default_channels() -> ChannelRegistry {
                 .with_weight(100),
             Backend::new("opencli", "opencli")
                 .with_args(vec!["tiktok".into(), "--help".into()])
-                .with_auth(true)
+                .with_credential(Credential::BrowserSession {
+                    hint: "log in to the platform in Chrome, then install the opencli browser extension".into(),
+                })
                 .with_weight(80),
         ],
     ));
@@ -502,37 +638,18 @@ fn now_ts() -> u64 {
 }
 
 /// Probe a single backend command
+///
+/// ⭐ 委托给 [`super::probe::probe_command_with_timeout`]。
+/// ⛔ **2026-10-03**：此处原有第二份**独立**探测实现（`Command::output()`，
+/// 无超时、无登录墙判别），与 `probe.rs` 的 `probe_command` 重复且行为不一致。
+/// 两份实现在本次修复前都不带真超时 —— `backend.probe_timeout` 从未被读。
+/// 现统一到单一实现，避免「改了一处忘了另一处」。
 pub fn probe_backend(backend: &Backend) -> ProbeResult {
-    let start = Instant::now();
-
-    let output = Command::new(&backend.probe_cmd)
-        .args(&backend.probe_args)
-        .output();
-
-    let latency = start.elapsed().as_millis() as u64;
-
-    match output {
-        Ok(output) => {
-            if output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-                ProbeResult::ok(stdout.trim().to_string(), latency)
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-                if stderr.contains("not found") || stderr.contains("No such file") {
-                    ProbeResult::missing(format!("{}: {}", backend.name, stderr))
-                } else {
-                    ProbeResult::error(stderr, latency)
-                }
-            }
-        }
-        Err(e) => {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                ProbeResult::missing(format!("{}: command not found", backend.probe_cmd))
-            } else {
-                ProbeResult::error(e.to_string(), latency)
-            }
-        }
-    }
+    super::probe::probe_command_with_timeout(
+        &backend.probe_cmd,
+        &backend.probe_args,
+        backend.probe_timeout,
+    )
 }
 
 #[cfg(test)]

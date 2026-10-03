@@ -263,6 +263,16 @@ enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    /// 社交平台访问：渠道后端诊断 / 单平台探测 / cookie 认证
+    #[command(about = "Social platform access: doctor|probe|status|weights|rank|auth")]
+    Social {
+        #[arg(
+            trailing_var_arg = true,
+            allow_hyphen_values = true,
+            help = "doctor [--json] | probe <platform> [--json] | status [--json] | weights [--json] | rank [--json] | auth x"
+        )]
+        args: Vec<String>,
+    },
     #[command(
         name = "clean",
         about = "Scan & remove dev/junk/ai/trash (PureMac-style safe clean): [dev|junk|ai|trash|all] [--dry-run] [--json] [--force]"
@@ -451,6 +461,7 @@ fn main() {
     let is_ops_cmd = matches!(
         cli.command,
         Some(Commands::Sysops { .. })
+            | Some(Commands::Social { .. })
             | Some(Commands::Guard { .. })
             | Some(Commands::Status)
             | Some(Commands::Completions { .. })
@@ -739,6 +750,48 @@ fn main() {
         }
         Some(Commands::Sysops { args }) => {
             entry::run_sysops(args);
+        }
+        Some(Commands::Social { args }) => {
+            // ⭐ social 是纯本地诊断/认证命令，不依赖 LLM provider ——
+            //    必须列入 is_ops_cmd，否则未配置 provider 时会被 wizard 阻塞。
+            let json = args.iter().any(|a| a == "--json");
+            let positional: Vec<&str> = args
+                .iter()
+                .filter(|a| !a.starts_with("--"))
+                .map(|a| a.as_str())
+                .collect();
+            let rc = match positional.first().copied() {
+                None | Some("doctor") => entry::run_social_doctor(json),
+                Some("probe") => match positional.get(1).copied() {
+                    Some(p) => entry::run_social_probe(p, json),
+                    None => {
+                        eprintln!("usage: neotrix social probe <platform> [--json]");
+                        78
+                    }
+                },
+                Some("status") => entry::run_social_status(json),
+                Some("weights") => entry::run_social_weights(json),
+                Some("rank") => entry::run_social_rank(json),
+                Some("auth") => match positional.get(1).copied() {
+                    Some("x") | Some("twitter") => entry::run_social_auth_x(),
+                    _ => {
+                        eprintln!("usage: neotrix social auth x");
+                        78
+                    }
+                },
+                Some(other) => {
+                    eprintln!(
+                        "unknown subcommand '{}'; expected one of: doctor, probe, status, weights, rank, auth",
+                        other
+                    );
+                    78
+                }
+            };
+            // 退出码对 CI 可判定（对齐 OpenCLI 的 sysexits 约定）：
+            // 0 = 全好，78 = 环境未配置后端/凭据。
+            if rc != 0 {
+                std::process::exit(rc);
+            }
         }
         Some(Commands::Clean { args }) => {
             if let Err(e) = entry::run_clean(args) {

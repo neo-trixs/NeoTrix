@@ -150,7 +150,8 @@ impl SocialPlatformAdapter for JinaReaderExtractor {
                         author: item.author,
                         metrics: EngagementMetrics::default(),
                         score: 0.0,
-                        actions: std::collections::HashMap::new(),
+                        predicted: Default::default(),
+                        bidirectional_eligible: false,
                     }
                 }).collect();
                 let total = items.len();

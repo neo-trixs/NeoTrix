@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::time::SystemTime;
 
 pub type PlatformId = String;
@@ -150,12 +149,49 @@ pub struct FeedItem {
     pub author: String,
     pub metrics: EngagementMetrics,
     pub score: f64,
-    pub actions: HashMap<String, f64>,
+    /// ⛔ **2026-10-03 语义更正**：原字段是 `actions: HashMap<String, f64>`，
+    ///    被排序引擎当作**原始计数**使用（`weight * count`）。
+    ///
+    ///    ⛔ 那是 x-algorithm `param.rs:285-292` 逐字点名为**错误**的读法：
+    ///    > the weights do not multiply raw engagement counts. One common
+    ///    > misinterpretation is … "one report cancels 468 likes" — this is
+    ///    > incorrect because the weights apply to the **predicted probabilities**
+    ///    > rather than raw counts.
+    ///
+    ///    且该 map 的 11 个键**没有任何生产者**（全部 adapter 写空 map），
+    ///    所以旧字段既是错的、又恒为空。
+    ///
+    /// ⇒ 改为 [`PredictedActions`](super::feed::PredictedActions)，
+    ///   用类型约束保证传入的是 `0.0..=1.0` 的概率而非计数。
+    pub predicted: super::feed::PredictedActions,
+    /// ⭐ 对应上游 `candidate.bidirectional_boost_eligible()`：
+    /// 互相关注时 reply 权重获得条件提升（`+15.0`，只作用于 reply 这一个 head）。
+    pub bidirectional_eligible: bool,
 }
 
 impl Default for FeedItem {
     fn default() -> Self {
-        Self { id: String::new(), content: String::new(), author: String::new(), metrics: EngagementMetrics::default(), score: 0.0, actions: HashMap::new() }
+        Self {
+            id: String::new(),
+            content: String::new(),
+            author: String::new(),
+            metrics: EngagementMetrics::default(),
+            score: 0.0,
+            predicted: super::feed::PredictedActions::new(),
+            bidirectional_eligible: false,
+        }
+    }
+}
+
+impl FeedItem {
+    /// 构造一条无预测的帖子（测试与占位用）。
+    pub fn with_id(id: &str, content: &str, author: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            content: content.to_string(),
+            author: author.to_string(),
+            ..Default::default()
+        }
     }
 }
 
@@ -218,9 +254,31 @@ pub struct ExtractorItem { pub id: String, pub title: String, pub author: String
 pub struct HttpPool { client: reqwest::Client }
 
 impl HttpPool {
-    pub fn standard() -> Self {
-        Self { client: reqwest::Client::builder().user_agent("NeoTrix/1.0").build().expect("failed to build HTTP client") }
+    /// ⛔ 原实现在此 `.expect("failed to build HTTP client")` —— 生产路径 panic。
+    ///    `reqwest::Client::builder().build()` 在 TLS 后端初始化失败时会 Err，
+    ///    虽罕见但并非不可能（缺 CA、代理配置非法）。
+    ///
+    ///    改为 `try_standard()` 返回 `Result`，让失败以值传递；
+    ///    保留 `standard()` 供测试与既有调用方使用，但其 panic 语义在此标注清楚。
+    pub fn try_standard() -> Result<Self, String> {
+        let client = reqwest::Client::builder()
+            .user_agent("NeoTrix/1.0")
+            .build()
+            .map_err(|e| format!("failed to build HTTP client: {}", e))?;
+        Ok(Self { client })
     }
+
+    /// 便捷构造：失败时 panic。
+    ///
+    /// ⛔ 仅供测试与「构建失败即程序不可用」的启动路径使用；
+    ///    业务路径请用 [`Self::try_standard`]。
+    pub fn standard() -> Self {
+        match Self::try_standard() {
+            Ok(p) => p,
+            Err(e) => panic!("{}", e),
+        }
+    }
+
     pub fn get(&self, url: &str) -> reqwest::RequestBuilder { self.client.get(url) }
     pub fn post(&self, url: &str) -> reqwest::RequestBuilder { self.client.post(url) }
 }
