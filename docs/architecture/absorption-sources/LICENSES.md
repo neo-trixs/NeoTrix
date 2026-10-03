@@ -81,6 +81,15 @@ curl -s "https://raw.githubusercontent.com/<owner>/<repo>/HEAD/LICENSE" | head -
 
 三者均为 MIT ⇒ 可自由取用思路与代码片段（**实际未复制任何代码**）。
 
+## 2026-10-03 新增
+
+| 仓库 | SPDX | 可吸收性 |
+|---|---|---|
+| `lightpanda-io/browser` | **AGPL-3.0** | ⛔ **代码不可吸收**（最强传染性 copyleft，链接即需整体开源）；✅ 4 条设计可移植（CDP 契约 / PandaScript 零 token 执行 / MCP 会话隔离 / robots 开关） |
+| `open-slide/open-slide` | **MIT** | ✅ 可吸收；✅ 2 条设计（skill 携带硬规则 / 约束画布而非内容） |
+
+判据见 [ABSORPTION-2026-10-01-CHUNUI-GROWTH-PI.md](../ABSORPTION-2026-10-01-CHUNUI-GROWTH-PI.md) 末节。
+
 ⛔ **未核实故未吸收**：`KKKKhazix/AIHOT`（许可证未核）。
 ⛔ **未逐仓核验**：`trendshift.io` 榜单 —— 榜单条目本身**不等于**已核实的许可/可移植性。
 

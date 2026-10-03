@@ -176,3 +176,63 @@ npm error Cannot read properties of null (reading 'matches')
 4. `KKKKhazix/AIHOT` —— 许可证**未核实**，按规矩**未吸收**。
 5. `trendshift.io` 榜单 —— 可免登陆访问，但榜单条目本身**不等于**已核实的许可/可移植性；
    已登记为源，尚未逐仓核验。
+---
+
+# 追加吸收：lightpanda-io/browser + open-slide（2026-10-03）
+
+## 许可结论截然不同 —— 这是判定的第一道分水岭
+
+| 源 | 许可 | 代码可否吸收 |
+|---|---|---|
+| `lightpanda-io/browser` | **AGPL-3.0** | ⛔ **不可**。AGPL 是最强传染性 copyleft：链接/嵌入即要求整个服务开源 |
+| `open-slide/open-slide` | **MIT** | ✅ 可自由取用 |
+
+ⓘ 两个源都是「为 agent 而建」，但**一个的许可就足以否决代码层吸收**。
+⇒ 许可判定必须**先于**技术评估，否则会在「技术上很漂亮」之后才发现不能落地。
+
+## `lightpanda-io/browser`（AGPL-3.0，35.9k★，Zig）
+
+⛔ 代码不吸收。四条**可移植的设计**：
+
+1. **CDP 作为唯一集成契约** —— `serve --port 9222` 后
+   Puppeteer/Playwright **代码不用改一行**（`browserWSEndpoint`）。
+   ⇦ 可移植性来自「暴露标准协议」而非「提供 SDK」。
+2. ⭐ **PandaScript：agent 写一次，之后确定性、零 token 执行**
+   > Scripts are deterministic and token-free, so you can prototype with the
+   > LLM and ship the output to production **without a model at runtime**.
+   ⇦ **这是本轮最有价值的一条**，与本仓的
+   `nt_nondet.py`（确定性缺陷）、`check-discarded-inputs`（反向锁）、
+   `EMERGENCE-PLAN` 的「先写可证伪的推翻条件」**同源**：
+   **把不确定性收敛在一次生成里，运行时不再付 token 与不确定性成本。**
+3. **MCP 会话隔离**：`Mcp-Session-Id` 头，每个连接独立
+   page/cookies/memory ⇒「agents no longer clobber each other's page」；
+   同 ID 则**共享**上下文（协作场景）。
+   ⇦ 我们 `multi_agent` 的 coordinator 是**共享状态**，
+   这条给出了「何时该隔离、何时该共享」的显式判据。
+4. `--obey-robots` 作为**显式开关**而非默认 —— 合规开关要可见、可审计。
+
+## `open-slide/open-slide`（MIT，8.7k★，pnpm+Turbo + React）
+
+✅ 许可宽松。两条值得对照：
+
+1. ⭐ **skill 里携带「硬规则」，而不是散文**
+   scaffolder 自带 `/create-slide` 与 `/slide-authoring`，
+   后者是「1920×1080 画布、type scale、palette、布局规则」的技术参考，
+   **agent 写代码前先读它**。
+   ⇦ 我们有 `skills/design/ui-direction/`、`skills/des/**`，
+   但本会话反复出现的问题是**规则只写在文档里、没被机器执行**
+   （字号 6 档、恒满分判据、弱断言…）⇒ **这条与我们的教训完全对上**。
+2. **约束画布而不是约束内容**：固定 1920×1080，
+   但「Pages are arbitrary React components, **not a constrained DSL**」。
+   ⇦ 架构取舍：把约束放在**边界**（画布尺寸），把自由留给**内容**。
+
+## 两个源合起来给 NeoTrix 的一条判断
+
+| lightpanda | open-slide |
+|---|---|
+| agent 写一次 → 确定性零 token 执行 | skill 携带硬规则 → agent 照着写 |
+| **生成期**付 token，**运行期**不付 | 规则**机器可读**，不是散文 |
+
+⇒ 合起来即：**把「不确定性 + 规则」都推到生成期，运行时只跑确定性检查。**
+这与本会话做完的事（4 个门 + 2 条反向锁 + 类型收敛）在方向上是同一件事，
+差别是它们**由人写**，而这两个源提示了下一步：**规则应该能被生成，而非只能被手写。**
