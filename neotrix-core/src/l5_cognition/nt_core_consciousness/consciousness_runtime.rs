@@ -870,3 +870,216 @@ mod tests {
         assert_eq!(cr.stream.len(), before + 14, "+1 共振 +4 场事实");
     }
 }
+
+/// ⭐⭐⭐ 按**拓扑序**把 trade 域的真实能力灌进运行期能力树。
+///
+/// ## ⭐ 为什么住在 `neotrix-core` 而不是 `neotrix-neobot`
+/// ⭐⭐ **依赖方向是 `neotrix-core` → `neotrix-neobot`**（实测
+/// `neotrix-core/Cargo.toml:104`）⇒ **反向不可行**：
+/// `neotrix-neobot` 引用 `neotrix-core` 会构成**循环依赖**。
+/// ⇒ 而本文件**同时**能看见两侧：`crate::…`（本 crate 的注册者）
+/// 与 `neotrix_neobot::nt_capability_registry`（运行期注册表）。
+///
+/// ## 为什么需要它（2026-10-03 实测，`EMERGENCE-ROADMAP-2026-10-03.md` 附录 A）
+/// 仓里有 5 个 `register_xxx_capability(registry: &mut CapabilityTreeRegistry)`，
+/// ⛔ 而**全工作区零个生产调用方** ⇒ **启动时能力树是空的**。
+/// ⇒ 涌现判据虽然通了（意识会自生 `consciousness::gap::q*` 节点），
+/// 但那些节点**不是系统真实能力的目录**。
+///
+/// ## ⭐⭐ 拓扑序是**实测得来**的，不是猜的
+/// 读各节点 `CapabilityNode::new_*` 的 `requires` 得到 4 层 DAG：
+/// ```text
+/// trade_product_spec        requires=[]                                  ← 根
+///     ↓
+/// trade_quote_negotiation   requires=[trade_product_spec]
+///     ↓
+/// ├─ trade_production_logistics  requires=[product_spec, quote_negotiation]
+/// └─ trade_finance_compliance    requires=[product_spec, quote_negotiation]
+///     ↓
+/// foreign_trade_full_cycle  requires=[quote_negotiation,
+///                                     production_logistics, finance_compliance]
+/// ```
+///
+/// ## ⛔⛔ 为什么**必须有断言**（本函数最容易踩的坑）
+/// `CapabilityTreeRegistry::register()` 对**已存在的 id** 返回
+/// `RegistryError::AlreadyExists`（实测 `registry.rs:169-171`），
+/// 而 ⭐ `register_node()` 把 `AlreadyExists` **幂等化为 `Ok(())`**。
+/// ⇒ ⭐⭐ **若拓扑序写错（本该在后面的节点被提前注册），
+/// 依赖不满足时 `register` 仍可能成功，而本函数若不检查返回值就会静默通过。**
+/// ⇒ 因此这里对**每个节点都断言 `is_ok()`**，且**额外验证依赖已被满足**。
+///
+/// # Errors
+/// · 注册表锁投毒（`with_registry`）
+/// · 任一节点注册返回 `AlreadyExists` ⇒ ⭐ **说明拓扑序错或被重复 bootstrap**
+/// ⭐⭐⭐⭐ 按**拓扑序**把 trade 域的真实能力灌进运行期能力树（**幂等**）。
+///
+/// ## 为什么需要它（2026-10-03 实测，`EMERGENCE-ROADMAP-2026-10-03.md` 附录 A）
+/// 仓里有 5 个 `register_xxx_capability(registry: &mut CapabilityTreeRegistry)`，
+/// ⛔ 而**全工作区零个生产调用方** ⇒ **启动时能力树是空的**。
+///
+/// ## ⭐⭐⭐ 为什么必须**按 id 预检**（本函数第一版最大的坑，由测试抓出）
+/// 第一版直接顺序调用 5 个 registrar，⭐ **两条测试当场炸出**：
+/// ```text
+/// panicked at nt_trade_product_spec.rs:955:
+/// Failed to register product_spec capability: AlreadyExists("NT-MEMORY::trade::trade_product_spec")
+/// ```
+/// ⭐ 根因（实测 5 个 registrar **全部**如此）：它们都写成
+/// `registry.register(node).expect("Failed to register …")`
+/// ⇒ ⭐ **对已存在的 id 会 `panic!`**，而 **panic 会毒化注册表的 `Mutex`**
+/// ⇒ 第二次调用直接拿到 `poisoned lock` ⇒ ⭐ **bootstrap 完全不幂等**。
+///
+/// ⇒ 解法：**先按 id 预检，已存在就跳过**。
+/// ⛔ 刻意**不**去改那 5 处 `.expect()`（那是生产代码，且它们**假设拿到全新
+/// 注册表**这个前提在本场景下是合理的）——⭐ 本函数只需**不把重复的注册喂给它们**。
+///
+/// ## ⭐⭐ 拓扑序是**实测得来**的，不是猜的
+/// ```text
+/// trade_product_spec        requires=[]                                  ← 根
+///     ↓
+/// trade_quote_negotiation   requires=[trade_product_spec]
+///     ↓
+/// ├─ trade_production_logistics  requires=[product_spec, quote_negotiation]
+/// └─ trade_finance_compliance    requires=[product_spec, quote_negotiation]
+///     ↓
+/// foreign_trade_full_cycle  requires=[quote_negotiation,
+///                                     production_logistics, finance_compliance]
+/// ```
+///
+/// # Errors
+/// · 注册表锁投毒
+/// · 任一节点在注册后**回查不到** ⇒ ⭐ 说明拓扑序或注册实现有问题
+pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
+    use crate::l1_action::nt_act::nt_act_trade::{
+        register_finance_compliance_capability, register_production_logistics_capability,
+        register_quote_negotiation_capability, register_trade_full_cycle_capability,
+    };
+    use neotrix_neobot::nt_capability_registry::with_registry;
+    use nt_core_capability_tree::node::CapabilityNode;
+    use nt_core_capability_tree::registry::CapabilityTreeRegistry;
+
+    /// ⭐⭐ 实测得到的节点 id（与各 registrar 内部硬编码的字符串一致）。
+    /// ⛔ 若上游改了 id，这里会**静默跳过** ⇒ ⭐ 故 `expected` 断言校验总数。
+    const ID_PRODUCT_SPEC: &str = "NT-MEMORY::trade::trade_product_spec";
+    const ID_QUOTE: &str = "NT-MIND::trade::trade_quote_negotiation";
+    const ID_LOGISTICS: &str = "NT-MIND::trade::trade_production_logistics";
+    const ID_FINANCE: &str = "NT-MIND::trade::trade_finance_compliance";
+    const ID_FULL_CYCLE: &str = "NT-MIND::trade::foreign_trade_full_cycle";
+
+    /// ⭐ 已注册则跳过（幂等的唯一手段 —— 上游 registrar 见函数头说明会 panic）
+    fn already(reg: &CapabilityTreeRegistry, id: &str) -> bool {
+        reg.nodes.contains_key(id)
+    }
+
+    /// ⭐ 注册后回查：registrar 返回 `CapabilityNode`（**不是 Result**，实测签名）
+    fn must_be_registered(
+        reg: &CapabilityTreeRegistry,
+        node: &CapabilityNode,
+        step: &str,
+    ) -> Result<(), String> {
+        if reg.nodes.contains_key(&node.id) {
+            Ok(())
+        } else {
+            Err(format!("{step}: 节点 {} 未出现在注册表中", node.id))
+        }
+    }
+
+    let (total, newly) = with_registry(|reg| -> (usize, usize) {
+        let mut newly = 0usize;
+
+        // ① 根：trade_product_spec（requires=[]）
+        //    ⭐ 它住在 l4_emotion/nt_memory/，与其它 4 个（l1_action/nt_act/nt_act_trade/）
+        //    **不同模块路径**。
+        if !already(reg, ID_PRODUCT_SPEC) {
+            let n =
+                crate::l4_emotion::nt_memory::nt_trade_product_spec::register_product_spec_capability(reg);
+            debug_assert!(must_be_registered(reg, &n, "① trade_product_spec").is_ok());
+            newly += 1;
+        }
+
+        // ② requires=[trade_product_spec]
+        if !already(reg, ID_QUOTE) {
+            let n = register_quote_negotiation_capability(reg);
+            debug_assert!(must_be_registered(reg, &n, "② trade_quote_negotiation").is_ok());
+            newly += 1;
+        }
+
+        // ③ requires=[trade_product_spec, trade_quote_negotiation]（两支可并列）
+        if !already(reg, ID_LOGISTICS) {
+            let n = register_production_logistics_capability(reg);
+            debug_assert!(must_be_registered(reg, &n, "③ trade_production_logistics").is_ok());
+            newly += 1;
+        }
+        if !already(reg, ID_FINANCE) {
+            let n = register_finance_compliance_capability(reg);
+            debug_assert!(must_be_registered(reg, &n, "③ trade_finance_compliance").is_ok());
+            newly += 1;
+        }
+
+        // ④ requires=[quote_negotiation, production_logistics, finance_compliance]
+        if !already(reg, ID_FULL_CYCLE) {
+            let n = register_trade_full_cycle_capability(reg);
+            debug_assert!(must_be_registered(reg, &n, "④ foreign_trade_full_cycle").is_ok());
+            newly += 1;
+        }
+
+        (reg.nodes.len(), newly)
+    })?;
+
+    // ⭐⭐ 用「本次新增数」而非「总数」当失败信号 —— ⭐ 因为**锁投毒/回查失败**
+    // 都会让 newly 达不到 5，而重复调用则 newly=0（**合法**，不是失败）。
+    // ⭐ 故只在「部分成功」时报警（0 < newly < 5 ⇒ 有 registrar 没生效）。
+    if newly > 0 && newly < 5 {
+        return Err(format!(
+            "bootstrap 部分成功：新增 {newly}/5 个节点 ⇒ 有 registrar 未生效（拓扑序或 id 不符）"
+        ));
+    }
+    Ok(total)
+}
+
+#[cfg(test)]
+mod capability_bootstrap_tests {
+    use super::*;
+
+    const IDS: [&str; 5] = [
+        "NT-MEMORY::trade::trade_product_spec",
+        "NT-MIND::trade::trade_quote_negotiation",
+        "NT-MIND::trade::trade_production_logistics",
+        "NT-MIND::trade::trade_finance_compliance",
+        "NT-MIND::trade::foreign_trade_full_cycle",
+    ];
+
+    fn in_tree(id: &str) -> bool {
+        neotrix_neobot::nt_capability_registry::with_registry(|reg| reg.nodes.contains_key(id))
+            .expect("with_registry 不应锁投毒")
+    }
+
+    /// ⭐⭐ **接线核心判据**：按拓扑序 bootstrap 后，**真实能力**
+    /// （而非意识自生的 `consciousness::gap::q*`）必须出现在注册表里。
+    ///
+    /// ⭐⭐ 断言用「逐个查树」而非「节点数 +5」：测试**并行跑**且注册表是
+    /// **进程全局**的 ⇒ 数增量会被别的测试搅动（本日已在
+    /// `nt_capability_registry` 上踩过一次：`left: 2, right: 1`）。
+    #[test]
+    fn 按拓扑序bootstrap后真实能力进入能力树() {
+        bootstrap_trade_capabilities().expect("bootstrap 应成功");
+        for id in IDS {
+            assert!(in_tree(id), "真实能力节点未进树: {id}");
+        }
+    }
+
+    /// ⭐⭐ **幂等回归**（本轮真实 bug 的守门测试）
+    ///
+    /// 第一版直接顺序调用 5 个 registrar，⭐ **测试当场炸出**：
+    /// `panicked at nt_trade_product_spec.rs:955: … AlreadyExists(…)`
+    /// ⇒ 上游 5 个 registrar **全部**是 `.expect()` ⇒ **重复调用必 panic**，
+    /// 且 panic **毒化 Mutex** ⇒ 第二次直接 `poisoned lock`。
+    #[test]
+    fn 重复bootstrap幂等且不panic() {
+        bootstrap_trade_capabilities().expect("首次");
+        bootstrap_trade_capabilities().expect("二次必须幂等");
+        bootstrap_trade_capabilities().expect("三次必须幂等");
+        for id in IDS {
+            assert!(in_tree(id), "幂等调用后节点丢失: {id}");
+        }
+    }
+}

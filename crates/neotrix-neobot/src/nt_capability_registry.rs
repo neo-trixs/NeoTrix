@@ -76,6 +76,30 @@ pub fn register_node(node: CapabilityNode) -> Result<(), String> {
     }
 }
 
+/// ⭐⭐ 把运行期注册表**借给**一个需要 `&mut CapabilityTreeRegistry` 的生产者。
+///
+/// ## 为什么要这个入口（2026-10-03 实测）
+/// 仓里现成的节点生产者签名统一是：
+/// ```ignore
+/// pub fn register_xxx_capability(registry: &mut CapabilityTreeRegistry) -> CapabilityNode
+/// ```
+/// ⇒ 它们**只认 `&mut`**，⛔ 无法通过 `register_node(node)` 那个「传成品」的入口。
+/// ⭐ 若为此给每个生产者改签名，就是**为接线改 8 处生产代码**；
+/// 而本函数让它们**原样调用**，接线成本降为一个 `with_registry`。
+///
+/// ⭐⭐ **为什么这个入口必须诚实地暴露 `&mut`**：调用方能拿到完整注册表，
+/// 也就**能绕过本模块的 `AlreadyExists` 幂等语义**（`register_node` 会把
+/// `AlreadyExists` 吞成 `Ok`，而这里不会）。
+/// ⇒ ⭐ 因此 `bootstrap` 类调用方**必须自己断言结果**，
+/// ⛔ 否则拓扑序写错会**静默失败**（详见 `bootstrap_trade_capabilities`）。
+///
+/// # Errors
+/// 注册表锁投毒。
+pub fn with_registry<R>(f: impl FnOnce(&mut CapabilityTreeRegistry) -> R) -> Result<R, String> {
+    let mut reg = slot().lock().map_err(|e| format!("能力注册表锁投毒: {e}"))?;
+    Ok(f(&mut reg))
+}
+
 /// 当前已登记的节点数 —— ⭐ **涌现门要盯的就是这个数**（见路线 §5 第 2 步）。
 ///
 /// ⭐ 「节点数不增长即判红」是**反向护栏**：钉住涌现必须是**行为**，
