@@ -18,16 +18,46 @@ impl Criterion {
     }
 }
 
+/// ⭐⭐ 判据来源 —— `EMERGENCE-PLAN` §6.4「自报独立性」的**机器化**。
+///
+/// **为什么需要它**：CASP（剑桥，Hinton/Bengio/Jack Clark 等 23 人）指出
+/// 「AI systems now write most of the code inside the companies that build them」；
+/// `yetone/cumora` 用 seen-cursor 让过期回复**重新决策**；
+/// `yetone/magpie` 规定历史「never inferred from today's configured key」。
+/// ⇒ 三份**互相独立**的来源指向同一条：**当系统自身能影响度量时，度量即失效。**
+///
+/// **为什么默认是 `SelfReported`**：不声明来源时**取最坏假设**。
+/// 这与本仓一贯的默认收紧同向（cumora 的未知引擎**默认拒绝**、
+/// 沙箱**默认 fail-closed**）；若默认取 `Independent`，
+/// 则「忘记声明」会静默升级成「可当涌现证据」—— 那正是本仓最贵的一类 bug。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CriteriaSource {
+    /// ⛔ 判据与被评判产出**同源**（自己写 rubric 评自己）
+    SelfReported,
+    /// ✅ 判据**独立于**被评判产出（外部基准 / 人工标注 / 固定 rubric）
+    Independent,
+}
+
 /// Configuration for an LLM-as-Judge evaluation.
 #[derive(Debug, Clone)]
 pub struct JudgeConfig {
     pub criteria: Vec<Criterion>,
     pub max_score: f32,
+    /// ⭐ 判据来源。`new()` **默认 `SelfReported`** ⇒ 不可当涌现证据。
+    pub criteria_source: CriteriaSource,
 }
 
 impl JudgeConfig {
+    /// ⛔ 默认 `SelfReported` —— 未声明来源时**取最坏假设**。
+    /// 想让它可当涌现证据，必须**显式**调[`with_source`](Self::with_source)。
     pub fn new(criteria: Vec<Criterion>, max_score: f32) -> Self {
-        Self { criteria, max_score }
+        Self { criteria, max_score, criteria_source: CriteriaSource::SelfReported }
+    }
+
+    /// ⭐ 显式声明判据来源。见[`CriteriaSource`]。
+    pub fn with_source(mut self, source: CriteriaSource) -> Self {
+        self.criteria_source = source;
+        self
     }
 
     /// Total weight across all criteria.
@@ -51,6 +81,24 @@ pub struct JudgeResult {
     pub max_possible: f32,
     pub criterion_scores: Vec<CriterionScore>,
     pub summary: String,
+    /// ⭐ 本次评分所用的判据来源（随结果一起落盘，供事后审计）。
+    pub criteria_source: CriteriaSource,
+}
+
+impl JudgeResult {
+    /// ⭐⭐ **可否计入涌现证据** —— `EMERGENCE-PLAN` §6.4 的机器判据。
+    ///
+    /// ⛔ `SelfReported`（判据与产出同源）⇒ **返回false**：
+    /// 这种评分可用于调试与回归，但**不得**计入 `new_category` 等涌现计数，
+    /// 且必须与独立来源（如 `nt_emergence_detector` 的实测计数）**并列呈现**。
+    ///
+    /// ✅ `Independent` ⇒ 可计入。
+    ///
+    /// ⭐ 之所以做成**方法**而不是注释：注释会被下一个 agent 忽略，
+    /// 而`if !result.is_emergence_evidence() { skip }` 会在编译期与评审时暴露。
+    pub fn is_emergence_evidence(&self) -> bool {
+        matches!(self.criteria_source, CriteriaSource::Independent)
+    }
 }
 
 /// Evaluate a response against configured criteria.
@@ -94,6 +142,7 @@ pub fn evaluate_response(
             max_possible: config.max_score,
             criterion_scores: Vec::new(),
             summary: "No criteria configured".into(),
+            criteria_source: config.criteria_source,
         });
     }
 
@@ -104,6 +153,7 @@ pub fn evaluate_response(
             max_possible: config.max_score,
             criterion_scores: Vec::new(),
             summary: "Total weight is zero".into(),
+            criteria_source: config.criteria_source,
         });
     }
 
@@ -207,4 +257,63 @@ mod tests {
         assert!(r.contains("rubric"), "拒绝理由未说明缺 rubric 信号");
         assert!(r.contains("Refusing"), "拒绝理由未表明这是主动拒绝而非故障");
     }
+
+    // ══════════════════════════════════════════════════════════════
+    // ⭐ 判据来源 / 自报独立性（`EMERGENCE-PLAN` §6.4）
+    // ══════════════════════════════════════════════════════════════
+
+    /// ⭐⭐ 反向锁：`JudgeConfig::new` **默认 `SelfReported`**
+    /// ⇒ 不声明来源就**不可**计入涌现证据。
+    /// 这条锁的意义：若默认取 `Independent`，
+    /// 「忘记声明」会静默升级成「可当涌现证据」。
+    #[test]
+    fn default_config_is_self_reported_and_not_emergence_evidence() {
+        let c = cfg(2, 10.0);
+        assert_eq!(c.criteria_source, CriteriaSource::SelfReported);
+        // 造一个结果并检查判定（走真实 evaluate_response 的非退化路径）
+        let r = evaluate_response(&c, "p", "r");
+        assert!(r.is_none(), "非退化配置本应拒绝评分");
+        // 直接构造结果验证判定逻辑（拒绝路径下也要可判）
+        let manual = JudgeResult {
+            total_score: 10.0,
+            max_possible: 10.0,
+            criterion_scores: Vec::new(),
+            summary: String::new(),
+            criteria_source: CriteriaSource::SelfReported,
+        };
+        assert!(
+            !manual.is_emergence_evidence(),
+            "同源判据**不得**计入涌现证据"
+        );
+    }
+
+    /// 显式声明独立 ⇒ 可计入涌现证据。
+    #[test]
+    fn independent_source_is_emergence_evidence() {
+        let c = cfg(2, 10.0).with_source(CriteriaSource::Independent);
+        assert_eq!(c.criteria_source, CriteriaSource::Independent);
+        let manual = JudgeResult {
+            total_score: 7.0,
+            max_possible: 10.0,
+            criterion_scores: Vec::new(),
+            summary: String::new(),
+            criteria_source: c.criteria_source,
+        };
+        assert!(manual.is_emergence_evidence());
+    }
+
+    /// ⭐ 边界判据的**失败方向**也要锁：满分同源 ⇒ 仍不可计入。
+    /// （防止将来有人用「分数很高」当作「可信」的等价物。）
+    #[test]
+    fn self_reported_perfect_score_still_not_evidence() {
+        let manual = JudgeResult {
+            total_score: 10.0,
+            max_possible: 10.0,
+            criterion_scores: Vec::new(),
+            summary: "Full score".into(),
+            criteria_source: CriteriaSource::SelfReported,
+        };
+        assert!(!manual.is_emergence_evidence());
+    }
 }
+
