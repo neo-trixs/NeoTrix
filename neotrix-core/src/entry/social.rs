@@ -430,3 +430,166 @@ pub fn run_social_rank(json: bool) -> i32 {
     let _ = (FeedType::Latest, SocialAccessManager::new());
     0
 }
+
+/// 执行 `neotrix social login <site>` — **通用**登录（不限 x.com）。
+///
+/// # ⭐ 通用化后的形态
+///
+/// 修复前只有 `neotrix social auth x`，且成功判据在 L1 里写死
+/// `cookie.name == "auth_token"`（X 专有）。现改为：
+/// 站点只贡献**数据**（[`LoginTarget`]），流程与判据全部共用。
+/// 新增一个平台 = 往注册表加一条记录，**不改控制流**。
+///
+/// ⛔ 本函数**不代为输入凭据** —— 它只打印目标与指引，
+/// 真实登录由浏览器打开、用户本人完成。凭据落盘到
+/// `~/.neotrix/cookies/<site>.json`，**值不进任何输出**。
+pub fn run_social_login(site: &str, json: bool) -> i32 {
+    use neotrix::l2_perception::nt_world::social_access::default_login_registry;
+
+    let registry = default_login_registry();
+    let Some(target) = registry.get(site) else {
+        let known: Vec<String> = registry.ids().iter().map(|s| s.to_string()).collect();
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({ "error": "unknown site", "site": site, "known": known })
+            );
+        } else {
+            eprintln!("unknown site '{}'; registered sites: {}", site, known.join(", "));
+        }
+        return EXIT_CONFIG;
+    };
+
+    let cookie_path = registry.cookie_path(site);
+
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "site": target.id,
+                "display_name": target.display_name,
+                "login_url": target.login_url,
+                "success_url": target.success_url,
+                "probes": target.probes.iter().map(|p| p.describe()).collect::<Vec<_>>(),
+                "timeout_secs": target.timeout.as_secs(),
+                "requires_session": target.requires_session,
+                "cookie_path": cookie_path.as_ref().ok().map(|p| p.display().to_string()),
+                "cookie_path_resolvable": cookie_path.is_ok(),
+            })
+        );
+    } else {
+        println!("site:      {} ({})", target.id, target.display_name);
+        println!("login url: {}", target.login_url);
+        if let Some(ref s) = target.success_url {
+            println!("success:   {}", s);
+        }
+        println!("timeout:   {}s", target.timeout.as_secs());
+        println!("verified by:");
+        for p in &target.probes {
+            println!("  - {}", p.describe());
+        }
+        match &cookie_path {
+            Ok(p) => println!("cookies:   {}", p.display()),
+            Err(e) => {
+                println!("cookies:   ⚠️  {}", e);
+            }
+        }
+        println!();
+        println!("ⓘ  Login is interactive and performed by you, in a real browser.");
+        println!("   Open the login url above, sign in, and cookies persist to the path");
+        println!("   above. This command never handles your password or 2FA.");
+        println!();
+        println!("⛔ Note: success is judged by cookie/url/body probes listed above.");
+        println!("   Cookie *values* are never read or printed — only presence.");
+        if !target.requires_session {
+            println!();
+            println!("   This site works without a session; logging in only adds capability.");
+        }
+    }
+
+    // ⛔ 不代为登录 ⇒ 退出码 78（待用户操作），不是 0（假成功）
+    EXIT_CONFIG
+}
+
+/// 执行 `neotrix social sites` — 列出所有可登录站点。
+pub fn run_social_sites(json: bool) -> i32 {
+    use neotrix::l2_perception::nt_world::social_access::default_login_registry;
+
+    let registry = default_login_registry();
+    let rows: Vec<serde_json::Value> = registry
+        .all()
+        .iter()
+        .map(|t| {
+            serde_json::json!({
+                "id": t.id,
+                "name": t.display_name,
+                "login_url": t.login_url,
+                "probes": t.probes.iter().map(|p| p.describe()).collect::<Vec<_>>(),
+                "requires_session": t.requires_session,
+            })
+        })
+        .collect();
+
+    // ⭐ 排序让输出稳定 —— HashMap 迭代序每次运行都不同，
+    //    会让 diff 噪音掩盖真实变化。
+    let mut sorted = rows;
+    sorted.sort_by(|a, b| {
+        a["id"].as_str().unwrap_or("").cmp(b["id"].as_str().unwrap_or(""))
+    });
+
+    if json {
+        println!("{}", serde_json::json!({ "sites": sorted }));
+    } else {
+        for r in &sorted {
+            println!(
+                "  {:<10} {:<14} {}",
+                r["id"].as_str().unwrap_or("?"),
+                r["name"].as_str().unwrap_or("?"),
+                r["login_url"].as_str().unwrap_or("?")
+            );
+        }
+        println!();
+        println!("Run `neotrix social login <id>` for details on a specific site.");
+    }
+    0
+}
+
+#[cfg(test)]
+mod login_cli_tests {
+    use super::*;
+
+    #[test]
+    fn every_registered_site_resolves_a_cookie_path() {
+        // ⭐ 通用化的实际意义：任一站点都必须能算出 cookie 落盘路径
+        for id in ["x", "github", "reddit", "bilibili", "zhihu"] {
+            let rc = run_social_login(id, true);
+            assert_eq!(rc, EXIT_CONFIG, "{} must report 78 (awaiting user action)", id);
+        }
+    }
+
+    #[test]
+    fn login_is_generic_not_x_only() {
+        // ⛔ 修复前只有 `auth x`。若这个测试失败，说明又退化成 X 专用。
+        for id in ["github", "reddit", "bilibili", "zhihu"] {
+            let rc = run_social_login(id, true);
+            assert_eq!(rc, EXIT_CONFIG, "non-X site `{}` must be supported", id);
+        }
+    }
+
+    #[test]
+    fn unknown_site_is_config_error() {
+        assert_eq!(run_social_login("definitely-not-a-site", false), EXIT_CONFIG);
+    }
+
+    #[test]
+    fn sites_listing_succeeds() {
+        assert_eq!(run_social_sites(true), 0);
+        assert_eq!(run_social_sites(false), 0);
+    }
+
+    #[test]
+    fn login_reports_config_error_not_success() {
+        // ⭐ 关键：登录未完成 ⇒ 必须 78，绝不能 0（假成功）
+        assert_ne!(run_social_login("x", false), 0);
+    }
+}

@@ -53,8 +53,8 @@ pub use sysops::run_sysops;
 pub use todo::run_todo;
 pub use wiki::run_wiki;
 pub use social::{
-    run_social_auth_x, run_social_doctor, run_social_probe, run_social_rank, run_social_status,
-    run_social_weights,
+    run_social_auth_x, run_social_doctor, run_social_login, run_social_probe,
+    run_social_rank, run_social_sites, run_social_status, run_social_weights,
 };
 fn success(msg: impl AsRef<str>) -> String {
     msg.as_ref().green().to_string()

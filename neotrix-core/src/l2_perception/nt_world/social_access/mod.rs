@@ -7,6 +7,7 @@ pub mod doctor;
 pub mod extractors;
 pub mod feed;
 pub mod manager;
+pub mod nt_login;
 pub mod nt_payload_guard;
 pub mod nt_selector_contract;
 pub mod nt_x_browser;
@@ -25,6 +26,10 @@ pub use channel_adapter::{ChannelAdapter, ChannelAdapterRegistry};
 pub use feed::{FeedService, PlatformAdapterRegistry, PredictedAction, PredictedActions, Prediction, RankOutcome, UniversalRecommender};
 pub use manager::{FeedResponse, SocialAccessManager, SessionPool};
 pub use doctor::{DoctorReport, ChannelReport, BackendReport, run_doctor};
+pub use nt_login::{
+    LoginRegistry, LoginTarget, Observation, ProbeOutcome, SuccessProbe, default_registry as default_login_registry,
+    evaluate as evaluate_login,
+};
 pub use nt_selector_contract::{PageShape, X_SELECTOR_CONTRACT};
 pub use nt_x_browser::{XBrowserRetriever, XQuery};
 pub use nt_payload_guard::{PayloadVerdict, classify as classify_payload};
