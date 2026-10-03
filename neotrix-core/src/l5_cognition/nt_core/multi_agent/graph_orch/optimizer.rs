@@ -427,34 +427,61 @@ mod tests {
         assert!(suggestions.is_empty());
     }
 
-    /// ⛔ **本测试与 `merge_sequential_tasks` 断言相反，无法同时满足。**
+    /// ✅ 2026-10-02 已裁决并重写（原先与 `merge_sequential_tasks` 断言相反）。
     ///
-    /// 两者的**输入 DAG 完全相同**（a→b→c，全 `Task`、全 `Sequential`）：
-    /// · 本测试：合并后 `merged` 应**仍有 1 条出边指向 c** ⇒ c **未**被合并
-    /// · `merge_sequential_tasks`：合并后 `node_count() == 1` ⇒ c **已**被合并
+    /// **矛盾根源**：原夹具是 a→b→c（全 `Task`、全 `Sequential`），
+    /// 却期望合并后 `merged` **仍有出边指向 c** ⇒ 要求 c **未**被合并；
+    /// 而 `merge_sequential_tasks` 对**同一 DAG** 要求 `node_count() == 1`
+    /// ⇒ 要求 c **已**被合并。两者不可同时满足。
     ///
-    /// 2026-10-02 已把 `merge_sequential_single_task_nodes` 的候选循环改为
-    /// 「每合并一对即重算」（原实现把候选表当快照，合并 (a,b) 后 (b,c) 失效）
-    /// ⇒ 满足 `merge_sequential_tasks`（+ `parallelization_no_suggestions_for_linear`），
-    /// 但使本测试失败。
-    /// 保留 2 : 1 的多数方；⛔ **不改本测试断言**（那会把矛盾掩盖掉）。
-    #[test]
-    #[ignore = "与 merge_sequential_tasks 断言相反（同 DAG 不同期望），待裁决合并契约"]
-    fn merge_preserves_outgoing_edges() {
+    /// **裁决**：`merge_pair`（:128）把合并节点建为 `NodeType::Task`
+    /// ⇒ 合并后**仍可继续合并** ⇒ 线性链**完全折叠**是本函数的契约
+    ///（这也正是 `parallelization_no_suggestions_for_linear` 依赖的行为）。
+    /// ⇒ 2 : 1 多数方。
+    ///
+    /// **重写而非忽略**：本测试的名字是「出边被保留」，而该意图
+    /// **确实被实现满足** —— `merge_pair`(:138-144) 把 `to_id` 的出边
+    /// **重连**到新节点，而非丢弃。原夹具只是恰好让链折完、没留下出边。
+    /// ⇒ 现把 `c` 改为 `NodeType::Join`（**不可合并**），
+    ///    链停在 2 个节点 ⇒ 这样它才**真正测到出边被重连**。
+    #[test]    fn merge_preserves_outgoing_edges() {
         let mut dag = Dag::new("merge-out");
         dag.add_node(DagNode::new("a", NodeType::Task)).unwrap();
         dag.add_node(DagNode::new("b", NodeType::Task)).unwrap();
-        dag.add_node(DagNode::new("c", NodeType::Task)).unwrap();
+        // ⚠️ 2026-10-02：`c` 改为 **Join**（原为 Task）。
+        // 原为 Task 时 a→b→c 会**整链折叠**成一个节点，于是「出边还在」
+        // 根本无法成立 —— 那是夹具选错，不是实现丢失出边。
+        // 改为 Join 后 `c` 不可合并 ⇒ 链停在 2 个节点 ⇒
+        // 本测试才真正验证「`to_id` 的出边被**重连**到 merged 节点」。
+                // ⚠️ 2026-10-02：`c` 改为 **Join**（原为 Task）。
+        // 原为 Task 时 a→b→c 会**整链折叠**成一个节点，于是「出边还在」
+        // 根本无法成立 —— 那是夹具选错，不是实现丢失出边。
+        // 改为 Join 后 `c` 不可合并 ⇒ 链停在 2 个节点 ⇒
+        // 本测试才真正验证「`to_id` 的出边被**重连**到 merged 节点」。
+        dag.add_node(DagNode::new("c", NodeType::Join)).unwrap();
         dag.add_edge(DagEdge::new("a", "b", EdgeType::Sequential))
             .unwrap();
         dag.add_edge(DagEdge::new("b", "c", EdgeType::Sequential))
             .unwrap();
 
         DagOptimizer::merge_sequential_single_task_nodes(&mut dag).unwrap();
-        // Merged node should have edge to c
-        let merged_id = dag.nodes.keys().next().unwrap();
-        assert_eq!(dag.outgoing_edges(merged_id).len(), 1);
-        assert_eq!(dag.outgoing_edges(merged_id)[0].to, "c");
+        assert_eq!(dag.node_count(), 2, "c 为 Join 不可合并 ⇒ 链应停在 2 个节点");
+
+        // ⚠️ 2026-10-02 修正：原代码用 `dag.nodes.keys().next().unwrap()`
+        // 取「第一个」节点当 merged —— 但 `nodes` 是 **HashMap，迭代顺序不确定**，
+        // 合并后有 2 个节点（merged_ab 与 c）⇒ 取到 `c` 就得到 0 条出边。
+        // ⇒ 这**又是一个「顺序不确定」型缺陷**（本会话第 N 次：
+        //   `nt_nondet.py` 扫的就是这一类）。
+        // 修法：按**语义**定位 merged 节点（id 以 `merged_` 开头），
+        // 而不是依赖 HashMap 顺序。
+        let merged_id = dag
+            .nodes
+            .keys()
+            .find(|id| id.starts_with("merged_"))
+            .expect("应存在 merged_ 前缀的合并节点");
+        let out = dag.outgoing_edges(merged_id);
+        assert_eq!(out.len(), 1, "merged 节点应保留指向 c 的出边");
+        assert_eq!(out[0].to, "c");
     }
 
     #[test]
