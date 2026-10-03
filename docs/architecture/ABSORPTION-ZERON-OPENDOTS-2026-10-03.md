@@ -168,3 +168,65 @@ ipv4-mapped-IPv6 / bad scheme+unparseable / allows-public），
 
 ⇒ 三条共同指向 `AGENTS.md` §5 **R-SCAN-1b**：裸 grep 的**命中与零命中都不构成证据**，
 必须回到**文件本身**读那一行。
+---
+
+## 5. 论文：Decoding Looped Transformers Better for (Almost) Free
+
+> **一手取证**：`webfetch https://arxiv.org/abs/2610.02185` 成功。
+> arXiv:2610.02185（cs.LG），2026-10-01 提交，8 位作者（Weihao Liu, Huangjie Zheng,
+> Tianrong Chen, Rohit Dilip, Richard He Bai, Yizhu Jiao, Yuyang Wang, Ruixiang Zhang），
+> 32 页 19 图。⛔ 本节仅读 **abstract + 索引页**，⛔ **未读正文/图表**
+> ⇒ 下面只写 abstract **明确陈述**的内容，以及**我标注为类比**的部分。
+
+### 5.1 论文实际说了什么（仅 abstract 可证的）
+
+- **Looped Transformer**：把**同一个 block** 在 recurrent loop 里**反复执行**以省参数。
+- 每个 loop 都产出**可解码为同一 next token** 的中间表示，⛔ 但**标准解码把早期状态全丢掉**。
+- ⭐ **关键洞察**：**更早的 loop 蕴含更少的计算** ⇒ 递归**天然**提供
+  **对齐的「弱-强」预测对**（aligned weak-and-strong prediction pairs），
+  **不需要辅助模型、不需要外部训练**。
+- **LoopCD**（**training-free** 对比解码）：
+  | 变体 | 空间 | 额外开销 |
+  |---|---|---|
+  | `LoopCD-Logits` | logit | **一次额外 output pass** |
+  | `LoopCD-Hidden` | hidden-state | **零 output 开销** |
+- 结果（4 个 looped Transformer 家族）：
+  - Ouro-2.6B-Thinking AIME 2024 pass@1 **61.88% → 73.33%**（Logits）
+  - Huginn HumanEval pass@1 **22.56% → 31.71%**（Hidden）
+- ⭐⭐ **最重要的结果不是精度，而是**：这些增益**允许把 recurrent loop 数减半**
+  同时**持平或超过全深度无引导基线** ⇒ **forward FLOPs 降 22.5%–48.2%**。
+
+### 5.2 ⭐⭐ 与 NeoTrix 能力树的结构同构（**这是我的类比，不是论文的主张**）
+
+| LoopCD | NeoTrix `nt-core-capability-tree` |
+|---|---|
+| 更早的 loop（**计算更少**）⇒ 弱预测 | 更低的 `constellation` 档（C0/C1 vs C4/C5） |
+| 最终 loop（计算更多）⇒ 强预测 | `maturity_audit()` 依据证据给出的 `supported` |
+| **对比弱 vs 强**来选 token | **对比 `claimed` vs `supported`** 来判虚标 |
+| training-free、**不需辅助模型** | ⭐ 审计同样是纯规则、**无外部模型** |
+| 「aligned」= 同一目标 token | ⭐ 同一 `node.id`、同一 `provides` 标签 |
+| ⛔ 早期状态被**丢弃** | ⛔ `ConsciousnessRuntime` 的中间 `AwakeningReport`/`EmotionReport` 被丢弃 |
+
+⭐⭐⭐ **同一个可迁移的方法论内核**：
+> **你本来就要丢弃的中间计算，可以零成本地当作「弱监督」去校准强信号。**
+
+### 5.3 ⭐ 可执行的研究方向（**假设，未验证**）
+
+论文最值得抄的**不是精度数字，而是那句「减半 loop 仍持平」** ——
+即**用便宜的中间证据避免昂贵的完整验证**。映射到 NeoTrix：
+
+> **能否用已登记的低档证据（C0/C1，廉价）作为对比信号，
+> 避免每次都跑昂贵的 C3Benchmark / C4MainPipeline 审计？**
+
+⚠️ **必须先证伪的三点**（否则这就是又一次「手推当实证」）：
+1. ⛔ 我们的 C0 证据与 C4 证据**是否真的「对齐」**（同一 node、同一 `provides`）？
+   若不对齐，对比无意义（这正是 LoopCD 里 "aligned" 一词的实质约束）。
+2. ⛔ 弱-强对比**是否会引入假虚标**（把「证据尚未登记」印成「已查清不够格」）
+   ⇒ 这正是 `Epistemic` 轴存在的理由 ⇒ ⭐ **新方向必须复用 `Epistemic`，不得另造语义**。
+3. ⛔ 是否存在「弱证据一致但强证据不一致」的节点？
+   若普遍存在 ⇒ 弱监督只能**筛可疑**，不能**定罪**。
+
+⛔ **本节不产出任何代码改动。** 按 `LESSONS-20260929-checked-is-not-verified.md`
+的教训：qybaihe/mu 的回测显示其 admission/chunk 准入**成本最高（54% token）、
+收益为零**（2412 块 drop 0 个）⇒ ⭐ **「听起来对味的机制」在本仓已被验证过一次是伪命题**。
+⇒ 上表 5.3 必须先做「三点证伪」，再谈实现。
