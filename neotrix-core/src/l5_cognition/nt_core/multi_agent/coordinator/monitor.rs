@@ -8,7 +8,6 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use super::coordinator::Assignment;
-use super::load_balancer::AgentStats;
 
 /// Aggregated coordination metrics
 #[derive(Debug, Clone, Serialize, Deserialize)]

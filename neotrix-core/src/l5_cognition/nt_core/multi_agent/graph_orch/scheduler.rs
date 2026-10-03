@@ -82,7 +82,11 @@ impl DagScheduler {
 
         for turn in 0..=max_turn {
             if let Some(nodes) = turns.get(&turn) {
-                for &&node_id in nodes {
+                // ⚠️ 2026-10-02 修正（E0277 ×2）：`nodes: &Vec<&str>`，
+                // `for x in nodes` 已得 `&&str`，原代码再剥一层写成 `for &&node_id`
+                // ⇒ 局部变量成了 `str`（unsized）⇒ 两条错误。
+                // 改为只迭代一层，`node_id` 为 `&str`，正好满足 `impl Into<String>`。
+                for &node_id in nodes {
                     entries.push(ScheduleEntry::new(node_id, turn, turn));
                 }
             }
@@ -129,7 +133,11 @@ impl DagScheduler {
 
 #[cfg(test)]
 mod tests {
-    use super::super::dag::{DagNode, NodeType};
+    // ⚠️ 2026-10-02 修正：漏了 `DagEdge` —— 同文件测试里 8 处 `DagEdge::new(..)`
+    // 全部无法解析。`optimizer.rs` 的同类导入本就含 DagEdge，`dag.rs` 靠 `use super::*`
+    // 拿到 ⇒ **只有本处漏了**。这正是「孤儿测试从未编译」的直接后果：
+    // 编译错误从未被任何人看见。
+    use super::super::dag::{DagEdge, DagNode, NodeType};
     use super::*;
 
     fn linear_dag() -> Dag {

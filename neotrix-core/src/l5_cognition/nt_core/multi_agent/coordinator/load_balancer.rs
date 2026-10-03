@@ -6,7 +6,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::coordinator::AgentEntry;
 
 /// Statistics for a single agent
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,7 +63,10 @@ impl AgentLoadBalancer {
             .iter()
             .find(|s| s.agent_id == agent_id)
             .map(|s| {
-                let total = s.total_tasks() as f64;
+                // ⚠️ 2026-10-02：原有一行 `let total = s.total_tasks() as f64;`
+                // 被算出却**从未参与计算**（分母是硬编码的 10.0）⇒ 死计算。
+                // ⛔ 未改用 `total` 作分母：那会**改变 get_load 的语义**，
+                //    属于行为变更而非冗余清理。保留硬编码上限，仅删死变量。
                 // Normalize against a soft cap of 10 concurrent tasks
                 (s.active_tasks as f64 / 10.0).min(1.0)
             })

@@ -199,11 +199,19 @@ impl DagOptimizer {
         }
 
         // Find the node with maximum distance
-        let end_node = dist
-            .iter()
-            .max_by_key(|(_, &d)| d)
-            .map(|(&id, _)| id)
-            .unwrap_or("");
+        //
+        // ⚠️ 2026-10-02 修正（**真实缺陷**，由 177 个从未运行的测试抓出）：
+        // 原实现 `.unwrap_or("")` 用**空串当哨兵**。空 DAG 时 `dist` 为空 ⇒
+        // `end_node = ""` ⇒ 下面回溯循环 `current = Some("")` 仍会执行一次
+        // ⇒ **把 `""` 压进 `path`** ⇒ 返回 `path == [""]`（长度 1）而非空。
+        // ⇒ 任何调用方 `path.first()` 会拿到 `Some("")` —— 一个**幽灵节点**。
+        // 修法：空 DAG 直接返回空路径，不引入哨兵。
+        let Some(end_node) = dist.iter().max_by_key(|(_, &d)| d).map(|(&id, _)| id) else {
+            return CriticalPath {
+                path: Vec::new(),
+                total_depth: 0,
+            };
+        };
 
         // Trace back
         let mut path = Vec::new();

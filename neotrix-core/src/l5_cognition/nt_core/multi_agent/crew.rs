@@ -241,10 +241,18 @@ impl Crew {
             }
 
             // Manager aggregates worker results (uses first-valid by default)
-            if let Some(aggregated) = worker_results.into_iter().find(|r| r.success) {
-                results.push(aggregated);
-            } else if let Some(fallback) = worker_results.into_iter().next() {
-                results.push(fallback);
+            //
+            // ⚠️ 2026-10-02 修正（E0382，且是**真逻辑 bug** 不只是编译错）：
+            // 原写法在两个分支里各调用一次 `worker_results.into_iter()`，
+            // 第一次就**消耗**了它 ⇒ `else if` 分支根本不可达。
+            // 而本函数意图是「优先取首个 success，否则退回首个结果」，
+            // 这需要**先定位再取走**，不能靠两次迭代。
+            if !worker_results.is_empty() {
+                let pick = worker_results
+                    .iter()
+                    .position(|r| r.success)
+                    .unwrap_or(0);
+                results.push(worker_results.swap_remove(pick));
             }
         }
         results

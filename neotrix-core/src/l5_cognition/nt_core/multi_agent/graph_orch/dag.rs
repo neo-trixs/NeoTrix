@@ -4,7 +4,7 @@
 //! Follows R-P125 (typed agent interfaces) and R-P126 (graph-based scheduling).
 
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// Type of node in the DAG
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -172,7 +172,13 @@ impl Dag {
 
         let mut sorted = Vec::new();
 
-        while let Some(node) = queue.remove(0) {
+        // ⚠️ 2026-10-02 修正（E0308）：**`Vec::remove` 返回 `T`，不是 `Option<T>`**
+        // —— 返回 `Option` 的是 `HashMap::remove`。原代码写
+        // `while let Some(node) = queue.remove(0)`，拿 `Some(..)` 去匹配一个 `&str`
+        // ⇒ 「expected `str`, found `Option<_>`」。
+        // 正确写法：先判空再取出。
+        while !queue.is_empty() {
+            let node = queue.remove(0);
             sorted.push(node.to_string());
 
             if let Some(neighbors) = adjacency.get(node) {

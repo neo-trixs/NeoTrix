@@ -67,7 +67,16 @@ impl DagStatus {
 
 /// Monitors execution state of a DAG, tracking per-node status.
 ///
-/// Thread-safe via interior mutability (all state is in the HashMap).
+// 2026-10-02 修正：补 `Serialize`/`Deserialize` —— 同文件的 `NodeStatus`(:10) 与
+// `StatusTransition`(:81) **都已派生**，只有本类型漏了 ⇒ `monitor.rs:325` 的
+// JSON 往返测试无法编译。该测试**从未运行过**（本模块此前从未编译）。
+//
+// ⚠️ 同时修正一句**与代码不符**的注释：原文写「Thread-safe via interior
+// mutability (all state is in the HashMap)」，但字段是**普通** `HashMap` 与 `Vec`，
+// **没有任何 `Mutex`/`RwLock`** ⇒ 该「线程安全」描述是**假的**。
+// ⛔ 本笔**不加** `Mutex`（那是行为/设计变更，超出「让测试能编译」的范围），
+//    但删除假注释以免误导。
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DagMonitor {
     /// DAG id this monitor is watching
     pub dag_id: String,
