@@ -118,6 +118,48 @@ ANCHORED: dict[str, str] = {
 }
 
 
+def anchor_verdict(expect: str, got: str) -> str | None:
+    """⭐ 锚点比对（**纯函数**：只吃两个 md5 字符串 ⇒ 可用内联样本自测）。
+
+    返回 `None` = 一致；返回字符串 = 漂移说明（含 file:line 级可读性）。
+    """
+    if got.startswith(expect):
+        return None
+    return (
+        f'锚点漂移（基准=自持树期望值）\n'
+        f'       期望前缀={expect[:8]}  实际={got[:8]}\n'
+        f'       ⇒ 该文件已登记为「有意分叉」并锚定自持树期望值；\n'
+        f'         任何人再改动它都会被抓 ⇒ 若改动是有意的，请同步更新 ANCHORED。'
+    )
+
+
+def selftest() -> int:
+    """⭐⭐ 内联样本自测（**不读仓库**，对齐 `nt_docclaims.py` 的既有范式）。
+
+    ⭐ 覆盖：绿 / 红（单字符改动）/ 红（完全不同）/ 空前缀边界。
+    ⭐⭐ **变异方向必须与被测性质相关**：本门度量「字节漂移」
+    ⇒ 变异**必须改字节**，⛔ 不是改期望值（改期望值是「更新基线」，不是漂移）。
+    """
+    EXPECT = '9c0b5ae2179ee59f50471219b906b165'
+    cases: list[tuple[str, bool]] = [
+        ('锚点绿（完全一致）', anchor_verdict(EXPECT, EXPECT) is None),
+        ('锚点绿（前缀一致+后续不同）',
+         anchor_verdict(EXPECT[:8], EXPECT + 'deadbeef') is None),
+        # ⭐ 变异：改**实际字节**的最后一个十六进制位 ⇒ 必须红
+        ('锚点红（末位改动 1 bit）',
+         anchor_verdict(EXPECT, EXPECT[:-1] + ('0' if EXPECT[-1] != '0' else '1')) is not None),
+        ('锚点红（完全不同）', anchor_verdict(EXPECT, 'f' * 32) is not None),
+        ('锚点红（空串）', anchor_verdict(EXPECT, '') is not None),
+    ]
+    ok = True
+    for name, good in cases:
+        print(f'{"✅" if good else "⛔"} 自测 {name}')
+        ok = ok and good
+    print()
+    print('SELFTEST OK: 锚点判定 绿/红 均可复现' if ok else 'SELFTEST FAIL')
+    return 0 if ok else 1
+
+
 def md5(path: str) -> str:
     with open(path, 'rb') as f:
         return hashlib.md5(f.read()).hexdigest()
@@ -127,6 +169,9 @@ def read(path: str) -> str:
     with open(path, encoding='utf-8', errors='ignore') as f:
         return f.read()
 
+
+if '--self-test' in sys.argv:
+    sys.exit(selftest())
 
 print(f'neobot-ui 接线门 · {os.path.relpath(UI, REPO)}')
 print()
@@ -149,15 +194,10 @@ for mine, orig in PAIRS:
     # ⭐ 锚点覆盖优先（见 ANCHORED 的裁决记录）
     expect = ANCHORED.get(mine)
     if expect is not None:
-        got = md5(a)
-        if not got.startswith(expect):
+        err = anchor_verdict(expect, md5(a))
+        if err:
             drift += 1
-            fail.append(
-                f'锚点漂移 src/{mine}\n'
-                f'       期望前缀={expect[:8]}  实际={got[:8]}\n'
-                f'       ⇒ 该文件已登记为「有意分叉」并锚定自持树期望值；\n'
-                f'         任何人再改动它都会被抓 ⇒ 若改动是有意的，请同步更新 ANCHORED。'
-            )
+            fail.append(err)
         else:
             print(f'✅ 1b 锚点一致 src/{mine}（有意分叉，基准=自持树期望值）')
         continue
