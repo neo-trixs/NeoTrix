@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 // ⭐ 2026-10-03：接入 waterfall 扩展点（兑现该文件自称的 R-P79，见 tool_hooks 字段注释）。
-use crate::l5_cognition::nt_core_dispatch::Dispatcher;
+use crate::l0_substrate::nt_core_dispatch::Dispatcher;
 use std::collections::HashMap;
 
 /// MCP 工具定义

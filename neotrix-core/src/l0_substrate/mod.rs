@@ -104,3 +104,9 @@ pub mod proxy_daemon_wrapper;
 #[cfg(feature = "ios-bridge")]
 pub mod ffi;
 pub mod nt_core_event_bus;
+// ⭐⭐ 2026-10-03 从 `l5_cognition/nt_core_dispatch.rs` **下沉**到基座。
+// ⭐ 依据：该模块**零 use、纯 std、完全自包含**，且它的两个消费者
+// （`nt_core_event_bus` / `nt_io_mcp_bridge`）**都不在 L5**
+// ⇒ 原位置是历史偶然；留在 L5 会让基座依赖顶层（近循环倒置）。
+// ⭐ `l5_cognition::nt_core_dispatch` 保留 `pub use` 再导出 ⇒ 调用方路径不变。
+pub mod nt_core_dispatch;

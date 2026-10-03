@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 //! 事件派发调度器 — 吸收自 deepseek-harness vendor/cordis/src/events.ts
 //! (4+1 dispatch modes: emit / waterfall / parallel / serial) 与
 //! cordiverse/paper §4.3.3 (asynchrony/inertia) + §5.1.2 (notify → refresh)。
@@ -11,6 +13,29 @@
 //!
 //! NeoTrix 消费方 (R-P79): McpServer 工具调用 pre/post 钩子 (Waterfall 中间件链),
 //! 对应 dsh tools.md "工具管线 = 可扩展 waterfall" 范式。
+// ⭐⭐⭐ 2026-10-03 **从 `l5_cognition/` 下沉到 `l0_substrate/`**。
+//
+// ## ⭐ 下沉的依据（三条，全部实测，非品味）
+//
+// ① ⭐ **本模块零 `use`、零 `crate::` 引用** ⇒ 纯 std、**完全自包含**
+//    ⇒ ⭐ 它对「认知」没有任何依赖，**层次归属是历史偶然**。
+//
+// ② ⭐ **它是基座设施，不是认知能力**：`Dispatcher` 是**通用事件/钩子链**
+//    （Emit/Waterfall/Parallel/Serial）。而 L0 是「被所有人依赖的基座」——
+//    ⭐ ⭐ L0 反过来依赖 L5 会构成**近乎循环**（见
+//    `docs/architecture/LAYER-DEBT-TIERS-2026-10-03.md` §2 的 S1 级定义）。
+//    ⭐ 原先 `l0_substrate/nt_core_event_bus.rs:6` 直接
+//    `use crate::l5_cognition::nt_core_dispatch::Dispatcher`
+//    ⇒ **正是 L0→L5 近循环倒置的一处**。
+//
+// ③ ⭐ **两个消费者都不在 L5**：
+//    · `l0_substrate/nt_core_event_bus.rs`（基座）
+//    · `l1_action/nt_io/nt_io_mcp_bridge.rs`（动作层，`54a2fa64` 接入）
+//    ⇒ ⭐ **消费者分布与它的实际用途一致**，只有「定义位置」不一致。
+//
+// ## ⭐ 兼容性
+// `l5_cognition::nt_core_dispatch` 保留为 **`pub use` 再导出**
+// ⇒ ⛔ 不改任何调用方的路径 ⇒ ⭐ 本 commit 是**纯位置变更**，零行为变化。
 
 /// 事件派发模式 (Cordis events.ts dispatch modes)。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

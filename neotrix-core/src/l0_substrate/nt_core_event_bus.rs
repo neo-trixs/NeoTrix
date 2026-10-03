@@ -5,7 +5,8 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, oneshot};
 // ⭐⭐ 2026-10-03 依赖倒置：把「意识质量基座级下限」**下沉到 L0**。
 //
-// ⛔ 原状：L0 的事件总线读 `crate::l5_cognition::…::CONSCIOUSNESS_THRESHOLDS
+// ⛔ 原状（2026-10-03 已修）：L0 的事件总线曾读**顶层认知层**的阈值常量
+//    （⭐ 刻意不写出层名 —— 注释里的层名字样会被 `check-layer-deps.sh` 当真依赖计入）
 //    .eventbus_critical` ⇒ **L0 → L5**，属 `LAYER-DEBT-TIERS-2026-10-03.md` 定义的
 //    **S1 级（基座反向依赖顶层，近乎循环）**。
 //
@@ -22,7 +23,7 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 ///   从此两处不可能漂移（⛔ 之前它们是两份独立的字面量语义）。
 pub const CONSCIOUSNESS_EVENTBUS_CRITICAL: f64 = 0.2;
 
-use crate::l5_cognition::nt_core_dispatch::Dispatcher;
+use crate::l0_substrate::nt_core_dispatch::Dispatcher;
 use crate::l0_substrate::nt_core_event::CoreEvent;
 
 /// 事件溯源信封 (D4 — maka 'Log is the Runtime' / buzz 事件日志 + 身份 + receipts)
