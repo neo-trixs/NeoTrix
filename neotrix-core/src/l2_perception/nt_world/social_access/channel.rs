@@ -295,27 +295,47 @@ impl Channel {
     }
 
     /// Check if this channel can handle a URL
+    ///
+    /// # ⭐ 2026-10-03：改为查表，不再 `match` 穷举
+    ///
+    /// ⛔ **原实现是 `match self.platform { … }` 穷举 6 个变体**，
+    /// 这让「加平台不用改代码」只做到一半：经
+    /// [`crate::l2_perception::nt_world::social_access::nt_login::LoginRegistry::register`]
+    /// 加进来的新平台（走 `SocialPlatform::Other`）在此**没有分支**，
+    /// 只能落到 `Other(ref name) => url.contains(name)` 的裸 contains ——
+    /// 而裸 contains 会把 `https://phishing-x.com/` 认领成 `x.com`。
+    ///
+    /// # ⚠️ 渠道名与目录 id 不一致（自测抓到）
+    ///
+    /// 渠道名是 `"twitter"`（CLI 与 opencli/bird 后端参数都按这个名字），
+    /// 而目录 id 是 `"x"`（登录/cookie 路径按这个）。二者**不能**强行统一：
+    /// 改渠道名会破 `neotrix social probe twitter` 与既有后端参数。
+    /// ⇒ 故用 `catalog_ids()` 显式声明**这个渠道对应哪些目录 id**。
     pub fn can_handle(&self, url: &str) -> bool {
+        let catalog = super::nt_catalog::default_catalog();
+        let Some(spec) = catalog.match_url(url) else {
+            return false;
+        };
+        self.catalog_ids()
+            .iter()
+            .any(|id| id == &spec.id)
+    }
+
+    /// 本渠道在 [`PlatformCatalog`] 中对应的 id 列表。
+    ///
+    /// ⭐ 渠道名（CLI 面向）与目录 id（登录/cookie 面向）历史上不同名，
+    /// 这里显式列出映射，而不是靠字符串相等隐式假设。
+    fn catalog_ids(&self) -> Vec<String> {
         match self.platform {
-            SocialPlatform::Twitter => {
-                url.contains("x.com") || url.contains("twitter.com")
-            }
-            SocialPlatform::Reddit => {
-                url.contains("reddit.com") || url.contains("redd.it")
-            }
-            SocialPlatform::Instagram => {
-                url.contains("instagram.com")
-            }
-            SocialPlatform::TikTok => {
-                url.contains("tiktok.com") || url.contains("vm.tiktok.com")
-            }
-            SocialPlatform::Youtube => {
-                url.contains("youtube.com") || url.contains("youtu.be")
-            }
-            SocialPlatform::Linkedin => {
-                url.contains("linkedin.com")
-            }
-            SocialPlatform::Other(ref name) => url.contains(name),
+            // ⚠️ `twitter.com` 与 `x.com` 都归 x；渠道名保持历史值
+            SocialPlatform::Twitter => vec!["x".to_string()],
+            SocialPlatform::Reddit => vec!["reddit".to_string()],
+            SocialPlatform::Instagram => vec!["instagram".to_string()],
+            SocialPlatform::TikTok => vec!["tiktok".to_string()],
+            SocialPlatform::Youtube => vec!["youtube".to_string()],
+            SocialPlatform::Linkedin => vec!["linkedin".to_string()],
+            // ⭐ `Other(name)` 直接当目录 id —— 这才是「加平台不改代码」的路径
+            SocialPlatform::Other(ref name) => vec![name.clone()],
         }
     }
 

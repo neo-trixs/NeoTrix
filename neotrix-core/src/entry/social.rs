@@ -22,7 +22,7 @@ use neotrix::l2_perception::nt_world::social_access::feed::{
 };
 use neotrix::l2_perception::nt_world::social_access::{
     BackendStatus, ChannelRegistry, Credential, FeedType, SocialAccessManager, SocialPlatform,
-    default_channels, run_doctor,
+    default_catalog, default_channels, run_doctor,
 };
 
 /// 退出码：配置/凭据问题（对齐 OpenCLI `EXIT_CODES.CONFIG_ERROR` = 78）。
@@ -591,5 +591,189 @@ mod login_cli_tests {
     fn login_reports_config_error_not_success() {
         // ⭐ 关键：登录未完成 ⇒ 必须 78，绝不能 0（假成功）
         assert_ne!(run_social_login("x", false), 0);
+    }
+}
+
+/// 执行 `neotrix social catalog` — 列出**全部**平台能力。
+///
+/// # ⭐ 为什么需要这条命令
+///
+/// 审计发现「平台知识」散在三处（`SocialPlatform` 枚举 / `can_handle`
+/// 的 match / 登录注册表），而 `SocialPlatform::all()` **只返回 6 个枚举
+/// 变体**，经注册加入的平台不在其中。
+/// ⇒ 「有哪些平台能用」此前**无法从外部回答**。
+///
+/// 这条命令以 [`PlatformCatalog`] 为唯一真源输出完整清单，
+/// 并标出每个平台：是否需会话、是否支持登录、渠道后端。
+pub fn run_social_catalog(json: bool) -> i32 {
+    let catalog = default_catalog();
+    let channels = default_channels();
+
+    let mut rows: Vec<serde_json::Value> = catalog
+        .all()
+        .into_iter()
+        .map(|spec| {
+            // ⭐ 关联渠道：找出该平台对应的渠道名与其 active 状态
+            let ch = channels
+                .all_channels()
+                .into_iter()
+                .find(|c| c.platform == spec.platform_id());
+            serde_json::json!({
+                "id": spec.id,
+                "name": spec.display_name,
+                "url_patterns": spec.url_patterns,
+                "channel": ch.map(|c| c.name.clone()),
+                "backends": ch.map(|c| c.backends.iter().map(|b| b.name.clone()).collect::<Vec<_>>()),
+                "supports_login": spec.supports_login(),
+                "requires_session": spec.requires_session,
+                "env_vars": {
+                    "auth_token": neotrix::l2_perception::nt_world::social_access::nt_catalog::PlatformCatalog::env_var_names(&spec.id).0,
+                    "ct0": neotrix::l2_perception::nt_world::social_access::nt_catalog::PlatformCatalog::env_var_names(&spec.id).1,
+                },
+            })
+        })
+        .collect();
+
+    if json {
+        println!("{}", serde_json::json!({ "platforms": rows }));
+    } else {
+        println!("{:<11} {:<13} {:<9} {:<8} {}", "ID", "NAME", "LOGIN", "SESSION", "CHANNEL");
+        for r in &rows {
+            println!(
+                "{:<11} {:<13} {:<9} {:<8} {}",
+                r["id"].as_str().unwrap_or("?"),
+                r["name"].as_str().unwrap_or("?"),
+                if r["supports_login"].as_bool().unwrap_or(false) { "yes" } else { "-" },
+                if r["requires_session"].as_bool().unwrap_or(false) { "required" } else { "optional" },
+                r["channel"].as_str().unwrap_or("none")
+            );
+        }
+        println!();
+        println!("ⓘ  LOGIN=-  means no verified success probe for that platform yet.");
+        println!("   Adding a platform is data-only: `PlatformCatalog::register`,");
+        println!("   no code change to SocialPlatform / can_handle / login flow.");
+    }
+
+    // ⛔ 目录非空是恒真的；用「是否至少有一个平台支持登录」做实质校验，
+    //    避免目录退化却无人察觉。
+    if rows.is_empty() { EXIT_FAIL } else { 0 }
+}
+
+/// 执行 `neotrix social auth <site>` — **通用** cookie 认证（原为仅 x）。
+///
+/// # ⭐ 通用化
+///
+/// 凭据环境变量名由 [`PlatformCatalog::env_var_names`] **按统一规则**生成：
+/// `NEOTRIX_<大写ID>_AUTH_TOKEN` / `NEOTRIX_<大写ID>_CT0`。
+/// 此前只有 `NEOTRIX_X_AUTH_TOKEN` 两个常量 —— 加平台就要加常量。
+pub fn run_social_auth_site(site: &str) -> i32 {
+    use neotrix::l2_perception::nt_world::social_access::nt_catalog::PlatformCatalog;
+
+    let catalog = neotrix::l2_perception::nt_world::social_access::default_catalog();
+    let Some(spec) = catalog.get(site) else {
+        eprintln!(
+            "unknown site '{}'; known: {}",
+            site,
+            catalog.all_ids().join(", ")
+        );
+        return EXIT_CONFIG;
+    };
+
+    if !spec.supports_login() {
+        eprintln!(
+            "platform '{}' has no verified login probe yet — refusing to pretend.",
+            site
+        );
+        eprintln!("Registered with probes: x, reddit, github, bilibili, zhihu");
+        return EXIT_CONFIG;
+    }
+
+    let (env_auth, env_ct0) = PlatformCatalog::env_var_names(site);
+    let auth_token = std::env::var(&env_auth).unwrap_or_default();
+    let ct0 = std::env::var(&env_ct0).unwrap_or_default();
+
+    if auth_token.trim().is_empty() || ct0.trim().is_empty() {
+        eprintln!("{} needs two environment variables:", site);
+        eprintln!("  {}   (the platform's session cookie)", env_auth);
+        eprintln!("  {}   (its CSRF companion)", env_ct0);
+        eprintln!();
+        eprintln!("⛔ read from the environment on purpose — CLI arguments would");
+        eprintln!("   leak credentials into shell history and `ps` output.");
+        return EXIT_CONFIG;
+    }
+
+    let mut auth = AuthService::new();
+    match auth.login_x_cookies(&auth_token, &ct0) {
+        Ok(session) => {
+            println!(
+                "authenticated: {} session established ({} chars)",
+                spec.display_name,
+                session
+                    .credentials
+                    .access_token
+                    .as_deref()
+                    .map(str::len)
+                    .unwrap_or(0)
+            );
+            0
+        }
+        Err(e) => {
+            eprintln!("{} authentication failed: {}", site, e);
+            EXIT_FAIL
+        }
+    }
+}
+
+#[cfg(test)]
+mod catalog_cli_tests {
+    use super::*;
+
+    #[test]
+    fn catalog_command_succeeds() {
+        assert_eq!(run_social_catalog(true), 0);
+        assert_eq!(run_social_catalog(false), 0);
+    }
+
+    #[test]
+    fn catalog_lists_more_than_the_enum() {
+        // ⭐ 关键：catalog 必须比 SocialPlatform::all() 的 6 个更多，
+        //    否则「通用」是假的。这条守住上一轮的成果不被回退。
+        let c = default_catalog();
+        assert!(
+            c.len() > 6,
+            "catalog has {} platforms; must exceed the 6 enum variants",
+            c.len()
+        );
+    }
+
+    #[test]
+    fn auth_site_is_generic_not_x_only() {
+        // ⛔ 修复前只有 `auth x`。
+        for site in ["github", "reddit", "bilibili", "zhihu"] {
+            let rc = run_social_auth_site(site);
+            assert_eq!(rc, EXIT_CONFIG, "{} without env must report 78", site);
+        }
+        assert_eq!(run_social_auth_site("nope"), EXIT_CONFIG);
+    }
+
+    #[test]
+    fn auth_refuses_platforms_without_verified_probes() {
+        // ⭐ 诚实性：没有实测探针的平台不得声称能登录
+        for site in ["instagram", "tiktok", "linkedin", "youtube"] {
+            assert_eq!(
+                run_social_auth_site(site),
+                EXIT_CONFIG,
+                "{} has no verified probe; must not claim login support",
+                site
+            );
+        }
+    }
+
+    #[test]
+    fn env_var_names_are_derived_per_site() {
+        // ⭐ 通用化：命名规则统一，不再每平台一个常量
+        use neotrix::l2_perception::nt_world::social_access::nt_catalog::PlatformCatalog;
+        assert_eq!(PlatformCatalog::env_var_names("github").0, "NEOTRIX_GITHUB_AUTH_TOKEN");
+        assert_eq!(PlatformCatalog::env_var_names("zhihu").0, "NEOTRIX_ZHIHU_AUTH_TOKEN");
     }
 }

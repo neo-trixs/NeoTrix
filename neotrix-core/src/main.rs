@@ -264,12 +264,12 @@ enum Commands {
         args: Vec<String>,
     },
     /// 社交平台访问：渠道后端诊断 / 单平台探测 / cookie 认证
-    #[command(about = "Social platform access: doctor|probe|status|sites|login|weights|rank|auth")]
+    #[command(about = "Social platform access: catalog|doctor|probe|status|sites|login|auth|weights|rank")]
     Social {
         #[arg(
             trailing_var_arg = true,
             allow_hyphen_values = true,
-            help = "doctor|probe|status|sites|login <site>|weights|rank|auth (--json where supported)"
+            help = "catalog|doctor|probe|status|sites|login <site>|auth <site>|weights|rank (--json where supported)"
         )]
         args: Vec<String>,
     },
@@ -773,6 +773,7 @@ fn main() {
                 Some("weights") => entry::run_social_weights(json),
                 Some("rank") => entry::run_social_rank(json),
                 Some("sites") => entry::run_social_sites(json),
+                Some("catalog") => entry::run_social_catalog(json),
                 Some("login") => match positional.get(1).copied() {
                     Some(site) => entry::run_social_login(site, json),
                     None => {
@@ -782,15 +783,16 @@ fn main() {
                     }
                 },
                 Some("auth") => match positional.get(1).copied() {
-                    Some("x") | Some("twitter") => entry::run_social_auth_x(),
-                    _ => {
-                        eprintln!("usage: neotrix social auth x");
+                    Some(site) => entry::run_social_auth_site(site),
+                    None => {
+                        eprintln!("usage: neotrix social auth <site>");
+                        eprintln!("       see `neotrix social catalog` for the registered list");
                         78
                     }
                 },
                 Some(other) => {
                     eprintln!(
-                        "unknown subcommand '{}'; expected one of: doctor, probe, status, sites, login, weights, rank, auth",
+                        "unknown subcommand '{}'; expected one of: doctor, probe, status, sites, catalog, login, weights, rank, auth",
                         other
                     );
                     78
