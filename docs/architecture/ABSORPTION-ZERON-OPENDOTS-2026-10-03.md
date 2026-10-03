@@ -191,6 +191,43 @@ ipv4-mapped-IPv6 / bad scheme+unparseable / allows-public），
 | `nt-core-capability-tree`（能力树） | 节点模型 + registry + 成熟度 + 反虚标 + CLI + CI 门 | **零运行期消费者** → 今天 `ee2cc276` + `ae3b3644` 接线 |
 | `nt_core_dispatch`（waterfall 扩展点） | **354 行**，cordis 吸收，4 种派发模式 | ⛔ **零真实消费者**（R-P79 声明为假） |
 
+### 3.6 ⛔ 订正订正：`54a2fa64` 的 commit message **又高估了一档**
+
+我写「McpBridge 兑现了 R-P79，354 行资产从零消费者到有」。⭐ **只对了一半**，
+严格核实（本日第 3 次实测同一形态，**且这次是我自己的提交**）：
+
+| 核实项 | 结果 |
+|---|---|
+| `Dispatcher` 在 L0 的用法 | ⭐ **一直是活的**：`EventBus::register_hook`（`nt_core_event_bus.rs:101`）+ `emit_from:113` 真的 `dispatch_waterfall`。生产调用方 = `l5_cognition/nt_mind/nt_mind_background_loop/run.rs:398` 的 `register_hook(flood_guard(500ms))` |
+| ⛔ `McpBridge::on_tool_call` 的调用方 | **只有我刚写的 3 条测试，零生产注册** |
+
+⇒ ⭐⭐ 两处订正：
+1. ⛔ 「`nt_core_dispatch` 真实消费者为零」**本来就错** —— L0 的 `register_hook`
+   + `run.rs:398` 的 flood_guard **是真实生产接线**。
+   我之前只数了「文件级引用」，⭐ **没区分「持有/分发」与「注册了真钩子」**。
+2. ⛔ 我说「McpBridge 兑现 R-P79」也高估：`tool_hooks` 现在**被持有且被分发**
+   （真实生产代码路径），但**没有任何生产代码注册工具钩子**
+   ⇒ **拦截能力未被使用**。
+
+### 3.7 ⭐⭐⭐ 于是模式升级：**「建成未用」在每一层都成立，包括我自己的提交**
+
+| 层次 | 资产 | 状态 |
+|---|---|---|
+| 模块级 | `nt-core-capability-tree` | 今天已接（`ee2cc276`+`ae3b3644`） |
+| 文件级 | `nt_core_dispatch`（354 行） | ⛔ 我误判为零消费者；实为 L0 + `run.rs:398` **已在用** |
+| **API 级** | ⭐ `McpBridge::on_tool_call`（我今天新增） | ⛔ **零生产注册，只有测试** |
+
+⇒ ⭐⭐⭐ **最强的证据：连我自己的贡献也立刻复现了同一个失效形态。**
+⇒ 由此得到一条**比「接线」更准**的判据，必须分三级看，缺一级就会自欺：
+
+| 判据级 | 问的问题 | `on_tool_call` 现状 |
+|---|---|---|
+| L1 声明级 | 文件/模块有引用吗？ | ✅ 有 |
+| L2 分发级 | 生产代码路径会**跑**它吗？ | ✅ 有（`call_local_tool` 开头必过 waterfall） |
+| ⭐ **L3 使用级** | ⭐ **有生产代码真的注册了它吗？** | ⛔ **没有 ⇒ 能力未被使用** |
+
+⭐ **今天我两次用 L1 级证据就宣称「已接线」** ⇒ 这个三级判据是本日最该沉淀的一条。
+
 ⇒ ⭐⭐ **结论：NeoTrix 的涌现瓶颈不在「缺引擎」，在「接线」。**
 ⇒ 这比任何单点设计都更该指导优先级：
 **不要再去建第三套机制；先把已建的两套接进生产，并给「接线」加门。**
