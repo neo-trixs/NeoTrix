@@ -13,6 +13,8 @@ use neotrix::l5_cognition::nt_mind::nt_mind::KnowledgeSource as V1KnowledgeSourc
 use neotrix::l6_meta::nt_auto_orchestrator::AutoOrchestrator;
 use neotrix_types::core::nt_core_cap::FIELD_NAMES;
 
+use nt_term_viz::display_width;
+use nt_term_viz::panel::{content_line, panel_bottom, panel_top};
 use super::brain::print_brain_stats;
 
 /// Headless 模式 — 原始 stdin/stdout REPL（保留 V1 行为）
@@ -171,40 +173,60 @@ async fn handle_command_headless(
             bridge.evaluate_cognitive_health();
             let state = bridge.silicon.current_state();
 
-            println!("╭─ SiliconSelf Status ───────────────────────────────╮");
-            println!(
-                "│ Iteration:  {:<5}                                 │",
+            // ⚠️ 2026-10-02 迁移到 nt_term_viz::panel（本会话第二批面板）。
+            //
+            // 原实现 20 行全部手写边框 + 手数空格，缺陷有三层：
+            // ① **emoji 宽度**：`🧠 📦 🔧 ⚡` 实测均占 **2 列**
+            //    （`display_width` 与 `unicode-width` 实测一致），
+            //    而原代码按 1 列手数空格 ⇒ 每行含 emoji 的都少 1 列。
+            // ② **中文宽度**：`{:<39}` 按**字符数**补足 ⇒ 中文标签多占列。
+            // ③ **多行内容溢出面板**：`status_summary()` 来自 `silicon.stats()`，
+            //    原代码 `println!("│ {} │", ...)` **假定它是单行**；
+            //    若是多行，第二行起就会**跑到面板外面**。
+            //    ⇒ 现按 '\n' 拆行，每行各自成为面板的一行。
+            let mut rows: Vec<String> = Vec::new();
+            rows.push(format!(
+                "{}  {}",
+                "Iteration:".to_string(),
                 bridge.silicon.iteration
-            );
-            println!("│ Strategy:   {:<39}│", state.active_strategy.label());
-            println!(
-                "│ Context:    {:.0}%                                 │",
-                state.context_usage * 100.0
-            );
-            println!("│                                                       │");
-            println!("│ 🧠 Cognitive Health                                    │");
-            println!(
-                "│ R_int:      {:.3}  (confidence={:.1}%, error={:.0}%, novelty={:.0}%) │",
+            ));
+            rows.push(format!("{}  {}", "Strategy:", state.active_strategy.label()));
+            rows.push(format!("{}  {:.0}%", "Context:", state.context_usage * 100.0));
+            rows.push(String::new());
+            rows.push("🧠 Cognitive Health".to_string());
+            rows.push(format!(
+                "R_int:      {:.3}  (confidence={:.1}%, error={:.0}%, novelty={:.0}%)",
                 mot.intrinsic_reward,
                 mot.confidence * 100.0,
                 mot.error_rate * 100.0,
                 mot.novelty_score * 100.0
-            );
-            println!(
-                "│ Explore:    {:<39}│",
+            ));
+            rows.push(format!(
+                "{}  {}",
+                "Explore:",
                 if mot.should_explore { "YES ⚡" } else { "no" }
-            );
-            println!("│                                                       │");
-            println!(
-                "│ 📦 Archive:  {} snapshots                            │",
+            ));
+            rows.push(String::new());
+            rows.push(format!(
+                "{}  {} snapshots",
+                "📦 Archive:",
                 bridge.archive.snapshots.len()
-            );
-            println!(
-                "│ 🔧 Repairs:  {}                                      │",
-                bridge.self_repair_count
-            );
-            println!("│ {} │", bridge.status_summary());
-            println!("╰──────────────────────────────────────────────────────╯");
+            ));
+            rows.push(format!("{}  {}", "🔧 Repairs:", bridge.self_repair_count));
+            // ⚠️ ③ 修复：`status_summary()` 可能多行，逐行拆开各自成行，
+            //    否则原代码的 `│ {} │` 只会框住第一行。
+            for line in bridge.status_summary().lines() {
+                rows.push(line.to_string());
+            }
+
+            let content_w = rows.iter().map(|l| display_width(l)).max().unwrap_or(0);
+            // ⛔ 刻意**不加** ANSI 染色：原面板本就是纯文本，
+            //    迁移只改对齐，不改行为（染色属超范围变更）。
+            println!("{}", panel_top("SiliconSelf Status", content_w));
+            for r in &rows {
+                println!("{}", content_line(r, content_w));
+            }
+            println!("{}", panel_bottom(content_w));
         }
         "/evo" => {
             let mut bridge = neotrix::l5_cognition::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge::new(".");
