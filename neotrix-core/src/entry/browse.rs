@@ -4,9 +4,11 @@
 
 use colored::Colorize;
 use super::{err, info, success, warn};
+use nt_term_viz::display_width;
+use nt_term_viz::panel::{content_line, panel_bottom, panel_top};
 
 pub fn run_browse(url: &str) {
-    use neotrix::l1_action::nt_io::nt_io_browser_engine::{
+use neotrix::l1_action::nt_io::nt_io_browser_engine::{
         AuthConfig, BackendKind, BrowserAction, BrowserConfig, BrowserEngine,
     };
     // 后端选择（默认 Http，行为不变）：
@@ -169,16 +171,6 @@ pub fn run_browse_act(path: &str) {
     let profile = std::env::var("NT_BROWSE_PROFILE")
         .ok()
         .filter(|s| !s.trim().is_empty());
-    println!(
-        "{}",
-        info("╭─ NeoTrix Browser Acts ───────────────────────╮")
-    );
-    println!("│ {} {}", info("File:"), path);
-    println!("│ {} {:?}", info("Backend:"), backend);
-    println!(
-        "{}",
-        info("╰────────────────────────────────────────────────╯")
-    );
     let data = match std::fs::read_to_string(path) {
         Ok(d) => d,
         Err(e) => {
@@ -197,6 +189,33 @@ pub fn run_browse_act(path: &str) {
         eprintln!("{}: no actions in {}", err("Error"), path);
         return;
     }
+
+    // ⚠️ 2026-10-03 面板从「读文件之前」移到「校验全部通过之后」（修 browse.rs 真缺陷）。
+    //
+    // 原实现在 :172-181 就打印完整面板（`╭─╮` + `╰─╯`），随后还有 3 个 `return`
+    //（读文件失败 / 解析失败 / actions 为空），而 `│ Actions: N` 印在**底边之后**
+    //（:200）⇒ 带 `│` 前缀的内容行掉到面板**外面**。
+    //
+    // 本次改动做两件事：
+    // ① 把面板整体挪到三个 `return` 之后 ⇒ `actions.len()` 此时已可用，
+    //    `Actions:` 正式成为面板的一行，框不再残缺。
+    // ② 副作用（正向）：读文件/解析失败时**不再先弹一个空面板再报错**。
+    //
+    // 边框宽度改由 nt_term_viz 计算（原为手数 `─`），且 `display_width`
+    // 会剥离 ANSI ⇒ `info()` 染色不再影响对齐。
+    let rows = vec![
+        format!("{} {}", "File:", path),
+        format!("{} {:?}", "Backend:", backend),
+        format!("{} {}", "Actions:", actions.len()),
+    ];
+    let content_w = rows.iter().map(|r| display_width(r)).max().unwrap_or(0);
+    println!("{}", info(&panel_top("NeoTrix Browser Acts", content_w)));
+    for r in &rows {
+        // 标签染色、内容保持原样（与原实现一致：仅标签有色）
+        let (label, value) = r.split_once(':').unwrap_or((r.as_str(), ""));
+        println!("{}", info(&format!("{label}:")) + &content_line(value, content_w));
+    }
+    println!("{}", info(&panel_bottom(content_w)));
     println!("│ {} {}", info("Actions:"), actions.len());
     let rt = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
