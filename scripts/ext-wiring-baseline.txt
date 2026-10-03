@@ -1,6 +1,12 @@
+# 基线：`path::fn` = 有声明但**零生产调用方**的注册式扩展 API。
+# 每条都应已定性；有正当理由的请在本行**上方**加 `#` 写明理由。
+# ⭐ 2026-10-03 重算：剥掉整行注释后 50 → 48（3 条是**文档示例**假阳性：
+#   agent.rs::register_agent_card / register_sse、l7_l1_bridge.rs::register_bridge）。
+# ⭐ 同时新增 1 条**刻意的 stub**（下方已写理由）。
+# ⭐ 刻意的 stub：签名返回 `Vec<String>` 且函数体就是 `{ vec![] }`，
+#   上游注释写明「(stub)」⇒ ⛔ 它不是「漏接线」，接线它反而是无意义包装。
+neotrix-core/src/l1_action/nt_core_llm/mod.rs::register_llm_self_tests
 crates/nt-core-capability-tree/src/social_access_node.rs::register_social_access_capability
-neotrix-core/src/agent.rs::register_agent_card
-neotrix-core/src/agent.rs::register_sse
 neotrix-core/src/agent.rs::register_sse_global
 neotrix-core/src/agent.rs::register_stdio_global
 neotrix-core/src/l0_substrate/nt_core_event_bus.rs::subscribe_all_layers
@@ -27,7 +33,6 @@ neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_search/nt_cache.rs:
 neotrix-core/src/l4_emotion/nt_memory/nt_trade_product_spec.rs::register_product_spec_capability
 neotrix-core/src/l4_emotion/nt_memory/typed_memory/conflict.rs::register_manual
 neotrix-core/src/l5_cognition/nt_core/capability/group_evolve.rs::register_peer
-neotrix-core/src/l5_cognition/nt_core/capability/l7_l1_bridge.rs::register_bridge
 neotrix-core/src/l5_cognition/nt_core/capability/protocol.rs::subscribers_for
 neotrix-core/src/l5_cognition/nt_core/capability/wisdom_bridge.rs::register_wisdom_capabilities
 neotrix-core/src/l5_cognition/nt_core_byoa.rs::register_presets

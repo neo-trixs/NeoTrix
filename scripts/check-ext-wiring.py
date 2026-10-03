@@ -75,9 +75,24 @@ def load():
     return src
 
 
+# ⭐⭐ SIM-27 同款处理：剥掉**整行注释**再扫。
+# ⭐ 起因（2026-10-03 实测，**本门自己的假阳性**）：
+#   `nt_capability_registry.rs` 的 `with_registry` 文档里有 ```` ```ignore ```` 代码块
+#   写着示例签名 `pub fn register_xxx_capability(registry: &mut …)`，
+#   ⭐⭐ 那是**文档示例**，不是真 API ⇒ 被本门当成「零生产调用的扩展点」而误报。
+#   ⭐ 与 `nt_layer_deps.sh:66`（SIM-27：drop full-line comments）
+#   以及 `nt_sampler.rs:17` 的注释误报**同型** —— ⭐ 而这次是我自己引入的。
+# ⛔ **只剥整行注释**（`//`、`///`、`//!`）；行尾注释与字符串字面量**保留**
+#   （保守：可能过度报告，绝不漏报）—— 与 layer-deps 的口径一致。
+_LINE_COMMENT = re.compile(r"^\s*(//+[!/]?).*$", re.M)
+
+
 def prod_body(text):
-    """去掉 `#[cfg(test)]` 之后的内容 —— 测试调用不算生产调用方。"""
-    return text.split("#[cfg(test)]")[0]
+    """剥掉整行注释 + `#[cfg(test)]` 之后的内容。
+
+    ⭐ 两处都要：测试里的调用不算生产调用方；文档里的示例签名不算真 API。
+    """
+    return _LINE_COMMENT.sub("", text).split("#[cfg(test)]")[0]
 
 
 def measure():
@@ -85,7 +100,8 @@ def measure():
     unwired = []
     total = 0
     for p, text in src.items():
-        for m in API.finditer(text):
+        # ⭐ 枚举候选时同样要剥注释（否则注释里的示例签名会被当成真 API）
+        for m in API.finditer(prod_body(text)):
             name = m.group(1)
             total += 1
             pat = re.compile(r"\b" + re.escape(name) + r"\s*\(")
@@ -110,6 +126,16 @@ def main():
 
     if "--rebaseline" in argv:
         with open(BASELINE, "w", encoding="utf-8") as fh:
+            # ⭐⭐ 保留既有 `#` 理由注释：⭐ 重算基线时**丢掉理由**比多一条更糟
+            # （下一个读到「某个 API 零调用」却不知道它是否已定性）。
+            keep = []
+            if os.path.exists(BASELINE):
+                with open(BASELINE, encoding="utf-8") as old:
+                    for ln in old:
+                        if ln.lstrip().startswith("#"):
+                            keep.append(ln.rstrip())
+            if keep:
+                fh.write("\n".join(keep) + "\n")
             fh.write("\n".join(unwired) + "\n")
         print(f"基线已重建: {total} 个注册 API / {len(unwired)} 个零生产调用方")
         return 0
@@ -117,7 +143,11 @@ def main():
     known = set()
     if os.path.exists(BASELINE):
         with open(BASELINE, encoding="utf-8") as fh:
-            known = {ln.strip() for ln in fh if ln.strip()}
+            # ⭐ 支持 `#` 理由注释行（写入时保留、读取时忽略）
+            known = {
+                ln.strip() for ln in fh
+                if ln.strip() and not ln.lstrip().startswith("#")
+            }
 
     fresh = [u for u in unwired if u not in known]
 
