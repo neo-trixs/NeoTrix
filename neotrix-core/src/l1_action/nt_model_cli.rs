@@ -318,45 +318,65 @@ pub(crate) fn run_capture(
     run_with_timeout(&mut cmd, timeout)
 }
 
-/// 带超时的同步执行：轮询收割，超时 kill，不留僵尸。
+/// ⭐⭐ 带超时的同步执行：**并发读取两条管道** + 超时 kill，不留僵尸。
+///
+/// ## ⭐⭐⭐ 2026-10-03 重写：修「大输出 = 假超时」
+///
+/// ⛔ **旧实现**（轮询 `try_wait()`，**从不并发读管道**）：
+/// ```ignore
+/// loop { match child.try_wait()? {
+///   Some(_) => { let out = child.wait_with_output()?; … }
+///   None => { if 超时 { kill; return Err("timed out") } sleep(50ms) } } }
+/// ```
+/// ⭐⭐ **缺陷形态**：子进程 stdout/stderr 若填满管道缓冲区（macOS/Linux 通常 64 KiB）
+/// 就会**永久阻塞在 write 上** ⇒ `try_wait()` 于是**永远**返回 `Ok(None)`
+/// ⇒ 最后被判成超时 ⭐⭐ **即「输出越大越容易被误判超时」**。
+///
+/// ⭐ **本仓已有一份写对的实现**：`l2_perception/nt_world/social_access/probe.rs:50`
+/// 的 `run_with_timeout` —— 它的 doc 逐字记录了这个 bug
+/// （「本实现第一版把读取放在等待循环**之后**，被自测抓到」），
+/// ⭐ 且带回归测试 `test_large_output_does_not_deadlock`（`probe.rs:363`）。
+///
+/// ⇒ ⭐⭐ **本函数此前是同一语义的「差版本」**（重复实现 + 缺陷）。
+/// ⭐ 现改为**复用那份写对的实现**，⛔ 不再自带一份。
+/// ⭐ 影响面：`run_capture` → `nt_io_provider/catalog/cli_free_source.rs`
+/// （⭐ 免费模型发现路径会误判超时）。
 fn run_with_timeout(cmd: &mut Command, timeout: Duration) -> Result<String, String> {
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("spawn failed: {e}"))?;
-    let start = std::time::Instant::now();
-    loop {
-        match child
-            .try_wait()
-            .map_err(|e| format!("wait failed: {e}"))?
-        {
-            Some(_) => {
-                let output = child
-                    .wait_with_output()
-                    .map_err(|e| format!("collect failed: {e}"))?;
-                if output.status.success() {
-                    let raw = String::from_utf8_lossy(&output.stdout);
-                    let text = strip_ansi(&raw).trim().to_string();
-                    if text.is_empty() {
-                        return Err("empty stdout from model command".to_string());
-                    }
-                    return Ok(text);
-                }
-                let raw = String::from_utf8_lossy(&output.stderr);
-                let err = strip_ansi(&raw).trim().to_string();
-                return Err(format!("model command failed: {err}"));
-            }
-            None => {
-                if start.elapsed() >= timeout {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    return Err(format!(
-                        "model command timed out after {}s",
-                        timeout.as_secs()
-                    ));
-                }
-                std::thread::sleep(Duration::from_millis(50));
-            }
+    // ⭐ 复用 `probe.rs` 的并发读实现（它返回 stdout/stderr/成功与否）。
+    // ⭐ `get_program()` 给 `&OsStr`，而目标签名要 `&str`
+    // ⛔ 非 UTF-8 的 program 名**不能静默替换成别的值** ⇒ 显式拒绝。
+    let program = cmd
+        .get_program()
+        .to_str()
+        .ok_or_else(|| "model command program is not valid UTF-8".to_string())?;
+    let args: Vec<String> = cmd
+        .get_args()
+        .filter_map(|a| a.to_str().map(|s| s.to_owned()))
+        .collect();
+    let outcome = crate::l2_perception::nt_world::social_access::probe::run_with_timeout(
+        program, &args, timeout,
+    )
+    .map_err(|e| format!("spawn failed: {e}"))?;
+    // ⭐⭐⭐ **必须先判 `timed_out`** —— 我第一版替换时漏了它，
+    // 导致 `test_ask_timeout_kills` 失败（实际文案 `model command failed: ` 而非
+    // `timed out`）。⭐ `RunOutcome` 有 `timed_out: bool`（`probe.rs:124`），
+    // ⭐⭐ **它排在 `success` 之前是有原因的**：超时被 kill 的子进程
+    // **必然** `success == false`，⛔ 不先判它就会把「超时」误报成「命令失败」。
+    if outcome.timed_out {
+        return Err(format!(
+            "model command timed out after {}s",
+            timeout.as_secs()
+        ));
+    }
+    if outcome.success {
+        let text = strip_ansi(&outcome.stdout).trim().to_string();
+        if text.is_empty() {
+            return Err("empty stdout from model command".to_string());
         }
+        Ok(text)
+    } else {
+        let err = strip_ansi(&outcome.stderr).trim().to_string();
+        Err(format!("model command failed: {err}"))
     }
 }
 
@@ -518,7 +538,7 @@ mod tests {
             .with_argv_template(vec!["-c".to_string(), "sleep 2".to_string()])
             .with_timeout(Duration::from_millis(400));
         let err = ask.ask("hi").unwrap_err();
-        assert!(err.to_string().contains("timed out"));
+        assert!(err.to_string().contains("timed out"), "实际文案: {}", err);
     }
 
     #[test]
@@ -613,5 +633,49 @@ mod tests {
         // 模板模式返回 None（回退整包）
         let t = NtModelCliAsk::new().with_argv_template(vec!["x".to_string()]);
         assert!(t.build_stream_argv("p").is_none());
+    }
+}
+
+#[cfg(test)]
+mod run_capture_regression_tests {
+    use super::*;
+
+    /// ⭐⭐⭐ **本改动的核心判据**：`run_capture` 在**大输出**下不得假超时。
+    ///
+    /// ⭐ **与 `probe.rs:363` 的 `test_large_output_does_not_deadlock` 同源**，
+    /// ⭐⭐ 但守的是**另一条路径**（`run_capture` → 免费模型发现）。
+    ///
+    /// ⛔ 旧实现（轮询 `try_wait`、从不并发读管道）在 >64 KiB 输出下
+    /// ⭐ **必然假超时**（macOS/Linux 管道缓冲通常 64 KiB，子进程阻塞在 write
+    /// ⇒ `try_wait()` 永远 `Ok(None)` ⇒ 被判超时）。
+    #[cfg(unix)]
+    #[test]
+    fn 大输出不被误判超时() {
+        // ⭐ 生成 > 256 KiB（管道缓冲的 4 倍）⇒ 旧实现必挂
+        let big = "y".repeat(256 * 1024);
+        let script = format!("printf '%s' '{big}'");
+        let ask = NtModelCliAsk::new()
+            .with_command("/bin/sh")
+            .with_argv_template(vec!["-c".to_string(), script])
+            .with_timeout(Duration::from_secs(20));
+        let got = ask.ask("hi").expect("大输出不应被判超时");
+        assert_eq!(got.text.len(), big.len(), "输出应完整取回（未被截断/误判）");
+    }
+
+    /// ⭐ 反向护栏：**超时**仍须报「timed out」（⇦ 我第一版替换漏判 `timed_out`
+    /// 时，这条正是它暴露的 ⭐ `test_ask_timeout_kills`）。
+    #[cfg(unix)]
+    #[test]
+    fn 超时仍报timed_out而非命令失败() {
+        let ask = NtModelCliAsk::new()
+            .with_command("/bin/sh")
+            .with_argv_template(vec!["-c".to_string(), "sleep 2".to_string()])
+            .with_timeout(Duration::from_millis(400));
+        let err = ask.ask("hi").unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("timed out"),
+            "⭐ 超时必须与「命令失败」可区分（实测文案：{msg}）"
+        );
     }
 }
