@@ -1,0 +1,14 @@
+[package]
+name = "nt-term-viz"
+version = "0.23.0"
+edition = "2021"
+description = "Unicode 终端可视化原语：宽度感知对齐、方块密度条、迷你图、树连线"
+license = "MIT"
+
+[dependencies]
+# ⛔ 已在根 Cargo.lock（0.2.2）且本地 registry 有缓存 ⇒ 零新增下载。
+# 用途：**东亚宽度**（CJK 全角 = 2 列）。自己手写区间表必然漏字，
+# 而本仓是中文为主的仓库，对齐算错会直接导致 CLI 表格错位。
+unicode-width = "0.2"
+
+[dev-dependencies]

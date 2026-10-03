@@ -8,6 +8,7 @@ members = [
     "crates/neotrix-gateway",
     "crates/neotrix-multi-agent",
     "crates/nt-core-capability-tree",
+    "crates/nt-term-viz",
     "crates/neotrix-neobot",
     "crates/neotrix-audit",
     "apps/neobot-desktop",
