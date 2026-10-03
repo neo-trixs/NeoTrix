@@ -1,5 +1,6 @@
 //! CLI: neotrix-capability 子命令
 
+use nt_term_viz::tree::{sibling_prefixes, TreeStyle};
 use crate::node::{CapabilityNode, ConstellationLevel, Domain, NodeLayer};
 use crate::registry::{CapabilityTreeRegistry, RegistryError};
 use crate::evolution::{EvolutionAction, EvolutionEngine, EvolutionPlan};
@@ -473,20 +474,42 @@ impl CapabilityCli {
             by_domain.entry(n.domain).or_default().push(n);
         }
 
-        for (domain, nodes) in by_domain {
+        // ⚠️ 2026-10-02 修正（**顺序不确定** + **硬编码框线字符**）：
+        //
+        // ① 原代码 `for (domain, nodes) in by_domain` 直接遍历 **HashMap**
+        //    ⇒ **输出顺序不确定** ⇒ 同一命令两次运行结果不同
+        //    ⇒ 能力树是**架构视图**，无法 diff 就失去意义。
+        //    （`Domain` 只 derive 了 `Eq/Hash`，**没有 `Ord`**
+        //      ⇒ 不能直接 `sort()`，改按 `as_str()` 排序，顺序稳定且可预期。）
+        //    ⓘ `by_layer` 的外层循环本来就是固定数组 `[L0Primitive, ...]`
+        //      ⇒ 层级顺序**已经**是确定的，无需改。
+        //
+        // ② 原代码对**每一项**都用 `├─`（含最后一项）⇒ 末项没有 `└─`
+        //    ⇒ 视觉上每项后面都跟着兄弟节点。改用 `tree_connector`。
+        let mut domains: Vec<Domain> = by_domain.keys().copied().collect();
+        domains.sort_by_key(|d| d.as_str());
+
+        for domain in domains {
             println!("{}", domain);
+            let empty: Vec<&&CapabilityNode> = Vec::new();
+            let nodes = by_domain.get(&domain).unwrap_or(&empty);
             // 按层级分组
-            let mut by_layer: HashMap<NodeLayer, Vec<_>> = HashMap::new();
+            let mut by_layer: HashMap<NodeLayer, Vec<&CapabilityNode>> = HashMap::new();
             for n in nodes {
                 by_layer.entry(n.layer).or_default().push(n);
             }
             for layer in [NodeLayer::L0Primitive, NodeLayer::L1Composite, NodeLayer::L2Orchestrator, NodeLayer::L3DomainService, NodeLayer::L4Application] {
                 if let Some(layer_nodes) = by_layer.get(&layer) {
                     println!("  {} ({})", layer.as_str(), layer_nodes.len());
-                    for n in layer_nodes {
+                    // `sibling_prefixes` 把「谁最后」收进原语，
+                    // 避免每个站点各写一遍 `i + 1 == len`（易错）。
+                    let prefixes = sibling_prefixes(layer_nodes.len(), TreeStyle::Unicode);
+                    for (i, n) in layer_nodes.iter().enumerate() {
                         let dep_mark = if n.deprecated { " [DEPRECATED]" } else { "" };
-                        println!("    ├─ {} [{}] deps={} dependents={}{}",
-                            n.id, n.constellation.as_str(), n.requires.len(), n.dependents.len(), dep_mark);
+                        // 缩进 4 列 + 树连线；连线占 4 列 ⇒ 合计 8 列
+                        println!("    {}{} [{}] deps={} dependents={}{}",
+                            prefixes[i], n.id, n.constellation.as_str(),
+                            n.requires.len(), n.dependents.len(), dep_mark);
                     }
                 }
             }
