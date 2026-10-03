@@ -183,6 +183,17 @@ jobs:
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
         working-directory: apps/neobot-desktop/neobot-ui
+      # ⭐ 2026-10-03 补：npm 依赖许可门此前**写了但 CI 从不运行**
+      #   （`scripts/check-license-js.sh` 190 行，在 .github/workflows 里零引用）。
+      #   ⛔ 后果：Rust 侧有 deny.toml + 两条阻断 job，而 npm 侧
+      #   AGPL/GPL/SSPL/Elastic/BUSL **无任何阻断** —— 许可防护真空是真的。
+      #   ⭐ 放在这一步之后：上面刚 `pnpm install --frozen-lockfile` 装好依赖，
+      #   本门从 `node_modules/<pkg>/package.json` 读 SPDX ⇒ 复用即可，
+      #   ⛔ 不新增任何第三方 action（供应链 pin 约束见上方注释）。
+      #   ⛔ 本门在 `node_modules` 缺失时**故意 FAIL**（区分「没扫成」与「没问题」），
+      #   所以它**必须**排在 install 之后。
+      - name: npm license gate (SPDX baseline + deny list, zero exceptions)
+        run: bash scripts/check-license-js.sh
       - name: Build frontend (tsc --noEmit + vite build)
         run: pnpm run build
         working-directory: apps/neobot-desktop/neobot-ui

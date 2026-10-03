@@ -1,8 +1,16 @@
 target/
 # 2026-09-28: Cargo.lock 改为入库。理由：本仓含可执行产物（neotrix CLI /
 # neobot-desktop / 原 src-tauri），Rust 惯例要求**应用**提交锁文件，否则
-# CI 与本机依赖图可漂移，构建不可复现。下方 `*.lock` 仍生效于
-# .opencode/package-lock.json 等 node 侧锁文件 —— 只定点解禁这一个。
+# CI 与本机依赖图可漂移，构建不可复现。
+# ⛔ 2026-10-03 更正本注释的**机制说法**（实测 `git check-ignore -v`）：
+#   下方 `*.lock` **拦不住** `.opencode/package-lock.json` —— 前者只匹配
+#   以 `.lock` **结尾**的文件，而后者以 `.json` 结尾（`pnpm-lock.yaml` 同理，
+#   以 `.yaml` 结尾）。实测它是被 **`.opencode/.gitignore:3`** 忽略的。
+#   ⇒ 结论不变（工具锁文件不入库），但**理由变了** —— 别再拿 `*.lock` 去解释它。
+# ⭐ 应用级 node 锁文件**确实入库**（实测 3 个）：
+#   apps/neobot-desktop/neobot-ui/pnpm-lock.yaml · frontend/pnpm-lock.yaml
+#   · frontend/skills-lock.json ⇒ 与 Cargo.lock 同一纪律，且使
+#   `pnpm install --frozen-lockfile` 在 CI 可复现。
 !Cargo.lock
 .DS_Store
 *.lock
