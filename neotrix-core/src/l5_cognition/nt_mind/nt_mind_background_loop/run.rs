@@ -62,7 +62,10 @@ impl Default for _ConsciousnessThresholds {
         Self {
             warn_quality: 0.3,
             critical_quality: 0.2,
-            eventbus_critical: 0.2,
+            // ⭐ 2026-10-03：下沉到 L0（见 `nt_core_event_bus::CONSCIOUSNESS_EVENTBUS_CRITICAL`
+            // 的论证）。⛔ 此前这里是**另一份独立字面量** `0.2`，与事件总线各写一遍
+            // ⇒ 两处可以静默漂移。现在是单一真源。
+            eventbus_critical: crate::l0_substrate::nt_core_event_bus::CONSCIOUSNESS_EVENTBUS_CRITICAL,
         }
     }
 }

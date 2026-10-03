@@ -3,6 +3,25 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, oneshot};
+// ⭐⭐ 2026-10-03 依赖倒置：把「意识质量基座级下限」**下沉到 L0**。
+//
+// ⛔ 原状：L0 的事件总线读 `crate::l5_cognition::…::CONSCIOUSNESS_THRESHOLDS
+//    .eventbus_critical` ⇒ **L0 → L5**，属 `LAYER-DEBT-TIERS-2026-10-03.md` 定义的
+//    **S1 级（基座反向依赖顶层，近乎循环）**。
+//
+// ⭐ 论证（实测消费者分布）：`CONSCIOUSNESS_THRESHOLDS` 共 6 处使用，
+//   其中 L5 用 `warn_quality` / `critical_quality`，而 **L0 只用
+//   `eventbus_critical` 这一个字段** —— ��「事件总线要用的阈值」是**基座自己的
+//   策略**，把它放在 L5 会让基座必须依赖顶层才能做自己的工作。
+//   ⇒ **谁消费，谁拥有** ⇒ 阈值下沉到 L0，L5 反过来引用它
+//   （L5 → L0 是**合法**方向）。
+//
+// ⛔ 刻意**不**整个搬走 `_ConsciousnessThresholds`：L5 那三个字段是认知层自己的
+//   分级策略，搬到基座会让基座背上不属于它的语义。**只搬基座真正消费的那一个。**
+/// ⭐ 单一真源：`run.rs::_ConsciousnessThresholds::default()` 引用本常量，
+///   从此两处不可能漂移（⛔ 之前它们是两份独立的字面量语义）。
+pub const CONSCIOUSNESS_EVENTBUS_CRITICAL: f64 = 0.2;
+
 use crate::l5_cognition::nt_core_dispatch::Dispatcher;
 use crate::l0_substrate::nt_core_event::CoreEvent;
 
@@ -334,7 +353,7 @@ pub fn subscribe_layer(bus: &EventBus, layer: LayerId) -> tokio::task::JoinHandl
                         crate::l0_substrate::nt_core_event::CoreEvent::GlobalHalt { reason, source } => {
                             log::error!("[event-bus:{}] GLOBAL HALT: {} from {}", layer_label, reason, source);
                         }
-                            crate::l0_substrate::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < crate::l5_cognition::nt_mind::nt_mind_background_loop::CONSCIOUSNESS_THRESHOLDS.eventbus_critical => {
+                            crate::l0_substrate::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < CONSCIOUSNESS_EVENTBUS_CRITICAL => {
                             log::warn!("[event-bus:{}] consciousness quality LOW ({:.3})", layer_label, quality);
                         }
                         _ => {
@@ -404,7 +423,7 @@ pub fn subscribe_all_layers_sync(bus: &EventBus) {
                             crate::l0_substrate::nt_core_event::CoreEvent::GlobalHalt { reason, source } => {
                                 log::error!("[event-bus:{}] GLOBAL HALT: {} from {}", layer_label, reason, source);
                             }
-                        crate::l0_substrate::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < crate::l5_cognition::nt_mind::nt_mind_background_loop::CONSCIOUSNESS_THRESHOLDS.eventbus_critical => {
+                        crate::l0_substrate::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < CONSCIOUSNESS_EVENTBUS_CRITICAL => {
                                 log::warn!("[event-bus:{}] consciousness quality LOW ({:.3})", layer_label, quality);
                             }
                             _ => {
