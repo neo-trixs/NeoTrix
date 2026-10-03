@@ -32,6 +32,9 @@ pub mod nt_memory_decompose;
 pub mod nt_memory_distill;
 pub mod nt_memory_diversity;
 pub mod nt_memory_dual_brain;
+// ⭐⭐ 检索准入闸（2026-10-03，吸收 waku-agent 的 retrieval_gate 设计）：
+// 「**这条消息需要记忆吗**」在**碰存储之前**回答 ⇒ 治「过度检索偏置答案」。
+pub mod nt_retrieval_gate;
 pub mod nt_memory_e8_agent;
 pub mod nt_memory_embed;
 pub mod nt_memory_feedback;
