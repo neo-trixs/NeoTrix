@@ -67,3 +67,58 @@ nt_core_consciousness_tree/lifecycle.rs:668  fog / branches.len().max(1)   ← �
    而我的事故记录已写死「未验证改动不可接受」。
 2. 部分缺省语义**需先裁决**（见上），不是机械替换。
 3. 应**分批**：单文件 → 跑绿 → 提交（事故记录的约束 2）。
+
+---
+
+# 补：逐处读上下文的**实证判定**（2026-10-03晚间）
+
+> 上文那份 14 处清单是**基于 grep 的候选**，不是判定。
+> 本节把其中 6 处**逐处读了上下文**，替换猜测。
+> ⭐ **结论：6 处里 3 处早已有守卫 —— 而 grep 形态完全看不到它们。**
+
+## ⛔ 先更正我自己的第 3 处误判：`sandbox.rs` **完全不需要改**
+```rust
+pub fn health(&self) -> f64 {
+    if self.evaluated_count == 0 {
+        return 1.0;              // ⭐ 守卫已存在
+    }
+    (1.0 - self.denied_count as f64 / self.evaluated_count as f64).max(0.0).min(1.0)
+}
+```
+⇒ 我上文说「`sandbox.rs:199` 未评估时静默 0% 安全」⇒ **错**，守卫在**上方 2 行**。
+⇒ 且**缺省语义早已裁决**：`1.0`（未评估 = 健康）—— 对一个名为 `health()` 的分数
+  这是**正确**的默认值，不需要我再去「裁决」。
+⇒ ⛔ 这是同型错误**第 4 次**（`lifecycle.rs:578`、`:586?`、`sandbox.rs:199`、本节的 `crystallization`）。
+
+## 6 处逐处判定
+| 站点 | 读到的守卫 | 判定 |
+| |---|
+| `nt_core_observer.rs:627` | ✅ `if self.mode_buffer.is_empty() { 0.5 }` | **已裁决**（0.5 中性多样性），无需改 |
+| `nt_core_memory_budget.rs:81` | ✅ 护了**分子** `if rss == 0 { return 0.0 }`；⛔ **分母 `soft_limit` 未护** | **残留**：`soft_limit == 0` ⇒ `inf/NaN` ⇒ `.min(1.0)` ⇒ 恒 1.0 |
+| `nt_mind/seal/crystallization.rs:122` | ✅ **构造性守卫**：`Some(&count) if count >= self.threshold` 才进入除法 | **基本安全**；仅 `count==0 && threshold==0` ⇒ `0/0` ⇒ NaN ⇒ 1.0 |
+| `nt_io_inference/kv_cache_optimizer.rs:353` | ⛔ **无** | **残留且后果最重**：`sparsity_threshold == 0` ⇒ `variance/0` ⇒ `.min(1.0)=1.0` ⇒ `keep_ratio=1` ⇒ `1.0-1.0=0` ⇒ **保留 0 个元素**（静默丢数据） |
+| `nt_core_gwt/monitor.rs:154` | ⛔ 分母未护，但在 `if self.in_deadlock` 分支内 | **待查**：`max_stimulus_before_rollback` 在该状态下是否恒 > 0 |
+| `l6_meta/nt_safety_monitor.rs:268` | ⛔ **无** | **残留**：`config.max_personality_drift == 0` ⇒ severity ⇒ `.min(1.0)` ⇒ **1.0（最大告警）**，方向是**误报最大化** |
+
+## ⭐ 判定标准（本节新增，比上文的方法论更严）
+光看「分母可为 0」**不足以定缺陷**，还要看**后果方向**与**是否已被上游守卫**：
+
+| 候选 | 后果方向 | 优先级 |
+|---|---|---|
+| `kv_cache_optimizer:353` | **静默丢数据**（保留 0 个元素） | ⭐最高 |
+| `nt_safety_monitor:268` | 误报最大化（severity 1.0） | 中 |
+| `memory_budget:81` | 该维度恒 1.0（无区分度） | 中 |
+| `monitor:154` | 未确认 | 待查 |
+
+## ⛔ 仍未落代码的理由（补充）
+上述 3 处「残留」我**都没有证明其配置项真的会被置 0**
+（`soft_limit` / `sparsity_threshold` / `max_personality_drift` 是否有 0 的合法路径）。
+⇒ 按本文档自己的前置条件门，**「可能为 0」不等于「为 0」** ⇒ 不动。
+⇒ 真要动，需先反查这三个配置项的**写入点**（它们是否 pub、是否可从配置/环境传入 0），
+再单文件修复 + 跑绿。**顺序是：先查写入点，后改代码。**
+
+## ⭐ 本节的方法论收获
+`rg` 能看到「除以非字面量 + 截断」的**形状**，**看不到上方两行的守卫**。
+⇒ 上文那份 14 处清单应被读作**候选集**；
+**只有逐处读过上下文的判定才算结论。**
+⇒ 这是本会话第 4 次同型失误 ⇒ 它不是偶发，是**默认行为**，故写进文档而非只写进commit。
