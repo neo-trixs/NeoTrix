@@ -39,8 +39,16 @@ impl SocialPlatform {
             Self::Other(ref name) => name.as_str(),
         }
     }
+    /// ⭐ 2026-10-03：改为**大小写不敏感**，与 [`From<&str>`] 对齐。
+    ///
+    /// ⛔ 原实现直接 `match s`，而 `From<&str>` 走 `s.to_lowercase()`
+    ///    ⇒ 同一份逻辑有两套大小写语义：`SocialPlatform::from("X")`
+    ///    得到 `Twitter`，而 `SocialPlatform::from_str("X")` 得到
+    ///    `Other("X")`。两者本该等价（`From<String>` 正是委托给
+    ///    `from_str` 的），不一致会让「按用户输入查平台」在
+    ///    CLI 参数路径上失效。
     pub fn from_str(s: &str) -> Self {
-        match s {
+        match s.to_lowercase().as_str() {
             "twitter" => Self::Twitter,
             "reddit" => Self::Reddit,
             "instagram" => Self::Instagram,
@@ -338,9 +346,26 @@ mod other_variant_tests {
     }
 
     #[test]
-    fn from_str_is_case_insensitive_through_the_From_impl() {
-        // From<&str> 走 to_lowercase，From<String> 委托给它
-        assert_eq!(SocialPlatform::from("X"), SocialPlatform::Twitter);
-        assert_eq!(SocialPlatform::from("GitHub".to_string()), SocialPlatform::Other("github".into()));
+    fn from_str_and_from_impl_agree_on_case() {
+        // ⭐ 三个入口必须大小写语义一致（修复前 from_str 与 From 不一致）
+        // ⚠️ 注意 "X" 不是枚举名 —— 小写化后是 "x"，落 Other。
+        //    这正是目录主键（"x"）与枚举名（"twitter"）不同的事实，
+        //    别名解析由 PlatformCatalog::resolve 负责，不该由 from_str 兜。
+        assert_eq!(SocialPlatform::from_str("Twitter"), SocialPlatform::Twitter);
+        assert_eq!(SocialPlatform::from("Twitter"), SocialPlatform::Twitter);
+        assert_eq!(SocialPlatform::from("Twitter".to_string()), SocialPlatform::Twitter);
+        // ⭐ 大写的 X 仍落 Other("x")，与 as_str 往返一致
+        assert_eq!(SocialPlatform::from_str("X"), SocialPlatform::Other("x".into()));
+        assert_eq!(SocialPlatform::from_str("X").as_str(), "x");
+        // ⭐ Other 也统一小写化，否则 `Other("GitHub")` 与
+        //    `Other("github")` 会是两个不同的 key
+        assert_eq!(
+            SocialPlatform::from_str("GitHub"),
+            SocialPlatform::Other("github".into())
+        );
+        assert_eq!(
+            SocialPlatform::from_str("GitHub").as_str(),
+            "github"
+        );
     }
 }
