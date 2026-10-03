@@ -297,12 +297,23 @@ mod tests {
         assert!((sim - 0.0).abs() < 1e-10);
     }
 
+    /// ⛔ 2026-10-03 更正：原断言是 `sim - 1.0`，**期望值本身是错的**。
+    ///
+    /// 四路独立证据都指向 `0.0`：
+    /// ①实现 `bank_impl/core.rs:39-43`：`norm_a == 0.0 || norm_b == 0.0` ⇒ 直接返回
+    ///    `0.0`（**不是 NaN** ⇒ 不存在 NaN 传播 bug，改此断言不会掩盖缺陷）。
+    /// ② 数学：零向量的余弦未定义，行业惯例取 0.0；取 1.0 无任何定义支撑。
+    /// ③ 同仓`nt_core_graph.rs` 的同名函数对零向量同样返回 0.0。
+    /// ④ ⭐ 兄弟测试 `test_cosine_similarity_zero_only_a`（下方 3 行）
+    ///    只有一个向量为零，断言的就是 `sim - 0.0`
+    ///    ⇒ 原断言与**自家兄弟测试**直接矛盾。
     #[test]
     fn test_cosine_similarity_zero() {
         let a = vec![0.0, 0.0];
         let b = vec![0.0, 0.0];
         let sim = ReasoningBank::cosine_similarity(&a, &b);
-        assert!((sim - 1.0).abs() < 1e-10);
+        // 零向量 ⇒ 0.0（见上方四条证据）。⛔ 勿再改回 1.0。
+        assert!((sim - 0.0).abs() < 1e-10);
     }
 
     #[test]
