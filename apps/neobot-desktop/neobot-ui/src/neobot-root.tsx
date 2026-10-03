@@ -195,9 +195,29 @@ export function NeoBotRoot() {
   const [err, setErr] = useState('')
   const [sel, setSel] = useState<string | null>(null)
   const [msgs, setMsgs] = useState<Msg[]>([])
-  const [draft, setDraft] = useState('')
-  const [busy, setBusy] = useState(false)
+  // ⭐⭐ 2026-10-03：草稿**按会话分区**（此前是**单个全局字符串**）
+  // ⛔ 旧形态的后果：切会话时草稿**丢失或串台**（在 A 打的字，切到 B 还在）。
+  //    ⭐ 用 Record 而非数组下标：会话 id 是字符串，Record 可直接按 id 取，
+  //    且 ⭐ 删除键用 `delete`（`undefined` 会留下 `'undefined'` 键的坑）。
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  // ⭐ 当前会话的草稿（渲染/发送都读它，避免各处重复写 `drafts[sel ?? '']`）
+  const draft = sel ? (drafts[sel] ?? '') : ''
+  // ⭐⭐ 2026-10-03：busy **按会话隔离**（此前是**单个全局 bool**）
+  // ⛔ 旧形态的后果：在 A 会话跑长任务时，**B 会话也发不出去**
+  //    （`:581` 的 `if (!text || busy) return` 一刀切整个界面）。
+  //    ⭐ 这是**串台**的一种：不是内容串，是**可用性**串。
+  const [busyByConvo, setBusyByConvo] = useState<Record<string, boolean>>({})
+  const busy = sel ? (busyByConvo[sel] ?? false) : false
   const [histLoading, setHistLoading] = useState(false)
+  // ⭐⭐ 2026-10-03：历史**分页**（接上 `neobot_convo_messages_page`）
+  // ⛔ 旧形态：切会话就 `invoke<ChatMessage[]>('neobot_convo_messages')`
+  //    **一次性全量拉取** ⇒ 长会话把整段历史一次塞进 DOM。
+  const [hasMore, setHasMore] = useState(false)
+  // ⭐ 下一页游标 = 当前**最小** seq（⛔ 不是最大，见 store 层论证）
+  const [oldestSeq, setOldestSeq] = useState<number | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  /** 首页条数：⭐ 有界（⛔ 不用「全部」）。中英各一条，不新增文案键。 */
+  const PAGE = 60
   // 能力快照：调不到就 null，顶栏直接不渲染 —— 「不可用就不渲染」。
   // ⛔ 不设静态默认值：两处默认值各自猜，正是本缺口的病因。
   const [caps, setCaps] = useState<CapabilitySnapshot | null>(null)
@@ -539,10 +559,18 @@ export function NeoBotRoot() {
     }
     let alive = true
     setHistLoading(true)
-    void invoke<ChatMessage[]>('neobot_convo_messages', { convoId: sel })
-      .then((rows) => {
+    setHasMore(false)
+    setOldestSeq(null)
+    // ⭐⭐ 改走**分页**命令：`beforeSeq` 缺席 = 取**最新**一页
+    // （store 层是 `seq > after_seq` 正序取，故「最新一页」= 不设游标）
+    void invoke<{ messages: ChatMessage[], hasMore: boolean, nextSeq: number | null }>(
+      'neobot_convo_messages_page', { convoId: sel, beforeSeq: null, limit: PAGE },
+    )
+      .then((page) => {
         if (!alive) return
-        setMsgs(rows.map((r): Msg => ({
+        setHasMore(page.hasMore)
+        setOldestSeq(page.nextSeq)
+        setMsgs(page.messages.map((r): Msg => ({
           who: r.role === 'user' ? 'me' : 'bot',
           text: r.text,
           ts: r.created_at,
@@ -576,6 +604,34 @@ export function NeoBotRoot() {
       })
   }, [])
 
+  /** ⭐⭐ 加载更早一页（把更早的历史**前置**到现有列表，不整体替换）。 */
+  const loadOlder = useCallback(async () => {
+    if (!sel || loadingMore || !hasMore || oldestSeq == null) return
+    setLoadingMore(true)
+    const convo = sel
+    try {
+      const page = await invoke<{ messages: ChatMessage[], hasMore: boolean, nextSeq: number | null }>(
+        'neobot_convo_messages_page', { convoId: convo, beforeSeq: oldestSeq, limit: PAGE },
+      )
+      if (convo !== sel) return   // ⭐ 会话已切 ⇒ 丢弃（与 send 同一套守卫）
+      const older = page.messages.map((r): Msg => ({
+        who: r.role === 'user' ? 'me' : 'bot',
+        text: r.text,
+        ts: r.created_at,
+      }))
+      // ⭐⭐ 前置而非替换 ⇒ ⭐ 已有滚动位置与阅读进度**不跳**
+      setMsgs(m => [...older, ...m])
+      setHasMore(page.hasMore)
+      setOldestSeq(page.nextSeq)
+    } catch (e) {
+      // ⛔ 非静默：失败要让用户知道，否则按钮一直亮着像还能点
+      setHasMore(false)
+      void invoke('log_frontend', { level: 'error', target: 'neobot-root', message: `loadOlder: ${String(e).slice(0, 160)}` }).catch(() => {})
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [sel, loadingMore, hasMore, oldestSeq, PAGE])
+
   async function send() {
     const text = draft.trim()
     if (!text || busy || histLoading) return
@@ -588,12 +644,14 @@ export function NeoBotRoot() {
     //    `send()` 的 then/catch 此前**无任何守卫** ⇒ 这条路径是裸的。
     //    ⇒ 解法：记下发起时的 convoId，回来后比对，不符就**丢弃**（不串台）。
     const sendConvo = sel ?? null
-    setDraft('')
+    // ⭐⭐ 草稿清空按**发起时的会话**（⛔ 不是 `sel` —— await 期间可能已切走）
+    if (sendConvo) setDrafts(d => ({ ...d, [sendConvo]: '' }))
     setMsgs(m => [...m, { who: 'me', text, ts: nowIso() }])
-    setBusy(true)
+    // ⭐⭐ busy 按**发起时的会话**置位 ⇒ ⭐ **别的会话此刻仍可发**
+    if (sendConvo) setBusyByConvo(b => ({ ...b, [sendConvo]: true }))
     try {
       // convo_id 缺席（无会话时）= 脱离会话手动跑，后端不落库。
-      const r = await invoke<{ output?: string, text?: string }>('neobot_send', { convoId: sel ?? undefined, text })
+      const r = await invoke<{ output?: string, text?: string }>('neobot_send', { convoId: sendConvo ?? undefined, text })
       // ⛔ 串台守卫：会话已变 ⇒ 这条回复属于**旧会话**，追加到新会话就是错的。
       if ((sel ?? null) !== sendConvo) return
       setMsgs(m => [...m, { who: 'bot', text: r?.output ?? r?.text ?? t('chat.noOutput'), ts: nowIso() }])
@@ -611,7 +669,9 @@ export function NeoBotRoot() {
         id: `f${nowIso()}-${m.length}`,
       }])
     } finally {
-      setBusy(false)
+      // ⭐⭐ 按**发起时的会话**复位 busy —— ⛔ 若用 `sel`，切走后会把
+      //    **新会话**误置/误清（那正是我们刚隔离掉的那类串台）
+      if (sendConvo) setBusyByConvo(b => ({ ...b, [sendConvo]: false }))
       reloadUsage()
     }
   }
@@ -622,11 +682,13 @@ export function NeoBotRoot() {
       // ⭐⭐ **按 id 寻址，不用数组下标**（理由见 `Msg.id` 的注释）。
       const bad = msgs.find(x => x.id === msgId)
       if (!bad?.failed || busy) return
+      // ⭐⭐ 重发也按**发起时的会话**记 busy（否则同样会串到新会话）
+      const retryConvo = sel ?? null
       setMsgs(m => m.filter(x => x.id !== msgId))
-      setBusy(true)
+      if (retryConvo) setBusyByConvo(b => ({ ...b, [retryConvo]: true }))
       try {
         const r = await invoke<{ output?: string, text?: string }>('neobot_send', {
-          convoId: sel ?? undefined,
+          convoId: retryConvo ?? undefined,
           // ⛔ 不再「剥本地化前缀」还原正文：改用发送时存下的原文。
           //    旧写法在切换语言后必然把前缀一起发出去。
           text: bad.prompt ?? bad.text,
@@ -642,7 +704,7 @@ export function NeoBotRoot() {
           id: `f${nowIso()}-${m.length}`,
         }])
       } finally {
-        setBusy(false)
+        if (retryConvo) setBusyByConvo(b => ({ ...b, [retryConvo]: false }))
         reloadUsage()
       }
     },
@@ -1072,6 +1134,20 @@ export function NeoBotRoot() {
             </div>
           ) : (
             <div className="mx-auto max-w-[760px] space-y-2">
+              {/* ⭐⭐ 2026-10-03「加载更早」（接上 `neobot_convo_messages_page`）。
+                  ⛔ 长会话此前一次性全量拉取 ⇒ 整段历史进 DOM。
+                  ⭐ 放在消息列表**上方** ⇒ 更早的内容出现在顶部，符合阅读直觉。
+                  ⛔ `hasMore` 为假时**完全不渲染** ⇒ ⛔ 不占位、不引视觉噪声。 */}
+              {hasMore && (
+                <button
+                  type="button"
+                  className="mx-auto block rounded-full border border-line px-3 py-1 text-[12px] text-muted hover:text-ink disabled:opacity-60"
+                  disabled={loadingMore}
+                  onClick={() => { void loadOlder() }}
+                >
+                  {loadingMore ? '…' : '加载更早的消息'}
+                </button>
+              )}
               {/* 消息窗口化。⛔ 外层**必须**撑出 getTotalSize()：省了它，
                   滚动条按「可见项数」算高度 ⇒ 根本滚不动。 */}
               {msgs.length > 0 && (
@@ -1202,7 +1278,13 @@ export function NeoBotRoot() {
             <textarea
               ref={taRef}
               value={draft}
-              onChange={e => setDraft(e.target.value)}
+              onChange={e => {
+                // ⭐⭐ 草稿写回**所属会话**，⛔ 不是当前选中的
+                //    （输入期间切会话，草稿必须跟着**它本来属于的**会话走）
+                const id = sel
+                if (!id) return
+                setDrafts(d => ({ ...d, [id]: e.target.value }))
+              }}
               onKeyDown={(e) => {
                 // ⛔⛔⛔ **必须有 IME 守卫**：`isComposing` 为真时，回车是
                 //    **输入法选词确认**，不是发送。
