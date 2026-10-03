@@ -22,11 +22,13 @@
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 pub mod bar;
+pub mod panel;
 pub mod sparkline;
 pub mod table;
 pub mod tree;
 
 pub use bar::{bar_line, bar_row};
+pub use panel::{content_line, panel_bottom, panel_top, render_panel};
 pub use sparkline::sparkline;
 pub use table::{Align, pad_to, pad_trunc};
 pub use tree::{tree_connector, TreeStyle};
