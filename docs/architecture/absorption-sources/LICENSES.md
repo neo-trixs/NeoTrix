@@ -81,6 +81,17 @@ curl -s "https://raw.githubusercontent.com/<owner>/<repo>/HEAD/LICENSE" | head -
 
 三者均为 MIT ⇒ 可自由取用思路与代码片段（**实际未复制任何代码**）。
 
+## 2026-10-03 第三批：用户提交 12 源中需单列的两条
+
+| 仓库 | SPDX | 备注 |
+|---|---|---|
+| `moguzbulbul/blueprint-animation` | **CC-BY-NC-4.0** | ⛔ **非商用**。常被误当 CC BY而漏掉 NC 条款；我方是否商用未确认 ⇒ 确认前不可取用 |
+| `markfulton/agent-cookie-sync` | **MIT** | ✅ 宽松 |
+| `Untrivial-ai/agent-orchestrator` | **Apache-2.0** | ⛔ 有**专利授权**条款，判据不同于 MIT |
+| `awesomedata/awesome-public-datasets` | ⛔ **未核实** | 未抓取（链接目录，且前置门第①问不通过）⇒ 不填未经核实的值 |
+
+统一索引：`ABSORPTION-INDEX-user-urls-2026-10-03.md`
+
 ## 2026-10-03 新增（第二批）
 
 | 仓库 | SPDX | 可吸收性 |

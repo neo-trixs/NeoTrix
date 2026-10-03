@@ -1,0 +1,99 @@
+# 统一吸收索引：用户提交的 12 个 URL（2026-10-03）
+
+> **本篇一处判完全部 12 个 URL。** 每条给三项：**许可档/ 前置门判定 / 一句话判据**。
+> 前置门三问见 `ABSORPTION-PRECONDITION-GATE-2026-10-03.md`：
+> ① **危险面存在吗** ② **路径可达吗** ③ **是我方的吗**。
+> ⛔ 未取任何代码。
+
+## 一览表
+
+| # | URL | ★ | 许可档 | 前置门 | 一句话判据 |
+|---|---|---|---|---|---|
+| 1 | `lightpanda-io/browser` | 35.9k | ⛔ **AGPL-3.0** | ✗ | 许可即否决；4 条设计可移植（CDP 契约 / 零 token 执行 / MCP 会话隔离 / robots 开关） |
+| 2 | `open-slide/open-slide` | 8.7k | ✅ MIT | ✗ 无痛点 | skill 携带硬规则；约束画布而非内容 |
+| 3 | `Niko1221/Strata` | 7.4k | ✅ MIT | ✗ 无痛点 | MoE 跨层级卸载 + 投机解码 + **双端点**（`/v1` 与 `/v1/messages`） |
+| 4 | `yetone/magpie` | 4.4k | ✅ MIT | ⛔ 部分 | 一网关说 4 种协议；**凭据单一收口**；历史**不按今天配置回填** |
+| 5 | `yetone/cumora` | 3.9k | ✅ MIT | ⛔ 已验为**不适用** | seen-cursor 扣留重决策（我方无共享流式状态）；默认 fail-closed |
+| 6 | `mizorewww/x_gift_bot` | 102 | ✅ MIT | ⛔ 未查证 | 「结果不明 ⇒ 标记待核实，**绝不重复扣款**」+事后对账 |
+| 7 | `robbietilton/Compositor` | 7.2k | ✅ MIT | ✗ 无痛点 | `.comp` = 图层目录 + manifest ⇒ **文件格式本身就是 API** |
+| 8 | `Untrivial-ai/agent-orchestrator` | 12.6k | ⛔ **Apache-2.0**（有专利条款） | ✅ **通过** | **文档优先级写成契约**（漂移时谁赢） |
+| 9 | `casp.ac/…intelligence-explosion` | — | 论文（非代码） | ✅ **通过** | 外部**独立印证**我已修的 P0：自评必须不自报 |
+| 10 | `markfulton/agent-cookie-sync` | 26 | ✅ MIT | ⛔ 未查证 | **硬编码拒绝名单**（Google/Meta/X 走官方 API）；注入脚本**从不打印值** |
+| 11 | `moguzbulbul/blueprint-animation` | 388 | ⛔ **CC BY-NC 4.0 非商用** | ⛔许可受限 | 「After 是 source of truth」+ 动画前**先按 Figma 导出核对** |
+| 12 | `awesomedata/awesome-public-datasets` | — | ⛔ **未核实**（不抓） | ⛔ **不通过** | 链接目录，非可吸收技术；第①问已判无痛点 |
+
+## 许可分档（本轮最重要的一张表）
+| 档 | 源 | 含义 |
+|---|---|---|
+| ⛔ **禁** | #1 AGPL-3.0 | 链接即需整体开源 ⇒ 代码层一律不吸收 |
+| ⛔ **受限** | #11 **CC BY-NC 4.0** | **非商用**。我方是否商用**未确认** ⇒ 在确认前**不可取用** |
+| ⛔ **有条件** | #8 Apache-2.0 | copyleft 弱，但**含专利授权** ⇒ 与 MIT 的判据不同 |
+| ✅ **宽松** | #2#3 #4 #5 #6 #7 #10 | MIT |
+| — | #9 #12 | 非代码源（论文 / 清单） |
+
+⭐ **CC BY-NC 值得单列**：它常被当作「CC BY」看而**漏掉 NC 条款**。
+「开源」≠「可自由使用」—— 这是本轮 12 个源里最容易踩的一个。
+
+## ⭐⭐ 通过前置门的三条（本轮真正该做的）
+
+### #9 CASP 报告 —— ⭐ 印证「会撒谎的尺子」
+剑桥 CASP（Hinton / Bengio / Barto / Jack Clark / Dawn Song 等 23 人）：
+> AI systems now write most of the code inside the companies that build them;
+> R&D 管道被自动化 ⇒ 进展可能非线性加速（years → months or less）。
+
+⇒ 机制与本仓 `EMERGENCE-PLAN` §一**同构**：**当系统自身能影响能力度量，
+就必须有独立于自报的裁判**。
+⇒ 我本会话已落地的 `llm_judge` 恒满分 → `Option` + **36 组反向锁**，
+在此得到**外部独立印证**（不是同一来源的自证）。
+⚠️ 但它是**政策论文，非工程证据** ⇒ 只能作为「判据方向正确」的旁证，
+**不能**当「我们的实现已足够」的依据。
+
+### #8 Agent Orchestrator —— 文档漂移的**契约化**
+`docs/documentation-map.md`：which docs are human-facing, which are
+**machine-readable contracts**, and **which wins on drift**。
+
+⇒ 本会话已实证 4 次陈旧断言（索引 19→75、browse「缺底边」、「刻意不改 expect」、
+`sandbox.rs` 守卫在上方 2 行）⇒ **危险面成立**。
+⛔ 但**不落门脚本**：门需先有**可枚举的文档类别**，
+凭空写会产出第二个误报门（`check-term-viz` 336 误报前车之鉴）。
+
+### #10 agent-cookie-sync —— 拒绝名单（**方向对，但我方前提未查**）
+⭐ **默认拒绝名单**、⭐ 生效规则**落进 `cookies.meta.json` 供审计**、
+⭐ 注入脚本**从不打印凭据值**。
+⇒ 与 cumora 的**默认 fail-closed** 同 polarity。
+⛔ **未查证**我方 `nt_io_browser_engine` / `nt_login` 是否真有会话凭据面
+⇒ 按前置门**不提方案**。该查的点是明确的：会话/凭据处理路径。
+
+## ⭐⭐⭐ 跨 12 源的总判断（本轮唯一值得记住的一条）
+
+**七源独立收敛到同一条**：
+
+> **把不确定性、凭据、代价、规则推到边界；运行时只跑确定性的东西。**
+
+| 源 | 推到了哪里 |
+|---|---|
+| lightpanda #1 | 不确定性 → 生成期（零 token 执行） |
+| open-slide #2 | 规则 → 机器可读（skill 而非散文） |
+| Strata #3 | 算力 → 存储层级；协议 → 双端点 |
+| magpie #4 | 凭据 → 网关；**历史不按今天配置回填** |
+| cumora #5 | 决策 → 提交期（过期扣留重决策） |
+| x_gift_bot #6 | 不可逆动作 → 结果未知时**不重试，标记待核实** |
+| Compositor #7 | 可编程性 → **朴素可被外部写的中间表示** |
+| AO #8 | 文档权威 → **漂移时的优先级契约** |
+| CASP #9 | 自评 → **必须独立于自报** |
+
+⭐⭐⭐ **而 9 个源里有 6 个都显式命名了「看起来正常、其实是坏」**：
+cumora「skipped 长得像 pass」· magpie「不按今天配置回填」· x_gift_bot「付款不明别重扣」
+· agent-cookie-sync「导出文件就是你的钥匙」· Compositor「先按 Figma 导出核对」
+· blueprint-animation「After 才是 source of truth」
+
+⇒ **判断**：我们这一整轮做的事（4 个门 + 2 条反向锁 + 5 次陈旧断言更正 +
+1 次真实算法缺陷修复）**方向正确**；
+**缺的不是纪律，是把纪律从「文档」变成「机器可判」的最后一公里。**
+
+## ⛔ 本篇明确未做
+- 未取任何代码（12 源全为只读设计）。
+- 未写「文档优先级」门（理由见 #8）。
+- 未提 #10 的会话凭据方案（我方前提未查证）。
+- #12 **未抓取**（内容为数千条链接的目录，且第①问已判不通过）
+  ⇒ 许可字段**留空**，不填未经核实的值。
