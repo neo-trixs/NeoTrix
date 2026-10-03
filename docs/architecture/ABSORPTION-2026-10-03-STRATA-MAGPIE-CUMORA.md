@@ -129,8 +129,41 @@ Strata「首启会卡 1–3 分钟是正常的」）。
 `skipped` 类测试必须可区分。
 ⇒ **判断：我们的「证伪优先」纪律方向正确，但产物应从「文档」升级为「机器可判」。**
 
-## 五、⛔ 本轮**未**做的事（明确列出）
+## 五、✅ §1.5 验收项已实测：**不适用**（我上一条说它「可执行」，错了）
+
+我上一条把「验证我们改写 agent 配置时是否保留注释/顺序」称作**唯一可执行验收项**。
+**实测结论：它不适用** —— 因为**我们根本不写那些文件**。
+
+### 实测证据
+① `cmd_provider_add`（`neobot.rs:1461`）写的是 **neobot 自己的 store**
+   （`open_store` → `store.upsert_provider`），⛔ 不碰 agent 配置。
+② `cmd_provider_preset`（`:1644`）只是查 `PRESETS` 表后转调 `cmd_provider_add`。
+③ 全仓搜 `.claude/settings` / `opencode.json` / `.codex/config` / `.gemini/settings`
+   ⇒ **零命中**，无任何 Rust 代码写 agent 配置文件。
+
+⇒ **我们的姿态比 magpie 更干净**：magpie 必须外科式改**30+ 个 agent 的配置**
+（因此才需要操心注释/顺序/原子写）；我们让agent 保持自己的默认配置，
+只管自己的 store ⇒ **不存在弄坏用户配置的风险面**。
+
+### ⭐ 但反向的缺口是真的（这才是 magpie 值得学的地方）
+我们**已有** magpie 的两条关键性质：
+· **凭据不自持**：`PRESETS` 只存环境变量**名**（`key_env`），
+  且 `Provider::looks_like_secret` 会对明文形态告警。
+· **协议兼容优先**：`gemini` preset 直接指向 Google 的
+  `generativelanguage.googleapis.com/v1beta/openai` ⇒
+  **已经在用「让厂商说别人的协议」而非各自 SDK**（magpie 的核心思路）。
+
+我们**缺**的是**网关本身**：
+⛔ `neobot channel serve` 是常驻长轮询渠道，**不是** OpenAI 兼容网关。
+⇒ 所以 `PRESETS` 只是**neobot 自己消费的目录**，不是 agent 能指向的端点。
+⇒ magpie 的「加一个 provider ⇒ 它出现在每个 agent 的选择器里」**我们拿不到**。
+
+###裁决
+- §1.5（配置外科式改写）：⛔ **不适用**，无需实现。
+- 「多协议网关」：⛔ **这是新功能，不是清理** ⇒ 属计划项，
+  不该在清理会话里顺手做。参照 `LOCAL-LLAMA-2026-09-28.md` 与
+  `EMERGENCE-ROADMAP` 的路线写法单独立项。
+
+## 六、⛔ 本轮**未**做的事
 - 未取任何代码；三源均只读设计。
-- 未验证我们 `neobot provider` 改写 agent 配置时**是否保留注释/顺序**（§1.5）——
-  这是 §1.5 对我们的**唯一可执行验收项**，尚未测。
 - 未评估 cumora 的 seen-cursor 闸门能否移植进 `multi_agent`（需先读我方协调器现状）。
