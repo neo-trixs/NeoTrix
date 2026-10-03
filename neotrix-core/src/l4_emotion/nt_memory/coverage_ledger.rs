@@ -197,39 +197,44 @@ impl CoverageLedger {
             return self.hash_chain.len() == 1 && self.hash_chain[0] == "genesis";
         }
 
-        for i in 1..self.entries.len() {
-            let current = &self.entries[i];
-            let previous = &self.entries[i - 1];
-            // ⚠️ 2026-10-02 修正（**核心缺陷**，`verify_integrity` 恒为 false）：
-            // 写入侧 `record_operation` 的链式公式是
-            //     chain_input = previous_chain_hash + entry.content_hash
-            //     其中 previous_chain_hash = **self.hash_chain.last()**
-            // 验证侧却按
-            //     previous_entry.content_hash + current.content_hash
-            // 重算 ⇒ 两边**用的是不同的东西**，永远不相等
-            // ⇒ `verify_integrity()` 恒返回 false，
-            //    **即使数据未被篡改** ⇒ 该模块赖以存在的「篡改必被发现」
-            //    实际是「永远报错」，等于没有校验。
-            //
-            // 修法：验证侧改用**链哈希**（与写入侧同一口径）。
-            // ⛔ 未改写入侧 —— 写入侧的链式定义（串行哈希链）是合理的，
-            //    且已被 `LedgerEntry.previous_hash` 字段记录。
+        // ⚠️ 2026-10-02 修正（**核心缺陷**：`verify_integrity()` 恒为 false
+        // ⇒「篡改必被发现」实际是「永远报错」，等于没有校验）。
+        //
+        // 原实现有两处错，用探针实测出的真实数据说清：
+        //
+        // 实测（`record_operation` x3）：
+        //     初始 hash_chain = ["genesis"]
+        //     第0条后: chain = ["genesis", h0]            len=1
+        //     第1条后: chain = ["genesis", h0, h1]         len=2
+        //     第2条后: chain = ["genesis", h0, h1, h2]     len=3
+        // 写入侧公式：`chain_input = hash_chain.last() + entry.content_hash`
+        //
+        // 错处 1 —— **差一位**：`hash_chain[0]` 是字面量 `"genesis"` 占位，
+        //   所以 entry `i` 的哈希落在 `hash_chain[i + 1]`，
+        //   而原代码比的是 `self.hash_chain[i]` ⇒ 拿 h_{i-1} 去比 entry i。
+        // 错处 2 —— **起点跳过 entry 0**：`for i in 1..entries.len()`
+        //   ⇒ 第一条 entry 从未被校验。
+        // 错处 3 —— **哈希源不同**：原用 `previous_entry.content_hash`，
+        //   而写入侧用的是**链哈希** ⇒ 两边永远不相等。
+        //
+        // 修法：`for i in 0..entries.len()`，用 `hash_chain[i]`（前驱链哈希）
+        // 与 `hash_chain[i + 1]`（本条链哈希）成对校验，覆盖**全部** entry。
+        if self.hash_chain.len() != self.entries.len() + 1 {
+            return false;
+        }
+        for (i, current) in self.entries.iter().enumerate() {
             let expected_chain_input =
-                format!("{}{}", self.hash_chain[i - 1], current.content_hash);
-            let expected_hash = sha256_hex(&expected_chain_input);
-
-            if self.hash_chain[i] != expected_hash {
+                format!("{}{}", self.hash_chain[i], current.content_hash);
+            if self.hash_chain[i + 1] != sha256_hex(&expected_chain_input) {
                 return false;
             }
-
-            // ⚠️ 同上：`LedgerEntry::new(.., previous_hash, ..)` 传入的
-            // 也是**链哈希**（`hash_chain.last()`），不是上一条 entry 的
-            // content_hash ⇒ 原比较同样恒不相等。
-            if current.previous_hash != self.hash_chain[i - 1] {
+            // `LedgerEntry::new(.., previous_hash, ..)` 传入的是当时的
+            // `hash_chain.last()`，即 `hash_chain[i]`（链哈希），
+            // 不是上一条 entry 的 content_hash。
+            if current.previous_hash != self.hash_chain[i] {
                 return false;
             }
         }
-
         true
     }
 
@@ -246,25 +251,29 @@ impl CoverageLedger {
 
         let mut proof_path = Vec::new();
         let mut idx = index;
+        // ⚠️ 2026-10-02 修正（**死循环**）：
+        // 原实现用 `merkle_tree.get(current_layer.len() / 2)` 去取**上一层**，
+        // 即**拿「当前层长度」当「层号」**。3 叶树的实际轨迹：
+        //     merkle_tree = [[l0,l1,l2], [p0,p1], [root]]
+        //     iter1: current_layer=[l0,l1,l2] len=3 ⇒ 取 get(3/2=1)=[p0,p1] ✓（碰巧对）
+        //     iter2: current_layer=[p0,p1]    len=2 ⇒ 取 get(2/2=1)=[p0,p1] ⛔ **同一层**
+        //     ⇒ len 恒为 2 ⇒ `while current_layer.len() > 1` **永不退出**
+        // ⇒ 表现为 `test_merkle_proof_verification` 挂死（cargo 报
+        //   「has been running for over 60 seconds」）。
+        //
+        // 修法：**显式跟踪层号** `level`，它严格递增且以
+        // `merkle_tree.len()` 为界 ⇒ 必然终止。
+        let mut level = 0usize;
         let mut current_layer = self.merkle_tree.first().cloned().unwrap_or_default();
 
-        while current_layer.len() > 1 {
-            let sibling_idx = if idx % 2 == 0 {
-                idx + 1
-            } else {
-                idx - 1
-            };
-
+        while level + 1 < self.merkle_tree.len() && current_layer.len() > 1 {
+            let sibling_idx = if idx % 2 == 0 { idx + 1 } else { idx - 1 };
             if sibling_idx < current_layer.len() {
                 proof_path.push(current_layer[sibling_idx].clone());
             }
-
             idx /= 2;
-            if idx < current_layer.len() / 2 {
-                current_layer = self.merkle_tree.get(current_layer.len() / 2).cloned().unwrap_or_default();
-            } else {
-                break;
-            }
+            level += 1;
+            current_layer = self.merkle_tree[level].clone();
         }
 
         let verified = self.verify_proof_internal(index, &proof_path);

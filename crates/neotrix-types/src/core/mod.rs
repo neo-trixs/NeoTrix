@@ -135,3 +135,5 @@ pub use nt_core_gwt::unified_consciousness::{
     LegacyConsciousnessPhase, CrystalConsciousnessState, EvolutionPhase,
     Layer,
 };
+
+pub mod nt_crypto_util;
