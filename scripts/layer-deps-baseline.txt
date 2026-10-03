@@ -4,10 +4,8 @@ l5_cognition	neotrix-core/src/l0_substrate/ffi/consciousness_tree.rs
 l5_cognition	neotrix-core/src/l0_substrate/ffi/seal_pipeline.rs
 l5_cognition	neotrix-core/src/l0_substrate/nt_core_event_bus.rs
 l5_cognition	neotrix-core/src/l1_action/nt_core_task_dispatcher/nt_dispatcher_core.rs
-l5_cognition	neotrix-core/src/l1_action/nt_dialogue_tui.rs
 l5_cognition	neotrix-core/src/l1_action/nt_file_ability/tests.rs
 l5_cognition	neotrix-core/src/l1_action/nt_io/nt_io_neocodex/agent/nt_agent_session.rs
-l5_cognition	neotrix-core/src/l1_action/nt_stdin_human.rs
 l5_cognition	neotrix-core/src/l1_action/nt_tui_app.rs
 l5_cognition	neotrix-core/src/l3_embodiment/nt_shield/shield_core/guard.rs
 l5_cognition	neotrix-core/src/l3_embodiment/nt_shield/shield_core/safety_kernel.rs

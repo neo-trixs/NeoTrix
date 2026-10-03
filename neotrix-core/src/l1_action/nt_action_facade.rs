@@ -33,6 +33,21 @@ use crate::l1_action::traits::LlmRouter;
 // ⛔ 刻意**只转出这 5 个符号**，不整包 re-export `nt_crystal_core`：
 // 整包转出等于给 L1 开了一扇通往后端的门，跨域错位只是换了个门牌号。
 pub use crate::l5_cognition::nt_crystal_core::{NtLlmAsk, NtLlmReply, NtTaskFusionError};
+// ⭐⭐ **人机通道簇**（2026-10-03 第 2 批）。同样是 `nt_crystal_core` 的跨层引用，
+// 但**单独成簇**，因为它与上面的「LLM 问答契约」是**两种不同性质的能力**：
+// · 上面 3 个 = 「怎么问模型」⇒ L1 作为**调用方**
+// · 下面 4 个 = 「怎么问人」⇒ L1 作为**通道提供方**（`nt_stdin_human` /
+//   `nt_dialogue_tui` 正是 L1 的人类交互界面）
+// ⇒ 混在一处会让「L1 何时依赖认知层」这个问题失去可读性。
+//
+// ⛔ **刻意不在此转出引擎簇**（`CrystalCore` / `NtCrystalTaskLoop` /
+// `NtTaskLoopConfig` / `NtTaskLoopReport` / `NtProgressSink`，`nt_tui_app.rs` +
+// `nt_dispatcher_core.rs` 需要）。理由：转出它们等于宣告「**L1 驱动认知引擎**」，
+// 这是一个**架构立场**，不是机械去重，须单独裁决（是否该把 `nt_crystal_core`
+// 重新分层？），⛔ 不在本批顺手决定。
+pub use crate::l5_cognition::nt_crystal_core::{
+    NtDemand, NtDemandKind, NtHumanChannel, NtHumanReply,
+};
 
 // ════════════════════════════════════════════════════════════════
 // Public types
