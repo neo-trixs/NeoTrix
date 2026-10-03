@@ -40,7 +40,26 @@ impl ResonanceMatrix {
     }
 
     /// Compute effective salience for each module given raw salience vector.
-    /// effective[i] = raw[i] + Σ(resonance[i][j] × raw[j] × 0.1)
+    /// effective[i] = raw[i] + mean_j(resonance[i][j] × raw[j] × 0.1)
+    ///
+    /// ⛔ 2026-10-03 **修正一个真实算法缺陷**（非测试期望错）。
+    ///
+    /// 【原式】`raw[i] + Σ(resonance[i][j] × raw[j] × 0.1)`，最后 `.min(1.0)`
+    /// 【问题】Σ 对**全部 (N-1)=13 个邻居**求和，而阻尼系数 `0.1` 是**固定**的
+    ///   ⇒ 增益随邻居**数量**线性放大，**与各邻居的实际关联强度无关**。
+    /// 【实测证据（MODULE_COUNT=14，探针实测）】
+    ///   raw 全 0.3 基底 + raw[3]=0.5 / raw[6]=0.52
+    ///     ⇒ 14/14 个模块 eff **全部撞上 1.0 上限**，「不同取值数 = 1」
+    ///     ⇒ argmax 在 14 个同值中取最后一个 ⇒ **winner 恒为 13**，
+    ///        **与谁 raw 更高完全无关**（把 3/6 互换，winner 仍是 13）。
+    ///   raw 全 0.9 ⇒ 同样 14/14 饱和、winner 仍 13。
+    ///   仅当基底为 0（只有一个模块显著）时才正常：i=0 显著⇒winner 0 ✓。
+    /// 【危害】「winner-take-most 竞争」在**任何非零统一基底**下**完全失去区分能力**，
+    ///   等价于恒定选择最后一个模块 ⇒ 共振裁决沦为常量。
+    /// 【修法】把求和换成**按邻居数取均值**（`/(N-1)`），使增益表达
+    ///   「平均邻居关联强度 × 0.1」，恢复模块间的真实差异。
+    ///   ⭐ 交叉验证：修正后原测试的 `winner == 6` **恰好成立**
+    ///   ⇒ 说明**按邻居归一才是原设计的意图**，旧式只是漏了这一项。
     pub fn effective_salience(&self, raw: &[f64; MODULE_COUNT]) -> [f64; MODULE_COUNT] {
         let mut eff = *raw;
         for (i, item) in eff.iter_mut().enumerate().take(MODULE_COUNT) {
@@ -50,7 +69,9 @@ impl ResonanceMatrix {
                 let boost = self.strengths[i][j] as f64 * r * 0.1;
                 resonance_boost += boost;
             }
-            *item = (*item + resonance_boost).min(1.0);
+            // ⛔ 2026-10-03：除以邻居数，见上方文档的缺陷分析。
+            let mean_boost = resonance_boost / (MODULE_COUNT - 1) as f64;
+            *item = (*item + mean_boost).min(1.0);
         }
         eff
     }
