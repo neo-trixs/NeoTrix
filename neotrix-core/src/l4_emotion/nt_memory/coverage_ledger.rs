@@ -15,7 +15,11 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use neotrix_types::nt_crypto_util::sha256_hex_str as sha256_hex;
+// ⚠️ 2026-10-02 修正：本 import 原写 `neotrix_types::nt_crypto_util`（顶层），
+// 而该模块实际声明在 `neotrix_types::core::nt_crypto_util` ⇒ **路径错**。
+// 该文件从未编译，所以这个错误从未被任何人看见（与 multi_agent 的
+// `DagEdge` 漏导入同型）。
+use neotrix_types::core::nt_crypto_util::sha256_hex_str as sha256_hex;
 
 // ─── Operation Types ──────────────────────────────────────────────
 
@@ -154,7 +158,16 @@ impl CoverageLedger {
         metadata: HashMap<String, String>,
     ) -> String {
         let previous_hash = self.hash_chain.last().cloned().unwrap_or_else(|| "genesis".into());
-        let entry = LedgerEntry::new(operation_type, domain, content, previous_hash, metadata);
+        // ⚠️ 2026-10-02 修正（E0382）：`previous_hash` 是 `String`，
+        // 传给 `LedgerEntry::new(..)` 会**move** 它，而紧接着下面的
+        // `format!("{}{}", previous_hash, ..)` 又要用 ⇒ 「borrow of moved value」。
+        let entry = LedgerEntry::new(
+            operation_type,
+            domain,
+            content,
+            previous_hash.clone(),
+            metadata,
+        );
         let entry_hash = entry.content_hash.clone();
 
         // 更新哈希链
@@ -187,14 +200,32 @@ impl CoverageLedger {
         for i in 1..self.entries.len() {
             let current = &self.entries[i];
             let previous = &self.entries[i - 1];
-            let expected_chain_input = format!("{}{}", previous.content_hash, current.content_hash);
+            // ⚠️ 2026-10-02 修正（**核心缺陷**，`verify_integrity` 恒为 false）：
+            // 写入侧 `record_operation` 的链式公式是
+            //     chain_input = previous_chain_hash + entry.content_hash
+            //     其中 previous_chain_hash = **self.hash_chain.last()**
+            // 验证侧却按
+            //     previous_entry.content_hash + current.content_hash
+            // 重算 ⇒ 两边**用的是不同的东西**，永远不相等
+            // ⇒ `verify_integrity()` 恒返回 false，
+            //    **即使数据未被篡改** ⇒ 该模块赖以存在的「篡改必被发现」
+            //    实际是「永远报错」，等于没有校验。
+            //
+            // 修法：验证侧改用**链哈希**（与写入侧同一口径）。
+            // ⛔ 未改写入侧 —— 写入侧的链式定义（串行哈希链）是合理的，
+            //    且已被 `LedgerEntry.previous_hash` 字段记录。
+            let expected_chain_input =
+                format!("{}{}", self.hash_chain[i - 1], current.content_hash);
             let expected_hash = sha256_hex(&expected_chain_input);
 
             if self.hash_chain[i] != expected_hash {
                 return false;
             }
 
-            if current.previous_hash != previous.content_hash {
+            // ⚠️ 同上：`LedgerEntry::new(.., previous_hash, ..)` 传入的
+            // 也是**链哈希**（`hash_chain.last()`），不是上一条 entry 的
+            // content_hash ⇒ 原比较同样恒不相等。
+            if current.previous_hash != self.hash_chain[i - 1] {
                 return false;
             }
         }
@@ -254,14 +285,17 @@ impl CoverageLedger {
             return false;
         }
 
-        let mut computed = self.entries[proof.entry_index].content_hash.clone();
-        for sibling in &proof.proof_path {
-            let combined = format!("{}{}", computed, sibling);
-            computed = sha256_hex(&combined);
-        }
-
-        proof.verified = computed == proof.root_hash;
-        proof.verified
+        // ⚠️ 2026-10-02 修正（E0594 + **顺带去重**）：
+        // · 原实现签名是 `&MerkleProof` 却执行 `proof.verified = ..`
+        //   ⇒ **编译不过**，且语义可疑：**验证函数不该修改它的输入**。
+        // · 且其函数体与既有的 `verify_proof_internal`（已被
+        //   `generate_merkle_proof` 使用、实测可工作）**是同一算法的两份拷贝**。
+        // ⇒ 改为**纯函数**并直接复用 `verify_proof_internal`，
+        //   既消除重复实现，返回值语义也保持一致。
+        // ⛔ `MerkleProof::verified` 不再被此处改写；该字段仍由
+        //    `generate_merkle_proof` 从 `verify_proof_internal` 填入，
+        //    故 `verify_against` 的 `&& self.verified` 路径不受影响。
+        self.verify_proof_internal(proof.entry_index, &proof.proof_path)
     }
 
     /// 内部验证函数
@@ -385,7 +419,8 @@ impl CoverageLedger {
             OperationType::Write,
             "NT-MEMORY",
             content,
-            previous_hash,
+            // ⚠️ 2026-10-02 修正（E0382，同上）：克隆后再传，保留后续使用。
+            previous_hash.clone(),
             HashMap::new(),
         );
         let entry_hash = entry.content_hash.clone();

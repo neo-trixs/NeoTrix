@@ -98,3 +98,68 @@ graph_orch::scheduler::tests::schedule_diamond
 （空 DAG 幽灵节点）—— 这本身就是「不编译 ⇒ 无法提供证据」的直接证明。
 ⇒ 但也**证实了它的代价**：11 个缺陷需逐条裁决。
 ⇒ 下一步应是**逐条分诊这 11 条**，而不是整包接线或整包归档。
+---
+
+# 追加：`coverage_ledger` + `nt_crypto_util` 实测（2026-10-02）
+
+## 结论：**暂不接线**。修掉 4 处编译错 + 1 处真实核心缺陷，但仍有未解失败。
+
+## ⛔ 我在这一轮开头又犯了一次「grep 命中即证据」
+看到 `coverage_ledger.rs:18` 有
+`use neotrix_types::nt_crypto_util::sha256_hex_str` ⇒ 我断言「`nt_crypto_util` 是活的」。
+**错了**：
+1. 该 import 路径写的是**顶层** `nt_crypto_util`，而模块实际在 `core::nt_crypto_util` ⇒ **从未解析成功**；
+2. 更关键：**`coverage_ledger.rs` 自己也在孤儿名单里** ⇒ 那条 import 从未参与编译。
+⇒ 二者是一对**从未编译的子系统**。这与本 session 反复出现的
+「grep 命中 ≠ 证据」是同一类错误，我刚批评完就又犯了一次。
+
+## 概念是否冗余？**不是** —— 三者记录的不是同一件事
+| 模块 | 记录什么 | 规模 / 状态 |
+|---|---|---|
+| `coverage_ledger` | **操作类型覆盖**（Read/Write/Absorb/SkillLoad…） | 521 行 / ⛔ 从未编译 |
+| `nt_memory_commitment` | **内容承诺**（chunk 完整性、Merkle） | 1,010 行 / ✅ 活 |
+| `nt_field_ledger` | **字段共识**（consensus frames + sha256 链） | 610 行 / ✅ 活 |
+
+ⓘ 我一度想判「完全冗余」（因 `nt_memory_commitment` 有**同形**的
+`CommitmentProof{leaf_index, sibling_hashes, leaf_hash, root_hash}` +
+`verify_proof` + `merkle_root_from_leaves`）⇒ **那是 MIRROR-BANK 式过度断言**，
+与当初把 `multi_agent` 说成「被取代」是同一种错。**三者概念不同。**
+⚠️ 但 `coverage_ledger` **自己又实现了一遍** Merkle + sha256 链
+⇒ **crypto 原语重复**（真实冗余），概念不重复。
+
+## 已修（保留并提交，即使暂不接线）
+1. **import 路径错**：`neotrix_types::nt_crypto_util` → `core::nt_crypto_util`。
+   该错误从未被看见，正与 `multi_agent` 的 `DagEdge` 漏导入同型。
+2. **E0382 ×2**：`previous_hash` 是 `String`，传给 `LedgerEntry::new(..)` 被 **move**，
+   紧接着 `format!("{}{}", previous_hash, ..)` 又要用 ⇒ 克隆后再传。
+3. **E0594 + 去重**：公开 `verify_proof(&self, proof: &MerkleProof)` 却执行
+   `proof.verified = ..` ⇒ 编译不过，**且语义可疑（验证函数不该改输入）**；
+   其函数体与既有 `verify_proof_internal`（已被生成器使用、实测可工作）
+   **是同一算法的两份拷贝** ⇒ 改为**纯函数**并复用 `verify_proof_internal`。
+4. **核心缺陷**：`verify_integrity()` 恒为 false ⇒ **篡改检测完全失效**。
+   写入侧链式公式是 `previous_chain_hash + entry.content_hash`
+   （`previous_chain_hash = self.hash_chain.last()`），
+   验证侧却按 `previous_entry.content_hash + current.content_hash` 重算
+   ⇒ **两边用的是不同的东西**，永不相等。
+   同类第二处：`current.previous_hash != previous.content_hash`
+   实际也该比 `self.hash_chain[i-1]`。
+   ⚠️ 修正后 `test_hash_chain_tamper_detection` **仍失败** ⇒ 链口径还有未追到的差异，
+   **本轮未完成**（已超预算）。**不把「修了一处」说成「修好了」。**
+
+## 未解失败（接线后实测）
+| 测试 | 症状 |
+|---|---|
+| `test_hash_chain_tamper_detection` | `verify_integrity()` 仍 false（链口径未完全对齐） |
+| `test_merkle_proof_verification` | **SIGKILL / 无输出**（疑似 OOM 或死循环，未定位；`rebuild_merkle_tree` 的 `step_by(2)` 逐层减半，看起来会收敛） |
+
+## 为何暂不接线
+上述两条未解 ⇒ 保持接线会让 `--lib` 变红。
+⛔ 不擅自让仓库变红（与 `multi_agent` 那一轮同样的判断），
+基线保持 **12,677 passed / 0 failed**。
+
+## 下一步（可查起点已定位）
+1. 打印 `record_operation` 写入的 `hash_chain[i]` 与 `verify_integrity`
+   重算的 `expected_hash`，逐项比对定位剩余口径差异。
+2. 单独跑 `generate_merkle_proof` + `verify_proof` 并加 `timeout`，
+   确认 SIGKILL 是 OOM 还是死循环（`rebuild_merkle_tree` 与
+   `generate_merkle_proof` 的层构造是两处，值得分别验证）。
