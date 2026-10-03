@@ -787,7 +787,7 @@ impl CapabilityTreeRegistry {
             // 选未访问最小距离节点
             let cur = dist.iter()
                 .filter(|(k, _)| !visited.contains(k))
-                .min_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+                .min_by(|a, b| a.1.total_cmp(b.1))
                 .map(|(k, _)| *k);
             let Some(cur) = cur else { break };
             if cur == to_idx { break; }
@@ -833,7 +833,7 @@ impl CapabilityTreeRegistry {
             // 对每个 provider 计算"最优依赖链" (Dijkstra 加权),
             // 而非 BFS 最短跳数 — 成熟度 + evidence + gates 全部参与选优。
             .filter_map(|n| self.optimal_path_to_primitive(&n.id))
-            .min_by(|a, b| a.cost.partial_cmp(&b.cost).unwrap_or(std::cmp::Ordering::Equal))
+            .min_by(|a, b| a.cost.total_cmp(&b.cost))
     }
 
     /// 最优依赖链 (Dijkstra 加权): 从目标节点到最近 primitive 的
@@ -850,7 +850,7 @@ impl CapabilityTreeRegistry {
         loop {
             let cur = dist.iter()
                 .filter(|(k, _)| !visited.contains(k))
-                .min_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+                .min_by(|a, b| a.1.total_cmp(b.1))
                 .map(|(k, _)| *k);
             let Some(cur) = cur else { break };
             visited.insert(cur);
