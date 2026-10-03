@@ -973,9 +973,11 @@ pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
         reg.nodes.contains_key(id)
     }
 
-    /// ⭐ 注册后回查。
-    /// ⛔ 2026-10-03 起 registrar 返回 `Result<CapabilityNode, RegistryError>`，
-    ///    调用点已用 `?` 传播错误，故此处拿到的 `node` 必已注册成功。
+    /// ⭐ 注册后回查 —— **常开校验**。
+    /// ⛔ 2026-10-02 起此处是 `debug_assert!`，**release 构建会被编译掉**
+    ///    ⇒ 「注册了但没生效」在生产环境无人发现。
+    /// ⛔ 2026-10-03 改为调用点 `?` 传播：既**常开**，又**不 panic**（返回 `Err`）。
+    ///    （不用 `assert!`：那会把校验失败变成新的 panic 源。）
     fn must_be_registered(
         reg: &CapabilityTreeRegistry,
         node: &CapabilityNode,
@@ -997,33 +999,33 @@ pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
         if !already(reg, ID_PRODUCT_SPEC) {
             let n =
                 crate::l4_emotion::nt_memory::nt_trade_product_spec::register_product_spec_capability(reg).map_err(|e| e.to_string())?;
-            debug_assert!(must_be_registered(reg, &n, "① trade_product_spec").is_ok());
+            must_be_registered(reg, &n, "① trade_product_spec")?;
             newly += 1;
         }
 
         // ② requires=[trade_product_spec]
         if !already(reg, ID_QUOTE) {
             let n = register_quote_negotiation_capability(reg).map_err(|e| e.to_string())?;
-            debug_assert!(must_be_registered(reg, &n, "② trade_quote_negotiation").is_ok());
+            must_be_registered(reg, &n, "② trade_quote_negotiation")?;
             newly += 1;
         }
 
         // ③ requires=[trade_product_spec, trade_quote_negotiation]（两支可并列）
         if !already(reg, ID_LOGISTICS) {
             let n = register_production_logistics_capability(reg).map_err(|e| e.to_string())?;
-            debug_assert!(must_be_registered(reg, &n, "③ trade_production_logistics").is_ok());
+            must_be_registered(reg, &n, "③ trade_production_logistics")?;
             newly += 1;
         }
         if !already(reg, ID_FINANCE) {
             let n = register_finance_compliance_capability(reg).map_err(|e| e.to_string())?;
-            debug_assert!(must_be_registered(reg, &n, "③ trade_finance_compliance").is_ok());
+            must_be_registered(reg, &n, "③ trade_finance_compliance")?;
             newly += 1;
         }
 
         // ④ requires=[quote_negotiation, production_logistics, finance_compliance]
         if !already(reg, ID_FULL_CYCLE) {
             let n = register_trade_full_cycle_capability(reg).map_err(|e| e.to_string())?;
-            debug_assert!(must_be_registered(reg, &n, "④ foreign_trade_full_cycle").is_ok());
+            must_be_registered(reg, &n, "④ foreign_trade_full_cycle")?;
             newly += 1;
         }
 
