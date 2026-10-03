@@ -89,7 +89,10 @@ impl MultiAgentCoordinator {
     /// Uses capability overlap scoring with load-aware tiebreaking.
     pub fn assign_task(&mut self, task: TaskDescription) -> Option<Assignment> {
         let agents = self.agents.clone();
-        let assignments = TaskRouter::route(&[task], &agents);
+        // ⚠️ 2026-10-02：传入 `LoadBalancer` 的**真实负载**作为路由起点，
+        // 否则跨批次分配永远看不到 a1 已累积的负载 ⇒ 全部落到先注册者身上。
+        let initial = self.current_loads();
+        let assignments = TaskRouter::route_with_initial_load(&[task], &agents, &initial);
 
         if let Some(mut assignment) = assignments.into_iter().next() {
             // Adjust duration based on load
@@ -107,7 +110,9 @@ impl MultiAgentCoordinator {
     /// Assign multiple tasks, returning all successful assignments
     pub fn assign_tasks(&mut self, tasks: Vec<TaskDescription>) -> Vec<Assignment> {
         let agents = self.agents.clone();
-        let mut assignments = TaskRouter::route(&tasks, &agents);
+        // ⚠️ 同上：把真实负载传给路由器（批内均衡之外的**跨批次**均衡）。
+        let initial = self.current_loads();
+        let mut assignments = TaskRouter::route_with_initial_load(&tasks, &agents, &initial);
 
         for assignment in &mut assignments {
             let load = self.load_balancer.get_load(&assignment.agent_id);
@@ -128,6 +133,22 @@ impl MultiAgentCoordinator {
     /// Get load for a specific agent (0.0–1.0)
     pub fn get_agent_load(&self, agent_id: &str) -> f64 {
         self.load_balancer.get_load(agent_id)
+    }
+
+    /// 各 agent 的当前活跃任务数（供 `TaskRouter` 作为路由起点）。
+    ///
+    /// `get_load` 返回的是**归一化 f64**（`active/10`，上限 1.0），
+    /// 而 `TaskRouter` 需要的是**任务计数**以做整数比较
+    /// ⇒ 这里由 `LoadBalancer` 提供计数口径，避免两处各自换算而失真。
+    fn current_loads(&self) -> Vec<(String, u32)> {
+        self.load_balancer
+            .get_all_loads()
+            .into_iter()
+            .map(|(id, _)| {
+                let n = self.load_balancer.active_task_count(&id);
+                (id, n)
+            })
+            .collect()
     }
 
     /// Rebalance: return agent IDs sorted by load (lowest first)
@@ -251,6 +272,50 @@ mod tests {
     /// ⇒ **产品行为正确**（平局偏向先注册者是合理且稳定的策略）。
     ///
     /// 修法：给 a1 一个**只有它有**的能力，使测试不再依赖平局结果。
+    /// 回归测试：**跨批次**负载均衡（原为纯缺陷）。
+    ///
+    /// 缺陷：`TaskRouter::route` 是纯函数，`agent_loads` 恒从 0 起算
+    /// ⇒ 看不到 `LoadBalancer` 的真实负载 ⇒ 每次分配都落到先注册者。
+    /// 修复前实测（2 个同能力 agent、连续 4 次 `assign_task`）：
+    ///     批次0..3 全部分给 a1，a2 负载恒为 0.00
+    ///
+    /// ⚠️ 两版踩坑记录（都是**测试设计**问题，不是实现问题）：
+    /// ① 首版在循环**结束后**看负载 —— 但每轮都 `complete_task`
+    ///    会把负载减回 0 ⇒ 报 `a1=0 a2=0`。
+    /// ② 二版仍在每轮 `complete_task` ⇒ 下一轮开始时两者负载都是 0
+    ///    ⇒ 平局归先注册者 ⇒ 报 `a1=4 a2=0`，**恰好复现了修复前的症状**。
+    ///    ⓘ 即「把要测的变量消掉了」：负载归零后就不存在跨批次不均衡。
+    ///
+    /// ⇒ 正确做法：**让负载累积**（不 `complete_task`），再断言分配次数。
+    #[test]
+    fn load_balances_across_batches() {
+        let mut c = MultiAgentCoordinator::new();
+        c.register_agent("a1", vec!["code".into()]);
+        c.register_agent("a2", vec!["code".into()]);
+
+        let mut got_a1 = 0u32;
+        let mut got_a2 = 0u32;
+        for i in 0..4 {
+            let a = c
+                .assign_task(TaskDescription::new(format!("t{i}"), vec!["code".into()]))
+                .expect("两个 agent 都能接 code");
+            match a.agent_id.as_str() {
+                "a1" => got_a1 += 1,
+                "a2" => got_a2 += 1,
+                other => panic!("分配给了未注册的 agent: {other}"),
+            }
+            // ⛔ **刻意不** `complete_task` —— 让活跃任务数累积，
+            //    下一轮的路由才能看到「上一轮给了谁」，跨批次均衡才有意义。
+        }
+
+        assert_eq!(
+            (got_a1, got_a2),
+            (2, 2),
+            "4 轮应精确交替（a1=2, a2=2）；实得 a1={got_a1} a2={got_a2}。\
+             修复前 a2 恒为 0 ⇒ 跨批次负载均衡完全失效"
+        );
+    }
+
     #[test]
     fn complete_task_updates_load() {
         let mut coord = make_coordinator();

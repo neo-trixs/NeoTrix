@@ -112,7 +112,32 @@ impl TaskRouter {
     /// Tasks are dequeued in priority order (Critical first). Each task is
     /// assigned to the best-matching agent based on capability overlap score.
     /// Returns `Assignment` for each successfully routed task.
+    /// 路由任务到 agent。
+    ///
+    /// ⚠️ 2026-10-02：本函数是**纯函数** —— 它只能看到本批内部的分配计数，
+    /// **看不到 `LoadBalancer` 里跨批次的真实负载**（`agent_loads` 全初始为 0）。
+    /// 实测（探针，2 个同能力 agent，连续 4 次 `assign_task`）：
+    ///     批次0: a1 | a1=0.10 a2=0.00
+    ///     批次1: a1 | a1=0.20 a2=0.00
+    ///     批次2: a1 | a1=0.30 a2=0.00
+    ///     批次3: a1 | a1=0.40 a2=0.00
+    /// ⇒ **a2 全程空闲** ⇒ 跨批次负载均衡完全失效。
+    ///
+    /// ⛔ 因此**本函数保持原签名**（9 个调用点，含 7 处测试，牵一发动全身），
+    ///    改为新增 [`Self::route_with_initial_load`] 供需要真实负载的调用方使用。
     pub fn route(tasks: &[TaskDescription], agents: &[AgentEntry]) -> Vec<Assignment> {
+        Self::route_with_initial_load(tasks, agents, &[])
+    }
+
+    /// 与 [`Self::route`] 相同，但以 `initial_loads` 作为各 agent 的**起始负载计数**。
+    ///
+    /// `initial_loads` 只需包含关心的 agent（`(agent_id, load)`），
+    /// 未列出的按 0 处理。用途：让路由能看到 `LoadBalancer` 的真实跨批次负载。
+    pub fn route_with_initial_load(
+        tasks: &[TaskDescription],
+        agents: &[AgentEntry],
+        initial_loads: &[(String, u32)],
+    ) -> Vec<Assignment> {
         if tasks.is_empty() || agents.is_empty() {
             return Vec::new();
         }
@@ -127,8 +152,18 @@ impl TaskRouter {
             .collect();
 
         let mut assignments = Vec::new();
-        let mut agent_loads: Vec<(String, u32)> =
-            agents.iter().map(|a| (a.agent_id.clone(), 0u32)).collect();
+        // ⚠️ 2026-10-02：以调用方提供的真实负载为起点（原先恒为全 0）。
+        let mut agent_loads: Vec<(String, u32)> = agents
+            .iter()
+            .map(|a| {
+                let start = initial_loads
+                    .iter()
+                    .find(|(id, _)| *id == a.agent_id)
+                    .map(|(_, l)| *l)
+                    .unwrap_or(0);
+                (a.agent_id.clone(), start)
+            })
+            .collect();
 
         while let Some(PrioritizedTask { task, .. }) = heap.pop() {
             if let Some(best_agent) = Self::find_best_agent(&task, agents, &agent_loads) {

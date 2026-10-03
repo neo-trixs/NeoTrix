@@ -81,6 +81,20 @@ impl AgentLoadBalancer {
             .collect()
     }
 
+    /// 该 agent 当前的**活跃任务数**（未归一化的原始计数）。
+    ///
+    /// 2026-10-02 新增：`get_load` 返回归一化 f64（`active/10`，上限 1.0），
+    /// 而 `TaskRouter::route_with_initial_load` 需要**整数计数**做比较。
+    /// ⇒ 单独暴露原始计数，避免调用方从归一化值反推（会丢分辨率：
+    ///    12 个任务与 10 个任务的归一化值都是 1.0）。
+    pub fn active_task_count(&self, agent_id: &str) -> u32 {
+        self.stats
+            .iter()
+            .find(|s| s.agent_id == agent_id)
+            .map(|s| s.active_tasks as u32)
+            .unwrap_or(0)
+    }
+
     /// Increment active task count for an agent
     pub fn task_started(&mut self, agent_id: &str) {
         if let Some(s) = self.stats.iter_mut().find(|s| s.agent_id == agent_id) {
