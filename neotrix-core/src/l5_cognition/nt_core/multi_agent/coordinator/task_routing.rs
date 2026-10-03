@@ -195,11 +195,24 @@ impl TaskRouter {
         let mut best: Option<(&AgentEntry, f64, u32)> = None;
 
         for agent in agents {
-            let overlap =
-                Self::capability_overlap(&task.required_capabilities, &agent.capabilities);
-            if overlap <= 0.0 {
+            // ⚠️ 2026-10-02 修正（**真实缺陷**，探针实测坐实）：
+            // 原门槛是 `overlap > 0`（**沾边即合格**）⇒ 只要命中**任意一项**
+            // 就算 eligible。实测（agent 分别只有 rust / sql，任务需 rust+sql+ml）：
+            //     需要[rust,sql,ml] -> Some("only_rust")
+            //     需要[rust,sql,ml] -> Some("only_sql")
+            // ⇒ **任务被派给根本做不了的 agent**，且无任何信号（静默降级）。
+            // 而字段自述是「Capabilities **required** to execute this task」
+            // ⇒ required 即**必须全覆盖**。
+            //
+            // 修法：eligibility 改为**全覆盖**，overlap 退化为**排序**用。
+            // ⛔ 保留 `capability_overlap` 本身与其 8 处测试
+            //    （`capability_overlap_partial` 等明确断言部分覆盖返回 0.5
+            //      ⇒ 那是对**函数**的正确断言，不是对**门槛**的背书）。
+            if !Self::covers_all(&task.required_capabilities, &agent.capabilities) {
                 continue;
             }
+            let overlap =
+                Self::capability_overlap(&task.required_capabilities, &agent.capabilities);
 
             let load = agent_loads
                 .iter()
@@ -219,6 +232,25 @@ impl TaskRouter {
         }
 
         best.map(|(agent, _, _)| agent)
+    }
+
+    /// 该 agent 是否**全覆盖**任务所需能力。
+    ///
+    /// 2026-10-02 新增：`TaskDescription::required_capabilities` 的字段自述是
+    /// 「Capabilities **required** to execute this task」⇒ 缺任何一项都不该被派单。
+    /// 与 `capability_overlap` 的区别：后者是**比例**（用于排序），
+    /// 本函数是**资格**（用于筛除）。二者刻意分开，避免「0.5 也算命中」的门槛错误。
+    ///
+    /// 约定：
+    /// · `required` 为空 ⇒ 任何 agent 都合格（无能力要求）。
+    /// · `agent_caps` 为空而 `required` 非空 ⇒ 不合格。
+    pub fn covers_all(required: &[String], agent_caps: &[String]) -> bool {
+        if required.is_empty() {
+            return true;
+        }
+        required
+            .iter()
+            .all(|req| agent_caps.iter().any(|ac| ac == req.as_str()))
     }
 
     /// Compute overlap score between required capabilities and agent capabilities.
@@ -302,6 +334,25 @@ mod tests {
         let req = vec!["code".into()];
         let caps = vec!["review".into()];
         assert!((TaskRouter::capability_overlap(&req, &caps)).abs() < 0.01);
+    }
+
+    /// `covers_all`（资格）与 `capability_overlap`（排序）刻意分离的回归测试。
+    #[test]
+    fn covers_all_requires_every_capability() {
+        let req = vec!["rust".to_string(), "sql".to_string()];
+        // 全覆盖 ⇒ 合格
+        assert!(TaskRouter::covers_all(
+            &req,
+            &["rust".to_string(), "sql".to_string(), "ml".to_string()]
+        ));
+        // 只覆盖一半 ⇒ **不合格**（但 overlap 仍是 0.5，说明它只是排序分）
+        assert!(!TaskRouter::covers_all(&req, &["rust".to_string()]));
+        assert!((TaskRouter::capability_overlap(&req, &["rust".to_string()]) - 0.5).abs() < 0.01);
+        // 无能力要求 ⇒ 任何 agent 都合格
+        assert!(TaskRouter::covers_all(&[], &[]));
+        assert!(TaskRouter::covers_all(&[], &["rust".to_string()]));
+        // agent 无能力而任务有要求 ⇒ 不合格
+        assert!(!TaskRouter::covers_all(&req, &[]));
     }
 
     #[test]

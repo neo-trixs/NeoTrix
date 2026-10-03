@@ -287,6 +287,35 @@ mod tests {
     ///    ⓘ 即「把要测的变量消掉了」：负载归零后就不存在跨批次不均衡。
     ///
     /// ⇒ 正确做法：**让负载累积**（不 `complete_task`），再断言分配次数。
+    /// 回归测试：**资格门槛**必须是「全覆盖」，而非「沾边」。
+    ///
+    /// 缺陷：`find_best_agent` 原门槛是 `capability_overlap > 0`
+    /// ⇒ 命中任意一项即 eligible。探针实测（agent 只有 rust / sql，
+    /// 任务需 rust+sql+ml）：两次都被派出去了 ⇒ **任务落到做不了的 agent 手里**，
+    /// 且**无任何信号**。
+    #[test]
+    fn task_is_not_assigned_to_incapable_agent() {
+        let mut c = MultiAgentCoordinator::new();
+        c.register_agent("only_rust", vec!["rust".into()]);
+        c.register_agent("only_sql", vec!["sql".into()]);
+
+        let need_three = TaskDescription::new("t", vec!["rust".into(), "sql".into(), "ml".into()]);
+        assert!(
+            c.assign_task(need_three).is_none(),
+            "无任何 agent 能全覆盖 [rust,sql,ml] ⇒ 应返回 None，\
+             而修复前会派给 only_rust / only_sql 之一"
+        );
+
+        // 对照：补上 ml 后必须可派单（证明不是「一律不派」）
+        c.register_agent("full", vec!["rust".into(), "sql".into(), "ml".into()]);
+        let ok = c.assign_task(TaskDescription::new("t2", vec!["rust".into(), "sql".into(), "ml".into()]));
+        assert_eq!(
+            ok.map(|a| a.agent_id),
+            Some("full".to_string()),
+            "有全覆盖 agent 时必须能派单"
+        );
+    }
+
     #[test]
     fn load_balances_across_batches() {
         let mut c = MultiAgentCoordinator::new();
