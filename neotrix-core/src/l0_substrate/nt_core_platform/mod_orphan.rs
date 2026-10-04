@@ -125,6 +125,79 @@ pub struct OrphanFile {
     pub mod_rs: String,
 }
 
+/// 递归扫描整棵源码树，返回**全部**孤儿，按行数降序。
+///
+/// # 与 `orphans_in_dir` 的关系
+///
+/// `orphans_in_dir` 是单目录原语（纯、无 IO 副作用、易测）；
+/// 本函数是它的**生产接线**（R-P79：导出 ≠ 接入）。
+/// 遍历策略：对每个含 `mod.rs` 的目录调用一次 `orphans_in_dir`。
+///
+/// # ⭐ 口径（务必读，否则会与 `nt_core_self::self_audit` 对不上账）
+///
+/// 本函数**保守**：只认「同目录 `mod.rs` 的直接声明」+ `#[path]`。
+/// 因此它**不会**报出 god-file 形态的孤儿（非 `mod.rs` 文件内部的
+/// `mod types;`，Rust 把它解析到 `dir/<该文件 stem>/types.rs`）。
+///
+/// 实测口径对照（2026-10-04，同一棵树）：
+/// - 本函数：**35** 个
+/// - `self_audit::scan_orphan_files`（宽松，含 god-file）：**99** 个
+///
+/// ⇒ **35 ⊂ 99**，本函数是保守子集。两者都能抓到已知的真孤儿
+/// （`seal/source_adapter.rs`）。看到两个数字不必惊慌。
+///
+/// # 边界
+///
+/// - 跳过 `target/`、`_archived/`、`/bin/`（与既有门保持一致）。
+/// - 无 `mod.rs` 的目录**不**单独扫描：Rust 子模块必须由某处声明，
+///   而本函数的判据是「本目录 mod.rs」⇒ 跳过比误报更安全。
+/// - I/O 失败（目录不可读等）静默跳过该目录，不 panic。
+pub fn scan_tree(root: &Path) -> Vec<OrphanFile> {
+    let mut out = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+
+    while let Some(dir) = stack.pop() {
+        // ⛔ 判孤儿必须在**当前 dir 自己**做，不能只在它的子目录里做。
+        //    早先版本把 `mod.rs` 检查写在遍历子目录的内层循环里
+        //    ⇒ **root 自身永远不被扫描**（实测：`root/loose.rs` 漏报，
+        //    而 `sub/loose2.rs` 报出来了 —— 一个「只漏顶层」的缺陷，
+        //    最坏情况是顶层恰恰是最容易出事的 `src/`）。
+        let mod_rs = dir.join("mod.rs");
+        if mod_rs.is_file() {
+            let content = std::fs::read_to_string(&mod_rs).unwrap_or_default();
+            let rel = mod_rs
+                .strip_prefix(root)
+                .unwrap_or(&mod_rs)
+                .to_string_lossy()
+                .to_string();
+            let mut found = orphans_in_dir(&dir, Some(&content), &[]);
+            for o in &mut found {
+                o.mod_rs = rel.clone();
+            }
+            out.append(&mut found);
+        }
+
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if !p.is_dir() {
+                continue;
+            }
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name == "target" || name == "_archived" || name == "bin" {
+                continue;
+            }
+            stack.push(p);
+        }
+    }
+
+    out.sort_by(|a, b| b.lines.cmp(&a.lines).then_with(|| a.stem.cmp(&b.stem)));
+    out
+}
+
 /// 列出某目录下所有**未被声明**的 `.rs` 文件。
 ///
 /// ⚠️ **前提**：传入的 `mod_rs` 必须是**当前目录真实的 `mod.rs`**。
@@ -321,5 +394,109 @@ mod plain;
         let orphans = orphans_in_dir(&d, Some("pub mod child;"), &[]);
         assert!(orphans.is_empty(), "子目录不是文件: {:?}", orphans);
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    // ── scan_tree（递归生产接线）──────────────────────────────────
+
+    /// 造一棵两层的树：
+    /// ```text
+    /// root/mod.rs            (pub mod a; pub mod b;)
+    /// root/a.rs              已声明
+    /// root/loose.rs          ⬅ 孤儿（root/mod.rs 未声明）
+    /// root/sub/mod.rs        (pub mod c;)
+    /// root/sub/c.rs          已声明
+    /// root/sub/loose2.rs     ⬅ 孤儿（sub/mod.rs 未声明）
+    /// root/target/x.rs       应被跳过（target/）
+    /// ```
+    fn build_tree(name: &str) -> PathBuf {
+        let root = tmpdir(name);
+        let sub = root.join("sub");
+        let target = root.join("target");
+        std::fs::create_dir_all(&sub).expect("mkdir sub");
+        std::fs::create_dir_all(&target).expect("mkdir target");
+        std::fs::write(root.join("mod.rs"), "pub mod a;\npub mod b;").expect("w");
+        std::fs::write(root.join("a.rs"), "pub fn a() {}").expect("w");
+        std::fs::write(root.join("loose.rs"), "// orphan\n// x\n").expect("w");
+        std::fs::write(sub.join("mod.rs"), "pub mod c;").expect("w");
+        std::fs::write(sub.join("c.rs"), "pub fn c() {}").expect("w");
+        std::fs::write(sub.join("loose2.rs"), "// orphan\n").expect("w");
+        std::fs::write(target.join("x.rs"), "junk").expect("w");
+        std::fs::write(target.join("mod.rs"), "pub mod x;").expect("w");
+        root
+    }
+
+    #[test]
+    fn scan_tree_finds_orphans_at_every_level() {
+        let root = build_tree("tree_all");
+        let found = scan_tree(&root);
+        let stems: Vec<&str> = found.iter().map(|o| o.stem.as_str()).collect();
+        assert!(stems.contains(&"loose"), "应抓到 root/loose.rs: {:?}", stems);
+        assert!(
+            stems.contains(&"loose2"),
+            "应抓到 sub/loose2.rs（递归下潜）: {:?}",
+            stems
+        );
+        assert!(!stems.contains(&"a"), "已声明的 a 不该报: {:?}", stems);
+        assert!(!stems.contains(&"c"), "已声明的 c 不该报: {:?}", stems);
+        assert!(!stems.contains(&"x"), "target/ 应被跳过: {:?}", stems);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn scan_tree_records_owning_mod_rs() {
+        let root = build_tree("tree_owner");
+        let found = scan_tree(&root);
+        let loose2 = found.iter().find(|o| o.stem == "loose2").expect("loose2");
+        assert_eq!(
+            loose2.mod_rs, "sub/mod.rs",
+            "应记录**该文件自己**目录的 mod.rs，而不是根的"
+        );
+        let loose = found.iter().find(|o| o.stem == "loose").expect("loose");
+        assert_eq!(loose.mod_rs, "mod.rs");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn scan_tree_sorted_by_lines_desc() {
+        let root = tmpdir("tree_sort");
+        let sub = root.join("s");
+        std::fs::create_dir_all(&sub).expect("mkdir");
+        std::fs::write(root.join("mod.rs"), "").expect("w");
+        std::fs::write(root.join("small.rs"), "x\n").expect("w");
+        std::fs::write(sub.join("mod.rs"), "").expect("w");
+        // 5 行 ⇒ 行数应更大，排在前
+        std::fs::write(sub.join("big.rs"), "a\nb\nc\nd\ne\n").expect("w");
+        let found = scan_tree(&root);
+        assert_eq!(found.len(), 2, "两个孤儿: {:?}", found);
+        assert_eq!(found[0].stem, "big", "应按行数降序: {:?}", found);
+        assert!(found[0].lines >= found[1].lines);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn scan_tree_on_nonexistent_root_is_empty_not_panic() {
+        assert!(scan_tree(Path::new("/nonexistent/scan_tree/xyz")).is_empty());
+    }
+
+    /// ⭐ 生产接线自证：在**真实仓库**上跑，必须抓到已知的真孤儿。
+    ///
+    /// 若此测试抓不到 `seal/source_adapter.rs`，说明 `scan_tree` 与
+    /// `orphans_in_dir` 的接线断了（而不是「仓库很干净」）。
+    #[test]
+    fn scan_tree_catches_known_orphan_in_real_repo() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let found = scan_tree(&root);
+        assert!(
+            !found.is_empty(),
+            "真实源码树应至少有已知孤儿（seal/source_adapter.rs 等）"
+        );
+        let has_seal = found
+            .iter()
+            .any(|o| o.mod_rs.contains("seal") || o.stem == "source_adapter");
+        assert!(
+            has_seal,
+            "应抓到 seal 下的孤儿（已知真孤儿）: {:?}",
+            found.iter().map(|o| (&o.stem, &o.mod_rs)).collect::<Vec<_>>()
+        );
     }
 }

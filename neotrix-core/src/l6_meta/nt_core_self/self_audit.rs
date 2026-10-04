@@ -210,6 +210,59 @@ fn collect_declared_paths(src: &Path) -> HashSet<PathBuf> {
     declared
 }
 
+/// 用 L0 `mod_orphan::scan_tree` 递归扫描 mod-tree 孤儿。
+///
+/// # 为什么与本文件的 `scan_orphan_files` 并存
+///
+/// 两个口径都保留，因为它们**互相不覆盖**：
+///
+/// | 函数 | 口径 | 实测全仓 |
+/// |---|---|---|
+/// | `scan_orphan_files`（本文件） | 全仓任意 `mod xxx;`，**含 god-file 形态** | 99 |
+/// | `mod_orphan::scan_tree`（L0） | 只认同目录 `mod.rs` 直接声明 + `#[path]` | 35 |
+///
+/// ⇒ 35 ⊂ 99。宽松口径能抓到 god-file 孤儿（`dir/<stem>/types.rs`），
+/// 保守口径不会误报「由父模块以 Rust 2018 路径语义引入」的文件。
+///
+/// ⭐ **本函数是 L0 原语的生产接线**（R-P79：导出 ≠ 接入）。
+/// 在此之前 `mod_orphan` 只被自己的单测调用过一次全仓扫描，
+/// 从未进入任何生产路径 —— 那正是它自己文档里批评的「导出即接入」缺陷。
+///
+/// 代价：会读整棵源码树的文件系统 ⇒ 只在审计/自检路径调用，
+/// **不要**放进高频或热路径。
+pub fn scan_mod_tree_orphans(src_root: &Path) -> Vec<AuditFinding> {
+    let mut findings = Vec::new();
+    for o in crate::l0_substrate::nt_core_platform::mod_orphan::scan_tree(src_root) {
+        // ⛔ 拼路径时**不要**用 `trim_end_matches("mod.rs")` ——
+        //    它是**子串**匹配，会把不以 "mod.rs" 结尾的路径也切掉。
+        //    实测：`l1_action/nt_act/mod.rs` 正常，但一旦某目录的 mod.rs
+        //    路径恰好不含该子串（或目录名本身以 mod.rs 开头）就会被截断。
+        // ⇒ 用 `strip_suffix("mod.rs")`，语义精确。
+        let dir = o
+            .mod_rs
+            .strip_suffix("mod.rs")
+            .unwrap_or(o.mod_rs.as_str())
+            .trim_end_matches('/');
+        let path = if dir.is_empty() {
+            o.stem.clone()
+        } else {
+            format!("{}/{}", dir, o.stem)
+        };
+        findings.push(AuditFinding {
+            category: "orphan-mod-tree",
+            severity: AuditSeverity::Warning,
+            file: path.trim_start_matches('/').to_string(),
+            line: None,
+            message: format!(
+                "{} ({} 行) 不在任何 mod.rs 的声明里 ⇒ 从未参与编译；\
+                 改它 git diff 照常显示，但 cargo 不会编译它",
+                o.stem, o.lines
+            ),
+        });
+    }
+    findings
+}
+
 pub fn verify_persistence(file_path: &str, expected_pattern: &str) -> bool {
     match fs::read_to_string(file_path) {
         Ok(content) => content.lines().any(|l| l.contains(expected_pattern)),
@@ -467,12 +520,22 @@ where
 pub fn converge_check<P: AsRef<Path>>(root: P) -> AuditReport {
     let ghost = scan_ghost_modules(root.as_ref());
     let ghost_count = ghost.len();
+    // ⭐ 两套孤儿口径**都**跑，findings 里用 category 区分：
+    //    - "orphan-file"      : 宽松口径（含 god-file 形态），历史行为
+    //    - "orphan-mod-tree"  : L0 mod_orphan::scan_tree（保守口径）★新增
+    //
+    // 为什么都要：宽松口径会漏「由父模块以 Rust 2018 路径语义引入」的文件
+    // （那会造成误报），保守口径覆盖不到 god-file 形态（那会造成漏报）。
+    // ⛔ 但 `stale_count` 只数宽松口径，避免**同一个文件被计两次**
+    //    （`scan_tree` 结果是宽松口径的真子集，重叠部分会翻倍）。
     let stale = scan_orphan_files(root.as_ref());
     let stale_count = stale.len();
+    let mod_tree = scan_mod_tree_orphans(root.as_ref());
     let health = scan_system_health(root.as_ref());
     let mut all = Vec::new();
     all.extend(ghost);
     all.extend(stale);
+    all.extend(mod_tree);
     all.extend(health);
     AuditReport {
         findings: all,
@@ -905,7 +968,28 @@ mod tests {
             .collect();
 
         // 已接管的两个文件不得再出现（回归防护：它们曾 1125 行整体未编译）
-        for joined in ["seal/source_adapter.rs", "seal/domain_mapper.rs"] {
+        //
+        // ✅ 这类断言方向是安全的：**要求文件「不再」是孤儿**。
+        //    ⛔ 与之相反的方向（「要求它继续是孤儿」）会变成反向谎言 ——
+        //    代码修好后测试反而红。踩坑记录：我曾断言「findings 里应有
+        //    seal/source_adapter.rs」，而它已在 72078c8e 接入编译树 ⇒ 该断言
+        //    在断言一个**已失效的事实**。已改为断言一个仍然存在的孤儿。
+        //
+        // ⚠️ 路径写错了两次，第二次靠「必须真实存在」这条防护抓住：
+        //    第一版写成 `seal/source_adapter.rs`（漏了 `nt_mind/`），
+        //    而真实路径是 `nt_mind/seal/source_adapter.rs`
+        //    ⇒ `!orphans.contains(...)` 因路径不匹配而**恒真 = 假绿**。
+        //    ⇒ 「否定式断言」必须配一条「该路径确实存在」的同向断言。
+        const JOINED: [&str; 2] = [
+            "l5_cognition/nt_mind/seal/source_adapter.rs",
+            "l5_cognition/nt_mind/seal/domain_mapper.rs",
+        ];
+        for joined in JOINED {
+            assert!(
+                src.join(joined).is_file(),
+                "已接入的文件必须真实存在，否则下面的「不再是孤儿」是假绿: {}",
+                joined
+            );
             assert!(
                 !orphans.iter().any(|o| o.ends_with(joined)),
                 "已接入的文件又被报为孤儿: {}",
@@ -1077,5 +1161,108 @@ mod tests {
         for f in &health_findings {
             assert!(!f.message.is_empty());
         }
+    }
+
+    /// ⭐ 生产接线验证：`converge_check` 必须真的把 L0 `mod_orphan`
+    /// 的结果带进 findings（category = "orphan-mod-tree"）。
+    ///
+    /// 动机：本函数是 R-P79 的接线点 —— 在此之前 `mod_orphan::scan_tree`
+    /// 只被单测调用，从未进入生产路径。若接线被误删，此测试立刻变红。
+    ///
+    /// ⚠️⚠️ 这里**只**验证 `scan_mod_tree_orphans` 那一段，
+    /// **不**调用 `converge_check`（它会连带跑 `scan_system_health` →
+    /// `scan_build_status`，在测试环境里触发真实 cargo 检查而挂起 60s+）。
+    /// 本仓已有先例：紧邻的 `test_converge_check_includes_health_signals`
+    /// 就是因此被 `#[ignore]` 的（「自死锁隔离」注释）。
+    /// ⛔ 若这里改回调 `converge_check`，会引入一个新的 60s+ 挂起测试 ——
+    ///    「接线验证」必须用**最窄的**那条路径来验。
+    #[test]
+    fn mod_tree_orphans_are_wired_into_audit_findings() {
+        let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let findings = scan_mod_tree_orphans(&src);
+
+        let mod_tree: Vec<&AuditFinding> = findings
+            .iter()
+            .filter(|f| f.category == "orphan-mod-tree")
+            .collect();
+        assert!(
+            mod_tree.len() == findings.len(),
+            "scan_mod_tree_orphans 的所有 finding 都应是 orphan-mod-tree 类别"
+        );
+        assert!(
+            !mod_tree.is_empty(),
+            "未产出 orphan-mod-tree findings ⇒ mod_orphan 的生产接线断了\
+             （R-P79：导出 ≠ 接入）"
+        );
+        // ⭐ 用「当前仍在编译树里的文件」当回归样本，而不是我记忆中的孤儿。
+        //
+        // 我原先断言「应包含 seal/source_adapter.rs」—— 但那个文件
+        // 已于 2026-10-03 **正式接入编译树**（提交 72078c8e），
+        // 它**不再是孤儿** ⇒ 断言它的存在是在断言一个**已失效的事实**。
+        //
+        // ⇒ 改为：从清单里取一个**确实存在**的孤儿文件（下面用
+        //   nt_act_scheduler，它是 748 行的独立能力，已取证），
+        //   并断言它**没有被误报成已声明**（即确实在 mod_tree 里）。
+        //
+        // ⚠️ 这类「拿历史事实当断言」的测试会随代码演进变成**反向谎言**：
+        //    代码修好了，测试却要求它继续坏。本仓已因此踩坑一次
+        //    （test_no_orphans_in_core 查了不存在的目录，空跑 100% 绿）。
+        let known = mod_tree
+            .iter()
+            .find(|f| f.file.ends_with("nt_act_scheduler"))
+            .unwrap_or_else(|| {
+                panic!(
+                    "应包含已取证的孤儿 nt_act_scheduler；实际前 8 条: {:?}",
+                    mod_tree
+                        .iter()
+                        .take(8)
+                        .map(|f| &f.file)
+                        .collect::<Vec<_>>()
+                )
+            });
+        assert!(
+            known.message.contains("从未参与编译"),
+            "message 应说明「改它 cargo 不会编译」: {}",
+            known.message
+        );
+        }
+
+    /// 口径关系：保守（mod_orphan）必须是宽松（scan_orphan_files）的子集。
+    /// 两者都在同一棵真实源码树上跑，可直接比对数量。
+    #[test]
+    fn conservative_mod_tree_count_is_subset_of_lenient_scan() {
+        let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let strict = scan_mod_tree_orphans(&src).len();
+        let lenient = scan_orphan_files(&src)
+            .iter()
+            .filter(|f| f.category == "orphan-file")
+            .count();
+        assert!(
+            strict > 0 && lenient > 0,
+            "两套口径都应产出发现: strict={} lenient={}",
+            strict,
+            lenient
+        );
+        assert!(
+            strict <= lenient,
+            "保守口径({}) 应 ≤ 宽松口径({})；若反了说明口径文档已过期",
+            strict,
+            lenient
+        );
+        eprintln!(
+            "[orphan-audit] 保守 mod_orphan={} ⊂ 宽松 scan_orphan_files={}",
+            strict, lenient
+        );
+    }
+
+    /// `scan_mod_tree_orphans` 不该在非源码目录上编造发现。
+    #[test]
+    fn scan_mod_tree_orphans_is_silent_on_empty_tree() {
+        let d = std::env::temp_dir().join(format!("nt_modtree_empty_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).expect("mkdir");
+        let findings = scan_mod_tree_orphans(&d);
+        assert!(findings.is_empty(), "空目录不该有发现: {:?}", findings);
+        let _ = std::fs::remove_dir_all(&d);
     }
 }

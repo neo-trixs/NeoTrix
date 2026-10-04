@@ -182,13 +182,32 @@ impl BackgroundLoopHandle {
         } else {
             log::info!("[bg] arch_audit: clean — all schemas match");
         }
-        let report = converge_check(".");
+        // ⚠️ cwd 不是 crate 根时，相对路径 "." 扫不到源码树 ⇒ findings 为空
+        //    ⇒ 审计静默「干净」。实测本仓跑 bin 时 cwd 可能不是 neotrix-core。
+        // ⇒ 优先用 CARGO_MANIFEST_DIR 编译期常量定位 neotrix-core/src。
+        let src_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let scan_root: &std::path::Path = if src_root.is_dir() { &src_root } else { std::path::Path::new(".") };
+        let report = converge_check(scan_root);
         if !report.findings.is_empty() {
+            // 按 category 分别计数：两套孤儿口径都在里面，混报会看不出是哪套报的
+            let mod_tree = report
+                .findings
+                .iter()
+                .filter(|f| f.category == "orphan-mod-tree")
+                .count();
             log::warn!(
-                "[bg] converge_check: {} ghosts, {} orphans, {} stale",
+                "[bg] converge_check: {} ghosts, {} stale(宽松口径), {} mod-tree孤儿(保守口径), scan_root={}",
                 report.ghost_count,
                 report.stale_count,
-                report.orphan_count
+                mod_tree,
+                scan_root.display()
+            );
+        } else {
+            log::warn!(
+                "[bg] converge_check: 0 findings —— scan_root={} 存在={}，\
+                 若非源码根则为静默空转（不是「干净」）",
+                scan_root.display(),
+                scan_root.is_dir()
             );
         }
         // GAP-2 (T3): converge_check 发现统一汇入 MetaAuditor — 使审计器成为真实消费端,

@@ -132,8 +132,19 @@ impl SealPipeline {
         }
     }
 
+    /// 运行收敛自检（幽灵模块 / 两套孤儿口径 / 失效检测）。
+    ///
+    /// ⚠️ `src_dir` 传相对路径时依赖调用方 cwd。cwd 不是 crate 根
+    /// ⇒ 扫不到源码树 ⇒ findings 空 ⇒ 「看起来干净」实为静默空转。
+    /// ⇒ 空字符串 / 非法路径时**回退到编译期已知的 crate 源根**。
     pub fn converge_check(&self, src_dir: &str) -> AuditReport {
-        converge_check(src_dir)
+        let p = std::path::Path::new(src_dir);
+        let root = if src_dir.is_empty() || !p.is_dir() {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src")
+        } else {
+            p.to_path_buf()
+        };
+        converge_check(&root)
     }
 
     /// 使用 CUDA Agent RL 选择优化策略
