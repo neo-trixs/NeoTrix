@@ -211,6 +211,17 @@ jobs:
       #   ⭐⭐ 防止「glob 静默匹配为空 ⇒ 契约作废」。
       - name: neobot layout-scale gate (bar family + cross-language contract)
         run: node scripts/ops/neobot-check-layout-scale.mjs
+      # ⭐⭐⭐ 2026-10-04：⭐⭐ **自持 UI 接线门首次进 CI**。
+      # ⭐⭐ 实测取证：`rg 'nt_neobot_ui_wiring' .github/workflows/` ⇒ **零命中**
+      # ⭐⭐ ⇒ ⭐⭐⭐ **这个门写好了却从未在 CI 跑过**（⭐⭐ 与 `check-license-js.sh`
+      # ⭐⭐ 同病，⭐⭐ 上一轮刚修过一个 ⇒ ⭐⭐ **本仓这是复发型缺陷**）。
+      # ⭐⭐⭐ 本门 4b 项在本轮由 ℹ️ 升级为**阻断**（前提已成立：pet.tsx 已收敛），
+      # ⭐⭐⭐ 拦的是**本项目复发 4 次**的那一类：**能力存在却没接线**。
+      # ⭐⭐ 变异测试已做：注入一个双引号写法的直连 ⇒ rc=1；还原 ⇒ rc=0。
+      # ⭐⭐ ⛔ 门内含「防空转自检」（扫不到源文件 ⇒ 判红），
+      # ⭐⭐ ⛔ 抄 better-sidebar 的教训：glob 静默匹配为空 ⇒ 契约作废。
+      - name: neobot self-hosted UI wiring gate (IPC single-exit + i18n + dist purity)
+        run: python3 scripts/ops/nt_neobot_ui_wiring.py
       - name: Build frontend (tsc --noEmit + vite build)
         run: pnpm run build
         working-directory: apps/neobot-desktop/neobot-ui

@@ -286,12 +286,31 @@ if js:
 else:
     print('ℹ️  4 产物纯净门：dist/ 不存在（未构建）—— 跳过')
 
-# ── 4b IPC 单一出口检查（**报告式**：不因他窗文件而判失败）─────────────
+# ── 4b IPC 单一出口检查（2026-10-04 起**阻断**）────────────────────────
 # 吸收 bytedance/UI-TARS-desktop 的 Event Stream Viewer / 工具调用耗时统计：
 # 活动面板依赖「所有 invoke 都经 src/ipc.ts」。直连者**不进入面板**
 # ⇒ 命令失败时用户看不到是哪条命令、多耗时。
-# ⛔ 刻意**不判失败**：唯一已知直连方 `src/pet/pet.tsx` 属另一窗口，
-#    把它做成红灯只会被忽略（本仓门纪律：恒红的门 = 没有门）。
+#
+# ⭐⭐⭐ **为什么从「报告式」升级为「阻断」**（⭐⭐ 这是本轮的核心裁定）：
+# ⭐⭐ 改前是 ℹ️ 级，理由是「唯一已知直连方 `src/pet/pet.tsx` 属另一窗口，
+# ⭐⭐ 把它做成红灯只会被忽略」（本仓门纪律：恒红的门 = 没有门）。
+# ⭐⭐⭐ 而那条**前提已消失**：`pet.tsx` 的 7 处调用已收敛到 `invokeCmd`
+# ⭐⭐ （`45886504`）⇒ ⭐⭐ **当前 DIRECT 为空** ⇒ ⭐⭐ 升级为阻断**不会恒红**。
+# ⭐⭐⭐ 升级的真正价值：⭐⭐ **本项目反复栽在同一处** ——
+# ⭐⭐ 「能力存在但没接线」已实证 **4 次**（UI 5 个孤儿刻度、
+# ⭐⭐ Rust 侧 `normalize_convo_arg` 存在却两处不用、本项 `pet.tsx`、
+# ⭐⭐ 以及 `ring_*` 四棵子树**整棵没接进 `mod.rs`**）。
+# ⭐⭐⭐ ⇒ ⭐⭐ **这类缺陷只能靠「门阻断」根治**，⭐⭐ 靠人记必然复发。
+#
+# ⭐⭐⭐ **豁免机制**（⭐⭐ 保留「恒红的门 = 没有门」这条纪律）：
+# ⭐⭐ 直接调用**必须**登记进 `ALLOW_DIRECT` 并写清理由；
+# ⭐⭐ ⛔ **裸字符串列表会让这道门退化成「什么都往里塞」**
+# ⭐⭐ （对标 better-sidebar 的 `tests/theme.spec.ts`：⭐⭐ 它的门只扫 `color:`，
+# ⭐⭐ ⭐ 于是尺寸漂了它不会红 —— ⭐⭐ 「有豁免」与「无约束」必须可区分）。
+ALLOW_DIRECT = {
+    # ⭐ 示例（当前**故意为空**，⛔ 不要为省事预登记）：
+    # 'src/foo.ts': '理由：Tauri 插件 API 不经 ipc.ts 的 invokeCmd（须写明为何不可）',
+}
 DIRECT = []
 for root, dirs, files in os.walk(os.path.join(UI, 'src')):
     dirs[:] = [x for x in dirs if x not in ('node_modules', 'dist', 'vendor')]
@@ -307,11 +326,47 @@ for root, dirs, files in os.walk(os.path.join(UI, 'src')):
         #   实际有 2 个。**判据要覆盖写法变体，不能假设引号统一。**
         if re.search(r"""from\s+['"]@tauri-apps/api/core['"]""", read(p_)):
             DIRECT.append(rel)
-if DIRECT:
-    print(f"ℹ️  4b IPC 单一出口：{len(DIRECT)} 个文件仍直连 @tauri-apps/api/core"
-          f" ⇒ 其调用不进活动面板（不判失败，属他窗文件）：{', '.join(DIRECT)}")
+# ⭐⭐⭐ **豁免要生效，必须先「用掉」它** —— ⭐⭐ 未登记的豁免等于没有豁免。
+ALLOW_UNUSED = sorted(set(ALLOW_DIRECT) - set(DIRECT))
+if ALLOW_UNUSED:
+    fail.append('4b 豁免已失效（登记了却不再命中）⇒ ⭐⭐ 死豁免会让门失去约束力'
+                f'，请删除：{", ".join(ALLOW_UNUSED)}')
+
+BLOCKING = [d for d in DIRECT if d not in ALLOW_DIRECT]
+if BLOCKING:
+    fail.append(f'4b IPC 单一出口：{len(BLOCKING)} 个文件直连 @tauri-apps/api/core'
+                f' ⇒ ⭐⭐ 这些调用**不进活动面板** ⇒ 命令失败时用户看不到'
+                f'（⭐⭐ 且 `.catch(() => {{}})` 会让失败彻底无声）'
+                f'：{", ".join(BLOCKING)}'
+                + (f'；已登记豁免：{sorted(set(DIRECT) & set(ALLOW_DIRECT))}'
+                   if set(DIRECT) & set(ALLOW_DIRECT) else
+                   '（⭐⭐ 如确需豁免，⭐⭐ **必须写明理由**登记进 ALLOW_DIRECT）'))
+elif DIRECT:
+    print(f'✅ 4b IPC 单一出口：无未豁免直连（{len(DIRECT)} 个已登记豁免：'
+          + ', '.join(sorted(DIRECT)) + '）')
 else:
     print('✅ 4b IPC 单一出口：全部经 src/ipc.ts（活动面板完整）')
+
+# ⭐⭐⭐ **防空转自检**（⭐⭐ 抄 better-sidebar 的教训）：
+# ⭐⭐ 「a glob that silently matches nothing would make this contract vacuous」
+# ⭐⭐ ⇒ 若扫描器一个文件都没扫到（路径写错 / 目录改名），
+# ⭐⭐ ⭐⭐ **这道门会「因为没发现问题」而假通过** ⇒ 判红。
+def _count_sources():
+    """⭐⭐ 与主扫描**同一套遍历逻辑**（⭐⭐ 我第一版自己写了个不一致的，
+    ⭐⭐ 结果只数到 3 ⇒ ⭐⭐ **自检自己先坏了** ⇒ ⭐⭐ 差点把门改成永远红）。"""
+    n = 0
+    for root, dirs, files in os.walk(os.path.join(UI, 'src')):
+        dirs[:] = [x for x in dirs if x not in ('node_modules', 'dist', 'vendor')]
+        n += sum(1 for fn in files if fn.endswith(('.ts', '.tsx')))
+    return n
+
+
+_scanned = _count_sources()
+if _scanned < 10:
+    fail.append(f'4b 防空转自检：只扫到 {_scanned} 个源文件（预期 ≥10）'
+                f' ⇒ ⭐⭐ 扫描路径可能已失效 ⇒ ⭐⭐ **本门会假通过**')
+else:
+    print(f'✅ 4b 防空转自检：扫描到 {_scanned} 个源文件（判据有效）')
 
 # ── 4c 工具类是否**真的编译进产物**（Tailwind 缺失守卫）───────────────
 # ⛔ 这条门来自一次**严重自伤**：neobot-root.tsx 逐字复制自 vendored 树，
