@@ -11,7 +11,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::{ExperienceRef, NexusCore};
+// ⚠️ `NexusCore` 曾在此 import 但**从未被使用** —— 文件里只有两处提到它，
+//    且都在**文档注释**中（"same pattern as NexusCore" /
+//    "cross-referencing with NexusCore"）⇒ 编译器判定为 unused import。
+// ⇒ 接入时删掉它。`ExperienceRef` 保留（下面真用到）。
+use super::ExperienceRef;
 use crate::l5_cognition::l1_facade::KnowledgeBase;
 
 // ─── Domain Types ───
