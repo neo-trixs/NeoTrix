@@ -248,8 +248,20 @@ export function Shell({ children }: { children?: React.ReactNode }) {
     }
   }, [])
 
+  // ⭐⭐⭐ 平台标记：macOS 的**交通灯**（红黄绿）占标题栏左侧，
+  // 而 `tauri.conf.json` 用的是 `titleBarStyle: "Overlay"` + `hiddenTitle: true`
+  // ⇒ ⭐⭐ **webview 内容会延伸到交通灯之下** ⇒ 不让位就会**视觉重叠**。
+  //
+  // ⭐⭐ 判定口径**刻意与本文件既有的 `useMacosMenu` 完全一致**
+  //（`navigator.userAgent.includes('Macintosh')`）——
+  // ⭐⭐ **同一份平台判定只留一处口径**，⛔ 不引入第二套（否则两处会漂移）。
+  const isMac = typeof navigator !== 'undefined'
+    && navigator.userAgent.includes('Macintosh')
+
   return (
-    <div className="nb-shell">
+    // ⭐⭐ `data-platform` 供 CSS 定向让位；⛔ 不用 JS 改 style
+    //（⭐ 那样每次语言/主题重渲染都要重算，⭐ 且无法被 CSS 媒体查询覆盖）
+    <div className="nb-shell" data-platform={isMac ? 'macos' : 'other'}>
       <header className="nb-bar">
         <div className="nb-brand">
           <span className="nb-wordmark">{t('shell.wordmark')}</span>

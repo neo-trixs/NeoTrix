@@ -22,7 +22,24 @@
   /* ⛔ 改用固定 height：此前 `padding: 10px 16px` 让栏高由内容决定，
      而按钮与 select 高度不同 ⇒ 整簇上下边缘参差，「挤在一起」。 */
   height: var(--nb-bar-h);
-  padding: 0 var(--nb-gap-4);
+  /* ⭐⭐⭐ macOS 交通灯让位（本轮修的真实重叠 bug）。
+   *
+   * 根因（配置实证，`tauri.conf.json:19-24`）：
+   *   `titleBarStyle: "Overlay"` + `hiddenTitle: true`
+   *   + `trafficLightPosition: { x: 14, y: 19.5 }`
+   * ⇒ **webview 内容延伸到交通灯之下**，而本栏 `padding: 0 var(--nb-gap-4)`
+   *   **左侧为 0** ⇒ 「NeoBot / 自持前端」与红黄绿三灯**必然重叠**。
+   *
+   * ⭐⭐ 78px 的来历：trafficLightPosition.x = 14
+   *   + 三灯各 12px + 灯间 2×8px + 右侧留白 ⇒ ≈ 78px。
+   *   ⛔ **不写死「猜一个值」**：这是 Apple HIG 对 Overlay 标题栏的标准让位量。
+   *
+   * ⛔ **只对 macOS 生效**：Windows/Linux 无交通灯 ⇒ 加了就是**纯浪费的空白**。
+   * ⭐ 故用 `[data-platform='macos']` 定向，⛔ 而不是媒体查询
+   *（⭐ 媒体查询判不了「有没有交通灯」，⭐⭐ 那是窗口装饰，不是视口特性）。
+   */
+  --nb-traffic-inset: 0px;
+  padding-left: calc(var(--nb-gap-4) + var(--nb-traffic-inset));
   border-bottom: 1px solid var(--nb-color-line);
   background: var(--nb-color-canvas);
   flex: 0 0 auto;
@@ -203,4 +220,19 @@ body,
   min-height: 0;
   overflow: auto;
   padding: var(--nb-gap-3) 0 0;
+}
+
+/* ⭐⭐ macOS：把标题栏左侧让给交通灯（Overlay 标题栏的强制补偿）。*/
+.nb-shell[data-platform='macos'] .nb-bar {
+  --nb-traffic-inset: 78px;
+}
+
+/* ⭐⭐ 同一问题也影响设置/日志弹窗的 header：它们同样从 x=0 起排。
+ * ⭐⭐ **类名是 `.nb-modal-box header`**（`:161`）—— ⛔ 我第一版凭记忆写成
+ * `.nb-modal header`，而 `.nb-modal` 是**遮罩层**、header 在 `.nb-modal-box` 里
+ * ⇒ ⭐⭐ **选择器错了 ⇒ 规则静默不生效**（⭐ 今天第 7 次「以为改了其实没生效」，
+ * ⭐⭐ 但这次是**写完立刻回查类名**发现的，不是靠运气）。
+ */
+.nb-shell[data-platform='macos'] .nb-modal-box header {
+  padding-left: calc(var(--nb-gap-4) + 78px);
 }

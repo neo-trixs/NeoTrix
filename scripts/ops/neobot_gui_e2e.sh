@@ -61,8 +61,19 @@ for _ in $(seq 1 30); do
 done
 grep -q 'neobot-root] mounted' "$LOG" 2>/dev/null \
   && ok "前端已挂载（日志信号）" || bad "30 秒内未见前端挂载日志"
-# ⭐ 给 webview 一小段布局时间（日志打在 mount 之后，⛔ 布局仍在进行）
-sleep 3
+# ⭐⭐⭐ **轮询**直到 AX 树「足够大」，⛔ 不用固定 sleep。
+# ⭐ 起因（实测）：固定 `sleep 3` ⭐ **不够** —— 有一次 AX 树只取到 **333 字节**
+#   （应 7,172）⇒ 默认态判据全红，而**最紧态却绿**（中间多几次 osascript 往返
+#   顺带给了时间）⇒ ⭐⭐ **判据在测「时序」而不是测「界面」**。
+# ⇒ ⭐⭐ 正确做法：以「树够大」为就绪条件，⭐ 事件驱动、⛔ 不猜时间。
+waited=0
+while [ "${waited}" -lt 30 ]; do
+  probe=$(osascript -e 'tell application "System Events" to tell process "neobot-desktop" to return entire contents of window 1' 2>/dev/null | wc -c | tr -d ' ')
+  [ "${probe:-0}" -ge 2000 ] && break
+  sleep 1
+  waited=$((waited + 1))
+done
+say "AX 树就绪：${probe:-0} 字节（等待 ${waited}s）"
 
 cleanup() { kill "$PID" 2>/dev/null; sleep 2; kill -9 "$PID" 2>/dev/null; }
 trap cleanup EXIT
