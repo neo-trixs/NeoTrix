@@ -8,15 +8,36 @@ use serde::{Deserialize, Serialize};
 ///   变为「为本地类型实现外来 trait」⇒ 符合 orphan 规则，可编译。
 ///
 /// ⛔ **但同文件的 `VSAEngine` 刻意不收敛**（与 trait 不同处理）：
-/// core 的 `impl VsaBackend for VSAEngine`（:76）与
-/// `impl crate::neotrix::VsaEmbedding for VSAEngine`（:87,:91,:96）
+/// core 的 `impl VsaBackend for VSAEngine` 与
+/// `impl crate::neotrix::VsaEmbedding for VSAEngine`
 /// **都要读 `self.dim`**，而 `dim` 在两个 crate 里**都是私有字段**（无 `pub`）。
 /// ⇒ 若把 `VSAEngine` 收敛到低层，core 这两个 impl **访问不到该字段，编译失败**。
-/// 该模块另有 7 个 core 文件同样触达 `VSAEngine`。
+/// 该模块另有 7 个 core 文件同样触达 `VSAEngine` / `VsaBackend`
+/// （`nt_memory_vsa_expand.rs`、`hyperdgm.rs`、`vsa_holon.rs`、
+///  `nt_file_ability/tests.rs`、`tests/vsa_engine.rs`、`nt_core_hcube/mod.rs` 等）。
 /// ⇒ 解开它必须先决定「`dim` 是否属于公开契约」（把私有字段改 `pub`
 /// 是**低层 API 面变更**，不是顺手能做的去重）⇒ 留独立批次。
 ///
+/// ⛔ **且上述只是「会编译失败」的那部分；下面 4 条是「会静默改行为」的，
+/// 比编译失败更危险，原注释未记录（2026-10-04 逐行 diff 补记）：**
+/// 1. **`bundle(&[])` 语义分叉**（两侧逐字读过，不是笔误）：
+///    · 低层 `nt_core_hcube::vsa::bundle` 空输入分支 → `vec![0.0; self.dim]`（保维）
+///    · core  本文件 `bundle` 同分支            → `Vec::new()`（**0 长**）
+///    ⇒ 合并后 core 侧 `bundle(&[])` 会从「0 长」变成「dim 长」。
+///    这是**返回值形状变化、不报错**，编译器拦不住 ⇒ 必须显式裁决后手改。
+/// 2. **derive 不对等**：core 有 `Clone, Copy, Debug, Serialize, Deserialize`；
+///    低层 `pub struct VSAEngine` **一个 derive 都没有**
+///    （其上一行仅是 `///` 文档注释，实测）⇒ 直接换类型会丢 serde 能力。
+/// 3. **`Default` 只在 core 侧**（dim=4096），低层没有。
+/// 4. **`VsaEmbedding` 只在 core 侧**（token hashing），
+///    且它有真实消费方 `l1_action/nt_file_ability/embedding.rs`
+///    （签名是 `&dyn VsaEmbedding`）⇒ 不是可删的死 impl。
+///
 /// ⇒ 本笔只收敛 trait：**能收敛的收敛，不能的写明为什么不能。**
+/// ⚠️ 下批若真要收敛，顺序必须是：先定 `bundle(&[])` 语义 → 再补低层
+/// derive/`Default`/`VsaEmbedding` → 最后才动类型指派。**跳步即静默回归。**
+/// 📌 本块**按符号名引用，刻意不写行号**：行号锚点必腐化，且本注释自身
+/// 一经增删即令行号失效（本次增补 19 行即自证）。
 pub use neotrix_types::core::nt_core_hcube::vsa::VsaBackend;
 
 /// Default MAP-based VSA engine on real-valued vectors.
