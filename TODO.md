@@ -2351,41 +2351,64 @@ iOS/Android **完全没抓**（⇒ 「移动端怎么做差量同步与草稿」
 
 ---
 
-## 📌 待办 16：域名判定统一到 L0 原语（2026-10-03 部分完成）
+## ✅ 待办 16：域名判定统一到 L0 原语（2026-10-03 **已完成**）
 
 ### 判据
 裸 `url.contains("github.com")` 之类会把 `https://github.com.evil.net/`、
 `https://phishing-github.com/`、`https://github.com@evil.net/` 全部误判。
-处置**按后果分档**，不机械替换：
 
-| 后果 | 处置 |
-|---|---|
-| **决定用哪个适配器去抓取** | ⛔ 安全相关，必修 |
-| **决定能否冒充 known_repo** | ⛔ 安全相关，必修 |
-| 仅给内容打分类标签 | ⚠️ 收紧会改变既有分类结果，需评估 |
+### 做法：新增 L0 原语 + **按判据性质分档**，而非机械替换
 
-### ✅ 本轮已修（5 处）
-新增 `l0_substrate/nt_core_platform/url_match.rs`（13 测试）作为**单一真源**：
-- `nt_world/social_access/nt_catalog.rs` —— 改为委托，删掉内联副本
-- `nt_world/osint/mod.rs` `AbsorbSource::from_url` —— **选抓取处理器**
-- `nt_world/source/playlist.rs` `from_url` —— 12 个分支全改
-- `nt_media/yt_extract.rs` `detect_site` —— **选提取器**（`extract`/`list_formats` 两处分派）
-- `nt_memory_kb/nt_absorb_mapper.rs` —— `KNOWN_REPOS` 冒充
-- `nt_mind/seal/domain_mapper.rs` —— `KNOWN_REPOS` 冒充（与上条同形）
+`l0_substrate/nt_core_platform/url_match.rs`（13 测试，纯函数无 IO）：
+- `host_of()` —— 容错提取 host（去 scheme/userinfo/端口/path，小写化）。
+  ⛔ 不用 `Url::parse` 作唯一路径：本仓多处拿的是残缺 URL
+  （`github.com/owner/repo`），解析失败回退 contains 等于退回原缺陷。
+- `host_matches()` —— 要求域名是 host **后缀**且前缀以 `.` 结束。
 
-### ⚠️ 未改：3 处**纯分类**，故意留下
-以下三处只用域名决定 `NodeType`/`WebSourceType` 标签，**不决定抓取行为**：
+### ⭐ 关键分档：域名规则 vs 关键词启发式
 
-| 位置 | 当前判据 | 为什么没动 |
+审计中途我犯过两次判断错误，均已更正：
+
+**错误 1**：初稿把 3 处 l5 站点写成「只决定分类标签」。**读代码后证明是错的** ——
+它们全都会影响行为：
+
+| 位置 | 我原以为 | 实读结论 |
 |---|---|---|
-| `nt_mind/knowledge/web_miner.rs:38` | wikipedia/arxiv/github + `lower.contains("wiki")` | ⛔ 末两条是**关键词启发式**（`"wiki"`/`"knowledge"`），不是域名。收紧会让 `wiki.example.org` 这类站点分类改变 —— 需先确认 `WebSourceType` 是否影响下游抓取 |
-| `nt_mind_background_loop/knowledge_pipeline.rs:177` | `url.contains("paper")` | 同上，`"paper"` 是关键词 |
-| `nt_mind/knowledge/exploration_pipeline.rs:28` | arxiv/semanticscholar/github | 纯 `UnifiedSourceType` 标签 |
+| `nt_mind/knowledge/web_miner.rs:36` | 纯展示标签 | ⛔ `detect()` → `to_task_type()` → **LLM 任务分派** |
+| `nt_mind/knowledge/exploration_pipeline.rs:24` | 纯展示标签 | ⛔ → `ExploreDomain::{Papers,Wiki}`，**影响探索方向** |
+| `nt_mind_background_loop/knowledge_pipeline.rs:178` | 纯展示标签 | ⛔ → `kb.insert_or_get_node`，是**持久节点类型** |
 
-⇒ **需要先回答一个问题**：这三处的分类结果是否会决定后续抓取？
-若是，则与上面同档、应一并修；若否（纯展示标签），保持现状即可。
-⛔ 不要在没有这个答案的情况下机械替换 —— 那会把
-`wiki.foo.com` 从 `KnowledgeBase` 改成 `GenericWeb`，是**行为变更**而非修 bug。
+**错误 2**：随后又以「含关键词启发式、需产品决策」为由不动。
+⛔ 那是**把两件事混为一谈** —— 每个函数的判据可以**拆开**：
+
+| 函数 | 域名规则 | 关键词启发式 | 处置 |
+|---|---|---|---|
+| `web_miner::detect` | wikipedia/arxiv/github | `contains("wiki"/"knowledge"/"encyclopedia")` | 域名收紧，**关键词保持** |
+| `knowledge_pipeline::classify_node_type` | arxiv/github/wikipedia | `contains("paper")` | 同上 |
+| `exploration_pipeline::detect` | 全部都是域名 | 无 | 纯净替换 |
+
+关键词规则**顺序在后、语义不变** ⇒ `wiki.foo.com`、`/papers/123`
+仍是 `KnowledgeBase`/`Paper`。用独立 harness 逐条比对 11 个 URL 确认：
+**除伪装域名外，分类结果全部不变**。
+
+### ✅ 最终修完 8 处
+- 前 5 处（commit c1b093b0）：`osint/mod.rs`、`yt_extract.rs`、
+  `playlist.rs`、`nt_absorb_mapper.rs`、`domain_mapper.rs`
+- 后 3 处（本轮）：`web_miner.rs`、`exploration_pipeline.rs`、
+  `knowledge_pipeline.rs`（并把内联 `if` 抽成 `classify_node_type()`
+  —— 否则伪装域名无法写回归测试）
+- `nt_catalog.rs` 改为委托 L0，消除重复实现
+
+每处均配两类测试：**正常 URL 分类/分派完全不变** + **伪装域名不再命中**。
+另有专项测试守住「关键词启发式不得被顺手删掉」。
+
+### ⚠️ 过程中我自己犯的 3 个错（均被测试/harness 抓到）
+1. playlist 迁移第一版把 `netease`/`soda` 等 token **直接删了** ——
+   悄悄缩小识别面，而我的注释还写着「未增删」。
+2. `classify_node_type` 的两条测试断言写反（以为「域名规则优先」，
+   实际 paper 分支在最前；且大写 `PAPERS` 既有行为就是不命中）。
+   靠独立 harness 逐条比对才定位 —— **断言不能凭印象写**。
+3. 抽函数时用错 import 路径（`core::nt_core_knowledge` vs `knowledge_access`）。
 
 ### ⚠️ 另一份重复清单，未合并
 `l2_perception/nt_world/osint/social_search.rs` 维护**另一份 29 平台**表
