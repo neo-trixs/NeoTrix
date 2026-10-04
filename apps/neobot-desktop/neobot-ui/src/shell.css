@@ -45,11 +45,23 @@
   flex: 0 0 auto;
 }
 
-.nb-brand { display: flex; align-items: baseline; gap: var(--nb-gap-2); min-width: 0; }
-.nb-wordmark { font-weight: 650; font-size: var(--nb-fs-lg); letter-spacing: .2px; color: var(--nb-color-ink); }
+/* ⭐⭐ 2026-10-03 栏槽契约：`brand` / `actions`。
+ * ⛔ 改前：`min-width: 0` 在**默认 flex 项上写**（`.nb-brand` 无 `flex` ⇒ 无效果）
+ *      且 `.nb-wordmark` ⭐ **没有 `shrink-0`** ⇒ 品牌区被右侧控件挤压时
+ *      ⭐⭐ **字标本身被压扁**，而 tagline 的 `text-overflow:ellipsis`
+ *      ⭐⭐ **又缺 `min-w-0` 前提** ⇒ 整簇溢出压到按钮上。
+ * ✅ 三段式：字标不可缩（它只有 6 个字母）· tagline 可缩可省略 · actions 不可缩
+ *      ⇒ ⭐⭐ **牺牲顺序被钉死**：先省略副标，字标与按钮永不移动。 */
+.nb-brand { display: flex; flex: 0 1 auto; align-items: baseline; gap: var(--nb-gap-2); min-width: 0; }
+.nb-wordmark { /* ⭐⭐ 不可缩：字标只 6 字母，被压扁比省略更难看 */
+  flex: 0 0 auto; font-weight: 650; font-size: var(--nb-fs-lg); letter-spacing: .2px; color: var(--nb-color-ink); }
 .nb-tagline {
   color: var(--nb-muted);
   font-size: var(--nb-fs-sm);
+  /* ⭐⭐ `flex:1` + `min-width:0` 是 `text-overflow:ellipsis` 的**两个前提**，
+   *     缺任一 ⇒ ⭐⭐ 长副标**直接压到右侧按钮上**（本轮实测同型缺陷第三处）。 */
+  flex: 1 1 auto;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
