@@ -104,6 +104,29 @@ fi
 if grep -q 'neobot-root] mounted' "$LOG" 2>/dev/null; then ok "前端挂载日志存在（webview 内 React 已 mount）"
 else bad "无前端挂载日志（日志：${LOG}）"; fi
 
+# ── ⑥ ⭐ 最紧态（自适应下限）验证 ───────────────────────────────────────
+# ⭐ `tauri.conf.json:19-20` 写死 `minWidth: 860` / `minHeight: 620`
+# ⇒ ⭐⭐ **自适应可行域是 860×620 – ∞**，实测压不下去（设 400×500 仍回弹到 860×620）。
+# ⭐⭐ **含义**：任何「窄窗口遮挡」的问题只可能发生在这**下限之内** ⇒
+# ⭐⭐ **必须验这个最紧态**，而不是只在默认 1280×840 看一眼。
+MIN_W=860; MIN_H=620
+osascript -e "tell application \"System Events\" to tell process \"neobot-desktop\" to set size of window 1 to {$MIN_W, $MIN_H}" >/dev/null 2>&1
+sleep 3
+sz=$(osascript -e 'tell application "System Events" to tell process "neobot-desktop" to return size of window 1' 2>/dev/null || echo "?")
+say "最紧态窗口尺寸：${sz}"
+AX2=$(osascript -e 'tell application "System Events" to tell process "neobot-desktop" to return entire contents of window 1' 2>/dev/null || echo "")
+T2=$(printf '%s' "$AX2" | grep -oE 'static text [^,]{1,60}' | sed 's/^static text //; s/ of .*$//' || true)
+n2=$(printf '%s' "$T2" | grep -c . || true)
+say "最紧态下可见文本：${n2} 条"
+if [ "${n2:-0}" -ge 8 ]; then ok "最紧态下界面元素未被遮挡（≥8 条）"
+else bad "最紧态下可见文本仅 ${n2} 条 ⇒ 可能存在遮挡/截断"; fi
+for want in "会话" "Enter 发送"; do
+  if printf '%s' "$T2" | grep -q "$want"; then ok "最紧态仍含「${want}」"
+  else bad "最紧态**缺**「${want}」⇒ 被遮挡"; fi
+done
+# 复原默认尺寸，⛔ 不给用户留一个 860×620 的窗口
+osascript -e 'tell application "System Events" to tell process "neobot-desktop" to set size of window 1 to {1280, 840}' >/dev/null 2>&1
+
 say ""
 if [ "$fail" -eq 0 ]; then
   say "PASS: neobot Tauri 窗口端到端验收全过"
