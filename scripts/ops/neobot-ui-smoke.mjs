@@ -172,10 +172,56 @@ const STUB_RETURNS = {
   //    `text` 写成 `content`，产品没坏、桩坏了，但**门没能力发现**）。
   //    现给两条真实消息，字段严格对齐 neobot-root.tsx 的 interface：
   //      { id, convo_id, role, text, created_at }
-  neobot_convo_messages: [
-    { id: 'm1', convo_id: 'c0', role: 'user', text: '为什么界面是乱的', created_at: '2026-10-01T00:00:00Z' },
-    { id: 'm2', convo_id: 'c0', role: 'assistant', text: 'main 是 display:block，flex 失去约束', created_at: '2026-10-01T00:00:01Z' },
-  ],
+  // ⭐⭐⭐ 2026-10-04 修「**桩键与前端 invoke 脱节**」——本仓**第三次**同型病。
+  //
+  // ⛔ 改前只有 `neobot_convo_messages`（**已废弃**的全量命令），而
+  //   `neobot-root.tsx:566-567` 自 `70a592df` 起 invoke 的是
+  //   ⭐⭐ **`neobot_convo_messages_page`** ⇒ 桩里**没有这个键**
+  //   ⇒ 返回 undefined ⇒ ⭐⭐ **消息一条都不渲染**。
+  // ⭐⭐ 症状极具欺骗性：`.nb-main` 仍有 **906/908 字**可见文本（侧栏/工具栏），
+  //   ⭐⭐ 所以「界面渲染了」成立；而 `innerText` 里**没有**那两句原文
+  //   ⇒ 门报「消息正文不可见」⇒ ⭐⭐ **看着像产品遮挡 bug，其实是桩坏了**。
+  //
+  // ⭐⭐ 三次同型病（同一个根：**桩与真实调用面手工对齐 ⇒ 必然漂移**）：
+  //   ① 桩把 `ChatMessage.text` 写成 `content`（见上方原注释）
+  //   ② `neobot-check-emergence` 自测重写正则 ⇒ 假通过
+  //   ③ ⭐⭐ 本次：**命令改名后桩没跟**
+  neobot_convo_messages_page: {
+    messages: [
+      { id: 'm1', convo_id: 'c0', role: 'user', text: '为什么界面是乱的', created_at: '2026-10-01T00:00:00Z', seq: 1 },
+      { id: 'm2', convo_id: 'c0', role: 'assistant', text: 'main 是 display:block，flex 失去约束', created_at: '2026-10-01T00:00:01Z', seq: 2 },
+    ],
+    hasMore: false,
+    nextSeq: null,
+  },
+  // ⭐⭐⭐ 2026-10-04 补上 `neobot_api_specs`（设置面板的数据源）。
+  //
+  // ⛔ 改前桩里**没有这个键** ⇒ 设置弹窗只能显示 `api.loadFailed`
+  //   ⇒ ⭐⭐ 这是**同型病第 4 次**（前三次见 `neobot_convo_messages_page` 处注释），
+  //   ⭐⭐ 而它之所以长期没被发现：⭐⭐ **没有任何判据看设置面板的内容**。
+  //
+  // ⭐⭐ 数字**取自 `apps/neobot-desktop/src/api.rs` 的真实分布**
+  //   （impl 67 / stub 55 / planned 16），⛔ **不是臆造**。
+  // ⚠️ ⭐⭐ **同步债**：`api.rs` 增删 spec 时**这里要跟着改**。
+  //   ⭐⭐ 为此才立了「桩面 vs 调用面一致性门」—— ⭐⭐ 它能抓**缺键**，
+  //   ⭐⭐ 但 ⭐⭐ **抓不到「键在、值过期」** ⇒ 这一条靠本注释明示。
+  neobot_api_specs: {
+    summary: {
+      total: 138, implemented: 67, stub: 55, planned: 16,
+      upstream_unlisted: 0, upstream_total: 138,
+    },
+    specs: [
+      { name: 'neobot_convo_list', category: '会话', params: [], ret: 'ConvoView[]',
+        status: 'implemented', note: '会话列表' },
+      { name: 'neobot_convo_messages_page', category: '会话', params: ['convoId', 'beforeSeq', 'limit'],
+        ret: 'MessagePage', status: 'implemented', note: '⭐ 分页取历史消息' },
+      { name: 'neobot_memory_add', category: '记忆', params: ['text'], ret: 'bool',
+        status: 'implemented', note: '写入一条记忆' },
+      { name: 'neobot_core_capabilities', category: '能力', params: [], ret: 'CapabilitySnapshot',
+        status: 'implemented', note: '能力快照' },
+    ],
+    upstream_unlisted: [],
+  },
   // 布尔型
   neobot_memory_add: true,
   neobot_memory_undo: true,
@@ -218,6 +264,14 @@ const STUB_RETURNS = {
 const TAURI_STUB = ({ table, failList }) => {
   window.__TAURI_INTERNALS__ = {
     invoke: (cmd, args) => {
+      // ⭐⭐⭐ 记录**真实发生的调用**（键 = 命令名）。
+      // ⭐⭐ 这是「桩面 vs 调用面一致性门」的**唯一数据来源** ——
+      // ⛔ 没有它，那道门就永远「无数据 ⇒ 提前 return」⇒ ⭐⭐ **假通过**，
+      // ⭐⭐ 而「一道永远不会失败的门比没有门更危险」（本轮已栽过）。
+      try {
+        window.__nbInvoked = window.__nbInvoked || {}
+        window.__nbInvoked[cmd] = (window.__nbInvoked[cmd] || 0) + 1
+      } catch { /* ignore */ }
       if (failList && failList.includes(cmd)) {
         return Promise.reject(new Error(`induced failure: ${cmd}`))
       }
@@ -388,6 +442,9 @@ async function probe(browser, label, failList, act, convoCount = 0) {
     //    **「渲染了」与「用户看得到内容」是两件事，必须分别断言。**
     // ⚠️ 采集必须写在 probe 内（`page` 只在这里有）；写进报告循环是作用域错误，
     //    我今天在同一个文件里已犯过两次。
+    // ⭐⭐⭐ 采集点顺带跑「桩面 vs 调用面一致性门」（⭐ 必须**接上** ——
+    // ⭐⭐ 只定义不调用 = 没有门，本轮已因此踩过一次）。
+    await assertStubCoversInvokes(page, label)   // ⭐ `label` 是 probe 的形参（`r` 只在报告循环里）
     feat.msgVisible = await page.evaluate(() => {
       const txt = (document.querySelector('.nb-main')?.innerText || '').replace(/\s+/g, ' ')
       return {
@@ -511,6 +568,63 @@ async function probe(browser, label, failList, act, convoCount = 0) {
 }
 
 // 用系统 Chrome：免去 npx playwright install 的 150MB 下载（本仓已装 Chrome）
+/** ⭐⭐⭐ 2026-10-04「桩面 vs 真实调用面」一致性门。
+ *
+ * ⭐⭐⭐ **立门理由：本仓已三次栽在同一件事上** ——
+ *   桩（stub）与前端真实 `invoke` 的**命令名/返回形状**靠**人手**对齐，
+ *   ⭐⭐ **改名必然漂移**，而 ⭐⭐ **漂移后的症状极具欺骗性**：
+ *   界面照样渲染出几百字（侧栏/工具栏），只有消息区空着，
+ *   ⭐⭐ 门报「消息正文不可见」⇒ ⭐⭐ **看着像遮挡 bug，其实是桩坏了**。
+ *   ① 桩把 `ChatMessage.text` 写成 `content`
+ *   ② `neobot-check-emergence` 自测重写正则 ⇒ 假通过
+ *   ③ ⭐⭐ `neobot_convo_messages` → `_page` 改名后桩没跟
+ *
+ * ⭐⭐ 判据：⭐⭐ **前端源码里出现的每个 `invoke('...')` 命令名**，
+ * ⭐⭐ 要么在桩里有对应键，要么在 ⭐⭐ `KNOWN_NON_STUB` 里**显式登记**并说明理由。
+ * ⇒ ⭐⭐ 改名后 ⇒ ⭐⭐ **本门立刻红**，⛔ 不再靠人记得改桩。
+ */
+const KNOWN_NON_STUB = new Map([
+  // ⭐⭐⭐ 登记**必须写理由**，⛔ 裸字符串列表会让这道门退化成「什么都往里塞」。
+  // ⭐⭐ 条目语义：`'handled'` = 桩里有专门分支（不算缺）；
+  // ⭐⭐ `'gap'` = ⭐⭐ **真的缺**，登记下来是为了 ⭐⭐ **让它可见**而不是消失。
+  ['quit_app', 'handled'],            // 无返回值，前端不读结果
+  ['read_run_logs', 'handled'],       // ⭐ 只在故障注入场景被拒；成功路径走 STUB_RETURNS
+  ['neobot_core_capabilities', 'handled'],
+  ['plugin:event|listen', 'handled'], // ⭐ `:243` 有专门分支，回数字 id
+  ['plugin:event|unlisten', 'handled'],// ⭐ `:244` 有专门分支，回 null
+  // ⭐⭐ `neobot_api_specs`：⛔ 原先**桩里完全没有**（同型病第 4 次），
+  //   ✅ 现已补上真实分布（impl 67 / stub 55 / planned 16，取自 `api.rs`）。
+  //   ⭐⭐ 仍登记在此，是为了让 ⭐⭐「已补」这件事在门里**留痕**（⛔ 不是默默消失）。
+  ['neobot_api_specs', 'handled'],
+])
+
+async function assertStubCoversInvokes(page, label) {
+  const used = await page.evaluate(() => {
+    const out = new Set()
+    // ⭐ 抓 React 挂载后真正发出的调用：读桩的「已调用」记录
+    for (const k of Object.keys(window.__nbInvoked || {})) out.add(k)
+    return [...out]
+  })
+  if (used.length === 0) {
+    // ⭐⭐⭐ **⛔ 绝不静默放过**：没有调用记录 ⇒ 这道门**没有能力**发现桩面脱节
+    // ⭐⭐ ⇒ 而「一道永远不会失败的门比没有门更危险」⇒ 判红，逼人修桩的记录。
+    console.log(`     ⛔ [${label}] 未取到任何调用记录 ⇒ ⭐⭐ 本门**无能力**发现桩面脱节`)
+    fail += 1
+    return
+  }
+  const missing = used.filter((k) => !(k in STUB_RETURNS) && !KNOWN_NON_STUB.has(k))
+  if (missing.length) {
+    console.log(`     ⛔ [${label}] 桩缺少命令键：${missing.join(', ')}`
+      + ' ⇒ ⭐⭐ **桩面与真实调用面脱节**（前端的 invoke 会静默拿到 undefined）')
+    fail += missing.length
+  }
+  // ⭐⭐ 登记为 'gap' 的：⭐⭐ **每次报出来**（⛔ 不因为「已登记」就消失）
+  const gaps = used.filter((k) => KNOWN_NON_STUB.get(k) === 'gap')
+  if (gaps.length) {
+    console.log(`     ⚠️ [${label}] 已知桩缺口（登记为 gap，非静默放过）：${gaps.join(', ')}`)
+  }
+}
+
 const browser = await chromium.launch({ channel: 'chrome' })
 const rows = []
 try {
