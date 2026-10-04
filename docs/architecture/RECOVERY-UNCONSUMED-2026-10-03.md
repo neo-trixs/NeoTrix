@@ -107,3 +107,48 @@ if let RecoveryAction::Retry { delay_ms, .. } = action { ... }
 ⇒ 查证后发现：**危险面不是我以为的那种**，但**确实有相关的另一种**。
 ⇒ 这第三次印证 `ABSORPTION-PRECONDITION-GATE` 的价值：
 **不查就不知道该防什么；而查了会发现「未接线」本身就是需要被看见的状态。**
+
+---
+
+# 收口：16 处**已逐条读完**，并给出**正确的搜索方式**
+
+## 一、16 处逐条判定 —— **无一是** `RecoveryManager::recover` 的消费者
+
+| 位置 | 实际是什么 |
+|---|---|
+| `nt_core_cross_layer.rs:788` | `ctx.recover()`，**测试内**，回滚 `ClosureEffect` |
+| `function_recovery.rs:121` / `:129` | `FunctionRecovery::recover(&data)` —— **另一个类型** |
+| `goal_lock/mod.rs:179` | `GoalLock::recover("test input", …)` —— **另一个类型** |
+| `nt_core_context/revertible.rs:220 / 311 / 346` | `ctx.recover()` = **回滚**（注释原文「整批回滚」） |
+| `nt_io_plugin/registry.rs:91 / 95 / 148 / 185` | `ctx.recover()` = **出错回滚**（`on_load` 失败分支） |
+| `consciousness_core/dispatch/nt_dispatch_loop.rs:187` | `goal_lock.recover(instruction, &output)` —— `GoalLock` 的方法 |
+| `nt_mind/evolution/autofixer.rs:64` | `self.ctx.recover()` = **回滚**（注释「批内失败 → recover 全部回滚」） |
+| `nt_memory_kb/nt_memory_coeffect.rs:136 / 174 / 205` | `self.ctx.recover()` = **回滚** |
+
+⇒ **`.recover(` 这条扫描路径给出的 16 处，全部是噪声。**
+
+## 二、⭐ 而真消费者是**另一条搜索**找到的
+```bash
+rg -n 'nt_core_error::recovery' --glob '*.rs' neotrix-core/src
+#→ gateway/execution.rs:6use …recovery::{ErrorContext, ErrorType, RecoveryAction};
+#→ gateway/execution.rs:632  if let RecoveryAction::Retry { delay_ms, .. } = action {
+```
+
+## 三、⭐⭐ 因此得到本条**可复用的正确判据**
+
+> **问「类型 X 有没有人用」，要搜 X 出现在 `use` / 类型签名 / `match` 形态里；
+> 而不是搜 X 的「方法名被调用」。**
+>
+> 因为**消费者匹配的是值，不是方法**：
+> - `RecoveryManager::recover()` —— 搜方法名 ⇒ 找到**生产者**
+> - `if let RecoveryAction::…` —— 搜方法名 ⇒ **完全找不到**
+>
+> ⇒ **搜「生产者的动词」找不到「消费者」。**
+
+## 四、纠正一处我自己的过度归因
+原文把 16 处整体归为「同名不同物」，并据此认为反向锁「只是误报」。
+⭐ **现在逐条读完后，这个结论碰巧是对的** ——
+但**当时我是没读就下的结论**，而那份文档正是用来示范「读现场」的。
+⇒ 它自己违反了自己的标准。
+⇒ 这一条比「误报」更值得记：**正确的结论，错误的取得方式。**
+
