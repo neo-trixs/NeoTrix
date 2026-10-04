@@ -269,41 +269,12 @@ export function Shell({ children }: { children?: React.ReactNode }) {
         </div>
 
         <div className="nb-actions">
-          <label className="nb-lang">
-            <span className="nb-lang-label">{t('shell.theme')}</span>
-            <select
-              data-testid="nb-theme-select"
-              value={theme}
-              disabled={busy}
-              onChange={(e) => setThemeMode(e.target.value as ThemeMode)}
-            >
-              <option value="system">{t('shell.themeSystem')}</option>
-              <option value="dark">{t('shell.themeDark')}</option>
-              <option value="light">{t('shell.themeLight')}</option>
-            </select>
-          </label>
-
-          <label className="nb-lang">
-            <span className="nb-lang-label">{t('shell.language')}</span>
-            <select
-              data-testid="nb-lang-select"
-              value={lang}
-              disabled={busy}
-              onChange={(e) => void choose(e.target.value as Lang)}
-            >
-              {availableLangs().map((l) => (
-                <option key={l.value} value={l.value}>
-                  {l.label}
-                </option>
-              ))}
-            </select>
-          </label>
 
           <button type="button" disabled={busy} onClick={() => void openLogs()}>
             {t('shell.openLogs')}
           </button>
           <span className="nb-actions-sep" aria-hidden="true" />
-          <button type="button" className="nb-primary" onClick={openSettings}>
+          <button type="button" className="nb-primary" data-testid="nb-settings-open" onClick={openSettings}>
             {t('shell.settings')}
           </button>
           <button type="button" className="nb-danger" disabled={busy} onClick={() => void invoke('quit_app')}>
@@ -339,10 +310,46 @@ export function Shell({ children }: { children?: React.ReactNode }) {
           >
             <header>
               <strong>{t('shell.settings')}</strong>
-              <button type="button" data-autofocus onClick={closeSettings}>
+              <button type="button" data-testid="nb-settings-close" data-autofocus onClick={closeSettings}>
                 {t('shell.logs.close')}
               </button>
             </header>
+            {/* ⭐⭐⭐ 必须**放在 `settingsHost` 外面**（实测依据，非猜）：
+             * `api-panel.ts:64` / `:74` 的 `loadApiPanel` 用
+             * `host.replaceChildren(...)` ⇒ ⭐⭐ **每次打开设置都清空整个 host**
+             * ⇒ 塞进 host 的控件会**被静默抹掉且不报错**。
+             * ⭐⭐ 控件**原文搬移**（⛔ 不是重写）：`data-testid` 与
+             * `availableLangs()` 的动态选项都原样保留 —— 3 个 smoke 脚本
+             * 9 处靠 testid 驱动，其中 6 处带 `.catch(() => {})`，
+             * ⭐⭐ **改名/丢失 ⇒ 测试静默 no-op 而非变红**。*/}
+            <section className="nb-prefs" aria-label={t('shell.theme')}>
+              <label className="nb-pref">
+              <span className="nb-pref-label">{t('shell.theme')}</span>
+              <select
+                data-testid="nb-theme-select"
+                value={theme}
+                  onChange={(e) => setThemeMode(e.target.value as ThemeMode)}
+              >
+                <option value="system">{t('shell.themeSystem')}</option>
+                <option value="dark">{t('shell.themeDark')}</option>
+                <option value="light">{t('shell.themeLight')}</option>
+              </select>
+            </label>
+              <label className="nb-pref">
+              <span className="nb-pref-label">{t('shell.language')}</span>
+              <select
+                data-testid="nb-lang-select"
+                value={lang}
+                  onChange={(e) => void choose(e.target.value as Lang)}
+              >
+                {availableLangs().map((l) => (
+                  <option key={l.value} value={l.value}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            </section>
             <div className="nb-scroll nb-settings-body" ref={settingsHost} />
           </section>
         </div>

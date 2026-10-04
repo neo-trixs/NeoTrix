@@ -251,3 +251,42 @@ body,
    * ⇒ 昨天那个数字从此**只有一处**（`theme.css` 的 `--nb-traffic-inset`）。*/
   padding-left: calc(var(--nb-bar-pad-x) + var(--nb-traffic-inset));
 }
+
+/* ⭐⭐⭐ 2026-10-03 设置弹窗的「外观」段（主题/语言）。
+ *
+ * ⛔ 为什么要有独立样式：控件是从顶栏**原文搬移**过来的 `nb-lang` 块，
+ *    而 `nb-lang` 是给顶栏设计的 ⇒ ⭐⭐ 直接沿用会让它在弹窗里
+ *    「继承顶栏的紧凑排版」⇒ ⭐ 两处排版不一致（⭐⭐ 正是本轮要消灭的病）。
+ * ⇒ ⭐⭐ 给弹窗一份**独立契约**，⭐ 值全部取自既有 token（⛔ 不新增刻度）。
+ *
+ * ⭐⭐ 栏位契约同 dsh：段内每样东西都有槽位，⛔ 不靠「碰巧对齐」。
+ * ⭐ `flex-wrap` 是关键：窄窗口下两项**换行**而不是**互相挤压**。
+ */
+.nb-prefs {
+  display: flex;
+  flex-wrap: wrap;                 /* ⭐ 窄态换行，⛔ 不挤压 */
+  gap: var(--nb-bar-pad-y) var(--nb-gap-6);
+  padding: var(--nb-bar-pad-y) var(--nb-bar-pad-x);
+  border-bottom: 1px solid var(--nb-color-line);
+  background: var(--nb-color-canvas);
+  flex: 0 0 auto;                  /* ⭐ 与下方滚动区分离：⭐ 偏好不该跟着滚走 */
+}
+.nb-pref {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-gap-2);
+  /* ⭐ `min-width:0` + 可收缩：⭐ 与顶栏同型缺陷的修法一致（见 d1a841e5） */
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.nb-pref-label {
+  color: var(--nb-muted);
+  font-size: var(--nb-fs-sm);
+  white-space: nowrap;             /* ⭐ 标签本身不换行 ⇒ 只换行「整项」 */
+  flex: 0 0 auto;
+}
+.nb-pref select {
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 auto;
+}

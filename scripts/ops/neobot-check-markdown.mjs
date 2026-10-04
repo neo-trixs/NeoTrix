@@ -237,7 +237,21 @@ for (const theme of ['light', 'dark']) {
   //   那个 select 带 `disabled={busy}` ⇒ Playwright 会等它可交互直到超时。
   //   ⇒ 先证明语言**真的**切了，再判文案是否跟随。
   let selErr = null
+  // ⭐⭐ 2026-10-03：控件已移进设置弹窗 ⇒ 不在常驻 DOM。
+  // ⭐⭐⭐ 而上面那段注释正是在警告「`.catch()` 把失败变成假象」——
+  // ⭐⭐ **我本轮在另外两个脚本里恰好犯了它自己警告过的错**（已一并修），
+  // ⭐⭐ 此处 ⛔ 不再吞：失败要么抛，要么记进 `selErr` 并被下方判据看见。
+  if (!(await page.$(sel))) {
+    await page.click('[data-testid="nb-settings-open"]')
+    await page.waitForSelector(sel, { timeout: 8000 })
+  }
   await page.selectOption(sel, 'en-US', { timeout: 8000 }).catch((e) => { selErr = String(e).split('\n')[0] })
+  // ⭐⭐⭐ 必须**关掉设置弹窗**：否则 ⭐⭐ 模态遮罩残留 ⇒ 后续判据全被挡
+  // （实测：neobot-ui-smoke 因遮罩残留，失败项 4 → 10）
+  if (await page.$('[data-testid="nb-settings-close"]')) {
+    await page.keyboard.press('Escape')
+    await page.waitForSelector('[data-testid="nb-settings-close"]', { state: 'detached', timeout: 8000 })
+  }
   await page.waitForTimeout(1000)
   const after = await page.evaluate(() => ({
     lang: document.documentElement.lang,

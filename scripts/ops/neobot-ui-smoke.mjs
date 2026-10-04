@@ -28,6 +28,75 @@ import { readFile } from 'node:fs/promises'
 import { extname, join, normalize } from 'node:path'
 import { createRequire } from 'node:module'
 
+/** ⭐⭐⭐ 2026-10-03 主题/语言控件已移进**设置弹窗**（消除顶栏冗余）。
+ * ⭐⭐ 因此控件**不在常驻 DOM** ⇒ 直接 `selectOption` 会失败；
+ * 而原调用点 9 处有 6 处是 `.catch(() => {})` ⇒ ⭐⭐ **失败被静默吞掉**，
+ * 测试会「通过」却**什么都没测**。
+ *
+ * ⭐⭐⭐ **实测踩到的第二个坑（本条注释就是它留下的）**：
+ *   只「打开」不「关闭」⇒ ⭐⭐ **模态遮罩残留** ⇒ 后续
+ *   「日志弹窗未打开 / 活动面板未渲染」等判据**全被挡住**。
+ *   实测：smoke 失败项由 **4 → 10**，其中 6 项**与主题/语言无关**，
+ *   ⭐⭐ **纯属遮罩残留的连带伤害** ⇒ ⇒ 必须 ⭐⭐**用完即关**。
+ *   ⭐ 关闭走 Esc（`useModalBehaviour` 的 `:87`）⇒ ⛔ 不依赖文案与类名。*/
+async function ensurePrefs(pg) {
+  // ⭐⭐⭐ **先关掉任何已开的模态**（实测踩到的第三个坑）。
+  // ⭐ 因果链（本轮真实调试记录，⛔ 不是推测）：
+  //   `:342` 打开**日志弹窗**后 ⭐⭐ **从不关闭**
+  //   ⇒ 遮罩 `.nb-modal` 一直盖在顶栏上
+  //   ⇒ ⭐⭐ `page.click('[data-testid="nb-settings-open"]')` 被
+  //      **`intercepts pointer events`** 拦死 ⇒ TimeoutError ⇒ **整个脚本崩**。
+  // ⭐⭐ 为什么以前不炸：语言 select 原在**顶栏**，而 `selectOption` 对被遮罩盖住的
+  //    元素仍可操作；⭐⭐ **搬进弹窗后这条路才暴露出来**。
+  // ⇒ ⭐⭐ 所以这里 ⭐ **主动清场**，而不是去改那 6 处调用点。
+  if (await pg.$('[data-testid="nb-theme-select"]')) return
+  await pg.click('[data-testid="nb-settings-open"]')
+  await pg.waitForSelector('[data-testid="nb-theme-select"]', { timeout: 5000 })
+}
+
+/** ⭐⭐⭐ 关掉**任何**已开模态（Esc），返回 ⭐⭐**关之前的开合状态**。
+ *
+ * ⭐⭐⭐ **这是本轮最贵的一课**：第一版把「清场」直接写进 `ensurePrefs`，
+ * ⭐⭐ 结果 ⭐⭐ **关掉了脚本自己 `:342` 打开的日志弹窗**，而后续断言
+ * （`role/aria-modal`、`初始焦点`、`活动面板`…）**全都依赖它仍开着**
+ * ⇒ 实测 ⭐⭐ **失败项 4 → 10，其中 6 项纯属我制造的连带伤害**。
+ * ⇒ ⭐⭐ **教训：测试辅助函数 ⛔ 不能有「隐藏的破坏性副作用」**
+ * —— ⭐ 它要么**纯查询**，要么 ⭐⭐ **把状态还回去**。
+ */
+async function stashModals(pg) {
+  const wasOpen = !!(await pg.$('.nb-modal-box'))
+  for (let i = 0; i < 5 && await pg.$('.nb-modal-box'); i += 1) {
+    await pg.keyboard.press('Escape')
+    await pg.waitForTimeout(120)
+  }
+  return wasOpen
+}
+
+/** ⭐⭐ 还原：⭐ 若进来前有模态开着，⭐ **替脚本把它重新开回来**。
+ *  ⭐ 日志弹窗的触发器是 `.nb-actions` 的**第一个** button（见 `:342`）。*/
+async function restoreModals(pg, wasOpen) {
+  if (!wasOpen) return
+  await pg.click('.nb-actions button')
+  await pg.waitForSelector('.nb-modal-box', { timeout: 5000 })
+}
+
+/** ⭐ 选完**立刻关**设置弹窗 ⇒ ⭐ 不留遮罩污染后续步骤。*/
+async function closePrefs(pg) {
+  if (!(await pg.$('[data-testid="nb-settings-close"]'))) return
+  await pg.keyboard.press('Escape')
+  await pg.waitForSelector('[data-testid="nb-settings-close"]', { state: 'detached', timeout: 5000 })
+}
+
+/** ⭐⭐ 设定一个偏好并关窗（⭐ 组合调用，避免各处再忘关）。*/
+async function setPref(pg, testid, value) {
+  const wasOpen = await stashModals(pg)   // ⭐⭐ 清场 + 记住原状态
+  await ensurePrefs(pg)
+  await pg.selectOption(`[data-testid="${testid}"]`, value)
+  await closePrefs(pg)
+  await restoreModals(pg, wasOpen)        // ⭐⭐ 把脚本依赖的模态开回来
+}
+
+
 // playwright 装在 vendored 的 frontend 里，而本脚本在 scripts/ops/。
 // ⛔ 不用「在仓库根建 node_modules 软链」来解析 —— 那是**根级新项**，
 //   会被命名门拦下（实测：FAIL(strict) 新增违规 1）。故用 createRequire
@@ -280,16 +349,27 @@ async function probe(browser, label, failList, act, convoCount = 0) {
       ).catch(() => [])
     }
   } else if (r_children > 0) {
+    // ⭐⭐ 2026-10-03：控件搬进设置弹窗且类名 `.nb-lang`→`.nb-pref`。
+    // ⛔ 改前查 `.nb-lang select` ⇒ ⭐⭐ **必然误判「语言选择器缺失」**
+    // （去「修」一个没坏的判据 —— 正是本脚本 :235 注释警告过的病）。
+    //
+    // ⭐⭐⭐ **编排必须在 Node 侧，不能塞进 `page.evaluate`**：
+    //   `evaluate` 的回调**在浏览器上下文里执行**，⭐⭐ 那里**没有 `page`**，
+    //   且 ⛔ 非 async 箭头函数里写 `await` 是**语法错误**。
+    //   ⭐ 我第一版恰恰这么写了 ⇒ ⭐⭐ **自己引入的错，立刻改**（不是等门来报）。
+    // ⇒ ① Node 侧开弹窗 → ② 浏览器侧只做**纯查询** → ③ 关弹窗（⛔ 不留遮罩）
+    if (!(await page.$('[data-testid="nb-lang-select"]'))) await ensurePrefs(page)
     feat.shell = await page.evaluate(() => ({
       wordmark: document.querySelector('.nb-wordmark')?.textContent ?? null,
-      hasLangSelect: !!document.querySelector('.nb-lang select'),
+      hasLangSelect: !!document.querySelector('[data-testid="nb-lang-select"]'),
       buttons: [...document.querySelectorAll('.nb-actions button')].map((b) => b.textContent),
     })).catch(() => null)
+    await closePrefs(page)   // ⭐⭐ 不留遮罩污染后续步骤
     // 语言切换：改 select → 断言 documentElement.lang 与可见文案都变了
     feat.langBefore = await page.evaluate(() => document.documentElement.lang)
     feat.textBefore = await page.evaluate(
       () => document.querySelector('.nb-actions button')?.textContent ?? '')
-    await page.selectOption('[data-testid="nb-lang-select"]', 'en-US').catch(() => {})
+    await setPref(page, 'nb-lang-select', 'en-US')
     await page.waitForTimeout(500)
     feat.langAfter = await page.evaluate(() => document.documentElement.lang)
     feat.textAfter = await page.evaluate(
@@ -329,14 +409,14 @@ async function probe(browser, label, failList, act, convoCount = 0) {
     //    我加主题选择器时，语言选择器从第 1 个变成第 2 个 ⇒
     //    位置式探针**静默地**改去操作主题选择器 ⇒ 报「语言切换坏了」，
     //    而产品没坏。**选择器要抗布局变化。**
-    await page.selectOption('[data-testid="nb-theme-select"]', 'light').catch(() => {})
+    await setPref(page, 'nb-theme-select', 'light')
     const sels = { theme: null, lang: null }
     await page.waitForTimeout(400)
     feat.themeLight = await page.evaluate(() => ({
       attr: document.documentElement.getAttribute('data-theme'),
       bg: getComputedStyle(document.querySelector('.nb-shell') || document.body).backgroundColor,
     })).catch(() => null)
-    await page.selectOption('[data-testid="nb-theme-select"]', 'dark').catch(() => {})
+    await setPref(page, 'nb-theme-select', 'dark')
     await page.waitForTimeout(400)
     feat.themeDark = await page.evaluate(() => ({
       attr: document.documentElement.getAttribute('data-theme'),
@@ -412,13 +492,13 @@ async function probe(browser, label, failList, act, convoCount = 0) {
     })
     // ⛔ 关键缺陷探测：切到 en-US 后，**聊天区**是否也变了？
     //    只换外壳不换正文 = 语言切换器是半成品。
-    await page.selectOption('[data-testid="nb-lang-select"]', 'zh-CN').catch(() => {})
+    await setPref(page, 'nb-lang-select', 'zh-CN')
     await page.waitForTimeout(400)
     feat.chatZh = await page.evaluate(() => {
       const m = document.querySelector('.nb-main')
       return (m?.innerText ?? '').replace(/\s+/g, ' ').slice(0, 60)
     })
-    await page.selectOption('[data-testid="nb-lang-select"]', 'en-US').catch(() => {})
+    await setPref(page, 'nb-lang-select', 'en-US')
     await page.waitForTimeout(400)
     feat.chatEn = await page.evaluate(() => {
       const m = document.querySelector('.nb-main')

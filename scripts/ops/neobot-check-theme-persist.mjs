@@ -31,6 +31,38 @@ import { readFile } from 'node:fs/promises'
 import { extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+/** ⭐⭐⭐ 2026-10-03 主题/语言控件已移进**设置弹窗**（消除顶栏冗余）。
+ * ⭐⭐ 因此控件**不在常驻 DOM** ⇒ 直接 `selectOption` 会失败；
+ * 而原调用点 9 处有 6 处是 `.catch(() => {})` ⇒ ⭐⭐ **失败被静默吞掉**，
+ * 测试会「通过」却**什么都没测**。
+ *
+ * ⭐⭐⭐ **实测踩到的第二个坑（本条注释就是它留下的）**：
+ *   只「打开」不「关闭」⇒ ⭐⭐ **模态遮罩残留** ⇒ 后续
+ *   「日志弹窗未打开 / 活动面板未渲染」等判据**全被挡住**。
+ *   实测：smoke 失败项由 **4 → 10**，其中 6 项**与主题/语言无关**，
+ *   ⭐⭐ **纯属遮罩残留的连带伤害** ⇒ ⇒ 必须 ⭐⭐**用完即关**。
+ *   ⭐ 关闭走 Esc（`useModalBehaviour` 的 `:87`）⇒ ⛔ 不依赖文案与类名。*/
+async function ensurePrefs(pg) {
+  if (await pg.$('[data-testid="nb-theme-select"]')) return
+  await pg.click('[data-testid="nb-settings-open"]')
+  await pg.waitForSelector('[data-testid="nb-theme-select"]', { timeout: 5000 })
+}
+
+/** ⭐ 选完**立刻关**设置弹窗 ⇒ ⭐ 不留遮罩污染后续步骤。*/
+async function closePrefs(pg) {
+  if (!(await pg.$('[data-testid="nb-settings-close"]'))) return
+  await pg.keyboard.press('Escape')
+  await pg.waitForSelector('[data-testid="nb-settings-close"]', { state: 'detached', timeout: 5000 })
+}
+
+/** ⭐⭐ 设定一个偏好并关窗（⭐ 组合调用，避免各处再忘关）。*/
+async function setPref(pg, testid, value) {
+  await ensurePrefs(pg)
+  await pg.selectOption(`[data-testid="${testid}"]`, value)
+  await closePrefs(pg)
+}
+
+
 const require = createRequire(
   new URL('../../apps/neobot-desktop/frontend/package.json', import.meta.url))
 const { chromium } = require('playwright')
@@ -104,11 +136,20 @@ const hasSel = (page) => page.evaluate(
 
 console.log('主题持久化门\n')
 
-// C：选择器存在
+// C：选择器存在（⭐⭐ 2026-10-03：控件已移进**设置弹窗** ⇒ ⛔ 不在常驻 DOM。
+//   ⛔ 改前直接 `hasSel(page)` 判存在 ⇒ ⭐⭐ **必然误判红**（去「修」一个没坏的判据）。
+//   ⇒ 现在 ⭐⭐ **先开弹窗再判**，且弹窗打不开就 ⭐⭐ **抛错**（⛔ 不静默 pass）。）
 {
   const { ctx, page } = await openPage(null)
-  if (await hasSel(page)) console.log('  C 主题选择器存在 ✅')
-  else bad('找不到 [data-testid="nb-theme-select"]')
+  try {
+    await ensurePrefs(page)
+  } catch (e) {
+    bad(`点「设置」后仍找不到主题选择器：${String(e).split('\n')[0]}`)
+    await ctx.close()
+    throw e
+  }
+  if (await hasSel(page)) console.log('  C 主题选择器存在 ✅（设置弹窗内）')
+  else bad('打开设置弹窗后仍找不到 [data-testid="nb-theme-select"]')
   await ctx.close()
 }
 
@@ -119,7 +160,7 @@ for (const [choice, label] of [['light', 'A 浅色'], ['dark', 'B 深色']]) {
   await page.addInitScript(initScript, { t: STUB })
   await page.goto(`http://127.0.0.1:${PORT}/app/index.html`, { waitUntil: 'load' })
   await page.waitForTimeout(1100)
-  await page.selectOption('[data-testid="nb-theme-select"]', choice).catch(() => {})
+  await setPref(page, 'nb-theme-select', choice)
   await page.waitForTimeout(400)
   const beforeReload = await themeOf(page)
   // ⛔ 必须**刷新** —— 覆盖 bug 发生在挂载时，同会话内比较看不出来
