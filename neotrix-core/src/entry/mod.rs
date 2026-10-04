@@ -28,6 +28,7 @@ mod interactive;
 mod sandbox_features;
 mod config_keys;
 mod wallet;
+mod web;
 mod agent;
 mod social;
 pub(crate) use provider::*;
@@ -52,6 +53,7 @@ pub use proxy_cmd::run_proxy_cmd;
 pub use sysops::run_sysops;
 pub use todo::run_todo;
 pub use wiki::run_wiki;
+pub use web::run_web_fetch;
 pub use social::{
     run_social_auth_site, run_social_catalog, run_social_doctor, run_social_login, run_social_probe,
     run_social_rank, run_social_sites, run_social_status, run_social_weights,

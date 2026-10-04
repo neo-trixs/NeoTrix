@@ -41,6 +41,27 @@ pub struct PlatformConfig {
 }
 
 impl PlatformConfig {
+    /// ⭐ 中性构造器：**不带登录语义**，供「只抓一个 URL」这类用法。
+    ///
+    /// 【为什么需要】此前只有站点专用构造器（`twitter()` / `futong()`），
+    /// 每个都带 `login_url` / `success_url` / 各自的 cookie 路径。
+    /// ⇒ 像 `neotrix web fetch <url>` 这种**通用抓取**没有可用配置，
+    /// 只能去构造一个「像某站点」的 config ⇒ 语义错位。
+    ///
+    /// ⚠️ 刻意**不给** `cookie_path` ⇒ 本构造器**不参与任何登录态**。
+    /// 需要自己的会话时，请自行把 cookie 放进
+    /// `~/.neotrix/cookies/<id>.json` 并使用相应站点构造器。
+    pub fn fetch() -> Self {
+        Self {
+            id: "fetch".into(),
+            login_url: String::new(),
+            success_url: None,
+            cookie_path: None,
+            extra_args: vec![],
+            timeout: Duration::from_secs(30),
+        }
+    }
+
     pub fn twitter() -> Self {
         Self {
             id: "twitter".into(),

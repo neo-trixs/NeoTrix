@@ -337,6 +337,38 @@ enum Commands {
         #[command(subcommand)]
         command: WalletCommands,
     },
+
+    // ── Web ──
+    #[command(about = "网络访问（用 NeoTrix 自带的浏览器能力）")]
+    Web {
+        #[command(subcommand)]
+        command: WebCommands,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum WebCommands {
+    /// 抓取一个 URL，把正文打到 stdout
+    ///
+    /// ⭐ 这是**补缺口**，不是新能力：`UniversalBrowser::fetch()`
+    /// 早已存在于 `l1_action::nt_io::universal_browser`，
+    /// 但此前**没有任何 CLI 或 example 能触达它** ⇒ 能力等于不存在。
+    ///
+    /// ⚠️ **凭据边界（重要）**：
+    /// · 本命令**只发匿名请求** —— 不读 Chrome、不导 cookie、不碰本机凭据。
+    /// · 因此需要登录的站点（飞书 / Google / Meta 等）**只会拿到登录墙**。
+    /// · `BrowserResult.cookies` 是**响应带来的**，不是本机的；打印时
+    ///   `CookieEntry` 的 `Debug` 已 redact（value ⇒ `<redacted>`），
+    ///   故本命令**不会**把会话值写进终端或日志。
+    /// · 若确需带自己的会话，请**自行**把 cookie 放进
+    ///   `~/.neotrix/cookies/<id>.json`（凭据操作，应由本人执行）。
+    Fetch {
+        /// 目标 URL（http/https）
+        url: String,
+        /// 只输出正文，不输出诊断行
+        #[arg(long)]
+        quiet: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -468,6 +500,7 @@ fn main() {
             | Some(Commands::Features { .. })
             | Some(Commands::Config { .. })
             | Some(Commands::Wallet { .. })
+            | Some(Commands::Web { .. })
             | Some(Commands::Wiki { .. })
             | Some(Commands::Todo { .. })
             | Some(Commands::Bench { .. })
@@ -724,6 +757,11 @@ fn main() {
             }
             WalletCommands::Export { label } => {
                 entry::run_wallet_export(label);
+            }
+        },
+        Some(Commands::Web { command }) => match command {
+            WebCommands::Fetch { url, quiet } => {
+                entry::run_web_fetch(url, *quiet);
             }
         },
         Some(Commands::Config { command }) => match command {
