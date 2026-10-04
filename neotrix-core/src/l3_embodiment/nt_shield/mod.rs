@@ -2,6 +2,16 @@
 
 // Core modules (renamed from 'core' to avoid shadowing std::core)
 pub mod shield_core;
+
+/// 7-stage 对抗防御管线（661 行 / 13 测试）。
+///
+/// ⚠️ 2026-10-04 之前本模块**从未被编译**：文件在此，`mod.rs` 无声明。
+///   ⇒ 661 行防御逻辑 + 13 个从未运行过的测试整体离线。
+///   ⇒ 它实现了 L0 `Pipeline` trait（`name()=="defense_pipeline"`），
+///      具备与其它管线同构的组合能力，却无法被任何调用方触达。
+/// 现补上声明。接入时实测：0 error，13 测试全绿（无需修改）。
+pub mod adversarial_pipeline;
+
 // pub mod content_moderation; // DEAD: zero external references
 pub mod circuit_breaker;
 pub mod dual_evidence;
