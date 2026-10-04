@@ -70,18 +70,15 @@ EXEMPT = {
     'mutation-check': '工具：命令形态是 `nt_mutation_check.py --audit <FILE.rs>`，⭐⭐ **需逐文件传参** ⇒ 无法无参运行 ⇒ 不适合做 CI 阻断',
     'nt-absorb-denylist': '工具：命令形态是 `nt_absorb_denylist.py <清单文件|->`，⭐⭐ **需传清单** ⇒ 同上',
 
-    # ── ③ ⭐⭐ 隐式依赖未声明：9 道 playwright UI 门 ──
-    # ⭐⭐⭐ 下面 9 条的豁免理由是**可证伪的**（见 P4）：
-    # ⭐⭐ 一旦 `playwright` 被写进 package.json，⭐⭐ **这些豁免自动失效并判红**。
-    'neobot-ui-smoke': 'UNDECLARED_DEP:需 playwright（未在 neobot-ui/package.json 声明）',
-    'neobot-msg-virtual': 'UNDECLARED_DEP:需 playwright（未在 neobot-ui/package.json 声明）',
-    'neobot-check-contrast': 'UNDECLARED_DEP:需 playwright（未在 neobot-ui/package.json 声明）',
-    'neobot-check-convo-groups': 'UNDECLARED_DEP:需 playwright（未在 neobot-ui/package.json 声明）',
-    'neobot-check-theme-persist': 'UNDECLARED_DEP:需 playwright（未在 neobot-ui/package.json 声明）',
-    'neobot-check-msg-copy': 'UNDECLARED_DEP:需 playwright（未在 neobot-ui/package.json 声明）',
-    'neobot-check-markdown': 'UNDECLARED_DEP:需 playwright（未在 neobot-ui/package.json 声明）',
-    'neobot-check-shortcuts': 'UNDECLARED_DEP:需 playwright（未在 neobot-ui/package.json 声明）',
-    'neobot-check-convo-keys': 'UNDECLARED_DEP:需 playwright（未在 neobot-ui/package.json 声明）',
+    # ── ③ ⭐⭐ 隐式依赖未声明 —— ⭐⭐ **已于 2026-10-04 清零** ──
+    # ⭐⭐⭐ 原来这里有 9 条 `UNDECLARED_DEP` 豁免（9 道 playwright UI 门）。
+    # ⭐⭐ 那 9 道门从 **vendored 冻结树** 解析 playwright，而 CI 只在
+    # ⭐⭐ `neobot-ui/` 跑 `pnpm install` ⇒ ⭐⭐ **CI 里必然加载失败**
+    # ⭐⭐ ⇒ ⭐⭐⭐ 它们在 CI 上等于不存在。
+    # ✅ 处置：playwright 已归位到 `neobot-ui/devDependencies`，
+    #    9 道门的 `createRequire` 锚点已改到交付树，⭐⭐ **全部已接进 CI**。
+    # ⭐⭐ P4 现在**故意不豁免任何门** ⇒ ⭐⭐ 一旦再出现「依赖未声明」的
+    # ⭐⭐ UI 门，它会**当场判红**（⭐⭐ 这道判据的价值就是「逼人真去接」）。
 }
 
 # ⭐⭐ 纯本地、**零浏览器/网络/编译依赖** ⇒ 应该接 CI 的门。

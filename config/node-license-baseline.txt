@@ -1,8 +1,7 @@
 # npm 依赖许可基线（scripts/check-license-js.sh 的棘轮）
 # 格式：name<TAB>version<TAB>license（SPDX，来自 node_modules/<pkg>/package.json）
 # ⛔ 新增包**不会**被自动放行：基线外 ⇒ 门红 ⇒ 须人工审后加进本文件。
-# ⛔ deny 名单（AGPL/GPL/SSPL/Elastic/BUSL/PolyForm-NC/Commons-Clause/CC-BY-NC）
-#    即使写进基线也 FAIL —— 基线不是绕过通道。
+# ⛔ deny 名单即使写进基线也 FAIL —— 基线不是绕过通道。
 @babel/code-frame	7.29.7	MIT
 @babel/compat-data	7.29.7	MIT
 @babel/core	7.29.7	MIT
@@ -73,6 +72,8 @@ nanoid	3.3.19	MIT
 node-releases	2.0.57	MIT
 picocolors	1.1.1	ISC
 picomatch	4.0.7	MIT
+playwright	1.63.0	Apache-2.0
+playwright-core	1.63.0	Apache-2.0
 postcss	8.5.28	MIT
 react	19.2.8	MIT
 react-dom	19.2.8	MIT

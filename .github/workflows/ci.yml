@@ -251,6 +251,41 @@ jobs:
         run: node scripts/ops/neobot-check-ipc-keys.mjs
       - name: neobot A1 recovery gate (running rows dominated by sweep)
         run: node scripts/ops/neobot-check-a1-recovery.mjs
+      # ⭐⭐⭐⭐ 2026-10-04：⭐⭐ **9 道 UI 门首次进 CI**（⭐⭐ 此前它们在 CI 上等于不存在）。
+      #
+      # ⭐⭐⭐ 根因（⭐⭐ 实测，非推理）：这 9 道门用 `createRequire` 把
+      #   `require('playwright')` 锚到 **`frontend/`（vendored 冻结树）** 的
+      #   package.json，⭐⭐ 而 CI **只在 `neobot-ui/` 跑 `pnpm install`**
+      #   ⇒ ⭐⭐ CI 里 `frontend/node_modules` 不存在 ⇒ ⭐⭐ 模块加载必然失败。
+      # ⭐⭐⭐ 它们的注释还写着「playwright 装在 vendored 的 frontend 里」——
+      # ⭐⭐⭐ **陈述属实，但没人问过 CI 里它存不存在**。
+      #
+      # ✅ 处置：playwright 归位到 `neobot-ui/devDependencies`（Apache-2.0，
+      #    ⛔ 不在 deny 名单；许可基线已更新，许可门 rc=0），
+      #    9 道门的锚点全部改到交付树。
+      # ⭐⭐ 元门 `nt_gate_coverage.py` 的 **P4** 会持续保证：
+      #   ⭐⭐ 一旦再出现「依赖未声明」的 UI 门，⭐⭐ **当场判红**。
+      #
+      # ⭐⭐ 用系统 Chrome（脚本内 `channel: 'chrome'`）⇒ ⭐⭐ **免 150MB 浏览器下载**
+      # ⭐⭐ （GitHub `ubuntu-latest` 镜像自带 Chrome）。
+      - name: neobot UI gate — neobot-check-contrast (对比度（AA）)
+        run: node scripts/ops/neobot-check-contrast.mjs
+      - name: neobot UI gate — neobot-check-convo-groups (会话分组)
+        run: node scripts/ops/neobot-check-convo-groups.mjs
+      - name: neobot UI gate — neobot-check-convo-keys (会话键名)
+        run: node scripts/ops/neobot-check-convo-keys.mjs
+      - name: neobot UI gate — neobot-check-msg-copy (消息复制按钮)
+        run: node scripts/ops/neobot-check-msg-copy.mjs
+      - name: neobot UI gate — neobot-check-shortcuts (快捷键)
+        run: node scripts/ops/neobot-check-shortcuts.mjs
+      - name: neobot UI gate — neobot-check-theme-persist (主题跨刷新持久)
+        run: node scripts/ops/neobot-check-theme-persist.mjs
+      - name: neobot UI gate — neobot-msg-virtual (消息虚拟化（长列表）)
+        run: node scripts/ops/neobot-msg-virtual.mjs
+      - name: neobot UI gate — neobot-check-markdown (markdown 渲染 + 语言跟随)
+        run: node scripts/ops/neobot-check-markdown.mjs
+      - name: neobot UI gate — neobot-ui-smoke (UI 冒烟（综合）)
+        run: node scripts/ops/neobot-ui-smoke.mjs
       - name: Build frontend (tsc --noEmit + vite build)
         run: pnpm run build
         working-directory: apps/neobot-desktop/neobot-ui
