@@ -32,14 +32,41 @@ impl WebSourceType {
         }
     }
 
+    /// 判定网页来源类型 —— **决定下游 LLM 任务类型**
+    /// （见 [`Self::to_task_type`]：Wikipedia/ArXiv/KnowledgeBase → CodeAnalysis，
+    /// GitHub → CodeGeneration），故判错的代价不止是标签不准。
+    ///
+    /// # ⭐ 2026-10-03：**只把域名规则**改为 host 判定
+    ///
+    /// ⛔ 原实现前三条用裸 `contains("wikipedia.org")` 等，会把
+    /// `https://wikipedia.org.evil.net/` 判成 Wikipedia 并派发
+    /// CodeAnalysis 任务。
+    ///
+    /// ⚠️ **但末尾的关键词启发式刻意保持 `contains` 不变** ——
+    ///    `contains("wiki") / ("knowledge") / ("encyclopedia")` 是**有意的内容
+    ///    启发式**（URL 里含这些词就当知识库），不是域名判定。
+    ///    ⛔ 若一并收紧，`wiki.foo.com` / `example.org/wiki/1` 会从
+    ///    KnowledgeBase 变成 GenericUrl ⇒ **那是行为变更，不是修 bug**。
+    ///
+    /// ⭐ 二者共存无冲突：域名规则在前（精确），关键词兜底在后（宽松）。
+    ///    实测「正常 URL 分类完全不变」+「伪装域名不再命中域名规则」。
     pub fn detect(url_str: &str) -> Self {
+        use crate::l0_substrate::nt_core_platform::url_match::url_matches_domain as m;
         let lower = url_str.to_lowercase();
-        if lower.contains("wikipedia.org") || lower.contains("wikidata.org") || lower.contains("wikimedia.org") {
+        // —— 精确域名规则（收紧）——
+        if m(url_str, "wikipedia.org")
+            || m(url_str, "wikidata.org")
+            || m(url_str, "wikimedia.org")
+        {
             WebSourceType::Wikipedia
-        } else if lower.contains("arxiv.org") || lower.contains("aclweb.org") || lower.contains("semanticscholar.org") {
+        } else if m(url_str, "arxiv.org")
+            || m(url_str, "aclweb.org")
+            || m(url_str, "semanticscholar.org")
+        {
             WebSourceType::ArXiv
-        } else if lower.contains("github.com") {
+        } else if m(url_str, "github.com") {
             WebSourceType::GitHub
+        // —— 内容启发式（**刻意保持 contains**）——
         } else if lower.contains("wiki") || lower.contains("knowledge") || lower.contains("encyclopedia") {
             WebSourceType::KnowledgeBase
         } else {
@@ -639,5 +666,106 @@ mod tests {
         let stats = miner.stats();
         assert_eq!(stats.total_mined, 0);
         assert_eq!(stats.total_edits, 0);
+    }
+}
+
+
+#[cfg(test)]
+mod detect_host_match_tests {
+    use super::*;
+
+    /// ⭐⭐ 迁移回归：正常 URL 的分类**必须完全不变**。
+    /// 尤其要验证关键词启发式未被误伤 ——
+    /// `wiki.foo.com` / `example.org/wiki/1` 仍须是 KnowledgeBase。
+    #[test]
+    fn normal_urls_keep_their_classification() {
+        for (url, want) in [
+            ("https://en.wikipedia.org/wiki/Rust", WebSourceType::Wikipedia),
+            ("https://www.wikidata.org/wiki/Q1", WebSourceType::Wikipedia),
+            ("https://arxiv.org/abs/1234.5678", WebSourceType::ArXiv),
+            ("https://aclweb.org/anthology/2026.acl-long.1", WebSourceType::ArXiv),
+            ("https://github.com/owner/repo", WebSourceType::GitHub),
+            // ⭐ 关键词启发式的三种形态，必须仍然命中
+            ("https://wiki.foo.com/x", WebSourceType::KnowledgeBase),
+            ("https://example.org/knowledge/1", WebSourceType::KnowledgeBase),
+            ("https://a.b/encyclopedia", WebSourceType::KnowledgeBase),
+            ("https://vimeo.com/123", WebSourceType::GenericUrl),
+        ] {
+            assert_eq!(WebSourceType::detect(url), want, "url: {}", url);
+        }
+    }
+
+    /// ⭐ 判定面收窄：伪装域名不再命中**域名规则**。
+    ///
+    /// ⚠️ 注意 `wikipedia.org.evil.net/` 收紧后落 `KnowledgeBase`
+    ///    而非 `GenericUrl` —— 因为 URL 里仍含 "wiki" 关键词。
+    ///    ⭐ 这是**正确**的：关键词启发式是刻意保留的语义，
+    ///    我们只收紧了域名规则，没有偷偷删掉启发式。
+    #[test]
+    fn lookalike_domains_no_longer_match_domain_rules() {
+        // 不含任何关键词的伪装域名 ⇒ 完全落到 GenericUrl
+        for hostile in [
+            "https://arxiv.org.evil.net/abs/1",
+            "https://github.com.evil.net/a/b",
+            "https://aclweb.org.evil.io/x",
+        ] {
+            assert_eq!(
+                WebSourceType::detect(hostile),
+                WebSourceType::GenericUrl,
+                "hostile {} must not match a domain rule",
+                hostile
+            );
+        }
+    }
+
+    #[test]
+    fn userinfo_impersonation_does_not_match_domain_rules() {
+        assert_eq!(
+            WebSourceType::detect("https://github.com@evil.net/a"),
+            WebSourceType::GenericUrl
+        );
+    }
+
+    /// ⭐⭐ 守住「关键词语义不得被静默删除」——
+    /// 这条专门针对「顺手把 contains 也改成 host 判定」的错误修法。
+    #[test]
+    fn keyword_heuristics_are_still_intact() {
+        assert_eq!(
+            WebSourceType::detect("https://wiki.foo.com/x"),
+            WebSourceType::KnowledgeBase,
+            "keyword heuristic must survive the migration"
+        );
+        assert_eq!(
+            WebSourceType::detect("https://example.org/papers/knowledge"),
+            WebSourceType::KnowledgeBase
+        );
+    }
+
+    /// ⭐ 域名规则优先于关键词（顺序语义不得改变）
+    #[test]
+    fn domain_rules_take_precedence_over_keywords() {
+        // github.com/…/wiki  → GitHub（域名规则在前），不是 KnowledgeBase
+        assert_eq!(
+            WebSourceType::detect("https://github.com/owner/wiki"),
+            WebSourceType::GitHub
+        );
+        // wikipedia.org/…/github → Wikipedia
+        assert_eq!(
+            WebSourceType::detect("https://wikipedia.org/wiki/GitHub"),
+            WebSourceType::Wikipedia
+        );
+    }
+
+    /// ⭐ 该分类决定 LLM 任务类型，故此处一并锁住下游行为。
+    #[test]
+    fn classification_still_drives_task_type() {
+        assert_eq!(
+            WebSourceType::detect("https://github.com/a/b").to_task_type(),
+            super::TaskType::CodeGeneration
+        );
+        assert_eq!(
+            WebSourceType::detect("https://en.wikipedia.org/wiki/Rust").to_task_type(),
+            super::TaskType::CodeAnalysis
+        );
     }
 }

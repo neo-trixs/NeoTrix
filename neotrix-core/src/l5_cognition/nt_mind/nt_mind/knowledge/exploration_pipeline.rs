@@ -22,12 +22,15 @@ pub enum UnifiedSourceType {
 
 impl UnifiedSourceType {
     pub fn detect(url: &str) -> Self {
-        let lower = url.to_lowercase();
-        if lower.contains("wikipedia.org") || lower.contains("wikidata.org") {
+        // ⭐ 2026-10-03：域名规则改为 host 判定（此函数**不含**关键词启发式，
+        //    故为纯净替换）。原裸 contains 会把 `wikipedia.org.evil.net`
+        //    判成 Wikipedia，进而把探索方向导向 ExploreDomain::Wiki。
+        use crate::l0_substrate::nt_core_platform::url_match::url_matches_domain as m;
+        if m(url, "wikipedia.org") || m(url, "wikidata.org") {
             UnifiedSourceType::Wikipedia
-        } else if lower.contains("arxiv.org") || lower.contains("semanticscholar.org") {
+        } else if m(url, "arxiv.org") || m(url, "semanticscholar.org") {
             UnifiedSourceType::ArXiv
-        } else if lower.contains("github.com") {
+        } else if m(url, "github.com") {
             UnifiedSourceType::GitHub
         } else {
             UnifiedSourceType::GenericWeb
@@ -638,5 +641,54 @@ mod tests {
         let urls = seed_urls_by_domain(ExploreDomain::Consciousness);
         assert!(!urls.is_empty());
         assert!(urls.iter().all(|u| u.contains("wikipedia.org")));
+    }
+}
+
+
+#[cfg(test)]
+mod unified_source_host_tests {
+    use super::UnifiedSourceType;
+
+    /// ⭐ 迁移回归：正常 URL 分类完全不变
+    #[test]
+    fn normal_urls_keep_their_classification() {
+        for (url, want) in [
+            ("https://en.wikipedia.org/wiki/Rust", UnifiedSourceType::Wikipedia),
+            ("https://www.wikidata.org/wiki/Q1", UnifiedSourceType::Wikipedia),
+            ("https://arxiv.org/abs/1234", UnifiedSourceType::ArXiv),
+            ("https://www.semanticscholar.org/paper/1", UnifiedSourceType::ArXiv),
+            ("https://github.com/a/b", UnifiedSourceType::GitHub),
+            ("https://vimeo.com/1", UnifiedSourceType::GenericWeb),
+            ("https://blog.example.org/post", UnifiedSourceType::GenericWeb),
+        ] {
+            assert_eq!(UnifiedSourceType::detect(url), want, "url: {}", url);
+        }
+    }
+
+    /// ⭐ 伪装域名不再命中（该分类决定 ExploreDomain ⇒ 影响探索方向）
+    #[test]
+    fn lookalike_domains_fall_back_to_generic() {
+        for hostile in [
+            "https://wikipedia.org.evil.net/wiki/X",
+            "https://arxiv.org.evil.net/abs/1",
+            "https://github.com.evil.net/a",
+            "https://semanticscholar.org.evil.io/p/1",
+        ] {
+            assert_eq!(
+                UnifiedSourceType::detect(hostile),
+                UnifiedSourceType::GenericWeb,
+                "hostile {} must not steer exploration",
+                hostile
+            );
+        }
+    }
+
+    #[test]
+    fn userinfo_and_empty_are_handled() {
+        assert_eq!(
+            UnifiedSourceType::detect("https://github.com@evil.net/a"),
+            UnifiedSourceType::GenericWeb
+        );
+        assert_eq!(UnifiedSourceType::detect(""), UnifiedSourceType::GenericWeb);
     }
 }

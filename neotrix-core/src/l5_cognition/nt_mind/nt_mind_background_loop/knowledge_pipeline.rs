@@ -175,10 +175,7 @@ impl KnowledgeAbsorptionPipeline {
             summary.clone()
         };
 
-        let node_type = if url.contains("arxiv.org") || url.contains("paper") { NodeType::Paper }
-            else if url.contains("github.com") { NodeType::Repository }
-            else if url.contains("wikipedia.org") { NodeType::Reference }
-            else { NodeType::Article };
+        let node_type = classify_node_type(url);
 
         // 插入失败必须传播错误：绝不把失败 URL 记成已吸收 (record_source 会使其 24h 不再重试)
         let kb = self.kb.as_ref().ok_or("knowledge base not initialized")?;
@@ -380,5 +377,96 @@ mod tests {
         let html = "<p>foo &amp; bar &lt; 3</p>";
         let (_, text) = extract_html_content(html);
         assert_eq!(text, "foo & bar < 3");
+    }
+}
+
+
+/// 由 URL 判定知识节点类型（写入 KB 的**持久类型**）。
+///
+/// # ⭐ 2026-10-03：**域名规则**改为 host 判定
+///
+/// ⛔ 原裸 `contains("github.com")` 会把 `https://github.com.evil.net/…`
+///    判成 [`NodeType::Repository`] 并**持久化进知识库** —— 之后所有
+///    消费该节点的逻辑都会被误导。
+///
+/// ⚠️ `contains("paper")` 是**关键词启发式**，刻意保持不变 ——
+///    收紧它会把 `/papers/123` 从 Paper 改成 Article，
+///    那是**行为变更**而非修 bug。故 arxiv 走 host 判定、paper 仍 contains。
+///
+/// ⭐ 抽成自由函数而非内联 `if`，是为了让判据**可被测试** ——
+/// 内联在深调用栈里时，伪装域名的问题无法写回归测试。
+pub fn classify_node_type(url: &str) -> NodeType {
+    use crate::l0_substrate::nt_core_platform::url_match::url_matches_domain as m;
+    if m(url, "arxiv.org") || url.contains("paper") {
+        NodeType::Paper
+    } else if m(url, "github.com") {
+        NodeType::Repository
+    } else if m(url, "wikipedia.org") {
+        NodeType::Reference
+    } else {
+        NodeType::Article
+    }
+}
+
+#[cfg(test)]
+mod classify_node_type_tests {
+    use super::classify_node_type;
+    use neotrix_types::knowledge_access::NodeType;
+
+    /// ⭐ 迁移回归：正常 URL 分类完全不变
+    #[test]
+    fn normal_urls_keep_their_type() {
+        for (url, want) in [
+            ("https://arxiv.org/abs/1234", NodeType::Paper),
+            ("https://github.com/a/b", NodeType::Repository),
+            ("https://en.wikipedia.org/wiki/Rust", NodeType::Reference),
+            ("https://blog.example.org/post", NodeType::Article),
+            // ⭐ 关键词启发式必须仍然生效
+            ("https://x.com/papers/123", NodeType::Paper),
+            ("https://example.org/my-paper", NodeType::Paper),
+        ] {
+            assert_eq!(classify_node_type(url), want, "url: {}", url);
+        }
+    }
+
+    /// ⭐ 伪装域名不再被写成 Repository/Reference（该值会**持久化**）
+    #[test]
+    fn lookalike_domains_are_not_typed_as_platform_nodes() {
+        for hostile in [
+            "https://github.com.evil.net/a/b",
+            "https://wikipedia.org.evil.net/wiki/X",
+            "https://arxiv.org.evil.net/abs/1",
+        ] {
+            assert_eq!(
+                classify_node_type(hostile),
+                NodeType::Article,
+                "hostile {} must not be persisted as a platform node",
+                hostile
+            );
+        }
+    }
+
+    /// ⭐⭐ 守住关键词语义：收紧域名判定时**不得**顺手把
+    /// `contains("paper")` 也改掉 —— 那会让 `/papers/123` 变 Article。
+    #[test]
+    fn paper_keyword_heuristic_survives() {
+        assert_eq!(classify_node_type("https://x.com/papers/1"), NodeType::Paper);
+        assert_eq!(classify_node_type("https://example.org/my-paper"), NodeType::Paper);
+        // ⚠️ 大写 `PAPERS` **不**命中 —— 这是**既有**行为（`contains("paper")`
+        //    本身大小写敏感），本次未改、也不该在此顺手改（那是独立的行为变更）。
+        assert_eq!(classify_node_type("https://x.com/PAPERS/1"), NodeType::Article);
+    }
+
+    /// ⭐ 分支顺序语义锁定：arXiv+paper 分支在**最前**，
+    /// 故含 `papers` 的 github URL 判 Paper。
+    /// ⚠️ 这是**既有**顺序，本次未改 —— 独立 harness 逐条比对 11 个 URL
+    /// 确认：除伪装域名外，分类结果全部不变。
+    #[test]
+    fn branch_order_is_paper_first() {
+        assert_eq!(
+            classify_node_type("https://github.com/owner/papers"),
+            NodeType::Paper,
+            "the paper branch is first, so `papers` wins over the github rule"
+        );
     }
 }
