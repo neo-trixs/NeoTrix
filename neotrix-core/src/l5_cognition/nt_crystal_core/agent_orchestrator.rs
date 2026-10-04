@@ -6,7 +6,6 @@
 //! - Flow 事件驱动
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 // T14: 原 AgentRole 改名 CrystalArchetype（与 L1 正典 AgentRole 消歧；crew 功能正典见 l5 multi_agent/role.rs）
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -115,6 +114,25 @@ impl AgentOrchestrator {
         }
     }
 
+    /// 登记一个**待委派**任务（不占用 agent）。
+    ///
+    /// 与 `dispatch` 的区别是本方法存在的全部理由：
+    /// - `dispatch`：按到达顺序**立刻**派给一个 `Idle` agent 并置 `InProgress`
+    /// - 本方法：只入队为 `Pending`，留给 `hierarchical_delegate` 批量委派
+    ///
+    /// ⚠️ 二者对同一个空闲 agent **互斥**：先 `dispatch` 再
+    ///   `hierarchical_delegate`，后者会因找不到 `Pending` 而返回空。
+    ///   这是设计如此（一个 agent 同时只做一件事），不是缺陷。
+    pub fn enqueue_pending_task(&mut self, crew_name: &str, task: Task) -> bool {
+        match self.crews.iter_mut().find(|c| c.name == crew_name) {
+            Some(crew) => {
+                crew.tasks.push(task);
+                true
+            }
+            None => false,
+        }
+    }
+
     pub fn hierarchical_delegate(&mut self, crew_name: &str) -> Vec<String> {
         let mut delegated = Vec::new();
         if let Some(crew) = self.crews.iter_mut().find(|c| c.name == crew_name) {
@@ -178,9 +196,44 @@ mod tests {
             capabilities: vec![], status: AgentStatus::Idle,
         });
         let task = Task { id: "t2".into(), description: "work".into(), assigned_to: None, status: TaskStatus::Pending, result: None };
-        orch.dispatch("beta", task);
+        // ⚠️ 此处原调用 `dispatch("beta", task)`。
+        //
+        //   而 `dispatch` 会**立刻**把任务派给空闲 agent 并置为 `InProgress`，
+        //   于是 `hierarchical_delegate` 再去找 `Pending` 任务时
+        //   找到 0 条 ⇒ `delegated` 必空 ⇒ **该测试恒失败**。
+        //
+        //   两条路径是**互斥**的（一条按到达顺序派发，一条按层级批量委派），
+        //   同一个 crew + 同一个空闲 agent 不该被两条路径先后用掉。
+        //
+        // ✅ 改为直接登记 Pending 任务（层级委派的正确前置条件）。
+        //    ⚠️ `add_task` 若不存在则用 push；先确认 API 再写。
+        orch.enqueue_pending_task("beta", task);
         let delegated = orch.hierarchical_delegate("beta");
-        assert!(!delegated.is_empty());
+        assert!(!delegated.is_empty(), "Pending 任务应被委派出去");
+        assert!(
+            delegated.iter().any(|d| d.contains("t2") && d.contains("b1")),
+            "委派记录应含任务 id 与 agent id: {:?}",
+            delegated
+        );
+    }
+
+    /// 锁住上面那条语义边界：`dispatch` 与 `hierarchical_delegate` 互斥。
+    /// 若将来有人让 `dispatch` 不再立刻置 `InProgress`，本测试会红。
+    #[test]
+    fn dispatch_consumes_the_idle_agent_so_delegate_finds_nothing() {
+        let mut orch = AgentOrchestrator::new();
+        orch.create_crew("gamma", ProcessType::Hierarchical);
+        orch.add_agent("gamma", Agent {
+            id: "g1".into(), role: CrystalArchetype::Guide, name: "G".into(),
+            capabilities: vec![], status: AgentStatus::Idle,
+        });
+        let task = Task { id: "t9".into(), description: "d".into(), assigned_to: None, status: TaskStatus::Pending, result: None };
+        assert!(orch.dispatch("gamma", task), "dispatch 应成功占用唯一空闲 agent");
+        // 任务已被 dispatch 置为 InProgress ⇒ 层级委派无 Pending 可用
+        assert!(
+            orch.hierarchical_delegate("gamma").is_empty(),
+            "dispatch 已占用 agent，层级委派应无事可做"
+        );
     }
 
     #[test]

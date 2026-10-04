@@ -33,6 +33,11 @@ mod tests {
     /// ⭐ 本文件此前**从未被编译**（`l2_perception/mod.rs` 漏了声明），
     /// 所以这些 impl 从未生效过，也**没有任何测试**证明它们可用。
     /// ⇒ 这里逐个断言 `?` 转换真的能编译并落到正确的错误变体。
+    ///
+    /// ⭐ 这些测试住在本文件里 ⇒ 它们**本身**也只有在本文件被编译时才存在。
+    ///   即「文件缺席」会让这 4 个测试一起消失，而不只是让断言失败。
+    /// ⚠️ 局限（如实记录）：测试计数变化不是 CI 会主动失败的信号 ——
+    ///   兜底靠 `self_audit` 的 mod-tree 扫描 + feature-gates 的 6 次 check。
     #[test]
     fn from_parse_error_maps_to_operation_failed() {
         let e: NeoTrixError = ParseError::InvalidField("bad".to_string()).into();

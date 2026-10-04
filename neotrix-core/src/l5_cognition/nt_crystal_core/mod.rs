@@ -9,6 +9,11 @@
 //! 核心循环: 吸收 → 熔炼 → 进化 → 输出
 
 pub mod identity;
+pub mod multi_graph_memory;
+pub mod self_healing;
+pub mod memory_orchestrator;
+pub mod observability;
+pub mod agent_orchestrator;
 pub mod knowledge;
 pub mod experience;
 pub mod evolution;

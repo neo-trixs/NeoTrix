@@ -676,14 +676,26 @@ mod retrieval_gate_wiring_tests {
     /// ⭐⭐⭐ **光有测试不够**：⭐⭐ 上游那种状态就是「有 4 条测试全绿」
     /// ⭐⭐⭐ 却零生产接线。⇒ 所以这里必须有一条 ⭐⭐ **断言真实跳过发生**
     /// ⭐⭐ 的测试 —— ⭐⭐ 它 ⭐⭐**只在门真的被调用时才会通过**。
-    /// ⭐⭐⭐ **门被调用的次数**（⭐⭐ 唯一无歧义的「接线证据」）
-    static DECIDE_CALLS: std::sync::atomic::AtomicUsize =
-        std::sync::atomic::AtomicUsize::new(0);
+    /// ⭐⭐⭐⭐ **门被调用的次数**（⭐⭐ 唯一无歧义的「接线证据」）
+    ///
+    /// ⚠️ **两个 gate 必须各自独立计数**（2026-10-04 实测 flaky 根因）：
+    ///   原实现只有一个 `DECIDE_CALLS`，但**只有** `AlwaysSkip` 会递增它；
+    ///   而 `gate_崩溃时必须_fail_open_照旧检索` 却断言 `DECIDE_CALLS > before`
+    ///   ⇒ 该断言能否通过，取决于**同进程内另一个测试有没有先跑过**
+    ///   （cargo test 的线程调度决定谁先）。
+    ///   ⇒ 单独跑必红、全量跑常绿、**偶尔**全量也红。
+    ///   我实测全量套件 6 次里红过 1 次（12964 passed; 1 failed），
+    ///   失败信息是「门从未被调用 ⇒ 接线已回退」—— 而接线其实好好的。
+    ///
+    /// ✅ 修法：拆成 `SKIP_CALLS` / `ERR_CALLS`，各自只被自己的 gate 递增，
+    ///   断言只跟自己比 ⇒ 与执行顺序、线程调度完全无关。
+    static SKIP_CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    static ERR_CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
     struct AlwaysSkip;
     impl RetrievalGate for AlwaysSkip {
         fn decide(&self, _m: &str) -> Result<GateDecision, GateError> {
-            DECIDE_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            SKIP_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             Ok(GateDecision::Skip { reason: "wiring-test".into() })
         }
     }
@@ -691,6 +703,7 @@ mod retrieval_gate_wiring_tests {
     struct AlwaysErr;
     impl RetrievalGate for AlwaysErr {
         fn decide(&self, _m: &str) -> Result<GateDecision, GateError> {
+            ERR_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             Err(GateError::Unavailable("wiring-test".into()))
         }
     }
@@ -733,7 +746,8 @@ mod retrieval_gate_wiring_tests {
     fn gate_崩溃时必须_fail_open_照旧检索() {
         let mut kb = KnowledgeBase::open(None).expect("临时库");
         kb.set_retrieval_gate(|| Box::new(AlwaysErr));
-        let before = DECIDE_CALLS.load(std::sync::atomic::Ordering::SeqCst);
+        // ⚠️ 只跟**自己**的计数器比（ERR_CALLS），不碰共享计数器
+        let before = ERR_CALLS.load(std::sync::atomic::Ordering::SeqCst);
         // ⭐⭐⭐ fail-open 的**可观测证据**：⭐⭐ 门崩了不抛错，
         // ⭐⭐ 而是照常走检索路径（⭐⭐ 空库 ⇒ 空集，但 ⭐⭐ **是 Ok**）
         match kb.search("任意查询", 5) {
@@ -742,7 +756,7 @@ mod retrieval_gate_wiring_tests {
         }
         // ⭐⭐⭐ **关键断言**：⭐⭐ 门**确实被调用过**
         assert!(
-            DECIDE_CALLS.load(std::sync::atomic::Ordering::SeqCst) > before,
+            ERR_CALLS.load(std::sync::atomic::Ordering::SeqCst) > before,
             "⭐⭐⭐ 门**从未被调用** ⇒ ⭐⭐ 接线已回退（本测试才有意义的前提）"
         );
     }

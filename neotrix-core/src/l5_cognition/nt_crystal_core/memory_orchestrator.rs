@@ -207,7 +207,19 @@ impl MemoryOrchestrator {
             }
             let before = keep.len();
             // 衰减
-            keep.retain(|r| self.decay_score(r) >= self.decay_config.min_retention);
+            //
+            // ⚠️ 此行曾编译不过（E0502）：`records` 是 `self.records.values_mut()`
+            //    借出的 `&mut`，闭包里再调 `self.decay_score(..)` 又要 `&self`
+            //    ⇒ 同一 `self` 同时可变与不可变借用。
+            //
+            // ✅ `decay_score` 实际只读 `self.decay_config`（我核对过它的函数体：
+            //    唯一用到 self 的地方是 `self.decay_config.half_life_ms`），
+            //    而 `decay_config` 不参与 `self.records` 的借用
+            //    ⇒ 在循环外先克隆一份，彻底切断闭包对 `self` 的依赖。
+            //    这比「改成 &self 形参」更小改动，且不改动 decay_score 的签名
+            //    （它可能还有别的调用方）。
+            let decay_cfg = self.decay_config.clone();
+            keep.retain(|r| Self::decay_score_with(r, &decay_cfg) >= decay_cfg.min_retention);
             removed += before - keep.len();
             *records = keep;
         }
@@ -218,8 +230,17 @@ impl MemoryOrchestrator {
 
     /// 计算衰减分数
     fn decay_score(&self, record: &MemoryRecord) -> f64 {
+        Self::decay_score_with(record, &self.decay_config)
+    }
+
+    /// 衰减分数的**纯函数**形式 —— 只依赖 `DecayConfig`，不依赖 `self`。
+    ///
+    /// 存在的理由：`consolidate()` 在 `self.records.values_mut()` 的借用期内
+    /// 需要调用它，而那个借用已是 `&mut self` ⇒ 再调 `&self` 方法必然 E0502。
+    /// 抽成关联函数后，闭包只需捕获 `DecayConfig`（`Copy` 语义的小结构）。
+    fn decay_score_with(record: &MemoryRecord, cfg: &DecayConfig) -> f64 {
         let age_ms = now_ms().saturating_sub(record.timestamp);
-        let half_lives = age_ms as f64 / self.decay_config.half_life_ms as f64;
+        let half_lives = age_ms as f64 / cfg.half_life_ms as f64;
         let base_decay = 0.5_f64.powf(half_lives);
         let access_boost = (record.access_count as f64).log2().max(0.0) * 0.1;
         (base_decay + access_boost).min(1.0)
