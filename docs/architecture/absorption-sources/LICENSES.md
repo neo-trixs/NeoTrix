@@ -81,6 +81,16 @@ curl -s "https://raw.githubusercontent.com/<owner>/<repo>/HEAD/LICENSE" | head -
 
 三者均为 MIT ⇒ 可自由取用思路与代码片段（**实际未复制任何代码**）。
 
+## 2026-10-04 第四批
+
+| 仓库 | SPDX | 备注 |
+|---|---|---|
+| `rehan-remade/universal-modder` | **MIT** | ✅ 宽松 |
+| `allenai/olmo-core` | **Apache-2.0** | ⛔ 有**专利授权**条款 |
+| `Niko1221/Strata` | **MIT** | ✅ 已于 `fc5a1107` 吸收，不重复登记 |
+
+统一索引：`ABSORPTION-2026-10-04-OLMOCORE-MODDER.md`
+
 ## 2026-10-03 第三批：用户提交 12 源中需单列的两条
 
 | 仓库 | SPDX | 备注 |
