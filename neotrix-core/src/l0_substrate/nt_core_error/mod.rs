@@ -4,7 +4,24 @@
 //! 子模块: parse (编译器错误解析), recovery (错误恢复策略)。
 
 pub mod parse;
-pub mod recovery;
+// ⛔ 2026-10-03 由 `pub` 收为 `pub(crate)`。
+//
+// 【实测依据（判据 1：按类型名逐个文件查，不搜方法名）】
+// · crate **外部**消费者：**0 个**
+//   （`rg 'nt_core_error::recovery' crates/` ⇒ 无命中）
+// · crate **内部**消费者：3 个文件，且都在 neotrix-core 内
+//   —— `l1_action/nt_io/nt_io_provider/gateway/execution.rs:6`
+//   —— `l0_substrate/nt_core_platform/init.rs:57`
+//   —— `l1_action/nt_io/nt_io_provider/gateway/mod.rs:8`
+//   ⇒ `pub(crate)` **不影响**它们。
+//
+// 【为什么要收】本模块的 `RecoveryManager::recover()` 在生产路径上
+// **未见调用点**（`rg '.recover('` 仅命中本模块自身）。
+// 对外`pub` 暴露一个**没有生产调用方**的恢复框架，
+// 会让读代码的人以为「重试保护已就位」—— **虚假保障**。
+// 而 `pub` 又让编译器**无法**给出 dead-code 信号（公开可达项不算 dead）。
+// ⇒ 收窄后，编译器才**重新获得**判它「有没有人用」的能力。
+pub(crate) mod recovery;
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
