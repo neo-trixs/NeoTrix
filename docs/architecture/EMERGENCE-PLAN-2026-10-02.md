@@ -112,6 +112,29 @@ criterion_scores.push(CriterionScore {
 ### 6.0 三份外部同构证据
 | 来源 | 原话/机制 |
 |---|---|
+### 6.9.1 ⛔ 【推被推翻】我曾断言「修饱和 bug = 修掉预算感知控制的盲点」——**错**
+
+**原断言**：「论文说预算感知控制是长程agent 的关键；而我修的 `resonance.rs`
+饱和缺陷正是让 `ThinkingBudgetGate` 失去区分能力 ⇒ **修一个饱和 bug，
+恰好修掉了「预算感知控制」的一个盲点**。」
+
+**实测反证（2026-10-04，`neotrix web fetch` 之后的自查）**：
+| 事实 | 证据 |
+|---|---|
+| `ThinkingBudgetGate` | **只出现在其定义文件** `neotrix-types/src/core/nt_core_gwt/resonance.rs` |
+| `resonate_cycle_with_budget` | **零生产调用方** |
+| L5 的同名 `resonance.rs` | ⛔ **完全没有** budget gate |
+| L5 那份的实际用途 | 只用 `default_specialist_states`（**共享状态集**，不是预算控制） |
+
+⇒ ⭐ **我方不存在「预算感知控制」路径。**
+⇒ 那条饱和 bug 影响的是**测试覆盖的那条路径**，
+**修不到任何生产盲点** ⇒ 原断言**建立在空中**。
+
+⇒ ⛔ 修正 §6.9 的性质：它**不是**「我方已有预算控制、缺预算下限」，
+而是「**我方连预算控制都还没有接线**」⇒ §6.9 因此**降级**为
+「若将来接入预算感知控制，则必须同时有预算下限」。
+⇒ ⭐ 而这也与本会话反复出现的同一条一致：**先把存在性查清，再谈改进。**
+
 | **CASP（剑桥，Hinton/Bengio/Jack Clark 等 23 人）** | 「AI systems now write most of the code inside the companies that build them」；R&D 自动化 ⇒ 进展可能非线性加速 |
 | **`yetone/cumora`（MIT）** | seen-cursor：过期回复**扣留**并让它看到新消息后**重新决策** ⇒ 不让过期信息直接生效 |
 | **`yetone/magpie`（MIT）** | 历史记录「**never inferred from today's configured key**」⇒ 缺证据时**显示「无记录」**，不拿现状补 |
