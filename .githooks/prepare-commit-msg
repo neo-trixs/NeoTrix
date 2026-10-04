@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# prepare-commit-msg — 删除声明门的**正确挂载点**
+#
+# ## 为什么必须挂在 prepare-commit-msg，而不是 pre-commit
+#
+# `scripts/check-commit-deletions.sh` 需要读**本次**的 commit message。
+# pre-commit 拿不到它 —— 不是「git 不传参」那么简单（那只是表面症状）：
+#
+# 实测（一次性仓库，2026-10-04，4 种提交方式全测）：
+#
+#   | 提交方式                       | pre-commit 读到的 COMMIT_EDITMSG | prepare-commit-msg 读到的 $1     |
+#   |--------------------------------|----------------------------------|--------------------------------|
+#   | 已暂存删 + --only -m           | **上一次**的 message             | 本次 message ✅                  |
+#   | 未暂存删 + --only -m           | **上一次**的 message             | 本次 message ✅                  |
+#   | 未暂存删 + --only -F           | **上一次**的 message             | 本次 message ✅                  |
+#   | 已暂存删 + git commit -m       | **上一次**的 message             | 本次 message ✅                  |
+#
+# ⇒ **`COMMIT_EDITMSG` 在 pre-commit 时刻装的是上一次提交的消息**；
+#   本次消息要到 pre-commit 之后才落盘。四个组合无一例外，
+#   与「暂存/未暂存删除」无关（早先怀疑是后者，实测证伪）。
+#
+# ⇒ 门挂在 pre-commit 上时，它读的是**上一次**的消息：
+#   - 本次声明了删除 → 读不到 ⇒ **误报红**（提交被无理由拒绝）
+#   - 上一次声明了、本次没声明 ⇒ **漏放行**（真事故反而过）
+#
+# ⚠️ 且 pre-commit 可被 `--no-verify` 跳过 ⇒ 现装法下门**可被完全绕过**
+#   （实测：`--no-verify` 下无声明的删除照样落账）。
+#   prepare-commit-msg **不受 `--no-verify` 影响**（实测 rc=1 拦住）
+#   ⇒ 把门搬到这里顺带**关掉了绕过口**。
+#
+# ## 与 pre-commit 中旧调用的关系
+#
+# pre-commit 里的调用已删除（不是注释掉）：留着会拿「上一次消息」判本次，
+# 造成**稳定误报**。本 hook 覆盖同样规则，且更早、更准、不可绕过。
+#
+# ## 边界
+#
+# · `$2` = message（-m/-F）/ template / merge / squash / commit（-c/-C/--amend）。
+#   本 hook 只读文件内容，不解释来源 ⇒ 一视同仁。
+# · `git commit --amend` 时 $1 是**待编辑后**的消息文件；
+#   prepare-commit-msg 拿到的是 amend 的新消息，符合预期。
+# · 若将来 git 在某路径下不跑本 hook，删除声明会失去拦截
+#   ⇒ 该风险已在 scripts/check-commit-deletions.sh 头注登记。
+set -uo pipefail
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+cd "$ROOT" || exit 0
+
+# $1 = 消息文件（git 必给）；$2 = 来源（message/template/merge/...）
+# 用 ${1-} 而非 ${1:-}：set -u 下 ${1:-} 会把「未传参」与「传了空串」混同，
+# 而 git 在 --amend 等路径上的传参组合需实测确认，不靠猜。
+MSG_FILE="${1-}"
+if [ -z "$MSG_FILE" ] || [ ! -f "$MSG_FILE" ]; then
+  echo "[deletions] WARNING: prepare-commit-msg 未拿到消息文件，跳过删除声明检查" >&2
+  exit 0
+fi
+
+if [ -f scripts/check-commit-deletions.sh ]; then
+  # 显式传消息文件 ⇒ 门读的是**本次**消息（门支持 (a) 号来源）
+  if ! bash scripts/check-commit-deletions.sh "$MSG_FILE"; then
+    exit 1
+  fi
+fi
+
+exit 0
