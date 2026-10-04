@@ -803,8 +803,16 @@ export function NeoBotRoot() {
                 active ? 'bg-btn-active' : ''
               }`}
             >
-              <div className="flex items-center gap-1">
-                <span className={`truncate text-[13px] ${active ? 'font-semibold text-ink' : 'text-ink'}`}>
+              {/* ⭐⭐ 2026-10-03 修「`truncate` 形同虚设」
+                  ⛔ 改前：`<div class="flex">` 里直接放 `<span class="truncate">`
+                  ⇒ ⭐⭐ **flex 子项的 `min-width` 默认是 `auto`**，
+                  ⇒ ⭐⭐ **内容不换行时它不肯收缩** ⇒ `truncate` 的
+                  `overflow:hidden; text-overflow:ellipsis` **永远不生效**
+                  ⇒ 长会话标题**直接撑破侧栏**（这正是「不能被遮挡」的根因之一）。
+                  ⇒ ⭐⭐ 修法就是 dsh `conversation-bar.tsx` 用的那一行：
+                  **`flex-1 min-w-0`** —— `min-w-0` 才是让 `truncate` 生效的前提。*/}
+              <div className="flex min-w-0 items-center gap-1">
+                <span className={`min-w-0 flex-1 truncate text-[13px] ${active ? 'font-semibold text-ink' : 'text-ink'}`}>
                   {c.title || c.id}
                 </span>
                 {c.muted && (
@@ -1016,10 +1024,17 @@ export function NeoBotRoot() {
             aria-expanded={memOpen}
             className="flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-left text-[12px] text-muted hover:bg-panel-hover"
           >
-            <span>{memOpen ? '▾' : '▸'}</span>
-            <span>{t('chat.memory')}{mem && mem.lines.length > 0 ? ` ${mem.lines.length}` : ''}</span>
+            {/* ⭐⭐ 2026-10-03 遮挡根治：三段式收缩契约
+                （形态照 dsh `conversation-bar.tsx` 的 slots 思路）。
+                ⛔ 改前：`<span>标题</span>` + `<span class="ml-auto">计数</span>`
+                ⇒ 两段**都没有收缩约束**，`ml-auto` 只推右边、不防挤压
+                ⇒ ⭐⭐ 「记忆 12」这类标题一长，**右侧计数就被挤出/重叠**。 */}
+            <span className="shrink-0" aria-hidden="true">{memOpen ? '▾' : '▸'}</span>
+            {/* ⭐ `min-w-0` 是 flex 子项**能收缩的前提**（缺它则 `truncate` 无效）*/}
+            <span className="min-w-0 flex-1 truncate">{t('chat.memory')}{mem && mem.lines.length > 0 ? ` ${mem.lines.length}` : ''}</span>
             {mem && mem.bytes > 0 && (
-              <span className="ml-auto tabular-nums">
+              // ⭐ `shrink-0` ⇒ 计数是**最后被牺牲**的，标题先省略
+              <span className="ml-2 shrink-0 tabular-nums text-[11px]">
                 {mem.bytes}/{mem.cap}
               </span>
             )}

@@ -38,8 +38,8 @@
    * ⭐ 故用 `[data-platform='macos']` 定向，⛔ 而不是媒体查询
    *（⭐ 媒体查询判不了「有没有交通灯」，⭐⭐ 那是窗口装饰，不是视口特性）。
    */
-  --nb-traffic-inset: 0px;
-  padding-left: calc(var(--nb-gap-4) + var(--nb-traffic-inset));
+  /* ⭐⭐ 栏内距**也**走栏族 token（原先是 `0 var(--nb-gap-4)` 写死）*/
+  padding: 0 calc(var(--nb-bar-pad-x) + var(--nb-traffic-inset));
   border-bottom: 1px solid var(--nb-color-line);
   background: var(--nb-color-canvas);
   flex: 0 0 auto;
@@ -223,7 +223,8 @@ body,
 }
 
 /* ⭐⭐ macOS：把标题栏左侧让给交通灯（Overlay 标题栏的强制补偿）。*/
-.nb-shell[data-platform='macos'] .nb-bar {
+.nb-shell[data-platform='macos'] {
+  /* ⭐⭐ 只在这里置位；`shell.css` 不再自带数字 ⇒ 单一来源 */
   --nb-traffic-inset: 78px;
 }
 
@@ -234,5 +235,7 @@ body,
  * ⭐⭐ 但这次是**写完立刻回查类名**发现的，不是靠运气）。
  */
 .nb-shell[data-platform='macos'] .nb-modal-box header {
-  padding-left: calc(var(--nb-gap-4) + 78px);
+  /* ⭐⭐ 复用同一个 token，⛔ 不再硬写 78px
+   * ⇒ 昨天那个数字从此**只有一处**（`theme.css` 的 `--nb-traffic-inset`）。*/
+  padding-left: calc(var(--nb-bar-pad-x) + var(--nb-traffic-inset));
 }
