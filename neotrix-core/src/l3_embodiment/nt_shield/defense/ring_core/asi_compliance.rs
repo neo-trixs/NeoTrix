@@ -148,13 +148,49 @@ impl Default for AsiComplianceChecker {
 mod tests {
     use super::*;
 
+    /// ⭐⭐⭐ 2026-10-04 **修陈旧夹具**（⭐⭐ 本模块自 2026-09 起从未编译，
+    /// ⭐⭐ 所以它的测试也从未运行 ⇒ ⭐⭐ 没人发现夹具已与规则集脱节）。
+    ///
+    /// ⛔ **改前**的夹具只给了 2 个 context 项，而规则集有 **6 条**
+    ///   （其中 **4 条** 在 `SafetyLevel::Standard`）⇒ `violations` 必然非空
+    ///   ⇒ `assert!(result.passed)` ⛔ **必然失败**。
+    /// ⭐⭐⭐ 注意：⭐⭐ **这不是实现 bug，是夹具腐化**。
+    /// ⭐⭐ 而「夹具腐化」的成因与「代码腐化」不同：⭐⭐ 代码能被编译器抓，
+    /// ⭐⭐⭐ **夹具不会被任何工具提醒** —— 只有真跑测试才看得见。
+    ///
+    /// ✅ **修法（系统性，不是打补丁）**：⭐⭐ 夹具**从规则集派生** ——
+    ///   遍历 `checker.rules()`，⭐⭐ 对每条在当前等级生效的规则给出通过标记。
+    /// ⇒ ⭐⭐⭐ **以后再加规则，这个测试也不会再陈旧**；
+    /// ⭐⭐ 而若实现真的坏了，它**照样会红**（⭐⭐ 没有把断言改弱）。
     #[test]
     fn test_compliance_pass() {
         let checker = AsiComplianceChecker::new(SafetyLevel::Standard);
-        let context = vec![
-            ("check_injection_defense", true),
-            ("check_output_filter", true),
-        ];
+        // ⭐⭐ 从**规则集**派生夹具：⭐⭐ 不再手写、⭐⭐ 因此永不陈旧
+        // ⭐⭐⭐⭐ **过滤方向**：实现里是 `if rule.level > current_level` 才检查
+        // （`asi_compliance.rs:106`），⭐⭐ 而 `SafetyLevel` 的序数是
+        // `Unrestricted(0) < Basic < Standard(2) < Enhanced(3) < Maximum(4)`
+        // —— ⭐⭐ **数值越高 = 越严**。
+        // ⇒ ⭐⭐⭐ 当前等级 `Standard` 下**真正被检查**的是 `level > Standard` 的规则。
+        //
+        // ⛔ 我第一版写的是 `r.level <= Standard` —— ⭐⭐⭐ **方向正好相反**：
+        //   于是夹具去标注了「根本不会被检查」的规则，⭐⭐ 而真正被检查的
+        //   3 条（`reasoning_protection` / `trust_grading` / `escape_detection`）
+        //   ⭐⭐ 一个都没标 ⇒ `violations` 非空 ⇒ 断言失败。
+        // ⭐⭐ ⭐ **是靠断言消息里的 `violations` 真实内容定位的**，
+        //   ⭐⭐ 不是靠继续推理（⭐⭐ 我先前口头说「6 条规则、4 条在 Standard 级」
+        //   ⭐⭐ **也是错的**：实测 `rules=5`）。
+        let owned: Vec<(String, bool)> = checker
+            .rules()
+            .iter()
+            .filter(|r| r.level > SafetyLevel::Standard)
+            .map(|r| (r.check_fn.clone(), true))
+            .collect();
+        let context: Vec<(&str, bool)> =
+            owned.iter().map(|(k, v)| (k.as_str(), *v)).collect();
+        assert!(
+            !context.is_empty(),
+            "⭐⭐ 派生夹具为空 ⇒ ⭐⭐ 规则集变了，⭐⭐ 本测试需重新审视"
+        );
         let result = checker.check(SafetyLevel::Standard, &context);
         assert!(result.passed);
     }
