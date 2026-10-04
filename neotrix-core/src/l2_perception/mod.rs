@@ -2,6 +2,17 @@ pub mod nt_judgment;
 pub mod nt_world;
 pub use crate::l1_action::nt_core_llm;
 
+/// L2 → L0 error conversions (moved from l0_substrate to respect L0 ← L2 direction)
+///
+/// ⚠️ 本文件此前**从未被编译**：`error_conversions.rs` 躺在
+/// `l2_perception/` 下却没有任何 `mod.rs` 声明它（L1/L3/L5/L6 四层都有
+/// 各自的 `error_conversions` 且都已声明，唯独 L2 漏了）。
+/// ⇒ 三个 `From<…> for NeoTrixError` impl 全部未生效：
+/// `asset_map::query::ParseError`、`social_access::traits::SocialAccessError`、
+/// `source::offline_download::OfflineError`。
+/// ⇒ 任何想用 `?` 自动转换这三类错误的代码都编译不过，只能显式 map。
+pub mod error_conversions;
+
 // 从 core/ 迁移的 L2 模块
 pub mod nt_core_e8;
 pub mod nt_core_e8_predictor;
