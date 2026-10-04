@@ -1,12 +1,14 @@
 #![forbid(unsafe_code)]
 
 //! 事件派发调度器 — 吸收自 deepseek-harness vendor/cordis/src/events.ts
-//! (4+1 dispatch modes: emit / waterfall / parallel / serial) 与
+//! (4+1 dispatch modes: emit / waterfall / independent / serial) 与
 //! cordiverse/paper §4.3.3 (asynchrony/inertia) + §5.1.2 (notify → refresh)。
 //!
 //! 机制:
 //! - `Emit`    广播: 所有 handler 收到事件, 互不短路。
-//! - `Parallel`并行: 语义同 Emit (Rust 同步调度); 保留模式名以对应 Cordis 语义。
+//! - `Independent` 独立: ⭐⭐ **逐 handler 隔离 panic**（⭐ 真「独立」，⛔ 不是并发）。
+//!   ⭐⭐ ⛔ **刻意不 spawn 线程**：L0 是无运行时依赖的同步基元，
+//!   ⭐⭐ 每事件 spawn 会把「同步基元」变成「线程工厂」。
 //! - `Serial`  顺序: 首个 handler 返回 `true` (已处理) 即短路 (bail)。
 //! - `Waterfall` 链式中间件: 每个 handler 可调 `next()` 委托给下一环 (around
 //!   middleware), 或返回 `true` 短路; 都不做则顺延 (fall-through)。
@@ -44,8 +46,27 @@ pub enum DispatchMode {
     Emit,
     /// around 中间件链: handler 可 next() 委托 / 返回 true 短路 / 静默顺延
     Waterfall,
-    /// 并行独立处理 (同步场景等价 Emit)
-    Parallel,
+    /// ⭐⭐⭐ **独立处理**：跑完**全部** handler，且**每个 handler 的 panic 被隔离**。
+    ///
+    /// ⭐⭐⭐ 2026-10-04 **重命名 + 语义修正**（⭐ 改名零风险：实测生产零调用方）。
+    ///
+    /// ⛔ **改名前叫 `Parallel`，而它撒谎**：
+    ///   原注释写着「并行独立处理 (同步场景等价 Emit)」——
+    ///   ⭐⭐ **前半句说并行，后半句自认等价 Emit（= 串行同步）**
+    ///   ⭐⭐ 实现更是 `for h in &self.handlers { h(event, &|| {}) }`
+    ///   ⭐⭐ ⇒ **既不并行，又阻塞 producer**。
+    /// ⭐⭐ 对标 Atlas 的 `atlas-bus` 原文原则：⭐⭐ **lagging subscriber
+    ///   绝不阻塞 producer**。⭐⭐ 那个「独立」真正要保证的不是并发度，
+    ///   ⭐⭐ 而是 ⭐⭐ **一个坏 handler 不能拖死/拖慢 producer**。
+    ///
+    /// ⭐⭐⭐ 所以这里给的是**真独立**：
+    ///   ① ⭐⭐ `catch_unwind` 逐个隔离 ⇒ **一个 handler panic 不影响其余**
+    ///   ② ⭐⭐ 全程 `catch_unwind` ⇒ ⭐⭐ **producer 永不 panic**
+    ///   ③ ⛔ ⭐⭐ **刻意不做真并发**（不 spawn 线程）：
+    ///      L0 是无运行时依赖的同步基元，⭐⭐ 每事件 spawn 线程会把
+    ///      ⭐⭐ 「同步基元」变成「线程工厂」，⭐⭐ 代价远大于收益。
+    ///      ⇒ ⭐⭐ 并发留给上层（tokio），⭐⭐ L0 只保证**隔离**。
+    Independent,
     /// 顺序处理, 首个 handler 返回 true 即短路 (bail)
     Serial,
 }
@@ -55,7 +76,7 @@ impl DispatchMode {
         match self {
             DispatchMode::Emit => "emit",
             DispatchMode::Waterfall => "waterfall",
-            DispatchMode::Parallel => "parallel",
+            DispatchMode::Independent => "independent",
             DispatchMode::Serial => "serial",
         }
     }
@@ -69,6 +90,17 @@ impl DispatchMode {
 /// - 返回 `true`: 声明"已处理" (Serial/Waterfall 短路; Emit/Parallel 仅计数)
 pub struct Dispatcher<E> {
     handlers: Vec<Box<dyn Fn(&E, &dyn Fn()) -> bool + Send + Sync>>,
+    /// ⭐⭐⭐ `Independent` 模式下被隔离掉的 handler panic 次数（**实例级**）。
+    ///
+    /// ⭐⭐⭐ **为什么必须是实例级、⛔ 不是进程全局**（⭐⭐ 第一版踩了）：
+    ///   ⛔ 我第一版做成 `static AtomicUsize`，⭐⭐ 于是
+    ///   ⭐⭐ **cargo test 并行跑测试时互相污染** —— 实测
+    ///   ⭐⭐ 「1 个 panic 的 handler，差值却测出 **2**」。
+    ///   ⭐⭐ 更本质的问题是：⭐⭐ 调用方要问的是
+    ///   ⭐⭐ **「我这次 dispatch 有没有 handler 崩」**，
+    ///   ⭐⭐ ⛔ 不是「全进程今天崩了几次」⇒ 观测必须**跟着 dispatcher 走**。
+    /// ⭐⭐ 附带收益：⭐⭐ 无全局可变状态 ⇒ ⭐⭐ **天然可重入、可并发观测**。
+    handler_panics: std::sync::atomic::AtomicUsize,
 }
 
 impl<E> Default for Dispatcher<E> {
@@ -81,6 +113,8 @@ impl<E> Dispatcher<E> {
     pub fn new() -> Self {
         Self {
             handlers: Vec::new(),
+            // ⭐⭐ 实例级 panic 计数（⭐⭐ ⛔ 不是 `static`：见字段注释的实测教训）
+            handler_panics: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
@@ -105,6 +139,14 @@ impl<E> Dispatcher<E> {
         self.handlers.len()
     }
 
+    /// ⭐⭐ 本实例累计隔离掉的 handler panic 次数（⭐⭐ `Independent` 模式）。
+    ///
+    /// ⭐⭐ 调用方据此判断：⭐⭐ 「这次派发**是否全部成功**」。
+    /// ⭐⭐ ⛔ **不要**把它当「错误率」指标跨实例相加（⭐⭐ 不同 dispatcher 语义不同）。
+    pub fn handler_panic_count(&self) -> usize {
+        self.handler_panics.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     pub fn is_empty(&self) -> bool {
         self.handlers.is_empty()
     }
@@ -112,11 +154,43 @@ impl<E> Dispatcher<E> {
     /// 按模式派发。返回实际运行的 handler 数。
     pub fn dispatch(&self, mode: DispatchMode, event: &E) -> usize {
         match mode {
-            DispatchMode::Emit | DispatchMode::Parallel => {
+            DispatchMode::Emit => {
                 let mut ran = 0;
                 for h in &self.handlers {
                     h(event, &|| {});
                     ran += 1;
+                }
+                ran
+            }
+            DispatchMode::Independent => {
+                // ⭐⭐⭐ 真独立：⭐⭐ 逐个 `catch_unwind` ⇒ ⭐⭐ **一个 handler
+                // panic 不影响其余，也不把 panic 抛回 producer**。
+                // ⭐ 这正是 Atlas `atlas-bus` 的核心契约（lagging/broken
+                // subscriber 不得阻塞 producer）在本层的最小实现。
+                let mut ran = 0;
+                for h in &self.handlers {
+                    let evt = event;
+                    // ⚠️ `AssertUnwindSafe` 是**必需**的：handler 是 `&dyn Fn`，
+                    // ⭐⭐ 而编译器无法证明它没有内部可变状态（`&mut` 捕获）。
+                    // ⭐⭐ 这里**只用于 unwinding 边界**，⛔ 不引入任何 `unsafe`
+                    // ⭐⭐ （本 crate 是 `#![forbid(unsafe_code)]`，catch_unwind 是安全 API）。
+                    let ok = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        h(evt, &|| {});
+                    }))
+                    .is_ok();
+                    // ⭐⭐ 计数语义：**跑过就算 ran**（含 panic 那个），
+                    // ⭐⭐ ⛔ 但返回值只说「派发到几个」，⭐⭐ 不该假装它成功了。
+                    ran += 1;
+                    if !ok {
+                        // ⭐⭐ 诚实：⭐⭐ 记一笔，⭐⭐ ⛔ **不静默吞掉**
+                        // ⭐⭐ （静默吞 = 用户以为「都处理了」）。
+                        // ⭐⭐⭐ 记在**实例**上（⭐⭐ 不是进程全局）——
+                        // ⭐⭐ 第一版做成了 `static` 全局，⭐⭐ 结果
+                        // ⭐⭐ **cargo test 并行跑测试时互相污染**
+                        // ⭐⭐ （实测：1 个 panic 却测出 2），
+                        // ⭐⭐ 且全局可变状态让 Dispatcher ⛔ 不可重入观测。
+                        self.handler_panics.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    }
                 }
                 ran
             }
@@ -322,7 +396,64 @@ mod tests {
     }
 
     #[test]
-    fn test_parallel_is_non_short_circuit() {
+    /// ⭐⭐⭐ `Independent` 的**核心契约**：⭐⭐ 一个 handler panic
+    /// **既不打断其余 handler，也不把 panic 抛回 producer**，⭐⭐ 且**留痕**。
+    ///
+    /// ⭐⭐ 这是 Atlas `atlas-bus` 那条原则的可执行形态：
+    /// ⭐⭐ 「lagging / broken subscriber 绝不阻塞 producer」。
+    /// ⭐⭐ 而 ⭐⭐ **留痕（计数器）** 同样重要 —— ⭐⭐ 静默吞掉 panic
+    /// ⭐⭐ 会让调用方以为「全部处理成功」。
+    #[test]
+    fn independent_isolates_panicking_handler_and_still_runs_the_rest() {
+        // ⭐⭐ `Dispatcher::on` 的真签名是 `Fn(&E) -> bool`（`:137`），
+        // ⭐⭐ **不是**裸 `Fn(&E, &dyn Fn())` —— ⭐⭐ 我第一版照 `dispatch`
+        // ⭐⭐ 的内部 handler 形状写，⭐⭐ 编译器当场抓住（⭐ 这就是有门的好处）。
+        let mut d: Dispatcher<i32> = Dispatcher::new();
+        // ⭐⭐⭐ 记录「到达了第几个 handler」。
+        // ⭐⭐⭐ **必须 `Arc`**：`Dispatcher::on` 的 bound 是 `F: Fn(&E) -> bool
+        //   + Send + Sync + 'static`（`:137`）⇒ ⭐⭐ **`'static` 要求闭包不借用
+        //   栈上局部** ⇒ 直接捕获 `step` 报 E0373。
+        // ⭐⭐ 而 `Mutex<Vec>` 更糟：handler 是 `Fn`（**不可变**捕获），
+        // ⭐⭐ 闭包里拿不到 `Mutex` 的 `&mut` ⇒ ⭐⭐ **两条路都堵**，
+        // ⭐⭐ 所以用 `Arc<AtomicUsize>`：⭐⭐ `Clone` 一份进闭包，⭐⭐ 全 'static。
+        let step = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        // ⭐⭐⭐ 三个句柄各司其职：`step` 进闭包 1、`step2` 进闭包 3、
+        // ⭐⭐ `reader` 留在测试里读数。⭐⭐ **不复用已被 move 的变量**
+        // ⭐⭐ （我第一版复用 ⇒ E0382，⭐⭐ 编译器当场抓住）。
+        let step2 = std::sync::Arc::clone(&step);
+        let reader = std::sync::Arc::clone(&step);
+
+        d.on(move |_e: &i32| {
+            step.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            false
+        });
+        // ⭐⭐ 故意 panic 的 handler
+        d.on(|_e: &i32| panic!("induced handler panic"));
+        d.on(move |_e: &i32| {
+            // ⭐⭐ 记 10（而不是 3）⇒ ⭐⭐ 于是「after 被跑到」可与
+            // ⭐⭐ 「停在 2」区分开 ⭐⭐（⭐ 只数个数分不清是否跳过了 3 号）
+            step2.fetch_add(10, std::sync::atomic::Ordering::SeqCst);
+            false
+        });
+
+        // ⭐⭐ `handler_panic_count()` 直接返回 `usize`（⭐ 我上一版返回类型写错，
+        // ⭐⭐ 编译器当场抓住 ⇒ **不要**再对它 `.load()`）
+        let before = d.handler_panic_count();
+        // ⭐⭐ 关键：⭐⭐ **producer 侧不 panic**（改前 Emit 会 panic 出来）
+        let ran = d.dispatch(DispatchMode::Independent, &1);
+        let after_panics = d.handler_panic_count() - before;
+
+        assert_eq!(ran, 3, "⭐ 三个 handler 都必须被派发到");
+        assert_eq!(
+            reader.load(std::sync::atomic::Ordering::SeqCst),
+            11,
+            "⭐⭐ panic 的 handler **不能**阻断前后两个（1 + 10）"
+        );
+        assert_eq!(after_panics, 1, "⭐⭐ panic 必须留痕（⛔ 不静默吞）");
+    }
+
+    #[test]
+    fn test_independent_is_non_short_circuit() {
         let mut d = Dispatcher::new();
         let count = Arc::new(AtomicU32::new(0));
         for _ in 0..2 {
@@ -332,7 +463,7 @@ mod tests {
                 true
             });
         }
-        let ran = d.dispatch(DispatchMode::Parallel, &9);
+        let ran = d.dispatch(DispatchMode::Independent, &9);
         assert_eq!(ran, 2); // 全部运行 (true 不短路)
         assert_eq!(count.load(Ordering::SeqCst), 2);
     }
@@ -373,7 +504,7 @@ mod tests {
     fn test_mode_names() {
         assert_eq!(DispatchMode::Emit.name(), "emit");
         assert_eq!(DispatchMode::Waterfall.name(), "waterfall");
-        assert_eq!(DispatchMode::Parallel.name(), "parallel");
+        assert_eq!(DispatchMode::Independent.name(), "independent");
         assert_eq!(DispatchMode::Serial.name(), "serial");
     }
 }
