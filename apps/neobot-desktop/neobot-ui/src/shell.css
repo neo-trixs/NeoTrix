@@ -170,7 +170,23 @@ body,
   border: 1px solid var(--nb-color-line);
   box-shadow: 0 12px 40px rgb(0 0 0 / .45);
 }
-.nb-modal-box header { display: flex; align-items: center; justify-content: space-between; }
+/* ⭐⭐⭐ 弹窗头：**首次进入栏族**。
+ * ⛔ 改前只有 `display:flex` + 居中 ⇒ ⭐⭐ **无 height / 无 padding / 无 border**
+ * ⇒ ⭐⭐ 弹窗头**根本不在栏族里**（实测缺口），⇒ 与顶栏/会话头**看起来不是一套**。
+ * ✅ 现在复用 `.nb-band` 的几何，只保留自己的左右分布。*/
+.nb-modal-box header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+  height: var(--nb-bar-h-sub);
+  padding: 0 var(--nb-bar-pad-x);
+  border-bottom: 1px solid var(--nb-color-line);
+  /* ⭐⭐ 圆角：⭐ 弹窗头是**有圆角容器的第一行** ⇒ 顶部两角要跟随 */
+  border-radius: 10px 10px 0 0;
+}
+/* ⭐⭐ 标题文字的收缩契约（⭐ 与顶栏 tagline 同型：⭐ `min-width:0` 是 ellipsis 前提）*/
+.nb-modal-box header strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nb-modal-box pre {
   margin: 0;
   overflow: auto;
@@ -183,14 +199,29 @@ body,
 }
 
 /* 顶栏内联错误位：说清失败，但不弹窗、不长期占位。 */
+/* ⭐⭐⭐ 错误位**也是一根栏**（它有 border-bottom 与内距 ⇒ 视觉上就是栏）。
+ * ⛔ 改前：`padding:6px 16px` 与所有栏的 `0 var(--nb-bar-pad-x)` **不同轴**
+ *      ⇒ ⭐⭐ 它的文字左边线比旁边所有栏**突出 6px**（肉眼可见的错位）。
+ * ⛔ 且 `border-bottom:#f0c9c9` / `color:#f87171` 是**两个字面色**
+ *      ⇒ ⭐⭐ 与全仓「只消费 `--nb-color-*`」的既定纪律冲突。
+ * ✅ 现在：高度/内距走栏族（⭐ `--nb-bar-h-sub` 第二次被消费），
+ *      颜色走语义 token。⭐⭐ 高度用 `--nb-bar-h-sub` ⛔ 不是硬写
+ *      （⭐ 它是**行**不是**头带**，44px 与相邻栏对齐）。*/
 .nb-bar-err {
   margin: 0;
-  padding: 6px 16px;
-  border-bottom: 1px solid #f0c9c9;
-  background: rgb(248 113 113 / .12);
-  color: #f87171;
-  font-size: 12px;
-  flex: 0 0 auto;
+  flex: none;
+  align-items: center;
+  height: var(--nb-bar-h-sub);
+  padding: 0 var(--nb-bar-pad-x);
+  border-bottom: 1px solid var(--nb-color-err-line, var(--nb-color-line));
+  background: var(--nb-color-err-bg, var(--nb-color-panel));
+  color: var(--nb-color-err, var(--nb-color-warn));
+  font-size: var(--nb-fs-xs);
+  /* ⭐⭐ 长错误文案必须能收缩：⭐ 同型缺陷第 N 次（min-w-0 是 ellipsis 前提）*/
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── 活动面板（IPC 调用记录）──────────────────────────────────────────
@@ -206,22 +237,33 @@ body,
 .nb-act-empty { margin: 0; color: var(--nb-muted); font-size: 12px; }
 .nb-act-list {
   margin: 0; padding: 0; list-style: none; overflow: auto;
-  max-height: 30vh; border: 1px solid #e8e8ed; border-radius: 6px;
+  max-height: 30vh; border: 1px solid var(--nb-color-line); border-radius: 6px;
 }
 .nb-act-list li {
   display: flex; align-items: baseline; gap: 8px;
-  padding: 4px 8px; border-bottom: 1px solid #f2f2f5; font-size: 12px;
+  padding: 4px 8px; border-bottom: 1px solid var(--nb-color-line); font-size: 12px;
 }
 .nb-act-list li:last-child { border-bottom: none; }
-.nb-act-list li.bad { background: #fdf3f3; }
+.nb-act-list li.bad { background: var(--nb-color-err-bg); }
 .nb-act-list code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .nb-act-ms { color: var(--nb-muted); margin-left: auto; white-space: nowrap; }
 .nb-act-st { font-weight: 600; }
 .nb-act-list li.ok .nb-act-st { color: var(--nb-color-ok); }
-.nb-act-list li.bad .nb-act-st { color: #f87171; }
+.nb-act-list li.bad .nb-act-st { color: var(--nb-color-err); }
 .nb-act-err {
-  color: #f87171; font-size: 12px; max-width: 46ch;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  /* ⭐⭐ 字面色已换成语义 token（本文件**最后一个**字面色）。*/
+  color: var(--nb-color-err);
+  font-size: var(--nb-fs-xs);
+  /* ⭐⭐ `46ch` ⇒ 错误文案有上限宽度，⭐⭐ 配合 ellipsis ⭐ 才不会被长栈撑破面板。
+     ⭐⭐⭐ **注意**：这里的 ellipsis ⭐⭐ **缺 `min-width:0`** ——
+     ⭐⭐ 在 flex/grid 子项里 ⭐⭐ `max-width` **不足以**让收缩生效，
+     ⭐⭐ 而本文件的父级 `.nb-act` 是 `display:flex` ⇒ ⭐⭐ **这是本项目
+     同型缺陷的第四处**（见 d1a841e5 / 989cf934）。⇒ 一并补上。*/
+  min-width: 0;
+  max-width: 46ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .nb-logs-title { margin: 2px 0 0; font-size: 12px; color: var(--nb-muted); }
 
@@ -290,3 +332,81 @@ body,
   max-width: 100%;
   flex: 1 1 auto;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+ * ⭐⭐⭐ 「栏族」配方：`.nb-band`（2026-10-04 重构，对标 deepseek-harness）
+ * ══════════════════════════════════════════════════════════════════
+ *
+ * ⭐⭐⭐ **为什么是「类」而不是「三个变量」**（⭐ 这是本轮最关键的一步）：
+ *
+ * ⭐⭐ 上一轮我只加了 `--nb-bar-h-sub` / `--nb-bar-pad-y` / `--nb-bar-pad-x`
+ *   三个变量，⭐⭐ **实测结果：5 个变量声明了但全仓零消费**
+ *   ⇒ ⭐⭐ 「声明了没人用的档比没有更危险」——
+ *   下一个 agent 会以为栏族已经统一，而实际上**一个栏都没接上**。
+ *
+ * ⭐⭐ 对标 DSH-better-sidebar 的实测做法（⭐⭐ 它是三家里唯一做到"写下来"的）：
+ *   ⭐⭐ 配方 `height:36px; padding:0 8px 0 12px; border-bottom:1px solid l1`
+ *   在 **5 个文件 6 处逐字复用**（`sidebar.module.css:679` / `:2092`、
+ *   `changes/changes.module.css:16`、`SubagentView.module.css:24`、
+ *   `FloatingWindow.module.css:37`）⇒ ⭐⭐ **不是三个变量，是一个类**。
+ *
+ * ⭐⭐⭐ 本仓的落地纪律（照抄它）：
+ *   ⭐ **凡"一根栏"，一律挂 `.nb-band`**；⛔ 子组件⛔ 不得自行声明
+ *   `height` / `padding-block` / `border-bottom`（⭐ 那正是 dsh `plugin.client.panel.md:111`
+ *   说的「页级几何只有一个拥有者，子组件只排内容」）。
+ *   ⭐ 要换栏高？只改 `.nb-band` 一处。
+ */
+.nb-band {
+  /* ⭐ `flex: none` = ⭐⭐ 不参与伸缩：栏**永远不被内容压扁**，
+     ⭐⭐ 这是 better-sidebar `.tab{max-width:160px}` 同族的防御。 */
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--nb-gap-3);
+  /* ⭐⭐ 栏高取自刻度族（`--nb-bar-h-sub` 此前**零消费**，此处首次接上）*/
+  height: var(--nb-bar-h-sub);
+  /* ⭐⭐ 栏内距取自刻度族，两侧对称 */
+  padding: 0 var(--nb-bar-pad-x);
+  /* ⭐⭐ 分隔线走语义 token：⛔ 不写字面色（⭐ 全仓纪律，见 .nb-act-list 的反例）*/
+  border-bottom: 1px solid var(--nb-color-line);
+  background: var(--nb-color-canvas);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ * ⭐⭐⭐ z-index 编号契约（方案⑤）
+ * ══════════════════════════════════════════════════════════════════
+ *
+ * ⭐⭐ 改前实测：`shell.css` / `theme.css` 里 **z-index 出现 0 次**
+ * ⇒ ⭐⭐ 层级纯靠 DOM 顺序，⛔ 加一个浮层就得靠「谁写在后面」赌。
+ *
+ * ⭐⭐ **编号直接沿用 dsh 与 DSH-better-sidebar 已协商好的值**
+ *   （来源：`external-plugin-guide.md` §12.1 + `sidebar.module.css:27-34`），
+ *   ⭐⭐ ⛔ 不自创一套 —— 否则与参考实现**语义冲突**。
+ *   ⚠️ douchat 是裸奔（实测 20+ 处字面数字、无 token、无文档）⇒ ⛔ 不学它。
+ */
+:root {
+  --nb-z-bar: 4;      /* ⭐ 常驻栏：会话头 / 状态行压住滚动内容 */
+  --nb-z-dock: 20;    /* ⭐ 输入坞（composer）：压在消息之上 */
+  --nb-z-panel: 30;   /* ⭐⭐ 遮罩层：⭐⭐ 必须高于 bar 与 dock */
+  --nb-z-modal: 1000; /* ⭐ 弹窗层（等价 dsh `z-[1000]`）*/
+  --nb-z-toast: 2147483000; /* ⭐ 提示条：⭐ 永远最上（等价 douchat 诊断条）*/
+}
+
+/* ⭐⭐⭐ 遮罩层：⭐⭐ 补一条 better-sidebar 踩过的坑（`sidebar.module.css:47-63`）
+ *   「`hidden` 盒子**仍是可编程滚动容器**，`scrollIntoView` 会把整层滚走」
+ *   ⇒ ⭐⭐ 遮挡层必须 `overflow: clip`（⭐⭐ `clip` 不建立滚动容器，⛔ `hidden` 会）。*/
+.nb-modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--nb-z-panel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: clip;
+}
+
+/* ⭐⭐ 弹窗层必须**高于遮罩** ⇒ 独立 stacking。*/
+.nb-modal-box { position: relative; z-index: var(--nb-z-modal); }
+
+/* ⭐⭐ 常驻栏：⭐⭐ 会话头/状态行/顶栏统一用它。*/
+.nb-bar, .nb-band-bar { z-index: var(--nb-z-bar); position: relative; }

@@ -844,7 +844,13 @@ export function NeoBotRoot() {
       {/* 侧栏：筛选 + 新建在上，列表独立滚动，记忆面板钉在底部。
           ⛔ 三段必须拆开：以前整栏一个 overflow-y-auto + `mt-auto`，
           列表一长记忆面板就被一起滚走，`mt-auto` 在滚动容器里本就无效。 */}
-      <aside className="flex min-h-0 w-64 shrink-0 flex-col border-r border-line">
+      {/* ⭐⭐ 侧栏宽：⭐ 此前用 `w-64`（Tailwind = 256px），
+          而 `theme.css` 声明了 `--nb-side-w: 260px` 却**零消费**
+          ⇒ ⭐⭐ **同一个语义有两个数字**，⭐ 这正是 douchat 栽过的坑
+          （它的侧栏宽同时存在 324 / 322 / 244 三个值）。
+          ⇒ ⭐⭐ 收敛到**单一真源**；⭐ `var()` 的 fallback 兜住
+          ⭐ 万一 token 未定义（⭐ 与 `--nb-traffic-inset` 同一纪律）。*/}
+      <aside className="flex min-h-0 w-[var(--nb-side-w,260px)] shrink-0 flex-col border-r border-line">
         <div className="shrink-0 space-y-1.5 p-2">
           <div className="flex gap-1.5">
             <input
@@ -867,7 +873,7 @@ export function NeoBotRoot() {
               }}
               aria-expanded={newOpen}
               title={t('chat.newConversation')}
-              className="h-[26px] w-[26px] shrink-0 rounded-lg border border-line text-[16px] leading-none text-muted hover:bg-panel-hover"
+              className="h-[var(--nb-row-h)] w-[26px] shrink-0 rounded-lg border border-line text-[16px] leading-none text-muted hover:bg-panel-hover"
             >
               {newOpen ? '×' : '+'}
             </button>
@@ -1094,8 +1100,19 @@ export function NeoBotRoot() {
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-12 shrink-0 items-center border-b border-line px-4">
-          <span className="text-sm font-semibold text-ink">
+        {/* ⭐⭐⭐ 会话头**挂上栏族**（2026-10-04）。
+         * ⛔ 改前：`h-12`（=48px）+ `px-4` + `border-b` ⇒ ⭐⭐ **没走栏族**，
+         *   ⭐⭐ 48px 恰好等于顶栏的 `--nb-bar-h` ⇒ ⭐⭐ 于是**会话头与顶栏等高**，
+         *   ⭐⭐ 而会话头里没有品牌也没有主按钮 ⇒ ⭐⭐ 视觉上「白白多出一条 48px 的带子」。
+         * ✅ 现在：走 `.nb-band`（`--nb-bar-h-sub` = 44px）
+         *   ⇒ ⭐⭐ **顶栏 48 / 次级栏 44** 的两级栏族第一次真正生效。
+         * ⭐⭐ 对标 douchat 的教训：它顶栏与会话头**都是 46px**、纯人工约定，
+         *   且 `inset:48px` 已漂 2px ⇒ ⭐⭐ **「靠约定统一」必然漂**，必须落到类。*/}
+        <header className="nb-band nb-convo-head">
+          {/* ⭐⭐ 同型缺陷**第 5 处**：⭐ 会话标题可很长（⭐ 用户可自命名）
+           *    ⇒ 无 `min-width:0` ⇒ ⭐⭐ **撑破栏、把右侧操作挤出**。
+           *    ⭐ `min-w-0` 是 ellipsis 的硬前提（本项目已栽 5 次）。*/}
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
             {current?.title ?? 'NeoBot'}
           </span>
           {current && (
@@ -1148,7 +1165,7 @@ export function NeoBotRoot() {
               )}
             </div>
           ) : (
-            <div className="mx-auto max-w-[760px] space-y-2">
+            <div className="mx-auto max-w-[var(--nb-col-w)] space-y-2">
               {/* ⭐⭐ 2026-10-03「加载更早」（接上 `neobot_convo_messages_page`）。
                   ⛔ 长会话此前一次性全量拉取 ⇒ 整段历史进 DOM。
                   ⭐ 放在消息列表**上方** ⇒ 更早的内容出现在顶部，符合阅读直觉。
@@ -1289,7 +1306,7 @@ export function NeoBotRoot() {
         </div>
 
         <div className="shrink-0 border-t border-line p-3">
-          <div className="mx-auto flex max-w-[760px] items-end gap-2">
+          <div className="mx-auto flex max-w-[var(--nb-col-w)] items-end gap-2">
             <textarea
               ref={taRef}
               value={draft}
@@ -1317,7 +1334,7 @@ export function NeoBotRoot() {
               rows={1}
               placeholder={t('chat.inputPlaceholder')}
               aria-label={t('chat.inputLabel')}
-              className="max-h-40 min-h-[36px] flex-1 resize-none overflow-y-auto rounded-2xl border border-line bg-panel px-3 py-2 text-[13px] text-ink outline-none focus:border-info-hover"
+              className="max-h-40 min-h-[var(--nb-row-2-h)] flex-1 resize-none overflow-y-auto rounded-2xl border border-line bg-panel px-3 py-2 text-[13px] text-ink outline-none focus:border-info-hover"
             />
             <button
               type="button"
@@ -1329,7 +1346,7 @@ export function NeoBotRoot() {
             </button>
           </div>
           {histLoading && (
-            <p className="mx-auto mt-1 max-w-[760px] text-[12px] text-muted">{t('chat.historyPaused')}</p>
+            <p className="mx-auto mt-1 max-w-[var(--nb-col-w)] text-[12px] text-muted">{t('chat.historyPaused')}</p>
           )}
         </div>
       </section>

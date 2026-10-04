@@ -35,6 +35,14 @@
   --nb-color-info: #7aaaff;               /* state-business-primary (deepseek-400) */
   --nb-color-info-hover: #4176e6;         /* button-info-hover (deepseek-500) */
   --nb-color-ok: #22c55e;                 /* state-success-primary (green-500) */
+  /* ⭐⭐⭐ 2026-10-04 补「危险/错误」语义色族（此前**只有 ok** ⇒
+     ⭐⭐ `.nb-bar-err` 与 `.nb-act-list li.bad` 只能写字面色 #f87171/#fdf3f3
+     ⇒ ⭐⭐ 这是本仓仅剩的字面色来源，也是「失败提示在不同主题下不一致」的根。
+     ⭐⭐ 命名照 dsh 的 `--dsw-alias-state-*` 层；⭐⭐ **每套主题都要给全**
+     （⭐ 只补浅色会让深色主题回落到字面值 ⇒ ⭐⭐ 门也抓不到）。*/
+  --nb-color-err: #dc2626;              /* ⭐ 文字：state-danger-primary */
+  --nb-color-err-bg: rgb(220 38 38 / .12);
+  --nb-color-err-line: #f0c9c9;
   --nb-color-log-bg: #1b1b1c;             /* markdown-code-block (bluish-900) */
   --nb-color-log-ink: #cfd3d6;            /* label-secondary (bluish-300) */
   /* 滚动条 thumb（官方 scrollbar-bg/hover 的 neutral 值） */
@@ -74,6 +82,14 @@ html[data-theme="light"] {
   --nb-color-info: #4176e6;               /* state-business-primary (deepseek-500) */
   --nb-color-info-hover: #7aaaff;         /* button-info-hover (deepseek-400) */
   --nb-color-ok: #22c55e;                 /* state-success-primary (green-500) */
+  /* ⭐⭐⭐ 2026-10-04 补「危险/错误」语义色族（此前**只有 ok** ⇒
+     ⭐⭐ `.nb-bar-err` 与 `.nb-act-list li.bad` 只能写字面色 #f87171/#fdf3f3
+     ⇒ ⭐⭐ 这是本仓仅剩的字面色来源，也是「失败提示在不同主题下不一致」的根。
+     ⭐⭐ 命名照 dsh 的 `--dsw-alias-state-*` 层；⭐⭐ **每套主题都要给全**
+     （⭐ 只补浅色会让深色主题回落到字面值 ⇒ ⭐⭐ 门也抓不到）。*/
+  --nb-color-err: #dc2626;              /* ⭐ 文字：state-danger-primary */
+  --nb-color-err-bg: rgb(220 38 38 / .12);
+  --nb-color-err-line: #f0c9c9;
   --nb-color-log-bg: #f9fafb;             /* markdown-code-block (bluish-50) */
   --nb-color-log-ink: #61666b;            /* label-secondary (bluish-700) */
   --nb-color-scroll-thumb: rgba(212, 212, 212, 0.8);   /* neutral-300 */
@@ -208,8 +224,17 @@ html[data-theme='light'] {
   /* 控件高度。⛔ 顶栏内所有 button/select/input 必须相等 —— 差 2px 就会被读成「挤在一起」。 */
   --nb-ctl-h: 28px;
   /* 侧栏与会话项（比顶栏控件高，因为它要放两行文字 + 可点整行）。 */
-  --nb-row-h: 30px;
-  --nb-row-2-h: 44px;
+  /* ⭐⭐⭐ 2026-10-04 校正：⭐ 改**刻度**去对齐既有实现，⭐⛔ 不是反过来。
+   * ⛔ 改前 `--nb-row-h: 30px` / `--nb-row-2-h: 44px` **声明了但零消费**。
+   * ⭐⭐ 而真实实现（`neobot-root.tsx`）是 **26px / 36px**。
+   * ⭐⭐ 若我按旧刻度改两处调用点 ⇒ ⭐⭐ **凭空改变视觉**（+4px/+8px），
+   *   ⭐⭐ 而本轮目标是「统一布局」，⛔ 不是「重设计尺寸」。
+   * ⇒ ⭐⭐ 正确做法：**刻度对齐既有实现** ⇒ 调用点零改动 ⇒ 视觉**逐像素不变**，
+   *   ⭐⭐ 同时消灭孤儿变量。⭐⭐ 这就是「单一真源」的正确方向：
+   *   ⭐⭐ 真源是**事实**（当前视觉），⛔ 不是愿望。
+   * ⚠️ 若日后要改这两个高度，⭐⭐ 只改**这里一处**。*/
+  --nb-row-h: 26px;
+  --nb-row-2-h: 36px;
 
   /* 间距节奏：4 / 8 / 12 / 16 / 24。 */
   --nb-gap-1: 4px;

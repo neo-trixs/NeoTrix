@@ -194,6 +194,23 @@ jobs:
       #   所以它**必须**排在 install 之后。
       - name: npm license gate (SPDX baseline + deny list, zero exceptions)
         run: bash scripts/check-license-js.sh
+      # ⭐⭐⭐ 2026-10-04 栏族尺度门（抄 deepseek-harness 的 CI 契约手法）。
+      # ⭐⭐ 必须在 install 之后？⛔ 不需要 —— ⭐⭐ 它**只读源码**
+      # （theme.css / shell.css / neobot-root.tsx / tauri.conf.json），
+      # ⭐⭐ 不碰 node_modules ⇒ ⭐ 放在这里只为紧邻其它 UI 门、便于发现。
+      #
+      # ⭐⭐⭐ **为什么这道门必须进 CI**（⭐ 三家对标研究的核心结论）：
+      #   ⭐ DSH-better-sidebar 有唯一一份「冻结尺度表」，但 ⭐⭐ 它的
+      #   `tests/theme.spec.ts` **只扫 `color:`** ⇒ ⭐⭐ **尺寸漂了它不会红**。
+      #   ⭐⭐ 真正被 CI 强制的是 dsh 的 `builder.rs:1213` ——
+      #   ⭐⭐ 它执行的不是某个数字，是**原则**（「栏高必须是 4px 刻度整数倍」）。
+      #   ⇒ ⭐⭐ 本门同理：P1 禁孤儿刻度 / P2 栏归栏族 / P3 列宽单一真源 /
+      #   P4 颜色语义化 / P5 跨语言契约（交通灯 y + 灯径 ≤ 栏高，⭐ issue #524 同型）。
+      #   ⭐⭐ 且 P0 有**扫描器自检**（先证明扫到了东西，⭐⭐ 抄
+      #   better-sidebar 的 `expect(sheets.length).toBeGreaterThan(5)`），
+      #   ⭐⭐ 防止「glob 静默匹配为空 ⇒ 契约作废」。
+      - name: neobot layout-scale gate (bar family + cross-language contract)
+        run: node scripts/ops/neobot-check-layout-scale.mjs
       - name: Build frontend (tsc --noEmit + vite build)
         run: pnpm run build
         working-directory: apps/neobot-desktop/neobot-ui
