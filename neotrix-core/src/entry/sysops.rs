@@ -184,16 +184,25 @@ fn cmd_status() {
     // 用 fast 健康检查 (schema 校验, 毫秒级); db_healthy 的 PRAGMA integrity_check
     // 对大型库 (28 万边) 全表校验耗时数秒~数十秒, 不适合 status 查询路径。
     let healthy = db_healthy_fast(&kb);
-    println!("╭─ NeoTrix SysOps ─────────────────────────╮");
-    println!(
-        "│ KB   {}  {}",
-        if healthy {
-            "✓ 健康".green()
-        } else {
-            "✗ 异常".red()
-        },
+    // ⚠️ 2026-10-05 迁移到 nt_term_viz::panel。
+    //
+    // 首版缺陷（实测可见宽）：
+    //   │ KB   ✓ 健康  knowledge.db      w=28
+    //   │      12 份备份 @ /Users/…       w=47  ← 路径长度不可预知
+    //   │ ✓  kb-guard  installed         w=25
+    //   │ ·  kb-backup  not installed    w=30
+    //   顶边 w=44 / **底边 w=45**  ← ⭐ 上下边框**自己就不等宽**，
+    //   且两串横线与任何内容行都无契约。
+    // ⇒ 这是本次迁移的一批里最直观的一处：框都不是矩形。
+    //
+    // ⛔ 备份目录路径长度**不可预知** ⇒ 内容宽必须等全部行齐了才算得出，
+    //   故先收集 `lines` 再 `render_panel`。
+    let mut lines: Vec<String> = Vec::new();
+    lines.push(format!(
+        "KB   {}  {}",
+        if healthy { "✓ 健康".green() } else { "✗ 异常".red() },
         kb.display()
-    );
+    ));
     let bdir = backup_root();
     let backups: Vec<_> = fs::read_dir(&bdir)
         .ok()
@@ -205,28 +214,23 @@ fn cmd_status() {
             n.starts_with("knowledge-") && n.ends_with(".db")
         })
         .collect();
-    println!("│      {} 份备份 @ {}", backups.len(), bdir.display());
+    lines.push(format!("     {} 份备份 @ {}", backups.len(), bdir.display()));
     for (name, path) in [
         ("kb-guard", kb_guard_plist_path()),
         ("kb-backup", kb_backup_plist_path()),
     ] {
         let installed = path.is_file();
-        println!(
-            "│ {}  {}  {}",
-            if installed {
-                "✓".green()
-            } else {
-                "·".dimmed()
-            },
+        lines.push(format!(
+            "{}  {}  {}",
+            if installed { "✓".green() } else { "·".dimmed() },
             name.to_string().blue(),
-            if installed {
-                "installed"
-            } else {
-                "not installed"
-            }
-        );
+            if installed { "installed" } else { "not installed" }
+        ));
     }
-    println!("╰───────────────────────────────────────────╯");
+    let borrowed: Vec<&str> = lines.iter().map(String::as_str).collect();
+    for r in nt_term_viz::panel::render_panel("NeoTrix SysOps", &borrowed) {
+        println!("{}", r);
+    }
 }
 
 /// 子命令: daemons — launchd 任务安装/卸载 (幂等)

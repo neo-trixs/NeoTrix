@@ -20,37 +20,48 @@ pub fn run_todo(args: &[String]) -> Result<(), String> {
             let st = orchestrator.status();
             let ls = &st.lifecycle_stats;
             let rs = &st.routing_stats;
-            println!("╭─ Orchestrator Status ──────────────────────╮");
-            println!(
-                "│ instances: {} total ({} idle, {} running, {} paused) │",
-                ls.total_instances, ls.idle, ls.running, ls.paused
-            );
-            println!(
-                "│ tasks: {} total | cost: ${:.2} / ${:.2} budget │",
-                ls.total_tasks, ls.total_cost, ls.cost_budget
-            );
-            println!(
-                "│ routes: {} total, {} ok ({:.0}%), avg {}ms │",
-                rs.total_routes,
-                rs.successful_routes,
-                rs.success_rate * 100.0,
-                rs.avg_duration_ms
-            );
+            // ⚠️ 2026-10-05 迁移到 nt_term_viz::panel。
+            //
+            // 首版缺陷：手画框 + 每行硬编码结尾 `│`，
+            // 而 `instances:` / `tasks:` / `routes:` 三行**长度各不相同**、
+            // 末尾空格数也不同 ⇒ 右边框参差。逐条实测（可见宽）：
+            //   │ - [TaskKind 92%] 帮我实现一个解析器 → agent-1 (ok) │
+            // 该行含 `truncate(&r.input, 24)`（≤24）+ task_type + agent_name
+            // ⇒ 长度随数据浮动，而框宽固定 48 列 ⇒ 长路由必然冲出框外。
+            //
+            // 现两段式：先收集全部行，再 render_panel 一次算出内容宽。
+            let mut lines: Vec<String> = vec![
+                format!(
+                    "instances: {} total ({} idle, {} running, {} paused)",
+                    ls.total_instances, ls.idle, ls.running, ls.paused
+                ),
+                format!(
+                    "tasks: {} total | cost: ${:.2} / ${:.2} budget",
+                    ls.total_tasks, ls.total_cost, ls.cost_budget
+                ),
+                format!(
+                    "routes: {} total, {} ok ({:.0}%), avg {}ms",
+                    rs.total_routes, rs.successful_routes, rs.success_rate * 100.0, rs.avg_duration_ms
+                ),
+            ];
             if st.recent_routes.is_empty() {
-                println!("│ (no routes yet — speak an intent in headless) │");
+                lines.push("(no routes yet — speak an intent in headless)".to_string());
             } else {
                 for r in st.recent_routes.iter().take(10) {
-                    println!(
-                        "│ - [{:?} {:.0}%] {} → {} ({}) │",
+                    lines.push(format!(
+                        "- [{:?} {:.0}%] {} → {} ({})",
                         r.task_type,
                         r.confidence * 100.0,
                         truncate(&r.input, 24),
                         r.agent_name,
                         if r.success { "ok" } else { "FAIL" }
-                    );
+                    ));
                 }
             }
-            println!("╰─────────────────────────────────────────────╯");
+            let borrowed: Vec<&str> = lines.iter().map(String::as_str).collect();
+            for r in nt_term_viz::panel::render_panel("Orchestrator Status", &borrowed) {
+                println!("{}", r);
+            }
             Ok(())
         }
         "sync" | "allocate" | "import" => Err(format!(
