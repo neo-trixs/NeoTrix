@@ -122,3 +122,38 @@ pub fn health(&self) -> f64 {
 ⇒ 上文那份 14 处清单应被读作**候选集**；
 **只有逐处读过上下文的判定才算结论。**
 ⇒ 这是本会话第 4 次同型失误 ⇒ 它不是偶发，是**默认行为**，故写进文档而非只写进commit。
+
+---
+
+# 收口：14 处候选**已全部逐处读完**（2026-10-03 最后补完）
+
+> 前一节只读了 6 处，剩 3 处未读 ⇒ 一份没读完的清单本身就是**误导**。
+> 本节补完，并给全表**最终判定**。
+
+## 本节补读的 3 处 —— **全部已有守卫**
+| 站点 | 读到的守卫 | 判定 |
+|---|---|---|
+| `nt_core_hcube/cube.rs:59` | `if self.entries.is_empty() { return 0.0; }`（在除法**之前**）；分母是 `entries.len()` 而非配置项 | ✅ **安全** |
+| `nt_core_consciousness_tree/lifecycle.rs:559` | `if self.soil.kb_node_count > 0 { … } else { … }`；上一行 `:554` 的 `/1000.0` 是**字面量**，恒 > 0 | ✅ **安全** |
+| `nt_core_consciousness_tree/lifecycle.rs:586` | `if self.roots.total_fetched > 0 { … } else { … }`（与 `:577` 同一模式） | ✅ **安全** |
+
+## ⭐ 全表最终判定（14 处候选，**逐处读过**）
+| 判定 | 站点 |
+|---|---|
+| ✅ **已守卫，无需改** | `observer.rs:627` · `cube.rs:59` · `crystallization.rs:122`（构造性） · `sandbox.rs:199` · `lifecycle.rs:559` · `lifecycle.rs:578` · `lifecycle.rs:586` · `lifecycle.rs:668`（本来就是正确范式） |
+| ✅ **已修**（真隐患，收窄封装） | `salience.rs:76` → `max_access_count` 收私有（`c4b6d6f1`） · `kv_cache_optimizer.rs:353` → `sparsity_threshold` 收私有（`38823093`） |
+| ⬜ **残留但不可达** | `nt_safety_monitor.rs:268`（`:263` 的 `if drift > max` 间接保证 `max > 0`；默认 0.3；两处赋值都在测试里） · `memory_budget.rs:81`（`soft_limit` **已是私有**、`u64`、构造参数、`:165` 测试已断言 `> 0`；除零得 `inf` ⇒ 「无预算 ⇒ 100% 占用」**语义正确**） |
+| — 不适用 | `monitor.rs:154`（在 `if self.in_deadlock` 分支内，待查） · `hebbian.rs:51`（**已注释掉**） |
+
+## ⭐ 这次普查真正的产出：**三个数字**
+1. **14 处候选里，0 处是「被截断到上限导致维度压平」的活缺陷。**
+2. 真正值得改的只有 **2 处**，且都不是「加 `if denom > 0`」，
+   而是**把 `pub` 字段收窄以让坏状态不可达** ⇒ 已改完。
+3. ⭐ **我在这一份清单上错了 5 次**（`lifecycle.rs:578`、`:586`、`sandbox.rs:199`、
+   `crystallization.rs:122`、以及把 `kv_cache_optimizer:353` 误判为最高优先级）
+   —— **全部因为没读守卫就下结论**。
+
+⇒ 所以这份文档的价值**不是清单**，而是那句结论：
+**「有守卫的地方，grep 看不见。」**
+⇒ 每个候选都必须读到「除法上方三行」，才允许进「缺陷」栏。
+
