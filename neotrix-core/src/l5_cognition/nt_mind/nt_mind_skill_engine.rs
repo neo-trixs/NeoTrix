@@ -450,6 +450,21 @@ impl SkillEngine {
     }
 }
 
+/// 技能域建模（domain_modeling，517 行）/ 流程路由（flow_router，400 行）/
+/// 渐进式披露（progressive_disclosure，351 行）。
+///
+/// ⚠️ 2026-10-04 之前这三个目录**从未被编译**：目录与 `mod.rs` 都在，
+///   但 `nt_mind_skill_engine.rs` 没有 `pub mod` 声明它们 ⇒
+///   1268 行 + 其自带测试整体离线，且外部零引用。
+///
+/// ⚠️ 注意本文件是**文件模块**（`nt_mind_skill_engine.rs`），
+///   Rust 2018 下它的 `pub mod foo;` 默认寻址 `nt_mind_skill_engine/foo.rs`
+///   或 `nt_mind_skill_engine/foo/mod.rs`
+///   ⇒ 这三个都是目录形态，故可直接声明（实测 0 error）。
+pub mod domain_modeling;
+pub mod flow_router;
+pub mod progressive_disclosure;
+
 pub mod skill_doc;
 pub use skill_doc::*;
 pub mod skill_quality;

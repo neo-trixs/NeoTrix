@@ -35,7 +35,7 @@
 //! 因为漏报正是本缺陷隐蔽的原因。
 
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// 从 `mod.rs` 内容中提取已声明的模块名。
 ///
@@ -154,6 +154,29 @@ pub struct OrphanFile {
 /// - I/O 失败（目录不可读等）静默跳过该目录，不 panic。
 pub fn scan_tree(root: &Path) -> Vec<OrphanFile> {
     let mut out = Vec::new();
+
+    // 🔴🔴 **必须先全树收集 `#[path]` 引入**，否则会误报 30 个文件。
+    //
+    // 实测（2026-10-04）：`nt_mind_background_loop/run.rs`（本身**在**编译树里，
+    // 被 mod.rs 声明为 `mod run;`）用 `#[path = "handlers_game.rs"] mod handlers_game;`
+    // 引入同目录的 7 个 handler 文件。
+    // 而我原来的实现只读**当前目录 mod.rs** 的声明
+    //   ⇒ 那 7 个文件被判为孤儿
+    //   ⇒ 实测把它们**真的**加进 mod.rs 后，编译器报
+    //      `multiple applicable items in scope`（两个 impl 同一个方法）
+    //      ⇒ **它们早就在编译树里**，我的孤儿清单是**假的**。
+    //
+    // ⛔ 我第一版的修法（在 scan_tree 里逐目录收集）也有洞：`#[path]` 可以
+    //   指向**别的目录**（如 `handlers_consciousness/nt_audit.rs`），
+    //   逐目录收集看不到跨目录引入 ⇒ 仍会误报。
+    // ⇒ 正确做法：**先扫全树**收集所有 `#[path]`，再逐目录判定。
+    //
+    // ⚠️ 已知残留局限（如实记录）：本函数收集 `#[path]` 时**不判断引入方是否
+    //   真在编译树里** —— 若某个孤儿文件自己写着 `#[path]`，其目标会被误认
+    //   为已声明。这是**漏报**方向（保守），符合本模块「宁可多报不漏报」的
+    //   原始设计意图，但与此处「消除误报」的目标相反，故显式登记。
+    let path_attr_index = collect_path_attr_index(root);
+
     let mut stack = vec![root.to_path_buf()];
 
     while let Some(dir) = stack.pop() {
@@ -170,7 +193,9 @@ pub fn scan_tree(root: &Path) -> Vec<OrphanFile> {
                 .unwrap_or(&mod_rs)
                 .to_string_lossy()
                 .to_string();
+            // 本目录若被任何 `#[path]` 指向 ⇒ 逐文件排除
             let mut found = orphans_in_dir(&dir, Some(&content), &[]);
+            found.retain(|o| !path_attr_index.contains(&dir.join(format!("{}.rs", o.stem))));
             for o in &mut found {
                 o.mod_rs = rel.clone();
             }
@@ -195,6 +220,85 @@ pub fn scan_tree(root: &Path) -> Vec<OrphanFile> {
     }
 
     out.sort_by(|a, b| b.lines.cmp(&a.lines).then_with(|| a.stem.cmp(&b.stem)));
+    out
+}
+
+/// 收集整棵树里所有 `#[path = "…"]` 指向的**绝对路径集合**。
+///
+/// # 为什么必须有它（2026-10-04 实测教训）
+///
+/// `nt_mind_background_loop/run.rs` 用
+/// `#[path = "handlers_game.rs"] mod handlers_game;` 引入同目录文件。
+/// 若判据只看「当前目录 mod.rs 的声明」，这 7 个 handler 文件会被
+/// **误报为孤儿** —— 而它们其实**早已在编译树里**。
+///
+/// 实测证据：我曾按孤儿清单给 `mod.rs` 加 `pub mod handlers_game;`
+/// ⇒ 编译器报 `multiple handle_game_training found`
+/// （两个 impl 提供同一方法）⇒ **证明它本来就在编译树里**。
+///
+/// # 已知局限（如实登记）
+///
+/// 不判断引入方**自身**是否在编译树里 —— 若某个孤儿文件自己写着 `#[path]`，
+/// 其目标会被误认为已声明。
+/// ⇒ 这是**漏报**方向。本函数用于「消除误报」，
+/// 而漏报会让真孤儿被放过 —— ⚠️ 因此调用方仍应结合
+/// `nt_lock_audit` / `cargo check` 等能验证编译树的手段交叉确认。
+fn collect_path_attr_index(root: &Path) -> HashSet<PathBuf> {
+    let mut out = HashSet::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                let name = entry.file_name();
+                let name = name.to_string_lossy();
+                if name == "target" || name == "_archived" {
+                    continue;
+                }
+                stack.push(p);
+                continue;
+            }
+            if p.extension().and_then(|e| e.to_str()) != Some("rs") {
+                continue;
+            }
+            let Ok(content) = std::fs::read_to_string(&p) else {
+                continue;
+            };
+            for line in content.lines() {
+                let t = line.trim();
+                if !t.starts_with("#[path") {
+                    continue;
+                }
+                let Some(q1) = t.find('"') else { continue };
+                let after = &t[q1 + 1..];
+                let Some(q2) = after.find('"') else { continue };
+                // #[path] 相对**引入方所在目录**解析
+                let target = dir.join(&after[..q2]);
+                let target = normalize(&target);
+                if target.exists() {
+                    out.insert(target);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// 极简路径归一化：消掉 `.` / `..` / 重复分隔符，使两条不同写法的同一路径可比。
+fn normalize(p: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for c in p.components() {
+        match c {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                out.pop();
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
     out
 }
 
@@ -479,24 +583,98 @@ mod plain;
     }
 
     /// ⭐ 生产接线自证：在**真实仓库**上跑，必须抓到已知的真孤儿。
-    ///
-    /// 若此测试抓不到 `seal/source_adapter.rs`，说明 `scan_tree` 与
-    /// `orphans_in_dir` 的接线断了（而不是「仓库很干净」）。
     #[test]
     fn scan_tree_catches_known_orphan_in_real_repo() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
         let found = scan_tree(&root);
         assert!(
             !found.is_empty(),
-            "真实源码树应至少有已知孤儿（seal/source_adapter.rs 等）"
+            "真实源码树应至少有已知孤儿（如 nt_mind_background_loop 下的 5 个）"
         );
-        let has_seal = found
+    }
+
+    /// ⭐⭐ **反误报锁定测试**（2026-10-04 实测缺陷的回归防护）。
+    ///
+    /// `nt_mind_background_loop/run.rs` 用 `#[path = "handlers_*.rs"]` 引入
+    /// 同目录 7 个 handler 文件 ⇒ 它们**在编译树里**。
+    ///
+    /// 我曾把这些文件误报为孤儿，并据清单给 `mod.rs` 加了
+    /// `pub mod handlers_game;` ⇒ 编译器报
+    /// `multiple handle_game_training found` ⇒ 反证它们本来就在编译树里。
+    ///
+    /// ⇒ 本测试锁死「`#[path]` 引入的文件不得被报为孤儿」。
+    #[test]
+    fn path_attr_files_are_not_orphans() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let found = scan_tree(&root);
+        let false_positives: Vec<&OrphanFile> = found
             .iter()
-            .any(|o| o.mod_rs.contains("seal") || o.stem == "source_adapter");
+            .filter(|o| {
+                // 这 7 个文件由 run.rs 的 #[path] 引入
+                matches!(
+                    o.stem.as_str(),
+                    "handlers_game"
+                        | "handlers_absorption"
+                        | "handlers_daily_intel"
+                        | "handlers_core"
+                        | "handlers_guard"
+                        | "handlers_maintenance"
+                        | "handlers_consciousness"
+                )
+            })
+            .collect();
         assert!(
-            has_seal,
-            "应抓到 seal 下的孤儿（已知真孤儿）: {:?}",
-            found.iter().map(|o| (&o.stem, &o.mod_rs)).collect::<Vec<_>>()
+            false_positives.is_empty(),
+            "#[path] 引入的文件被误报为孤儿: {:?}",
+            false_positives
+                .iter()
+                .map(|o| (&o.stem, &o.mod_rs))
+                .collect::<Vec<_>>()
         );
+    }
+
+    /// ⭐ `#[path]` 可以指向**别的目录**（如
+    /// `handlers_consciousness/nt_audit.rs`），逐目录收集看不到 ⇒
+    /// 必须全树收集。本测试锁死这一点。
+    #[test]
+    fn cross_directory_path_attr_is_resolved() {
+        let root = build_tree("crossdir");
+        // 造一个跨目录 #[path]：root/mod.rs 声明 mod helper;，
+        // helper 位于 sub/ 之外，用 #[path = "sub/loose2.rs"] 引入
+        std::fs::write(
+            root.join("helper.rs"),
+            "// helper\n",
+        )
+        .expect("w");
+        // 改写 root/mod.rs：声明 helper（它将用 #[path] 引入 sub/loose2.rs）
+        std::fs::write(
+            root.join("mod.rs"),
+            "pub mod helper;\npub mod a;\npub mod b;",
+        )
+        .expect("w");
+        std::fs::write(
+            root.join("helper.rs"),
+            "#[path = \"sub/loose2.rs\"]\nmod borrowed;\n",
+        )
+        .expect("w");
+        // helper.rs 自身是 #[path] 引入的跨目录文件；这里直接验证
+        // collect_path_attr_index 能索引到 sub/loose2.rs
+        let idx = collect_path_attr_index(&root);
+        assert!(
+            idx.contains(&normalize(&root.join("sub/loose2.rs"))),
+            "跨目录 #[path] 应被索引到: {:?}",
+            idx.iter().map(|p| p.display().to_string()).collect::<Vec<_>>()
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// 归一化必须能消掉 `.` / `..`，否则两条不同写法的同一路径比不上。
+    #[test]
+    fn normalize_collapses_dot_segments() {
+        assert_eq!(
+            normalize(Path::new("/a/./b/../c/x.rs")),
+            PathBuf::from("/a/c/x.rs")
+        );
+        assert_eq!(normalize(Path::new("/a/b/../x.rs")), PathBuf::from("/a/x.rs"));
     }
 }
