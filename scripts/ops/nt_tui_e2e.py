@@ -39,12 +39,15 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import os
 import pty
 import re
 import select
 import signal
+import struct
 import sys
+import termios
 import time
 
 # ⭐ 对话产生的输出下限（字节，去 ANSI 后）。
@@ -100,6 +103,16 @@ def main() -> int:
         os.environ["LINES"] = "40"
         os.execv(args.bin, argv)
 
+    # ⭐⭐⭐ 必须显式设置 PTY 窗口大小 —— 否则 ratatui 读到 0×0 就**什么都不画**。
+    # ⭐⭐ 2026-10-03 的教训：我第一次跑这份脚本时**没有**设，
+    #    看到「7,230 个控制序列 / 0 可见字符」⇒ ⭐⭐ **我差点把它报成产品缺陷**
+    #    （「渲染循环空转」）。⭐ 一旦设了 120×40，立��可见 2,823 字符。
+    # ⇒ ⭐ **`pty.fork()` 的默认窗口大小不足以渲染 TUI**；这不是被测程序的缺陷。
+    try:
+        fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
+    except OSError as e:  # pragma: no cover - 平台相关
+        print(f"⚠️ 设置 PTY 窗口大小失败：{e}（TUI 可能渲染不出内容）", file=sys.stderr)
+
     buf = bytearray()
     results: list[tuple[str, bool, str]] = []
 
@@ -139,19 +152,23 @@ def main() -> int:
             #   `ESC[39m ESC[49m ESC[59m ESC[0m ESC[?25h ESC[2;3H`
             #   ⇒ ⭐⭐ **渲染循环在转，但一个字符都没画** ⇒ 那是**缺陷**，不是慢。
             seqs = re.findall(r"\x1b\[[0-9;?]*[a-zA-Z]", raw_after)
-            uniq = len(set(seqs))
-            # ⭐ 阈值取自实测：120s 内 7,230 序列 / 11 种 ⇒ 200/15 稳定触发
-            spinning = len(seqs) >= 200 and uniq <= 15
+            # ⭐⭐⭐ **判据必须是「可见字符数」，⛔ 不是「序列种类数」**。
+            # ⓰ 第一版用「序列多 + 种类少」判空转 ⇒ ⭐⭐ **误报旋转指示器**
+            #   （`⠙⠹⠸⠼⠴⠦⠧⠋` 动画本来就只发几种序列、却每帧都有可见字符）。
+            # ⇒ ⭐ **空转的定义 = 大量重绘 + 几乎没有可见字符**；
+            #   ⭐ 只要有可见字符，就说明**确实在画东西**（哪怕只是动画）。
+            visible = len(after.strip())
+            spinning = len(seqs) >= 200 and visible <= 2
             results.append((
                 "rendered_answer", answered,
                 f"可见输出 {len(after.strip())} 字符（下限 {MIN_ANSWER_CHARS}）"
-                + (f" · ⭐ 空转嫌疑：{len(seqs)} 个控制序列仅 {uniq} 种（重复渲染）"
+                + (f" · 控制序列 {len(seqs)} 个 / 可见 {visible} 字符"
                    if spinning else ""),
             ))
             if spinning:
                 results.append((
                     "no_empty_spin", False,
-                    f"检测到 **{len(seqs)} 次几乎相同的空帧**（{uniq} 种序列）"
+                    f"检测到 **{len(seqs)} 个控制序列但可见字符仅 {visible}**（空转）"
                     f"⇒ 渲染循环在转但未绘制任何内容 ⇒ **这是缺陷，不是慢**",
                 ))
 
