@@ -689,10 +689,28 @@ mod tests {
     /// 伪模糊 roundtrip: 随机数据 × 多变块边界 × zstd, 全部无损
     #[test]
     fn test_chunked_roundtrip_fuzz() {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
+        use rand::{Rng, SeedableRng};
+        // ⭐ 2026-10-03：**改为可复现**（原为 `rand::thread_rng()`，无种子）。
+        //
+        // 【为什么】本测试断言的是**往返无损** —— 这是对**任意**输入都成立的性质，
+        // 所以它**不是 flaky**（这点与「随机测试」是两件事，本会话实测区分过）。
+        // ⛔ 但原来**失败无法复现**：失败消息只有 `step`，而随机流不可重放
+        // ⇒ 一旦它在 CI 上红，只能干瞪眼。
+        //
+        // 【做法】**按 step 派生种子**（而不是全局单一种子）：
+        // 这样任何一次失败都能**单独**重放该step，而不必重跑前面所有 step。
+        //
+        // 【两种用法】
+        // · 默认：固定基种子 ⇒ CI **确定性**，回归可复现
+        // · 想真正 fuzz：`NT_FUZZ_SEED=<任意 u64> cargo test …`
+        let base: u64 = std::env::var("NT_FUZZ_SEED")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0x5EED_C0DE);
         let kinds = ["airport", "volcano", "city", ""];
-        for step in 0..60 {
+        for step in 0..60u64 {
+            let mut rng = rand::rngs::StdRng::seed_from_u64(base.wrapping_add(step));
+            let step = step as usize;
             let n = rng.gen_range(1..500usize);
             let cs = rng.gen_range(1..200usize);
             let pts: Vec<GeoPoint> = (0..n)
@@ -714,7 +732,12 @@ mod tests {
             let bytes = encode_chunked(&pts, cs);
             let meta = parse_chunked_header(&bytes)
                 .unwrap_or_else(|e| panic!("step {} parse: {}", step, e));
-            assert_eq!(meta.nchunks, n.div_ceil(cs), "step {}: 块数", step);
+            assert_eq!(
+                meta.nchunks,
+                n.div_ceil(cs),
+                "step {step}: 块数（复现命令：NT_FUZZ_SEED={} cargo test -p neotrix --lib test_chunked_roundtrip_fuzz）",
+                base
+            );
             let v2_out =
                 decode_chunked(&bytes).unwrap_or_else(|e| panic!("step {} decode: {}", step, e));
             assert_eq!(v2_out.len(), n, "step {}: 条数", step);
