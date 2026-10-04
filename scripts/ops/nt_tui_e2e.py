@@ -86,6 +86,14 @@ def main() -> int:
     ap.add_argument("--model", default=None)
     ap.add_argument("--timeout", type=float, default=120.0)
     ap.add_argument("--boot", type=float, default=6.0)
+    ap.add_argument(
+        "--env", action="append", default=[], metavar="K=V",
+        help=(
+            "⭐ 传给子进程的额外环境变量（可重复）。"
+            "⭐⭐ **必要**：`pty.fork()` 的子进程只继承我显式设置的变量，"
+            "外层 shell 的 `VAR=… cmd` 不会自动到达 TUI 内部再拉起的模型调用。"
+        ),
+    )
     args = ap.parse_args()
 
     if not os.path.exists(args.bin):
@@ -101,6 +109,10 @@ def main() -> int:
         os.environ["TERM"] = "xterm-256color"
         os.environ["COLUMNS"] = "120"
         os.environ["LINES"] = "40"
+        for kv in args.env:
+            k, _, v = kv.partition("=")
+            if k:
+                os.environ[k] = v
         os.execv(args.bin, argv)
 
     # ⭐⭐⭐ 必须显式设置 PTY 窗口大小 —— 否则 ratatui 读到 0×0 就**什么都不画**。
