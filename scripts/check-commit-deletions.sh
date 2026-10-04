@@ -41,7 +41,7 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
 }
 cd "$ROOT" || exit 2
 
-# commit message 来源（2026-09-29 修一个实测缺陷）：
+# commit message 来源（2026-09-29 修一个实测缺陷；2026-10-04 再修根因）：
 #
 #   原注释写「pre-commit 时 git 把它作为 $1 传入」—— **这是错的**。
 #   git 对 pre-commit **传 0 个参数**（三种 commit 方式皆然，AGENTS.md 的
@@ -55,7 +55,29 @@ cd "$ROOT" || exit 2
 #   门与「--only 防共享 index 误提交」这两条纪律因此互锁死：正是最需要
 #   删除声明的场景（--only）让声明失效。
 #
-# 修法：按可靠性依次尝试三个来源。
+# ⛔⛔ 2026-10-04：**上面那段根因诊断是错的**，实测推翻（一次性仓库，4 组合全测）：
+#
+#   | 提交方式                 | pre-commit 读到的 COMMIT_EDITMSG | prepare-commit-msg 的 $1 |
+#   |--------------------------|----------------------------------|--------------------------|
+#   | 已暂存删 + --only -m     | **上一次**的 message             | 本次 ✅                   |
+#   | 未暂存删 + --only -m     | **上一次**的 message             | 本次 ✅                   |
+#   | 未暂存删 + --only -F     | **上一次**的 message             | 本次 ✅                   |
+#   | 已暂存删 + commit -m     | **上一次**的 message             | 本次 ✅                   |
+#
+#   ⇒ **不是「--only 不写 COMMIT_EDITMSG」**，而是
+#     **pre-commit 运行时本次消息尚未落盘，该文件装的是上一次的消息**。
+#     与「暂存/未暂存删除」无关（早先怀疑是后者，实测证伪）。
+#   ⇒ git **确实**会写 COMMIT_EDITMSG，只是**晚于** pre-commit。
+#
+#   ⇒ 真正的修法是**换挂载点**，不是换读取来源：门已移到
+#     `.githooks/prepare-commit-msg`（`$1` 即本次消息文件）。
+#     额外收益：pre-commit 可被 `--no-verify` 跳过（实测无声明删除照样落账，rc=0），
+#     而 `--no-verify` **不**跳过 prepare-commit-msg（实测 rc=1 拦住）⇒ 绕过口关闭。
+#
+# 保留下面三个来源的原因：手动调用（`bash check-commit-deletions.sh <msgfile>`，
+# 探针与 CI 用此路径）与 merge/squash 等其它 hook 场景仍需能工作。
+#
+# 按可靠性依次尝试三个来源。
 MSG_FILE=""
 # (a) 显式传入（供手动/CI 调用：`bash check-commit-deletions.sh <msgfile>`）
 if [ -n "${1:-}" ] && [ -f "$1" ]; then

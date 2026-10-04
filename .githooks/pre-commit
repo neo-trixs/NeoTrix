@@ -39,16 +39,20 @@ if [ -f "$AGENTS" ] && git diff --cached --name-only | grep -qx "$AGENTS"; then
   fi
 fi
 
-# ---------- 1.5) 删除声明门（2026-09-29 事故后置入） ----------
+# ---------- 1.5) 删除声明门：已移至 .githooks/prepare-commit-msg ----------
 # 事故：多窗口共享工作树 ⇒ 共享 index。`git add <显式文件> && git commit`
 # 连带提交了**别窗暂存区里的删除**（339 行他窗在途工作），从那扇窗看是凭空消失。
 # 显式 add 约束不了「暂存区里已有什么」，但那类事故的签名确定：**提交里有删除**。
 # ⇒ 任何 staged 删除必须在 commit message 里显式声明。写不出声明就得去看一眼。
-if [ -x scripts/check-commit-deletions.sh ] || [ -f scripts/check-commit-deletions.sh ]; then
-  if ! bash scripts/check-commit-deletions.sh "${1:-}"; then
-    exit 1
-  fi
-fi
+#
+# ⛔ 2026-10-04：本段原在此处调用 `check-commit-deletions.sh "${1:-}"`，**已删除**。
+# 原因（一次性仓库实测，4 种提交方式全测）：pre-commit 时刻
+# `COMMIT_EDITMSG` 装的是**上一次**提交的消息，本次消息要到 pre-commit 之后才落盘。
+# ⇒ 本次声明了删除也读不到 ⇒ **稳定误报红**；上次声明过、本次没声明 ⇒ **漏放行**。
+# 且 pre-commit 可被 `--no-verify` 整体跳过 ⇒ 真事故反而过得去（实测 rc=0 落账）。
+# ⇒ 门已搬到 `prepare-commit-msg`：那里 `$1` 就是**本次**消息文件（实测四个组合全对），
+#   且 `--no-verify` **不**跳过它（实测 rc=1 拦住）⇒ 顺带关掉了绕过口。
+# 详见 .githooks/prepare-commit-msg 头注的实测表。
 
 # ---------- 2) P0 编译卡点 ----------
 # 仅当本次提交触及 Rust 源码时才跑, 避免纯文档/脚本提交被当前红构建卡死。

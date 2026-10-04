@@ -58,7 +58,7 @@ done
 # 格式：文件名|类别|理由（理由要指向真实消费者，否则就是待清理物）
 ALLOW_FILES="
 README.md|入口|项目入口，GitHub 展示面，DOCUMENTATION-MAP:14
-AGENTS.md|agent 守则|agent 守则中枢，.githooks/pre-commit + 94 处引用
+AGENTS.md|agent 守则|agent 守则中枢，.githooks/{pre-commit,prepare-commit-msg} + 94 处引用
 RUST-STANDARDS.md|规范|Rust 编码标准正典，cargo xl 风格命令出处
 CONTRIBUTING.md|流程|贡献指南
 CHANGELOG.md|流程|Keep a Changelog
