@@ -16,7 +16,19 @@
  *   macOS 上看起来像「桌宠没启动」，而实际是「这个宠物包读不出来」。
  */
 
-import { invoke } from '@tauri-apps/api/core'
+// ⭐⭐⭐ 2026-10-04：⭐⭐ 改走统一出口 `invokeCmd`（⭐⭐ `nt_neobot_ui_wiring`
+// 门的「4b IPC 单一出口」项**如实报出**了这个缺口，⭐⭐ 但「不判失败」）。
+// ⭐⭐ 为什么必须改（⭐⭐ 两条独立理由，⭐⭐ 都不是「风格」）：
+// ⭐⭐ ① ⭐⭐ **可观测性**：`invokeCmd` 把每次调用记进**活动面板**
+//    （`ipc.ts:63` `record`）⇒ ⭐⭐ **改前拖动宠物窗失败时，
+//    ⭐⭐ 活动面板里什么都没有** ⇒ ⭐⭐ 用户与维护者都看不到失败。
+// ⭐⭐ ② ⭐⭐⭐ **静默失败**：改前两处都写着 `.catch(() => {})`
+//    ⇒ ⭐⭐ **`move_pet_window` 失败（窗口拖不动）与
+//    ⭐⭐ `set_pet_ignore_cursor_events` 失败（光标穿透失效）
+//    ⭐⭐⭐ 全都无声消失** —— ⭐⭐ 而「光标穿透失效」会让宠物窗
+//    ⭐⭐ 永久挡住鼠标，⭐⭐⭐ 用户只会觉得「app 卡住了」，⭐⭐ 找不到原因。
+// ⭐⭐ ⛔ 不再吞：失败进活动面板（可见、可查），⭐⭐ 控制流仍由调用方决定。
+import { invokeCmd } from '../ipc'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './pet.css'
 
@@ -52,7 +64,7 @@ export function Pet() {
   useEffect(() => {
     let alive = true
     const read = () => {
-      void invoke<PetStatus>('get_pet_status')
+      void invokeCmd<PetStatus>('get_pet_status')
         .then((s) => alive && setStatus(s))
         .catch((e) => alive && setErr(String(e).slice(0, 120)))
     }
@@ -72,7 +84,7 @@ export function Pet() {
       return
     }
     let alive = true
-    void invoke<PetAsset>('get_pet_asset', { id })
+    void invokeCmd<PetAsset>('get_pet_asset', { id })
       .then((a) => {
         if (!alive) return
         setAsset(a)
@@ -110,7 +122,7 @@ export function Pet() {
     const dy = Math.round(e.clientY - from.y)
     if (dx === 0 && dy === 0) return
     dragRef.current = { x: e.clientX, y: e.clientY }
-    void invoke('move_pet_window', { deltaX: dx, deltaY: dy }).catch(() => {})
+    void invokeCmd('move_pet_window', { deltaX: dx, deltaY: dy }).catch(() => {})
   }, [])
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
@@ -123,7 +135,7 @@ export function Pet() {
   // 穿透：不在拖动时让指针穿透到桌面，否则用户永远抓不住它；
   // 拖动中必须**不**穿透，否则 move_pet_window 收不到事件。
   const setIgnore = useCallback((ignore: boolean) => {
-    void invoke('set_pet_ignore_cursor_events', { ignore }).catch(() => {})
+    void invokeCmd('set_pet_ignore_cursor_events', { ignore }).catch(() => {})
   }, [])
   useEffect(() => {
     if (!status?.visible) return
