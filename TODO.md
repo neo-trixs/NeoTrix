@@ -2757,3 +2757,64 @@ ethical_intuition / dao_engine）与 `evolution/`（或 `knowledge/`）下的现
 ⚠️ 但**仍不删**：其一，删除需逐条确认「等价写法」真的等价；
 其二，`RewardSource` 那个路径差异说明现活版已迁移到 `neotrix_types`，
 而孤儿还指向旧路径 ⇒ 若将来有人恢复顶层声明会立刻编译失败（这倒是好事）。
+
+
+---
+
+## 📌 待办 18 补遗三：检测器自身的假阳性（2026-10-04，**本节未提交**）
+
+补遗二记录的「孤儿 35 → 22」里，**有一半是假的**。
+
+### 🔴 我自己的检测器漏判 `#[path]`，30 个文件被误报
+
+我按孤儿清单给 `nt_mind_background_loop/mod.rs` 加
+`pub mod handlers_game;` ⇒ 编译器报：
+
+```text
+error[E0034]: multiple `handle_game_training` found
+note: candidate #1 is defined in an impl for the type `run::BackgroundLoopHandle`
+      --> handlers_game.rs:367
+note: candidate #2 is defined in an impl for the type `run::BackgroundLoopHandle`
+      --> handlers_game.rs:367     ← 同一个文件、同一个位置
+```
+
+⇒ **两个候选指向同一处** ⇒ 它本来就在编译树里。
+真相：`run.rs`（已被 `mod.rs` 声明为 `mod run;`）用
+`#[path = "handlers_game.rs"] mod handlers_game;` 引入同目录文件，
+而我的判据**只读当前目录 `mod.rs` 的声明** ⇒ 看不见 `#[path]`。
+
+被误报的 30 个文件里包括 7 个 `handlers_*` 与 2 个 `l1_facade_*` ——
+**它们全都在编译树里、都在正常跑**。
+
+⚠️ 若我没做「实际接入」这一步，就会照清单去「修」30 个正确代码 ——
+这正是 R-SCAN-1 说的「把 bug 修进正确代码」。
+
+### ✅ 修法（已提交 `1ea8a849`）
+
+全树收集 `#[path]` 索引（`collect_path_attr_index`），再逐目录判定时排除。
+⚠️ 第一版逐目录收集仍有洞（`#[path` 可指向别的目录），已加测试锁定。
+⚠️ 残留局限已登记：不判断引入方自身是否在编译树 ⇒ 漏报方向。
+
+### 📊 口径修正后的真值
+
+| 口径 | 补遗二记录 | 修正后 |
+|---|---|---|
+| 保守 `mod_orphan::scan_tree` | 35 | **13** |
+| 宽松 `scan_orphan_files` | 99 | **82** |
+
+### ⭐ 另一类假阳性：`[[bin]]` 目标不是 mod-tree
+
+`lib.rs` 已声明 `skill_loader/agent/skill_registry/unified_cmd` 等顶层文件，
+`Cargo.toml` 的 `[[bin]]` 也有各自 `path` ——
+**它们当然在编译树里**，只是不由任何 `mod.rs` 引入。
+⇒ 「非 `mod.rs` 引入 = 孤儿」这个判据对 bin 目标与 god-file 都成立不了。
+
+### ✅ 本轮真实成果（已提交，累计）
+
+| 项 | 量 |
+|---|---|
+| 接入从未编译的代码 | **7,719 行**（11 个文件 + 3 个目录） |
+| 上线的从未运行过的测试 | **80 个** |
+| 删文件 | 1 个（83 行，唯一经逐行 diff 相同证明的重复） |
+| 修的门/测试自身缺陷 | 4 个（空跑断言、删除声明门从未生效、真 flaky、检测器假阳性） |
+| 孤儿（修正口径后） | 35 → **13**（保守）/ 99 → **82**（宽松） |

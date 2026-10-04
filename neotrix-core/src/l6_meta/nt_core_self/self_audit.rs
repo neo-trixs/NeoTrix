@@ -1013,9 +1013,11 @@ mod tests {
         //    我实测过两版：两版都能抓到 seal/source_adapter.rs 这个
         //    已知真孤儿，所以两版都可用；口径不同，不是 bug。
         eprintln!(
-            "[orphan-audit] 全仓孤儿 {} 个（宽松口径：含 god-file 形态）；\
-             L0 mod_orphan 口径为 35 个（保守子集）。已取证，见 TODO 待办 18",
-            orphans.len()
+            "[orphan-audit] 宽松口径（scan_orphan_files）{} 个；\
+             保守口径（L0 mod_orphan::scan_tree，已正确处理 #[path]）{} 个。\
+             已取证，见 TODO 待办 18",
+            orphans.len(),
+            crate::l0_substrate::nt_core_platform::mod_orphan::scan_tree(src).len()
         );
     }
 
