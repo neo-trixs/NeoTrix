@@ -6,12 +6,16 @@
 
 pub mod aegis;
 pub mod crystallization;
+pub mod domain_mapper;
 pub mod distillation;
 pub mod harness_evolution;
 pub mod harness_optimizer;
 pub mod procedural_graph;
+pub mod source_adapter;
 
 // Re-exports for pipeline integration
+pub use domain_mapper::{Domain, DomainMapper, MappingResult, SourceCore};
+pub use source_adapter::{KnowledgeInput, SourceAdapter, SourceAdapterFactory, SourceError, SourceKind};
 pub use aegis::AegisEngine;
 pub use harness_optimizer::HarnessOptimizer;
 pub use procedural_graph::ProceduralGraph;

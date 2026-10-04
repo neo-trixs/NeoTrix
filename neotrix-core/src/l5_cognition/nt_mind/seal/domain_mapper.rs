@@ -659,3 +659,76 @@ mod tests {
         assert_eq!(sc, SourceCore::E8);
     }
 }
+
+#[cfg(test)]
+mod known_repo_host_tests {
+    use super::super::source_adapter::{KnowledgeInput, SourceKind, SourceSpecific};
+    use super::*;
+
+    /// 构造最小可用的 `KnowledgeInput`（该类型**没有** `Default` impl）。
+    fn input(kind: SourceKind, url: Option<&str>, title: &str) -> KnowledgeInput {
+        KnowledgeInput {
+            source_kind: kind,
+            title: title.to_string(),
+            summary: String::new(),
+            content: None,
+            url: url.map(String::from),
+            domain: None,
+            language: "en".into(),
+            confidence: 1.0,
+            importance: 0.5,
+            metadata: std::collections::HashMap::new(),
+            source_specific: SourceSpecific::Generic,
+        }
+    }
+
+    /// ⭐⭐ 回归：`try_known_repo` 曾用裸 `url.contains("github.com")`，
+    /// 叠加内层 `lower.contains(&key)` 匹配 `owner/repo`
+    /// ⇒ 可用 `https://github.com.evil.net/ollama/ollama` 这类构造 URL
+    /// **冒充任意 KNOWN_REPOS 条目**并套用其 capability。
+    ///
+    /// ⚠️ 本文件的 host 门此前**从未被编译过**（整个文件不在 mod.rs 里），
+    /// 见待办 17。2026-10-03 接入编译树后该修正才真正生效。
+    #[test]
+    fn spoofed_domain_cannot_impersonate_known_repo() {
+        // ⛔ 伪装域名不得通过 URL 路径命中 KNOWN_REPOS
+        //    （title 刻意取无关值，确保只可能由 URL 分支命中）
+        let inp = input(
+            SourceKind::Article,
+            Some("https://github.com.evil.net/ollama/ollama"),
+            "unrelated-title-xyz",
+        );
+        assert!(
+            DomainMapper::try_known_repo(&inp).is_none(),
+            "spoofed domain must not reach KNOWN_REPOS via URL"
+        );
+    }
+
+    /// ⭐ 真实 github URL 仍应命中（收敛不得误伤功能）
+    #[test]
+    fn real_github_url_still_matches_known_repo() {
+        let inp = input(
+            SourceKind::GitHubRepo,
+            Some("https://github.com/ollama/ollama"),
+            "ollama/ollama",
+        );
+        let got = DomainMapper::try_known_repo(&inp);
+        assert!(got.is_some(), "real github URL must still match KNOWN_REPOS");
+        assert!(got.unwrap().2.starts_with("known_repo:"));
+    }
+
+    /// ⭐ 伪装 userinfo 形态同样不得命中
+    #[test]
+    fn userinfo_impersonation_cannot_impersonate_known_repo() {
+        let inp = input(
+            SourceKind::Article,
+            Some("https://github.com@evil.net/ollama/ollama"),
+            "unrelated-title-xyz",
+        );
+        // 真实 host 是 evil.net ⇒ URL 路径不应命中
+        assert!(
+            DomainMapper::try_known_repo(&inp).is_none(),
+            "userinfo impersonation must not reach KNOWN_REPOS"
+        );
+    }
+}
