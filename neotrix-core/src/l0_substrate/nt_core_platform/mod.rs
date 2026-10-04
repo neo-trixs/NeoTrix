@@ -15,6 +15,7 @@ pub mod metrics;
 pub mod orchestrator;
 pub mod pipeline;
 pub mod pipeline_registry;
+pub mod mod_orphan;
 pub mod registry;
 pub mod url_match;
 
@@ -31,3 +32,5 @@ pub use pipeline_registry::{PipelineRegistry, PipelineRegistryBuilder};
 pub use registry::{DomainRegistry, RegistryEntry};
 
 pub use url_match::{host_matches, host_of, url_matches_any, url_matches_any_owned, url_matches_domain};
+
+pub use mod_orphan::{OrphanFile, declared_mods, orphans_in_dir, path_attr_files};
