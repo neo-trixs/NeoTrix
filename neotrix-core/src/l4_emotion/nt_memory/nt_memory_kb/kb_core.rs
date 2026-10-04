@@ -54,8 +54,15 @@ impl KnowledgeBase {
             bm25: RwLock::new(None),
             bm25_dirty: RwLock::new(bm25_dirty),
             embedding_config: RwLock::new(None),
+            // ⛔ 原先这里是 `NonZeroUsize::new(100).expect("non-zero cache capacity")`。
+            //    `NonZeroUsize::new` 只在传 0 时返回 None ⇒ **字面量 100 恒 Some**
+            //    ⇒ 那个 `.expect` 是**不可达分支**，纯噪音（`new_unchecked` 与本次
+            //    stripper 修复无关，是既有写法）。
+            //    ⇒ 改用 `LruCache::new(NonZeroUsize::new(100).unwrap_or(1))` 会在
+            //    理论上静默改成容量 1，**掩盖**意图；故此处保持可读且零 panic：
+            //    用 `unwrap_or` 表达「不可能失败，但不想引入 unsafe」。
             fused_cache: Mutex::new(LruCache::new(
-                NonZeroUsize::new(100).expect("non-zero cache capacity"),
+                NonZeroUsize::new(100).unwrap_or(NonZeroUsize::MIN),
             )),
             adaptive: AdaptiveRetrieval::new(nt_memory_adaptive_rag::AdaptiveRagConfig::default()),
             commitment_store: RwLock::new(commitment_store),

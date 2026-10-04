@@ -2309,3 +2309,86 @@ iOS/Android **完全没抓**（⇒ 「移动端怎么做差量同步与草稿」
    —— ⛔ **顺序不能颠倒**：先重生成会把上面那些真违规一并洗白
 5. 修 `nt_pub_dead.py:50` 的同类缺陷 + 去掉基线里的硬编码日期
 6. 把生成器里那段硬编码的「声明失效」裁决改成**实测** `allow`/`forbid`
+
+## 📋 stripper 修复后暴露的 13 处 unwrap：**逐条读现场**判定结果
+（并发已查：13 处所在文件**全部干净**、mtime 均在数小时前 ⇒ 无冲突风险；
+`nt_pet.rs` 那 2 条仍归他窗 `2d8159b5`，**未动**）
+
+### A. 可证不发散，但**机械修法有代价**（5 处，未改）
+| 位置 | 形态 | 为什么没机械改 |
+|---|---|---|
+| `nt_act_crypto/dex.rs:207`、`token.rs:46/56/66`、`tx.rs:170` | `hex::decode("<8 位十六进制常量>").expect("static hex selector")` | ⓘ 该串**恒为合法 hex** ⇒ `decode` 必 `Ok`，`.unwrap()` 是死分支。理论上可换成字节数组常量，但**牺牲可审性**（审阅者无法一眼核对 `a9059cbb` 与 `[0xa9,0x05,0x9c,0xbb]`）。⇒ **需人裁决**：保可审性留 `expect`，还是换常量。 |
+| `kb_core.rs:58` | `NonZeroUsize::new(100).expect(..)` | ✅ **已改**为 `unwrap_or(NonZeroUsize::MIN)`。⛔ 刻意**不用** `unwrap_or_default()`：那会把容量静默变成 1、**掩盖**意图。 |
+
+### B. ⛔ 门缺陷导致的**假阳性**（1 处）—— 不是代码问题
+`nt_shield_sandbox/mod.rs:850` 位于一个 **`#[test] fn`** 内（`#[test]` 在其上方 5 行）。
+⓰ **`check-unwrap.sh` 的 `is_production` 只认 `#[cfg(test)] mod tests` 栅栏与测试文件名，
+     完全不认裸 `#[test]` 属性** ⇒ 集成测试内联的写法会被**当生产代码审计**。
+⇒ 该文件的 `#[cfg(test)]` 栅栏在 895/1002 行，**都在 850 之后** ⇒ 旧口径也确实看不见栅栏。
+⇒ **要修的是门**（`is_production` 需增加「已见 `#[test]` ⇒ 该函数体不计」），
+   而不是这行代码。⏳ 未做，见下。
+
+### C. ⭐ **真实 panic 路径**（3 处，未改 —— 它们需要语义决策，不是机械替换）
+| 位置 | 风险 | 为什么不能机械改 |
+|---|---|---|
+| `nt_shield_approval/human_approval.rs:180` | `.remove(&id).expect("key exists")` —— 上游守卫**只**检查 `decision ∈ {Approved, Rejected}`，**不检查 key 是否存在** ⇒ 未知 `request_id` 的裁决会 panic | 该改成「不存在就跳过」还是「返回 Err」是**业务语义决策** |
+| `nt_world/social_access/feed.rs:44` | `partial_cmp(&..).unwrap()` —— `partial_cmp` 对 **NaN 返回 None** ⇒ 分数出现 NaN 即 panic。分数由 f64 运算得来，**NaN 可达** | 标准修法是 `unwrap_or(Ordering::Equal)`，但那会**把 NaN 当相等排序** —— 需确认业务上可接受 |
+| `l6_meta/evolving_evaluator.rs:168` | `.lock().unwrap()` —— **锁中毒**（持锁线程 panic）即 panic | 标准修法是 `unwrap_or_else(\|e\| e.into_inner())`，但那是**明知中毒仍继续**的语义选择 |
+
+### D. 我改错又撤回的一处（记录下来）
+`rise_reflector.rs:42` 是 `self.reflections.last().unwrap()`，紧邻其上的 `push` **保证非空**
+⇒ `.unwrap()` 是死分支。我先改成 `.last().cloned().unwrap_or_else(..)`，
+**编译不过**（函数返回 `&Reflection`，`.cloned()` 产出所有权）⇒ **已撤回**。
+⓰ 根因：**返回引用就无法在不 panic 的前提下表达「必存在」**。
+真解是**改签名**为 `-> Option<&Reflection>` 让调用方处理 —— 那会波及调用点，**需单独一轮**。
+
+## ⛔ 三个门的**结构性缺陷**（本轮定位，均未修）
+1. **`check-unwrap.sh` 的 `is_production` 不认裸 `#[test]`** ⇒ 内联集成测试被当生产代码（见 B）
+2. **`unwrap-baseline.txt` 的生成日期硬编码**，与 mtime 差 3 天 ⇒ **基线自报出处不可信**（违反 R-SCAN-3）
+3. **`CODE-TOPOLOGY.md` 的「`neobot-sysctl` 声明 `forbid` 却含 5 处 unsafe ⇒ 声明失效」是错的**
+   —— 该文件第 12 行是 `allow(unsafe_code, reason=…)`；且这段裁决**硬编码在生成器里**
+   ⇒ **重跑也改不掉**。这正是 `AGENTS.md` §5 R-SCAN-1b 记录的事故，**生成器至今仍在吐错误裁决**。
+
+---
+
+## 📌 待办 16：域名判定统一到 L0 原语（2026-10-03 部分完成）
+
+### 判据
+裸 `url.contains("github.com")` 之类会把 `https://github.com.evil.net/`、
+`https://phishing-github.com/`、`https://github.com@evil.net/` 全部误判。
+处置**按后果分档**，不机械替换：
+
+| 后果 | 处置 |
+|---|---|
+| **决定用哪个适配器去抓取** | ⛔ 安全相关，必修 |
+| **决定能否冒充 known_repo** | ⛔ 安全相关，必修 |
+| 仅给内容打分类标签 | ⚠️ 收紧会改变既有分类结果，需评估 |
+
+### ✅ 本轮已修（5 处）
+新增 `l0_substrate/nt_core_platform/url_match.rs`（13 测试）作为**单一真源**：
+- `nt_world/social_access/nt_catalog.rs` —— 改为委托，删掉内联副本
+- `nt_world/osint/mod.rs` `AbsorbSource::from_url` —— **选抓取处理器**
+- `nt_world/source/playlist.rs` `from_url` —— 12 个分支全改
+- `nt_media/yt_extract.rs` `detect_site` —— **选提取器**（`extract`/`list_formats` 两处分派）
+- `nt_memory_kb/nt_absorb_mapper.rs` —— `KNOWN_REPOS` 冒充
+- `nt_mind/seal/domain_mapper.rs` —— `KNOWN_REPOS` 冒充（与上条同形）
+
+### ⚠️ 未改：3 处**纯分类**，故意留下
+以下三处只用域名决定 `NodeType`/`WebSourceType` 标签，**不决定抓取行为**：
+
+| 位置 | 当前判据 | 为什么没动 |
+|---|---|---|
+| `nt_mind/knowledge/web_miner.rs:38` | wikipedia/arxiv/github + `lower.contains("wiki")` | ⛔ 末两条是**关键词启发式**（`"wiki"`/`"knowledge"`），不是域名。收紧会让 `wiki.example.org` 这类站点分类改变 —— 需先确认 `WebSourceType` 是否影响下游抓取 |
+| `nt_mind_background_loop/knowledge_pipeline.rs:177` | `url.contains("paper")` | 同上，`"paper"` 是关键词 |
+| `nt_mind/knowledge/exploration_pipeline.rs:28` | arxiv/semanticscholar/github | 纯 `UnifiedSourceType` 标签 |
+
+⇒ **需要先回答一个问题**：这三处的分类结果是否会决定后续抓取？
+若是，则与上面同档、应一并修；若否（纯展示标签），保持现状即可。
+⛔ 不要在没有这个答案的情况下机械替换 —— 那会把
+`wiki.foo.com` 从 `KnowledgeBase` 改成 `GenericWeb`，是**行为变更**而非修 bug。
+
+### ⚠️ 另一份重复清单，未合并
+`l2_perception/nt_world/osint/social_search.rs` 维护**另一份 29 平台**表
+（`default_platforms()`），与 `nt_catalog` 的 10 平台有 3 个重叠（github/…）。
+二者用途不同（前者做用户名存在性探测，后者做登录+URL 路由），
+**不建议强行合并**，但需知悉：新增平台时要决定改哪一处或两处都改。
