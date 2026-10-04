@@ -1,3 +1,39 @@
+# ⛔⛔ 本篇核心结论**已被同日实测推翻** —— 请先读这一段
+
+## 原文的错在哪
+原文断言：**`RecoveryAction` 在生产代码中没有任何消费者**，并把它定性为「虚假保障」。
+
+⭐ **反证（实测）**：`l1_action/nt_io/nt_io_provider/gateway/execution.rs:632`
+```rust
+if let RecoveryAction::Retry { delay_ms, .. } = action { ... }
+```
+⇒ `RecoveryAction` **确有生产消费者**。
+另有 `nt_core_platform/init.rs:57`、`gateway/mod.rs:8` `use` 了
+`RecoveryOrchestrator` / `RecoveryConfig`。
+
+## ⭐ 我搜错的机制 —— 比错本身更值得记
+我搜的是**生产侧**的 `.recover(` 调用（`RecoveryManager::recover` 产出一个动作）。
+而**消费侧**根本不调 `.recover(` —— 它**匹配**那个返回值（`if let RecoveryAction::…`）。
+
+⇒ **搜「生产者的动词」找不到「消费者」。**
+⇒ 问「有没有人用」时，必须搜**消费形态**：
+   `match` / `if let` / 字段访问 / **类型出现在签名或 import 里**。
+
+## ⛔ 由此产生的第二个、更坏的后果
+原文第二节把那 16 处反向锁误报**整体**归类为「同名不同物」，
+但**我从未逐条读完** —— ⭐ **其中很可能就混着上面那个真消费者**。
+
+⇒ **误报的不只是噪声：它让我把真信号当噪声丢弃了。**
+⇒ 这比「门是噪声」严重一级：门本该是**发现**手段，我用它做了**排除**手段。
+
+## 仍然可能成立的那一半（⛔ 未证）
+`RecoveryManager::recover()` 的**调用点**在本仓**未见**
+（`rg '.recover('` 仅命中本文件自身）。
+⛔ 但「orchestrator 无调用方」与「Action 无消费者」是**两件事** ——
+**上一条正是把它们混为一谈才出的错**，此处不再重复该错误。
+
+---
+
 # L0 恢复机制：产出了建议，但**无人消费**（2026-10-03 实测）
 
 > 起因：查证 `mizorewww/x_gift_bot` 那条「**结果不明 ⇒ 标记待核实，绝不重试**」
