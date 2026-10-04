@@ -3,6 +3,7 @@
 // ============================================================================
 // Provider — 模型提供商与适配层
 // ============================================================================
+pub mod nt_io_protocol_bridge;
 pub mod nt_io_provider;
 pub mod model_adapter;
 pub mod model_routing;

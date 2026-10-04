@@ -2,6 +2,8 @@
 
 // Actions subdirectory
 pub mod actions;
+pub mod nt_act_scheduler;
+pub mod nt_act_workspace_isolator;
 
 // Trade cluster
 pub mod nt_act_trade;

@@ -9,6 +9,7 @@ pub mod nt_io_download; // 下载引擎 (自研，无外部依赖)
 
 pub mod nt_memory_spatial; // moved from L2 (no L2 deps, spatial storage belongs in L1)
 pub mod nt_action_facade; // L1 行动层唯一门面 (sole facade)
+pub mod nt_infra_unified_search;
 pub mod nt_conn; // migrated from cli/nt_conn
 pub mod nt_router; // migrated from cli/nt_router
 

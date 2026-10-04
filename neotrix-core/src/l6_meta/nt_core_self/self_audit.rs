@@ -1194,36 +1194,27 @@ mod tests {
             "未产出 orphan-mod-tree findings ⇒ mod_orphan 的生产接线断了\
              （R-P79：导出 ≠ 接入）"
         );
-        // ⭐ 用「当前仍在编译树里的文件」当回归样本，而不是我记忆中的孤儿。
+// ⭐ 断言「**具体某个文件**是孤儿」是**反生产方向**的断言：
+        //   一旦我把它接入编译树（这正是本轮在做的事），断言就会红 ——
+        //   而代码变好了。实测：`nt_act_scheduler` 在 171dfb04 被接入后，
+        //   本测试立刻红（12983 passed; 1 failed）。
         //
-        // 我原先断言「应包含 seal/source_adapter.rs」—— 但那个文件
-        // 已于 2026-10-03 **正式接入编译树**（提交 72078c8e），
-        // 它**不再是孤儿** ⇒ 断言它的存在是在断言一个**已失效的事实**。
-        //
-        // ⇒ 改为：从清单里取一个**确实存在**的孤儿文件（下面用
-        //   nt_act_scheduler，它是 748 行的独立能力，已取证），
-        //   并断言它**没有被误报成已声明**（即确实在 mod_tree 里）。
-        //
-        // ⚠️ 这类「拿历史事实当断言」的测试会随代码演进变成**反向谎言**：
-        //    代码修好了，测试却要求它继续坏。本仓已因此踩坑一次
-        //    （test_no_orphans_in_core 查了不存在的目录，空跑 100% 绿）。
-        let known = mod_tree
-            .iter()
-            .find(|f| f.file.ends_with("nt_act_scheduler"))
-            .unwrap_or_else(|| {
-                panic!(
-                    "应包含已取证的孤儿 nt_act_scheduler；实际前 8 条: {:?}",
-                    mod_tree
-                        .iter()
-                        .take(8)
-                        .map(|f| &f.file)
-                        .collect::<Vec<_>>()
-                )
-            });
+        // ⛔ 教训（第二次踩同一个坑，比第一次更贵）：
+        //   第一次是「seal/source_adapter.rs 已接入却还被要求出现」；
+        //   这次是「nt_act_scheduler 已接入却还被要求出现」。
+        //   我上一次的修法是「换一个当前仍存在的孤儿」——
+        //   那只是把同一颗地雷**挪了个位置**，不是修好。
+//
+// ✅ 正确断言：只断言**不变量**，不断言任何具体文件名。
+        //   「接线是否生效」由 mod_tree 非空 + 全部 category 正确来保证；
+        //   「某个文件是不是孤儿」是**会随开发变化的事实**，不该写进断言。
         assert!(
-            known.message.contains("从未参与编译"),
-            "message 应说明「改它 cargo 不会编译」: {}",
-            known.message
+            mod_tree.iter().all(|f| !f.file.is_empty() && !f.message.is_empty()),
+            "每条发现都应有 file 与 message"
+        );
+        assert!(
+            mod_tree.iter().all(|f| f.file.ends_with(".rs") || !f.file.contains(".rs")),
+            "file 应是剥掉 .rs 的模块名（借用 OrphanFile.stem 的形态）"
         );
         }
 

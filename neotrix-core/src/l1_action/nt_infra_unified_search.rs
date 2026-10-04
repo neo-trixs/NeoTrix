@@ -309,12 +309,27 @@ impl UnifiedSearch {
         let rrf_scores = rrf_fuse(&lists, 60.0);
 
         // Apply RRF scores and sort.
+        //
+        // ⚠️ 此处曾编译不过（E0382 borrow of moved value）：
+        //   下面 `.map(|mut r| … hit_score(&rrf_scores, …) …)` 在
+        //   `rrf_scores.into_iter()` **消费**了 `rrf_scores` 的闭包里
+        //   又按引用借用它 ⇒ 移动与借用冲突。
+        //
+        // ✅ 修法：`RrfHit` 是 `Clone`，而 `hit_score` 只需 `&[RrfHit]`。
+        //   ⇒ 先把分数查成一张 `HashMap<id, score>`（`hit_score` 本来就是
+        //     线性查找，每次 O(n)），闭包里查 map，不再借用已被移动的向量。
+        //   这同时把 O(n²) 的重复查找降为 O(n)。
+        let rrf_by_id: std::collections::HashMap<String, f64> = rrf_scores
+            .iter()
+            .map(|h| (h.id.clone(), h.score))
+            .collect();
         let mut fused: Vec<UnifiedSearchResult> = rrf_scores
             .into_iter()
             .filter_map(|hit| by_location.remove(&hit.id))
             .map(|mut r| {
                 // Blend original score with RRF score.
-                r.score = r.score * 0.3 + hit_score(&rrf_scores, &r.location) * 0.7;
+                let fused_score = rrf_by_id.get(&r.location).copied().unwrap_or(0.0);
+                r.score = r.score * 0.3 + fused_score * 0.7;
                 r
             })
             .collect();
@@ -358,6 +373,15 @@ fn rrf_fuse(lists: &[&[String]], k: f64) -> Vec<RrfHit> {
     hits
 }
 
+/// 按 id 取 RRF 分数（未命中记 0）。
+///
+/// ⚠️ 已无生产调用方：原唯一调用点在 `rrf_fuse` 之后的 `.map()` 闭包里，
+///   那里 `rrf_scores` 已被 `into_iter()` 移动 ⇒ 无法再借用（E0382）。
+///   现改为调用前先建 `HashMap<id, score>`。
+///
+/// 保留本函数而非直接删：它是「查不到就记 0」这条语义的**可执行说明**，
+/// 而 map 版把这语义写成了一行 `.copied().unwrap_or(0.0)`。
+#[allow(dead_code)]
 fn hit_score(hits: &[RrfHit], id: &str) -> f64 {
     hits.iter().find(|h| h.id == id).map(|h| h.score).unwrap_or(0.0)
 }
