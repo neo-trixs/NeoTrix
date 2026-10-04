@@ -34,7 +34,31 @@ pub struct EntropyMonitor {
     /// How many stimulus injections have been performed during the current deadlock.
     pub stimulus_attempts: u64,
     /// Max stimulus attempts before triggering rollback.
-    pub max_stimulus_before_rollback: u64,
+    ///
+    /// ⛔ 2026-10-04 由 `pub` 收为**私有**，并新增带钳位的构造器
+    /// [`with_max_stimulus_before_rollback`](Self::with_max_stimulus_before_rollback)。
+    ///
+    /// 【为什么】`crisis_level()`（`:154`）拿它**做除数**：
+    /// ```text
+    /// (self.stimulus_attempts as f64 / self.max_stimulus_before_rollback as f64).min(1.0)
+    /// ```
+    /// 而 `u64::MAX as f64` 远大于 1 ⇒ 分子只要 ≥ 分母，结果被 `.min(1.0)` 压成 1.0；
+    /// **真正会出问题的是分母为 0** ⇒ `x/0 = +inf` ⇒ `.min(1.0)` ⇒ **恒 1.0**
+    /// ⇒ `crisis_level()` 在那种配置下**恒为 1.0**（永久「危急」），
+    /// 且**调用处收不到任何信号**。
+    ///
+    /// 【实测依据】全仓 `rg 'max_stimulus_before_rollback'`：
+    /// · **外部读写皆 0**（`neotrix-core/src` + `crates/` 内除本文件外无命中）
+    /// · 本文件内 5 处：声明 / 默认值(`:55` = 3) / `should_rollback` 读 / `crisis_level` 除
+    ///   / **两个测试各自赋 2**（`:392`、`:438`）
+    /// · ⛔ **无 setter** ⇒ 此前唯一改法就是**直接给`pub` 字段赋值**。
+    /// ⇒ 收私有**不破坏任何外部调用方**（外部本就没有）。
+    ///
+    /// 【同一模式的第三处】与
+    /// `nt_io_inference/kv_cache_optimizer.rs:312 sparsity_threshold`（`38823093`）、
+    /// `decay_forgetting/salience.rs:51 max_access_count`（`c4b6d6f1`）
+    /// **完全同形**：`pub` + 零外部写入 + 无钳位 + 用作除数。
+    max_stimulus_before_rollback: u64,
     /// Whether the stimulus helped (entropy increased after injection).
     pub stimulus_succeeded: bool,
 }
@@ -67,6 +91,16 @@ impl EntropyMonitor {
             stuck_min_cycles: min_stuck,
             ..Default::default()
         }
+    }
+
+    /// 设置「触发回滚前的最大刺激次数」，**钳位到 ≥ 1**。
+    ///
+    /// ⛔ 钳位不是防御性冗余，而是**让坏状态不可达**：
+    /// `crisis_level()` 把它当除数，为 0 会让结果恒为 1.0（见字段注释）。
+    /// ⇒ 与 `SalienceCalculator::with_max_access_count`（`.max(1.0)`）同一模式。
+    pub fn with_max_stimulus_before_rollback(mut self, max: u64) -> Self {
+        self.max_stimulus_before_rollback = max.max(1);
+        self
     }
 
     /// Feed a new entropy reading and update deadlock state.
@@ -388,8 +422,7 @@ mod tests {
 
     #[test]
     fn test_should_rollback_after_max_stimulus() {
-        let mut m = EntropyMonitor::new(10, 0.5, 3);
-        m.max_stimulus_before_rollback = 2;
+        let mut m = EntropyMonitor::new(10, 0.5, 3).with_max_stimulus_before_rollback(2);
         assert!(!m.should_rollback());
         // deadlock first
         for _ in 0..3 {
@@ -434,8 +467,7 @@ mod tests {
 
     #[test]
     fn test_crisis_level_increases_with_attempts() {
-        let mut m = EntropyMonitor::new(10, 0.5, 3);
-        m.max_stimulus_before_rollback = 2;
+        let mut m = EntropyMonitor::new(10, 0.5, 3).with_max_stimulus_before_rollback(2);
         for _ in 0..3 {
             m.feed(0.1);
         }
@@ -462,4 +494,36 @@ mod tests {
         assert_eq!(m.stimulus_attempts, 0);
         assert!(!m.stimulus_succeeded);
     }
+
+    /// ⭐⭐ 反向锁：钳位**真的生效**，且坏状态**不可达**。
+    ///
+    /// 【为什么需要这条】`crisis_level()` 把 `max_stimulus_before_rollback` 当除数。
+    /// 为 0 时 `x/0 = +inf` ⇒ `.min(1.0)` ⇒ 结果**恒为 1.0**
+    /// ⇒ 该 monitor 会**永久**报「危急」，且调用处**收不到任何信号**。
+    /// ⇒ 字段已收私有，本构造器是**唯一**改它的地方 ⇒ 这里必须被守住。
+    #[test]
+    fn max_stimulus_before_rollback_is_clamped_to_at_least_one() {
+        let m = EntropyMonitor::new(10, 0.5, 3);
+        // 默认值必须 ≥ 1
+        assert!(
+            m.should_rollback() || m.max_stimulus_before_rollback >= 1,
+            "默认值必须 ≥ 1"
+        );
+
+        // 传 0 必须被钳到 1：两次刺激即达上限 ⇒ should_rollback 为真
+        let clamped = EntropyMonitor::new(10, 0.5, 3).with_max_stimulus_before_rollback(0);
+        let mut m = clamped;
+        assert!(!m.should_rollback(), "尚未 deadlocked 时不应回滚");
+        m.in_deadlock = true;
+        m.stimulus_attempts = 1;
+        assert!(
+            m.should_rollback(),
+            "钳位到 1 时：1 次刺激即应触发回滚（若未钳位则阈值 0，行为不同）"
+        );
+
+        // 正常值原样保留
+        let normal = EntropyMonitor::new(10, 0.5, 3).with_max_stimulus_before_rollback(2);
+        assert!(!normal.should_rollback(), "in_deadlock=false 时不应回滚");
+    }
+
 }
