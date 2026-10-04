@@ -2601,3 +2601,159 @@ pub 符号差异（pub fn/struct/enum/trait/const）: 孤儿独有 0 / 现存独
 
 ⇒ 下一步建议按 `federation` 那种「同名分叉」模式**逐对比对**，
 确认「孤儿是否有独有内容」后再决定 merge 还是 delete。
+
+
+---
+
+## 📌 待办 18 补遗：35 个孤儿全量分类 + 我三次判据自纠（2026-10-04，**本节未提交**）
+
+上文结项时只取证 4 个。现已用脚本把 **35 个全部**分类，
+并把上一节「①可删 5 个」的结论**推翻 4 个**。
+
+### 全量分类（可复用判据，逐文件取证）
+
+| 类 | 判据 | 数量 | 行数 |
+|---|---|---|---|
+| ① 唯一可删 | 与同名活实现**逐行完全相同** | **1** | 83 |
+| ② 需重写接入 | `pubAPI=0 且 tests=0`，接入报大量「私有字段/类型已变」 | 9 | 2,007 |
+| ③ 独立能力 | 无同名实现（有 pub API 或自带测试） | 15 | 5,830 |
+| ④ 同名但已分叉 | 有同名实现且**孤儿持有独有 fn** | 6 | 1,364 |
+
+① 仅 `l1_action/nt_io/nt_io_eli5.rs`：`diff` 与
+`l5_cognition/nt_core/io_skills/nt_io_eli5.rs` **0 行差异**，
+全仓仅 `io_skills/mod.rs:1` 声明后者。
+
+### ⛔ 我自己三次用「代理信号」下结论，三次都被复核推翻
+
+| # | 我用的代理信号 | 真相 |
+|---|---|---|
+| 1 | `git log` 时间**较新** ⇒ 是新版 | `federation.rs` 孤儿(09-09) 比现存活(09-01) 新，却**缺**集成 ⇒ 是功能更少的分叉 |
+| 2 | **文件名相同** ⇒ 同一物 | `nt_nexus/checkpoint.rs` 与 `seal_core/self_iterating/checkpoint.rs` 用途完全不同（会话 provenance vs 大脑 checkpoint），只是**文件名撞了** ⇒ 误删会丢 36 个独有 fn |
+| 3 | `fn` **名称集合**无独有 ⇒ 内容等价 | federation / ethical_intuition / dao_engine 三者**各有 42/43/49 行独有代码**；且其 blob **从未出现在现存活文件的 git 历史里** ⇒ 是分叉，不是陈旧副本 |
+
+⭐ **教训（可复用）**：判定「可删」只认**内容等价证明** ——
+逐行 `diff` 相同，或编译后**行为等价**测试通过。
+时间戳 / 文件名 / 符号名集合 / 行级 diff **全部是代理信号**，单独用必错。
+
+⚠️ 另有一处**我自己打自己脸**：我曾据 `diff | rg '^>' | head -8`
+断言「孤儿缺 `use super::deliberation::…`」，逐行复核发现**孤儿也有**，
+只是 import 顺序/分组不同 ⇒ 两侧各有一行「对方没有」的文本。
+**截断输出把「有差异」变成了「缺能力」。**
+
+### 🔍 新发现的能力缺口（非垃圾，勿删）
+
+`l2_perception/error_conversions.rs`（孤儿，25 行）持有**全仓唯一**的两个 impl：
+
+```rust
+impl From<crate::l2_perception::nt_world::asset_map::query::ParseError> for NeoTrixError
+impl From<crate::l2_perception::nt_world::social_access::traits::SocialAccessError> for NeoTrixError
+```
+
+它们从未被编译 ⇒ 任何依赖 `?` 自动转换这两类错误的代码只能显式映射。
+⇒ 这是**缺口**，处置应是「把 impl 补进现活的 `l1_action/error_conversions.rs`」，
+不是删文件。（本轮未做：属新增功能，不在授权范围。）
+
+### ⭐ 附带查出一处**门缺陷**：`--only` 与删除声明互锁死
+
+`scripts/check-commit-deletions.sh:44-56` **自己注释里已记录**该缺陷：
+git 对 pre-commit **传 0 个参数**，而 `git commit --only -m` **不写** `COMMIT_EDITMSG`
+⇒ 门回退去读**上一次**提交的消息 ⇒ 本次 `DELETION-INTENT` 永远判不出。
+
+实测症状与注释完全一致（声明写了仍报「未声明」）。
+**规避法**（本轮已用）：先把消息 `cp` 到
+`$(git rev-parse --git-path COMMIT_EDITMSG)`，再 `git commit --only … -F <file>`。
+
+⭐ **可修**：改用 `prepare-commit-msg` hook（它**能**拿到本次消息与消息文件路径）
+把本次消息落到临时文件，供 pre-commit 读 ⇒ 「防共享 index 误提交」与
+「删除必须声明」两条纪律即可同时生效。
+⛔ 本轮未改门：改的是**所有窗口提交都要走的门**，需先与主线确认。
+
+### 本轮未提交的原因（不是我卡住）
+
+删除 `nt_io_eli5.rs` 后跑提交，P0 build gate 失败于
+`neotrix-core/src/entry/brain.rs:86-99`（他窗未提交 WIP：
+`strip_ansi` 改成返回 `String` 后调用点未同步改完，mtime 00:03）。
+⇒ **任何**提交（含本文档）都被挡住。
+⇒ 我已 `git checkout HEAD -- nt_io_eli5.rs` **还原删除**：
+把一个无法提交、又会被他窗 `git add` 卷走的删除留在共享工作树里，
+是在给他窗制造事故（他们的 pre-commit 会突然报「删除未声明」）。
+
+⇒ **待办**：待 build 转绿后执行
+`rm neotrix-core/src/l1_action/nt_io/nt_io_eli5.rs`
++ 预置 `COMMIT_EDITMSG` + `git commit --only`（判据与检验见 commit 消息草稿）。
+
+⚠️ 另：他窗已提交 `54be0301` 修掉我先前撞见的 2 个 `nt_shield` 红测试
+（`reasoning_shield.rs` / `asi_compliance.rs`）—— 那两个**不是我的**，
+我未触碰，仅做了归属取证。
+
+
+---
+
+## 📌 待办 18 补遗二：孤儿治理**已从「取证」推进到「接入」**（2026-10-04）
+
+补遗一里 35 个孤儿的处置已实际执行过半。**孤儿 35 → 22**，未删任何非重复文件。
+
+### ✅ 本轮接入的（全部实测 0 error 才提交）
+
+| 提交 | 内容 | 行数 | 接入时发现 |
+|---|---|---|---|
+| `d065591b` | 删 `l1_action/nt_io/nt_io_eli5.rs` | -83 | 唯一经**逐行 diff 相同**证明的重复 |
+| `383836d1` | `l2/error_conversions.rs` | 24 | 三个 `From` impl **从未生效**（L2 是唯一漏声明 error_conversions 的层） |
+| `cf1a1882` | `l3/nt_shield/adversarial_pipeline.rs` | 661 | 7-stage 防御管线 + 13 测试全离线，**零修改**接入 |
+| `171dfb04` | `nt_crystal_core` 6 个 | 1996 | ①E0502 借用冲突 ②一个**恒失败**测试 ③未用 import |
+| `3cdc2e9e` | `nt_act_scheduler` / `workspace_isolator` / `nt_io_protocol_bridge` / `nt_infra_unified_search` | 2428 | E0382 borrow-of-moved + **mod 声明放错目录** |
+
+⇒ **累计 5,111 行从未编译的代码 + 48 个从未运行的测试进入编译树。**
+
+### 🔴 顺带修掉的 3 个「门/测试自身」的缺陷（非我引入，但污染验证）
+
+1. **`test_no_orphans_in_core` 从未执行过**（`aeab45a5`）
+   查 `src/core` —— 该目录**不存在** ⇒ `if exists()` 恒 false ⇒ 断言体空跑，
+   而「core 里没有孤儿」这个保证**从来没被测过**，长期显示为绿。
+
+2. **删除声明门挂在 pre-commit 上从未生效**（`ae0e8eae`/`c2563e65`）
+   实测 4 种提交方式：pre-commit 时刻 `COMMIT_EDITMSG` 装的是**上一次**的消息。
+   ⇒ 本次声明了也判不出（稳定误报），上次声明过则漏放行；
+   且 pre-commit 可被 `--no-verify` 整体跳过 ⇒ **真事故反而过得去**。
+   已搬到 `prepare-commit-msg`（`$1` 即本次消息，且不受 `--no-verify` 影响）。
+
+3. **`kb_search` 一个真 flaky 测试**（`171dfb04`）
+   三个 gate 共用一个计数器但只有一个递增；断言能否通过取决于
+   **另一个测试有没有先跑**（线程调度）⇒ 我实测全量 6 次红过 1 次，
+   而失败信息谎称「接线已回退」。已拆成两个独立计数器。
+
+### ⭐ 三次「拿事实当断言」的反向谎言（本轮我犯的）
+
+| # | 我断言 | 真相 | 修法 |
+|---|---|---|---|
+| 1 | findings 应含 `seal/source_adapter.rs` | 它已接入编译树 | 改断言不变量 |
+| 2 | findings 应含 `nt_act_scheduler` | **我这轮把它接入了** ⇒ 立刻红 | 同上 |
+| 3 | 「已接入文件不再是孤儿」用了漏 `nt_mind/` 的路径 | `!contains()` 因不匹配而**恒真 = 假绿** | 补同向存在性断言 |
+
+⭐ 规律：①**不断言任何具体文件名**（会随开发变化的事实）；
+②**否定式断言必须配一条同向的存在性断言**（否则路径写错就假绿）。
+
+### 剩余 22 个的定性（未删、未接入）
+
+| 类 | 数量 | 行数 | 处置 |
+|---|---|---|---|
+| ②需重写接入 | 9 | 2007 | 接入即 475 errors（私有字段/API 漂移），且 `spawn_handler!` 宏作用域在函数体内 |
+| ③独立能力 | 7 | 1629 | 逐个试接入，成功的即转正 |
+| ④同名但已分叉 | 4 | 899 | **本轮已定性**：见下 |
+
+### ⭐ 关于 ④类「分叉」的最终定性（本轮查实，比补遗一更细）
+
+`nt_mind/` 下 5 个孤儿（self_evolver / knowledge_miner / federation /
+ethical_intuition / dao_engine）与 `evolution/`（或 `knowledge/`）下的现活版：
+
+| 证据 | 结果 |
+|---|---|
+| 顶层项（fn/struct/impl）集合 | **孤儿独有 0 / 现活独有 0** |
+| fn 签名集合 | **孤儿 ⊆ 现活**（5 个文件全真） |
+| 同名 fn 的实现差异 | 8~10 个，**逐个看全是** `pub(crate)`↔`pub`、尾逗号、`crate::…::RewardSource`↔`neotrix_types::RewardSource` 这类**等价写法** |
+| `mod.rs` 现状 | 走 `pub use evolution::self_evolver` —— 即**现活版**，孤儿未被引用 |
+
+⇒ 这 5 个是**重构后的残留副本**，不是未合并的新能力。
+⚠️ 但**仍不删**：其一，删除需逐条确认「等价写法」真的等价；
+其二，`RewardSource` 那个路径差异说明现活版已迁移到 `neotrix_types`，
+而孤儿还指向旧路径 ⇒ 若将来有人恢复顶层声明会立刻编译失败（这倒是好事）。
