@@ -103,7 +103,7 @@ pub fn has_ansi_escape(s: &str) -> bool {
 
 /// 剔除 ANSI 转义序列（仅支持 CSI `ESC[...m` 这类 SGR）。
 ///
-/// ⛔ 这是**尽力而为**的最小实现：只处理 `ESC [` … 终���符。
+/// ⛔ 这是**尽力而为**的最小实现：只处理 `ESC [` … 终止符。
 /// 遇到未识别的转义构造时**保持原样**（不猜测），宁可保守。
 pub fn strip_ansi(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -138,6 +138,59 @@ pub fn strip_ansi(s: &str) -> String {
 /// 带颜色的表格若不先剥离，`display_width` 会把转义序列算成 0 列。
 pub fn pad_to_ansi_safe(s: &str, cols: usize, align: Align) -> String {
     pad_to(&strip_ansi(s), cols, align)
+}
+
+/// 字符串在终端里的**真实可见列宽**（ANSI 转义序列不计列）。
+///
+/// # 为什么需要它（实测依据，2026-10-04）
+///
+/// [`display_width`] 直接调 `UnicodeWidthStr::width`，**不剥 ANSI**。
+/// 本 crate 自带测试 `ansi_is_detected_and_stripped` 已实测：
+/// ```text
+/// display_width("\e[31m中\e[0m") == 11   // \e[31m=5 + 中=2 + \e[0m=4
+/// display_width("中")            == 2
+/// ```
+/// ⇒ **带颜色的字符串算出的宽度是虚高的**，拿去补齐必然错位。
+///
+/// # 与 [`pad_to_ansi_safe`] 的分工（别混用）
+///
+/// | 函数 | 测宽 | 输出 | 颜色 |
+/// |---|---|---|---|
+/// | `pad_to` | 含 ANSI | 原串 + 空格 | 保留 |
+/// | `pad_to_ansi_safe` | 已剥离 | **已剥离** + 空格 | **丢失** |
+/// | [`pad_to_visible`] | 已剥离 | **原串** + 空格 | **保留** ✅ |
+///
+/// ⇒ **要保留颜色就用 [`pad_to_visible`]**；
+/// `pad_to_ansi_safe` 会把调用方的染色**抹掉**。
+pub fn visible_width(s: &str) -> usize {
+    if has_ansi_escape(s) {
+        // 有转义才付出分配代价；纯文本走零分配快路径。
+        crate::display_width(&strip_ansi(s))
+    } else {
+        crate::display_width(s)
+    }
+}
+
+/// 按**可见列宽**补齐到 `cols`，**原样保留** ANSI 染色。
+///
+/// 与 [`pad_to`] 的唯一区别是**测宽那一步剥掉 ANSI**，
+/// 而**输出仍是原串** ⇒ 既对齐又保留颜色。
+///
+/// # 与 [`pad_to`] 的差异为何会静默出错
+///
+/// [`pad_to`] 内部 `w = display_width(s)`，彩色串的 `w` 虚高
+/// ⇒ 命中 `w >= cols` 分支 ⇒ **原样返回、一个空格都不补**
+/// ⇒ 行短一截，右边框参差。**这正是 `panel::content_line` 的旧行为。**
+pub fn pad_to_visible(s: &str, cols: usize, align: Align) -> String {
+    let w = visible_width(s);
+    if cols == 0 || w >= cols {
+        return s.to_string();
+    }
+    let fill = " ".repeat(cols - w);
+    match align {
+        Align::Left => format!("{s}{fill}"),
+        Align::Right => format!("{fill}{s}"),
+    }
 }
 
 /// 确保某个字符是单列宽（用于绘制垂直线、方块等）。
