@@ -2479,3 +2479,125 @@ detect("2301.12345")  期望 ArxivPaper,实际 Article
 不留残迹（`git status` 中 `seal/` 干净）。
 `c1b093b0` 里对 `domain_mapper.rs` 的改动**保留在历史中但不生效**，
 如实记录于此。
+
+
+---
+
+## ✅ 待办 18：35 个 mod-tree 孤儿逐一取证（2026-10-03 完成，**本轮未删任何文件**）
+
+用 268ac887 的检测原语扫全仓得 35 个孤儿 / 10,768 行，分两类取证。
+**⭐ 结论先行：没有任何一个适合在本轮删除** —— 理由见下。
+
+### 取证方法（可复用，非凭大小猜）
+
+| 维度 | 怎么取 |
+|---|---|
+| 是否死重 | `pub (fn\|struct\|enum\|trait\|const\|static)` 计数 + `#[test]` 计数 |
+| 是否被取代 | `rg "pub mod <name>"` 找同名活实现，比对 git 时间与 pub API 差异 |
+| **是否真的过时** | 临时接入 `mod.rs` 试编译，看错误**性质**而非数量 |
+
+### A 类：纯死重（pubAPI=0 且 tests=0）—— 10 个 / 2,032 行
+
+**取证结论：不是「死代码」，是「对不上现在的 API」。**
+
+我把 5 个 `nt_mind_background_loop/handlers_*` 临时接入试编译，得 **475 errors**，
+按性质归类后：
+
+| 错误类型 | 数量 | 含义 |
+|---|---|---|
+| `field X of struct X is private` | 231 | ⛔ **访问了已改为私有的字段** |
+| `type annotations needed` | 109 | 结构体定义已变 |
+| `duplicate definitions with name X` | 48 | 与现有类型重名 |
+| `multiple applicable items in scope` | 42 | `use super::*` 语义已变 |
+| `use of undeclared type X` | 14 | 类型被删/改名 |
+
+⇒ **不是缺 import**（`CleanupKind` 等确实仍在 `cleanup_engine/mod.rs:36` 导出），
+而是这些文件写的是**上一代 API**：字段可见性与结构体定义都变了。
+⇒ 接入它们 = **重写**（要逐字段对齐新 API），不是接线。
+
+⚠️ 另注：`spawn_handler!` 宏定义在 `run.rs:741` 的**函数体内**（`macro_rules!` 作用域），
+孤儿文件即便修好类型也**拿不到该宏** —— 又一道结构性阻断。
+
+### B 类：有 API 或测试 —— 25 个 / 8,736 行
+
+抽样 3 个查到**存在同名活实现**，且孤儿是**被取代的旧分叉**：
+
+| 孤儿 | 现存活实现 | 证据 |
+|---|---|---|
+| `nt_mind/federation.rs`(700行) | `nt_mind/evolution/federation.rs`(783行) | pub API 完全相同；孤儿缺 `use super::deliberation::{…}` 与 `value_compass::{…}` 集成（现存版有）；孤儿 git 时间 09-09 反而**更新**，说明它是**分叉后未合并**，不是旧版 |
+| `nt_nexus/checkpoint.rs` | `seal_core/self_iterating/` 下有 checkpoint | 同名并存 |
+| `self_evolver.rs` | `nt_consciousness_core/`、`l6_meta/evolution/evolution_loop/` | 同名并存 |
+
+⇒ 「git 时间更新」曾让我判成「较新版」，**这是错的** —— 差异内容证明它是
+**功能更少的分叉**。**时间戳不能替代内容比对**（又一次 R-SCAN-1b）。
+
+### ⭐ `federation` 双版本的最终定性（我原先留的坑已补上）
+
+我在上文留了一句「没有反向验证孤儿是否有独有内容」，现已补完：
+
+```text
+pub 符号差异（pub fn/struct/enum/trait/const）: 孤儿独有 0 / 现存独有 0
+全部 fn 差异（含私有）              : 孤儿独有 0 / 现存独有 0
+```
+
+⇒ **两版函数集合完全相同**，201 行差异全在**函数体内部**，
+且现存版多出 `deliberation` / `value_compass` 集成。
+
+**结论：`nt_mind/federation.rs` 是同实现的一个功能更少的分叉，
+无独有内容 ⇒ 可安全删除**（但仍需先 patch 兜底，见下）。
+
+⇒ **这也给出一条可复用的判定捷径**：
+对「同名分叉」型孤儿，比对 `fn` 集合比逐行 diff 更决定性 ——
+若孤儿无独有 `fn`，则它不含任何未合并的新能力，删除不会丢功能。
+
+### ⚠️⚠️ 但**同名不等于同物** —— checkpoint 是反例（必须逐个查）
+
+我对 `checkpoint` 做同样比对，得到**完全相反**的结论：
+
+```text
+孤儿(nt_nexus/checkpoint.rs) 独有 fn: 36 个（by_agent/by_session/diff/generate_id/…）
+现存活(seal_core/self_iterating/checkpoint.rs) 独有 fn: 35 个（_get_checkpoint/_clear_kb_persisted/…）
+```
+
+读代码确认二者**用途完全不同**，只是文件名撞了：
+
+| 文件 | 实际职责 |
+|---|---|
+| `l6_meta/nt_nexus/checkpoint.rs` | 「Checkpoint Provenance — Atlas-inspired session lineage tracking」：会话元数据 / 决策链 / 工具调用史 / 状态 diff / 因果链接 |
+| `…/seal_core/self_iterating/checkpoint.rs` | 大脑 checkpoint：`VecDeque` + `BrainSnapshot` + `CapabilityVector` |
+
+⇒ **`nt_nexus/checkpoint.rs` 是独立能力，绝不可删。**
+
+⛔ 若我只做「同名分叉」这一个判据就会误删它。
+**⇒ 判定必须逐文件做，且「同名」本身不构成删除理由。**
+这与本仓 R-P16「同名 ≠ 同一符号」是同一条纪律在孤儿治理上的应用。
+
+### ⭐ 三类孤儿（按证据强度，最终分类）
+
+| 类 | 判据 | 本轮样本 | 处置 |
+|---|---|---|---|
+| **① 可删** | 存在同名活实现 且 `fn` 集合无独有 | `nt_mind/federation.rs`(700) | 待 patch 兜底后删 |
+| **② 需重写接入** | 临时接入报大量「私有字段/类型已变」 | `handlers_*` 5 个 (1677) | 逐字段对齐新 API，成本高 |
+| **③ 独立能力** | 无同名实现，或同名但 `fn` 集合差异大 | `nt_nexus/checkpoint.rs`(687)、`self_evolver.rs`(654) | **必须接入或移植**，不可删 |
+
+⚠️ 35 个孤儿里我**只逐一取证了 4 个**（federation / checkpoint / handlers_* / self_evolver），
+其余 31 个的分类**尚未取证** —— 按上面的判据补齐即可，
+但**不得**把 ①类结论外推到未取证的文件。
+
+### ⛔ 为什么本轮不删
+
+1. A 类需**重写**而非删除（475 errors 是 API 漂移的证据，不是「没人要」的证据）；
+2. B 类的分叉里**可能含有未合并的独有改动** —— `federation` 孤儿版与现存版
+   差 201 行，我只验证了「现存版有孤儿没有的东西」，**没有**反向逐行验证
+   「孤儿没有现存版没有的东西」；
+3. 删除 10,768 行属不可逆操作，且本仓历史教训
+   （2026-09-28：850 处未提交改动手删即永久丢失）要求先 patch 兜底。
+
+### ✅ 本轮实际产出
+- 取证脚本 + 三张分类表（可复用，见上）
+- 发现「git 时间更新 ≠ 较新」这一判据错误，已在 B 类记录
+- `handlers_*` 的 475 errors 性质分类 —— 这是接入成本的**量化依据**
+  （接入 = 重写，不是接线）
+
+⇒ 下一步建议按 `federation` 那种「同名分叉」模式**逐对比对**，
+确认「孤儿是否有独有内容」后再决定 merge 还是 delete。
