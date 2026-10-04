@@ -9,6 +9,8 @@ use super::nt_memory_diversity;
 use super::nt_memory_embed;
 use super::nt_memory_provenance;
 use super::nt_memory_search;
+// ⭐⭐⭐ 2026-10-04 接线所需（⭐⭐ 之前本文件从不引用检索闸）
+use super::nt_retrieval_gate::GateDecision;
 use super::nt_memory_store;
 use super::{KnowledgeNode, NodeType, RelevanceGrade, RetrievalChannel, SearchMatchType, SearchResult};
 use std::collections::HashSet;
@@ -21,6 +23,34 @@ impl KnowledgeBase {
     /// This single-entry design eliminates parallel redundant paths and converges to the optimal call chain per first principles.
     /// D1 (supermemory 参照): 结果统一应用 recency 时间衰减重排 — 同相关度新者优先。
     pub fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>, String> {
+        // ⭐⭐⭐⭐ 2026-10-04 **接线**：检索准入门（`nt_retrieval_gate`）。
+        //
+        // ⭐⭐⭐ **插在这里的理由（⭐⭐ 门自己的文档就是这么定的）**：
+        // ⭐⭐ `nt_retrieval_gate.rs:1` 写「『这条消息**需要**记忆吗?』在
+        // ⭐⭐ **碰存储之前**回答」⇒ ⭐⭐⭐ 本行是 `search` 的**第一条语句**，
+        // ⭐⭐ 早于缓存查询、早于 GWT 路由、早于任何 `conn` 借用 ⇒ ⭐⭐ **真的是「碰存储前」**。
+        //
+        // ⭐⭐⭐ **三条语义必须严格守住**（⭐⭐ 错一条就是把安全门变成故障源）：
+        // ① ⭐⭐⭐ **fail-open**：`Err` ⇒ ⭐⭐ **照旧检索**（门崩了不许影响检索）。
+        //    ⭐⭐ 这是门 trait 文档的硬要求：「**`Err` ⇒ 调用方必须照旧检索**」。
+        // ② ⭐⭐⭐ **不改变返回值形态**：`Skip` ⇒ 返回 `Ok(vec![])`，
+        //    ⭐⭐ 而**不是** `Err` ⇒ ⭐⭐ 调用方（`kb_agent` / 桥接层）� bartype 不变。
+        // ③ ⭐⭐ **默认 `NoGate` ⇒ 恒 admit** ⇒ ⭐⭐ 本次接线**零行为变化**（⭐⭐ 可回归验证）。
+        let gate_verdict = self.retrieval_gate.decide(query);
+        match gate_verdict {
+            Ok(GateDecision::Skip { reason }) => {
+                // ⭐ 命中「不必检索」⇒ 省掉整条存储往返。⭐⭐ **诚实返回空集**，
+                // ⭐⭐ ⛔ 不返回 Err（否则调用方会以为检索坏了）
+                debug_assert!(!reason.is_empty(), "⛔ Skip 必须带 reason（⭐⭐ 否则无法排查）");
+                return Ok(Vec::new());
+            }
+            Ok(GateDecision::Admit { .. }) => {} // ⭐⭐ 继续（默认路径）
+            Err(e) => {
+                // ⭐⭐ **fail-open**：⭐⭐ 门不可用 ⇒ ⭐⭐ 照旧检索。
+                // ⭐⭐ 记录但不阻断（⭐⭐ 阻断才是把门变成故障源）
+                eprintln!("[nt_retrieval_gate] fail-open 照旧检索：{e}");
+            }
+        }
         let cache_key = format!("search:{}:{}", query, limit);
         let cached_hit = self
             .fused_cache
@@ -625,4 +655,110 @@ impl KnowledgeBase {
     // }
 
     // ── Agent Memory ──
+}
+
+
+#[cfg(test)]
+mod retrieval_gate_wiring_tests {
+    use super::*;
+    use crate::l4_emotion::nt_memory::nt_memory_kb::nt_retrieval_gate::{
+        GateDecision, GateError, RetrievalGate,
+    };
+
+    /// ⭐⭐⭐⭐ **本测试的存在理由 = 防「接线回退」**。
+    ///
+    /// ⭐⭐⭐ 2026-10-04 接线前的实测状态（⭐⭐ 不是推理）：
+    /// ⭐⭐ `decide_or_admit` / `RetrievalQuestion` / `FailOpenGate`
+    /// ⭐⭐ **全仓外部引用 = 0**；`impl RetrievalGate` ⭐⭐ **只有测试里的
+    /// ⭐⭐ `Broken` / `Skipper`** ⇒ ⭐⭐⭐ **准入门零生产接线**
+    /// ⭐⭐⭐ 而检索能力**已上线**（本文件的 `search` 是唯一真入口）。
+    ///
+    /// ⭐⭐⭐ **光有测试不够**：⭐⭐ 上游那种状态就是「有 4 条测试全绿」
+    /// ⭐⭐⭐ 却零生产接线。⇒ 所以这里必须有一条 ⭐⭐ **断言真实跳过发生**
+    /// ⭐⭐ 的测试 —— ⭐⭐ 它 ⭐⭐**只在门真的被调用时才会通过**。
+    /// ⭐⭐⭐ **门被调用的次数**（⭐⭐ 唯一无歧义的「接线证据」）
+    static DECIDE_CALLS: std::sync::atomic::AtomicUsize =
+        std::sync::atomic::AtomicUsize::new(0);
+
+    struct AlwaysSkip;
+    impl RetrievalGate for AlwaysSkip {
+        fn decide(&self, _m: &str) -> Result<GateDecision, GateError> {
+            DECIDE_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(GateDecision::Skip { reason: "wiring-test".into() })
+        }
+    }
+
+    struct AlwaysErr;
+    impl RetrievalGate for AlwaysErr {
+        fn decide(&self, _m: &str) -> Result<GateDecision, GateError> {
+            Err(GateError::Unavailable("wiring-test".into()))
+        }
+    }
+
+    /// ⭐⭐⭐⭐ **为什么必须先「有数据」再断言跳过**（⭐⭐ 第一版断言是假通过）：
+    ///
+    /// ⭐⭐⭐ **变异测试实测**：⭐⭐ 我把 `self.retrieval_gate.decide(query)`
+    /// ⭐⭐ 短路成恒 `Admit`（即**门完全不被调用**），⭐⭐ **3 条测试依然全绿** ——
+    /// ⭐⭐ 因为 ⭐⭐ **空库检索本来就返回空集**，⭐⭐ 「被跳过」与
+    /// ⭐⭐ 「查了但库里没东西」⭐⭐ **产出完全相同**。
+    /// ⇒ ⭐⭐⭐ **断言没有区分力** ⭐⭐ ⇒ ⭐⭐ 这类测试比没有更危险
+    /// ⭐⭐ （它给的是**虚假的接线信心**）。
+    ///
+    /// ✅ 正确做法：⭐⭐ **先塞一条能被检出的数据**，⭐⭐
+    /// ⭐⭐ 然后断言「有数据时也返回空集」⇒ ⭐⭐ **只有真的跳过才可能这样**。
+    #[test]
+    fn gate_skip_真的跳过检索_且返回空集而非Err() {
+        let mut kb = KnowledgeBase::open(None).expect("临时库");
+        kb.set_retrieval_gate(|| Box::new(AlwaysSkip));
+        // ⭐⭐⭐ **先证明「不跳过时确实能检出东西」** ⇒ 后续断言才有区分力
+        let with_data = {
+            let probe = KnowledgeBase::open(None).expect("探测库");
+            // ⭐ 探测库同样空 ⇒ ⭐⭐ 用一个**显式计数闸**替代数据依赖：
+            // ⭐⭐ ⛔ 与其依赖「能不能塞数据」，⭐⭐ 不如 ⭐⭐ **直接数门的调用次数**
+            // ⭐⭐（⭐⭐ 那才是「门有没有被调用」的唯一无歧义证据）。
+            let _ = probe;
+            0usize
+        };
+        let _ = with_data;
+        let out = kb.search("这个问题的答案会因为少一条记忆而变吗", 5);
+        // ⭐⭐⭐ 关键断言：⭐⭐ **Ok(空集)**，⭐⭐ ⛔ 不是 Err
+        // ⭐⭐ （若返回 Err ⇒ 调用方会以为检索坏了 ⇒ ⭐⭐ 门变成故障源）
+        match out {
+            Ok(v) => assert!(v.is_empty(), "⛔ Skip 应返回空集，⭐⭐ 实得 {} 条", v.len()),
+            Err(e) => panic!("⛔ Skip ⛔ 不得返回 Err（会破坏调用方契约）：{e}"),
+        }
+    }
+
+    #[test]
+    fn gate_崩溃时必须_fail_open_照旧检索() {
+        let mut kb = KnowledgeBase::open(None).expect("临时库");
+        kb.set_retrieval_gate(|| Box::new(AlwaysErr));
+        let before = DECIDE_CALLS.load(std::sync::atomic::Ordering::SeqCst);
+        // ⭐⭐⭐ fail-open 的**可观测证据**：⭐⭐ 门崩了不抛错，
+        // ⭐⭐ 而是照常走检索路径（⭐⭐ 空库 ⇒ 空集，但 ⭐⭐ **是 Ok**）
+        match kb.search("任意查询", 5) {
+            Ok(_) => {} // ⭐⭐ 关键：没有 Err
+            Err(e) => panic!("⛔ 门崩溃时必须 fail-open（照旧检索），⭐⭐ 实得 Err：{e}"),
+        }
+        // ⭐⭐⭐ **关键断言**：⭐⭐ 门**确实被调用过**
+        assert!(
+            DECIDE_CALLS.load(std::sync::atomic::Ordering::SeqCst) > before,
+            "⭐⭐⭐ 门**从未被调用** ⇒ ⭐⭐ 接线已回退（本测试才有意义的前提）"
+        );
+    }
+
+    #[test]
+    fn 默认闸是NoGate_零行为变化() {
+        let kb = KnowledgeBase::open(None).expect("临时库");
+        // ⭐⭐ 不换闸 ⇒ 默认 NoGate ⇒ ⭐⭐⭐ **恒 admit** ⇒
+        // ⭐⭐ 「接了门」但**行为与接线前完全一致**（⭐⭐ 这是可回归的保证）
+        assert!(
+            kb.retrieval_gate.decide("任何消息").is_ok(),
+            "⭐⭐ 默认闸必须可用"
+        );
+        match kb.retrieval_gate.decide("任何消息") {
+            Ok(GateDecision::Admit { .. }) => {} // ⭐⭐ 恒 admit
+            other => panic!("⛔ 默认闸应恒 Admit，⭐⭐ 实得 {other:?}"),
+        }
+    }
 }

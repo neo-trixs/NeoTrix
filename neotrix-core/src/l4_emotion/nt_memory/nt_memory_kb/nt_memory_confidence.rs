@@ -1271,6 +1271,10 @@ mod tests {
             ),
             absorb_scanner: std::sync::RwLock::new(None),
             receipt_emitter: std::sync::RwLock::new(None),
+            // ⭐⭐ 2026-10-04 新字段：检索准入门（⭐⭐ 默认 NoGate ⇒ 恒 admit）
+            retrieval_gate: std::sync::Arc::new(
+                crate::l4_emotion::nt_memory::nt_memory_kb::nt_retrieval_gate::NoGate,
+            ),
         };
 
         let high_conf_id = Uuid::new_v4();
