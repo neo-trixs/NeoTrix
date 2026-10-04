@@ -706,7 +706,15 @@ pub fn map_node(
     url: &str,
 ) -> Option<(&'static str, &'static str, String)> {
     // 1. KNOWN_REPOS 确定性映射 (URL 判真优先, 任意 node_type)
-    if !url.is_empty() && url.contains("github.com") {
+    //
+    // ⭐ 2026-10-03：host 判定，不再裸 contains。
+    // ⛔ 原实现 `url.contains("github.com")` 会让
+    //    `https://github.com@evil.net/<known-repo-key>` 进入本分支，
+    //    而下面的 Pass 1 又用 `url_low.contains(&kl)` 匹配 owner/repo ——
+    //    两者叠加即可用**构造 URL** 冒充任意 known repo。
+    if !url.is_empty()
+        && crate::l0_substrate::nt_core_platform::url_match::url_matches_domain(url, "github.com")
+    {
         let url_low = url.to_ascii_lowercase();
         let last = url_low
             .trim_end_matches('/')

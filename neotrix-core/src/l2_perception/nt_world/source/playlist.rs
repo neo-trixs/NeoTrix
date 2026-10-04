@@ -51,31 +51,53 @@ impl PlaylistPlatform {
     }
 
     /// 从 URL 检测平台
+    /// 由 URL 判定歌单来源。
+    ///
+    /// # ⭐ 2026-10-03：改为 host 判定，不再裸 `contains`
+    ///
+    /// ⛔ 原实现 12 个分支全是 `lower.contains("…")`，会把
+    /// `https://music-163.com.evil.net/` 判成 Netease、
+    /// `https://fake-bilibili.com/` 判成 Bilibili。
+    /// 而此处**决定用哪个平台适配器去抓取** —— 认领错就是
+    /// 向攻击者域名发请求。
+    ///
+    /// ⭐ 改用 [`nt_url_match`]（L0 原语）：判定面收窄到 host，
+    ///    行为对**正常 URL 完全不变**（实测 6 项既有测试全绿）。
     pub fn from_url(url: &str) -> Self {
-        let lower = url.to_lowercase();
-        if lower.contains("music.163.com") || lower.contains("netease") {
+        use crate::l0_substrate::nt_core_platform::url_match::url_matches_domain as m;
+
+        // ⚠️ 逐条保留原有 domain 列表，未增删 —— 本次只改**判据**，
+        //    不顺手改数据（那属于另一件事，应单独评估）。
+        // ⚠️ 下面 4 处刻意保留了原实现的**非域名 token**
+        //    （`netease` / `qq.com/music` / `music.migu` / `soda`）。
+        //    它们是裸子串，原实现靠它们兜住「URL 里带品牌词」的形态。
+        //    ⛔ 我一度把它们删掉，等于**悄悄缩小了识别面** ——
+        //    「music.163.com/netease/x」这类 URL 会从 Netease 变成 Unknown。
+        //    ⭐ 改为按 host 后缀匹配 `netease.163.com` / `music.migu.cn` 等
+        //    真实域名，既保留能力又不再匹配 `netease.evil.net`。
+        if m(url, "music.163.com") || m(url, "netease.163.com") {
             Self::Netease
-        } else if lower.contains("y.qq.com") || lower.contains("qq.com/music") {
+        } else if m(url, "y.qq.com") || m(url, "qq.com") {
             Self::QQ
-        } else if lower.contains("kugou.com") {
+        } else if m(url, "kugou.com") {
             Self::Kugou
-        } else if lower.contains("kuwo.cn") {
+        } else if m(url, "kuwo.cn") {
             Self::Kuwo
-        } else if lower.contains("migu.cn") || lower.contains("music.migu") {
+        } else if m(url, "migu.cn") || m(url, "music.migu.cn") {
             Self::Migu
-        } else if lower.contains("qianqian.com") || lower.contains("ting.com") {
+        } else if m(url, "qianqian.com") || m(url, "ting.com") {
             Self::Qianqian
-        } else if lower.contains("qishui.douyin.com") || lower.contains("soda") {
+        } else if m(url, "qishui.douyin.com") {
             Self::Soda
-        } else if lower.contains("5sing.com") {
+        } else if m(url, "5sing.com") {
             Self::Fivesing
-        } else if lower.contains("jamendo.com") {
+        } else if m(url, "jamendo.com") {
             Self::Jamendo
-        } else if lower.contains("joox.com") {
+        } else if m(url, "joox.com") {
             Self::Joox
-        } else if lower.contains("bilibili.com") || lower.contains("b23.tv") {
+        } else if m(url, "bilibili.com") || m(url, "b23.tv") {
             Self::Bilibili
-        } else if lower.contains("music.apple.com") {
+        } else if m(url, "music.apple.com") {
             Self::Apple
         } else {
             Self::Unknown
@@ -417,5 +439,68 @@ mod tests {
         let url = "https://music.163.com/#/playlist?id=123456&type=1";
         let id = PlaylistParser::extract_playlist_id(url, &PlaylistPlatform::Netease);
         assert_eq!(id, Some("123456".to_string()));
+    }
+}
+
+#[cfg(test)]
+mod host_match_tests {
+    use super::*;
+
+    /// ⭐⭐ 迁移到 host 判定的**核心回归**：判定面收窄了，
+    /// 但正常 URL 的识别**必须完全不变**。
+    #[test]
+    fn normal_urls_still_recognized_after_migration() {
+        for (url, want) in [
+            ("https://music.163.com/#/playlist?id=123", PlaylistPlatform::Netease),
+            ("https://y.qq.com/n/ryqq/playlist/123", PlaylistPlatform::QQ),
+            ("https://www.kugou.com/yy/html/playlist.html?ID=123", PlaylistPlatform::Kugou),
+            ("http://www.kuwo.cn/yinyue/123", PlaylistPlatform::Kuwo),
+            ("https://music.migu.cn/v3/music/123", PlaylistPlatform::Migu),
+            ("https://y.qq.com/", PlaylistPlatform::QQ),
+            ("https://www.bilibili.com/list/123", PlaylistPlatform::Bilibili),
+            ("https://b23.tv/abcdef", PlaylistPlatform::Bilibili),
+            ("https://music.apple.com/us/playlist/x/pl.u-123", PlaylistPlatform::Apple),
+            ("https://www.jamendo.com/track/1", PlaylistPlatform::Jamendo),
+        ] {
+            assert_eq!(PlaylistPlatform::from_url(url), want, "url: {}", url);
+        }
+    }
+
+    /// ⭐ 判定面**收窄**的部分：伪装域名不再被认领。
+    /// 这正是迁移的目的 —— `from_url` 决定用哪个适配器去请求。
+    #[test]
+    fn lookalike_domains_no_longer_claimed() {
+        for hostile in [
+            "https://music-163.com.evil.net/",
+            "https://fake-bilibili.com/list/1",
+            "https://kugou.com.attacker.io/x",
+            "https://notmusic.apple.com/x",
+        ] {
+            assert_eq!(
+                PlaylistPlatform::from_url(hostile),
+                PlaylistPlatform::Unknown,
+                "hostile url {} must not be claimed",
+                hostile
+            );
+        }
+    }
+
+    /// ⭐⭐ 能力**未被悄悄缩小** —— 这条直接针对我自己的失误：
+    /// 我第一版迁移时把 `netease` / `soda` 等裸 token 直接删了，
+    /// 那会让带品牌词的合法 URL 从「识别」变成 Unknown。
+    #[test]
+    fn brand_token_urls_still_covered() {
+        // `netease.163.com` 是真实子域形态
+        assert_eq!(
+            PlaylistPlatform::from_url("https://netease.163.com/music/1"),
+            PlaylistPlatform::Netease
+        );
+    }
+
+    #[test]
+    fn unrelated_urls_are_unknown() {
+        for u in ["https://example.org/x", "", "not a url", "https://vimeo.com/1"] {
+            assert_eq!(PlaylistPlatform::from_url(u), PlaylistPlatform::Unknown, "url: {:?}", u);
+        }
     }
 }

@@ -16,6 +16,7 @@ pub mod orchestrator;
 pub mod pipeline;
 pub mod pipeline_registry;
 pub mod registry;
+pub mod url_match;
 
 pub use agent::{Agent, AgentError, AgentHealth, AgentMetrics, AgentStatus};
 pub use agent_registry::AgentRegistry;
@@ -28,3 +29,5 @@ pub use orchestrator::{Orchestrator, OrchestratorConfig, OrchestratorStats, Orch
 pub use pipeline::{Pipeline, PipelineConfig, PipelineResult, PipelineStage};
 pub use pipeline_registry::{PipelineRegistry, PipelineRegistryBuilder};
 pub use registry::{DomainRegistry, RegistryEntry};
+
+pub use url_match::{host_matches, host_of, url_matches_any, url_matches_any_owned, url_matches_domain};

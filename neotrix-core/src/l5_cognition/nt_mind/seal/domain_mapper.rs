@@ -541,7 +541,15 @@ impl DomainMapper {
 
     fn try_known_repo(input: &KnowledgeInput) -> Option<(Domain, String, String)> {
         if let Some(ref url) = input.url {
-            if url.contains("github.com") {
+            // ⭐ 2026-10-03：host 判定，不再裸 contains。
+            // ⛔ 与 nt_absorb_mapper 同形：`contains("github.com")` 让
+            //    `https://github.com@evil.net/<key>` 进入本分支，
+            //    再叠加下面 `lower.contains(&key)` 的 KNOWN_REPOS 匹配
+            //    ⇒ 可用构造 URL 冒充任意已知仓库并套用其 capability。
+            if crate::l0_substrate::nt_core_platform::url_match::url_matches_domain(
+                url,
+                "github.com",
+            ) {
                 let lower = url.to_lowercase();
                 for (key, mapping) in KNOWN_REPOS.iter() {
                     if lower.contains(&key.to_lowercase()) {

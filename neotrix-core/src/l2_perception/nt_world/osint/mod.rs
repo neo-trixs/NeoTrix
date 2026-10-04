@@ -748,19 +748,34 @@ pub enum AbsorbSource {
 }
 
 impl AbsorbSource {
+    /// 由 URL 判定吸收来源。
+    ///
+    /// # ⭐ 2026-10-03：改为 host 判定
+    ///
+    /// ⛔ 原实现用裸 `url.contains("github.com")`。此处决定
+    ///    **用哪个处理器去抓取**（GitHub API / arXiv / Wikipedia / 通用网页）——
+    ///    误判意味着向攻击者域名发请求，或把钓鱼站当 GitHub 仓库处理。
+    ///    `https://github.com.evil.net/owner/repo` 会被原实现
+    ///    判成 `GitHubUrl` 并走 GitHub 适配器。
+    ///
+    /// ⭐ 改用 [`url_matches_domain`]（L0 原语，单一真源）。
     pub fn from_url(url: &str) -> Option<Self> {
+        use crate::l0_substrate::nt_core_platform::url_match::url_matches_domain as m;
+
         let url = url.trim();
-        if url.contains("github.com") {
+        if m(url, "github.com") {
             return Some(AbsorbSource::GitHubUrl(url.to_string()));
         }
-        if url.contains("arxiv.org") {
+        if m(url, "arxiv.org") {
             let id = url.trim_end_matches('/').split('/').next_back().unwrap_or(url);
             return Some(AbsorbSource::ArXiv(id.to_string()));
         }
-        if url.contains("wikipedia.org") {
+        if m(url, "wikipedia.org") {
             let topic = url.split('/').next_back().unwrap_or(url).replace('_', " ");
             return Some(AbsorbSource::Wikipedia(topic));
         }
+        // ⚠️ 兜底仍是 WebPage —— 未知站点按通用网页处理是既有语义，
+        //    本次不改（是否该对未知域名拒绝，属产品决策）。
         Some(AbsorbSource::WebPage(url.to_string()))
     }
 }
@@ -1412,5 +1427,71 @@ mod tests {
         let summary = absorber.absorb_video_production("X", &manifest, (3, 1, 2)).unwrap();
         assert!(summary.contains("video production: X"));
         assert!(summary.contains("asset enrichment: total=3 dup=1 kept=2"));
+    }
+}
+
+#[cfg(test)]
+mod absorb_source_host_tests {
+    use super::*;
+
+    /// ⭐⭐ 迁移回归：正常 URL 的处理器选择**必须完全不变**。
+    #[test]
+    fn normal_urls_keep_their_handler() {
+        match AbsorbSource::from_url("https://github.com/owner/repo") {
+            Some(AbsorbSource::GitHubUrl(u)) => assert_eq!(u, "https://github.com/owner/repo"),
+            other => panic!("expected GitHubUrl, got {:?}", other),
+        }
+        assert!(matches!(
+            AbsorbSource::from_url("https://arxiv.org/abs/1234.5678"),
+            Some(AbsorbSource::ArXiv(_))
+        ));
+        assert!(matches!(
+            AbsorbSource::from_url("https://en.wikipedia.org/wiki/Rust_(programming_language)"),
+            Some(AbsorbSource::Wikipedia(_))
+        ));
+        assert!(matches!(
+            AbsorbSource::from_url("https://example.org/page"),
+            Some(AbsorbSource::WebPage(_))
+        ));
+    }
+
+    /// ⭐ 判定面收窄：伪装域名不再走 GitHub/arXiv 适配器。
+    ///
+    /// ⛔ 这是本次改动的**全部意义**：原实现会把
+    /// `https://github.com.evil.net/owner/repo` 判成 GitHubUrl，
+    /// 进而用 GitHub API 去请求攻击者的域名。
+    #[test]
+    fn lookalike_domains_do_not_reach_specialized_handlers() {
+        for hostile in [
+            "https://github.com.evil.net/owner/repo",
+            "https://notgithub.com/x",
+            "https://phishing-github.com/owner/repo",
+            "https://arxiv.org.evil.net/abs/1",
+            "https://wikipedia.org.attacker.io/wiki/X",
+        ] {
+            match AbsorbSource::from_url(hostile) {
+                Some(AbsorbSource::WebPage(_)) => {}
+                other => panic!("hostile {} must fall through to WebPage, got {:?}", hostile, other),
+            }
+        }
+    }
+
+    /// ⭐⭐ userinfo 伪装：`https://github.com@evil.net/` 的
+    /// **真实 host 是 evil.net**，裸 contains 会判成 GitHub。
+    #[test]
+    fn userinfo_impersonation_does_not_reach_github() {
+        match AbsorbSource::from_url("https://github.com@evil.net/owner/repo") {
+            Some(AbsorbSource::WebPage(_)) => {}
+            other => panic!("must not be GitHubUrl, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn github_subdomains_still_recognized() {
+        // ⭐ 收窄不得误伤合法子域
+        assert!(matches!(
+            AbsorbSource::from_url("https://gist.github.com/owner/id"),
+            Some(AbsorbSource::GitHubUrl(_))
+        ));
     }
 }

@@ -270,33 +270,14 @@ impl PlatformCatalog {
     }
 }
 
-/// 判断 host 是否真的包含该域名片段。
+/// ⭐ 2026-10-03：委托给 L0 原语，本仓不再保留第二份实现。
 ///
-/// # 规则（刻意保守）
-///
-/// `x.com` 应匹配 `x.com` / `www.x.com` / `x.com.evil` 的**前缀侧**不对，
-/// 但 `notx.com` 不该命中。判据：
-///
-/// - 片段出现在 host **起始**，或
-/// - 片段前一个字符是 `.`（子域边界）。
-///
-/// ⚠️ 只查 host，不查 path —— `url_patterns` 里带 `/` 的（如 `youtu.be`
-/// 实际是域名）由调用方保证语义。此函数按域名处理。
-fn matches_domain_fragment(host: &str, pattern: &str) -> bool {
-    if pattern.is_empty() || host.is_empty() {
-        return false;
-    }
-    if host == pattern {
-        return true;
-    }
-    // 片段必须是 host 的**后缀**，或被 `.` 包围的子域
-    if let Some(rest) = host.strip_suffix(pattern) {
-        // rest 非空 ⇒ 前面必须有边界字符；rest 为空 ⇒ 上面已处理
-        return rest.ends_with('.');
-    }
-    // 或片段作为子域前缀：`x.com.evil.net` —— ⛔ **不**认为命中，
-    // 因为那是攻击者控制的域名。故此处刻意不匹配。
-    false
+/// ⛔ 此前本文件内联了一份 `matches_domain_fragment` + host 提取逻辑，
+///    而 [`crate::l0_substrate::nt_core_platform::url_match`] 是同一件事。
+///    两份判定逻辑一旦分叉，就是「同一件事两个答案」——
+///    本仓已因 `SocialAccessManager::get_feed` 的桩实现吃过同样的亏。
+pub fn matches_domain_fragment(host: &str, pattern: &str) -> bool {
+    crate::l0_substrate::nt_core_platform::url_match::host_matches(host, pattern)
 }
 
 /// 内置平台目录。
