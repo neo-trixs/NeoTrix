@@ -7,30 +7,107 @@ use super::{info, warn};
 use neotrix::l1_action::nt_core_bank::bank::ReasoningBank;
 use neotrix::l5_cognition::nt_mind::nt_mind::self_iterating::{ReasoningBrain, SelfIteratingBrain};
 
+/// 打印 brain 状态面板。
+///
+/// ⚠️ 2026-10-04 迁移到 `nt_term_viz::panel`（TERM-VIZ 清单最后一项）。
+///
+/// **首版的三处手画缺陷**（逐条实测，非观感问题）：
+/// 1. `│ {:<5}` 用**字符数**补足，而标签 `Capability Sum:` 比 `Iteration:`
+///    长 5 列 ⇒ 两行右边框落在**不同列**。
+/// 2. 顶边 `╭─ NeoTrix V2 Brain Status ──…──╮` 与内容行**各自硬编码**，
+///    宽度互不相关 ⇒ 框线参差。
+/// 3. 底边是**另一串** `─`，与顶边长度无任何契约。
+///
+/// 现全部交给 `render_panel`：内容宽 = 最长内容的**可见列宽**，
+/// 顶/底/内容行共享同一个 `content_width`。
 pub(crate) fn print_brain_stats(brain: &SelfIteratingBrain) {
+    use nt_term_viz::panel::render_panel;
+
     let stats = brain.brain.get_statistics();
-    println!(
-        "\n{}",
-        info("╭─ NeoTrix V2 Brain Status ──────────────────────────╮")
+    let rows = render_panel(
+        "NeoTrix V2 Brain Status",
+        &[
+            &format!("{} {}", info("Iteration:"), brain.iteration),
+            &format!("{} {}", info("Absorbed:"), brain.brain.total_absorb_count),
+            &format!("{} {:.3}", info("Capability Sum:"), stats.capability_sum),
+            &format!("{} {}", info("Memory:"), brain.reasoning_bank.memories().len()),
+        ],
     );
-    println!(
-        "│ {} {:<5}  {} {:<5}             │",
-        info("Iteration:"),
-        brain.iteration,
-        info("Absorbed:"),
-        brain.brain.total_absorb_count
+    println!();
+    for r in rows {
+        // 染色整行（含边框）⇒ 宽度不受影响，视觉统一。
+        println!("{}", info(r));
+    }
+}
+
+/// 构造 brain 面板行 —— 测试与生产共用同一条渲染路径。
+///
+/// ⚠️ 刻意**复用** `render_panel` 而非在测试里另写一份格式串：
+/// 否则测试测的是「测试自己」，生产改动它不会变红（自证循环）。
+fn render_brain_stats_for_test(
+    iteration: u64,
+    absorbed: u64,
+    capability_sum: f64,
+    memory: usize,
+) -> Vec<String> {
+    use nt_term_viz::panel::render_panel;
+    let rows = render_panel(
+        "NeoTrix V2 Brain Status",
+        &[
+            &format!("{} {}", super::info("Iteration:"), iteration),
+            &format!("{} {}", super::info("Absorbed:"), absorbed),
+            &format!("{} {:.3}", super::info("Capability Sum:"), capability_sum),
+            &format!("{} {}", super::info("Memory:"), memory),
+        ],
     );
-    println!(
-        "│ {} {:.3}  {} {:<5}       │",
-        info("Capability Sum:"),
-        stats.capability_sum,
-        info("Memory:"),
-        brain.reasoning_bank.memories().len()
-    );
-    println!(
-        "{}",
-        info("╰──────────────────────────────────────────────────────╯")
-    );
+    rows.into_iter().map(|r| super::info(r)).collect()
+}
+
+fn strip_ansi(s: &str) -> String {
+    nt_term_viz::table::strip_ansi(s)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nt_term_viz::display_width;
+
+    /// 反向锁：首版的两行内容宽度**不等**，右边框参差。
+    ///
+    /// 复算首版格式串（ANSI 已剥）：
+    /// · `│ Iteration: 7  Absorbed: 12` + 13 空格 ⇒ `│ `2 + `Iteration:`10 + ` `
+    ///   1 + `7`1 + `  `2 + `Absorbed:`9 + ` `1 + `12`2 + 13 = **41**
+    /// · `│ Capability Sum: 3.500  Memory: 9` + 7 空格 ⇒ `│ `2 + 16 + 1 + 5
+    ///   + `  `2 + `Memory:`7 + ` `1 + `9`1 + 7 = **42**
+    /// ⇒ 差 1 列。这正是手画 `{:<5}` + 硬编码空格必然踩的坑。
+    #[test]
+    fn brain_status_panel_lines_share_one_width() {
+        let rows = render_brain_stats_for_test(7, 12, 3.5, 9);
+        let widths: Vec<usize> = rows.iter().map(|r| display_width(&strip_ansi(r))).collect();
+        assert!(
+            widths.windows(2).all(|w| w[0] == w[1]),
+            "brain 面板每行可见宽度应一致（右边框对齐），实测 {widths:?}"
+        );
+        assert_eq!(widths[0], display_width(&strip_ansi(&rows[0])));
+    }
+
+    /// 数值位数变化不得改变框宽（首版 `{:<5}` 在 ≥5 位时会撑开）。
+    #[test]
+    fn brain_panel_width_is_stable_across_magnitudes() {
+        let small = render_brain_stats_for_test(1, 2, 0.5, 0);
+        let big = render_brain_stats_for_test(123456789, 987654321, 999999.5, 1234567);
+        let w = |rows: &[String]| display_width(&strip_ansi(&rows[1]));
+        // 只断言「每组内部自洽」——跨组宽度可变（内容更长就该更宽），
+        // 但**每组内所有行必须同宽**，这才是右边框对齐的充要条件。
+        for rows in [&small, &big] {
+            let ws: Vec<usize> = rows.iter().map(|r| display_width(&strip_ansi(r))).collect();
+            assert!(
+                ws.windows(2).all(|x| x[0] == x[1]),
+                "组内行宽应一致，实测 {ws:?}"
+            );
+        }
+        assert!(w(&big) > w(&small), "内容更长时框应变宽（反之说明宽度没跟上）");
+    }
 }
 
 pub(crate) fn brain_dir(profile: &str) -> PathBuf {
