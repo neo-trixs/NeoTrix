@@ -2415,3 +2415,67 @@ iOS/Android **完全没抓**（⇒ 「移动端怎么做差量同步与草稿」
 （`default_platforms()`），与 `nt_catalog` 的 10 平台有 3 个重叠（github/…）。
 二者用途不同（前者做用户名存在性探测，后者做登录+URL 路由），
 **不建议强行合并**，但需知悉：新增平台时要决定改哪一处或两处都改。
+
+
+---
+
+## 📌 待办 17：`seal/` 有 2 个**孤儿文件**，其中之一我曾「修过」但从未编译
+
+### ⭐ 核心发现
+
+审计 `source_adapter.rs` 时顺藤摸瓜，发现 `l5_cognition/nt_mind/seal/` 目录里
+**磁盘上有 8 个 `.rs`，但 `mod.rs` 只 `pub mod` 了 6 个**：
+
+| 孤儿文件 | 行数 | 状态 |
+|---|---|---|
+| `domain_mapper.rs` | 661 | 零外部引用 |
+| `source_adapter.rs` | 464 | 零外部引用 |
+
+两者**互相依赖**（`domain_mapper` 用 `use super::source_adapter::KnowledgeInput;`）
+⇒ 1125 行互链逻辑**整体从未进入编译树**。
+
+### ⛔ 因此要更正我此前的一次汇报
+
+`c1b093b0` 我报告「修 5 处裸 contains」，其中第 5 处是
+`seal/domain_mapper.rs`。**那次修改从未被编译过** ——
+文件不在 `mod.rs` 里，rustc 根本没看它。
+⇒ 实际生效的只有 4 处，不是 5 处。
+
+⚠️ 更值得记的是**它为什么看起来是有效的**：
+`cargo check` 全绿、`cargo test` 全绿、`check-feature-gates` PASS
+—— 因为**不存在的代码不可能失败**。
+这是「导出 ≠ 接入」比之前几次都更隐蔽的形态：
+连"文件里有我的改动"都能骗过 `git diff`。
+
+### 验证方法（可复用）
+
+```python
+# 列出目录下未被 mod.rs 声明的 .rs
+declared = set(re.findall(r'pub mod (\w+);', (p/'mod.rs').read_text()))
+on_disk  = {f.stem for f in p.glob('*.rs') if f.stem != 'mod'}
+orphan   = sorted(on_disk - declared)
+```
+
+我在 `seal/`、`social_access/`、`nt_core_platform/` 三个目录都跑了：
+只有 `seal/` 有孤儿（2 个），另两个目录 0 孤儿。
+
+### ⛔ 为什么**没有**顺手把它们接进编译树
+
+临时接入验证过：两者**能编译、零 warning**，但既有测试
+`test_factory_detection` **当场失败**：
+
+```text
+detect("2301.12345")  期望 ArxivPaper,实际 Article
+```
+
+我用 HEAD 版逻辑独立复现确认：**该测试在我改动之前就已经失败** ——
+即这份代码从未被维护过。接入它等于接手一个未完成的半成品：
+需补 arXiv 裸 ID 解析、修 `GitHubTopicAdapter` 不可达（分支顺序 bug，
+`starts_with("github.com/")` 在前使 `topics/` 分支永不可达），
+外加它自己那套域名判定的收敛。**属独立一轮工作，不该塞进本次提交。**
+
+### 已做的清理
+本轮对这两个文件的改动**已全部 `git checkout` 还原**，
+不留残迹（`git status` 中 `seal/` 干净）。
+`c1b093b0` 里对 `domain_mapper.rs` 的改动**保留在历史中但不生效**，
+如实记录于此。
