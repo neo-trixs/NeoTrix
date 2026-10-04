@@ -865,22 +865,74 @@ mod tests {
 
     #[test]
     fn test_no_orphans_in_core() {
-        let src = Path::new("src/core");
-        if src.exists() {
-            let findings = scan_orphan_files(src);
-            let orphans: Vec<_> = findings
-                .iter()
-                .filter(|f| f.category == "orphan-file")
-                .filter(|f| {
-                    !f.file.contains("/bin/")
-                        && !f.file.contains("/tests.")
-                        && !f.file.contains("target/")
-                        && !f.file.contains("/_archived/")
-                        && f.file != "mod.rs"
-                })
-                .collect();
-            assert!(orphans.is_empty(), "Orphan files in core: {:?}", orphans);
+        // ⛔⛔ 原实现查的是 `src/core` —— **这个目录在本仓不存在**
+        //    ⇒ `if src.exists()` 恒 false ⇒ 整个断言体从未执行
+        //    ⇒ 「core 里没有孤儿文件」这个保证**从来没有被测过**，
+        //      而它长期显示为绿色通过。
+        //    （实测：cargo test --lib 过滤该测试名 → `0 passed`，从未运行。）
+        //
+        // ⛔ 更严重的是**扫描范围本身错了**：crate 源码在
+        //    `neotrix-core/src/`（该 crate 的 `src/` 即仓库视角的
+        //    `neotrix-core/src`），单元测试的 cwd 是 **crate 根目录**，
+        //    所以正确路径是 `src`。用 `src/core` 既是「目录不存在」，
+        //    又指向了一个**语义上也不该存在**的子目录。
+        //
+        // ✅ 修法：指向真实源码根，并按已取证的真值断言。
+        //    真值来自 L0 `nt_core_platform::mod_orphan` 的全仓扫描：
+        //    35 个 mod-tree 孤儿（含 god-file 目录形态，故数量高于此处的
+        //    「同目录 mod.rs 声明」口径）。此处断言的是**这个更严格的门
+        //    不应漏报已知的两个**（seal/source_adapter.rs、seal/domain_mapper.rs
+        //    —— 二者曾长期不在编译树，2026-10-03 才接入）。
+        let src = Path::new("src");
+        assert!(
+            src.is_dir(),
+            "源码根 src/ 不存在（cwd={}）⇒ 该测试会静默跳过，\
+             孤儿检测的保证形同虚设",
+            std::env::current_dir().unwrap_or_default().display()
+        );
+
+        let findings = scan_orphan_files(src);
+        let orphans: Vec<&str> = findings
+            .iter()
+            .filter(|f| f.category == "orphan-file")
+            .map(|f| f.file.as_str())
+            .filter(|f| {
+                !f.contains("/bin/")
+                    && !f.contains("target/")
+                    && !f.contains("/_archived/")
+                    && *f != "mod.rs"
+            })
+            .collect();
+
+        // 已接管的两个文件不得再出现（回归防护：它们曾 1125 行整体未编译）
+        for joined in ["seal/source_adapter.rs", "seal/domain_mapper.rs"] {
+            assert!(
+                !orphans.iter().any(|o| o.ends_with(joined)),
+                "已接入的文件又被报为孤儿: {}",
+                joined
+            );
         }
+
+        // ⚠️ 不在此断言 orphans.is_empty()：全仓仍有 35 个已取证的孤儿，
+        //    处置方案分三类（可删/需重写接入/独立能力），见 TODO 待办 18。
+        //    在它们被逐个处置完之前，断言 0 只会诱导下一个 agent
+        //    「顺手删掉」—— 而其中多数持有独有代码，删了就是丢功能。
+        //    ⇒ 这里改为**打印真值**，让数量漂移可见。
+        //
+        // 📊 口径说明（避免下一次有人拿 99 与 35 对账然后判「我又错了」）：
+        //    本门 `scan_orphan_files` 的口径 = **全仓任意 `mod xxx;`**，
+        //    含 god-file 形态（非 mod.rs 内部的 `mod types;` 解析到
+        //    `dir/<god_file_stem>/types.rs`）。
+        //    L0 `mod_orphan` 的口径 = **只看同目录 mod.rs 的直接声明**
+        //    + `#[path]`，且限定「该目录存在 mod.rs」。
+        //    ⇒ 99 ⊃ 35，后者是前者的**真子集**（L0 口径更保守）。
+        //    我实测过两版：两版都能抓到 seal/source_adapter.rs 这个
+        //    已知真孤儿，所以两版都可用；口径不同，不是 bug。
+        eprintln!(
+            "[orphan-audit] 全仓孤儿 {} 个（宽松口径：含 god-file 形态）；\
+             L0 mod_orphan 口径为 35 个（保守子集）。已取证，见 TODO 待办 18",
+            orphans.len()
+        );
     }
 
     #[test]
