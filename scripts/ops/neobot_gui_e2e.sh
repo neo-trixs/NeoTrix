@@ -75,6 +75,25 @@ while [ "${waited}" -lt 30 ]; do
 done
 say "AX 树就绪：${probe:-0} 字节（等待 ${waited}s）"
 
+# ⭐⭐⭐ 2026-10-04 显示唤醒前置（实测踩出来的**假失败**，⛔ 不是产品缺陷）
+#
+# ⭐⭐⭐ 症状：报「30 秒内未出现窗口」，而 ⭐ 二分证据显示**与代码无关** ——
+#   把 `neobot-ui/src` **整体 stash 回改动之前仍复现**；手动起进程
+#   **90 秒内 AX 窗口数恒为 0**，但 ⭐⭐ webview 日志**有 `[neobot-root] mounted`**
+#   ⇒ ⭐⭐ 「进程活着、页面已加载、却没有窗口」。
+# ⭐⭐⭐ 真因：**屏幕休眠** ⇒ macOS 不 map 窗口 ⇒ **AX 枚举恒为 0**。
+#   `ioreg -n IODisplayWrangler` 当时读不到 `CurrentPowerState`（显示已睡）。
+#   执行 `caffeinate -u -t 2`（模拟用户活动、唤醒显示器）后 ⇒ ⭐⭐ **窗口数立刻变 1**，
+#   本脚本随即 **PASS**。
+#
+# ⭐⭐ 为什么必须写进门：⛔ 否则**每次机器睡一会儿后跑门都会红**，
+# ⭐⭐ 而 ⭐⭐ **维护者会去「修」一个完全正确的窗口创建代码** ——
+# ⭐⭐ 这正是 AGENTS.md §5「扫描器告警 ≠ 缺陷」的同类：⭐ **门的环境前提失真**。
+# ⭐⭐⭐ 而且它比 R-SCAN-4 更隐蔽：**不报错、不改代码、只是默默让门失真**。
+if ! caffeinate -u -t 2 >/dev/null 2>&1; then
+  say "ℹ️ caffeinate 不可用（⛔ 屏幕休眠时本门会假红，⛔ 但不阻塞）"
+fi
+
 cleanup() { kill "$PID" 2>/dev/null; sleep 2; kill -9 "$PID" 2>/dev/null; }
 trap cleanup EXIT
 
