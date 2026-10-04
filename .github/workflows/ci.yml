@@ -231,6 +231,26 @@ jobs:
       # ⭐⭐ 纯 python、无浏览器/网络/编译依赖 ⇒ ⭐⭐ 接进 CI 零成本。
       - name: neobot API contract gate (contract table <-> handler registry <-> frontend calls)
         run: python3 scripts/ops/nt_api_contract.py
+      # ⭐⭐⭐ 2026-10-04：⭐⭐ **元门** —— 「门必须接了 CI 或带理由登记豁免」。
+      # ⭐⭐⭐ 本轮实测：`kind=gate` 41 道里 **27 道从未在 CI 引用**，
+      #   其中 `nt_api_contract.py` **一跑就抓到已发布的缺陷** ⇒
+      #   ⭐⭐⭐ **门写了没跑 ⇒ 缺陷能长期存活**。⇒ 立这道元门让该状态**可判定**。
+      # ⭐⭐ 零依赖（纯 python + 读文本），⭐⭐ 不装浏览器、不编译。
+      - name: gate coverage meta-gate (every gate is wired or has a reasoned exemption)
+        run: python3 scripts/ops/nt_gate_coverage.py
+      # ⭐⭐ 以下 4 道为「零浏览器/网络/编译依赖且实测 rc=0」的门，⭐⭐ 本轮补齐接线。
+      # ⭐⭐⭐ 对标 dsh `builder.rs:1213` 与 Atlas：⭐⭐ **原则要被 CI 强制**，
+      #   ⭐⭐ 「写下来」不等于「守得住」。
+      - name: scan-surface gate (21 scan surfaces exist)
+        run: python3 scripts/ops/nt_scan_surface.py
+      - name: neobot feature viability gate (no silently dropped live feature)
+        run: python3 scripts/ops/nt_feature_viability.py
+      - name: neobot self-contained imports gate (no escape from the self-hosted tree)
+        run: node scripts/ops/neobot-check-selfcontained.mjs
+      - name: neobot IPC payload-key gate (camelCase matches Rust params)
+        run: node scripts/ops/neobot-check-ipc-keys.mjs
+      - name: neobot A1 recovery gate (running rows dominated by sweep)
+        run: node scripts/ops/neobot-check-a1-recovery.mjs
       - name: Build frontend (tsc --noEmit + vite build)
         run: pnpm run build
         working-directory: apps/neobot-desktop/neobot-ui
