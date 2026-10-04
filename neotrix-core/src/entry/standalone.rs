@@ -4,19 +4,38 @@ use std::io::{self, Write};
 pub(crate) async fn run_standalone(stage: usize) {
     use neotrix::l1_action::nt_io::nt_io_standalone::StandaloneEngine;
     let mut engine = StandaloneEngine::new(stage.min(18));
-    println!("╭─ NeoTrix Standalone Mode ──────────────────────────╮");
-    println!("│                                                    │");
-    println!("│  ReasoningKernel v3.0    No external LLM required   │");
-    println!("│  {}                        │", engine.stats());
-    println!("│                                                    │");
-    println!("│  Type your questions. The kernel reasons internally │");
-    println!(
-        "│  through {} stages of neural architecture.    │",
-        stage.min(18) + 1
+    // ⚠️ 2026-10-05 迁移到 nt_term_viz::panel。
+    //
+    // 首版缺陷（实测可见宽，ANSI 已剥）：
+    //   │                       │  空行      w=3   ← 手写了 52 个空格？
+    //   │  ReasoningKernel …   │            w=55
+    //   │  {stats}              │            w=35  ← 且**被截断**
+    //   │  Commands: …          │            w=53
+    //   顶边 w=54 / 底边 w=54（另外两串手数横线，与内容行无契约）
+    // ⇒ 同一个框里行宽在 3~55 之间乱跳；且 `engine.stats()` 是**变长**串，
+    //   塞进 `{:35}` 会被静默截断 ⇒ 信息丢失。
+    //
+    // 现全部交给 render_panel：内容宽 = 最长内容的可见列宽，
+    // 空行交给 ""，`stats()` 不截断（超出即撑宽）。
+    let rows = nt_term_viz::panel::render_panel(
+        "NeoTrix Standalone Mode",
+        &[
+            "",
+            "  ReasoningKernel v3.0    No external LLM required",
+            &format!("  {}", engine.stats()),
+            "",
+            "  Type your questions. The kernel reasons internally",
+            &format!(
+                "  through {} stages of neural architecture.",
+                stage.min(18) + 1
+            ),
+            "",
+            "  Commands: /stats  /stage <N>  /help  /exit",
+        ],
     );
-    println!("│                                                    │");
-    println!("│  Commands: /stats  /stage <N>  /help  /exit       │");
-    println!("╰────────────────────────────────────────────────────╯");
+    for r in rows {
+        println!("{}", r);
+    }
 
     loop {
         print!("\n❯ ");

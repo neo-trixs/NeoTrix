@@ -23,23 +23,43 @@ pub async fn run_proxy_cmd(cmd_str: &str) {
                     let uptime = v["uptime_secs"].as_i64().unwrap_or(0);
                     let active = v["active_count"].as_i64().unwrap_or(0);
                     let idle = v["idle_secs"].as_i64().unwrap_or(0);
-                    println!("╭─ Proxy Daemon ─────────────────────╮");
-                    println!("│ {}  {}", "Mode:".blue(), mode);
-                    println!("│ {}  {}", "PID:".blue(), pid);
-                    println!("│ {}  {}", "Port:".blue(), port);
-                    println!("│ {}  {}s", "Uptime:".blue(), uptime);
-                    println!("│ {}  {}", "Active:".blue(), active);
-                    println!("│ {}  {}s", "Idle:".blue(), idle);
-                    println!(
-                        "│ {}  {}",
-                        "Tor SOCKS5:".blue(),
-                        if TorManager::socks5_reachable().await {
-                            "✓ reachable".green()
-                        } else {
-                            "✗ unreachable".red()
-                        }
+                    // ⚠️ 2026-10-05 迁移到 nt_term_viz::panel。
+                    //
+                    // 首版是手画框，且**每一行宽度都不同**（实测，ANSI 已剥）：
+                    //   │ Mode: x          w=11
+                    //   │ PID: 1           w=10
+                    //   │ Port: 9050       w=14
+                    //   │ Uptime: 12s      w=14
+                    //   │ Active: 3        w=13
+                    //   │ Idle: 0s         w=11
+                    //   │ Tor SOCKS5: ...  w=25  ← 最长，框宽实际由它决定
+                    // 而顶边/底边是**另外两串**手数横线（各 35 个 `─`），
+                    // 与任何一行都无契约 ⇒ 右边框参差 14 列。
+                    //
+                    // ⛔ 首版还把 `"Mode:".blue()` 放进框内 —— 这正是
+                    // `nt-term-viz` 首版 `content_line` 静默错位的触发条件
+                    // （display_width 把 ANSI 计入 ⇒ 命中 `w >= cols`
+                    // ⇒ 零补齐）。该原语已由 93c6a01 修好，本迁移才安全。
+                    let tor = if TorManager::socks5_reachable().await {
+                        "✓ reachable".green()
+                    } else {
+                        "✗ unreachable".red()
+                    };
+                    let rows = nt_term_viz::panel::render_panel(
+                        "Proxy Daemon",
+                        &[
+                            &format!("{}  {}", "Mode:".blue(), mode),
+                            &format!("{}  {}", "PID:".blue(), pid),
+                            &format!("{}  {}", "Port:".blue(), port),
+                            &format!("{}  {}s", "Uptime:".blue(), uptime),
+                            &format!("{}  {}", "Active:".blue(), active),
+                            &format!("{}  {}s", "Idle:".blue(), idle),
+                            &format!("{}  {}", "Tor SOCKS5:".blue(), tor),
+                        ],
                     );
-                    println!("╰────────────────────────────────────╯");
+                    for r in rows {
+                        println!("{}", r);
+                    }
                 } else {
                     println!("{}", s);
                 }

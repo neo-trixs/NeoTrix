@@ -153,35 +153,43 @@ fn run_pipeline(args: &[String], base: CleanFlags) -> Result<(), String> {
     // 打印扫描结果
     let mut grand_all = 0u64;
     let mut grand_sel = 0u64;
-    println!("╭─ Cleanup Scan ─────────────────────────────────────╮");
+    // ⚠️ 2026-10-05 迁移到 nt_term_viz::panel。
+    //
+    // 首版缺陷：手画框 + `{:<16}`，而 `cat.title` 与文件路径长度**不可预知**
+    // ⇒ 内容宽随数据变化，而顶/底边是**手数横线**（各 52 个 `─`，vis=54）
+    // ⇒ 路径一长就冲出框外。实测 `│ TOTAL  all 12  default-selected 3`
+    // vis=35，而顶边 vis=54 ⇒ 首屏就已错位 19 列。
+    //
+    // ⛔ 必须**先收集再渲染**：首版在 `for cat in &results` 里直接 println，
+    //   而 render_panel 需要先知道全部行才能算内容宽 ⇒ 改成两段式。
+    let mut lines: Vec<String> = Vec::new();
     for cat in &results {
-        println!(
-            "│ {:<16} {:>6} items  all {}  default {}",
+        lines.push(format!(
+            "{:<16} {:>6} items  all {}  default {}",
             cat.title,
             cat.items.len(),
             format_size(cat.total_bytes()),
             format_size(cat.selected_bytes())
-        );
+        ));
         grand_all += cat.total_bytes();
         grand_sel += cat.selected_bytes();
         // 最多列前 8 项
         for item in cat.items.iter().take(8) {
-            println!(
-                "│   {}  {}",
-                format_size(item.size_bytes),
-                item.path.display()
-            );
+            lines.push(format!("  {}  {}", format_size(item.size_bytes), item.path.display()));
         }
         if cat.items.len() > 8 {
-            println!("│   … +{} more", cat.items.len() - 8);
+            lines.push(format!("  … +{} more", cat.items.len() - 8));
         }
     }
-    println!(
-        "│ TOTAL  all {}  default-selected {}",
+    lines.push(format!(
+        "TOTAL  all {}  default-selected {}",
         format_size(grand_all),
         format_size(grand_sel)
-    );
-    println!("╰────────────────────────────────────────────────────╯");
+    ));
+    let borrowed: Vec<&str> = lines.iter().map(String::as_str).collect();
+    for r in nt_term_viz::panel::render_panel("Cleanup Scan", &borrowed) {
+        println!("{}", r);
+    }
 
     let selected: Vec<_> = results
         .iter()
