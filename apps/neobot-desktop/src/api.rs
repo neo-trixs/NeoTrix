@@ -112,8 +112,25 @@ pub const SPECS: &[ApiSpec] = &[
         "登记成员（human|agent，幂等）；会话创建的前置条件"),
     ApiSpec::new("neobot_send", "会话", &["convo_id", "text"], "AgentRunResult", Status::Implemented,
         "会话内一轮：问落库 → 跑 → 答落库；convo 缺席 = 脱离会话手动跑"),
-    ApiSpec::new("neobot_convo_messages", "会话", &["convo_id"], "ChatMessage[]", Status::Implemented,
-        "切会话时读历史；⛔ 之前只换标题不换消息流（串台）"),
+    // ⭐⭐⭐ 2026-10-04 契约表改名（⭐⭐ 由 `nt_api_contract.py` 的 B 项抓出）。
+    //
+    // ⛔ 改前这里写的是 **`neobot_convo_messages`**（**已废弃的全量命令**），
+    // ⭐⭐ 而自 `70a592df` 起实际注册的是 ⭐⭐ **`neobot_convo_messages_page`**
+    // ⇒ ⭐⭐ 契约表描述了一个**不存在的命令**，而真实命令**无条目**
+    // ⇒ ⭐⭐ 后果（门原文）：「能力存在于代码但契约表不描述
+    //   ⇒ **UI 无从得知，文档与现实分叉**」。
+    //
+    // ⭐⭐⭐ **这是同一病的第 4 次复发**，⭐⭐ 且复发路径完全一致：
+    // ⭐⭐ **改名后下游没跟**。前三次：① smoke 桩（`1c67dafb`）
+    // ⭐⭐ ② `neobot_convo_messages` → `_page` 时 UI 侧注释
+    // ⭐⭐ ③ 本次契约表。⇒ ⭐⭐⭐ **根治只能靠「改名后必跑契约门」**。
+    //
+    // ⭐⭐ 返回类型同步改成真实的 `MessagePage`：
+    // ⭐⭐ ⛔ 旧契约写 `ChatMessage[]` ⇒ ⭐⭐ **形状本身就是错的**
+    // ⭐⭐ （真返回 `{messages, hasMore, nextSeq}`，⭐⭐ 见 `commands.rs:644`）。
+    ApiSpec::new("neobot_convo_messages_page", "会话",
+        &["convo_id", "before_seq", "limit"], "MessagePage", Status::Implemented,
+        "⭐ 分页读历史（cursor=最小 seq）；⛔ 旧的全量命令已移除 —— 长会话曾一次塞满 DOM"),
     ApiSpec::new("neobot_skill_list", "其它", &[], "SkillListView", Status::Implemented,
         "技能清单（顶替上游插件页签）；skipped>0 = 有技能包装坏了"),
     ApiSpec::new("neobot_skill_install", "其它", &["path"], "null", Status::Implemented,

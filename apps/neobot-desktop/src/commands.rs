@@ -605,22 +605,24 @@ fn check_convo_exists(store: &NeobotStore, id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// `neobot_convo_messages(convo_id) -> ChatMessage[]`
-///
-/// 一个会话的全部消息（时间正序）。切会话时界面调这条换历史 ——
-///
-/// ⛔ 之前切会话只换了标题，消息流还留着上一个会话的（串台）。
-/// 历史由库出，界面只负责渲染，不做合并/去重/截断。
-#[tauri::command]
-pub fn neobot_convo_messages(
-    convo_id: String,
-) -> Result<Vec<neotrix_neobot::nt_store::ChatMessage>, String> {
-    let store = open_store()?;
-    // ⭐⭐ 走唯一规范化入口（⭐⭐ 改前是裸 `.trim()`：⭐⭐ 空串会被当成合法 id 去查库）
-    let convo = normalize_convo_id(Some(convo_id.as_str()))
-        .ok_or_else(|| "会话 id 为空".to_string())?;
-    store.list_messages(&convo).map_err(|e| e.to_string())
-}
+// ⭐⭐⭐⭐ 2026-10-04 **删除** `neobot_convo_messages`（**全量**读历史）。
+//
+// ⛔ **为什么删**（⭐⭐ 由 `nt_api_contract.py` 的 B 项抓出，⭐⭐ 非人工排查）：
+// ⭐⭐ ① ⭐⭐ **零调用方**：自持交付树 `neobot-ui/` 只在**注释**里提到它
+//      （`:99`、`:213`），⭐⭐ 真实调用已全部改走 `_page`。
+// ⭐⭐ ② ⭐⭐ **与 `neobot_convo_messages_page` 语义重叠** ⇒ ⭐⭐⭐ 两条路径
+//      **必然分叉**（⭐⭐ 这正是「同一语义两个真源」的病根）。
+// ⭐⭐ ③ ⭐⭐ 它的存在本身就是 `70a592df`「建成未用」的残留物：
+//      ⭐⭐ 库层的分页函数早已存在，⭐⭐ 而命令层与界面层**三层都缺接线**
+//      ⭐⭐（该 commit 注释原文），⭐⭐ 接完之后这条全量命令就该退场。
+//
+// ⭐⭐⭐ **留着的代价是可证的**：`nt_api_contract.py` 报「已注册但契约表无条目」
+// ⭐⭐⭐ ⇒ **门会红**；而若把它写进契约表 ⇒ ⭐⭐ 契约表开始**描述一个没人用的能力**
+// ⭐⭐⭐ ⇒ 「UI 无从得知，文档与现实分叉」（门原文）。
+// ⇒ ⭐⭐⭐ 两个方向都不对 ⇒ ⭐⭐ **删除是唯一自洽解**。
+//
+// ⭐⭐ 保留 `list_messages` 库函数本身（⭐⭐ 库层测试仍在用，⭐⭐ ⛔ 不动库 API）。
+// ⭐⭐ 唯一真源：⭐⭐ **`neobot_convo_messages_page`**（分页，有界，⭐⭐ 治长会话）。
 
 /// ⭐⭐ 分页拉取一页消息（**增量式**，治长会话一次性全量渲染）。
 ///

@@ -97,7 +97,7 @@ fn mock_app() -> tauri::App<tauri::test::MockRuntime> {
             neobot_desktop::commands::neobot_api_specs,
             neobot_desktop::commands::neobot_member_add,
             neobot_desktop::commands::neobot_convo_group,
-            neobot_desktop::commands::neobot_convo_messages,
+            neobot_desktop::commands::neobot_convo_messages_page,
             neobot_desktop::commands::neobot_send,
         ])
         .build(mock_context(noop_assets()))
@@ -166,7 +166,7 @@ fn canary_无参命令能走通真实分发() {
             .filter_map(|v| v.get("name").and_then(|n| n.as_str()))
             .collect();
         assert!(
-            names.contains(&"neobot_send") && names.contains(&"neobot_convo_messages"),
+            names.contains(&"neobot_send") && names.contains(&"neobot_convo_messages_page"),
             "契约清单应含被测命令，实际含：{names:?}"
         );
     })
@@ -241,7 +241,7 @@ fn neobot_send_键名错则问不落库且返回值不变() {
 ///
 /// 与上一个测试构成对照：`Option` 形参**静默**、非 `Option` **吵**。
 #[test]
-fn neobot_convo_messages_键名错则硬失败并点名期望键() {
+fn neobot_convo_messages_page_键名错则硬失败并点名期望键() {
     with_temp_data_dir(|dir| {
         let app = mock_app();
         let w = app.get_webview_window("main").expect("窗口");
@@ -252,7 +252,7 @@ fn neobot_convo_messages_键名错则硬失败并点名期望键() {
         let ok = get_ipc_response(
             &w,
             req(
-                "neobot_convo_messages",
+                "neobot_convo_messages_page",
                 InvokeBody::Json(json!({ "convoId": convo })),
             ),
         )
@@ -264,7 +264,7 @@ fn neobot_convo_messages_键名错则硬失败并点名期望键() {
         let bad = get_ipc_response(
             &w,
             req(
-                "neobot_convo_messages",
+                "neobot_convo_messages_page",
                 InvokeBody::Json(json!({ "convo_id": convo })),
             ),
         );
@@ -295,7 +295,7 @@ fn 消息返回带seq游标() {
         let ok = get_ipc_response(
             &w,
             req(
-                "neobot_convo_messages",
+                "neobot_convo_messages_page",
                 InvokeBody::Json(json!({ "convoId": convo })),
             ),
         )
@@ -387,7 +387,7 @@ fn 注册表含全部被测命令() {
     for cmd in [
         "neobot_api_specs",
         "neobot_convo_group",
-        "neobot_convo_messages",
+        "neobot_convo_messages_page",
         "neobot_send",
     ] {
         assert!(

@@ -222,6 +222,15 @@ jobs:
       # ⭐⭐ ⛔ 抄 better-sidebar 的教训：glob 静默匹配为空 ⇒ 契约作废。
       - name: neobot self-hosted UI wiring gate (IPC single-exit + i18n + dist purity)
         run: python3 scripts/ops/nt_neobot_ui_wiring.py
+      # ⭐⭐⭐ 2026-10-04：⭐⭐ **契约门首次进 CI**，⭐⭐ 且它**当场抓到一个已发布的缺陷**。
+      # ⭐⭐ 三方一致性：`api.rs` 契约表 ⇔ `generate_handler` 注册 ⇔ 前端 `invoke` 实调。
+      # ⭐⭐⭐ 为什么优先级最高：⭐⭐ 本轮实测它报出
+      #   「已注册但契约表无条目：`neobot_convo_messages`」
+      #   ⇒ ⭐⭐⭐ **那是一条已废弃、零调用方、却仍在注册表里的命令**，
+      #   ⭐⭐ 而**这个门从未在 CI 跑过** ⇒ ⭐⭐ 缺陷可以长期存活。
+      # ⭐⭐ 纯 python、无浏览器/网络/编译依赖 ⇒ ⭐⭐ 接进 CI 零成本。
+      - name: neobot API contract gate (contract table <-> handler registry <-> frontend calls)
+        run: python3 scripts/ops/nt_api_contract.py
       - name: Build frontend (tsc --noEmit + vite build)
         run: pnpm run build
         working-directory: apps/neobot-desktop/neobot-ui

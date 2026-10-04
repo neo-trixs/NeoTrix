@@ -42,7 +42,28 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 API = os.path.join(REPO, 'apps/neobot-desktop/src/api.rs')
 MAIN = os.path.join(REPO, 'apps/neobot-desktop/src/main.rs')
+# ⭐⭐⭐ 2026-10-04 **修正真源**（⭐⭐ 这是本门最严重的设计缺陷，⭐⭐ 实测才发现）。
+#
+# ⛔ 改前 `FRONTEND` 指向 **`frontend/src` = vendored 参考树**
+#   （AGENTS.md §0：`apps/neobot-desktop/neobot-ui/` 才是**唯一交付 UI**，
+#     `frontend/` 仅为 vendored 参考）。
+# ⇒ ⭐⭐⭐ 后果：**本门从不扫描真正交付的那棵树**，⭐⭐ 而拿一棵**冻结**的树
+#   当「前端实调」的真源。
+#
+# ⭐⭐⭐ **它是怎么暴露的**（⭐⭐ 不是推理出来的）：
+#   修完契约表改名（`neobot_convo_messages` → `_page`）后，B 项转绿，
+#   ⭐⭐ 却冒出一处 ⛔「`neobot_convo_messages` ← 前端 1 处调用」。
+#   ⭐⭐ 读现场发现命中在 **`frontend/src/neobot-root.tsx:302`**
+#   ⭐⭐ —— ⭐⭐ **vendored 树里的真代码**，⭐⭐ ⛔ **不是**我自持树的注释。
+#   ⇒ ⭐⭐ **自持树当时其实已经没有这个调用了** ⇒ ⭐⭐ 门报的是**别人的调用**。
+#
+# ⭐⭐ 三处修正同时落地（⭐⭐ 缺一不可）：
+#   ① `SELFHOST` = `neobot-ui/src` ⇒ ⭐⭐ **交付树成为真源**
+#   ② C 项用 `SELFHOST` 判定 ⇒ ⭐⭐ 门从此保护**真正发布的东西**
+#   ③ vendored 树的调用**单独报告**（ℹ️）⇒ ⭐⭐ 仍可见，⭐⭐ 但不当失败
+#      （⭐⭐ 它是冻结的上游代码，⭐⭐ ⛔ 它的调用不该阻塞我方）
 FRONTEND = os.path.join(REPO, 'apps/neobot-desktop/frontend/src')
+SELFHOST = os.path.join(REPO, 'apps/neobot-desktop/neobot-ui/src')
 VENDORED = os.path.join(REPO, 'apps/neobot-desktop/frontend')
 
 
@@ -207,17 +228,44 @@ def load_registered():
     return names
 
 
-def frontend_invocations():
-    """前端 `invoke('X'` 的调用点。**排除 vendored 树** ——
-    那是被冻结的上游代码，契约以我方 SPECS 为准。"""
+def frontend_invocations(base=None):
+    """`invoke('X'` 的调用点。⭐⭐ `base` 缺省 = **自持交付树**（⭐⭐ 真源）。
+
+    ⭐⭐⭐ 改前**无参数**，⭐⭐ 硬扫 vendored 树 ⇒ ⭐⭐ 门保护错了对象。
+    ⭐⭐ 仍保留 `base` 参数以便分别统计两棵树（⭐⭐ vendored 单独报告）。"""
+    base = base or SELFHOST
     hits = {}
-    for root, dirs, files in os.walk(FRONTEND):
+    for root, dirs, files in os.walk(base):
         dirs[:] = [d for d in dirs if d not in ('node_modules', 'dist', 'vendor')]
         for fn in files:
             if not fn.endswith(('.ts', '.tsx')):
                 continue
             p = os.path.join(root, fn)
             txt = open(p, encoding='utf-8', errors='ignore').read()
+            # ⭐⭐⭐ 2026-10-04：**先剥注释与字符串**再扫。
+            #
+            # ⭐⭐⭐ **实测假阳性（本门自己撞出来的）**：修完契约表改名后，
+            # ⭐⭐ B 项转绿却冒出新的一处 ⛔「`neobot_convo_messages`
+            # ← 前端 1 处调用」；⭐⭐ 读现场发现那是 ⭐⭐ **我自己写的注释**
+            # （`neobot-root.tsx:213`：「⛔ 旧形态：切会话就
+            # `invoke<ChatMessage[]>('neobot_convo_messages')`」）
+            # ⇒ ⭐⭐ **一个记录历史形态的注释，被当成了活代码调用**。
+            #
+            # ⭐⭐ 这正是 R-SCAN-1b 的第 N 次复发：⭐⭐「裸 grep 的命中不构成证据」。
+            # ⭐⭐⭐ **复用既有能力**（⛔ 不自己再写一个，⭐⭐ 否则第二套剥法必然漂）：
+            #   `nt_topology._strip_noncode` —— 它自己的 docstring 记录了
+            #   ⭐⭐ **两轮错法**（只跳 `//` 行 ⇒ 7/3/25 假阳性；逐行剥字符串
+            #   ⭐⭐ ⇒ 仍漏 1 处，⭐⭐ 因为 `r#"..."#` 夹具**跨行**）。
+            # ⇒ ⭐⭐ 直接 import 它，⭐⭐ **别写第四套**。
+            try:
+                from nt_topology import _strip_noncode  # type: ignore
+                txt = _strip_noncode(txt)
+            except Exception:
+                # ⭐⭐⭐ 拿不到就 ⛔ **不静默降级为「全文扫」** ——
+                # ⭐⭐ 那正是本条假阳性的成因。⭐⭐ 宁可门报错，也不要错的绿。
+                print(f'\u26d4 无法导入 nt_topology._strip_noncode（{p}）'
+                      ' ⇒ ⭐⭐ 拒绝在未剥注释的文本上判定（⭐⭐ 否则必假阳性）')
+                continue
             for m in re.finditer(r'invoke(?:<[^>]*>)?\s*\(\s*[\'"]([A-Za-z0-9_]+)[\'"]', txt):
                 hits.setdefault(m.group(1), []).append(
                     os.path.relpath(p, REPO))
@@ -229,11 +277,22 @@ def main(argv):
     as_json = '--json' in argv
     specs = load_specs()
     registered = load_registered()
-    invoked = frontend_invocations()
+    invoked = frontend_invocations()          # ⭐⭐ 自持交付树（真源）
+    vendored_invoked = frontend_invocations(FRONTEND)   # ⭐⭐ vendored 参考树（仅报告）
 
     impl = {s['name'] for s in specs if s['status'] == 'Implemented'}
     documented = {s['name'] for s in specs}
     stub_called = {s['name'] for s in specs if s['status'] != 'Implemented'}
+    # ⭐⭐ vendored 树单独报告：⭐⭐ 它是**冻结上游代码**，
+    # ⭐⭐ 它调已废弃的命令**不该阻塞我方**（⭐⭐ ⛔ 否则会被迫去改冻结代码），
+    # ⭐⭐ 但**必须可见** —— ⭐⭐ 今天就是它把「真源搞错」这件事暴露出来的。
+    _vend_orphan = sorted(set(vendored_invoked) - registered)
+    if _vend_orphan:
+        print(f'\u2139\ufe0f  D2 vendored 参考树（frontend/，**冻结上游**）'
+              f'调了 {len(_vend_orphan)} 个未注册命令（⭐⭐ 不判红，'
+              f'⭐⭐ 但说明真源曾搞错）：{", ".join(_vend_orphan[:6])}'
+              f'{"…" if len(_vend_orphan) > 6 else ""}')
+
     a_fail = sorted(impl - registered)          # 契约说已实现但调不到
     b_fail = sorted(registered - documented)    # 能调但契约无条目
     # C 只抓**真漂移**：前端调了、既没注册、契约表里也没有。
