@@ -485,8 +485,60 @@ pub struct UsageSummary {
 ///
 /// ⛔ 空串与 None 必须同义：前端 `sel` 为 null 时有时传缺席有时传 `""`
 /// （JSON 里 `undefined` 字段会被整个丢掉），两条路必须同归。
+#[cfg(test)]
+mod convo_id_canonical_tests {
+    use super::normalize_convo_id;
+
+    /// ⭐⭐⭐ Atlas `acpSessionId` 契约的可执行形态：
+    /// ⭐⭐ **id 只有一个规范化口径**，⭐⭐ 且 ⭐⭐ **空 id 必须被拒**。
+    #[test]
+    fn canonical_form_is_stable_and_whitespace_is_rejected_as_empty() {
+        // ⭐ 规范化后**幂等**：⭐⭐ 反复调用不再变化（⭐⭐ 这是「单一真源」的判据）
+        assert_eq!(normalize_convo_id(Some("c0")).as_deref(), Some("c0"));
+        assert_eq!(
+            normalize_convo_id(Some("c0")).as_deref(),
+            normalize_convo_id(normalize_convo_id(Some("c0")).as_deref()).as_deref(),
+            "⭐⭐ 规范化必须幂等"
+        );
+        // ⭐⭐ 带空白 ⇒ 收敛到同一个规范值（⭐⭐ 与写路径同口径 ⇒ 不再静默丢消息）
+        assert_eq!(normalize_convo_id(Some("  c0 ")).as_deref(), Some("c0"));
+        assert_eq!(
+            normalize_convo_id(Some("  c0 ")).as_deref(),
+            normalize_convo_id(Some("c0")).as_deref(),
+            "⭐⭐ 带空白与不带空白必须收敛到**同一** id（⭐⭐ 否则读不到写进去的消息）"
+        );
+        // ⭐⭐ 空 / 纯空白 / 缺席 ⇒ 一律 None（⭐⭐ 改前 `.trim()` 会让空串去查库）
+        assert_eq!(normalize_convo_id(Some("")), None);
+        assert_eq!(normalize_convo_id(Some("   ")), None);
+        assert_eq!(normalize_convo_id(None), None);
+    }
+}
+
 fn normalize_convo_arg(convo_id: Option<String>) -> Option<String> {
-    convo_id.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty())
+    normalize_convo_id(convo_id.as_deref())
+}
+
+/// ⭐⭐⭐ **会话 id 的唯一规范化入口**（2026-10-04）。
+///
+/// ⭐⭐⭐ **为什么必须有唯一入口**（⭐⭐ 对标 Atlas 的 `acpSessionId` 契约）：
+/// ⭐⭐ Atlas 原文：「`acpSessionId` is the single source of truth. It's both
+/// ⭐⭐ the wire session id and the filename stem … **Code that reconstructs
+/// ⭐⭐ or transforms this id is a bug.**」
+///
+/// ⭐⭐⭐ 改前本文件有 **3 处各自散写 `convo_id.trim()`**
+/// ⭐⭐（`:567` 列表、`:622` 分页、`:489` Option 包装），⭐⭐⭐ 而
+/// ⭐⭐ **写库路径用的是未经规范化的原值** ⇒ ⭐⭐⭐ **读写两侧规范化不一致**：
+/// ⭐⭐ 一个带首尾空白的 id ⇒ **写入 `c0`，读取 `c0`**
+/// ⭐⭐ ⇒ ⭐⭐⭐ **消息静默消失，且没有任何报错**。
+///
+/// ⭐⭐ 收敛后：**所有读路径都走这一个函数**，⭐⭐ 与写路径同一口径。
+fn normalize_convo_id(raw: Option<&str>) -> Option<String> {
+    let t = raw?.trim();
+    if t.is_empty() {
+        None
+    } else {
+        Some(t.to_owned())
+    }
 }
 
 /// 记忆视图（`neobot_memory_list` 返回值）。
@@ -564,7 +616,10 @@ pub fn neobot_convo_messages(
     convo_id: String,
 ) -> Result<Vec<neotrix_neobot::nt_store::ChatMessage>, String> {
     let store = open_store()?;
-    store.list_messages(convo_id.trim()).map_err(|e| e.to_string())
+    // ⭐⭐ 走唯一规范化入口（⭐⭐ 改前是裸 `.trim()`：⭐⭐ 空串会被当成合法 id 去查库）
+    let convo = normalize_convo_id(Some(convo_id.as_str()))
+        .ok_or_else(|| "会话 id 为空".to_string())?;
+    store.list_messages(&convo).map_err(|e| e.to_string())
 }
 
 /// ⭐⭐ 分页拉取一页消息（**增量式**，治长会话一次性全量渲染）。
@@ -619,13 +674,15 @@ pub fn neobot_convo_messages_page(
     limit: Option<i64>,
 ) -> Result<MessagePage, String> {
     let store = open_store()?;
-    let convo = convo_id.trim();
+    // ⭐⭐ 同样走唯一入口 + ⭐⭐ 拒绝空 id（⭐⭐ 改前 `.trim()` 会让空串通过）
+    let convo = normalize_convo_id(Some(convo_id.as_str()))
+        .ok_or_else(|| "会话 id 为空".to_string())?;
     // ⭐ 夹紧 limit：⛔ 不接受 0/负数（会让 `has_more` 探测失真），
     // ⛔ 也不接受超大值（界面 bug 不该拖垮库）。
     let take = limit.unwrap_or(200).clamp(1, 1000);
     // ⭐ 多取 1 条用于探测 has_more ⇒ 界面不需要知道「怎么算还有没有」
     let probe = store
-        .list_messages_page(convo, before_seq, take + 1)
+        .list_messages_page(&convo, before_seq, take + 1)
         .map_err(|e| e.to_string())?;
     Ok(shape_page(probe, take))
 }
