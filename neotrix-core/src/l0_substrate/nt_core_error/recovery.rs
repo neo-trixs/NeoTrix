@@ -32,6 +32,20 @@
 //!    类型名搜索仍会有少量「同名不同物」需逐条读（如 `seal_core` 另有同名项），
 //!    但那是**可逐条收敛**的噪声，不是「不可行」。
 
+#![deny(dead_code)]
+
+// ⭐⭐ 模块级**收紧** lint：让编译器替我们回答「这个模块里哪些项没人用」。
+// crate 根部有 `#![allow(dead_code)]`（见 lib.rs），会把这类信号全部压掉；
+// 而「未接线」正是本模块最需要被看见的状态。
+//
+// ⭐ 配合 `pub(crate)`（见 `nt_core_error/mod.rs` 的理由）：
+// 对外`pub` 会让编译器**无法**给 dead-code 信号（公开可达项不算 dead）；
+// 收窄后，编译器**重新获得**判「有没有人用」的能力。
+//
+// ⚠️ 这**取代**了此前那版文本扫描门（误报 16 处，因它搜了方法名 `.recover(`
+//   而非类型名）⇒ 判据记录见 `RECOVERY-UNCONSUMED-2026-10-03.md`。
+//
+// 📌 因此：`AgentError` 上有**定点豁免 + 写明理由**，其余未使用会**直接断构建**。
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
@@ -91,6 +105,15 @@ pub enum RecoveryAction {
     Abort(String),
 }
 
+/// ⚠️ **已设计、尚未接线** —— 编译器证据：全文件仅此一处出现（`:95` 定义）；
+/// `:796` 导入的是**别名** `PlatformAgentError`（`nt_core_platform` 的那个同名类型）。
+///
+/// 三个同名 `AgentError`（本处 / `nt_core_platform/agent.rs` / `nt_act_orch_patterns.rs`）
+/// 互不相干 ⇒ 又一个「同名不同物」实例。
+///
+/// ⛔ 不删：本模块整体是**等待消费者的库**（见文件头），删掉会把「尚未接线」
+/// 变成「不存在」，后者更坏。⇒ 定点豁免并在此写明。
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct AgentError {
     pub kind: ErrorType,
