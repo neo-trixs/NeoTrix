@@ -20,6 +20,41 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # 2026-10-05 新增。安全接线门：抓「造了资产但没人调用」。
+  #
+  # 为什么单独一个 job 且排在最前：它**纯文本分析、不需要 cargo**（实测 ~15s，
+  # 连 rustup 都不用），而 `check` job 要 3 OS × 多步 cargo check。放在前面
+  # 让它在长构建跑起来之前就把结论摆出来。
+  #
+  # 现有两个门都看不见这一类，原因不同：
+  #   · check-truth-surface.sh 只覆盖 EMPTY / UNDECLARED / TRACKED，
+  #     **没有「编译了但零生产消费者」这一类**；
+  #   · check-ext-wiring.py 只认 register_*/on_*/subscribe* 注册式命名，
+  #     所以 DnsEgressPolicy / ToolSandbox 这类非注册式策略资产它一条都看不见。
+  # 已实测的存量例：nt_shield/guard/agent_guardrails/ 1,492 行从未被编译
+  # （父 guard/mod.rs 只声明了另外三个子模块）—— 那是全仓唯一的
+  # rm -rf / sudo / curl|sh 破坏性命令检测实现。
+  #
+  # ⚠️ 本步当前是 **--audit（只报告，不判红）**：棘轮基线
+  # 「造了资产但没人调用」棘轮门。纯文本分析，**不需要 cargo**，
+  # 故排在需要 cargo 的 check 之前快速失败。
+  #
+  # 基线 2,148 条是 2026-10-05 的存量快照（14 个从未编译的孤儿目录 +
+  # 1,966 个零消费者资产 + 168 个仅测试消费）。**建基线 = 把存量合法化**，
+  # 是一次有判断的动作；已落库并经 --strict 验证（新增 0），
+  # 后续只允许**下降**：stale 条目不算失败，所以每修一处接线都能棘轮收掉。
+  security-wiring:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: "Security-wiring self-test (injected negative fixtures, no cargo)"
+        run: python3 scripts/ops/nt_security_wiring.py --self-test
+      - name: "Security-wiring ratchet (new unwired assets fail the build)"
+        run: python3 scripts/ops/nt_security_wiring.py --strict
+
   check:
     runs-on: ${{ matrix.os }}
     strategy:

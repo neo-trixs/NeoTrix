@@ -320,6 +320,27 @@ truth-surface-strict:
 truth-surface-baseline:
 	bash scripts/check-truth-surface.sh --update-baseline
 
+# 安全接线门禁 (2026-10-05; 零编译成本, 纯 Python 文本分析)
+# 卡"造了资产但没人调用" —— truth-surface 与 check-ext-wiring.py 都看不见的第四类:
+#   · ORPHAN_MODULE 目录有 .rs 却无任何 mod 声明 ⇒ 从未编译 (1,492 行的
+#     nt_shield/guard/agent_guardrails/ 破坏性命令检测就在这里)
+#   · ZERO_CONSUMER 已编译的 pub 资产零生产消费者 (DnsEgressPolicy::verify_query)
+#   · TEST_ONLY     只被测试引用
+# 与 check-ext-wiring.py 的区别: 后者只认 register_*/on_* 注册式命名,
+# 本门**全量枚举** pub 项再按语义分类 (非注册式策略资产才占安全资产的大头)
+# 棘轮基线 = scripts/security-wiring-baseline.txt (2026-10-05 已建, 2,148 条存量:
+# 14 个从未编译的孤儿目录 + 1,966 零消费者 + 168 仅测试)。
+# 建基线 = 把存量合法化, 属需判断的动作; 建后 --strict 只拦**新增**,
+# stale 条目不算失败 ⇒ 每修一处接线即可棘轮收掉一条。
+security-wiring:
+	python3 scripts/ops/nt_security_wiring.py --audit
+
+security-wiring-strict:
+	python3 scripts/ops/nt_security_wiring.py --strict
+
+security-wiring-baseline:
+	python3 scripts/ops/nt_security_wiring.py --baseline
+
 # 覆盖率地板 (过渡值 70 防腐化; P2 清理后提到 80 卡点)
 # 需: cargo install cargo-llvm-cov
 coverage-gate:
