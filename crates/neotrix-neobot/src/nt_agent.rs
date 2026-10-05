@@ -915,12 +915,38 @@ fn run_loop(
             let reason_note = status_reason(&call.args)
                 .map(|reason| format!(" reason={reason}"))
                 .unwrap_or_default();
+            // 凭据检测（工具**输出**面）：steps 表持久化、`on_step` 外发到
+            // 前端 / IM ⇒ 命中的凭据会四处扩散。
+            //
+            // ⛔ 与 `nt_audit::redact_detail` **不重复**：后者靠行内 key 名
+            //   （`api_key=` / `password=`）整行替换，而真实泄露常是**裸值**
+            //   —— `read_file` 读到的 .env 内容可能没有可识别的前缀格式。
+            // ⛔ 与 core 侧 `AgentLoop::call_tool` 的扫描**也不重复**：那个拦
+            //   工具**参数**（模型即将送出的），这里拦工具**输出**（读回的）。
+            // ⛔ 只报告不改写：用户可能**故意**让我们看自己的配置，自动截断
+            //   会让模型拿不到它需要的上下文。处置决策交人。
+            let output = &result.output;
+            let step_output = match crate::nt_secret_scan::summarize(
+                &crate::nt_secret_scan::scan(&result.output),
+            ) {
+                Some(warning) => {
+                    store.record_audit(&crate::nt_audit::AuditEvent::new(
+                        actor_name,
+                        "output_secret_scan",
+                        crate::nt_audit::AuditDecision::Allow,
+                        Some(call.name.as_str().to_owned()),
+                        &warning,
+                    ))?;
+                    format!("{warning}\n{output}{reason_note}{shadow_note}")
+                }
+                None => format!("{output}{reason_note}{shadow_note}"),
+            };
             store.add_step(
                 task_id,
                 i64::from(n),
                 call.name.as_str(),
                 result.ok,
-                &format!("{result_output}{reason_note}{shadow_note}", result_output = result.output),
+                &step_output,
             )?;
             // 工作流事件外发（流式对话流用；500 字截断，明细仍在 steps 表）。
             if let Some(emit) = on_step.as_mut() {
@@ -2104,6 +2130,24 @@ mod tests {
     /// 永远只调工具不收尾的引擎 — 验证耗尽转 Waiting + 最后一步 nudge.
     struct LoopForever {
         seen_nudge: std::sync::Mutex<bool>,
+        /// 每跳执行的 shell 命令。默认 `echo x`；接线测试改成 `cat` 凭据文件。
+        command: Option<String>,
+    }
+
+    impl LoopForever {
+        fn new() -> Self {
+            Self {
+                seen_nudge: std::sync::Mutex::new(false),
+                command: None,
+            }
+        }
+
+        fn with_command(command: &str) -> Self {
+            Self {
+                seen_nudge: std::sync::Mutex::new(false),
+                command: Some(command.to_owned()),
+            }
+        }
     }
 
     impl crate::nt_engine::EngineAdapter for LoopForever {
@@ -2126,7 +2170,9 @@ mod tests {
                 tool_calls: vec![crate::nt_types::ToolCall {
                     id: "l1".to_owned(),
                     name: crate::nt_types::ToolName::Bash,
-                    args: serde_json::json!({"command": "echo x"}),
+                    args: serde_json::json!({
+                        "command": self.command.as_deref().unwrap_or("echo x"),
+                    }),
                 }],
                 usage: None,
                 side_effects: Vec::new(),
@@ -2198,6 +2244,138 @@ mod tests {
     ///
     /// 这一条比上一条更重要：上一条只能证明「跑了」，这一条证明「跑出了真实
     /// 结论」。若治理器被改成永远返回满分，本条红。
+    /// 只读一次凭据文件的引擎（`ReadFile` 在 policy 里是 allow 分支）。
+    struct ReadCredsEngine {
+        done: std::sync::atomic::AtomicBool,
+    }
+
+    impl ReadCredsEngine {
+        fn new() -> Self {
+            Self {
+                done: std::sync::atomic::AtomicBool::new(false),
+            }
+        }
+    }
+
+    impl crate::nt_engine::EngineAdapter for ReadCredsEngine {
+        fn engine_id(&self) -> &str {
+            "read-creds"
+        }
+
+        fn probe(&self) -> Result<String, crate::NtBotError> {
+            Ok("read-creds".to_owned())
+        }
+
+        fn run_turn(
+            &self,
+            _prompt: &str,
+            _inbox: &[String],
+        ) -> Result<crate::nt_engine::EngineTurn, crate::NtBotError> {
+            Ok(self.turn(&[]))
+        }
+
+        fn run_turn_with_history(
+            &self,
+            _prompt: &str,
+            _history: &[crate::nt_types::TranscriptItem],
+        ) -> Result<crate::nt_engine::EngineTurn, crate::NtBotError> {
+            Ok(self.turn(&[]))
+        }
+    }
+
+    impl ReadCredsEngine {
+        fn turn(&self, _history: &[crate::nt_types::TranscriptItem]) -> crate::nt_engine::EngineTurn {
+            let first = !self
+                .done
+                .swap(true, std::sync::atomic::Ordering::SeqCst);
+            crate::nt_engine::EngineTurn {
+                assistant_text: String::new(),
+                status: if first {
+                    crate::nt_types::TurnStatus::Continue
+                } else {
+                    crate::nt_types::TurnStatus::Done
+                },
+                tool_calls: if first {
+                    vec![crate::nt_types::ToolCall {
+                        id: "r1".to_owned(),
+                        name: crate::nt_types::ToolName::ReadFile,
+                        args: serde_json::json!({"path": "creds.env"}),
+                    }]
+                } else {
+                    Vec::new()
+                },
+                usage: None,
+                side_effects: Vec::new(),
+            }
+        }
+    }
+
+    /// ⭐⭐ **接线守门：工具输出含凭据时，生产派发路径必须落一条扫描审计。**
+    ///
+    /// 这条测试**真的跑 `run_loop`**：`LoopForever` 每跳执行
+    /// `cat <凭据文件>` ⇒ 凭据经 `execute_bash` 的输出回到 `result.output`
+    /// ⇒ 必经 `add_step` 之前那段扫描。
+    ///
+    /// ⛔ 第一版我写成「直接调 `nt_secret_scan::scan()` + `summarize()`」，
+    ///   那只测了模块与 audit API，**没跑到接线点** ⇒ 把整段 `match` 删掉
+    ///   它仍全绿 ⇒ 零证明力。现在改为端到端。
+    #[test]
+    fn 工具输出含凭据时生产路径落扫描审计() {
+        let dir = crate::nt_testutil::temp_dir("secret-scan-wiring");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("workspace")).expect("mkdir");
+        std::fs::write(
+            dir.join("workspace/creds.env"),
+            "OPENAI_API_KEY=sk-abcdefghijklmnopqrstuvwxyz0123\n",
+        )
+        .expect("write");
+        let config = NeobotConfig {
+            data_dir: dir.clone(),
+            workspace_dir: dir.join("workspace"),
+            policy_mode: crate::nt_config::PolicyMode::Enforce,
+            human_has_control: false,
+            max_steps: 1,
+            engine: crate::nt_config::EngineKind::Echo,
+            computer_allow: Vec::new(),
+            computer_hosts: Vec::new(),
+            extra_deny: Vec::new(),
+            write_budget: crate::nt_config::default_write_budget(),
+        };
+        config.validate().expect("validate");
+        let store = NeobotStore::open(":memory:").expect("open");
+        // ⛔ Bash 是**恒定 deny**（nt_policy.rs:172-173 的 `default-deny`），
+        //   所以这条用例必须走 `ReadFile`（allow 分支）才能真正执行。
+        //   我第一版用 bash ⇒ 每次都 `(denied)`，接线根本没被执行到 ——
+        //   报错信息（audit tools 只有 ["bash"]）才是定位线索。
+        let engine = ReadCredsEngine::new();
+
+        let _ = run_local_turn(&store, &config, &engine, "scan", "go").expect("run");
+
+        let audits = store.list_audit(50).expect("audits");
+        let bash: Vec<_> = audits.iter().filter(|a| a.tool == "bash").collect();
+        eprintln!("DEBUG bash detail={:?}", bash.iter().map(|a| a.detail.as_str()).collect::<Vec<_>>());
+        let tid: Vec<String> = Vec::new();
+        let _ = tid;
+        // 直接用 store 查所有 task 的 step 不可行（★ task_id 内部 UUID），
+        // 改为在 bash 审计后看是否有 output_secret_scan。
+        let hits: Vec<_> = audits
+            .iter()
+            .filter(|a| a.tool == "output_secret_scan")
+            .collect();
+        assert!(
+            !hits.is_empty(),
+            "★ 生产路径未产生凭据扫描审计 ⇒ 接线被删或没跑到；audit tools: {:?}",
+            audits.iter().map(|a| &a.tool).collect::<Vec<_>>()
+        );
+        // ⛔ 报告不得含凭据原文（报告本身也是泄露面）
+        assert!(
+            !hits[0].detail.contains("sk-abcdefghijklmnop"),
+            "警告文案泄露凭据原文: {}",
+            hits[0].detail
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn 治理违规会把报告标红() {
         use crate::nt_governance::OutputGovernor;
@@ -2249,9 +2427,7 @@ mod tests {
         };
         config.validate().expect("validate");
         let store = NeobotStore::open(":memory:").expect("open");
-        let engine = LoopForever {
-            seen_nudge: std::sync::Mutex::new(false),
-        };
+        let engine = LoopForever::new();
         let status = run_local_turn(&store, &config, &engine, "loop", "go").expect("run");
         assert_eq!(status, crate::nt_types::TurnStatus::Waiting);
         assert!(engine.seen_nudge.lock().map(|seen| *seen).unwrap_or(false));

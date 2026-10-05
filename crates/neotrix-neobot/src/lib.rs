@@ -42,6 +42,7 @@ pub mod nt_determinism;
 pub mod nt_effect_key;
 pub mod nt_governance;
 pub mod nt_prompt_guard;
+pub mod nt_secret_scan;
 pub mod nt_engine;
 pub mod nt_evidence;
 pub mod nt_panel;
