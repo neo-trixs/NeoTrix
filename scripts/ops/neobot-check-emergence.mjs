@@ -96,20 +96,69 @@ try {
 
 // ── ⑥ ⭐ 三态判定 ────────────────────────────────────────────────────────────
 const wired = prodCalls > 0 && auditGreen;
+// ⭐⭐⭐ 涌现状态**提为模块级变量**（⭐⭐ 单一真源）：⭐⭐ 上面的分支要写它，
+// ⭐⭐ 文件末尾的**汇总行**也要读它 ⇒ ⭐⭐ 放函数体内会 ReferenceError。
+// ⭐⭐⭐ 而**不是**让汇总行硬编码字符串 —— ⭐⭐ 那正是我刚修掉的「摘要撒谎」。
+let emergentState = 'UNKNOWN';
 if (!wired) {
   console.error('FAIL: 涌现接线不在（见上方逐项）');
 } else {
-  // 接线在。是否「已成长」需要运行期证据；本门是静态门，拿不到 ⇒ 报 COLD_START。
-  console.log('STATE: COLD_START');
-  console.log('  接线在位，但本门是**静态**门 ⇒ 拿不到运行期节点数。');
-  console.log('  ⇒ 「节点数是否增长」需第 2 步的运行期探针（路线 §5 第 2 步）才能判。');
-  console.log('  ⛔ 本状态**不是**绿灯豁免：接线被删 / 审计转红会立即翻成 FAIL。');
+  // ⭐⭐⭐⭐ **运行期探针**（⭐⭐ 路线 §5 第 2 步，⭐⭐ 本轮实现）。
+  // ⭐⭐⭐ 静态门拿不到「节点数是否增长」⇒ ⭐⭐ 于是只能报 COLD_START。
+  // ⭐⭐⭐ 探针走**真实构造路径**（`ConsciousnessRuntime::new()`），
+  // ⭐⭐⭐ ⛔ 不许自证（不直接调 bootstrap）。
+  const probe = (() => {
+    try {
+      const out = execFileSync(
+        'cargo',
+        ['test', '-p', 'neotrix', '--lib', '运行期探针', '--', '--nocapture'],
+        { cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 900_000 },
+      );
+      const m = out.match(/^EMERGENCE_PROBE (\{.*\})$/m);
+      return m ? JSON.parse(m[1]) : null;
+    } catch (e) {
+      const so = `${e.stdout || ''}`;
+      const m = so.match(/^EMERGENCE_PROBE (\{.*\})$/m);
+      return m ? JSON.parse(m[1]) : null;
+    }
+  })();
+
+  if (!probe) {
+    // ⭐⭐⭐ ⛔ **探针跑不出来 ⇒ FAIL，不许静默回落成 COLD_START**。
+    // ⭐⭐ 理由：⭐⭐ 回落 = ⭐⭐「拿不到证据」被当成「没有缺陷」⇒
+    // ⭐⭐⭐ **这正是本门自己文档里警告的「COLD_START 不是绿灯豁免」**。
+    console.error('FAIL: 运行期探针跑不出结果（无法判定是否已成长）');
+    console.error('  ⛔ ⭐⭐ 不回落成 COLD_START：⭐⭐ 拿不到证据 ≠ 没有缺陷');
+    process.exit(1);
+  }
+
+  const findings = probe.maturity_findings || [];
+  if (findings.length) {
+    console.error(`FAIL: 成熟度审计（反虚标）红：${findings.join('; ')}`);
+    process.exit(1);
+  }
+  if (!(probe.abilities >= 5)) {
+    console.error(`FAIL: 运行期真实能力节点 ${probe.abilities} 个（应 ≥5）`
+      + ' ⇒ ⭐⭐ 播种没发生 or 被回退 ⇒ ⭐⭐ 涌现链断在这里');
+    process.exit(1);
+  }
+
+  // ⭐⭐⭐ 第四态：**已成长**（⭐⭐ 静态门 + 运行期证据都成立）
+  emergentState = 'WARM';   // ⭐⭐ 供末尾汇总行读（⭐⭐ 单一真源）
+  console.log(`STATE: WARM ✅（运行期实测：能力节点 ${probe.abilities} / 总节点 ${probe.total}`
+    + ` · 缺口节点 ${probe.gaps} · 成熟度审计 0 条）`);
+  console.log(`  能力节点清单：${probe.ids.join(', ')}`);
+  console.log('  ⭐⭐ 本状态由**运行期探针**判定，⭐⭐ 不是静态推断。');
 }
 
 for (const [s, m] of results) console.log(`${s}: ${m}`);
 const failed = results.filter(([s]) => s === 'FAIL').length;
 if (failed) { console.error(`\nFAIL: ${failed} 项红`); process.exit(1); }
-console.log(`\nOK: ${results.length} 项全绿（STATE: COLD_START）`);
+// ⭐⭐⭐ 汇总行**必须**与真实状态一致（⭐⭐ 修一处「摘要撒谎」）。
+// ⛔ 改前这行**硬编码** `(STATE: COLD_START)`，⭐⭐⭐ 而上面已打印
+// ⭐⭐ `STATE: WARM` ⇒ ⭐⭐⭐ **汇总与真实状态矛盾** ⇒ ⭐⭐ 读者只看
+// ⭐⭐ 最后一行就会得到**相反结论**。⇒ 改为引用同一个变量。
+console.log(`\nOK: ${results.length} 项全绿（STATE: ${emergentState}）`);
 
 // ── ⭐ 负向自测：摘掉接线，**同一份** staticVerdict 必须翻红 ──────────────────
 // ⛔ 三次修正才让它有意义：
