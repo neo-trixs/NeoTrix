@@ -1171,6 +1171,48 @@ mod capability_seeding_tests {
         );
     }
 
+    /// ⭐⭐⭐⭐⭐ **运行期探针**（⭐⭐ 涌现门 `neobot-check-emergence.mjs` 亲自指出的
+    /// 「路线 §5 第 2 步」，⭐⭐ 本轮实现）。
+    ///
+    /// ⭐⭐⭐ **为什么必须有它**：⭐⭐ 涌现门是**静态**门（吃源码文本），
+    /// ⭐⭐⭐ 所以它 ⭐⭐ **永远只能报 `COLD_START`** ——
+    /// ⭐⭐⭐ 「接线在位，但**拿不到运行期节点数**」。
+    /// ⇒ ⭐⭐ 「节点数是否增长」⭐⭐⭐ **至今无法判定** ⇒ 静态门全绿
+    /// ⭐⭐⭐ **不等于能力真的长出来了**。
+    ///
+    /// ⭐⭐⭐ **契约（⛔ 请勿改动输出格式）**：打印**单行** `EMERGENCE_PROBE`
+    /// ⭐⭐ JSON，⭐⭐ 门按此解析。⭐⭐ 格式变了门会解析失败 ⇒ ⭐⭐ **门会立刻发现**
+    /// ⭐⭐ （⭐⭐ 而门设计成「解析不到 ⇒ FAIL」，⭐⭐ ⛔ 不静默放过）。
+    #[test]
+    fn 运行期探针_打印真实节点数与能力清单() {
+        // ⭐⭐ 走**构造函数**这条真实路径（⭐⭐ 而不是直接调 bootstrap，
+        // ⭐⭐ 否则探针就成了自证）
+        let _rt = ConsciousnessRuntime::new();
+        let ids = neotrix_neobot::nt_capability_registry::with_registry(|reg| {
+            let mut v: Vec<String> = reg.nodes.keys().cloned().collect();
+            v.sort(); // ⭐⭐ 排序 ⇒ 输出确定 ⇒ 门可稳定比对
+            v
+        })
+        .expect("注册表锁");
+        let total = neotrix_neobot::nt_capability_registry::node_count();
+        let abilities = ids.iter().filter(|k| k.contains("::trade::")).count();
+        let gaps = ids
+            .iter()
+            .filter(|k| k.starts_with("consciousness::gap::"))
+            .count();
+        let findings = neotrix_neobot::nt_capability_registry::maturity_findings();
+        println!(
+            "EMERGENCE_PROBE {}",
+            serde_json::json!({
+                "total": total,
+                "abilities": abilities,
+                "gaps": gaps,
+                "ids": ids,
+                "maturity_findings": findings,
+            })
+        );
+    }
+
     /// ⭐⭐⭐⭐ **反面判据：只有「缺口」没有「能力」是不合格状态。**
     ///
     /// ⭐⭐ 接线前的实测：⭐⭐ 运行期注册表里唯一的生产写入是
