@@ -351,8 +351,8 @@ impl ConsciousnessRuntime {
             // 拒绝任何虚标。这是判据的后半段。
             {
                 use neotrix_neobot::nt_capability_registry::register_node;
-                use nt_core_capability_tree::node::{CapabilityNode, Domain};
-                let node = CapabilityNode::new_primitive(
+                use nt_core_capability_tree::node::{CapabilityKind, CapabilityNode, Domain};
+                let mut node = CapabilityNode::new_primitive(
                     // ⭐ id 含 quality 档位 ⇒ 同一档位只登记一个节点（注册是
                     // 幂等的），不同档位各一个 ⇒ 节点数随「缺口严重度」增长，
                     // ⭐ 这正是 `neobot-check-emergence` 要盯的那个数。
@@ -360,6 +360,19 @@ impl ConsciousnessRuntime {
                     Domain::Mind,
                     vec!["consciousness.capability_gap".to_owned()],
                 );
+                // ⭐⭐⭐⭐⭐ **必须显式标成 `Gap`**（2026-10-05）。
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 缺陷：`new_primitive` 默认 `CapabilityKind::Skill`
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ （见 node.rs:345 的默认值及其理由）⇒ **意识自生的
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 缺口节点被标成了「技能」**。
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⇒ ⭐⭐ **一旦补上 `market.*` 元数据，它会被市场
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 当成一个可售插件上架** ⇒ ⭐⭐ 把「我还不会」
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 当成商品卖 ⭐⭐ ⭐⭐ 语义直接反了。
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 现在市场 `listable()` 靠 `market.*`
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 缺失把它挡住 ⇒ **这是偶然挡住，不是设计挡住**；
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 一旦有人批量补元数据就会漏出来。
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⇒ 显式声明，让「缺口不是插件」成为
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **类型层面的事实**而非元数据缺失的巧合。
+                node.kind = CapabilityKind::Gap;
                 if let Err(e) = register_node(node) {
                     log::warn!("[consciousness] 能力缺口登记失败（不阻断自愈）: {e}");
                 }
@@ -617,6 +630,135 @@ mod tests {
             report.frustration
         );
         assert_eq!(cr.last_quality, 0.2);
+    }
+
+    /// ⭐⭐⭐⭐ **「缺口不是插件」必须是类型事实，⭐⭐ 不是元数据缺失的巧合**
+    ///
+    /// ⭐⭐⭐⭐ **本测试必须能证伪**：⭐⭐ 若只断言「节点进了树」，⭐⭐ **删掉
+    /// ⭐⭐⭐⭐ `node.kind = CapabilityKind::Gap;` 后仍然全绿**（⭐⭐ 默认值 `Skill`
+    /// ⭐⭐⭐⭐ 照样能注册）⇒ **零证明力**。⇒ 这里断言的是 **kind 本身**。
+    #[test]
+    fn 意识自生的能力缺口被标成Gap而非Skill() {
+        let mut cr = ConsciousnessRuntime::new();
+        let critique = CritiqueResult {
+            passed: true,
+            relevance_score: 0.0,
+            consistency_score: 0.0,
+            uncertainty_score: 0.8,
+            overall_quality: 0.2,
+            reasons: vec!["low quality".into()],
+            selected_action: Some("rethink".into()),
+            temporal_delta: Some(0.0),
+        };
+        cr.observe_from_critique(&critique);
+
+        let gap_id = "consciousness::gap::q20";
+        let kind = neotrix_neobot::nt_capability_registry::with_registry(|reg| {
+            reg.nodes
+                .get(gap_id)
+                .map(|n| n.kind)
+                .ok_or_else(|| format!("缺口节点未进树: {gap_id}"))
+        })
+        .expect("注册表锁")
+        .expect("缺口节点应存在");
+        assert_eq!(
+            kind,
+            nt_core_capability_tree::node::CapabilityKind::Gap,
+            "⭐⭐ 意识自生的缺口被标成 {kind:?} ⇒ ⭐⭐ 补上 market.* 后它会被当成可售插件上架"
+        );
+    }
+
+    /// ⭐⭐⭐⭐⭐ **元数据齐备也不能让缺口上架 ⭐⭐ 只要 `kind` 还是 `Gap`**
+    ///
+    /// ⭐⭐⭐⭐⭐ **本测试记录的是一个真事实，⭐⭐ 而不是我以为的设计。**
+    /// ⭐⭐⭐⭐⭐ 2026-10-05 我先写成「就算把 kind 标错成 Skill 并补齐 license/version，
+    /// ⭐⭐⭐⭐⭐ 市场也必须排除它」⭐⭐⭐⭐⭐ **测试当场红了** ⭐⭐⭐⭐⭐
+    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 输出显示 `consciousness::gap::q20` **真的进了市场清单**。
+    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐⭐ **真相**：市场的唯一判据是
+    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ `MarketEntry::is_listable()` ⭐⭐⭐⭐⭐ ⭐⭐ 它只看
+    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ `kind.is_marketable() && license && version`
+    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⇒ ⭐⭐ **kind 一旦被标错，元数据救不了它，也拦不住它。**
+    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **⇒ 「缺口不是插件」是单点防线，
+    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 不是「标对 + 市场兜底」两层。**
+    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 这正是上一条测试不可省的原因
+    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ —— ⭐⭐ **它守的是整个防线本身。**
+    #[test]
+    fn 缺口即便license与version齐备也进不了市场() {
+        use nt_core_capability_tree::node::CapabilityKind;
+        let gap_id = "consciousness::gap::q20";
+
+        let mut cr = ConsciousnessRuntime::new();
+        cr.observe_from_critique(&CritiqueResult {
+            passed: true,
+            relevance_score: 0.0,
+            consistency_score: 0.0,
+            uncertainty_score: 0.8,
+            overall_quality: 0.2,
+            reasons: vec!["low quality".into()],
+            selected_action: Some("rethink".into()),
+            temporal_delta: Some(0.0),
+        });
+
+        // ⭐⭐ 补齐**全部**市场元数据（⭐⭐ 故意不改 kind ⇒ 保持 Gap）
+        neotrix_neobot::nt_capability_registry::with_registry(|reg| {
+            let n = reg
+                .get_mut(gap_id)
+                .ok_or_else(|| format!("缺口节点未进树: {gap_id}"))?;
+            n.metadata.insert(
+                neotrix_neobot::nt_capability_market::meta_keys::LICENSE.to_owned(),
+                serde_json::Value::String("LicenseRef-Test".to_owned()),
+            );
+            n.metadata.insert(
+                neotrix_neobot::nt_capability_market::meta_keys::VERSION.to_owned(),
+                serde_json::Value::String("0.0.1".to_owned()),
+            );
+            n.metadata.insert(
+                neotrix_neobot::nt_capability_market::meta_keys::CATEGORY.to_owned(),
+                serde_json::Value::String("test".to_owned()),
+            );
+            Ok::<(), String>(())
+        })
+        .expect("注册表锁")
+        .expect("缺口节点应存在");
+
+        let (listable, blocked) =
+            neotrix_neobot::nt_capability_registry::with_registry(|reg| {
+                (
+                    neotrix_neobot::nt_capability_market::listable(reg)
+                        .into_iter()
+                        .map(|e| e.id)
+                        .collect::<Vec<String>>(),
+                    neotrix_neobot::nt_capability_market::blocked(reg),
+                )
+            })
+            .expect("注册表锁");
+
+        assert!(
+            !listable.iter().any(|id| id == gap_id),
+            "⭐⭐ 元数据齐备的缺口节点仍进了市场清单：{listable:?}"
+        );
+        // ⭐⭐⭐⭐⭐ **更强的断言**：⭐⭐⭐⭐⭐ 它必须带着「因为它是缺口」的理由
+        // ⭐⭐⭐⭐⭐ 出现在 blocked 里 ⭐⭐⭐⭐⭐ ⇒ ⭐⭐ **不能从市场视图里静默消失**
+        // ⭐⭐⭐⭐⭐ （⭐⭐ 消失比「被拒绝」更坏 ⭐⭐ —— 那就是「不可见」）
+        let reason = blocked
+            .iter()
+            .find(|(id, _)| id == gap_id)
+            .map(|(_, why)| why.clone())
+            .expect("⭐⭐ 缺口节点既不在清单也不在 blocked ⇒ 它从市场视图里**消失**了（最坏形态）");
+        assert!(
+            reason.contains("缺口") || reason.contains("Gap"),
+            "⭐⭐ blocked 理由应指向「它是缺口」，实际：{reason}"
+        );
+
+        // ⭐⭐ 清理（⭐⭐ 测试共享进程级注册表，⭐⭐ 残留会污染别处断言）
+        neotrix_neobot::nt_capability_registry::with_registry(|reg| {
+            if let Some(n) = reg.get_mut(gap_id) {
+                n.kind = CapabilityKind::Gap;
+                n.metadata.clear();
+            }
+            Ok::<(), String>(())
+        })
+        .expect("注册表锁");
     }
 
     #[test]
