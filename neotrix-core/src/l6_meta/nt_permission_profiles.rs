@@ -381,6 +381,29 @@ pub fn list_profiles() -> Vec<String> {
 }
 
 /// Map an ActionType to a profile action key string.
+/// ⭐⭐⭐ 2026-10-05 修**键永不相交** —— 内置的两条 `Deny` 从未生效过。
+///
+/// ## 实测的缺陷形状
+/// 本函数此前只产 **6 个键**，其中 git 动作一律映射成 `"git_push"`；
+/// 而内置画像 `nt_shield` 里写的键是
+/// `read_secrets`（`:77`）与 `git_force_push`（`:79`）。
+/// ⇒ **两者永不相交** ⇒ 画像里那两条 `Deny` 规则
+///   **从存在之日起就没有任何 `ActionType` 能命中它们**。
+///
+/// ## 危害
+/// `git push --force` 与「读密钥」被声明为硬拒，
+/// 实际却因键名对不上而**从未被拒**。
+/// 结合本轮另一处修复（`Deny` 曾被降级成「需审批」）看，
+/// 这是**两层失效叠加**：就算键对上了，也只弹窗不硬拒。
+///
+/// ## 修法
+/// 补齐可判别的**子动作**键，并且**保留**原有的粗粒度键
+/// （粗粒度键仍会被 `is_action_denied` 之外的查询用到，
+/// 直接删掉会让依赖它们的代码静默失效 —— 那比多一个键更危险）。
+///
+/// ⛔ 未知子动作的判据是**「含关键词才进细粒度键，否则回退粗粒度键」**
+///   —— 而不是 `unreachable!()`：生产路径不能因一个没见过的
+///   git 子命令而 panic（AGENTS.md：生产代码禁 panic）。
 pub fn action_type_to_key(action: &crate::l6_meta::nt_approval::ActionType) -> &'static str {
     use crate::l6_meta::nt_approval::ActionType;
     match action {
@@ -388,7 +411,19 @@ pub fn action_type_to_key(action: &crate::l6_meta::nt_approval::ActionType) -> &
         ActionType::FileCreate { .. } => "write_file",
         ActionType::FileEdit { .. } => "write_file",
         ActionType::ShellCommand { .. } => "execute_command",
-        ActionType::GitOperation { .. } => "git_push",
+        ActionType::GitOperation { description, .. } => {
+            // ⭐ 细粒度键：与画像里声明的键名**逐字对齐**
+            let d = description.to_ascii_lowercase();
+            if d.contains("force") || d.contains("--force") || d.contains("+") {
+                "git_force_push"
+            } else if d.contains("push") {
+                "git_push"
+            } else {
+                // 其余 git 动作（commit / pull / fetch / status…）
+                // 落回粗粒度键，不硬拒（它们不在画像的 deny 列表里）
+                "git_operation"
+            }
+        }
         ActionType::Other { .. } => "tool_call",
     }
 }
@@ -645,7 +680,99 @@ mod tests {
         assert_eq!(action_type_to_key(&ActionType::FileCreate { path: "x".into() }), "write_file");
         assert_eq!(action_type_to_key(&ActionType::FileEdit { path: "x".into(), diff: "".into() }), "write_file");
         assert_eq!(action_type_to_key(&ActionType::ShellCommand { command: "ls".into() }), "execute_command");
-        assert_eq!(action_type_to_key(&ActionType::GitOperation { description: "commit".into() }), "git_push");
+
+        // ⚠️ 2026-10-05 **语义变更**：git 动作**不再一律映射成 `git_push`**。
+        // 原断言 `commit → "git_push"` 正是缺陷来源 ——
+        // 它让 `git push --force` 与 `git commit` 落到同一个键，
+        // 于是画像里那条 `git_force_push` 的 `Deny` **永不可达**。
+        // 现按子动作分键（见 `action_type_to_key` 的文档）。
+        assert_eq!(action_type_to_key(&ActionType::GitOperation { description: "git push origin main".into() }), "git_push");
+        assert_eq!(action_type_to_key(&ActionType::GitOperation { description: "git push --force origin main".into() }), "git_force_push");
+        assert_eq!(action_type_to_key(&ActionType::GitOperation { description: "git commit -m x".into() }), "git_operation");
+        assert_eq!(action_type_to_key(&ActionType::GitOperation { description: "git pull".into() }), "git_operation");
+    }
+
+    /// ⭐⭐⭐ 端到端：画像里**每一条** `Deny` 规则都必须有某个 `ActionType` 能命中。
+    ///
+    /// 【缺陷形状】此前画像声明了 11 条键，而 `action_type_to_key`
+    /// 只产 6 个 ⇒ 其中 `read_secrets` / `git_force_push` 等
+    /// **7 条永不可达** —— 「声明了但从不起作用」。
+    ///
+    /// 本测试把「键集合」与「画像 deny 键集合」求交，
+    /// 断言**交集非空**，让「新增 deny 规则却忘了加键」在测试期就红。
+    #[test]
+    fn every_builtin_deny_rule_is_reachable_from_some_action_type() {
+        use crate::l6_meta::nt_approval::ActionType;
+
+        // 本函数当前能产出的全部键（穷举枚举，**有意列全**：
+        // 将来给 ActionType 加变体时，这个清单就是提醒）
+        let producible: std::collections::HashSet<&str> = [
+            action_type_to_key(&ActionType::FileWrite { path: "x".into(), content_preview: "".into() }),
+            action_type_to_key(&ActionType::FileCreate { path: "x".into() }),
+            action_type_to_key(&ActionType::FileEdit { path: "x".into(), diff: "".into() }),
+            action_type_to_key(&ActionType::ShellCommand { command: "ls".into() }),
+            action_type_to_key(&ActionType::GitOperation { description: "git push".into() }),
+            action_type_to_key(&ActionType::GitOperation { description: "git push --force".into() }),
+            action_type_to_key(&ActionType::GitOperation { description: "git commit".into() }),
+            action_type_to_key(&ActionType::Other { tool: "x".into(), args: String::new() }),
+        ]
+        .into_iter()
+        .collect();
+
+        // 画像里所有 deny 规则
+        let store = crate::l6_meta::nt_permission_profiles::ProfileStore::builtin();
+        let mut deny_keys: Vec<String> = Vec::new();
+        for p in ["nt_shield", "strict-nt_shield", "balanced"] {
+            if let Some(rules) = store.resolve(p) {
+                for (k, v) in rules {
+                    if matches!(v, ProfileDecision::Deny) {
+                        deny_keys.push(k);
+                    }
+                }
+            }
+        }
+        deny_keys.sort();
+        deny_keys.dedup();
+
+        assert!(
+            !deny_keys.is_empty(),
+            "前提断言：内置画像里应当至少有Deny 规则"
+        );
+
+        let unreachable: Vec<&String> =
+            deny_keys.iter().filter(|k| !producible.contains(k.as_str())).collect();
+
+        // 如实记录当前仍不可达的键（不假装全绿），但**要求清单被显式登记**：
+        // 新增的不可达键必须在这里出现，否则测试失败。
+        const KNOWN_UNREACHABLE: &[&str] = &[
+            // 画像声明了，但当前没有任何 ActionType 变体能表达「读密钥」这个动作。
+            // 要修它需要给 ActionType 加变体 —— 属独立批次。
+            "read_secrets",
+            // 以下为历史键，当前 ActionType 粒度到不了：
+            "delete_file",
+            "compile_check",
+            "modify_dependency",
+            "access_stealth_browser_auto",
+            "access_tor_network",
+            "network_request",
+        ];
+
+        let unexpected: Vec<&&String> = unreachable
+            .iter()
+            .filter(|k| !KNOWN_UNREACHABLE.contains(&k.as_str()))
+            .collect();
+        assert!(
+            unexpected.is_empty(),
+            "这些 deny 规则**没有任何 ActionType 能命中**（声明了但从不起作用）：{unexpected:?}。\
+             要么给 action_type_to_key 补键，要么把它登记进 KNOWN_UNREACHABLE 并写明原因"
+        );
+
+        // ⭐ 关键断言：`git_force_push` 必须**不在**不可达列表里
+        // （它是本轮修好的那条；若它出现在unreachable 里说明修复回退了）
+        assert!(
+            !unreachable.iter().any(|k| k.as_str() == "git_force_push"),
+            "git_force_push 必须可命中 —— 本轮已修；若此断言失败说明键映射回退了"
+        );
     }
 
     #[test]

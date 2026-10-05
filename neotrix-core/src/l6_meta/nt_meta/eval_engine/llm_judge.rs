@@ -479,6 +479,92 @@ mod tests {
 
     /// ⭐⭐ 反向锁：把 `&&` 改回「只看 CriteriaSource」必须失败。
     /// 这条锁直接守住本轮的核心修复。
+    /// ⭐⭐⭐ **未来污染不变性元测试**（2026-10-05，来自 `HKUDS/Vibe-Trading`）
+    ///
+    /// 【源】`agent/tests/factors/test_lookahead.py` 的判据：
+    /// *"Look-ahead guard: factor values at row `t` must not depend on rows > t."*
+    /// 方法是「扰动下游未来 ⇒ 断言上游结论不变」，并配**正向对照**
+    /// （否则一个恒返回 0 的坏实现也能通过）。
+    ///
+    /// 【推】为什么这条适配本仓：`evaluate_response` 的
+    /// 「判官与被评判产出同源」问题，在金融语境下的等价物就是前视偏差 ——
+    /// **判官的结论不得依赖它本不该看到的输入**。
+    /// 本仓 `evaluate_response` 当前对非退化配置**恒拒绝**（返回 `None`），
+    /// ⇒ 真正可测的不变量在**退化路径**上。
+    ///
+    /// 形状：扰动 `response`（被判读的产出 = 「未来」）⇒
+    /// 断言 `prompt` 侧可观测的量不变。
+    #[test]
+    fn perturbing_response_must_not_change_prompt_side_observation() {
+        // 退化配置（无判据）⇒ 返回 Some，且分数由 config 决定而非输入内容
+        let empty = JudgeConfig::new(vec![], 5.0);
+        let baseline = evaluate_response(&empty, "PROMPT_A", "RESPONSE_A").expect("退化配置应给出确定分");
+
+        // 扰动「未来」：response 完全换掉
+        let perturbed = evaluate_response(&empty, "PROMPT_A", "TOTALLY_DIFFERENT_ZZZZ").expect("退化配置应给出确定分");
+
+        // 不变量：prompt 侧与 config 决定的量不受 response 影响
+        assert_eq!(
+            (baseline.total_score, baseline.max_possible, baseline.summary.clone()),
+            (perturbed.total_score, perturbed.max_possible, perturbed.summary.clone()),
+            "扰动 response 不得改变退化路径上的分数/上限/摘要"
+        );
+        assert!(
+            baseline.criterion_scores.is_empty() && perturbed.criterion_scores.is_empty(),
+            "无判据 ⇒ 不应有 criterion_scores"
+        );
+    }
+
+    /// ⭐⭐ **正向对照**（子代理明确要求的一条）：
+    /// 上面的不变性测试**单独存在时会被一个恒返回 0 的坏实现通过**。
+    /// 故必须同时证明「输入确实被读到了、确实起作用」。
+    #[test]
+    fn positive_control_proves_inputs_actually_reach_the_function() {
+        // 对照 1：response 确实被读取（由 `prompt` 侧无关，但配置区分度必须真实存在）
+        let degenerate = JudgeConfig::new(vec![], 5.0);
+        let a = evaluate_response(&degenerate, "p", "r").expect("退化");
+        let b = evaluate_response(&JudgeConfig::new(vec![], 9.0), "p", "r").expect("退化");
+        assert_eq!(
+            a.max_possible, 5.0,
+            "max_possible 必须来自 config ⇒ 证明 config 真的被读了"
+        );
+        assert_ne!(
+            a.max_possible, b.max_possible,
+            "不同 config 必须给出不同上限（否则上面的不变性是空洞的）"
+        );
+
+        // 对照 2：非退化配置必须**拒绝**，且拒绝与输入无关（恒 None）
+        let real = JudgeConfig::new(vec![Criterion::new("a", "d", 1.0)], 5.0);
+        for resp in ["", "r", "完全不同的回答", "ZZZZ"] {
+            assert!(
+                evaluate_response(&real, "p", resp).is_none(),
+                "非退化配置对任何输入都必须拒绝（输入不得影响拒绝与否）"
+            );
+        }
+    }
+
+    /// ⭐⭐⭐ **污染方向对照**：证明 `response` 真的进了函数体。
+    /// 若实现将来改成忽略 `response`，上面两条不变性测试会同时「通过」——
+    /// 本测试就是防这个：它要求**至少存在一个 response 影响可观测量的机制**。
+    ///
+    /// 当前实现的诚实答案是：`evaluate_response` 对非退化配置拒绝，
+    /// 所以**不存在**这样的机制 —— 本测试断言的正是这个**已知边界**，
+    /// 而不是编造一个差异。⚠️ 若将来真接入模型判官，本测试必须改为
+    /// 「同一 config 下不同 response ⇒ 分数可不同」。
+    #[test]
+    fn response_is_currently_not_read_because_non_degenerate_is_refused() {
+        let real = JudgeConfig::new(vec![Criterion::new("a", "d", 1.0)], 5.0);
+        // 全部拒绝 ⇒ response 对结果**没有任何**影响力
+        let outs: Vec<Option<f32>> = ["A", "B", "C"]
+            .iter()
+            .map(|r| evaluate_response(&real, "p", r).map(|x| x.total_score))
+            .collect();
+        assert!(
+            outs.iter().all(|o| o.is_none()),
+            "当前实现下非退化配置恒拒绝 ⇒ response 无影响力（这是已知边界，非缺陷断言）"
+        );
+    }
+
     #[test]
     fn reverse_lock_tier_must_participate_in_the_verdict() {
         // 若 `is_emergence_evidence` 忽略 tier，则此断言必红

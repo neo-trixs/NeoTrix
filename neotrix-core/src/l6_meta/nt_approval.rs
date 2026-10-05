@@ -195,6 +195,50 @@ fn default_actor() -> String {
 
 /// 审批引擎：待审队列 + **决策账本 + 审计轨迹**。
 ///
+/// ⭐⭐⭐ 三态审批裁决（2026-10-05）。
+///
+/// ## 为什么不是 bool
+/// `bool` 只能表达「要过问一下 / 不用问」，**表达不了「问也没用」**。
+/// 于是硬拒（deny）只能退化成「需审批」（ask）——
+/// 代码里的注释自己承认了：*"action is blocked — require approval to inform user"*。
+/// 后果：用户在提示里点一下，`git push --force` 就跑出去了。
+///
+/// ## 三态的语义（严格区分，不可互相退化）
+/// | 变体 | 含义 | 人点批准后 |
+/// |---|---|---|
+/// | [`Deny`](ActionVerdict::Deny) | **硬拒**，越不过去 | **仍然拒** |
+/// | [`Ask`](ActionVerdict::Ask) | 需要人过一眼 | 放行 |
+/// | [`Allow`](ActionVerdict::Allow) | 无需打扰 | 直接跑 |
+///
+/// ⛔ 禁止把 `Deny` 折叠成 `Ask`（那是 2026-10-05 修掉的缺陷）。
+/// 判据来源：`codewhale-hq/Codewhale` 授权栈第 2/7 层
+/// ——「既allow 又 deny ⇒ deny 胜」、且 repo-law 在 Full Access 下
+/// 变成**硬 block**（不是弹窗）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActionVerdict {
+    /// ⛔ 硬拒。人点批准**也不放行**。
+    Deny,
+    /// 需要人确认；批准后放行。
+    Ask,
+    /// 无需审批。
+    Allow,
+}
+
+impl ActionVerdict {
+    /// 是否需要人过一眼（`Deny` 与 `Ask` 都要）。
+    pub fn needs_human(&self) -> bool {
+        matches!(self, ActionVerdict::Deny | ActionVerdict::Ask)
+    }
+
+    /// ⭐ 是否**不可放行**。这是 `Deny` 存在的唯一理由 ——
+    /// 若某条路径只问`needs_human()` 而不问本方法，
+    /// 硬拒就会被降级成弹窗（2026-10-05 修掉的正是这个）。
+    pub fn is_blocked(&self) -> bool {
+        matches!(self, ActionVerdict::Deny)
+    }
+}
+
+
 /// 作用域声明：本结构的状态**全在内存**，进程退出即消失。跨重启的 id 唯一性由
 /// 纪元前缀保证（不必持久化即可拒掉陈旧 id），但「决策历史可追」在跨重启意义上
 /// 不成立 —— 那是持久化范畴的活，此处不做。
@@ -241,8 +285,48 @@ impl ApprovalEngine {
         self.mode = mode;
     }
 
+    /// ⭐⭐⭐ 三态判据（2026-10-05）——`require_approval` 的**权威版本**。
+    ///
+    /// ## 为什么必须新增（`bool` 表达不了三态）
+    /// `require_approval` 返回 `bool`，于是「**硬拒**」只能退化成
+    /// 「**需审批**」—— 代码里的注释自己写着
+    // 原文注释：*"action is blocked — require approval to inform user"*，
+    // 也就是**把 deny 当成 ask**。后果：内置画像里
+    // `read_secrets` 与 `git_force_push` 两条 `Deny` 规则，
+    // 用户在提示里点一下批准，**`git push --force` 就真的跑出去**。
+    /// ⇒ bool 这一层**丢失了 deny 与 ask 的区别**，不是判断写错了。
+    ///
+    /// ## 与 `require_approval` 的关系（不破既有签名）
+    /// `require_approval` 保留原样（5 处现有调用方不动），
+    /// 但它的语义被**重新定义为**「Deny 与 Ask 都需要人过一眼」，
+    /// 而**硬拒的判据改走本方法**。调用方要判 deny 时**必须**用本方法。
+    ///
+    /// 判据来源：`codewhale-hq/Codewhale` 授权栈第 2 层
+    /// ——「同一命令同时出现在 allow 与 deny 列表 ⇒ **deny**」，
+    /// 且第 7 层「repo-law 在 Full Access 下变成**硬block**」
+    /// ——即**存在一个越不过去的档位**，而不是「问一下就能过」。
+    pub fn action_verdict(&self, action: &ActionType) -> ActionVerdict {
+        let action_key = crate::l6_meta::nt_permission_profiles::action_type_to_key(action);
+        if crate::l6_meta::nt_permission_profiles::is_action_denied(action_key) {
+            // ⭐ 硬拒：**不是**「问一下就能过」。
+            return ActionVerdict::Deny;
+        }
+        if crate::l6_meta::nt_permission_profiles::is_action_allowed(action_key) {
+            return ActionVerdict::Allow;
+        }
+        match self.mode {
+            ApprovalMode::Suggest => ActionVerdict::Ask,
+            ApprovalMode::AutoEdit => ActionVerdict::Ask,
+            ApprovalMode::FullAuto => ActionVerdict::Allow,
+        }
+    }
+
     /// Check whether a given action type requires user approval under current mode.
     /// Respects active permission profile (deny overrides everything).
+    ///
+    /// ⚠️ **不要用它判断「是否被硬拒」** —— bool 表达不了 deny/ask 之别，
+    /// 本方法把两者都压成 `true`。判 deny 请用
+    /// [`Self::action_verdict`]。
     pub fn require_approval(&self, action: &ActionType) -> bool {
         // Profile deny takes precedence over everything
         let action_key = crate::l6_meta::nt_permission_profiles::action_type_to_key(action);
@@ -1001,5 +1085,107 @@ mod tests {
         assert!(legacy("nope", &mut engine).is_err());
         let pa = engine.submit(w("/tmp/x"));
         assert!(legacy(&pa.id, &mut engine).is_ok());
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // ⭐⭐⭐ 三态裁决反向锁（2026-10-05）
+    // ══════════════════════════════════════════════════════════════
+
+    /// ⭐⭐⭐ 端到端：`git push --force` 必须落在**硬拒**档。
+    ///
+    /// 【原缺陷两层叠加】
+    /// ① `action_type_to_key` 把所有 git 动作映射成 `"git_push"`，
+    ///    而画像里的键是 `"git_force_push"` ⇒ 键永不相交 ⇒ 从未命中。
+    /// ② 即便命中，`require_approval` 也把 `Deny` 压成 `true`
+    ///    ⇒ 退化成弹窗，点一下就放行。本测试同时锁住这两层。
+    ///
+    /// 注意用 **FullAuto** 构造：即便模式是「全自动」，硬拒依然成立。
+    #[test]
+    fn force_push_is_hard_denied_even_in_full_auto() {
+        let engine = ApprovalEngine::new(ApprovalMode::FullAuto);
+        let force_push = ActionType::GitOperation {
+            description: "git push --force origin main".into(),
+        };
+
+        // ① 键必须真的能命中画像里那条规则
+        assert_eq!(
+            crate::l6_meta::nt_permission_profiles::action_type_to_key(&force_push),
+            "git_force_push",
+            "force push 必须映射到画像里声明的键，否则那条 Deny 永不可达"
+        );
+        assert!(
+            crate::l6_meta::nt_permission_profiles::is_action_denied("git_force_push"),
+            "内置画像里应当确实有 git_force_push 的 Deny（前提断言）"
+        );
+
+        // ② 裁决必须是 Deny
+        let v = engine.action_verdict(&force_push);
+        assert_eq!(v, ActionVerdict::Deny, "force push 必须是硬拒");
+        assert!(v.is_blocked(), "is_blocked 必须为 true");
+        assert!(v.needs_human(), "needs_human 也为 true（Deny 与 Ask 都要人过一眼）");
+    }
+
+    /// ⭐ 对照组：普通 `git push`（无 force）**不应**被硬拒。
+    /// ⇒ 证明修复不是「把所有 git 动作一刀切拒掉」。
+    #[test]
+    fn plain_push_is_not_hard_denied() {
+        let engine = ApprovalEngine::new(ApprovalMode::FullAuto);
+        let plain = ActionType::GitOperation { description: "git push origin main".into() };
+        assert_eq!(
+            crate::l6_meta::nt_permission_profiles::action_type_to_key(&plain),
+            "git_push"
+        );
+        assert_ne!(
+            engine.action_verdict(&plain),
+            ActionVerdict::Deny,
+            "普通 push 不该被硬拒（否则修复就变成了过度拒绝）"
+        );
+    }
+
+    /// ⭐ `read_secrets` 那条 Deny 也要能命中。
+    /// ⚠️ 它当前**无生产 ActionType 能产生该键**（`FileWrite`/`FileEdit`
+    /// 都映射到 `write_file`）⇒ 本测试断言的是**画像侧配置正确**，
+    /// 而非「已经拦住了什么」—— 后者需要新增 `ActionType` 变体才成立。
+    /// 如实标注，不假装它已生效。
+    #[test]
+    fn read_secrets_deny_is_declared_in_builtin_profile() {
+        assert!(
+            crate::l6_meta::nt_permission_profiles::is_action_denied("read_secrets"),
+            "画像里声明了 read_secrets 的 Deny（前提断言）"
+        );
+    }
+
+    /// ⭐⭐ 反向锁：三态**不可**被折叠回两态。
+    /// 若有人把 `is_blocked` 写成 `needs_human`，本测试立刻红 ——
+    /// 那正是 2026-10-05 修掉的降级。
+    #[test]
+    fn deny_must_not_collapse_into_ask() {
+        assert!(ActionVerdict::Deny.is_blocked());
+        assert!(ActionVerdict::Deny.needs_human());
+        // ⭐ 关键差异：Ask 问了就放行，Deny 问了也不放行
+        assert!(!ActionVerdict::Ask.is_blocked());
+        assert!(ActionVerdict::Ask.needs_human());
+        assert!(!ActionVerdict::Allow.needs_human());
+        assert!(!ActionVerdict::Allow.is_blocked());
+    }
+
+    /// ⭐ 未知 git 子命令**不得 panic**，且大小写必须归一。
+    /// 依据 AGENTS.md「生产代码禁 panic」—— 不能因没见过的子命令崩掉。
+    #[test]
+    fn unknown_git_subcommand_does_not_panic_and_is_case_insensitive() {
+        let engine = ApprovalEngine::new(ApprovalMode::FullAuto);
+        for d in ["git", "git rebase -i", "git bisect start", ""] {
+            let a = ActionType::GitOperation { description: d.into() };
+            let key = crate::l6_meta::nt_permission_profiles::action_type_to_key(&a);
+            assert!(!key.is_empty(), "键不得为空串：{d:?}");
+            let _ = engine.action_verdict(&a);
+        }
+        // 大写也须命中硬拒键，否则大写输入可绕过
+        let upper = ActionType::GitOperation { description: "GIT PUSH --FORCE".into() };
+        assert_eq!(
+            crate::l6_meta::nt_permission_profiles::action_type_to_key(&upper),
+            "git_force_push",
+            "键匹配必须大小写不敏感"
+        );
     }
 }
