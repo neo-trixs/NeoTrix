@@ -1005,6 +1005,8 @@ mod tests {
 /// · 注册表锁投毒
 /// · 任一节点在注册后**回查不到** ⇒ ⭐ 说明拓扑序或注册实现有问题
 pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
+    // ⭐⭐⭐⭐⭐ 市场元数据需要的类别（⭐⭐⭐⭐⭐ 2026-10-04）
+    use crate::l1_action::nt_act::nt_act_trade::capability_registry::TradeCategory;
     use crate::l1_action::nt_act::nt_act_trade::{
         register_finance_compliance_capability, register_production_logistics_capability,
         register_quote_negotiation_capability, register_trade_full_cycle_capability,
@@ -1035,15 +1037,47 @@ pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
     /// ⛔ 2026-10-03 改为调用点 `?` 传播：既**常开**，又**不 panic**（返回 `Err`）。
     ///    （不用 `assert!`：那会把校验失败变成新的 panic 源。）
     fn must_be_registered(
-        reg: &CapabilityTreeRegistry,
+        reg: &mut CapabilityTreeRegistry,
         node: &CapabilityNode,
         step: &str,
+        category: crate::l1_action::nt_act::nt_act_trade::capability_registry::TradeCategory,
+        description: &str,
     ) -> Result<(), String> {
-        if reg.nodes.contains_key(&node.id) {
-            Ok(())
-        } else {
-            Err(format!("{step}: 节点 {} 未出现在注册表中", node.id))
+        if !reg.nodes.contains_key(&node.id) {
+            return Err(format!("{step}: 节点 {} 未出现在注册表中", node.id));
         }
+        // ⭐⭐⭐⭐⭐ **顺带补齐市场元数据**（⭐⭐⭐⭐⭐ 2026-10-04）。
+        //
+        // ⭐⭐⭐⭐⭐ **为什么挑这个函数当改动点**（⭐⭐⭐⭐⭐ 三个理由，全部可核）：
+        // ① ⭐⭐⭐⭐⭐ **每个 registrar 必经** ⇒ ⭐⭐ 不会漏掉任何一个
+        //    （⭐⭐ ⛔ 改 5 个 registrar = 5 个文件的侵入，⭐⭐ 且必有一处漏）
+        // ② ⭐⭐⭐⭐⭐ 它**本来就是校验点** ⇒ ⭐⭐ ⭐⭐ 在「必须被回查」的位置
+        //    顺手把「必须可上架」也补上，⭐⭐⭐⭐⭐ ⭐⭐ **语义同源**：
+        //    ⭐⭐⭐⭐⭐ 「登记了」与「能被人找到」是**同一个承诺的两半**
+        // ③ ⭐⭐⭐⭐⭐ ⭐⭐ **幂等**：⭐⭐ 每次 bootstrap 都重写同样的值
+        //    ⇒ ⭐⭐⭐⭐⭐ ⭐⭐ **可重复执行**，⭐⭐ ⭐⭐ 且**版本号一处升版即全生效**
+        //    （⭐⭐⭐⭐⭐ 这正是「市场元数据集中在一处」的全部收益）。
+        //
+        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **⚠️ 为什么重复 bootstrap 也要补**：
+        // ⭐⭐⭐⭐⭐ ⭐⭐ 上面的 `already(...)` 分支会跳过 registrar，
+        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐ 若只在首次登记时打标，⭐⭐⭐⭐⭐⭐⭐
+        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **升级版本号后老进程里的节点永远不会更新** ⭐⭐⭐⭐⭐
+        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ ⇒ 放在回查处 ⇒ ⭐⭐⭐⭐⭐ **每次都刷**。
+        let patched = {
+            let n = reg
+                .nodes
+                .get_mut(&node.id)
+                .ok_or_else(|| format!("{step}: 回查时取不到节点 {}", node.id))?;
+            crate::l1_action::nt_act::nt_act_trade::capability_registry::apply_market_meta(
+                n,
+                category,
+                description,
+            );
+            n.clone()
+        };
+        // ⭐⭐⭐⭐⭐ 打标后**立刻回查市场元数据** ⇒ ⭐⭐ 「打标没生效」当场变红，
+        // ⭐⭐⭐⭐⭐ ⭐⭐ 而不是等某天有人打开市场才发现。
+        crate::l1_action::nt_act::nt_act_trade::capability_registry::assert_market_ready(&patched, step)
     }
 
     let (total, newly) = with_registry(|reg| -> Result<(usize, usize), String> {
@@ -1055,33 +1089,38 @@ pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
         if !already(reg, ID_PRODUCT_SPEC) {
             let n =
                 crate::l4_emotion::nt_memory::nt_trade_product_spec::register_product_spec_capability(reg).map_err(|e| e.to_string())?;
-            must_be_registered(reg, &n, "① trade_product_spec")?;
+            must_be_registered(reg, &n, "① trade_product_spec", TradeCategory::ProductSpec,
+                "产品规格生成：抽取产品要素与规格约束")?;
             newly += 1;
         }
 
         // ② requires=[trade_product_spec]
         if !already(reg, ID_QUOTE) {
             let n = register_quote_negotiation_capability(reg).map_err(|e| e.to_string())?;
-            must_be_registered(reg, &n, "② trade_quote_negotiation")?;
+            must_be_registered(reg, &n, "② trade_quote_negotiation", TradeCategory::Quote,
+                "报价谈判：生成报价单并处理还价")?;
             newly += 1;
         }
 
         // ③ requires=[trade_product_spec, trade_quote_negotiation]（两支可并列）
         if !already(reg, ID_LOGISTICS) {
             let n = register_production_logistics_capability(reg).map_err(|e| e.to_string())?;
-            must_be_registered(reg, &n, "③ trade_production_logistics")?;
+            must_be_registered(reg, &n, "③ trade_production_logistics", TradeCategory::Logistics,
+                "生产物流：排产、运输与交付跟踪")?;
             newly += 1;
         }
         if !already(reg, ID_FINANCE) {
             let n = register_finance_compliance_capability(reg).map_err(|e| e.to_string())?;
-            must_be_registered(reg, &n, "③ trade_finance_compliance")?;
+            must_be_registered(reg, &n, "④ trade_finance_compliance", TradeCategory::Finance,
+                "金融合规：结算、汇率与合规校验")?;
             newly += 1;
         }
 
         // ④ requires=[quote_negotiation, production_logistics, finance_compliance]
         if !already(reg, ID_FULL_CYCLE) {
             let n = register_trade_full_cycle_capability(reg).map_err(|e| e.to_string())?;
-            must_be_registered(reg, &n, "④ foreign_trade_full_cycle")?;
+            must_be_registered(reg, &n, "⑤ foreign_trade_full_cycle", TradeCategory::FullCycle,
+                "外贸全链：串起报价、物流、合规与产品规格")?;
             newly += 1;
         }
 

@@ -1111,3 +1111,68 @@ use nt_core_capability_tree::node::Domain as CapabilityTreeDomain;
         assert!(blocked[0].1.contains("license"), "⭐⭐⭐ 原因要说清是 license");
     }
 }
+
+#[cfg(test)]
+mod market_end_to_end_tests {
+    use super::*;
+    use nt_core_capability_tree::node::{CapabilityKind, CapabilityNode};
+    // ⭐⭐ 市场查询函数（⭐⭐ 在 neobot crate，⭐⭐⭐⭐⭐ core 依赖 neobot ⇒ 可直接用）
+    use neotrix_neobot::nt_capability_market::{blocked, listable, MarketEntry};
+
+    /// ⭐⭐⭐⭐⭐ **端到端：⭐⭐ 播种 ⇒ 市场里真的能看到 5 个贸易能力。**
+    ///
+    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **这是「市场不是空的」的唯一证据** —— ⭐⭐⭐⭐⭐
+    /// ⭐⭐⭐⭐⭐ 前面所有测试都只验 `project()` 这个纯函数，⭐⭐⭐⭐⭐
+    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ **没有人证明过「真源 → 市场」这条链是通的**。
+    #[test]
+    fn 真实贸易能力在市场里可见且可上架() {
+        // ⭐⭐ 走**真实构造路径**（⭐⭐ ⛔ 不直接调 registrar）
+        let _rt = crate::l5_cognition::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime::new();
+
+        let (listable, blocked) =
+            neotrix_neobot::nt_capability_registry::with_registry(|reg| {
+                (listable(reg), blocked(reg))
+            })
+            .expect("注册表锁");
+
+        let trade: Vec<&MarketEntry> =
+            listable.iter().filter(|e| e.category.starts_with("trade/")).collect();
+        assert_eq!(
+            trade.len(),
+            5,
+            "⭐⭐⭐⭐⭐ 播种后应有 **5 个**可上架贸易能力，⭐⭐ 实得 {}（⭐⭐ blocked {} 个）",
+            trade.len(),
+            blocked.len()
+        );
+        // ⭐⭐⭐⭐⭐ 五类必须**各一个**（⭐⭐ ⛔ 类别串了 = 市场目录错乱）
+        let mut cats: Vec<&str> = trade.iter().map(|e| e.category.as_str()).collect();
+        cats.sort();
+        assert_eq!(
+            cats,
+            vec![
+                "trade/finance",
+                "trade/full-cycle",
+                "trade/logistics",
+                "trade/product-spec",
+                "trade/quote"
+            ],
+            "⭐⭐⭐⭐⭐ 五类各一个且不多不少"
+        );
+        // ⭐⭐⭐⭐⭐ ⭐⭐ 市场**不得**收进缺口（纪律②的端到端验）
+        assert!(
+            !listable.iter().any(|e| e.kind == CapabilityKind::Gap),
+            "⭐⭐⭐⭐⭐ 缺口 ⭐⭐ 绝不能出现在市场里"
+        );
+        // ⭐⭐⭐⭐⭐ blocked 必须为空（⭐⭐ 5 个 trade 都填全了）
+        let trade_blocked: Vec<&String> = blocked
+            .iter()
+            .filter(|(id, _)| id.contains("trade"))
+            .map(|(_, r)| r)
+            .collect();
+        assert!(
+            trade_blocked.is_empty(),
+            "⭐⭐⭐⭐⭐ 贸易能力不该有任何 blocked：{:?}",
+            trade_blocked
+        );
+    }
+}
