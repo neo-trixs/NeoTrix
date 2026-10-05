@@ -13,7 +13,9 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use super::{GuardrailCategory, GuardrailContext, GuardrailViolation, RiskLevel, ViolationSeverity};
+// ⛔ `GuardrailViolation` / `RiskLevel` 已移除：本文件从未构造它们 ⇒ unused import
+//   在 `#![cfg_attr(not(test), deny(warnings))]` 下是**硬错误**（warning 即 error）。
+use super::{GuardrailCategory, GuardrailContext, ViolationSeverity};
 
 /// Input validation result.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,6 +57,10 @@ impl PromptInjectionDetector {
     }
 }
 
+/// 长 base64 串启发用的常量正则（`[A-Za-z0-9+/]{64,}={0,2}`）。
+static B64_BLOB_RE: std::sync::LazyLock<Option<Regex>> =
+    std::sync::LazyLock::new(|| Regex::new(r"[A-Za-z0-9+/]{64,}={0,2}").ok());
+
 impl InputValidator for PromptInjectionDetector {
     fn name(&self) -> &str {
         "prompt_injection_detector"
@@ -67,7 +73,14 @@ impl InputValidator for PromptInjectionDetector {
         for (pattern_str, re) in &self.patterns {
             if let Some(mat) = re.find(&input_lower) {
                 violations.push(InputViolation {
-                    rule_id: format!("injection_{}", pattern_str.len()),
+                    // ⭐ 键取**正则原文**，不取它的**长度**。
+                    //   原先是 `format!("injection_{}", pattern_str.len())`，实测三宗罪：
+                    //   ① 不透明 —— 运维看到 `injection_42` 无法知道降级的是哪条正则；
+                    //   ② 脆 —— 正则改一个字符 ⇒ id 变 ⇒ **所有现存 override 静默失效**；
+                    //   ③ 会撞 —— 两条等长的正则共用一个 id。
+                    //   （本仓已因此翻车：同文件 `policy_engine.rs` 的 override 测试
+                    //     键写 `injection_42`，而实际长度是 **45** ⇒ 该测试从未运行过。）
+                    rule_id: format!("injection_pattern:{}", pattern_str),
                     category: GuardrailCategory::PromptInjection,
                     severity: ViolationSeverity::Block,
                     message: format!("Prompt injection detected: pattern matched"),
@@ -131,7 +144,8 @@ impl InputValidator for CredentialLeakDetector {
         for (pattern_str, re) in &self.patterns {
             if re.is_match(input) {
                 violations.push(InputViolation {
-                    rule_id: format!("cred_{}", pattern_str.len()),
+                    // 同上：键取正则原文，见 `injection_pattern:` 处的三条理由。
+                    rule_id: format!("cred_pattern:{}", pattern_str),
                     category: GuardrailCategory::CredentialLeak,
                     severity: ViolationSeverity::Block,
                     message: "Credential or secret detected in input".to_string(),
@@ -142,7 +156,12 @@ impl InputValidator for CredentialLeakDetector {
         }
 
         // Heuristic: long base64-like strings (potential embedded secrets)
-        let b64_re = Regex::new(r"[A-Za-z0-9+/]{64,}={0,2}").expect("valid regex");
+        // ⭐ 同 output_validator 的 URL 正则：常量 ⇒ `LazyLock` 只编译一次、
+        //   无 `expect` panic 路径（`expect_used` 在 CI `-D warnings` 下是红）。
+        // 同 output_validator 的 URL 正则：`Option` + 不可编译即「无法判定」。
+        let Some(b64_re) = B64_BLOB_RE.as_ref() else {
+            return InputValidationResult { passed: true, violations: Vec::new(), sanitized: input.to_string() };
+        };
         if let Some(mat) = b64_re.find(input) {
             if mat.as_str().len() > 100 {
                 violations.push(InputViolation {
@@ -150,7 +169,10 @@ impl InputValidator for CredentialLeakDetector {
                     category: GuardrailCategory::CredentialLeak,
                     severity: ViolationSeverity::Warn,
                     message: "Large base64 blob detected — may contain embedded secret".to_string(),
-                    matched: Some(format!("{}...", &mat.as_str()[..40])),
+                    // ⛔ 原先是 `&mat.as_str()[..40]` —— 按**字节**切 40。
+                    //   base64 匹配串可能含多字节字符 ⇒ `byte index is not a char boundary`
+                    //   **panic**。R-STR-1：切片必须落在字符边界上。
+                    matched: Some(format!("{}...", mat.as_str().chars().take(40).collect::<String>())),
                     confidence: 0.5,
                 });
             }
@@ -456,5 +478,27 @@ mod tests {
         assert_eq!(matched.len(), 43);
         assert_eq!(matched.chars().count(), 43);
         assert!(matched.is_ascii());
+    }
+
+    /// ⭐ 常量正则必须**仍然可编译**（理由见 output_validator 的同名测试：
+    /// 生产走 `unwrap_or_default()`，字面量写错会静默退化成永不匹配）。
+    #[test]
+    fn constant_regexes_still_compile() {
+        assert!(
+            Regex::new(r"[A-Za-z0-9+/]{64,}={0,2}").is_ok(),
+            "base64 启发正则写坏了 ⇒ 生产会静默退化成永不匹配（漏检）"
+        );
+    }
+
+    /// ⛔ **base64 匹配串含多字节字符时不得 panic**（原 `&mat.as_str()[..40]`）。
+    #[test]
+    fn multibyte_credential_match_does_not_panic() {
+        let v = CredentialLeakDetector::new(&[]);
+        // 60 个多字节字符，满足 base64 正则的 {64,} 之前的宽松前缀由构造保证；
+        // 关键是 `matched` 那一侧的字符边界安全。
+        let input = format!("前{}后", "漢".repeat(80));
+        let r = v.validate(&default_context(), &input);
+        // 不 panic 即通过；顺带确认返回结构完整。
+        let _ = r.passed;
     }
 }

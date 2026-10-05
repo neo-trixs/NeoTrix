@@ -32,7 +32,9 @@ pub struct GuardrailViolation {
 }
 
 /// Guardrail categories — maps to compliance domains.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+// ⛔ **不能 derive Copy**：本枚举含 `Custom(String)` 变体（`mod.rs:44`），
+//   `String: Copy` 不成立 ⇒ E0277。这是本目录「从未编译」的第一处硬错误。
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum GuardrailCategory {
     PromptInjection,
     ToolAbuse,

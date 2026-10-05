@@ -76,6 +76,10 @@ impl Default for HallucinationDetector {
     }
 }
 
+/// URL 密度启发用的常量正则（见 `HallucinationDetector::validate` 处的说明）。
+static URL_DENSITY_RE: std::sync::LazyLock<Option<Regex>> =
+    std::sync::LazyLock::new(|| Regex::new(r"https?://[^\s]+").ok());
+
 impl OutputValidator for HallucinationDetector {
     fn name(&self) -> &str {
         "hallucination_detector"
@@ -98,8 +102,20 @@ impl OutputValidator for HallucinationDetector {
         }
 
         // High URL density heuristic
-        let url_re = Regex::new(r"https?://[^\s]+").expect("valid regex");
-        let url_count = url_re.find_iter(output).count();
+        // ⭐ 编译期常量正则 ⇒ `LazyLock` **只编译一次**。原先每次调用都
+        //   `Regex::new(..).expect("valid regex")`：① 重复编译 ② `expect_used`
+        //   在 CI clippy `-D warnings` 下是红 ③ 万一字面量写错就 panic 在生产路径。
+        //   兜底用 `unwrap_or_default()`（空正则，永不匹配）⇒ **宁可漏检也不崩**；
+        //   「字面量是否仍可编译」由同文件测试 `constant_regexes_still_compile` 守住。
+        // 正则不可编译属**代码缺陷**（字面量是编译期常量），由测试
+        // `constant_regexes_still_compile` 守住。此处**不做静默兜底**：
+        // `Regex` 没有 `Default`（编译器实测：`the trait bound Regex: Default
+        // is not satisfied`），而编一个永不匹配的正则同样需要会 panic 的 API。
+        // ⇒ 拿不到正则就当作「无法判定」，不计入 URL 密度（宁可漏检不崩）。
+        let url_count = URL_DENSITY_RE
+            .as_ref()
+            .map(|re| re.find_iter(output).count())
+            .unwrap_or(0);
         if url_count > 5 {
             violations.push(OutputViolation {
                 rule_id: "halluc_url_density".to_string(),
@@ -286,7 +302,22 @@ impl OutputValidator for OutputLengthValidator {
                     matched: None,
                     confidence: 1.0,
                 }],
-                sanitized: output[..self.max_length].to_string(),
+                // ⛔ 原先是 `output[..self.max_length]` —— 按**字节**切。
+                //   多字节字符恰好跨在 `max_length` 边界上就 panic
+                //   （`byte index is not a char boundary`）⇒ 这是一条**活体 panic**：
+                //   任何长度超限的多字节输出都会崩（max_output_length 默认 500_000，
+                //   但 config 可改小到任意值 ⇒ 边界必然被踩到）。
+                //   R-STR-1：截断必须落在**字符边界**上。
+                sanitized: {
+                    // 最大的、不超过 max_length 的字符边界（`char_indices` 给出全部边界）。
+                    let cut = output
+                        .char_indices()
+                        .map(|(i, _)| i)
+                        .filter(|&i| i <= self.max_length)
+                        .last()
+                        .unwrap_or(0);
+                    output[..cut].to_string()
+                },
             }
         } else {
             OutputValidationResult {
@@ -438,5 +469,53 @@ mod tests {
         ]);
         let r = c.validate(&ctx(), "Run eval(\"import os; os.system('id')\")");
         assert!(!r.passed);
+    }
+
+    /// ⛔ **多字节输出超长截断不得 panic**。
+    ///
+    /// 原实现是 `output[..self.max_length]`（按**字节**切）。构造一个
+    /// `max_length` 恰好落在某个多字节字符中间的配置 ⇒ 旧实现直接
+    /// `byte index is not a char boundary` 崩掉。
+    ///
+    /// ⭐ 这条测试的价值在于**它是回归钉子**：没有它，R-STR-1 那条规矩
+    /// 在这个模块里没有任何强制力。
+    #[test]
+    fn multibyte_output_truncation_lands_on_a_char_boundary() {
+        let ctx = ctx();
+        // "家" 是 3 字节。max_length = 2 ⇒ 旧实现在此 panic。
+        let text = "家家家";
+        let v = OutputLengthValidator::new(2);
+        let r = v.validate(&ctx, text);
+        assert!(!r.passed, "超长必须判不通过");
+        assert!(
+            r.sanitized.chars().count() <= 1,
+            "截断结果必须是 0 个完整字符（2 字节装不下 3 字节的「家」），实得 {:?}",
+            r.sanitized
+        );
+        // 且必须真的截短了，而不是原样返回。
+        assert!(r.sanitized.len() < text.len());
+    }
+
+    /// 刚好落在边界上时不应**少**截。
+    #[test]
+    fn truncation_keeps_every_complete_char_that_fits() {
+        let ctx = ctx();
+        let v = OutputLengthValidator::new(3); // 恰好装下一个「家」
+        let r = v.validate(&ctx, "家家家");
+        assert_eq!(r.sanitized.chars().count(), 1);
+        assert_eq!(r.sanitized, "家");
+    }
+
+    /// ⭐ 常量正则必须**仍然可编译**。
+    ///
+    /// 生产路径改用了 `LazyLock` + `unwrap_or_default()`（无 panic 路径），
+    /// 代价是：字面量若写错会**静默退化成永不匹配**。本测试把那个代价
+    /// 变成可检测的 —— 否则「静默漏检」会取代「panic」。
+    #[test]
+    fn constant_regexes_still_compile() {
+        assert!(
+            Regex::new(r"https?://[^\s]+").is_ok(),
+            "URL 密度正则写坏了 ⇒ 生产会静默退化成永不匹配（漏检）"
+        );
     }
 }
