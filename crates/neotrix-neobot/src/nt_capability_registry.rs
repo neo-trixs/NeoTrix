@@ -109,6 +109,37 @@ pub fn lookup(id: &str) -> Result<Option<CapabilityNode>, String> {
     Ok(found)
 }
 
+/// ⭐⭐⭐⭐⭐ **按能力标签派发** —— ⭐⭐ **两座 id 空间之间那座缺失的桥**。
+///
+/// ⭐⭐⭐⭐ 能力树节点 id 形如 `NT-MEMORY::trade::trade_product_spec`，
+/// ⭐⭐ 而路由标签形如 `hybrid_retrieval` ⇒ ⭐⭐⭐ **改前两者无法互达**，
+/// ⭐⭐⭐⭐ 于是「路由决策」永远变不成「一个可派发的能力」
+/// ⭐⭐⭐⭐ ⇒ 这就是「注册了但没调用」的**结构性根因**。
+/// ⭐⭐ `provides` ⭐⭐ **本来就是连接键**，⭐⭐ 而索引一直在维护它 ⇒ 只是没有 API。
+///
+/// ⭐⭐⭐ **计数语义与 `lookup` 一致**：⭐⭐ **真的取到节点**才计数；
+/// ⭐⭐ 标签无提供者 ⇒ 返回空 vec 且 ⭐⭐ **不计数**
+/// ⭐⭐（⭐⭐ 否则「路由到不存在的能力」会被误读成「有真实调用」）。
+pub fn dispatch_by_capability(capability_tag: &str) -> Result<Vec<CapabilityNode>, String> {
+    let ids = {
+        let reg = slot().lock().map_err(|e| format!("注册表锁投毒: {e}"))?;
+        reg.nodes_providing(capability_tag)
+    };
+    let mut out = Vec::with_capacity(ids.len());
+    for id in ids {
+        let node = {
+            let reg = slot().lock().map_err(|e| format!("注册表锁投毒: {e}"))?;
+            reg.nodes.get(&id).cloned()
+        };
+        if let Some(n) = node {
+            out.push(n);
+        }
+        let mut c = counts().lock().map_err(|e| format!("计数锁投毒: {e}"))?;
+        *c.entry(id).or_insert(0) += 1;
+    }
+    Ok(out)
+}
+
 /// ⭐⭐⭐⭐ **「注册了但一次都没被调用」的清单** —— ⭐⭐ **三��参考仓库都没有的能力**。
 ///
 /// ⭐⭐ 返回 `(id, 已调用次数)`，⭐⭐ **只含次数为 0 的**。

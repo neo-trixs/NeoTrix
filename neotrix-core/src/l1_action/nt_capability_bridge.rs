@@ -189,6 +189,27 @@ impl ExperienceRouter {
                 // 蒸馏合成内容会带跨域关键词 (如 NT-MIND 的 '双进程路由' 含 '路由'),
                 // 纯内容关键词路由会把经验误归因到它域 (NT-ACT tool_routing)。
                 let domain = parse_domain(&entry.domain_name);
+                // ⭐⭐⭐⭐ 2026-10-04 **接通「路由 → 可派发能力」这座桥**。
+                //
+                // ⭐⭐⭐⭐ 此前 `capability_tag` 的注释就写着「provides tag」，
+                // ⭐⭐⭐ **桥在设计上一直存在**，⭐⭐ 但没有任何代码把它解析成
+                // ⭐⭐⭐ **能力树节点** ⇒ 「注册了但没调用」的**结构性根因**。
+                // ⭐⭐⭐ 改前能力树节点 id（`NT-MEMORY::trade::…`）与路由标签
+                // ⭐⭐ （`hybrid_retrieval` / `vector_storage` / …）**两个 id 空间
+                // ⭐⭐ 完全无法互达**。
+                //
+                // ⭐⭐⭐ 本次把解析结果**写进 rationale**（⭐⭐ ⛔ 不藏起来）：
+                // ⭐⭐ 解析到 ⇒ 论证里带节点 id；⭐⭐ 解析不到 ⇒ **明说「未命中已注册能力」**。
+                // ⭐⭐⭐ 这让「路由命中了标签但能力树里没有它」⭐⭐ **变得可见** ——
+                // ⭐⭐⭐ 而那正是「有路由、没能力」这类缺陷的形态。
+                let resolved = neotrix_neobot::nt_capability_registry::dispatch_by_capability(&tag)
+                    .unwrap_or_default();
+                let resolution_note = if resolved.is_empty() {
+                    format!(" | ⛔ 未命中已注册能力（路由标签 '{}' 无提供者）", tag)
+                } else {
+                    let ids: Vec<String> = resolved.iter().map(|n| n.id.clone()).collect();
+                    format!(" | 已解析到已注册能力节点：{}", ids.join(", "))
+                };
                 return ExperienceDimension::CapabilityNetwork {
                     domain,
                     capability_tag: tag.clone(),
@@ -197,8 +218,8 @@ impl ExperienceRouter {
                         note: format!("[{}] {} | signal={:.2}", entry.entry_type, entry.content, signal),
                     },
                     rationale: format!(
-                        "经验 '{}' 命中能力标签 '{}' 于域 {:?}, 应强化对应能力节点",
-                        entry.content, tag, domain
+                        "经验 '{}' 命中能力标签 '{}' 于域 {:?}, 应强化对应能力节点{}",
+                        entry.content, tag, domain, resolution_note
                     ),
                     signal,
                 };
@@ -597,5 +618,65 @@ mod tests {
         assert_eq!(targets2.len(), 2, "追加而非覆盖, 应累计 2 条");
 
         let _ = std::fs::remove_file(&path);
+    }
+}
+
+
+#[cfg(test)]
+mod capability_bridge_tests {
+    use super::*;
+
+    /// ⭐⭐⭐⭐ 桥的**可证伪**判据：⭐⭐ 路由产出标签后，
+    /// ⭐⭐ **必须真的解析出已注册能力节点**，⭐⭐ ⛔ 而不是静默产出标签。
+    ///
+    /// ⭐⭐⭐⭐ **本测试的意义 = 抓住「注册了但没调用」**。
+    /// ⭐⭐⭐⭐ 三家对标仓库（`os-taxonomy` / `lcu` / `backburner`）
+    /// ⭐⭐⭐⭐ **全部只能证明「声明 == 现实」**，⭐⭐⭐⭐
+    /// ⭐⭐⭐⭐ 「注册了」与「被用了」**是两个不同的事实**，
+    /// ⭐⭐⭐⭐ 只有后者能靠**计数 / 真实解析**证伪。
+    #[test]
+    fn 路由命中标签后必须真的解析出已注册能力_否则rationale要明说() {
+        // ⭐⭐ 先播种（⭐⭐ 走**真实构造路径**，⭐⭐ ⛔ 不直接调 bootstrap）
+        let _rt = crate::l5_cognition::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime::new();
+
+        // ⭐⭐ 构造一条**必然命中路由表**的经验：⭐⭐ ROUTE_TABLE 首项是
+        // ⭐⭐ `("检索", "NT-MEMORY", "hybrid_retrieval")`
+        let entry = ExperienceEntry {
+            id: "bridge-test-1".to_owned(),
+            entry_type: "insight".to_owned(),
+            domain_name: "NT-MEMORY".to_owned(),
+            content: "检索质量下降，需要复核召回".to_owned(),
+            not: None,
+            confidence: 0.9,
+            importance: 0.9,
+            verified_by: Some("test".to_owned()),
+            verification_status: Some("verified".to_owned()),
+        };
+        match ExperienceRouter::route_experience(&entry) {
+            ExperienceDimension::CapabilityNetwork { capability_tag, rationale, .. } => {
+                assert_eq!(capability_tag, "hybrid_retrieval", "⭐⭐ 应命中检索标签");
+                // ⭐⭐⭐ **关键判据**：⭐⭐ rationale 必须**如实报告**解析结果
+                assert!(
+                    rationale.contains("已解析到已注册能力节点") || rationale.contains("未命中已注册能力"),
+                    "⭐⭐⭐ rationale 必须报告解析结论（⭐⭐ ⛔ 不许只给标签就交差）\n实际：{rationale}"
+                );
+            }
+            other => panic!("⭐⭐ 应路由到 CapabilityNetwork，⭐⭐ 实得 {other:?}"),
+        }
+    }
+
+    /// ⭐⭐⭐ 桥的另一侧：**标签无提供者时 ⛔ 不许伪造命中**。
+    #[test]
+    fn 标签无提供者时返回空且不计数() {
+        let _ = neotrix_neobot::nt_capability_registry::dispatch_by_capability(
+            "tag-that-definitely-has-no-provider",
+        )
+        .expect("锁");
+        // ⭐⭐ 空 vec ⇒ ⭐⭐ 诚实
+        let got = neotrix_neobot::nt_capability_registry::dispatch_by_capability(
+            "tag-that-definitely-has-no-provider",
+        )
+        .expect("锁");
+        assert!(got.is_empty(), "⭐⭐ 无提供者的标签 ⭐⭐ **不得**返回节点");
     }
 }
