@@ -813,8 +813,6 @@ pub fn create_empty_registry() -> TradeCapabilityRegistry {
 
 #[cfg(test)]
 mod tests {
-    use nt_core_capability_tree::node::CapabilityNode;
-    use nt_core_capability_tree::registry::CapabilityTreeRegistry;
 
     use super::*;
     use serde_json::json;
@@ -1037,6 +1035,35 @@ pub fn apply_market_meta(node: &mut CapabilityNode, category: TradeCategory, des
         meta_keys::DESCRIPTION.to_owned(),
         serde_json::Value::String(description.to_owned()),
     );
+}
+
+/// ⭐⭐⭐⭐⭐ **打标后立刻回查市场元数据**（⭐⭐⭐⭐⭐ 「打标没生效」当场变红）。
+///
+/// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **为什么必须有**：⭐⭐⭐⭐⭐ `apply_market_meta` 往
+/// ⭐⭐⭐⭐⭐ `metadata` 写值，⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 而 ⭐⭐ `metadata` 是
+/// ⭐⭐⭐⭐⭐ `HashMap<String, serde_json::Value>` ⇒ ⭐⭐⭐⭐⭐ 键名拼错**不会报错**，
+/// ⭐⭐⭐⭐⭐ 只会被市场的 `as_str()` 取成 `None` ⇒ ⭐⭐⭐⭐⭐ **静默变成「不可上架」**。
+/// ⭐⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **必须在这里当场验**，⭐⭐⭐⭐⭐ ⭐⭐
+/// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 否则「打标了但市场里没有」⭐⭐⭐⭐⭐ **和没打标完全一样**。
+///
+/// # Errors
+/// 缺 `market.version` / `market.license` / `market.category`，或类型不是字符串
+pub fn assert_market_ready(node: &CapabilityNode, step: &str) -> Result<(), String> {
+    use nt_core_capability_tree::node::CapabilityKind;
+    if node.kind == CapabilityKind::Gap {
+        return Err(format!(
+            "{step}: 节点 {} 的 kind 是 Gap ⭐⭐ 缺口不应进市场",
+            node.id
+        ));
+    }
+    // ⭐⭐⭐⭐⭐ ⭐⭐ 用**市场自己的投影函数**回查 ⇒ ⭐⭐⭐⭐⭐
+    // ⭐⭐⭐⭐⭐ ⭐⭐ **判据与市场准入是同一份逻辑**（⭐⭐ ⛔ 不复制一份判据：
+    // ⭐⭐⭐⭐⭐ ⭐⭐ 两份判据必然漂，⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 那正是本轮治的第三种状态）。
+    let entry = neotrix_neobot::nt_capability_market::project(node);
+    match entry.blocked_reason() {
+        None => Ok(()),
+        Some(why) => Err(format!("{step}: 节点 {} 不可上架 ⇒ {why}", node.id)),
+    }
 }
 
 #[cfg(test)]
