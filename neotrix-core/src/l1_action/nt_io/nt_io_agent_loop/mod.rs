@@ -26,6 +26,8 @@ pub mod nt_loop_handle;
 pub mod nt_loop_step;
 pub mod nt_loop_types;
 #[cfg(test)]
+pub mod nt_loop_canary_tests;
+#[cfg(test)]
 pub mod nt_loop_tests;
 
 pub use nt_loop_types::*;

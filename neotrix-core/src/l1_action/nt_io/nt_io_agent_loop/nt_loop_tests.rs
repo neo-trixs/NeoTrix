@@ -15,8 +15,8 @@ use std::sync::{Arc, Mutex};
 
 // ── Mock 工具 ─────────────────────────────────────────────────────
 
-struct MockCalc {
-    calls: Arc<Mutex<Vec<String>>>,
+pub(super) struct MockCalc {
+    pub(super) calls: Arc<Mutex<Vec<String>>>,
 }
 
 impl NativeTool for MockCalc {
@@ -60,7 +60,7 @@ fn tool_def(id: &str) -> ToolDef {
 // ── 可编程 Mock LLM ───────────────────────────────────────────────
 
 /// 按预设脚本返回响应序列；`tool_calls_seq` 控制每轮是否返回工具调用。
-struct ScriptedLlm {
+pub(super) struct ScriptedLlm {
     /// (content, finish_reason, tool_calls) 序列，每次调用 pop 第一个。
     script: Arc<Mutex<Vec<(String, FinishReason, Vec<ToolCallInfo>)>>>,
     /// 记录每次请求携带的工具数量。
@@ -148,7 +148,7 @@ fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
     }
 }
 
-fn tool_call(name: &str, id: &str, args: &str) -> ToolCallInfo {
+pub(super) fn tool_call(name: &str, id: &str, args: &str) -> ToolCallInfo {
     ToolCallInfo {
         id: id.to_string(),
         name: name.to_string(),
@@ -161,7 +161,7 @@ fn tool_call(name: &str, id: &str, args: &str) -> ToolCallInfo {
     }
 }
 
-fn backend_with(
+pub(super) fn backend_with(
     script: Vec<(String, FinishReason, Vec<ToolCallInfo>)>,
 ) -> (Arc<ScriptedLlm>, Arc<Mutex<Vec<usize>>>) {
     let seen = Arc::new(Mutex::new(Vec::new()));

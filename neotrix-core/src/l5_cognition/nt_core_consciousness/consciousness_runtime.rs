@@ -87,36 +87,36 @@ pub struct ConsciousnessRuntime {
 }
 
 impl ConsciousnessRuntime {
-    /// ⭐⭐⭐ 2026-10-04：**在这里播种真实能力**（⭐⭐ 治「建成未用」）。
+    /// 2026-10-04：**在这里播种真实能力**（治「建成未用」）。
     ///
-    /// ⭐⭐⭐ **为什么必须放在构造函数，而不是调用点**（⭐⭐ 实测得来的事实）：
-    /// `ConsciousnessRuntime::new()` 有 ⭐⭐ **3 个生产调用点**
+    /// **为什么必须放在构造函数，而不是调用点**（实测得来的事实）：
+    /// `ConsciousnessRuntime::new()` 有 **3 个生产调用点**
     /// —— `nt_mind_background_loop/mod.rs:180`（常驻后台循环）、
     /// `nt_credit_stages.rs:465`（自迭代流水线）、
     /// `nt_audit.rs:590`（自测登记）。
-    /// ⇒ ⭐⭐ **在调用点播种就必然漏掉一处**，⭐⭐⭐ 而漏掉的那处会
-    /// ⭐⭐ 「静默地」拥有意识却**没有能力** ⇒ ⭐⭐ **涌现链断在最难发现的地方**。
-    /// ⇒ ⭐⭐ 构造函数是 ⭐⭐ **唯一必经点**（`Default` 也走它）。
+    /// ⇒ **在调用点播种就必然漏掉一处**， 而漏掉的那处会
+    /// 「静默地」拥有意识却**没有能力** ⇒ **涌现链断在最难发现的地方**。
+    /// ⇒ 构造函数是 **唯一必经点**（`Default` 也走它）。
     ///
-    /// ⭐⭐⭐ **接线前的实测状态**（⭐⭐ 不是推理）：
+    /// **接线前的实测状态**（不是推理）：
     /// `bootstrap_trade_capabilities` 的调用点只有它**自己测试里的两行**
-    /// （`:1075` / `:1089`）⇒ ⭐⭐⭐ **生产零调用**；而运行期注册表里
-    /// ⭐⭐ 唯一的生产 `register_node` 是 `observe_from_critique` 登记的
-    /// ⭐⭐ `consciousness::gap::q*` ⇒ ⭐⭐⭐ **注册表里只有「缺口」，没有「能力」**
-    /// ⭐⭐⭐ —— ⭐⭐**恰好是「知道自己不会」而没有「自己会」**。
+    /// （`:1075` / `:1089`）⇒ **生产零调用**；而运行期注册表里
+    /// 唯一的生产 `register_node` 是 `observe_from_critique` 登记的
+    /// `consciousness::gap::q*` ⇒ **注册表里只有「缺口」，没有「能力」**
+    /// —— **恰好是「知道自己不会」而没有「自己会」**。
     ///
-    /// ⭐⭐ **不因播种失败而 panic**：⭐⭐ 能力注册失败 ⛔ 不该让意识 runtime
-    /// 起不来 ⇒ ⭐⭐ `log::warn!`（⭐⭐ 与 `observe_from_critique` 的处置一致：
-    /// ⭐⭐⭐ **记录缺口不许反过来损害启动**）。
+    /// **不因播种失败而 panic**： 能力注册失败 ⛔ 不该让意识 runtime
+    /// 起不来 ⇒ `log::warn!`（与 `observe_from_critique` 的处置一致：
+    /// **记录缺口不许反过来损害启动**）。
     pub fn new() -> Self {
-        // ⭐⭐⭐⭐⭐ **金丝雀登记**（2026-10-04，吸收自 `plur` 的 `CapabilityCanary`）
-        // ⭐⭐⭐⭐⭐ ⭐⭐ **与播种同一个必经点** ⇒ ⭐⭐⭐⭐ 永远不会「播了种但没纳入监视」。
-        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **`fix` 字段是关键**（⭐⭐ ⭐⭐ 照 plur 的 `plur_doctor`
-        // ⭐⭐⭐⭐⭐ ⭐⭐ `remediation[]`）：⭐⭐⭐⭐⭐ 告警必须**可执行**，
-        // ⭐⭐⭐⭐⭐ ⭐⭐ 只说「它坏了」而不说「怎么修」，⭐⭐⭐⭐⭐ 这个门就会被关掉。
-        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ **登记 5 个**（⭐⭐ id 与 `bootstrap_trade_capabilities`
-        // ⭐⭐⭐⭐⭐ ⭐⭐ 里的 `const ID_*` **逐字一致** —— ⭐⭐⭐⭐⭐ 不一致会让
-        // ⭐⭐⭐⭐⭐ ⭐⭐ 反向核对（`expected_but_unregistered`）永远红）。
+        // **金丝雀登记**（2026-10-04，吸收自 `plur` 的 `CapabilityCanary`）
+        // **与播种同一个必经点** ⇒ 永远不会「播了种但没纳入监视」。
+        // **`fix` 字段是关键**（照 plur 的 `plur_doctor`
+        // `remediation[]`）： 告警必须**可执行**，
+        // 只说「它坏了」而不说「怎么修」， 这个门就会被关掉。
+        // **登记 5 个**（id 与 `bootstrap_trade_capabilities`
+        // 里的 `const ID_*` **逐字一致** —— 不一致会让
+        // 反向核对（`expected_but_unregistered`）永远红）。
         for (id, desc) in [
             ("NT-MEMORY::trade::trade_product_spec", "产品规格生成"),
             ("NT-MIND::trade::trade_quote_negotiation", "报价谈判"),
@@ -128,16 +128,16 @@ impl ConsciousnessRuntime {
                 neotrix_neobot::nt_capability_canary::CanaryCapability {
                     id: id.to_owned(),
                     description: desc.to_owned(),
-                    fix: "在生产派发处调 nt_capability_canary::signal（⭐⭐ ⛔ 不许在 register 或测试里打点）"
+                    fix: "在生产派发处调 nt_capability_canary::signal（⛔ 不许在 register 或测试里打点）"
                         .to_owned(),
                 },
             );
         }
 
-        // ⭐⭐⭐ 播种：⭐⭐ 幂等（重复调用 `newly=0`），⭐⭐ 故构造几次都安全
+        // 播种： 幂等（重复调用 `newly=0`）， 故构造几次都安全
         match bootstrap_trade_capabilities() {
             Ok(n) if n > 0 => log::debug!("[consciousness] 播种真实能力 {n} 个"),
-            Ok(_) => {} // ⭐ 已播种过 ⇒ 幂等静默
+            Ok(_) => {} // 已播种过 ⇒ 幂等静默
             Err(e) => log::warn!("[consciousness] 能力播种失败（不阻断启动）: {e}"),
         }
         Self {
@@ -329,17 +329,17 @@ impl ConsciousnessRuntime {
                 0.7 - quality,
                 "low_quality_critique",
             );
-            // ⭐⭐ 2026-10-03：**能力树运行期接线（第 1 步）**
+            // 2026-10-03：**能力树运行期接线（第 1 步）**
             //
             // 判据（`docs/architecture/EMERGENCE-ROADMAP-2026-10-03.md` §1）：
             //   **涌现 = 能力树在无人工干预下新增了节点，且该节点通过
             //   `audit-maturity --strict`。**
             //
-            // ⭐ **为什么挂在这里**：本分支是整个 runtime 里**唯一**「观察到自己做不好」
+            // **为什么挂在这里**：本分支是整个 runtime 里**唯一**「观察到自己做不好」
             // 的判据（`quality < 0.3`）⇒ 它就是「**缺口**」的可观测形式。
             // ⇒ 这是路线 §5 第 3 步「先发现自己不会，再造工具」的机器形态。
             //
-            // ⭐⭐ 为什么这样**不违反分层**：`nt_core_capability_registry` 落在
+            // 为什么这样**不违反分层**：`nt_core_capability_registry` 落在
             // `crates/neotrix-neobot/`，而 `neotrix-core/Cargo.toml:104` **依赖**
             // neotrix-neobot ⇒ L5 可以直接调它，而 `check-layer-deps.sh:36` 的
             // `SRC` 只扫 `neotrix-core/src` 内部的**相对层引用** ⇒ 不受影响。
@@ -353,25 +353,25 @@ impl ConsciousnessRuntime {
                 use neotrix_neobot::nt_capability_registry::register_node;
                 use nt_core_capability_tree::node::{CapabilityKind, CapabilityNode, Domain};
                 let mut node = CapabilityNode::new_primitive(
-                    // ⭐ id 含 quality 档位 ⇒ 同一档位只登记一个节点（注册是
+                    // id 含 quality 档位 ⇒ 同一档位只登记一个节点（注册是
                     // 幂等的），不同档位各一个 ⇒ 节点数随「缺口严重度」增长，
-                    // ⭐ 这正是 `neobot-check-emergence` 要盯的那个数。
+                    // 这正是 `neobot-check-emergence` 要盯的那个数。
                     format!("consciousness::gap::q{}", (quality * 100.0) as u64),
                     Domain::Mind,
                     vec!["consciousness.capability_gap".to_owned()],
                 );
-                // ⭐⭐⭐⭐⭐ **必须显式标成 `Gap`**（2026-10-05）。
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 缺陷：`new_primitive` 默认 `CapabilityKind::Skill`
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ （见 node.rs:345 的默认值及其理由）⇒ **意识自生的
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 缺口节点被标成了「技能」**。
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⇒ ⭐⭐ **一旦补上 `market.*` 元数据，它会被市场
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 当成一个可售插件上架** ⇒ ⭐⭐ 把「我还不会」
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 当成商品卖 ⭐⭐ ⭐⭐ 语义直接反了。
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 现在市场 `listable()` 靠 `market.*`
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 缺失把它挡住 ⇒ **这是偶然挡住，不是设计挡住**；
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 一旦有人批量补元数据就会漏出来。
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⇒ 显式声明，让「缺口不是插件」成为
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **类型层面的事实**而非元数据缺失的巧合。
+                // **必须显式标成 `Gap`**（2026-10-05）。
+                // 缺陷：`new_primitive` 默认 `CapabilityKind::Skill`
+                // （见 node.rs:345 的默认值及其理由）⇒ **意识自生的
+                // 缺口节点被标成了「技能」**。
+                // ⇒ **一旦补上 `market.*` 元数据，它会被市场
+                // 当成一个可售插件上架** ⇒ 把「我还不会」
+                // 当成商品卖 语义直接反了。
+                // 现在市场 `listable()` 靠 `market.*`
+                // 缺失把它挡住 ⇒ **这是偶然挡住，不是设计挡住**；
+                // 一旦有人批量补元数据就会漏出来。
+                // ⇒ 显式声明，让「缺口不是插件」成为
+                // **类型层面的事实**而非元数据缺失的巧合。
                 node.kind = CapabilityKind::Gap;
                 if let Err(e) = register_node(node) {
                     log::warn!("[consciousness] 能力缺口登记失败（不阻断自愈）: {e}");
@@ -632,11 +632,11 @@ mod tests {
         assert_eq!(cr.last_quality, 0.2);
     }
 
-    /// ⭐⭐⭐⭐ **「缺口不是插件」必须是类型事实，⭐⭐ 不是元数据缺失的巧合**
+    /// **「缺口不是插件」必须是类型事实， 不是元数据缺失的巧合**
     ///
-    /// ⭐⭐⭐⭐ **本测试必须能证伪**：⭐⭐ 若只断言「节点进了树」，⭐⭐ **删掉
-    /// ⭐⭐⭐⭐ `node.kind = CapabilityKind::Gap;` 后仍然全绿**（⭐⭐ 默认值 `Skill`
-    /// ⭐⭐⭐⭐ 照样能注册）⇒ **零证明力**。⇒ 这里断言的是 **kind 本身**。
+    /// **本测试必须能证伪**： 若只断言「节点进了树」， **删掉
+    /// `node.kind = CapabilityKind::Gap;` 后仍然全绿**（默认值 `Skill`
+    /// 照样能注册）⇒ **零证明力**。⇒ 这里断言的是 **kind 本身**。
     #[test]
     fn 意识自生的能力缺口被标成Gap而非Skill() {
         let mut cr = ConsciousnessRuntime::new();
@@ -664,24 +664,24 @@ mod tests {
         assert_eq!(
             kind,
             nt_core_capability_tree::node::CapabilityKind::Gap,
-            "⭐⭐ 意识自生的缺口被标成 {kind:?} ⇒ ⭐⭐ 补上 market.* 后它会被当成可售插件上架"
+            " 意识自生的缺口被标成 {kind:?} ⇒ 补上 market.* 后它会被当成可售插件上架"
         );
     }
 
-    /// ⭐⭐⭐⭐⭐ **元数据齐备也不能让缺口上架 ⭐⭐ 只要 `kind` 还是 `Gap`**
+    /// **元数据齐备也不能让缺口上架 只要 `kind` 还是 `Gap`**
     ///
-    /// ⭐⭐⭐⭐⭐ **本测试记录的是一个真事实，⭐⭐ 而不是我以为的设计。**
-    /// ⭐⭐⭐⭐⭐ 2026-10-05 我先写成「就算把 kind 标错成 Skill 并补齐 license/version，
-    /// ⭐⭐⭐⭐⭐ 市场也必须排除它」⭐⭐⭐⭐⭐ **测试当场红了** ⭐⭐⭐⭐⭐
-    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 输出显示 `consciousness::gap::q20` **真的进了市场清单**。
-    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐⭐ **真相**：市场的唯一判据是
-    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ `MarketEntry::is_listable()` ⭐⭐⭐⭐⭐ ⭐⭐ 它只看
-    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ `kind.is_marketable() && license && version`
-    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⇒ ⭐⭐ **kind 一旦被标错，元数据救不了它，也拦不住它。**
-    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **⇒ 「缺口不是插件」是单点防线，
-    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 不是「标对 + 市场兜底」两层。**
-    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 这正是上一条测试不可省的原因
-    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ —— ⭐⭐ **它守的是整个防线本身。**
+    /// **本测试记录的是一个真事实， 而不是我以为的设计。**
+    /// 2026-10-05 我先写成「就算把 kind 标错成 Skill 并补齐 license/version，
+    /// 市场也必须排除它」 **测试当场红了** 
+    /// 输出显示 `consciousness::gap::q20` **真的进了市场清单**。
+    /// ⇒ **真相**：市场的唯一判据是
+    /// `MarketEntry::is_listable()` 它只看
+    /// `kind.is_marketable() && license && version`
+    /// ⇒ **kind 一旦被标错，元数据救不了它，也拦不住它。**
+    /// **⇒ 「缺口不是插件」是单点防线，
+    /// 不是「标对 + 市场兜底」两层。**
+    /// 这正是上一条测试不可省的原因
+    /// —— **它守的是整个防线本身。**
     #[test]
     fn 缺口即便license与version齐备也进不了市场() {
         use nt_core_capability_tree::node::CapabilityKind;
@@ -699,7 +699,7 @@ mod tests {
             temporal_delta: Some(0.0),
         });
 
-        // ⭐⭐ 补齐**全部**市场元数据（⭐⭐ 故意不改 kind ⇒ 保持 Gap）
+        // 补齐**全部**市场元数据（故意不改 kind ⇒ 保持 Gap）
         neotrix_neobot::nt_capability_registry::with_registry(|reg| {
             let n = reg
                 .get_mut(gap_id)
@@ -735,22 +735,22 @@ mod tests {
 
         assert!(
             !listable.iter().any(|id| id == gap_id),
-            "⭐⭐ 元数据齐备的缺口节点仍进了市场清单：{listable:?}"
+            " 元数据齐备的缺口节点仍进了市场清单：{listable:?}"
         );
-        // ⭐⭐⭐⭐⭐ **更强的断言**：⭐⭐⭐⭐⭐ 它必须带着「因为它是缺口」的理由
-        // ⭐⭐⭐⭐⭐ 出现在 blocked 里 ⭐⭐⭐⭐⭐ ⇒ ⭐⭐ **不能从市场视图里静默消失**
-        // ⭐⭐⭐⭐⭐ （⭐⭐ 消失比「被拒绝」更坏 ⭐⭐ —— 那就是「不可见」）
+        // **更强的断言**： 它必须带着「因为它是缺口」的理由
+        // 出现在 blocked 里 ⇒ **不能从市场视图里静默消失**
+        // （消失比「被拒绝」更坏 —— 那就是「不可见」）
         let reason = blocked
             .iter()
             .find(|(id, _)| id == gap_id)
             .map(|(_, why)| why.clone())
-            .expect("⭐⭐ 缺口节点既不在清单也不在 blocked ⇒ 它从市场视图里**消失**了（最坏形态）");
+            .expect(" 缺口节点既不在清单也不在 blocked ⇒ 它从市场视图里**消失**了（最坏形态）");
         assert!(
             reason.contains("缺口") || reason.contains("Gap"),
-            "⭐⭐ blocked 理由应指向「它是缺口」，实际：{reason}"
+            " blocked 理由应指向「它是缺口」，实际：{reason}"
         );
 
-        // ⭐⭐ 清理（⭐⭐ 测试共享进程级注册表，⭐⭐ 残留会污染别处断言）
+        // 清理（测试共享进程级注册表， 残留会污染别处断言）
         neotrix_neobot::nt_capability_registry::with_registry(|reg| {
             if let Some(n) = reg.get_mut(gap_id) {
                 n.kind = CapabilityKind::Gap;
@@ -1065,10 +1065,10 @@ mod tests {
     }
 }
 
-/// ⭐⭐⭐ 按**拓扑序**把 trade 域的真实能力灌进运行期能力树。
+/// 按**拓扑序**把 trade 域的真实能力灌进运行期能力树。
 ///
-/// ## ⭐ 为什么住在 `neotrix-core` 而不是 `neotrix-neobot`
-/// ⭐⭐ **依赖方向是 `neotrix-core` → `neotrix-neobot`**（实测
+/// ## 为什么住在 `neotrix-core` 而不是 `neotrix-neobot`
+/// **依赖方向是 `neotrix-core` → `neotrix-neobot`**（实测
 /// `neotrix-core/Cargo.toml:104`）⇒ **反向不可行**：
 /// `neotrix-neobot` 引用 `neotrix-core` 会构成**循环依赖**。
 /// ⇒ 而本文件**同时**能看见两侧：`crate::…`（本 crate 的注册者）
@@ -1080,7 +1080,7 @@ mod tests {
 /// ⇒ 涌现判据虽然通了（意识会自生 `consciousness::gap::q*` 节点），
 /// 但那些节点**不是系统真实能力的目录**。
 ///
-/// ## ⭐⭐ 拓扑序是**实测得来**的，不是猜的
+/// ## 拓扑序是**实测得来**的，不是猜的
 /// 读各节点 `CapabilityNode::new_*` 的 `requires` 得到 4 层 DAG：
 /// ```text
 /// trade_product_spec        requires=[]                                  ← 根
@@ -1097,26 +1097,26 @@ mod tests {
 /// ## ⛔⛔ 为什么**必须有断言**（本函数最容易踩的坑）
 /// `CapabilityTreeRegistry::register()` 对**已存在的 id** 返回
 /// `RegistryError::AlreadyExists`（实测 `registry.rs:169-171`），
-/// 而 ⭐ `register_node()` 把 `AlreadyExists` **幂等化为 `Ok(())`**。
-/// ⇒ ⭐⭐ **若拓扑序写错（本该在后面的节点被提前注册），
+/// 而 `register_node()` 把 `AlreadyExists` **幂等化为 `Ok(())`**。
+/// ⇒ **若拓扑序写错（本该在后面的节点被提前注册），
 /// 依赖不满足时 `register` 仍可能成功，而本函数若不检查返回值就会静默通过。**
 /// ⇒ 因此这里对**每个节点都断言 `is_ok()`**，且**额外验证依赖已被满足**。
 ///
 /// # Errors
 /// · 注册表锁投毒（`with_registry`）
-/// · 任一节点注册返回 `AlreadyExists` ⇒ ⭐ **说明拓扑序错或被重复 bootstrap**
-/// ⭐⭐⭐⭐ 按**拓扑序**把 trade 域的真实能力灌进运行期能力树（**幂等**）。
+/// · 任一节点注册返回 `AlreadyExists` ⇒ **说明拓扑序错或被重复 bootstrap**
+/// 按**拓扑序**把 trade 域的真实能力灌进运行期能力树（**幂等**）。
 ///
 /// ## 为什么需要它（2026-10-03 实测，`EMERGENCE-ROADMAP-2026-10-03.md` 附录 A）
 /// 仓里有 5 个 `register_xxx_capability(registry: &mut CapabilityTreeRegistry)`，
 /// ⛔ 而**全工作区零个生产调用方** ⇒ **启动时能力树是空的**。
 ///
-/// ## ⭐⭐⭐ 为什么必须**按 id 预检**（本函数第一版最大的坑，由测试抓出）
-/// 第一版直接顺序调用 5 个 registrar，⭐ **两条测试当场炸出**：
-/// ⭐ 根因（当时实测 5 个 registrar **全部**如此）：它们都写成
+/// ## 为什么必须**按 id 预检**（本函数第一版最大的坑，由测试抓出）
+/// 第一版直接顺序调用 5 个 registrar， **两条测试当场炸出**：
+/// 根因（当时实测 5 个 registrar **全部**如此）：它们都写成
 /// `registry.register(node).expect("Failed to register …")`
-/// ⇒ ⭐ **对已存在的 id 会 `panic!`**，而 **panic 会毒化注册表的 `Mutex`**
-/// ⇒ 第二次调用直接拿到 `poisoned lock` ⇒ ⭐ **bootstrap 完全不幂等**。
+/// ⇒ **对已存在的 id 会 `panic!`**，而 **panic 会毒化注册表的 `Mutex`**
+/// ⇒ 第二次调用直接拿到 `poisoned lock` ⇒ **bootstrap 完全不幂等**。
 /// 该 panic **已实际发生过一次**，原文记录于
 /// `EMERGENCE-WIRING-DEFECT-2026-10-03.md`。
 ///
@@ -1130,7 +1130,7 @@ mod tests {
 ///    第一道是 registrar 自身的 `?` 传播。保留 `already()` 的理由变了——
 ///    现在是为了让重复 bootstrap 保持 `newly = 0`（合法），而非报错。
 ///
-/// ## ⭐⭐ 拓扑序是**实测得来**的，不是猜的
+/// ## 拓扑序是**实测得来**的，不是猜的
 /// ```text
 /// trade_product_spec        requires=[]                                  ← 根
 ///     ↓
@@ -1145,9 +1145,9 @@ mod tests {
 ///
 /// # Errors
 /// · 注册表锁投毒
-/// · 任一节点在注册后**回查不到** ⇒ ⭐ 说明拓扑序或注册实现有问题
+/// · 任一节点在注册后**回查不到** ⇒ 说明拓扑序或注册实现有问题
 pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
-    // ⭐⭐⭐⭐⭐ 市场元数据需要的类别（⭐⭐⭐⭐⭐ 2026-10-04）
+    // 市场元数据需要的类别（2026-10-04）
     use crate::l1_action::nt_act::nt_act_trade::capability_registry::TradeCategory;
     use crate::l1_action::nt_act::nt_act_trade::{
         register_finance_compliance_capability, register_production_logistics_capability,
@@ -1157,15 +1157,15 @@ pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
     use nt_core_capability_tree::node::CapabilityNode;
     use nt_core_capability_tree::registry::CapabilityTreeRegistry;
 
-    /// ⭐⭐ 实测得到的节点 id（与各 registrar 内部硬编码的字符串一致）。
-    /// ⛔ 若上游改了 id，这里会**静默跳过** ⇒ ⭐ 故 `expected` 断言校验总数。
+    /// 实测得到的节点 id（与各 registrar 内部硬编码的字符串一致）。
+    /// ⛔ 若上游改了 id，这里会**静默跳过** ⇒ 故 `expected` 断言校验总数。
     const ID_PRODUCT_SPEC: &str = "NT-MEMORY::trade::trade_product_spec";
     const ID_QUOTE: &str = "NT-MIND::trade::trade_quote_negotiation";
     const ID_LOGISTICS: &str = "NT-MIND::trade::trade_production_logistics";
     const ID_FINANCE: &str = "NT-MIND::trade::trade_finance_compliance";
     const ID_FULL_CYCLE: &str = "NT-MIND::trade::foreign_trade_full_cycle";
 
-    /// ⭐ 已注册则跳过。
+    /// 已注册则跳过。
     /// ⛔ 2026-10-03 起这**不再是**唯一手段：5 个 registrar 已改用 `?` 传播
     ///    `RegistryError`（`AlreadyExists` / `CircularDependency`），**不再 panic**。
     ///    但 `already()` 仍保留：它让重复 bootstrap 保持 `newly=0`（合法）而非报错。
@@ -1173,7 +1173,7 @@ pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
         reg.nodes.contains_key(id)
     }
 
-    /// ⭐ 注册后回查 —— **常开校验**。
+    /// 注册后回查 —— **常开校验**。
     /// ⛔ 2026-10-02 起此处是 `debug_assert!`，**release 构建会被编译掉**
     ///    ⇒ 「注册了但没生效」在生产环境无人发现。
     /// ⛔ 2026-10-03 改为调用点 `?` 传播：既**常开**，又**不 panic**（返回 `Err`）。
@@ -1188,23 +1188,23 @@ pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
         if !reg.nodes.contains_key(&node.id) {
             return Err(format!("{step}: 节点 {} 未出现在注册表中", node.id));
         }
-        // ⭐⭐⭐⭐⭐ **顺带补齐市场元数据**（⭐⭐⭐⭐⭐ 2026-10-04）。
+        // **顺带补齐市场元数据**（2026-10-04）。
         //
-        // ⭐⭐⭐⭐⭐ **为什么挑这个函数当改动点**（⭐⭐⭐⭐⭐ 三个理由，全部可核）：
-        // ① ⭐⭐⭐⭐⭐ **每个 registrar 必经** ⇒ ⭐⭐ 不会漏掉任何一个
-        //    （⭐⭐ ⛔ 改 5 个 registrar = 5 个文件的侵入，⭐⭐ 且必有一处漏）
-        // ② ⭐⭐⭐⭐⭐ 它**本来就是校验点** ⇒ ⭐⭐ ⭐⭐ 在「必须被回查」的位置
-        //    顺手把「必须可上架」也补上，⭐⭐⭐⭐⭐ ⭐⭐ **语义同源**：
-        //    ⭐⭐⭐⭐⭐ 「登记了」与「能被人找到」是**同一个承诺的两半**
-        // ③ ⭐⭐⭐⭐⭐ ⭐⭐ **幂等**：⭐⭐ 每次 bootstrap 都重写同样的值
-        //    ⇒ ⭐⭐⭐⭐⭐ ⭐⭐ **可重复执行**，⭐⭐ ⭐⭐ 且**版本号一处升版即全生效**
-        //    （⭐⭐⭐⭐⭐ 这正是「市场元数据集中在一处」的全部收益）。
+        // **为什么挑这个函数当改动点**（三个理由，全部可核）：
+        // ① **每个 registrar 必经** ⇒ 不会漏掉任何一个
+        // （⛔ 改 5 个 registrar = 5 个文件的侵入， 且必有一处漏）
+        // ② 它**本来就是校验点** ⇒ 在「必须被回查」的位置
+        // 顺手把「必须可上架」也补上， **语义同源**：
+        // 「登记了」与「能被人找到」是**同一个承诺的两半**
+        // ③ **幂等**： 每次 bootstrap 都重写同样的值
+        // ⇒ **可重复执行**， 且**版本号一处升版即全生效**
+        // （这正是「市场元数据集中在一处」的全部收益）。
         //
-        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **⚠️ 为什么重复 bootstrap 也要补**：
-        // ⭐⭐⭐⭐⭐ ⭐⭐ 上面的 `already(...)` 分支会跳过 registrar，
-        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐ 若只在首次登记时打标，⭐⭐⭐⭐⭐⭐⭐
-        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **升级版本号后老进程里的节点永远不会更新** ⭐⭐⭐⭐⭐
-        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ ⇒ 放在回查处 ⇒ ⭐⭐⭐⭐⭐ **每次都刷**。
+        // **⚠️ 为什么重复 bootstrap 也要补**：
+        // 上面的 `already(...)` 分支会跳过 registrar，
+        // 若只在首次登记时打标，
+        // **升级版本号后老进程里的节点永远不会更新** 
+        // ⇒ 放在回查处 ⇒ **每次都刷**。
         let patched = {
             let n = reg
                 .nodes
@@ -1217,32 +1217,19 @@ pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
             );
             n.clone()
         };
-        // ⭐⭐⭐⭐⭐ 打标后**立刻回查市场元数据** ⇒ ⭐⭐ 「打标没生效」当场变红，
-        // ⭐⭐⭐⭐⭐ ⭐⭐ 而不是等某天有人打开市场才发现。
-        // ⭐⭐⭐⭐⭐⭐⭐ **⚠️⭐⭐⭐⭐⭐ 这里曾经返回 `Err` ⇒⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
-        // ⭐⭐⭐⭐⭐⭐⭐ **变异测试抓到的真设计缺陷**（⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 2026-10-04，⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐ 摘掉一个
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ `market.license` 键 ⇒ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 打标校验失败
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ **bootstrap 整体中断**
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐ **其余 4 个能力从未注册**。
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⇒ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ **「能力可用性」被「市场元数据」绑架了**
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ **而这是两种不同的事**：
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐ 「能力**注册成功**」（⭐⭐⭐⭐⭐⭐ 系统能力）
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐ vs「能力**可上架**」（⭐⭐⭐⭐⭐⭐ 市场状态）。
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐ **缺 license ⭐⭐ 应该是「上架不了」，
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐ **不是「能力没了」**。
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 判红：⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 「这个能力不可上架」⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 是**市场状态**，
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 由 ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ `market_unlisted`（⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ **持续暴露** ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐，
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
-        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
+        // 打标后立刻回查市场元数据，让「打标没生效」当场变红，而不是等某天
+        // 有人打开市场才发现。
+        //
+        // 这里曾经 return Err，是变异测试抓到的真设计缺陷（2026-10-04）：
+        // 抽掉一个 market.license 键 -> 打标校验失败 -> bootstrap 整体中断
+        // -> 其余 4 个能力从未注册。即「能力可用性」被「市场元数据」绑架了。
+        //
+        // 而这是两种不同的事：
+        //   - 能力「注册成功」（系统能力）
+        //   - 能力「可上架」（市场状态）
+        // 缺 license 应该是「上架不了」，不是「能力没了」。判红交给探针的
+        // market_unlisted 持续暴露，不在这里 return Err。
+
         if let Err(why) = crate::l1_action::nt_act::nt_act_trade::capability_registry::assert_market_ready(&patched, step) {
             log::warn!("[consciousness] {step}: 能力已注册但**不可上架**：{why}");
         }
@@ -1253,7 +1240,7 @@ pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
         let mut newly = 0usize;
 
         // ① 根：trade_product_spec（requires=[]）
-        //    ⭐ 它住在 l4_emotion/nt_memory/，与其它 4 个（l1_action/nt_act/nt_act_trade/）
+        // 它住在 l4_emotion/nt_memory/，与其它 4 个（l1_action/nt_act/nt_act_trade/）
         //    **不同模块路径**。
         if !already(reg, ID_PRODUCT_SPEC) {
             let n =
@@ -1296,9 +1283,9 @@ pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
         Ok((reg.nodes.len(), newly))
     })??;
 
-    // ⭐⭐ 用「本次新增数」而非「总数」当失败信号 —— ⭐ 因为**锁投毒/回查失败**
+    // 用「本次新增数」而非「总数」当失败信号 —— 因为**锁投毒/回查失败**
     // 都会让 newly 达不到 5，而重复调用则 newly=0（**合法**，不是失败）。
-    // ⭐ 故只在「部分成功」时报警（0 < newly < 5 ⇒ 有 registrar 没生效）。
+    // 故只在「部分成功」时报警（0 < newly < 5 ⇒ 有 registrar 没生效）。
     if newly > 0 && newly < 5 {
         return Err(format!(
             "bootstrap 部分成功：新增 {newly}/5 个节点 ⇒ 有 registrar 未生效（拓扑序或 id 不符）"
@@ -1324,10 +1311,10 @@ mod capability_bootstrap_tests {
             .expect("with_registry 不应锁投毒")
     }
 
-    /// ⭐⭐ **接线核心判据**：按拓扑序 bootstrap 后，**真实能力**
+    /// **接线核心判据**：按拓扑序 bootstrap 后，**真实能力**
     /// （而非意识自生的 `consciousness::gap::q*`）必须出现在注册表里。
     ///
-    /// ⭐⭐ 断言用「逐个查树」而非「节点数 +5」：测试**并行跑**且注册表是
+    /// 断言用「逐个查树」而非「节点数 +5」：测试**并行跑**且注册表是
     /// **进程全局**的 ⇒ 数增量会被别的测试搅动（本日已在
     /// `nt_capability_registry` 上踩过一次：`left: 2, right: 1`）。
     #[test]
@@ -1338,9 +1325,9 @@ mod capability_bootstrap_tests {
         }
     }
 
-    /// ⭐⭐ **幂等回归**（本轮真实 bug 的守门测试）
+    /// **幂等回归**（本轮真实 bug 的守门测试）
     ///
-    /// 第一版直接顺序调用 5 个 registrar，⭐ **测试当场炸出**：
+    /// 第一版直接顺序调用 5 个 registrar， **测试当场炸出**：
     /// `panicked at nt_trade_product_spec.rs:955: … AlreadyExists(…)`
     /// ⇒ 上游 5 个 registrar **全部**是 `.expect()` ⇒ **重复调用必 panic**，
     /// 且 panic **毒化 Mutex** ⇒ 第二次直接 `poisoned lock`。
@@ -1360,28 +1347,28 @@ mod capability_bootstrap_tests {
 mod capability_seeding_tests {
     use super::*;
 
-    /// ⭐⭐⭐⭐ **本测试的唯一目的：让「播种回退」立刻变红。**
+    /// **本测试的唯一目的：让「播种回退」立刻变红。**
     ///
-    /// ⭐⭐⭐ **它必须能证伪**（⭐⭐ 本轮刚吃过教训）：⭐⭐ 若断言写成
-    /// 「`bootstrap_trade_capabilities()` 返回 Ok」⇒ ⭐⭐ **它在播种被删掉后
-    /// ⭐⭐ 仍然全绿**（⭐⭐ 因为可以直接调那个函数）⇒ ⭐⭐ **零证明力**。
-    /// ⇒ ⭐⭐ 这里断言的是 ⭐⭐ **「构造 runtime 这个动作本身**」**播种了节点**。
+    /// **它必须能证伪**（本轮刚吃过教训）： 若断言写成
+    /// 「`bootstrap_trade_capabilities()` 返回 Ok」⇒ **它在播种被删掉后
+    /// 仍然全绿**（因为可以直接调那个函数）⇒ **零证明力**。
+    /// ⇒ 这里断言的是 **「构造 runtime 这个动作本身**」**播种了节点**。
     ///
-    /// ⭐⭐ 判据用「节点是否已存在」⭐⭐ 而非「调用返回什么」——
-    /// ⭐⭐ 前者 ⭐⭐ **只能由构造路径满足**。
+    /// 判据用「节点是否已存在」 而非「调用返回什么」——
+    /// 前者 **只能由构造路径满足**。
     #[test]
     fn 构造runtime就会播种真实能力_而不是只有缺口() {
-        // ⭐⭐ 先直接确认这些节点此刻**不存在**（若存在 ⇒ 测试无区分力，
-        // ⭐⭐ ⛔ 因为别的测试可能已播种过 ⇒ 必须如实说明而不是硬绿）
+        // 先直接确认这些节点此刻**不存在**（若存在 ⇒ 测试无区分力，
+        // ⛔ 因为别的测试可能已播种过 ⇒ 必须如实说明而不是硬绿）
         let already = neotrix_neobot::nt_capability_registry::with_registry(|reg| {
             reg.nodes.contains_key("NT-MEMORY::trade::trade_product_spec")
         })
         .expect("注册表锁");
         if already {
-            eprintln!("ℹ️ 节点已由更早的构造播种（进程级注册表）⇒ ⭐⭐ 本次只断言它**存在**");
+            eprintln!("ℹ️ 节点已由更早的构造播种（进程级注册表）⇒ 本次只断言它**存在**");
         }
 
-        // ⭐⭐⭐ **关键动作**：⭐⭐ 走**构造函数**这条真实路径
+        // **关键动作**： 走**构造函数**这条真实路径
         let _rt = ConsciousnessRuntime::new();
 
         let present = neotrix_neobot::nt_capability_registry::with_registry(|reg| {
@@ -1399,31 +1386,59 @@ mod capability_seeding_tests {
 
         assert!(
             present,
-            "⭐⭐⭐ 构造 `ConsciousnessRuntime` 后真实能力节点**仍缺失** ⇒ \
-             ⭐⭐⭐ **播种没发生**（or 被删）⇒ ⭐⭐ 涌现链断在这里"
+            " 构造 `ConsciousnessRuntime` 后真实能力节点**仍缺失** ⇒ \
+              **播种没发生**（or 被删）⇒ 涌现链断在这里"
         );
     }
 
-    /// ⭐⭐⭐⭐⭐ **运行期探针**（⭐⭐ 涌现门 `neobot-check-emergence.mjs` 亲自指出的
-    /// 「路线 §5 第 2 步」，⭐⭐ 本轮实现）。
+    /// **运行期探针**（涌现门 `neobot-check-emergence.mjs` 亲自指出的
+    /// 「路线 §5 第 2 步」， 本轮实现）。
     ///
-    /// ⭐⭐⭐ **为什么必须有它**：⭐⭐ 涌现门是**静态**门（吃源码文本），
-    /// ⭐⭐⭐ 所以它 ⭐⭐ **永远只能报 `COLD_START`** ——
-    /// ⭐⭐⭐ 「接线在位，但**拿不到运行期节点数**」。
-    /// ⇒ ⭐⭐ 「节点数是否增长」⭐⭐⭐ **至今无法判定** ⇒ 静态门全绿
-    /// ⭐⭐⭐ **不等于能力真的长出来了**。
+    /// **为什么必须有它**： 涌现门是**静态**门（吃源码文本），
+    /// 所以它 **永远只能报 `COLD_START`** ——
+    /// 「接线在位，但**拿不到运行期节点数**」。
+    /// ⇒ 「节点数是否增长」 **至今无法判定** ⇒ 静态门全绿
+    /// **不等于能力真的长出来了**。
     ///
-    /// ⭐⭐⭐ **契约（⛔ 请勿改动输出格式）**：打印**单行** `EMERGENCE_PROBE`
-    /// ⭐⭐ JSON，⭐⭐ 门按此解析。⭐⭐ 格式变了门会解析失败 ⇒ ⭐⭐ **门会立刻发现**
-    /// ⭐⭐ （⭐⭐ 而门设计成「解析不到 ⇒ FAIL」，⭐⭐ ⛔ 不静默放过）。
+    /// **契约（⛔ 请勿改动输出格式）**：打印**单行** `EMERGENCE_PROBE`
+    /// JSON， 门按此解析。 格式变了门会解析失败 ⇒ **门会立刻发现**
+    /// （而门设计成「解析不到 ⇒ FAIL」， ⛔ 不静默放过）。
     #[test]
     fn 运行期探针_打印真实节点数与能力清单() {
-        // ⭐⭐ 走**构造函数**这条真实路径（⭐⭐ 而不是直接调 bootstrap，
-        // ⭐⭐ 否则探针就成了自证）
+        // 走**构造函数**这条真实路径（而不是直接调 bootstrap，
+        // 否则探针就成了自证）
         let _rt = ConsciousnessRuntime::new();
+        // 市场清单由「市场自己报」，不由门去推断。由门推断就会重犯
+        // 「canary 是监视集合、不是市场集合」的错，上一次就是这么把分母算成 10 的。
+        let (market_listable, market_unlisted): (Vec<String>, Vec<String>) =
+            neotrix_neobot::nt_capability_registry::with_registry(|reg| {
+                let listed_ids: Vec<String> =
+                    neotrix_neobot::nt_capability_market::listable(reg)
+                        .into_iter()
+                        .map(|e| e.id)
+                        .collect();
+                let blocked_ids: Vec<String> =
+                    neotrix_neobot::nt_capability_market::blocked(reg)
+                        .into_iter()
+                        .map(|(id, _)| id)
+                        .collect();
+                let mut listed_sorted = listed_ids;
+                listed_sorted.sort();
+                listed_sorted.dedup();
+                // 未上架 = 被拦的 - 已上架。
+                let mut diff: Vec<String> = blocked_ids
+                    .into_iter()
+                    .filter(|id| !listed_sorted.contains(id))
+                    .collect();
+                diff.sort();
+                diff.dedup();
+                (listed_sorted, diff)
+            })
+            .unwrap_or_default();
+
         let ids = neotrix_neobot::nt_capability_registry::with_registry(|reg| {
             let mut v: Vec<String> = reg.nodes.keys().cloned().collect();
-            v.sort(); // ⭐⭐ 排序 ⇒ 输出确定 ⇒ 门可稳定比对
+            v.sort(); // 排序 ⇒ 输出确定 ⇒ 门可稳定比对
             v
         })
         .expect("注册表锁");
@@ -1434,21 +1449,21 @@ mod capability_seeding_tests {
             .filter(|k| k.starts_with("consciousness::gap::"))
             .count();
         let findings = neotrix_neobot::nt_capability_registry::maturity_findings();
-        // ⭐⭐⭐ 涌现指纹（2026-10-05 接入）：能力树当前状态的可复现单值摘要。
-        //   ⭐ 计数不足以判定涌现 ——「数量不变但节点被换掉」计数完全看不见。
-        //   ⭐ 判据抄 `rust-alert/ra2.exe` `tests/engine/persistence/digest.rs:8-61`
+        // 涌现指纹（2026-10-05 接入）：能力树当前状态的可复现单值摘要。
+        // 计数不足以判定涌现 ——「数量不变但节点被换掉」计数完全看不见。
+        // 判据抄 `rust-alert/ra2.exe` `tests/engine/persistence/digest.rs:8-61`
         //     的**同进程双胞胎差分**（该仓全仓无 golden hash，`rg EXPECTED_HASH`=0 命中）。
         //   ⚠️ 纠错记录：注册表 `nodes` 是 `IndexMap`（插入序，本就确定），
         //     故摘要前的排序**不是**在修现存 bug，而是让「可复现」不依赖
         //     「某字段恰好是插入序映射」这一实现细节（换容器也不会静默漂移）。
         //   ⛔ 锁投毒 ⇒ 显式记 `null`，绝不让「无法测量」长得像「空树」。
         let digest = neotrix_neobot::nt_capability_registry::capability_digest().ok();
-        // ⭐⭐⭐⭐ 「注册了但没调用」清单（⭐⭐ **三家对标仓库全都没有**）。
-        // ⭐⭐⭐ 这是 backburner「三段式能力播报」的第三段：⭐⭐ 消费者据此判断
-        // ⭐⭐ 「注册了」与「被用了」**是不是同一件事**。
-        // ⭐⭐ ⛔ 只报告 ⭐⭐ **不阻断**（照 lcu `tested.py` 的
-        // ⭐⭐ 「Informational, never refuses」原则）—— ⭐⭐ 因为
-        // ⭐⭐ 「本次进程该调用几次」**没有可证伪的定义**，⭐⭐ 阻断它就是造假。
+        // 「注册了但没调用」清单（**三家对标仓库全都没有**）。
+        // 这是 backburner「三段式能力播报」的第三段： 消费者据此判断
+        // 「注册了」与「被用了」**是不是同一件事**。
+        // ⛔ 只报告 **不阻断**（照 lcu `tested.py` 的
+        // 「Informational, never refuses」原则）—— 因为
+        // 「本次进程该调用几次」**没有可证伪的定义**， 阻断它就是造假。
         let never_invoked =
             neotrix_neobot::nt_capability_registry::registered_never_invoked().unwrap_or_default();
         let invoked_counts: Vec<serde_json::Value> = ids
@@ -1460,42 +1475,6 @@ mod capability_seeding_tests {
                 })
             })
             .collect();
-
-        // ⭐⭐⭐⭐⭐ **市场未上架清单**（⭐⭐⭐⭐⭐ 治「静默消失」）。
-        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 为什么必须单独算：⭐⭐⭐⭐⭐ 市场 `listable()` **只返回
-        // ⭐⭐⭐⭐⭐ ⭐⭐ 可上架的** ⇒ ⭐⭐⭐⭐⭐ 没填 `market.*` 的**从视图里彻底消失**。
-        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 本仓 **83 处**构造点里只有 5 个填了 ⭐⭐⭐⭐⭐ ⇒
-        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **78 处会静默消失** ⇒ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐
-        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 「不可见」又回来了（⭐⭐ 与本轮治的病同型）。
-        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⚠️ 实现纪律：⭐⭐ **`json!` ⭐⭐ 不接受
-        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 值位置的裸语句块**（⭐⭐ 我第一版写成
-        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ `"k": { let x = …; x }` ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
-        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⇒ 编译错「comparison operators cannot be chained」
-        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐）⇒ ⭐⭐ **先算成变量，再放进 json**。
-        let (market_listable, market_unlisted): (Vec<String>, Vec<String>) =
-            neotrix_neobot::nt_capability_registry::with_registry(|reg| {
-                let blocked_ids: Vec<String> =
-                    neotrix_neobot::nt_capability_market::blocked(reg)
-                        .into_iter()
-                        .map(|(id, _)| id)
-                        .collect();
-                let listed_ids: Vec<String> =
-                    neotrix_neobot::nt_capability_market::listable(reg)
-                        .into_iter()
-                        .map(|e| e.id)
-                        .collect();
-                let mut listed_sorted = listed_ids;
-                listed_sorted.sort();
-                listed_sorted.dedup();
-                let mut diff: Vec<String> = blocked_ids
-                    .into_iter()
-                    .filter(|id| !listed_sorted.contains(id))
-                    .collect();
-                diff.sort();
-                diff.dedup();
-                (listed_sorted, diff)
-            })
-            .unwrap_or_default();
         println!(
             "EMERGENCE_PROBE {}",
             serde_json::json!({
@@ -1505,14 +1484,14 @@ mod capability_seeding_tests {
                 "digest": digest,
                 "ids": ids,
                 "maturity_findings": findings,
-                // ⭐⭐⭐ 新增（backburner 三段式的第 3 段）
+                // backburner 三段式的第 3 段
                 "never_invoked": never_invoked,
                 "invoked_counts": invoked_counts,
-                // ⭐⭐⭐⭐⭐ **金丝雀快照**（⭐⭐ 第 4 段：⭐⭐ **「有没有被用」的健康判定**）
-                // ⭐⭐⭐⭐⭐ ⭐⭐ 与 `never_invoked`（累计计数）的区别：
-                // ⭐⭐⭐⭐⭐ ⭐⭐ ⭐⭐ `never_invoked` 答「历史上调用过几次」；
-                // ⭐⭐⭐⭐⭐ ⭐⭐ ⭐⭐ 金丝雀答「**在当前观察窗口内**它到底活不活」，
-                // ⭐⭐⭐⭐⭐ ⭐⭐ ⭐⭐ 且 ⭐⭐⭐ **冷启动期不判红**（⭐⭐⭐ 关键性质）。
+                // 金丝雀快照（第 4 段：「有没有被用」的健康判定）。
+                // 与 never_invoked（累计计数）的区别：never_invoked 答
+                // 「历史上调用过几次」；金丝雀答「在当前观察窗口内它到底活不活」，
+                // 且冷启动期不判红（关键性质 —— 缺这一项任何刚启动的进程都会被
+                // 判红，然后这个门就会被整体关掉，比没有门更坏）。
                 "canary": neotrix_neobot::nt_capability_canary::status()
                     .unwrap_or_default()
                     .iter()
@@ -1524,20 +1503,15 @@ mod capability_seeding_tests {
                     }))
                     .collect::<Vec<_>>(),
                 "canary_ticks": neotrix_neobot::nt_capability_canary::window_ticks(),
-                // ⭐⭐⭐ 反向核对：⭐⭐ **登记了却不在能力树里** ⭐⭐ ⇒ 第三种状态
-                // ⭐⭐⭐⭐⭐ **市场未上架清单**（⭐⭐⭐⭐⭐ 治「静默消失」）。
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 为什么必须单独输出：⭐⭐⭐⭐⭐
-                // ⭐⭐⭐⭐⭐ 市场 `listable()` **只返回可上架的** ⇒ ⭐⭐⭐⭐⭐
-                // ⭐⭐⭐⭐⭐ ⭐⭐ **没填 `market.*` 的会从视图里彻底消失**。
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 而本仓 **83 处**构造点里只有 5 个填了
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ ⇒ ⭐⭐⭐⭐⭐ **78 处会静默消失**
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **「不可见」又回来了**
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ （与本轮一路治的病**完全同型**）。
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 所以这里 ⭐⭐ **显式算出差集**，
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 让市场清单门能打出「还差多少」。
-                // ⭐⭐⭐⭐⭐ **市场上架清单**（⭐⭐⭐⭐⭐ 市场自己报，⭐⭐⭐⭐⭐ ⭐⭐
-                // ⭐⭐⭐⭐⭐ ⭐⭐ 由门去推断就会重犯「canary ≠ market」的错，
-                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 上一次就是这么把分母算成 10 的）。
+                // 反向核对：登记了却不在能力树里 => 第三种状态。
+                //
+                // 市场「未上架清单」（治「静默消失」）。必须单独算的原因：市场
+                // listable() 只返回可上架的，所以没填 market.* 的能力会从视图里
+                // 彻底消失。本仓 83 处构造点里只有 5 个填了 => 其余 78 处会静默
+                // 消失 => 「不可见」又回来了，与本轮一路治的病完全同型。
+                //
+                // market_listable 由市场自己报，不由门去推断 —— 由门推断就会
+                // 重犯「canary 不等于 market」的错，上一次就是这么把分母算成 10 的。
                 "market_listable": market_listable,
                 "market_unlisted": market_unlisted,
                 "canary_expected_but_unregistered":
@@ -1548,12 +1522,12 @@ mod capability_seeding_tests {
         );
     }
 
-    /// ⭐⭐⭐⭐ **反面判据：只有「缺口」没有「能力」是不合格状态。**
+    /// **反面判据：只有「缺口」没有「能力」是不合格状态。**
     ///
-    /// ⭐⭐ 接线前的实测：⭐⭐ 运行期注册表里唯一的生产写入是
-    /// ⭐⭐ `observe_from_critique` 的 `consciousness::gap::q*`
-    /// ⇒ ⭐⭐⭐ **恰好是「知道自己不会」而没有「自己会」**。
-    /// ⇒ ⭐⭐ 本测试把「能力 ⊆ 注册表」钉成契约。
+    /// 接线前的实测： 运行期注册表里唯一的生产写入是
+    /// `observe_from_critique` 的 `consciousness::gap::q*`
+    /// ⇒ **恰好是「知道自己不会」而没有「自己会」**。
+    /// ⇒ 本测试把「能力 ⊆ 注册表」钉成契约。
     #[test]
     fn 注册表里必须同时有能力与缺口_而非只有缺口() {
         let _rt = ConsciousnessRuntime::new();
@@ -1567,8 +1541,8 @@ mod capability_seeding_tests {
             (ability, gap)
         })
         .expect("注册表锁");
-        assert!(ability >= 5, "⭐⭐ 真实能力节点应 ≥5，⭐⭐ 实得 {ability}");
-        // ⭐⭐ 缺口数为 0 是**正常**（要真的观察到 quality<0.3 才登记）
+        assert!(ability >= 5, " 真实能力节点应 ≥5， 实得 {ability}");
+        // 缺口数为 0 是**正常**（要真的观察到 quality<0.3 才登记）
         eprintln!("ℹ️ 能力节点 {ability} 个 · 缺口节点 {gap} 个（缺口 0 = 尚未观察到低质自省）");
     }
 }

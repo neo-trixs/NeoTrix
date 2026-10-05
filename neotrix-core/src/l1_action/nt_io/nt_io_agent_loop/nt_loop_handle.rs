@@ -18,6 +18,9 @@ impl AgentLoop {
         if !system_prompt.is_empty() {
             messages.push(Message::new(Role::System, system_prompt));
         }
+        // 刻意**不**在这里调 `nt_capability_canary::reset()`：
+        // 测试也调 `new()`，构造即归零会让并行测试互相清零对方的计数。
+        // 归零是显式的会话生命周期事件，见 `begin_session_window()`。
         Self {
             backend,
             tools: Vec::new(),
@@ -36,6 +39,23 @@ impl AgentLoop {
             secret_scanner: None,
             last_governance: None,
         }
+    }
+
+    /// 会话窗口起点（金丝雀观察窗口归零），真会话路径专用。
+    ///
+    /// 2026-10-05 接通。此前 `nt_capability_canary::reset()` 零生产调用者，
+    /// 于是 `window_ticks()` 恒 0，健康判据 `fired>0 || ticks<threshold`
+    /// 的第二项恒真 —— 任何能力永远被判「健康」。照抄 plur `tools.ts:3594`：
+    /// 不 reset 的话，一次信号就能让金丝雀在整个进程生命周期保持健康
+    /// （它记的 #192 事故）。
+    ///
+    /// 不放在 `new()` 里的理由：测试也调 `new()`，构造即归零 ⇒ 并行测试互相
+    /// 清零对方的计数 ⇒ 门与测试读到随机值。归零必须是显式的会话事件，
+    /// 不能挂在「对象被构造过」这个事实上。
+    ///
+    /// 幂等：重复调只是把窗口再归零，无副作用。
+    pub fn begin_session_window(&mut self) {
+        neotrix_neobot::nt_capability_canary::reset();
     }
 
     pub(crate) fn _with_multimodal_transform(mut self, stage: MultimodalTransform) -> Self {

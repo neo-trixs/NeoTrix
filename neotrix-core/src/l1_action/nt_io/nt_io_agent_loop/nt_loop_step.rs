@@ -294,6 +294,17 @@ impl AgentLoop {
         let assistant_msg = Message::assistant_with_calls("", calls.to_vec());
         self.messages.push(assistant_msg);
 
+        // 每个 tool call 推进一个金丝雀观察窗口。位置照抄 plur `server.ts:336`
+        // 「每次 tool call = 一个 turn」。
+        //
+        // 放这里才诚实：这是本仓唯一「模型请求了能力并被派发」的汇聚点，
+        // 所以窗口推进衡量的是「模型真的在用能力」。
+        // 刻意不在 `turn()` 入口打 tick —— 那会把「用户问了一句但模型没调
+        // 任何能力」也算成一轮，窗口被无关轮次灌水，阈值形同虚设。
+        for _call in calls {
+            neotrix_neobot::nt_capability_canary::tick();
+        }
+
         // 2. 逐个执行。
         for call in calls {
             let args: Value = serde_json::from_str(&call.arguments).unwrap_or(Value::Null);
