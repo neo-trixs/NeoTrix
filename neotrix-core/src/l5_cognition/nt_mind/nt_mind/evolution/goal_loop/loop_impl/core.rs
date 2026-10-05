@@ -27,14 +27,54 @@ fn state_icon(state: &GoalState) -> &str {
     }
 }
 
+/// 按**终端列宽**截断/补齐到 `max` 列，超长时以 `...` 收尾。
+///
+/// ⚠️ 2026-10-05 修单位混用。原实现三种语义混在一起：
+/// - `s.len() <= max` 判界用的是**字节数**（「中」3 字节）
+/// - `format!("{:width$}")` 填充按**字符数**（Rust 的宽度对齐语义）
+/// - `chars().take(max - 3)` 截断按**字符数**
+///
+/// ⇒ 本仓是中文为主（`nt-term-viz/src/lib.rs:11-18` 自己论证「`一` 占 2 列，
+/// 而 `chars().count()` 数的是字符数不是列宽」），实测中文短路径即溢出：
+/// `truncate("优化进化目标", 28)` 得 34 列（超 6 列），截断路径超 25 列。
+/// 旧测试（:584 `test_truncate_long_string`）全是 ASCII ⇒ 永远发现不了。
+///
+/// ✅ 修法：判界与填充一律按 `nt_term_viz::display_width`（`unicode-width` 口径），
+///   借用 sanctioned 原语。⛔ **不**直接换成 `truncate_to`：它收尾用 `…`（1 列），
+///   而本函数既有行为是 `...`（3 列），`test_truncate_long_string` 钉住了后者
+///   ⇒ 换原语会顺带改可见输出。仓规「禁改松断言绕过」⇒ 保留 `...`，只修单位。
 pub fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
-        format!("{:width$}", s, width = max)
+    if nt_term_viz::display_width(s) <= max {
+        let mut out = s.to_string();
+        while nt_term_viz::display_width(&out) < max {
+            out.push(' ');
+        }
+        out
     } else {
-        format!(
-            "{}...",
-            s.chars().take(max.saturating_sub(3)).collect::<String>()
-        )
+        // ⛔ `max < 3` 时 `...` 本身（3 列）就超预算 ⇒ 用 `…`（1 列），
+        //   `max == 0` 直接空串。实测（旧实现同样有此错，我的 CJK 断言抓到）：
+        //   `truncate("abcdefg", 1)` 返回 3 列。
+        if max == 0 {
+            return String::new();
+        }
+        let marker = if max >= 3 { "..." } else { "…" };
+        // marker 占 `display_width(marker)` 列（ASCII `...` = 3 / `…` = 1）
+        let budget = max - nt_term_viz::display_width(marker);
+        let mut out = String::new();
+        let mut acc = 0usize;
+        for c in s.chars() {
+            let cw = nt_term_viz::char_width(c);
+            if acc + cw > budget {
+                break;
+            }
+            out.push(c);
+            acc += cw;
+        }
+        out.push_str(marker);
+        while nt_term_viz::display_width(&out) < max {
+            out.push(' ');
+        }
+        out
     }
 }
 
@@ -571,6 +611,53 @@ mod tests {
         let result = truncate("this is a very long string", 15);
         assert!(result.len() <= 15);
         assert!(result.ends_with("..."));
+    }
+
+    #[test]
+    fn test_truncate_cjk_respects_column_width() {
+        // ⚠️ 2026-10-05 新增：补上旧测试全是 ASCII 的盲区。
+        //
+        // 修复前 `truncate("优化进化目标", 28)` 返回 34 列（预算超 6 列）
+        // ⇒ `/goal` 面板的固定宽方框会破格。本仓中文为主，这不是理论问题。
+        let short = truncate("优化进化目标", 28);
+        assert_eq!(
+            nt_term_viz::display_width(&short),
+            28,
+            "短路径必须补齐到恰好 28 列"
+        );
+
+        let long = truncate("让系统自主进化并持续涌现更高层级的智能能力与自我修复", 28);
+        assert_eq!(
+            nt_term_viz::display_width(&long),
+            28,
+            "截断路径也必须恰好 28 列"
+        );
+        assert!(long.ends_with("..."), "沿用既有 `...` 收尾（非 `…`）");
+        // ⛔ 断言口径必须是**列宽**，不是 `len()`（字节）或 `chars().count()`
+        assert!(
+            long.len() > 28,
+            "中文按字节必然 > 预算，这正是旧 bug 的形态"
+        );
+    }
+
+    /// 边界：`max` 小于省略号本身宽度时**不得超预算**。
+    ///
+    /// ⚠️ 实测抓到：修复前 `truncate("abcdefg", 1)` 返回 3 列（`...` 本身 3 列）。
+    /// 旧实现也有此错，但旧测试全是 ASCII 且 max≥5 ⇒ 永远看不到。
+    #[test]
+    fn test_truncate_below_marker_width() {
+        assert_eq!(truncate("abc", 0), "", "max=0 ⇒ 空串");
+        assert_eq!(nt_term_viz::display_width(&truncate("abcdefg", 1)), 1, "max=1 不得超");
+        assert_eq!(nt_term_viz::display_width(&truncate("abcdefg", 2)), 2, "max=2 不得超");
+        // 任何 max 都必须满足不变量
+        for max in 0..12 {
+            let r = truncate("让系统自主进化并持续涌现", max);
+            assert!(
+                nt_term_viz::display_width(&r) <= max,
+                "max={max} ⇒ 超预算：{}",
+                nt_term_viz::display_width(&r)
+            );
+        }
     }
 
     #[test]

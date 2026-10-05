@@ -229,6 +229,69 @@ pub struct PackDecoder {
     pub use_zstd: bool,
 }
 
+/// 有边界检查的字节游标。
+///
+/// ⚠️ 2026-10-05 新增。此前头部解析用裸 `bytes[pos]` / `bytes[pos..pos+n]`，
+/// 而 `decode` 的唯一长度守卫是 `:236` 的 `len() < 16` ⇒ 畸形 `.ntpack`
+/// （`ncols` 取自 1 字节、`dict_len` 取自 4 字节）会让索引越界 panic。
+/// 生产路径 `nt_geo_ntpack_cold.rs:78` 直接 `fs::read` 后 `decode`，
+/// 且 `Cargo.toml:77` release `panic = "abort"` ⇒ **进程中止**，不是可捕获错误。
+///
+/// ⛔ 为什么不是既有判据的问题：同文件 `:321`/`:350` 已有
+/// `ok_or("truncated …")?` 的正确范式，头部解析是唯一例外 ⇒ 是遗漏不是设计。
+/// `shield_core/vault.rs:164-167` 对同类操作亦有守卫，反证这是应有规范。
+struct Cursor<'a> {
+    b: &'a [u8],
+    pos: usize,
+}
+
+impl<'a> Cursor<'a> {
+    fn new(b: &'a [u8], pos: usize) -> Self {
+        Self { b, pos }
+    }
+
+    /// 取 `n` 字节并前移游标；越界 ⇒ `Err`（**不 panic**）。
+    fn take(&mut self, n: usize) -> Result<&'a [u8], String> {
+        // ⛔ 用 checked_add：`pos + n` 在 n 很大时会溢出 usize 变回绕，
+        //   `self.pos + n <= len` 这类判断在溢出后为假/真都可能，反而漏检。
+        let end = self
+            .pos
+            .checked_add(n)
+            .ok_or_else(|| "truncated: cursor overflow".to_string())?;
+        if end > self.b.len() {
+            return Err(format!(
+                "truncated: need {n} bytes at {}, have {}",
+                self.pos,
+                self.b.len().saturating_sub(self.pos)
+            ));
+        }
+        let s = &self.b[self.pos..end];
+        self.pos = end;
+        Ok(s)
+    }
+
+    fn u8(&mut self) -> Result<u8, String> {
+        Ok(self.take(1)?[0])
+    }
+
+    /// 剩余未读字节数（`pos` 恒 ≤ len，故饱和减）。
+    fn remaining(&self) -> usize {
+        self.b.len().saturating_sub(self.pos)
+    }
+
+    fn u32le(&mut self) -> Result<u32, String> {
+        let s = self.take(4)?;
+        Ok(u32::from_le_bytes([s[0], s[1], s[2], s[3]]))
+    }
+
+    /// 按前导长度读一个字符串。
+    fn str_with_len32(&mut self) -> Result<String, String> {
+        let slen = self.u32le()? as usize;
+        let raw = self.take(slen)?;
+        Ok(String::from_utf8_lossy(raw).to_string())
+    }
+}
+
 impl PackDecoder {
     /// 解码 NT-Pack 二进制为地理点列表 (无损: 定点量化容差内)。
     /// 兼容 v2 分块文件 (A5): 检测到 FLAG_CHUNKED 自动路由到块解码。
@@ -276,14 +339,16 @@ impl PackDecoder {
         }
 
         // 列描述段
-        let mut pos = 15usize;
-        let ncols = bytes[pos] as usize;
-        pos += 1;
-        let mut cols = Vec::with_capacity(ncols);
+        // ⚠️ 改用有边界检查的游标（见 `Cursor` 的文档：畸形文件曾在此 panic）。
+        let mut cur = Cursor::new(bytes, 15);
+        let ncols = cur.u8()? as usize;
+        // ⛔ 每个列条目占 2 字节 ⇒ `ncols` 不可能超过剩余字节数的一半。
+        //   不设上限时，`Vec::with_capacity(ncols)` 会按伪造值预分配（ncols ≤255，
+        //   危害有限），而下面 `dict_len` 可达 4 GiB —— 那里才是真正的分配炸弹。
+        let mut cols = Vec::with_capacity(ncols.min(cur.remaining() / 2));
         for _ in 0..ncols {
-            let t = bytes[pos];
-            let prec = bytes[pos + 1];
-            pos += 2;
+            let t = cur.u8()?;
+            let prec = cur.u8()?;
             cols.push((t, prec));
         }
         // 取 lat/lng 精度 + 检测 node_id 列
@@ -299,20 +364,17 @@ impl PackDecoder {
         }
 
         // 字符串段
-        let dict_len =
-            u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]])
-                as usize;
-        pos += 4;
-        let mut dict: Vec<String> = Vec::with_capacity(dict_len);
+        // ⛔ `dict_len` 来自字节流（最大 4 294 967 295）⇒ 原先
+        //   `Vec::with_capacity(dict_len)` 是**分配炸弹**：16 字节文件即可让解码器
+        //   申请 4 GiB 而后越界 panic。现在每个元素至少占 4 字节长度前缀，
+        //   故 `dict_len ≤ remaining/4` 是硬上界。
+        let dict_len = cur.u32le()? as usize;
+        let mut dict: Vec<String> = Vec::with_capacity(dict_len.min(cur.remaining() / 4));
         for _ in 0..dict_len {
-            let slen =
-                u32::from_le_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]])
-                    as usize;
-            pos += 4;
-            let s = String::from_utf8_lossy(&bytes[pos..pos + slen]).to_string();
-            pos += slen;
-            dict.push(s);
+            dict.push(cur.str_with_len32()?);
         }
+        // 后续解析继续推进同一个游标位置（`mut`：数据区解析会再赋值它）。
+        let mut pos = cur.pos;
 
         // 数据区 (坐标 + ident + 索引) — FLAG_ZSTD 时被 zstd 压缩
         let data: Vec<u8>;
@@ -534,6 +596,69 @@ fn find_data_start(bytes: &[u8]) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 畸形 `.ntpack` 必须返回 `Err`，**不得 panic**。
+    ///
+    /// ⚠️ 2026-10-05 回归锁。修复前：16 字节文件即可让头部解析越界 panic，
+    /// 而生产路径 `nt_geo_ntpack_cold.rs:78` 是 `fs::read` + `decode`，
+    /// 且 release `panic = "abort"` ⇒ **整个进程中止**。
+    ///
+    /// 构造：magic 合法 + version 合法 + flags 不含 FLAG_CHUNKED（否则会被
+    /// 路由到 chunked 解码器而测不到这段）+ FLAG_CHECKSUM **不**置位
+    /// （CRC 不是门，见 `decode` 内注释）+ `ncols=200` 但只剩 1 字节。
+    #[test]
+    fn test_malformed_header_returns_err_not_panic() {
+        let mut b: Vec<u8> = Vec::with_capacity(16);
+        b.extend_from_slice(MAGIC); // [0..8]
+        b.push(VERSION); // [8] = 1
+        b.extend_from_slice(&0u16.to_le_bytes()); // [9..11] flags：无 CHUNKED、无 CHECKSUM
+        b.extend_from_slice(&1u32.to_le_bytes()); // [11..15] n = 1
+        b.push(200); // [15] ncols = 200 ⇒ 需要 400 字节，但缓冲只有 16
+        assert_eq!(b.len(), 16, "本测试的构造前提：恰好 16 字节");
+
+        let r = PackDecoder::decode(&b);
+        assert!(r.is_err(), "畸形头必须返回 Err，实际 got {:?}", r.is_ok());
+    }
+
+    /// 分配炸弹：伪造的 `dict_len`（4 GiB）不得让解码器预分配。
+    ///
+    /// 修复前 `Vec::with_capacity(dict_len)` 会按伪造值申请 4 GiB。
+    /// 这里用 `ncols=0` 直接走到字典段，让 `dict_len` 从字节流读取。
+    #[test]
+    fn test_forged_dict_len_does_not_allocate_gigabytes() {
+        let mut b: Vec<u8> = Vec::new();
+        b.extend_from_slice(MAGIC);
+        b.push(VERSION);
+        b.extend_from_slice(&0u16.to_le_bytes());
+        b.extend_from_slice(&1u32.to_le_bytes());
+        b.push(0); // ncols = 0 ⇒ 直接进字典段
+        b.extend_from_slice(&u32::MAX.to_le_bytes()); // dict_len = 4294967295
+
+        let r = PackDecoder::decode(&b);
+        assert!(r.is_err(), "伪造 dict_len 必须 Err");
+        // ⛔ 若守卫失效，这里会先尝试分配 4 GiB 再 panic（abort ⇒ 整进程死）
+        //   故本测试通过本身就是「未分配」的证据。
+    }
+
+    /// 游标边界本身：越界须 `Err`，游标溢出须 `Err`，均不得 panic。
+    #[test]
+    fn test_cursor_bounds() {
+        let data = [1u8, 2, 3, 4, 5];
+        let mut c = Cursor::new(&data, 2);
+        assert_eq!(c.remaining(), 3);
+        assert_eq!(c.u8().ok(), Some(3));
+        assert_eq!(c.remaining(), 2);
+        // ⛔ 只剩 2 字节却要 4 ⇒ 必须 Err（这一条正是旧代码 panic 的形态）
+        assert!(c.u32le().is_err(), "不足 4 字节须Err");
+
+        // 字节序：独立游标读全 4 字节，little-endian
+        let mut c1 = Cursor::new(&data, 0);
+        assert_eq!(c1.u32le().ok(), Some(0x0403_0201));
+        let mut c2 = Cursor::new(&data, 0);
+        assert!(c2.take(6).is_err(), "越界须 Err");
+        assert!(c2.take(usize::MAX).is_err(), "溢出须 Err");
+        assert_eq!(Cursor::new(&data, 99).remaining(), 0, "pos>len 须饱和到 0，不 panic");
+    }
 
     fn sample_points() -> Vec<GeoPoint> {
         vec![

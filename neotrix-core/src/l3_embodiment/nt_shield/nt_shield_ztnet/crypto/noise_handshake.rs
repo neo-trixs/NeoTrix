@@ -552,7 +552,14 @@ mod tests {
     /// 补齐 msg1 的 `es`/`s`/`ss` 后才转绿。**不得改成"看起来能跑"的宽松断言**
     /// （仓规：禁改松断言绕过）。
     #[test]
-    #[ignore = "B-2 证据：msg1 缺 es/s/ss token（规范 96B，本实现 32B）。修复方案见 B2-NOISE-IK-RESOLUTION-20260928.md §4-A"]
+    // ⚠️ 2026-10-05 解除 `#[ignore]`：原理由「msg1 缺 es/s/ss token（规范 96B，
+    // 本实现 32B）」**前提已失效** —— `_create_message1`（:183-193）现在依次写
+    // `e`(32) + `enc_static`(48) + `enc_empty`(16) = 96B，与 :150 的注释一致。
+    // TODO.md:961/1004 亦记载「B-2 已按官方向量重写为 2-message IKpsk2」并转绿。
+    //
+    // ✅ 解除前**实测**：`cargo test --lib noise_handshake -- --ignored`
+    //    ⇒ 2 passed。故这不是「改松断言」，而是让一个已修好的 crypto 门
+    //    重新参与守门。
     fn msg1_matches_official_vector_length() {
         const OFFICIAL_MSG0_LEN: usize = 96; // 实测自官方向量：192 hex chars（手推 97 是错的）
         let initiator_key = PrivateKey::generate();
@@ -581,7 +588,17 @@ mod tests {
     /// 用同状态下两次加密不同明文来暴露：若 nonce 自增，密文前缀（ChaCha20
     /// keystream）必不同；若恒零，密文前缀（同一 keystream）**必然相同**。
     #[test]
-    #[ignore = "B-2 证据：encrypt() 的 nonce 恒为全零且不自增，违反规范 EncryptAndHash（4字节零||LE64(n)，每次+1）"]
+    // ⚠️ 2026-10-05 解除 `#[ignore]`：原理由称「`encrypt()` 的 nonce 恒为全零
+    // 且不自增」，但该模块**根本不存在 `fn encrypt`**（旧 :367 现已是
+    // `ok_or(_NoiseError::InvalidState)?`）；实际调用的是 `encrypt_and_hash`
+    // （:450），其中 `self.nonce = self.nonce.saturating_add(1)`，且
+    // `current_nonce()`（:436-440）编码的是计数器而非常量零。
+    //
+    // ⭐ 这条比上一条更要紧：活动测试 `full_handshake_matches_official_vectors`
+    // 在传输轮用 `seal(&zero12, …)`（:676）**绕过** `encrypt_and_hash`
+    // ⇒ 「nonce 必须自增」此前**没有任何活动测试覆盖**，
+    //    只靠这个被挂起的门 ⇒ nonce 复用回归会静默通过。
+    // ✅ 解除前实测：`--ignored` ⇒ passed。
     fn encrypt_nonce_must_not_be_reused() {
         // 直接构造一个 symmetric_key 已就绪的状态（绕开未完成的握手），
         // 以便单独检验 encrypt 的 nonce 行为。

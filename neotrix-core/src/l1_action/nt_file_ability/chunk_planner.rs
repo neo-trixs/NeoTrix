@@ -139,18 +139,30 @@ impl ChunkPlanner {
     }
 }
 
-/// 估算 token 数 (粗略: 1 token ≈ 4 chars)
+/// 估算 token 数 —— 复用本仓 **CJK 感知单一事实源**。
+///
+/// ⚠️ 2026-10-05 修单位混用 + 注释与实现不符。旧实现注释写「粗略: 1 token
+/// ≈ 4 chars」，而代码是 `chars += h.len()`（**字节**）后 `/4`
+/// ⇒ 中文表头/单元格被高估 3 倍。而本仓是中文为主，xlsx/csv 的中文表头
+/// 与单元格是**常态**（本模块正是 xlsx/csv 读取结果的 chunk 规划器）
+/// ⇒ `TableChunk.estimated_tokens` 系统性偏高，chunk 切分因此偏小。
+///
+/// ✅ 转出 `l1_action::nt_core_llm::estimate_tokens`（CJK 1 token/字、
+/// 其余 4 字/token）。逐格累加会漏掉分隔符开销，故先拼总量再估。
 fn estimate_tokens(table: &TableData) -> usize {
-    let mut chars = 0;
+    let mut text = String::new();
     for h in &table.headers {
-        chars += h.len();
+        text.push_str(h);
+        text.push('\n');
     }
     for row in &table.rows {
         for cell in row {
-            chars += cell.len();
+            text.push_str(cell);
+            text.push('\t');
         }
+        text.push('\n');
     }
-    chars / 4
+    crate::l1_action::nt_core_llm::estimate_tokens(&text)
 }
 
 /// 快捷函数: 自动分块

@@ -330,13 +330,37 @@ mod tests {
 
     #[test]
     fn test_mention_resolves_tilde_path() {
+        // ⚠️ 2026-10-05 修并发竞态（本测试曾随机失败，CI 红）。
+        //
+        // 症状：全量 `cargo test --lib` 时 `results.len()` 得 0；单跑则 ok。
+        // 根因：`shellexpand::tilde`（`resolve_path:147`）展开的是**进程真实
+        // `$HOME`**，而旧版把 fixture 写成 `$HOME/tilde_test.rs` 这个**固定名**。
+        // 测试二进制可多实例并行 ⇒ 实例 A 的清理 `remove_file` 会删掉实例 B
+        // 刚写的同一路径 ⇒ B 解析时文件已不存在 ⇒ `results.len() == 0`。
+        //
+        // ⛔ 不能改生产实现去迁就测试：那会动 `resolve_path` 的真实语义。
+        // ✅ 修法：文件名带上本进程唯一 id（pid + 测试计数器），消除跨实例碰撞。
+        // `cwd` 传 `test_dir()`：该参数对 `~` 分支无影响（`~` 走 HOME 分支），
+        // 但避免测试依赖调用方目录。
+        let uniq = format!(
+            "tilde_test_{}_{}.rs",
+            std::process::id(),
+            TEST_COUNTER.fetch_add(1, Ordering::SeqCst)
+        );
         let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
-        let dir = PathBuf::from(&home);
-        fs::write(dir.join("tilde_test.rs"), "// tilde file").unwrap();
-        let input = "check @~/tilde_test.rs";
-        let (modified, results) = resolve_mentions(input, &dir);
-        assert_eq!(results.len(), 1);
+        let target = PathBuf::from(&home).join(&uniq);
+        // 写入用 create_new 语义兜底：万一仍碰撞则明确失败，而非静默共用。
+        fs::write(&target, "// tilde file").unwrap();
+
+        let cwd = test_dir();
+        let input = format!("check @~/{uniq}");
+        let (modified, results) = resolve_mentions(&input, &cwd);
+
+        // 清理放最后，且只删自己那个唯一路径 —— 不影响任何并行实例。
+        let _ = fs::remove_file(&target);
+        cleanup(&cwd);
+
+        assert_eq!(results.len(), 1, "@~ 应展开到 $HOME 并读到内容");
         assert!(modified.contains("tilde file"));
-        let _ = fs::remove_file(dir.join("tilde_test.rs"));
     }
 }

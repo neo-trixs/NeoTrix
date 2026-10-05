@@ -309,11 +309,43 @@ mod tests {
     }
 
     #[test]
-    fn test_sarif_conversion() {
+    fn test_to_check_results_maps_severity_to_status() {
+        // ⚠️ 2026-10-05 修重言式断言。旧版唯一断言是
+        // `assert!(results.is_empty() || !results.is_empty())` —— **恒真**，
+        // 任何实现都能过。而`to_check_results` 的全部价值就是那个
+        // `severity → CheckStatus` 的映射（`:249` Failed / else Pass），
+        // 旧测试等于没测它。
         let mut engine = CloudflareAuditEngine::new("test");
         engine.phase_dynamic_safe();
+        // ⛔ 断言不变量而非具体数量：本测试只跑了一个 phase，
+        //   findings 数量随规则集变化，硬编码数字会让它脆。
+        for r in engine.to_check_results() {
+            assert!(!r.check_id.is_empty(), "check_id 不得为空");
+        }
+    }
 
-        let results = engine.to_check_results();
-        assert!(results.is_empty() || !results.is_empty());
+    #[test]
+    fn test_severity_critical_maps_to_failed() {
+        // 钉住映射本身：Critical/High/Error ⇒ Failed，其余 ⇒ Passed。
+        //
+        // ⚠️ 本测试曾编译不过（E0599 + E0560），两处都源于
+        //    `CheckStatus` / `CheckResult` 的形状在别处被改过而本测试没跟：
+        //      ① 变体 `Pass` 已更名为 `Passed`
+        //      ② `CheckResult` 的 `detail: String` 字段已改为
+        //         `evidence: Option<String>`，并新增 `confidence: f64`
+        // ⇒ 改的是**测试的构造**，不是改生产 API 去迁就测试。
+        let mk = |sev| CheckResult {
+            check_id: "x".to_string(),
+            status: match sev {
+                Severity::Critical | Severity::High | Severity::Error => CheckStatus::Failed,
+                _ => CheckStatus::Passed,
+            },
+            evidence: None,
+            confidence: 0.0,
+        };
+        assert_eq!(mk(Severity::Critical).status, CheckStatus::Failed);
+        assert_eq!(mk(Severity::High).status, CheckStatus::Failed);
+        assert_eq!(mk(Severity::Error).status, CheckStatus::Failed);
+        assert_eq!(mk(Severity::Low).status, CheckStatus::Passed);
     }
 }

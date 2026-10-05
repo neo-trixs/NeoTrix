@@ -32,6 +32,7 @@ pub mod nt_free_pool; // 池免费模型智能调用 → 晶体 NtLlmAsk（轮�
 pub mod nt_stdin_human; // 终端里的人 → 晶体 NtHumanChannel（窗口回话）
 pub mod nt_dialogue_tui; // 对话终端 TUI 形态 → 晶体 NtHumanChannel（借鉴 Claude/opencode）
 pub mod nt_tui_app; // v2 事件驱动会话应用（工作线程 + 实时渲染 + Esc 取消）
+pub mod nt_tui_theme; // TUI 配色集中点（v1+v2 共用；走 nt_action_facade 以免新增层违规）
 pub mod nt_conversation; // 对话持久化：保存/加载/列出/删除对话
 pub mod nt_core_harness;
 pub mod nt_harness;

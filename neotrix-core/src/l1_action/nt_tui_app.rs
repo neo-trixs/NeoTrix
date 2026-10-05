@@ -32,6 +32,7 @@ use crate::l1_action::nt_dialogue_tui::{
 };
 use crate::l1_action::nt_free_pool::NtFreePoolAsk;
 use crate::l1_action::nt_stdin_human::NtStdinHuman;
+use crate::l1_action::nt_tui_theme as theme;
 use crate::l5_cognition::nt_crystal_core::{
     CrystalCore, NtDemand, NtHumanChannel, NtHumanReply, NtInnerLoop, NtInnerLoopOutcome,
     NtLlmAsk, NtProgressSink, NtTaskLoopConfig,
@@ -52,7 +53,6 @@ use crossterm::{
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Terminal,
@@ -635,16 +635,33 @@ fn render_sidebar_app(
     app: &NtTuiApp,
 ) {
     let mut items: Vec<ListItem> = Vec::new();
+    // ⚠️ 2026-10-05 接线 nt_term_viz（此前侧栏三行全是裸 format!，零原语）。
+    //
+    // 标签列宽取三行标签的**可见宽**最大值，再 `pad_to_visible` 补齐 ⇒ 值列自动对齐。
+    // ⛔ 不能用 `chars().count()` 或 `s.len()`：本仓中文为主，「融合」2 字符占 4 列，
+    // 按字符数算会把值列推歪。与 entry/status.rs 2026-10-05 首版
+    // 「每行补空格数不同」的坑同源，故此处按最长标签算一次，而非每行手算。
+    const L_FUSE: &str = "融合";
+    const L_DEMAND: &str = "内需";
+    const L_POOL: &str = "池";
+    let label_w = [L_FUSE, L_DEMAND, L_POOL]
+        .iter()
+        .map(|s| nt_term_viz::table::visible_width(s))
+        .max()
+        .unwrap_or(4);
+    let lf = || nt_term_viz::table::pad_to_visible(L_FUSE, label_w, nt_term_viz::Align::Left);
+    let ld = || nt_term_viz::table::pad_to_visible(L_DEMAND, label_w, nt_term_viz::Align::Left);
+    let lp = || nt_term_viz::table::pad_to_visible(L_POOL, label_w, nt_term_viz::Align::Left);
+
+    let fused = if app.state.fused_line.is_empty() {
+        "（暂无）".to_string()
+    } else {
+        app.state.fused_line.clone()
+    };
+    items.push(ListItem::new(Line::from(format!("{}：{}", lf(), fused))));
     items.push(ListItem::new(Line::from(format!(
-        "融合：{}",
-        if app.state.fused_line.is_empty() {
-            "（暂无）".to_string()
-        } else {
-            app.state.fused_line.clone()
-        }
-    ))));
-    items.push(ListItem::new(Line::from(format!(
-        "内需（{}）：",
+        "{}（{}）：",
+        ld(),
         app.state.demands.len()
     ))));
     for d in &app.state.demands {
@@ -654,7 +671,8 @@ fn render_sidebar_app(
         )])));
     }
     items.push(ListItem::new(Line::from(format!(
-        "池：{} · {}",
+        "{}：{} · {}",
+        lp(),
         app.pinned_label(),
         app.state.pool_line
     ))));
@@ -672,7 +690,7 @@ fn render_working(f: &mut ratatui::Frame, area: ratatui::layout::Rect, app: &NtT
             Block::default()
                 .borders(Borders::ALL)
                 .title(" 工作中 ")
-                .style(Style::default().fg(Color::Yellow)),
+                .style(theme::active()),
         );
         f.render_widget(p, area);
         return;
@@ -687,9 +705,30 @@ fn render_working(f: &mut ratatui::Frame, area: ratatui::layout::Rect, app: &NtT
     };
 
     let mut lines: Vec<Line> = Vec::new();
+    // bar 的归一基准 = 本批并行任务里最慢者（秒）。先算一次，供所有行共用。
+    let slowest_s = app
+        .active_tasks
+        .iter()
+        .map(|w| w.started.elapsed().as_secs_f64())
+        .fold(0.0_f64, f64::max);
     for w in &app.active_tasks {
         let elapsed = w.started.elapsed().as_millis() as u64;
         let spin = spinner_frame(elapsed);
+        // ⚠️ 2026-10-05 接线 nt_term_viz::bar_row + 补真实缺陷。
+        //
+        // 本文件 doc（`:18`）声称工作相含「已用时间」，但旧版 `elapsed` **只**喂
+        // `spinner_frame`，一个绝对秒数都没显示 ⇒ 声明与实现不符。
+        // 状态区的 sparkline 是**相对分布**（按 min/max 归一），也读不出绝对值。
+        // `bar_row` 标签列自动对齐（手写补空格会重犯 status.rs 的错），
+        // 条长按当前并行批里最长任务归一 ⇒ 一眼看出谁最慢。
+        let elapsed_s = w.started.elapsed().as_secs_f64();
+        let bar = nt_term_viz::bar_row(
+            &w.subtask_id,
+            elapsed_s,
+            slowest_s.max(elapsed_s),
+            8,
+            10,
+        );
         let tail: String = w
             .stream
             .chars()
@@ -707,15 +746,18 @@ fn render_working(f: &mut ratatui::Frame, area: ratatui::layout::Rect, app: &NtT
         lines.push(Line::from(vec![
             Span::styled(
                 format!(" {spin} "),
-                Style::default().fg(Color::Yellow),
+                theme::active(),
             ),
             Span::styled(
                 format!("{} ", w.subtask_id),
-                Style::default().fg(Color::Cyan),
+                theme::meta(),
             ),
             Span::raw(format!("{} ", w.title)),
             Span::raw(format!("{} ", status_icon)),
-            Span::styled(tail, Style::default().fg(Color::DarkGray)),
+            // 绝对耗时条（2026-10-05 接线 nt_term_viz::bar_row，见上方注释）。
+            Span::styled(bar, theme::meta()),
+            Span::raw(format!(" {:.1}s", elapsed_s)),
+            Span::styled(tail, theme::dim()),
         ]));
     }
 
@@ -723,7 +765,7 @@ fn render_working(f: &mut ratatui::Frame, area: ratatui::layout::Rect, app: &NtT
         Block::default()
             .borders(Borders::ALL)
             .title(header)
-            .style(Style::default().fg(Color::Yellow)),
+            .style(theme::active()),
     );
     f.render_widget(p, area);
 }
@@ -738,7 +780,7 @@ fn render_input_app(
     if state.input.is_empty() {
         spans.push(Span::styled(
             "<id>: 文字批准 · <id>! 文字驳回 · ok/no <id> · /命令 · 空回结束",
-            Style::default().fg(Color::DarkGray),
+            theme::dim(),
         ));
     } else {
         let chars: Vec<char> = state.input.chars().collect();
@@ -754,7 +796,7 @@ fn render_input_app(
         spans.push(Span::raw(before));
         spans.push(Span::styled(
             at,
-            Style::default().bg(Color::DarkGray).fg(Color::White),
+            theme::cursor(),
         ));
         spans.push(Span::raw(after));
     }
@@ -779,13 +821,30 @@ fn render_status_app(
     } else {
         String::new()
     };
+    // ⚠️ 2026-10-05 接线 nt_term_viz::sparkline：并行各子任务的已用秒数分布。
+    //
+    // 数据来自真实 `WorkingView.started`（非假数据）；无并行任务时不画。
+    // `sparkline` 内部按 max 归一（见 sparkline.rs），故只需传原始秒数。
+    let elapsed_spark = if active > 1 {
+        let now = Instant::now();
+        let secs: Vec<f64> = app
+            .active_tasks
+            .iter()
+            .map(|w| now.saturating_duration_since(w.started).as_secs_f64())
+            .collect();
+        format!(" {}", nt_term_viz::sparkline(&secs, 8))
+    } else {
+        String::new()
+    };
+
     let p = Paragraph::new(format!(
-        "{} · {}{}",
+        "{} · {}{}{}",
         app.state.status_line(),
         app.pinned_label(),
         parallel_info,
+        elapsed_spark,
     ))
-    .style(Style::default().fg(Color::Cyan));
+    .style(theme::status());
     f.render_widget(p, area);
 }
 
@@ -795,12 +854,29 @@ fn render_help_app(f: &mut ratatui::Frame, area: ratatui::layout::Rect) {
         Line::from("  Enter 提交 · 空回/Esc 结束本轮 · 工作中Esc=中断问答 · Ctrl+C/D 结束"),
         Line::from("  ←/→/Home/End 光标 · Ctrl+J 换行 · Up/Down 历史/行移"),
         Line::from("  Ctrl+S 暂存 · Ctrl+O 详情 · F2 侧栏 · Alt+P 选模型 · Ctrl+Q 退出"),
-        Line::from("  /help /pool /model /quit /clear · 鼠标滚轮滚动"),
+        // ⚠️ 2026-10-05 补 /exit：`dispatch_slash` 早就把它当活别名
+        // （`"/quit" | "/exit" => NtSlash::Quit`，且 :950 有断言钉住），
+        // 但 help 文案漏了 ⇒ 用户能猜到却无从查证。
+        Line::from("  /help /pool /model /quit /exit /clear · 鼠标滚轮滚动"),
     ];
     let p = Paragraph::new(text)
         .block(Block::default().borders(Borders::ALL).title(" 帮助 "))
         .wrap(Wrap { trim: true });
     f.render_widget(p, area);
+}
+
+/// picker 可视窗：返回 `(offset, shown)`，保证 `sel` 必落在窗内。
+///
+/// 抽成纯函数是为了能单测（`render_picker_app` 本身要 ratatui::Frame，不好构造）。
+/// ⚠️ 2026-10-05 引入 —— 此前 `.take(10)` 无视口偏移，候选 >10 时
+/// 选中项不可见却仍会被 Enter 选中。
+fn picker_window(total: usize, sel: usize, visible: usize) -> (usize, usize) {
+    if visible == 0 || total == 0 {
+        return (0, 0);
+    }
+    let offset = sel.min(total - 1).saturating_sub(visible - 1);
+    let shown = total.saturating_sub(offset).min(visible);
+    (offset, shown)
 }
 
 fn render_picker_app(
@@ -814,10 +890,20 @@ fn render_picker_app(
     };
     let items_all = picker.items(&app.state.pool_models);
     let sel = picker.selected.min(items_all.len().saturating_sub(1));
+    // ⚠️ 2026-10-05 修功能缺陷：候选 >10 时选中项**不可见但可被 Enter 选中**。
+    //
+    // 旧版 `.iter().enumerate().take(10)` 从下标 0 起取、无视口偏移，而
+    // `apply_key_picker` 的 Down 会把 `selected` 推到 `items.len()-1`
+    // ⇒ 选中第 11 项以后时屏幕上无任何高亮，Enter 却会选中看不见的那一项。
+    // 修法：`offset` 让 `sel` 始终落在可视窗内（末项时窗口贴着底部），
+    // 纯呈现层改动，不动 `NtPicker` 状态与按键状态机。
+    const VISIBLE: usize = 10;
+    let (offset, shown) = picker_window(items_all.len(), sel, VISIBLE);
     let show: Vec<ListItem> = items_all
         .iter()
         .enumerate()
-        .take(10)
+        .skip(offset)
+        .take(shown)
         .map(|(i, m)| {
             let marker = if i == sel { "▶ " } else { "  " };
             ListItem::new(Line::from(vec![
@@ -825,27 +911,32 @@ fn render_picker_app(
                 Span::styled(
                     m.clone(),
                     if i == sel {
-                        Style::default().fg(Color::Yellow)
+                        theme::selected()
                     } else {
-                        Style::default()
+                        theme::normal()
                     },
                 ),
             ]))
         })
         .collect();
     let w = area.width.saturating_sub(20).max(40);
-    let h = (items_all.len().min(10) + 4)
+    let h = (shown + 4)
         .min(area.height.saturating_sub(4).max(6) as usize)
         .max(6) as u16;
     let x = (area.width.saturating_sub(w)) / 2;
     let y = (area.height.saturating_sub(h)) / 2;
     let popup = ratatui::layout::Rect::new(x, y, w, h);
     f.render_widget(ratatui::widgets::Clear, popup);
-    let list = List::new(show).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title(format!(" 模型（{}）· 输入过滤 · Enter定点 · Esc关闭 ", picker.filter)),
-    );
+    // 位置指示：>VISIBLE 时才显示，避免单屏时噪声。
+    let pos = if items_all.len() > VISIBLE {
+        format!(" · {}-{}", offset + 1, offset + shown)
+    } else {
+        String::new()
+    };
+    let list = List::new(show).block(Block::default().borders(Borders::ALL).title(format!(
+        " 模型（{}）{pos} · 输入过滤 · Enter定点 · Esc关闭 ",
+        picker.filter
+    )));
     f.render_widget(list, popup);
 }
 
@@ -864,6 +955,28 @@ mod tests {
         assert_eq!(dispatch_slash("/nope"), NtSlash::Unknown);
         assert_eq!(dispatch_slash("plain"), NtSlash::Unknown);
         assert_eq!(dispatch_slash(""), NtSlash::Unknown);
+    }
+
+    #[test]
+    fn test_picker_window_keeps_selection_visible() {
+        // 回归锁：候选 >visible 时，选中项必须落在可视窗内。
+        // 旧实现（无 offset）会让 sel=12 不可见，但 Enter 仍选中它。
+        const V: usize = 10;
+        // 单屏：无需偏移
+        assert_eq!(picker_window(5, 3, V), (0, 5));
+        // 恰好满窗
+        assert_eq!(picker_window(10, 9, V), (0, 10));
+        // ⭐ 缺陷场景：选第 12 项（0-based），窗口须右移到把它纳入
+        let (off, shown) = picker_window(25, 12, V);
+        assert!(off > 0, "选中项越过窗口末位时必须偏移");
+        assert!(12 >= off && 12 < off + shown, "选中项必须落在 [off, off+shown)");
+        // 末项：窗口贴底
+        let (off, shown) = picker_window(25, 24, V);
+        assert!(24 >= off && 24 < off + shown, "末项也必须可见");
+        assert_eq!(off + shown, 25);
+        // 边界：空/零窗不得 panic（生产代码禁 panic）
+        assert_eq!(picker_window(0, 0, V), (0, 0));
+        assert_eq!(picker_window(5, 0, 0), (0, 0));
     }
 
     #[test]

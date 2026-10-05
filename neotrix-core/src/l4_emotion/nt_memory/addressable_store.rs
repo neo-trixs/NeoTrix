@@ -168,18 +168,34 @@ impl AddressableStore {
     }
 }
 
-/// 粗略估算 token 数（按空格分词，1 token ≈ 4 字符 或 1 词）
+/// 估算 token 数 —— 转出本仓 **CJK 感知单一事实源**。
+///
+/// ⚠️ 2026-10-05 修单位混用。旧实现：
+/// ```ignore
+/// let chars = text.len();          // 变量名叫 chars，装的是**字节**
+/// max(chars / 4, words)
+/// ```
+/// ⛔ `len()` 是字节数 ⇒ 纯中文被**高估 3 倍**（一个汉字 3 字节），
+/// 而本仓是中文为主（`nt-term-viz/src/lib.rs:11-18` 有专节论证这一点）。
+/// 本值进持久化记账（`Observation.token_count`）⇒ 偏差会累积。
+///
+/// ✅ 复用 `l1_action::nt_core_llm::estimate_tokens`（`nt_forecast` 标为 P0-7
+/// 单一事实源；CJK 1 token/字、其余 4 字/token，非空至少 1）。
+/// 范式抄 `l5_cognition/…/seal_core/model_router.rs:353` 的既有转出。
 fn estimate_tokens(text: &str) -> usize {
-    let chars = text.len();
-    let words = text.split_whitespace().count();
-    // 取字符估算和词估算的较大值
-    std::cmp::max(chars / 4, words)
+    crate::l1_action::nt_core_llm::estimate_tokens(text)
 }
 
-/// 生成一行摘要
+/// 生成一行摘要。
+///
+/// ⚠️ 2026-10-05 修字符/字节混用。旧实现 `preview` 按**字符**取 60，
+/// 而 `output.len() > 60` 按**字节**判 ⇒ 21～60 字的中文输出（63～180 字节）
+/// 会**一个字都没截就加上 `...`**（谎报截断）。判界与截断现统一按字符数。
 fn make_summary(tool_name: &str, output: &str) -> String {
-    let preview: String = output.chars().take(60).collect();
-    if output.len() > 60 {
+    const PREVIEW_CHARS: usize = 60;
+    let total = output.chars().count();
+    let preview: String = output.chars().take(PREVIEW_CHARS).collect();
+    if total > PREVIEW_CHARS {
         format!("[{tool_name}] {preview}...")
     } else {
         format!("[{tool_name}] {preview}")

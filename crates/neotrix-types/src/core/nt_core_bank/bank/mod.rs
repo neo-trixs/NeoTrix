@@ -365,7 +365,15 @@ mod tests {
         let id = bank.memories()[0].id.clone();
         assert!(bank.index_memory(&id).is_ok());
         let traverse = bank.hypergraph_traverse(&id, 1);
-        assert!(traverse.is_empty() || !traverse.is_empty());
+        // ⚠️ 2026-10-05 修重言式断言：旧版唯一断言
+        // `assert!(traverse.is_empty() || !traverse.is_empty())` **恒真**。
+        // 钉住真实语义：`traverse` 返回从 `id` 出发 depth=1 可达的节点 id
+        // （`bank_impl/persist.rs:126-129`：图未启用才返回空Vec）。
+        // `enable_hypergraph` 已启用 ⇒ 起点自身必被纳入。
+        assert!(
+            traverse.contains(&id),
+            "超图已启用，起点自身应在遍历结果中：{traverse:?}"
+        );
     }
 
     #[test]

@@ -24,8 +24,9 @@
 //! - ratatui + crossterm 标准全屏流程，`Drop` 守卫必还终端，无 unsafe (R-P1)。
 //! - 生产代码无 `unwrap/expect/panic`。
 
+use crate::l1_action::nt_action_facade::{NtDemand, NtHumanChannel, NtHumanReply};
 use crate::l1_action::nt_stdin_human::NtStdinHuman;
-use crate::l1_action::nt_action_facade::{NtDemand, NtDemandKind, NtHumanChannel, NtHumanReply};
+use crate::l1_action::nt_tui_theme as theme;
 use std::sync::Mutex;
 
 use crossterm::{
@@ -36,7 +37,6 @@ use crossterm::{
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Terminal,
@@ -223,20 +223,13 @@ pub fn demand_row_text(d: &NtDemand, detailed: bool) -> String {
     }
 }
 
-/// 需求单配色（自有进化特性：kind 即 JEV 式紧急度语义）。
-/// 复核=黄（待审），重试=红（失败），裁决=品红（冲突），
-/// 核查=青（求证），确认=蓝（待定），其他=灰。
-pub fn demand_style(kind: NtDemandKind) -> Style {
-    let fg = match kind {
-        NtDemandKind::ReviewFusion | NtDemandKind::RecheckLowConf => Color::Yellow,
-        NtDemandKind::RetryFailed => Color::Red,
-        NtDemandKind::Adjudicate => Color::Magenta,
-        NtDemandKind::RecheckMinority => Color::Cyan,
-        NtDemandKind::ConfirmSkipped => Color::Blue,
-        NtDemandKind::Other => Color::Gray,
-    };
-    Style::default().fg(fg)
-}
+/// 需求单配色 —— 已平移至 [`crate::l1_action::nt_tui_theme::demand`]。
+///
+/// ⛔ 2026-10-05：本函数原为唯一定义，现改为**纯转出**（不是第二份定义）。
+/// 理由：配色真源必须唯一，否则 v1/v2 会各自漂移。
+/// 保留旧名 `demand_style` 是为了不动 2 个渲染调用点与 4 条测试断言；
+/// 若直接删名，测试里钉死调色板的断言会一并失效（那是覆盖率的倒退）。
+pub use crate::l1_action::nt_tui_theme::demand as demand_style;
 
 /// 从窗口文本按前缀取行（render() 格式的逆操作）。
 pub fn extract_line(window: &str, prefix: &str) -> String {
@@ -713,7 +706,7 @@ fn render_input(f: &mut ratatui::Frame, area: ratatui::layout::Rect, state: &NtT
     if state.input.is_empty() {
         spans.push(Span::styled(
             "<id>: 文字批准 · <id>! 文字驳回 · ok/no <id> · 空回结束",
-            Style::default().fg(Color::DarkGray),
+            theme::dim(),
         ));
     } else {
         let chars: Vec<char> = state.input.chars().collect();
@@ -729,7 +722,7 @@ fn render_input(f: &mut ratatui::Frame, area: ratatui::layout::Rect, state: &NtT
         spans.push(Span::raw(before));
         spans.push(Span::styled(
             at,
-            Style::default().bg(Color::DarkGray).fg(Color::White),
+            theme::cursor(),
         ));
         spans.push(Span::raw(after));
     }
@@ -745,7 +738,7 @@ fn render_input(f: &mut ratatui::Frame, area: ratatui::layout::Rect, state: &NtT
 }
 
 fn render_status(f: &mut ratatui::Frame, area: ratatui::layout::Rect, state: &NtTuiState) {
-    let p = Paragraph::new(state.status_line()).style(Style::default().fg(Color::Cyan));
+    let p = Paragraph::new(state.status_line()).style(theme::status());
     f.render_widget(p, area);
 }
 
@@ -770,9 +763,9 @@ fn render_picker(f: &mut ratatui::Frame, area: ratatui::layout::Rect, state: &Nt
                 Span::styled(
                     m.clone(),
                     if i == picker.selected {
-                        Style::default().fg(Color::Yellow)
+                        theme::selected()
                     } else {
-                        Style::default()
+                        theme::normal()
                     },
                 ),
             ]))
@@ -955,16 +948,18 @@ mod tests {
             "[retry-1] 失败重试".to_string()
         );
         assert!(demand_row_text(&d, true).contains("重试子任务"));
-        assert_eq!(demand_style(NtDemandKind::RetryFailed).fg, Some(Color::Red));
-        assert_eq!(
-            demand_style(NtDemandKind::ReviewFusion).fg,
-            Some(Color::Yellow)
-        );
-        assert_eq!(
-            demand_style(NtDemandKind::Adjudicate).fg,
-            Some(Color::Magenta)
-        );
-        assert_eq!(demand_style(NtDemandKind::Other).fg, Some(Color::Gray));
+        // ⚠️ 2026-10-05 移走 4 条调色板断言到 `nt_tui_theme::tests`。
+        //
+        // 理由：`demand_style` 已改为从 `nt_tui_theme::demand` **纯转出**，
+        // 配色真源唯一。若断言留在这里，会让人以为本文件是配色真源；
+        // 留在真源模块里才能保证「改配色必改测试」。
+        //
+        // ⛔ 覆盖面**未减少**：新位置的 `demand_palette_is_stable` 逐字覆盖
+        // 全部 **7 个**变体（旧处只断言 4 个），另新增
+        // `same_color_different_semantics` 钉住「一色一名」不变量。
+        //
+        // 行为侧仍有断言在本测试里：`demand_row_text` 的两种形态。
+        assert!(demand_style(NtDemandKind::RetryFailed).fg.is_some());
     }
 
     #[test]
