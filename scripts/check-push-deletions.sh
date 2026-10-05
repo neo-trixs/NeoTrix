@@ -40,7 +40,53 @@ cd "$ROOT" || exit 2
 #    正确做法：锚点 = 本脚本**首次入库**的那笔提交，从它开始算（含它自己）。
 #    门还没入库时（开发中自测）没有锚点，此时只做只读报告并 exit 0，
 #    不能因为「找不到锚点」就退化成一个必然红的门。
-ANCHOR=$(git log --diff-filter=A --format=%H -1 -- scripts/check-push-deletions.sh 2>/dev/null || true)
+#
+# ---------------------------------------------------------------------------
+# ⚠️ 2026-10-05：自动锚点有个**实测出来的**缺陷，本段改为支持「显式基线」。
+#
+# 缺陷：锚点是「本脚本首次入库」那笔提交 ⇒ 它之后的所有提交都会被追溯，
+#   **包括门当时还处于「不可达」状态期间做的提交**。
+#   实测：门在 `.githooks/pre-push` 里被 `exit 0` 挡在后面（从未真正跑过），
+#   期间其他窗口正常提交了 7 个含删除的 commit ⇒ 门一激活就报 7 个未声明，
+#   **push 被全量封死** ⇒ 于是继续不激活 ⇒ 死锁。
+#
+#   ⚠️ 原设计的两条出路都不可接受：
+#     「rebase 补声明」⇒ **重写他人已提交的共享历史**（多窗口并发下极危险）
+#     「继续不激活」⇒ 门永远不存在，等于没有门
+#
+# ✅ 正确做法：**基线可前移**。把「已裁定完毕」的那笔提交记为基线，
+#   门只对其后的提交生效。这样：
+#   - 不需要重写任何历史
+#   - 门可以立刻激活并真实拦截
+#   - 未来新增违规仍然被拦（这才是门的价值）
+#
+# 基线来源优先级：
+#   1. 环境变量 `NT_PUSH_DELETIONS_BASE`（CI / 一次性裁定用）
+#   2. 基线文件 `.neotrix/push_deletions_base`（仓库内，可随提交前移）
+#   3. 回退到「本脚本首次入库」的自动锚点（保持旧行为）
+# ---------------------------------------------------------------------------
+BASELINE_FILE=".neotrix/push_deletions_base"
+BASE_SHA=""
+
+if [ -n "${NT_PUSH_DELETIONS_BASE:-}" ]; then
+  BASE_SHA="$NT_PUSH_DELETIONS_BASE"
+elif [ -f "$BASELINE_FILE" ]; then
+  BASE_SHA=$(tr -d '[:space:]' < "$BASELINE_FILE" 2>/dev/null || true)
+fi
+
+if [ -n "$BASE_SHA" ] && BASE_COMMIT=$(git rev-parse -q --verify "$BASE_SHA^{commit}" 2>/dev/null); then
+  RANGE="$BASE_COMMIT..HEAD"
+  echo "[push-deletions] 显式基线：${BASE_COMMIT:0:8}（已裁定完毕，此前不追溯）。"
+  echo "[push-deletions]       前移基线：echo $(git rev-parse HEAD) > $BASELINE_FILE"
+elif [ -n "$BASE_SHA" ]; then
+  echo "[push-deletions] 基线 $BASE_SHA 不可解析，回退到自动锚点。"
+  BASE_SHA=""
+fi
+
+ANCHOR=$BASE_SHA
+if [ -z "$ANCHOR" ]; then
+  ANCHOR=$(git log --diff-filter=A --format=%H -1 -- scripts/check-push-deletions.sh 2>/dev/null || true)
+fi
 
 if [ -z "$ANCHOR" ]; then
   echo "[push-deletions] SKIP: 本脚本尚未入库（无锚点提交），跳过历史检查。"
@@ -54,7 +100,7 @@ if ANCHOR_COMMIT=$(git rev-parse -q --verify "$ANCHOR^{commit}" 2>/dev/null); th
   else
     RANGE="$ANCHOR_COMMIT..HEAD"   # 根提交：只能查它之后
   fi
-  echo "[push-deletions] 起算点：${ANCHOR_COMMIT:0:8}（本门首次入库），不追溯此前历史。"
+  [ -n "$BASE_SHA" ] || echo "[push-deletions] 起算点：${ANCHOR_COMMIT:0:8}（本门首次入库），不追溯此前历史。"
 else
   RANGE="HEAD"
   echo "[push-deletions] 锚点提交不可解析，范围退化为单个 HEAD。"
