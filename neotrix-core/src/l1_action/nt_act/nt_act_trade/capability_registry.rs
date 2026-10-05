@@ -813,6 +813,9 @@ pub fn create_empty_registry() -> TradeCapabilityRegistry {
 
 #[cfg(test)]
 mod tests {
+    use nt_core_capability_tree::node::CapabilityNode;
+    use nt_core_capability_tree::registry::CapabilityTreeRegistry;
+
     use super::*;
     use serde_json::json;
 
@@ -950,5 +953,134 @@ mod tests {
         // 全局注册中心可以通过 Domain::Trade 查询
         let trade_caps = registry.global_registry().by_domain(Domain::Trade);
         assert_eq!(trade_caps.len(), 1);
+    }
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+// ⭐⭐⭐⭐⭐ **能力市场元数据**（2026-10-04，⭐⭐ 对标 hermes 的 `IndexEntry`）
+// ══════════════════════════════════════════════════════════════════
+//
+// ⭐⭐⭐⭐⭐ **为什么集中在这里而不是 5 个 registrar 各写一份**：
+// ⭐⭐⭐⭐⭐ ① ⭐⭐ **单一真源** —— 5 处散写必然漂（⭐⭐ 这正是本轮一路在治的病）
+// ⭐⭐⭐⭐⭐ ② ⭐⭐⭐⭐⭐ **可反查**：⭐⭐ `check-trade-market.sh` 能断言
+// ⭐⭐⭐⭐⭐ 「每个 trade 节点都过了这个函数」，⭐⭐ ⭐⭐ 而不是
+// ⭐⭐⭐⭐⭐ 「代码里看起来有 metadata」（⭐⭐ grep ⭐⭐ 不是证据）。
+// ⭐⭐⭐⭐⭐ ③ ⭐⭐ 版本号 ⭐⭐ **一处升版**，⭐⭐ 5 个能力同时生效。
+//
+// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **⚠️ 纪律③：`license` 为空 ⭐⭐ 不是「未知」，
+// ⭐⭐⭐⭐⭐ ⭐⭐ 而是「**不可上架**」** —— 本仓有商业许可阻断门
+// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ （`check-license-js.sh` / `deny.toml`），⭐⭐⭐⭐⭐ 但那只管构建期；
+// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 运行期上架的插件许可无从审计 ⇒ ⭐⭐⭐⭐⭐ **必须显式声明**。
+
+/// ⭐⭐⭐⭐⭐ 本模块需要的类型（⭐⭐⭐ 与 `full_cycle.rs` 等 registrar 同一来源）
+// ⭐⭐⭐⭐⭐ `Domain` ⭐⭐ 本文件已从 `crate::l1_action` 导入（⭐⭐ 见 `:18`）
+// ⭐⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐⭐ **只补真正缺的**，⭐⭐⭐⭐⭐ ⛔ 不重复引入（⭐⭐ 否则同名冲突）。
+use nt_core_capability_tree::node::CapabilityNode;
+
+// ⭐⭐ 贸易能力统一版本号（⭐⭐⭐ 一处升版，5 个能力同时生效）
+pub const TRADE_ABILITY_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// ⭐⭐⭐⭐⭐ 能力在市场里的类别（⭐⭐ 对标 hermes 的 `category`）
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TradeCategory {
+    /// ⭐⭐ 贸易全链（⭐⭐ 编排型）
+    FullCycle,
+    /// ⭐⭐ 报价
+    Quote,
+    /// ⭐⭐ 生产物流
+    Logistics,
+    /// ⭐⭐ 金融合规
+    Finance,
+    /// ⭐⭐ 产品规格
+    ProductSpec,
+}
+
+impl TradeCategory {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::FullCycle => "trade/full-cycle",
+            Self::Quote => "trade/quote",
+            Self::Logistics => "trade/logistics",
+            Self::Finance => "trade/finance",
+            Self::ProductSpec => "trade/product-spec",
+        }
+    }
+}
+
+/// ⭐⭐⭐⭐⭐ **给贸易能力节点填市场元数据 + 类型**（⭐⭐ **五个 registrar 的唯一入口**）。
+///
+/// ⭐⭐ `kind` ⭐⭐ 一律 `Skill`：⭐⭐ 贸易能力 ⭐⭐ **不是 MCP 工具**
+/// （⭐⭐ 它们不进 `McpBridge` 的工具表）、⭐⭐ ⭐⭐ **不是 workflow**
+/// （⭐⭐ 各自独立）、⭐⭐ ⭐⭐ 也不是 agent ⇒ ⭐⭐ `Skill` 是诚实的分类。
+pub fn apply_market_meta(node: &mut CapabilityNode, category: TradeCategory, description: &str) {
+    use neotrix_neobot::nt_capability_market::meta_keys;
+    node.kind = nt_core_capability_tree::node::CapabilityKind::Skill;
+    node.metadata.insert(
+        meta_keys::VERSION.to_owned(),
+        serde_json::Value::String(TRADE_ABILITY_VERSION.to_owned()),
+    );
+    // ⭐⭐⭐⭐⭐ **许可**（⭐⭐⭐ 纪律③ 的关键字段）。
+    // ⭐⭐⭐⭐⭐ 本仓能力是**仓内自有实现**（⭐⭐ ⛔ 不是 vendored 第三方），
+    // ⭐⭐⭐⭐⭐ ⇒ 许可 = 本仓许可。⭐⭐⭐⭐⭐ ⭐⭐ **显式写出** ⭐⭐ 而不是留空
+    // ⭐⭐⭐⭐⭐ ⭐⭐ ⭐⭐ ⭐⭐ 因为留空 ⭐⭐ 会被市场判「不可上架」，
+    // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 而**那需要人先想清楚凭什么**才能填。
+    node.metadata.insert(
+        meta_keys::LICENSE.to_owned(),
+        serde_json::Value::String("LicenseRef-NeoTrix-Internal".to_owned()),
+    );
+    node.metadata.insert(
+        meta_keys::CATEGORY.to_owned(),
+        serde_json::Value::String(category.as_str().to_owned()),
+    );
+    node.metadata.insert(
+        meta_keys::DESCRIPTION.to_owned(),
+        serde_json::Value::String(description.to_owned()),
+    );
+}
+
+#[cfg(test)]
+mod market_meta_tests {
+    use super::*;
+    // ⭐⭐⭐⭐⭐ `CapabilityTreeRegistry` ⭐⭐ **只有测试用** ⇒ ⭐⭐ 留在测试块内，
+    // ⭐⭐⭐⭐⭐ ⭐⭐ ⛔ 不在模块级引入（⭐⭐ 否则是无用的公开依赖面）。
+    use nt_core_capability_tree::registry::CapabilityTreeRegistry;
+use nt_core_capability_tree::node::Domain as CapabilityTreeDomain;
+
+    /// ⭐⭐⭐⭐⭐ **元数据齐全 ⇒ 市场可上架**（⭐⭐ 端到端，⭐⭐ 跨两个 crate）。
+    #[test]
+    fn 贸易能力填完市场元数据即可上架() {
+        let mut n = CapabilityNode::new_primitive(
+            "NT-MIND::trade::x".to_owned(),
+            CapabilityTreeDomain::Mind,
+            vec!["x".to_owned()],
+        );
+        apply_market_meta(&mut n, TradeCategory::Quote, "报价谈判能力");
+        let mut reg = CapabilityTreeRegistry::default();
+        reg.register(n).expect("register");
+        let listable = neotrix_neobot::nt_capability_market::listable(&reg);
+        assert_eq!(listable.len(), 1, "⭐⭐ 填完元数据 ⇒ ⭐⭐ **必须真的出现在市场里**");
+        let e = &listable[0];
+        assert_eq!(e.category, "trade/quote", "⭐⭐ category 对标 hermes");
+        assert!(!e.license.is_empty(), "⭐⭐⭐ 许可必须显式（纪律③）");
+        assert!(!e.version.is_empty(), "⭐⭐ 版本必须显式（⭐⭐ 否则无法判兼容性）");
+        assert_eq!(e.description, "报价谈判能力");
+    }
+
+    /// ⭐⭐⭐⭐⭐ **⛔ 不填元数据 ⇒ ⭐⭐ 不可上架**（⭐⭐⭐ **反向可证伪**）。
+    #[test]
+    fn 未填市场元数据的能力不可上架且必须报出原因() {
+        let n = CapabilityNode::new_primitive(
+            "NT-MIND::trade::bare".to_owned(),
+            CapabilityTreeDomain::Mind,
+            vec!["bare".to_owned()],
+        );
+        let mut reg = CapabilityTreeRegistry::default();
+        reg.register(n).expect("register");
+        assert!(neotrix_neobot::nt_capability_market::listable(&reg).is_empty(),
+            "⭐⭐⭐ 未填 ⇒ 不可上架");
+        let blocked = neotrix_neobot::nt_capability_market::blocked(&reg);
+        assert_eq!(blocked.len(), 1, "⭐⭐⭐ 且必须在 blocked 清单里（⭐⭐ ⛔ 不许静默消失）");
+        assert!(blocked[0].1.contains("license"), "⭐⭐⭐ 原因要说清是 license");
     }
 }

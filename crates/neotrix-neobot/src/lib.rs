@@ -21,6 +21,7 @@
 
 pub mod nt_capability_registry;
 pub mod nt_capability_canary;
+pub mod nt_capability_market;
 pub mod nt_agent;
 pub mod nt_audit;
 pub mod nt_cancel;
