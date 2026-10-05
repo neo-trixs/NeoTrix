@@ -229,8 +229,20 @@ pub mod team {
             Self { name: name.to_string(), process_type, agents: Vec::new(), state: HashMap::new() }
         }
 
-        pub fn add_agent(&mut self, _role: AgentRole) {
-            self.agents.push(_role.name);
+        // ⚠️ 2026-10-05 修 `clippy::used_underscore_binding`：`_role` 的 `_` 前缀是错的。
+        //
+        // 事实：`:233` 实际**使用了** `_role.name`，而 `_` 前缀在 Rust 里的约定是
+        // 「此参数不使用、保留以免 unused 警告」⇒ 声明与代码**矛盾**，
+        // 读者会误以为 `add_agent` 丢弃了 role。
+        //
+        // ⛔ 只改参数名，**不改签名类型** ⇒ 零调用方影响
+        //   （已核实：`rg 'add_agent\('` 在全仓无其他调用点）。
+        // ⚠️ 同族的 `_task`（`:239`）**保持不变** —— 那个参数确实未使用，
+        //   `_` 前缀是正确的。⇒ 本仓库混着「该去前缀」与「该留前缀」两种情况，
+        //   所以 495 条 `used_underscore_binding` **不能机器批量改**：
+        //   逐条读才知道是哪种。样本见交接文档 §15。
+        pub fn add_agent(&mut self, role: AgentRole) {
+            self.agents.push(role.name);
         }
         /// Execute a task across all agents in the team.
         ///
