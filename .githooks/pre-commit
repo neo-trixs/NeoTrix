@@ -145,6 +145,19 @@ if [ -x scripts/check-doc-drift.sh ]; then
   scripts/check-doc-drift.sh 2>&1 | tail -2 || true
 fi
 
+# ---------- 3.5) orphan-dir 门（2026-10-05 立；advisory，登记在 task-index）----------
+# 依据：本轮实测 `nt_memory/` 下曾有 5 个目录 2663 行 + 若干测试**从未被编译**
+# （父 mod.rs 零 mod 声明），挂载后立刻暴露「相关度全 NaN」与
+# 「insert 返回 Ok 却没写入」两个真缺陷 —— 而当时 13041 条测试全绿。
+# ⛔ 现有三道门都不覆盖「源码是否在编译树里」：
+#   check-layer-deps 管跨层引用 / check-naming 管文件名 / check-truth-surface 管扫描面。
+# 默认 advisory：存量 25 个孤儿目录（>19000 行），blocking 会让本门恒红
+# ⇒ 恒红的门等于没有门（R-SCAN-3）。只对**新增**孤儿提示。
+if [ -x scripts/check-orphan-dirs.sh ]; then
+  echo -e "\033[1;33m🗂  orphan-dir advisory:\033[0m"
+  scripts/check-orphan-dirs.sh 2>&1 | head -8 || true
+fi
+
 # ---------- 4) 目录结构门（2026-09-29 立；blocking on NEW 违规）----------
 # DOCUMENTATION-MAP.md 的 4 条「禁止」此前**全是散文、无一道门执行**（实测：
 # 根目录放 SCRATCH-临时笔记.md，naming/doc-drift/truth-surface 三门全过）。

@@ -1203,6 +1203,24 @@
       "spec": "断言「running 行必被 sweep 支配」：C1 同一函数体内 sweep 行号 < Running 写入行号；C2 非测试代码里 Running 构造点恰好 1 个；C3 无裸 SQL 写 tasks.status；C4 能开库的 bin 花名册。⭐ 判据锚在「写」而非「入口」——入口是投影，按入口枚举会造出 22 条假要求（实测 25 个 bin 里只有 3 个能开库）。",
       "tool": "node scripts/ops/neobot-check-a1-recovery.mjs",
       "when_not": "⛔ 抓不到 Rust workspace 外的写入（sqlite3 CLI 或别的语言写同一个 neobot.db）。⛔ C1 是行序判据不是数据流证明——sweep 若被移进不覆盖写路径的条件分支，行号仍「小于」⇒ 假绿。⛔ C4 的 bin→opener 可达性是文本推导不是真编译图。"
+    },
+    {
+      "id": "check-orphan-dirs",
+      "query": [
+        "孤儿目录",
+        "未编译",
+        "未挂载",
+        "没进编译树",
+        "mod 声明",
+        "孤儿模块",
+        "绿测试背书",
+        "orphan"
+      ],
+      "tool": "bash scripts/check-orphan-dirs.sh            # advisory 列清单\npython3 scripts/ops/nt_orphan_dir.py --strict   # 仅新增孤儿时非零",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "不要用它判「这些目录该不该存在」—— 基线里 25 个孤儿目录尚未逐个裁决，清单是**待裁决输入**不是判决；也不要用它替代 cargo 编译门：它只看目录可达性，不看类型是否正确。已知三类误报来源：有意的死代码归档、`#[path=..]` 非典型挂载（本门不解析该属性）、未来的代码生成目录。",
+      "spec": "scripts/ops/nt_orphan_dir.py 顶部文档（含 2026-10-05 实测依据）"
     }
   ],
   "excluded": {
