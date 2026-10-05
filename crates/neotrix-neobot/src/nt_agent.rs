@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::nt_audit::{AuditDecision, AuditEvent};
 use crate::nt_cancel::StopToken;
+use crate::nt_capability_canary;
 use crate::nt_config::{NeobotConfig, PolicyMode};
 use crate::nt_engine::EngineAdapter;
 use crate::nt_error::NtBotError;
@@ -521,6 +522,14 @@ fn run_local_turn_inner(
     let title = ctx.title;
     let convo_id = ctx.convo_id;
     let now = Utc::now().to_rfc3339();
+
+    // 本轮是新的观察窗口：金丝雀计数归零。
+    //
+    // 纪律照抄 plur `tools.ts:3594`：不 reset 的话，一次信号就能让金丝雀在
+    // **整个进程生命周期**保持健康（它记的 #192 事故）。判据是
+    // `fired>0 || ticks<3`，ticks 只增不减会让第一项一旦为真就永不失效，
+    // 于是「早已坏掉的能力」看起来一直健康。
+    nt_capability_canary::reset();
     // 检查点 C0（取消）：**入轮清一次旗**。
     //
     // 语义是「进入这一轮时的值」就是「这一轮专属的停止意图」。共享令牌
@@ -791,6 +800,16 @@ fn run_loop(
             current = turn.status;
             break;
         }
+        // 每个 tool call 推进一个金丝雀观察窗口。
+        //
+        // 位置：紧贴 tool_calls 循环头，即「模型请求了能力」的汇聚点。纪律
+        // 沿用 plur `server.ts:336`（每次 tool call = 一个 turn）。
+        // 刻意不放在 hop 开头 —— 那会把「这一跳模型没调任何工具」也算成一轮，
+        // 窗口被无关轮次灌水，阈值（ticks < 3）形同虚设。
+        for _call in turn.tool_calls.iter() {
+            nt_capability_canary::tick();
+        }
+
         let mut saw_status: Option<TurnStatus> = None;
         for (call_idx, call) in turn.tool_calls.iter().enumerate() {
             // 检查点 C2：**同跳内不再执行下一个工具**（最重要的一处）。
