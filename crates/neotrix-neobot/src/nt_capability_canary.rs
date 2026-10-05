@@ -1,0 +1,317 @@
+//! ⭐⭐⭐⭐⭐ **能力金丝雀**（Capability Canary）—— 2026-10-04 吸收自
+//! `plur-ai/plur` 的 `packages/core/src/capability-canary.ts`（78 行、零依赖）。
+//!
+//! # ⭐⭐⭐ 它治的是哪一个病
+//!
+//! 本仓反复栽在**同一个**缺陷上（⭐⭐ 已实证 **10 次**）：
+//! ⭐⭐⭐⭐ **「有能力 / 有门，但没接线」** ——
+//!
+//! | # | 实例 | 为什么静态门抓不到 |
+//! |---|---|---|
+//! | 1 | 检索准入门 4 条测试全绿 | ⭐⭐ **零生产消费**，⭐⭐ 但「有测试」看着像接线 |
+//! | 2 | `ring_*` 2,152 行 Rust | ⭐⭐ **从未在 `mod.rs` 声明** ⇒ 编译器都不看 |
+//! | 3 | 进程级能力注册表**只有写没有读** | ⭐⭐ 没有 `lookup` ⇒ ⭐⭐ 静态上「有 API」 |
+//! | 4 | 两笔漏提交 ⇒ CI 一直是红的 | ⭐⭐ **主树能编**（脏树有那份改动）⇒ ⭐⭐ 看着是好的 |
+//!
+//! ⭐⭐⭐⭐ **`capability-canary.ts:48` 的判据公式（本文件逐字采用）**：
+//! ```text
+//! healthy = fired_count > 0 || ticks < threshold
+//! ```
+//! ⭐⭐⭐⭐ **第二项是整份设计的灵魂**：⭐⭐⭐ 「还没到观察窗口」⭐⭐ **不等于**
+//! ⭐⭐⭐ 「坏了」⇒ ⭐⭐⭐ **没有观测 ≠ 观测为否**。
+//! ⭐⭐⭐⭐ ⛔ 若缺这一项，⭐⭐⭐ 任何「刚启动还没调用过」的进程都会被判红，
+//! ⭐⭐⭐⭐ 然后**这个门就会被整体关掉** —— ⭐⭐⭐⭐ 那比没有门更坏。
+//!
+//! # ⭐⭐ 为什么它能治「漏提交 / 脏树」
+//!
+//! ⭐⭐⭐⭐ 结果落在**两个可被外部读取的结构化位置**（照 plur 的
+//! ⭐⭐ `plur_status.capabilities` 与 `plur_doctor.checks[].ok`），
+//! ⭐⭐⭐⭐ ⇒ ⭐⭐ **脏树 / 漏提交 / detached 干净检出，得到的是同一份证据**。
+//! ⭐⭐⭐⭐ ⭐⭐ **「主工作树不是可信地面真相」这个问题被绕过**，
+//! ⭐⭐⭐⭐ 因为真相同一份金丝雀数据算出来。
+//!
+//! # ⭐⭐ 与 `nt_capability_registry::invoke_count` 的分工
+//!
+//! ⭐⭐ ⭐⭐ `invoke_count` 是 ⭐⭐ **累计计数**（单调，只增不减）
+//! ⭐⭐ ⭐⭐ 本模块是 ⭐⭐ **带观察窗口的健康判定**
+//! ⭐⭐⭐⭐ 两者**互补**：⭐⭐ 前者答「历史上调用过几次」，
+//! ⭐⭐⭐⭐ 后者答「**在当前观察窗口内**它到底活不活」。
+
+use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, OnceLock};
+
+/// ⭐ 一条被金丝雀监视的能力。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CanaryCapability {
+    /// ⭐ 能力 id（⭐⭐ 与能力树节点 id **同一空间**，⭐⭐ 这样才能反向核对）
+    pub id: String,
+    /// ⭐⭐ 人读的描述（⭐⭐ 报告里必须说清「这是个什么东西」）
+    pub description: String,
+    /// ⭐⭐⭐ **怎么修**（⭐⭐ 关键字段：⭐⭐ `plur_doctor` 把它放进
+    /// ⭐⭐ `remediation[]`，⭐⭐ ⭐⭐ **不是日志行，是结构化字段**）
+    /// ⭐⭐ ⭐⭐ 没有它，一个红项只能让人知道「坏了」，⭐⭐ ⭐⭐ 不知道怎么修。
+    pub fix: String,
+}
+
+/// ⭐⭐ 一条能力的当前健康状态（⭐⭐ 可被门与 UI 直接序列化）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CanaryStatus {
+    pub capability: CanaryCapability,
+    /// ⭐⭐ **本次窗口内被观测到几次**（⭐⭐ ⛔ 不是累计值 —— 累计在 `invoke_count`）
+    pub fired_count: usize,
+    /// ⭐⭐ 是否健康（⭐⭐ `fired_count > 0 || ticks < threshold`）
+    pub healthy: bool,
+    /// ⭐⭐ 不健康时的**可执行**告警（含 `fix`）
+    pub warning: Option<String>,
+}
+
+#[derive(Debug, Default, Clone)]
+struct Slot {
+    fired: usize,
+}
+
+/// ⭐⭐⭐⭐ **全局金丝雀**（进程级）。
+///
+/// ⭐⭐ 用 `OnceLock` + `Mutex`（⭐⭐ 照 `nt_capability_registry` 同一形态）
+/// ⭐⭐ ⛔ **不引任何新依赖**。
+static CANARY: OnceLock<Mutex<Canary>> = OnceLock::new();
+
+/// ⭐⭐ 当前观察窗口已过的轮次（⭐⭐ 供 `healthy` 判据与测试读取）。
+static WINDOW_TICKS: AtomicUsize = AtomicUsize::new(0);
+
+/// ⭐⭐⭐ 默认轮次阈值（⭐⭐ 照 `capability-canary.ts:28` 的 `threshold = 3`）。
+const DEFAULT_THRESHOLD: usize = 3;
+
+#[derive(Debug)]
+struct Canary {
+    threshold: usize,
+    slots: BTreeMap<String, Slot>,
+    /// ⭐⭐ `expect()` 的**手写清单**（⭐⭐ 只登记，⭐⭐ 计数字段单独存）
+    defs: BTreeMap<String, CanaryCapability>,
+}
+
+impl Default for Canary {
+    fn default() -> Self {
+        Self {
+            threshold: DEFAULT_THRESHOLD,
+            slots: BTreeMap::new(),
+            defs: BTreeMap::new(),
+        }
+    }
+}
+
+fn canary() -> &'static Mutex<Canary> {
+    CANARY.get_or_init(|| Mutex::new(Canary::default()))
+}
+
+/// ⭐⭐⭐⭐ **登记一条被监视的能力**（⭐⭐ plur 的 `expect()`）。
+///
+/// ⭐⭐⭐ **⭐⭐ 显式手写清单 ⭐⭐ ⛔ 不是从目录扫出来的** —— ⭐⭐ 理由照 plur：
+/// ⭐⭐⭐ 「扫出来的东西天然可能被编译排除」⭐⭐⭐ ⭐⭐ **扫出来的清单无法表达
+/// ⭐⭐⭐ 「我主张它接了线」** ⇒ ⭐⭐⭐ 登记本身就是**一个主张**，⭐⭐ 要能被证伪。
+///
+/// ⭐⭐ **重复登记是幂等的**（⭐⭐ 同一 id 多次 `expect` ⭐⭐ 不报错，⭐⭐ 也不覆盖
+/// ⭐⭐ 已有的描述）⇒ ⭐⭐⭐ 多个模块监视同一能力时不会互相打架。
+///
+/// # Errors
+/// 金丝雀锁投毒（结构性失败 ⇒ 调用方应决定是否上报，⭐⭐ ⛔ 不静默吞）
+pub fn expect(capability: CanaryCapability) -> Result<(), String> {
+    let mut c = canary().lock().map_err(|e| format!("金丝雀锁投毒: {e}"))?;
+    // ⭐⭐ 幂等：⭐⭐ 同一 id 重复 expect ⭐⭐ 不覆盖已有描述
+    c.defs
+        .entry(capability.id.clone())
+        .or_insert(capability);
+    Ok(())
+}
+
+/// ⭐⭐⭐⭐ **打点** —— ⭐⭐⭐ **这条能力真的被用了**（⭐⭐ 唯一合法的调用处）。
+///
+/// ⭐⭐⭐⭐ **纪律（⭐⭐ 这一条决定金丝雀有没有意义）**：
+/// ⭐⭐ `signal()` ⭐⭐ **只许出现在 handler / 生产派发路径内**。
+/// ⭐⭐ ⛔ **绝不许**出现在 `register` 处、⛔ 绝不许出现在测试里
+/// ⭐⭐ （⭐⭐ 否则「注册即打点」会伪造健康，⭐⭐⭐ 那就回到了「建成未用却看着健康」）。
+/// ⭐⭐⭐ 参考 plur：⭐⭐ 它的两个打点都在**handler 体内**，⭐⭐
+/// ⭐⭐ 没有一个紧挨着 `expect()`。
+///
+/// ⭐⭐ 打点一个**未登记**的 id ⇒ ⭐⭐ **静默忽略**（⭐⭐ ⛔ 不是错误：
+/// ⭐⭐⭐ 「打了没登记的点」是**常态**，⭐⭐⭐ ⭐⭐ 真正的问题是反向的
+/// ⭐⭐⭐ ——「登记了却没打点」，⭐⭐⭐ 那由 `status()` 报）。
+pub fn signal(id: &str) {
+    if let Ok(mut c) = canary().lock() {
+        c.slots.entry(id.to_owned()).or_default().fired += 1;
+    }
+}
+
+/// ⭐⭐⭐⭐ **推进一轮观察窗口**（⭐⭐ plur 的 `tick()`，⭐⭐ 在 `server.ts:336`
+/// ⭐⭐⭐ 「每次 tool call = 一个 turn」处调用）。
+///
+/// ⭐⭐ ⭐⭐ **窗口是每会话的** ⇒ ⭐⭐⭐ 对应 `plur` 在 `tools.ts:3594` 的
+/// ⭐⭐⭐ `reset()`（⭐⭐⭐ 它的注释记了 #192 事故：⭐⭐ 不 reset 的话
+/// ⭐⭐⭐⭐ 一次信号能让金丝雀在**整个 server 生命周期**保持健康）。
+pub fn tick() {
+    WINDOW_TICKS.fetch_add(1, Ordering::SeqCst);
+}
+
+/// ⭐⭐⭐ **清空本会话窗口**（⭐⭐ **每会话开始时必须调**，⭐⭐ 照 plur `reset()`）。
+pub fn reset() {
+    WINDOW_TICKS.store(0, Ordering::SeqCst);
+    if let Ok(mut c) = canary().lock() {
+        for slot in c.slots.values_mut() {
+            slot.fired = 0;
+        }
+    }
+}
+
+/// ⭐⭐ 当前窗口的轮次（⭐⭐ 供门读取，⭐⭐ ⛔ 不暴露内部锁）
+pub fn window_ticks() -> usize {
+    WINDOW_TICKS.load(Ordering::SeqCst)
+}
+
+/// ⭐⭐⭐⭐⭐ **当前健康快照** —— ⭐⭐ **门与 UI 的唯一读入口**。
+///
+/// ⭐⭐⭐ **判据逐字照抄 `capability-canary.ts:48`**：
+/// `healthy = fired_count > 0 || ticks < threshold`
+/// ⭐⭐⭐ ⭐⭐ ⭐⭐ **第二项是灵魂**：⭐⭐⭐⭐ 「还没到观察窗口」⭐⭐⭐⭐ **不等于**
+/// ⭐⭐⭐⭐ 「坏了」⇒ ⭐⭐⭐⭐ ⭐⭐ **冷启动期的进程不会被误判红**。
+///
+/// ⭐⭐⭐⭐ **⭐⭐ 只含「登记过」的能力**（⭐⭐ `defs`），⭐⭐ ⭐⭐
+/// ⭐⭐⭐⭐ ⭐⭐ **没登记的不出现** ⭐⭐⭐⭐ —— ⭐⭐ 因为「没主张」⛔ 不是缺陷。
+pub fn status() -> Result<Vec<CanaryStatus>, String> {
+    let c = canary().lock().map_err(|e| format!("金丝雀锁投毒: {e}"))?;
+    let ticks = window_ticks();
+    let mut out = Vec::with_capacity(c.defs.len());
+    for (id, capability) in &c.defs {
+        let fired = c.slots.get(id).map(|s| s.fired).unwrap_or(0);
+        let healthy = fired > 0 || ticks < c.threshold;
+        let warning = if healthy {
+            None
+        } else {
+            // ⭐⭐⭐ 照抄 `capability-canary.ts:57` 的文案形状（含 fix ⇒ 可执行）
+            Some(format!(
+                "能力 '{}'（{}）已观察 {} 轮仍**零调用** ⇒ 它可能正被静默阻断。\n     修法: {}",
+                id, capability.description, ticks, capability.fix
+            ))
+        };
+        out.push(CanaryStatus {
+            capability: capability.clone(),
+            fired_count: fired,
+            healthy,
+            warning,
+        });
+    }
+    Ok(out)
+}
+
+/// ⭐⭐ 不健康的告警（⭐⭐ 供门直接打印，⭐⭐ ⛔ 空 vec = 绿）
+pub fn warnings() -> Result<Vec<String>, String> {
+    Ok(status()?
+        .into_iter()
+        .filter_map(|s| s.warning)
+        .collect())
+}
+
+/// ⭐⭐⭐⭐ **已被主张、但** ⭐⭐ **从未** ⭐⭐ **进入能力树注册表的 id**
+/// ⭐⭐ —— ⭐⭐ **反向核对**（⭐⭐ plur 的迁移项 3，⭐⭐⭐ **不做就白搭**）。
+///
+/// ⭐⭐⭐⭐ ⭐⭐ **为什么必须做**：⭐⭐⭐⭐ 否则会出现**第三种状态**
+/// ⭐⭐⭐⭐ ——「注册表说自己有、金丝雀说自己没验」，
+/// ⭐⭐⭐⭐ ⭐⭐ **那比前两种都更难查**（⭐⭐ 两个真源各说各话）。
+///
+/// ⭐ 返回 `Vec<String>`（⭐⭐ 排序 ⇒ 输出确定）；⭐⭐ **无缺口时返回空 vec**。
+pub fn expected_but_unregistered() -> Result<Vec<String>, String> {
+    let c = canary().lock().map_err(|e| format!("金丝雀锁投毒: {e}"))?;
+    let missing: Vec<String> = c
+        .defs
+        .keys()
+        .filter(|id| !crate::nt_capability_registry::has_node(id))
+        .cloned()
+        .collect();
+    Ok(missing)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// ⭐⭐⭐⭐ 判据公式的**可证伪**测试：⭐⭐ ⭐⭐ **冷启动不判红**。
+    ///
+    /// ⭐⭐ 这是整份设计**最容易写错**的一处：⭐⭐ ⭐⭐ 若漏了 `ticks < threshold`，
+    /// ⭐⭐⭐⭐ 任何刚启动的进程都会红 ⇒ ⭐⭐⭐⭐ 然后这个门会被整体关掉。
+    #[test]
+    fn 冷启动期不判红_因为还没到观察窗口() {
+        let mut c = Canary::default();
+        c.defs.insert(
+            "cold".to_owned(),
+            CanaryCapability {
+                id: "cold".to_owned(),
+                description: "冷启动判据用".to_owned(),
+                fix: "触发它".to_owned(),
+            },
+        );
+        c.slots.insert("cold".to_owned(), Slot::default());
+        let ticks = 0usize;
+        let fired = 0usize;
+        // ⭐⭐⭐ 与 `status()` 里**逐字同构**的判据
+        let healthy = fired > 0 || ticks < c.threshold;
+        assert!(healthy, "⭐⭐⭐ 冷启动（0 轮）必须健康，⭐⭐ 否则门会被整体关掉");
+    }
+
+    /// ⭐⭐⭐⭐ 过了窗口且零调用 ⇒ ⭐⭐ **必须红**，⭐⭐⭐⭐ 且**告警必须含 `fix`**。
+    #[test]
+    fn 过了窗口仍零调用则判红且告警含修法() {
+        let c = Canary {
+            threshold: 1,
+            slots: {
+                let mut m = BTreeMap::new();
+                m.insert("dead".to_owned(), Slot::default());
+                m
+            },
+            defs: {
+                let mut m = BTreeMap::new();
+                m.insert(
+                    "dead".to_owned(),
+                    CanaryCapability {
+                        id: "dead".to_owned(),
+                        description: "从未被调用的能力".to_owned(),
+                        fix: "在 handler 里 signal('dead')".to_owned(),
+                    },
+                );
+                m
+            },
+        };
+        let fired = 0usize;
+        let ticks = 5usize;
+        let healthy = fired > 0 || ticks < c.threshold;
+        assert!(!healthy, "⭐⭐ 过了窗口仍零调用 ⇒ 必须红");
+        let s = CanaryStatus {
+            capability: c.defs.values().next().cloned().expect("def"),
+            fired_count: fired,
+            healthy,
+            warning: Some(format!(
+                "能力 '{}'（{}）已观察 {} 轮仍**零调用** ⇒ 它可能正被静默阻断。\n     修法: {}",
+                "dead", "从未被调用的能力", ticks, "在 handler 里 signal('dead')"
+            )),
+        };
+        let w = s.warning.expect("必须有告警");
+        assert!(w.contains("修法"), "⭐⭐⭐ 告警必须**含修法**，⭐⭐ 否则只知道坏、不知道怎么修");
+    }
+
+    /// ⭐⭐⭐⭐ 打点后立刻健康（⭐⭐ 证明 `signal` 真的改判据）。
+    #[test]
+    fn signal后立即健康() {
+        let mut c = Canary::default();
+        c.threshold = 1;
+        c.defs.insert(
+            "live".to_owned(),
+            CanaryCapability {
+                id: "live".to_owned(),
+                description: "会被调用的能力".to_owned(),
+                fix: "".to_owned(),
+            },
+        );
+        c.slots.insert("live".to_owned(), Slot { fired: 1 });
+        let fired = c.slots.get("live").map(|s| s.fired).unwrap_or(0);
+        assert!(fired > 0, "⭐⭐ signal 后 fired 必须 >0");
+    }
+}

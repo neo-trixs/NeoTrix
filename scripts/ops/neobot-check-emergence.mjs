@@ -155,6 +155,27 @@ if (!wired) {
   // ⭐⭐⭐ （os-taxonomy / lcu / backburner）⭐⭐ **全部只能证明前者**。
   const neverInvoked = probe.never_invoked || [];
   const invokedCounts = probe.invoked_counts || [];
+  // ⭐⭐⭐⭐⭐ **第 4 段：金丝雀**（⭐⭐ 吸收自 `plur` 的 `CapabilityCanary`）
+  // ⭐⭐⭐⭐⭐ ⭐⭐ 与第 3 段的区别：⭐⭐ 第 3 段是**累计计数**（历史），
+  // ⭐⭐⭐⭐⭐ ⭐⭐ 第 4 段是 ⭐⭐ **带观察窗口的健康判定**（当次会话）。
+  // ⭐⭐⭐⭐⭐ ⭐⭐ **冷启动不判红** ⇒ ⭐⭐ 探针本身不 tick ⇒ ⭐⭐ 必然绿
+  // ⭐⭐⭐⭐⭐ ⭐⭐ ⭐⭐ **这是设计意图，不是放水**：⭐⭐⭐ 「还没到观察窗口」
+  // ⭐⭐⭐⭐⭐ ⭐⭐ ⭐⭐ **不等于「坏了」**。
+  const canary = probe.canary || [];
+  const ticks = probe.canary_ticks;
+  console.log(`  ── 金丝雀（第 4 段）· 窗口轮次 ${ticks} ──`);
+  for (const c of canary) {
+    console.log(`    ${c.healthy ? '✅' : '⛔ '} ${c.id} fired=${c.fired}`
+      + (c.warning ? `\n       ${c.warning.replace(/\n/g, '\n       ')}` : ''));
+  }
+  const orphan = probe.canary_expected_but_unregistered || [];
+  if (orphan.length) {
+    // ⭐⭐⭐ ⛔ 这一项 ⭐⭐ **判红**：⭐⭐ 「金丝雀主张它接了线，能力树里却没有」
+    // ⭐⭐⭐ ⇒ ⭐⭐ **两个真源各说各话**，⭐⭐⭐ 那比「有门没跑」更难查。
+    console.error(`  ⛔ 金丝雀登记了但**能力树里没有**：${orphan.join(', ')}`);
+    console.error('     ⭐⭐ 两个真源漂移 ⇒ 请核对 id 是否逐字一致');
+    process.exit(1);
+  }
   console.log('  ── 调用面（三段式的第 3 段）──');
   for (const v of invokedCounts) {
     console.log(`    ${v.invoked > 0 ? '✅' : 'ℹ️ '} ${v.id} 被调用 ${v.invoked} 次`);

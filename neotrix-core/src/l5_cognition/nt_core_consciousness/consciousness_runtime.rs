@@ -109,6 +109,31 @@ impl ConsciousnessRuntime {
     /// 起不来 ⇒ ⭐⭐ `log::warn!`（⭐⭐ 与 `observe_from_critique` 的处置一致：
     /// ⭐⭐⭐ **记录缺口不许反过来损害启动**）。
     pub fn new() -> Self {
+        // ⭐⭐⭐⭐⭐ **金丝雀登记**（2026-10-04，吸收自 `plur` 的 `CapabilityCanary`）
+        // ⭐⭐⭐⭐⭐ ⭐⭐ **与播种同一个必经点** ⇒ ⭐⭐⭐⭐ 永远不会「播了种但没纳入监视」。
+        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **`fix` 字段是关键**（⭐⭐ ⭐⭐ 照 plur 的 `plur_doctor`
+        // ⭐⭐⭐⭐⭐ ⭐⭐ `remediation[]`）：⭐⭐⭐⭐⭐ 告警必须**可执行**，
+        // ⭐⭐⭐⭐⭐ ⭐⭐ 只说「它坏了」而不说「怎么修」，⭐⭐⭐⭐⭐ 这个门就会被关掉。
+        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ **登记 5 个**（⭐⭐ id 与 `bootstrap_trade_capabilities`
+        // ⭐⭐⭐⭐⭐ ⭐⭐ 里的 `const ID_*` **逐字一致** —— ⭐⭐⭐⭐⭐ 不一致会让
+        // ⭐⭐⭐⭐⭐ ⭐⭐ 反向核对（`expected_but_unregistered`）永远红）。
+        for (id, desc) in [
+            ("NT-MEMORY::trade::trade_product_spec", "产品规格生成"),
+            ("NT-MIND::trade::trade_quote_negotiation", "报价谈判"),
+            ("NT-MIND::trade::trade_production_logistics", "生产物流"),
+            ("NT-MIND::trade::trade_finance_compliance", "金融合规"),
+            ("NT-MIND::trade::foreign_trade_full_cycle", "外贸全链"),
+        ] {
+            let _ = neotrix_neobot::nt_capability_canary::expect(
+                neotrix_neobot::nt_capability_canary::CanaryCapability {
+                    id: id.to_owned(),
+                    description: desc.to_owned(),
+                    fix: "在生产派发处调 nt_capability_canary::signal（⭐⭐ ⛔ 不许在 register 或测试里打点）"
+                        .to_owned(),
+                },
+            );
+        }
+
         // ⭐⭐⭐ 播种：⭐⭐ 幂等（重复调用 `newly=0`），⭐⭐ 故构造几次都安全
         match bootstrap_trade_capabilities() {
             Ok(n) if n > 0 => log::debug!("[consciousness] 播种真实能力 {n} 个"),
@@ -1240,6 +1265,26 @@ mod capability_seeding_tests {
                 // ⭐⭐⭐ 新增（backburner 三段式的第 3 段）
                 "never_invoked": never_invoked,
                 "invoked_counts": invoked_counts,
+                // ⭐⭐⭐⭐⭐ **金丝雀快照**（⭐⭐ 第 4 段：⭐⭐ **「有没有被用」的健康判定**）
+                // ⭐⭐⭐⭐⭐ ⭐⭐ 与 `never_invoked`（累计计数）的区别：
+                // ⭐⭐⭐⭐⭐ ⭐⭐ ⭐⭐ `never_invoked` 答「历史上调用过几次」；
+                // ⭐⭐⭐⭐⭐ ⭐⭐ ⭐⭐ 金丝雀答「**在当前观察窗口内**它到底活不活」，
+                // ⭐⭐⭐⭐⭐ ⭐⭐ ⭐⭐ 且 ⭐⭐⭐ **冷启动期不判红**（⭐⭐⭐ 关键性质）。
+                "canary": neotrix_neobot::nt_capability_canary::status()
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|st| serde_json::json!({
+                        "id": st.capability.id,
+                        "fired": st.fired_count,
+                        "healthy": st.healthy,
+                        "warning": st.warning,
+                    }))
+                    .collect::<Vec<_>>(),
+                "canary_ticks": neotrix_neobot::nt_capability_canary::window_ticks(),
+                // ⭐⭐⭐ 反向核对：⭐⭐ **登记了却不在能力树里** ⭐⭐ ⇒ 第三种状态
+                "canary_expected_but_unregistered":
+                    neotrix_neobot::nt_capability_canary::expected_but_unregistered()
+                        .unwrap_or_default(),
                 "seeded_at": "ConsciousnessRuntime::new",
             })
         );

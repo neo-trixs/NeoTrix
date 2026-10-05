@@ -223,6 +223,18 @@ impl TradeCapabilityRegistry {
 
     /// 获取能力 (TradeCapability 视图)
     pub fn get(&self, capability_id: &str) -> Option<Arc<dyn TradeCapability>> {
+        // ⭐⭐⭐⭐⭐ **金丝雀打点**（2026-10-04，吸收自 `plur` 的 `CapabilityCanary`）。
+        //
+        // ⭐⭐⭐⭐ **为什么打在这里**：⭐⭐ `get()` 是 trade 能力
+        // ⭐⭐⭐⭐ **唯一的生产派发点**（⭐⭐ 拿到它 ⇒ 就要执行它）。
+        // ⭐⭐⭐⭐ ⭐⭐ **纪律**：`signal()` ⭐⭐ 只许出现在**派发路径**内，
+        // ⭐⭐⭐⭐ ⛔ 绝不许出现在 `register` 处、⛔ 绝不许出现在测试里 ——
+        // ⭐⭐⭐⭐ 否则「注册即打点」会伪造健康，⭐⭐⭐⭐
+        // ⭐⭐⭐⭐ 那就回到了「建成未用却看着健康」。
+        //
+        // ⭐⭐ 打点一个**未被 expect 登记**的 id 是**静默无害**的：
+        // ⭐⭐ ⭐⭐ 金丝雀只报告**登记过却没打点**的（⭐⭐ 真正的问题方向）。
+        neotrix_neobot::nt_capability_canary::signal(capability_id);
         self.local.get(capability_id).cloned()
     }
 

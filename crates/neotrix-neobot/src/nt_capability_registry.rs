@@ -109,6 +109,20 @@ pub fn lookup(id: &str) -> Result<Option<CapabilityNode>, String> {
     Ok(found)
 }
 
+/// ⭐⭐⭐⭐⭐ **该 id 是否已登记进能力树**（⭐⭐ 供金丝雀做**反向核对**）。
+///
+/// ⭐⭐⭐⭐ ⭐⭐ **为什么必须有它**：⭐⭐⭐⭐ 金丝雀的 `expect()` 是
+/// ⭐⭐⭐⭐ **显式手写的主张清单**，⭐⭐⭐⭐ 而能力树是**另一个真源**。
+/// ⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐ 若无此函数，⭐⭐⭐⭐ 就会出现 ⭐⭐⭐⭐**第三种状态**：
+/// ⭐⭐⭐⭐ 「金丝雀主张它接了线，⭐⭐ 能力树里却根本没有它」
+/// ⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐ **那比「有门没跑」更难查**（⭐⭐ 两个真源各说各话）。
+pub fn has_node(id: &str) -> bool {
+    slot()
+        .lock()
+        .map(|reg| reg.nodes.contains_key(id))
+        .unwrap_or(false)
+}
+
 /// ⭐⭐⭐⭐⭐ **按能力标签派发** —— ⭐⭐ **两座 id 空间之间那座缺失的桥**。
 ///
 /// ⭐⭐⭐⭐ 能力树节点 id 形如 `NT-MEMORY::trade::trade_product_spec`，
