@@ -36,6 +36,7 @@ pub mod nt_config;
 pub mod nt_core;
 pub mod nt_cost;
 pub mod nt_daemon;
+pub mod nt_determinism;
 pub mod nt_effect_key;
 pub mod nt_engine;
 pub mod nt_evidence;
