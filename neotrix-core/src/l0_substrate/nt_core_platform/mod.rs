@@ -33,4 +33,4 @@ pub use registry::{DomainRegistry, RegistryEntry};
 
 pub use url_match::{host_matches, host_of, url_matches_any, url_matches_any_owned, url_matches_domain};
 
-pub use mod_orphan::{OrphanFile, declared_mods, orphans_in_dir, path_attr_files, scan_tree};
+pub use mod_orphan::{OrphanFile, OrphanKind, declared_mods, orphans_in_dir, path_attr_files, scan_tree};
