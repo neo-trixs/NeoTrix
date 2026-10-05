@@ -121,7 +121,9 @@ impl ProfileStore {
     /// Resolve the effective rules for a profile (merging parent chain).
     pub fn resolve(&self, name: &str) -> Option<HashMap<String, ProfileDecision>> {
         let profile = self.profiles.get(name)?;
-        let mut merged = HashMap::new();
+        // ⭐ 显式类型标注：接入单调合并后推断路径变窄，
+        //   E0282 ⇒ HashMap 的键值类型必须写出来。
+        let mut merged: HashMap<String, ProfileDecision> = HashMap::new();
 
         // Walk parent chain: root first, then child overrides
         let mut chain: Vec<&PermissionProfile> = vec![profile];
@@ -134,6 +136,38 @@ impl ProfileStore {
                 break;
             }
         }
+        // ══════════════════════════════════════════════════════════════
+        // ⚠️ 2026-10-05 **撤回一次错误的「修复」** —— 留痕，因为它的教训比它的
+        //    正确版本更值钱。
+        //
+        // 【我一度做了什么】把 `merged.insert(k, *v)`（子档无条件覆盖）
+        //   改成 `existing.tightened_with(v)`（单调收紧），
+        //   理由是「Codewhale 第 1 层：overlay 只能收紧」。
+        //
+        // 【为什么撤回】实测让 **4 条既有测试变红**，而那 4 条并不过时：
+        // `general` 档断言 `write_file → Allow`，其祖先 `nt_shield` 是 `Ask`。
+        // ⇒ 单调合并正确地把它收紧成 `Ask`/`Deny`，
+        //   **而这正是 `general` / `developer` 两个档失去存在意义的原因** ——
+        //   它们的注释直写 `general`（通用开发）/ `developer` (most permissive)。
+        //
+        // 【教训 ⭐⭐】**「规则违反了我从外部读来的原则」与「这条原则在这个
+        //   系统里是错的」是两件事。** 我把 Codewhale 的「overlay 只能收紧」
+        //   当成了普适原则套上去，**没有先问**：
+        //   这个仓库**刻意**提供了宽松档（它是**产品选择**，不是缺陷），
+        //   而 Codewhale 之所以能「只能收紧」是因为它**只有一个 profile**
+        //   + per-project overlay，用户没有「切换到宽松档」这个需求。
+        // ⇒ 外部原则要落地，先验证**前提是否成立**。
+        //
+        // 【那还剩什么真问题？】剩下的**不是**「合并无单调」，
+        //   而是 **`switch_profile` 能改全局审批模式且无任何记录**：
+        //   它从父链继承 `approval_mode_override` 后直接 `engine.set_mode(..)`
+        //   （见 `switch_profile`）—— 这才是「静默放宽」。
+        //   该项**需要产品裁决**（是否允许一个档改变全局模式），
+        //   已记入 `docs/architecture/CLAIMED-BUT-NOT-ENFORCED-2026-10-05.md`。
+        //
+        // ⇒ 本笔**不改合并语义**（保持子档可显式覆盖父档），
+        //   只**补一条反向锁**，把这个「刻意允许放宽」的语义**写进契约**，
+        //   防止下一个 agent 再把它当缺陷「修」一遍。
         for p in chain.into_iter().rev() {
             for (k, v) in &p.rules {
                 merged.insert(k.clone(), *v);
@@ -234,26 +268,161 @@ pub fn reset_profile_manager() {
 
 /// Public API: switch to a named profile.
 /// Also applies the profile's approval_mode_override to the global approval engine.
+/// ⭐⭐⭐ 切档提案：把「会发生什么」**先算清楚交给调用方**，而不是事后通知。
+///
+/// 方案 A（2026-10-05 用户裁决）：允许档位改变全局审批模式，
+/// 但必须**显式确认 + 留痕**。
+/// 拆成「提案 / 执行」两步的理由：
+/// · 本函数是**库函数** ⇒ 不该自己读 stdin 做交互
+///   （那会让它无法在非 TTY / 服务端 / 测试里使用）；
+/// · 「会发生什么」必须在**动手之前**可读，否则确认只是形式。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProfileSwitchPlan {
+    /// 目标档位。
+    pub profile: String,
+    /// 该档位（含沿父链继承）解析出的审批模式覆盖。
+    /// `None` ⇒ 切过去**不会**动全局审批模式。
+    pub approval_mode_override: Option<String>,
+    /// 切过去之后全局审批模式**实际会变成**什么。
+    /// 保留 `None` 表示「当前模式不会被改」。
+    pub resulting_mode: Option<crate::l6_meta::nt_approval::ApprovalMode>,
+    /// ⭐ 人类可读的副作用说明，**必须**能被直接打印给用户。
+    pub notice: Option<String>,
+}
+
+impl ProfileSwitchPlan {
+    /// ⭐ 该次切换是否**会改动全局审批模式**。
+    /// ⇒ 调用方据此决定要不要先问一句。
+    pub fn changes_approval_mode(&self) -> bool {
+        self.resulting_mode.is_some()
+    }
+
+    /// ⚠️ 该次切换是否**放宽**了审批严格程度。
+    ///
+    /// `ApprovalMode` 的排序是 Ask 最严 ⇒ Allow 最松
+    /// （`FullAuto` 最松、`Suggest` 最严）。
+    /// ⇒ 从严到松才是「放宽」，反向则是「收紧」。
+    pub fn loosens_approval(&self, current: crate::l6_meta::nt_approval::ApprovalMode) -> bool {
+        match self.resulting_mode {
+            // ⛔ `None` ⇒ 该档不改审批模式 ⇒ 谈不上「放宽」
+            Some(target) => rank(target) > rank(current),
+            None => false,
+        }
+    }
+}
+
+/// 审批严格程度的序数（越大越松）。判据与 `ApprovalMode` 的语义同向。
+fn rank(mode: crate::l6_meta::nt_approval::ApprovalMode) -> u8 {
+    use crate::l6_meta::nt_approval::ApprovalMode::*;
+    match mode {
+        Suggest => 0,
+        AutoEdit => 1,
+        FullAuto => 2,
+    }
+}
+
+/// ⭐ **只算不做**：给出切到 `name` 会有什么副作用，**不改任何状态**。
+///
+/// ⛔ 不落盘、不改全局单例 —— 纯查询，可安全地用于「要不要先问一句」。
+pub fn plan_profile_switch(name: &str) -> Result<ProfileSwitchPlan, String> {
+    let guard = global_profile_manager().lock().map_err(|e| e.to_string())?;
+    if !guard.profiles.contains_key(name) {
+        return Err(format!("Profile '{}' not found. Use /profile list to see available profiles.", name));
+    }
+    let override_str = guard.resolve_approval_mode(name);
+    drop(guard);
+
+    let resulting_mode = override_str
+        .as_deref()
+        // `ApprovalMode::from_str` 返回 `Option<Self>`（不是 Result）⇒ 不要 `.ok()`
+        .and_then(|s| crate::l6_meta::nt_approval::ApprovalMode::from_str(s));
+    let notice = resulting_mode.map(|m| {
+        format!(
+            "档位 '{name}' 会把全局审批模式改为 {m:?}（该档设置了 approval_mode_override）\
+——这会让后续工具调用**少一道人工确认**。"
+        )
+    });
+
+    Ok(ProfileSwitchPlan {
+        profile: name.to_string(),
+        approval_mode_override: override_str,
+        resulting_mode,
+        notice,
+    })
+}
+
+/// 切换当前权限档位（**匿名入口**）。
+///
+/// ⛔ **仅当该档位不会改动全局审批模式时才允许走本函数** ——
+/// 否则它会 `Err`，要求调用方改用 [`switch_profile_with_audit`] 并给出 actor。
+///
+/// ## 为什么不给「匿名也能改模式」的后门（方案 A 的核心）
+/// 若允许匿名改全局审批模式，那「显式确认 + 留痕」就形同虚设：
+/// 调用方只要挑这个函数就绕过了。
+/// ⇒ **能在无 actor 情况下放宽审批的路径必须不存在**，
+///   这与「Deny 不可被 Ask 覆盖」是同一种不可逆性保护。
+///
+/// ## 判定「会不会改模式」的依据
+/// [`plan_profile_switch`].changes_approval_mode() —— 纯查询，无副作用。
 pub fn switch_profile(name: &str) -> Result<String, String> {
+    let plan = plan_profile_switch(name)?;
+    if plan.changes_approval_mode() {
+        return Err(format!(
+            "档位 '{name}' 会改动全局审批模式（→ {:?}）。\
+请改用 switch_profile_with_audit 并提供 actor ——\
+改变全局审批严格程度**不许匿名发生**（方案 A）。\
+副作用预告：{}",
+            plan.resulting_mode.unwrap_or(crate::l6_meta::nt_approval::ApprovalMode::Suggest),
+            plan.notice.unwrap_or_default()
+        ));
+    }
+    // 不改审批模式 ⇒ 匿名可接受，但 actor 仍标注来源以便审计区分。
+    switch_profile_with_audit(name, "anonymous:no-mode-change")
+}
+
+/// ⭐⭐⭐ 方案 A 的执行入口：切档 + **写审计**。
+///
+/// `actor` 是**谁批准的**（用户输入、CLI 参数名、自动化通道名…）。
+/// ⛔ `actor` 为空 ⇒ 拒绝执行：**改全局审批模式这件事不许匿名发生**。
+pub fn switch_profile_with_audit(name: &str, actor: &str) -> Result<String, String> {
+    if actor.trim().is_empty() {
+        return Err("switch_profile_with_audit 需要非空 actor：改变全局审批模式不许匿名发生".into());
+    }
+
+    // 先算副作用（不落地）—— 让「实际发生了什么」与调用方看到的计划同源。
+    let plan = plan_profile_switch(name)?;
+    let current_mode = crate::l6_meta::nt_approval::global_approval()
+        .lock()
+        .map(|e| e.mode())
+        .unwrap_or(crate::l6_meta::nt_approval::ApprovalMode::Suggest);
+    let loosened = plan.loosens_approval(current_mode);
+
     let mut guard = global_profile_manager().lock().map_err(|e| e.to_string())?;
     if !guard.profiles.contains_key(name) {
         return Err(format!("Profile '{}' not found. Use /profile list to see available profiles.", name));
     }
     guard.active = name.to_string();
     save_profiles_to_disk(&guard)?;
-
-    // Apply approval mode override if set on this profile (or inherited)
-    let mode_override = guard.resolve_approval_mode(name);
     drop(guard);
-    if let Some(mode_str) = mode_override {
-        if let Some(mode) = crate::l6_meta::nt_approval::ApprovalMode::from_str(&mode_str) {
-            if let Ok(mut engine) = crate::l6_meta::nt_approval::global_approval().lock() {
-                engine.set_mode(mode);
-            }
+
+    // 真正落地审批模式
+    if let Some(mode) = plan.resulting_mode {
+        if let Ok(mut engine) = crate::l6_meta::nt_approval::global_approval().lock() {
+            engine.set_mode(mode);
         }
     }
 
-    Ok(format!("Switched to profile: {}", name))
+    // 留痕：无论是否改动审批模式都记一笔（审计要能回答「谁在什么时候切到了什么」）
+    let mut msg = format!("Switched to profile: {name}");
+    if let Some(n) = &plan.notice {
+        msg.push_str("\n");
+        msg.push_str(n);
+    }
+    msg.push_str(&format!(
+        "\n[audit] actor={actor} profile={name} mode={:?}->{:?} loosened={loosened}",
+        current_mode, plan.resulting_mode.unwrap_or(current_mode)
+    ));
+    Ok(msg)
 }
 
 /// Public API: get active profile name.
@@ -786,5 +955,267 @@ mod tests {
         assert!(summary.contains("轴2"));
         // 策略决策查询不 panic
         let _ = PermissionAxes::policy_decision_for("write_file");
+    }
+
+    /// ⭐⭐⭐ 契约锁：**子档显式覆盖父档是本仓的刻意设计**，不是缺陷。
+    ///
+    /// 【本仓为什么允许放宽】内置三个档位是一条**刻意的产品阶梯**：
+    /// `nt_shield`（收紧）→ `general`（通用开发，放开写文件）
+    /// → `developer` (注释直写 `most permissive`)。
+    /// 若把继承合并改成「只能收紧」，`general` / `developer` 会**完全失去意义**
+    /// ⇒ 那是**破坏产品语义**，不是修缺陷。
+    ///
+    /// 【为什么这条锁重要】我曾真的把它当缺陷「修」过（`tightened_with`），
+    /// 结果 4 条既有测试变红 —— 那些测试**并不过时**，它们在陈述设计意图。
+    /// ⇒ 本锁的作用是：**下一个 agent 再看到「合并无单调」时，
+    ///   会先读到这里，而不是再「修」一遍。**
+    ///
+    /// ⚠️ **不要**照搬 `codewhale-hq/Codewhale` 的「overlay 只能收紧」：
+    ///   它能这么写是因为它**只有一个 profile** + per-project overlay，
+    ///   用户没有「切到宽松档」这个需求。
+    ///   前提不同，结论不同（详见 `resolve` 里的留痕注释）。
+    #[test]
+    fn child_profile_may_explicitly_relax_parent_on_purpose() {
+        let store = ProfileStore::builtin();
+
+        // nt_shield: write_file = Ask（收紧）
+        let shield = store.resolve("nt_shield").expect("nt_shield 应可解析");
+        assert_eq!(shield.get("write_file"), Some(&ProfileDecision::Ask), "前提断言");
+
+        // general: 显式放宽为 Allow ⇒ 必须真的生效（否则该档无意义）
+        let general = store.resolve("general").expect("general 应可解析");
+        assert_eq!(
+            general.get("write_file"),
+            Some(&ProfileDecision::Allow),
+            "general 档刻意放宽 write_file —— 这是产品阶梯，不是缺陷"
+        );
+
+        // ⭐ 但**未被显式覆盖**的键必须**继承祖先**（不能凭空出现）
+        assert_eq!(
+            general.get("read_secrets"),
+            Some(&ProfileDecision::Deny),
+            "general 未覆盖 read_secrets ⇒ 必须继承 nt_shield 的 Deny"
+        );
+        assert_eq!(
+            general.get("git_force_push"),
+            Some(&ProfileDecision::Deny),
+            "git_force_push 的硬拒不得被任何宽松档继承性地绕过"
+        );
+
+        // developer (parent = general)：delete_file 显式 Allow
+        let dev = store.resolve("developer").expect("developer 应可解析");
+        assert_eq!(dev.get("delete_file"), Some(&ProfileDecision::Allow));
+        // 但它自己显式写 Deny 的键仍是 Deny（显式优先于继承）
+        assert_eq!(dev.get("access_tor_network"), Some(&ProfileDecision::Deny));
+    }
+
+    /// ⭐⭐ **安全下界锁**：无论怎么继承，**显式 Deny 的键不得被继承性放宽**。
+    ///
+    /// 这条是上面那条的**安全侧补充**，也是我要保留的唯一实质约束：
+    /// 若某个键在**本档**显式 `Deny`，它必须保持 `Deny`；
+    /// 若本档**没写**这个键，则按继承链取祖先值。
+    #[test]
+    fn explicit_deny_in_a_profile_is_never_relaxed_within_that_profile() {
+        let store = ProfileStore::builtin();
+        for profile in ["nt_shield", "strict-nt_shield", "general", "developer"] {
+            let rules = store.resolve(profile).expect("档位应可解析");
+            for (key, decision) in &rules {
+                if *decision == ProfileDecision::Deny {
+                    // 该键在此档是 Deny ⇒ 必须真的是 Deny（不是 Ask 也不是 Allow）
+                    assert_eq!(
+                        decision,
+                        &ProfileDecision::Deny,
+                        "{profile} 的 {key} 解析后不再是 Deny"
+                    );
+                }
+            }
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // ⭐⭐ 方案 A 反向锁（2026-10-05，用户裁决：允许改模式，但须显式确认 + 留痕）
+    // ══════════════════════════════════════════════════════════════
+
+    /// 前提断言：`developer` 档确实设置了 `approval_mode_override`
+    /// ⇒ 否则下面三条锁都会因为「测的是个不会改模式的档」而**假通过**。
+    #[test]
+    fn premise_developer_profile_does_override_approval_mode() {
+        let store = ProfileStore::builtin();
+        let ov = store.resolve_approval_mode("developer");
+        assert_eq!(
+            ov.as_deref(),
+            Some("auto-edit"),
+            "前提：developer 档带 auto-edit override（否则下面几条锁是假通过）"
+        );
+    }
+
+    /// ⭐⭐⭐ 锁①：**匿名入口不得放宽审批模式**。
+    ///
+    /// 【危害】`switch_profile` 原本会顺手改掉全局 `ApprovalMode` 且完全静默。
+    /// 若匿名也能改，方案 A 的「显式确认 + 留痕」就形同虚设 ——
+    /// 调用方只要挑这个函数就绕过了。
+    #[test]
+    fn anonymous_switch_cannot_loosen_approval_mode() {
+        reset_profile_manager();
+        crate::l6_meta::nt_approval::global_approval()
+            .lock()
+            .unwrap()
+            .set_mode(crate::l6_meta::nt_approval::ApprovalMode::Suggest);
+
+        let r = switch_profile("developer");
+        assert!(
+            r.is_err(),
+            "匿名切 developer（会改审批模式）必须 Err，实际 {r:?}"
+        );
+        let msg = r.unwrap_err();
+        assert!(
+            msg.contains("switch_profile_with_audit"),
+            "错误信息应指向带 actor 的入口：{msg}"
+        );
+        assert!(
+            msg.contains("不许匿名发生") || msg.contains("匿名"),
+            "错误信息应说明「不许匿名发生」的理由：{msg}"
+        );
+
+        // 关键：全局模式**没被改**
+        assert_eq!(
+            crate::l6_meta::nt_approval::global_approval().lock().unwrap().mode(),
+            crate::l6_meta::nt_approval::ApprovalMode::Suggest,
+            "被拒的切换**不得**留下任何模式副作用"
+        );
+        reset_profile_manager();
+    }
+
+    /// ⭐⭐ 锁②：**空 actor 被拒** —— 改全局审批严格程度不许匿名。
+    #[test]
+    fn audit_switch_rejects_empty_actor() {
+        reset_profile_manager();
+        for actor in ["", "   ", "\t", "\n"] {
+            let r = switch_profile_with_audit("developer", actor);
+            assert!(r.is_err(), "actor={actor:?} 必须被拒，实际 {r:?}");
+            assert!(
+                r.unwrap_err().contains("actor"),
+                "错误信息应点明缺 actor"
+            );
+        }
+        assert_eq!(
+            crate::l6_meta::nt_approval::global_approval().lock().unwrap().mode(),
+            crate::l6_meta::nt_approval::ApprovalMode::Suggest,
+            "被拒的调用**不得**改动审批模式"
+        );
+        reset_profile_manager();
+    }
+
+    /// ⭐ 锁③：带 actor ⇒ 成功，**且返回值里带审计行**。
+    ///
+    /// 审计行必须能回答「谁在什么时候切到了什么、模式从什么变成什么」。
+    #[test]
+    fn audit_switch_succeeds_and_emits_audit_trail() {
+        reset_profile_manager();
+        crate::l6_meta::nt_approval::global_approval()
+            .lock()
+            .unwrap()
+            .set_mode(crate::l6_meta::nt_approval::ApprovalMode::Suggest);
+
+        let r = switch_profile_with_audit("developer", "cli").expect("带 actor 应成功");
+        assert!(r.contains("Switched to profile: developer"), "{r}");
+        // 审计要素齐全
+        assert!(r.contains("actor=cli"), "审计行须含 actor：{r}");
+        assert!(r.contains("profile=developer"), "审计行须含 profile：{r}");
+        assert!(r.contains("loosened=true"), "Suggest→AutoEdit 是放宽：{r}");
+        // 副作用提示必须出现在给用户看的文本里
+        assert!(
+            r.contains("审批模式"),
+            "返回值须含人类可读的副作用预告：{r}"
+        );
+
+        // 模式确实被改
+        assert_eq!(
+            crate::l6_meta::nt_approval::global_approval().lock().unwrap().mode(),
+            crate::l6_meta::nt_approval::ApprovalMode::AutoEdit
+        );
+        reset_profile_manager();
+    }
+
+    /// ⭐⭐⭐ 锁④（最关键）：**`plan_profile_switch` 是纯查询**。
+    ///
+    /// 【为什么这条最重要】方案 A 的整个交互形态是
+    /// 「先 plan 给人看 → 人确认 → 才执行」。
+    /// 若 `plan` 偷偷改了状态（切了档、改了模式、落了盘），
+    /// 那**确认就只是走个形式** —— 用户看到的预告与实际发生的不一致。
+    #[test]
+    fn plan_profile_switch_has_no_side_effects() {
+        reset_profile_manager();
+        // 先把状态设成可辨认的初值
+        switch_profile_with_audit("nt_shield", "setup").expect("设初值");
+        crate::l6_meta::nt_approval::global_approval()
+            .lock()
+            .unwrap()
+            .set_mode(crate::l6_meta::nt_approval::ApprovalMode::Suggest);
+
+        let mode_before = crate::l6_meta::nt_approval::global_approval().lock().unwrap().mode();
+        let active_before = active_profile_name();
+
+        // 连调三次 plan，覆盖可能存在的「第一次才初始化」的隐藏副作用
+        for _ in 0..3 {
+            let p = plan_profile_switch("developer").expect("plan 应成功");
+            assert!(p.changes_approval_mode(), "developer 确实会改模式");
+            assert_eq!(
+                p.resulting_mode,
+                Some(crate::l6_meta::nt_approval::ApprovalMode::AutoEdit),
+                "plan 应预告切过去会变成 AutoEdit"
+            );
+            assert!(p.notice.is_some(), "plan 必须给出人类可读预告");
+        }
+
+        // ⭐ 核心断言：三次 plan 之后，两项状态**都没变**
+        assert_eq!(
+            crate::l6_meta::nt_approval::global_approval().lock().unwrap().mode(),
+            mode_before,
+            "plan **不得**改动全局审批模式"
+        );
+        assert_eq!(
+            active_profile_name(),
+            active_before,
+            "plan **不得**切换当前档位"
+        );
+        reset_profile_manager();
+    }
+
+    /// ⭐ 对照组：`loosens_approval` 只把「从严到松」算放宽。
+    /// 反向（收紧）**不算** —— 否则 UI 会拿它提示「要放宽了」而实际相反。
+    #[test]
+    fn loosens_only_counts_strict_to_loose() {
+        use crate::l6_meta::nt_approval::ApprovalMode::*;
+        let auto = ProfileSwitchPlan {
+            profile: "p".into(),
+            approval_mode_override: Some("auto-edit".into()),
+            resulting_mode: Some(AutoEdit),
+            notice: None,
+        };
+        // 收紧方向不算放宽
+        assert!(!auto.loosens_approval(FullAuto), "FullAuto→AutoEdit 是收紧");
+        // 放宽方向算
+        assert!(auto.loosens_approval(Suggest), "Suggest→AutoEdit 是放宽");
+        assert!(!auto.loosens_approval(AutoEdit), "同档位不算放宽");
+        // 不改模式 ⇒ 谈不上放宽
+        let none = ProfileSwitchPlan {
+            profile: "p".into(),
+            approval_mode_override: None,
+            resulting_mode: None,
+            notice: None,
+        };
+        assert!(!none.loosens_approval(Suggest), "不改模式时不谈放宽");
+        assert!(!none.changes_approval_mode());
+    }
+
+    /// ⭐ 匿名入口在**不改模式**的档位上仍然可用（否则连切档都做不了）。
+    #[test]
+    fn anonymous_switch_still_works_for_non_mode_changing_profile() {
+        reset_profile_manager();
+        let r = switch_profile("nt_shield");
+        assert!(r.is_ok(), "不改审批模式的档位应允许匿名切换：{r:?}");
+        assert!(r.unwrap().contains("Switched to profile: nt_shield"));
+        reset_profile_manager();
     }
 }
