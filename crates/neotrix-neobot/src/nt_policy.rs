@@ -271,9 +271,104 @@ fn looks_like_escape(cmd: &str) -> bool {
         "cd", "env", "printenv", "export", "unset", "declare", "curl", "wget", "ssh", "scp",
         "nc", "telnet", "ftp", "chmod", "chown", "sudo", "su",
     ];
-    lower
-        .split(|c: char| !c.is_ascii_alphanumeric())
-        .any(|w| WORD_NEEDLES.contains(&w))
+    // ⚠️ 分词用 `-` 也算分隔符（`reboot-now` / `format-disk` 这类
+    // 合法命令名若不拆，会把 `reboot` 当成命令词而误杀）。
+    //
+    // ⭐⭐ 2026-10-05 **修正判据形状**（实测踩到的坑）：
+    // `str::split` 对**非空**分隔符**保留**分隔符本身。实测：
+    //   "rm -rf ./src".split(|c| !alnum && c != '-')
+    //     ⇒ ["rm", "-rf", "", "", "src"]   ← 注意是 **`-rf`**，不是 `rf`
+    // ⇒ 我首版把 `CLUSTERED_FORCE` 写成 `["rf","fr"]` ⇒ **永远匹配不上**，
+    //   `rm -rf` 全部漏过。
+    // ⇒ 判据必须按**实际产出的形状**写：簇标志带前导连字符。
+    //   （Python 的 `re.split(r'[^A-Za-z0-9]|-', s)` 会**丢掉**分隔符，
+    //     产出 `rf` —— 两语言语义不同，**用 Python 推演 Rust 判据会错**。）
+    let words: Vec<&str> = lower
+        .split(|c: char| !c.is_ascii_alphanumeric() && c != '-')
+        .filter(|w| !w.is_empty())
+        .collect();
+    // 另存一份「剥掉前导 `-` 的标志簇」，供短标志判据使用。
+    let flags: Vec<&str> = words
+        .iter()
+        .filter(|w| w.starts_with('-'))
+        .map(|w| w.trim_start_matches('-'))
+        .filter(|w| !w.is_empty())
+        .collect();
+    if words.iter().any(|w| WORD_NEEDLES.contains(w)) {
+        return true;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // ⭐⭐⭐ 破坏性命令（2026-10-05 补）
+    //
+    // 【审计实测的缺口】上表的整词集里**没有任何破坏性命令**：
+    // `rm` / `dd` / `mkfs` / `git push --force` / `truncate` / `shutdown` 全部放行。
+    // 实测放行路径：`bash {"command":"rm -rf ./src"}` ⇒ `rm` 不在词表、
+    // `./src` 不含 `..`、无元字符 ⇒ `Allow` ⇒ **真执行**。
+    //
+    // ⚠️ **为什么不能把 `rm` 直接加进上面那张整词表**：
+    // 那样会把 `rm file.txt` / `rm -i` 这类**正常清理**一并拒掉
+    // ⇒ 门变成「一刀切不可用」，同样是不负责任。
+    // ⇒ 因此分两档：
+    //   ① **无条件破坏**（任何调用都不可逆）⇒ 直接拒。
+    //   ② **需要递归/强制标志才破坏**（`rm`/`git`/`truncate`）⇒
+    //      命令本身**不**足以定罪，必须与 `-rf`/`--force`/`/` 组合才拒。
+    //
+    // 判据方向：**宁可多拒，不可漏拒**（deny 方向是安全侧）。
+    // ⛔ 但拒绝理由必须**写进 deny**，让调用方知道是被哪条规则挡的，
+    //    否则用户无法判断该改命令还是改授权。
+    const ALWAYS_DESTRUCTIVE: &[&str] = &[
+        // 磁盘/文件系统级：写错就是数据没了，且通常不可恢复
+        "mkfs", "fdisk", "diskutil", "shred",
+        // 直接把设备/块设备清零（`of=` 是 dd 的经典落点）
+        "dd",
+        // 关机/重启：不是「数据没了」，但属不可逆系统级动作
+        "shutdown", "reboot", "halt", "poweroff",
+        // 改防火墙/hosts：属持久化提权面
+        "visudo", "iptables", "pfctl",
+        // 数据库/系统级清空
+        "dropdb", "dropuser", "truncate",
+        // 覆盖备份（**唯一**让「已备份」这个假设失效的动作）
+        "rsync", "unlink",
+    ];
+    if words.iter().any(|w| ALWAYS_DESTRUCTIVE.contains(w)) {
+        return true;
+    }
+
+    // ② 标志组合档：`rm` 单独无害，`rm -rf` 有害。
+    //    判据要求**同时**满足：命令词在集合内，且带递归/强制标志。
+    const NEEDS_FORCE_FLAG: &[&str] = &["rm", "git", "mv", "cp"];
+    if words.iter().any(|w| NEEDS_FORCE_FLAG.contains(w))
+        && lower.contains("--force")
+    {
+        // `git push --force` / `rm --force` —— 长标志显式意图
+        return true;
+    }
+    // ⭐ 2026-10-05 **修正**：`rm -r` 是日常操作，不该被拒。
+    //
+    // 【实测的自身缺陷】首版 `FORCE_FLAGS` 里含单个 `"r"` 与 `"f"`
+    // ⇒ `rm -r build` 与 `rm -f x` 都被拒。
+    // ⇒ 判据应是**「递归 + 强制」的组合**，或**已粘成簇的 `-rf`/`-fr`**。
+    //   `rm -r`（仅递归、逐个确认）⇒ 放行
+    //   `rm -f`（仅强制、单个文件）⇒ 放行
+    //   `rm -rf` / `rm -fr` / `rm -r -f` ⇒ 拒
+    const CLUSTERED_FORCE: &[&str] = &["rf", "fr", "rrf"];
+    if words.iter().any(|w| NEEDS_FORCE_FLAG.contains(w)) {
+        // ① 簇形式：`-rf` 剥掉前导连字符后是 `rf`
+        if flags.iter().any(|f| CLUSTERED_FORCE.contains(f)) {
+            return true;
+        }
+        // ② 分开形式：`-r -f` / `-f -r`（两个独立标志簇同时出现）
+        let has_recursive = flags.iter().any(|f| *f == "r" || *f == "recursive");
+        let has_force = flags.iter().any(|f| *f == "f" || *f == "force");
+        if has_recursive && has_force {
+            return true;
+        }
+    }
+    // ③ `git push`（无 force）也拒绝 —— 因为 neobot 是自主 bot，
+    //    「往远端推」必须由人显式批准。已单独实现硬拒
+    //    （见 nt_approval 的 ActionVerdict::Deny），这里不重复拦。
+    false
 }
 
 #[cfg(test)]
@@ -618,5 +713,85 @@ mod tests {
         assert_eq!(ToolName::Bash.intent(), "run_command");
         assert_eq!(ToolName::EditFile.intent(), "write_file");
         assert_eq!(ToolName::SetTurnStatus.intent(), "turn_status");
+    }
+
+    /// ⭐⭐⭐ 反向锁：**破坏性命令不得放行**（审计实测这些此前全部 `Allow`）。
+    ///
+    /// 【实测的放行路径】修复前 `rm -rf ./src` 走：
+    /// `rm` 不在整词表 · `./src` 不含 `..` · 无元字符 ⇒ `Allow` ⇒ 真执行。
+    #[test]
+    fn destructive_commands_are_denied() {
+        for cmd in [
+            "rm -rf ./src",
+            "rm -rf /",
+            "rm -fr build",
+            "dd if=/dev/zero of=/dev/disk0",
+            "mkfs.ext4 /dev/sda1",
+            "git push --force origin main",
+            "rm --force important.txt",
+            "truncate table users",
+            "shutdown -h now",
+            "rsync -rf --delete /src/ /dst/",
+        ] {
+            let c = PolicyContext { command: Some(cmd.into()), ..ctx(ToolName::Bash) };
+            assert!(
+                !matches!(evaluate_policy(&c), PolicyDecision::Allow),
+                "破坏性命令「{cmd}」必须被拒"
+            );
+        }
+    }
+
+    /// ⭐⭐ **对照组（本轮最关键的一条）**：正常命令**不得**被误杀。
+    ///
+    /// 为什么必须有：`rm` 若直接进整词表，`rm file.txt` 这类正常清理也会被拒
+    /// ⇒ 门变成「一刀切不可用」⇒ 同样是不负责任。
+    /// 本测试保证分档设计成立：**危险在标志，不在命令本身**。
+    #[test]
+    fn benign_commands_are_still_allowed() {
+        for cmd in [
+            "ls -la",
+            "cat README.md",
+            "git status",
+            "git commit -m 'fix'",
+            "rm notes.txt",
+            "echo hello",
+            "grep -r TODO src",
+            "cargo build",
+            "make test",
+        ] {
+            let c = PolicyContext { command: Some(cmd.into()), ..ctx(ToolName::Bash) };
+            assert!(
+                matches!(evaluate_policy(&c), PolicyDecision::Allow),
+                "正常命令「{cmd}」不应被拒（防误杀）"
+            );
+        }
+    }
+
+    /// ⭐ 分档判据的具体边界：`rm` 带 `-r` 但**无 `-f`** 仍应放行吗？
+    /// 记录当前口径，避免后人误以为是疏漏。
+    /// `rm -r dir` 会递归删除但**逐个确认**，属「可逆意图」⇒ 当前放行。
+    #[test]
+    fn rm_without_force_stays_allowed_by_design() {
+        let c = PolicyContext {
+            command: Some("rm -r build".into()),
+            ..ctx(ToolName::Bash)
+        };
+        assert!(
+            matches!(evaluate_policy(&c), PolicyDecision::Allow),
+            "「rm -r」无强制标志 ⇒ 当前口径放行；若将来要收紧，此测试是提醒"
+        );
+    }
+
+    /// ⭐ 子串误杀防护：`rm` 作为**别的词的一部分**不得被当成破坏命令。
+    /// 依据原有注释「分词后整词比，避免 `echo` 误杀 `chown` 类子串」。
+    #[test]
+    fn destructive_words_are_matched_whole_not_as_substring() {
+        for cmd in ["format-disk", "reboot-now", "ddtrace-run", "shutdownx"] {
+            let c = PolicyContext { command: Some(cmd.into()), ..ctx(ToolName::Bash) };
+            assert!(
+                matches!(evaluate_policy(&c), PolicyDecision::Allow),
+                "「{cmd}」只是含破坏词的普通命令名，不应被误杀"
+            );
+        }
     }
 }
