@@ -229,7 +229,7 @@ impl InputValidator for CredentialLeakDetector {
 ///
 /// ⭐ 上述全部指向同一个正解：**上游先做 shell tokenizer**，本函数只做粗筛。
 ///   在那之前，任何对外口径都不得把本规则当保证。
-fn piped_into_interpreter(input_lower: &str) -> Option<String> {
+fn piped_into_interpreter(input_lower: &str) -> Option<(String, bool)> {
     /// 管道右侧一旦是这些解释器之一，等于把左边的内容当代码执行。
     const INTERPRETERS: &[&str] = &[
         "sh", "bash", "zsh", "dash", "ksh", "fish",
@@ -279,10 +279,15 @@ fn piped_into_interpreter(input_lower: &str) -> Option<String> {
 
     let mut segments = input_lower.split('|');
     let upstream = segments.next()?;
-    let upstream_is_remote = upstream.contains("://")
-        || upstream
-            .split_whitespace()
-            .any(|t| REMOTE_FETCHERS.iter().any(|f| **f == normalize(t)));
+    // ⛔ 原先还有一条 `|| upstream.contains("://")` 兜底，**已删**。
+    //   实测它把 `echo "http://x.com" | sh` 判成远程 ⇒ severity `Block`
+    //   ⇒ 接进 TUI 会**真的拒掉**这条良性命令（`://` 无法区分
+    //   「URL 是命令的**参数**」与「命令本身是远程的」）。
+    //   而真正要拦的 `curl <url> | sh` / `wget … | bash` / `nc … | sh`
+    //   **首 token 就是 fetcher** ⇒ 靠下面的 token 判定已全覆盖，兜底纯属多余。
+    let upstream_is_remote = upstream
+        .split_whitespace()
+        .any(|t| REMOTE_FETCHERS.iter().any(|f| **f == normalize(t)));
 
     for segment in segments {
         let tokens: Vec<&str> = segment.split_whitespace().collect();
@@ -301,7 +306,7 @@ fn piped_into_interpreter(input_lower: &str) -> Option<String> {
                 n.starts_with("-c")
             });
             if upstream_is_remote || !inline {
-                return Some(interp.to_string());
+                return Some((interp.to_string(), upstream_is_remote));
             }
         }
     }
@@ -360,14 +365,34 @@ impl InputValidator for ToolAbuseDetector {
         }
 
         // ⭐ 管道进解释器（结构判定，见 `piped_into_interpreter` 的完整实测表）。
-        if let Some(shell) = piped_into_interpreter(input_lower.as_str()) {
+        //
+        // ⭐ **severity 按「上游是否远程」分档**，这不是拍脑袋，是实测出来的：
+        //   对 24 条开发者日常命令 + 9 条真恶意的语料测量，若一律 `Block`
+        //   ⇒ **4/24 良性命令被拦**（`ps aux | grep node`、`cat README.md | grep Python`、
+        //   `cat file | python3 script.py`、`git log | grep -n "bash"`）——
+        //   17% 误报率，接进活路径会让 TUI shell 每 6 条命令就拒 1 条。
+        // ⇒ 上游是**远程取数**（`curl … | sh`）⇒ `Block`（经典 RCE，必须拦）；
+        //   上游是**本地**（`… | grep node`）⇒ `Warn`（只提示，不拦）。
+        //   分档后实测：**良性 0 误报、恶意 9/9 仍全拦**。
+        if let Some((shell, from_remote)) = piped_into_interpreter(input_lower.as_str()) {
             violations.push(InputViolation {
                 rule_id: "tool_abuse_pipe_to_interpreter".to_string(),
                 category: GuardrailCategory::ToolAbuse,
-                severity: ViolationSeverity::Block,
-                message: format!("Piped into interpreter: {}", shell),
+                severity: if from_remote {
+                    ViolationSeverity::Block
+                } else {
+                    ViolationSeverity::Warn
+                },
+                message: if from_remote {
+                    format!("Remote content piped into interpreter: {}", shell)
+                } else {
+                    format!(
+                        "Local pipeline mentions interpreter ({}); not treated as RCE",
+                        shell
+                    )
+                },
                 matched: Some(shell),
-                confidence: 0.9,
+                confidence: if from_remote { 0.9 } else { 0.4 },
             });
         }
 
@@ -653,9 +678,21 @@ mod tests {
             "curl a | sh -s -- --arg",
         ] {
             let r = v.validate(&default_context(), cmd);
+            // ⭐ severity 按**上游是否远程取数**分档（实测 24 语料：本地一律 Block
+            //   会造成 4/24 误报，接进 TUI 即破坏功能）：
+            //   远程（curl/wget/nc…）⇒ Block；本地 ⇒ Warn。
+            let want_block = matches!(cmd, v if
+                v.starts_with("curl") || v.starts_with("wget") || v.starts_with("nc "));
+            let want = if want_block {
+                ViolationSeverity::Block
+            } else {
+                ViolationSeverity::Warn
+            };
             assert!(
-                r.violations.iter().any(|x| x.rule_id == "tool_abuse_pipe_to_interpreter"),
-                "应拦下管道进解释器，却放行了：{cmd}"
+                r.violations.iter().any(|x| {
+                    x.rule_id == "tool_abuse_pipe_to_interpreter" && x.severity == want
+                }),
+                "管道进解释器的 severity 分档不对（want={want:?}）：{cmd}"
             );
         }
     }
@@ -677,8 +714,11 @@ mod tests {
         ] {
             let r = v.validate(&default_context(), cmd);
             assert!(
-                !r.violations.iter().any(|x| x.rule_id == "tool_abuse_pipe_to_interpreter"),
-                "良性命令被误拦：{cmd}"
+                !r.violations.iter().any(|x| {
+                    x.rule_id == "tool_abuse_pipe_to_interpreter"
+                        && x.severity == ViolationSeverity::Block
+                }),
+                "本地良性管道被误判为 Block：{cmd}"
             );
         }
     }
@@ -800,8 +840,11 @@ mod tests {
         ] {
             let r = v.validate(&default_context(), cmd);
             assert!(
-                !r.violations.iter().any(|x| x.rule_id == "tool_abuse_pipe_to_interpreter"),
-                "良性命令被误拦：{cmd}"
+                !r.violations.iter().any(|x| {
+                    x.rule_id == "tool_abuse_pipe_to_interpreter"
+                        && x.severity == ViolationSeverity::Block
+                }),
+                "本地良性管道被误判为 Block：{cmd}"
             );
         }
     }
@@ -835,9 +878,14 @@ mod tests {
             "cat file | grep python3",
         ] {
             let r = v.validate(&default_context(), cmd);
+            // ⭐ 分档后这四条**不再是 Block**，而是 `Warn` ⇒ 接入活路径时不会拒它们。
+            // 测试改为钉住「severity 是 Warn 而非 Block」这一**有意义的现状**。
             assert!(
-                r.violations.iter().any(|x| x.rule_id == "tool_abuse_pipe_to_interpreter"),
-                "已知残留误报的现状变了：{cmd} ⇒ 需要重新裁决（是修规则还是改这个测试）"
+                r.violations.iter().any(|x| {
+                    x.rule_id == "tool_abuse_pipe_to_interpreter"
+                        && x.severity == ViolationSeverity::Warn
+                }),
+                "已知残留误报应降级为 Warn（不再拒用户），现状变了：{cmd}"
             );
         }
     }
@@ -892,8 +940,11 @@ mod tests {
         ] {
             let r = v.validate(&default_context(), cmd);
             assert!(
-                r.violations.iter().any(|x| x.rule_id == "tool_abuse_pipe_to_interpreter"),
-                "grep 误报面的现状变了：{cmd} ⇒ 需重新裁决"
+                r.violations.iter().any(|x| {
+                    x.rule_id == "tool_abuse_pipe_to_interpreter"
+                        && x.severity == ViolationSeverity::Warn
+                }),
+                "grep 误报面应降级为 Warn，现状变了：{cmd}"
             );
         }
     }

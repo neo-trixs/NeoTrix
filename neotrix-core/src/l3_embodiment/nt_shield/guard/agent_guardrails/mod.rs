@@ -16,7 +16,11 @@ pub mod policy_engine;
 
 pub use input_validator::{InputValidator, InputValidationResult, InputViolation};
 pub use output_validator::{OutputValidator, OutputValidationResult, OutputViolation};
-pub use policy_engine::{PolicyEngine, PolicyConfig, ViolationSeverity, GuardrailVerdict, HitlRequest};
+pub use policy_engine::{HitlRequest, GuardrailVerdict, PolicyConfig, PolicyEngine, ViolationSeverity};
+// ⛔ 曾误加 `pub use policy_engine::{GuardrailContext, GuardrailResult};` ——
+//   **它们定义在本文件**（`mod.rs`），而 `policy_engine.rs:40` 是反过来
+//   `use super::{…}` 拿它们的 ⇒ 从 `policy_engine` re-export 触发 E0603
+//   「private struct import」。本文件的 `pub struct` 本身就是对外路径，无需再导。
 
 use serde::{Deserialize, Serialize};
 

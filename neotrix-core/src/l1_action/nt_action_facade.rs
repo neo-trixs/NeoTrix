@@ -448,6 +448,9 @@ pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::config::{reload,
 pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::proxy_pool::ProxyPool;
 pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net::rules::RuleEngine;
 pub use crate::l3_embodiment::nt_shield_enforcer::global_shield;
+pub use crate::l3_embodiment::nt_shield::guard::agent_guardrails::{
+    GuardrailContext, GuardrailResult, GuardrailVerdict, PolicyEngine, ViolationSeverity,
+};
 pub use crate::l6_meta::nt_approval;
 pub use crate::l6_meta::nt_approval::PendingAction;
 

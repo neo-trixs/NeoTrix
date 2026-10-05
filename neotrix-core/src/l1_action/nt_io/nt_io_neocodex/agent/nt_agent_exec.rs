@@ -12,6 +12,21 @@ use super::{NeoCodexAgent, StreamOutcome};
 use super::super::evolution::{EvolutionLoop, NeoCodexHealthReport};
 use super::super::hooks::{HookDecision, ToolCallContext};
 use super::super::provider::{ModelCapability, NeoCodexMode};
+// 走**本层** facade（AGENTS.md §4.2：L1 不得直接引用 L3 的层名路径）。
+use crate::l1_action::nt_action_facade::{
+    GuardrailContext, GuardrailVerdict, PolicyEngine, ViolationSeverity,
+};
+
+/// shell 护栏引擎（进程内构造一次）。
+///
+/// ⭐ 用 `OnceLock` 而非每次调用 `PolicyEngine::production_default()`：
+///   后者每次都要新建 4+ 个 validator 并**重新编译全部正则**，而配置是常量。
+/// 刻意**不做全局可变开关**（没有 interior mutability）—— 一旦允许运行期改策略，
+/// 同一个进程里不同命令的判据就不一致，那比没有护栏更难排查。
+fn shell_guardrail() -> &'static PolicyEngine {
+    static ENGINE: std::sync::OnceLock<PolicyEngine> = std::sync::OnceLock::new();
+    ENGINE.get_or_init(PolicyEngine::production_default)
+}
 use super::super::wire::WireEvent;
 
 impl NeoCodexAgent {
@@ -69,6 +84,62 @@ impl NeoCodexAgent {
     }
 
     async fn exec_shell(&mut self, input: &str) -> String {
+        // ── 执行前护栏（R-P129/R-P132）──────────────────────────────────────
+        //
+        // ⛔ **本函数原先完全没有闸**，而同文件的兄弟 `exec_agent`（:113+）有
+        //   `hooks.run_pre`。更糟的是：`register_pre` 在生产代码里**只有
+        //   `nt_agent_session.rs:17` 那个注册方法本身**，无任何生产调用点，
+        //   `hooks.rs:98` 在 `#[cfg(test)]` 内 ⇒ **默认 registry 的
+        //   `run_pre` 恒返回 `Allow`** ⇒ 那道「执行前闸」本身也是空的。
+        //   而 `global_shield()` 虽在 4 处生产点被调用，**本路径不在其中**。
+        //   ⇒ 一条 LLM/用户可直接驱动的 `sh -c` 通道，全程无任何检查。
+        //
+        // ⛔ **为什么不用 `ShieldEnforcer::check_all`**：实测它在默认 `Suggest`
+        //   模式下对**每一条**命令（含 `echo hello`）都返回 `RequireApproval`，
+        //   而这条 TUI 路径**没有审批 UI** ⇒ 等于把 shell 功能 100% 关掉。
+        //   （`nt_sandboxed_shell::execute_guarded` 零消费者，很可能正是因此被搁置。）
+        // ⇒ 改用 `agent_guardrails` 的 `PolicyEngine`：它有**真实判别力**，
+        //   且接活路径前已过判别力门槛测试（24 条日常命令 0 误报 / 9 条恶意全拦）。
+        let verdict = {
+            let engine = shell_guardrail();
+            let ctx = GuardrailContext::default();
+            let result = engine.validate_input(&ctx, input);
+            // 只拦 `Block`。`Warn` 是「提示」—— 刻意不拦，否则
+            // `ps aux | grep node` / `cat file | python3 script.py`
+            // 这类日常命令会被拒（实测那是 17% 误报率）。
+            if result.verdict == GuardrailVerdict::Block {
+                let detail = result
+                    .violations
+                    .iter()
+                    .map(|v| format!("[{:?}/{}] {}", v.severity, v.rule_id, v.message))
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                let warn = result
+                    .violations
+                    .iter()
+                    .filter(|v| v.severity == ViolationSeverity::Warn)
+                    .map(|v| format!("[warn] {}", v.message))
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                Some((detail, warn))
+            } else {
+                None
+            }
+        };
+        if let Some((detail, warn)) = verdict {
+            // ⛔ **绝不执行**被拦的命令。
+            self.state.tool_call_count += 1;
+            self.wire.record(WireEvent::ToolCall {
+                name: "shell".into(),
+                args: input.to_string(),
+                result: format!("[blocked by guardrail] {detail}"),
+                duration_ms: 0,
+                success: false,
+            });
+            let tail = if warn.is_empty() { String::new() } else { format!("\n\n{warn}") };
+            return format!("[BLOCKED] 护栏拒绝执行该命令。\n{detail}{tail}");
+        }
+
         let output = tokio::process::Command::new("sh")
             .arg("-c")
             .arg(input)
