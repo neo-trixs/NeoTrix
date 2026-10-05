@@ -418,6 +418,68 @@ impl NeobotStore {
              ON messages(convo_id, created_at)",
             [],
         )?;
+        // ── 工具**调用**侧的落库（配平的另一半；见 nt_store_tool_calls）──────
+        //
+        // 「工具调用 ↔ 工具结果」这条不变量需要**两侧**同一把钥匙。`steps` 已于
+        // 上面的 `ALTER` 拿到 `tool_call_id`（结果侧），而**调用侧此前无处可落**：
+        // transcript 侧的 `TranscriptItem.tool_call_id` 只活在 `nt_agent` 的内存
+        // `Vec` 里（`nt_agent.rs:694`），进程一退就没了 ⇒ join 对**真实落库数据**
+        // 无从表达，`ToolCallJoinCheck` 只能诚实回 `NOT_EVALUABLE`。
+        //
+        // ⛔ **为什么不是 `messages` 的一列**：那张表**结构上装不下调用**。
+        //   ① `append_message` 硬拒 `role` 非 `user`/`assistant`
+        //      （`nt_store_messages.rs:69-71`），而调用在 OpenAI 兼容形状里正是
+        //      `tool` role 的一条 ⇒ 想借 `messages` 落地，就得先废掉一条**前端
+        //      渲染依赖**的校验（模块头 ② 明写「多一种 role，前端要多一个分支」）；
+        //   ② 调用与消息的基数不同：一次 assistant 消息带**若干**调用，
+        //      一行一消息装不下，且会把「这次说了什么」和「调了什么」搅在一起；
+        //   ③ 调用有自己的字段（工具名、参数、跳数），`messages` 一列给不出。
+        //   ⇒ 调用是**另一个实体**，单开一张表。
+        //
+        // ⛔ **为什么 `call_id` 不是 PRIMARY KEY**（本表最重要的一条设计）：
+        //   实测两个生产 id 源**都会重复**同一个 id ——
+        //   ① `nt_engine.rs:272` 的 CLI 引擎把 id 写死成常量 `"cli-status-1"`
+        //      ⇒ **每一次** CLI 调用都叫这名；
+        //   ② `nt_http_engine.rs:560-564`：provider 回的 id 为空时合成
+        //      `format!("call-{name}")` —— **只由工具名决定**，于是所有
+        //      `bash` 调用共用 `"call-bash"`，且**同一响应里的两个并行同工具
+        //      调用当场撞名**。
+        //   实测（`sqlite3` CLI）：把 `call_id` 设成 `PRIMARY KEY` 后，插入第二行
+        //   直接 `UNIQUE constraint failed` ⇒ 那种设计不是「重复时报个警」，
+        //   是**正常业务写不进去**（若被 `.ok()` 吞掉就变成静默丢调用）。
+        //   ⇒ 本表用 `seq` 代理键 + **`call_id` 上的非唯一索引**。
+        //   ⭐ 而 `call_id` 重复本身**正是 `ToolCallJoinCheck` 的一个结论**
+        //      （`nt_core_artifact_verdict.rs:640-641` 的 `CODE_DUPLICATE_JOIN_KEY`
+        //      ⇒ `INVALID_ARTIFACT`，理由「配平键失去单射性」）⇒ 重复必须
+        //      **能被记下来**供检查读，绝不能由主键在入库前掐掉。
+        //
+        // ⛔ `convo_id` 可空：`run_loop` 的作用域里**只有 `task_id`、没有 `convo_id`**
+        //   （签名 `nt_agent.rs:677-685`；实测该函数体 `:677-970` 内 `convo_id`
+        //   零出现）⇒ 调用侧此刻拿不到会话归属 ⇒ 存 `NULL`，**不拿
+        //   `tasks.conversation_id` 反查编造**。无 DEFAULT ⇒ 不知道就是不知道。
+        //
+        // 幂等：`CREATE TABLE/INDEX IF NOT EXISTS`（SQLite 没有 `ADD COLUMN
+        // IF NOT EXISTS`，但**整表新建**不受那个限制）⇒ 第 2/3 次开库是纯 no-op。
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS tool_calls(
+               seq INTEGER PRIMARY KEY AUTOINCREMENT,
+               task_id TEXT NOT NULL, n INTEGER NOT NULL,
+               -- ⛔ 非唯一：见上面「为什么 `call_id` 不是 PRIMARY KEY」。
+               --    可空**不适用**于本表（新表无存量行），键为空白的行在写口拒收。
+               call_id TEXT NOT NULL,
+               tool TEXT NOT NULL,
+               convo_id TEXT,
+               created_at TEXT NOT NULL)",
+            [],
+        )?;
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tool_calls_call ON tool_calls(call_id)",
+            [],
+        )?;
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tool_calls_task ON tool_calls(task_id, seq)",
+            [],
+        )?;
         // ⛔⛔ **这里刻意没有 `(convo_id, rowid)` 索引**，而且**加不了**：
         //    `rowid` 是 SQLite 的**隐式** rowid 列，在 `SELECT`/`WHERE`/`ORDER BY`
         //    里可用（别名 `_rowid_`、`oid`），但 **索引定义看不见它** ⇒
@@ -494,7 +556,11 @@ mod nt_store_routines;
 /// `delivery_row` 取列事故的同款形状。
 pub use nt_store_routines::StepRow;
 mod nt_store_tasks;
+mod nt_store_tool_calls;
 /// 重导出：调用方能用 `.ok` / `.output`，但**写不出**该类型（模块私有），
 /// 所以具名类型必须从这里出去，否则调用点只能继续拿位置性元组。
 pub use nt_store_tasks::LastStep;
+/// 重导出：同 [`LastStep`] 的理由（模块私有 ⇒ 调用点写不出具名类型）—— 配平
+/// 检查要按 `call_id` 双向 join，两侧都得是具名行类型，不能是位置性元组。
+pub use nt_store_tool_calls::ToolCallRow;
 mod nt_store_upkeep;
