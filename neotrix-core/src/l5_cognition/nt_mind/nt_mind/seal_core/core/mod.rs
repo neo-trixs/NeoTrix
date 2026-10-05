@@ -1,3 +1,4 @@
+pub mod execution_trace;
 mod brain_mut_view;
 mod capability;
 mod knowledge_source;
