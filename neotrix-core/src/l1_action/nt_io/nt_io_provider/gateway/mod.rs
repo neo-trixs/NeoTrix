@@ -991,6 +991,48 @@ mod tests {
         assert_eq!(out.provider_name, "cloud-ok");
     }
 
+    /// 回归（2026-10-05）：`build_candidate_chain` 在**四项判据全并列**时链序必须可复现。
+    ///
+    /// 原实现 `rest.sort_by` 只有 available / free / 有调用记录 / score 四级，
+    /// **没有名字兜底**；而 `rest` 是从 `states.iter()`（`HashMap<String, _>`）
+    /// 物化来的 ⇒ `sort_by` 虽稳定，但**输入序是哈希序** ⇒ 并列时链序跨进程漂移。
+    /// 危害到顶：`resolve_default_model_sync` 取 `chain.first()` ⇒ **默认模型本身**会变。
+    ///
+    /// 范式对齐同文件 `select_best` 已有的 `.then(na.cmp(nb))`（那里注明「D13 确定性」）；
+    /// 本测试是该已修兄弟的「未修兄弟」的回归保护。
+    ///
+    /// 6 个 provider 的 `ProviderState` 完全相同（同样的 `is_free` + `category`
+    /// ⇒ `composite_score` 相同、`total_calls = 0`、`is_available` 相同）
+    /// ⇒ 四级判据必然全并列 ⇒ 旧实现只有 **1/720** 概率恰好排出正确序。
+    /// 注册顺序刻意非字典序，杜绝「碰巧有序」造成的假通过。
+    #[test]
+    fn test_build_candidate_chain_tie_is_name_ascending() {
+        let gw = GatewayV2::new();
+        for name in ["f_alpha", "b_bravo", "e_charlie", "a_delta", "d_echo", "c_foxtrot"] {
+            gw.register_provider_with_category(
+                name,
+                Arc::new(MockProvider::new("ok")),
+                true,
+                ProviderCategory::Cloud,
+            );
+        }
+        // model 传 "" ⇒ 跳过前缀 provider 那一段，只剩排序段
+        let chain = gw.build_candidate_chain("", 10);
+        let mut expect =
+            vec!["f_alpha", "b_bravo", "e_charlie", "a_delta", "d_echo", "c_foxtrot"];
+        expect.sort_unstable();
+        assert_eq!(
+            chain.len(),
+            6,
+            "6 个 provider 都应入链；实际 {:?}",
+            chain
+        );
+        assert_eq!(
+            chain, expect,
+            "四项判据全并列时必须按名字升序（可复现）"
+        );
+    }
+
     #[tokio::test]
     #[ignore = "需联网: 网关/provider 集成测试, 默认忽略; 联网环境 `cargo test -- --ignored` 运行 (R-P79)"]
     async fn test_per_query_budget_uses_request_not_cumulative() {

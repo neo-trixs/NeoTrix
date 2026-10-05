@@ -251,7 +251,8 @@ pub struct ResidencyAuditRow {
     pub action: &'static str,
 }
 
-/// 技能驻留成本审计 (P4): 输入 quality_stats, 输出降级候选排名 (resident 降序)。
+/// 技能驻留成本审计 (P4): 输入 quality_stats, 输出降级候选排名 (resident 降序,
+/// 同 resident 按技能名升序 — D13 确定性)。
 /// 消费者: `SkillEngine::load_all` 之后 / background-loop 定期审计。
 pub fn audit_residency(
     stats: &std::collections::HashMap<String, SkillQualityScores>,
@@ -275,6 +276,99 @@ pub fn audit_residency(
             }
         })
         .collect();
-    rows.sort_by(|a, b| b.resident_tokens.cmp(&a.resident_tokens));
+    // ⚠️ 2026-10-05 修正：原先**只**按 `resident_tokens` 降序排，无名字兜底。
+    // `rows` 由 `stats.iter()`（`HashMap<String, SkillQualityScores>`）物化而来，
+    // `sort_by` 虽稳定，但**输入序是哈希序** ⇒ resident_tokens 并列时输出序仍是
+    // 哈希序。而本函数是**两条真链路**的下游：
+    //   `nt_mind_skill_engine.rs::SkillEngine::audit_residency` →
+    //   `nt_mind_background_loop/handlers_maintenance.rs` 的 skill_residency 段
+    //   → `log::warn!` + `CoreEvent::SystemError { error: format!("...{:?}", names) }`
+    // ⇒ 同分技能的排名**跨进程漂移** ⇒ 日志与事件载荷不可复现（事件比对/回归基线失效）。
+    // ⇒ 补名字升序兜底，与 `selection.rs::build_candidate_chain` 的
+    //   `.then_with(|| a.0.cmp(b.0))` 同一范式。
+    rows.sort_by(|a, b| {
+        b.resident_tokens
+            .cmp(&a.resident_tokens)
+            .then_with(|| a.skill.cmp(&b.skill))
+    });
     rows
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    /// `audit_residency` 同分兜底确定性 (D13 确定性)。
+    ///
+    /// 构造**全并列**: N 个技能 `resident_tokens` 完全相同 ⇒ 原实现里输出序
+    /// 完全由 `HashMap` 哈希序决定。而同一进程里**两个独立构造的 `HashMap`
+    /// 拿到不同 hasher 种子** ⇒ 各自遍历序不同 ⇒ "建两个比一比" 确实能测出漂移;
+    /// 再乘多轮 + 8 个并列项，漏检概率极低。
+    fn tied_stats(n: usize, tokens: usize) -> HashMap<String, SkillQualityScores> {
+        let mut m = HashMap::new();
+        for i in 0..n {
+            m.insert(
+                format!("skill-{:02}", i),
+                SkillQualityScores {
+                    safety: 1.0,
+                    completeness: 0.9,
+                    executability: 1.0,
+                    maintainability: 0.6,
+                    cost_awareness: 0.6,
+                    resident_tokens: tokens,
+                    body_tokens: tokens,
+                },
+            );
+        }
+        m
+    }
+
+    #[test]
+    fn audit_residency_tie_is_name_deterministic() {
+        const N: usize = 8;
+        const ROUNDS: usize = 24;
+        let expected: Vec<String> = (0..N).map(|i| format!("skill-{:02}", i)).collect();
+        for round in 0..ROUNDS {
+            let rows = audit_residency(&tied_stats(N, 1500));
+            assert_eq!(rows.len(), N, "round {}: 行数不对", round);
+            let got: Vec<String> = rows.iter().map(|r| r.skill.clone()).collect();
+            assert_eq!(got, expected, "round {}: 同分排名不是名字升序", round);
+        }
+    }
+
+    /// 两个**独立构造**的 map (⇒ 不同 hasher 种子) 必须给出完全相同的排序结果。
+    #[test]
+    fn audit_residency_tie_stable_across_hasher_seeds() {
+        const N: usize = 8;
+        let a = audit_residency(&tied_stats(N, 1500));
+        let b = audit_residency(&tied_stats(N, 1500));
+        let av: Vec<(String, usize)> = a.iter().map(|r| (r.skill.clone(), r.resident_tokens)).collect();
+        let bv: Vec<(String, usize)> = b.iter().map(|r| (r.skill.clone(), r.resident_tokens)).collect();
+        assert_eq!(av, bv, "两个独立 HashMap 的同分排名不一致 ⇒ 哈希序泄漏");
+    }
+
+    /// 主判据 resident_tokens 仍严格降序 (兜底不得反转主判据)。
+    #[test]
+    fn audit_residency_primary_key_still_descending() {
+        let mut m = HashMap::new();
+        for (name, tok) in [("a", 900usize), ("b", 3000), ("c", 1500), ("d", 3000)] {
+            m.insert(
+                name.to_string(),
+                SkillQualityScores {
+                    resident_tokens: tok,
+                    body_tokens: tok,
+                    ..Default::default()
+                },
+            );
+        }
+        let rows = audit_residency(&m);
+        let pairs: Vec<(&str, usize)> =
+            rows.iter().map(|r| (r.skill.as_str(), r.resident_tokens)).collect();
+        assert_eq!(
+            pairs,
+            vec![("b", 3000), ("d", 3000), ("c", 1500), ("a", 900)],
+            "主判据降序 + 同分名字升序"
+        );
+    }
 }

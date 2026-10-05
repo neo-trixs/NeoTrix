@@ -430,4 +430,31 @@ mod tests {
         // Result depends on which violations fire
         assert!(result.passed || result.violations.iter().any(|v| v.severity != ViolationSeverity::Block));
     }
+
+    /// base64 预览处的 `&mat.as_str()[..40]` 经核查**不是**本缺陷类（故未改动）：
+    /// `b64_re`（`Regex::new(r"[A-Za-z0-9+/]{64,}={0,2}")`）的字符类 `[A-Za-z0-9+/]`
+    /// 与 `=` 全是 ASCII，`find()` 的匹配结果必为纯 ASCII ⇒ 字节偏移 40 必落在
+    /// 字符边界上；外层 `mat.as_str().len() > 100` 又保证 40 不越界。
+    /// 两条 panic 路径（切中间 / 越界）都被正则字符类排除。
+    /// 本测试把该不变量钉死 —— 输入本身是多字节（模拟中文 agent 输入），
+    /// 走完整 `validate` 路径不 panic，且截断宽度仍为 40。
+    #[test]
+    fn test_base64_preview_ascii_invariant_on_multibyte_input() {
+        let detector = CredentialLeakDetector::new(&[]);
+        let blob = "A".repeat(120); // 120 bytes > 100 ⇒ 必定进入该分支
+        let input = format!("多字节前缀漢字测试 {blob}");
+        assert!(input.len() > 120, "input must be multibyte-heavy");
+
+        let result = detector.validate(&default_context(), &input);
+        let matched = result
+            .violations
+            .iter()
+            .find(|v| v.rule_id == "cred_base64_blob")
+            .and_then(|v| v.matched.as_deref())
+            .unwrap_or_default();
+        // 40 个 ASCII 字符 + "..." = 43 字节 / 43 字符（纯 ASCII ⇒ 字节切安全）。
+        assert_eq!(matched.len(), 43);
+        assert_eq!(matched.chars().count(), 43);
+        assert!(matched.is_ascii());
+    }
 }

@@ -60,6 +60,22 @@ impl GatewayV2 {
             log::warn!("[gateway] states RwLock poisoned: {}", e);
             e.into_inner()
         });
+        // ⚠️ 2026-10-05 修正：两级的 `max_by` 原先**只**比 `composite_score()`，
+        // 无任何兜底。`states` 是 `RwLock<HashMap<String, ProviderState>>`
+        // （`gateway/mod.rs`: `states: RwLock<HashMap<...>>`），默认 hasher
+        // `RandomState` **每次实例化换种子** ⇒ 遍历序跨进程不同。
+        // 而新建 provider 的 `ProviderState::new` 五项默认值全同
+        // （success_ema 0.8 / 空 latency_window / cost 0 / breaker Closed）
+        // ⇒ `composite_score()` **完全相等** ⇒ 同分时胜者由哈希序决定。
+        // 危害到顶：本函数是 `complete_for_profile_detailed` 的 provider 选点，
+        // 也被 `CapabilityCoordinator::coordinate` 直接调用 ⇒ 同一请求在不同进程
+        // 可能路由到不同 provider（同分 provider 的可用性/配额往往不同）。
+        // ⇒ 补名字兜底，与同目录 `selection.rs::select_best` 的 `.then(na.cmp(nb))`
+        //   同一范式（那里已注明「D13 确定性」）；`nt_core_cache.rs::evict_semantic`
+        //   的 LFU 分支是同一 bug 类的完整注释范例。
+        // 注意方向: `max_by` 在并列时返回**最后一个**最大值 ⇒ 名字升序 ⇒ 胜者是
+        //   字典序**最大**的那个名字 (与 `select_best` 行为一致)。
+        //
         // Tier 1: 满足安全级别的免费 provider
         let best_free = states
             .iter()
@@ -68,10 +84,11 @@ impl GatewayV2 {
                     && s.is_free
                     && s.category.default_security_profile().meets(required)
             })
-            .max_by(|(_, a), (_, b)| {
+            .max_by(|(na, a), (nb, b)| {
                 a.composite_score()
                     .partial_cmp(&b.composite_score())
                     .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| na.cmp(nb))
             })
             .map(|(name, _)| name.clone());
         if best_free.is_some() {
@@ -83,10 +100,11 @@ impl GatewayV2 {
             .filter(|(_, s)| {
                 s.is_available() && s.category.default_security_profile().meets(required)
             })
-            .max_by(|(_, a), (_, b)| {
+            .max_by(|(na, a), (nb, b)| {
                 a.composite_score()
                     .partial_cmp(&b.composite_score())
                     .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| na.cmp(nb))
             })
             .map(|(name, _)| name.clone())
     }
@@ -229,8 +247,26 @@ impl GatewayV2 {
     /// 记录一次子网格调用 (成功/失败/延迟) 到健康状态 + nt_core_telemetry
     fn record_sub_grid_call(&self, profile: CommunicationProfile, success: bool, latency_ms: u64) {
         if let Ok(mut grids) = self.sub_grids.write() {
-            if let Some(grid) = grids.values_mut().find(|g| g.security_profile == profile) {
-                grid.health.record_call(success, latency_ms);
+            // ⚠️ 2026-10-05 修正：原先是 `grids.values_mut().find(|g| g.security_profile == profile)`。
+            //
+            // `sub_grids` 是按**名字**键入的 `HashMap`，而筛选条件是 `security_profile`
+            // ⇒ **两个不同名的子网格可以共享同一 profile**。此时 `find` 返回「哈希序里
+            // 第一个」⇒ **哪张网格收到这次调用记录会跨进程漂移**。
+            //
+            // ⛔ 后果不是日志抖动：`record_call` 改的是**健康计数**，而
+            // `_has_healthy_sub_grid` 用健康状况做**路由前置条件**
+            // ⇒ 归属不同 ⇒ 健康不同 ⇒ 路由决策可能翻转。
+            //
+            // ⇒ 改为：在匹配项中取**名字字典序最小**者，与哈希序完全无关。
+            let target = grids
+                .iter()
+                .filter(|(_, g)| g.security_profile == profile)
+                .map(|(name, _)| name.clone())
+                .min();
+            if let Some(name) = target {
+                if let Some(grid) = grids.get_mut(&name) {
+                    grid.health.record_call(success, latency_ms);
+                }
             }
         }
         // 反馈到全局遥测 (D21 外部观察): 子网格健康可见于 nt_core_telemetry
@@ -321,5 +357,83 @@ impl GatewayV2 {
             .filter(|sg| sg.security_profile.meets(required))
             .map(|sg| sg.name)
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 最小 mock provider — 只为把名字塞进 `states`, 本测试不发生任何 LLM 调用。
+    struct TieMock;
+
+    #[async_trait::async_trait]
+    impl crate::l1_action::nt_core_llm::LlmProvider for TieMock {
+        fn set_proxy(&mut self, _proxy_url: &str) {}
+        fn data_trust(&self) -> crate::l1_action::nt_core_llm::DataTrust {
+            crate::l1_action::nt_core_llm::DataTrust::Trusted
+        }
+        async fn complete_raw(
+            &self,
+            _request: &LlmRequest,
+        ) -> Result<LlmResponse, LlmError> {
+            Err(LlmError::Unknown("tie-mock never called".into()))
+        }
+        async fn stream_complete_raw(
+            &self,
+            _request: &LlmRequest,
+        ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+            Err(LlmError::Unknown("tie-mock never called".into()))
+        }
+    }
+
+    /// `select_best_for_profile` 同分兜底确定性 (D13 确定性)。
+    ///
+    /// 构造**全并列**场景: N 个 provider 全部 `ProviderState::new(true, Cloud)`
+    /// ⇒ `composite_score()` 五项输入逐位相同 (success_ema 0.8 / 空延迟窗口 /
+    /// cost 0 / breaker Closed / Cloud boost 0) ⇒ 分数**完全相等**。
+    /// 每个 `GatewayV2::new()` 新建一个 `HashMap` ⇒ `RandomState` 换种子 ⇒
+    /// 遍历序逐轮不同 ⇒ 无名字兜底时胜者会漂移。
+    /// 期望: 每一轮都选字典序最大的名字 (max_by 并列取最后一个最大值)。
+    #[tokio::test]
+    async fn select_best_for_profile_tie_is_name_deterministic() {
+        const N: usize = 8;
+        const ROUNDS: usize = 16;
+        for round in 0..ROUNDS {
+            let gw = GatewayV2::new();
+            for i in 0..N {
+                gw.register_provider_with_category(
+                    &format!("tie-{:02}", i),
+                    std::sync::Arc::new(TieMock),
+                    true,
+                    ProviderCategory::Cloud,
+                );
+            }
+            // 前提: 全并列 — 断言分数确实逐位相等, 否则本测试就测不到兜底。
+            let scores: Vec<f64> = gw
+                .states
+                .read()
+                .map(|s| s.values().map(|st| st.composite_score()).collect())
+                .unwrap_or_default();
+            assert_eq!(scores.len(), N, "round {}: provider 未全部注册", round);
+            let mut tied = true;
+            let mut prev: Option<f64> = None;
+            for s in &scores {
+                if let Some(p) = prev {
+                    if p.to_bits() != s.to_bits() {
+                        tied = false;
+                    }
+                }
+                prev = Some(*s);
+            }
+            assert!(tied, "round {}: 分数本应全并列, 实得 {:?}", round, scores);
+            let picked = gw.select_best_for_profile(CommunicationProfile::Open).await;
+            assert_eq!(
+                picked,
+                Some(format!("tie-{:02}", N - 1)),
+                "round {}: 同分兜底选出的 provider 不确定 (遍历序泄漏)",
+                round
+            );
+        }
     }
 }

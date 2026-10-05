@@ -275,14 +275,23 @@ impl LeadManager {
 
     pub(crate) fn _needs_follow_up(&self) -> Vec<&Lead> {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
-        self.leads.values().filter(|l|
+        // ⚠️ 2026-10-05：按 `id` 升序规范化。`leads` 是 `HashMap` ⇒ 原先返回顺序随
+        // 进程漂移；调用方若「取第一条」或按序输出，结果就不可复现。
+        let mut out: Vec<&Lead> = self.leads.values().filter(|l|
             l.stage != LeadStage::ClosedWon && l.stage != LeadStage::ClosedLost
                 && l.next_follow_up.map_or(true, |t| t <= now)
-        ).collect()
+        ).collect();
+        out.sort_by(|a, b| a.id.cmp(&b.id));
+        out
     }
 
     pub fn get_lead(&self, id: &str) -> Option<&Lead> { self.leads.get(id) }
-    pub(crate) fn _list_leads(&self) -> Vec<&Lead> { self.leads.values().collect() }
+    pub(crate) fn _list_leads(&self) -> Vec<&Lead> {
+        // ⚠️ 同上：按 `id` 升序规范化（原为哈希序）。
+        let mut out: Vec<&Lead> = self.leads.values().collect();
+        out.sort_by(|a, b| a.id.cmp(&b.id));
+        out
+    }
     pub(crate) fn _total_leads(&self) -> usize { self.leads.len() }
 }
 
@@ -320,15 +329,33 @@ impl DataStore for LeadManager {
     }
 
     fn query(&self, query: &str, limit: usize) -> Result<Vec<QueryResult>, CapabilityError> {
-        let results: Vec<QueryResult> = self.leads.values()
+        // ⚠️ 2026-10-05 修正：原先是 `self.leads.values().filter(..).take(limit)`。
+        //
+        // `leads: HashMap<String, Lead>` ⇒ 遍历序由随机种子决定 ⇒ **匹配数超过 `limit`
+        // 时「返回哪 N 条」跨进程漂移**。这比「tie-break 缺失」严重一档：
+        // 不是顺序不可复现，而是**结果集本身不同**。
+        //
+        // 且原实现**根本没按 score 排序**，`take(limit)` 只是「任意 N 条」——
+        // 参数名 `limit` 与语义（取最好的 N 条）不符。
+        //
+        // ⇒ 改为：收集全部匹配 → 按 (score 降序, id 升序) 规范化排序 → **再**截断。
+        //   `id` 兜底使全并列时结果可复现。范式对齐
+        //   `gateway/routing/selection.rs::select_best` 的 `.then(na.cmp(nb))`。
+        let mut results: Vec<QueryResult> = self.leads.values()
             .filter(|l| l.contact_name.contains(query) || l.inquiry_text.contains(query))
-            .take(limit)
             .map(|l| QueryResult {
                 id: l.id.clone(),
                 score: l.score / 100.0,
                 data: serde_json::to_vec(l).unwrap_or_default(),
             })
             .collect();
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        results.truncate(limit);
         Ok(results)
     }
 }
@@ -354,7 +381,15 @@ impl LeadRegistry {
             .max_by(|a, b| {
                 let a_s = 1.0 - a.health_check().error_rate;
                 let b_s = 1.0 - b.health_check().error_rate;
-                a_s.partial_cmp(&b_s).unwrap_or(std::cmp::Ordering::Equal)
+                a_s.partial_cmp(&b_s)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    // ⚠️ 2026-10-05 修正：原先**没有**名字兜底 ⇒ `error_rate` 并列时
+                    // 胜者完全取决于 `managers` 的**注册顺序**。`managers` 是 `Vec`
+                    // (不是 `HashMap`，故遍历序本身确定)，但注册顺序由调用方决定 ——
+                    // 一旦调用方从某个 `HashMap` 派生注册序列，胜者即成哈希序 ⇒
+                    // 跨进程漂移。与 `nt_memory_kb/nt_memory_search/nt_router.rs` 的
+                    // `SearchRegistry::optimal` 是同一范式的同一处修正。
+                    .then_with(|| a.capability_id().cmp(b.capability_id()))
             })
             .map(|m| m.as_ref())
     }
@@ -428,5 +463,143 @@ mod tests {
         assert_eq!(LeadScorer::score_to_quality(70.0), LeadQuality::Hot);
         assert_eq!(LeadScorer::score_to_quality(50.0), LeadQuality::Warm);
         assert_eq!(LeadScorer::score_to_quality(20.0), LeadQuality::Cold);
+    }
+
+    // ── LeadRegistry::optimal 同分兜底确定性 (D13 确定性) ─────────
+
+    /// 8 个并列 store 的名字 (字典序 ⇒ 最后一个最大)。
+    const TIED_IDS: [&str; 8] = [
+        "data.lead_00", "data.lead_01", "data.lead_02", "data.lead_03",
+        "data.lead_04", "data.lead_05", "data.lead_06", "data.lead_07",
+    ];
+
+    /// 最小 mock store — 只为构造**同分**并列集, `query` 不被本组测试调用。
+    struct StubStore {
+        id: &'static str,
+        error_rate: f64,
+        healthy: bool,
+    }
+
+    impl StubStore {
+        fn new(id: &'static str, error_rate: f64) -> Self {
+            Self { id, error_rate, healthy: true }
+        }
+        fn unhealthy(id: &'static str, error_rate: f64) -> Self {
+            Self { id, error_rate, healthy: false }
+        }
+    }
+
+    impl L1Capability for StubStore {
+        fn capability_id(&self) -> &str { self.id }
+        fn category(&self) -> CapabilityCategory { CapabilityCategory::Data }
+        fn constellation(&self) -> ConstellationLevel { ConstellationLevel::C1UnitTest }
+        fn health_check(&self) -> CapabilityHealth {
+            CapabilityHealth {
+                healthy: self.healthy,
+                latency_ms: None,
+                error_rate: self.error_rate,
+                last_check: 0,
+                message: None,
+            }
+        }
+        fn description(&self) -> &str { "stub" }
+    }
+
+    impl DataStore for StubStore {
+        fn store(&self, _ns: &str, key: &str, _v: &[u8]) -> Result<String, CapabilityError> {
+            Ok(key.to_string())
+        }
+        fn load(&self, _id: &str) -> Result<Option<Vec<u8>>, CapabilityError> { Ok(None) }
+        fn query(&self, _q: &str, _limit: usize) -> Result<Vec<QueryResult>, CapabilityError> {
+            Ok(Vec::new())
+        }
+    }
+
+    /// `LeadRegistry::optimal` 同分兜底: 胜者只由 `capability_id` 决定, 与**注册顺序**
+    /// 无关。原实现无兜底 ⇒ `max_by` 取最后一个最大值 ⇒ 逆序注册会翻转结果。
+    #[test]
+    fn test_lead_registry_optimal_tie_is_name_deterministic() {
+        let expected = TIED_IDS[TIED_IDS.len() - 1];
+
+        let mut asc = LeadRegistry::new();
+        for id in TIED_IDS {
+            asc.register(Box::new(StubStore::new(id, 0.25)));
+        }
+        let mut desc = LeadRegistry::new();
+        for id in TIED_IDS.iter().rev() {
+            desc.register(Box::new(StubStore::new(*id, 0.25)));
+        }
+        assert_eq!(
+            asc.optimal().map(|m| m.capability_id()),
+            Some(expected),
+            "正序注册的同分胜者不是名字最大者"
+        );
+        assert_eq!(
+            desc.optimal().map(|m| m.capability_id()),
+            Some(expected),
+            "同分胜者随注册顺序漂移 ⇒ 顺序泄漏"
+        );
+    }
+
+    /// 非并列时主判据 (error_rate 越低越好) 不得被兜底反转; 不健康项必须被滤掉。
+    #[test]
+    fn test_lead_registry_optimal_primary_key_and_health_filter() {
+        let mut reg = LeadRegistry::new();
+        reg.register(Box::new(StubStore::new("data.lead_bad", 0.9)));
+        reg.register(Box::new(StubStore::new("data.lead_good", 0.01)));
+        reg.register(Box::new(StubStore::unhealthy("data.lead_zzz", 0.0)));
+        assert_eq!(
+            reg.optimal().map(|m| m.capability_id()),
+            Some("data.lead_good"),
+            "兜底不得反转主判据, 也不得让不健康项胜出"
+        );
+        assert!(LeadRegistry::new().optimal().is_none(), "空注册表 ⇒ None");
+    }
+
+    /// ⭐⭐ 回归（2026-10-05）：`LeadManager::query` 的 top-N **结果集与顺序**必须规范化。
+    ///
+    /// 原实现 `values().filter(..).take(limit)` 在 `HashMap` 上截断 ⇒ 匹配数超过
+    /// `limit` 时「哪 N 条」跨进程漂移（不是顺序问题，是**结果集本身不同**），
+    /// 且**根本没按 score 排序** ⇒ `limit` 名不符实。
+    ///
+    /// ⚠️ 判别力说明（实测约束，非偷懒）：`capture_lead` 的 id 是
+    /// **`lead_{uuid::new_v4()}`** ⇒ 两次构造的 id 天然不同，所以
+    /// 「建两个 manager 比对结果」这种测法在此**不成立**。
+    /// ⇒ 改用**单次运行即可判定**的不变量：**返回值必须已按 (score 降, id 升) 有序**。
+    /// 原实现返回哈希序 ⇒ 该断言必失败；这比概率性的跨进程比对更强。
+    #[test]
+    fn test_lead_manager_query_is_canonically_ordered() {
+        let mut mgr = LeadManager::new();
+        for i in 0..6 {
+            mgr.capture_lead(
+                LeadSource::Website,
+                &format!("contact-{}", i),
+                "widget inquiry",
+                vec!["p".to_string()],
+            );
+        }
+
+        let all = mgr.query("widget", 100).unwrap_or_default();
+        assert_eq!(all.len(), 6, "query 应返回全部 6 条匹配");
+
+        // ① 返回值必须已按 (score 降, id 升) 规范化 —— 原实现是哈希序，必失败
+        for w in all.windows(2) {
+            let (a_score, a_id) = (w[0].score, w[0].id.as_str());
+            let (b_score, b_id) = (w[1].score, w[1].id.as_str());
+            let ordered = b_score < a_score || (b_score == a_score && a_id < b_id);
+            assert!(
+                ordered,
+                "结果未按 (score 降, id 升) 排序: ({}, {}) 之后是 ({}, {})",
+                a_score, a_id, b_score, b_id
+            );
+        }
+
+        // ② 截断必须是「全序列表的前缀」—— 即 limit 真的取最好的 N 条
+        let all_ids: Vec<&str> = all.iter().map(|r| r.id.as_str()).collect();
+        for k in 1..=6usize {
+            let top = mgr.query("widget", k).unwrap_or_default();
+            let top_ids: Vec<&str> = top.iter().map(|r| r.id.as_str()).collect();
+            assert_eq!(top_ids, all_ids[..k], "limit={} 不是全序前缀", k);
+        }
     }
 }

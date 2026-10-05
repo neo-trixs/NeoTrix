@@ -15,6 +15,21 @@ use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_schema;
 use neotrix::l1_action::nt_memory::nt_memory_kb::nt_memory_shanhai::{export_geojson, shanhai_evidence, shanhai_mappings, shanhai_peaks, shanhai_schools, shanhai_stats};
 use rusqlite::Connection;
 
+/// 按**字符**截断到 `max` 个字符（不足 `max` 则原样返回）。
+///
+/// ⛔ 不能写 `&s[..max]`：`max` 是**字节**偏移，`&str` 按非边界字节切会 panic
+/// （`byte index … is not a char boundary`），且 `&str[..]` 本身触发
+/// `clippy::string_slice`（workspace warn 级 + CI `-D warnings`）。
+/// 山海世界的 `summary` 全是中文（《山海经》条目正文），一汉字 3 字节 ⇒
+/// 旧代码的 `&m.summary[..120]` / `&summary[..100]` 遇到任何超阈值中文记录就崩。
+fn truncate_chars(s: &str, max: usize) -> String {
+    if s.chars().count() > max {
+        s.chars().take(max).collect()
+    } else {
+        s.to_string()
+    }
+}
+
 fn open_kb() -> Connection {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     let db_path = format!("{}/.neotrix/knowledge.db", home);
@@ -65,8 +80,8 @@ fn cmd_mappings(conn: &Connection) {
         if !m.scholars.is_empty() {
             println!("    归因: {}", m.scholars.join(", "));
         }
-        if m.summary.len() > 120 {
-            println!("    证据: {}...", &m.summary[..120]);
+        if m.summary.chars().count() > 120 {
+            println!("    证据: {}...", truncate_chars(&m.summary, 120));
         } else if !m.summary.is_empty() {
             println!("    证据: {}", m.summary);
         }
@@ -97,8 +112,8 @@ fn cmd_schools(conn: &Connection) {
             importance,
             if tags.is_empty() { "—".to_string() } else { tags.to_string() }
         );
-        if summary.len() > 100 {
-            println!("    {}", &summary[..100]);
+        if summary.chars().count() > 100 {
+            println!("    {}", truncate_chars(summary, 100));
         } else if !summary.is_empty() {
             println!("    {}", summary);
         }
@@ -157,5 +172,83 @@ fn main() {
             print_usage();
             std::process::exit(1);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::truncate_chars;
+
+    /// `n` 个汉字（3 字节/字）——山海世界 `summary` 的真实形态。
+    fn cjk(n: usize) -> String {
+        "山海经".chars().cycle().take(n).collect()
+    }
+
+    #[test]
+    fn truncate_chars_cjk_never_splits_a_character() {
+        // 300 汉字 = 900 字节 ⇒ 旧代码 `&s[..120]` / `&s[..100]` 必 panic。
+        let s = cjk(300);
+        let t = truncate_chars(&s, 100);
+        assert_eq!(t.chars().count(), 100, "must keep 100 chars");
+        assert_eq!(
+            t.len(),
+            300,
+            "100 CJK chars == 300 bytes (byte-cut would be 100)"
+        );
+        assert_eq!(t, cjk(100));
+    }
+
+    #[test]
+    fn truncate_chars_ascii_matches_old_byte_semantics() {
+        let s = "A".repeat(200);
+        assert_eq!(truncate_chars(&s, 120), "A".repeat(120));
+        assert_eq!(truncate_chars(&s, 100), "A".repeat(100));
+    }
+
+    #[test]
+    fn truncate_chars_4byte_emoji_boundary() {
+        // 200 个 emoji = 800 字节 ⇒ 任何按字节的定长切分都会落在 4 字节字符中间。
+        let s: String = std::iter::repeat('🙂').take(200).collect();
+        let t = truncate_chars(&s, 40);
+        assert_eq!(t.chars().count(), 40);
+        assert_eq!(t.len(), 160);
+        let want: String = std::iter::repeat('🙂').take(40).collect();
+        assert_eq!(t, want);
+    }
+
+    #[test]
+    fn truncate_chars_shorter_than_max_is_noop() {
+        let s = cjk(30); // 90 字节但只有 30 字符
+        assert_eq!(truncate_chars(&s, 100), s);
+        assert_eq!(truncate_chars(&s, 30), s, "exactly max ⇒ no cut");
+        assert_eq!(truncate_chars(&s, 29), cjk(29));
+        assert_eq!(truncate_chars("", 100), "");
+    }
+
+    /// 钉死 `cmd_mappings` / `cmd_schools` 的展示语义：
+    /// 阈值与截断长度现在都以**字符**计（120 / 100），省略号仍留在调用点。
+    #[test]
+    fn summary_display_semantics_preserved_on_cjk() {
+        // 160 汉字 = 480 字节：旧代码两处都会 panic（120 / 100 皆非边界）。
+        let summary = cjk(160);
+
+        // cmd_schools 形态：>100 字符 ⇒ 取前 100 字符，无省略号。
+        let printed = if summary.chars().count() > 100 {
+            truncate_chars(&summary, 100)
+        } else if !summary.is_empty() {
+            summary.clone()
+        } else {
+            String::new()
+        };
+        assert_eq!(printed.chars().count(), 100);
+
+        // cmd_mappings 形态：>120 字符 ⇒ 取前 120 字符 + "..."。
+        let evidence = format!("{}...", truncate_chars(&summary, 120));
+        assert!(evidence.ends_with("..."));
+        assert_eq!(evidence.chars().count(), 123);
+
+        // 短于阈值时原样输出（空串不输出，见调用点的 else if 分支）。
+        let short = cjk(30); // 90 字节 < 100 字节阈值，且只有 30 字符
+        assert_eq!(truncate_chars(&short, 100), short);
     }
 }

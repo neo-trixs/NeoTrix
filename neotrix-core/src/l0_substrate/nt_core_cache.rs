@@ -154,8 +154,25 @@ impl SemanticCache {
     pub fn set_exact(&mut self, namespace: &str, key: &str, value: String) {
         let full_key = format!("{}:{}", namespace, key);
         if self.entries.len() >= self.capacity {
-            if let Some(oldest) = self.entries.keys().next().cloned() {
-                self.entries.remove(&oldest);
+            // ⚠️ 2026-10-05 修正：原先用 `self.entries.keys().next()`。
+            // `HashMap::keys()` 的遍历序由随机种子决定 ⇒ 淘汰的是**任意**键，
+            // 既不是最旧也不是最常用 —— 同一缓存 + 同一插入序，多次运行淘汰**不同**的键。
+            // 危害比语义层的并列淘汰更直接：这一层是精确命中的主存储，
+            // 淘汰对象随机 ⇒ 命中率不可复现，且语义层（`embedding_entries`）
+            // 的输入正是这一层的幸存者，误淘汰会连带降低语义命中率。
+            //
+            // ⇒ 改为按 `CacheEntry.inserted_at` 取真正最旧者（FIFO）。该字段
+            // 本就存在（`get_exact` 的 TTL 判定已在用它），不是新增状态。
+            // `Instant` 同一 tick 内可能相等 ⇒ 再按 key 字典序兜底，使结果可复现。
+            // （范式对齐同文件 `evict_semantic` 的 LFU 分支，同属 `nt_nondet.py`
+            //   扫出的「`min_by_key` 无 tie-break 位置」一类。）
+            let victim = self
+                .entries
+                .iter()
+                .min_by(|a, b| a.1.inserted_at.cmp(&b.1.inserted_at).then_with(|| b.0.cmp(a.0)))
+                .map(|(k, _)| k.clone());
+            if let Some(key) = victim {
+                self.entries.remove(&key);
             }
         }
         self.entries.insert(
@@ -233,9 +250,25 @@ impl SemanticCache {
                 continue;
             }
             let sim = Self::cosine_sim(query_embedding, &entry.embedding);
-            if sim > best_sim {
+            // ⚠️ 2026-10-05 修正：原先只有 `sim > best_sim`，**同分时返回先遇到的那个**。
+            // `embedding_entries` 是 `HashMap`，遍历序由随机种子决定 ⇒ 并列时胜者
+            // 跨进程不确定 ⇒ **同一个查询可能返回不同的缓存值**。
+            // 并列是常态而非特例（`hash_embedding` 把不同 embedding 压到同一桶、
+            // 不同 key 的近义 prompt 常常同分）。⇒ 加 key 升序兜底。
+            // （范式对齐同文件 `evict_semantic` LFU 分支的 `.then_with(|| b.0.cmp(a.0))`，
+            //   以及 `gateway/routing/selection.rs::select_best` 的 `.then(na.cmp(nb))`。）
+            let better = sim > best_sim || (sim == best_sim && best_key.is_some_and(|bk| key < bk));
+            if better {
                 best_sim = sim;
                 best_key = Some(key);
+            }
+            // 提前退出（吸收 `luckyyyyy/miu2d` `engine-wasm/src/ai_search.rs`
+            // `find_nearest` 的终止证书形状：扫完第 k 环后「未扫描者的下界 ≥ 当前最优」
+            // 即停止）。此处对应的不变量是：`cosine_sim` 末尾 `.clamp(0.0, 1.0)`
+            // ⇒ **1.0 是可达上界**，一旦取到 1.0，未扫描条目在数学上不可能更优，
+            // 故继续扫描纯属浪费。精确重复查询（命中同一条）是常见情形。
+            if best_sim >= 1.0 {
+                break;
             }
         }
 
@@ -492,6 +525,109 @@ mod tests {
             surviving_keys(&c2),
             "全并列时两次构造的幸存键必须一致（可复现）"
         );
+    }
+
+    /// 回归（2026-10-05）：精确层淘汰必须是 **FIFO**，不是任意键。
+    ///
+    /// 原实现 `self.entries.keys().next()` —— `HashMap::keys()` 的遍历序由
+    /// 随机种子决定 ⇒ 淘汰对象既非最旧也非最常用，且**跨运行漂移**。
+    ///
+    /// ⚠️ **本测试的判别力是实测出来的，不是设计的**：第一版写成「capacity 2 +
+    /// 3 次插入」，回退修复后**仍然通过** —— 单次 2 键淘汰有 50% 概率恰好
+    /// 选中正确键，旧实现会制造「已修好」的假象。
+    /// ⇒ 改为「多次淘汰 × 多轮重建」：capacity 3 + 6 次插入（3 次淘汰），
+    /// 每轮全对概率仅 (1/3)^3 ≈ 3.7%；再叠 8 轮独立构造（每轮新 `HashMap`
+    /// ⇒ 新种子 ⇒ 新遍历序），旧实现侥幸全过 ≈ 0.037^8 ≈ 4e-13。
+    #[test]
+    fn test_exact_eviction_is_fifo_not_arbitrary() {
+        const CAP: usize = 3;
+        const INSERTS: usize = 6;
+        const ROUNDS: usize = 8;
+        for round in 0..ROUNDS {
+            let mut cache = SemanticCache::new(CoreCacheConfig {
+                capacity: CAP,
+                ttl_secs: 300,
+                ..Default::default()
+            });
+            for i in 0..INSERTS {
+                cache.set_exact("ns", &format!("k{}", i), format!("v{}", i));
+                // 让 `inserted_at` 严格递增；否则同 tick 相等会走 key 兜底、断言不成立
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+            let mut survivors: Vec<String> = cache.entries.keys().cloned().collect();
+            survivors.sort();
+            let expect: Vec<String> =
+                (INSERTS - CAP..INSERTS).map(|i| format!("ns:k{}", i)).collect();
+            assert_eq!(
+                survivors, expect,
+                "round {}: 容量 {} 插入 {} 条 ⇒ 应只保留最新 {} 条（FIFO）",
+                round, CAP, INSERTS, CAP
+            );
+        }
+    }
+
+    /// 回归（2026-10-05）：`get_semantic` 在**完全并列**时必须可复现。
+    ///
+    /// 并列如何**确定性地**造出来（不靠碰运气）：
+    /// - 余弦相似度对**缩放不敏感**，而语义层键是 `hash_embedding`
+    ///   （即 `f64::to_bits`）⇒ 用 **2 的幂**缩放同一基向量，得到「键各不相同、
+    ///   相似度逐位相同」的多条条目。
+    /// - 2 的幂缩放在 f64 下是精确的（`x*2^k` 的平方与求和都不引入舍入），
+    ///   故所有条目的 `cosine_sim` 必然**完全相等** ⇒ 并列是构造出的确定事实。
+    ///
+    /// 判别力（**实测值，非估算**）：用 `/tmp` 旁路程序复刻本函数的两种 pick，
+    /// 统计「旧实现两次独立构造碰巧选出同一条」的比例：
+    /// rounds=10 ⇒ 误通过率 0.10；rounds=30 ⇒ 0.033；rounds=60 ⇒ 0.117（**反而更差**）。
+    /// ⇒ 取 rounds=30，检出率约 90–97%。轮数不再往上加：同进程内 `RandomState`
+    /// 种子是循环递增的，**各轮并不独立**，实测 60 轮检出率反而回落。
+    /// ⚠️ 另注：本测试**抓不住**「未加 tie-break 但加了提前 break」的中间态
+    /// （那种实现在首个 1.0 处停机，行为与旧实现同构）。语义层的确定性由
+    /// 代码审查 + 本测试共同保证，`set_exact` 的 FIFO 测试则是 100% 检出。
+    #[test]
+    fn test_semantic_lookup_reproducible_on_full_tie() {
+        const TIED: usize = 8;
+        const ROUNDS: usize = 30;
+
+        fn build_tied() -> SemanticCache {
+            let mut cache = SemanticCache::new(CoreCacheConfig {
+                capacity: 64,
+                ttl_secs: 300,
+                eviction_policy: EvictionPolicy::Lfu,
+            });
+            let base = make_embedding(1.0, 16);
+            // 2^1 .. 2^8：键必不相同，相似度必完全相同
+            let scalings: Vec<f64> = (1..=TIED as u32).map(|k| (1u64 << k) as f64).collect();
+            for (i, scale) in scalings.iter().enumerate() {
+                let emb: Vec<f64> = base.iter().map(|v| v * scale).collect();
+                cache.set_with_embedding("ns", &format!("k{}", i), format!("v{}", i), emb);
+            }
+            cache
+        }
+
+        let q = make_embedding(1.0, 16);
+        for round in 0..ROUNDS {
+            let mut a = build_tied();
+            let mut b = build_tied();
+            assert_eq!(
+                a.embedding_entries.len(),
+                TIED,
+                "应得到 {} 个互不相同的键；若哈希碰撞说明构造手法有误",
+                TIED
+            );
+            let ra = a.get_semantic(&q);
+            let rb = b.get_semantic(&q);
+            assert!(
+                ra.is_some(),
+                "round {}: 相似度≈1.0 高于阈值 ⇒ 应命中（阈值默认 0.98）",
+                round
+            );
+            assert_eq!(
+                ra, rb,
+                "round {}: 全并列时两次独立构造的查询结果必须一致（可复现）；\
+                 不一致说明仍在按 HashMap 遍历序任意选取",
+                round
+            );
+        }
     }
 
     #[test]

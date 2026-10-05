@@ -6,6 +6,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
@@ -200,6 +201,35 @@ pub fn is_official_converged(name: &str, existing: &[ResolvedSkill]) -> bool {
         .any(|s| s.name.eq_ignore_ascii_case(name) && s.tags.iter().any(|t| t == "official"))
 }
 
+/// 谁在看这份技能列表 —— 决定 `SkillInvocationPolicy` 哪一维生效（A5 接线）。
+///
+/// 「存在」与「对谁可见」正交：同一批技能对**受信调用方**按名取用永远可用，
+/// 但**自动面**（模型自动触发、用户 `/` 菜单）必须按策略裁掉。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SkillAudience {
+    /// 面向模型的**自动触发 / 广告面**（默认，见 [`SkillFilter::audience`]）。
+    #[default]
+    Model,
+    /// 用户 `/` 菜单 / `user_invocable` 面。
+    User,
+    /// 受信调用方（按名 `load_skill`、依赖图、发现面）：不隐藏。
+    Trusted,
+}
+
+impl SkillAudience {
+    /// 该受众是否应看到此技能。
+    ///
+    /// 纯函数、单点裁决：`SkillInvocationPolicy` 的两个 `visible_to_*`
+    /// 由此**首次获得生产消费者**（此前只有测试引用，等于策略未被强制）。
+    pub fn admits(self, policy: &SkillInvocationPolicy) -> bool {
+        match self {
+            SkillAudience::Model => policy.visible_to_model(),
+            SkillAudience::User => policy.visible_to_user(),
+            SkillAudience::Trusted => true,
+        }
+    }
+}
+
 /// Search filter for querying skills.
 #[derive(Debug, Clone, Default)]
 pub struct SkillFilter {
@@ -215,6 +245,14 @@ pub struct SkillFilter {
     pub require_exists: bool,
     /// If true, only return skills admitted by the three-part gate (P0-2).
     pub require_admitted: bool,
+    /// 谁在看这份结果；缺省 [`SkillAudience::Model`]。
+    ///
+    /// 选 Model 为缺省，是因为 `search_skills` 的**唯一生产消费者**就是
+    /// `skill_registry::SkillRegistry::match_trigger`（`skill_registry.rs:41`）
+    /// —— 触发词自动选技能，即「模型按 description/triggers 自动加载」。
+    /// 要按名取用走 `load_skill`（Trusted，不隐藏），要浏览用户菜单走
+    /// `list_visible_to_user`。
+    pub audience: SkillAudience,
 }
 
 /// Search results with relevance ranking.
@@ -225,9 +263,35 @@ pub struct SearchResult {
     pub score: f64,
 }
 
+/// 进程级 `index.json` 解析缓存（A5, 2026-10-05）。
+///
+/// **为什么需要进程级**：`SkillLoader` 的调用方每次都新建实例
+/// （`consciousness_core::core::tick` 每 tick 一个、`SkillRegistry::new` 一个），
+/// 所以 loader 内的 memo 字段永远命中不了 ⇒ 每 tick 重读 + 重解析 27KB JSON。
+/// 代价落在 per-tick 热路径上，且 `consciousness_core/core.rs:265` 已有对应 TODO。
+///
+/// **失效判据**：`(绝对路径, mtime, len)`。三者任一变化即重解析 ⇒ 开发期
+/// 重生成 index.json 立刻可见；len 一并纳入是为了在 mtime 粒度较粗的
+/// 文件系统上不误判（mtime 相同但长度不同 ⇒ 内容必不同）。
+///
+/// **测试隔离**：按**绝对路径**分键。临时目录测试各自持有不同路径 ⇒ 天然
+/// 不共享；`SkillLoader::with_dirs` 指向的目录亦同。已由
+/// `test_index_cache_does_not_leak_between_dirs` /
+/// `test_index_cache_invalidates_on_rewrite` 证明。
+static INDEX_CACHE: std::sync::OnceLock<
+    std::sync::Mutex<HashMap<PathBuf, (Option<std::time::SystemTime>, u64, Arc<SkillIndex>)>>,
+> = std::sync::OnceLock::new();
+
+fn index_cache() -> &'static std::sync::Mutex<
+    HashMap<PathBuf, (Option<std::time::SystemTime>, u64, Arc<SkillIndex>)>,
+> {
+    INDEX_CACHE.get_or_init(|| std::sync::Mutex::new(HashMap::new()))
+}
+
 /// Enhanced skill loader with index-based discovery.
 pub struct SkillLoader {
-    index: Option<SkillIndex>,
+    /// `Arc` 而非 `SkillIndex`：多个 loader 共享同一份解析结果，克隆 O(1)。
+    index: Option<Arc<SkillIndex>>,
     skill_dirs: Vec<PathBuf>,
 }
 
@@ -274,32 +338,112 @@ impl SkillLoader {
     }
 
     /// Load the skill index from `skills/index.json` (first found directory).
+    ///
+    /// 读取走进程级缓存（见 [`INDEX_CACHE`]），故同一进程内重复调用不再读盘。
     pub fn load_index(&mut self) -> Result<&SkillIndex, String> {
+        self.ensure_index()?;
+        // `Arc<SkillIndex>` → `&SkillIndex`：deref 借用 self.index，生命周期与 &self 一致。
+        let idx: &SkillIndex = self
+            .index
+            .as_deref()
+            .ok_or_else(|| "skill index unavailable after load".to_string())?;
+        Ok(idx)
+    }
+
+    /// 幂等：确保 `self.index` 已就位。已有则直接返回。
+    ///
+    /// 解析过一次后 `self.index` 命中，无需再 stat；未命中才按目录顺序找
+    /// `index.json`，并经 [`INDEX_CACHE`] 复用其它 loader 的解析结果。
+    fn ensure_index(&mut self) -> Result<(), String> {
         if self.index.is_some() {
-            return Ok(self.index.as_ref().unwrap());
+            return Ok(());
         }
 
         for dir in &self.skill_dirs {
             let index_path = dir.join("index.json");
-            if index_path.exists() {
-                let content = std::fs::read_to_string(&index_path)
-                    .map_err(|e| format!("Failed to read {}: {}", index_path.display(), e))?;
-                let idx: SkillIndex = serde_json::from_str(&content)
-                    .map_err(|e| format!("Failed to parse {}: {}", index_path.display(), e))?;
-                self.index = Some(idx);
-                return Ok(self.index.as_ref().unwrap());
+            if !index_path.exists() {
+                continue;
             }
+            // 绝对路径做键 ⇒ 相对 CWD 与临时目录互不串味。
+            let key = std::fs::canonicalize(&index_path).unwrap_or_else(|_| index_path.clone());
+            let meta = std::fs::metadata(&index_path).ok();
+            let stamp = meta
+                .as_ref()
+                .map(|m| (m.modified().ok(), m.len()));
+
+            if let Some((mtime, len)) = stamp {
+                if let Ok(cache) = index_cache().lock() {
+                    if let Some((hit_mtime, hit_len, idx)) = cache.get(&key) {
+                        if *hit_mtime == mtime && *hit_len == len {
+                            self.index = Some(idx.clone());
+                            return Ok(());
+                        }
+                    }
+                }
+                // 锁被 poison 时 `if let Ok(..)` 落空 ⇒ 退化为直读，不 panic。
+            }
+
+            let content = std::fs::read_to_string(&index_path)
+                .map_err(|e| format!("Failed to read {}: {}", index_path.display(), e))?;
+            let parsed: SkillIndex = serde_json::from_str(&content)
+                .map_err(|e| format!("Failed to parse {}: {}", index_path.display(), e))?;
+            let shared = Arc::new(parsed);
+            if let Some((mtime, len)) = stamp {
+                if let Ok(mut cache) = index_cache().lock() {
+                    cache.insert(key, (mtime, len, shared.clone()));
+                }
+            }
+            self.index = Some(shared);
+            return Ok(());
         }
 
         Err("No index.json found in any skill directory".to_string())
     }
 
     /// List all known skills from the index, optionally resolving paths.
+    ///
+    /// **不做发现过滤**（A5, 2026-10-05）：本函数是**发现面**，被
+    /// `consciousness_core::core::tick`（workspace_context.active_skills）与
+    /// `agent::skills::SkillsEngine::init` 消费；调用策略（`visible_to_*`）在
+    /// **投放面**强制（[`SkillLoader::list_visible_to`] 与
+    /// [`SkillFilter::audience`]`search_skills`），不在这里丢条目 ——
+    /// 隐藏项仍须可被发现、可按名取用，只是不被自动选中/不被列出。
     pub fn list_skills(&mut self) -> Result<Vec<ResolvedSkill>, String> {
-        let index = self.load_index()?;
-        // borrow 结束后再用 self.skill_dirs，避免与 load_index 的 &mut 借用重叠
-        let index = index.clone();
+        self.ensure_index()?;
+        // `Arc::clone` 而非深克隆整棵 index：旧写法 `let index = index.clone()`
+        // 为绕开 `load_index(&mut self)` 与 `resolve_from_index(&self, ..)` 的
+        // 借用重叠而复制全部 categories/skill_index/Vec<String>，且**每 tick
+        // 一次**（consciousness_core tick 路径）。现在 memo 里已是 `Arc`，
+        // 克隆是引用计数加一。
+        let index: Arc<SkillIndex> = self
+            .index
+            .clone()
+            .ok_or_else(|| "skill index unavailable after load".to_string())?;
         Ok(self.resolve_from_index(&index))
+    }
+
+    /// **投放面**：可向某受众展示的技能清单。
+    ///
+    /// A5 的接线点在此处而非 `list_skills` —— `list_skills` 是**发现面**
+    /// （`consciousness_core` 每 tick 取全量名字写 `active_skills`、
+    /// `SkillsEngine::init` 靠它计数），在那里丢条目会改掉「有哪些技能存在」
+    /// 这一发现语义；本函数只回答「**谁能看到哪些**」，发现面保持完整。
+    pub fn list_visible_to(&mut self, audience: SkillAudience) -> Result<Vec<ResolvedSkill>, String> {
+        Ok(self
+            .list_skills()?
+            .into_iter()
+            .filter(|s| audience.admits(&s.invocation))
+            .collect())
+    }
+
+    /// 面向模型的目录：`disable_model_invocation` 的技能不出现在这里。
+    pub fn list_visible_to_model(&mut self) -> Result<Vec<ResolvedSkill>, String> {
+        self.list_visible_to(SkillAudience::Model)
+    }
+
+    /// 用户 `/` 菜单：`user_invocable == false` 的技能不出现在这里。
+    pub fn list_visible_to_user(&mut self) -> Result<Vec<ResolvedSkill>, String> {
+        self.list_visible_to(SkillAudience::User)
     }
 
     /// Resolve every category entry into a `ResolvedSkill` with a real on-disk path.
@@ -335,7 +479,10 @@ impl SkillLoader {
                             .iter()
                             .map(|d| d.join(&idx.file))
                             .find(|p| p.exists())
-                            .unwrap_or_else(|| skill_dirs[0].join(&idx.file))
+                            // skill_dirs 为空（`with_dirs(vec![])` + 外部注入 index，
+                            // resolve_from_index 是 pub）时不得索引 [0] ⇒ panic。
+                            .or_else(|| skill_dirs.first().map(|d| d.join(&idx.file)))
+                            .unwrap_or_else(|| PathBuf::from(&idx.file))
                     })
                     .unwrap_or_else(|| PathBuf::from(format!("skills/{}", skill_name)));
 
@@ -370,6 +517,10 @@ impl SkillLoader {
     }
 
     /// Load a specific skill by name.
+    ///
+    /// **受信面**（等价 [`SkillAudience::Trusted`]）：按名取用不受
+    /// `disable_model_invocation` / `user_invocable` 限制 —— 这正是策略文档里
+    /// 「仍可被受信调用方按名字取用」那一维。
     pub fn load_skill(&mut self, name: &str) -> Result<ResolvedSkill, String> {
         let skills = self.list_skills()?;
         skills
@@ -379,6 +530,9 @@ impl SkillLoader {
     }
 
     /// Search skills using a filter. Returns results sorted by relevance score.
+    ///
+    /// 受众裁剪由 `filter.audience` 决定（缺省 [`SkillAudience::Model`]），
+    /// 见 [`SkillFilter::audience`]。
     pub fn search_skills(&mut self, filter: &SkillFilter) -> Result<Vec<SearchResult>, String> {
         let skills = self.list_skills()?;
         let mut results: Vec<SearchResult> = skills
@@ -400,7 +554,7 @@ impl SkillLoader {
 
     /// Get all skills that the given skill depends on (recursive).
     pub fn get_dependencies(&mut self, name: &str) -> Result<Vec<ResolvedSkill>, String> {
-        let index = self.load_index()?.clone();
+        let index = self.load_index()?.clone(); // Arc clone：O(1)，非深克隆
         let mut visited = HashSet::new();
         let mut result = Vec::new();
 
@@ -419,6 +573,9 @@ impl SkillLoader {
     }
 
     /// Get all skills in a category.
+    ///
+    /// 与 `list_skills` 同为**发现面**（不做受众裁剪）：它是「按类目查全部」的
+    /// 检索原语，调用方（`agent::skills::get_category`）自行决定投放给谁。
     pub fn get_category(&mut self, category: &str) -> Result<Vec<ResolvedSkill>, String> {
         let skills = self.list_skills()?;
         Ok(skills
@@ -460,6 +617,12 @@ impl SkillLoader {
     // -- Private helpers --
 
     fn matches_filter(&self, skill: &ResolvedSkill, filter: &SkillFilter) -> bool {
+        // A5 接线：受众裁剪放**第一道** —— 策略是「能不能被看见」，
+        // 先过策略再判内容匹配，省掉对不可见技能的无谓打分。
+        if !filter.audience.admits(&skill.invocation) {
+            return false;
+        }
+
         if let Some(ref cat) = filter.category {
             if &skill.category != cat {
                 return false;
@@ -719,8 +882,25 @@ pub fn load_skill(name: &str) -> Result<ResolvedSkill, String> {
 }
 
 /// Convenience function: list all skills using default loader.
+///
+/// **发现面**：不做受众裁剪（见 [`SkillLoader::list_skills`]）。
 pub fn list_skills() -> Result<Vec<ResolvedSkill>, String> {
     SkillLoader::new().list_skills()
+}
+
+/// Convenience function: **投放面** —— 可向 `audience` 展示的技能。
+pub fn list_visible_to(audience: SkillAudience) -> Result<Vec<ResolvedSkill>, String> {
+    SkillLoader::new().list_visible_to(audience)
+}
+
+/// Convenience function: 面向模型的技能目录。
+pub fn list_visible_to_model() -> Result<Vec<ResolvedSkill>, String> {
+    SkillLoader::new().list_visible_to_model()
+}
+
+/// Convenience function: 用户 `/` 菜单的技能清单。
+pub fn list_visible_to_user() -> Result<Vec<ResolvedSkill>, String> {
+    SkillLoader::new().list_visible_to_user()
 }
 
 /// Convenience function: search skills using default loader.
@@ -1093,5 +1273,364 @@ mod tests {
             }
         };
         assert_eq!(back.license, "Apache-2.0");
+    }
+
+    // ── A5：调用策略接线（投放面强制，发现面保持完整）──
+
+    /// 一条 index，含四个调用策略组合各一，外加各自独立的触发词。
+    fn policy_index() -> SkillIndex {
+        let mk = |desc: &str, disable_model: bool, user_invocable: bool| SkillEntry {
+            description: desc.into(),
+            tags: vec![],
+            triggers: vec![format!("trig-{}", desc)],
+            dependencies: vec![],
+            exclusions: vec!["不用于删除".into()],
+            output_contract: Some("JSON".into()),
+            license: String::new(),
+            disable_model_invocation: disable_model,
+            user_invocable,
+        };
+        // name 即 desc，四组极性齐全
+        let mut skills = HashMap::new();
+        for (name, dm, ui) in [
+            ("both", false, true),   // 两面都可见
+            ("no-model", true, true), // 只对用户可见
+            ("no-user", false, false), // 只对模型可见
+            ("neither", true, false), // 仅受信调用方
+        ] {
+            skills.insert(name.to_string(), mk(name, dm, ui));
+        }
+        let mut skill_index = HashMap::new();
+        for name in ["both", "no-model", "no-user", "neither"] {
+            skill_index.insert(
+                name.to_string(),
+                SkillIndexEntry {
+                    category: "pol".into(),
+                    file: format!("{}/SKILL.md", name),
+                },
+            );
+        }
+        let mut categories = HashMap::new();
+        categories.insert(
+            "pol".to_string(),
+            SkillCategory {
+                description: "c".into(),
+                tags: vec![],
+                skills,
+            },
+        );
+        SkillIndex {
+            version: "1.0.0".into(),
+            generated: "2026-10-05".into(),
+            categories,
+            skill_index,
+        }
+    }
+
+    fn names(skills: &[ResolvedSkill]) -> Vec<String> {
+        let mut v: Vec<String> = skills.iter().map(|s| s.name.clone()).collect();
+        v.sort();
+        v
+    }
+
+    #[test]
+    fn test_discovery_surface_keeps_all_four_combinations() {
+        // 发现面不得丢条目：隐藏项仍「存在」，否则 conscious tick 的
+        // active_skills 与 SkillsEngine::init 的计数都会失真。
+        let loader = SkillLoader::with_dirs(vec![PathBuf::from("/nonexistent-nt-dir")]);
+        let all = loader.resolve_from_index(&policy_index());
+        assert_eq!(
+            names(&all),
+            vec!["both", "neither", "no-model", "no-user"],
+            "发现面必须返回全部四条"
+        );
+    }
+
+    #[test]
+    fn test_model_surface_excludes_disable_model_invocation() {
+        let loader = SkillLoader::with_dirs(vec![PathBuf::from("/nonexistent-nt-dir")]);
+        let model: Vec<ResolvedSkill> = loader
+            .resolve_from_index(&policy_index())
+            .into_iter()
+            .filter(|s| s.invocation.visible_to_model())
+            .collect();
+        assert_eq!(
+            names(&model),
+            vec!["both", "no-user"],
+            "disable_model_invocation 的技能不得对模型可见"
+        );
+    }
+
+    #[test]
+    fn test_user_surface_excludes_non_user_invocable() {
+        let loader = SkillLoader::with_dirs(vec![PathBuf::from("/nonexistent-nt-dir")]);
+        let user: Vec<ResolvedSkill> = loader
+            .resolve_from_index(&policy_index())
+            .into_iter()
+            .filter(|s| s.invocation.visible_to_user())
+            .collect();
+        assert_eq!(
+            names(&user),
+            vec!["both", "no-model"],
+            "user_invocable=false 的技能不得作为用户命令出现"
+        );
+    }
+
+    #[test]
+    fn test_trusted_surface_sees_everything() {
+        let loader = SkillLoader::with_dirs(vec![PathBuf::from("/nonexistent-nt-dir")]);
+        let trusted: Vec<ResolvedSkill> = loader
+            .resolve_from_index(&policy_index())
+            .into_iter()
+            .filter(|s| SkillAudience::Trusted.admits(&s.invocation))
+            .collect();
+        assert_eq!(names(&trusted).len(), 4, "受信面按名取用不受策略限制");
+    }
+
+    #[test]
+    fn test_audience_admits_is_the_single_verdict_point() {
+        // 四组合 × 三受众的完整真值表（期望值按语义手推，与实现独立）。
+        // (disable_model, user_invocable) -> (Model, User, Trusted)
+        let cases = [
+            (false, true, true, true, true),
+            (true, true, false, true, true),
+            (false, false, true, false, true),
+            (true, false, false, false, true),
+        ];
+        for (dm, ui, want_model, want_user, want_trusted) in cases {
+            let p = SkillInvocationPolicy {
+                model_invocable: !dm,
+                user_invocable: ui,
+            };
+            assert_eq!(
+                SkillAudience::Model.admits(&p),
+                want_model,
+                "disable_model={dm}"
+            );
+            assert_eq!(SkillAudience::User.admits(&p), want_user, "user_invocable={ui}");
+            assert_eq!(SkillAudience::Trusted.admits(&p), want_trusted);
+        }
+    }
+
+    #[test]
+    fn test_search_default_audience_hides_disable_model_skill() {
+        // 端到端过 search_skills（唯一生产消费者是 SkillRegistry::match_trigger）。
+        // 用真实临时目录 + 真实 index.json，避免依赖 resolve_from_index 的
+        // 内部路径而漏掉「策略真的落到 search 上」这一层。
+        let dir = std::env::temp_dir().join("nt_skill_loader_policy_search");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let json = serde_json::to_string(&policy_index()).expect("ser");
+        std::fs::write(dir.join("index.json"), json).expect("write index");
+
+        let mut loader = SkillLoader::with_dirs(vec![dir.clone()]);
+
+        // 触发词命中全部四条；默认受众 = Model ⇒ 只能看到两条。
+        let filter = SkillFilter {
+            triggers: vec!["trig-".to_string()],
+            ..Default::default()
+        };
+        let default_audience: Vec<String> = match loader.search_skills(&filter) {
+            Ok(results) => results.into_iter().map(|r| r.skill.name).collect(),
+            Err(e) => {
+                assert!(false, "search must succeed: {e}");
+                return;
+            }
+        };
+        let mut sorted = default_audience.clone();
+        sorted.sort();
+        assert_eq!(sorted, vec!["both", "no-user"], "默认受众应裁掉 disable_model");
+
+        // 显式 Trusted ⇒ 全部可见（同一批 index，只差受众参数）。
+        let trusted = SkillFilter {
+            triggers: vec!["trig-".to_string()],
+            audience: SkillAudience::Trusted,
+            ..Default::default()
+        };
+        let trusted_names: Vec<String> = match loader.search_skills(&trusted) {
+            Ok(results) => results.into_iter().map(|r| r.skill.name).collect(),
+            Err(e) => {
+                assert!(false, "search must succeed: {e}");
+                return;
+            }
+        };
+        let mut sorted_trusted = trusted_names.clone();
+        sorted_trusted.sort();
+        assert_eq!(sorted_trusted.len(), 4, "受信受众应看到全部");
+
+        // 发现面仍然完整（不受 search 的裁剪影响）。
+        let discovered = match loader.list_skills() {
+            Ok(v) => names(&v),
+            Err(e) => {
+                assert!(false, "list must succeed: {e}");
+                return;
+            }
+        };
+        assert_eq!(discovered.len(), 4, "list_skills 是发现面，不得裁剪");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_list_visible_to_applies_policy_end_to_end() {
+        let dir = std::env::temp_dir().join("nt_skill_loader_policy_visible");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        std::fs::write(
+            dir.join("index.json"),
+            serde_json::to_string(&policy_index()).expect("ser"),
+        )
+        .expect("write index");
+
+        let mut loader = SkillLoader::with_dirs(vec![dir.clone()]);
+        assert_eq!(
+            names(&loader.list_visible_to_model().expect("model")),
+            vec!["both", "no-user"]
+        );
+        assert_eq!(
+            names(&loader.list_visible_to_user().expect("user")),
+            vec!["both", "no-model"]
+        );
+        assert_eq!(
+            names(&loader.list_visible_to(SkillAudience::Trusted).expect("trusted")),
+            vec!["both", "neither", "no-model", "no-user"]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_skill_by_name_reaches_hidden_skill() {
+        // 「两面都不暴露」的技能仍须能被受信调用方按名取到 —— 这是策略
+        // 文档里明确的第三种合法状态（is_trusted_only）。
+        let dir = std::env::temp_dir().join("nt_skill_loader_policy_byname");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        std::fs::write(
+            dir.join("index.json"),
+            serde_json::to_string(&policy_index()).expect("ser"),
+        )
+        .expect("write index");
+
+        let mut loader = SkillLoader::with_dirs(vec![dir.clone()]);
+        let got = loader.load_skill("neither");
+        assert!(
+            got.as_ref().map(|s| s.invocation.is_trusted_only()) == Ok(true),
+            "按名取用必须成功且标记为 trusted_only，实际 {:?}",
+            got.as_ref().map(|s| &s.invocation)
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ── A5：进程级 index 缓存的隔离与失效 ──
+
+    fn write_min_index(dir: &Path, name: &str) {
+        let mut skills = HashMap::new();
+        skills.insert(
+            name.to_string(),
+            SkillEntry {
+                description: "d".into(),
+                tags: vec![],
+                triggers: vec![],
+                dependencies: vec![],
+                exclusions: vec![],
+                output_contract: None,
+                license: String::new(),
+                disable_model_invocation: false,
+                user_invocable: true,
+            },
+        );
+        let mut skill_index = HashMap::new();
+        skill_index.insert(
+            name.to_string(),
+            SkillIndexEntry {
+                category: "c".into(),
+                file: format!("{}/SKILL.md", name),
+            },
+        );
+        let mut categories = HashMap::new();
+        categories.insert(
+            "c".to_string(),
+            SkillCategory {
+                description: "c".into(),
+                tags: vec![],
+                skills,
+            },
+        );
+        let idx = SkillIndex {
+            version: "1.0.0".into(),
+            generated: "2026-10-05".into(),
+            categories,
+            skill_index,
+        };
+        std::fs::write(
+            dir.join("index.json"),
+            serde_json::to_string(&idx).expect("ser"),
+        )
+        .expect("write index");
+    }
+
+    #[test]
+    fn test_index_cache_does_not_leak_between_dirs() {
+        // 两个不同绝对路径 ⇒ 两条独立缓存条目。证明缓存键是路径而非内容/单例。
+        let a = std::env::temp_dir().join("nt_skill_cache_iso_a");
+        let b = std::env::temp_dir().join("nt_skill_cache_iso_b");
+        for d in [&a, &b] {
+            let _ = std::fs::remove_dir_all(d);
+            std::fs::create_dir_all(d).expect("mkdir");
+        }
+        write_min_index(&a, "skill-a");
+        write_min_index(&b, "skill-b");
+
+        // 交替构造 loader，模拟「每次调用新建 SkillLoader」的真实用法。
+        for _ in 0..3 {
+            assert_eq!(
+                names(&SkillLoader::with_dirs(vec![a.clone()]).list_skills().expect("a")),
+                vec!["skill-a"]
+            );
+            assert_eq!(
+                names(&SkillLoader::with_dirs(vec![b.clone()]).list_skills().expect("b")),
+                vec!["skill-b"]
+            );
+        }
+        let _ = std::fs::remove_dir_all(&a);
+        let _ = std::fs::remove_dir_all(&b);
+    }
+
+    #[test]
+    fn test_index_cache_invalidates_on_rewrite() {
+        // 同路径重写 index.json ⇒ 新内容必须可见（缓存不得变成陈旧真相）。
+        let dir = std::env::temp_dir().join("nt_skill_cache_invalidate");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        write_min_index(&dir, "v1");
+        assert_eq!(
+            names(&SkillLoader::with_dirs(vec![dir.clone()]).list_skills().expect("first")),
+            vec!["v1"]
+        );
+
+        write_min_index(&dir, "v2-longer-name-to-change-len");
+        assert_eq!(
+            names(&SkillLoader::with_dirs(vec![dir.clone()]).list_skills().expect("second")),
+            vec!["v2-longer-name-to-change-len"],
+            "重写后必须读到新 index（len 变化 ⇒ 缓存失效）"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_missing_index_still_errors() {
+        // 缓存不得把「找不到」也缓存住：目录不存在必须照旧报错。
+        let mut loader = SkillLoader::with_dirs(vec![PathBuf::from("/nonexistent-nt-dir-xyz")]);
+        assert!(loader.load_index().is_err());
+        assert!(loader.list_skills().is_err());
+    }
+
+    #[test]
+    fn test_resolve_from_index_with_empty_dirs_does_not_panic() {
+        // `with_dirs(vec![])` + 外部注入 index：旧代码在此处索引 skill_dirs[0]
+        // ⇒ panic。resolve_from_index 是 pub，属可达路径。
+        let loader = SkillLoader::with_dirs(Vec::new());
+        let resolved = loader.resolve_from_index(&policy_index());
+        assert_eq!(resolved.len(), 4, "空目录列表下仍应解析出全部条目");
     }
 }

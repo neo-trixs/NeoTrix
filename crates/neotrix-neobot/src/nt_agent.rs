@@ -42,6 +42,255 @@ const CANCELLED_RULE: &str = "cancelled";
 /// 落进 `tasks.error` 的取消原因前缀（`stopped by user at hop N/M`）。
 const STOPPED_PREFIX: &str = "stopped by user";
 
+// ══════════════════ 影子层（shadow）：超时策略按可逆性分流 ══════════════════
+//
+// ## 本段的全部目的是**把一个争论变成一次测量**
+//
+// 先前审计判定「可逆性门控」属于仪式，理由是 `ToolReversibility` 只有
+// 一个取值 —— 那个结论**对 gateway 成立**（见下面的「同名 ≠ 同一符号」），
+// 但它由**外部证据**（HKUDS/Vibe-Trading, MIT）推翻了：那里在
+// `agent/src/agent/loop.py:2850-2925` 把工具执行的**超时策略按可逆性分流**，
+// 原文注释是「Write tools are never killed: a watchdog warns once past the
+// timeout, then the result is awaited to completion.」；只读工具才拿硬超时
+// 并返回结构化 `tool_timeout` 信封。其承重原则是：
+//
+// > **能不能安全地中止，是动作可逆性的性质，不是超时配置的性质。**
+// > 中途杀掉不可逆动作，会留下一个谁也没选过的世界状态；杀掉一次读是免费的。
+//
+// ## ⛔ 影子阶段：**不改变任何执行行为**
+//
+// 本段只做两件事：① 分类 + 纯决策函数（可单测）；② 在真实 funnel 上
+// **记录**「这次调用本该适用哪条策略」。**没有任何一处分支去改超时、
+// 改 kill、改 await。** 目的是让「这个类别到底有没有住户、分布如何」
+// 用**我们自己运行的数据**回答，而不是继续辩论。
+//
+// ## ⛔ 同名 ≠ 同一符号（`RUST-STANDARDS.md` §4.2 L15）
+//
+// 本枚举刻意**不叫** `ToolReversibility`：那个名字已经属于
+// `neotrix_gateway::gate::ToolReversibility`（crates/neotrix-gateway/src/gate.rs:111），
+// 而本 crate **不得**依赖 gateway 之外的类型布局、也不该制造同名歧义。
+// 那边的枚举是 4 值（含 `Compensable`），且**全仓唯一构造点都在它自己的
+// 单测里**（gate.rs:1283 `ToolSpec::read_only("ls")` / gate.rs:1289
+// `ToolSpec::irreversible("send_email")`）⇒ 那边确实只有测试住户。
+// 本枚举是 neobot 从**自己的 `ToolName`** 独立推出来的分类，
+// 逐条对照见 `reversibility_of` 的表。
+
+/// neobot 本地的工具可逆性分级（**影子**）。
+///
+/// ⛔ 本类型**不改变任何执行行为**；见本节顶部说明。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NeobotReversibility {
+    /// 中止免费：没写过任何外部状态。
+    ReadOnly,
+    /// 中止后**有据可复原**（前像已落库 / 动作可原样重发）。
+    Reversible,
+    /// 中止会留下一个谁也没选过的状态。**未分类者的安全默认。**
+    Irreversible,
+}
+
+impl NeobotReversibility {
+    /// 落库/日志用的稳定字符串。
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::ReadOnly => "read_only",
+            Self::Reversible => "reversible",
+            Self::Irreversible => "irreversible",
+        }
+    }
+
+    /// 判别标签（喂 [`crate::nt_determinism::Digest::variant`]，
+    /// 必须逐变体唯一，否则摘要别名）。
+    fn tag(self) -> u8 {
+        match self {
+            Self::ReadOnly => 1,
+            Self::Reversible => 2,
+            Self::Irreversible => 3,
+        }
+    }
+}
+
+/// 「如果这条策略今天生效，这次调用会被怎么办」的裁决（**影子**）。
+///
+/// ⛔ 影子阶段**没有任何生产分支读这个值**；它只被记录下来。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeoutPolicy {
+    /// 越过超时也不中止：看门狗告警一次，然后**等它跑完**。
+    WouldWait,
+    /// 越过超时即中止（只读工具的硬超时），并回一个结构化 `tool_timeout` 信封。
+    WouldTimeout,
+}
+
+impl TimeoutPolicy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::WouldWait => "would_wait",
+            Self::WouldTimeout => "would_timeout",
+        }
+    }
+}
+
+/// neobot 的 `ToolName` → 可逆性。**穷尽匹配，无兜底分支**。
+///
+/// ⛔ 兜底分支在这里是**缺陷**，不是稳健：新增变体时若有 `_ =>`，新工具会
+/// 静默落进某个类（默认多半是可杀的那个）⇒ 未来某个版本悄悄杀掉一个不可逆
+/// 动作，且没有编译错误。Rust 的穷尽匹配正是我们要的编译器保险。
+/// `Unknown(_)` 本身则显式判 `Irreversible`：**未知名按最危险处理**。
+///
+/// | `ToolName` | 分类 | 依据 |
+/// |---|---|---|
+/// | `ReadFile` `ReadImage` `WebSearch` `WebFetch` `QwenMediaInfo` `QwenReadVideo` `QwenVisualize` `PdfGroundText` | `ReadOnly` | 只读/只出结果，不写任何外部状态 |
+/// | `WriteFile` `EditFile` | `Reversible` | `ChangeSink` 落**前像**（`nt_changes.rs:69-81`，`before` 非空即原内容），30 天留存 ⇒ 中止后有据可复原 |
+/// | `SetTurnStatus` | `Reversible` | 唯一持久效果是 ledger 里的一个状态串，原样重发即可 |
+/// | `SidebarOpen` | `Reversible` | 效果由**前端**执行（见 `nt_types.rs:196-201`），本 crate 无法断言「无副作用」；tab 可原样再开 |
+/// | `Bash` | `Irreversible` | 任意 shell，可 `mv`/`git push`/改外部系统 |
+/// | `ComputerAct` | `Irreversible` | 驱动真实 UI（点击/输入），落到人看得见的界面上 |
+/// | `QwenSaveView` | `Irreversible` | 写盘产物（artifacts），会覆盖既有文件 |
+/// | `Unknown(_)` | `Irreversible` | **安全默认**：认不出来的一律按不可逆 |
+pub fn reversibility_of(tool: &ToolName) -> NeobotReversibility {
+    match tool {
+        ToolName::ReadFile
+        | ToolName::ReadImage
+        | ToolName::WebSearch
+        | ToolName::WebFetch
+        | ToolName::QwenMediaInfo
+        | ToolName::QwenReadVideo
+        | ToolName::QwenVisualize
+        | ToolName::PdfGroundText => NeobotReversibility::ReadOnly,
+        ToolName::WriteFile
+        | ToolName::EditFile
+        | ToolName::SetTurnStatus
+        | ToolName::SidebarOpen => NeobotReversibility::Reversible,
+        ToolName::Bash | ToolName::ComputerAct | ToolName::QwenSaveView => {
+            NeobotReversibility::Irreversible
+        }
+        ToolName::Unknown(_) => NeobotReversibility::Irreversible,
+    }
+}
+
+/// 这条工具路径**真正在执行**的超时（毫秒）。`None` = 该路径没有超时。
+///
+/// 影子阶段必须记**真实存在的**超时，不能借一个假想值：否则「有多少比例的
+/// 调用真的会撞上超时」这个问题会被答错。逐条实测来源：
+/// · `Bash` ⇒ `BASH_TIMEOUT`（本文件 `execute_bash`，60s，**到期 `child.kill()`**）
+/// · `Qwen*` 四个 ⇒ `nt_qwen_mm::CORE_TIMEOUT_MS`（90s，经 `launch.session(...)`）
+/// · `WebSearch`/`WebFetch` ⇒ `nt_web::TIMEOUT`（15s，ureq agent 级请求超时）
+/// · 其余（`read_file`/`write_file`/`edit_file`/`computer_act`/`sidebar_open`/
+///   `set_turn_status`/`pdf_ground_text`）⇒ 路径里**没有**超时，`None`。
+#[must_use]
+pub fn enforced_timeout_ms(tool: &ToolName) -> Option<f64> {
+    match tool {
+        ToolName::Bash => Some(60_000.0),
+        ToolName::QwenMediaInfo
+        | ToolName::QwenReadVideo
+        | ToolName::QwenVisualize
+        | ToolName::QwenSaveView => Some(90_000.0),
+        ToolName::WebSearch | ToolName::WebFetch => Some(15_000.0),
+        ToolName::ReadFile
+        | ToolName::ReadImage
+        | ToolName::WriteFile
+        | ToolName::EditFile
+        | ToolName::ComputerAct
+        | ToolName::SidebarOpen
+        | ToolName::SetTurnStatus
+        | ToolName::PdfGroundText
+        | ToolName::Unknown(_) => None,
+    }
+}
+
+/// `None` / `NaN` / `±∞` / `≤0` 一律折成「无超时」。
+///
+/// **裁决**：`NaN` 按**无超时**处理，不是按「立即超时」。
+/// 理由：把 `NaN` 读成「已经超时」会让一次**超时配置本身有 bug** 的调用
+/// 被当成超时受害者杀掉 —— 那是拿一次配置缺陷去换一个不可逆动作的半途而废。
+/// 反过来把 `NaN` 读成无超时，代价只是这次调用**不被杀**（现状），
+/// 方向安全。同理 `≤0` 视为「未配置」而非「零预算」。
+fn normalize_timeout_ms(timeout_ms: Option<f64>) -> Option<f64> {
+    timeout_ms.filter(|value| value.is_finite() && *value > 0.0)
+}
+
+/// 纯决策：(类, 已耗, 超时) → **本该适用**的策略。**影子阶段无人读它的值去分支。**
+///
+/// 规则（Vibe-Trading 的分流，只读侧才可中止）：
+/// 1. 没有可用超时 ⇒ 永远到不了超时那条分支 ⇒ [`TimeoutPolicy::WouldWait`]。
+/// 2. 未越过超时（`elapsed <= timeout`，**恰好等于不算越过**）⇒ [`TimeoutPolicy::WouldWait`]。
+/// 3. 越过超时且只读 ⇒ [`TimeoutPolicy::WouldTimeout`]。越过超时但非只读
+///    ⇒ [`TimeoutPolicy::WouldWait`]（告警一次，等它跑完）。
+///
+/// **为什么 `Reversible` 越过超时也判 `WouldWait`**（而不是给它第三种策略）：
+/// 可逆性在本仓是**有条件**的 —— `ChangeSink` 的前像只在「文件此前存在」且
+/// 「内容未超 `CHANGE_CONTENT_CAP`」时才落（`nt_changes.rs:91-98`），
+/// 且**没有** `revert` 函数。所以「新文件写一半被中止」根本不可复原。
+/// 影子阶段一律取**安全侧**；正是这份影子数据（有没有真在超时上吃过亏的
+/// 可逆工具、分布如何）才能决定将来要不要把它放宽成 `WouldTimeout`。
+///
+/// `elapsed_ms` 为 `NaN`/负数同样按「未越过」处理（理由同 `normalize_timeout_ms`）。
+#[must_use]
+pub fn timeout_policy(
+    class: NeobotReversibility,
+    elapsed_ms: f64,
+    timeout_ms: Option<f64>,
+) -> TimeoutPolicy {
+    let past_timeout = match normalize_timeout_ms(timeout_ms) {
+        Some(limit) => elapsed_ms.is_finite() && elapsed_ms > limit,
+        None => false,
+    };
+    if past_timeout && matches!(class, NeobotReversibility::ReadOnly) {
+        TimeoutPolicy::WouldTimeout
+    } else {
+        TimeoutPolicy::WouldWait
+    }
+}
+
+/// 「哪个工具落进了哪个类」的**稳定身份**。
+///
+/// 复用既有的 [`crate::nt_determinism::Digest`]（逐字段 `mul+add`，
+/// 无位段别名）而**不**自己再造一个哈希；也**不**引新依赖。
+/// 变体标签逐个唯一（`tag()`）⇒ 换类必换摘要；工具名按 `field_str` 纳入
+/// （长度亦计入 ⇒ 不与别的拼接方式别名）。
+#[must_use]
+pub fn class_digest(class: NeobotReversibility, tool: &ToolName) -> u64 {
+    crate::nt_determinism::Digest::new()
+        .section("tool-reversibility-shadow")
+        .variant(class.tag())
+        .field_str(tool.as_str())
+        .finish()
+}
+
+/// 记进 steps 行的那一行影子遥测（**追加**，不改既有内容）。
+///
+/// ⛔ 追加在**工具结果的 steps 行**上而不是另开一行，也不是审计行：
+/// · 审计行的「先写后执」是网关律（见本文件 `run_local_turn` 的顺序注释），
+///   事后往里补执行耗时等于倒着写账 ⇒ 审计行**不碰**。
+/// · 另开一行会破「每个被请求过的工具都有且只有一行归属」的纪律
+///   （C2 汇总行那条注释就是为这个存在的）⇒ 也不另开。
+/// · steps 行本来就是**执行之后**写的（`result.ok` 只有执行完才知道），
+///   所以实测耗时在这里是**如实**的，不是倒填。
+fn shadow_line(
+    tool: &ToolName,
+    class: NeobotReversibility,
+    timeout_ms: Option<f64>,
+    elapsed_ms: Option<f64>,
+    policy: TimeoutPolicy,
+) -> String {
+    let timeout = match timeout_ms {
+        Some(value) => format!("{value}"),
+        None => "none".to_owned(),
+    };
+    let elapsed = match elapsed_ms {
+        Some(value) => format!("{value:.3}"),
+        None => "none".to_owned(),
+    };
+    format!(
+        "\n[shadow-rev] tool={} class={} timeout_ms={} elapsed_ms={} policy={} digest={}",
+        tool.as_str(),
+        class.as_str(),
+        timeout,
+        elapsed,
+        policy.as_str(),
+        class_digest(class, tool)
+    )
+}
+
 /// 租约心跳（**有界 + 退避**的续租闸）。
 ///
 /// 每跳之后问一次 `due()`，只在「距上次续租够间隔」且「本轮未到上限」时
@@ -595,9 +844,18 @@ fn run_loop(
                 &format!("task={task_id} intent={intent}"),
             );
             store.record_audit(&pre_event)?;
+            // ── 影子层（Vibe-Trading 式按可逆性分流）**只测不施** ──
+            //
+            // `will_execute` 是原 `if` 条件的**原样提取**，不改短路顺序、不改
+            // 分支归属；提出来只为让下面能如实区分「测了耗时」与「压根没跑」
+            // （被拒/dry-run 的 elapsed 若记 0，会把一次**没执行**混进耗时分布）。
+            let will_execute = allowed && config.policy_mode == crate::nt_config::PolicyMode::Enforce;
+            let rev_class = reversibility_of(&call.name);
+            let rev_timeout_ms = enforced_timeout_ms(&call.name);
+            let rev_started = std::time::Instant::now();
             // dry-run: 记录但不执行. 执行错误转失败结果 (模型可见, 可换路),
             // 只有落库/审计失败才 `?` 中断.
-            let outcome = if allowed && config.policy_mode == crate::nt_config::PolicyMode::Enforce {
+            let outcome = if will_execute {
                 match execute_tool(config, engine, call, &mut turn_written, &sink, stop) {
                     Ok(outcome) => outcome,
                     Err(err) => ToolOutcome::from(ToolResult {
@@ -617,6 +875,22 @@ fn run_loop(
                     truncated: false,
                 })
             };
+            // 实测耗时 → 纯决策 → 记账。⛔ `policy` **不被任何分支读**：
+            // 它只被追加进下面的 steps 行（外加一条 debug 日志）。
+            let rev_elapsed_ms = will_execute.then(|| rev_started.elapsed().as_secs_f64() * 1000.0);
+            let rev_policy =
+                timeout_policy(rev_class, rev_elapsed_ms.unwrap_or(0.0), rev_timeout_ms);
+            let shadow_note =
+                shadow_line(&call.name, rev_class, rev_timeout_ms, rev_elapsed_ms, rev_policy);
+            log::debug!(
+                "shadow-rev tool={} class={} timeout_ms={:?} elapsed_ms={:?} policy={} digest={}",
+                call.name.as_str(),
+                rev_class.as_str(),
+                rev_timeout_ms,
+                rev_elapsed_ms,
+                rev_policy.as_str(),
+                class_digest(rev_class, &call.name)
+            );
             let result = outcome.result;
             let reason_note = status_reason(&call.args)
                 .map(|reason| format!(" reason={reason}"))
@@ -626,7 +900,7 @@ fn run_loop(
                 i64::from(n),
                 call.name.as_str(),
                 result.ok,
-                &format!("{}{reason_note}", result.output),
+                &format!("{result_output}{reason_note}{shadow_note}", result_output = result.output),
             )?;
             // 工作流事件外发（流式对话流用；500 字截断，明细仍在 steps 表）。
             if let Some(emit) = on_step.as_mut() {
@@ -2887,5 +3161,288 @@ done
         )
         .expect_err("blind engine must not pretend to see");
         assert!(err.to_string().contains("no-vision-engine"), "{err}");
+    }
+
+    // ══════════════════ 影子层（shadow）：按可逆性分流 ══════════════════
+    //
+    // ⛔ 这些用例**全部只测纯函数**：本影子层不改任何执行行为，所以
+    // 「行为没变」这件事**没有**测试能证明 —— 它由「决策值无人读」这句话
+    // 保证（`timeout_policy` 的返回值在 funnel 里只被 format! 吃掉）。
+    // 能测的只有：分类对不对、决策对不对、记账那行长什么样。
+
+    use crate::nt_types::ToolName;
+
+    use super::{
+        NeobotReversibility, TimeoutPolicy, class_digest, enforced_timeout_ms, reversibility_of,
+        timeout_policy,
+    };
+
+    /// `ToolName` 的**全部**变体（2026-10-05 实测 16 个）。
+    ///
+    /// 这份清单本身就是一道编译期保险的一半：`reversibility_of` 的
+    /// `match` **没有** `_ =>` 兜底 ⇒ 日后给 `ToolName` 加变体，编译直接红，
+    /// 逼着人来这里补一行分类（而不是让新工具静默落进某个类）。
+    /// 另一半是下面那句 `assert_eq!(ALL_TOOLS.len(), 16)`：
+    /// 万一有人用 `_ =>` 把编译期保险拆了，计数与逐项断言仍会红。
+    const ALL_TOOLS: [ToolName; 16] = [
+        ToolName::Bash,
+        ToolName::SetTurnStatus,
+        ToolName::ReadFile,
+        ToolName::WriteFile,
+        ToolName::EditFile,
+        ToolName::ReadImage,
+        ToolName::ComputerAct,
+        ToolName::WebSearch,
+        ToolName::WebFetch,
+        ToolName::SidebarOpen,
+        ToolName::QwenMediaInfo,
+        ToolName::QwenReadVideo,
+        ToolName::QwenVisualize,
+        ToolName::QwenSaveView,
+        ToolName::PdfGroundText,
+        ToolName::Unknown(String::new()),
+    ];
+
+    #[test]
+    fn reversibility_covers_every_tool_variant() {
+        // 变体总数被钉住：新增变体而忘了改这里 ⇒ 红。
+        assert_eq!(ALL_TOOLS.len(), 16, "ToolName 变体数变了，本清单待补");
+        // 每个变体的分类都被逐条钉死（含「哪几个是只读」这个集合本身）。
+        let expected = [
+            (ToolName::ReadFile, NeobotReversibility::ReadOnly),
+            (ToolName::ReadImage, NeobotReversibility::ReadOnly),
+            (ToolName::WebSearch, NeobotReversibility::ReadOnly),
+            (ToolName::WebFetch, NeobotReversibility::ReadOnly),
+            (ToolName::QwenMediaInfo, NeobotReversibility::ReadOnly),
+            (ToolName::QwenReadVideo, NeobotReversibility::ReadOnly),
+            (ToolName::QwenVisualize, NeobotReversibility::ReadOnly),
+            (ToolName::PdfGroundText, NeobotReversibility::ReadOnly),
+            (ToolName::WriteFile, NeobotReversibility::Reversible),
+            (ToolName::EditFile, NeobotReversibility::Reversible),
+            (ToolName::SetTurnStatus, NeobotReversibility::Reversible),
+            (ToolName::SidebarOpen, NeobotReversibility::Reversible),
+            (ToolName::Bash, NeobotReversibility::Irreversible),
+            (ToolName::ComputerAct, NeobotReversibility::Irreversible),
+            (ToolName::QwenSaveView, NeobotReversibility::Irreversible),
+            (ToolName::Unknown("rm_rf_root".to_owned()), NeobotReversibility::Irreversible),
+        ];
+        for (tool, class) in expected {
+            assert_eq!(reversibility_of(&tool), class, "{}", tool.as_str());
+        }
+        // 「这个类别到底有没有住户」—— 正是本影子阶段要回答的那个问题，
+        // 先用**枚举**回答一遍（真答案要看实测分布，那是 shadow 的产出）。
+        let read_only = ALL_TOOLS
+            .iter()
+            .filter(|tool| reversibility_of(tool) == NeobotReversibility::ReadOnly)
+            .count();
+        let reversible = ALL_TOOLS
+            .iter()
+            .filter(|tool| reversibility_of(tool) == NeobotReversibility::Reversible)
+            .count();
+        let irreversible = ALL_TOOLS
+            .iter()
+            .filter(|tool| reversibility_of(tool) == NeobotReversibility::Irreversible)
+            .count();
+        assert_eq!((read_only, reversible, irreversible), (8, 4, 4));
+        assert_eq!(
+            read_only + reversible + irreversible,
+            ALL_TOOLS.len(),
+            "每个工具都必须落在恰好一个类里"
+        );
+    }
+
+    #[test]
+    fn unclassified_tool_defaults_to_irreversible() {
+        // **安全默认**：认不出来的一律按不可逆（⇒ 超时被 `WouldWait`）。
+        // 逐个常见「看起来无害」的未知名都要过这一关 ——
+        // 「无害」是猜测，「不可逆」是保证。
+        for raw in ["ls", "git_status", "read_notes", "echo_hello", "sleep_1"] {
+            let tool = ToolName::parse(raw);
+            assert_eq!(reversibility_of(&tool), NeobotReversibility::Irreversible, "{raw}");
+            assert_eq!(
+                timeout_policy(NeobotReversibility::Irreversible, 10_000.0, Some(1.0)),
+                TimeoutPolicy::WouldWait,
+                "{raw}: 未知名必须走「等它跑完」"
+            );
+        }
+    }
+
+    #[test]
+    fn read_only_past_timeout_would_time_out() {
+        // Vibe-Trading 的只读侧：越过超时 ⇒ 可中止（结构化 tool_timeout 信封）。
+        assert_eq!(
+            timeout_policy(NeobotReversibility::ReadOnly, 15_001.0, Some(15_000.0)),
+            TimeoutPolicy::WouldTimeout
+        );
+        // 没越过 ⇒ 无论什么类都照常等。
+        assert_eq!(
+            timeout_policy(NeobotReversibility::ReadOnly, 14_999.0, Some(15_000.0)),
+            TimeoutPolicy::WouldWait
+        );
+    }
+
+    #[test]
+    fn irreversible_and_reversible_past_timeout_would_wait() {
+        // 承重那一半：「Write tools are never killed」——
+        // 越过超时也**等它跑完**，只告警一次。
+        for class in [NeobotReversibility::Irreversible, NeobotReversibility::Reversible] {
+            assert_eq!(
+                timeout_policy(class, 999_999.0, Some(1.0)),
+                TimeoutPolicy::WouldWait,
+                "{}: 越过超时也不许中止",
+                class.as_str()
+            );
+        }
+    }
+
+    #[test]
+    fn exactly_at_the_timeout_is_not_yet_past_it() {
+        // 边界：`elapsed == timeout` 判**未越过**（严格大于才是越过）。
+        // 差这一点就会让「刚好 15.000s 的 web_fetch」被当成超时受害者。
+        for class in [
+            NeobotReversibility::ReadOnly,
+            NeobotReversibility::Reversible,
+            NeobotReversibility::Irreversible,
+        ] {
+            assert_eq!(
+                timeout_policy(class, 15_000.0, Some(15_000.0)),
+                TimeoutPolicy::WouldWait,
+                "{}: 恰好等于超时不算越过",
+                class.as_str()
+            );
+            assert_eq!(
+                timeout_policy(class, 15_000.001, Some(15_000.0)),
+                match class {
+                    NeobotReversibility::ReadOnly => TimeoutPolicy::WouldTimeout,
+                    _ => TimeoutPolicy::WouldWait,
+                },
+                "{}: 越过 1µs 之后",
+                class.as_str()
+            );
+        }
+    }
+
+    #[test]
+    fn nan_and_absent_timeout_mean_no_timeout() {
+        // 裁决：`NaN` 读成「无超时」，不是「立即超时」。理由：
+        // 把配置缺陷当成超时受害者 = 拿一次 bug 换一个不可逆动作的半途而废。
+        let read_only = NeobotReversibility::ReadOnly;
+        for bad in [None, Some(f64::NAN), Some(f64::INFINITY), Some(0.0), Some(-1.0)] {
+            assert_eq!(
+                timeout_policy(read_only, 1_000_000.0, bad),
+                TimeoutPolicy::WouldWait,
+                "{bad:?}: 一律当「无超时」"
+            );
+        }
+        // `elapsed` 侧同样 fail-safe：NaN / 负数都算「未越过」。
+        for bad_elapsed in [f64::NAN, -1.0, 0.0] {
+            assert_eq!(
+                timeout_policy(read_only, bad_elapsed, Some(1.0)),
+                TimeoutPolicy::WouldWait,
+                "elapsed={bad_elapsed}: 一律当「未越过」"
+            );
+        }
+        // 不可约简性：非正数超时与 `None` 归一化成同一个东西。
+        assert_eq!(
+            timeout_policy(read_only, 5.0, Some(0.0)),
+            timeout_policy(read_only, 5.0, None)
+        );
+    }
+
+    #[test]
+    fn enforced_timeouts_are_the_ones_that_really_exist() {
+        // 影子阶段只能记**真实存在**的超时，否则「多少比例会撞上超时」这个问题
+        // 会被答错。三个来源：bash 60s / qwen 90s / web 15s，其余无超时。
+        assert_eq!(enforced_timeout_ms(&ToolName::Bash), Some(60_000.0));
+        assert_eq!(enforced_timeout_ms(&ToolName::QwenSaveView), Some(90_000.0));
+        assert_eq!(enforced_timeout_ms(&ToolName::QwenReadVideo), Some(90_000.0));
+        assert_eq!(enforced_timeout_ms(&ToolName::WebFetch), Some(15_000.0));
+        assert_eq!(enforced_timeout_ms(&ToolName::WebSearch), Some(15_000.0));
+        for tool in [
+            ToolName::ReadFile,
+            ToolName::ReadImage,
+            ToolName::WriteFile,
+            ToolName::EditFile,
+            ToolName::ComputerAct,
+            ToolName::SidebarOpen,
+            ToolName::SetTurnStatus,
+            ToolName::PdfGroundText,
+            ToolName::Unknown("x".to_owned()),
+        ] {
+            assert_eq!(enforced_timeout_ms(&tool), None, "{}", tool.as_str());
+        }
+        // ⭐⭐ 本机制的**实测抓手**：今天全仓唯一「带硬超时且会 kill」的路径是
+        // bash（`child.kill()`）与 qwen 会话（`nt_qwen_mm` 到期报错），
+        // 而它们**都不可逆**。也就是说「不可逆动作被硬杀」这条路**今天已经
+        // 存在**（`bash -c 'git push'` 跑到 60s 被 SIGKILL），
+        // 影子层要量的就是这条路上到底发生过几次。
+        // （`let all = ALL_TOOLS`：把借用绑到局部变量上，别借 const 的临时量。）
+        let all = ALL_TOOLS;
+        let killed_and_irreversible: Vec<&str> = all
+            .iter()
+            .filter(|tool| {
+                enforced_timeout_ms(tool).is_some()
+                    && reversibility_of(tool) == NeobotReversibility::Irreversible
+            })
+            .map(ToolName::as_str)
+            .collect();
+        assert_eq!(killed_and_irreversible, vec!["bash", "qwen_save_view"]);
+        // 反过来：只读工具**全都**有超时可谈吗？不是 —— read_file 没有超时，
+        // 所以「只读 ⇒ 可中止」这条规则今天在 read_file 上是空转的。
+        assert!(enforced_timeout_ms(&ToolName::ReadFile).is_none());
+    }
+
+    #[test]
+    fn class_digest_separates_classes_and_tools() {
+        // 摘要要能当「哪个工具落进了哪个类」的稳定身份：同工具不同类必须不同
+        // （否则「分类写错了」在日志里看不出来），同类不同工具也必须不同。
+        let bash_digest = class_digest(NeobotReversibility::Irreversible, &ToolName::Bash);
+        assert_ne!(
+            bash_digest,
+            class_digest(NeobotReversibility::ReadOnly, &ToolName::Bash),
+            "同一个工具换了类，摘要必须跟着变"
+        );
+        assert_ne!(
+            class_digest(NeobotReversibility::ReadOnly, &ToolName::ReadFile),
+            class_digest(NeobotReversibility::ReadOnly, &ToolName::ReadImage),
+            "同类不同工具必须可区分"
+        );
+        // 稳定性：同输入同输出（否则跨运行聚合分布对不上）。
+        assert_eq!(
+            class_digest(NeobotReversibility::Irreversible, &ToolName::Bash),
+            bash_digest
+        );
+    }
+
+    #[test]
+    fn shadow_line_records_every_field_it_promises() {
+        // 记账那行是本影子层**唯一的产出** ⇒ 字段缺一个，测量就少一维。
+        let line = super::shadow_line(
+            &ToolName::WebFetch,
+            NeobotReversibility::ReadOnly,
+            Some(15_000.0),
+            Some(15_123.5),
+            TimeoutPolicy::WouldTimeout,
+        );
+        for field in [
+            "tool=web_fetch",
+            "class=read_only",
+            "timeout_ms=15000",
+            "elapsed_ms=15123.500",
+            "policy=would_timeout",
+            "digest=",
+        ] {
+            assert!(line.contains(field), "影子行缺字段 {field}：{line}");
+        }
+        // 没执行的路径（被拒 / dry-run）耗时记 `none` 而不是 0 ——
+        // 「没跑」混进耗时分布会让分布好看得不真实。
+        let not_run = super::shadow_line(
+            &ToolName::Bash,
+            NeobotReversibility::Irreversible,
+            Some(60_000.0),
+            None,
+            TimeoutPolicy::WouldWait,
+        );
+        assert!(not_run.contains("elapsed_ms=none"), "{not_run}");
     }
 }

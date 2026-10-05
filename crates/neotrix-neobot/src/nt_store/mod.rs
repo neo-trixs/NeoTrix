@@ -254,7 +254,13 @@ impl NeobotStore {
              CREATE TABLE IF NOT EXISTS steps(
                id INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL,
                n INTEGER NOT NULL, tool TEXT NOT NULL, ok INTEGER NOT NULL,
-               output TEXT NOT NULL);
+               output TEXT NOT NULL,
+               -- ⛔ `tool_call_id` **必须追加在末尾**（同 `pending_deliveries`
+               --    那条纪律，见本文件 `delivery_row` 的取列注释）：它是配平键，
+               --    插在中间会让按位置取列的读口静默错位。
+               --    可空**不是**「这次没调工具」，而是**「本列存在之前写的旧行」**
+               --    —— 两者混同会让配平检查把每一行旧账都报成孤儿结果。
+               tool_call_id TEXT);
              CREATE TABLE IF NOT EXISTS audit(
                id TEXT PRIMARY KEY, at TEXT NOT NULL, actor TEXT NOT NULL,
                tool TEXT NOT NULL, decision TEXT NOT NULL,
@@ -383,6 +389,14 @@ impl NeobotStore {
             //    由下面的 `.ok()` 吞掉 ⇒ 幂等成立（同 mod.rs:361-362 的先例）。
             "ALTER TABLE pending_deliveries ADD COLUMN available_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
             "ALTER TABLE pending_deliveries ADD COLUMN claimed INTEGER NOT NULL DEFAULT 0",
+            // ⛔ `steps.tool_call_id`：配平「工具调用 ↔ 工具结果」两半的**同一把钥匙**。
+            //    缺它时两侧用不同键（transcript 侧 `TranscriptItem.tool_call_id`
+            //    走内存 history、`steps` 侧什么都没有）⇒ join **无法表达**，
+            //    `ToolCallJoinCheck` 对真实落库数据只能诚实回 `NOT_EVALUABLE`。
+            //    **可空**（无 DEFAULT）：存量行保持 `NULL` 而不是被编造一个 id ——
+            //    编出来的键会让「这一行到底配不配得上」永远判不出来。
+            //    幂等性同上：第二次执行报 duplicate column，由 `.ok()` 吞掉。
+            "ALTER TABLE steps ADD COLUMN tool_call_id TEXT",
         ] {
             let _applied: Option<usize> = self.conn.execute(alter, []).ok();
         }
@@ -475,6 +489,10 @@ pub use nt_store_messages::{ChatMessage, MESSAGE_MAX_CHARS};
 mod nt_store_providers;
 mod nt_store_reply_tag;
 mod nt_store_routines;
+/// 重导出：同 [`LastStep`] 的理由（模块私有 ⇒ 调用点写不出具名类型），
+/// 否则配平检查的读口只能拿位置性元组，而位置性元组正是本文件
+/// `delivery_row` 取列事故的同款形状。
+pub use nt_store_routines::StepRow;
 mod nt_store_tasks;
 /// 重导出：调用方能用 `.ok` / `.output`，但**写不出**该类型（模块私有），
 /// 所以具名类型必须从这里出去，否则调用点只能继续拿位置性元组。

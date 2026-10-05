@@ -24,6 +24,13 @@ pub struct LastStep {
     pub ok: bool,
     /// `steps.output`：输出正文。
     pub output: String,
+    /// `steps.tool_call_id`：配平键（工具调用 ↔ 工具结果用同一把钥匙）。
+    ///
+    /// ⛔ `None` = **本列存在之前写入的旧行**，**不是**「这一步没调工具」。
+    /// 判定方必须自己分辨这两种情况：把旧行当成「无对应调用」会把**每一行
+    /// 存量账**报成孤儿结果（假阳性）。加字段是**加法**（老调用点仍只读
+    /// `.ok` / `.output`，编译不受影响）。
+    pub tool_call_id: Option<String>,
 }
 
 impl NeobotStore {
@@ -134,22 +141,26 @@ impl NeobotStore {
         Ok(())
     }
 
-    /// 某任务**最后一条**指定工具的 step 行（`(ok, output)`，按写入序）。
+    /// 某任务**最后一条**指定工具的 step 行（`{ok, output, tool_call_id}`，
+    /// 按写入序）。
     ///
     /// 与 `nt_store_reply_tag::last_step_output` 互补：那个只取 `output`
     /// （给侧聊继承摘要），这个把 `ok` 一起带出来 —— 取消落库要能自证
     /// 「那行 `cancelled:tool_calls` 的 `ok` 是 0」，不能只凭工具名猜。
+    /// 再把 `tool_call_id` 带出来 —— 配平检查要靠它把结果接回调用。
     /// 没有匹配行即 `None`。
     pub fn last_step(&self, task_id: &str, tool: &str) -> Result<Option<LastStep>, NtBotError> {
         Ok(self
             .conn
             .query_row(
-                "SELECT ok, output FROM steps WHERE task_id=?1 AND tool=?2 ORDER BY id DESC LIMIT 1",
+                "SELECT ok, output, tool_call_id FROM steps
+                 WHERE task_id=?1 AND tool=?2 ORDER BY id DESC LIMIT 1",
                 params![task_id, tool],
                 |r| {
                     Ok(LastStep {
                         ok: r.get::<_, i64>(0)? != 0,
                         output: r.get::<_, String>(1)?,
+                        tool_call_id: r.get::<_, Option<String>>(2)?,
                     })
                 },
             )

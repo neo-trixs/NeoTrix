@@ -12,6 +12,32 @@ use std::time::SystemTime;
 use neotrix::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 use neotrix::l6_meta::nt_auto_orchestrator::AutoOrchestrator;
 
+/// 摘要预览阈值：超过 `PREVIEW_MAX` 个**字符**则取前 `PREVIEW_KEEP` 个加 `...`。
+///
+/// ⚠️ 原先是「按**字节**判断 + 按字节切」——`r.summary.len() > 80` 配
+/// `&r.summary[..77]`。
+///
+/// ⛔ **真实 panic**：`WikiSearchResult.summary` 由 `nt_memory_wiki::extract_summary`
+/// 产出（`chars().take(200)`，即最多 200 **字符** / 600 字节），而 `wiki sync` 的
+/// 内容源是 `docs/**/*.md` —— 本仓架构文档正文几乎全是中文。一汉字 3 字节，
+/// 27 个汉字即 81 字节 > 80 ⇒ `&r.summary[..77]` 必落在字符中间，
+/// 一次 `wiki query <中文词>` 就 panic。
+const PREVIEW_MAX: usize = 80;
+const PREVIEW_KEEP: usize = 77;
+
+/// 按**字符**截断到 `max` 个字符（不足 `max` 则原样返回）。
+///
+/// ⛔ 不能写 `&s[..max]`：`max` 是**字节**偏移，`&str` 按非边界字节切会 panic
+/// （`byte index … is not a char boundary`），且 `&str[..]` 本身触发
+/// `clippy::string_slice`（workspace warn 级 + CI `-D warnings`）。
+fn truncate_chars(s: &str, max: usize) -> String {
+    if s.chars().count() > max {
+        s.chars().take(max).collect()
+    } else {
+        s.to_string()
+    }
+}
+
 /// `wiki` 入口：意图分类 → 子命令分发。
 pub fn run_wiki(args: &[String]) -> Result<(), String> {
     let orchestrator = AutoOrchestrator::new();
@@ -90,8 +116,8 @@ fn cmd_query(args: &[String]) -> Result<String, String> {
             }
             let mut msg = format!("Wiki results for \"{query}\":\n");
             for (i, r) in results.iter().enumerate() {
-                let s = if r.summary.len() > 80 {
-                    format!("{}...", &r.summary[..77])
+                let s = if r.summary.chars().count() > PREVIEW_MAX {
+                    format!("{}...", truncate_chars(&r.summary, PREVIEW_KEEP))
                 } else {
                     r.summary.clone()
                 };
@@ -433,4 +459,71 @@ fn build_tree(root: &Path, depth: usize, max_depth: usize) -> String {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{truncate_chars, PREVIEW_KEEP, PREVIEW_MAX};
+
+    /// 复刻 `cmd_query` 的摘要展示表达式（不含 DB 查询），供测试直接驱动。
+    fn preview(s: &str) -> String {
+        if s.chars().count() > PREVIEW_MAX {
+            format!("{}...", truncate_chars(s, PREVIEW_KEEP))
+        } else {
+            s.to_string()
+        }
+    }
+
+    fn cjk(n: usize) -> String {
+        "模块边界".chars().cycle().take(n).collect()
+    }
+
+    #[test]
+    fn preview_cjk_over_threshold_does_not_panic() {
+        // 200 汉字 = 600 字节（`extract_summary` 的上限形态）：
+        // 旧代码 `len() > 80` 命中后 `&s[..77]` 必落在字符中间 ⇒ panic。
+        let s = cjk(200);
+        let out = preview(&s);
+        assert!(out.ends_with("..."));
+        assert_eq!(out.chars().count(), PREVIEW_KEEP + 3);
+        assert_eq!(out.len(), PREVIEW_KEEP * 3 + 3, "77 汉字 == 231 字节");
+    }
+
+    #[test]
+    fn preview_cjk_just_over_byte_threshold_passes_through() {
+        // 30 汉字 = 90 字节：字节阈值 80 会被误触发，但字符数 30 < 80 ⇒ 原样输出。
+        // 旧代码在此 panic（`&s[..77]` on 90-byte string）。
+        let s = cjk(30);
+        assert!(s.len() > 80, "byte-guard would have fired");
+        assert_eq!(preview(&s), s);
+    }
+
+    #[test]
+    fn preview_4byte_emoji_boundary() {
+        let s: String = std::iter::repeat('🙂').take(200).collect();
+        let out = preview(&s);
+        assert!(out.ends_with("..."));
+        assert_eq!(out.chars().count(), PREVIEW_KEEP + 3);
+        assert_eq!(out.len(), PREVIEW_KEEP * 4 + 3);
+    }
+
+    #[test]
+    fn preview_exact_threshold_is_not_truncated() {
+        let s = cjk(PREVIEW_MAX); // 80 字符 / 240 字节
+        assert_eq!(preview(&s), s);
+        assert_eq!(truncate_chars(&s, PREVIEW_KEEP), cjk(PREVIEW_KEEP));
+    }
+
+    #[test]
+    fn preview_ascii_keeps_original_byte_semantics() {
+        let s = "a".repeat(120);
+        assert_eq!(preview(&s), format!("{}...", "a".repeat(PREVIEW_KEEP)));
+        assert_eq!(truncate_chars(&s, PREVIEW_KEEP).len(), PREVIEW_KEEP);
+    }
+
+    #[test]
+    fn truncate_chars_empty_and_short_inputs() {
+        assert_eq!(truncate_chars("", PREVIEW_KEEP), "");
+        assert_eq!(truncate_chars("山海", PREVIEW_KEEP), "山海");
+    }
 }

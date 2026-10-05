@@ -211,10 +211,19 @@ impl GatewayV2 {
             b.3.cmp(&a.3)
                 // free 优先
                 .then(b.2.cmp(&a.2))
-                // 有调用记录优先 (避免未尝试 provider 默认 EMA 虚高)
+                // 有调用记录优先 (避免未尝试 provider 默认 EMA 0.8 会虚高)
                 .then((b.4 > 0).cmp(&(a.4 > 0)))
                 // score 降序
                 .then(b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal))
+                // ⚠️ 2026-10-05 修正：原先**没有**名字兜底。`rest` 由
+                // `states.iter()`（`HashMap<String, ProviderState>`）物化而来，
+                // `sort_by` 虽稳定，但**输入序是哈希序** ⇒ 四项判据全并列时
+                // 链的相对顺序跨进程不确定。
+                // 危害已到顶层：`resolve_default_model_sync` 取 `chain.first()`
+                // ⇒ **默认模型本身**会漂移。
+                // ⇒ 补齐 `.then_with(名字升序)`，与同文件 `select_best` 的
+                //   `.then(na.cmp(nb))` 同一范式（那里已注明「D13 确定性」）。
+                .then_with(|| a.0.cmp(b.0))
         });
         for (name, _, _, _, _) in rest {
             if chain.len() >= limit {

@@ -25,6 +25,7 @@
 pub mod nt_guardrail;
 pub mod nt_judge;
 pub mod nt_panel_debate;
+pub mod nt_provenance;
 pub mod nt_tool_registry;
 pub mod nt_trajectory;
 pub mod nt_types;
