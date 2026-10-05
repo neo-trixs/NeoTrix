@@ -89,7 +89,7 @@ pub struct CheckResult {
     pub confidence: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CheckStatus {
     Passed,
     Failed,
