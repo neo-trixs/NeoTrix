@@ -335,7 +335,13 @@ fn capture_model_command(
     args: &[String],
     timeout: Duration,
 ) -> Result<String, String> {
-    let outcome = crate::l2_perception::nt_world::social_access::probe::run_with_timeout(
+    // ⚠️ 2026-10-05 路径收敛（L2 批次）：原为直引
+    // `crate::l2_perception::nt_world::social_access::probe::run_with_timeout`，
+    // 而 `check-layer-deps.sh` 的规则是「层不得引用更高层」⇒ L1 引 L2 记违规。
+    // 现经**本层** facade 转出（走目标层 facade 无效：路径仍含层名）。
+    // ⛔ 只改引用路径，**不改语义**：超时/失败判定逻辑一字未动
+    //   （下方 `timed_out` 必须先判那条注释仍成立）。
+    let outcome = crate::l1_action::nt_action_facade::run_with_timeout(
         program, args, timeout,
     )
     .map_err(|e| format!("spawn failed: {e}"))?;

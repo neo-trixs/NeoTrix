@@ -451,6 +451,28 @@ pub use crate::l3_embodiment::nt_shield_enforcer::global_shield;
 pub use crate::l6_meta::nt_approval;
 pub use crate::l6_meta::nt_approval::PendingAction;
 
+// ─── L1→L2 收敛点（第二批；`check-layer-deps.sh` 规则是「层不得引用更高层」）──
+//
+// L2 批次的存在理由与上面 L3/L6 相同：`nt_model_cli.rs::capture_model_command`
+// 直引 `crate::l2_perception::nt_world::social_access::probe::run_with_timeout`，
+// 而门规定 **L1 不得引用 L2/L3/L4/L5/L6** ⇒ 该行记 `NEW layer violation`。
+//
+// ⭐ 为何必须走**本层** facade（AGENTS.md §4.2）：改用「目标层的 facade」无效，
+//   因为路径仍含层名，门照样命中。唯一合法通道是消费方自己那层的门面。
+//
+// ⛔ 不选替代方案「把 `capture_model_command` 整体搬进 L2」：那是**语义变更**
+//   而非接线 —— 该函数是「模型询问」特有语义（去 ANSI / 空 stdout 判失败 /
+//   超时与失败可区分，见其 doc 的「本文件唯一的进程执行出口」三职责），
+//   搬层会牵动 `run_once` 与 `run_capture` 两个调用方，
+//   而 `nt_model_cli.rs` 头注释正记着 2026-10-03「删转发层前没查全部调用方
+//   ⇒ 把主路径一起打断」的教训。⇒ 本次只做**路径收敛**，不动语义。
+//
+// ✅ 可转安全性已核实：`RunOutcome`（`probe.rs:116`）是 `pub struct`
+//   且字段全 `pub`（`success`/`stdout`/`stderr`/`latency`/`timed_out`）
+//   ⇒ 无私有类型泄漏，facade 转出是合法的。
+pub use crate::l2_perception::nt_world::social_access::probe::run_with_timeout;
+pub use crate::l2_perception::nt_world::social_access::probe::RunOutcome;
+
 // ─── L1→L4 跨层引用收敛（接上批 L3/L6 段）────────────────────────────────────
 // 路径沿用消费方原本就在用的路径（原代码已能编译 ⇒ 路径可证）。
 // ⚠️ `nt_memory` 与 `nt_feel_facade` 是**模块型**引用（L1 门面需要它们做
