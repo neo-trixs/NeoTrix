@@ -32,6 +32,8 @@ zip = { version = "1", default-features = false, features = ["deflate"] }
 # nt_llama 的进程生命周期日志。`log` 是零后端 facade (~10KB, 仅 cfg-if),
 # 不引任何日志实现 —— 后端由最终二进制决定。与 neotrix-core 同一套口径。
 log = "0.4"
+regex = "1"   # nt_governance（从 neotrix-core 搬移，★ 与 core 同版本）
+neotrix-types = { workspace = true }   # nt_governance 的 R09 语言一致性规则要用 is_cjk_wide
 # ⭐ 能力树（2026-10-03 接线）。此前本 crate 与 `neotrix-core` 都不依赖它
 # ⇒ 那套「节点模型 + registry + 成熟度审计」只能被 CLI 读、运行时不消费
 # （实测：全仓仅自身 crate / Cargo.toml / 文档 / 门基线提到它）。

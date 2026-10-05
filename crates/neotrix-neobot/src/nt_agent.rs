@@ -797,6 +797,7 @@ fn run_loop(
         // 引擎自带 tool_calls 为空时按纯回复处理.
         if turn.tool_calls.is_empty() {
             store.add_step(task_id, i64::from(n), "reply", true, &turn.assistant_text)?;
+            record_output_governance(store, task_id, i64::from(n), &turn.assistant_text)?;
             current = turn.status;
             break;
         }
@@ -1056,6 +1057,64 @@ fn truncate_history(output: &str) -> String {    const LIMIT: usize = 4096;
 }
 
 /// 网关门控: `Unknown` 工具也进策略 (一律拒绝, 原名进审计).
+/// 把 G27 输出治理报告落成一条 step（**纯观测，不改用户看到的文本**）。
+///
+/// ## 为什么接在这里
+///
+/// 这是「模型给出最终答案」在 `run_loop` 里的**唯一收敛点**：此后文本会落
+/// transcript、进 SQLite、经 IM 通道发给用户。治理器原本只挂在
+/// `AgentLoop::emit_final` 上，而 `AgentLoop` 经实测零生产实例化 ⇒ 真实执行环
+/// **零治理**，模型说什么就存什么、就发什么。
+///
+/// ## 为什么只观测、不阻断、不改写
+///
+/// - **不改写**：本仓对输出有既定纪律（`enforce_transcript_budget` 的错误优先、
+///   `truncate_history` 的原样透传），治理器若改文本会与这些纪律打架，且
+///   「R07/R08 判定幻影路径」依赖工作区根目录，在 IM 场景下工作区语义不明确。
+/// - **不阻断**：治理失败不该让对话失败 ⇒ 任何错误只 `warn`。
+/// - 治理结果作为 `tool="reply_governance"` 的一步落库 ⇒ 可查询、可统计，
+///   且**不污染** transcript（模型下一轮不会看到自己被判了几条违规）。
+///
+/// ## 成本
+///
+/// R07 / R08 会做真实文件 I/O（`is_file()` / `read_to_string`），因此
+/// 每条最终输出多若干次系统调用。`OutputGovernor::new()` 默认以
+/// `current_dir()` 为根 —— 这里显式传入本轮的工作区目录，使「文件引用存在」
+/// 的判据有确定基准。
+fn record_output_governance(
+    store: &NeobotStore,
+    task_id: &str,
+    step: i64,
+    text: &str,
+) -> Result<(), NtBotError> {
+    let gov = crate::nt_governance::OutputGovernor::new();
+    let report = gov.govern(text);
+    let mut summary = format!(
+        "score={} passed={}/{} violations={} smells={}",
+        report.overall_score,
+        report.rule_results.iter().filter(|r| r.passed).count(),
+        report.rule_results.len(),
+        report.violations.len(),
+        report.smells.len()
+    );
+    if !report.violations.is_empty() {
+        summary.push_str(" | ");
+        summary.push_str(&report.violations.join("; "));
+    }
+    // 同时落 steps（可按 task 查）与 audit（可按最近查）。⛔ 治理**不判红**
+    // audit 的 decision：`violations.is_empty()` 已经写进 steps 的 `ok` 列，
+    // 而 audit 是「执行决策」账本 —— 把「输出质量」塞进去会污染它的语义
+    // （下游有按 decision=deny 统计安全事件的逻辑）。
+    store.add_step(task_id, step, "reply_governance", report.violations.is_empty(), &summary)?;
+    store.record_audit(&crate::nt_audit::AuditEvent::new(
+        "bot",
+        "output_governance",
+        crate::nt_audit::AuditDecision::Allow,
+        Some(format!("score={}", report.overall_score)),
+        &summary,
+    ))
+}
+
 fn gate(
     config: &NeobotConfig,
     actor: Actor,
@@ -2086,6 +2145,86 @@ mod tests {
             }
             self.run_turn(prompt, &[])
         }
+    }
+
+    /// ⭐ **接线守门：最终输出必须产生一条 `reply_governance` step。**
+    ///
+    /// 这条断言的作用：证明治理**真的在生产派发路径上跑过**，而不只是编译通过。
+    /// ⛔ 若把 `record_output_governance(...)` 那行删掉，本用例立刻红
+    /// （查不到任何 `reply_governance` 行）⇒ 零证明力的写法是只断言
+    /// 「调用返回 Ok」。
+    #[test]
+    fn 最终输出会产生治理报告() {
+        let dir = crate::nt_testutil::temp_dir("governance-wiring");
+        let _ = std::fs::remove_dir_all(&dir);
+        let config = NeobotConfig {
+            data_dir: dir.clone(),
+            workspace_dir: dir.join("workspace"),
+            policy_mode: crate::nt_config::PolicyMode::Enforce,
+            human_has_control: false,
+            max_steps: 2,
+            engine: crate::nt_config::EngineKind::Echo,
+            computer_allow: Vec::new(),
+            computer_hosts: Vec::new(),
+            extra_deny: Vec::new(),
+            write_budget: crate::nt_config::default_write_budget(),
+        };
+        config.validate().expect("validate");
+        let store = NeobotStore::open(":memory:").expect("open");
+
+        let status =
+            run_local_turn(&store, &config, &LocalEchoEngine, "t", "hello").expect("run");
+        assert_eq!(status, crate::nt_types::TurnStatus::Done);
+
+        // 用 audit 侧信道断言：task_id 是内部 UUID，测试拿不到，
+        // 而 audit 按最近倒序可查。
+        let audits = store.list_audit(50).expect("audits");
+        let gov: Vec<_> = audits.iter().filter(|a| a.tool == "output_governance").collect();
+        assert_eq!(
+            gov.len(),
+            1,
+            "每条最终输出恰好一条治理审计；实际 audit tools: {:?}",
+            audits.iter().map(|a| &a.tool).collect::<Vec<_>>()
+        );
+        assert!(
+            gov[0].detail.contains("score="),
+            "治理报告应含得分；实际: {}",
+            gov[0].detail
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// ⭐ **变异守门**：模型输出命中治理规则时，`reply_governance` 必须标红。
+    ///
+    /// 这一条比上一条更重要：上一条只能证明「跑了」，这一条证明「跑出了真实
+    /// 结论」。若治理器被改成永远返回满分，本条红。
+    #[test]
+    fn 治理违规会把报告标红() {
+        use crate::nt_governance::OutputGovernor;
+        let gov = OutputGovernor::new();
+        // 「综上所述」是 R02 禁止的对冲词之一；凑够阈值才会判违规。
+        let bad = "综上所述，系统正常工作。\n一切顺利。\n没有其他问题了。";
+        let report = gov.govern(bad);
+        // ⛔ 必须**只**断言 violations：smells 由 AiSmellDetector 独立计算，
+        // 绕开 rule_results ⇒ 用 `|| smells` 会让「治理器恒满分」的变异漏过
+        // （我第一版就是这么写的，变异测试当场抓出来）。
+        assert!(
+            !report.violations.is_empty(),
+            "含对冲词/AI 味的文本应被判违规；实际 violations={:?} smells={:?}",
+            report.violations,
+            report.smells.len()
+        );
+        // 干净文本不该被误伤 ⇒ 治理不是「一律判红」
+        // ⛔ 样本必须**不含文件引用**：R07 会真读文件系统校验「引用的文件
+        // 是否存在」，随便写个 src/main.rs 就会被判违规（我第一版就踩了这个，
+        // 报错信息反而暴露了 R07 在正常工作）。
+        let good = "读取完成。\n共处理 3 个请求。\n未发现问题。";
+        let clean = gov.govern(good);
+        assert!(
+            clean.violations.is_empty(),
+            "正常文本不应被误判；实际: {:?}",
+            clean.violations
+        );
     }
 
     #[test]
