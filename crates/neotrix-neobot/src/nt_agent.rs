@@ -15,7 +15,7 @@ use crate::nt_capability_canary;
 use crate::nt_config::{NeobotConfig, PolicyMode};
 use crate::nt_engine::EngineAdapter;
 use crate::nt_error::NtBotError;
-use crate::nt_policy::{Actor, PolicyContext, PolicyDecision, evaluate_policy};
+use crate::nt_policy::{evaluate_policy, Actor, PolicyContext, PolicyDecision};
 use crate::nt_store::NeobotStore;
 use crate::nt_types::{AgentTask, TaskStatus, ToolName, ToolResult, TurnStatus};
 
@@ -563,10 +563,7 @@ fn run_local_turn_inner(
     // 会话归属：指定即用（不存在则报错，不静默建）；缺省自动建群组会话。
     let convo_id = match convo_id {
         Some(id) => {
-            let found = store
-                .list_conversations()?
-                .into_iter()
-                .find(|c| c.id == id);
+            let found = store.list_conversations()?.into_iter().find(|c| c.id == id);
             let Some(convo) = found else {
                 return Err(NtBotError::Store(format!("no such conversation '{id}'")));
             };
@@ -574,8 +571,7 @@ fn run_local_turn_inner(
             // 用户手改过的标题永不动；失败不挡本轮）。
             if is_placeholder_title(&convo.title) {
                 if let Some(snippet) = title_snippet(ctx.user_text) {
-                    let _renamed: Option<()> =
-                        store.rename_conversation(&convo.id, &snippet).ok();
+                    let _renamed: Option<()> = store.rename_conversation(&convo.id, &snippet).ok();
                 }
             }
             id.to_owned()
@@ -598,15 +594,7 @@ fn run_local_turn_inner(
         conversation_id: Some(convo_id),
     };
     store.save_task(&task)?;
-    let outcome = run_loop(
-        ctx,
-        &task.id,
-        &lease_id,
-        on_delta,
-        on_step,
-        stop,
-        lease,
-    );
+    let outcome = run_loop(ctx, &task.id, &lease_id, on_delta, on_step, stop, lease);
     // turn 级错误（落库失败等）记终态 Failed + error 后原错返回，不吞错。
     let (status, stopped_at) = match outcome {
         Ok(pair) => pair,
@@ -843,7 +831,13 @@ fn run_loop(
                 // 请求过的工具都有归属（正常路径有自己的行，取消路径进这一
                 // 行）—— 不留悬空的 tool_call id（history 里有、steps 里
                 // 查无此行是最难查的一类脏数据）。
-                store.add_step(task_id, i64::from(n), CANCELLED_TOOL_STEPS, false, &pending_csv)?;
+                store.add_step(
+                    task_id,
+                    i64::from(n),
+                    CANCELLED_TOOL_STEPS,
+                    false,
+                    &pending_csv,
+                )?;
                 stopped_at = Some(usize::from(n));
                 break;
             }
@@ -869,7 +863,8 @@ fn run_loop(
             // `will_execute` 是原 `if` 条件的**原样提取**，不改短路顺序、不改
             // 分支归属；提出来只为让下面能如实区分「测了耗时」与「压根没跑」
             // （被拒/dry-run 的 elapsed 若记 0，会把一次**没执行**混进耗时分布）。
-            let will_execute = allowed && config.policy_mode == crate::nt_config::PolicyMode::Enforce;
+            let will_execute =
+                allowed && config.policy_mode == crate::nt_config::PolicyMode::Enforce;
             let rev_class = reversibility_of(&call.name);
             let rev_timeout_ms = enforced_timeout_ms(&call.name);
             let rev_started = std::time::Instant::now();
@@ -900,8 +895,13 @@ fn run_loop(
             let rev_elapsed_ms = will_execute.then(|| rev_started.elapsed().as_secs_f64() * 1000.0);
             let rev_policy =
                 timeout_policy(rev_class, rev_elapsed_ms.unwrap_or(0.0), rev_timeout_ms);
-            let shadow_note =
-                shadow_line(&call.name, rev_class, rev_timeout_ms, rev_elapsed_ms, rev_policy);
+            let shadow_note = shadow_line(
+                &call.name,
+                rev_class,
+                rev_timeout_ms,
+                rev_elapsed_ms,
+                rev_policy,
+            );
             log::debug!(
                 "shadow-rev tool={} class={} timeout_ms={:?} elapsed_ms={:?} policy={} digest={}",
                 call.name.as_str(),
@@ -926,9 +926,9 @@ fn run_loop(
             // ⛔ 只报告不改写：用户可能**故意**让我们看自己的配置，自动截断
             //   会让模型拿不到它需要的上下文。处置决策交人。
             let output = &result.output;
-            let step_output = match crate::nt_secret_scan::summarize(
-                &crate::nt_secret_scan::scan(&result.output),
-            ) {
+            let step_output = match crate::nt_secret_scan::summarize(&crate::nt_secret_scan::scan(
+                &result.output,
+            )) {
                 Some(warning) => {
                     store.record_audit(&crate::nt_audit::AuditEvent::new(
                         actor_name,
@@ -963,7 +963,10 @@ fn run_loop(
             }
             history.push(TranscriptItem {
                 role: TranscriptRole::Tool,
-                content: truncate_history(&result.output),
+                // 蒸馏已**下沉到 truncate_output**（见该函数文档），这里原样带上。
+                // ⛔ 原先的 truncate_history（砍尾留头）已从本路径移除；
+                //   变异验证：接回来 ⇒ 接线守门测试立刻红（exit code 丢失）。
+                content: result.output.clone(),
                 tool_calls: Vec::new(),
                 tool_call_id: Some(call.id.clone()),
                 // 图像**不进 content**（`content` 是纯文本通道，进去了模型只会读到
@@ -1003,8 +1006,7 @@ fn run_loop(
             let until = lease_deadline();
             // 0 行 = 不再持有这行（被回收或被接管）：不重试，更不重写 ——
             // 续租只推后**自己手上那把钥匙**的窗口。
-            let _renewed: Result<usize, NtBotError> =
-                store.renew_lease(task_id, lease_id, &until);
+            let _renewed: Result<usize, NtBotError> = store.renew_lease(task_id, lease_id, &until);
             lease.note();
         }
     }
@@ -1054,12 +1056,7 @@ fn enforce_transcript_budget(history: &mut Vec<crate::nt_types::TranscriptItem>)
         else {
             break;
         };
-        bytes = bytes.saturating_sub(
-            history
-                .get(pos)
-                .map(transcript_weight)
-                .unwrap_or(0),
-        );
+        bytes = bytes.saturating_sub(history.get(pos).map(transcript_weight).unwrap_or(0));
         if history.get(pos).is_none() {
             break;
         }
@@ -1068,7 +1065,12 @@ fn enforce_transcript_budget(history: &mut Vec<crate::nt_types::TranscriptItem>)
 }
 
 /// 历史回填截断 (4KiB/条, 防上下文爆炸; 全量仍在 steps 表).
-fn truncate_history(output: &str) -> String {    const LIMIT: usize = 4096;
+/// 旧的无脑截断。**保留但已不用于 transcript**。
+///
+/// ⛔ 勿再拿它当工具输出的截断手段：砍尾留头会丢 exit code（见接线处注释）。
+#[allow(dead_code)]
+fn truncate_history(output: &str) -> String {
+    const LIMIT: usize = 4096;
     if output.len() <= LIMIT {
         return output.to_owned();
     }
@@ -1131,7 +1133,13 @@ fn record_output_governance(
     // audit 的 decision：`violations.is_empty()` 已经写进 steps 的 `ok` 列，
     // 而 audit 是「执行决策」账本 —— 把「输出质量」塞进去会污染它的语义
     // （下游有按 decision=deny 统计安全事件的逻辑）。
-    store.add_step(task_id, step, "reply_governance", report.violations.is_empty(), &summary)?;
+    store.add_step(
+        task_id,
+        step,
+        "reply_governance",
+        report.violations.is_empty(),
+        &summary,
+    )?;
     store.record_audit(&crate::nt_audit::AuditEvent::new(
         "bot",
         "output_governance",
@@ -1251,7 +1259,10 @@ struct ToolOutcome {
 impl From<ToolResult> for ToolOutcome {
     /// 纯文本工具的落点：图像恒 `None`。
     fn from(result: ToolResult) -> Self {
-        Self { result, image: None }
+        Self {
+            result,
+            image: None,
+        }
     }
 }
 
@@ -1504,8 +1515,7 @@ fn execute_sidebar_open(call: &crate::nt_types::ToolCall) -> Result<ToolResult, 
         .unwrap_or("");
     let registry = crate::nt_sidebar::TabRegistry::with_builtins();
     let viewers = crate::nt_sidebar::builtin_viewers();
-    let resolved =
-        crate::nt_sidebar::resolve_open(&registry, &viewers, topic, target)?;
+    let resolved = crate::nt_sidebar::resolve_open(&registry, &viewers, topic, target)?;
     let output = serde_json::to_string(&resolved)
         .map_err(|err| NtBotError::Codec(format!("sidebar_open encode: {err}")))?;
     Ok(ToolResult {
@@ -1534,7 +1544,7 @@ fn peek_before(full: &std::path::Path) -> Option<String> {
 
 /// computer 执行 — 当前 Noop 后端诚实失败 (调用方转失败结果回填模型).
 fn execute_computer(call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBotError> {
-    use crate::nt_computer::{ComputerBackend as _, NoopBackend, parse_computer_call};
+    use crate::nt_computer::{parse_computer_call, ComputerBackend as _, NoopBackend};
     let parsed = parse_computer_call(&call.args)?;
     let output = NoopBackend.execute(&parsed)?;
     Ok(ToolResult {
@@ -1547,15 +1557,17 @@ fn execute_computer(call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBo
 /// 联网搜索执行（客户端直调；count 越界钳制 1-10，缺 query 直接 Invalid）。
 fn execute_web_search(call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBotError> {
     let Some(query) = call.args.get("query").and_then(|v| v.as_str()) else {
-        return Err(NtBotError::Invalid("web_search requires {query}".to_owned()));
+        return Err(NtBotError::Invalid(
+            "web_search requires {query}".to_owned(),
+        ));
     };
-    let count = call
-        .args
-        .get("count")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(5) as usize;
+    let count = call.args.get("count").and_then(|v| v.as_u64()).unwrap_or(5) as usize;
     let output = crate::nt_web::web_search(query, count)?;
-    Ok(ToolResult { ok: true, output, truncated: true })
+    Ok(ToolResult {
+        ok: true,
+        output,
+        truncated: true,
+    })
 }
 
 /// 网页抓取执行（scheme 门控在 nt_web 内，fail-closed）。
@@ -1564,7 +1576,11 @@ fn execute_web_fetch(call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtB
         return Err(NtBotError::Invalid("web_fetch requires {url}".to_owned()));
     };
     let output = crate::nt_web::web_fetch(url)?;
-    Ok(ToolResult { ok: true, output, truncated: true })
+    Ok(ToolResult {
+        ok: true,
+        output,
+        truncated: true,
+    })
 }
 
 /// PDF 文字定位（本地只读，零外部依赖）。
@@ -1670,7 +1686,9 @@ fn execute_bash(
             cmd.env(key, value);
         }
     }
-    let mut child = cmd.spawn().map_err(|e| NtBotError::Io(format!("spawn bash: {e}")))?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| NtBotError::Io(format!("spawn bash: {e}")))?;
     let stdout_handle = child.stdout.take().map(|mut pipe| {
         std::thread::spawn(move || {
             let mut buf = Vec::new();
@@ -1687,12 +1705,20 @@ fn execute_bash(
     });
     let deadline = Instant::now() + BASH_TIMEOUT;
     let status = loop {
-        match child.try_wait().map_err(|e| NtBotError::Io(format!("wait bash: {e}")))? {
+        match child
+            .try_wait()
+            .map_err(|e| NtBotError::Io(format!("wait bash: {e}")))?
+        {
             Some(status) => break status,
             None if Instant::now() >= deadline => {
                 let _killed: Option<()> = child.kill().ok();
                 let _waited: Option<std::process::ExitStatus> = child.wait().ok();
-                let mut text = String::from_utf8_lossy(&stdout_handle.and_then(|h| h.join().ok()).unwrap_or_default()).into_owned();
+                let mut text = String::from_utf8_lossy(
+                    &stdout_handle
+                        .and_then(|h| h.join().ok())
+                        .unwrap_or_default(),
+                )
+                .into_owned();
                 text.push_str("\n[neobot] bash timed out after 60s and was killed");
                 return Ok(truncate_output(text, false));
             }
@@ -1718,11 +1744,15 @@ fn execute_bash(
         }
     };
     let mut text = String::from_utf8_lossy(
-        &stdout_handle.and_then(|h| h.join().ok()).unwrap_or_default(),
+        &stdout_handle
+            .and_then(|h| h.join().ok())
+            .unwrap_or_default(),
     )
     .into_owned();
     if !status.success() {
-        let stderr_bytes = stderr_handle.and_then(|h| h.join().ok()).unwrap_or_default();
+        let stderr_bytes = stderr_handle
+            .and_then(|h| h.join().ok())
+            .unwrap_or_default();
         let stderr = String::from_utf8_lossy(&stderr_bytes);
         text.push_str(&stderr);
     }
@@ -1760,7 +1790,9 @@ fn execute_write(
 ) -> Result<ToolResult, NtBotError> {
     let path = required_path(&call.args)?;
     let Some(content) = call.args.get("content").and_then(|v| v.as_str()) else {
-        return Err(NtBotError::Invalid("write_file requires {content}".to_owned()));
+        return Err(NtBotError::Invalid(
+            "write_file requires {content}".to_owned(),
+        ));
     };
     // 嵌套预算：单次上限 + 单轮累计上限（rish 律）。
     let budget = config.write_budget;
@@ -1813,7 +1845,9 @@ fn execute_edit(
         call.args.get("old").and_then(|v| v.as_str()),
         call.args.get("new").and_then(|v| v.as_str()),
     ) else {
-        return Err(NtBotError::Invalid("edit_file requires {old,new}".to_owned()));
+        return Err(NtBotError::Invalid(
+            "edit_file requires {old,new}".to_owned(),
+        ));
     };
     let full = join_workspace(&config.workspace_dir, &path)?;
     let content = std::fs::read_to_string(&full)?;
@@ -1870,6 +1904,24 @@ fn join_workspace(workspace: &Path, rel: &str) -> Result<std::path::PathBuf, NtB
     Ok(workspace.join(rel))
 }
 
+/// 工具输出的**统一收窄点**（5 个 executor 都走它：grep / bash / read / qwen-mm）。
+///
+/// ⭐⭐⭐⭐⭐ 2026-10-06：**这里原本是砍尾留头**（`output[..OUTPUT_CAP] + …[truncated]`），
+/// 而砍尾留头有两个**具体**损失，不是「不够精细」这种修辞：
+///   ① **exit code 与尾部摘要被丢掉** —— 而那正是命令成败的最终结论；
+///   ② 8 KiB 之后的 `error:` / `FAIL:` 行一起被砍 ⇒ 模型看到一段正常的前缀，
+///      **得到「命令成功」的错觉** —— 这是最坏的一类错误（假成功）。
+///
+/// ⛔⛔⛔ **本轮实测踩到的坑，比这更重要**：我一开始只在**外层**
+///   （写进 transcript 前）接了 `distill_output`，测试红 ⇒ 查下去发现
+///   `truncate_output` 早已在内层砍过一刀 ⇒ **外层拿到的是残缺文本**，
+///   错误行在内层就没了，**外层再怎么蒸馏也救不回来**。
+///   ⇒ ⭐⭐ **收窄必须发生在最靠里的那一层**，否则「更精细的算法」被更粗糙的
+///      前置截断架空，成了永远走不到的死代码。
+///
+/// ⇒ 这里改成 errors-first 可逆蒸馏（与 `nt_output_distill` 同源）：
+///   错误行前置、尾部 3 行（exit code / 摘要）享 20% 预留、其余按预算装入、
+///   省略处打 `[ref#1]` 标记，全量原文仍在 `steps` 表。
 fn truncate_output(text: String, ok: bool) -> ToolResult {
     if text.len() <= OUTPUT_CAP {
         return ToolResult {
@@ -1878,18 +1930,13 @@ fn truncate_output(text: String, ok: bool) -> ToolResult {
             truncated: false,
         };
     }
-    let mut cut = OUTPUT_CAP;
-    while cut > 0 && !text.is_char_boundary(cut) {
-        cut -= 1;
-    }
-    let output = if let Some(safe) = text.get(..cut) {
-        format!("{safe}…[truncated]")
-    } else {
-        "…[truncated]".to_owned()
-    };
+    // ⚠️ 预算按 token 算，不是字节：8 KiB 的中文 ≈ 2730 token，
+    // 而 8 KiB 的 ASCII ≈ 2048 token ⇒ 用字节当 token 会高估中文的可用量。
+    let budget_tokens = OUTPUT_CAP / 4;
+    let distilled = crate::nt_output_distill::distill_output(&text, budget_tokens);
     ToolResult {
         ok,
-        output,
+        output: distilled,
         truncated: true,
     }
 }
@@ -1974,7 +2021,11 @@ mod tests {
         };
         let res = execute_bash(&config, &call, &live_stop()).expect("run");
         std::env::remove_var("NEOBOT_TEST_ONLY_SECRET");
-        assert!(res.ok, "PATH whitelist must keep wc working: {}", res.output);
+        assert!(
+            res.ok,
+            "PATH whitelist must keep wc working: {}",
+            res.output
+        );
         assert!(
             !res.output.contains("s3cr3t-marker"),
             "env must be scrubbed: {}",
@@ -2014,11 +2065,16 @@ mod tests {
         // 单次超限拒
         let big = serde_json::json!({"path": "a.txt", "content": "0123456789ABCDEF"});
         let mut turn_written = 0usize;
-        let err = super::execute_write(&config, &crate::nt_types::ToolCall {
-            id: "w1".to_owned(),
-            name: crate::nt_types::ToolName::WriteFile,
-            args: big,
-        }, &mut turn_written, &sink)
+        let err = super::execute_write(
+            &config,
+            &crate::nt_types::ToolCall {
+                id: "w1".to_owned(),
+                name: crate::nt_types::ToolName::WriteFile,
+                args: big,
+            },
+            &mut turn_written,
+            &sink,
+        )
         .expect_err("single over budget must fail");
         assert!(err.to_string().contains("single-write"), "{err}");
         // 两次小写累计超轮预算拒
@@ -2028,15 +2084,12 @@ mod tests {
             name: crate::nt_types::ToolName::WriteFile,
             args: small,
         };
-        super::execute_write(&config, &call, &mut turn_written, &sink)
-            .expect("first small write");
+        super::execute_write(&config, &call, &mut turn_written, &sink).expect("first small write");
         let err = super::execute_write(&config, &call, &mut turn_written, &sink)
             .expect_err("turn over budget must fail");
         assert!(err.to_string().contains("write-budget"), "{err}");
         // 只有第一次成功写入了盘，才该有一笔账。
-        let tallies = store
-            .tally_task_paths("budget-task")
-            .expect("tally");
+        let tallies = store.tally_task_paths("budget-task").expect("tally");
         assert_eq!(tallies.len(), 1, "被拒的两次不该记账：{tallies:?}");
         assert_eq!(tallies.first().map(|t| t.path.as_str()), Some("b.txt"));
         let _ = std::fs::remove_dir_all(&dir);
@@ -2093,12 +2146,19 @@ mod tests {
         run("随便聊点别的什么内容", &dm);
         assert_eq!(title_of(&dm), "帮我写一份周报总结");
         // 纯附件系统行不命名
-        let g = store.create_conversation("group", "新群组", &[]).expect("group");
+        let g = store
+            .create_conversation("group", "新群组", &[])
+            .expect("group");
         run("[附件：a.png]", &g);
         assert_eq!(title_of(&g), "新群组");
         // 超长截 24 字
-        let g2 = store.create_conversation("group", "新群组", &[]).expect("group2");
-        run("这是一条超过二十四个字的超长输入内容用来测试截断行为是否正确", &g2);
+        let g2 = store
+            .create_conversation("group", "新群组", &[])
+            .expect("group2");
+        run(
+            "这是一条超过二十四个字的超长输入内容用来测试截断行为是否正确",
+            &g2,
+        );
         assert_eq!(title_of(&g2).chars().count(), 24);
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -2193,6 +2253,158 @@ mod tests {
         }
     }
 
+    /// 按固定路径 `read_file` 一次的引擎（`ReadFile` 在 policy 里是 allow 分支）。
+    ///
+    /// ⭐ 顺带记录收到的 `history` —— 蒸馏结果只走这条路，而 `history` 是
+    /// `run_loop` 的局部变量（**不落库**）⇒ 查 steps / audit 都取不到它。
+    struct ReadPathEngine {
+        path: String,
+        done: std::sync::atomic::AtomicBool,
+        seen: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+    }
+
+    impl ReadPathEngine {
+        fn new(path: &str) -> Self {
+            Self {
+                path: path.to_owned(),
+                done: std::sync::atomic::AtomicBool::new(false),
+                seen: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+            }
+        }
+
+        fn seen(&self) -> std::sync::Arc<std::sync::Mutex<Vec<String>>> {
+            self.seen.clone()
+        }
+    }
+
+    impl crate::nt_engine::EngineAdapter for ReadPathEngine {
+        fn engine_id(&self) -> &str {
+            "read-path"
+        }
+
+        fn probe(&self) -> Result<String, crate::NtBotError> {
+            Ok("read-path".to_owned())
+        }
+
+        fn run_turn(
+            &self,
+            _prompt: &str,
+            _inbox: &[String],
+        ) -> Result<crate::nt_engine::EngineTurn, crate::NtBotError> {
+            Ok(self.turn())
+        }
+
+        fn run_turn_with_history(
+            &self,
+            _prompt: &str,
+            history: &[crate::nt_types::TranscriptItem],
+        ) -> Result<crate::nt_engine::EngineTurn, crate::NtBotError> {
+            if let Ok(mut seen) = self.seen.lock() {
+                for item in history {
+                    seen.push(item.content.clone());
+                }
+            }
+            Ok(self.turn())
+        }
+    }
+
+    impl ReadPathEngine {
+        fn turn(&self) -> crate::nt_engine::EngineTurn {
+            let first = !self.done.swap(true, std::sync::atomic::Ordering::SeqCst);
+            crate::nt_engine::EngineTurn {
+                assistant_text: String::new(),
+                status: if first {
+                    crate::nt_types::TurnStatus::Continue
+                } else {
+                    crate::nt_types::TurnStatus::Done
+                },
+                tool_calls: if first {
+                    vec![crate::nt_types::ToolCall {
+                        id: "rp1".to_owned(),
+                        name: crate::nt_types::ToolName::ReadFile,
+                        args: serde_json::json!({"path": self.path.clone()}),
+                    }]
+                } else {
+                    Vec::new()
+                },
+                usage: None,
+                side_effects: Vec::new(),
+            }
+        }
+    }
+
+    /// ⭐⭐ **接线守门：超预算工具输出进 transcript 时必须保留尾部错误与 exit code。**
+    ///
+    /// ⛔ 判别式必须区分两件事，否则就是**拿正确实现当缺陷**：
+    ///   - 「被蒸馏」（长度收缩）
+    ///   - 「超预算」（本该蒸馏）
+    /// 我第一版夹具只写 200 行 ≈ 8206 字节 ≈ **2051 token**，落在 3000 预算
+    /// 内 ⇒ `distill_output` **原样透传**（正确行为！）⇒ 测试红了。
+    /// ⇒ 夹具必须远超预算，且要断言「Tool 行确实被收缩」。
+    #[test]
+    fn 超预算工具输出进transcript保留尾部错误与退出码() {
+        let dir = crate::nt_testutil::temp_dir("distill-wiring");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("workspace")).expect("mkdir");
+        // 前缀远超旧 LIMIT(4096) 与蒸馏预算(3000 token)，错误与 exit code 在**尾部**。
+        let mut big = String::new();
+        for i in 0..600 {
+            big.push_str(&format!(
+                "filler line {i} padding padding padding padding\n"
+            ));
+        }
+        big.push_str("error: the tail error that must survive\n");
+        big.push_str("exit code 3\n");
+        std::fs::write(dir.join("workspace/big.log"), &big).expect("write");
+        assert!(
+            big.len() > 4096 * 3,
+            "夹具须远超旧 LIMIT，实际 {}",
+            big.len()
+        );
+
+        let config = NeobotConfig {
+            data_dir: dir.clone(),
+            workspace_dir: dir.join("workspace"),
+            policy_mode: crate::nt_config::PolicyMode::Enforce,
+            human_has_control: false,
+            max_steps: 2,
+            engine: crate::nt_config::EngineKind::Echo,
+            computer_allow: Vec::new(),
+            computer_hosts: Vec::new(),
+            extra_deny: Vec::new(),
+            write_budget: crate::nt_config::default_write_budget(),
+        };
+        config.validate().expect("validate");
+        let store = NeobotStore::open(":memory:").expect("open");
+        let engine = ReadPathEngine::new("big.log");
+
+        let _ = run_local_turn(&store, &config, &engine, "distill", "go").expect("run");
+
+        let seen = engine.seen();
+        let snapshot: Vec<String> = seen.lock().map(|v| v.clone()).unwrap_or_default();
+        let tool_line = snapshot
+            .iter()
+            .find(|x| x.contains("filler line") || x.contains("## errors"))
+            .expect("★ Tool 行缺失（引擎没收到）⇒ 用例零区分力");
+        assert!(
+            tool_line.len() < big.len(),
+            "★ Tool 行未被蒸馏（{} 字节 vs 原文 {}）⇒ 用例零区分力",
+            tool_line.len(),
+            big.len()
+        );
+        assert!(
+            tool_line.contains("error: the tail error"),
+            "★ 尾部错误行被丢弃（砍尾留头的核心损失）：{}",
+            &tool_line[..tool_line.len().min(300)]
+        );
+        assert!(
+            tool_line.contains("exit code 3"),
+            "★ 尾部 exit code 被丢弃（★ 这正是砍尾留头的核心损失）：{}",
+            &tool_line[..tool_line.len().min(300)]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// ⭐ **接线守门：最终输出必须产生一条 `reply_governance` step。**
     ///
     /// 这条断言的作用：证明治理**真的在生产派发路径上跑过**，而不只是编译通过。
@@ -2218,14 +2430,16 @@ mod tests {
         config.validate().expect("validate");
         let store = NeobotStore::open(":memory:").expect("open");
 
-        let status =
-            run_local_turn(&store, &config, &LocalEchoEngine, "t", "hello").expect("run");
+        let status = run_local_turn(&store, &config, &LocalEchoEngine, "t", "hello").expect("run");
         assert_eq!(status, crate::nt_types::TurnStatus::Done);
 
         // 用 audit 侧信道断言：task_id 是内部 UUID，测试拿不到，
         // 而 audit 按最近倒序可查。
         let audits = store.list_audit(50).expect("audits");
-        let gov: Vec<_> = audits.iter().filter(|a| a.tool == "output_governance").collect();
+        let gov: Vec<_> = audits
+            .iter()
+            .filter(|a| a.tool == "output_governance")
+            .collect();
         assert_eq!(
             gov.len(),
             1,
@@ -2284,10 +2498,11 @@ mod tests {
     }
 
     impl ReadCredsEngine {
-        fn turn(&self, _history: &[crate::nt_types::TranscriptItem]) -> crate::nt_engine::EngineTurn {
-            let first = !self
-                .done
-                .swap(true, std::sync::atomic::Ordering::SeqCst);
+        fn turn(
+            &self,
+            _history: &[crate::nt_types::TranscriptItem],
+        ) -> crate::nt_engine::EngineTurn {
+            let first = !self.done.swap(true, std::sync::atomic::Ordering::SeqCst);
             crate::nt_engine::EngineTurn {
                 assistant_text: String::new(),
                 status: if first {
@@ -2353,7 +2568,10 @@ mod tests {
 
         let audits = store.list_audit(50).expect("audits");
         let bash: Vec<_> = audits.iter().filter(|a| a.tool == "bash").collect();
-        eprintln!("DEBUG bash detail={:?}", bash.iter().map(|a| a.detail.as_str()).collect::<Vec<_>>());
+        eprintln!(
+            "DEBUG bash detail={:?}",
+            bash.iter().map(|a| a.detail.as_str()).collect::<Vec<_>>()
+        );
         let tid: Vec<String> = Vec::new();
         let _ = tid;
         // 直接用 store 查所有 task 的 step 不可行（★ task_id 内部 UUID），
@@ -2681,11 +2899,17 @@ mod tests {
         assert_eq!(image.media_type, "image/png");
         assert_eq!(
             image.base64,
-            crate::nt_vision::base64_encode(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, b'I', b'H', b'D', b'R'])
+            crate::nt_vision::base64_encode(&[
+                0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, b'I', b'H', b'D', b'R'
+            ])
         );
         // 文本那行是**说明**不是载荷：base64 不许漏进 content。
         assert!(!outcome.result.output.contains(&image.base64));
-        assert!(outcome.result.output.contains("image/png"), "{}", outcome.result.output);
+        assert!(
+            outcome.result.output.contains("image/png"),
+            "{}",
+            outcome.result.output
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -2966,8 +3190,9 @@ mod tests {
         let ctx = farm_ctx(&store, &config, &engine);
         // 第一个工具跑完就置位（今天没人能置位 —— 这里代置）。
         let mut after_first = |_tool: &str, _ok: bool, _out: &str| token.cancel();
-        let status = super::run_local_turn_cancellable(&ctx, None, Some(&mut after_first), Some(&token))
-            .expect("run");
+        let status =
+            super::run_local_turn_cancellable(&ctx, None, Some(&mut after_first), Some(&token))
+                .expect("run");
         assert_eq!(status, crate::nt_types::TurnStatus::Waiting);
         assert_eq!(engine.calls(), 1, "叫停后不许再发起第 2 次模型调用");
         let task = store.list_tasks(1).expect("list").remove(0);
@@ -3006,14 +3231,18 @@ mod tests {
         let token = super::StopToken::new();
         let ctx = farm_ctx(&store, &config, &engine);
         let mut after_first = |_tool: &str, _ok: bool, _out: &str| token.cancel();
-        let status = super::run_local_turn_cancellable(&ctx, None, Some(&mut after_first), Some(&token))
-            .expect("run");
+        let status =
+            super::run_local_turn_cancellable(&ctx, None, Some(&mut after_first), Some(&token))
+                .expect("run");
         assert_eq!(status, crate::nt_types::TurnStatus::Waiting);
         let task = store.list_tasks(1).expect("list").remove(0);
         assert_eq!(task.status, crate::nt_types::TaskStatus::Cancelled);
         // 拦在 hop 0 的第二个工具之前 ⇒ 第 0 跳。
         assert!(
-            task.error.clone().unwrap_or_default().contains("at hop 0/3"),
+            task.error
+                .clone()
+                .unwrap_or_default()
+                .contains("at hop 0/3"),
             "{:?}",
             task.error
         );
@@ -3025,10 +3254,8 @@ mod tests {
         assert_eq!(cancel_row.decision, crate::nt_audit::AuditDecision::Deny);
         assert_eq!(cancel_row.tool, "tool_calls");
         assert!(
-            !audits
-                .iter()
-                .any(|event| event.tool == "web_search"
-                    && event.decision == crate::nt_audit::AuditDecision::Allow),
+            !audits.iter().any(|event| event.tool == "web_search"
+                && event.decision == crate::nt_audit::AuditDecision::Allow),
             "被跳过的工具不许有 allow 审计行（那是假账）"
         );
         // 汇总 steps 行：`ok=0` + 点名未执行的那一个。
@@ -3059,11 +3286,18 @@ mod tests {
         assert!(token.is_cancelled(), "第一轮结束时旗确实是立着的");
         let calls_after_first = engine.calls();
         // 第二轮：同一枚令牌，不给任何回调 ⇒ C0 必须先把旗清掉。
-        let status = super::run_local_turn_cancellable(&ctx, None, None, Some(&token)).expect("second run");
-        assert_eq!(status, crate::nt_types::TurnStatus::Waiting, "第二轮不该被误杀");
+        let status =
+            super::run_local_turn_cancellable(&ctx, None, None, Some(&token)).expect("second run");
+        assert_eq!(
+            status,
+            crate::nt_types::TurnStatus::Waiting,
+            "第二轮不该被误杀"
+        );
         assert_eq!(engine.calls() - calls_after_first, 3, "第二轮应跑满 3 跳");
         let tasks = store.list_tasks(5).expect("list");
-        let newest = tasks.iter().find(|t| t.status != crate::nt_types::TaskStatus::Cancelled);
+        let newest = tasks
+            .iter()
+            .find(|t| t.status != crate::nt_types::TaskStatus::Cancelled);
         assert!(
             newest.is_some(),
             "第二轮必须留下一个非 cancelled 的行（它跑完了）"
@@ -3219,8 +3453,7 @@ mod tests {
     /// 退避闸本身：刚续过就不该立刻又续（否则快 hop 会把库写穿）。
     #[test]
     fn lease_heartbeat_backs_off_after_a_renewal() {
-        let mut heartbeat =
-            super::LeaseHeartbeat::tuned(std::time::Duration::from_secs(60), 4);
+        let mut heartbeat = super::LeaseHeartbeat::tuned(std::time::Duration::from_secs(60), 4);
         assert!(heartbeat.due(), "第一跳就该续（还没有上一次）");
         heartbeat.note();
         assert!(!heartbeat.due(), "刚续过 → 退避期内不再续");
@@ -3349,7 +3582,10 @@ done
         (dir, config, session, artifacts)
     }
 
-    fn qwen_call(name: crate::nt_types::ToolName, args: serde_json::Value) -> crate::nt_types::ToolCall {
+    fn qwen_call(
+        name: crate::nt_types::ToolName,
+        args: serde_json::Value,
+    ) -> crate::nt_types::ToolCall {
         crate::nt_types::ToolCall {
             id: "c-qwen".to_owned(),
             name,
@@ -3372,7 +3608,11 @@ done
         )
         .expect("dispatch");
         assert!(outcome.result.ok);
-        assert!(outcome.result.output.contains("media ok"), "{}", outcome.result.output);
+        assert!(
+            outcome.result.output.contains("media ok"),
+            "{}",
+            outcome.result.output
+        );
         assert!(outcome.image.is_none());
         // 越狱：video_path 绝对路径在执行层被拒（网关是第一道，这里是第二道）。
         let denied = super::execute_qwen_mm_with_session(
@@ -3386,7 +3626,11 @@ done
         )
         .expect("refusal is a normal outcome, not a Rust error");
         assert!(!denied.result.ok);
-        assert!(denied.result.output.contains("refused"), "{}", denied.result.output);
+        assert!(
+            denied.result.output.contains("refused"),
+            "{}",
+            denied.result.output
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -3441,9 +3685,15 @@ done
         let mp4 = workspace.join("t.mp4");
         let st = Command::new("ffmpeg")
             .args([
-                "-y", "-v", "error", "-f", "lavfi",
-                "-i", "testsrc=duration=2:size=160x120:rate=5",
-                "-pix_fmt", "yuv420p",
+                "-y",
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc=duration=2:size=160x120:rate=5",
+                "-pix_fmt",
+                "yuv420p",
             ])
             .arg(&mp4)
             .output()
@@ -3511,8 +3761,8 @@ done
     use crate::nt_types::ToolName;
 
     use super::{
-        NeobotReversibility, TimeoutPolicy, class_digest, enforced_timeout_ms, reversibility_of,
-        timeout_policy,
+        class_digest, enforced_timeout_ms, reversibility_of, timeout_policy, NeobotReversibility,
+        TimeoutPolicy,
     };
 
     /// `ToolName` 的**全部**变体（2026-10-05 实测 16 个）。
@@ -3562,7 +3812,10 @@ done
             (ToolName::Bash, NeobotReversibility::Irreversible),
             (ToolName::ComputerAct, NeobotReversibility::Irreversible),
             (ToolName::QwenSaveView, NeobotReversibility::Irreversible),
-            (ToolName::Unknown("rm_rf_root".to_owned()), NeobotReversibility::Irreversible),
+            (
+                ToolName::Unknown("rm_rf_root".to_owned()),
+                NeobotReversibility::Irreversible,
+            ),
         ];
         for (tool, class) in expected {
             assert_eq!(reversibility_of(&tool), class, "{}", tool.as_str());
@@ -3596,7 +3849,11 @@ done
         // 「无害」是猜测，「不可逆」是保证。
         for raw in ["ls", "git_status", "read_notes", "echo_hello", "sleep_1"] {
             let tool = ToolName::parse(raw);
-            assert_eq!(reversibility_of(&tool), NeobotReversibility::Irreversible, "{raw}");
+            assert_eq!(
+                reversibility_of(&tool),
+                NeobotReversibility::Irreversible,
+                "{raw}"
+            );
             assert_eq!(
                 timeout_policy(NeobotReversibility::Irreversible, 10_000.0, Some(1.0)),
                 TimeoutPolicy::WouldWait,
@@ -3623,7 +3880,10 @@ done
     fn irreversible_and_reversible_past_timeout_would_wait() {
         // 承重那一半：「Write tools are never killed」——
         // 越过超时也**等它跑完**，只告警一次。
-        for class in [NeobotReversibility::Irreversible, NeobotReversibility::Reversible] {
+        for class in [
+            NeobotReversibility::Irreversible,
+            NeobotReversibility::Reversible,
+        ] {
             assert_eq!(
                 timeout_policy(class, 999_999.0, Some(1.0)),
                 TimeoutPolicy::WouldWait,
@@ -3665,7 +3925,13 @@ done
         // 裁决：`NaN` 读成「无超时」，不是「立即超时」。理由：
         // 把配置缺陷当成超时受害者 = 拿一次 bug 换一个不可逆动作的半途而废。
         let read_only = NeobotReversibility::ReadOnly;
-        for bad in [None, Some(f64::NAN), Some(f64::INFINITY), Some(0.0), Some(-1.0)] {
+        for bad in [
+            None,
+            Some(f64::NAN),
+            Some(f64::INFINITY),
+            Some(0.0),
+            Some(-1.0),
+        ] {
             assert_eq!(
                 timeout_policy(read_only, 1_000_000.0, bad),
                 TimeoutPolicy::WouldWait,
@@ -3693,7 +3959,10 @@ done
         // 会被答错。三个来源：bash 60s / qwen 90s / web 15s，其余无超时。
         assert_eq!(enforced_timeout_ms(&ToolName::Bash), Some(60_000.0));
         assert_eq!(enforced_timeout_ms(&ToolName::QwenSaveView), Some(90_000.0));
-        assert_eq!(enforced_timeout_ms(&ToolName::QwenReadVideo), Some(90_000.0));
+        assert_eq!(
+            enforced_timeout_ms(&ToolName::QwenReadVideo),
+            Some(90_000.0)
+        );
         assert_eq!(enforced_timeout_ms(&ToolName::WebFetch), Some(15_000.0));
         assert_eq!(enforced_timeout_ms(&ToolName::WebSearch), Some(15_000.0));
         for tool in [
