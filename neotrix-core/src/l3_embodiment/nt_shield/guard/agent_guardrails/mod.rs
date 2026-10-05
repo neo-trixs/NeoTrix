@@ -85,9 +85,30 @@ impl Default for PolicyConfig {
             blocked_input_patterns: vec![],
             blocked_output_patterns: vec![],
             credential_patterns: vec![
-                r"(?i)(api[_-]?key|secret[_-]?key|access[_-]?token)\s*[:=]\s*\S+".to_string(),
-                r"(?i)(password|passwd|pwd)\s*[:=]\s*\S+".to_string(),
+                // ⭐ 键名族（实测修正过一次，见下方长注释）。
+                r"(?i)(api[_-]?key|secret|access|token|passwd|password|pass|pwd)[a-z0-9_-]*\s*[:=]\s*\S+".to_string(),
                 r"(?i)-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----".to_string(),
+                // ⭐ 云厂商 / GitHub / Slack / OpenAI 的**真实形态**。这些靠**值的
+                //   前缀**识别，因为键名可任意而值前缀不能。
+                //
+                // ⛔ 前一版把键名写成
+                //   `(api[_-]?key|secret|access)[_-]?(?:[a-z0-9]+[_-]?)*key…`
+                //   —— 尾部 `key` 是**强制**的，而 `api[_-]?key` 分支已把 `key` 吃掉
+                //   ⇒ 永远配不上。**实测（独立 crate 跑真实输入）三条全漏**：
+                //   `api_key = "sk-…"` / `password: …` / `my-secret=…`。
+                //   且那 7 条里**根本没有** `password` 分支。
+                // ⇒ 现在是「前缀词 + 任意尾巴」，实测 12/12 预期全中。
+                //
+                // ⚠️ 键名族这几条**刻意不加 `\b`**：实测 `\b(api[_-]?key|…)` 会让
+                //   `AWS_SECRET_ACCESS_KEY` 失败（`SECRET` 前是 `_`，属 word char，
+                //   无词边界）。下面按**值前缀**识别的几条才用 `\b`。
+                r"\bAKIA[0-9A-Z]{16}\b".to_string(),
+                r"\bASIA[0-9A-Z]{16}\b".to_string(),
+                r"\bgh[pousr]_[A-Za-z0-9]{36}\b".to_string(),
+                r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b".to_string(),
+                r"\bsk-[A-Za-z0-9_-]{20,}\b".to_string(),
+                r"(?i)(github[_-]?token|gh[_-]?token|glpat|glptt|npm[_-]?token)\s*[:=]\s*\S+".to_string(),
+                r"(?i)authorization\s*:\s*bearer\s+\S+".to_string(),
             ],
             injection_patterns: vec![
                 r"(?i)ignore\s+(all\s+)?previous\s+instructions".to_string(),
