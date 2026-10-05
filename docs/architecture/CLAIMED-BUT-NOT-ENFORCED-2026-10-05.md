@@ -168,3 +168,58 @@ Codewhale 能这么写，是因为它**只有一个 profile** + per-project over
 本会话实测到**五处同名不同物**：`health.check_all()` / `stack.check_all()` /
 `unified_defense.validate_input()` / `p.run_pipeline()` / `e.into_inner()`。
 其中 `check_all` 那次让我差点得出「`ShieldEnforcer` 有生产调用方」的反向错误结论。
+
+---
+
+## 📌 补记（2026-10-06）：第 10 项的**裁决落地**与第三类并发并发病
+
+### 第 10 项已由用户裁决并实现（`96056d65`）
+**方案 A**：允许档位改变全局审批模式，但必须**显式确认 + 留痕**。
+落地要点（详见 `sessions/handoff-2026-10-05-authorization-audit-and-inert-defenses.md`）：
+· `plan_profile_switch`（**纯查询**）⇒ 调用方先看副作用再决定要不要问用户
+· `switch_profile_with_audit(name, actor)`，**空 actor 被拒**
+· ⭐ **匿名 `switch_profile` 在会改模式的档位上直接 `Err`**
+  ⇒「能在无 actor 情况下放宽审批的路径」必须不存在
+  （与「Deny 不可被 Ask 覆盖」同属**不可逆性保护**）
+
+---
+
+## ⭐⭐⭐ 第三类并发并发病：**测试之间**抢全局状态
+
+前两类我已记录：
+1. 共享 index 的「暂存区与提交不原子」（2026-09-29 实测事故）
+2. 他窗 WIP 把门挡住（本会话反复遇到）
+
+第三类是 **`cargo test` 默认多线程 + 模块级全局单例**：
+
+`nt_permission_profiles` 有 13+ 处测试共用
+`global_profile_manager` / `global_approval` 两个单例
+⇒ 同模块测试互相改状态 ⇒ **间歇性失败，且失败行号漂移**。
+
+### ⭐ 正确取证顺序（我这次差点搞反）
+新写的锁④「`plan_profile_switch` 不得改动全局审批模式」首跑就红。
+**第一反应**会是「`plan` 有副作用，去修它」—— 那是**错的**。
+
+**先做单线程探针**：
+```
+PROBE after setup mode=Suggest active=nt_shield
+PROBE after plan  mode=Suggest      ← plan 确实是纯的
+```
+⇒ **真因是测试抢全局态。**
+
+依据同AGENTS.md §5 的 R-SCAN-1：扫描/测试告警先读现场证实或证伪再动代码。
+**测试红了不等于被测代码错** —— 在共享单例的模块里，它更可能是测试自己抢了。
+
+### 修法（本仓现状）
+无 `serial_test` dev-dependency ⇒ 用标准库 `Mutex` 手写串行化
+（`TEST_GLOBAL_STATE`，**中毒取内值** —— 守卫本身不含状态，
+中毒只意味着另一个测试 panic 过，不该连带阻断本测试）。
+
+**实证必要性**：去掉互斥锁后连跑两次 ⇒ 第一次 `FAILED(18/1)`、第二次 `ok(19/0)`。
+
+⚠️ 若将来引入 `#[serial]`，**删掉这个手写锁**（双重串行化无害但会让人困惑）。
+
+### 推广
+任何「模块内有全局单例」的测试集都适用这条：
+**先问「是不是测试之间在抢」，再问「是不是代码有 bug」。**
+判别手段就一个：**单线程跑一遍**。

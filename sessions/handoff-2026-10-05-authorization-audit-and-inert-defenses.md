@@ -27,6 +27,7 @@
 | `7b162c47` | Strata 的 effort 方言归一（`none`/`minimal` 曾白烧推理预算） | ⭐⭐ 静默烧钱 |
 | `5a3dce85` 系 | Vibe-Trading 的**未来污染不变性元测试** | ⭐⭐ 前视偏差 |
 | `6b72ca16` | 八源许可证判定（3 个 `NOASSERTION` 全是真限制）+ **GPL-3.0 空白区裁决** | ⭐⭐ 消除歧义 |
+| `96056d65` | **方案 A**（用户裁决）：切档改审批模式必须「显式确认 + 留痕」+ **关闭匿名放宽路径** + 6 条锁 | ⭐⭐⭐ 产品语义落地 |
 | `591dd9f0` | **`CLAIMED-BUT-NOT-ENFORCED-2026-10-05.md`**：10 项「声称存在但实际不生效」实证 | ⭐⭐⭐ 方法论资产 |
 | `0b49366b`/`c24347b8`/`5a3dce85` | `EntropyMonitor` 除零、`VSAEngine` 四级障碍、`llm_judge` 三态裁决 | ⭐⭐ |
 
@@ -39,9 +40,13 @@
 ## 5. 下一步（按优先级排序）
 
 1. **落地 `5bf3aee7` + `5b058ce8`**（见 §8.2，patch 已兜底，门红在他窗）
-2. **P0 需产品裁决**：`switch_profile` 能否改变全局 `ApprovalMode`？
-   当前可单次调用把 `strict-nt_shield` 改成 `AutoEdit`，**无记录无确认**。
-   允许 → 必须落审计 + 显式确认；不允许 → 该字段从 profile 移除。
+2. ~~**P0 需产品裁决**~~ ⇒ ✅ **已裁决并实现**（用户选 A，落地于 `96056d65`）：
+   · 新增 `plan_profile_switch`（纯查询）⇒ 调用方先看副作用再决定
+   · 新增 `switch_profile_with_audit(name, actor)`，空 actor 被拒
+   · **匿名 `switch_profile` 在会改模式的档位上直接 `Err`**
+     ⇒「能在无 actor 情况下放宽审批的路径」必须不存在
+   · ⏭ **待办**：接 CLI（`plan` → 若 `loosens_approval` 则提示确认 → 执行）；
+     当前 `switch_profile` 仍**零生产调用方**，故接线前还需先有 CLI 入口。
 3. **P1 接 `agent_guardrails`**：接成 `ShieldEnforcer::check_all` 的**第 9 段**，
    且 `GuardrailVerdict::Block` 要**真阻断**（别学 `ProjectLaws::check_laws` 的
    non-blocking default）。⚠️ 该目录他窗正在改 ⇒ 等他落地。
@@ -131,3 +136,70 @@ git -c core.hooksPath=.githooks commit --only \
 - `check-orphan-dirs.sh --strict` ⇒ 新增 0（25 个已在基线）
 - 本会话新建门：`scripts/ops/nt_orphan_dir.py` + `scripts/check-orphan-dirs.sh`，
   已实测**能抓新增**（造孤儿 ⇒ rc=1；移除 ⇒ rc=0）⇒ 不是恒绿假门
+
+---
+
+## 📌 补记（2026-10-06 06:50 收尾）
+
+### 晚间落地的 3 笔
+| 提交 | 内容 |
+|---|---|
+| `d68744d3` | 方案 A 的实现主体（`plan` / `switch_profile_with_audit` / 匿名入口关闭） |
+| `96056d65` | 补齐 6 条反向锁 + **测试串行化** + 改写 2 处「钉死旧行为」的既有测试 |
+| 本次收尾 | 交接文档更新 + worktree 收尾 |
+
+### ⭐⭐⭐ 方案 A 落地过程中抓到的**第三类并发病**
+前两类我已遇到过（2026-09-29「暂存区与提交不原子」、他窗 WIP 打断门），
+这第三类是**测试之间**的：
+
+**`nt_permission_profiles` 的 13+ 处测试共用两个全局单例**
+（`global_profile_manager` / `global_approval`），
+而 cargo test **默认多线程** ⇒ 同模块测试互相抢状态
+⇒ 表现为**间歇性失败且失败行号漂移**。
+
+**⭐ 关键取证**：我新写的锁④「`plan` 不得改动全局审批模式」首跑就红。
+我用**独立探针**（单线程连打 before/after）验证：
+```
+PROBE after setup mode=Suggest active=nt_shield
+PROBE after plan  mode=Suggest      ← plan 确实是纯的
+```
+⇒ **真因是测试抢全局态，不是被测代码有副作用。**
+若不做这一步，我会去「修」一个**正确的** `plan`（R-SCAN-1 的又一次）。
+
+**修法**：本仓无 `serial_test` dev-dependency ⇒ 用标准库 `Mutex` 手写串行化
+（`TEST_GLOBAL_STATE`，中毒取内值 —— 守卫本身不含状态，中毒只意味着
+另一个测试 panic 过，不该连带阻断）。
+**实证必要性**：去掉互斥锁后连跑两次 ⇒ 第一次 **FAILED(18/1)**、第二次 **ok(19/0)**。
+
+### ⭐ 顺带改写两处「钉死旧行为」的既有测试
+它们断言的正是方案 A 要消除的行为：
+1. `test_global_state_integration` 里的 `switch_profile("developer").is_ok()`
+2. 专门测「override 会生效」的那一段
+改写后**保留了「功能未被削掉」**：匿名 ⇒ `Err` + 模式不变；
+带 actor ⇒ 成功 + **override 依然生效**（`AutoEdit`）。
+
+### 门状态（2026-10-06 06:49 核实）
+· `cargo check --tests -p neotrix` ⇒ **exit 0**
+· `cargo test -p neotrix --lib nt_permission_profiles` ⇒ **19 passed / 0 failed**
+· `cargo test -p neotrix --lib` ⇒ **13358 passed / 1 failed**
+  ⛔ 唯一失败是**他窗文件** `l0_substrate/nt_core_platform/mod_orphan.rs`
+  （他提交 `64913227`「补上孤儿目录模块盲区」引入），
+  **与本会话改动无交集**（`96056d65` 只改 1 个文件）。
+
+### worktree 最终状态
+| worktree | 去向 |
+|---|---|
+| `.worktrees/nt-verify` / `nt-v3` / `nt-v5` / `nt-v7` | ✅ 已 `prune --force` 移除（成果均已入主分支或 patch 兜底） |
+| `.worktrees/nt-v2` | ⏭ 保留（门判 HEAD 未含于任何分支；成果已入主分支） |
+| `.worktrees/nt-v4` | ⏭ 保留（门判「脏 + 疑似他窗在用」） |
+| `.worktrees/merge-b` | ⏭ 保留（**他窗**的 worktree，非我创建） |
+
+⭐ 备份分支（成果的第二重保险，HEAD 被 rebase 后 `is-ancestor` 会失真）：
+`backup/nt-verify-01ec33b9` · `backup/nt-v3-26744a78` · `backup/nt-v4-307499b9`
+· `backup/nt-v5-5b058ce8` · `backup/nt-v7-940b157a`
+
+### 本轮新增的 patch 兜底
+· `.neotrix/patches/2026-10-05-profile-switch-confirm-planA.patch`
+· `.neotrix/patches/2026-10-06-planA-mutex-and-lock-rewrite.patch`
+· `.neotrix/patches/2026-10-05-contract-locks-monotonic-revert.patch`
+· `.neotrix/patches/2026-10-05-honest-flag-warning.patch`
