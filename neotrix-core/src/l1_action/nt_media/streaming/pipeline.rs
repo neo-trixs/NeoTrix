@@ -23,11 +23,11 @@ use tokio::fs;
 // EventBus integration — R-P79: download progress → system-wide visibility
 // ═══════════════════════════════════════════════════════════════════════════
 
-pub(crate) static GLOBAL_EVENT_BUS: OnceLock<Arc<crate::neotrix::nt_core_event_bus::EventBus>> = OnceLock::new();
+pub(crate) static GLOBAL_EVENT_BUS: OnceLock<Arc<crate::l0_substrate::nt_core_event_bus::EventBus>> = OnceLock::new();
 
 /// Register the global EventBus for download progress publishing.
 /// Call once at startup; silently no-ops if already set.
-pub fn set_download_event_bus(bus: Arc<crate::neotrix::nt_core_event_bus::EventBus>) {
+pub fn set_download_event_bus(bus: Arc<crate::l0_substrate::nt_core_event_bus::EventBus>) {
     let _ = GLOBAL_EVENT_BUS.set(bus);
 }
 
