@@ -32,6 +32,50 @@
 | `letta-ai/letta` | — | ⚠️ **`main` 只有 10 个文件、零代码**（README 自述真码已迁 `letta-code`）。24.9k 星衡量的是 MemGPT V1 历史 | ⚠️ README 自述 |
 | `trailofbits/skills` | **CC-BY-SA-4.0** | **只取思想（rust-review/insecure-defaults/fp-check 等审计纪律），不抄代码不抄文本**；相同署名-相同方式共享，沾上即传染 | ⚠️ 页面徽标自述 |
 
+## 🟡 Copyleft（**条件可取**，须先满足本档三条硬条件）
+
+> **为什么需要这一档（2026-10-05 立）**
+> 原表只有「⛔ 不可用」与「✅ 可抄」两档。
+> 而 **GPL-3.0 落在两档之间的空白区**：它既不是宽松许可（不能进「可抄」），
+> 也不是「完全禁止」（**只取设计是允许的**）。
+> ⇒ 空白区的危害是**每个 agent 会各自猜**：
+> 有的当宽松放行（违法），有的当禁止浪费可用的设计。
+> （本次触发源：`rizinorg/cutter`，19,878★，实测 GPL-3.0。）
+
+### 三条硬条件（**全部**满足才可取码）
+
+1. **取的是「独立可执行体」而非链接库**
+   GPL 文末原文：*"The GNU General Public License does not permit
+   incorporating your program into proprietary programs."*
+   ⇒ 取代码必须**整体独立**（独立进程/独立二进制），**不得**静态或动态链接进
+   NeoTrix 主体，否则整个作品须 GPL。
+
+2. **不触发「整个作品」传染**
+   GPL §5(c)：*"You must license the entire work, as a whole, under this
+   License to anyone who gets a copy."*
+   ⇒ 只要与 NeoTrix 同一分发物，就必须整体 GPL ⇒ **实际不可行**。
+
+3. **分发时附 Corresponding Source + 挂 Appropriate Legal Notices**
+   ⇒ 我方无「分发」场景（自用），故本档现实结论通常是**只取设计**。
+
+### 本档现实裁决（2026-10-05）
+
+| 仓 | 许可 | 裁决 | 依据 |
+|---|---|---|---|
+| `rizinorg/cutter` | **GPL-3.0** | 🟡 **只取设计，不取码** | 条件 2 不满足（C++/Qt 逆向平台，与我方主体同分发物）。⭐ **取证曲折**：`dev/LICENSE` 返回 **404**（默认分支是 `dev` 非 `main`，且文件名不叫 `LICENSE`），实际文件是 **`COPYING`**（35,148 字节）。**只看 `LICENSE` 会误判成「无许可证」** ⇒ 文件名不是判据，内容才是 |
+
+⚠️ **GPL vs AGPL 的实质区别（别混为一谈）**
+· GPL：**分发**时传染（我方不分发 ⇒ 不触发）
+· AGPL：**提供网络服务**时传染（我方是长期运营的服务 ⇒ **必然触发**）
+⇒ 这就是 `AFK-surf/Comma`（AGPL）进「⛔ 不可用」而 cutter 进本档的原因。
+
+⚠️ **无 LICENSE 与 NC 类的区别（2026-10-05 新增教训）**
+· **无 LICENSE** = 默认全权保留 ⇒ 你什么都拿不到 ⇒ **安全地失败**
+· **PolyForm NC / CC-BY-NC** = 「看起来能拿，拿到就违法」⇒ **更危险**
+  实测：`GitNexus`（47,728★）= PolyForm Noncommercial 1.0.0；
+  `htd-ai-augmented-education`（268★）= CC BY-NC 4.0。
+  ⇒ API 返回 `NOASSERTION` 时**必须读原文**，不许按「无许可」处理。
+
 ## ✅ 可抄（已核实）
 
 | 许可 | 仓 |
@@ -197,3 +241,19 @@ lightpanda 的「声明能力面」补到了**它没有的一层**：
 ⚠️ **本仓 vendored 第三方代码的许可另记**：`apps/neobot-desktop/frontend/`
 是 dsh-harness-desktop 0.19.1（**MIT**，vendored，含 2 处本地改动，详见其 `VENDOR.md`）。
 ⛔ 它**不是**冗余副本 —— 不得按「重复文件」删除，且其字号等规范**不适用**本仓排版门。
+
+## 2026-10-05 第五批：游戏引擎侧两源（吸收判定见 [ABSORPTION-MIU2D-RA2-2026-10-05.md](../ABSORPTION-MIU2D-RA2-2026-10-05.md)）
+
+| 仓库 | SPDX | 备注 |
+|---|---|---|
+| `luckyyyyy/miu2d` | **MIT** | ✅ 宽松。⚠️ **游戏资源/IP 不在许可内**（属西山居）⇒ 只取引擎源码思路 |
+| `rust-alert/ra2.exe` | **Apache-2.0** | ⛔ 含**专利授权**条款。⚠️ 同上，《红色警戒》IP 属 Westwood ⇒ 只取源码 |
+
+⛔ **同组织另 7 仓本轮一律「只读设计」，不得抄码**：
+
+| 仓库 | SPDX | 处置 |
+|---|---|---|
+| `rust-alert/ra2-remixer` / `ra2-tools` / `ra3.exe` / `rs-ddraw` / `YurisHook` / `factorio.exe` | **MPL-2.0** | ⚠️ **文件级 copyleft** —— 抄进 MIT/Apache 文件会污染本仓许可 ⇒ 只取设计 |
+| `rust-alert/homm3.exe` | **CC0-1.0** | ✅ 公共领域贡献，本可抄；本轮未取 |
+| `rust-alert/rgss.exe` / `terraria.exe` / `hl.exe` | **无 LICENSE** | ⛔ 只取设计（沿用 `ABSORPTION-AGENT-ARCH2-2026-09-29.md`「无 LICENSE ⇒ 只取设计」先例） |
+| `rust-alert/vxl-renderer` / `FontsForRedAlert2` / `RA2YR-reMIXer` / `relert.js-browser` | — | ⛔ **皆为 fork**，且多数无 LICENSE ⇒ 只取设计 |
