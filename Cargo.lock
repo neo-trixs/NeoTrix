@@ -5836,6 +5836,7 @@ dependencies = [
  "neotrix-types",
  "notify",
  "noyalib",
+ "nt-term-viz",
  "nt_core_capability_tree",
  "num-bigint 0.4.8",
  "num_cpus",
@@ -5977,6 +5978,7 @@ dependencies = [
  "clap",
  "log",
  "lopdf 0.42.0",
+ "nt_core_capability_tree",
  "rusqlite",
  "serde",
  "serde_json",
@@ -6240,6 +6242,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "nt-term-viz"
+version = "0.23.0"
+dependencies = [
+ "unicode-segmentation",
+ "unicode-width",
+]
+
+[[package]]
 name = "nt_core_capability_tree"
 version = "0.1.0"
 dependencies = [
@@ -6247,6 +6257,7 @@ dependencies = [
  "clap",
  "daggy",
  "indexmap 2.14.2",
+ "nt-term-viz",
  "petgraph 0.6.5",
  "serde",
  "serde_json",

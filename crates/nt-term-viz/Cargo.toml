@@ -10,5 +10,12 @@ license = "MIT"
 # 用途：**东亚宽度**（CJK 全角 = 2 列）。自己手写区间表必然漏字，
 # 而本仓是中文为主的仓库，对齐算错会直接导致 CLI 表格错位。
 unicode-width = "0.2"
+# ⛔ 同上，零新增下载：**grapheme cluster 切分**（1.13.3 已由 ratatui-core /
+#   termwiz / convert_case 等 6 个依赖带入根 Cargo.lock，本地 registry 亦有缓存）。
+# 用途：`truncate_to` 必须按**用户感知字符**截断，而非按 `char`。
+#   实测（2026-10-05）逐 `char` 截断 emoji 家族会留下**孤立 ZWJ**
+#   （"👨\u{200d}👩\u{200d}"），终端渲染即豆腐块/替换字符。
+#   而 `unicode-width` 只提供 `width()`，**不提供切分** ⇒ 必须另加。
+unicode-segmentation = "1.13"
 
 [dev-dependencies]
