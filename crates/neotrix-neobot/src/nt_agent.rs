@@ -2202,8 +2202,12 @@ mod tests {
     fn 治理违规会把报告标红() {
         use crate::nt_governance::OutputGovernor;
         let gov = OutputGovernor::new();
-        // 「综上所述」是 R02 禁止的对冲词之一；凑够阈值才会判违规。
-        let bad = "综上所述，系统正常工作。\n一切顺利。\n没有其他问题了。";
+        // R02（禁止模糊对冲）判据是 `total >= 3`，且词表**只有 14 个**
+        // （可能/或许/大概/也许/我觉得/我猜/我认为/好像 + 6 个英文）。
+        // ⛔ 我第一版写的「综上所述 / 总体来看」**不在词表里** ⇒ R02 放过、
+        //   实际命中的是 AI-smell（绕开 rule_results）⇒ 变异能漏过。
+        // ⛔ 第二版补了 3 处但仍用表外词 ⇒ 依旧漏过。⇒ 样本必须取自 HEDGES。
+        let bad = "可能完成了。\n或许还需要再看看。\n大概就这样。";
         let report = gov.govern(bad);
         // ⛔ 必须**只**断言 violations：smells 由 AiSmellDetector 独立计算，
         // 绕开 rule_results ⇒ 用 `|| smells` 会让「治理器恒满分」的变异漏过

@@ -202,6 +202,13 @@ impl HttpEngine {
         // PDF 定位工具是**常挂载**的（编译进二进制），所以提示词也无条件跟着上 ——
         // 与 Qwen 那组「挂载判据必须两处同源」是同一条纪律的另一面。
         system.push_str(PDF_GROUND_PROMPT);
+        // 心智病毒传播防护（arXiv 2608.10218）。IM 入站的外部文本会与 system
+        // prompt 一起抵达模型，故这里给提示词加一句防线。
+        // ⛔ 它**只防 agent-to-agent 传播**，不防 prompt injection ——
+        //   真正的注入防护在 `gate` 的越狱检测（nt_policy.rs）那边，两者是
+        //   不同的威胁模型，不要把这条当「有了注入防护」讲。
+        // 幂等由 `harden_system_prompt` 保证 ⇒ 每次请求都调也不会膨胀。
+        system = crate::nt_prompt_guard::harden_system_prompt(&system);
         if let Some(memory) = self.memory_context.as_deref() {
             system.push_str("\n\n");
             system.push_str(memory);
