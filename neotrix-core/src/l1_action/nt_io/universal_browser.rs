@@ -14,6 +14,12 @@
 
 #![forbid(unsafe_code)]
 
+/// 取 body 可见文本（剥掉浏览器为 text/plain 响应加的 `<pre>` 包装）。
+///
+/// ⚠️ 与 `page.content()` 的区别见 `fetch()` 处的说明：要**源文本**而非
+/// **渲染产物**。判据来自 morluto/rea 的「canonical bytes vs 重建」原则。
+const JS_BODY_INNER_TEXT: &str = "document.body ? document.body.innerText : ''";
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -543,9 +549,37 @@ impl UniversalBrowser {
 
         tokio::time::sleep(Duration::from_secs(2)).await;
 
-        let content = page.content()
+        // ⭐ 2026-10-05 修：不要用 `page.content()`，它给的是**渲染后的 DOM**。
+        //
+        // 缺陷实测（本窗口用 `neotrix web fetch` 抓 GitHub API 时撞上）：
+        //   `page.content()` 把 JSON 响应渲染成
+        //     <html><head>…</head><body><pre>{ …json… }</pre></body></html>
+        //   ⇒ `web fetch` 对**所有 JSON 端点**都返回带壳 HTML，
+        //     调用方 `json.loads` 必失败。Chrome 把 text/plain 当文档渲染，
+        //     `<pre>` 是浏览器加的包装，**不是响应体的一部分**。
+        //
+        // ⇒ 判据来自 morluto/rea 的「canonical bytes vs 重建」原则：
+        //   要的是**源文本**，不是**渲染产物**。`innerText` 取 body 文本，
+        //   剥掉浏览器包装而保留原文。
+        //
+        // ⛔ 但 `innerText` 对**真 HTML 页面**会丢标签 —— 故两步取：
+        //   先试 body 文本；若拿不到、或看起来像 HTML 文档，则回退 `page.content()`。
+        // ⚠️ `evaluate` 返回 `EvaluationResult`，须 `into_value::<String>()` 取文本。
+        let body_text: Option<String> = page
+            .evaluate(JS_BODY_INNER_TEXT)
             .await
-            .map_err(|e| format!("Get content: {}", e))?;
+            .ok()
+            .and_then(|r| r.into_value::<String>().ok())
+            .filter(|t| !t.trim().is_empty())
+            .filter(|t| !(t.contains("<html") || t.contains("<HTML")));
+
+        let content = match body_text {
+            Some(t) => t,
+            None => page
+                .content()
+                .await
+                .map_err(|e| format!("Get content: {}", e))?,
+        };
 
         let cookies = page.get_cookies().await.unwrap_or_default();
         let _ = page.close().await;
