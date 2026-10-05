@@ -46,19 +46,64 @@
 //! | 情形 | 判定 | 例 |
 //! |---|---|---|
 //! | 注解畸形 / `role=` 为空 / 角色不在 [`ROLES`] | **`not_evaluable`** | `2.5[role=bogus]`、`2.5[role=derived` |
-//! | 角色已声明，但**可选旁证**载荷没声明 | **`not_evaluable`** | `187.40[role=observed]` 无 `witness=` |
 //! | 角色已声明，**规则要求的字段**缺失**或为空串** | **`block`** | `4.2[role=derived]`（无 `formula=`）与 `4.2[role=derived formula=]` |
 //!
-//! ⛔ 第三行是本模块最容易被读错的一格，务必分清：**协议要求**的字段缺失就是
+//! ⛔ 第二行是本模块最容易被读错的一格，务必分清：**协议要求**的字段缺失就是
 //! **违规本身**（那正是这条检查存在的理由）；只有**「连规则适不适用都不知道」**
 //! 才是不可判定。
 //!
-//! ⭐ 第三行里「**为空串**」那半是实测逼出来的：本模块第一版把 `formula=`
+//! ⭐ 第二行里「**为空串**」那半是实测逼出来的：本模块第一版把 `formula=`
 //! 的空值当**注解畸形** ⇒ 整条注解作废 ⇒ 该判定退化成 `not_evaluable`
 //! ⇒ **「模型把口径写空了」这件事永远抓不到**。空串与「键不存在」在这个协议里
 //! 是**同一个违规**（该填而没填），必须落到 `block`。唯一不许为空的是
 //! **`role=` 的值** —— 那个空了，我们连这条声明归哪道检查管都不知道。
 //! 钉死它的测试：`derived_with_empty_formula_still_blocks`。
+//!
+//! ## ⛔ 已删除的虚构协议：`observed` 的 `witness=`（诚实台账）
+//!
+//! 本模块**第一版**有第三条检查 `ObservedWitnessCheck` 与载荷键
+//! `witness=<claim id>`，要求 `role=observed` 声明一条能被账本解析到的旁证。
+//! ⛔ **`witness=` 在被吸收的上游里不存在，是第一版为了让
+//! [`RefusalReason::RemainderStillFails`] 在测试里可达而发明的。**
+//! 「造一条规则让 fail-closed 分支可达」＝「为满足测试而造机械」的教科书定义。
+//! 于是：检查、两个检查码（`…witness_absent` / `…witness_unresolved`）与载荷键
+//! 常量**全部删除**，`default_checks()` 只剩两条内建检查。`role=observed` 现在
+//! **没有任何内建规则** —— 这是诚实的边界，不是漏写：给「观测」编一个旁证协议
+//! 只能靠凭空发明字段。钉死它的测试：
+//! `an_observed_claim_is_silent_because_no_rule_was_invented_for_it`。
+//!
+//! ## ⭐ 那么什么真正到达 `REMAINDER_STILL_FAILS`（别信注释，信测试）
+//!
+//! 删掉虚构协议后，「切完复验仍失败」有两条真实来源。**两条都不需要发明字段。**
+//!
+//! ### 来源一：调用方少报了账本（设计上的那条）
+//!
+//! [`admit_claims`] 第一轮只信调用方给的 `claims`，但切完之后 `degrade` 阶段 4
+//! **刻意全量重解析**切后的文本（`parse_declarations(cut_text)`，**不是**复用
+//! 调用方的集合）。⇒ 调用方少报的那条阻断声明，在重解析那一刻被抓出来。
+//! 测试 `an_under_reported_ledger_is_caught_by_the_mandatory_recheck` 钉住它：
+//! **同一段文本、同一道门**，完整解析 ⇒ 可降级发布；少报一条 ⇒ 拒答。
+//!
+//! ### ⛔ 来源二：字节拼接（存在，但**不要**当设计来依赖）
+//!
+//! 直觉上「切掉的声明不会制造新违规」，因为解析器把游标推进到 `cut_span.end`，
+//! 下一条声明只能落在其后 ⇒ 切掉的跨度之间拼不出新声明。**这条论证有洞**：
+//! `parse_declarations` 的游标在注解畸形时落在 `[` 的**后一位**，而围栏声明的
+//! `cut_span` 会一路伸到围栏尾（甚至文本尾）⇒ 这两者可以交叠 ⇒ 被围栏声明吃掉
+//! 的那个字节区间，切掉后左右两侧**可能**拼出一条新的声明。
+//!
+//! ⛔ 因此本模块**不**声称「完整解析的路径不会级联」—— 那是个未证明的断言。
+//! 唯一**保证**成立的不变式是这条：
+//!
+//! > **凡本层放行的文本，用同一注册表复验必须零阻断。**
+//!
+//! 它由 `degrade` 阶段 4 直接保证（放行前刚复验过），干净路径则由第一轮保证。
+//! 测试 `every_release_is_revalidated_clean` 在语料级钉住它，**并且刻意收录了
+//! 上面那个交叠形状**（围栏 + 畸形注解）—— 那条测试只断言这条保证，**不**预言
+//! 它给出哪种裁决。
+//!
+//! ⭐ 也就是说：真正承重的从来不是「级联不可能」这个论证，而是**复验这一步本身**。
+//! 去掉虚构协议没有削弱 fail-closed，只是不再需要为了它编一个协议。
 //!
 //! ## 纯度由签名保证
 //!
@@ -381,8 +426,6 @@ pub const ROLE_SET_LABEL: &str = "observed/derived/proposed/cited/count";
 pub const PAYLOAD_FORMULA: &str = "formula";
 /// 载荷键：`cited` 必须给来源。
 pub const PAYLOAD_SOURCE: &str = "source";
-/// 载荷键：`observed` 的**可选**旁证（声明了就要能解析到）。
-pub const PAYLOAD_WITNESS: &str = "witness";
 /// 载荷键：`count` 的枚举口径。
 pub const PAYLOAD_BASIS: &str = "basis";
 
@@ -763,7 +806,7 @@ fn is_value_end(c: u8) -> bool {
 pub enum IssueSeverity {
     /// 可判定，且违规 ⇒ 计入阻断 ⇒ 触发降级。
     Block,
-    /// 判定所需仪表不存在（角色未声明 / 注解畸形 / 可选旁证缺失）。
+    /// 判定所需仪表不存在（角色未声明 / 注解畸形 / 角色不在 [`ROLES`]）。
     NotEvaluable,
 }
 
@@ -906,11 +949,11 @@ impl<'a> Ledger<'a> {
         self.claims.get(index)
     }
 
-    /// ⭐ 按稳定 id 取声明（旁证解析用）。
+    /// ⭐ 按稳定 id 取声明（`figure#occurrence` 寻址）。
     ///
     /// 线性扫描、返回切片中**第一条** ⇒ 结果是切片的函数。解析器产出的 id
     /// 唯一（`figure#occurrence`），所以顺序不影响结果 —— 测试
-    /// `witness_lookup_is_independent_of_claim_order` 钉住这一点，并附**反例**
+    /// `claim_id_lookup_is_independent_of_claim_order` 钉住这一点，并附**反例**
     /// 证明该测试有判别力。
     #[must_use]
     pub fn claim_by_id(&self, id: &str) -> Option<&'a DeclaredClaim> {
@@ -964,8 +1007,8 @@ pub trait ProvenanceCheck {
     fn evaluate(&self, ledger: &Ledger<'_>) -> Vec<Issue>;
 }
 
-/// 统一措辞的「角色不可知」说明。**三条检查共用同一措辞** ⇒ 日志里不会
-/// 出现三种说法讲同一件事。
+/// 统一措辞的「角色不可知」说明。**所有检查共用同一措辞** ⇒ 日志里不会
+/// 出现几种说法讲同一件事。
 fn undeclared_role_detail(claim: &DeclaredClaim) -> String {
     if !claim.is_well_formed() {
         return format!(
@@ -1124,102 +1167,17 @@ impl ProvenanceCheck for CitedSourceCheck {
     }
 }
 
-// ── 检查 3：`observed` 的旁证（降级会因此**级联**）──────────────────────
+// ── 内建检查到此为止（⛔ 曾经存在的第三条检查已被删除，见模块头「诚实台账」）──
 
-/// 检查码：`observed` 声明了旁证但账本里解析不到。
-pub const CODE_WITNESS_UNRESOLVED: &str = "nt.prov.observed.witness_unresolved";
-/// 检查码：`observed` 根本没声明旁证 ⇒ 旁证不可判定。
-pub const CODE_WITNESS_ABSENT: &str = "nt.prov.observed.witness_absent";
-
-/// ⭐⭐ 检查三：**`observed` 的旁证（可声明、可解析）**。
-///
-/// 这条检查有**两个码**，因为它同时是**降级级联**的引擎与
-/// 「诚实不可判定」的落脚点 —— 两者都是必需，不是妥协：
-///
-/// | 情形 | 判定 | 理由 |
-/// |---|---|---|
-/// | `role=observed` 且**未**声明 `witness=` | **`not_evaluable`** | 账本既不能证实也不能证伪这条观测；说它「通过」是撒谎 |
-/// | `role=observed` 且 `witness=<id>` 能在账本里解析到 | 静默 | 旁证在位 |
-/// | `role=observed` 且 `witness=<id>` **解析不到** | **`block`** | 声明过的支撑不见了 —— 可判定，且必须拦 |
-///
-/// ⭐ 第三行是 ⭐ **fail-closed 的真实触发路径**：切掉旁证那条声明后，
-/// 留下的观测文本会声称「我核过」，而核过它的那条已经被删了 ⇒ 复验必然再失败
-/// ⇒ 拒答。测试 `cut_removes_the_witness_so_the_remainder_still_fails` 钉住。
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct ObservedWitnessCheck;
-
-impl ObservedWitnessCheck {
-    /// 新建（零大小，可作单例）。
-    #[must_use]
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl ProvenanceCheck for ObservedWitnessCheck {
-    fn code(&self) -> &'static str {
-        "nt.prov.observed.witness"
-    }
-
-    fn description(&self) -> &'static str {
-        "an `observed` claim may declare a corroborating witness (`witness=<claim id>`); a \
-         declared witness that is absent from the ledger blocks, while an undeclared witness is \
-         NOT_EVALUABLE"
-    }
-
-    fn evaluate(&self, ledger: &Ledger<'_>) -> Vec<Issue> {
-        let mut out: Vec<Issue> = Vec::new();
-        for (i, claim) in ledger.claims().iter().enumerate() {
-            let Some(role) = claim.role() else {
-                out.push(Issue::not_evaluable(self.code(), i, claim, undeclared_role_detail(claim)));
-                continue;
-            };
-            if role != ProvenanceRole::Observed {
-                continue;
-            }
-            match claim.payload_value(PAYLOAD_WITNESS) {
-                None => out.push(Issue::not_evaluable(
-                    CODE_WITNESS_ABSENT,
-                    i,
-                    claim,
-                    "no `witness=` declared: the ledger can neither corroborate nor refute this \
-                     observation, so corroboration is NOT_EVALUABLE rather than assumed to hold",
-                )),
-                Some(id) if id.trim().is_empty() => out.push(Issue::not_evaluable(
-                    CODE_WITNESS_ABSENT,
-                    i,
-                    claim,
-                    "`witness=` is declared but empty: that is an absent witness, so \
-                     corroboration is NOT_EVALUABLE",
-                )),
-                Some(id) => {
-                    if ledger.claim_by_id(id).is_none() {
-                        out.push(Issue::block(
-                            CODE_WITNESS_UNRESOLVED,
-                            i,
-                            claim,
-                            format!(
-                                "declared witness `{id}` is not present in the ledger: this \
-                                 observation claims corroboration it does not have"
-                            ),
-                        ));
-                    }
-                }
-            }
-        }
-        out
-    }
-}
-
-/// ⭐ 默认注册表（三条声明行）。**新增检查在此追加一行** —— 这是全层唯一需要
+/// ⭐ 默认注册表（两条声明行）。**新增检查在此追加一行** —— 这是全层唯一需要
 /// 改的地方，且它是**声明**，不是控制流分支。
+///
+/// ⛔ 这里**曾经**有第三条 `ObservedWitnessCheck`（`witness=` 旁证），已删除：
+/// 那个字段在上游不存在，是为让 fail-closed 分支可达而发明的。**不要**为了「让
+/// 某个分支可达」再加一条 —— 见模块头「什么真正到达 `REMAINDER_STILL_FAILS`」。
 #[must_use]
 pub fn default_checks() -> Vec<Box<dyn ProvenanceCheck>> {
-    vec![
-        Box::new(DerivedFormulaCheck::new()),
-        Box::new(CitedSourceCheck::new()),
-        Box::new(ObservedWitnessCheck::new()),
-    ]
+    vec![Box::new(DerivedFormulaCheck::new()), Box::new(CitedSourceCheck::new())]
 }
 
 /// ⭐ 校验入口。**纯函数**：`(ledger, checks) ⇒ 排序后的问题行`。
@@ -1245,12 +1203,20 @@ pub fn validate(ledger: &Ledger<'_>, checks: &[Box<dyn ProvenanceCheck>]) -> Vec
 ///
 /// 原文列了四种 `None`：*a market answer observed no price* /
 /// *an issue cannot be cut* / *a flagged figure cannot be located* /
-/// *the text still fails*。中间两条在本层**是同一件事**（切不掉 = 定位不到），
-/// 故归并；剩三态：
+/// *the text still fails*。
 ///
-/// | 终态 | 含义 |
+/// ⛔ **归并说明（诚实边界）**：中间两条在本层**是同一件事**（切不掉 = 定位不到），
+/// 故合并为一个 [`RefusalReason::IssueNotCuttable`]。**第一条与第三条**在本层
+/// **是两个不同的事实**，别把它们说成一件：上游那条 *a market answer observed no
+/// price* 讲的是**行情本身没报价**，本层无从得知（[`Ledger`] 里没有任何行情句柄）；
+/// 本层能观测到的只是「切割把声明清空」这一**自己的动作**。⇒ 因此**不沿用上游
+/// 那个名字**：本模块第一版把它叫 `NoPriceObserved`，让调用方读成一个关于
+/// **行情**的结论，实际含义是「我们把每一条声明都切了」。同名不同事实是最难在
+/// 事后发现的错误，故按事实改名。
+///
+/// | 终态 | 含义（说的是**本层自己的动作**，不是行情） |
 /// |---|---|
-/// | [`RefusalReason::NoPriceObserved`] | 切割把**所有**声明都删了 ⇒ 剩下的文本里一个可核查的断言都没有 ⇒ 等价于「市场答案没有观测到价格」 |
+/// | [`RefusalReason::AllClaimsCut`] | 切割把**所有**声明都删了 ⇒ 剩下的文本里一个可核查的断言都没有 ⇒ 无内容可发布 |
 /// | [`RefusalReason::IssueNotCuttable`] | 某条被标记的 figure 在当前文本里**定位不到**（跨度越界 / 非字符边界 / 跨度起点不是该 figure） |
 /// | [`RefusalReason::RemainderStillFails`] | 切完用**同一道门**复验，仍有阻断问题 |
 ///
@@ -1258,8 +1224,8 @@ pub fn validate(ledger: &Ledger<'_>, checks: &[Box<dyn ProvenanceCheck>]) -> Vec
 /// 这是 fail-closed 的类型形态，不是注释约定。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RefusalReason {
-    /// 切完一条声明都不剩。
-    NoPriceObserved,
+    /// 切完一条声明都不剩 —— 无内容可发布。**不是**「行情没报价」。
+    AllClaimsCut,
     /// 被标记的 figure 定位不到 / 切不掉。
     IssueNotCuttable,
     /// 切后复验仍有阻断问题。
@@ -1268,17 +1234,19 @@ pub enum RefusalReason {
 
 /// 全部终态（`--list` 用的穷举清单）。
 pub const REFUSAL_REASONS: [RefusalReason; 3] = [
-    RefusalReason::NoPriceObserved,
+    RefusalReason::AllClaimsCut,
     RefusalReason::IssueNotCuttable,
     RefusalReason::RemainderStillFails,
 ];
 
 impl RefusalReason {
-    /// 稳定标签。
+    /// 稳定标签（进报告；跨版本不许改，故 [`RefusalReason::AllClaimsCut`] 的
+    /// 标签是 `ALL_CLAIMS_CUT` 而不是第一版的 `NO_PRICE_OBSERVED` —— 后者是
+    /// **错标签**，改名会让旧日志里的那一行**对不上**，这是有意的）。
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
-            RefusalReason::NoPriceObserved => "NO_PRICE_OBSERVED",
+            RefusalReason::AllClaimsCut => "ALL_CLAIMS_CUT",
             RefusalReason::IssueNotCuttable => "ISSUE_NOT_CUTTABLE",
             RefusalReason::RemainderStillFails => "REMAINDER_STILL_FAILS",
         }
@@ -1702,7 +1670,7 @@ pub fn admit(
 ///        ▼
 ///   切掉全部被标记的 figure 跨度
 ///        ├─ 定位不到 ────────────▶ Refused{ISSUE_NOT_CUTTABLE}
-///        ├─ 一条不剩 ────────────▶ Refused{NO_PRICE_OBSERVED}
+///        ├─ 一条不剩 ────────────▶ Refused{ALL_CLAIMS_CUT}
 ///        ▼
 ///   re-parse(cut_text) + validate（**同一道门**）
 ///        ├─ 仍有阻断 ────────────▶ Refused{REMAINDER_STILL_FAILS}
@@ -1715,6 +1683,10 @@ pub fn admit(
 ///
 /// ⛔ 切后**必须重新解析**：跨度是**位置**，切一刀之后所有后续跨度都会漂移。
 /// 复用旧 `claims` 去切新文本，是本层最容易写出的 LIVE bug。
+///
+/// ⛔ 顺带：重解析用的是**全量** `parse_declarations(cut_text)`，因此
+/// `REMAINDER_STILL_FAILS` 有一条**设计上的**触发场景：**调用方少报了账本**
+/// （见模块头）。字节拼接**也可能**造成同样的结果 —— 本层**不**声称那不可能。
 #[must_use]
 pub fn admit_claims(
     text: &str,
@@ -1808,10 +1780,12 @@ fn degrade(
         codes.push(issue.code().to_owned());
     }
 
-    // ── 阶段 2：切空 ⇒ 等价于「没有观测到任何价格」（NO_PRICE_OBSERVED）──
+    // ── 阶段 2：切空 ⇒ 无内容可发布（ALL_CLAIMS_CUT）──────────────────────────
+    // ⛔ 说的是**本层自己的动作**（每条声明都被切了），不是「行情没报价」。
+    //    第一版把这个终态叫 `NoPriceObserved`，让读日志的人以为系统去看过行情。
     if cut_indices.len() == claims.len() {
         return Err((
-            RefusalReason::NoPriceObserved,
+            RefusalReason::AllClaimsCut,
             format!(
                 "all {} declared claim(s) are flagged: the released text would carry no \
                  verifiable assertion at all, which is a refusal, not an empty answer",
@@ -1823,7 +1797,10 @@ fn degrade(
     // ── 阶段 3：切（与给出的顺序无关 ⇒ 逆序输入同结果）────────────────────
     let cut_text = apply_cuts(text, &ranges);
 
-    // ── 阶段 4：用**同一道门**复验剩余文本（★ 必须重新解析）──────────────
+    // ── 阶段 4：用**同一道门**复验剩余文本（★ 必须**全量**重新解析）────────
+    // ⛔ 这里刻意**不**复用调用方的 `claims`：调用方少报的那条阻断声明，恰好要
+    //    在这一步被抓出来 —— 这就是 `REMAINDER_STILL_FAILS` 诚实的触发场景。
+    //    钉住它的测试：`an_under_reported_ledger_is_caught_by_the_mandatory_recheck`。
     let rest_claims = parse_declarations(&cut_text);
     let rest_ledger = Ledger::new(&cut_text, &rest_claims);
     let rest_digest = rest_ledger.digest();
@@ -1857,6 +1834,24 @@ fn degrade(
 
 /// ⭐ 按跨度切文本。**顺序无关**：先排序再合并 ⇒ 调用方给正序、逆序、
 /// 重复跨度都得到同一结果（与 `sorted_keys` 纪律同源）。
+///
+/// ⛔ **已知的输出质量欠账（本层最弱的一处取舍，刻意留在此处可见）**：
+/// 切割**精确到字节**，只挖掉 `figure[role=…]`，因此句子里的引导词会留下孤儿：
+/// `bench 9.90[role=cited]` ⇒ 留下 `"bench "`（人读起来像坏掉的散文）。
+/// 正确的做法是**行级切 + 空白塌缩**（整行删掉，并收拢空行）；**本层没做**，
+/// 因为它不是「顺手改一下」：
+///
+/// 1. 它要求一套**行模型**（行首/行尾偏移、行内多 figure、围栏跨行）—— 现有的
+///    [`Span`] 是纯字节跨度，够不着「这一行」这个概念；
+/// 2. 它会**改变** [`Span`] / [`apply_cuts`] 的契约与本层的输出语义，而不只是
+///    换个切点：删整行会同时改掉 [`Ledger::digest`] 与 [`ReleasedText::digest`]
+///    的输入（测试 `digest_is_order_independent_and_discriminating` 已经把这点
+///    写明：「尾部多一个换行 ⇒ 换摘要」）；
+/// 3. 「切整行」与「只切被标记的声明」是两个不同的产品决策（例如一行里两个
+///    figure，一个合规一个违规时，整行删会把合规的内容也删掉）。
+///
+/// ⇒ 取舍：**正确但字节精确的切法 ≫ 破坏行的切法**。要改，先决定上面第 3 条。
+/// 现状由 `one_bad_claim_releases_the_rest_with_degraded_set` 逐字节钉住。
 #[must_use]
 fn apply_cuts(text: &str, ranges: &[Span]) -> String {
     let mut sorted: Vec<Span> = ranges.iter().copied().filter(|s| !s.is_empty()).collect();
@@ -1898,11 +1893,11 @@ mod tests {
 
     // ── 夹具 ─────────────────────────────────────────────────────────────
 
-    /// 一条**干净**文本：五个角色齐、载荷齐、旁证在位。
+    /// 一条**干净**文本：五个角色齐、各角色的载荷齐。
     ///
     /// ⚠️ 两条 `1437` 是**故意重复**的：id 分别是 `1437#0` / `1437#1`，用来
-    /// 验 occurrence；而观测声明的旁证必须指向**真实存在**的 `1437#0`。
-    const CLEAN: &str = "open 187.40[role=observed witness=1437#0]\n\
+    /// 验 occurrence 与 [`Ledger::claim_by_id`] 的 id 寻址。
+    const CLEAN: &str = "open 187.40[role=observed]\n\
 margin 4.20[role=derived formula=(high-low)/open]\n\
 view 9.90[role=proposed rationale=momentum]\n\
 src 12.00[role=cited source=HKEX-2026-09-30]\n\
@@ -1912,9 +1907,15 @@ n 1437[role=count basis=rows_scanned]\n";
     /// 一条声明了 `cited` 却**没给来源**的文本（可修复：切掉即可）。
     const ONE_BAD_CITED: &str = "open 187.40[role=observed]\nbench 9.90[role=cited]\n";
 
-    /// ⭐ 降级会**级联**失败：观测声明了旁证，旁证自己违规。
-    const WITNESS_CASCADE: &str =
-        "open 5.0[role=observed witness=9.9#1]\nA 9.9[role=cited source=hkex]\nB 9.9[role=cited]\n";
+    /// 同一个 figure 文本出现两次、第二条无来源 ⇒ 用来钉 id 寻址与顺序无关。
+    const SAME_FIGURE_TWICE: &str =
+        "x 9.9[role=cited source=hkex]\ny 9.9[role=cited]\n";
+
+    /// ⭐ 三条声明：一条合规 `count`、一条违规 `derived`（无口径）、一条违规
+    /// `cited`（无来源）。**完整解析时**后两条一起被切 ⇒ 可降级发布。
+    const UNDER_REPORTED: &str = "p 5.0[role=count basis=rows]\n\
+a 1.0[role=derived]\n\
+b 2.0[role=cited]\n";
 
     fn one_bad() -> Release {
         admit(ONE_BAD_CITED, &default_checks(), &RevisionBudget::none())
@@ -2098,7 +2099,7 @@ i #42[role=observed]\n\
         let issues = validate(&ledger, &default_checks());
         let unknown: Vec<&Issue> =
             issues.iter().filter(|i| i.claim_index() == 1).collect();
-        assert!(!unknown.is_empty(), "三条检查都必须对不可知角色表态");
+        assert!(!unknown.is_empty(), "每条检查都必须对不可知角色表态");
         assert!(
             unknown.iter().all(|i| i.is_not_evaluable()),
             "未知角色只能 not_evaluable（实测 {:?}）",
@@ -2187,43 +2188,40 @@ i #42[role=observed]\n\
         assert_eq!(issues[0].claim_index(), 1, "只有 claim#1 是 derived");
     }
 
-    // ── 检查三：旁证的三态 ────────────────────────────────────────────────
+    // ── `observed`：没有内建规则，且**这是诚实的** ────────────────────────
 
+    /// ⭐ 第一版这里有一条要求 `witness=` 的检查。删掉它之后，`role=observed`
+    /// 在默认注册表下**不产生任何问题行** —— 这不是「漏查」，而是**没有依据**：
+    /// 要求一条观测携带旁证，就得先有一个「旁证」协议，而上游没有这个字段。
+    /// ⛔ 别为了「让 `observed` 也被管一管」而凭空发明一个键。
     #[test]
-    fn observed_without_witness_is_not_evaluable() {
-        let text = "open 187.40[role=observed]\n";
-        let claims = parse_declarations(text);
-        let issues = validate(&Ledger::new(text, &claims), &default_checks());
-        assert!(
-            issues.iter().any(|i| i.code() == CODE_WITNESS_ABSENT && i.is_not_evaluable()),
-            "没有声明旁证 ⇒ 不可判定（实测 {:?}）",
-            issues.iter().map(Issue::render).collect::<Vec<_>>()
-        );
-        assert!(!issues.iter().any(Issue::is_blocking));
+    fn an_observed_claim_is_silent_because_no_rule_was_invented_for_it() {
+        for text in [
+            "open 187.40[role=observed]\n",
+            // 一个**已删除协议的残留**载荷：现在它只是载荷区里的一个未知键，
+            // 既不被要求、也不被判违规 —— 协议里未知键一律放过。
+            "open 187.40[role=observed witness=nobody#7]\n",
+        ] {
+            let claims = parse_declarations(text);
+            assert_eq!(claims.len(), 1, "`{text}` 应产出一条声明");
+            assert_eq!(claims[0].role(), Some(ProvenanceRole::Observed));
+            let issues = validate(&Ledger::new(text, &claims), &default_checks());
+            assert!(
+                issues.is_empty(),
+                "`observed` 无内建规则 ⇒ 零问题行（实测 {:?}）",
+                issues.iter().map(Issue::render).collect::<Vec<_>>()
+            );
+            assert!(!issues.iter().any(Issue::is_blocking));
+        }
     }
 
+    /// ⭐ 删掉第三条检查后，默认注册表**恰好**剩两条，且正是模块头承诺的两条。
+    /// 这条测试的作用是**让「悄悄加了第三条规则」变成红的** —— 注册表是本层
+    /// 唯一能引入规则的地方，它必须是可见的清单，不是隐式行为。
     #[test]
-    fn observed_with_resolvable_witness_is_silent() {
-        let text = "open 5.0[role=observed witness=9.9#0]\nn 9.9[role=cited source=hkex]\n";
-        let claims = parse_declarations(text);
-        let issues = validate(&Ledger::new(text, &claims), &default_checks());
-        assert!(
-            !issues.iter().any(|i| i.code() == CODE_WITNESS_UNRESOLVED),
-            "旁证在位 ⇒ 不得报 unresolved"
-        );
-        assert!(issues.iter().all(|i| !i.is_blocking()), "实测 {:?}", issues);
-    }
-
-    #[test]
-    fn observed_with_unresolvable_witness_blocks() {
-        let text = "open 5.0[role=observed witness=nobody#7]\n";
-        let claims = parse_declarations(text);
-        let issues = validate(&Ledger::new(text, &claims), &default_checks());
-        assert!(
-            issues.iter().any(|i| i.code() == CODE_WITNESS_UNRESOLVED && i.is_blocking()),
-            "声明了却解析不到 ⇒ 阻断（实测 {:?}）",
-            issues.iter().map(Issue::render).collect::<Vec<_>>()
-        );
+    fn the_default_registry_only_rules_on_derived_and_cited() {
+        let codes: Vec<&str> = default_checks().iter().map(|c| c.code()).collect();
+        assert_eq!(codes, vec![CODE_DERIVED_FORMULA, CODE_CITED_SOURCE]);
     }
 
     // ── ⭐ 降级路径 ───────────────────────────────────────────────────────
@@ -2236,8 +2234,8 @@ i #42[role=observed]\n\
         assert_eq!(rt.claims_cut(), 1);
         assert_eq!(rt.claims_kept(), 1);
         // ⭐ 切割是**精确到字节**的最小手术：只挖掉 `9.90` 及其注解，
-        // 行首的引导词 `bench ` 原样留下（本层不做行级清理，见
-        // [`apply_cuts`] 的文档）—— 留下的空白是诚实的，不擅自改写用户文本。
+        // 行首的引导词 `bench ` 原样留下 —— 行级切 + 空白塌缩是**已知欠账**，
+        // `apply_cuts` 的文档里有完整理由（需要行模型 + 会改摘要口径）。
         assert_eq!(rt.text(), "open 187.40[role=observed]\nbench \n");
         assert!(!rt.text().contains("cited"), "不能留下孤儿注解");
         assert_eq!(rt.cut_codes().to_vec(), vec![CODE_CITED_SOURCE.to_owned()]);
@@ -2284,12 +2282,14 @@ i #42[role=observed]\n\
         let rel = admit(text, &default_checks(), &RevisionBudget::none());
         match rel.verdict() {
             ReleaseVerdict::Refused(rf) => {
-                assert_eq!(rf.reason(), RefusalReason::NoPriceObserved);
+                assert_eq!(rf.reason(), RefusalReason::AllClaimsCut);
                 assert!(!rf.issues().is_empty(), "拒答仍要留问题行供排错");
             }
             other => panic!("必须拒答，实际 {other}"),
         }
         assert!(rel.released_text().is_none(), "拒答**不携带**任何可发布文本");
+        // ⭐ 名字说的是**本层自己的动作**：两条声明都被切光了。
+        assert_eq!(RefusalReason::AllClaimsCut.to_string(), "ALL_CLAIMS_CUT");
     }
 
     #[test]
@@ -2337,32 +2337,117 @@ i #42[role=observed]\n\
         assert!(err.1.contains("not in the ledger"), "{}", err.1);
     }
 
-    /// ⭐⭐ **降级会级联**：切掉旁证 ⇒ 留下的观测**仍然**失败 ⇒ 拒答。
+    /// ⭐⭐ **什么真正到达 `REMAINDER_STILL_FAILS`：调用方少报了账本。**
     ///
-    /// 这条路径不是构造出来的巧合：它证明「切完必须复验」不是多余的一步 ——
-    /// 切一刀完全可以**制造**一个新的违规。
+    /// 第一版这条测试是靠虚构的 `witness=` 协议制造「切一刀 ⇒ 新的违规」来
+    /// 达到这个分支的。那条路已经删掉（见模块头「诚实台账」）。现在走的是
+    /// **真实**的路径，且更有价值：
+    ///
+    /// * [`admit_claims`] 接受调用方给的 `claims`，第一轮只信它；
+    /// * 但切完之后 `degrade` **刻意全量重解析**切后的文本，不复用调用方的集合。
+    ///
+    /// ⇒ 调用方少报一条阻断声明时，它在重解析那一刻被抓出来 ⇒ 拒答。
+    /// 这证明「切完必须复验」不是仪式：复验是**唯一**能发现少报账本的环节。
     #[test]
-    fn cut_removes_the_witness_so_the_remainder_still_fails() {
-        // 前置确认：原文本**只**有一条阻断问题（旁证那条 cited）。
-        let claims = parse_declarations(WITNESS_CASCADE);
-        let first = validate(&Ledger::new(WITNESS_CASCADE, &claims), &default_checks());
-        let blocking: Vec<&Issue> = first.iter().filter(|i| i.is_blocking()).collect();
-        assert_eq!(blocking.len(), 1, "前置：只有一条阻断（实测 {:?}）", first);
-        assert_eq!(blocking[0].code(), CODE_CITED_SOURCE);
+    fn an_under_reported_ledger_is_caught_by_the_mandatory_recheck() {
+        let full = parse_declarations(UNDER_REPORTED);
+        assert_eq!(full.len(), 3, "完整解析：三条声明");
 
-        let rel = admit(WITNESS_CASCADE, &default_checks(), &RevisionBudget::none());
+        // ── 对照 A：**完整**解析 ⇒ 两条违规一起被切 ⇒ 可降级发布 ──────────
+        let complete = admit_claims(UNDER_REPORTED, &full, &default_checks(), &RevisionBudget::none());
+        let rt = released_of(&complete);
+        assert!(rt.degraded(), "对照 A：切了两条 ⇒ 降级发布");
+        assert_eq!(rt.claims_cut(), 2);
+        assert_eq!(rt.claims_kept(), 1, "只剩那条合规的 count");
+
+        // ── 对照 B：**少报**一条（不给那条无来源的 cited）⇒ 复验失败 ⇒ 拒答 ─
+        // 顺序刻意打乱，证明这里与调用方的排列无关。
+        let subset = vec![full[1].clone(), full[0].clone()];
+        assert_eq!(subset.len(), 2, "少报一条 ⇒ 只剩两条声明");
+        let rel = admit_claims(UNDER_REPORTED, &subset, &default_checks(), &RevisionBudget::none());
         match rel.verdict() {
             ReleaseVerdict::Refused(rf) => {
                 assert_eq!(
                     rf.reason(),
                     RefusalReason::RemainderStillFails,
-                    "切掉旁证后剩下的观测必须复验失败"
+                    "少报的那条违规必须在重解析时被抓出来"
                 );
                 assert!(rf.detail().contains("survive the cut"), "{}", rf.detail());
+                // ⛔ 注意 [`Refusal::issues`] 装的是**切之前**（调用方那一轮）
+                // 的问题行 —— 不是复验抓到的那条。这是一个容易读错的细节，
+                // 故钉死：这里给的是「触发切割」的问题，不是「剩余仍失败」的问题。
+                assert_eq!(rf.issues().len(), 1, "拒答带的是切前的问题行");
+                assert_eq!(rf.issues()[0].code(), CODE_DERIVED_FORMULA);
             }
             other => panic!("必须拒答，实际 {other}"),
         }
         assert!(rel.released_text().is_none(), "复验失败 ⇒ 不发文本");
+
+        // ⭐ 同一段文本，**完整**解析 ⇒ 放行。⇒ 拒答的原因只能是「少报」，
+        // 不是这段文本本身有别的毛病。
+        let parsed = admit(UNDER_REPORTED, &default_checks(), &RevisionBudget::none());
+        assert!(
+            parsed.verdict().degraded(),
+            "对照 C：全量解析同一段文本应当可降级发布（实测 {:?}）",
+            parsed.verdict()
+        );
+    }
+
+    /// ⭐⭐ **语料级不变式：凡本层放行的文本，用同一注册表复验必须零阻断。**
+    ///
+    /// 这是本层**唯一真正承重**的不变式，也是「删掉虚构协议之后真正剩下的东西」：
+    /// 干净路径第一轮就无阻断；降级路径阶段 4 用同一道门复验过。⇒
+    /// 「发出去的文本」与「过了门的文本」不可能分家。
+    ///
+    /// ⛔ 这条测试**只断言上面这一条**，**不**预言任何输入给出哪种裁决 —— 包括
+    /// 最后两条围栏畸形形状：那是模块头说的「跨度交叠」那一类，行为取决于解析器
+    /// 的 minutiae，把它钉死等于把一个未证明的事实写成契约。
+    ///
+    /// ⛔ **判别力**：将来若有人加一条「切一刀会制造新违规」的检查、或改坏阶段 4
+    /// 的复验，这条会先红 —— 那正是需要有人停下来想一想的时候（而不是像第一版
+    /// 那样，反过来发明一个协议）。
+    #[test]
+    fn every_release_is_revalidated_clean() {
+        // 语料：干净 / 单点违规 / 重复 figure / 无声明 / 空串 / 一堆畸形注解 /
+        // 围栏（闭合与未闭合）/ 注解畸形**落在围栏声明里**（跨度会交叠的那种）。
+        let corpus = [
+            CLEAN,
+            ONE_BAD_CITED,
+            SAME_FIGURE_TWICE,
+            UNDER_REPORTED,
+            "no declarations here",
+            "",
+            "中文[role=observed]中文",
+            "1[role=a b=c",
+            "```[role=proposed]",
+            "`[role=proposed]",
+            "1[role=derived formula=]",
+            "((((((((((1[role=count basis=x]",
+            "```rs[role\nx 5.0[role=cited]\n",
+            "head\n```rs[role=proposed]\nfn main() {}\n```\ntail\n",
+            "```rs[role=junk5.0[role=cited]X[role=cited]",
+        ];
+        let checks = default_checks();
+        let mut released = 0usize;
+        for text in corpus {
+            let rel = admit(text, &checks, &RevisionBudget::none());
+            let Some(rt) = rel.released_text() else {
+                continue; // 拒答 / 请求修订：没有文本可放行，不在不变式范围内。
+            };
+            released = released.saturating_add(1);
+            // 复验：用**同一注册表**跑一遍切后（或原文）文本。
+            let again = parse_declarations(rt.text());
+            let issues = validate(&Ledger::new(rt.text(), &again), &checks);
+            assert!(
+                !issues.iter().any(Issue::is_blocking),
+                "`{text}` 放行的文本复验却失败：{:?}",
+                issues.iter().map(Issue::render).collect::<Vec<_>>()
+            );
+            // 报出来的「保留条数」必须是事实，不是乐观估计。
+            assert_eq!(rt.claims_kept(), again.len(), "`{text}` 的 claims_kept 与复解析不符");
+            assert_eq!(rt.degraded(), rt.claims_cut() > 0);
+        }
+        assert!(released > 0, "语料必须至少放行一条，否则这测试什么都没验");
     }
 
     #[test]
@@ -2371,7 +2456,7 @@ i #42[role=observed]\n\
         let labels: Vec<&str> = RefusalReason::all().iter().map(|r| r.as_str()).collect();
         assert_eq!(
             labels,
-            vec!["NO_PRICE_OBSERVED", "ISSUE_NOT_CUTTABLE", "REMAINDER_STILL_FAILS"]
+            vec!["ALL_CLAIMS_CUT", "ISSUE_NOT_CUTTABLE", "REMAINDER_STILL_FAILS"]
         );
     }
 
@@ -2429,7 +2514,7 @@ i #42[role=observed]\n\
 
     #[test]
     fn same_input_twice_is_byte_identical() {
-        for text in [CLEAN, ONE_BAD_CITED, WITNESS_CASCADE, "no declarations here"] {
+        for text in [CLEAN, ONE_BAD_CITED, SAME_FIGURE_TWICE, UNDER_REPORTED, "no declarations here"] {
             let a = admit(text, &default_checks(), &RevisionBudget::none());
             let b = admit(text, &default_checks(), &RevisionBudget::none());
             assert_eq!(a, b, "`{text}` 两次求值必须完全一致");
@@ -2515,63 +2600,74 @@ i #42[role=observed]\n\
     }
 
     #[test]
-    fn witness_lookup_is_independent_of_claim_order() {
-        let claims = parse_declarations(WITNESS_CASCADE);
-        let fwd = Ledger::new(WITNESS_CASCADE, &claims);
+    fn claim_id_lookup_is_independent_of_claim_order() {
+        let claims = parse_declarations(SAME_FIGURE_TWICE);
+        assert_eq!(claims.len(), 2);
+        assert_eq!(claims[0].id(), "9.9#0", "id 由**文档位置**决定");
+        assert_eq!(claims[1].id(), "9.9#1");
+        let fwd = Ledger::new(SAME_FIGURE_TWICE, &claims);
         let mut reversed = claims.clone();
         reversed.reverse();
-        let bwd = Ledger::new(WITNESS_CASCADE, &reversed);
+        let bwd = Ledger::new(SAME_FIGURE_TWICE, &reversed);
         let probe = "9.9#1";
         assert_eq!(
             fwd.claim_by_id(probe).map(DeclaredClaim::id),
             bwd.claim_by_id(probe).map(DeclaredClaim::id),
-            "按 id 解析旁证与声明顺序无关"
+            "按稳定 id 寻址与声明顺序无关"
         );
+        // 且 id 命中的**是同一条事实**，不只是同一个字符串。
+        assert_eq!(
+            fwd.claim_by_id(probe).map(|c| c.payload_value(PAYLOAD_SOURCE).is_some()),
+            bwd.claim_by_id(probe).map(|c| c.payload_value(PAYLOAD_SOURCE).is_some()),
+            "两序命中的必须同一条事实"
+        );
+        assert_eq!(
+            fwd.claim_by_id(probe).map(|c| c.payload_value(PAYLOAD_SOURCE).is_some()),
+            Some(false),
+            "`9.9#1` 是那条**无来源**的声明"
+        );
+        assert_eq!(fwd.claim_by_id("9.9#9"), None, "不存在的 id ⇒ None，不猜");
     }
 
     /// ⭐⭐ **判别力实测（反例 / oracle）**：证明上面那条「顺序无关」测试
-    /// 不是恒真的仪式 —— 一份**故意坏**的实现（拿 witness 的 id 当成
-    /// figure 文本去匹配）会随输入序翻转，而本实现不会。
+    /// 不是恒真的仪式 —— 一份**故意坏**的实现（把 id 当成切片下标去取）会随
+    /// 输入序翻转，而本实现不会。
+    ///
+    /// ⚠️ 这个反例与第一版不同：原来那条是「拿 witness 的 id 当 figure 文本去
+    /// 匹配」，它依赖已删除的 `witness=` 协议 ⇒ 一并删掉。现在用一个**与任何
+    /// 协议无关**的错法：`figure#occurrence` 的形状**看起来**像下标。
     #[test]
     fn the_order_independence_assertion_has_discriminating_power() {
-        let claims = parse_declarations(WITNESS_CASCADE);
+        let claims = parse_declarations(SAME_FIGURE_TWICE);
         let mut reversed = claims.clone();
         reversed.reverse();
 
-        // 故意坏：把 `9.9#1` 的前缀 `9.9` 当匹配键，取切片里第一条 9.9 声明，
-        // 再看它**是否合规**。
+        // 故意坏：把 `9.9#1` 的 `#1` 当成**切片下标** ⇒ 直接取 `claims[1]`。
+        // 这份实现「看起来合理」且**能编译**，但它把 id 绑到了调用方的排列上。
         let buggy_says_ok = |slice: &[DeclaredClaim]| {
-            slice
-                .iter()
-                .find(|c| c.figure() == "9.9")
+            let idx = "9.9#1".rsplit('#').next().and_then(|i| i.parse::<usize>().ok());
+            idx.and_then(|i| slice.get(i)).and_then(|c| c.payload_value(PAYLOAD_SOURCE)).is_some()
+        };
+        assert_ne!(
+            buggy_says_ok(&claims),
+            buggy_says_ok(&reversed),
+            "反例：把 id 当下标的坏实现必须随输入序翻转（否则上面的测试无判别力）"
+        );
+
+        // 正确实现：按稳定 id **匹配** ⇒ 两序同答（且都指向无来源的那条）。
+        let correct_says_ok = |slice: &[DeclaredClaim]| {
+            Ledger::new(SAME_FIGURE_TWICE, slice)
+                .claim_by_id("9.9#1")
                 .and_then(|c| c.payload_value(PAYLOAD_SOURCE))
                 .is_some()
         };
-        let bad_forward = buggy_says_ok(&claims);
-        let bad_backward = buggy_says_ok(&reversed);
-        assert_ne!(
-            bad_forward, bad_backward,
-            "反例：按 figure 文本匹配的坏实现必须随输入序翻转（否则上面的测试无判别力）"
-        );
-
-        // 正确实现：按稳定 id 解析 ⇒ 两序同答（且都指向无来源的那条）。
-        let correct_says_ok = |slice: &[DeclaredClaim]| {
-            let ledger = Ledger::new(WITNESS_CASCADE, slice);
-            let witness = ledger
-                .claims()
-                .iter()
-                .find(|c| c.payload_value(PAYLOAD_WITNESS).is_some())
-                .and_then(|c| c.payload_value(PAYLOAD_WITNESS))
-                .unwrap_or("");
-            ledger.claim_by_id(witness).and_then(|c| c.payload_value(PAYLOAD_SOURCE)).is_some()
-        };
         assert_eq!(correct_says_ok(&claims), correct_says_ok(&reversed));
-        assert!(!correct_says_ok(&claims), "正确实现应判定旁证不合规");
+        assert!(!correct_says_ok(&claims), "正确实现应判定 `9.9#1` 无来源");
     }
 
     // ── 声明式注册表：加检查不动控制流 ────────────────────────────────────
 
-    /// 测试专用第四条检查：`proposed` 必须给理由。**它能注册成功这件事本身**
+    /// 测试专用**第三条**检查：`proposed` 必须给理由。**它能注册成功这件事本身**
     /// 就是「新增检查不改控制流」的证据。
     #[derive(Debug, Clone, Copy)]
     struct ProposedRationaleCheck;
@@ -2622,12 +2718,12 @@ i #42[role=observed]\n\
 
     #[test]
     fn a_singleton_registry_cannot_be_silently_emptied() {
-        // 单条声明被切 ⇒ 等价于「没有观测到任何价格」⇒ 拒答而非空文本。
+        // 单条声明被切 ⇒ 无内容可发布（ALL_CLAIMS_CUT）⇒ 拒答而非空文本。
         let text = "view 9.90[role=proposed]\n";
         let mut extended = default_checks();
         extended.push(Box::new(ProposedRationaleCheck));
         match admit(text, &extended, &RevisionBudget::none()).verdict() {
-            ReleaseVerdict::Refused(rf) => assert_eq!(rf.reason(), RefusalReason::NoPriceObserved),
+            ReleaseVerdict::Refused(rf) => assert_eq!(rf.reason(), RefusalReason::AllClaimsCut),
             other => panic!("必须拒答，实际 {other}"),
         }
     }
@@ -2650,7 +2746,7 @@ i #42[role=observed]\n\
         for rel in [
             admit(CLEAN, &default_checks(), &RevisionBudget::none()),
             one_bad(),
-            admit(WITNESS_CASCADE, &default_checks(), &RevisionBudget::none()),
+            admit(SAME_FIGURE_TWICE, &default_checks(), &RevisionBudget::none()),
             admit(ONE_BAD_CITED, &default_checks(), &RevisionBudget::new(2)),
         ] {
             // ⭐ 不变式：**有文本 ⟺ 发布态**。修订态与拒答态都不携带文本，
@@ -2688,7 +2784,7 @@ i #42[role=observed]\n\
         assert!(rt.render().contains("DEGRADED"));
         let claim =
             DeclaredClaim::declared("1.0", Span::new(0, 3), ProvenanceRole::Count, &[]);
-        let issue = Issue::not_evaluable(CODE_WITNESS_ABSENT, 0, &claim, "x");
+        let issue = Issue::not_evaluable(CODE_DERIVED_FORMULA, 0, &claim, "x");
         assert_eq!(issue.render(), issue.render());
         assert!(issue.render().contains("NOT_EVALUABLE"));
         assert_eq!(issue.severity(), IssueSeverity::NotEvaluable);
