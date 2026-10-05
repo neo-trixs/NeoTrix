@@ -114,15 +114,31 @@ pub fn path_attr_files(content: &str) -> HashSet<String> {
     out
 }
 
+/// 孤儿的两种形态。
+///
+/// ⭐ 2026-10-05 新增第二种：**这是本模块此前的一整类盲区**。
+/// 早先版本只报告「某目录下未被声明的 `.rs` 文件」，
+/// 而 `dual_track/mod.rs` 这类**目录模块**本身**就是**那个未被声明的文件，
+/// 且它目录内**没有别的 `.rs`** ⇒ 扫出来是空 ⇒ 完全看不见。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OrphanKind {
+    /// 叶子文件：`dir/foo.rs` 未被 `dir/mod.rs` 声明。
+    LeafFile,
+    /// 目录模块：`dir/foo/mod.rs` 存在，但 `foo` 这个模块名无人声明。
+    DirModule,
+}
+
 /// 一个孤儿文件的判定结果。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrphanFile {
-    /// 文件名（不含 `.rs`）。
+    /// 文件名（不含 `.rs`）；`DirModule` 时为目录名。
     pub stem: String,
     /// 行数（供评估「值不值得修」）。
     pub lines: usize,
     /// 该目录的 `mod.rs` 路径（相对）。
     pub mod_rs: String,
+    /// ⭐ 孤儿形态（2026-10-05 新增，缺省视为 `LeafFile` 以兼容旧构造）。
+    pub kind: OrphanKind,
 }
 
 /// 递归扫描整棵源码树，返回**全部**孤儿，按行数降序。
@@ -177,6 +193,19 @@ pub fn scan_tree(root: &Path) -> Vec<OrphanFile> {
     //   原始设计意图，但与此处「消除误报」的目标相反，故显式登记。
     let path_attr_index = collect_path_attr_index(root);
 
+    // ⭐ 2026-10-05：补上「孤儿**目录模块**」这一整类盲区。
+    //
+    // 缺陷：`scan_tree` 只在「目录含 mod.rs」时报告**该目录内的 .rs 文件**，
+    //   而 `dual_track/mod.rs` 这类**目录模块**自己**就是**那个未被声明的文件，
+    //   且它目录内没有别的 `.rs` ⇒ 该目录的 `orphans_in_dir` 返回空
+    //   ⇒ **整个目录模块从不出现在结果里**。
+    //   实测：本仓至少 5 个这样的孤儿（dual_track / crawl 下 2 个 /
+    //   dream_replay / semantic_routing），此前**一个都没报出来**。
+    //
+    // 判据：目录 `d` 含 `d/mod.rs`，而 `d` 的**目录名**在
+    //   「所有 mod.rs + 所有 .rs 的 mod 声明 + #[path]」里都找不到。
+    let declared_dir_names = collect_declared_module_names(root);
+
     let mut stack = vec![root.to_path_buf()];
 
     while let Some(dir) = stack.pop() {
@@ -215,11 +244,85 @@ pub fn scan_tree(root: &Path) -> Vec<OrphanFile> {
             if name == "target" || name == "_archived" || name == "bin" {
                 continue;
             }
+            // ⭐ 目录模块孤儿判定（与叶子文件判定**互不替代**）
+            //
+            // 判据：目录 `d` 含 `d/mod.rs`，而 `d` 的**目录名**在
+            // 「所有 mod.rs + 所有 .rs 的 mod 声明 + #[path]」里都找不到。
+            if name != "mod"
+                && p.join("mod.rs").is_file()
+                && !declared_dir_names.contains(name.as_ref())
+                && !path_attr_index.contains(&normalize(&p.join("mod.rs")))
+            {
+                let dir_mod = p.join("mod.rs");
+                let lines = std::fs::read_to_string(&dir_mod)
+                    .map(|c| c.lines().count())
+                    .unwrap_or(0);
+                let rel = normalize(&dir_mod)
+                    .strip_prefix(root)
+                    .unwrap_or(&dir_mod)
+                    .to_string_lossy()
+                    .to_string();
+                out.push(OrphanFile {
+                    stem: name.to_string(),
+                    lines,
+                    mod_rs: rel,
+                    kind: OrphanKind::DirModule,
+                });
+            }
             stack.push(p);
         }
     }
 
     out.sort_by(|a, b| b.lines.cmp(&a.lines).then_with(|| a.stem.cmp(&b.stem)));
+    out
+}
+
+/// 收集全树所有 `mod <name>` 声明里的 `<name>`。
+///
+/// 用于判定「孤儿目录模块」：某目录含 `mod.rs` 但其**目录名**从未被声明。
+/// ⚠️ 只按**名字**收集，不区分声明位置 —— 这是**保守**（漏报）方向：
+/// 若别处恰好有同名 `mod xxx;`，会把这个目录模块误判为已声明。
+fn collect_declared_module_names(root: &Path) -> HashSet<String> {
+    let mut out = HashSet::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                let name = entry.file_name();
+                let name = name.to_string_lossy();
+                if name != "target" && name != "_archived" {
+                    stack.push(p);
+                }
+                continue;
+            }
+            if p.extension().and_then(|e| e.to_str()) != Some("rs") {
+                continue;
+            }
+            let Ok(content) = std::fs::read_to_string(&p) else {
+                continue;
+            };
+            for line in content.lines() {
+                let t = line.trim();
+                if t.starts_with("//") || t.starts_with("#[") {
+                    continue;
+                }
+                if let Some(name) = t
+                    .strip_prefix("pub mod ")
+                    .or_else(|| t.strip_prefix("pub(crate) mod "))
+                    .or_else(|| t.strip_prefix("mod "))
+                {
+                    let name = name.split([';', '{', ' ']).next().unwrap_or("").trim();
+                    if !name.is_empty() {
+                        out.insert(name.to_string());
+                    }
+                }
+            }
+        }
+    }
     out
 }
 
@@ -352,7 +455,12 @@ pub fn orphans_in_dir(
             .join("mod.rs")
             .to_string_lossy()
             .to_string();
-        out.push(OrphanFile { stem, lines, mod_rs });
+        out.push(OrphanFile {
+            stem,
+            lines,
+            mod_rs,
+            kind: OrphanKind::LeafFile,
+        });
     }
     out.sort_by(|a, b| b.lines.cmp(&a.lines).then(a.stem.cmp(&b.stem)));
     out
