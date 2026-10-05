@@ -175,3 +175,79 @@
 - 检测器实现与口径：`neotrix-core/src/l0_substrate/nt_core_platform/mod_orphan.rs`
 - 门实现：`scripts/check-commit-deletions.sh`、`scripts/check-push-deletions.sh`、`.githooks/prepare-commit-msg`
 - 孤儿全量台账：`TODO.md` 待办 18（含补遗一/二/三）
+---
+
+# 补遗（2026-10-05 23:2x，第二轮）
+
+## A. 补上了检测器盲区 —— 真实孤儿数比之前报的高得多
+
+`scan_tree` 此前只找**孤儿叶子文件**，**孤儿目录模块**（`foo/mod.rs` 无人声明）
+完全看不见。已补（`64913227`）：新增 `OrphanKind::{LeafFile, DirModule}` +
+`collect_declared_module_names()`。
+
+**实测：17 个孤儿目录模块**（此前一个都没报出来）。
+最大：`crawl/ordered_backend_router`(386)、`crawl/dom_extractor`(250)、
+`dream_replay`(186)、`semantic_routing`(184)、`decision_layer`(137)。
+
+⇒ **更正**：我此前报「孤儿只剩 2 个」是错的。
+
+## B. 顺带推翻我上一轮的一个判断
+
+上一轮删 `nt_io_eli5.rs` 时称「现活版在 `nt_core/io_skills/`」——
+实测 `nt_core/mod.rs` **没有 `io_skills` 声明**
+⇒ 那份「活路径」自己也在孤儿目录模块里。
+⇒ **两份都不在线**。删重复件这个结论仍成立，但「其中一份在线」是错的。
+
+## C. 逐个实测筛出 8 个零成本并接入（`47a1d303`，1,317 行）
+
+一次性接入 17 个 ⇒ 67 错误、错误点分散、无法归因。
+⇒ 回滚后**逐个**接入 + 逐个计数，得到独立成本表（见该提交信息）。
+
+已接入（编译零成本）：`cost_ladder` `decision_layer` `evidence_gating`
+`jit_harness` `nt_meta_cleanup` `dream_replay` `dom_extractor`
+`ordered_backend_router`
+
+未接入，留台账：
+
+| 模块 | 相对基线 | 性质 |
+|---|---|---|
+| `cross_domain` / `geo_seo` | +1 | 小，下一轮可清 |
+| `nt_act_dev_tools` / `io_skills` | +3 | 小 |
+| `temporal_kg` | +9 | 中 |
+| `nt_memory_knowledge_graph` | +21 | 重写级 |
+| `agent_loop` | +29 | 重写级 |
+| `semantic_routing` | +30 | 重写级 |
+| `nt_consciousness` | 见下 | **只测 `--lib` 会误判** |
+
+## D. ⭐ 本轮最该被继承的两条
+
+### D1. 「零成本」只测 `cargo check --lib` 会误判
+
+`nt_consciousness` 在 `--lib` 下 **+0 错误**，我据此判零成本。
+但 `--lib --tests` 报：
+```text
+E0432: unresolved import `nt_consciousness::features
+E0432: unresolved import `nt_consciousness::core
+```
+⇒ **只测 lib 目标会漏掉 test 构建才暴露的断裂**。
+⇒ 凡是要接线的模块，**lib 与 test 两个目标都要测**。
+
+### D2. 回滚临时改动必须逐文件核对
+
+我本想只回滚临时 `mod` 声明，执行了 `git checkout neotrix-core/src/`
+⇒ **漏掉了 `l5_cognition/mod.rs` 的一行**，导致 `nt_consciousness`
+在树里残留并持续制造错误，我差点把它当成「已接入」。
+⇒ 目录级 checkout **不等于**覆盖全部文件；回滚后必须 `git status` 逐个确认。
+
+## E. 门状态（最终）
+
+| 门 | 结果 |
+|---|---|
+| `cargo check -p neotrix --lib` | **4 error = 基线**（他窗 10:57 已提交代码的既存破损，非在途 WIP） |
+| `cargo check --lib --tests` | 5 error，**全部他窗**（`nt_loop_canary_tests.rs` 已 staged 删除但 `mod.rs:29` 仍声明；另两处在途 WIP） |
+| `nt_lock_audit` | **0 处** |
+| **测试** | ⛔ **本轮全程未跑通**（被上述他窗状态全程阻断） |
+
+⚠️ 因此「8 个零成本接入」的准确含义是**编译零成本**，
+**不等于测试通过** —— 这些模块的测试至今一次都没运行过。
+接手者第一件事：解掉 `nt_loop_canary_tests` 的声明/文件不一致，然后跑全量。
