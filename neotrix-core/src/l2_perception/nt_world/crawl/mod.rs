@@ -1,3 +1,5 @@
+pub mod dom_extractor;
+pub mod ordered_backend_router;
 pub mod config;
 pub mod discover;
 pub mod frontier;

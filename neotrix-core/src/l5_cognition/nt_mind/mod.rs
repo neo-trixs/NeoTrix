@@ -1,3 +1,4 @@
+pub mod jit_harness;
 pub mod dual_track;
 pub mod nt_mind;
 pub mod nt_mind_background_loop;
