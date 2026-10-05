@@ -125,7 +125,13 @@ impl RecallStore {
             .iter()
             .map(|i| (now - i.timestamp).max(0))
             .max()
-            .unwrap_or(1);
+            // ⭐ 2026-10-05 修除零（同秒写入 ⇒ 相关度全 NaN）：
+            // · max() 返回 Some(0) 时**不触发** unwrap_or(1) ⇒ max_age == 0
+            // · 随后 age / max_age == 0/0 == NaN ⇒ 相关度全 NaN
+            // · NaN 经 partial_cmp→None→Equal ⇒ 排序静默退化为插入序
+            // ⇒ 钳下界（.max(1)），而不是只兜 None。
+            .unwrap_or(1)
+            .max(1);
 
         // Collect candidate indices from keyword index
         let mut candidate_indices: Vec<usize> = Vec::new();
@@ -417,5 +423,50 @@ mod tests {
 
         let results = store.search(&query);
         assert_eq!(results.len(), 2);
+    }
+
+    /// ⭐⭐⭐ 反向锁：同一秒写入的条目**不得**产出 NaN 相关度。
+    ///
+    /// 缺陷形状（逐行核实）：
+    /// · `append` 用秒级时间戳（`MemoryItem::new` 内 `.as_secs() as i64`）
+    /// · `search` 里 `max_age = items.map(|(now - ts).max(0)).max().unwrap_or(1)`
+    ///   ⛔ `.unwrap_or(1)` **只在 items 为空时**生效；`max()` 返回
+    ///     `Some(0)`（同秒写入）时**不触发** ⇒ `max_age == 0`
+    /// · 随后 `recency_score = 1.0 - (age / max_age as f64)`
+    ///   在 `age == 0` 时得到 `1.0 - (0.0/0.0)` = **NaN**
+    /// · `NaN` 经 `partial_cmp` → `None` → `unwrap_or(Equal)`
+    ///   ⇒ 全部并列、排序静默退化为插入序，而 `relevance` 全是 NaN，
+    ///   且**调用方收不到任何错误**。
+    #[test]
+    fn same_second_writes_must_not_yield_nan_relevance() {
+        let mut store = RecallStore::new(RecallConfig::default());
+        // 复用既有 make_item ⇒ 三条由 append 打上秒级时间戳，必然同一秒
+        for i in 0..3 {
+            store
+                .append(make_item(&format!("m{i}"), "共享关键词 内容"))
+                .unwrap();
+        }
+        let query = MemoryQuery {
+            text: "共享关键词".to_string(),
+            embedding: Vec::new(),
+            tier_filter: vec![MemoryTier::Tier3Recall],
+            max_results: 5,
+            min_importance: 0.0,
+            prefer_concise: false,
+        };
+        let results = store.search(&query);
+        assert!(!results.is_empty(), "查询应命中同秒写入的条目");
+        for r in &results {
+            assert!(
+                r.relevance.is_finite(),
+                "同秒写入产出 NaN 相关度（max_age=0 ⇒ 0/0）：{:?}",
+                r.relevance
+            );
+            assert!(
+                (0.0..=1.0).contains(&r.relevance),
+                "相关度应落在 [0,1]，实得 {}",
+                r.relevance
+            );
+        }
     }
 }

@@ -1,6 +1,11 @@
 //! L1 Action Layer - Memory Modules
 
 /// 共享工具函数 — 消除跨模块重复
+pub mod tiered_memory;
+pub mod tiered_pipeline;
+pub mod git_memory;
+pub mod paged_kv;
+pub mod nt_memory_cleanup;
 pub mod shared_utils;
 
 pub mod nt_trade_product_spec;

@@ -2,7 +2,8 @@
 //!
 //! 三级 KV 缓存管理: GPU → Host → NVMe
 
-use serde::{Deserialize, Serialize};
+// ⛔ 原首行 `use serde::{Deserialize, Serialize};` 在挂载本模块时暴露为
+//    `unused import`（KVBackend 等均无 serde derive）⇒ 挂载即编译失败。
 use std::collections::HashMap;
 
 /// KV 缓存后端 trait

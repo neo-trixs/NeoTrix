@@ -38,6 +38,62 @@ pub enum CriteriaSource {
     Independent,
 }
 
+/// ⭐⭐⭐ **证据层级** —— 判官**输入本身**是什么性质的东西。
+///
+/// ## 为什么需要它（`CriteriaSource` 不够用）
+///
+/// [`CriteriaSource`] 回答的是「判据**从哪来**」，本枚举回答的是
+/// 「被判官读的那个**产出**是从哪来的」。两者**正交**。
+///
+/// 【源】判据来自 `morluto/rea` 的 `docs/adr/0003-managed-code-evidence-and-provider-boundary.md`：
+/// > "That reconstruction is valuable, but it is not the original source
+/// > and cannot replace the underlying metadata and CIL evidence."
+///
+/// rea 用**四级**区分，本仓实现其中对本仓产出链真正起作用的三级：
+/// | 本枚举 | rea 对应 | 含义 |
+/// |---|---|---|
+/// | `Canonical` | canonical static observation | **直接观测/量出来的**，不是任何解读的产物 |
+/// | `Reconstruction` | reconstruction | 由 canonical 经**某个模型的解读**而来 |
+/// | `Inference` | analyst inference | 人的/系统的**推断与外推**，无直接观测 |
+///
+/// ## ⛔ 缺失的那一层才是危险的那一层
+///
+/// 【推】在 `EvidenceTier` 出现之前，`CriteriaSource::Independent` 的语义是
+/// 「判据独立」—— 但如果**被判官读的产出本身是上游模型的重建**，
+/// 那么：判官再独立，也只是在**对重建做独立评估**。
+/// ⇒ 那**不是**涌现证据，而是「重建的独立评估」。
+/// 二级分类看不见这一层 ⇒ 会**静默误判为涌现证据**。
+///
+/// **失败长什么样**：`seal_loop` 把 L5 的自产解读喂给判官，
+/// 判官来源标 `Independent`，于是计数 +1 —— 而底层从未被直接观测过。
+///
+/// **如何验证**：构造 `EvidenceTier::Reconstruction` +
+/// `CriteriaSource::Independent` 的组合，断言 `is_emergence_evidence()`
+/// 返回 `false`（而非 `true`）。
+///
+/// ## 默认取最坏假设
+///
+/// 与本仓一贯默认收紧同向（`CriteriaSource` 默认 `SelfReported`、
+/// 沙箱 fail-closed、cumora 未知引擎默认拒绝）：
+/// 不声明时取 `Inference`（最弱），要升级必须**显式** [`JudgeResult::with_evidence_tier`]。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EvidenceTier {
+    /// ✅ 直接观测/量出来的。可作涌现证据。
+    Canonical,
+    /// ⛔ 由 canonical 经某个模型的解读而来。**不是**原始事实。
+    Reconstruction,
+    /// ⛔⛔ 推断与外推，最弱。本仓默认值。
+    #[default]
+    Inference,
+}
+
+impl EvidenceTier {
+    /// ⛔ 只有 `Canonical` 才算直接观测。
+    pub fn is_canonical(&self) -> bool {
+        matches!(self, EvidenceTier::Canonical)
+    }
+}
+
 /// Configuration for an LLM-as-Judge evaluation.
 #[derive(Debug, Clone)]
 pub struct JudgeConfig {
@@ -83,21 +139,42 @@ pub struct JudgeResult {
     pub summary: String,
     /// ⭐ 本次评分所用的判据来源（随结果一起落盘，供事后审计）。
     pub criteria_source: CriteriaSource,
+    /// ⭐⭐⭐ 被判官读取的**产出**本身的证据层级（2026-10-05 增补）。
+    ///
+    /// ⛔ **无 `Default` 构造路径**：`JudgeResult` 的每一处构造都必须显式
+    ///   指定它，或经 [`JudgeResult::with_evidence_tier`] 显式设置。
+    ///   ⇒ 编译器强制「新评分必须声明产出层级」，与
+    ///   `CriteriaSource` 的「默认取最坏」不同 —— 这里连默认值都不给，
+    ///   因为忘记声明**没有**安全的取值（`Inference` 只是最坏，不是安全）。
+    pub evidence_tier: EvidenceTier,
 }
 
 impl JudgeResult {
-    /// ⭐⭐ **可否计入涌现证据** —— `EMERGENCE-PLAN` §6.4 的机器判据。
+    /// ⭐ 显式声明产出层级。见[`EvidenceTier`]。
+    pub fn with_evidence_tier(mut self, tier: EvidenceTier) -> Self {
+        self.evidence_tier = tier;
+        self
+    }
+
+    /// ⭐⭐⭐ **可否计入涌现证据** —— `EMERGENCE-PLAN` §6.4 的机器判据。
     ///
-    /// ⛔ `SelfReported`（判据与产出同源）⇒ **返回false**：
-    /// 这种评分可用于调试与回归，但**不得**计入 `new_category` 等涌现计数，
-    /// 且必须与独立来源（如 `nt_emergence_detector` 的实测计数）**并列呈现**。
+    /// ⛔ **两个条件都必须满足**（与 2026-10-05 之前不同）：
+    /// 1. `CriteriaSource::Independent` —— 判据独立于产出；
+    /// 2. `EvidenceTier::Canonical` —— 产出本身是**直接观测**。
     ///
-    /// ✅ `Independent` ⇒ 可计入。
+    /// ⭐ **为什么必须是「与」而不是「或」**：
+    /// 独立判官读**重建产物**时，判官再独立也只是「对重建做独立评估」，
+    /// 底层从未被直接观测 ⇒ 那不是涌现证据（依据 rea ADR-0003）。
+    /// 只有判据独立**且**产出为 canonical，两条链路才都没有模型的解读环节。
+    ///
+    /// ⛔ `SelfReported` ⇒ false（判据与产出同源）。
+    /// ⛔ `Reconstruction` / `Inference` ⇒ false（产出非直接观测）。
     ///
     /// ⭐ 之所以做成**方法**而不是注释：注释会被下一个 agent 忽略，
     /// 而`if !result.is_emergence_evidence() { skip }` 会在编译期与评审时暴露。
     pub fn is_emergence_evidence(&self) -> bool {
         matches!(self.criteria_source, CriteriaSource::Independent)
+            && self.evidence_tier.is_canonical()
     }
 }
 
@@ -143,6 +220,9 @@ pub fn evaluate_response(
             criterion_scores: Vec::new(),
             summary: "No criteria configured".into(),
             criteria_source: config.criteria_source,
+            // 退化配置（无判据 / 权重零）⇒ 无「被判读的产出」可言，
+            // 取最弱层：这两条路径本就不该产出任何涌现证据。
+            evidence_tier: EvidenceTier::Inference,
         });
     }
 
@@ -154,6 +234,9 @@ pub fn evaluate_response(
             criterion_scores: Vec::new(),
             summary: "Total weight is zero".into(),
             criteria_source: config.criteria_source,
+            // 退化配置（无判据 / 权重零）⇒ 无「被判读的产出」可言，
+            // 取最弱层：这两条路径本就不该产出任何涌现证据。
+            evidence_tier: EvidenceTier::Inference,
         });
     }
 
@@ -280,6 +363,7 @@ mod tests {
             criterion_scores: Vec::new(),
             summary: String::new(),
             criteria_source: CriteriaSource::SelfReported,
+            evidence_tier: EvidenceTier::Canonical,
         };
         assert!(
             !manual.is_emergence_evidence(),
@@ -298,6 +382,7 @@ mod tests {
             criterion_scores: Vec::new(),
             summary: String::new(),
             criteria_source: c.criteria_source,
+            evidence_tier: EvidenceTier::Canonical,
         };
         assert!(manual.is_emergence_evidence());
     }
@@ -312,8 +397,101 @@ mod tests {
             criterion_scores: Vec::new(),
             summary: "Full score".into(),
             criteria_source: CriteriaSource::SelfReported,
+            evidence_tier: EvidenceTier::Canonical,
         };
         assert!(!manual.is_emergence_evidence());
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // ⭐⭐⭐ 证据层级（2026-10-05，来自 `morluto/rea` ADR-0003）
+    // ══════════════════════════════════════════════════════════════
+
+    fn judge(src: CriteriaSource, tier: EvidenceTier) -> JudgeResult {
+        JudgeResult {
+            total_score: 9.0,
+            max_possible: 10.0,
+            criterion_scores: Vec::new(),
+            summary: String::new(),
+            criteria_source: src,
+            evidence_tier: tier,
+        }
+    }
+
+    /// ⭐⭐⭐ **本轮新增的核心判据**：独立判官读**重建产物** ⇒ 仍不得计入。
+    ///
+    /// 这正是 `EvidenceTier` 存在的唯一理由。
+    /// 二级分类下这个组合会返回 `true`（判据独立 ⇒ 可计入）⇒ **静默误判**。
+    #[test]
+    fn independent_judge_over_reconstruction_is_NOT_evidence() {
+        let r = judge(CriteriaSource::Independent, EvidenceTier::Reconstruction);
+        assert!(
+            !r.is_emergence_evidence(),
+            "独立判官读**重建产物**不得计入涌现证据：底层从未被直接观测过"
+        );
+    }
+
+    /// 推断层同理（比重建更弱）。
+    #[test]
+    fn independent_judge_over_inference_is_NOT_evidence() {
+        assert!(!judge(CriteriaSource::Independent, EvidenceTier::Inference).is_emergence_evidence());
+    }
+
+    /// ✅ 唯一可计入的组合：**判据独立 且 产出为 canonical**。
+    #[test]
+    fn independent_judge_over_canonical_IS_evidence() {
+        assert!(judge(CriteriaSource::Independent, EvidenceTier::Canonical).is_emergence_evidence());
+    }
+
+    /// ⛔ 反向锁：canonical 也救不了同源判据（两条件是「与」不是「或」）。
+    #[test]
+    fn canonical_output_cannot_rescue_self_reported_judge() {
+        assert!(
+            !judge(CriteriaSource::SelfReported, EvidenceTier::Canonical).is_emergence_evidence(),
+            "判据同源时，即便产出是直接观测也**不得**计入"
+        );
+    }
+
+    /// 全 2×3 真值表 —— 穷举而非抽样，防止将来加变体时漏判。
+    #[test]
+    fn evidence_truth_table_is_exhaustive() {
+        let expected = |s: CriteriaSource, t: EvidenceTier| {
+            matches!(s, CriteriaSource::Independent) && matches!(t, EvidenceTier::Canonical)
+        };
+        for s in [CriteriaSource::SelfReported, CriteriaSource::Independent] {
+            for t in [EvidenceTier::Canonical, EvidenceTier::Reconstruction, EvidenceTier::Inference] {
+                assert_eq!(
+                    judge(s, t).is_emergence_evidence(),
+                    expected(s, t),
+                    "组合({s:?}, {t:?}) 判定与真值表不符"
+                );
+            }
+        }
+    }
+
+    /// ⛔ 默认取最弱层（`Inference`），且**不能**靠 Default 静默升级。
+    #[test]
+    fn evidence_tier_default_is_weakest() {
+        assert_eq!(EvidenceTier::default(), EvidenceTier::Inference);
+        assert!(!EvidenceTier::default().is_canonical());
+        // 且 Inference 单独就足以否决
+        assert!(!judge(CriteriaSource::Independent, EvidenceTier::default()).is_emergence_evidence());
+    }
+
+    /// ⭐⭐ 反向锁：把 `&&` 改回「只看 CriteriaSource」必须失败。
+    /// 这条锁直接守住本轮的核心修复。
+    #[test]
+    fn reverse_lock_tier_must_participate_in_the_verdict() {
+        // 若 `is_emergence_evidence` 忽略 tier，则此断言必红
+        let sneaky = judge(CriteriaSource::Independent, EvidenceTier::Reconstruction);
+        assert_ne!(
+            sneaky.is_emergence_evidence(),
+            judge(CriteriaSource::Independent, EvidenceTier::Canonical).is_emergence_evidence(),
+            "tier 必须参与判定：否则 Reconstruction 与 Canonical 无区别，EvidenceTier 是死字段"
+        );
+        assert!(
+            sneaky.evidence_tier != EvidenceTier::Canonical,
+            "本测试自身的前提：Reconstruction 不得等于 Canonical"
+        );
     }
 }
 

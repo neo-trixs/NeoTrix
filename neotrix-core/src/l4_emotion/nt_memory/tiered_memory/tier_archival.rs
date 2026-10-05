@@ -136,10 +136,31 @@ impl ArchivalStore {
     }
 
     /// Insert or update an archival item.
+    /// ⭐ 2026-10-05 修**静默丢弃**：低于阈值时返回 `Err` 而非 `Ok(())`。
+    ///
+    /// ## 缺陷实测（本批挂载孤儿模块时暴露）
+    /// `ArchivalConfig::default().min_importance == 0.3`，而原实现对
+    /// `importance < min_importance` 的条目 `return Ok(())`
+    /// ⇒ **返回「成功」却什么都没写**。
+    /// 实证：`insert(importance=0.1)` 后 `store.len() == 1`（只有前一条），
+    /// 且 `items` 的键里**找不到**被丢弃的那条。
+    ///
+    /// ## 为什么 `Ok(())` 是错的（不只是「不好看」）
+    /// `Result` 的契约是「Err = 没做成」。返回 `Ok` 等于**向调用方撒谎**：
+    /// 上层会以为「已归档」，而记忆**根本没进存储**，且**无任何可观测信号**。
+    /// 这与本仓既有纪律同向（`llm_judge` 的 `REFUSAL_REASON`、
+    /// `recovery` 的 fail-closed）—— 拒绝必须**可观测**。
+    ///
+    /// ## 影响面
+    /// `TieredMemoryHub` 的写入路径若依赖 `insert`，则低重要性条目会
+    /// **静默消失**；调用方无法区分「写成功」与「被阈值拒绝」。
     pub fn insert(&mut self, mut item: MemoryItem) -> Result<(), String> {
         // Skip items below importance threshold
         if item.importance < self.config.min_importance {
-            return Ok(());
+            return Err(format!(
+                "importance {:.3} < min_importance {:.3}：条目被拒，未写入",
+                item.importance, self.config.min_importance
+            ));
         }
 
         item.tier = MemoryTier::Tier2Archival;
@@ -407,6 +428,10 @@ mod tests {
         assert!(store.get("doc-1").is_some());
     }
 
+    /// ⭐⭐ 修正：原版用 `.unwrap()` 断言「低于阈值仍返回 Ok」，
+    /// 即**把静默丢弃钉成了预期**。这与 `test_prune` 是同一个错误的两个面：
+    /// 一个用 `.unwrap()` 假通过，一个直接依赖被丢弃的条目不存在。
+    /// 现按新契约：低于阈值 ⇒ `Err`，且条目确实不在库内。
     #[test]
     fn test_importance_threshold() {
         let config = ArchivalConfig {
@@ -414,8 +439,13 @@ mod tests {
             ..Default::default()
         };
         let mut store = ArchivalStore::in_memory(config);
-        store.insert(make_item("low", "trivial", 0.2)).unwrap();
-        assert_eq!(store.len(), 0);
+        // 阈值内对照：必须成功写入
+        store.insert(make_item("high", "重要", 0.8)).expect("阈值内应写入");
+        assert_eq!(store.len(), 1);
+        // 阈值外：必须 Err，且不入库
+        let r = store.insert(make_item("low", "trivial", 0.2));
+        assert!(r.is_err(), "阈值外必须 Err（不得静默 Ok）");
+        assert_eq!(store.len(), 1, "被拒条目不改变库内容");
     }
 
     #[test]
@@ -460,13 +490,55 @@ mod tests {
         assert!((cosine_similarity(&a, &c)).abs() < 1e-6);
     }
 
+    /// ⭐⭐ 修正一条**从未跑过的**测试（该模块 2026-10-05 才挂载进编译树）。
+    ///
+    /// 原版传 `importance = 0.1`，而默认 `min_importance = 0.3`
+    /// ⇒ 该条目**本就不该被写入** ⇒ 断言 `len() == 1` 只是「恰好只有 a 被写入」，
+    /// 而 `pruned == 1` 依赖「b 存在」⇒ 与实现语义冲突。
+    ///
+    /// ⭐ 更要紧的是它暴露的真缺陷：`insert` 对低于阈值者**返回 `Ok(())`**
+    /// （静默丢弃），而本测试用 `.unwrap()` ⇒ 假通过。
+    /// 现拆成两条：① 阈值内正常剪枝 ② 阈值外**必须 Err**。
     #[test]
     fn test_prune() {
         let mut store = ArchivalStore::in_memory(ArchivalConfig::default());
         store.insert(make_item("a", "a", 0.9)).unwrap();
-        store.insert(make_item("b", "b", 0.1)).unwrap();
+        store.insert(make_item("b", "b", 0.4)).expect("0.4 在阈值 0.3 内，应写入成功");
+        assert_eq!(store.len(), 2, "两条都应在库内");
         let pruned = store.prune(0.5);
-        assert_eq!(pruned, 1);
+        assert_eq!(pruned, 1, "只有 b(0.4) 低于 0.5");
+        assert_eq!(store.len(), 1);
+    }
+
+    /// ⭐⭐⭐ 反向锁：低于 `min_importance` 的写入**必须 Err**，不得静默 `Ok`。
+    ///
+    /// 缺陷形状：`insert` 曾对 `importance < min_importance` 返回 `Ok(())`
+    /// ⇒ 调用方以为已归档，实际什么都没写，且**无任何可观测信号**。
+    #[test]
+    fn insert_below_min_importance_must_ERR_not_silently_succeed() {
+        let mut store = ArchivalStore::in_memory(ArchivalConfig::default());
+        let err = store.insert(make_item("low", "低重要性", 0.1));
+        assert!(
+            err.is_err(),
+            "低于阈值必须 Err —— Ok 等于向调用方撒谎（未写入却报成功）"
+        );
+        let msg = err.unwrap_err();
+        assert!(
+            msg.contains("min_importance"),
+            "错误信息应说明被阈值拒绝：{msg}"
+        );
+        assert_eq!(store.len(), 0, "被拒条目不得留在库内");
+        assert!(store.get("low").is_none(), "被拒条目不得可被检索到");
+    }
+
+    /// 边界：恰好等于阈值应当**写入成功**（判据是 `<` 而非 `<=`）。
+    #[test]
+    fn insert_exactly_at_min_importance_is_accepted() {
+        let mut store = ArchivalStore::in_memory(ArchivalConfig::default());
+        let at = store.config.min_importance;
+        store
+            .insert(make_item("edge", "边界", at))
+            .unwrap_or_else(|e| panic!("恰好等于阈值应被接受，却得到Err：{e}"));
         assert_eq!(store.len(), 1);
     }
 
