@@ -23,7 +23,22 @@ use super::output_validator::{
     CompositeOutputValidator, DataExfiltrationDetector, HallucinationDetector, OutputValidator,
     OutputLengthValidator, UnsafeCodeDetector,
 };
-use super::{GuardrailCategory, GuardrailContext, GuardrailResult, GuardrailViolation, RiskLevel, ViolationSeverity};
+// ⚠️ 2026-10-05 修 `E0255`：`ViolationSeverity` 在**同文件下方 `:34`** 就有定义
+// （`pub enum ViolationSeverity`），而本行用 `use super::{…}` 又导入同名类型
+// ⇒「the name is defined multiple times」。`super` 即 `agent_guardrails`，
+//   而该类型正是从 `super` 转出的，所以 `use super::ViolationSeverity`
+//   与本地定义直接冲突。
+//
+// ⛔ 为什么这行从未被发现：**本模块整目录未被 `mod` 声明 ⇒ 从不编译**
+//   （`guard/mod.rs` 只声明 `input_gatekeeper`/`output_sentinel`/`prompt_guardian`）。
+//   本次为接线做试编译才暴露（`cargo check -p neotrix --lib` → E0255）。
+//
+// ✅ 修法：本地已有定义，**删掉 `use super::` 里的这一项**即可，
+//   同 import 的其余 5 项（`GuardrailCategory`/`GuardrailContext`/
+//   `GuardrailResult`/`GuardrailViolation`/`RiskLevel`）保留。
+use super::{
+    GuardrailCategory, GuardrailContext, GuardrailResult, GuardrailViolation, RiskLevel,
+};
 
 // ---------------------------------------------------------------------------
 // ViolationSeverity
