@@ -637,7 +637,11 @@ mod capability_bridge_tests {
     #[test]
     fn 路由命中标签后必须真的解析出已注册能力_否则rationale要明说() {
         // ⭐⭐ 先播种（⭐⭐ 走**真实构造路径**，⭐⭐ ⛔ 不直接调 bootstrap）
-        let _rt = crate::l5_cognition::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime::new();
+        // ⚠️ 2026-10-05 路径收敛（L5 第二批）：原先直引 L5 的
+        // `ConsciousnessRuntime::new()`，而层门规定 L1 不得引用 L5 ⇒ 记违规。
+        // 现经**本层** facade 转出（走目标层 facade 无效：路径仍含层名）。
+        // ⛔ 只改引用路径，不改测试语义（仍走真实构造路径播种）。
+        let _rt = crate::l1_action::nt_action_facade::ConsciousnessRuntime::new();
 
         // ⭐⭐ 构造一条**必然命中路由表**的经验：⭐⭐ ROUTE_TABLE 首项是
         // ⭐⭐ `("检索", "NT-MEMORY", "hybrid_retrieval")`

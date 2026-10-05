@@ -473,6 +473,27 @@ pub use crate::l6_meta::nt_approval::PendingAction;
 pub use crate::l2_perception::nt_world::social_access::probe::run_with_timeout;
 pub use crate::l2_perception::nt_world::social_access::probe::RunOutcome;
 
+// ─── L1→L5 第二批：`ConsciousnessRuntime` ──────────────────────────────────────
+//
+// `check-layer-deps.sh:89` 的 `check_layer "l1_action" … "l5_cognition" …`
+// ⇒ L1 不得引用 L5。两条违规点**都在 `#[cfg(test)] mod tests` 内**：
+//   · `l1_action/nt_capability_bridge.rs:640`
+//   · `l1_action/nt_act/nt_act_trade/capability_registry.rs:1130`
+// 两侧形态完全相同：`ConsciousnessRuntime::new()` 绑到 `_rt` 做播种。
+//
+// ⚠️ 为什么不改门去排除 `#[cfg(test)]`：门脚本 `:70` 明写
+//   「string literals still count (conservative: **may over-report, never under-**)」
+//   ⇒ 过报是**有意的保守设计**；放宽它会削弱门的捕获面，
+//   而本次两条违规**是真的**（只是恰好在测试区）。⇒ 改引用路径，不改门。
+//
+// ✅ 可转安全性已核实：`ConsciousnessRuntime`（`consciousness_runtime.rs:64`）
+//   是 `pub struct`，`new()`（`:111`）是 `pub fn` 且无参数 ⇒ 完整类型可转出。
+//
+// ⛔ 注意与本文件既有 `NtLlmAsk`/`NtTaskFusionError` 转出的区别：那些是
+//   **生产**依赖 L5；本次两处是**测试**依赖 L5。走 facade 后层名不再出现在
+//   业务文件里，两种情形一并收敛。
+pub use crate::l5_cognition::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime;
+
 // ─── L1→L4 跨层引用收敛（接上批 L3/L6 段）────────────────────────────────────
 // 路径沿用消费方原本就在用的路径（原代码已能编译 ⇒ 路径可证）。
 // ⚠️ `nt_memory` 与 `nt_feel_facade` 是**模块型**引用（L1 门面需要它们做

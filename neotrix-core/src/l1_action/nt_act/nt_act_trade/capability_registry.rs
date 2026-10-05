@@ -1127,7 +1127,12 @@ mod market_end_to_end_tests {
     #[test]
     fn 真实贸易能力在市场里可见且可上架() {
         // ⭐⭐ 走**真实构造路径**（⭐⭐ ⛔ 不直接调 registrar）
-        let _rt = crate::l5_cognition::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime::new();
+        // ⚠️ 2026-10-05 路径收敛（L5 第二批）：原先直引 L5 的
+        // `ConsciousnessRuntime::new()`，
+        // 而层门规定 L1 不得引用 L5 ⇒ 记违规。
+        // 现经**本层** facade 转出（走目标层 facade 无效：路径仍含层名）。
+        // ⛔ 只改引用路径，不改测试语义（仍走真实构造路径播种）。
+        let _rt = crate::l1_action::nt_action_facade::ConsciousnessRuntime::new();
 
         let (listable, blocked) =
             neotrix_neobot::nt_capability_registry::with_registry(|reg| {
