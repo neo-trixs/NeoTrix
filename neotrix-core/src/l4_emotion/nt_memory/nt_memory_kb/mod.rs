@@ -1,6 +1,7 @@
 #![deny(clippy::unwrap_used)]
 
 
+pub mod process_skill_memory;
 pub mod bloom_filter;
 pub mod bm25;
 pub mod cognitive_graph;
