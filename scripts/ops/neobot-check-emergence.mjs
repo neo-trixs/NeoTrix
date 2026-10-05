@@ -149,6 +149,22 @@ if (!wired) {
     + ` · 缺口节点 ${probe.gaps} · 成熟度审计 0 条）`);
   console.log(`  能力节点清单：${probe.ids.join(', ')}`);
   console.log('  ⭐⭐ 本状态由**运行期探针**判定，⭐⭐ 不是静态推断。');
+  // ⭐⭐⭐ 三段式能力播报（backburner 范式）：⭐⭐ **第 3 段 = 「被调用了吗」**。
+  // ⭐⭐⭐ 前面的「STATE: WARM」证明「已注册」，⭐⭐ 这一段证明「是否真被用过」。
+  // ⭐⭐⭐ 「注册了」与「被用了」是**两个不同的事实** —— ⭐⭐ 而三家对标仓库
+  // ⭐⭐⭐ （os-taxonomy / lcu / backburner）⭐⭐ **全部只能证明前者**。
+  const neverInvoked = probe.never_invoked || [];
+  const invokedCounts = probe.invoked_counts || [];
+  console.log('  ── 调用面（三段式的第 3 段）──');
+  for (const v of invokedCounts) {
+    console.log(`    ${v.invoked > 0 ? '✅' : 'ℹ️ '} ${v.id} 被调用 ${v.invoked} 次`);
+  }
+  if (neverInvoked.length) {
+    // ⭐⭐ ⛔ 只报告 ⛔ **不阻断**：⭐⭐「本次进程该调用几次」无可证伪定义，
+    // ⭐⭐ 阻断它等于造假（照 lcu `tested.py` 的「Informational, never refuses」）。
+    console.log(`    ℹ️ 已注册但**本次进程零调用**：${neverInvoked.join(', ')}`);
+    console.log('    ⭐⭐ ⛔ **刻意不阻断**（理由同上）');
+  }
 }
 
 for (const [s, m] of results) console.log(`${s}: ${m}`);

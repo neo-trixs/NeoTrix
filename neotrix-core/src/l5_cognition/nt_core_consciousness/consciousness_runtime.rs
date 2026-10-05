@@ -1201,14 +1201,46 @@ mod capability_seeding_tests {
             .filter(|k| k.starts_with("consciousness::gap::"))
             .count();
         let findings = neotrix_neobot::nt_capability_registry::maturity_findings();
+        // ⭐⭐⭐ 涌现指纹（2026-10-05 接入）：能力树当前状态的可复现单值摘要。
+        //   ⭐ 计数不足以判定涌现 ——「数量不变但节点被换掉」计数完全看不见。
+        //   ⭐ 判据抄 `rust-alert/ra2.exe` `tests/engine/persistence/digest.rs:8-61`
+        //     的**同进程双胞胎差分**（该仓全仓无 golden hash，`rg EXPECTED_HASH`=0 命中）。
+        //   ⚠️ 纠错记录：注册表 `nodes` 是 `IndexMap`（插入序，本就确定），
+        //     故摘要前的排序**不是**在修现存 bug，而是让「可复现」不依赖
+        //     「某字段恰好是插入序映射」这一实现细节（换容器也不会静默漂移）。
+        //   ⛔ 锁投毒 ⇒ 显式记 `null`，绝不让「无法测量」长得像「空树」。
+        let digest = neotrix_neobot::nt_capability_registry::capability_digest().ok();
+        // ⭐⭐⭐⭐ 「注册了但没调用」清单（⭐⭐ **三家对标仓库全都没有**）。
+        // ⭐⭐⭐ 这是 backburner「三段式能力播报」的第三段：⭐⭐ 消费者据此判断
+        // ⭐⭐ 「注册了」与「被用了」**是不是同一件事**。
+        // ⭐⭐ ⛔ 只报告 ⭐⭐ **不阻断**（照 lcu `tested.py` 的
+        // ⭐⭐ 「Informational, never refuses」原则）—— ⭐⭐ 因为
+        // ⭐⭐ 「本次进程该调用几次」**没有可证伪的定义**，⭐⭐ 阻断它就是造假。
+        let never_invoked =
+            neotrix_neobot::nt_capability_registry::registered_never_invoked().unwrap_or_default();
+        let invoked_counts: Vec<serde_json::Value> = ids
+            .iter()
+            .map(|id| {
+                serde_json::json!({
+                    "id": id,
+                    "invoked": neotrix_neobot::nt_capability_registry::invoke_count(id),
+                })
+            })
+            .collect();
+
         println!(
             "EMERGENCE_PROBE {}",
             serde_json::json!({
                 "total": total,
                 "abilities": abilities,
                 "gaps": gaps,
+                "digest": digest,
                 "ids": ids,
                 "maturity_findings": findings,
+                // ⭐⭐⭐ 新增（backburner 三段式的第 3 段）
+                "never_invoked": never_invoked,
+                "invoked_counts": invoked_counts,
+                "seeded_at": "ConsciousnessRuntime::new",
             })
         );
     }

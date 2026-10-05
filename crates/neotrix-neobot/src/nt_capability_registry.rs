@@ -39,6 +39,8 @@ use std::sync::{Mutex, OnceLock};
 use nt_core_capability_tree::node::CapabilityNode;
 use nt_core_capability_tree::registry::{CapabilityTreeRegistry, RegistryError};
 
+use crate::nt_determinism::{sorted_keys, Digest};
+
 /// 进程级注册表。
 ///
 /// ⭐ 用 `OnceLock<Mutex<…>>` 而非 `static mut` / `lazy_static`：
@@ -48,6 +50,91 @@ static REGISTRY: OnceLock<Mutex<CapabilityTreeRegistry>> = OnceLock::new();
 
 fn slot() -> &'static Mutex<CapabilityTreeRegistry> {
     REGISTRY.get_or_init(|| Mutex::new(CapabilityTreeRegistry::default()))
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ⭐⭐⭐⭐ **读侧 + 调用计数**（2026-10-04）
+// ══════════════════════════════════════════════════════════════════
+//
+// ⭐⭐⭐⭐ **为什么补这个**（⭐⭐ 本轮实测发现，⭐⭐ 不是推理）：
+// 改前本模块的公开面是 ⭐⭐ **只有写、没有读** ——
+// `register_node`（写）+ `with_registry` / `node_count` / `maturity_findings`
+// / `capability_digest`（全是「关于注册表的查询」）。
+// ⇒ ⭐⭐⭐ **没有任何生产路径能经这个进程级注册表「取到一个能力并调用它」。**
+// ⇒ ⭐⭐⭐ 这是「有能力没接线」这一类缺陷的 ⭐⭐ **第 9 例**，⭐⭐ 而且是
+// ⭐⭐ **结构性的**：注册表被当成**只写日志**，⭐⭐ 而不是**可派发的能力面**。
+//
+// ⭐⭐⭐ **补上读侧后，还顺带解锁了一件三家对标仓库都做不到的事**：
+// ⭐⭐⭐⭐ **「注册了但没调用」的检测**。⭐⭐⭐ 对标结论（2026-10-04 深挖）：
+// ⭐⭐ `os-taxonomy` / `lcu` / `backburner` ⭐⭐⭐ **三家全部没有**
+// ⭐⭐ 「注册了却零调用」的直接度量 —— ⭐⭐ 它们只能证明
+// ⭐⭐ 「声明 == 现实」（计数、摘要、符号、差分对拍），
+// ⭐⭐⭐ **但「注册了」与「被用了」是两个不同的事实**，⭐⭐ 只有后者能靠计数证伪。
+//
+// ⭐⭐ 计数放**旁挂表**而非改 `CapabilityNode`：
+// ⭐⭐ ⛔ 不改另一个 crate 的节点类型（那会把 `nt-core-capability-tree`
+// ⭐⭐ ⛔ 变成「为了加一个计数器而承担语义」）。
+/// 每个能力的调用次数（⭐⭐ **单调递增**，⭐⭐ 只增不减）。
+///
+/// ⭐⭐ 用 `OnceLock` + `Mutex<HashMap<String, u64>>` 而非 per-node `AtomicU64`：
+/// ⭐⭐ 节点本身在另一个 crate 里，⭐⭐ 旁挂表让本 crate ⭐⭐ **零侵入**。
+static INVOKE_COUNTS: OnceLock<Mutex<std::collections::HashMap<String, u64>>> =
+    OnceLock::new();
+
+fn counts() -> &'static Mutex<std::collections::HashMap<String, u64>> {
+    INVOKE_COUNTS.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+}
+
+/// ⭐⭐⭐⭐ **取一个能力节点 —— 注册表的「读侧」**（⭐⭐ 改前完全没有）。
+///
+/// ⭐⭐⭐ 这是 ⭐⭐ **唯一的生产调用路径**：能力被真正使用，⭐⭐ **必须**经过这里。
+/// ⇒ ⭐⭐ 因此它同时是 ⭐⭐⭐ **「有没有被用」这件事的唯一可信观测点**
+/// ⭐⭐ （⭐⭐ 在别处打点都可以被绕过，⭐⭐ 这里不行）。
+///
+/// # Errors
+/// · 注册表锁投毒
+/// · `id` 未登记 ⇒ `Ok(None)`（⭐⭐ **不是 Err**：⭐⭐ 「没这个能力」是正常查询结果，
+///   ⛔ 把它变成 Err 会让调用方分不清「不存在」与「系统坏了」）
+pub fn lookup(id: &str) -> Result<Option<CapabilityNode>, String> {
+    let found = {
+        let reg = slot().lock().map_err(|e| format!("注册表锁投毒: {e}"))?;
+        reg.nodes.get(id).cloned()
+    };
+    if found.is_some() {
+        // ⭐⭐⭐ 计数**只对真正取到的能力递增**：⭐⭐ 未登记的 id ⭐⭐ **不计数**
+        // ⭐⭐ （否则「查了 100 次不存在的 id」会被误读成「有 100 次真实调用」）。
+        let mut c = counts().lock().map_err(|e| format!("计数锁投毒: {e}"))?;
+        *c.entry(id.to_owned()).or_insert(0) += 1;
+    }
+    Ok(found)
+}
+
+/// ⭐⭐⭐⭐ **「注册了但一次都没被调用」的清单** —— ⭐⭐ **三��参考仓库都没有的能力**。
+///
+/// ⭐⭐ 返回 `(id, 已调用次数)`，⭐⭐ **只含次数为 0 的**。
+/// ⭐⭐ ⛔ 刻意**不做**覆盖率百分比：⭐⭐ 分母（「本该被调用多少次」）⭐⭐ 无从定义，
+/// ⭐⭐⭐ 造一个假分母会得到一个 ⭐⭐**看起来精确、实则无法证伪**的数字
+/// ⭐⭐ （⭐⭐ 对标 `lcu/tested.py` 的原则：「Informational, never refuses」）。
+pub fn registered_never_invoked() -> Result<Vec<String>, String> {
+    let reg = slot().lock().map_err(|e| format!("注册表锁投毒: {e}"))?;
+    let c = counts().lock().map_err(|e| format!("计数锁投毒: {e}"))?;
+    let mut out: Vec<String> = reg
+        .nodes
+        .keys()
+        .filter(|id| c.get(*id).copied().unwrap_or(0) == 0)
+        .cloned()
+        .collect();
+    // ⭐⭐ 排序 ⇒ 输出确定（⭐⭐ 对标本 crate `nt_determinism::sorted_keys` 的纪律）
+    out.sort();
+    Ok(out)
+}
+
+/// ⭐⭐ 某能力的调用次数（⭐⭐ 未登记或从未调用 ⇒ 0）。
+pub fn invoke_count(id: &str) -> usize {
+    counts()
+        .lock()
+        .map(|c| c.get(id).copied().unwrap_or(0) as usize)
+        .unwrap_or(0)
 }
 
 /// ⭐ 把一个能力节点登记进运行期能力树。
@@ -118,6 +205,56 @@ pub fn maturity_findings() -> Vec<String> {
     }
 }
 
+/// ⭐⭐⭐ **涌现指纹** —— 运行期能力树状态的**可复现单值摘要**。
+///
+/// ## 为什么需要它（2026-10-05）
+///
+/// 涌现探针原先只能报 `node_count()` 与若干计数。⛔ **计数不足以判定涌现**：
+/// 「5 个能力节点」既可能是 5 次真实生长，也可能是同一次 bootstrap 的重复登记；
+/// 更糟的是**节点换了一对而数量不变**时，计数完全看不见 —— 而那正是
+/// 「能力被悄悄换掉」最需要被发现的形态。
+///
+/// ⭐ 指纹把「能力树当前是什么」压成一个 `u64`：同一状态 ⇒ 同一值；
+/// 任一节点 id 或虚标结论变化 ⇒ 值变。⇒ 涌现从「数得出来」变成「比得了」。
+///
+/// ## ⭐ 键序：⓰ 我第一版的理由是**错的**，实测修正
+///
+/// ⓰ 我原写「本函数必须先排序，否则指纹会漂移」—— 那是**想当然**。
+/// 编译实测发现 `CapabilityTreeRegistry::nodes` 是 **`indexmap::IndexMap`**
+/// 而非 `HashMap`，而 `IndexMap` **保持插入序** ⇒ 直接遍历**本来就是确定的**。
+/// ⇒ 所以此处排序**不是**在修一个现存 bug。
+///
+/// ⭐ 那为什么仍然排序？（这才是它现在的正当理由）
+/// 1. **防未来换容器**：本函数的价值就是「可复现」这个契约，而契约不该
+///    依赖「某个字段恰好是插入序映射」这一实现细节。哪天有人为了性能把它
+///    换成 `HashMap`，指纹会**静默**开始漂移，而**没有任何测试会红**。
+///    排序把这个隐患变成不可能，代价 2 行。
+/// 2. 与 [`crate::nt_determinism::sorted_keys`] 同款纪律，跨调用方可读。
+/// 3. ⚠️ 附带收益：排序对**顺序敏感型容器**同样正确，不依赖「有序映射」假设。
+///
+/// ## ⛔ 锁投毒返回 `Err` 而非 `0`
+///
+/// 「无法测量」绝不能长得像「空树」—— 那会让探针把测量失败读成「涌现尚未发生」。
+///
+/// # Errors
+/// 注册表锁投毒。
+pub fn capability_digest() -> Result<u64, String> {
+    let reg = slot().lock().map_err(|e| format!("能力注册表锁投毒: {e}"))?;
+    let ids = sorted_keys(reg.nodes.keys().cloned());
+    let mut d = Digest::new()
+        .section("consciousness-capability-tree")
+        .variant(1)
+        .field_u64(ids.len() as u64)
+        .field_sorted_keys(&ids);
+    let mut findings: Vec<String> = reg.maturity_audit().into_iter().map(|f| f.id).collect();
+    findings.sort();
+    d = d.field_u64(findings.len() as u64);
+    for f in &findings {
+        d = d.field_str(f);
+    }
+    Ok(d.finish())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -182,5 +319,100 @@ mod tests {
                 maturity_findings()
             );
         });
+    }
+
+    /// ⭐⭐⭐ 涌现指纹必须**可复现** —— 同一状态两次取值必须相等。
+    ///
+    /// ⭐ 这是 `capability_digest` 存在的全部理由：若它不可复现，
+    /// 「比指纹判涌现」就退化成「比噪声」，比没有指纹更坏。
+    ///
+    /// ⛔ 注册表是**进程全局**且 `cargo test` **并行跑** ⇒ 必须持 `SERIAL`
+    /// 才能对「两次取值相等」下断言（否则别的测试中途 register 会打破它）。
+    #[test]
+    fn 涌现指纹可复现() {
+        serial(|| {
+            let a = capability_digest().expect("digest");
+            let b = capability_digest().expect("digest");
+            assert_eq!(a, b, "同一状态下涌现指纹必须可复现");
+        });
+    }
+
+    /// ⭐⭐ 指纹必须对**节点集变化**敏感 —— 否则它测不出涌现。
+    ///
+    /// ⚠️ 这里断言的是**敏感**（指纹变了），不是「等于某个常量」：
+    /// 注册表是进程全局的，具体数值依赖其它测试是否已 register ⇒ 钉常量必假失败。
+    /// golden 常量对「全局可变状态」本就不适用（`ra2.exe` 全仓也没有）。
+    #[test]
+    fn 涌现指纹对新增节点敏感() {
+        serial(|| {
+            let before = capability_digest().expect("digest");
+            register_node(probe_node("digest-sensitive")).expect("register");
+            let after = capability_digest().expect("digest");
+            assert_ne!(
+                before, after,
+                "新增能力节点后指纹必须变化，否则测不出涌现"
+            );
+        });
+    }
+}
+
+#[cfg(test)]
+mod read_side_tests {
+    use super::*;
+
+    /// ⭐⭐⭐⭐ **「注册了但没调用」必须可测** —— ⭐⭐ 这是本轮补读侧的核心目的。
+    ///
+    /// ⭐⭐ 三家对标仓库（`os-taxonomy` / `lcu` / `backburner`）⭐⭐⭐
+    /// **全部没有**这个度量：它们只能证明「声明 == 现实」，
+    /// ⭐⭐⭐ **但「注册了」与「被用了」是两个不同的事实。**
+    #[test]
+    fn 注册后未被lookup的能力会出现在never_invoked清单里() {
+        let id = "test::read_side::never_invoked_probe";
+        let node = CapabilityNode::new_primitive(
+            id.to_owned(),
+            nt_core_capability_tree::node::Domain::Mind,
+            vec!["test.read_side".to_owned()],
+        );
+        // ⭐⭐ 幂等登记（⭐⭐ 重复跑不会因 AlreadyExists 而红）
+        let _ = register_node(node.clone());
+
+        // ⭐⭐ 此刻它**已注册、零调用** ⇒ ⭐⭐ 必须在清单里
+        let never = registered_never_invoked().expect("锁");
+        assert!(never.contains(&id.to_owned()), "⭐⭐ 已注册未调用的能力应被列出");
+
+        // ⭐⭐⭐ **读侧一次** ⇒ ⭐⭐ 立刻从清单里消失（⭐⭐ 这是「可被调用」的证明）
+        let got = lookup(id).expect("锁").expect("应能取到");
+        assert_eq!(got.id, id, "⭐⭐ lookup 必须返回该节点");
+        assert_eq!(invoke_count(id), 1, "⭐⭐ 取到即计数");
+        let never2 = registered_never_invoked().expect("锁");
+        assert!(
+            !never2.contains(&id.to_owned()),
+            "⭐⭐ 被取到过 ⇒ ⭐⭐ **不再是**「注册了但没调用」"
+        );
+    }
+
+    /// ⭐⭐⭐ **未登记的 id ⭐⭐ 不许被计数** —— ⭐⭐ 否则「查了 100 次
+    /// 不存在的 id」会被误读成「有 100 次真实调用」。
+    #[test]
+    fn 未登记的id_lookup返回None且不计数() {
+        let ghost = "test::read_side::ghost";
+        assert!(lookup(ghost).expect("锁").is_none(), "⭐⭐ 未登记 ⇒ None（⛔ 不是 Err）");
+        assert_eq!(invoke_count(ghost), 0, "⭐⭐ 未登记 ⭐⭐ **不得**计数");
+    }
+
+    /// ⭐⭐ 计数必须**单调**：重复 lookup ⇒ 计数累加（⭐⭐ 不是置位）。
+    #[test]
+    fn 计数单调累加() {
+        let id = "test::read_side::monotonic";
+        let node = CapabilityNode::new_primitive(
+            id.to_owned(),
+            nt_core_capability_tree::node::Domain::Mind,
+            vec!["test.read_side".to_owned()],
+        );
+        let _ = register_node(node);
+        for expect in 1..=3 {
+            let _ = lookup(id).expect("锁").expect("已登记");
+            assert_eq!(invoke_count(id), expect, "⭐⭐ 计数应单调累加到 {expect}");
+        }
     }
 }
