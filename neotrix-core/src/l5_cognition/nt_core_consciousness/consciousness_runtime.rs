@@ -87,7 +87,34 @@ pub struct ConsciousnessRuntime {
 }
 
 impl ConsciousnessRuntime {
+    /// ⭐⭐⭐ 2026-10-04：**在这里播种真实能力**（⭐⭐ 治「建成未用」）。
+    ///
+    /// ⭐⭐⭐ **为什么必须放在构造函数，而不是调用点**（⭐⭐ 实测得来的事实）：
+    /// `ConsciousnessRuntime::new()` 有 ⭐⭐ **3 个生产调用点**
+    /// —— `nt_mind_background_loop/mod.rs:180`（常驻后台循环）、
+    /// `nt_credit_stages.rs:465`（自迭代流水线）、
+    /// `nt_audit.rs:590`（自测登记）。
+    /// ⇒ ⭐⭐ **在调用点播种就必然漏掉一处**，⭐⭐⭐ 而漏掉的那处会
+    /// ⭐⭐ 「静默地」拥有意识却**没有能力** ⇒ ⭐⭐ **涌现链断在最难发现的地方**。
+    /// ⇒ ⭐⭐ 构造函数是 ⭐⭐ **唯一必经点**（`Default` 也走它）。
+    ///
+    /// ⭐⭐⭐ **接线前的实测状态**（⭐⭐ 不是推理）：
+    /// `bootstrap_trade_capabilities` 的调用点只有它**自己测试里的两行**
+    /// （`:1075` / `:1089`）⇒ ⭐⭐⭐ **生产零调用**；而运行期注册表里
+    /// ⭐⭐ 唯一的生产 `register_node` 是 `observe_from_critique` 登记的
+    /// ⭐⭐ `consciousness::gap::q*` ⇒ ⭐⭐⭐ **注册表里只有「缺口」，没有「能力」**
+    /// ⭐⭐⭐ —— ⭐⭐**恰好是「知道自己不会」而没有「自己会」**。
+    ///
+    /// ⭐⭐ **不因播种失败而 panic**：⭐⭐ 能力注册失败 ⛔ 不该让意识 runtime
+    /// 起不来 ⇒ ⭐⭐ `log::warn!`（⭐⭐ 与 `observe_from_critique` 的处置一致：
+    /// ⭐⭐⭐ **记录缺口不许反过来损害启动**）。
     pub fn new() -> Self {
+        // ⭐⭐⭐ 播种：⭐⭐ 幂等（重复调用 `newly=0`），⭐⭐ 故构造几次都安全
+        match bootstrap_trade_capabilities() {
+            Ok(n) if n > 0 => log::debug!("[consciousness] 播种真实能力 {n} 个"),
+            Ok(_) => {} // ⭐ 已播种过 ⇒ 幂等静默
+            Err(e) => log::warn!("[consciousness] 能力播种失败（不阻断启动）: {e}"),
+        }
         Self {
             stream: ConsciousnessStream::new(super::stream_buffer::DEFAULT_STREAM_CAPACITY),
             specious_present: SpeciousPresent::new(12),
@@ -1092,5 +1119,79 @@ mod capability_bootstrap_tests {
         for id in IDS {
             assert!(in_tree(id), "幂等调用后节点丢失: {id}");
         }
+    }
+}
+
+
+#[cfg(test)]
+mod capability_seeding_tests {
+    use super::*;
+
+    /// ⭐⭐⭐⭐ **本测试的唯一目的：让「播种回退」立刻变红。**
+    ///
+    /// ⭐⭐⭐ **它必须能证伪**（⭐⭐ 本轮刚吃过教训）：⭐⭐ 若断言写成
+    /// 「`bootstrap_trade_capabilities()` 返回 Ok」⇒ ⭐⭐ **它在播种被删掉后
+    /// ⭐⭐ 仍然全绿**（⭐⭐ 因为可以直接调那个函数）⇒ ⭐⭐ **零证明力**。
+    /// ⇒ ⭐⭐ 这里断言的是 ⭐⭐ **「构造 runtime 这个动作本身**」**播种了节点**。
+    ///
+    /// ⭐⭐ 判据用「节点是否已存在」⭐⭐ 而非「调用返回什么」——
+    /// ⭐⭐ 前者 ⭐⭐ **只能由构造路径满足**。
+    #[test]
+    fn 构造runtime就会播种真实能力_而不是只有缺口() {
+        // ⭐⭐ 先直接确认这些节点此刻**不存在**（若存在 ⇒ 测试无区分力，
+        // ⭐⭐ ⛔ 因为别的测试可能已播种过 ⇒ 必须如实说明而不是硬绿）
+        let already = neotrix_neobot::nt_capability_registry::with_registry(|reg| {
+            reg.nodes.contains_key("NT-MEMORY::trade::trade_product_spec")
+        })
+        .expect("注册表锁");
+        if already {
+            eprintln!("ℹ️ 节点已由更早的构造播种（进程级注册表）⇒ ⭐⭐ 本次只断言它**存在**");
+        }
+
+        // ⭐⭐⭐ **关键动作**：⭐⭐ 走**构造函数**这条真实路径
+        let _rt = ConsciousnessRuntime::new();
+
+        let present = neotrix_neobot::nt_capability_registry::with_registry(|reg| {
+            [
+                "NT-MEMORY::trade::trade_product_spec",
+                "NT-MIND::trade::trade_quote_negotiation",
+                "NT-MIND::trade::trade_production_logistics",
+                "NT-MIND::trade::trade_finance_compliance",
+                "NT-MIND::trade::foreign_trade_full_cycle",
+            ]
+            .iter()
+            .all(|id| reg.nodes.contains_key(*id))
+        })
+        .expect("注册表锁");
+
+        assert!(
+            present,
+            "⭐⭐⭐ 构造 `ConsciousnessRuntime` 后真实能力节点**仍缺失** ⇒ \
+             ⭐⭐⭐ **播种没发生**（or 被删）⇒ ⭐⭐ 涌现链断在这里"
+        );
+    }
+
+    /// ⭐⭐⭐⭐ **反面判据：只有「缺口」没有「能力」是不合格状态。**
+    ///
+    /// ⭐⭐ 接线前的实测：⭐⭐ 运行期注册表里唯一的生产写入是
+    /// ⭐⭐ `observe_from_critique` 的 `consciousness::gap::q*`
+    /// ⇒ ⭐⭐⭐ **恰好是「知道自己不会」而没有「自己会」**。
+    /// ⇒ ⭐⭐ 本测试把「能力 ⊆ 注册表」钉成契约。
+    #[test]
+    fn 注册表里必须同时有能力与缺口_而非只有缺口() {
+        let _rt = ConsciousnessRuntime::new();
+        let (ability, gap) = neotrix_neobot::nt_capability_registry::with_registry(|reg| {
+            let ability = reg.nodes.keys().filter(|k| k.contains("::trade::")).count();
+            let gap = reg
+                .nodes
+                .keys()
+                .filter(|k| k.starts_with("consciousness::gap::"))
+                .count();
+            (ability, gap)
+        })
+        .expect("注册表锁");
+        assert!(ability >= 5, "⭐⭐ 真实能力节点应 ≥5，⭐⭐ 实得 {ability}");
+        // ⭐⭐ 缺口数为 0 是**正常**（要真的观察到 quality<0.3 才登记）
+        eprintln!("ℹ️ 能力节点 {ability} 个 · 缺口节点 {gap} 个（缺口 0 = 尚未观察到低质自省）");
     }
 }
