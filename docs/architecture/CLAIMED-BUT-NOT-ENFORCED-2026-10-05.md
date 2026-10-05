@@ -29,8 +29,8 @@
 | 6 | `shield_core::SecurityManager::inspect_tool`：5 层 + 22 条规则 | **零调用方**（连测试都没有）；`attach_safety_kernel` 零调用方 ⇒ `execution_guard` 恒 `None` | ⛔ 悬空 |
 | 7 | `ProjectLaws::check_laws`（仓库法） | 注释自承 **"non-blocking by default"** | ⛔ 非阻断 |
 | 8 | `PolicyConfig::default()`：`blocked_input_patterns` 为 `vec![]` | 空 —— 凭据/注入/外泄三组正则**默认全不生效**，只靠 `injection_patterns`/`exfil_patterns` 那些内置项 | ⚠️ 待核 |
-| 9 | `main.rs` 的 `--yolo` / `--full-auto` / `--auto-edit` | 写入全局 `ApprovalMode`，但 **`run_one_shot` / `run_interactive_with_ephemeral` / `run_headless_mode` 都不走带审批的那条路** ⇒ **三个 flag 在工具执行上零效果** | ⛔ 语义落空 |
-| 10 | `nt_permission_profiles` 的继承合并单调性 | `tightened_with` 只在 `set_rule` 用；继承合并是**子档无条件覆盖父档** ⇒ `developer` 档可抹掉 `nt_shield` 的收紧 | ⛔ 单调性空转 |
+| 9 | `main.rs` 的 `--yolo` / `--full-auto` / `--auto-edit` | 写入全局 `ApprovalMode`，但唯一生产读者 `require_approval` 只被 **两条都不在生产链上的路径**消费（`ShieldEnforcer` 悬空 + `turn_stream_with_approval` 零调用方）⇒ **三 flag 在工具执行上零效果** | ⚠️ **已加诚实告警**（`main.rs` 在设 mode 后打印「该模式未被任何生产工具执行路径读取」并指向本表） |
+| 10 | `nt_permission_profiles` 的继承合并单调性 | 继承合并是**子档无条件覆盖父档**（`tightened_with` 只在 `set_rule` 用） | ✅ **裁定为「刻意设计」**（见下节） |
 
 ---
 
@@ -69,3 +69,102 @@
 | P1 | `--yolo` / `--full-auto` 要么接到实际路径，要么**明确报「该 flag 当前无效」** | 静默无效比报错更糟 |
 | P1 | 核实 #8：`blocked_*_patterns` 空默认值是否有意 | 空 ⇒ 三组正则不生效，需在文档写明 |
 | P2 | `developer` 档的 `most permissive` 语义与「overlay 只能收紧」冲突 | 需裁决：保留 developer 档，还是删掉它的覆盖能力 |
+
+---
+
+## ⭐ 第 10 项的最终裁定：**刻意设计，不是缺陷**（2026-10-05 留痕）
+
+### 我一度做了什么
+把继承合并从「子档无条件覆盖父档」改成 `existing.tightened_with(v)`（单调收紧），
+理由是 Codewhale 授权栈第 1 层「项目 overlay **只能收紧**，不能放松」。
+
+### 为什么撤回
+实测让 **4 条既有测试变红**，而那 4 条**并不过时**：
+`general` 档断言 `write_file → Allow`，而其祖先 `nt_shield` 是 `Ask`。
+
+⇒ 单调合并正确地把它收紧成 `Ask`/`Deny`，
+**而这正是 `general` / `developer` 两个档失去存在意义的原因** ——
+它们是有意的产品阶梯（`general` = 通用开发；`developer` 注释直写
+`most permissive`）。
+
+### ⭐⭐ 教训（本轮最值钱的一条）
+**「规则违反了我从外部读来的原则」与「这条原则在这个系统里是错的」是两件事。**
+
+我机械套用了 Codewhale 的「只能收紧」，**没有先验证它的前提**：
+Codewhale 能这么写，是因为它**只有一个 profile** + per-project overlay，
+用户**没有「切换到宽松档」这个需求**。
+⇒ 本仓有「宽松档」这个产品概念 ⇒ 前提不成立 ⇒ 结论不能照搬。
+
+**推广纪律**：外部原则落地前，先问「它的前提在我方成立吗？」——
+这与「吸收前置门」同源，但更细一层。
+
+### 现在留下的东西（不是「什么都没做」）
+1. `resolve` 里留了**完整的撤回记录与理由**（防止下一个 agent 再「修」一遍）。
+2. 新增 **2 条契约锁**：
+   · `child_profile_may_explicitly_relax_parent_on_purpose`
+     —— 断言 `general` 的放宽**必须真的生效**，且**未被显式覆盖的键
+     必须继承祖先**（特别是 `read_secrets` / `git_force_push` 的 `Deny`）。
+   · `explicit_deny_in_a_profile_is_never_relaxed_within_that_profile`
+     —— 安全下界：任何档位里解析后为 `Deny` 的键必须仍是 `Deny`。
+
+⇒ 「刻意允许放宽」现在是**契约**，不是**未被记录的巧合**。
+
+---
+
+## ⭐ 真正剩余的问题（第 10 项剥离后）
+
+不是「合并无单调」，而是 **`switch_profile` 能改全局审批模式且无任何记录**：
+它沿父链继承 `approval_mode_override` 后直接 `engine.set_mode(..)`
+⇒ 从 `strict-nt_shield`（`write_file → Deny`）切到 `developer`
+会**单次调用**把全局模式改写为 `AutoEdit`，无记录、无单调检查、无确认。
+
+⚠️ **需产品裁决**（不是纯技术缺陷）：是否允许一个档位改变全局审批模式？
+若允许 ⇒ 必须**落审计 + 要求显式确认**；若不允许 ⇒ 该字段应从 profile 移除。
+
+---
+
+## ⭐ 本轮的一条工作方法：`rg` 命中同名不同物时，先核「是不是同一个类型」
+
+第 9 项的根因核实过程中，`rg -n '\.check_all\('` 返回了 8 处非测试命中，
+看起来「`ShieldEnforcer` 有生产调用方」⇒ 结论本该是「三 flag 有效」。
+
+逐个读那一行才发现**全是同名不同物**：
+`monitor.health.check_all()`（健康检查）、`stack.check_all()`（工具栈）。
+真正的 `ShieldEnforcer::check_all` 调用方**只有 1 处，且零生产调用方**。
+
+⇒ **命中数不是证据，「那一行引用的是哪个类型」才是。**
+（这与文档方法论节里那三处同名不同物是同一类，只是这次是我自己踩的。）
+
+---
+
+## 📌 本会话的收尾状态（2026-10-05 23:20）
+
+### 待落地 2 笔（已验证、已双重兜底，门红在他窗）
+| 内容 | 兜底 |
+|---|---|
+| 撤回错误的单调合并 + 2 条契约锁（`nt_permission_profiles.rs`） | `.neotrix/patches/2026-10-05-contract-locks-monotonic-revert.patch` + 分支 `backup/nt-v5-5b058ce8` |
+| 三个无效 CLI flag 的诚实告警（`main.rs`） | `.neotrix/patches/2026-10-05-honest-flag-warning.patch` + 同分支 |
+
+落地命令见 `sessions/handoff-2026-10-05-authorization-audit-and-inert-defenses.md` §8.2。
+⚠️ **不要用 `git cherry-pick` 整体应用** —— 共享工作树暂存区里有他窗的改动与删除。
+
+### ⭐⭐ 本会话最该被继承的三条经验
+
+**1. 「规则违反了我从外部读来的原则」与「这条原则在本系统里是错的」是两件事。**
+我曾把 Codewhale 的「overlay 只能收紧」套到权限档继承上，
+结果 4 条**并不过时**的测试变红 —— 因为本仓**刻意**提供宽松档
+（`general` / `developer (most permissive)`），而 Codewhale 只有一个 profile
++ per-project overlay，**前提不成立**。
+⇒ **外部原则落地前，先问「它的隐含前提在我方成立吗？」**
+这比吸收前置门更细一层：前置门问「危害是否存在」，这条问「前提是否成立」。
+
+**2. 「有测试」不等于「在跑」，「被文档引用」不等于「有效」。**
+本会话修的 3 处硬拒缺陷，根因全是同一件事：规则被声明、被测试、被文档引用，
+但**从未在生产路径上被求值**。
+⇒ 而**验「有没有在编译树里」，一次 `cargo check` 就够了** —— 比任何搜索都快、都可靠
+（`GuardrailCategory` 那个 E0277 就直接证明了它从未被编译）。
+
+**3. `rg` 的命中数不是证据，「那一行引用的是哪个类型」才是。**
+本会话实测到**五处同名不同物**：`health.check_all()` / `stack.check_all()` /
+`unified_defense.validate_input()` / `p.run_pipeline()` / `e.into_inner()`。
+其中 `check_all` 那次让我差点得出「`ShieldEnforcer` 有生产调用方」的反向错误结论。
