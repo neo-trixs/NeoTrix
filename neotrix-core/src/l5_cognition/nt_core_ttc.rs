@@ -700,6 +700,76 @@ pub enum EffortTier {
 }
 
 impl EffortTier {
+    // ══════════════════════════════════════════════════════════════
+    // ⭐ 客户端方言归一（2026-10-05，吸收 `Niko1221/Strata`）
+    //
+    // 【源】`serve/frontend.py` 的 `EFFORT` 表原文注释：
+    //   *"Clients spell these many ways; everything maps onto those four."*
+    //   其映射把 `none / off / minimal / disabled / false` 全部收敛为「关闭」。
+    //
+    // 【实测】我方 `gateway/` 下 `rg reasoning_effort` 为 **rc=1（零命中）**
+    // ⇒ 只有 `thinking_budget: Option<u32>` 这个**未映射的裸字段**
+    //   （`gateway/execution.rs`），无任何「客户端方言 → 档位」转换。
+    //
+    // 【推】为什么这一层必须补：`thinking_budget` 是**Anthropic 形状**，
+    // 而客户端会送来 `none/minimal/off/disabled/false` 这类**关闭拼写**、
+    // 或 `xhigh` / `max` 这类**超出四档的拼写**。
+    // 若上层直接 `thinking_budget.unwrap_or(1024)`，
+    // 则「显式要求不思考」与「未设置」被混为一谈 ⇒ **静默多算一次推理成本**。
+    //
+    // ⭐ 与 Strata 的差异（刻意不照抄）：
+    // Strata 只有四档（none/low/medium/high），本仓有**五档**
+    // （多 `XHigh` 与 `Max`，用于 TTC 的深验证与 MCTS）⇒ 保留本仓档位，
+    // 只吸收它的**拼写收敛**这一层，不引入它的档位体系。
+
+    /// 把客户端的 effort 拼写归一到本仓档位。
+    ///
+    /// ✅ 返回 `None` 表示「显式要求关闭思考」⇒ 调用方应把 thinking 关掉，
+    ///    **而不是**回落到某个默认档。
+    /// ⛔ 未知拼写返回 `Err` —— **不崩、不静默兜底**。
+    ///    依据同源判据：Strata 的 `effort_kwargs` 文档写明
+    ////    *"Unknown values are a 400, not a crash."*
+    ///    对本仓即「对调用方是显式错误」，而不是猜一个档位烧掉推理预算。
+    pub fn from_client_spelling(spelling: &str) -> Result<Option<Self>, String> {
+        match spelling.trim().to_ascii_lowercase().as_str() {
+            // 「关闭」家族 —— 五个拼写同义（Strata 的第一层映射）
+            "none" | "off" | "minimal" | "disabled" | "false" | "0" => Ok(None),
+            "low" | "1" => Ok(Some(EffortTier::Low)),
+            "medium" | "med" | "2" => Ok(Some(EffortTier::Medium)),
+            "high" | "3" => Ok(Some(EffortTier::High)),
+            // ⭐ 本仓多出的两档（Strata 的模板对此「什么也没说」，见其注释
+            //   *"no xhigh sentence is medium there"* ⇒ 我们按本仓语义填）
+            "xhigh" | "x-high" | "extra-high" | "4" => Ok(Some(EffortTier::XHigh)),
+            "max" | "maximum" | "5" => Ok(Some(EffortTier::Max)),
+            other => Err(format!(
+                "unknown reasoning effort {other:?}: use none/low/medium/high/xhigh/max"
+            )),
+        }
+    }
+
+    /// 从 Anthropic 形状的 `thinking.budget_tokens` 反推档位。
+    ///
+    /// 【源】`serve/frontend.py::budget_effort` 原文：
+    ///   *"Anthropic's thinking budget (budget_tokens) -> a level:
+    ///     under 2K low, under 8K medium, else high."*
+    ///
+    /// ⚠️ 与本仓 `thinking_budget_tokens()` 的**方向相反**：
+    /// 那是「档位 → token 数」，这是「token 数 → 档位」。
+    /// 两条边界**故意对齐**：本仓 `Medium = 1024 < 2048` ⇒ 落 Low；
+    /// `High = 2048` ⇒ 落 Medium；`XHigh = 4096` / `Max = 8192` ⇒ 落 XHigh。
+    /// ⇒ 反推结果**永远不会回到出发那一档**，这是有意的：
+    /// 语义是「预算够到哪一档」，不是「精确还原」。
+    /// 已在下方 `roundtrip_is_never_the_identity` 锁住这条性质。
+    pub fn from_budget_tokens(tokens: u32) -> Self {
+        if tokens < 2048 {
+            EffortTier::Low
+        } else if tokens < 8192 {
+            EffortTier::Medium
+        } else {
+            EffortTier::XHigh
+        }
+    }
+
     /// Detect effort tier from task difficulty and length.
     /// Mirrors Qwen3's thinking budget allocation heuristic.
     pub fn from_difficulty(difficulty: f64, task_length: usize) -> Self {
@@ -1281,5 +1351,96 @@ mod tests {
         .should_exit());
         assert!(!ConvergenceSignal::NeedsMoreSteps { variance: 0.5 }.should_exit());
         assert!(!ConvergenceSignal::InsufficientSteps.should_exit());
+    }
+
+    /// ⭐⭐ 反向锁：「显式关闭」必须与「未设置」区分开。
+    ///
+    /// ## 危害（为什么这不是洁癖）
+    /// 若上层写成 `thinking_budget.unwrap_or(1024)`，那么客户端送来的
+    /// `none` / `minimal` / `off` / `disabled` / `false` —— 全部落到 `1024`
+    /// ⇒ **每次都白烧一份推理预算**，而用户明确说了「不要思考」。
+    /// 这类缺陷不会报错、不会崩，只会让账单变贵。
+    #[test]
+    fn explicit_off_is_distinguishable_from_unset() {
+        for spelling in ["none", "off", "minimal", "disabled", "false", "0"] {
+            assert_eq!(
+                EffortTier::from_client_spelling(spelling).unwrap(),
+                None,
+                "「{spelling}」是显式关闭，不得被解析成某个推理档位"
+            );
+        }
+    }
+
+    /// 拼写归一：大小写与空白不敏感（客户端拼写混乱是常态）。
+    #[test]
+    fn spelling_is_case_and_whitespace_insensitive() {
+        for s in [" HIGH", "High", "hIgH ", "\thigh\n"] {
+            assert_eq!(
+                EffortTier::from_client_spelling(s).unwrap(),
+                Some(EffortTier::High),
+                "「{s:?}」应归一为 High"
+            );
+        }
+    }
+
+    /// ⛔ 反向锁：未知拼写必须 `Err`，**不得**猜一个档。
+    ///
+    /// 依据 Strata 的原文判据：*"Unknown values are a 400, not a crash."*
+    /// ⇒ 猜一个档 = 静默烧掉推理预算 + 上层无从察觉。
+    #[test]
+    fn unknown_spelling_is_ERR_not_a_guessed_tier() {
+        for bad in ["ultra", "HIGHEST", "9", "lots", ""] {
+            let r = EffortTier::from_client_spelling(bad);
+            assert!(r.is_err(), "未知拼写 {bad:?} 必须 Err，实际得到 {r:?}");
+            let msg = r.unwrap_err();
+            assert!(
+                msg.contains("none/low/medium/high"),
+                "错误信息应列出可用档位（调用方要据此纠正）：{msg}"
+            );
+        }
+    }
+
+    /// 本仓比 Strata 多两档 ⇒ 必须能解析（否则 `xhigh`/`max` 会落到 Err）。
+    #[test]
+    fn repo_specific_tiers_are_parseable() {
+        assert_eq!(
+            EffortTier::from_client_spelling("xhigh").unwrap(),
+            Some(EffortTier::XHigh)
+        );
+        assert_eq!(
+            EffortTier::from_client_spelling("max").unwrap(),
+            Some(EffortTier::Max)
+        );
+    }
+
+    /// ⭐ 双向映射的**非自反性**是刻意设计，锁住它并说明理由。
+    ///
+    /// `from_budget_tokens` 的语义是「预算够到哪一档」，不是「精确还原」
+    /// ⇒ 往返**必然**降档（2048 → Medium → from_budget(2048) → Medium，
+    /// 而 1024 → Medium 出发会落回 Low）。
+    /// 若将来有人把它改成自反的，本测试会红 —— 那说明语义被悄悄改了。
+    #[test]
+    fn budget_roundtrip_is_not_identity_by_design() {
+        for tier in [
+            EffortTier::Low,
+            EffortTier::Medium,
+            EffortTier::High,
+            EffortTier::XHigh,
+            EffortTier::Max,
+        ] {
+            let tokens = tier.thinking_budget_tokens();
+            let back = EffortTier::from_budget_tokens(tokens);
+            assert!(
+                tokens == 0 || back != tier,
+                "档位 {tier:?}({tokens} tokens) 往返后成了 {back:?} —— \
+                 若期望自反，须先改 from_budget_tokens 的语义并改本测试"
+            );
+        }
+        // 边界必须精确（Strata 原文的分界）
+        assert_eq!(EffortTier::from_budget_tokens(0), EffortTier::Low);
+        assert_eq!(EffortTier::from_budget_tokens(2047), EffortTier::Low);
+        assert_eq!(EffortTier::from_budget_tokens(2048), EffortTier::Medium);
+        assert_eq!(EffortTier::from_budget_tokens(8191), EffortTier::Medium);
+        assert_eq!(EffortTier::from_budget_tokens(8192), EffortTier::XHigh);
     }
 }
