@@ -692,6 +692,32 @@ impl PermissionAxes {
 
 #[cfg(test)]
 mod tests {
+
+    /// ⭐⭐⭐ 本模块测试**共享全局单例**（`global_profile_manager` /
+    /// `global_approval`），而 cargo test **默认多线程**
+    /// ⇒ 同模块测试会互相抢状态，表现为**间歇性失败**且失败行号漂移。
+    ///
+    /// 【本轮实测证据】首次运行时三条测试同时失败，且失败点在**不同行**：
+    /// · `audit_switch_rejects_empty_actor` —— 「被拒的调用不得改动审批模式」
+    /// · `plan_profile_switch_has_no_side_effects` —— 「plan 不得改动全局审批模式」
+    /// · `test_global_state_integration`
+    /// 而**独立探针**（单线程连打 before/after）证明 `plan` 确实是纯的
+    /// ⇒ 真因是**测试间抢全局态**，不是被测代码有副作用。
+    ///
+    /// 【为什么不用 `serial_test`】本仓 `neotrix-core` 无该 dev-dependency，
+    /// 为几条测试引入新依赖不划算 ⇒ 用标准库 `Mutex` 做**手写串行化**。
+    ///
+    /// ⚠️ 若将来给本模块加 `#[serial]`，记得**删掉这个锁**（否则双重串行化，
+    /// 无害但会让人困惑）。
+    static TEST_GLOBAL_STATE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// 取得全局状态互斥守卫。**中毒时取内值** —— 守卫本身不含状态，
+    /// 中毒只意味着另一个测试 panic 过，不该连带阻断本测试。
+    fn lock_global_state() -> std::sync::MutexGuard<'static, ()> {
+        TEST_GLOBAL_STATE
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+    }
     use super::*;
 
     #[test]
@@ -750,6 +776,7 @@ mod tests {
 
     #[test]
     fn test_global_state_integration() {
+        let _guard = lock_global_state();
         // All tests that touch global state run sequentially to prevent
         // races from parallel test execution sharing OnceLock/Mutex.
         reset_profile_manager();
@@ -797,8 +824,15 @@ mod tests {
             assert_eq!(profile.rules.get("mono_guard"), Some(&ProfileDecision::Deny));
         }
 
-        // switch profile
-        assert!(switch_profile("developer").is_ok());
+        // ⭐ switch profile —— 2026-10-05 语义变更（方案 A）
+        //
+        // 【原断言（已删除）】`switch_profile("developer").is_ok()`
+        //   —— 它把「匿名切档可以顺带改掉全局审批模式」**钉成了契约**。
+        // 【新语义】`developer` 带 `approval_mode_override = auto-edit`
+        //   ⇒ 匿名切它必须**被拒**；带 actor 才允许。
+        // 另：`nt_shield` 无 override ⇒ 匿名切换仍可用（对照组）。
+        assert!(switch_profile("developer").is_err(), "匿名切 developer 必须被拒（方案 A）");
+        assert!(switch_profile_with_audit("developer", "test").is_ok());
         assert_eq!(active_profile_name(), "developer");
         assert!(switch_profile("nt_shield").is_ok());
 
@@ -829,14 +863,29 @@ mod tests {
 
         assert!(get_profile_info("does-not-exist").is_err());
 
-        // switch_profile applies approval override
+        // ⭐ 2026-10-05 语义变更（方案 A）：override **仍然生效**，
+        // 但**必须带 actor** —— 匿名入口不再允许放宽审批模式。
+        //
+        // 【原断言（已删除）】`switch_profile("developer").is_ok()`
+        //   + 断言模式变AutoEdit ⇒ 它把「匿名切档可以顺带放宽审批」
+        //   **钉成了契约**，正是方案 A 要消除的行为。
         reset_profile_manager();
         crate::l6_meta::nt_approval::global_approval().lock().unwrap().set_mode(crate::l6_meta::nt_approval::ApprovalMode::Suggest);
-        assert!(switch_profile("developer").is_ok());
+
+        // ① 匿名 ⇒ 被拒，且**模式不变**
+        assert!(switch_profile("developer").is_err(), "匿名切 developer 必须被拒（方案 A）");
+        assert_eq!(
+            crate::l6_meta::nt_approval::global_approval().lock().unwrap().mode(),
+            crate::l6_meta::nt_approval::ApprovalMode::Suggest,
+            "被拒的匿名切换不得留下模式副作用"
+        );
+
+        // ② 带 actor ⇒ 成功，**override 依然生效**
+        assert!(switch_profile_with_audit("developer", "test").is_ok());
         {
             let engine = crate::l6_meta::nt_approval::global_approval().lock().unwrap();
             assert_eq!(engine.mode(), crate::l6_meta::nt_approval::ApprovalMode::AutoEdit,
-                "switching to developer should apply auto-edit override");
+                "带 actor 切到 developer 仍应应用 auto-edit override（功能未被削掉）");
         }
         assert!(switch_profile("nt_shield").is_ok());
         crate::l6_meta::nt_approval::global_approval().lock().unwrap().set_mode(crate::l6_meta::nt_approval::ApprovalMode::Suggest);
@@ -1040,6 +1089,7 @@ mod tests {
     /// ⇒ 否则下面三条锁都会因为「测的是个不会改模式的档」而**假通过**。
     #[test]
     fn premise_developer_profile_does_override_approval_mode() {
+        let _guard = lock_global_state();
         let store = ProfileStore::builtin();
         let ov = store.resolve_approval_mode("developer");
         assert_eq!(
@@ -1056,6 +1106,7 @@ mod tests {
     /// 调用方只要挑这个函数就绕过了。
     #[test]
     fn anonymous_switch_cannot_loosen_approval_mode() {
+        let _guard = lock_global_state();
         reset_profile_manager();
         crate::l6_meta::nt_approval::global_approval()
             .lock()
@@ -1089,6 +1140,7 @@ mod tests {
     /// ⭐⭐ 锁②：**空 actor 被拒** —— 改全局审批严格程度不许匿名。
     #[test]
     fn audit_switch_rejects_empty_actor() {
+        let _guard = lock_global_state();
         reset_profile_manager();
         for actor in ["", "   ", "\t", "\n"] {
             let r = switch_profile_with_audit("developer", actor);
@@ -1111,6 +1163,7 @@ mod tests {
     /// 审计行必须能回答「谁在什么时候切到了什么、模式从什么变成什么」。
     #[test]
     fn audit_switch_succeeds_and_emits_audit_trail() {
+        let _guard = lock_global_state();
         reset_profile_manager();
         crate::l6_meta::nt_approval::global_approval()
             .lock()
@@ -1145,6 +1198,7 @@ mod tests {
     /// 那**确认就只是走个形式** —— 用户看到的预告与实际发生的不一致。
     #[test]
     fn plan_profile_switch_has_no_side_effects() {
+        let _guard = lock_global_state();
         reset_profile_manager();
         // 先把状态设成可辨认的初值
         switch_profile_with_audit("nt_shield", "setup").expect("设初值");
@@ -1153,8 +1207,25 @@ mod tests {
             .unwrap()
             .set_mode(crate::l6_meta::nt_approval::ApprovalMode::Suggest);
 
+        // ⚠️ 本仓的 profile 测试**共享全局单例**（`global_profile_manager` /
+        // `global_approval`），而 cargo test **默认多线程** ⇒ 同模块其它测试
+        // 可能在「读基线」与「断言」之间改动它 ⇒ 表现为**间歇性失败**。
+        // 本仓无 `serial_test` 依赖（同模块 13 处测试同样靠 `reset_profile_manager()`
+        // 复位）⇒ 本测试沿用**同一手法**：进出各复位一次、基线自带断言。
+        //
+        // ⭐ 这也是本锁**第一次运行时抓到的东西**：
+        // 它首跑报「plan 不得改动全局审批模式」失败，
+        // 而**独立探针证明 plan 确实是纯的**
+        // （连续打印 before/after plan，mode 不变）
+        // ⇒ 真因是**测试之间抢全局态**，不是 plan 有副作用。
+        // ⇒ 若不写清这点，下一个 agent 会去「修」一个正确的 plan。
         let mode_before = crate::l6_meta::nt_approval::global_approval().lock().unwrap().mode();
         let active_before = active_profile_name();
+        assert_eq!(
+            mode_before,
+            crate::l6_meta::nt_approval::ApprovalMode::Suggest,
+            "前提：本测试已把基线设为 Suggest（若此断言失败，是别的测试抢了全局态）"
+        );
 
         // 连调三次 plan，覆盖可能存在的「第一次才初始化」的隐藏副作用
         for _ in 0..3 {
@@ -1186,6 +1257,7 @@ mod tests {
     /// 反向（收紧）**不算** —— 否则 UI 会拿它提示「要放宽了」而实际相反。
     #[test]
     fn loosens_only_counts_strict_to_loose() {
+        let _guard = lock_global_state();
         use crate::l6_meta::nt_approval::ApprovalMode::*;
         let auto = ProfileSwitchPlan {
             profile: "p".into(),
@@ -1212,10 +1284,12 @@ mod tests {
     /// ⭐ 匿名入口在**不改模式**的档位上仍然可用（否则连切档都做不了）。
     #[test]
     fn anonymous_switch_still_works_for_non_mode_changing_profile() {
+        let _guard = lock_global_state();
         reset_profile_manager();
         let r = switch_profile("nt_shield");
         assert!(r.is_ok(), "不改审批模式的档位应允许匿名切换：{r:?}");
         assert!(r.unwrap().contains("Switched to profile: nt_shield"));
         reset_profile_manager();
     }
+
 }
