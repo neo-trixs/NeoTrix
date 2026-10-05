@@ -1077,7 +1077,34 @@ pub fn bootstrap_trade_capabilities() -> Result<usize, String> {
         };
         // ⭐⭐⭐⭐⭐ 打标后**立刻回查市场元数据** ⇒ ⭐⭐ 「打标没生效」当场变红，
         // ⭐⭐⭐⭐⭐ ⭐⭐ 而不是等某天有人打开市场才发现。
-        crate::l1_action::nt_act::nt_act_trade::capability_registry::assert_market_ready(&patched, step)
+        // ⭐⭐⭐⭐⭐⭐⭐ **⚠️⭐⭐⭐⭐⭐ 这里曾经返回 `Err` ⇒⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
+        // ⭐⭐⭐⭐⭐⭐⭐ **变异测试抓到的真设计缺陷**（⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 2026-10-04，⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐ 摘掉一个
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ `market.license` 键 ⇒ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 打标校验失败
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ **bootstrap 整体中断**
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐ **其余 4 个能力从未注册**。
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⇒ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ **「能力可用性」被「市场元数据」绑架了**
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ **而这是两种不同的事**：
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐ 「能力**注册成功**」（⭐⭐⭐⭐⭐⭐ 系统能力）
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐ vs「能力**可上架**」（⭐⭐⭐⭐⭐⭐ 市场状态）。
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐ **缺 license ⭐⭐ 应该是「上架不了」，
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐ **不是「能力没了」**。
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 判红：⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 「这个能力不可上架」⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 是**市场状态**，
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 由 ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ `market_unlisted`（⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ **持续暴露** ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐，
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
+        // ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
+        if let Err(why) = crate::l1_action::nt_act::nt_act_trade::capability_registry::assert_market_ready(&patched, step) {
+            log::warn!("[consciousness] {step}: 能力已注册但**不可上架**：{why}");
+        }
+        Ok(())
     }
 
     let (total, newly) = with_registry(|reg| -> Result<(usize, usize), String> {
@@ -1292,6 +1319,41 @@ mod capability_seeding_tests {
             })
             .collect();
 
+        // ⭐⭐⭐⭐⭐ **市场未上架清单**（⭐⭐⭐⭐⭐ 治「静默消失」）。
+        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 为什么必须单独算：⭐⭐⭐⭐⭐ 市场 `listable()` **只返回
+        // ⭐⭐⭐⭐⭐ ⭐⭐ 可上架的** ⇒ ⭐⭐⭐⭐⭐ 没填 `market.*` 的**从视图里彻底消失**。
+        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 本仓 **83 处**构造点里只有 5 个填了 ⭐⭐⭐⭐⭐ ⇒
+        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **78 处会静默消失** ⇒ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐
+        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 「不可见」又回来了（⭐⭐ 与本轮治的病同型）。
+        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⚠️ 实现纪律：⭐⭐ **`json!` ⭐⭐ 不接受
+        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 值位置的裸语句块**（⭐⭐ 我第一版写成
+        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ `"k": { let x = …; x }` ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
+        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⇒ 编译错「comparison operators cannot be chained」
+        // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐）⇒ ⭐⭐ **先算成变量，再放进 json**。
+        let (market_listable, market_unlisted): (Vec<String>, Vec<String>) =
+            neotrix_neobot::nt_capability_registry::with_registry(|reg| {
+                let blocked_ids: Vec<String> =
+                    neotrix_neobot::nt_capability_market::blocked(reg)
+                        .into_iter()
+                        .map(|(id, _)| id)
+                        .collect();
+                let listed_ids: Vec<String> =
+                    neotrix_neobot::nt_capability_market::listable(reg)
+                        .into_iter()
+                        .map(|e| e.id)
+                        .collect();
+                let mut listed_sorted = listed_ids;
+                listed_sorted.sort();
+                listed_sorted.dedup();
+                let mut diff: Vec<String> = blocked_ids
+                    .into_iter()
+                    .filter(|id| !listed_sorted.contains(id))
+                    .collect();
+                diff.sort();
+                diff.dedup();
+                (listed_sorted, diff)
+            })
+            .unwrap_or_default();
         println!(
             "EMERGENCE_PROBE {}",
             serde_json::json!({
@@ -1321,6 +1383,21 @@ mod capability_seeding_tests {
                     .collect::<Vec<_>>(),
                 "canary_ticks": neotrix_neobot::nt_capability_canary::window_ticks(),
                 // ⭐⭐⭐ 反向核对：⭐⭐ **登记了却不在能力树里** ⭐⭐ ⇒ 第三种状态
+                // ⭐⭐⭐⭐⭐ **市场未上架清单**（⭐⭐⭐⭐⭐ 治「静默消失」）。
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 为什么必须单独输出：⭐⭐⭐⭐⭐
+                // ⭐⭐⭐⭐⭐ 市场 `listable()` **只返回可上架的** ⇒ ⭐⭐⭐⭐⭐
+                // ⭐⭐⭐⭐⭐ ⭐⭐ **没填 `market.*` 的会从视图里彻底消失**。
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 而本仓 **83 处**构造点里只有 5 个填了
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ ⇒ ⭐⭐⭐⭐⭐ **78 处会静默消失**
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **「不可见」又回来了**
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ （与本轮一路治的病**完全同型**）。
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 所以这里 ⭐⭐ **显式算出差集**，
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 让市场清单门能打出「还差多少」。
+                // ⭐⭐⭐⭐⭐ **市场上架清单**（⭐⭐⭐⭐⭐ 市场自己报，⭐⭐⭐⭐⭐ ⭐⭐
+                // ⭐⭐⭐⭐⭐ ⭐⭐ 由门去推断就会重犯「canary ≠ market」的错，
+                // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 上一次就是这么把分母算成 10 的）。
+                "market_listable": market_listable,
+                "market_unlisted": market_unlisted,
                 "canary_expected_but_unregistered":
                     neotrix_neobot::nt_capability_canary::expected_but_unregistered()
                         .unwrap_or_default(),

@@ -305,6 +305,24 @@ jobs:
       - name: neobot library tests (479, previously never run in CI)
         run: cargo test -p neotrix-neobot
 
+      # ⭐⭐⭐⭐⭐ 能力市场清单自洽门（2026-10-04 新增）
+      # ⭐⭐⭐⭐⭐ 防止「有能力但从市场静默消失」：
+      # ⭐⭐⭐⭐⭐ 市场 `listable()` 只返回可上架的 ⇒ 没填 `market.*` 的
+      # ⭐⭐⭐⭐⭐ **从视图里彻底消失** ⇒ 与「有能力没接线」完全同型。
+      # ⭐⭐⭐⭐⭐ 判据全部来自运行期探针（与 neobot-check-emergence 同源），
+      # ⭐⭐⭐⭐⭐ ⭐⭐ 上架率**只报告不当阻断**（演进指标当阻断 ⇒ 恒红 ⇒ 门被关），
+      # ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 只对**清单不自洽**判红：互斥 / 完备 / 反向一致 /
+      # ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 拿不到证据（⭐⭐ 不把「跑不出结果」当「没问题」）。
+      - name: Capability market manifest gate (listable/unlisted self-consistency)
+        run: bash scripts/ops/neobot-check-market.sh
+
+      # ⭐⭐⭐⭐⭐ orphan-dir 门（他窗 2026-10-05 加，⭐⭐ 本轮接 CI）
+      # ⭐⭐⭐⭐⭐ 防「目录不在编译树上 ⇒ 绿测试给未编译的代码背书」。
+      # ⭐⭐⭐⭐⭐ `--strict` 只在**新增**孤儿时非零 ⇒ 基线里 25 个待裁决目录
+      # ⭐⭐⭐⭐⭐ 不会让门恒红（⭐⭐ 照抄「演进指标不当阻断」的纪律）。
+      - name: Orphan directory gate (baseline-tolerant, --strict)
+        run: bash scripts/check-orphan-dirs.sh --strict
+
   coverage:
     runs-on: ubuntu-latest
     steps:

@@ -1221,6 +1221,26 @@
       "read_only": true,
       "when_not": "不要用它判「这些目录该不该存在」—— 基线里 25 个孤儿目录尚未逐个裁决，清单是**待裁决输入**不是判决；也不要用它替代 cargo 编译门：它只看目录可达性，不看类型是否正确。已知三类误报来源：有意的死代码归档、`#[path=..]` 非典型挂载（本门不解析该属性）、未来的代码生成目录。",
       "spec": "scripts/ops/nt_orphan_dir.py 顶部文档（含 2026-10-05 实测依据）"
+    },
+    {
+      "id": "neobot-check-market",
+      "query": [
+        "能力市场",
+        "插件市场",
+        "market",
+        "上架",
+        "未上架",
+        "marketable",
+        "CapabilityKind",
+        "market.*",
+        "静默消失",
+        "能力清单"
+      ],
+      "tool": "bash scripts/ops/neobot-check-market.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "⛔ 别拿它的**上架率**当阻断项 —— 那是演进指标，拿它当阻断 ⇒ 恒红 ⇒ 门被关掉 ⇒ 更坏（照抄 nt_gate_coverage 的教训）。它只对「清单不自洽」判红：互斥/完备/反向一致/拿不到证据。⛔ 它必须跑在干净检出上（脏树的编译结果不可信）。⛔ 别拿 canary 当地图 —— canary 是监视集合不是市场集合，混用会把分母算成两个不同集合的和（第一版就报过 5/10 这种无意义的数）。",
+      "spec": "能力市场清单自洽门：market_listable / market_unlisted 来自运行期探针（EMERGENCE_PROBE），与 neobot-check-emergence.mjs 同源"
     }
   ],
   "excluded": {
