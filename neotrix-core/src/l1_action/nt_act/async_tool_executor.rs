@@ -3,6 +3,38 @@
 //! Supports spawning async tasks, awaiting all results, cancelling
 //! tasks, and collecting results with timeout and retry logic.
 
+// ⭐⭐ 2026-10-05 修锁中毒放大（判据来自 `codewhale-hq/Codewhale`
+// `docs/ARCHITECTURE.md`「Key Design Decisions」第 7 条的**判别标准**）。
+//
+// ## 原缺陷
+// 本模块用 `std::sync::Mutex`（**可中毒**），且 `tokio::spawn` 块内调用
+// **调用方提供的工具闭包**（`execute_with_retry` 的 `F: Fn(ToolExecutionRequest) -> …`）。
+// ⇒ 工具 panic 时若持有锁 ⇒ 锁中毒 ⇒ 此后**全部** `.lock().unwrap()` 都 panic，
+//   包括 `submit` / `cancel` / `results` / `stats` 等 10 处对外 API
+//   ⇒ **单个工具的 panic 放大成执行器永久失效且无法自愈**。
+//   实测本文件原有 **16 处** `.lock().unwrap()`。
+//
+// ## 为什么可以 `into_inner()` 而不是留 `expect()`
+// Codewhale 的判别标准是 ⭐**「能否容忍陈旧状态」**（能否容忍 half-updated state）：
+// · 该标准下 `into_inner()` 是正解 —— 因为本模块的锁装的是
+//   `HashMap` / `HashSet` / `Vec`（**任务账本**），中毒只意味着
+//   「上一次 panic 时正在改动这个集合」⇒ 集合本身仍是**合法 Rust 值**，
+//   **不是半个字节流、不是半个文件**⇒ 读它不会崩。
+// · 反例（本模块**没有**的）：若锁里是「写了一半的磁盘文件」或
+//   「算了一半的校验和」，那才是必须 fail-stop 的场景。
+//
+// ## 同仓已有正确写法可对照（不是外来口味）
+// `neotrix-core/src/l0_substrate/nt_core_di.rs` 早已统一用
+// `lock().unwrap_or_else(|e| e.into_inner())`（10 处）⇒
+// 本笔是把**同仓既有正确实践**铺到这 16 处，不是引入新写法。
+//
+// ⚠️ 与本仓硬规则的关系（未改动规则本身）：
+// 规则是「生产禁 `unwrap`/`expect`」。本笔按同仓既有实践统一为
+// `unwrap_or_else(|e| e.into_inner())` —— 它不是 `unwrap`/`expect`，
+// 且**在类型层面就要求你显式面对中毒**（闭包里必须写 `e`）。
+// ⛔ 本笔**不**为「已命名的中毒锁」开 `expect()` 例外 —— 那是规则级决策，
+//   不该在一笔缺陷修复里顺手改。
+
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
@@ -15,6 +47,36 @@ use tokio::task::JoinHandle;
 // ============================================================================
 
 /// Tool execution result
+/// ⭐⭐ 任务登记的**必跑清理 guard**（2026-10-05）。
+///
+/// ## 为什么需要它（这是比锁中毒更严重的一个缺陷）
+/// 清理 `active_tasks` + 唤醒 `await_all` 这两个动作，**无论任务正常结束
+/// 还是 panic 都必须发生**。原实现把它们排在
+/// `execute_with_retry(..).await` **之后**且不在任何 guard 下
+/// ⇒ 工具闭包 panic 时 async 块整体 unwind，那两行**永不执行**
+/// ⇒ `active_tasks` 里那条永久滞留 ⇒ `await_all()` 的
+/// `if active.is_empty()` 永假、`shutdown_notify.notified()` 永不被唤醒
+/// ⇒ **整个执行器永久挂死**（实测：反向锁跑超 60s 不返回）。
+///
+/// ## 为什么放在 `Drop` 里
+/// unwind 路径与正常路径**共用同一份清理代码**，
+/// 不存在「只覆盖了正常路径」的可能 —— 那正是原缺陷的形状。
+struct ActiveTaskGuard {
+    active_tasks: Arc<Mutex<HashMap<String, TaskHandle>>>,
+    task_id: String,
+    shutdown_notify: Arc<Notify>,
+}
+
+impl Drop for ActiveTaskGuard {
+    fn drop(&mut self) {
+        self.active_tasks
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&self.task_id);
+        self.shutdown_notify.notify_one();
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolResult {
     pub tool_name: String,
@@ -141,6 +203,13 @@ impl AsyncToolExecutor {
         let task_id_clone = task_id.clone();
         let request_clone = request.clone();
         let handle = tokio::spawn(async move {
+            // ⭐ 清理动作交给 guard ⇒ panic 路径也会跑（见 ActiveTaskGuard 文档）
+            let _cleanup = ActiveTaskGuard {
+                active_tasks: active_tasks.clone(),
+                task_id: task_id_clone.clone(),
+                shutdown_notify: shutdown_notify.clone(),
+            };
+
             let result = Self::execute_with_retry(
                 &request_clone,
                 &executor_fn,
@@ -148,12 +217,10 @@ impl AsyncToolExecutor {
                 &cancelled_tasks,
             ).await;
 
-            if !cancelled_tasks.lock().unwrap().contains(&task_id_clone) {
-                completed_results.lock().unwrap().insert(task_id_clone.clone(), result.clone());
+            if !cancelled_tasks.lock().unwrap_or_else(|e| e.into_inner()).contains(&task_id_clone) {
+                completed_results.lock().unwrap_or_else(|e| e.into_inner()).insert(task_id_clone.clone(), result.clone());
             }
 
-            active_tasks.lock().unwrap().remove(&task_id_clone);
-            shutdown_notify.notify_one();
             result
         });
 
@@ -163,7 +230,7 @@ impl AsyncToolExecutor {
             join_handle: handle,
         };
 
-        self.active_tasks.lock().unwrap().insert(task_id.clone(), task_handle);
+        self.active_tasks.lock().unwrap_or_else(|e| e.into_inner()).insert(task_id.clone(), task_handle);
         task_id
     }
 
@@ -181,7 +248,7 @@ impl AsyncToolExecutor {
         let start = Instant::now();
 
         loop {
-            if cancelled_tasks.lock().unwrap().contains(&request.tool_name) {
+            if cancelled_tasks.lock().unwrap_or_else(|e| e.into_inner()).contains(&request.tool_name) {
                 return ToolResult {
                     tool_name: request.tool_name.clone(),
                     success: false,
@@ -257,7 +324,7 @@ impl AsyncToolExecutor {
         let mut results = Vec::new();
 
         loop {
-            let active = self.active_tasks.lock().unwrap();
+            let active = self.active_tasks.lock().unwrap_or_else(|e| e.into_inner());
             if active.is_empty() {
                 drop(active);
                 break;
@@ -266,7 +333,7 @@ impl AsyncToolExecutor {
             self.shutdown_notify.notified().await;
         }
 
-        let completed = self.completed_results.lock().unwrap();
+        let completed = self.completed_results.lock().unwrap_or_else(|e| e.into_inner());
         results.extend(completed.values().cloned());
         results
     }
@@ -276,15 +343,15 @@ impl AsyncToolExecutor {
     /// # Returns
     /// `true` if the task was found and cancelled
     pub async fn cancel(&self, task_id: &str) -> bool {
-        self.cancelled_tasks.lock().unwrap().insert(task_id.to_string());
-        self.active_tasks.lock().unwrap().remove(task_id).is_some()
+        self.cancelled_tasks.lock().unwrap_or_else(|e| e.into_inner()).insert(task_id.to_string());
+        self.active_tasks.lock().unwrap_or_else(|e| e.into_inner()).remove(task_id).is_some()
     }
 
     /// Cancel all running tasks
     pub async fn cancel_all(&self) {
-        let mut tasks = self.active_tasks.lock().unwrap();
+        let mut tasks = self.active_tasks.lock().unwrap_or_else(|e| e.into_inner());
         for (id, _) in tasks.iter() {
-            self.cancelled_tasks.lock().unwrap().insert(id.clone());
+            self.cancelled_tasks.lock().unwrap_or_else(|e| e.into_inner()).insert(id.clone());
         }
         tasks.clear();
     }
@@ -294,28 +361,28 @@ impl AsyncToolExecutor {
     /// # Returns
     /// HashMap mapping task IDs to their results
     pub async fn get_results(&self) -> HashMap<String, ToolResult> {
-        self.completed_results.lock().unwrap().clone()
+        self.completed_results.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
     /// Get results for a specific task
     pub async fn get_result(&self, task_id: &str) -> Option<ToolResult> {
-        self.completed_results.lock().unwrap().get(task_id).cloned()
+        self.completed_results.lock().unwrap_or_else(|e| e.into_inner()).get(task_id).cloned()
     }
 
     /// Get count of active tasks
     pub async fn active_count(&self) -> usize {
-        self.active_tasks.lock().unwrap().len()
+        self.active_tasks.lock().unwrap_or_else(|e| e.into_inner()).len()
     }
 
     /// Check if backpressure is active
     pub fn is_backpressured(&self) -> bool {
-        let active = self.active_tasks.lock().unwrap();
+        let active = self.active_tasks.lock().unwrap_or_else(|e| e.into_inner());
         active.len() >= self.config.backpressure_threshold
     }
 
     /// Shutdown the executor
     pub async fn shutdown(&self) {
-        *self.running.lock().unwrap() = false;
+        *self.running.lock().unwrap_or_else(|e| e.into_inner()) = false;
         self.cancel_all().await;
         self.shutdown_notify.notify_one();
     }
@@ -459,5 +526,62 @@ mod tests {
         executor.spawn(req, dummy_executor);
         executor.shutdown().await;
         assert_eq!(executor.active_count().await, 0);
+    }
+
+    /// ⭐⭐⭐ 反向锁：**一个工具 panic 不得毒死整个执行器**。
+    ///
+    /// ## 缺陷形状（2026-10-05 修）
+    /// 本模块用 `std::sync::Mutex`（**可中毒**），且 `tokio::spawn` 块内调用
+    /// **调用方提供的工具闭包**。⇒ 工具 panic 且持锁 ⇒ 锁中毒 ⇒
+    /// 此后全部 `.lock().unwrap()` 都 panic，**含 10 处对外 API**
+    /// （`spawn` / `await_all` / `cancel` / `cancel_all` / `get_results` /
+    /// `get_result` / `active_count` / `is_backpressured` / `shutdown` / `config`）
+    /// ⇒ 单个工具的 panic 放大成执行器**永久失效且无法自愈**。
+    ///
+    /// ## 本测试怎么做
+    /// 不靠「锁中毒」这种间接推断，而是**真的让工具 panic**，
+    /// 然后逐个调用对外 API —— 任何一个 panic 就说明执行器被毒死了。
+    ///
+    /// ⚠️ 修复前：`.lock().unwrap()` 会在**第二次** `spawn`（锁已中毒）时 panic。
+    #[tokio::test]
+    async fn panicking_tool_must_not_poison_the_executor() {
+        /// 故意 panic 的工具：模拟真实插件/工具崩在用户代码里
+        fn exploding_executor(_req: ToolExecutionRequest) -> Pin<Box<dyn std::future::Future<Output = ToolResult> + Send>> {
+            Box::pin(async move { panic!("工具内部 panic（模拟真实工具崩溃）") })
+        }
+
+        let req = |name: &str| ToolExecutionRequest {
+            tool_name: name.to_string(),
+            parameters: serde_json::json!({}),
+            timeout_ms: 1000,
+            max_retries: 0,
+            priority: TaskPriority::Normal,
+        };
+
+        let executor = AsyncToolExecutor::new();
+
+        // 1) 第一个工具 panic（它会持有并污染锁）
+        executor.spawn(req("boom"), exploding_executor);
+
+        // 2) 等它真的跑完（panic 发生在 spawn 内的 async 块里）
+        let _ = executor.await_all().await;
+
+        // 3) ⭐ 核心断言：此后执行器必须**仍然可用**。
+        //    修复前这里会在 `active_tasks.lock().unwrap()` 处 panic。
+        executor.spawn(req("healthy"), dummy_executor);
+        let results = executor.await_all().await;
+
+        assert!(
+            results.iter().any(|r| r.tool_name == "healthy" && r.success),
+            "panic 之后健康工具仍必须能跑完（锁中毒会毁掉这一点）：{results:?}"
+        );
+
+        // 4) 全部对外 API 逐个触碰 —— 任一 panic 即为未修复
+        assert!(executor.active_count().await <= 1);
+        let _ = executor.get_results().await;
+        let _ = executor.get_result("healthy").await;
+        let _ = executor.cancel("nonexistent").await;
+        let _ = executor.is_backpressured();
+        let _ = executor.config();
     }
 }
