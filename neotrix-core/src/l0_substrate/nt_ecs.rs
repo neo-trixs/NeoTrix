@@ -20,6 +20,11 @@ pub struct EntityId(pub u64);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UniversalEntity {
     pub id: EntityId,
+    /// ⛔ **世代**：槽位每次被回收时递增。**零值的世代是合法的**，但
+    /// 持有者必须去 [`UniversalWorld::contains`] 核对 —— 裸比 `id` 会在
+    /// 槽位复用后**静默别名**到新实体（ABA）。
+    ///
+    /// 移植自 `ra-ecs`（Apache-2.0）的 `EcsEntity { slot, generation }`。
     pub generation: u32,
     pub archetype: ArchetypeId,
 }
@@ -32,6 +37,19 @@ impl UniversalEntity {
             archetype: ArchetypeId(0),
         }
     }
+}
+
+/// 槽位的存活与世代元数据。
+///
+/// ⭐ **为什么必须是独立并行数组**，而不是从 `entities: Vec<Option<…>>` 里读：
+/// `despawn` 之后槽位变空（`None`），若世代只活在句柄里，**释放即丢失**
+/// ⇒ 复用该槽位时没有可递增的基准，也就无法区分「旧句柄」与「新实体」。
+/// `ra-ecs` 的 `EntityMeta { generation, alive }` 正是为此存在。
+/// 世代号存在 `metas` 里 ⇒ 槽位空着也**保留**上次那个值。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct EntityMeta {
+    pub(crate) generation: u32,
+    pub(crate) alive: bool,
 }
 
 /// Component storage types
@@ -122,8 +140,16 @@ impl Archetype {
         }
     }
 
+    /// ⭐ **幂等**：同一实体重复登记会静默变成**多条**，于是任何按 archetype
+    /// 迭代的代码都会把同一个实体返回多次（实测：插两个组件后，
+    /// 一个实体在全体 archetype 里共两条登记）。
+    ///
+    /// O(n) 扫一遍换掉一整类「静默重复」的错；`entities` 本就是
+    /// 装饰性结构（当前无外部消费者），这里要正确性不要吞吐。
     pub fn add_entity(&mut self, entity: UniversalEntity) {
-        self.entities.push(entity);
+        if !self.entities.iter().any(|e| e.id == entity.id) {
+            self.entities.push(entity);
+        }
     }
 
     pub fn remove_entity(&mut self, entity: EntityId) {
@@ -267,12 +293,17 @@ pub trait Event: Send + Sync + 'static {
 
 /// Universal world
 pub struct UniversalWorld {
+    /// 槽位 → 活实体的 archetype（`None` = 该槽位空着）。
+    /// **与 [`Self::metas`] 等长**，下标即 `EntityId.0`。
     entities: Vec<Option<UniversalEntity>>,
+    /// 槽位世代与存活位。**空槽也保留世代**（见 [`EntityMeta`]）。
+    metas: Vec<EntityMeta>,
+    /// 已释放槽位的 **LIFO** 空闲表 —— 分配走 `pop()`，释放走 `push()`。
+    free_slots: Vec<u32>,
     archetypes: HashMap<ArchetypeId, Archetype>,
     components: HashMap<(EntityId, TypeId), Box<dyn Any + Send + Sync>>,
     resources: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
     events: Vec<Box<dyn Any + Send + Sync>>,
-    next_entity_id: u64,
     next_archetype_id: u64,
 }
 
@@ -280,48 +311,98 @@ impl UniversalWorld {
     pub fn new() -> Self {
         Self {
             entities: Vec::new(),
+            metas: Vec::new(),
+            free_slots: Vec::new(),
             archetypes: HashMap::new(),
             components: HashMap::new(),
             resources: HashMap::new(),
             events: Vec::new(),
-            next_entity_id: 0,
             next_archetype_id: 0,
         }
     }
 
+    /// ⭐ 句柄是否仍指向一个**活着**的实体。
+    ///
+    /// **每个公开的按实体操作都必须先过这里** —— 这是「槽位复用后旧句柄
+    /// 静默串写到新实体」（ABA）唯一的检测点。移植自 `ra-ecs`
+    /// （Apache-2.0）的 `EcsWorld::contains`。
+    pub fn contains(&self, entity: UniversalEntity) -> bool {
+        match self.metas.get(entity.id.0 as usize) {
+            Some(meta) => meta.alive && meta.generation == entity.generation,
+            None => false,
+        }
+    }
+
     /// Spawn a new entity
+    ///
+    /// ⭐ 优先复用 [`Self::free_slots`] 的 LIFO 空闲表。**不是**单调递增的新槽位：
+    /// 单调递增意味着长跑的世界里 `entities`/`metas` 无限增长（实测：每 64 次
+    /// spawn/despawn 循环就 +64 槽，永不回收）。
+    ///
+    /// 新槽位的世代取 **1**（不是 0）—— 与 `ra-ecs` 一致，让「构造出来的
+    /// 世代」与「递增出来的世代」在直觉上区分得开。
     pub fn spawn(&mut self) -> UniversalEntity {
-        let id = EntityId(self.next_entity_id);
-        self.next_entity_id += 1;
-        
-        let entity = UniversalEntity::new(id, 0);
-        self.entities.push(Some(entity));
-        
+        let slot = match self.free_slots.pop() {
+            Some(slot) => {
+                self.metas[slot as usize].alive = true;
+                slot
+            }
+            None => {
+                let slot = self.metas.len() as u32;
+                self.metas.push(EntityMeta { generation: 1, alive: true });
+                self.entities.push(None);
+                slot
+            }
+        };
+        let generation = self.metas[slot as usize].generation;
+        let entity = UniversalEntity::new(EntityId(u64::from(slot)), generation);
+        self.entities[slot as usize] = Some(entity);
         entity
     }
 
     /// Despawn an entity
+    ///
+    /// ⛔ 陈旧句柄（已被复用槽位取代，或已被 despawn 过）**返回 `false` 且不做
+    /// 任何事** —— 绝不拿它去清别人的组件或改别人的 archetype。
+    ///
+    /// 槽位**不被销毁**，只是入 [`Self::free_slots`] 空闲表并递增世代。
     pub fn despawn(&mut self, entity: UniversalEntity) -> bool {
-        if let Some(slot) = self.entities.get_mut(entity.id.0 as usize) {
-            if slot.is_some() {
-                // Remove from archetype
-                if let Some(archetype) = self.archetypes.get_mut(&entity.archetype) {
-                    archetype.remove_entity(entity.id);
-                }
-                
-                *slot = None;
-                
-                // Remove components
-                self.remove_all_components(entity.id);
-                
-                return true;
+        if !self.contains(entity) {
+            return false;
+        }
+        let idx = entity.id.0 as usize;
+
+        // 从**世界里存的那份** archetype 移出。⛔ 不是句柄拷贝 —— 那份可能早已
+        // 过期（没有任何途径能刷新调用方手里的 `.archetype`）。
+        if let Some(stored) = self.entities[idx] {
+            if let Some(arch) = self.archetypes.get_mut(&stored.archetype) {
+                arch.remove_entity(entity.id);
             }
         }
-        false
+
+        self.entities[idx] = None;
+        self.remove_all_components(entity.id);
+
+        // 世代递增 + 入空闲表。世代号活在 `metas` 里，所以槽位空着也留着它。
+        self.metas[idx].alive = false;
+        self.metas[idx].generation = self.metas[idx].generation.wrapping_add(1);
+        self.free_slots.push(idx as u32);
+        true
     }
 
     /// Insert a component into an entity
-    pub fn insert_component<T: Component>(&mut self, entity: UniversalEntity, component: T) {
+    ///
+    /// 返回是否真的写入。**`false` = 句柄已失效，本次什么都没做。**
+    ///
+    /// ⛔ 不能是 `()`：「拒收」与「接受」必须能被调用方区分，否则一次被
+    /// 拒的写入与一次成功写入在调用点长得一模一样 —— 而组件行已经落进了
+    /// `components`，`query()` 却遍历不到它（它只扫存活槽位）
+    /// ⇒ 一个**索引里有、迭代里没有、且 `despawn` 早已跑过所以永不清**的
+    /// 幽灵行。返回 `bool` 是让这件事**可检测**的最小改动。
+    pub fn insert_component<T: Component>(&mut self, entity: UniversalEntity, component: T) -> bool {
+        if !self.contains(entity) {
+            return false;
+        }
         let type_id = component.type_id();
         
         // Store component
@@ -332,10 +413,14 @@ impl UniversalWorld {
         
         // Update archetype
         self.update_archetype(entity, type_id);
+        true
     }
 
     /// Get a component reference
     pub fn get_component<T: Component>(&self, entity: UniversalEntity) -> Option<&T> {
+        if !self.contains(entity) {
+            return None;
+        }
         let type_id = TypeId::of::<T>();
         self.components
             .get(&(entity.id, type_id))
@@ -344,6 +429,9 @@ impl UniversalWorld {
 
     /// Get a mutable component reference
     pub fn get_component_mut<T: Component>(&mut self, entity: UniversalEntity) -> Option<&mut T> {
+        if !self.contains(entity) {
+            return None;
+        }
         let type_id = TypeId::of::<T>();
         self.components
             .get_mut(&(entity.id, type_id))
@@ -352,6 +440,9 @@ impl UniversalWorld {
 
     /// Remove a component from an entity
     pub fn remove_component<T: Component>(&mut self, entity: UniversalEntity) -> Option<T> {
+        if !self.contains(entity) {
+            return None;
+        }
         let type_id = TypeId::of::<T>();
         
         if let Some(component) = self.components.remove(&(entity.id, type_id)) {
@@ -366,6 +457,9 @@ impl UniversalWorld {
 
     /// Check if entity has a component
     pub fn has_component<T: Component>(&self, entity: UniversalEntity) -> bool {
+        if !self.contains(entity) {
+            return false;
+        }
         let type_id = TypeId::of::<T>();
         self.components.contains_key(&(entity.id, type_id))
     }
@@ -442,26 +536,40 @@ impl UniversalWorld {
 
     /// Helper: update archetype when component is added
     fn update_archetype(&mut self, entity: UniversalEntity, type_id: TypeId) {
-        // Get current archetype
-        let current_archetype = entity.archetype;
+        let idx = entity.id.0 as usize;
+
+        // ⛔ 读**世界里存的那份** archetype，不是 `entity.archetype`（句柄拷贝）。
+        //   调用方手里的句柄在首次 insert 之后 archetype 字段就**永久过期**
+        //   （没有任何 API 能刷新它）⇒ 拿它算，等于每次都从同一份陈旧基底重算，
+        //   实测让 archetype 的 `component_types` **插两个组件后仍然只有 1 个**。
+        let current_archetype = self.entities[idx]
+            .map(|e| e.archetype)
+            .unwrap_or(ArchetypeId(0));
         
         // Get or create archetype with new component
-        let mut component_types = if let Some(archetype) = self.archetypes.get(&current_archetype) {
-            archetype.component_types.clone()
-        } else {
-            HashSet::new()
-        };
+        let mut component_types = self.archetypes
+            .get(&current_archetype)
+            .map(|a| a.component_types.clone())
+            .unwrap_or_default();
         
         component_types.insert(type_id);
         
         // Find or create matching archetype
         let archetype_id = self.find_or_create_archetype(component_types);
         
-        // Update entity archetype
-        if let Some(slot) = self.entities.get_mut(entity.id.0 as usize) {
-            if let Some(e) = slot {
-                e.archetype = archetype_id;
+        // ⭐ **从旧 archetype 移出**。否则实体留在它待过的**每一个** archetype 里，
+        //   而 `add_entity` 无去重 ⇒ 每插一个新组件就多留一份登记
+        //   （实测：一个实体两条登记）。任何按 archetype 迭代的代码
+        //   ——那正是 archetype 存在的全部理由——都会把它返回多次。
+        if archetype_id != current_archetype {
+            if let Some(old) = self.archetypes.get_mut(&current_archetype) {
+                old.remove_entity(entity.id);
             }
+        }
+        
+        // Update entity archetype
+        if let Some(e) = self.entities[idx].as_mut() {
+            e.archetype = archetype_id;
         }
         
         // Add entity to new archetype
@@ -472,7 +580,11 @@ impl UniversalWorld {
 
     /// Helper: update archetype when component is removed
     fn update_archetype_remove(&mut self, entity: UniversalEntity, type_id: TypeId) {
-        let current_archetype = entity.archetype;
+        let idx = entity.id.0 as usize;
+        // 同上：读存的那份，不是句柄拷贝。
+        let current_archetype = self.entities[idx]
+            .map(|e| e.archetype)
+            .unwrap_or(ArchetypeId(0));
         
         if let Some(archetype) = self.archetypes.get(&current_archetype) {
             let mut component_types = archetype.component_types.clone();
@@ -480,11 +592,16 @@ impl UniversalWorld {
             
             let archetype_id = self.find_or_create_archetype(component_types);
             
-            // Update entity archetype
-            if let Some(slot) = self.entities.get_mut(entity.id.0 as usize) {
-                if let Some(e) = slot {
-                    e.archetype = archetype_id;
+            // 从旧 archetype 移出（同 `update_archetype`）。
+            if archetype_id != current_archetype {
+                if let Some(old) = self.archetypes.get_mut(&current_archetype) {
+                    old.remove_entity(entity.id);
                 }
+            }
+            
+            // Update entity archetype
+            if let Some(e) = self.entities[idx].as_mut() {
+                e.archetype = archetype_id;
             }
             
             // Add entity to new archetype
@@ -1358,5 +1475,232 @@ impl Transform {
 impl Default for Transform {
     fn default() -> Self {
         Self { position: Vec2::zero(), rotation: 0.0, scale: Vec2::one() }
+    }
+}
+
+// ===========================================================================
+// 句柄契约测试 —— 移植自 `ra-ecs`（Apache-2.0）的 `EntityMeta` + LIFO 空闲表
+//
+// ⛔ 这组测试**先于**实现写成，作用是把两个被证伪的缺陷钉成红的：
+//   ① `generation` 字段只出现在声明/构造/赋值三处（`:23/:28/:31`），
+//      **从未被任何代码读过** ⇒ 它承诺「防复用误命中」却零强制；
+//   ② `update_archetype` 读的是**调用方手里那份句柄拷贝**的 `.archetype`，
+//      而不是世界里存的那份 ⇒ 拿同一个句柄连插两个组件，第二个算出的
+//      仍是「从 ArchetypeId(0) 起算的 1 个组件」，archetype 集合**永不累积**。
+// ===========================================================================
+#[cfg(test)]
+mod tests_5 {
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq)]
+    struct Hp(i32);
+    impl Component for Hp {}
+
+    #[derive(Clone, Debug, PartialEq)]
+    struct Xp(i32);
+    impl Component for Xp {}
+
+    /// 活着的实体的当前 archetype 存了几个组件类型。
+    fn live_archetype_size(world: &UniversalWorld) -> usize {
+        let e = world.entities().into_iter().next().expect("应有一个活实体");
+        world
+            .archetypes
+            .get(&e.archetype)
+            .expect("活实体必属某个 archetype")
+            .component_types
+            .len()
+    }
+
+    /// ⛔ **幽灵组件**：`despawn` 之后再拿**旧句柄**插组件，不得凭空造出
+    /// 一个「`has_component` 说有、`query` 看不见、且永远不会被回收」的行。
+    ///
+    /// 旧实现的病：`insert_component` 直接 `self.components.insert((entity.id, type_id), ..)`，
+    /// **从不检查该实体是否还活着** ⇒ 而 `query()` 只遍历存活槽位
+    /// ⇒ 落进一个「索引里有、迭代里没有、且 `despawn` 早已跑过所以永不清」的黑洞。
+    #[test]
+    fn inserting_through_a_dead_handle_must_not_create_a_ghost_component() {
+        let mut world = UniversalWorld::new();
+        let e = world.spawn();
+        world.insert_component(e, Hp(10));
+        assert!(world.despawn(e));
+
+        // 拿死句柄再插一次 —— 必须被拒。
+        let accepted = world.insert_component(e, Hp(99));
+        assert!(
+            !accepted,
+            "死句柄的插入必须被拒并让调用方知道；静默接受 = 造出迭代看不见的幽灵行"
+        );
+        assert!(
+            world.get_component::<Hp>(e).is_none(),
+            "死句柄不得读出任何组件"
+        );
+        assert!(!world.has_component::<Hp>(e), "死句柄不得被说有组件");
+        // 关键：不能有「索引里有、迭代里没有」的行。
+        assert_eq!(world.entity_count(), 0, "世界里不该有活实体");
+        assert!(
+            world.components.is_empty(),
+            "组件表必须被清空 —— 幽灵行就是这里漏的"
+        );
+    }
+
+    /// ⭐ **槽位复用 + 世代递增**：这是 `generation` 字段唯一能兑现承诺的方式。
+    ///
+    /// 旧实现的病：`spawn()` 只 `self.entities.push(...)`，`next_entity_id` 单调递增
+    /// ⇒ **槽位永不回收** ⇒ 长跑的世界里 `entities` Vec 无限增长，
+    /// 且没有任何机制能让 `generation` 变成非 0。
+    #[test]
+    fn despawned_slot_is_reused_and_carries_a_new_generation() {
+        let mut world = UniversalWorld::new();
+        let first = world.spawn();
+        assert!(world.despawn(first));
+
+        let second = world.spawn();
+        assert_eq!(
+            first.id, second.id,
+            "释放的槽位必须被复用，否则 entities Vec 单调增长、长跑必泄漏"
+        );
+        assert_ne!(
+            first.generation, second.generation,
+            "复用槽位必须换世代，否则旧句柄会静默别名到新实体（ABA）"
+        );
+        assert_eq!(world.entity_count(), 1);
+    }
+
+    /// ⭐⭐ **ABA 契约**：旧句柄在槽位被复用后**绝不能**读写新实体。
+    ///
+    /// 这是上两条合起来的**真正目的**：单独看「复用槽位」只是省内存，
+    /// 单独看「换世代」只是个数字；合起来才让「拿旧句柄操作」变成可检测的失败
+    /// 而不是一次静默的串写。这正是 `ra-ecs` 每个公开操作都过 `contains()` 的原因。
+    #[test]
+    fn a_stale_handle_never_aliases_the_reused_slot() {
+        let mut world = UniversalWorld::new();
+        let stale = world.spawn();
+        assert!(world.despawn(stale));
+
+        let fresh = world.spawn();
+        world.insert_component(fresh, Hp(7));
+        assert_eq!(world.get_component::<Hp>(fresh), Some(&Hp(7)));
+
+        // 旧句柄：读不到新实体的组件，写也进不去，despawn 也不能把新实体杀掉。
+        assert!(
+            world.get_component::<Hp>(stale).is_none(),
+            "旧句柄读到了复用槽位上的新实体 ⇒ ABA 串写"
+        );
+        assert!(!world.has_component::<Hp>(stale));
+        assert!(
+            !world.insert_component(stale, Hp(123)),
+            "旧句柄不得写入复用槽位"
+        );
+        assert!(
+            !world.despawn(stale),
+            "旧句柄不得 despawn 掉复用槽位上的新实体"
+        );
+        // 新实体毫发无伤。
+        assert_eq!(world.get_component::<Hp>(fresh), Some(&Hp(7)));
+        assert_eq!(world.entity_count(), 1);
+    }
+
+    /// ⛔ **archetype 的组件集合必须累积**。
+    ///
+    /// 旧实现的病：`update_archetype(entity, ..)` 读 `entity.archetype` ——
+    /// 那是**调用方手里那份句柄拷贝**。调用方拿同一个句柄连插两个组件时，
+    /// 第二次读到的仍是 spawn 时的 `ArchetypeId(0)` ⇒ 于是每次都从空集重算
+    /// ⇒ archetype 里的 `component_types` **永远只有 1 个**，
+    /// 而实体在真实意义上已经有两个组件了。
+    ///
+    /// 旧测试测不出来：`query()` 遍历的是 `entities` 而不是 archetype，
+    /// 所以 `test_query` 照样绿 —— **测试绕过了坏掉的那条路径**。
+    #[test]
+    fn archetype_component_set_accumulates_across_inserts() {
+        let mut world = UniversalWorld::new();
+        let e = world.spawn();
+        // 同一个句柄连插两个 —— 不刷新句柄拷贝。
+        world.insert_component(e, Hp(1));
+        assert_eq!(live_archetype_size(&world), 1, "插一个 ⇒ 集合里 1 个");
+        world.insert_component(e, Xp(2));
+        assert_eq!(
+            live_archetype_size(&world),
+            2,
+            "插第二个后 archetype 必须记 2 个组件；\
+             读句柄拷贝重算的实现会让这里停在 1（组件集合永不累积）"
+        );
+        world.insert_component(e, Hp(3));
+        assert_eq!(
+            live_archetype_size(&world),
+            2,
+            "覆盖写不得让集合涨到 3（同一 TypeId 只算一次）"
+        );
+    }
+
+    /// ⛔ **archetype 成员不得累积**：实体换 archetype 时必须**从旧的移出**。
+    ///
+    /// 旧实现的病：`update_archetype` 只 `new_archetype.add_entity(entity)`，
+    /// **从不** `old.remove_entity` ⇒ 实体留在它待过的**每一个** archetype 里，
+    /// 且 `add_entity` 是 `Vec::push`（无去重）⇒ 每插一个新组件就多留一份。
+    /// 一旦有任何按 archetype 迭代的代码（这是 archetype 存在的全部理由），
+    /// 同一个实体会被返回 N 次。
+    #[test]
+    fn entity_is_not_duplicated_into_every_archetype_it_ever_had() {
+        let mut world = UniversalWorld::new();
+        let e = world.spawn();
+
+        world.insert_component(e, Hp(1));
+        world.insert_component(e, Xp(2));
+
+        // 每个 archetype 里，同一个实体至多出现一次。
+        for (id, arch) in &world.archetypes {
+            let occurrences = arch.entities.iter().filter(|x| x.id == e.id).count();
+            assert!(
+                occurrences <= 1,
+                "实体在 archetype {id:?} 里出现了 {occurrences} 次 \
+                 （换 archetype 时没从旧的移出 + add_entity 无去重）"
+            );
+        }
+        // 且总数必须等于活实体数 —— 没有「重复登记」也没有「漏登记」。
+        let total: usize = world.archetypes.values().map(|a| a.entities.len()).sum();
+        assert_eq!(
+            total, 1,
+            "一个实体只应登记在一个 archetype 里，实测共 {total} 条登记"
+        );
+    }
+
+    /// `despawn` 幂等 + 拒陈旧句柄（契约锁定，防回归）。
+    #[test]
+    fn despawn_is_idempotent_and_rejects_stale_handles() {
+        let mut world = UniversalWorld::new();
+        let e = world.spawn();
+        assert!(world.despawn(e), "第一次 despawn 必须成功");
+        assert!(!world.despawn(e), "第二次 despawn 同一个句柄必须返回 false");
+        assert_eq!(world.entity_count(), 0);
+    }
+
+    /// 大量 spawn/despawn 循环后，槽位表必须**不增长**（旧实现每轮泄漏 1 槽）。
+    #[test]
+    fn churn_does_not_grow_the_slot_table() {
+        let mut world = UniversalWorld::new();
+        let mut handles = Vec::new();
+        for i in 0..64 {
+            let e = world.spawn();
+            world.insert_component(e, Hp(i));
+            handles.push(e);
+        }
+        for e in &handles {
+            assert!(world.despawn(*e));
+        }
+        assert_eq!(world.entity_count(), 0);
+        assert!(world.components.is_empty(), "全部 despawn 后组件表必须空");
+        // 再开一轮：槽位表不该比第一轮结束时更大。
+        let after_first = world.entities.len();
+        for i in 0..64 {
+            let e = world.spawn();
+            world.insert_component(e, Xp(i));
+            assert!(world.despawn(e));
+        }
+        assert_eq!(
+            world.entities.len(),
+            after_first,
+            "第二轮 churn 后槽位表不得增长（旧实现 push-only ⇒ 每轮 +64）"
+        );
+        assert_eq!(world.entity_count(), 0);
     }
 }
