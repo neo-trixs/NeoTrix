@@ -70,10 +70,24 @@ pub fn truncate(s: &str, max: usize) -> String {
             out.push(c);
             acc += cw;
         }
-        out.push_str(marker);
-        while nt_term_viz::display_width(&out) < max {
+        // ⚠️ 补白必须在 marker **之前**（`e6386797` 修 `display_width` 时放错了位置）。
+        //
+        // 原写法（补白在 marker 之后）在 CJK + max=28 + marker="..." 下实测：
+        //   结果 = "让系统自主进化并持续涌现... "  ← 末字符是空格
+        //   列宽 = 28（✓ 达标）但 ends_with("...") = false
+        // ⇒ 列宽断言过了、以省略号收尾的契约被破坏。
+        //   下方测试 `test_truncate_cjk_respects_column_width` 钉的正是后者。
+        //
+        // ✅ 先把内容补到「marker 前应有的宽度」，再接 marker ⇒ 收尾恒为 marker。
+        //
+        // ⓘ 顺带说明：`budget = max - marker_width` = 28-3 = 25（奇数），
+        //   CJK 每字 2 列 ⇒ 内容只能填到 24 ⇒ 这 1 列缺口靠补白补齐。
+        //   该「奇数 budget」是设计后果，不是缺陷。
+        let mw = nt_term_viz::display_width(marker);
+        while nt_term_viz::display_width(&out) + mw < max {
             out.push(' ');
         }
+        out.push_str(marker);
         out
     }
 }
