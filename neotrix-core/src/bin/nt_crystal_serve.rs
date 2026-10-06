@@ -1273,10 +1273,27 @@ fn write_back_experience(goal: &str, output: &str, model_used: &str, steps: usiz
         "steps": steps,
     });
     let path = std::path::PathBuf::from(format!("{home}/.neotrix/audit_neobot_crystal.jsonl"));
-    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
-        use std::io::Write as _;
-        let _written: Result<(), std::io::Error> =
-            writeln!(file, "{}", serde_json::to_string(&line).unwrap_or_default());
+    // ⚠️ 此处原有**三处**静默失败叠加（本轮 `.ok()` 分诊 + opener 放宽后发现）：
+    //   ① `if let Ok(..)` 打开失败 ⇒ 审计记录**静默跳过**
+    //   ② `let _written` 把写入错误**丢弃**
+    //   ③ `unwrap_or_default()` 序列化失败 ⇒ 写出**空串**，
+    //      即一条**看起来有效但内容为空的损坏审计记录**
+    // ⇒ 审计链正是「出事时靠它」的组件，三者都必须**可见**。
+    use std::io::Write as _;
+    let payload = match serde_json::to_string(&line) {
+        Ok(s) => s,
+        Err(e) => {
+            log::warn!("[crystal_serve] 审计行序列化失败（该记录已丢失）: {e}");
+            return;
+        }
+    };
+    match std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        Ok(mut file) => {
+            if let Err(e) = writeln!(file, "{payload}") {
+                log::warn!("[crystal_serve] 审计写入失败 {}: {e}", path.display());
+            }
+        }
+        Err(e) => log::warn!("[crystal_serve] 审计文件打开失败 {}: {e}", path.display()),
     }
 }
 
