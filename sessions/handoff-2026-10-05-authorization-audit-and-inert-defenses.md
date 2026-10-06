@@ -281,3 +281,100 @@ macOS `script -q /dev/null cmd` **不把管道输入送进子进程 pty**（`^D`
    仍不在生产链上 ⇒ 「flag 落地 ⇒ 被工具执行消费」那一段仍然断。
    **不要因为 flag 已收敛就把这一项划掉。**
 2. `EffortTier::from_client_spelling` 仍**无生产调用方**（仅测试）⇒ 待接 gateway。
+
+---
+
+# 追加：2026-10-06 五源吸收（uber/ADR 为主）+ 三处缺陷修复
+
+用户提交 5 源并要求「吸收，补齐 neotrix 缺陷」。**先过 LICENSE 前置门**：
+MangoDisk 与 openhuman 均 **GPL-3.0 ⇒ 不取码**；Jev-Mem / Codewhale 为 MIT（只取设计）；
+**uber/ADR 为 Apache-2.0 ⇒ 可取码**，是本轮主要来源。
+
+## 本轮四笔提交（`feat/capability-absorb-20260828`，未推送）
+| 提交 | 内容 |
+|---|---|
+| `408d23c1` | ⭐ 审计不再抄录文件内容（含密钥）+ 修 `action_verdict` 丢 AutoEdit 白名单 |
+| `9fa2af7b` | `--sandbox` 接到活对象 + **如实记录**两处 sandbox 闸语义漂移（不擅自统一） |
+| `39f37509` | `init_sandbox` 同时推进 `global_shield()` |
+| `2714681a` | 五源吸收判定文档 + 台账 525 条 + 第 9 项升级为**实测结论** |
+
+## ⭐ 修掉的三个真实缺陷
+1. **审计抄录文件内容**：`describe_action` 把 `content_preview`/`diff` 原文（≤60 字符）
+   拼进 `description`，而它被 `ApprovalAuditEntry` **快照进审计轨迹**
+   ⇒ 写 `.env` 时那 60 字符**就是密钥**。改为 **`<N> chars, sha256:<12hex>`** 指纹
+   （源：uber/ADR `run_manifest` 明确 *file contents are not stored*）。
+2. **`action_verdict` 丢 AutoEdit 文件类白名单**：它是 `ActionSandbox` 的硬拒判据，
+   却把同一动作判成与 `require_approval` **不同**的答案 ⇒ AutoEdit 下所有文件写全被当 Ask。
+   改为委托 `require_approval`（判据唯一真源）+ 穷举 3 档 × 6 动作的一致性锁。
+   ⚠️ 该函数此前**零测试**。
+3. **`--sandbox` 完全无效**：`init_sandbox` 只写 `global_sandbox()`，
+   而实测该单例**模块外零读者**。改为同时推进 `global_shield()` 的活对象。
+
+## ⚠️ 本轮「刻意没做」的一件事（需要产品裁决）
+`check_all` 与 `check_cli_command` 的 sandbox 闸语义**不一致**
+（前者拦一切、后者只拦写），且前者被既有测试**显式断言**（*"should block even reads"*）。
+我一度改成「只拦写」，**随后撤回**，三条实测理由：
+1. 对活路径**零效果**（唯一调用方 `seal_iterate` 本就登记为 `irreversible`）
+2. 默认档**根本走不到** sandbox 段（`SecurityGuard` 第 1 段先短路）
+3. 改它 = 单方面翻转被测试钉住的安全语义；「read-only 该不该拦读」是**产品判断**
+⇒ 代码里已写入完整裁决依据 + 7 条按**实测**（非我期望）写的锁。
+
+## ⭐⭐ 环境事故：他窗 `cargo clean` 两次抽走主 `target/`
+症状：`can't find crate for hashbrown` / `extern location for libc does not exist` /
+`failed to write … .fingerprint/… No such file or directory`。
+⇒ **这些不是代码错误。** 应对：改用私有 `CARGO_TARGET_DIR=/tmp/nt-target-private`
+（11G，他窗再也删不到）。⚠️ 拷贝热缓存失败（拷贝期间目录正被删，只拿到 170M），
+冷构建约 3 分钟可接受。
+**下一个人若在共享工作树编译报上述错误，先 `ps aux | rg cargo clean` 查他窗，不要
+去「修」代码。**
+
+## 三条可复用判据
+1. **审计/日志记摘要不记内容**（源 uber/ADR）
+2. **遮蔽误伤的代价 = 审批失效**，比漏遮更难发现 ⇒ 遮蔽器必须配反向测试
+   （`KEYBOARD=1` 被误遮就是这么抓到的）
+3. **解析/输出失败必须朝严格方向**（escalate/`Err`），不得回落成放行
+
+## 8. 收工自查
+
+### 8.1 worktree 去向
+```
+[worktree-gate] repo=/Users/neo/Downloads/neotrix mode=check
+------------------------------------------------------------
+路径 | HEAD | 分支 | 脏 | 体积 | target | 近3h活动
+--------------------------------------------------------------------------
+/Users/neo/Downloads/neotrix/.worktrees/merge-b | 1a48ecd3 | HEAD | 3 | 66M | 0M | no
+/Users/neo/Downloads/neotrix/.worktrees/nt-v2 | 6b57fe08 | HEAD | 0 | 81M | 0M | no
+[worktree-gate] ℹ️  **主树**：14 处未提交 | target 14017M（**只报告，不影响退出码**）
+[worktree-gate]    ⛔ 主树未提交改动**不在任何提交里**（AGENTS.md §1 收工义务）
+[worktree-gate]    提交：git add <显式路径> && git commit --only <同一批>（⛔ 共享 index 下禁 -A）
+------------------------------------------------------------
+[worktree-gate] worktree=2 个 | 合计 147M | target 占 0M
+[worktree-gate] 带未提交改动: 1 个 | 近3h有改动: 0 个
+[worktree-gate] ⛔ 1 个 worktree 的未提交改动**不在任何提交里**：
+[worktree-gate]      ⛔ /Users/neo/Downloads/neotrix/.worktrees/merge-b
+[worktree-gate]    删它们必须先 patch 兜底（R-DISK-5）：sh scripts/ops/nt_worktree_gate.sh prune
+```
+本会话**新建** worktree：**无**。
+
+| worktree | 用途 | 去向 |
+|---|---|---|
+| `.worktrees/merge-b` | **非本会话创建**（他窗） | ⛔ 含未提交改动 ⇒ **不得 prune、不得手删**，移交他窗 |
+| `.worktrees/nt-v2` | 非本会话创建 | 无未提交改动，本会话未触碰 |
+
+### 8.2 未提交改动的去向
+本会话触碰的文件（`nt_approval.rs`、`nt_shield_enforcer.rs`、`nt_sandbox.rs`、
+`repos.csv`、`CLAIMED-BUT-NOT-ENFORCED-*.md`、新增吸收文档、handoff）
+**全部已进入上述 4+1 笔提交**，`git status --porcelain -- <这些文件>` 为空，
+暂存区亦为空。
+⛔ 主工作树仍有**他窗 WIP**（`agent_guardrails/input_validator.rs` 等），未触碰未提交。
+
+### 8.3 用户侧副作用
+本轮**未触碰**用户配置（`~/.neotrix/profiles.toml` 未改动）。
+新增 `.neotrix/patches/2026-10-06-verdict-and-sandbox-gate.patch`（改动中途的兜底，
+最终已入提交，可留作对照）。
+
+## ⏭ 接手者的下一个动作
+1. **需要产品裁决**：`read-only` sandbox 该不该拦读（两处语义漂移，代码里已备好依据）。
+2. **第 9 项仍未闭环**：`--approval-mode` 的 `Ask` 档在**生产工具执行链**上无绑定点。
+   三条硬约束与三条收口路径见 `CLAIMED-BUT-NOT-ENFORCED-2026-10-05.md` 第 9 项。
+   ⛔ **不要因为本轮闭环了两条就把本项划掉。**
