@@ -106,14 +106,13 @@ impl MarketEntry {
 
 /// 市场查询用的 `metadata` 键名（**命名契约**）。
 pub mod meta_keys {
-    /// 版本号（市场必需，缺失即不可上架）
-    pub const VERSION: &str = "market.version";
-    /// **许可**（**市场必需**，**缺失即不可上架** 纪律③）
-    pub const LICENSE: &str = "market.license";
-    /// 分组（对标 hermes 的 `category`）
-    pub const CATEGORY: &str = "market.category";
-    /// 描述（缺失不阻断 但市场会显示为空 ⇒ 人自己知道少了什么）
-    pub const DESCRIPTION: &str = "market.description";
+    /// ⚠️ **唯一定义处在 `nt_core_capability_tree::market::keys`**。
+    ///
+    /// 本模块此前**硬编码**这四个字符串，而清单已下沉到共享 crate
+    /// ⇒ 两份键名会分叉。`metadata` 是 `HashMap<String, serde_json::Value>`
+    /// ⇒ **键名拼错不会报错**，只会让值静默「读不出来」。
+    /// ⇒ 故此处改为**引用**，键名只有一份。
+    pub use nt_core_capability_tree::market::keys::{CATEGORY, DESCRIPTION, LICENSE, VERSION};
 }
 
 /// 把一个能力节点投影成市场条目（**纯函数**，可单测）。

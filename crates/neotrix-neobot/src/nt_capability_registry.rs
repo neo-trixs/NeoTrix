@@ -504,3 +504,67 @@ mod read_side_tests {
         }
     }
 }
+
+/// **从共享清单惰性播种**（2026-10-06，方案 A）。
+///
+/// ## 为什么需要它
+///
+/// 播种的真身在 `neotrix-core`（`bootstrap_trade_capabilities`，且
+/// `apply_market_meta` 会写 `market.*` 键），而 `tool_schemas` 在本 crate。
+/// 依赖方向固定 `core → neobot` ⇒ **工作区里没有任何 crate 同时依赖两侧**
+/// ⇒ 服务进程里注册表恒空 ⇒ `capability_invoke` **永不上桌**。
+///
+/// ## 它做什么 / 不做什么
+///
+/// - ✅ 把**「这个能力是什么」**（`id` / `category` / `description`）播种进注册表 ——
+///   这些是 `nt_core_capability_tree::market::TRADE_MANIFEST` 里的**纯数据**；
+/// - ✅ 补 `version`（本 crate 的 `env!("CARGO_PKG_VERSION")`）与
+///   `license`（共享串）—— `is_listable()` 要求二者齐备；
+/// - ⛔ **不**在这里注册可执行实现（那在 core）⇒ 本函数**只让能力「可见」**，
+///   调用仍会 fail-closed（`CAPABILITY_BODY_NOT_EXECUTED`）。
+///
+/// ## 为什么 version 可以取本 crate 的
+///
+/// 两个 crate 都是 `version.workspace = true` ⇒ 当前同为 `0.23.0`，
+/// 由 `scripts/ops/check_version_sync.py` 守护；一旦分叉门会红。
+/// ⚠️ 这**不是**「谁离实现近谁报」——而是两侧共享同一个 workspace 版本号，
+/// 故本 crate 的 `env!` 与 core 的 `env!` **解析结果相同**。
+///
+/// **幂等**：已存在的 id 直接跳过，可反复调用。
+pub fn seed_from_market_manifest() -> Result<usize, String> {
+    use nt_core_capability_tree::market::{keys, TRADE_LICENSE, TRADE_MANIFEST};
+    use nt_core_capability_tree::node::{CapabilityKind, CapabilityNode};
+    let ver = env!("CARGO_PKG_VERSION").to_owned();
+    let mut added = 0usize;
+    for e in TRADE_MANIFEST {
+        with_registry(|reg| {
+            if reg.nodes.contains_key(e.id) {
+                return;
+            }
+            let mut meta = std::collections::HashMap::new();
+            meta.insert(
+                keys::VERSION.to_owned(),
+                serde_json::Value::String(ver.clone()),
+            );
+            meta.insert(
+                keys::LICENSE.to_owned(),
+                serde_json::Value::String(TRADE_LICENSE.to_owned()),
+            );
+            meta.insert(
+                keys::CATEGORY.to_owned(),
+                serde_json::Value::String(e.category.to_owned()),
+            );
+            meta.insert(
+                keys::DESCRIPTION.to_owned(),
+                serde_json::Value::String(e.description.to_owned()),
+            );
+            let mut node =
+                CapabilityNode::new_primitive(e.id.to_owned(), e.domain, Vec::new());
+            node.kind = CapabilityKind::Skill;
+            node.metadata = meta;
+            reg.nodes.insert(e.id.to_owned(), node);
+            added += 1;
+        })?;
+    }
+    Ok(added)
+}

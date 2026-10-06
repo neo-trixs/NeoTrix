@@ -391,6 +391,11 @@ fn qwen_mm_mounted() -> bool {
 /// 空清单意味着「这台进程没播种任何能力」⇒ 摆上工具只会让模型白试一轮。
 /// 纪律与 `read_image` / `qwen_*` 的动态挂载一致。
 fn capability_market_ids() -> Vec<String> {
+    // ⛔ 惰性播种：注册表空时从**共享清单**载入「能力是什么」。
+    //    真实现实现在 core 且本 crate 不得反向依赖它（core → neobot 固定）⇒
+    //    清单下沉到 （两侧共读）才能在这里对上号。
+    //    幂等；已播种时是no-op。
+    let _ = crate::nt_capability_registry::seed_from_market_manifest();
     crate::nt_capability_registry::with_registry(|reg| {
         crate::nt_capability_market::listable(reg)
             .into_iter()

@@ -1683,6 +1683,8 @@ fn cmd_provider_preset(name: &str) -> Result<(), NtBotError> {
 /// ⇒ 独立跑本 CLI 时注册表为空是**预期**现象，不是 bug。
 /// 详见 `docs/architecture/B1-CAPABILITY-INVOKE-WIRING-2026-10-06.md`。
 fn cmd_capability_list() -> Result<(), NtBotError> {
+    // 与生产同一路径：惰性播种后读注册表（否则 CLI 会显示空，而生产非空）
+    let _ = neotrix_neobot::nt_capability_registry::seed_from_market_manifest();
     // `capability_market_ids()` 是 `nt_http_engine` 的**私有**函数，不可从 CLI 调
     // ⇒ 走公开的 `with_registry` + `nt_capability_market::listable`。
     let ids: Vec<String> = match neotrix_neobot::nt_capability_registry::with_registry(|reg| {

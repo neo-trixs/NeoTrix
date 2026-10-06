@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod market; // 能力市场清单（纯数据，两侧共读）
 pub mod epistemic;
 pub mod node;
 pub mod registry;
