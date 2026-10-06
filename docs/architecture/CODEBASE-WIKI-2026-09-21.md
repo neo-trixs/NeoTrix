@@ -196,8 +196,8 @@ docs/
     DATAFLOW.md
     NEOTRIX-FULL-ARCHITECTURE.md
     TODO.md
-    all-capability-analysis.md
-    capability-topology-map.md
+    _superseded/all-capability-analysis.md
+    _superseded/capability-topology-map.md
     design-fusion-analysis-2026-09-20.md
   plans/
     2026-09-20-agent-guardrail-architecture.md

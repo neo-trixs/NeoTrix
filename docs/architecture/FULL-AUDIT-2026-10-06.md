@@ -126,8 +126,8 @@
 
 | 产物 | 最后更新 | 距今 |
 |---|---|---:|
-| `docs/architecture/capability-topology-map.md` | 09-21 | **16 天** |
-| `docs/architecture/APP-CODE-MAP-2026-09-28.md` | 09-28 | 8 天 |
+| `docs/architecture/_superseded/capability-topology-map.md` | 09-21 | **16 天** |
+| `docs/architecture/_superseded/APP-CODE-MAP-2026-09-28.md` | 09-28 | 8 天 |
 | `docs/architecture/CODE-TOPOLOGY.md` | 09-30 | 6 天 |
 | `docs/architecture/DIR-AUDIT-2026-09-27.md` | 09-30 | 6 天 |
 | `.project-map/codemap.json`（14M） | 09-30 | 6 天 |

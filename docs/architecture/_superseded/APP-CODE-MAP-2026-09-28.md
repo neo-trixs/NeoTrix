@@ -1,5 +1,14 @@
 # App Code Map — 2026-09-28
 
+> ⛔ **已归档（2026-10-06）—— 主体内容已不成立，保留仅作溯源。**
+>
+> - 本档的 `src-tauri/` 整表主体已于 `5c02e738` 归档（实测 `apps/neobot-desktop`
+>   声明 19 文件/5,698 行，实测仅 12/4,525；`neotrix-neobot` 声明 48/24,804，
+>   实测 65/38,081）。
+> - 文中多处引用**已不存在的目录**。
+> - 当前代码地图正典是 `CODE-TOPOLOGY.md`（由 `scripts/ops/nt_topology.py` 生成）
+>   与 `.project-map/codemap.json`；本档**无生成器、无门、无维护触发**。
+
 > 实测生成。**方法**：逐文件 `diff -rq` + `#[tauri::command]` 抽取 + workspace 成员核对。
 > 一切结论可复算；不接受"看起来像"的判断（见 `LESSONS-20260928-fresh-checkout.md`）。
 > 版本基线：`neotrix` HEAD `ecd10d3e`。

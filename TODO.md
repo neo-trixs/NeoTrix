@@ -531,7 +531,7 @@ TODO 原 §156-162 记「新增 `scripts/ops/nt_ipc_keys.py`，实测 声明 97/
 | 文件 | 裁决 | 取证依据 |
 |---|---|---|
 | `FUSION_ARCHITECTURE.md`（436 行） | 归档，**保留独有溯源** | 13 章被 `design-fusion-analysis-2026-09-20.md` 一一覆盖且后者更全；⛔ 但 `Bluehook` 破甲分析、「43 种攻击+15 种防御」、`Fable Dataset` **全仓别处没有**（`git grep` 确认只在本文）⇒ 删了永久丢失外部研究来源 |
-| `ANALYSIS_ARCHITECTURE.md`（178 行） | 归档，**方法论有效但数据作废** | 三维度「聚焦冗余/扁平缺陷/跨域错位」**已被现行文档沿用**（design-fusion / BATCH-FIX / capability-topology-map）⇒ 非孤例有继承；⛔ 其代码度量写 `931行`，实测 `neotrix-core` 已 **789,902 行** ⇒ 拿它判规模会错 |
+| `ANALYSIS_ARCHITECTURE.md`（178 行） | 归档，**方法论有效但数据作废** | 三维度「聚焦冗余/扁平缺陷/跨域错位」**已被现行文档沿用**（design-fusion / BATCH-FIX / capability-topology-map（已归档至 _superseded/））⇒ 非孤例有继承；⛔ 其代码度量写 `931行`，实测 `neotrix-core` 已 **789,902 行** ⇒ 拿它判规模会错 |
 | `CRYSTAL_ARCHITECTURE.md`（130 行） | 归档，**架构完全不存在** | 其列的 8 个类型 `MeltingEngine`/`CrystalRouter`/`CrystalSpeculator`/`EcsSceneBridge`/`CrystalCard`/`CrystalStateMachine`/`CrystalWorld`/`CrystalError` 逐个 `rg` 实测 **8/8 已不存在** ⇒ 描述的是从未落地或已彻底重构的架构 |
 
 **为何不删**：`CRYSTAL_ARCHITECTURE` 描述的架构虽不存在，但「曾经这样设计过、
@@ -1118,7 +1118,7 @@ payload 是 `{"task_id","status"}` —— **没有 `channel` 键**。
 - **A. payload 补 `channel`** —— 但 `nt_agent` 那时未必有渠道概念
 - **B. `drain_outbox` 按 topic 过滤** —— 更正，outbox 本该按 topic 分派
 
-**取证**：`docs/architecture/ORPHAN-CODE-AUDIT-2026-09-30.md` 同批
+**取证**：`docs/architecture/_superseded/ORPHAN-CODE-AUDIT-2026-09-30.md` 同批
 （子代理读实际行，非 grep 命中）。
 
 **2026-09-30 复核裁决：缺陷为真，但定级 P0 过高 → P1。**

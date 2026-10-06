@@ -126,3 +126,23 @@
 `neotrix-core/docs/plans/` 下仍有 2 份 09-14 的设计稿
 （`DESIGN_CRYSTAL_CORE.md` / `DESIGN_COLIBRI_ABSORPTION.md`）——
 它们**符合** `YYYY-MM-DD_` 前缀，故 `check-layout.sh` 不判违规。
+
+---
+
+## 2026-10-06 归档：四份误导性地图（代码地图审计第一批）
+
+审计判据：每份给出「文档声称 / 实测」两数，逐条`test -e` 验证引用。
+处置原则：**归档不是删除**（见本目录开头），但必须写明「为何作废、由谁取代」，
+否则陈旧数字仍是活事实，会让下一个 agent 去「修」正确代码。
+
+| 归档件 | 作废理由（实测） | 取代者 |
+|---|---|---|
+| `APP-CODE-MAP-2026-09-28.md` | `src-tauri/` 主体已于 `5c02e738` 归档；声明 `19/5,698` 实测 `12/4,525`、`48/24,804` 实测 `65/38,081`；多处引用已不存在目录 | `CODE-TOPOLOGY.md` |
+| `ORPHAN-CODE-AUDIT-2026-09-30.md` | 结论已被本轮两轮推翻：`279/60,871` → `63/16,264` → `9/5,258` | `ORPHAN-ADJUDICATION-` / `ORPHAN-DISPOSITION-2026-10-06.md` |
+| `capability-topology-map.md` | 与下一档**同源同错**（`2,413/7/68/65`；实测 `2,865/11/21/—`），零生成器零门 | `CODE-TOPOLOGY.md` + `.project-map/codemap.json` |
+| `all-capability-analysis.md` | 同上（孪生档） | 同上 |
+
+⇒ 后两份保留两份只会让**错误数字有两个来源**，故一并归档。
+四份引用方（`FULL-AUDIT-2026-10-06.md`、根 `TODO.md`、`docs/architecture/TODO.md`、
+`CODEBASE-WIKI-2026-09-21.md`）已同步指向 `_superseded/`。
+

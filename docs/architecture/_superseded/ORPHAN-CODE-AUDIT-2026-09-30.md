@@ -1,5 +1,16 @@
 # 幽灵代码特性判定 —— ORPHAN-CODE-AUDIT-2026-09-30
 
+> ⛔ **已归档（2026-10-06）—— 本档的结论已被本轮两轮裁决推翻。**
+>
+> 数值演化：`279 文件 / 60,871 行` → `ORPHAN-ADJUDICATION-2026-10-06.md`
+> `63 / 16,264` → `ORPHAN-DISPOSITION-2026-10-06.md` `9 / 5,258`
+> ⇒ 最终**孤儿目录 2 个、待接线 0 个**。
+>
+> 留着会误导下一个 agent 去「修」一份已被推翻的清单
+> （与 AGENTS.md R-SCAN-3「陈旧记录会让下一个 agent 去修正确代码」同族）。
+> 当前正典：`ORPHAN-ADJUDICATION-2026-10-06.md` + `ORPHAN-DISPOSITION-2026-10-06.md`，
+> 并由 `scripts/ops/nt_orphan_dir.py` 棘轮持续对账。
+
 - **范围**：`/tmp/ghost.txt` 的 **279** 个「未参与 `cargo check --workspace` 编译」的 `.rs`
 - ⛔ **本次未删、未改、未 `git mv` 任何文件**；本文只产出判定与清单。
 - 清单直接采用给定 `/tmp/ghost.txt`，**未重新推导**。
