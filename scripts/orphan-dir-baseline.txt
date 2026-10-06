@@ -1,15 +1,15 @@
 # orphan-dir baseline — 已裁决为「有意不挂载」的目录
 # 由 `python3 scripts/ops/nt_orphan_dir.py --write-baseline` 生成。
 # 每行一个相对路径（相对仓库根）。改这个文件 = 显式声明「它可以继续不编译」。
+# 2026-10-06 审计：棘轮收缩 —— 原 25 条中 10 条已陈旧（该目录已被挂载进编译树，
+#   当时裁决「有意不挂载」的前提已不成立）。收缩到 15 条真孤儿。
+# 逐条定性见 docs/architecture/ORPHAN-ADJUDICATION-2026-10-06.md
 
 neotrix-core/src/l1_action/nt_act/agent_loop
 neotrix-core/src/l1_action/nt_act/geo_seo
 neotrix-core/src/l1_action/nt_act/nt_act_dev_tools
 neotrix-core/src/l1_action/nt_act/semantic_routing
-neotrix-core/src/l2_perception/nt_world/crawl/dom_extractor
-neotrix-core/src/l2_perception/nt_world/crawl/ordered_backend_router
 neotrix-core/src/l2_perception/nt_world/temporal_kg
-neotrix-core/src/l3_embodiment/nt_shield/guard/agent_guardrails
 neotrix-core/src/l4_emotion/nt_feel/cognition_bridge
 neotrix-core/src/l4_emotion/nt_memory/nt_memory_knowledge_graph
 neotrix-core/src/l5_cognition/nt_consciousness
@@ -17,13 +17,6 @@ neotrix-core/src/l5_cognition/nt_core/io_skills
 neotrix-core/src/l5_cognition/nt_core/knowledge
 neotrix-core/src/l5_cognition/nt_core/memory
 neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/archive
-neotrix-core/src/l5_cognition/nt_core_gwt/cost_ladder
-neotrix-core/src/l5_cognition/nt_core_gwt/decision_layer
-neotrix-core/src/l5_cognition/nt_core_gwt/evidence_gating
 neotrix-core/src/l5_cognition/nt_mind/cross_domain
-neotrix-core/src/l5_cognition/nt_mind/dual_track
-neotrix-core/src/l5_cognition/nt_mind/jit_harness
 neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_consciousness
 neotrix-core/src/l5_cognition/nt_mind/self_improvement
-neotrix-core/src/l6_meta/coordination/nt_meta_cleanup
-neotrix-core/src/l6_meta/nt_meta/dream_replay

@@ -159,11 +159,24 @@ def main() -> int:
     known = load_baseline()
     new = [(p, n) for p, n in orphans if p not in known]
     total_rs = sum(n for _, n in orphans)
+    # 2026-10-06 审计：基线**只报「新增」从不报「陈旧」** ⇒ 已挂载/已删除的条目
+    #   可以无限期留在基线里而无人察觉（实测：25 条里 10 条已失效，僵了 6 天）。
+    #   对照：`check-silent-failure.sh` 有「baseline stale」提示，本门缺 ⇒ 对齐。
+    live = {p for p, _ in orphans}
+    stale = sorted(known - live)
 
     print(f"orphan-dir: 孤儿目录 {len(orphans)} 个 / {total_rs} 个 .rs；"
           f"基线已裁决 {len(known)}；新增 {len(new)}")
     for p, n in new:
         print(f"    ⚠️  NEW  {p}  ({n} 个 .rs)  ← 从未编译，其测试也不会跑")
+    if stale:
+        print(f"    ⛔ STALE {len(stale)} 条基线已失效（目录已挂载或已删除）"
+              f"⇒ 该条目当初「有意不挂载」的裁决前提已不成立，建议收缩基线：")
+        for p in stale[:12]:
+            gone = "（目录已不存在）" if not os.path.isdir(os.path.join(args.root, p)) else "（已挂载进编译树）"
+            print(f"       - {p}  {gone}")
+        if len(stale) > 12:
+            print(f"       … 另有 {len(stale) - 12} 条")
     if not new:
         for p, n in orphans[:3]:
             print(f"    ·  已知 {p}  ({n} 个 .rs)")
