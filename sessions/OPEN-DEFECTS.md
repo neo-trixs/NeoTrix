@@ -12,6 +12,8 @@
 
 | # | 缺陷 | 位置 | 状态 | 判据 / 备注 |
 |---|---|---|---|---|
+| 0 | ⛔ **`neotrix` crate 编译不过**：`unused variable: interp` | `neotrix-core/src/l3_embodiment/nt_shield/guard/agent_guardrails/input_validator.rs:589` | **已核实，2026-10-06 12:00 仍红** | 来自提交 `0c5b1bc9`（11:01）。**证据**：`cargo check`（**不调用链接器**）同样失败 ⇒ 与构建配置改动无关。该文件仍在被持续编辑 ⇒ 未代改。⚠️ 修法：`let Some(interp)` 那个 `interp` 未使用 ⇒ 改名 `_interp` 或补上使用。**⚠️ author 字段全部是 `openhands`（含我自己）⇒ 不能用 author 区分窗口，归属只能看文件清单。** |
+
 | 1 | 一次写命令把能力注册表从 **318 节点/43 边**覆盖成 **41 节点/0 边**，**退出码 0** | `crates/nt-core-capability-tree/src/{node,cli}.rs` | **已修** `83bc568b` | 三处叠加：`kind` 缺 `#[serde(default)]`（318 节点全无此键）⇒ `from_str` 整体失败；`load_registry` 用 `Err(_)` 吞错误走老 schema 迁移（0 节点）；`save_registry` 在 `run()` 末尾无条件执行。门：`scripts/ops/nt-registry-determinism.sh` |
 | 2 | 注册表快照**跨进程不确定**：直接序列化照抄 `metadata: HashMap` 迭代序 | 同上 | **已修** `83bc568b` | 实测同一输入 5 次写盘 ⇒ 5 个不同 md5。改走 `serde_json::Value` 中转。⛔ 单进程测不出（曾写 3 条单测，变异后 8/8 照样绿）⇒ 必须靠跨进程门 |
 
@@ -34,6 +36,25 @@
 | 10 | 商业许可阻断：例外条目 `status: void` | `.neotrix/LICENSE-EXCEPTIONS.md` | 未核实（本轮未读该文件现状） | ⛔ 不得改门规避 |
 | 11 | 能力市场无 API/UI；KB namespace/sensitivity → `ring_inner` 结果层门未接 | 多处 | 未核实 | 承接自 `handoff-2026-10-05-tui-wiring-and-six-defects.md` 等，⛔ 动手前先复现 |
 | 12 | UI 门存在既有失败；macOS 截图受屏幕录制权限阻塞（AX 验证可用） | UI 相关 | 未核实 | ⛔ 复现前不要改门 |
+
+## 编译与磁盘（本轮专项）
+
+| # | 事项 | 状态 | 判据 / 备注 |
+|---|---|---|---|
+| C1 | `target/debug/incremental` 曾占 **14G / 22G（67%）**，是本仓最大的「无界增长文件」 | **已处理** | 删掉回收 14.1G，代价仅 **10.17s 且只重编 1 个 crate**（依赖不重编）。⇒ 这是 `cargo clean` 的正确替代品：`rm -rf target/debug/incremental`。⚠️ 上界：`incremental` 随编辑次数累积，需定期清 |
+| C2 | 改 profile / rustflags 后**旧产物不删**，实测同 crate 多个哈希并存（`rand` 17 个、500 个 crate 重名） | 机制已记录 | 指纹失效 ≠ 旧产物删除。⚠️ `cargo-sweep` 按天龄**治不了**（超 1 天仅 9 个文件）⇒ 这类要靠 C1 或 `cargo clean` |
+| C3 | `cargo-sweep` 未装 | **有意不装** | crates.io 最新 v0.8.0 **无 release 资产** ⇒ 只能源码编译；且当时 `target` 超 7 天仅 4 文件 ⇒ 回收≈0。等真有陈旧件再装 |
+| C4 | `cargo-nextest` 已装但**不采用** | 已实测否决 | `group_contracts::*` **13/13 在 nextest 下失败、`cargo test` 下全绿**。定位：`test_sync_group` 单独跑 PASS、与 12 个兄弟同跑 FAIL ⇒ 测试**共用固定临时目录**，nextest 多进程并行互相踩。属测试写法问题，`cargo test` 保持默认 |
+| C5 | lld 替代 ld64 | **已接** `df490a75` | 需 `brew upgrade lld`（22.1.7 → 23.1.2 才可用；22.1.7 报 `libSystem.tbd: unknown architecture: arm64e.x1-macos`）。⚠️ mold 走同源 TAPI 解析器，很可能吃同一刀 |
+| C6 | `dev` profile 调试信息过重 | **已修** `df490a75` | 9.7G → 6.8G（−30%）。`[profile.dev] debug = "line-tables-only"` + `[profile.dev.package."*"] debug = 0`。⛔ 已撤回「−45% 编译耗时」：四次 clean 构建 2m55s/3m17s/4m31s/5m14s 不随 debug 递减 ⇒ 本机耗时是噪声，只有体积是确定性的 |
+
+## 本轮新发现（未修，登记备查）
+
+| # | 事项 | 位置 | 判据 |
+|---|---|---|---|
+| N1 | 集成测试被**禁用**（`.disabled` 后缀，文件有完整文档头 ⇒ 有意为之非垃圾） | `neotrix-core/tests/nt_meta_integration.rs.disabled` | nt_meta ⨯ nt_core 跨模块集成测试全部不参与 `cargo test` |
+| N2 | 2 处 **U+FFFD 编码损坏仍在**（上轮已报，他窗未修） | `neotrix-core/src/l0_substrate/nt_core_event_bus.rs`、`neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/kb_search.rs` | 各 1 处；仍未加防复发门 |
+| N3 | `nt-core-capability-tree` 3 个文件仍有 48 个装饰性 `⭐` | `registry.rs` 15 / `node.rs` 27 / `cli.rs` 6 | ⏸ **本轮有意跳过**：`registry.rs` 的 mtime 比当前时间还晚 54 分钟 ⇒ 疑似他窗带偏时钟在写，按并发纪律不撞车 |
 
 ## ⛔ 不要重复踩的坑（本轮实测得到）
 

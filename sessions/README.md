@@ -1,6 +1,6 @@
 # sessions/ 交接文档索引
 
-> 本文件是**导航层**，不存快照正文。2026-10-06 建：此前 70 份 handoff **无任何索引**，
+> 本文件是**导航层**，不存快照正文。2026-10-06 建（当日刷新至 72 份）：此前 70 份 handoff **无任何索引**，
 > 只能靠文件名猜。⛔ 索引里的「状态」列只反映**建表当时**的判断，未核实项已标注。
 
 ## 怎么用这个目录
@@ -11,6 +11,7 @@
 | 提交纪律 / 覆盖事故 | `handoff-commit-only-2026-09-29.md` · `handoff-20261003-my-overwrite-incident.md` |
 | 能力市场与涌现 | `handoff-2026-10-06-capability-invoke.md`（最新）→ `handoff-2026-10-06-agent-loop-wiring.md` → `handoff-2026-10-06-output-distill.md` |
 | 找遗留缺陷 | `OPEN-DEFECTS.md`（本目录，**单一入口**） |
+| 编译慢 / target 巨大 | `OPEN-DEFECTS.md` §编译与磁盘 + `Cargo.toml` 的 `[profile.dev]` 注释 |
 | 抄方法论 | `../docs/architecture/LESSONS-*.md` 按主题挑读，勿只读最新 |
 
 ## ⛔ 慎读 / 已被取代
@@ -22,14 +23,15 @@
   有效部分迁入 neobot 真实执行环（见 10-06 三份），**这两份只作历史取证**。
 - `HANDOFF-TEMPLATE.md` 是模板，不是交接记录。
 
-## 全量清单（70 份）
+## 全量清单（72 份）
 
 
-### 窗口协同与纪律（先读这组）（16 份）
+### 窗口协同与纪律（先读这组）（17 份）
 
 | 文件 | 标题 | 日期 | 体积 |
 |---|---|---|---:|
 | `HANDOFF-TEMPLATE.md` | Handoff 交接模板（复制改名用） | ? | 3K |
+| `handoff-2026-10-06-cleanup-and-defect-triage.md` | handoff — 2026-10-06 磁盘清理 + 交接文档梳理 + P0 数据丢失修复  <br/>*★ 本轮：磁盘清理 + 交接索引 + P0 注册表数据丢失修复（我）* | 2026-10-06 | 7K |
 | `handoff-20260927-final.md` | 交接 · 卡死/内存专项 + 长尾修复（2026-09-27 收口） | 20260927 | 7K |
 | `handoff-20260928-consolidated.md` | Handoff — 剩余任务汇总（供单窗口统一修复，2026-09-28） | 20260928 | 10K |
 | `handoff-20260928-new-window-opening.md` | …在这里跑真实命令，最后 git worktree remove --force "$W" | 20260928 | 7K |
@@ -42,16 +44,17 @@
 | `handoff-consolidate-all-windows-20260928.md` | Handoff · 单窗口汇总（2026-09-28 收口）— 请由**单一窗口**统一修复 | 20260928 | 10K |
 | `handoff-crystal-consolidate-20260928.md` | Handoff — 晶体核心统一收口（2026-09-28 第 5 次会话） | 20260928 | 10K |
 | `handoff-decision-20260927.md` | 需人工决策项 · 技术决策书 (2026-09-27) | 20260927 | 5K |
-| `handoff-s-audit0927.md` | Handoff — 结构性审计线（cycle `audit0927` / `audit0927b`） | 2026-09-2x | 6K |
+| `handoff-s-audit0927.md` | Handoff — 结构性审计线（cycle `audit0927` / `audit0927b`） | ? | 6K |
 | `handoff-s000.md` | Handoff s000 — main.rs 战斗簇拆分进行中（3 个重复定义待删） | ? | 9K |
 | `handoff-to-browser-window.md` | 喊话 browser 窗口：三处调用点缺参，请补齐（owner 明确不让我代修） | ? | 1K |
 
-### 外部吸收（19 份）
+### 外部吸收 / SDLC（20 份）
 
 | 文件 | 标题 | 日期 | 体积 |
 |---|---|---|---:|
 | `handoff-2026-10-05-game-source-absorption.md` | 交接 —— Rust 游戏源码吸收窗口（2026-10-05 15:5x ~ 18:52） | 2026-10-05 | 9K |
 | `handoff-2026-10-05-miu2d-ra2.md` | handoff — 2026-10-05 — miu2d / rust-alert 吸收轮（确定性纪律 + 涌现指纹） | 2026-10-05 | 11K |
+| `handoff-2026-10-06-ai-native-sdlc-absorption.md` | handoff — 吸收 Anthropic《AI-native SDLC playbook》(2026-10-06)  <br/>*吸收 Anthropic《AI-native SDLC playbook》（他窗）* | 2026-10-06 | 8K |
 | `handoff-20260929-absorption-round2.md` | Handoff — 第二轮外部吸收 + 幻影门拆除（2026-09-29） | 20260929 | 8K |
 | `handoff-EVO04-browse-20260926.md` | EVO-04 高速浏览器环 Spec（抄 browser-use / jev-ultrafast） | 20260926 | 4K |
 | `handoff-S39-20260926.md` | §39 交接提示词（2026-09-26，补齐 handoff-generative-20260924 预告） | 20260926 | 2K |
@@ -67,7 +70,7 @@
 | `handoff-neobot-absorption-20260928.md` | Handoff · NeoBot 侧边栏/IM 吸收轮（单窗口汇总收口） | 20260928 | 12K |
 | `handoff-ntbrowse-20260923.md` | Handoff：自研浏览器内核 + Lingee 收割（2026-09-23 早） | 20260923 | 2K |
 | `handoff-ntcode-tauri-api.md` | ntcode 桌面 App 构建交接 | ? | 7K |
-| `handoff-social-access-20261003.md` | handoff — social_access 缺陷修复与生产接线（2026-10-03）  <br/>*社交平台访问* | 20261003 | 21K |
+| `handoff-social-access-20261003.md` | handoff — social_access 缺陷修复与生产接线（2026-10-03） | 20261003 | 21K |
 | `handoff-spire-restore-20260923.md` | 跨会话字条：neotrix-spire 恢复（2026-09-23 夜） | 20260923 | 1K |
 
 ### UI / 桌面 / 交互（10 份）
@@ -82,7 +85,7 @@
 | `handoff-neobot-desktop-20260930.md` | handoff — neobot-desktop 重建会话（2026-09-30） | 20260930 | 6K |
 | `handoff-neobot-selfhosted-ui-20261001.md` | Handoff — 商用自持前端（neobot-ui）重构收尾 | 20261001 | 8K |
 | `handoff-nt-pet-unwrap-notice.md` | 知会：`nt_pet.rs` 2 处 `.unwrap()` 待修（属另一窗口在途特性，我未改） | ? | 3K |
-| `handoff-qwen-mm-20260928.md` | Handoff — Qwen-MM-Plugins 吸收（A+B+C 全做）· 2026-09-28  <br/>*Qwen-MM 视觉能力接入* | 20260928 | 29K |
+| `handoff-qwen-mm-20260928.md` | Handoff — Qwen-MM-Plugins 吸收（A+B+C 全做）· 2026-09-28 | 20260928 | 29K |
 | `handoff-ui-opt-20260927.md` | 通用 UI 优化建议全集（2026-09-27，调研＋对标＋落地状态） | 20260927 | 1K |
 
 ### 能力市场 / 涌现 / 金丝雀（8 份）
@@ -91,12 +94,12 @@
 |---|---|---|---:|
 | `handoff-2026-10-05-decor-noise-and-canary-rewiring.md` | handoff — 2026-10-05 星号噪声清理 + 金丝雀改接真实派发路径 | 2026-10-05 | 8K |
 | `handoff-2026-10-05-tui-wiring-and-six-defects.md` | handoff — TUI 接线 + 六个真缺陷（2026-10-05） | 2026-10-05 | 40K |
-| `handoff-2026-10-06-agent-loop-wiring.md` | handoff — 2026-10-06 把 AgentLoop 的独有能力接到真实执行环 | 2026-10-06 | 8K |
-| `handoff-2026-10-06-capability-invoke.md` | handoff — 2026-10-06 capability_invoke 接线 + 星号/编码清理 | 2026-10-06 | 6K |
-| `handoff-2026-10-06-output-distill.md` | handoff — 2026-10-06 工具输出 errors-first 蒸馏（AgentLoop 最后一项能力） | 2026-10-06 | 7K |
-| `handoff-2026-10-06-security-wiring-and-shell-guard.md` | 交接 —— 游戏源码吸收 · 第二批（修「尺子」+ 补安全洞） | 2026-10-06 | 13K |
-| `handoff-loop-20250925.md` | Handoff — 采矿循环窗 + 抖音任务（2026-09-25 晚，新对话从此接）  <br/>*AgentLoop 早期轮次（2025-09，已被后续取代）* | 20250925 | 4K |
-| `handoff-loop-20260927.md` | Handoff Loop 20260927 — 长循环执行证据（owner 直令循环到全绿）  <br/>*AgentLoop 主线（被 10-06 agent-loop-wiring 取代）* | 20260927 | 25K |
+| `handoff-2026-10-06-agent-loop-wiring.md` | handoff — 2026-10-06 把 AgentLoop 的独有能力接到真实执行环  <br/>*AgentLoop 有效部分迁入 neobot 真实执行环（我）* | 2026-10-06 | 8K |
+| `handoff-2026-10-06-capability-invoke.md` | handoff — 2026-10-06 capability_invoke 接线 + 星号/编码清理  <br/>*★ capability_invoke 接线；§3 执行通路仍未完成（我）* | 2026-10-06 | 6K |
+| `handoff-2026-10-06-output-distill.md` | handoff — 2026-10-06 工具输出 errors-first 蒸馏（AgentLoop 最后一项能力）  <br/>*工具输出 errors-first 蒸馏（我）* | 2026-10-06 | 7K |
+| `handoff-2026-10-06-security-wiring-and-shell-guard.md` | 交接 —— 游戏源码吸收 · 第二批（修「尺子」+ 补安全洞）  <br/>*shell 护栏与凭据检测（我）* | 2026-10-06 | 13K |
+| `handoff-loop-20250925.md` | Handoff — 采矿循环窗 + 抖音任务（2026-09-25 晚，新对话从此接）  <br/>*AgentLoop 早期轮次（已拆解，只作历史取证）* | 20250925 | 4K |
+| `handoff-loop-20260927.md` | Handoff Loop 20260927 — 长循环执行证据（owner 直令循环到全绿）  <br/>*AgentLoop 主线（已被 10-06 agent-loop-wiring 取代）* | 20260927 | 25K |
 
 ### 目录 / 分层 / 孤儿治理（6 份）
 
@@ -133,7 +136,7 @@
 
 | 文件 | 标题 | 日期 | 体积 |
 |---|---|---|---:|
-| `handoff-2026-10-05-authorization-audit-and-inert-defenses.md` | Handoff — 授权栈审计与「声称存在但实际不生效」防线（本窗口） | 2026-10-05 | 16K |
+| `handoff-2026-10-05-authorization-audit-and-inert-defenses.md` | Handoff — 授权栈审计与「声称存在但实际不生效」防线（本窗口） | 2026-10-05 | 22K |
 
 ### 未归类（0 份）
 
