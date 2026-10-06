@@ -1,5 +1,6 @@
 pub mod capabilities;
 pub mod capability_registry;
+pub mod tree_dispatch;
 pub mod contract_parser;
 pub mod error;
 pub mod extractors;

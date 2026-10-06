@@ -140,6 +140,17 @@ impl ConsciousnessRuntime {
             Ok(_) => {} // 已播种过 ⇒ 幂等静默
             Err(e) => log::warn!("[consciousness] 能力播种失败（不阻断启动）: {e}"),
         }
+        // 派发接线：与上面的树播种**同一生命周期、同一处**——
+        // 树里有了能力节点，派发表里就该有对应执行器，否则「树上有名、无人可派」。
+        //
+        // ⚠️ 只注册**已有权威 schema**的 2 个（`register_tree_dispatchers` 内已说明）；
+        //    其余 3 个无单一执行入口 ⇒ 保持 `None` ⇒ 调用方 fail-closed。
+        let reg_failed =
+            crate::l1_action::nt_act::nt_act_trade::tree_dispatch::register_tree_dispatchers();
+        if !reg_failed.is_empty() {
+            log::warn!("[consciousness] 派发注册失败 {} 项 ⇒ 相应能力将 fail-closed: {reg_failed:?}", reg_failed.len());
+        }
+
         Self {
             stream: ConsciousnessStream::new(super::stream_buffer::DEFAULT_STREAM_CAPACITY),
             specious_present: SpeciousPresent::new(12),
