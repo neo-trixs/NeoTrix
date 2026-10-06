@@ -258,3 +258,16 @@ python3 scripts/ops/nt_topology.py   # → 本文件
   - `neotrix-core/src/l3_embodiment/nt_shield/guard/output_sentinel.rs:20`
 
 ⚠️ **归并不是免费的**：`Severity` 散在 L1/L3 与两个 crate，合并会改公开 API 与跨层依赖方向 ⇒ 需逐组评估，不宜批量脚本化。
+
+---
+
+## 可核对声明（machine-checked）
+
+> 本节由 `scripts/ops/nt_map_reconcile.py` 逐条实测。
+> **本文件此前的计数被其它文档引用，却零断言覆盖** —— 数字可以悄悄漂移而无人知晓。
+
+```assert
+cmd:python3 scripts/ops/check_layer_map_consumers.py
+cmd:test $(find neotrix-core/src -name '*.rs' | wc -l) -gt 2000
+cmd:test $(find neotrix-core/src/neotrix -name '*.rs' | wc -l) -le 1
+```
