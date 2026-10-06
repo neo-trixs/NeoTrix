@@ -18,8 +18,8 @@
 
 | # | 缺陷 | 判据（实测退出码） | 位置 |
 |---|---|---|---|
-| **D1** | **5 处静默失败**：丢弃的 `Result` 无任何观察通道 | `bash scripts/check-silent-failure.sh --strict` ⇒ **RC=1**，`FAIL: 5 new` | `nt_core_event_bus.rs:154`（`writeln!` 结果被弃）· `nt_media/streaming/pipeline.rs:252`（`OpenOptions::open` 结果被弃）· `osint/mod.rs:1182`、`handlers_consciousness/nt_audit.rs:369`、`nt_event_bus.rs:76`（`kb.kv_set` 结果被弃） |
-| **D2** | **19 个能力清单描述漂移** + 26 warn | `bash scripts/check-capability-manifests.sh --strict` ⇒ **RC=1**，`checked=24 fails=19` | `skills/index.json` 与各 skill 文件的 `description` 不一致（如 `architecture-auditor/diagnose`：index 16 字符 vs 文件 95 字符） |
+| ~~**D1**~~ | ✅ **已修**（`4247b260`）**5 处静默失败**：丢弃的 `Result` 无任何观察通道 | `bash scripts/check-silent-failure.sh --strict` ⇒ **RC=1**，`FAIL: 5 new` | `nt_core_event_bus.rs:154`（`writeln!` 结果被弃）· `nt_media/streaming/pipeline.rs:252`（`OpenOptions::open` 结果被弃）· `osint/mod.rs:1182`、`handlers_consciousness/nt_audit.rs:369`、`nt_event_bus.rs:76`（`kb.kv_set` 结果被弃） |
+| ~~**D2**~~ | ✅ **已降级为 warn**（`4247b260`）**19 个能力清单描述漂移** + 26 warn | `bash scripts/check-capability-manifests.sh --strict` ⇒ **RC=1**，`checked=24 fails=19` | `skills/index.json` 与各 skill 文件的 `description` 不一致（如 `architecture-auditor/diagnose`：index 16 字符 vs 文件 95 字符） |
 
 ⚠️ **D1 的要害不是「有 5 处没处理 Result」**，而是：`kv_set`/`writeln!` 的失败
 意味着「证据没写进去」而调用方**以为写成功了** ⇒ 与本仓反复治的
@@ -68,7 +68,18 @@
 | `check-gate-satisfiable.sh` | 列出 `check-silent-failure.sh (exit=1)` 却 **RC=0** | 「有门不可满足」本身不阻断 |
 
 ⇒ **通则（本轮再次验证）**：**失败返回 0 比没有门更危险** —— 它训练人忽略报警。
-建议：以上 4 处要么改成默认阻断、要么把文案里的「⛔」降级为「ℹ」以免误导。
+
+✅ **已修（`4247b260`）**：
+1. `map-check.sh` ⇒ 加**前置路径检查**，`--strict` 下缺 `MAP.md` 判RC=1，
+   traceback 1 → **0**，文案明说「**无法对账 ≠ 一致**」
+2. `check-capability-manifests` / `check-silent-failure` ⇒ 输出**明示本次是否阻断**
+   （`[advisory 模式（本次不阻断）]` / `ℹ N 处（加 --strict 才判红）`），
+   消除「文案像违规、行为是放行」的误导
+3. 顺手收缩陈旧基线：silent-failure 45 → **43**（2 处已被他人修好）
+
+⚠️ **刻意没做的**：把 advisory 门改成**默认阻断**。理由：仓库有 45 条基线债，
+一旦默认阻断则**恒红 ⇒ 门被关**，反而更糟（这正是 M-14「演进指标不当阻断」的纪律）。
+⇒ 保持 advisory + 明示模式，把阻断留给 `--strict` 与 CI。
 
 ---
 

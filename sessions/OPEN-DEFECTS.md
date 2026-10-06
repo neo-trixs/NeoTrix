@@ -99,6 +99,18 @@
 | 13 | **测试隔离缺陷**：单独跑 PASS、全量跑 FAIL | `neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_game.rs::tests::test_constellation_advance` | **已核实**（2026-10-06） | 同一测试 `cargo test -p neotrix --lib test_constellation_advance` **2 passed**，而全量 `cargo test -p neotrix --lib` 记录它 FAILED ⇒ **跨测试状态污染**，不是断言错。⚠️ 该文件当时有 **-317 行未提交改动**（他窗在途重构）⇒ 尚未定位污染源，⛔ **不要**先改断言。查污染源的方向：全量与单测的差异在「谁先跑了什么」⇒ 需按测试序逐段二分，或用 `--test-threads=1` 缩小范围。⚠️ 同型问题在 nextest 上更早暴露（`group_contracts` 13/13，见「编译与磁盘」C4）⇒ 两者可能是同一类根因。 |
 
 
+## ✅ 本窗口已关闭（2026-10-06 晚）
+
+| 原编号 | 事项 | 关闭依据 |
+|---|---|---|
+| 审计 **D1** | 5 处静默失败 | `4247b260`：`check-silent-failure --strict` **RC=1 → RC=0**，NEW=0；`cargo check -p neotrix` RC=0 |
+| 审计 **D2** | 19 处能力清单描述漂移 | `4247b260`：M3 逐字判据降为 warn（依据：Agent Skills 官方规范 + Mintlify/better-i18n/Cloudflare RFC 三套实现均**从 frontmatter 派生** index 描述，且本仓该字段**零消费者**）⇒ `--strict` RC=1→0；真正的 M1/M2/M4 防护保持不变 |
+| 审计 **§4** | 4 处「门会骗人」 | `4247b260`：`map-check` 加前置检查（traceback 1→0、`--strict` 正确判红）；2 个门输出明示是否阻断；基线 45→43 |
+| 批次 A3 | 测试账本 | 账本 1 行 → **0 字节**（全量套件实测全绿 + `handlers_game` 6 passed ⇒ 原条目对应已修复的测试） |
+| 批次 A6 | admission 改判 | `ad3309ea`：`handoff-evo-20260926.md` 的 M-02 从 `P0` → `**P2 观察项**` |
+| 批次 B5 | M-4 影子→active | `fdd17081`：`JudgeLedger` 记 `source`/`outcome` + `record_outcome` 回填 |
+
+
 ## ⛔ 不要重复踩的坑（本轮实测得到）
 
 1. **「序列化两次比对」抓不到跨进程缺陷** —— 同一进程内 `HashMap` 迭代序稳定。
