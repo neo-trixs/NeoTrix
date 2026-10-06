@@ -65,7 +65,7 @@
 | 缺口 | 层 | 源 | 严重度 |
 |---|---|---|---|
 | M-01 Token 成本门（阈值告警/拦截/压缩回归） | L0/L6 横切 | cto | P0 |
-| M-02 judge-kernel（admission/墓碑/ledger，小模型常驻） | L0 缓存 | mu | P0 |
+| M-02 judge-kernel（墓碑/ledger/小模型常驻） | L0 缓存 | mu | **P2 观察项**（2026-10-06 改判，见下） |
 | M-03 DSPy 自优化 prompt（Signature/编译器/评估闭环） | L5 认知 | dspy | P0 |
 | M-04 高速浏览器环（原子快照/单 RTT/遮挡校验） | L1 动作 | jev-ultrafast | P0 |
 | M-05 语义索引＋系统图谱（AST+向量召回，symbols 图精排） | L1/L2 | coco/Ix | P1 |
@@ -76,6 +76,33 @@
 | M-10 RL＋仿真（GRPO tool-use reward；MarS 反事实评估） | L4/L5 | verl/MarS | P2 |
 | M-11 证明门＋语义网关（LAWS 影子模式；Jev路由+独立计量） | Shield/网关 | bend/TokenHub | P2 |
 | M-12 情报 profile 管线（rubric/去重/balanced digest）＋跨模态 ICL 基准 | 感知/评估 | Horizon/14011 | P2 |
+
+### ⚠️ M-02 改判依据（2026-10-06，按 `FINAL-ROADMAP-2026-09-29.md` §2 + 批次 A6）
+
+**原表述「admission/墓碑/ledger = P0」已改判为 P2 观察项。**
+
+理由（引自唯一排期真源 §2，非本文档自创）：
+
+- 我们的 `nt_judge.rs` 抄的正是 `qybaihe/mu` 的 **admission（chunk 准入）**决策点；
+- 而 mu **自己公开的回测报告**（`kyrn/docs/08-jev-retrospective.md`，四轮吸收里
+  唯一一份公开失败数据的）对 admission 的实测是：
+  **194 批 / 2,412 块，`drop=true` 命中 0 个（一块都没删掉）**，
+  却消耗 **1,966,585 input tokens = 已记录 Jev 输入的 54.0%**，
+  延迟 p50 **1,351ms** / p95 **3,807ms**；
+  原文结论：*"这不是「Jev 应该删掉源码」的证据……不是为了制造节省而放宽删除阈值。"*
+- ⇒ 我们抄的是一个**「消耗 54% 判断输入、收益为零」**的决策点。
+
+**公平地说清两点**（否则这个改判会被误读成「admission 无价值」）：
+1. **我们的实现是纯规则**（敏感词 + 长度），**没有真调小模型**
+   ⇒ 上面那些 token / 延迟数字**不适用于我们**；
+2. ⇒ 真正该吸收的是 **mu 自己的方法论**（M-1 臂中立 veto 契约 / M-2 `cacheImpact`
+   三分类 / M-3 choice-escape 不变量），以及**「先测量再扩建」**这条纪律。
+
+**改判后的动作**：先接线一个 **mu 自己证明有效**的决策点（技能隐藏 / 蜂群过滤），
+admission 降级为**观察项**——保留实现、不再排 P0、不再扩建。
+
+⚠️ 引用纪律（AGENTS.md §6.2）：本条只说「我们的排期表述需改判」，
+**不等于** `qybaihe/mu` 的回测数字适用于我们。抄结论前先复核来源。
 
 ## 2. 统一进化路线（最优解序列）
 
