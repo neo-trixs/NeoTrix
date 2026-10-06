@@ -322,7 +322,29 @@ impl CapabilityCli {
                     // 保留经验驱动迭代目标 (distill 蒸馏写入, scan --apply 消费)
                     reg.experience_targets = export.experience_targets;
                 }
-                Err(_) => {
+                Err(parse_err) => {
+                    // ⛔⛔ 2026-10-06 P0：**只在文件确实是老 schema 时**才允许走迁移。
+                    //
+                    // 原代码是 `Err(_)` ⇒ **任何**解析失败都被当成「老 schema」。
+                    // 实测后果：已提交的新-schema 文件因缺 `kind` 解析失败 ⇒
+                    // 迁移出 **0 节点** ⇒ `save_registry` 写回 41 个 roadmap 节点
+                    // ⇒ **318 节点 / 43 边一次性销毁**，而退出码是 0（伪装成成功）。
+                    //
+                    // 判别「是不是老 schema」用**结构**而非「解析成功与否」：
+                    // 老 schema 顶层是 `domains` 形且**无 `nodes` 键**。
+                    // 新 schema 文件一旦损坏 ⇒ **响亮报错并拒绝继续**，
+                    // 因为此时任何"迁移"都等于用空注册表覆盖真实数据。
+                    let looks_legacy = Self::looks_like_legacy_schema(&content);
+                    if !looks_legacy {
+                        return Err(format!(
+                            "注册表解析失败，且**不是**老 schema ⇒ 拒绝迁移（否则会销毁数据）。\n\
+                             原始错误: {parse_err}\n\
+                             文件: {}\n\
+                             修法: 修好该文件；**不要**靠迁移绕过。",
+                            self.registry.display()
+                        )
+                        .into());
+                    }
                     // 老 schema 文件（domains 形，无 nodes）：内存迁移。
                     // 先落一次性备份，下一次写命令 save_registry 即转正新 schema。
                     reg = CapabilityTreeRegistry::migrate_legacy(&content).map_err(|e| {
@@ -367,11 +389,64 @@ impl CapabilityCli {
             .unwrap_or_else(|| std::path::PathBuf::from("capability_overrides.json"))
     }
 
+    /// 规范序列化：递归把**所有对象**的 key 按字节序排好，再出字符串。
+    ///
+    /// ## 为什么必须有（实测缺陷，非推测）
+    ///
+    /// `CapabilityNode::metadata` 是 `HashMap<String, serde_json::Value>`，
+    /// 而工作区 `Cargo.toml:31` 开了 serde_json 的 `preserve_order`。
+    /// ⇒ 序列化**照抄 HashMap 的迭代顺序**，而 Rust 的 `HashMap` 用
+    /// `RandomState` ⇒ **每个进程内同一个 map 的迭代顺序都不同**。
+    ///
+    /// 实测后果（2026-10-06 取证）：`.neotrix/capability_registry.json`
+    /// 与 `capability_overrides.json` 两个**已跟踪**文件，每次 CLI 运行
+    /// 都产生 706 增 / 706 删的 diff，而**语义差异 0 条**、318 个节点
+    /// 逐字段完全一致 —— 纯粹是 key 顺序抖动。
+    ///
+    /// ⇒ 它让主工作树**永久脏**，`nt_worktree_gate.sh check` 于是反复报
+    ///   「主树未提交改动不在任何提交里」，而那条报警**每次都是假的**。
+    ///   一个恒假的门比没有门更危险：它训练人忽略报警。
+    ///
+    /// ## 为什么在**写盘边界**修，而不是把 `metadata` 改成 `BTreeMap`
+    ///
+    /// 后者是类型级修法（更彻底），但 `CapabilityNode` 被 core / fusion /
+    /// neobot 多处构造与读取，改类型会外溢到这些 crate —— 而共享树上
+    /// 另有窗口在改同样的文件。写盘边界是**收口点**：已证实 cli.rs 是
+    /// 这两个文件的**唯一写者**（registry.rs 的 565/606/615 只读）。
+    /// ⇒ 一处改动即根治，且不扩大爆炸半径。
+    ///
+    /// ## 只排 key，**不动数组顺序**
+    ///
+    /// 数组元素顺序是数据本身（`requires`/`depends_on` 有语义），排序会
+    /// 改变内容。对象 key 无序 ⇒ 排序是恒等变换。
+    /// ⛔ **判别「是不是老 schema」的唯一入口**（抽成函数是为了可测）。
+    ///
+    /// ## 为什么必须抽出来
+    ///
+    /// 它起初是内联在 `load_registry` 里的一行闭包，而我第一版测试在
+    /// **测试里重写了一遍同样的判别** ⇒ 变异验证时把生产代码改成恒真，
+    /// **测试依然全绿**（实测）⇒ 零区分力。
+    /// ⇒ 判别逻辑必须**只有一份**，测试直接调它。
+    ///
+    /// 判据是**结构**（顶层 `domains` 存在且 `nodes` 不存在），而不是
+    /// 「解析成功与否」—— 后者正是 P0 里把损坏文件误判成老 schema 的原因。
+    fn looks_like_legacy_schema(content: &str) -> bool {
+        serde_json::from_str::<serde_json::Value>(content)
+            .ok()
+            .and_then(|v| v.as_object().cloned())
+            .is_some_and(|o| !o.contains_key("nodes") && o.contains_key("domains"))
+    }
+
+    fn canonical_json<T: serde::Serialize>(value: &T) -> Result<String, serde_json::Error> {
+        let v = serde_json::to_value(value)?;
+        serde_json::to_string_pretty(&v)
+    }
+
     fn save_registry(&self, registry: &CapabilityTreeRegistry) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(parent) = self.registry.parent() {
             fs::create_dir_all(parent)?;
         }
-        let content = serde_json::to_string_pretty(&registry.export())?;
+        let content = Self::canonical_json(&registry.export())?;
         fs::write(&self.registry, &content)?;
         // Durable 层: 把完整注册表镜像写入提交的 overlay (capability_overrides.json),
         // 使手动 durable 写入在基础被重新生成后仍生效。overlay 与基础文件同步,
@@ -855,7 +930,8 @@ impl CapabilityCli {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let export = registry.export();
         let content = match format {
-            ExportFormat::Json => serde_json::to_string_pretty(&export)?,
+            // 同 save_registry：canonical 化 ⇒ 导出可 diff、可复现。
+            ExportFormat::Json => Self::canonical_json(&export)?,
             ExportFormat::Mermaid => {
                 let mut out = String::from("```mermaid\ngraph TD\n");
                 for (from, to) in &export.edges {
@@ -1060,5 +1136,194 @@ impl CapabilityCli {
             }
         }
         Ok(())
+    }
+}
+#[cfg(test)]
+mod canonical_json_tests {
+    use super::CapabilityCli;
+
+    /// 递归断言 `Value` 里**每个对象**的 key 都已升序。
+    fn assert_keys_sorted(v: &serde_json::Value, path: &str) {
+        match v {
+            serde_json::Value::Object(map) => {
+                let keys: Vec<String> = map.keys().cloned().collect();
+                let mut sorted = keys.clone();
+                sorted.sort();
+                assert_eq!(keys, sorted, "路径 {path}: 对象 key 未排序 ⇒ 输出会随 HashMap 漂移");
+                for (k, val) in map {
+                    assert_keys_sorted(val, &format!("{path}/{k}"));
+                }
+            }
+            serde_json::Value::Array(items) => {
+                for (i, it) in items.iter().enumerate() {
+                    assert_keys_sorted(it, &format!("{path}[{i}]"));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// ⭐⭐⭐ **canonical_json 的输出对象 key 必须全有序。**
+    ///
+    /// ## 修复机制（实测得出，与最初设想不同）
+    ///
+    /// 最初我额外写了一个 `sort_json_keys` 递归排序，并以为它在干活。
+    /// **实测证明它是死代码**：把 `canonical_json` 改成
+    /// `to_value(...)` + `to_string_pretty(&v)`、把 `sort_json_keys`
+    /// 掏成空操作，输出**依然是有序的**。
+    ///
+    /// 原因：本 crate 的 `Cargo.toml` 写的是 `serde_json = "1.0"`
+    /// （**没有** `preserve_order` feature，尽管工作区根声明了它）
+    /// ⇒ `serde_json::Value::Object` 是 `BTreeMap` ⇒ **`to_value` 这一步
+    /// 本身就完成排序**。
+    ///
+    /// ⇒ 真正的修复是「**不要直接序列化结构体，改为经 `Value` 中转**」：
+    /// 直接 `to_string_pretty(&export)` 会照抄 `metadata: HashMap` 的
+    /// 迭代顺序，而 Rust 的 `HashMap` 每进程重新播种 ⇒ **同一输入 5 次
+    /// 写盘产出 5 个不同文件**（实测 5 个互不相同的 md5）。
+    ///
+    /// ⛔ 因此本 crate 若将来启用 `preserve_order`，本修复会**静默失效**
+    ///   ⇒ 唯一能抓住它的是 `scripts/ops/neobot-check-registry-determinism.sh`
+    ///   （跨进程跑真二进制并比对 md5）—— 单进程测试**抓不到**这个缺陷，
+    ///   因为同一进程内 HashMap 迭代序是稳定的。
+    #[test]
+    fn canonical_json_输出key全有序() {
+        let v = serde_json::json!({
+            "zeta": 1,
+            "alpha": {"z": 1, "a": 2},
+            "mid": [{"q": 1, "b": 2}],
+        });
+        let out = CapabilityCli::canonical_json(&v).expect("序列化应成功");
+        let parsed: serde_json::Value = serde_json::from_str(&out).expect("输出应是合法 JSON");
+        assert_keys_sorted(&parsed, "$");
+
+        let ia = out.find("\"alpha\"").expect("alpha 应出现");
+        let im = out.find("\"mid\"").expect("mid 应出现");
+        let iz = out.find("\"zeta\"").expect("zeta 应出现");
+        assert!(ia < im && im < iz, "顶层 key 应 alpha<mid<zeta，实际 {ia}/{im}/{iz}");
+        let ia2 = out.find("\"a\"").expect("嵌套 a 应出现");
+        let iz2 = out.find("\"z\"").expect("嵌套 z 应出现");
+        assert!(ia2 < iz2, "嵌套对象 key 也应排序");
+    }
+
+    /// ⭐⭐⭐ **数组顺序必须原样保留**（不得被排序）。
+    ///
+    /// `requires` 之类字段的数组顺序是**数据本身**。「顺手把数组也排了」
+    /// 会静默改变语义 ⇒ 用测试钉死这条边界。
+    #[test]
+    fn 数组顺序不被排序() {
+        let v = serde_json::json!(["zebra", "apple", "mango"]);
+        let out = CapabilityCli::canonical_json(&v).expect("序列化应成功");
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&out).expect("应可解析"),
+            v,
+            "数组顺序是数据，canonical 化不得改变它"
+        );
+        let iz = out.find("zebra").expect("zebra");
+        let ia = out.find("apple").expect("apple");
+        let im = out.find("mango").expect("mango");
+        assert!(iz < ia && ia < im, "数组应保持原序 zebra/apple/mango，实际 {iz}/{ia}/{im}");
+    }
+}
+
+#[cfg(test)]
+mod registry_roundtrip_tests {
+    use super::CapabilityCli;
+    use crate::registry::CapabilityTreeRegistry;
+
+    /// ⭐⭐⭐⭐⭐ **缺 `kind` 的注册表必须能加载，且往返零丢失。**
+    ///
+    /// ## 2026-10-06 P0 数据丢失的回归锁
+    ///
+    /// `CapabilityNode::kind` 曾是唯一没有 `#[serde(default)]` 的语义字段，
+    /// 而已提交的 `.neotrix/capability_registry.json` 里 **318 个节点全部
+    /// 没有这个键** ⇒ `from_str::<RegistryExport>` 整体失败 ⇒
+    /// `load_registry` 的 `Err(_)` 把它当成「老 schema」⇒ 迁移出 **0 节点**
+    /// ⇒ `save_registry`（`run()` 末尾**无条件**执行）写回 41 个 roadmap
+    /// 节点 ⇒ **318 节点 / 43 边一次性销毁，而退出码是 0**（实测 3/3 复现）。
+    ///
+    /// ## 判据为什么是「往返不丢节点」而不是「能解析」
+    ///
+    /// 缺陷的杀伤力全在**保存时覆盖** ⇒ 只断言「能解析」锁不住它。
+    #[test]
+    fn 缺kind的旧形态注册表_能解析且往返零丢失() {
+        let raw = serde_json::json!({
+            "nodes": [{
+                "id": "exp::legacy::no_kind",
+                "domain": "act",
+                "layer": "l0primitive",
+                "constellation": "c1unittest",
+                "provides": ["legacy"],
+                "requires": []
+            }],
+            "edges": [],
+            "experience_targets": []
+        });
+        let export: crate::registry::RegistryExport = serde_json::from_value(raw)
+            .unwrap_or_else(|e| panic!("★ 旧形态 JSON 应能解析（修复前报 {e}）⇒ kind 的 serde default 未生效"));
+        assert_eq!(export.nodes.len(), 1);
+
+        let mut reg = CapabilityTreeRegistry::new();
+        for n in export.nodes {
+            reg.register(n).expect("登记应成功");
+        }
+        let out = reg.export();
+        assert_eq!(out.nodes.len(), 1, "★ 往返后节点数变了 ⇒ 静默截断回归");
+        assert_eq!(out.nodes[0].id, "exp::legacy::no_kind");
+        assert_eq!(
+            out.nodes[0].kind,
+            crate::node::CapabilityKind::Skill,
+            "★ 缺省 kind 应为 Skill（市场 fail-closed 的依据，见 Default impl）"
+        );
+    }
+
+    /// ⭐⭐⭐⭐⭐ **真实已提交注册表：解析 + 往返零丢失。**
+    ///
+    /// P0 的**最忠实**回归锁 —— 直接吃出事的那份文件。
+    /// ⛔ 文件不存在则跳过：单测不该依赖工作区布局。
+    #[test]
+    fn 真实注册表文件_解析并往返零丢失() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../.neotrix/capability_registry.json");
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            eprintln!("跳过：{} 不在工作区", path.display());
+            return;
+        };
+        let export: crate::registry::RegistryExport = serde_json::from_str(&content)
+            .unwrap_or_else(|e| panic!("★ 真实注册表解析失败（这正是 P0 的成因）: {e}"));
+        assert!(export.nodes.len() > 100, "真实注册表不该只有 {} 个节点", export.nodes.len());
+
+        let expected = export.nodes.len();
+        let mut reg = CapabilityTreeRegistry::new();
+        for n in export.nodes {
+            reg.register(n).expect("登记应成功");
+        }
+        let out = reg.export();
+        assert_eq!(out.nodes.len(), expected, "★ 往返后节点数变了 ⇒ 静默截断回归");
+    }
+
+    /// ⭐⭐⭐ **非老 schema 的坏文件不得被判为可迁移。**
+    ///
+    /// 缺陷机制：`Err(_)` 把**任何**解析失败都当成「老 schema」。
+    /// 判别用**结构**（顶层有 `nodes` 键 ⇒ 是新 schema 的损坏文件）。
+    #[test]
+    fn 新schema坏文件不被误判为老schema() {
+        let broken = serde_json::json!({"nodes": "这不是数组", "edges": []});
+        assert!(
+            !CapabilityCli::looks_like_legacy_schema(&broken.to_string()),
+            "★ 含 nodes 键的文件不得走迁移（否则空注册表会覆盖真实数据）"
+        );
+    }
+
+    /// ⭐⭐ **真正的老 schema（domains 形、无 nodes）仍须判为可迁移。**
+    ///
+    /// 反向锁：防止把「消除破坏性回退」做成「彻底不许迁移」。
+    #[test]
+    fn 老schema仍判为可迁移() {
+        let legacy = serde_json::json!({"domains": {"Mind": ["a", "b"]}});
+        assert!(
+            CapabilityCli::looks_like_legacy_schema(&legacy.to_string()),
+            "★ domains 形且无 nodes 应判为老 schema"
+        );
     }
 }

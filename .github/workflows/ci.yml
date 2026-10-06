@@ -358,6 +358,17 @@ jobs:
       - name: Orphan directory gate (baseline-tolerant, --strict)
         run: bash scripts/check-orphan-dirs.sh --strict
 
+      # ⭐⭐⭐⭐⭐ 注册表跨进程确定性门（2026-10-06 新增）
+      # ⭐⭐⭐⭐⭐ 防**一次写命令销毁注册表**：实测 `neotrix-capability` 任何
+      # ⭐⭐⭐⭐⭐ 写子命令都会在 `run()` 末尾无条件 `save_registry`，而
+      # ⭐⭐⭐⭐⭐ `load_registry` 曾用 `Err(_)` 吞掉解析错误并误走「老 schema
+      # ⭐⭐⭐⭐⭐ 迁移」（0 节点）⇒ 318 节点 / 43 边被覆盖成 41 / 0，**退出码 0**。
+      # ⭐⭐⭐⭐⭐ 同时锁住**序列化抖动**：直接序列化会把 `metadata: HashMap`
+      # ⭐⭐⭐⭐⭐ 的迭代序写进文件 ⇒ 同一输入 5 次写盘产出 5 个不同 md5。
+      # ⭐⭐⭐⭐⭐ ⭐⭐ 必须跨进程跑：单进程内 HashMap 迭代序稳定 ⇒ 单测抓不到。
+      - name: Capability registry cross-process determinism + lossless roundtrip
+        run: bash scripts/ops/nt-registry-determinism.sh
+
   coverage:
     runs-on: ubuntu-latest
     steps:

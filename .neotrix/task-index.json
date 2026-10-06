@@ -1241,6 +1241,28 @@
       "read_only": true,
       "when_not": "⛔ 别拿它的**上架率**当阻断项 —— 那是演进指标，拿它当阻断 ⇒ 恒红 ⇒ 门被关掉 ⇒ 更坏（照抄 nt_gate_coverage 的教训）。它只对「清单不自洽」判红：互斥/完备/反向一致/拿不到证据。⛔ 它必须跑在干净检出上（脏树的编译结果不可信）。⛔ 别拿 canary 当地图 —— canary 是监视集合不是市场集合，混用会把分母算成两个不同集合的和（第一版就报过 5/10 这种无意义的数）。",
       "spec": "能力市场清单自洽门：market_listable / market_unlisted 来自运行期探针（EMERGENCE_PROBE），与 neobot-check-emergence.mjs 同源"
+    },
+    {
+      "id": "registry-determinism",
+      "query": [
+        "注册表确定性",
+        "快照抖动",
+        "假diff",
+        "HashMap 迭代顺序",
+        "序列化不确定",
+        "注册表截断",
+        "数据丢失",
+        "能力注册表",
+        "capability_registry.json",
+        "往返丢节点",
+        "md5 不一致",
+        "写盘覆盖"
+      ],
+      "tool": "bash scripts/ops/nt-registry-determinism.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "不要用它判「注册表内容对不对」—— 它只管**同一输入的输出是否逐字节一致**以及**往返是否零丢失**（318 节点/43 边是基准），不判节点语义是否正确。也不要用单进程 cargo test 替代它：跨进程的 HashMap 迭代序抖动在单进程内**测不出来**（曾写过 3 条单测，变异验证全部照样绿 ⇒ 零区分力）。若二进制陈旧必须加 NT_REGISTRY_REBUILD=1，否则会拿旧二进制的结果误判当前代码。",
+      "spec": "scripts/ops/nt-registry-determinism.sh 顶部文档（含 2026-10-06 实测：同一输入 5 次写盘产出 5 个不同 md5）"
     }
   ],
   "excluded": {

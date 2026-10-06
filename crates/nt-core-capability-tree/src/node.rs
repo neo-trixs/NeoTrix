@@ -94,6 +94,30 @@ pub enum CapabilityKind {
     Gap,
 }
 
+impl Default for CapabilityKind {
+    /// **缺 `kind` 的旧节点一律按 `Skill`**。
+    ///
+    /// ## 为什么是 `Skill` 而不是 `Gap`
+    ///
+    /// 市场的 fail-closed 依赖 `Gap` 被排除在可上架清单外，所以默认值
+    /// 若取 `Gap` 会让**所有**能力都不可上架（市场恒空）；
+    /// 若取 `Skill`，一个本该是 `Gap` 的节点会被错误上架。
+    ///
+    /// ## 为什么这个风险在当前数据上**不成立**（实测，非推测）
+    ///
+    /// 已提交的注册表 318 个节点里，`kind` 键**一个都没有**，而
+    /// `consciousness::gap::*` 节点**一个都不在该文件里** —— 缺口节点由
+    /// `ConsciousnessRuntime` 在**运行期**注册并显式带
+    /// `CapabilityKind::Gap`（见 `ea5b5424`）。
+    /// ⇒ 旧文件里的节点都不是缺口，取 `Skill` 不会让缺口混入市场。
+    ///
+    /// ⛔ 若将来把缺口节点**持久化进这个文件**，必须先给它们写显式
+    ///   `kind: "gap"`，否则默认值会把「我不会」伪装成「我会」。
+    fn default() -> Self {
+        Self::Skill
+    }
+}
+
 impl CapabilityKind {
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -307,6 +331,14 @@ pub struct CapabilityNode {
     pub layer: NodeLayer,
     pub constellation: ConstellationLevel,
     /// ⭐⭐⭐⭐⭐ **能力类型**（⭐⭐ ⭐⭐ **市场枚举的第一维度**，⭐⭐ 见 `CapabilityKind`）
+    // 2026-10-06 P0 数据丢失修复：`kind` 曾是**唯一没有 `#[serde(default)]`**
+    // 的可选语义字段，而已提交的 `.neotrix/capability_registry.json`
+    // 318 个节点**全部**没有这个键 ⇒ `from_str::<RegistryExport>` 整体失败。
+    // `cli::load_registry` 用 `Err(_)` 吞掉错误并误走「老 schema 迁移」，
+    // 迁移结果 **0 节点**；随后 `save_registry` 把 41 个 roadmap 节点
+    // 写回 ⇒ **318 节点 / 43 边被一次性销毁**（实测 3/3 复现）。
+    // 加 `default` 让旧文件仍可解析；默认值语义见 `Default for CapabilityKind`。
+    #[serde(default)]
     pub kind: CapabilityKind,
     pub provides: Vec<String>,                // 提供的能力标签
     #[serde(default)]
