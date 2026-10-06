@@ -26,6 +26,10 @@ use serde_json::Value;
 use super::full_cycle::{self, TradeContext};
 use super::quote_negotiation::RequirementConfirmation;
 
+/// 树 id 常量：打点与注册**必须用同一个串**，故只在此定义。
+const _TREE_ID_FULL_CYCLE: &str = "NT-MIND::trade::foreign_trade_full_cycle";
+const _TREE_ID_QUOTE: &str = "NT-MIND::trade::trade_quote_negotiation";
+
 /// 派发 `foreign_trade_full_cycle`：输入 = `TradeContext`。
 fn dispatch_full_cycle(_id: &str, input: Value) -> BoxFuture<'static, Result<Value, String>> {
     Box::pin(async move {
@@ -33,6 +37,8 @@ fn dispatch_full_cycle(_id: &str, input: Value) -> BoxFuture<'static, Result<Val
         let ctx: TradeContext = serde_json::from_value(input)
             .map_err(|e| format!("TradeContext 反序列化失败: {e}"))?;
         let result = full_cycle::execute_trade_full_cycle(ctx);
+        // ✅ **执行成功后**才打点（金丝雀必须度量「真被执行」，不是「被查过」）
+        neotrix_neobot::nt_capability_canary::signal(_TREE_ID_FULL_CYCLE);
         serde_json::to_value(result).map_err(|e| format!("TradeResult 序列化失败: {e}"))
     })
 }
@@ -48,6 +54,7 @@ fn dispatch_quote_negotiation(_id: &str, input: Value) -> BoxFuture<'static, Res
         }
         let a: Args = serde_json::from_value(input)
             .map_err(|e| format!("报价参数反序列化失败: {e}"))?;
+        neotrix_neobot::nt_capability_canary::signal(_TREE_ID_QUOTE);
         let (quotes, records) = super::quote_negotiation::execute_quote_negotiation(
             a.requirement,
             a.product_spec,
@@ -70,11 +77,8 @@ pub fn register_tree_dispatchers() -> Vec<String> {
     let mut failed = Vec::new();
     // 显式标注为 DispatchFn 指针类型：否则数组被推断为首元素的**具体 fn item 类型**
     let pairs: [(&str, dispatch::DispatchFn); 2] = [
-        ("NT-MIND::trade::foreign_trade_full_cycle", dispatch_full_cycle),
-        (
-            "NT-MIND::trade::trade_quote_negotiation",
-            dispatch_quote_negotiation,
-        ),
+        (_TREE_ID_FULL_CYCLE, dispatch_full_cycle),
+        (_TREE_ID_QUOTE, dispatch_quote_negotiation),
     ];
     for (id, f) in pairs {
         if let Err(e) = dispatch::register_dispatcher(id, f) {
@@ -87,6 +91,11 @@ pub fn register_tree_dispatchers() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// ⚠️ 金丝雀是**进程级全局**，而测试**并行**执行
+    /// ⇒ 两个 canary 测试会互相 `reset()`，实测 `--test-threads=1` 时
+    /// 6 绿、并行时必红（与 `dispatch` 派发表同类问题）。
+    static CANARY_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
     use nt_core_capability_tree::dispatch::{dispatch, registered_count};
 
     /// 注册后，这两个 id 必须**从 `None` 变成`Some`** —— 这是接线生效的判据。
@@ -145,6 +154,100 @@ mod tests {
             got.is_err(),
             "非法输入必须 Err（fail-closed），实得 {got:?}"
         );
+    }
+
+    /// ⭐ **可观测性闭环**：真实执行后金丝雀的 `fired` 必须 +1。
+    ///
+    /// 这是「执行确实发生了」的**外部可观测证据** ——
+    /// 之前只有「派发返回 Some」这种自证，无第三方观测。
+    #[test]
+    fn 真实执行后金丝雀必须打点() {
+        use neotrix_neobot::nt_capability_canary as cn;
+        // ⚠️ 必须先注册派发器，否则 dispatch 返 None（我第一次就漏了这行，
+        //    症状是 expect("已注册")  panic —— 错误信息完全指错了方向）
+        let failed = register_tree_dispatchers();
+        assert!(failed.is_empty(), "{failed:?}");
+        let _cg = CANARY_LOCK.lock().expect("金丝雀测试锁");
+        cn::reset();
+        cn::expect(cn::CanaryCapability {
+            id: _TREE_ID_FULL_CYCLE.to_owned(),
+            description: "外贸全链".to_owned(),
+            fix: "在 tree_dispatch 执行后 signal".to_owned(),
+        })
+        .expect("登记金丝雀");
+        let before = cn::status()
+            .expect("status")
+            .into_iter()
+            .find(|c| c.capability.id == _TREE_ID_FULL_CYCLE)
+            .map(|c| c.fired_count)
+            .unwrap_or(0);
+
+        let input =
+            serde_json::to_value(full_cycle::capability_spec().context).expect("仓内 spec 转 JSON");
+        let fut = dispatch(_TREE_ID_FULL_CYCLE, input)
+            .expect("表可用")
+            .expect("已注册");
+        tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("runtime")
+            .block_on(fut)
+            .expect("执行应成功");
+
+        let after = cn::status()
+            .expect("status")
+            .into_iter()
+            .find(|c| c.capability.id == _TREE_ID_FULL_CYCLE)
+            .map(|c| c.fired_count)
+            .unwrap_or(0);
+        // 用 `>` 而非 `== before+1`：其他测试经`TradeCapabilityRegistry::get()`
+        //也会 signal（金丝雀是全局的），并行时可能多出计数。
+        // 但**必须严格增长** —— 那才是「本次执行确实被打点」的证据。
+        assert!(
+            after > before,
+            "真实执行后金丝雀 fired 必须增长（{before} → {after}）"
+        );
+    }
+
+    /// ⛔ 反向证据：**非法输入（未真正执行）不得打点**。
+    ///
+    /// 若「解析失败」也算打点 ⇒ 金丝雀会奖励「失败的能力」。
+    #[test]
+    fn 执行失败不得打点() {
+        use neotrix_neobot::nt_capability_canary as cn;
+        // ⚠️ 必须先注册派发器，否则 dispatch 返 None（我第一次就漏了这行，
+        //    症状是 expect("已注册")  panic —— 错误信息完全指错了方向）
+        let failed = register_tree_dispatchers();
+        assert!(failed.is_empty(), "{failed:?}");
+        let _cg = CANARY_LOCK.lock().expect("金丝雀测试锁");
+        cn::reset();
+        cn::expect(cn::CanaryCapability {
+            id: _TREE_ID_FULL_CYCLE.to_owned(),
+            description: "外贸全链".to_owned(),
+            fix: "在 tree_dispatch 执行后 signal".to_owned(),
+        })
+        .expect("登记金丝雀");
+        let before = cn::status()
+            .expect("status")
+            .into_iter()
+            .find(|c| c.capability.id == _TREE_ID_FULL_CYCLE)
+            .map(|c| c.fired_count)
+            .unwrap_or(0);
+
+        let fut = dispatch(_TREE_ID_FULL_CYCLE, serde_json::json!({ "错的": 1 }))
+            .expect("表可用")
+            .expect("已注册");
+        let got = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("runtime")
+            .block_on(fut);
+        assert!(got.is_err(), "非法输入必须失败");
+        let after = cn::status()
+            .expect("status")
+            .into_iter()
+            .find(|c| c.capability.id == _TREE_ID_FULL_CYCLE)
+            .map(|c| c.fired_count)
+            .unwrap_or(0);
+        assert_eq!(after, before, "⛔ 执行失败不得打点，否则金丝雀奖励失败");
     }
 
     /// 未注册的 3 个能力必须仍然返 `None` ⇒ **不得被误接线**。
