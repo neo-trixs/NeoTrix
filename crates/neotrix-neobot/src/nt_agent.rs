@@ -1728,17 +1728,29 @@ fn execute_capability_invoke(call: &crate::nt_types::ToolCall) -> Result<ToolRes
     // 上游账本/审计读的是 `ok`，不是 `note` ⇒ 等于报假成功。
     // 这正是本仓一路在治的「建成未用却看着健康」。
     // 显式标注 exec_out 类型：移除 `Some(v)` 臂后已无锚点可推(E0282)
-    let (ok, executed, counted, reason, exec_out): (bool, bool, bool, String, Option<serde_json::Value>) = match &dispatched {
-        // 有实现，但 future 需 async 上下文才能 drive，而本函数是**同步**的
-        // ⇒ ⛔ 绝不能在此 `block_on`（async 上下文里会嵌套运行时）
-        // ⇒ 判为「未执行」，等调用链提供 async 入口后再接线。
-        Ok(Some(_fut)) => (
-            false,
-            false,
-            false,
-            "CAPABILITY_BODY_NOT_EXECUTED".to_owned(),
-            None,
-        ),
+    let (ok, executed, counted, reason, exec_out): (bool, bool, bool, String, Option<serde_json::Value>) = match dispatched {
+        // 有实现 ⇒ **真实执行**（驱动 future，按上下文安全分流）。
+        Ok(Some(fut)) => match crate::nt_dispatch_drive::drive(fut) {
+            // ⚠️ `drive` 的 `Result` **嵌套**实现自身的 `Result`
+            //（外层=能否驱动，内层=实现执行结果）⇒ 必须三层全匹配，⛔ 不可 `?` 混掉。
+            // ✅ 真实执行成功 ⇒ 现在才计数（闭环要求「成功后计数」）
+            Ok(Ok(out)) => {
+                let after = crate::nt_capability_registry::record_dispatch(id)
+                    .map_err(NtBotError::Store)?;
+                let _ = after;
+                (
+                    true,
+                    true,
+                    true,
+                    "EXECUTED_VIA_DISPATCH_PORT".to_owned(),
+                    Some(out),
+                )
+            }
+            // 已驱动、但实现自身失败
+            Ok(Err(e)) => (false, false, false, e, None),
+            // 连驱动都失败（如已在 async runtime 内）
+            Err(e) => (false, false, false, format!("DISPATCH_DRIVE_FAILED: {e}"), None),
+        },
         Ok(None) => (
             false,
             false,

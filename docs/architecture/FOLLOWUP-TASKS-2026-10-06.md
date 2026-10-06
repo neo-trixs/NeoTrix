@@ -366,6 +366,39 @@ neobot 侧 `listable()` 为真。
 `capability_spec().context`，零虚构数据**）；非法输入必须 `Err`；
 **未注册的 3 个必须仍 `None`**。
 
+### ✅ P0.3 neobot 侧无法 drive 派发 future —— 已用可判定分流解决（2026-10-06）
+
+`execute_capability_invoke` 是**同步**函数（工具派发链全是 `Result<ToolResult>`），
+而端口产出 `BoxFuture`。
+
+⛔ **绝不能在 tokio runtime 内 `block_on`**（会 panic：
+`Cannot start a runtime from within a runtime`），而「同步工具链被 async
+调用方包着」是极常见情形。
+
+⇒ 新增 `nt_dispatch_drive::drive`，用 `Handle::try_current()` **可判定**分流：
+
+| 上下文 | 行为 |
+|---|---|
+| 不在 runtime 内（CLI / 同步驱动） | 起临时 `current_thread` runtime → **真实执行** |
+| 在 runtime 内 | 返回明确 `DISPATCH_REQUIRES_SYNC_CONTEXT` ⇒ **fail-closed**（⛔ 不 panic、不假装成功） |
+
+⇒ `Ok(Some(fut))` 现在**真实执行**，成功后才 `record_dispatch` 计数
+（闭环要求「成功后计数」）。
+
+⚠️ **嵌套 Result 语义**（编译器抓到我把期望写错）：
+外层 `Err` = 驱动失败；外层 `Ok(Err(..))` = **驱动成功但实现失败**
+⇒ 调用方**三层全匹配**，⛔ 不可把内层错误当驱动失败。
+
+### ⚠️ 我在本轮**又踩了一次 R-SCAN-4**（反引号被 shell 执行）
+
+写测试注释时用了 `` `Ok(Err(..))` ``，**zsh 当命令替换执行了**
+（`command not found: Err`）⇒ 注释里的内容被**吃掉**，
+只剩 `外层  = **驱动失败**`。
+
+⚠️ `bash -n` 抓不到（语法完全合法），**只有核对写入内容才发现**。
+⇒ 该纪律在 AGENTS.md 已记录，我在**同一个会话里**又犯。
+⇒ 本次修复：**注释里不写反引号**，改用裸 `Ok(内层 Err)`。
+
 ⇒ 另 3 个（`production_logistics` / `finance_compliance` / `trade_product_spec`）
 **顶层执行器数为 0** ⇒ 接线须**发明** schema ⇒ **不注册，保持 fail-closed**。
 

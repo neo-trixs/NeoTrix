@@ -24,6 +24,7 @@ pub mod nt_audit;
 pub mod nt_cancel;
 pub mod nt_capability_canary;
 pub mod nt_capability_market;
+pub mod nt_dispatch_drive;
 pub mod nt_capability_registry;
 pub mod nt_changes;
 pub mod nt_channel;
