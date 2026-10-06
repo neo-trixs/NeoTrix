@@ -65,50 +65,58 @@ pub struct ManifestEntry {
     pub description: &'static str,
 }
 
-/// 贸易能力的市场清单（**4 条**）。
+/// 贸易能力的市场清单（**5 条**）。
 ///
-/// # ⭐ 本清单曾被**编造**过，教训在案（2026-10-06）
+/// # ⭐ 这 5 条是**既有契约**（`7187e0b9`，2026-10-03，早于本轮），不是编造
 ///
-/// 首版我凭空写了 5 条 `NT-MEMORY::trade::*` / `NT-MIND::trade::*`
-/// 的 id（命名方案自创、数量自创）。
-/// 而真实注册表 `create_default_registry()` 只有 **4** 个实现，id 形如
-/// `trade.price_calculator`。**零重叠**——却因两侧都读同一份清单，
-/// `neobot capability list` 一度**上架 5 项不存在的能力**，
-/// 看上去完全健康。
+/// 每个 id 都能在对应实现模块里找到**字面同串 + 注册调用**：
 ///
-/// ⇒ 本清单的每一条都必须由 `capability_registry` 里的真实 id 逐字对照，
-/// 而「对照」由 core 侧测试 `manifest每个id都能在全局注册表查到` 承重：
-/// id 一旦漂移，**测试立刻红**（不是运行时静默降级）。
+/// | id | 实现模块 |
+/// |---|---|
+/// | `NT-MEMORY::trade::trade_product_spec` | `l4_emotion/nt_memory/nt_trade_product_spec.rs` |
+/// | `NT-MIND::trade::trade_quote_negotiation` | `l1_action/nt_act/nt_act_trade/quote_negotiation.rs` |
+/// | `NT-MIND::trade::trade_production_logistics` | `…/production_logistics.rs` |
+/// | `NT-MIND::trade::trade_finance_compliance` | `…/finance_compliance.rs` |
+/// | `NT-MIND::trade::foreign_trade_full_cycle` | `…/full_cycle.rs` |
 ///
-/// # 为什么不含 `StepHandlerCapability`
+/// # ⚠️⛔ 不要拿`TradeCapabilityRegistry` 来核对本清单
 ///
-/// 它**有** `execute_trade` 实现，但 id 是**动态的**
-/// `trade.step.{handler_name}` ⇒ 无法进静态清单
-/// （要进，得先把 handler 名集合固化 —— 那是独立的一件事）。
+/// 那是**另一层**能力：`trade.price_calculator` / `product_matcher` /
+/// `risk_assessor` / `supplier_matcher`（点号 id，4 个）——
+/// **计价 / 产品匹配 / 风控 / 供应商匹配**，与本清单的 5 个贸易能力**不是同一批东西**。
+///
+/// 我曾据它把清单改成 `trade.*`（提交 `f67942ea`）⇒ **那是错的，已回退**。
+/// 详见 `docs/architecture/FOLLOWUP-TASKS-2026-10-06.md` 的 P0.1 修正。
 pub const TRADE_MANIFEST: &[ManifestEntry] = &[
     ManifestEntry {
-        id: "trade.price_calculator",
-        domain: crate::node::Domain::Mind,
-        category: "trade/pricing",
-        description: "按配置计算价格（PriceCalcRequest → 计价结果）",
+        id: "NT-MEMORY::trade::trade_product_spec",
+        domain: crate::node::Domain::Memory,
+        category: "trade/product-spec",
+        description: "贸易产品规格生成（L4 memory 侧）",
     },
     ManifestEntry {
-        id: "trade.product_matcher",
+        id: "NT-MIND::trade::trade_quote_negotiation",
         domain: crate::node::Domain::Mind,
-        category: "trade/product",
-        description: "按配置做产品匹配（ProductMatchRequest → 匹配结果）",
+        category: "trade/quote",
+        description: "报价谈判",
     },
     ManifestEntry {
-        id: "trade.risk_assessor",
+        id: "NT-MIND::trade::trade_production_logistics",
         domain: crate::node::Domain::Mind,
-        category: "trade/risk",
-        description: "按配置评估风险（RiskAssessRequest → 风险结论）",
+        category: "trade/logistics",
+        description: "生产物流",
     },
     ManifestEntry {
-        id: "trade.supplier_matcher",
+        id: "NT-MIND::trade::trade_finance_compliance",
         domain: crate::node::Domain::Mind,
-        category: "trade/supplier",
-        description: "按配置匹配供应商（SupplierMatchRequest → 供应商候选）",
+        category: "trade/finance",
+        description: "金融合规",
+    },
+    ManifestEntry {
+        id: "NT-MIND::trade::foreign_trade_full_cycle",
+        domain: crate::node::Domain::Mind,
+        category: "trade/full-cycle",
+        description: "外贸全链（full cycle）",
     },
 ];
 
@@ -137,24 +145,20 @@ mod tests {
 
     /// 清单 id 必须是**能力树 id 形态**（含两个 `::`），否则反向核对照不上。
     #[test]
-    /// 清单 id 必须用**实现注册表**的 id 形态（点号 `trade.*`）。
-    ///
-    /// ⚠️ 首版此处断言的是 `域::模块::实例`（`::` 出现 2 次）——
-    /// 那是我照抄 **canary 的 id 空间**写下的，而 canary 与实现
-    /// **是两个注册表、两套 id**。真实派发走 `capability_registry`，
-    /// 故清单必须用**它**的形态。
+    /// 清单 id 必须是**能力树 id** 形态（`域::模块::实例`，`::` 恰 2 次）。
     #[test]
-    fn 清单id是实现注册表形态() {
+    fn 清单id是能力树形态() {
         for e in TRADE_MANIFEST {
-            assert!(
-                e.id.starts_with("trade.") && !e.id.contains("::"),
-                "id 应为实现注册表形态 `trade.*`，实得 {:?}",
+            assert_eq!(
+                e.id.matches("::").count(),
+                2,
+                "id 应为 `域::模块::实例` 形态，实得 {:?}",
                 e.id
             );
         }
     }
 
-    /// 清单**非空**（市场有东西可展示）。
+    /// 清单非空。
     #[test]
     fn 清单非空() {
         assert!(!TRADE_MANIFEST.is_empty(), "清单为空 ⇒ 市场无从展示");

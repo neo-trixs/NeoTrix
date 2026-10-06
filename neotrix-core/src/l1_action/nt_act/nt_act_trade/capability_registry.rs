@@ -224,10 +224,7 @@ mod global_registry_tests {
         assert!(std::ptr::eq(a, b), "两次取值必须是同一实例");
     }
 
-    /// 注册表在**锁内**可被查找（派发 `fn` 指针的实际用法）。
-    ///
-    /// ⛔ 本测试**不**断言具体能力存在 —— 那会把「默认集内容」与「派发可用性」
-    /// 两个无关事实绑死；派发是否真的成功由 `dispatch` 侧测试负责。
+
     #[test]
     fn 锁内查找不panic且可重入() {
         let reg = global_trade_registry();
