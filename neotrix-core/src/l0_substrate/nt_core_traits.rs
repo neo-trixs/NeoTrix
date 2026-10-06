@@ -24,6 +24,22 @@ pub use nt_core_capability_tree::RuneSocket;
 /// 实现者声明自身在能力树中的坐标 (provides/requires)、符文槽位与星座成熟度。
 /// 注意: `nt_core_capability_tree::CapabilityNode` 是注册表数据 struct,
 /// 此 trait 是能力节点实现方 (l8/l9/l10) 向 core 层声明节点契约的接口。
+/// ⚠️ **与 `nt_core_capability_tree::node::CapabilityNode` 同名但不是同一个东西**
+/// （AGENTS.md L15「同名 ≠ 同一符号」）。
+///
+/// | | 本 trait | `nt_core_capability_tree` 的同名**结构体** |
+/// |---|---|---|
+/// | 形态 | trait（行为接口） | struct（数据模型） |
+/// | 语义 | **运行期能力提供者**：可被编排、可声明依赖 | **能力树节点**：`id`/`domain`/`kind`/`provides` |
+/// | 构造 | `impl CapabilityNode for X`（4 个活跃实现） | `CapabilityNode::new_primitive(..)` 等（70 处构造） |
+///
+/// ⛔ **不要把市场元数据（category/version/license/description/tags/maturity）
+/// 加到本 trait 上** —— 它们属于**结构体**那边（见
+/// `docs/architecture/FOLLOWUP-TASKS-2026-10-06.md` 的 T0.1 裁决）。
+///
+/// 📌 改名计划已量化：改名本 trait → `CapabilityProvider` 触及 **60 处 / 18 文件**，
+/// 含 B1 核心的 5 个 trade 能力。属独立任务，不在能力接线工作中顺带做
+/// （`DIR-REMEDY` 记过「活路径误判」事故）。
 pub trait CapabilityNode: Send + Sync {
     /// 节点唯一标识 (域::模块::实例路径)
     fn node_id(&self) -> &str;

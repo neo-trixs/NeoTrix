@@ -325,6 +325,16 @@ pub struct RunewordConfig {
 
 /// 能力节点核心定义
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 能力树节点（**数据模型**）。
+///
+/// ⚠️ 与 `neotrix_core::l0_substrate::nt_core_traits::CapabilityNode`（**同名 trait**）
+/// 不是同一个东西 —— 那是「运行期能力提供者」的行为接口，本结构体是树的数据模型。
+/// 见 `docs/architecture/FOLLOWUP-TASKS-2026-10-06.md` T0.1。
+///
+/// 📌 **这里是能力市场描述性元数据的家**：`category` / `version` / `license` /
+/// `description` / `tags` / `maturity` 应下沉到本结构体（neobot 已依赖本 crate），
+/// 而**不是**复制到 neobot —— 复制会产生第二个真身（本仓已记录四起同源数据腐化）。
+/// 当前这 6 个字段仍在别处 ⇒ 这是 `capability_invoke` 生产不可达的根因（T0.1）。
 pub struct CapabilityNode {
     pub id: String,                           // 全局唯一 ID: "domain::module::function"
     pub domain: Domain,
