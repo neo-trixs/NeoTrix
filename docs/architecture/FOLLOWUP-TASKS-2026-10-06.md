@@ -302,6 +302,30 @@ neobot 侧 `listable()` 为真。
 4. **分类优于清零**：死链 129 里真该修 ~95；死字段 904 里待判定 188
 5. **不写无法验证的结论**：生成器只渲染算得出的事实
 
+### T4.5 派发端口的签名与执行形态不匹配（2026-10-06 实测，下一窗口先做）
+
+我已在共享 crate 落地 `nt_core_capability_tree::dispatch`（接口完整、4 个测试）
+并让 neobot 消费（`4c42ae7c`）。但**核实后发现两个障碍**：
+
+|障碍 | 证据 |
+|---|---|
+| **执行是 `async`，端口是同步 `fn` 指针** | `TradeCapability::execute_trade` 是 `async fn`（`nt_act_trade/capability_registry.rs:32`） |
+| **无全局注册表** | `TradeCapabilityRegistry` 只有 `new() -> Self`（实例）；`create_default_registry()` 非测试引用为 0 ⇒ 无捕获 `fn` **无处取实例** |
+
+⇒ **在解决这两点前，`register_dispatcher` 不应被真实实现调用。**
+当前生产 `dispatch` 返回 `None` ⇒ 调用方fail-closed ⇒ **与接线前行为一致**（未引入回归）。
+
+**下一步（二选一，需实测后定）**：
+- **A** `DispatchFn` 改为 `fn(&str, &Value) -> BoxFuture<Result<Value,String>>`
+  ⇒ 需装箱future + 明确运行时归属（谁提供 executor）；
+- **B** 在共享 crate 增设**全局注册表落点**，且执行入口改为**同步外壳**
+  （如 `block_on`）⇒ ⚠️ 需先确认不会在 async 上下文中嵌套运行时。
+
+⚠️ 本条是本轮**第四次**「先提方案后核实」的实例（前三：A/B/C 三个方案）。
+**纪律写进文档 ≠ 内化** —— 我已把T4.1 第5 条改为可执行形式：
+**凡提出「接口/端口/签名」类方案，必须先核实被调用方的真实签名与实例获取方式。**
+
+
 ### T4.4 CapabilityNode 改名（已量化，待整块时间）
 
 trait → `CapabilityProvider`。**60 处 / 18 文件**，含 5 个 trade 能力。

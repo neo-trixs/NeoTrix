@@ -34,6 +34,25 @@ use std::collections::BTreeMap;
 use std::sync::{Mutex, OnceLock};
 
 /// 派发函数签名：`输入 id` → `输入负载` → `结构化结果`。
+///
+/// # ⛔⛔ **本签名目前与实际执行形态不匹配 —— 不要据此注册实现**
+///
+/// 实测（2026-10-06）：trade 能力的执行入口是
+/// `TradeCapability::execute_trade`，而它是 **`async fn`**
+/// （`nt_act_trade/capability_registry.rs:32`）。
+///
+/// 本类型是**同步** `fn` 指针 ⇒ **承载不了 async 执行**。
+///
+/// 第二个障碍：`TradeCapabilityRegistry` 只有 `new() -> Self`（实例），
+/// **没有全局单例**，而 `create_default_registry()` 的非测试引用为 0
+/// ⇒ 无捕获的 `fn` 指针**无处取得注册表**。
+///
+/// ⇒ **在签名改为 async（装箱 future）且注册表有全局落点之前，
+/// `register_dispatcher` 不应被真实实现调用。**
+/// 现在唯一正确的用法就是测试（同步、可控），
+/// 而生产里 `dispatch` 返回 `None` ⇒ 调用方 fail-closed ⇒ **与接线前行为一致**。
+///
+/// 详见 `docs/architecture/FOLLOWUP-TASKS-2026-10-06.md`。
 pub type DispatchFn = fn(&str, &serde_json::Value) -> Result<serde_json::Value, String>;
 
 type Table = BTreeMap<String, DispatchFn>;
