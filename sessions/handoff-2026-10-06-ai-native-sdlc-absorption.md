@@ -136,3 +136,54 @@
 - 门红归因：**全部为他窗 WIP 或既有债，本会话引入 0 个**（归因表见 §6）。
 - ⛔ 未跑 `--all-targets` 全量构建：`nt_mem_gate.sh` rc=0 但当时有另两窗在跑 git commit；
   且无 `.rs` 改动，全量构建无验证价值。
+---
+
+## 9. 补记（同会话后续，2026-10-06 晚）—— §8.2 已作废，两件事都落了
+
+§8.2 写的「**未提交**」现已不成立。实际落账：
+
+| 提交 | 内容 | 文件数 |
+|---|---|---|
+| `a131d9bd` | 变更工件链 + `REVIEW.md` + `check-agent-config.sh` + 探针 + 棘轮基线 + 索引/接线 + 本交接件 | 14 |
+| `149af337` | `actions/setup-python@v5` 溯源补记（**修掉 main 上既有红门**）+ `nt_sdlc_metrics.py` 落地 + `REVIEW.md §6` 换成实测数 | 5 |
+
+**两个提交都完整在 HEAD 历史里**（`git merge-base --is-ancestor` 已核实）。
+中间夹了别的窗口的 `2cc4badf` / `1f37626e` —— 那是并发窗口各自的提交，
+`1f37626e` 只含它自己的 3 个 LESSONS/handoff 文档，**没有捎带我的文件**。
+
+### 9.1 上一版 §5「遗留判断 1」已解决
+
+原文说 `check-ci-refs.sh` 红是「需联网、留给有网的人」。后来**发现有网**，
+且该溯源清单 `_comment` 自带离线可复现流程 ⇒ 按流程**实测**补记
+（ls-remote 取 commit + codeload tarball 取 sha256，**两次独立下载 sha256 一致**，
+`file` 确认是真 gzip tarball 而非错误页）。
+
+⇒ `check-ci-refs.sh --strict` **rc=0**；`provenance_check.sh` **14/14 PASS**；
+**恒红门 4 → 3**（clean-HEAD 基线是 5）。
+
+⚠️ 遗留：`@v5` 是**可移动 tag**，记录只对那一刻成立。真要不可变须改
+`uses: @<commit SHA>` —— 独立决策，未做。
+
+### 9.2 原 §5「遗留判断 3」已部分解决
+
+`REVIEW.md §6` 拆成两节：§6.1 是**真能测**的 3 项（工件覆盖率 0.9% /
+工件→diff 漂移 NO_BASELINE / 返工代理 1.5%），§6.2 是**测不出**的 3 项
+（如实标 `UNMEASURED` + 写明为何测不出）。**没有造没人跑的空仪表。**
+
+⚠️ `--self-test` 当场抓到我自己的两个真 bug（详见提交说明）：
+① coverage 窗口建在「只含 code commit」的列表上 ⇒ 工件单独成 commit 时永远进不了窗口；
+② `git log -n N` 配 pathspec 与不配 pathspec **是两个不同的窗口**。
+**两个都是跑出来的** —— 没有 `--self-test`，指标就会永远输出 0，而 0 与
+「写坏了」不可区分。
+
+### 9.3 仍未修（需要 cargo 或产品码改动，非本会话范围）
+
+`check-doc-drift`（NEW offender `nt_core_event_bus.rs`）· `check-unwrap` ·
+`check-silent-failure`（后两者存量债，`gate-registry.tsv` 已记）·
+`check-doc-claims` 探针 rc=2（门有效性未获证，既有）。
+
+### 9.4 并发实况
+
+本会话全程与**两个窗口**并行。它们在跑 `git commit --only` 提交
+`nt_approval.rs` / `input_validator.rs`。本会话**未删任何 index.lock**，
+一律用有界轮询等待（`for i in seq; git add … || sleep`）。
