@@ -127,7 +127,8 @@ impl BrainStage for GoalContractStage {
 
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         use super::nt_reward::RewardLedger;
-        use super::pipeline::AutonomyLevel;
+        // 注：AutonomyLevel 的实际决策已抽到 decide_autonomy（纯函数，可独立测试），
+        // 此处不再需要该导入 ⇒ 保留会触发 deny(warnings)。
 
         let mut ledger = RewardLedger::new();
 
