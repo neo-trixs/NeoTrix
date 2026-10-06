@@ -2619,7 +2619,7 @@ pub 符号差异（pub fn/struct/enum/trait/const）: 孤儿独有 0 / 现存独
 | ③ 独立能力 | 无同名实现（有 pub API 或自带测试） | 15 | 5,830 |
 | ④ 同名但已分叉 | 有同名实现且**孤儿持有独有 fn** | 6 | 1,364 |
 
-① 仅 `l1_action/nt_io/nt_io_eli5.rs`：`diff` 与
+① 仅 `l1_action/nt_io/nt_io_eli5.rs`（**已删**，见 `d065591b` 孤儿去重）：`diff` 与
 `l5_cognition/nt_core/io_skills/nt_io_eli5.rs` **0 行差异**，
 全仓仅 `io_skills/mod.rs:1` 声明后者。
 
@@ -2670,7 +2670,11 @@ git 对 pre-commit **传 0 个参数**，而 `git commit --only -m` **不写** `
 
 ### 本轮未提交的原因（不是我卡住）
 
-删除 `nt_io_eli5.rs` 后跑提交，P0 build gate 失败于
+> ⚠️ **本节已是历史（2026-10-06 核实）**：下面那次删除**后来真的提交了** ——
+> `d065591b chore(orphan): 删除唯一经内容等价证明的重复孤儿 nt_io_eli5.rs（83 行）`。
+> 故本节保留原样作为过程记录，路径均**已删**。
+
+删除 `nt_io_eli5.rs`（**已删**，见 `d065591b`）后跑提交，P0 build gate 失败于
 `neotrix-core/src/entry/brain.rs:86-99`（他窗未提交 WIP：
 `strip_ansi` 改成返回 `String` 后调用点未同步改完，mtime 00:03）。
 ⇒ **任何**提交（含本文档）都被挡住。
@@ -2679,7 +2683,7 @@ git 对 pre-commit **传 0 个参数**，而 `git commit --only -m` **不写** `
 是在给他窗制造事故（他们的 pre-commit 会突然报「删除未声明」）。
 
 ⇒ **待办**：待 build 转绿后执行
-`rm neotrix-core/src/l1_action/nt_io/nt_io_eli5.rs`
+`rm neotrix-core/src/l1_action/nt_io/nt_io_eli5.rs`（**已删**，`d065591b` 已执行）
 + 预置 `COMMIT_EDITMSG` + `git commit --only`（判据与检验见 commit 消息草稿）。
 
 ⚠️ 另：他窗已提交 `54be0301` 修掉我先前撞见的 2 个 `nt_shield` 红测试
@@ -2697,7 +2701,7 @@ git 对 pre-commit **传 0 个参数**，而 `git commit --only -m` **不写** `
 
 | 提交 | 内容 | 行数 | 接入时发现 |
 |---|---|---|---|
-| `d065591b` | 删 `l1_action/nt_io/nt_io_eli5.rs` | -83 | 唯一经**逐行 diff 相同**证明的重复 |
+| `d065591b` | 删 `l1_action/nt_io/nt_io_eli5.rs`（**已删**） | -83 | 唯一经**逐行 diff 相同**证明的重复 |
 | `383836d1` | `l2/error_conversions.rs` | 24 | 三个 `From` impl **从未生效**（L2 是唯一漏声明 error_conversions 的层） |
 | `cf1a1882` | `l3/nt_shield/adversarial_pipeline.rs` | 661 | 7-stage 防御管线 + 13 测试全离线，**零修改**接入 |
 | `171dfb04` | `nt_crystal_core` 6 个 | 1996 | ①E0502 借用冲突 ②一个**恒失败**测试 ③未用 import |

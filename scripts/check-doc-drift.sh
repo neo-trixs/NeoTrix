@@ -213,15 +213,27 @@ if [ -s "$LINKTMP" ]; then
       # 标记在 425-426）。只看单行或只看后 2 行都会漏判 ⇒ 窗口取 ln-2..ln+2。
       : > "$DEADTMP2"
       rg -n -F "$p" "$d" 2>/dev/null | cut -d: -f1 | while IFS= read -r ln; do
-        [ -n "$ln" ] || continue
-        lo=$((ln-3)); [ "$lo" -lt 1 ] && lo=1
-        ctx=$(sed -n "${lo},$((ln+3))p" "$d" 2>/dev/null)
-        case "$ctx" in
-          *已删*|*已废止*|*已归档*|*已失效*|*已消失*|*不要再*|*已完全*|*归档*|*不要删*|*已移除*|*全无消费者*|*仅自身测试*|*无生产*|*从未入库*|*从未存在*|*不存在*|*已作废*|*已裁决*|*永久丢失*|*正典*|*未关闭*|*未落地*|*不是实测*|*仍然敞开*)
+[ -n "$ln" ] || continue
+      lo=$((ln-3)); [ "$lo" -lt 1 ] && lo=1
+      ctx=$(sed -n "${lo},$((ln+3))p" "$d" 2>/dev/null)
+      # ⑤ 探针注入点（2026-10-06）：本门判据是「文档让下一个 agent 去读一个
+      #    真实存在的路径」。但**探针注入文件按设计只在探针运行期间存在**
+      #    （TODO.md 记载的 check-silent-failure / check-unwrap 落点即如此），
+      #    文档记下那个路径是在描述**注入契约**，不是在下指示。
+      #    ⛔ 判据必须窄，双条件缺一不可：
+      #       (a) 上下文提到探针/probe；(b) 路径本身形如 nt_probe_*.rs。
+      #       绝不能泛化成「文件名含 probe 就跳过」—— 那会让真死链溜过去。
+      #    （写成 case 的额外分支会与外层 case 的 ;; 冲突 ⇒ 提前 continue）
+      if printf '%s' "$ctx" | grep -qE '探针|probe|PROBE' \
+         && printf '%s' "$p" | grep -qE '(^|/)nt_probe_[a-z0-9_]*\.rs$'; then
+        continue
+      fi
+      case "$ctx" in
+        *已删*|*已废止*|*已归档*|*已失效*|*已消失*|*不要再*|*已完全*|*归档*|*不要删*|*已移除*|*全无消费者*|*仅自身测试*|*无生产*|*从未入库*|*从未存在*|*不存在*|*已作废*|*已裁决*|*永久丢失*|*正典*|*未关闭*|*未落地*|*不是实测*|*仍然敞开*)
             : ;;   # 历史告知 / 订正语境 → 不计
           *) echo DEADLINE >> "$DEADTMP2"; break ;;
-        esac
-      done
+      esac
+    done
       if [ -s "$DEADTMP2" ]; then is_dead=1; break; fi
     done
     if [ "$is_dead" -eq 1 ]; then
