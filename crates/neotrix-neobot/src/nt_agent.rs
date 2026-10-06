@@ -1709,7 +1709,7 @@ fn execute_capability_invoke(call: &crate::nt_types::ToolCall) -> Result<ToolRes
     // 本 crate 消费。`Ok(None)` = **本进程没有该能力的实现**
     // ⇒ 保持 fail-closed；`Ok(Some(_))` = **真的执行了** ⇒ 此时才计数。
     let input = payload.clone().unwrap_or_else(|| serde_json::json!({}));
-    let dispatched = nt_core_capability_tree::dispatch::dispatch(id, &input);
+    let dispatched = nt_core_capability_tree::dispatch::dispatch(id, input.clone());
 
     //  **这里是真执行的边界**（2026-06 实测确认，见 commit 信息）：
     // 能力**本体**（trade 域的 `execute_trade` 等）的执行入口在
@@ -1727,20 +1727,18 @@ fn execute_capability_invoke(call: &crate::nt_types::ToolCall) -> Result<ToolRes
     // 同时 `note` 自认未执行 —— **机器可读判词与文字说明互相矛盾**。
     // 上游账本/审计读的是 `ok`，不是 `note` ⇒ 等于报假成功。
     // 这正是本仓一路在治的「建成未用却看着健康」。
-    let (ok, executed, counted, reason, exec_out) = match &dispatched {
-        Ok(Some(v)) => {
-            // ★ 真实执行 ⇒ 现在才计数（闭环要求「成功后计数」）
-            let after = crate::nt_capability_registry::record_dispatch(id)
-                .map_err(|e| NtBotError::Store(e))?;
-            let _ = after;
-            (
-                true,
-                true,
-                true,
-                "EXECUTED_VIA_DISPATCH_PORT".to_owned(),
-                Some(v.clone()),
-            )
-        }
+    // 显式标注 exec_out 类型：移除 `Some(v)` 臂后已无锚点可推(E0282)
+    let (ok, executed, counted, reason, exec_out): (bool, bool, bool, String, Option<serde_json::Value>) = match &dispatched {
+        // 有实现，但 future 需 async 上下文才能 drive，而本函数是**同步**的
+        // ⇒ ⛔ 绝不能在此 `block_on`（async 上下文里会嵌套运行时）
+        // ⇒ 判为「未执行」，等调用链提供 async 入口后再接线。
+        Ok(Some(_fut)) => (
+            false,
+            false,
+            false,
+            "CAPABILITY_BODY_NOT_EXECUTED".to_owned(),
+            None,
+        ),
         Ok(None) => (
             false,
             false,

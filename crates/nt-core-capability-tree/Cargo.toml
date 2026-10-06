@@ -27,3 +27,11 @@ workspace = true
 [[bin]]
 name = "neotrix-capability"
 path = "src/main.rs"
+
+[dev-dependencies]
+# 仅测试用：派发端口是 async，测试需要一个 executor。
+# ⚠️ **仅 dev-dependency** —— 共享 crate 的运行时依赖保持为零，
+#    端口本身只用 `std::future`（见 dispatch::BoxFuture）。
+# 曾试图在测试里手写 `block_on`，但那需要 `RawWaker`（unsafe）
+# ⇒ 被本 crate 的 `#![forbid(unsafe_code)]` 正确拦下⇒ 改用 tokio。
+tokio = { version = "1", features = ["rt", "macros"] }

@@ -53,7 +53,31 @@ use std::sync::{Mutex, OnceLock};
 /// 而生产里 `dispatch` 返回 `None` ⇒ 调用方 fail-closed ⇒ **与接线前行为一致**。
 ///
 /// 详见 `docs/architecture/FOLLOWUP-TASKS-2026-10-06.md`。
-pub type DispatchFn = fn(&str, &serde_json::Value) -> Result<serde_json::Value, String>;
+/// 装箱 future 的别名 —— **刻意用 `std`，不给本 crate 加 `futures` 依赖**
+/// （共享 crate 不该为端口引入运行时依赖）。
+pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
+
+/// 派发函数签名（**async**）。
+///
+/// # ✅ 签名已与实际执行形态对齐（2026-10-06修正）
+///
+/// 实测：`TradeCapability::execute_trade` 是 `async fn`
+/// （`nt_act_trade/capability_registry.rs:32`），而 `execute_trade` 的
+/// 非测试调用者为 **0** ⇒ 没有既有 async 上下文约束本端口的形状，
+/// 故**直接对齐 async**，而不是逼实现方用 `block_on` 包一层
+///（后者在 async 上下文里会**嵌套运行时**，是真实的死锁风险）。
+///
+/// **执行器归属**：本端口**不选执行器** —— 谁调用谁提供
+/// （neobot 与 core 都已有 `tokio`）⇒ 端口只产出 future，不drive 它。
+///
+/// # 仍存一个障碍（见 T4.5）
+///
+/// `TradeCapabilityRegistry` 只有 `new() -> Self`（实例），
+/// **无全局单例** ⇒ 无捕获的 `fn` 指针**取不到注册表**。
+/// core 侧需增设全局落点（或改用捕获式注册）。在此之前
+/// `register_dispatcher` 不应被真实实现调用；生产 `dispatch` 返回 `None`
+/// ⇒ 调用方 fail-closed ⇒ **与接线前行为一致**。
+pub type DispatchFn = fn(&str, serde_json::Value) -> BoxFuture<'static, Result<serde_json::Value, String>>;
 
 type Table = BTreeMap<String, DispatchFn>;
 
@@ -77,7 +101,10 @@ pub fn register_dispatcher(id: &str, f: DispatchFn) -> Result<(), String> {
 /// - `Ok(Some(v))` ⇒ **真实执行过**，`v` 是实现返回的结果；
 /// - `Ok(None)` ⇒ **本进程没有该能力的实现** ⇒ 调用方**必须** fail-closed；
 /// - `Err(e)` ⇒ 实现已调用但**执行失败**（锁投毒等基础设施问题）。
-pub fn dispatch(id: &str, input: &serde_json::Value) -> Result<Option<serde_json::Value>, String> {
+pub fn dispatch(
+    id: &str,
+    input: serde_json::Value,
+) -> Result<Option<BoxFuture<'static, Result<serde_json::Value, String>>>, String> {
     let f = {
         let t = table().lock().map_err(|e| format!("派发表锁投毒: {e}"))?;
         t.get(id).copied()
@@ -86,7 +113,7 @@ pub fn dispatch(id: &str, input: &serde_json::Value) -> Result<Option<serde_json
         // ⛔ 找不到实现 ⇒ None。**绝不能**退化成 `Ok(Some(json!({})))`
         //    ——那会让「没实现」看起来像「执行成功」。
         None => Ok(None),
-        Some(f) => f(id, input).map(Some),
+        Some(f) => Ok(Some(f(id, input))),
     }
 }
 
@@ -119,22 +146,37 @@ pub fn test_guard() -> std::sync::MutexGuard<'static, ()> {
 mod tests {
     use super::*;
 
-    fn ok_impl(_id: &str, _input: &serde_json::Value) -> Result<serde_json::Value, String> {
-        Ok(serde_json::json!({"executed": true}))
+    fn ok_impl(
+        _id: &str,
+        _input: serde_json::Value,
+    ) -> BoxFuture<'static, Result<serde_json::Value, String>> {
+        Box::pin(async { Ok(serde_json::json!({"executed": true})) })
     }
 
-    fn boom_impl(_id: &str, _input: &serde_json::Value) -> Result<serde_json::Value, String> {
-        Err("实现内部失败".to_owned())
+    fn boom_impl(
+        _id: &str,
+        _input: serde_json::Value,
+    ) -> BoxFuture<'static, Result<serde_json::Value, String>> {
+        Box::pin(async { Err("实现内部失败".to_owned()) })
+    }
+
+    /// 测试用executor。**只在 `#[cfg(test)]` 里存在**，不污染运行时依赖。
+    fn block_on<T>(fut: BoxFuture<'static, T>) -> T {
+        tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("建测试 runtime")
+            .block_on(fut)
     }
 
     #[test]
     fn 未注册必须返回None而非空成功() {
         let _g = test_guard();
         clear_for_tests();
-        let got = dispatch("NT-MIND::trade::nonexistent", &serde_json::json!({}));
+        let got = dispatch("NT-MIND::trade::nonexistent", serde_json::json!({}));
         assert!(
             matches!(got, Ok(None)),
-            "无实现必须是 None（让调用方 fail-closed），实得 {got:?}"
+            "无实现必须是 None（让调用方 fail-closed），实得 Ok/Err 已判但有实现={}",
+            matches!(got, Ok(Some(_)))
         );
     }
 
@@ -143,8 +185,8 @@ mod tests {
         let _g = test_guard();
         clear_for_tests();
         register_dispatcher("NT-MIND::trade::x", ok_impl).expect("注册");
-        let got = dispatch("NT-MIND::trade::x", &serde_json::json!({"a":1})).expect("派发");
-        assert_eq!(got, Some(serde_json::json!({"executed": true})));
+        let fut = dispatch("NT-MIND::trade::x", serde_json::json!({"a":1})).expect("派发").expect("有实现");
+        assert_eq!(block_on(fut), Ok(serde_json::json!({"executed": true})));
         assert_eq!(registered_count(), 1);
     }
 
@@ -153,8 +195,8 @@ mod tests {
         let _g = test_guard();
         clear_for_tests();
         register_dispatcher("NT-MIND::trade::boom", boom_impl).expect("注册");
-        let got = dispatch("NT-MIND::trade::boom", &serde_json::json!({}));
-        assert!(matches!(got, Err(ref e) if e.contains("实现内部失败")));
+        let fut = dispatch("NT-MIND::trade::boom", serde_json::json!({})).expect("派发").expect("有实现");
+        assert!(matches!(block_on(fut), Err(ref e) if e.contains("实现内部失败")));
     }
 
     #[test]
@@ -163,8 +205,8 @@ mod tests {
         clear_for_tests();
         register_dispatcher("NT-MIND::trade::dup", ok_impl).expect("注册");
         register_dispatcher("NT-MIND::trade::dup", boom_impl).expect("覆盖注册");
-        let got = dispatch("NT-MIND::trade::dup", &serde_json::json!({}));
-        assert!(got.is_err(), "同名应被后者覆盖");
+        let fut = dispatch("NT-MIND::trade::dup", serde_json::json!({})).expect("派发").expect("有实现");
+        assert!(block_on(fut).is_err(), "同名应被后者覆盖");
         clear_for_tests();
     }
 }
