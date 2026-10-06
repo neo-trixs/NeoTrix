@@ -14,6 +14,7 @@
 - `SDB-REGISTRY.md` — SDB 登记（先看版本行诚实口径，再看表）
 - `IMPACT-ANALYSIS.md` — 改动影响面（动手前查 blast radius）
 - `ABSORPTION-ROUND*.md` — 外部模式出处（论证用，不是指令）
+- `ABSORPTION-AI-NATIVE-SDLC-2026-10-06.md` — 工件链 `intent/plan` + `REVIEW.md` + agent 配置门的出处。**改 `docs/plans/`、`REVIEW.md`、`.opencode/agent/review.md` 或新增门之前先读**；含「本仓已更强因而**不**照抄的 5 项」与一条 pre-existing 红门
 - `SESSION-ABSORPTION-2026-09-21.md` — 12 条血泪教训（新人必读半页）
 - `SDB-REGISTRY.md` 的 §Verifier、`REFACTORING-GUIDE.md` — 设计细节库
 

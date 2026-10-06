@@ -11,7 +11,7 @@
 | 结构性改动 | `cargo clean && cargo build` **跑两遍** | 硬规则 §1 |
 | 跑重型构建前 | `nt_mem_gate.sh` 非 0 则**禁止起构建** | 三道闸 §4 |
 | 改完 `.rs` | `nt_lock_audit.py` 重跑，**禁止沿用旧值** | 三道闸 §4 |
-| 找「该跑哪个脚本」 | `nt_find.py <意图>`（75 条索引，每条带「何时别用」） | 三道闸 §4 |
+| 找「该跑哪个脚本」 | `nt_find.py <意图>`（79 条索引，每条带「何时别用」） | 三道闸 §4 |
 | 删 worktree / 收工 | `nt_worktree_gate.sh prune`，**禁手删目录** | 硬规则 §1 · 三道闸 §4 |
 | 接外部技术 | 同会话接到生产可用，否则不算做完 | 硬规则 §1 |
 | 扫出告警 | **先读现场证实/证伪**，再决定动不动 | 扫描器告警 §5 |
@@ -103,7 +103,7 @@
 | 架构现状 | `ARCHITECTURE.md` ⚠️ **§1-§12 已被 §13 推翻，只读 §13 起** |
 | 模块台账 | `ARCHITECTURE-MAP-ROADMAP-V2.md` —— **2026-09-29 已拆分，只留 §11 起的事实对账层**（可再生实测值）。§1–§7 的 308 行死数据已移入 `_superseded/ARCHITECTURE-MAP-ROADMAP-V2-deathsnap-2026-09-19.md`。更新规则 **R-P199**，口径限 `neotrix-core` L1–L6；`neobot` 独立 crate 不占 L 层故不进 ⇒ 见 `ABSORPTION-DSH-SIDEBAR-IM.md` |
 | 模块拓扑实测 | `DIR-AUDIT-2026-09-27.md`（16 包依赖图 + 8 类重复类型）· **目录解法** `DIR-REMEDY-2026-09-28.md` |
-| 外部吸收 | `ABSORPTION-AGENT-ARCH-2026-09-28.md`（8 源）+ `…ARCH2-2026-09-29.md`（30 源，含 5 个被证伪前提，3 仓无 LICENSE ⇒ 只取设计）+ `BATCH-FIX-2026-09-29.md` · `ABSORPTION-EXTERNAL-2026-09-27.md` |
+| 外部吸收 | `ABSORPTION-AGENT-ARCH-2026-09-28.md`（8 源）+ `…ARCH2-2026-09-29.md`（30 源，含 5 个被证伪前提，3 仓无 LICENSE ⇒ 只取设计）+ `BATCH-FIX-2026-09-29.md` · `ABSORPTION-EXTERNAL-2026-09-27.md` · `ABSORPTION-AI-NATIVE-SDLC-2026-10-06.md`（工件链/`REVIEW.md`/agent 配置门；含「本仓已更强因而**不**照抄的 5 项」） |
 | 方法论教训 | `LESSONS-*.md` **8 档，按主题挑读，勿只读最新**。纪律类见 `…2026-09-24.md` §五（R36–R46：反引号当命令执行 / 门干跑有副作用 / `--only` 按路径取 diff / 全角标点吃字节 / 门记录声称已做而实现从未入库） |
 | 文档规范 | `DOCUMENTATION-MAP.md` |
 | 本地模型 | `LOCAL-LLAMA-2026-09-28.md` |

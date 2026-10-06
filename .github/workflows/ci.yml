@@ -131,6 +131,22 @@ jobs:
       # （injectable，探针 scripts/probes/check-doc-claims.sh 实证非空）。
       - name: "Doc-claims gate (docs asserting 'zero consumers' that code refutes)"
         run: bash scripts/check-doc-claims.sh
+      # ⭐⭐⭐ 2026-10-06：agent 配置回归门 + 变更工件链棘轮。
+      # ⭐⭐⭐ 立门理由（本仓「门写了没跑」同族的**反向**形态 ——
+      #   「**配置在改，配置无门**」，本仓自 2026-10-04 起已实证 7 次同类）：
+      # ⭐⭐⭐ 实测 `ci.yml` 的 on: **无 paths 过滤** ⇒ 任何 PR 都触发 5 分钟
+      #   cargo 套件；但改 `skills/index.json` 的 PR **不会**跑 check-skill-gate，
+      #   改 `AGENTS.md` 的 PR **不会**跑任何配置校验，改 `.neotrix/task-index.json`
+      #   的 PR **不会**跑 `nt_find.py --audit`（那只在 pre-commit，而 pre-commit
+      #   可被 `--no-verify` 跳过，且 AGENTS.md §1 记载共享 index 下它不原子）。
+      # ⭐⭐⭐ 吸收自 Anthropic《AI-native SDLC playbook》Stage 4 Test
+      #   「Continuous evals in CI」：*the configuration that steers the agent
+      #   deserves the regression testing that code gets*。
+      # ⭐⭐ 非 cargo、无网络、秒级、只读（唯一写入是 --update-baseline 写基线本身）。
+      # ⭐⭐ 已登记 scripts/gate-registry.tsv（injectable）；非空性由
+      #   scripts/probes/check-agent-config.sh 两处注入实证（不只是看出来的）。
+      - name: "Agent-config gate (config gets the regression testing code gets; artifact-chain ratchet)"
+        run: bash scripts/check-agent-config.sh --strict
 
   test:
     runs-on: ${{ matrix.os }}

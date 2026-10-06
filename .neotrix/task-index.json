@@ -1261,8 +1261,29 @@
       "tool": "bash scripts/ops/nt-registry-determinism.sh",
       "kind": "gate",
       "read_only": true,
-      "when_not": "不要用它判「注册表内容对不对」—— 它只管**同一输入的输出是否逐字节一致**以及**往返是否零丢失**（318 节点/43 边是基准），不判节点语义是否正确。也不要用单进程 cargo test 替代它：跨进程的 HashMap 迭代序抖动在单进程内**测不出来**（曾写过 3 条单测，变异验证全部照样绿 ⇒ 零区分力）。若二进制陈旧必须加 NT_REGISTRY_REBUILD=1，否则会拿旧二进制的结果误判当前代码。",
-      "spec": "scripts/ops/nt-registry-determinism.sh 顶部文档（含 2026-10-06 实测：同一输入 5 次写盘产出 5 个不同 md5）"
+      "when_not": "不要用它判「注册表内容对不对」—— 它只管**同一输入的输出是否逐字节一致**以及**往返是否零丢失**（318 节点/43 边是基准），不判节点语义是否正确。也不要用单进程 cargo test 替代它：跨进程的 HashMap 迭代序抖动在单进程内**测不出来**（曾写过 3 条单测，变异验证全部照样绿 ⇒ 零区分力）。若二进制陈旧必须加 NT_REGISTRY_REBUILD=1，否则会拿旧二进制的结果误判当前代码。",      "spec": "scripts/ops/nt-registry-determinism.sh 顶部文档（含 2026-10-06 实测：同一输入 5 次写盘产出 5 个不同 md5）"
+    },
+    {
+      "id": "check-agent-config",
+      "query": [
+        "agent 配置",
+        "配置门",
+        "工件",
+        "工件链",
+        "变更工件",
+        "intent.md",
+        "plan.md",
+        "spec.md",
+        "REVIEW.md",
+        "审查策略",
+        "task-index 漂移",
+        "配置回归"
+      ],
+      "tool": "bash scripts/check-agent-config.sh --strict",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "不要用它判产品代码对错 —— 它只扫 agent 自身配置（docs/plans/ 工件链、REVIEW.md 引用完整性、task-index 自审）。⛔ 它是**棘轮**：只拦基线 scripts/artifact-chain-baseline.txt 之后新增的工件，故报出的「棘轮管辖 0」不是「全仓合规」，是「无增量」。⛔ 不要为让门变绿而跑 --update-baseline，那是给违规发永久通行证。⛔ 不要用它替代 check-skill-gate.sh（后者 strict 恒红，属另一议题）。",
+      "spec": "REVIEW.md §3 + docs/plans/_TEMPLATE.md §5；立门理由见 docs/architecture/ABSORPTION-AI-NATIVE-SDLC-2026-10-06.md"
     }
   ],
   "excluded": {
