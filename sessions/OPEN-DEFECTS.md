@@ -99,6 +99,13 @@
 | 13 | **测试隔离缺陷**：单独跑 PASS、全量跑 FAIL | `neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_game.rs::tests::test_constellation_advance` | **已核实**（2026-10-06） | 同一测试 `cargo test -p neotrix --lib test_constellation_advance` **2 passed**，而全量 `cargo test -p neotrix --lib` 记录它 FAILED ⇒ **跨测试状态污染**，不是断言错。⚠️ 该文件当时有 **-317 行未提交改动**（他窗在途重构）⇒ 尚未定位污染源，⛔ **不要**先改断言。查污染源的方向：全量与单测的差异在「谁先跑了什么」⇒ 需按测试序逐段二分，或用 `--test-threads=1` 缩小范围。⚠️ 同型问题在 nextest 上更早暴露（`group_contracts` 13/13，见「编译与磁盘」C4）⇒ 两者可能是同一类根因。 |
 
 
+## 地图刷新带出的结构澄清（2026-10-06 13:36）
+
+| # | 事项 | 状态 | 判据 / 备注 |
+|---|---|---|---|
+| M-1 | `CODE-TOPOLOGY.md` 的「其他」分类从169 文件涨到 **1328 文件** | **✅ 已澄清，非分层问题** | 逐文件统计后：**1143 个来自 `apps/neobot-desktop`**（864 `.ts` + 114 `.tsx` = Tauri 前端源码，本就不属 L0–L6 层树）+ 103 `scripts/ops`。**other 里的 `.rs` 只有 13 个**，且多为 Tauri 壳（`build.rs` 3 行 / `commands.rs` 1407 行 / `core.rs` 455 行等）。⇒ **不是「八成代码在层外」**，而是「层树只管 Rust 分层，前端与脚本被归入兜底类」。⚠️ 若要让它可判别，需给 `nt_topology.py` 增加 `frontend`/`tooling` 两个 tree —— 但那是**分类法变更**，须走 OWNERSHIP 裁决，不在缺陷台账里擅自改 |
+
+
 ## ✅ 本窗口已关闭（2026-10-06 晚）
 
 | 原编号 | 事项 | 关闭依据 |
