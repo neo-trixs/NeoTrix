@@ -1691,11 +1691,16 @@ fn execute_capability_invoke(call: &crate::nt_types::ToolCall) -> Result<ToolRes
         });
     };
 
-    // ③ 调用计数：本次派发真实发生 ⇒ 记一次。
-    //    放在市场校验**之后** —— 被拒的尝试不是「调用了能力」。
+    // ③ 调用计数：**能力本体尚未执行，故此处不计数。**
+    //
+    // ⚠️ 原实现在此调用 `record_dispatch`，即**先计数、后（永不）执行**，
+    // 而返回 `ok: true`（见下）⇒ 上游账本读到的是「调用成功」，
+    // `never_invoked` 也被污染成「有调用」。这违反生产闭环
+    // 「… → fail-closed → 真实执行 → **成功后**计数」。
+    //
+    // 现改为：诚实报告 `counted: false`，计数待「执行端口」落地后
+    // 在**执行成功之后**补上（唯一落点见下方注释）。
     let before = crate::nt_capability_registry::invoke_count(id);
-    let after = crate::nt_capability_registry::record_dispatch(id)
-        .map_err(|e| NtBotError::Store(e))?;
     let payload = call.args.get("input").cloned();
 
     //  **这里是真执行的边界**（2026-06 实测确认，见 commit 信息）：
@@ -1708,8 +1713,14 @@ fn execute_capability_invoke(call: &crate::nt_types::ToolCall) -> Result<ToolRes
     // ⛔ 刻意**不**在这里编造一个「看起来执行了」的假结果 —— 那会让调用数
     //   变成绿灯而能力依然不可用，正是本仓一路在治的「建成未用却看着健康」。
     //   执行通路的接法见 handoff `2026-10-06-capability-invoke.md` 的 §3。
+    // ⛔ **fail-closed**：能力本体未执行 ⇒ 判词必须是 `ok: false`。
+    //
+    // 首版返回 `ok: true` 而 payload 里写 `"execution": "dispatched_to_..."`，
+    // 同时 `note` 自认未执行 —— **机器可读判词与文字说明互相矛盾**。
+    // 上游账本/审计读的是 `ok`，不是 `note` ⇒ 等于报假成功。
+    // 这正是本仓一路在治的「建成未用却看着健康」。
     Ok(ToolResult {
-        ok: true,
+        ok: false,
         output: serde_json::json!({
             "capability_id": entry.id,
             "kind": entry.kind.as_str(),
@@ -1720,10 +1731,14 @@ fn execute_capability_invoke(call: &crate::nt_types::ToolCall) -> Result<ToolRes
             "maturity": entry.maturity,
             "tags": entry.tags,
             "invoked_before": before,
-            "invoked_after": after,
+            "invoked_after": before,
+            "executed": false,
+            "counted": false,
             "input_echo": payload,
-            "execution": "dispatched_to_capability_registry",
-            "note": "能力本体执行入口在 neotrix-core L1（nt_act_trade），本 crate 不反向依赖它；本次记录的是市场派发与计数。",
+            "reason": "CAPABILITY_BODY_NOT_EXECUTED",
+            "execution": "not_executed",
+            "note": "能力本体执行入口在 neotrix-core L1（nt_act_trade），本 crate 不反向依赖它（core → neobot 是既有方向）。本次仅完成市场校验与元数据回报，未执行、未计数。",
+            "next_work": "执行端口落地后：在此处调用真执行，成功后再 record_dispatch(id) 并把 ok 置 true。",
         })
         .to_string(),
         truncated: false,
@@ -2579,11 +2594,29 @@ mod tests {
 
         let result = run_cap_invoke(&config, &cap_invoke_call(&target));
 
-        assert!(result.ok, "★ 能力调用应成功: {}", result.output);
+        // ⚠️ 契约已变更（2026-10-06 B2 修复）：能力本体**尚未执行**，
+        // 故判词必须是 `ok:false`、计数**不得增加**。
+        // 本用例原先断言 `ok:true` 且计数 +1 —— **那固化了缺陷行为**：
+        // 「先计数、后永不执行」正是「能力恒 0 调用」被掩盖成「有调用」的原因。
+        assert!(
+            !result.ok,
+            "★ 未执行本体时不得报成功（否则上游账本读到假成功）: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains("\"executed\":false"),
+            "★ payload 应显式声明未执行: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains("CAPABILITY_BODY_NOT_EXECUTED"),
+            "★ 应给出可机读的原因码: {}",
+            result.output
+        );
         assert_eq!(
             crate::nt_capability_registry::invoke_count(&target),
-            1,
-            "★ 调用数未增加（★ 这正是本轮要修的「能力恒 0 调用」）"
+            0,
+            "★ 未执行 ⇒ 计数不得增加（「成功后计数」；本仓全程受此约束）"
         );
         assert!(
             result.output.contains(&target),
