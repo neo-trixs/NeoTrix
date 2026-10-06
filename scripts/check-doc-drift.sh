@@ -56,7 +56,10 @@ set -uo pipefail
 
 SRC="neotrix-core/src"
 BASELINE="scripts/doc-drift-baseline.txt"
-ROOTDOCS="${ROOTDOCS:-AGENTS.md README.md DOCUMENTATION-MAP.md CONTRIBUTING.md RUST-STANDARDS.md TODO.md}"
+# ⚠️ 扫描面此前**只有 6 份根文档** ⇒ `docs/architecture/` 下 170+ 份架构文档的
+#    死链**结构性不可见**（审计实测）。现默认纳入 `docs/architecture/**/*.md`。
+#    仍可用 ROOTDOCS=... 覆盖。
+ROOTDOCS="${ROOTDOCS:-AGENTS.md README.md DOCUMENTATION-MAP.md CONTRIBUTING.md RUST-STANDARDS.md TODO.md $(find docs/architecture -name '*.md' 2>/dev/null | tr '\n' ' ')}"
 STRICT=0
 UPDATE=0
 for arg in "$@"; do
@@ -191,6 +194,7 @@ trap 'rm -f "$CUR" "$NEW" "$GONE" "$BASE_C" "$LINKTMP" "$CANDTMP"' EXIT
 
 DEAD=0
 SKIPPED=0
+KNOWN=0
 if [ -s "$LINKTMP" ]; then
   # DEADTMP 记「该路径被当作**指示**提及」
   DEADTMP=$(mktemp)
@@ -242,8 +246,17 @@ if [ -s "$LINKTMP" ]; then
       SKIPPED=$((SKIPPED+1))
     fi
   done < "$LINKTMP"
+  BASEFILE="${BASEFILE:-scripts/doc-drift-baseline.txt}"
   if [ -s "$DEADTMP" ]; then
-    while IFS= read -r p; do echo "root-doc-deadlink: $p"; DEAD=$((DEAD+1)); done < "$DEADTMP"
+    while IFS= read -r p; do
+      # 棘轮：已在基线里的死链只报告（KNOWN），不计入阻断；基线外的新增才拦。
+      # 与 orphan-dir / dead-flag 门同一套棘轮纪律。
+      if [ -f "$BASEFILE" ] && grep -Fqx "$p" "$BASEFILE" 2>/dev/null; then
+        echo "root-doc-deadlink(known): $p"; KNOWN=$((KNOWN+1))
+      else
+        echo "root-doc-deadlink: $p"; DEAD=$((DEAD+1))
+      fi
+    done < "$DEADTMP"
   fi
   rm -f "$DEADTMP" "$DEADTMP2"
 fi
