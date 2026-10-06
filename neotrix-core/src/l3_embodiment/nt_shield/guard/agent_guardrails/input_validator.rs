@@ -585,12 +585,17 @@ fn download_then_execute(input_lower: &str) -> Option<DownloadThenExecute> {
             }
             continue;
         };
-        // ⛔ 不用 `unwrap_or("sh")` —— 那会把「找到了位置却取不到名字」悄悄变成 sh。
-        let Some(interp) = as_interpreter_name(ident[pos].as_str()) else {
-            continue;
-        };
         // ⛔ 不用 `unwrap_or("sh")` —— 那会把「找到了位置却取不到名字」悄悄
         //   变成 sh。穷尽匹配让不可能的分支**显式失败**。
+        //
+        // ⚠️ 2026-10-06：本块此前**紧邻地重复了两遍**（两段注释 + 两段 let-else
+        // 完全相同），第一处 `interp` 被第二处**遮蔽** ⇒ rustc 报
+        // `unused variable: interp`，且它是 **deny 级** ⇒ 整个共享分支的
+        // pre-commit 门对**所有人**变红。
+        // 【为什么删重复块而不是给第一处加 `_`】
+        // 加 `_` 能让编译过，但会把「这里被复制粘贴过一次」静默掉 ——
+        // 而重复绑定正是它自己报出来的。删重复的那份是**零行为变化**
+        // （第二份才是被 `message: format!(…, interp)` 真正使用的那份）。
         let Some(interp) = as_interpreter_name(ident[pos].as_str()) else {
             continue;
         };
