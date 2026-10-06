@@ -3,15 +3,24 @@ xt = "test --lib"
 xc = "clippy --all-targets -- -D warnings -W clippy::unwrap_used -W clippy::expect_used -W clippy::panic -W clippy::manual_let_else"
 xf = "fmt -- --check"
 
-# 2026-10-06 试过接 lld 替代 ld64：**实测失败，已回退**（留此记录以免下轮重踩）。
-#   配置写法本身是对的（`-C link-arg=-fuse-ld=lld`，走 cc 驱动以保住 sysroot），
-#   但本机 `lld 22.1.7` **解析不了当前 macOS SDK 的 TAPI 文件**：
-#     ld64.lld: error: could not load TAPI file .../libSystem.tbd: malformed file
-#     libSystem.tbd:4:20: error: unknown architecture: arm64e.x1-macos
-#   ⇒ arm64e.x1 是新版 SDK 的架构标记，lld 22 不认识。
-#   ⇒ 解法是 `brew upgrade lld`（**未做**：属系统级变更，需你确认）。
-#   ⚠️ mold 走的是 LLD 同源的 TAPI 解析器，**可能同样中招** —— 装前建议先验证。
-#   ⚠️ 三元组必须是本机真实 host（`rustc -vV` = aarch64-apple-darwin）。
-#      我第一版写成 x86_64-apple-darwin ⇒ 配置**静默不生效**，
-#      而 cargo 依然 0.39s "Finished" ⇒ 假成功。
-#      判别法：改 rustflags 后构建必须真的重编；秒 Finished 即没生效。
+# 2026-10-06 用 lld 替代 macOS 默认 ld64。实测可用，但**前提是 lld 版本够新**。
+#
+#   ⚠️ 前置条件：lld 必须能解析当前 SDK 的 TAPI 文件。本机 lld 22.1.7 会报
+#      `libSystem.tbd:4:20: error: unknown architecture: arm64e.x1-macos`
+#      （arm64e.x1 是新版 SDK 的架构标记）⇒ **brew upgrade lld 后可用**
+#      （实测 22.1.7 → 23.1.2 通过）。升级 SDK 后要复查 lld 版本。
+#      ⚠️ mold 走 LLD 同源的 TAPI 解析器，很可能同样受此版本约束。
+#
+#   写法要点：
+#   - 用 `-C link-arg=-fuse-ld=lld`（走 cc 驱动），**不要**用 `-C linker=`：
+#     后者绕过 cc ⇒ macOS SDK 的 sysroot / framework 搜索路径会丢。
+#   - 三元组必须是本机真实 host（`rustc -vV` = aarch64-apple-darwin）。
+#     曾写成 x86_64-apple-darwin ⇒ 配置**静默不生效**而 cargo 照样秒 Finished
+#     ⇒ **假成功**。判别法：改 rustflags 后构建必须真的重编；秒 Finished 即没生效。
+#   - 改 rustflags 会让**全部**指纹失效 ⇒ 首次必全量重建一次（一次性代价）。
+#
+#   ⛔ 未实测项：`-p neotrix`（仓内最大 crate）当前**编译不过**（他人提交
+#      `0c5b1bc9` 引入 `unused variable: interp`，与本配置无关 ——
+#      `cargo check` 不调链接器也失败）。故 lld 目前只在较小 crate 上实测过。
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
