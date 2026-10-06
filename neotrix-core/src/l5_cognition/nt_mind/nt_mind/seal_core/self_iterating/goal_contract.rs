@@ -461,3 +461,59 @@ mod stage_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod e2e_evolution_tests {
+    use super::GoalContractStage;
+    use super::super::pipeline::BrainStage;
+    use super::SelfIteratingBrain;
+    // ⚠️  住在 ——
+    //    与 self_iterating 同层内的 re-export **不存在**（实测踩到）。
+    use crate::l2_perception::nt_world::nt_world_model::TaskType;
+
+    /// ⭐⭐ **自我进化闭环的端到端实证**（2026-10-06）
+    ///
+    /// 本模块此前只有「账本语义」与「决策函数」的单测，
+    /// **没有任何测试证明 `evaluate → iterate → 记账 → autonomy` 真会连起来动**。
+    ///
+    /// 闭环四段（全部在生产路径上）：
+    /// 1. `SelfIteratingBrain::iterate(TaskType)` —— 推进一轮并**写** `evaluation_history`
+    /// 2. `GoalContractStage::process` —— **读**它构造 `RewardLedger`
+    /// 3. `decide_autonomy` —— 由账本推出 autonomy
+    /// 4. 写回 `brain.autonomy`
+    ///
+    /// ⛔ 只断言「链路真的传导」，**不臆断具体 autonomy 数值** ——
+    /// 断言具体值会把「链路通」与「阈值调得好」两个独立事实绑死。
+    #[test]
+    fn 端到端_iterate到autonomy真的会传导() {
+        let mut brain = SelfIteratingBrain::new();
+        let before_hist = brain.evaluation_history.len();
+
+        for _ in 0..3 {
+            // ⚠️ `TaskType` 是**无 Default 的裸枚举**（实测踩到 ⇒ 别用 `::default()`）
+            brain.iterate(TaskType::General);
+        }
+        let grew = brain.evaluation_history.len();
+        assert!(
+            grew > before_hist,
+            "iterate() 必须在**生产路径**上写 evaluation_history（{before_hist} → {grew}）"
+        );
+
+        let rec = &brain.evaluation_history[grew - 1];
+        assert!(
+            rec.score_before.is_finite() && rec.score_after.is_finite(),
+            "评分必须是有限值，before={} after={}",
+            rec.score_before,
+            rec.score_after
+        );
+
+        // 跑真实 stage（直接调 decide_autonomy 会**跳过接线**）
+        let autonomy_before = brain.autonomy;
+        GoalContractStage.process(&mut brain).expect("stage 应能处理");
+        assert_ne!(
+            brain.autonomy, autonomy_before,
+            "端到端跑完 stage 后 autonomy 必须被改写 —— \
+             否则说明账本读完但**没有回写**，等于「算了不用」"
+        );
+    }
+}

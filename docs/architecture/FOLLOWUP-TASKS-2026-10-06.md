@@ -655,3 +655,57 @@ T2.1（需体积策略）
 ⇒ 本轮据此：**只修「我造成的」**（claims-numbers、doc-claims），
    **不动非本会话引入的存量债**（unwrap 24、doc-drift 125）。
 
+## 附二：全域审计实测清单 + 决策建议（2026-10-06 收官）
+
+### 13 个门的真实状态（实测，非记忆）
+
+| 门 | RC | 判定 |
+|---|---|---|
+| `check-silent-failure` | 0 | 绿 |
+| `check-dead-config-flag` | 0 | 绿 |
+| `check-orphan-dirs` | 0 | 绿 |
+| `check-doc-drift` | 0 | 绿（本会话修好格式碰撞后） |
+| `check-doc-claims` | 0 | 绿 |
+| `check-claims-numbers` | 0 | 绿 |
+| `check-agent-config` | 0 | 绿 |
+| `check-layer-deps` | 0 | 绿 |
+| `map-check` | 0 | 绿 |
+| `check-test-baseline` | 0 | 绿 |
+| `check-gate-satisfiable` | 1 | 元门恒红 **1**（`check-unwrap` 存量债） |
+| `check-unwrap` | 1 | **24 new 存量债**，分布 7 文件，本会话引入 **0** |
+| `check-naming` | 1 | **1615 offender**，advisory，规约 vs 现实差极大 |
+
+### ✅ 已闭合（本会话）
+
+- **自我进化闭环端到端实证**（新增 `e2e_evolution_tests`）：
+  `SelfIteratingBrain::iterate(TaskType)` → **写** `evaluation_history`
+  → `GoalContractStage::process` → **读**并构造 `RewardLedger`
+  → `decide_autonomy` → **回写** `brain.autonomy`
+  ⇒ 测试断言「history 增长 + autonomy 被改写」。
+  ⛔ 刻意**不断言具体 autonomy 数值**（那会把「链路通」与「阈值好」绑死）。
+  ⚠️ 实测两个易错点：`TaskType` 住`l2_perception`（同层无 re-export）、
+  且**无 `Default`** ⇒ 不能 `TaskType::default()`。
+
+### ⛔ 阻塞 / 需外部裁决（本会话**不能**完成）
+
+| # | 项 | 性质 |
+|---|---|---|
+| 1 | 3 个贸易能力无顶层执行器（`production_logistics`/`finance_compliance`/`trade_product_spec`） | **业务逻辑缺口**：需权威输入schema，发明即造假 |
+| 2 | `foreign_trade_full_cycle` 是阶段脚手架（17 阶段逻辑全是注释） | 同上；已在代码头/市场描述/台账三处标注 |
+| 3 | `check-unwrap` 24 new | **存量债**（本会话引入 0）⇒ 按纪律不碰 |
+| 4 | `check-naming` 1615 offender | **规约无约束力**（advisory）⇒ 需先定切片策略 |
+| 5 | `.neotrix/LICENSE-EXCEPTIONS.md` `status: void` | **需所有者签署** |
+| 6 | `.project-map/` 354M 体积策略 | **需体积决策** |
+
+### 决策建议（按 价值/风险 排序）
+
+1. **先立「执行器登记制」**：任何能力上架前，必须同时有
+   （a）可调用入口　（b）输入 schema 来源　（c）至少一个**非桩**证据测试。
+   ⇒ 本会话 4 处缺陷全部源于「上架了但不可用/是桩」，此制可一次性根治该类。
+2. **`check-naming` 暂不设为门**：1615 的规约 vs 现实差太大，
+   先按层抽 1 层做切片，验证可行再谈门禁。
+3. **`check-unwrap` 存量债单独立项**：按文件分批修，
+   每批必须**变异验证**（注入一个 unwrap 看门是否报），避免「批量改完门不动」。
+4. **外部吸收一律走「证据三件套」**：许可证核实 + 生产接线 + 变异/回归测试；
+   ⛔ 不接受「调研完成」当作吸收完成（R-P79）。
+
