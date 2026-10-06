@@ -378,3 +378,115 @@ MangoDisk 与 openhuman 均 **GPL-3.0 ⇒ 不取码**；Jev-Mem / Codewhale 为 
 2. **第 9 项仍未闭环**：`--approval-mode` 的 `Ask` 档在**生产工具执行链**上无绑定点。
    三条硬约束与三条收口路径见 `CLAIMED-BUT-NOT-ENFORCED-2026-10-05.md` 第 9 项。
    ⛔ **不要因为本轮闭环了两条就把本项划掉。**
+
+---
+
+# 追加：2026-10-06 收尾 —— TOCTOU 指纹 + 全分支红门 + 十三源许可证判定
+
+## 本轮四笔提交（`feat/capability-absorb-20260828`，未推送）
+| 提交 | 内容 |
+|---|---|
+| `7a8d4322` | ⭐⭐⭐ 审批绑定内容指纹，堵住「批准 A、执行 B」的 TOCTOU |
+| `8ae4052a` | 删掉复制粘贴产生的重复 `let-else`（它让**全分支**提交门变红） |
+| `ed6593d4` | 十三源批量许可证判定（5/13 不可取码）+ 台账 539 条 |
+
+## ⭐ 本轮修掉的真实缺陷：TOCTOU
+`approve(id)` **只凭 id**，而执行发生在**稍后、别处** ⇒ 批准到执行之间内容无人复核。
+落地 `ActionFingerprint`（sha2+hex，`neotrix-types` 本已依赖）+ `PendingAction.content_fingerprint`
+（一等字段）+ `approve_if_unchanged` + `ApprovalError::ContentChanged`。
+⚠️ 失败方向：**`Err` 且不写 `decided` 账本、不记审计** ——
+否则「只看 `decision_for」会以为已批过」，整个机制只是装饰。
+⚠️ **尚未接线到执行点**（受第 9 项同一依赖方向约束）。
+
+## ⭐⭐ 三件我差点做错、靠「读现场」纠正的事
+1. **`unused variable: interp` 不是未使用变量，是重复块**
+   该处紧邻重复了两遍 `let Some(interp) = … else { continue }`，
+   第一处被第二处**遮蔽** ⇒ rustc 报未使用，且是 deny 级 ⇒ **全分支提交门变红**。
+   ⛔ 差点加 `_` 前缀 —— 那能让编译过，但会把「这里被复制粘贴过」**静默掉**，
+   而重复绑定正是它自己报出来的信号。⇒ 删重复的那份（零行为变化）。
+2. **差点把另一处 `interp` 也当成重复**：第 350 行属**不同函数**且合法被使用。
+3. **第一次替换把新注释插在原注释中间**，造成同句注释出现两次
+   ⇒ 读输出发现并清掉。**不看输出就会留下垃圾注释。**
+
+## ⭐⭐ 共享工作流的两个硬阻塞（都不是代码问题，但会让人去「修」正确代码）
+1. **他窗 `cargo clean` 抽走主 `target/`**
+   症状像编译错误（`can't find crate for hashbrown` / `extern location for libc does not exist`）。
+   ⇒ 应对：私有 `CARGO_TARGET_DIR`（`/tmp/nt-target-private`，11G）。
+   ⚠️ 拷贝热缓存会失败（拷贝期间目录正被删），冷构建约 3 分钟可接受。
+2. **他窗 `nt_game/evolution.rs` WIP 使主树 build 门红**
+   （`AutoTicTacToe` / `Auto2048` / `AutoHexCrucible` 已引用但未声明）
+   ⇒ 分支 HEAD 本身干净，只有脏工作树坏 ⇒ **提交门对所有人变红**。
+   ⇒ 应对：`.worktrees/` 隔离 + 定点 cherry-pick 落回分支。
+
+### ⚠️ 隔离 worktree 的两个假阴性（下次别被它们卡住）
+- **`nt_mapgen.py` 报 `.project-map/codemap.json` MISSING**
+  那是**生成物且被 gitignore** ⇒ 新 worktree 里必然没有 ⇒ 门必红。
+  修法：从主树 `cp .project-map/codemap.json` 进去。
+- **`nt_worktree_gate.sh prune` 报「HEAD 未含于任何分支」**
+  我的隔离提交 `dcf2a57d` 已通过 **cherry-pick** 以 `7a8d4322` 落在分支上，
+  但门按血统判断 ⇒ **假阴性**。
+  ⇒ AGENTS.md 已记「rebase 使 `is-ancestor` 失真，成果须用**内容搜索**核对」。
+  本次实证：`git diff dcf2a57d HEAD -- <两文件>` 为**空** ⇒ 内容一致 ⇒ 可安全移除。
+
+## 十三源许可证判定（详见 `ABSORPTION-2026-10-06-thirteen-sources.md`）
+⭐ **API 标签不可信，必须读原文**：`NOASSERTION` 的含义是「GitHub 无法分类」，
+**不是宽松** —— 实测 3 个 `NOASSERTION` 源里藏着 **CC BY-NC 4.0 / CC BY-NC-SA 4.0 / CC BY-SA 4.0**。
+只看标签就放行 = 把**禁商用 + 传染性**内容放进要分发的仓。
+另 2 个源**连 LICENSE 文件都没有** ⇒ 默认版权保留 ⇒ ⛔。
+⇒ **5/13（38%）不可取码**，其中 3 个是本批最高星。
+
+### ⭐ 一个挑战我方规格的发现（仅记录，未改规格）
+ARIS（MIT，17k★）自述 **markdown-only skills**（skill 内无可执行脚本），
+而 `skills/SKILL-SPEC.md` **要求 `scripts/`**。
+⇒ 反问「skill 路径上该不该有可执行代码」：纯 markdown 去掉了 skill 的**执行面**，
+与本轮 uber/ADR 纪律同族。⚠️ 改规格影响全部既有 skill ⇒ 独立立项。
+
+## 8. 收工自查
+
+### 8.1 worktree 去向
+```
+[worktree-gate] repo=/Users/neo/Downloads/neotrix mode=check
+------------------------------------------------------------
+路径 | HEAD | 分支 | 脏 | 体积 | target | 近3h活动
+--------------------------------------------------------------------------
+/Users/neo/Downloads/neotrix/.worktrees/merge-b | 1a48ecd3 | HEAD | 3 | 66M | 0M | no
+/Users/neo/Downloads/neotrix/.worktrees/nt-v2 | 6b57fe08 | HEAD | 0 | 81M | 0M | no
+[worktree-gate] ℹ️  **主树**：20 处未提交 | target 26212M（**只报告，不影响退出码**）
+[worktree-gate]    ⛔ 主树未提交改动**不在任何提交里**（AGENTS.md §1 收工义务）
+[worktree-gate]    提交：git add <显式路径> && git commit --only <同一批>（⛔ 共享 index 下禁 -A）
+------------------------------------------------------------
+[worktree-gate] worktree=2 个 | 合计 147M | target 占 0M
+[worktree-gate] 带未提交改动: 1 个 | 近3h有改动: 0 个
+[worktree-gate] ⛔ 1 个 worktree 的未提交改动**不在任何提交里**：
+[worktree-gate]      ⛔ /Users/neo/Downloads/neotrix/.worktrees/merge-b
+[worktree-gate]    删它们必须先 patch 兜底（R-DISK-5）：sh scripts/ops/nt_worktree_gate.sh prune
+```
+本会话**新建**：`.worktrees/toctou`（隔离用）⇒ **已 `git worktree remove` 移除**
+（用正规工具，非手删；移除前已用 `git diff` 内容核对证明无独有价值）。
+
+| worktree | 用途 | 去向 |
+|---|---|---|
+| `.worktrees/toctou` | 隔离提交 TOCTOU（主树被门挡） | ✅ **已移除**（内容已核对等价落在 `7a8d4322`） |
+| `.worktrees/merge-b` | **非本会话创建**（他窗） | ⛔ 含未提交改动 ⇒ 不得 prune / 不得手删，移交他窗 |
+| `.worktrees/nt-v2` | 非本会话创建 | 无未提交改动，本会话未触碰 |
+
+### 8.2 未提交改动的去向
+本会话触碰的文件（`nt_approval.rs`、`nt_core_approval.rs`、`input_validator.rs`、
+`repos.csv`、两份吸收文档、handoff）**全部已入上述提交**，
+`git status --porcelain -- <这些文件>` 为空。
+⛔ 主工作树仍有**他窗 WIP**（`nt_game/evolution.rs` 等），未触碰未提交。
+兜底：`.neotrix/patches/2026-10-06-approval-toctou-fingerprint.patch`。
+
+### 8.3 用户侧副作用
+本轮**未触碰**用户配置或 `~/.neotrix/*`。
+⚠️ 中途为隔离曾 `git stash` / `stash pop` 两次（仅在隔离 worktree 内），
+已确认 `stash list` 里只剩一条**本会话之前**就存在的旧 stash，未被我吞掉。
+
+## ⏭ 接手者的下一个动作
+1. **需要产品裁决**：① `read-only` sandbox 该不该拦读；
+   ② skill 契约该不该保留 `scripts/`（ARIS 的 markdown-only 反例）。
+2. **第 9 项仍未闭环**：`--approval-mode` 的 `Ask` 档在生产工具执行链无绑定点；
+   本轮 TOCTOU 指纹同样**尚未接线**（同一依赖方向约束）。
+   ⛔ 不要因为本轮又闭环了两条就把本项划掉。
+3. **待裁决的产品方向**：8 个 MIT skill 包是否转换接入
+   （Claude Skills → NT 契约，属转换而非即插即用；且这是方向性投入）。
