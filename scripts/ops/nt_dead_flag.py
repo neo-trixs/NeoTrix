@@ -131,7 +131,12 @@ def scan_once(root: Path, want: str = "bool"):
             # ⚠️ 早期版本在 struct 行直接把 derives_serde 重置为 False，
             # 正好清掉紧邻其前的 #[derive(..., Serialize)] ⇒ 分类全部失真。
             if re.match(r"^\s*#\[", line):
-                if "Serialize" in line or "Deserialize" in line:
+                # `uniffi::Record` 与 serde 同族：字段由**Rust 树外**的
+                # Swift/Kotlin 消费方读取 ⇒ 只写不读是合法的。
+                # 门此前不认识这个边界 ⇒ ffi/types.rs 的 8 个字段全被误判
+                # 进「待人工判定」（审计已独立确认它们是假阳性）。
+                if ("Serialize" in line or "Deserialize" in line
+                        or "uniffi::Record" in line):
                     pending_serde = True
                 continue
             sm = _RE_STRUCT.match(line)
@@ -258,11 +263,11 @@ def main() -> int:
 
     noise = [d for d in dead if not d[4] and _is_noise(d[0])]
     noise_set = {(d[0], d[1], d[2]) for d in noise}
-    serde_mirrors = [d for d in dead if d[4]]
+    external = [d for d in dead if d[4]]
     behavioral = [d for d in dead if not d[4]]
     print(
         f"dead-flag[{args.types}] 字段 {len(fields)} 个；零读点 {len(dead)} 个"
-        f"（serde 外部格式镜像 {len(serde_mirrors)}、配置噪声 {len(noise)}、"
+        f"（外部消费者 serde/uniffi {len(external)}、配置噪声 {len(noise)}、"
         f"待人工判定 {len(behavioral) - len(noise)}）；"
         f"基线已裁决 {len(baseline)}；新增 {len(new)}"
     )
@@ -271,7 +276,7 @@ def main() -> int:
         tag = "已知" if name in baseline else "新增"
         hint = f" [{struct_name}]" if struct_name and CONFIG_HINT_RE.search(struct_name) else ""
         if serde:
-            kind = "serde-镜像"
+            kind = "外部消费者(serde/uniffi)"
         elif (name, decl_path, line_no) in noise_set:
             kind = "配置噪声(异名近名)"
         else:
