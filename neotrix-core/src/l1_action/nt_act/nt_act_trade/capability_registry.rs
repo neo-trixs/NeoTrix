@@ -184,6 +184,59 @@ pub struct TradeCapabilityRegistry {
     type_index: HashMap<TradeCapabilityType, Vec<String>>,
 }
 
+/// 全局 trade 能力注册表（T4.5）。
+///
+/// # ⛔ 唯一存在的理由
+///
+/// `nt_core_capability_tree::dispatch::DispatchFn` 是**无捕获 `fn` 指针**，
+/// 它在调用时刻**拿不到任何实例** ⇒ 只能走一个进程级落点。
+///
+/// # 本函数能被编译出来的**唯一前提**是 `TradeCapabilityRegistry: Send + Sync`
+///
+/// —— 实测该前提**本就成立**：`UnifiedCapability: Send + Sync`
+/// （`nt_core_capability_types.rs:504`）是 `TradeCapability` 的父trait
+/// ⇒ 注册表天然可跨线程共享。
+///
+/// ⚠️ 我一度在 `Arc<dyn TradeCapability>` 上补`+ Send + Sync` 并写「承重断言」；
+/// **变异测试证明那是冗余且装饰的**（去掉后仍 RC=0）⇒ 已回退。
+/// **教训：不要给编译器已保证的东西补约束，再称之为「证据」。**
+static GLOBAL_TRADE_REGISTRY: std::sync::LazyLock<std::sync::Mutex<TradeCapabilityRegistry>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(create_default_registry()));
+
+/// 取全局 trade 注册表。
+///
+/// ⚠️ 返回**锁**而非引用：注册表内部是可变的（`register` 需 `&mut`），
+/// 而 `DispatchFn` 是同步的、拿不到 `&mut`。调用方在**自己线程**内 `lock`，
+/// 锁范围不跨 `await`（端口只取出 future，不 drive 它）。
+pub fn global_trade_registry() -> &'static std::sync::Mutex<TradeCapabilityRegistry> {
+    &GLOBAL_TRADE_REGISTRY
+}
+
+#[cfg(test)]
+mod global_registry_tests {
+    use super::global_trade_registry;
+
+    /// 全局落点必须是**同一个**实例 —— 否则它对派发 `fn` 指针毫无意义。
+    #[test]
+    fn 全局注册表是单例() {
+        let a = global_trade_registry();
+        let b = global_trade_registry();
+        assert!(std::ptr::eq(a, b), "两次取值必须是同一实例");
+    }
+
+    /// 注册表在**锁内**可被查找（派发 `fn` 指针的实际用法）。
+    ///
+    /// ⛔ 本测试**不**断言具体能力存在 —— 那会把「默认集内容」与「派发可用性」
+    /// 两个无关事实绑死；派发是否真的成功由 `dispatch` 侧测试负责。
+    #[test]
+    fn 锁内查找不panic且可重入() {
+        let reg = global_trade_registry();
+        let guard1 = reg.lock().expect("第一次加锁");
+        drop(guard1);
+        let _guard2 = reg.lock().expect("释放后可再次加锁");
+    }
+}
+
 impl Default for TradeCapabilityRegistry {
     fn default() -> Self {
         Self::new()

@@ -315,6 +315,30 @@ neobot 侧 `listable()` 为真。
 ⇒ **在解决这两点前，`register_dispatcher` 不应被真实实现调用。**
 当前生产 `dispatch` 返回 `None` ⇒ 调用方fail-closed ⇒ **与接线前行为一致**（未引入回归）。
 
+### ✅ T4.5-b「无全局落点」已解决，但**我的因果诊断是错的**（2026-10-06）
+
+我原以为障碍是「注册表不可跨线程共享」，于是给 `Arc<dyn TradeCapability>`
+补 `+ Send + Sync` 并写了「承重断言」。
+
+**变异测试直接证伪了我**（这是本轮最值钱的一次变异）：
+
+| 步骤 | 结果 |
+|---|---|
+| 去掉全部 6 处 `+ Send + Sync` | **build RC=0**（我预期失败） |
+| 查父 trait | `UnifiedCapability: Send + Sync`（`nt_core_capability_types.rs:504`） |
+
+⇒ **约束本就成立**，我补的是**冗余且装饰**的东西，还称之为「证据」。
+⇒ 已回退约束、删除那个假断言。
+
+**真正的前提只有两条**，第一条已修：
+1. ✅ **async 签名**（`77e9688d`）
+2. ✅ **全局落点**（`global_trade_registry()`，本提交）——
+   `static` 本身就是 `Send + Sync` 的编译期证据，无需人工断言
+
+⇒ **教训（本轮第五次「先提方案后核实」）：
+编译器已保证的东西，不要补约束再称之为「证据」。**
+断言必须经得起**去掉它就编译失败**的变异检验；我的没经得起。
+
 **下一步（二选一，需实测后定）**：
 - **A** `DispatchFn` 改为 `fn(&str, &Value) -> BoxFuture<Result<Value,String>>`
   ⇒ 需装箱future + 明确运行时归属（谁提供 executor）；
