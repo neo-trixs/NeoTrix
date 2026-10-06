@@ -198,10 +198,49 @@ pub struct JudgeEntry {
     pub seq: u64,
     /// 被判决 chunk 的 id。
     pub chunk_id: String,
-    /// 判决结果（含理由）。
+    /// **judged**：judge 给出的判决（含理由）。
     pub verdict: JudgeVerdict,
+    /// **source**：这条判决**从哪里来**（影子 / 已激活 / 人工）。
+    ///
+    /// 2026-10-06（B5 = M-4「影子→active 升级路径」）：没有它就无法回答
+    /// 「这条判决是 shadow 猜的，还是 active 真拦的」⇒ 切active 时
+    /// 两类数据混在一起，对比 `judged` vs `outcome` 就**没有意义**。
+    pub source: JudgeSource,
+    /// **outcome**：真实发生的结果。
+    ///
+    /// ⛔ 影子模式下判决当刻**拿不到真实结果**（我们没按它行动）⇒
+    ///   初始恒为 `None`，由 [`JudgeLedger::record_outcome`] 在结果已知时回填。
+    ///   ⚠️ 刻意**不**在此处填 `Judged(verdict.clone())` —— 那会让
+    ///   「judged 与 outcome 一致」变成**恒真**，从而**伪装成已验证**，
+    ///   而这正是 mu 自己的教训（`judged` vs 真实 `outcome` 对比才有意义）。
+    pub outcome: Option<JudgeOutcome>,
     /// 记录时间（秒级时间戳，由调用方传入）。
     pub recorded_secs: u64,
+}
+
+/// 判决来源（M-4 影子→active 的关键维度）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JudgeSource {
+    /// 影子：调 judge、记 ledger，但**返回 fallback**（不据此行动）。
+    Shadow,
+    /// 已激活：判决真正拦截了行为。
+    Active,
+    /// 人工判定（owner 裁决），不经judge。
+    Manual,
+}
+
+/// 真实发生的结果（M-4 的对比基准面）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum JudgeOutcome {
+    /// 真实结果与judge 判决**一致**。
+    Matched,
+    /// 真实结果与judge 判决**不一致**（⇒ judge 在这个case 上判错）。
+    Mismatched {
+        /// 实际发生了什么（供人复核）。
+        detail: String,
+    },
+    /// 真实结果**无法判定**（不可归因）⇒ 不计入一致率。
+    Unknown,
 }
 
 /// 影子模式开关：恒为 `true`（只记录、不拦截）。
@@ -249,10 +288,16 @@ impl JudgeLedger {
     }
 
     /// 记录一条判决，返回其序列号；满时先丢弃最旧一条。
+    /// 记一条判决（M-4：影子→active 的记录面）。
+    ///
+    /// `source` 必须由调用方**显式**给出：它决定这条判决将来能否参与
+    /// 「judged vs outcome」对比（影子猜的和 active 拦的不是一回事）。
+    /// `outcome` 初始恒为 `None` —— 影子模式下判决当刻**没有**真实结果。
     pub fn record(
         &mut self,
         chunk_id: &str,
         verdict: JudgeVerdict,
+        source: JudgeSource,
         recorded_secs: u64,
     ) -> u64 {
         if self.entries.len() >= JUDGE_LEDGER_CAP {
@@ -264,6 +309,8 @@ impl JudgeLedger {
             seq,
             chunk_id: chunk_id.to_string(),
             verdict,
+            source,
+            outcome: None,
             recorded_secs,
         });
         seq
@@ -271,6 +318,28 @@ impl JudgeLedger {
 
     /// 按序列号查询（克隆返回，保持纯逻辑无借用泄露）。
     #[must_use]
+    /// 回填某条判决的**真实结果**（M-4：`judged` vs `outcome` 的对比面）。
+    ///
+    /// ## 为什么要单独一个入口
+    ///
+    /// 判决当刻拿不到真实结果（影子模式下我们**没按它行动**）⇒ 不能在
+    /// `record` 里一并写入。⇒ 必须允许「先记判决，事后知道结果再回填」。
+    ///
+    /// ## 幂等与诚实
+    ///
+    /// -重复回填以**最后一次**为准（真实结果可能被修正）。
+    /// - 找不到 `seq` ⇒ 返回 `Err`，**不静默新建**：凭空造一条会让
+    ///   一致率统计出现无源数据。
+    pub fn record_outcome(&mut self, seq: u64, outcome: JudgeOutcome) -> Result<(), String> {
+        let entry = self
+            .entries
+            .iter_mut()
+            .find(|e| e.seq == seq)
+            .ok_or_else(|| format!("ledger 无seq={seq} 的判决，不凭空新建"))?;
+        entry.outcome = Some(outcome);
+        Ok(())
+    }
+
     pub fn query(&self, seq: u64) -> Option<JudgeEntry> {
         self.entries
             .iter()
@@ -352,7 +421,7 @@ mod tests {
         assert_eq!(ledger.capacity(), JUDGE_LEDGER_CAP);
         for i in 0..(JUDGE_LEDGER_CAP + 10) {
             let id = std::format!("c-{i}");
-            let _ = ledger.record(&id, JudgeVerdict::admit("ok"), 1_700_000_000);
+            let _ = ledger.record(&id, JudgeVerdict::admit("ok"), JudgeSource::Shadow, 1_700_000_000);
         }
         assert_eq!(ledger.len(), JUDGE_LEDGER_CAP);
         assert!(ledger.query(0).is_none());
@@ -377,12 +446,74 @@ mod tests {
     #[test]
     fn ledger_record_seq_monotonic_and_filter() {
         let mut ledger = JudgeLedger::new();
-        let seq0 = ledger.record("a", JudgeVerdict::admit("ok"), 100);
-        let seq1 = ledger.record("b", JudgeVerdict::skip("empty chunk"), 101);
+        let seq0 = ledger.record("a", JudgeVerdict::admit("ok"), JudgeSource::Shadow, 100);
+        let seq1 = ledger.record("b", JudgeVerdict::skip("empty chunk"), JudgeSource::Active, 101);
         assert_eq!(seq0, 0);
         assert_eq!(seq1, 1);
         assert_eq!(ledger.next_seq(), 2);
         assert_eq!(ledger.query_by_admit(true).len(), 1);
         assert_eq!(ledger.query_by_admit(false).len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod m4_ledger_tests {
+    use super::{JudgeLedger, JudgeOutcome, JudgeSource, JudgeVerdict};
+
+    /// ⭐⭐⭐ **B5/M-4 验收判据（排期 §4 原文）：ledger 每条同时含
+    /// `judged`/`outcome`/`source`。**
+    #[test]
+    fn 每条判决都带judged_outcome_source() {
+        let mut l = JudgeLedger::new();
+        let s0 = l.record("c0", JudgeVerdict::admit("ok"), JudgeSource::Shadow, 100);
+        let s1 = l.record("c1", JudgeVerdict::archive("long"), JudgeSource::Active, 101);
+
+        for seq in [s0, s1] {
+            let e = l
+                .entries
+                .iter()
+                .find(|e| e.seq == seq)
+                .expect("entry 应存在");
+            // judged：就是 verdict
+            assert!(!format!("{:?}", e.verdict).is_empty(), "judged 不得为空");
+            // source：显式给出、不是默认值糊弄
+            assert!(
+                matches!(e.source, JudgeSource::Shadow | JudgeSource::Active | JudgeSource::Manual),
+                "source 必须是三态之一"
+            );
+            // outcome：**初始必须是 None** —— 影子模式当刻没有真实结果
+            assert!(
+                e.outcome.is_none(),
+                "★ 判决当刻的 outcome 必须是 None（伪装成已知=伪造验证）"
+            );
+        }
+        // source 确实被区分了（不是同一个值糊过去）
+        assert_eq!(l.entries[0].source, JudgeSource::Shadow);
+        assert_eq!(l.entries[1].source, JudgeSource::Active);
+    }
+
+    /// ⭐⭐ **回填后 outcome 可见，且不一致能被记出来**（这才是 M-4 的用途）。
+    #[test]
+    fn 回填outcome_后可对比judged() {
+        let mut l = JudgeLedger::new();
+        let seq = l.record("c", JudgeVerdict::admit("ok"), JudgeSource::Shadow, 1);
+        assert!(l.entries[0].outcome.is_none());
+
+        l.record_outcome(seq, JudgeOutcome::Mismatched { detail: "实际被丢弃".into() })
+            .expect("回填应成功");
+        let e = &l.entries[0];
+        assert!(
+            matches!(e.outcome, Some(JudgeOutcome::Mismatched { .. })),
+            "★ 不一致的判决必须能被记下来 —— 否则切active 时无从发现判错"
+        );
+    }
+
+    /// ⭐⭐ **回填不存在的 seq 必须报错，不得凭空新建**（否则一致率出现无源数据）。
+    #[test]
+    fn 回填不存在的seq_报错且不新建() {
+        let mut l = JudgeLedger::new();
+        let before = l.len();
+        assert!(l.record_outcome(999, JudgeOutcome::Matched).is_err());
+        assert_eq!(l.len(), before, "★ 失败的回填不得改变 ledger 长度");
     }
 }
