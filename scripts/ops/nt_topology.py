@@ -421,7 +421,10 @@ def _ghost_consumers(layer_map):
                 walk(v)
         elif isinstance(node, str):
             m = re.match(r"^(.*\.rs):\d+$", node)
-            if m and not (root / m.group(1)).exists():
+            #⚠️ base 必须是 `neotrix-core/src/`：layer-map 的 consumer 路径
+            #   相对该目录，而非仓库根。用仓库根会造出**假幽灵**——
+            #   实测这样会把 1 条真幽灵报成 12 条（我自己犯过，见提交 99614a09）。
+            if m and not (root / "neotrix-core" / "src" / m.group(1)).exists():
                 out.append(node)
     walk(layer_map)
     return sorted(set(out))

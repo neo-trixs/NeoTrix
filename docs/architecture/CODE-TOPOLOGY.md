@@ -9,13 +9,7 @@
 ## 维度 2 · 代码树分叉（⛔ 不可从目录名推断）
 
 > ✅ **第二棵树已清空**（实测）：`neotrix-core/src/neotrix/` 仅剩 1 个 `.rs`（40 行，纯 re-export 面）。
-> ⛔ **layer-map.json 有 12 条 consumer 指向不存在的路径**（本生成器实测；这是「盲区已关」类断言的反例）：
-> - `l3_embodiment/nt_shield/shield_core/guard.rs:16`
-> - `l3_embodiment/nt_shield/shield_core/safety_kernel.rs:12`
-> - `l5_cognition/nt_mind/nt_mind_background_loop/handlers_crystal.rs:51`
-> - `l6_meta/evolution/evolution_loop/absorber.rs:7`
-> - `l6_meta/evolution/evolution_loop/loop_runner.rs:14`
-> - …另有 7 条
+> ✅ layer-map.json 的 consumer 路径全部存在（实测，无幽灵条目）。
 >
 > 上一版此处断言「8 个模块已全部显式登记 ⇒ 盲区已关」，**该断言已删除**：
 > 本生成器无法验证「是否全部登记」，却把它写成结论。物理并成一棵目录的
