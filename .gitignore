@@ -25,6 +25,13 @@ notes/
 sessions/*
 !sessions/HANDOFF-TEMPLATE.md
 !sessions/handoff-*.md
+# 2026-10-06 加：导航层与缺陷清单必须入库。
+# `sessions/README.md` 是 70 份 handoff 的唯一索引，`OPEN-DEFECTS.md` 是遗留
+# 缺陷的唯一入口 —— 两者若被忽略，则「缺陷散落正文、随窗口沉底」这一老问题
+# 会重新长出来（`handoff-disease-list-20260927.md` 记过该教训）。
+# 与 HANDOFF-TEMPLATE.md 同等对待：它们同样是 AGENTS.md 引用的证据来源。
+!sessions/README.md
+!sessions/OPEN-DEFECTS.md
 _archive/
 _archive/opencode/*
 !_archive/opencode/plugins/
