@@ -10,6 +10,21 @@ MAP="$ROOT/apps/neobot-desktop/frontend/MAP.md"
 STRICT=0
 [ "${1:-}" = "--strict" ] && STRICT=1
 
+# 2026-10-06 审计 D-gate-integrity：`MAP.md` 缺失时，内层 python 的
+# `open(MAP)` 抛 FileNotFoundError，而脚本 `set -u`（**没有 `set -e`**）⇒
+# 该异常既不中断也不改退出码 ⇒ **地图检查在崩溃状态下依然 RC=0**，
+# 看起来像「三向一致」实际是「根本没查」。
+# ⛔ 缺前置文件不是「通过」，是「无法判定」⇒ 显式判红并说清缺什么。
+for req in "$MAP" "$FE" "$CMD"; do
+  if [ ! -e "$req" ]; then
+    echo "MAP-CHECK-ABORT: 缺少对账所需路径: ${req#$ROOT/}"
+    echo "  ⇒ **无法对账**，本次不产出任何结论（⛔ 这不等于「一致」）"
+    [ "$STRICT" -eq 1 ] && exit 1
+    echo "  （advisory 模式 ⇒ 不阻断；但请注意本次**没有任何校验发生**）"
+    exit 0
+  fi
+done
+
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 

@@ -100,14 +100,33 @@ for label, loc in index.get("skill_index", {}).items():
     idx_desc = ((index.get("categories", {}).get(cat, {}).get("skills", {}).get(sk, {}).get("description")) or "").strip()
     fm_desc = (fm.get("description") or "").strip()
     if idx_desc and fm_desc and idx_desc != fm_desc:
-        fails.append(f"M3: {label}: description drift (index {len(idx_desc)}ch vs file {len(fm_desc)}ch)")
+        # 2026-10-06 审计 D2：M3 原为「逐字相等」判红，但本仓结构下**永不可能满足**
+        # —— index 侧是中文短标签（如「架构诊断 — 识别系统级架构问题」16ch），
+        # 文件 frontmatter 是英文详述（95ch）。
+        #
+        # 外部依据（Agent Skills 官方规范 + 三套真实实现 Mintlify /
+        # better-i18n / Cloudflare Discovery RFC v0.2.0）：`description` **属于
+        # SKILL.md frontmatter**，index 里的 description 是**从 frontmatter 派生**
+        # （better-i18n  literally: `meta.description ?? fallback`）。
+        # ⇒ 生态里**没有任何一处**要求「手写 index 描述与 frontmatter 逐字相等」。
+        # 且本仓 `skills/index.json` 的 description **零消费者**
+        # （实测全仓无代码读它）⇒ 该字段不承担触发/检索职责。
+        #
+        # ⇒ 降级为 warn（提示双语形态、提示人工确认语义是否还对得上）。
+        #    真正的漂移防护由 M1/M2/M4 承担（文件存在 / name 一致 / name 唯一），
+        #    而这三条本仓**已全绿** ⇒ 降级不会削弱实际防护。
+        warns.append(f"M3-bilingual: {label}: index {len(idx_desc)}ch ≠ file {len(fm_desc)}ch（非逐字，疑似双语）")
 
 # M4
 for name, n in names_seen.items():
     if n > 1:
         fails.append(f"M4: duplicate frontmatter name {name!r} x{n}")
 
-print(f"capability-manifests: checked={checked} fails={len(fails)} warns={len(warns)}")
+# 2026-10-06 审计 D-gate-integrity：原文只打数字，不说本次**是否阻断** ⇒
+# 读脚本的人看到 `fails=19` 会以为门红了，而 advisory 模式其实放行。
+# ⇒ 如实标注模式（⛔ 失败返回 0 比没门更危险：它训练人忽略这类输出）。
+_tag = "**--strict：本次判红**" if strict == "1" else "advisory 模式（**本次不阻断**）"
+print(f"capability-manifests: checked={checked} fails={len(fails)} warns={len(warns)}  [{_tag}]")
 for w in warns[:10]:
     print(f"  WARN {w}")
 if len(warns) > 10:

@@ -151,7 +151,12 @@ impl EventBus {
                     // 隐私脱敏挂载点: 落盘前净化 secrets/PII (R-P42 强化 nt_shield 节点)。
                     // 用 JSON 感知脱敏 — 只替换字符串值, 不破坏数值/结构 (R-P86 类教训)。
                     let redacted = crate::l3_embodiment::nt_shield::shield_core::redaction::redact_json_line(&line);
-                    let _ = writeln!(file, "{}", redacted);
+                    // 2026-10-06（审计 D1）：落盘失败必须留痕。
+                    // 原文`let _ = writeln!(...)` ⇒ **审计记录写不进去却无任何痕迹**，
+                    // 调用方以为已审计 ⇒ 审计链在此处静默断裂。
+                    if let Err(e) = writeln!(file, "{}", redacted) {
+                        log::warn!("[event_bus] 审计落盘失败（该条事件未被记录）: {e}");
+                    }
                 }
             }
         }

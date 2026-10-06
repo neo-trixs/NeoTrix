@@ -73,7 +73,10 @@ impl BackgroundLoopHandle {
             {
                 log::warn!("[bg] event_bus: consciousness CRITICAL ({:.3})", quality);
                 if let Some(ref kb) = self.kb {
-                    let _ = kb.kv_set(
+                    // 2026-10-06（审计 D1）：上方那行 `log::warn` 记录的是
+                    // **事件本身**，而此处丢弃的是**状态落库**的失败 ——
+                    // 两者是不同的失败，原代码只覆盖了前者。
+                    if let Err(e) = kb.kv_set(
                         "event_bus",
                         "consciousness_critical",
                         &serde_json::json!({
@@ -83,7 +86,9 @@ impl BackgroundLoopHandle {
                                 .unwrap_or_default().as_secs(),
                         })
                         .to_string(),
-                    );
+                    ) {
+                        log::warn!("[bg] event_bus: CRITICAL 状态落库失败（该事件不可追溯）: {e}");
+                    }
                 }
             }
             CoreEvent::TaskSubmitted {

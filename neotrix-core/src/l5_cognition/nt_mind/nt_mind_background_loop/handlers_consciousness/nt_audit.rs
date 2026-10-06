@@ -366,7 +366,11 @@ impl BackgroundLoopHandle {
                 check.evidence.as_deref().unwrap_or("no evidence")
             );
             if let Some(evidence) = check.evidence.as_deref() {
-                let _ = kb.kv_set("consciousness", "write_guard_audit", evidence);
+                // 2026-10-06（审计 D1）：审计证据写失败原本静默 ⇒
+                // 证据「看起来记了」实则没记 ⇒ 比不记更危险（下游会以为已审计）。
+                if let Err(e) = kb.kv_set("consciousness", "write_guard_audit", evidence) {
+                    log::warn!("[bg] write_guard_audit 证据落库失败（该审计不可追溯）: {e}");
+                }
             }
             if matches!(check.status, CheckStatus::Failed) {
                 use crate::l5_cognition::l1_facade::nt_core_meta_auditor::AuditorFinding;

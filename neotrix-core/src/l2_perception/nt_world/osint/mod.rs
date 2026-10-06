@@ -1179,7 +1179,13 @@ impl UnifiedAbsorber {
             None,
             Some("nvda"),
         )?;
-        let _ = self.kb.kv_set("absorber", "last_video_production", &summary);
+        // 2026-10-06（审计 D1）：状态写失败原本静默。
+        // ⛔ 刻意**不**用 `?`：这只是一条附带状态记录，让它失败掉整次生产
+        // 会把「缓存写失败」升级成「生产失败」⇒ 属过度传播。
+        // ⇒ 降级为告警：状态会陈旧，但调用方看得见。
+        if let Err(e) = self.kb.kv_set("absorber", "last_video_production", &summary) {
+            log::warn!("[osint] absorber last_video_production 状态写失败（状态将陈旧）: {e}");
+        }
         Ok(summary)
     }
 }

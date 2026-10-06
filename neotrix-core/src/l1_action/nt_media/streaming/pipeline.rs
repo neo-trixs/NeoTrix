@@ -249,11 +249,16 @@ impl StreamingPipeline {
                     ));
 
                     use std::os::unix::fs::OpenOptionsExt;
-                    let _ = std::fs::OpenOptions::new()
+                    // 2026-10-06（审计 D1）：FIFO 创建失败原本静默，
+                    // 而下方代码会继续用这个路径 ⇒ 错误延后到别处以**更难懂**的形式爆。
+                    if let Err(e) = std::fs::OpenOptions::new()
                         .write(true)
                         .create_new(true)
                         .mode(0o644)
-                        .open(&fifo_path);
+                        .open(&fifo_path)
+                    {
+                        log::warn!("[streaming] 创建 FIFO 失败（后续写入将失败）: {e}");
+                    }
 
                     let fifo_path_clone = fifo_path.clone();
                     let url_clone = url.clone();

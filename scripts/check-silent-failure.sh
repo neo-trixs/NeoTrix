@@ -347,7 +347,11 @@ if stale:
         print("     … %d more" % (len(stale) - 5))
 
 if new:
-    print("  ⛔ %d NEW silent failure(s) — a discarded Result with no observation channel:" % len(new))
+    # 2026-10-06 审计 D-gate-integrity：原文用「⛔」开头，读起来像**已判违规**，
+    # 但advisory 模式（无 --strict）恰恰**放行** ⇒ 文案与行为相反，会让人
+    # 以为「已经报过了就算处理」。⇒ 如实写明当前模式会不会阻断。
+    mode_tag = "advisory 模式（**本次不阻断**，加 --strict 才判红）" if mode != "strict" else "**--strict：本次判红**"
+    print("  ℹ %d 处 NEW（%s）—— 被丢弃且无观察通道的 Result:" % (len(new), mode_tag))
     print("     same function must have log::!/eprintln!/report push, or propagate with `?`")
     for k in new[:20]:
         print("     + %-58s %s" % (k, hits[k]))
