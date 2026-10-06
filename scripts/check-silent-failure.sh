@@ -326,6 +326,9 @@ print("  [silent-failure] baseline entries: %d（其中 %d 条**命中当前代�
 print("  [silent-failure] NEW (未基线、--strict 下阻断): %d" % len(new))
 print("  [silent-failure] out of scope by design (remove_file/.send*): %d" % ambiguous)
 print("  [silent-failure] reported, not gated (`.ok()` 丢弃 Result): %d" % ok_discarded)
+# ⚠️ 上面那个计数**含测试代码**。生产口径请用nt_ok_audit.py（按行区间排除
+# #[cfg(test)] 与整文件测试模块）—— 本仓实测两者的差距极大，
+# 且**测试里的 `.ok()` 多为合理用法**，混在一起会让这个数字失去判断价值。
 if mode != "list":
     print("  [silent-failure] OPEN CONTRACTS (baseline row with no criterion): %d/%d"
           % (len(unjudged), len(have)))

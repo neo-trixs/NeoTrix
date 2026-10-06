@@ -1360,6 +1360,24 @@
       "read_only": true,
       "when_not": "⛔ 不要用它判**产品代码**对错 —— 它只比「文档里的数字」与「注册表里的裁决值」。⛔ 不要为了变绿去改注册表的 expected：expected 是**裁决值**，漂了说明该重新裁决，不是该改期望（改期望等于把断言变成回声）。⛔ 它**不执行**被检查的命令（纯文本提取）⇒ 判不了「命令跑出来的数」，只判「另一个文件里写着同一个数」。⛔ 报「pattern 一个都没命中」时该修 pattern 或删该行，**不是**加宽白名单。",
       "spec": "FEATURE-MAP-TASKS-2026-09-29.md 批次 A · N-5；R-SCAN-4"
+    },
+    {
+      "id": "nt-ok-audit",
+      "query": [
+        "静默失败",
+        "丢弃 Result",
+        ".ok()",
+        "unwrap_or_default",
+        "吞错误",
+        "吞异常",
+        "audit 丢记录",
+        "注册失败被吞"
+      ],
+      "tool": "python3 scripts/ops/nt_ok_audit.py [--kind risky] [--file PATH]",
+      "kind": "audit",
+      "read_only": true,
+      "when_not": "⛔ 不要用它判「某处就是缺陷」—— 它只做**生产代码**清点（已按区间排除 #[cfg(test)] 与整文件测试模块）；实测 25 处IO/写类里只有 1 处是真缺陷，其余为清理路径/Option 转换/缓存时间戳等**正确**用法。⛔ 也不要拿它替代 check-silent-failure.sh --strict：后者是**设门**的判据，前者只是报告。",
+      "spec": "FOLLOWUP-TASKS-2026-10-06 P0.5-b"
     }
   ],
   "excluded": {
