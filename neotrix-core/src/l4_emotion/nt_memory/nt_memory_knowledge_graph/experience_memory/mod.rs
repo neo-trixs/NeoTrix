@@ -4,6 +4,7 @@
 //! 同步到 KB experience 命名空间
 
 use std::collections::HashMap;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
@@ -62,7 +63,10 @@ impl SkillMemory {
                 let rest = line[colon_pos + 1..].trim();
                 if let Some(arrow_pos) = rest.find("→") {
                     let event = rest[..arrow_pos].trim();
-                    let conclusion = rest[arrow_pos + 1..].trim();
+                    // ⚠️ UTF-8 修复：`→` 占 3 字节，原 `arrow_pos + 1` 会落在
+                    // 字符内部 ⇒ panic「byte index is not a char boundary」。
+                    // 必须按 `len_utf8()` 跳过整个箭头。
+                    let conclusion = rest[arrow_pos + '→'.len_utf8()..].trim();
                     
                     if let Ok(date) = chrono::NaiveDate::parse_from_str(
                         date_part.trim_matches(|c| c == '{' || c == '}'),
@@ -120,12 +124,16 @@ impl SkillMemory {
             .write_all(line.as_bytes())
     }
 
-    /// 同步到 KB experience 命名空间
-    pub async fn sync_to_kb(&self, kb: &Arc<crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase>) -> Result<usize, String> {
+    /// 同步到 KB experience 命名空间。
+    ///
+    /// ⚠️ **当前是未实现桩**：真实写入调用在下方被注释，函数只做计数。
+    /// 原因是 `KnowledgeBase` 上不存在 `write_experience` 这类写入 API
+    /// （已核实 `add_entry` 属于 nt_memory_tech_reserve 的另一个类型）。
+    /// 保留 `Ok(计数)` 以不破坏签名，但**不得据此认为已落库**。
+    pub async fn sync_to_kb(&self, _kb: &Arc<crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase>) -> Result<usize, String> {
         let mut synced = 0;
-        for record in &self.records {
-            // 这里简化：实际应调用 KB 的 experience 写入 API
-            // kb.write_experience(record).await?;
+        for _record in &self.records {
+            // ⚠️ 未实现：KB 无 experience 写入 API，故此处不落库（见上方文档）。
             synced += 1;
         }
         Ok(synced)
@@ -196,7 +204,7 @@ impl ExperienceMemoryManager {
     }
 
     /// SelfTest for C1 promotion
-    pub fn self_test() -> Result<(), String> {
+    pub async fn self_test() -> Result<(), String> {
         let temp_dir = tempfile::tempdir().map_err(|e| e.to_string())?;
         let manager = ExperienceMemoryManager::new();
         
@@ -278,8 +286,8 @@ mod tests {
         assert_eq!(lessons.len(), 1);
     }
 
-    #[test]
-    fn test_self_test_passes() {
-        assert!(ExperienceMemoryManager::self_test().is_ok());
+    #[tokio::test]
+    async fn test_self_test_passes() {
+        assert!(ExperienceMemoryManager::self_test().await.is_ok());
     }
 }

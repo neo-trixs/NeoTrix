@@ -9,13 +9,13 @@
 
 | | 值 |
 |---|---:|
-| 孤儿目录 | **11**（O-1 单列裁决；O-5/O-6 已于A51 接线） |
-| `.rs` 文件 | **42** |
-| 代码行 | **9,586** |
+| 孤儿目录 | **8**（O-1 单列裁决；O-5/O-6 A51 接线；O-11/12/13 A52 接线） |
+| `.rs` 文件 | **35** |
+| 代码行 | **8,127** |
 | **判为「纯重复」** | **0 条** |
 | 判为「独有能力」 | 2 条 |
 | 判为「部分覆盖」 | 11 条 |
-| 已删除 / 已接线 | **1 条**（`nt_consciousness`，实测无法编译）/ **2 条**（A51） |
+| 已删除 / 已接线 | **1 条**（`nt_consciousness`）/ **5 条**（A51 两条＋ A52 三条） |
 
 ⚠️ **最重要的一条结论**：**13 条里没有一条是重复副本。**
 ⇒ 「未接线」在本仓不是「冗余」，而是「**有能力、无接线**」——
@@ -67,9 +67,9 @@ error[E0432]: unresolved import `crate::l5_cognition::nt_consciousness::features
 | O-8 | `nt_act/semantic_routing` | 4 / 844 / 22 | 12/13 | **归档** | 覆盖率 1/13 ⇒ 近乎全新能力 |
 | O-9 | `nt_act/geo_seo` | 4 / 591 / 9 | 13/18 | **归档** | 独有 `KeywordRanking`/`GeoRegion` 等 SEO 域能力 |
 | O-10 | `nt_act/nt_act_dev_tools` | 4 / 582 / 4 | **5/5** | **归档** | **全未覆盖** ⇒ 独有：`DesktopBuilder`/`BuildLadder`/`GitHook`/`DaemonMonitor` |
-| O-11 | `nt_memory_knowledge_graph` | 3 / 569 / 8 | 9/10 | **归档** | ⚠️ 曾被我误判为「8 行桩」⇒ 实为 **569 行**（`mod.rs` + 2 个子模块），教训：统计须用 `find -name '*.rs'` 而非 `ls *.rs` |
-| O-12 | `nt_feel/cognition_bridge` | 2 / 234 / 9 | 1/3 | **归档** | 仅 1 个独有类型（`CouplingConfig`）⇒ 若接线成本极低，可优先评估 |
-| O-13 | `nt_core/io_skills` | 2 / 87 / 3 | **3/3** | **归档** | **全未覆盖**：独有 `Eli5Engine`/`Eli5Explainer`/`Eli5SelfTest` |
+| O-11 | `nt_memory_knowledge_graph` | 3 / 569 / 8 | 9/10 | ✅ **已接线（A52）** | 首接线 **22 → 0 error**。测出：孤立残留 derive 块（同时作用于同一 enum ⇒ `rename_all` 重复＋6 个 `E0119`）、`use` 夹在 `#[derive]` 与 struct 之间、derive 缺 `Hash` 却用 `HashSet`、**真UTF-8 panic**（按字节切3 字节的 `→`）。另发现 `sync_to_kb` 是**活路径上的死端桩**（真实写入被注释，有调用方） |
+| O-12 | `nt_feel/cognition_bridge` | 2 / 234 / 9 | 1/3 | ✅ **已接线（A52）** | 缺 `mod.rs`（只有 `config.rs`/`emotion_state.rs`）⇒ 补建后直接编译通过，**9 测试零改动全绿** |
+| O-13 | `nt_core/io_skills` | 2 / 87 / 3 | **3/3** | ✅ **已接线（A52）** | 全未覆盖的 `Eli5Engine` 解释器，直接编译通过，3 测试全绿 |
 
 ## 4. 为什么「归档」而不是「删除」或「接线」
 

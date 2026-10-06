@@ -3,6 +3,7 @@
 //! 能力注册、调度、成熟度进化、星脉通信协议。
 
 pub mod capability;
+pub mod io_skills; // I/O 技能（孤儿接线 A52）
 pub mod memory; // 记忆层（孤儿接线 A51）
 pub mod knowledge; // 知识图谱层（孤儿接线 A51）
 pub mod nt_crt;

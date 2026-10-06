@@ -2,6 +2,7 @@
 
 /// 共享工具函数 — 消除跨模块重复
 pub mod tiered_memory;
+pub mod nt_memory_knowledge_graph; // 记忆知识图谱层（孤儿接线 A52）
 pub mod tiered_pipeline;
 pub mod git_memory;
 pub mod paged_kv;

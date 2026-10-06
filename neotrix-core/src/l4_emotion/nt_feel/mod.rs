@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 pub mod digital_human;
+pub mod cognition_bridge; // 认知桥（孤儿接线 A52）
 pub mod emotion_engine;
 pub mod fep_iit_bridge;
 pub mod salesperson_profiling;

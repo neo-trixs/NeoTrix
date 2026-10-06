@@ -28,10 +28,8 @@ pub struct AuditFindingSummary {
     pub status: FindingStatus,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+// 注：原derive 缺 Hash，而本类型被放入 HashSet<AttackClass> ⇒ 补上。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum AttackClass {
     Injection,
@@ -73,8 +71,9 @@ pub struct ConflictVerdict {
 }
 
 /// 审计记忆引擎
-#[derive(Debug)]
 use neotrix_types::shared::Severity;
+
+#[derive(Debug)]
 pub struct AuditMemory {
     runs: Vec<AuditRun>,
     project_root: PathBuf,
@@ -136,7 +135,7 @@ impl AuditMemory {
         
         let mut covered_classes = std::collections::HashSet::new();
         let mut subsystem_coverage: HashMap<String, usize> = HashMap::new();
-        let mut conflicts = Vec::new();
+        let conflicts = Vec::new();
 
         for run in &self.runs {
             for finding in &run.findings {
@@ -159,13 +158,17 @@ impl AuditMemory {
         // 检测冲突判决 (简化)
         // 实际应比对同一 finding 在不同 run 中的 verdict
 
+        // move 后复用修复：uncovered_classes 被移入结构体字段后又被 iter()，
+        // 故必须先算出 recommended_focus。
+        let recommended_focus: Vec<String> = uncovered_classes
+            .iter()
+            .map(|c| format!("{:?}", c))
+            .collect();
         GapAnalysis {
             uncovered_classes,
             under_explored_subsystems,
             conflicting_verdicts: conflicts,
-            recommended_focus: uncovered_classes.iter()
-                .map(|c| format!("{:?}", c))
-                .collect(),
+            recommended_focus,
         }
     }
 

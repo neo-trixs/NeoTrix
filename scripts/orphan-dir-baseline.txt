@@ -27,6 +27,11 @@
 #     修 bfs/dfs max_depth off-by-one）＋`nt_core/memory`（5 文件 1,171 行，4 测试全绿；
 #     修 EmotionLabel→PlutchikEmotion 避开 L5→L6 违规、6 处 ConceptNode 字段误用、
 #     1 处 move-after-use、2 处借用冲突）—— **均为「从未编译过」，首次接线即暴露真bug**
+#   已接线 3 条（A52 波，890 行）：`nt_core::io_skills`（Eli5 解释器，3 测试）＋
+#     `nt_feel::cognition_bridge`（补缺失的 mod.rs，9 测试）＋
+#     `nt_memory::nt_memory_knowledge_graph`（8 测试）—— 20/20 全绿。
+#     本波测出**真 UTF-8 bug**：`rest[arrow_pos + 1..]` 按字节切分 3 字节的 `→`
+#     ⇒ panic「byte index is not a char boundary」，已改 `len_utf8()`。
 #   已删除 1 条：`l5_cognition/nt_consciousness`（39 行自引用 facade，
 #     实测挂载报 E0432 ×3 ⇒ 永远无法编译，且其文档误导消费者去用该路径）
 #
@@ -82,9 +87,6 @@ neotrix-core/src/l1_action/nt_act/geo_seo
 neotrix-core/src/l1_action/nt_act/nt_act_dev_tools
 neotrix-core/src/l1_action/nt_act/semantic_routing
 neotrix-core/src/l2_perception/nt_world/temporal_kg
-neotrix-core/src/l4_emotion/nt_feel/cognition_bridge
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_knowledge_graph
-neotrix-core/src/l5_cognition/nt_core/io_skills
 neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/archive
 neotrix-core/src/l5_cognition/nt_mind/cross_domain
 neotrix-core/src/l5_cognition/nt_mind/self_improvement
