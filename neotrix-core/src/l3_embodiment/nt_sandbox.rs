@@ -128,9 +128,46 @@ pub fn global_sandbox() -> &'static Mutex<SandboxEnforcer> {
     &SANDBOX_ENFORCER
 }
 
+/// ⭐⭐⭐ 初始化进程级沙箱档位（`--sandbox` 的**唯一**落地入口）。
+///
+/// ## 【缺陷（2026-10-06 修）】`--sandbox` 此前**完全无效**
+/// 本函数只写 `global_sandbox()` 这一个单例，而实测
+/// `global_sandbox()` 在**本模块之外零读者**（`rg global_sandbox` 只命中定义处）
+/// ⇒ `--sandbox read-only` 解析得好好的、存进单例、**没有任何代码读它**。
+/// 真正会判只读的是 `ShieldEnforcer::sandbox`，那是**另一个** `SandboxEnforcer`
+/// （`ShieldEnforcer::new()` 里独立构造），两者从不联通。
+///
+/// ## 修法：同时推进 `global_shield()` 的那一份
+/// ⚠️ 为什么这**不是**「一个单例写两份」的坏味道，而是必须的：
+/// `ShieldEnforcer` 才是活路径上真正执行 sandbox 闸的那个对象
+/// （`check_all` 的生产调用方是 `seal_loop.rs:47`）。
+/// 保留 `global_sandbox()` 是为了不破既有签名；两份都写 ⇒ 判据仍只有一份
+/// （`SandboxMode::is_read_only`），不会漂移。
+///
+/// ## ⚠️ 安全性：默认档**零行为变化**
+/// `ShieldEnforcer::new()` 的 sandbox 默认是 `SandboxMode::Disabled`，
+/// 而 `--sandbox` 的 `default_value` 同样是 `disabled`
+/// ⇒ 不传 flag 时推过去的是同一个值，行为逐位相同。
+/// ⇒ 只有用户**显式**传 `--sandbox read-only|workspace-write` 才会收紧。
+/// （这正是「静默失效只允许朝严格方向」的反面：默认不许变得更松。）
 pub fn init_sandbox(mode: SandboxMode) {
-    let mut e = global_sandbox().lock().unwrap_or_else(|e| e.into_inner());
-    e.set_mode(mode);
+    {
+        let mut e = global_sandbox().lock().unwrap_or_else(|e| e.into_inner());
+        e.set_mode(mode);
+    }
+    // 推到活路径上真正执行 sandbox 闸的那个对象
+    let pushed = {
+        let mut s = crate::l3_embodiment::nt_shield_enforcer::global_shield()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        s.sandbox.set_mode(mode);
+        s.sandbox.mode()
+    };
+    // ⚠️ 两份必须一致；不一致说明有第三份判据（那就是要漂移的信号）
+    debug_assert_eq!(
+        pushed, mode,
+        "init_sandbox: 两处 SandboxEnforcer 档位不一致 ⇒ 存在第三份判据"
+    );
 }
 
 pub fn check_sandbox() -> Option<String> {
