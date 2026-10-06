@@ -203,3 +203,81 @@ PROBE after plan  mode=Suggest      ← plan 确实是纯的
 · `.neotrix/patches/2026-10-06-planA-mutex-and-lock-rewrite.patch`
 · `.neotrix/patches/2026-10-05-contract-locks-monotonic-revert.patch`
 · `.neotrix/patches/2026-10-05-honest-flag-warning.patch`
+
+---
+
+# 追加：2026-10-06 授权/沙箱双轴收敛 + profile CLI 接线
+
+用户裁决：① `--sandbox` 走**方案 A**；② 审批模式收敛成**一个 flag**。
+
+## 本轮三笔提交（均在 `feat/capability-absorb-20260828`，未推送）
+| 提交 | 内容 |
+|---|---|
+| `2169b633` | 审批/沙箱双轴收敛 + 「启用即断言接线」测试（7 条 + 沙箱 8 条） |
+| `145c33d7` | `profile` 子命令接线（方案 A 从库函数变成命令行可达）+ 授权判据反向锁 6 条 |
+| `98395ab7` | 更新 `CLAIMED-BUT-NOT-ENFORCED` 第 9/10 项（含「未闭环」的诚实标注） |
+
+## 修掉的两个真实缺陷（都是「静默失效」族）
+1. **`--sandbox` 未知值静默兜底成 `Disabled`** ⇒ `--sandbox danger-full-access`
+   不报错、静默变成「不设限」，**语义与意图相反**。改为 `Err` + 退出码 2。
+2. **`ApprovalMode::from_str` 返回 `Option`** ⇒ 档位里
+   `approval_mode_override` 拼错一个字母 ⇒ 覆盖被**无声忽略**。
+   注意它「看起来更严」（停在 Suggest）⇒ 实则用户要的自动批准没生效且无人知道。
+   改为 `Result`。
+
+## ⭐ 可复用的判据
+- **静默失效只允许朝严格方向回落**。「未知 → Disabled」是朝宽松方向 ⇒ 直接违反。
+- **安全边界必须做成纯函数**。`authorize_profile_use` 决定「要不要问一句」，
+  内联在 I/O 里就**测不到** ⇒ 改松了没人知道。
+- **穷举优于逐格**。授权真值表逐格测容易漏一格，而漏的那格恰好是
+  「CI 里静默放宽审批」⇒ 用循环穷举全 8 格，钉住「恰好一格 Refuse」。
+
+## ⚠️ 夹具坑（下一个人会踩）
+macOS `script -q /dev/null cmd` **不把管道输入送进子进程 pty**（`^D` 早于输入到达）
+⇒ 测出「输入 `y` 也被取消」的**假阳性**。
+按 R-SCAN-1 改用 python `pty.fork()` 精确驱动后确认**代码无缺陷**。
+**不修正它就会去「修」正确的代码** —— 错误的测试结论比没有记录更危险。
+
+## 8. 收工自查
+
+### 8.1 worktree 去向
+```
+[worktree-gate] repo=/Users/neo/Downloads/neotrix mode=check
+------------------------------------------------------------
+路径 | HEAD | 分支 | 脏 | 体积 | target | 近3h活动
+--------------------------------------------------------------------------
+/Users/neo/Downloads/neotrix/.worktrees/merge-b | 1a48ecd3 | HEAD | 3 | 66M | 0M | no
+/Users/neo/Downloads/neotrix/.worktrees/nt-v2 | 6b57fe08 | HEAD | 0 | 81M | 0M | no
+[worktree-gate] ℹ️  **主树**：13 处未提交 | target 239869M（**只报告，不影响退出码**）
+[worktree-gate]    ⛔ 主树未提交改动**不在任何提交里**（AGENTS.md §1 收工义务）
+[worktree-gate]    提交：git add <显式路径> && git commit --only <同一批>（⛔ 共享 index 下禁 -A）
+------------------------------------------------------------
+[worktree-gate] worktree=2 个 | 合计 147M | target 占 0M
+[worktree-gate] 带未提交改动: 1 个 | 近3h有改动: 0 个
+[worktree-gate] ⛔ 1 个 worktree 的未提交改动**不在任何提交里**：
+[worktree-gate]      ⛔ /Users/neo/Downloads/neotrix/.worktrees/merge-b
+[worktree-gate]    删它们必须先 patch 兜底（R-DISK-5）：sh scripts/ops/nt_worktree_gate.sh prune
+```
+本会话**新建**的 worktree：**无**（全程在主工作树 + `--only` 定点提交）。
+
+| worktree | 用途 | 去向 |
+|---|---|---|
+| `.worktrees/merge-b` | **非本会话创建**（他窗） | ⛔ 含未提交改动（含 1 处 staged 删除 `proxy_daemon_wrapper.rs`）⇒ **不得 prune、不得手删**，移交他窗处理 |
+| `.worktrees/nt-v2` | 非本会话创建 | 无未提交改动，本会话未触碰 |
+
+### 8.2 未提交改动的去向
+本会话触碰的 6 个文件（`main.rs`、`nt_sandbox.rs`、`nt_core_approval.rs`、
+`nt_permission_profiles.rs`、`nt_approval.rs`、`CLAIMED-BUT-NOT-ENFORCED-*.md`）
+**全部已进入上述 3 笔提交**，`git status --porcelain -- <这些文件>` 输出为空。
+⛔ 主工作树仍有**他窗 WIP**（非本会话产生），按共享 index 事故纪律**未触碰、未提交**。
+
+### 8.3 用户侧副作用
+测试动过 `~/.neotrix/profiles.toml`（`switch_profile_with_audit` 会落盘）
+⇒ 已备份 `/tmp/profiles.bak.toml` 并**逐字节复原**（`diff` 干净，`active = "nt_shield"`）。
+
+## ⏭ 接手者的下一个动作
+1. ⛔ **第 9 项仍未闭环**：`require_approval` 的两个消费者
+   （`ShieldEnforcer` 悬空 + `turn_stream_with_approval` 零调用方）
+   仍不在生产链上 ⇒ 「flag 落地 ⇒ 被工具执行消费」那一段仍然断。
+   **不要因为 flag 已收敛就把这一项划掉。**
+2. `EffortTier::from_client_spelling` 仍**无生产调用方**（仅测试）⇒ 待接 gateway。
