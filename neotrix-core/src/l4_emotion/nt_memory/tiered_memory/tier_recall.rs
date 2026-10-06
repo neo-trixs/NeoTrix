@@ -125,7 +125,7 @@ impl RecallStore {
             .iter()
             .map(|i| (now - i.timestamp).max(0))
             .max()
-            // ⭐ 2026-10-05 修除零（同秒写入 ⇒ 相关度全 NaN）：
+            // 2026-10-05 修除零（同秒写入 ⇒ 相关度全 NaN）：
             // · max() 返回 Some(0) 时**不触发** unwrap_or(1) ⇒ max_age == 0
             // · 随后 age / max_age == 0/0 == NaN ⇒ 相关度全 NaN
             // · NaN 经 partial_cmp→None→Equal ⇒ 排序静默退化为插入序
@@ -425,7 +425,7 @@ mod tests {
         assert_eq!(results.len(), 2);
     }
 
-    /// ⭐⭐⭐ 反向锁：同一秒写入的条目**不得**产出 NaN 相关度。
+    /// 反向锁：同一秒写入的条目**不得**产出 NaN 相关度。
     ///
     /// 缺陷形状（逐行核实）：
     /// · `append` 用秒级时间戳（`MemoryItem::new` 内 `.as_secs() as i64`）

@@ -434,7 +434,7 @@ async fn extract_generic(
 // ---------------------------------------------------------------------------
 /// 判定视频站点 —— **决定用哪个提取器去请求**。
 ///
-/// # ⭐ 2026-10-03：改为 host 判定，不再裸 `contains`
+/// # 2026-10-03：改为 host 判定，不再裸 `contains`
 ///
 /// ⛔ 原实现 `url.contains("youtube.com")` 会把
 /// `https://youtube.com.evil.net/watch?v=x` 判成 youtube，
@@ -442,7 +442,7 @@ async fn extract_generic(
 /// `detect_site` 的两个调用点（`extract` / `list_formats`）
 /// 都是真正的抓取分派，不是分类标签。
 ///
-/// ⭐ 用 [`nt_url_match`]（L0 原语，与 social_access/playlist 同源）。
+/// 用 [`nt_url_match`]（L0 原语，与 social_access/playlist 同源）。
 fn detect_site(url: &str) -> &str {
     use crate::l0_substrate::nt_core_platform::url_match::url_matches_domain as m;
     if m(url, "youtube.com") || m(url, "youtu.be") {
@@ -571,7 +571,7 @@ async fn list_youtube_formats(
 mod detect_site_tests {
     use super::detect_site;
 
-    /// ⭐ 迁移回归：正常 URL 的分派必须完全不变
+    /// 迁移回归：正常 URL 的分派必须完全不变
     #[test]
     fn normal_urls_keep_their_extractor() {
         assert_eq!(detect_site("https://www.youtube.com/watch?v=abc"), "youtube");
@@ -582,7 +582,7 @@ mod detect_site_tests {
         assert_eq!(detect_site("https://example.org/v.mp4"), "generic");
     }
 
-    /// ⭐ 判定面收窄：伪装域名不再走 YouTube/Bilibili 提取器。
+    /// 判定面收窄：伪装域名不再走 YouTube/Bilibili 提取器。
     /// ⛔ 原实现会把 `youtube.com.evil.net` 判成 youtube 并**实际请求**它。
     #[test]
     fn lookalike_domains_fall_back_to_generic() {

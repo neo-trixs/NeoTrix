@@ -11,7 +11,7 @@ pub use tracing::{info, warn, error, debug};
 
 /// 初始化 tracing 日志（带环境变量过滤）
 ///
-/// ⭐ 2026-10-05 修：**日志必须走 stderr**。
+/// 2026-10-05 修：**日志必须走 stderr**。
 ///
 /// ## 缺陷实测（本窗口用 `neotrix web fetch | python3 -c json.loads` 时撞上）
 /// `fmt()` **默认写 stdout** ⇒ 任何 CLI 的标准输出都被日志行污染：

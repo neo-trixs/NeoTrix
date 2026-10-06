@@ -90,7 +90,7 @@ impl ProcessSkillMemory {
 mod tests {
     use super::*;
 
-    /// ⭐ `best_skill` 的回归防护。
+    /// `best_skill` 的回归防护。
     ///
     /// 它曾编译不过（把 `&ProcessSkill` 当 `ProcessSkillMemory` 调
     /// `success_rate()`）。修法是引入局部 `rate(&ProcessSkill)`。

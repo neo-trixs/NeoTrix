@@ -54,7 +54,7 @@ impl SocialAccessManager {
 
     /// 注册一个平台适配器。
     ///
-    /// ⭐ 2026-10-03 新增：`get_feed` 原先**无视** `feed_service` 直接
+    /// 2026-10-03 新增：`get_feed` 原先**无视** `feed_service` 直接
     /// 返回 `vec![]`，因此 `register_adapter` 注册的东西永远不会被读到 ——
     /// 注册路径与读取路径之间是断的。
     pub fn register_adapter(&mut self, adapter: std::sync::Arc<dyn SocialPlatformAdapter>) {
@@ -63,7 +63,7 @@ impl SocialAccessManager {
 
     /// 本次抓取是否真的发生了排序。
     ///
-    /// ⭐ 排序分数只在「适配器提供了预测」时才有意义（见
+    /// 排序分数只在「适配器提供了预测」时才有意义（见
     /// [`RankOutcome`]）。本字段让调用方能区分「排过」与「顺序是任意的」，
     /// 而不是从一个恒 0 的分数里读出虚假结论。
     pub fn last_fetch_was_ranked(&self) -> bool {
@@ -248,7 +248,7 @@ mod tests {
                         if i == 0 { "alice" } else { "bob" },
                     );
                     if *p > 0.0 {
-                        // ⭐ 只在有预测时才填 —— 供「是否排序」的判定使用。
+                        // 只在有预测时才填 —— 供「是否排序」的判定使用。
                         // 用 `with`（会 move self）不行，改用 set + Prediction。
                         if let Some(pred) = crate::l2_perception::nt_world::social_access::feed::Prediction::new(*p) {
                             item.predicted.set(PredictedAction::ShareViaCopyLink, pred);
@@ -285,7 +285,7 @@ mod tests {
         m
     }
 
-    // ── ⭐ R-P79 回归：注册了 adapter 就必须读得到 ──────────────
+    // ── R-P79 回归：注册了 adapter 就必须读得到 ──────────────
 
     #[test]
     fn registered_adapter_is_actually_reachable() {
@@ -300,7 +300,7 @@ mod tests {
 
     #[test]
     fn unranked_is_reported_when_adapter_gives_no_predictions() {
-        // ⭐ adapter 不给预测 ⇒ 分数恒 0 ⇒ 必须能观测到「未排序」
+        // adapter 不给预测 ⇒ 分数恒 0 ⇒ 必须能观测到「未排序」
         let mut m = manager_with(vec![]);
         let r = m
             .get_feed(SocialPlatform::Twitter, FeedType::Latest, 10)
@@ -317,13 +317,13 @@ mod tests {
             .expect("must succeed");
         assert_eq!(r.posts.len(), 2);
         assert!(m.last_fetch_was_ranked(), "predictions present means ranking happened");
-        // ⭐ 排序真的按分数走了：20.0*0.5=10.0 > 20.0*0.1=2.0
+        // 排序真的按分数走了：20.0*0.5=10.0 > 20.0*0.1=2.0
         assert_eq!(r.posts[0].id, "1", "higher predicted share must rank first");
     }
 
     #[test]
     fn unified_post_carries_ranked_flag_in_meta() {
-        // ⭐ ranked 标志必须进 platform_meta，否则下游无法判断
+        // ranked 标志必须进 platform_meta，否则下游无法判断
         let mut m = manager_with(vec![0.1, 0.5]);
         let r = m
             .get_feed(SocialPlatform::Twitter, FeedType::Latest, 10)

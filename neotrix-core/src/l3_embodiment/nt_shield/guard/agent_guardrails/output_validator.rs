@@ -102,7 +102,7 @@ impl OutputValidator for HallucinationDetector {
         }
 
         // High URL density heuristic
-        // ⭐ 编译期常量正则 ⇒ `LazyLock` **只编译一次**。原先每次调用都
+        // 编译期常量正则 ⇒ `LazyLock` **只编译一次**。原先每次调用都
         //   `Regex::new(..).expect("valid regex")`：① 重复编译 ② `expect_used`
         //   在 CI clippy `-D warnings` 下是红 ③ 万一字面量写错就 panic 在生产路径。
         //   兜底用 `unwrap_or_default()`（空正则，永不匹配）⇒ **宁可漏检也不崩**；
@@ -483,7 +483,7 @@ mod tests {
     /// `max_length` 恰好落在某个多字节字符中间的配置 ⇒ 旧实现直接
     /// `byte index is not a char boundary` 崩掉。
     ///
-    /// ⭐ 这条测试的价值在于**它是回归钉子**：没有它，R-STR-1 那条规矩
+    /// 这条测试的价值在于**它是回归钉子**：没有它，R-STR-1 那条规矩
     /// 在这个模块里没有任何强制力。
     #[test]
     fn multibyte_output_truncation_lands_on_a_char_boundary() {
@@ -512,7 +512,7 @@ mod tests {
         assert_eq!(r.sanitized, "家");
     }
 
-    /// ⭐ 常量正则必须**仍然可编译**。
+    /// 常量正则必须**仍然可编译**。
     ///
     /// 生产路径改用了 `LazyLock` + `unwrap_or_default()`（无 panic 路径），
     /// 代价是：字面量若写错会**静默退化成永不匹配**。本测试把那个代价
@@ -525,7 +525,7 @@ mod tests {
         );
     }
 
-    /// ⭐ **\`exfil_base64\` 的正则原先是写错的**，不是阈值问题。
+    /// **\`exfil_base64\` 的正则原先是写错的**，不是阈值问题。
     ///
     /// \`base64(1)\`（GNU coreutils）**没有** \`encode\`/\`decode\` 子命令** ——
     /// 那是 Python 的用法。实测 36 MiB 真实语料里它的 10 次命中有 **9 次是英文

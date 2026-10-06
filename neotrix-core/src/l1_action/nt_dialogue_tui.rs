@@ -805,7 +805,7 @@ fn render_help(f: &mut ratatui::Frame, area: ratatui::layout::Rect) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    // ⭐ 2026-10-03 跨域错位收敛（函数内 use，与顶部 import 同一根因）
+    // 2026-10-03 跨域错位收敛（函数内 use，与顶部 import 同一根因）
     use crate::l1_action::nt_action_facade::NtDemandKind;
 
     fn demand(id: &str) -> NtDemand {

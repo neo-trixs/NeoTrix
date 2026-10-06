@@ -1163,7 +1163,7 @@ mod canonical_json_tests {
         }
     }
 
-    /// ⭐⭐⭐ **canonical_json 的输出对象 key 必须全有序。**
+    /// **canonical_json 的输出对象 key 必须全有序。**
     ///
     /// ## 修复机制（实测得出，与最初设想不同）
     ///
@@ -1206,7 +1206,7 @@ mod canonical_json_tests {
         assert!(ia2 < iz2, "嵌套对象 key 也应排序");
     }
 
-    /// ⭐⭐⭐ **数组顺序必须原样保留**（不得被排序）。
+    /// **数组顺序必须原样保留**（不得被排序）。
     ///
     /// `requires` 之类字段的数组顺序是**数据本身**。「顺手把数组也排了」
     /// 会静默改变语义 ⇒ 用测试钉死这条边界。
@@ -1231,7 +1231,7 @@ mod registry_roundtrip_tests {
     use super::CapabilityCli;
     use crate::registry::CapabilityTreeRegistry;
 
-    /// ⭐⭐⭐⭐⭐ **缺 `kind` 的注册表必须能加载，且往返零丢失。**
+    /// **缺 `kind` 的注册表必须能加载，且往返零丢失。**
     ///
     /// ## 2026-10-06 P0 数据丢失的回归锁
     ///
@@ -1277,7 +1277,7 @@ mod registry_roundtrip_tests {
         );
     }
 
-    /// ⭐⭐⭐⭐⭐ **真实已提交注册表：解析 + 往返零丢失。**
+    /// **真实已提交注册表：解析 + 往返零丢失。**
     ///
     /// P0 的**最忠实**回归锁 —— 直接吃出事的那份文件。
     /// ⛔ 文件不存在则跳过：单测不该依赖工作区布局。
@@ -1302,7 +1302,7 @@ mod registry_roundtrip_tests {
         assert_eq!(out.nodes.len(), expected, "★ 往返后节点数变了 ⇒ 静默截断回归");
     }
 
-    /// ⭐⭐⭐ **非老 schema 的坏文件不得被判为可迁移。**
+    /// **非老 schema 的坏文件不得被判为可迁移。**
     ///
     /// 缺陷机制：`Err(_)` 把**任何**解析失败都当成「老 schema」。
     /// 判别用**结构**（顶层有 `nodes` 键 ⇒ 是新 schema 的损坏文件）。
@@ -1315,7 +1315,7 @@ mod registry_roundtrip_tests {
         );
     }
 
-    /// ⭐⭐ **真正的老 schema（domains 形、无 nodes）仍须判为可迁移。**
+    /// **真正的老 schema（domains 形、无 nodes）仍须判为可迁移。**
     ///
     /// 反向锁：防止把「消除破坏性回退」做成「彻底不许迁移」。
     #[test]

@@ -64,7 +64,7 @@ pub struct SelectorProbe {
 
 /// X 抽取器的选择器契约。
 ///
-/// ⭐ 全部选择器集中在这一处，是「约束抽取面」的落点：
+/// 全部选择器集中在这一处，是「约束抽取面」的落点：
 /// 改版时只改这里，且 [`Self::verify`] 会强制每个改动都被验证。
 pub const X_SELECTOR_CONTRACT: &[SelectorProbe] = &[
     SelectorProbe {
@@ -108,7 +108,7 @@ impl ContractVerdict {
 
 /// 判定页面形态。
 ///
-/// ⭐ **先判形态再验契约**，顺序不能反：若先验契约，未登录页会
+/// **先判形态再验契约**，顺序不能反：若先验契约，未登录页会
 /// 被误判成「选择器漂移」，把「请先登录」报成「X 改版了」——
 /// 后者会让维护者去改代码，而真正的问题是去登录。
 ///
@@ -180,7 +180,7 @@ pub fn verdict_to_error(v: &ContractVerdict, url: &str) -> Option<SocialAccessEr
 
 /// 便利入口：观测 → 判形态 → 验契约 → 返回错误（若有）。
 ///
-/// ⭐ 顺序即语义，见 [`classify_shape`] 的说明。
+/// 顺序即语义，见 [`classify_shape`] 的说明。
 ///
 /// # ⚠️ `expected` 是必需的，且这个参数的存在是被测试逼出来的
 ///
@@ -232,7 +232,7 @@ pub fn check(
             Ok(shape)
         }
         PageShape::Unknown => {
-            // ⭐ 走到这里说明「零推文容器」且「无登录墙标记」。
+            // 走到这里说明「零推文容器」且「无登录墙标记」。
             //    若调用方预期是 Feed，则这是一个**不可静默**的歧义：
             //    真的没数据 与 选择器漂移 在此不可区分。
             if expected == PageShape::Feed {
@@ -268,7 +268,7 @@ mod tests {
 
     #[test]
     fn login_wall_wins_over_zero_tweets() {
-        // ⭐ 关键顺序测试：未登录页天然 0 推文。
+        // 关键顺序测试：未登录页天然 0 推文。
         //    若先验契约会误报「选择器漂移」，把「去登录」报成「X 改版」。
         //    标记来自**正文**（实测：未登录 x.com 输出全是 Log in / Sign up 链接）
         let markers = ["Log in to X", "Sign up"];
@@ -278,7 +278,7 @@ mod tests {
 
     #[test]
     fn login_markers_in_title_alone_do_not_trip_the_gate() {
-        // ⭐ 回归：首版拿 doc_title 比对登录标记，这是错的 ——
+        // 回归：首版拿 doc_title 比对登录标记，这是错的 ——
         //    title 里没有这些文案，据此判墙会永远漏判。
         let shape = classify_shape(&[], 0, "Log in to X");
         assert_eq!(shape, PageShape::Unknown);
@@ -293,7 +293,7 @@ mod tests {
 
     #[test]
     fn login_marker_outranks_present_tweets() {
-        // ⭐ 未登录页不该有推文；若两者同时出现，登录墙更可信
+        // 未登录页不该有推文；若两者同时出现，登录墙更可信
         //    （可能是「部分渲染 + 登录提示」的中间态）
         let shape = classify_shape(&["Sign up"], 3, "X");
         assert_eq!(shape, PageShape::LoginWall);
@@ -327,7 +327,7 @@ mod tests {
 
     #[test]
     fn feed_with_zero_tweet_elements_is_drift_not_empty() {
-        // ⭐⭐ 这就是本模块存在的理由：Feed 形态却零推文容器 = 选择器漂移
+        // 这就是本模块存在的理由：Feed 形态却零推文容器 = 选择器漂移
         let v = verify(
             X_SELECTOR_CONTRACT,
             PageShape::Feed,
@@ -343,7 +343,7 @@ mod tests {
 
     #[test]
     fn non_essential_zero_hits_is_not_drift() {
-        // ⭐ 图片推文没有 tweetText 是正常的 —— 不得判失败
+        // 图片推文没有 tweetText 是正常的 —— 不得判失败
         let v = verify(
             X_SELECTOR_CONTRACT,
             PageShape::Feed,
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn ambiguous_zero_on_expected_feed_is_an_error_not_an_empty_result() {
-        // ⭐⭐ 这条测试逼出了首版 API 的缺陷：/home 是必然有推文的 feed，
+        // 这条测试逼出了首版 API 的缺陷：/home 是必然有推文的 feed，
         //    观测到 0 条时首版返回 Ok(Unknown)，调用方会照常报 total: 0
         //    —— 假成功只是换了个位置。
         let err = check(
@@ -411,7 +411,7 @@ mod tests {
         match err {
             SocialAccessError::Parse(msg) => {
                 assert!(msg.contains("ambiguous zero result"), "got: {}", msg);
-                // ⭐ 必须点明两种可能，否则调用方无从下手
+                // 必须点明两种可能，否则调用方无从下手
                 assert!(msg.contains("(a) genuinely no results"), "got: {}", msg);
                 assert!(msg.contains("(b) selector drift"), "got: {}", msg);
                 assert!(msg.contains("X_SELECTOR_CONTRACT"), "must name the fix site: {}", msg);

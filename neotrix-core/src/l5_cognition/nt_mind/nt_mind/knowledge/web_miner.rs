@@ -36,7 +36,7 @@ impl WebSourceType {
     /// （见 [`Self::to_task_type`]：Wikipedia/ArXiv/KnowledgeBase → CodeAnalysis，
     /// GitHub → CodeGeneration），故判错的代价不止是标签不准。
     ///
-    /// # ⭐ 2026-10-03：**只把域名规则**改为 host 判定
+    /// # 2026-10-03：**只把域名规则**改为 host 判定
     ///
     /// ⛔ 原实现前三条用裸 `contains("wikipedia.org")` 等，会把
     /// `https://wikipedia.org.evil.net/` 判成 Wikipedia 并派发
@@ -48,7 +48,7 @@ impl WebSourceType {
     ///    ⛔ 若一并收紧，`wiki.foo.com` / `example.org/wiki/1` 会从
     ///    KnowledgeBase 变成 GenericUrl ⇒ **那是行为变更，不是修 bug**。
     ///
-    /// ⭐ 二者共存无冲突：域名规则在前（精确），关键词兜底在后（宽松）。
+    /// 二者共存无冲突：域名规则在前（精确），关键词兜底在后（宽松）。
     ///    实测「正常 URL 分类完全不变」+「伪装域名不再命中域名规则」。
     pub fn detect(url_str: &str) -> Self {
         use crate::l0_substrate::nt_core_platform::url_match::url_matches_domain as m;
@@ -674,7 +674,7 @@ mod tests {
 mod detect_host_match_tests {
     use super::*;
 
-    /// ⭐⭐ 迁移回归：正常 URL 的分类**必须完全不变**。
+    /// 迁移回归：正常 URL 的分类**必须完全不变**。
     /// 尤其要验证关键词启发式未被误伤 ——
     /// `wiki.foo.com` / `example.org/wiki/1` 仍须是 KnowledgeBase。
     #[test]
@@ -685,7 +685,7 @@ mod detect_host_match_tests {
             ("https://arxiv.org/abs/1234.5678", WebSourceType::ArXiv),
             ("https://aclweb.org/anthology/2026.acl-long.1", WebSourceType::ArXiv),
             ("https://github.com/owner/repo", WebSourceType::GitHub),
-            // ⭐ 关键词启发式的三种形态，必须仍然命中
+            // 关键词启发式的三种形态，必须仍然命中
             ("https://wiki.foo.com/x", WebSourceType::KnowledgeBase),
             ("https://example.org/knowledge/1", WebSourceType::KnowledgeBase),
             ("https://a.b/encyclopedia", WebSourceType::KnowledgeBase),
@@ -695,11 +695,11 @@ mod detect_host_match_tests {
         }
     }
 
-    /// ⭐ 判定面收窄：伪装域名不再命中**域名规则**。
+    /// 判定面收窄：伪装域名不再命中**域名规则**。
     ///
     /// ⚠️ 注意 `wikipedia.org.evil.net/` 收紧后落 `KnowledgeBase`
     ///    而非 `GenericUrl` —— 因为 URL 里仍含 "wiki" 关键词。
-    ///    ⭐ 这是**正确**的：关键词启发式是刻意保留的语义，
+    ///    这是**正确**的：关键词启发式是刻意保留的语义，
     ///    我们只收紧了域名规则，没有偷偷删掉启发式。
     #[test]
     fn lookalike_domains_no_longer_match_domain_rules() {
@@ -726,7 +726,7 @@ mod detect_host_match_tests {
         );
     }
 
-    /// ⭐⭐ 守住「关键词语义不得被静默删除」——
+    /// 守住「关键词语义不得被静默删除」——
     /// 这条专门针对「顺手把 contains 也改成 host 判定」的错误修法。
     #[test]
     fn keyword_heuristics_are_still_intact() {
@@ -741,7 +741,7 @@ mod detect_host_match_tests {
         );
     }
 
-    /// ⭐ 域名规则优先于关键词（顺序语义不得改变）
+    /// 域名规则优先于关键词（顺序语义不得改变）
     #[test]
     fn domain_rules_take_precedence_over_keywords() {
         // github.com/…/wiki  → GitHub（域名规则在前），不是 KnowledgeBase
@@ -756,7 +756,7 @@ mod detect_host_match_tests {
         );
     }
 
-    /// ⭐ 该分类决定 LLM 任务类型，故此处一并锁住下游行为。
+    /// 该分类决定 LLM 任务类型，故此处一并锁住下游行为。
     #[test]
     fn classification_still_drives_task_type() {
         assert_eq!(

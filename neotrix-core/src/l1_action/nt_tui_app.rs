@@ -966,7 +966,7 @@ mod tests {
         assert_eq!(picker_window(5, 3, V), (0, 5));
         // 恰好满窗
         assert_eq!(picker_window(10, 9, V), (0, 10));
-        // ⭐ 缺陷场景：选第 12 项（0-based），窗口须右移到把它纳入
+        // 缺陷场景：选第 12 项（0-based），窗口须右移到把它纳入
         let (off, shown) = picker_window(25, 12, V);
         assert!(off > 0, "选中项越过窗口末位时必须偏移");
         assert!(12 >= off && 12 < off + shown, "选中项必须落在 [off, off+shown)");

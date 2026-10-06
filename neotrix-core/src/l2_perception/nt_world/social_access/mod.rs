@@ -42,7 +42,7 @@ pub use probe::{
 
 // ─── 统一 adapter 工厂 ────────────────────────────────────────────────────
 //
-// ⭐ 2026-10-03 新增。审计发现：`extractors/` 下 6 个 adapter
+// 2026-10-03 新增。审计发现：`extractors/` 下 6 个 adapter
 //   （twitter / reddit / instagram / tiktok / ytdlp / web_jina）
 //   **全部零生产调用方**。
 //
@@ -70,7 +70,7 @@ pub struct AdapterEntry {
     pub platform: SocialPlatform,
 }
 
-/// ⭐ 内置 adapter 清单 —— **单一真源**。
+/// 内置 adapter 清单 —— **单一真源**。
 ///
 /// ⛔ 此前没有任何统一入口，6 个 adapter 只能靠 `use` 路径逐个捞，
 ///    极易漏（实测就是全漏）。
@@ -85,14 +85,14 @@ const ADAPTERS: &[(&str, fn() -> Arc<dyn SocialPlatformAdapter>)] = &[
 
 /// 构造全部内置 adapter。
 ///
-/// ⭐ 这是「注册 adapter」的唯一入口：调用方不再逐个 import。
+/// 这是「注册 adapter」的唯一入口：调用方不再逐个 import。
 pub fn default_adapters() -> Vec<Arc<dyn SocialPlatformAdapter>> {
     ADAPTERS.iter().map(|(_, f)| f()).collect()
 }
 
 /// 只取某个平台的 adapter。
 ///
-/// ⭐ 先把平台解析成**目录主键**，再按主键查 adapter ——
+/// 先把平台解析成**目录主键**，再按主键查 adapter ——
 ///    因为 adapter 的 `id()` 可能是别名（`TwitterExtractor::id()` 是
 ///    `"twitter"`，目录主键是 `"x"`）。直接用 `SocialPlatform::as_str()`
 ///    查会让 X 的 adapter 永远取不到（自测抓到）。
@@ -100,7 +100,7 @@ pub fn adapter_for(platform: &SocialPlatform) -> Option<Arc<dyn SocialPlatformAd
     let key = platform.as_str().to_string();
     let catalog = default_catalog();
 
-    // ⭐ 候选序列必须包含**主键自身声明的别名**。
+    // 候选序列必须包含**主键自身声明的别名**。
     // ⛔ 独立 harness 抓到的实际缺陷：请求 "x" 时
     //    candidates = ["x", "x"] —— "x" 是主键、不是别名，
     //    故“别名反查”返回 None，别名 `twitter` **从未被尝试**，
@@ -136,7 +136,7 @@ pub fn adapter_entries() -> Vec<AdapterEntry> {
             platform: SocialPlatform::from_str(&a.id()),
         })
         .collect();
-    // ⭐ 排序稳定 —— HashMap/注册顺序变化会造成 diff 噪音
+    // 排序稳定 —— HashMap/注册顺序变化会造成 diff 噪音
     v.sort_by(|a, b| a.id.cmp(b.id));
     v
 }
@@ -147,7 +147,7 @@ mod factory_tests {
 
     #[test]
     fn factory_registers_all_six_extractors() {
-        // ⭐ 这条是本轮的核心回归：审计发现 6 个 adapter 零生产调用方
+        // 这条是本轮的核心回归：审计发现 6 个 adapter 零生产调用方
         let adapters = default_adapters();
         assert_eq!(adapters.len(), 6, "all six extractors must be registered");
         let ids: Vec<String> = adapters.iter().map(|a| a.id()).collect();
@@ -177,12 +177,12 @@ mod factory_tests {
 
     #[test]
     fn every_adapter_maps_to_a_catalog_platform() {
-        // ⭐ 防漂移：adapter 的 id 必须在平台目录里存在，
+        // 防漂移：adapter 的 id 必须在平台目录里存在，
         // 否则会出现「有 adapter 但目录不知道」的孤儿。
         let catalog = default_catalog();
         for a in default_adapters() {
             let id = a.id();
-            // ⭐ 用 `resolve`（含别名）：`TwitterExtractor::id()` 是
+            // 用 `resolve`（含别名）：`TwitterExtractor::id()` 是
             //    `"twitter"`，目录主键是 `"x"`。
             assert!(
                 catalog.resolve(&id).is_some(),
@@ -194,7 +194,7 @@ mod factory_tests {
 
     #[test]
     fn every_catalog_channel_has_an_adapter_or_explicit_reason() {
-        // ⭐ 渠道存在但无 adapter ⇒ 探测说健康、抓取必然失败。
+        // 渠道存在但无 adapter ⇒ 探测说健康、抓取必然失败。
         //    至少要能枚举出来供 CLI 报告，而不是静默。
         let catalog = default_catalog();
         for a in default_adapters() {
@@ -226,7 +226,7 @@ mod factory_tests {
 mod alias_tests {
     use super::*;
 
-    /// ⭐⭐ 这是本轮抓到的**真实生产缺陷**（非测试瑕疵）：
+    /// 这是本轮抓到的**真实生产缺陷**（非测试瑕疵）：
     /// `TwitterExtractor::id()` 返回 `"twitter"`，而目录主键是 `"x"`。
     /// 若 `adapter_for` 只按 `SocialPlatform::as_str()` 查，
     /// X 的 adapter 永远取不到 ⇒ `get_ranked(Twitter)` 报

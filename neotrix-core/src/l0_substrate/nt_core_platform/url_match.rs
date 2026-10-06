@@ -2,7 +2,7 @@
 
 //! URL 主机判定原语 —— 供各层做「这个 URL 属于哪个站点」
 //!
-//! # ⭐ 为何抽到这里（L0）
+//! # 为何抽到这里（L0）
 //!
 //! 审计（2026-10-03）发现同一类缺陷散落 11 个文件、12 处：
 //!
@@ -110,7 +110,7 @@ pub fn host_matches(host: &str, domain: &str) -> bool {
 
 /// 便捷判定：URL 是否属于该域名。
 ///
-/// ⭐ 这是**应当替换裸 `contains` 的那个函数**。
+/// 这是**应当替换裸 `contains` 的那个函数**。
 pub fn url_matches_domain(url: &str, domain: &str) -> bool {
     host_matches(&host_of(url), domain)
 }
@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn handles_schemeless_and_protocol_relative() {
-        // ⭐ 残缺输入在真实数据里很常见（`github.com/owner/repo`）
+        // 残缺输入在真实数据里很常见（`github.com/owner/repo`）
         assert_eq!(host_of("github.com/owner/repo"), "github.com");
         assert_eq!(host_of("//www.x.com/home"), "www.x.com");
     }
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn rejects_lookalike_domains() {
-        // ⭐⭐ 这三条就是裸 contains 会误判的全部形态
+        // 这三条就是裸 contains 会误判的全部形态
         assert!(!host_matches("notx.com", "x.com"));
         assert!(!host_matches("phishing-x.com", "x.com"));
         assert!(!host_matches("x.com.evil.net", "x.com"));

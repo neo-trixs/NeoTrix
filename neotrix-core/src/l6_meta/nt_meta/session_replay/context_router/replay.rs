@@ -21,7 +21,7 @@ impl SessionReplayLogger {
 
     /// Log a context snapshot for the current turn (R-P130).
     pub fn log_turn(&self, snapshot: ContextSnapshot) {
-                    // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02）。
+                    // 锁投毒改为**恢复**而非 panic（2026-10-02）。
             // 判据：锁内是**只增/只清**的日志数据（`Vec<…>` / `u128` 计数），
             // 元素之间没有「长度与索引匹配」型耦合不变量 ⇒ 某个线程 panic 后
             // 可能只丢一条日志，**不会读到不一致状态** ⇒ 恢复是安全的。
@@ -43,7 +43,7 @@ impl SessionReplayLogger {
 
     /// Retrieve all recorded snapshots.
     pub fn get_replay(&self) -> Vec<ContextSnapshot> {
-                    // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02）。
+                    // 锁投毒改为**恢复**而非 panic（2026-10-02）。
             // 判据：锁内是**只增/只清**的日志数据（`Vec<…>` / `u128` 计数），
             // 元素之间没有「长度与索引匹配」型耦合不变量 ⇒ 某个线程 panic 后
             // 可能只丢一条日志，**不会读到不一致状态** ⇒ 恢复是安全的。
@@ -65,7 +65,7 @@ impl SessionReplayLogger {
 
     /// Number of recorded turns.
     pub fn turn_count(&self) -> usize {
-                    // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02）。
+                    // 锁投毒改为**恢复**而非 panic（2026-10-02）。
             // 判据：锁内是**只增/只清**的日志数据（`Vec<…>` / `u128` 计数），
             // 元素之间没有「长度与索引匹配」型耦合不变量 ⇒ 某个线程 panic 后
             // 可能只丢一条日志，**不会读到不一致状态** ⇒ 恢复是安全的。
@@ -81,7 +81,7 @@ impl SessionReplayLogger {
 
     /// Clear all recorded snapshots.
     pub fn clear(&self) {
-                    // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02）。
+                    // 锁投毒改为**恢复**而非 panic（2026-10-02）。
             // 判据：锁内是**只增/只清**的日志数据（`Vec<…>` / `u128` 计数），
             // 元素之间没有「长度与索引匹配」型耦合不变量 ⇒ 某个线程 panic 后
             // 可能只丢一条日志，**不会读到不一致状态** ⇒ 恢复是安全的。

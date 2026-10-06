@@ -157,7 +157,7 @@ impl PolicyEngine {
         }
 
         let result = self.input_validator.validate(context, input);
-        // ⭐ 先统一映射成 `GuardrailViolation`，下游两个 helper 只认这一种类型。
+        // 先统一映射成 `GuardrailViolation`，下游两个 helper 只认这一种类型。
         //   本模块曾把**同一段映射逐字写了两遍**（输入侧 + 输出侧），而
         //   `compute_verdict` / `create_hitl_request` 各自只收其中一种
         //   `Violation` ⇒ 输出侧调用点类型对不上（这正是本目录从未编译的物证）。
@@ -484,7 +484,7 @@ mod tests {
         assert!(!result.passed);
     }
 
-    /// ⭐⭐ **接进活路径前的判别力门槛**：24 条开发者日常命令 vs 9 条真恶意。
+    /// **接进活路径前的判别力门槛**：24 条开发者日常命令 vs 9 条真恶意。
     ///
     /// 这条测试存在的理由：上一次「把 guardrail 接进 LLM 驱动的 shell 路径」的
     /// 尝试**差点把功能整个关掉** —— 实测 \`ShieldEnforcer::check_all\` 在默认

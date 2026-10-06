@@ -64,7 +64,7 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
                     let _ = w.show();
                 }
             }
-            // ⭐⭐ A1：启动刷一次崩溃残留（`mark_outcome_unknown`）。
+            // A1：启动刷一次崩溃残留（`mark_outcome_unknown`）。
             //
             // ⛔ **为什么必须在这里**：A1 只挂了 `bin/neobot.rs` 的
             //    `cmd_doctor` 与 `cmd_channel_serve` —— 但**桌面端不 spawn `neobot`
@@ -78,7 +78,7 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
             //
             // ⛔ best-effort 语义（与上方桌宠同一档）：开不起库不拦主窗启动 ——
             //    为一次维护动作而让整个应用起不来是本末倒置。
-            // ⭐ 用 `let _marked: usize` 而非 `let _ =`：避开
+            // 用 `let _marked: usize` 而非 `let _ =`：避开
             //    `check-silent-failure` 的 opener（虽然 `mark_outcome_unknown`
             //    不在 GATED 动词表里，属双保险）。
             match neobot_desktop::commands::open_store() {

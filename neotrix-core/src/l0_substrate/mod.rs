@@ -104,15 +104,15 @@ pub mod proxy_daemon_wrapper;
 #[cfg(feature = "ios-bridge")]
 pub mod ffi;
 pub mod nt_core_event_bus;
-// ⭐⭐ 2026-10-03 从 `l5_cognition/nt_core_dispatch.rs` **下沉**到基座。
-// ⭐ 依据：该模块**零 use、纯 std、完全自包含**，且它的两个消费者
+// 2026-10-03 从 `l5_cognition/nt_core_dispatch.rs` **下沉**到基座。
+// 依据：该模块**零 use、纯 std、完全自包含**，且它的两个消费者
 // （`nt_core_event_bus` / `nt_io_mcp_bridge`）**都不在 L5**
 // ⇒ 原位置是历史偶然；留在 L5 会让基座依赖顶层（近循环倒置）。
-// ⭐ `l5_cognition::nt_core_dispatch` 保留 `pub use` 再导出 ⇒ 调用方路径不变。
+// `l5_cognition::nt_core_dispatch` 保留 `pub use` 再导出 ⇒ 调用方路径不变。
 pub mod nt_core_dispatch;
-// ⭐⭐ 2026-10-05 吸收 `HKUDS/Vibe-Trading`（MIT）的 `agent/evals/harness/`：
+// 2026-10-05 吸收 `HKUDS/Vibe-Trading`（MIT）的 `agent/evals/harness/`：
 // 确定性、**纯产物**的四值判定层（PASS/FAIL/NOT_EVALUABLE/INVALID_ARTIFACT）。
-// ⭐ 落 L0 的依据：**零 IO、零时钟、零依赖**（只 `use` 已有依赖
+// 落 L0 的依据：**零 IO、零时钟、零依赖**（只 `use` 已有依赖
 // `neotrix_neobot::nt_determinism::Digest`），输入全是自有数据
 // ⇒ 每层都能经 L0 facade 取用，不引入任何反向依赖。
 /// Artifact verdict layer — deterministic, artifact-only four-valued evaluation

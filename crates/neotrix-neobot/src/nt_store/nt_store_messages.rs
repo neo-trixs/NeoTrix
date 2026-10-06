@@ -36,18 +36,18 @@ pub struct ChatMessage {
     pub role: String,
     pub text: String,
     pub created_at: String,
-    /// ⭐ 会话内单调序号（SQLite `rowid`）。**游标分页的游标就是它。**
+    /// 会话内单调序号（SQLite `rowid`）。**游标分页的游标就是它。**
     ///
     /// ⛔⛔ 为什么不用 `created_at` 当游标：`created_at` 由 `chrono::to_rfc3339()`
     ///    写入，**宽度不定**（亚秒为 0 时不带小数部分）⇒ **字符串比较不是全序**
     ///    ⇒ `WHERE created_at < ?` 在**同秒并列**时不可靠，**且不报错，只是漏消息或重复**。
     ///    全 crate 零定宽时间戳写入（已实测：`to_rfc3339_opts`/`%Y-%m-%dT%H:%M:%S` 零命中）。
     ///
-    /// ⭐ 为什么不用「新增 `seq` 列 + `MAX(seq)+1`」：
+    /// 为什么不用「新增 `seq` 列 + `MAX(seq)+1`」：
     ///    ① `MAX()+1` 是「先读后写」两步，而**本 crate 零事务** + 双进程共库
     ///       （`neobot_send` 对同一会话分两次写、每次新开连接）⇒ 有窗口，失败形态是**静默错号**；
     ///    ② `ALTER … DEFAULT 0` 会让**全部历史行 seq=0** ⇒ 存量数据上分页第一页就捞光、之后再捞不到。
-    ///    ⭐ `rowid` 已存在、已是整型、单调，且**代码里对 `messages` 零 DELETE/UPDATE**
+    ///    `rowid` 已存在、已是整型、单调，且**代码里对 `messages` 零 DELETE/UPDATE**
     ///    （`rg 'DELETE FROM messages|UPDATE messages'` 零命中）⇒ 无重号来源。
     pub seq: i64,
 }
@@ -84,7 +84,7 @@ impl NeobotStore {
             "INSERT INTO messages(id,convo_id,role,text,created_at) VALUES(?1,?2,?3,?4,?5)",
             params![id, convo_id, role, text, now],
         )?;
-        // ⭐ 取刚落库这行的 `rowid` 当 `seq` 游标。
+        // 取刚落库这行的 `rowid` 当 `seq` 游标。
         //    `last_insert_rowid` 读的是**本连接**最后一次 INSERT 的 rowid
         //    ⇒ 不需要 `MAX(seq)+1` 那种「先读后写」的两步，**无竞态窗口**。
         // ⛔ 不可用 `SELECT rowid WHERE id=?` 回查：多一次查询，
@@ -104,36 +104,36 @@ impl NeobotStore {
     /// 读一个会话的**全部**消息（时间正序）。会话不存在即报错 ——
     /// 「空会话」与「不存在的会话」对调用方是两种处境（见模块头 ①）。
     ///
-    /// ⭐ **薄封装**：转调 `list_messages_page` 且不设游标、不限条数。
+    /// **薄封装**：转调 `list_messages_page` 且不设游标、不限条数。
     ///    ⛔ **刻意不改签名** —— 本函数是唯一的生产读侧入口（IPC `neobot_convo_messages`）
     ///    且被 3 处测试断言依赖；Rust 无默认参数，若加 `limit` 参数会让**全部调用点编译失败**。
-    ///    ⭐ 分页能力走新增的 `list_messages_page`，本函数行为**逐字不变**。
+    ///    分页能力走新增的 `list_messages_page`，本函数行为**逐字不变**。
     pub fn list_messages(&self, convo_id: &str) -> Result<Vec<ChatMessage>, NtBotError> {
         self.list_messages_page(convo_id, None, i64::MAX)
     }
 
-    /// ⭐ 读一个会话的消息**一页**（按 `seq` 正序，可游标续读）。
+    /// 读一个会话的消息**一页**（按 `seq` 正序，可游标续读）。
     ///
     /// * `after_seq` —— **排他**下界：只返回 `seq > after_seq` 的行；`None` 从头读。
     /// * `limit` —— 最多返回几条；`i64::MAX` 表示不限。
     ///
     /// ⛔⛔ **`after_seq` 是 `>` 不是 `<`。** 本函数按 `seq` **正序**返回
     ///    （最旧在前，符合消息列表的阅读方向），调用方一路向**更新的**消息翻页。
-    ///    ⭐ 曾误写成 `rowid < ?`（把它当「before」）—— 那是从新往旧回翻，
+    ///    曾误写成 `rowid < ?`（把它当「before」）—— 那是从新往旧回翻，
     ///    与正向翻页方向相反 ⇒ 实测**漏消息**：7 行/每页 3 条只拼出 6 条。
     ///    ⓰ 测试 `游标分页小步长不漏不重` 就是为钉住这个方向而写的。
-    ///    ⭐ 游标取**上一页最后一条的 `seq`**（正序 ⇒ 最小的那条），配合 `>` 即排他、不重复。
+    ///    游标取**上一页最后一条的 `seq`**（正序 ⇒ 最小的那条），配合 `>` 即排他、不重复。
     ///
-    /// ⭐ 用 `seq`（`rowid`）而非 `created_at` 做游标，理由见 `ChatMessage::seq` 的文档。
+    /// 用 `seq`（`rowid`）而非 `created_at` 做游标，理由见 `ChatMessage::seq` 的文档。
     ///
     /// ⛔ **代价（诚实记录）：本查询仍走不了索引 ⇒ SQLite 必须额外排序。**
     ///    ⓰ 原因：`rowid` 是**隐式**列，`CREATE INDEX` 看不见它 ⇒ `(convo_id, rowid)`
     ///    这个索引**建不出来**（实测 `no such column: rowid`）。
     ///    ⓰ 现有 `idx_messages_convo(convo_id, created_at)` 也用不上
     ///    （索引不含 `rowid`，而排序第二键是 `rowid`）。
-    ///    ⭐ 也就是说：**排序开销在改动前后一样，本次拿到的是「正确性」不是「加速」。**
+    ///    也就是说：**排序开销在改动前后一样，本次拿到的是「正确性」不是「加速」。**
     ///    ⛔ 要索引覆盖只能新增**真实列** `seq INTEGER`（改 DDL + 回填 + 写入侧赋值），
-    ///    ⭐ 那是独立的、更大的一步，本轮**刻意不做**（见 TODO）。
+    ///    那是独立的、更大的一步，本轮**刻意不做**（见 TODO）。
     pub fn list_messages_page(
         &self,
         convo_id: &str,
@@ -178,7 +178,7 @@ mod tests {
         store.create_conversation("group", "t", &["neo".into()]).expect("会话")
     }
 
-    /// ⭐ 确定性造出 `created_at` **并列**的一批行（不走 `append_message`，
+    /// 确定性造出 `created_at` **并列**的一批行（不走 `append_message`，
     ///    因为它用 `Utc::now()`，能不能撞上同一秒取决于运气 ⇒ 测不稳定）。
     ///    然后用**同一个** `created_at` 灌 7 行。
     fn seed_tied_rows(store: &NeobotStore, convo_id: &str, tied_at: &str, n: u32) -> Vec<i64> {
@@ -197,7 +197,7 @@ mod tests {
         seqs
     }
 
-    /// ⭐⭐ 本次改动的核心断言：`created_at` 并列时，**旧游标口径不可靠、`seq` 可靠**。
+    /// 本次改动的核心断言：`created_at` 并列时，**旧游标口径不可靠、`seq` 可靠**。
     #[test]
     fn created_at并列时seq仍给出唯一全序() {
         let s = open();
@@ -212,14 +212,14 @@ mod tests {
             all.iter().all(|m| m.created_at == tied),
             "前提不成立：造出的行 created_at 不全相同"
         );
-        // ⭐ 而 `seq` **严格递增且互不相同** ⇒ 它是这批并列行的唯一全序。
+        // 而 `seq` **严格递增且互不相同** ⇒ 它是这批并列行的唯一全序。
         let got: Vec<i64> = all.iter().map(|m| m.seq).collect();
         assert_eq!(got, seqs, "seq 必须与落库顺序一致");
         let mut uniq = got.clone();
         uniq.sort_unstable();
         uniq.dedup();
         assert_eq!(uniq.len(), 7, "seq 必须互不相同，否则游标会歧义");
-        // ⭐⭐ 口径对比：以 `created_at` 为游标时，**全部并列 ⇒ 无法分页**；
+        // 口径对比：以 `created_at` 为游标时，**全部并列 ⇒ 无法分页**；
         //    以 `seq` 为游标时可以。
         let by_time: Vec<&str> = all.iter().map(|m| m.created_at.as_str()).collect();
         assert!(
@@ -228,7 +228,7 @@ mod tests {
         );
     }
 
-    /// ⭐⭐ **游标分页不漏不重**：小 limit 逐页取完，拼接结果与全量逐字相等。
+    /// **游标分页不漏不重**：小 limit 逐页取完，拼接结果与全量逐字相等。
     #[test]
     fn 游标分页小步长不漏不重() {
         let s = open();
@@ -236,7 +236,7 @@ mod tests {
         seed_tied_rows(&s, &c, "2026-01-01T00:00:00Z", 7);
 
         let full = s.list_messages(&c).expect("全量");
-        // ⭐ 逐页取，每页 3 条，游标取「上一页最后一条的 seq」。
+        // 逐页取，每页 3 条，游标取「上一页最后一条的 seq」。
         let mut paged: Vec<ChatMessage> = Vec::new();
         let mut cursor: Option<i64> = None;
         loop {
@@ -277,7 +277,7 @@ mod tests {
         );
     }
 
-    /// ⭐ `limit` 夹取：负数在 SQLite 里等于「**无限制**」⇒ 必须被夹住，
+    /// `limit` 夹取：负数在 SQLite 里等于「**无限制**」⇒ 必须被夹住，
     /// 否则「我要 20 条」会悄悄变成「全给我」。
     #[test]
     fn limit负数被夹住不退化为无限() {
@@ -290,7 +290,7 @@ mod tests {
             "负数 limit 必须夹到 0（SQLite 的 LIMIT -1 是『无限制』，不能放行）"
         );
         assert_eq!(s.list_messages_page(&c, None, 3).expect("正常 limit").len(), 3);
-        // ⭐ 薄封装行为不变：仍然返回**全部**。
+        // 薄封装行为不变：仍然返回**全部**。
         assert_eq!(s.list_messages(&c).expect("全量").len(), 7);
     }
 

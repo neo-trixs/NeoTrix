@@ -41,7 +41,7 @@ impl UniversalEntity {
 
 /// 槽位的存活与世代元数据。
 ///
-/// ⭐ **为什么必须是独立并行数组**，而不是从 `entities: Vec<Option<…>>` 里读：
+/// **为什么必须是独立并行数组**，而不是从 `entities: Vec<Option<…>>` 里读：
 /// `despawn` 之后槽位变空（`None`），若世代只活在句柄里，**释放即丢失**
 /// ⇒ 复用该槽位时没有可递增的基准，也就无法区分「旧句柄」与「新实体」。
 /// `ra-ecs` 的 `EntityMeta { generation, alive }` 正是为此存在。
@@ -140,7 +140,7 @@ impl Archetype {
         }
     }
 
-    /// ⭐ **幂等**：同一实体重复登记会静默变成**多条**，于是任何按 archetype
+    /// **幂等**：同一实体重复登记会静默变成**多条**，于是任何按 archetype
     /// 迭代的代码都会把同一个实体返回多次（实测：插两个组件后，
     /// 一个实体在全体 archetype 里共两条登记）。
     ///
@@ -321,7 +321,7 @@ impl UniversalWorld {
         }
     }
 
-    /// ⭐ 句柄是否仍指向一个**活着**的实体。
+    /// 句柄是否仍指向一个**活着**的实体。
     ///
     /// **每个公开的按实体操作都必须先过这里** —— 这是「槽位复用后旧句柄
     /// 静默串写到新实体」（ABA）唯一的检测点。移植自 `ra-ecs`
@@ -335,7 +335,7 @@ impl UniversalWorld {
 
     /// Spawn a new entity
     ///
-    /// ⭐ 优先复用 [`Self::free_slots`] 的 LIFO 空闲表。**不是**单调递增的新槽位：
+    /// 优先复用 [`Self::free_slots`] 的 LIFO 空闲表。**不是**单调递增的新槽位：
     /// 单调递增意味着长跑的世界里 `entities`/`metas` 无限增长（实测：每 64 次
     /// spawn/despawn 循环就 +64 槽，永不回收）。
     ///
@@ -557,7 +557,7 @@ impl UniversalWorld {
         // Find or create matching archetype
         let archetype_id = self.find_or_create_archetype(component_types);
         
-        // ⭐ **从旧 archetype 移出**。否则实体留在它待过的**每一个** archetype 里，
+        // **从旧 archetype 移出**。否则实体留在它待过的**每一个** archetype 里，
         //   而 `add_entity` 无去重 ⇒ 每插一个新组件就多留一份登记
         //   （实测：一个实体两条登记）。任何按 archetype 迭代的代码
         //   ——那正是 archetype 存在的全部理由——都会把它返回多次。
@@ -1543,7 +1543,7 @@ mod tests_5 {
         );
     }
 
-    /// ⭐ **槽位复用 + 世代递增**：这是 `generation` 字段唯一能兑现承诺的方式。
+    /// **槽位复用 + 世代递增**：这是 `generation` 字段唯一能兑现承诺的方式。
     ///
     /// 旧实现的病：`spawn()` 只 `self.entities.push(...)`，`next_entity_id` 单调递增
     /// ⇒ **槽位永不回收** ⇒ 长跑的世界里 `entities` Vec 无限增长，
@@ -1566,7 +1566,7 @@ mod tests_5 {
         assert_eq!(world.entity_count(), 1);
     }
 
-    /// ⭐⭐ **ABA 契约**：旧句柄在槽位被复用后**绝不能**读写新实体。
+    /// **ABA 契约**：旧句柄在槽位被复用后**绝不能**读写新实体。
     ///
     /// 这是上两条合起来的**真正目的**：单独看「复用槽位」只是省内存，
     /// 单独看「换世代」只是个数字；合起来才让「拿旧句柄操作」变成可检测的失败

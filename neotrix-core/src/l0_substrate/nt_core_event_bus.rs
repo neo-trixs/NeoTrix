@@ -1,3 +1,25 @@
+//! L0 substrate — event bus, event-sourcing envelopes, and the actor runtime.
+//!
+//! Three responsibilities, in dependency order:
+//!
+//! 1. [`EventBus`] — broadcast/mpsc fan-out to layer-scoped subscribers, with a
+//!    flood guard ([`flood_guard`]) so one noisy producer cannot starve the bus.
+//! 2. [`EventEnvelope`] — event-sourcing wrapper (global monotonic `seq` +
+//!    source identity + timestamp) written *around* `CoreEvent` so the `CoreEvent`
+//!    enum schema is untouched (R-P84). Replay via [`replay`] / [`replay_enveloped`].
+//! 3. Actor runtime — [`ActorMessage`] / [`ActorHandler`] / [`ActorContext`],
+//!    with per-[`LayerId`] subscription helpers.
+//!
+//! Why the consciousness threshold lives *here* (2026-10-03 dependency
+//! inversion, see `LAYER-DEBT-TIERS-2026-10-03.md`): this bus used to read a
+//! cognitive-layer threshold constant ⇒ L0 → L5, an S1 substrate-inverts-top
+//! dependency. Of the 6 uses of that constant only `eventbus_critical` belongs
+//! to the bus — "the threshold the event bus cares about" is the substrate's
+//! own policy. **Whoever consumes, owns** ⇒ it is defined below as
+//! [`CONSCIOUSNESS_EVENTBUS_CRITICAL`], and L5 references it back (L5 → L0 is
+//! the legal direction). Only that one field was moved; the layer's own grading
+//! policy stays with the layer.
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};

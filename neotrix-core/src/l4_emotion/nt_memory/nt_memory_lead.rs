@@ -556,7 +556,7 @@ mod tests {
         assert!(LeadRegistry::new().optimal().is_none(), "空注册表 ⇒ None");
     }
 
-    /// ⭐⭐ 回归（2026-10-05）：`LeadManager::query` 的 top-N **结果集与顺序**必须规范化。
+    /// 回归（2026-10-05）：`LeadManager::query` 的 top-N **结果集与顺序**必须规范化。
     ///
     /// 原实现 `values().filter(..).take(limit)` 在 `HashMap` 上截断 ⇒ 匹配数超过
     /// `limit` 时「哪 N 条」跨进程漂移（不是顺序问题，是**结果集本身不同**），

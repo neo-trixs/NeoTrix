@@ -224,7 +224,7 @@ fn collect_declared_paths(src: &Path) -> HashSet<PathBuf> {
 /// ⇒ 35 ⊂ 99。宽松口径能抓到 god-file 孤儿（`dir/<stem>/types.rs`），
 /// 保守口径不会误报「由父模块以 Rust 2018 路径语义引入」的文件。
 ///
-/// ⭐ **本函数是 L0 原语的生产接线**（R-P79：导出 ≠ 接入）。
+/// **本函数是 L0 原语的生产接线**（R-P79：导出 ≠ 接入）。
 /// 在此之前 `mod_orphan` 只被自己的单测调用过一次全仓扫描，
 /// 从未进入任何生产路径 —— 那正是它自己文档里批评的「导出即接入」缺陷。
 ///
@@ -520,7 +520,7 @@ where
 pub fn converge_check<P: AsRef<Path>>(root: P) -> AuditReport {
     let ghost = scan_ghost_modules(root.as_ref());
     let ghost_count = ghost.len();
-    // ⭐ 两套孤儿口径**都**跑，findings 里用 category 区分：
+    // 两套孤儿口径**都**跑，findings 里用 category 区分：
     //    - "orphan-file"      : 宽松口径（含 god-file 形态），历史行为
     //    - "orphan-mod-tree"  : L0 mod_orphan::scan_tree（保守口径）★新增
     //
@@ -1165,7 +1165,7 @@ mod tests {
         }
     }
 
-    /// ⭐ 生产接线验证：`converge_check` 必须真的把 L0 `mod_orphan`
+    /// 生产接线验证：`converge_check` 必须真的把 L0 `mod_orphan`
     /// 的结果带进 findings（category = "orphan-mod-tree"）。
     ///
     /// 动机：本函数是 R-P79 的接线点 —— 在此之前 `mod_orphan::scan_tree`
@@ -1196,7 +1196,7 @@ mod tests {
             "未产出 orphan-mod-tree findings ⇒ mod_orphan 的生产接线断了\
              （R-P79：导出 ≠ 接入）"
         );
-// ⭐ 断言「**具体某个文件**是孤儿」是**反生产方向**的断言：
+// 断言「**具体某个文件**是孤儿」是**反生产方向**的断言：
         //   一旦我把它接入编译树（这正是本轮在做的事），断言就会红 ——
         //   而代码变好了。实测：`nt_act_scheduler` 在 171dfb04 被接入后，
         //   本测试立刻红（12983 passed; 1 failed）。

@@ -1,10 +1,10 @@
 //! 自动更新规则引擎 — 多源 GeoIP + 域名规则
 //!
 //! 数据源评测:
-//! [19.7k⭐] Loyalsoldier/v2ray-rules-dat  — 每天更新，中国IP+域名最全
-//! [25.3k⭐] gfwlist/gfwlist               — 被墙域名规范列表
-//! [8.6k⭐ ] v2fly/domain-list-community    — 社区域名分类
-//! [726⭐  ] mayaxcn/china-ip-list          — 每小时 APNIC 原始数据
+//! [19.7k] Loyalsoldier/v2ray-rules-dat  — 每天更新，中国IP+域名最全
+//! [25.3k] gfwlist/gfwlist               — 被墙域名规范列表
+//! [8.6k] v2fly/domain-list-community    — 社区域名分类
+//! [726 ] mayaxcn/china-ip-list          — 每小时 APNIC 原始数据
 //!
 //! 架构: _GeoDatabase(IP范围) + _DomainRules(域名集合) → RuleUpdater(自动更新)
 

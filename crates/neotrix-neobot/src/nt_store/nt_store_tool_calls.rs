@@ -33,7 +33,7 @@
 //! `UNIQUE constraint failed` ⇒ 那不是「重复时报个警」，而是**正常业务写不进去**；
 //! 若错误被 `.ok()` 吞掉，就退化成**静默丢调用** —— 比重复严重得多。
 //!
-//! ⭐ 反过来，`call_id` 重复**本身就是一条要报的结论**：
+//! 反过来，`call_id` 重复**本身就是一条要报的结论**：
 //! `nt_core_artifact_verdict.rs:640-641` 的 `CODE_DUPLICATE_JOIN_KEY`（判定
 //! `INVALID_ARTIFACT`，理由「配平键失去单射性」）就是为它准备的。
 //! ⇒ 重复**必须能被记下来**给检查读，**绝不能**由主键在入库前掐掉。
@@ -101,7 +101,7 @@ impl NeobotStore {
     ///   且两行空白键会互相「配平」⇒ 造出假配平。与 `steps` 侧不同，
     ///   这里**没有** `Some("")` 的合法用法（本表无存量行），故直接拒而不是存下来。
     ///
-    /// ⭐ **重复 `call_id` 不拒**：它是一条**发现**（模块头 + `CODE_DUPLICATE_JOIN_KEY`），
+    /// **重复 `call_id` 不拒**：它是一条**发现**（模块头 + `CODE_DUPLICATE_JOIN_KEY`），
     ///   在这里被拦掉就等于把证据销毁。本函数**不**去重、不覆盖。
     ///
     /// ## 零事务
@@ -170,7 +170,7 @@ impl NeobotStore {
 
     /// 按配平键取**全部**匹配行（跨任务）。
     ///
-    /// ⭐ **必须返回 `Vec` 而不是 `Option`** —— 因为 `call_id` 可以重复
+    /// **必须返回 `Vec` 而不是 `Option`** —— 因为 `call_id` 可以重复
     /// （模块头），「有几行」本身就是判定所需的信息：
     /// * `0` 行 ⇒ 若结果侧有这条键 ⇒ **孤儿结果**；
     /// * `1` 行 ⇒ 正常配平；
@@ -218,7 +218,7 @@ impl NeobotStore {
 /// ⛔⛔ 取列**按位置**，故 SELECT 列表与此处 `r.get` 的序号必须同进同出 ——
 /// 往表尾追加列是安全的（`get` 取不到不存在的序号就不该用），
 /// 往中间插列会让读口**静默错位**（`mod.rs` `pending_deliveries` 那条事故同款）。
-/// ⭐ `convo_id` 用 `r.get::<_, Option<String>>` ⇒ **SQL `NULL` 读成 `None`、
+/// `convo_id` 用 `r.get::<_, Option<String>>` ⇒ **SQL `NULL` 读成 `None`、
 /// 空串读成 `Some("")`**，两者可区分（实测 `LENGTH(NULL)=-1` vs `LENGTH('')=0`）。
 fn read_tool_call_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<ToolCallRow> {
     Ok(ToolCallRow {
@@ -304,7 +304,7 @@ mod tests {
         );
     }
 
-    /// ⭐⭐ **重复 `call_id` 必须能记下来**（不是被主键拦掉，也不是被去重）。
+    /// **重复 `call_id` 必须能记下来**（不是被主键拦掉，也不是被去重）。
     ///
     /// 这条守的是一条**实测存在**的同款行为：`nt_engine.rs:272` 的 CLI 引擎
     /// 把 id 写死成常量 `"cli-status-1"`，故「同一个 id 出现两次」是它的**常态**。
@@ -329,7 +329,7 @@ mod tests {
         );
         assert_eq!(rows[0].n, 0);
         assert_eq!(rows[1].n, 1);
-        // ⭐ 重复要能被**读出来**报给检查，而不必把全集拉回内存自己数。
+        // 重复要能被**读出来**报给检查，而不必把全集拉回内存自己数。
         assert_eq!(
             store.duplicate_call_keys("t1").expect("dups"),
             vec![("cli-status-1".to_owned(), 2)],
@@ -423,7 +423,7 @@ mod tests {
         assert!(store.list_tool_calls("t1").expect("list").is_empty());
     }
 
-    /// ⭐ **迁移幂等**：同一个库开三次都不得报错、且数据存活。
+    /// **迁移幂等**：同一个库开三次都不得报错、且数据存活。
     ///
     /// 本表用 `CREATE TABLE/INDEX IF NOT EXISTS`（不是 ALTER）⇒ 幂等性由
     /// SQLite 自己保证，第 2/3 次开库是纯 no-op。**顺带把上一位 agent 那条
@@ -440,7 +440,7 @@ mod tests {
             .expect("write before reopen");
         drop(first);
 
-        // ⭐ 断言的是**「只增不减」**而不是一个常数：开库前（第 1 次）已写 1 行，
+        // 断言的是**「只增不减」**而不是一个常数：开库前（第 1 次）已写 1 行，
         //   之后每轮写 1 行 ⇒ 第 N 次开库应恰好看到 **N−1** 行、写完变 **N** 行。
         //   断言常数会与循环自身的写入自相矛盾 ⇒ 那是**测试的错**，不是幂等
         //   被破坏。生产侧此处三次开库零报错、数据零丢失。
@@ -481,7 +481,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(path.parent().expect("parent"));
     }
 
-    /// ⭐ **存量库迁移**：没有 `tool_calls` 表的旧库必须能开，且**旧
+    /// **存量库迁移**：没有 `tool_calls` 表的旧库必须能开，且**旧
     /// `steps`/`messages` 行全部存活**。
     ///
     /// ⛔ 直接用 `rusqlite` 手搓旧 schema，不用 `NeobotStore::open` ——

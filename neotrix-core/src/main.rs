@@ -125,7 +125,7 @@ enum Commands {
         pipe: bool,
         #[arg(long, value_name = "FORMAT", help = "Output format: text|json")]
         format: Option<String>,
-        /// ⭐⭐ 主入口（2026-10-06）：审批与沙箱是**两个正交轴**，各一个 flag。
+        /// 主入口（2026-10-06）：审批与沙箱是**两个正交轴**，各一个 flag。
         /// 依据 `codex` 的 `--sandbox` × `--ask-for-approval` 双轴设计 ——
         /// 沙箱管「在哪跑、能写多少」，审批管「动手前问不问」，二者不可互相替代。
         #[arg(
@@ -142,7 +142,7 @@ enum Commands {
         full_auto: bool,
         /// ⚠️ **`--yolo` 与 `--full-auto` 字面等价**，两者都是「无审批」。
         ///
-        /// ⭐ 之所以把这句话写进 help：`codex` 的 `--yolo` = 无沙箱无审批，
+        /// 之所以把这句话写进 help：`codex` 的 `--yolo` = 无沙箱无审批，
         /// 而 `opencode` 的 `--yolo` 是**隐藏别名**，实际语义是
         /// 「批准一切未被显式 deny 的请求」⇒ **同名不同义**。
         /// （子代理实证：opencode 把它 `hidden: true` 且 OR 进 `auto` 布尔，
@@ -271,7 +271,7 @@ enum Commands {
         #[command(subcommand)]
         command: ConfigCommands,
     },
-    /// ⭐⭐ 管理权限档位（`--approval-mode` 的**持久化对应物**）。
+    /// 管理权限档位（`--approval-mode` 的**持久化对应物**）。
     ///
     /// 【为什么要它】`--approval-mode` 只改**单次进程**的全局单例，进程一退就没了；
     /// 而 `switch_profile_with_audit` 此前**零生产调用方** ——
@@ -375,7 +375,7 @@ enum Commands {
 enum WebCommands {
     /// 抓取一个 URL，把正文打到 stdout
     ///
-    /// ⭐ 这是**补缺口**，不是新能力：`UniversalBrowser::fetch()`
+    /// 这是**补缺口**，不是新能力：`UniversalBrowser::fetch()`
     /// 早已存在于 `l1_action::nt_io::universal_browser`，
     /// 但此前**没有任何 CLI 或 example 能触达它** ⇒ 能力等于不存在。
     ///
@@ -444,7 +444,7 @@ enum FeaturesCommands {
     List,
 }
 
-/// ⭐⭐ `profile` 的子命令。
+/// `profile` 的子命令。
 ///
 /// ## 信任边界（比 `claude-code` 更严一档）
 /// · `use` 会改动**全局审批模式** ⇒ 属于「不可逆性放宽」，
@@ -523,7 +523,7 @@ enum WalletCommands {
 }
 
 
-/// ⭐⭐ `profile use` 的**授权裁决**（纯函数，无 I/O、无副作用）。
+/// `profile use` 的**授权裁决**（纯函数，无 I/O、无副作用）。
 ///
 /// ## 为什么必须是纯函数
 /// 这是**安全边界**（决定「要不要问一句」）。
@@ -547,7 +547,7 @@ enum ProfileUseAuthorization {
     Refuse { reason: String },
 }
 
-/// ⭐⭐⭐ 裁决 `profile use` 该怎么执行。
+/// 裁决 `profile use` 该怎么执行。
 ///
 /// ## 规则表（每条都有依据，不是拍脑袋）
 /// | 是否改审批模式 | TTY | `--yes` | 裁决 |
@@ -557,7 +557,7 @@ enum ProfileUseAuthorization {
 /// | 是 | 否 | 是 | `AllowNonInteractive` |
 /// | 是 | 否 | 否 | **`Refuse`** |
 ///
-/// ## ⭐ 最后一格为什么是「拒绝」而不是「放行」
+/// ## 最后一格为什么是「拒绝」而不是「放行」
 /// `claude-code` 在**无对话框**（非交互/管道）时是**直接放行**。
 /// 我们反其道而行，理由：
 /// · 它的默认是「放行」，我们是「拒绝」——
@@ -579,7 +579,7 @@ fn authorize_profile_use(
 ) -> ProfileUseAuthorization {
     use neotrix::l6_meta::nt_permission_profiles::ProfileSwitchPlan;
 
-    // ⭐ 不改全局审批模式 ⇒ 不是不可逆放宽 ⇒ 无需确认（方案 A 的前提）。
+    // 不改全局审批模式 ⇒ 不是不可逆放宽 ⇒ 无需确认（方案 A 的前提）。
     if !plan.changes_approval_mode() {
         return ProfileUseAuthorization::NoConfirmationNeeded {
             actor: format!("cli:{}", plan.profile),
@@ -597,7 +597,7 @@ fn authorize_profile_use(
     }
     if yes_flag {
         return ProfileUseAuthorization::AllowNonInteractive {
-            // ⭐ actor 标注「这是自动化通道决定的」，审计行据此可区分人/机。
+            // actor 标注「这是自动化通道决定的」，审计行据此可区分人/机。
             actor: format!("non-interactive:{}", plan.profile),
         };
     }
@@ -621,7 +621,7 @@ fn print_profile_notice(notice: &str, loosens: bool) {
     println!("{notice}");
 }
 
-/// ⭐⭐⭐ **审批模式解码**（2026-10-06）—— 抽成独立函数以便**被测试覆盖**。
+/// **审批模式解码**（2026-10-06）—— 抽成独立函数以便**被测试覆盖**。
 ///
 /// ⛔ 之前这段逻辑**内联在 `main()` 里**，因此**无法写测试**
 /// ⇒ 这本身就是「声明了但不可验证」的一种形态：
@@ -679,7 +679,7 @@ fn resolve_approval_mode(
 
 
 
-/// ⭐⭐ `profile` 子命令的执行体（I/O 层）。
+/// `profile` 子命令的执行体（I/O 层）。
 ///
 /// ⛔ 这里**不含任何安全判据** —— 全部在 [`authorize_profile_use`] 里。
 /// 本函数只做：取计划 → 问判据 → 按裁决行动。
@@ -744,7 +744,7 @@ fn run_profile_command(command: &ProfileCommands) -> Result<(), String> {
                 .mode();
             println!("当前档位      : {name}");
             println!("当前审批模式  : {}", mode.as_str());
-            // ⭐ 把「档位与模式是否一致」摆出来 —— 两者可以独立漂移
+            // 把「档位与模式是否一致」摆出来 —— 两者可以独立漂移
             // （`--approval-mode` 只改模式不改档位，`profile use` 两者都改）。
             let declared = pp::get_profile_info(&name)
                 .ok()
@@ -959,7 +959,7 @@ fn main() {
                     .unwrap_or_else(|e| e.into_inner())
                     .set_max_budget_usd(*limit);
             }
-            // ⭐ 审批模式解码（抽成 `resolve_approval_mode` 以便被测试覆盖 —— 见其文档）
+            // 审批模式解码（抽成 `resolve_approval_mode` 以便被测试覆盖 —— 见其文档）
             // ⚠️ 局部名不能也叫 `approval_mode`（会遮住同名的 flag 绑定）
             let approval_mode_flag = approval_mode.clone();
             let approval_mode = match resolve_approval_mode(
@@ -980,7 +980,7 @@ fn main() {
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
                 .set_mode(approval_mode);
-            // ⭐ 2026-10-06 未知沙箱档**硬拒绝并退出**（原为静默兜底成 Disabled）
+            // 2026-10-06 未知沙箱档**硬拒绝并退出**（原为静默兜底成 Disabled）
             //
             // 【缺陷】`from_str` 首版是 `_ => Self::Disabled`
             // ⇒ `--sandbox danger-full-access` 不报错、静默变成「不设限」
@@ -1164,7 +1164,7 @@ fn main() {
             entry::run_sysops(args);
         }
         Some(Commands::Social { args }) => {
-            // ⭐ social 是纯本地诊断/认证命令，不依赖 LLM provider ——
+            // social 是纯本地诊断/认证命令，不依赖 LLM provider ——
             //    必须列入 is_ops_cmd，否则未配置 provider 时会被 wizard 阻塞。
             let json = args.iter().any(|a| a == "--json");
             let positional: Vec<&str> = args
@@ -1261,7 +1261,7 @@ fn main() {
 
 #[cfg(test)]
 mod cli_permission_tests {
-    //! ⭐⭐⭐「**启用即断言接线**」的测试 —— 子代理实证：`codex` / `claude-code` /
+    //! 「**启用即断言接线**」的测试 —— 子代理实证：`codex` / `claude-code` /
     //! `opencode` **三家都没有**做这件事；而本会话修的正是「flag 存在、
     //! 能解析、但语义与用户意图相反」这一类缺陷。
     //!
@@ -1295,7 +1295,7 @@ mod cli_permission_tests {
         }
     }
 
-    /// ⭐ 未知档位必须 `Err`（不得静默兜底成默认）。
+    /// 未知档位必须 `Err`（不得静默兜底成默认）。
     /// 依据：静默失效只允许朝**严格**方向回落；「拼错 → Suggest」看似更严，
     /// 实则**用户要的 auto-edit 没生效且无人知道** ⇒ 仍是静默失效。
     #[test]
@@ -1305,7 +1305,7 @@ mod cli_permission_tests {
         assert!(e.contains("suggest"), "错误信息应列出可用档位：{e}");
     }
 
-    /// ⭐⭐ 旧 flag 是**别名**，语义必须与主 flag 对应档**完全一致**。
+    /// 旧 flag 是**别名**，语义必须与主 flag 对应档**完全一致**。
     /// 这一条锁的是「重构没改语义」—— 别名降级最常见的失误就是偷偷改了含义。
     #[test]
     fn legacy_flags_are_true_aliases_of_primary_flag() {
@@ -1323,7 +1323,7 @@ mod cli_permission_tests {
         }
     }
 
-    /// ⭐⭐⭐ **`--yolo` 与 `--full-auto` 必须字面等价**。
+    /// **`--yolo` 与 `--full-auto` 必须字面等价**。
     ///
     /// 【为什么这条最重要】`codex` 的 `--yolo` = 无沙箱无审批，
     /// 而 `opencode` 的 `--yolo` 是**隐藏别名**、实际语义是
@@ -1346,7 +1346,7 @@ mod cli_permission_tests {
         assert!(resolve_approval_mode(None, false, false, true, true).is_ok());
     }
 
-    /// ⭐⭐⭐ **冲突必须报错**，不得猜优先级。
+    /// **冲突必须报错**，不得猜优先级。
     ///
     /// 「同时给 `--suggest` 和 `--yolo` 时谁赢」**不该由程序替用户决定** ——
     /// 无论选哪个，另一个都是用户明确要求的、且被静默忽略。
@@ -1369,7 +1369,7 @@ mod cli_permission_tests {
         assert!(resolve_approval_mode(Some("full-auto"), false, false, true, true).is_ok());
     }
 
-    /// ⭐⭐ **「启用即断言接线」**：解码结果必须真的能落地到全局单例。
+    /// **「启用即断言接线」**：解码结果必须真的能落地到全局单例。
     ///
     /// 【这条为什么必要】本会话实测过同族缺陷：
     /// `--yolo` / `--full-auto` / `--auto-edit` 会写入全局 `ApprovalMode`，
@@ -1402,7 +1402,7 @@ mod cli_permission_tests {
 
 #[cfg(test)]
 mod profile_use_authorization_tests {
-    //! ⭐⭐⭐ **安全边界的反向锁** —— `profile use` 的授权裁决。
+    //! **安全边界的反向锁** —— `profile use` 的授权裁决。
     //!
     //! 【为什么必须有】这是决定「要不要问一句 / 允不允许静默执行」的判据。
     //! ⛔ 它一旦被改松，**后果是审批严格度被静默放宽**，
@@ -1433,7 +1433,7 @@ mod profile_use_authorization_tests {
         // 而**真正的裁决**在 `authorize_profile_use`，此处正是要独立测它。
     }
 
-    /// ⭐ 不改审批模式 ⇒ 无需确认（方案 A 的前提：不可逆放宽才需要问）。
+    /// 不改审批模式 ⇒ 无需确认（方案 A 的前提：不可逆放宽才需要问）。
     #[test]
     fn no_mode_change_never_asks() {
         for (is_tty, yes) in [(true, false), (false, false), (false, true), (true, true)] {
@@ -1445,7 +1445,7 @@ mod profile_use_authorization_tests {
         }
     }
 
-    /// ⭐⭐⭐ 改审批模式 + **非 TTY + 无 `--yes` ⇒ 必须 `Refuse`**。
+    /// 改审批模式 + **非 TTY + 无 `--yes` ⇒ 必须 `Refuse`**。
     ///
     /// 【这是整张表里最关键的一格】
     /// 若放行，则 `neotrix profile use developer` 出现在 CI/脚本里
@@ -1507,7 +1507,7 @@ mod profile_use_authorization_tests {
         }
     }
 
-    /// ⭐ 放宽/收紧的判定必须与 `strictness_rank` 一致（收紧不该被标成「放宽」）。
+    /// 放宽/收紧的判定必须与 `strictness_rank` 一致（收紧不该被标成「放宽」）。
     #[test]
     fn loosens_flag_matches_direction_of_change() {
         // 放宽：Suggest(0) → FullAuto(2)
@@ -1527,7 +1527,7 @@ mod profile_use_authorization_tests {
         ));
     }
 
-    /// ⭐⭐ **穷举锁**：把 (TTY × `--yes` × 是否改模式) 全部 8 格跑一遍，
+    /// **穷举锁**：把 (TTY × `--yes` × 是否改模式) 全部 8 格跑一遍，
     /// 钉住「**恰好**只有一格是 Refuse、且没有格子意外放行」。
     ///
     /// 【为什么要穷举】逐格测试容易漏一格，而漏的那格恰好是

@@ -541,7 +541,7 @@ impl DomainMapper {
 
     fn try_known_repo(input: &KnowledgeInput) -> Option<(Domain, String, String)> {
         if let Some(ref url) = input.url {
-            // ⭐ 2026-10-03：host 判定，不再裸 contains。
+            // 2026-10-03：host 判定，不再裸 contains。
             // ⛔ 与 nt_absorb_mapper 同形：`contains("github.com")` 让
             //    `https://github.com@evil.net/<key>` 进入本分支，
             //    再叠加下面 `lower.contains(&key)` 的 KNOWN_REPOS 匹配
@@ -682,7 +682,7 @@ mod known_repo_host_tests {
         }
     }
 
-    /// ⭐⭐ 回归：`try_known_repo` 曾用裸 `url.contains("github.com")`，
+    /// 回归：`try_known_repo` 曾用裸 `url.contains("github.com")`，
     /// 叠加内层 `lower.contains(&key)` 匹配 `owner/repo`
     /// ⇒ 可用 `https://github.com.evil.net/ollama/ollama` 这类构造 URL
     /// **冒充任意 KNOWN_REPOS 条目**并套用其 capability。
@@ -704,7 +704,7 @@ mod known_repo_host_tests {
         );
     }
 
-    /// ⭐ 真实 github URL 仍应命中（收敛不得误伤功能）
+    /// 真实 github URL 仍应命中（收敛不得误伤功能）
     #[test]
     fn real_github_url_still_matches_known_repo() {
         let inp = input(
@@ -717,7 +717,7 @@ mod known_repo_host_tests {
         assert!(got.unwrap().2.starts_with("known_repo:"));
     }
 
-    /// ⭐ 伪装 userinfo 形态同样不得命中
+    /// 伪装 userinfo 形态同样不得命中
     #[test]
     fn userinfo_impersonation_cannot_impersonate_known_repo() {
         let inp = input(

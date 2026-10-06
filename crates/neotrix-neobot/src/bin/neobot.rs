@@ -578,7 +578,7 @@ fn cmd_channel_serve(channel: Option<&str>, interval: Option<i64>) -> Result<(),
     let store = open_store(&cfg)?;
     let fixed = interval.map(|secs| secs.max(1));
     println!("neobot channel serve —— Ctrl-C 退出。数据只在 {}", cfg.data_dir.display());
-    // ⭐ 启动刷一次崩溃残留（`mark_outcome_unknown`，A1）。
+    // 启动刷一次崩溃残留（`mark_outcome_unknown`，A1）。
     // ⛔ 刻意**不**挂 `open_store()`：`open_store` 在 CLI 里有 50 处调用，
     //    挂那里会让 `task list` 这类纯读命令也触发一次 UPDATE，
     //    「启动一次」的语义就名不副实了。
@@ -685,7 +685,7 @@ fn cmd_doctor() -> Result<(), NtBotError> {
     let cfg = load_config()?;
     let store = open_store(&cfg)?;
     // 启动即回收：崩溃残留 + 过期认领（单机，一次 UPDATE 级代价）。
-    // ⭐ A1：`recover_stale_running` 现在落 `outcome_unknown` 而非 `pending`
+    // A1：`recover_stale_running` 现在落 `outcome_unknown` 而非 `pending`
     //   —— 租约过期的任务**不再被自动重跑**（外部副作用可能已落地）。
     const RECOVERY_NOTE: &str = "lease expired (crash recovery)";
     let now = chrono_now();

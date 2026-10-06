@@ -2,7 +2,7 @@
 
 //! mod-tree 孤儿检测原语 —— 「文件在磁盘上但不在编译树里」
 //!
-//! # ⭐ 为什么要有它
+//! # 为什么要有它
 //!
 //! 2026-10-03 审计发现 `l5_cognition/nt_mind/seal/` 有**两个 `.rs` 从未
 //! 进入编译树**：`source_adapter.rs`(464 行) 与 `domain_mapper.rs`(661 行)，
@@ -116,7 +116,7 @@ pub fn path_attr_files(content: &str) -> HashSet<String> {
 
 /// 孤儿的两种形态。
 ///
-/// ⭐ 2026-10-05 新增第二种：**这是本模块此前的一整类盲区**。
+/// 2026-10-05 新增第二种：**这是本模块此前的一整类盲区**。
 /// 早先版本只报告「某目录下未被声明的 `.rs` 文件」，
 /// 而 `dual_track/mod.rs` 这类**目录模块**本身**就是**那个未被声明的文件，
 /// 且它目录内**没有别的 `.rs`** ⇒ 扫出来是空 ⇒ 完全看不见。
@@ -137,7 +137,7 @@ pub struct OrphanFile {
     pub lines: usize,
     /// 该目录的 `mod.rs` 路径（相对）。
     pub mod_rs: String,
-    /// ⭐ 孤儿形态（2026-10-05 新增，缺省视为 `LeafFile` 以兼容旧构造）。
+    /// 孤儿形态（2026-10-05 新增，缺省视为 `LeafFile` 以兼容旧构造）。
     pub kind: OrphanKind,
 }
 
@@ -149,7 +149,7 @@ pub struct OrphanFile {
 /// 本函数是它的**生产接线**（R-P79：导出 ≠ 接入）。
 /// 遍历策略：对每个含 `mod.rs` 的目录调用一次 `orphans_in_dir`。
 ///
-/// # ⭐ 口径（务必读，否则会与 `nt_core_self::self_audit` 对不上账）
+/// # 口径（务必读，否则会与 `nt_core_self::self_audit` 对不上账）
 ///
 /// 本函数**保守**：只认「同目录 `mod.rs` 的直接声明」+ `#[path]`。
 /// 因此它**不会**报出 god-file 形态的孤儿（非 `mod.rs` 文件内部的
@@ -193,7 +193,7 @@ pub fn scan_tree(root: &Path) -> Vec<OrphanFile> {
     //   原始设计意图，但与此处「消除误报」的目标相反，故显式登记。
     let path_attr_index = collect_path_attr_index(root);
 
-    // ⭐ 2026-10-05：补上「孤儿**目录模块**」这一整类盲区。
+    // 2026-10-05：补上「孤儿**目录模块**」这一整类盲区。
     //
     // 缺陷：`scan_tree` 只在「目录含 mod.rs」时报告**该目录内的 .rs 文件**，
     //   而 `dual_track/mod.rs` 这类**目录模块**自己**就是**那个未被声明的文件，
@@ -244,7 +244,7 @@ pub fn scan_tree(root: &Path) -> Vec<OrphanFile> {
             if name == "target" || name == "_archived" || name == "bin" {
                 continue;
             }
-            // ⭐ 目录模块孤儿判定（与叶子文件判定**互不替代**）
+            // 目录模块孤儿判定（与叶子文件判定**互不替代**）
             //
             // 判据：目录 `d` 含 `d/mod.rs`，而 `d` 的**目录名**在
             // 「所有 mod.rs + 所有 .rs 的 mod 声明 + #[path]」里都找不到。
@@ -544,7 +544,7 @@ mod plain;
         assert!(!stems.contains(&"beta"), "已声明的不报: {:?}", stems);
         assert!(!stems.contains(&"mod"), "mod.rs 自身不报");
 
-        // ⭐ 按行数降序 —— 便于先看值不值得修的大块
+        // 按行数降序 —— 便于先看值不值得修的大块
         assert_eq!(orphans[0].stem, "delta", "应按行数降序");
         assert_eq!(orphans[0].lines, 100);
 
@@ -690,7 +690,7 @@ mod plain;
         assert!(scan_tree(Path::new("/nonexistent/scan_tree/xyz")).is_empty());
     }
 
-    /// ⭐ 生产接线自证：在**真实仓库**上跑，必须抓到已知的真孤儿。
+    /// 生产接线自证：在**真实仓库**上跑，必须抓到已知的真孤儿。
     #[test]
     fn scan_tree_catches_known_orphan_in_real_repo() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
@@ -701,7 +701,7 @@ mod plain;
         );
     }
 
-    /// ⭐⭐ **反误报锁定测试**（2026-10-04 实测缺陷的回归防护）。
+    /// **反误报锁定测试**（2026-10-04 实测缺陷的回归防护）。
     ///
     /// `nt_mind_background_loop/run.rs` 用 `#[path = "handlers_*.rs"]` 引入
     /// 同目录 7 个 handler 文件 ⇒ 它们**在编译树里**。
@@ -741,7 +741,7 @@ mod plain;
         );
     }
 
-    /// ⭐ `#[path]` 可以指向**别的目录**（如
+    /// `#[path]` 可以指向**别的目录**（如
     /// `handlers_consciousness/nt_audit.rs`），逐目录收集看不到 ⇒
     /// 必须全树收集。本测试锁死这一点。
     #[test]

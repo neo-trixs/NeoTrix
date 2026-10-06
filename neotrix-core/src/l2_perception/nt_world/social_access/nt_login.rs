@@ -1,6 +1,6 @@
 //! 通用站点登录 — 与平台无关的会话建立
 //!
-//! # ⭐ 为什么要有这一层（2026-10-03）
+//! # 为什么要有这一层（2026-10-03）
 //!
 //! 修复前的登录能力**只对 X 有效**，且是四处硬编码：
 //!
@@ -22,7 +22,7 @@
 //! [`LoginTarget`] 用 [`SuccessProbe`] 描述「怎么算登录成功」：
 //! cookie 存在性 / URL 前缀 / DOM 标记。每个平台只贡献数据，不写控制流。
 //!
-//! ⭐ 这直接对上同类项目的教训：bird 与 OpenCLI **都不读浏览器 cookie
+//! 这直接对上同类项目的教训：bird 与 OpenCLI **都不读浏览器 cookie
 //! 数据库**，只做 `auth_token` 的**存在性检查**，然后让浏览器自己附送 ——
 //! 因为 `auth_token` 是 HttpOnly，**拿不到值也不需要值**。
 //! 本模块据此把 cookie 探测设计成「只看名字、不读值」。
@@ -48,7 +48,7 @@ pub struct LoginTarget {
     pub login_url: String,
     /// 登录成功后应当出现的 URL 前缀（可空）。
     pub success_url: Option<String>,
-    /// ⭐ 判定登录成功的探针（可多个，任一命中即成功）。
+    /// 判定登录成功的探针（可多个，任一命中即成功）。
     pub probes: Vec<SuccessProbe>,
     /// cookie 存储文件名（相对 `~/.neotrix/cookies/`）。
     pub cookie_file: String,
@@ -56,7 +56,7 @@ pub struct LoginTarget {
     pub timeout: Duration,
     /// 该站点是否**必须**有 cookie 才能工作。
     ///
-    /// ⭐ 用于诊断文案：`false` 表示「登录只是加分项，没它也能用」，
+    /// 用于诊断文案：`false` 表示「登录只是加分项，没它也能用」，
     /// 避免把「没登录」报成致命错误。
     pub requires_session: bool,
 }
@@ -65,7 +65,7 @@ pub struct LoginTarget {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum SuccessProbe {
-    /// ⭐ 存在名为 `name` 的非空 cookie。**不读值**（参照 bird/OpenCLI：
+    /// 存在名为 `name` 的非空 cookie。**不读值**（参照 bird/OpenCLI：
     /// HttpOnly cookie 拿不到值也不需要值）。
     CookiePresent { name: String },
     /// 当前 URL 含此前缀。
@@ -204,7 +204,7 @@ pub const DEFAULT_LOGIN_TIMEOUT: Duration = Duration::from_secs(300);
 
 /// 对一次观测执行全部探针。
 ///
-/// ⭐ **纯函数** —— 不碰浏览器、不碰文件系统。真实浏览器观测由
+/// **纯函数** —— 不碰浏览器、不碰文件系统。真实浏览器观测由
 /// [`observe_and_verify`] 负责。这样判别逻辑可完整单测。
 pub fn evaluate(target: &LoginTarget, observation: &Observation) -> ProbeOutcome {
     let mut cookie_names: Vec<String> = observation.cookie_names.clone();
@@ -250,7 +250,7 @@ pub fn evaluate(target: &LoginTarget, observation: &Observation) -> ProbeOutcome
 pub struct Observation {
     /// 观测到的 cookie **名字**列表。
     pub cookie_names: Vec<String>,
-    /// ⭐ 哪些 cookie 有**非空值**（只记布尔，不记值本身）。
+    /// 哪些 cookie 有**非空值**（只记布尔，不记值本身）。
     ///
     /// ⛔ 存「值是否非空」而非值：前者足以判定登录态，
     /// 后者会把凭据带进内存与调试输出。
@@ -285,7 +285,7 @@ impl Observation {
 ///
 /// ⛔ **需要 `stealth-net` feature**（chromiumoxide）。
 ///
-/// # ⭐ 为何复用 [`UniversalBrowser::fetch`] 而非自己开页面
+/// # 为何复用 [`UniversalBrowser::fetch`] 而非自己开页面
 ///
 /// 跨层调用必须走「消费方自己那层」的 facade（AGENTS.md 硬规则）。
 /// `UniversalBrowser::new_page` 是 **private**，故本模块不自建页面；
@@ -333,7 +333,7 @@ pub async fn observe_and_verify(
         ));
     }
 
-    // ⭐ 观测输入必须被清空：它含 cookie 值（fetch 会填 value），
+    // 观测输入必须被清空：它含 cookie 值（fetch 会填 value），
     //    而 outcome 不含。显式截断 body 避免把大段 HTML 带出去。
     outcome.body_excerpt = outcome.body_excerpt.map(|b| b.chars().take(120).collect());
     Ok(outcome)
@@ -410,7 +410,7 @@ mod tests {
         ]);
         let out = evaluate(&t, &obs(&[("user_session", "v")], Some("https://github.com/home"), None));
         assert!(out.is_authenticated());
-        // ⭐ 报告的是**实际命中**的那个，便于诊断
+        // 报告的是**实际命中**的那个，便于诊断
         assert!(out.matched_by.unwrap().contains("user_session"));
     }
 
@@ -422,7 +422,7 @@ mod tests {
         let t = target(vec![SuccessProbe::CookiePresent { name: "auth_token".into() }]);
         let out = evaluate(&t, &obs(&[("auth_token", secret)], Some("https://x.com/home"), None));
 
-        // ⭐ 值不得出现在任何可序列化字段里（doctor 会把它打印进日志）
+        // 值不得出现在任何可序列化字段里（doctor 会把它打印进日志）
         let dumped = serde_json::to_string(&out).expect("outcome must serialize");
         assert!(
             !dumped.contains(secret),
@@ -446,7 +446,7 @@ mod tests {
 
     #[test]
     fn default_registry_covers_multiple_platforms() {
-        // ⭐ 这条是「通用化」的验收：不能只有 X
+        // 这条是「通用化」的验收：不能只有 X
         let r = default_registry();
         for id in ["x", "github", "reddit", "bilibili", "zhihu"] {
             assert!(r.get(id).is_some(), "target `{}` must be registered", id);
@@ -468,7 +468,7 @@ mod tests {
 
     #[test]
     fn probe_descriptions_are_distinguishable_in_diagnostics() {
-        // ⭐ doctor 靠这段文案告诉用户「怎么算成功」
+        // doctor 靠这段文案告诉用户「怎么算成功」
         let a = SuccessProbe::CookiePresent { name: "auth_token".into() };
         let b = SuccessProbe::UrlContains { needle: "/home".into() };
         let c = SuccessProbe::BodyContains { needle: "x".into() };
@@ -479,7 +479,7 @@ mod tests {
 
     #[test]
     fn custom_target_can_be_registered_without_code_change() {
-        // ⭐ 这是「通用化」的实质：加平台**不改代码**，只加数据
+        // 这是「通用化」的实质：加平台**不改代码**，只加数据
         let mut r = LoginRegistry::new();
         let mut t = target(vec![SuccessProbe::CookiePresent { name: "MY_COOKIE".into() }]);
         t.id = "mysite".into();
@@ -512,7 +512,7 @@ mod tests {
 mod drift_guard_tests {
     use super::*;
 
-    /// ⭐⭐ **漂移守卫** —— 本轮审计的核心缺陷。
+    /// **漂移守卫** —— 本轮审计的核心缺陷。
     ///
     /// ⛔ 此前 `default_registry()` 是**第二份手写平台清单**，与
     /// `nt_catalog` 的漂移后果已实测：
@@ -528,7 +528,7 @@ mod drift_guard_tests {
         let catalog = default_catalog();
         let login = default_registry();
 
-        // ⭐ 登录表 ⊆ 目录（无探针的平台理应缺席）
+        // 登录表 ⊆ 目录（无探针的平台理应缺席）
         for id in login.ids() {
             assert!(
                 catalog.get(id).is_some(),
@@ -537,7 +537,7 @@ mod drift_guard_tests {
             );
         }
 
-        // ⭐ 目录里凡「有探针且有 login_url」的平台，登录表**必须**有
+        // 目录里凡「有探针且有 login_url」的平台，登录表**必须**有
         for spec in catalog.all() {
             if !spec.login_probes.is_empty() && spec.login_url.is_some() {
                 assert!(
@@ -551,7 +551,7 @@ mod drift_guard_tests {
 
     #[test]
     fn platforms_without_probes_are_absent_from_login_table() {
-        // ⭐ 关键区分：「无可验证判据」≠「已判未登录」
+        // 关键区分：「无可验证判据」≠「已判未登录」
         let login = default_registry();
         for id in ["instagram", "tiktok", "linkedin", "youtube", "web"] {
             assert!(
@@ -574,7 +574,7 @@ mod drift_guard_tests {
             assert_eq!(t.display_name, spec.display_name, "{} display_name drift", id);
             assert_eq!(t.probes, spec.login_probes, "{} probes drift", id);
             assert_eq!(t.login_url, spec.login_url.clone().unwrap_or_default());
-            // ⭐ cookie 文件名也必须同源，否则会出现两套路径
+            // cookie 文件名也必须同源，否则会出现两套路径
             assert_eq!(t.cookie_file, spec.cookie_file.clone().unwrap_or_else(|| format!("{}.json", spec.id)));
             assert_eq!(t.requires_session, spec.requires_session);
         }

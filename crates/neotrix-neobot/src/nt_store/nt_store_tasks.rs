@@ -227,7 +227,7 @@ impl NeobotStore {
     /// running 且租约过期（或无租约）→ **`outcome_unknown`** + error 注记，返回回收条数。
     /// 调用方在每次 run 起点调一次即可（单机，代价一次 UPDATE）。
     ///
-    /// ⭐⭐ **2026-10-02 语义变更：不再打回 `pending`。**
+    /// **2026-10-02 语义变更：不再打回 `pending`。**
     /// 原实现 `SET status='pending'` 隐含一个假设：**重跑是安全的**。
     /// ⛔ 但崩溃窗口里存在「**外部副作用已落地、结果未落库**」的缝隙
     /// （例：`neobot_send` 已把消息发出去、还没写进 `messages`），
@@ -244,7 +244,7 @@ impl NeobotStore {
 
     /// 把 `running` 且租约过期（或无租约）的行刷成 `outcome_unknown`。
     ///
-    /// ⭐ 这是「启动刷残留」的**唯一**入口：`bin/neobot.rs` 的 `cmd_doctor` 与
+    /// 这是「启动刷残留」的**唯一**入口：`bin/neobot.rs` 的 `cmd_doctor` 与
     /// `cmd_channel_serve` 各调一次（真·启动一次，不是每轮）。
     /// ⛔ 刻意**不挂** `lib.rs:76 open_store()` —— 那会让 `task list` 这类纯读命令
     /// 也触发一次 UPDATE，「启动一次」的语义名不副实。
@@ -374,7 +374,7 @@ mod tests {
             conversation_id: None,
         };
         store.save_task(&mk("a")).expect("save");
-        // ⭐ A1 语义变更（2026-10-02）：租约过期 → **`outcome_unknown`**，不再 pending。
+        // A1 语义变更（2026-10-02）：租约过期 → **`outcome_unknown`**，不再 pending。
         //    理由：崩溃窗口里可能「外部副作用已落地、结果未落库」，
         //    打回 pending 会让重跑**二次执行**该副作用。
         let recovered = store
@@ -389,7 +389,7 @@ mod tests {
         );
         assert!(got.lease_id.is_none());
         assert!(got.error.is_some());
-        // ⭐ A1：`outcome_unknown` 是**终态** —— cancel 与 retry 皆不接它。
+        // A1：`outcome_unknown` 是**终态** —— cancel 与 retry 皆不接它。
         //    这是有意的：「等人工裁决」意味着调度器不会碰它，但也不假装它被取消过。
         assert!(
             store.cancel_task("a").is_err(),
@@ -417,7 +417,7 @@ mod tests {
         assert!(store.retry_task("b").is_err());
     }
 
-    /// ⭐⭐ A1 的核心回归：租约过期**不再**自动重排队。
+    /// A1 的核心回归：租约过期**不再**自动重排队。
     ///
     /// ⛔ 这条测试的存在理由是「防止有人把 `mark_outcome_unknown` 改回 `pending`」——
     /// 那不会让任何现有测试变红（它们断言的是 lease/error，不是终态），
@@ -448,7 +448,7 @@ mod tests {
         let got = store.get_task("x").expect("get").expect("exists");
         assert_eq!(got.status, TaskStatus::OutcomeUnknown);
         assert_eq!(got.error.as_deref(), Some("test note"), "note 应可自定义");
-        // ⭐ 幂等：第二次扫不应再命中（已不是 running）
+        // 幂等：第二次扫不应再命中（已不是 running）
         assert_eq!(
             store
                 .mark_outcome_unknown("2026-10-02T02:00:00Z", "again")
@@ -456,7 +456,7 @@ mod tests {
             0,
             "已落 outcome_unknown 的行不该被再次扫中"
         );
-        // ⭐⭐ 读回不能丢行：`parse` 漏了 "outcome_unknown" 会让 list_* 静默丢行。
+        // 读回不能丢行：`parse` 漏了 "outcome_unknown" 会让 list_* 静默丢行。
         let all = store.list_tasks(10).expect("list");
         assert!(
             all.iter().any(|t| t.id == "x"),

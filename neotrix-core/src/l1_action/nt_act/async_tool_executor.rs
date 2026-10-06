@@ -3,7 +3,7 @@
 //! Supports spawning async tasks, awaiting all results, cancelling
 //! tasks, and collecting results with timeout and retry logic.
 
-// ⭐⭐ 2026-10-05 修锁中毒放大（判据来自 `codewhale-hq/Codewhale`
+// 2026-10-05 修锁中毒放大（判据来自 `codewhale-hq/Codewhale`
 // `docs/ARCHITECTURE.md`「Key Design Decisions」第 7 条的**判别标准**）。
 //
 // ## 原缺陷
@@ -15,7 +15,7 @@
 //   实测本文件原有 **16 处** `.lock().unwrap()`。
 //
 // ## 为什么可以 `into_inner()` 而不是留 `expect()`
-// Codewhale 的判别标准是 ⭐**「能否容忍陈旧状态」**（能否容忍 half-updated state）：
+// Codewhale 的判别标准是 **「能否容忍陈旧状态」**（能否容忍 half-updated state）：
 // · 该标准下 `into_inner()` 是正解 —— 因为本模块的锁装的是
 //   `HashMap` / `HashSet` / `Vec`（**任务账本**），中毒只意味着
 //   「上一次 panic 时正在改动这个集合」⇒ 集合本身仍是**合法 Rust 值**，
@@ -47,7 +47,7 @@ use tokio::task::JoinHandle;
 // ============================================================================
 
 /// Tool execution result
-/// ⭐⭐ 任务登记的**必跑清理 guard**（2026-10-05）。
+/// 任务登记的**必跑清理 guard**（2026-10-05）。
 ///
 /// ## 为什么需要它（这是比锁中毒更严重的一个缺陷）
 /// 清理 `active_tasks` + 唤醒 `await_all` 这两个动作，**无论任务正常结束
@@ -203,7 +203,7 @@ impl AsyncToolExecutor {
         let task_id_clone = task_id.clone();
         let request_clone = request.clone();
         let handle = tokio::spawn(async move {
-            // ⭐ 清理动作交给 guard ⇒ panic 路径也会跑（见 ActiveTaskGuard 文档）
+            // 清理动作交给 guard ⇒ panic 路径也会跑（见 ActiveTaskGuard 文档）
             let _cleanup = ActiveTaskGuard {
                 active_tasks: active_tasks.clone(),
                 task_id: task_id_clone.clone(),
@@ -528,7 +528,7 @@ mod tests {
         assert_eq!(executor.active_count().await, 0);
     }
 
-    /// ⭐⭐⭐ 反向锁：**一个工具 panic 不得毒死整个执行器**。
+    /// 反向锁：**一个工具 panic 不得毒死整个执行器**。
     ///
     /// ## 缺陷形状（2026-10-05 修）
     /// 本模块用 `std::sync::Mutex`（**可中毒**），且 `tokio::spawn` 块内调用
@@ -566,7 +566,7 @@ mod tests {
         // 2) 等它真的跑完（panic 发生在 spawn 内的 async 块里）
         let _ = executor.await_all().await;
 
-        // 3) ⭐ 核心断言：此后执行器必须**仍然可用**。
+        // 3) 核心断言：此后执行器必须**仍然可用**。
         //    修复前这里会在 `active_tasks.lock().unwrap()` 处 panic。
         executor.spawn(req("healthy"), dummy_executor);
         let results = executor.await_all().await;

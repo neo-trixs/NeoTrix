@@ -1,4 +1,4 @@
-//! ⭐⭐ **确定性、纯产物的判定层**（absorbed from `HKUDS/Vibe-Trading`, MIT,
+//! **确定性、纯产物的判定层**（absorbed from `HKUDS/Vibe-Trading`, MIT,
 //! `agent/evals/harness/`）。
 //!
 //! ## 那一处决定性选择：**harness 永不运行被测物**
@@ -7,7 +7,7 @@
 //! run from persisted files. It is deterministic and read-only: it does not call
 //! an LLM, invoke a tool, load market data, or rewrite the case prompt.」
 //!
-//! ⭐ **本模块把这个选择做成类型层面的事实，而非纪律**：
+//! **本模块把这个选择做成类型层面的事实，而非纪律**：
 //!
 //! | 原作靠约定 | 本模块靠签名 |
 //! |---|---|
@@ -30,17 +30,17 @@
 //! | [`Verdict::InvalidArtifact`] | `2` | 产物本身畸形，判定无从谈起 |
 //! | [`Verdict::NotEvaluable`] | `0` | 判定所需仪表**不存在** |
 //!
-//! ⭐⭐ **两个「0」是这层的关键**。原作 `runner.py:80-85`：`NOT_EVALUABLE`
+//! **两个「0」是这层的关键**。原作 `runner.py:80-85`：`NOT_EVALUABLE`
 //! **不**让命令失败；只有 `INVALID_ARTIFACT`→`2`、`FAIL`→`1`。
 //! 本模块 [`Verdict::exit_code`] 与 [`EvalReport::exit_code`] 逐字照抄。
 //!
-//! ⭐ 而**唯一**能堵住「低覆盖冒充干净运行」的是**覆盖率**：
+//! 而**唯一**能堵住「低覆盖冒充干净运行」的是**覆盖率**：
 //! 原作 `report.py:44-46` 显式报 `evaluation_coverage = evaluable / assertion_count`。
 //! 本模块 [`EvalReport::evaluation_coverage`] 同口径，且
 //! **分母为 0 时返回 `0.0` 而非 `NaN`**（`0/0` 是 `NaN`，`NaN < 1.0` 为假 ⇒
 //! 任何 `< 1.0` 的守卫都会**放行**它；`NaN` 在诚实性上是最坏的一档）。
 //!
-//! ## ⭐⭐ 检查是**声明行**，不是共享控制流里的分支
+//! ## 检查是**声明行**，不是共享控制流里的分支
 //!
 //! 抄 `agent/evals/harness/registry.py:1-13` 的自述原则：a check should be
 //! **a declared row**, not an edit to shared control flow, because
@@ -51,7 +51,7 @@
 //! 这与本仓 §4.2「改跨层引用只能走消费方那层的 facade」同源：**入口收敛，
 //! 扩展走注册**。
 //!
-//! ## ⭐⭐ 复用自己的状态摘要，不造第二个哈希
+//! ## 复用自己的状态摘要，不造第二个哈希
 //!
 //! [`Digest`] 直接取 `neotrix_neobot::nt_determinism::Digest`
 //! （`neotrix-core/Cargo.toml:106` 已有该依赖）——**零新依赖**。
@@ -64,7 +64,7 @@
 //! `sorted_keys` + `field_sorted_keys` ⇒ **产物记录换序不改变摘要**，
 //! 也**不改变判定行序**（[`evaluate`] 出口统一排序）。
 //!
-//! ## ⭐⭐ 本层对自己的仪表做不变量检查（工具调用 ↔ 结果 配平）
+//! ## 本层对自己的仪表做不变量检查（工具调用 ↔ 结果 配平）
 //!
 //! [`ToolCallJoinCheck`]：给一组工具调用/结果记录，检出
 //!
@@ -91,7 +91,7 @@ use neotrix_neobot::nt_determinism::{sorted_keys, Digest};
 // 判定四值 + 退出码映射
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// ⭐ 判定四值。**故意不用 `Result`**：`Err` 只有一个，无法区分
+/// 判定四值。**故意不用 `Result`**：`Err` 只有一个，无法区分
 /// 「不通过」与「无法判定」⇒ 未覆盖的运行会冒充干净运行。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Verdict {
@@ -117,7 +117,7 @@ impl Verdict {
         }
     }
 
-    /// ⭐ 是否计入覆盖率。**只有真正判过的才算**：`NotEvaluable`（没仪表）与
+    /// 是否计入覆盖率。**只有真正判过的才算**：`NotEvaluable`（没仪表）与
     /// `InvalidArtifact`（产物畸形）都**不算**已评估 —— 二者都会压低覆盖率，
     /// 这正是诚实性的用途。
     #[must_use]
@@ -125,7 +125,7 @@ impl Verdict {
         matches!(self, Verdict::Pass | Verdict::Fail)
     }
 
-    /// ⭐ 严重度序：混合结果取**最高**者。`NotEvaluable` 是中性值（权重 0），
+    /// 严重度序：混合结果取**最高**者。`NotEvaluable` 是中性值（权重 0），
     /// 因此「全 `NOT_EVALUABLE`」的运行退出码是 `0` 而非 `1`。
     #[must_use]
     pub fn severity(self) -> u8 {
@@ -159,7 +159,7 @@ impl fmt::Display for Verdict {
 // 证据引用：一条失败必须能指到它的来源位置
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// ⭐ 一条证据引用：`artifact` + `locator`，渲染成
+/// 一条证据引用：`artifact` + `locator`，渲染成
 /// `trace.jsonl:12`（行号）或 `state.json#/status`（JSON 指针）——
 /// 与原作 `schema.py:181-197` 的两种形态一致。
 ///
@@ -205,7 +205,7 @@ impl fmt::Display for EvidenceRef {
 
 /// 无证据可报时落进 `evidence_refs` 的**显式标记**。
 ///
-/// ⭐ 为什么不用 panic / 不用 `debug_assert`：本层是**全函数**（total），
+/// 为什么不用 panic / 不用 `debug_assert`：本层是**全函数**（total），
 /// 缺证据是**可容忍的退化**，不是编程错误。静默补一条标记，
 /// 比让一条失败断言丢掉位置好。
 pub const NO_EVIDENCE_MARKER: &str = "<no-evidence-supplied>";
@@ -214,7 +214,7 @@ pub const NO_EVIDENCE_MARKER: &str = "<no-evidence-supplied>";
 // 一行判定（报告的最小单元）
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// ⭐ 一条声明的检查产出的**一行**判定。
+/// 一条声明的检查产出的**一行**判定。
 ///
 /// 字段私有 + 四个构造器：这样 `Fail` **无法**在没有位置的情况下被构造出来
 /// —— 要求 3（失败必须指名来源）由 API 形状保证，而不是靠调用方自觉。
@@ -236,14 +236,14 @@ impl VerdictRecord {
         detail: impl Into<String>,
         mut evidence_refs: Vec<EvidenceRef>,
     ) -> Self {
-        // ⭐ 失败行**必须**带位置。缺了就补显式标记（不是静默丢弃）。
+        // 失败行**必须**带位置。缺了就补显式标记（不是静默丢弃）。
         if evidence_refs.is_empty() && verdict.severity() > 0 {
             evidence_refs.push(EvidenceRef {
                 artifact: NO_EVIDENCE_MARKER.to_owned(),
                 locator: String::new(),
             });
         }
-        // ⭐ 位置序**规范化**：同一事实的引用集合不因组装顺序而漂移
+        // 位置序**规范化**：同一事实的引用集合不因组装顺序而漂移
         // （`sorted_keys` 纪律的同一条，直接作用于证据列表）。
         let refs = sorted_keys(evidence_refs.into_iter());
         Self {
@@ -266,7 +266,7 @@ impl VerdictRecord {
         Self::new(code, subject, Verdict::Pass, detail, evidence)
     }
 
-    /// ⭐ 失败行。**`evidence` 是必填参数**（可为空 Vec，但那样会被补上标记）。
+    /// 失败行。**`evidence` 是必填参数**（可为空 Vec，但那样会被补上标记）。
     #[must_use]
     pub fn fail(
         code: impl Into<String>,
@@ -277,7 +277,7 @@ impl VerdictRecord {
         Self::new(code, subject, Verdict::Fail, detail, evidence)
     }
 
-    /// ⭐ `NOT_EVALUABLE`：判定所需仪表不存在。**这不是失败**，且必须写明
+    /// `NOT_EVALUABLE`：判定所需仪表不存在。**这不是失败**，且必须写明
     /// **缺什么**（照抄原作 `assertions.py:330-343` 的机器可读诚实）。
     #[must_use]
     pub fn not_evaluable(
@@ -324,7 +324,7 @@ impl VerdictRecord {
         &self.detail
     }
 
-    /// ⭐ 证据位置。失败行**恒非空**（见 [`VerdictRecord::new`]）。
+    /// 证据位置。失败行**恒非空**（见 [`VerdictRecord::new`]）。
     #[must_use]
     pub fn evidence_refs(&self) -> &[EvidenceRef] {
         &self.evidence_refs
@@ -332,7 +332,7 @@ impl VerdictRecord {
 
     /// 排序键：`(code, subject, detail)`。
     ///
-    /// ⭐ 三级而非一级：两个检查**允许**共用 `code`（同一族断言），
+    /// 三级而非一级：两个检查**允许**共用 `code`（同一族断言），
     /// 但出口顺序仍必须是**函数的**，否则注册顺序就泄漏进报告。
     fn sort_key(&self) -> (&str, &str, &str) {
         (self.code.as_str(), self.subject.as_str(), self.detail.as_str())
@@ -345,7 +345,7 @@ impl VerdictRecord {
 
 /// 一个 case 的一条**期望声明**。
 ///
-/// ⭐ 期望是**数据**，不是 `if` 分支 —— 「加一条期望」与「加一条检查」是
+/// 期望是**数据**，不是 `if` 分支 —— 「加一条期望」与「加一条检查」是
 /// 两个独立动作，[`EvalReport::uncovered_expectations`] 负责揪出
 /// 「声明了期望却没有任何检查产出对应行」的空转。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -358,7 +358,7 @@ pub struct Expectation {
     pub required: bool,
 }
 
-/// ⭐ case 描述（**只读输入**）。
+/// case 描述（**只读输入**）。
 ///
 /// `expectations` 是**声明**，`pinned_bundle_digest` 是**回归钉子**。
 /// 两者都是数据，因此「换一条检查」不需要碰本结构。
@@ -368,7 +368,7 @@ pub struct EvalCase {
     pub case_id: String,
     /// 声明的期望行。
     pub expectations: Vec<Expectation>,
-    /// ⭐ 钉住的产物摘要；`None` ⇒ 摘要类检查**不可判定**（不猜默认值）。
+    /// 钉住的产物摘要；`None` ⇒ 摘要类检查**不可判定**（不猜默认值）。
     pub pinned_bundle_digest: Option<u64>,
 }
 
@@ -397,7 +397,7 @@ impl EvalCase {
         self
     }
 
-    /// ⭐ case 自身的内容地址（逐字段显式列出，`variant` 声明编码版本）。
+    /// case 自身的内容地址（逐字段显式列出，`variant` 声明编码版本）。
     #[must_use]
     pub fn digest(&self) -> u64 {
         let codes = sorted_keys(self.expectations.iter().map(|e| e.code.clone()));
@@ -424,7 +424,7 @@ const BUNDLE_SCHEMA_V: u8 = 1;
 
 // ── 产物包 ──────────────────────────────────────────────────────────────
 
-/// ⭐ 工具记录是**调用**还是**结果**。
+/// 工具记录是**调用**还是**结果**。
 ///
 /// 两个方向**必须可区分**：孤儿调用（要了没回）与孤儿结果（回来了没人要）
 /// 是两种病，塌成一个「配平失败」就丢了是哪一种。
@@ -447,7 +447,7 @@ impl ToolKind {
     }
 }
 
-/// ⭐ 一条工具调用/结果记录。**自有数据，无借用、无路径**。
+/// 一条工具调用/结果记录。**自有数据，无借用、无路径**。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolRecord {
     /// 调用 ↔ 结果的**唯一**配平键。
@@ -488,14 +488,14 @@ impl ToolRecord {
         Self { call_id, name: name.into(), source: source.into(), line, kind: ToolKind::Result }
     }
 
-    /// ⭐ 本记录的证据引用。
+    /// 本记录的证据引用。
     #[must_use]
     pub fn evidence(&self) -> EvidenceRef {
         EvidenceRef::line(self.source.clone(), self.line)
     }
 }
 
-/// ⭐ 一份具名产物（供未来检查消费**本层尚未认识**的仪表）。
+/// 一份具名产物（供未来检查消费**本层尚未认识**的仪表）。
 ///
 /// 存在的理由见报告第 4 条：NeoTrix 已有多种落库形态（`steps` 表、
 /// `history` transcript、JSONL 流……），但**没有一个统一信封**能让判定层
@@ -531,7 +531,7 @@ impl NamedArtifact {
     }
 }
 
-/// ⭐ 产物包：判定层的**全部**世界。
+/// 产物包：判定层的**全部**世界。
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ArtifactBundle {
     /// 工具调用/结果记录（混合两个方向）。
@@ -567,7 +567,7 @@ impl ArtifactBundle {
         self.artifacts.iter().find(|a| a.name == name)
     }
 
-    /// ⭐ 内容地址。**键序无关**：记录换序不改变摘要
+    /// 内容地址。**键序无关**：记录换序不改变摘要
     /// （`sorted_keys` + `field_sorted_keys`，抄 `nt_determinism.rs:171-176`）。
     #[must_use]
     pub fn digest(&self) -> u64 {
@@ -599,10 +599,10 @@ impl ArtifactBundle {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ⭐⭐ 检查 trait：声明行，不是控制流分支
+// 检查 trait：声明行，不是控制流分支
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// ⭐ 一条声明式检查。**对象安全**（无泛型方法、无 `Self` 返回）。
+/// 一条声明式检查。**对象安全**（无泛型方法、无 `Self` 返回）。
 ///
 /// 实现者**不得**写 IO / 时钟 / LLM 调用 —— 那会毁掉整层的可复现性
 /// （`README.md:1-18` 的那个选择）。本层对此的保障是签名本身：
@@ -614,7 +614,7 @@ pub trait ArtifactCheck {
     /// 人读描述（进报告头 / `--list`）。
     fn description(&self) -> &'static str;
 
-    /// ⭐ 求值。**必须全函数**：畸形 / 缺失产物只能产出
+    /// 求值。**必须全函数**：畸形 / 缺失产物只能产出
     /// [`Verdict::InvalidArtifact`] 或 [`Verdict::NotEvaluable`]，不许 panic。
     ///
     /// `bundle: Option<&ArtifactBundle>` —— ⛔ **参数是 `Option` 而非 `&`**
@@ -624,7 +624,7 @@ pub trait ArtifactCheck {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ⭐⭐ 不变量检查：工具调用 ↔ 结果 配平
+// 不变量检查：工具调用 ↔ 结果 配平
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// 检查码：孤儿调用（有 `call_id` 的调用无对应结果）。
@@ -642,14 +642,14 @@ pub const CODE_DUPLICATE_JOIN_KEY: &str = "nt.av.tool_join.duplicate_join_key";
 /// 检查码：产物包整体缺失（`NOT_EVALUABLE`）。
 pub const CODE_BUNDLE_ABSENT: &str = "nt.av.bundle.absent";
 
-/// ⭐⭐ 对**我们自己的仪表**做不变量检查。
+/// 对**我们自己的仪表**做不变量检查。
 ///
 /// 检查对象不是被测 agent，而是**记录 agent 行为的那条管道**：若调用与结果
 /// 不能配平，那么一切基于这些记录的结论（包括本层产出的其它判定）都不可信。
 /// 这是「先保证尺子没坏，再去量东西」—— 与 `nt_agent.rs:573-576`
 /// 自述的纪律（「不留悬空的 tool_call id」）同源，但**本检查是可执行的**。
 ///
-/// ## ⭐ 三档诚实降级（绝不猜）
+/// ## 三档诚实降级（绝不猜）
 ///
 /// | 情形 | 判定 | 理由 |
 /// |---|---|---|
@@ -679,7 +679,7 @@ impl ArtifactCheck for ToolCallJoinCheck {
 
     fn evaluate(&self, _case: &EvalCase, bundle: Option<&ArtifactBundle>) -> Vec<VerdictRecord> {
         let Some(bundle) = bundle else {
-            // ⭐ 缺失 ⇒ `NOT_EVALUABLE`（退出码 0），**不是**失败、**不是** panic。
+            // 缺失 ⇒ `NOT_EVALUABLE`（退出码 0），**不是**失败、**不是** panic。
             return vec![VerdictRecord::not_evaluable(
                 CODE_BUNDLE_ABSENT,
                 "-",
@@ -693,7 +693,7 @@ impl ArtifactCheck for ToolCallJoinCheck {
         // ── 阶段 1：逐条校验配平键 ──────────────────────────────────────
         // 有键的进 `keyed`；无键的逐条产出 `NOT_EVALUABLE` 并**说明缺什么仪表**。
         let mut keyed: Vec<&ToolRecord> = Vec::with_capacity(bundle.tool_records.len());
-        // ⭐⭐ 重复计数**必须按方向分开**：一个配平键**本来就会出现两次**
+        // 重复计数**必须按方向分开**：一个配平键**本来就会出现两次**
         // —— 一次 `Call`、一次 `Result`。共用一个计数桶会把**每一对正常配平**
         // 都误判成「重复键」⇒ 整条不变量恒为 `INVALID_ARTIFACT`（假阳性，
         // 且足以让人把检查关掉 —— 那才是真正的损失）。
@@ -731,7 +731,7 @@ impl ArtifactCheck for ToolCallJoinCheck {
         }
 
         // ── 阶段 2：同方向重复键 ⇒ `INVALID_ARTIFACT` ────────────────────
-        // ⭐ 重复键**先**于配平报告：键失去单射性时，「谁配谁」无从谈起，
+        // 重复键**先**于配平报告：键失去单射性时，「谁配谁」无从谈起，
         // 此时报孤儿是**撒谎**（会把一对合法配平误报成两个孤儿）。
         for (bucket, kind) in [(&seen_calls, ToolKind::Call), (&seen_results, ToolKind::Result)] {
             for (id, count) in bucket {
@@ -755,7 +755,7 @@ impl ArtifactCheck for ToolCallJoinCheck {
             }
         }
         if out.iter().any(|r| r.verdict() == Verdict::InvalidArtifact) {
-            // ⭐ 键域已污染 ⇒ 孤儿结论**一律不报**（会误导）。返回已确定的行。
+            // 键域已污染 ⇒ 孤儿结论**一律不报**（会误导）。返回已确定的行。
             out.sort_by(|a, b| a.sort_key().cmp(&b.sort_key()));
             return out;
         }
@@ -822,7 +822,7 @@ pub const CODE_BUNDLE_DIGEST_DRIFT: &str = "nt.av.bundle.digest_drift";
 /// 检查码：case 未钉摘要 ⇒ 不可判定。
 pub const CODE_NO_PINNED_DIGEST: &str = "nt.av.bundle.no_pinned_digest";
 
-/// ⭐ 产物**回归钉子**检查：case 钉一个 [`ArtifactBundle::digest`]，
+/// 产物**回归钉子**检查：case 钉一个 [`ArtifactBundle::digest`]，
 /// 本检查重算并比对。⇒ 判定结果与「判的是哪一份产物」一起被寻址，
 /// 不可复现的裁决不可能被误当成干净的。
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -855,7 +855,7 @@ impl ArtifactCheck for BundleDigestCheck {
             )];
         };
         let Some(pinned) = case.pinned_bundle_digest else {
-            // ⭐ case 没钉 ⇒ 不猜（"空包摘要" 是个诱人的默认值，会把
+            // case 没钉 ⇒ 不猜（"空包摘要" 是个诱人的默认值，会把
             // 「没钉」洗成「钉了空包」）。诚实地不可判定。
             return vec![VerdictRecord::not_evaluable(
                 CODE_NO_PINNED_DIGEST,
@@ -885,7 +885,7 @@ impl ArtifactCheck for BundleDigestCheck {
     }
 }
 
-/// ⭐ 默认注册表（两个声明行）。**新增检查请在此追加一行**
+/// 默认注册表（两个声明行）。**新增检查请在此追加一行**
 /// —— 这是全层唯一需要改的地方，且它是**声明**，不是控制流分支。
 #[must_use]
 pub fn default_checks() -> Vec<Box<dyn ArtifactCheck>> {
@@ -896,7 +896,7 @@ pub fn default_checks() -> Vec<Box<dyn ArtifactCheck>> {
 // 报告 + 求值入口
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// ⭐ 判定报告。
+/// 判定报告。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvalReport {
     /// 被判的 case（回显，便于归档时不必另开索引）。
@@ -923,13 +923,13 @@ impl EvalReport {
         self.records.iter().filter(|r| r.verdict().is_evaluable()).count()
     }
 
-    /// ⭐ 整型覆盖率 `(分子, 分母)`，供无损渲染。
+    /// 整型覆盖率 `(分子, 分母)`，供无损渲染。
     #[must_use]
     pub fn coverage(&self) -> (usize, usize) {
         (self.evaluable_count(), self.assertion_count())
     }
 
-    /// ⭐ 覆盖率 = `evaluable / assertion_count`（抄 `report.py:44-46`）。
+    /// 覆盖率 = `evaluable / assertion_count`（抄 `report.py:44-46`）。
     ///
     /// ⛔ **分母为 0 返回 `0.0`，不是 `NaN`、不是 `1.0`**：`NaN` 骗得过
     /// 任何 `< 1.0` 守卫（NaN 比较恒假），而 `1.0` 会让「什么都没判」
@@ -943,7 +943,7 @@ impl EvalReport {
         num as f64 / den as f64
     }
 
-    /// ⭐ 报告退出码 = 各行 `exit_code` 的**最大值**（混合结果取最严重）。
+    /// 报告退出码 = 各行 `exit_code` 的**最大值**（混合结果取最严重）。
     /// 无行 ⇒ `0`。
     #[must_use]
     pub fn exit_code(&self) -> i32 {
@@ -954,7 +954,7 @@ impl EvalReport {
             .unwrap_or(0)
     }
 
-    /// ⭐ 「声明了期望却没有任何检查产出对应行」的期望清单。
+    /// 「声明了期望却没有任何检查产出对应行」的期望清单。
     ///
     /// ⇒ 空转的期望（加了 case 行、忘了加检查）**当场可见**，
     /// 而不是安静地把覆盖率按稀释后的分母算掉。
@@ -969,7 +969,7 @@ impl EvalReport {
     }
 
     /// 报告渲染（`PASS`/`FAIL`/… 每行一条，含证据位置与覆盖率）。
-    /// ⭐ 纯函数，无 IO：返回 `String` 由调用方决定去向。
+    /// 纯函数，无 IO：返回 `String` 由调用方决定去向。
     #[must_use]
     pub fn render(&self) -> String {
         let mut s = format!(
@@ -998,9 +998,9 @@ impl EvalReport {
     }
 }
 
-/// ⭐ 求值入口。**纯函数**：`(case, bundle, checks)` ⇒ 报告。
+/// 求值入口。**纯函数**：`(case, bundle, checks)` ⇒ 报告。
 ///
-/// ⭐⭐ 出口**统一排序**：插入顺序**不进入**结果 ⇒
+/// 出口**统一排序**：插入顺序**不进入**结果 ⇒
 /// 「注册顺序泄漏进报告」这条缺陷在类型层面不可能发生。
 /// 这是本仓刚修完的那条哈希序纪律在判定层的同款落实
 /// （对照 `nt_determinism.rs:200-224`）。
@@ -1049,7 +1049,7 @@ mod tests {
             .with_tool_record(ToolRecord::result(Some("c2".into()), "write", "trace.jsonl", 8))
     }
 
-    /// ⭐ 只装配配平检查的注册表（把断言聚焦在配平不变量本身，
+    /// 只装配配平检查的注册表（把断言聚焦在配平不变量本身，
     /// 不让摘要检查的 `NOT_EVALUABLE` 行稀释覆盖率算术）。
     fn join_only() -> Vec<Box<dyn ArtifactCheck>> {
         vec![Box::new(ToolCallJoinCheck::new())]
@@ -1057,7 +1057,7 @@ mod tests {
 
     /// 取指定 code 的记录。
     ///
-    /// ⭐ 显式生命周期 `'a`：返回的 `&VerdictRecord` 借自 `rep`，
+    /// 显式生命周期 `'a`：返回的 `&VerdictRecord` 借自 `rep`，
     /// 而 `code: &str` 的生命周期与输出**无关** ——
     /// 若让编译器把输出的生命周期与最短的那个输入绑定，
     /// 调用方就会拿到「活不过 `code`」的引用（E0106 missing lifetime specifier）。
@@ -1067,7 +1067,7 @@ mod tests {
 
     // ── 四值 + 退出码映射 ────────────────────────────────────────────────
 
-    /// ⭐ 退出码映射逐字钉死（`runner.py:80-85`）。
+    /// 退出码映射逐字钉死（`runner.py:80-85`）。
     /// 关键：`NOT_EVALUABLE` **必须**是 `0` —— 它不失败命令。
     #[test]
     fn four_valued_verdict_maps_to_exact_exit_codes() {
@@ -1077,7 +1077,7 @@ mod tests {
         assert_eq!(Verdict::NotEvaluable.exit_code(), 0, "NOT_EVALUABLE -> 0，不失败");
     }
 
-    /// ⭐⭐ 端到端钉死：一份**全部 `NOT_EVALUABLE`** 的运行 ⇒ 退出码 `0`。
+    /// 端到端钉死：一份**全部 `NOT_EVALUABLE`** 的运行 ⇒ 退出码 `0`。
     /// 若日后有人把 `NotEvaluable` 改成 `1`，此测试立刻红。
     #[test]
     fn not_evaluable_run_does_not_fail_the_command() {
@@ -1117,7 +1117,7 @@ mod tests {
 
     // ── 覆盖率诚实性 ─────────────────────────────────────────────────────
 
-    /// ⭐⭐ 什么都没判 ⇒ **不得**报 `1.0`，也**不得**报 `NaN`。
+    /// 什么都没判 ⇒ **不得**报 `1.0`，也**不得**报 `NaN`。
     /// `NaN < 1.0` 为假 ⇒ 任何 `< 1.0` 守卫都会放行它。
     #[test]
     fn nothing_evaluable_must_not_report_full_coverage() {
@@ -1131,7 +1131,7 @@ mod tests {
         assert!(cov < 1.0, "零可判定绝不能报满覆盖");
     }
 
-    /// ⭐ 报告里**一条行都没有**时（调用方传空注册表）⇒ 覆盖率 `0.0` 而非 `NaN`。
+    /// 报告里**一条行都没有**时（调用方传空注册表）⇒ 覆盖率 `0.0` 而非 `NaN`。
     #[test]
     fn zero_assertions_yields_zero_coverage_not_nan() {
         let rep = evaluate(&EvalCase::new("case.empty_registry"), None, &[]);
@@ -1143,7 +1143,7 @@ mod tests {
         assert_eq!(rep.bundle_digest, None, "产物缺失时摘要必须是 None 而不是 0");
     }
 
-    /// ⭐ 混合覆盖率算得准：`INVALID_ARTIFACT` 与 `NOT_EVALUABLE` 都**不计入**分子。
+    /// 混合覆盖率算得准：`INVALID_ARTIFACT` 与 `NOT_EVALUABLE` 都**不计入**分子。
     #[test]
     fn coverage_mixes_counts_only_evaluable_rows() {
         let case = EvalCase::new("case.coverage_mix");
@@ -1170,7 +1170,7 @@ mod tests {
 
     // ── 证据引用 ─────────────────────────────────────────────────────────
 
-    /// ⭐ 失败行必须指到来源位置（`trace.jsonl:<line>`，抄 `schema.py:181-197`）。
+    /// 失败行必须指到来源位置（`trace.jsonl:<line>`，抄 `schema.py:181-197`）。
     #[test]
     fn failures_carry_evidence_refs() {
         let case = EvalCase::new("case.evidence");
@@ -1186,7 +1186,7 @@ mod tests {
         assert!(orphans[0].detail().contains("grep"), "失败说明应点名工具");
     }
 
-    /// ⭐ `FAIL` / `INVALID_ARTIFACT` 行**恒**带至少一条证据
+    /// `FAIL` / `INVALID_ARTIFACT` 行**恒**带至少一条证据
     /// （空证据会被补上显式标记，而非静默丢弃）。
     #[test]
     fn failure_rows_never_have_empty_evidence() {
@@ -1212,9 +1212,9 @@ mod tests {
         assert_eq!(a, b, "证据集合须与组装顺序无关");
     }
 
-    // ── ⭐ 不变量检查：孤儿双向 ──────────────────────────────────────────
+    // ── 不变量检查：孤儿双向 ──────────────────────────────────────────
 
-    /// ⭐⭐ **两个方向**都检出：孤儿调用与孤儿结果。
+    /// **两个方向**都检出：孤儿调用与孤儿结果。
     #[test]
     fn orphan_tool_call_detects_both_directions() {
         let case = EvalCase::new("case.orphans");
@@ -1239,7 +1239,7 @@ mod tests {
         assert_eq!(rep.evaluation_coverage(), 1.0);
     }
 
-    /// ⭐ 健康 bundle ⇒ 全 `PASS`、退出码 0。
+    /// 健康 bundle ⇒ 全 `PASS`、退出码 0。
     #[test]
     fn healthy_bundle_passes_the_join_invariant() {
         let rep = evaluate(&EvalCase::new("case.healthy"), Some(&healthy_bundle()), &join_only());
@@ -1249,7 +1249,7 @@ mod tests {
         assert_eq!(rep.evaluation_coverage(), 1.0);
     }
 
-    /// ⭐⭐ **诚实边界**：无 `call_id` 的记录逐条 `NOT_EVALUABLE`，且写明缺什么仪表。
+    /// **诚实边界**：无 `call_id` 的记录逐条 `NOT_EVALUABLE`，且写明缺什么仪表。
     /// 这是本层对「仪表不存在」的对策（抄 `assertions.py:330-343` 的做法）。
     #[test]
     fn records_without_join_key_are_not_evaluable_with_a_reason() {
@@ -1279,7 +1279,7 @@ mod tests {
 
     // ── 畸形产物 / 缺失产物：全函数 ──────────────────────────────────────
 
-    /// ⭐ 畸形 bundle ⇒ `INVALID_ARTIFACT`（退出码 2）：重复键 + 空白键。
+    /// 畸形 bundle ⇒ `INVALID_ARTIFACT`（退出码 2）：重复键 + 空白键。
     #[test]
     fn malformed_bundle_is_invalid_artifact() {
         let case = EvalCase::new("case.malformed");
@@ -1301,7 +1301,7 @@ mod tests {
         );
     }
 
-    /// ⭐⭐ **缺失** bundle ⇒ `NOT_EVALUABLE`，**不是** panic、**不是**失败。
+    /// **缺失** bundle ⇒ `NOT_EVALUABLE`，**不是** panic、**不是**失败。
     /// 这正是把 `bundle` 声明成 `Option<&…>` 换来的：缺失是签名内的正常路径。
     #[test]
     fn missing_bundle_is_not_evaluable_not_a_panic() {
@@ -1321,7 +1321,7 @@ mod tests {
         assert_eq!(records_with(&rep, CODE_BUNDLE_ABSENT).len(), 2);
     }
 
-    /// ⭐ 全函数性：畸形输入**不 panic**（含空 `call_id`、重复 `call_id`、
+    /// 全函数性：畸形输入**不 panic**（含空 `call_id`、重复 `call_id`、
     /// 零行 bundle、空 case）。
     #[test]
     fn total_function_never_panics_on_degenerate_input() {
@@ -1353,7 +1353,7 @@ mod tests {
 
     // ── 确定性 ───────────────────────────────────────────────────────────
 
-    /// ⭐ 同 `(case, bundle)` 求值两次 ⇒ 逐字段相同。
+    /// 同 `(case, bundle)` 求值两次 ⇒ 逐字段相同。
     #[test]
     fn evaluation_is_reproducible() {
         let case = EvalCase::new("case.repro").expecting(CODE_PAIRED, "c1");
@@ -1364,7 +1364,7 @@ mod tests {
         assert_eq!(a.render(), b.render(), "渲染结果亦须相同");
     }
 
-    /// ⭐⭐ **注册顺序不进入结果**：正序与逆序组装同一批检查 ⇒ 逐字段相同。
+    /// **注册顺序不进入结果**：正序与逆序组装同一批检查 ⇒ 逐字段相同。
     /// 这是本仓刚修完的哈希序纪律在判定层的同款钉死
     /// （对照 `nt_determinism.rs:329-378` 的双胞胎差分手法）。
     #[test]
@@ -1385,7 +1385,7 @@ mod tests {
         assert!(!a.records.is_empty(), "对照：确实产出了行（否则本测试无判别力）");
     }
 
-    /// ⭐⭐ 双胞胎差分：产物记录**换序**不改变报告。
+    /// 双胞胎差分：产物记录**换序**不改变报告。
     /// 两个独立构造的 `Vec` 顺序不同 ⇒ 判别力是被证明的，不是声称的。
     #[test]
     fn record_order_within_bundle_does_not_change_output() {
@@ -1404,7 +1404,7 @@ mod tests {
         assert_eq!(a.bundle_digest, b.bundle_digest, "bundle 摘要必须键序无关");
     }
 
-    /// ⭐⭐ 反例（oracle）：证明上一条的纪律**有判别力**。
+    /// 反例（oracle）：证明上一条的纪律**有判别力**。
     /// 若用遍历序破平局，两个构造必然分叉 —— 这里显式构造坏版本并断言被抓到。
     #[test]
     fn hash_order_tie_break_would_be_caught() {
@@ -1424,7 +1424,7 @@ mod tests {
         let backward: Vec<Box<dyn ArtifactCheck>> =
             vec![Box::new(BundleDigestCheck::new()), Box::new(ToolCallJoinCheck::new())];
 
-        // ⭐ 先证「坏」：未经排序的行序确实随注册序而变 ⇒ 出口排序不是空转。
+        // 先证「坏」：未经排序的行序确实随注册序而变 ⇒ 出口排序不是空转。
         assert_ne!(
             unordered(&forward),
             unordered(&backward),
@@ -1436,7 +1436,7 @@ mod tests {
 
     // ── Digest 复用 ──────────────────────────────────────────────────────
 
-    /// ⭐ 摘要漂移被检出（证明 `Digest` 复用不是摆设）。
+    /// 摘要漂移被检出（证明 `Digest` 复用不是摆设）。
     #[test]
     fn bundle_digest_pin_detects_drift() {
         let bundle = healthy_bundle();
@@ -1458,7 +1458,7 @@ mod tests {
         assert!(!drift[0].evidence_refs().is_empty());
     }
 
-    /// ⭐ 没钉摘要 ⇒ `NOT_EVALUABLE`（不猜「空包摘要」这个默认值）。
+    /// 没钉摘要 ⇒ `NOT_EVALUABLE`（不猜「空包摘要」这个默认值）。
     #[test]
     fn unpinned_digest_is_not_evaluable_not_assumed_to_hold() {
         let rep = evaluate_default(&EvalCase::new("case.unpinned"), Some(&healthy_bundle()));
@@ -1467,7 +1467,7 @@ mod tests {
         assert_eq!(rows[0].verdict(), Verdict::NotEvaluable);
     }
 
-    /// ⭐ `Digest` 的既有性质被继承：无 `id` 记录的**存在与位置**也进摘要
+    /// `Digest` 的既有性质被继承：无 `id` 记录的**存在与位置**也进摘要
     /// ⇒ 删掉一条脏记录不可能做到「摘要不变」。
     #[test]
     fn digest_covers_unkeyed_record_identity() {
@@ -1480,7 +1480,7 @@ mod tests {
 
     // ── 声明行：期望与检查解耦 ───────────────────────────────────────────
 
-    /// ⭐ 声明了期望却无检查产出对应行 ⇒ `uncovered_expectations` 点名。
+    /// 声明了期望却无检查产出对应行 ⇒ `uncovered_expectations` 点名。
     /// 这让「加了 case 行、忘了加检查」的空转**当场可见**。
     #[test]
     fn declared_expectation_without_a_check_is_reported() {
@@ -1494,7 +1494,7 @@ mod tests {
         assert_eq!(holes[0].code, CODE_ORPHAN_CALL);
     }
 
-    /// ⭐ 新增一条检查**不需要**改任何求值控制流：调用方自带注册表即可。
+    /// 新增一条检查**不需要**改任何求值控制流：调用方自带注册表即可。
     /// （同时钉住 trait 的可扩展性——这是要求 4 的行为证据。）
     #[test]
     fn adding_a_check_requires_no_edits_to_evaluation_control_flow() {
@@ -1537,7 +1537,7 @@ mod tests {
         assert_eq!(codes, sorted, "新检查的行也必须落在规范位置");
     }
 
-    /// ⭐ 报告渲染含四值标签、证据位置与覆盖率（机器可读 + 人读）。
+    /// 报告渲染含四值标签、证据位置与覆盖率（机器可读 + 人读）。
     #[test]
     fn render_includes_verdict_labels_evidence_and_coverage() {
         let bundle = ArtifactBundle::new()
@@ -1549,7 +1549,7 @@ mod tests {
         assert!(text.contains("exit=1"), "缺退出码：{text}");
     }
 
-    /// ⭐ 具名产物：缺失 ⇒ `None`（由调用方产 `NOT_EVALUABLE`），存在可取。
+    /// 具名产物：缺失 ⇒ `None`（由调用方产 `NOT_EVALUABLE`），存在可取。
     #[test]
     fn named_artifacts_are_addressable_by_name() {
         let bundle = ArtifactBundle::new()

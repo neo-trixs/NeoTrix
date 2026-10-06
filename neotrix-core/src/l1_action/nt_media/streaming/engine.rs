@@ -242,7 +242,7 @@ impl DownloadEngine {
 
         // Disk space pre-check（**只查，不预分配**）
         //
-        // ⭐⭐ 2026-10-02 删除了原来的 `dest` 预分配（`File::…set_len(total_size)`），
+        // 2026-10-02 删除了原来的 `dest` 预分配（`File::…set_len(total_size)`），
         //    它是一个 **P0 正确性缺陷**，链条闭合：
         //      ① 预分配把 `dest` 撑成 `total_size` 字节零填充
         //      ② 下面的 `existing = metadata(dest).len()` 于是 **恒等于 total_size**
@@ -253,7 +253,7 @@ impl DownloadEngine {
         //    触发条件只是 HEAD 返回 `Content-Length`（`head_size()` 成功），
         //    即**绝大多数媒体文件**。
         //
-        // ⭐ 为什么预分配本就多余：`merge_chunks`（`dl_fs.rs:127`）用
+        // 为什么预分配本就多余：`merge_chunks`（`dl_fs.rs:127`）用
         //   `File::create(dest)` **整体覆写** `dest` ⇒ 预分配的内容必被丢弃。
         //   真正的「早失败」价值由上面的 `check_disk_space` 提供；
         //   真 ENOSPC 会在 `merge_chunks` 的 `create` 处以可读错误浮出。
@@ -273,7 +273,7 @@ impl DownloadEngine {
 
         // ⛔⛔ 2026-10-02 **删除**了这里的「长度够就算完成」早退。
         //    原码：`if total_size > 0 && existing >= total_size { write_done_marker(…); return Ok(existing); }`
-        //    ⭐ 它本意是「续传时发现已经下完」；但在上面预分配被删之后，
+        //    它本意是「续传时发现已经下完」；但在上面预分配被删之后，
         //    这个条件仍会在**上一次崩溃留下半截 dest** 时误判为完成
         //    —— 「文件够长」从来**不是**完成的证据，**`.done` 才是**。
         //    ⓰ 「已完成」的权威判据在函数开头 `:236` 的 `is_done(&dest)`，
@@ -447,7 +447,7 @@ mod p0_regression_tests {
     use super::*;
     use crate::l1_action::nt_media::streaming::types::DownloadTask;
 
-    /// ⭐⭐⭐ P0 回归（2026-10-02）：**HEAD 返回 Content-Length 时，
+    /// P0 回归（2026-10-02）：**HEAD 返回 Content-Length 时，
     /// 一次字节都不许下就报 `Completed`**。
     ///
     /// ## 原缺陷的链条（闭合）
@@ -456,7 +456,7 @@ mod p0_regression_tests {
     /// `write_done_marker` + `return Ok(existing)` ⇒ 零字节下载报成功，
     /// 且 `.done` 让 `is_done()` 此后永久返回 `Some` ⇒ 分块下载永不可达。
     ///
-    /// ⭐ 判据用**「服务端实际发出的字节数」**而不是「落盘文件大小」：
+    /// 判据用**「服务端实际发出的字节数」**而不是「落盘文件大小」：
     /// 前者是「有没有真的传输」的**唯一**可观测信号 —— 落盘大小可以被
     /// 预分配/零填充伪造，正是原缺陷能藏住的原因。
     #[tokio::test]
@@ -505,12 +505,12 @@ mod p0_regression_tests {
             DownloadStatus::Completed { .. } => {}
             other => panic!("期望 Completed，实际 {other:?}"),
         }
-        // ⭐⭐ 落盘内容必须**真的是那份 blob** —— 这条比「大小相等」更强：
+        // 落盘内容必须**真的是那份 blob** —— 这条比「大小相等」更强：
         // 零填充文件的前 N 字节是 0，与 blob 的 `(i % 251)` 必然不同。
         let bytes = std::fs::read(&dest).expect("read dest");
-        // ⭐⭐ 这条断言在 parallel.rs 的 Range 修复**之前**是失败的
+        // 这条断言在 parallel.rs 的 Range 修复**之前**是失败的
         //（实测落盘 65536 = 16 chunk × 4096，服务端忽略 Range 导致每块写全量）。
-        // ⭐ 加回来是因为它才是「文件没被撑大」的**直接**判据；
+        // 加回来是因为它才是「文件没被撑大」的**直接**判据；
         //   只断「传输 ≥ N」会漏掉「传输过量」这个方向的损坏。
         assert_eq!(
             bytes.len(), N,
@@ -529,7 +529,7 @@ mod range_honoured_tests {
     use super::*;
     use crate::l1_action::nt_media::streaming::types::DownloadTask;
 
-    /// ⭐⭐ 补上「服务端**遵守** Range」那一半的覆盖。
+    /// 补上「服务端**遵守** Range」那一半的覆盖。
     ///
     /// ## 为什么必须有这条（这是上一个 bug 能长期存活的根因）
     /// `aa921122` 修的「N 倍长损坏文件」之所以长期没人发现：
@@ -537,7 +537,7 @@ mod range_honoured_tests {
     /// 而**代码的默认假设恰恰是「服务端会遵守 Range」（206）**。
     /// ⇒ 测试只覆盖了它**不成立**的那一半 ⇒ 真 compliant 服务端那条路径
     /// **从来没被执行过**，里面的任何错都不会被门抓到。
-    /// ⭐ 这条测试让两端都被钉住：`aa921122` 的测试钉「忽略 Range」，
+    /// 这条测试让两端都被钉住：`aa921122` 的测试钉「忽略 Range」，
     /// 本条钉「遵守 Range」。
     #[tokio::test]
     async fn 服务端遵守Range时按区间精确落盘() {
@@ -548,7 +548,7 @@ mod range_honoured_tests {
 
         const N: usize = 8192;
         let body: Vec<u8> = (0..N as u32).map(|i| (i % 251) as u8).collect();
-        // ⭐ 真·支持 Range 的 handler：解析 `bytes=start-end` ⇒ 回 206 + Content-Range。
+        // 真·支持 Range 的 handler：解析 `bytes=start-end` ⇒ 回 206 + Content-Range。
         let app = Router::new().route(
             "/blob",
             get(move |h: HeaderMap| {
@@ -566,7 +566,7 @@ mod range_honoured_tests {
                             Some((start, end.min(full - 1)))
                         });
                     match rng {
-                        // ⭐ 206：告诉客户端这是**部分内容**，且给出确切区间。
+                        // 206：告诉客户端这是**部分内容**，且给出确切区间。
                         Some((start, end)) => {
                             let slice = b[start..=end].to_vec();
                             let mut resp = Response::new(axum::body::Body::from(slice));

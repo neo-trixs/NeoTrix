@@ -22,7 +22,7 @@ pub enum UnifiedSourceType {
 
 impl UnifiedSourceType {
     pub fn detect(url: &str) -> Self {
-        // ⭐ 2026-10-03：域名规则改为 host 判定（此函数**不含**关键词启发式，
+        // 2026-10-03：域名规则改为 host 判定（此函数**不含**关键词启发式，
         //    故为纯净替换）。原裸 contains 会把 `wikipedia.org.evil.net`
         //    判成 Wikipedia，进而把探索方向导向 ExploreDomain::Wiki。
         use crate::l0_substrate::nt_core_platform::url_match::url_matches_domain as m;
@@ -649,7 +649,7 @@ mod tests {
 mod unified_source_host_tests {
     use super::UnifiedSourceType;
 
-    /// ⭐ 迁移回归：正常 URL 分类完全不变
+    /// 迁移回归：正常 URL 分类完全不变
     #[test]
     fn normal_urls_keep_their_classification() {
         for (url, want) in [
@@ -665,7 +665,7 @@ mod unified_source_host_tests {
         }
     }
 
-    /// ⭐ 伪装域名不再命中（该分类决定 ExploreDomain ⇒ 影响探索方向）
+    /// 伪装域名不再命中（该分类决定 ExploreDomain ⇒ 影响探索方向）
     #[test]
     fn lookalike_domains_fall_back_to_generic() {
         for hostile in [

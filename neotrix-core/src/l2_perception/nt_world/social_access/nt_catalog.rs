@@ -1,6 +1,6 @@
 //! 平台目录 — 社交平台知识的**单一真源**
 //!
-//! # ⭐ 审计发现的同类问题（2026-10-03）
+//! # 审计发现的同类问题（2026-10-03）
 //!
 //! 上一轮把登录通用化了，但审计全仓后发现「平台知识」散在**三处互不相通**的地方：
 //!
@@ -57,7 +57,7 @@ pub struct PlatformSpec {
     pub login_url: Option<String>,
     /// 登录成功后应出现的 URL 前缀（可空）。
     ///
-    /// ⭐ 与 [`SuccessProbe::UrlContains`] 语义重叠但用途不同：
+    /// 与 [`SuccessProbe::UrlContains`] 语义重叠但用途不同：
     /// 探针是**判据**（可多条），这里是给用户看的「成功后会看到什么」。
     pub success_url: Option<String>,
     /// 登录等待超时。
@@ -66,7 +66,7 @@ pub struct PlatformSpec {
     pub cookie_file: Option<String>,
     /// 该平台是否必须有会话才能工作。
     ///
-    /// ⭐ `false` 表示「不登录也能用（如只读公开数据）」，
+    /// `false` 表示「不登录也能用（如只读公开数据）」，
     /// 避免把「没登录」报成致命错误。
     pub requires_session: bool,
 }
@@ -79,7 +79,7 @@ impl PlatformSpec {
 
     /// 登录成功后的 URL 前缀。
     ///
-    /// ⭐ 若未显式配置，从 [`SuccessProbe::UrlContains`] 派生 ——
+    /// 若未显式配置，从 [`SuccessProbe::UrlContains`] 派生 ——
     /// 这样「判据」与「展示给用户的成功标志」不会各说各话。
     pub fn success_url_for_channel(&self) -> Option<String> {
         if let Some(ref s) = self.success_url {
@@ -93,7 +93,7 @@ impl PlatformSpec {
 
     /// 本平台的**别名**（历史遗留的其他 id）。
     ///
-    /// ⭐ 存在的理由：`TwitterExtractor::id()` 返回 `"twitter"`（既有契约），
+    /// 存在的理由：`TwitterExtractor::id()` 返回 `"twitter"`（既有契约），
     /// 而目录主键是 `"x"`（登录/cookie 路径）。强行统一任一侧都会破坏
     /// 另一侧的既有调用方 ⇒ 改为**显式声明别名**，让
     /// `adapter_for` / `login_table_is_derived` 等跨表查找能解析。
@@ -106,7 +106,7 @@ impl PlatformSpec {
 
     /// 本平台对应的 [`SocialPlatform`](super::traits::SocialPlatform)。
     ///
-    /// ⭐ 用于把目录条目关联到既有渠道。⚠️ `x` 映射回 `Twitter` ——
+    /// 用于把目录条目关联到既有渠道。⚠️ `x` 映射回 `Twitter` ——
     /// 历史渠道名是 `"twitter"` 但枚举变体叫 `Twitter`，二者都保留。
     pub fn platform_id(&self) -> SocialPlatform {
         SocialPlatform::from_str(&self.id)
@@ -126,7 +126,7 @@ impl PlatformCatalog {
 
     /// 注册一个平台（按 `id` 覆盖）。
     ///
-    /// ⭐ 这是「加平台」的唯一入口 —— 不改枚举、不改 `can_handle`、不改登录流程。
+    /// 这是「加平台」的唯一入口 —— 不改枚举、不改 `can_handle`、不改登录流程。
     pub fn register(&mut self, spec: PlatformSpec) {
         self.specs.insert(spec.id.clone(), spec);
     }
@@ -135,7 +135,7 @@ impl PlatformCatalog {
         self.specs.get(id)
     }
 
-    /// ⭐ 全部平台 id（**排序稳定**）。
+    /// 全部平台 id（**排序稳定**）。
     ///
     /// ⛔ 不要用 `SocialPlatform::all()` —— 它只含 6 个枚举变体，
     /// 经 `register` 加入的平台不在其中。HashMap 迭代序不稳定，
@@ -161,7 +161,7 @@ impl PlatformCatalog {
         self.specs.is_empty()
     }
 
-    /// ⭐ 由 id **或别名**解析平台。
+    /// 由 id **或别名**解析平台。
     ///
     /// ⛔ 只按主键查会漏：`adapter_for(&SocialPlatform::Twitter)` 用
     /// `SocialPlatform::as_str()` 得到 `"twitter"`，而目录主键是 `"x"`
@@ -181,7 +181,7 @@ impl PlatformCatalog {
 
     /// 认领一个 URL。
     ///
-    /// ⭐ 取代旧 `Channel::can_handle` 的 `match` 穷举。
+    /// 取代旧 `Channel::can_handle` 的 `match` 穷举。
     ///
     /// # ⚠️ 判据必须是域名/路径片段，不是 `contains` 裸匹配
     ///
@@ -256,7 +256,7 @@ impl PlatformCatalog {
 
     /// 凭据环境变量名（若该平台需要）。
     ///
-    /// ⭐ **统一规则**：`NEOTRIX_<大写ID>_AUTH_TOKEN`。
+    /// **统一规则**：`NEOTRIX_<大写ID>_AUTH_TOKEN`。
     /// 此前只有 `NEOTRIX_X_AUTH_TOKEN`，加平台就要加一个常量。
     pub fn env_var_names(id: &str) -> (String, String) {
         let upper: String = id
@@ -270,7 +270,7 @@ impl PlatformCatalog {
     }
 }
 
-/// ⭐ 2026-10-03：委托给 L0 原语，本仓不再保留第二份实现。
+/// 2026-10-03：委托给 L0 原语，本仓不再保留第二份实现。
 ///
 /// ⛔ 此前本文件内联了一份 `matches_domain_fragment` + host 提取逻辑，
 ///    而 [`crate::l0_substrate::nt_core_platform::url_match`] 是同一件事。
@@ -282,7 +282,7 @@ pub fn matches_domain_fragment(host: &str, pattern: &str) -> bool {
 
 /// 内置平台目录。
 ///
-/// ⭐ URL 模式全部取自实测的既有 `can_handle` 实现，未凭空添加。
+/// URL 模式全部取自实测的既有 `can_handle` 实现，未凭空添加。
 pub fn default_catalog() -> PlatformCatalog {
     let mut c = PlatformCatalog::new();
 
@@ -292,7 +292,7 @@ pub fn default_catalog() -> PlatformCatalog {
         // ⚠️ `twitter.com` 与 `x.com` 并列（X 未登录时会 302 到它）
         url_patterns: vec!["x.com".into(), "twitter.com".into()],
         login_probes: vec![
-            // ⭐ 只看存在性，不读值（HttpOnly）
+            // 只看存在性，不读值（HttpOnly）
             SuccessProbe::CookiePresent { name: "auth_token".into() },
             SuccessProbe::UrlContains { needle: "/home".into() },
         ],
@@ -353,7 +353,7 @@ pub fn default_catalog() -> PlatformCatalog {
         success_url: None,
         login_timeout: None,
         cookie_file: None,
-        // ⭐ YouTube 靠 yt-dlp **零配置**可用（实测 `yt-dlp --version` rc=0）
+        // YouTube 靠 yt-dlp **零配置**可用（实测 `yt-dlp --version` rc=0）
         requires_session: false,
     });
 
@@ -421,7 +421,7 @@ pub fn default_catalog() -> PlatformCatalog {
         success_url: None,
         login_timeout: None,
         cookie_file: None,
-        // ⭐ 通用网页靠 Jina Reader，零配置
+        // 通用网页靠 Jina Reader，零配置
         requires_session: false,
     });
 
@@ -436,7 +436,7 @@ mod tests {
 
     #[test]
     fn custom_platform_needs_no_code_change() {
-        // ⭐ 这是「通用性」的验收：不经由 SocialPlatform 枚举
+        // 这是「通用性」的验收：不经由 SocialPlatform 枚举
         let mut c = PlatformCatalog::new();
         c.register(PlatformSpec {
             id: "mastodon".into(),
@@ -452,7 +452,7 @@ mod tests {
 
         assert!(c.get("mastodon").is_some());
         assert_eq!(c.all_ids(), vec!["mastodon"]);
-        // ⭐ 不用碰 SocialPlatform 枚举就能被 URL 路由认领
+        // 不用碰 SocialPlatform 枚举就能被 URL 路由认领
         assert_eq!(c.match_url("https://mastodon.social/@x").map(|s| s.id.as_str()), Some("mastodon"));
     }
 
@@ -470,7 +470,7 @@ mod tests {
 
     #[test]
     fn all_ids_is_sorted_and_stable() {
-        // ⭐ HashMap 迭代序不稳定 ⇒ 会造成 diff 噪音
+        // HashMap 迭代序不稳定 ⇒ 会造成 diff 噪音
         let c = default_catalog();
         let a = c.all_ids();
         let b = c.all_ids();
@@ -502,7 +502,7 @@ mod tests {
 
     #[test]
     fn does_not_claim_lookalike_domains() {
-        // ⭐⭐ 安全判据：`x.com` 是 host **后缀**才认领。
+        // 安全判据：`x.com` 是 host **后缀**才认领。
         //    裸 `contains` 会把 phishing-x.com / x.com.evil.net 误判成 X。
         let c = default_catalog();
         for hostile in [
@@ -527,7 +527,7 @@ mod tests {
 
     #[test]
     fn subdomain_of_platform_is_claimed() {
-        // ⭐ `www.x.com` 是 X 的合法子域，必须认领
+        // `www.x.com` 是 X 的合法子域，必须认领
         let c = default_catalog();
         assert_eq!(
             c.match_url("https://www.x.com/home").map(|s| s.id.as_str()),
@@ -596,7 +596,7 @@ mod tests {
 
     #[test]
     fn env_var_names_follow_one_uniform_rule() {
-        // ⭐ 统一规则而非每平台一个常量
+        // 统一规则而非每平台一个常量
         assert_eq!(
             PlatformCatalog::env_var_names("x"),
             ("NEOTRIX_X_AUTH_TOKEN".to_string(), "NEOTRIX_X_CT0".to_string())
@@ -649,7 +649,7 @@ mod tests {
     #[test]
     fn requires_session_false_only_where_session_is_optional() {
         let c = default_catalog();
-        // ⭐ 这两个实测可零配置工作（yt-dlp / Jina Reader）
+        // 这两个实测可零配置工作（yt-dlp / Jina Reader）
         assert!(!c.get("youtube").unwrap().requires_session);
         assert!(!c.get("web").unwrap().requires_session);
     }

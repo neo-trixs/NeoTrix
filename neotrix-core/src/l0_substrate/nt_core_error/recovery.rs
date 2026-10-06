@@ -9,7 +9,7 @@
 //! 另有 `nt_core_platform/init.rs:57` 与 `gateway/mod.rs:8`
 //! `use` 了 `RecoveryOrchestrator` / `RecoveryConfig`。
 //!
-//! 【⭐ 我为何搜错 —— 这是本条最值得记的部分】
+//! 【我为何搜错 —— 这是本条最值得记的部分】
 //! 我搜的是**生产侧**的 `.recover(` 调用；而**消费侧**根本不调 `.recover(`，
 //! 它**匹配**那个返回值。
 //! ⇒ **搜「生产者的动词」找不到「消费者」。**
@@ -34,11 +34,11 @@
 
 #![deny(dead_code)]
 
-// ⭐⭐ 模块级**收紧** lint：让编译器替我们回答「这个模块里哪些项没人用」。
+// 模块级**收紧** lint：让编译器替我们回答「这个模块里哪些项没人用」。
 // crate 根部有 `#![allow(dead_code)]`（见 lib.rs），会把这类信号全部压掉；
 // 而「未接线」正是本模块最需要被看见的状态。
 //
-// ⭐ 配合 `pub(crate)`（见 `nt_core_error/mod.rs` 的理由）：
+// 配合 `pub(crate)`（见 `nt_core_error/mod.rs` 的理由）：
 // 对外`pub` 会让编译器**无法**给 dead-code 信号（公开可达项不算 dead）；
 // 收窄后，编译器**重新获得**判「有没有人用」的能力。
 //

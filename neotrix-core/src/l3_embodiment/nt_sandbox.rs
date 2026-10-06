@@ -21,7 +21,7 @@ use std::sync::Mutex;
 /// | `WorkspaceWrite` | 工作区内可写，**网络默认关** | codex `workspace-write` |
 /// | `Disabled` | 不设限（**仍受 execpolicy/规则引擎约束**） | codex `danger-full-access` 的「不装 sandbox」，但**语义更弱** —— 本仓的规则引擎与 deny 规则在 `Disabled` 下**依然生效** |
 ///
-/// ⭐ 为什么要有中间档：原实现只有 `Disabled` / `ReadOnly` / `Docker`，
+/// 为什么要有中间档：原实现只有 `Disabled` / `ReadOnly` / `Docker`，
 /// 而 `Docker` 是**后端**不是**级别** ⇒ 用户想要「能写代码但不许联网/不许出工作区」
 /// 只能选 `Disabled` ⇒ **被迫全放开**。这是缺口，不是设计。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,14 +30,14 @@ pub enum SandboxMode {
     Disabled,
     /// 任何写入都拒。
     ReadOnly,
-    /// ⭐ 工作区内可写；工作区外与网络仍受限。
+    /// 工作区内可写；工作区外与网络仍受限。
     WorkspaceWrite,
     /// 用 Docker 做隔离（**后端**，不是级别）。
     Docker,
 }
 
 impl SandboxMode {
-    /// ⭐⭐⭐ 解析用户输入的沙箱级别。**未知值返回 `Err`，不再静默兜底。**
+    /// 解析用户输入的沙箱级别。**未知值返回 `Err`，不再静默兜底。**
     ///
     /// 【缺陷（2026-10-06 修）】首版是 `_ => Self::Disabled`
     /// ⇒ `--sandbox danger-full-access`（`codex` 的最危险档）
@@ -56,7 +56,7 @@ impl SandboxMode {
         match s.trim().to_lowercase().as_str() {
             "disabled" | "off" | "none" => Ok(Self::Disabled),
             "read-only" | "readonly" | "read_only" | "ro" => Ok(Self::ReadOnly),
-            // ⭐ 新增中间档（对齐 codex workspace-write）
+            // 新增中间档（对齐 codex workspace-write）
             "workspace-write" | "workspace_write" | "workspace" | "ww" => Ok(Self::WorkspaceWrite),
             "docker" => Ok(Self::Docker),
             other => Err(format!(
@@ -65,12 +65,12 @@ impl SandboxMode {
         }
     }
 
-    /// ⭐ 该级别是否允许**工作区内**写入。
+    /// 该级别是否允许**工作区内**写入。
     pub fn allows_workspace_write(&self) -> bool {
         matches!(self, Self::WorkspaceWrite | Self::Disabled | Self::Docker)
     }
 
-    /// ⭐ 该级别是否**完全禁止写入**。
+    /// 该级别是否**完全禁止写入**。
     pub fn is_read_only(&self) -> bool {
         matches!(self, Self::ReadOnly)
     }
@@ -128,7 +128,7 @@ pub fn global_sandbox() -> &'static Mutex<SandboxEnforcer> {
     &SANDBOX_ENFORCER
 }
 
-/// ⭐⭐⭐ 初始化进程级沙箱档位（`--sandbox` 的**唯一**落地入口）。
+/// 初始化进程级沙箱档位（`--sandbox` 的**唯一**落地入口）。
 ///
 /// ## 【缺陷（2026-10-06 修）】`--sandbox` 此前**完全无效**
 /// 本函数只写 `global_sandbox()` 这一个单例，而实测
@@ -179,7 +179,7 @@ pub fn check_sandbox() -> Option<String> {
 
 #[cfg(test)]
 mod mode_parse_tests {
-    //! ⭐ 反向锁：**未知沙箱档必须硬拒绝**，不得静默兜底。
+    //! 反向锁：**未知沙箱档必须硬拒绝**，不得静默兜底。
     //!
     //! 【缺陷（2026-10-06 修）】首版是 `_ => Self::Disabled`
     //! ⇒ `--sandbox danger-full-access`（`codex` 最危险档）
@@ -212,7 +212,7 @@ mod mode_parse_tests {
         }
     }
 
-    /// ⭐⭐ 未知档必须 `Err`，且**不得**是 `Disabled`。
+    /// 未知档必须 `Err`，且**不得**是 `Disabled`。
     ///
     /// `Disabled` 是「不设限」，把它当兜底值是最危险的一种 ——
     /// 用户拼错一个字母 ⇒ 保护全没了。
@@ -245,7 +245,7 @@ mod mode_parse_tests {
         }
     }
 
-    /// ⭐ `WorkspaceWrite` 是**新增的中间档**（对齐 codex）——
+    /// `WorkspaceWrite` 是**新增的中间档**（对齐 codex）——
     /// 此前用户想要「能写代码但不许出工作区」只能选 `Disabled` ⇒ 被迫全放开。
     #[test]
     fn workspace_write_is_distinct_from_disabled() {

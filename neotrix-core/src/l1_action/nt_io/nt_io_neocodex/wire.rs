@@ -96,7 +96,7 @@ impl WireSession {
             let _ = std::fs::create_dir_all(parent);
         }
         if let Ok(line) = serde_json::to_string(&event) {
-            // ⭐ 2026-10-02：原 `let _ =` 丢弃 ⇒ 写失败则「full history for replay」**静默截断**
+            // 2026-10-02：原 `let _ =` 丢弃 ⇒ 写失败则「full history for replay」**静默截断**
             //    （本文件 :85-88 自述它就是耐久记录，`load()`/`replay()` 靠它回放）。
             // ⛔ `record()` 返回 `()` ⇒ 没有 `?` 可用 ⇒ 用日志作观察通道
             //    （范式抄 `nt_dispatch_loop.rs:251`，该处注释逐字解释了这个取舍）。

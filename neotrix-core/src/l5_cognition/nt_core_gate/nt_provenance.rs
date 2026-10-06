@@ -1,10 +1,10 @@
-//! ⭐⭐ **声明式溯源门 + 优雅降级发布**（absorbed from `HKUDS/Vibe-Trading`, MIT,
+//! **声明式溯源门 + 优雅降级发布**（absorbed from `HKUDS/Vibe-Trading`, MIT,
 //! `agent/src/agent/grounding/`）。
 //!
 //! ## 那一处真正的新东西：**不因为一个坏数字就整段拒答**
 //!
 //! 原作的发布顺序（`release.py:515-527` + `loop.py:1718-1901`）是：
-//! 校验 → 便宜的确定性修补 → **有界**修订 → ⭐ **切掉失败的 figure、用同一道门
+//! 校验 → 便宜的确定性修补 → **有界**修订 → **切掉失败的 figure、用同一道门
 //! 复验剩下的文本** → 仍失败才 fail-closed 拒答。产出带 `degraded: true`。
 //!
 //! 本模块把这个顺序做成**类型上的**（见 [`admit`]）：
@@ -31,13 +31,13 @@
 //! 五个角色 [`ROLES`]、五种形状 [`FIGURE_SHAPES`]（number / date / ordinal /
 //! index-cell / code fence）都是**数据**，不是分支。
 //!
-//! ## ⭐ 检查是**声明行**，不是共享控制流里的分支（`registry.py:1-13`）
+//! ## 检查是**声明行**，不是共享控制流里的分支（`registry.py:1-13`）
 //!
 //! 原作自述：「every incident landed as another inline rule」⇒ 本模块
 //! [`ProvenanceCheck`] 是 trait，注册表由**调用方组装**。**新增一条检查不动
 //! [`admit`] 一行**（测试 `registry_extension_needs_no_control_flow_edit` 钉住）。
 //!
-//! ## ⭐ `not_evaluable` 绝不静默变成成功（三分表，不是二分表）
+//! ## `not_evaluable` 绝不静默变成成功（三分表，不是二分表）
 //!
 //! 「不能判定」与「判定为不通过」是两种事实，塌成两值 ⇒ 未声明的声明会冒充
 //! 通过。故 [`Issue`] 分 [`IssueSeverity::Block`] 与 [`IssueSeverity::NotEvaluable`]，
@@ -52,7 +52,7 @@
 //! **违规本身**（那正是这条检查存在的理由）；只有**「连规则适不适用都不知道」**
 //! 才是不可判定。
 //!
-//! ⭐ 第二行里「**为空串**」那半是实测逼出来的：本模块第一版把 `formula=`
+//! 第二行里「**为空串**」那半是实测逼出来的：本模块第一版把 `formula=`
 //! 的空值当**注解畸形** ⇒ 整条注解作废 ⇒ 该判定退化成 `not_evaluable`
 //! ⇒ **「模型把口径写空了」这件事永远抓不到**。空串与「键不存在」在这个协议里
 //! 是**同一个违规**（该填而没填），必须落到 `block`。唯一不许为空的是
@@ -72,7 +72,7 @@
 //! 只能靠凭空发明字段。钉死它的测试：
 //! `an_observed_claim_is_silent_because_no_rule_was_invented_for_it`。
 //!
-//! ## ⭐ 那么什么真正到达 `REMAINDER_STILL_FAILS`（别信注释，信测试）
+//! ## 那么什么真正到达 `REMAINDER_STILL_FAILS`（别信注释，信测试）
 //!
 //! 删掉虚构协议后，「切完复验仍失败」有两条真实来源。**两条都不需要发明字段。**
 //!
@@ -102,7 +102,7 @@
 //! 上面那个交叠形状**（围栏 + 畸形注解）—— 那条测试只断言这条保证，**不**预言
 //! 它给出哪种裁决。
 //!
-//! ⭐ 也就是说：真正承重的从来不是「级联不可能」这个论证，而是**复验这一步本身**。
+//! 也就是说：真正承重的从来不是「级联不可能」这个论证，而是**复验这一步本身**。
 //! 去掉虚构协议没有削弱 fail-closed，只是不再需要为了它编一个协议。
 //!
 //! ## 纯度由签名保证
@@ -138,7 +138,7 @@ use neotrix_neobot::nt_determinism::{sorted_keys, Digest};
 // 字节跨度：全函数，永不 panic
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// ⭐ 文本里的**字节**跨度。
+/// 文本里的**字节**跨度。
 ///
 /// `start > end`、越界、非字符边界一律合法构造 —— 一切非法情形都在
 /// [`Span::slice`] 处退化成 `None`，**没有一个 `unwrap`**。理由：降级切割要
@@ -183,7 +183,7 @@ impl Span {
         self.len() == 0
     }
 
-    /// ⭐ 取子串。越界 / 反向 / 非字符边界 ⇒ `None`。
+    /// 取子串。越界 / 反向 / 非字符边界 ⇒ `None`。
     #[must_use]
     pub fn slice<'t>(&self, text: &'t str) -> Option<&'t str> {
         text.get(self.start..self.end)
@@ -212,7 +212,7 @@ impl fmt::Display for Span {
 // 形状：数字 / 日期 / 序数 / 索引单元 / 代码围栏
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// ⭐ figure 的**形状**。语言无关，靠字符形态判定（`figures.py:47-84`）。
+/// figure 的**形状**。语言无关，靠字符形态判定（`figures.py:47-84`）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FigureShape {
     /// 数值（可带 `,` 千分位、`.` 小数、`%`/`k`/`m`/`b`/`x` 量级后缀与正负号）。
@@ -249,7 +249,7 @@ impl FigureShape {
         }
     }
 
-    /// ⭐ 判别值（1 起；`0` 保留给「形状未识别」）。
+    /// 判别值（1 起；`0` 保留给「形状未识别」）。
     #[must_use]
     pub fn code(self) -> u8 {
         match self {
@@ -261,7 +261,7 @@ impl FigureShape {
         }
     }
 
-    /// ⭐⭐ 形状判定。**返回 `None` 就是「不认识」** —— 调用方必须把它当
+    /// 形状判定。**返回 `None` 就是「不认识」** —— 调用方必须把它当
     /// `not_evaluable` 处理，绝不猜 pass 也不猜 fail。
     #[must_use]
     pub fn detect(figure: &str) -> Option<Self> {
@@ -360,7 +360,7 @@ fn is_number_suffix(c: u8) -> bool {
 // 角色：模型自报的来源
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// ⭐ 声明的来源角色（`figures.py:36` 的 `ROLES`）。
+/// 声明的来源角色（`figures.py:36` 的 `ROLES`）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ProvenanceRole {
     /// 观测到（工具/行情直接读到的）。
@@ -433,7 +433,7 @@ pub const PAYLOAD_BASIS: &str = "basis";
 // 一条声明
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// ⭐⭐ 一条声明的 claim：**文本跨度 + 自报角色 + 可选载荷**。
+/// 一条声明的 claim：**文本跨度 + 自报角色 + 可选载荷**。
 ///
 /// 字段私有：角色与载荷无法与跨度**脱钩**被构造出来 —— 「切得到」这件事
 /// 依赖 `figure` 真的躺在 `cut_span` 起点，构造期就得保证。
@@ -451,7 +451,7 @@ pub struct DeclaredClaim {
 }
 
 impl DeclaredClaim {
-    /// ⭐ 程序化构造（不走文本解析）。
+    /// 程序化构造（不走文本解析）。
     ///
     /// 语义约定：**`cut_span` 的起点就是 figure 的起点**（与解析器产出一致）。
     /// 这条约定正是降级切割的校验点（[`admit_claims`] 里的
@@ -495,7 +495,7 @@ impl DeclaredClaim {
         self.figure_span
     }
 
-    /// ⭐ 降级时**要切掉的**跨度 = `figure ∪ 注解`。
+    /// 降级时**要切掉的**跨度 = `figure ∪ 注解`。
     ///
     /// 切注解是必须的：留下 `[role=cited]` 这种孤儿会把文本搞成**语法残缺**
     /// 的一段话，而不是「删掉了一句」。
@@ -504,7 +504,7 @@ impl DeclaredClaim {
         self.cut_span
     }
 
-    /// ⭐ 稳定标识 = `figure#occurrence`（同一 figure 的第几次出现，从 0 起）。
+    /// 稳定标识 = `figure#occurrence`（同一 figure 的第几次出现，从 0 起）。
     ///
     /// ⚠️ 由**文档位置**决定，与调用方给的 `Vec` 顺序无关 ⇒ 逆序喂进
     /// [`Ledger`] 不改变任何 id ⇒ 旁证解析天然顺序无关。
@@ -519,13 +519,13 @@ impl DeclaredClaim {
         self.occurrence
     }
 
-    /// ⭐ 形状。`None` = **不认识** ⇒ 调用方须 `not_evaluable`。
+    /// 形状。`None` = **不认识** ⇒ 调用方须 `not_evaluable`。
     #[must_use]
     pub fn shape(&self) -> Option<FigureShape> {
         self.shape
     }
 
-    /// ⭐ 自报角色。`None` = 未声明 / 未知 / 注解畸形 ⇒ **不猜**。
+    /// 自报角色。`None` = 未声明 / 未知 / 注解畸形 ⇒ **不猜**。
     #[must_use]
     pub fn role(&self) -> Option<ProvenanceRole> {
         self.role
@@ -543,7 +543,7 @@ impl DeclaredClaim {
         self.well_formed
     }
 
-    /// ⭐ 取一个载荷值。**同名多个取排序后第一个**（确定性，不依赖声明序）。
+    /// 取一个载荷值。**同名多个取排序后第一个**（确定性，不依赖声明序）。
     #[must_use]
     pub fn payload_value(&self, key: &str) -> Option<&str> {
         self.payload.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
@@ -561,7 +561,7 @@ impl DeclaredClaim {
         &self.payload
     }
 
-    /// ⭐ 本条声明的内容地址（逐字段显式列出，`variant` 声明编码版本）。
+    /// 本条声明的内容地址（逐字段显式列出，`variant` 声明编码版本）。
     #[must_use]
     pub fn digest(&self) -> u64 {
         let pairs: Vec<String> =
@@ -589,10 +589,10 @@ const LEDGER_SCHEMA_V: u8 = 1;
 const RELEASE_SCHEMA_V: u8 = 1;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ⭐ 解析：全函数，永不 panic
+// 解析：全函数，永不 panic
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// ⭐⭐ 解析声明。**总函数**：任何输入（含畸形括号、多字节、未闭合围栏）都返回
+/// 解析声明。**总函数**：任何输入（含畸形括号、多字节、未闭合围栏）都返回
 /// 一个 `Vec`，不 panic、不 `unwrap`。
 ///
 /// ⛔ 本函数**不读自然语言的词**：它只认 `[role=…]` 这一行**声明协议**。
@@ -664,7 +664,7 @@ fn line_end(b: &[u8], from: usize) -> usize {
     i
 }
 
-/// ⭐ 围栏块的结束（不含结尾换行）。**未闭合 ⇒ 文本末尾**（诚实的降级，
+/// 围栏块的结束（不含结尾换行）。**未闭合 ⇒ 文本末尾**（诚实的降级，
 /// 不是静默丢弃整块）。
 fn fence_block_end(b: &[u8], after_open: usize) -> usize {
     let mut i = after_open;
@@ -691,7 +691,7 @@ struct Annotation {
     complete: bool,
 }
 
-/// ⭐ 注解扫描：**容错但绝不半信**。要么完整解出 `[role=R k=v …]`，要么
+/// 注解扫描：**容错但绝不半信**。要么完整解出 `[role=R k=v …]`，要么
 /// `complete = false` 且 `role = None`。不存在「解出角色但载荷丢了一半」这种
 /// 中间态 —— 那会让检查误以为规则适用。
 fn scan_annotation(text: &str, open: usize) -> Annotation {
@@ -745,7 +745,7 @@ fn scan_annotation(text: &str, open: usize) -> Annotation {
             return malformed();
         }
         i = skip_inline_ws(b, i.saturating_add(1));
-        // ⭐ 载荷值**允许为空**。`role=derived formula=` 是一个**声明完整、但
+        // 载荷值**允许为空**。`role=derived formula=` 是一个**声明完整、但
         // 必填字段为空**的注解 ⇒ 规则适用 ⇒ 违规（`block`）。若把空值当畸形，
         // 整条注解作废 ⇒ 规则退化成 `not_evaluable` ⇒ 「模型把口径写空了」
         // 这件事**永远抓不到** —— 那正是这条检查存在的理由。
@@ -781,7 +781,7 @@ fn take_ident(b: &[u8], from: usize) -> Option<(String, usize)> {
 
 /// 取一个载荷值：读到空白 / `[` / `]` 为止。
 ///
-/// ⭐ 因为分隔符全是 ASCII（`< 0x80`），逐字节推进**不会**切进 UTF-8 续字节
+/// 因为分隔符全是 ASCII（`< 0x80`），逐字节推进**不会**切进 UTF-8 续字节
 /// ⇒ `from_utf8_lossy` 是纯保险，不是修复。
 fn take_value(b: &[u8], from: usize) -> (String, usize) {
     let mut i = from;
@@ -800,7 +800,7 @@ fn is_value_end(c: u8) -> bool {
 // 问题行：只有「阻断」与「不可判定」，没有「通过」
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// ⭐ 问题严重度。**没有 `Pass`** —— 通过就是**没有问题**；给通过也造一行
+/// 问题严重度。**没有 `Pass`** —— 通过就是**没有问题**；给通过也造一行
 /// 会让「检查没跑」和「检查跑了且通过」长得一样。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum IssueSeverity {
@@ -810,7 +810,7 @@ pub enum IssueSeverity {
     NotEvaluable,
 }
 
-/// ⭐⭐ 一条检查产出的**一行**问题。
+/// 一条检查产出的**一行**问题。
 ///
 /// ⛔ `not_evaluable` **不是**失败，也**绝不**算通过：它只说明这道检查此刻
 /// 没有资格表态。唯一的去向是被 [`Issue::is_blocking`] 排除。
@@ -836,7 +836,7 @@ impl Issue {
         }
     }
 
-    /// ⭐ 不可判定行。
+    /// 不可判定行。
     #[must_use]
     pub fn not_evaluable(
         code: &str,
@@ -883,7 +883,7 @@ impl Issue {
         self.severity
     }
 
-    /// ⭐ 是否计入阻断（⇒ 触发降级切割）。
+    /// 是否计入阻断（⇒ 触发降级切割）。
     #[must_use]
     pub fn is_blocking(&self) -> bool {
         self.severity == IssueSeverity::Block
@@ -916,7 +916,7 @@ impl fmt::Display for Issue {
 // 账本：检查能看到的全部世界（自有数据 ⇒ 无 IO 可钻的空子）
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// ⭐ 账本 = 一段文本 + 一组声明。**只有 `&str` 与 `&[DeclaredClaim]`**。
+/// 账本 = 一段文本 + 一组声明。**只有 `&str` 与 `&[DeclaredClaim]`**。
 #[derive(Debug, Clone, Copy)]
 pub struct Ledger<'a> {
     text: &'a str,
@@ -949,7 +949,7 @@ impl<'a> Ledger<'a> {
         self.claims.get(index)
     }
 
-    /// ⭐ 按稳定 id 取声明（`figure#occurrence` 寻址）。
+    /// 按稳定 id 取声明（`figure#occurrence` 寻址）。
     ///
     /// 线性扫描、返回切片中**第一条** ⇒ 结果是切片的函数。解析器产出的 id
     /// 唯一（`figure#occurrence`），所以顺序不影响结果 —— 测试
@@ -972,7 +972,7 @@ impl<'a> Ledger<'a> {
         self.claims.is_empty()
     }
 
-    /// ⭐ 账本内容地址。**键序无关**：声明逆序不改变身份（`sorted_keys`）。
+    /// 账本内容地址。**键序无关**：声明逆序不改变身份（`sorted_keys`）。
     #[must_use]
     pub fn digest(&self) -> u64 {
         let keys: Vec<String> =
@@ -988,10 +988,10 @@ impl<'a> Ledger<'a> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ⭐ 检查 trait：声明行，不是控制流分支
+// 检查 trait：声明行，不是控制流分支
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// ⭐⭐ 一条声明式检查。**对象安全**（无泛型方法、无 `Self` 返回）。
+/// 一条声明式检查。**对象安全**（无泛型方法、无 `Self` 返回）。
 ///
 /// 实现者**不得**写 IO / 时钟 / LLM 调用 —— [`Ledger`] 里没有任何能读写外部
 /// 世界的句柄，想写也编译不过。
@@ -1002,7 +1002,7 @@ pub trait ProvenanceCheck {
     /// 人读描述（进清单 / `--list`）。
     fn description(&self) -> &'static str;
 
-    /// ⭐ 求值。**必须全函数**：畸形 / 缺载荷只能产出
+    /// 求值。**必须全函数**：畸形 / 缺载荷只能产出
     /// [`IssueSeverity::NotEvaluable`] 或 [`IssueSeverity::Block`]，不许 panic。
     fn evaluate(&self, ledger: &Ledger<'_>) -> Vec<Issue>;
 }
@@ -1038,7 +1038,7 @@ fn undeclared_role_detail(claim: &DeclaredClaim) -> String {
 /// 检查码：`derived` 声明未给出公式。
 pub const CODE_DERIVED_FORMULA: &str = "nt.prov.derived.formula";
 
-/// ⭐⭐ 检查一：**`derived` 必须命名它的公式**。
+/// 检查一：**`derived` 必须命名它的公式**。
 ///
 /// 角色集本身蕴含这条规则：`derived` 的全部意义就是「这个数是算出来的」，
 /// 而算不出来的东西不配叫 `derived` —— 它只是个 `observed` 或 `proposed`
@@ -1109,7 +1109,7 @@ impl ProvenanceCheck for DerivedFormulaCheck {
 /// 检查码：`cited` 声明未给出来源。
 pub const CODE_CITED_SOURCE: &str = "nt.prov.cited.source";
 
-/// ⭐⭐ 检查二：**`cited` 必须携带来源**。
+/// 检查二：**`cited` 必须携带来源**。
 ///
 /// 与检查一同源但**不可互相替代**：`formula` 讲「怎么算出来的」（可复算），
 /// `source` 讲「从哪儿看来的」（可回查）。少了 `source` 的 `cited` 是一句
@@ -1169,7 +1169,7 @@ impl ProvenanceCheck for CitedSourceCheck {
 
 // ── 内建检查到此为止（⛔ 曾经存在的第三条检查已被删除，见模块头「诚实台账」）──
 
-/// ⭐ 默认注册表（两条声明行）。**新增检查在此追加一行** —— 这是全层唯一需要
+/// 默认注册表（两条声明行）。**新增检查在此追加一行** —— 这是全层唯一需要
 /// 改的地方，且它是**声明**，不是控制流分支。
 ///
 /// ⛔ 这里**曾经**有第三条 `ObservedWitnessCheck`（`witness=` 旁证），已删除：
@@ -1180,7 +1180,7 @@ pub fn default_checks() -> Vec<Box<dyn ProvenanceCheck>> {
     vec![Box::new(DerivedFormulaCheck::new()), Box::new(CitedSourceCheck::new())]
 }
 
-/// ⭐ 校验入口。**纯函数**：`(ledger, checks) ⇒ 排序后的问题行`。
+/// 校验入口。**纯函数**：`(ledger, checks) ⇒ 排序后的问题行`。
 ///
 /// 出口统一排序 ⇒ **注册顺序不进入结果**（本仓刚修完的哈希序纪律在溯源门的
 /// 同款落实，对照 `nt_determinism.rs:200-224`）。`sort` 稳定 ⇒ 完全同键的行
@@ -1199,7 +1199,7 @@ pub fn validate(ledger: &Ledger<'_>, checks: &[Box<dyn ProvenanceCheck>]) -> Vec
 // fail-closed 的终态
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// ⭐⭐ fail-closed 终态（`release.py:520-527` 的四条理由归并为三态）。
+/// fail-closed 终态（`release.py:520-527` 的四条理由归并为三态）。
 ///
 /// 原文列了四种 `None`：*a market answer observed no price* /
 /// *an issue cannot be cut* / *a flagged figure cannot be located* /
@@ -1252,7 +1252,7 @@ impl RefusalReason {
         }
     }
 
-    /// ⭐ 穷举清单。
+    /// 穷举清单。
     #[must_use]
     pub fn all() -> &'static [RefusalReason] {
         &REFUSAL_REASONS
@@ -1272,7 +1272,7 @@ impl fmt::Display for RefusalReason {
 /// 原作的修订预算上限（`release.py:32`）。
 pub const MAX_GROUNDING_REVISIONS: u32 = 2;
 
-/// ⭐⭐ 有界修订预算。
+/// 有界修订预算。
 ///
 /// ⛔ 本层**永不**修改它：`admit` 只拿 `&RevisionBudget`，唯一的写入口
 /// [`RevisionBudget::consume`] 是 `&mut self`，只有**调用方**（那个跑修订轮、
@@ -1309,19 +1309,19 @@ impl RevisionBudget {
         self.consumed
     }
 
-    /// ⭐ 剩余（饱和减）。
+    /// 剩余（饱和减）。
     #[must_use]
     pub fn remaining(&self) -> u32 {
         self.max_revisions.saturating_sub(self.consumed)
     }
 
-    /// ⭐ 是否已耗尽。
+    /// 是否已耗尽。
     #[must_use]
     pub fn exhausted(&self) -> bool {
         self.remaining() == 0
     }
 
-    /// ⭐⭐ 消费一格。**返回是否成功** —— 耗尽后调用方能看见失败，而不是
+    /// 消费一格。**返回是否成功** —— 耗尽后调用方能看见失败，而不是
     /// 静默超支（超支的修订轮等于「有界」这个说法失效）。
     pub fn consume(&mut self) -> bool {
         if self.exhausted() {
@@ -1353,7 +1353,7 @@ impl Default for RevisionBudget {
 // 三种结局
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// ⭐⭐⭐ **释放文本**：裁决与文本**捆绑**的载体。
+/// **释放文本**：裁决与文本**捆绑**的载体。
 ///
 /// 字段私有 + [`ReleasedText::degraded`] **从 `claims_cut` 派生** ⇒ 标志与
 /// 事实不可能分叉（不能「声明降级却没删任何东西」）。
@@ -1367,13 +1367,13 @@ pub struct ReleasedText {
 }
 
 impl ReleasedText {
-    /// ⭐⭐ 可发布文本（**原文**，无任何声明被切时逐字节相同）。
+    /// 可发布文本（**原文**，无任何声明被切时逐字节相同）。
     #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
 
-    /// ⭐ 是否降级发布 —— **派生于** `claims_cut > 0`，不是独立字段。
+    /// 是否降级发布 —— **派生于** `claims_cut > 0`，不是独立字段。
     #[must_use]
     pub fn degraded(&self) -> bool {
         self.claims_cut > 0
@@ -1409,7 +1409,7 @@ impl ReleasedText {
         self.text.is_empty()
     }
 
-    /// ⭐ 裁决 + 文本的审计身份。
+    /// 裁决 + 文本的审计身份。
     #[must_use]
     pub fn digest(&self) -> u64 {
         let code_keys = sorted_keys(
@@ -1442,7 +1442,7 @@ impl ReleasedText {
     }
 }
 
-/// ⭐ 「需要一轮修订」：**还没有**可发布文本，只有待修的问题行。
+/// 「需要一轮修订」：**还没有**可发布文本，只有待修的问题行。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Revision {
     issues: Vec<Issue>,
@@ -1482,13 +1482,13 @@ impl Revision {
         self.consumed
     }
 
-    /// ⭐ 剩余。
+    /// 剩余。
     #[must_use]
     pub fn revisions_remaining(&self) -> u32 {
         self.max_revisions.saturating_sub(self.consumed)
     }
 
-    /// ⭐ 是否还允许再修订一轮。
+    /// 是否还允许再修订一轮。
     #[must_use]
     pub fn may_revise(&self) -> bool {
         self.revisions_remaining() > 0
@@ -1501,7 +1501,7 @@ impl Revision {
     }
 }
 
-/// ⭐⭐ **拒答**。⛔ **没有任何 text 访问器** —— 终态就是终态。
+/// **拒答**。⛔ **没有任何 text 访问器** —— 终态就是终态。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Refusal {
     reason: RefusalReason,
@@ -1536,7 +1536,7 @@ impl Refusal {
     }
 }
 
-/// ⭐⭐⭐ 三种结局。
+/// 三种结局。
 ///
 /// | 变体 | 何时 | 带着什么 |
 /// |---|---|---|
@@ -1553,7 +1553,7 @@ pub enum Release {
     Refused(Refusal),
 }
 
-/// ⭐⭐⭐ **裁决 —— 变体里直接持有结局载荷**。
+/// **裁决 —— 变体里直接持有结局载荷**。
 ///
 /// ⛔ 这是需求「**不可能只拿到裁决而拿不到释放文本**」的落地形态：
 /// `ReleaseVerdict::Released` 携带的是 `&ReleasedText`，**不是**一个
@@ -1570,7 +1570,7 @@ pub enum ReleaseVerdict<'r> {
 }
 
 impl<'r> ReleaseVerdict<'r> {
-    /// ⭐ 取释放文本。**只有发布态才是 `Some`**。
+    /// 取释放文本。**只有发布态才是 `Some`**。
     #[must_use]
     pub fn released_text(self) -> Option<&'r ReleasedText> {
         match self {
@@ -1579,13 +1579,13 @@ impl<'r> ReleaseVerdict<'r> {
         }
     }
 
-    /// ⭐ 是否降级发布。
+    /// 是否降级发布。
     #[must_use]
     pub fn degraded(self) -> bool {
         self.released_text().is_some_and(ReleasedText::degraded)
     }
 
-    /// ⭐ 是否**干净**发布（一字未改）。
+    /// 是否**干净**发布（一字未改）。
     #[must_use]
     pub fn is_clean(self) -> bool {
         self.released_text().is_some_and(|rt| !rt.degraded())
@@ -1615,7 +1615,7 @@ impl fmt::Display for ReleaseVerdict<'_> {
 }
 
 impl Release {
-    /// ⭐ 取可发布文本。
+    /// 取可发布文本。
     #[must_use]
     pub fn released_text(&self) -> Option<&ReleasedText> {
         match self {
@@ -1624,7 +1624,7 @@ impl Release {
         }
     }
 
-    /// ⭐⭐ 裁决**捆绑**结局载荷。
+    /// 裁决**捆绑**结局载荷。
     #[must_use]
     pub fn verdict(&self) -> ReleaseVerdict<'_> {
         match self {
@@ -1642,10 +1642,10 @@ impl Release {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ⭐⭐ 发布状态机：一趟算完裁决 + 释放文本
+// 发布状态机：一趟算完裁决 + 释放文本
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// ⭐⭐ 便利入口：解析 + 门控（`parse → validate → …`）。
+/// 便利入口：解析 + 门控（`parse → validate → …`）。
 #[must_use]
 pub fn admit(
     text: &str,
@@ -1656,7 +1656,7 @@ pub fn admit(
     admit_claims(text, &claims, checks, budget)
 }
 
-/// ⭐⭐⭐ 状态机本体（`release.py:515-527` 的顺序）。
+/// 状态机本体（`release.py:515-527` 的顺序）。
 ///
 /// ```text
 ///   parse(claims)
@@ -1832,7 +1832,7 @@ fn degrade(
     })
 }
 
-/// ⭐ 按跨度切文本。**顺序无关**：先排序再合并 ⇒ 调用方给正序、逆序、
+/// 按跨度切文本。**顺序无关**：先排序再合并 ⇒ 调用方给正序、逆序、
 /// 重复跨度都得到同一结果（与 `sorted_keys` 纪律同源）。
 ///
 /// ⛔ **已知的输出质量欠账（本层最弱的一处取舍，刻意留在此处可见）**：
@@ -1911,7 +1911,7 @@ n 1437[role=count basis=rows_scanned]\n";
     const SAME_FIGURE_TWICE: &str =
         "x 9.9[role=cited source=hkex]\ny 9.9[role=cited]\n";
 
-    /// ⭐ 三条声明：一条合规 `count`、一条违规 `derived`（无口径）、一条违规
+    /// 三条声明：一条合规 `count`、一条违规 `derived`（无口径）、一条违规
     /// `cited`（无来源）。**完整解析时**后两条一起被切 ⇒ 可降级发布。
     const UNDER_REPORTED: &str = "p 5.0[role=count basis=rows]\n\
 a 1.0[role=derived]\n\
@@ -2008,7 +2008,7 @@ i #42[role=observed]\n\
 
     // ── 解析：全函数 + 定位不变量 ─────────────────────────────────────────
 
-    /// ⭐⭐ **定位不变量**：解析器产出的每条声明，其切分跨度都能切出来，且**从
+    /// **定位不变量**：解析器产出的每条声明，其切分跨度都能切出来，且**从
     /// figure 开始**。这条不变量让 fail-closed 的 `ISSUE_NOT_CUTTABLE` 只能由
     /// **手造 / 外部**声明触发 —— 正是它该被触发的场景。
     #[test]
@@ -2056,7 +2056,7 @@ i #42[role=observed]\n\
                     claim.cut_span(),
                     claim.figure()
                 );
-                // ⭐ 完整解析出的注解**必须**解出角色原文（可能是未知角色）。
+                // 完整解析出的注解**必须**解出角色原文（可能是未知角色）。
                 // 但角色**可以**解不出 —— 这正是「不猜」的那一格。
                 assert_eq!(
                     claim.is_well_formed(),
@@ -2190,7 +2190,7 @@ i #42[role=observed]\n\
 
     // ── `observed`：没有内建规则，且**这是诚实的** ────────────────────────
 
-    /// ⭐ 第一版这里有一条要求 `witness=` 的检查。删掉它之后，`role=observed`
+    /// 第一版这里有一条要求 `witness=` 的检查。删掉它之后，`role=observed`
     /// 在默认注册表下**不产生任何问题行** —— 这不是「漏查」，而是**没有依据**：
     /// 要求一条观测携带旁证，就得先有一个「旁证」协议，而上游没有这个字段。
     /// ⛔ 别为了「让 `observed` 也被管一管」而凭空发明一个键。
@@ -2215,7 +2215,7 @@ i #42[role=observed]\n\
         }
     }
 
-    /// ⭐ 删掉第三条检查后，默认注册表**恰好**剩两条，且正是模块头承诺的两条。
+    /// 删掉第三条检查后，默认注册表**恰好**剩两条，且正是模块头承诺的两条。
     /// 这条测试的作用是**让「悄悄加了第三条规则」变成红的** —— 注册表是本层
     /// 唯一能引入规则的地方，它必须是可见的清单，不是隐式行为。
     #[test]
@@ -2224,7 +2224,7 @@ i #42[role=observed]\n\
         assert_eq!(codes, vec![CODE_DERIVED_FORMULA, CODE_CITED_SOURCE]);
     }
 
-    // ── ⭐ 降级路径 ───────────────────────────────────────────────────────
+    // ── 降级路径 ───────────────────────────────────────────────────────
 
     #[test]
     fn one_bad_claim_releases_the_rest_with_degraded_set() {
@@ -2233,7 +2233,7 @@ i #42[role=observed]\n\
         assert!(rt.degraded(), "切掉了声明 ⇒ 必须降级发布");
         assert_eq!(rt.claims_cut(), 1);
         assert_eq!(rt.claims_kept(), 1);
-        // ⭐ 切割是**精确到字节**的最小手术：只挖掉 `9.90` 及其注解，
+        // 切割是**精确到字节**的最小手术：只挖掉 `9.90` 及其注解，
         // 行首的引导词 `bench ` 原样留下 —— 行级切 + 空白塌缩是**已知欠账**，
         // `apply_cuts` 的文档里有完整理由（需要行模型 + 会改摘要口径）。
         assert_eq!(rt.text(), "open 187.40[role=observed]\nbench \n");
@@ -2255,7 +2255,7 @@ i #42[role=observed]\n\
 
     #[test]
     fn text_without_any_declaration_is_clean_not_refused() {
-        // ⭐ 诚实的边界：本层**只管声明过的 figure**。一段没有数字的散文
+        // 诚实的边界：本层**只管声明过的 figure**。一段没有数字的散文
         // 没有理由被拒 —— 否则这层就成了「不许说不带数字的话」。
         let rel = admit("今天没有可核查的数字。", &default_checks(), &RevisionBudget::none());
         let rt = released_of(&rel);
@@ -2274,7 +2274,7 @@ i #42[role=observed]\n\
         assert_eq!(dirty.degraded(), dirty.claims_cut() > 0);
     }
 
-    // ── ⭐ fail-closed ────────────────────────────────────────────────────
+    // ── fail-closed ────────────────────────────────────────────────────
 
     #[test]
     fn every_flagged_claim_cut_leaves_nothing_and_refuses() {
@@ -2288,13 +2288,13 @@ i #42[role=observed]\n\
             other => panic!("必须拒答，实际 {other}"),
         }
         assert!(rel.released_text().is_none(), "拒答**不携带**任何可发布文本");
-        // ⭐ 名字说的是**本层自己的动作**：两条声明都被切光了。
+        // 名字说的是**本层自己的动作**：两条声明都被切光了。
         assert_eq!(RefusalReason::AllClaimsCut.to_string(), "ALL_CLAIMS_CUT");
     }
 
     #[test]
     fn unlocatable_figure_refuses_instead_of_deleting_unrelated_text() {
-        // ⭐ 手造一条**跨度撒谎**的声明：跨度指向 "alpha "，figure 却是 "9.99"。
+        // 手造一条**跨度撒谎**的声明：跨度指向 "alpha "，figure 却是 "9.99"。
         let text = "alpha 1.5[role=cited] omega\n";
         let lying =
             DeclaredClaim::declared("9.99", Span::new(0, 6), ProvenanceRole::Cited, &[]);
@@ -2337,7 +2337,7 @@ i #42[role=observed]\n\
         assert!(err.1.contains("not in the ledger"), "{}", err.1);
     }
 
-    /// ⭐⭐ **什么真正到达 `REMAINDER_STILL_FAILS`：调用方少报了账本。**
+    /// **什么真正到达 `REMAINDER_STILL_FAILS`：调用方少报了账本。**
     ///
     /// 第一版这条测试是靠虚构的 `witness=` 协议制造「切一刀 ⇒ 新的违规」来
     /// 达到这个分支的。那条路已经删掉（见模块头「诚实台账」）。现在走的是
@@ -2383,7 +2383,7 @@ i #42[role=observed]\n\
         }
         assert!(rel.released_text().is_none(), "复验失败 ⇒ 不发文本");
 
-        // ⭐ 同一段文本，**完整**解析 ⇒ 放行。⇒ 拒答的原因只能是「少报」，
+        // 同一段文本，**完整**解析 ⇒ 放行。⇒ 拒答的原因只能是「少报」，
         // 不是这段文本本身有别的毛病。
         let parsed = admit(UNDER_REPORTED, &default_checks(), &RevisionBudget::none());
         assert!(
@@ -2393,7 +2393,7 @@ i #42[role=observed]\n\
         );
     }
 
-    /// ⭐⭐ **语料级不变式：凡本层放行的文本，用同一注册表复验必须零阻断。**
+    /// **语料级不变式：凡本层放行的文本，用同一注册表复验必须零阻断。**
     ///
     /// 这是本层**唯一真正承重**的不变式，也是「删掉虚构协议之后真正剩下的东西」：
     /// 干净路径第一轮就无阻断；降级路径阶段 4 用同一道门复验过。⇒
@@ -2510,7 +2510,7 @@ i #42[role=observed]\n\
         assert!(rel.verdict().degraded());
     }
 
-    // ── ⭐ 确定性 + 顺序稳定 ──────────────────────────────────────────────
+    // ── 确定性 + 顺序稳定 ──────────────────────────────────────────────
 
     #[test]
     fn same_input_twice_is_byte_identical() {
@@ -2557,14 +2557,14 @@ i #42[role=observed]\n\
         };
         let base = digest_of(ONE_BAD_CITED);
 
-        // ⭐ 顺序无关（同一个事实的两种组装）。
+        // 顺序无关（同一个事实的两种组装）。
         let mut claims = parse_declarations(ONE_BAD_CITED);
         let reversed = Ledger::new(ONE_BAD_CITED, &claims).digest();
         claims.reverse();
         assert_eq!(reversed, Ledger::new(ONE_BAD_CITED, &claims).digest());
         assert_eq!(reversed, base, "逆序不改变账本身份");
 
-        // ⭐ 判别力：换了文本 / 换了声明都必须换摘要。摘要恒定等于没摘要
+        // 判别力：换了文本 / 换了声明都必须换摘要。摘要恒定等于没摘要
         // （这正是 `nt_determinism.rs:39-43` 记的「字段覆盖靠手维护」缺陷的
         // 另一面：不动的摘要没人能看出它没在动）。
         assert_ne!(digest_of("bench 9.90[role=cited]\n"), base, "换文本 ⇒ 换摘要");
@@ -2629,7 +2629,7 @@ i #42[role=observed]\n\
         assert_eq!(fwd.claim_by_id("9.9#9"), None, "不存在的 id ⇒ None，不猜");
     }
 
-    /// ⭐⭐ **判别力实测（反例 / oracle）**：证明上面那条「顺序无关」测试
+    /// **判别力实测（反例 / oracle）**：证明上面那条「顺序无关」测试
     /// 不是恒真的仪式 —— 一份**故意坏**的实现（把 id 当成切片下标去取）会随
     /// 输入序翻转，而本实现不会。
     ///
@@ -2749,7 +2749,7 @@ i #42[role=observed]\n\
             admit(SAME_FIGURE_TWICE, &default_checks(), &RevisionBudget::none()),
             admit(ONE_BAD_CITED, &default_checks(), &RevisionBudget::new(2)),
         ] {
-            // ⭐ 不变式：**有文本 ⟺ 发布态**。修订态与拒答态都不携带文本，
+            // 不变式：**有文本 ⟺ 发布态**。修订态与拒答态都不携带文本，
             // 所以「上游拿到一个不含文本的已发布」这件事在类型上不存在。
             let verdict = rel.verdict();
             let has_text = verdict.released_text().is_some();

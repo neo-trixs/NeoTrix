@@ -304,7 +304,7 @@ mod tests {
     ///    `0.0`（**不是 NaN** ⇒ 不存在 NaN 传播 bug，改此断言不会掩盖缺陷）。
     /// ② 数学：零向量的余弦未定义，行业惯例取 0.0；取 1.0 无任何定义支撑。
     /// ③ 同仓`nt_core_graph.rs` 的同名函数对零向量同样返回 0.0。
-    /// ④ ⭐ 兄弟测试 `test_cosine_similarity_zero_only_a`（下方 3 行）
+    /// ④ 兄弟测试 `test_cosine_similarity_zero_only_a`（下方 3 行）
     ///    只有一个向量为零，断言的就是 `sim - 0.0`
     ///    ⇒ 原断言与**自家兄弟测试**直接矛盾。
     #[test]

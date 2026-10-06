@@ -594,7 +594,7 @@ mod tests {
     // （:450），其中 `self.nonce = self.nonce.saturating_add(1)`，且
     // `current_nonce()`（:436-440）编码的是计数器而非常量零。
     //
-    // ⭐ 这条比上一条更要紧：活动测试 `full_handshake_matches_official_vectors`
+    // 这条比上一条更要紧：活动测试 `full_handshake_matches_official_vectors`
     // 在传输轮用 `seal(&zero12, …)`（:676）**绕过** `encrypt_and_hash`
     // ⇒ 「nonce 必须自增」此前**没有任何活动测试覆盖**，
     //    只靠这个被挂起的门 ⇒ nonce 复用回归会静默通过。

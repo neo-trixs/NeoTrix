@@ -750,7 +750,7 @@ pub enum AbsorbSource {
 impl AbsorbSource {
     /// 由 URL 判定吸收来源。
     ///
-    /// # ⭐ 2026-10-03：改为 host 判定
+    /// # 2026-10-03：改为 host 判定
     ///
     /// ⛔ 原实现用裸 `url.contains("github.com")`。此处决定
     ///    **用哪个处理器去抓取**（GitHub API / arXiv / Wikipedia / 通用网页）——
@@ -758,7 +758,7 @@ impl AbsorbSource {
     ///    `https://github.com.evil.net/owner/repo` 会被原实现
     ///    判成 `GitHubUrl` 并走 GitHub 适配器。
     ///
-    /// ⭐ 改用 [`url_matches_domain`]（L0 原语，单一真源）。
+    /// 改用 [`url_matches_domain`]（L0 原语，单一真源）。
     pub fn from_url(url: &str) -> Option<Self> {
         use crate::l0_substrate::nt_core_platform::url_match::url_matches_domain as m;
 
@@ -1147,9 +1147,9 @@ impl UnifiedAbsorber {
 
     fn persist_cycle_report(&self, report: &AbsorbCycleReport) -> Result<(), String> {
         let json = serde_json::to_string(report).map_err(|e| format!("serde: {}", e))?;
-        // ⭐ 2026-10-02：原 `let _ =` 丢弃 ⇒ 写失败与「没有上一轮」**不可区分**
+        // 2026-10-02：原 `let _ =` 丢弃 ⇒ 写失败与「没有上一轮」**不可区分**
         //    （读侧 `:1094` 的 `unwrap_or(None)` 会把它当成首轮）。
-        // ⭐ 本函数签名**已经是** `Result<(), String>` 且三个调用方全用 `?`
+        // 本函数签名**已经是** `Result<(), String>` 且三个调用方全用 `?`
         //    ⇒ 传播通道现成，无需改任何调用方。
         // ⛔ 不用 `.ok()`/`.unwrap_or()`：那正是本门要抓的「伪装成功」。
         self.kb
@@ -1434,7 +1434,7 @@ mod tests {
 mod absorb_source_host_tests {
     use super::*;
 
-    /// ⭐⭐ 迁移回归：正常 URL 的处理器选择**必须完全不变**。
+    /// 迁移回归：正常 URL 的处理器选择**必须完全不变**。
     #[test]
     fn normal_urls_keep_their_handler() {
         match AbsorbSource::from_url("https://github.com/owner/repo") {
@@ -1455,7 +1455,7 @@ mod absorb_source_host_tests {
         ));
     }
 
-    /// ⭐ 判定面收窄：伪装域名不再走 GitHub/arXiv 适配器。
+    /// 判定面收窄：伪装域名不再走 GitHub/arXiv 适配器。
     ///
     /// ⛔ 这是本次改动的**全部意义**：原实现会把
     /// `https://github.com.evil.net/owner/repo` 判成 GitHubUrl，
@@ -1476,7 +1476,7 @@ mod absorb_source_host_tests {
         }
     }
 
-    /// ⭐⭐ userinfo 伪装：`https://github.com@evil.net/` 的
+    /// userinfo 伪装：`https://github.com@evil.net/` 的
     /// **真实 host 是 evil.net**，裸 contains 会判成 GitHub。
     #[test]
     fn userinfo_impersonation_does_not_reach_github() {
@@ -1488,7 +1488,7 @@ mod absorb_source_host_tests {
 
     #[test]
     fn github_subdomains_still_recognized() {
-        // ⭐ 收窄不得误伤合法子域
+        // 收窄不得误伤合法子域
         assert!(matches!(
             AbsorbSource::from_url("https://gist.github.com/owner/id"),
             Some(AbsorbSource::GitHubUrl(_))

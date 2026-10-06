@@ -47,7 +47,7 @@ pub struct PlatformConfig {
 }
 
 impl PlatformConfig {
-    /// ⭐ 中性构造器：**不带登录语义**，供「只抓一个 URL」这类用法。
+    /// 中性构造器：**不带登录语义**，供「只抓一个 URL」这类用法。
     ///
     /// 【为什么需要】此前只有站点专用构造器（`twitter()` / `futong()`），
     /// 每个都带 `login_url` / `success_url` / 各自的 cookie 路径。
@@ -549,7 +549,7 @@ impl UniversalBrowser {
 
         tokio::time::sleep(Duration::from_secs(2)).await;
 
-        // ⭐ 2026-10-05 修：不要用 `page.content()`，它给的是**渲染后的 DOM**。
+        // 2026-10-05 修：不要用 `page.content()`，它给的是**渲染后的 DOM**。
         //
         // 缺陷实测（本窗口用 `neotrix web fetch` 抓 GitHub API 时撞上）：
         //   `page.content()` 把 JSON 响应渲染成

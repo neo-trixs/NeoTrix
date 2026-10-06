@@ -1,4 +1,4 @@
-//! ⭐⭐ **确定性三件套** —— 无状态可寻址采样 / 无别名状态摘要 / 有序键。
+//! **确定性三件套** —— 无状态可寻址采样 / 无别名状态摘要 / 有序键。
 //!
 //! ## 为什么有这个模块（2026-10-05 实测事故）
 //!
@@ -15,7 +15,7 @@
 //! 三者同一病根：**用无序容器的遍历序去破平局**。危害到顶 ——
 //! `resolve_default_model_sync` 取 `chain.first()`，⇒ **默认模型本身**会漂移。
 //!
-//! ⭐ 手搓回归测试时实测（`/tmp` 旁路程序，非估算）：单次 2 键淘汰有 **50%**
+//! 手搓回归测试时实测（`/tmp` 旁路程序，非估算）：单次 2 键淘汰有 **50%**
 //! 概率**恰好**选中正确键 ⇒ 第一版测试在回退修复后**仍然通过**，制造了
 //! 「已修好」的假象。所以**判别力必须实测**，不能声称。
 //!
@@ -24,7 +24,7 @@
 //! 1. [`stateless_sample`] —— **纯函数** `f(seed, tick, key)`，**无 RNG 游标**。
 //!    取自 `ra2.exe` `gameplay/terrain_spawn.rs:170-179`（splitmix64 finalizer）
 //!    与 `gameplay/ai_triggers.rs:197-203`（FNV 变体）。
-//!    ⭐⭐ **可寻址 = 无需把游标存进状态**：没有游标就没有可失同步的东西，
+//!    **可寻址 = 无需把游标存进状态**：没有游标就没有可失同步的东西，
 //!    可重算、可并行、可重放。`luckyyyyy/miu2d` 的
 //!    `ai_search.rs` 同理由把确定性写成「桶按 group 升序 ⇒ first-wins 帧间稳定」。
 //!
@@ -45,7 +45,7 @@
 //! 另：ra2.exe 全仓**没有** golden hash 常量（`rg EXPECTED_HASH` = 0 命中），
 //! 其唯一确定性测试 `tests/engine/persistence/digest.rs:8-61` 是**同进程双胞胎
 //! 差分**（两个独立构造 ⇒ Rust 给每个 `HashMap` 不同 hasher 种子 ⇒ 遍历序不同）。
-//! ⭐ 该手法正是本仓 3 处 bug 的理想探测器，已用于
+//! 该手法正是本仓 3 处 bug 的理想探测器，已用于
 //! [`tests::twin_diff_detects_hash_order_tie_break`]。
 
 use std::collections::HashMap;
@@ -60,7 +60,7 @@ const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
 /// 概率分母（百万分之一），与 RA2 原作的 `PROBABILITY_DENOMINATOR` 同口径。
 pub const PROBABILITY_DENOMINATOR: u32 = 1_000_000;
 
-/// splitmix64 finalizer（Vigna）。⭐ 只用 `wrapping_*`，**无 panic 路径**。
+/// splitmix64 finalizer（Vigna）。只用 `wrapping_*`，**无 panic 路径**。
 #[must_use]
 pub fn splitmix64_finalize(mut h: u64) -> u64 {
     h ^= h >> 30;
@@ -71,9 +71,9 @@ pub fn splitmix64_finalize(mut h: u64) -> u64 {
     h
 }
 
-/// ⭐ 无状态掷骰 —— `(seed, tick, key)` 的**纯函数**。
+/// 无状态掷骰 —— `(seed, tick, key)` 的**纯函数**。
 ///
-/// ⭐⭐ 与顺序 RNG 的关键差别：**没有游标**。同一个 `(seed, tick, key)`
+/// 与顺序 RNG 的关键差别：**没有游标**。同一个 `(seed, tick, key)`
 /// 永远给同一个值，与「之前抽过什么」「谁先抽」**完全无关**。
 /// ⇒ 可并行、可重试、可重放、可在任意子集上重算，均不失同步。
 #[must_use]
@@ -91,7 +91,7 @@ pub fn sample_1m(seed: u64, tick: u64, key: &str) -> u32 {
     (mix(seed, tick, key) % u64::from(PROBABILITY_DENOMINATOR)) as u32
 }
 
-/// ⭐⭐ 无别名状态摘要。
+/// 无别名状态摘要。
 ///
 /// ## 与 ra2.exe `persistence/digest.rs` 的**关键**区别
 ///
@@ -134,7 +134,7 @@ impl Digest {
         self.field_bytes(name.as_bytes())
     }
 
-    /// ⭐ 枚举变体判别值。**同一次摘要里每个变体位置必须给唯一值。**
+    /// 枚举变体判别值。**同一次摘要里每个变体位置必须给唯一值。**
     #[must_use]
     pub fn variant(self, tag: u8) -> Self {
         self.field_u64(u64::from(tag))
@@ -147,7 +147,7 @@ impl Digest {
 
     #[must_use]
     pub fn field_i64(self, v: i64) -> Self {
-        // ⭐ `as u64` 保持位模式相同 ⇒ `field_i64` 与 `field_u64` 对同一数值等价，
+        // `as u64` 保持位模式相同 ⇒ `field_i64` 与 `field_u64` 对同一数值等价，
         //   避免「同一事实两条编码路径」这种新的分歧源。
         self.field_u64(v as u64)
     }
@@ -164,7 +164,7 @@ impl Digest {
 
     #[must_use]
     pub fn field_str(self, s: &str) -> Self {
-        // ⭐ 长度也纳入 ⇒ `("ab","c")` 与 `("a","bc")` 不别名。
+        // 长度也纳入 ⇒ `("ab","c")` 与 `("a","bc")` 不别名。
         self.field_u64(s.len() as u64).field_bytes(s.as_bytes())
     }
 
@@ -197,13 +197,13 @@ impl Digest {
     }
 }
 
-/// ⭐⭐ 「遍历无序容器做决策前先排序键」这条纪律的可复用原语。
+/// 「遍历无序容器做决策前先排序键」这条纪律的可复用原语。
 ///
 /// 抄 `ra2.exe` `gameplay/ai_triggers.rs:137-138`。它**不**禁止 `HashMap`
 /// （那会与性能冲突），而是在**迭代边界**把键序规范化 —— 2 行代价，
 /// 消除整类「同分取哈希序首个」的不可复现行为。
 ///
-/// ## ⭐ 签名为什么是「键的迭代器」而不是 `&HashMap<K,V>`
+/// ## 签名为什么是「键的迭代器」而不是 `&HashMap<K,V>`
 ///
 /// ⓰ 我第一版写成 `&HashMap<K,V>`，**编译即失败**才发现自己想当然：本仓
 /// `CapabilityTreeRegistry::nodes` 实际是 `indexmap::IndexMap`
@@ -244,7 +244,7 @@ mod tests {
         }
     }
 
-    /// ⭐ 与顺序 RNG 的**本质**差别：求值顺序不影响结果集合。
+    /// 与顺序 RNG 的**本质**差别：求值顺序不影响结果集合。
     /// 顺序 RNG 抽第 k 次的值依赖前 k-1 次 ⇒ 换序即换值；本实现不可能。
     #[test]
     fn stateless_sample_is_order_independent() {
@@ -269,7 +269,7 @@ mod tests {
         assert_ne!(a, b, "字段顺序不同 ⇒ 摘要必须不同");
     }
 
-    /// ⭐⭐ 直接钉住 ra2.exe `digest.rs:59-79` 的**位段别名**缺陷。
+    /// 直接钉住 ra2.exe `digest.rs:59-79` 的**位段别名**缺陷。
     /// 那份实现下 `x=0,health=1` 与 `x=1,health=0` 摘要相同；本实现必须不同。
     #[test]
     fn digest_has_no_bit_packing_alias() {
@@ -319,14 +319,14 @@ mod tests {
             }
             m
         };
-        // ⭐ 两个独立构造的 HashMap 种子不同 ⇒ 无序遍历序不同；排序后必须一致。
+        // 两个独立构造的 HashMap 种子不同 ⇒ 无序遍历序不同；排序后必须一致。
         assert_eq!(
             sorted_keys(build().keys().cloned()),
             sorted_keys(build().keys().cloned())
         );
     }
 
-    /// ⭐⭐ **反例（oracle）测试**：证明双胞胎差分确实能抓到本仓那类 bug。
+    /// **反例（oracle）测试**：证明双胞胎差分确实能抓到本仓那类 bug。
     ///
     /// 手法抄 `ra2.exe` `tests/engine/persistence/digest.rs:8-61`（同进程双胞胎
     /// 差分）：Rust 的 `RandomState` 每次实例化自增线程局部种子 ⇒ 两个 `HashMap`

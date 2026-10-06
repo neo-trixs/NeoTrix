@@ -255,7 +255,7 @@ pub struct SourceAdapterFactory;
 impl SourceAdapterFactory {
     /// 判定来源适配器 —— **决定用哪个适配器解析**。
     ///
-    /// # ⭐ 2026-10-03 接入编译树时修三处
+    /// # 2026-10-03 接入编译树时修三处
     ///
     /// ## ① `GitHubTopicAdapter` 分支**永不可达**（分支顺序 bug）
     ///
@@ -396,7 +396,7 @@ mod tests {
 mod wiring_tests {
     use super::*;
 
-    /// ⭐⭐ 回归①：`GitHubTopicAdapter` 曾**永不可达** ——
+    /// 回归①：`GitHubTopicAdapter` 曾**永不可达** ——
     /// 原分支顺序把 `starts_with("github.com/")` 放在前，topics 分支永不评估。
     #[test]
     fn github_topics_adapter_is_reachable_now() {
@@ -413,7 +413,7 @@ mod wiring_tests {
         }
     }
 
-    /// ⭐⭐ 回归②：裸 arXiv ID 曾无法路由，导致既有测试长期失败。
+    /// 回归②：裸 arXiv ID 曾无法路由，导致既有测试长期失败。
     /// 解析器本就支持（`parse_arxiv_id` 第三分支），只是路由没接线。
     #[test]
     fn bare_arxiv_id_is_routed() {
@@ -433,7 +433,7 @@ mod wiring_tests {
         );
     }
 
-    /// ⭐⭐ 路由与解析必须用**同一**判据 ——
+    /// 路由与解析必须用**同一**判据 ——
     /// 若 detect 路由过去了但 parse 失败，就是新的裂缝。
     #[test]
     fn every_routed_arxiv_form_actually_parses() {
@@ -452,7 +452,7 @@ mod wiring_tests {
         }
     }
 
-    /// ⭐ 伪装域名不再走 GitHub 适配器（旧 starts_with 前缀匹配会误判）。
+    /// 伪装域名不再走 GitHub 适配器（旧 starts_with 前缀匹配会误判）。
     #[test]
     fn lookalike_domain_does_not_reach_github_adapter() {
         assert_ne!(
@@ -462,7 +462,7 @@ mod wiring_tests {
         );
     }
 
-    /// ⭐ 分支顺序语义：github.com/…/topics/ 必须判 Topics 而非 Repo。
+    /// 分支顺序语义：github.com/…/topics/ 必须判 Topics 而非 Repo。
     #[test]
     fn topics_branch_precedes_plain_github() {
         assert_eq!(
@@ -475,7 +475,7 @@ mod wiring_tests {
         );
     }
 
-    /// ⭐⭐ 域名形态不能被裸 ID 判据吞掉。
+    /// 域名形态不能被裸 ID 判据吞掉。
     /// `github.com` 全是合法字符 —— 若 `is_bare_arxiv_id` 不排除域名，
     /// 它会因 arxiv 分支在前而被误判成 ArxivPaper。
     #[test]
@@ -495,7 +495,7 @@ mod wiring_tests {
         }
     }
 
-    /// ⭐ 保留原有的「单斜杠短式」输入（`owner/repo`）
+    /// 保留原有的「单斜杠短式」输入（`owner/repo`）
     #[test]
     fn short_slash_repo_input_still_works() {
         assert_eq!(
@@ -504,7 +504,7 @@ mod wiring_tests {
         );
     }
 
-    /// ⭐ www 子域：旧 starts_with 不含 `www.`，故此前**落到 Generic**
+    /// www 子域：旧 starts_with 不含 `www.`，故此前**落到 Generic**
     /// （GitHub 内容被当通用文章处理）。host 判定天然覆盖子域。
     #[test]
     fn www_github_subdomain_now_recognized() {

@@ -1,6 +1,6 @@
 //! `neotrix social` — 社交平台访问能力诊断入口
 //!
-//! # ⭐ 为何要这个入口（R-P79：外部技术必须同会话接到生产）
+//! # 为何要这个入口（R-P79：外部技术必须同会话接到生产）
 //!
 //! `social_access` 模块此前**整模块零生产接线**：`SocialAccessManager`、
 //! `run_doctor`、`login_x_auto`、`default_channels` 在全仓都没有外部调用方。
@@ -34,14 +34,14 @@ pub const EXIT_FAIL: i32 = 1;
 ///
 /// 探测所有渠道的后端可用性并打印报告。
 ///
-/// ⭐ **对标 OpenCLI 的分层探测**（研究所得）：`opencli auth status` 区分
+/// **对标 OpenCLI 的分层探测**（研究所得）：`opencli auth status` 区分
 /// quick check（cookie 存在性）与 full check（whoami 身份断言）。
 /// 本仓对应的分层是：命令能否启动（探测层）＋ 凭据是否就绪（门控层），
 /// 两者都已就绪才算 `active`。
 pub fn run_social_doctor(json: bool) -> i32 {
     let mut registry: ChannelRegistry = default_channels();
 
-    // ⭐ 必须真正跑一遍 probe 才能填 `active_backend`。
+    // 必须真正跑一遍 probe 才能填 `active_backend`。
     // ⛔ `run_doctor` 只读 `channel.active_backend`，而 `Channel::new`
     //    把它初始化为 `None` —— 不先 probe 的话报告会全显示 `active: none`，
     //    而后端其实可能是好的。这是「导出的诊断函数」与「可用的诊断」之间的差别。
@@ -55,7 +55,7 @@ pub fn run_social_doctor(json: bool) -> i32 {
         print!("{}", report);
     }
 
-    // ⭐ 可供 CI 判定的退出码：
+    // 可供 CI 判定的退出码：
     // 有渠道完全不可用 ⇒ 非 0。全 Missing 是**预期状态**（用户没装后端），
     // 故用 EXIT_CONFIG(78) 而非 EXIT_FAIL，让 CI 能区分「环境未配置」
     // 与「代码坏了」。
@@ -87,7 +87,7 @@ pub fn run_social_probe(platform: &str, json: bool) -> i32 {
         return EXIT_CONFIG;
     };
 
-    // ⭐ 凭据门控的独立呈现：这是原实现完全缺失的信息
+    // 凭据门控的独立呈现：这是原实现完全缺失的信息
     // （`requires_auth` 曾是死字段，doctor 因此无法解释「为什么装了却用不了」）。
     let auth_rows: Vec<_> = channel
         .backends
@@ -138,7 +138,7 @@ pub fn run_social_probe(platform: &str, json: bool) -> i32 {
 
 /// 执行 `neotrix social auth x` — 走 cookie 路线完成 X/Twitter 认证。
 ///
-/// ⭐ **不接 OAuth 占位凭据**：`with_x_oauth` 需要真实 client_id/secret，
+/// **不接 OAuth 占位凭据**：`with_x_oauth` 需要真实 client_id/secret，
 /// 未配置时 `login_x_auto` 会 fail-fast（这是 D5 修复的行为）。
 /// cookie 路线无需任何 client 凭据，故默认走它。
 ///
@@ -218,7 +218,7 @@ mod tests {
 
     #[test]
     fn doctor_reports_all_registered_channels() {
-        // ⭐ 回归测试：验证 `probe_all()` 确实被调用了。
+        // 回归测试：验证 `probe_all()` 确实被调用了。
         // 若有人删掉它，`active_backend` 会全为 None 而此断言失败 ——
         // 这正是「run_doctor 只读 active_backend」这个隐含契约的守卫。
         let mut registry = default_channels();
@@ -260,7 +260,7 @@ mod tests {
 
     #[test]
     fn status_exits_zero_even_when_nothing_installed() {
-        // ⭐ 全 Missing 是**预期环境状态**，不是错误 ⇒ 退出码 0。
+        // 全 Missing 是**预期环境状态**，不是错误 ⇒ 退出码 0。
         // 若改成非 0，会让任何未装后端的 CI 无谓变红。
         assert_eq!(run_social_status(true), 0);
     }
@@ -274,7 +274,7 @@ mod tests {
 }
 /// 执行 `neotrix social weights` — 打印排序权重表并**核对来源**。
 ///
-/// ⭐ 这条命令存在的理由：`feed.rs` 的权重表曾把「权重 × 原始计数」
+/// 这条命令存在的理由：`feed.rs` 的权重表曾把「权重 × 原始计数」
 /// 当作语义，而 x-algorithm `param.rs:285-292` 明确点名那是错误读法。
 /// 把权重表暴露成可检视的输出，比让它埋在源码里等人误读更可靠。
 pub fn run_social_weights(json: bool) -> i32 {
@@ -314,7 +314,7 @@ pub fn run_social_weights(json: bool) -> i32 {
         })
         .collect();
 
-    // ⭐ 未建模的 head 必须是空 —— 非空说明枚举加了新变体而权重表没跟上
+    // 未建模的 head 必须是空 —— 非空说明枚举加了新变体而权重表没跟上
     let unmodeled: Vec<String> = all
         .iter()
         .filter(|a| r.weight_of(**a).is_none())
@@ -359,7 +359,7 @@ pub fn run_social_weights(json: bool) -> i32 {
 /// 执行 `neotrix social rank` — 用给定预测概率演示排序，并**显式区分**
 /// 「真排过」与「无预测故未排」。
 ///
-/// ⭐ 这是排序引擎的**唯一真实消费者**（此前 `FeedService` 零调用方）。
+/// 这是排序引擎的**唯一真实消费者**（此前 `FeedService` 零调用方）。
 /// 它演示的是「权重 × 概率」的语义：相同权重、不同概率 ⇒ 不同排序；
 /// 而**无预测时排序不发生**（返回 0 分 + ranked=false），而不是假装排过。
 pub fn run_social_rank(json: bool) -> i32 {
@@ -391,7 +391,7 @@ pub fn run_social_rank(json: bool) -> i32 {
         .map(|p| serde_json::json!({ "id": p.id, "author": p.author, "score": p.score }))
         .collect();
 
-    // ⭐ 对照组：无任何预测 ⇒ 必须报「未排序」
+    // 对照组：无任何预测 ⇒ 必须报「未排序」
     let no_pred = recommender.rank(vec![
         FeedItem::with_id("x", "c", "alice"),
         FeedItem::with_id("y", "c", "bob"),
@@ -433,7 +433,7 @@ pub fn run_social_rank(json: bool) -> i32 {
 
 /// 执行 `neotrix social login <site>` — **通用**登录（不限 x.com）。
 ///
-/// # ⭐ 通用化后的形态
+/// # 通用化后的形态
 ///
 /// 修复前只有 `neotrix social auth x`，且成功判据在 L1 里写死
 /// `cookie.name == "auth_token"`（X 专有）。现改为：
@@ -530,7 +530,7 @@ pub fn run_social_sites(json: bool) -> i32 {
         })
         .collect();
 
-    // ⭐ 排序让输出稳定 —— HashMap 迭代序每次运行都不同，
+    // 排序让输出稳定 —— HashMap 迭代序每次运行都不同，
     //    会让 diff 噪音掩盖真实变化。
     let mut sorted = rows;
     sorted.sort_by(|a, b| {
@@ -560,7 +560,7 @@ mod login_cli_tests {
 
     #[test]
     fn every_registered_site_resolves_a_cookie_path() {
-        // ⭐ 通用化的实际意义：任一站点都必须能算出 cookie 落盘路径
+        // 通用化的实际意义：任一站点都必须能算出 cookie 落盘路径
         for id in ["x", "github", "reddit", "bilibili", "zhihu"] {
             let rc = run_social_login(id, true);
             assert_eq!(rc, EXIT_CONFIG, "{} must report 78 (awaiting user action)", id);
@@ -589,14 +589,14 @@ mod login_cli_tests {
 
     #[test]
     fn login_reports_config_error_not_success() {
-        // ⭐ 关键：登录未完成 ⇒ 必须 78，绝不能 0（假成功）
+        // 关键：登录未完成 ⇒ 必须 78，绝不能 0（假成功）
         assert_ne!(run_social_login("x", false), 0);
     }
 }
 
 /// 执行 `neotrix social catalog` — 列出**全部**平台能力。
 ///
-/// # ⭐ 为什么需要这条命令
+/// # 为什么需要这条命令
 ///
 /// 审计发现「平台知识」散在三处（`SocialPlatform` 枚举 / `can_handle`
 /// 的 match / 登录注册表），而 `SocialPlatform::all()` **只返回 6 个枚举
@@ -613,7 +613,7 @@ pub fn run_social_catalog(json: bool) -> i32 {
         .all()
         .into_iter()
         .map(|spec| {
-            // ⭐ 关联渠道：找出该平台对应的渠道名与其 active 状态
+            // 关联渠道：找出该平台对应的渠道名与其 active 状态
             let ch = channels
                 .all_channels()
                 .into_iter()
@@ -625,7 +625,7 @@ pub fn run_social_catalog(json: bool) -> i32 {
                 "url_patterns": spec.url_patterns,
                 "channel": ch.map(|c| c.name.clone()),
                 "backends": ch.map(|c| c.backends.iter().map(|b| b.name.clone()).collect::<Vec<_>>()),
-                // ⭐ 报告 adapter 接线状态 —— 审计发现 6 个 extractor
+                // 报告 adapter 接线状态 —— 审计发现 6 个 extractor
                 //    曾全部零生产调用方，这条让该状态可从外部观测
                 "adapter": neotrix::l2_perception::nt_world::social_access::adapter_for(&spec.platform_id())
                     .map(|a| a.id()),
@@ -673,7 +673,7 @@ pub fn run_social_catalog(json: bool) -> i32 {
 
 /// 执行 `neotrix social auth <site>` — **通用** cookie 认证（原为仅 x）。
 ///
-/// # ⭐ 通用化
+/// # 通用化
 ///
 /// 凭据环境变量名由 [`PlatformCatalog::env_var_names`] **按统一规则**生成：
 /// `NEOTRIX_<大写ID>_AUTH_TOKEN` / `NEOTRIX_<大写ID>_CT0`。
@@ -748,7 +748,7 @@ mod catalog_cli_tests {
 
     #[test]
     fn catalog_lists_more_than_the_enum() {
-        // ⭐ 关键：catalog 必须比 SocialPlatform::all() 的 6 个更多，
+        // 关键：catalog 必须比 SocialPlatform::all() 的 6 个更多，
         //    否则「通用」是假的。这条守住上一轮的成果不被回退。
         let c = default_catalog();
         assert!(
@@ -770,7 +770,7 @@ mod catalog_cli_tests {
 
     #[test]
     fn auth_refuses_platforms_without_verified_probes() {
-        // ⭐ 诚实性：没有实测探针的平台不得声称能登录
+        // 诚实性：没有实测探针的平台不得声称能登录
         for site in ["instagram", "tiktok", "linkedin", "youtube"] {
             assert_eq!(
                 run_social_auth_site(site),
@@ -783,7 +783,7 @@ mod catalog_cli_tests {
 
     #[test]
     fn env_var_names_are_derived_per_site() {
-        // ⭐ 通用化：命名规则统一，不再每平台一个常量
+        // 通用化：命名规则统一，不再每平台一个常量
         use neotrix::l2_perception::nt_world::social_access::nt_catalog::PlatformCatalog;
         assert_eq!(PlatformCatalog::env_var_names("github").0, "NEOTRIX_GITHUB_AUTH_TOKEN");
         assert_eq!(PlatformCatalog::env_var_names("zhihu").0, "NEOTRIX_ZHIHU_AUTH_TOKEN");

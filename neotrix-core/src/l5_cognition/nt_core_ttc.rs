@@ -701,7 +701,7 @@ pub enum EffortTier {
 
 impl EffortTier {
     // ══════════════════════════════════════════════════════════════
-    // ⭐ 客户端方言归一（2026-10-05，吸收 `Niko1221/Strata`）
+    // 客户端方言归一（2026-10-05，吸收 `Niko1221/Strata`）
     //
     // 【源】`serve/frontend.py` 的 `EFFORT` 表原文注释：
     //   *"Clients spell these many ways; everything maps onto those four."*
@@ -717,7 +717,7 @@ impl EffortTier {
     // 若上层直接 `thinking_budget.unwrap_or(1024)`，
     // 则「显式要求不思考」与「未设置」被混为一谈 ⇒ **静默多算一次推理成本**。
     //
-    // ⭐ 与 Strata 的差异（刻意不照抄）：
+    // 与 Strata 的差异（刻意不照抄）：
     // Strata 只有四档（none/low/medium/high），本仓有**五档**
     // （多 `XHigh` 与 `Max`，用于 TTC 的深验证与 MCTS）⇒ 保留本仓档位，
     // 只吸收它的**拼写收敛**这一层，不引入它的档位体系。
@@ -737,7 +737,7 @@ impl EffortTier {
             "low" | "1" => Ok(Some(EffortTier::Low)),
             "medium" | "med" | "2" => Ok(Some(EffortTier::Medium)),
             "high" | "3" => Ok(Some(EffortTier::High)),
-            // ⭐ 本仓多出的两档（Strata 的模板对此「什么也没说」，见其注释
+            // 本仓多出的两档（Strata 的模板对此「什么也没说」，见其注释
             //   *"no xhigh sentence is medium there"* ⇒ 我们按本仓语义填）
             "xhigh" | "x-high" | "extra-high" | "4" => Ok(Some(EffortTier::XHigh)),
             "max" | "maximum" | "5" => Ok(Some(EffortTier::Max)),
@@ -1353,7 +1353,7 @@ mod tests {
         assert!(!ConvergenceSignal::InsufficientSteps.should_exit());
     }
 
-    /// ⭐⭐ 反向锁：「显式关闭」必须与「未设置」区分开。
+    /// 反向锁：「显式关闭」必须与「未设置」区分开。
     ///
     /// ## 危害（为什么这不是洁癖）
     /// 若上层写成 `thinking_budget.unwrap_or(1024)`，那么客户端送来的
@@ -1413,7 +1413,7 @@ mod tests {
         );
     }
 
-    /// ⭐ 双向映射的**非自反性**是刻意设计，锁住它并说明理由。
+    /// 双向映射的**非自反性**是刻意设计，锁住它并说明理由。
     ///
     /// `from_budget_tokens` 的语义是「预算够到哪一档」，不是「精确还原」
     /// ⇒ 往返**必然**降档（2048 → Medium → from_budget(2048) → Medium，

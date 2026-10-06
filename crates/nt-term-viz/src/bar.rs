@@ -21,14 +21,14 @@ pub fn bar_line(value: f64, max: f64, width: usize) -> String {
     if width == 0 {
         return String::new();
     }
-        // ⭐ 2026-10-05 修 `clippy::neg_cmp_op_on_partial_ord`（CI 是 `-D warnings` ⇒ 硬红）。
+        // 2026-10-05 修 `clippy::neg_cmp_op_on_partial_ord`（CI 是 `-D warnings` ⇒ 硬红）。
     //   `f64` 是**偏序**类型，`!(max > 0.0)` 同时排除「≤0」与「NaN」，
     //   语义正确但 clippy 要求写明。实测 6/6 等价（0.0/-1.0/1.0/NaN/±INF）。
     //   ⇒ 改成显式 `is_nan()`，语义逐位不变，同时满足 lint。
     if max.is_nan() || max <= 0.0 {
         return " ".repeat(width);
     }
-    // ⭐ 2026-10-05 补 NaN 显式处理。
+    // 2026-10-05 补 NaN 显式处理。
     //
     // 实测：`f64::clamp` 对 NaN **返回 NaN**（不夹取），
     // 而 `NaN as usize` 饱和到 0 ⇒ `value=NaN` 或 `value/max=NaN` 时
@@ -114,7 +114,7 @@ mod tests {
         assert_eq!(bar_line(5.0, -1.0, 3), "   ");
     }
 
-    /// ⭐ 回归锁：NaN /±INF 不得产生**静默错误**的条（2026-10-05）。
+    /// 回归锁：NaN /±INF 不得产生**静默错误**的条（2026-10-05）。
     ///
     /// 实测（喂真值）：`value=INF, max=INF` ⇒ `ratio = INF/INF = NaN`
     /// ⇒ `f64::clamp`对 NaN **返回 NaN**（不夹取）
@@ -122,7 +122,7 @@ mod tests {
     ///    而调用方看到的是「一条空条」，**无从区分「真的是 0」还是「算崩了」**。
     #[test]
     fn bar_line_nan_and_inf_do_not_silently_blank() {
-        // ⭐ NaN 比例 ⇒ 必须夹到 0（全空条），不得 panic / 不得输出乱码
+        // NaN 比例 ⇒ 必须夹到 0（全空条），不得 panic / 不得输出乱码
         let nan_ratio = bar_line(f64::INFINITY, f64::INFINITY, 4);
         assert_eq!(
             nan_ratio.chars().count(),
@@ -151,7 +151,7 @@ mod tests {
         }
     }
 
-    /// ⭐ `!(max > 0.0)` 与显式写法的**等价性**锁。
+    /// `!(max > 0.0)` 与显式写法的**等价性**锁。
     ///
     /// 为何要改写：`clippy::neg_cmp_op_on_partial_ord`（`f64` 是偏序类型）。
     /// 而 CI 是 `cargo clippy --lib -p neotrix -- -D warnings` ⇒ 该告警**硬红 CI**。

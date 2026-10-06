@@ -62,7 +62,7 @@ pub fn run_with_timeout(
 
     // 先取走管道（所有权移出 child），再进入等待循环。
     //
-    // ⭐ **必须并发读取，不能等到子进程退出后再读。**
+    // **必须并发读取，不能等到子进程退出后再读。**
     // ⛔ 本实现第一版把读取放在等待循环**之后**，被自测抓到：管道缓冲区
     //    （macOS/Linux 通常 64 KiB）填满后子进程阻塞在 write 上，
     //    `try_wait()` 于是永远返回 `Ok(None)`，最后被判成超时 ——
@@ -166,7 +166,7 @@ pub fn probe_command_with_timeout(
         Ok(out) => {
             let latency_ms = start.elapsed().as_millis() as u64;
 
-            // ⭐ **登录墙判别必须排在 `success` 之前**（自测抓到）。
+            // **登录墙判别必须排在 `success` 之前**（自测抓到）。
             // ⛔ 第一版把它放在 `Ok(out) if out.success` 分支**之后**，
             //    于是退出码为 0 的 HTML 输出先被 `success` 臂匹配并返回 Ok，
             //    这个判别对**它唯一想覆盖的情形**完全不可达。
@@ -213,7 +213,7 @@ pub fn probe_backends(
     let mut results = Vec::new();
 
     for backend in backends {
-        // ⭐ 每个后端用自己的 `probe_timeout`（此前被忽略 ⇒ 真超时形同虚设）
+        // 每个后端用自己的 `probe_timeout`（此前被忽略 ⇒ 真超时形同虚设）
         let result = probe_command_with_timeout(
             &backend.probe_cmd,
             &backend.probe_args,

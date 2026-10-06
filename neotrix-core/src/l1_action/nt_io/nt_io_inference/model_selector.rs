@@ -443,7 +443,7 @@ impl ModelSelector {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // whichllm (⭐6.1K) 吸收: 真实硬件基准排序, 不靠参数量
+    // whichllm (6.1K) 吸收: 真实硬件基准排序, 不靠参数量
     // ═══════════════════════════════════════════════════════════
 
     /// Rank models by real benchmarks (whichllm 风格), not parameter count

@@ -602,11 +602,11 @@ pub(crate) async fn http_chunk_download(
     let mut writer = BufWriter::with_capacity(256 * 1024, file);
     let mut downloaded = already;
 
-    // ⭐⭐ 2026-10-02 修的**数据损坏 bug**：原实现把服务端发的**每一块**都写进文件，
+    // 2026-10-02 修的**数据损坏 bug**：原实现把服务端发的**每一块**都写进文件，
     // 对 `end` **没有任何上限**。⇒ 只要服务端**忽略 `Range` 头**（回环/自建源/
     // 部分 CDN/反代都会），每个 chunk 请求都会拿到**整个响应体**
     // ⇒ N 个 chunk 各写全量 ⇒ 合并出 **N 倍长**的损坏文件。
-    // ⭐ 实测：`DownloadEngine` 默认 `max_concurrent=16`，一个 4096 字节的源
+    // 实测：`DownloadEngine` 默认 `max_concurrent=16`，一个 4096 字节的源
     // 落盘成 **65536**（= 16 × 4096）—— 由 P0 回归测试当场抓到。
     //
     // ✅ 修法按 HTTP 语义**取正确切片**，⛔ 不是「截断」（截断会静默产出错内容）：

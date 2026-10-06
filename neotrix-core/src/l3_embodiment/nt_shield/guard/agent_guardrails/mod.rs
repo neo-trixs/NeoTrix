@@ -89,10 +89,10 @@ impl Default for PolicyConfig {
             blocked_input_patterns: vec![],
             blocked_output_patterns: vec![],
             credential_patterns: vec![
-                // ⭐ 键名族（实测修正过一次，见下方长注释）。
+                // 键名族（实测修正过一次，见下方长注释）。
                 r"(?i)(api[_-]?key|secret|access|token|passwd|password|pass|pwd)[a-z0-9_-]*\s*[:=]\s*\S+".to_string(),
                 r"(?i)-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----".to_string(),
-                // ⭐ 云厂商 / GitHub / Slack / OpenAI 的**真实形态**。这些靠**值的
+                // 云厂商 / GitHub / Slack / OpenAI 的**真实形态**。这些靠**值的
                 //   前缀**识别，因为键名可任意而值前缀不能。
                 //
                 // ⛔ 前一版把键名写成

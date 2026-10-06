@@ -21,14 +21,14 @@ pub mod menu;
 pub mod pet;
 pub mod platform;
 
-/// ⭐⭐ **命令注册表（唯一真源）** —— `main.rs` 与集成测试**共用**。
+/// **命令注册表（唯一真源）** —— `main.rs` 与集成测试**共用**。
 ///
 /// ## 为什么必须共用
 ///
 /// ⛔ 2026-10-02 的 P0 复盘教了一件事：**「命令名 → 函数 → 库」这段接线，
 ///    在此之前从未被任何自动化测试执行过** —— 74 个命令的 IPC 往返覆盖率 = 0%，
 ///    已有 74 个测试全都落在私有 helper / store / state 层。
-///    ⭐ 注册表若只留在 `main.rs`（bin 侧），`tests/` 根本够不着它，
+///    注册表若只留在 `main.rs`（bin 侧），`tests/` 根本够不着它，
 ///    于是「测试能跑」与「命令真被注册」之间永远隔着一条没人走过的路
 ///    —— 漏注册不会有任何信号。⇒ 注册表进 lib、两侧展开同一个宏
 ///    ⇒ **漏注册，测试立刻红**。
@@ -94,13 +94,13 @@ macro_rules! neobot_commands {
             neobot_desktop::commands::neobot_memory_list,
             neobot_desktop::commands::neobot_memory_add,
             neobot_desktop::commands::neobot_memory_undo,
-            // ⭐⭐⭐ 2026-10-04：⭐⭐ **已删除** `neobot_convo_messages`（全量）注册。
+            // 2026-10-04：**已删除** `neobot_convo_messages`（全量）注册。
             //
             // ⛔ 删前这里写着「⛔ 不改 neobot_convo_messages 的签名 ⇒ 旧路径仍可用」
-            // —— ⭐⭐⭐ **那正是分叉的根源**：⭐⭐ 两条读历史的路径并存
-            // ⭐⭐（「同一语义两个真源」），⭐⭐ 而本仓已**零调用方**用它
-            // ⭐⭐（自持树只在注释里提到）。⇒ ⭐⭐ **唯一真源 = `_page`**。
-            // ⭐⭐ 详见 `commands.rs` 里同名的删除说明 + `api.rs` 的契约条目。
+            // —— **那正是分叉的根源**：两条读历史的路径并存
+            // （「同一语义两个真源」），而本仓已**零调用方**用它
+            // （自持树只在注释里提到）。⇒ **唯一真源 = `_page`**。
+            // 详见 `commands.rs` 里同名的删除说明 + `api.rs` 的契约条目。
             neobot_desktop::commands::neobot_convo_messages_page,
             neobot_desktop::commands::neobot_convo_list,
             neobot_desktop::commands::neobot_member_list,

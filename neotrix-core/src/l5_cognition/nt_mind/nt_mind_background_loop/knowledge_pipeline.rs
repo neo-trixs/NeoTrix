@@ -383,7 +383,7 @@ mod tests {
 
 /// 由 URL 判定知识节点类型（写入 KB 的**持久类型**）。
 ///
-/// # ⭐ 2026-10-03：**域名规则**改为 host 判定
+/// # 2026-10-03：**域名规则**改为 host 判定
 ///
 /// ⛔ 原裸 `contains("github.com")` 会把 `https://github.com.evil.net/…`
 ///    判成 [`NodeType::Repository`] 并**持久化进知识库** —— 之后所有
@@ -393,7 +393,7 @@ mod tests {
 ///    收紧它会把 `/papers/123` 从 Paper 改成 Article，
 ///    那是**行为变更**而非修 bug。故 arxiv 走 host 判定、paper 仍 contains。
 ///
-/// ⭐ 抽成自由函数而非内联 `if`，是为了让判据**可被测试** ——
+/// 抽成自由函数而非内联 `if`，是为了让判据**可被测试** ——
 /// 内联在深调用栈里时，伪装域名的问题无法写回归测试。
 pub fn classify_node_type(url: &str) -> NodeType {
     use crate::l0_substrate::nt_core_platform::url_match::url_matches_domain as m;
@@ -413,7 +413,7 @@ mod classify_node_type_tests {
     use super::classify_node_type;
     use neotrix_types::knowledge_access::NodeType;
 
-    /// ⭐ 迁移回归：正常 URL 分类完全不变
+    /// 迁移回归：正常 URL 分类完全不变
     #[test]
     fn normal_urls_keep_their_type() {
         for (url, want) in [
@@ -421,7 +421,7 @@ mod classify_node_type_tests {
             ("https://github.com/a/b", NodeType::Repository),
             ("https://en.wikipedia.org/wiki/Rust", NodeType::Reference),
             ("https://blog.example.org/post", NodeType::Article),
-            // ⭐ 关键词启发式必须仍然生效
+            // 关键词启发式必须仍然生效
             ("https://x.com/papers/123", NodeType::Paper),
             ("https://example.org/my-paper", NodeType::Paper),
         ] {
@@ -429,7 +429,7 @@ mod classify_node_type_tests {
         }
     }
 
-    /// ⭐ 伪装域名不再被写成 Repository/Reference（该值会**持久化**）
+    /// 伪装域名不再被写成 Repository/Reference（该值会**持久化**）
     #[test]
     fn lookalike_domains_are_not_typed_as_platform_nodes() {
         for hostile in [
@@ -446,7 +446,7 @@ mod classify_node_type_tests {
         }
     }
 
-    /// ⭐⭐ 守住关键词语义：收紧域名判定时**不得**顺手把
+    /// 守住关键词语义：收紧域名判定时**不得**顺手把
     /// `contains("paper")` 也改掉 —— 那会让 `/papers/123` 变 Article。
     #[test]
     fn paper_keyword_heuristic_survives() {
@@ -457,7 +457,7 @@ mod classify_node_type_tests {
         assert_eq!(classify_node_type("https://x.com/PAPERS/1"), NodeType::Article);
     }
 
-    /// ⭐ 分支顺序语义锁定：arXiv+paper 分支在**最前**，
+    /// 分支顺序语义锁定：arXiv+paper 分支在**最前**，
     /// 故含 `papers` 的 github URL 判 Paper。
     /// ⚠️ 这是**既有**顺序，本次未改 —— 独立 harness 逐条比对 11 个 URL
     /// 确认：除伪装域名外，分类结果全部不变。

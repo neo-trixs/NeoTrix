@@ -1,6 +1,6 @@
 //! 自建 X/Twitter 检索器 — 浏览器驱动，**零外部 CLI 依赖**
 //!
-//! # ⭐ 为何自建而非依赖 opencli / bird（2026-10-03 决策修正）
+//! # 为何自建而非依赖 opencli / bird（2026-10-03 决策修正）
 //!
 //! 上一轮我修好了地基（超时/端点/判别/门控），却把**数据面能力**外包给了
 //! `opencli` / `bird` 两个外部 CLI。那不叫自我构建 —— 它把可用性押在
@@ -60,7 +60,7 @@ mod selector {
     pub const ACTION: &str = "[data-testid='UserName'] , div[role='group']";
     /// 登录墙指示物。
     ///
-    /// ⭐ 判别依据是**具体文案**而非泛化启发式：AutoCLI 的做法是
+    /// 判别依据是**具体文案**而非泛化启发式：AutoCLI 的做法是
     /// `/登录后查看搜索结果/.test(document.body.innerText)`
     /// （中文站特定文案）。这里覆盖 X 实际使用的三种形态。
     pub const LOGIN_WALL: &str = r#"
@@ -70,7 +70,7 @@ mod selector {
 
 /// 从 JS 抽取结果反序列化的中间结构。
 ///
-/// ⭐ 全部字段 `#[serde(default)]` —— 前端改版会悄悄少字段，
+/// 全部字段 `#[serde(default)]` —— 前端改版会悄悄少字段，
 /// 没有 default 会让整次抽取因一个字段缺失而全盘失败。
 #[derive(Debug, Deserialize, Default)]
 struct DomTweet {
@@ -162,7 +162,7 @@ fn urlencode_min(s: &str) -> String {
 
 /// 抽取用的 JS 脚本。
 ///
-/// ⭐ 关键设计：**在页面上下文里 `fetch`**，而不是从 Rust 侧发请求。
+/// 关键设计：**在页面上下文里 `fetch`**，而不是从 Rust 侧发请求。
 /// 这样 `auth_token` 由浏览器自动附带（同源），Rust 侧**永远不接触 cookie 值**
 /// —— 与 bird/OpenCLI 的做法一致（它们也只做存在性检查）。
 fn extraction_script(sel: &Constants, limit: usize) -> String {
@@ -176,7 +176,7 @@ fn extraction_script(sel: &Constants, limit: usize) -> String {
           const seen = new Set();
           for (const el of document.querySelectorAll(SEL.tweet)) {{
             if (out.length >= LIMIT) break;
-            // ⭐ 去重：转推/引用会在时间线里重复出现同一 id
+            // 去重：转推/引用会在时间线里重复出现同一 id
             const link = el.querySelector('a[href*="/status/"]');
             const href = link ? link.getAttribute('href') : null;
             const m = href && href.match(/\/status\/(\d+)/);
@@ -242,7 +242,7 @@ impl Constants {
 /// 自建检索器。
 pub struct XBrowserRetriever {
     limit_cap: usize,
-    /// ⭐ 是否强制 robots 合规。
+    /// 是否强制 robots 合规。
     ///
     /// # ⛔ 为什么默认 `true` 而不是绕过它（本仓实测 2026-10-03）
     ///
@@ -307,7 +307,7 @@ impl XBrowserRetriever {
         let limit = q.limit.min(self.limit_cap).max(1);
         let url = format!("https://x.com{}", q.path());
 
-        // ⭐ **合规门先行**：本仓实测 x.com 的 `User-agent: *` 是 `Disallow: /`。
+        // **合规门先行**：本仓实测 x.com 的 `User-agent: *` 是 `Disallow: /`。
         //    这里复用既有的 robots 解析器（`nt_io_browser_engine`），
         //    而不是自己写一份 —— 避免出现「两套 robots 判定」的分叉。
         //    ⛔ 门在**启动浏览器之前**：被拒时不该付浏览器启动的代价。
@@ -374,7 +374,7 @@ impl XBrowserRetriever {
             .map(|(_, p)| format!("/{}", p))
             .unwrap_or_else(|| "/".to_string());
 
-        // ⭐ 复用既有的纯函数解析器，避免出现第二套 robots 判定
+        // 复用既有的纯函数解析器，避免出现第二套 robots 判定
         let rules = parse_robots_disallows(&body);
         if robots_denied(&rules, &path) {
             return Err(SocialAccessError::Platform(format!(
@@ -398,7 +398,7 @@ impl XBrowserRetriever {
 fn parse(html: &str, q: &XQuery) -> SocialAccessResult<ExtractorResult> {
         use super::nt_selector_contract::{PageShape, check as contract_check, X_SELECTOR_CONTRACT};
 
-        // ⭐⭐ 本函数首版是**无条件** `Ok(Self::empty_result(...))` ——
+        // 本函数首版是**无条件** `Ok(Self::empty_result(...))` ——
         //    只判了登录墙就返回空列表。于是「选择器失效导致抽不到元素」
         //    与「真的没有结果」在返回值上完全相同。
         //    这是本会话反复打击的那个失败模式，我自己又犯了一次。
@@ -479,7 +479,7 @@ fn parse(html: &str, q: &XQuery) -> SocialAccessResult<ExtractorResult> {
             });
         }
 
-        // ⭐ 零结果要与「未登录」区分：这里只有在**确认没被墙**的前提下
+        // 零结果要与「未登录」区分：这里只有在**确认没被墙**的前提下
         // 零结果才合法。
         let items: Vec<ExtractorItem> = payload
             .tweets
@@ -549,9 +549,9 @@ mod tests {
         let js = extraction_script(&Constants::build(), 7);
         assert!(js.contains("article[data-testid='tweet']"));
         assert!(js.contains("const LIMIT = 7"));
-        // ⭐ 登录墙判别必须内联进 JS（Rust 侧看不到渲染后的文本）
+        // 登录墙判别必须内联进 JS（Rust 侧看不到渲染后的文本）
         assert!(js.contains("Log in to X"));
-        // ⭐ 去重必须存在，否则转推会重复计数
+        // 去重必须存在，否则转推会重复计数
         assert!(js.contains("seen"));
     }
 
@@ -582,7 +582,7 @@ mod tests {
     #[cfg(feature = "stealth-net")]
     #[test]
     fn login_wall_becomes_auth_error_not_empty_result() {
-        // ⭐ 这是本模块最关键的一条：未登录必须报错，不能返回空列表。
+        // 这是本模块最关键的一条：未登录必须报错，不能返回空列表。
         // 空列表会被上游读成「该查询真的没有结果」。
         let v: serde_json::Value = serde_json::from_str(
             r#"{"tweets":[],"login_walled":true,"doc_title":"Log in to X"}"#,
@@ -594,7 +594,7 @@ mod tests {
         match err {
             SocialAccessError::AuthFailed { reason, .. } => {
                 assert!(reason.contains("login"), "reason must name the cause: {}", reason);
-                // ⭐ 错误信息必须可执行
+                // 错误信息必须可执行
                 assert!(reason.contains("neotrix social login x"));
             }
             other => panic!("expected AuthFailed, got {:?}", other),
@@ -614,7 +614,7 @@ mod tests {
     #[cfg(feature = "stealth-net")]
     #[test]
     fn missing_fields_default_instead_of_failing_whole_batch() {
-        // ⭐ 前端改版会悄悄少字段；有 default 才不会一次少字段就全盘失败
+        // 前端改版会悄悄少字段；有 default 才不会一次少字段就全盘失败
         let v: serde_json::Value =
             serde_json::from_str(r#"{"tweets":[{"id":"7"}]}"#).expect("hardcoded JSON must parse");
         let r = XBrowserRetriever::payload_from_value(&v).expect("partial payload must survive");
@@ -662,7 +662,7 @@ mod robots_tests {
     use super::*;
     use crate::l1_action::nt_io::nt_io_browser_engine::fetch::parse_robots_disallows;
 
-    /// ⭐ 用**本仓实测抓到的真实** x.com robots.txt 作为夹具。
+    /// 用**本仓实测抓到的真实** x.com robots.txt 作为夹具。
     /// 抓取时间 2026-10-03。
     const X_ROBOTS: &str = "\
 User-agent: *
@@ -680,7 +680,7 @@ Allow: /*?t=
     #[test]
     fn real_x_robots_blocks_everything_for_wildcard() {
         let rules = parse_robots_disallows(X_ROBOTS);
-        // ⭐ 这条断言是整个 robots 门的根据：通配段含 "/"
+        // 这条断言是整个 robots 门的根据：通配段含 "/"
         assert!(rules.contains(&"/".to_string()), "wildcard Disallow: / must be parsed, got {:?}", rules);
         assert!(rules.contains(&"/i/u".to_string()));
         // ⛔ 非通配段（Bingbot 的 Allow）不得混入
@@ -695,17 +695,17 @@ Allow: /*?t=
     //    于是网络抖动 / 限流 / DNS 失败 ⇒ 放行 ⇒ 断言失败。
     //    全量测试第一次跑就抓到了（12914 passed; **2 failed**）。
     //
-    //    ⭐ 单元测试**不得**依赖外部网络 —— 它把 CI 的成败绑在
+    //    单元测试**不得**依赖外部网络 —— 它把 CI 的成败绑在
     //    x.com 可达性上。真实网络契约改由**夹具**覆盖（下方
     //    `robots_fixture_gate_rejects_*`），网络路径的正确性属于
     //    集成测试范畴，不应混进 `--lib` 单元套件。
     #[test]
     fn robots_gate_semantics_are_fail_open_on_fetch_error() {
         // 锁定这一契约：抓不到 robots ⇒ 放行（不阻断）
-        // ⭐ 该判据由下方 robots_tests 中的夹具测试覆盖，此处只作说明。
+        // 该判据由下方 robots_tests 中的夹具测试覆盖，此处只作说明。
     }
 
-    /// ⭐⭐ 替代被移除的 `live_gate_rejects_x_com_search`（打真实网络，
+    /// 替代被移除的 `live_gate_rejects_x_com_search`（打真实网络，
     /// 会因网络抖动 fail-open 而间歇失败）。用**实测抓到的真实
     /// robots.txt 夹具**覆盖同一契约，且完全离线、确定。
     #[cfg(feature = "stealth-net")]
@@ -723,12 +723,12 @@ Allow: /*?t=
             "real x.com robots is `Disallow: /` so a search path must be denied; rules={:?}",
             rules
         );
-        // ⭐ 逐字节对应 assert_robots_allows 内部的判据，
+        // 逐字节对应 assert_robots_allows 内部的判据，
         //    保证「夹具断言」与「生产判据」用的是同一套规则。
         assert!(rules.contains(&"/".to_string()));
     }
 
-    /// ⭐ 另一条契约：抓不到 robots ⇒ fail-open（不阻断）。
+    /// 另一条契约：抓不到 robots ⇒ fail-open（不阻断）。
     /// 这正是我那个网络测试会间歇失败的原因，把它显式固化。
     #[test]
     fn fail_open_semantics_is_deliberate() {
@@ -774,7 +774,7 @@ mod parse_contract_tests {
     fn page_with_tweets_does_not_report_empty_success() {
         let q = XQuery::search("rust", 5);
         let res = TwitterExtractorParse::run(EMPTY_HTML, &q);
-        // ⭐⭐ 核心回归：观测到推文容器时**不得**返回 Ok(空)。
+        // 核心回归：观测到推文容器时**不得**返回 Ok(空)。
         //    首版在这里返回 Ok(total:0) —— 假成功。
         assert!(res.is_err(), "must not report an empty success when tweets were observed");
         let msg = format!("{:?}", res.unwrap_err());

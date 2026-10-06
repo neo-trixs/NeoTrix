@@ -33,7 +33,7 @@ pub mod nt_memory_decompose;
 pub mod nt_memory_distill;
 pub mod nt_memory_diversity;
 pub mod nt_memory_dual_brain;
-// ⭐⭐ 检索准入闸（2026-10-03，吸收 waku-agent 的 retrieval_gate 设计）：
+// 检索准入闸（2026-10-03，吸收 waku-agent 的 retrieval_gate 设计）：
 // 「**这条消息需要记忆吗**」在**碰存储之前**回答 ⇒ 治「过度检索偏置答案」。
 pub mod nt_retrieval_gate;
 pub mod nt_memory_e8_agent;
@@ -228,22 +228,22 @@ pub struct KnowledgeBase {
     /// 可验证回放收据发射器 (L3 AgentReceipt trait 抽象, 消除 L1→L3 直接依赖)。
     pub receipt_emitter:
         RwLock<Option<Box<dyn crate::l0_substrate::nt_core_traits::ReceiptEmitter>>>,
-    // ⭐⭐⭐ 2026-10-04 **接线**：检索准入门（`nt_retrieval_gate`）。
+    // 2026-10-04 **接线**：检索准入门（`nt_retrieval_gate`）。
     //
-    // ⭐⭐⭐ 为什么现在才接（⭐⭐ 这是一条「建成未用」的清账）：
-    // ⭐⭐ 该门自 `8aac2fc6` 落地起 ⭐⭐ **零生产消费者**
-    // ⭐⭐ （`decide_or_admit` / `RetrievalQuestion` / `FailOpenGate`
-    // ⭐⭐   全仓外部引用均为 0；`impl RetrievalGate` 只有测试里的
-    // ⭐⭐   `Broken` / `Skipper`）⇒ ⭐⭐⭐ **检索能力已上线（kb_search
-    // ⭐⭐ 的 `search_local` 是唯一真入口），门却没装**。
+    // 为什么现在才接（这是一条「建成未用」的清账）：
+    // 该门自 `8aac2fc6` 落地起 **零生产消费者**
+    // （`decide_or_admit` / `RetrievalQuestion` / `FailOpenGate`
+    //  全仓外部引用均为 0；`impl RetrievalGate` 只有测试里的
+    //  `Broken` / `Skipper`）⇒ **检索能力已上线（kb_search
+    // 的 `search_local` 是唯一真入口），门却没装**。
     //
-    // ⭐⭐⭐ **默认 `NoGate` ⇒ 零行为变化**，⭐⭐ 这是刻意的：
-    // ⭐⭐ 门自己的文档写明「可插拔，**默认不改变任何行为**」，
-    // ⭐⭐ 而我方**没有实测阈值**（⭐⭐ `LESSONS-20260929-checked-is-not-verified.md`
-    // ⭐⭐ 警告过「塞一个未测的启发式」）。⇒ ⭐⭐ **先接线、后测量**。
+    // **默认 `NoGate` ⇒ 零行为变化**，这是刻意的：
+    // 门自己的文档写明「可插拔，**默认不改变任何行为**」，
+    // 而我方**没有实测阈值**（`LESSONS-20260929-checked-is-not-verified.md`
+    // 警告过「塞一个未测的启发式」）。⇒ **先接线、后测量**。
     //
-    // ⭐⭐ `Arc` 而非 `RwLock`：⭐⭐ 闸是**只读判定**，⭐⭐ 换闸不需要
-    // ⭐⭐ 与检索并发协调。
+    // `Arc` 而非 `RwLock`：闸是**只读判定**，换闸不需要
+    // 与检索并发协调。
     pub(crate) retrieval_gate: std::sync::Arc<dyn nt_retrieval_gate::RetrievalGate>,
 }
 

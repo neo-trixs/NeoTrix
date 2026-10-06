@@ -6,38 +6,38 @@
 //!
 //! 机制:
 //! - `Emit`    广播: 所有 handler 收到事件, 互不短路。
-//! - `Independent` 独立: ⭐⭐ **逐 handler 隔离 panic**（⭐ 真「独立」，⛔ 不是并发）。
-//!   ⭐⭐ ⛔ **刻意不 spawn 线程**：L0 是无运行时依赖的同步基元，
-//!   ⭐⭐ 每事件 spawn 会把「同步基元」变成「线程工厂」。
+//! - `Independent` 独立: **逐 handler 隔离 panic**（真「独立」，⛔ 不是并发）。
+//!   ⛔ **刻意不 spawn 线程**：L0 是无运行时依赖的同步基元，
+//!   每事件 spawn 会把「同步基元」变成「线程工厂」。
 //! - `Serial`  顺序: 首个 handler 返回 `true` (已处理) 即短路 (bail)。
 //! - `Waterfall` 链式中间件: 每个 handler 可调 `next()` 委托给下一环 (around
 //!   middleware), 或返回 `true` 短路; 都不做则顺延 (fall-through)。
 //!
 //! NeoTrix 消费方 (R-P79): McpServer 工具调用 pre/post 钩子 (Waterfall 中间件链),
 //! 对应 dsh tools.md "工具管线 = 可扩展 waterfall" 范式。
-// ⭐⭐⭐ 2026-10-03 **从 `l5_cognition/` 下沉到 `l0_substrate/`**。
+// 2026-10-03 **从 `l5_cognition/` 下沉到 `l0_substrate/`**。
 //
-// ## ⭐ 下沉的依据（三条，全部实测，非品味）
+// ## 下沉的依据（三条，全部实测，非品味）
 //
-// ① ⭐ **本模块零 `use`、零 `crate::` 引用** ⇒ 纯 std、**完全自包含**
-//    ⇒ ⭐ 它对「认知」没有任何依赖，**层次归属是历史偶然**。
+// ① **本模块零 `use`、零 `crate::` 引用** ⇒ 纯 std、**完全自包含**
+//    ⇒ 它对「认知」没有任何依赖，**层次归属是历史偶然**。
 //
-// ② ⭐ **它是基座设施，不是认知能力**：`Dispatcher` 是**通用事件/钩子链**
+// ② **它是基座设施，不是认知能力**：`Dispatcher` 是**通用事件/钩子链**
 //    （Emit/Waterfall/Parallel/Serial）。而 L0 是「被所有人依赖的基座」——
-//    ⭐ ⭐ L0 反过来依赖 L5 会构成**近乎循环**（见
+//    L0 反过来依赖 L5 会构成**近乎循环**（见
 //    `docs/architecture/LAYER-DEBT-TIERS-2026-10-03.md` §2 的 S1 级定义）。
-//    ⭐ 原先 `l0_substrate/nt_core_event_bus.rs:6` 直接
+//    原先 `l0_substrate/nt_core_event_bus.rs:6` 直接
 //    `use crate::l5_cognition::nt_core_dispatch::Dispatcher`
 //    ⇒ **正是 L0→L5 近循环倒置的一处**。
 //
-// ③ ⭐ **两个消费者都不在 L5**：
+// ③ **两个消费者都不在 L5**：
 //    · `l0_substrate/nt_core_event_bus.rs`（基座）
 //    · `l1_action/nt_io/nt_io_mcp_bridge.rs`（动作层，`54a2fa64` 接入）
-//    ⇒ ⭐ **消费者分布与它的实际用途一致**，只有「定义位置」不一致。
+//    ⇒ **消费者分布与它的实际用途一致**，只有「定义位置」不一致。
 //
-// ## ⭐ 兼容性
+// ## 兼容性
 // `l5_cognition::nt_core_dispatch` 保留为 **`pub use` 再导出**
-// ⇒ ⛔ 不改任何调用方的路径 ⇒ ⭐ 本 commit 是**纯位置变更**，零行为变化。
+// ⇒ ⛔ 不改任何调用方的路径 ⇒ 本 commit 是**纯位置变更**，零行为变化。
 
 /// 事件派发模式 (Cordis events.ts dispatch modes)。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,26 +46,26 @@ pub enum DispatchMode {
     Emit,
     /// around 中间件链: handler 可 next() 委托 / 返回 true 短路 / 静默顺延
     Waterfall,
-    /// ⭐⭐⭐ **独立处理**：跑完**全部** handler，且**每个 handler 的 panic 被隔离**。
+    /// **独立处理**：跑完**全部** handler，且**每个 handler 的 panic 被隔离**。
     ///
-    /// ⭐⭐⭐ 2026-10-04 **重命名 + 语义修正**（⭐ 改名零风险：实测生产零调用方）。
+    /// 2026-10-04 **重命名 + 语义修正**（改名零风险：实测生产零调用方）。
     ///
     /// ⛔ **改名前叫 `Parallel`，而它撒谎**：
     ///   原注释写着「并行独立处理 (同步场景等价 Emit)」——
-    ///   ⭐⭐ **前半句说并行，后半句自认等价 Emit（= 串行同步）**
-    ///   ⭐⭐ 实现更是 `for h in &self.handlers { h(event, &|| {}) }`
-    ///   ⭐⭐ ⇒ **既不并行，又阻塞 producer**。
-    /// ⭐⭐ 对标 Atlas 的 `atlas-bus` 原文原则：⭐⭐ **lagging subscriber
-    ///   绝不阻塞 producer**。⭐⭐ 那个「独立」真正要保证的不是并发度，
-    ///   ⭐⭐ 而是 ⭐⭐ **一个坏 handler 不能拖死/拖慢 producer**。
+    ///   **前半句说并行，后半句自认等价 Emit（= 串行同步）**
+    ///   实现更是 `for h in &self.handlers { h(event, &|| {}) }`
+    ///   ⇒ **既不并行，又阻塞 producer**。
+    /// 对标 Atlas 的 `atlas-bus` 原文原则：**lagging subscriber
+    ///   绝不阻塞 producer**。那个「独立」真正要保证的不是并发度，
+    ///   而是 **一个坏 handler 不能拖死/拖慢 producer**。
     ///
-    /// ⭐⭐⭐ 所以这里给的是**真独立**：
-    ///   ① ⭐⭐ `catch_unwind` 逐个隔离 ⇒ **一个 handler panic 不影响其余**
-    ///   ② ⭐⭐ 全程 `catch_unwind` ⇒ ⭐⭐ **producer 永不 panic**
-    ///   ③ ⛔ ⭐⭐ **刻意不做真并发**（不 spawn 线程）：
-    ///      L0 是无运行时依赖的同步基元，⭐⭐ 每事件 spawn 线程会把
-    ///      ⭐⭐ 「同步基元」变成「线程工厂」，⭐⭐ 代价远大于收益。
-    ///      ⇒ ⭐⭐ 并发留给上层（tokio），⭐⭐ L0 只保证**隔离**。
+    /// 所以这里给的是**真独立**：
+    ///   ① `catch_unwind` 逐个隔离 ⇒ **一个 handler panic 不影响其余**
+    ///   ② 全程 `catch_unwind` ⇒ **producer 永不 panic**
+    ///   ③ ⛔ **刻意不做真并发**（不 spawn 线程）：
+    ///      L0 是无运行时依赖的同步基元，每事件 spawn 线程会把
+    ///      「同步基元」变成「线程工厂」，代价远大于收益。
+    ///      ⇒ 并发留给上层（tokio），L0 只保证**隔离**。
     Independent,
     /// 顺序处理, 首个 handler 返回 true 即短路 (bail)
     Serial,
@@ -90,16 +90,16 @@ impl DispatchMode {
 /// - 返回 `true`: 声明"已处理" (Serial/Waterfall 短路; Emit/Parallel 仅计数)
 pub struct Dispatcher<E> {
     handlers: Vec<Box<dyn Fn(&E, &dyn Fn()) -> bool + Send + Sync>>,
-    /// ⭐⭐⭐ `Independent` 模式下被隔离掉的 handler panic 次数（**实例级**）。
+    /// `Independent` 模式下被隔离掉的 handler panic 次数（**实例级**）。
     ///
-    /// ⭐⭐⭐ **为什么必须是实例级、⛔ 不是进程全局**（⭐⭐ 第一版踩了）：
-    ///   ⛔ 我第一版做成 `static AtomicUsize`，⭐⭐ 于是
-    ///   ⭐⭐ **cargo test 并行跑测试时互相污染** —— 实测
-    ///   ⭐⭐ 「1 个 panic 的 handler，差值却测出 **2**」。
-    ///   ⭐⭐ 更本质的问题是：⭐⭐ 调用方要问的是
-    ///   ⭐⭐ **「我这次 dispatch 有没有 handler 崩」**，
-    ///   ⭐⭐ ⛔ 不是「全进程今天崩了几次」⇒ 观测必须**跟着 dispatcher 走**。
-    /// ⭐⭐ 附带收益：⭐⭐ 无全局可变状态 ⇒ ⭐⭐ **天然可重入、可并发观测**。
+    /// **为什么必须是实例级、⛔ 不是进程全局**（第一版踩了）：
+    ///   ⛔ 我第一版做成 `static AtomicUsize`，于是
+    ///   **cargo test 并行跑测试时互相污染** —— 实测
+    ///   「1 个 panic 的 handler，差值却测出 **2**」。
+    ///   更本质的问题是：调用方要问的是
+    ///   **「我这次 dispatch 有没有 handler 崩」**，
+    ///   ⛔ 不是「全进程今天崩了几次」⇒ 观测必须**跟着 dispatcher 走**。
+    /// 附带收益：无全局可变状态 ⇒ **天然可重入、可并发观测**。
     handler_panics: std::sync::atomic::AtomicUsize,
 }
 
@@ -113,7 +113,7 @@ impl<E> Dispatcher<E> {
     pub fn new() -> Self {
         Self {
             handlers: Vec::new(),
-            // ⭐⭐ 实例级 panic 计数（⭐⭐ ⛔ 不是 `static`：见字段注释的实测教训）
+            // 实例级 panic 计数（⛔ 不是 `static`：见字段注释的实测教训）
             handler_panics: std::sync::atomic::AtomicUsize::new(0),
         }
     }
@@ -139,10 +139,10 @@ impl<E> Dispatcher<E> {
         self.handlers.len()
     }
 
-    /// ⭐⭐ 本实例累计隔离掉的 handler panic 次数（⭐⭐ `Independent` 模式）。
+    /// 本实例累计隔离掉的 handler panic 次数（`Independent` 模式）。
     ///
-    /// ⭐⭐ 调用方据此判断：⭐⭐ 「这次派发**是否全部成功**」。
-    /// ⭐⭐ ⛔ **不要**把它当「错误率」指标跨实例相加（⭐⭐ 不同 dispatcher 语义不同）。
+    /// 调用方据此判断：「这次派发**是否全部成功**」。
+    /// ⛔ **不要**把它当「错误率」指标跨实例相加（不同 dispatcher 语义不同）。
     pub fn handler_panic_count(&self) -> usize {
         self.handler_panics.load(std::sync::atomic::Ordering::Relaxed)
     }
@@ -163,32 +163,32 @@ impl<E> Dispatcher<E> {
                 ran
             }
             DispatchMode::Independent => {
-                // ⭐⭐⭐ 真独立：⭐⭐ 逐个 `catch_unwind` ⇒ ⭐⭐ **一个 handler
+                // 真独立：逐个 `catch_unwind` ⇒ **一个 handler
                 // panic 不影响其余，也不把 panic 抛回 producer**。
-                // ⭐ 这正是 Atlas `atlas-bus` 的核心契约（lagging/broken
+                // 这正是 Atlas `atlas-bus` 的核心契约（lagging/broken
                 // subscriber 不得阻塞 producer）在本层的最小实现。
                 let mut ran = 0;
                 for h in &self.handlers {
                     let evt = event;
                     // ⚠️ `AssertUnwindSafe` 是**必需**的：handler 是 `&dyn Fn`，
-                    // ⭐⭐ 而编译器无法证明它没有内部可变状态（`&mut` 捕获）。
-                    // ⭐⭐ 这里**只用于 unwinding 边界**，⛔ 不引入任何 `unsafe`
-                    // ⭐⭐ （本 crate 是 `#![forbid(unsafe_code)]`，catch_unwind 是安全 API）。
+                    // 而编译器无法证明它没有内部可变状态（`&mut` 捕获）。
+                    // 这里**只用于 unwinding 边界**，⛔ 不引入任何 `unsafe`
+                    // （本 crate 是 `#![forbid(unsafe_code)]`，catch_unwind 是安全 API）。
                     let ok = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                         h(evt, &|| {});
                     }))
                     .is_ok();
-                    // ⭐⭐ 计数语义：**跑过就算 ran**（含 panic 那个），
-                    // ⭐⭐ ⛔ 但返回值只说「派发到几个」，⭐⭐ 不该假装它成功了。
+                    // 计数语义：**跑过就算 ran**（含 panic 那个），
+                    // ⛔ 但返回值只说「派发到几个」，不该假装它成功了。
                     ran += 1;
                     if !ok {
-                        // ⭐⭐ 诚实：⭐⭐ 记一笔，⭐⭐ ⛔ **不静默吞掉**
-                        // ⭐⭐ （静默吞 = 用户以为「都处理了」）。
-                        // ⭐⭐⭐ 记在**实例**上（⭐⭐ 不是进程全局）——
-                        // ⭐⭐ 第一版做成了 `static` 全局，⭐⭐ 结果
-                        // ⭐⭐ **cargo test 并行跑测试时互相污染**
-                        // ⭐⭐ （实测：1 个 panic 却测出 2），
-                        // ⭐⭐ 且全局可变状态让 Dispatcher ⛔ 不可重入观测。
+                        // 诚实：记一笔，⛔ **不静默吞掉**
+                        // （静默吞 = 用户以为「都处理了」）。
+                        // 记在**实例**上（不是进程全局）——
+                        // 第一版做成了 `static` 全局，结果
+                        // **cargo test 并行跑测试时互相污染**
+                        // （实测：1 个 panic 却测出 2），
+                        // 且全局可变状态让 Dispatcher ⛔ 不可重入观测。
                         self.handler_panics.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     }
                 }
@@ -396,30 +396,30 @@ mod tests {
     }
 
     #[test]
-    /// ⭐⭐⭐ `Independent` 的**核心契约**：⭐⭐ 一个 handler panic
-    /// **既不打断其余 handler，也不把 panic 抛回 producer**，⭐⭐ 且**留痕**。
+    /// `Independent` 的**核心契约**：一个 handler panic
+    /// **既不打断其余 handler，也不把 panic 抛回 producer**，且**留痕**。
     ///
-    /// ⭐⭐ 这是 Atlas `atlas-bus` 那条原则的可执行形态：
-    /// ⭐⭐ 「lagging / broken subscriber 绝不阻塞 producer」。
-    /// ⭐⭐ 而 ⭐⭐ **留痕（计数器）** 同样重要 —— ⭐⭐ 静默吞掉 panic
-    /// ⭐⭐ 会让调用方以为「全部处理成功」。
+    /// 这是 Atlas `atlas-bus` 那条原则的可执行形态：
+    /// 「lagging / broken subscriber 绝不阻塞 producer」。
+    /// 而 **留痕（计数器）** 同样重要 —— 静默吞掉 panic
+    /// 会让调用方以为「全部处理成功」。
     #[test]
     fn independent_isolates_panicking_handler_and_still_runs_the_rest() {
-        // ⭐⭐ `Dispatcher::on` 的真签名是 `Fn(&E) -> bool`（`:137`），
-        // ⭐⭐ **不是**裸 `Fn(&E, &dyn Fn())` —— ⭐⭐ 我第一版照 `dispatch`
-        // ⭐⭐ 的内部 handler 形状写，⭐⭐ 编译器当场抓住（⭐ 这就是有门的好处）。
+        // `Dispatcher::on` 的真签名是 `Fn(&E) -> bool`（`:137`），
+        // **不是**裸 `Fn(&E, &dyn Fn())` —— 我第一版照 `dispatch`
+        // 的内部 handler 形状写，编译器当场抓住（这就是有门的好处）。
         let mut d: Dispatcher<i32> = Dispatcher::new();
-        // ⭐⭐⭐ 记录「到达了第几个 handler」。
-        // ⭐⭐⭐ **必须 `Arc`**：`Dispatcher::on` 的 bound 是 `F: Fn(&E) -> bool
-        //   + Send + Sync + 'static`（`:137`）⇒ ⭐⭐ **`'static` 要求闭包不借用
+        // 记录「到达了第几个 handler」。
+        // **必须 `Arc`**：`Dispatcher::on` 的 bound 是 `F: Fn(&E) -> bool
+        //   + Send + Sync + 'static`（`:137`）⇒ **`'static` 要求闭包不借用
         //   栈上局部** ⇒ 直接捕获 `step` 报 E0373。
-        // ⭐⭐ 而 `Mutex<Vec>` 更糟：handler 是 `Fn`（**不可变**捕获），
-        // ⭐⭐ 闭包里拿不到 `Mutex` 的 `&mut` ⇒ ⭐⭐ **两条路都堵**，
-        // ⭐⭐ 所以用 `Arc<AtomicUsize>`：⭐⭐ `Clone` 一份进闭包，⭐⭐ 全 'static。
+        // 而 `Mutex<Vec>` 更糟：handler 是 `Fn`（**不可变**捕获），
+        // 闭包里拿不到 `Mutex` 的 `&mut` ⇒ **两条路都堵**，
+        // 所以用 `Arc<AtomicUsize>`：`Clone` 一份进闭包，全 'static。
         let step = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        // ⭐⭐⭐ 三个句柄各司其职：`step` 进闭包 1、`step2` 进闭包 3、
-        // ⭐⭐ `reader` 留在测试里读数。⭐⭐ **不复用已被 move 的变量**
-        // ⭐⭐ （我第一版复用 ⇒ E0382，⭐⭐ 编译器当场抓住）。
+        // 三个句柄各司其职：`step` 进闭包 1、`step2` 进闭包 3、
+        // `reader` 留在测试里读数。**不复用已被 move 的变量**
+        // （我第一版复用 ⇒ E0382，编译器当场抓住）。
         let step2 = std::sync::Arc::clone(&step);
         let reader = std::sync::Arc::clone(&step);
 
@@ -427,19 +427,19 @@ mod tests {
             step.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             false
         });
-        // ⭐⭐ 故意 panic 的 handler
+        // 故意 panic 的 handler
         d.on(|_e: &i32| panic!("induced handler panic"));
         d.on(move |_e: &i32| {
-            // ⭐⭐ 记 10（而不是 3）⇒ ⭐⭐ 于是「after 被跑到」可与
-            // ⭐⭐ 「停在 2」区分开 ⭐⭐（⭐ 只数个数分不清是否跳过了 3 号）
+            // 记 10（而不是 3）⇒ 于是「after 被跑到」可与
+            // 「停在 2」区分开 （只数个数分不清是否跳过了 3 号）
             step2.fetch_add(10, std::sync::atomic::Ordering::SeqCst);
             false
         });
 
-        // ⭐⭐ `handler_panic_count()` 直接返回 `usize`（⭐ 我上一版返回类型写错，
-        // ⭐⭐ 编译器当场抓住 ⇒ **不要**再对它 `.load()`）
+        // `handler_panic_count()` 直接返回 `usize`（我上一版返回类型写错，
+        // 编译器当场抓住 ⇒ **不要**再对它 `.load()`）
         let before = d.handler_panic_count();
-        // ⭐⭐ 关键：⭐⭐ **producer 侧不 panic**（改前 Emit 会 panic 出来）
+        // 关键：**producer 侧不 panic**（改前 Emit 会 panic 出来）
         let ran = d.dispatch(DispatchMode::Independent, &1);
         let after_panics = d.handler_panic_count() - before;
 

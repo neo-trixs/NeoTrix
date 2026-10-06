@@ -495,7 +495,7 @@ mod tests {
         assert!(!m.stimulus_succeeded);
     }
 
-    /// ⭐⭐ 反向锁：钳位**真的生效**，且坏状态**不可达**。
+    /// 反向锁：钳位**真的生效**，且坏状态**不可达**。
     ///
     /// 【为什么需要这条】`crisis_level()` 把 `max_stimulus_before_rollback` 当除数。
     /// 为 0 时 `x/0 = +inf` ⇒ `.min(1.0)` ⇒ 结果**恒为 1.0**

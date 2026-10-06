@@ -158,17 +158,17 @@ impl Default for ReasoningShield {
 mod tests {
     use super::*;
 
-    /// ⭐⭐⭐ 2026-10-04 **修陈旧夹具**（⭐⭐ 与 `asi_compliance` 同一病根）。
+    /// 2026-10-04 **修陈旧夹具**（与 `asi_compliance` 同一病根）。
     ///
     /// ⛔ **改前**夹具给的是**恰好 3 行**，而 `summarize`（`:96`）的判据是
-    ///   `if line_count <= 3 { 原样返回 }` ⇒ ⭐⭐ **3 行恰好落在「不摘要」那一侧**，
-    ///   ⭐⭐ 于是永远不会产出 `"...omitted for security..."` ⇒ 断言必然失败。
-    /// ⭐⭐ 而那个字符串**确实存在**（`:107`）—— ⭐⭐ 我一度以为「全仓不存在」
-    ///   ⭐⭐ **那是误读了自己 grep 的输出**（⭐⭐ 第一行就是命中）。
+    ///   `if line_count <= 3 { 原样返回 }` ⇒ **3 行恰好落在「不摘要」那一侧**，
+    ///   于是永远不会产出 `"...omitted for security..."` ⇒ 断言必然失败。
+    /// 而那个字符串**确实存在**（`:107`）—— 我一度以为「全仓不存在」
+    ///   **那是误读了自己 grep 的输出**（第一行就是命中）。
     ///
-    /// ✅ 修法：⭐⭐ 夹具改成 **5 行**（⭐⭐ 跨过 `>3` 阈值），
-    ///   ⭐⭐ 并 ⭐⭐ **额外断言「≤3 行时保持原样」** —— ⭐⭐ 把
-    ///   ⭐⭐ **两条分支都钉住**，⭐⭐ 而不只是把测试改绿。
+    /// ✅ 修法：夹具改成 **5 行**（跨过 `>3` 阈值），
+    ///   并 **额外断言「≤3 行时保持原样」** —— 把
+    ///   **两条分支都钉住**，而不只是把测试改绿。
     #[test]
     fn test_protect_reasoning() {
         let shield = ReasoningShield::new();
@@ -182,9 +182,9 @@ mod tests {
         assert!(!result.encrypted_signature.is_empty());
         assert!(result.decoy_injected);
 
-        // ⭐⭐⭐ 补钉**另一条分支**：`summarize` 在 `line_count <= 3` 时原样返回。
-        // ⭐⭐ ⛔ 旧测试只看 >3 那一侧 ⇒ ⭐⭐ 这一侧**从未被断言过**
-        // ⭐⭐（⭐⭐ 而它恰恰是「3 行输入不触发摘要」的行为边界）。
+        // 补钉**另一条分支**：`summarize` 在 `line_count <= 3` 时原样返回。
+        // ⛔ 旧测试只看 >3 那一侧 ⇒ 这一侧**从未被断言过**
+        // （而它恰恰是「3 行输入不触发摘要」的行为边界）。
         let short = shield.protect(
             "Step 1: Analyze input\nStep 2: Process\nStep 3: Output",
             "sig123",

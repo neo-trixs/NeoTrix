@@ -223,17 +223,17 @@ impl TradeCapabilityRegistry {
 
     /// 获取能力 (TradeCapability 视图)
     pub fn get(&self, capability_id: &str) -> Option<Arc<dyn TradeCapability>> {
-        // ⭐⭐⭐⭐⭐ **金丝雀打点**（2026-10-04，吸收自 `plur` 的 `CapabilityCanary`）。
+        // **金丝雀打点**（2026-10-04，吸收自 `plur` 的 `CapabilityCanary`）。
         //
-        // ⭐⭐⭐⭐ **为什么打在这里**：⭐⭐ `get()` 是 trade 能力
-        // ⭐⭐⭐⭐ **唯一的生产派发点**（⭐⭐ 拿到它 ⇒ 就要执行它）。
-        // ⭐⭐⭐⭐ ⭐⭐ **纪律**：`signal()` ⭐⭐ 只许出现在**派发路径**内，
-        // ⭐⭐⭐⭐ ⛔ 绝不许出现在 `register` 处、⛔ 绝不许出现在测试里 ——
-        // ⭐⭐⭐⭐ 否则「注册即打点」会伪造健康，⭐⭐⭐⭐
-        // ⭐⭐⭐⭐ 那就回到了「建成未用却看着健康」。
+        // **为什么打在这里**：`get()` 是 trade 能力
+        // **唯一的生产派发点**（拿到它 ⇒ 就要执行它）。
+        // **纪律**：`signal()` 只许出现在**派发路径**内，
+        // ⛔ 绝不许出现在 `register` 处、⛔ 绝不许出现在测试里 ——
+        // 否则「注册即打点」会伪造健康，
+        // 那就回到了「建成未用却看着健康」。
         //
-        // ⭐⭐ 打点一个**未被 expect 登记**的 id 是**静默无害**的：
-        // ⭐⭐ ⭐⭐ 金丝雀只报告**登记过却没打点**的（⭐⭐ 真正的问题方向）。
+        // 打点一个**未被 expect 登记**的 id 是**静默无害**的：
+        // 金丝雀只报告**登记过却没打点**的（真正的问题方向）。
         neotrix_neobot::nt_capability_canary::signal(capability_id);
         self.local.get(capability_id).cloned()
     }
@@ -956,41 +956,41 @@ mod tests {
 
 
 // ══════════════════════════════════════════════════════════════════
-// ⭐⭐⭐⭐⭐ **能力市场元数据**（2026-10-04，⭐⭐ 对标 hermes 的 `IndexEntry`）
+// **能力市场元数据**（2026-10-04，对标 hermes 的 `IndexEntry`）
 // ══════════════════════════════════════════════════════════════════
 //
-// ⭐⭐⭐⭐⭐ **为什么集中在这里而不是 5 个 registrar 各写一份**：
-// ⭐⭐⭐⭐⭐ ① ⭐⭐ **单一真源** —— 5 处散写必然漂（⭐⭐ 这正是本轮一路在治的病）
-// ⭐⭐⭐⭐⭐ ② ⭐⭐⭐⭐⭐ **可反查**：⭐⭐ `check-trade-market.sh` 能断言
-// ⭐⭐⭐⭐⭐ 「每个 trade 节点都过了这个函数」，⭐⭐ ⭐⭐ 而不是
-// ⭐⭐⭐⭐⭐ 「代码里看起来有 metadata」（⭐⭐ grep ⭐⭐ 不是证据）。
-// ⭐⭐⭐⭐⭐ ③ ⭐⭐ 版本号 ⭐⭐ **一处升版**，⭐⭐ 5 个能力同时生效。
+// **为什么集中在这里而不是 5 个 registrar 各写一份**：
+// ① **单一真源** —— 5 处散写必然漂（这正是本轮一路在治的病）
+// ② **可反查**：`check-trade-market.sh` 能断言
+// 「每个 trade 节点都过了这个函数」，而不是
+// 「代码里看起来有 metadata」（grep 不是证据）。
+// ③ 版本号 **一处升版**，5 个能力同时生效。
 //
-// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **⚠️ 纪律③：`license` 为空 ⭐⭐ 不是「未知」，
-// ⭐⭐⭐⭐⭐ ⭐⭐ 而是「**不可上架**」** —— 本仓有商业许可阻断门
-// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ （`check-license-js.sh` / `deny.toml`），⭐⭐⭐⭐⭐ 但那只管构建期；
-// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 运行期上架的插件许可无从审计 ⇒ ⭐⭐⭐⭐⭐ **必须显式声明**。
+// **⚠️ 纪律③：`license` 为空 不是「未知」，
+// 而是「**不可上架**」** —— 本仓有商业许可阻断门
+// （`check-license-js.sh` / `deny.toml`），但那只管构建期；
+// 运行期上架的插件许可无从审计 ⇒ **必须显式声明**。
 
-/// ⭐⭐⭐⭐⭐ 本模块需要的类型（⭐⭐⭐ 与 `full_cycle.rs` 等 registrar 同一来源）
-// ⭐⭐⭐⭐⭐ `Domain` ⭐⭐ 本文件已从 `crate::l1_action` 导入（⭐⭐ 见 `:18`）
-// ⭐⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐⭐ **只补真正缺的**，⭐⭐⭐⭐⭐ ⛔ 不重复引入（⭐⭐ 否则同名冲突）。
+/// 本模块需要的类型（与 `full_cycle.rs` 等 registrar 同一来源）
+// `Domain` 本文件已从 `crate::l1_action` 导入（见 `:18`）
+// ⇒ **只补真正缺的**，⛔ 不重复引入（否则同名冲突）。
 use nt_core_capability_tree::node::CapabilityNode;
 
-// ⭐⭐ 贸易能力统一版本号（⭐⭐⭐ 一处升版，5 个能力同时生效）
+// 贸易能力统一版本号（一处升版，5 个能力同时生效）
 pub const TRADE_ABILITY_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// ⭐⭐⭐⭐⭐ 能力在市场里的类别（⭐⭐ 对标 hermes 的 `category`）
+/// 能力在市场里的类别（对标 hermes 的 `category`）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TradeCategory {
-    /// ⭐⭐ 贸易全链（⭐⭐ 编排型）
+    /// 贸易全链（编排型）
     FullCycle,
-    /// ⭐⭐ 报价
+    /// 报价
     Quote,
-    /// ⭐⭐ 生产物流
+    /// 生产物流
     Logistics,
-    /// ⭐⭐ 金融合规
+    /// 金融合规
     Finance,
-    /// ⭐⭐ 产品规格
+    /// 产品规格
     ProductSpec,
 }
 
@@ -1006,11 +1006,11 @@ impl TradeCategory {
     }
 }
 
-/// ⭐⭐⭐⭐⭐ **给贸易能力节点填市场元数据 + 类型**（⭐⭐ **五个 registrar 的唯一入口**）。
+/// **给贸易能力节点填市场元数据 + 类型**（**五个 registrar 的唯一入口**）。
 ///
-/// ⭐⭐ `kind` ⭐⭐ 一律 `Skill`：⭐⭐ 贸易能力 ⭐⭐ **不是 MCP 工具**
-/// （⭐⭐ 它们不进 `McpBridge` 的工具表）、⭐⭐ ⭐⭐ **不是 workflow**
-/// （⭐⭐ 各自独立）、⭐⭐ ⭐⭐ 也不是 agent ⇒ ⭐⭐ `Skill` 是诚实的分类。
+/// `kind` 一律 `Skill`：贸易能力 **不是 MCP 工具**
+/// （它们不进 `McpBridge` 的工具表）、**不是 workflow**
+/// （各自独立）、也不是 agent ⇒ `Skill` 是诚实的分类。
 pub fn apply_market_meta(node: &mut CapabilityNode, category: TradeCategory, description: &str) {
     use neotrix_neobot::nt_capability_market::meta_keys;
     node.kind = nt_core_capability_tree::node::CapabilityKind::Skill;
@@ -1018,11 +1018,11 @@ pub fn apply_market_meta(node: &mut CapabilityNode, category: TradeCategory, des
         meta_keys::VERSION.to_owned(),
         serde_json::Value::String(TRADE_ABILITY_VERSION.to_owned()),
     );
-    // ⭐⭐⭐⭐⭐ **许可**（⭐⭐⭐ 纪律③ 的关键字段）。
-    // ⭐⭐⭐⭐⭐ 本仓能力是**仓内自有实现**（⭐⭐ ⛔ 不是 vendored 第三方），
-    // ⭐⭐⭐⭐⭐ ⇒ 许可 = 本仓许可。⭐⭐⭐⭐⭐ ⭐⭐ **显式写出** ⭐⭐ 而不是留空
-    // ⭐⭐⭐⭐⭐ ⭐⭐ ⭐⭐ ⭐⭐ 因为留空 ⭐⭐ 会被市场判「不可上架」，
-    // ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ 而**那需要人先想清楚凭什么**才能填。
+    // **许可**（纪律③ 的关键字段）。
+    // 本仓能力是**仓内自有实现**（⛔ 不是 vendored 第三方），
+    // ⇒ 许可 = 本仓许可。**显式写出** 而不是留空
+    // 因为留空 会被市场判「不可上架」，
+    // 而**那需要人先想清楚凭什么**才能填。
     node.metadata.insert(
         meta_keys::LICENSE.to_owned(),
         serde_json::Value::String("LicenseRef-NeoTrix-Internal".to_owned()),
@@ -1037,14 +1037,14 @@ pub fn apply_market_meta(node: &mut CapabilityNode, category: TradeCategory, des
     );
 }
 
-/// ⭐⭐⭐⭐⭐ **打标后立刻回查市场元数据**（⭐⭐⭐⭐⭐ 「打标没生效」当场变红）。
+/// **打标后立刻回查市场元数据**（「打标没生效」当场变红）。
 ///
-/// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **为什么必须有**：⭐⭐⭐⭐⭐ `apply_market_meta` 往
-/// ⭐⭐⭐⭐⭐ `metadata` 写值，⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 而 ⭐⭐ `metadata` 是
-/// ⭐⭐⭐⭐⭐ `HashMap<String, serde_json::Value>` ⇒ ⭐⭐⭐⭐⭐ 键名拼错**不会报错**，
-/// ⭐⭐⭐⭐⭐ 只会被市场的 `as_str()` 取成 `None` ⇒ ⭐⭐⭐⭐⭐ **静默变成「不可上架」**。
-/// ⭐⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **必须在这里当场验**，⭐⭐⭐⭐⭐ ⭐⭐
-/// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 否则「打标了但市场里没有」⭐⭐⭐⭐⭐ **和没打标完全一样**。
+/// **为什么必须有**：`apply_market_meta` 往
+/// `metadata` 写值，而 `metadata` 是
+/// `HashMap<String, serde_json::Value>` ⇒ 键名拼错**不会报错**，
+/// 只会被市场的 `as_str()` 取成 `None` ⇒ **静默变成「不可上架」**。
+/// ⇒ **必须在这里当场验**，
+/// 否则「打标了但市场里没有」**和没打标完全一样**。
 ///
 /// # Errors
 /// 缺 `market.version` / `market.license` / `market.category`，或类型不是字符串
@@ -1056,9 +1056,9 @@ pub fn assert_market_ready(node: &CapabilityNode, step: &str) -> Result<(), Stri
             node.id
         ));
     }
-    // ⭐⭐⭐⭐⭐ ⭐⭐ 用**市场自己的投影函数**回查 ⇒ ⭐⭐⭐⭐⭐
-    // ⭐⭐⭐⭐⭐ ⭐⭐ **判据与市场准入是同一份逻辑**（⭐⭐ ⛔ 不复制一份判据：
-    // ⭐⭐⭐⭐⭐ ⭐⭐ 两份判据必然漂，⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ 那正是本轮治的第三种状态）。
+    // 用**市场自己的投影函数**回查 ⇒ 
+    // **判据与市场准入是同一份逻辑**（⛔ 不复制一份判据：
+    // 两份判据必然漂，那正是本轮治的第三种状态）。
     let entry = neotrix_neobot::nt_capability_market::project(node);
     match entry.blocked_reason() {
         None => Ok(()),
@@ -1069,12 +1069,12 @@ pub fn assert_market_ready(node: &CapabilityNode, step: &str) -> Result<(), Stri
 #[cfg(test)]
 mod market_meta_tests {
     use super::*;
-    // ⭐⭐⭐⭐⭐ `CapabilityTreeRegistry` ⭐⭐ **只有测试用** ⇒ ⭐⭐ 留在测试块内，
-    // ⭐⭐⭐⭐⭐ ⭐⭐ ⛔ 不在模块级引入（⭐⭐ 否则是无用的公开依赖面）。
+    // `CapabilityTreeRegistry` **只有测试用** ⇒ 留在测试块内，
+    // ⛔ 不在模块级引入（否则是无用的公开依赖面）。
     use nt_core_capability_tree::registry::CapabilityTreeRegistry;
 use nt_core_capability_tree::node::Domain as CapabilityTreeDomain;
 
-    /// ⭐⭐⭐⭐⭐ **元数据齐全 ⇒ 市场可上架**（⭐⭐ 端到端，⭐⭐ 跨两个 crate）。
+    /// **元数据齐全 ⇒ 市场可上架**（端到端，跨两个 crate）。
     #[test]
     fn 贸易能力填完市场元数据即可上架() {
         let mut n = CapabilityNode::new_primitive(
@@ -1094,7 +1094,7 @@ use nt_core_capability_tree::node::Domain as CapabilityTreeDomain;
         assert_eq!(e.description, "报价谈判能力");
     }
 
-    /// ⭐⭐⭐⭐⭐ **⛔ 不填元数据 ⇒ ⭐⭐ 不可上架**（⭐⭐⭐ **反向可证伪**）。
+    /// **⛔ 不填元数据 ⇒ 不可上架**（**反向可证伪**）。
     #[test]
     fn 未填市场元数据的能力不可上架且必须报出原因() {
         let n = CapabilityNode::new_primitive(
@@ -1116,17 +1116,17 @@ use nt_core_capability_tree::node::Domain as CapabilityTreeDomain;
 mod market_end_to_end_tests {
     use super::*;
     use nt_core_capability_tree::node::{CapabilityKind, CapabilityNode};
-    // ⭐⭐ 市场查询函数（⭐⭐ 在 neobot crate，⭐⭐⭐⭐⭐ core 依赖 neobot ⇒ 可直接用）
+    // 市场查询函数（在 neobot crate，core 依赖 neobot ⇒ 可直接用）
     use neotrix_neobot::nt_capability_market::{blocked, listable, MarketEntry};
 
-    /// ⭐⭐⭐⭐⭐ **端到端：⭐⭐ 播种 ⇒ 市场里真的能看到 5 个贸易能力。**
+    /// **端到端：播种 ⇒ 市场里真的能看到 5 个贸易能力。**
     ///
-    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ **这是「市场不是空的」的唯一证据** —— ⭐⭐⭐⭐⭐
-    /// ⭐⭐⭐⭐⭐ 前面所有测试都只验 `project()` 这个纯函数，⭐⭐⭐⭐⭐
-    /// ⭐⭐⭐⭐⭐ ⭐⭐⭐⭐⭐ ⭐⭐ **没有人证明过「真源 → 市场」这条链是通的**。
+    /// **这是「市场不是空的」的唯一证据** —— 
+    /// 前面所有测试都只验 `project()` 这个纯函数，
+    /// **没有人证明过「真源 → 市场」这条链是通的**。
     #[test]
     fn 真实贸易能力在市场里可见且可上架() {
-        // ⭐⭐ 走**真实构造路径**（⭐⭐ ⛔ 不直接调 registrar）
+        // 走**真实构造路径**（⛔ 不直接调 registrar）
         // ⚠️ 2026-10-05 路径收敛（L5 第二批）：原先直引 L5 的
         // `ConsciousnessRuntime::new()`，
         // 而层门规定 L1 不得引用 L5 ⇒ 记违规。
@@ -1149,7 +1149,7 @@ mod market_end_to_end_tests {
             trade.len(),
             blocked.len()
         );
-        // ⭐⭐⭐⭐⭐ 五类必须**各一个**（⭐⭐ ⛔ 类别串了 = 市场目录错乱）
+        // 五类必须**各一个**（⛔ 类别串了 = 市场目录错乱）
         let mut cats: Vec<&str> = trade.iter().map(|e| e.category.as_str()).collect();
         cats.sort();
         assert_eq!(
@@ -1163,12 +1163,12 @@ mod market_end_to_end_tests {
             ],
             "⭐⭐⭐⭐⭐ 五类各一个且不多不少"
         );
-        // ⭐⭐⭐⭐⭐ ⭐⭐ 市场**不得**收进缺口（纪律②的端到端验）
+        // 市场**不得**收进缺口（纪律②的端到端验）
         assert!(
             !listable.iter().any(|e| e.kind == CapabilityKind::Gap),
             "⭐⭐⭐⭐⭐ 缺口 ⭐⭐ 绝不能出现在市场里"
         );
-        // ⭐⭐⭐⭐⭐ blocked 必须为空（⭐⭐ 5 个 trade 都填全了）
+        // blocked 必须为空（5 个 trade 都填全了）
         let trade_blocked: Vec<&String> = blocked
             .iter()
             .filter(|(id, _)| id.contains("trade"))

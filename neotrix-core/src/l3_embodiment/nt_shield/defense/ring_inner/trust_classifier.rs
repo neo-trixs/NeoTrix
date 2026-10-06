@@ -57,22 +57,22 @@ impl TrustClassifier {
         }
 
         // 2. 内容风险
-        // ⭐⭐⭐⭐ 2026-10-04 修**真安全缺陷**（⭐⭐ 这个模块 2026-09 起从未编译，
-        //   ⭐⭐ 所以它的测试也从未运行 ⇒ ⭐⭐ 缺陷一直没被发现）。
+        // 2026-10-04 修**真安全缺陷**（这个模块 2026-09 起从未编译，
+        //   所以它的测试也从未运行 ⇒ 缺陷一直没被发现）。
         //
         // ⛔ **改前**：高危模式只做 `confidence -= 0.4`（**减法**）。
-        //   ⭐⭐ 算一遍就明白它有多糟：⭐⭐ `local` 来源 **+0.3**，
-        //   ⭐⭐ `0.5（基准） + 0.3 − 0.4 = 0.4`，
-        //   ⭐⭐ 而 thresholds 里正好有 `(0.4, TrustLevel::Medium)`
-        //   ⇒ ⭐⭐⭐ **`Ignore previous instructions` 这类 prompt 注入，
-        //   ⭐⭐⭐ 只要来源标成 `local`，就被判为「中等可信」。**
-        //   ⭐⭐ 等于 ⭐⭐ **「来源可信」可以抵消「内容高危」** —— ⭐⭐ 方向反了。
+        //   算一遍就明白它有多糟：`local` 来源 **+0.3**，
+        //   `0.5（基准） + 0.3 − 0.4 = 0.4`，
+        //   而 thresholds 里正好有 `(0.4, TrustLevel::Medium)`
+        //   ⇒ **`Ignore previous instructions` 这类 prompt 注入，
+        //   只要来源标成 `local`，就被判为「中等可信」。**
+        //   等于 **「来源可信」可以抵消「内容高危」** —— 方向反了。
         //
-        // ✅ **改法（语义而非调参）**：⭐⭐ **内容高危 = 一票否决**，
-        //   ⭐⭐ 不再是可被来源信任抵消的减项。命中即 `content_veto = true`，
-        //   ⭐⭐ 末尾 ⭐⭐**无条件**落到 `TrustLevel::Unknown`（最低档，
-        //   ⭐⭐ `requires_elevation = true` ⇒ 必须人工介入）。
-        // ⭐⭐ 理由：taint / provenance 风险 ⭐⭐⭐ **不可被「来源看起来可信」消解**。
+        // ✅ **改法（语义而非调参）**：**内容高危 = 一票否决**，
+        //   不再是可被来源信任抵消的减项。命中即 `content_veto = true`，
+        //   末尾 **无条件**落到 `TrustLevel::Unknown`（最低档，
+        //   `requires_elevation = true` ⇒ 必须人工介入）。
+        // 理由：taint / provenance 风险 **不可被「来源看起来可信」消解**。
         let input_lower = input.to_lowercase();
         let mut content_veto = false;
         for pattern in &self.high_risk_patterns {
@@ -91,7 +91,7 @@ impl TrustClassifier {
         }
 
         // 映射到信任等级
-        // ⭐⭐⭐ **内容高危 ⇒ 一票否决**：⭐⭐ 无视累积分数，⭐⭐ 直接最低档。
+        // **内容高危 ⇒ 一票否决**：无视累积分数，直接最低档。
         let level = if content_veto {
             reasons.push("⛔ 内容高危 ⇒ 来源信任被否决（veto）".to_string());
             TrustLevel::Unknown

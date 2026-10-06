@@ -280,7 +280,7 @@ impl NeobotStore {
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
-    /// ⭐ **原子认领**一行补发：成功返回 `true`，被别人抢走返回 `false`。
+    /// **原子认领**一行补发：成功返回 `true`，被别人抢走返回 `false`。
     ///
     /// ⛔⛔ **刻意不照抄 `drain_outbox`**：它是「SELECT … WHERE claimed=0 收集到 Vec，
     ///    再 for 循环逐条 UPDATE」且**全程无事务**（本 crate 零事务）
@@ -565,7 +565,7 @@ mod tests {
         assert!(st.due_deliveries(ALL_DUE_NOW, 10).expect("due").is_empty());
     }
 
-    /// ⭐ 本轮修复的核心判据：补发行**只能被认领一次**。
+    /// 本轮修复的核心判据：补发行**只能被认领一次**。
     ///
     /// # 为什么这条测试必须存在
     /// CLI 与桌面 App 是**两个进程打开同一个库文件**。修复前
@@ -600,7 +600,7 @@ mod tests {
         );
     }
 
-    /// ⭐ 失败必须把 `claimed` 归 0，否则该行**永久卡住** ⇒ 静默丢消息。
+    /// 失败必须把 `claimed` 归 0，否则该行**永久卡住** ⇒ 静默丢消息。
     #[test]
     fn failed_delivery_releases_claim() {
         let st = store("release");
@@ -628,7 +628,7 @@ mod tests {
         assert!(st.claim_delivery("d1").expect("re-claim"), "失败后必须能再认领，否则消息永久卡住");
     }
 
-    /// ⭐ `complete_delivery` 只删**自己认领**的行，且**重复调用无害**。
+    /// `complete_delivery` 只删**自己认领**的行，且**重复调用无害**。
     #[test]
     fn complete_delivery_is_scoped_and_idempotent() {
         let st = store("complete");

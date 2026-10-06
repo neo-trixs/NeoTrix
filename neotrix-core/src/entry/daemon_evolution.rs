@@ -89,9 +89,9 @@ pub fn run_daemon_evolution(profile: &str) {
                             .duration_since(std::time::UNIX_EPOCH)
                             .map(|d| d.as_secs())
                             .unwrap_or(0);
-                        // ⭐ 2026-10-02：原 `let _ =` 丢弃写失败 ⇒ 心跳停更**无任何线索**
+                        // 2026-10-02：原 `let _ =` 丢弃写失败 ⇒ 心跳停更**无任何线索**
                         //    （外部看门狗只看到「进程活着但心跳不动」）。
-                        // ⭐ 范式抄本仓既有 fs 侧写法 `l6_meta/nt_cost_tracker.rs:198`。
+                        // 范式抄本仓既有 fs 侧写法 `l6_meta/nt_cost_tracker.rs:198`。
                         // ⛔ 刻意**不阻断**：心跳写失败不该让 daemon 退出。
                         if let Err(e) = std::fs::write(
                             &heartbeat_clone,

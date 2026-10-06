@@ -1110,7 +1110,7 @@ impl GGUFModel {
 }
 
 // ═══════════════════════════════════════════════════════════
-// sift (⭐) 吸收: GGUF header introspection over HTTP range requests
+// sift () 吸收: GGUF header introspection over HTTP range requests
 // Reads model metadata without downloading the full file
 // ═══════════════════════════════════════════════════════════
 

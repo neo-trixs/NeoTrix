@@ -29,7 +29,7 @@ pub fn data_dir() -> Result<PathBuf, String> {
         .map_err(|e| format!("解析数据目录失败（检查 NEOBOT_DATA_DIR 等环境变量）：{e}"))
 }
 
-/// ⭐ 开库（**桌面端唯一的开库口径**）。
+/// 开库（**桌面端唯一的开库口径**）。
 ///
 /// ⛔ 2026-10-02 提为 `pub`：A1 要在 `main.rs` 的 `.setup` 里启动刷崩溃残留，
 ///    而**复制**第二份开库代码等于制造第二条 `data_dir` → `neobot.db` 路径 ——
@@ -489,25 +489,25 @@ pub struct UsageSummary {
 mod convo_id_canonical_tests {
     use super::normalize_convo_id;
 
-    /// ⭐⭐⭐ Atlas `acpSessionId` 契约的可执行形态：
-    /// ⭐⭐ **id 只有一个规范化口径**，⭐⭐ 且 ⭐⭐ **空 id 必须被拒**。
+    /// Atlas `acpSessionId` 契约的可执行形态：
+    /// **id 只有一个规范化口径**，且 **空 id 必须被拒**。
     #[test]
     fn canonical_form_is_stable_and_whitespace_is_rejected_as_empty() {
-        // ⭐ 规范化后**幂等**：⭐⭐ 反复调用不再变化（⭐⭐ 这是「单一真源」的判据）
+        // 规范化后**幂等**：反复调用不再变化（这是「单一真源」的判据）
         assert_eq!(normalize_convo_id(Some("c0")).as_deref(), Some("c0"));
         assert_eq!(
             normalize_convo_id(Some("c0")).as_deref(),
             normalize_convo_id(normalize_convo_id(Some("c0")).as_deref()).as_deref(),
             "⭐⭐ 规范化必须幂等"
         );
-        // ⭐⭐ 带空白 ⇒ 收敛到同一个规范值（⭐⭐ 与写路径同口径 ⇒ 不再静默丢消息）
+        // 带空白 ⇒ 收敛到同一个规范值（与写路径同口径 ⇒ 不再静默丢消息）
         assert_eq!(normalize_convo_id(Some("  c0 ")).as_deref(), Some("c0"));
         assert_eq!(
             normalize_convo_id(Some("  c0 ")).as_deref(),
             normalize_convo_id(Some("c0")).as_deref(),
             "⭐⭐ 带空白与不带空白必须收敛到**同一** id（⭐⭐ 否则读不到写进去的消息）"
         );
-        // ⭐⭐ 空 / 纯空白 / 缺席 ⇒ 一律 None（⭐⭐ 改前 `.trim()` 会让空串去查库）
+        // 空 / 纯空白 / 缺席 ⇒ 一律 None（改前 `.trim()` 会让空串去查库）
         assert_eq!(normalize_convo_id(Some("")), None);
         assert_eq!(normalize_convo_id(Some("   ")), None);
         assert_eq!(normalize_convo_id(None), None);
@@ -518,20 +518,20 @@ fn normalize_convo_arg(convo_id: Option<String>) -> Option<String> {
     normalize_convo_id(convo_id.as_deref())
 }
 
-/// ⭐⭐⭐ **会话 id 的唯一规范化入口**（2026-10-04）。
+/// **会话 id 的唯一规范化入口**（2026-10-04）。
 ///
-/// ⭐⭐⭐ **为什么必须有唯一入口**（⭐⭐ 对标 Atlas 的 `acpSessionId` 契约）：
-/// ⭐⭐ Atlas 原文：「`acpSessionId` is the single source of truth. It's both
-/// ⭐⭐ the wire session id and the filename stem … **Code that reconstructs
-/// ⭐⭐ or transforms this id is a bug.**」
+/// **为什么必须有唯一入口**（对标 Atlas 的 `acpSessionId` 契约）：
+/// Atlas 原文：「`acpSessionId` is the single source of truth. It's both
+/// the wire session id and the filename stem … **Code that reconstructs
+/// or transforms this id is a bug.**」
 ///
-/// ⭐⭐⭐ 改前本文件有 **3 处各自散写 `convo_id.trim()`**
-/// ⭐⭐（`:567` 列表、`:622` 分页、`:489` Option 包装），⭐⭐⭐ 而
-/// ⭐⭐ **写库路径用的是未经规范化的原值** ⇒ ⭐⭐⭐ **读写两侧规范化不一致**：
-/// ⭐⭐ 一个带首尾空白的 id ⇒ **写入 `c0`，读取 `c0`**
-/// ⭐⭐ ⇒ ⭐⭐⭐ **消息静默消失，且没有任何报错**。
+/// 改前本文件有 **3 处各自散写 `convo_id.trim()`**
+/// （`:567` 列表、`:622` 分页、`:489` Option 包装），而
+/// **写库路径用的是未经规范化的原值** ⇒ **读写两侧规范化不一致**：
+/// 一个带首尾空白的 id ⇒ **写入 `c0`，读取 `c0`**
+/// ⇒ **消息静默消失，且没有任何报错**。
 ///
-/// ⭐⭐ 收敛后：**所有读路径都走这一个函数**，⭐⭐ 与写路径同一口径。
+/// 收敛后：**所有读路径都走这一个函数**，与写路径同一口径。
 fn normalize_convo_id(raw: Option<&str>) -> Option<String> {
     let t = raw?.trim();
     if t.is_empty() {
@@ -605,66 +605,66 @@ fn check_convo_exists(store: &NeobotStore, id: &str) -> Result<(), String> {
     Ok(())
 }
 
-// ⭐⭐⭐⭐ 2026-10-04 **删除** `neobot_convo_messages`（**全量**读历史）。
+// 2026-10-04 **删除** `neobot_convo_messages`（**全量**读历史）。
 //
-// ⛔ **为什么删**（⭐⭐ 由 `nt_api_contract.py` 的 B 项抓出，⭐⭐ 非人工排查）：
-// ⭐⭐ ① ⭐⭐ **零调用方**：自持交付树 `neobot-ui/` 只在**注释**里提到它
-//      （`:99`、`:213`），⭐⭐ 真实调用已全部改走 `_page`。
-// ⭐⭐ ② ⭐⭐ **与 `neobot_convo_messages_page` 语义重叠** ⇒ ⭐⭐⭐ 两条路径
-//      **必然分叉**（⭐⭐ 这正是「同一语义两个真源」的病根）。
-// ⭐⭐ ③ ⭐⭐ 它的存在本身就是 `70a592df`「建成未用」的残留物：
-//      ⭐⭐ 库层的分页函数早已存在，⭐⭐ 而命令层与界面层**三层都缺接线**
-//      ⭐⭐（该 commit 注释原文），⭐⭐ 接完之后这条全量命令就该退场。
+// ⛔ **为什么删**（由 `nt_api_contract.py` 的 B 项抓出，非人工排查）：
+// ① **零调用方**：自持交付树 `neobot-ui/` 只在**注释**里提到它
+//      （`:99`、`:213`），真实调用已全部改走 `_page`。
+// ② **与 `neobot_convo_messages_page` 语义重叠** ⇒ 两条路径
+//      **必然分叉**（这正是「同一语义两个真源」的病根）。
+// ③ 它的存在本身就是 `70a592df`「建成未用」的残留物：
+//      库层的分页函数早已存在，而命令层与界面层**三层都缺接线**
+//      （该 commit 注释原文），接完之后这条全量命令就该退场。
 //
-// ⭐⭐⭐ **留着的代价是可证的**：`nt_api_contract.py` 报「已注册但契约表无条目」
-// ⭐⭐⭐ ⇒ **门会红**；而若把它写进契约表 ⇒ ⭐⭐ 契约表开始**描述一个没人用的能力**
-// ⭐⭐⭐ ⇒ 「UI 无从得知，文档与现实分叉」（门原文）。
-// ⇒ ⭐⭐⭐ 两个方向都不对 ⇒ ⭐⭐ **删除是唯一自洽解**。
+// **留着的代价是可证的**：`nt_api_contract.py` 报「已注册但契约表无条目」
+// ⇒ **门会红**；而若把它写进契约表 ⇒ 契约表开始**描述一个没人用的能力**
+// ⇒ 「UI 无从得知，文档与现实分叉」（门原文）。
+// ⇒ 两个方向都不对 ⇒ **删除是唯一自洽解**。
 //
-// ⭐⭐ 保留 `list_messages` 库函数本身（⭐⭐ 库层测试仍在用，⭐⭐ ⛔ 不动库 API）。
-// ⭐⭐ 唯一真源：⭐⭐ **`neobot_convo_messages_page`**（分页，有界，⭐⭐ 治长会话）。
+// 保留 `list_messages` 库函数本身（库层测试仍在用，⛔ 不动库 API）。
+// 唯一真源：**`neobot_convo_messages_page`**（分页，有界，治长会话）。
 
-/// ⭐⭐ 分页拉取一页消息（**增量式**，治长会话一次性全量渲染）。
+/// 分页拉取一页消息（**增量式**，治长会话一次性全量渲染）。
 ///
 /// `neobot_convo_messages_page(convo_id, before_seq, limit) -> MessagePage`
 ///
 /// ## 为什么加这条（2026-10-03 实测的「建成未用」第三实例）
-/// ⭐ `NeobotStore::list_messages_page`（`nt_store_messages.rs:137`）早已存在，
-/// 且有 `created_at` 并列/不漏不重测试，⭐ 但**全仓消费者只有它自己**
+/// `NeobotStore::list_messages_page`（`nt_store_messages.rs:137`）早已存在，
+/// 且有 `created_at` 并列/不漏不重测试，但**全仓消费者只有它自己**
 /// ⇒ 命令层只有全量的 `neobot_convo_messages`，界面 `:542` 也是一次性全量拉取。
-/// ⇒ ⭐ 三层都缺接线，长会话会把整段历史一次性塞进 DOM。
+/// ⇒ 三层都缺接线，长会话会把整段历史一次性塞进 DOM。
 ///
-/// ## ⭐ 为什么用**新命令**而不是改 `neobot_convo_messages` 的签名
+/// ## 为什么用**新命令**而不是改 `neobot_convo_messages` 的签名
 /// ⛔ 改既有命令会破坏 UI 的 `invoke<ChatMessage[]>`（返回类型变了）
-/// ⇒ ⭐ **加法式**新增，旧路径保持可用 ⇒ 界面可**渐进**切换。
+/// ⇒ **加法式**新增，旧路径保持可用 ⇒ 界面可**渐进**切换。
 ///
-/// ## ⭐ 游标语义（实测 store 层）
+/// ## 游标语义（实测 store 层）
 /// `after_seq` 是 `messages.seq`，即 SQLite `rowid`（`a0243425` 起）
-/// ⇒ ⭐ **按 seq 严格递增翻页**，⛔ 不用 `created_at`（同秒消息会并列漏掉）。
+/// ⇒ **按 seq 严格递增翻页**，⛔ 不用 `created_at`（同秒消息会并列漏掉）。
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MessagePage {
     /// 本页消息（时间正序，与 `neobot_convo_messages` 一致）
     pub messages: Vec<neotrix_neobot::nt_store::ChatMessage>,
-    /// ⭐ 是否还有更早的消息（用 `limit + 1` 探测，见实现）
+    /// 是否还有更早的消息（用 `limit + 1` 探测，见实现）
     pub has_more: bool,
-    /// ⭐ 下一页游标：把本页**最小** `seq` 回传（继续往更早翻）
+    /// 下一页游标：把本页**最小** `seq` 回传（继续往更早翻）
     pub next_seq: Option<i64>,
 }
 
-/// ⭐⭐ 分页整形（**生产与测试共用同一份**）。
+/// 分页整形（**生产与测试共用同一份**）。
 ///
-/// ⭐ 刻意抽成自由函数：否则测试会复制一份逻辑，
-/// ⭐⭐ **测的就不是命令真正跑的那段代码**（本日已在
+/// 刻意抽成自由函数：否则测试会复制一份逻辑，
+/// **测的就不是命令真正跑的那段代码**（本日已在
 /// `neobot-check-emergence.mjs` 上踩过「自测重写正则 ⇒ 假通过」的同型坑）。
 fn shape_page(
     mut probe: Vec<neotrix_neobot::nt_store::ChatMessage>,
     take: i64,
 ) -> MessagePage {
-    // ⭐ 多取 1 条 ⇒ 有余量即「还有更早的」
+    // 多取 1 条 ⇒ 有余量即「还有更早的」
     let has_more = probe.len() as i64 > take;
     probe.truncate(take as usize);
-    // ⭐ 游标 = 本页**最小** seq（消息正序 ⇒ 最后一条 seq 最小）
+    // 游标 = 本页**最小** seq（消息正序 ⇒ 最后一条 seq 最小）
     let next_seq = probe.last().map(|m| m.seq).filter(|_| has_more);
     MessagePage { messages: probe, has_more, next_seq }
 }
@@ -676,13 +676,13 @@ pub fn neobot_convo_messages_page(
     limit: Option<i64>,
 ) -> Result<MessagePage, String> {
     let store = open_store()?;
-    // ⭐⭐ 同样走唯一入口 + ⭐⭐ 拒绝空 id（⭐⭐ 改前 `.trim()` 会让空串通过）
+    // 同样走唯一入口 + 拒绝空 id（改前 `.trim()` 会让空串通过）
     let convo = normalize_convo_id(Some(convo_id.as_str()))
         .ok_or_else(|| "会话 id 为空".to_string())?;
-    // ⭐ 夹紧 limit：⛔ 不接受 0/负数（会让 `has_more` 探测失真），
+    // 夹紧 limit：⛔ 不接受 0/负数（会让 `has_more` 探测失真），
     // ⛔ 也不接受超大值（界面 bug 不该拖垮库）。
     let take = limit.unwrap_or(200).clamp(1, 1000);
-    // ⭐ 多取 1 条用于探测 has_more ⇒ 界面不需要知道「怎么算还有没有」
+    // 多取 1 条用于探测 has_more ⇒ 界面不需要知道「怎么算还有没有」
     let probe = store
         .list_messages_page(&convo, before_seq, take + 1)
         .map_err(|e| e.to_string())?;
@@ -1365,8 +1365,8 @@ mod data_dir_tests {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // ⭐⭐ 分页命令的**纯逻辑**测试（2026-10-03）
-    // ⭐ 刻意**不**调 `open_store()`（它走全局 HOME）⇒ 测纯函数化后的分页整形。
+    // 分页命令的**纯逻辑**测试（2026-10-03）
+    // 刻意**不**调 `open_store()`（它走全局 HOME）⇒ 测纯函数化后的分页整形。
     // ════════════════════════════════════════════════════════════════
 
     fn msg(seq: i64) -> neotrix_neobot::nt_store::ChatMessage {
@@ -1380,7 +1380,7 @@ mod data_dir_tests {
         }
     }
 
-    /// ⭐⭐ `has_more` 探测正确：多取 1 条 ⇒ 有余量即 true
+    /// `has_more` 探测正确：多取 1 条 ⇒ 有余量即 true
     #[test]
     fn 分页探测出还有更多() {
         let p = shape_page((1..=6).map(msg).collect(), 5);
@@ -1388,7 +1388,7 @@ mod data_dir_tests {
         assert_eq!(p.messages.len(), 5, "实际返回条数必须等于 limit");
     }
 
-    /// ⭐⭐ 最后一页：`has_more=false` 且 ⭐ **`next_seq` 必须为 None**
+    /// 最后一页：`has_more=false` 且 **`next_seq` 必须为 None**
     /// （否则界面会拿着陈旧游标反复请求同一页 ⇒ 死循环）
     #[test]
     fn 最后一页无更多且游标为空() {
@@ -1397,7 +1397,7 @@ mod data_dir_tests {
         assert_eq!(p.next_seq, None, "无更多时不得回传游标，否则界面会死循环");
     }
 
-    /// ⭐⭐ 游标 = 本页**最小** seq（正序 ⇒ 最后一条），⭐ 不是最大
+    /// 游标 = 本页**最小** seq（正序 ⇒ 最后一条），不是最大
     /// —— 用错方向会让「加载更早」变成「加载更晚」，静默错误。
     #[test]
     fn 游标取本页最小seq() {

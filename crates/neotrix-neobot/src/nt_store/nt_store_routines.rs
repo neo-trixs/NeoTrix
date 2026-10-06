@@ -640,7 +640,7 @@ mod tests {
         );
     }
 
-    /// ⭐ **迁移幂等**：同一个库开两次都不得报错、且数据存活。
+    /// **迁移幂等**：同一个库开两次都不得报错、且数据存活。
     ///
     /// 这条是本组最要紧的一条：`migrate()` 的 `ALTER` 列表是
     /// **无条件逐条执行**的（SQLite 不支持 `ADD COLUMN IF NOT EXISTS`），
@@ -673,7 +673,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(path.parent().expect("parent"));
     }
 
-    /// ⭐ **存量库迁移**：表里没有该列的旧库必须能开开，且旧行读回 `NULL`
+    /// **存量库迁移**：表里没有该列的旧库必须能开开，且旧行读回 `NULL`
     /// （**不是**被编造一个 id、**不是**空串）。
     #[test]
     fn legacy_db_without_column_migrates_and_keeps_rows() {

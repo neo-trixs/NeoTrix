@@ -27,7 +27,7 @@ impl SocialPlatform {
             Self::TikTok => "tiktok",
             Self::Youtube => "youtube",
             Self::Linkedin => "linkedin",
-            // ⭐ 2026-10-03 修复：原为 `Self::Other(_) => "other"`，
+            // 2026-10-03 修复：原为 `Self::Other(_) => "other"`，
             // 返回类型是 `&'static str`，故**丢弃了内部的名字**。
             //
             // ⛔ 后果实测：`SocialPlatform::Other("web".into()).as_str()`
@@ -39,7 +39,7 @@ impl SocialPlatform {
             Self::Other(ref name) => name.as_str(),
         }
     }
-    /// ⭐ 2026-10-03：改为**大小写不敏感**，与 [`From<&str>`] 对齐。
+    /// 2026-10-03：改为**大小写不敏感**，与 [`From<&str>`] 对齐。
     ///
     /// ⛔ 原实现直接 `match s`，而 `From<&str>` 走 `s.to_lowercase()`
     ///    ⇒ 同一份逻辑有两套大小写语义：`SocialPlatform::from("X")`
@@ -181,7 +181,7 @@ pub struct FeedItem {
     /// ⇒ 改为 [`PredictedActions`](super::feed::PredictedActions)，
     ///   用类型约束保证传入的是 `0.0..=1.0` 的概率而非计数。
     pub predicted: super::feed::PredictedActions,
-    /// ⭐ 对应上游 `candidate.bidirectional_boost_eligible()`：
+    /// 对应上游 `candidate.bidirectional_boost_eligible()`：
     /// 互相关注时 reply 权重获得条件提升（`+15.0`，只作用于 reply 这一个 head）。
     pub bidirectional_eligible: bool,
 }
@@ -317,7 +317,7 @@ pub fn build_headers(session: &SessionEntry) -> reqwest::header::HeaderMap {
 mod other_variant_tests {
     use super::*;
 
-    /// ⭐⭐ 回归：原 `as_str()` 对 `Other(_)` 返回字面量 `"other"`
+    /// 回归：原 `as_str()` 对 `Other(_)` 返回字面量 `"other"`
     /// 并丢弃内部名字（签名是 `&'static str` 逼出了这个 bug）。
     /// 后果：所有非枚举平台无法按自身 id 寻址 ——
     /// 实测 `social catalog` 把 `web` 的 ADAPTER 报成 none。
@@ -347,17 +347,17 @@ mod other_variant_tests {
 
     #[test]
     fn from_str_and_from_impl_agree_on_case() {
-        // ⭐ 三个入口必须大小写语义一致（修复前 from_str 与 From 不一致）
+        // 三个入口必须大小写语义一致（修复前 from_str 与 From 不一致）
         // ⚠️ 注意 "X" 不是枚举名 —— 小写化后是 "x"，落 Other。
         //    这正是目录主键（"x"）与枚举名（"twitter"）不同的事实，
         //    别名解析由 PlatformCatalog::resolve 负责，不该由 from_str 兜。
         assert_eq!(SocialPlatform::from_str("Twitter"), SocialPlatform::Twitter);
         assert_eq!(SocialPlatform::from("Twitter"), SocialPlatform::Twitter);
         assert_eq!(SocialPlatform::from("Twitter".to_string()), SocialPlatform::Twitter);
-        // ⭐ 大写的 X 仍落 Other("x")，与 as_str 往返一致
+        // 大写的 X 仍落 Other("x")，与 as_str 往返一致
         assert_eq!(SocialPlatform::from_str("X"), SocialPlatform::Other("x".into()));
         assert_eq!(SocialPlatform::from_str("X").as_str(), "x");
-        // ⭐ Other 也统一小写化，否则 `Other("GitHub")` 与
+        // Other 也统一小写化，否则 `Other("GitHub")` 与
         //    `Other("github")` 会是两个不同的 key
         assert_eq!(
             SocialPlatform::from_str("GitHub"),

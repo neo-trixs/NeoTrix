@@ -60,7 +60,7 @@ use crate::l2_perception::nt_world::social_access::SocialAccessError;
 
 /// 可预测的交互行为。
 ///
-/// ⭐ 用**枚举**而非字符串键：上游是静态类型 + 穷举数组，
+/// 用**枚举**而非字符串键：上游是静态类型 + 穷举数组，
 /// 未建模的 head 不该被静默计 0，而应在编译期暴露。
 ///
 /// 每个变体对应 x-algorithm Phoenix 的一个预测 head
@@ -165,7 +165,7 @@ impl PredictedActions {
 
 /// 排序引擎 —— 权重 × 预测概率。
 ///
-/// ⭐ 每个权重的值**逐一核对自** `x-algorithm` `home-mixer/params/param.rs`
+/// 每个权重的值**逐一核对自** `x-algorithm` `home-mixer/params/param.rs`
 /// （fetched 2026-10-03, commit `b412112d03`）。
 /// 同一作者在结果中最多出现几条（多样性上限）。
 pub const MAX_PER_AUTHOR: usize = 2;
@@ -197,7 +197,7 @@ impl UniversalRecommender {
         action_weights.insert(PredictedAction::VideoOpen, 0.07);        // VideoOpenWeight
         action_weights.insert(PredictedAction::Vqv, 0.0);               // VqvWeight
         // ── 负权重 ────────────────────────────────────────────────
-        // ⭐ 原实现**完全没有**负权重，于是「被屏蔽/不感兴趣」的帖子
+        // 原实现**完全没有**负权重，于是「被屏蔽/不感兴趣」的帖子
         //    排序分数虚高 —— 这是比数值偏差更严重的排序缺陷。
         action_weights.insert(PredictedAction::NotInterested, -47.52); // NotInterestedWeight
         action_weights.insert(PredictedAction::BlockAuthor, -31.2);    // BlockAuthorWeight
@@ -225,7 +225,7 @@ impl UniversalRecommender {
 
     /// 计算一条帖子的排序分。
     ///
-    /// # ⭐ 语义：权重 × **预测概率**
+    /// # 语义：权重 × **预测概率**
     ///
     /// ⛔ 这不是「权重 × 原始计数」。上游 `param.rs:285-292` 明确说
     /// 后者是误读，并点名「1 个 report 抵消 468 个 like」为错误推论。
@@ -235,12 +235,12 @@ impl UniversalRecommender {
     /// `candidate.bidirectional_boost_eligible()`：为真时把
     /// **基础 reply 权重提高 boost 值**，作用于**同一个** reply 概率。
     pub fn score_actions(&self, actions: &PredictedActions, bidirectional: bool) -> f64 {
-        // ⭐ `total_cmp` 而非 `partial_cmp(..).unwrap()`：NaN 会让后者返 None
+        // `total_cmp` 而非 `partial_cmp(..).unwrap()`：NaN 会让后者返 None
         //    ⇒ 直接 panic。累加里出现 NaN 不需要字面量 NaN 就能触发。
         let mut total = 0.0f64;
         for (action, prediction) in actions.inner.iter() {
             let Some(weight) = self.action_weights.get(action) else {
-                // ⭐ 穷尽性由枚举保证：走到这里说明有新 head 未建模。
+                // 穷尽性由枚举保证：走到这里说明有新 head 未建模。
                 //    计 0 并**不静默** —— score_actions_unmodeled 会报出来。
                 continue;
             };
@@ -256,7 +256,7 @@ impl UniversalRecommender {
 
     /// 诊断：哪些已记录 head 没有建模权重。
     ///
-    /// ⭐ 存在的理由：`score_actions` 对未建模 head 计 0（与上游
+    /// 存在的理由：`score_actions` 对未建模 head 计 0（与上游
     /// `unwrap_or(0)` 行为一致），但那会让「拼错的 head」静默消失。
     /// 本方法让调用方/测试能把它查出来。
     pub fn unmodeled_heads(&self, actions: &PredictedActions) -> Vec<PredictedAction> {
@@ -287,7 +287,7 @@ impl UniversalRecommender {
                 self.score_actions(&post.predicted, post.bidirectional_eligible)
             };
         }
-        // ⭐ `total_cmp` 全序化（含 NaN）
+        // `total_cmp` 全序化（含 NaN）
         posts.sort_by(|a, b| b.score.total_cmp(&a.score));
 
         let unranked = !any_predictions;
@@ -442,7 +442,7 @@ impl FeedService {
 
     /// 聚合所有平台。
     ///
-    /// ⭐ 保留 `was_ranked` 供调用方判断，理由同 [`Self::get_ranked`]。
+    /// 保留 `was_ranked` 供调用方判断，理由同 [`Self::get_ranked`]。
     pub fn get_feed_all(
         &self,
         session: &SessionEntry,
@@ -469,11 +469,11 @@ mod tests {
         Prediction::new(p).expect("test probability must be in range")
     }
 
-    // ── ⭐ 核心语义：权重乘概率，不乘计数 ────────────────────────
+    // ── 核心语义：权重乘概率，不乘计数 ────────────────────────
 
     #[test]
     fn prediction_rejects_counts_outside_zero_one() {
-        // ⭐⭐ 这条是本次重写存在的核心理由：
+        // 这条是本次重写存在的核心理由：
         // 上游 param.rs:285-292 明确说权重乘的是 P(action)，
         // 并把「1 report 抵消 468 likes」点名为错误推论。
         // 原始计数 468 必须**在类型层面**被拒绝。
@@ -496,7 +496,7 @@ mod tests {
 
     #[test]
     fn weights_match_upstream_param_rs() {
-        // ⭐ 逐值核对自 x-algorithm home-mixer/params/param.rs
+        // 逐值核对自 x-algorithm home-mixer/params/param.rs
         //    (commit b412112d03, fetched 2026-10-03)
         let r = UniversalRecommender::new();
         let expect = [
@@ -529,7 +529,7 @@ mod tests {
 
     #[test]
     fn negative_weights_exist_at_all() {
-        // ⭐ 原实现**没有任何负权重** —— 被屏蔽/不感兴趣的帖子排序虚高。
+        // 原实现**没有任何负权重** —— 被屏蔽/不感兴趣的帖子排序虚高。
         let r = UniversalRecommender::new();
         assert!(r.weight_of(PredictedAction::Report).unwrap() < 0.0);
         assert!(r.weight_of(PredictedAction::NotInterested).unwrap() < 0.0);
@@ -594,7 +594,7 @@ mod tests {
 
     #[test]
     fn report_does_not_cancel_468_likes() {
-        // ⭐⭐ 复现上游点名的那条错误推论并证明我们不再犯：
+        // 复现上游点名的那条错误推论并证明我们不再犯：
         //   「1 report cancels 468 likes」—— 因为权重乘的是**概率**，
         //   1 次举报的概率不会线性等价于 468 个赞的计数。
         let r = UniversalRecommender::new();
@@ -615,7 +615,7 @@ mod tests {
         assert!((r.score_actions(&many_likes_prob, false) - 0.5).abs() < 1e-9);
     }
 
-    // ── ⭐ 无预测时不得假装排过 ────────────────────────────────
+    // ── 无预测时不得假装排过 ────────────────────────────────
 
     #[test]
     fn no_predictions_yields_unranked_not_silent_order() {
@@ -663,7 +663,7 @@ mod tests {
 
     #[test]
     fn nan_inputs_do_not_panic_in_sorting() {
-        // ⭐ total_cmp 保证含 NaN 时排序不 panic（原实现用 partial_cmp().unwrap()）
+        // total_cmp 保证含 NaN 时排序不 panic（原实现用 partial_cmp().unwrap()）
         let r = UniversalRecommender::new();
         let mut p = FeedItem::with_id("1", "a", "alice");
         p.score = f64::NAN;

@@ -20,14 +20,14 @@ use tokio::sync::RwLock;
 
 /// A single cookie entry, serializable to JSON for file persistence.
 ///
-/// ⭐⭐ 手工实现 `Debug`：**`value` 永不打印**（2026-10-03）。
+/// 手工实现 `Debug`：**`value` 永不打印**（2026-10-03）。
 ///
 /// 【同类问题的第二处】`nt_io_browser_engine/cookies.rs` 里有**另一个**
 /// 同名的 `CookieEntry`，本轮已为它手工实现了 redact 的 `Debug`
 /// （并配反向锁测试 `redacted_debug_tests`）。
 /// ⛔ 本类型当时**被漏掉** —— 因为它是**同名不同物**，
 /// 而我最初正是用「rg 命中数」当判据的。
-/// ⭐ 正确的复核判据：**按类型名逐个文件读**（`CookieEntry` 命中 10 个文件），
+/// 正确的复核判据：**按类型名逐个文件读**（`CookieEntry` 命中 10 个文件），
 /// 而不是只看自己改过的那一个。
 ///
 /// 【为什么 `Debug` 要 redact 而 `Serialize` 不 redact】
@@ -468,7 +468,7 @@ mod tests {
 }
 
 // ══════════════════════════════════════════════════════════════
-// ⭐ `Debug`：只暴露元数据，**不含 value**
+// `Debug`：只暴露元数据，**不含 value**
 // ══════════════════════════════════════════════════════════════
 impl std::fmt::Debug for CookieEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -487,7 +487,7 @@ impl std::fmt::Debug for CookieEntry {
 mod cookie_debug_redaction_tests {
     use super::*;
 
-    /// ⭐ 反向锁：`{:?}` **绝不**包含 cookie 值。
+    /// 反向锁：`{:?}` **绝不**包含 cookie 值。
     /// 与 `nt_io_browser_engine::cookies::redacted_debug_tests` 同款，
     /// 因为这是**同一个泄露面的第二处实现**。
     #[test]
@@ -507,7 +507,7 @@ mod cookie_debug_redaction_tests {
         assert!(shown.contains("session") && shown.contains("example.com"));
     }
 
-    /// ⭐ `Serialize` **仍须**写出真实值 —— 否则 cookie 无法落盘跨会话复用。
+    /// `Serialize` **仍须**写出真实值 —— 否则 cookie 无法落盘跨会话复用。
     /// 这条锁住 redact 的边界：只挡`Debug`，不挡 `Serialize`。
     #[test]
     fn serialize_still_writes_real_value() {

@@ -240,7 +240,7 @@ mod tests {
         assert!(results.is_empty());
     }
 
-    /// ⭐⭐ 修复：**该测试恒失败**，且**与本文件的历史缺陷同构**。
+    /// 修复：**该测试恒失败**，且**与本文件的历史缺陷同构**。
     ///
     /// ⛔ 根因：[`permute_subdomains`] 的 `filter_map` **只保留能解析出 IP 的
     ///    候选**（`resolve_subdomain_ips` 非空）。而 `example.com` 是
@@ -251,7 +251,7 @@ mod tests {
     /// ⚠️ 该测试**从未通过**（文件自 `a3a8292d` 起工作树干净、我亦从未碰过），
     ///    属既有缺陷，不是我引入的。
     ///
-    /// ⭐ 我之前修过**同构**的另一处（`nt_x_browser` 里打真实网络的
+    /// 我之前修过**同构**的另一处（`nt_x_browser` 里打真实网络的
     ///    `live_gate_rejects_x_com_search`）—— 那类测试把 CI 成败绑在
     ///    外部 DNS/网络上。此处同因。
     ///
@@ -262,7 +262,7 @@ mod tests {
     fn test_permute_subdomains_generates_candidates() {
         let h = SubdomainHarvester::new(Client::new());
         let known = vec!["api.example.com".to_string()];
-        // ⭐ 不断言 `!results.is_empty()` —— 那依赖 DNS。
+        // 不断言 `!results.is_empty()` —— 那依赖 DNS。
         //    改为断言：凡是返回的结果，必须形态正确（后缀 + 源标记）。
         for r in h.permute_subdomains("example.com", &known) {
             assert!(r.subdomain.ends_with("example.com"));
@@ -271,7 +271,7 @@ mod tests {
         }
     }
 
-    /// ⭐ 把「保留域名 ⇒ 空结果」这一**确定性**事实显式固化。
+    /// 把「保留域名 ⇒ 空结果」这一**确定性**事实显式固化。
     /// `example.com` 是 RFC 2606 保留域名 ⇒ 子域恒不解析 ⇒ 结果必为空。
     /// 这条**不依赖网络**（它断言的正是「网络查不到」这一事实）。
     #[test]
@@ -286,7 +286,7 @@ mod tests {
         }
     }
 
-    /// ⭐ 用**必定解析**的 localhost 域验证「生成 ⇒ 过滤」链路真能出结果，
+    /// 用**必定解析**的 localhost 域验证「生成 ⇒ 过滤」链路真能出结果，
     /// 从而在不依赖外网的前提下证明 `filter_map` 不是恒空。
     #[test]
     fn test_permute_subdomains_yields_results_for_localhost() {

@@ -448,7 +448,7 @@ impl NeobotStore {
         //   直接 `UNIQUE constraint failed` ⇒ 那种设计不是「重复时报个警」，
         //   是**正常业务写不进去**（若被 `.ok()` 吞掉就变成静默丢调用）。
         //   ⇒ 本表用 `seq` 代理键 + **`call_id` 上的非唯一索引**。
-        //   ⭐ 而 `call_id` 重复本身**正是 `ToolCallJoinCheck` 的一个结论**
+        //   而 `call_id` 重复本身**正是 `ToolCallJoinCheck` 的一个结论**
         //      （`nt_core_artifact_verdict.rs:640-641` 的 `CODE_DUPLICATE_JOIN_KEY`
         //      ⇒ `INVALID_ARTIFACT`，理由「配平键失去单射性」）⇒ 重复必须
         //      **能被记下来**供检查读，绝不能由主键在入库前掐掉。
@@ -485,7 +485,7 @@ impl NeobotStore {
         //    里可用（别名 `_rowid_`、`oid`），但 **索引定义看不见它** ⇒
         //    `CREATE INDEX … ON messages(convo_id, rowid)` 直接报
         //    `no such column: rowid`（实测：`nt_store_messages` 4 个测试当场红）。
-        //    ⭐ 故 `ORDER BY rowid` 仍需 SQLite 排序 —— 但那是**性能**问题，
+        //    故 `ORDER BY rowid` 仍需 SQLite 排序 —— 但那是**性能**问题，
         //    而游标分页的**正确性**来自「`rowid` 是全序整数」，与此无关。
         //    ⛔ 若日后要索引覆盖，必须新增**真实列** `seq INTEGER` 并把
         //    `rowid` 的值写进去（见 `nt_store_messages.rs` 里 seq 游标的取舍注释）。

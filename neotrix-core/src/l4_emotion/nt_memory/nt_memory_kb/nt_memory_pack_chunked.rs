@@ -690,7 +690,7 @@ mod tests {
     #[test]
     fn test_chunked_roundtrip_fuzz() {
         use rand::{Rng, SeedableRng};
-        // ⭐ 2026-10-03：**改为可复现**（原为 `rand::thread_rng()`，无种子）。
+        // 2026-10-03：**改为可复现**（原为 `rand::thread_rng()`，无种子）。
         //
         // 【为什么】本测试断言的是**往返无损** —— 这是对**任意**输入都成立的性质，
         // 所以它**不是 flaky**（这点与「随机测试」是两件事，本会话实测区分过）。

@@ -23,7 +23,7 @@
 //! - 只用 `std::process`，无 shell 拼接（prompt 整体作单个 argv 传参），
 //!   无 unsafe (R-P1)；生产代码无 `unwrap/expect/panic`。
 
-// ⭐ 2026-10-03 跨域错位收敛：原先直取 `crate::l5_cognition::nt_crystal_core::…`
+// 2026-10-03 跨域错位收敛：原先直取 `crate::l5_cognition::nt_crystal_core::…`
 // （L1 越过 L2–L4），且本行在 3 个文件里逐字节重复。现经 **L1 自己的 facade** 转出
 // —— `AGENTS.md` §4.2：「改跨层引用唯一合法通道是消费方自己那层的 facade」。
 use crate::l1_action::nt_action_facade::{NtLlmAsk, NtLlmReply, NtTaskFusionError};
@@ -308,26 +308,26 @@ pub(crate) fn run_capture(
     capture_model_command(program, args, timeout)
 }
 
-/// ⭐⭐⭐ **本文件唯一的进程执行出口**（2026-10-03 重整）
+/// **本文件唯一的进程执行出口**（2026-10-03 重整）
 ///
-/// ⭐⭐ 它刻意**只做三件事**，且都是模型询问语义**特有**的：
-/// 1. ⭐ **去 ANSI**（窗口展示与 `-free` 后缀判定都依赖干净文本）
-/// 2. ⭐ **空 stdout 视为失败**（模型命令静默退出不算成功）
-/// 3. ⭐ 超时 / 非零退出 → **可区分**的两类错误串
+/// 它刻意**只做三件事**，且都是模型询问语义**特有**的：
+/// 1. **去 ANSI**（窗口展示与 `-free` 后缀判定都依赖干净文本）
+/// 2. **空 stdout 视为失败**（模型命令静默退出不算成功）
+/// 3. 超时 / 非零退出 → **可区分**的两类错误串
 ///
-/// ⭐⭐ 而 ⭐**并发读管道**这件事**不在这里** —— 它由
+/// 而 **并发读管道**这件事**不在这里** —— 它由
 /// `l2_perception/…/social_access/probe.rs::run_with_timeout` 提供
-/// （⭐⭐ 那边有回归测试 `test_large_output_does_not_deadlock` 守着
+/// （那边有回归测试 `test_large_output_does_not_deadlock` 守着
 /// 「大输出 = 假超时」那个坑）。
 ///
-/// ## ⭐⭐ 为什么必须是**一个**出口（而不是两个调用方各写一份）
+/// ## 为什么必须是**一个**出口（而不是两个调用方各写一份）
 /// ⛔ 2026-10-03 教训：我删掉旧的转发层时**没查全部调用方**
 /// ⇒ `run_once`（模型询问主路径）被一起打断。
-/// ⇒ ⭐⭐ 所以本函数是**唯一**实现，`run_once` 与 `run_capture` **共用**它。
+/// ⇒ 所以本函数是**唯一**实现，`run_once` 与 `run_capture` **共用**它。
 ///
 /// # Errors
 /// · `"spawn failed: …"` —— 起不来
-/// · `"model command timed out after {s}s"` —— ⭐ **超时被 kill**（可与失败区分）
+/// · `"model command timed out after {s}s"` —— **超时被 kill**（可与失败区分）
 /// · `"model command failed: {stderr}"` —— 非零退出
 /// · `"empty stdout from model command"` —— 成功但无输出
 fn capture_model_command(
@@ -345,7 +345,7 @@ fn capture_model_command(
         program, args, timeout,
     )
     .map_err(|e| format!("spawn failed: {e}"))?;
-    // ⭐⭐ **必须先判 `timed_out`**：超时被 kill 的子进程**必然** `success == false`
+    // **必须先判 `timed_out`**：超时被 kill 的子进程**必然** `success == false`
     // ⇒ ⛔ 不先判就会把「超时」误报成「命令失败」（我第一版正是这样，
     //    被既有测试 `test_ask_timeout_kills` 当场抓住）。
     if outcome.timed_out {
@@ -625,18 +625,18 @@ mod tests {
 mod run_capture_regression_tests {
     use super::*;
 
-    /// ⭐⭐⭐ **本改动的核心判据**：`run_capture` 在**大输出**下不得假超时。
+    /// **本改动的核心判据**：`run_capture` 在**大输出**下不得假超时。
     ///
-    /// ⭐ **与 `probe.rs:363` 的 `test_large_output_does_not_deadlock` 同源**，
-    /// ⭐⭐ 但守的是**另一条路径**（`run_capture` → 免费模型发现）。
+    /// **与 `probe.rs:363` 的 `test_large_output_does_not_deadlock` 同源**，
+    /// 但守的是**另一条路径**（`run_capture` → 免费模型发现）。
     ///
     /// ⛔ 旧实现（轮询 `try_wait`、从不并发读管道）在 >64 KiB 输出下
-    /// ⭐ **必然假超时**（macOS/Linux 管道缓冲通常 64 KiB，子进程阻塞在 write
+    /// **必然假超时**（macOS/Linux 管道缓冲通常 64 KiB，子进程阻塞在 write
     /// ⇒ `try_wait()` 永远 `Ok(None)` ⇒ 被判超时）。
     #[cfg(unix)]
     #[test]
     fn 大输出不被误判超时() {
-        // ⭐ 生成 > 256 KiB（管道缓冲的 4 倍）⇒ 旧实现必挂
+        // 生成 > 256 KiB（管道缓冲的 4 倍）⇒ 旧实现必挂
         let big = "y".repeat(256 * 1024);
         let script = format!("printf '%s' '{big}'");
         let ask = NtModelCliAsk::new()
@@ -647,8 +647,8 @@ mod run_capture_regression_tests {
         assert_eq!(got.text.len(), big.len(), "输出应完整取回（未被截断/误判）");
     }
 
-    /// ⭐ 反向护栏：**超时**仍须报「timed out」（⇦ 我第一版替换漏判 `timed_out`
-    /// 时，这条正是它暴露的 ⭐ `test_ask_timeout_kills`）。
+    /// 反向护栏：**超时**仍须报「timed out」（⇦ 我第一版替换漏判 `timed_out`
+    /// 时，这条正是它暴露的 `test_ask_timeout_kills`）。
     #[cfg(unix)]
     #[test]
     fn 超时仍报timed_out而非命令失败() {

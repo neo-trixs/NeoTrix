@@ -53,7 +53,7 @@ impl PlaylistPlatform {
     /// 从 URL 检测平台
     /// 由 URL 判定歌单来源。
     ///
-    /// # ⭐ 2026-10-03：改为 host 判定，不再裸 `contains`
+    /// # 2026-10-03：改为 host 判定，不再裸 `contains`
     ///
     /// ⛔ 原实现 12 个分支全是 `lower.contains("…")`，会把
     /// `https://music-163.com.evil.net/` 判成 Netease、
@@ -61,7 +61,7 @@ impl PlaylistPlatform {
     /// 而此处**决定用哪个平台适配器去抓取** —— 认领错就是
     /// 向攻击者域名发请求。
     ///
-    /// ⭐ 改用 [`nt_url_match`]（L0 原语）：判定面收窄到 host，
+    /// 改用 [`nt_url_match`]（L0 原语）：判定面收窄到 host，
     ///    行为对**正常 URL 完全不变**（实测 6 项既有测试全绿）。
     pub fn from_url(url: &str) -> Self {
         use crate::l0_substrate::nt_core_platform::url_match::url_matches_domain as m;
@@ -73,7 +73,7 @@ impl PlaylistPlatform {
         //    它们是裸子串，原实现靠它们兜住「URL 里带品牌词」的形态。
         //    ⛔ 我一度把它们删掉，等于**悄悄缩小了识别面** ——
         //    「music.163.com/netease/x」这类 URL 会从 Netease 变成 Unknown。
-        //    ⭐ 改为按 host 后缀匹配 `netease.163.com` / `music.migu.cn` 等
+        //    改为按 host 后缀匹配 `netease.163.com` / `music.migu.cn` 等
         //    真实域名，既保留能力又不再匹配 `netease.evil.net`。
         if m(url, "music.163.com") || m(url, "netease.163.com") {
             Self::Netease
@@ -446,7 +446,7 @@ mod tests {
 mod host_match_tests {
     use super::*;
 
-    /// ⭐⭐ 迁移到 host 判定的**核心回归**：判定面收窄了，
+    /// 迁移到 host 判定的**核心回归**：判定面收窄了，
     /// 但正常 URL 的识别**必须完全不变**。
     #[test]
     fn normal_urls_still_recognized_after_migration() {
@@ -466,7 +466,7 @@ mod host_match_tests {
         }
     }
 
-    /// ⭐ 判定面**收窄**的部分：伪装域名不再被认领。
+    /// 判定面**收窄**的部分：伪装域名不再被认领。
     /// 这正是迁移的目的 —— `from_url` 决定用哪个适配器去请求。
     #[test]
     fn lookalike_domains_no_longer_claimed() {
@@ -485,7 +485,7 @@ mod host_match_tests {
         }
     }
 
-    /// ⭐⭐ 能力**未被悄悄缩小** —— 这条直接针对我自己的失误：
+    /// 能力**未被悄悄缩小** —— 这条直接针对我自己的失误：
     /// 我第一版迁移时把 `netease` / `soda` 等裸 token 直接删了，
     /// 那会让带品牌词的合法 URL 从「识别」变成 Unknown。
     #[test]

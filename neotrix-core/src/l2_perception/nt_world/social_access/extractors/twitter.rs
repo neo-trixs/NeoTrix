@@ -166,7 +166,7 @@ impl TwitterExtractor {
 
     /// 查询用户档案（免登录，实测可用）。
     ///
-    /// ⭐ 这是本 extractor 唯一能覆盖「按用户名查」的能力 ——
+    /// 这是本 extractor 唯一能覆盖「按用户名查」的能力 ——
     /// 搜索端点不存在，但档案端点存在。
     pub async fn profile(
         &self,

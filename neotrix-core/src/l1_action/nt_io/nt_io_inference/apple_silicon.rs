@@ -1,7 +1,7 @@
 //! # Apple Silicon Optimizer
 //!
 //! Absorbs Apple Silicon native inference technologies:
-//! - **MLX** (⭐25K): Apple's native ML framework, fused kernels, lazy evaluation
+//! - **MLX** (25K): Apple's native ML framework, fused kernels, lazy evaluation
 //! - **Ollama 0.19 MLX backend**: 2× faster decode (58→112 tok/s), 32GB+ unified memory required
 //! - **Metal Performance Shaders**: GPU kernel optimizations
 //! - **Neural Engine**: Dedicated NPU for inference

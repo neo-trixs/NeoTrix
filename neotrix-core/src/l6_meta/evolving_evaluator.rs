@@ -60,12 +60,12 @@ impl EvolvingEvaluator {
     }
 
     pub fn evaluate(&self, _target: &str, actual: &HashMap<String, f64>) -> ScoreBreakdown {
-        // ⭐ 锁投毒改为**恢复**而非 panic（2026-10-02），本文件 10 处**一致**处理。
+        // 锁投毒改为**恢复**而非 panic（2026-10-02），本文件 10 处**一致**处理。
 // 判据：锁内是 `Vec<EvaluationCriteria>` / `HashMap` / `Vec<EvolutionEvent>`，
 // 而 `EvaluationCriteria` 的 4 个字段（name/weight/threshold/description）**互相独立**，
 // 且 `evolve_criteria` 用 `.clamp(min_weight, max_weight)` 写回
 // ⇒ 「权重恒在区间内」这个不变量**与是否投毒无关**，元素不会撕裂。
-// ⭐⭐ 同批改的必要性：`:80`/`:100` 在**已持有** `criteria`(+`scores`) 时再取第三把锁。
+// 同批改的必要性：`:80`/`:100` 在**已持有** `criteria`(+`scores`) 时再取第三把锁。
 //    一旦那里 panic，是在**持锁状态**下 panic ⇒ 同时毒化多个锁
 //    ⇒ 之后每个 `.unwrap()` 都 panic ⇒ **一次瞬时失败升级为该 evaluator 的永久拒绝服务**。
 //    只修 `:168`（`remove_criterion`，实测 0 调用者）等于没修。

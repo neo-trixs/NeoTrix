@@ -88,21 +88,21 @@ impl KnowledgeBase {
             lifecycle: RwLock::new(nt_memory_lifecycle::MemoryLifecycle::default()),
             absorb_scanner: RwLock::new(None),
             receipt_emitter: RwLock::new(None),
-            // ⭐⭐⭐ 2026-10-04 接线：默认 `NoGate`（恒 admit）⇒ ⭐⭐ **零行为变化**
+            // 2026-10-04 接线：默认 `NoGate`（恒 admit）⇒ **零行为变化**
             retrieval_gate: std::sync::Arc::new(super::nt_retrieval_gate::NoGate),
         }
     }
 
-    /// ⭐⭐⭐ 换检索闸（⭐⭐ 2026-10-04 接线新增）。
+    /// 换检索闸（2026-10-04 接线新增）。
     ///
-    /// ⭐⭐ **为什么需要它**：⭐⭐ 门是 trait 对象，⭐⭐ 若无 setter，
-    /// ⭐⭐ 接线就只有「永远 `NoGate`」这一种状态 ⇒ ⭐⭐ **接了等于没接**
-    /// ⭐⭐（⭐⭐ 「建成未用」换了个位置而已）。
-    /// ⭐⭐⭐ `FnOnce() -> Box<dyn RetrievalGate>` 而非直接给 trait object：
-    /// ⭐⭐⭐ 免得每个调用方都要自己写 `Box::new(..) as Box<dyn ..>`。
+    /// **为什么需要它**：门是 trait 对象，若无 setter，
+    /// 接线就只有「永远 `NoGate`」这一种状态 ⇒ **接了等于没接**
+    /// （「建成未用」换了个位置而已）。
+    /// `FnOnce() -> Box<dyn RetrievalGate>` 而非直接给 trait object：
+    /// 免得每个调用方都要自己写 `Box::new(..) as Box<dyn ..>`。
     ///
-    /// ⭐⭐ **调用方必须自备实测过的闸** ⇒ ⭐⭐ 本仓**不提供**默认启发式
-    /// ⭐⭐ （⭐⭐ `LESSONS-20260929-checked-is-not-verified.md` 的纪律）。
+    /// **调用方必须自备实测过的闸** ⇒ 本仓**不提供**默认启发式
+    /// （`LESSONS-20260929-checked-is-not-verified.md` 的纪律）。
     pub fn set_retrieval_gate<F>(&mut self, make: F)
     where
         F: FnOnce() -> Box<dyn super::nt_retrieval_gate::RetrievalGate>,

@@ -1,6 +1,6 @@
 //! `neotrix web fetch` —— 用 NeoTrix 自带的 `UniversalBrowser` 抓一个 URL.
 //!
-//! ⭐ **本文件是「补缺口」，不是新能力。**
+//! **本文件是「补缺口」，不是新能力。**
 //! `UniversalBrowser::fetch()` 早已存在于
 //! `neotrix::l1_action::nt_io::universal_browser`，但此前
 //! **没有任何 CLI 或 example 能触达它**

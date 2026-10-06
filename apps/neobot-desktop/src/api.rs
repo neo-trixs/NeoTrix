@@ -112,22 +112,22 @@ pub const SPECS: &[ApiSpec] = &[
         "登记成员（human|agent，幂等）；会话创建的前置条件"),
     ApiSpec::new("neobot_send", "会话", &["convo_id", "text"], "AgentRunResult", Status::Implemented,
         "会话内一轮：问落库 → 跑 → 答落库；convo 缺席 = 脱离会话手动跑"),
-    // ⭐⭐⭐ 2026-10-04 契约表改名（⭐⭐ 由 `nt_api_contract.py` 的 B 项抓出）。
+    // 2026-10-04 契约表改名（由 `nt_api_contract.py` 的 B 项抓出）。
     //
     // ⛔ 改前这里写的是 **`neobot_convo_messages`**（**已废弃的全量命令**），
-    // ⭐⭐ 而自 `70a592df` 起实际注册的是 ⭐⭐ **`neobot_convo_messages_page`**
-    // ⇒ ⭐⭐ 契约表描述了一个**不存在的命令**，而真实命令**无条目**
-    // ⇒ ⭐⭐ 后果（门原文）：「能力存在于代码但契约表不描述
+    // 而自 `70a592df` 起实际注册的是 **`neobot_convo_messages_page`**
+    // ⇒ 契约表描述了一个**不存在的命令**，而真实命令**无条目**
+    // ⇒ 后果（门原文）：「能力存在于代码但契约表不描述
     //   ⇒ **UI 无从得知，文档与现实分叉**」。
     //
-    // ⭐⭐⭐ **这是同一病的第 4 次复发**，⭐⭐ 且复发路径完全一致：
-    // ⭐⭐ **改名后下游没跟**。前三次：① smoke 桩（`1c67dafb`）
-    // ⭐⭐ ② `neobot_convo_messages` → `_page` 时 UI 侧注释
-    // ⭐⭐ ③ 本次契约表。⇒ ⭐⭐⭐ **根治只能靠「改名后必跑契约门」**。
+    // **这是同一病的第 4 次复发**，且复发路径完全一致：
+    // **改名后下游没跟**。前三次：① smoke 桩（`1c67dafb`）
+    // ② `neobot_convo_messages` → `_page` 时 UI 侧注释
+    // ③ 本次契约表。⇒ **根治只能靠「改名后必跑契约门」**。
     //
-    // ⭐⭐ 返回类型同步改成真实的 `MessagePage`：
-    // ⭐⭐ ⛔ 旧契约写 `ChatMessage[]` ⇒ ⭐⭐ **形状本身就是错的**
-    // ⭐⭐ （真返回 `{messages, hasMore, nextSeq}`，⭐⭐ 见 `commands.rs:644`）。
+    // 返回类型同步改成真实的 `MessagePage`：
+    // ⛔ 旧契约写 `ChatMessage[]` ⇒ **形状本身就是错的**
+    // （真返回 `{messages, hasMore, nextSeq}`，见 `commands.rs:644`）。
     ApiSpec::new("neobot_convo_messages_page", "会话",
         &["convo_id", "before_seq", "limit"], "MessagePage", Status::Implemented,
         "⭐ 分页读历史（cursor=最小 seq）；⛔ 旧的全量命令已移除 —— 长会话曾一次塞满 DOM"),
@@ -307,13 +307,13 @@ pub const SPECS: &[ApiSpec] = &[
     ApiSpec::new("clear_service_logs", "日志", &[], "void", Status::Stub, DSH_ONLY),
     ApiSpec::new("get_desktop_about", "桌面", &[], "DesktopAboutInfo", Status::Implemented, ""),
     ApiSpec::new("remote_bridge_ping", "远端", &[], "string", Status::Planned,
-        // ⭐ 2026-10-02 更正两处**失真声明**（原文：「ssh2 在 devDeps 只是引子，
+        // 2026-10-02 更正两处**失真声明**（原文：「ssh2 在 devDeps 只是引子，
         // 无后端的心跳是假心跳」）：
         // ① `ssh2` 在**整个 workspace 的 Cargo.toml 里零出现**（实测）⇒ 不是引子，
         //    是**根本没加**；
         // ② 且本命令**无任何实现、未注册**（实测全仓仅本行命中）⇒ 不是「假心跳」，
         //    是**连心跳都没有**。
-        // ⭐ 订正后的口径：未接线。调用它会得到 `command not found`。
+        // 订正后的口径：未接线。调用它会得到 `command not found`。
         //    前端当前**无调用方**（实测），故这是「出口声明」而非「坏掉的功能」。
         "出口：SSH 后端（远端起停 + 隧道）。⛔ 未接线：无实现、未注册、ssh2 未引入；前端无调用方"),
 

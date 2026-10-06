@@ -36,7 +36,7 @@ impl GridPos {
         (self.x - other.x).abs() + (self.y - other.y).abs()
     }
 
-    /// ⭐ 八邻（对角 ×`SQRT_2`）度量的**可采纳且一致**启发：octile 距离。
+    /// 八邻（对角 ×`SQRT_2`）度量的**可采纳且一致**启发：octile 距离。
     ///
     /// `√2 * min(dx,dy) + 1 * (|dx-dy|)` —— 即「先走对角，再走正交」。
     /// 它正是该度量的真实最短距离（无障碍时）⇒ 既不高估也不低估。
@@ -120,7 +120,7 @@ impl AStar {
             && !self.obstacles[pos.x as usize][pos.y as usize]
     }
 
-    /// ⭐ **对角步是否可走：两侧正交格都必须可走。**
+    /// **对角步是否可走：两侧正交格都必须可走。**
     ///
     /// ⛔ 缺这条时，`neighbors()` 的 4 个对角方向**不看两侧** ⇒ 单位尺寸的
     ///   实体被允许从两面都堵死的夹角里挤过去（实测：`(1,0)`/`(0,1)` 全堵，
@@ -150,7 +150,7 @@ impl AStar {
             .collect()
     }
 
-    /// ⭐ **唯一一份 A\* 实现**；`max_steps = None` 表示不限步数。
+    /// **唯一一份 A\* 实现**；`max_steps = None` 表示不限步数。
     ///
     /// 此前 `find_path` 与 `find_path_with_limit` 是**两份逐字复制**（只差一个
     /// 计数器）⇒ 任何算法修正都必须改两处，漏一处就产生两个互相矛盾的
@@ -166,7 +166,7 @@ impl AStar {
         }
 
         let mut open: BinaryHeap<Node> = BinaryHeap::new();
-        // ⭐ `g_score` = **已生成**（不只是已弹出）的节点里最好的 g。
+        // `g_score` = **已生成**（不只是已弹出）的节点里最好的 g。
         //
         // ⛔ 原实现叫它 `closed`，但只在**弹出时**写入 ⇒ 还在 `open` 里的邻居
         //   查不到 ⇒ 每次重展开都把它们**重复 push**，`open` 无限膨胀。
@@ -179,7 +179,7 @@ impl AStar {
         let mut parents: HashMap<GridPos, GridPos> = HashMap::new();
         let mut steps: usize = 0;
 
-        // ⭐ 启发必须是 octile（与 √2 对角边**同度量**），不是 L1。
+        // 启发必须是 octile（与 √2 对角边**同度量**），不是 L1。
         let h = start.octile_distance(&goal);
         // ⛔ **必须把起点种进去**。否则起点自己会被当作邻居**重新生成**
         //   （`g_score.get(&start)` = `None` ⇒ 不跳过），`parents[start]`
@@ -222,7 +222,7 @@ impl AStar {
                 let move_cost = if dx + dy == 2 { SQRT_2 * base } else { base };
                 let new_g = current.g + move_cost;
 
-                // ⭐ 与 `g_score` 比：不够好就不生成。**这一句是「不重复 push」的
+                // 与 `g_score` 比：不够好就不生成。**这一句是「不重复 push」的
                 //   全部保证** —— 生成时就记账，而不是等弹出才记账。
                 if let Some(&best_g) = g_score.get(&neighbor) {
                     if new_g >= best_g {
@@ -436,7 +436,7 @@ mod tests_2 {
 // ===========================================================================
 // 判决实验：L1 启发在 √2 对角边下**实测**是否真会返回次优路径
 //
-// ⭐ 上一条 `diagonal_path_cost_must_actually_be_optimal` 是绿的 ⇒
+// 上一条 `diagonal_path_cost_must_actually_be_optimal` 是绿的 ⇒
 //    「不可采纳 ⇒ 一定次优」这个推断**不成立**（不可采纳只意味着「可能」）。
 //    这里用同一套边代价 + 同一套邻居规则跑一遍 Dijkstra 当基准，
 //    在确定性扫描的障碍布局上逐个对账。有反例就是真缺陷，没有就

@@ -81,26 +81,26 @@ impl Default for CapabilityTreeRegistry {
 }
 
 impl CapabilityTreeRegistry {
-    /// ⭐⭐⭐⭐ **按「能力标签」反查节点 id**（⭐⭐ 2026-10-04 新增）。
+    /// **按「能力标签」反查节点 id**（2026-10-04 新增）。
     ///
-    /// ⭐⭐⭐⭐ **为什么这是缺失的那座桥**（⭐⭐ 实测得来的结构事实）：
-    /// ⭐⭐ 能力树与能力路由**用两个不同的 id 空间**：
-    /// ⭐⭐ - 能力树节点 id：`NT-MEMORY::trade::trade_product_spec`
-    /// ⭐⭐ - 路由表标签（`nt_capability_bridge::ROUTE_TABLE` 第三列）：
-    /// ⭐⭐   `hybrid_retrieval` / `vector_storage` / `consciousness_tree` …
-    /// ⭐⭐ ⇒ ⭐⭐⭐ **两者之间没有任何通路**，⭐⭐ 所以「路由决策」永远变不成
-    /// ⭐⭐⭐ 「一个可派发的能力」⇒ ⭐⭐⭐ **这正是「注册了但没调用」的结构性根因**。
+    /// **为什么这是缺失的那座桥**（实测得来的结构事实）：
+    /// 能力树与能力路由**用两个不同的 id 空间**：
+    /// - 能力树节点 id：`NT-MEMORY::trade::trade_product_spec`
+    /// - 路由表标签（`nt_capability_bridge::ROUTE_TABLE` 第三列）：
+    ///  `hybrid_retrieval` / `vector_storage` / `consciousness_tree` …
+    /// ⇒ **两者之间没有任何通路**，所以「路由决策」永远变不成
+    /// 「一个可派发的能力」⇒ **这正是「注册了但没调用」的结构性根因**。
     ///
-    /// ⭐⭐ 而 `provides` ⭐⭐ **本来就是这两者的连接键**：
-    /// ⭐⭐ `CapabilityNode::new_primitive(id, domain, vec![provides…])` 的第三参
-    /// ⭐⭐ 就是「本节点提供哪些能力标签」，⭐⭐ 索引 `provides_index` 已在维护它 ——
-    /// ⭐⭐⭐ **索引一直存在，只是没有任何 API 暴露它** ⇒ ⭐⭐ **死索引**。
+    /// 而 `provides` **本来就是这两者的连接键**：
+    /// `CapabilityNode::new_primitive(id, domain, vec![provides…])` 的第三参
+    /// 就是「本节点提供哪些能力标签」，索引 `provides_index` 已在维护它 ——
+    /// **索引一直存在，只是没有任何 API 暴露它** ⇒ **死索引**。
     ///
-    /// ⭐⭐ 返回全部命中的 id（⭐⭐ 一个标签可能由多个节点提供，
-    /// ⭐⭐ ⛔ 不擅自挑一个 —— ⭐⭐ 挑谁是**策略问题**，⭐⭐ 不该藏在取数函数里）。
+    /// 返回全部命中的 id（一个标签可能由多个节点提供，
+    /// ⛔ 不擅自挑一个 —— 挑谁是**策略问题**，不该藏在取数函数里）。
     pub fn nodes_providing(&self, capability_tag: &str) -> Vec<String> {
         let mut v = self.provides_index.get(capability_tag).cloned().unwrap_or_default();
-        // ⭐⭐ 排序 ⇒ 输出确定（本 crate 一贯的确定性纪律）
+        // 排序 ⇒ 输出确定（本 crate 一贯的确定性纪律）
         v.sort();
         v.dedup();
         v

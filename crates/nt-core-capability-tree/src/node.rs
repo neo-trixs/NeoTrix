@@ -63,34 +63,34 @@ impl std::fmt::Display for Domain {
 }
 
 /// 抽象层轴 (Z 轴)
-/// ⭐⭐⭐⭐⭐ **能力类型**（2026-10-04，吸收 `hermes-desktop` 的
-/// `IndexEntry.type`）—— ⭐⭐⭐⭐ **「一切为插件」的分类维度**。
+/// **能力类型**（2026-10-04，吸收 `hermes-desktop` 的
+/// `IndexEntry.type`）—— **「一切为插件」的分类维度**。
 ///
-/// ⭐⭐⭐⭐⭐ **为什么必须是显式字段、⛔ 不能从 id 猜**（⭐⭐ 本轮实测）：
-/// 本仓 83 处生产侧能力构造点里，⭐⭐⭐⭐ **只有 30 处用了可读域前缀**
+/// **为什么必须是显式字段、⛔ 不能从 id 猜**（本轮实测）：
+/// 本仓 83 处生产侧能力构造点里，**只有 30 处用了可读域前缀**
 /// （`NT-MIND` 20 / `NT-MEMORY` 6 / `consciousness` 3 / `exp` 1）
-/// ⇒ ⭐⭐⭐⭐ **从 id 推断类型会漏掉一大半**，⭐⭐⭐⭐ ⭐⭐ 那是**结构性脆弱**。
+/// ⇒ **从 id 推断类型会漏掉一大半**，那是**结构性脆弱**。
 ///
-/// ⭐⭐⭐⭐⭐ 与 hermes 的对应关系（⭐⭐ 语义不同，⭐⭐ ⛔ 不是照抄枚举值）：
+/// 与 hermes 的对应关系（语义不同，⛔ 不是照抄枚举值）：
 /// | hermes `IndexEntry.type` | 本仓 `CapabilityKind` |
 /// |---|---|
-/// | `mcp` | ⭐⭐ `Tool`（⭐⭐ ⭐⭐ 本仓工具统一经 MCP 桥暴露） |
-/// | `skill` | ⭐⭐ `Skill` |
-/// | `workflow` | ⭐⭐ `Workflow` |
-/// | `agent` | ⭐⭐ `Agent` |
+/// | `mcp` | `Tool`（本仓工具统一经 MCP 桥暴露） |
+/// | `skill` | `Skill` |
+/// | `workflow` | `Workflow` |
+/// | `agent` | `Agent` |
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CapabilityKind {
-    /// ⭐⭐ 工具（⭐⭐ ⭐⭐ 经 `McpBridge` 派发）
+    /// 工具（经 `McpBridge` 派发）
     Tool,
-    /// ⭐⭐ 技能（⭐⭐ 可复用的领域能力）
+    /// 技能（可复用的领域能力）
     Skill,
-    /// ⭐⭐ 工作流（⭐⭐ 多能力编排）
+    /// 工作流（多能力编排）
     Workflow,
-    /// ⭐⭐ 代理（⭐⭐ 有自身循环/状态者）
+    /// 代理（有自身循环/状态者）
     Agent,
-    /// ⭐⭐⭐ **缺口**（⭐⭐ ⭐⭐ 意识观察到「自己不会」而登记的节点）
-    /// ⭐⭐⭐⭐ ⭐⭐ **⭐⭐ 它不是插件** ⇒ ⭐⭐⭐⭐ 市场的「可安装项」视图**必须排除它**
+    /// **缺口**（意识观察到「自己不会」而登记的节点）
+    /// **它不是插件** ⇒ 市场的「可安装项」视图**必须排除它**
     Gap,
 }
 
@@ -129,12 +129,12 @@ impl CapabilityKind {
         }
     }
 
-    /// ⭐⭐⭐⭐⭐ **它是不是一个「可被市场列出的插件」**（⭐⭐ 关键区分）。
+    /// **它是不是一个「可被市场列出的插件」**（关键区分）。
     ///
-    /// ⭐⭐⭐⭐⭐ `Gap` ⭐⭐ **不是插件**：⭐⭐⭐⭐ 它是意识登记的**缺口**
-    /// （⭐⭐ `consciousness::gap::q*`，⭐⭐ 来自 `observe_from_critique`）
-    /// ⭐⭐⭐⭐⭐ ⇒ ⭐⭐⭐⭐ **市场的「已安装能力」视图若含它，⭐⭐ 就是把
-    /// ⭐⭐⭐⭐⭐ 「我不会」当成「我有」⇒ ⭐⭐⭐⭐⭐ **语义反了**。
+    /// `Gap` **不是插件**：它是意识登记的**缺口**
+    /// （`consciousness::gap::q*`，来自 `observe_from_critique`）
+    /// ⇒ **市场的「已安装能力」视图若含它，就是把
+    /// 「我不会」当成「我有」⇒ **语义反了**。
     pub fn is_marketable(&self) -> bool {
         !matches!(self, Self::Gap)
     }
@@ -330,7 +330,7 @@ pub struct CapabilityNode {
     pub domain: Domain,
     pub layer: NodeLayer,
     pub constellation: ConstellationLevel,
-    /// ⭐⭐⭐⭐⭐ **能力类型**（⭐⭐ ⭐⭐ **市场枚举的第一维度**，⭐⭐ 见 `CapabilityKind`）
+    /// **能力类型**（**市场枚举的第一维度**，见 `CapabilityKind`）
     // 2026-10-06 P0 数据丢失修复：`kind` 曾是**唯一没有 `#[serde(default)]`**
     // 的可选语义字段，而已提交的 `.neotrix/capability_registry.json`
     // 318 个节点**全部**没有这个键 ⇒ `from_str::<RegistryExport>` 整体失败。
@@ -374,9 +374,9 @@ impl CapabilityNode {
         Self {
             id,
             domain,
-            // ⭐⭐⭐ 默认 `Skill`：⭐⭐ `new_primitive` 是最常用的构造器，
-            // ⭐⭐⭐ 而绝大多数能力确实既非工具也非工作流 ⭐⭐⭐
-            // ⭐⭐ （⭐⭐ ⛔ 默认成 `Gap` 会让市场把它们全排除 ⭐⭐ ⇒ 那是更坏的错）
+            // 默认 `Skill`：`new_primitive` 是最常用的构造器，
+            // 而绝大多数能力确实既非工具也非工作流 
+            // （⛔ 默认成 `Gap` 会让市场把它们全排除 ⇒ 那是更坏的错）
             kind: CapabilityKind::Skill,
             layer: NodeLayer::L0Primitive,
             constellation: ConstellationLevel::C0Compile,
@@ -406,7 +406,7 @@ impl CapabilityNode {
         Self {
             id,
             domain,
-            // ⭐⭐ 与 `new_primitive` 同一默认值（⭐⭐ 两处不一致 = ⭐⭐ 第三种状态）
+            // 与 `new_primitive` 同一默认值（两处不一致 = 第三种状态）
             kind: CapabilityKind::Skill,
             layer,
             constellation: ConstellationLevel::C0Compile,
@@ -436,7 +436,7 @@ impl CapabilityNode {
         Self {
             id,
             domain,
-            // ⭐⭐ 与 `new_primitive` 同一默认值（⭐⭐ 两处不一致 = ⭐⭐ 第三种状态）
+            // 与 `new_primitive` 同一默认值（两处不一致 = 第三种状态）
             kind: CapabilityKind::Skill,
             layer,
             constellation: ConstellationLevel::C0Compile,

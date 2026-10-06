@@ -13,7 +13,7 @@ pub use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
 use crate::l1_action::traits::LlmRouter;
 
 // ════════════════════════════════════════════════════════════════
-// ⭐⭐ L5 跨层引用收敛点（2026-10-03 修「跨域错位 + 冗余」双重缺陷）
+// L5 跨层引用收敛点（2026-10-03 修「跨域错位 + 冗余」双重缺陷）
 // ════════════════════════════════════════════════════════════════
 //
 // **实测事实**（`bash scripts/check-layer-deps.sh` ⇒ 19 处已记录违规）：
@@ -25,7 +25,7 @@ use crate::l1_action::traits::LlmRouter;
 //
 // ⇒ 同时是**跨域错位**（L1 越过 L2–L4 直取 L5）与**冗余**（同一条 import 抄三遍）。
 //
-// ⭐ **为什么走本 facade 而不是就地改**：本文件是 L1 自己的门面，
+// **为什么走本 facade 而不是就地改**：本文件是 L1 自己的门面，
 // `check-layer-deps.sh` 明确把 facade bridge 当作 sanctioned channel 排除
 // ⇒ 在此处转出是**该门认可的唯一合法通道**，而在 3 个消费方直接写
 // `crate::l1_action::nt_action_facade::…` 同样不含层名字样。
@@ -33,7 +33,7 @@ use crate::l1_action::traits::LlmRouter;
 // ⛔ 刻意**只转出这 5 个符号**，不整包 re-export `nt_crystal_core`：
 // 整包转出等于给 L1 开了一扇通往后端的门，跨域错位只是换了个门牌号。
 pub use crate::l5_cognition::nt_crystal_core::{NtLlmAsk, NtLlmReply, NtTaskFusionError};
-// ⭐⭐ **人机通道簇**（2026-10-03 第 2 批）。同样是 `nt_crystal_core` 的跨层引用，
+// **人机通道簇**（2026-10-03 第 2 批）。同样是 `nt_crystal_core` 的跨层引用，
 // 但**单独成簇**，因为它与上面的「LLM 问答契约」是**两种不同性质的能力**：
 // · 上面 3 个 = 「怎么问模型」⇒ L1 作为**调用方**
 // · 下面 4 个 = 「怎么问人」⇒ L1 作为**通道提供方**（`nt_stdin_human` /
@@ -460,7 +460,7 @@ pub use crate::l6_meta::nt_approval::PendingAction;
 // 直引 `crate::l2_perception::nt_world::social_access::probe::run_with_timeout`，
 // 而门规定 **L1 不得引用 L2/L3/L4/L5/L6** ⇒ 该行记 `NEW layer violation`。
 //
-// ⭐ 为何必须走**本层** facade（AGENTS.md §4.2）：改用「目标层的 facade」无效，
+// 为何必须走**本层** facade（AGENTS.md §4.2）：改用「目标层的 facade」无效，
 //   因为路径仍含层名，门照样命中。唯一合法通道是消费方自己那层的门面。
 //
 // ⛔ 不选替代方案「把 `capture_model_command` 整体搬进 L2」：那是**语义变更**

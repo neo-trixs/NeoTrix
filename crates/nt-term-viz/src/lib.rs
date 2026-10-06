@@ -36,7 +36,7 @@ pub use tree::{tree_connector, TreeStyle};
 
 /// 按**grapheme cluster**（用户感知字符）迭代字符串。
 ///
-/// ⭐ 2026-10-05 吸收 `emilkowalski/skills@break-ui`（MIT）时新增。
+/// 2026-10-05 吸收 `emilkowalski/skills@break-ui`（MIT）时新增。
 /// 存在的理由是**实测**（喂真 `unicode-width 0.2`）：
 /// `👨‍👩‍👧‍👦` 逐 `char` 累加宽 15 而 `display_width` 只有 9（差 6），
 /// 且逐 `char` 切分会留下**孤立 ZWJ / 孤立肤色修饰**
@@ -85,7 +85,7 @@ pub fn char_width(c: char) -> usize {
 /// ⛔ 不能直接用 [`pad_trunc`]：它按列宽截断时不会补省略号，
 /// 适合表格单元；此函数面向「单行标题」场景。
 ///
-/// # ⭐ 按 grapheme cluster 切分，不按 `char`（2026-10-05）
+/// # 按 grapheme cluster 切分，不按 `char`（2026-10-05）
 ///
 /// 原实现 `for c in s.chars()` 逐字符切分，实测产生**孤立 ZWJ**：
 /// ```text
@@ -116,7 +116,7 @@ pub fn truncate_to(s: &str, max_cols: usize) -> String {
     let budget = max_cols - 1;
     let mut out = String::new();
     let mut w = 0usize;
-    // ⭐ 每簇用 `display_width(g)` 而**不是**逐 char 累加 —— 实测两者不等：
+    // 每簇用 `display_width(g)` 而**不是**逐 char 累加 —— 实测两者不等：
     //   👨‍👩‍👧‍👦 逐 char 累加=15 但 display_width=9（差 6）
     //   👍🏽        逐 char 累加=7  但 display_width=5（差 2）
     //   若按累加计，会**提前截断**（看起来还有空间却已停）。
@@ -167,7 +167,7 @@ mod tests {
         assert_eq!(char_width('中'), 2);
     }
 
-    /// ⭐ 回归锁：截断**不得切碎** grapheme cluster（2026-10-05）。
+    /// 回归锁：截断**不得切碎** grapheme cluster（2026-10-05）。
     ///
     /// 用例值是**实测抓来的**，不是构造的：喂进真`unicode-width 0.2`
     /// 后发现逐 `char` 截断 emoji 家族会留下孤立 ZWJ。
@@ -177,7 +177,7 @@ mod tests {
         let fam = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{200D}\u{1F466}family";
         assert_eq!(display_width(fam), 8, "实测值：家族 emoji 占 2 列 + family 6 列");
 
-        // ⭐ 核心不变量：切出来的每个前缀都必须是**完整簇序列的前缀**。
+        // 核心不变量：切出来的每个前缀都必须是**完整簇序列的前缀**。
         //
         // ⚠️ 判据不能写成「输出不含 ZWJ」—— 家族 emoji *内部*就有 3 个 ZWJ，
         //   那是合法的。实测教训：`max=3` 得 `"👨‍👩‍👧‍👦…"`（簇完整，未切碎）
@@ -212,7 +212,7 @@ mod tests {
         }
     }
 
-    /// ⭐ 回归锁：每簇宽度必须用 `display_width(g)`，不可逐char 累加。
+    /// 回归锁：每簇宽度必须用 `display_width(g)`，不可逐char 累加。
     ///
     /// 实测（喂 `unicode-width 0.2` 真值）：
     /// 👨‍👩‍👧‍👦 逐 char 累加 = 15，但 `display_width` = 9（差 6）
@@ -228,7 +228,7 @@ mod tests {
             by_char > whole,
             "本测试前提：逐 char 累加应 > 整串宽度（实测 {by_char} > {whole}）"
         );
-        // ⭐ 预算 8（不触发截断）⇒ 必须**原样返回**
+        // 预算 8（不触发截断）⇒ 必须**原样返回**
         assert_eq!(truncate_to(fam, 8), fam, "预算恰好够时不得截断");
         // 预算 7 ⇒ 只放得下 'family' 之外的部分… 至少必须是合法簇
         let out = truncate_to(fam, 7);

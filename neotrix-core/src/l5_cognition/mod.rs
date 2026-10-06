@@ -28,9 +28,9 @@ pub mod nt_core_context;
 pub mod nt_core_cot_generator;
 pub mod nt_core_gate;
 pub mod nt_core_prm;
-// ⭐⭐ 2026-10-03： 已**下沉到 **
+// 2026-10-03： 已**下沉到 **
 // （它零 use、纯 std、且两个消费者都不在 L5 ⇒ 原位置是历史偶然）。
-// ⭐ 此处保留  再导出 ⇒ ⛔ 调用方路径不变，纯位置变更。
+// 此处保留  再导出 ⇒ ⛔ 调用方路径不变，纯位置变更。
 pub use crate::l0_substrate::nt_core_dispatch;
 /// EVO-03 DSPy 声明式自优化层 (Signature/Metric/BootstrapCompiler/CompiledPrompt 纯逻辑)
 pub mod nt_dspy;

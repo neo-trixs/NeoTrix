@@ -707,7 +707,7 @@ pub fn map_node(
 ) -> Option<(&'static str, &'static str, String)> {
     // 1. KNOWN_REPOS 确定性映射 (URL 判真优先, 任意 node_type)
     //
-    // ⭐ 2026-10-03：host 判定，不再裸 contains。
+    // 2026-10-03：host 判定，不再裸 contains。
     // ⛔ 原实现 `url.contains("github.com")` 会让
     //    `https://github.com@evil.net/<known-repo-key>` 进入本分支，
     //    而下面的 Pass 1 又用 `url_low.contains(&kl)` 匹配 owner/repo ——

@@ -121,7 +121,7 @@ impl ProfileStore {
     /// Resolve the effective rules for a profile (merging parent chain).
     pub fn resolve(&self, name: &str) -> Option<HashMap<String, ProfileDecision>> {
         let profile = self.profiles.get(name)?;
-        // ⭐ 显式类型标注：接入单调合并后推断路径变窄，
+        // 显式类型标注：接入单调合并后推断路径变窄，
         //   E0282 ⇒ HashMap 的键值类型必须写出来。
         let mut merged: HashMap<String, ProfileDecision> = HashMap::new();
 
@@ -150,7 +150,7 @@ impl ProfileStore {
         //   **而这正是 `general` / `developer` 两个档失去存在意义的原因** ——
         //   它们的注释直写 `general`（通用开发）/ `developer` (most permissive)。
         //
-        // 【教训 ⭐⭐】**「规则违反了我从外部读来的原则」与「这条原则在这个
+        // 【教训 】**「规则违反了我从外部读来的原则」与「这条原则在这个
         //   系统里是错的」是两件事。** 我把 Codewhale 的「overlay 只能收紧」
         //   当成了普适原则套上去，**没有先问**：
         //   这个仓库**刻意**提供了宽松档（它是**产品选择**，不是缺陷），
@@ -268,7 +268,7 @@ pub fn reset_profile_manager() {
 
 /// Public API: switch to a named profile.
 /// Also applies the profile's approval_mode_override to the global approval engine.
-/// ⭐⭐⭐ 切档提案：把「会发生什么」**先算清楚交给调用方**，而不是事后通知。
+/// 切档提案：把「会发生什么」**先算清楚交给调用方**，而不是事后通知。
 ///
 /// 方案 A（2026-10-05 用户裁决）：允许档位改变全局审批模式，
 /// 但必须**显式确认 + 留痕**。
@@ -286,12 +286,12 @@ pub struct ProfileSwitchPlan {
     /// 切过去之后全局审批模式**实际会变成**什么。
     /// 保留 `None` 表示「当前模式不会被改」。
     pub resulting_mode: Option<crate::l6_meta::nt_approval::ApprovalMode>,
-    /// ⭐ 人类可读的副作用说明，**必须**能被直接打印给用户。
+    /// 人类可读的副作用说明，**必须**能被直接打印给用户。
     pub notice: Option<String>,
 }
 
 impl ProfileSwitchPlan {
-    /// ⭐ 该次切换是否**会改动全局审批模式**。
+    /// 该次切换是否**会改动全局审批模式**。
     /// ⇒ 调用方据此决定要不要先问一句。
     pub fn changes_approval_mode(&self) -> bool {
         self.resulting_mode.is_some()
@@ -312,12 +312,12 @@ impl ProfileSwitchPlan {
 }
 
 /// 审批严格程度的序数（越大越松）。
-/// ⭐ 委托给 `ApprovalMode::strictness_rank`（枚举是唯一真源，避免两处判据漂移）。
+/// 委托给 `ApprovalMode::strictness_rank`（枚举是唯一真源，避免两处判据漂移）。
 fn rank(mode: crate::l6_meta::nt_approval::ApprovalMode) -> u8 {
     mode.strictness_rank()
 }
 
-/// ⭐ **只算不做**：给出切到 `name` 会有什么副作用，**不改任何状态**。
+/// **只算不做**：给出切到 `name` 会有什么副作用，**不改任何状态**。
 ///
 /// ⛔ 不落盘、不改全局单例 —— 纯查询，可安全地用于「要不要先问一句」。
 pub fn plan_profile_switch(name: &str) -> Result<ProfileSwitchPlan, String> {
@@ -329,7 +329,7 @@ pub fn plan_profile_switch(name: &str) -> Result<ProfileSwitchPlan, String> {
     drop(guard);
 
     // ⚠️ 档位里的 override 字符串**可能写错**（手改 profiles.toml、复制粘贴…）。
-    // ⭐ `ApprovalMode::from_str` 现返回 `Result` ⇒ 拼错时**硬拒绝**，
+    // `ApprovalMode::from_str` 现返回 `Result` ⇒ 拼错时**硬拒绝**，
     //   而不是 `Option` 的静默 `None`（那会让该档的覆盖被无声忽略）。
     let resulting_mode = match override_str.as_deref() {
         None => None,
@@ -382,7 +382,7 @@ pub fn switch_profile(name: &str) -> Result<String, String> {
     switch_profile_with_audit(name, "anonymous:no-mode-change")
 }
 
-/// ⭐⭐⭐ 方案 A 的执行入口：切档 + **写审计**。
+/// 方案 A 的执行入口：切档 + **写审计**。
 ///
 /// `actor` 是**谁批准的**（用户输入、CLI 参数名、自动化通道名…）。
 /// ⛔ `actor` 为空 ⇒ 拒绝执行：**改全局审批模式这件事不许匿名发生**。
@@ -552,7 +552,7 @@ pub fn list_profiles() -> Vec<String> {
 }
 
 /// Map an ActionType to a profile action key string.
-/// ⭐⭐⭐ 2026-10-05 修**键永不相交** —— 内置的两条 `Deny` 从未生效过。
+/// 2026-10-05 修**键永不相交** —— 内置的两条 `Deny` 从未生效过。
 ///
 /// ## 实测的缺陷形状
 /// 本函数此前只产 **6 个键**，其中 git 动作一律映射成 `"git_push"`；
@@ -583,7 +583,7 @@ pub fn action_type_to_key(action: &crate::l6_meta::nt_approval::ActionType) -> &
         ActionType::FileEdit { .. } => "write_file",
         ActionType::ShellCommand { .. } => "execute_command",
         ActionType::GitOperation { description, .. } => {
-            // ⭐ 细粒度键：与画像里声明的键名**逐字对齐**
+            // 细粒度键：与画像里声明的键名**逐字对齐**
             let d = description.to_ascii_lowercase();
             if d.contains("force") || d.contains("--force") || d.contains("+") {
                 "git_force_push"
@@ -695,7 +695,7 @@ impl PermissionAxes {
 #[cfg(test)]
 mod tests {
 
-    /// ⭐⭐⭐ 本模块测试**共享全局单例**（`global_profile_manager` /
+    /// 本模块测试**共享全局单例**（`global_profile_manager` /
     /// `global_approval`），而 cargo test **默认多线程**
     /// ⇒ 同模块测试会互相抢状态，表现为**间歇性失败**且失败行号漂移。
     ///
@@ -826,7 +826,7 @@ mod tests {
             assert_eq!(profile.rules.get("mono_guard"), Some(&ProfileDecision::Deny));
         }
 
-        // ⭐ switch profile —— 2026-10-05 语义变更（方案 A）
+        // switch profile —— 2026-10-05 语义变更（方案 A）
         //
         // 【原断言（已删除）】`switch_profile("developer").is_ok()`
         //   —— 它把「匿名切档可以顺带改掉全局审批模式」**钉成了契约**。
@@ -865,7 +865,7 @@ mod tests {
 
         assert!(get_profile_info("does-not-exist").is_err());
 
-        // ⭐ 2026-10-05 语义变更（方案 A）：override **仍然生效**，
+        // 2026-10-05 语义变更（方案 A）：override **仍然生效**，
         // 但**必须带 actor** —— 匿名入口不再允许放宽审批模式。
         //
         // 【原断言（已删除）】`switch_profile("developer").is_ok()`
@@ -912,7 +912,7 @@ mod tests {
         assert_eq!(action_type_to_key(&ActionType::GitOperation { description: "git pull".into() }), "git_operation");
     }
 
-    /// ⭐⭐⭐ 端到端：画像里**每一条** `Deny` 规则都必须有某个 `ActionType` 能命中。
+    /// 端到端：画像里**每一条** `Deny` 规则都必须有某个 `ActionType` 能命中。
     ///
     /// 【缺陷形状】此前画像声明了 11 条键，而 `action_type_to_key`
     /// 只产 6 个 ⇒ 其中 `read_secrets` / `git_force_push` 等
@@ -987,7 +987,7 @@ mod tests {
              要么给 action_type_to_key 补键，要么把它登记进 KNOWN_UNREACHABLE 并写明原因"
         );
 
-        // ⭐ 关键断言：`git_force_push` 必须**不在**不可达列表里
+        // 关键断言：`git_force_push` 必须**不在**不可达列表里
         // （它是本轮修好的那条；若它出现在unreachable 里说明修复回退了）
         assert!(
             !unreachable.iter().any(|k| k.as_str() == "git_force_push"),
@@ -1008,7 +1008,7 @@ mod tests {
         let _ = PermissionAxes::policy_decision_for("write_file");
     }
 
-    /// ⭐⭐⭐ 契约锁：**子档显式覆盖父档是本仓的刻意设计**，不是缺陷。
+    /// 契约锁：**子档显式覆盖父档是本仓的刻意设计**，不是缺陷。
     ///
     /// 【本仓为什么允许放宽】内置三个档位是一条**刻意的产品阶梯**：
     /// `nt_shield`（收紧）→ `general`（通用开发，放开写文件）
@@ -1041,7 +1041,7 @@ mod tests {
             "general 档刻意放宽 write_file —— 这是产品阶梯，不是缺陷"
         );
 
-        // ⭐ 但**未被显式覆盖**的键必须**继承祖先**（不能凭空出现）
+        // 但**未被显式覆盖**的键必须**继承祖先**（不能凭空出现）
         assert_eq!(
             general.get("read_secrets"),
             Some(&ProfileDecision::Deny),
@@ -1060,7 +1060,7 @@ mod tests {
         assert_eq!(dev.get("access_tor_network"), Some(&ProfileDecision::Deny));
     }
 
-    /// ⭐⭐ **安全下界锁**：无论怎么继承，**显式 Deny 的键不得被继承性放宽**。
+    /// **安全下界锁**：无论怎么继承，**显式 Deny 的键不得被继承性放宽**。
     ///
     /// 这条是上面那条的**安全侧补充**，也是我要保留的唯一实质约束：
     /// 若某个键在**本档**显式 `Deny`，它必须保持 `Deny`；
@@ -1084,7 +1084,7 @@ mod tests {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // ⭐⭐ 方案 A 反向锁（2026-10-05，用户裁决：允许改模式，但须显式确认 + 留痕）
+    // 方案 A 反向锁（2026-10-05，用户裁决：允许改模式，但须显式确认 + 留痕）
     // ══════════════════════════════════════════════════════════════
 
     /// 前提断言：`developer` 档确实设置了 `approval_mode_override`
@@ -1101,7 +1101,7 @@ mod tests {
         );
     }
 
-    /// ⭐⭐⭐ 锁①：**匿名入口不得放宽审批模式**。
+    /// 锁①：**匿名入口不得放宽审批模式**。
     ///
     /// 【危害】`switch_profile` 原本会顺手改掉全局 `ApprovalMode` 且完全静默。
     /// 若匿名也能改，方案 A 的「显式确认 + 留痕」就形同虚设 ——
@@ -1139,7 +1139,7 @@ mod tests {
         reset_profile_manager();
     }
 
-    /// ⭐⭐ 锁②：**空 actor 被拒** —— 改全局审批严格程度不许匿名。
+    /// 锁②：**空 actor 被拒** —— 改全局审批严格程度不许匿名。
     #[test]
     fn audit_switch_rejects_empty_actor() {
         let _guard = lock_global_state();
@@ -1160,7 +1160,7 @@ mod tests {
         reset_profile_manager();
     }
 
-    /// ⭐ 锁③：带 actor ⇒ 成功，**且返回值里带审计行**。
+    /// 锁③：带 actor ⇒ 成功，**且返回值里带审计行**。
     ///
     /// 审计行必须能回答「谁在什么时候切到了什么、模式从什么变成什么」。
     #[test]
@@ -1192,7 +1192,7 @@ mod tests {
         reset_profile_manager();
     }
 
-    /// ⭐⭐⭐ 锁④（最关键）：**`plan_profile_switch` 是纯查询**。
+    /// 锁④（最关键）：**`plan_profile_switch` 是纯查询**。
     ///
     /// 【为什么这条最重要】方案 A 的整个交互形态是
     /// 「先 plan 给人看 → 人确认 → 才执行」。
@@ -1215,7 +1215,7 @@ mod tests {
         // 本仓无 `serial_test` 依赖（同模块 13 处测试同样靠 `reset_profile_manager()`
         // 复位）⇒ 本测试沿用**同一手法**：进出各复位一次、基线自带断言。
         //
-        // ⭐ 这也是本锁**第一次运行时抓到的东西**：
+        // 这也是本锁**第一次运行时抓到的东西**：
         // 它首跑报「plan 不得改动全局审批模式」失败，
         // 而**独立探针证明 plan 确实是纯的**
         // （连续打印 before/after plan，mode 不变）
@@ -1241,7 +1241,7 @@ mod tests {
             assert!(p.notice.is_some(), "plan 必须给出人类可读预告");
         }
 
-        // ⭐ 核心断言：三次 plan 之后，两项状态**都没变**
+        // 核心断言：三次 plan 之后，两项状态**都没变**
         assert_eq!(
             crate::l6_meta::nt_approval::global_approval().lock().unwrap().mode(),
             mode_before,
@@ -1255,7 +1255,7 @@ mod tests {
         reset_profile_manager();
     }
 
-    /// ⭐ 对照组：`loosens_approval` 只把「从严到松」算放宽。
+    /// 对照组：`loosens_approval` 只把「从严到松」算放宽。
     /// 反向（收紧）**不算** —— 否则 UI 会拿它提示「要放宽了」而实际相反。
     #[test]
     fn loosens_only_counts_strict_to_loose() {
@@ -1283,7 +1283,7 @@ mod tests {
         assert!(!none.changes_approval_mode());
     }
 
-    /// ⭐ 匿名入口在**不改模式**的档位上仍然可用（否则连切档都做不了）。
+    /// 匿名入口在**不改模式**的档位上仍然可用（否则连切档都做不了）。
     #[test]
     fn anonymous_switch_still_works_for_non_mode_changing_profile() {
         let _guard = lock_global_state();

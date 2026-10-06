@@ -161,7 +161,7 @@ impl AuthService {
             bind_result
         });
 
-        // ⭐ 先确认回调端口真的绑上了，再去开浏览器。
+        // 先确认回调端口真的绑上了，再去开浏览器。
         match bind_receiver.recv() {
             Ok(Err(e)) => {
                 return Err(SocialAccessError::AuthFailed {
@@ -339,7 +339,7 @@ impl AuthService {
 
     /// Cookie-based login — 用户提供 `auth_token` 和 `ct0`。
     ///
-    /// # ⭐ 2026-10-03：补上原先缺失的输入校验
+    /// # 2026-10-03：补上原先缺失的输入校验
     ///
     /// 原实现接受任意字符串（含空串）并把 session 标记为
     /// `AuthState::Authenticated`。于是 `login_x_cookies("", "")`
@@ -590,7 +590,7 @@ mod tests {
                     "error must state the cause, got: {}",
                     reason
                 );
-                // ⭐ 错误信息必须**可执行** —— 告诉用户下一步做什么
+                // 错误信息必须**可执行** —— 告诉用户下一步做什么
                 assert!(
                     reason.contains("with_x_oauth"),
                     "error must name the remedy, got: {}",

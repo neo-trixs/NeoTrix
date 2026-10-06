@@ -796,7 +796,7 @@ mod tests {
 
 #[cfg(test)]
 mod sandbox_gate_consistency_tests {
-    //! ⭐⭐⭐ **同一个 sandbox 闸的两处判据必须一致**。
+    //! **同一个 sandbox 闸的两处判据必须一致**。
     //!
     //! 【缺陷（2026-10-06 修）】`check_all` 的 read-only 分支此前是
     //! `if self.sandbox.is_read_only()`（**拦一切**），
@@ -814,7 +814,7 @@ mod sandbox_gate_consistency_tests {
 
     /// `is_write_action` 对**未登记**的动作返回 false（读类/内部动作）。
     /// 这是「read-only 不拦一切」的前提 ⇒ 先把这条前提本身钉住。
-    /// ⭐ `write_action_registry` 的登记事实（**实测，不是设计意图**）。
+    /// `write_action_registry` 的登记事实（**实测，不是设计意图**）。
     ///
     /// ⛔ 特别记录 `seal_iterate` **登记为 `irreversible`** ⇒ 它**是**写动作
     /// ⇒ `--sandbox read-only` 会拦 SEAL 自迭代（这是既有行为，非本次引入）。
@@ -833,7 +833,7 @@ mod sandbox_gate_consistency_tests {
         }
     }
 
-    /// ⭐⭐⭐ 默认档（`Disabled`）**不产生任何 `Block`** —— 本次改动零回归的证据。
+    /// 默认档（`Disabled`）**不产生任何 `Block`** —— 本次改动零回归的证据。
     ///
     /// ## ⚠️ 为什么断言的是「无 `Block`」而不是「`is_ok()`」
     /// 实测（2026-10-06）：默认档下 `check_all` 对**每一条**动作都返回
@@ -859,7 +859,7 @@ mod sandbox_gate_consistency_tests {
         }
     }
 
-    /// ⭐⭐⭐ **实测记录**：默认档下粗粒度闸对一切动作都要审批（来自 `SecurityGuard`）。
+    /// **实测记录**：默认档下粗粒度闸对一切动作都要审批（来自 `SecurityGuard`）。
     /// 这条不是断言「应该这样」，而是**把实测钉住**，让将来有人修掉粗闸时
     /// 必须 consciously 更新它 —— 而不是在不知情的情况下改变全局行为。
     #[test]
@@ -873,7 +873,7 @@ mod sandbox_gate_consistency_tests {
         );
     }
 
-    /// ⭐⭐⭐ **钉住「既有语义」：read-only 连读也拦**（`check_all` 口径）。
+    /// **钉住「既有语义」：read-only 连读也拦**（`check_all` 口径）。
     ///
     /// ## 为什么这条是「钉住现状」而不是「主张正确」
     /// `tests::test_check_all_sandbox_read_only` 明确断言这个行为
@@ -904,7 +904,7 @@ mod sandbox_gate_consistency_tests {
         }
     }
 
-    /// ⭐⭐⭐ **记录一处已实测的语义漂移（不修，只钉住差异存在）。**
+    /// **记录一处已实测的语义漂移（不修，只钉住差异存在）。**
     ///
     /// `check_all` 的 sandbox 闸 = 「拦一切」，
     /// `check_cli_command` 的 sandbox 闸 = 「只拦写（`is_write_action`）」。
@@ -927,7 +927,7 @@ mod sandbox_gate_consistency_tests {
         );
     }
 
-    /// ⭐⭐⭐ **实测：默认档下 sandbox 段根本不可达**（粗闸在第 1 段短路）。
+    /// **实测：默认档下 sandbox 段根本不可达**（粗闸在第 1 段短路）。
     ///
     /// 这条把「两段闸的可达性关系」钉住。若将来有人修掉 `SecurityGuard` 的
     /// 粗粒度行为，本条会红 —— 那是**好事**：它逼着那个人回头验证
@@ -950,7 +950,7 @@ mod sandbox_gate_consistency_tests {
         );
     }
 
-    /// ⭐⭐ `SandboxEnforcer::is_read_only` 的判据唯一真源在枚举上：
+    /// `SandboxEnforcer::is_read_only` 的判据唯一真源在枚举上：
     /// 引擎与枚举对同一 mode 必须给出同一答案（防两处漂移）。
     #[test]
     fn enforcer_and_enum_agree_on_read_only() {

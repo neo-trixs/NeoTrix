@@ -19,7 +19,7 @@ use crate::l1_action::nt_action_facade::{
 
 /// shell 护栏引擎（进程内构造一次）。
 ///
-/// ⭐ 用 `OnceLock` 而非每次调用 `PolicyEngine::production_default()`：
+/// 用 `OnceLock` 而非每次调用 `PolicyEngine::production_default()`：
 ///   后者每次都要新建 4+ 个 validator 并**重新编译全部正则**，而配置是常量。
 /// 刻意**不做全局可变开关**（没有 interior mutability）—— 一旦允许运行期改策略，
 /// 同一个进程里不同命令的判据就不一致，那比没有护栏更难排查。

@@ -18,7 +18,7 @@ impl Criterion {
     }
 }
 
-/// ⭐⭐ 判据来源 —— `EMERGENCE-PLAN` §6.4「自报独立性」的**机器化**。
+/// 判据来源 —— `EMERGENCE-PLAN` §6.4「自报独立性」的**机器化**。
 ///
 /// **为什么需要它**：CASP（剑桥，Hinton/Bengio/Jack Clark 等 23 人）指出
 /// 「AI systems now write most of the code inside the companies that build them」；
@@ -38,7 +38,7 @@ pub enum CriteriaSource {
     Independent,
 }
 
-/// ⭐⭐⭐ **证据层级** —— 判官**输入本身**是什么性质的东西。
+/// **证据层级** —— 判官**输入本身**是什么性质的东西。
 ///
 /// ## 为什么需要它（`CriteriaSource` 不够用）
 ///
@@ -99,7 +99,7 @@ impl EvidenceTier {
 pub struct JudgeConfig {
     pub criteria: Vec<Criterion>,
     pub max_score: f32,
-    /// ⭐ 判据来源。`new()` **默认 `SelfReported`** ⇒ 不可当涌现证据。
+    /// 判据来源。`new()` **默认 `SelfReported`** ⇒ 不可当涌现证据。
     pub criteria_source: CriteriaSource,
 }
 
@@ -110,7 +110,7 @@ impl JudgeConfig {
         Self { criteria, max_score, criteria_source: CriteriaSource::SelfReported }
     }
 
-    /// ⭐ 显式声明判据来源。见[`CriteriaSource`]。
+    /// 显式声明判据来源。见[`CriteriaSource`]。
     pub fn with_source(mut self, source: CriteriaSource) -> Self {
         self.criteria_source = source;
         self
@@ -137,9 +137,9 @@ pub struct JudgeResult {
     pub max_possible: f32,
     pub criterion_scores: Vec<CriterionScore>,
     pub summary: String,
-    /// ⭐ 本次评分所用的判据来源（随结果一起落盘，供事后审计）。
+    /// 本次评分所用的判据来源（随结果一起落盘，供事后审计）。
     pub criteria_source: CriteriaSource,
-    /// ⭐⭐⭐ 被判官读取的**产出**本身的证据层级（2026-10-05 增补）。
+    /// 被判官读取的**产出**本身的证据层级（2026-10-05 增补）。
     ///
     /// ⛔ **无 `Default` 构造路径**：`JudgeResult` 的每一处构造都必须显式
     ///   指定它，或经 [`JudgeResult::with_evidence_tier`] 显式设置。
@@ -150,19 +150,19 @@ pub struct JudgeResult {
 }
 
 impl JudgeResult {
-    /// ⭐ 显式声明产出层级。见[`EvidenceTier`]。
+    /// 显式声明产出层级。见[`EvidenceTier`]。
     pub fn with_evidence_tier(mut self, tier: EvidenceTier) -> Self {
         self.evidence_tier = tier;
         self
     }
 
-    /// ⭐⭐⭐ **可否计入涌现证据** —— `EMERGENCE-PLAN` §6.4 的机器判据。
+    /// **可否计入涌现证据** —— `EMERGENCE-PLAN` §6.4 的机器判据。
     ///
     /// ⛔ **两个条件都必须满足**（与 2026-10-05 之前不同）：
     /// 1. `CriteriaSource::Independent` —— 判据独立于产出；
     /// 2. `EvidenceTier::Canonical` —— 产出本身是**直接观测**。
     ///
-    /// ⭐ **为什么必须是「与」而不是「或」**：
+    /// **为什么必须是「与」而不是「或」**：
     /// 独立判官读**重建产物**时，判官再独立也只是「对重建做独立评估」，
     /// 底层从未被直接观测 ⇒ 那不是涌现证据（依据 rea ADR-0003）。
     /// 只有判据独立**且**产出为 canonical，两条链路才都没有模型的解读环节。
@@ -170,7 +170,7 @@ impl JudgeResult {
     /// ⛔ `SelfReported` ⇒ false（判据与产出同源）。
     /// ⛔ `Reconstruction` / `Inference` ⇒ false（产出非直接观测）。
     ///
-    /// ⭐ 之所以做成**方法**而不是注释：注释会被下一个 agent 忽略，
+    /// 之所以做成**方法**而不是注释：注释会被下一个 agent 忽略，
     /// 而`if !result.is_emergence_evidence() { skip }` 会在编译期与评审时暴露。
     pub fn is_emergence_evidence(&self) -> bool {
         matches!(self.criteria_source, CriteriaSource::Independent)
@@ -342,10 +342,10 @@ mod tests {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // ⭐ 判据来源 / 自报独立性（`EMERGENCE-PLAN` §6.4）
+    // 判据来源 / 自报独立性（`EMERGENCE-PLAN` §6.4）
     // ══════════════════════════════════════════════════════════════
 
-    /// ⭐⭐ 反向锁：`JudgeConfig::new` **默认 `SelfReported`**
+    /// 反向锁：`JudgeConfig::new` **默认 `SelfReported`**
     /// ⇒ 不声明来源就**不可**计入涌现证据。
     /// 这条锁的意义：若默认取 `Independent`，
     /// 「忘记声明」会静默升级成「可当涌现证据」。
@@ -387,7 +387,7 @@ mod tests {
         assert!(manual.is_emergence_evidence());
     }
 
-    /// ⭐ 边界判据的**失败方向**也要锁：满分同源 ⇒ 仍不可计入。
+    /// 边界判据的**失败方向**也要锁：满分同源 ⇒ 仍不可计入。
     /// （防止将来有人用「分数很高」当作「可信」的等价物。）
     #[test]
     fn self_reported_perfect_score_still_not_evidence() {
@@ -403,7 +403,7 @@ mod tests {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // ⭐⭐⭐ 证据层级（2026-10-05，来自 `morluto/rea` ADR-0003）
+    // 证据层级（2026-10-05，来自 `morluto/rea` ADR-0003）
     // ══════════════════════════════════════════════════════════════
 
     fn judge(src: CriteriaSource, tier: EvidenceTier) -> JudgeResult {
@@ -417,7 +417,7 @@ mod tests {
         }
     }
 
-    /// ⭐⭐⭐ **本轮新增的核心判据**：独立判官读**重建产物** ⇒ 仍不得计入。
+    /// **本轮新增的核心判据**：独立判官读**重建产物** ⇒ 仍不得计入。
     ///
     /// 这正是 `EvidenceTier` 存在的唯一理由。
     /// 二级分类下这个组合会返回 `true`（判据独立 ⇒ 可计入）⇒ **静默误判**。
@@ -477,9 +477,9 @@ mod tests {
         assert!(!judge(CriteriaSource::Independent, EvidenceTier::default()).is_emergence_evidence());
     }
 
-    /// ⭐⭐ 反向锁：把 `&&` 改回「只看 CriteriaSource」必须失败。
+    /// 反向锁：把 `&&` 改回「只看 CriteriaSource」必须失败。
     /// 这条锁直接守住本轮的核心修复。
-    /// ⭐⭐⭐ **未来污染不变性元测试**（2026-10-05，来自 `HKUDS/Vibe-Trading`）
+    /// **未来污染不变性元测试**（2026-10-05，来自 `HKUDS/Vibe-Trading`）
     ///
     /// 【源】`agent/tests/factors/test_lookahead.py` 的判据：
     /// *"Look-ahead guard: factor values at row `t` must not depend on rows > t."*
@@ -515,7 +515,7 @@ mod tests {
         );
     }
 
-    /// ⭐⭐ **正向对照**（子代理明确要求的一条）：
+    /// **正向对照**（子代理明确要求的一条）：
     /// 上面的不变性测试**单独存在时会被一个恒返回 0 的坏实现通过**。
     /// 故必须同时证明「输入确实被读到了、确实起作用」。
     #[test]
@@ -543,7 +543,7 @@ mod tests {
         }
     }
 
-    /// ⭐⭐⭐ **污染方向对照**：证明 `response` 真的进了函数体。
+    /// **污染方向对照**：证明 `response` 真的进了函数体。
     /// 若实现将来改成忽略 `response`，上面两条不变性测试会同时「通过」——
     /// 本测试就是防这个：它要求**至少存在一个 response 影响可观测量的机制**。
     ///

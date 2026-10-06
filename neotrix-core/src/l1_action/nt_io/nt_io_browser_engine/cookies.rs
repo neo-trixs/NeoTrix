@@ -19,7 +19,7 @@ pub(crate) struct CookieEntry {
     secure_only: bool,
 }
 
-/// ⭐⭐ 手工实现 `Debug`：**`value` 永不打印**。
+/// 手工实现 `Debug`：**`value` 永不打印**。
 ///
 /// 【为什么不能用 `derive(Debug)`】
 /// `value` 就是 cookie 的**凭据本身**（等价于 `Set-Cookie` 里的值）。
@@ -295,7 +295,7 @@ pub(crate) fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// ⭐ `CookieJar` 的 `Debug`：**只暴露 host 与条目数**，不含任何值。
+/// `CookieJar` 的 `Debug`：**只暴露 host 与条目数**，不含任何值。
 impl std::fmt::Debug for CookieJar {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut hosts: Vec<&String> = self.entries.keys().collect();
@@ -313,7 +313,7 @@ impl std::fmt::Debug for CookieJar {
 mod redacted_debug_tests {
     use super::*;
 
-    /// ⭐⭐ 反向锁：`{:?}` **绝不**包含 cookie 值。
+    /// 反向锁：`{:?}` **绝不**包含 cookie 值。
     /// 吸收 `agent-cookie-sync`（MIT）的「注入脚本从不打印凭据值」。
     #[test]
     fn debug_never_prints_cookie_value() {

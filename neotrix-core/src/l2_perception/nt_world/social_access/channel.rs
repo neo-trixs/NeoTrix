@@ -126,7 +126,7 @@ pub struct Backend {
     pub cost_tier: u8,
     /// Priority weight for selection (higher = preferred)
     pub weight: u32,
-    /// ⭐ **2026-10-03 新增（D4）**：门控此后端所需的凭据来源。
+    /// **2026-10-03 新增（D4）**：门控此后端所需的凭据来源。
     ///
     /// ⛔ **此前 `requires_auth` 是个死字段**：被设置、被序列化，但**从未被读**。
     ///    后果是「装了 CLI 但没登录」的渠道会被选为 `active_backend`，
@@ -216,7 +216,7 @@ impl Backend {
         self
     }
 
-    /// ⭐ 声明凭据来源。`with_auth(true)` 单独调用**不**设置它 ——
+    /// 声明凭据来源。`with_auth(true)` 单独调用**不**设置它 ——
     /// 那正是修复前「auth 标记是死字段」的成因：两者语义不同，
     /// 前者只影响文档与排序，后者才门控可用性。
     pub fn with_credential(mut self, credential: Credential) -> Self {
@@ -296,7 +296,7 @@ impl Channel {
 
     /// Check if this channel can handle a URL
     ///
-    /// # ⭐ 2026-10-03：改为查表，不再 `match` 穷举
+    /// # 2026-10-03：改为查表，不再 `match` 穷举
     ///
     /// ⛔ **原实现是 `match self.platform { … }` 穷举 6 个变体**，
     /// 这让「加平台不用改代码」只做到一半：经
@@ -323,7 +323,7 @@ impl Channel {
 
     /// 本渠道在 [`PlatformCatalog`] 中对应的 id 列表。
     ///
-    /// ⭐ 渠道名（CLI 面向）与目录 id（登录/cookie 面向）历史上不同名，
+    /// 渠道名（CLI 面向）与目录 id（登录/cookie 面向）历史上不同名，
     /// 这里显式列出映射，而不是靠字符串相等隐式假设。
     fn catalog_ids(&self) -> Vec<String> {
         match self.platform {
@@ -334,7 +334,7 @@ impl Channel {
             SocialPlatform::TikTok => vec!["tiktok".to_string()],
             SocialPlatform::Youtube => vec!["youtube".to_string()],
             SocialPlatform::Linkedin => vec!["linkedin".to_string()],
-            // ⭐ `Other(name)` 直接当目录 id —— 这才是「加平台不改代码」的路径
+            // `Other(name)` 直接当目录 id —— 这才是「加平台不改代码」的路径
             SocialPlatform::Other(ref name) => vec![name.clone()],
         }
     }
@@ -346,7 +346,7 @@ impl Channel {
         let mut first_warn: Option<String> = None;
 
         for backend in ordered {
-            // ⭐ **凭据门控（D4）**：命令探测**之前**先查凭据。
+            // **凭据门控（D4）**：命令探测**之前**先查凭据。
             //    顺序很关键 —— 若放在探测之后，一个「装了但没登录」的渠道
             //    会先被判 Ok 并 `return`，凭据检查永远轮不到。
             //    这里改成：凭据缺失 ⇒ 记为 Warn 并**继续**往下找后端，
@@ -469,7 +469,7 @@ pub fn default_channels() -> ChannelRegistry {
 
     // Twitter/X — multi-backend: opencli → bird → 免登录镜像
     //
-    // ⭐ **2026-10-03 探测参数修正（D4）**：原配置对全部三个后端都用
+    // **2026-10-03 探测参数修正（D4）**：原配置对全部三个后端都用
     //    `--help` / `--version` 这类「flag 存在性」探测。两个问题：
     //
     //    1. `bird` 的 README 命令表里是 `help` / `whoami` / `check`，
@@ -538,7 +538,7 @@ pub fn default_channels() -> ChannelRegistry {
 
     // Reddit — OpenCLI or rdt-cli
     //
-    // ⭐ 同 D4：`<platform> --help` 只证明二进制在，不证明能取到数据。
+    // 同 D4：`<platform> --help` 只证明二进制在，不证明能取到数据。
     // 改用真实只读命令。opencli 的 reddit 命令表（README）有 `frontpage`。
     registry.register(Channel::new(
         "reddit",
@@ -561,7 +561,7 @@ pub fn default_channels() -> ChannelRegistry {
 
     // Instagram — OpenCLI
     //
-    // ⭐ opencli instagram 命令表有 `profile`；用 `--help` 探测不到凭据状态。
+    // opencli instagram 命令表有 `profile`；用 `--help` 探测不到凭据状态。
     registry.register(Channel::new(
         "instagram",
         SocialPlatform::Instagram,
@@ -659,7 +659,7 @@ fn now_ts() -> u64 {
 
 /// Probe a single backend command
 ///
-/// ⭐ 委托给 [`super::probe::probe_command_with_timeout`]。
+/// 委托给 [`super::probe::probe_command_with_timeout`]。
 /// ⛔ **2026-10-03**：此处原有第二份**独立**探测实现（`Command::output()`，
 /// 无超时、无登录墙判别），与 `probe.rs` 的 `probe_command` 重复且行为不一致。
 /// 两份实现在本次修复前都不带真超时 —— `backend.probe_timeout` 从未被读。
