@@ -314,10 +314,24 @@ impl ApprovalEngine {
         if crate::l6_meta::nt_permission_profiles::is_action_allowed(action_key) {
             return ActionVerdict::Allow;
         }
-        match self.mode {
-            ApprovalMode::Suggest => ActionVerdict::Ask,
-            ApprovalMode::AutoEdit => ActionVerdict::Ask,
-            ApprovalMode::FullAuto => ActionVerdict::Allow,
+        // ⭐⭐⭐ **委托给 `require_approval`**，不自己再写一遍 mode 判据。
+        //
+        // 【缺陷（2026-10-06 修）】本方法此前是
+        // `Suggest | AutoEdit => Ask; FullAuto => Allow`
+        // ⇒ **丢掉了 AutoEdit 的文件类白名单**：
+        // `require_approval` 里 AutoEdit 对 `FileWrite`/`FileCreate`/`FileEdit`
+        // 返回 `false`（免审批），而本「权威版」却对同一动作返回 `Ask`。
+        // ⇒ 同一个动作，两处判据给出**不同答案**，而本方法是
+        //   `ActionSandbox` 的**硬拒判据** ⇒ AutoEdit 下所有文件写**全被当 Ask**。
+        //
+        // 【判据依据】判据只该有一份。两处各写一遍 mode 分支，
+        // 漂移只是时间问题 —— 实测已漂移（AutoEdit 白名单）。
+        // ⇒ profile 的 Deny/Allow 仍在本方法里**先判**（那两档优先于 mode，
+        //   是设计的一部分）；余下的 mode 判定一律委托。
+        if self.require_approval(action) {
+            ActionVerdict::Ask
+        } else {
+            ActionVerdict::Allow
         }
     }
 
@@ -636,18 +650,109 @@ fn preview_or_full(s: &str) -> String {
     }
 }
 
+/// ⭐⭐⭐ 内容指纹（吸收 `uber/ADR`，2026-10-06）。
+///
+/// 【缺陷（2026-10-06 修）】`describe_action` 此前把 `content_preview` /
+/// `diff` 的**原文**（最多 60 字符）拼进 `description`。而 `description`
+/// 会进 [`PendingAction`]，并被 `ApprovalAuditEntry::description`
+/// **快照进审计轨迹** ⇒ **每写一次文件，就把它开头 60 个字符留在审计里**。
+///
+/// ## 【实测的泄漏面】
+/// 写 `.env` / `credentials` / `.npmrc` 这类文件时，那 60 个字符**就是密钥本身**
+/// （`API_KEY=sk-...`）。审计轨迹是**长期留存 + 可能导出**的结构
+/// ⇒ 一次普通的文件写就把凭据抄进了本不该有它的存储。
+///
+/// ## 【源】`uber/ADR`（Apache-2.0，已部署于 Uber 生产，MLSys 2026）
+/// 其 `run_manifest` 明确：*"Paths, directory names, host identifiers,
+/// environment values, prompts, and file contents are not stored"*
+/// —— 要能证明「审批的就是这份内容」，只需记 **SHA-256 摘要**，不必记内容。
+///
+/// ## 为什么指纹是**够用**的
+/// 审批要回答的问题是「**这份**内容准不准」，不是「内容写了什么」。
+/// 路径 + 字符数 + 摘要三者合起来：人能定位文件、能看到规模、
+/// 事后能**验证**内容未被替换 —— 而不必把内容抄进审计。
+fn content_fingerprint(s: &str) -> String {
+    let digest = hex::encode(<sha2::Sha256 as sha2::Digest>::digest(s.as_bytes()));
+    format!("{} chars, sha256:{}", s.chars().count(), &digest[..12])
+}
+
+/// ⭐⭐ 键名是否「看起来是密钥名」。
+///
+/// ## ⛔ 为什么必须**整段命中**而不是子串包含（2026-10-06 实测教训）
+/// 首版用 `key.contains("key")`，结果 **`KEYBOARD=1` 被遮蔽** ——
+/// 而金丝雀测试抓到它时，`--port`/`LEVEL`/`a=1` 都侥幸没被误伤。
+/// ⇒ 一旦遮蔽开始误伤普通赋值，命令就变得**不可读**，
+///   而「审批人必须看清要跑什么」正是这道闸存在的理由
+///   ⇒ **遮蔽误伤的代价 = 审批失效**，比漏遮更难发现。
+/// ⇒ 只在按 `_`/`-`/`.`/数字切出的**整段**命中提示词时才判定为密钥名。
+fn is_secret_key(key: &str) -> bool {
+    const SECRET_HINTS: [&str; 8] = [
+        "token", "key", "secret", "password", "passwd", "api", "auth", "credential",
+    ];
+    key.split(|c: char| c == '_' || c == '-' || c == '.' || c.is_ascii_digit())
+        .filter(|seg| !seg.is_empty())
+        .any(|seg| SECRET_HINTS.contains(&seg.to_ascii_lowercase().as_str()))
+}
+
+/// ⭐⭐ 遮蔽赋值型密钥（`KEY=value` 与 `--flag VALUE` **两种形态**）。
+///
+/// ## 为什么两种形态都要（2026-10-06 实测教训）
+/// 首版只处理 `KEY=value`，金丝雀测试立刻抓到
+/// `deploy --api-key sk_live_...` —— **CLI 里 `--flag VALUE` 比 `KEY=value` 更常见**
+/// ⇒ 只做赋值形态等于漏掉主流用法。
+///
+/// ## 遮蔽后保留什么
+/// · **键名保留**（要让人知道在传什么）
+/// · **被遮值的长度保留**（要让人知道「这里原本有个非空值」，
+///   否则 `KEY=` 与 `KEY=x` 在审计里长得一样）
+///
+/// ⛔ 这是**减害**而非保证：把密钥拼进命令正文
+/// （`curl .../$(cat ~/.aws/credentials)`）不在此覆盖内。依据同源判据：
+/// 不宣称做不到的事。
+fn redact_assigned_secrets(s: &str) -> String {
+    let mut out: Vec<String> = Vec::new();
+    let mut mask_next = false;
+    for tok in s.split_whitespace() {
+        if mask_next {
+            out.push(format!("<redacted:{}chars>", tok.chars().count()));
+            mask_next = false;
+        } else if let Some((k, v)) = tok.split_once('=') {
+            if !v.is_empty() && is_secret_key(k) {
+                out.push(format!("{k}=<redacted:{}chars>", v.chars().count()));
+            } else {
+                out.push(tok.to_owned());
+            }
+        } else {
+            // `--api-key VALUE` 形态（值在**下一个** token）
+            if tok.starts_with('-') && is_secret_key(tok.trim_start_matches('-')) {
+                mask_next = true;
+            }
+            out.push(tok.to_owned());
+        }
+    }
+    out.join(" ")
+}
+
 fn describe_action(action: &ActionType) -> String {
     match action {
+        // ⚠️ 内容/diff 一律**只留指纹**，不再抄原文（见 content_fingerprint 的缺陷说明）
         ActionType::FileWrite { path, content_preview } => {
-            format!("📝 Write {}: {}", path, preview_or_full(content_preview))
+            format!("📝 Write {} ({})", path, content_fingerprint(content_preview))
         }
         ActionType::FileCreate { path } => format!("📄 Create {}", path),
         ActionType::FileEdit { path, diff } => {
-            format!("✏️ Edit {}: {}", path, preview_or_full(diff))
+            format!("✏️ Edit {} ({})", path, content_fingerprint(diff))
         }
-        ActionType::ShellCommand { command } => format!("💻 Run: {}", command),
-        ActionType::GitOperation { description } => format!("🔧 Git: {}", description),
-        ActionType::Other { tool, args } => format!("🔧 Tool {}: {}", tool, args),
+        // 命令与参数：保留本体（审批人必须看清），但遮掉赋值型密钥的值
+        ActionType::ShellCommand { command } => {
+            format!("💻 Run: {}", preview_or_full(&redact_assigned_secrets(command)))
+        }
+        ActionType::GitOperation { description } => {
+            format!("🔧 Git: {}", preview_or_full(&redact_assigned_secrets(description)))
+        }
+        ActionType::Other { tool, args } => {
+            format!("🔧 Tool {}: {}", tool, preview_or_full(&redact_assigned_secrets(args)))
+        }
     }
 }
 
@@ -1190,5 +1295,228 @@ mod tests {
             "git_force_push",
             "键匹配必须大小写不敏感"
         );
+    }
+}
+#[cfg(test)]
+mod action_verdict_locks {
+    //! ⭐⭐⭐ `action_verdict` 的锁 —— 本函数此前**零测试**，
+    //! 而它是 `ActionSandbox` 的**硬拒判据**（deny/ask 二态全靠它）。
+    //!
+    //! 零测试的「权威判据」比有 bug 的非权威判据更危险：
+    //! 所有人都会因为「它是权威的」而**不再怀疑它**。
+    //!
+    //! 【核心不变量】对任意动作，`action_verdict` 必须是
+    //! `require_approval` 的**忠实三态化**：除 profile 的 Deny/Allow 先判外，
+    //! 「要不要问」必须与 `require_approval` **完全一致**。
+
+    use super::*;
+    use crate::l6_meta::nt_approval::ActionVerdict;
+
+    fn engine(mode: ApprovalMode) -> ApprovalEngine {
+        ApprovalEngine::new(mode)
+    }
+
+    fn fw() -> ActionType {
+        ActionType::FileWrite { path: "x".into(), content_preview: String::new() }
+    }
+    fn sh(cmd: &str) -> ActionType {
+        ActionType::ShellCommand { command: cmd.into() }
+    }
+
+    /// ⭐⭐⭐ **一致性不变量（穷举 mode × 动作）**：
+    /// `Ask ⇔ require_approval == true`，且**永远不产出 `Deny`**（未命中 profile 时）。
+    ///
+    /// 这条锁死了「委托给 `require_approval`」这个修法 ——
+    /// 任何人不小心把 mode 分支重新写回本函数，这条立刻红。
+    #[test]
+    fn verdict_is_faithful_tristate_of_require_approval() {
+        let actions = [
+            ("FileWrite", fw()),
+            ("FileCreate", ActionType::FileCreate { path: "x".into() }),
+            ("FileEdit", ActionType::FileEdit { path: "x".into(), diff: String::new() }),
+            ("Shell", sh("ls")),
+            ("Git", ActionType::GitOperation { description: "commit".into() }),
+            ("Other", ActionType::Other { tool: "web_search".into(), args: "q=rust".into() }),
+        ];
+        for mode in [ApprovalMode::Suggest, ApprovalMode::AutoEdit, ApprovalMode::FullAuto] {
+            let e = engine(mode);
+            for (name, a) in &actions {
+                let v = e.action_verdict(a);
+                let req = e.require_approval(a);
+                match v {
+                    ActionVerdict::Ask => assert!(
+                        req,
+                        "[{mode:?}] {name}: 判据说 Ask 但 require_approval 说免审批 ⇒ 两份判据漂移"
+                    ),
+                    ActionVerdict::Allow => assert!(
+                        !req,
+                        "[{mode:?}] {name}: 判据说 Allow 但 require_approval 说要审批 ⇒ 两份判据漂移"
+                    ),
+                    ActionVerdict::Deny => panic!(
+                        "[{mode:?}] {name}: 未命中 profile 的 Deny 却返回 Deny \
+                         （deny 只能来自 profile 规则）"
+                    ),
+                }
+            }
+        }
+    }
+
+    /// ⭐⭐⭐ **反向锁：AutoEdit 的文件类白名单**（本函数此前的真实缺陷）。
+    ///
+    /// `require_approval` 对 `AutoEdit` 的 `FileWrite`/`FileCreate`/`FileEdit`
+    /// 明确返回 `false`（免审批）；而「权威版」此前对同一动作返回 `Ask`
+    /// ⇒ AutoEdit 下**所有文件写全被当 Ask**，档位名存实亡。
+    #[test]
+    fn auto_edit_whitelist_file_ops_is_preserved() {
+        let e = engine(ApprovalMode::AutoEdit);
+        for (name, a) in [
+            ("FileWrite", fw()),
+            ("FileCreate", ActionType::FileCreate { path: "x".into() }),
+            ("FileEdit", ActionType::FileEdit { path: "x".into(), diff: String::new() }),
+        ] {
+            assert_eq!(
+                e.action_verdict(&a),
+                ActionVerdict::Allow,
+                "AutoEdit 下 {name} 应免审批（`--approval-mode auto-edit` 的承诺就是这条）"
+            );
+        }
+        // ⭐ 但**命令/git/未分类**仍要审批 —— 白名单不是「全放开」
+        for (name, a) in [
+            ("Shell", sh("ls")),
+            ("Git", ActionType::GitOperation { description: "commit".into() }),
+            ("Other", ActionType::Other { tool: "web_search".into(), args: String::new() }),
+        ] {
+            assert_eq!(
+                e.action_verdict(&a),
+                ActionVerdict::Ask,
+                "AutoEdit 下 {name} 仍需审批 —— 白名单只覆盖文件类"
+            );
+        }
+    }
+
+    /// ⭐ 三个档位各自的整体形态（一张表钉住全貌）。
+    #[test]
+    fn three_modes_have_the_documented_shape() {
+        assert_eq!(engine(ApprovalMode::Suggest).action_verdict(&fw()), ActionVerdict::Ask);
+        assert_eq!(engine(ApprovalMode::FullAuto).action_verdict(&fw()), ActionVerdict::Allow);
+        assert_eq!(engine(ApprovalMode::FullAuto).action_verdict(&sh("rm -rf /")), ActionVerdict::Allow);
+        assert_eq!(engine(ApprovalMode::Suggest).action_verdict(&sh("rm -rf /")), ActionVerdict::Ask);
+    }
+}
+
+#[cfg(test)]
+mod audit_content_leak_tests {
+    //! ⭐⭐⭐ **审计轨迹不得抄录文件内容**（吸收 `uber/ADR`，2026-10-06）。
+    //!
+    //! 【缺陷（已修）】`describe_action` 曾把 `content_preview` / `diff` 的
+    //! **原文**拼进 `description`，而 `description` 被
+    //! `ApprovalAuditEntry::description` **快照进审计轨迹**
+    //! ⇒ 写一次 `.env` 就把 `API_KEY=sk-...` 的前 60 字符抄进长期留存的审计。
+    //!
+    //! 【源】`uber/ADR`（Apache-2.0，Uber 生产，MLSys 2026）：其 `run_manifest`
+    //! 明确 *"file contents are not stored"*，只记 SHA-256 摘要。
+    //!
+    //! 【测法】用**金丝雀串**：断言它**不出现**在 description 与审计条目里。
+    //! 选金丝雀而不是断言格式，是因为「泄漏没了」这件事本身才是要锁的不变量 ——
+    //! 断言输出格式会把实现细节钉死，让人为了改格式而删掉这条防护。
+
+    use super::*;
+
+    /// 金丝雀：一段只可能来自「内容被抄走」的串。
+    const CANARY: &str = "CANARY_SECRET_sk_live_ABC123";
+
+    fn audit_of(action: ActionType) -> (String, ApprovalAuditEntry) {
+        let mut e = ApprovalEngine::new(ApprovalMode::Suggest);
+        let pa = e.submit(action);
+        // 走一次决策，让审计条目真的产生
+        e.approve(&pa.id);
+        let entry = e.decisions().last().cloned().expect("应有一条审计");
+        (pa.description.clone(), entry)
+    }
+
+    /// ⭐⭐⭐ `FileWrite` 的内容**不得**出现在描述或审计里（金丝雀测试）。
+    #[test]
+    fn file_write_content_never_reaches_description_or_audit() {
+        let content = format!("API_KEY={CANARY}\nDATABASE_URL=postgres://x");
+        let (desc, entry) = audit_of(ActionType::FileWrite {
+            path: "/srv/app/.env".into(),
+            content_preview: content.clone(),
+        });
+        assert!(
+            !desc.contains(CANARY),
+            "金丝雀出现在描述里 ⇒ 内容仍被抄走：{desc}"
+        );
+        assert!(
+            !entry.description.contains(CANARY),
+            "金丝雀出现在审计条目里 ⇒ 内容仍被抄走：{}",
+            entry.description
+        );
+        // ⭐ 但审计必须仍能回答「审的是哪份内容」⇒ 路径 + 摘要 + 规模都在
+        assert!(desc.contains("/srv/app/.env"), "路径应保留（审批人需要定位）：{desc}");
+        assert!(desc.contains("chars"), "应记内容规模：{desc}");
+        assert!(desc.contains("sha256:"), "应记内容摘要：{desc}");
+    }
+
+    /// ⭐⭐ `FileEdit` 的 diff **不得**出现在描述或审计里。
+    #[test]
+    fn file_edit_diff_never_reaches_description_or_audit() {
+        let diff = format!("-password = old\n+password = {CANARY}");
+        let (desc, entry) = audit_of(ActionType::FileEdit {
+            path: "config.toml".into(),
+            diff,
+        });
+        assert!(!desc.contains(CANARY), "diff 原文泄漏进描述：{desc}");
+        assert!(!entry.description.contains(CANARY), "diff 原文泄漏进审计：{}", entry.description);
+    }
+
+    /// ⭐⭐⭐ 命令**本体必须保留**（否则审批失效），但**赋值型密钥的值被遮蔽**。
+    #[test]
+    fn command_body_kept_but_assigned_secret_masked() {
+        let (desc, _e) = audit_of(ActionType::ShellCommand {
+            command: format!("deploy --api-key {CANARY} --force"),
+        });
+        // 命令本体（审批人必须看清要跑什么）
+        assert!(desc.contains("deploy"), "命令本体必须保留：{desc}");
+        assert!(desc.contains("--force"), "命令本体必须保留：{desc}");
+        // 密钥值不得出现
+        assert!(!desc.contains(CANARY), "命令行里的密钥值泄漏：{desc}");
+    }
+
+    /// ⭐⭐ `KEY=value` 形态：键名保留、值遮蔽。
+    #[test]
+    fn assigned_secret_value_masked_but_key_visible() {
+        let red = super::redact_assigned_secrets(&format!("TOKEN={CANARY} echo hi"));
+        assert!(!red.contains(CANARY), "值未遮蔽：{red}");
+        assert!(red.contains("TOKEN="), "键名应保留（要让人知道在传什么）：{red}");
+        assert!(red.contains("echo hi"), "非密钥部分应原样保留：{red}");
+        // ⭐ 遮蔽后要**标明长度** —— 审批人需要知道「这里原本有个长值」
+        assert!(red.contains("chars"), "应记录被遮值的长度：{red}");
+    }
+
+    /// ⭐ 非密钥赋值**不得**被误遮（否则命令变得不可读 = 审批失效）。
+    #[test]
+    fn ordinary_assignments_are_not_masked() {
+        for cmd in [
+            "java -jar app.jar --port=8080",
+            "LEVEL=debug cargo test",
+            "KEYBOARD=1 make",
+            "echo a=1 b=2",
+        ] {
+            let red = super::redact_assigned_secrets(cmd);
+            assert_eq!(red, cmd, "普通赋值不该被遮蔽：{cmd} → {red}");
+        }
+    }
+
+    /// ⭐⭐ 摘要必须**对内容敏感**且**稳定** —— 否则它证明不了任何事。
+    #[test]
+    fn fingerprint_is_stable_and_content_sensitive() {
+        let a = super::content_fingerprint("hello");
+        let b = super::content_fingerprint("hello");
+        let c = super::content_fingerprint("hellp");
+        assert_eq!(a, b, "同内容必须同摘要（否则审计无法复核）");
+        assert_ne!(a, c, "内容不同必须不同摘要（否则换内容查不出来）");
+        assert!(a.contains(&a.split("sha256:").nth(1).unwrap()[..12]), "摘要片段应自洽");
+        // 大小也要进去：否则「空内容」与「被清空的内容」无法区分
+        assert!(super::content_fingerprint("").contains("0 chars"));
     }
 }
