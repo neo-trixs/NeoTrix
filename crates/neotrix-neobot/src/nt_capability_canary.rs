@@ -147,8 +147,15 @@ pub fn expect(capability: CanaryCapability) -> Result<(), String> {
 /// ——「登记了却没打点」，那由 `status()` 报）。
 pub fn signal(id: &str) {
     let Ok(mut c) = canary().lock() else { return };
-    if c.slots.contains_key(id) {
-        c.slots.get_mut(id).map(|s| s.fired += 1);
+    // ⚠️ 判据必须是 `defs`（`expect()` 登记处），**不是** `slots`：
+    //    `slots` 是 `tick()`/status 计算时**懒建**的，`expect()` 并不建它
+    //    ⇒ 查slots 会把**已登记**的 id 误判成未登记（实测踩到：
+    //    5 条树 id 全部落进 unmatched）。
+    if c.defs.contains_key(id) {
+        // slots 是懒建的 ⇒ 这里必须 entry().or_default()，
+        // 否则首次打点落空（实测：5 条树id 的 fired 全是 0）。
+        // ⛔ 但仅限**已登记**的 id —— 首版的bug 正在于对未登记 id 也建槽。
+        c.slots.entry(id.to_owned()).or_default().fired += 1;
     } else {
         // ⚠️ 首版是 `c.slots.entry(id).or_default().fired += 1` —— 对**未登记**的 id
         // 静默新建槽位。于是 id 空间不一致（`expect()` 登记的是能力树 id如
@@ -196,6 +203,12 @@ pub fn reset() {
         for slot in c.slots.values_mut() {
             slot.fired = 0;
         }
+        // ⚠️ 原实现**名不副实**：叫 `reset` 却只清 `fired`，
+        // 留着 `defs`（登记项）与 `unmatched`（未登记信号）。
+        // ⇒ 「重置后仍带着上一次的未登记信号」会让 id 空间不一致**跨窗口残留**。
+        c.unmatched.clear();
+        c.defs.clear();
+        c.slots.clear();
     }
 }
 
@@ -264,6 +277,84 @@ pub fn expected_but_unregistered() -> Result<Vec<String>, String> {
         .cloned()
         .collect();
     Ok(missing)
+}
+
+/// **T0.2 id 空间契约**（2026-10-06）
+///
+/// 背景：金丝雀 `expect()` 登记的是**能力树 id**（`TRADE_MANIFEST` 里的
+/// `NT-*::...`），而生产派发点 `TradeCapabilityRegistry::get()` 传进来的是
+/// 调用方给的 id。两侧若用不同 id 空间，`signal()` 会**静默落进 `unmatched`**，
+/// 于是「登记了却零触发」看起来像负载问题，而真因是**命名空间不一致**。
+///
+/// `07aabb9f` 已让 `unmatched` 可见；本组测试**把契约钉死**，
+/// 使下一个接线者无法静默用错 id。
+#[cfg(test)]
+mod idspace_contract_tests {
+    use super::*;
+    use nt_core_capability_tree::market::TRADE_MANIFEST;
+
+    /// 登记（树 id）+ 打点（树 id）⇒ 必须命中该金丝雀，且 `unmatched` 保持空。
+    #[test]
+    fn 树id打点命中金丝雀且无未登记信号() {
+        reset(); // 公共函数（非方法）
+        for e in TRADE_MANIFEST {
+            expect(CanaryCapability {
+                id: e.id.to_owned(),
+                description: e.description.to_owned(),
+                fix: "在生产派发处 signal(同一个树 id)".to_owned(),
+            })
+            .expect("登记");
+        }
+        for e in TRADE_MANIFEST {
+            signal(e.id); // ⛔ 必须是**树 id**，不是 meta id
+        }
+        let unmatched = unmatched_signals().expect("读未登记信号");
+        assert!(
+            unmatched.is_empty(),
+            "用树 id 打点不该产生未登记信号，实得 {unmatched:?}"
+        );
+        let st = status().expect("读状态");
+        assert_eq!(st.len(), TRADE_MANIFEST.len());
+        assert!(
+            st.iter().all(|s| s.fired_count > 0),
+            "每条树 id 都应被记到触发：{:?}",
+            st.iter().map(|s| (&s.capability.id, s.fired_count)).collect::<Vec<_>>()
+        );
+    }
+
+    /// 反面：**meta id 形态**的 id 不许被当成已登记信号。
+    /// 这条测试存在的意义：若将来有人图省事直接传 `PriceCalculatorCapability`，
+    /// 立刻红，而不是静默地让 5 条金丝雀永远零触发。
+    #[test]
+    fn 非树id打点必落未登记() {
+        reset(); // 公共函数（非方法）
+        expect(CanaryCapability {
+            id: TRADE_MANIFEST[0].id.to_owned(),
+            description: TRADE_MANIFEST[0].description.to_owned(),
+            fix: "在生产派发处 signal(树 id)".to_owned(),
+        })
+        .expect("登记");
+        signal("PriceCalculatorCapability"); // 错的 id 空间
+        let unmatched = unmatched_signals().expect("读未登记信号");
+        assert_eq!(
+            unmatched,
+            vec![("PriceCalculatorCapability".to_owned(), 1)],
+            "meta id 形态必须被记为未登记，而不是静默丢弃"
+        );
+    }
+
+    /// 清单与金丝雀清单必须同源：清单为空 ⇒ 无可登记项（防两处各写一份 id）。
+    #[test]
+    fn 清单非空且id为树形态() {
+        assert!(!TRADE_MANIFEST.is_empty(), "清单不该为空");
+        for e in TRADE_MANIFEST {
+            assert!(
+                e.id.starts_with("NT-") && e.id.matches("::").count() == 2,
+                "清单 id 应为 `NT-域::模块::实例` 形态，实得 {:?}",
+                e.id
+            );
+        }
+    }
 }
 
 #[cfg(test)]
