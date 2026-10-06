@@ -182,6 +182,45 @@ Codewhale 能这么写，是因为它**只有一个 profile** + per-project over
   ⇒「能在无 actor 情况下放宽审批的路径」必须不存在
   （与「Deny 不可被 Ask 覆盖」同属**不可逆性保护**）
 
+### ⭐⭐⭐ 第 9 项：已从「未闭环的 TODO」升级为**已实测的可达性结论**（2026-10-06）
+
+此前本项只写「两个消费者不在生产链上」。本轮**逐层实测**后，结论具体到「哪一段闸
+在哪个档位下可达」—— 因为**笼统的「未闭环」无法指导下一步**。
+
+#### 实测链路
+生产工具执行路径是 **`crates/neotrix-neobot/src/nt_agent.rs::execute_tool`**，
+它由 `neobot` 二进制与 `nt_channel_dispatch.rs` 调用。
+它的闸是 `nt_policy::evaluate_policy` —— **`PolicyDecision` 只有
+`Allow` / `Deny` 两态，没有 `Ask`** ⇒ `--approval-mode` 在这条链上**无绑定点**。
+
+#### 三条实测的硬约束（不是「还没做」，是「这样做会出事」）
+1. ⛔ **`Ask` 在无 UI 路径上无法执行**。
+   `nt_io_neocodex/agent/nt_agent_exec.rs` 已实测记录：
+   *「实测它在默认 `Suggest` 模式下对**每一条**命令（含 `echo hello`）都返回
+   `RequireApproval`，而这条路径**没有审批 UI** ⇒ 等于把 shell 功能 100% 关掉」*，
+   并注明 `nt_sandboxed_shell::execute_guarded` **零消费者，很可能正因此被搁置**。
+   ⇒ **本轮特意没有**把 `Ask` 接进 bot 路径：那会**复现同一事故**。
+2. ⛔ **依赖方向禁止**：`neotrix-neobot` **不依赖** `neotrix-core`，
+   而 `neotrix-core` **依赖** `neotrix-neobot`
+   ⇒ bot 进程**根本看不见** `l6_meta::global_approval()`。加依赖会成环。
+3. ⛔ **粗闸先行**：`ShieldEnforcer::check_all` 的**第 1 段** `SecurityGuard`
+   在 `Suggest`/`AutoEdit` 档对**一切**动作返回 `RequireApproval` 并**提前 return**
+   ⇒ sandbox 段（第 4 段）**只在 `FullAuto` 档可达**（已加测试钉住）。
+   ⇒ 想让 sandbox/审批链在默认档生效，**必须先处理这道粗闸**，
+   而那是一次**朝宽松方向**的改动 —— 不该由「接线」任务顺手做掉。
+
+#### 本轮确实闭环的部分
+· ✅ `action_verdict` 曾**丢 AutoEdit 的文件类白名单**（已修 + 穷举一致性锁）
+· ✅ `--sandbox` 曾写进**无人读的单例**（已修：`init_sandbox` 同时推进
+  `global_shield()` 的活对象，两侧默认都是 `Disabled` ⇒ 不传 flag 时零行为变化）
+
+#### ⛔ 仍未闭环（**不要因为上面两条✅就把本项划掉**）
+「`--approval-mode` 的 `Ask` 档」在**生产工具执行链上**仍无绑定点。
+**唯一诚实的收口路径**（都不是「接线」，需要独立立项）：
+· 给 bot/channel 路径一个**审批通道**（聊天本身就是通道），或
+· 把 profile 档位下移到一个 bot 也能依赖的 crate（`neotrix-types`），或
+· 先把第 3 条那道粗闸改成有判别力的形态（**朝宽松方向，需裁决**）
+
 ### ⭐ 第 10 项已从「库函数」变成「命令行可达」（`145c33d7`）
 ⚠️ 上一笔实现完 `switch_profile_with_audit` 后我核对发现：它**零生产调用方**
 ⇒ 库函数写好、测试全绿，而命令行**根本够不着** ⇒ 等于没有。
