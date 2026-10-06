@@ -43,10 +43,32 @@ listed = d.get('market_listable') or []
 unlisted = d.get('market_unlisted') or []
 orphan = d.get('canary_expected_but_unregistered') or []
 canary = d.get('canary') or []
+never = d.get('never_invoked') or []
 total = d.get('total')
 
 print(f'  能力节点总数（运行期实测）：{total}')
 print(f'  市场上架：{len(listed)}   未上架：{len(unlisted)}   金丝雀监视：{len(canary)}')
+print()
+# ── 审计新增：脚本收了 canary/never_invoked 证据却从不读 ──
+# 原实现只打印 `len(canary)`，从不读 fired_count / healthy，也从不读 never_invoked
+# ⇒「5 上架 / 0 未上架 / 5 金丝雀」全绿，而实际 invoked 全为 0（金丝雀 fired_count 恒 0）
+#   ——「建成未用却看着健康」，正是本门本该拦的东西。
+# 按本门既有定位（报告式：演进指标不当阻断），这里只报告不阻断。
+cold = [c for c in canary if isinstance(c, dict) and (c.get('fired_count') or 0) == 0]
+if never:
+    print(f'  [WARN] 注册但从未被调用：{len(never)} 项')
+    for v in never[:8]:
+        print(f'      NEVER  {v.get("id", v) if isinstance(v, dict) else v}')
+    if len(never) > 8:
+        print(f'      ...另有 {len(never) - 8} 项')
+else:
+    print('  [OK] 注册但从未被调用：0 项')
+if cold:
+    print(f'  [WARN] 金丝雀 fired_count == 0：{len(cold)}/{len(canary)} 项（存在但从未触发）')
+    for c in cold[:8]:
+        print(f'      COLD    {c.get("id", c)}')
+elif canary:
+    print(f'  [OK] 金丝雀全部有触发记录（{len(canary)} 项）')
 print()
 print('  -- 已上架（license/version/category 齐备）--')
 for i in listed:
