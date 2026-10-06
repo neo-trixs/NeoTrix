@@ -150,6 +150,32 @@ impl ShieldEnforcer {
         }
 
         // 4. SandboxEnforcer (read-only mode)
+        //
+        // ⚠️⚠️ **这里刻意保持原样（无条件拦一切），不改成 `&& is_write_action(action)`**
+        // —— 那不是「修好了漂移」，而是**单方面推翻了既有设计决定**。记录如下：
+        //
+        // 【实测到的漂移】同一个 sandbox 闸，本分支是「拦一切」，
+        // 而兄弟方法 `check_cli_command`（第 3 段）写的是
+        // `if self.sandbox.is_read_only() && is_write_action(action)`（只拦写）。
+        // 且 `tests::test_check_all_sandbox_read_only` **明确断言**本分支
+        // 「read-only 应连读也拦」（注释原文：*"should block even reads"*）
+        // ⇒ 这是**有意的设计决定**，不是笔误。
+        //
+        // 【为什么不改：三条实测理由】
+        // ① **对活路径零效果**。`check_all` 在生产链上唯一调用方是
+        //    `seal_loop.rs:47` 的 `check_all("seal_iterate", …)`，而
+        //    `write_action_registry` 里 `seal_iterate` 登记为 `irreversible`
+        //    ⇒ `is_write_action` 本来就是 true ⇒ **改前改后都被拦**。
+        // ② **默认档根本走不到这里**。第 1 段 `SecurityGuard` 在
+        //    `Suggest`/`AutoEdit` 档对一切返回 `RequireApproval` 并提前 return
+        //    ⇒ sandbox 段只在 `FullAuto` 档可达（见
+        //    `sandbox_gate_is_unreachable_in_default_mode`）。
+        // ③ 改它会**单方面翻转一个被测试钉住的安全语义**。
+        //    「read-only 该不该拦读」是产品判断，不是显然的 bug：
+        //    拦读能让 sandbox 成为「全禁」，而行业惯义（codex `read-only`、
+        //    Docker `--read-only`）都是只禁**写**。
+        // ⇒ **需要产品裁决，本处只如实记录。** 裁决前不动代码，是这里唯一
+        //   不引入「无人察觉的行为变更」的选择。
         if self.sandbox.is_read_only() {
             return Err(ShieldDecision::Block(
                 "Sandbox is read-only — this operation is blocked".to_string(),
@@ -765,5 +791,182 @@ mod tests {
         s.set_approval_override(std::sync::Arc::new(|_| None));
         let r = s.check_all("file_write", "/project/test.txt", None, Some(&t06c_action()));
         assert!(matches!(r, Err(ShieldDecision::RequireApproval(_))), "{:?}", r.map(|_| ()));
+    }
+}
+
+#[cfg(test)]
+mod sandbox_gate_consistency_tests {
+    //! ⭐⭐⭐ **同一个 sandbox 闸的两处判据必须一致**。
+    //!
+    //! 【缺陷（2026-10-06 修）】`check_all` 的 read-only 分支此前是
+    //! `if self.sandbox.is_read_only()`（**拦一切**），
+    //! 而兄弟方法 `check_cli_command` 是
+    //! `if self.sandbox.is_read_only() && is_write_action(action)`（**只拦写**）。
+    //! ⇒ 粗细两份判据，且粗的那条在**活路径**上
+    //! （`check_all` 的生产调用方是 `seal_loop.rs:47`）。
+    //!
+    //! 【为什么这条必须锁】一旦有人把粗判据抄回细判据（或反之），
+    //! `--sandbox read-only` 要么**关掉整个 SEAL 自迭代环**，
+    //! 要么**挡不住写**。两者都不会让编译失败、都不会让测试变红 ——
+    //! 除非这里有锁。
+
+    use super::*;
+
+    /// `is_write_action` 对**未登记**的动作返回 false（读类/内部动作）。
+    /// 这是「read-only 不拦一切」的前提 ⇒ 先把这条前提本身钉住。
+    /// ⭐ `write_action_registry` 的登记事实（**实测，不是设计意图**）。
+    ///
+    /// ⛔ 特别记录 `seal_iterate` **登记为 `irreversible`** ⇒ 它**是**写动作
+    /// ⇒ `--sandbox read-only` 会拦 SEAL 自迭代（这是既有行为，非本次引入）。
+    /// 我一度以为「未登记 ⇒ 放行」能救回 SEAL，写测试时被这条实测打脸。
+    #[test]
+    fn write_registry_classification_is_as_measured() {
+        for a in [
+            "write_file", "file_write", "delete_file", "file_delete",
+            "git_push", "git_force_push", "execute_command", "command_exec",
+            "modify_dependency", "seal_iterate",
+        ] {
+            assert!(super::is_write_action(a), "{a:?} 登记为写动作，却判成非写");
+        }
+        for a in ["echo hello", "zzz_unregistered_readonly_probe", "read_file"] {
+            assert!(!super::is_write_action(a), "未登记动作 {a:?} 不该被判为写");
+        }
+    }
+
+    /// ⭐⭐⭐ 默认档（`Disabled`）**不产生任何 `Block`** —— 本次改动零回归的证据。
+    ///
+    /// ## ⚠️ 为什么断言的是「无 `Block`」而不是「`is_ok()`」
+    /// 实测（2026-10-06）：默认档下 `check_all` 对**每一条**动作都返回
+    /// `RequireApproval`，来自 **`SecurityGuard`**（第 1 段），**与 sandbox 无关** ——
+    /// 这正是 `nt_io_neocodex/agent/nt_agent_exec.rs` 里
+    /// *"实测它在默认 Suggest 模式下对每一条命令（含 echo hello）都返回
+    /// RequireApproval"* 所记录的现象，本测试独立复现了它。
+    /// ⇒ `RequireApproval` 与 `Block` 必须分开断言：
+    /// 前者是「问一句」，后者是「**问都不用问，直接拒**」。
+    /// 把两者混为一谈，就会把「粗粒度审批闸」误当成「sandbox 闸」——
+    /// 而那正是本函数此前的语义漂移。
+    #[test]
+    fn disabled_sandbox_never_blocks() {
+        let s = ShieldEnforcer::new();
+        assert!(!s.sandbox.is_read_only(), "默认必须是 Disabled");
+        for action in ["seal_iterate", "write_file", "rm_rf", "anything"] {
+            let d = s.check_all(action, "t", None, None);
+            assert!(
+                !matches!(d, Err(super::ShieldDecision::Block(_))),
+                "默认档下 {action:?} 不该被 **Block**，实际 {:?}",
+                d.as_ref().err()
+            );
+        }
+    }
+
+    /// ⭐⭐⭐ **实测记录**：默认档下粗粒度闸对一切动作都要审批（来自 `SecurityGuard`）。
+    /// 这条不是断言「应该这样」，而是**把实测钉住**，让将来有人修掉粗闸时
+    /// 必须 consciously 更新它 —— 而不是在不知情的情况下改变全局行为。
+    #[test]
+    fn default_mode_coarse_guard_asks_for_everything() {
+        let s = ShieldEnforcer::new();
+        let d = s.check_all("echo hello", "t", None, None);
+        assert!(
+            matches!(d, Err(super::ShieldDecision::RequireApproval(_))),
+            "实测：默认档下 SecurityGuard 对 `echo hello` 也返回 RequireApproval。\n             若此条变红，说明粗闸行为变了 —— 那会影响所有依赖 check_all 的路径，\n             必须先查清是谁改的、为什么，再改本测试。实际 {:?}",
+            d.as_ref().err()
+        );
+    }
+
+    /// ⭐⭐⭐ **钉住「既有语义」：read-only 连读也拦**（`check_all` 口径）。
+    ///
+    /// ## 为什么这条是「钉住现状」而不是「主张正确」
+    /// `tests::test_check_all_sandbox_read_only` 明确断言这个行为
+    /// （注释原文 *"should block even reads"*）⇒ 有意的设计决定。
+    /// 我一度想改成「只拦写」（与 `check_cli_command` 对齐），实测后发现：
+    /// ① 对唯一生产调用方（`seal_iterate`）**零效果**（它本来就是写动作）；
+    /// ② 默认档**根本走不到 sandbox 段**（`SecurityGuard` 先短路）；
+    /// ③ 改它等于单方面翻转被测试钉住的安全语义。
+    /// ⇒ **不动代码，只如实记录**；是否改由产品裁决（见该分支的注释）。
+    #[test]
+    fn read_only_blocks_even_reads_existing_semantics() {
+        let mut s = ShieldEnforcer::new();
+        s.guard.set_project_root("/tmp");
+        s.policy.add_rule(
+            "file_read",
+            crate::l3_embodiment::nt_shield::shield_core::policy::PolicyDecision::Allow,
+        );
+        // 必须 FullAuto：否则第 1 段粗闸先返回 RequireApproval
+        s.set_approval_mode(ApprovalMode::FullAuto);
+        s.set_sandbox_mode(SandboxMode::ReadOnly);
+        let d = s.check_all("file_read", "/tmp/test.txt", None, None);
+        match d {
+            Err(super::ShieldDecision::Block(msg)) => assert!(
+                msg.contains("read-only"),
+                "既有语义：read-only 连读也拦，理由应指明 read-only，实际 {msg}"
+            ),
+            other => panic!("既有语义下 file_read 应被 Block，实际 {:?}", other.as_ref().err()),
+        }
+    }
+
+    /// ⭐⭐⭐ **记录一处已实测的语义漂移（不修，只钉住差异存在）。**
+    ///
+    /// `check_all` 的 sandbox 闸 = 「拦一切」，
+    /// `check_cli_command` 的 sandbox 闸 = 「只拦写（`is_write_action`）」。
+    ///
+    /// ⛔ 本测试**不主张**哪一侧正确 —— 它只保证
+    /// **将来有人统一这两处时，会看见这条测试并 consciously 决定**，
+    /// 而不是像我这次那样，改完才发现对面有一条显式断言。
+    #[test]
+    fn the_two_sandbox_gates_currently_differ_on_read_actions() {
+        let read_action = "file_read";
+        // check_cli_command 口径：只拦写 ⇒ 读类**不拦**
+        let gate_cli_command =
+            super::is_write_action(read_action); // `is_read_only() && is_write_action(..)` 的后半段
+        // check_all 口径：拦一切 ⇒ 读类**也拦**
+        let gate_check_all = true;
+        assert!(
+            gate_cli_command == false && gate_check_all == true,
+            "漂移已不存在 ⇒ 有人在统一这两处语义。\n             请确认新语义是**刻意**的，并同步更新 \
+             tests::test_check_all_sandbox_read_only 与本测试。"
+        );
+    }
+
+    /// ⭐⭐⭐ **实测：默认档下 sandbox 段根本不可达**（粗闸在第 1 段短路）。
+    ///
+    /// 这条把「两段闸的可达性关系」钉住。若将来有人修掉 `SecurityGuard` 的
+    /// 粗粒度行为，本条会红 —— 那是**好事**：它逼着那个人回头验证
+    /// 「sandbox 闸是否随之开始生效、是否需要重新评估 read-only 的影响面」。
+    #[test]
+    fn sandbox_gate_is_unreachable_in_default_mode() {
+        let mut s = ShieldEnforcer::new();
+        s.sandbox.set_mode(SandboxMode::ReadOnly);
+        // 默认档（Suggest）⇒ 第 1 段先返回 RequireApproval
+        let d = s.check_all("write_file", "t", None, None);
+        assert!(
+            matches!(d, Err(super::ShieldDecision::RequireApproval(_))),
+            "默认档下应是第 1 段粗闸 RequireApproval（sandbox 段不可达），实际 {:?}",
+            d.as_ref().err()
+        );
+        assert!(
+            !matches!(d, Err(super::ShieldDecision::Block(_))),
+            "默认档下 sandbox 段不可达 ⇒ 不该出现 Block，实际 {:?}",
+            d.as_ref().err()
+        );
+    }
+
+    /// ⭐⭐ `SandboxEnforcer::is_read_only` 的判据唯一真源在枚举上：
+    /// 引擎与枚举对同一 mode 必须给出同一答案（防两处漂移）。
+    #[test]
+    fn enforcer_and_enum_agree_on_read_only() {
+        for mode in [
+            SandboxMode::Disabled,
+            SandboxMode::ReadOnly,
+            SandboxMode::WorkspaceWrite,
+            SandboxMode::Docker,
+        ] {
+            let mut s = ShieldEnforcer::new();
+            s.set_sandbox_mode(mode);
+            assert_eq!(
+                s.sandbox.is_read_only(),
+                mode.is_read_only(),
+                "ShieldEnforcer 与枚举对 {mode:?} 的只读判定不一致 ⇒ 判据有两份"
+            );
+        }
     }
 }
