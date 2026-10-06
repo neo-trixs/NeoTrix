@@ -123,32 +123,48 @@
 | `bands.yaml` 分级自治 | **本仓已有** `AutonomyLevel` 且已接线（§4）。照抄造第二机制 |
 | managed settings / `permissions.deny` / sandbox | 这是**企业 MDM 分发**问题。本仓是单机自管仓，无 MDM 面 |
 | Claude Tag（Slack on-call）、Claude Security（托管扫描） | 外部 SaaS，接入即引入外部依赖与费用；本仓无 Slack/托管扫描位 |
-| 每次 play 的 leading/lagging 指标 | 原文给的是**指标口径**，不是实现。本仓把它缩成 `REVIEW.md §6` 的**诚实缺口声明**（明确写「未接线」），而不是造一个没人跑的空仪表 |
+| 每次 play 的 leading/lagging 指标 | 原文给的是**指标口径**，不是实现。⇒ **只落地本仓真能 git 复算的 3 项**（`scripts/ops/nt_sdlc_metrics.py`，2026-10-06 同会话补齐），另 3 项如实标 `UNMEASURED` 并写明为何测不出（`REVIEW.md` §6.2）。**不造没人跑的空仪表**，也不把测不出的报成 0 |
 | 20–50 条真实任务的 eval 套件 | 需真实 agent 非交互运行 + API key + 预算。本仓 `evals/gaia_mini` 已声明「模型实测：按需，不进 CI」（`evals/VERIFICATION.md:24`）——**同一道纪律**：不把「没跑」记成绿 |
 
 ---
 
-## 8. 本轮顺手查出的**既有**缺陷（非本次吸收范围，**未修**）
+## 8. 本轮顺手查出的**既有**缺陷
 
-**`check-ci-refs.sh --strict` 当前红，pre-existing。**
+### 8.1 `check-ci-refs.sh --strict` 恒红 —— **已按规程补记，修掉了**
 
 ```
 .github/workflows/ci.yml uses=actions/setup-python@v5
-  (未登记于 neotrix-core/.../nt_shield/provenance/external-inputs.json)
+  (未登记于 .../nt_shield/provenance/external-inputs.json)
 ```
 
 - **真阳性**，非误报：`actions/setup-python` 确实不在 13 条溯源清单里
   （`check-ci-refs.sh:198-199` 的匹配逻辑已读现场核实：先剥 `@version` 再比对 name）。
-- 出处 `ci.yml:50`，`git show HEAD:.github/workflows/ci.yml` 已确认**早于本次改动**
-  （本次 diff 为 +16 行插入，不含 setup-python）。
-- ⛔ **未修，且不应由本轮顺手修**：补它需要 `actions/setup-python@v5` 的真实
-  `sha256`，那要联网取。**编一个哈希进溯源清单，比红门坏得多** ——
-  那是把「无记录」换成「假记录」，直接违反 `evals/VERIFICATION.md:8-9`
-  （没跑 ≠ 通过）与 `nt_shield` 溯源契约。**留给有网的人按规程补**。
+- 出处 `ci.yml:50`，`git show HEAD:.github/workflows/ci.yml` 已确认**早于本次改动**。
 
-⇒ 连带影响：**main 上 CI 现在就是红的**。本轮新增的
-`check-agent-config.sh --strict` 跑点因此**不会**在 CI 里显示为绿，
-这是既有红，不是本轮引入。
+**处置（不是编哈希）**：该清单 `_comment` 自带**离线可复现流程**，
+2026-10-06 有网 ⇒ 按流程**实测**而非编造：
+
+| 字段 | 值 | 取得方式 |
+|---|---|---|
+| `commit` | `a26af69be951a213d495a4c3e4e4022e16d87065` | `git ls-remote --tags … refs/tags/v5` |
+| `sha256` | `6318d936…25a09` | `curl -sL codeload.github.com/…/tar.gz/<commit> \| shasum -a 256` |
+| `tarball_bytes` | `1569541` | 同一次下载的字节数（人工复核 sha256 是否算错对象） |
+
+⛔ **两次独立下载 sha256 完全一致**（可复现性实测），且 `file` 确认是真 gzip tarball
+（排除「拿到错误页还照样算哈希」这种最坏情况）。
+⇒ `provenance_check.sh` 14/14 PASS；`check-ci-refs.sh --strict` **rc=0**。
+
+⚠️ 清单 `_comment` 已警告：`@v5` 是**可移动 tag**，上表只对记录那一刻成立；
+真要不可变须把 `uses:` 改成 `@<commit SHA>`（**属独立决策，本轮未做**）。
+
+### 8.2 仍未修（需要 cargo 或产品码改动，非本轮范围）
+
+| 门 | 状态 |
+|---|---|
+| `check-doc-drift.sh --strict` | NEW offender `neotrix-core/src/l0_substrate/nt_core_event_bus.rs`（既有/他窗） |
+| `check-unwrap.sh --strict` | 存量债（`gate-registry.tsv` 已记「当前恒红，NEW 5 / STALE 6」） |
+| `check-silent-failure.sh --strict` | 同上 |
+| `check-commit-deletions` 探针 | `check-doc-claims` 探针 rc=2 ⇒ 门有效性未获证（既有） |
 
 ---
 

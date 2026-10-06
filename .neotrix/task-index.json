@@ -1284,6 +1284,24 @@
       "read_only": true,
       "when_not": "不要用它判产品代码对错 —— 它只扫 agent 自身配置（docs/plans/ 工件链、REVIEW.md 引用完整性、task-index 自审）。⛔ 它是**棘轮**：只拦基线 scripts/artifact-chain-baseline.txt 之后新增的工件，故报出的「棘轮管辖 0」不是「全仓合规」，是「无增量」。⛔ 不要为让门变绿而跑 --update-baseline，那是给违规发永久通行证。⛔ 不要用它替代 check-skill-gate.sh（后者 strict 恒红，属另一议题）。",
       "spec": "REVIEW.md §3 + docs/plans/_TEMPLATE.md §5；立门理由见 docs/architecture/ABSORPTION-AI-NATIVE-SDLC-2026-10-06.md"
+    },
+    {
+      "id": "sdlc-metrics",
+      "query": [
+        "SDLC 指标",
+        "过程指标",
+        "工件覆盖率",
+        "计划漂移",
+        "返工率",
+        "先行指标",
+        "滞后指标",
+        "评审效率"
+      ],
+      "tool": "python3 scripts/ops/nt_sdlc_metrics.py --head 200",
+      "kind": "ops",
+      "read_only": true,
+      "when_not": "⛔ 它是**报告器不是门** —— 不判 pass/fail，故不在 gate-registry.tsv、不进 CI 阻断。⛔ 不要拿「工件覆盖率」汇报成熟度：该值刚接上机制时必然≈0（2026-10-06 实测 0.9%），它衡量的是「增量是否守规矩」，不是「历史欠账多少」。⛔ 改它的度量逻辑前必须先跑 `--self-test`：合成夹具上证明两个指标都有判别力，没有它你就无法区分「真的 0」与「写坏了恒 0」。⛔ REVIEW.md §6 那三项（PR 首审耗时/发现被门重复报出的比例/合并前 vs 逃逸缺陷）它**测不出**且会如实标注 UNMEASURED —— 不要拿它当那三项的答案。",
+      "spec": "REVIEW.md §6（诚实缺口声明）+ docs/architecture/ABSORPTION-AI-NATIVE-SDLC-2026-10-06.md §7"
     }
   ],
   "excluded": {
