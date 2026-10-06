@@ -85,11 +85,99 @@ pub enum DisclosureSeverity {
     Detection,
 }
 
+/// ⭐⭐⭐ 动作的**内容指纹**（2026-10-06）。
+///
+/// ## 为什么需要它（真实缺陷，不是前瞻设计）
+/// `ApprovalEngine::approve(id)` **只凭 id** 批准，而执行发生在**稍后**、
+/// 在**别处**（`execute_tool`）。⇒ 从「批准」到「执行」之间，
+/// 动作内容**没有任何一步被复核**。
+/// 若这期间动作被替换（队列重渲染 / 子代理中转 / handoff 转述），
+/// 那次批准会被**原样用在另一份内容上**。
+///
+/// 外部同源判据：
+/// · 一份公开的系统提示纪律：*「确认只覆盖用户当时看到的那份具体内容；
+///   内容若在批准后改变，先出示新版本」* —— 与本仓
+///   `uber/ADR` 吸收的 provenance 纪律同族。
+/// · `uber/ADR`（Apache-2.0）：用摘要而非内容来证明「是这一份」。
+///
+/// ## 判据设计
+/// · 只覆盖**会改变执行结果**的字段（路径 / 内容 / diff / 命令 / 描述 / 参数），
+///   **不含** `id` 与时间戳 —— 否则同一动作两次提交会算出不同指纹，
+///   「同一动作」就无从判定。
+/// · **短摘要**（12 位 hex）足够：它要证明的是「变了没有」，不是密码学防碰撞。
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct ActionFingerprint(pub String);
+
+impl ActionFingerprint {
+    /// 计算动作的内容指纹。
+    pub fn of(action: &ActionType) -> Self {
+        use sha2::Digest;
+        // ⛔ 字段顺序是判据的一部分：改它会让历史指纹全部失配。
+        //   故此处**只用显式列举**，不用 `{:?}`（derive 输出会随代码变动而变）。
+        let mut h = sha2::Sha256::new();
+        match action {
+            ActionType::FileWrite { path, content_preview } => {
+                h.update(b"FileWrite\0");
+                h.update(path.as_bytes());
+                h.update(b"\0");
+                h.update(content_preview.as_bytes());
+            }
+            ActionType::FileCreate { path } => {
+                h.update(b"FileCreate\0");
+                h.update(path.as_bytes());
+            }
+            ActionType::FileEdit { path, diff } => {
+                h.update(b"FileEdit\0");
+                h.update(path.as_bytes());
+                h.update(b"\0");
+                h.update(diff.as_bytes());
+            }
+            ActionType::ShellCommand { command } => {
+                h.update(b"ShellCommand\0");
+                h.update(command.as_bytes());
+            }
+            ActionType::GitOperation { description } => {
+                h.update(b"GitOperation\0");
+                h.update(description.as_bytes());
+            }
+            ActionType::Other { tool, args } => {
+                h.update(b"Other\0");
+                h.update(tool.as_bytes());
+                h.update(b"\0");
+                h.update(args.as_bytes());
+            }
+        }
+        ActionFingerprint(hex::encode(h.finalize())[..12].to_string())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// ⭐⭐⭐ 内容是否仍与批准时一致。
+    pub fn matches(&self, action: &ActionType) -> bool {
+        *self == ActionFingerprint::of(action)
+    }
+}
+
+impl std::fmt::Display for ActionFingerprint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct PendingAction {
     pub id: String,
     pub action_type: ActionType,
     pub description: String,
+    /// ⭐⭐⭐ 提交时的**内容指纹**（2026-10-06）。
+    ///
+    /// ⛔ 它与 `description` 里那段 `sha256:` 字符串**刻意重复** ——
+    /// 那段是给人看的，这字段是给**执行前复核**用的。
+    /// 合成一个会迫使执行侧去解析人类可读串（脆），或反过来让人从
+    /// 展示文本反推是否可信（更脆）。
+    pub content_fingerprint: ActionFingerprint,
     /// W2.1 poka-yoke 披露门：此动作将关闭的可能性；空表 = 未披露 (Detection 级)。
     pub forecloses: Vec<String>,
     pub created_at: Instant,

@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 // T06a：正典类型已收敛至 L0（neotrix-types），此处仅重导出＋引擎实现。
-pub use neotrix_types::core::nt_core_approval::{
+pub use neotrix_types::core::nt_core_approval::{ActionFingerprint, 
     ActionType, ApprovalMode, ApproveGate, DisclosureSeverity, PendingAction,
 };
 
@@ -80,6 +80,17 @@ pub enum ApprovalError {
     /// id 已有决策。重复点击（先 approve 后 deny、二次 approve）必须被拒，
     /// 而不能因为「pending 里已经没了」而被静默当成一次新决策。
     AlreadyDecided { id: String, previous: ApprovalDecision },
+    /// ⭐⭐⭐ **TOCTOU**：复核时呈现的动作与**提交时**的内容指纹不符。
+    ///
+    /// 含义：那次批准**不适用**于眼前这份内容（内容在批准后被替换过）。
+    /// ⛔ 携带两个指纹以便定位：提交时的是什么、现在拿来的又是什么。
+    ContentChanged {
+        id: String,
+        /// 提交时记录的内容指纹（= 用户当时看到的）。
+        approved: String,
+        /// 复核时呈现的内容指纹。
+        presented: String,
+    },
 }
 
 impl ApprovalError {
@@ -88,6 +99,7 @@ impl ApprovalError {
         match self {
             Self::UnknownId { .. } => "unknown-id",
             Self::AlreadyDecided { .. } => "already-decided",
+            Self::ContentChanged { .. } => "content-changed",
         }
     }
 
@@ -96,6 +108,7 @@ impl ApprovalError {
         match self {
             Self::UnknownId { id } => id,
             Self::AlreadyDecided { id, .. } => id,
+            Self::ContentChanged { id, .. } => id,
         }
     }
 }
@@ -106,6 +119,15 @@ impl std::fmt::Display for ApprovalError {
             Self::UnknownId { id } => write!(f, "unknown approval id '{}'", id),
             Self::AlreadyDecided { id, previous } => {
                 write!(f, "approval id '{}' already decided as {}", id, previous.as_str())
+            }
+            // ⚠️ 两个指纹都打出来：TOCTOU 排查要靠它们定位「批准的是哪份、
+            //   递来的是哪份」，只打一个等于让排查者自己去猜。
+            Self::ContentChanged { id, approved, presented } => {
+                write!(
+                    f,
+                    "approval id '{id}' content changed since approval \
+(approved {approved}, presented {presented}) — 批准不适用于眼前这份内容"
+                )
             }
         }
     }
@@ -383,10 +405,13 @@ impl ApprovalEngine {
                 id, forecloses
             );
         }
+        // ⭐⭐⭐ 执行前复核用的内容指纹（TOCTOU 防护，见 `ActionFingerprint` 文档）
+        let content_fingerprint = ActionFingerprint::of(&action);
         let pa = PendingAction {
             id,
             action_type: action,
             description,
+            content_fingerprint,
             forecloses,
             created_at: Instant::now(),
         };
@@ -480,6 +505,52 @@ impl ApprovalEngine {
     pub fn approve(&mut self, id: &str) -> Result<ApprovalDecision, ApprovalError> {
         let actor = self.actor.clone();
         self.decide(id, ApprovalDecision::Approved, &actor, None)
+    }
+
+    /// ⭐⭐⭐ **复核批准**：只有当 `action` 的内容指纹与提交时**完全一致**才批准。
+    ///
+    /// ## 【缺陷（2026-10-06 修）】`approve(id)` **只凭 id**，
+    /// 而执行发生在**稍后、别处** ⇒ 从批准到执行之间内容**没有任何一步被复核**。
+    /// 若这期间动作被替换（队列重渲染 / 子代理中转 / handoff 转述），
+    /// 那次批准会被**原样用在另一份内容上** —— 这就是经典的 TOCTOU。
+    ///
+    /// ## 【为什么不能靠 `approve` 自己解决】
+    /// `approve(id)` 无从知道调用方「即将执行的是哪一份」——
+    /// 它只拿到一个 id。把内容传进来是**唯一**能在批准时建立绑定的办法。
+    ///
+    /// ## 失败方向（判据）
+    /// 指纹不符 ⇒ **`Err`，且不写入 `decided` 账本**
+    /// ⇒ 既不批准、也不留下「已批准」的痕迹。
+    /// 依据同源判据：**静默降级只允许朝严格方向**；
+    /// 若此处回落成「照样批准」，则整个指纹机制只是装饰。
+    ///
+    /// ⚠️ 与 [`Self::approve`] 的关系：后者保留原样（既有调用方不动），
+    /// 但**要真正防住 TOCTOU 的调用方必须用本方法**。
+    pub fn approve_if_unchanged(
+        &mut self,
+        id: &str,
+        action: &crate::l6_meta::nt_approval::ActionType,
+    ) -> Result<ApprovalDecision, ApprovalError> {
+        let pa = self
+            .pending
+            .iter()
+            .find(|p| p.id == id)
+            .ok_or_else(|| ApprovalError::UnknownId { id: id.to_string() })?;
+        if !pa.content_fingerprint.matches(action) {
+            // ⛔ 刻意**不**写入 decided：否则账本会出现一条「已批准」的假记录，
+            //   而实际上没有任何内容被批准过。
+            log::warn!(
+                "approval TOCTOU: id={id} 内容指纹不符（提交时 {} vs 复核时 {}）—— 拒绝批准",
+                pa.content_fingerprint,
+                ActionFingerprint::of(action)
+            );
+            return Err(ApprovalError::ContentChanged {
+                id: id.to_string(),
+                approved: pa.content_fingerprint.as_str().to_string(),
+                presented: ActionFingerprint::of(action).as_str().to_string(),
+            });
+        }
+        self.approve(id)
     }
 
     /// 拒绝一个待审批动作；以引擎配置的 actor 署名。与 [`ApprovalEngine::approve`]
@@ -1518,5 +1589,141 @@ mod audit_content_leak_tests {
         assert!(a.contains(&a.split("sha256:").nth(1).unwrap()[..12]), "摘要片段应自洽");
         // 大小也要进去：否则「空内容」与「被清空的内容」无法区分
         assert!(super::content_fingerprint("").contains("0 chars"));
+    }
+}
+
+#[cfg(test)]
+mod approval_toctou_tests {
+    //! ⭐⭐⭐ **审批必须绑定内容，而非只凭 id**（2026-10-06）。
+    //!
+    //! 【缺陷】`approve(id)` 只凭 id，而执行发生在**稍后、别处**
+    //! ⇒ 批准到执行之间内容**没有任何一步被复核**。
+    //! 动作若在这期间被替换（队列重渲染 / 子代理中转 / handoff 转述），
+    //! 那次批准会被**原样用在另一份内容上**（经典 TOCTOU）。
+    //!
+    //! 【为什么这类缺陷特别危险】它**不会让任何现有测试变红** ——
+    //! 现有测试都是「提交什么就批准什么」，而 TOCTOU 恰恰发生在
+    //! 「批准的」与「执行的」**不是同一份**的那条路径上。
+    //! ⇒ 必须用「提交 A、拿 B 去批准」这种**不自然**的调用来暴露它。
+
+    use super::*;
+    use neotrix_types::core::nt_core_approval::ActionFingerprint;
+
+    fn fw(path: &str, body: &str) -> ActionType {
+        ActionType::FileWrite { path: path.into(), content_preview: body.into() }
+    }
+
+    /// ⭐ 同一内容 ⇒ 指纹稳定、复核通过。
+    #[test]
+    fn same_content_approves() {
+        let mut e = ApprovalEngine::new(ApprovalMode::Suggest);
+        let a = fw("/etc/app.conf", "debug=false");
+        let pa = e.submit(a.clone());
+        assert_eq!(
+            e.approve_if_unchanged(&pa.id, &a).unwrap(),
+            ApprovalDecision::Approved,
+            "内容未变时必须照常批准"
+        );
+    }
+
+    /// ⭐⭐⭐ **核心用例**：提交 A，却拿 B 去批准 ⇒ 必须 `Err`，且**账本里无记录**。
+    #[test]
+    fn substituted_content_is_REFUSED_and_leaves_no_approval_record() {
+        let mut e = ApprovalEngine::new(ApprovalMode::Suggest);
+        let submitted = fw("/etc/app.conf", "debug=false");
+        let pa = e.submit(submitted);
+        // 攻击/意外：执行侧递来的是**另一份**内容
+        let substituted = fw("/etc/app.conf", "debug=false\nbackdoor=true");
+
+        let err = e
+            .approve_if_unchanged(&pa.id, &substituted)
+            .expect_err("内容被替换后必须拒绝批准");
+        assert_eq!(err.kind(), "content-changed");
+        assert_eq!(err.id(), pa.id);
+
+        // ⭐⭐⭐ 最关键的一条：**账本里绝不能出现「已批准」**
+        // 否则调用方只看 `decision_for` 会以为「已经批过了」
+        assert!(
+            e.decision_for(&pa.id).is_none(),
+            "被拒的复核不得在账本留下任何决策痕迹"
+        );
+        assert!(
+            e.decisions().is_empty(),
+            "审计轨迹也不该为这次未发生的批准记一笔：{:?}",
+            e.decisions()
+        );
+    }
+
+    /// ⭐ 换路径也算内容变了（路径是执行结果的一部分）。
+    #[test]
+    fn path_change_counts_as_content_change() {
+        let mut e = ApprovalEngine::new(ApprovalMode::Suggest);
+        let pa = e.submit(fw("/home/u/notes.md", "hello"));
+        let elsewhere = fw("/home/u/.bashrc", "hello");
+        assert!(
+            e.approve_if_unchanged(&pa.id, &elsewhere).is_err(),
+            "同内容不同路径 ⇒ 批准不适用（用户批准的是那个文件）"
+        );
+    }
+
+    /// ⭐ 每一类动作都要能区分（不能只有 FileWrite 有指纹）。
+    #[test]
+    fn every_action_kind_is_fingerprinted() {
+        let pairs: Vec<(&str, ActionType, ActionType)> = vec![
+            ("FileWrite", fw("a", "x"), fw("a", "y")),
+            ("FileCreate", ActionType::FileCreate { path: "a".into() }, ActionType::FileCreate { path: "b".into() }),
+            ("FileEdit", ActionType::FileEdit { path: "a".into(), diff: "x".into() }, ActionType::FileEdit { path: "a".into(), diff: "y".into() }),
+            ("Shell", ActionType::ShellCommand { command: "ls".into() }, ActionType::ShellCommand { command: "rm -rf /".into() }),
+            ("Git", ActionType::GitOperation { description: "commit".into() }, ActionType::GitOperation { description: "push --force".into() }),
+            ("Other", ActionType::Other { tool: "t".into(), args: "a".into() }, ActionType::Other { tool: "t".into(), args: "b".into() }),
+        ];
+        for (name, a, b) in pairs {
+            assert_ne!(
+                ActionFingerprint::of(&a),
+                ActionFingerprint::of(&b),
+                "{name}: 两种内容必须算出不同指纹"
+            );
+            assert_eq!(
+                ActionFingerprint::of(&a),
+                ActionFingerprint::of(&a.clone()),
+                "{name}: 同内容必须算出同一指纹（否则「同一动作」无从判定）"
+            );
+        }
+    }
+
+    /// ⭐⭐ **动作类型本身也参与指纹** —— 否则 `FileWrite` 与 `FileCreate`
+    /// 恰好内容相同时会撞指纹。
+    #[test]
+    fn action_kind_is_part_of_the_fingerprint() {
+        let a = ActionFingerprint::of(&fw("p", "body"));
+        let b = ActionFingerprint::of(&ActionType::FileEdit {
+            path: "p".into(),
+            diff: "body".into(),
+        });
+        assert_ne!(a, b, "不同动作类型即便字段值巧合相同也不得撞指纹");
+    }
+
+    /// ⭐ 未知 id 仍走 `UnknownId`（不因新增分支而改变既有语义）。
+    #[test]
+    fn unknown_id_still_reports_unknown() {
+        let mut e = ApprovalEngine::new(ApprovalMode::Suggest);
+        let a = fw("a", "b");
+        let err = e.approve_if_unchanged("a0000000000000000000", &a).unwrap_err();
+        assert_eq!(err.kind(), "unknown-id");
+    }
+
+    /// ⭐⭐⭐ **失败朝严格方向**：TOCTOU 被拒后，原动作**仍可**被正确批准。
+    /// （拒绝的是「这份不符的内容」，不是「这个动作永远不许批」。）
+    #[test]
+    fn refusing_a_substitution_does_not_poison_the_original_action() {
+        let mut e = ApprovalEngine::new(ApprovalMode::Suggest);
+        let real = fw("/etc/app.conf", "debug=false");
+        let pa = e.submit(real.clone());
+        assert!(e.approve_if_unchanged(&pa.id, &fw("/etc/app.conf", "evil")).is_err());
+        // 拿**正确**内容再来 ⇒ 应当能批（此刻尚未有任何决策）
+        assert_eq!(
+            e.approve_if_unchanged(&pa.id, &real).unwrap(),
+            ApprovalDecision::Approved
+        );
     }
 }
