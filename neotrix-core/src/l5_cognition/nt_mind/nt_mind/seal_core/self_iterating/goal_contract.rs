@@ -81,15 +81,110 @@ pub struct RepairTarget {
     pub description: String,
 }
 
+/// 由有符号账本结论决定自治级别。**纯函数** ⇒ 可独立测试，
+/// 且决策规则与IO/状态彻底分离。
+///
+/// 规则（收权优先于放权）：
+/// - 有违规（`untrusted`）或净值为负 ⇒ 降一级，最低 `Proposal`；
+/// - 否则净值为正 ⇒ 升一级，最高 `Full`。
+pub fn decide_autonomy(
+    before: super::pipeline::AutonomyLevel,
+    net: f64,
+    untrusted: bool,
+) -> super::pipeline::AutonomyLevel {
+    use super::pipeline::AutonomyLevel;
+    if untrusted || net < 0.0 {
+        match before {
+            AutonomyLevel::Full => AutonomyLevel::Bounded,
+            _ => AutonomyLevel::Proposal,
+        }
+    } else {
+        match before {
+            AutonomyLevel::Proposal => AutonomyLevel::Bounded,
+            AutonomyLevel::Bounded => AutonomyLevel::Full,
+            AutonomyLevel::Full => AutonomyLevel::Full,
+        }
+    }
+}
+
 pub struct GoalContractStage;
 impl GoalContractStage {
     pub fn new() -> Self { Self }
 }
 impl Default for GoalContractStage { fn default() -> Self { Self } }
+
 impl BrainStage for GoalContractStage {
     fn name(&self) -> &str { "goal_contract" }
+
+    /// 每轮迭代都重新结算奖励/惩罚。
+    ///
+    /// ⚠️ 本stage 的实现**必须**是纯函数式的：它每轮从
+    /// `brain.evaluation_history`（跨迭代累积的真实测量）重新推导账本，
+    /// 而**不在stage 内部存状态**——`BrainStage::process` 收 `&self`，
+    /// 存状态就得引入内部可变性，而那会让「奖励」脱离真实测量、
+    /// 退化成自说自话（正是本仓规则记载的「导出 ≠ 调用」同一族缺陷）。
+    fn frequency(&self) -> usize { 1 }
+
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let _ = brain;
+        use super::nt_reward::RewardLedger;
+        use super::pipeline::AutonomyLevel;
+
+        let mut ledger = RewardLedger::new();
+
+        for rec in brain.evaluation_history.iter() {
+            let goal = format!("task:{:?}", rec.task_type);
+            // 产物用**真实测量值**拼装：不含自我声明，空产物即降级为惩罚。
+            let artifact = format!(
+                "iter={} {}→{}",
+                rec.iteration, rec.score_before, rec.score_after
+            );
+
+            if rec.improved {
+                // 分数确实上升 ⇒ 属最难伪造的一档证据。
+                ledger.record_evidence(
+                    &goal,
+                    GoalPhase::Verify,
+                    super::goal_contract::EvidenceType::PropertyProof,
+                    &artifact,
+                );
+            } else {
+                // 未改进 ⇒ 记验证失败（负权重）。
+                ledger.record_verification_failure(
+                    &goal,
+                    GoalPhase::Verify,
+                    format!("iter={} 未改进 ({}→{})", rec.iteration, rec.score_before, rec.score_after),
+                );
+                // 且分数**下降** ⇒ 额外记回归（最重惩罚）。
+                // 「未改进但没下降」不计回归，避免同一事实被重罚两遍。
+                if rec.score_after < rec.score_before {
+                    ledger.record_verification_failure(
+                        &goal,
+                        GoalPhase::Reflect,
+                        format!("iter={} 分数下降", rec.iteration),
+                    );
+                }
+            }
+        }
+
+        let net = ledger.net();
+        let untrusted = ledger.scores().values().any(|s| s.is_untrusted());
+
+        // ── 闭环落点：账本结论**真的改变** autonomy ──
+        // 净值为负或有违规 ⇒ 收权；净值为正且无违规 ⇒ 放权。
+        // `AutonomyLevel` derive 了 Ord，故可直接比较升降。
+        let before = brain.autonomy;
+        brain.autonomy = decide_autonomy(before, net, untrusted);
+
+        log::debug!(
+            "[goal_contract] iter={} records={} net={:.3} untrusted={} autonomy {:?}→{:?}",
+            brain.iteration,
+            brain.evaluation_history.len(),
+            net,
+            untrusted,
+            before,
+            brain.autonomy
+        );
+
         Ok(StageDecision::Continue)
     }
 }
@@ -313,4 +408,55 @@ pub fn write_journal(report: &GoalVerificationReport) -> String {
 
 pub fn should_stop_seal_loop(_report: &GoalVerificationReport) -> bool {
     false
+}
+
+#[cfg(test)]
+mod stage_tests {
+    use super::decide_autonomy;
+    use super::super::pipeline::AutonomyLevel; // 测试 mod 的 super 是 goal_contract
+
+    /// 闭环核心断言：奖励/惩罚**真的改变**自治级别。
+    #[test]
+    fn negative_reward_reduces_autonomy() {
+        assert_eq!(
+            decide_autonomy(AutonomyLevel::Full, -0.1, false),
+            AutonomyLevel::Bounded
+        );
+        assert_eq!(
+            decide_autonomy(AutonomyLevel::Bounded, -5.0, false),
+            AutonomyLevel::Proposal
+        );
+        // 已是最低则不再降
+        assert_eq!(
+            decide_autonomy(AutonomyLevel::Proposal, -5.0, false),
+            AutonomyLevel::Proposal
+        );
+    }
+
+    #[test]
+    fn positive_reward_raises_autonomy() {
+        assert_eq!(
+            decide_autonomy(AutonomyLevel::Proposal, 3.0, false),
+            AutonomyLevel::Bounded
+        );
+        assert_eq!(
+            decide_autonomy(AutonomyLevel::Bounded, 3.0, false),
+            AutonomyLevel::Full
+        );
+        assert_eq!(
+            decide_autonomy(AutonomyLevel::Full, 3.0, false),
+            AutonomyLevel::Full,
+            "已达上限不应继续升"
+        );
+    }
+
+    /// 违规即使净值为正也必须收权（不可洗白）。
+    #[test]
+    fn violation_reduces_autonomy_even_when_net_positive() {
+        assert_eq!(
+            decide_autonomy(AutonomyLevel::Full, 100.0, true),
+            AutonomyLevel::Bounded,
+            "净值为正但有违规 ⇒ 仍须收权"
+        );
+    }
 }
