@@ -214,6 +214,17 @@ def main() -> int:
     baseline = load_baseline(baseline_path)
 
     fields, read_counts, name_decls = scan_once(root, args.types)
+
+    def _reads(name, decl_path):
+        own = read_counts.get((str(decl_path), name), 0)
+        if name_decls.get(name, 0) == 1:
+            return own or sum(v for (f, k), v in read_counts.items() if k == name)
+        return own
+
+    alive_names = {
+        f[0] for f in fields if _reads(f[0], f[1]) > 0
+    }
+
     dead = []
     for name, decl_path, line_no, struct_name, serde in fields:
         own = read_counts.get((str(decl_path), name), 0)
@@ -235,18 +246,36 @@ def main() -> int:
     rel = lambda p: str(Path(p).resolve().relative_to(root))  # noqa: E731
 
     new = [d for d in dead if d[0] not in baseline]
+    # ── 第三类：配置噪声 ──
+    # 异名近名孪生（`apple_silicon` vs `is_apple_silicon`、`allowed` vs `allow`、
+    # `active` vs `is_active`）是历史命名重复：活的那份已接线，死的那份是**遗留字段**。
+    # 它们的危害不是「缺能力」而是**污染清单**——待人工判定量因此从 674 降到 513。
+    # ⚠️ 判据要求**异名**：同名不同结构体已由按声明文件计读点正确处理，
+    #    若把同名也算「孪生」，会把那类正确情形误标成噪声（本轮实测踩过）。
+    import difflib as _dl
+    def _is_noise(nm):
+        return any(x != nm for x in _dl.get_close_matches(nm, alive_names, n=3, cutoff=0.80))
+
+    noise = [d for d in dead if not d[4] and _is_noise(d[0])]
+    noise_set = {(d[0], d[1], d[2]) for d in noise}
     serde_mirrors = [d for d in dead if d[4]]
     behavioral = [d for d in dead if not d[4]]
     print(
         f"dead-flag[{args.types}] 字段 {len(fields)} 个；零读点 {len(dead)} 个"
-        f"（其中 serde 外部格式镜像 {len(serde_mirrors)}、本仓行为开关 {len(behavioral)}）；"
+        f"（serde 外部格式镜像 {len(serde_mirrors)}、配置噪声 {len(noise)}、"
+        f"待人工判定 {len(behavioral) - len(noise)}）；"
         f"基线已裁决 {len(baseline)}；新增 {len(new)}"
     )
 
     for name, decl_path, line_no, struct_name, serde in sorted(dead, key=lambda d: d[0]):
         tag = "已知" if name in baseline else "新增"
         hint = f" [{struct_name}]" if struct_name and CONFIG_HINT_RE.search(struct_name) else ""
-        kind = "serde-镜像" if serde else "**本仓行为开关**"
+        if serde:
+            kind = "serde-镜像"
+        elif (name, decl_path, line_no) in noise_set:
+            kind = "配置噪声(异名近名)"
+        else:
+            kind = "**待人工判定**"
         print(f"      · {tag} {rel(decl_path)}:{line_no} `pub {name}`{hint}  ({kind})")
 
     if not dead:
