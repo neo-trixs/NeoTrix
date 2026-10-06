@@ -147,6 +147,22 @@ jobs:
       #   scripts/probes/check-agent-config.sh 两处注入实证（不只是看出来的）。
       - name: "Agent-config gate (config gets the regression testing code gets; artifact-chain ratchet)"
         run: bash scripts/check-agent-config.sh --strict
+      # ⭐⭐⭐⭐ 2026-10-06：路线 N-5「claims 数字追溯」—— 补 nt_manifest.py 的洞。
+      # ⭐⭐⭐⭐ `nt_manifest.py`（Context Manifest）只验 `file:line` 指向是否还在
+      #   ⇒ **它不查数字**。而「文档里写着 82 条」在变成 83 条后仍是「82 条」，
+      #   门不会响，而数字恰是 agent 最常直接采信的东西。
+      # ⭐⭐⭐⭐ 立门实测依据：**同一场会话内踩了 4 次陈旧数字** ——
+      #   AGENTS.md 75→79→82 / ROADMAP「下一步仍是 A3」而 A3 已 ✅ /
+      #   FEATURE-MAP N-4 ⬜ 而 visible_to_model 已接生产 /
+      #   gate-registry「恒红 NEW 5」而实测 24。
+      # ⭐⭐ 纯文本提取（正则 + 整数比较），⛔ 不执行被检查的任何命令
+      #   （R-SCAN-4：check-disk.sh 初版把反引号示例当命令跑，删掉 115.2 GiB）。
+      # ⭐⭐ 防空转双判据：注册表非空 + 每条 pattern 必须真命中
+      #   （命中不到 = 断言已失去意义，**判红**；否则「文档删掉那句话」会让门静默变绿）。
+      # ⭐⭐ 已登记 scripts/gate-registry.tsv（injectable）；非空性由
+      #   scripts/probes/nt_claims_numbers.sh 覆盖**两种**失败模式实证。
+      - name: "Claims-numbers gate (docs asserting numbers the code refutes)"
+        run: bash scripts/check-claims-numbers.sh --strict
 
   test:
     runs-on: ${{ matrix.os }}

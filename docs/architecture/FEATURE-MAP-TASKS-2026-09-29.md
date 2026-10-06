@@ -83,14 +83,14 @@
 > ⇒ 后果不只是脏数据：一旦被人手写进 baseline，等于**豁免了一个不存在的测试**。
 > ⇒ 已改为单点 `extract_failing`（两处重复逻辑合并为一处，防漂移），
 >   并用注入探针端到端验证：修复前 2 行（含汇总行），修复后**恰好 1 行**。
-| **N-4** | **skill policy 接线**（第一轮误标为「核心代码」） | 官方规范 | `skill_loader.rs:107-142` 三个 `visible_*` **零消费者** | `grep` ≥1 非测试消费者 | ⬜ |
+| **N-4** | **skill policy 接线**（第一轮误标为「核心代码」） | 官方规范 | `SkillAudience::admits`（`skill_loader.rs:224`） | `visible_to_model` 生产生效；**`visible_to_user` 仍零生产路径** | 🟡 **半落地**（见下） |
 > **实测 2026-09-29（纠错记录）**：台账原文写「`skill_loader.rs:107-142` 三个 `visible_*` 零消费者」。
 > 逐条核实发现**两处不准**：(a) 实际只有**两个** `visible_*`（`:118` `visible_to_model`、
 > `:123` `visible_to_user`），不是三个；(b) 真正查这两个函数名的非测试消费者，**确为 0**。
 > ⇒ 结论「零消费者」成立，行号与个数不准，**状态保持 ⬜ 不变**。
 > ⚠️ 核查方法教训：`grep visible_` 会命中 `invisible_*` 等子串，曾一度误得「33 个消费者」。
 > **必须用完整函数名 `visible_to_model|visible_to_user` 精确匹配**（对应 R-SCAN-1：先证实现状再改码）。
-| **N-5** | **claims 数字追溯** | `kev/scripts/verify_claims.py` | `nt_manifest.py`（查 `file:line` 不查数字） | 4 个错数字入 claims 后 audit=1 | ⬜ |
+| **N-5** | **claims 数字追溯** | `kev/scripts/verify_claims.py` | `scripts/ops/nt_claims_numbers.py` + `scripts/claims-numbers.tsv` | 数字漂移 ⇒ 判红并指名文档 + 实测值 | ✅ **2026-10-06 落地** |
 | **N-6** | **`docs/package.json` 裁决** | 本地 | `docs/` 113 跟踪文件 vs vitepress 已删 | 重建或删触发 | ⛔ 需裁决 |
 
 ## 批次 B · 测量面（最高长期价值，~1 周）
@@ -289,3 +289,24 @@ grep -c "protocolVersion" neotrix-core/src/agent.rs                      # 0  �
 md5 -q .neotrix/capability_registry.json .neotrix/capability_overrides.json  # 相同 ⇒ overlay 从未分叉
 grep -c "impl ComputerBackend for" crates/neotrix-neobot/src/nt_computer.rs # 1 ⇒ 仅 NoopBackend
 ```
+
+---
+
+## 2026-10-06 裁决补记 · N-4 半落地（实测，非推断）
+
+原文「三个 `visible_*` 零消费者」**已被后续提交部分作废**，逐条实测：
+
+| 事实 | 出处 |
+|---|---|
+| `SkillAudience::admits()` 是**单点裁决** | `neotrix-core/src/skill_loader.rs:224` |
+| `visible_to_model` **在生产生效** | `search_skills` 走 `SkillFilter::audience`，其 `#[default]` 是 `Model` ⇒ 默认即按 model 面裁剪（`:622`） |
+| `visible_to_user` **生产零路径** | 无任何生产代码构造 `SkillAudience::User`；唯一构造点在 `skill_loader.rs:1410` 的**测试**里 |
+| `:123` 注释宣称「是否应出现在**用户 `/` 菜单**里」 | ⛔ 该菜单面**在生产尚不存在** ⇒ 这是**代码注释里的死断言**，与 `check-doc-claims.sh` 治的病同型（但该门只扫根文档，不扫代码注释） |
+
+⇒ **裁决：N-4 是「名义已接线」，不是「已接入」。** 依据 R-P79（导出 ≠ 接入）
+再往下一层：**模块内有消费者 ≠ 策略输入被真实变化过**。
+`admits()` 确实被调用，但它收到的 `audience` 永远是默认值 ⇒
+`visible_to_user` 那一支在生产中**从未被求值**。
+
+⇒ **补齐它需要一个真实消费者**（即真的 `/` 菜单面），属功能建设而非缺陷修复，
+不在批次 A「零 `.rs`」范围内 ⇒ **留作独立裁决项**，此处只登记事实。

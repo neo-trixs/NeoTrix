@@ -1343,82 +1343,15 @@
       "read_only": true,
       "when_not": "不要用它判「源码里还有几个 ⭐」——它只挡**新增**：比的是 `git diff` 的 `+` 行里 `//` 之后的部分。⛔ 存量 ⭐ 不阻断（实测存量 191 处里绝大多数在**字符串字面量**，`assert_eq!` 消息/`eprintln!` 跨行串，那些是内容不是注释）⇒ 若按「总数」判会让门恒红、门被关。⚠️ 自测必须用 `NT_REPO_ROOT=<临时仓库>` 覆盖根目录，否则会在本仓上误测（2026-10-06 首次自测就踩了：三个场景结论全错）。⛔ 也不要用它替代人工判断「注释写得对不对」——它只管噪声，不管内容。",
       "spec": "scripts/ops/nt-no-star-noise.sh 顶部文档（含 2026-10-06 实测：一次清理 4526 处后，紧随的 4 个提交又新增 21 行带 ⭐ 的注释）"
+    },
+    {
+      "id": "check-claims-numbers",
+      "query": ["陈旧数字", "claims 数字", "数字追溯", "台账过期", "文档数字对不上", "verify_claims", "N-5"],
+      "tool": "bash scripts/check-claims-numbers.sh --strict",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "⛔ 不要用它判**产品代码**对错 —— 它只比「文档里的数字」与「注册表里的裁决值」。⛔ 不要为了变绿去改注册表的 expected：expected 是**裁决值**，漂了说明该重新裁决，不是该改期望（改期望等于把断言变成回声）。⛔ 它**不执行**被检查的命令（纯文本提取）⇒ 判不了「命令跑出来的数」，只判「另一个文件里写着同一个数」。⛔ 报「pattern 一个都没命中」时该修 pattern 或删该行，**不是**加宽白名单。",
+      "spec": "FEATURE-MAP-TASKS-2026-09-29.md 批次 A · N-5；R-SCAN-4"
     }
-  ],
-  "excluded": {
-    "_about": "刻意不进入日常索引的脚本 —— 它们是一次性数据管道，日常任务不该找到它们。",
-    "platform_scrapers": {
-      "files": "scripts/ops/nt_douyin_*.py (6), nt_deepseek_*.py (2), nt_doubao_batch.py",
-      "why": "playwright/faster-whisper 的一次性采集管道，Rust 无等价形态；进日常索引会污染 nt_find 的排序（它们有 1~2 个触发词但几乎不会被日常问起）"
-    },
-    "hf_absorption": {
-      "files": "scripts/ops/nt_hf_survey.py, nt_hf_batch_absorb.py, nt_hf_digest_to_cocoons.py",
-      "why": "数据集批量吸收，跑一次即完成；nt_cocoons_verify_absorb.py 已单列（它是**验收器**，会被重复调用）"
-    },
-    "mapgen": {
-      "files": "scripts/ops/nt_mapgen.py",
-      "why": "**与 neotrix-core/src/l2_perception/nt_core_code_search.rs 强重复且 Rust 更强**（670 行含 RRF 融合）。task-index 的 project-map 条目指向 make project-map 即可。**合并前勿删此文件** —— 它仍是 Makefile 的实际后端"
-    },
-    "orphan_misc": {
-      "files": "scripts/ops/__pycache__/ (7 个 .pyc)",
-      "why": "悬空残影，源码已删（nt_docclaims/nt_foundation_laws/nt_hf_smelt_chains/nt_ipc_keys/nt_symbol_brain/nt_verify_sim）。建议 gitignore + 清理"
-    },
-    "dangerous_ops": {
-      "files": "scripts/cargo-clean-locks.sh",
-      "why": "⛔ **删 cargo 锁文件**。共享工作树下他窗正在构建时执行会破坏其编译（\"Blocking waiting for file lock\" 的反面：直接砸锁）。⛔ **零引用反而是安全的** —— 不要为了「完整性」把它登记进可用索引。",
-      "how_to_use": "真被锁住时：先 `sh scripts/ops/nt_build_lock.sh --status` 看锁状态，等锁释放，而不是删锁。"
-    }
-  },
-  "doc-claims": {
-    "intent": "文档里的断言被代码反驳（如「某模块零消费者」但其实有消费者）",
-    "tool": "bash scripts/check-doc-claims.sh",
-    "cost": "秒级，只读 git grep，无 cargo",
-    "when_not": "① 时点性断言（「上次跑是绿的」这类）判不了，需人工复核；② 历史交接件默认豁免（改它等于篡改历史），要查用 DOC_CLAIMS_SESSIONS=1；③ 短模块名/:: 记法碎片无法唯一解析，会跳过",
-    "notes": "本会话「死记录」复发 6 次的产物。带 commit hash 的行视作时点陈述并豁免。"
-  },
-  "commit-deletions": {
-    "intent": "提交前核对暂存区里有没有别人的改动（多窗口共享 index 事故）",
-    "tool": "bash scripts/check-commit-deletions.sh  （已挂 .githooks/pre-commit，自动跑）",
-    "cost": "毫秒级，只读 git diff --cached",
-    "when_not": "① 无删除的提交直接 PASS，不必手动跑；② 想查已入库提交用 scripts/check-push-deletions.sh（pre-push 自动兜底，锚定在门自身提交，不追溯历史）；③ 想看共享暂存区全貌仍要 git diff --cached --name-only 对自己的文件清单",
-    "notes": "2026-09-29 事故：误删他窗 339 行在途工作。显式 add 只能约束我 add 什么，约束不了暂存区已有什么。"
-  },
-  "scripts": {
-    "neobot-ui-typography": {
-      "run": "node scripts/ops/neobot-check-typography.mjs",
-      "category": "门禁",
-      "read_only": true,
-      "desc": "字号阶梯门：px 须在定档内（下限12px）· em 须在 0.8~2.0 带内 · Tailwind text-* 须在允许集合。吸收 ChunUI(MIT) 硬约束写法。⛔ 不扫 vendored 的 frontend/。",
-      "when_not_to_use": "要改 vendored 第三方代码的字号时——它需走 vendor 流程，不适用本门定档。"
-    },
-    "discarded-inputs": {
-      "run": "python3 scripts/ops/check-discarded-inputs.py",
-      "category": "门禁",
-      "read_only": true,
-      "desc": "自评函数丢弃入参门：evaluate/judge/score 类函数若丢弃形参且**返回类型不是 Option** ⇒ 无法表达拒绝 ⇒ 只能撒谎。FAIL 档=无法拒绝；WARN 档=Option 返回型，确认它真走 None 路径。⛔ 不是拦所有 let _ =（那合法），只拦「自称评判却不看输入」。",
-      "when_not_to_use": "要新写「刻意不读入参但会返回诚实分数」的函数时——门会 FAIL，那是设计问题不是误报，改设计别改门。"
-    },
-    "build-lock": {
-      "run": "bash scripts/ops/nt_build_lock.sh -- <cmd>",
-      "category": "门禁",
-      "read_only": false,
-      "desc": "跨 worktree 重型命令原子串行锁（原子 mkdir + 陈旧 PID/时间戳回收 + 退出码透传 + --strict）。⛔ 禁止手删锁目录。吸收 growth-engineer 重型命令串行模式。",
-      "when_not_to_use": "轻量只读命令（rg/git status/单文件 wc）不必加锁；门脚本本身已自证时用 nt_build_lock_selftest.sh 而非加锁跑 cargo。",
-      "selftest": "bash scripts/ops/nt_build_lock_selftest.sh  # 8/8"
-    },
-    "check-license-js": {
-      "run": "bash scripts/check-license-js.sh",
-      "category": "门禁",
-      "read_only": true,
-      "desc": "npm 依赖许可门 —— 填补 Rust 侧 deny.toml 之外的 npm 侧许可真空（AGPL/GPL/SSPL/Elastic/BUSL）。⛔ 2026-10-03 实测：CI 零引用 ⇒ **此门从未运行**，属「有防护但未接线」。",
-      "when_not_to_use": "只看 Rust 依赖许可时用 cargo-deny（CI 已接）；本门只管 npm 侧。"
-    },
-    "map-check": {
-      "run": "bash scripts/map-check.sh [--strict]",
-      "category": "门禁",
-      "read_only": true,
-      "desc": "前端 MAP 表三向对账：frontend invoke(\"neobot_*\") vs nt_commands.rs #[tauri::command] vs MAP.md 表格。默认只报警，--strict 则漂移即非零退出。",
-      "when_not_to_use": "只改前端不碰 MAP.md 时可只报警；发布前对账用 --strict。"
-    }
-  }
+  ]
 }

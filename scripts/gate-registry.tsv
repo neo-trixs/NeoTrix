@@ -20,6 +20,7 @@
 # ⛔ 代价：probe 里不能有未转义的 tab；复杂注入请写成 scripts/probes/<gate>.sh
 #   并在 probe 列写 `bash scripts/probes/<gate>.sh`。
 # gate	class	probe	rc	note
+scripts/check-claims-numbers.sh	injectable	bash scripts/probes/nt_claims_numbers.sh	0	2026-10-06 立门 = 路线 N-5。补 nt_manifest.py 只验 file:line 不验数字的洞。实测同一会话踩 4 次陈旧数字（AGENTS.md 75→79→82→83 / ROADMAP「下一步仍是 A3」而 A3 已✅ / FEATURE-MAP N-4 ⬜ 而 visible_to_model 已接生产 / gate-registry「恒红 NEW 5」而实测 24）。⚠️⚠️ 注册表**无 expected 列**（初版有，是设计缺陷：文档与 expected 同时陈旧时门照样绿，实测真源到 83 而两处都写 82 ⇒ rc=0）⇒ 改为 doc 与 src 同一次运行各自提取再互比，字面量不得参与印证。⚠️ 纯文本提取，绝不执行被检查的命令（R-SCAN-4：check-disk.sh 初版把反引号示例当命令跑，删掉 115.2GiB）。防空转双判据：注册表非空 + 两侧 pattern 都必须真命中（命中不到=断言失效，判红）—— 建门当日即抓到我自己写错的 pattern。⛔ 探针自身也不得硬编码那个数字：初版写死「82 条索引」，真源一变前置断言就失败 ⇒ 探针自己成了又一个陈旧数字（已改为先读后 +1）。
 scripts/check-ci-refs.sh	injectable	bash scripts/probes/check-ci-refs.sh	0	2026-09-29 固化为探针：注入幻影 CI job（working-dir 指向 gitignored 目录）⇒ 门 exit 1 并指名行号。探针自身 exit 0 = 证明成功
 scripts/check-truth-surface.sh	injectable	bash scripts/probes/check-truth-surface.sh	0	2026-09-29 固化为探针：注入未声明 .rs ⇒ UNDECLARED+UNREACHABLE 各 +1 ⇒ strict 红
 scripts/check-test-baseline.sh	opaque	—	—	需 cargo test（约 174s，超出元门预算）＋需改被测代码。2026-09-29 已人工验过：注入 assert_eq!(1+1,3) ⇒ --strict exit 1 并指名

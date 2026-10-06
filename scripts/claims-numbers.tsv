@@ -1,0 +1,12 @@
+# claims 数字追溯注册表（N-5）—— 文档里的数字必须等于**权威源**里的数字
+# 列(tab): doc<TAB>doc_pattern<TAB>src<TAB>src_pattern<TAB>note
+# src_pattern 以 `count:` 开头 = 取匹配行数（真源多是「有多少条」）；
+#   否则取正则捕获到的纯数字组。
+# ⛔⛔ **没有 expected 列**（初版有，是设计缺陷）：文档与 expected 同时陈旧时门照样绿
+#   （实测 task-index 到 83、文档与 expected 都写 82 ⇒ rc=0）。⇒ 字面量不得参与印证。
+# ⚠️ count: 的正则必须**只匹配权威源里那一种条目**：
+#   `'^      "id":'`（6 空格）恰好 83 条，而 4 空格的 `"id":` 是 _schema 的字段说明
+#   —— 缩进即判据，换缩进会静默多数/少数。
+AGENTS.md	（(\d+) 条索引	.neotrix/task-index.json	count:^      "id":	task-index 真实条数；本门抓过一次 75→79→82→83 连续漂
+docs/plans/_TEMPLATE.md	既有 (\d+) 件工件	scripts/artifact-chain-baseline.txt	count:^docs/plans/	棘轮基线里的存量件数
+docs/plans/_TEMPLATE.md	`docs/plans/` \| \*\*(\d+) 件\*\*	scripts/artifact-chain-baseline.txt	count:^docs/plans/	同上，§0 缺口表那一处
