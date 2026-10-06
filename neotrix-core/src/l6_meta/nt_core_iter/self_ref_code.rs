@@ -96,7 +96,31 @@ impl SelfCodeMonitor {
         self.pending_requests.push_back(request);
     }
 
+    /// 自动审批：**`requires_review` 的请求一律拒绝**。
+    ///
+    /// ⚠️ 首版无条件 `remove` 后直接返回，从不读 `requires_review`
+    /// ⇒ 该字段是纯装饰，**自改代码的人工复核闸门实际不存在**
+    /// （由 dead-config-flag 门与人工审计共同查出）。现在它真的生效。
     pub fn approve_request(&mut self, id: &str) -> Option<CodeMutation> {
+        let pos = self
+            .pending_requests
+            .iter()
+            .position(|r| r.mutation.id == id)?;
+        if self.pending_requests[pos].requires_review {
+            log::warn!(
+                "[self_ref_code] 拒绝自动审批：mutation={} 需人工复核",
+                id
+            );
+            return None;
+        }
+        self.pending_requests.remove(pos).map(|r| r.mutation)
+    }
+
+    /// 人工复核**通过后**的显式放行路径。
+    ///
+    /// 与 [`SelfRefCodeMonitor::approve_request`] 分开而不是加布尔参数：
+    /// 让「谁批准的」在调用点即可见，避免再次退化成「参数传了就放行」。
+    pub fn approve_request_after_review(&mut self, id: &str) -> Option<CodeMutation> {
         let pos = self
             .pending_requests
             .iter()
@@ -181,12 +205,14 @@ mod tests {
     }
 
     #[test]
-    fn test_submit_and_approve() {
+    /// `requires_review: false` ⇒ 自动审批放行（闸门不误伤正常路径）。
+    #[test]
+    fn test_submit_and_approve_no_review_needed() {
         let mut monitor = SelfCodeMonitor::new();
         let req = MutationRequest {
-            mutation: sample_mutation("MUT-001", MutationRisk::High),
-            reason: "Optimize E8 transition".into(),
-            requires_review: true,
+            mutation: sample_mutation("MUT-001", MutationRisk::Low),
+            reason: "Cosmetic rename".into(),
+            requires_review: false,
             submitted_at: 20260701,
         };
         monitor.submit_request(req);
@@ -195,6 +221,37 @@ mod tests {
         let approved = monitor.approve_request("MUT-001");
         assert!(approved.is_some());
         assert_eq!(approved.unwrap().id, "MUT-001");
+        assert!(monitor.pending_requests.is_empty());
+    }
+
+    /// ⚠️ 闸门回归测试：`requires_review: true` 不得被自动放行。
+    ///
+    /// 首版的 `test_submit_and_approve` 用 `requires_review: true`
+    /// 却断言 `approve_request` 返回 `Some` —— **该测试固化了缺陷行为**，
+    /// 是这个闸门长期不存在却全绿的直接原因。
+    #[test]
+    fn test_requires_review_blocks_auto_approval() {
+        let mut monitor = SelfCodeMonitor::new();
+        monitor.submit_request(MutationRequest {
+            mutation: sample_mutation("MUT-002", MutationRisk::High),
+            reason: "Rewrite core state machine".into(),
+            requires_review: true,
+            submitted_at: 20260701,
+        });
+
+        assert!(
+            monitor.approve_request("MUT-002").is_none(),
+            "需人工复核的请求不得自动放行"
+        );
+        assert_eq!(
+            monitor.pending_requests.len(),
+            1,
+            "被拒后请求应仍在pending 队列里（不得被静默丢弃）"
+        );
+
+        // 人工复核通过后的显式放行路径可用
+        let approved = monitor.approve_request_after_review("MUT-002");
+        assert!(approved.is_some());
         assert!(monitor.pending_requests.is_empty());
     }
 

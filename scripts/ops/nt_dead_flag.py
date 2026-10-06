@@ -98,13 +98,19 @@ _RE_DOT_TOKEN = re.compile(r"\.\s*([a-z_][a-z0-9_]*)")
 
 
 def scan_once(root: Path):
-    """单次扫描全仓：返回 (字段候选列表, 全仓 `.field` 读点计数)。
+    """单次扫描全仓：返回 (字段候选列表, 按 (文件,字段) 的读点计数, 字段名声明分布)。
 
-    原实现是 O(文件 × 字段) —— 每字段全仓重扫，实测超时（RC=124）。
-    改为一次遍历同时统计所有 `.field` 出现，复杂度降到 O(总行数)。
+    复杂度 O(总行数)。首版是 O(文件 × 字段)，实测超时 RC=124。
+
+    ⚠️ 读点数必须**按声明所在文件**统计，不能按字段名全局聚合：
+    AGENTS.md L15「同名 ≠ 同一符号」在本门内的复现 ——
+    `enable_account_clustering` 在 `proxy_detection`（活，:290 真读）与
+    `anti_distillation`（死）各有一份，全局聚合会把死的那个一并救活。
+    实测此类「同名多声明」字段 183 个，其中 161 个因此被误救活。
     """
     fields = []
-    read_counts: dict[str, int] = {}
+    read_counts: dict[tuple, int] = {}
+    name_decls: dict[str, int] = {}
     for path in iter_rs_files(root):
         try:
             raw = path.read_text(encoding="utf-8", errors="replace")
@@ -135,15 +141,26 @@ def scan_once(root: Path):
                     (fm.group(1), path, idx, struct_name, derives_serde)
                 )
             for tok in _RE_DOT_TOKEN.findall(line):
-                read_counts[tok] = read_counts.get(tok, 0) + 1
-    return fields, read_counts
+                key = (str(path), tok)
+                read_counts[key] = read_counts.get(key, 0) + 1
+    for name, _, _, _, _ in fields:
+        name_decls[name] = name_decls.get(name, 0) + 1
+    return fields, read_counts, name_decls
 
 
-def locate_read_sites(root: Path, field: str, limit: int = 3):
-    """零读点字段的定位复查（本应为空；有则说明索引口径需修正）。"""
+def locate_read_sites(root: Path, field: str, limit: int = 3, only_file: Path | None = None):
+    """零读点字段的定位复查（本应为空；有则说明索引口径需修正）。
+
+    ⚠️ `only_file` 必须按**声明所在文件**限定：首版全仓复查，
+    于是同名不同符号会互相救活 —— `enable_account_clustering` 在
+    `proxy_detection` 的读点把 `anti_distillation` 的死声明救活，
+    「二次复查」本身成了 D2 修复的漏斗（已实测复现）。
+    """
     pat = re.compile(r"\.\s*" + re.escape(field) + r"\b")
     hits = []
     for path in iter_rs_files(root):
+        if only_file is not None and path != only_file:
+            continue
         try:
             code = strip_comments_and_strings(path.read_text(encoding="utf-8", errors="replace"))
         except OSError:
@@ -183,17 +200,24 @@ def main() -> int:
     baseline_path = root / "scripts" / "dead-flag-baseline.txt"
     baseline = load_baseline(baseline_path)
 
-    fields, read_counts = scan_once(root)
+    fields, read_counts, name_decls = scan_once(root)
     dead = []
     for name, decl_path, line_no, struct_name, serde in fields:
-        if read_counts.get(name, 0) == 0:
+        own = read_counts.get((str(decl_path), name), 0)
+        if name_decls.get(name, 0) == 1:
+            # 该字段名全仓唯一 => 允许跨文件读取，取全仓总和
+            reads = own or sum(v for (f, k), v in read_counts.items() if k == name)
+        else:
+            # 同名多声明 => 只认本文件读点，否则同名不同符号会互相救活
+            reads = own
+        if reads == 0:
             # 二次复查：确认真的零读点（防止索引口径错误导致误报）
-            if not locate_read_sites(root, name, limit=1):
+            if not locate_read_sites(root, name, limit=1, only_file=decl_path):
                 dead.append((name, decl_path, line_no, struct_name, serde))
             else:
                 continue
         elif args.audit:
-            print(f"  活{name}: {read_counts[name]} 读点")
+            print(f"  活{name}: {reads} 读点")
 
     rel = lambda p: str(Path(p).resolve().relative_to(root))  # noqa: E731
 
