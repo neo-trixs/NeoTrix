@@ -3,8 +3,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-// 注：BehaviorPatternType 主代码未用，但 #[cfg(test)] 用到 ⇒ 必须保留。
-use super::{BehaviorPattern, BehaviorPatternType, PatternCatalog, RouteResult, SimilarityScore, PolicyTrace, TrustBoundary, FanInQueue, PatternRequest};
+use super::{BehaviorPattern, PatternCatalog, RouteResult, SimilarityScore, PolicyTrace, TrustBoundary, FanInQueue, PatternRequest};
 
 /// Pattern router that matches queries to the nearest skill
 pub struct PatternRouter {
@@ -226,6 +225,8 @@ fn now_timestamp() -> u64 {
 
 #[cfg(test)]
 mod tests {
+    // 仅测试代码使用；主代码不引用，否则 deny(warnings) 判为未使用导入。
+    use super::super::BehaviorPatternType; // 测试 mod 的 super 是 router，需再上一层
     use super::*;
     use std::collections::HashMap;
 
