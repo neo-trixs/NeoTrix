@@ -3,6 +3,8 @@
 //! 能力注册、调度、成熟度进化、星脉通信协议。
 
 pub mod capability;
+pub mod memory; // 记忆层（孤儿接线 A51）
+pub mod knowledge; // 知识图谱层（孤儿接线 A51）
 pub mod nt_crt;
 pub mod nt_core_cost_ladder; // 成本阶梯（孤儿接线 T45+2）
 // ⛔ `multi_agent` **本轮不接线**，理由是实测证据（2026-09-30）：

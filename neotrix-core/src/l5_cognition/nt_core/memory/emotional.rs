@@ -267,7 +267,7 @@ mod tests {
         let memory = EmotionalMemory {
             id: "emotion-1".to_string(),
             event_id: "event-1".to_string(),
-            emotion: EmotionLabel::Satisfaction,
+            emotion: PlutchikEmotion::Satisfaction,
             intensity: 0.8,
             valence: 0.9,
             arousal: 0.5,
@@ -278,7 +278,7 @@ mod tests {
                 complexity: 0.7,
                 time_pressure: 0.3,
                 social_context: None,
-                previous_emotions: vec![EmotionLabel::Frustration],
+                previous_emotions: vec![PlutchikEmotion::Frustration],
             },
             regulation_history: vec![],
         };
@@ -286,7 +286,7 @@ mod tests {
         store.store(memory);
         assert_eq!(store.count(), 1);
 
-        let satisfaction = store.recall_by_emotion(EmotionLabel::Satisfaction, 10);
+        let satisfaction = store.recall_by_emotion(PlutchikEmotion::Satisfaction, 10);
         assert_eq!(satisfaction.len(), 1);
 
         let positive = store.recall_by_valence(true, 10);

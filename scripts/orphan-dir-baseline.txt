@@ -23,6 +23,10 @@
 # 统一处置：**归档（不接线）**，理由 = ① 全部从未编译验证 ② 全部带测试（删除会销毁资产）
 #③ 接线缺本自有数据（见 O-1 的反面实证）。归档非遗忘：每条带复活触发条件。
 #
+#   已接线 2 条（A51 波）：`nt_core/knowledge`（5 文件 1,263 行，补 5 个冒烟测试 +
+#     修 bfs/dfs max_depth off-by-one）＋`nt_core/memory`（5 文件 1,171 行，4 测试全绿；
+#     修 EmotionLabel→PlutchikEmotion 避开 L5→L6 违规、6 处 ConceptNode 字段误用、
+#     1 处 move-after-use、2 处借用冲突）—— **均为「从未编译过」，首次接线即暴露真bug**
 #   已删除 1 条：`l5_cognition/nt_consciousness`（39 行自引用 facade，
 #     实测挂载报 E0432 ×3 ⇒ 永远无法编译，且其文档误导消费者去用该路径）
 #
@@ -81,8 +85,6 @@ neotrix-core/src/l2_perception/nt_world/temporal_kg
 neotrix-core/src/l4_emotion/nt_feel/cognition_bridge
 neotrix-core/src/l4_emotion/nt_memory/nt_memory_knowledge_graph
 neotrix-core/src/l5_cognition/nt_core/io_skills
-neotrix-core/src/l5_cognition/nt_core/knowledge
-neotrix-core/src/l5_cognition/nt_core/memory
 neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/archive
 neotrix-core/src/l5_cognition/nt_mind/cross_domain
 neotrix-core/src/l5_cognition/nt_mind/self_improvement

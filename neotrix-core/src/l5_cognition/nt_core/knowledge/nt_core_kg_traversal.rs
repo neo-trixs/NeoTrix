@@ -99,7 +99,11 @@ impl KnowledgeGraph {
 
         while let Some((current, depth)) = queue.pop_front() {
             if let Some(max) = max_depth {
-                if depth >= max {
+                // max_depth = 纳入结果的最大节点深度（0 = start 自身）
+                // 原为 `>=` 且 continue 发生在 nodes.push 之前
+                // => Some(1) 只回 start 自身，却又给邻居记了 distances=1.0
+                // 自相矛盾；A51 冒烟测试实测发现。
+                if depth > max {
                     continue;
                 }
             }
@@ -141,7 +145,11 @@ impl KnowledgeGraph {
 
         while let Some((current, depth)) = stack.pop() {
             if let Some(max) = max_depth {
-                if depth >= max {
+                // max_depth = 纳入结果的最大节点深度（0 = start 自身）
+                // 原为 `>=` 且 continue 发生在 nodes.push 之前
+                // => Some(1) 只回 start 自身，却又给邻居记了 distances=1.0
+                // 自相矛盾；A51 冒烟测试实测发现。
+                if depth > max {
                     continue;
                 }
             }
@@ -308,5 +316,110 @@ impl KnowledgeGraph {
     /// 获取所有边
     pub fn get_all_edges(&self) -> &HashMap<String, Vec<_KGEdge>> {
         &self.edges
+    }
+}
+
+#[cfg(test)]
+mod smoke_tests {
+    use super::*;
+
+    fn node(id: &str) -> _KGNode {
+        _KGNode {
+            id: id.to_string(),
+            node_type: "concept".to_string(),
+            properties: HashMap::new(),
+            embedding: None,
+        }
+    }
+
+    fn edge(s: &str, t: &str) -> _KGEdge {
+        _KGEdge {
+            source: s.to_string(),
+            target: t.to_string(),
+            edge_type: "related".to_string(),
+            weight: 1.0,
+            properties: HashMap::new(),
+        }
+    }
+
+    /// 接线验收（2026-10-06, A51）：本模块此前 0 测试且从未编译，
+    /// 「编译通过」不足以证明可用⇒ 补最小行为断言。
+    #[test]
+    fn bfs_reaches_transitively_and_isolates_islands() {
+        let mut g = KnowledgeGraph::new();
+        for id in ["a", "b", "c", "island"] {
+            g.add_node(node(id));
+        }
+        g.add_edge(edge("a", "b"));
+        g.add_edge(edge("b", "c"));
+
+        let r = g.bfs("a", None);
+        assert_eq!(r.nodes.len(), 3, "a→b→c 传递可达应全达");
+        assert!(r.distances.contains_key("c"), "c 应有距离记录");
+
+        assert_eq!(
+            g.bfs("island", None).nodes.len(),
+            1,
+            "孤立节点只能达自身"
+        );
+    }
+
+    #[test]
+    fn bfs_respects_max_depth() {
+        let mut g = KnowledgeGraph::new();
+        for id in ["a", "b", "c"] {
+            g.add_node(node(id));
+        }
+        g.add_edge(edge("a", "b"));
+        g.add_edge(edge("b", "c"));
+
+        assert_eq!(g.bfs("a", Some(1)).nodes.len(), 2, "depth=1 只到 b");
+        assert_eq!(g.bfs("a", Some(9)).nodes.len(), 3, "depth 足够时全达");
+    }
+
+    #[test]
+    fn dfs_visits_same_reachable_set_as_bfs() {
+        let mut g = KnowledgeGraph::new();
+        for id in ["a", "b", "c", "d"] {
+            g.add_node(node(id));
+        }
+        g.add_edge(edge("a", "b"));
+        g.add_edge(edge("b", "c"));
+        g.add_edge(edge("a", "d"));
+
+        // 注意：必须先绑定 TraversalResult 再取借用，否则 E0716（临时值析构）
+        let bfs_r = g.bfs("a", None);
+        let dfs_r = g.dfs("a", None);
+        let bfs_ids: Vec<&str> = bfs_r.nodes.iter().map(|n| n.id.as_str()).collect();
+        let dfs_ids: Vec<&str> = dfs_r.nodes.iter().map(|n| n.id.as_str()).collect();
+        assert_eq!(bfs_ids.len(), dfs_ids.len(), "BFS/DFS 可达集大小应一致");
+        assert!(bfs_ids.contains(&"c") && dfs_ids.contains(&"c"));
+    }
+
+    #[test]
+    fn lookup_accessors_reflect_graph_state() {
+        let mut g = KnowledgeGraph::new();
+        g.add_node(node("a"));
+        g.add_edge(edge("a", "b"));
+
+        assert!(g.get_node("a").is_some(), "已加入节点应可查得");
+        assert!(g.get_node("nope").is_none(), "未加入节点应查不到");
+        assert_eq!(g.get_all_nodes().len(), 1);
+        assert!(
+            g.get_edges("a").is_some(),
+            "出边应挂在 source 上a"
+        );
+    }
+
+    #[test]
+    fn detect_communities_handles_isolated_nodes() {
+        let mut g = KnowledgeGraph::new();
+        for id in ["a", "b", "c"] {
+            g.add_node(node(id));
+        }
+        g.add_edge(edge("a", "b"));
+        // c 为孤立节点：社区检测不得 panic，且须返回至少一个社区
+        let comms = g.detect_communities();
+        assert!(!comms.is_empty(), "含边的连通分量应成社区");
     }
 }

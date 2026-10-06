@@ -4,7 +4,10 @@ use std::collections::HashMap;
 
 use super::episodic::{EpisodicMemory, EpisodicMemoryStore};
 use super::semantic::{SemanticMemory, SemanticMemoryStore, AbstractionLevel};
-use super::emotional::{EmotionalMemory, EmotionalMemoryStore, EmotionLabel};
+// 注：原 `EmotionLabel` 只存在于 l6_meta/nt_core_self/emotion_state.rs；
+// 本文件在 L5，引它即 L5→L6 向上依赖（分层违规）。改用同层本地枚举，
+// 且 `PlutchikEmotion` 同样有 `Satisfaction` 变体，语义等价。
+use super::emotional::{EmotionalMemory, EmotionalMemoryStore, PlutchikEmotion};
 
 /// Memory consolidation pipeline
 pub struct MemoryConsolidation {
@@ -84,7 +87,7 @@ impl MemoryConsolidation {
             let emotional_memory = EmotionalMemory {
                 id: format!("emotional-{}", memory.id),
                 event_id: memory.id.clone(),
-                emotion: EmotionLabel::Satisfaction, // Default, should be computed
+                emotion: PlutchikEmotion::Satisfaction, // Default, should be computed
                 intensity: memory.salience,
                 valence: if memory.outcome.success { 0.8 } else { -0.5 },
                 arousal: memory.context.complexity,
@@ -127,14 +130,14 @@ impl MemoryConsolidation {
         
         for episode in consolidated_episodes {
             let pattern = self.episode_to_pattern(&episode);
-            let semantic_id = format!("pattern-{}", pattern.concept.name);
-            let mut semantic_memory = SemanticMemory {
+            let semantic_id = format!("pattern-{}", pattern.name);
+            let semantic_memory = SemanticMemory {
                 id: semantic_id,
                 concept: pattern,
                 relations: vec![],
                 abstraction_level: AbstractionLevel::Pattern,
                 confidence: episode.salience,
-                source_episodes: vec![episode.id],
+                source_episodes: vec![episode.id.clone()],
                 last_consolidation: Utc::now(),
                 usage_count: 1,
             };
@@ -153,10 +156,13 @@ impl MemoryConsolidation {
 
         // 3. Consolidate patterns into principles
         let patterns = self.semantic_store.find_by_level(AbstractionLevel::Pattern, 100);
-        if patterns.len() >= self.consolidation_config.pattern_to_principle_threshold as usize {
+        // 借用冲突修复：`patterns` 借自 self.semantic_store（&SemanticMemory），
+        // 若在store() 之后还用就会与 &mut 冲突 ⇒ 先把 len 提到store 之前。
+        let patterns_count = patterns.len();
+        if patterns_count >= self.consolidation_config.pattern_to_principle_threshold as usize {
             let principle = self.patterns_to_principle(&patterns);
-            let semantic_id = format!("principle-{}", principle.concept.name);
-            let mut semantic_memory = SemanticMemory {
+            let semantic_id = format!("principle-{}", principle.name);
+            let semantic_memory = SemanticMemory {
                 id: semantic_id,
                 concept: principle,
                 relations: vec![],
@@ -171,20 +177,23 @@ impl MemoryConsolidation {
             events.push(ConsolidationEvent {
                 timestamp: Utc::now(),
                 event_type: ConsolidationType::PatternToPrinciple,
-                source_count: patterns.len(),
+                source_count: patterns_count,
                 target_concept: Some("New Principle".to_string()),
                 abstraction_level: Some("Principle".to_string()),
                 success: true,
-                details: format!("Consolidated {} patterns into principle", patterns.len()),
+                details: format!("Consolidated {} patterns into principle", patterns_count),
             });
         }
 
         // 4. Consolidate principles into wisdom
         let principles = self.semantic_store.find_by_level(AbstractionLevel::Principle, 100);
-        if principles.len() >= self.consolidation_config.principle_to_wisdom_threshold as usize {
+        // 借用冲突修复：`principles` 借自 self.semantic_store（&SemanticMemory），
+        // 若在store() 之后还用就会与 &mut 冲突 ⇒ 先把 len 提到store 之前。
+        let principles_count = principles.len();
+        if principles_count >= self.consolidation_config.principle_to_wisdom_threshold as usize {
             let wisdom = self.principles_to_wisdom(&principles);
-            let semantic_id = format!("wisdom-{}", wisdom.concept.name);
-            let mut semantic_memory = SemanticMemory {
+            let semantic_id = format!("wisdom-{}", wisdom.name);
+            let semantic_memory = SemanticMemory {
                 id: semantic_id,
                 concept: wisdom,
                 relations: vec![],
@@ -199,11 +208,11 @@ impl MemoryConsolidation {
             events.push(ConsolidationEvent {
                 timestamp: Utc::now(),
                 event_type: ConsolidationType::PrincipleToWisdom,
-                source_count: principles.len(),
+                source_count: principles_count,
                 target_concept: Some("New Wisdom".to_string()),
                 abstraction_level: Some("Wisdom".to_string()),
                 success: true,
-                details: format!("Consolidated {} principles into wisdom", principles.len()),
+                details: format!("Consolidated {} principles into wisdom", principles_count),
             });
         }
 
@@ -316,7 +325,11 @@ pub struct ConsolidationStatistics {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::episodic::{TaskContext, ActionRecord, OutcomeRecord, EmotionSnapshot};
+    // 原 `super::episodic` 解析为 `memory::consolidation::episodic`（不存在）；
+    // 本测试 mod 的 super 是 consolidation 自身 ⇒ 改用 crate 绝对路径。
+    use crate::l5_cognition::nt_core::memory::episodic::{
+        ActionRecord, EmotionSnapshot, OutcomeRecord, TaskContext,
+    };
 
     #[test]
     fn test_memory_consolidation() {

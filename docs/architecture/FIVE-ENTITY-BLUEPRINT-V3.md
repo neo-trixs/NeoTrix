@@ -480,3 +480,4 @@ CrystalState 为单一事实源；五实体是它的五种投影，外围注册�
 | 快照体积膨胀 | 低 | 低 | 投影只存 ID＋状态；体积单测上限 | ⬜ |
 | 全量 test harness 超时（环境） | 高 | 低 | 逻辑级独立验证＋check 门；CI 侧全量 | ✅ 已验证模式（P0-2） |
 | 多窗口并发改同一文件 | 中 | 中 | 改前 `git status` 查脏文件；小步快走 | ⬜ 进行中（main.rs/nt_tui_app 已见他窗） |
+| A51 | 孤儿接线第四波（知识图谱＋记忆层） | ✅ `nt_core::knowledge`（5 文件 1,263 行）＋`nt_core::memory`（5 文件 1,171 行）挂载`nt_core/mod.rs`，沿用 A48/A49 的 `// 孤儿接线 Ax` 注释约定。**两模块均「从未编译过」，首接线即暴露真 bug**：knowledge 的 `bfs`/`dfs` `max_depth` off-by-one（`Some(1)` 不返回直接邻居却给它记 `distances=1.0`）；memory 的 `EmotionLabel` 只存在于 l6_meta（引它即 L5→L6 分层违规，改用同层 `PlutchikEmotion`）、`ConceptNode` 无 `concept` 字段 6 处误用、`episode.id` move 后复用、`patterns`/`principles` 不可变借用活过 `store()` 的 `&mut`。门：`cargo check -p neotrix --lib` RC=0；`smoke_tests` 5/5 新增测试 + memory 4/4 既有测试全绿；孤儿 13 → 11 | 归档优先原则被推翻：预算无限时「没数据/没编译」两条反接线理由均可消除，而「有测试 ⇒ 不删」依然成立 |
