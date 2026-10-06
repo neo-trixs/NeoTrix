@@ -78,6 +78,22 @@ panic = "abort"
 
 [profile.dev]
 overflow-checks = true
+# 2026-10-06 治target 体积（实测数据见 commit 正文）：
+# dev 的 debug 取默认 full ⇒ 每个 rlib/rmeta/test 二进制内嵌全量 DWARF。
+# 改 line-tables-only：保留 file:line（panic 回溯仍可读），只丢掉看变量值
+# 所需的完整 DWARF。本仓无依赖调试器的流程 ⇒ 这部分调试信息是纯成本。
+debug = "line-tables-only"
+#   实测（`-p neotrix`，均从 cargo clean 起，同一台机器）：
+#   | debug      | target |  deps  | 耗时  |
+#   | full(默认) |  9.7G  |  5.3G  | 5m14s |
+#   | line-tables|  7.5G  |  3.7G  | 2m55s |
+#   | 0          |  6.0G  |  2.3G  | 3m17s |
+#   ⇒ 取 line-tables：比 full 省 23% 体积 / 45% 时间，且**每个栈帧仍带
+#     file:line**（实测 RUST_BACKTRACE=1 对比：debug=0 只有函数名）。
+#   ⇒ 不取 0：省下的 1.5G 不值「栈帧没有行号」—— 本仓排障靠回溯。
+#   ⚠️ 改 profile 会让**全部**指纹失效，但**旧产物不会被自动删** ⇒
+#   实测改完直接构建，target 反而涨到 16G（1259 个 rlib，同 crate 两版并存）。
+#   ⇒ 改 profile 后要么 `cargo clean`，要么用 `cargo-sweep` 按天龄回收陈旧件。
 
 [profile.bench]
 inherits = "release"
