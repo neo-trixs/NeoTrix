@@ -21,6 +21,17 @@
 #
 # ⚠️ 本文件曾被一次批量脚本写坏（128/129 条丢失，04da1dec）。
 #    改本文件时**务必先备份 + 改后重跑门验证**，不要凭印象写盘。
+# 类别④ 「按 basename 匹配来自动重指」—— ⛔ **已被实测证伪，禁止使用**。
+#   曾尝试用「同名文件是否存在于别处」把死链分成「已移走可重指」/「已删除应删引用」，
+#   实测 25 条被误判为「可重指」，逐条核对全部错误：
+#     crates/neotrix-decision-engine/src/types.rs → neotrix-core/src/l0_substrate/ffi/types.rs
+#     crates/neotrix-game/src/nt_clock.rs          → nt_mind/nt_game/nt_clock.rs
+#   ⇒ `types.rs` 是全仓最常见的文件名，basename 匹配会随机命中**完全无关**的文件。
+#   这正是 AGENTS.md L15「同名 ≠ 同一符号」在死链治理上的复现。
+#   ⇒ 这 ~108 条（25 + 83）**必须逐条人工判断**，任何自动批量改引用都可能改错。
+#
+# ⚠️ 本文件曾被一次批量脚本写坏（128/129 条丢失，04da1dec）。
+#    改本文件时**务必先备份 + 改后重跑门验证**，不要凭印象写盘。
 config/tokenizer
 crates/_archive/
 crates/atlas-agents/src/actor.rs
