@@ -345,12 +345,17 @@ mod idspace_contract_tests {
 
     /// 清单与金丝雀清单必须同源：清单为空 ⇒ 无可登记项（防两处各写一份 id）。
     #[test]
-    fn 清单非空且id为树形态() {
-        assert!(!TRADE_MANIFEST.is_empty(), "清单不该为空");
-        for e in TRADE_MANIFEST {
+    fn 清单非空且id与实现注册表同空间() {
+        //⚠️ 首版此处断言 `NT-域::模块::实例`（`::`×2）——
+        //   那是**canary 自己**的 id 空间，而清单用的是**实现注册表**的 `trade.*`。
+        //   ⛔ 两套 id 现存且**无桥**（见 FOLLOWUP-TASKS 的 id 空间裁决项）。
+        //   ⇒ 此处只断言清单自身的一致性；跨空间对齐是那个裁决项的职责，
+        //   **不在测试里偷偷把两者拉平**（那会让canary 的期望集被清单反向定义）。
+        assert!(!nt_core_capability_tree::market::TRADE_MANIFEST.is_empty());
+        for e in nt_core_capability_tree::market::TRADE_MANIFEST {
             assert!(
-                e.id.starts_with("NT-") && e.id.matches("::").count() == 2,
-                "清单 id 应为 `NT-域::模块::实例` 形态，实得 {:?}",
+                e.id.starts_with("trade."),
+                "清单 id 应与实现注册表同空间 `trade.*`，实得 {:?}",
                 e.id
             );
         }

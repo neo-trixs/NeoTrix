@@ -65,42 +65,50 @@ pub struct ManifestEntry {
     pub description: &'static str,
 }
 
-/// 贸易能力的市场清单（5 条）。
+/// 贸易能力的市场清单（**4 条**）。
 ///
-/// ⚠️ id 与 `neotrix-core` 的 `consciousness_runtime.rs:120-125`
-/// （金丝雀 `expect()`）以及 `bootstrap_trade_capabilities` 的 `ID_*` 常量
-/// **必须逐字一致** —— 三处任一不一致，反向核对（`expected_but_unregistered`）
-/// 就会永远红。
+/// # ⭐ 本清单曾被**编造**过，教训在案（2026-10-06）
+///
+/// 首版我凭空写了 5 条 `NT-MEMORY::trade::*` / `NT-MIND::trade::*`
+/// 的 id（命名方案自创、数量自创）。
+/// 而真实注册表 `create_default_registry()` 只有 **4** 个实现，id 形如
+/// `trade.price_calculator`。**零重叠**——却因两侧都读同一份清单，
+/// `neobot capability list` 一度**上架 5 项不存在的能力**，
+/// 看上去完全健康。
+///
+/// ⇒ 本清单的每一条都必须由 `capability_registry` 里的真实 id 逐字对照，
+/// 而「对照」由 core 侧测试 `manifest每个id都能在全局注册表查到` 承重：
+/// id 一旦漂移，**测试立刻红**（不是运行时静默降级）。
+///
+/// # 为什么不含 `StepHandlerCapability`
+///
+/// 它**有** `execute_trade` 实现，但 id 是**动态的**
+/// `trade.step.{handler_name}` ⇒ 无法进静态清单
+/// （要进，得先把 handler 名集合固化 —— 那是独立的一件事）。
 pub const TRADE_MANIFEST: &[ManifestEntry] = &[
     ManifestEntry {
-        id: "NT-MEMORY::trade::trade_product_spec",
-        domain: crate::node::Domain::Memory,
-        category: "trade/product-spec",
-        description: "产品规格生成",
+        id: "trade.price_calculator",
+        domain: crate::node::Domain::Mind,
+        category: "trade/pricing",
+        description: "按配置计算价格（PriceCalcRequest → 计价结果）",
     },
     ManifestEntry {
-        id: "NT-MIND::trade::trade_quote_negotiation",
+        id: "trade.product_matcher",
         domain: crate::node::Domain::Mind,
-        category: "trade/quote",
-        description: "报价谈判",
+        category: "trade/product",
+        description: "按配置做产品匹配（ProductMatchRequest → 匹配结果）",
     },
     ManifestEntry {
-        id: "NT-MIND::trade::trade_production_logistics",
+        id: "trade.risk_assessor",
         domain: crate::node::Domain::Mind,
-        category: "trade/logistics",
-        description: "生产物流",
+        category: "trade/risk",
+        description: "按配置评估风险（RiskAssessRequest → 风险结论）",
     },
     ManifestEntry {
-        id: "NT-MIND::trade::trade_finance_compliance",
+        id: "trade.supplier_matcher",
         domain: crate::node::Domain::Mind,
-        category: "trade/finance",
-        description: "金融合规",
-    },
-    ManifestEntry {
-        id: "NT-MIND::trade::foreign_trade_full_cycle",
-        domain: crate::node::Domain::Mind,
-        category: "trade/full-cycle",
-        description: "外贸全链",
+        category: "trade/supplier",
+        description: "按配置匹配供应商（SupplierMatchRequest → 供应商候选）",
     },
 ];
 
@@ -129,15 +137,26 @@ mod tests {
 
     /// 清单 id 必须是**能力树 id 形态**（含两个 `::`），否则反向核对照不上。
     #[test]
-    fn 清单id是能力树形态() {
+    /// 清单 id 必须用**实现注册表**的 id 形态（点号 `trade.*`）。
+    ///
+    /// ⚠️ 首版此处断言的是 `域::模块::实例`（`::` 出现 2 次）——
+    /// 那是我照抄 **canary 的 id 空间**写下的，而 canary 与实现
+    /// **是两个注册表、两套 id**。真实派发走 `capability_registry`，
+    /// 故清单必须用**它**的形态。
+    #[test]
+    fn 清单id是实现注册表形态() {
         for e in TRADE_MANIFEST {
-            assert_eq!(
-                e.id.matches("::").count(),
-                2,
-                "id 应为 `域::模块::实例` 形态，实得 {:?}",
+            assert!(
+                e.id.starts_with("trade.") && !e.id.contains("::"),
+                "id 应为实现注册表形态 `trade.*`，实得 {:?}",
                 e.id
             );
-            assert!(e.id.starts_with("NT-"), "id 域前缀应为 NT-，实得 {:?}", e.id);
         }
+    }
+
+    /// 清单**非空**（市场有东西可展示）。
+    #[test]
+    fn 清单非空() {
+        assert!(!TRADE_MANIFEST.is_empty(), "清单为空 ⇒ 市场无从展示");
     }
 }
