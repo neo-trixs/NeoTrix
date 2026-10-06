@@ -60,7 +60,12 @@ pub(crate) fn load_features() -> std::collections::BTreeSet<String> {
 pub(crate) fn save_features(features: &std::collections::BTreeSet<String>) {
     let path = features_path();
     if let Ok(content) = serde_json::to_string_pretty(features) {
-        std::fs::write(path, content).ok();
+        // ⚠️ 曾是 `.ok()`：写失败时调用方以为已保存（静默数据丢失）。
+        // ⭐ 本轮由 `check-silent-failure` 的 opener 放宽**首次发现**
+        //    （旧 opener 只认 `let _ =`，裸语句根本进不了扫描）。
+        if let Err(e) = std::fs::write(&path, content) {
+            log::warn!("[sandbox_features] 特征持久化失败 {}: {e}", path.display());
+        }
     }
 }
 

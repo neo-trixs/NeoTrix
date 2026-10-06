@@ -580,7 +580,12 @@ impl WorkspaceGuard {
         // 写本次快照
         let stamp = chrono_timestamp_stamp();
         let snap = self.config.snapshot_dir.join(format!("snap-{stamp}.txt"));
-        fs::write(&snap, curr).ok();
+        // ⚠️ 曾是 `.ok()`：**守卫组件**的快照写失败会被完全吞掉
+        // ⇒ 出事时没有快照可查，而守卫本身正是「出事时靠它」的。
+        // ⭐ 同为 opener 放宽后本门首次发现。
+        if let Err(e) = fs::write(&snap, curr) {
+            log::warn!("[guardian] 快照写入失败 {}: {e}", snap.display());
+        }
 
         // 只保留最近 max_snapshots 份
         let mut all: Vec<PathBuf> = fs::read_dir(&self.config.snapshot_dir)

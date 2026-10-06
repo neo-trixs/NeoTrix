@@ -205,6 +205,7 @@ def is_test(lines, i):
 
 hits = {}
 ambiguous = 0
+ok_discarded = 0        # `.ok()` 丢弃 Result：报告但不设门（见下方注释）
 for root in ROOTS:
     for dirpath, _d, files in os.walk(root):
         for fn in sorted(files):
@@ -240,7 +241,18 @@ for root in ROOTS:
                 #   ⇒ 改为：先认 opener，再**沿后续行按括号配平**累积到收尾的 `;`。
                 m = re.search(r"let\s+_\s*=\s*(.*)$", line)
                 if not m:
-                    continue
+                    # ⭐ 裸语句形态（2026-10-06 实测补齐）：
+                    #   `foo().ok();` 这种**不写 `let _ =`** 的丢弃，
+                    #   原 opener 完全看不见 ⇒ 实测漏掉 `full_cycle.rs` 里
+                    #   `execute_trade_full_cycle` 的 **10 处**阶段推进错误。
+                    #   只放宽到「以 .ok() 收尾的裸调用语句」，
+                    #   ⛔ 不放宽到任意裸语句（会把正常调用全卷进来）。
+                    m = re.search(
+                        r"^([\w:.]+\s*\([^;]*\)\s*\.\s*ok\s*\(\s*\)\s*;)$",
+                        line.strip(),
+                    )
+                    if not m:
+                        continue
                 rhs = m.group(1)
                 if not rhs.rstrip().endswith(";"):
                     # 多行形态：向下累积直到括号配平且该行以 `;` 收尾。
@@ -264,6 +276,11 @@ for root in ROOTS:
                 # strip a leading `mut ` and the receiver chain noise
                 if AMBIGUOUS.search(rhs):
                     ambiguous += 1
+                # `.ok()` 把 Result 变成 () ⇒ 错误**彻底消失**。
+                # 计数并每次打印，但**不设门**：全仓 `.ok()` 极多，
+                # 多数是有意的 best-effort；设门会误伤，改为「边界可见」。
+                if re.search(r"\.ok\(\)\s*;?\s*$", rhs):
+                    ok_discarded += 1
                 if not GATED.search(rhs):
                     continue
                 if is_test(lines, i):
@@ -304,6 +321,7 @@ print("  [silent-failure] baseline entries: %d（其中 %d 条**命中当前代�
       % (len(have), matched, len(stale)))
 print("  [silent-failure] NEW (未基线、--strict 下阻断): %d" % len(new))
 print("  [silent-failure] out of scope by design (remove_file/.send*): %d" % ambiguous)
+print("  [silent-failure] reported, not gated (`.ok()` 丢弃 Result): %d" % ok_discarded)
 if mode != "list":
     print("  [silent-failure] OPEN CONTRACTS (baseline row with no criterion): %d/%d"
           % (len(unjudged), len(have)))

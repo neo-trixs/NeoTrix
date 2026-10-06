@@ -399,6 +399,44 @@ neobot 侧 `listable()` 为真。
 ⇒ 该纪律在 AGENTS.md 已记录，我在**同一个会话里**又犯。
 ⇒ 本次修复：**注释里不写反引号**，改用裸 `Ok(内层 Err)`。
 
+### ⭐⭐⭐ P0.4 我接线的那个执行器**是桩** —— 而门本可以抓到它的输入形态（2026-10-06）
+
+复查 `execute_trade_full_cycle` 的函数体：
+
+```rust
+machine.current_phase = TradePhase::Ft01CustomerDevelopment;
+// ... execute FT01 logic          ← 注释，不是代码
+machine.advance(TradePhase::Ft02RequirementConfirmation).ok();
+```
+
+⇒ **17 个阶段的「执行」全是注释**；函数只设置 `current_phase`。
+且 10 处 `.ok()` **静默丢弃阶段推进错误**。
+
+⇒ **含义**：`foreign_trade_full_cycle` 现在会被派发、会被计数、会被打金丝雀，
+**而它没有真正做任何贸易逻辑**。
+这正是本会话一路在治的病，**我在最后一棒踩了进去**。
+
+⇒ ⛔ **不做的事**：不把派发接线撤掉（管道是对的，schema 是真的），
+但**必须**让「它是个桩」这件事可见，且**不能**靠「执行成功」来宣称它工作。
+
+#### ✅ 顺带修掉：门的一个真实覆盖漏洞（同一处形态）
+
+`check-silent-failure` 的 opener 只认 `let _ = ...`
+⇒ **`machine.advance(..).ok();` 这种裸语句从未进入扫描**。
+
+⇒ 按证据放宽 opener（只加「以 `.ok()` 收尾的裸调用语句」，不放宽到任意裸语句）
+⇒ 立刻出现：
+- `.ok()` 丢弃 Result 共 **69 处**（新增报告项，每次运行打印，**不设门**）
+- **2 处此前不可见的新命中**（真实缺陷，已修）：
+  - `entry/sandbox_features.rs:63` `save_features` 写失败被吞 ⇒ 调用方以为已保存
+  - `l5_cognition/nt_mind/foundation/guardian.rs:583` **守卫组件**快照写失败被吞
+    ⇒ 出事时没有快照可查，**而守卫正是出事时靠它的**
+
+⇒ 两处都改为 `log::warn!`（门的 OBSERVE 通道 ⇒ 既修缺陷又过门）。
+
+⚠️ **这正是「门必须能被证伪」的价值**：一个只看「自己关心的形态」的门，
+会以 PASS 的面貌放过真缺陷。**扩大覆盖面的那一刻，门才第一次真的在工作。**
+
 ⇒ 另 3 个（`production_logistics` / `finance_compliance` / `trade_product_spec`）
 **顶层执行器数为 0** ⇒ 接线须**发明** schema ⇒ **不注册，保持 fail-closed**。
 
