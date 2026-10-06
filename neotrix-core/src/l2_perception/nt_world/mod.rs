@@ -9,6 +9,7 @@
 //!   data_source/ — 情报数据源采集器 (12 个)
 
 pub mod l1_facade;
+pub mod temporal_kg; // 时序知识图谱（孤儿接线 A53）
 pub mod crawl;
 pub mod osint;
 pub mod sense;

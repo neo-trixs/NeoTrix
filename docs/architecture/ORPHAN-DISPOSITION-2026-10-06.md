@@ -9,13 +9,13 @@
 
 | | 值 |
 |---|---:|
-| 孤儿目录 | **8**（O-1 单列裁决；O-5/O-6 A51 接线；O-11/12/13 A52 接线） |
-| `.rs` 文件 | **35** |
-| 代码行 | **8,127** |
+| 孤儿目录 | **5**（O-1 单列裁决；A51/A52/A53 共接线 8 条） |
+| `.rs` 文件 | **19** |
+| 代码行 | **3,104** |
 | **判为「纯重复」** | **0 条** |
 | 判为「独有能力」 | 2 条 |
 | 判为「部分覆盖」 | 11 条 |
-| 已删除 / 已接线 | **1 条**（`nt_consciousness`）/ **5 条**（A51 两条＋ A52 三条） |
+| 已删除 / 已接线 | **1 条**（`nt_consciousness`）/ **8 条**（A51 两条 ＋ A52 三条 ＋ A53 三条） |
 
 ⚠️ **最重要的一条结论**：**13 条里没有一条是重复副本。**
 ⇒ 「未接线」在本仓不是「冗余」，而是「**有能力、无接线**」——
@@ -60,12 +60,12 @@ error[E0432]: unresolved import `crate::l5_cognition::nt_consciousness::features
 |---|---|---|---:|---|---|
 | O-2 | `nt_mind/cross_domain` | 5 / 2,649 / 14 | **46**/54 | **归档（不接线）** | 独有能力占比最高（85%），带测试 ⇒ 有资产价值；从无数据 |
 | O-3 | `nt_mind/self_improvement` | 4 / 2,129 / **44** | 19/27 | **归档** | 测试密度最高（44 / 2,129 行）⇒ 明显被维护过 |
-| O-4 | `nt_world/temporal_kg` | 8 / 1,278 / **42** | 3/8 | **归档** | 覆盖率最高（5/8）⇒ 若接线，**先迁 3 个独有类型**即可，其余可弃 |
+| O-4 | `nt_world/temporal_kg` | 8 / 1,278 / **42** | 3/8 | ✅ **已接线（A53）** | 42 测试全绿。测出**真数学 bug**：PPR 把悬挂质量 `dangling_sum/n` 均摊 ⇒ 链尾 `e4` 反超种子 `e0`；已改为按 personalization 再分配（标准公式）。另 7 处 `NaiveDateTime::from_ymd_opt`（该 API 不存在）改现代 chrono |
 | O-5 | `nt_core/knowledge` | 5 / 1,263 / **0→5** | 29/42 | ✅ **已接线（A51）** | 首次接线即编译通过；补 5 个冒烟测试并**测出`bfs`/`dfs` 的 `max_depth` off-by-one**（`Some(1)` 不返回直接邻居，却给它记了`distances=1.0`）⇒ 真 bug，已修并被测试锁定 |
 | O-6 | `nt_core/memory` | 5 / 1,171 / 4 | 16/24 | ✅ **已接线（A51）** | 4 测试全绿。首接线暴露 **4 类真 bug**：`EmotionLabel` 只在 L6（引它即 **L5→L6 违规**）、`ConceptNode` 无 `concept` 字段 6 处、`episode.id` move 后复用 1 处、`patterns`/`principles` 借用活过 `store()` 2 处 |
 | O-7 | `nt_consciousness_core/archive` | 3 / 1,082 / 19 | 13/14 | **归档（名已自述）** | 目录名即 `archive` ⇒ 可能是有意归档；需确认保留策略 |
-| O-8 | `nt_act/semantic_routing` | 4 / 844 / 22 | 12/13 | **归档** | 覆盖率 1/13 ⇒ 近乎全新能力 |
-| O-9 | `nt_act/geo_seo` | 4 / 591 / 9 | 13/18 | **归档** | 独有 `KeywordRanking`/`GeoRegion` 等 SEO 域能力 |
+| O-8 | `nt_act/semantic_routing` | 4 / 844 / 22 | 12/13 | ✅ **已接线（A53）** | 22 → 0 error，含**真逻辑 bug**：`context_boost` 拿上下文 **key** 比关键词（永匹配不上）⇒ 改为比 value。另 `SimilarityScore` 持 `String` 却derive `Copy`（E0204）、`BehaviorPatternType` 缺 `Eq/Hash` 却作 HashMap 键、闭包内`?` 需改 `and_then`、借用冲突 2 处 |
+| O-9 | `nt_act/geo_seo` | 4 / 591 / 9 | 13/18 | ✅ **已接线（A53）** | **零错误零改动**直接编译通过，9 测试全绿 |
 | O-10 | `nt_act/nt_act_dev_tools` | 4 / 582 / 4 | **5/5** | **归档** | **全未覆盖** ⇒ 独有：`DesktopBuilder`/`BuildLadder`/`GitHook`/`DaemonMonitor` |
 | O-11 | `nt_memory_knowledge_graph` | 3 / 569 / 8 | 9/10 | ✅ **已接线（A52）** | 首接线 **22 → 0 error**。测出：孤立残留 derive 块（同时作用于同一 enum ⇒ `rename_all` 重复＋6 个 `E0119`）、`use` 夹在 `#[derive]` 与 struct 之间、derive 缺 `Hash` 却用 `HashSet`、**真UTF-8 panic**（按字节切3 字节的 `→`）。另发现 `sync_to_kb` 是**活路径上的死端桩**（真实写入被注释，有调用方） |
 | O-12 | `nt_feel/cognition_bridge` | 2 / 234 / 9 | 1/3 | ✅ **已接线（A52）** | 缺 `mod.rs`（只有 `config.rs`/`emotion_state.rs`）⇒ 补建后直接编译通过，**9 测试零改动全绿** |

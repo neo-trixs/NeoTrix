@@ -15,11 +15,12 @@ pub use router::PatternRouter;
 pub use catalog::PatternCatalog;
 
 use std::collections::HashMap;
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 /// Semantic similarity score
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+// 注：原 derive 含 Copy，但本结构持有 `String` ⇒ Copy 不可能实现（E0204）。
+// 注：原 derive 无 Serialize/Deserialize，而 PolicyTrace 含本类型且派生二者。
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct SimilarityScore {
     pub value: f64,
     pub method: String,
@@ -47,7 +48,8 @@ pub struct PolicyTrace {
 }
 
 /// Fan-in queue for batching similar pattern requests
-#[derive(Debug, Clone)]
+// 注：原 derive 缺 Serialize/Deserialize，而 BehaviorPattern 含本类型且派生二者。
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FanInQueue {
     pub queue_id: String,
     pub pattern_type: String,
@@ -77,7 +79,9 @@ pub struct RouteResult {
 }
 
 /// Default behavior pattern types
-#[derive(Debug, Clone, Serialize, Deserialize)]
+// 注：原 derive 无 PartialEq/Eq/Hash，而本类型被用作 HashMap 的键
+// （patterns_by_type: HashMap<BehaviorPatternType, _>）⇒ 必须补齐。
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BehaviorPatternType {
     /// Sequential task execution
     Sequential,

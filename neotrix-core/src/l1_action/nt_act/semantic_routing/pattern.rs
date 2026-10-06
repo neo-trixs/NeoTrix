@@ -2,10 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
 
-use super::{BehaviorPatternType, TrustBoundary, SimilarityScore, PolicyTrace, FanInQueue, PatternRequest, RouteResult};
-use super::semantic_routing::BehaviorPatternType;
+use super::{BehaviorPatternType, TrustBoundary, SimilarityScore, PolicyTrace, FanInQueue};
 
 /// A semantic behavior pattern recognized in the system
 #[derive(Debug, Clone, Serialize, Deserialize)]

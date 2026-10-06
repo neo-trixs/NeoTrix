@@ -147,7 +147,9 @@ mod tests {
     use super::*;
 
     fn dt(year: i32, month: u32, day: u32) -> NaiveDateTime {
-        NaiveDateTime::from_ymd_opt(year, month, day, 0, 0, 0).unwrap()
+        chrono::NaiveDate::from_ymd_opt(year,month,day)
+            .and_then(|d| d.and_hms_opt(0,0,0))
+            .expect("测试时间戳构造：日期/时间应合法")
     }
 
     fn make_entities() -> Vec<Entity> {
@@ -185,7 +187,9 @@ mod tests {
         assert_eq!(facts.len(), 1);
         assert_eq!(
             facts[0].valid_from,
-            NaiveDateTime::from_ymd_opt(2024, 6, 15, 14, 30, 0).unwrap()
+            chrono::NaiveDate::from_ymd_opt(2024,6,15)
+            .and_then(|d| d.and_hms_opt(14,30,0))
+            .expect("测试时间戳构造：日期/时间应合法")
         );
     }
 

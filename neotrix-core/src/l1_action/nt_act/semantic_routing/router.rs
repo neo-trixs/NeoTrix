@@ -3,9 +3,8 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use super::{BehaviorPattern, PatternCatalog, RouteResult, BehaviorPatternType, SimilarityScore, PolicyTrace, TrustBoundary, FanInQueue, PatternRequest};
-use super::behavior_pattern::BehaviorPatternType as BPT;
-use super::semantic_routing::{BehaviorPatternType, TrustBoundary, SimilarityScore, PolicyTrace, RouteResult, FanInQueue, PatternRequest};
+// 注：BehaviorPatternType 主代码未用，但 #[cfg(test)] 用到 ⇒ 必须保留。
+use super::{BehaviorPattern, BehaviorPatternType, PatternCatalog, RouteResult, SimilarityScore, PolicyTrace, TrustBoundary, FanInQueue, PatternRequest};
 
 /// Pattern router that matches queries to the nearest skill
 pub struct PatternRouter {
@@ -53,6 +52,14 @@ impl PatternRouter {
         let skill_id = best_match.primary_skill()?.to_string();
         let score = best_match.compute_similarity(query);
         let confidence = score.value;
+        // ⚠️ 借用冲突修复：`best_match` 借自 self（Option<&BehaviorPattern>），
+        // 若其存活到下面的 &mut self 调用（policy_traces.push / enqueue_request）
+        // 会触发 E0502 ⇒ 先把派生数据取出，让不可变借用尽早结束。
+        let skill_name = best_match.name.clone();
+        let fan_in_queue_id = best_match
+            .fan_in_queue
+            .as_ref()
+            .map(|q| q.queue_id.clone());
 
         // Create policy trace
         let trace = PolicyTrace {
@@ -67,15 +74,15 @@ impl PatternRouter {
         self.policy_traces.push(trace.clone());
 
         // Check fan-in queue
-        if let Some(fan_in) = best_match.fan_in_queue.as_ref() {
-            self.enqueue_request(&fan_in.queue_id, query, &trace);
+        if let Some(queue_id) = fan_in_queue_id {
+            self.enqueue_request(&queue_id, query, &trace);
         }
 
         // Cache the result
         let cache_key = format!("{}:{}", query, skill_id);
         let result = RouteResult {
             skill_id: skill_id.clone(),
-            skill_name: best_match.name.clone(),
+            skill_name,
             score,
             policy_trace: trace,
             references_loaded: Vec::new(),
@@ -103,7 +110,8 @@ impl PatternRouter {
             }
         }
 
-        best_pattern.map(|p| {
+        // 闭包内用了 `?`（primary_skill() 返回 Option）⇒ 必须让闭包返回 Option。
+        best_pattern.and_then(|p| {
             let score = SimilarityScore { value: best_score.min(1.0), method: "context_aware".to_string() };
             let trace = PolicyTrace {
                 skill_id: p.primary_skill()?.to_string(),
@@ -113,14 +121,14 @@ impl PatternRouter {
                 timestamp: now_timestamp(),
                 path: vec![p.id.clone()],
             };
-            RouteResult {
+            Some(RouteResult {
                 skill_id: p.primary_skill()?.to_string(),
                 skill_name: p.name.clone(),
                 score,
                 policy_trace: trace,
                 references_loaded: Vec::new(),
                 scripts_loaded: Vec::new(),
-            }
+            })
         })
     }
 
@@ -142,9 +150,17 @@ impl PatternRouter {
 
     /// Calculate context boost for a pattern
     fn context_boost(&self, pattern: &BehaviorPattern, context: &HashMap<String, String>) -> f64 {
-        let mut boost = 0.0;
+        let mut boost: f64 = 0.0; // 原为 `0.0`，仅与 f64 字面量运算 ⇒ 类型歧义（E0689）
         for (key, value) in context {
-            if pattern.keywords.iter().any(|kw| kw.to_lowercase() == key.to_lowercase()) {
+            // ⚠️ 真bug 修复：原实现拿上下文的 **key**（形如 "domain"/"language"）
+            // 去和模式关键词比，语义上永远匹配不上；而下一行 `metadata.get(key)` 用的是
+            // value 侧比较，两者自相矛盾。上下文的意义在**值**（{"domain": "research"}），
+            // 故改为与 value 比较。
+            if pattern
+                .keywords
+                .iter()
+                .any(|kw| kw.to_lowercase() == value.to_lowercase())
+            {
                 boost += 0.2;
             }
             if pattern.metadata.get(key).map_or(false, |v| v == value) {
@@ -155,7 +171,8 @@ impl PatternRouter {
     }
 
     /// Enqueue a request in a fan-in queue
-    fn enqueue_request(&mut self, queue_id: &str, query: &str, trace: &PolicyTrace) {
+    // 注：`trace` 形参未被使用（原实现未把 trace 记入请求）⇒ 保留签名但前缀下划线。
+    fn enqueue_request(&mut self, queue_id: &str, query: &str, _trace: &PolicyTrace) {
         let request = PatternRequest {
             query: query.to_string(),
             context: HashMap::new(),
@@ -211,7 +228,6 @@ fn now_timestamp() -> u64 {
 mod tests {
     use super::*;
     use std::collections::HashMap;
-    use super::semantic_routing::BehaviorPatternType;
 
     fn create_test_router() -> PatternRouter {
         let mut router = PatternRouter::new();

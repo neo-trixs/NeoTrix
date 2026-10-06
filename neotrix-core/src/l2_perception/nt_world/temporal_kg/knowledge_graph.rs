@@ -54,7 +54,9 @@ mod tests {
     use super::*;
 
     fn dt(year: i32, month: u32, day: u32, hour: u32, min: u32) -> NaiveDateTime {
-        NaiveDateTime::from_ymd_opt(year, month, day, hour, min, 0).unwrap()
+        chrono::NaiveDate::from_ymd_opt(year,month,day)
+            .and_then(|d| d.and_hms_opt(hour,min,0))
+            .expect("测试时间戳构造：日期/时间应合法")
     }
 
     fn make_graph() -> KnowledgeGraph {

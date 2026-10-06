@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use super::{BehaviorPattern, BehaviorPatternType, TrustBoundary, RouteResult};
-use super::semantic_routing::{BehaviorPatternType, TrustBoundary, RouteResult};
 
 /// Catalog of recognized behavior patterns mapped to skills
 pub struct PatternCatalog {
@@ -73,7 +72,7 @@ impl PatternCatalog {
     /// Add a pattern to a registered skill
     pub fn add_skill_pattern(&mut self, skill_id: &str, pattern_id: String) {
         if let Some(skill) = self.registered_skills.get_mut(skill_id) {
-            skill.patterns.push(pattern_id);
+            skill.patterns.push(pattern_id.clone()); // 原被 move，后续还要 push 到 skill_patterns
         }
         self.skill_patterns
             .entry(skill_id.to_string())
@@ -126,8 +125,8 @@ impl PatternCatalog {
         Some(RouteResult {
             skill_id: skill_id.to_string(),
             skill_name: skill.skill_name.clone(),
-            score: super::semantic_routing::SimilarityScore { value: score, method: "catalog_match".to_string() },
-            policy_trace: super::semantic_routing::PolicyTrace {
+            score: super::SimilarityScore { value: score, method: "catalog_match".to_string() },
+            policy_trace: super::PolicyTrace {
                 skill_id: skill_id.to_string(),
                 pattern_id: pattern_id.to_string(),
                 confidence: score,
@@ -175,7 +174,7 @@ fn now_timestamp() -> u64 {
 mod tests {
     use super::*;
     use std::path::PathBuf;
-    use super::semantic_routing::BehaviorPatternType;
+    use super::BehaviorPatternType;
 
     #[test]
     fn test_register_and_find() {

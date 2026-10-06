@@ -30,8 +30,6 @@ pub fn personalized_page_rank(
         }
     }
 
-    let mut scores = vec![1.0 / n as f64; n];
-
     let mut personalization = vec![0.0; n];
     let seed_weight = 1.0 / seed_ids.len() as f64;
     for qid in seed_ids {
@@ -39,6 +37,9 @@ pub fn personalized_page_rank(
             personalization[idx] = seed_weight;
         }
     }
+
+    // 标准 PPR 的初值即 personalization 向量（原为均匀 1/n，非标准）。
+    let mut scores = personalization.clone();
 
     for _ in 0..iterations {
         let mut new_scores = vec![0.0; n];
@@ -55,10 +56,13 @@ pub fn personalized_page_rank(
             }
         }
 
-        let dangling_share = dangling_sum / n as f64;
+        // ⚠️ PPR 数学修正：悬挂（无出边）节点的质量必须**按 personalization
+        // 向量再分配**。原实现用 `dangling_sum / n` 均摊给每个节点，于是链尾
+        // （如 e4）拿到与种子无关的等额提升，反而压过种子本身 ——
+        // 实测 `personalized_page_rank(chain, ["e0"])` 把 e4 排到第一。
         for i in 0..n {
-            new_scores[i] =
-                (1.0 - damping) * personalization[i] + damping * (new_scores[i] + dangling_share);
+            new_scores[i] = (1.0 - damping) * personalization[i]
+                + damping * (new_scores[i] + dangling_sum * personalization[i]);
         }
 
         scores = new_scores;
@@ -83,7 +87,9 @@ mod tests {
     use chrono::NaiveDateTime;
 
     fn dt(year: i32, month: u32, day: u32, hour: u32, min: u32) -> NaiveDateTime {
-        NaiveDateTime::from_ymd_opt(year, month, day, hour, min, 0).unwrap()
+        chrono::NaiveDate::from_ymd_opt(year,month,day)
+            .and_then(|d| d.and_hms_opt(hour,min,0))
+            .expect("测试时间戳构造：日期/时间应合法")
     }
 
     fn make_chain_graph() -> KnowledgeGraph {

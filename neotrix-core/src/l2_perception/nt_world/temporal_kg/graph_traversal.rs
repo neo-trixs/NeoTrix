@@ -124,7 +124,9 @@ mod tests {
     use std::collections::HashMap;
 
     fn dt(year: i32, month: u32, day: u32) -> NaiveDateTime {
-        NaiveDateTime::from_ymd_opt(year, month, day, 0, 0, 0).unwrap()
+        chrono::NaiveDate::from_ymd_opt(year,month,day)
+            .and_then(|d| d.and_hms_opt(0,0,0))
+            .expect("测试时间戳构造：日期/时间应合法")
     }
 
     fn make_graph() -> KnowledgeGraph {
