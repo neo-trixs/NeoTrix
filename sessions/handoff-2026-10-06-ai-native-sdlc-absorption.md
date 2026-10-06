@@ -250,3 +250,77 @@
 - `nt_worktree_gate.sh check`：本轮**未新建任何 worktree**（第一轮那个基线测量用的
   已 `git worktree remove`）。
 - 本轮改动 5 个文件全部 `--only` 提交（`cdaf48a8`），暂存区已清空。
+
+---
+
+## 11. 第三轮 · 路线 N-5 落地 + 浮点 panic 修复（`b7f41132` `b0fa4f5e` `1e17d892`）
+
+### 11.1 裁决：正典的「下一步」自相矛盾
+
+`FINAL-ROADMAP` §5 写「批次 A 下一步仍是 A3」，但**同一份正典**的
+`FEATURE-MAP-TASKS:71` 已把 N-3（=A3）标 ✅ 并附证伪记录 ⇒ 那句按 R-SCAN-3
+属不可沿用的门记录，**已作废**。批次 A 真实开放项 = **N-4 / N-5**。
+
+### 11.2 N-5 已落地（claims 数字追溯门）
+
+补 `nt_manifest.py` 只验 `file:line` **不验数字**的洞。立门依据是**同一场会话
+踩了 4 次陈旧数字**（`AGENTS.md` 75→79→82→83、`ROADMAP`「下一步 A3」而 A3 已✅、
+`FEATURE-MAP` N-4 ⬜ 而代码已接生产、`gate-registry`「NEW 5」而实测 24）。
+
+⛔ **两条设计教训，都是建门当日自查抓到的**：
+1. **注册表不存字面量**。初版存 `expected`，我当场加一条索引（82→83），
+   门**照样绿**（文档与 expected 都写 82）⇒ **两处陈旧互相印证是最坏形态**。
+   改为 doc 与 src 同一次运行各自提取再互比。
+2. **⛔ 探针自己也不得硬编码那个数字**。探针写死「82 条索引」，
+   真源一变前置断言就失败 ⇒ **探针自己成了又一个陈旧数字**。
+
+防空转双判据当天抓到我自己写错的 pattern。接线四处 + **壳层**
+（`check-gate-satisfiable` 按 `grep scripts/check-*.sh` 发现门，
+只放 `scripts/ops/` 它看不见 ⇒ 有探针也不被元门跑到）。
+元门：18 → **20 门，已登记 20/20，未登记 0，探针失败 0**。
+
+### 11.3 N-4 裁决：只登记事实，不擅自建设
+
+`visible_to_model` **生产生效**（`search_skills` 默认 audience=Model）；
+⛔ `visible_to_user` **生产零路径**（唯一构造点在 `:1410` 测试里），
+而 `:123` 注释宣称「用户 `/` 菜单」—— **代码注释里的死断言**。
+
+⇒ 裁决「**名义已接线**」而非「已接入」。R-P79 再往下一层：
+**模块内有消费者 ≠ 策略输入被真实变化过**。补齐需真消费者（功能建设）⇒ 留独立裁决项。
+
+### 11.4 已修：3 处浮点**潜在 panic**（真缺陷）
+
+`resonance.rs` 的 `partial_cmp().expect("no NaN")` —— 那断言**不 enforce 任何东西**，
+NaN 真进来就 panic。`:359` 最险：它直接消费 `modulate()` 的输出，而该输出可被 NaN 污染。
+修法 `ord_nan_last()`（NaN 恒最小）。⛔ 不用 `total_cmp`：它把 NaN 当**最大**
+⇒ winner-take-most 会让 NaN 夺冠。
+验证：编译 ✅ · `resonance` 测试 **18 passed** · `check-unwrap` NEW **24 → 21**。
+
+⚠️ **先纠自己的错**：初判「`cost == 0` 出 NaN」被读代码证伪（`cost <= 0.0` 已守卫）；
+真路径是 `cost`/`cost_sensitivity` **本身为 NaN**（`NaN <= 0.0` 为 false ⇒ 穿过守卫）。
+
+### 11.5 剩余 18 条：分类登记 + ⛔ 不批量入基线
+
+分类写入 `FINAL-ROADMAP` §7.0（A 常量正则 4 / B 锁中毒 2 / C 定长切片 2 /
+D 紧邻 push 不变量 2 / F 未读 4），逐条写明为什么不在本轮机械修（多为**行为变更**或需先读全函数）。
+
+⛔ **不批量写进 baseline**：当前格式 `<path>:<line>\t<token>` **两列、无 criterion/oracle**
+⇒ 批量加 18 行 = 把「已裁决」伪装成「已豁免」。正当出路是「补基线带 criterion+oracle」，
+而该格式尚未落地 ⇒ **前置缺口先补格式**。
+⇒ `check-unwrap --strict` **继续红（21 NEW）= 如实状态**。
+
+### 11.6 ⛔ 本轮我的一起严重失误（已修）
+
+给 task-index 追加索引时用 `s[:j] + entry` 切片，**把 `tasks` 之后的整个文件截断**
+（`excluded`/`doc-claims`/`commit-deletions`/`scripts` 共 85 行）。
+JSON 语法报错我修了，**却没发现内容少了一整块** —— 拿「能 parse」当验证，
+而 parse 通过恰恰掩盖了字段整段消失。已从 `HEAD~1` 逐节恢复（**0 个 id 丢失**）。
+
+⇒ 两个我该早点做的检查：① `git diff --stat` 删除数与预期不符就该停；
+② 改结构化文件要比对**顶层键集合**，不只验能否 parse。
+
+### 11.7 收工义务（本轮）
+
+- 本轮**未新建任何 worktree**。
+- 3 笔提交全部 `--only`：`b7f41132`(10 文件) `b0fa4f5e`(1) `1e17d892`(2)。
+- 暂存区已清空；`git diff --cached` 为空。
