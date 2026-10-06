@@ -287,3 +287,57 @@ bash scripts/check-truth-surface.sh 2>&1 | sed -n '3p'
 gh api repos/qybaihe/mu --jq '{fork,parent:.parent.full_name,created_at,license:.license.spdx_id}'
 gh api repos/maliaosaide/aether-search --jq '.license'
 ```
+
+---
+
+## 7.0 2026-10-06 裁决补记 · `check-unwrap` 21 条 NEW 的**分类裁决**
+
+⛔ **本节不主张「已修完」**。21 条中我只改了 **3 条**，其余 18 条按类登记如下，
+理由逐条对应实际代码（不是按 token 名猜的）。
+
+### 先纠一次自己的错
+
+初判「`cost == 0` 会让 `budget_f / (cost * 10000.0)` 出 NaN」——**读代码后证伪**：
+`if cost <= 0.0 { factors[i] = 1.0; continue; }` 已挡住 `cost == 0`。
+真路径是 **`cost` 或 `cost_sensitivity` 本身为 NaN**：`NaN <= 0.0` 为 false ⇒ 穿过守卫。
+⇒ 「读一遍再裁决」与「推一遍就裁决」的结果差一个门禁。
+
+### 已修：3 处浮点 `partial_cmp().expect()`（**真缺陷，不是风格问题**）
+
+| 位置 | 判据 |
+|---|---|
+| `resonance.rs:124` `max_by` | 同一文件两处，另两处 `:250` / `:359` |
+| `resonance.rs:250` `sort_by`（`take(min_active)` 的排序键） | |
+| `resonance.rs:359` `max_by`（**直接消费 `modulate()` 的输出**） | |
+
+**为什么是真缺陷**：`expect("no NaN")` **不 enforce 任何东西** —— 它是把「我认为不会有
+NaN」写成注释。NaN 真进来时 `partial_cmp` 返回 `None` ⇒ `expect` 立刻 **panic**
+⇒ 一次坏输入变成一次崩溃（`:359` 尤其：它吃的就是 `modulate()` 的输出，
+而 `modulate()` 的因子可由 NaN 污染）。
+
+**修法**：`ord_nan_last()`（`resonance.rs:104`）—— NaN 恒排最小。
+⛔ 不用 `total_cmp`：`total_cmp` 把 NaN 当**最大** ⇒ winner-take-most 会让 **NaN 夺冠**，
+语义是错的。（`total_cmp` 是本仓既有写法，见 `nt-core-capability-tree/src/registry.rs:816`。）
+验证：`cargo test -p neotrix-types --lib resonance` = **18 passed / 0 failed**；
+`check-unwrap` NEW **24 → 21**。
+
+### 未修：18 条按类登记（⛔ 不批量入基线）
+
+| 类 | 处数 | 为什么**不**在本轮机械修 |
+|---|---|---|
+| **A** `Regex::new(常量).expect()` | 4（+ `nt_governance.rs:138`，是多行调用的续行，上一轮分类器漏判） | 正则是**编译期常量** ⇒ 要么永远成立要么永远不成立。真正该做的是 `OnceLock`/`LazyLock` 把编译移到首次使用时**给出可诊断错误**，而不是每次调用重编译 + panic。**属结构改造，超出「零 `.rs`」批次**，且会改 `GovernorRule` 构造路径 ⇒ 留独立裁决 |
+| **B** `Mutex::lock().unwrap()` | 2（`coverage_ledger.rs:388/464`） | 锁中毒。正确处置是 `unwrap_or_else(PoisonError::into_inner)` —— **这是行为变更**（是否继续用被毒化的数据），需产品判断，不是机械替换 |
+| **C** 定长切片 `try_into().unwrap()` | 2（`nt_pet.rs:225/226`，PNG 头 `bytes[16..20]`） | 真不变量（切片长度由 PNG 校验保证）。可换 `u32::from_be_bytes([bytes[16],..])` 免 panic，但属**风格**；且该文件是否值得改取决于它是否在生产路径 ⇒ 先查证再动 |
+| **D** `last/last_mut().unwrap()` | 2（`coverage_ledger.rs:447`、`agent_orchestrator.rs:91`） | 紧邻 `push` 的不变量。改成 `if let Some(x) = ... else { return }` 会**改变控制流** ⇒ 需读全函数判断 |
+| **F** 其他 | 4（`shanhai_query.rs:131`、`social_access/traits.rs:295` 等） | 未逐条读。⛔ 不在没读过的代码上动手 |
+
+### ⛔ 明确不做的事
+
+**不把 18 条批量写进 `scripts/unwrap-baseline.txt`。** 理由：
+① 仓库自己的判据说得很直白 ——「⛔ 绝不要为了让门变绿而调大 baseline」；
+② 当前基线格式是 `<path>:<line>\t<token>` **两列，没有 `criterion`/`oracle` 字段**
+⇒ 批量加 18 行等于把「已裁决」伪装成「已豁免」，下一个 agent 无法判断哪条能修；
+③ `gate-registry.tsv` 给的正当出路是「**补基线带 criterion+oracle** 或修代码」，
+而带字段的基线格式本身尚未落地 ⇒ **这是前置缺口，应先补格式再谈入基线**。
+
+⇒ 故 `check-unwrap --strict` **继续红（21 NEW）**，这是**如实状态**而非遗留。

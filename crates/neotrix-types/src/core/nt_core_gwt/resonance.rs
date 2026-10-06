@@ -90,6 +90,26 @@ impl ResonanceMatrix {
     }
 }
 
+/// 浮点比较，**NaN 恒排最小**（即永不当赢家、永不进入 `take(n)` 的头部）。
+///
+/// ⛔ 为什么不能用 `partial_cmp().expect("no NaN")`：那行断言**不 enforce 任何东西**，
+/// 它只是把「我认为不会有 NaN」写成一句注释。NaN 一旦真的进来（`cost_sensitivity`
+/// 是 NaN、或 `cost` 是 NaN —— 注意 `NaN <= 0.0` 为 false ⇒ 能穿过
+/// `if cost <= 0.0 { continue }` 那道守卫），`partial_cmp` 返回 `None`，
+/// `expect` 立刻 **panic** ⇒ 一次坏输入变成一次崩溃。
+///
+/// ⇒ 本仓既有做法是 `f64::total_cmp`（`nt-core-capability-tree/src/registry.rs:816`
+/// 等 5+ 处），但 `total_cmp` 把 NaN 当**最大** ⇒ 「winner-take-most」会让 NaN 夺冠，
+/// 语义是错的。故这里显式把 NaN 压到最小，其余走 `total_cmp`。
+fn ord_nan_last(a: &f64, b: &f64) -> core::cmp::Ordering {
+    match (a.is_nan(), b.is_nan()) {
+        (true, true) => core::cmp::Ordering::Equal,
+        (true, false) => core::cmp::Ordering::Less,
+        (false, true) => core::cmp::Ordering::Greater,
+        (false, false) => a.total_cmp(b),
+    }
+}
+
 /// Compute resonance-boosted winner-take-most competition.
 /// Returns (winner_index, effective_saliences, entropy).
 pub fn resonate_and_select(
@@ -101,7 +121,7 @@ pub fn resonate_and_select(
     // Winner-take-most: pick the highest effective salience
     let winner = eff.iter()
         .enumerate()
-        .max_by(|(_, a), (_, b)| a.partial_cmp(b).expect("f64 partial_cmp should not produce NaN"))
+        .max_by(|(_, a), (_, b)| ord_nan_last(a, b))
         .map(|(i, _)| i)
         .unwrap_or(0);
 
@@ -227,7 +247,7 @@ impl ThinkingBudgetGate {
 
         // Ensure at least `min_active` modules remain viable
         let mut indexed: Vec<(usize, f64)> = factors.iter().copied().enumerate().collect();
-        indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).expect("no NaN in factors"));
+        indexed.sort_by(|a, b| ord_nan_last(&b.1, &a.1));
         for &(idx, _) in indexed.iter().take(self.min_active) {
             factors[idx] = factors[idx].max(0.1);
         }
@@ -336,7 +356,7 @@ pub fn resonate_cycle_with_budget(
     let winner = budget_modulated
         .iter()
         .enumerate()
-        .max_by(|(_, a), (_, b)| a.partial_cmp(b).expect("no NaN"))
+        .max_by(|(_, a), (_, b)| ord_nan_last(a, b))
         .map(|(i, _)| i)
         .unwrap_or(0);
 
