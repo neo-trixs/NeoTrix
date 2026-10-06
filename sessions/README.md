@@ -23,7 +23,7 @@
   有效部分迁入 neobot 真实执行环（见 10-06 三份），**这两份只作历史取证**。
 - `HANDOFF-TEMPLATE.md` 是模板，不是交接记录。
 
-## 全量清单（72 份）
+## 全量清单（73 份）
 
 
 ### 窗口协同与纪律（先读这组）（17 份）
@@ -95,6 +95,7 @@
 | `handoff-2026-10-05-decor-noise-and-canary-rewiring.md` | handoff — 2026-10-05 星号噪声清理 + 金丝雀改接真实派发路径 | 2026-10-05 | 8K |
 | `handoff-2026-10-05-tui-wiring-and-six-defects.md` | handoff — TUI 接线 + 六个真缺陷（2026-10-05） | 2026-10-05 | 40K |
 | `handoff-2026-10-06-agent-loop-wiring.md` | handoff — 2026-10-06 把 AgentLoop 的独有能力接到真实执行环  <br/>*AgentLoop 有效部分迁入 neobot 真实执行环（我）* | 2026-10-06 | 8K |
+| `handoff-2026-10-06-cleanup-p0-and-build-governance.md` | ★ 本窗口收尾：磁盘治理 + P0 注册表数据丢失 + 交接索引（73 份）<br/>*含「无限文件」真凶：`target/debug/incremental` 曾占 14G/22G* | 2026-10-06 | 12K |
 | `handoff-2026-10-06-capability-invoke.md` | handoff — 2026-10-06 capability_invoke 接线 + 星号/编码清理  <br/>*★ capability_invoke 接线；§3 执行通路仍未完成（我）* | 2026-10-06 | 6K |
 | `handoff-2026-10-06-output-distill.md` | handoff — 2026-10-06 工具输出 errors-first 蒸馏（AgentLoop 最后一项能力）  <br/>*工具输出 errors-first 蒸馏（我）* | 2026-10-06 | 7K |
 | `handoff-2026-10-06-security-wiring-and-shell-guard.md` | 交接 —— 游戏源码吸收 · 第二批（修「尺子」+ 补安全洞）  <br/>*shell 护栏与凭据检测（我）* | 2026-10-06 | 13K |

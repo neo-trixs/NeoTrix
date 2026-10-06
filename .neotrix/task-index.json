@@ -1261,7 +1261,8 @@
       "tool": "bash scripts/ops/nt-registry-determinism.sh",
       "kind": "gate",
       "read_only": true,
-      "when_not": "不要用它判「注册表内容对不对」—— 它只管**同一输入的输出是否逐字节一致**以及**往返是否零丢失**（318 节点/43 边是基准），不判节点语义是否正确。也不要用单进程 cargo test 替代它：跨进程的 HashMap 迭代序抖动在单进程内**测不出来**（曾写过 3 条单测，变异验证全部照样绿 ⇒ 零区分力）。若二进制陈旧必须加 NT_REGISTRY_REBUILD=1，否则会拿旧二进制的结果误判当前代码。",      "spec": "scripts/ops/nt-registry-determinism.sh 顶部文档（含 2026-10-06 实测：同一输入 5 次写盘产出 5 个不同 md5）"
+      "when_not": "不要用它判「注册表内容对不对」—— 它只管**同一输入的输出是否逐字节一致**以及**往返是否零丢失**（318 节点/43 边是基准），不判节点语义是否正确。也不要用单进程 cargo test 替代它：跨进程的 HashMap 迭代序抖动在单进程内**测不出来**（曾写过 3 条单测，变异验证全部照样绿 ⇒ 零区分力）。若二进制陈旧必须加 NT_REGISTRY_REBUILD=1，否则会拿旧二进制的结果误判当前代码。",
+      "spec": "scripts/ops/nt-registry-determinism.sh 顶部文档（含 2026-10-06 实测：同一输入 5 次写盘产出 5 个不同 md5）"
     },
     {
       "id": "check-agent-config",
@@ -1302,6 +1303,28 @@
       "read_only": true,
       "when_not": "⛔ 它是**报告器不是门** —— 不判 pass/fail，故不在 gate-registry.tsv、不进 CI 阻断。⛔ 不要拿「工件覆盖率」汇报成熟度：该值刚接上机制时必然≈0（2026-10-06 实测 0.9%），它衡量的是「增量是否守规矩」，不是「历史欠账多少」。⛔ 改它的度量逻辑前必须先跑 `--self-test`：合成夹具上证明两个指标都有判别力，没有它你就无法区分「真的 0」与「写坏了恒 0」。⛔ REVIEW.md §6 那三项（PR 首审耗时/发现被门重复报出的比例/合并前 vs 逃逸缺陷）它**测不出**且会如实标注 UNMEASURED —— 不要拿它当那三项的答案。",
       "spec": "REVIEW.md §6（诚实缺口声明）+ docs/architecture/ABSORPTION-AI-NATIVE-SDLC-2026-10-06.md §7"
+    },
+    {
+      "id": "handoff-hygiene",
+      "query": [
+        "交接文档梳理",
+        "交接索引",
+        "sessions 索引",
+        "遗留缺陷清单",
+        "OPEN-DEFECTS",
+        "垃圾文件",
+        "无限增长",
+        "无界文件",
+        "incremental 膨胀",
+        "target 清理",
+        "收尾卫生",
+        "索引漏了"
+      ],
+      "tool": "bash scripts/ops/nt-handoff-hygiene.sh",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "不要用它判「交接文档写得对不对」——它只判**索引与磁盘是否逐份对齐**、缺陷单一入口是否存在，以及**报告**项（incremental 体积、遗留备份、未提交数）。⛔ 判据 3/4/5 是报告项不当阻断：共享树上他窗 WIP 与瞬时文件（如某窗口探针留下的 `TODO.md.probe.bak`，实测几秒内就消失）是常态，硬阻断会让门被关掉。⚠️ 也不要拿它替代人工「梳理」——它保证的是**一致性**，不是内容质量。另：清 target 用 `rm -rf target/debug/incremental` 而**不是** `cargo clean`（实测前者回收 14.1G、代价 10.17s 且只重编 workspace crate；后者会丢掉全部依赖产物）。",
+      "spec": "scripts/ops/nt-handoff-hygiene.sh 顶部文档（含 2026-10-06 建门动机：该请求被提三遍，且人工盘点连续两轮漏掉「自己刚写的交接」）"
     }
   ],
   "excluded": {
