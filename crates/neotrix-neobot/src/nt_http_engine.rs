@@ -378,6 +378,28 @@ fn qwen_mm_mounted() -> bool {
 ///
 /// `read_image` 同样**按能力挂载**：引擎/模型看不见图时就不摆上桌。挂了却在
 /// 执行期才失败，模型会白白浪费一轮去发现「这台机器没有眼睛」。
+///  能力市场当前**可上架**的能力 id（供 `tool_schemas` 动态挂载）。
+///
+/// ## 为什么读市场而不是读配置
+///
+/// 「模型能调用什么」必须与「市场对外声称有什么」**同源**。若 schema 读配置
+/// 而执行读市场，两者就会漂移 —— 模型能看见一个调用不了的能力，或反过来
+/// 调用一个看不见的能力。⇒ 两个方向都读 `nt_capability_market::listable`。
+///
+/// ## 为什么空清单就返回空 vec（而不是回退到静态列表）
+///
+/// 空清单意味着「这台进程没播种任何能力」⇒ 摆上工具只会让模型白试一轮。
+/// 纪律与 `read_image` / `qwen_*` 的动态挂载一致。
+fn capability_market_ids() -> Vec<String> {
+    crate::nt_capability_registry::with_registry(|reg| {
+        crate::nt_capability_market::listable(reg)
+            .into_iter()
+            .map(|e| e.id)
+            .collect()
+    })
+    .unwrap_or_default()
+}
+
 fn tool_schemas(offer_computer: bool, offer_vision: bool) -> Vec<serde_json::Value> {
     let offer_qwen_mm = qwen_mm_mounted();
     let mut tools = vec![
@@ -442,6 +464,23 @@ fn tool_schemas(offer_computer: bool, offer_vision: bool) -> Vec<serde_json::Val
                 "count": {"type": "integer", "description": "条数 1-10"},
             }, "required": ["query"]},
     }}));
+    //  能力市场调用（2026-06）。**动态挂载**的纪律与 `read_image` /
+    // `qwen_*` 同源：**探测不到就不摆上桌** —— 挂了却在执行期才失败，模型会
+    // 白白浪费一轮去发现「这台机器没装」。
+    let market_ids = capability_market_ids();
+    if !market_ids.is_empty() {
+        tools.push(serde_json::json!({"type": "function", "function": {
+            "name": "capability_invoke",
+            "description": format!(
+                "调用能力市场上一个已上架的能力（按 id）。当前可调用：{}。\n拿不准参数就只传最小 input，不要臆造字段。",
+                market_ids.join(", ")
+            ),
+            "parameters": {"type": "object", "properties": {
+                "capability_id": {"type": "string", "description": "能力 id（取自上面清单）"},
+                "input": {"type": "object", "description": "传给该能力的 JSON 参数"},
+            }, "required": ["capability_id"]},
+        }}));
+    }
     tools.push(serde_json::json!({"type": "function", "function": {
         "name": "web_fetch",
         "description": "抓取网页正文（只允许 http/https；4000 字截断）",
@@ -951,8 +990,75 @@ fn accumulate_tool_calls(
 
 #[cfg(test)]
 mod tests {
-    use super::{HttpEngine, HttpEngineConfig};
+    use super::{tool_schemas, HttpEngine, HttpEngineConfig};
     use crate::nt_engine::EngineAdapter;
+
+    ///  **市场非空时 `capability_invoke` 必须摆上桌。**
+    ///
+    /// ## 为什么这条住在 `nt_http_engine` 而不是 `nt_agent`
+    ///
+    /// `tool_schemas` 是**模块私有**的 —— 它是「发给模型的那份清单」，
+    /// 只在本模块组装。把它提到 `pub(crate)` 只为让别处的测试够到，
+    /// 等于为测试扩大生产可见面 ⇒ 判别标准是：**测试属于被测代码所在模块**。
+    ///
+    /// ## 为什么与 `nt_agent` 那两条互补
+    ///
+    /// 那两条证明「**调得动**」，这条证明「**看得见**」。两头缺一，
+    /// 模型都用不了能力市场：只有 schema 没有 executor ⇒ 模型试了就报错；
+    /// 只有 executor 没有 schema ⇒ 模型压根不知道有这回事。
+    #[test]
+    fn 市场非空时能力调用工具摆上桌() {
+        use nt_core_capability_tree::node::{CapabilityKind, CapabilityNode, Domain};
+        let id = format!(
+            "NT-TEST::cap::{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        );
+        let mut node = CapabilityNode::new_primitive(
+            id.clone(),
+            Domain::Mind,
+            vec!["test.capability".to_owned()],
+        );
+        node.kind = CapabilityKind::Skill;
+        node.metadata.insert(
+            crate::nt_capability_market::meta_keys::LICENSE.to_owned(),
+            serde_json::Value::String("LicenseRef-Test".to_owned()),
+        );
+        node.metadata.insert(
+            crate::nt_capability_market::meta_keys::VERSION.to_owned(),
+            serde_json::Value::String("0.0.1".to_owned()),
+        );
+        node.metadata.insert(
+            crate::nt_capability_market::meta_keys::CATEGORY.to_owned(),
+            serde_json::Value::String("test".to_owned()),
+        );
+        crate::nt_capability_registry::register_node(node).expect("登记应成功");
+
+        let schemas = tool_schemas(false, false);
+        let entry = schemas
+            .iter()
+            .find_map(|s: &serde_json::Value| {
+                let f = s.get("function")?;
+                if f.get("name").and_then(|n| n.as_str()) == Some("capability_invoke") {
+                    Some(f.clone())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| {
+                panic!("★ 市场已播种却没把 capability_invoke 摆上桌 ⇒ 模型看不见它")
+            });
+        let desc = entry
+            .get("description")
+            .and_then(|d| d.as_str())
+            .unwrap_or_default();
+        assert!(
+            desc.contains(&id),
+            "★ 工具描述里必须列出真实可调 id（★ 否则模型只能瞎猜）: {desc}"
+        );
+    }
 
     fn test_config(base_url: &str) -> HttpEngineConfig {
         HttpEngineConfig {

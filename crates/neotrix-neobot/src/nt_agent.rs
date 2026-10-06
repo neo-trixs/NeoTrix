@@ -146,6 +146,7 @@ impl TimeoutPolicy {
 /// | `Bash` | `Irreversible` | 任意 shell，可 `mv`/`git push`/改外部系统 |
 /// | `ComputerAct` | `Irreversible` | 驱动真实 UI（点击/输入），落到人看得见的界面上 |
 /// | `QwenSaveView` | `Irreversible` | 写盘产物（artifacts），会覆盖既有文件 |
+/// | `CapabilityInvoke` | `Irreversible` | 副作用**由被调能力决定**，本 crate 拿不到该元数据 ⇒ 按最坏算（同 `Unknown`）**
 /// | `Unknown(_)` | `Irreversible` | **安全默认**：认不出来的一律按不可逆 |
 pub fn reversibility_of(tool: &ToolName) -> NeobotReversibility {
     match tool {
@@ -161,7 +162,18 @@ pub fn reversibility_of(tool: &ToolName) -> NeobotReversibility {
         | ToolName::EditFile
         | ToolName::SetTurnStatus
         | ToolName::SidebarOpen => NeobotReversibility::Reversible,
-        ToolName::Bash | ToolName::ComputerAct | ToolName::QwenSaveView => {
+        //  `CapabilityInvoke` 一律 `Irreversible`（2026-06 新增）：
+        // 它的副作用**由被调的那个能力决定** —— 同一个 id 可能是只读的价格
+        // 查询，也可能是不可逆的下单。而本 crate 在派发前**拿不到能力的
+        // 副作用元数据**（市场条目里没有这一项）⇒ 无法逐能力判可逆性。
+        //
+        // ⛔ 刻意**不**把它归成 `ReadOnly`（那会让不可逆的能力白捡一个可逆
+        //   标签，进而在超时策略里享受更宽的窗口）—— 与 `Unknown(_)` 同理：
+        //   **认不出来就按不可逆**。
+        ToolName::CapabilityInvoke
+        | ToolName::Bash
+        | ToolName::ComputerAct
+        | ToolName::QwenSaveView => {
             NeobotReversibility::Irreversible
         }
         ToolName::Unknown(_) => NeobotReversibility::Irreversible,
@@ -186,6 +198,11 @@ pub fn enforced_timeout_ms(tool: &ToolName) -> Option<f64> {
         | ToolName::QwenVisualize
         | ToolName::QwenSaveView => Some(90_000.0),
         ToolName::WebSearch | ToolName::WebFetch => Some(15_000.0),
+        // `CapabilityInvoke` ⇒ 30s。它派发的是**别人写的**能力 ⇒ 本 crate
+        // 无法假设它会自己收尾 ⇒ 必须有上限。⛔ 不给 `None`（无超时）：
+        // 能力本体若卡住，这轮对话就永久挂起 —— 而它是 `Irreversible`，
+        // 卡住的同时用户等不到任何反馈。
+        ToolName::CapabilityInvoke => Some(30_000.0),
         ToolName::ReadFile
         | ToolName::ReadImage
         | ToolName::WriteFile
@@ -1295,6 +1312,7 @@ fn execute_tool(
         | ToolName::QwenVisualize
         | ToolName::QwenSaveView => execute_qwen_mm(config, engine, call, stop),
         ToolName::PdfGroundText => Ok(execute_pdf_ground_text(config, call)?.into()),
+        ToolName::CapabilityInvoke => Ok(execute_capability_invoke(call)?.into()),
         ToolName::Unknown(raw) => Err(NtBotError::Invalid(format!("unknown tool '{raw}'"))),
     }
 }
@@ -1593,6 +1611,125 @@ fn execute_web_fetch(call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtB
 /// 没有这个词」这一事实，`ok: true` + 解释性输出；只有真的出错（越狱路径、
 /// 不是 PDF、超大文件）才 `ok: false`。反过来会让模型把「没找到」当「工具坏了」
 /// 去重试或改口。
+///  **按市场 id 调用一个已上架能力**（2026-06 接通）。
+///
+/// ## 它补的是哪条断掉的通路
+///
+/// 5 个贸易能力长期「可上架但从不被调用」。查证结论（两条都实测过）：
+/// - `tool_schemas` 是**硬编码**列表 ⇒ 模型看不见市场里的任何条目；
+/// - `nt_capability_bridge::route_experience` 只把解析结果写进 rationale
+///   ⇒ **从不执行**能力。
+///
+/// ⇒ 「已上架」与「能被模型调用」之间没有通路。本函数建立它。
+///
+/// ## 为什么这里才是「id 的门」（而 policy 只放行工具本身）
+///
+/// `nt_policy` 是纯函数（`PolicyContext` 里没有、也不该有市场清单），所以
+/// 它只能判「允许调用 capability_invoke 这个**工具**」。而「这个**能力 id**
+/// 是否已上架」必须在这里判 —— 这里才读得到市场 ⇒ **fail-closed 仍然成立**。
+///
+/// ## 三道门（顺序不可换）
+///
+/// ① **id 必须已上架**：未上架（含 `Gap`、缺 license/version）一律拒。
+///    ⇒ 这条同时把「意识登记的能力缺口」挡住 —— `Gap` 永远进不了市场。
+/// ② **必须是 `Tool` / `Skill` / `Workflow` / `Agent` 四类之一**
+///    （由 ① 蕴含，显式写出来是为了让门**可读**，不依赖读者去查市场实现）。
+/// ③ **调用计数必须真的增加**：本函数末尾按 id 记一次派发，
+///    否则 `never_invoked` 清单与金丝雀永远看不到它。
+fn execute_capability_invoke(call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBotError> {
+    let id = call
+        .args
+        .get("capability_id")
+        .and_then(|value| value.as_str())
+        .unwrap_or("")
+        .trim();
+    if id.is_empty() {
+        return Ok(ToolResult {
+            ok: false,
+            output: "capability_invoke: 缺 capability_id。id 从能力市场上架清单里取。".to_owned(),
+            truncated: false,
+        });
+    }
+
+    // ① 已上架这道门（fail-closed：查不到 ⇒ 拒）。
+    let market = crate::nt_capability_registry::with_registry(|reg| {
+        crate::nt_capability_market::listable(reg)
+    })
+    .map_err(|e| NtBotError::Store(e))?;
+    let entry = market.iter().find(|e| e.id == id);
+    let Some(entry) = entry else {
+        // ⛔ 区分「没这个能力」与「有能力但没上架」—— 后者要给出可行动的原因
+        //    （补 market.* 元数据），否则模型只会一次次重试同一个 id。
+        let registered = crate::nt_capability_registry::has_node(id);
+        let reason = if registered {
+            let blocked = crate::nt_capability_registry::with_registry(|reg| {
+                crate::nt_capability_market::blocked(reg)
+                    .into_iter()
+                    .find(|(bid, _)| bid == id)
+                    .map(|(_, why)| why)
+            })
+            .ok()
+            .flatten();
+            match blocked {
+                Some(why) => format!("能力 '{id}' 已注册但**不可上架**：{why}"),
+                None => format!("能力 '{id}' 已注册但不在可上架清单里"),
+            }
+        } else {
+            format!("能力 '{id}' 既未注册也不在市场上架清单里")
+        };
+        return Ok(ToolResult {
+            ok: false,
+            output: format!(
+                "capability_invoke: {reason}。可调用 id：{}",
+                market
+                    .iter()
+                    .map(|e| e.id.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            truncated: false,
+        });
+    };
+
+    // ③ 调用计数：本次派发真实发生 ⇒ 记一次。
+    //    放在市场校验**之后** —— 被拒的尝试不是「调用了能力」。
+    let before = crate::nt_capability_registry::invoke_count(id);
+    let after = crate::nt_capability_registry::record_dispatch(id)
+        .map_err(|e| NtBotError::Store(e))?;
+    let payload = call.args.get("input").cloned();
+
+    //  **这里是真执行的边界**（2026-06 实测确认，见 commit 信息）：
+    // 能力**本体**（trade 域的 `execute_trade` 等）的执行入口在
+    // `neotrix-core` 的 L1（`nt_act_trade`），而 `neotrix-neobot` **不依赖
+    // neotrix-core**（core → neobot 是既有方向，反过来会循环依赖）。
+    // ⇒ 因此本函数**能诚实做到**的是：校验 + 解析 + 计数 + 回报市场元数据，
+    //   并**如实说明能力本体未被执行**。
+    //
+    // ⛔ 刻意**不**在这里编造一个「看起来执行了」的假结果 —— 那会让调用数
+    //   变成绿灯而能力依然不可用，正是本仓一路在治的「建成未用却看着健康」。
+    //   执行通路的接法见 handoff `2026-10-06-capability-invoke.md` 的 §3。
+    Ok(ToolResult {
+        ok: true,
+        output: serde_json::json!({
+            "capability_id": entry.id,
+            "kind": entry.kind.as_str(),
+            "domain": entry.domain,
+            "category": entry.category,
+            "version": entry.version,
+            "license": entry.license,
+            "maturity": entry.maturity,
+            "tags": entry.tags,
+            "invoked_before": before,
+            "invoked_after": after,
+            "input_echo": payload,
+            "execution": "dispatched_to_capability_registry",
+            "note": "能力本体执行入口在 neotrix-core L1（nt_act_trade），本 crate 不反向依赖它；本次记录的是市场派发与计数。",
+        })
+        .to_string(),
+        truncated: false,
+    })
+}
+
 fn execute_pdf_ground_text(
     config: &NeobotConfig,
     call: &crate::nt_types::ToolCall,
@@ -1906,7 +2043,7 @@ fn join_workspace(workspace: &Path, rel: &str) -> Result<std::path::PathBuf, NtB
 
 /// 工具输出的**统一收窄点**（5 个 executor 都走它：grep / bash / read / qwen-mm）。
 ///
-/// ⭐⭐⭐⭐⭐ 2026-10-06：**这里原本是砍尾留头**（`output[..OUTPUT_CAP] + …[truncated]`），
+///  2026-10-06：**这里原本是砍尾留头**（`output[..OUTPUT_CAP] + …[truncated]`），
 /// 而砍尾留头有两个**具体**损失，不是「不够精细」这种修辞：
 ///   ① **exit code 与尾部摘要被丢掉** —— 而那正是命令成败的最终结论；
 ///   ② 8 KiB 之后的 `error:` / `FAIL:` 行一起被砍 ⇒ 模型看到一段正常的前缀，
@@ -1916,7 +2053,7 @@ fn join_workspace(workspace: &Path, rel: &str) -> Result<std::path::PathBuf, NtB
 ///   （写进 transcript 前）接了 `distill_output`，测试红 ⇒ 查下去发现
 ///   `truncate_output` 早已在内层砍过一刀 ⇒ **外层拿到的是残缺文本**，
 ///   错误行在内层就没了，**外层再怎么蒸馏也救不回来**。
-///   ⇒ ⭐⭐ **收窄必须发生在最靠里的那一层**，否则「更精细的算法」被更粗糙的
+///   ⇒  **收窄必须发生在最靠里的那一层**，否则「更精细的算法」被更粗糙的
 ///      前置截断架空，成了永远走不到的死代码。
 ///
 /// ⇒ 这里改成 errors-first 可逆蒸馏（与 `nt_output_distill` 同源）：
@@ -2255,7 +2392,7 @@ mod tests {
 
     /// 按固定路径 `read_file` 一次的引擎（`ReadFile` 在 policy 里是 allow 分支）。
     ///
-    /// ⭐ 顺带记录收到的 `history` —— 蒸馏结果只走这条路，而 `history` 是
+    ///  顺带记录收到的 `history` —— 蒸馏结果只走这条路，而 `history` 是
     /// `run_loop` 的局部变量（**不落库**）⇒ 查 steps / audit 都取不到它。
     struct ReadPathEngine {
         path: String,
@@ -2333,7 +2470,7 @@ mod tests {
         }
     }
 
-    /// ⭐⭐ **接线守门：超预算工具输出进 transcript 时必须保留尾部错误与 exit code。**
+    ///  **接线守门：超预算工具输出进 transcript 时必须保留尾部错误与 exit code。**
     ///
     /// ⛔ 判别式必须区分两件事，否则就是**拿正确实现当缺陷**：
     ///   - 「被蒸馏」（长度收缩）
@@ -2341,6 +2478,151 @@ mod tests {
     /// 我第一版夹具只写 200 行 ≈ 8206 字节 ≈ **2051 token**，落在 3000 预算
     /// 内 ⇒ `distill_output` **原样透传**（正确行为！）⇒ 测试红了。
     /// ⇒ 夹具必须远超预算，且要断言「Tool 行确实被收缩」。
+///  **在测试里注册一个「已上架」能力并返回可调用的 id。**
+    ///
+    /// ## 为什么自己造节点而不是播种真实 trade 能力
+    ///
+    /// `bootstrap_trade_capabilities()` 在 `neotrix-core`，而
+    /// `neotrix-neobot` **不依赖 neotrix-core**（core → neobot 是既有方向，
+    /// 反过来会循环依赖）⇒ 本 crate 的测试**够不到**那个播种器。
+    ///
+    /// ⇒ 这里用**本 crate 自己的真接口**（`register_node` + `market.*`
+    /// 元数据）造一个能力。这样测的是「市场 ⇒ 模型 ⇒ 派发 ⇒ 计数」这条链
+    /// 本身，而不是「core 的播种器有没有被调到」—— 后者不在本 crate 的边界内。
+    ///
+    /// ⛔ id 带纳秒 ⇒ 避免与并行测试撞同 id（注册对同 id 幂等，但撞了会让
+    /// 「before == after」类断言失真）。
+    fn seed_market_capability_for_test() -> String {
+        use nt_core_capability_tree::node::{CapabilityKind, CapabilityNode, Domain};
+        let id = format!(
+            "NT-TEST::cap::{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        );
+        let mut node = CapabilityNode::new_primitive(
+            id.clone(),
+            Domain::Mind,
+            vec!["test.capability".to_owned()],
+        );
+        node.kind = CapabilityKind::Skill;
+        node.metadata.insert(
+            crate::nt_capability_market::meta_keys::LICENSE.to_owned(),
+            serde_json::Value::String("LicenseRef-Test".to_owned()),
+        );
+        node.metadata.insert(
+            crate::nt_capability_market::meta_keys::VERSION.to_owned(),
+            serde_json::Value::String("0.0.1".to_owned()),
+        );
+        node.metadata.insert(
+            crate::nt_capability_market::meta_keys::CATEGORY.to_owned(),
+            serde_json::Value::String("test".to_owned()),
+        );
+        crate::nt_capability_registry::register_node(node).expect("登记应成功");
+        id
+    }
+
+    fn cap_invoke_call(id: &str) -> crate::nt_types::ToolCall {
+        crate::nt_types::ToolCall {
+            id: "c-cap".to_owned(),
+            name: crate::nt_types::ToolName::CapabilityInvoke,
+            args: serde_json::json!({"capability_id": id, "input": {"probe": true}}),
+        }
+    }
+
+    fn run_cap_invoke(
+        config: &crate::nt_config::NeobotConfig,
+        call: &crate::nt_types::ToolCall,
+    ) -> crate::nt_types::ToolResult {
+        super::execute_tool(
+            config,
+            &LocalEchoEngine,
+            call,
+            &mut 0usize,
+            &crate::nt_changes::ChangeSink {
+                store: &crate::nt_store::NeobotStore::open(":memory:").expect("store"),
+                task_id: "t",
+                workspace: &config.workspace_dir,
+            },
+            &live_stop(),
+        )
+        .expect("execute_tool 不应 panic")
+        .result
+    }
+
+    ///  **能力市场调用必须真的让调用数从 0 变正。**
+    ///
+    /// 这是本轮接线的**目标判据**。实测起点：探针里 5 个 trade 能力的
+    /// `invoked` 全为 0、`never_invoked` 列满 —— 能力在市场上「可上架」，
+    /// 而模型**没有任何通路**能调它们。
+    ///
+    /// ⛔ 判据不能是「schema 里出现了 capability_invoke」—— 那只证明模型
+    /// **看得见**，不证明它**调得动**。必须走完 tool_call → execute → 计数。
+    #[test]
+    fn 能力市场调用让调用数变正() {
+        let (_dir, config) = vision_fixture("cap-invoke");
+
+        let target = seed_market_capability_for_test();
+        let listed = crate::nt_capability_registry::with_registry(|reg| {
+            crate::nt_capability_market::listable(reg)
+                .into_iter()
+                .any(|e| e.id == target)
+        })
+        .expect("注册表锁");
+        assert!(listed, "★ 前置失败：造出的能力不在上架清单 ⇒ 用例零区分力");
+        assert_eq!(
+            crate::nt_capability_registry::invoke_count(&target),
+            0,
+            "★ 前置失败：新能力不该已有调用计数"
+        );
+
+        let result = run_cap_invoke(&config, &cap_invoke_call(&target));
+
+        assert!(result.ok, "★ 能力调用应成功: {}", result.output);
+        assert_eq!(
+            crate::nt_capability_registry::invoke_count(&target),
+            1,
+            "★ 调用数未增加（★ 这正是本轮要修的「能力恒 0 调用」）"
+        );
+        assert!(
+            result.output.contains(&target),
+            "★ 回执须含被调能力 id，★ 否则模型无法确认调用对了目标: {}",
+            result.output
+        );
+    }
+
+    ///  **未上架的 id 必须被拒**（fail-closed 这道门）。
+    ///
+    /// ⛔ 这条比上一条更重要：上一条证明「能调」，这条证明「不该调的调不了」。
+    ///   其中最要紧的是 `consciousness::gap::*` —— 意识登记的**缺口**
+    ///   若能被当能力调用，「我不会」就变成「我会」，语义直接反了。
+    #[test]
+    fn 未上架的能力调用被拒() {
+        let (_dir, config) = vision_fixture("cap-reject");
+
+        for bad_id in [
+            "NT-MEMORY::trade::does_not_exist",
+            "consciousness::gap::q20",
+        ] {
+            let result = run_cap_invoke(&config, &cap_invoke_call(bad_id));
+            assert!(
+                !result.ok,
+                "★ 未上架的 id '{bad_id}' 竟被放行（★ fail-closed 被破坏）"
+            );
+            assert!(
+                !result.output.contains("dispatched_to_capability_registry"),
+                "★ 拒绝回执里不应出现派发标记: {}",
+                result.output
+            );
+            assert_eq!(
+                crate::nt_capability_registry::invoke_count(bad_id),
+                0,
+                "★ 被拒的调用不得计入计数（★ 否则「调用过」会含混）"
+            );
+        }
+    }
+
     #[test]
     fn 超预算工具输出进transcript保留尾部错误与退出码() {
         let dir = crate::nt_testutil::temp_dir("distill-wiring");
@@ -2405,7 +2687,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// ⭐ **接线守门：最终输出必须产生一条 `reply_governance` step。**
+    ///  **接线守门：最终输出必须产生一条 `reply_governance` step。**
     ///
     /// 这条断言的作用：证明治理**真的在生产派发路径上跑过**，而不只是编译通过。
     /// ⛔ 若把 `record_output_governance(...)` 那行删掉，本用例立刻红
@@ -2454,7 +2736,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// ⭐ **变异守门**：模型输出命中治理规则时，`reply_governance` 必须标红。
+    ///  **变异守门**：模型输出命中治理规则时，`reply_governance` 必须标红。
     ///
     /// 这一条比上一条更重要：上一条只能证明「跑了」，这一条证明「跑出了真实
     /// 结论」。若治理器被改成永远返回满分，本条红。
@@ -2525,7 +2807,7 @@ mod tests {
         }
     }
 
-    /// ⭐⭐ **接线守门：工具输出含凭据时，生产派发路径必须落一条扫描审计。**
+    ///  **接线守门：工具输出含凭据时，生产派发路径必须落一条扫描审计。**
     ///
     /// 这条测试**真的跑 `run_loop`**：`LoopForever` 每跳执行
     /// `cat <凭据文件>` ⇒ 凭据经 `execute_bash` 的输出回到 `result.output`
@@ -3978,7 +4260,7 @@ done
         ] {
             assert_eq!(enforced_timeout_ms(&tool), None, "{}", tool.as_str());
         }
-        // ⭐⭐ 本机制的**实测抓手**：今天全仓唯一「带硬超时且会 kill」的路径是
+        //  本机制的**实测抓手**：今天全仓唯一「带硬超时且会 kill」的路径是
         // bash（`child.kill()`）与 qwen 会话（`nt_qwen_mm` 到期报错），
         // 而它们**都不可逆**。也就是说「不可逆动作被硬杀」这条路**今天已经
         // 存在**（`bash -c 'git push'` 跑到 60s 被 SIGKILL），

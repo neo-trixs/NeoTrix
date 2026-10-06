@@ -94,7 +94,7 @@ pub fn evaluate_policy(ctx: &PolicyContext) -> PolicyDecision {    // 1) 人接�
     }
     // 3) 文件越狱拦截（工作区外路径一律拒）。
     //
-    // ⭐⭐ 2026-10-05 修**可被一个多余参数键绕过的漏洞**。
+    //  2026-10-05 修**可被一个多余参数键绕过的漏洞**。
     //
     // 【原缺陷】本分支写成 `if let Some(path) … { …; return Allow; }`
     // ⇒ 只要 `ctx.file_path` 是 `Some`，就**无条件提前返回 Allow**，
@@ -133,7 +133,7 @@ pub fn evaluate_policy(ctx: &PolicyContext) -> PolicyDecision {    // 1) 人接�
         // 纯 bash 调用（无 path）同样放行 —— 但它是**无路径风险**的。
         return PolicyDecision::Allow;
     }
-    // ⭐ 原先被跳过的第 5 步（「协议工具放行 / 未知工具永拒」）现在**能被走到**了
+    //  原先被跳过的第 5 步（「协议工具放行 / 未知工具永拒」）现在**能被走到**了
     // —— 这是本次修复的附带收益：带file_path 的未知工具不再漏过兜底拒。
     // 5) 纯协议工具默认放行; 未知工具永拒 (fail-closed, 原名进审计).
     //
@@ -168,6 +168,14 @@ pub fn evaluate_policy(ctx: &PolicyContext) -> PolicyDecision {    // 1) 人接�
         // 不 spawn、不发网络请求），风险等级等同 `read_file`；`path` 参数与
         // 执行层 `join_workspace` 双保险同 `ReadFile`。
         ToolName::PdfGroundText => PolicyDecision::Allow,
+        // `capability_invoke` 放行（2026-06）：它本身**不碰世界状态** ——
+        // 只是「按市场 id 转交一次能力调用」。
+        //
+        // ⚠️ 这里**故意不判能力 id**：policy 是纯函数，`PolicyContext` 里没有
+        // 市场清单（也不该有 —— 那是运行期状态，而 policy 必须可纯测）。
+        // ⇒ 「该 id 是否已上架」这道门放在 executor（`execute_capability_invoke`），
+        //    那里才读得到市场 ⇒ **fail-closed 仍然成立**，只是换了个位置判。
+        ToolName::CapabilityInvoke => PolicyDecision::Allow,
         ToolName::Unknown(raw) => deny("unknown-tool", &format!("unknown tool '{raw}'")),
         ToolName::Bash | ToolName::ComputerAct => {
             deny("default-deny", "no explicit allow rule matched")
@@ -274,7 +282,7 @@ fn looks_like_escape(cmd: &str) -> bool {
     // ⚠️ 分词用 `-` 也算分隔符（`reboot-now` / `format-disk` 这类
     // 合法命令名若不拆，会把 `reboot` 当成命令词而误杀）。
     //
-    // ⭐⭐ 2026-10-05 **修正判据形状**（实测踩到的坑）：
+    //  2026-10-05 **修正判据形状**（实测踩到的坑）：
     // `str::split` 对**非空**分隔符**保留**分隔符本身。实测：
     //   "rm -rf ./src".split(|c| !alnum && c != '-')
     //     ⇒ ["rm", "-rf", "", "", "src"]   ← 注意是 **`-rf`**，不是 `rf`
@@ -299,7 +307,7 @@ fn looks_like_escape(cmd: &str) -> bool {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // ⭐⭐⭐ 破坏性命令（2026-10-05 补）
+    //  破坏性命令（2026-10-05 补）
     //
     // 【审计实测的缺口】上表的整词集里**没有任何破坏性命令**：
     // `rm` / `dd` / `mkfs` / `git push --force` / `truncate` / `shutdown` 全部放行。
@@ -344,7 +352,7 @@ fn looks_like_escape(cmd: &str) -> bool {
         // `git push --force` / `rm --force` —— 长标志显式意图
         return true;
     }
-    // ⭐ 2026-10-05 **修正**：`rm -r` 是日常操作，不该被拒。
+    //  2026-10-05 **修正**：`rm -r` 是日常操作，不该被拒。
     //
     // 【实测的自身缺陷】首版 `FORCE_FLAGS` 里含单个 `"r"` 与 `"f"`
     // ⇒ `rm -r build` 与 `rm -f x` 都被拒。
@@ -375,7 +383,7 @@ fn looks_like_escape(cmd: &str) -> bool {
 mod tests {
     use super::{Actor, PolicyContext, PolicyDecision, ToolName, evaluate_policy};
 
-    /// ⭐⭐⭐ 反向锁：**多余的一个 `path` 参数不得跳过 bash 逃逸检查**。
+    ///  反向锁：**多余的一个 `path` 参数不得跳过 bash 逃逸检查**。
     ///
     /// 【原漏洞（2026-10-05 修）】路径检查写成
     /// `if let Some(path) { …; return Allow; }`
@@ -407,7 +415,7 @@ mod tests {
                 "「{cmd}」不带 path 时必须被拒"
             );
 
-            // ⭐ 带一个**无害**的 path —— 修复前这里会拿到 Allow
+            //  带一个**无害**的 path —— 修复前这里会拿到 Allow
             let with_path = PolicyContext {
                 command: Some(cmd.into()),
                 file_path: Some("x".into()),
@@ -421,7 +429,7 @@ mod tests {
         }
     }
 
-    /// ⭐ 附带收益：带 `file_path` 的**未知工具**不得漏过兜底拒。
+    ///  附带收益：带 `file_path` 的**未知工具**不得漏过兜底拒。
     ///
     /// 同一个 early-return 也让 `ToolName::Unknown(raw)` 带着 `file_path` 时
     /// 跳过第 5 步的 `unknown-tool` 永拒。
@@ -438,7 +446,7 @@ mod tests {
         );
     }
 
-    /// ⭐ 对照组：**合法**的 bash + 合法 path 必须仍被放行。
+    ///  对照组：**合法**的 bash + 合法 path 必须仍被放行。
     /// ⇒ 证明修复不是「把门焊死」，而是「把检查顺序摆正」。
     #[test]
     fn benign_bash_with_benign_path_is_still_allowed() {
@@ -715,7 +723,7 @@ mod tests {
         assert_eq!(ToolName::SetTurnStatus.intent(), "turn_status");
     }
 
-    /// ⭐⭐⭐ 反向锁：**破坏性命令不得放行**（审计实测这些此前全部 `Allow`）。
+    ///  反向锁：**破坏性命令不得放行**（审计实测这些此前全部 `Allow`）。
     ///
     /// 【实测的放行路径】修复前 `rm -rf ./src` 走：
     /// `rm` 不在整词表 · `./src` 不含 `..` · 无元字符 ⇒ `Allow` ⇒ 真执行。
@@ -741,7 +749,7 @@ mod tests {
         }
     }
 
-    /// ⭐⭐ **对照组（本轮最关键的一条）**：正常命令**不得**被误杀。
+    ///  **对照组（本轮最关键的一条）**：正常命令**不得**被误杀。
     ///
     /// 为什么必须有：`rm` 若直接进整词表，`rm file.txt` 这类正常清理也会被拒
     /// ⇒ 门变成「一刀切不可用」⇒ 同样是不负责任。
@@ -767,7 +775,7 @@ mod tests {
         }
     }
 
-    /// ⭐ 分档判据的具体边界：`rm` 带 `-r` 但**无 `-f`** 仍应放行吗？
+    ///  分档判据的具体边界：`rm` 带 `-r` 但**无 `-f`** 仍应放行吗？
     /// 记录当前口径，避免后人误以为是疏漏。
     /// `rm -r dir` 会递归删除但**逐个确认**，属「可逆意图」⇒ 当前放行。
     #[test]
@@ -782,7 +790,7 @@ mod tests {
         );
     }
 
-    /// ⭐ 子串误杀防护：`rm` 作为**别的词的一部分**不得被当成破坏命令。
+    ///  子串误杀防护：`rm` 作为**别的词的一部分**不得被当成破坏命令。
     /// 依据原有注释「分词后整词比，避免 `echo` 误杀 `chown` 类子串」。
     #[test]
     fn destructive_words_are_matched_whole_not_as_substring() {

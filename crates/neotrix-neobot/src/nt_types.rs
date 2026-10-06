@@ -59,7 +59,7 @@ impl TurnStatus {
 
 /// 任务状态（pending/running/done/failed/cancelled/outcome_unknown，租约机简化版）.
 ///
-/// ⭐⭐ `OutcomeUnknown` 是**不可自动重试**的终态，含义是：
+///  `OutcomeUnknown` 是**不可自动重试**的终态，含义是：
 /// **「这个任务的外部副作用是否已经落地，无法判定」**。
 ///
 /// ## 为什么需要它（2026-10-02，OpenMuse / pi / Telegram 三方交叉印证）
@@ -68,7 +68,7 @@ impl TurnStatus {
 /// 此时若把租约过期的 `running` 无条件打回 `pending`（本仓 `recover_stale_running`
 /// 修复前的行为），重跑就会**二次执行**那个副作用 —— 而界面上完全看不出异常。
 ///
-/// ⭐ 本仓此前是**三家里唯一假设「重跑是安全的」**的那个：
+///  本仓此前是**三家里唯一假设「重跑是安全的」**的那个：
 /// · pi 的答法：先落「意图」再执行（effect sandwich）
 /// · OpenMuse 的答法：新增一个**不可重试的终态**，启动时把残留的 executing 刷成它
 /// · Telegram 的答法：失败必须能关联到**具体那一次尝试**
@@ -76,7 +76,7 @@ impl TurnStatus {
 /// ## 语义边界
 /// · **不自动重试**，但**允许人工裁决**（见 `nt_store_tasks.rs` 的 `retry_task`：
 ///   它目前只接 `failed`/`cancelled`，本状态需显式改 SQL 才放开 —— 有意如此）。
-/// · ⭐ **不会**由 `TurnStatus` 产出（`nt_agent.rs:400-406` 的映射表不含它）
+/// ·  **不会**由 `TurnStatus` 产出（`nt_agent.rs:400-406` 的映射表不含它）
 ///   ⇒ 只能由「启动刷残留」与显式 API 产生，这是自洽的。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -221,6 +221,29 @@ pub enum ToolName {
     /// **不是通用 OCR**：只对有文字层的 PDF 有效；扫描件/文字转轮廓的 PDF
     /// 会如实报「没找到文字层」，不给猜出来的框。
     PdfGroundText,
+    ///  **按能力市场条目 id 调用一个已上架能力**（2026-10-06 新增）。
+    ///
+    /// ## 为什么需要它（这是「5 个 trade 能力调用数恒 0」的结构性根因）
+    ///
+    /// 能力市场里 5 个贸易能力（`NT-MEMORY::trade::*` / `NT-MIND::trade::*`）
+    /// 长期「可上架但从不被调用」。查证结论：
+    /// - `tool_schemas`（`nt_http_engine.rs:381`）是**硬编码**的工具列表
+    ///   ⇒ 模型**看不见**能力市场里的任何条目；
+    /// - `nt_capability_bridge` 只把解析结果**写进 rationale**（:205），
+    ///   **从不执行**能力。
+    ///
+    /// ⇒ 于是「能力已上架」与「模型能调用它」之间**没有任何通路**。
+    ///   本工具建立那条通路：模型按 `id` 调用 ⇒ 落到能力树 ⇒ 计数与金丝雀
+    ///   一起被真实打点。
+    ///
+    /// ## 与 `dispatch_by_capability` 的分工
+    ///
+    /// 那个函数按**标签**解析（`hybrid_retrieval` 等路由标签），本工具按
+    /// **条目 id** 调用。前者服务于「经验路由到能力网络」，后者服务于
+    /// 「模型直接使用一个能力」。⛔ 两者都不**执行**能力本体 ——
+    /// 能力本体的执行入口在各自的 executor（trade 域等），
+    /// 本工具走的是那条链（见 `execute_capability_invoke`）。
+    CapabilityInvoke,
     Unknown(String),
 }
 
@@ -242,6 +265,7 @@ impl ToolName {
             Self::QwenVisualize => "qwen_visualize",
             Self::QwenSaveView => "qwen_save_view",
             Self::PdfGroundText => "pdf_ground_text",
+            Self::CapabilityInvoke => "capability_invoke",
             Self::Unknown(_) => "unknown_tool",
         }
     }
@@ -271,6 +295,10 @@ impl ToolName {
             "qwen_save_view" | "save_view" => Self::QwenSaveView,
             // 裸名只收 `ground_text`（`pdf_` 前缀已在工具名里，`ground` 太泛不收）。
             "pdf_ground_text" | "ground_text" => Self::PdfGroundText,
+            //  能力市场调用（2026-06 新增）：只收裸名。
+            // ⛔ 不收 `invoke_capability` 之类的别名 —— 别名越多，模型选错的机会
+            // 越多，而撞名会让模型随机挑并绕过派发（`read_image` 的教训）。
+            "capability_invoke" => Self::CapabilityInvoke,
             _ => Self::Unknown(raw.to_owned()),
         }
     }
@@ -293,6 +321,9 @@ impl ToolName {
             Self::QwenVisualize => "visualize_file",
             Self::QwenSaveView => "write_view_file",
             Self::PdfGroundText => "locate_text_in_pdf",
+            // 能力市场调用：intent 是"invoke_capability"（★ 不是 read/write），
+            // ★ 因为它**执行的是能力本体**，★ 具体副作用由该能力自己决定。
+            Self::CapabilityInvoke => "invoke_capability",
             Self::Unknown(_) => "unknown_tool",
         }
     }
