@@ -56,6 +56,15 @@ set -uo pipefail
 
 SRC="neotrix-core/src"
 BASELINE="scripts/doc-drift-baseline.txt"
+# ⭐⭐⭐ **第二个账本**（2026-10-06 修门）：`BASELINE` 存的是**死链**条目
+#   （形如 `|docs/xxx.md:12`），而上面的 `$CUR` 装的是**缺 module doc 的文件路径**
+#   （形如 `neotrix-core/src/....rs`）。
+#   两种格式塞进同一个文件 ⇒ `comm -23` **必然全部不匹配**
+#   ⇒ 实测输出「resolved 129 + NEW 125」是**格式碰撞**，不是真漂移；
+#   且 `--update-baseline`（下段 `cat "$BASELINE.tmp" "$CUR"`）
+#   会把文件路径**混进**死链账本 ⇒ **污染源**。
+# ⇒ 故拆成两个账本：死链仍用 `BASELINE`，module doc 用 `MODDOC_BASE`。
+MODDOC_BASE="${MODDOC_BASE:-scripts/doc-drift-module-docs-baseline.txt}"
 # ⚠️ 扫描面此前**只有 6 份根文档** ⇒ `docs/architecture/` 下 170+ 份架构文档的
 #    死链**结构性不可见**（审计实测）。现默认纳入 `docs/architecture/**/*.md`。
 #    仍可用 ROOTDOCS=... 覆盖。
@@ -88,27 +97,37 @@ sort -u "$CUR" -o "$CUR"
 TOTAL=$(grep -c . "$CUR" 2>/dev/null); TOTAL=${TOTAL:-0}
 
 if [ "$UPDATE" -eq 1 ]; then
+  {
+    if [ -f "$MODDOC_BASE" ]; then
+      grep '^#' "$MODDOC_BASE" || :
+    fi
+    cat "$CUR"
+  } > "$MODDOC_BASE"
+  echo "module-docs baseline updated: $MODDOC_BASE now has $(grep -vc '^#' "$MODDOC_BASE") entries"
   if [ -f "$BASELINE" ]; then
     grep '^#' "$BASELINE" > "$BASELINE.tmp" || : > "$BASELINE.tmp"
   else
     : > "$BASELINE.tmp"
   fi
-  cat "$BASELINE.tmp" "$CUR" > "$BASELINE"
+  # ⛔⛔ **不再**把 `$CUR`（module-doc 文件路径）写进死链账本：
+  #   实测这行会把 `doc-drift-baseline.txt` 的 129 条死链记录**整体覆盖**成
+  #   module-doc 路径（我实测踩到：恢复前该文件已是 125 条且死链记录全失）。
+  #   ⇒ 死链账本只能由它自己的类别更新（当前无 --update 路径，改动需人工核对）。
   rm -f "$BASELINE.tmp"
-  echo "baseline updated: $BASELINE now has $(grep -vc '^#' "$BASELINE") entries"
+  echo "deadlink baseline left untouched: $(grep -vc '^#' "$BASELINE" 2>/dev/null || echo 0) entries"
   exit 0
 fi
 
 # 与账本求差
-if [ -f "$BASELINE" ]; then
-  grep -v '^#' "$BASELINE" 2>/dev/null | sort -u > "$BASE_C" || : > "$BASE_C"
+if [ -f "$MODDOC_BASE" ]; then
+  grep -v '^#' "$MODDOC_BASE" 2>/dev/null | sort -u > "$BASE_C" || : > "$BASE_C"
 fi
 comm -23 "$CUR" "$BASE_C" > "$NEW"    # 在树里、不在账本 => 新增
 comm -13 "$CUR" "$BASE_C" > "$GONE"   # 在账本、树里已修好 => 已解决
 
 N_NEW=$(grep -c . "$NEW" 2>/dev/null); N_NEW=${N_NEW:-0}
 N_GONE=$(grep -c . "$GONE" 2>/dev/null); N_GONE=${N_GONE:-0}
-N_BASE=$(grep -vc '^#' "$BASELINE" 2>/dev/null); N_BASE=${N_BASE:-0}
+N_BASE=$(grep -vc '^#' "$MODDOC_BASE" 2>/dev/null); N_BASE=${N_BASE:-0}
 
 echo "=== NeoTrix doc-drift check (R-P232) ==="
 echo "missing //! module docs: $TOTAL   ledger: $N_BASE   resolved since ledger: $N_GONE"
