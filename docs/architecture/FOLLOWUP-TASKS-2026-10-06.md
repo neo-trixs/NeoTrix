@@ -730,10 +730,27 @@ T2.1（需体积策略）
 
 ⇒ ⛔ 故 `neobot capability call` 已**撤回**（写了也不能工作，且会让人以为它能）。
 
-**若要进程外真实调用**，唯一正确落点是 **core 侧二进制**
-（如 `bin/nt_crystal_serve`，它本就构造 `ConsciousnessRuntime`
-⇒ 注册与实现都在场），命令形态可直接复用 `ensure_trade_dispatchers()` +
-`dispatch()` + `drive()` 三步。**本轮未做**（预算已尽），已登记为待办。
+**进程外真实调用的正确落点**是 **core 侧二进制**
+（`bin/nt_crystal_serve` 本就构造 `ConsciousnessRuntime` ⇒ 注册与实现都在场）。
+
+### ✅ P0.6-b 进程外真实调用已落地：`nt-crystal-serve capability-call`
+
+形态即前述三步：`ensure_trade_dispatchers()` → `dispatch()` → 本地 `block_on`。
+在 `real_main()` **最顶部**拦截 `argv[1]`，不进入任何服务器逻辑。
+
+四类结果实测（**全程无假成功**）：
+
+| 输入 | 输出 |
+|---|---|
+| 未上架 id | `能力未上架: NT-BOGUS::x` |
+| `DeclaredOnly`（未注册实现） | 先打印 `可执行性=DeclaredOnly`，再 `fail-closed，无结果可返回` |
+| 非法 JSON | `参数不是合法 JSON: key must be a string at line 1 column 2` |
+| 已注册 + 不完整输入 | `可执行性=Scaffold` + 真实执行 → `TradeContext 反序列化失败: missing field buyer_profile` |
+
+⚠️ `block_on` 前先 `Handle::try_current()`：已在 async runtime 内则**拒绝**，
+⛔ 绝不 panic（`Cannot start a runtime from within a runtime`）。
+
+⇒ 至此闭环**同时具备**：进程内（测试断言）+ **进程外**（CLI 实跑）证据。
 
 ⇒ **元教训**：我又一次在**没核实进程边界**的情况下加功能。
 与 P0.1「连错两层能力」同族 —— 那次错在**注册表层**，这次错在**进程层**。

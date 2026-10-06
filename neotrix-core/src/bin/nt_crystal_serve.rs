@@ -1909,7 +1909,76 @@ async fn handle_chat(
         .into_response()
 }
 
+/// 处理 `capability-call <id> [json]`。
+///
+/// 返回 `None` 表示**不是**该子命令 ⇒ 交回服务器正常启动。
+fn cli_capability_call(args: Vec<String>) -> Option<Result<(), String>> {
+    if args.first().map(String::as_str) != Some("capability-call") {
+        return None;
+    }
+    let Some(id) = args.get(1).cloned() else {
+        return Some(Err("用法: capability-call <id> [json]".to_owned()));
+    };
+    let payload = args.get(2).cloned().unwrap_or_else(|| "{}".to_owned());
+    Some(run_capability_call(&id, &payload))
+}
+
+/// 真实调用一个已上架能力，并把**失败按类打印**（⛔ 绝不以空结果冒充成功）。
+fn run_capability_call(id: &str, payload: &str) -> Result<(), String> {
+    use nt_core_capability_tree::dispatch::dispatch;
+    use neotrix::l1_action::nt_act::nt_act_trade::tree_dispatch::ensure_trade_dispatchers;
+
+    let input: serde_json::Value = serde_json::from_str(payload)
+        .map_err(|e| format!("参数不是合法 JSON: {e}"))?;
+
+    let entry = nt_core_capability_tree::market::TRADE_MANIFEST
+        .iter()
+        .find(|e| e.id == id)
+        .ok_or_else(|| format!("能力未上架: {id}"))?;
+    println!("id={}  可执行性={:?}", entry.id, entry.executability);
+
+    ensure_trade_dispatchers();
+    let fut = dispatch(id, input).map_err(|e| format!("派发表不可用: {e}"))?;
+    let Some(fut) = fut else {
+        return Err(format!(
+            "未注册派发实现（executability={:?}）⇒ fail-closed，无结果可返回",
+            entry.executability
+        ));
+    };
+    let out = block_on_dispatch(fut)?;
+    println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+    Ok(())
+}
+
+/// 在**同步**上下文里 drive 派发 future。
+///
+/// ⛔ 已在 tokio runtime 内则**拒绝**：此时 `block_on` 会 panic
+/// （`Cannot start a runtime from within a runtime`）。
+fn block_on_dispatch<T>(
+    fut: std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'static>>,
+) -> Result<T, String> {
+    if tokio::runtime::Handle::try_current().is_ok() {
+        return Err(
+            "已在 async runtime 内，⛔ 不能 block_on；该路径需改走 async 入口".to_owned(),
+        );
+    }
+    tokio::runtime::Builder::new_current_thread()
+        .build()
+        .map_err(|e| format!("runtime 初始化失败: {e}"))
+        .map(|rt| rt.block_on(fut))
+}
+
 fn real_main() -> Result<(), String> {
+    // ⭐ 进程外**真实调用**能力（P0.6 的正确落点）。
+    //
+    //为什么落在这里而不是 `neobot` CLI：`neotrix-neobot` 的依赖里**没有 core**
+    //（方向是 `core -> neotrix-neobot`）⇒ 那个二进制内**不存在**任何派发实现。
+    // 而本二进制链接 core ⇒ 实现与注册都在场。
+    //
+    // 用法：`nt-crystal-serve capability-call <id> [json]`
+    if let Some(rest) = cli_capability_call(std::env::args().skip(1).collect()) {
+        return rest;
+    }
     let file_cfg = load_file();
     let (file_port, discover_limit, file_upstreams, file_token) = match &file_cfg {
         Some(c) => (c.port, c.discover_limit, c.upstreams.clone(), c.token.clone()),

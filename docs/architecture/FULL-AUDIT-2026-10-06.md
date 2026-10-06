@@ -153,3 +153,37 @@
 4. **map-check 修好 + 地图刷新** —— 先修校验器再刷地图（顺序不可反）
 5. **孤儿 63 文件逐条裁决** —— 工作量最大，但「假绿」风险随之解除
 6. **B1/B2 需你裁决**（许可 + 溯源）
+
+---
+
+## 审计刷新（2026-10-06 会话收官）
+
+### 门实测（13 门）
+
+🟢 **10 绿**：silent-failure · dead-config-flag · orphan-dirs · doc-drift ·
+doc-claims · claims-numbers · agent-config · layer-deps · map-check · test-baseline
+🔴 **3 红**：`check-unwrap` 24 new（**存量债，本会话引入 0**）·
+`check-naming` 1615（**advisory，规约无约束力**）· 元门因此恒红 1
+🟢 **本会话新增门**：`check-executor-registry`（已登记 + 探针 PASS）
+
+### 本会话修复的「说法与事实不符」清单
+
+| # | 说法 | 事实 | 处理 |
+|---|---|---|---|
+| 1 | 市场清单 id（`NT-*::trade::*`）是我编的 | 是**既有契约**，我**照抄错了对象** | 回退 |
+| 2 | 「无全局注册表落点」 | 前提本成立（`UnifiedCapability: Send+Sync`），我的约束是装饰 | 回退 |
+| 3 | 「没有权威输入 schema」 | **schema 就是 serde 类型**，我错把空值样本当 schema | 接线 2 个 |
+| 4 | 「`maybe_compact_context` 未接生产」 | **已接生产**（`AgentLoop::turn()` 主路径） | 定正 |
+| 5 | 「索引 83 条」 | 实为 **84** | 同步 |
+| 6 | 「doc-drift 恒红 = 125 存量债」 | **格式碰撞**（两个类别塞进同一账本） | 修门 |
+| 7 | 「`check-silent-failure` 全绿 ⇒ 无静默失败」 | 它的 opener 只认 `let _ =`，**裸语句从未被扫** | 放宽 + 抓出 4 处真缺陷 |
+
+### 闭环证据（同时具备进程内 + 进程外）
+
+```
+nt-crystal-serve capability-call <id> [json]
+  → ensure_trade_dispatchers() → dispatch() → block_on
+```
+
+四类失败全部**按类报告**，⛔ 无假成功。
+
