@@ -47,6 +47,34 @@ C 答「数据住在哪」。若数据住在共享 crate，neobot 直接读它**
 crate（`Cargo.toml:42`）⇒ 送数据这一步自动消失 ⇒ **B 变成多余**。
 那 6 个字段是**关于该能力的描述性元数据**，它的家就是能力节点本身，不是 neobot。
 
+#### ② 实施方案已修正（2026-10-06）：**不加快照字段，用已有的 `metadata`**
+
+我原计划「给 `CapabilityNode` 加 6 个类型化字段」。**核实后发现这条路是错的**：
+
+- `CapabilityNode` **已有 `metadata: HashMap<String, serde_json::Value>`**（`node.rs:363`），
+  且**已在活跃使用**（`registry.rs` 用 `contract_de…`、`epistemic` 等字符串键）；
+- `CapabilityNode` **不derive `Default`**，三个构造器都用 `Self { .. }` 字面量
+  ⇒ 加字段会触发 **E0063，波及 70 处构造点**（正是 `A48` 记载的陷阱）。
+
+⇒ **最优解：在共享 crate 定义规范键名，让 neobot 的 `project()`
+从 `node.metadata` 读这 6 个字段。**
+
+| 维度 | 加 6 个类型化字段 | 用已有 `metadata` + 规范键名 |
+|---|---|---|
+| 破坏面 | **70 处构造点**（E0063） | **0** |
+| 真源位置 | 共享 crate ✔ | 共享 crate ✔ |
+| 可扩展性 | 改一次要改结构体 | 加键即可 |
+| 跨语言消费 | 需序列化字段 | `serde_json::Value` 已跨 FFI |
+
+**执行路径**（下一项）：
+1. 共享 crate 定义规范键名常量（如 `MARKET_CATEGORY` / `MARKET_VERSION` /
+   `MARKET_LICENSE` / `MARKET_DESCRIPTION` / `MARKET_TAGS` / `MARKET_MATURITY`）；
+2. `nt_capability_market::project()` 从 `node.metadata` 读它们填 `MarketEntry`；
+3. core 侧 5 个 trade 能力在**播种时**写入这些键
+   （`consciousness_runtime.rs:121-125` 已是唯一播种点）；
+4. 验收：`neobot-check-market.sh` 不再报「5 个能力从未被调用」以外的陈旧项，
+   且 `capability_invoke` 出现在 `tool_schemas`。
+
 ### 前置：必须先消除一个同名冲突（实测发现）
 
 存在**两个 `CapabilityNode`**：
