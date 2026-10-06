@@ -24,12 +24,14 @@ r"""安全接线门 —— 抓「造了资产但没人调用」。
 `DnsEgressPolicy` / `ToolSandbox` / `SecurityManager` 这类**非注册式的策略资产**
 它一条都看不见 —— 而它们恰恰是安全资产的主力形态。
 
-⭐ **四类发现**
+⭐ **五类发现**
 - `ORPHAN_MODULE` —— 目录里有 `.rs`、看起来像个模块（有自己的 `mod.rs`
   或目录内 ≥2 个 `.rs`），但**父目录下没有任何 `.rs` 声明 `mod <dirname>;`**
   ⇒ 这些文件**从未被编译**。抓 `nt_shield/guard/agent_guardrails/`（1,492 行）。
 - `ZERO_CONSUMER` —— 是 `pub`、定义文件 ≥ 60 行、**已被 `mod` 声明（确实编译）**、
-  但在非测试非自身文件里找不到任何消费者。
+  但在非测试非自身文件里找不到任何消费者，**且治理判据至少有一路是
+  name / file / 方法名**。
+- `PATH_ONLY` —— 同上，但**唯一**的治理判据是「所在目录名含治理词」（见下节）。
 - `TEST_ONLY` —— 被测试引用但无生产消费者（与 ZERO_CONSUMER 分开列）。
 - `WIRED_OK` —— 有 ≥1 个非测试非自身消费者的资产（**只计数，不逐个列出**）。
 
@@ -83,6 +85,38 @@ r"""安全接线门 —— 抓「造了资产但没人调用」。
    rollback|heal|repair|reconcile` 等**改变授权/等级/存续状态的动作**。
    这一路专治 `demote_mislabeled`（能力诚实度自愈动作）。
 
+### ⭐ `PATH_ONLY`：把「仅目录名命中」从 ZERO_CONSUMER 里拆出来（2026-10-06）
+
+⭐ **为什么拆**：`classify()` 里 name / file / path / 方法名四路是**取或**的。
+当三路都落空、只剩 path 一路命中时，「它是个安全资产」这件事的**全部**证据
+就是**它待在哪个目录里** —— 一个目录名会把该目录下**每一个** `pub` 项都算成
+安全资产。这类条目逐条**没有行动价值**，混在 ZERO_CONSUMER 里会让使用者
+对整个门失去信任（AGENTS.md §5：噪音门记录比没有门更危险）。
+
+⭐ **实测（2026-10-06，重算前的基线 1,969 条 ZERO_CONSUMER）**：
+
+| 判据 | 条数 |
+|---|---|
+| `why == "path"`（仅目录名） | **693**（35.2%） |
+| 含 name / file 判据 | 1,199 |
+| 含 `method:` 判据 | 77 |
+
+693 条触发的目录名高度集中：`nt_shield`(495) / `gateway`(86) /
+`social_access`(50) / `nt_core_gate`(42) / `healing`(19) / `health`(11) …
+⇒ 只覆盖 **181 个文件 / 59 个目录**，其中 483/693 是 snake_case（`pub fn` /
+`pub mod` / `pub type`）—— 对这三类 item **方法名那一路根本不会执行**
+（见 `classify()` 的 `if kind in (...)`）⇒ 连潜在的语义信号都没被看过。
+
+⭐ **为什么不把 `file` 一路也拆出去**（实测后确认边界是对的）：305 条 file-only
+的文件名是 `nt_approval.rs` / `nt_judge.rs` / `nt_law_gate.rs` /
+`nt_permission_profiles.rs` 这种**具体治理模块名**，不是整 crate 的统称
+⇒ 是可用判据，不是噪音。path 一路之所以不同，是因为它匹配的是**路径里任意
+一段**，包括 crate 名与中间层目录名。
+
+⚠️ **`TEST_ONLY` 未拆**：实测 168 条里有 53 条同样是仅目录名判据。本门只在
+`--audit` 里把这个残余数**显式报出来**，不改变其归类（拆它会动到另一类发现
+的语义，超出本次范围）。⇒ 弱信号总量 = `PATH_ONLY` + 该残余数。
+
 治理词表（SKIP 逻辑见 `POLICY_WORDS`）分四簇：
 - **安全/权限**：`security secure shield guard sandbox jail isolat confine
   egress firewall blocklist denylist allowlist permission privilege auth
@@ -129,6 +163,12 @@ r"""安全接线门 —— 抓「造了资产但没人调用」。
 
 基线默认路径：`scripts/security-wiring-baseline.txt`（格式对齐
 `scripts/truth-surface-baseline.txt`：`#` 理由注释行 + `KIND 定位符` 条目行）。
+
+⭐ **基线格式区分强弱信号靠的是 KIND 前缀本身**：`ZERO_CONSUMER <loc>` 与
+`PATH_ONLY <loc>` 各占一种前缀，行尾的 `# L<n> (<判据>)` 注释同时把判据
+写进文件，所以「哪些条目只有目录名判据」在基线文件里也一眼可查。
+`read_baseline()` **不需要**为新 KIND 改动（它按 `KIND <loc>` 逐字读），
+拆分前的旧基线由 `fold_split_baseline()` 在比较阶段补齐。
 
 ⛔ **建基线是需要判断的动作** —— 一旦建立，当前这些存量发现就被「合法化」。
 基线里必须逐条写理由（沿用 truth-surface 的做法：重算时保留既有 `#` 行）。
@@ -595,8 +635,23 @@ def own_method_names(masked, type_name):
     return names
 
 
+#: 拆分出来的弱信号类别名（基线里作为 `KIND` 前缀，与 ZERO_CONSUMER 平级）。
+PATH_ONLY = "PATH_ONLY"
+
+#: 「唯一判据是所在目录名」时 `classify()` 写进 `why` 的那个标记。
+WEAK_PATH_WHY = "path"
+
+
 def classify(fi, kind, name, masked):
-    """三路信号取或：名字 / 自身 impl 方法 / 治理动作。返回 (是否治理类, 命中理由)。"""
+    """四路信号取或：名字 / 文件名 / 目录名 / 自身 impl 方法名。
+
+    返回 ``(是否治理类, 命中理由, 是否仅目录名)``。
+
+    ⛔ **不要用 `why == "path"` 反推「是否仅目录名」**：`why` 是
+    `"+".join(reasons[:3])`，被截断到 3 段。虽然 path 在 reasons 里排第 3
+    （下标 2）恰好不会被截掉、当前字符串比较是对的，但那是**巧合**：任何人
+    往 reasons 里插一路信号就会静默改变语义。⇒ 显式返回第三项。
+    """
     reasons = []
     if _name_hit(name):
         reasons.append("name")
@@ -613,8 +668,8 @@ def classify(fi, kind, name, masked):
                 reasons.append("method:" + mn)
                 break
     if not reasons:
-        return False, ""
-    return True, "+".join(reasons[:3])
+        return False, "", False
+    return True, "+".join(reasons[:3]), reasons == [WEAK_PATH_WHY]
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -737,7 +792,7 @@ def analyze(roots, base):
             if (kind, name) in seen_here:
                 continue
             seen_here.add((kind, name))
-            is_policy, why = classify(fi, kind, name, fi.masked)
+            is_policy, why, weak_path = classify(fi, kind, name, fi.masked)
             if not is_policy:
                 other_total += 1
                 continue
@@ -762,13 +817,19 @@ def analyze(roots, base):
                     "loc": f"{key}::{name}",
                     "line": line,
                     "why": why,
+                    "weak": weak_path,
                 })
             else:
+                # ⭐ 仅目录名判据 ⇒ 归入 PATH_ONLY，不与真需要人工定性的
+                #    ZERO_CONSUMER 混在一起（见模块 docstring 的实测表）。
                 findings.append({
-                    "kind": "ZERO_CONSUMER",
+                    "kind": PATH_ONLY if weak_path else "ZERO_CONSUMER",
                     "loc": f"{key}::{name}",
                     "line": line,
                     "why": why,
+                    # `weak` 供报告层披露「其它类别里同样的弱信号残余」
+                    # （实测 TEST_ONLY 也有 53 条仅目录名判据）。
+                    "weak": weak_path,
                 })
 
     for o in orphans:
@@ -778,9 +839,10 @@ def analyze(roots, base):
             "line": o["files"],
             "why": ("declared-only-under-cfg(test) " if o["test_only_decl"] else "")
                    + f"{o['files']} files / {o['loc']} LOC never compiled",
+            "weak": False,
         })
 
-    order = {"ORPHAN_MODULE": 0, "ZERO_CONSUMER": 1, "TEST_ONLY": 2}
+    order = {"ORPHAN_MODULE": 0, "ZERO_CONSUMER": 1, PATH_ONLY: 2, "TEST_ONLY": 3}
     findings.sort(key=lambda f: (order[f["kind"]], f["loc"]))
     return {
         "findings": findings,
@@ -799,7 +861,14 @@ def analyze(roots, base):
 # ══════════════════════════════════════════════════════════════════
 
 def read_baseline(path):
-    """读基线：忽略空行与 `#` 理由注释；返回 ``{kind: set(loc)}`` 与理由行列表。"""
+    """读基线：忽略空行与 `#` 理由注释；返回 ``{kind: set(loc)}`` 与理由行列表。
+
+    ⚠️ **本函数刻意不认识 `PATH_ONLY`** —— 它按 `KIND <loc>` 逐字读，
+    新的 KIND 前缀天然被接受（无需改动即可读回拆分后的基线），
+    而拆分前的旧基线里那 693 条仍以 `ZERO_CONSUMER` 存在。
+    那部分由 `fold_split_baseline()` 在**比较阶段**补齐，避免动到这里的
+    「读到什么就是什么」语义。
+    """
     known, reasons = set(), []
     if not os.path.exists(path):
         return known, reasons
@@ -825,6 +894,37 @@ def read_baseline(path):
 
 def baseline_keys(findings):
     return {f"{f['kind']} {f['loc']}" for f in findings}
+
+
+#: 拆分前后的 KIND 对：(旧 KIND, 新 KIND)。
+SPLIT_PAIRS = (("ZERO_CONSUMER", PATH_ONLY),)
+
+
+def fold_split_baseline(known, cur):
+    """让拆分前的旧基线继续有效；返回 ``(有效键集, 被折叠的条数)``。
+
+    ⭐ 为什么要这一层：把 `PATH_ONLY` 从 `ZERO_CONSUMER` 里拆出来，会让
+    旧基线里那 693 条 `ZERO_CONSUMER <loc>` 与新算出的 `PATH_ONLY <loc>`
+    **键对不上** ⇒ `--strict` 会一次性报 693 条「新增」+ 693 条「已消失」。
+    那不是新增技术债，只是**重新定性**，不该让门红。
+
+    ⛔ 折叠是**有条件的**：只有当旧基线里**逐字存在** `ZERO_CONSUMER <loc>`
+    这一行时，才认为它覆盖了 `PATH_ONLY <loc>`。⇒ 基线已经重算成新格式后，
+    本函数是**空操作**；且永远不会掩盖真正的新增条目（新条目在旧基线里
+    不存在对应行）。返回的计数用于在报告里显式披露这次重新定性。
+    """
+    eff, folded = set(known), 0
+    for old_kind, new_kind in SPLIT_PAIRS:
+        for k in cur:
+            if not k.startswith(new_kind + " "):
+                continue
+            loc = k[len(new_kind) + 1:]
+            if k in eff:
+                continue
+            if f"{old_kind} {loc}" in known:
+                eff.add(k)
+                folded += 1
+    return eff, folded
 
 
 def entry_lines(f):
@@ -856,21 +956,32 @@ def load_truth_baseline():
 
 def report(res, all_items):
     counts = {}
+    weak_by_kind = {}
     for f in res["findings"]:
         counts[f["kind"]] = counts.get(f["kind"], 0) + 1
+        if f.get("weak"):
+            weak_by_kind[f["kind"]] = weak_by_kind.get(f["kind"], 0) + 1
+    n_zc = counts.get("ZERO_CONSUMER", 0)
+    n_po = counts.get(PATH_ONLY, 0)
+    n_to = counts.get("TEST_ONLY", 0)
+    weak_to = weak_by_kind.get("TEST_ONLY", 0)
     print("security-wiring audit — 「造了资产但没人调用」")
     print(f"  扫描 .rs: {res['nfiles']} · 定义文件 ≥{MIN_DEF_LINES} 行的文件: "
           f"{res['nfiles'] - res['too_small']}（<{MIN_DEF_LINES} 行跳过 {res['too_small']}）")
     print(f"  治理类资产（枚举后按语义分类）: {res['policy_total']}"
           f" · WIRED_OK: {res['wired']}（其中弱消费者/仅 use 提到: {res['weak_only']}）")
     print(f"  ORPHAN_MODULE: {counts.get('ORPHAN_MODULE', 0)}"
-          f" · ZERO_CONSUMER: {counts.get('ZERO_CONSUMER', 0)}"
-          f" · TEST_ONLY: {counts.get('TEST_ONLY', 0)}")
+          f" · ZERO_CONSUMER: {n_zc} · {PATH_ONLY}: {n_po} · TEST_ONLY: {n_to}")
+    print(f"  ⇦ 需人工判定: ZERO_CONSUMER {n_zc} 条（判据含 name/file/方法名）"
+          f" · {PATH_ONLY} {n_po} 条（判据**仅**目录名 = 弱信号，见判定口径）")
+    if weak_to:
+        print(f"  ⓘ 残余弱信号: TEST_ONLY 里有 {weak_to}/{n_to} 条同样仅目录名判据"
+              f"（本门未拆该类，勿把它们当强信号）")
     if all_items:
         print(f"  ⓘ OTHER（非治理类，按词表漏过）: {res['other_total']}")
 
     truth = load_truth_baseline()
-    for kind in ("ORPHAN_MODULE", "ZERO_CONSUMER", "TEST_ONLY"):
+    for kind in ("ORPHAN_MODULE", "ZERO_CONSUMER", PATH_ONLY, "TEST_ONLY"):
         group = [f for f in res["findings"] if f["kind"] == kind]
         if not group:
             continue
@@ -884,12 +995,22 @@ def report(res, all_items):
             print(f"  {entry_lines(f)}{tag}")
     print("\n判定口径：")
     print("  · 枚举 = 全量 pub 项（struct/enum/trait/union/fn/mod/type），"
-          "不做路径或名字预筛；治理类判定在枚举之后，三路信号（资产名 / "
-          "自身 impl 方法名 / 治理动作）取或。")
+          "不做路径或名字预筛；治理类判定在枚举之后，四路信号（资产名 / "
+          "文件名 stem / 所在目录名 / 自身 impl 方法名）取或。")
+    print(f"  · {PATH_ONLY} 与 ZERO_CONSUMER 的**唯一差别是判据强度**："
+          f"{PATH_ONLY} = name / 文件名 / 方法名三路全部落空，"
+          "治理判据**只剩「所在目录名含治理词」**这一条。")
+    print(f"    ⇒ {PATH_ONLY} 那 {n_po} 条**不等于**资产有问题：一个目录名会把"
+          "该目录下所有 pub 项都算成安全资产，")
+    print("      逐条无行动价值。它是**分类噪音**，需要看的是那 "
+          f"{n_zc} 条含 name/file/方法名判据的。")
     print("  · 消费者 = 其它文件**生产区**（花括号配对切掉 #[cfg(test)]）里的标识符出现，"
           "含 use 导入；判前已用词法扫描把注释与字符串/字符字面量掩成等长空格。")
     print("  · tests/ 目录与 #[cfg(test)] 块都不算生产消费者。")
     print("  · WIRED_OK 只计数不逐个列出（避免噪音）。")
+    print("  · ⚠️ 弱信号的另一面：对 pub fn / pub mod / pub type 三类 item，"
+          "方法名那一路**根本不执行**")
+    print("    ⇒ 连潜在的语义信号都没被看过，这也是 path-only 判据偏弱的第二个原因。")
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -909,20 +1030,30 @@ def main(argv):
         res = analyze(ROOTS, REPO)
         _, reasons = read_baseline(target)
         os.makedirs(os.path.dirname(os.path.abspath(target)) or ".", exist_ok=True)
+        marker = "# generated by scripts/ops/nt_security_wiring.py --baseline"
         with open(target, "w", encoding="utf-8") as fh:
+            # ⛔ 既有 `#` 理由行会被原样保留（沿用 truth-surface 的做法）。
+            #    但 marker 本身也要保留 —— 原来这里无条件再写一遍 marker，
+            #    于是**每重算一次就多一行重复表头**（实测 2026-10-06：已积累 2 行）。
             if reasons:
-                fh.write("\n".join(reasons) + "\n")
-            fh.write("# generated by scripts/ops/nt_security_wiring.py --baseline\n")
+                fh.write("\n".join(r for r in reasons if r.strip() != marker) + "\n")
+            fh.write(marker + "\n")
             for f in res["findings"]:
                 fh.write(entry_lines(f) + "\n")
         counts = {}
+        weak = 0
         for f in res["findings"]:
             counts[f["kind"]] = counts.get(f["kind"], 0) + 1
+            if f.get("weak"):
+                weak += 1
         print(f"基线已写: {target}")
         print(f"  ORPHAN_MODULE {counts.get('ORPHAN_MODULE', 0)}"
               f" · ZERO_CONSUMER {counts.get('ZERO_CONSUMER', 0)}"
+              f" · {PATH_ONLY} {counts.get(PATH_ONLY, 0)}"
               f" · TEST_ONLY {counts.get('TEST_ONLY', 0)}"
               f" · WIRED_OK {res['wired']}（只计数，未入基线）")
+        print(f"  ⓘ 弱信号（判据仅目录名）{weak} 条，其中 {counts.get(PATH_ONLY, 0)} 条已单列为 "
+              f"{PATH_ONLY}，其余混在 TEST_ONLY 里。")
         print("  ⛔ 基线把上面这些存量「合法化」。每一条都必须有理由；")
         print("     重算时既有 # 理由行会被保留（沿用 truth-surface 的做法）。")
         return 0
@@ -945,14 +1076,21 @@ def main(argv):
         return 0
 
     cur = baseline_keys(res["findings"])
-    fresh = sorted(cur - known)
+    known_eff, folded = fold_split_baseline(known, cur)
+    fresh = sorted(cur - known_eff)
     stale = sorted(known - cur)
     print(f"\n基线: {len(known)} 条 · 当前: {len(cur)} 条 · 新增: {len(fresh)}")
+    if folded:
+        print(f"ℹ️ {folded} 条由旧基线的 ZERO_CONSUMER 重新定性为 {PATH_ONLY}"
+              "（仅目录名判据）—— 不计入新增")
     if stale:
         print(f"ℹ️ 基线中 {len(stale)} 条已消失（不判红，可清理）")
 
     if fresh:
-        print(f"\nFAIL: 新增 {len(fresh)} 条发现：", file=sys.stderr)
+        n_po_fresh = sum(1 for k in fresh if k.startswith(PATH_ONLY + " "))
+        print(f"\nFAIL: 新增 {len(fresh)} 条发现"
+              + (f"（其中 {PATH_ONLY} {n_po_fresh} 条为弱信号判据）" if n_po_fresh else "")
+              + "：", file=sys.stderr)
         for k in fresh:
             print("  " + k, file=sys.stderr)
         print(
@@ -960,7 +1098,9 @@ def main(argv):
             "  · ORPHAN_MODULE  ⇒ 文件从未编译。先问「补 pub mod 后能编译吗」\n"
             "    （truth-surface 基线记 nt_memory/mod.rs 的 hybrid_retrieval 是\n"
             "     「声明被注释掉 + 编译不过」，补声明会让干净检出红）。\n"
-            "  · ZERO_CONSUMER ⇒ 接上消费者，或写明正当理由进基线。\n"
+            f"  · ZERO_CONSUMER ⇒ 接上消费者，或写明正当理由进基线。\n"
+            f"  · {PATH_ONLY} ⇒ **先别改代码**。判据只有目录名，多半是分类噪音；\n"
+            "    真要接线请先确认这个 pub 项真的是安全资产（静态匹配判不出该不该接线）。\n"
             "  · 有正当理由 ⇒ 加进 scripts/security-wiring-baseline.txt 并注明理由\n"
             "  · 定性不了 ⇒ 留红，别加白名单\n"
             "  · 本门度量「有没有生产消费者」；**静态匹配无法判定该不该接线**。",
@@ -1033,6 +1173,14 @@ def self_test():
             "pub mod wired_ok;\n"
             "pub mod wired_ok_consumer;\n"
         ))
+        # ⚠️ (g)/(h) 的夹具目录必须**放在 `src/` 之下**：夹具根是 tmp 本身，
+        #    根级目录的 `parent` 为空 ⇒ `find_orphan_modules()` 的宿主扫描
+        #    整段被跳过 ⇒ 该目录必被判成 ORPHAN_MODULE，而 `analyze()` 会
+        #    `continue` 跳过孤儿目录里的**全部**文件 ⇒ 分类根本不会执行。
+        #    （真实仓库不受影响：ROOTS 是 `neotrix-core/src` 等，relpath 恒有
+        #    ≥2 段，`parent` 不会为空。）`src` 在 SKIP_BASENAMES 里，
+        #    且 `src/mod.rs` 显式声明两个子模块 ⇒ 不产生孤儿。
+        w("src/mod.rs", "pub mod nt_shield;\npub mod misc;\n" + _PAD + "\n")
         # (a) ORPHAN_MODULE：有 mod.rs + 2 个 .rs，但 lib.rs 不声明 orphan_dir
         w("orphan_dir/mod.rs", "pub mod guard_part;\n" + _PAD + "\n")
         w("orphan_dir/guard_part.rs",
@@ -1079,6 +1227,35 @@ def self_test():
         w("wired_ok_consumer.rs",
           "use crate::wired_ok::WiredOkGate;\n"
           'pub fn check(g: &WiredOkGate) -> bool { g.authorize("k") }\n' + _PAD + "\n")
+        # (g) PATH_ONLY：资产名 / 文件名 / 方法名全部治理词落空，
+        #     **只有目录名** nt_shield 命中 ⇒ 必须归 PATH_ONLY，不得混进 ZERO_CONSUMER。
+        w("src/nt_shield/mod.rs", "pub mod netlink;\n" + _PAD + "\n")
+        w("src/nt_shield/netlink.rs", (
+            "/// neutral name, neutral stem, neutral method names\n"
+            "pub struct Relay {\n"
+            "    pub hops: u32,\n"
+            "    pub window: u32,\n"
+            "}\n"
+            "impl Relay {\n"
+            "    pub fn new(hops: u32) -> Self { Self { hops, window: 4 } }\n"
+            "    pub fn step(&mut self) { self.hops += 1; }\n"
+            "    pub fn flush(&mut self) { self.window = 4; }\n"
+            "}\n" + _PAD + "\n"
+        ))
+        # (h) 方法判据：资产名 / 文件名 / 目录名全落空，只有方法名命中
+        #     ⇒ 必须**留在** ZERO_CONSUMER（不能被 path-only 规则误吞）。
+        w("src/misc/mod.rs", "pub mod telemetry;\n" + _PAD + "\n")
+        w("src/misc/telemetry.rs", (
+            "/// neutral name, neutral stem, neutral dir => only the method matches\n"
+            "pub struct Probe {\n"
+            "    pub id: u64,\n"
+            "    pub seen: u32,\n"
+            "}\n"
+            "impl Probe {\n"
+            "    pub fn new(id: u64) -> Self { Self { id, seen: 0 } }\n"
+            "    pub fn verify_payload(&mut self) -> bool { self.seen += 1; self.seen > 0 }\n"
+            "}\n" + _PAD + "\n"
+        ))
 
         res = analyze(["."], tmp)
         kinds = {}
@@ -1116,6 +1293,26 @@ def self_test():
         allbad = kinds.get("ZERO_CONSUMER", set()) | kinds.get("TEST_ONLY", set())
         say("wired_ok.rs::WiredOkGate" not in allbad,
             "(f) WIRED_OK 对照组未被误报")
+
+        # (g) PATH_ONLY：仅目录名判据 ⇒ 归 PATH_ONLY，且不得留在 ZERO_CONSUMER
+        po = kinds.get(PATH_ONLY, set())
+        zc = kinds.get("ZERO_CONSUMER", set())
+        say("src/nt_shield/netlink.rs::Relay" in po,
+            f"(g) 仅目录名判据的资产被归入 {PATH_ONLY}（发现集: {sorted(po)}）")
+        say("src/nt_shield/netlink.rs::Relay" not in zc,
+            f"(g2) 仅目录名判据的资产**没有**混进 ZERO_CONSUMER"
+            f"（ZC 实测: {sorted(zc)}）")
+        say(all(f["why"] == "path" for f in res["findings"] if f["kind"] == PATH_ONLY),
+            "(g3) 不变式: kind == PATH_ONLY ⇔ 判据恰好是 (path)"
+            "（防止有人手改 classify 而两边脱钩）")
+
+        # (h) 方法判据 ⇒ 必须留在 ZERO_CONSUMER
+        say("src/misc/telemetry.rs::Probe" in zc,
+            "(h) 方法名判据(method:verify_payload)的资产仍归入 ZERO_CONSUMER")
+        say("src/misc/telemetry.rs::Probe" not in po,
+            "(h2) 方法名判据的资产未被误降级到 PATH_ONLY")
+        say("zc.rs::ZeroConsumerPolicy" in zc and "zc.rs::ZeroConsumerPolicy" not in po,
+            "(h3) 资产名判据(name)的资产仍归入 ZERO_CONSUMER")
 
         # 缺陷 1 的直接断言：朴素 split 会让 (d) 的消费者隐形
         naive = open(os.path.join(tmp, "callafter.rs"), encoding="utf-8").read()
@@ -1161,7 +1358,15 @@ def self_test():
                        ("with_transparent", False), ("world_to_local", False),
                        ("DnsEgressPolicy", True), ("ToolSandbox", True),
                        ("SecurityManager", True), ("demote_mislabeled", True),
-                       ("AdmissionControl", True), ("verify_query", True)]:
+                       ("AdmissionControl", True), ("verify_query", True),
+                       # ⭐ 下面 6 条是 (g)/(h) 两个夹具的**前提**：它们的资产名 /
+                       #    文件名 / 目录名必须**真的**不命中治理词表，否则夹具会
+                       #    因为一个自己都没料到的词命中而被误判成强信号，
+                       #    于是 (g)/(h) 变成永真的假测试。
+                       ("Relay", False), ("netlink", False),
+                       ("Probe", False), ("telemetry", False),
+                       ("misc", False),
+                       ("nt_shield", True), ("verify_payload", True)]:
         got = _name_hit(word)
         say(got == want,
             f"谓词 _name_hit({word!r}) = {got}（期望 {want}）")
@@ -1175,6 +1380,24 @@ def self_test():
                        f"· 等长 {len(masked) == len(src)}")
         else:
             say(True, f"掩码器 {src[:34]!r} -> 剩余 {sorted(got)} · 偏移等长")
+
+    # ⭐ `fold_split_baseline()` 单元断言：拆分前的旧基线必须继续有效。
+    #    这段逻辑**只在比较阶段**生效，坏掉的表现是 `--strict` 一次性报
+    #    693 条假「新增」—— 即门在基线重算之前一直红。
+    L = "neotrix-core/src/x.rs::Thing"
+    old_base = {f"ZERO_CONSUMER {L}", "ZERO_CONSUMER other.rs::A", "TEST_ONLY t.rs::B"}
+    new_cur = {f"{PATH_ONLY} {L}", "ZERO_CONSUMER other.rs::A", "TEST_ONLY t.rs::B"}
+    eff, folded = fold_split_baseline(old_base, new_cur)
+    say(folded == 1 and not (new_cur - eff),
+        f"fold: 旧基线的 ZERO_CONSUMER 覆盖了 {PATH_ONLY}（折叠 {folded} 条，"
+        f"新增 {len(new_cur - eff)} 条）")
+    fresh_base = {f"{PATH_ONLY} {L}", "ZERO_CONSUMER other.rs::A", "TEST_ONLY t.rs::B"}
+    eff2, folded2 = fold_split_baseline(fresh_base, new_cur)
+    say(folded2 == 0 and not (new_cur - eff2),
+        f"fold: 基线已是新格式时为空操作（折叠 {folded2} 条）")
+    eff3, folded3 = fold_split_baseline(set(), {f"{PATH_ONLY} brand_new.rs::C"})
+    say(folded3 == 0 and f"{PATH_ONLY} brand_new.rs::C" not in eff3,
+        "fold: 旧基线里没有的定位符**不会**被折叠（不掩盖真正的新增）")
 
     print("\nSELFTEST " + ("OK — 全部绿" if ok else "FAIL"))
     return 0 if ok else 1
