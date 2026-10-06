@@ -490,3 +490,112 @@ ARIS（MIT，17k★）自述 **markdown-only skills**（skill 内无可执行脚
    ⛔ 不要因为本轮又闭环了两条就把本项划掉。
 3. **待裁决的产品方向**：8 个 MIT skill 包是否转换接入
    （Claude Skills → NT 契约，属转换而非即插即用；且这是方向性投入）。
+
+---
+
+# 收尾交接：2026-10-06（裁决权下放轮次结束）
+
+用户指令：「停在这里，禁止一切活动，吸收经验，交接任务收尾提交」。
+本轮成果：**全量测试首次全绿** + **一类新缺陷形状的发现** + **七条判据入库**。
+
+## 本轮三笔提交
+| 提交 | 内容 |
+|---|---|
+| `a46d71cc` | ⭐ 裁决并修正一处**陈旧测试**（`mod_orphan`）⇒ 全量测试首次全绿 |
+| `d75fea35` | 系统性取证记录（用本仓自有门）⇒ 发现「自引用孤岛」 |
+| `f059dc1e` | AIHOT（MIT/6,037★）入台账 |
+| 末笔 | 自查修正：测试丢弃 `Result` + `LESSONS-2026-10-06` 七条判据 |
+
+## ⭐⭐ 最硬的一个结果：全量测试从「长期带红」到 **0 failed**
+`mod_orphan::tests::scan_tree_sorted_by_lines_desc` 红了 1 天多。
+裁决为**测试陈旧、扫描器正确**（三条证据，见 L1）⇒ 改测试而非改扫描器。
+**`cargo test -p neotrix --lib` ⇒ 13395 passed / 0 failed**（隔离树实测）。
+
+⚠️ **诚实标注**：其后主树有一次全量报 `2 failed`，**未能定位到具体用例**
+（随后一次运行在链接阶段被 SIGKILL/OOM 打断）。
+⇒ **接手者第一件事：在你自己的干净检出上重跑一次全量，确认基线。**
+我最后一次**可复现**的全绿证据来自隔离 worktree（不含他窗未提交 WIP）。
+
+## ⭐⭐ 本轮最有复用价值的产出：「自引用孤岛」
+`nt_shield_ztnet` 整子系统 **26 文件 / 5077 行**（WireGuard 密钥轮换 + Noise-IK，
+引 NDSS 2024），**挂载在 `mod.rs` 上、19 处测试、但外部消费者为 0**。
+而 `nt_pub_dead.py` 在它内部只报 **3 条**零引用 ⇒ **逐项扫描器看不见它**
+（岛内互引 ⇒ 每项都有引用）。
+
+### 裁决：**不删**
+`DIR-REMEDY` §2.5 已明确「导出 ≠ 调用」在本仓**反复误判**
+（`nt_jev` / `nt_crystal_core` 是活路径，勿当死代码删）。
+⇒ 5077 行是「**已就绪、待接线**」，不是死代码。
+
+### ⛔ 下一步该做的门（不是又一个逐项扫描器）
+**模块级可达性门**：从生产入口出发，该子系统**可达吗**？
+逐项零引用**回答不了**这个问题。
+
+## 本轮其余取证（避免重复评估）
+· `nt_lock_audit.py neotrix-core/src` ⇒ **可疑 0 处**
+· `check-layer-deps.sh --strict` ⇒ **PASS: 0 new**（13 known）
+· `nt_pub_dead.py` ⇒ 1866 条 `pub` 零引用（const 109 / fn 1753 / static 4）；
+  **抽样 3 条核实无误报** ⇒ 结论可信。
+  ⚠️ **不可逐个改** ⇒ 应做**棘轮基线**（只拦新增）
+
+## ⚠️ 本轮**未**做的事（都留了依据）
+| 事项 | 理由 |
+|---|---|
+| 接线 `nt_shield_ztnet` | 需先决定 ZTNet 是否进生产网络路径 ⇒ 独立立项 |
+| 建「可达性门」 | 已识别为最高价值下一步，本轮**未动手**（用户叫停） |
+| `read-only` sandbox 语义统一 | 需产品裁决（两处不一致 + 既有测试显式钉住） |
+| 改 `SKILL-SPEC.md` 去掉 `scripts/` | 影响全部既有 skill ⇒ 独立立项 |
+| 接入 8 个 MIT skill 包 | 产品方向决策，非缺陷修复 |
+| `ztnet` 的 `_` 前缀项改名 | 改名会触发 `dead_code` 警告**爆发**（它们本来靠 `_` 压制）⇒ 须与接线一并做 |
+
+## 8. 收工自查
+
+### 8.1 worktree 去向
+```
+[worktree-gate] repo=/Users/neo/Downloads/neotrix mode=check
+------------------------------------------------------------
+路径 | HEAD | 分支 | 脏 | 体积 | target | 近3h活动
+--------------------------------------------------------------------------
+/Users/neo/Downloads/neotrix/.worktrees/evo | d524e278 | HEAD | 0 | 3562M | 3480M | YES
+/Users/neo/Downloads/neotrix/.worktrees/merge-b | 1a48ecd3 | HEAD | 3 | 66M | 0M | no
+/Users/neo/Downloads/neotrix/.worktrees/nt-v2 | 6b57fe08 | HEAD | 0 | 81M | 0M | no
+[worktree-gate] ℹ️  **主树**：14 处未提交 | target 48542M（**只报告，不影响退出码**）
+[worktree-gate]    ⛔ 主树未提交改动**不在任何提交里**（AGENTS.md §1 收工义务）
+[worktree-gate]    提交：git add <显式路径> && git commit --only <同一批>（⛔ 共享 index 下禁 -A）
+------------------------------------------------------------
+[worktree-gate] worktree=3 个 | 合计 3709M | target 占 3480M
+[worktree-gate] 带未提交改动: 1 个 | 近3h有改动: 1 个
+[worktree-gate] ⚠️  1 个 worktree 近 3 小时仍有 .rs 改动 ⇒ 可能他窗在用，勿删
+[worktree-gate] ⛔ 1 个 worktree 的未提交改动**不在任何提交里**：
+[worktree-gate]      ⛔ /Users/neo/Downloads/neotrix/.worktrees/merge-b
+[worktree-gate]    删它们必须先 patch 兜底（R-DISK-5）：sh scripts/ops/nt_worktree_gate.sh prune
+[worktree-gate] ♻️  target 累计 3480M ≥ 1024M ⇒ 零风险可回收：sh scripts/ops/nt_worktree_gate.sh clean
+```
+本会话**新建**：`.worktrees/evo`（系统性取证用）⇒ 见下表。
+
+| worktree | 用途 | 去向 |
+|---|---|---|
+| `.worktrees/evo` | 系统性取证 + 隔离编译 | ⛔ **仍存在且干净**，HEAD=`d524e278`。其内容已以 `a46d71cc`/`d75fea35`/`f059dc1e` 落在分支 ⇒ **可用 `git worktree remove .worktrees/evo` 收掉**（我未收，因用户叫停） |
+| `.worktrees/merge-b` | **非本会话创建**（他窗） | ⛔ 含未提交改动 ⇒ 不得 prune / 不得手删 |
+| `.worktrees/nt-v2` | 非本会话创建 | 无未提交改动，本会话未触碰 |
+
+### 8.2 未提交改动的去向
+本会话触碰的文件（`mod_orphan.rs`、`nt_approval.rs`、
+`CLAIMED-BUT-NOT-ENFORCED-*.md`、两份吸收文档、台账、handoff、本 LESSONS）
+**全部进入上述提交**。兜底 patch：
+`.neotrix/patches/2026-10-06-*.patch`。
+⛔ 主工作树仍有**他窗 WIP**（`nt_game/*`、`.neotrix/capability_*.json` 等），未触碰。
+
+### 8.3 用户侧副作用
+本轮**未触碰**用户配置或 `~/.neotrix/*`。
+⚠️ 私有构建目录 `/tmp/nt-target-private`（约 11G）**留在磁盘上** ——
+它是本轮对抗「他窗 `cargo clean`」的手段，重启机器前可复用；
+不需要时 `rm -rf /tmp/nt-target-private` 即可（**不在仓内，无风险**）。
+
+## ⏭ 接手者的第一个动作（按序）
+1. **干净检出上重跑全量** `cargo test -p neotrix --lib` —— 确认基线（见上文诚实标注）
+2. **收掉 `.worktrees/evo`**（内容已在分支上，见 8.1）
+3. 读 `docs/architecture/LESSONS-2026-10-06-adjudication-and-scanner-blindspots.md`
+   —— 七条判据，本轮所有裁决的依据都在里面
+4. 若要继续进化路线：**第一件该做的事是「模块级可达性门」**（L2 已论证），
+   而不是继续逐项清理 1866 条
