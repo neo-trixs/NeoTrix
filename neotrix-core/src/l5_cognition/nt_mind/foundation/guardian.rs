@@ -546,7 +546,15 @@ impl WorkspaceGuard {
             Ok(s) => s,
             Err(_) => return report,
         };
-        fs::create_dir_all(&self.config.snapshot_dir).ok();
+        // ⚠️ 曾是 `.ok()`：**根因**被吞。目录创建失败（如权限）⇒
+        // 随后的快照写入必然失败 ⇒ 而「为什么失败」在这里就已经丢了。
+        // 与本文件上一处快照写入的 warn 配套：**先因、后果**都可见。
+        if let Err(e) = fs::create_dir_all(&self.config.snapshot_dir) {
+            log::warn!(
+                "[guardian] 快照目录创建失败 {}（后续快照写入也将失败）: {e}",
+                self.config.snapshot_dir.display()
+            );
+        }
 
         let mut snapshots: Vec<PathBuf> = fs::read_dir(&self.config.snapshot_dir)
             .ok()
