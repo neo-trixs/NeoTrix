@@ -109,14 +109,14 @@ RC=0
 
 | 文件 | 改动内容 | 去向 |
 |---|---|---|
-| `nt_game/env.rs` | 补 `GameOutcome`/`outcome()`/`turn_budget()`，phi 改 `Option` | ☐ 已提交（`<填 hash>`） |
-| `nt_game/evolution.rs` | 删 `Auto*`，接线，3 条回归测试 | ☐ 已提交 |
-| `nt_game/hex_crucible.rs` | D4 下溢修复 + 3 方法实现 | ☐ 已提交 |
-| `nt_game/builtin/hex_tictactoe.rs` | `outcome()`/`phi` 实现 | ☐ 已提交 |
-| `nt_game/builtin/game_2048.rs` | `outcome()`/`phi` 实现 | ☐ 已提交 |
-| `nt_mind_background_loop/handlers_game.rs` | 接线 + 6 条测试 | ☐ 已提交 |
-| `sessions/handoff-2026-10-06-ntgame-phase1-wiring.md` | 本文件 | ☐ 已提交 |
-| `docs/architecture/NT-GAME-CONVERGENCE-2026-10-06.md` | 追加 D1–D6 裁决 | ☐ 已提交 |
+| `nt_game/env.rs` | 补 `GameOutcome`/`outcome()`/`turn_budget()`，phi 改 `Option` | ☑ `git commit --only` 已提交（`3fdd1a0f`） |
+| `nt_game/evolution.rs` | 删 `Auto*`，接线，3 条回归测试 | ☑ `git commit --only` 已提交（`3fdd1a0f`） |
+| `nt_game/hex_crucible.rs` | D4 下溢修复 + 3 方法实现 | ☑ `git commit --only` 已提交（`3fdd1a0f`） |
+| `nt_game/builtin/hex_tictactoe.rs` | `outcome()`/`phi` 实现 | ☑ `git commit --only` 已提交（`3fdd1a0f`） |
+| `nt_game/builtin/game_2048.rs` | `outcome()`/`phi` 实现 | ☑ `git commit --only` 已提交（`3fdd1a0f`） |
+| `nt_mind_background_loop/handlers_game.rs` | 接线 + 6 条测试 | ☑ `git commit --only` 已提交（`3fdd1a0f`） |
+| `sessions/handoff-2026-10-06-ntgame-phase1-wiring.md` | 本文件 | ☑ `git commit --only` 已提交（`3fdd1a0f`） |
+| `docs/architecture/NT-GAME-CONVERGENCE-2026-10-06.md` | 追加 D1–D6 裁决 | ☑ `git commit --only` 已提交（`3fdd1a0f`） |
 
 > 他窗改动（`nt_judge.rs`、两个 `.neotrix/*.json`、未跟踪的 patch/db）**不在上表**，本会话未碰，保持其原状。
 
