@@ -3,8 +3,8 @@
 > 生成器 `scripts/ops/nt_topology.py`，索引 `scripts/ops/nt_mapgen.py`（1 秒重建）。
 > **⛔ 本文件由代码生成，改它会被下次重建覆盖 —— 要改判据请改生成器。**
 
-- **rs 文件** 2,860 · **代码行** 881,805 · **符号** 82,835
-- 符号行号已全量核对：**82,835 个符号 100% 命中真实声明行**
+- **rs 文件** 2,860 · **代码行** 910,151 · **符号** 84,084
+- 符号行号已全量核对：**84,084 个符号 100% 命中真实声明行**
 
 ## 维度 2 · 代码树分叉（⛔ 不可从目录名推断）
 
@@ -16,11 +16,11 @@
 
 | 树 | 文件 | 行数 | 占比 | |
 |---|---:|---:|---:|---|
-| 主分层树 (L0–L6) | 2489 | 767,654 | ███████████████████ | `layered` |
-| 文档/会话 | 375 | 79,032 | ██ | `doc` |
-| 独立 crate | 245 | 76,249 | ██ | `crate` |
-| core 内、层外 (entry/bin/examples) | 148 | 39,985 | █ | `core-outside-layers` |
-| 其他 | 169 | 36,202 | █ | `other` |
+| 主分层树 (L0–L6) | 2483 | 784,660 | ███████████████████ | `layered` |
+| 其他 | 1328 | 200,632 | █████ | `other` |
+| 文档/会话 | 463 | 96,889 | ██ | `doc` |
+| 独立 crate | 243 | 80,616 | ██ | `crate` |
+| core 内、层外 (entry/bin/examples) | 152 | 43,477 | █ | `core-outside-layers` |
 | 第二棵树（2026-09-30 B 方案后仅剩门面 re-export 面） | 1 | 40 |  | `second-tree` |
 
 > ✅ **第二棵树已清空**：仅剩 `neotrix-core/src/neotrix/mod.rs`（40 行，纯 re-export 面，无实现）。
@@ -31,20 +31,20 @@
 
 | 层 | 文件 | 行数 | 符号 | 占比 |
 |---|---:|---:|---:|---|
-| `l0_substrate` | 62 | 23,878 | 2,718 | `█` |
-| `l1_action` | 551 | 171,987 | 16,177 | `████` |
-| `l2_perception` | 360 | 92,295 | 9,784 | `██` |
-| `l3_embodiment` | 247 | 68,114 | 7,045 | `██` |
-| `l4_emotion` | 255 | 86,945 | 6,977 | `██` |
-| `l5_cognition` | 764 | 249,467 | 23,932 | `██████` |
-| `l6_meta` | 234 | 72,732 | 6,903 | `██` |
+| `l0_substrate` | 66 | 27,627 | 2,945 | `█` |
+| `l1_action` | 549 | 174,097 | 16,312 | `████` |
+| `l2_perception` | 364 | 97,559 | 10,181 | `██` |
+| `l3_embodiment` | 247 | 70,423 | 7,141 | `██` |
+| `l4_emotion` | 256 | 88,783 | 7,135 | `██` |
+| `l5_cognition` | 750 | 248,673 | 23,725 | `██████` |
+| `l6_meta` | 233 | 75,053 | 7,018 | `██` |
 
 ## 维度 1 · 物理目录树
 
 ```
-neotrix-core/  (2623 文件, 805,453 行)
-crates/  (231 文件, 75,510 行)
-apps/  (5 文件, 802 行)
+neotrix-core/  (2619 文件, 825,742 行)
+crates/  (228 文件, 79,844 行)
+apps/  (12 文件, 4,525 行)
 docs/  (1 文件, 40 行)
 ```
 
@@ -54,36 +54,36 @@ docs/  (1 文件, 40 行)
 
 | # | 文件 | 行 | 符号 | pub 符号 | modpath |
 |---:|---|---:|---:|---:|---|
-| 1 | `neotrix-core/src/l0_substrate/nt_ecs.rs` | 1,362 | 251 | 132 | `neotrix::l0_substrate::nt_ecs` |
-| 2 | `neotrix-core/src/l5_cognition/nt_mind/nt_game/tests/mod.rs` | 1,485 | 181 | 0 | `neotrix::l5_cognition::nt_mind::nt_game::tests` |
-| 3 | `neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/mod.rs` | 463 | 171 | 97 | `neotrix::l4_emotion::nt_memory::nt_memory_kb` |
-| 4 | `neotrix-core/src/agent.rs` | 1,048 | 163 | 83 | `neotrix::agent` |
-| 5 | `neotrix-core/src/l3_embodiment/nt_shield/nt_shield_sandbox/mod.rs` | 1,186 | 160 | 100 | `neotrix::l3_embodiment::nt_shield::nt_shield_sandbox` |
-| 6 | `neotrix-core/tests/nt_shield_integration.rs` | 1,900 | 155 | 0 | `neotrix::..::tests::nt_shield_integration` |
-| 7 | `neotrix-core/src/l2_perception/nt_world/source/osint_bridge.rs` | 788 | 153 | 3 | `neotrix::l2_perception::nt_world::source::osint_bridge` |
-| 8 | `crates/neotrix-neobot/src/nt_agent.rs` | 2,897 | 152 | 11 | `neotrix_neobot::nt_agent` |
-| 9 | `neotrix-core/src/l1_action/nt_act/nt_act_trade/tests/test_extractors.rs` | 1,780 | 147 | 0 | `neotrix::l1_action::nt_act::nt_act_trade::tests::test_extractors` |
-| 10 | `crates/neotrix-neobot/src/nt_channel_dispatch.rs` | 2,123 | 144 | 18 | `neotrix_neobot::nt_channel_dispatch` |
-| 11 | `neotrix-core/src/l2_perception/nt_world/nt_world_search.rs` | 1,391 | 144 | 49 | `neotrix::l2_perception::nt_world::nt_world_search` |
-| 12 | `neotrix-core/src/l2_perception/nt_world/osint/mod.rs` | 1,409 | 144 | 78 | `neotrix::l2_perception::nt_world::osint` |
-| 13 | `neotrix-core/src/l1_action/nt_act/nt_act_trade/tests/test_orchestration.rs` | 1,958 | 143 | 0 | `neotrix::l1_action::nt_act::nt_act_trade::tests::test_orchestration` |
-| 14 | `neotrix-core/src/l1_action/nt_io/nt_io_provider/gateway/execution.rs` | 1,369 | 141 | 64 | `neotrix::l1_action::nt_io::nt_io_provider::gateway::execution` |
-| 15 | `neotrix-core/src/l4_emotion/nt_memory/nt_trade_product_spec.rs` | 1,242 | 141 | 25 | `neotrix::l4_emotion::nt_memory::nt_trade_product_spec` |
-| 16 | `neotrix-core/src/l5_cognition/nt_core_ttc.rs` | 1,285 | 139 | 67 | `neotrix::l5_cognition::nt_core_ttc` |
-| 17 | `neotrix-core/src/l1_action/nt_act/nt_act_trade/trade_core.rs` | 931 | 137 | 46 | `neotrix::l1_action::nt_act::nt_act_trade::trade_core` |
-| 18 | `neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/stage_contracts.rs` | 886 | 137 | 29 | `neotrix::l5_cognition::nt_mind::nt_mind::seal_core::self_iterating::stage_contracts` |
-| 19 | `neotrix-core/src/l0_substrate/nt_core_telemetry.rs` | 1,572 | 135 | 60 | `neotrix::l0_substrate::nt_core_telemetry` |
-| 20 | `neotrix-core/src/l5_cognition/nt_mind/nt_game/render/components.rs` | 910 | 135 | 78 | `neotrix::l5_cognition::nt_mind::nt_game::render::components` |
-| 21 | `crates/neotrix-neobot/src/nt_channel_telegram.rs` | 2,353 | 134 | 18 | `neotrix_neobot::nt_channel_telegram` |
-| 22 | `neotrix-core/src/l1_action/nt_file_ability/image_super_resolution.rs` | 1,672 | 134 | 66 | `neotrix::l1_action::nt_file_ability::image_super_resolution` |
-| 23 | `neotrix-core/src/l0_substrate/nt_core_cross_layer.rs` | 1,036 | 133 | 75 | `neotrix::l0_substrate::nt_core_cross_layer` |
-| 24 | `neotrix-core/src/l1_action/nt_io/nt_io_provider/gateway/mod.rs` | 1,685 | 132 | 12 | `neotrix::l1_action::nt_io::nt_io_provider::gateway` |
-| 25 | `neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs` | 1,345 | 131 | 26 | `neotrix::l5_cognition::nt_mind::nt_mind_background_loop::run` |
-| 26 | `crates/neotrix-gateway/src/gate.rs` | 1,314 | 127 | 56 | `neotrix_gateway::gate` |
-| 27 | `neotrix-core/src/l5_cognition/nt_mind/nt_game/render/input.rs` | 548 | 126 | 107 | `neotrix::l5_cognition::nt_mind::nt_game::render::input` |
-| 28 | `neotrix-core/src/l0_substrate/nt_core_hex.rs` | 1,530 | 125 | 68 | `neotrix::l0_substrate::nt_core_hex` |
-| 29 | `neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_sweep_20260815.rs` | 1,074 | 125 | 76 | `neotrix::l4_emotion::nt_memory::nt_memory_kb::nt_memory_sweep_20260815` |
-| 30 | `neotrix-core/tests/phase_integration_tests.rs` | 793 | 121 | 0 | `neotrix::..::tests::phase_integration_tests` |
+| 1 | `neotrix-core/src/l0_substrate/nt_ecs.rs` | 1,706 | 267 | 133 | `neotrix::l0_substrate::nt_ecs` |
+| 2 | `neotrix-core/src/l5_cognition/nt_core_gate/nt_provenance.rs` | 2,821 | 238 | 117 | `neotrix::l5_cognition::nt_core_gate::nt_provenance` |
+| 3 | `crates/neotrix-neobot/src/nt_agent.rs` | 4,337 | 210 | 19 | `neotrix_neobot::nt_agent` |
+| 4 | `neotrix-core/src/l5_cognition/nt_mind/nt_game/tests/mod.rs` | 1,485 | 181 | 0 | `neotrix::l5_cognition::nt_mind::nt_game::tests` |
+| 5 | `neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/mod.rs` | 484 | 173 | 99 | `neotrix::l4_emotion::nt_memory::nt_memory_kb` |
+| 6 | `neotrix-core/src/agent.rs` | 1,078 | 163 | 83 | `neotrix::agent` |
+| 7 | `neotrix-core/src/l3_embodiment/nt_shield/nt_shield_sandbox/mod.rs` | 1,186 | 160 | 100 | `neotrix::l3_embodiment::nt_shield::nt_shield_sandbox` |
+| 8 | `neotrix-core/tests/nt_shield_integration.rs` | 1,900 | 155 | 0 | `neotrix::..::tests::nt_shield_integration` |
+| 9 | `neotrix-core/src/l2_perception/nt_world/source/osint_bridge.rs` | 788 | 153 | 3 | `neotrix::l2_perception::nt_world::source::osint_bridge` |
+| 10 | `neotrix-core/src/l2_perception/nt_world/osint/mod.rs` | 1,503 | 151 | 78 | `neotrix::l2_perception::nt_world::osint` |
+| 11 | `crates/neotrix-neobot/src/nt_channel_dispatch.rs` | 2,258 | 148 | 18 | `neotrix_neobot::nt_channel_dispatch` |
+| 12 | `neotrix-core/src/l1_action/nt_act/nt_act_trade/tests/test_extractors.rs` | 1,780 | 147 | 0 | `neotrix::l1_action::nt_act::nt_act_trade::tests::test_extractors` |
+| 13 | `neotrix-core/src/l5_cognition/nt_core_ttc.rs` | 1,446 | 146 | 69 | `neotrix::l5_cognition::nt_core_ttc` |
+| 14 | `neotrix-core/src/l2_perception/nt_world/nt_world_search.rs` | 1,391 | 144 | 49 | `neotrix::l2_perception::nt_world::nt_world_search` |
+| 15 | `neotrix-core/src/l1_action/nt_act/nt_act_trade/tests/test_orchestration.rs` | 1,958 | 143 | 0 | `neotrix::l1_action::nt_act::nt_act_trade::tests::test_orchestration` |
+| 16 | `neotrix-core/src/l4_emotion/nt_memory/nt_trade_product_spec.rs` | 1,245 | 142 | 25 | `neotrix::l4_emotion::nt_memory::nt_trade_product_spec` |
+| 17 | `neotrix-core/src/l1_action/nt_io/nt_io_provider/gateway/execution.rs` | 1,369 | 141 | 64 | `neotrix::l1_action::nt_io::nt_io_provider::gateway::execution` |
+| 18 | `neotrix-core/src/l6_meta/nt_approval.rs` | 1,734 | 141 | 35 | `neotrix::l6_meta::nt_approval` |
+| 19 | `neotrix-core/src/l1_action/nt_act/nt_act_trade/trade_core.rs` | 931 | 137 | 46 | `neotrix::l1_action::nt_act::nt_act_trade::trade_core` |
+| 20 | `neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/stage_contracts.rs` | 886 | 137 | 29 | `neotrix::l5_cognition::nt_mind::nt_mind::seal_core::self_iterating::stage_contracts` |
+| 21 | `neotrix-core/src/l1_action/nt_act/nt_act_trade/capability_registry.rs` | 1,183 | 136 | 38 | `neotrix::l1_action::nt_act::nt_act_trade::capability_registry` |
+| 22 | `neotrix-core/src/l0_substrate/nt_core_telemetry.rs` | 1,572 | 135 | 60 | `neotrix::l0_substrate::nt_core_telemetry` |
+| 23 | `neotrix-core/src/l5_cognition/nt_mind/nt_game/render/components.rs` | 910 | 135 | 78 | `neotrix::l5_cognition::nt_mind::nt_game::render::components` |
+| 24 | `crates/neotrix-neobot/src/nt_channel_telegram.rs` | 2,353 | 134 | 18 | `neotrix_neobot::nt_channel_telegram` |
+| 25 | `neotrix-core/src/l0_substrate/nt_core_artifact_verdict.rs` | 1,562 | 134 | 66 | `neotrix::l0_substrate::nt_core_artifact_verdict` |
+| 26 | `neotrix-core/src/l1_action/nt_file_ability/image_super_resolution.rs` | 1,672 | 134 | 66 | `neotrix::l1_action::nt_file_ability::image_super_resolution` |
+| 27 | `neotrix-core/src/l0_substrate/nt_core_cross_layer.rs` | 1,036 | 133 | 75 | `neotrix::l0_substrate::nt_core_cross_layer` |
+| 28 | `neotrix-core/src/l1_action/nt_io/nt_io_provider/gateway/mod.rs` | 1,727 | 133 | 12 | `neotrix::l1_action::nt_io::nt_io_provider::gateway` |
+| 29 | `neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs` | 1,348 | 131 | 26 | `neotrix::l5_cognition::nt_mind::nt_mind_background_loop::run` |
+| 30 | `crates/neotrix-gateway/src/gate.rs` | 1,314 | 127 | 56 | `neotrix_gateway::gate` |
 
 ## 维度 4 · 孤儿与异常
 
@@ -150,9 +150,9 @@ python3 scripts/ops/nt_topology.py   # → 本文件
 
 | 位置 | `.unwrap()` | `.expect()` | `panic!` |
 |---|---:|---:|---:|
-| 全仓 | 5140 | 2926 | 173 |
-| 测试目录内 | 1011 | 395 | 44 |
-| **生产代码** | **4129** | **2531** | **129** |
+| 全仓 | 5152 | 3405 | 226 |
+| 测试目录内 | 1011 | 426 | 49 |
+| **生产代码** | **4141** | **2979** | **177** |
 
 **⛔ `AGENTS.md` / `RUST-STANDARDS.md` 明令生产代码禁这三者，但全仓无任何门或基线在度量** ⇒ 一次性历史债，存量裸奔，随时可能新增而无报警。
 
@@ -179,10 +179,10 @@ python3 scripts/ops/nt_topology.py   # → 本文件
 
 | 口径 | 数量 | 含义 |
 |---|---:|---|
-| 重复的**类型名** | 1120 | 同名出现 ≥2 次的**名字**数 |
-| 名义多余定义 | 1797 | 每名保留 1 份后余下的（**含异构**） |
-| **结构完全相同**的真重复组 | **351** | 字段集合逐项相同 |
-| **真正可归并的定义** | **393** | 只有这个数才叫「可归并」 |
+| 重复的**类型名** | 1014 | 同名出现 ≥2 次的**名字**数 |
+| 名义多余定义 | 1663 | 每名保留 1 份后余下的（**含异构**） |
+| **结构完全相同**的真重复组 | **241** | 字段集合逐项相同 |
+| **真正可归并的定义** | **269** | 只有这个数才叫「可归并」 |
 
 > ⚠️ **本表数字是「候选」，不是「结论」** —— 三次判据缺陷已修（2026-09-30），每次都显著抬高数字，说明历史上每次都在**漏判**：
 >
@@ -190,16 +190,16 @@ python3 scripts/ops/nt_topology.py   # → 本文件
 > 2. 变体正则不认尾逗号 ⇒ **所有无负载 enum 被静默丢弃**（`GoalPriority` 3 份，审计看见 0）
 > 3. 签名顺序敏感 ⇒ 声明序相反的同枚举被判异构
 >
-> 三处修完：147 → **351** 组 / 174 → **393** 可归并。**下一个同类缺陷仍可能存在。**
+> 三处修完：147 → **241** 组 / 174 → **269** 可归并。**下一个同类缺陷仍可能存在。**
 >
 > ⛔ **顺序敏感那条是双刃**：排序让「声明序不同」判同构了，但 enum 的**自定义 `Ord` 实现可能刻意不同于声明序**（如 `rank()`）—— 排序会把这种差异隐藏掉。
 > ⇒ **每一组在归并前必须读 doc comment 判语义**，本表只负责缩小候选范围。
 > 已验证的误报样例：`Position`（f32/f64，已排除）、`Output`（`Add`/`Sub`/`Mul` 的**强制**关联类型 `type Output = Self;`，不可合）、`ThreatLevel` 的 2 份组（带注释「mirrors anti_distillation for module independence」= 刻意重复）。
 
-⇒ 1120 个同名里，**只有 393 个结构真同构**（占名义多余的 22%）。
+⇒ 1014 个同名里，**只有 269 个结构真同构**（占名义多余的 16%）。
 其余是**合法的同名异构**（如 `TaskStatus` 出现 12 次却是 10 个不同枚举）—— 报原始名数会是对正确代码的误报，与 `unsafe` 字面量陷阱同一层次。
 
-> ⚠️ 本表第一版把「名义多余 1797」误写成「可归并」并算出 160% —— **那正是本节警告的那个错误，我自己犯了一遍**。三个数已分列，逐个标明含义。
+> ⚠️ 本表第一版把「名义多余 1663」误写成「可归并」并算出 160% —— **那正是本节警告的那个错误，我自己犯了一遍**。三个数已分列，逐个标明含义。
 
 #### Top 12 真同构组（按可归并数）
 
@@ -215,8 +215,8 @@ python3 scripts/ops/nt_topology.py   # → 本文件
 | 8 | `Bm25Document` | struct | 2 | 3 | l1_action, l4_emotion |
 | 9 | `CapabilityGap` | struct | 5 | 3 | l0_substrate, l1_action, l5_cognition |
 | 10 | `Cli` | struct | 1 | 3 | 跨 crate |
-| 11 | `CompilationHealth` | struct | 3 | 3 | l6_meta |
-| 12 | `ComponentMap` | struct | 2 | 3 | l6_meta |
+| 11 | `CrtTimeScale` | enum | 3 | 3 | l0_substrate, l5_cognition |
+| 12 | `DecomposeSuggestion` | struct | 2 | 3 | l0_substrate, l1_action, l5_cognition |
 
 **逐处位置**（`nt_locate --component <名>` 可直查）：
 
@@ -228,10 +228,10 @@ python3 scripts/ops/nt_topology.py   # → 本文件
   - `neotrix-core/src/l6_meta/healing/self_healing/circuit_breaker.rs:9`
   - `neotrix-core/src/l6_meta/nt_core_guardian/circuit_breaker.rs:20`
 - `RiskLevel` ×5
-  - `neotrix-core/src/agent.rs:450`
-  - `neotrix-core/src/l1_action/nt_act/nt_act_trade/production_logistics.rs:308`
+  - `neotrix-core/src/agent.rs:462`
+  - `neotrix-core/src/l1_action/nt_act/nt_act_trade/production_logistics.rs:309`
   - `neotrix-core/src/l1_action/nt_act/nt_act_trade/capabilities/risk_assessor.rs:47`
-  - `neotrix-core/src/l3_embodiment/nt_shield/guard/agent_guardrails/mod.rs:59`
+  - `neotrix-core/src/l3_embodiment/nt_shield/guard/agent_guardrails/mod.rs:65`
   - `neotrix-core/src/l3_embodiment/nt_shield/nt_shield_approval/human_approval.rs:24`
 - `Severity` ×5
   - `neotrix-core/src/l1_action/nt_infra_ai/inspection.rs:15`
