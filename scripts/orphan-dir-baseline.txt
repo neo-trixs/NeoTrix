@@ -27,6 +27,15 @@
 #     修 bfs/dfs max_depth off-by-one）＋`nt_core/memory`（5 文件 1,171 行，4 测试全绿；
 #     修 EmotionLabel→PlutchikEmotion 避开 L5→L6 违规、6 处 ConceptNode 字段误用、
 #     1 处 move-after-use、2 处借用冲突）—— **均为「从未编译过」，首次接线即暴露真bug**
+#   已接线 2 条（A54 波，2,711 行 / 57 测试）：`nt_act::nt_act_dev_tools`（4 测试）＋
+#     `nt_mind::self_improvement`（53 测试）。本波测出**单位错配真 bug**：
+#     `updated_at` 是 Unix 秒，而 consolidate 拿它当回合数（`% (current_turn+1)`，
+#     源码自称 pseudo-age）⇒ age 取决于挂钟取模，测试可绿可红。已引入回合域
+#     `last_access_turn` 彻底解耦。另修 `accuracy()` 用只含 positive 的分子
+#     （结构上永远 ≥1.0，无法反映失败）⇒ 增 `times_reported` 作分母。
+#   **永不接线 1 条**：`nt_core/nt_consciousness_core/archive` —— 其 README 自述
+#     「旧代码归档 / 2026-09-18 / 按 FUSION-ARCHITECTURE-v4 重构」，新架构文件就在
+#     父目录 ⇒ 接线它等于复活被刻意归档的死代码。
 #   已接线 3 条（A53 波，2,713 行 / 73 测试）：`nt_world::temporal_kg`（42 测试）＋
 #     `nt_act::semantic_routing`（22 测试）＋ `nt_act::geo_seo`（9 测试，零错误）。
 #     本波测出 2 个**真逻辑/数学 bug**：
@@ -89,7 +98,5 @@
 #     裁决全文：docs/architecture/O1-AGENT-LOOP-VERDICT-2026-10-06.md
 
 neotrix-core/src/l1_action/nt_act/agent_loop
-neotrix-core/src/l1_action/nt_act/nt_act_dev_tools
 neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/archive
 neotrix-core/src/l5_cognition/nt_mind/cross_domain
-neotrix-core/src/l5_cognition/nt_mind/self_improvement

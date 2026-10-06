@@ -4,7 +4,7 @@
 //! 支持 status/start/stop/restart/log 命令
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// 守护进程监控器

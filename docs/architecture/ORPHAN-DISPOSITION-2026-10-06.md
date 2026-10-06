@@ -9,13 +9,13 @@
 
 | | 值 |
 |---|---:|
-| 孤儿目录 | **5**（O-1 单列裁决；A51/A52/A53 共接线 8 条） |
-| `.rs` 文件 | **19** |
-| 代码行 | **3,104** |
+| 孤儿目录 | **3**（O-1 归档不接线；O-7 有意归档永不接线；余 1 条待接线） |
+| `.rs` 文件 | **15** |
+| 代码行 | **5,744** |
 | **判为「纯重复」** | **0 条** |
 | 判为「独有能力」 | 2 条 |
 | 判为「部分覆盖」 | 11 条 |
-| 已删除 / 已接线 | **1 条**（`nt_consciousness`）/ **8 条**（A51 两条 ＋ A52 三条 ＋ A53 三条） |
+| 已删除 / 已接线 / 永不接线 | **1 / 10 / 1** 条 |
 
 ⚠️ **最重要的一条结论**：**13 条里没有一条是重复副本。**
 ⇒ 「未接线」在本仓不是「冗余」，而是「**有能力、无接线**」——
@@ -59,14 +59,14 @@ error[E0432]: unresolved import `crate::l5_cognition::nt_consciousness::features
 | # | 目录 | 文件/行/测试 | 独有类型 | 处置 | 理由摘要 |
 |---|---|---|---:|---|---|
 | O-2 | `nt_mind/cross_domain` | 5 / 2,649 / 14 | **46**/54 | **归档（不接线）** | 独有能力占比最高（85%），带测试 ⇒ 有资产价值；从无数据 |
-| O-3 | `nt_mind/self_improvement` | 4 / 2,129 / **44** | 19/27 | **归档** | 测试密度最高（44 / 2,129 行）⇒ 明显被维护过 |
+| O-3 | `nt_mind/self_improvement` | 4 / 2,129 / **53** | 19/27 | ✅ **已接线（A54）** | 53 测试全绿。测出**单位错配真 bug**：`updated_at` 是 Unix 秒却被当回合数用（`% (current_turn+1)`，源码自称 pseudo-age）⇒ age 依赖挂钟取模，**测试可绿可红**；已引入回合域 `last_access_turn` 解耦。另 `accuracy()` 分子只含 positive ⇒ 结构上永远 ≥1.0、无法反映失败，已增 `times_reported` 作分母 |
 | O-4 | `nt_world/temporal_kg` | 8 / 1,278 / **42** | 3/8 | ✅ **已接线（A53）** | 42 测试全绿。测出**真数学 bug**：PPR 把悬挂质量 `dangling_sum/n` 均摊 ⇒ 链尾 `e4` 反超种子 `e0`；已改为按 personalization 再分配（标准公式）。另 7 处 `NaiveDateTime::from_ymd_opt`（该 API 不存在）改现代 chrono |
 | O-5 | `nt_core/knowledge` | 5 / 1,263 / **0→5** | 29/42 | ✅ **已接线（A51）** | 首次接线即编译通过；补 5 个冒烟测试并**测出`bfs`/`dfs` 的 `max_depth` off-by-one**（`Some(1)` 不返回直接邻居，却给它记了`distances=1.0`）⇒ 真 bug，已修并被测试锁定 |
 | O-6 | `nt_core/memory` | 5 / 1,171 / 4 | 16/24 | ✅ **已接线（A51）** | 4 测试全绿。首接线暴露 **4 类真 bug**：`EmotionLabel` 只在 L6（引它即 **L5→L6 违规**）、`ConceptNode` 无 `concept` 字段 6 处、`episode.id` move 后复用 1 处、`patterns`/`principles` 借用活过 `store()` 2 处 |
-| O-7 | `nt_consciousness_core/archive` | 3 / 1,082 / 19 | 13/14 | **归档（名已自述）** | 目录名即 `archive` ⇒ 可能是有意归档；需确认保留策略 |
+| O-7 | `nt_consciousness_core/archive` | 3 / 1,082 / 19 | 13/14 | ⛔ **永不接线** | 其 `README.md` 自述：**「旧代码归档 / 归档日期 2026-09-18 / 按 FUSION-ARCHITECTURE-v4 重构为5层架构，旧代码已备份到此目录」**，且「新架构文件」列在**父目录**。⇒ 接线它等于**复活被刻意归档的死代码** |
 | O-8 | `nt_act/semantic_routing` | 4 / 844 / 22 | 12/13 | ✅ **已接线（A53）** | 22 → 0 error，含**真逻辑 bug**：`context_boost` 拿上下文 **key** 比关键词（永匹配不上）⇒ 改为比 value。另 `SimilarityScore` 持 `String` 却derive `Copy`（E0204）、`BehaviorPatternType` 缺 `Eq/Hash` 却作 HashMap 键、闭包内`?` 需改 `and_then`、借用冲突 2 处 |
 | O-9 | `nt_act/geo_seo` | 4 / 591 / 9 | 13/18 | ✅ **已接线（A53）** | **零错误零改动**直接编译通过，9 测试全绿 |
-| O-10 | `nt_act/nt_act_dev_tools` | 4 / 582 / 4 | **5/5** | **归档** | **全未覆盖** ⇒ 独有：`DesktopBuilder`/`BuildLadder`/`GitHook`/`DaemonMonitor` |
+| O-10 | `nt_act/nt_act_dev_tools` | 4 / 582 / 4 | **5/5** | ✅ **已接线（A54）** | 全未覆盖的 `DesktopBuilder`/`BuildLadder`/`GitHook`/`DaemonMonitor`，仅 4 处导入错误，4 测试全绿 |
 | O-11 | `nt_memory_knowledge_graph` | 3 / 569 / 8 | 9/10 | ✅ **已接线（A52）** | 首接线 **22 → 0 error**。测出：孤立残留 derive 块（同时作用于同一 enum ⇒ `rename_all` 重复＋6 个 `E0119`）、`use` 夹在 `#[derive]` 与 struct 之间、derive 缺 `Hash` 却用 `HashSet`、**真UTF-8 panic**（按字节切3 字节的 `→`）。另发现 `sync_to_kb` 是**活路径上的死端桩**（真实写入被注释，有调用方） |
 | O-12 | `nt_feel/cognition_bridge` | 2 / 234 / 9 | 1/3 | ✅ **已接线（A52）** | 缺 `mod.rs`（只有 `config.rs`/`emotion_state.rs`）⇒ 补建后直接编译通过，**9 测试零改动全绿** |
 | O-13 | `nt_core/io_skills` | 2 / 87 / 3 | **3/3** | ✅ **已接线（A52）** | 全未覆盖的 `Eli5Engine` 解释器，直接编译通过，3 测试全绿 |

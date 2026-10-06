@@ -376,16 +376,21 @@ pub struct MetaInsight {
     pub pattern_ids: Vec<String>,
     pub confidence: f64,
     pub times_predicted: u64,
+    /// ⚠️ `report_outcome(false)` 原本被完全丢弃，而 `accuracy()` 拿
+    /// `times_observed`（只含 positive）当分子 ⇒ 结构上永远 ≥ 1.0，
+    /// 无法反映失败。故显式记录**总报告数**作为正确分母。
+    #[serde(default)]
+    pub times_reported: u64,
     pub times_observed: u64,
 }
 
 impl MetaInsight {
     /// Accuracy ratio: observed / predicted (1.0 = perfect)
     pub fn accuracy(&self) -> f64 {
-        if self.times_predicted == 0 {
+        if self.times_reported == 0 {
             return 0.0;
         }
-        self.times_observed as f64 / self.times_predicted as f64
+        self.times_observed as f64 / self.times_reported as f64
     }
 }
 
@@ -451,6 +456,7 @@ impl ReflectionEngine {
                     pattern_ids: vec![format!("pat_{}", theme)],
                     confidence: (count as f64 / session_summaries.len() as f64).min(1.0),
                     times_predicted: count,
+                    times_reported: 0,
                     times_observed: 0,
                 };
                 new_insights.push(insight);
@@ -479,6 +485,7 @@ impl ReflectionEngine {
                         pattern_ids: vec![format!("dec_{}", decision)],
                         confidence: (*count as f64 / session_summaries.len() as f64).min(1.0),
                         times_predicted: *count,
+                        times_reported: 0,
                         times_observed: 0,
                     });
                 }
@@ -492,6 +499,8 @@ impl ReflectionEngine {
     /// Report observed outcomes for previously predicted insights
     pub fn report_outcome(&mut self, insight_id: &str, observed: bool) {
         if let Some(insight) = self.insights.iter_mut().find(|i| i.insight_id == insight_id) {
+            // 总报告数无条件累加（含 negative），否则 accuracy 无从反映失败。
+            insight.times_reported += 1;
             if observed {
                 insight.times_observed += 1;
             }
@@ -562,9 +571,10 @@ impl SleepComputer {
         let mut to_promote = Vec::new();
         for id in &recall_ids {
             if let Some(block) = fs.blocks.get(id) {
-                let age = self.current_turn.saturating_sub(
-                    block.updated_at % (self.current_turn + 1), // pseudo-age
-                );
+                // 回合域年龄：原先 `updated_at % (current_turn+1)` 把 **Unix 秒**
+                // 当回合数混算（源码自称pseudo-age）⇒ age 取决于挂钟取模，
+                // 同一次运行可绿可红。回合语义一律走 last_access_turn。
+                let age = self.current_turn.saturating_sub(block.last_access_turn);
                 if block.access_count >= self.config.promotion_min_access
                     && age >= self.config.consolidation_threshold_turns
                 {
@@ -739,7 +749,7 @@ impl SleepComputer {
                 // Decay: salience = access_count * exp(-age / half_life)
                 let half_life = 10.0;
                 let salience =
-                    block.access_count as f64 * (-age as f64 / half_life).exp();
+                    block.access_count as f64 * (-(age as f64) / half_life).exp();
                 if salience < 0.1 {
                     pruned_ids.push(id.clone());
                 }
@@ -784,13 +794,20 @@ fn compress_content(content: &str) -> String {
     if content.len() <= max_len {
         return content.to_string();
     }
+    // ⚠️ UTF-8 安全：原实现 `content[..max_len]` 按**字节**索引，max_len 落在
+    // 多字节字符中间即 panic（与 A52 的 `→` 同类缺陷）。先按 char 边界回退。
+    let cut = (0..=max_len.min(content.len()))
+        .rev()
+        .find(|&i| content.is_char_boundary(i))
+        .unwrap_or(0);
+    let head = &content[..cut];
     // Try to cut at sentence boundary
-    if let Some(pos) = content[..max_len].rfind(". ") {
-        format!("{}...", &content[..=pos])
-    } else if let Some(pos) = content[..max_len].rfind(' ') {
-        format!("{}...", &content[..pos])
+    if let Some(pos) = head.rfind(". ") {
+        format!("{}...", &head[..=pos])
+    } else if let Some(pos) = head.rfind(' ') {
+        format!("{}...", &head[..pos])
     } else {
-        format!("{}...", &content[..max_len])
+        format!("{}...", head)
     }
 }
 
@@ -825,8 +842,8 @@ mod tests {
         let mut computer = SleepComputer::new();
         computer.current_turn = 20;
 
+            // 提升需同时满足：access_count >= promotion_min_access 且回合年龄 >= 阈值。
         let result = computer.consolidate(&mut fs);
-        // recall1 has access_count=5 >= min_access=3, should be promoted
         assert!(result.promoted_to_core.iter().any(|id| id.contains("recall1")));
     }
 
@@ -915,10 +932,23 @@ mod tests {
         let short = "Short text.";
         assert_eq!(compress_content(short), "Short text.");
 
-        let long = "This is a very long sentence that goes on and on and should be compressed. And another sentence.";
-        let compressed = compress_content(long);
-        assert!(compressed.len() < long.len());
-        assert!(compressed.ends_with("..."));
+        // 阈值是 `max_len = 200`。原用例的"long"只有 102 字节 < 200，
+        // 于是原样返回，`compressed.len() < long.len()` **永远不可能成立**
+        // （此模块此前从未编译，故该断言从未被真正执行过）。
+        // 这里如实覆盖两个分支，而不擅自改动生产阈值：
+        //   ① 低于阈值 ⇒ 不压缩
+        //   ② 超过阈值 ⇒ 截断并加省略号
+        let medium = "This is a very long sentence that goes on and on and should be compressed. And another sentence.";
+        assert!(medium.len() < 200);
+        assert_eq!(compress_content(medium), medium, "低于阈值应原样返回");
+
+        let long = format!("{}. {}", medium, "Additional sentences pushing the total length well past the two hundred byte compression threshold used by this helper.");
+        assert!(long.len() > 200, "构造的长文本须超过阈值，实际 {}", long.len());
+        let compressed = compress_content(&long);
+        assert!(compressed.len() < long.len(), "应被压缩: {} -> {}", long.len(), compressed.len());
+        assert!(compressed.ends_with("..."), "应以省略号结尾: {:?}", compressed);
+        // UTF-8 安全：截断点不得落在多字节字符中间
+        assert!(long.is_char_boundary(compressed.len() - 3) || compressed.is_char_boundary(3));
     }
 
     #[test]

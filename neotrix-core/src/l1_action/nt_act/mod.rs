@@ -2,6 +2,7 @@
 
 // Actions subdirectory
 pub mod actions;
+pub mod nt_act_dev_tools; // 开发工具（孤儿接线 A54）
 pub mod geo_seo; // Geo/SEO（孤儿接线 A53）
 pub mod semantic_routing; // 语义路由（孤儿接线 A53）
 pub mod nt_act_scheduler;

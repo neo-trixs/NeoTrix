@@ -56,6 +56,14 @@ pub struct MemoryBlock {
     pub content: String,
     pub created_at: u64,
     pub updated_at: u64,
+    /// 回合域的「最近活跃回合」。
+    ///
+    /// ⚠️ `updated_at` 是 **Unix 秒**（见 `age_secs()`），而 `SleepComputer`
+    /// 按**回合**推进；原实现用 `updated_at % (current_turn+1)` 把两者混算
+    /// （源码自称pseudo-age）⇒ age 取决于挂钟取模，**同一次运行可绿可红**。
+    /// 回合语义的年龄一律走本字段。
+    #[serde(default)]
+    pub last_access_turn: u64,
     pub access_count: u64,
     pub tags: Vec<String>,
 }
@@ -69,6 +77,7 @@ impl MemoryBlock {
             content: content.into(),
             created_at: now,
             updated_at: now,
+            last_access_turn: 0,
             access_count: 0,
             tags: Vec::new(),
         }

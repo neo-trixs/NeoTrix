@@ -3,7 +3,7 @@
 //! 移植自 scripts/build-desktop.sh
 //! 支持 check/build/package:dir/package 阶梯
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 /// 构建阶梯
