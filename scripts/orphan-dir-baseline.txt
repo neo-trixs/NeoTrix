@@ -17,6 +17,49 @@
 #   (b) 取 [path] 目标的**父目录名**（原先取 basename 得到文件名，永不匹配子目录名）。
 # 逐条定性见 docs/architecture/ORPHAN-ADJUDICATION-2026-10-06.md
 #
+# ── 逐条裁决状态（2026-10-06，M-14 限制四段式）────────────────────────────────
+# 处置表全文：docs/architecture/ORPHAN-DISPOSITION-2026-10-06.md
+# 通用结论：13 条中**0 条是重复副本** ⇒ 本仓「未接线」= 有能力无接线，非冗余。
+# 统一处置：**归档（不接线）**，理由 = ① 全部从未编译验证 ② 全部带测试（删除会销毁资产）
+#③ 接线缺本自有数据（见 O-1 的反面实证）。归档非遗忘：每条带复活触发条件。
+#
+#   已删除 1 条：`l5_cognition/nt_consciousness`（39 行自引用 facade，
+#     实测挂载报 E0432 ×3 ⇒ 永远无法编译，且其文档误导消费者去用该路径）
+#
+#   ▸ neotrix-core/src/l5_cognition/nt_mind/cross_domain
+#     保留项：5 文件 / 2649 行 / 14 测试 / 独有类型 46
+#     处置：**归档（不接线）** · 复活触发：需要该能力时，取回并先补编译验证
+#   ▸ neotrix-core/src/l5_cognition/nt_mind/self_improvement
+#     保留项：4 文件 / 2129 行 / 44 测试 / 独有类型 19
+#     处置：**归档（不接线）** · 复活触发：需要该能力时，取回并先补编译验证
+#   ▸ neotrix-core/src/l2_perception/nt_world/temporal_kg
+#     保留项：8 文件 / 1278 行 / 42 测试 / 独有类型 3
+#     处置：**归档（不接线）** · 复活触发：需要该能力时，取回并先补编译验证
+#   ▸ neotrix-core/src/l5_cognition/nt_core/knowledge
+#     保留项：5 文件 / 1263 行 / 0 测试 / 独有类型 29
+#     处置：**归档（不接线）** · 复活触发：需要该能力时，取回并先补编译验证
+#   ▸ neotrix-core/src/l5_cognition/nt_core/memory
+#     保留项：5 文件 / 1171 行 / 4 测试 / 独有类型 16
+#     处置：**归档（不接线）** · 复活触发：需要该能力时，取回并先补编译验证
+#   ▸ neotrix-core/src/l1_action/nt_act/semantic_routing
+#     保留项：4 文件 / 844 行 / 22 测试 / 独有类型 12
+#     处置：**归档（不接线）** · 复活触发：需要该能力时，取回并先补编译验证
+#   ▸ neotrix-core/src/l1_action/nt_act/geo_seo
+#     保留项：4 文件 / 591 行 / 9 测试 / 独有类型 13
+#     处置：**归档（不接线）** · 复活触发：需要该能力时，取回并先补编译验证
+#   ▸ neotrix-core/src/l1_action/nt_act/nt_act_dev_tools
+#     保留项：4 文件 / 582 行 / 4 测试 / 独有类型 5
+#     处置：**归档（不接线）** · 复活触发：需要该能力时，取回并先补编译验证
+#   ▸ neotrix-core/src/l4_emotion/nt_memory/nt_memory_knowledge_graph
+#     保留项：3 文件 / 569 行 / 8 测试 / 独有类型 9
+#     处置：**归档（不接线）** · 复活触发：需要该能力时，取回并先补编译验证
+#   ▸ neotrix-core/src/l4_emotion/nt_feel/cognition_bridge
+#     保留项：2 文件 / 234 行 / 9 测试 / 独有类型 1
+#     处置：**归档（不接线）** · 复活触发：需要该能力时，取回并先补编译验证
+#   ▸ neotrix-core/src/l5_cognition/nt_core/io_skills
+#     保留项：2 文件 / 87 行 / 3 测试 / 独有类型 3
+#     处置：**归档（不接线）** · 复活触发：需要该能力时，取回并先补编译验证
+#
 # ⚠️ 逐条状态（2026-10-06）：基线语义是「**已裁决**」，不是「已放弃」。
 #   `l1_action/nt_act/agent_loop` 已完成**能力差集**裁决 ⇒ **暂不接线**
 #   （不是「被取代」也不是「死代码」）：
@@ -37,7 +80,6 @@ neotrix-core/src/l1_action/nt_act/semantic_routing
 neotrix-core/src/l2_perception/nt_world/temporal_kg
 neotrix-core/src/l4_emotion/nt_feel/cognition_bridge
 neotrix-core/src/l4_emotion/nt_memory/nt_memory_knowledge_graph
-neotrix-core/src/l5_cognition/nt_consciousness
 neotrix-core/src/l5_cognition/nt_core/io_skills
 neotrix-core/src/l5_cognition/nt_core/knowledge
 neotrix-core/src/l5_cognition/nt_core/memory
