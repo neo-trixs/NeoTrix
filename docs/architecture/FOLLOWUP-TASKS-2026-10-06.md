@@ -93,6 +93,38 @@ core L1 的领域类型（`TradeCategory`、`TradeCapability` 等），不是纯
 | **市场事实**（id / category / version / license / description） | 纯数据，无core 类型 | **新增**：`nt-core-capability-tree::market_manifest()` |
 | **可执行实现**（registrar / TradeCapability） | 引用 core L1 类型 | 维持 core（`bootstrap_trade_capabilities`） |
 
+#### ⑤ 最后一个阻塞点：**version / license 不能随清单下沉**（2026-10-06 实测）
+
+`TRADE_ABILITY_VERSION = env!("CARGO_PKG_VERSION")`
+（`capability_registry.rs:981`）⇒ 它取的是 **core 这个 crate 的包版本**。
+
+⇒ **清单若放进共享 crate 并自带 version，`env!` 会解析成共享 crate 的版本
+⇒ 静默改掉对外报告的版本号。** 而 `meta_keys` 注释明确
+`VERSION` / `LICENSE` **缺失即不可上架** ⇒ 清单单独存在**不足以**让
+neobot 侧 `listable()` 为真。
+
+⇒ 字段必须按**语义**切分，而非按「谁方便」：
+
+| 字段 | 语义 | 归属 | 理由 |
+|---|---|---|---|
+| `id` / `category` / `description` | **这个能力是什么** | **共享 crate**（纯数据） | 跨 crate 稳定，与实现无关 |
+| `version` | **本仓实现版本** | **core**（`env!`） | 移动会静默改变其含义 |
+| `license` | **本仓的许可决策** | **core**（`LicenseRef-NeoTrix-Internal`） | 这是关于**本仓实现**的声明，不是关于能力概念的 |
+
+⇒ **由此剩一个真实的策略决策（不是技术问题）**：neobot 侧要让 `listable()`
+为真必须拿到 version + license；它既不能依赖 core，**又不能自己编**
+（编出来就会与 core 漂移）。
+
+**候选（需裁决）**：
+- **A** neobot 从自己的 `env!("CARGO_PKG_VERSION")` 取 + 复用同一 license 串
+  ⇒ 两侧版本号会不同（除非两 crate 版本严格同步）⇒ 需显式接受或加一致性检查；
+- **B** `trade_manifest(version, license)` 改为**显式入参** ⇒ 无漂移，
+  但调用方仍须从 core 拿值 ⇒ 又回到「谁同时依赖两侧」的死结；
+- **C** 判定二者属**市场呈现面**，由 neobot 声明，core 的 `apply_market_meta`
+  不再写这两项 ⇒ 需确认不破坏现有回查断言。
+
+⛔ 我**不擅自选** —— 这是关于「对外声称什么版本、什么许可」的表述决策；
+编一个值会让市场门变绿却让**对外声明与实现脱节**，比现在不绿更糟。
 ⇒ 两侧都加载**同一份清单** ⇒ 真源一份：
 - neobot 入口加载清单 ⇒ `market_ids` 非空 ⇒ `tool_schemas` 的守卫不再恒假；
 - core 的 `must_be_registered` 继续注册实现并 `apply_market_meta`
