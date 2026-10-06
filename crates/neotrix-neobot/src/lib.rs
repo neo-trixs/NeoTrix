@@ -91,6 +91,26 @@ pub use nt_agent::run_local_turn_as;
 pub use nt_agent::run_local_turn_stream;
 pub use nt_agent::run_local_turn_stream_as;
 pub use nt_audit::{redact_detail, AuditDecision, AuditEvent};
+// ── 能力市场门面（2026-10-06）──────────────────────────────────────────
+// 此前 capability 三模块只有 `pub mod`、**无 `pub use`** ⇒ 外部消费者
+// 必须写全路径（core 的 nt_capability_bridge.rs、CLI 都是在写全路径）。
+// 与本文件既有惯例（nt_audit / nt_changes 等均有门面）保持一致。
+//
+// ⚠️ 只导出**外部真实消费过**的符号，不做全量转出——
+//    全量转出等于替外部代码决定它需要什么，反而掩盖「哪个被真的用」。
+pub use nt_capability_canary::{
+    expected_but_unregistered, signal as canary_signal, status as canary_status,
+    tick as canary_tick, unmatched_signals, warnings as canary_warnings,
+    CanaryCapability, CanaryStatus,
+};
+pub use nt_capability_market::{blocked as market_blocked, listable as market_listable,
+    list_with_calls, MarketEntry};
+pub use nt_capability_registry::{
+    capability_digest, dispatch_by_capability, invoke_count, lookup as capability_lookup,
+    maturity_findings, record_dispatch, registered_never_invoked,
+    resolve_by_capability, with_registry,
+};
+
 pub use nt_changes::{prune_best_effort, ChangeSink, KIND_EDIT, KIND_READ, KIND_WRITE};
 pub use nt_channel::{
     AccessMode, ChannelAdapter, ChannelHealth, ChannelRegistry, InboundMessage, OutboundMessage,
