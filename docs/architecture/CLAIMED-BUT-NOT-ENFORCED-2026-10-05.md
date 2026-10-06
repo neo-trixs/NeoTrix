@@ -29,7 +29,7 @@
 | 6 | `shield_core::SecurityManager::inspect_tool`：5 层 + 22 条规则 | **零调用方**（连测试都没有）；`attach_safety_kernel` 零调用方 ⇒ `execution_guard` 恒 `None` | ⛔ 悬空 |
 | 7 | `ProjectLaws::check_laws`（仓库法） | 注释自承 **"non-blocking by default"** | ⛔ 非阻断 |
 | 8 | `PolicyConfig::default()`：`blocked_input_patterns` 为 `vec![]` | 空 —— 凭据/注入/外泄三组正则**默认全不生效**，只靠 `injection_patterns`/`exfil_patterns` 那些内置项 | ⚠️ 待核 |
-| 9 | `main.rs` 的 `--yolo` / `--full-auto` / `--auto-edit` | 写入全局 `ApprovalMode`，但唯一生产读者 `require_approval` 只被 **两条都不在生产链上的路径**消费（`ShieldEnforcer` 悬空 + `turn_stream_with_approval` 零调用方）⇒ **三 flag 在工具执行上零效果** | ⚠️ **已加诚实告警**（`main.rs` 在设 mode 后打印「该模式未被任何生产工具执行路径读取」并指向本表） |
+| 9 | `main.rs` 的 `--yolo` / `--full-auto` / `--auto-edit` | 写入全局 `ApprovalMode`，但唯一生产读者 `require_approval` 只被 **两条都不在生产链上的路径**消费（`ShieldEnforcer` 悬空 + `turn_stream_with_approval` 零调用方）⇒ **三 flag 在工具执行上零效果** | ⚠️ **2026-10-06 已收敛**（`2169b633`）：三个 flag 降为 `--approval-mode <suggest\|auto-edit\|full-auto>` 的**别名**，解码抽成 `resolve_approval_mode` 并加 7 条**「启用即断言接线」**测试。⚠️ **本项仍未闭环** —— `require_approval` 那两个消费者依旧不在生产链上 ⇒ **「落地 ⇒ 被消费」那一段仍断** |
 | 10 | `nt_permission_profiles` 的继承合并单调性 | 继承合并是**子档无条件覆盖父档**（`tightened_with` 只在 `set_rule` 用） | ✅ **裁定为「刻意设计」**（见下节） |
 
 ---
@@ -181,6 +181,34 @@ Codewhale 能这么写，是因为它**只有一个 profile** + per-project over
 · ⭐ **匿名 `switch_profile` 在会改模式的档位上直接 `Err`**
   ⇒「能在无 actor 情况下放宽审批的路径」必须不存在
   （与「Deny 不可被 Ask 覆盖」同属**不可逆性保护**）
+
+### ⭐ 第 10 项已从「库函数」变成「命令行可达」（`145c33d7`）
+⚠️ 上一笔实现完 `switch_profile_with_audit` 后我核对发现：它**零生产调用方**
+⇒ 库函数写好、测试全绿，而命令行**根本够不着** ⇒ 等于没有。
+本笔新增 `neotrix profile list|show|use|current`，其中：
+
+· ⭐⭐⭐ 安全边界做成**纯函数** `authorize_profile_use`
+  | 改审批模式 | TTY | `--yes` | 裁决 |
+  |---|---|---|---|
+  | 否 | 任意 | 任意 | `NoConfirmationNeeded` |
+  | 是 | 是 | 任意 | `NeedsInteractiveConfirm` |
+  | 是 | 否 | 是 | `AllowNonInteractive` |
+  | 是 | 否 | 否 | **`Refuse`** |
+
+  ⛔ 若该判据内联在 I/O 里就**测不到** ⇒ 边界改松了没人知道
+  （与第 9 项同一种病：flag 存在、能编译，行为却不受约束）。
+· ⭐ **最后一格比 `claude-code` 更严**：`claude-code` 无对话框时**直接放行**，
+  我们**拒绝**。理由：它的默认是放行、我们是拒绝
+  ⇒ **静默降级只允许朝严格方向**；否则 CI 里 `profile use developer`
+  会悄悄把审批降到 auto-edit 且日志零痕迹。
+· ⭐ actor 区分人/机：`cli-confirmed` / `non-interactive` / `cli`
+· ⭐ 反向锁 6 条，含**穷举 (TTY × --yes × 是否改模式) 全 8 格**
+  ⇒ 逐格测试容易漏的那格，恰好就是「CI 里静默放宽审批」那条路径
+· ⚠️ **夹具坑（R-SCAN-1 实例）**：macOS `script -q /dev/null cmd`
+  **不把管道输入送进子进程 pty**（`^D` 早于输入到达）
+  ⇒ 首轮测出「输入 `y` 也被取消」的**假阳性**。
+  按「先读现场证实/证伪」改用 python `pty` 精确驱动后确认**代码无缺陷**。
+  **不修正它就会去「修」正确的代码。**
 
 ---
 
