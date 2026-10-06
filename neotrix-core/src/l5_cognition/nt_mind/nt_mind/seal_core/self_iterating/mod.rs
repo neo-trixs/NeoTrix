@@ -302,3 +302,4 @@ mod tests {
         // 测试已禁用：benchmarks 模块暂时禁用
     }
 }
+pub mod nt_reward; // 有符号奖励账本（A56）
