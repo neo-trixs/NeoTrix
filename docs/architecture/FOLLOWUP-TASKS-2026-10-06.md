@@ -47,7 +47,31 @@ C 答「数据住在哪」。若数据住在共享 crate，neobot 直接读它**
 crate（`Cargo.toml:42`）⇒ 送数据这一步自动消失 ⇒ **B 变成多余**。
 那 6 个字段是**关于该能力的描述性元数据**，它的家就是能力节点本身，不是 neobot。
 
-#### ② 实施方案已修正（2026-10-06）：**不加快照字段，用已有的 `metadata`**
+#### ② 实施路径已被前序窗口做完（2026-10-06 核实）—— 真正的缺口只剩一个
+
+逐项核实结果：
+
+| 环节 | 状态 | 证据 |
+|---|---|---|
+| 读侧（市场元数据 → `MarketEntry`） | ✅ **已实现** | `nt_capability_market::project()` 已按 `meta_keys::CATEGORY/VERSION/LICENSE/DESCRIPTION` 从 `node.metadata` 读 |
+| 写侧（播种时打标） | ✅ **已实现** | `consciousness_runtime.rs:1208-1215` 的 `must_be_registered` 每次 bootstrap 都调`apply_market_meta(n, category, ..)`（2026-10-04） |
+| 播种被调用 | ✅ **已接线** | `consciousness_runtime.rs:138` 在 `ConsciousnessRuntime::new()` 里调 `bootstrap_trade_capabilities()` |
+| **播种点与挂载点是否同进程** | ❌ **唯一缺口** | 播种在 core `ConsciousnessRuntime::new()`；挂载在 neobot `HttpEngine::tool_schemas`（`nt_http_engine.rs:470`）。neobot **不得**依赖 core ⇒ **无路径让两者相遇** |
+
+⇒ **收敛后的精确根因**：不是「元数据没定义」，不是「没播种」，而是
+**播种代码住在 core、消费代码住在 neobot，而依赖方向禁止 neobot 触达 core**
+⇒ 注册表在服务进程里恒空 ⇒ `market_ids` 恒空 ⇒ `tool_schemas` 的守卫恒假。
+
+⇒ **方案 C 的精确形式**：把**播种动作**（连同 `apply_market_meta` 所需的
+`TradeCategory`）下沉到 `nt-core-capability-tree`，让
+`ConsciousnessRuntime::new()`（core）与 neobot 的入口路径**都能触发同一份播种**。
+这样「登记了」与「能被找到」在**两个 crate 里都是同一个承诺**，
+而真源只有一份。
+
+⚠️ 我在② 里写的「用已有 `metadata`、避开 70 处 E0063」这个方案方向对但**描述不准确**：
+读侧本来就在用 `metadata`，**不需要我做任何改动**。真正的改动是把播种下沉。
+
+#### ③（原②）加 6 个类型化字段是错的，勿采纳
 
 我原计划「给 `CapabilityNode` 加 6 个类型化字段」。**核实后发现这条路是错的**：
 
