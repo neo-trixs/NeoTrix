@@ -116,7 +116,10 @@ pub const TRADE_MANIFEST: &[ManifestEntry] = &[
         id: "NT-MIND::trade::foreign_trade_full_cycle",
         domain: crate::node::Domain::Mind,
         category: "trade/full-cycle",
-        description: "外贸全链（full cycle）",
+        // ⚠️⚠️ **诚实标注**：该能力的执行器目前是**阶段脚手架**——
+        // 17 个阶段的业务逻辑全是注释，函数只推进状态机（实测 2026-10-06）。
+        // ⇒ 上架它不等于它能干活。详见 FOLLOWUP-TASKS P0.4。
+        description: "外贸全链（⚠️ 当前为阶段脚手架，未含各阶段业务逻辑）",
     },
 ];
 

@@ -704,48 +704,80 @@ impl Default for TradeResult {
 pub fn execute_trade_full_cycle(context: TradeContext) -> TradeResult {
     let mut machine = TradeStateMachine::new(context);
 
+    // ⚠️⚠️ **本函数当前是阶段脚手架，不是贸易引擎**（2026-10-06 实测）。
+    //
+    // 17 个阶段的业务逻辑**全是注释**（`// ... execute FTXX logic`），
+    // 本函数只设置 `current_phase` 并推进状态机。
+    // ⇒ 它能被派发、能计数、能打金丝雀，**但没有真正做任何贸易逻辑**。
+    //
+    // ⛔ 不要把「执行成功」当作「该能力在工作」的证据。
+    //    真实缺口见 `docs/architecture/FOLLOWUP-TASKS-2026-10-06.md` P0.4。
+    //
+    // 阶段推进失败原先是 `.ok()` **静默丢弃**（10 处）⇒ 现改为 warn：
+    // 推进失败意味着状态机与预期阶段序**已经不一致**，那是需要看见的。
+
     // Phase 1: Customer Acquisition
     machine.current_phase = TradePhase::Ft01CustomerDevelopment;
     // ... execute FT01 logic
-    machine.advance(TradePhase::Ft02RequirementConfirmation).ok();
+    if let Err(e) = machine.advance(TradePhase::Ft02RequirementConfirmation) {
+                log::warn!("[full_cycle] 阶段推进失败: {e}");
+            }
     // ... execute FT02 logic
 
     // Phase 2: Quotation & Negotiation (delegates to sub-skill)
     machine.current_phase = TradePhase::Ft03DetailedQuotation;
     // ... execute FT03 logic (uses trade_quote_negotiation)
-    machine.advance(TradePhase::Ft04NegotiationObjectionHandling).ok();
+    if let Err(e) = machine.advance(TradePhase::Ft04NegotiationObjectionHandling) {
+                log::warn!("[full_cycle] 阶段推进失败: {e}");
+            }
     // ... execute FT04 logic
 
     // Phase 3: Contract & Payment (delegates to sub-skill)
     machine.current_phase = TradePhase::Ft05ContractReviewSigning;
     // ... execute FT05 logic (uses trade_finance_compliance)
-    machine.advance(TradePhase::Ft06PaymentCollection).ok();
+    if let Err(e) = machine.advance(TradePhase::Ft06PaymentCollection) {
+                log::warn!("[full_cycle] 阶段推进失败: {e}");
+            }
     // ... execute FT06 logic
 
     // Phase 4: Production (delegates to sub-skill)
     machine.current_phase = TradePhase::Ft07ProductionOrderMaterialPrep;
     // ... execute FT07 logic (uses trade_production_logistics)
-    machine.advance(TradePhase::Ft08ProductionTrackingAlerting).ok();
+    if let Err(e) = machine.advance(TradePhase::Ft08ProductionTrackingAlerting) {
+                log::warn!("[full_cycle] 阶段推进失败: {e}");
+            }
     // ... execute FT08 logic
-    machine.advance(TradePhase::Ft09QualityInspectionRelease).ok();
+    if let Err(e) = machine.advance(TradePhase::Ft09QualityInspectionRelease) {
+                log::warn!("[full_cycle] 阶段推进失败: {e}");
+            }
     // ... execute FT09 logic
 
     // Phase 5: Logistics (delegates to sub-skill)
     machine.current_phase = TradePhase::Ft10InspectionCertification;
     // ... execute FT10 logic (uses trade_production_logistics)
-    machine.advance(TradePhase::Ft11BookingPackingList).ok();
+    if let Err(e) = machine.advance(TradePhase::Ft11BookingPackingList) {
+                log::warn!("[full_cycle] 阶段推进失败: {e}");
+            }
     // ... execute FT11 logic
-    machine.advance(TradePhase::Ft12CustomsClearance).ok();
+    if let Err(e) = machine.advance(TradePhase::Ft12CustomsClearance) {
+                log::warn!("[full_cycle] 阶段推进失败: {e}");
+            }
     // ... execute FT12 logic
-    machine.advance(TradePhase::Ft13BillOfLadingManagement).ok();
+    if let Err(e) = machine.advance(TradePhase::Ft13BillOfLadingManagement) {
+                log::warn!("[full_cycle] 阶段推进失败: {e}");
+            }
     // ... execute FT13 logic
 
     // Phase 6: Settlement (delegates to sub-skill)
     machine.current_phase = TradePhase::Ft14FinalPaymentCollection;
     // ... execute FT14 logic (uses trade_finance_compliance)
-    machine.advance(TradePhase::Ft15SettlementVerification).ok();
+    if let Err(e) = machine.advance(TradePhase::Ft15SettlementVerification) {
+                log::warn!("[full_cycle] 阶段推进失败: {e}");
+            }
     // ... execute FT15 logic
-    machine.advance(TradePhase::Ft16TaxRefundDeclaration).ok();
+    if let Err(e) = machine.advance(TradePhase::Ft16TaxRefundDeclaration) {
+                log::warn!("[full_cycle] 阶段推进失败: {e}");
+            }
     // ... execute FT16 logic
 
     // Phase 7: Review
