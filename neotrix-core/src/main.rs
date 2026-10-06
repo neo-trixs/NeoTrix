@@ -271,6 +271,16 @@ enum Commands {
         #[command(subcommand)]
         command: ConfigCommands,
     },
+    /// ⭐⭐ 管理权限档位（`--approval-mode` 的**持久化对应物**）。
+    ///
+    /// 【为什么要它】`--approval-mode` 只改**单次进程**的全局单例，进程一退就没了；
+    /// 而 `switch_profile_with_audit` 此前**零生产调用方** ——
+    /// 库函数写好了、测试也绿，但从命令行**根本够不着** ⇒ 等于没有。
+    #[command(about = "Manage permission profiles (list/show/use/current)")]
+    Profile {
+        #[command(subcommand)]
+        command: ProfileCommands,
+    },
     #[command(
         about = "NeoTrix 系统运维 (统一安装/守护/卸载, 替代分散 sh 脚本): daemons|uninstall|status"
     )]
@@ -434,6 +444,40 @@ enum FeaturesCommands {
     List,
 }
 
+/// ⭐⭐ `profile` 的子命令。
+///
+/// ## 信任边界（比 `claude-code` 更严一档）
+/// · `use` 会改动**全局审批模式** ⇒ 属于「不可逆性放宽」，
+///   所以**必须先只算副作用、再确认**（`plan_profile_switch` 是纯查询）。
+/// · **非 TTY（脚本/管道/CI）且未给 `--yes` ⇒ 直接拒绝**，
+///   不静默放行。依据 `claude-code` 的「静默降级只朝严格方向」纪律：
+///   它在无对话框时**直接放行**，我们反其道 —— 因为我们的默认是**拒绝**，
+///   静默放行会让「CI 里跑 `neotrix profile use developer`」
+///   **悄悄把审批降到 auto-edit**，而 CI 日志里什么痕迹都没有。
+#[derive(Subcommand, Debug)]
+enum ProfileCommands {
+    #[command(about = "List all permission profiles (★ marks the active one)")]
+    List,
+    #[command(about = "Show a profile's effective rules and approval mode")]
+    Show {
+        #[arg(help = "Profile name")]
+        name: String,
+        #[arg(long, help = "JSON output (for scripts)")]
+        json: bool,
+    },
+    /// 切换档位。改动全局审批模式时需确认（非 TTY 需 `--yes`）。
+    #[command(about = "Switch to a profile (asks before loosening approvals)")]
+    Use {
+        #[arg(help = "Profile name")]
+        name: String,
+        /// 非交互通道（脚本/CI）的显式授权。语义是「我知道这会改审批模式」。
+        #[arg(long, help = "Skip the confirmation prompt (non-interactive channels)")]
+        yes: bool,
+    },
+    #[command(about = "Show the active profile and current approval mode")]
+    Current,
+}
+
 #[derive(Subcommand, Debug)]
 enum ConfigCommands {
     #[command(about = "Encrypt all plaintext API keys in the config file")]
@@ -478,6 +522,104 @@ enum WalletCommands {
     },
 }
 
+
+/// ⭐⭐ `profile use` 的**授权裁决**（纯函数，无 I/O、无副作用）。
+///
+/// ## 为什么必须是纯函数
+/// 这是**安全边界**（决定「要不要问一句」）。
+/// ⛔ 若它内联在 I/O 代码里，就**无法写测试** ⇒ 边界改了没人知道
+/// ——这与本会话修掉的「`--yolo` 全程没人断言」是同一种病。
+/// ⇒ 判据在此单点，I/O 只负责「拿到输入后调用它」。
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ProfileUseAuthorization {
+    /// 该档不改全局审批模式 ⇒ 无需确认，直接执行。
+    NoConfirmationNeeded { actor: String },
+    /// 会改审批模式，且当前是 TTY ⇒ 必须拿到用户的明确 `yes`。
+    NeedsInteractiveConfirm {
+        /// 必须**先打印**给用户的副作用预告（确认才不只是形式）。
+        notice: String,
+        /// 是否**放宽**（`false` 表示是收紧）。
+        loosens: bool,
+    },
+    /// 会改审批模式，当前非 TTY，但给了 `--yes` ⇒ 显式授权成立。
+    AllowNonInteractive { actor: String },
+    /// 会改审批模式，当前非 TTY 且**没给** `--yes` ⇒ **拒绝**。
+    Refuse { reason: String },
+}
+
+/// ⭐⭐⭐ 裁决 `profile use` 该怎么执行。
+///
+/// ## 规则表（每条都有依据，不是拍脑袋）
+/// | 是否改审批模式 | TTY | `--yes` | 裁决 |
+/// |---|---|---|---|
+/// | 否 | 任意 | 任意 | `NoConfirmationNeeded` |
+/// | 是 | 是 | 任意 | `NeedsInteractiveConfirm` |
+/// | 是 | 否 | 是 | `AllowNonInteractive` |
+/// | 是 | 否 | 否 | **`Refuse`** |
+///
+/// ## ⭐ 最后一格为什么是「拒绝」而不是「放行」
+/// `claude-code` 在**无对话框**（非交互/管道）时是**直接放行**。
+/// 我们反其道而行，理由：
+/// · 它的默认是「放行」，我们是「拒绝」——
+///   **静默降级只允许朝严格方向**（这条纪律见多处吸收分析）。
+/// · 若非 TTY 缺 `--yes` 也放行，则
+///   `neotrix profile use developer` 出现在 CI/脚本里会
+///   **悄悄把审批严格度降到 auto-edit**，而日志里零痕迹、
+///   没有任何「这是自动化决定的」标记。
+/// · `--yes` 的语义是**显式**声明「我知道这会改审批模式」，
+///   与 `claude-code` 的**自动注入默认值**（用户压根没意识到）性质不同。
+///
+/// `plan` 是 [`plan_profile_switch`] 的产物（纯查询）；
+/// `current` 是**当前**全局审批模式（用于判断「放宽」还是「收紧」）。
+fn authorize_profile_use(
+    plan: &neotrix::l6_meta::nt_permission_profiles::ProfileSwitchPlan,
+    current: neotrix::l6_meta::nt_approval::ApprovalMode,
+    is_tty: bool,
+    yes_flag: bool,
+) -> ProfileUseAuthorization {
+    use neotrix::l6_meta::nt_permission_profiles::ProfileSwitchPlan;
+
+    // ⭐ 不改全局审批模式 ⇒ 不是不可逆放宽 ⇒ 无需确认（方案 A 的前提）。
+    if !plan.changes_approval_mode() {
+        return ProfileUseAuthorization::NoConfirmationNeeded {
+            actor: format!("cli:{}", plan.profile),
+        };
+    }
+
+    let notice = plan
+        .notice
+        .clone()
+        .unwrap_or_else(|| format!("档位 '{}' 会改动全局审批模式。", plan.profile));
+    let loosens = plan.loosens_approval(current);
+
+    if is_tty {
+        return ProfileUseAuthorization::NeedsInteractiveConfirm { notice, loosens };
+    }
+    if yes_flag {
+        return ProfileUseAuthorization::AllowNonInteractive {
+            // ⭐ actor 标注「这是自动化通道决定的」，审计行据此可区分人/机。
+            actor: format!("non-interactive:{}", plan.profile),
+        };
+    }
+    ProfileUseAuthorization::Refuse {
+        reason: format!(
+            "非交互通道下切换到 '{}' 会改动全局审批模式（{}），
+拒绝静默执行。\n\
+若确认要改，请显式加 --yes（它会记下 actor=non-interactive 以便审计）。",
+            plan.profile,
+            plan.resulting_mode
+                .map(|m| m.as_str())
+                .unwrap_or("<unknown>")
+        ),
+    }
+}
+
+/// 打印一行 notice（确认前的副作用预告**必须**先落到用户眼前）。
+fn print_profile_notice(notice: &str, loosens: bool) {
+    let tag = if loosens { "⚠️  放宽审批" } else { "ℹ️  收紧审批" };
+    println!("{tag}");
+    println!("{notice}");
+}
 
 /// ⭐⭐⭐ **审批模式解码**（2026-10-06）—— 抽成独立函数以便**被测试覆盖**。
 ///
@@ -536,6 +678,134 @@ fn resolve_approval_mode(
 }
 
 
+
+/// ⭐⭐ `profile` 子命令的执行体（I/O 层）。
+///
+/// ⛔ 这里**不含任何安全判据** —— 全部在 [`authorize_profile_use`] 里。
+/// 本函数只做：取计划 → 问判据 → 按裁决行动。
+fn run_profile_command(command: &ProfileCommands) -> Result<(), String> {
+    use neotrix::l6_meta::nt_permission_profiles as pp;
+    use std::io::IsTerminal;
+
+    match command {
+        ProfileCommands::List => {
+            let active = pp::active_profile_name();
+            let names = pp::list_profiles();
+            if names.is_empty() {
+                println!("(没有任何权限档位)");
+                return Ok(());
+            }
+            for n in names {
+                let mark = if n == active { "★" } else { " " };
+                println!("{mark} {n}");
+            }
+            println!("\n(★ = 当前生效档位)");
+            Ok(())
+        }
+        ProfileCommands::Show { name, json } => {
+            let info = pp::get_profile_info(name)?;
+            let json = *json;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&info).map_err(|e| e.to_string())?);
+                return Ok(());
+            }
+            let active = pp::active_profile_name();
+            println!("档位 {name}{}", if *name == active { "（当前生效）" } else { "" });
+            println!("  父档          : {}", info["parent"].as_str().unwrap_or("-"));
+            println!(
+                "  审批模式覆盖  : {}",
+                info["approval_mode_override"].as_str().unwrap_or("(未设置)")
+            );
+            println!(
+                "  生效审批模式  : {}",
+                info["effective_approval_mode"].as_str().unwrap_or("(不改)")
+            );
+            // 规则用 `effective_rules`（已沿父链继承）⇒ 打印的**就是实际生效的**，
+            // 而不是该档自己写的那几条。
+            let rules = info["effective_rules"].as_object();
+            match rules {
+                Some(m) if !m.is_empty() => {
+                    println!("  生效规则（沿父链继承后）:");
+                    let mut kv: Vec<(&String, &serde_json::Value)> = m.iter().collect();
+                    kv.sort_by(|a, b| a.0.cmp(b.0));
+                    for (k, v) in kv {
+                        println!("    {:<28} {}", k, v.as_str().unwrap_or("?"));
+                    }
+                }
+                _ => println!("  生效规则      : (无显式规则 ⇒ 落到默认审批流程)"),
+            }
+            Ok(())
+        }
+        ProfileCommands::Current => {
+            let name = pp::active_profile_name();
+            let mode = neotrix::l6_meta::nt_approval::global_approval()
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .mode();
+            println!("当前档位      : {name}");
+            println!("当前审批模式  : {}", mode.as_str());
+            // ⭐ 把「档位与模式是否一致」摆出来 —— 两者可以独立漂移
+            // （`--approval-mode` 只改模式不改档位，`profile use` 两者都改）。
+            let declared = pp::get_profile_info(&name)
+                .ok()
+                .and_then(|i| i["effective_approval_mode"].as_str().map(|s| s.to_string()));
+            match declared {
+                Some(d) if d != mode.as_str() => println!(
+                    "⚠️  提示：档位 '{name}' 声明的审批模式是 {d}，但当前全局模式是 {}。\
+               ⇒ 两者已漂移（`--approval-mode` 只改本次进程的模式，不改档位）。",
+                    mode.as_str()
+                ),
+                _ => {}
+            }
+            Ok(())
+        }
+        ProfileCommands::Use { name, yes } => {
+            let yes = *yes;
+            // ① 只算副作用（不改状态）
+            let plan = pp::plan_profile_switch(name)?;
+            let current = neotrix::l6_meta::nt_approval::global_approval()
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .mode();
+
+            // ② 裁决（纯函数）
+            let auth = authorize_profile_use(&plan, current, std::io::stdin().is_terminal(), yes);
+            let actor = match auth {
+                ProfileUseAuthorization::NoConfirmationNeeded { actor } => actor,
+                ProfileUseAuthorization::NeedsInteractiveConfirm { notice, loosens } => {
+                    // ③ 先把「会发生什么」摆出来，否则确认只是形式
+                    print_profile_notice(&notice, loosens);
+                    print!("\n确认切换到 '{name}' 吗？[y/N] ");
+                    use std::io::Write;
+                    let _ = std::io::stdout().flush();
+                    let mut line = String::new();
+                    std::io::stdin().read_line(&mut line).map_err(|e| e.to_string())?;
+                    let ans = line.trim().to_ascii_lowercase();
+                    // ⛔ 默认 N：空回车 = 拒绝（不放行 ⇒ 静默降级只朝严格方向）
+                    if ans != "y" && ans != "yes" {
+                        return Err(format!("已取消（未输入 y）。档位仍为 '{}'", pp::active_profile_name()));
+                    }
+                    format!("cli-confirmed:{}", name)
+                }
+                ProfileUseAuthorization::AllowNonInteractive { actor } => {
+                    println!("⚠️  非交互通道 + --yes ⇒ 直接执行 {actor}");
+                    actor
+                }
+                ProfileUseAuthorization::Refuse { reason } => return Err(reason),
+            };
+
+            // ④ 执行（带 actor ⇒ 改审批模式这件事不许匿名发生）
+            let msg = pp::switch_profile_with_audit(&name, &actor)?;
+            println!("{msg}");
+            if let Some(m) = plan.resulting_mode {
+                println!("   全局审批模式 → {}", m.as_str());
+            }
+            Ok(())
+        }
+    }
+}
+
+
 fn main() {
     // 智能命令整合: clap 解析失败时, 未知子命令回退到交互式命令注册表
     // (60+ 命令: /kb /goal /wiki /evidence ...), 使它们可直接从命令行调用。
@@ -572,6 +842,7 @@ fn main() {
             | Some(Commands::Completions { .. })
             | Some(Commands::Features { .. })
             | Some(Commands::Config { .. })
+            | Some(Commands::Profile { .. })
             | Some(Commands::Wallet { .. })
             | Some(Commands::Web { .. })
             | Some(Commands::Wiki { .. })
@@ -861,6 +1132,12 @@ fn main() {
                 entry::run_web_fetch(url, *quiet);
             }
         },
+        Some(Commands::Profile { command }) => {
+            if let Err(e) = run_profile_command(command) {
+                eprintln!("error: {e}");
+                std::process::exit(1);
+            }
+        }
         Some(Commands::Config { command }) => match command {
             ConfigCommands::EncryptKeys => {
                 entry::run_config_encrypt_keys();
@@ -1120,5 +1397,178 @@ mod cli_permission_tests {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .set_mode(ApprovalMode::Suggest);
+    }
+}
+
+#[cfg(test)]
+mod profile_use_authorization_tests {
+    //! ⭐⭐⭐ **安全边界的反向锁** —— `profile use` 的授权裁决。
+    //!
+    //! 【为什么必须有】这是决定「要不要问一句 / 允不允许静默执行」的判据。
+    //! ⛔ 它一旦被改松，**后果是审批严格度被静默放宽**，
+    //! 且**没有任何测试会红**（编译器不管、运行时无日志）。
+    //! ⇒ 这类判据必须逐格锁住，否则等于没写。
+    //!
+    //! 【规则表】
+    //! | 改审批模式 | TTY | `--yes` | 裁决 |
+    //! |---|---|---|---|
+    //! | 否 | 任意 | 任意 | `NoConfirmationNeeded` |
+    //! | 是 | 是 | 任意 | `NeedsInteractiveConfirm` |
+    //! | 是 | 否 | 是 | `AllowNonInteractive` |
+    //! | 是 | 否 | 否 | **`Refuse`** |
+
+    use super::{authorize_profile_use, ProfileUseAuthorization};
+    use neotrix::l6_meta::nt_approval::ApprovalMode;
+    use neotrix::l6_meta::nt_permission_profiles::ProfileSwitchPlan;
+
+    fn plan(changes: bool, resulting: Option<ApprovalMode>) -> ProfileSwitchPlan {
+        ProfileSwitchPlan {
+            profile: "developer".into(),
+            approval_mode_override: resulting.map(|m| m.as_str().to_string()),
+            resulting_mode: resulting,
+            notice: resulting.map(|m| format!("切过去会变成 {m:?}")),
+        }
+        // ⚠️ 字段是 `pub` ⇒ 构造器测试**绕过了 plan_profile_switch**。
+        // 这不是缺陷：`ProfileSwitchPlan` 是纯数据（DTO），
+        // 而**真正的裁决**在 `authorize_profile_use`，此处正是要独立测它。
+    }
+
+    /// ⭐ 不改审批模式 ⇒ 无需确认（方案 A 的前提：不可逆放宽才需要问）。
+    #[test]
+    fn no_mode_change_never_asks() {
+        for (is_tty, yes) in [(true, false), (false, false), (false, true), (true, true)] {
+            let auth = authorize_profile_use(&plan(false, None), ApprovalMode::Suggest, is_tty, yes);
+            assert!(
+                matches!(auth, ProfileUseAuthorization::NoConfirmationNeeded { .. }),
+                "不改模式时(is_tty={is_tty},yes={yes})不该问，实际 {auth:?}"
+            );
+        }
+    }
+
+    /// ⭐⭐⭐ 改审批模式 + **非 TTY + 无 `--yes` ⇒ 必须 `Refuse`**。
+    ///
+    /// 【这是整张表里最关键的一格】
+    /// 若放行，则 `neotrix profile use developer` 出现在 CI/脚本里
+    /// 会**悄悄把审批严格度降到 auto-edit**，日志零痕迹。
+    /// （对比 `claude-code`：无对话框时**直接放行** —— 它的默认是放行，
+    ///   我们的默认是拒绝，**静默降级只允许朝严格方向**。）
+    #[test]
+    fn non_tty_without_yes_is_REFUSED_not_silently_allowed() {
+        let auth = authorize_profile_use(
+            &plan(true, Some(ApprovalMode::AutoEdit)),
+            ApprovalMode::Suggest,
+            false,
+            false,
+        );
+        match auth {
+            ProfileUseAuthorization::Refuse { reason } => {
+                assert!(reason.contains("--yes"), "拒绝理由应告诉用户怎么显式授权：{reason}");
+                assert!(reason.contains("developer"), "拒绝理由应点名是哪个档位：{reason}");
+            }
+            other => panic!("必须 Refuse，实际 {other:?} —— 这会让 CI 静默放宽审批"),
+        }
+    }
+
+    /// 非 TTY + `--yes` ⇒ 放行，但 actor 必须标注是**自动化通道**（审计要能区分人/机）。
+    #[test]
+    fn non_tty_with_yes_allows_and_marks_actor_as_non_interactive() {
+        let auth = authorize_profile_use(
+            &plan(true, Some(ApprovalMode::FullAuto)),
+            ApprovalMode::Suggest,
+            false,
+            true,
+        );
+        match auth {
+            ProfileUseAuthorization::AllowNonInteractive { actor } => {
+                assert!(
+                    actor.starts_with("non-interactive:"),
+                    "actor 必须标明非交互通道（审计据此区分人/机），实际 {actor:?}"
+                );
+            }
+            other => panic!("应 AllowNonInteractive，实际 {other:?}"),
+        }
+    }
+
+    /// TTY ⇒ 一律要确认，**即使 `--yes` 给了**（有交互能力时不该跳过确认）。
+    #[test]
+    fn tty_always_confirms_even_with_yes_flag() {
+        let auth = authorize_profile_use(
+            &plan(true, Some(ApprovalMode::AutoEdit)),
+            ApprovalMode::Suggest,
+            true,
+            true,
+        );
+        match auth {
+            ProfileUseAuthorization::NeedsInteractiveConfirm { notice, loosens } => {
+                assert!(!notice.is_empty(), "确认前必须有副作用预告，否则确认只是形式");
+                assert!(loosens, "Suggest → AutoEdit 是**放宽**");
+            }
+            other => panic!("TTY 下必须确认，实际 {other:?}"),
+        }
+    }
+
+    /// ⭐ 放宽/收紧的判定必须与 `strictness_rank` 一致（收紧不该被标成「放宽」）。
+    #[test]
+    fn loosens_flag_matches_direction_of_change() {
+        // 放宽：Suggest(0) → FullAuto(2)
+        assert!(matches!(
+            authorize_profile_use(&plan(true, Some(ApprovalMode::FullAuto)), ApprovalMode::Suggest, true, false),
+            ProfileUseAuthorization::NeedsInteractiveConfirm { loosens: true, .. }
+        ));
+        // 收紧：FullAuto(2) → Suggest(0)
+        assert!(matches!(
+            authorize_profile_use(&plan(true, Some(ApprovalMode::Suggest)), ApprovalMode::FullAuto, true, false),
+            ProfileUseAuthorization::NeedsInteractiveConfirm { loosens: false, .. }
+        ));
+        // 同档：不算放宽也不收紧
+        assert!(matches!(
+            authorize_profile_use(&plan(true, Some(ApprovalMode::AutoEdit)), ApprovalMode::AutoEdit, true, false),
+            ProfileUseAuthorization::NeedsInteractiveConfirm { loosens: false, .. }
+        ));
+    }
+
+    /// ⭐⭐ **穷举锁**：把 (TTY × `--yes` × 是否改模式) 全部 8 格跑一遍，
+    /// 钉住「**恰好**只有一格是 Refuse、且没有格子意外放行」。
+    ///
+    /// 【为什么要穷举】逐格测试容易漏一格，而漏的那格恰好是
+    /// 「CI 里静默放宽审批」那条路径。⇒ 用循环穷举，让漏网无处可藏。
+    #[test]
+    fn exhaustive_truth_table_has_exactly_one_refuse_cell() {
+        let mut refuse_cells = 0;
+        let mut allow_without_tty_and_without_yes = 0;
+        for is_tty in [false, true] {
+            for yes in [false, true] {
+                for changes in [false, true] {
+                    let resulting = if changes { Some(ApprovalMode::AutoEdit) } else { None };
+                    let auth =
+                        authorize_profile_use(&plan(changes, resulting), ApprovalMode::Suggest, is_tty, yes);
+                    match auth {
+                        ProfileUseAuthorization::Refuse { .. } => {
+                            refuse_cells += 1;
+                            assert!(
+                                changes && !is_tty && !yes,
+                                "只应在 (改模式 ∧ 非TTY ∧ 无--yes) 这一格 Refuse，实际 \
+                                 (changes={changes}, is_tty={is_tty}, yes={yes})"
+                            );
+                        }
+                        ProfileUseAuthorization::AllowNonInteractive { .. } => {
+                            assert!(!is_tty && yes, "AllowNonInteractive 只该出现在非TTY+--yes");
+                        }
+                        ProfileUseAuthorization::NeedsInteractiveConfirm { .. } => {
+                            assert!(changes && is_tty, "确认只该出现在「改模式 ∧ TTY」");
+                        }
+                        ProfileUseAuthorization::NoConfirmationNeeded { .. } => {
+                            assert!(!changes, "不改模式时不该确认");
+                            if !is_tty && !yes {
+                                allow_without_tty_and_without_yes += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert_eq!(refuse_cells, 1, "整张表里恰好一格 Refuse");
+        // 「非TTY 无 --yes 但不改模式」是**允许**的（没放宽就不需要授权）
+        assert_eq!(allow_without_tty_and_without_yes, 1, "不改模式时不该要授权");
     }
 }
