@@ -92,12 +92,17 @@ def iter_rs_files(root: Path):
                 yield Path(dirpath) / fn
 
 
-_RE_FIELD = re.compile(r"^\s*pub\s+([a-z_][a-z0-9_]*)\s*:\s*bool\b")
+_RE_FIELD_BOOL = re.compile(r"^\s*pub\s+([a-z_][a-z0-9_]*)\s*:\s*bool\b")
+# 数值型配置字段（如 `*_interval_secs: u64`）—— 「子系统从未被调度」的直接判据
+_RE_FIELD_NUM = re.compile(
+    r"^\s*pub\s+([a-z_][a-z0-9_]*)\s*:\s*(?:u8|u16|u32|u64|usize|i32|i64|f32|f64)\b"
+)
+_CONFIG_STRUCT = re.compile(r"(?:Config|Settings|Options|Params|Policy)\b")
 _RE_STRUCT = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?struct\s+([A-Za-z_][A-Za-z0-9_]*)")
 _RE_DOT_TOKEN = re.compile(r"\.\s*([a-z_][a-z0-9_]*)")
 
 
-def scan_once(root: Path):
+def scan_once(root: Path, want: str = "bool"):
     """单次扫描全仓：返回 (字段候选列表, 按 (文件,字段) 的读点计数, 字段名声明分布)。
 
     复杂度 O(总行数)。首版是 O(文件 × 字段)，实测超时 RC=124。
@@ -135,8 +140,12 @@ def scan_once(root: Path):
                 derives_serde = pending_serde
                 pending_serde = False
                 continue
-            fm = _RE_FIELD.match(line)
-            if fm:
+            fm = (
+                _RE_FIELD_BOOL.match(line)
+                if want == "bool"
+                else _RE_FIELD_NUM.match(line)
+            )
+            if fm and (want == "bool" or (struct_name and _CONFIG_STRUCT.search(struct_name))):
                 fields.append(
                     (fm.group(1), path, idx, struct_name, derives_serde)
                 )
@@ -190,6 +199,10 @@ def main() -> int:
     ap.add_argument("--root", default=".")
     ap.add_argument("--strict", action="store_true", help="对基线外新增非零")
     ap.add_argument("--audit", action="store_true", help="打印读点计数与样例位置")
+    ap.add_argument(
+        "--types", choices=["bool", "numeric"], default="bool",
+        help="bool=布尔开关（默认）；numeric=*Config 的数值字段（子系统是否被调度）",
+    )
     args = ap.parse_args()
 
     root = Path(args.root).resolve()
@@ -200,7 +213,7 @@ def main() -> int:
     baseline_path = root / "scripts" / "dead-flag-baseline.txt"
     baseline = load_baseline(baseline_path)
 
-    fields, read_counts, name_decls = scan_once(root)
+    fields, read_counts, name_decls = scan_once(root, args.types)
     dead = []
     for name, decl_path, line_no, struct_name, serde in fields:
         own = read_counts.get((str(decl_path), name), 0)
@@ -225,7 +238,7 @@ def main() -> int:
     serde_mirrors = [d for d in dead if d[4]]
     behavioral = [d for d in dead if not d[4]]
     print(
-        f"dead-flag: 布尔字段 {len(fields)} 个；零读点 {len(dead)} 个"
+        f"dead-flag[{args.types}] 字段 {len(fields)} 个；零读点 {len(dead)} 个"
         f"（其中 serde 外部格式镜像 {len(serde_mirrors)}、本仓行为开关 {len(behavioral)}）；"
         f"基线已裁决 {len(baseline)}；新增 {len(new)}"
     )
@@ -234,7 +247,7 @@ def main() -> int:
         tag = "已知" if name in baseline else "新增"
         hint = f" [{struct_name}]" if struct_name and CONFIG_HINT_RE.search(struct_name) else ""
         kind = "serde-镜像" if serde else "**本仓行为开关**"
-        print(f"      · {tag} {rel(decl_path)}:{line_no} `pub {name}: bool`{hint}  ({kind})")
+        print(f"      · {tag} {rel(decl_path)}:{line_no} `pub {name}`{hint}  ({kind})")
 
     if not dead:
         print("      · 无零读点布尔配置字段")
