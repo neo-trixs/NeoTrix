@@ -51,6 +51,33 @@ pub mod keys {
 /// ⇒ 但它必须是**同一个串**（core 与 neobot 两侧都写它），故放这里共用。
 pub const TRADE_LICENSE: &str = "LicenseRef-NeoTrix-Internal";
 
+/// 能力**是否可执行** —— 「执行器登记制」的记账字段。
+///
+/// # 为什么要有这个枚举（2026-10-06）
+///
+/// 本轮实测抓到 4 处「**上架了但不可用/是桩**」：
+/// manifest id 与实现错层 · 金丝雀度量「被查过」而非「被执行过」·
+/// 安全工具注册失败静默 · 执行器是阶段脚手架。
+///
+/// ⇒ 光有「清单」不够，**必须同时记账「它到底能不能干活」**，
+/// 且这个记账要**可被机器校验**（见 `scripts/check-executor-registry.sh`），
+/// 否则又是一条「写着健康、实际不能跑」的说法。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Executability {
+    /// **无可调用入口**（只有 engine 方法 / 只是知识包工厂）
+    ///
+    /// ⇒ 派发必然返 `None` ⇒ 调用方 fail-closed。
+    /// ⚠️ 上架它**不等于**它能干活；描述里必须写明。
+    DeclaredOnly,
+    /// **有可调用入口，且已通过非桩证据测试**
+    Executable,
+    /// **有入口，但是脚手架**（各阶段业务逻辑未实现）
+    ///
+    /// ⚠️ 最危险的一档：能跑通、有产出、却没做实事
+    /// （本轮 `foreign_trade_full_cycle` 即此档）。
+    Scaffold,
+}
+
 /// 清单里的一条：**只含「这个能力是什么」**，不含版本/许可。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ManifestEntry {
@@ -63,6 +90,8 @@ pub struct ManifestEntry {
     pub category: &'static str,
     /// 人读描述
     pub description: &'static str,
+    /// ⭐ 可执行性记账（见 [`Executability`]）
+    pub executability: Executability,
 }
 
 /// 贸易能力的市场清单（**5 条**）。
@@ -93,24 +122,32 @@ pub const TRADE_MANIFEST: &[ManifestEntry] = &[
         domain: crate::node::Domain::Memory,
         category: "trade/product-spec",
         description: "贸易产品规格生成（L4 memory 侧）",
+        // 实测：只有 `get_product_knowledge_pack`（知识包工厂），**无执行器**
+        executability: Executability::DeclaredOnly,
     },
     ManifestEntry {
         id: "NT-MIND::trade::trade_quote_negotiation",
         domain: crate::node::Domain::Mind,
         category: "trade/quote",
         description: "报价谈判",
+        // 实测：顶层 `execute_quote_negotiation` + serde 三元组 ⇒ 可派发
+        executability: Executability::Executable,
     },
     ManifestEntry {
         id: "NT-MIND::trade::trade_production_logistics",
         domain: crate::node::Domain::Mind,
         category: "trade/logistics",
         description: "生产物流",
+        // 实测：顶层执行器数为 **0**（只有 engine 方法）⇒ 无单一入口
+        executability: Executability::DeclaredOnly,
     },
     ManifestEntry {
         id: "NT-MIND::trade::trade_finance_compliance",
         domain: crate::node::Domain::Mind,
         category: "trade/finance",
         description: "金融合规",
+        // 实测：顶层执行器数为 **0**（只有 FinanceEngine 方法）
+        executability: Executability::DeclaredOnly,
     },
     ManifestEntry {
         id: "NT-MIND::trade::foreign_trade_full_cycle",
@@ -120,6 +157,8 @@ pub const TRADE_MANIFEST: &[ManifestEntry] = &[
         // 17 个阶段的业务逻辑全是注释，函数只推进状态机（实测 2026-10-06）。
         // ⇒ 上架它不等于它能干活。详见 FOLLOWUP-TASKS P0.4。
         description: "外贸全链（⚠️ 当前为阶段脚手架，未含各阶段业务逻辑）",
+        // ⚠️ 能跑通、有产出、却**没做实事** ⇒ 最危险的一档
+        executability: Executability::Scaffold,
     },
 ];
 
