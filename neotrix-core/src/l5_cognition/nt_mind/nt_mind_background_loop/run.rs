@@ -822,7 +822,7 @@ impl BackgroundLoop {
         spawn_handler!(cfg.evolution_interval_secs, "evolve", |h| h.handle_evolve().await);
         spawn_handler!(cfg.nt_world_sense_interval_secs, "world_sense", |h| h.handle_world_sense().await);
         #[cfg(feature = "stealth-net")]
-        spawn_handler!(cfg.nt_world_sense_interval_secs, "proxy_heartbeat", |h| h.handle_proxy_heartbeat().await);
+        spawn_handler!(cfg.proxy_heartbeat_interval_secs, "proxy_heartbeat", |h| h.handle_proxy_heartbeat().await);
         spawn_handler!(SKILL_SCAN_INTERVAL_SECS, |h| h.handle_skill_scan().await);
         // spawn_handler!(SESSION_ROUTER_FLUSH_INTERVAL_SECS, "session_router", |h| h.handle_session_router_flush().await);
         // ── Nexus-Weaver 跨会话模式挖掘 (cycle 1053): 每 30min 扫描 experience 命名空间
