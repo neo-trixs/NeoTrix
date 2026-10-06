@@ -1703,6 +1703,14 @@ fn execute_capability_invoke(call: &crate::nt_types::ToolCall) -> Result<ToolRes
     let before = crate::nt_capability_registry::invoke_count(id);
     let payload = call.args.get("input").cloned();
 
+    // ── 执行端口（2026-10-06）：真实派发尝试 ──
+    //
+    // 端口在 `nt-core-capability-tree`（两侧共读）⇒ core 注册实现、
+    // 本 crate 消费。`Ok(None)` = **本进程没有该能力的实现**
+    // ⇒ 保持 fail-closed；`Ok(Some(_))` = **真的执行了** ⇒ 此时才计数。
+    let input = payload.clone().unwrap_or_else(|| serde_json::json!({}));
+    let dispatched = nt_core_capability_tree::dispatch::dispatch(id, &input);
+
     //  **这里是真执行的边界**（2026-06 实测确认，见 commit 信息）：
     // 能力**本体**（trade 域的 `execute_trade` 等）的执行入口在
     // `neotrix-core` 的 L1（`nt_act_trade`），而 `neotrix-neobot` **不依赖
@@ -1719,8 +1727,33 @@ fn execute_capability_invoke(call: &crate::nt_types::ToolCall) -> Result<ToolRes
     // 同时 `note` 自认未执行 —— **机器可读判词与文字说明互相矛盾**。
     // 上游账本/审计读的是 `ok`，不是 `note` ⇒ 等于报假成功。
     // 这正是本仓一路在治的「建成未用却看着健康」。
+    let (ok, executed, counted, reason, exec_out) = match &dispatched {
+        Ok(Some(v)) => {
+            // ★ 真实执行 ⇒ 现在才计数（闭环要求「成功后计数」）
+            let after = crate::nt_capability_registry::record_dispatch(id)
+                .map_err(|e| NtBotError::Store(e))?;
+            let _ = after;
+            (
+                true,
+                true,
+                true,
+                "EXECUTED_VIA_DISPATCH_PORT".to_owned(),
+                Some(v.clone()),
+            )
+        }
+        Ok(None) => (
+            false,
+            false,
+            false,
+            "CAPABILITY_BODY_NOT_EXECUTED".to_owned(),
+            None,
+        ),
+        Err(e) => (false, false, false, format!("DISPATCH_FAILED: {e}"), None),
+    };
+    let invoked_after = crate::nt_capability_registry::invoke_count(id);
+
     Ok(ToolResult {
-        ok: false,
+        ok,
         output: serde_json::json!({
             "capability_id": entry.id,
             "kind": entry.kind.as_str(),
@@ -1731,12 +1764,13 @@ fn execute_capability_invoke(call: &crate::nt_types::ToolCall) -> Result<ToolRes
             "maturity": entry.maturity,
             "tags": entry.tags,
             "invoked_before": before,
-            "invoked_after": before,
-            "executed": false,
-            "counted": false,
+            "invoked_after": invoked_after,
+            "executed": executed,
+            "counted": counted,
             "input_echo": payload,
-            "reason": "CAPABILITY_BODY_NOT_EXECUTED",
-            "execution": "not_executed",
+            "reason": reason,
+            "execution": if executed { "dispatched" } else { "not_executed" },
+            "execution_result": exec_out,
             "note": "能力本体执行入口在 neotrix-core L1（nt_act_trade），本 crate 不反向依赖它（core → neobot 是既有方向）。本次仅完成市场校验与元数据回报，未执行、未计数。",
             "next_work": "执行端口落地后：在此处调用真执行，成功后再 record_dispatch(id) 并把 ok 置 true。",
         })
@@ -2594,6 +2628,11 @@ mod tests {
 
         let result = run_cap_invoke(&config, &cap_invoke_call(&target));
 
+        // ⚠️ 契约（2026-10-06，按派发端口分流）：
+        //   ·本进程**未注册**该能力的派发实现 ⇒ `ok:false` +
+        //     `CAPABILITY_BODY_NOT_EXECUTED` 且**不计数**（fail-closed）；
+        //   · 已注册且执行成功 ⇒ `ok:true`、**此时才计数**（闭环要求「成功后计数」）。
+        //   端口：`nt_core_capability_tree::dispatch::dispatch`（core 注册 / 本 crate 消费）。
         // ⚠️ 契约已变更（2026-10-06 B2 修复）：能力本体**尚未执行**，
         // 故判词必须是 `ok:false`、计数**不得增加**。
         // 本用例原先断言 `ok:true` 且计数 +1 —— **那固化了缺陷行为**：

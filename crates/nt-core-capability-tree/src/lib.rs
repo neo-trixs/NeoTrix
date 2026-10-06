@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod dispatch; // 能力派发端口（core 注册 / neobot 消费）
 pub mod market; // 能力市场清单（纯数据，两侧共读）
 pub mod epistemic;
 pub mod node;
