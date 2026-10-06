@@ -80,7 +80,7 @@ pub enum ApprovalError {
     /// id 已有决策。重复点击（先 approve 后 deny、二次 approve）必须被拒，
     /// 而不能因为「pending 里已经没了」而被静默当成一次新决策。
     AlreadyDecided { id: String, previous: ApprovalDecision },
-    /// ⭐⭐⭐ **TOCTOU**：复核时呈现的动作与**提交时**的内容指纹不符。
+    /// **TOCTOU**：复核时呈现的动作与**提交时**的内容指纹不符。
     ///
     /// 含义：那次批准**不适用**于眼前这份内容（内容在批准后被替换过）。
     /// ⛔ 携带两个指纹以便定位：提交时的是什么、现在拿来的又是什么。
@@ -217,7 +217,7 @@ fn default_actor() -> String {
 
 /// 审批引擎：待审队列 + **决策账本 + 审计轨迹**。
 ///
-/// ⭐⭐⭐ 三态审批裁决（2026-10-05）。
+/// 三态审批裁决（2026-10-05）。
 ///
 /// ## 为什么不是 bool
 /// `bool` 只能表达「要过问一下 / 不用问」，**表达不了「问也没用」**。
@@ -252,7 +252,7 @@ impl ActionVerdict {
         matches!(self, ActionVerdict::Deny | ActionVerdict::Ask)
     }
 
-    /// ⭐ 是否**不可放行**。这是 `Deny` 存在的唯一理由 ——
+    /// 是否**不可放行**。这是 `Deny` 存在的唯一理由 ——
     /// 若某条路径只问`needs_human()` 而不问本方法，
     /// 硬拒就会被降级成弹窗（2026-10-05 修掉的正是这个）。
     pub fn is_blocked(&self) -> bool {
@@ -307,7 +307,7 @@ impl ApprovalEngine {
         self.mode = mode;
     }
 
-    /// ⭐⭐⭐ 三态判据（2026-10-05）——`require_approval` 的**权威版本**。
+    /// 三态判据（2026-10-05）——`require_approval` 的**权威版本**。
     ///
     /// ## 为什么必须新增（`bool` 表达不了三态）
     /// `require_approval` 返回 `bool`，于是「**硬拒**」只能退化成
@@ -330,13 +330,13 @@ impl ApprovalEngine {
     pub fn action_verdict(&self, action: &ActionType) -> ActionVerdict {
         let action_key = crate::l6_meta::nt_permission_profiles::action_type_to_key(action);
         if crate::l6_meta::nt_permission_profiles::is_action_denied(action_key) {
-            // ⭐ 硬拒：**不是**「问一下就能过」。
+            // 硬拒：**不是**「问一下就能过」。
             return ActionVerdict::Deny;
         }
         if crate::l6_meta::nt_permission_profiles::is_action_allowed(action_key) {
             return ActionVerdict::Allow;
         }
-        // ⭐⭐⭐ **委托给 `require_approval`**，不自己再写一遍 mode 判据。
+        // **委托给 `require_approval`**，不自己再写一遍 mode 判据。
         //
         // 【缺陷（2026-10-06 修）】本方法此前是
         // `Suggest | AutoEdit => Ask; FullAuto => Allow`
@@ -405,7 +405,7 @@ impl ApprovalEngine {
                 id, forecloses
             );
         }
-        // ⭐⭐⭐ 执行前复核用的内容指纹（TOCTOU 防护，见 `ActionFingerprint` 文档）
+        // 执行前复核用的内容指纹（TOCTOU 防护，见 `ActionFingerprint` 文档）
         let content_fingerprint = ActionFingerprint::of(&action);
         let pa = PendingAction {
             id,
@@ -507,7 +507,7 @@ impl ApprovalEngine {
         self.decide(id, ApprovalDecision::Approved, &actor, None)
     }
 
-    /// ⭐⭐⭐ **复核批准**：只有当 `action` 的内容指纹与提交时**完全一致**才批准。
+    /// **复核批准**：只有当 `action` 的内容指纹与提交时**完全一致**才批准。
     ///
     /// ## 【缺陷（2026-10-06 修）】`approve(id)` **只凭 id**，
     /// 而执行发生在**稍后、别处** ⇒ 从批准到执行之间内容**没有任何一步被复核**。
@@ -700,7 +700,7 @@ impl ApproveGate for ApprovalEngine {
 const PREVIEW_MAX: usize = 60;
 const PREVIEW_KEEP: usize = 57;
 
-/// ⭐ 预览截断（按**字符**）。
+/// 预览截断（按**字符**）。
 ///
 /// ⚠️ 2026-10-05 修正：原先是「按**字节**判断 + 按字节切」——
 /// `content_preview.len() > 60` 配 `&content_preview[..57]`。
@@ -721,7 +721,7 @@ fn preview_or_full(s: &str) -> String {
     }
 }
 
-/// ⭐⭐⭐ 内容指纹（吸收 `uber/ADR`，2026-10-06）。
+/// 内容指纹（吸收 `uber/ADR`，2026-10-06）。
 ///
 /// 【缺陷（2026-10-06 修）】`describe_action` 此前把 `content_preview` /
 /// `diff` 的**原文**（最多 60 字符）拼进 `description`。而 `description`
@@ -747,7 +747,7 @@ fn content_fingerprint(s: &str) -> String {
     format!("{} chars, sha256:{}", s.chars().count(), &digest[..12])
 }
 
-/// ⭐⭐ 键名是否「看起来是密钥名」。
+/// 键名是否「看起来是密钥名」。
 ///
 /// ## ⛔ 为什么必须**整段命中**而不是子串包含（2026-10-06 实测教训）
 /// 首版用 `key.contains("key")`，结果 **`KEYBOARD=1` 被遮蔽** ——
@@ -765,7 +765,7 @@ fn is_secret_key(key: &str) -> bool {
         .any(|seg| SECRET_HINTS.contains(&seg.to_ascii_lowercase().as_str()))
 }
 
-/// ⭐⭐ 遮蔽赋值型密钥（`KEY=value` 与 `--flag VALUE` **两种形态**）。
+/// 遮蔽赋值型密钥（`KEY=value` 与 `--flag VALUE` **两种形态**）。
 ///
 /// ## 为什么两种形态都要（2026-10-06 实测教训）
 /// 首版只处理 `KEY=value`，金丝雀测试立刻抓到
@@ -904,7 +904,7 @@ mod tests {
         assert_eq!(ApprovalMode::from_str("auto-edit").unwrap(), ApprovalMode::AutoEdit);
         assert_eq!(ApprovalMode::from_str("full-auto").unwrap(), ApprovalMode::FullAuto);
         assert_eq!(ApprovalMode::from_str("yolo").unwrap(), ApprovalMode::FullAuto);
-        // ⭐ 2026-10-06 语义变更：未知值从 `None` 改为 **`Err`**
+        // 2026-10-06 语义变更：未知值从 `None` 改为 **`Err`**
         // （静默忽略 → 用户要的档位没生效且无任何错误）
         let e = ApprovalMode::from_str("unknown").expect_err("未知档位必须 Err");
         assert!(e.contains("suggest"), "错误信息应列出可用档位：{e}");
@@ -1267,10 +1267,10 @@ mod tests {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // ⭐⭐⭐ 三态裁决反向锁（2026-10-05）
+    // 三态裁决反向锁（2026-10-05）
     // ══════════════════════════════════════════════════════════════
 
-    /// ⭐⭐⭐ 端到端：`git push --force` 必须落在**硬拒**档。
+    /// 端到端：`git push --force` 必须落在**硬拒**档。
     ///
     /// 【原缺陷两层叠加】
     /// ① `action_type_to_key` 把所有 git 动作映射成 `"git_push"`，
@@ -1304,7 +1304,7 @@ mod tests {
         assert!(v.needs_human(), "needs_human 也为 true（Deny 与 Ask 都要人过一眼）");
     }
 
-    /// ⭐ 对照组：普通 `git push`（无 force）**不应**被硬拒。
+    /// 对照组：普通 `git push`（无 force）**不应**被硬拒。
     /// ⇒ 证明修复不是「把所有 git 动作一刀切拒掉」。
     #[test]
     fn plain_push_is_not_hard_denied() {
@@ -1321,7 +1321,7 @@ mod tests {
         );
     }
 
-    /// ⭐ `read_secrets` 那条 Deny 也要能命中。
+    /// `read_secrets` 那条 Deny 也要能命中。
     /// ⚠️ 它当前**无生产 ActionType 能产生该键**（`FileWrite`/`FileEdit`
     /// 都映射到 `write_file`）⇒ 本测试断言的是**画像侧配置正确**，
     /// 而非「已经拦住了什么」—— 后者需要新增 `ActionType` 变体才成立。
@@ -1334,21 +1334,21 @@ mod tests {
         );
     }
 
-    /// ⭐⭐ 反向锁：三态**不可**被折叠回两态。
+    /// 反向锁：三态**不可**被折叠回两态。
     /// 若有人把 `is_blocked` 写成 `needs_human`，本测试立刻红 ——
     /// 那正是 2026-10-05 修掉的降级。
     #[test]
     fn deny_must_not_collapse_into_ask() {
         assert!(ActionVerdict::Deny.is_blocked());
         assert!(ActionVerdict::Deny.needs_human());
-        // ⭐ 关键差异：Ask 问了就放行，Deny 问了也不放行
+        // 关键差异：Ask 问了就放行，Deny 问了也不放行
         assert!(!ActionVerdict::Ask.is_blocked());
         assert!(ActionVerdict::Ask.needs_human());
         assert!(!ActionVerdict::Allow.needs_human());
         assert!(!ActionVerdict::Allow.is_blocked());
     }
 
-    /// ⭐ 未知 git 子命令**不得 panic**，且大小写必须归一。
+    /// 未知 git 子命令**不得 panic**，且大小写必须归一。
     /// 依据 AGENTS.md「生产代码禁 panic」—— 不能因没见过的子命令崩掉。
     #[test]
     fn unknown_git_subcommand_does_not_panic_and_is_case_insensitive() {
@@ -1370,7 +1370,7 @@ mod tests {
 }
 #[cfg(test)]
 mod action_verdict_locks {
-    //! ⭐⭐⭐ `action_verdict` 的锁 —— 本函数此前**零测试**，
+    //! `action_verdict` 的锁 —— 本函数此前**零测试**，
     //! 而它是 `ActionSandbox` 的**硬拒判据**（deny/ask 二态全靠它）。
     //!
     //! 零测试的「权威判据」比有 bug 的非权威判据更危险：
@@ -1394,7 +1394,7 @@ mod action_verdict_locks {
         ActionType::ShellCommand { command: cmd.into() }
     }
 
-    /// ⭐⭐⭐ **一致性不变量（穷举 mode × 动作）**：
+    /// **一致性不变量（穷举 mode × 动作）**：
     /// `Ask ⇔ require_approval == true`，且**永远不产出 `Deny`**（未命中 profile 时）。
     ///
     /// 这条锁死了「委托给 `require_approval`」这个修法 ——
@@ -1432,7 +1432,7 @@ mod action_verdict_locks {
         }
     }
 
-    /// ⭐⭐⭐ **反向锁：AutoEdit 的文件类白名单**（本函数此前的真实缺陷）。
+    /// **反向锁：AutoEdit 的文件类白名单**（本函数此前的真实缺陷）。
     ///
     /// `require_approval` 对 `AutoEdit` 的 `FileWrite`/`FileCreate`/`FileEdit`
     /// 明确返回 `false`（免审批）；而「权威版」此前对同一动作返回 `Ask`
@@ -1451,7 +1451,7 @@ mod action_verdict_locks {
                 "AutoEdit 下 {name} 应免审批（`--approval-mode auto-edit` 的承诺就是这条）"
             );
         }
-        // ⭐ 但**命令/git/未分类**仍要审批 —— 白名单不是「全放开」
+        // 但**命令/git/未分类**仍要审批 —— 白名单不是「全放开」
         for (name, a) in [
             ("Shell", sh("ls")),
             ("Git", ActionType::GitOperation { description: "commit".into() }),
@@ -1465,7 +1465,7 @@ mod action_verdict_locks {
         }
     }
 
-    /// ⭐ 三个档位各自的整体形态（一张表钉住全貌）。
+    /// 三个档位各自的整体形态（一张表钉住全貌）。
     #[test]
     fn three_modes_have_the_documented_shape() {
         assert_eq!(engine(ApprovalMode::Suggest).action_verdict(&fw()), ActionVerdict::Ask);
@@ -1477,7 +1477,7 @@ mod action_verdict_locks {
 
 #[cfg(test)]
 mod audit_content_leak_tests {
-    //! ⭐⭐⭐ **审计轨迹不得抄录文件内容**（吸收 `uber/ADR`，2026-10-06）。
+    //! **审计轨迹不得抄录文件内容**（吸收 `uber/ADR`，2026-10-06）。
     //!
     //! 【缺陷（已修）】`describe_action` 曾把 `content_preview` / `diff` 的
     //! **原文**拼进 `description`，而 `description` 被
@@ -1505,7 +1505,7 @@ mod audit_content_leak_tests {
         (pa.description.clone(), entry)
     }
 
-    /// ⭐⭐⭐ `FileWrite` 的内容**不得**出现在描述或审计里（金丝雀测试）。
+    /// `FileWrite` 的内容**不得**出现在描述或审计里（金丝雀测试）。
     #[test]
     fn file_write_content_never_reaches_description_or_audit() {
         let content = format!("API_KEY={CANARY}\nDATABASE_URL=postgres://x");
@@ -1522,13 +1522,13 @@ mod audit_content_leak_tests {
             "金丝雀出现在审计条目里 ⇒ 内容仍被抄走：{}",
             entry.description
         );
-        // ⭐ 但审计必须仍能回答「审的是哪份内容」⇒ 路径 + 摘要 + 规模都在
+        // 但审计必须仍能回答「审的是哪份内容」⇒ 路径 + 摘要 + 规模都在
         assert!(desc.contains("/srv/app/.env"), "路径应保留（审批人需要定位）：{desc}");
         assert!(desc.contains("chars"), "应记内容规模：{desc}");
         assert!(desc.contains("sha256:"), "应记内容摘要：{desc}");
     }
 
-    /// ⭐⭐ `FileEdit` 的 diff **不得**出现在描述或审计里。
+    /// `FileEdit` 的 diff **不得**出现在描述或审计里。
     #[test]
     fn file_edit_diff_never_reaches_description_or_audit() {
         let diff = format!("-password = old\n+password = {CANARY}");
@@ -1540,7 +1540,7 @@ mod audit_content_leak_tests {
         assert!(!entry.description.contains(CANARY), "diff 原文泄漏进审计：{}", entry.description);
     }
 
-    /// ⭐⭐⭐ 命令**本体必须保留**（否则审批失效），但**赋值型密钥的值被遮蔽**。
+    /// 命令**本体必须保留**（否则审批失效），但**赋值型密钥的值被遮蔽**。
     #[test]
     fn command_body_kept_but_assigned_secret_masked() {
         let (desc, _e) = audit_of(ActionType::ShellCommand {
@@ -1553,18 +1553,18 @@ mod audit_content_leak_tests {
         assert!(!desc.contains(CANARY), "命令行里的密钥值泄漏：{desc}");
     }
 
-    /// ⭐⭐ `KEY=value` 形态：键名保留、值遮蔽。
+    /// `KEY=value` 形态：键名保留、值遮蔽。
     #[test]
     fn assigned_secret_value_masked_but_key_visible() {
         let red = super::redact_assigned_secrets(&format!("TOKEN={CANARY} echo hi"));
         assert!(!red.contains(CANARY), "值未遮蔽：{red}");
         assert!(red.contains("TOKEN="), "键名应保留（要让人知道在传什么）：{red}");
         assert!(red.contains("echo hi"), "非密钥部分应原样保留：{red}");
-        // ⭐ 遮蔽后要**标明长度** —— 审批人需要知道「这里原本有个长值」
+        // 遮蔽后要**标明长度** —— 审批人需要知道「这里原本有个长值」
         assert!(red.contains("chars"), "应记录被遮值的长度：{red}");
     }
 
-    /// ⭐ 非密钥赋值**不得**被误遮（否则命令变得不可读 = 审批失效）。
+    /// 非密钥赋值**不得**被误遮（否则命令变得不可读 = 审批失效）。
     #[test]
     fn ordinary_assignments_are_not_masked() {
         for cmd in [
@@ -1578,7 +1578,7 @@ mod audit_content_leak_tests {
         }
     }
 
-    /// ⭐⭐ 摘要必须**对内容敏感**且**稳定** —— 否则它证明不了任何事。
+    /// 摘要必须**对内容敏感**且**稳定** —— 否则它证明不了任何事。
     #[test]
     fn fingerprint_is_stable_and_content_sensitive() {
         let a = super::content_fingerprint("hello");
@@ -1594,7 +1594,7 @@ mod audit_content_leak_tests {
 
 #[cfg(test)]
 mod approval_toctou_tests {
-    //! ⭐⭐⭐ **审批必须绑定内容，而非只凭 id**（2026-10-06）。
+    //! **审批必须绑定内容，而非只凭 id**（2026-10-06）。
     //!
     //! 【缺陷】`approve(id)` 只凭 id，而执行发生在**稍后、别处**
     //! ⇒ 批准到执行之间内容**没有任何一步被复核**。
@@ -1613,7 +1613,7 @@ mod approval_toctou_tests {
         ActionType::FileWrite { path: path.into(), content_preview: body.into() }
     }
 
-    /// ⭐ 同一内容 ⇒ 指纹稳定、复核通过。
+    /// 同一内容 ⇒ 指纹稳定、复核通过。
     #[test]
     fn same_content_approves() {
         let mut e = ApprovalEngine::new(ApprovalMode::Suggest);
@@ -1626,7 +1626,7 @@ mod approval_toctou_tests {
         );
     }
 
-    /// ⭐⭐⭐ **核心用例**：提交 A，却拿 B 去批准 ⇒ 必须 `Err`，且**账本里无记录**。
+    /// **核心用例**：提交 A，却拿 B 去批准 ⇒ 必须 `Err`，且**账本里无记录**。
     #[test]
     fn substituted_content_is_REFUSED_and_leaves_no_approval_record() {
         let mut e = ApprovalEngine::new(ApprovalMode::Suggest);
@@ -1641,7 +1641,7 @@ mod approval_toctou_tests {
         assert_eq!(err.kind(), "content-changed");
         assert_eq!(err.id(), pa.id);
 
-        // ⭐⭐⭐ 最关键的一条：**账本里绝不能出现「已批准」**
+        // 最关键的一条：**账本里绝不能出现「已批准」**
         // 否则调用方只看 `decision_for` 会以为「已经批过了」
         assert!(
             e.decision_for(&pa.id).is_none(),
@@ -1654,7 +1654,7 @@ mod approval_toctou_tests {
         );
     }
 
-    /// ⭐ 换路径也算内容变了（路径是执行结果的一部分）。
+    /// 换路径也算内容变了（路径是执行结果的一部分）。
     #[test]
     fn path_change_counts_as_content_change() {
         let mut e = ApprovalEngine::new(ApprovalMode::Suggest);
@@ -1666,7 +1666,7 @@ mod approval_toctou_tests {
         );
     }
 
-    /// ⭐ 每一类动作都要能区分（不能只有 FileWrite 有指纹）。
+    /// 每一类动作都要能区分（不能只有 FileWrite 有指纹）。
     #[test]
     fn every_action_kind_is_fingerprinted() {
         let pairs: Vec<(&str, ActionType, ActionType)> = vec![
@@ -1691,7 +1691,7 @@ mod approval_toctou_tests {
         }
     }
 
-    /// ⭐⭐ **动作类型本身也参与指纹** —— 否则 `FileWrite` 与 `FileCreate`
+    /// **动作类型本身也参与指纹** —— 否则 `FileWrite` 与 `FileCreate`
     /// 恰好内容相同时会撞指纹。
     #[test]
     fn action_kind_is_part_of_the_fingerprint() {
@@ -1703,7 +1703,7 @@ mod approval_toctou_tests {
         assert_ne!(a, b, "不同动作类型即便字段值巧合相同也不得撞指纹");
     }
 
-    /// ⭐ 未知 id 仍走 `UnknownId`（不因新增分支而改变既有语义）。
+    /// 未知 id 仍走 `UnknownId`（不因新增分支而改变既有语义）。
     #[test]
     fn unknown_id_still_reports_unknown() {
         let mut e = ApprovalEngine::new(ApprovalMode::Suggest);
@@ -1712,7 +1712,7 @@ mod approval_toctou_tests {
         assert_eq!(err.kind(), "unknown-id");
     }
 
-    /// ⭐⭐⭐ **失败朝严格方向**：TOCTOU 被拒后，原动作**仍可**被正确批准。
+    /// **失败朝严格方向**：TOCTOU 被拒后，原动作**仍可**被正确批准。
     /// （拒绝的是「这份不符的内容」，不是「这个动作永远不许批」。）
     #[test]
     fn refusing_a_substitution_does_not_poison_the_original_action() {

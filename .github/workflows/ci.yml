@@ -394,6 +394,14 @@ jobs:
       - name: Handoff index consistency + unbounded-file report
         run: bash scripts/ops/nt-handoff-hygiene.sh
 
+      # ⭐⭐⭐⭐⭐ 注释星号噪声门（2026-10-06 新增）
+      # ⭐⭐⭐⭐⭐ 只挡**新增**：一次清理（4526→285）当天就被证明不够 ——
+      # ⭐⭐⭐⭐⭐ 紧随的 4 个提交又新增 21 行带 ⭐ 的注释。
+      # ⭐⭐⭐⭐⭐ 只看 `+` 行里 `//` 之后的部分 ⇒ **不误判字符串字面量**
+      # ⭐⭐⭐⭐⭐ （实测 51 处 ⭐ 在 `assert_eq!` 消息里，那是内容不是注释）。
+      - name: No decorative star in newly added comments
+        run: bash scripts/ops/nt-no-star-noise.sh
+
   coverage:
     runs-on: ubuntu-latest
     steps:

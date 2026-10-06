@@ -17,7 +17,7 @@ pub enum ApprovalMode {
 }
 
 impl ApprovalMode {
-    /// ⭐⭐⭐ 解析审批模式。**未知值返回 `Err`**，不再返回 `None` 让调用方兜底。
+    /// 解析审批模式。**未知值返回 `Err`**，不再返回 `None` 让调用方兜底。
     ///
     /// 【缺陷（2026-10-06 修）】首版返回 `Option`，
     /// 而**唯一的调用方**（`nt_permission_profiles::plan_profile_switch`）
@@ -85,7 +85,7 @@ pub enum DisclosureSeverity {
     Detection,
 }
 
-/// ⭐⭐⭐ 动作的**内容指纹**（2026-10-06）。
+/// 动作的**内容指纹**（2026-10-06）。
 ///
 /// ## 为什么需要它（真实缺陷，不是前瞻设计）
 /// `ApprovalEngine::approve(id)` **只凭 id** 批准，而执行发生在**稍后**、
@@ -154,7 +154,7 @@ impl ActionFingerprint {
         &self.0
     }
 
-    /// ⭐⭐⭐ 内容是否仍与批准时一致。
+    /// 内容是否仍与批准时一致。
     pub fn matches(&self, action: &ActionType) -> bool {
         *self == ActionFingerprint::of(action)
     }
@@ -171,7 +171,7 @@ pub struct PendingAction {
     pub id: String,
     pub action_type: ActionType,
     pub description: String,
-    /// ⭐⭐⭐ 提交时的**内容指纹**（2026-10-06）。
+    /// 提交时的**内容指纹**（2026-10-06）。
     ///
     /// ⛔ 它与 `description` 里那段 `sha256:` 字符串**刻意重复** ——
     /// 那段是给人看的，这字段是给**执行前复核**用的。
