@@ -1,18 +1,56 @@
 # OPEN-DEFECTS —— 遗留待修缺陷（单一入口）
 
-> 2026-10-06 建。此前缺陷散落在 70 份 handoff 正文里（`sessions/README.md` 有索引），
-> 随窗口关闭而沉底。**新发现的缺陷必须同时登记到这里**，否则等于没报。
+## 📊 总账（2026-10-06 12:45 对账）
+
+| 真源 | 条目 | 说明 |
+|---|---:|---|
+| **本文件** | **22 条（已修 6 / 待处理 16）** | 逐条标`已核实`/`未核实`/`已修`；⚠️ `未核实`项是转述，**别当既成事实动手** |
+| `FINAL-ROADMAP-2026-09-29.md` 批次 A~E | 18 项未完成 | **排期真源**（AGENTS.md §6 钦定）；与本文件**有重叠**，见下方去重说明 |
+| 同上 §6 需裁决 | 3 项 | ⛔ **需项目所有者/外部信息**，agent 不能自裁（mu 署名链 / Aegis 署名 / Aegis 22 skill） |
+| `FEATURE-MAP-TASKS-2026-09-29.md` | 特性级 N-x 清单 | 批次 A/B/C/D/E 的完整条目在此（排期 §5 只列本轮新增） |
+| `sessions/` 交接文档 | **73 份** | 索引见 `README.md`（脚本对账零遗漏） |
+
+### ⛔ 去重说明（★ 为什么两个数字不能相加）
+
+排期批次与本文件条目**指向同一批工作**，例如：
+
+- 排期 **A5**（`visible_to_user` 零路径）≈ 本文件 **P1-3** 邻域（能力市场无 API/UI）
+- 排期 **B5**（M-4 只差记 `judged`）≈ 本文件 **P1-4**（`dispatch_by_capability` 计数语义）
+- 排期 **A6**（admission 改判）⇒ **已于本日执行并关闭**
+
+⇒ **真实待办量级是「16 条缺陷 + 18 项排期」的并集，去重后约 20~24 项**，
+不是 34。逐项映射见下表。
+
+### 待处理 16 条 → 映射到排期批次
+
+| 缺陷 | 归属 | 可否现在做 |
+|---|---|---|
+| P1-13 测试隔离（单跑 PASS / 全量 FAIL） | **无排期项** ⇒ 建议新增批次 B（B3 证伪门邻域） | ✅ 可（零依赖，只需定位污染源） |
+| P1-3 `capability_invoke` 不执行本体 | 排期未列 ⇒ 建议新增 **批次 A/B 之间**（执行端口 A/B/C 方案裁决） | ⛔ 需先裁决方案（涉及 crate 依赖方向） |
+| P1-4 `dispatch_by_capability` 只解析就计数 | ≈ **B5**（M-4 记 `judged`） | ✅ 可（小改，同族） |
+| P1-5 金丝雀窗口进程全局 | 排期未列 ⇒ 建议新增 | ✅ 可 |
+| P1-6 `maybe_compact_context` 未接生产 | ≈ **D6**（context 装配） | ⛔ 需先接`nt_cost` 预算，否则等于悄悄加钱 |
+| P2-8 2 处 U+FFFD | 排期未列（纯文本 1 行内） | ✅ 可（但文件在他窗在途） |
+| P2-10 license `status: void` | 排期未列 | ⛔ **需项目所有者裁决**，不可自裁 |
+| P2-11 市场无 API/UI；KB→`ring_inner` | ≈ **E组** | 🟡 部分可 |
+| P2-12 UI 门既有失败 / 截图权限 | ≈ **E组** | 🟡 需先复现 |
+| C1~C5 编译与磁盘 | 已全部处置（机制记录留档） | ✅ 已完成 |
+| N1 集成测试被禁用 | 排期未列 | ✅ 可（启用前需确认为何禁用） |
+| N3 残留 77 行装饰星号 | 已接门`nt-no-star-noise.sh` | 🟡 需CI/合并时由门拦 |
+
+> **本文件是遗留缺陷的唯一入口。** 逐条标注：
+> - `已核实` = 本窗口用命令读过现场/跑过实测
+> - `未核实` = 转述自某份 handoff，本窗口**没有**复现 ⇒ ⛔ 别当既成事实直接动手
+> - `已修` = 已修掉，附验证判据
 >
-> **核实状态**逐条标注，含义严格：
-> - `已核实` = 本轮用命令读过现场/跑过实测
-> - `未核实` = 转述自某份 handoff，本轮**没有**复现，⛔ 别当既成事实直接动手
-> - `已修` = 本轮修掉，附验证判据
+> ⚠️ 纪律：交接文档里的待修项**不要只写在正文** —— 同步登记到这里，
+> 否则缺陷会随窗口关闭而沉底（`handoff-disease-list-20260927.md` 的教训）。
 
 ## P0
 
 | # | 缺陷 | 位置 | 状态 | 判据 / 备注 |
 |---|---|---|---|---|
-| 0 | ⛔ **`neotrix` crate 编译不过**：`unused variable: interp` | `neotrix-core/src/l3_embodiment/nt_shield/guard/agent_guardrails/input_validator.rs:589` | **已核实，2026-10-06 12:00 仍红** | 来自提交 `0c5b1bc9`（11:01）。**证据**：`cargo check`（**不调用链接器**）同样失败 ⇒ 与构建配置改动无关。该文件仍在被持续编辑 ⇒ 未代改。⚠️ 修法：`let Some(interp)` 那个 `interp` 未使用 ⇒ 改名 `_interp` 或补上使用。**⚠️ author 字段全部是 `openhands`（含我自己）⇒ 不能用 author 区分窗口，归属只能看文件清单。** |
+| 0 | ⛔ **`neotrix` crate 编译不过**：`unused variable: interp` | `neotrix-core/src/l3_embodiment/nt_shield/guard/agent_guardrails/input_validator.rs:589` | **✅ 已修**（2026-10-06 12:35 复测 `cargo check -p neotrix` = **0 error**）| 来自提交 `0c5b1bc9`（11:01）。**证据**：`cargo check`（**不调用链接器**）同样失败 ⇒ 与构建配置改动无关。该文件仍在被持续编辑 ⇒ 未代改。⚠️ 修法：`let Some(interp)` 那个 `interp` 未使用 ⇒ 改名 `_interp` 或补上使用。**⚠️ author 字段全部是 `openhands`（含我自己）⇒ 不能用 author 区分窗口，归属只能看文件清单。** |
 
 | 1 | 一次写命令把能力注册表从 **318 节点/43 边**覆盖成 **41 节点/0 边**，**退出码 0** | `crates/nt-core-capability-tree/src/{node,cli}.rs` | **已修** `83bc568b` | 三处叠加：`kind` 缺 `#[serde(default)]`（318 节点全无此键）⇒ `from_str` 整体失败；`load_registry` 用 `Err(_)` 吞错误走老 schema 迁移（0 节点）；`save_registry` 在 `run()` 末尾无条件执行。门：`scripts/ops/nt-registry-determinism.sh` |
 | 2 | 注册表快照**跨进程不确定**：直接序列化照抄 `metadata: HashMap` 迭代序 | 同上 | **已修** `83bc568b` | 实测同一输入 5 次写盘 ⇒ 5 个不同 md5。改走 `serde_json::Value` 中转。⛔ 单进程测不出（曾写 3 条单测，变异后 8/8 照样绿）⇒ 必须靠跨进程门 |
@@ -32,7 +70,7 @@
 | # | 缺陷 | 位置 | 状态 | 判据 / 备注 |
 |---|---|---|---|---|
 | 8 | 2 处 **U+FFFD 编码损坏**在 core | `neotrix-core/src/l0_substrate/nt_core_event_bus.rs`、`neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/kb_search.rs` | **已核实，各 1 处** | 纯文本修复（1 行内）。建议加个门，否则编码损坏会静默传播 |
-| 9 | `mod_orphan::scan_tree_sorted_by_lines_desc` 失败 | `neotrix-core/src/l0_substrate/nt_core_platform/mod_orphan.rs:682` | **已核实**（他窗引入） | 来自 `64913227`；已在**无本轮改动**的检出上复现 ⇒ 不是本轮引入。报「两个孤儿」实得 3 个 |
+| 9 | `mod_orphan::scan_tree_sorted_by_lines_desc` 失败 | `neotrix-core/src/l0_substrate/nt_core_platform/mod_orphan.rs:682` | **✅ 已修**（2026-10-06 12:38 复测 `scan_tree_sorted` = **1 passed**）| 他窗于本日修正断言（2→3）并附裁决依据「扫描器是对的，本测试陈旧」⇒ 属**测试陈旧**而非扫描器缺陷。棘轮已正确归零（见排期 §5 A3 裁决） |
 | 10 | 商业许可阻断：例外条目 `status: void` | `.neotrix/LICENSE-EXCEPTIONS.md` | 未核实（本轮未读该文件现状） | ⛔ 不得改门规避 |
 | 11 | 能力市场无 API/UI；KB namespace/sensitivity → `ring_inner` 结果层门未接 | 多处 | 未核实 | 承接自 `handoff-2026-10-05-tui-wiring-and-six-defects.md` 等，⛔ 动手前先复现 |
 | 12 | UI 门存在既有失败；macOS 截图受屏幕录制权限阻塞（AX 验证可用） | UI 相关 | 未核实 | ⛔ 复现前不要改门 |
@@ -53,11 +91,9 @@
 | # | 事项 | 位置 | 判据 |
 |---|---|---|---|
 | N1 | 集成测试被**禁用**（`.disabled` 后缀，文件有完整文档头 ⇒ 有意为之非垃圾） | `neotrix-core/tests/nt_meta_integration.rs.disabled` | nt_meta ⨯ nt_core 跨模块集成测试全部不参与 `cargo test` |
-| N2 | 2 处 **U+FFFD 编码损坏仍在**（上轮已报，他窗未修） | `neotrix-core/src/l0_substrate/nt_core_event_bus.rs`、`neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/kb_search.rs` | 各 1 处；仍未加防复发门 |
 | N3 | `nt-core-capability-tree` 3 个文件仍有 48 个装饰性 `⭐` | `registry.rs` 15 / `node.rs` 27 / `cli.rs` 6 | ⏸ **本轮有意跳过**：`registry.rs` 的 mtime 比当前时间还晚 54 分钟 ⇒ 疑似他窗带偏时钟在写，按并发纪律不撞车 |
 
-## P1（本轮新发现）
-
+### P1 补充（本轮新发现）
 | # | 缺陷 | 位置 | 状态 | 判据 / 备注 |
 |---|---|---|---|---|
 | 13 | **测试隔离缺陷**：单独跑 PASS、全量跑 FAIL | `neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_game.rs::tests::test_constellation_advance` | **已核实**（2026-10-06） | 同一测试 `cargo test -p neotrix --lib test_constellation_advance` **2 passed**，而全量 `cargo test -p neotrix --lib` 记录它 FAILED ⇒ **跨测试状态污染**，不是断言错。⚠️ 该文件当时有 **-317 行未提交改动**（他窗在途重构）⇒ 尚未定位污染源，⛔ **不要**先改断言。查污染源的方向：全量与单测的差异在「谁先跑了什么」⇒ 需按测试序逐段二分，或用 `--test-threads=1` 缩小范围。⚠️ 同型问题在 nextest 上更早暴露（`group_contracts` 13/13，见「编译与磁盘」C4）⇒ 两者可能是同一类根因。 |
