@@ -116,6 +116,12 @@ for dirpath, dirnames, filenames in os.walk("."):
         code = _strip_noncode(text).splitlines()
         in_test_block = False
         depth = 0
+        # `#[cfg(test)]` 出现处的括号深度；模块闭合后用它把 in_test_block **复位**。
+        # ⭐ 2026-10-06 修盲区：`in_test_block` 原先**只置位不复位** ⇒
+        #   `#[cfg(test)]` 之后的**全部生产代码对门不可见**。
+        #   实测受害：`nt_memory/coverage_ledger.rs`（cfg(test) 在 477 行 / 共 566 行）
+        #   ⇒ 往文件末尾注入一个 unwrap，门**不报**（据此差点误判「门是盲的」）。
+        test_depth = None
         for i, line in enumerate(code, 1):
             # ⭐⭐ 2026-10-02 修的**假阳性**：原先只认**字面** `#[cfg(test)]`，
             #    而 `#[cfg(all(test, feature = "…"))]` / `#[cfg(any(test, …))]`
@@ -136,8 +142,15 @@ for dirpath, dirnames, filenames in os.walk("."):
             is_cfg_attr = re.match(r"\s*#\[cfg\(", line) is not None
             if is_cfg_attr and re.search(r"\btest\b", line):
                 in_test_block = True
+                test_depth = depth
             if in_test_block:
+                # ⭐ 先消费本行括号，再判断 `mod` 是否已闭合
+                depth += line.count("{") - line.count("}")
+                if test_depth is not None and depth <= test_depth:
+                    in_test_block = False
+                    test_depth = None
                 continue
+            depth += line.count("{") - line.count("}")
             for name, rx in TOKENS:
                 if rx.search(line):
                     hits.append((rel, i, name))
