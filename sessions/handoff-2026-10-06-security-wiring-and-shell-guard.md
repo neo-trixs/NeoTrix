@@ -94,10 +94,66 @@
 | 项 | 阻塞点 |
 |---|---|
 | 13 个孤儿目录的处置 | 3 个建议删但已被否决（§5）；4 个接线后仍是死的（**接线等于关闭监控**）；1 条依赖链须先裁决情绪枚举正源 |
-| 1,966 条 `ZERO_CONSUMER` | **693 条判据只是「目录名含治理词」= 弱信号噪音**；真正可行动的是 name/method 判据那 ~693 条 |
-| 「下载后执行」规则 | `sh < payload` / `bash <(curl x)` / `curl … && sh` / `;` / 换行 —— 现有规则只按 `\|` 切分 |
-| `agent_guardrails` **输出侧** | 幻觉/不安全代码/数据外泄检测仍零生产调用方（输入侧已接） |
+| 1,966 条 `ZERO_CONSUMER` | ✅ **已拆分**（`501f1f2d`）：`ZERO_CONSUMER` 1,284 条（判据含 name/file/方法名）+ `PATH_ONLY` 693 条（**仅**目录名 = 弱信号）。另有 `TEST_ONLY` 168 条里 53 条同类，未拆，待裁决 |
 | 1,466 行陈旧 patch | `git apply --reverse --check` 已失败 ⇒ 零恢复价值，建议删（未擅自删 untracked） |
+
+### 6.1 ⭐ `agent_guardrails` **输出侧**：实测结论是**先别接线**
+
+只读取证（1,121 条真实模型自由文本 + 406 篇 agent 撰写的 markdown + 2,694 个代码文件，
+含注释/字符串掩码）得到的硬数据：
+
+**零风险的两个检测器：**
+- ⭐ `HallucinationDetector` **结构上不可能 block** —— 6 条 fabrication 正则与
+  URL 密度启发全标 `Warn`（`output_validator.rs:96`/`:122`），而 `passed`
+  由 `severity != Block` 算出（`:130`）⇒ **`passed` 恒 true** ⇒ 接它零可用性损失。
+  但它的正则**全是英文**，在 1,121 条中文真实语料上**零命中** ⇒ 对中文输出等于失效。
+- `OutputLengthValidator` 生产配置 500KB vs 实际 p90=373 字节 ⇒ **零命中**。
+
+**全部 Block 级误报风险集中在 9 条正则**（`UnsafeCodeDetector` 3 条 +
+`DataExfiltrationDetector` 6 条），实测误报率：markdown 3.2%、代码 1.4%，
+**且逐条核实的样本误报率 100%**：
+- `exec_eval`（`(?i)(exec|eval|system)\s*\(`）判 Block 命中的是
+  `Agent Identity System (nt_agent_identity.rs)`、`Event system (EventBus…)`、
+  **CSS 属性 `stroke_system()`**、Legion 的 `#[system(for_each)]`、
+  **本仓自己的 `UniversalBrowser::eval()` API 名**；
+- `exfil_curl` 命中的是 **官方 rustup 安装命令**、`curl http://localhost:8237/health`
+  健康检查、`dig +short <host> @8.8.8.8` DNS 污染排查、文档里**推荐执行**的取证命令。
+
+⇒ **接线的前置条件不是「挑几个检测器」，而是先补一条等价于
+`discrimination_gate_for_live_shell_wiring` 的判别力门槛测试** ——
+输出侧目前**没有任何门槛测试**，而 9 条正则的判别力显然不够。
+
+**本仓已有两处同向先例**（都是「报告而不阻断」）：
+- `nt_secret_scan.rs:39-41`：「工具输出里出现 `sk-` 可能是用户**故意**让我们看自己的配置；
+  自动截断会让模型拿不到它需要的上下文。真正的处置决策交给人。」
+- `nt_agent.rs:1095-1102`：治理失败**不阻断对话**、**不污染 transcript**。
+
+**建议路径**（下一窗口）：
+1. 先只接 `HallucinationDetector` + `OutputLengthValidator`（结构上零 block 风险），
+   把 9 条 Block 正则整体降为 Log ⇒ 先拿到「模型输出被观测过」这个事实，
+   为后续调阈值积累真实语料；
+2. 优先复用 `nt_secret_scan` 的 16 条（它有 16/16 样本覆盖的测试），
+   **不要**用 `hardcoded_secret`（它要求 `key = \"value\"` 形态，
+   会漏掉真实泄露常见的**裸值**形态 —— `nt_secret_scan.rs:9-12` 记着同一个缺口）；
+3. `exec_eval` 降为 Log，或改成要求 `system` 前后是引号/行首。
+
+**接线时必须避开的三个坑**（已核实，非推测）：
+1. ⛔ **流式路径无法阻断** —— `nt_agent_exec.rs:487` 与 `nt_http_engine.rs:896`
+   都是**逐 token 直发**给调用方 ⇒ 任何「输出侧阻断」在流式下都是
+   **已经渲染之后**才发生 ⇒ 必须先明确「流式只标注不阻断」，否则会做出一个假防护。
+2. ⛔ **`WireEvent::AgentMessage` 已落盘且会回灌** —— `wire.rs:98-111` 写进
+   session jsonl，`nt_agent_session.rs:208-213` 把它塞回 context ⇒
+   若要改写 `sanitized` **必须在 `nt_agent_exec.rs:75` 的 `wire.record` 之前**，
+   否则落盘与回灌都是原文。
+3. ⛔ **`exec_shell` 的返回不是模型文本**（是 shell stdout）⇒ 在
+   `nt_agent_exec.rs:75` 那个集中点接检测时**必须按 `self.state.mode` 分档**，
+   否则模型 `cat .env` 的内容会让 Shell 模式永久 Block。
+
+**另一处值得记的既有缺陷**：`UnifiedDefenseLayer::defend` 的输出审查段是**空的** ——
+`unified_defense.rs:157-162` 硬编码 `is_safe: true, threat_level: Safe,
+signals: vec![], sanitized_output: String::new()`。而 `OutputSentinel`
+（`output_sentinel.rs:36`）的唯一调用点 `unified_defense.rs:169` **零生产调用方**
+⇒ **输出侧整条链在生产上是空白，连那个 stub 都不生效。**
 
 ---
 
