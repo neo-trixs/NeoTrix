@@ -26,47 +26,92 @@ impl SecurityMcpToolRegistry {
     }
 
     pub fn register_defaults(&mut self) {
-        self.register_tool(_SecurityMcpTool::new(
+        // ⚠️ 曾是逐个 `.ok()`：任一工具注册失败被**完全吞掉** ⇒ 该安全工具
+        // **静默缺席**，而系统看起来完全健康（无错、无日志）⇒ **安全面被悄悄缩小**。
+        // 本轮由 `.ok()` 报告项分诊发现。⇒ 现在逐个 warn。
+        {
+            let __r = self.register_tool(_SecurityMcpTool::new(
             "scan_secrets",
             "Scan code or text for hardcoded secrets, API keys, tokens, and passwords. Returns findings with severity High for confirmed secrets.",
             SecurityToolCategory::SecretDetection,
             scan_secrets_handler,
-        )).ok();
+        ));
+            if let Err(e) = __r {
+                log::warn!(
+                    "[shield_mcp_security] 工具 scan_secrets 注册失败（安全面变小）: {e}"
+                );
+            }
+        }
 
-        self.register_tool(_SecurityMcpTool::new(
+        {
+            let __r = self.register_tool(_SecurityMcpTool::new(
             "audit_code_security",
             "Static analysis for OWASP Top 10 security patterns including command injection, SQL injection, path traversal, and unsafe deserialization with CWE mapping.",
             SecurityToolCategory::CodeAudit,
             audit_code_security_handler,
-        )).ok();
+        ));
+            if let Err(e) = __r {
+                log::warn!(
+                    "[shield_mcp_security] 工具 audit_code_security 注册失败（安全面变小）: {e}"
+                );
+            }
+        }
 
-        self.register_tool(_SecurityMcpTool::new(
+        {
+            let __r = self.register_tool(_SecurityMcpTool::new(
             "check_dependencies",
             "Check project dependencies for known vulnerable patterns in package.json, Cargo.toml, or requirements.txt files.",
             SecurityToolCategory::DependencyCheck,
             check_dependencies_handler,
-        )).ok();
+        ));
+            if let Err(e) = __r {
+                log::warn!(
+                    "[shield_mcp_security] 工具 check_dependencies 注册失败（安全面变小）: {e}"
+                );
+            }
+        }
 
-        self.register_tool(_SecurityMcpTool::new(
+        {
+            let __r = self.register_tool(_SecurityMcpTool::new(
             "test_prompt_injection",
             "Test text for prompt injection patterns including jailbreaks, system prompt leaks, role-playing attacks, and delimiter poisoning.",
             SecurityToolCategory::PromptInjectionTest,
             test_prompt_injection_handler,
-        )).ok();
+        ));
+            if let Err(e) = __r {
+                log::warn!(
+                    "[shield_mcp_security] 工具 test_prompt_injection 注册失败（安全面变小）: {e}"
+                );
+            }
+        }
 
-        self.register_tool(_SecurityMcpTool::new(
+        {
+            let __r = self.register_tool(_SecurityMcpTool::new(
             "analyze_threat",
             "Threat intelligence analysis of IOCs (IP addresses, domains, file hashes). Returns threat context, known associations, and risk assessment.",
             SecurityToolCategory::ThreatIntel,
             analyze_threat_handler,
-        )).ok();
+        ));
+            if let Err(e) = __r {
+                log::warn!(
+                    "[shield_mcp_security] 工具 analyze_threat 注册失败（安全面变小）: {e}"
+                );
+            }
+        }
 
-        self.register_tool(_SecurityMcpTool::new(
+        {
+            let __r = self.register_tool(_SecurityMcpTool::new(
             "security_health_check",
             "Comprehensive security posture summary. Runs all available security tools on the target and returns an aggregated risk score with prioritized findings.",
             SecurityToolCategory::VulnerabilityScan,
             security_health_check_handler,
-        )).ok();
+        ));
+            if let Err(e) = __r {
+                log::warn!(
+                    "[shield_mcp_security] 工具 security_health_check 注册失败（安全面变小）: {e}"
+                );
+            }
+        }
     }
 
     pub fn register_tool(&mut self, tool: _SecurityMcpTool) -> Result<(), String> {
