@@ -31,6 +31,34 @@
 **这不是「忘了调」**：neobot 不得反向依赖 core，能力元数据的真身在
 core L1 `nt_act_trade`。方案详见 `B1-CAPABILITY-INVOKE-WIRING-2026-10-06.md`。
 
+**⇒ 裁决：选方案 C**（2026-10-06，依据见下）。**方案 B 不再需要。**
+
+### 裁决依据（实测字段比对）
+
+| 字段 | `CapabilityNode`（`nt-core-capability-tree`，**两侧都能用**） | `MarketEntry`（neobot） |
+|---|---|---|
+| `id` / `kind` / `domain` | ✅ 已有 | ✅ 需要 |
+| `category` / `version` / `license` / `description` / `tags` / `maturity` | ❌ **不在共享 crate** | ✅ 需要 |
+
+⇒ 能力元数据目前**分裂在两处**：3 个字段在共享 crate，6 个在别处。
+
+**为什么 C 而非 B**：B 与 C 不是同类选项 —— B 答「数据怎么送过去」，
+C 答「数据住在哪」。若数据住在共享 crate，neobot 直接读它**已经依赖**的
+crate（`Cargo.toml:42`）⇒ 送数据这一步自动消失 ⇒ **B 变成多余**。
+那 6 个字段是**关于该能力的描述性元数据**，它的家就是能力节点本身，不是 neobot。
+
+### 前置：必须先消除一个同名冲突（实测发现）
+
+存在**两个 `CapabilityNode`**：
+
+| 位置 | 形态 |
+|---|---|
+| `crates/nt-core-capability-tree/src/node.rs:328` | **结构体**（有 `new_primitive` / `new_composite` / `new_constellation`） |
+| `neotrix-core/src/l0_substrate/nt_core_traits.rs:27` | **同名 trait** |
+
+⇒ 又是 L15「同名 ≠ 同一符号」。**先统一这两个，再谈把元数据下沉** ——
+否则会把描述性字段加到错误的符号上。
+
 - ⛔ **方案 A（neobot 自带清单自播种）已判定不可接受** —— 会产生第二个真身。
   依据：本仓已记录四起「两份同源数据」资产最终两份都腐化。
 - ✅ 推荐 **方案 C**：把能力清单下沉到 `nt-core-capability-tree`
