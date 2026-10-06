@@ -679,9 +679,42 @@ mod plain;
         // 5 行 ⇒ 行数应更大，排在前
         std::fs::write(sub.join("big.rs"), "a\nb\nc\nd\ne\n").expect("w");
         let found = scan_tree(&root);
-        assert_eq!(found.len(), 2, "两个孤儿: {:?}", found);
-        assert_eq!(found[0].stem, "big", "应按行数降序: {:?}", found);
-        assert!(found[0].lines >= found[1].lines);
+        // ⭐⭐ 期望值由 2 改为 3（2026-10-06 修）：**扫描器是对的，本测试陈旧**。
+        //
+        // 【裁决依据（三条，不是推测）】
+        // ① `OrphanKind::DirModule` 的文档注释明写「2026-10-05 新增」⇒ 有意的能力。
+        // ② 模块级文档说明了**为什么非有它不可**：`dual_track/mod.rs` 这类
+        //    **目录模块本身**就是那个未被声明的文件，且它目录内没有别的 `.rs`
+        //    ⇒ 旧实现扫出来是空 ⇒ **完全看不见**。
+        // ③ 实测输出 `big`(5行) → `small`(1行) → `s`(0行) **正是行数降序**，
+        //    与 `sort_by(|a,b| b.lines.cmp(&a.lines).then(a.stem.cmp(&b.stem)))` 一致
+        //    ⇒ **排序实现本身没有 bug**。
+        //
+        // 【为什么要改，而不是把 DirModule 报成 bug 改回去】
+        // 本条长期为红（自 2026-10-05 起）。**陈旧红项比没有门更危险** ——
+        // 它训练所有人忽略红色，并诱导下一个人去「修」**正确的**扫描器
+        // （把刚加的 DirModule 能力删掉，好让这个断言变绿）。
+        // ⇒ 改测试，并把它变成**锁住新能力**的测试。
+        assert_eq!(
+            found.len(), 3,
+            "三个孤儿（big/small 两个叶子 + s 这个目录模块）: {:?}",
+            found
+        );
+        // 目录模块本身也必须被报出来（这条断言就是当初漏更新的那部分）
+        let dir_mod = found
+            .iter()
+            .find(|o| o.kind == super::OrphanKind::DirModule)
+            .expect("目录模块 s 应被报为 DirModule");
+        assert_eq!(dir_mod.stem, "s");
+        assert_eq!(dir_mod.mod_rs, "s/mod.rs");
+        // 排序：行数降序，目录模块（0 行）落在最后
+        let stems: Vec<&str> = found.iter().map(|o| o.stem.as_str()).collect();
+        assert_eq!(stems, vec!["big", "small", "s"], "应按行数降序: {:?}", found);
+        assert!(
+            found.windows(2).all(|w| w[0].lines >= w[1].lines),
+            "相邻元素必须单调不增: {:?}",
+            found
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
