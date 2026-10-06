@@ -73,6 +73,36 @@ fn dispatch_quote_negotiation(_id: &str, input: Value) -> BoxFuture<'static, Res
 ///
 /// ⚠️ **不吞错误**：派发表锁投毒等失败必须能被调用方看见，
 ///否则「注册失败」会静默退化成「永远 fail-closed」，正是本轮在治的病。
+/// 幂等闸：确保派发实现**恰好注册一次**。
+///
+/// # ⭐ 为什么需要它（2026-10-06 实测发现）
+///
+/// 注册原先只挂在 `ConsciousnessRuntime::new()` 里 ⇒
+/// **任何不构造 `ConsciousnessRuntime` 的进程**（如 `neobot` CLI）
+/// 拿到的是**空派发表** ⇒ 一切能力 fail-closed。
+///
+/// 这是「导出 ≠ 接入」在**进程级**的重演：
+/// 入口存在 ≠ 每个消费者都被接上。
+///
+/// ⇒ 改为 `Once` 幂等自注册，并提供 [`ensure_trade_dispatchers`] 供任意入口调用。
+static TRADE_DISPATCH_ONCE: std::sync::Once = std::sync::Once::new();
+
+/// 供**任意入口**调用的幂等注册（CLI / daemon / 测试皆可）。
+///
+/// ⛔ 重复调用**无副作用**（`Once` 保证）。
+pub fn ensure_trade_dispatchers() {
+    TRADE_DISPATCH_ONCE.call_once(|| {
+        let failed = register_tree_dispatchers();
+        if !failed.is_empty() {
+            log::warn!(
+                "[tree_dispatch] 派发注册失败 {} 项（相应能力将 fail-closed）: {failed:?}",
+                failed.len()
+            );
+        }
+    });
+}
+
+/// 注册全部派发器（**幂等由调用方保证**；对外推荐用 [`ensure_trade_dispatchers`]）。
 pub fn register_tree_dispatchers() -> Vec<String> {
     let mut failed = Vec::new();
     // 显式标注为 DispatchFn 指针类型：否则数组被推断为首元素的**具体 fn item 类型**

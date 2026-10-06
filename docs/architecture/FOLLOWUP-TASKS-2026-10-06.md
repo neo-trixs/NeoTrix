@@ -709,3 +709,34 @@ T2.1（需体积策略）
 4. **外部吸收一律走「证据三件套」**：许可证核实 + 生产接线 + 变异/回归测试；
    ⛔ 不接受「调研完成」当作吸收完成（R-P79）。
 
+### ⭐⭐⭐ P0.6 派发实现**只在 core 进程内可用** —— neobot CLI 只能「看」不能「调」（2026-10-06 实测）
+
+我给 `neobot capability` 加了 `call` 子命令（想补上「闭环的外部可观测」），
+**写完立刻被自己的命令顶回来**：`foreign_trade_full_cycle` 明明已注册、
+清单里也标了 `Scaffold`，CLI 却报「未注册派发实现」。
+
+⇒ 追查发现**两层**原因：
+
+1. **注册挂在 `ConsciousnessRuntime::new()` 里** ⇒ 不构造该runtime 的进程
+   拿到**空派发表**。⇒ 已修为 `Once` 幂等的
+   `ensure_trade_dispatchers()`，供任意入口调用。
+2. ⛔ **更根本**：`neotrix-neobot` 的依赖里**只有 `neotrix-types`，没有 core**
+   （方向是 `core → neobot`）⇒ **`neobot` 二进制内根本不存在core 的派发实现**。
+
+⇒ ⇒ **架构结论（不是缺陷，是设计约束）**：
+**派发执行只在 core 侧进程内成立**。`neobot capability {list,never,canary}`
+能「看」是因为它读的是**共享 crate 的清单与金丝雀**（都在 `nt-core-capability-tree`），
+不依赖 core；一旦要「调」，就必须有实现，而实现在 core。
+
+⇒ ⛔ 故 `neobot capability call` 已**撤回**（写了也不能工作，且会让人以为它能）。
+
+**若要进程外真实调用**，唯一正确落点是 **core 侧二进制**
+（如 `bin/nt_crystal_serve`，它本就构造 `ConsciousnessRuntime`
+⇒ 注册与实现都在场），命令形态可直接复用 `ensure_trade_dispatchers()` +
+`dispatch()` + `drive()` 三步。**本轮未做**（预算已尽），已登记为待办。
+
+⇒ **元教训**：我又一次在**没核实进程边界**的情况下加功能。
+与 P0.1「连错两层能力」同族 —— 那次错在**注册表层**，这次错在**进程层**。
+⇒ 新增判据：**凡「加一个能触发 X 的入口」，先确认 X 的实现与该入口
+在同一个依赖闭包里。**
+
