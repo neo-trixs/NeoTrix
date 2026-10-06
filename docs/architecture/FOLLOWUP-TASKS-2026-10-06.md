@@ -345,6 +345,30 @@ neobot 侧 `listable()` 为真。
 在没有统一执行契约前，`dispatch` 返回 `None` ⇒ 调用方 fail-closed
 ⇒ **不会把「没实现」伪装成「执行成功」**。
 
+### ✅ P0.2-a 已接线 2 / 5 —— schema 就是 Rust 类型，零发明（2026-10-06）
+
+复核 `TradeCapabilitySpec { context: TradeContext, result: TradeResult }` 后发现
+**权威 schema 一直存在**：`TradeContext` 等类型都派生 `Serialize + Deserialize`
+⇒ **schema 自描述**。而 `capability_spec()` 本身只是**空值样本**
+（`buyer_id: String::new()`）⇒ **我先前把它当成 schema，才误判「需发明」**。
+
+⇒ 新增 `nt_act_trade/tree_dispatch.rs`，注册**2 个**：
+
+| 能力 | 执行器 | 输入 |
+|---|---|---|
+| `foreign_trade_full_cycle` | `execute_trade_full_cycle(TradeContext)` | `TradeContext` |
+| `trade_quote_negotiation` | `execute_quote_negotiation(..)` | `{requirement, product_spec, market_env}` |
+
+**接入生产**：`ConsciousnessRuntime::new()`，与 `bootstrap_trade_capabilities()`
+**同处、同生命周期**。注册失败**不吞**（返回失败项 + `log::warn`）。
+
+**4 个测试**：注册后 `None`→`Some`；真实执行（**输入取自仓内
+`capability_spec().context`，零虚构数据**）；非法输入必须 `Err`；
+**未注册的 3 个必须仍 `None`**。
+
+⇒ 另 3 个（`production_logistics` / `finance_compliance` / `trade_product_spec`）
+**顶层执行器数为 0** ⇒ 接线须**发明** schema ⇒ **不注册，保持 fail-closed**。
+
 ⛔ **我没有写那 5 个适配器**，尽管技术上可行（引擎都是 `Default` 可构造）。
 理由：输入 schema 只能靠**发明**。而本轮已两次因「发明出的东西看着健康」
 造成真实伤害（清单 id 一次、canary 形态一次）。
