@@ -315,6 +315,46 @@ neobot 侧 `listable()` 为真。
 ⇒ **在解决这两点前，`register_dispatcher` 不应被真实实现调用。**
 当前生产 `dispatch` 返回 `None` ⇒ 调用方fail-closed ⇒ **与接线前行为一致**（未引入回归）。
 
+### ⭐⭐⭐ P0.2 派发端口**无法统一接线**——5 个能力的执行面**异构**（2026-10-06 实测）
+
+在把 `DispatchFn` 对齐 async、并给 `TradeCapabilityRegistry` 加了全局落点之后，
+我去核实「派发对象到底是谁」，结论是**负面的**，且这是本轮最有价值的一条：
+
+#### ① `CapabilityNode` **没有执行入口**
+
+共享 crate `node.rs` 里**无** `handler` / `executor` / `invoke` 字段
+（grep `pub (handler|executor|invoke|execute|run)\w*:` 只命中 `runeword*` 噪声）。
+⇒ **能力树节点是纯元数据/结构**，不是可执行注册表。
+⇒ 树 id → 可执行函数之间**没有任何结构性连接**，只有「按约定对齐 id」。
+
+#### ② 5 个能力的可执行面**各不相同**
+
+| 能力 | 可执行入口 | 形态 |
+|---|---|---|
+| `foreign_trade_full_cycle` | `execute_trade_full_cycle(TradeContext) -> TradeResult` | 自由函数 ✅ |
+| `trade_quote_negotiation` | `execute_quote_negotiation(...)` | 自由函数 ✅ |
+| `trade_production_logistics` | `customs_clearance` / `manage_bl` / `track_shipment` | **仅 engine 方法**（`ProductionEngine`/`LogisticsEngine` 是 unit struct + `Default`） |
+| `trade_finance_compliance` | `verify_settlement` / `declare_tax_refund` / `reconcile_accounts` | **仅 `FinanceEngine` 方法** |
+| `trade_product_spec` | `get_product_knowledge_pack(ProductType)` | **知识包工厂，不是执行器** |
+
+⇒ **不存在统一的「树 id → 执行」契约。** 要接线就得为每个能力
+**新造一份输入 schema**（JSON → 哪个方法的哪些参数）。
+
+#### ③ 结论：**当前的 fail-closed 是正确行为，不是缺陷**
+
+在没有统一执行契约前，`dispatch` 返回 `None` ⇒ 调用方 fail-closed
+⇒ **不会把「没实现」伪装成「执行成功」**。
+
+⛔ **我没有写那 5 个适配器**，尽管技术上可行（引擎都是 `Default` 可构造）。
+理由：输入 schema 只能靠**发明**。而本轮已两次因「发明出的东西看着健康」
+造成真实伤害（清单 id 一次、canary 形态一次）。
+⇒ **在没有权威 schema 来源前，宁可保持 fail-closed 并把缺口写明。**
+
+**待决**：这5 个能力的输入 schema 权威来源是
+① 各模块既有 `capability_spec()` / `TradeCapabilitySpec` 是否已含schema；
+② 需产品/协议侧给定。
+⇒ 查证方向已写明，未执行。
+
 ### ⭐⭐ P0.1 **修正**：不是「id 空间分裂」，是**我连错了两层能力**（2026-10-06）
 
 我先写「manifest id 必须能在 `TradeCapabilityRegistry` 查到」的测试，它红了，
