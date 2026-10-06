@@ -67,7 +67,7 @@
 | **B1** | 商业许可 `.neotrix/LICENSE-EXCEPTIONS.md` 的 `status: void`（`apps/neobot-desktop/frontend`，2026-10-01 第三次认定商用触发 condition #1） | 文件自记「决定由**所有者**作出，agent 代为记录」⇒ 需你裁决 |
 | **B2** | 排期 §6 三项溯源待澄清：`qybaihe/mu` 署名链（Mario Zechner vs 提交者）· `Aegis` 与 Jesse Vincent 双署名零提及 · `Aegis` 22 个 skill 是否吸收（与 superpowers 大面积同名同义） | 未澄清前不进正典索引（排期 §1.2 溯源红旗） |
 | **B3** | `capability_invoke` **不执行能力本体**（只做市场校验+计数+回执） | trade 执行入口在 core L1，neobot 不依赖 core ⇒ 需先裁决 A/B/C 接法（涉及 crate 依赖方向） |
-| **B4** | `maybe_compact_context` 未接生产 | 接它会新增 LLM 调用 ⇒ 须先纳入 `nt_cost` 预算，否则等于悄悄加钱 |
+| ~~**B4**~~ | ~~`maybe_compact_context` 未接生产~~ | ✅ **已接生产**（2026-10-06 实测）：`nt_loop_core.rs:25` 在 `AgentLoop::turn()` 主路径里调用，且该 loop 有生产调用方（`planner_executor.rs` / `bin/nt_crystal_serve.rs::run_agent_loop`）。⚠️ 真正遗留的是「它**未纳入成本预算**」，非接线问题 |
 
 ---
 

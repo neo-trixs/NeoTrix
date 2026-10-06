@@ -619,3 +619,39 @@ T2.1（需体积策略）
 ```
 
 **不建议**在 T0.1 裁决前推进 T0.2 —— 它需要知道每个能力的真实执行 id。
+
+## 附：治理元门本轮的四条实证（2026-10-06）
+
+`check-gate-satisfiable.sh` 报「未登记 1 / 恒红 4」。逐条判读后：
+
+| 项 | 判定 | 处理 |
+|---|---|---|
+| `check-dead-config-flag` 未登记 | **缺审**（非坏门） | 补**探针** + 登记 `gate-registry.tsv` ⇒ 未登记归 0 |
+| `check-claims-numbers` 恒红 | **我造成的陈旧数字** | 我加了第 84 条索引却没同步 `AGENTS.md` ⇒ 已改（83→84、75→84）⇒ **PASS** |
+| `check-doc-claims` 恒红 | **文档断言被代码反驳** | `FULL-AUDIT` 的 B4「`maybe_compact_context` 未接生产」**已不成立**：实测 `nt_loop_core.rs:25` 在 `AgentLoop::turn()` 主路径调用，且有生产调用方 ⇒ 已定正 |
+| `check-unwrap` 24 new / `check-doc-drift` 125 | **存量债，非本会话引入** | 24 new 分布在 7 个文件，**本会话 30 个提交命中 0**；`unwrap-baseline.txt` 未被我改过 ⇒ **不碰** |
+
+### ⭐ 探针首版失败，暴露「注入形态必须匹配门的真实契约」
+
+`check-dead-config-flag` 的探针**第一次就 FAIL**（门不报我注入的东西）。
+
+⇒ 根因：`_RE_FIELD_BOOL` 要求 **`pub`**（门只管「对外声称的配置面」），
+   而我注入的是**私有**字段 `foo: bool`。
+⇒ 改注入为 `pub` 后 **PASS**。
+
+⚠️ 这与 `check-orphan-dirs` 探针里记的坑**同族**：
+**选错注入形态会得到 rc=0 / 门不响的假阴性**，
+而「门没响」很容易被读成「门是空的」⇒ 实为**注入无效**。
+
+⇒ 元规则：**探针的注入形态必须先读门的正则/契约再写**，
+   否则「探针通过」与「探针报错」都可能是自欺。
+
+### 「恒红」的正确处置
+
+`check-gate-satisfiable` 自己给出判据：
+① 门真的坏了 → 修门；② 存量债已记账 → 搬进baseline，`--strict` 只挡新增；
+⛔ 绝不要为了让门变绿而**调大 baseline**或**删掉 --strict**。
+
+⇒ 本轮据此：**只修「我造成的」**（claims-numbers、doc-claims），
+   **不动非本会话引入的存量债**（unwrap 24、doc-drift 125）。
+
