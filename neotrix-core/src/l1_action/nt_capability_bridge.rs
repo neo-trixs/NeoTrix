@@ -202,14 +202,23 @@ impl ExperienceRouter {
                 // 解析到 ⇒ 论证里带节点 id；解析不到 ⇒ **明说「未命中已注册能力」**。
                 // 这让「路由命中了标签但能力树里没有它」**变得可见** ——
                 // 而那正是「有路由、没能力」这类缺陷的形态。
-                let resolved = neotrix_neobot::nt_capability_registry::dispatch_by_capability(&tag)
-                    .unwrap_or_default();
-                let resolution_note = if resolved.is_empty() {
-                    format!(" | ⛔ 未命中已注册能力（路由标签 '{}' 无提供者）", tag)
-                } else {
-                    let ids: Vec<String> = resolved.iter().map(|n| n.id.clone()).collect();
-                    format!(" | 已解析到已注册能力节点：{}", ids.join(", "))
-                };
+                // ⚠️ 必须用**无副作用**的 `resolve_by_capability`：
+                // 原代码调`dispatch_by_capability(...).unwrap_or_default()`，
+                // 而该函数**带计数副作用** ⇒ merely「被路由过」就被记成「被调用过」，
+                // 直接污染 `registered_never_invoked()`（本仓独有的度量）。
+                // 另`.unwrap_or_default()` 还会把「注册表锁投毒」这类硬错误
+                // 悄悄咽成「没解析到」，与上面自己写的「⛔ 不藏起来」矛盾。
+                let resolution_note =
+                    match neotrix_neobot::nt_capability_registry::resolve_by_capability(&tag) {
+                        Err(e) => format!(" | ⛔ 解析已注册能力失败（注册表不可用）：{e}"),
+                        Ok(v) if v.is_empty() => {
+                            format!(" | ⛔ 未命中已注册能力（路由标签 '{}' 无提供者）", tag)
+                        }
+                        Ok(v) => {
+                            let ids: Vec<&str> = v.iter().map(|n| n.id.as_str()).collect();
+                            format!(" | 已解析到已注册能力节点：{}", ids.join(", "))
+                        }
+                    };
                 return ExperienceDimension::CapabilityNetwork {
                     domain,
                     capability_tag: tag.clone(),

@@ -155,6 +155,23 @@ enum Cmd {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// 能力市场：上架清单 / 从未被调用 / 金丝雀触发情况.
+    Capability {
+        #[command(subcommand)]
+        cmd: CapabilityCmd,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum CapabilityCmd {
+    /// 已上架能力清单（license/version/category 齐备者）.
+    List,
+    /// 注册但**从未被调用**的能力 —— 本仓独有的度量.
+    ///
+    /// 该清单直接建立在调用计数上，故只在计数语义可信时才有意义。
+    Never,
+    /// 金丝雀触发情况：`fired_count` 与 `healthy`（不读就等于没看见）。
+    Canary,
 }
 
 #[derive(Debug, Subcommand)]
@@ -394,6 +411,11 @@ fn real_main() -> Result<(), NtBotError> {
             ChannelCmd::Probe { channel } => cmd_channel_probe(&channel),
             ChannelCmd::Once { channel } => cmd_channel_once(channel.as_deref()),
             ChannelCmd::Serve { channel, interval } => cmd_channel_serve(channel.as_deref(), interval),
+        },
+        Cmd::Capability { cmd } => match cmd {
+            CapabilityCmd::List => cmd_capability_list(),
+            CapabilityCmd::Never => cmd_capability_never(),
+            CapabilityCmd::Canary => cmd_capability_canary(),
         },
         Cmd::Export { out } => cmd_export(out.as_deref()),
         Cmd::Run { title, text, engine, provider, model, convo, stream } => {
@@ -1652,4 +1674,70 @@ fn cmd_provider_preset(name: &str) -> Result<(), NtBotError> {
         )));
     };
     cmd_provider_add(name.trim(), base_url, key_env, model)
+}
+
+/// 能力市场上架清单。
+///
+/// ⛔ 诚实边界：本命令读的是**当前进程内**的注册表。
+/// 生产中播种由 `neotrix-core` 的 `BackgroundLoop` 完成，而 neobot 不依赖 core
+/// ⇒ 独立跑本 CLI 时注册表为空是**预期**现象，不是 bug。
+/// 详见 `docs/architecture/B1-CAPABILITY-INVOKE-WIRING-2026-10-06.md`。
+fn cmd_capability_list() -> Result<(), NtBotError> {
+    // `capability_market_ids()` 是 `nt_http_engine` 的**私有**函数，不可从 CLI 调
+    // ⇒ 走公开的 `with_registry` + `nt_capability_market::listable`。
+    let ids: Vec<String> = match neotrix_neobot::nt_capability_registry::with_registry(|reg| {
+        neotrix_neobot::nt_capability_market::listable(reg)
+            .into_iter()
+            .map(|e| e.id)
+            .collect()
+    }) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("无法读取能力注册表：{e}");
+            return Ok(());
+        }
+    };
+    if ids.is_empty() {
+        println!("能力市场：空（本进程未播种；生产由 BackgroundLoop 播种）");
+        return Ok(());
+    }
+    println!("已上架能力 {} 项：", ids.len());
+    for id in &ids {
+        let n = neotrix_neobot::nt_capability_registry::invoke_count(id);
+        println!("  {id}    invoked={n}");
+    }
+    Ok(())
+}
+
+/// 注册但从未被调用的能力。
+fn cmd_capability_never() -> Result<(), NtBotError> {
+    match neotrix_neobot::nt_capability_registry::registered_never_invoked() {
+        Ok(v) if v.is_empty() => println!("注册但从未被调用：0 项"),
+        Ok(v) => {
+            println!("[WARN] 注册但从未被调用：{} 项", v.len());
+            for id in &v {
+                println!("  NEVER  {id}");
+            }
+        }
+        Err(e) => eprintln!("无法读取调用计数：{e}"),
+    }
+    Ok(())
+}
+
+/// 金丝雀触发情况 —— 此前没有任何出口读 `fired_count`。
+fn cmd_capability_canary() -> Result<(), NtBotError> {
+    match neotrix_neobot::nt_capability_canary::status() {
+        Ok(v) if v.is_empty() => println!("金丝雀：空"),
+        Ok(v) => {
+            println!("金丝雀 {} 项：", v.len());
+            for s in &v {
+                println!(
+                    "  {}  fired={}  healthy={}",
+                    s.capability.id, s.fired_count, s.healthy
+                );
+            }
+        }
+        Err(e) => eprintln!("无法读取金丝雀状态：{e}"),
+    }
+    Ok(())
 }
