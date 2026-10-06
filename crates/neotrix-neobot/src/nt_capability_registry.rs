@@ -134,7 +134,7 @@ pub fn has_node(id: &str) -> bool {
 ///  **计数语义与 `lookup` 一致**： **真的取到节点**才计数；
 ///  标签无提供者 ⇒ 返回空 vec 且  **不计数**
 /// （ 否则「路由到不存在的能力」会被误读成「有真实调用」）。
-pub fn dispatch_by_capability(capability_tag: &str) -> Result<Vec<CapabilityNode>, String> {
+pub fn resolve_by_capability(capability_tag: &str) -> Result<Vec<CapabilityNode>, String> {
     let ids = {
         let reg = slot().lock().map_err(|e| format!("注册表锁投毒: {e}"))?;
         reg.nodes_providing(capability_tag)
@@ -148,8 +148,24 @@ pub fn dispatch_by_capability(capability_tag: &str) -> Result<Vec<CapabilityNode
         if let Some(n) = node {
             out.push(n);
         }
+    }
+    Ok(out)
+}
+
+/// 同 [`resolve_by_capability`]，但对**真正取到的**能力递增计数。
+///
+/// ⚠️ 修复记录：原实现把 `counts += 1` 放在 `if let Some(n)` **之外**
+/// ⇒ 标签无提供者时也会计数，与本函数上方文档「取到才计数」**直接矛盾**，
+/// 也与 `lookup` 的 `if found.is_some()` 守卫不一致
+/// ⇒ 「路由到不存在的能力」被误记成「有真实调用」，
+/// 而 `registered_never_invoked()` 直接建立在这份计数上 ⇒ 该清单不可信。
+pub fn dispatch_by_capability(capability_tag: &str) -> Result<Vec<CapabilityNode>, String> {
+    let out = resolve_by_capability(capability_tag)?;
+    if !out.is_empty() {
         let mut c = counts().lock().map_err(|e| format!("计数锁投毒: {e}"))?;
-        *c.entry(id).or_insert(0) += 1;
+        for n in &out {
+            *c.entry(n.id.clone()).or_insert(0) += 1;
+        }
     }
     Ok(out)
 }
