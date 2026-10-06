@@ -155,7 +155,9 @@ pub struct DisagreementPattern {
 }
 
 /// 匹配条件
-#[derive(Debug, Clone, Serialize, Deserialize)]
+// 注：原此处有 `#[derive(Debug, Clone, Serialize, Deserialize)]`，是 2026-09-29
+// `nt_fuse_types.py` 把本文件的 MatchCondition 定义换成 re-export 时的**残留**——
+// derive 挂在 `pub use` 上 ⇒ E0774。类型现由 entity_mapping 提供，derive 亦随之。
 // 2026-09-29 自动融合（nt_fuse_types.py）：`MatchCondition` 原在本文件与
 // `l5_cognition/nt_mind/cross_domain/entity_mapping.rs` 各有一份，字段名+类型+impl 块完全相同。
 // 真源是后者（模块 mod.rs 的 re-export 指向它）⇒ 本文件改为 re-export，

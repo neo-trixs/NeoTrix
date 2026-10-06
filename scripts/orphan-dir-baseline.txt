@@ -27,6 +27,11 @@
 #     修 bfs/dfs max_depth off-by-one）＋`nt_core/memory`（5 文件 1,171 行，4 测试全绿；
 #     修 EmotionLabel→PlutchikEmotion 避开 L5→L6 违规、6 处 ConceptNode 字段误用、
 #     1 处 move-after-use、2 处借用冲突）—— **均为「从未编译过」，首次接线即暴露真bug**
+#   已接线 1 条（A55 波，2,649 行 / 23 测试，全仓最大孤儿）：`nt_mind::cross_domain`。
+#     仅 1 处编译错误（2026-09-29 `nt_fuse_types.py` 把 MatchCondition 换成 re-export
+#     时的残留 derive 挂在 use 上 ⇒ E0774）。**能力缺失**：`enable_semantic_mapping`
+#     默认 true 且模块文档写明「跨域实体对齐」，但该开关在名称相似度中从未被读取；
+#     字符集 Jaccard 对 `HashMap`/`Dict` 恒为 0 ⇒ 已实现 14 组跨语言同义概念层（0.7 分）。
 #   已接线 2 条（A54 波，2,711 行 / 57 测试）：`nt_act::nt_act_dev_tools`（4 测试）＋
 #     `nt_mind::self_improvement`（53 测试）。本波测出**单位错配真 bug**：
 #     `updated_at` 是 Unix 秒，而 consolidate 拿它当回合数（`% (current_turn+1)`，
@@ -99,4 +104,3 @@
 
 neotrix-core/src/l1_action/nt_act/agent_loop
 neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/archive
-neotrix-core/src/l5_cognition/nt_mind/cross_domain

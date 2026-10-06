@@ -272,6 +272,41 @@ pub struct MatchCondition {
     pub value: String,
 }
 
+/// 跨域同义概念表：不同语言/框架里**语义等价**的类型名。
+///
+/// 元素为 `(概念 id, 各语言别名)`，别名已归一化（小写、仅保留字母数字）。
+/// 跨域实体对齐的核心场景就是「Rust `HashMap` ↔ Python `dict` ↔ JS `Map`」——
+/// 字符集 Jaccard 对这类名称恒为 0（`hashmap` 与 `dict` 无公共字符）。
+const SEMANTIC_CONCEPTS: &[(&str, &[&str])] = &[
+    ("map", &["map", "hashmap", "dict", "dictionary", "mapping", "hashtable", "treemap"]),
+    ("list", &["list", "array", "vec", "vector", "slice", "seq", "sequence"]),
+    ("string", &["string", "str", "text", "char", "chars"]),
+    ("bool", &["bool", "boolean", "flag", "toggle"]),
+    ("int", &["int", "integer", "i32", "i64", "u32", "u64", "usize", "isize", "long", "short"]),
+    ("float", &["float", "f32", "f64", "double", "decimal", "real"]),
+    ("set", &["set", "hashset", "pool"]),
+    ("option", &["option", "optional", "maybe", "nullable"]),
+    ("result", &["result", "outcome", "either"]),
+    ("tuple", &["tuple", "pair"]),
+    ("struct", &["struct", "record", "dataclass", "entity", "model", "pojo"]),
+    ("enum", &["enum", "enumeration", "union", "adt"]),
+    ("error", &["error", "exception", "failure", "err"]),
+    ("future", &["future", "promise", "task", "awaitable"]),
+];
+
+/// 把类型名归一化后映射到跨域概念 id；无对应概念时返回 `None`。
+fn semantic_concept(name: &str) -> Option<&'static str> {
+    let norm: String = name
+        .to_lowercase()
+        .chars()
+        .filter(|c| c.is_alphanumeric())
+        .collect();
+    SEMANTIC_CONCEPTS
+        .iter()
+        .find(|(_, aliases)| aliases.contains(&norm.as_str()))
+        .map(|(concept, _)| *concept)
+}
+
 impl EntityMapper {
     /// 创建新的实体映射器
     pub fn new(config: EntityMappingConfig) -> Self {
@@ -437,6 +472,23 @@ impl EntityMapper {
             let converted = self.apply_naming_convention(&name1_lower, convention);
             if converted == name2_lower {
                 return 0.9;
+            }
+        }
+
+        // 跨域语义同义（本模块的核心场景）。
+        //
+        // ⚠️ 此前 `enable_semantic_mapping` 开关在本函数中**从未被读取**，
+        // 而字符集 Jaccard 对 `HashMap` / `Dict` 这类跨语言名称恒为 0
+        // （`hashmap` 与 `dict` 无公共字符）⇒ 语义对齐能力缺失。
+        // 取 0.7 而非 1.0：语义等价但字面不同，置信度应低于精确匹配(1.0)
+        // 与命名约定等价(0.9)，仍高于 `min_confidence_threshold`(0.6)。
+        if self.config.enable_semantic_mapping {
+            if let (Some(c1), Some(c2)) =
+                (semantic_concept(&name1_lower), semantic_concept(&name2_lower))
+            {
+                if c1 == c2 {
+                    return 0.7;
+                }
             }
         }
 
@@ -797,6 +849,37 @@ mod tests {
         assert_eq!(mapper.calculate_name_similarity("HashMap", "HashMap"), 1.0);
         assert!(mapper.calculate_name_similarity("HashMap", "Dict") > 0.0);
         assert_eq!(mapper.calculate_name_similarity("abc", "xyz"), 0.0);
+    }
+
+    /// A55 接线验收：锁定新增的跨域语义同义层。
+    #[test]
+    fn test_cross_domain_semantic_aliases() {
+        let mapper = EntityMapper::new(EntityMappingConfig::default());
+        // 同一概念、字面不同 ⇒ 高于 0，但低于精确匹配(1.0)与命名约定(0.9)
+        assert!((mapper.calculate_name_similarity("HashMap", "dict") - 0.7).abs() < 1e-9);
+        assert!((mapper.calculate_name_similarity("Vec", "array") - 0.7).abs() < 1e-9);
+        // 分隔符/大小写归一化：hash_map / HASHMAP 同属 map 概念
+        assert!((mapper.calculate_name_similarity("hash_map", "Dictionary") - 0.7).abs() < 1e-9);
+        // 不同概念 ⇒ 仍走字符集 Jaccard，不误判
+        assert!(mapper.calculate_name_similarity("HashMap", "Future") < 0.7);
+        // 无别名的名字不产生语义分
+        assert_eq!(semantic_concept("zzz"), None);
+        assert_eq!(semantic_concept("HashMap"), Some("map"));
+    }
+
+    /// 关掉 `enable_semantic_mapping` 后，语义层必须完全失效（回到字符集相似度）。
+    #[test]
+    fn test_semantic_mapping_can_be_disabled() {
+        let cfg = EntityMappingConfig {
+            enable_semantic_mapping: false,
+            ..Default::default()
+        };
+        let mapper = EntityMapper::new(cfg);
+        assert_eq!(
+            mapper.calculate_name_similarity("HashMap", "dict"),
+            0.0,
+            "关闭语义映射后不应返回同义分"
+        );
     }
 
     #[test]

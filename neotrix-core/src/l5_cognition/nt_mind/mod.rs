@@ -1,4 +1,5 @@
 pub mod jit_harness;
+pub mod cross_domain; // 跨域迁移框架（孤儿接线 A55）
 pub mod self_improvement; // 自我改进（孤儿接线 A54）
 pub mod dual_track;
 pub mod nt_mind;
