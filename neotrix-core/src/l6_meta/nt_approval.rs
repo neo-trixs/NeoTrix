@@ -1499,8 +1499,13 @@ mod audit_content_leak_tests {
     fn audit_of(action: ActionType) -> (String, ApprovalAuditEntry) {
         let mut e = ApprovalEngine::new(ApprovalMode::Suggest);
         let pa = e.submit(action);
-        // 走一次决策，让审计条目真的产生
-        e.approve(&pa.id);
+        // 走一次决策，让审计条目真的产生。
+        // ⭐ 2026-10-06 自查修正：此前写的是 `e.approve(&pa.id);` ——
+        // **丢弃了 `Result`**（编译警告 `unused Result that must be used`）。
+        // ⚠️ 那正是本会话一直在修的「静默失效」族，**出现在我自己的测试里**：
+        // 一旦 `approve` 返回 `Err`，测试不会在这里停下，而会跑到后面的
+        // `.expect("应有一条审计")` 给出**误导性**报错（真正的失败点被掩盖）。
+        e.approve(&pa.id).expect("提交后立即批准必须成功");
         let entry = e.decisions().last().cloned().expect("应有一条审计");
         (pa.description.clone(), entry)
     }
