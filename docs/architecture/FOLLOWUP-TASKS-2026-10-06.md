@@ -71,7 +71,39 @@ crate（`Cargo.toml:42`）⇒ 送数据这一步自动消失 ⇒ **B 变成多�
 ⚠️ 我在② 里写的「用已有 `metadata`、避开 70 处 E0063」这个方案方向对但**描述不准确**：
 读侧本来就在用 `metadata`，**不需要我做任何改动**。真正的改动是把播种下沉。
 
-#### ③（原②）加 6 个类型化字段是错的，勿采纳
+#### ③ 「把播种下沉」也不可行 —— 依赖方向决定了没有装配层（2026-10-06 实测）
+
+核实工作区依赖后**排除了方案 C 的字面形式**：
+
+- workspace 成员含 `neotrix-core` 与 `neotrix-neobot`，但
+  **`apps/neobot-desktop` 只依赖 `neotrix-neobot`，不依赖 `neotrix-core`**；
+  逐个 `Cargo.toml` 核实：**没有任何 crate 同时依赖两者**。
+- 而 `consciousness_runtime.rs:127` 已在用 `neotrix_neobot::nt_capability_canary::expect`
+  ⇒ **core 依赖 neobot**，方向固定为 `core → neobot`
+  ⇒ neobot 不能反向依赖 core
+  ⇒ **按当前依赖方向，不存在能同时看到两侧的装配层**（这不是疏漏，是方向的必然结果）。
+
+且「把 5 个 registrar 下沉到共享 crate」**不可行** —— 它们构造节点时引用
+core L1 的领域类型（`TradeCategory`、`TradeCapability` 等），不是纯数据。
+
+⇒ **唯一可行形式：把「市场清单」做成共享 crate 里的纯数据。**
+
+| | 内容 | 家 |
+|---|---|---|
+| **市场事实**（id / category / version / license / description） | 纯数据，无core 类型 | **新增**：`nt-core-capability-tree::market_manifest()` |
+| **可执行实现**（registrar / TradeCapability） | 引用 core L1 类型 | 维持 core（`bootstrap_trade_capabilities`） |
+
+⇒ 两侧都加载**同一份清单** ⇒ 真源一份：
+- neobot 入口加载清单 ⇒ `market_ids` 非空 ⇒ `tool_schemas` 的守卫不再恒假；
+- core 的 `must_be_registered` 继续注册实现并 `apply_market_meta`
+  **写同样的键**（幂等）⇒ 两边写同一份事实，不会漂移。
+
+**这不是「第二个真身」**：清单只存**市场事实**，实现只在 core；
+两侧写的是**同一个键空间**，且 core 侧幂等覆盖。
+
+**验收信号不变**：`capability_invoke` 出现在 `tool_schemas`。
+
+#### ④（原③）加 6 个类型化字段是错的，勿采纳
 
 我原计划「给 `CapabilityNode` 加 6 个类型化字段」。**核实后发现这条路是错的**：
 
