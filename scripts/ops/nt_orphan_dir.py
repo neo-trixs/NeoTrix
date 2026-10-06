@@ -101,15 +101,40 @@ def find_orphans(root: str) -> list[tuple[str, int]]:
         if not os.path.isdir(abs_root):
             continue
         for dirpath, _dirnames, filenames in os.walk(abs_root):
+            # ⚠️ `mod.rs` 守卫是**承重**的，**不能删**：`SRC_ROOTS` 含 `crates`，
+            #   而 `crates/*/src` 是 crate 根（只有 `lib.rs`、**无 `mod.rs`**）。
+            #   实测删掉它后 `src=""` ⇒ `declared` 恒空 ⇒ 孤儿从 15 虚增到 49
+            #   （`crates/neotrix-audit/src` 等全被误报）。
             if "mod.rs" not in filenames:
                 continue
             mod_path = os.path.join(dirpath, "mod.rs")
             src = _read(mod_path)
+            # 2026-10-06 修门缺陷（假阳性）：`#[path="dir/xxx.rs"]` 挂载若写在
+            # **同名 `.rs`**（非 mod.rs）里，原实现完全看不见 ⇒ 实测
+            # `handlers_consciousness/`（由 12 行的同名 .rs 挂载 6 个文件）
+            # 被误报为孤儿，混在基线里 6 天无人察觉。
+            # ⇒ 只扫**与子目录同名的 `.rs`**，不扫全部 .rs（否则下面那条
+            #   「父目录任意提到该名即视为有意」的宽松规则会到处误命中）。
+            extra_path_targets: list[str] = []
+            for fn in filenames:
+                if fn.endswith(".rs") and fn != "mod.rs":
+                    stem = fn[:-3]
+                    sibling = os.path.join(dirpath, stem + ".rs")
+                    if os.path.isfile(sibling) and stem in _dirnames:
+                        extra_path_targets.extend(PATH_ATTR.findall(_read(sibling)))
             declared = _declared_names(src)
             # `#[path="..."]` 挂载：把被引用文件的目录名也算已挂载
-            for target in PATH_ATTR.findall(src):
+            # ⚠️ `#[path]` 通常指向**文件**（如 `handlers_consciousness/nt_audit.rs`）
+            #   ⇒ 直接取 basename 得到的是 `nt_audit.rs`，而下面比对的是
+            #   **子目录名** `handlers_consciousness` ⇒ 永不相等 ⇒ 假阳性。
+            # ⇒ 必须取目标的**父目录名**；若目标本身就是目录，才取自身名。
+            for target in list(PATH_ATTR.findall(src)) + extra_path_targets:
                 tgt_abs = os.path.normpath(os.path.join(dirpath, target))
-                declared.add(os.path.basename(tgt_abs))
+                parent = os.path.dirname(tgt_abs)
+                if parent and os.path.isdir(parent):
+                    declared.add(os.path.basename(parent))
+                else:
+                    declared.add(os.path.basename(tgt_abs))
             try:
                 children = sorted(os.listdir(dirpath))
             except OSError:

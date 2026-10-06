@@ -1,8 +1,20 @@
 # orphan-dir baseline — 已裁决为「有意不挂载」的目录
 # 由 `python3 scripts/ops/nt_orphan_dir.py --write-baseline` 生成。
 # 每行一个相对路径（相对仓库根）。改这个文件 = 显式声明「它可以继续不编译」。
-# 2026-10-06 审计：棘轮收缩 —— 原 25 条中 10 条已陈旧（该目录已被挂载进编译树，
+# 2026-10-06 审计：棘轮收缩（25 → 15 → 14）
+#   其中 1 条（handlers_consciousness）是**假阳性**：它早已由同名 12 行的
+#   `handlers_consciousness.rs` 用 `#[path="handlers_consciousness/xxx.rs"]`
+#   挂进编译树，而当时的门**不解析 #[path]**（也不扫同名 .rs）⇒ 误报。
+#   已修门（见下），该条目随之从基线剔除 ⇒ 真实孤儿 14 个 / 57 个 .rs。
+#   （该 .rs 仅 12 行）⇒ 它其实**在编译**，而本门**不解析 #[path]** 故误报。
+# 2026-10-06 审计：棘轮收缩（25 → 15 → 14）
+#   其中 1 条（handlers_consciousness）是**假阳性**：它早已由同名 12 行的
+#   `handlers_consciousness.rs` 用 `#[path="handlers_consciousness/xxx.rs"]`
+#   挂进编译树，而当时的门**不解析 #[path]**（也不扫同名 .rs）⇒ 误报。
+#   已修门（见下），该条目随之从基线剔除 ⇒ 真实孤儿 14 个 / 57 个 .rs。
 #   当时裁决「有意不挂载」的前提已不成立）。收缩到 15 条真孤儿。
+# 门已修（2026-10-06）：`nt_orphan_dir.py` 现在 (a) 也扫**同名 .rs** 的 #[path]，
+#   (b) 取 [path] 目标的**父目录名**（原先取 basename 得到文件名，永不匹配子目录名）。
 # 逐条定性见 docs/architecture/ORPHAN-ADJUDICATION-2026-10-06.md
 
 neotrix-core/src/l1_action/nt_act/agent_loop
@@ -18,5 +30,4 @@ neotrix-core/src/l5_cognition/nt_core/knowledge
 neotrix-core/src/l5_cognition/nt_core/memory
 neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/archive
 neotrix-core/src/l5_cognition/nt_mind/cross_domain
-neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_consciousness
 neotrix-core/src/l5_cognition/nt_mind/self_improvement

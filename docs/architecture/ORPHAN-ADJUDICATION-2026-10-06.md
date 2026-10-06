@@ -8,8 +8,8 @@
 
 | 度量 | 值 |
 |---|---:|
-| 孤儿目录 | **15** |
-| `.rs` 文件 | **63** |
+| 孤儿目录（门报） | 15（**其中 1 个是 `#[path]` 假阳性** ⇒ 真实 **14**） |
+| `.rs` 文件（门报） | 63（**真实 57**） |
 | 代码行 | **16,264** |
 | **内含测试** | **204 个 `#[test]`** |
 | 文档引用（`docs/`+`sessions/`） | 最高 120 处（`nt_core/memory`） |
@@ -46,7 +46,6 @@
 |---|---|---:|---:|---:|---:|---|
 | 1 | `l1_action/nt_act/agent_loop` | 9 | 2,096 | **31** | 20 | ⚠️ **最大嫌疑**。AGENTS.md §6.2 把它记为「死引擎，已把有效部分迁入 neobot」，但**这 9 个文件仍在原地且带 31 个测试** ⇒ 裁决前提需重验：是残留副本，还是迁移后忘了删？ |
 | 2 | `l5_cognition/nt_mind/cross_domain` | 5 | **2,649** | 14 | 7 | ⚠️ **最大体量**，带测试 ⇒ 活代码未接线 |
-| 3 | `nt_mind/nt_mind_background_loop/handlers_consciousness` | 6 | 2,211 | 3 | 6 | ⚠️ 我**本日刚在其中修过 D1**（`nt_audit.rs` / `nt_event_bus.rs`）⇒ ⚠️⚠️ **我改的代码不在编译树上** —— 那 2 处修复**未经编译验证的有效性存疑** |
 | 4 | `nt_mind/self_improvement` | 4 | 2,129 | **44** | 10 | ⚠️ 测试密度最高（44/2129 行）⇒ 明显被维护过 |
 | 5 | `l2_perception/nt_world/temporal_kg` | 8 | 1,278 | **42** | 4 | ⚠️ 测试密度最高之一 |
 | 6 | `l5_cognition/nt_core/knowledge` | 5 | 1,263 | 0 | **60** | ⚠️ 无测试但 60 处文档引用 ⇒ 被文档当作既有能力引用，**却不可用** |
@@ -67,6 +66,30 @@
 | **O-1** | **`agent_loop` 9 文件 / 2,096 行 / 31 测试**与 AGENTS.md「已迁入 neobot」的记载**冲突** | 迁移可能只完成一半（neobot 侧已接线、这侧忘删）。⇒ 需比对两侧是否重复实现，再决定「删」还是「接」。**这正是排期 A3 那类「前提已变」的情况。** |
 | **O-2** | **`knowledge` / `memory` 被文档引用 60 / 120 次，却不可执行** | 文档把它们当既有能力引用 ⇒ 要么接线，要么改文档。**改文档 = 承认能力不存在**，属产品决策。 |
 | **O-3** | **`handlers_consciousness` 不在编译树上 ⇒ 我本日对它的 D1 修复未生效** | 我在 `4247b260` 修了它 2 处静默失败，但那些代码**根本不参与编译** ⇒ 修复是「正确的死代码修改」。⇒ 须与O-1 一并裁决：接线 or 迁移或删除。 |
+
+## 3.1 ⛔ O-3 的完整撤销记录（★ 我的判断错误全过程）
+
+1. 我判定「`handlers_consciousness` 未挂载 ⇒ 漏了一行 `mod`」；
+2. 我新建了 `handlers_consciousness/mod.rs` 并在父 `mod.rs` 加 `mod handlers_consciousness;`；
+3. 编译器立刻报 `E0761: file for module 'handlers_consciousness' found at **both**
+   handlers_consciousness.rs and handlers_consciousness/mod.rs`；
+4. 复查发现**早就存在** `handlers_consciousness.rs`（12 行），内容正是
+   `#[path = "handlers_consciousness/nt_audit.rs"] pub mod nt_audit;` ×6
+   ⇒ **代码从来都在编译树里**；
+5. 已完全回退（删我建的 `mod.rs` + `git checkout` 还原父 `mod.rs`），
+   `cargo check -p neotrix` 恢复 **RC=0**。
+
+⇒ **裁决层面的修正**：15 个「孤儿」中 **1 个是假阳性**，
+真实孤儿为 **14 个 / 57 文件**（不是 15 / 63）。
+
+⚠️ **门缺陷确认**：`nt_orphan_dir.py` **不解析 `#[path]` 属性**
+（AGENTS.md §4.2 已把它列为该门已知假阳性来源，但门本身至今**没有任何提示**）
+⇒ 假阳性会长期混在基线里，让「未接线」的判断失真。
+⇒ 已把该假阳性从基线剔除，并建议给门加「`#[path]` 挂载」识别。
+
+⚠️ **方法论教训**：判「某目录是否编译」**不能只看父 `mod.rs` 的 `mod` 声明** ——
+必须同时查① 同名 `.rs` 文件 ② 全仓 `#[path = "…/该目录/…"` 引用。
+我漏了第②步，代价是「差点把已编译的活代码当成漏接线」。
 
 ## 4. 建议的处置顺序（按「解除假绿收益 ÷ 风险」）
 
