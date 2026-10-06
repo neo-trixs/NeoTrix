@@ -311,14 +311,10 @@ impl ProfileSwitchPlan {
     }
 }
 
-/// 审批严格程度的序数（越大越松）。判据与 `ApprovalMode` 的语义同向。
+/// 审批严格程度的序数（越大越松）。
+/// ⭐ 委托给 `ApprovalMode::strictness_rank`（枚举是唯一真源，避免两处判据漂移）。
 fn rank(mode: crate::l6_meta::nt_approval::ApprovalMode) -> u8 {
-    use crate::l6_meta::nt_approval::ApprovalMode::*;
-    match mode {
-        Suggest => 0,
-        AutoEdit => 1,
-        FullAuto => 2,
-    }
+    mode.strictness_rank()
 }
 
 /// ⭐ **只算不做**：给出切到 `name` 会有什么副作用，**不改任何状态**。
@@ -332,10 +328,16 @@ pub fn plan_profile_switch(name: &str) -> Result<ProfileSwitchPlan, String> {
     let override_str = guard.resolve_approval_mode(name);
     drop(guard);
 
-    let resulting_mode = override_str
-        .as_deref()
-        // `ApprovalMode::from_str` 返回 `Option<Self>`（不是 Result）⇒ 不要 `.ok()`
-        .and_then(|s| crate::l6_meta::nt_approval::ApprovalMode::from_str(s));
+    // ⚠️ 档位里的 override 字符串**可能写错**（手改 profiles.toml、复制粘贴…）。
+    // ⭐ `ApprovalMode::from_str` 现返回 `Result` ⇒ 拼错时**硬拒绝**，
+    //   而不是 `Option` 的静默 `None`（那会让该档的覆盖被无声忽略）。
+    let resulting_mode = match override_str.as_deref() {
+        None => None,
+        Some(raw) => match crate::l6_meta::nt_approval::ApprovalMode::from_str(raw) {
+            Ok(m) => Some(m),
+            Err(e) => return Err(format!("档位 '{name}' 的 approval_mode_override 非法：{e}")),
+        },
+    };
     let notice = resulting_mode.map(|m| {
         format!(
             "档位 '{name}' 会把全局审批模式改为 {m:?}（该档设置了 approval_mode_override）\

@@ -17,12 +17,47 @@ pub enum ApprovalMode {
 }
 
 impl ApprovalMode {
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "suggest" | "Suggest" => Some(Self::Suggest),
-            "auto-edit" | "auto_edit" | "AutoEdit" => Some(Self::AutoEdit),
-            "full-auto" | "full_auto" | "FullAuto" | "yolo" => Some(Self::FullAuto),
-            _ => None,
+    /// ⭐⭐⭐ 解析审批模式。**未知值返回 `Err`**，不再返回 `None` 让调用方兜底。
+    ///
+    /// 【缺陷（2026-10-06 修）】首版返回 `Option`，
+    /// 而**唯一的调用方**（`nt_permission_profiles::plan_profile_switch`）
+    /// 当时写的是 `.and_then(|s| ApprovalMode::from_str(s))`
+    /// ⇒ 档位里写错一个字母 ⇒ `None` ⇒ **该档的审批模式覆盖被静默忽略**
+    /// ⇒ 切换后模式与用户预期不符，且**无任何错误**。
+    ///
+    /// 判据与 `nt_sandbox::SandboxMode::from_str` 相同：
+    /// **静默失效只允许朝严格方向回落**；而「拼错 → 忽略覆盖」朝的是宽松方向
+    /// （`developer` 档的 `auto-edit` 若被拼错 ⇒ 停在 `Suggest`，
+    /// 看似更严，实际是**用户要的自动批准没生效且没人知道**）。
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "suggest" | "manual" => Ok(Self::Suggest),
+            "auto-edit" | "auto_edit" | "autoedit" => Ok(Self::AutoEdit),
+            "full-auto" | "full_auto" | "fullauto" | "yolo" => Ok(Self::FullAuto),
+            other => Err(format!(
+                "unknown approval mode {other:?}: use suggest | auto-edit | full-auto"
+            )),
+        }
+    }
+
+    /// 严格程度的序数（越大越松）：`Suggest`=0 < `AutoEdit`=1 < `FullAuto`=2。
+    ///
+    /// 供「本次切换是否**放宽**审批」这类判据使用
+    /// （见 `nt_permission_profiles::ProfileSwitchPlan::loosens_approval`）。
+    pub fn strictness_rank(self) -> u8 {
+        match self {
+            Self::Suggest => 0,
+            Self::AutoEdit => 1,
+            Self::FullAuto => 2,
+        }
+    }
+
+    /// 人类可读的档位名（用于 CLI 输出与审计行）。
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Suggest => "suggest",
+            Self::AutoEdit => "auto-edit",
+            Self::FullAuto => "full-auto",
         }
     }
 }

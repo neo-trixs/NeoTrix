@@ -125,16 +125,30 @@ enum Commands {
         pipe: bool,
         #[arg(long, value_name = "FORMAT", help = "Output format: text|json")]
         format: Option<String>,
-        #[arg(long, help = "Start in Suggest mode (approve all)")]
-        suggest: bool,
-        #[arg(long, help = "Start in AutoEdit mode (auto-approve file writes)")]
-        auto_edit: bool,
+        /// ⭐⭐ 主入口（2026-10-06）：审批与沙箱是**两个正交轴**，各一个 flag。
+        /// 依据 `codex` 的 `--sandbox` × `--ask-for-approval` 双轴设计 ——
+        /// 沙箱管「在哪跑、能写多少」，审批管「动手前问不问」，二者不可互相替代。
         #[arg(
             long,
-            help = "Start in FullAuto mode (no approvals, like Codex --yolo)"
+            value_name = "MODE",
+            help = "Approval mode: suggest|auto-edit|full-auto (default: suggest)"
         )]
+        approval_mode: Option<String>,
+        #[arg(long, help = "Alias for --approval-mode suggest")]
+        suggest: bool,
+        #[arg(long, help = "Alias for --approval-mode auto-edit")]
+        auto_edit: bool,
+        #[arg(long, help = "Alias for --approval-mode full-auto")]
         full_auto: bool,
-        #[arg(long, help = "Alias for --full-auto")]
+        /// ⚠️ **`--yolo` 与 `--full-auto` 字面等价**，两者都是「无审批」。
+        ///
+        /// ⭐ 之所以把这句话写进 help：`codex` 的 `--yolo` = 无沙箱无审批，
+        /// 而 `opencode` 的 `--yolo` 是**隐藏别名**，实际语义是
+        /// 「批准一切未被显式 deny 的请求」⇒ **同名不同义**。
+        /// （子代理实证：opencode 把它 `hidden: true` 且 OR 进 `auto` 布尔，
+        ///   用户按 codex 的肌肉记忆敲它，得到的是**更弱的**保护。）
+        /// ⇒ 本仓明确声明：`--yolo` ≡ `--full-auto` ≡ `--approval-mode full-auto`。
+        #[arg(long, help = "Alias for --approval-mode full-auto (== --full-auto)")]
         yolo: bool,
         #[arg(
             long,
@@ -146,7 +160,8 @@ enum Commands {
             long,
             value_name = "MODE",
             default_value = "disabled",
-            help = "Sandbox mode: disabled|read-only"
+            help = "Sandbox level: read-only|workspace-write|disabled|docker \
+(未知值直接报错退出，不静默兜底)"
         )]
         sandbox: String,
         #[arg(long, help = "Disposable session — do not save to disk")]
@@ -463,6 +478,64 @@ enum WalletCommands {
     },
 }
 
+
+/// ⭐⭐⭐ **审批模式解码**（2026-10-06）—— 抽成独立函数以便**被测试覆盖**。
+///
+/// ⛔ 之前这段逻辑**内联在 `main()` 里**，因此**无法写测试**
+/// ⇒ 这本身就是「声明了但不可验证」的一种形态：
+/// flag 存在、能解析、能编译，但**没有任何机制能证明它真的改了全局态**。
+/// （子代理实证：`codex` / `claude-code` / `opencode` **三家都没做**这种
+/// 「启用即断言接线」的测试；而本会话修的正是这一类缺陷。）
+///
+/// ## 规则
+/// · 主 flag `--approval-mode` 优先；旧 flag（`--suggest` / `--auto-edit` /
+///   `--full-auto` / `--yolo`）保留为**别名**（已在文档/README/脚本里出现，
+///   直接删是破坏性变更）。
+/// · 多个来源指向**同一档**不算冲突（`--yolo` ≡ `--full-auto` 是常态用法）。
+/// · 指向**不同档** ⇒ 返回 `Err`，**不猜优先级** ——
+///   「同时给 `--suggest` 和 `--yolo` 时谁赢」不该由程序替用户决定。
+/// · 一个都没给 ⇒ `Suggest`（最严）。
+/// · 未知档位名 ⇒ 返回 `Err`（`ApprovalMode::from_str` 已改为硬拒绝）。
+fn resolve_approval_mode(
+    approval_mode: Option<&str>,
+    suggest: bool,
+    auto_edit: bool,
+    full_auto: bool,
+    yolo: bool,
+) -> Result<neotrix::l6_meta::nt_approval::ApprovalMode, String> {
+    use neotrix::l6_meta::nt_approval::ApprovalMode;
+    let mut wanted: Vec<ApprovalMode> = Vec::new();
+    let mut push = |m: ApprovalMode| {
+        if !wanted.contains(&m) {
+            wanted.push(m);
+        }
+    };
+    if let Some(raw) = approval_mode {
+        push(ApprovalMode::from_str(raw)?);
+    }
+    if suggest {
+        push(ApprovalMode::Suggest);
+    }
+    if auto_edit {
+        push(ApprovalMode::AutoEdit);
+    }
+    if full_auto || yolo {
+        push(ApprovalMode::FullAuto);
+    }
+    match wanted.len() {
+        0 => Ok(ApprovalMode::Suggest),
+        1 => Ok(wanted[0]),
+        _ => {
+            let names: Vec<&str> = wanted.iter().map(|m| m.as_str()).collect();
+            Err(format!(
+                "审批模式冲突：同时请求了 {}\n每个模式只能给一次（--yolo 与 --full-auto 等价，可同时给）。",
+                names.join(" 与 ")
+            ))
+        }
+    }
+}
+
+
 fn main() {
     // 智能命令整合: clap 解析失败时, 未知子命令回退到交互式命令注册表
     // (60+ 命令: /kb /goal /wiki /evidence ...), 使它们可直接从命令行调用。
@@ -599,7 +672,8 @@ fn main() {
             file,
             pipe,
             format,
-            suggest: _,
+            suggest,
+            approval_mode,
             auto_edit,
             full_auto,
             yolo,
@@ -614,20 +688,43 @@ fn main() {
                     .unwrap_or_else(|e| e.into_inner())
                     .set_max_budget_usd(*limit);
             }
-            let approval_mode = if *yolo || *full_auto {
-                neotrix::l6_meta::nt_approval::ApprovalMode::FullAuto
-            } else if *auto_edit {
-                neotrix::l6_meta::nt_approval::ApprovalMode::AutoEdit
-            } else {
-                neotrix::l6_meta::nt_approval::ApprovalMode::Suggest
+            // ⭐ 审批模式解码（抽成 `resolve_approval_mode` 以便被测试覆盖 —— 见其文档）
+            // ⚠️ 局部名不能也叫 `approval_mode`（会遮住同名的 flag 绑定）
+            let approval_mode_flag = approval_mode.clone();
+            let approval_mode = match resolve_approval_mode(
+                approval_mode_flag.as_deref(),
+                // ⚠️ 解构自 `&Cli` ⇒ 这些是 `&bool`，必须解引用
+                *suggest,
+                *auto_edit,
+                *full_auto,
+                *yolo,
+            ) {
+                Ok(m) => m,
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    std::process::exit(2);
+                }
             };
             neotrix::l6_meta::nt_approval::global_approval()
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
                 .set_mode(approval_mode);
-            neotrix::l3_embodiment::nt_sandbox::init_sandbox(
-                neotrix::l3_embodiment::nt_sandbox::SandboxMode::from_str(sandbox.as_str()),
-            );
+            // ⭐ 2026-10-06 未知沙箱档**硬拒绝并退出**（原为静默兜底成 Disabled）
+            //
+            // 【缺陷】`from_str` 首版是 `_ => Self::Disabled`
+            // ⇒ `--sandbox danger-full-access` 不报错、静默变成「不设限」
+            // ⇒ 用户以为设了最严档，实际**语义与意图相反**。
+            // 判据：静默失效只允许朝**严格**方向回落（claude-code 的文档纪律），
+            // 而「未知 → Disabled」是朝**宽松**方向 ⇒ 直接违反。
+            let sandbox_mode =
+                match neotrix::l3_embodiment::nt_sandbox::SandboxMode::from_str(sandbox.as_str()) {
+                    Ok(m) => m,
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        std::process::exit(2);
+                    }
+                };
+            neotrix::l3_embodiment::nt_sandbox::init_sandbox(sandbox_mode);
             if let Some(p) = prompt {
                 let resolved = resolve_prompt(Some(p), file.as_deref(), *pipe);
                 run_one_shot(&resolved, format.as_deref(), &cli.profile, *stream);
@@ -882,5 +979,146 @@ fn main() {
                 run_interactive(&cfg, &cli.profile);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod cli_permission_tests {
+    //! ⭐⭐⭐「**启用即断言接线**」的测试 —— 子代理实证：`codex` / `claude-code` /
+    //! `opencode` **三家都没有**做这件事；而本会话修的正是「flag 存在、
+    //! 能解析、但语义与用户意图相反」这一类缺陷。
+    //!
+    //! 成本极低（几条纯函数断言），收益是**这类缺陷无法再悄悄进来**。
+
+    use super::resolve_approval_mode;
+    use neotrix::l6_meta::nt_approval::ApprovalMode;
+
+    /// 什么都没给 ⇒ 最严档（`Suggest`）。默认必须朝**严格**方向。
+    #[test]
+    fn default_is_strictest_mode() {
+        assert_eq!(
+            resolve_approval_mode(None, false, false, false, false).unwrap(),
+            ApprovalMode::Suggest
+        );
+    }
+
+    /// 主 flag 三档都要能解析。
+    #[test]
+    fn primary_flag_parses_all_three_modes() {
+        for (raw, want) in [
+            ("suggest", ApprovalMode::Suggest),
+            ("auto-edit", ApprovalMode::AutoEdit),
+            ("full-auto", ApprovalMode::FullAuto),
+        ] {
+            assert_eq!(
+                resolve_approval_mode(Some(raw), false, false, false, false).unwrap(),
+                want,
+                "--approval-mode {raw} 应解析为 {want:?}"
+            );
+        }
+    }
+
+    /// ⭐ 未知档位必须 `Err`（不得静默兜底成默认）。
+    /// 依据：静默失效只允许朝**严格**方向回落；「拼错 → Suggest」看似更严，
+    /// 实则**用户要的 auto-edit 没生效且无人知道** ⇒ 仍是静默失效。
+    #[test]
+    fn unknown_mode_is_ERR_not_silent_default() {
+        let e = resolve_approval_mode(Some("yoloo"), false, false, false, false)
+            .expect_err("拼错的档位必须 Err");
+        assert!(e.contains("suggest"), "错误信息应列出可用档位：{e}");
+    }
+
+    /// ⭐⭐ 旧 flag 是**别名**，语义必须与主 flag 对应档**完全一致**。
+    /// 这一条锁的是「重构没改语义」—— 别名降级最常见的失误就是偷偷改了含义。
+    #[test]
+    fn legacy_flags_are_true_aliases_of_primary_flag() {
+        let cases: [(bool, bool, bool, bool, ApprovalMode); 4] = [
+            (true, false, false, false, ApprovalMode::Suggest),
+            (false, true, false, false, ApprovalMode::AutoEdit),
+            (false, false, true, false, ApprovalMode::FullAuto),
+            (false, false, false, true, ApprovalMode::FullAuto),
+        ];
+        for (sg, ae, fa, yo, want) in cases {
+            let via_flag = resolve_approval_mode(Some(want.as_str()), false, false, false, false).unwrap();
+            let via_alias = resolve_approval_mode(None, sg, ae, fa, yo).unwrap();
+            assert_eq!(via_alias, want, "旧 flag 应等价于 --approval-mode {}", want.as_str());
+            assert_eq!(via_alias, via_flag, "别名与主 flag 必须给出同一档");
+        }
+    }
+
+    /// ⭐⭐⭐ **`--yolo` 与 `--full-auto` 必须字面等价**。
+    ///
+    /// 【为什么这条最重要】`codex` 的 `--yolo` = 无沙箱无审批，
+    /// 而 `opencode` 的 `--yolo` 是**隐藏别名**、实际语义是
+    /// 「批准一切未被显式 deny 的请求」⇒ **同名不同义**。
+    /// 子代理在 opencode 源码里验到：它把 `--yolo` 与
+    /// `--dangerously-skip-permissions` 都 `hidden: true` 然后 OR 进 `auto` 布尔
+    /// ⇒ 用户按 codex 的肌肉记忆敲它，得到的是**更弱的**保护，且零文档零警告。
+    /// ⇒ 本仓明确声明等价，并用测试钉住。
+    #[test]
+    fn yolo_is_exactly_equivalent_to_full_auto() {
+        assert_eq!(
+            resolve_approval_mode(None, false, false, false, true).unwrap(),
+            resolve_approval_mode(None, false, false, true, false).unwrap(),
+        );
+        assert_eq!(
+            resolve_approval_mode(None, false, false, false, true).unwrap(),
+            ApprovalMode::FullAuto
+        );
+        // 同时给两者**不算冲突**（等价档去重）
+        assert!(resolve_approval_mode(None, false, false, true, true).is_ok());
+    }
+
+    /// ⭐⭐⭐ **冲突必须报错**，不得猜优先级。
+    ///
+    /// 「同时给 `--suggest` 和 `--yolo` 时谁赢」**不该由程序替用户决定** ——
+    /// 无论选哪个，另一个都是用户明确要求的、且被静默忽略。
+    #[test]
+    fn conflicting_modes_are_ERR_not_silent_precedence() {
+        for (sg, ae, fa, yo) in [
+            (true, true, false, false),   // suggest + auto-edit
+            (true, false, true, false),   // suggest + full-auto
+            (true, false, false, true),   // suggest + yolo
+            (false, true, true, false),   // auto-edit + full-auto
+            (false, true, false, true),   // auto-edit + yolo
+        ] {
+            let r = resolve_approval_mode(None, sg, ae, fa, yo);
+            assert!(r.is_err(), "冲突组合({sg},{ae},{fa},{yo}) 必须 Err，实际 {r:?}");
+            assert!(r.unwrap_err().contains("冲突"), "错误信息应说明是冲突");
+        }
+        // 主 flag 与旧 flag 指向不同档 ⇒ 同样冲突
+        assert!(resolve_approval_mode(Some("suggest"), false, true, false, false).is_err());
+        // 指向同一档 ⇒ 不算冲突
+        assert!(resolve_approval_mode(Some("full-auto"), false, false, true, true).is_ok());
+    }
+
+    /// ⭐⭐ **「启用即断言接线」**：解码结果必须真的能落地到全局单例。
+    ///
+    /// 【这条为什么必要】本会话实测过同族缺陷：
+    /// `--yolo` / `--full-auto` / `--auto-edit` 会写入全局 `ApprovalMode`，
+    /// 但**没有任何生产工具执行路径读取它** ⇒ flag 存在、能编译、有文档，
+    /// 而行为完全不变。
+    /// ⇒ 本测试至少守住「解码 ⇒ 落地」这一段是通的；
+    /// 「落地 ⇒ 被消费」那一段由 `CLAIMED-BUT-NOT-ENFORCED` 清单第 9 项跟踪。
+    #[test]
+    fn resolved_mode_actually_lands_in_global_state() {
+        let m = resolve_approval_mode(Some("full-auto"), false, false, false, false).unwrap();
+        neotrix::l6_meta::nt_approval::global_approval()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .set_mode(m);
+        assert_eq!(
+            neotrix::l6_meta::nt_approval::global_approval()
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .mode(),
+            ApprovalMode::FullAuto,
+            "解码出的模式必须真的落到全局单例（否则 flag 就是假开关）"
+        );
+        // 复位，别污染其它测试
+        neotrix::l6_meta::nt_approval::global_approval()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .set_mode(ApprovalMode::Suggest);
     }
 }

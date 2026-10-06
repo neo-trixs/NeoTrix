@@ -724,11 +724,14 @@ mod tests {
 
     #[test]
     fn test_mode_from_str() {
-        assert_eq!(ApprovalMode::from_str("suggest"), Some(ApprovalMode::Suggest));
-        assert_eq!(ApprovalMode::from_str("auto-edit"), Some(ApprovalMode::AutoEdit));
-        assert_eq!(ApprovalMode::from_str("full-auto"), Some(ApprovalMode::FullAuto));
-        assert_eq!(ApprovalMode::from_str("yolo"), Some(ApprovalMode::FullAuto));
-        assert_eq!(ApprovalMode::from_str("unknown"), None);
+        assert_eq!(ApprovalMode::from_str("suggest").unwrap(), ApprovalMode::Suggest);
+        assert_eq!(ApprovalMode::from_str("auto-edit").unwrap(), ApprovalMode::AutoEdit);
+        assert_eq!(ApprovalMode::from_str("full-auto").unwrap(), ApprovalMode::FullAuto);
+        assert_eq!(ApprovalMode::from_str("yolo").unwrap(), ApprovalMode::FullAuto);
+        // ⭐ 2026-10-06 语义变更：未知值从 `None` 改为 **`Err`**
+        // （静默忽略 → 用户要的档位没生效且无任何错误）
+        let e = ApprovalMode::from_str("unknown").expect_err("未知档位必须 Err");
+        assert!(e.contains("suggest"), "错误信息应列出可用档位：{e}");
     }
 
     #[test]
