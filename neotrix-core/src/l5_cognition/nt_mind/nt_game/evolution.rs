@@ -10,8 +10,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::framework::{Action, Observation, StepResult};
+use super::env::{GameOutcome, NtGameEnv};
+use super::hex_crucible::{HexCrucible, HexCrucibleConfig};
 use super::play::adaptive::{AdaptiveDifficultyConfig, DifficultyAdjuster};
+use super::builtin::{Game2048, HexTicTacToe};
 
 // ═══════════════════════════════════════════════════════════════════
 // Config
@@ -47,6 +49,11 @@ impl Default for GameEvolutionConfig {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct GameEvolutionState {
     pub current_constellation: u8,
+    /// ⭐ **单调递增的 tick 计数**。此前只有 `total_episodes`，而活路径
+    /// （`handlers_game.rs::handle_game_training`）的日志需要「第几个 tick」。
+    /// 这与渲染层调研强调的「每条响应必须带单调递增序号」是同一条纪律：
+    /// 没有它，丢帧/漏事件后接收方无法判断自己缺了什么、也无法对齐。
+    pub total_ticks: usize,
     pub total_episodes: usize,
     pub total_steps: usize,
     pub constellation_scores: HashMap<u8, f64>,
@@ -72,540 +79,9 @@ pub struct GameTickReport {
     pub phi_avg: f64,
     pub health_score: f64,
     pub constellation_advanced: bool,
+    /// ⭐ 本次是第几个 tick（单调）。**消费方对齐与丢帧检测都靠它。**
+    pub tick: usize,
     pub timestamp: String,
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// Inline Game Engines (self-contained, no cross-module imports)
-// ═══════════════════════════════════════════════════════════════════
-
-/// Minimal game engine for autonomous training.
-trait AutoGame {
-    fn reset(&mut self, seed: u64);
-    fn step(&mut self, action: &Action) -> StepResult;
-    fn legal_actions(&self, player: u32) -> Vec<Action>;
-    fn is_terminal(&self) -> bool;
-    fn reward(&self, player: u32) -> f64;
-    fn phi(&self) -> f64;
-    fn name(&self) -> &str;
-    fn board_hexagrams(&self) -> Vec<u8>;
-}
-
-// ─── HexTicTacToe (C0) ───
-
-struct AutoTicTacToe {
-    board: [u8; 9], // 0=empty, 1=X, 2=O
-    turn: usize,
-    terminal: bool,
-    winner: Option<u8>,
-}
-
-impl AutoTicTacToe {
-    fn new() -> Self {
-        Self {
-            board: [0; 9],
-            turn: 0,
-            terminal: false,
-            winner: None,
-        }
-    }
-
-    fn check(&mut self) {
-        let lines = [
-            [0, 1, 2],
-            [3, 4, 5],
-            [6, 7, 8],
-            [0, 3, 6],
-            [1, 4, 7],
-            [2, 5, 8],
-            [0, 4, 8],
-            [2, 4, 6],
-        ];
-        for line in lines {
-            let a = self.board[line[0]];
-            if a != 0 && a == self.board[line[1]] && a == self.board[line[2]] {
-                self.terminal = true;
-                self.winner = Some(a);
-                return;
-            }
-        }
-        if self.turn >= 9 {
-            self.terminal = true;
-        }
-    }
-}
-
-impl AutoGame for AutoTicTacToe {
-    fn reset(&mut self, _seed: u64) {
-        self.board = [0; 9];
-        self.turn = 0;
-        self.terminal = false;
-        self.winner = None;
-    }
-
-    fn step(&mut self, action: &Action) -> StepResult {
-        let target = action
-            .params
-            .get("pos")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0) as usize;
-        if target < 9 && self.board[target] == 0 {
-            self.board[target] = if self.turn % 2 == 0 { 1 } else { 2 };
-            self.turn += 1;
-            self.check();
-        }
-        let reward = if self.terminal {
-            match self.winner {
-                Some(1) => 1.0,
-                Some(2) => -1.0,
-                None => 0.0,
-                _ => 0.0,
-            }
-        } else {
-            0.0
-        };
-        StepResult {
-            observation: Observation {
-                text: format!("TicTacToe turn={} board={:?}", self.turn, self.board),
-                legal_actions: vec![],
-                hexagram: None,
-                phi: None,
-            },
-            reward,
-            done: self.terminal,
-            info: serde_json::json!({"turn": self.turn}),
-        }
-    }
-
-    fn legal_actions(&self, player: u32) -> Vec<Action> {
-        if self.terminal {
-            return vec![];
-        }
-        self.board
-            .iter()
-            .enumerate()
-            .filter(|(_, &v)| v == 0)
-            .map(|(i, _)| Action {
-                kind: "Place".into(),
-                params: serde_json::json!({"pos": i}),
-                actor_id: player,
-            })
-            .collect()
-    }
-
-    fn is_terminal(&self) -> bool {
-        self.terminal
-    }
-
-    fn reward(&self, player: u32) -> f64 {
-        match self.winner {
-            Some(w) if w as u32 == player => 1.0,
-            Some(_) => -1.0,
-            None => 0.0,
-        }
-    }
-
-    fn phi(&self) -> f64 {
-        let filled = self.board.iter().filter(|&&v| v != 0).count() as f64;
-        filled / 9.0
-    }
-
-    fn name(&self) -> &str {
-        "HexTicTacToe"
-    }
-
-    fn board_hexagrams(&self) -> Vec<u8> {
-        self.board.iter().map(|&v| v as u8 * 10).collect()
-    }
-}
-
-// ─── Simplified 2048 (C1) ───
-
-struct Auto2048 {
-    board: [[u32; 4]; 4],
-    score: u32,
-    terminal: bool,
-    rng: u64,
-}
-
-impl Auto2048 {
-    fn new() -> Self {
-        let mut g = Self {
-            board: [[0; 4]; 4],
-            score: 0,
-            terminal: false,
-            rng: 0,
-        };
-        g.spawn();
-        g.spawn();
-        g
-    }
-
-    fn spawn(&mut self) {
-        let empty: Vec<(usize, usize)> = (0..4)
-            .flat_map(|r| (0..4).map(move |c| (r, c)))
-            .filter(|&(r, c)| self.board[r][c] == 0)
-            .collect();
-        if empty.is_empty() {
-            return;
-        }
-        self.rng = self.rng.wrapping_mul(6364136223846793005).wrapping_add(1);
-        let idx = (self.rng >> 33) as usize % empty.len();
-        let (r, c) = empty[idx];
-        self.board[r][c] = if self.rng % 10 == 0 { 4 } else { 2 };
-    }
-
-    fn slide(row: &mut [u32; 4]) -> u32 {
-        let mut v: Vec<u32> = row.iter().copied().filter(|&x| x != 0).collect();
-        v.resize(4, 0);
-        let mut score = 0u32;
-        for i in 0..3 {
-            if v[i] == v[i + 1] && v[i] != 0 {
-                v[i] *= 2;
-                score += v[i];
-                v[i + 1] = 0;
-            }
-        }
-        let mut r: Vec<u32> = v.into_iter().filter(|&x| x != 0).collect();
-        r.resize(4, 0);
-        for (i, &val) in r.iter().enumerate() {
-            row[i] = val;
-        }
-        score
-    }
-
-    fn can_move(&self) -> bool {
-        for r in 0..4 {
-            for c in 0..4 {
-                if self.board[r][c] == 0 {
-                    return true;
-                }
-                if c + 1 < 4 && self.board[r][c] == self.board[r][c + 1] {
-                    return true;
-                }
-                if r + 1 < 4 && self.board[r][c] == self.board[r + 1][c] {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
-    fn rotate(&mut self) {
-        let b = self.board;
-        for r in 0..4 {
-            for c in 0..4 {
-                self.board[c][3 - r] = b[r][c];
-            }
-        }
-    }
-
-    fn move_dir(&mut self, dir: u8) -> u32 {
-        let mut score = 0u32;
-        for _ in 0..dir {
-            self.rotate();
-        }
-        for r in 0..4 {
-            score += Self::slide(&mut self.board[r]);
-        }
-        for _ in 0..(4 - dir) % 4 {
-            self.rotate();
-        }
-        score
-    }
-}
-
-impl AutoGame for Auto2048 {
-    fn reset(&mut self, seed: u64) {
-        self.board = [[0; 4]; 4];
-        self.score = 0;
-        self.terminal = false;
-        self.rng = seed;
-        self.spawn();
-        self.spawn();
-    }
-
-    fn step(&mut self, action: &Action) -> StepResult {
-        let dir = match action.kind.as_str() {
-            "Left" => 0,
-            "Up" => 1,
-            "Right" => 2,
-            "Down" => 3,
-            _ => 0,
-        };
-        let old = self.board;
-        let gain = self.move_dir(dir);
-        if self.board == old {
-            return StepResult {
-                observation: Observation {
-                    text: "no change".into(),
-                    legal_actions: vec![],
-                    hexagram: None,
-                    phi: None,
-                },
-                reward: 0.0,
-                done: false,
-                info: serde_json::json!({}),
-            };
-        }
-        self.score += gain;
-        self.spawn();
-        if !self.can_move() {
-            self.terminal = true;
-        }
-        StepResult {
-            observation: Observation {
-                text: format!(
-                    "2048 score={} max={}",
-                    self.score,
-                    self.board.iter().flatten().max().unwrap_or(&0)
-                ),
-                legal_actions: vec![],
-                hexagram: Some((self.score as u8).min(63)),
-                phi: None,
-            },
-            reward: gain as f64 / 2048.0,
-            done: self.terminal,
-            info: serde_json::json!({"score": self.score}),
-        }
-    }
-
-    fn legal_actions(&self, player: u32) -> Vec<Action> {
-        if self.terminal {
-            return vec![];
-        }
-        ["Left", "Up", "Right", "Down"]
-            .iter()
-            .map(|d| Action {
-                kind: d.to_string(),
-                params: serde_json::json!({}),
-                actor_id: player,
-            })
-            .collect()
-    }
-
-    fn is_terminal(&self) -> bool {
-        self.terminal
-    }
-    fn reward(&self, _player: u32) -> f64 {
-        self.score as f64 / 10000.0
-    }
-    fn phi(&self) -> f64 {
-        let max = *self.board.iter().flatten().max().unwrap_or(&1) as f64;
-        (max.log2() / 12.0).min(1.0)
-    }
-    fn name(&self) -> &str {
-        "2048"
-    }
-    fn board_hexagrams(&self) -> Vec<u8> {
-        self.board
-            .iter()
-            .flatten()
-            .map(|&v| (v as u8).min(63))
-            .collect()
-    }
-}
-
-// ─── Simplified HexCrucible (C2+) ───
-
-struct AutoHexCrucible {
-    cells: Vec<u8>,
-    grid: usize,
-    owners: Vec<i8>, // -1=none, 0=player, 1=opponent
-    tokens: Vec<i8>, // -1=none, 0=player, 1=opponent
-    turn: usize,
-    terminal: bool,
-    energy: [f64; 2],
-    territory: [usize; 2],
-}
-
-impl AutoHexCrucible {
-    fn new(grid_size: usize) -> Self {
-        let n = grid_size * grid_size;
-        Self {
-            cells: (0..n).map(|i| (i % 64) as u8).collect(),
-            grid: grid_size,
-            owners: vec![-1; n],
-            tokens: vec![-1; n],
-            turn: 0,
-            terminal: false,
-            energy: [5.0; 2],
-            territory: [0; 2],
-        }
-    }
-
-    fn neighbors(&self, idx: usize) -> Vec<usize> {
-        let r = idx / self.grid;
-        let c = idx % self.grid;
-        let mut out = Vec::new();
-        let offsets = if r % 2 == 0 {
-            [(-1, -1), (-1, 0), (0, -1), (0, 1), (1, -1), (1, 0)]
-        } else {
-            [(-1, 0), (-1, 1), (0, -1), (0, 1), (1, 0), (1, 1)]
-        };
-        for (dr, dc) in offsets {
-            let nr = r as isize + dr;
-            let nc = c as isize + dc;
-            if nr >= 0 && nr < self.grid as isize && nc >= 0 && nc < self.grid as isize {
-                out.push(nr as usize * self.grid + nc as usize);
-            }
-        }
-        out
-    }
-
-    fn hamming(a: u8, b: u8) -> u32 {
-        (a ^ b).count_ones()
-    }
-
-    fn compute_phi(&self) -> f64 {
-        let mut total = 0u32;
-        let n = self.grid * self.grid;
-        for i in 0..n {
-            for &j in &self.neighbors(i) {
-                if j > i {
-                    total += 6 - Self::hamming(self.cells[i], self.cells[j]);
-                }
-            }
-        }
-        let max = (n as u32) * 6;
-        if max == 0 {
-            0.0
-        } else {
-            total as f64 / max as f64
-        }
-    }
-}
-
-impl AutoGame for AutoHexCrucible {
-    fn reset(&mut self, seed: u64) {
-        let n = self.grid * self.grid;
-        for i in 0..n {
-            self.cells[i] = ((i as u64 * seed.wrapping_add(7)) % 64) as u8;
-            self.owners[i] = -1;
-            self.tokens[i] = -1;
-        }
-        // Place initial tokens
-        self.owners[0] = 0;
-        self.tokens[0] = 0;
-        self.territory[0] = 1;
-        let last = n - 1;
-        self.owners[last] = 1;
-        self.tokens[last] = 1;
-        self.territory[1] = 1;
-        self.turn = 0;
-        self.terminal = false;
-        self.energy = [5.0; 2];
-    }
-
-    fn step(&mut self, action: &Action) -> StepResult {
-        let player = self.turn % 2;
-        let target = action
-            .params
-            .get("target")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0) as usize;
-        let n = self.grid * self.grid;
-
-        match action.kind.as_str() {
-            "Claim" if self.energy[player] >= 1.0 && target < n && self.owners[target] == -1 => {
-                self.energy[player] -= 1.0;
-                self.owners[target] = player as i8;
-                self.territory[player] += 1;
-            }
-            "Transform" if self.energy[player] >= 2.0 && target < n => {
-                self.energy[player] -= 2.0;
-                let line = action
-                    .params
-                    .get("line")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(0) as usize;
-                if line < 6 {
-                    self.cells[target] ^= 1 << line;
-                }
-            }
-            "Pass" => {
-                self.energy[player] = (self.energy[player] + 1.0).min(10.0);
-            }
-            _ => {}
-        }
-
-        self.turn += 1;
-        let max_turns = self.grid * self.grid * 2;
-        if self.turn >= max_turns {
-            self.terminal = true;
-        }
-
-        let phi = self.compute_phi();
-        StepResult {
-            observation: Observation {
-                text: format!("HexCrucible turn={} phi={:.3}", self.turn, phi),
-                legal_actions: vec![],
-                hexagram: Some((phi * 63.0) as u8),
-                phi: Some(phi),
-            },
-            reward: 0.0,
-            done: self.terminal,
-            info: serde_json::json!({"phi": phi, "turn": self.turn}),
-        }
-    }
-
-    fn legal_actions(&self, player: u32) -> Vec<Action> {
-        if self.terminal {
-            return vec![];
-        }
-        let mut actions = Vec::new();
-        let n = self.grid * self.grid;
-        actions.push(Action {
-            kind: "Pass".into(),
-            params: serde_json::json!({}),
-            actor_id: player,
-        });
-        if self.energy[player as usize] >= 1.0 {
-            for i in 0..n {
-                if self.owners[i] == -1 {
-                    actions.push(Action {
-                        kind: "Claim".into(),
-                        params: serde_json::json!({"target": i}),
-                        actor_id: player,
-                    });
-                }
-            }
-        }
-        if self.energy[player as usize] >= 2.0 {
-            for i in 0..n {
-                for line in 0..6 {
-                    actions.push(Action {
-                        kind: "Transform".into(),
-                        params: serde_json::json!({"target": i, "line": line}),
-                        actor_id: player,
-                    });
-                }
-            }
-        }
-        actions
-    }
-
-    fn is_terminal(&self) -> bool {
-        self.terminal
-    }
-
-    fn reward(&self, player: u32) -> f64 {
-        let p = player as usize;
-        let opp = 1 - p;
-        let territory_diff = self.territory[p] as f64 - self.territory[opp] as f64;
-        let max = (self.grid * self.grid) as f64;
-        (territory_diff / max).clamp(-1.0, 1.0)
-    }
-
-    fn phi(&self) -> f64 {
-        self.compute_phi()
-    }
-    fn name(&self) -> &str {
-        "HexCrucible"
-    }
-    fn board_hexagrams(&self) -> Vec<u8> {
-        self.cells.clone()
-    }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -631,19 +107,35 @@ impl GameEvolutionLoop {
         }
     }
 
-    fn create_game(&self, constellation: u8, seed: u64) -> Box<dyn AutoGame> {
+    /// ⭐ 按 constellation 造一个**正式游戏**（`NtGameEnv` 实现者）。
+    ///
+    /// ⛔ 此前这里造的是 `AutoTicTacToe`/`Auto2048`/`AutoHexCrucible` ——
+    ///   那三个是为「避免跨模块依赖」而**重写的内联副本**（见被删区块的
+    ///   原注释「Inline Game Engines (self-contained, no cross-module imports)」）。
+    ///   但它们与 `builtin/hex_tictactoe.rs` / `builtin/game_2048.rs` /
+    ///   `hex_crucible.rs` 是**同一批游戏的第二、第三次实现**，
+    ///   而后者才是唯一实现了完整 `NtGameEnv` 契约（含 `get_game_rules` /
+    ///   `to_hexagram` / `phi_contribution` / `difficulty`）的那份。
+    ///
+    /// ✅ 之所以当初能删掉 `Auto*`，是因为它比 `NtGameEnv` 多两个方法
+    ///   （`reward(player)` 与 `board_hexagrams()`）—— 而**这两个都能从
+    ///   `NtGameEnv::state()` 推出**，不需要另立接口：
+    ///   · `reward(player)`  ⇒ `state().scores.get(&player)`
+    ///   · `board_hexagrams()` ⇒ `state().hexagram_states`（本来就是 `Vec<u8>`）
+    pub fn create_game(&self, constellation: u8, seed: u64) -> Box<dyn NtGameEnv> {
         match constellation {
-            0 => Box::new(AutoTicTacToe::new()),
-            1 => {
-                let mut g = Auto2048::new();
-                g.rng = seed;
-                Box::new(g)
-            }
-            _ => Box::new(AutoHexCrucible::new((constellation as usize + 2).min(8))),
+            0 => Box::new(HexTicTacToe::new(seed)),
+            1 => Box::new(Game2048::new(seed)),
+            // `for_constellation` 内部按 level 选 grid_size/max_turns，
+            // 与被删的 `AutoHexCrucible::new((level + 2).min(8))` 等价。
+            other => Box::new(HexCrucible::new(
+                HexCrucibleConfig::for_constellation(other),
+                seed,
+            )),
         }
     }
 
-    fn game_name(constellation: u8) -> &'static str {
+    pub fn game_name(constellation: u8) -> &'static str {
         match constellation {
             0 => "HexTicTacToe",
             1 => "2048",
@@ -651,8 +143,11 @@ impl GameEvolutionLoop {
         }
     }
 
+
     pub fn tick(&mut self) -> GameTickReport {
         self.state.is_running = true;
+        self.state.total_ticks += 1;
+        let tick_no = self.state.total_ticks;
         let constellation = self.state.current_constellation;
         let seed = self.state.total_episodes as u64 + 1;
         let mut game = self.create_game(constellation, seed);
@@ -663,16 +158,29 @@ impl GameEvolutionLoop {
         let mut total_reward = 0.0f64;
         let mut total_turns = 0.0f64;
         let mut total_phi = 0.0f64;
+        // 有多少 episode 的游戏**真的定义了** phi（见 `phi_contribution` → `Option`）
+        let mut phi_defined_episodes = 0usize;
         let episodes = self.config.episodes_per_round;
 
         for ep in 0..episodes {
-            game.reset(seed.wrapping_add(ep as u64));
+            // ⭐ `NtGameEnv::reset` 收 `Option<u64>` 并返回 `Observation`
+            //（被删的 `AutoGame::reset(u64)` 不返回）。返回值此处无用，丢弃。
+            let _ = game.reset(Some(seed.wrapping_add(ep as u64)));
             let mut steps = 0usize;
             let ep_seed = seed.wrapping_add(ep as u64);
 
-            while !game.is_terminal() && steps < self.config.max_turns {
-                let player = (steps % 2) as u32;
-                let actions = game.legal_actions(player);
+            // ⭐ 有效回合预算 = max(外层安全帽, 本局预算)。
+            //   此前只用 `self.config.max_turns`(50)，把 constellation 4/5 所需的
+            //   60/80 硬砍掉 ⇒ 永不到终局 ⇒ 全判 draw（实测，见 `NtGameEnv::turn_budget`）。
+            let budget = self
+                .config
+                .max_turns
+                .max(game.turn_budget().unwrap_or(0));
+
+            while !game.is_terminal() && steps < budget {
+                // ⭐ `NtGameEnv::legal_actions()` **无 player 参数**
+                //（被删的 `AutoGame::legal_actions(player)` 有）。
+                let actions = game.legal_actions();
                 if actions.is_empty() {
                     break;
                 }
@@ -681,23 +189,46 @@ impl GameEvolutionLoop {
                 let idx = ((ep_seed.wrapping_add(steps as u64)) % actions.len() as u64) as usize;
                 let result = game.step(&actions[idx]);
                 total_reward += result.reward;
-                total_phi += result
-                    .info
-                    .get("phi")
-                    .and_then(|v| v.as_f64())
-                    .unwrap_or(0.0);
+                // ⭐ phi 改从 `NtGameEnv::phi_contribution()` 取（被删的
+                //   `AutoGame::phi()`）。`result.info["phi"]` 是内联副本的私有约定，
+                //   正式游戏不保证写这个键 ⇒ 旧写法在正式游戏上恒为 0。
+                // ⭐ `phi_contribution()` 现返回 `Option<f64>`：只有定义了 phi 语义
+                //   的游戏（当前仅 `HexCrucible`）才计入，`None` 不再被洗成 0.0 数据。
+                if let Some(phi) = game.phi_contribution() {
+                    total_phi += phi;
+                    phi_defined_episodes += 1;
+                }
                 steps += 1;
             }
 
             total_turns += steps as f64;
-            let reward = game.reward(0);
-            if reward > 0.0 {
-                wins += 1;
-            } else if reward < 0.0 {
-                losses += 1;
-            } else {
-                draws += 1;
-            }
+            // ⭐ 胜负改由 `NtGameEnv::outcome()` 给出 —— 该方法读取各游戏**早已算好**
+            //   的 `winner`，不再从 `state().scores` 猜（实测 `scores` 从不填胜负，
+            //   猜测导致 `win_rate` 恒 0 ⇒ constellation 进阶成为死逻辑）。
+            // ⛔ 记分制游戏（2048）终局报 `Draw`（无胜者概念），故「输」只可能
+            //   出现在有胜者语义的对局里 —— 这与真实定义一致，不是缺口。
+            let outcome = game.outcome();
+            let reward = match outcome {
+                Some(GameOutcome::Win(current)) => {
+                    // `GameOutcome::Win` 存玩家下标（usize），`current_player()` 返回
+                    // `ActorId`(= u32) ⇒ 显式转换，不依赖二者恰好同型。
+                    if current as u32 == game.current_player() {
+                        wins += 1;
+                    } else {
+                        losses += 1;
+                    }
+                    1.0
+                }
+                Some(GameOutcome::Draw) => {
+                    draws += 1;
+                    0.5
+                }
+                // 未在 `max_turns` 内走到终局：既非胜也非负，计 draw 但**不**给 reward。
+                None => {
+                    draws += 1;
+                    0.0
+                }
+            };
 
             self.state.total_episodes += 1;
             self.state.total_steps += steps;
@@ -719,8 +250,11 @@ impl GameEvolutionLoop {
         } else {
             0.0
         };
-        let phi_avg = if episodes > 0 {
-            total_phi / (episodes as f64 * avg_turns.max(1.0))
+        // ⭐ 分母用 `phi_defined_episodes` 而非 `episodes`：未定义 phi 的游戏
+        //   （HexTicTacToe / 2048 在补齐前）根本不该让分母变大，否则会把
+        //   「无 phi 语义」稀释成「phi 很小」。0 则如实报 0。
+        let phi_avg = if phi_defined_episodes > 0 {
+            total_phi / (phi_defined_episodes as f64 * avg_turns.max(1.0))
         } else {
             0.0
         };
@@ -735,7 +269,18 @@ impl GameEvolutionLoop {
             self.phi_history.iter().sum::<f64>() / self.phi_history.len() as f64
         };
 
-        // Health: composite of win_rate + phi
+        // Health: win_rate + phi 的复合分。
+        //
+        // ⚠️ **本公式当前不可作为决策依据**，原因已实测定位（勿再怀疑公式本身）：
+        //   `tick()` 的动作选择仍是
+        //   `idx = (ep_seed + steps) % actions.len()` —— 一个**对种子取模**的
+        //   自占位策略（注释自称 "simulating a policy network"）。它不学习、不记忆、
+        //   不依状态 ⇒ 自对弈产出的是**噪声**，故 `win_rate` 与 `avg_reward` 都无
+        //   统计意义，`advance_threshold` 也无法被真实跨过。
+        // ⇒ 要让 constellation 进阶真正生效，必须先给 `tick()` 接上真策略
+        //   （仓内已有 `play/self_play_loop.rs::SelfPlayLoop` + `advantage`/
+        //   `grpo_adapter`，收敛计划本就判其「保留」—— 但目前同样未被本循环调用）。
+        //   在那之前**保留**此公式以免改变既有报告形状，仅标注事实。
         let health = (win_rate * 0.6 + phi_avg_stable * 0.4).clamp(0.0, 1.0);
         self.health_history.push(health);
         if self.health_history.len() > 100 {
@@ -784,6 +329,7 @@ impl GameEvolutionLoop {
             phi_avg: phi_avg_stable,
             health_score: health,
             constellation_advanced: advanced,
+            tick: tick_no,
             timestamp: timestamp(),
         }
     }
@@ -808,6 +354,25 @@ impl GameEvolutionLoop {
         if self.state.current_constellation < self.config.max_constellation {
             self.state.current_constellation += 1;
         }
+    }
+
+    /// 连跑 `n` 个 tick，返回每 tick 的报告。**tick 号单调递增**（见 `GameTickReport::tick`）。
+    pub fn run_ticks(&mut self, n: usize) -> Vec<GameTickReport> {
+        (0..n).map(|_| self.tick()).collect()
+    }
+
+    /// JSON 状态快照（供 MCP / 后台循环观测）。
+    pub fn status(&self) -> String {
+        let st = &self.state;
+        serde_json::json!({
+            "constellation": st.current_constellation,
+            "total_ticks": st.total_ticks,
+            "total_episodes": st.total_episodes,
+            "total_steps": st.total_steps,
+            "is_running": st.is_running,
+            "constellation_scores": st.constellation_scores,
+        })
+        .to_string()
     }
 
     pub fn state(&self) -> &GameEvolutionState {
@@ -867,27 +432,139 @@ mod tests {
         assert_eq!(evo.state.current_constellation, 1);
     }
 
+    // ⭐ 以下三个测试原先打在被删的 `Auto*` 内联副本上，现改为打
+    //   **正式游戏实现**（`create_game` 返回的 `Box<dyn NtGameEnv>`）。
+    //   这是「副本已消失」的判别力证据：换错符号 cargo 才报错，
+    //   所以额外断言 `meta().name`，确保拿到的是预期那个游戏。
     #[test]
     fn test_tictactoe_game() {
-        let mut game = AutoTicTacToe::new();
-        game.reset(42);
+        let evo = GameEvolutionLoop::new(GameEvolutionConfig::default());
+        let mut game = evo.create_game(0, 42);
+        let _ = game.reset(Some(42));
         assert!(!game.is_terminal());
-        let actions = game.legal_actions(0);
+        let actions = game.legal_actions();
         assert!(!actions.is_empty());
+        assert_eq!(game.meta().name, "HexTicTacToe");
     }
 
     #[test]
     fn test_2048_game() {
-        let mut game = Auto2048::new();
-        game.reset(42);
+        let evo = GameEvolutionLoop::new(GameEvolutionConfig::default());
+        let mut game = evo.create_game(1, 42);
+        let _ = game.reset(Some(42));
         assert!(!game.is_terminal());
+        assert_eq!(game.meta().name, "2048");
     }
 
     #[test]
     fn test_hex_crucible_game() {
-        let mut game = AutoHexCrucible::new(3);
-        game.reset(42);
+        let evo = GameEvolutionLoop::new(GameEvolutionConfig::default());
+        let mut game = evo.create_game(2, 42);
+        let _ = game.reset(Some(42));
         assert!(!game.is_terminal());
-        assert!(game.compute_phi() >= 0.0);
+        assert_eq!(game.meta().name, "HexCrucible");
+        // `Option<f64>`：`HexCrucible` 是唯一定义了 phi 语义的游戏 ⇒ 必须 `Some`。
+        assert!(game.phi_contribution().is_some());
+        // ⭐ `board_hexagrams` 的等价物现在从 state() 直接拿 —— 曾是 Auto* 独有方法。
+        assert!(!game.state().hexagram_states.is_empty());
+    }
+
+
+
+
+    /// ⭐ 回归护栏：六个星位**都**必须能真正走到终局并产出胜负分类。
+    ///
+    /// 这条测试锁住三个曾被实测抓出的缺陷，任一复发即红：
+    /// ① `NtGameEnv` 无终局出口 ⇒ `wins+losses+draws` 恒 0（实测全 draw / win_rate≡0）；
+    /// ② 外层 `max_turns=50` 砍断 constellation 4/5 所需的 60/80 回合
+    ///    ⇒ 永不到终局（实测 `turns` 恒 50、30/30 全 draw）；
+    /// ③ `phi_contribution()` 默认 `0.0` 把「未定义」洗成「真值 0」。
+    ///
+    /// 断言用**不变量**而非具体数值 —— 随机自对弈的具体胜率不应被钉死
+    /// （那正是 D5：无策略时它就是噪声，钉死会逼后人去调种子造假）。
+    #[test]
+    fn test_every_constellation_reaches_a_verdicts() {
+        let cap = GameEvolutionConfig::default().max_turns;
+        let mut constellations_with_wins = 0;
+
+        for c in 0..6u8 {
+            let mut evo = GameEvolutionLoop::new(GameEvolutionConfig {
+                episodes_per_round: 30,
+                ..Default::default()
+            });
+            evo.state.current_constellation = c;
+            let declared = evo.create_game(c, 1).turn_budget().unwrap_or(0);
+            let r = evo.tick();
+
+            // ① 每个 episode 都要有归宿（胜/负/和），不得出现「没结论」
+            assert_eq!(
+                r.wins + r.losses + r.draws, 30,
+                "constellation {c} 有 episode 未走到终局：W/L/D={}/{}/{} turns={}",
+                r.wins, r.losses, r.draws, r.avg_turns
+            );
+            // ② 回合数不得超过**有效预算**（= max(安全帽, 本局预算)）
+            assert!(
+                r.avg_turns <= (cap.max(declared)) as f64 + 1e-9,
+                "constellation {c} 回合数 {} 超过有效预算 {}（declared={declared} cap={cap}）——                 说明又被某个平帽截断了",
+                r.avg_turns, cap.max(declared)
+            );
+            if r.wins > 0 {
+                constellations_with_wins += 1;
+            }
+        }
+
+        // ③ `outcome()` 确实接上了 —— 记分制 2048 无胜者，故要求「至少两个」星位有胜局，
+        //    这样即使有人把 2048 误接成胜负游戏，该断言仍不会被误判为通过。
+        assert!(
+            constellations_with_wins >= 2,
+            "只有 {constellations_with_wins} 个星位产出胜局 —— `outcome()` 可能未生效"
+        );
+    }
+
+    /// ⭐ 回归护栏：`HexCrucible` 高星位声明的预算**必须**大于外层默认安全帽，
+    /// 否则 D6 会以「某个平帽」的形式复发（本次实测：4/5 星位被 50 砍断）。
+    #[test]
+    fn test_high_constellation_budget_exceeds_flat_cap() {
+        let evo = GameEvolutionLoop::new(GameEvolutionConfig::default());
+        let cap = evo.config.max_turns;
+        for c in 4..6u8 {
+            let declared = evo
+                .create_game(c, 1)
+                .turn_budget()
+                .unwrap_or_else(|| panic!("constellation {c} 必须声明回合预算"));
+            assert!(
+                declared > cap,
+                "constellation {c} 预算 {declared} 未超过安全帽 {cap} —— 该星位会被截断"
+            );
+        }
+    }
+
+    /// ⭐ 回归护栏：三局都必须**真的定义** phi（`Some`），不得再吃默认 `0.0`。
+    /// 若某局phi 未定义，`Option` 契约要求它如实报 `None`，而不是伪装成 0.0。
+    #[test]
+    fn test_all_games_declare_phi_or_honestly_none() {
+        let evo = GameEvolutionLoop::new(GameEvolutionConfig::default());
+        for c in 0..6u8 {
+            let phi = evo.create_game(c, 1).phi_contribution();
+            assert!(
+                phi.is_some(),
+                "constellation {c} 的 phi 为 None —— 这可以接受，但必须**显式**实现，                 不能靠 trait 默认值静默变成 0.0"
+            );
+            if let Some(v) = phi {
+                // 非负是**全游戏**的共识。
+                assert!(v >= 0.0, "phi 不得为负，实得 {v}");
+                // ⛔ 只有 constellation 0/1 的 phi 是本次**新写且明确归一到 [0,1]** 的
+                //   （棋盘多样性比例 / 分数÷2048）。`HexCrucible::compute_phi()` 是
+                //   游戏内部的共鸣度量，**按设计不归一**（实测 53/49≈1.08）——
+                //   此处不得替它强加 [0,1] 上限，那会篡改游戏语义。
+                //   （此断言曾以 [0,1] 卡住全部星位，实测抓到的正是这条误判。）
+                if c <= 1 {
+                    assert!(
+                        (0.0..=1.0).contains(&v),
+                        "constellation {c} 的 phi 由新公式给出，应归一到 [0,1]，实得 {v}"
+                    );
+                }
+            }
+        }
     }
 }

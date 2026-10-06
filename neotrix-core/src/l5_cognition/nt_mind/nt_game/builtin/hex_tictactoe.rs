@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 
 use super::super::env::{
-    CognitiveSkill, Difficulty, GameMeta, GameRegistry, NtGameEnv, RenderMode,
+    CognitiveSkill, Difficulty, GameMeta, GameOutcome, GameRegistry, NtGameEnv, RenderMode,
 };
 use super::super::framework::{Action, ActorId, Observation, StepResult};
 
@@ -296,6 +296,39 @@ impl NtGameEnv for HexTicTacToe {
 First to get 3 in a row wins.
 "#
         .into()
+    }
+
+    fn outcome(&self) -> Option<GameOutcome> {
+        // `winner` 由 `check_winner()` 在每步后算出（满格无线 ⇒ `None` 且已终局）。
+        if !self.is_terminal {
+            return None;
+        }
+        Some(match self.winner {
+            Some(w) => GameOutcome::Win(w),
+            None => GameOutcome::Draw,
+        })
+    }
+
+    fn phi_contribution(&self) -> Option<f64> {
+        // ⭐ 本局此前**未定义** phi，吃 trait 默认 `0.0` —— 于是上层
+        // `phi_avg` 恒 0 却看不出是「缺口」还是「真值」（实测）。
+        // 这里给出与**已有状态**自洽的定义：棋盘上 hexagram 的多样性比例
+        //（`hexagrams` 是本局本就持有的数据，不引入新状态）。
+        let mut seen = [false; 64];
+        let mut filled = 0usize;
+        for r in 0..GRID {
+            for c in 0..GRID {
+                if self.board[r][c] != Cell::Empty {
+                    seen[self.hexagrams[r][c] as usize % 64] = true;
+                    filled += 1;
+                }
+            }
+        }
+        if filled == 0 {
+            return Some(0.0);
+        }
+        let distinct = seen.iter().filter(|b| **b).count();
+        Some(distinct as f64 / filled as f64)
     }
 
     fn constellation_level(&self) -> u8 {

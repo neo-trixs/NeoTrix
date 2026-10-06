@@ -32,7 +32,7 @@
 
 use std::collections::HashMap;
 
-use super::env::{CognitiveSkill, Difficulty, GameMeta, GameRegistry, NtGameEnv, RenderMode};
+use super::env::{CognitiveSkill, Difficulty, GameMeta, GameOutcome, GameRegistry, NtGameEnv, RenderMode};
 use super::framework::{Action, Actor, ActorId, Observation, Role, StepResult, TurnIndex};
 
 // ═══════════════════════════════════════════════════════════════════
@@ -436,11 +436,17 @@ impl HexCrucible {
         // Check for new resonance pairs
         let old_pairs = self.state.total_resonance_pairs;
         let new_pairs = self.compute_resonance_pairs().len();
-        let bonus = if new_pairs > old_pairs {
-            (new_pairs - old_pairs) as f64 * 0.5
-        } else {
-            0.0
-        };
+        // ⛔ 此前这个差值在本函数里被算了两遍：`bonus` 处有 `new_pairs > old_pairs`
+        //   守卫（安全），但下面 `info` 里的 `"new_resonance_pairs": new_pairs - old_pairs`
+        //   **无守卫**。transform 会**打散**共鸣对（new < old）⇒ 该行在 debug 构建下
+        //   `attempt to subtract with overflow` panic。
+        //   实测：本文件原先是「死代码」（活路径走 nt_game_background_loop 的内联
+        //   副本），故此 panic 从未被触发；一旦按收敛计划把活路径接到正式游戏，
+        //   constellation ≥ 2 的第一次 transform 即崩（实测 tick 探针复现）。
+        // ✅ 根因修法：差值**只算一次**用 `saturating_sub`，两处共用 ——
+        //   打散时 bonus 自然为 0.0，语义也与原守卫分支完全一致。
+        let pairs_delta = new_pairs.saturating_sub(old_pairs);
+        let bonus = pairs_delta as f64 * 0.5;
 
         self.state.total_resonance_pairs = new_pairs;
         self.advance_turn();
@@ -454,7 +460,7 @@ impl HexCrucible {
                 "action": "transform",
                 "target": target,
                 "line": line,
-                "new_resonance_pairs": new_pairs - old_pairs,
+                "new_resonance_pairs": pairs_delta,
                 "phi": phi,
             }),
         })
@@ -806,8 +812,27 @@ Winning:
         Some((avg / count) as u8)
     }
 
-    fn phi_contribution(&self) -> f64 {
-        self.compute_phi()
+    fn outcome(&self) -> Option<GameOutcome> {
+        // `determine_winner()` 在终局时已按 `compute_score` 比分填好 `winner`
+        // （平分为 `None`）。这里只是把那个**早已算好的结果**暴露出去。
+        if !self.state.is_terminal {
+            return None;
+        }
+        Some(match self.state.winner {
+            Some(w) => GameOutcome::Win(w),
+            None => GameOutcome::Draw,
+        })
+    }
+
+    fn turn_budget(&self) -> Option<usize> {
+        // 本局自带预算（`for_constellation` 给出 20/30/40/50/60/80）。
+        Some(self.config.max_turns)
+    }
+
+    fn phi_contribution(&self) -> Option<f64> {
+        // `HexCrucible` 是**唯一定义了 phi 语义**的游戏（见 `compute_phi`），
+        // 故返回 `Some`；其余两局不覆写 ⇒ `None`（未定义），上层可据此区分。
+        Some(self.compute_phi())
     }
 
     fn constellation_level(&self) -> u8 {

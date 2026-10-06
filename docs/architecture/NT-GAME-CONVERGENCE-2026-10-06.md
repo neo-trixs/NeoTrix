@@ -231,3 +231,53 @@ Rust 只送逻辑位置。这是 1,563 → 124 B 的核心原因。
 | 4 | `NtGameEnv: !Send` + 多客户端锁竞争 | 照 channel-zero：**每房间一个独占 task + mpsc 命令队列，状态周围无锁**；改 `.rs` 后必跑 `nt_lock_audit.py` |
 | 5 | 误引入 Bevy/macroquad 导致两个游戏循环打架 | **渲染层 100% 放浏览器**；删掉那句无依据的 macroquad 注释 |
 | 6 | 阶段 2 删错 ⇒ 丢掉「编译了但没用」的唯一可运行实现 | 用 §3 的测试数预测**证伪**；分小批提交，每批单独验证 |
+---
+
+## 6. 阶段 1 执行裁决（2026-10-06，实测驱动）
+
+> 本节由实际执行推翻并修正了本文件上半部分的部分判据。**保留原文不改写**，
+> 因为「原判据错在哪」本身是证据。
+
+### 6.1 裁决反转：审计判的「530 行冗余副本」不是冗余
+
+原判据：`evolution.rs` 里 `AutoTicTacToe`/`Auto2048`/`AutoHexCrucible` 是
+`builtin/` 与 `hex_crucible.rs` 的重复实现，删掉即可。
+
+**实测反证**：被删的 `trait AutoGame` 比 `NtGameEnv` **多两个方法** ——
+`reward(player) -> f64` 与 `board_hexagrams() -> Vec<u8>`。
+两者都不是 `NtGameEnv` 的方法。
+
+⇒ 这不是随手重写的副本，是**给缺失合约打的补丁**。
+若只删副本不补合约，等于**把补丁连同它掩盖的能力一起删掉**。
+
+### 6.2 六个实测缺陷
+
+| # | 缺陷 | 实测证据 | 修法 |
+|---|---|---|---|
+| D1 | `NtGameEnv` 无终局出口 | `win_rate ≡ 0.000`、`scores={0:0.0,1:0.0}`；三局内部**早有** `winner` 却无出口 | 新增 `GameOutcome` + `outcome()` |
+| D2 | 两局未定义 phi，吃默认 `0.0` | `phi_avg ≡ 0.0000`，且「真是 0」与「没定义」不可分辨 | `phi_contribution()` 改 `-> Option<f64>` + 补两局实现 |
+| D3 | `health = win_rate*0.6 + phi*0.4` 结构退化 | 零和对称局胜率≈0.5；记分制无胜率概念 | **保留公式 + 事实注释**，不在 D5 之前换公式 |
+| D4 | `hex_crucible.rs:457` 下溢 panic | `attempt to subtract with overflow`，`constellation≥2` 必踩 | 差值只算一次 `saturating_sub` |
+| D6 | 回合预算双重权威 | 游戏预算 20/30/40/50/60/80 vs 外层硬帽 50 ⇒ c=4/5 `turns≡50.0`、`30/30` 全 draw | 新增 `turn_budget()`，有效预算 `= max(安全帽, 本局预算)` |
+| **D5** | **假策略（本轮未修，最高优先）** | `idx = (ep_seed + steps) % actions.len()` —— 注释自称 `simulating a policy network` | 待接线 `play/self_play_loop.rs::SelfPlayLoop` |
+
+修后实测（六星位全部产出真实胜负）：
+
+| c | 游戏 | 修前 | 修后 |
+|---|---|---|---|
+| 0 | HexTicTacToe | `win_rate ≡ 0` | `W/L/D=27/0/3`，`0.900` |
+| 1 | 2048 | `win_rate ≡ 0` | `0/0/30`（**正确**：记分制无胜者） |
+| 2 | HexCrucible | **panic** | `10/14/6`，`0.333` |
+| 4 | HexCrucible | `0/0/30`，`turns=50`（截断） | `12/17/1`，`turns=60`，`0.400` |
+| 5 | HexCrucible | `0/0/30`，`turns=50`（截断） | `12/15/3`，`turns=80`，`0.400` |
+
+### 6.3 对阶段 2（删冗余）的修正
+
+本节 6.1 已证明：**「零消费者」不等于「可删」**。
+因此阶段 2 的删除清单必须先经 `rg` 逐块复核，且判据从
+「零消费者」升级为「**零消费者 且 其存在理由已被真正替代**」。
+当前基线：游戏测试 **458** 条（原估 449→152 的预测作废，须重算）。
+
+### 6.4 未闭合项
+
+- 🔴 `check-feature-gates.sh` 本次改动了 trait 签名，**改动后**的验证被中止 ⇒ 提交未覆盖 6 个非默认 feature 的门检查。不得引用改动前那次 PASS。

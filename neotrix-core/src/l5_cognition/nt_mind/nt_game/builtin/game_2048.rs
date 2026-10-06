@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 
 use super::super::env::{
-    CognitiveSkill, Difficulty, GameMeta, GameRegistry, NtGameEnv, RenderMode,
+    CognitiveSkill, Difficulty, GameMeta, GameOutcome, GameRegistry, NtGameEnv, RenderMode,
 };
 use super::super::framework::{Action, ActorId, Observation, StepResult};
 
@@ -315,6 +315,20 @@ Slide tiles in 4 directions. Same-value tiles merge.
 Goal: reach 2048 or maximize score before the board fills.
 "#
         .into()
+    }
+
+    fn outcome(&self) -> Option<GameOutcome> {
+        // 2048 是**记分制**：走不动即终局，但没有「胜者」概念
+        // ⇒ 报 `Draw`（终局无胜者）。真实成绩走 `state().scores[0]`。
+        if !self.is_terminal {
+            return None;
+        }
+        Some(GameOutcome::Draw)
+    }
+
+    fn phi_contribution(&self) -> Option<f64> {
+        // 与 `state().scores` 同源：以 2048 目标块为分母做归一，落在 [0,1]。
+        Some((self.score as f64 / 2048.0).min(1.0))
     }
 
     fn constellation_level(&self) -> u8 {
