@@ -1739,5 +1739,16 @@ fn cmd_capability_canary() -> Result<(), NtBotError> {
         }
         Err(e) => eprintln!("无法读取金丝雀状态：{e}"),
     }
+    // id 空间不一致的**直接证据**：非空即说明 signal() 与 expect() 用的不是同一套 id
+    match neotrix_neobot::nt_capability_canary::unmatched_signals() {
+        Ok(v) if v.is_empty() => println!("  未登记信号：0 项（signal 与 expect 的 id 空间一致）"),
+        Ok(v) => {
+            println!("  [WARN] 收到过但无金丝雀登记的信号：{} 项（id 空间不一致）", v.len());
+            for (id, n) in v.iter().take(8) {
+                println!("      UNMATCHED  {id}  x{n}");
+            }
+        }
+        Err(e) => eprintln!("无法读取未登记信号：{e}"),
+    }
     Ok(())
 }

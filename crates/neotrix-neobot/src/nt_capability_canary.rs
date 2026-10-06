@@ -89,6 +89,13 @@ struct Canary {
     slots: BTreeMap<String, Slot>,
     /// `expect()` 的**手写清单**（只登记，计数字段单独存）
     defs: BTreeMap<String, CanaryCapability>,
+    /// **收到过但没有任何金丝雀登记过**的 id → 次数。
+    ///
+    /// 这是 id 空间不一致的**直接证据**：非空即说明 `signal()` 与 `expect()`
+    /// 用的不是同一套 id（前者收`TradeCapability` meta id，
+    /// 后者登记能力树 id）。首版让 `signal()` 静默新建槽位，
+    /// 于是这个不相交在现场完全不可见。
+    unmatched: BTreeMap<String, usize>,
 }
 
 impl Default for Canary {
@@ -97,6 +104,7 @@ impl Default for Canary {
             threshold: DEFAULT_THRESHOLD,
             slots: BTreeMap::new(),
             defs: BTreeMap::new(),
+            unmatched: BTreeMap::new(),
         }
     }
 }
@@ -138,9 +146,37 @@ pub fn expect(capability: CanaryCapability) -> Result<(), String> {
 /// 「打了没登记的点」是**常态**，真正的问题是反向的
 /// ——「登记了却没打点」，那由 `status()` 报）。
 pub fn signal(id: &str) {
-    if let Ok(mut c) = canary().lock() {
-        c.slots.entry(id.to_owned()).or_default().fired += 1;
+    let Ok(mut c) = canary().lock() else { return };
+    if c.slots.contains_key(id) {
+        c.slots.get_mut(id).map(|s| s.fired += 1);
+    } else {
+        // ⚠️ 首版是 `c.slots.entry(id).or_default().fired += 1` —— 对**未登记**的 id
+        // 静默新建槽位。于是 id 空间不一致（`expect()` 登记的是能力树 id如
+        // `NT-MEMORY::trade::trade_product_spec`，而 `signal()` 收到的是
+        // `TradeCapability` 的 meta id 如 `PriceCalculatorCapability`）
+        // **既不命中、也不报错** ⇒ 5 个金丝雀恒为 fired=0，
+        // 而这个「永不相交」在现场完全不可见。
+        //
+        // 现改为：未登记的信号**单独计数并记名**，让不相交变成可报告的证据。
+        // （真正统一两个 id 空间需要执行端口，属 B1 方案 C 的范围。）
+        *c.unmatched.entry(id.to_owned()).or_insert(0usize) += 1;
     }
+}
+
+/// **收到过但没有任何金丝雀登记过的** id 及其次数。
+///
+/// 这是 id 空间不一致的**直接证据**：非空即说明 `signal()` 与 `expect()`
+/// 用的不是同一套 id。
+pub fn unmatched_signals() -> Result<Vec<(String, usize)>, String> {
+    let c = canary().lock().map_err(|e| format!("金丝雀锁投毒: {e}"))?;
+    let mut v: Vec<(String, usize)> = c
+        .unmatched
+        .iter()
+        .map(|(k, n)| (k.clone(), *n))
+        .collect();
+    // 排序 ⇒ 输出确定（本仓一贯的确定性纪律）
+    v.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(v)
 }
 
 /// **推进一轮观察窗口**（plur 的 `tick()`，在 `server.ts:336`
@@ -279,6 +315,7 @@ mod tests {
                 );
                 m
             },
+            unmatched: BTreeMap::new(),
         };
         let fired = 0usize;
         let ticks = 5usize;
