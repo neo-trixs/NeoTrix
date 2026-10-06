@@ -8,11 +8,18 @@
 
 ## 维度 2 · 代码树分叉（⛔ 不可从目录名推断）
 
-> **2026-09-30 A 方案**：第二棵树的 8 个模块已在 `.neotrix/layer-map.json`
-> **全部显式登记**（原 4 + 本轮补 4），`check-layer-deps` 修了两处缺陷后
-> **真正扫得到它们** ⇒ 盲区已关。下方仍按 `tree` 分列，但 `second-tree`
-> 一行现在**不再是「门看不见的地方」，而是「门看得见、且已记账 2 处违规」的地方**」。
-> 物理并成一棵目录属 B 方案（进行中，见 `docs/architecture/DIR-REMEDY-2026-09-28.md`）。
+> ✅ **第二棵树已清空**（实测）：`neotrix-core/src/neotrix/` 仅剩 1 个 `.rs`（40 行，纯 re-export 面）。
+> ⛔ **layer-map.json 有 12 条 consumer 指向不存在的路径**（本生成器实测；这是「盲区已关」类断言的反例）：
+> - `l3_embodiment/nt_shield/shield_core/guard.rs:16`
+> - `l3_embodiment/nt_shield/shield_core/safety_kernel.rs:12`
+> - `l5_cognition/nt_mind/nt_mind_background_loop/handlers_crystal.rs:51`
+> - `l6_meta/evolution/evolution_loop/absorber.rs:7`
+> - `l6_meta/evolution/evolution_loop/loop_runner.rs:14`
+> - …另有 7 条
+>
+> 上一版此处断言「8 个模块已全部显式登记 ⇒ 盲区已关」，**该断言已删除**：
+> 本生成器无法验证「是否全部登记」，却把它写成结论。物理并成一棵目录的
+> B 方案进度见 `docs/architecture/DIR-REMEDY-2026-09-28.md`。
 
 | 树 | 文件 | 行数 | 占比 | |
 |---|---:|---:|---:|---|
@@ -150,9 +157,9 @@ python3 scripts/ops/nt_topology.py   # → 本文件
 
 | 位置 | `.unwrap()` | `.expect()` | `panic!` |
 |---|---:|---:|---:|
-| 全仓 | 5152 | 3405 | 226 |
+| 全仓 | 5145 | 3412 | 226 |
 | 测试目录内 | 1011 | 426 | 49 |
-| **生产代码** | **4141** | **2979** | **177** |
+| **生产代码** | **4134** | **2986** | **177** |
 
 **⛔ `AGENTS.md` / `RUST-STANDARDS.md` 明令生产代码禁这三者，但全仓无任何门或基线在度量** ⇒ 一次性历史债，存量裸奔，随时可能新增而无报警。
 

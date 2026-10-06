@@ -389,6 +389,44 @@ def render_dir(node, name, out, depth=0, maxdepth=4):
             render_dir(v, k, out, depth + 1, maxdepth)
 
 
+
+def _load_layer_map():
+    """读 `.neotrix/layer-map.json`；缺失或损坏时返回 {}（不得让生成器崩）。"""
+    import json
+    from pathlib import Path
+    p = Path(__file__).resolve().parents[2] / ".neotrix" / "layer-map.json"
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _ghost_consumers(layer_map):
+    """返回 layer-map.json 中**指向不存在路径**的 consumer 列表。
+
+    这是可机器判定的一类缺陷：`layer-map.json` 里的 `live_consumers` 指向
+    已删除/改名的文件时，它会让人误以为该层已被记账。
+    判据：取 `路径:行号` 形态的 consumer，剥掉 `:行号` 后 `Path.exists()`。
+    """
+    import re
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    out = []
+    def walk(node):
+        if isinstance(node, dict):
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+        elif isinstance(node, str):
+            m = re.match(r"^(.*\.rs):\d+$", node)
+            if m and not (root / m.group(1)).exists():
+                out.append(node)
+    walk(layer_map)
+    return sorted(set(out))
+
+
 def main():
     doc = load()
     files = doc["files"]
@@ -412,11 +450,39 @@ def main():
     # ---------- 维度 2: 代码树分叉 ----------
     A("## 维度 2 · 代码树分叉（⛔ 不可从目录名推断）")
     A("")
-    A("> **2026-09-30 A 方案**：第二棵树的 8 个模块已在 `.neotrix/layer-map.json`")
-    A("> **全部显式登记**（原 4 + 本轮补 4），`check-layer-deps` 修了两处缺陷后")
-    A("> **真正扫得到它们** ⇒ 盲区已关。下方仍按 `tree` 分列，但 `second-tree`")
-    A("> 一行现在**不再是「门看不见的地方」，而是「门看得见、且已记账 2 处违规」的地方**」。")
-    A("> 物理并成一棵目录属 B 方案（进行中，见 `docs/architecture/DIR-REMEDY-2026-09-28.md`）。")
+    # ⚠️ 原此处是一段**无条件硬编码**的散文：
+    #   「第二棵树的 8 个模块已在 layer-map.json 全部显式登记 ⇒ 盲区已关」
+    # 该断言**已被实测证伪**：`.neotrix/layer-map.json` 里存在指向**不存在路径**的
+    # consumer（例：`.../handlers_crystal.rs`，`find` 零命中），而这段话挂在
+    # 「⛔ 本文件由代码生成」的横幅下 —— **把已被推翻的断言洗成机器事实**，
+    # 等于主动训练下一个 agent 去信任假话（R-SCAN-3）。
+    #
+    # 改为：**只报告本生成器算得出的事实**，不写无法验证的结论。
+    trees = doc.get("trees", {})   # 本块需要它，须先于下方原定义取用
+    _lm = _load_layer_map()
+    _ghost = _ghost_consumers(_lm)
+    st0 = trees.get("second-tree")
+    if st0 and st0["files"] <= 1:
+        A(f"> ✅ **第二棵树已清空**（实测）：`neotrix-core/src/neotrix/` 仅剩 "
+          f"{st0['files']} 个 `.rs`（{st0['loc']} 行，纯 re-export 面）。")
+    elif st0:
+        A(f"> ⚠️ **第二棵树 = {st0['files']} 文件 / {st0['loc']:,} 行**，实测仍存在，"
+          f"不参与 L0–L6 声明层。")
+    else:
+        A("> 第二棵树在 layer-map.json 中无登记条目（实测）。")
+    if _ghost:
+        A(f"> ⛔ **layer-map.json 有 {len(_ghost)} 条 consumer 指向不存在的路径**"
+          f"（本生成器实测；这是「盲区已关」类断言的反例）：")
+        for g in _ghost[:5]:
+            A(f"> - `{g}`")
+        if len(_ghost) > 5:
+            A(f"> - …另有 {len(_ghost) - 5} 条")
+    else:
+        A("> ✅ layer-map.json 的 consumer 路径全部存在（实测，无幽灵条目）。")
+    A(">")
+    A("> 上一版此处断言「8 个模块已全部显式登记 ⇒ 盲区已关」，**该断言已删除**：")
+    A("> 本生成器无法验证「是否全部登记」，却把它写成结论。物理并成一棵目录的")
+    A("> B 方案进度见 `docs/architecture/DIR-REMEDY-2026-09-28.md`。")
     A("")
     A("| 树 | 文件 | 行数 | 占比 | |")
     A("|---|---:|---:|---:|---|")
