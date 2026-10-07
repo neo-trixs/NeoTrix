@@ -1,3 +1,21 @@
+//! ⛔ **roadmap T1-1 已复核并改为「不归并」**（2026-10-07）。
+//!
+//! 全仓熔断器实测共 **10 个**（同名的 `CircuitState` 6 份 + `BreakerState` 2 份
+//! + `CircuitBreaker` 类型别名与包装类型）。正典声明在
+//! `crates/neotrix-types/src/core/shared_types.rs:80`（自述 "Canonical circuit breaker"）。
+//!
+//! **初版 roadmap 判定「3 个零消费者副本可归并正典」—— 复核后不成立**：
+//!
+//! | 维度 | 本类型 | 正典 `shared_types.rs` |
+//! |---|---|---|
+//! | 并发模型 | `Arc<AtomicBool>` + `AtomicU32` + `Mutex<Option<Instant>>`，方法收 **`&self`** | 裸字段，方法收 **`&mut self`** |
+//! | 独有方法 | `with_half_open_max` `record_failure_allow_transition` `state()` | `try_acquire` `reset` `force_open` |
+//! | 测试 | 2 个 | — |
+//!
+//! ⇒ **`&self`（跨线程共享）vs `&mut self`（独占）不是签名差异，是并发模型差异**。
+//! 归并 = 删掉并发安全，或删掉 11 个测试覆盖的状态机行为。
+//! ⇒ 本类型**零外部消费者**属实（仅 `resilience/mod.rs:11` 的 `pub use`），
+//!   但它是网关韧性的并发正确实现，接线时应保留并接真实调用点，**不是删除对象**。
 //! 熔断 — CircuitBreaker half-open 状态机, 防止级联故障。
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};

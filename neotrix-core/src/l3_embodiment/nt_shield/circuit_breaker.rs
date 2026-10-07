@@ -1,3 +1,15 @@
+//! ⛔ **roadmap T1-1 已复核并改为「不归并」**（2026-10-07）。
+//!
+//! 正典：`crates/neotrix-types/src/core/shared_types.rs:80`（自述 "Canonical circuit breaker"）。
+//! 本类型与正典**并发模型不同**（本类型 `Arc<AtomicU64>` + `Mutex`，方法收 `&self`；
+//! 正典裸字段 + `&mut self`），且**独有** `BreakerOutcome`、`CircuitBreakerOpenError`
+//! 与 `call()` 包装（把闭包结果按熔断状态分流）—— 正典**没有**这个 API。
+//! 本类型有 **7 个测试**，是三者中覆盖最厚的。
+//!
+//! ⇒ **零外部消费者属实**（全仓唯一命中是 `nt_shield/mod.rs:16` 的 `pub mod`），
+//!   但按本仓既有裁决「已建 + 已测 + 未接线 ⇒ 不删只标注」
+//!   （对照 `CLAIMED-BUT-NOT-ENFORCED-2026-10-05.md` §2 对 `nt_shield_ztnet` 的处置）。
+//! ⇒ 接线方向：让 shield 的真实调用点用上它，或明确归档 —— 属接线裁决，非清理。
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};

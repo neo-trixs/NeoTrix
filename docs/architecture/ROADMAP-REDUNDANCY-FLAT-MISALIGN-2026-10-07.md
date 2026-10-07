@@ -102,18 +102,27 @@
 
 ## 3. P1 —— 冗余清理（按"省多少 + 风险多低"排）
 
-### T1-1 ⭐ 10 个熔断器，3 个零消费者
-- **正典已存在**：`crates/neotrix-types/src/core/shared_types.rs:81`（文件头自述 "Canonical circuit breaker"）
-- **已证可归并（零消费者 ⇒ 无 API 破坏）**：
-  - `l1_action/nt_io/nt_io_provider/gateway/resilience/nt_circuit_breaker.rs:12`
-  - `l3_embodiment/nt_shield/circuit_breaker.rs:7`
-  - `l3_embodiment/nt_shield/defense/ring_boundary/circuit_breaker.rs:10`
-- ⛔ **勿动** 4 个活路径（`health/`、`nt_infra_breaker`、`goal_loop`、`nt_act_circuit_breaker`）
-  —— 构造签名不同（滑窗/强开/健康惩罚），可能带正典没有的语义
-- ⭐ **附带发现**：`nt_core_guardian/circuit_breaker.rs:1-3` 声称
-  「融合 self_healing + nt_infra_breaker ⇒ **单一实现**」，
-  但**两个源都仍是独立活实现** —— 这是**假融合声明**
-- **成本 L**
+### T1-1 ⛔ **已复核并改为「不归并」**（2026-10-07）—— 三者是不同并发模型
+
+初版判定「10 个熔断器，3 个零消费者可归并正典」。**复核后不成立。**
+正典确在 `crates/neotrix-types/src/core/shared_types.rs:80`（自述 "Canonical circuit breaker"）。
+
+| | `resilience/`（196行） | `nt_shield/`（333行） | `ring_boundary/`（109行） | 正典 |
+|---|---|---|---|---|
+| 并发模型 | `Arc<AtomicBool>`+`AtomicU32`+`Mutex`，**`&self`** | `Arc<AtomicU64>`+`Mutex`，**`&self`** | 裸字段，**`&mut self`** | 裸字段，**`&mut self`** |
+| 独有 | `with_half_open_max` `record_failure_allow_transition` `state()` | `BreakerOutcome` `CircuitBreakerOpenError` `call()` 包装 | `success_threshold`；`record_*()` **返回新状态** | `try_acquire` `reset` `force_open` |
+| 测试 | 2 | **7** | 2 | — |
+
+⇒ **`&self`（跨线程共享）vs `&mut self`（独占）不是签名差异，是并发模型差异。**
+⇒ 归并 = 删掉并发安全，或删掉 11 个测试覆盖的状态机行为。
+
+⭐ **初版判定的错误来源**：子代理给了"零消费者"与"正典存在"两个**真事实**，
+但我把它们拼成了"因此可归并"——**缺了"它们是同一件事"这一步**。
+又一次印证 L1（证据粒度）。已复核：同名的 `CircuitState` 6 份 ≠ 同机制；
+`BreakerState`/类型别名/包装类型全在名字检测之外（这才是低估 40% 的根因）。
+
+**替代处置**：三处补「⛔ T1-1 已改为不归并 + 为何不同构」头注释（零行为变更），
+并各自标注零外部消费者与接线方向。按既有裁决「已建+已测+未接线 ⇒ 不删只标注」。
 
 ### T1-2 ⭐ `nt_act_trade/data_model.rs` 违反自己的 SSOT 头
 - **8 个类型逐字重复**（含 `Product` 的 13 行手写 `impl Default`）：
@@ -230,7 +239,7 @@
 | T1-5 | 删 `l2_perception/nt_judgment/` | S | 先查跨 crate 消费者 | ✅ `43e2380c` −313 行 |
 | T1-7a | `nt_core_guardian` **文档**修复 | S | 无 | 🟨 本轮 |
 | T1-8 | 缓存岛 + "LRU"→FIFO 头修正 | S | 无 | 🟡 已修头（`ebf1d458`），剩可达性标注 |
-| T1-1 | 3 个零消费者熔断器归正典 | L | **勿动 4 个活路径** |
+| T1-1 | ~~3 个零消费者熔断器归正典~~ | — | — | ⛔ **已推翻**（三种并发模型，见 §T1-1）→ ✅ 改为标注 |
 | T1-6 | 裁 `nt_shield::osint` | S | `compliance` 留待裁决 |
 | T1-7b | `nt_core_guardian` 接线裁决 | L | 依赖裁决，不删 |
 
