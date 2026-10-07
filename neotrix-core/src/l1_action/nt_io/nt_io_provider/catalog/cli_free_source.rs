@@ -156,14 +156,13 @@ impl ModelSource for CliFreeSource {
     }
 }
 
-/// freebuff：本机 CLI 后端的免费模型发现源。
+/// freebuff：本机 CLI 后端的免费档模型发现源（账号登录型，**交互式**）。
 ///
-/// freebuff **不提供** `models` 列表/headless completion，所以无法走
-/// `CliFreeSource` 的 `<cli> models` 解析路径；它的 Chat 端点经
-/// `CODEBUFF_API_KEY` + OpenAI 兼容 `/api/v1` 暴露。因此本源只在
-/// `freebuff --version` 可跑时，把 settings.json 里记录的免费档默认模型
-/// 上报为一条 `cloud_free` 条目（provider_type 复用 CustomProxy：
-/// 语义上 freebuff 就是 OpenAI 兼容的自定义端点，不新增枚举变体）。
+/// freebuff **不提供** `models` 列表/headless completion，也不是
+/// `CODEBUFF_API_KEY` 型的 OpenAI 兼容服务——它要求交互式帐号登录。
+/// 因此它**不应**被当成可经 CustomProxy/HTTP key 直接 chat 调用的模型；
+/// 本源只做「可见 + 可探活」的发现登记，真实调用形态是交互 TUI agent
+/// （见 L1 的 `interactive_cli.rs` / `--agent freebuff`）。
 pub struct FreebuffFreeSource {
     command: String,
     timeout: Duration,
@@ -188,9 +187,11 @@ impl Default for FreebuffFreeSource {
     }
 }
 
+/// 注意：freebuff 为账号登录的交互 CLI，**没有**稳定的 OpenAI 兼容公共端点；
+/// 该函数仅返回信息性配置（默认指向 freebuff 官网），不表示可经此直连 chat。
 pub fn freebuff_base_url() -> String {
     std::env::var("NEOTRIX_FREEBUFF_URL")
-        .unwrap_or_else(|_| "https://www.codebuff.com/api/v1".to_string())
+        .unwrap_or_else(|_| "https://freebuff.com".to_string())
 }
 
 impl ModelSource for FreebuffFreeSource {
@@ -213,14 +214,16 @@ impl ModelSource for FreebuffFreeSource {
         }
         let model = std::env::var("NEOTRIX_FREEBUFF_MODEL")
             .unwrap_or_else(|_| "glm-5.3-flash-2026-09-05".to_string());
+        // 只登记「存在且可探活」，不声称可经 key/HTTP chat 直接调用；
+        // 该档是账号登录的交互 agent，真实入口走 --agent freebuff。
         let mut e = UnifiedModelEntry::cloud_free(
             "freebuff",
             &model,
-            &format!("{model} (Freebuff, free)"),
-            &freebuff_base_url(),
-            "free",
-            true,
-            Some("CODEBUFF_API_KEY"),
+            &format!("{model} (Freebuff 交互 agent)"),
+            "https://freebuff.com",
+            "interactive-free",
+            false,
+            None,
             LlmProviderType::CustomProxy,
         );
         e.source = "freebuff".to_string();
