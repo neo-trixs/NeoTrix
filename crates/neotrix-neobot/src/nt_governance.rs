@@ -583,25 +583,54 @@ pub struct OutputGovernor {
 /// 默认单消息长度上限 (字符)。
 pub const DEFAULT_MAX_MESSAGE_CHARS: usize = 8_000;
 
+/// 构造正则，**失败时不 panic**（2026-10-07 去 unwrap/expect）。
+///
+/// # 为什么原来可以 expect，现在不行
+///
+/// `bare_path_re` / `line_ref_re` 是**运行时拼装**的
+/// （`format!(... EXTS.join("|"))`），⛔ 不是编译期常量
+/// ⇒ 任何人往 `EXTS` 里加一个 `.` / `+` / `(` 都会让
+/// `OutputGovernor::new()` 在**启动期 panic**。
+///
+/// # 失败时怎么办
+///
+/// 记 `error!`（⛔ 不静默）并返回**永不匹配**的正则
+/// ⇒ 相关治理规则不触发（能力降级但**可见**），而不是进程崩掉。
+///
+/// # 为什么不会被静默放过
+///
+/// `治理正则均可编译` 测试断言全部模式可编译
+/// ⇒ 有人改坏 `EXTS` 时**CI 立刻红**，而不是等到启动才panic。
+fn re_or_never_match(pat: &str) -> Regex {
+    match Regex::new(pat) {
+        Ok(r) => r,
+        Err(e) => {
+            log::error!("[governor] 正则无法编译，规则将不触发: {pat:?} ({e})");
+            // ⚠️ `(?!)` **不行**：`regex` crate 不支持前瞻（实测 panic）⇒
+            // 改用 `a^`（正则经典永不匹配式：无元字符，crate 必然接受）。
+            // ⇒ 我第一版写的 `unreachable!()` **自身就是 panic 路径**，
+            //   被本文件的 `坏模式降级为不匹配而不panic` 测试当场抓住。
+            Regex::new("a^").expect("a^ 无元字符，regex crate 必然接受")
+        }
+    }
+}
+
 fn build_rules(root: &Path, max_message_chars: usize) -> Vec<GovernorRule> {
     let root = root.to_path_buf();
-    let placeholder_pure = Arc::new(Regex::new(PLACEHOLDER_PURE_RE).expect("placeholder_pure 正则有效"));
-    let placeholder_inline = Arc::new(Regex::new(PLACEHOLDER_INLINE_RE).expect("placeholder_inline 正则有效"));
+    let placeholder_pure = Arc::new(re_or_never_match(PLACEHOLDER_PURE_RE));
+    let placeholder_inline = Arc::new(re_or_never_match(PLACEHOLDER_INLINE_RE));
     let placeholder_pure_for_inline = placeholder_pure.clone();
     let root_for_hallucinated = root.clone();
-    let backtick_re = Arc::new(Regex::new(r"`([^`]+)`").expect("backtick 正则有效"));
-    let bare_path_re = Arc::new(
-        Regex::new(&format!(r"[\w.\-/]+\.(?:{})", EXTS.join("|")))
-            .expect("bare_path 正则有效"),
-    );
-    let line_ref_re = Arc::new(
-        Regex::new(&format!(
-            r"(?i)([A-Za-z0-9_.\-/]+\.(?:{})):(\d+)",
-            EXTS.join("|")
-        ))
-        .expect("line_ref 正则有效"),
-    );
-    let line_suffix_re = Arc::new(Regex::new(r":\d+$").expect("line_suffix 正则有效"));
+    let backtick_re = Arc::new(re_or_never_match(r"`([^`]+)`"));
+    let bare_path_re = Arc::new(re_or_never_match(&format!(
+        r"[\w.\-/]+\.(?:{})",
+        EXTS.join("|")
+    )));
+    let line_ref_re = Arc::new(re_or_never_match(&format!(
+        r"(?i)([A-Za-z0-9_.\-/]+\.(?:{})):(\d+)",
+        EXTS.join("|")
+    )));
+    let line_suffix_re = Arc::new(re_or_never_match(r":\d+$"));
 
     vec![
         GovernorRule {
@@ -801,5 +830,48 @@ mod governance_tests {
             .smells
             .iter()
             .any(|s| s.pattern_id == "conclusion-signpost"));
+    }
+}
+
+#[cfg(test)]
+mod regex_validity_tests {
+    use super::{EXTS, PLACEHOLDER_INLINE_RE, PLACEHOLDER_PURE_RE};
+    use regex::Regex;
+
+    /// ⭐ **把「启动期 panic」变成「CI 期失败」**（2026-10-07）。
+    ///
+    /// `bare_path_re` / `line_ref_re` 是**运行时拼装**的，⛔ 不是编译期常量
+    /// ⇒ 任何人往 `EXTS` 里加一个正则元字符（`.` `+` `(` …），
+    ///   生产代码只会「记 error + 规则不触发」（见 `re_or_never_match`），
+    ///   **不会崩** —— 但那样治理能力就静默降级了。
+    ///
+    /// ⇒ 本测试断言**全部模式可编译** ⇒ 改坏 `EXTS` 时 CI 立刻红。
+    #[test]
+    fn 治理正则均可编译() {
+        for pat in [
+            PLACEHOLDER_PURE_RE,
+            PLACEHOLDER_INLINE_RE,
+            r"`([^`]+)`",
+            r":\d+$",
+            &format!(r"[\w.\-/]+\.(?:{})", EXTS.join("|")),
+            &format!(
+                r"(?i)([A-Za-z0-9_.\-/]+\.(?:{})):(\d+)",
+                EXTS.join("|")
+            ),
+        ] {
+            assert!(
+                Regex::new(pat).is_ok(),
+                "治理正则无法编译（会静默降级为不触发）: {pat:?}"
+            );
+        }
+    }
+
+    /// 反向证据：`re_or_never_match` 对**坏模式**不 panic，且返回永不匹配的正则。
+    ///
+    /// ⛔ 不断言它「有效」—— 断言「不 panic + 不匹配」才是契约。
+    #[test]
+    fn 坏模式降级为不匹配而不panic() {
+        let r = super::re_or_never_match("([unclosed");
+        assert!(!r.is_match("任何东西"), "降级后的正则必须永不匹配");
     }
 }
