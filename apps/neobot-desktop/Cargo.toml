@@ -4,6 +4,12 @@ description = "NeoBot — 本地优先的 agent 沟通界面（Tauri 薄壳）"
 version = "0.24.0"
 edition = "2021"
 rust-version = "1.77"
+# ⭐⭐ 2026-10-07 补：本成员此前**漏了 license 字段** ⇒ `cargo deny check licenses`
+#   报 error[unlicensed]: neobot-desktop = 0.24.0 is unlicensed ⇒ **CI 的
+#   cargo-deny job（.github/workflows/deny.yml）是红的**。
+# ⓘ 不是「缺例外文件」：根 Cargo.toml 声明 license = "MIT" + license-file = "LICENSE"，
+#   本仓 LICENSE 确是 MIT ⇒ 这里按 workspace 口径继承，与其它成员一致。
+license.workspace = true
 
 [[bin]]
 name = "neobot-desktop"
