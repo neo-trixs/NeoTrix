@@ -177,7 +177,9 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     // 2026-08-27 外部吸收 (arXiv:2608.23642): NT-SHIELD 监督退化 canary (Rev-明 审计强化)
     crate::l3_embodiment::nt_shield::nt_shield_oversight::register_oversight_self_tests(registry);
     // 2026-08-28 外部吸收 (arXiv:2608.23642): NT-GOVERNANCE 人类监督治理 affordance + 萎缩对策
-    crate::l6_meta::coordination::nt_governance::register_human_oversight_self_tests(registry);
+    // ⇒ 设计级吸收, 无规则/钩子可验; 占位 register_human_oversight_self_tests 与
+    //    HumanOversightSelfTest 已于 2026-10-07 删除 (能力节点同步 C2→C1, 见
+    //    nt_governance/mod.rs 模块注记), 故此处不再注册。
     // 2026-09-11 PDF图像能力熔炼: SelfTest T2 注册
     crate::l1_action::nt_file_ability::register_pdf_sr_self_tests(registry);
 }
