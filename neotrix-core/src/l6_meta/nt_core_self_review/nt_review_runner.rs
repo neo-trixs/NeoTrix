@@ -1,7 +1,7 @@
 //! Self-review runner — gate execution, run_all dispatch, all check_* (PA001-PA027).
 //! Pure move from `mod.rs` (God-file split) — zero behavior change.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use regex::Regex;
 
@@ -424,9 +424,24 @@ impl SelfReviewGate {
         // 2026-10-07（裁定 5C）：`classified` 只为报告层诚实性服务 —— 区分
         // "检了 N 个文件、发现 0 个违规" 与 "一个文件都没检到"。
         let mut classified = 0usize;
+        // 2026-10-07（裁定 5A 第二批）：**递归**进层目录。
+        // 原实现只遍历 `src` 的直接子项并跳过非 `.rs` ⇒ 层目录本身被跳过
+        // （`src/l0_substrate/` 是目录，不是 `.rs`）⇒ 可分类文件 = 0。
         if let Ok(entries) = std::fs::read_dir(&src_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
+                if path.is_dir() {
+                    // 层目录：递归收集其下的 .rs（跳过 target 等）
+                    for rs in collect_rs_files(&path) {
+                        let source_layer = ArchLayer::from_path(&rs);
+                        if source_layer.layer_index() < 0 {
+                            continue;
+                        }
+                        classified += 1;
+                        scan_layer_file(self, &rs, source_layer, &mut violations);
+                    }
+                    continue;
+                }
                 if path.extension().is_none_or(|e| e != "rs") {
                     continue;
                 }
@@ -435,18 +450,7 @@ impl SelfReviewGate {
                     continue;
                 }
                 classified += 1;
-                if let Ok(content) = read_source_cached(&path) {
-                    for line in content.lines() {
-                        if line.starts_with("use crate::") {
-                            let target_layer = self.detect_import_layer(line);
-                            if target_layer.layer_index() >= 0
-                                && target_layer.layer_index() < source_layer.layer_index()
-                            {
-                                violations += 1;
-                            }
-                        }
-                    }
-                }
+                scan_layer_file(self, &path, source_layer, &mut violations);
             }
         }
         // ⛔ 2026-10-07 裁定 5C：只修**报告层**，不修判定层。
@@ -492,7 +496,7 @@ impl SelfReviewGate {
         }
         let msg = format!(
             "Architecture depth: {violations} reverse-layer imports \
-             (higher layer importing from lower), across {classified} classifiable files"
+             (lower layer importing a higher layer), across {classified} classifiable files"
         );
         self.check(
             violations == 0,
@@ -504,7 +508,33 @@ impl SelfReviewGate {
         );
     }
 
+    /// `detect_import_layer` 的公开别名（供本模块的自由函数 `scan_layer_file` 调用）。
+    pub(crate) fn detect_import_layer_pub(&self, line: &str) -> ArchLayer {
+        self.detect_import_layer(line)
+    }
+
+    /// 判定一行 `use crate::` 引的是哪一层。
+    ///
+    /// # 2026-10-07（裁定 5A 第三批）：修 `core::` 子串误判
+    ///
+    /// ⛔ **原实现把 `core::` 当作 L0 标志**，于是
+    /// `use crate::l3_embodiment::nt_shield::shield_core::guard::...`
+    /// 里的 `shield_core::` 子串会被抓成 L0 ⇒ **同层引用被误报成"高层引低层"**。
+    /// 实测：修 `from_path` + 递归后检出 55 处，其中 **54 处是这类误判**，
+    /// 真违规仅 **1 处**（`l6_meta/nt_core_observer.rs:4` 的 L6→L5 真引用）。
+    ///
+    /// ⭐ 修法：**先按真实层目录名（`crate::lN_xxx::`）精确判定**，
+    /// 只有都不命中时才退回历史词汇的子串启发式。
+    /// 这与我方铁律一致：`scripts/check-layer-deps.sh` 能做的绝不在别处重造，
+    /// 而这里做的是它做不了的"文件级归类计数"。
     fn detect_import_layer(&self, line: &str) -> ArchLayer {
+        // ── 精确：真实层目录名（必须最先判，否则被下面的 core:: 吃掉）──
+        for (name, layer) in REAL_LAYER_DIRS {
+            if line.contains(&format!("crate::{name}::")) {
+                return *layer;
+            }
+        }
+        // ── 历史词汇（保留；已知与真实层只有部分重叠，命中数是下界）──
         if line.contains("core::") || line.contains("::core::") {
             ArchLayer::L0Core
         } else if line.contains("l1_body") || line.contains("::act::") {
@@ -1462,4 +1492,91 @@ pub fn scan_for_patterns(
         }
     }
     results
+}
+
+
+/// 真实层目录名 ⇄ `ArchLayer` 的映射（裁定 5A）。
+///
+/// ⚠️ **映射本身带妥协**：`l3_embodiment`（具体化/盾）没有对应枚举变体，
+/// 被映到 `L3Memory`；`l4_emotion`（情绪/记忆）映到 `L4Cognition`。
+/// ⛔ 这两处的**分层语义是错的**，改枚举要动 10+ 处 `layer_index()` 匹配，
+/// 属 roadmap T0-4（层词汇裁决）的范围。
+/// ⇒ 本表只保证「能分类并计数」，**不宣称「分类正确」**。
+static REAL_LAYER_DIRS: &[(&str, ArchLayer)] = &[
+    ("l0_substrate", ArchLayer::L0Core),
+    ("l1_action", ArchLayer::L1Act),
+    ("l2_perception", ArchLayer::L2World),
+    ("l3_embodiment", ArchLayer::L3Memory),
+    ("l4_emotion", ArchLayer::L4Cognition),
+    ("l5_cognition", ArchLayer::L5Prm),
+    ("l6_meta", ArchLayer::L6Self),
+];
+
+/// 递归收集目录下的 `.rs`（跳过 `target/` 与隐藏目录）—— 裁定 5A 第二批。
+fn collect_rs_files(dir: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return out;
+    };
+    for entry in entries.flatten() {
+        let p = entry.path();
+        if p.is_dir() {
+            let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+            if name == "target" || name.starts_with('.') {
+                continue;
+            }
+            out.extend(collect_rs_files(&p));
+        } else if p.extension().is_some_and(|e| e == "rs") {
+            out.push(p);
+        }
+    }
+    out
+}
+
+/// 扫一个文件里的 `use crate::` 行，统计**反向**分层引用（低层引高层为逆）。
+///
+/// ⚠️ **已知局限**（不要高估本检查）：
+/// 1. 只看 `use crate::` 开头的行 ⇒ `mod.rs` 里的 `pub use a as b`、
+///    宏内路径、`#[path]` 全看不见。
+/// 2. 字符串字面量里的路径**也会被算进来**（门分不清字面量与真引用）。
+/// 3. `detect_import_layer` 认的是**第三套词汇**（`l0_core`/`l1_body`…），
+///    与真实层名只有部分重叠 ⇒ 命中数是**下界**。
+/// ⇒ 本检查的定位是"粗筛 + 可见"，**不是权威分层裁决**；
+///    权威仍是 `scripts/check-layer-deps.sh`（clean checkout 口径）。
+fn scan_layer_file(
+    gate: &SelfReviewGate,
+    path: &Path,
+    source_layer: ArchLayer,
+    violations: &mut usize,
+) {
+    let Ok(content) = read_source_cached(path) else {
+        return;
+    };
+    for line in content.lines() {
+        if line.starts_with("use crate::") {
+            let target_layer = gate.detect_import_layer_pub(line);
+            // ⛔ 2026-10-07（裁定 5A 第三批）：**判据方向原本是反的**。
+            //
+            // 原条件 `target < source` 把「高层引低层」判成违规，例如
+            // `l2_perception/error_conversions.rs` 引 `l0_substrate::nt_core_error`
+            // 被算成 L2→L0 违规 —— 而那**恰恰是分层的目的**（下层供上层）。
+            //
+            // 正典口径见 `scripts/check-layer-deps.sh:2`：
+            //   「enforces L0->L1->L2->L3->L4->L5->L6 unidirectional deps」
+            // ⇒ 合法方向是 source<target（引更高层）；本仓的真违规形态是
+            //   **源层号小、目标层号大却跨层跳跃**（如 L1→L5 的 S1/S2 类）。
+            //
+            // ⛔ 但**本检查只能发现「反向」，无法发现「跨层跳跃」** ——
+            //   源层与目标层的层距（|src−tgt| > 1）才是真正的判据，而
+            //   `ArchLayer` 的历史映射把 embodiment→memory、emotion→cognition
+            //   压成了相邻层，使层距不可靠。
+            // ⇒ 因此这里只报**反向引用**（方向确实错、必是债），
+            //   跨层跳跃仍以 `check-layer-deps.sh` 为权威（见函数文档的「已知局限」）。
+            if target_layer.layer_index() >= 0
+                && target_layer.layer_index() > source_layer.layer_index()
+            {
+                *violations += 1;
+            }
+        }
+    }
 }
