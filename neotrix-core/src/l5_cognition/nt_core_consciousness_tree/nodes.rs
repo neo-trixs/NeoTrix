@@ -152,6 +152,16 @@ pub struct EvolutionForecast {
     /// 校准置信度 (0..1)
     pub confidence: f64,
     /// 弃权信号 — 信息不足时置 true (不参与决策)
+    /// ⭐ 审计裁定 2026-10-07：`dead-flag` 判此字段零读点 —— **门是对的**。
+    ///
+    /// 我一度以为门误报（`lifecycle.rs` 有 4 处 `.abstain`），核实后：
+    /// 那 4 处属于 **`nt_forecast::Forecast`**（另一文件、**同名** struct），
+    /// 本字段属 **`EvolutionForecast`** ⇒ **同名异类型**，互不算读点。
+    ///
+    /// ⇒ 这是本会话第 4 次「以为门错、实则门对」：
+    ///   同名字段跨文件/跨 struct 会互相「救活」，掩盖真死字段。
+    /// ⇒ 门按 `(文件, token)` 计数 + `name_decls>1` 时**不回退**，
+    ///   这个设计恰恰**避免了**同名互相救活 —— 是对的，别改。
     pub abstain: bool,
     /// 情景树叶子概率摘要 (bull/bear/sideways)
     pub scenario_probs: Vec<(String, f64)>,
