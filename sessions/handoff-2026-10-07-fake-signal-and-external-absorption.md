@@ -112,3 +112,23 @@
 - **Stash**：`git stash list` 检查是否为空
 - **新门/探针的验证闭环**：`check-fake-signal` 有探针 4/4 PASS + `--strict` RC=0；`check-license` 用 `git stash` 前后 RC=4→2 验证
 - **生产接线（R-P79）核查**：本窗口所有外部技术（memvid 校验和 / e2e 录制—重放 / TradingAgents 决策账本）⇒ 最终只有 memvid 的 1 条校验和真实接线（`7b3dfbbf`），其余 ⛔ 未接线且留档裁决，符合 R-P79「不算、只做设计级研究」
+
+---
+
+## § 3.3 续记: silent-failure 门修复 + 死标记回归取证 (2026-10-07 22:00–00:00)
+
+| 提交 | 改动 | 证据 |
+|---|---|---|
+| `4fa1c019` | `nt_dead_flag` 补第⑤类盲区「宏间接」—— `spawn_handler!(cfg, X, …)` 展开即读点 `cfg.X`，`_RE_DOT_TOKEN` 看不见且 `only_file=声明文件` 救不回 | numeric 零读点 332→311、新增 19→0；孤儿探针真死字段仍被报、宏实参正确不报；--strict 双 RC=0 |
+| `fd8d8af0` | `check-silent-failure` 补第三桶「unlisted persistence-shaped」—— 白名单外的持久化丢弃此前完全不可见（宣称可见实则不可见，L8 绿色≠有效） | 原 GATED 计数 43/302/75 不变 ⇒ 新桶不污染既有信号；词干两轮修正（'init/ensure'）后 `flush_state(`/`save_wallet(` 可匹配；探针 PROBE-OK |
+| `7bab4b99` | 4 处真静默失败补上报 + 门修「单行 fn 尾随 `}`」盲区 | ① wal.rs Drop `if let Ok` → match；② history_log.rs `_log_operation`/`clear()` `let _ = self.save()` → `if let Err + log::warn!`；③ kb_write.rs `init_graphrag` 丢弃 → warn!。门修：`let _ = self.save(); }` 的 `group(1)` 不以 `;` 结尾 ⇒ 误入多行累积 ⇒ else:continue ⇒ 站点永久不可见 ⇒ 只剥行尾 `}`。双面变异：A 主树（.rs 已修）43/75/85/302/NEW0/PASS 不变⇒零误伤；B 预修代码 + 新门 88→89 且 `history_log.rs:85` 被捞出 ⇒ 盲区证实；89−85=4=本次 4 处，算术闭合。隔离 worktree 验证（主树被他窗 neobot WIP 阻断）：`cargo check -p neotrix --lib` 0 错、`test --lib` 13639 passed/0 failed、neotrix-types 440/0 |
+| `fc3f4d5a` | BackgroundConfig 补回 3 处被误剥的 `nt-unwired-spec` 标记（evolve/geo_update/world_crawl） | `f59c2ddb` 声称「撤 5 个错误规格标注」，实则把 config.rs 全部 32 个标记剥为 0 ⇒ 该桶退化。按 path:line 证实 prose 仍有效且无线 `handle_*`，仅对 3 字段补回标记线。变异证据：numeric 未接线规格 8→11（+3 正好是补回 3 处）、待人工 45→42、新增 0、--strict RC=0 |
+
+## § 4. 当前阻塞 / 交接
+
+- **主树 `cargo check -p neotrix --lib` 被他窗 neobot WIP 阻断**（`nt_agent.rs:824`、`nt_capability_canary.rs:196`、`nt-core-capability-tree/src/dispatch.rs`）—— 他 11:51 的 `515cb99d` 只改了 `run.rs` 并给它加 4 个 `panic!`，未更新 `unwrap-baseline.txt` ⇒ `check-unwrap --strict` **RC=1**（1 NEW：`run.rs:870` 宏 fail-fast panic，属已提交代码但基线缺行）。
+- `check-layer-deps --strict` **RC=1**（1 NEW：`l0_substrate/nt_core_event_bus.rs:283` `l6_meta` 注释假阳性，属他 `1ee7333c` 提交中 `///` 文档注释提到目录名，L14 门不识注释）。
+- 待人工判定：bool 119、numeric 42（本轮已从 119/45 压降 3 处）。top 簇：l5_cognition/nt_mind 23、l3_embodiment/nt_shield 22、l1_action/nt_io 19。
+- `nt_mind_background_loop/config.rs` 4 个 bool 待判定（agent_protocol_enabled / enabled / geo_auto_update / system_proxy_enabled）系 `f59c2ddb` 显式撤标件，**保持原裁定**，不再动。
+- 磁盘：本轮经临时 worktree + target 回收后 `target/` 99G→55G，root free 192G；他窗 `.worktrees/evo` 3.4G target 按原样保留。
+- worktree：本轮自开 1 个（`…/opencode/ntverify`），完成 `git worktree remove --force` 后 `prune` 已清 ⇒ 剩余 7。
