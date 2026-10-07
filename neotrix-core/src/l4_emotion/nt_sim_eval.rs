@@ -57,6 +57,22 @@ pub fn compute_facts(prices: &[f64]) -> Option<StylizedFacts> {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct GrpoReward {
     pub verifiable: f64,
+    /// ⭐ 审计裁定 2026-10-07（`check-fake-signal` R4 命中）：
+    /// **⛔ 这不是伪信号** —— `format_ok` 在 `score()`（本文件 L71）里
+    /// **真的影响总分**（格式错则半罚）。
+    ///
+    /// 它之所以「只有字面量赋值」，是因为本 struct 是**评估结果的数据载体** ——
+    /// ⛔ 值本就该由**调用方**（真正的格式检查器）填入，
+    /// ⛔ 而不是在 struct 内部自己算。
+    ///
+    /// ⚠️ 但实测：`GrpoReward { .. }` 的构造点**全在本文件的测试里**
+    ///（L114/115/116/123）⇒ **生产路径零消费**。
+    /// ⇒ 本 struct 当前是**未接线的评估骨架**，
+    ///    ⛔ 而非「格式检查在假装工作」。
+    ///
+    /// ⭐ 正解（未实施，需 owner 决策）：接上真实的格式检查器并构造本 reward；
+    ///    或若该评估路线已废弃 ⇒ 删除整个 struct。
+    /// ⛔ 我**不擅自删除**：它承载 GRPO 评估的**规格意图**，删字段会销毁规格。
     pub format_ok: bool,
 }
 
