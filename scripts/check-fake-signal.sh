@@ -359,7 +359,26 @@ for f in rs_files():
         # ⇒ 充要条件就是「**取值多于一种**」：
         #    一个恒 `true` 的字段若真被计算，其取值必然可正可负；
         #    ⛔ 反之，只有 `{true}` ⇒ 它就只是恒定结论。
-        if len(lit_vals) >= 2:
+        # ⭐ 2026-10-07 **第八轮修正**：豁免判据漏了 `self.<field> = <字面量>` 形态。
+        #
+        # 实测误报（`provider_swap.rs:16 is_healthy`）：
+        #   · 结构体字面量里只有 `is_healthy: true`（Default）
+        #   · ⛔ 但 `record_success()` 里有 `self.is_healthy = true`（L38）、
+        #     `record_error()` 里有 `self.is_healthy = false`（L47）
+        #   ⇒ 它是**由真实成败记录驱动的可正可负状态**，
+        #     ⛔ **不是**伪信号（且 L59 `is_circuit_broken`、L149 都在消费它）。
+        # ⇒ `lit_vals` 只看到 `{true}`（因为只统计了 `name:` 形态）
+        #   ⇒ 豁免不触发 ⇒ **门误报**。
+        # ⇒ 正解：豁免条件扩为「**字段名被赋过 ≥2 种布尔字面量**」
+        #    （涵盖 `name: X` 与 `self.name = X` 两种形态）。
+        assigned_vals = set()
+        for l2 in lines_masked:
+            m2 = re.search(
+                rf"(?<![\w])(?:self\.)?{re.escape(name)}\s*[:=]\s*(true|false)\b", l2
+            )
+            if m2:
+                assigned_vals.add(m2.group(1))
+        if len(lit_vals | assigned_vals) >= 2:
             nonlit.append(idx)      # 视作「可正可负的状态」，阻止 R1
 
         if not nonlit:

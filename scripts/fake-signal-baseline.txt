@@ -10,10 +10,8 @@ neotrix-core/src/l1_action/nt_infra_persistence.rs	R4	pub health_healthy: bool,
 neotrix-core/src/l1_action/nt_io/nt_io_inference/apple_silicon.rs	R1	pub _mlx_available: bool,
 neotrix-core/src/l1_action/nt_io/nt_io_inference/apple_silicon.rs	R2	pub fn detect :: pub fn detect() -> Result<Self, String> {
 neotrix-core/src/l1_action/nt_io/nt_io_neocodex/agent/nt_agent_types.rs	R1	pub shell_available: bool,
-neotrix-core/src/l1_action/nt_io/nt_io_provider/routing/provider_swap.rs	R1	pub is_healthy: bool,
 neotrix-core/src/l1_action/nt_io/nt_io_provider/routing/provider_swap.rs	R4	pub is_healthy: bool,
 neotrix-core/src/l1_action/traits.rs	R1	fn providers :: pub healthy: bool,
-neotrix-core/src/l3_embodiment/nt_shield/defense/unified_defense.rs	R1	pub is_safe: bool,
 neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_cortex_sync.rs	R1	pub fn report_lineage :: pub version_ok: bool,
 neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_cortex_sync.rs	R4	pub fn report_lineage :: pub version_ok: bool,
 neotrix-core/src/l4_emotion/nt_sim_eval.rs	R4	pub fn compute_facts :: pub format_ok: bool,
@@ -22,4 +20,3 @@ neotrix-core/src/l5_cognition/nt_core/nt_core_parallel/executor.rs	R3	pub fn all
 neotrix-core/src/l5_cognition/nt_goal/behavioral_verifier.rs	R4	fn run_bounded :: pub tests_ok: bool,
 neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs	R3	fn default :: Self::compute(true, false, true, true)
 neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs	R3	pub(crate) fn _recompute_readiness :: let score = _LoopReadyScore::compute(handlers_ok, kb_ok, true, true);
-neotrix-core/src/l6_meta/nt_agents_guard.rs	R1	pub ok: bool,
