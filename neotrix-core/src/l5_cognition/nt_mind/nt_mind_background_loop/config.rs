@@ -17,6 +17,7 @@ pub struct BackgroundConfig {
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     pub consolidate_interval_secs: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     pub evolve_interval_secs: u64,
@@ -33,6 +34,7 @@ pub struct BackgroundConfig {
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     pub thinking_interval_secs: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     pub geo_update_interval_hours: u64,
@@ -55,6 +57,7 @@ pub struct BackgroundConfig {
     /// ⭐ **功能未实现**：全仓无 `handle_agent_protocol*` 被派发 ⇒ 非「开关漏接」，是能力缺位。
     /// ⇒ 保留字段以便该能力落地时直接消费。
     pub agent_protocol_enabled: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     pub nt_world_crawl_interval_secs: u64,
