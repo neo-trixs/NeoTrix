@@ -45,7 +45,9 @@ const SECOND_BRAIN_TICK_INTERVAL_SECS: u64 = 600;
 const EMOTION_RESTORE_DEFER_SECS: u64 = 5;
 const LOOP_READINESS_INTERVAL_SECS: u64 = 300;
 const MARKET_RE_EVAL_INTERVAL_SECS: u64 = 300;
-const TELEMETRY_INTERVAL_SECS: u64 = 60;
+// ⛔ 2026-10-07 删除：`TELEMETRY_INTERVAL_SECS = 60` —— 它硬编码覆盖了
+//   `config.telemetry_interval_secs`（Default 300）⇒ 配置项形同虚设，
+//   且实际间隔与声明值不一致。现已改读 `cfg.telemetry_interval_secs`。
 const SYSTEM_HEALTH_HEAL_INTERVAL_SECS: u64 = 300; // 5min NT-REPAIR 自愈巡检 (Track 3: D22/D26/D27/D28)
 const GAME_TRAINING_INTERVAL_SECS: u64 = 300; // 5min NT-PLAY 自主进化训练
 const CLUSTERING_INTERVAL_SECS: u64 = 3600; // 1h KB 域聚类巡检
@@ -870,7 +872,11 @@ impl BackgroundLoop {
         spawn_handler!(DAILY_INTEL_INTERVAL_SECS, "daily_intel", |h| h.handle_daily_intel_check().await);
         spawn_handler!(ALWAYS_ON_INTERVAL_SECS, "always_on", |h| h.handle_always_on().await);
         spawn_handler!(cfg.scheduler_interval_secs, "scheduler", |h| h.handle_scheduler_tick().await);
-        spawn_handler!(cfg.evolution_interval_secs, "evolve", |h| h.handle_evolve().await);
+        // ⭐ 2026-10-07 接线：此前错读 `evolution_interval_secs`（**另一个字段**，
+        //   Default 3600），而 `handle_evolve` 的**正确驱动项**是
+        //   `evolve_interval_secs`（Default 120）⇒ 改 `evolve_interval_secs`
+        //   完全无效，且实际间隔是声明值的 30 倍。
+        spawn_handler!(cfg.evolve_interval_secs, "evolve", |h| h.handle_evolve().await);
         spawn_handler!(cfg.nt_world_sense_interval_secs, "world_sense", |h| h.handle_world_sense().await);
         #[cfg(feature = "stealth-net")]
         // ⭐ **接线 `proxy_enabled`**（2026-10-07，此前是「未接线规格」）：
@@ -956,7 +962,13 @@ impl BackgroundLoop {
         spawn_handler!(MARKET_RE_EVAL_INTERVAL_SECS, "market_re_eval", |h| h.handle_market_re_evaluation().await);
         // ── G29 隐私聚合遥测 (R-P79): 60s 周期把全局 TelemetryStore 数值指标喂
         //    AnomalyDetector 做 spike/drop 检测, 告警经 EventBus 注入意识监控 ──
-        spawn_handler!(TELEMETRY_INTERVAL_SECS, "telemetry", |h| h.handle_telemetry().await);
+        // ⭐ 2026-10-07 接线（裁定 A：接线而非删字段）：此前用**硬编码常量**
+        //   `TELEMETRY_INTERVAL_SECS = 60`，而 `config.telemetry_interval_secs`
+        //   的 Default 是 **300** ⇒ 配置项形同虚设，用户改它无效，
+        //   且实际间隔（60）与声明值（300）**不一致** —— 典型的
+        //   「功能已实现、配置没接」（对照 commit 9d7bdfa0 同型）。
+        //   ⇒ 改读 `cfg`，并删掉那个常量（它此后再无引用）。
+        spawn_handler!(cfg.telemetry_interval_secs, "telemetry", |h| h.handle_telemetry().await);
         // 意识体智慧周期 — 价值观学习 + 叙事整合 + 规则结晶 + GC (E1)
         {
             const WISDOM_TICK_INTERVAL_SECS: u64 = 300; // 5 min
