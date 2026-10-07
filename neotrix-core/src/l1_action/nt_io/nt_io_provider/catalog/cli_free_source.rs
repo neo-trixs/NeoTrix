@@ -156,6 +156,86 @@ impl ModelSource for CliFreeSource {
     }
 }
 
+/// freebuff：本机 CLI 后端的免费模型发现源。
+///
+/// freebuff **不提供** `models` 列表/headless completion，所以无法走
+/// `CliFreeSource` 的 `<cli> models` 解析路径；它的 Chat 端点经
+/// `CODEBUFF_API_KEY` + OpenAI 兼容 `/api/v1` 暴露。因此本源只在
+/// `freebuff --version` 可跑时，把 settings.json 里记录的免费档默认模型
+/// 上报为一条 `cloud_free` 条目（provider_type 复用 CustomProxy：
+/// 语义上 freebuff 就是 OpenAI 兼容的自定义端点，不新增枚举变体）。
+pub struct FreebuffFreeSource {
+    command: String,
+    timeout: Duration,
+}
+
+impl FreebuffFreeSource {
+    pub fn new() -> Self {
+        Self {
+            command: "freebuff".to_string(),
+            timeout: Duration::from_secs(10),
+        }
+    }
+    pub fn with_command(mut self, command: impl Into<String>) -> Self {
+        self.command = command.into();
+        self
+    }
+}
+
+impl Default for FreebuffFreeSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub fn freebuff_base_url() -> String {
+    std::env::var("NEOTRIX_FREEBUFF_URL")
+        .unwrap_or_else(|_| "https://www.codebuff.com/api/v1".to_string())
+}
+
+impl ModelSource for FreebuffFreeSource {
+    fn name(&self) -> &str {
+        "freebuff"
+    }
+    fn category(&self) -> ProviderCategory {
+        ProviderCategory::Cloud
+    }
+    fn discover(&self) -> Vec<UnifiedModelEntry> {
+        let ok = run_capture(
+            &self.command,
+            &["--version".to_string()],
+            self.timeout,
+        )
+        .map(|o| o.trim().len() > 0)
+        .unwrap_or(false);
+        if !ok {
+            return Vec::new();
+        }
+        let model = std::env::var("NEOTRIX_FREEBUFF_MODEL")
+            .unwrap_or_else(|_| "glm-5.3-flash-2026-09-05".to_string());
+        let mut e = UnifiedModelEntry::cloud_free(
+            "freebuff",
+            &model,
+            &format!("{model} (Freebuff, free)"),
+            &freebuff_base_url(),
+            "free",
+            true,
+            Some("CODEBUFF_API_KEY"),
+            LlmProviderType::CustomProxy,
+        );
+        e.source = "freebuff".to_string();
+        vec![e]
+    }
+    fn is_available(&self) -> bool {
+        run_capture(
+            &self.command,
+            &["--version".to_string()],
+            Duration::from_secs(5),
+        )
+        .is_ok()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,4 +314,12 @@ mod tests {
         assert!(e.is_free);
         assert!(!e.requires_api_key);
     }
+
+    #[test]
+    fn freebuff_free_source_unavailable_command_empty() {
+        let src = FreebuffFreeSource::new().with_command("/nonexistent-freebuff-xyz");
+        assert!(src.discover().is_empty());
+        assert!(!src.is_available());
+    }
+
 }

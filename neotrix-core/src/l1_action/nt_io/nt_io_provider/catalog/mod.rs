@@ -12,4 +12,4 @@ pub use registry::*;
 pub use discovery::*;
 pub use gateway_adapter::GatewayV2Adapter;
 pub use model_pool::{UnifiedModelPool, UnifiedModelEntry, ModelSource, LocalGgufSource, CloudFreeSource, LocalEndpointSource};
-pub use cli_free_source::{CliFreeSource, parse_models_list, is_free_model_id, is_free_model_id_with, zen_base_url};
+pub use cli_free_source::{CliFreeSource, parse_models_list, is_free_model_id, is_free_model_id_with, zen_base_url, FreebuffFreeSource, freebuff_base_url};
