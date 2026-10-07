@@ -3,7 +3,26 @@
 //! Aggregates data from multiple sources for digital footprint analysis,
 //! technical fingerprinting, and threat profile generation.
 //!
-//! All external data collection calls go through `egress_privacy_guard`.
+//! ⛔ **2026-10-07 删除了原文第 6 行「All external data collection calls go
+//! through `egress_privacy_guard`.」** 该声明**与代码不符**：
+//! - 全文 `egress_privacy_guard(` **调用数 = 0**（只剩本段与 `:491` 一句注释）
+//! - `OsintCollector::new()` 是 `reqwest::Client::builder()` **直呼**（`:236-238`）
+//! - 且真实 guard 的签名是 `egress_privacy_guard(&mut LlmRequest, DataTrust, &str)`
+//!   （`l1_action/nt_io/nt_io_provider/common/privacy_guard.rs:355`），
+//!   **接收 `LlmRequest`，不接受 `reqwest::Client`** ⇒ 本模块即使想调也调不上
+//!
+//! ## ⛔ 本模块的三条未决问题（接线前必须先裁）
+//!
+//! 1. **域错位**：OSINT 采集属**感知**（L2），而 `l2_perception/nt_world/osint/`
+//!    有 29 个模块且**是活的**（被 `nt_core_self_test_integration.rs` 消费）。
+//!    本模块是 L3 embodiment 下的**第二份、未接线**副本。
+//! 2. **零消费者**：全仓 `--glob '*.rs'` 实测 `OsintCollector` 与 `nt_shield::osint`
+//!    **零外部引用**（`nt_shield/mod.rs:32` 仅 `pub mod`）。12 个 `#[test]` 齐全
+//!    ⇒ 形态是「已建 + 已测 + 未接线」，按本仓既有裁决**不删，只标注**。
+//! 3. **本文件自带 `#![allow(dead_code)]`** ⇒ 它自己压掉了编译器的未用信号。
+//!
+//! ⇒ 接线方向：**以 L2 的 `nt_world/osint` 为真源**，本模块要么转门面、要么归档。
+//! 属 roadmap `T1-6`，本轮只让三处声明与实现一致。
 
 #![allow(dead_code)]
 
@@ -486,9 +505,19 @@ impl OsintCollector {
     }
 
     /// Apply egress privacy guard for external OSINT calls.
+    ///
+    /// ⛔ **2026-10-07 标注：此函数是空实现，不施加任何 guard。**
+    /// 它被 `fetch_from_source` 调用（`:430`）⇒ 读起来像"外呼前已过 guard"，
+    /// 实际恒 `Ok(())` 无操作。真正的 guard 是
+    /// `l1_action/nt_io/nt_io_provider/common/privacy_guard.rs::egress_privacy_guard`，
+    /// 签名 `(&mut LlmRequest, DataTrust, &str)` —— **收 `LlmRequest` 而非
+    /// `reqwest::Client`**，所以本模块无法直接复用它。
+    ///
+    /// ⇒ 保持空实现（改签名会波及 12 个测试与 `fetch_from_source` 的错误路径），
+    /// 但**不再让文档声称它做了 scrub**。真正的接线属 roadmap `T1-6`。
     fn apply_egress_guard(&self) -> Result<(), String> {
-        // Scrub internal paths and secrets from any outbound OSINT data
-        // Per egress_privacy_guard pattern: always scrub secrets, redact internal fingerprints
+        // ⛔ 空实现（见上方文档）。TODO(T1-6): 接 `privacy_guard::redact_internals`
+        // 或按 `LlmRequest` 路径改造本模块的外呼层，二者择一。
         Ok(())
     }
 }

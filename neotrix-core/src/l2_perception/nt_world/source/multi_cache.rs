@@ -1,3 +1,10 @@
+//! ⛔ **孤儿接线**：本文件仅被同目录 `cache_warmer.rs` 消费，而 `cache_warmer`
+//! 仅被 `source/mod.rs:248` 的 `pub use` 再导出 ⇒ **全仓零外部消费者**
+//! （已实测：`MultiLevelCache` 在本目录外零命中）。
+//!
+//! 本文件用**真 LRU**（`lru::LruCache` + TTL）；同目录 `search_cache.rs` 其实是
+//! **FIFO**（其原头自称 LRU，2026-10-07 已修正）。
+//! ⇒ 若接线，应以**本文件为真源**，`search_cache.rs` 另行裁决。
 use crate::l2_perception::nt_world::source::types::*;
 use lru::LruCache;
 use std::num::NonZeroUsize;

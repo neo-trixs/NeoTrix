@@ -1,3 +1,7 @@
+//! ⛔ **孤儿接线**：本文件仅被 `source/mod.rs:248` 的 `pub use` 再导出，
+//! **全仓零外部消费者**；它唯一的消费方 `multi_cache.rs` 同样只被它消费
+//! ⇒ `cache_warmer → multi_cache` 构成**自指岛**（两者互为唯一出口，都不通向外部）。
+//! 接线前不改结构，仅标注。
 use crate::l2_perception::nt_world::source::engine::MediaSource;
 use crate::l2_perception::nt_world::source::multi_cache::MultiLevelCache;
 use std::sync::Arc;
