@@ -335,6 +335,35 @@ jobs:
       #
       # ⭐⭐ 用系统 Chrome（脚本内 `channel: 'chrome'`）⇒ ⭐⭐ **免 150MB 浏览器下载**
       # ⭐⭐ （GitHub `ubuntu-latest` 镜像自带 Chrome）。
+      # ⭐⭐⭐⭐⭐ 2026-10-07 修「构建排在门之后」—— 这是**顺序缺陷**，不是配置缺失。
+      #
+      # # 事实链（逐条实测，非推理）
+      #
+      # ① 下面这 9 道门**全部**读 `apps/neobot-desktop/neobot-ui/dist`
+      #    （`nt_dist_freshness.mjs` 就是为此抽的公用件）。
+      # ② `neobot-ui/.gitignore:4` 忽略 `dist/`，`git ls-files` 实测 0 文件入库
+      #    ⇒ CI 的干净检出的里**没有** dist。
+      # ③ 上面唯一的构建是 `pnpm install --frozen-lockfile`；
+      #    实测 `neobot-ui/package.json` **无** postinstall / prepare 钩子，
+      #    且 `neobot-ui/` 无 `pnpm-workspace.yaml` ⇒ install **不会**顺带构建。
+      # ④ 把 dist 移开实测：9 道门全部 rc=1（**原始版同样红**，⛔ 不是本次改动引入）。
+      #
+      # ⇒ 改动前这 9 道门在 CI 里**必然红**，且 GitHub Actions 遇红即跳过后续步骤
+      # ⇒ `cargo test -p neobot-desktop`（89 条）与 `cargo test -p neotrix-neobot`
+      #    （481 条）**从未真正执行过**。
+      #
+      # # 为什么会这样
+      #
+      # `3b3dd3fe`(10-02) 先加 desktop job（含本步骤），`4fee8663`(10-04) 后加这 9 道门，
+      # ⛔ 插入位置落在了构建**之前** —— 而那个 commit 的标题写着
+      # 「9 道 UI 门**首次在 CI 真正生效**」。**陈述与事实分叉**，
+      # 且分叉方向正是「以为门在跑，实际不可能跑」。
+      #
+      # ⓘ 顺带白拿：`build` 脚本是 `tsc --noEmit && vite build`
+      #    ⇒ 提前到门之前，等于给全部 TS 上了类型检查。
+      - name: Build frontend (tsc --noEmit + vite build)
+        run: pnpm run build
+        working-directory: apps/neobot-desktop/neobot-ui
       - name: neobot UI gate — neobot-check-contrast (对比度（AA）)
         run: node scripts/ops/neobot-check-contrast.mjs
       - name: neobot UI gate — neobot-check-convo-groups (会话分组)
@@ -353,10 +382,6 @@ jobs:
         run: node scripts/ops/neobot-check-markdown.mjs
       - name: neobot UI gate — neobot-ui-smoke (UI 冒烟（综合）)
         run: node scripts/ops/neobot-ui-smoke.mjs
-      - name: Build frontend (tsc --noEmit + vite build)
-        run: pnpm run build
-        working-directory: apps/neobot-desktop/neobot-ui
-
       # ⭐⭐ `neobot-desktop`：本次补的核心。此前 CI 一次都没跑过它，
       #   后果是 2026-10-02 那个 P0（前端载荷键 snake_case vs Tauri camelCase ⇒
       #   **消息从不落库、切会话历史永远空**）能带着「全部 UI 门全绿」活下来。
