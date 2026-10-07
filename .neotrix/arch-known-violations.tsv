@@ -1,0 +1,22 @@
+# 已知违反项清单 —— 红蓝对抗（rank_layer_debts）的输入
+#
+# 列（tab 分隔）：
+#   1 path        文件路径
+#   2 line        行号
+#   3 src_layer   源层号 0-6
+#   4 tgt_layer   目标层号 0-6（> src = 反向引用）
+#   5 snippet     原代码片段
+#   6 note        为什么暂不修（基线理由）
+#
+# ⭐ **这份清单非空是门的要求**（check-arch-rules.sh 判据③）：
+#    空清单会让对抗评分报「全部健康」，而那是**误读** —— 它意味着
+#    「没人登记」，不是「没有问题」。
+# ⚠️ 本清单由 `check_architecture_layer_depth` 的实测产出（2465 文件检出 6 处）
+#    人工录入；权威分层裁决仍是 `scripts/check-layer-deps.sh`（干净检出口径）。
+
+neotrix-core/src/l1_action/nt_tui_app.rs	36	1	5	use crate::l5_cognition::nt_crystal_core::…	L1→L5 跨 4 层。已在 layer-deps-baseline.txt 登记；改哪一层属跨窗口架构决策，需人裁决。
+neotrix-core/src/l1_action/nt_action_facade.rs	11	1	4	use crate::l4_emotion::nt_memory::…	走 facade 通道 ⇒ AGENTS.md §4.2 认定合法；红蓝对抗已压低其分数（-0.35）。
+neotrix-core/src/l1_action/nt_io/universal_model/traits.rs	10	1	2	use crate::l2_perception::nt_core_llm::…	相邻层跳跃；权威门按目录扫描未必覆盖此形态。
+neotrix-core/src/l1_action/nt_file_ability/tests.rs	12	1	2	use crate::l2_perception::nt_core_hcube::vsa::…	在 tests 内 ⇒ 不影响生产编译路径。
+neotrix-core/src/l3_embodiment/nt_shield/shield_core/safety_kernel.rs	12	3	5	use crate::l5_cognition::nt_jev::…	盾层引认知层裁决器；已在 baseline 登记为已知债。
+neotrix-core/src/l3_embodiment/nt_shield/shield_core/guard.rs	16	3	5	use crate::l5_cognition::nt_jev::…	同上。

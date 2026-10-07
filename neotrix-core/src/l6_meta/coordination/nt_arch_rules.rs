@@ -73,6 +73,19 @@ impl std::fmt::Display for RejectReason {
 }
 
 /// 规则注册表 —— **开集**（可随时注册新规则），但每条受三条准入判定约束。
+///
+/// # 规则注册表（`.neotrix/arch-rules.tsv`）与本结构的对应
+///
+/// | 规则 | 本文件的实现点 | 门 |
+/// |---|---|---|
+/// | **R1** 反向层依赖 | `scan_layer_file`（判定 `tgt > src`） | `scripts/check-layer-deps.sh` |
+/// | **R2** 层词汇单一真源 | [`ArchLayer::REAL_DIRS`](crate::l6_meta::nt_core_self_review::nt_review_types::ArchLayer::REAL_DIRS) | `scripts/check-arch-rules.sh` |
+/// | **R3** 规则三准入 | [`RuleRegistry::register`] 的三条 `RejectReason` | `scripts/check-arch-rules.sh` |
+/// | **R4** 对抗不代替裁决 | [`DebtVerdict::needs_human`]（`score_layer_debt` 恒填充） | `scripts/check-arch-rules.sh` |
+///
+/// ⛔ 改本文件时**同步** `.neotrix/arch-rules.tsv` —— 门会校验
+/// 「每个规则 id 在本文件有实现引用」，反向（改了实现没改表）由
+/// `arch-rules-baseline.txt` 的双向差集抓住。
 #[derive(Debug, Default)]
 pub struct RuleRegistry {
     rules: BTreeMap<String, ArchRuleMeta>,

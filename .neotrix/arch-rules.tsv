@@ -1,0 +1,24 @@
+# 架构规则注册表（裁定 ①A：开集可注册，但每条必须可证伪 + 有消费者 + 进豁免基线）
+#
+# 列（tab 分隔）：
+#   1 id              规则 id（必须与 nt_arch_rules.rs 中的实现引用一致）
+#   2 falsifiable_by  什么输入会让这条规则为假（必填 —— 空则不得注册）
+#   3 serves          这条规则服务的模块或门（必填 —— 无消费者即装饰）
+#
+# ⛔ 禁止写「规则是无限的」。D-16（NEOTRIX-MASTER-BLUEPRINT §20）：
+#    理解 ＝ 在未见过的数据上描述长度最短。规则无限 = complexity 趋于无穷
+#    ⇒ 按 D-16 不是更自知，是更不自知。
+# ⛔ 行尾追加 `VIOLATES: R1,R2` 声明本规则当前**已知违反**的 id，
+#    那些 id 必须逐个登记在 .neotrix/arch-rules-baseline.txt。
+#
+# 手法来源：anonrouter/confidential-content-plane（Apache-2.0，只取设计）
+#   —— 「声明一个边界要由机器强制，而非信任文档」。
+
+# 反向层依赖：低层模块引用高层模块
+R1	喂一个 src_layer < tgt_layer 的 use 行 ⇒ detect_import_layer 报反向	neotrix-core/src/l6_meta/nt_core_self_review/nt_review_runner.rs + scripts/check-layer-deps.sh
+# 层词汇单一真源：REAL_DIRS 是唯一定义处
+R2	在 REAL_DIRS 之外再写一份层名字符串匹配（rg 应只命中 nt_review_types.rs）	neotrix-core/src/l6_meta/nt_core_self_review/nt_review_types.rs + scripts/check-arch-rules.sh
+# 架构规则三准入：可证伪 + 有消费者 + 进基线
+R3	注册一条 falsifiable_by 为空或 serves 为空的规则 ⇒ register 必须返回 Err	neotrix-core/src/l6_meta/coordination/nt_arch_rules.rs + scripts/check-arch-rules.sh
+# 红蓝对抗不得代替人工裁决
+R4	把 needs_human 改成空串 ⇒ score_layer_debt 的 verdict 必须仍提示裁决点	neotrix-core/src/l6_meta/coordination/nt_arch_rules.rs
