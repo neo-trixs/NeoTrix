@@ -818,7 +818,7 @@ impl BackgroundLoop {
                         $name
                     );
                 }
-                spawn_handler!($cfgv.$field, $name, |$lock| $body);
+                spawn_handler!(@impl $cfgv.$field, $name, |$lock| $body);
             }};
             // ── arm 2：只给字段名 ⇒ body 里必须出现 handle_<去后缀名> ──
             ($cfgv:ident, $field:ident, |$lock:ident| $body:expr) => {{
@@ -834,9 +834,37 @@ impl BackgroundLoop {
                         want
                     );
                 }
-                spawn_handler!($cfgv.$field, "handler", |$lock| $body);
+                spawn_handler!(@impl $cfgv.$field, "handler", |$lock| $body);
             }};
             // ── 旧分支：常量间隔，字段路径直接拒绝 ──
+            // ⛔ 内部委托分支（不参与 ban 检查）—— 禁止直接手写 `spawn_handler!(@impl ...)`
+            (@impl $interval:expr, $name:literal, |$lock:ident| $body:expr) => {{
+                let h = this.clone();
+                let mut rx = shutdown_rx.clone();
+                self.handles.push(tokio::spawn(async move {
+                    let mut ticker = tokio::time::interval(
+                        tokio::time::Duration::from_secs($interval));
+                    loop {
+                        tokio::select! {
+                            biased;
+                            _ = ticker.tick() => {
+                                tracing::debug!("[bg-tick] {} fired", $name);
+                                let mut $lock = h.lock().await;
+                                tracing::debug!("[bg-tick] {} acquired lock", $name);
+                                if let Err(e) = $lock.denylist.check($name) {
+                                    log::warn!("[bg-loop] handler '{}' 被 denylist gate 拦截: {}", $name, e);
+                                    continue;
+                                }
+                                $body;
+                            }
+                            _ = rx.changed() => {
+                                log::trace!("[bg] handler shutting down (interval={})", $interval);
+                                break;
+                            }
+                        }
+                    }
+                }));
+            }};
             ($interval:expr, $name:literal, |$lock:ident| $body:expr) => {{
                 if stringify!($interval).starts_with("cfg.") {
                     panic!(
@@ -1436,6 +1464,118 @@ mod tests {
             "metacog_interval_secs",
             "h.handle_awareness().await"
         ));
+    }
+
+    // ── 循环启动 smoke：真实接线计划走一遍 spawn_handler! 校验 (CI 覆盖) ──
+    //
+    // ⭐ 为什么需要本测试：arm1/arm2 的校验语句**只在 `start()` 运行时执行**
+    //    （`stringify!` 实参埋在宏调用点里），上面的纯函数单测只覆盖「判据
+    //    函数」本身 ⇒ 新接线写错（字段↔handler 错配）此前能溜过 CI。
+    //
+    // ⭐ 可行性依据（裁定选 a，未退化为 audit 函数 b）：
+    //    ① `BackgroundLoop::new(brain)` 已被 mod.rs 既有测试使用
+    //       （构造副作用与先例相同，无新增外部进程依赖）；
+    //    ② `start()` 函数体自身**零 `.await`**（L394–L1083 全同步），
+    //       current_thread runtime 下 spawn 的任务在测试返回前**从不被 poll**
+    //       ⇒ 48 个 handler body 一律不执行，只有宏里的校验 `if` 真跑；
+    //    ③ 校验失败即 `panic!`（消息带字段名）⇒ 本测试红，CI 可见。
+    //
+    // ⛔ 故意**不**调 `shutdown()`：shutdown 内部 `await` 会让 runtime
+    //    调度已 spawn 的任务 ⇒ `tokio::time::interval` 首 tick 立即就绪
+    //    ⇒ 全部 handler 真实执行一轮（扫 ~/.claude/skills、cwd 等）。
+    //    直接 drop：JoinHandle detach，runtime drop 时任务未 poll 即弃。
+    #[tokio::test]
+    async fn start_smoke_真实接线计划下23个cfg校验全部通过() {
+        use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
+        use crate::l5_cognition::nt_mind::nt_mind_background_loop::BackgroundLoop;
+
+        let brain = std::sync::Arc::new(tokio::sync::RwLock::new(SelfIteratingBrain::new()));
+        let mut bg = BackgroundLoop::new(brain);
+
+        // 23 个 cfg 调用点的 name_ok/body_ok 校验全部在此同步执行；
+        // 任何错配 ⇒ start() panic ⇒ 本测试红（panic 消息含字段名）。
+        bg.start().await;
+
+        assert!(bg.started, "start() 完成后 started 必须置位");
+        // 48 个 spawn_handler!（23 cfg 校验分支 + 25 常量分支）+ 1 个 EventBus 消费者。
+        // 本断言专抓「静默删掉某条接线」——删调用点不会 panic，但任务数会掉。
+        // 新增/删除 handler 时必须同步更新此数。
+        #[cfg(feature = "stealth-net")]
+        const EXPECTED_TASKS: usize = 49;
+        #[cfg(not(feature = "stealth-net"))]
+        const EXPECTED_TASKS: usize = 48;
+        assert_eq!(
+            bg.handles.len(),
+            EXPECTED_TASKS,
+            "spawn 任务数漂移 — 有 handler 被增删而未同步本断言"
+        );
+    }
+
+    // ── 23 个 cfg 接线点逐一可见的 #[test] 覆盖 ──
+    //
+    // 与 smoke 测试的分工：smoke 吃**真实计划**（宏调用点现场执行），
+    // 本表给**逐字段** CI 输出并锁死「23」这个数。两表抄自 run.rs
+    // L895–L1037 的真实调用点；smoke 测试兜底防漂移（真计划错配会 panic）。
+
+    /// arm1（字段 + 显式 handler 名）⇒ 走 `nt_bg_wiring_name_ok`。
+    const CFG_WIRING_ARM1: &[(&str, &str)] = &[
+        ("save_interval_secs", "save"),
+        ("consolidate_interval_secs", "consolidate"),
+        ("refinement_interval_secs", "refinement"),
+        ("exploration_interval_secs", "exploration"),
+        ("kb_guard_interval_secs", "kb_guard"),
+        ("kb_backup_interval_secs", "kb_backup"),
+        ("workspace_guard_interval_secs", "workspace_guard"),
+        ("scheduler_interval_secs", "scheduler"),
+        ("evolve_interval_secs", "evolve"),
+        ("nt_world_sense_interval_secs", "world_sense"),
+        ("proxy_heartbeat_interval_secs", "proxy_heartbeat"),
+        ("telemetry_interval_secs", "telemetry"),
+    ];
+
+    /// arm2（只给字段）⇒ 走 `nt_bg_wiring_body_ok`；body 文本抄自真实调用点。
+    const CFG_WIRING_ARM2: &[(&str, &str)] = &[
+        ("goal_interval_secs", "h.handle_goal().await"),
+        ("knowledge_chain_interval_secs", "h.handle_knowledge_chain().await"),
+        ("knowledge_aging_interval_secs", "h.handle_knowledge_aging().await"),
+        ("crystallization_interval_secs", "h.handle_crystallization().await"),
+        ("nt_act_voice_interval_secs", "h.handle_nt_act_voice_tick().await"),
+        ("plugin_interval_secs", "h.handle_plugin_tick().await"),
+        ("curiosity_interval_secs", "h.handle_curiosity().await"),
+        ("world_prediction_interval_secs", "h.handle_prediction().await"),
+        ("metacog_interval_secs", "h.handle_awareness().await"),
+        ("cleanup_interval_secs", "h.handle_cleanup().await"),
+        ("consciousness_interval_secs", "h.handle_consciousness_tick().await"),
+    ];
+
+    #[test]
+    fn cfg接线计划_23个调用点逐一通过校验() {
+        assert_eq!(CFG_WIRING_ARM1.len(), 12, "arm1 调用点数漂移（对照 run.rs 调用点）");
+        assert_eq!(CFG_WIRING_ARM2.len(), 11, "arm2 调用点数漂移（对照 run.rs 调用点）");
+        assert_eq!(CFG_WIRING_ARM1.len() + CFG_WIRING_ARM2.len(), 23);
+
+        for (field, name) in CFG_WIRING_ARM1 {
+            assert!(
+                super::nt_bg_wiring_name_ok(field, name),
+                "arm1 接线错配：字段 `{field}` 不应驱动 handler `{name}`"
+            );
+        }
+        for (field, body) in CFG_WIRING_ARM2 {
+            assert!(
+                super::nt_bg_wiring_body_ok(field, body),
+                "arm2 接线错配：字段 `{field}` 的 body `{body}` 缺对应 handle_ 调用"
+            );
+        }
+
+        // 变异证据：判据若被掏空成恒真，下列断言立刻红
+        assert!(
+            !super::nt_bg_wiring_name_ok("evolve_interval_secs", "evolution"),
+            "变异守卫：错配 handler 名必须被拒"
+        );
+        assert!(
+            !super::nt_bg_wiring_body_ok("goal_interval_secs", "h.handle_cleanup().await"),
+            "变异守卫：body 缺对应 handle_ 调用必须被拒"
+        );
     }
 
     #[test]
