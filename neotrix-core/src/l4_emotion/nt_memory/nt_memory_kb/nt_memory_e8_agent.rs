@@ -77,8 +77,22 @@ pub struct E8AgentConfig {
     /// 每轮检索 top_k
     pub top_k: usize,
     /// 图路径推进跳数上限
+    ///
+    /// ⛔⚠️ **未接线规格**（审计裁定 2026-10-07，零读点）。
+    ///
+    /// 全仓仅出现于**声明**（L80）与 `Default`（L90）⇒ 零消费。
+    /// ⛔ 而**图遍历本身从未实现**：本文件 576 行，`hop` / `graph_neighbor` /
+    ///    `adjacency` / `decay_factor` **零命中**（唯一 `0.5` 在 L287 是
+    ///    **无关的置信度字面量** `term_match_ratio * 0.5 + r.score * 0.5`）。
+    ///
+    /// ⚠️ 易误判处：`test_run_rewrite_loop_records_transitions`（L489）
+    ///    里的 `"multi hop query"` **只是查询字符串**，其注释明写
+    ///    「title/summary 刻意不含查询词 ⇒ **仅靠 score 判定**」
+    ///    ⇒ ⛔ 该测试**不**验证图遍历，切勿据其命名误判为已实现。
     pub graph_hop_limit: usize,
     /// 图跳衰减系数
+    ///
+    /// ⛔⚠️ **未接线规格**，理由同 [`Self::graph_hop_limit`]。
     pub decay: f64,
 }
 

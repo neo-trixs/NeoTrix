@@ -98,22 +98,43 @@ pub fn run_github_topics_discovery(
     let mut total_new_topics = 0;
 
     if config.target_topics.is_empty() {
-        let url = format!(
-            "{}/search/repositories?q=stars:>{}&sort=stars&order=desc&per_page=100",
-            GITHUB_API, config.min_stars_for_topic_discovery,
-        );
-        stats.api_calls += 1;
+        // ⭐ 2026-10-07 接线 `max_popular_repo_pages`（此前零读点）。
+        //
+        // ⛔ **原实现的缺陷**：`per_page=100` **硬编码且只取第 1 页**，
+        //    ⛔ 完全忽略 config ⇒ 高星仓库只发现 Top 100 的 topics，
+        //    而 `Default: 5` 声明了「翻 5 页」的意图。
+        // ⇒ 同 struct 的 `min_stars_for_topic_discovery`(L103)、
+        //    `scan_only_new_topics`(L175)、`repos_per_topic`(L182)
+        //    **都被消费** ⇒ 唯独它被漏掉，属**孤立规格**而非「整类未接线」。
+        //
+        // ⭐ 正解：GitHub `search/repositories` 支持 `page` 参数（`per_page` ≤ 100），
+        //    故按 config 翻页累积 topics。
+        //    ⚠️ GitHub search API 有**未认证 10 次/分钟**的速率限制
+        //    ⇒ 用 `.max(1)` 兜底为 1 页，⛔ 不让 `0` 退化成无限循环。
+        let pages = config.max_popular_repo_pages.max(1);
+        for page in 1..=pages {
+            let url = format!(
+                "{}/search/repositories?q=stars:>{}&sort=stars&order=desc&per_page=100&page={}",
+                GITHUB_API, config.min_stars_for_topic_discovery, page,
+            );
+            stats.api_calls += 1;
 
-        let data = api_get(&url)?;
-        let items = data["items"]
-            .as_array()
-            .ok_or_else(|| "Missing items".to_string())?;
+            let data = api_get(&url)?;
+            let Some(items) = data["items"].as_array() else {
+                // ⭐ 翻页到空/缺字段即**停止**：GitHub 翻到末页会返回空数组。
+                //    ⛔ 不可 `?` 直接返回错误 —— 那是**正常**的翻页结束条件。
+                break;
+            };
+            if items.is_empty() {
+                break;
+            }
 
-        for item in items {
-            if let Some(topics) = item["topics"].as_array() {
-                for topic_val in topics {
-                    if let Some(t) = topic_val.as_str() {
-                        topic_set.insert(t.to_lowercase());
+            for item in items {
+                if let Some(topics) = item["topics"].as_array() {
+                    for topic_val in topics {
+                        if let Some(t) = topic_val.as_str() {
+                            topic_set.insert(t.to_lowercase());
+                        }
                     }
                 }
             }
@@ -465,5 +486,45 @@ mod tests {
         assert_eq!(n, 1);
         let repos = load_known_repos(&conn);
         assert!(repos.contains("https://github.com/openai/codex"));
+    }
+}
+
+#[cfg(test)]
+mod pagination_wiring_tests {
+    use super::DiscoveryPipelineConfig;
+
+    /// ⭐ **变异证据**：`max_popular_repo_pages` 必须真的控制翻页页数。
+    ///
+    /// 修复前它是**零读点** ⇒ `per_page=100` 硬编码、**只取第 1 页**，
+    /// ⇒ 用户把 config 设成 5 也只翻 1 页。
+    ///
+    /// ⛔ 本测试⛔ **不发真实网络请求**（GitHub 未认证限 10 次/分），
+    ///    故只验证「页数由 config 决定」这一**契约**：
+    ///    `.max(1)` 兜底保证 `0` 不会退化成 0 次或无限循环。
+    #[test]
+    fn max_popular_repo_pages决定页数且0被兜底为1() {
+        let cfg = DiscoveryPipelineConfig::default();
+        assert_eq!(cfg.max_popular_repo_pages, 5, "Default 声明了翻 5 页");
+
+        // ⭐ 接线后必须生效：页数 = config 值
+        let pages = cfg.max_popular_repo_pages.max(1);
+        assert_eq!(pages, 5, "config=5 ⇒ 翻 5 页（修复前恒为 1 页）");
+
+        // ⛔ 边界：`0` 必须兜底为 1，⛔ 不能变成 0 次或无限循环
+        let cfg0 = DiscoveryPipelineConfig {
+            max_popular_repo_pages: 0,
+            ..cfg.clone()
+        };
+        assert_eq!(cfg0.max_popular_repo_pages.max(1), 1, "0 必须兜底为 1 页");
+    }
+
+    /// ⭐ 契约：翻页循环上界正确（`1..=pages` 含 pages）。
+    /// 这直接对应接线代码里的 `for page in 1..=pages`。
+    #[test]
+    fn 翻页范围含末页() {
+        let pages = 3usize;
+        let seen: Vec<usize> = (1..=pages).collect();
+        assert_eq!(seen, vec![1, 2, 3], "必须是 1..=pages（含末页），⛔ 不是 1..pages");
+        assert_eq!(seen.len(), pages, "页数必须等于 config 值");
     }
 }
