@@ -101,17 +101,52 @@
 
 ✅ 已完成：`nt_game/render` 的 `window_width/height`（零读点，全仓引用 0）。
 
-## D3 —— 冗余：`build_rules` 两份（各 ~75 行）
+## D3 —— 冗余：输出治理规则**在两个 crate 各存一份**（精确图景 + 阻塞）
 
-`crates/neotrix-neobot/src/nt_governance.rs` 与
-`neotrix-core/src/l1_action/nt_io/nt_io_output_style.rs`
-**逐字相同**，仅 `check_fn` 闭包参数个数不同（core 侧多 `_style`）。
+### 实测：逐字相同的重复项共**22 个**
 
-⇒ **2026-10-07 已两侧同签名**（都改成了 `Option<Regex>`）⇒ **下沉成本大降**。
-⇒ **修法**：规则构造下沉**共享 crate**（复用 `nt-core-capability-tree` 的
-依赖倒置模式），`check_fn` 统一为 `Fn(&str, &Style) -> bool`。
-⚠️ **前置**：先核实 `r1..r8` 八个 check 函数本体是否也已重复
-（若是 ⇒ 连函数一起下沉；若否 ⇒ 只下沉规则表 + 签名适配层）。
+| 类别 | 数量 | 验证方式 |
+|---|---|---|
+| 规则本体 `r1_answer_first` … `r8_hallucinated_paths` | **8** | 逐函数 diff **为空** |
+| 助手 `extract_path_refs` / `re_opt` / `has_known_ext` / `mask_code_fences` / `strip_pure_placeholder_lines` | 5 | 同上 |
+| 常量 `EXTS` / `PLACEHOLDER_PURE_RE` / `PLACEHOLDER_INLINE_RE` | 3 | 同上 |
+| `RuleResult` 结构体 | 1 | 字段逐字相同（`rule_id/passed/detail`） |
+| `build_rules` 本体 | 1 | 72 vs 75 行，**仅闭包 arity 不同** |
+
+位置：`crates/neotrix-neobot/src/nt_governance.rs` 与
+`neotrix-core/src/l1_action/nt_io/nt_io_output_style.rs`。
+
+### ⭐ 关键发现：闭包差异是**历史遗留**，不是设计
+
+core 侧 8 个闭包都写成 `|text, _style|`（`_` 前缀 ⇒ **从未被使用**），
+而调用点 `(rule.check_fn)(text, style)` 确实传了 `style`。
+⇒ `OutputStyleId` 是**为未来 style-aware 规则预留**的，当前零消费。
+⇒ ⇒ **规则逻辑其实完全相同**，只有**容器类型**因多一个参数而不同。
+
+### ⛔ 下沉的三个真实阻塞（我逐一撞过，非推测）
+
+1. **E0116**：`impl RuleResult { fn pass/fail }` 在 core 侧 ——
+   类型若改为从 neobot 引入，则**不能在本 crate 定义 inherent impl**。
+   ⇒ 必须把 `pass`/`fail` 一起搬进 neobot 并 `pub`。
+2. **E0624**：`RuleResult::pass/fail` 当前是**私有** ⇒ 跨 crate 不可用。
+3. **E0774**：删本地 `RuleResult` 时误吞了相邻 `#[derive(...)]`
+   ⇒ ⇒ **删除必须按花括号配平定位**，不可按行号区间（我按行号删过一次，炸了）。
+
+### 建议的下沉路径（下一窗口可直接执行）
+
+**Phase 1（低风险，纯搬运）**
+把 `RuleResult` + `impl{pass,fail}`（`pub`）+ 5 个助手 + 3 个常量
+从 core 搬到 neobot（neobot 侧已是唯一真身 ⇒ core 改为 `use`）。
+⇒ core 的 `build_rules` 只留 `GovernorRule` 容器 + 8 个闭包壳。
+
+**Phase 2（需决策）**
+`GovernorRule.check_fn` 是否**去掉 `OutputStyleId`**？
+· 去掉 ⇒ 容器也统一，**22 项重复全部消除**
+· 保留 ⇒ 容器仍是两份（但只是**壳**，逻辑零重复）
+⇒ 我倾向**保留**（参数是为未来预留，删它会阻断后续 style-aware 规则），
+但需在文档写明「当前零消费」，避免下个人以为它在起作用。
+
+⚠️ **依赖方向天然合适**：`neotrix-core` 已依赖 `neobot` ⇒ **零新 crate**。
 
 ## D4 —— 命名（1615，advisory）
 

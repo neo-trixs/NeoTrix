@@ -209,26 +209,26 @@ pub struct GovernorRule {
 }
 
 /// 已知文件扩展名 (R07/R08 路径引用识别)。
-const EXTS: &[&str] = &[
+pub const EXTS: &[&str] = &[
     "rs", "md", "toml", "py", "ts", "tsx", "js", "jsx", "json", "yaml", "yml", "sh", "bash",
     "go", "c", "cpp", "cc", "h", "hpp", "rb", "lua", "sql", "vue", "svelte", "css", "scss",
     "html", "svg", "txt", "xml", "proto", "java", "kt", "swift", "zig", "ex", "cs", "php",
     "ino", "lock", "png", "jpg", "jpeg", "gif", "pdf", "docx", "xlsx", "pptx",
 ];
 
-fn has_known_ext(p: &str) -> bool {
+pub fn has_known_ext(p: &str) -> bool {
     let l = p.to_lowercase();
     EXTS.iter().any(|e| l.ends_with(&format!(".{e}")))
 }
 
 /// 纯占位行 (整行只有占位符) — R04 违规 + auto-fix 可剥离。
-const PLACEHOLDER_PURE_RE: &str = r"^(?:\s*[\[<]?)?(?:\bTODO\b|\bTBD\b|\bFIXME\b|\bPLACEHOLDER\b|lorem ipsum|待补充|待完善|待定|占位|\.\.\.|…)(?:\s*[\]>]?)?$";
+pub const PLACEHOLDER_PURE_RE: &str = r"^(?:\s*[\[<]?)?(?:\bTODO\b|\bTBD\b|\bFIXME\b|\bPLACEHOLDER\b|lorem ipsum|待补充|待完善|待定|占位|\.\.\.|…)(?:\s*[\]>]?)?$";
 
 /// 内联强占位符 (出现在行内即违规) — 全 Latin 加词边界防误伤。
-const PLACEHOLDER_INLINE_RE: &str = r"(?i)\b(TODO|TBD|FIXME|PLACEHOLDER)\b|lorem ipsum";
+pub const PLACEHOLDER_INLINE_RE: &str = r"(?i)\b(TODO|TBD|FIXME|PLACEHOLDER)\b|lorem ipsum";
 
 /// 掩盖 ``` 代码块内容 (路径/语言检查跳过代码内文本)。
-fn mask_code_fences(text: &str) -> String {
+pub fn mask_code_fences(text: &str) -> String {
     let mut masked = String::new();
     let mut in_fence = false;
     for line in text.lines() {
@@ -251,7 +251,7 @@ fn is_placeholder_only(line: &str, pure_re: &Regex) -> bool {
 }
 
 /// 提取文本中的路径引用 (反引号 + 裸路径)，排除 `file:line` 形态 (R08 处理)。
-fn extract_path_refs(
+pub fn extract_path_refs(
     text: &str,
     backtick_re: &Option<Regex>,
     bare_re: &Option<Regex>,
@@ -284,7 +284,7 @@ fn extract_path_refs(
 // ── 各规则检查实现 (纯函数, 便于单测) ───────────────────────────────
 
 /// R01 答案前置: 禁止以"让我先/让我想想"等铺垫推迟答案。
-fn r1_answer_first(text: &str) -> RuleResult {
+pub fn r1_answer_first(text: &str) -> RuleResult {
     let lines: Vec<&str> = text.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
     let Some(first) = lines.first() else {
         return RuleResult::pass(1, "空输入，无前置铺垫问题");
@@ -308,7 +308,7 @@ const HEDGES: &[&str] = &[
     "probably", "maybe", "perhaps", "i think", "i guess", "it seems",
 ];
 
-fn r2_no_hedging(text: &str) -> RuleResult {
+pub fn r2_no_hedging(text: &str) -> RuleResult {
     let lower = text.to_lowercase();
     let mut found: Vec<(String, usize)> = Vec::new();
     let mut total = 0usize;
@@ -328,7 +328,7 @@ fn r2_no_hedging(text: &str) -> RuleResult {
 }
 
 /// R03 章节必须有实内容: 标题后不得紧跟空行/纯占位/纯符号。
-fn r3_sections_concrete(text: &str, pure_re: &Option<Regex>) -> RuleResult {
+pub fn r3_sections_concrete(text: &str, pure_re: &Option<Regex>) -> RuleResult {
     let Some(pure_re) = pure_re else {
         return RuleResult::pass(3, "R03 未触发：placeholder_pure 正则不可用");
     };
@@ -366,7 +366,7 @@ fn r3_sections_concrete(text: &str, pure_re: &Option<Regex>) -> RuleResult {
 }
 
 /// R04 禁止空/占位文本: TODO/TBD/待补充/lorem ipsum 等。
-fn r4_no_placeholder(text: &str, pure_re: &Option<Regex>, inline_re: &Option<Regex>) -> RuleResult {
+pub fn r4_no_placeholder(text: &str, pure_re: &Option<Regex>, inline_re: &Option<Regex>) -> RuleResult {
     let (Some(pure_re), Some(inline_re)) = (pure_re, inline_re) else {
         return RuleResult::pass(4, "R04 未触发：placeholder 正则不可用");
     };
@@ -385,7 +385,7 @@ fn r4_no_placeholder(text: &str, pure_re: &Option<Regex>, inline_re: &Option<Reg
 }
 
 /// R05 单消息长度上限。
-fn r5_max_length(text: &str, max_chars: usize) -> RuleResult {
+pub fn r5_max_length(text: &str, max_chars: usize) -> RuleResult {
     let n = text.chars().count();
     if n > max_chars {
         RuleResult::fail(5, format!("单消息 {n} 字符 > 上限 {max_chars}"))
@@ -395,7 +395,7 @@ fn r5_max_length(text: &str, max_chars: usize) -> RuleResult {
 }
 
 /// R06 禁止重复样板: 相同长行 (≥25 字符) 出现 ≥3 次。
-fn r6_no_dup_boilerplate(text: &str) -> RuleResult {
+pub fn r6_no_dup_boilerplate(text: &str) -> RuleResult {
     let mut counts: HashMap<String, usize> = HashMap::new();
     for line in text.lines() {
         let t = line.trim();
@@ -415,7 +415,7 @@ fn r6_no_dup_boilerplate(text: &str) -> RuleResult {
     }
 }
 
-fn truncate(s: &str, max: usize) -> String {
+pub fn truncate(s: &str, max: usize) -> String {
     let mut t: String = s.chars().take(max).collect();
     if s.chars().count() > max {
         t.push('…');
@@ -424,7 +424,7 @@ fn truncate(s: &str, max: usize) -> String {
 }
 
 /// R07 文件引用必须存在 (工作区真实文件)。
-fn r7_file_refs_exist(text: &str, root: &Path, backtick_re: &Option<Regex>, bare_re: &Option<Regex>, line_suffix_re: &Option<Regex>) -> RuleResult {
+pub fn r7_file_refs_exist(text: &str, root: &Path, backtick_re: &Option<Regex>, bare_re: &Option<Regex>, line_suffix_re: &Option<Regex>) -> RuleResult {
     let mut missing: Vec<String> = Vec::new();
     for p in extract_path_refs(text, backtick_re, bare_re, line_suffix_re) {
         if p.contains("//") || p.starts_with('*') || p.starts_with("http") {
@@ -442,7 +442,7 @@ fn r7_file_refs_exist(text: &str, root: &Path, backtick_re: &Option<Regex>, bare
 }
 
 /// R08 禁止幻影路径: `file:line` 引用必须存在且行号在文件范围内。
-fn r8_hallucinated_paths(text: &str, root: &Path, line_ref_re: &Option<Regex>) -> RuleResult {
+pub fn r8_hallucinated_paths(text: &str, root: &Path, line_ref_re: &Option<Regex>) -> RuleResult {
     let Some(line_ref_re) = line_ref_re else {
         return RuleResult::pass(8, "R08 未触发：line_ref 正则不可用");
     };
@@ -568,7 +568,7 @@ fn strip_trailing_apology(text: &str) -> Option<(String, Vec<String>)> {
 }
 
 /// auto-fix R04: 移除纯占位行。
-fn strip_pure_placeholder_lines(
+pub fn strip_pure_placeholder_lines(
     text: &str,
     pure_re: &Option<Regex>,
 ) -> Option<(String, Vec<String>)> {
@@ -635,7 +635,7 @@ pub const DEFAULT_MAX_MESSAGE_CHARS: usize = 8_000;
 /// ⇒ 要么 `expect`（AGENTS.md 禁）、要么 `unreachable!()`（**本身就是 panic 路径**，
 ///   我第一版就这么写，且被本文件的测试当场抓住）⇒ 都不采用。
 /// ⇒ 改为让**规则不触发**（`None`），失败由 `log::error!` 记录。
-fn re_opt(pat: &str) -> Option<Regex> {
+pub fn re_opt(pat: &str) -> Option<Regex> {
     match Regex::new(pat) {
         Ok(r) => Some(r),
         Err(e) => {
