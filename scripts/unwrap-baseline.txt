@@ -2,708 +2,517 @@
 # Ratchet: only NEW sites fail. Format = <path>:<line>	<token>
 # Regenerate: bash scripts/check-unwrap.sh --update-baseline
 # A count would let 'delete one, add one' hide; this is a list.
-crates/neotrix-neobot/src/nt_llama.rs:888	expect
-crates/neotrix-neobot/src/nt_pdf_ground.rs:1039	expect
-crates/neotrix-neobot/src/nt_pdf_ground.rs:513	expect
-crates/neotrix-reasoning/src/kernel_types.rs:126	expect
-crates/neotrix-types/src/core/file_parser/mod.rs:54	expect
-crates/neotrix-types/src/core/file_parser/pdf.rs:1291	expect
-crates/neotrix-types/src/core/file_parser/pdf.rs:631	expect
-crates/neotrix-types/src/core/node_canvas.rs:220	expect
-crates/neotrix-types/src/core/nt_core_gwt/resonance.rs:209	expect
-crates/neotrix-types/src/core/nt_core_gwt/resonance.rs:318	expect
-crates/neotrix-types/src/core/nt_core_gwt/resonance.rs:83	expect
-crates/neotrix-types/src/core/nt_core_gwt/workspace.rs:111	expect
-crates/neotrix-types/src/core/nt_core_meta/monitor.rs:116	expect
-crates/neotrix-types/src/core/nt_core_observer.rs:225	expect
-crates/neotrix-types/src/core/nt_core_observer.rs:237	expect
-crates/neotrix-types/src/core/nt_core_observer.rs:256	expect
-crates/neotrix-types/src/core/nt_core_observer.rs:257	expect
-crates/neotrix-types/src/core/nt_core_observer.rs:547	expect
-crates/neotrix-types/src/core/nt_core_self/metacognitive_evaluator.rs:280	expect
-crates/neotrix-types/src/core/nt_core_self/metacognitive_evaluator.rs:288	expect
-crates/neotrix-types/src/core/skill_tree.rs:126	expect
-crates/nt-core-capability-tree/src/evolution.rs:437	expect
-crates/nt-core-capability-tree/src/fusion.rs:162	expect
-crates/nt-core-capability-tree/src/fusion.rs:183	expect
-neotrix-core/src/bin/experience/exp_absorb.rs:1042	expect
-neotrix-core/src/bin/experience/exp_absorb.rs:334	expect
-neotrix-core/src/bin/experience/exp_absorb.rs:338	expect
-neotrix-core/src/bin/experience/exp_absorb.rs:499	expect
-neotrix-core/src/bin/experience/exp_absorb.rs:501	expect
-neotrix-core/src/bin/experience/exp_absorb.rs:562	expect
-neotrix-core/src/bin/experience/exp_absorb.rs:674	expect
-neotrix-core/src/bin/experience/exp_absorb.rs:682	expect
-neotrix-core/src/bin/experience/exp_absorb.rs:825	expect
-neotrix-core/src/bin/experience/exp_absorb.rs:838	expect
-neotrix-core/src/bin/experience/exp_absorb.rs:844	expect
-neotrix-core/src/bin/experience/exp_absorb.rs:885	expect
-neotrix-core/src/bin/experience/exp_absorb.rs:933	expect
-neotrix-core/src/bin/experience/exp_absorb.rs:948	expect
-neotrix-core/src/bin/experience/exp_absorb.rs:973	expect
-neotrix-core/src/bin/experience/exp_absorb.rs:981	expect
-neotrix-core/src/bin/experience/exp_distill.rs:123	expect
-neotrix-core/src/bin/experience/exp_distill.rs:148	expect
-neotrix-core/src/bin/experience/exp_distill.rs:160	expect
-neotrix-core/src/bin/experience/exp_distill.rs:163	expect
-neotrix-core/src/bin/experience/exp_distill.rs:635	expect
-neotrix-core/src/bin/experience/exp_distill.rs:658	expect
-neotrix-core/src/bin/experience/exp_distill.rs:660	expect
-neotrix-core/src/bin/experience/exp_distill.rs:676	expect
-neotrix-core/src/bin/experience/exp_distill.rs:678	expect
-neotrix-core/src/bin/experience/exp_distill.rs:691	expect
-neotrix-core/src/bin/experience/exp_distill.rs:696	expect
-neotrix-core/src/bin/experience/exp_distill.rs:719	expect
-neotrix-core/src/bin/experience/exp_distill.rs:725	expect
-neotrix-core/src/bin/experience/exp_distill.rs:727	expect
-neotrix-core/src/bin/experience/exp_distill.rs:750	expect
-neotrix-core/src/bin/experience/exp_distill.rs:755	expect
-neotrix-core/src/bin/experience/exp_distill.rs:833	expect
-neotrix-core/src/bin/experience/exp_query.rs:526	expect
-neotrix-core/src/bin/experience/exp_query.rs:546	expect
-neotrix-core/src/bin/experience/exp_query.rs:658	expect
-neotrix-core/src/bin/experience/exp_store.rs:128	expect
-neotrix-core/src/bin/experience/exp_store.rs:177	expect
-neotrix-core/src/bin/experience/exp_store.rs:182	expect
-neotrix-core/src/bin/experience/exp_store.rs:21	expect
-neotrix-core/src/bin/experience/exp_store.rs:290	expect
-neotrix-core/src/bin/experience/exp_store.rs:59	expect
-neotrix-core/src/bin/experience/exp_store.rs:65	expect
-neotrix-core/src/bin/experience/exp_topo.rs:245	expect
-neotrix-core/src/bin/experience/exp_topo.rs:256	expect
-neotrix-core/src/bin/experience/exp_topo.rs:258	expect
-neotrix-core/src/bin/experience/exp_topo.rs:264	expect
-neotrix-core/src/bin/experience/exp_util.rs:139	expect
-neotrix-core/src/bin/geoint.rs:242	expect
-neotrix-core/src/bin/geoint.rs:248	expect
-neotrix-core/src/bin/geoint.rs:574	expect
-neotrix-core/src/bin/geoint.rs:575	expect
-neotrix-core/src/bin/kb_crawl_daemon.rs:12	expect
-neotrix-core/src/bin/kb_crawl_daemon.rs:26	expect
-neotrix-core/src/bin/kb_crawl_daemon.rs:50	expect
-neotrix-core/src/bin/model_download.rs:43	expect
-neotrix-core/src/bin/nt_pack_bench.rs:67	expect
-neotrix-core/src/bin/nt_pack_bench.rs:71	expect
-neotrix-core/src/bin/nt_pack_bench.rs:80	expect
-neotrix-core/src/bin/nt_train_export.rs:167	expect
-neotrix-core/src/bin/nt_train_export.rs:195	expect
-neotrix-core/src/bin/nt_train_export.rs:197	expect
-neotrix-core/src/bin/nt_train_export.rs:46	expect
-neotrix-core/src/bin/nt_train_export.rs:94	expect
-neotrix-core/src/bin/shanhai_evidence.rs:104	expect
-neotrix-core/src/bin/shanhai_evidence.rs:152	expect
-neotrix-core/src/bin/shanhai_evidence.rs:19	expect
-neotrix-core/src/bin/shanhai_evidence.rs:199	expect
-neotrix-core/src/bin/shanhai_evidence.rs:20	expect
-neotrix-core/src/bin/shanhai_evidence.rs:242	expect
-neotrix-core/src/bin/shanhai_evidence.rs:281	expect
-neotrix-core/src/bin/shanhai_evidence.rs:328	expect
-neotrix-core/src/bin/shanhai_evidence.rs:377	expect
-neotrix-core/src/bin/shanhai_evidence.rs:65	expect
-neotrix-core/src/bin/shanhai_finalize.rs:17	expect
-neotrix-core/src/bin/shanhai_finalize.rs:18	expect
-neotrix-core/src/bin/shanhai_geo.rs:113	expect
-neotrix-core/src/bin/shanhai_geo.rs:166	expect
-neotrix-core/src/bin/shanhai_geo.rs:20	expect
-neotrix-core/src/bin/shanhai_geo.rs:21	expect
-neotrix-core/src/bin/shanhai_geo.rs:58	expect
-neotrix-core/src/bin/shanhai_ingest.rs:138	expect
-neotrix-core/src/bin/shanhai_ingest.rs:173	expect
-neotrix-core/src/bin/shanhai_ingest.rs:220	expect
-neotrix-core/src/bin/shanhai_ingest.rs:23	expect
-neotrix-core/src/bin/shanhai_ingest.rs:24	expect
-neotrix-core/src/bin/shanhai_ingest.rs:246	expect
-neotrix-core/src/bin/shanhai_ingest.rs:305	expect
-neotrix-core/src/bin/shanhai_ingest.rs:70	expect
-neotrix-core/src/bin/shanhai_link.rs:15	expect
-neotrix-core/src/bin/shanhai_link.rs:16	expect
-neotrix-core/src/bin/shanhai_query.rs:116	expect
-neotrix-core/src/bin/shanhai_query.rs:21	expect
-neotrix-core/src/bin/shanhai_query.rs:22	expect
-neotrix-core/src/l0_substrate/nt_core_di.rs:97	expect
-neotrix-core/src/l1_action/nt_act/actions/media/media.rs:406	expect
-neotrix-core/src/l1_action/nt_act/actions/video/video_job_pipeline.rs:166	expect
-neotrix-core/src/l1_action/nt_act/actions/video/video_job_pipeline.rs:167	expect
-neotrix-core/src/l1_action/nt_act/nt_act_crypto/cipher.rs:68	expect
-neotrix-core/src/l1_action/nt_act/nt_act_crypto/dex.rs:127	expect
-neotrix-core/src/l1_action/nt_act/nt_act_crypto/dex.rs:160	expect
-neotrix-core/src/l1_action/nt_act/nt_act_crypto/token.rs:37	expect
-neotrix-core/src/l1_action/nt_act/nt_act_crypto/tx.rs:158	expect
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:434	expect
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:439	expect
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:443	expect
-neotrix-core/src/l1_action/nt_act/nt_act_trade/extractors/joinf.rs:338	expect
-neotrix-core/src/l1_action/nt_act/nt_act_trade/finance_compliance.rs:602	expect
-neotrix-core/src/l1_action/nt_act/nt_act_trade/full_cycle.rs:771	expect
-neotrix-core/src/l1_action/nt_act/nt_act_trade/orchestrator_v2.rs:464	expect
-neotrix-core/src/l1_action/nt_act/nt_act_trade/production_logistics.rs:660	expect
-neotrix-core/src/l1_action/nt_act/nt_act_trade/quote_negotiation.rs:298	expect
-neotrix-core/src/l1_action/nt_io/nt_io_avatar_channel.rs:251	expect
-neotrix-core/src/l1_action/nt_io/nt_io_browser_engine/mod.rs:52	expect
-neotrix-core/src/l1_action/nt_io/nt_io_inference/quantization_engine.rs:454	expect
-neotrix-core/src/l1_action/nt_io/nt_io_neocodex/context.rs:161	expect
-neotrix-core/src/l1_action/nt_io/nt_io_output_style.rs:154	expect
-neotrix-core/src/l1_action/nt_io/nt_io_output_style.rs:295	expect
-neotrix-core/src/l1_action/nt_io/nt_io_output_style.rs:740	expect
-neotrix-core/src/l1_action/nt_io/nt_io_output_style.rs:741	expect
-neotrix-core/src/l1_action/nt_io/nt_io_output_style.rs:747	expect
-neotrix-core/src/l1_action/nt_io/nt_io_output_style.rs:754	expect
-neotrix-core/src/l1_action/nt_io/nt_io_output_style.rs:821	expect
-neotrix-core/src/l1_action/nt_io/nt_io_plugin/registry.rs:104	expect
-neotrix-core/src/l1_action/nt_io/nt_io_plugin/registry.rs:167	expect
-neotrix-core/src/l1_action/nt_io/nt_io_plugin/registry.rs:169	expect
-neotrix-core/src/l1_action/nt_io/nt_io_plugin/registry.rs:174	expect
-neotrix-core/src/l1_action/nt_io/nt_io_plugin/registry.rs:201	expect
-neotrix-core/src/l1_action/nt_io/nt_io_web/server.rs:40	expect
-neotrix-core/src/l2_perception/nt_core_code_search.rs:503	expect
-neotrix-core/src/l2_perception/nt_core_code_search.rs:499	expect
-neotrix-core/src/l2_perception/nt_core_e8/nt_latent_transformer.rs:214	expect
-neotrix-core/src/l2_perception/nt_world/crawl/discover.rs:122	expect
-neotrix-core/src/l2_perception/nt_world/crawl/discover.rs:129	expect
-neotrix-core/src/l2_perception/nt_world/crawl/discover.rs:136	expect
-neotrix-core/src/l2_perception/nt_world/crawl/discover.rs:143	expect
-neotrix-core/src/l2_perception/nt_world/crawl/discover.rs:150	expect
-neotrix-core/src/l2_perception/nt_world/crawl/discover.rs:61	expect
-neotrix-core/src/l2_perception/nt_world/crawl/frontier.rs:300	expect
-neotrix-core/src/l2_perception/nt_world/crawl/frontier.rs:357	expect
-neotrix-core/src/l2_perception/nt_world/crawl/ordered_backend_router/mod.rs:328	expect
-neotrix-core/src/l2_perception/nt_world/crawl/ordered_backend_router/mod.rs:330	expect
-neotrix-core/src/l2_perception/nt_world/osint/harvest/email_harvester.rs:50	expect
-neotrix-core/src/l2_perception/nt_world/social_access/auth.rs:326	expect
-neotrix-core/src/l2_perception/nt_world/social_access/traits.rs:222	expect
-neotrix-core/src/l2_perception/nt_world/source/crypto.rs:57	expect
-neotrix-core/src/l2_perception/nt_world/source/multi_cache.rs:34	expect
-neotrix-core/src/l3_embodiment/nt_shield/defense/guardrail_traversal.rs:178	expect
-neotrix-core/src/l3_embodiment/nt_shield/defense/guardrail_traversal.rs:181	expect
-neotrix-core/src/l3_embodiment/nt_shield/defense/guardrail_traversal.rs:184	expect
-neotrix-core/src/l3_embodiment/nt_shield/defense/reasoning_protection.rs:92	expect
-neotrix-core/src/l3_embodiment/nt_shield/defense/refusal_tamper.rs:149	expect
-neotrix-core/src/l3_embodiment/nt_shield/http_intercept/mod.rs:161	expect
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_approval/confirmation_gate/mod.rs:236	expect
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_approval/confirmation_gate/mod.rs:241	expect
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_approval/confirmation_gate/mod.rs:253	expect
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_sandbox/docker.rs:419	expect
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_sandbox/docker.rs:480	expect
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_sandbox/mod.rs:849	expect
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_sandbox/mod.rs:852	expect
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_sandbox/mod.rs:862	expect
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_sandbox/mod.rs:865	expect
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_sandbox/mod.rs:887	expect
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_sandbox/mod.rs:890	expect
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_sentry.rs:105	expect
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_sentry.rs:82	expect
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/ip_geo.rs:38	expect
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_ztnet/crypto/aead.rs:34	expect
-neotrix-core/src/l3_embodiment/nt_shield/osint/mod.rs:238	expect
-neotrix-core/src/l3_embodiment/nt_shield/proxy_detection/account_cluster.rs:424	expect
-neotrix-core/src/l3_embodiment/nt_shield/proxy_detection/account_cluster.rs:425	expect
-neotrix-core/src/l3_embodiment/nt_shield/proxy_detection/account_cluster.rs:455	expect
-neotrix-core/src/l3_embodiment/nt_shield/proxy_detection/account_cluster.rs:456	expect
-neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs:104	expect
-neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs:115	expect
-neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs:126	expect
-neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs:137	expect
-neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs:25	expect
-neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs:36	expect
-neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs:49	expect
-neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs:58	expect
-neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs:67	expect
-neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs:78	expect
-neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs:86	expect
-neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs:95	expect
-neotrix-core/src/l3_embodiment/nt_shield/shield_core/audit.rs:794	expect
-neotrix-core/src/l3_embodiment/nt_shield/shield_core/audit.rs:801	expect
-neotrix-core/src/l3_embodiment/nt_shield/shield_core/audit.rs:804	expect
-neotrix-core/src/l3_embodiment/nt_shield/shield_core/tool_inspection_stack.rs:305	expect
-neotrix-core/src/l3_embodiment/nt_shield/slang_norm.rs:93	expect
-neotrix-core/src/l4_emotion/nt_memory/evidence_ledger/mod.rs:87	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_historian/nt_evidence_hypothesis.rs:333	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/kb_core.rs:47	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_absorb_mapper.rs:686	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_adaptive_rag.rs:94	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_brain.rs:327	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_cortex_sync.rs:310	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_cortex_sync.rs:95	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_gwt_router.rs:115	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_knowledge_assets.rs:1044	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_knowledge_assets.rs:739	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_pack.rs:492	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_pack_chunked.rs:200	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_provenance.rs:142	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_snapshot.rs:142	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_snapshot.rs:146	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_snapshot.rs:151	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_snapshot.rs:152	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_snapshot.rs:169	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_snapshot.rs:174	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_sweep_20260815.rs:718	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_normalizer.rs:155	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_normalizer.rs:308	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_normalizer.rs:38	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_knowledge_graph/experience_memory/mod.rs:107	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_knowledge_graph/experience_memory/mod.rs:72	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_lead.rs:222	expect
-neotrix-core/src/l4_emotion/nt_memory/nt_trade_product_spec.rs:955	expect
-neotrix-core/src/l5_cognition/nt_core/knowledge/nt_core_rag.rs:217	expect
-neotrix-core/src/l5_cognition/nt_core_arch_fitness.rs:193	expect
-neotrix-core/src/l5_cognition/nt_core_gate/nt_panel_debate.rs:524	expect
-neotrix-core/src/l5_cognition/nt_mind/mind_modules/other/rsi_exam.rs:86	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_game/play/self_play_loop.rs:169	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/consciousness/bbrain_monitor.rs:322	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/consciousness/bbrain_monitor.rs:323	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/consciousness/predictive_cortex.rs:362	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/agent_capability/nt_capability_eval.rs:630	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/deliberation.rs:303	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/deliberation.rs:338	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/goal_loop/loop_impl/core.rs:236	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/goal_loop/loop_impl/execution.rs:285	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/goal_loop/loop_impl/execution.rs:412	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/goal_loop/loop_impl/pursue.rs:141	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/goal_loop/loop_impl/pursue.rs:289	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/value_compass.rs:311	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/value_compass.rs:312	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/infrastructure/build_context.rs:230	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/infrastructure/code_review.rs:398	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/infrastructure/code_review.rs:399	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/infrastructure/code_review.rs:410	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/infrastructure/code_review.rs:411	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/infrastructure/group_contracts.rs:148	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge/context_artifacts/store.rs:249	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge/context_artifacts/store.rs:250	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge/context_artifacts/store.rs:302	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge/context_artifacts/store.rs:306	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge/context_artifacts/store.rs:307	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge/context_artifacts/store.rs:318	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge/context_artifacts/store.rs:319	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge/context_artifacts/store.rs:330	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge/context_artifacts/store.rs:334	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge/context_artifacts/store.rs:335	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/reason/thinking_bridge.rs:174	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/always_on.rs:109	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/always_on.rs:118	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/always_on.rs:140	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/consciousness_orchestrator.rs:122	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/consciousness_orchestrator.rs:45	expect
-neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs:709	expect
-neotrix-core/src/l5_cognition/nt_mind/seal/crystallization.rs:138	expect
-neotrix-core/src/l5_cognition/nt_mind/seal/crystallization.rs:147	expect
-neotrix-core/src/l5_cognition/nt_mind/seal/crystallization.rs:494	expect
-neotrix-core/src/l5_cognition/nt_mind/seal/procedural_graph.rs:320	expect
-neotrix-core/src/l5_cognition/nt_mind/seal/procedural_graph.rs:417	expect
-neotrix-core/src/l6_meta/coordination/nt_mind_repair/skill_improver/mod.rs:407	expect
-neotrix-core/src/l6_meta/nt_core_scheduler/event_driven_claim.rs:175	expect
-neotrix-core/src/l6_meta/nt_core_scheduler/event_driven_claim.rs:338	expect
-neotrix-core/src/l6_meta/nt_core_scheduler/event_driven_claim.rs:356	expect
-neotrix-core/src/l6_meta/nt_core_self/attention_head.rs:589	expect
-neotrix-core/src/l6_meta/nt_core_self/pilot_steering.rs:207	expect
-neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rs:764	expect
-neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rs:771	expect
-neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rs:815	expect
-neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rs:822	expect
-neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rs:833	expect
-neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rs:864	expect
-neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rs:870	expect
-neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rs:893	expect
-neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rs:936	expect
-neotrix-core/src/l6_meta/nt_meta/otel_bridge/cost_tracker.rs:73	expect
-neotrix-core/src/l6_meta/nt_meta/otel_bridge/cost_tracker.rs:78	expect
-neotrix-core/src/l6_meta/nt_meta/otel_bridge/cost_tracker.rs:83	expect
-neotrix-core/src/l6_meta/nt_meta/otel_bridge/trace_pipeline.rs:67	expect
-neotrix-core/src/l6_meta/nt_meta/otel_bridge/trace_pipeline.rs:72	expect
-neotrix-core/src/l6_meta/nt_meta/otel_bridge/trace_pipeline.rs:77	expect
-neotrix-core/src/l6_meta/nt_meta/otel_bridge/trace_pipeline.rs:82	expect
-neotrix-core/src/l6_meta/nt_meta/otel_bridge/trace_pipeline.rs:87	expect
-neotrix-core/src/main.rs:642	expect
-neotrix-core/src/l0_substrate/ffi/consciousness_tree.rs:110	expect
-neotrix-core/src/l0_substrate/ffi/consciousness_tree.rs:146	expect
-neotrix-core/src/l0_substrate/ffi/consciousness_tree.rs:150	expect
-neotrix-core/src/l0_substrate/ffi/consciousness_tree.rs:166	expect
-neotrix-core/src/l0_substrate/ffi/consciousness_tree.rs:61	expect
-neotrix-core/src/l0_substrate/ffi/constellation_system.rs:41	expect
-neotrix-core/src/l0_substrate/ffi/constellation_system.rs:45	expect
-neotrix-core/src/l0_substrate/ffi/constellation_system.rs:49	expect
-neotrix-core/src/l0_substrate/ffi/constellation_system.rs:53	expect
-neotrix-core/src/l0_substrate/ffi/constellation_system.rs:68	expect
-neotrix-core/src/l0_substrate/ffi/dual_specialization.rs:52	expect
-neotrix-core/src/l0_substrate/ffi/dual_specialization.rs:56	expect
-neotrix-core/src/l0_substrate/ffi/dual_specialization.rs:70	expect
-neotrix-core/src/l0_substrate/ffi/dual_specialization.rs:77	expect
-neotrix-core/src/l0_substrate/ffi/e8_reasoning.rs:47	expect
-neotrix-core/src/l0_substrate/ffi/e8_reasoning.rs:77	expect
-neotrix-core/src/l0_substrate/ffi/e8_reasoning.rs:81	expect
-neotrix-core/src/l0_substrate/ffi/e8_reasoning.rs:96	expect
-neotrix-core/src/l0_substrate/ffi/gwt_attention.rs:100	expect
-neotrix-core/src/l0_substrate/ffi/gwt_attention.rs:104	expect
-neotrix-core/src/l0_substrate/ffi/gwt_attention.rs:114	expect
-neotrix-core/src/l0_substrate/ffi/gwt_attention.rs:128	expect
-neotrix-core/src/l0_substrate/ffi/gwt_attention.rs:135	expect
-neotrix-core/src/l0_substrate/ffi/gwt_attention.rs:50	expect
-neotrix-core/src/l0_substrate/ffi/gwt_attention.rs:90	expect
-neotrix-core/src/l0_substrate/ffi/gwt_attention.rs:94	expect
-neotrix-core/src/l0_substrate/ffi/gwt_attention.rs:95	expect
-neotrix-core/src/l0_substrate/ffi/kb_bridge.rs:111	expect
-neotrix-core/src/l0_substrate/ffi/kb_bridge.rs:131	expect
-neotrix-core/src/l0_substrate/ffi/kb_bridge.rs:33	expect
-neotrix-core/src/l0_substrate/ffi/kb_bridge.rs:55	expect
-neotrix-core/src/l0_substrate/ffi/kb_bridge.rs:70	expect
-neotrix-core/src/l0_substrate/ffi/kb_bridge.rs:76	expect
-neotrix-core/src/l0_substrate/ffi/kb_bridge.rs:91	expect
-neotrix-core/src/l0_substrate/ffi/rune_socketing.rs:48	expect
-neotrix-core/src/l0_substrate/ffi/rune_socketing.rs:52	expect
-neotrix-core/src/l0_substrate/ffi/rune_socketing.rs:56	expect
-neotrix-core/src/l0_substrate/ffi/rune_socketing.rs:61	expect
-neotrix-core/src/l0_substrate/ffi/rune_socketing.rs:65	expect
-neotrix-core/src/l0_substrate/ffi/seal_pipeline.rs:110	expect
-neotrix-core/src/l0_substrate/ffi/seal_pipeline.rs:114	expect
-neotrix-core/src/l0_substrate/ffi/seal_pipeline.rs:125	expect
-neotrix-core/src/l0_substrate/ffi/seal_pipeline.rs:131	expect
-neotrix-core/src/l0_substrate/ffi/seal_pipeline.rs:36	expect
-neotrix-core/src/l0_substrate/ffi/seal_pipeline.rs:78	expect
-neotrix-core/src/l0_substrate/ffi/seal_pipeline.rs:82	expect
-neotrix-core/src/l0_substrate/ffi/seal_pipeline.rs:97	expect
-neotrix-core/src/l0_substrate/ffi/skill_tree.rs:46	expect
-neotrix-core/src/l0_substrate/ffi/skill_tree.rs:56	expect
-neotrix-core/src/l0_substrate/ffi/skill_tree.rs:75	expect
-neotrix-core/src/l0_substrate/ffi/skill_tree.rs:91	expect
-neotrix-core/src/l0_substrate/ffi/skill_tree.rs:95	expect
-neotrix-core/src/l0_substrate/ffi/vsa_hypercube.rs:131	expect
-neotrix-core/src/l0_substrate/ffi/vsa_hypercube.rs:136	expect
-neotrix-core/src/l0_substrate/ffi/vsa_hypercube.rs:39	expect
-neotrix-core/src/l0_substrate/ffi/vsa_hypercube.rs:66	expect
-neotrix-core/src/l0_substrate/ffi/vsa_hypercube.rs:74	expect
-neotrix-core/src/l0_substrate/ffi/vsa_hypercube.rs:96	expect
-neotrix-core/src/l1_action/nt_file_ability/doc_parse.rs:126	expect
-neotrix-core/src/l1_action/nt_file_ability/doc_parse.rs:316	expect
-neotrix-core/src/l1_action/nt_file_ability/visual/grounding.rs:104	expect
-neotrix-core/src/l1_action/nt_file_ability/visual/grounding.rs:69	expect
-neotrix-core/src/l1_action/nt_file_ability/visual/grounding.rs:70	expect
-neotrix-core/src/l1_action/nt_file_ability/visual/grounding.rs:74	expect
-neotrix-core/src/l1_action/nt_file_ability/visual/grounding.rs:82	expect
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_sandbox/docker.rs:473	panic
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_pack.rs:718	panic
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/infrastructure/code_review.rs:223	panic
-neotrix-core/src/l6_meta/nt_meta/auto_inspector/mod.rs:90	panic
-crates/neotrix-gateway/src/hive.rs:540	unwrap
-crates/neotrix-multi-agent/src/hive.rs:524	unwrap
-crates/neotrix-types/src/core/nt_core_meta/weakness.rs:119	unwrap
-crates/neotrix-types/src/write_guard_types.rs:106	unwrap
-crates/neotrix-types/src/write_guard_types.rs:112	unwrap
-crates/neotrix-types/src/write_guard_types.rs:119	unwrap
-crates/neotrix-types/src/write_guard_types.rs:126	unwrap
-crates/neotrix-types/src/write_guard_types.rs:72	unwrap
-crates/neotrix-types/src/write_guard_types.rs:82	unwrap
-crates/neotrix-types/src/write_guard_types.rs:97	unwrap
-neotrix-core/src/bin/nt_train_export.rs:164	unwrap
-neotrix-core/src/l0_substrate/nt_core_consciousness_types.rs:305	unwrap
-neotrix-core/src/l0_substrate/nt_core_consciousness_types.rs:682	unwrap
-neotrix-core/src/l0_substrate/nt_core_hot_data.rs:275	unwrap
-neotrix-core/src/l0_substrate/nt_core_hot_data.rs:278	unwrap
-neotrix-core/src/l1_action/nt_act/acp_protocol.rs:213	unwrap
-neotrix-core/src/l1_action/nt_act/acp_protocol.rs:219	unwrap
-neotrix-core/src/l1_action/nt_act/agent_loop/auditor.rs:112	unwrap
-neotrix-core/src/l1_action/nt_act/agent_loop/auditor.rs:113	unwrap
-neotrix-core/src/l1_action/nt_act/agent_loop/auditor.rs:149	unwrap
-neotrix-core/src/l1_action/nt_act/agent_loop/auditor.rs:154	unwrap
-neotrix-core/src/l1_action/nt_act/agent_loop/auditor.rs:159	unwrap
-neotrix-core/src/l1_action/nt_act/agent_loop/executor.rs:195	unwrap
-neotrix-core/src/l1_action/nt_act/agent_loop/manager.rs:100	unwrap
-neotrix-core/src/l1_action/nt_act/agent_loop/manager.rs:106	unwrap
-neotrix-core/src/l1_action/nt_act/agent_loop/manager.rs:111	unwrap
-neotrix-core/src/l1_action/nt_act/agent_loop/manager.rs:126	unwrap
-neotrix-core/src/l1_action/nt_act/agent_loop/manager.rs:138	unwrap
-neotrix-core/src/l1_action/nt_act/agent_loop/manager.rs:147	unwrap
-neotrix-core/src/l1_action/nt_act/agent_loop/manager.rs:148	unwrap
-neotrix-core/src/l1_action/nt_act/agent_loop/manager.rs:158	unwrap
-neotrix-core/src/l1_action/nt_act/agent_loop/manager.rs:159	unwrap
-neotrix-core/src/l1_action/nt_act/agent_protocol.rs:191	unwrap
-neotrix-core/src/l1_action/nt_act/async_tool_executor.rs:151	unwrap
-neotrix-core/src/l1_action/nt_act/async_tool_executor.rs:152	unwrap
-neotrix-core/src/l1_action/nt_act/async_tool_executor.rs:155	unwrap
-neotrix-core/src/l1_action/nt_act/async_tool_executor.rs:166	unwrap
-neotrix-core/src/l1_action/nt_act/async_tool_executor.rs:184	unwrap
-neotrix-core/src/l1_action/nt_act/async_tool_executor.rs:260	unwrap
-neotrix-core/src/l1_action/nt_act/async_tool_executor.rs:269	unwrap
-neotrix-core/src/l1_action/nt_act/async_tool_executor.rs:279	unwrap
-neotrix-core/src/l1_action/nt_act/async_tool_executor.rs:280	unwrap
-neotrix-core/src/l1_action/nt_act/async_tool_executor.rs:285	unwrap
-neotrix-core/src/l1_action/nt_act/async_tool_executor.rs:287	unwrap
-neotrix-core/src/l1_action/nt_act/async_tool_executor.rs:297	unwrap
-neotrix-core/src/l1_action/nt_act/async_tool_executor.rs:302	unwrap
-neotrix-core/src/l1_action/nt_act/async_tool_executor.rs:307	unwrap
-neotrix-core/src/l1_action/nt_act/async_tool_executor.rs:312	unwrap
-neotrix-core/src/l1_action/nt_act/async_tool_executor.rs:318	unwrap
-neotrix-core/src/l1_action/nt_act/deferred_loader.rs:116	unwrap
-neotrix-core/src/l1_action/nt_act/deferred_loader.rs:117	unwrap
-neotrix-core/src/l1_action/nt_act/deferred_loader.rs:118	unwrap
-neotrix-core/src/l1_action/nt_act/deferred_loader.rs:132	unwrap
-neotrix-core/src/l1_action/nt_act/deferred_loader.rs:133	unwrap
-neotrix-core/src/l1_action/nt_act/deferred_loader.rs:134	unwrap
-neotrix-core/src/l1_action/nt_act/deferred_loader.rs:149	unwrap
-neotrix-core/src/l1_action/nt_act/deferred_loader.rs:154	unwrap
-neotrix-core/src/l1_action/nt_act/deferred_loader.rs:164	unwrap
-neotrix-core/src/l1_action/nt_act/deferred_loader.rs:199	unwrap
-neotrix-core/src/l1_action/nt_act/deferred_loader.rs:202	unwrap
-neotrix-core/src/l1_action/nt_act/deferred_loader.rs:68	unwrap
-neotrix-core/src/l1_action/nt_act/deferred_loader.rs:83	unwrap
-neotrix-core/src/l1_action/nt_act/deferred_loader.rs:84	unwrap
-neotrix-core/src/l1_action/nt_act/deferred_loader.rs:85	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:435	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:436	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:440	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:441	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:456	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:459	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:462	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:463	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:475	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:476	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:478	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:484	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:485	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:495	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:496	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:498	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:502	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:505	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:506	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:516	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:518	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:519	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:520	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:522	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:536	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:537	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:538	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_orchestrator/task_state_dag.rs:541	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rs:101	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rs:219	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rs:234	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rs:254	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rs:282	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rs:295	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rs:326	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rs:423	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rs:446	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rs:574	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rs:603	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rs:84	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/nt_trade_crm.rs:611	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/nt_trade_pipeline.rs:335	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/nt_trade_pipeline.rs:364	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/nt_trade_pipeline.rs:393	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/nt_trade_supplier_mgmt.rs:213	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/nt_trade_supplier_mgmt.rs:222	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/nt_trade_supplier_mgmt.rs:227	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/nt_trade_supplier_mgmt.rs:236	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rs:513	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rs:547	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rs:561	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rs:576	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rs:597	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rs:611	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rs:635	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rs:636	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rs:644	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rs:676	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rs:742	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rs:773	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/trade_knowledge.rs:240	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/workers/analyze_worker.rs:125	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_trade/workers/track_worker.rs:133	unwrap
-neotrix-core/src/l1_action/nt_core_bank/bank/rag_engine.rs:289	unwrap
-neotrix-core/src/l1_action/nt_core_graph_memory.rs:230	unwrap
-neotrix-core/src/l1_action/nt_core_graph_memory.rs:263	unwrap
-neotrix-core/src/l1_action/nt_core_graph_memory.rs:898	unwrap
-neotrix-core/src/l1_action/nt_core_graph_memory.rs:932	unwrap
-neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rs:138	unwrap
-neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rs:208	unwrap
-neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rs:224	unwrap
-neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rs:231	unwrap
-neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rs:241	unwrap
-neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rs:248	unwrap
-neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rs:253	unwrap
-neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rs:49	unwrap
-neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rs:83	unwrap
-neotrix-core/src/l1_action/nt_io/nt_io_media/liquid_glass.rs:88	unwrap
-neotrix-core/src/l1_action/nt_io/nt_io_provider/gateway/resilience/nt_detection.rs:365	unwrap
-neotrix-core/src/l1_action/nt_io/nt_io_provider/routing/provider_swap.rs:337	unwrap
-neotrix-core/src/l1_action/nt_io/nt_io_provider/routing/provider_swap.rs:350	unwrap
-neotrix-core/src/l2_perception/nt_world/cfg_builder.rs:82	unwrap
-neotrix-core/src/l2_perception/nt_world/osint/ad_graph/analysis.rs:60	unwrap
-neotrix-core/src/l2_perception/nt_world/osint/harvest/cert_transparency.rs:104	unwrap
-neotrix-core/src/l2_perception/nt_world/osint/harvest/cert_transparency.rs:119	unwrap
-neotrix-core/src/l2_perception/nt_world/osint/harvest/cert_transparency.rs:149	unwrap
-neotrix-core/src/l2_perception/nt_world/osint/harvest/cert_transparency.rs:164	unwrap
-neotrix-core/src/l2_perception/nt_world/social_access/auth.rs:46	unwrap
-neotrix-core/src/l2_perception/nt_world/social_access/auth.rs:47	unwrap
-neotrix-core/src/l2_perception/nt_world/social_access/auth.rs:49	unwrap
-neotrix-core/src/l2_perception/nt_world/social_access/auth.rs:57	unwrap
-neotrix-core/src/l2_perception/nt_world/social_access/auth.rs:61	unwrap
-neotrix-core/src/l2_perception/nt_world/social_access/auth.rs:65	unwrap
-neotrix-core/src/l2_perception/nt_world/source/multi_cache.rs:43	unwrap
-neotrix-core/src/l2_perception/nt_world/temporal_kg/entity.rs:34	unwrap
-neotrix-core/src/l2_perception/nt_world/temporal_kg/fact_extractor.rs:16	unwrap
-neotrix-core/src/l2_perception/nt_world/temporal_kg/fact_extractor.rs:21	unwrap
-neotrix-core/src/l2_perception/nt_world/temporal_kg/fact_extractor.rs:23	unwrap
-neotrix-core/src/l2_perception/nt_world/temporal_kg/fact_extractor.rs:24	unwrap
-neotrix-core/src/l2_perception/nt_world/temporal_kg/fact_extractor.rs:45	unwrap
-neotrix-core/src/l3_embodiment/nt_shield/binary_analyzer.rs:112	unwrap
-neotrix-core/src/l3_embodiment/nt_shield/binary_analyzer.rs:242	unwrap
-neotrix-core/src/l3_embodiment/nt_shield/binary_analyzer.rs:254	unwrap
-neotrix-core/src/l3_embodiment/nt_shield/binary_analyzer.rs:266	unwrap
-neotrix-core/src/l3_embodiment/nt_shield/binary_analyzer.rs:278	unwrap
-neotrix-core/src/l3_embodiment/nt_shield/binary_analyzer.rs:290	unwrap
-neotrix-core/src/l4_emotion/nt_emotion_reasoning_bridge.rs:272	unwrap
-neotrix-core/src/l4_emotion/nt_feel/salesperson_profiling.rs:500	unwrap
-neotrix-core/src/l4_emotion/nt_feel/writing_style.rs:334	unwrap
-neotrix-core/src/l4_emotion/nt_feel/writing_style.rs:341	unwrap
-neotrix-core/src/l4_emotion/nt_feel/writing_style.rs:361	unwrap
-neotrix-core/src/l4_emotion/nt_feel/writing_style.rs:367	unwrap
-neotrix-core/src/l4_emotion/nt_memory/add_only_writes/memory_entry.rs:17	unwrap
-neotrix-core/src/l4_emotion/nt_memory/cascade/episodic.rs:123	unwrap
-neotrix-core/src/l4_emotion/nt_memory/cascade/episodic.rs:94	unwrap
-neotrix-core/src/l4_emotion/nt_memory/cascade/working.rs:107	unwrap
-neotrix-core/src/l4_emotion/nt_memory/cascade/working.rs:123	unwrap
-neotrix-core/src/l4_emotion/nt_memory/cascade/working.rs:79	unwrap
-neotrix-core/src/l4_emotion/nt_memory/coverage_ledger.rs:345	unwrap
-neotrix-core/src/l4_emotion/nt_memory/coverage_ledger.rs:403	unwrap
-neotrix-core/src/l4_emotion/nt_memory/coverage_ledger.rs:420	unwrap
-neotrix-core/src/l4_emotion/nt_memory/entity_linking/extractor.rs:115	unwrap
-neotrix-core/src/l4_emotion/nt_memory/entity_linking/extractor.rs:160	unwrap
-neotrix-core/src/l4_emotion/nt_memory/entity_linking/extractor.rs:76	unwrap
-neotrix-core/src/l4_emotion/nt_memory/entity_linking/extractor.rs:82	unwrap
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_pack.rs:591	unwrap
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_pack.rs:610	unwrap
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_pack.rs:624	unwrap
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_search/nt_engine.rs:46	unwrap
-neotrix-core/src/l4_emotion/nt_memory/tiered_memory/tier_core.rs:62	unwrap
-neotrix-core/src/l4_emotion/nt_memory/vector_index.rs:112	unwrap
-neotrix-core/src/l4_emotion/nt_memory/vector_index.rs:115	unwrap
-neotrix-core/src/l4_emotion/nt_memory/vector_index.rs:118	unwrap
-neotrix-core/src/l4_emotion/nt_memory/vector_index.rs:138	unwrap
-neotrix-core/src/l4_emotion/nt_memory/vector_index.rs:173	unwrap
-neotrix-core/src/l4_emotion/nt_memory/vector_index.rs:177	unwrap
-neotrix-core/src/l4_emotion/nt_memory/vector_index.rs:199	unwrap
-neotrix-core/src/l4_emotion/nt_memory/vector_index.rs:212	unwrap
-neotrix-core/src/l4_emotion/nt_memory/vector_index.rs:218	unwrap
-neotrix-core/src/l4_emotion/nt_memory/vector_index.rs:229	unwrap
-neotrix-core/src/l4_emotion/nt_memory/vector_index.rs:76	unwrap
-neotrix-core/src/l5_cognition/nt_agent/ode.rs:102	unwrap
-neotrix-core/src/l5_cognition/nt_agent/ode.rs:103	unwrap
-neotrix-core/src/l5_cognition/nt_core/multi_agent/aggregation.rs:148	unwrap
-neotrix-core/src/l5_cognition/nt_core/multi_agent/aggregation.rs:183	unwrap
-neotrix-core/src/l5_cognition/nt_core/multi_agent/aggregation.rs:195	unwrap
-neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/archive/crystal_unified_pipeline.rs:89	unwrap
-neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/patches.rs:577	unwrap
-neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/unified_memory.rs:71	unwrap
-neotrix-core/src/l5_cognition/nt_core_agent_circuit_breaker.rs:216	unwrap
-neotrix-core/src/l5_cognition/nt_core_agent_circuit_breaker.rs:279	unwrap
-neotrix-core/src/l5_cognition/nt_core_agents_md.rs:104	unwrap
-neotrix-core/src/l5_cognition/nt_core_agents_md.rs:169	unwrap
-neotrix-core/src/l5_cognition/nt_core_agents_md.rs:216	unwrap
-neotrix-core/src/l5_cognition/nt_core_agents_md.rs:222	unwrap
-neotrix-core/src/l5_cognition/nt_core_gwt/cost_ladder/mod.rs:76	unwrap
-neotrix-core/src/l5_cognition/nt_decision_engine.rs:489	unwrap
-neotrix-core/src/l5_cognition/nt_decision_engine.rs:536	unwrap
-neotrix-core/src/l5_cognition/nt_decision_engine.rs:550	unwrap
-neotrix-core/src/l5_cognition/nt_mind/mid_turn_steering.rs:145	unwrap
-neotrix-core/src/l5_cognition/nt_mind/mid_turn_steering.rs:149	unwrap
-neotrix-core/src/l5_cognition/nt_mind/mid_turn_steering.rs:150	unwrap
-neotrix-core/src/l5_cognition/nt_mind/nt_game/ecs/component.rs:27	unwrap
-neotrix-core/src/l5_cognition/nt_mind/nt_game/events/mod.rs:48	unwrap
-neotrix-core/src/l5_cognition/nt_mind/nt_game/render/components.rs:794	unwrap
-neotrix-core/src/l5_cognition/nt_mind/rise_reflector.rs:141	unwrap
-neotrix-core/src/l5_cognition/nt_mind/rise_reflector.rs:145	unwrap
-neotrix-core/src/l5_cognition/nt_mind/rise_reflector.rs:65	unwrap
-neotrix-core/src/l5_cognition/nt_mind/rise_reflector.rs:76	unwrap
-neotrix-core/src/l5_cognition/nt_mind/rise_reflector.rs:78	unwrap
-neotrix-core/src/l5_cognition/nt_mind/rise_reflector.rs:85	unwrap
-neotrix-core/src/l5_cognition/nt_mind/seal/domain_mapper.rs:483	unwrap
-neotrix-core/src/l5_cognition/nt_mind/self_improvement/memory_filesystem.rs:172	unwrap
-neotrix-core/src/l6_meta/coordination/governance/enforcement/audit.rs:78	unwrap
-neotrix-core/src/l6_meta/coordination/quality_control/evolving_evaluator.rs:67	unwrap
-neotrix-core/src/l6_meta/evolving_evaluator.rs:100	unwrap
-neotrix-core/src/l6_meta/evolving_evaluator.rs:112	unwrap
-neotrix-core/src/l6_meta/evolving_evaluator.rs:130	unwrap
-neotrix-core/src/l6_meta/evolving_evaluator.rs:134	unwrap
-neotrix-core/src/l6_meta/evolving_evaluator.rs:138	unwrap
-neotrix-core/src/l6_meta/evolving_evaluator.rs:63	unwrap
-neotrix-core/src/l6_meta/evolving_evaluator.rs:80	unwrap
-neotrix-core/src/l6_meta/evolving_evaluator.rs:85	unwrap
-neotrix-core/src/l6_meta/evolving_evaluator.rs:86	unwrap
-neotrix-core/src/l6_meta/healing/diagnostic_chain/diagnostician.rs:61	unwrap
-neotrix-core/src/l6_meta/healing/predictive_maintenance/predictor.rs:116	unwrap
-neotrix-core/src/l6_meta/healing/predictive_maintenance/predictor.rs:35	unwrap
-neotrix-core/src/l6_meta/healing/predictive_maintenance/predictor.rs:37	unwrap
-neotrix-core/src/l6_meta/healing/predictive_maintenance/predictor.rs:59	unwrap
-neotrix-core/src/l6_meta/healing/self_healing/circuit_breaker.rs:111	unwrap
-neotrix-core/src/l6_meta/healing/self_healing/circuit_breaker.rs:118	unwrap
-neotrix-core/src/l6_meta/healing/self_healing/circuit_breaker.rs:140	unwrap
-neotrix-core/src/l6_meta/healing/self_healing/circuit_breaker.rs:55	unwrap
-neotrix-core/src/l6_meta/healing/self_healing/circuit_breaker.rs:77	unwrap
-neotrix-core/src/l6_meta/healing/self_healing/circuit_breaker.rs:98	unwrap
-neotrix-core/src/l6_meta/nt_meta/weakness.rs:140	unwrap
-neotrix-core/src/l6_meta/nt_safety_monitor.rs:78	unwrap
-neotrix-core/src/l6_meta/runtime_monitor.rs:102	unwrap
-neotrix-core/src/l6_meta/runtime_monitor.rs:112	unwrap
-neotrix-core/src/l6_meta/runtime_monitor.rs:117	unwrap
-neotrix-core/src/l6_meta/runtime_monitor.rs:154	unwrap
-neotrix-core/src/l6_meta/runtime_monitor.rs:176	unwrap
-neotrix-core/src/l6_meta/runtime_monitor.rs:180	unwrap
-neotrix-core/src/l6_meta/runtime_monitor.rs:95	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/agent_orchestrator.rs:92	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/meta_cognitive.rs:268	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/meta_metrics.rs:147	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/meta_metrics.rs:148	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/action_module.rs:40	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/action_module.rs:46	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/action_module.rs:48	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/action_module.rs:71	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rs:51	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rs:52	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rs:53	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rs:54	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rs:55	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rs:56	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rs:58	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rs:59	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rs:60	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rs:92	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rs:95	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rs:98	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/memory_module.rs:33	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/memory_module.rs:83	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/meta_module.rs:36	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/meta_module.rs:39	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/meta_module.rs:46	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/meta_module.rs:47	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/meta_module.rs:61	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/meta_module.rs:91	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/perception_module.rs:30	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/perception_module.rs:40	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/perception_module.rs:49	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/perception_module.rs:75	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/safety_module.rs:104	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/safety_module.rs:62	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/safety_module.rs:63	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/safety_module.rs:80	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/modules/safety_module.rs:81	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/nt_shared_mind.rs:104	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/nt_shared_mind.rs:112	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/nt_shared_mind.rs:134	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/nt_shared_mind.rs:150	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/nt_shared_mind.rs:172	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/nt_shared_mind.rs:182	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/nt_shared_mind.rs:99	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/retention_policy.rs:157	unwrap
-neotrix-core/src/l5_cognition/nt_crystal_core/retention_policy.rs:222	unwrap
-neotrix-core/src/l5_cognition/nt_jev/primitives.rs:84	unwrap
-neotrix-core/src/skill_loader.rs:279	unwrap
-neotrix-core/src/skill_loader.rs:290	unwrap
-neotrix-core/src/l1_action/nt_act/nt_act_crypto/dex.rs:207	expect	# 编译期字面量 "0902f1ac"：偶数长度且全为 hex 位 ⇒ hex::decode 恒 Ok，expect 分支不可达。同形态全仓 9 处（4 处已在此基线）。
-neotrix-core/src/l1_action/nt_act/nt_act_crypto/token.rs:46	expect	# 编译期字面量 "a9059cbb"（ERC-20 transfer selector）⇒ 同上，运行期不可能失败。
-neotrix-core/src/l1_action/nt_act/nt_act_crypto/token.rs:56	expect	# 编译期字面量 "095ea7b3"（approve selector）⇒ 同上。
-neotrix-core/src/l1_action/nt_act/nt_act_crypto/token.rs:66	expect	# 编译期字面量 "dd62ed3e" ⇒ 同上。
-neotrix-core/src/l1_action/nt_act/nt_act_crypto/tx.rs:170	expect	# 编译期字面量 "095ea7b3" ⇒ 同上。
-neotrix-core/src/l3_embodiment/nt_shield/nt_shield_approval/human_approval.rs:180	expect	# 不可达的不变量断言：上方 :157-160 已用 get_mut(...).ok_or("Request not found")? 校验过同一 key，且 make_decision 非 async、全文件 0 个 .await ⇒ 无 TOCTOU。⛔ 刻意不改 if let —— 那会在真有 bug 时静默吞掉请求，比 panic 更坏。
-neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/rise_reflector.rs:42	unwrap	# 紧接上一行 push 之后的 last()：reflect(&mut self) 独占可变借用（编译期排除并发），Vec::push 只在 OOM 时 abort 不 unwind ⇒ last 必为 Some。⛔ 无法在 forbid(unsafe_code) 下无 unwrap 表达「刚 push 的末元素」（签名返回 &Reference）。
+crates/neotrix-neobot/src/nt_pdf_ground.rsflush_block*chars.get_mut(last).expect("")=	expect
+crates/neotrix-neobot/src/nt_pdf_ground.rsgroup_lineslethead=line.last().expect("");	expect
+crates/neotrix-reasoning/src/kernel_types.rsreasonletb=intermediates.last().expect("");	expect
+crates/neotrix-types/src/core/file_parser/mod.rswith_cacheletcache=guard.get_or_insert_with(||lru::LruCache::new(NonZeroUsize::new(128).expect("")));	expect
+crates/neotrix-types/src/core/file_parser/pdf.rsbuild_table_gridrow_groups.last_mut().expect("").push(run);	expect
+crates/neotrix-types/src/core/file_parser/pdf.rsstructure_native_pdfletlast=rows.last_mut().expect("");	expect
+crates/neotrix-types/src/core/node_canvas.rscreate_projectself.projects.last_mut().expect("")	expect
+crates/neotrix-types/src/core/nt_core_gwt/workspace.rsresonant_broadcastself.last_resonance.as_ref().expect("")	expect
+crates/neotrix-types/src/core/nt_core_observer.rsdetect_efficiencyletend=modes.last().copied().expect("");	expect
+crates/neotrix-types/src/core/nt_core_observer.rsdetect_efficiencyletstart=modes.first().copied().expect("");	expect
+crates/neotrix-types/src/core/nt_core_observer.rsdetect_loop_backletlast=modes.last().copied().expect("");	expect
+crates/neotrix-types/src/core/nt_core_observer.rsdetect_stuckletlast=modes.last().copied().expect("");	expect
+crates/neotrix-types/src/core/skill_tree.rsinsert_skillnode=node.children.last_mut().expect("");	expect
+crates/nt-core-capability-tree/src/evolution.rsauto_scan.expect("");	expect
+crates/nt-core-capability-tree/src/fusion.rsdedup_duplicate_edgesletnode=self.nodes.get_mut(id).expect("");	expect
+crates/nt-core-capability-tree/src/fusion.rsfix_domain_mismatchesletnode=self.nodes.get_mut(id).expect("");	expect
+neotrix-core/src/bin/experience/exp_absorb.rscmd_absorbletcmeta=cmeta.as_object_mut().expect("");	expect
+neotrix-core/src/bin/experience/exp_absorb.rscmd_absorbletcycles=hub[""][""].as_object_mut().expect("");	expect
+neotrix-core/src/bin/experience/exp_absorb.rscmd_absorb_node).expect("");	expect
+neotrix-core/src/bin/experience/exp_absorb.rscmd_absorb_node.expect("");	expect
+neotrix-core/src/bin/experience/exp_absorb.rscmd_absorb_nodechrono::DateTime::from_timestamp(0,0).expect("")	expect
+neotrix-core/src/bin/experience/exp_absorb.rscmd_absorb_nodelettx=conn.unchecked_transaction().expect("");	expect
+neotrix-core/src/bin/experience/exp_absorb.rscmd_absorb_nodeletv:Value=serde_json::from_str(&raw).expect("");	expect
+neotrix-core/src/bin/experience/exp_absorb.rscmd_absorb_nodetx.commit().expect("");	expect
+neotrix-core/src/bin/experience/exp_absorb.rscmd_feedbackletobj=v.as_object_mut().expect("");	expect
+neotrix-core/src/bin/experience/exp_absorb.rscmd_update_node_metadata.expect("");	expect
+neotrix-core/src/bin/experience/exp_absorb.rscmd_update_node_metadataletv:Value=serde_json::from_str(&raw).expect("");	expect
+neotrix-core/src/bin/experience/exp_distill.rscmd_compress.expect("")	expect
+neotrix-core/src/bin/experience/exp_distill.rscmd_compress.expect("");	expect
+neotrix-core/src/bin/experience/exp_distill.rscmd_compresslettx=conn.transaction().expect("");	expect
+neotrix-core/src/bin/experience/exp_distill.rscmd_compresstx.commit().expect("");	expect
+neotrix-core/src/bin/experience/exp_distill.rscmd_gen_indexstd::fs::write(out,format!("",body)).expect("");	expect
+neotrix-core/src/bin/experience/exp_distill.rscmd_hebb.expect("");	expect
+neotrix-core/src/bin/experience/exp_distill.rscmd_hebblettx=conn.transaction().expect("");	expect
+neotrix-core/src/bin/experience/exp_distill.rscmd_hebbtx.commit().expect("");	expect
+neotrix-core/src/bin/experience/exp_distill.rscycle_summary.expect("");	expect
+neotrix-core/src/bin/experience/exp_distill.rsfind.expect("");	expect
+neotrix-core/src/bin/experience/exp_distill.rsfindlettx=conn.transaction().expect("");	expect
+neotrix-core/src/bin/experience/exp_distill.rsfindtx.commit().expect("");	expect
+neotrix-core/src/bin/experience/exp_query.rscmd_hubprintln!("",serde_json::to_string_pretty(&hub).expect(""));	expect
+neotrix-core/src/bin/experience/exp_query.rscmd_neuronletc=c.expect("");	expect
+neotrix-core/src/bin/experience/exp_query.rscmd_route.expect("")	expect
+neotrix-core/src/bin/experience/exp_store.rskv_set.expect("");	expect
+neotrix-core/src/bin/experience/exp_store.rsopen_kbletconn=Connection::open(&db_path).expect("");	expect
+neotrix-core/src/bin/experience/exp_store.rsopen_kbnt_memory_schema::initialize(&conn).expect("");	expect
+neotrix-core/src/bin/experience/exp_store.rsrefresh_hub_metricsletcmeta=cmeta.as_object_mut().expect("");	expect
+neotrix-core/src/bin/experience/exp_store.rsscan_values.expect("");	expect
+neotrix-core/src/bin/experience/exp_store.rsvalue_encodeletc=enc.finish().expect("");	expect
+neotrix-core/src/bin/experience/exp_topo.rscmd_rune.expect("");	expect
+neotrix-core/src/bin/experience/exp_topo.rscmd_runeletcolor_str=color.expect("");	expect
+neotrix-core/src/bin/experience/exp_topo.rscmd_runeletmutstmt=conn.prepare("").expect("");	expect
+neotrix-core/src/bin/experience/exp_topo.rscmd_runeparams![NS,key,serde_json::to_string(&val).expect(""),now_ts()],	expect
+neotrix-core/src/bin/experience/exp_util.rsseed_from_stru64::from_be_bytes(d[..8].try_into().expect(""))	expect
+neotrix-core/src/bin/geoint.rsfuseletdisc_list=entry[""].as_array_mut().expect("");	expect
+neotrix-core/src/bin/geoint.rsfuseletev=entry[""].as_array_mut().expect("");	expect
+neotrix-core/src/bin/geoint.rsrunscenario[""].as_object().expect(""),	expect
+neotrix-core/src/bin/kb_crawl_daemon.rsmainletafter=kb.stats().expect("");	expect
+neotrix-core/src/bin/kb_crawl_daemon.rsmainletbefore=kb.stats().expect("");	expect
+neotrix-core/src/bin/kb_crawl_daemon.rsmainletkb=KnowledgeBase::open(None).expect("");	expect
+neotrix-core/src/bin/model_download.rsmainstd::fs::create_dir_all(&target).expect("");	expect
+neotrix-core/src/bin/nt_pack_bench.rsmainlet(_,out)=PackDecoder::decode(&pack_e5).expect("");	expect
+neotrix-core/src/bin/nt_pack_bench.rsmainlet(_,out)=PackDecoder::decode(&pack_e5z).expect("");	expect
+neotrix-core/src/bin/nt_pack_bench.rsmainletjson_bytes=serde_json::to_string(&pts).expect("").len();	expect
+neotrix-core/src/bin/nt_train_export.rsingest_fileletdata=std::fs::read_to_string(path).expect("");	expect
+neotrix-core/src/bin/nt_train_export.rsingest_filestore.save().expect("");	expect
+neotrix-core/src/bin/nt_train_export.rsmainNtTrainExport::append_jsonl(&path,lines).expect("")	expect
+neotrix-core/src/bin/nt_train_export.rsmainNtTrainExport::write_jsonl(&path,lines).expect("")	expect
+neotrix-core/src/bin/nt_train_export.rsmainstd::fs::create_dir_all(&out_dir).expect("");	expect
+neotrix-core/src/bin/shanhai_evidence.rsmainletconn=Connection::open(&db_path).expect("");	expect
+neotrix-core/src/bin/shanhai_evidence.rsmainnt_memory_schema::initialize(&conn).expect("");	expect
+neotrix-core/src/bin/shanhai_evidence.rsmainsafe_insert_node(&conn,&dayu_kunlun).expect("");	expect
+neotrix-core/src/bin/shanhai_evidence.rsmainsafe_insert_node(&conn,&dna_evidence).expect("");	expect
+neotrix-core/src/bin/shanhai_evidence.rsmainsafe_insert_node(&conn,&gong_linguistics).expect("");	expect
+neotrix-core/src/bin/shanhai_evidence.rsmainsafe_insert_node(&conn,&kunlun_location).expect("");	expect
+neotrix-core/src/bin/shanhai_evidence.rsmainsafe_insert_node(&conn,&mertz_detail).expect("");	expect
+neotrix-core/src/bin/shanhai_evidence.rsmainsafe_insert_node(&conn,&qin_inscription).expect("");	expect
+neotrix-core/src/bin/shanhai_evidence.rsmainsafe_insert_node(&conn,&shimao).expect("");	expect
+neotrix-core/src/bin/shanhai_evidence.rsmainsafe_insert_node(&conn,&zhao_volcano).expect("");	expect
+neotrix-core/src/bin/shanhai_finalize.rsmainletconn=Connection::open(&db_path).expect("");	expect
+neotrix-core/src/bin/shanhai_finalize.rsmainnt_memory_schema::initialize(&conn).expect("");	expect
+neotrix-core/src/bin/shanhai_geo.rsmain.expect("");	expect
+neotrix-core/src/bin/shanhai_geo.rsmainletconn=Connection::open(&db_path).expect("");	expect
+neotrix-core/src/bin/shanhai_geo.rsmainnt_memory_schema::initialize(&conn).expect("");	expect
+neotrix-core/src/bin/shanhai_ingest.rsabsorb_core_books).expect("");	expect
+neotrix-core/src/bin/shanhai_ingest.rsabsorb_geography_conceptsletr=ingester.ingest(&desc).expect("");	expect
+neotrix-core/src/bin/shanhai_ingest.rsabsorb_global_mappingsletr=ingester.ingest(&desc).expect("");	expect
+neotrix-core/src/bin/shanhai_ingest.rsabsorb_mythical_kingdomsletr=ingester.ingest(&desc).expect("");	expect
+neotrix-core/src/bin/shanhai_ingest.rsabsorb_schools_of_thoughtletr=ingester.ingest(&desc).expect("");	expect
+neotrix-core/src/bin/shanhai_ingest.rsinsert_person_nodesafe_insert_node(conn,&node).expect("");	expect
+neotrix-core/src/bin/shanhai_ingest.rsmainletconn=Connection::open(&db_path).expect("");	expect
+neotrix-core/src/bin/shanhai_ingest.rsmainnt_memory_schema::initialize(&conn).expect("");	expect
+neotrix-core/src/bin/shanhai_link.rsopen_kbletconn=Connection::open(&db_path).expect("");	expect
+neotrix-core/src/bin/shanhai_link.rsopen_kbnt_memory_schema::initialize(&conn).expect("");	expect
+neotrix-core/src/l0_substrate/ffi/consciousness_tree.rsget_branchself.inner.read().expect("").branches.get(branch_id).cloned().ok_or(NeoTrixError::NotFound)	expect
+neotrix-core/src/l0_substrate/ffi/consciousness_tree.rsget_evolution_historyself.inner.read().expect("").history.iter().rev().take(limitasusize).cloned().collect()	expect
+neotrix-core/src/l0_substrate/ffi/consciousness_tree.rsget_stateletinner=self.inner.read().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/consciousness_tree.rstrigger_meta_cognitionletmutinner=self.inner.write().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/consciousness_tree.rsupdate_branch_healthletmutinner=self.inner.write().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/constellation_system.rscan_upgradeself.inner.read().expect("").states.get(module).map(|s|s.level<6).unwrap_or(false)	expect
+neotrix-core/src/l0_substrate/ffi/constellation_system.rscheck_upgradeletmutinner=self.inner.write().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/constellation_system.rsget_all_statesself.inner.read().expect("").states.values().cloned().collect()	expect
+neotrix-core/src/l0_substrate/ffi/constellation_system.rsget_stateself.inner.read().expect("").states.get(module).cloned().ok_or(NeoTrixError::NotFound)	expect
+neotrix-core/src/l0_substrate/ffi/constellation_system.rsget_upgrade_pathself.inner.read().expect("").states.get(module).map(|s|s.requirements.clone()).ok_or(NeoTrixError::NotFound)	expect
+neotrix-core/src/l0_substrate/ffi/dual_specialization.rsconfigure_setletmutinner=self.inner.write().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/dual_specialization.rsget_stateself.inner.read().expect("").state.clone()	expect
+neotrix-core/src/l0_substrate/ffi/dual_specialization.rsrecommend_setletinner=self.inner.read().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/dual_specialization.rsswitch_setletmutinner=self.inner.write().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/e8_reasoning.rsevolve_hexagramletmutinner=self.inner.write().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/e8_reasoning.rsget_current_hexagramself.inner.read().expect("").current.clone()	expect
+neotrix-core/src/l0_substrate/ffi/e8_reasoning.rsget_hexagram_libraryHexagramLibrary{hexagrams:self.inner.read().expect("").library.clone()}	expect
+neotrix-core/src/l0_substrate/ffi/e8_reasoning.rsreasonletinner=self.inner.read().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/gwt_attention.rsget_resonanceletinner=self.inner.read().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/gwt_attention.rsget_thinking_budgetself.inner.read().expect("").thinking_budget	expect
+neotrix-core/src/l0_substrate/ffi/gwt_attention.rsget_workspace_stateself.inner.read().expect("").workspace.clone()	expect
+neotrix-core/src/l0_substrate/ffi/gwt_attention.rsregister_moduleself.inner.write().expect("").modules.insert(name.to_string(),interest_keywords);	expect
+neotrix-core/src/l0_substrate/ffi/gwt_attention.rsregister_moduleself.inner.write().expect("").thresholds.entry(name.to_string()).or_insert(0.3);	expect
+neotrix-core/src/l0_substrate/ffi/gwt_attention.rsset_salience_thresholdletmutinner=self.inner.write().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/gwt_attention.rsset_thinking_budgetletmutinner=self.inner.write().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/gwt_attention.rssubmit_signalletmutinner=self.inner.write().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/gwt_attention.rsunregister_moduleself.inner.write().expect("").modules.remove(name).is_some()	expect
+neotrix-core/src/l0_substrate/ffi/kb_bridge.rsget_relatedletinner=self.inner.read().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/kb_bridge.rsget_statsletinner=self.inner.read().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/kb_bridge.rsqueryletinner=self.inner.read().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/kb_bridge.rsrun_absorptionletinner=self.inner.read().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/kb_bridge.rssemantic_searchletinner=self.inner.read().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/kb_bridge.rsstore_experienceletemb=inner.nodes.get(&id).expect("").embedding.clone();	expect
+neotrix-core/src/l0_substrate/ffi/kb_bridge.rsstore_experienceletmutinner=self.inner.write().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/rune_socketing.rscompute_runewordsletinner=self.inner.read().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/rune_socketing.rsconfigure_socketsself.inner.write().expect("").configs.insert(config.module.clone(),config);	expect
+neotrix-core/src/l0_substrate/ffi/rune_socketing.rsget_module_configself.inner.read().expect("").configs.get(module).cloned().ok_or(NeoTrixError::NotFound)	expect
+neotrix-core/src/l0_substrate/ffi/rune_socketing.rsget_runesself.inner.read().expect("").runes.clone()	expect
+neotrix-core/src/l0_substrate/ffi/rune_socketing.rsget_runewordsself.inner.read().expect("").runewords.clone()	expect
+neotrix-core/src/l0_substrate/ffi/seal_pipeline.rscloneinner:RwLock::new(self.inner.read().expect("").clone()),	expect
+neotrix-core/src/l0_substrate/ffi/seal_pipeline.rsget_absorption_progressself.inner.read().expect("").absorption.clone()	expect
+neotrix-core/src/l0_substrate/ffi/seal_pipeline.rsget_exploration_resultsself.inner.read().expect("").exploration.clone()	expect
+neotrix-core/src/l0_substrate/ffi/seal_pipeline.rsget_statusself.inner.read().expect("").status.clone()	expect
+neotrix-core/src/l0_substrate/ffi/seal_pipeline.rsrun_cycleletmutinner=self.inner.write().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/seal_pipeline.rsrun_stageletmutinner=self.inner.write().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/seal_pipeline.rsrun_training_cycleletmutinner=self.inner.write().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/seal_pipeline.rstrigger_distillationletinner=self.inner.read().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/skill_tree.rsallocate_pointletmutinner=self.inner.write().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/skill_tree.rsget_nodeself.inner.read().expect("").nodes.iter().find(|n|n.id==node_id).cloned().ok_or(NeoTrixError::NotFound)	expect
+neotrix-core/src/l0_substrate/ffi/skill_tree.rsget_stateletinner=self.inner.read().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/skill_tree.rsis_constellation_activeletinner=self.inner.read().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/skill_tree.rsrespecletmutinner=self.inner.write().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/vsa_hypercube.rsbindsparsity:self.inner.read().expect("").sparsity,	expect
+neotrix-core/src/l0_substrate/ffi/vsa_hypercube.rsbundleletinner=self.inner.read().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/vsa_hypercube.rspermuteHyperVector{dimensions:vector.dimensions,data,sparsity:self.inner.read().expect("").sparsity}	expect
+neotrix-core/src/l0_substrate/ffi/vsa_hypercube.rsrandom_vectorletinner=self.inner.read().expect("");	expect
+neotrix-core/src/l0_substrate/ffi/vsa_hypercube.rsretrieveself.inner.read().expect("").store.get(label).cloned().ok_or(NeoTrixError::NotFound)	expect
+neotrix-core/src/l0_substrate/ffi/vsa_hypercube.rsstoreself.inner.write().expect("").store.insert(label.to_string(),vector);	expect
+neotrix-core/src/l0_substrate/nt_core_di.rsglobal_containerwrite.as_ref().expect("").clone()	expect
+neotrix-core/src/l1_action/nt_act/actions/media/media.rsscheduleOk(self.slots.last().expect(""))	expect
+neotrix-core/src/l1_action/nt_act/actions/video/video_job_pipeline.rs_next_jobletjob_a=self.jobs.get(a).expect("");	expect
+neotrix-core/src/l1_action/nt_act/actions/video/video_job_pipeline.rs_next_jobletjob_b=self.jobs.get(b).expect("");	expect
+neotrix-core/src/l1_action/nt_act/nt_act_crypto/cipher.rskey_to_cipherAes256Gcm::new_from_slice(key).expect("")	expect
+neotrix-core/src/l1_action/nt_act/nt_act_crypto/dex.rsencode_add_liquidity_v2data.extend_from_slice(&hex::decode("").expect(""));	expect
+neotrix-core/src/l1_action/nt_act/nt_act_crypto/dex.rsencode_swap_exact_tokens_for_tokens_v2data.extend_from_slice(&hex::decode("").expect(""));	expect
+neotrix-core/src/l1_action/nt_act/nt_act_crypto/dex.rsget_reserves_v2letdata=hex::decode("").expect("");	expect
+neotrix-core/src/l1_action/nt_act/nt_act_crypto/token.rsallowancedata.extend_from_slice(&hex::decode("").expect(""));	expect
+neotrix-core/src/l1_action/nt_act/nt_act_crypto/token.rsapprovedata.extend_from_slice(&hex::decode("").expect(""));	expect
+neotrix-core/src/l1_action/nt_act/nt_act_crypto/token.rsbalance_ofdata.extend_from_slice(&hex::decode("").expect(""));	expect
+neotrix-core/src/l1_action/nt_act/nt_act_crypto/token.rstransferdata.extend_from_slice(&hex::decode("").expect(""));	expect
+neotrix-core/src/l1_action/nt_act/nt_act_crypto/tx.rsencode_erc20_approvedata.extend_from_slice(&hex::decode("").expect(""));	expect
+neotrix-core/src/l1_action/nt_act/nt_act_crypto/tx.rsencode_erc20_transferdata.extend_from_slice(&hex::decode("").expect(""));	expect
+neotrix-core/src/l1_action/nt_act/nt_act_trade/extractors/joinf.rsnew.expect("");	expect
+neotrix-core/src/l1_action/nt_act/nt_act_trade/orchestrator_v2.rsexecute_task.expect("");	expect
+neotrix-core/src/l1_action/nt_file_ability/doc_parse.rsparse_anyletbackend=f.to_anydoc().expect("");	expect
+neotrix-core/src/l1_action/nt_file_ability/doc_parse.rstable_to_markdownletheader=grid.first().expect("");	expect
+neotrix-core/src/l1_action/nt_file_ability/visual/grounding.rscritical_identifiers.expect("")	expect
+neotrix-core/src/l1_action/nt_file_ability/visual/grounding.rscritical_numeric_tokensletm=cap.get(0).expect("");	expect
+neotrix-core/src/l1_action/nt_file_ability/visual/grounding.rscritical_numeric_tokensletre=regex::Regex::new(NUMERIC_TOKEN_RE).expect("");	expect
+neotrix-core/src/l1_action/nt_file_ability/visual/grounding.rscritical_numeric_tokensletversion_re=regex::Regex::new(VERSION_TOKEN_RE).expect("");	expect
+neotrix-core/src/l1_action/nt_io/nt_io_avatar_channel.rspushself.entries.last().expect("")	expect
+neotrix-core/src/l1_action/nt_io/nt_io_browser_engine/mod.rs<toplevel>.expect("")	expect
+neotrix-core/src/l1_action/nt_io/nt_io_inference/quantization_engine.rsdynamic_selectifselected.is_none()||level.quality_score>selected.as_ref().expect("").quality_score{	expect
+neotrix-core/src/l1_action/nt_io/nt_io_neocodex/context.rscompact_if_neededletfront=self.turns.pop_front().expect("");	expect
+neotrix-core/src/l1_action/nt_io/nt_io_plugin/registry.rshot_reload_batch*old_cell_fwd.lock().expect("")=stale;	expect
+neotrix-core/src/l1_action/nt_io/nt_io_plugin/registry.rshot_reload_batchifletSome(old_p)=old_cell.lock().expect("").take(){	expect
+neotrix-core/src/l1_action/nt_io/nt_io_plugin/registry.rshot_reload_batchlet(info,new_p)=cell.lock().expect("").take().expect("");	expect
+neotrix-core/src/l1_action/nt_io/nt_io_plugin/registry.rshot_reload_batchlet(info,p)=cell.lock().expect("").take().expect("");	expect
+neotrix-core/src/l1_action/nt_io/nt_io_plugin/registry.rsload_batchletp=cell.lock().expect("").take().expect("");	expect
+neotrix-core/src/l1_action/nt_io/nt_io_web/server.rshandle_openapi.expect("")	expect
+neotrix-core/src/l2_perception/nt_core_code_search.rsextract_symbols.expect("");	expect
+neotrix-core/src/l2_perception/nt_core_e8/nt_latent_transformer.rsreasonletmutlast=self.states.last().expect("").clone();	expect
+neotrix-core/src/l2_perception/nt_world/crawl/discover.rs_compiled_patternRegex::new(&self.pattern).expect("")	expect
+neotrix-core/src/l2_perception/nt_world/crawl/discover.rsnew).expect(""));	expect
+neotrix-core/src/l2_perception/nt_world/crawl/ordered_backend_router/mod.rsself_testassert!(!router.backends.iter().find(|b|b.backend==BackendType::BrowserAct).expect("").enabled);	expect
+neotrix-core/src/l2_perception/nt_world/crawl/ordered_backend_router/mod.rsself_testassert!(router.backends.iter().find(|b|b.backend==BackendType::BrowserAct).expect("").enabled);	expect
+neotrix-core/src/l2_perception/nt_world/osint/harvest/email_harvester.rsnew).expect("");	expect
+neotrix-core/src/l2_perception/nt_world/source/crypto.rsmigu_signletmutmac=HmacSha1::new_from_slice(b"").expect("");	expect
+neotrix-core/src/l2_perception/nt_world/source/multi_cache.rsnewl1:LruCache::new(NonZeroUsize::new(DEFAULT_L1_CAPACITY).expect("")),	expect
+neotrix-core/src/l3_embodiment/nt_shield/defense/guardrail_traversal.rs_auto_select_frameself.frames.iter().find(|f|f.name=="").expect("")	expect
+neotrix-core/src/l3_embodiment/nt_shield/defense/reasoning_protection.rsinject_decoyletdecoy=self.decoy_patterns.first().expect("");	expect
+neotrix-core/src/l3_embodiment/nt_shield/defense/refusal_tamper.rstamperletdecoy=self.decoy_templates.first().expect("");	expect
+neotrix-core/src/l3_embodiment/nt_shield/http_intercept/mod.rsnew.expect("");	expect
+neotrix-core/src/l3_embodiment/nt_shield/nt_shield_approval/confirmation_gate/mod.rsself_testletbrowser_policy=gate.policies.get(&ConfirmationType::BrowserCreation).expect("");	expect
+neotrix-core/src/l3_embodiment/nt_shield/nt_shield_approval/confirmation_gate/mod.rsself_testletpolicy=gate.policies.get(&ConfirmationType::FormSubmission).expect("");	expect
+neotrix-core/src/l3_embodiment/nt_shield/nt_shield_approval/confirmation_gate/mod.rsself_testletprofile_policy=gate.policies.get(&ConfirmationType::ProfileSwitch).expect("");	expect
+neotrix-core/src/l3_embodiment/nt_shield/nt_shield_approval/human_approval.rsmake_decision.expect("");	expect
+neotrix-core/src/l3_embodiment/nt_shield/nt_shield_sentry.rs_cleanse_untaggedletch=content[i..].chars().next().expect("");	expect
+neotrix-core/src/l3_embodiment/nt_shield/nt_shield_sentry.rs_fence_untrustedletch=content[i..].chars().next().expect("");	expect
+neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/ip_geo.rsnewcache:Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1024).expect("")))),	expect
+neotrix-core/src/l3_embodiment/nt_shield/nt_shield_ztnet/crypto/aead.rsnew.expect("");	expect
+neotrix-core/src/l3_embodiment/nt_shield/osint/mod.rsnew.expect("");	expect
+neotrix-core/src/l3_embodiment/nt_shield/proxy_detection/account_cluster.rscompute_creation_scoreletmax_time=*times.iter().max().expect("");	expect
+neotrix-core/src/l3_embodiment/nt_shield/proxy_detection/account_cluster.rscompute_creation_scoreletmin_time=*times.iter().min().expect("");	expect
+neotrix-core/src/l3_embodiment/nt_shield/proxy_detection/account_cluster.rscompute_window_durationletmax_time=*times.iter().max().expect("");	expect
+neotrix-core/src/l3_embodiment/nt_shield/proxy_detection/account_cluster.rscompute_window_durationletmin_time=*times.iter().min().expect("");	expect
+neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs<toplevel>.expect("")	expect
+neotrix-core/src/l3_embodiment/nt_shield/scanners/secret_scanner/detector.rs<toplevel>Regex::new("").expect("")	expect
+neotrix-core/src/l3_embodiment/nt_shield/shield_core/audit.rshas_author_year.expect("")	expect
+neotrix-core/src/l3_embodiment/nt_shield/shield_core/audit.rshas_verifiable_metadata.expect("")	expect
+neotrix-core/src/l3_embodiment/nt_shield/shield_core/tool_inspection_stack.rsdefaultre:regex::Regex::new($pattern).expect(""),	expect
+neotrix-core/src/l3_embodiment/nt_shield/slang_norm.rssearchlast_match=Some((node.professional.clone().expect(""),node.domain.expect("")));	expect
+neotrix-core/src/l4_emotion/nt_memory/evidence_ledger/mod.rsadd_evidence.expect("")	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_historian/nt_evidence_hypothesis.rspropose_hypothesisself.hypotheses.last_mut().expect("")	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/kb_core.rsinit_fields.expect("")	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_absorb_mapper.rskeyword_rules.map(|(pat,br,cap)|(Regex::new(pat).expect(""),*br,*cap))	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_adaptive_rag.rsnewstd::num::NonZeroUsize::new(200).expect(""),	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_brain.rsspread_activationseed_scores[seed_nodes.iter().position(|s|s==node).expect("")]	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_cortex_sync.rsenrich_cortex_metadatapayload[""]=serde_json::to_value(&lineage).expect("");	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_cortex_sync.rsupdate_cortex_lineagemeta[""]=serde_json::to_value(&lineage).expect("");	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_gwt_router.rsnewNonZeroUsize::new(200).expect(""),	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_knowledge_assets.rsimport_bandit_dataletarr=entry.as_array().expect("");	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_pack_chunked.rsinternletmutenc=zstd::stream::write::Encoder::new(Vec::new(),9).expect("");	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_provenance.rssign_contentletmutmac=HmacSha256::new_from_slice(key).expect("");	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_snapshot.rsdiff_snapshotsbase_edges.get(*id).copied().expect(""),	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_snapshot.rsdiff_snapshotsletb=base_nodes.get(*id).copied().expect("");	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_snapshot.rsdiff_snapshotsletn=base_nodes.get(*id).copied().expect("");	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_snapshot.rsdiff_snapshotsletn=other_nodes.get(*id).copied().expect("");	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_snapshot.rsdiff_snapshotsleto=other_nodes.get(*id).copied().expect("");	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_snapshot.rsdiff_snapshotsother_edges.get(*id).copied().expect(""),	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_sweep_20260815.rspushself.records.last().expect("")	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_normalizer.rsdetect_language.max_by(|a,b|a.1.partial_cmp(b.1).expect(""))	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_normalizer.rslang_signatures.map(|(pat,lang,w)|(Regex::new(pat).expect(""),*lang,*w))	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_normalizer.rsmd_rules.map(|(pat,rep)|(Regex::new(pat).expect(""),*rep))	expect
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_lead.rscapture_leadself.leads.get(&id).expect("")	expect
+neotrix-core/src/l5_cognition/nt_core_arch_fitness.rsself_test.expect("");	expect
+neotrix-core/src/l5_cognition/nt_core_gate/nt_panel_debate.rsrun_ensemblelast:Box::new(last.expect("")),	expect
+neotrix-core/src/l5_cognition/nt_mind/mind_modules/other/rsi_exam.rs_transfer_ratioletnum:f64=kept.iter().map(|r|r.hidden_score.expect("")).sum();	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_game/play/self_play_loop.rsrun_iterationlegal.into_iter().next().expect("")	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/consciousness/bbrain_monitor.rshealth_trendletfirst=recent.last().expect("");	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/consciousness/bbrain_monitor.rshealth_trendletlast=recent.first().expect("");	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/agent_capability/nt_capability_eval.rsdefault.expect(""),	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/deliberation.rsadvance_phaseletcurrent=session.rounds.last_mut().expect("");	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/deliberation.rsadvance_phasesession.rounds.last_mut().expect("").phase=next_phase.clone();	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/goal_loop/loop_impl/execution.rsauto_plan.expect(""),	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/goal_loop/loop_impl/execution.rsdrill_down.expect(""),	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/goal_loop/loop_impl/pursue.rspursue_auto_iterationletfinished=self.active_goal.take().expect("");	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/goal_loop/loop_impl/pursue.rspursue_iteration.expect("");	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/value_compass.rsarbitrateletv1=self.values.get(v1_id).expect("");	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/value_compass.rsarbitrateletv2=self.values.get(v2_id).expect("");	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/infrastructure/build_context.rsdfsletpos=rec_stack.iter().position(|&x|x==next).expect("");	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/infrastructure/code_review.rs_compute_seal_rewardletlast=self.history.last().expect("");	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/infrastructure/code_review.rs_compute_seal_rewardletprev=self.history.get(self.history.len()-2).expect("");	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/infrastructure/code_review.rs_delta_improvement-self.history.first().expect("").score	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/infrastructure/code_review.rs_delta_improvementself.history.last().expect("").score	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/infrastructure/group_contracts.rsregexletsig=sig_re.captures(&content[cap.get(0).expect("").start()..])	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge/context_artifacts/store.rsparse_configletkey=cap.get(1).expect("").as_str();	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge/context_artifacts/store.rsparse_configletsection=cap.get(1).expect("").as_str();	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge/context_artifacts/store.rsparse_configletvalue=cap.get(2).expect("").as_str().trim();	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge/context_artifacts/store.rsparse_markdownletheading=cap.get(2).expect("").as_str().trim();	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/knowledge/context_artifacts/store.rsparse_markdownletlevel=cap.get(1).expect("").as_str().len();	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/reason/thinking_bridge.rsevaluate_cognitive_health.expect("");	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/always_on.rsnext_run.unwrap_or_else(||date.and_hms_opt(0,0,0).expect("")),	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/always_on.rsnext_run.unwrap_or_else(||today.and_hms_opt(0,0,0).expect("")),	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/always_on.rsnext_run.unwrap_or_else(||tomorrow.and_hms_opt(0,0,0).expect("")),	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/consciousness_orchestrator.rs_wisdom_cycle.unwrap_or_else(||rusqlite::Connection::open_in_memory().expect(""));	expect
+neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/consciousness_orchestrator.rsinit.unwrap_or_else(||rusqlite::Connection::open_in_memory().expect(""));	expect
+neotrix-core/src/l5_cognition/nt_mind/seal/crystallization.rs_status_of.expect("")	expect
+neotrix-core/src/l5_cognition/nt_mind/seal/crystallization.rschrono_now.expect("")	expect
+neotrix-core/src/l5_cognition/nt_mind/seal/procedural_graph.rs_propose_edit.expect("");	expect
+neotrix-core/src/l5_cognition/nt_mind/seal/procedural_graph.rstopological_sortletdegree=in_degree.get_mut(neighbor).expect("");	expect
+neotrix-core/src/l6_meta/coordination/nt_mind_repair/skill_improver/mod.rsself_testletresult_ref=result.as_ref().expect("");	expect
+neotrix-core/src/l6_meta/nt_core_scheduler/event_driven_claim.rshealletclaim=self.claims.remove(&tid).expect("");	expect
+neotrix-core/src/l6_meta/nt_core_scheduler/event_driven_claim.rstry_claim_for_workerlettask=self.tasks.get_mut(&task_id).expect("");	expect
+neotrix-core/src/l6_meta/nt_core_self/attention_head.rsfsm_assisted_routeletstate_id=format!("",history.last().expect("").label());	expect
+neotrix-core/src/l6_meta/nt_core_self/pilot_steering.rsextract_failure_patternslast_seen:points.last().expect("").timestamp,	expect
+neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rscompute_abstraction_coverage).expect("");	expect
+neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rscompute_abstraction_coverage}).expect("");	expect
+neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rscompute_connectivity_stats).expect("");	expect
+neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rsscan_connectivity_gaps).expect("");	expect
+neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rsscan_connectivity_gaps}).expect("");	expect
+neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rsscan_stale_knowledge).expect("");	expect
+neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rsscan_stale_knowledgetitle,age_days,chrono::DateTime::from_timestamp(updated,0).expect("").format("")	expect
+neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rsscan_stale_knowledge}).expect("");	expect
+neotrix-core/src/l6_meta/nt_meta/knowledge_gap_detector.rswrite_gap_reports_to_kb).expect("");	expect
+neotrix-core/src/l6_meta/nt_meta/otel_bridge/cost_tracker.rsentriesletentries=self.entries.lock().expect("");	expect
+neotrix-core/src/l6_meta/nt_meta/otel_bridge/cost_tracker.rsrecordletmutentries=self.entries.lock().expect("");	expect
+neotrix-core/src/l6_meta/nt_meta/otel_bridge/cost_tracker.rssummaryletentries=self.entries.lock().expect("");	expect
+neotrix-core/src/l6_meta/nt_meta/otel_bridge/trace_pipeline.rsclearletmutinner=self.inner.lock().expect("");	expect
+neotrix-core/src/l6_meta/nt_meta/otel_bridge/trace_pipeline.rsdrainletmutinner=self.inner.lock().expect("");	expect
+neotrix-core/src/l6_meta/nt_meta/otel_bridge/trace_pipeline.rsnext_idletmutinner=self.inner.lock().expect("");	expect
+neotrix-core/src/l6_meta/nt_meta/otel_bridge/trace_pipeline.rsrecordletmutinner=self.inner.lock().expect("");	expect
+neotrix-core/src/l6_meta/nt_meta/otel_bridge/trace_pipeline.rssnapshotsletinner=self.inner.lock().expect("");	expect
+neotrix-core/src/l6_meta/nt_meta/auto_inspector/mod.rsrun_cargo.unwrap_or_else(|e|panic!("",args.join(""),e));	panic
+crates/neotrix-gateway/src/hive.rsdelegate_to_best.unwrap()	unwrap
+crates/neotrix-multi-agent/src/hive.rsdelegate_to_best.unwrap()	unwrap
+crates/neotrix-types/src/write_guard_types.rsactive_countlettokens=self.tokens.lock().unwrap();	unwrap
+crates/neotrix-types/src/write_guard_types.rsclearletmuttokens=self.tokens.lock().unwrap();	unwrap
+crates/neotrix-types/src/write_guard_types.rsclear_allletmuttokens=self.tokens.lock().unwrap();	unwrap
+crates/neotrix-types/src/write_guard_types.rsgcletmuttokens=self.tokens.lock().unwrap();	unwrap
+crates/neotrix-types/src/write_guard_types.rshas_validlettokens=self.tokens.lock().unwrap();	unwrap
+crates/neotrix-types/src/write_guard_types.rsissueletmuttokens=self.tokens.lock().unwrap();	unwrap
+crates/neotrix-types/src/write_guard_types.rstry_consumeletmuttokens=self.tokens.lock().unwrap();	unwrap
+neotrix-core/src/bin/nt_train_export.rsmain.unwrap()	unwrap
+neotrix-core/src/l0_substrate/nt_core_consciousness_types.rscompute_phihistory.last().unwrap()-history[history.len()-2]	unwrap
+neotrix-core/src/l0_substrate/nt_core_hot_data.rsquery_similarscored.select_nth_unstable_by(k-1,|a,b|b.1.partial_cmp(&a.1).unwrap());	unwrap
+neotrix-core/src/l0_substrate/nt_core_hot_data.rsquery_similarscored.sort_by(|a,b|b.1.partial_cmp(&a.1).unwrap());	unwrap
+neotrix-core/src/l1_action/nt_act/acp_protocol.rsget_responseletpending=self.pending_responses.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/acp_protocol.rsstore_responseletmutpending=self.pending_responses.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/agent_loop/auditor.rsauditself.audit_log.lock().unwrap().push(record.details.clone());	unwrap
+neotrix-core/src/l1_action/nt_act/agent_loop/auditor.rsauditself.history.lock().unwrap().push(record.clone());	unwrap
+neotrix-core/src/l1_action/nt_act/agent_loop/auditor.rsaudit_countself.history.lock().unwrap().len()	unwrap
+neotrix-core/src/l1_action/nt_act/agent_loop/auditor.rsaudit_logself.audit_log.lock().unwrap().clone()	unwrap
+neotrix-core/src/l1_action/nt_act/agent_loop/auditor.rshistoryself.history.lock().unwrap().clone()	unwrap
+neotrix-core/src/l1_action/nt_act/agent_loop/manager.rsassign_taskself.tasks.lock().unwrap().insert(task_id.clone(),task);	unwrap
+neotrix-core/src/l1_action/nt_act/agent_loop/manager.rsexecute_taskletmuttasks=self.tasks.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/agent_loop/manager.rsexecute_tasklettask=tasks.get_mut(task_id).unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/agent_loop/manager.rsexecute_tasklettasks=self.tasks.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/agent_loop/manager.rsexecute_tasktasks.get(task_id).unwrap().objective.clone()	unwrap
+neotrix-core/src/l1_action/nt_act/agent_loop/manager.rsget_taskself.tasks.lock().unwrap().get(task_id).cloned()	unwrap
+neotrix-core/src/l1_action/nt_act/agent_loop/manager.rsmonitorlettasks=self.tasks.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/agent_loop/manager.rsupdate_progressletmuttasks=self.tasks.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/agent_protocol.rsapply_mutationself.config.max_budget_usd=mutation.max_budget_usd.unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/deferred_loader.rscache_dataletmutresources=self.resources.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/deferred_loader.rscurrent_usage*self.current_size.lock().unwrap()	unwrap
+neotrix-core/src/l1_action/nt_act/deferred_loader.rsevictletmutcurrent_size=self.current_size.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/deferred_loader.rsevictletmutloaded=self.loaded_keys.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/deferred_loader.rsevictletmutresources=self.resources.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/deferred_loader.rsget_cachedletresources=self.resources.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/deferred_loader.rsis_loadedletloaded=self.loaded_keys.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/deferred_loader.rsloadletloaded=self.loaded_keys.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/deferred_loader.rsloadletmutcurrent_size=self.current_size.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/deferred_loader.rsloadletmutloaded=self.loaded_keys.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/deferred_loader.rsloadletmutresources=self.resources.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/deferred_loader.rsloaded_countself.loaded_keys.lock().unwrap().len()	unwrap
+neotrix-core/src/l1_action/nt_act/deferred_loader.rsprefetchletmutcurrent_size=self.current_size.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/deferred_loader.rsprefetchletmutloaded=self.loaded_keys.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/deferred_loader.rsprefetchletmutresources=self.resources.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rs_amend_lcOk(self.lcs.get(lc_number).unwrap())	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rsbook_shipmentOk(self.shipments.get(shipment_id).unwrap())	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rsconfirm_lcOk(self.lcs.get(lc_number).unwrap())	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rscreate_orderOk(self.orders.get(order_id).unwrap())	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rsissue_lcOk(self.lcs.get(lc_number).unwrap())	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rspresent_documentsOk(self.lcs.get(lc_number).unwrap())	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rsprocess_paymentOk(self.payments.get(&payment_id).unwrap())	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rsreview_documentsOk(self.lcs.get(lc_number).unwrap())	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rssubmit_declarationOk(self.declarations.get(declaration_id).unwrap())	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rsupdate_statusOk(self.declarations.get(declaration_id).unwrap())	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rsupdate_statusOk(self.orders.get(order_id).unwrap())	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/mock_adapters.rsupdate_statusOk(self.shipments.get(shipment_id).unwrap())	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/nt_trade_crm.rsquery_customersitems.sort_by(|a,b|b.total_revenue.partial_cmp(&a.total_revenue).unwrap());	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/nt_trade_pipeline.rsadvance_stageOk(self.deals.get(deal_id).unwrap())	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/nt_trade_pipeline.rsmark_lostOk(self.deals.get(deal_id).unwrap())	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/nt_trade_pipeline.rsmark_wonOk(self.deals.get(deal_id).unwrap())	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/nt_trade_supplier_mgmt.rscompare_suppliers.max_by(|a,b|a.1.partial_cmp(&b.1).unwrap())	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rsexecute_next_steplethandler=self.handlers.get(&handler_name).unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rsexecute_next_stepletinst=self.process_instances.get(instance_id).unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rsexecute_next_stepletinst=self.process_instances.get_mut(instance_id).unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rsresume_instanceletinst=self.process_instances.get_mut(instance_id).unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rsretry_from_stepletinst=self.process_instances.get_mut(instance_id).unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/process_engine.rsstart_instanceletinst=self.process_instances.get_mut(instance_id).unwrap();	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/trade_knowledge.rsget_needs_followup.unwrap()	unwrap
+neotrix-core/src/l1_action/nt_act/nt_act_trade/workers/track_worker.rssnapshotself.progress.lock().unwrap().clone()	unwrap
+neotrix-core/src/l1_action/nt_core_bank/bank/rag_engine.rsretrievescored.sort_by(|a,b|b.relevance_score.partial_cmp(&a.relevance_score).unwrap());	unwrap
+neotrix-core/src/l1_action/nt_core_graph_memory.rsprune.unwrap()	unwrap
+neotrix-core/src/l1_action/nt_core_graph_memory.rsstrongest_connectionsedges.sort_by(|a,b|b.weight.partial_cmp(&a.weight).unwrap());	unwrap
+neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rsbb_read.unwrap()	unwrap
+neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rsbb_write.unwrap()	unwrap
+neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rsbroadcastself.router.lock().unwrap().send(msg);	unwrap
+neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rscoordinated_turnletmutrouter=self.router.lock().unwrap();	unwrap
+neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rsinbox_depthself.router.lock().unwrap().inbox_depth(&self.agent_id)	unwrap
+neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rsnewrouter.lock().unwrap().ensure_mailbox(agent_id);	unwrap
+neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rsrouter_statsself.router.lock().unwrap().stats()	unwrap
+neotrix-core/src/l1_action/nt_io/nt_io_hive_agent_loop.rssend_toself.router.lock().unwrap().send(msg);	unwrap
+neotrix-core/src/l1_action/nt_io/nt_io_media/liquid_glass.rscreate_glassself.effects.get(name).unwrap().layers.last().unwrap()	unwrap
+neotrix-core/src/l2_perception/nt_world/cfg_builder.rsbuildself.cfg.as_ref().unwrap()	unwrap
+neotrix-core/src/l2_perception/nt_world/osint/ad_graph/analysis.rsfind_high_risk_pathspaths.sort_by(|a,b|b.risk_score.partial_cmp(&a.risk_score).unwrap());	unwrap
+neotrix-core/src/l2_perception/nt_world/source/multi_cache.rswith_capacityl1:LruCache::new(NonZeroUsize::new(capacity.max(1)).unwrap()),	unwrap
+neotrix-core/src/l2_perception/nt_world/temporal_kg/entity.rsextract_entitiesletfirst_char=cleaned.chars().next().unwrap();	unwrap
+neotrix-core/src/l2_perception/nt_world/temporal_kg/fact_extractor.rsextract_factsletdate_str=cap.get(1).unwrap().as_str().trim();	unwrap
+neotrix-core/src/l2_perception/nt_world/temporal_kg/fact_extractor.rsextract_factsletprefix=&text[..cap.get(0).unwrap().start()];	unwrap
+neotrix-core/src/l2_perception/nt_world/temporal_kg/fact_extractor.rsextract_factsletsuffix=&text[cap.get(0).unwrap().end()..];	unwrap
+neotrix-core/src/l2_perception/nt_world/temporal_kg/fact_extractor.rsextract_factslett=parsed.unwrap();	unwrap
+neotrix-core/src/l2_perception/nt_world/temporal_kg/fact_extractor.rsparse_datetimereturnSome(d.and_hms_opt(0,0,0).unwrap());	unwrap
+neotrix-core/src/l3_embodiment/nt_shield/binary_analyzer.rsclear_cacheletmutcache=self.cache.lock().unwrap();	unwrap
+neotrix-core/src/l3_embodiment/nt_shield/binary_analyzer.rsget_exportsletcache=self.cache.lock().unwrap();	unwrap
+neotrix-core/src/l3_embodiment/nt_shield/binary_analyzer.rsget_headersletcache=self.cache.lock().unwrap();	unwrap
+neotrix-core/src/l3_embodiment/nt_shield/binary_analyzer.rsget_importsletcache=self.cache.lock().unwrap();	unwrap
+neotrix-core/src/l3_embodiment/nt_shield/binary_analyzer.rsget_sectionsletcache=self.cache.lock().unwrap();	unwrap
+neotrix-core/src/l3_embodiment/nt_shield/binary_analyzer.rsparseletmutcache=self.cache.lock().unwrap();	unwrap
+neotrix-core/src/l4_emotion/nt_emotion_reasoning_bridge.rsupdate_ct_prioritiessorted.sort_by(|a,b|b.1.partial_cmp(&a.1).unwrap());	unwrap
+neotrix-core/src/l4_emotion/nt_feel/salesperson_profiling.rsgenerate_insights.unwrap();	unwrap
+neotrix-core/src/l4_emotion/nt_feel/writing_style.rsextract_closings).unwrap();	unwrap
+neotrix-core/src/l4_emotion/nt_feel/writing_style.rsextract_closingsletnormalized=m.get(1).unwrap().as_str().to_lowercase();	unwrap
+neotrix-core/src/l4_emotion/nt_feel/writing_style.rsextract_greetings.unwrap();	unwrap
+neotrix-core/src/l4_emotion/nt_feel/writing_style.rsextract_greetingsletnormalized=m.get(1).unwrap().as_str().to_lowercase();	unwrap
+neotrix-core/src/l4_emotion/nt_memory/add_only_writes/memory_entry.rsnow_ts.unwrap()	unwrap
+neotrix-core/src/l4_emotion/nt_memory/cascade/episodic.rsall_by_importanceitems.sort_by(|a,b|b.importance.partial_cmp(&a.importance).unwrap());	unwrap
+neotrix-core/src/l4_emotion/nt_memory/cascade/episodic.rsevict_lowest_importance.min_by(|a,b|a.1.importance.partial_cmp(&b.1.importance).unwrap())	unwrap
+neotrix-core/src/l4_emotion/nt_memory/cascade/working.rsdrain_allitems.sort_by(|a,b|b.attention_weight.partial_cmp(&a.attention_weight).unwrap());	unwrap
+neotrix-core/src/l4_emotion/nt_memory/cascade/working.rsevict_lowest.min_by(|a,b|a.1.attention_weight.partial_cmp(&b.1.attention_weight).unwrap())	unwrap
+neotrix-core/src/l4_emotion/nt_memory/cascade/working.rsrecall_allitems.sort_by(|a,b|b.attention_weight.partial_cmp(&a.attention_weight).unwrap());	unwrap
+neotrix-core/src/l4_emotion/nt_memory/entity_linking/extractor.rs<toplevel>.unwrap()	unwrap
+neotrix-core/src/l4_emotion/nt_memory/entity_linking/extractor.rsextract_entitiesletoffset=cap.get(1).or_else(||cap.get(2)).unwrap().start();	unwrap
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_search/nt_engine.rshealth_check.unwrap()	unwrap
+neotrix-core/src/l4_emotion/nt_memory/tiered_memory/tier_core.rsnewNonZeroUsize::new(config.cache_capacity).unwrap_or(NonZeroUsize::new(1).unwrap()),	unwrap
+neotrix-core/src/l4_emotion/nt_memory/vector_index.rsdeleteletmutcache=self.cache.lock().unwrap();	unwrap
+neotrix-core/src/l4_emotion/nt_memory/vector_index.rsdeleteletmutdeleted=self.deleted_ids.lock().unwrap();	unwrap
+neotrix-core/src/l4_emotion/nt_memory/vector_index.rsgetletmutcache=self.cache.lock().unwrap();	unwrap
+neotrix-core/src/l4_emotion/nt_memory/vector_index.rsinsertletmutcache=self.cache.lock().unwrap();	unwrap
+neotrix-core/src/l4_emotion/nt_memory/vector_index.rsinsertletmutcount=self.insert_count.lock().unwrap();	unwrap
+neotrix-core/src/l4_emotion/nt_memory/vector_index.rsinsertletmutdeleted=self.deleted_ids.lock().unwrap();	unwrap
+neotrix-core/src/l4_emotion/nt_memory/vector_index.rslenletcache=self.cache.lock().unwrap();	unwrap
+neotrix-core/src/l4_emotion/nt_memory/vector_index.rssearchletcache=self.cache.lock().unwrap();	unwrap
+neotrix-core/src/l4_emotion/nt_memory/vector_index.rstotal_insertsletcount=self.insert_count.lock().unwrap();	unwrap
+neotrix-core/src/l4_emotion/nt_memory/vector_index.rsupdateletmutcache=self.cache.lock().unwrap();	unwrap
+neotrix-core/src/l4_emotion/nt_memory/vector_index.rswith_configletcapacity=NonZeroUsize::new(config.capacity.max(1)).unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_agent/ode.rsdecide.max_by(|a,b|a.goal_relevance.partial_cmp(&b.goal_relevance).unwrap())	unwrap
+neotrix-core/src/l5_cognition/nt_agent/ode.rsdecide.unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_core/multi_agent/aggregation.rsaggregate_first_validletfirst=results.first().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_core/multi_agent/aggregation.rsaggregate_votingletwinner=counts.iter().max_by_key(|(_,c)|*c).unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_core/multi_agent/aggregation.rsaggregate_weightedlet(winner,_)=best.unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_core/nt_consciousness_core/archive/crystal_unified_pipeline.rsextract_knowledgesorted_facts.sort_by(|a,b|b.confidence.partial_cmp(&a.confidence).unwrap());	unwrap
+neotrix-core/src/l5_cognition/nt_core_agent_circuit_breaker.rscheckletstate=self.agents.get_mut(agent_id).unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_core_agent_circuit_breaker.rsrecord_failureletstate=self.agents.get_mut(agent_id).unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_core_agents_md.rsclear_all_cacheletmutcache=self.cache.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_core_agents_md.rsclear_cacheletmutcache=self.cache.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_core_agents_md.rsdiscoverletcache=self.cache.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_core_agents_md.rsdiscoverletmutcache=self.cache.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_core_gwt/cost_ladder/mod.rsmost_capable_rungself.rungs.last().unwrap()	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/meta_cognitive.rsimproveself.archive.last().unwrap()	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/meta_metrics.rsrecommendationsletcurrent=self.metrics_history.back().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/meta_metrics.rsrecommendationsletprevious=self.metrics_history.back().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/action_module.rsexecute*self.total_actions.lock().unwrap()+=1;	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/action_module.rsexecuteletmuthistory=self.action_history.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/action_module.rsexecutelettotal=*self.total_actions.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/action_module.rswriteletmuthistory=self.action_history.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rsexecute*self.arousal.lock().unwrap()=(old_a*0.7+new_arousal*0.3).clamp(0.0,1.0);	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rsexecute*self.dominance.lock().unwrap()=(old_d*0.8+dominant*0.2).clamp(0.0,1.0);	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rsexecute*self.valence.lock().unwrap()=(old_v*0.7+new_valence*0.3).clamp(-1.0,1.0);	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rsexecuteleta=*self.arousal.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rsexecuteletd=*self.dominance.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rsexecuteletold_a=*self.arousal.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rsexecuteletold_d=*self.dominance.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rsexecuteletold_v=*self.valence.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rsexecuteletv=*self.valence.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rswrite*self.arousal.lock().unwrap()=a;	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rswrite*self.dominance.lock().unwrap()=d;	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/emotion_module.rswrite*self.valence.lock().unwrap()=v;	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/memory_module.rsexecuteletmutcc=self.consciousness.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/memory_module.rswriteletmutcc=self.consciousness.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/meta_module.rsexecute*self.tick_count.lock().unwrap()+=1;	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/meta_module.rsexecuteletmutmodel=self.self_model.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/meta_module.rsexecuteletmutobserved=self.observed_chunks.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/meta_module.rsexecuteletobserved=self.observed_chunks.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/meta_module.rsexecutelettick=*self.tick_count.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/meta_module.rswriteself.self_model.lock().unwrap().insert("".into(),value);	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/perception_module.rsexecute*self.last_input_domain.lock().unwrap()=domain.clone();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/perception_module.rsexecuteletmutcount=self.perceived_count.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/perception_module.rsexecuteletperceived_count=*self.perceived_count.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/perception_module.rswrite*self.last_input_domain.lock().unwrap()=domain;	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/safety_module.rsexecute*self.violations.lock().unwrap()+=1;	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/safety_module.rsexecuteletrules=self.safety_rules.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/safety_module.rsexecuteletviolations=*self.violations.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/modules/safety_module.rswriteself.safety_rules.lock().unwrap().push(rule.clone());	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/nt_shared_mind.rsactive_countself.inner.lock().unwrap().active_ids.len()	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/nt_shared_mind.rshas_overlapletinner=self.inner.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/nt_shared_mind.rspostletmutinner=self.inner.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/nt_shared_mind.rsregister_activeself.inner.lock().unwrap().active_ids.insert(id.to_string());	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/nt_shared_mind.rsrelevant_contextletinner=self.inner.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/nt_shared_mind.rssnapshotself.inner.lock().unwrap().facts.clone()	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/nt_shared_mind.rsunregister_activeself.inner.lock().unwrap().active_ids.remove(id);	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/retention_policy.rsoptimize_based_on_history.unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_crystal_core/retention_policy.rsperformance_summaryletlast=self.history.last().unwrap().recall_accuracy;	unwrap
+neotrix-core/src/l5_cognition/nt_decision_engine.rsbt_decide.min_by(|a,b|a.distance.partial_cmp(&b.distance).unwrap())	unwrap
+neotrix-core/src/l5_cognition/nt_decision_engine.rsutility_decide.min_by(|a,b|a.distance.partial_cmp(&b.distance).unwrap())	unwrap
+neotrix-core/src/l5_cognition/nt_jev/primitives.rsnewsorted.sort_by(|a,b|b.partial_cmp(a).unwrap());	unwrap
+neotrix-core/src/l5_cognition/nt_mind/mid_turn_steering.rscorrection_countpubfncorrection_count(&self)->usize{*self.correction_count.lock().unwrap()}	unwrap
+neotrix-core/src/l5_cognition/nt_mind/mid_turn_steering.rsrecord_correctionletmutcount=self.correction_count.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_mind/mid_turn_steering.rsresetpubfnreset(&self){*self.correction_count.lock().unwrap()=0;self.trajectory_history.lock().unwrap().clear();}	unwrap
+neotrix-core/src/l5_cognition/nt_mind/nt_game/ecs/component.rsinsertletmap=store.downcast_mut::<HashMap<EntityId,T>>().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_mind/nt_game/events/mod.rsemitletevent_ref=self.event_log.last().unwrap().as_ref();	unwrap
+neotrix-core/src/l5_cognition/nt_mind/nt_game/render/components.rsupdate.unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/evolution/rise_reflector.rsreflectself.reflections.last().unwrap()	unwrap
+neotrix-core/src/l5_cognition/nt_mind/rise_reflector.rsdistillself.history.lock().unwrap().push(result.clone());	unwrap
+neotrix-core/src/l5_cognition/nt_mind/rise_reflector.rsget_historyself.history.lock().unwrap().clone()	unwrap
+neotrix-core/src/l5_cognition/nt_mind/rise_reflector.rsproject_future*self.projection_count.lock().unwrap()+=1;	unwrap
+neotrix-core/src/l5_cognition/nt_mind/rise_reflector.rsproject_future*self.projection_count.lock().unwrap()=0;	unwrap
+neotrix-core/src/l5_cognition/nt_mind/rise_reflector.rsproject_futureletcount=*self.projection_count.lock().unwrap();	unwrap
+neotrix-core/src/l5_cognition/nt_mind/rise_reflector.rsprojection_count*self.projection_count.lock().unwrap()	unwrap
+neotrix-core/src/l5_cognition/nt_mind/seal/domain_mapper.rskw_rulepattern:Regex::new(pattern).unwrap(),	unwrap
+neotrix-core/src/l6_meta/coordination/governance/enforcement/audit.rslogself.entries.last().unwrap()	unwrap
+neotrix-core/src/l6_meta/coordination/quality_control/evolving_evaluator.rstrendself.history.last().unwrap()[idx]-self.history[self.history.len()-2][idx]	unwrap
+neotrix-core/src/l6_meta/healing/diagnostic_chain/diagnostician.rsanalyzeletsource_signals=component_signals.get(source).unwrap();	unwrap
+neotrix-core/src/l6_meta/healing/predictive_maintenance/predictor.rsexponential_smoothingletprev=*result.last().unwrap();	unwrap
+neotrix-core/src/l6_meta/healing/predictive_maintenance/predictor.rsforecast_failureletlast=*history.last().unwrap();	unwrap
+neotrix-core/src/l6_meta/healing/predictive_maintenance/predictor.rspredict*history.last().unwrap()	unwrap
+neotrix-core/src/l6_meta/healing/predictive_maintenance/predictor.rspredict*smoothed.last().unwrap()	unwrap
+neotrix-core/src/l6_meta/healing/self_healing/circuit_breaker.rscallletinner=self.inner.lock().unwrap();	unwrap
+neotrix-core/src/l6_meta/healing/self_healing/circuit_breaker.rscallletmutinner=self.inner.lock().unwrap();	unwrap
+neotrix-core/src/l6_meta/healing/self_healing/circuit_breaker.rsconsecutive_failuresletinner=self.inner.lock().unwrap();	unwrap
+neotrix-core/src/l6_meta/healing/self_healing/circuit_breaker.rsresetletmutinner=self.inner.lock().unwrap();	unwrap
+neotrix-core/src/l6_meta/healing/self_healing/circuit_breaker.rsstateletinner=self.inner.lock().unwrap();	unwrap
+neotrix-core/src/l6_meta/nt_safety_monitor.rsis_anomalyletlatest=*self.window.back().unwrap();	unwrap
+neotrix-core/src/l6_meta/runtime_monitor.rsalertself.alerts.lock().unwrap().push(alert.clone());	unwrap
+neotrix-core/src/l6_meta/runtime_monitor.rscheck_thresholdsletmetrics=self.metrics.lock().unwrap();	unwrap
+neotrix-core/src/l6_meta/runtime_monitor.rsclear_alertsself.alerts.lock().unwrap().clear();	unwrap
+neotrix-core/src/l6_meta/runtime_monitor.rsget_alertsself.alerts.lock().unwrap().clone()	unwrap
+neotrix-core/src/l6_meta/runtime_monitor.rsget_healthletmetrics=self.metrics.lock().unwrap();	unwrap
+neotrix-core/src/l6_meta/runtime_monitor.rsget_metricsself.metrics.lock().unwrap().clone()	unwrap
+neotrix-core/src/l6_meta/runtime_monitor.rsmonitorletmutguard=self.metrics.lock().unwrap();	unwrap

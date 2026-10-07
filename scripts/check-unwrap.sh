@@ -224,6 +224,17 @@ for _p, _l, _n, _fn, _norm in hits:
     fn_of[_a] = _fn
     norm_of[_a] = _norm
 have = {}
+# ⭐ 2026-10-07：**记录被丢弃的基线条目**。
+#
+# ⛔ **原实现的盲区**（实测证据）：v1 条目仅当「此刻该行号仍被检出」才折算，
+#    否则**静默丢弃** —— 既不计入 `have`，也不报「失效」。
+#    ⇒ 实测：把一条**已失效**的 v1 条目改指向任意文件，
+#       门仍输出 `baseline entries: 514` + `PASS: 0 new` ⇒ **完全无感**。
+#    ⇒ 后果：基线可无限膨胀（实测文件 705 条 vs 门认 514 ⇒ **191 条隐形**），
+#       而「基线已瘦身」这件事**在门输出里看不出来**。
+#    ⇒ 这正是 R-SCAN-3「门记录声称已做而实现从未入库」的同类：
+#       门看起来绿，实际有 27% 的死条目。
+stale_baseline = []          # 折算失败的 v1 条目（原样保留行号，便于人工核对）
 if os.path.exists(baseline_path):
     for line in open(baseline_path, encoding="utf-8"):
         line = line.rstrip("\n")
@@ -238,6 +249,10 @@ if os.path.exists(baseline_path):
                 # ⛔ 绝不无条件折算：旧账本那 132 条「已不存在」的条目若被折算，
                 #    会凭空造出 never-seen 的锚点 ⇒ **等于洗白**。
                 have[cur_by_line[key][0]] = tok
+            else:
+                # ⭐ 2026-10-07 新增：v1 条目此刻**无对应检出** ⇒ 记为失效，
+                #    ⛔ 仍然不折算（保持原「不洗白」语义），但**必须被看见**。
+                stale_baseline.append(line)
 
 if update:
     with open(baseline_path, "w", encoding="utf-8") as fh:
@@ -258,6 +273,23 @@ for k in new:
 
 print("  production unwrap/expect/panic sites: %d" % len(cur))
 print("  baseline entries:                   %d" % len(have))
+# ⭐ 2026-10-07：显式报告**基线文件里已失效的条目**。
+#   ⛔ 此前它们被静默丢弃 ⇒ 门输出与基线文件**行数不符也无人察觉**
+#      （实测：文件 705 条 / 门认 514 ⇒ 191 条隐形，占 27%）。
+if stale_baseline:
+    _n = len(stale_baseline)
+    print("  \u26d4 %d baseline entr(ies) matched NO current site — STALE:" % _n)
+    print("     (baseline file has %d, gate honoured %d)"
+          % (_n + len(have) + len(fixed), len(have)))
+    print("     These are v1 `path:line` rows whose line no longer holds a")
+    print("     violation (code moved, or it was already fixed). They are")
+    print("     NOT counted as honoured, and NOT counted as NEW \u2014 i.e. invisible.")
+    print("     Fix: `bash scripts/check-unwrap.sh --update-baseline`")
+    print("     (safe: it re-derives from live sites, so stale rows just vanish.)")
+    for _l in stale_baseline[:5]:
+        print("       - %s" % _l)
+    if _n > 5:
+        print("       ... and %d more" % (_n - 5))
 if fixed:
     print("  ⛔ %d baseline site(s) no longer exist — baseline is stale:" % len(fixed))
     print("     (good news: someone fixed them. Re-run --update-baseline to shrink.)")
