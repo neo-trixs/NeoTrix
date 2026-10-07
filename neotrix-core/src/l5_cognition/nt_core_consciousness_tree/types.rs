@@ -716,6 +716,8 @@ pub struct ModuleLeaf {
     pub branch: BranchKind,
     pub lines: usize,
     pub has_tests: bool,
+    // nt-unwired-spec: 未接线规格 —— D2 切片实测（2026-10-07）全仓零读点
+    //   （in 者读点=0，且声明数=1，非同名遮蔽）⇒ 规格存在但未接线 ⇒ B 类保留。
     pub has_self_test: bool,
     pub is_wired: bool,
     pub consumers: usize,

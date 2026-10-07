@@ -162,6 +162,11 @@ pub struct EvolutionForecast {
     ///   同名字段跨文件/跨 struct 会互相「救活」，掩盖真死字段。
     /// ⇒ 门按 `(文件, token)` 计数 + `name_decls>1` 时**不回退**，
     ///   这个设计恰恰**避免了**同名互相救活 —— 是对的，别改。
+    // ⭐ **活的（2026-10-07 切片复核）**：`lifecycle.rs:189/:985` 用同 struct
+    //   的 `forecast.abstain` 判定 —— `EvolutionForecast` 的真实消费点。
+    // ⛔ 死开关门把它判成「零读点」：它按「声明文件内读点」计数，而读点在
+    //   兄弟文件 lifecycle.rs ⇒ **跨文件消费被当成没消费**（与 chunk_size/concurrency
+    //   同类，门的第二类误报）。不删。
     pub abstain: bool,
     /// 情景树叶子概率摘要 (bull/bear/sideways)
     pub scenario_probs: Vec<(String, f64)>,
