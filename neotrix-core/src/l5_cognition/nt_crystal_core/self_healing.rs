@@ -15,40 +15,6 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModuleHealth {
     pub module_name: String,
-    /// ⛔ **遗留声明字段**（2026-10-07 起**不再被信任**）。
-    ///
-    /// `HealthMonitor::check()` 已改为**由 `error_rate` / `latency_p99_ms` /
-    /// `last_check` 三项真实测量推导** `overall_healthy`，
-    /// ⛔ **不再**读本字段（此前是 `modules.iter().all(|m| m.is_healthy)`）。
-    ///
-    /// ⚠️ 本字段**仅在测试中被赋值**（L370/388/409）⇒ 生产路径无写入者。
-    /// ⛔ 故它是一个**无信息量的声明** ⇒ 任何据此做的判断都是
-    ///    「未经测量的主张」。
-    ///
-    /// ⚠️ **保留**而不删除：它属于对外数据形状（`Serialize`），
-    ///    删除会破坏持久化兼容。⇒ 处置是「**标记为不被信任**」。
-    ///
-    /// ⭐ 判定依据：`check-fake-signal` R4 —— 「只有字面量赋值 + 生产区零读点」
-    ///    ⇒ **该维度是恒定假信号且无人消费**。本字段符合该形态。
-    ///
-    /// ⭐⭐⭐ 2026-10-07 D2 切片复核：确认为 **nt-unwired-spec（有意保留，不删）**。
-    ///
-    /// # 为什么「生产区零读点」在这里是**正确设计**而不是漏接线
-    ///
-    /// `HealthMonitor::check`（见下）**故意不读**本字段，改由
-    /// `last_check` / `latency_p99_ms` / `error_rate` 三个**真实测量**推导
-    /// `overall_healthy` —— 因为本字段在生产路径上只是**调用方的主观声明**
-    /// （只在测试 L343/L361 被赋值）。理由在该函数上方已完整记录。
-    // nt-unwired-spec: 有意保留 —— 上面的 `check()` 刻意不读它，改用真实指标推导；
-    //   ⛔ **不要**为了「让它看起来被用上」而回退到 `all(|m| m.is_healthy)`：
-    //   那会让整体健康判定退回「调用方自称健康」，是 check-fake-signal R1/R4
-    //   命中过的形态。字段按原注释保留（ABI/其他消费方）。
-    //
-    //   ⓘ 名字键控的基线说明：`dead-flag-baseline.txt` 的 `is_healthy` 条目
-    //   只对**零读点的那个实例**生效。`nt_io_provider/routing/provider_swap.rs`
-    //   也有一个同名 `is_healthy`，但它在同文件 :38/:47/:59 **被读** ⇒ 是活的，
-    //   本就不在 dead 集合里，与本条目无关。
-    pub is_healthy: bool,
     pub error_rate: f64,
     pub latency_p99_ms: f64,
     pub last_check: u64,
@@ -96,14 +62,14 @@ impl HealthMonitor {
     ///
     /// ⭐ 正解：与同文件 L104/L113 **同一判据**（`error_rate_threshold`）
     ///   推导 `overall_healthy`。
-    /// ⚠️ 保留 `m.is_healthy` 字段本身（ABI/其他消费方），
+    /// ⚠️ **`ModuleHealth::is_healthy` 字段已于 2026-10-07 删除**
+    ///   （长期路线：不留序列化兼容层）—— 它是「调用方自称健康」的无信息量声明。
     ///   ⛔ 但⛔ **不再**用它决定整体健康。
     pub fn check(&self, modules: &[ModuleHealth]) -> HealthSnapshot {
         // ⭐ 由**真实指标**推导（与下方 L104 的判据一致）
         let overall = modules.iter().all(|m| {
             // ⭐⭐ 三个「真实测量」缺一不可（实测：本 struct 的
-            //   `is_healthy` 与 `last_check` 都**只在测试里被赋值**
-            //   —— `is_healthy` L343/361、`last_check` L365/383
+            //   `last_check` **只在测试里被赋值**（L343/361 一带）
             //   ⇒ 生产路径上它们都是**未经测量的声明**）。
             // ⇒ 判据：`last_check` 必须非 0（说明真被检查过）、
             //   `latency_p99_ms` 必须 > 0、且错误率未超阈值。
@@ -400,7 +366,6 @@ mod tests {
         let modules = vec![
             ModuleHealth {
                 module_name: "nt_core".to_string(),
-                is_healthy: true,
                 error_rate: 0.01,
                 latency_p99_ms: 10.0,
                 last_check: now_ms(),
@@ -418,7 +383,6 @@ mod tests {
             timestamp: now_ms(),
             modules: vec![ModuleHealth {
                 module_name: "nt_core".to_string(),
-                is_healthy: false,
                 error_rate: 0.5,
                 latency_p99_ms: 2000.0,
                 last_check: now_ms(),
@@ -439,7 +403,6 @@ mod real_health_tests {
         ModuleHealth {
             module_name: name.to_owned(),
             // ⭐ 刻意**恒 true**（模拟「调用方总是声明健康」）
-            is_healthy: true,
             error_rate,
             latency_p99_ms: p99,
             // ⚠️ 这两个字段我**漏了**（第 8 次「猜数据结构」）⇒ 补上
@@ -450,8 +413,9 @@ mod real_health_tests {
 
     /// ⭐ **变异证据**：`overall_healthy` 必须**随真实指标变化**。
     ///
-    /// 修复前它是 `modules.iter().all(|m| m.is_healthy)`，
-    /// 而 `is_healthy` 在测试里恒 `true` ⇒ **无论错误率多高都判健康**。
+    /// 修复前它是 `modules.iter().all(|m| m.is_healthy)`，而该字段
+    /// （**已于 2026-10-07 删除**）在测试里恒 `true`
+    /// ⇒ **无论错误率多高都判健康**。
     #[test]
     fn overall必须随真实错误率变化() {
         let mon = HealthMonitor::new();
@@ -464,8 +428,9 @@ mod real_health_tests {
         let sick = mon.check(&[mk("a", 0.5, 10.0)]);
         assert!(
             !sick.overall_healthy,
-            "error_rate 0.5 > threshold 0.1 ⇒ 必须判**不健康**，\
-             即便 is_healthy 仍声明 true（修复前不可能失败 ⇒ 本测试即变异证据）"
+            "error_rate 0.5 > threshold 0.1 ⇒ 必须判**不健康**。\
+             （本测试即变异证据：修复前读的是已被删除的声明字段，\
+              无论错误率多高都判健康 ⇒ 该测试不可能失败）"
         );
     }
 
