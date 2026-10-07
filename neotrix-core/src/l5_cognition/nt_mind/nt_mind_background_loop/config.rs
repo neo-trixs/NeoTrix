@@ -7,7 +7,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// 背景循环配置
 #[derive(Debug, Clone)]
 pub struct BackgroundConfig {
-    // ⛔⚠️ **本结构体 18 / 42 个字段是「未接线规格」**（`enable_exploration` 已接线）（字段上方标 `nt-unwired-spec`）：
     //   它们声明了想要的行为（探索 / 代理 / 自动结晶 / 各循环间隔…），
     //   但**读者从未实现**。
     //   ⛔ **不要因为「门报死配置」就删它们** —— 删掉等于把「要实现什么」抹掉。
@@ -15,85 +14,68 @@ pub struct BackgroundConfig {
     // ✅ **已接线**（2026-10-07）：`run.rs` 的 exploration handler 现在读它
     //    （此前探索**一直在跑**而开关零读点 ⇒ 用户无法关闭）。
     pub save_interval_secs: u64,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     pub consolidate_interval_secs: u64,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     pub evolve_interval_secs: u64,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     pub cleanup_interval_secs: u64,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     pub mine_interval_secs: u64,
     pub goal_interval_secs: u64,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     pub metacog_interval_secs: u64,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     pub thinking_interval_secs: u64,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     pub geo_update_interval_hours: u64,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     pub telemetry_interval_secs: u64,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
+    /// ⭐ 总开关：`BackgroundLoop::start()` 首行读取（run.rs:387）。
     pub enabled: bool,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
-    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
-    ///    实现对应功能时**必须**读取本字段。
+    /// ⭐ **已接线**（2026-10-07）：派发点 run.rs:837 `proxy_heartbeat` 现按此开关守门。
+    /// ⇒ 2026-10-07 撤销原标注：门报告与真实读点不符（本字段其实已被读取/已接线）。
     pub proxy_enabled: bool,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
-    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
-    ///    实现对应功能时**必须**读取本字段。
+    /// ⭐ ⛔ **跨域错位**：同名实现在 `l3_embodiment/nt_shield/nt_shield_stealth_net/system_proxy.rs`（L3 另一模块），与本 background loop 无关 ⇒ 留此会诱导未来 agent 去 L3 找接线点。
+    /// ⇒ 保留字段以便该能力落地时直接消费。
     pub system_proxy_enabled: bool,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
-    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
-    ///    实现对应功能时**必须**读取本字段。
+    /// ⭐ **功能未实现**：全仓无 `handle_geo*` 被 `spawn_handler!` 派发 ⇒ 非「开关漏接」，是能力缺位。
+    /// ⇒ 保留字段以便该能力落地时直接消费。
     pub geo_auto_update: bool,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
-    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
-    ///    实现对应功能时**必须**读取本字段。
+    /// ⭐ **功能未实现**：全仓无 `handle_agent_protocol*` 被派发 ⇒ 非「开关漏接」，是能力缺位。
+    /// ⇒ 保留字段以便该能力落地时直接消费。
     pub agent_protocol_enabled: bool,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     pub nt_world_crawl_interval_secs: u64,
     pub world_prediction_interval_secs: u64,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     pub prediction_interval_secs: u64,
     pub evolution_interval_secs: u64,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     pub panorama_interval_secs: u64,
     pub exploration_interval_secs: u64,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
-    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
-    ///    实现对应功能时**必须**读取本字段。
+    /// ⭐ **已接线**（2026-10-07）：派发点 run.rs:809 `exploration` 现按此开关守门。
+    /// ⇒ 2026-10-07 撤销原标注：门报告与真实读点不符（本字段其实已被读取/已接线）。
     pub enable_exploration: bool,
     pub curiosity_interval_secs: u64,
     pub knowledge_chain_interval_secs: u64,
     pub knowledge_aging_interval_secs: u64,
     pub crystallization_interval_secs: u64,
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
-    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
-    ///    实现对应功能时**必须**读取本字段。
+    /// ⭐ **活字段**：`handle_crystallization` 首行即读 `self.config.enable_auto_crystallize`（handlers_maintenance.rs:78）⇒ 原标注（断言该字段无消费方）**错误** —— 它其实已被读取。已撤。
+    /// ⇒ 2026-10-07 撤销原标注：门报告与真实读点不符（本字段其实已被读取/已接线）。
     pub enable_auto_crystallize: bool,
     pub tor_crawler_interval_secs: u64,
     pub tor_crawler_search_queries: Vec<String>,

@@ -834,7 +834,19 @@ impl BackgroundLoop {
         spawn_handler!(cfg.evolution_interval_secs, "evolve", |h| h.handle_evolve().await);
         spawn_handler!(cfg.nt_world_sense_interval_secs, "world_sense", |h| h.handle_world_sense().await);
         #[cfg(feature = "stealth-net")]
-        spawn_handler!(cfg.proxy_heartbeat_interval_secs, "proxy_heartbeat", |h| h.handle_proxy_heartbeat().await);
+        // ⭐ **接线 `proxy_enabled`**（2026-10-07，此前是「未接线规格」）：
+        //   心跳 handler **本来就在跑**，但开关零读点 ⇒ 用户无法关闭代理心跳。
+        //   ⚠️ 取证陷阱：`grep proxy_enabled` 会命中 `proxy_client` /
+        //      `proxy_heartbeat_interval_secs` 的**子串** ⇒ 误判为「已接线」。
+        //      ⇒ 本次用**精确读点**（`cfg.proxy_enabled` 全仓 0 处）确认后才接线。
+        let proxy_on = cfg.proxy_enabled;
+        spawn_handler!(cfg.proxy_heartbeat_interval_secs, "proxy_heartbeat", |h| {
+            if proxy_on {
+                h.handle_proxy_heartbeat().await;
+            } else {
+                tracing::debug!("[bg-tick] proxy heartbeat 被 proxy_enabled=false 关闭");
+            }
+        });
         spawn_handler!(SKILL_SCAN_INTERVAL_SECS, |h| h.handle_skill_scan().await);
         // spawn_handler!(SESSION_ROUTER_FLUSH_INTERVAL_SECS, "session_router", |h| h.handle_session_router_flush().await);
         // ── Nexus-Weaver 跨会话模式挖掘 (cycle 1053): 每 30min 扫描 experience 命名空间
