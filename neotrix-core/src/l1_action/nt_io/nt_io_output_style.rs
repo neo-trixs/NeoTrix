@@ -259,7 +259,7 @@ pub struct AiSmell {
 /// AI-smell 检测模式 — 正则 + 建议。
 pub struct SmellPattern {
     pub id: &'static str,
-    pub regex: Regex,
+    pub regex: Option<Regex>,
     pub suggestion: &'static str,
 }
 
@@ -289,30 +289,27 @@ impl AiSmellDetector {
         vec![
             SmellPattern {
                 id: "meta-speech",
-                regex: Regex::new(
-                    r"(?i)值得注意的是|需要注意的是|it's worth noting|it is worth noting|please note that|as an ai,|i am an ai",
-                )
-                .expect("meta-speech 正则有效"),
+                regex: re_opt(r"(?i)值得注意的是|需要注意的是|it's worth noting|it is worth noting|please note that|as an ai,|i am an ai",),
                 suggestion: "直接给结论/事实, 不要声明性前言",
             },
             SmellPattern {
                 id: "conclusion-signpost",
-                regex: Regex::new(r"综上所述|总而言之|总的说来|in conclusion|to summarize|to sum up|overall, i think|in summary").expect("conclusion-signpost 正则有效"),
+                regex: re_opt(r"综上所述|总而言之|总的说来|in conclusion|to summarize|to sum up|overall, i think|in summary"),
                 suggestion: "删掉总结开场白, 直接给要点或删除冗余段",
             },
             SmellPattern {
                 id: "transition-cliche",
-                regex: Regex::new(r"首先，|其次，|最后，|最后,|firstly,|secondly,|furthermore,|moreover,|additionally,").expect("transition-cliche 正则有效"),
+                regex: re_opt(r"首先，|其次，|最后，|最后,|firstly,|secondly,|furthermore,|moreover,|additionally,"),
                 suggestion: "用清单/编号结构替代口语化过渡词",
             },
             SmellPattern {
                 id: "over-polished",
-                regex: Regex::new(r"如下所示|如下：|以下是对|以下为|below is|here is the|as you can see|如您所见|正如您所知|as we all know|as you know").expect("over-polished 正则有效"),
+                regex: re_opt(r"如下所示|如下：|以下是对|以下为|below is|here is the|as you can see|如您所见|正如您所知|as we all know|as you know"),
                 suggestion: "去掉恭维性引导, 直入主题",
             },
             SmellPattern {
                 id: "hedge-stack",
-                regex: Regex::new(r"(?i)very very|extremely extremely|absolutely|undoubtedly|无疑|诚然|毋庸置疑|显然,").expect("hedge-stack 正则有效"),
+                regex: re_opt(r"(?i)very very|extremely extremely|absolutely|undoubtedly|无疑|诚然|毋庸置疑|显然,"),
                 suggestion: "删减程度副词, 让论证自己说话",
             },
         ]
@@ -323,7 +320,11 @@ impl AiSmellDetector {
         let mut out: Vec<AiSmell> = Vec::new();
         for p in &self.patterns {
             let mut hits: Vec<AiSmell> = Vec::new();
-            for cap in p.regex.captures_iter(text) {
+            // ⛔ 正则不可用 ⇒ 该模式**不产出命中**（已被 log::error! 记录）
+            let Some(p_regex) = p.regex.as_ref() else {
+                continue;
+            };
+            for cap in p_regex.captures_iter(text) {
                 if hits.len() >= self.max_per_pattern {
                     break;
                 }
@@ -400,7 +401,18 @@ fn is_placeholder_only(line: &str, pure_re: &Regex) -> bool {
 }
 
 /// 提取文本中的路径引用 (反引号 + 裸路径)，排除 `file:line` 形态 (R08 处理)。
-fn extract_path_refs(text: &str, backtick_re: &Regex, bare_re: &Regex, line_suffix_re: &Regex) -> Vec<String> {
+fn extract_path_refs(
+    text: &str,
+    backtick_re: &Option<Regex>,
+    bare_re: &Option<Regex>,
+    line_suffix_re: &Option<Regex>,
+) -> Vec<String> {
+    // ⛔ 任一正则不可用 ⇒ 本规则**不触发**（降级已被 log::error! 记录）
+    let (Some(backtick_re), Some(bare_re), Some(line_suffix_re)) =
+        (backtick_re, bare_re, line_suffix_re)
+    else {
+        return Vec::new();
+    };
     let masked = mask_code_fences(text);
     let mut out: Vec<String> = Vec::new();
     for cap in backtick_re.captures_iter(&masked) {
@@ -466,7 +478,10 @@ fn r2_no_hedging(text: &str) -> RuleResult {
 }
 
 /// R03 章节必须有实内容: 标题后不得紧跟空行/纯占位/纯符号。
-fn r3_sections_concrete(text: &str, pure_re: &Regex) -> RuleResult {
+fn r3_sections_concrete(text: &str, pure_re: &Option<Regex>) -> RuleResult {
+    let Some(pure_re) = pure_re else {
+        return RuleResult::pass(3, "R03 未触发：placeholder_pure 正则不可用");
+    };
     let lines: Vec<&str> = text.lines().collect();
     let mut bad: Vec<String> = Vec::new();
     for (i, raw) in lines.iter().enumerate() {
@@ -501,7 +516,10 @@ fn r3_sections_concrete(text: &str, pure_re: &Regex) -> RuleResult {
 }
 
 /// R04 禁止空/占位文本: TODO/TBD/待补充/lorem ipsum 等。
-fn r4_no_placeholder(text: &str, pure_re: &Regex, inline_re: &Regex) -> RuleResult {
+fn r4_no_placeholder(text: &str, pure_re: &Option<Regex>, inline_re: &Option<Regex>) -> RuleResult {
+    let (Some(pure_re), Some(inline_re)) = (pure_re, inline_re) else {
+        return RuleResult::pass(4, "R04 未触发：placeholder 正则不可用");
+    };
     let mut bad: Vec<String> = Vec::new();
     for (i, raw) in text.lines().enumerate() {
         let t = raw.trim();
@@ -556,7 +574,7 @@ fn truncate(s: &str, max: usize) -> String {
 }
 
 /// R07 文件引用必须存在 (工作区真实文件)。
-fn r7_file_refs_exist(text: &str, root: &Path, backtick_re: &Regex, bare_re: &Regex, line_suffix_re: &Regex) -> RuleResult {
+fn r7_file_refs_exist(text: &str, root: &Path, backtick_re: &Option<Regex>, bare_re: &Option<Regex>, line_suffix_re: &Option<Regex>) -> RuleResult {
     let mut missing: Vec<String> = Vec::new();
     for p in extract_path_refs(text, backtick_re, bare_re, line_suffix_re) {
         if p.contains("//") || p.starts_with('*') || p.starts_with("http") {
@@ -574,7 +592,10 @@ fn r7_file_refs_exist(text: &str, root: &Path, backtick_re: &Regex, bare_re: &Re
 }
 
 /// R08 禁止幻影路径: `file:line` 引用必须存在且行号在文件范围内。
-fn r8_hallucinated_paths(text: &str, root: &Path, line_ref_re: &Regex) -> RuleResult {
+fn r8_hallucinated_paths(text: &str, root: &Path, line_ref_re: &Option<Regex>) -> RuleResult {
+    let Some(line_ref_re) = line_ref_re else {
+        return RuleResult::pass(8, "R08 未触发：line_ref 正则不可用");
+    };
     let masked = mask_code_fences(text);
     let mut bad: Vec<String> = Vec::new();
     for cap in line_ref_re.captures_iter(&masked) {
@@ -697,7 +718,12 @@ fn strip_trailing_apology(text: &str) -> Option<(String, Vec<String>)> {
 }
 
 /// auto-fix R04: 移除纯占位行。
-fn strip_pure_placeholder_lines(text: &str, pure_re: &Regex) -> Option<(String, Vec<String>)> {
+fn strip_pure_placeholder_lines(
+    text: &str,
+    pure_re: &Option<Regex>,
+) -> Option<(String, Vec<String>)> {
+    // ⛔ 正则不可用 ⇒ **不动文本**（`None` = 无改动），⛔ 绝不「清空」
+    let pure_re = pure_re.as_ref()?;
     let mut removed: Vec<String> = Vec::new();
     let out: Vec<&str> = text
         .lines()
@@ -727,7 +753,7 @@ pub struct OutputGovernor {
     rules: Vec<GovernorRule>,
     workspace_root: PathBuf,
     max_message_chars: usize,
-    placeholder_pure: Regex,
+    placeholder_pure: Option<Regex>,
     /// AI-smell 检测器 (natural-japanese #14 吸收)。
     smell_detector: AiSmellDetector,
 }
@@ -735,25 +761,39 @@ pub struct OutputGovernor {
 /// 默认单消息长度上限 (字符)。
 pub const DEFAULT_MAX_MESSAGE_CHARS: usize = 8_000;
 
+/// 构造正则，失败 ⇒ `None`（⛔ **不构造任何 fallback 正则**）。
+///
+/// # 为什么不「fallback 成永不匹配」
+///
+/// 那需要**再构造一次 `Regex::new`** ⇒ 要么 `expect`（AGENTS.md 禁）、
+/// 要么 `unreachable!()`（**本身就是 panic 路径**）。
+/// ⇒ 正确解是**消除该前提**：返`None`，让规则不触发（已 `log::error!`）。
+fn re_opt(pat: &str) -> Option<Regex> {
+    match Regex::new(pat) {
+        Ok(r) => Some(r),
+        Err(e) => {
+            log::error!("[output_style] 正则无法编译，规则将不触发: {pat:?} ({e})");
+            None
+        }
+    }
+}
+
 fn build_rules(root: &Path, max_message_chars: usize) -> Vec<GovernorRule> {
     let root = root.to_path_buf();
-    let placeholder_pure = Arc::new(Regex::new(PLACEHOLDER_PURE_RE).expect("placeholder_pure 正则有效"));
-    let placeholder_inline = Arc::new(Regex::new(PLACEHOLDER_INLINE_RE).expect("placeholder_inline 正则有效"));
+    let placeholder_pure = Arc::new(re_opt(PLACEHOLDER_PURE_RE));
+    let placeholder_inline = Arc::new(re_opt(PLACEHOLDER_INLINE_RE));
     let placeholder_pure_for_inline = placeholder_pure.clone();
     let root_for_hallucinated = root.clone();
-    let backtick_re = Arc::new(Regex::new(r"`([^`]+)`").expect("backtick 正则有效"));
-    let bare_path_re = Arc::new(
-        Regex::new(&format!(r"[\w.\-/]+\.(?:{})", EXTS.join("|")))
-            .expect("bare_path 正则有效"),
-    );
-    let line_ref_re = Arc::new(
-        Regex::new(&format!(
-            r"(?i)([A-Za-z0-9_.\-/]+\.(?:{})):(\d+)",
-            EXTS.join("|")
-        ))
-        .expect("line_ref 正则有效"),
-    );
-    let line_suffix_re = Arc::new(Regex::new(r":\d+$").expect("line_suffix 正则有效"));
+    let backtick_re = Arc::new(re_opt(r"`([^`]+)`"));
+    let bare_path_re = Arc::new(re_opt(&format!(
+        r"[\w.\-/]+\.(?:{})",
+        EXTS.join("|")
+    )));
+    let line_ref_re = Arc::new(re_opt(&format!(
+        r"(?i)([A-Za-z0-9_.\-/]+\.(?:{})):(\d+)",
+        EXTS.join("|")
+    )));
+    let line_suffix_re = Arc::new(re_opt(r":\d+$"));
 
     vec![
         GovernorRule {
@@ -818,7 +858,7 @@ impl OutputGovernor {
             rules: build_rules(&root, DEFAULT_MAX_MESSAGE_CHARS),
             workspace_root: root,
             max_message_chars: DEFAULT_MAX_MESSAGE_CHARS,
-            placeholder_pure: Regex::new(PLACEHOLDER_PURE_RE).expect("placeholder_pure 正则有效"),
+            placeholder_pure: re_opt(PLACEHOLDER_PURE_RE),
             smell_detector: AiSmellDetector::new(),
         }
     }
