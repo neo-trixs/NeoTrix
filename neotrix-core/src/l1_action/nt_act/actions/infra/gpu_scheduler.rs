@@ -107,8 +107,12 @@ pub struct GpuScheduler {
 #[derive(Debug, Clone)]
 pub struct AutoscaleConfig {
     /// 最小设备数
+    // nt-unwired-spec: 未接线规格 —— D2 切片实测（2026-10-07）**全仓零读点**。
+    // ⛔ B 类（功能没做，不是不要了）⇒ 保留并标注：删掉等于抹掉「自动缩容的最小设备数」这个规格。
     pub min_devices: usize,
     /// 最大设备数
+    // nt-unwired-spec: 未接线规格 —— D2 切片实测（2026-10-07）**全仓零读点**。
+    // ⛔ B 类（功能没做，不是不要了）⇒ 保留并标注：删掉等于抹掉「自动缩容的最大设备数」这个规格。
     pub max_devices: usize,
     /// 扩容阈值 (利用率 %)
     pub scale_up_threshold: f64,

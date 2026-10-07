@@ -101,6 +101,8 @@ pub struct FailoverConfig {
     /// 故障检测阈值
     pub failure_threshold: u32,
     /// 最大故障转移次数
+    // nt-unwired-spec: 未接线规格 —— D2 切片实测（2026-10-07）**全仓零读点**。
+    // ⛔ B 类（功能没做，不是不要了）⇒ 保留并标注：删掉等于抹掉「最大故障转移次数」这个规格。
     pub max_failovers: u32,
 }
 

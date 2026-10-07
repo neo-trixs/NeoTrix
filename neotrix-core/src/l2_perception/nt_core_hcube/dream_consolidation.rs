@@ -6,9 +6,15 @@ const PATTERN_MATCH_THRESHOLD: f64 = 0.8;
 #[derive(Debug, Clone)]
 pub struct DreamConfig {
     pub merge_threshold: f64,
+    // nt-unwired-spec: 未接线规格 —— D2 切片实测（2026-10-07）**全仓零读点**。
+    // ⛔ B 类（功能没做，不是不要了）⇒ 保留并标注：删掉等于抹掉「回放批大小」这个规格。
     pub replay_batch_size: usize,
     pub min_abstraction_freq: usize,
+    // nt-unwired-spec: 未接线规格 —— D2 切片实测（2026-10-07）**全仓零读点**。
+    // ⛔ B 类（功能没做，不是不要了）⇒ 保留并标注：删掉等于抹掉「几次梦循环触发一次固化」这个规格。
     pub dream_cycles_per_consolidation: usize,
+    // nt-unwired-spec: 未接线规格 —— D2 切片实测（2026-10-07）**全仓零读点**。
+    // ⛔ B 类（功能没做，不是不要了）⇒ 保留并标注：删掉等于抹掉「预测步长」这个规格。
     pub prediction_horizon: usize,
 }
 

@@ -91,9 +91,17 @@ pub struct StreamingPipelineConfig {
     pub buffer_threshold: u64,
     pub proxy: Option<String>,
     pub timeout: Duration,
+    // ⭐ **活的，跨模块消费**：pipeline.rs:116/279 读取（分块写入大小）。
+    // ⛔ 死开关门曾把它报成「零读点」—— 那是**门的第二类误报**（详见 nt_dead_flag.py）：
+    //    本字段在 types.rs 声明、在 pipeline.rs 被读，而门对「同名多声明」的字段
+    //    只统计**声明文件内**的读点 ⇒ 跨模块消费被当成没消费。
     pub chunk_size: usize,
     pub persistence: Option<Arc<super::super::persistence::DownloadStore>>,
     pub auth: Option<AuthConfig>,
+    // ⭐ **活的，跨模块消费**：pipeline.rs:124/163 读取（并发度）。
+    // ⛔ 死开关门曾把它报成「零读点」—— 那是**门的第二类误报**（详见 nt_dead_flag.py）：
+    //    本字段在 types.rs 声明、在 pipeline.rs 被读，而门对「同名多声明」的字段
+    //    只统计**声明文件内**的读点 ⇒ 跨模块消费被当成没消费。
     pub concurrency: usize,
     pub verify_sha256: Option<String>,
     pub stall_timeout: Duration,
@@ -136,6 +144,8 @@ pub type PipelineConfig = StreamingPipelineConfig;
 pub struct DownloadConfig {
     pub max_concurrent: usize,
     pub max_tasks: usize,
+    // nt-unwired-spec: 未接线规格 —— D2 切片实测（2026-10-07）**全仓零读点**。
+    // ⛔ B 类（功能没做，不是不要了）⇒ 保留并标注：删掉等于抹掉「带宽上限（MB/s）」这个规格。
     pub max_bandwidth: u64,
     pub min_disk_space: u64,
     pub timeout_secs: u64,

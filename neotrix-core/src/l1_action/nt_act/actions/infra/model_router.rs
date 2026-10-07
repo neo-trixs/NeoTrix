@@ -87,6 +87,8 @@ pub struct ModelTierLevel {
     /// 档位描述
     pub desc: String,
     /// 是否自动路由（auto 档为 true）
+    // nt-unwired-spec: 未接线规格 —— D2 切片实测（2026-10-07）**全仓零读点**。
+    // ⛔ B 类（功能没做，不是不要了）⇒ 保留并标注：删掉等于抹掉「档位是否自动路由」这个规格。
     pub auto_routing: bool,
     /// 消费系数（计费乘子）
     pub consumption_coefficient: f64,
