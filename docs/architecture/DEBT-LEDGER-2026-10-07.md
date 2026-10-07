@@ -739,3 +739,71 @@ R-SCAN-3 的原文教训：「**陈旧门记录会让下一个 agent 去『修�
 - 判据：**批量红 ⇒ 逐个单跑复核**；单跑仍红才是真红。
 - ⛔ **不要**因为批量红就改代码（第 1 轮差点这么做）。
 - ⓘ 单跑也要**留间隔**（本轮用 1–3s）：上一次的 Chrome 可能还没退干净。
+
+---
+
+# ⭐ 2026-10-07 裁决：原「D3-Phase-2 / D5 / D6」三道决策题的处理结果
+
+本节是三道题的**终局记录**。三道都被上一节标为「⛔ 决策题，非代码可解」——
+实测其中**两道根本不是决策题，是代码缺陷**；第三道（D5）才是真阻塞。
+
+| 原判 | 裁决 | 依据 |
+|---|---|---|
+| D3-Phase-2「容器两份，需决策保留还是合并」 | ✅ **合并**（已做） | 保留副本的书面理由是「`check_fn` 多带 `OutputStyleId`，为未来 style-aware 规则预留」；实测该参数在 **10 条规则里无一使用**（全为 `|text, _style|`），整条链纯透传 ⇒ **投机预留**，不是需求 |
+| D6「`LICENSE-EXCEPTIONS.md` status: void，需所有者签署」 | ✅ **文件根本不存在**；真红是 `neobot-desktop` 漏 `license` 字段（已修） | `cargo deny check licenses` 报 `error[unlicensed]: neobot-desktop = 0.24.0 is unlicensed` ⇒ `deny.yml` 的 cargo-deny job **一直是红的** |
+| D5「3 DeclaredOnly + 1 Scaffold，缺权威输入 schema」 | ⛔ **仍然阻塞**（本轮不动） | 「发明即造假」成立：权威输入 schema 只能来自业务侧，不能由 agent 构造 |
+
+## D3-Phase-2：合并已完成（`7dd97f3b`）
+
+- 实测 7 项双份：`GovernanceReport` / `AiSmell` / `SmellPattern` / `AiSmellDetector` /
+  `GovernorRule` / `OutputGovernor` / `DEFAULT_MAX_MESSAGE_CHARS`
+  （前 6 项逐字相同；`GovernorRule` 仅差那个死参数）。
+- 两个 impl 块的方法集与 neobot 侧**完全一致**（`OutputGovernor` 6 个 / `AiSmellDetector` 3 个）。
+- 处置：删死参数 → core 侧 7 个副本 + 2 个 impl + 2 个孤儿 `impl Default` 全部删除，
+  改为 `pub use neotrix_neobot::nt_governance::{...}`。core 文件 **791 → 617 行**。
+- ⛔ **不留转发别名、不加 `#[deprecated]` 垫片** —— 旧签名已无人调用，
+  留兼容层只会让「同一条治理链有两种写法」继续共存。
+- 验证：`cargo test -p neotrix --lib` **13629 passed / 0 failed**；neotrix-neobot 581 passed。
+
+## D6：真缺陷已修（`9ef71c5d`）
+
+- `apps/neobot-desktop/Cargo.toml` 补 `license.workspace = true`
+  （其它成员本来就有：neotrix-core / neotrix-neobot 继承 workspace，neotrix-types 直写 MIT）。
+- `cargo deny check licenses` ⇒ **rc=0 / licenses ok** ⇒ 当前依赖树**零例外需求**。
+- ⇒ 「需要所有者签署的例外清单」这个东西**本身没有存在必要**。
+- 剩余 warning（`fuchsia-cprng` 无 license 字段的传递依赖、`Unicode-DFS-2016` 未被用到）
+  ⛔ 非 error，本轮不动：删那条 allowance 属独立清理。
+
+## D5：仍然阻塞，且**不可由 agent 解**
+
+| 能力 | `executability` | 阻塞 |
+|---|---|---|
+| `trade_quote_negotiation` | `Executable` | — |
+| `foreign_trade_full_cycle` | `Scaffold` | 17 阶段业务逻辑全是注释（状态机本身是真代码） |
+| `trade_production_logistics` | `DeclaredOnly` | 顶层执行器数 0 |
+| `trade_finance_compliance` | `DeclaredOnly` | 顶层执行器数 0 |
+| `trade_product_spec` | `DeclaredOnly` | 只有知识包工厂 |
+
+**核实过的两件事**（不是复述账本）：
+1. 三处诚实标注**仍然成立** —— `full_cycle.rs:712` 明写「本函数当前是阶段脚手架，
+   不是贸易引擎」，且 `:721` 记录了原先 `.ok()` 静默丢弃 10 处、现已改为 `warn`。
+2. 这 4 项**不被任何现有门覆盖** —— `nt_feature_viability.py` 覆盖的是「命令是否在本产品范围」
+   （另一套 5 条），`neobot-check-market.sh` 覆盖的是上架自洽（当前 5/5、rc=0）。
+   ⇒ 它们的「未接线」状态**只靠散文记录**，无机器守卫。
+
+**解锁条件（唯一）**：业务侧提供权威输入 schema。⛔ agent 不可用适配器/桩绕过 ——
+那会让 `Executability` 变成谎言，正是本仓反复出现的事故形状（导出≠接入 / 报 PASS 却不可能失败）。
+
+**建议的下一步（需人）**：若要机器守卫，先定「DeclaredOnly/Scaffold 的**合法**理由模板」
+与「阻塞多久算腐烂」的阈值，再让门只对**无理由的**未接线能力判红 ——
+否则又是一次「门永远绿」。
+
+## 本节附带的自我更正（本轮我又错了三次）
+
+| # | 我的错误 | 真相 |
+|---|---|---|
+| 1 | 「`check-arch-rules` 是幻影门，数据源从不存在」 | 数据源在 HEAD 里是 tracked blob；探针初版 `mv`+`rm -f` 把它从工作树删了，我读到的「不存在」是探针自己制造的 |
+| 2 | 「dot 目录也扫不到」 | dot 目录循环一直是 `for d in */ .*/`，本来就扫得到；盲区**只有 dot 文件** |
+| 3 | 「`codemap.json` 已陈旧（2860 vs 2777）」 | 我拿工具的总量去比一个**不完整**的文件计数；重建后 nt_mapgen 记 `rs_total=2863`，索引本身没问题 |
+
+⇒ 三次同一形状：**用局部/单次证据下关于整体的断言，没回头查 HEAD 或做反向验证。**
