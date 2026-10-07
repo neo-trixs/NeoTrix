@@ -126,6 +126,75 @@ $(echo "$NOREF" | sed 's/^/    /')"
   fi
 fi
 
+# ── 判据⑥ R2 执行器：层名只有一个定义处 ──────────────────────────
+#
+# ⭐ 裁定 ②B 归一时，层名的**权威定义处**是权威门自己的层序表
+# （scripts/check-layer-deps.sh:84-88 的 5 行 check_layer）。
+# ⛔ 我方此前把同一份层名复制到 Rust 的 `ArchLayer::REAL_DIRS`
+#    ⇒ **两处字符串定义 = 归一前的"四套词汇"的成因**。
+#
+# ⇒ 本判据**双向**校验：
+#   ① 权威门层序表里的 7 个层名，与 Rust `REAL_DIRS` 的 7 个**逐字相同**
+#   ② 别处不得再有第三份层名清单（`nt_review_runner.rs` 曾有一份，已删）
+#
+# ⛔ 双判据防空转：若两个 pattern 都命中不到 ⇒ 判红（断言失效）
+LAYER_SRC="scripts/check-layer-deps.sh"
+# ⛔ 真源是 nt_review_types.rs（ArchLayer::REAL_DIRS 所在处），
+#    **不是** $SRC（那是 nt_arch_rules.rs，规则注册表所在处）。
+#    两者是不同的文件 —— 初版指错导致 R2 判据永久判红。
+ARCH_TYPES="neotrix-core/src/l6_meta/nt_core_self_review/nt_review_types.rs"
+if [ ! -f "$LAYER_SRC" ]; then
+  fail "权威层序表不存在: $LAYER_SRC"
+else
+  # ① 权威门声明的层名（check_layer 的第 1 个参数）
+  grep -E '^check_layer "l[0-9]_' "$LAYER_SRC" \
+    | sed 's/check_layer "\([^"]*\)".*/\1/' | sort -u > /tmp/.nt_layers_canonical.$$
+  CANON=$(grep -cE '^check_layer "l[0-9]_' "$LAYER_SRC")
+  if [ "$CANON" -lt 5 ]; then
+    fail "权威层序表只解析出 $CANON 个层（期望 ≥5）⇒ 判据失效"
+  else
+    # Rust 侧的 7 个（REAL_DIRS 表）
+    # ⚠️ ⛔ 不要用 `tr -d '("'`：它会把**每个词的首字符**也删掉
+    #    （实测把 l1_action 变成 1_action，comm 于是判"全不一致"）。
+    # ⇒ 用 sed 只剥掉首尾括号。
+    grep -oE '\(\"l[0-9]_[a-z]+\"' "$ARCH_TYPES" | sed 's/^(\"//; s/\"$//' | sort -u > /tmp/.nt_layers_rust.$$
+    # ⚠️ 口径修正：权威门只声明 **5 层**（l1_action..l5_cognition）——
+    #   `l0_substrate` 是基座，它不需要禁任何层（没有比它更低的层）。
+    # ⇒ 正确判据是「权威门的每个层名都必须在 Rust REAL_DIRS 里」，
+    #   **不是**「两者逐字相同」（那会要求基座层出现在 check_layer 里，语义错）。
+    MISSING=$(comm -23 /tmp/.nt_layers_canonical.$$ /tmp/.nt_layers_rust.$$)
+    rm -f /tmp/.nt_layers_canonical.$$ /tmp/.nt_layers_rust.$$
+    if [ -n "$MISSING" ]; then
+      fail "权威门声明的层在 Rust REAL_DIRS 里查不到（R2：层名必须只定义一次）:
+$(echo "$MISSING" | sed 's/^/    /')"
+    else
+      echo "ok: 权威层序表的 $CANON 个层名全部见于 Rust REAL_DIRS（基座 l0_substrate 无需禁层，权威门不声明它）"
+    fi
+  fi
+  # ② 第三份清单：**清单**的特征是单文件含 ≥3 个层名（而非仅提到某个层名）。
+  #    ⚠️ 口径修正：仅"提到 l0_substrate"不足以判违规 ——
+  #    nt_review_runner.rs 的注释与 tests.rs 的测试路径都合法提到层名。
+  # ⛔ 只统计**代码**里的层名，跳过 `//` 与 `///` 行 —— 实测 nt_review_runner.rs
+  #    的 l1_action/l2_perception 出现处全是**文档注释**（解释判据为何这样写），
+  #    tests.rs 的 7 个层名是**测试断言真目录名**（归一 ②B 时刚写的）。
+  #    把它们算成"第三份清单"是判据自身的缺陷，不是代码的。
+  THIRD=$(for f in $(grep -rl 'l[0-9]_[a-z]' neotrix-core/src/l6_meta/nt_core_self_review/ 2>/dev/null); do
+    n=$(grep -vE '^[[:space:]]*//' "$f" \
+        | grep -oE 'l[0-9]_(substrate|action|perception|embodiment|emotion|cognition|meta)' \
+        | sort -u | wc -l | tr -d ' ')
+    [ "$n" -ge 3 ] && echo "$f"
+    # ⚛ 测试文件（tests.rs / *_test.rs / 含 #[cfg(test)] 的文件）**天然会列出全部层名**
+    #   —— 它们要断言"每个层都能被归类"。⇒ 排除测试文件，
+    #   否则本判据会永久判红，而那是判据自身的缺陷。
+  done | grep -vE 'nt_review_types\.rs|(^|/)tests\.rs$|_test\.rs$|/tests/' | sed 's/^/    /')
+  if [ -n "$THIRD" ]; then
+    fail "发现第三份层名清单（含 ≥3 个层名且非真源，R2 违规）:
+$THIRD"
+  else
+    echo "ok: 无第三份层名清单（唯一真源 ArchLayer::REAL_DIRS）"
+  fi
+fi
+
 # ── 已知违反项登记（供对抗评分消费）──────────────────────────────
 # ⭐ 本门同时校验「已知违反项」清单存在且非空 —— 它是 rank_layer_debts 的输入，
 #   没有它，红蓝对抗就无债可打分（而"无债"会被读成"无问题"）。

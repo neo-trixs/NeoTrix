@@ -46,6 +46,35 @@ rc=0
 bash scripts/check-arch-rules.sh >/dev/null 2>&1 || rc=$?
 assert_gate_red "check-arch-rules(基线腐化)" "$rc"
 
+# ── 注入③：第三份层名清单 ⇒ 违反 R2（裁定 ②B 的"层名只定义一次"）──
+# ⚠️ 必须注入到**代码**里（不是注释）—— 判据刻意跳过 `//` 行，
+#    因为 nt_review_runner.rs 的文档注释本来就合法提到多个层名。
+RUNNER="neotrix-core/src/l6_meta/nt_core_self_review/nt_review_runner.rs"
+BAK_RUNNER="/tmp/.nt_probe_runner.$$.bak"
+[ -f "$RUNNER" ] || PROBE_FAIL "目标不存在: $RUNNER"
+cp "$RUNNER" "$BAK_RUNNER"
+cleanup_runner() { [ -f "$BAK_RUNNER" ] && cp "$BAK_RUNNER" "$RUNNER" && rm -f "$BAK_RUNNER"; }
+trap 'cleanup; cleanup_runner' EXIT
+
+python3 - "$RUNNER" <<'PYINJ'
+import sys
+p = sys.argv[1]
+s = open(p, encoding='utf-8').read()
+anchor = "    fn detect_import_layer(&self, line: &str) -> ArchLayer {"
+inj = anchor + '\n        let _probe_third_list = ["l0_substrate", "l1_action", "l2_perception"];'
+if anchor in s:
+    open(p, 'w', encoding='utf-8').write(s.replace(anchor, inj, 1))
+else:
+    sys.stderr.write("PROBE-BROKEN: 注入锚点不存在\n"); sys.exit(2)
+PYINJ
+[ $? -eq 0 ] || PROBE_FAIL "注入③失败（锚点缺失）"
+
+rc=0
+bash scripts/check-arch-rules.sh >/dev/null 2>&1 || rc=$?
+assert_gate_red "check-arch-rules(第三份层名清单)" "$rc"
+
+cleanup_runner
+
 # 还原后门应恢复绿（证明探针不是"永远红"）
 cp "$BAK_BB" "$BAK_B"
 rc=0
