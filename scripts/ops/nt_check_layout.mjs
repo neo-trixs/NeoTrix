@@ -41,21 +41,89 @@
  */
 
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { createServer, get } from "node:http";
 import { tmpdir } from "node:os";
-import { join, dirname, extname } from "node:path";
+import { join, dirname, extname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const DIST = join(ROOT, "apps/neobot-desktop/frontend/dist");
+const DIST = join(ROOT, "apps/neobot-desktop/neobot-ui/dist");
+// ⭐⭐ 2026-10-07：真源从 `frontend/dist` 改为 `neobot-ui/dist`（**交付树**）。
+//
+//    ⛔ 改前指向 `apps/neobot-desktop/frontend/dist` —— 那棵树：
+//      ① `AGENTS.md` §0 明写是**参考树、不可交付**；
+//      ② `.gitignore` 第 334 行**显式忽略** `apps/neobot-desktop/frontend/dist/`
+//         （注释写明它是「vite build 的输出」）⇒ CI 里**永远不会被构建**。
+//    ⇒ 这道门**从来跑不起来**，而 `STATUS.md` §1.5 却把它列在「门禁（10 个）」
+//    里、§5 第 5/6 条还写「已闭合」。**声称与事实分叉**，且分叉方向正是
+//    「文档说有门、实际没有」—— 本仓 §4 教训 38 的形状。
+//
+//    ⭐ 佐证「本意就是交付树」而不是我改了它的口径：门里的 stub 注册的是
+//      `neobot_convo_list` / `neobot_core_capabilities` / `neobot_usage_summary` /
+//      `neobot_memory_list` —— **全部只存在于 `neobot-ui/` 的自持根**，
+//      vendored 树根本没有这些调用。⇒ 只是路径忘了改。
 const W = Number(process.env["NB_W"] || 1280);
 const H = Number(process.env["NB_H"] || 840);
 const PORT = 9341;
 
 if (!existsSync(join(DIST, "index.html"))) {
-  console.error("布局门 FAIL: dist 不存在 —— 先跑 pnpm --dir apps/neobot-desktop/frontend run build");
+  console.error("布局门 FAIL: dist 不存在 —— 先跑 cd apps/neobot-desktop/neobot-ui && ./node_modules/.bin/vite build");
   process.exit(1);
+}
+
+/** statSync 的安全版：文件可能在遍历途中消失（共享工作树）。 */
+function safeStat(p) { try { return statSync(p); } catch { return null; } }
+
+// ⭐⭐⭐ 2026-10-07 新增「产物新鲜度」断言（dist 比 src 旧 ⇒ 拒绝跑）。
+//
+// # 为什么必须有这道
+//
+// 实测：本门（以及另外 9+ 道读 dist 的 UI 门）此前**全都不看产物时效**。
+// ⓘ 逐一验证：同时含 neobot-ui/dist 与 mtime/statSync 的门 —— **零**。
+// ⇒ 真实事故：源码 14:56 改过，dist 仍是 13:53 的 ⇒ **门绿着测的是旧界面**。
+// ⓘ 复现：touch 源码（内容零改动）后跑本门 ⇒ 仍 rc=0 PASS，它**无法分辨**
+//   自己测的是哪一版。
+// ⇒ 这是 §4 教训 38 的形状，只是分叉在**产物时效**而非选择器：
+//   「文档说有门、实际没测到目标」。
+//
+// ⛔ 文案里**不得出现反引号包命令示例**（§4 教训 R36：check-disk.sh 那次
+//   反引号被 bash 当命令替换，真删了 115.2 GiB）。
+//
+// # 已知局限（必须写下来，否则会被当万能门）
+//
+// ⚠️ mtime 比对挡不住「改了又改回」：改文件又还原内容，mtime 会更新但产物
+//   其实是对的 —— 此时本断言**误报**（要求重建，实际不必）。
+//   要更硬得靠构建期内容哈希（vite manifest），成本高一档，暂不做。
+// ⚠️ 只比 mtime，不校验产物**真的**由当前源码生成（如手工拷了个旧 dist 进
+//   去并 touch 过 index.html ⇒ 假绿）。
+{
+  const SRC = join(ROOT, "apps/neobot-desktop/neobot-ui/src");
+  const newestSrc = (function walk(d) {
+    let newest = 0, newestRel = "";
+    if (!existsSync(d)) return { newest: 0, newestRel: "" };
+    for (const e of readdirSync(d)) {
+      if (e === "node_modules" || e === ".git") continue;
+      const p = join(d, e);
+      const st = safeStat(p);
+      if (!st) continue;
+      if (st.isDirectory()) {
+        const sub = walk(p);
+        if (sub.newest > newest) { newest = sub.newest; newestRel = sub.newestRel; }
+      } else if (st.isFile()) {
+        if (st.mtimeMs > newest) { newest = st.mtimeMs; newestRel = p; }
+      }
+    }
+    return { newest, newestRel };
+  })(SRC);
+
+  const distMtime = statSync(join(DIST, "index.html")).mtimeMs;
+  if (newestSrc.newest > distMtime) {
+    console.error("布局门 FAIL: 产物比源码旧 —— 门会测到旧界面（本次修复前正是此状态）");
+    console.error("  最新源码: " + relative(ROOT, newestSrc.newestRel));
+    console.error("  修法: cd apps/neobot-desktop/neobot-ui && pnpm run build");
+    process.exit(1);
+  }
 }
 
 // ── 退役 guard（v1 探针是旧 UI 选择器；本文件已是 v2，留此注释防回退） ──
@@ -97,8 +165,32 @@ const STUB = `(() => {
     convertFileSrc: (p) => 'asset://localhost/' + p,
     invoke: async (cmd, args) => {
       window.__CALLS__.push(cmd);
-      if (cmd === 'neobot_convo_messages') {
-        return Array.from({ length: 60 }, (_, i) => ({ id: 'm' + i, convo_id: (args && args.convo_id) || 'c1', role: i % 2 ? 'assistant' : 'user', text: '消息' + i + '：这是一条足够长的测试消息，用来把消息流撑出可滚动的高度。', created_at: new Date().toISOString() }));
+      // ⭐ 2026-10-07 两处修正（都因为**门停了太久**，桩停在旧形态）：
+      //  ① 命令改名：\`neobot_convo_messages\` → \`neobot_convo_messages_page\`
+      //     （全量命令已删；见 api.rs:117 记的「改名后下游没跟」复发链）。
+      //     ⛔ 不改的后果正是本次实测到的失败：门报「未登记调用」，
+      //     且因为**没注册就抛 UNMOCKED**，页面拿不到历史 ⇒
+      //     「消息流只渲染了 0 个气泡」—— 两个症状其实**同一个原因**。
+      //     这是本仓 §4 教训 25 的形状：只处理第一个症状会把第二个当成另一个 bug。
+      //  ② 返回形状：\`{messages, hasMore, nextSeq}\`（MessagePage），不是裸数组。
+      if (cmd === 'neobot_convo_messages_page') {
+        const msgs = Array.from({ length: 60 }, (_, i) => ({ id: 'm' + i, seq: i + 1, convo_id: (args && args.convoId) || 'c1', role: i % 2 ? 'assistant' : 'user', text: '消息' + i + '：这是一条足够长的测试消息，用来把消息流撑出可滚动的高度。', created_at: new Date().toISOString() }));
+        // ⛔ hasMore 必须**为真**且给游标，否则「加载更早」不渲染 ⇒ 门验不到那条路径。
+        return { messages: msgs, hasMore: true, nextSeq: 1 };
+      }
+      // ⭐ 轨迹读口（2026-10-07 新增两条命令 ⇒ 桩必须跟，否则门报未登记）。
+      //   3 条 run + 每轮 4 步 + 1 条文件改动：够门分别断言
+      //   「列表渲染了」「展开能拉到详情」「步与改动都在」。
+      if (cmd === 'neobot_run_list') {
+        return { runs: Array.from({ length: 3 }, (_, i) => ({ id: 't' + (i + 1), title: '轮次' + (i + 1), status: i === 1 ? 'failed' : 'done', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), error: i === 1 ? 'boom' : null, steps: 4, failed_steps: i === 1 ? 1 : 0 })) };
+      }
+      if (cmd === 'neobot_run_trace') {
+        const id = (args && args.taskId) || 't1';
+        return {
+          run: { id: id, title: '轮次', status: 'done', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), error: null, steps: 4, failed_steps: 0 },
+          steps: Array.from({ length: 4 }, (_, i) => ({ id: i + 1, n: i, tool: i === 0 ? 'bash' : i === 3 ? 'reply' : 'read', ok: i !== 2, output: '步骤输出 ' + i + '\\n' + Array.from({ length: 12 }, (_, k) => '第 ' + (k + 1) + ' 行输出').join('\\n'), tool_call_id: i === 0 ? 'c1' : null })),
+          changes: [{ id: 'ch1', at: new Date().toISOString(), path: 'src/lib.rs', kind: 'edit', bytes: 128, content_omitted: false }],
+        };
       }
       if (cmd === 'plugin:event|listen' || cmd === 'plugin:event|unlisten') return 1;
       if (cmd === 'plugin:store|load') throw new Error('UNMOCKED:plugin:store|load');
@@ -144,6 +236,12 @@ const PROBE = `(() => {
   });
   const px = (v) => Number(String(v).replace('px', '')) || 0;
   return {
+    // 2026-10-07 补诊断字段：selBg 为 null 时**必须能说出为什么**，
+    //    否则报告只有一句「选中态与未选中态相同（null vs …）」，读者无从下手
+    //    （本轮就为这个 null 反复猜了三轮：端口？时序？半就绪？—— 全是猜）。
+    //    ⛔ 「报不出原因的空值」和「断言失败」一样有害。
+    ariaCurrentCount: root.querySelectorAll('[aria-current="true"]').length,
+    listButtonCount: root.querySelectorAll('[data-testid="nb-convo-list"] button').length,
     selBg: (() => {
       const b = root.querySelector('[aria-current="true"]');
       return b ? window.getComputedStyle(b).backgroundColor : null;
@@ -288,7 +386,47 @@ try {
       const out = await send("Runtime.evaluate", { expression: PROBE, returnByValue: true, awaitPromise: true });
       if (out.exceptionDetails) throw new Error("探针异常：" + (out.exceptionDetails.text || "?"));
       d = out.result.value;
-      if (d.ready && d.rows >= 40 && d.bubbles >= 60) break;
+      // ⭐⭐ 2026-10-07 修**门自身的两处竞态**（实测 5 跑里 3 次假红，逐个定位）。
+      //
+      // 【竞态 1】等待条件在等一个**永远达不到**的数
+      //   ⛔ 改前是 `d.rows >= 40 && d.bubbles >= 60`，而两处列表**已窗口化**
+      //     （`useVirtualizer`）⇒ DOM 里**永远只有约 20 行 / 16 个气泡**
+      //     ⇒ 条件永不成立 ⇒ 循环每次空跑满 20 秒，然后**拿半就绪的页面**断言。
+      //   ⛔⛔ 且它**自相矛盾**：断言已改成「rows >= 40 ⇒ 判定窗口化被回退」，
+      //     一旦真等到 `rows >= 40`，**门会立刻判自己失败**。
+      //   ⇒ 教训：**改断言必须同步改等待条件**，两者是同一不变量的两半。
+      //
+      // 【竞态 2】⭐ 真正让 `selBg` 时有时无的原因（**加了诊断字段才定位到**）：
+      //   桩造 40 个会话，`last_active` 用 `new Date().toISOString()` ——
+      //   **毫秒级**。⇒ 有时 40 个拿到同一毫秒（排序稳定，c1 落在顶部），
+      //   有时各差 1ms（排序被打乱，**c1 可能掉到第 30 位**）。
+      //   ⭐ 而界面**已窗口化**：DOM 里只有约 20 个会话项
+      //   ⇒ 选中的 c1 **可能在渲染窗口之外** ⇒ `aria-current` 根本不在 DOM 里
+      //   ⇒ `selBg` 读成 `null`。
+      //   ⛔ **这不是产品缺陷**：用户滚到那儿就能看到选中态；滚动窗口里
+      //     本来就不该期待「任意某个选中项此刻在 DOM 中」。
+      //
+      // ✅ 修法（不靠运气）：**先点一个「此刻确实渲染着」的行**再等选中态。
+      //   点的是 DOM 里第一个会话项 ⇒ 按定义就在窗口内 ⇒ 确定性成立。
+      //   ⭐ 顺带把「选中态」从「碰巧成立」变成「**真的点出来的**」——
+      //   这比原来更强，不是放松判据。
+      if (d.ready && d.rows > 0 && d.bubbles > 0) {
+        if (d.ariaCurrentCount === 0) {
+          // 此刻 DOM 里没有任何 aria-current ⇒ 点第一个渲染中的会话项
+          await send("Runtime.evaluate", {
+            expression: `(() => {
+              const list = document.querySelector('[data-testid="nb-convo-list"]');
+              const first = list && list.querySelector('button[data-testid="nb-convo-item"]');
+              if (!first) return false;
+              first.click();
+              return true;
+            })()`,
+            returnByValue: true,
+          });
+          continue; // 点完让 React 重渲染，下一轮再量
+        }
+        if (d.selBg) break;
+      }
     }
     // 暗色翻色：直接切 data-theme（偏好管线 resolveTheme 是纯函数，不在此测）。
     const themeExpr = `(async () => {
@@ -321,11 +459,34 @@ try {
     // ⛔ 上一轮之前选中态与 hover 态同为 bg-panel-hover，肉眼在截图里看不出差别。
     const sel = d.selBg, unsel = d.unselBg;
     if (!sel || !unsel || sel === unsel) {
-      bad.push(`选中态与未选中态背景相同（${sel} vs ${unsel}）—— 等于没有选中态`);
+      bad.push(
+        `选中态与未选中态背景相同（${sel} vs ${unsel}）—— 等于没有选中态` +
+          `｜诊断：aria-current 数=${d.ariaCurrentCount} 列表按钮数=${d.listButtonCount}`,
+      );
     }
 
-    if (d.rows < 40) bad.push(`会话列表只渲染了 ${d.rows} 条（桩给了 40 条）`);
-    if (d.bubbles < 60) bad.push(`消息流只渲染了 ${d.bubbles} 个气泡（桩给了 60 条）`);
+    // ⭐⭐ 2026-10-07：这两条断言**写在窗口化之前**，门停了太久没跟着改。
+    //
+    // ⛔ 改前断言「DOM 里必须有 40 条会话 / 60 个气泡」，而两处列表
+    //    **都已窗口化**（`useVirtualizer`，见 `neobot-root.tsx` 的
+    //    `convoRows` 拍平 + `msgVirtualizer`）⇒ DOM 里**永远只有约 20 / 16 个**。
+    //    ⇒ 门在「全部渲染」的世界里是对的，在窗口化的世界里是**恒假**。
+    //
+    // ⛔ 为什么不能把阈值调小来「修好」它：那样门就只在
+    //    「窗口里一个都没渲染」时才报 —— 而那恰恰是**该报**的故障。
+    //    ⇒ 改成断言**三件真正要保证的事**：
+    //      ① 窗口内确实渲染出了东西（> 0）——「一个都没渲染」是真故障；
+    //      ② 滚动容器**真的溢出**（已在别处断言）⇒ 窗口化在起作用；
+    //      ③ 渲染数**显著小于**桩给的总数 ⇒ 证明没有退化成全量渲染。
+    //    ⓘ ③ 是这条断言的**真正价值**：它是「窗口化没被回退」的守卫。
+    if (d.rows <= 0) bad.push(`会话列表窗口内一条都没渲染（桩给了 40 条）`);
+    if (d.bubbles <= 0) bad.push(`消息流窗口内一个气泡都没渲染（桩给了 60 条）`);
+    if (d.rows >= 40) {
+      bad.push(`会话列表渲染了全部 40 条 ⇒ 窗口化被回退了（长会话会一次建上千个节点）`);
+    }
+    if (d.bubbles >= 60) {
+      bad.push(`消息流渲染了全部 60 个气泡 ⇒ 消息窗口化被回退了（长会话曾一次塞满 DOM）`);
+    }
     for (const [name, r] of [["会话列表", d.aside], ["消息流", d.msgs]]) {
       if (!r) { bad.push(`${name} 容器不存在`); continue; }
       if (r.overflowY !== "auto" && r.overflowY !== "scroll") {

@@ -117,8 +117,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  /* ⭐⭐ 2026-10-07：22px → **24px**。
+   *
+   * ⛔ 改前是 `22px` —— ⛔ **低于 WCAG 2.2 SC 2.5.8 Target Size (Minimum)**
+   *    要求的 24×24 CSS px。实测（headless Chrome，1280×840，60 条消息的桩）：
+   *    窗口内 **16 个** `.nb-msg-copy` 全部 22×22 ⇒ 全部不达标。
+   *    ⓘ `nt_check_layout` 的 a11y 段只查 img 的 alt / button 的可读名 /
+   *       textarea 的 label —— ⛔ **不查目标尺寸**，所以这道门此前抓不到。
+   *
+   * ⭐ 为什么改尺寸**不会**动气泡高度（本改动唯一的风险点）：
+   *    本按钮是 `position: absolute` ⇒ ⛔ **不参与文档流** ⇒ 气泡盒高不变
+   *    ⇒ `measureElement` 量到的仍是纯文本高度 ⇒ 虚拟化几何不受影响。
+   *    （`neobot-msg-copy` 那道门正是断言「复制不改变气泡高度」的。）
+   */
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 1px solid var(--nb-color-line, rgb(0 0 0 / .12));
   border-radius: 6px;

@@ -27,6 +27,7 @@
 import { invokeCmd as invoke } from './ipc'
 
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { listen } from '@tauri-apps/api/event'
 
 import { t, useT } from './i18n'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -35,6 +36,7 @@ import './vendor/openghost/markdown.js'
 import './vendor/openghost/highlight.js'
 import { installOpenghostShim } from './vendor/openghost/shim.ts'
 import './ui/nb-markdown.css'
+import './nb-reduced-motion.css'
 
 interface ConvoView {
   id: string
@@ -103,6 +105,185 @@ interface ChatMessage {
   role: string
   text: string
   created_at: string
+}
+
+/** 库侧轨迹行（`neobot_run_list` 的 `runs[]`，蛇形同名）。 */
+interface RunRow {
+  id: string
+  title: string
+  /** **原样**状态串（库侧不解析；可能是本仓还不认识的新值）。 */
+  status: string
+  created_at: string
+  updated_at: string
+  error: string | null
+  steps: number
+  /** 其中失败步数（≠ 失败轮数）。 */
+  failed_steps: number
+}
+
+/** 库侧轨迹页的一步（`neobot_run_trace` 的 `steps[]`）。 */
+interface StepView {
+  id: number
+  n: number
+  tool: string
+  ok: boolean
+  output: string
+  /** `null` = 该行没有配平键（**不是**空串）。 */
+  tool_call_id: string | null
+}
+
+/** 库侧文件改动（`neobot_run_trace` 的 `changes[]`）。 */
+interface ChangeView {
+  id: string
+  at: string
+  path: string
+  /** `read` | `write` | `edit`。 */
+  kind: string
+  bytes: number
+  content_omitted: boolean
+}
+
+/** 库侧单轮轨迹（`neobot_run_trace` 返回值）。 */
+interface RunTrace {
+  run: RunRow
+  steps: StepView[]
+  changes: ChangeView[]
+}
+
+/**
+ * 跑轮生命周期信号（Rust `RUN_EVENT = "neobot:run"` 的载荷）。
+ *
+ * ⛔ **刻意没有 `delta`/`token` 字段**，前端的类型里也不许加。
+ *    发送路径走的是配对核心的 `POST /v1/agents/run`，那个端点是否支持
+ *    SSE **本仓无法验证** ⇒ 凭空造一条 token 流就是「对不存在能力的
+ *    投机实现」。这里只收**能证实**的三段信号。
+ */
+interface RunSignal {
+  phase: 'started' | 'finished' | 'failed'
+  convo_id: string | null
+  elapsed_ms: number
+  trace: Array<{ kind: string; detail: string }>
+  error: string | null
+}
+
+/** 跑轮信号事件名（必须与 `commands.rs::RUN_EVENT` 逐字一致）。 */
+const RUN_EVENT = 'neobot:run'
+
+/**
+ * 卡住看门狗的阈值（秒）。
+ *
+ * ⭐ 吸收 `outsourc-e/hermes-workspace`（MIT）的 `use-streaming-message.ts`：
+ *   它把「服务端已受理但还没动静」与「服务端在跑但忽然安静」分成**两个**预算
+ *   （120s / 300s），理由是这两种情况**需要用户做不同的事**。
+ *   本仓的发送是**一次同步 HTTP**（`nt_core` 里 `post_with_auth(.., 120)`），
+ *   所以只有一个阈值，且它必须**略大于**服务端的 120s ——
+ *   否则看门狗会先于后端超时判死，用户看到「可能卡住了」而实际后端马上就要
+ *   返回一个**说得出原因**的真错误。用「猜的超时」盖住「已知的超时」
+ *   只会把一个可解释的失败换成一句不可解释的猜测。
+ */
+const RUN_STALL_SECS = 135
+
+/**
+ * 把一次失败分成人能据以行动的几类。
+ *
+ * ⭐ 吸收两处，两处都强调**不要误分类**：
+ *   · `hermes-dojo`（MIT）`_classify_error_root_cause`：把 infra / auth /
+ *     rate_limit 明确标成**不是技能能修的** ⇒ 不该给「重试就好」的暗示。
+ *   · `hermes-workspace`（MIT）`connection-errors.ts`：泛化的 `token`
+ *     字样**不得**路由到「重新登录」，因为 `"failed to fetch token from /api/x"`
+ *     是网络噪声。
+ * ⇒ 判据全部落在**成对出现**的标记上；单个泛化词不构成证据。
+ */
+type FailKind = 'unpaired' | 'auth' | 'rate' | 'network' | 'timeout' | 'empty' | 'other'
+
+function classifyFailure(raw: string): FailKind {
+  const s = raw.toLowerCase()
+  // ⚠️ 每条都要**成对**证据：单看一个泛化词会把网络抖动说成要重新登录。
+  if (s.includes('unpaired') || s.includes('pair first')) return 'unpaired'
+  if (s.includes('rate limit') || s.includes('429') || s.includes('too many requests')) {
+    return 'rate'
+  }
+  if (
+    (s.includes('401') || s.includes('403') || s.includes('unauthorized')) &&
+    (s.includes('auth') || s.includes('key') || s.includes('token') || s.includes('bearer'))
+  ) {
+    return 'auth'
+  }
+  if (s.includes('timeout') || s.includes('timed out') || s.includes('deadline')) return 'timeout'
+  if (
+    s.includes('connection') ||
+    s.includes('connect') ||
+    s.includes('network') ||
+    s.includes('dns') ||
+    s.includes('refused') ||
+    s.includes('resolve')
+  ) {
+    return 'network'
+  }
+  return 'other'
+}
+
+/**
+ * 失败类 → 一句**可据以行动**的话；`other` 如实回显原文（不猜）。
+ *
+ * ⛔ 用**显式映射表**而非 `t(`run.err.${kind}`)` 模板字面量：
+ *    4d 门的正则只认 `'x'` 与 `"x"` ⇒ 模板字面量的键**不在它的视野内**
+ *    ⇒ 键拼错不会被门发现，且无法 grep（`neobot-root.tsx` 的组标签
+ *    已为同一理由走过这条路，见 `GROUP_LABEL`）。
+ */
+const FAIL_HINT_KEY: Record<FailKind, string> = {
+  unpaired: 'run.errUnpaired',
+  auth: 'run.errAuth',
+  rate: 'run.errRate',
+  network: 'run.errNetwork',
+  timeout: 'run.errTimeout',
+  empty: 'run.emptyOutput',
+  other: 'run.errOther',
+}
+
+function failHint(kind: FailKind, raw: string): string {
+  // `other` 没有可指的动作 ⇒ **如实回显原文**，不套一句通用废话
+  // （「未知错误」比原文更没用：原文里可能有用户能据此行动的线索）。
+  if (kind === 'other') return raw.slice(0, 200)
+  return t(FAIL_HINT_KEY[kind])
+}
+
+/**
+ * 人类可读的一步标签：只留**末段**文件名，命令截断。
+ *
+ * ⭐ 吸收 `hermes-workspace`（MIT）`streaming-activity-ui.ts`：它把工具名翻译成
+ *   `read foo.ts`（**只取 basename**，完整路径不进标签）、
+ *   `exec <cmd 截到 27 字符 + …>`。理由是转录该说**发生了什么**，
+ *   不是**参数原文** —— 完整路径属于展开后的一层。
+ */
+function stepLabel(tool: string): string {
+  if (tool === 'reply') return t('trace.stepReply')
+  if (tool.startsWith('side-effect:')) return t('trace.stepSideEffect')
+  if (tool === 'cancelled:tool_calls') return t('trace.stepCancelled')
+  const parts = tool.split(/[\\/:]/)
+  return parts[parts.length - 1] || tool
+}
+
+/** 文件改动一行的 kind → 词条键（⛔ 显式映射；理由同 `FAIL_HINT_KEY`）。 */
+const CHANGE_KIND_KEY: Record<string, string> = {
+  read: 'trace.kindRead',
+  write: 'trace.kindWrite',
+  edit: 'trace.kindEdit',
+}
+
+/** 文件改动一行的人类标签（kind + 末段路径）。 */
+function changeLabel(kind: string, path: string): string {
+  const parts = path.split('/')
+  const tail = parts[parts.length - 1] || path
+  const key = CHANGE_KIND_KEY[kind]
+  // 未知 kind 不编词：直接原样显示（库侧认不出的值也可能是新 kind）。
+  return key ? `${t(key)} ${tail}` : tail
+}
+
+/** 字节数的人类标签（读=读到的长度；写/改=改后长度）。 */
+function bytesLabel(kind: string, bytes: number): string {
+  if (kind === 'read') return t('trace.bytesRead', { n: bytes.toLocaleString() })
+  return t('trace.bytesAfter', { n: bytes.toLocaleString() })
 }
 
 /**
@@ -234,6 +415,133 @@ export function NeoBotRoot() {
       .catch(() => setUsageToday(null))
   }, [])
   useEffect(reloadUsage, [reloadUsage])
+
+  // ── 对话 / 轨迹 双页签 ──────────────────────────────────────────
+  //
+  // ⭐⭐ 吸收的形态：DSH 的会话视图是**两个页签**（对话 / 轨迹），
+  //    而本仓此前只有「对话」—— **跑过什么完全看不见**。
+  //    现在数据源接上（`neobot_run_list` / `neobot_run_trace`），
+  //    两页共用**同一个选中会话**（不是各自选一个：那会造出「对话看 A、
+  //    轨迹看 B」这种无法解释的错位）。
+  const [view, setView] = useState<'chat' | 'trace'>('chat')
+
+  // 轨迹列表：⛔ 与会话列表同纪律 —— `null` = 还没读；`[]` = **真的没有**；
+  // `runsErr` 非空 = **读不到**。三者渲染成三种不同的话。
+  const [runs, setRuns] = useState<RunRow[] | null>(null)
+  const [runsErr, setRunsErr] = useState('')
+  const [runsLoading, setRunsLoading] = useState(false)
+  const reloadRuns = useCallback(() => {
+    setRunsLoading(true)
+    // ⛔ 缺席 convoId = 全部会话（库侧 `run_list` 允许）；给了就只看那个会话。
+    //    「全量」是有界的：库侧钳在 200 条，且 `null` 是「还没读」不是「没有」。
+    void invoke<{ runs: RunRow[] }>('neobot_run_list', { convoId: sel ?? undefined, limit: 100 })
+      .then((v) => {
+        setRuns(v.runs)
+        setRunsErr('')
+      })
+      .catch((e) => {
+        setRuns(null)
+        setRunsErr(String(e).slice(0, 200))
+      })
+      .finally(() => setRunsLoading(false))
+  }, [sel])
+  // 轨迹**按需**拉：不在轨迹页时不花钱（对照：会话列表是首屏就要的）。
+  useEffect(() => {
+    if (view === 'trace') reloadRuns()
+  }, [view, reloadRuns])
+  // 跑完一轮后轨迹会变 ⇒ 重拉（`runPhase` 进 finished/failed 时触发）。
+  const [runPhase, setRunPhase] = useState<'started' | 'finished' | 'failed' | null>(null)
+  useEffect(() => {
+    if (view === 'trace' && (runPhase === 'finished' || runPhase === 'failed')) reloadRuns()
+    // ⛔ 依赖只到 `runPhase`：**不把 reloadRuns 列进去** —— 切会话也会换它，
+    //    那样这条 effect 会在每次切会话时多跑一次（读一整页轨迹只为了立刻扔掉）。
+  }, [runPhase, view]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 单轮详情：点开才拉。⛔ `detailFor` 是 id ⇒ 拉回的是哪一轮由**答**决定，
+  //    不是由「谁点的」决定（后者在连点两行时会串台）。
+  const [detailFor, setDetailFor] = useState<string | null>(null)
+  const [detail, setDetail] = useState<RunTrace | null>(null)
+  const [detailErr, setDetailErr] = useState('')
+  const toggleRun = useCallback(async (id: string) => {
+    if (detailFor === id) {
+      setDetailFor(null) // 收起：不需要清 detail（下次展开会重拉）
+      return
+    }
+    setDetailFor(id)
+    setDetail(null)
+    setDetailErr('')
+    try {
+      const got = await invoke<RunTrace>('neobot_run_trace', { taskId: id })
+      // ⛔ 回来时用户可能已展开别的轮次 ⇒ 只在**仍然是这一轮**时才落状态。
+      setDetailFor((cur) => {
+        if (cur === id) setDetail(got)
+        return cur
+      })
+    } catch (e) {
+      setDetailFor((cur) => {
+        if (cur === id) setDetailErr(String(e).slice(0, 200))
+        return cur
+      })
+    }
+  }, [detailFor])
+
+  // ── 跑轮生命周期信号 + 卡住看门狗 ─────────────────────────────────
+  //
+  // ⭐ 有了 `neobot:run` 三段信号，「正在想…」才第一次是**真的**在描述
+  //    后端状态，而不是一个凭 `busy` 猜出来的脉冲。
+  // ⛔ `runTrace` 只存**最后一条 finished 的服务端 trace 摘要**：它是当次的
+  //    补充，**不冒充**轨迹页（轨迹页读库、覆盖历史轮）。
+  const [lastRunTrace, setLastRunTrace] = useState<RunSignal['trace'] | null>(null)
+  // ⛔ 看门狗只在「已 started 且还没结束」时跑；秒数进一个 state 让文案跟着走。
+  const [stallSecs, setStallSecs] = useState(0)
+  useEffect(() => {
+    let alive = true
+    let un: (() => void) | undefined
+    void listen<RunSignal>(RUN_EVENT, (ev) => {
+      const s = ev.payload
+      if (!alive) return
+      // ⛔ 只认**本会话**的信号：busy 是按会话隔离的，信号也必须
+      //    （否则 A 会话在跑，B 会话顶部跟着显示「正在跑」= 又一处串台）。
+      const mine = (s.convo_id ?? null) === (sel ?? null)
+      if (!mine) return
+      setRunPhase(s.phase)
+      if (s.phase === 'finished') setStallSecs(0)
+      if (s.phase === 'finished') setLastRunTrace(s.trace.length ? s.trace : null)
+    })
+      .then((fn) => {
+        if (alive) un = fn
+        else fn() // ⛔ 挂载已撤 ⇒ 立刻退订（否则往已死的组件发事件）
+      })
+      .catch(() => {
+        // ⛔ listen 失败**不让界面炸**：轨迹页与信号是增强，不是主流程。
+        //    非静默：把它写成一条可查的前端日志（ipc.ts 的活动面板看不到这里）。
+        void invoke('log_frontend', {
+          level: 'warn', target: 'neobot-root',
+          message: `listen(${RUN_EVENT}) failed: trace signal unavailable`,
+        }).catch(() => {})
+      })
+    return () => {
+      alive = false
+      un?.()
+    }
+  }, [sel])
+
+  // 看门狗计时：只有「在跑」且没超阈值时才有意义。
+  useEffect(() => {
+    if (runPhase !== 'started' || !busy) {
+      setStallSecs(0)
+      return
+    }
+    const t0 = Date.now()
+    const id = window.setInterval(() => {
+      const secs = Math.floor((Date.now() - t0) / 1000)
+      // ⛔ 超过阈值就**停表**而不是继续涨：一个无界的数字会诱使人盯着它数，
+      //    而它此时不提供新信息（真结果只会来自后端超时或成功）。
+      if (secs <= RUN_STALL_SECS) setStallSecs(secs)
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [runPhase, busy])
+  const stalled = runPhase === 'started' && busy && stallSecs >= RUN_STALL_SECS
 
   // 记忆面板：默认收起（不占首屏），展开才拉。
   // ⛔ 拉不到就 null 且面板内明说「读不到」，不渲染成「还没有记忆」——
@@ -654,14 +962,34 @@ export function NeoBotRoot() {
       const r = await invoke<{ output?: string, text?: string }>('neobot_send', { convoId: sendConvo ?? undefined, text })
       // ⛔ 串台守卫：会话已变 ⇒ 这条回复属于**旧会话**，追加到新会话就是错的。
       if ((sel ?? null) !== sendConvo) return
-      setMsgs(m => [...m, { who: 'bot', text: r?.output ?? r?.text ?? t('chat.noOutput'), ts: nowIso() }])
+      // ⭐⭐ **空白回复按失败处理**，不是成功（吸收 `42-evey/hermes-plugins`（MIT）
+      //    `evey-delegate-model/_call_model` 的「空内容计为失败并重试」）。
+      //    ⛔ 改前是 `r?.output ?? r?.text ?? t('chat.noOutput')` ⇒ 跑完了、
+      //    返回体里没有正文时，界面上出现一条**看起来正常**的
+      //    「（无输出）」气泡，既不能重发、也不标红。
+      //    ⇒ 那是在把「没答上来」说成「答上来了但是空的」。
+      const body = (r?.output ?? r?.text ?? '').trim()
+      if (!body) {
+        setMsgs(m => [...m, {
+          who: 'bot',
+          text: failHint('empty', ''),
+          ts: nowIso(), failed: true,
+          prompt: text,
+          id: `f${nowIso()}-${m.length}`,
+        }])
+        return
+      }
+      setMsgs(m => [...m, { who: 'bot', text: body, ts: nowIso() }])
     } catch (e) {
       // ⛔ 同样要守：失败气泡串到别的会话同样是错的。
       if ((sel ?? null) !== sendConvo) return
       // ⛔ 失败气泡标成 failed：那样才能给「重发」，也不至于和正常回复混淆。
       setMsgs(m => [...m, {
         who: 'bot',
-        text: `${t('chat.sendFailedPrefix')}${String(e).slice(0, 200)}`,
+        // ⭐ 失败气泡**先给一句可据以行动的话**，原文放 `title` 里备查。
+        //    判据是**成对标记**（见 classifyFailure），单个泛化词不算证据 ——
+        //    否则网络抖动会被说成「去改密钥」，而密钥没问题。
+        text: `${t('chat.sendFailedPrefix')}${failHint(classifyFailure(String(e)), String(e))}`,
         ts: nowIso(), failed: true,
         // ⭐ 存下**原始正文**：`重发` 直接用它，不必剥本地化前缀
         //    （切语言后剥前缀会把前缀一起发出去）。
@@ -693,11 +1021,20 @@ export function NeoBotRoot() {
           //    旧写法在切换语言后必然把前缀一起发出去。
           text: bad.prompt ?? bad.text,
         })
-        setMsgs(m => [...m, { who: 'bot', text: r?.output ?? r?.text ?? t('chat.noOutput'), ts: nowIso() }])
+        // ⭐ 与首发同口径：空白 = 失败（可再重发），不是一条「（无输出）」。
+        const body = (r?.output ?? r?.text ?? '').trim()
+        if (!body) {
+          setMsgs(m => [...m, {
+            who: 'bot', text: failHint('empty', ''), ts: nowIso(), failed: true,
+            prompt: bad.prompt ?? bad.text, id: `f${nowIso()}-${m.length}`,
+          }])
+          return
+        }
+        setMsgs(m => [...m, { who: 'bot', text: body, ts: nowIso() }])
       } catch (e) {
         setMsgs(m => [...m, {
           who: 'bot',
-          text: `${t('chat.sendFailedPrefix')}${String(e).slice(0, 200)}`,
+          text: `${t('chat.sendFailedPrefix')}${failHint(classifyFailure(String(e)), String(e))}`,
           ts: nowIso(), failed: true,
           // ⭐ 重发仍要能再重发 ⇒ 沿用**同一份原文**。
           prompt: bad.prompt ?? bad.text,
@@ -1040,7 +1377,7 @@ export function NeoBotRoot() {
             <span className="min-w-0 flex-1 truncate">{t('chat.memory')}{mem && mem.lines.length > 0 ? ` ${mem.lines.length}` : ''}</span>
             {mem && mem.bytes > 0 && (
               // ⭐ `shrink-0` ⇒ 计数是**最后被牺牲**的，标题先省略
-              <span className="ml-2 shrink-0 tabular-nums text-[11px]">
+              <span className="ml-2 shrink-0 tabular-nums text-[12px]">
                 {mem.bytes}/{mem.cap}
               </span>
             )}
@@ -1109,10 +1446,37 @@ export function NeoBotRoot() {
          * ⭐⭐ 对标 douchat 的教训：它顶栏与会话头**都是 46px**、纯人工约定，
          *   且 `inset:48px` 已漂 2px ⇒ ⭐⭐ **「靠约定统一」必然漂**，必须落到类。*/}
         <header className="nb-band nb-convo-head">
+          {/* ⭐⭐ 对话 / 轨迹 双页签（2026-10-07）。
+           * ⛔ 刻意放在**同一根栏**里而不是另起一根：另起一根会让
+           *    「顶栏 48 / 会话头 44 / 页签 44」三根等高栏叠在一起，
+           *    而这四行里只有一行在承载**位置信息**（页签 = 你在看哪一半）。
+           *    ⭐ 栏族纪律（`theme.css` 的 `--nb-bar-h-sub`）说的就是这件事。
+           * ⛔ 形态用 `role="tablist"` + `aria-selected` 而不是纯按钮：
+           *    读屏用户需要知道「这两个是同一个东西的两半」，
+           *    而两个独立按钮读起来就是两个独立功能。*/}
+          <div role="tablist" aria-label={t('chat.tabHint')} className="flex shrink-0 items-center gap-0.5">
+            {(['chat', 'trace'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                role="tab"
+                aria-selected={view === v}
+                data-testid={`nb-tab-${v}`}
+                onClick={() => setView(v)}
+                className={`rounded-md px-2 py-1 text-[12px] transition-colors ${
+                  view === v
+                    ? 'bg-btn-active font-semibold text-ink'
+                    : 'text-muted hover:bg-panel-hover'
+                }`}
+              >
+                {v === 'chat' ? t('chat.tabChat') : t('chat.tabTrace')}
+              </button>
+            ))}
+          </div>
           {/* ⭐⭐ 同型缺陷**第 5 处**：⭐ 会话标题可很长（⭐ 用户可自命名）
            *    ⇒ 无 `min-width:0` ⇒ ⭐⭐ **撑破栏、把右侧操作挤出**。
            *    ⭐ `min-w-0` 是 ellipsis 的硬前提（本项目已栽 5 次）。*/}
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+          <span className="ml-2 min-w-0 flex-1 truncate text-sm font-semibold text-ink">
             {current?.title ?? 'NeoBot'}
           </span>
           {current && (
@@ -1134,13 +1498,30 @@ export function NeoBotRoot() {
               {t('chat.capsFailed')}
             </span>
           )}
-          {usageToday !== null && usageToday > 0 && (
+          {/* ⛔ 今日用量**只在对话页**出现：轨迹页刻意不给任何用量数字
+           *    （每轮没有可信的费用可摊，见 `nt_run_trace` 不变量 2）。
+           *    在轨迹页显示一个**会话级**数字紧挨着**逐轮**行，
+           *    会诱导用户拿它去除 —— 那正是一个凭空捏造出来的「每轮费用」。*/}
+          {view === 'chat' && usageToday !== null && usageToday > 0 && (
             <span className="ml-2 truncate text-xs text-muted" title={t('chat.tokensTitle')}>
               {t('chat.tokensToday', { n: usageToday.toLocaleString() })}
             </span>
           )}
         </header>
 
+        {view === 'trace' ? (
+          <TraceView
+            runs={runs}
+            runsErr={runsErr}
+            loading={runsLoading}
+            reload={reloadRuns}
+            detailFor={detailFor}
+            detail={detail}
+            detailErr={detailErr}
+            toggleRun={toggleRun}
+            lastRunTrace={lastRunTrace}
+          />
+        ) : (
         <div ref={msgsRef} className="relative min-h-0 flex-1 overflow-y-auto px-4 py-3">
           {/* ⛔ 空状态之前只有一行 12px 小字浮在上方：既没有视觉重心，
               也读不出「我现在能做什么」。空状态是唯一一次能告诉用户下一步
@@ -1165,7 +1546,7 @@ export function NeoBotRoot() {
               )}
             </div>
           ) : (
-            <div className="mx-auto max-w-[var(--nb-col-w)] space-y-2">
+<div className="mx-auto max-w-[var(--nb-col-w)] space-y-2">
               {/* ⭐⭐ 2026-10-03「加载更早」（接上 `neobot_convo_messages_page`）。
                   ⛔ 长会话此前一次性全量拉取 ⇒ 整段历史进 DOM。
                   ⭐ 放在消息列表**上方** ⇒ 更早的内容出现在顶部，符合阅读直觉。
@@ -1281,16 +1662,59 @@ export function NeoBotRoot() {
               })}
               </div>
               )}
-              {busy && (
-                <div className="flex">
+              {/* ⭐⭐⭐ 2026-10-07 加 `aria-live="polite"`（此前**全树零 live region**）。
+               *
+               * # 为什么加
+               *
+               * 实测 `grep -rn aria-live neobot-ui/src/` **零命中**（唯一的
+               * `role="alert"` 在 `shell.tsx:292` 的顶栏错误位）⇒
+               * ⭐⭐ 「已受理 → 思考中 → 已停滞 Ns」这条**诚实增量链读屏完全听不到**。
+               * 而这条链正是本轮专门做的（`run.started` 来自**后端信号**而非 `busy` 猜）。
+               * ⓘ `nt_check_layout` 的 a11y 段只查 alt / 可读名 / label，
+               *   ⛔ 不查 live region ⇒ 此前无人发现。
+               *
+               * # 为什么容器**常驻**而内容条件渲染
+               *
+               * ⛔ 若把 `aria-live` 放在 `{busy && ...}` **里面**，多数读屏
+               *   **不会播报**：live region 与其内容同时插入 DOM 时，
+               *   辅助技术常认为「没有变化发生」。
+               *   ✅ 可靠形态 = 容器自页面加载就在 DOM 里，**只有内容变**。
+               *   ⓘ 空闲时容器是**空的 flex**，高度 0 ⇒ 视觉零影响。
+               *
+               * # 为什么是 `polite` 而不是 `assertive`
+               *
+               * ⛔ `assertive` 会**打断**读屏当前朗读；「正在思考」「已停滞」
+               *   是背景进展提示，不是打断级事件 ⇒ `polite` 排队播报。
+               * ⭐ `aria-atomic` 让「已受理」整句读出，而不是只读变化的两个字。
+               *
+               * ⭐ 本块**不在**虚拟化容器内（是 `msgVirtualizer` 的兄弟节点）
+               *   ⇒ ⛔ 不会有「虚拟化反复挂载 ⇒ 重复播报」的风险。*/}
+              <div className="flex" aria-live="polite" aria-atomic="true">
+                {busy && (
                   <div className="rounded-2xl rounded-bl-md bg-[#ededef] px-3 py-2 text-[13px] text-[#61666b]">
+                    {/* ⭐ 两条文案由**后端信号**决定，不由 `busy` 猜：
+                     *    `busy` 只说「本地有个 await 没回来」。
+                     *    `runPhase === 'started'` 才说「后端确实接了」，
+                     *    两者在「invoke 发出但后端还没受理」的窗口里是不同的。*/}
                     <span className="inline-flex items-center gap-1">
-                      <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#8a8f98]" />
-                      {t('chat.thinking')}
+                      {/* ⛔ 脉冲点挂 `nb-run-pulse` ⇒ `prefers-reduced-motion`
+                       *    下落成**静态**可见的点（见 `nb-reduced-motion.css`：
+                       *    那里刻意不写成 `animation: none` 了事，因为起始帧是透明的）。*/}
+                      <span className="nb-run-pulse inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#8a8f98]" />
+                      {runPhase === 'started' ? t('run.started') : t('chat.thinking')}
                     </span>
+                    {/* ⭐⭐ 卡住**有界**且**说清下一步**（吸收 hermes-workspace 的
+                     *    两档 stall 预算；本仓只有一档，因为它只有一次同步 HTTP）。
+                     *    ⛔ 改前是一个**无界**的脉冲：真卡住时它会一直跳，
+                     *    用户既不知道是「慢」还是「死了」，也等不到任何提示。*/}
+                    {stalled && (
+                      <p className="mt-1 max-w-[var(--nb-col-w)] text-[12px] leading-snug text-[#8a5a12]">
+                        {t('run.stalled', { n: stallSecs })}
+                      </p>
+                    )}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
           {/* 回到底部：只在用户已经滚上去时才出现（贴底时它是噪声）。 */}
@@ -1304,6 +1728,7 @@ export function NeoBotRoot() {
             </button>
           )}
         </div>
+        )}
 
         <div className="shrink-0 border-t border-line p-3">
           <div className="mx-auto flex max-w-[var(--nb-col-w)] items-end gap-2">
@@ -1349,7 +1774,281 @@ export function NeoBotRoot() {
             <p className="mx-auto mt-1 max-w-[var(--nb-col-w)] text-[12px] text-muted">{t('chat.historyPaused')}</p>
           )}
         </div>
+        {/* ⛔ 输入区**始终可见**（不随页签切走）：轨迹页是「去看跑过什么」，
+         *    不是「去另一个地方发消息」。把它藏起来会让「看完回去发」多一步，
+         *    而那一页切回来草稿还在（草稿按会话分区，本来就防串台）。 */}
       </section>
+    </div>
+  )
+}
+
+/** 单步输出的行数上限：超过就折叠成「还有 N 行」。 */
+const STEP_LINES = 6
+
+/**
+ * 轨迹页（对话页的另一半）。
+ *
+ * # 为什么单独一个组件而不是内联在 `NeoBotRoot` 里
+ *
+ * ⛔ 它有自己的**拉取生命周期**（按需拉、切会话重拉、展开才拉详情），
+ *    塞进根组件会让根组件的状态面多出 8 个只服务这一页的 state，
+ *    而根组件的任何一次 setState 都会**重渲染整个侧栏 + 对话流 + 轨迹页**。
+ *    拆开之后，轨迹页内部的 tick（看门狗那类）不再牵动侧栏。
+ *
+ * # 三态是真的三态（吸收 taste-skill §4.5「LLM 只写成功态」）
+ *
+ *   · `null`   = 还没读 ⇒ 读骨架（不是「没有」）
+ *   · `''`     = **读不到** ⇒ 说读不到 + 给重读按钮
+ *   · `[]`     = **真的没有** ⇒ 说清是「没跑过」并指向对话页
+ *
+ * ⭐ 吸收 `super-hermes`（MIT）的做法：长输出**按行数省略**为
+ *   `(+N lines)` 而不是截断字符 —— 「有多大」是信息，「前 200 个字符」
+ *   是噪音。
+ */
+function TraceView(props: {
+  runs: RunRow[] | null
+  runsErr: string
+  loading: boolean
+  reload: () => void
+  detailFor: string | null
+  detail: RunTrace | null
+  detailErr: string
+  toggleRun: (id: string) => void | Promise<void>
+  lastRunTrace: RunSignal['trace'] | null
+}) {
+  const { runs, runsErr, loading, reload, detailFor, detail, detailErr, toggleRun, lastRunTrace } = props
+  // 展开的行数：每一步独立（⛔ 不共用一个计数 —— 共用会让「展开第 3 步」
+  // 连带把第 1 步也展开，而用户只点了第 3 步）。
+  const [openSteps, setOpenSteps] = useState<Record<number, boolean>>({})
+
+  return (
+    <div data-testid="nb-trace" className="relative min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div className="mx-auto max-w-[var(--nb-col-w)] space-y-2">
+        {/* ⭐ 重读按钮只在**正在读**时可用 —— ⛔ 此前 `loading` 只进了 deps、
+         *    界面上完全不可见，于是「读了一次」与「读了很多次」长得一模一样。
+         *    （这类「变量算了但没渲染」是本仓 §4 教训 1 的 UI 版：没人看见，
+         *    就等于它不存在。）*/}
+        {runsErr && (
+          <button
+            type="button"
+            className="rounded-full border border-line px-2 py-0.5 text-[12px] text-muted hover:bg-panel-hover disabled:opacity-40"
+            onClick={reload}
+            disabled={loading}
+          >
+            {loading ? t('trace.loading') : t('trace.retry')}
+          </button>
+        )}
+        {/* ⛔ 当次的服务端 trace 摘要：它是**补充**，不是轨迹页的主体，
+         *    所以排在最上面并**标清来源**，免得被当成「这就是全部」。*/}
+        {lastRunTrace && lastRunTrace.length > 0 && (
+          <section className="rounded-lg border border-line bg-panel p-2" data-testid="nb-trace-live">
+            <h3 className="text-[12px] font-medium text-muted">{t('trace.liveTitle')}</h3>
+            <ul className="mt-1 space-y-0.5">
+              {lastRunTrace.map((r, i) => (
+                <li key={i} className="break-words text-[12px] text-ink">
+                  <span className="text-muted">{r.kind}</span> {r.detail}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {runsErr && (
+          <div className="m-1 rounded-lg bg-btn-danger-hover p-2 text-xs" style={{ color: '#a3272b' }}>
+            <div className="font-semibold">{t('trace.loadFailed')}</div>
+            <div className="mt-1 break-all">{runsErr}</div>
+            <button
+              type="button"
+              className="mt-2 rounded-full border border-line px-2 py-0.5 text-[12px]"
+              onClick={reload}
+            >
+              {t('trace.retry')}
+            </button>
+          </div>
+        )}
+
+        {/* ⛔ 骨架屏而不是「暂无」：taste-skill §4.5「避免泛用转圈」。
+         *    这里用**与行同高**的条 ⇒ 读的时候版式不跳。*/}
+        {!runsErr && runs === null && (
+          <div className="space-y-1.5" aria-busy="true" data-testid="nb-trace-skeleton">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-[var(--nb-row-2-h)] rounded-lg bg-panel-2" />
+            ))}
+            <p className="pt-1 text-center text-[12px] text-muted">{t('trace.loading')}</p>
+          </div>
+        )}
+
+        {!runsErr && runs !== null && runs.length === 0 && (
+          <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+            <div className="text-[13px] font-medium text-ink">{t('trace.empty')}</div>
+            <div className="max-w-[320px] text-[12px] leading-relaxed text-muted">
+              {t('trace.emptyHint')}
+            </div>
+          </div>
+        )}
+
+        {!runsErr && runs !== null && runs.length > 0 && (
+          <ul className="space-y-1.5" data-testid="nb-trace-list">
+            {runs.map((r) => {
+              const open = detailFor === r.id
+              // ⛔ 详情**只认正在展开的那一轮**：拿 `detail.run.id !== r.id`
+              //    来判会漏掉「刚展开、还没回来」的那一瞬（此时 detail 是旧的）。
+              const mine = open && detail?.run.id === r.id
+              return (
+                <li key={r.id} className="rounded-lg border border-line bg-panel">
+                  <button
+                    type="button"
+                    data-testid="nb-trace-run"
+                    aria-expanded={open}
+                    onClick={() => void toggleRun(r.id)}
+                    className="flex w-full items-center gap-2 px-2.5 py-2 text-left transition-colors hover:bg-panel-hover"
+                  >
+                    <span aria-hidden="true" className="shrink-0 text-muted">
+                      {open ? '▾' : '▸'}
+                    </span>
+                    {/* ⭐ `min-w-0` 在 `truncate` 之前（flex 子项不收缩则
+                     *    ellipsis 永不生效 —— 本仓已栽 5 次，见 renderConvoRow）。*/}
+                    <span className="min-w-0 flex-1 truncate text-[13px] text-ink">
+                      {r.title || r.id}
+                    </span>
+                    {/* ⛔ 状态**原样显示**库侧给的串：库侧不解析（可能是不认识的新
+                     *    状态），这里也不映射成已知集合 —— 那会把「新的」显示成
+                     *    「没有」而丢信息（`nt_run_trace` 不变量 1）。*/}
+                    <span className="shrink-0 text-[12px] text-muted" title={r.status}>
+                      {r.status}
+                    </span>
+                    <span className="shrink-0 text-[12px] tabular-nums text-muted">
+                      {t('trace.steps', { n: r.steps })}
+                    </span>
+                    {/* ⛔ 失败步数 > 0 才出现，且用**危险色**：0 个失败步时
+                    //    显示「0 失败」是纯噪声。*/}
+                    {r.failed_steps > 0 && (
+                      <span
+                        className="shrink-0 text-[12px] tabular-nums"
+                        style={{ color: '#a3272b' }}
+                      >
+                        {t('trace.failedSteps', { n: r.failed_steps })}
+                      </span>
+                    )}
+                  </button>
+
+                  {open && (
+                    <div className="border-t border-line px-2.5 pb-2 pt-1.5">
+                      {detailErr ? (
+                        <p className="break-all text-[12px]" style={{ color: '#a3272b' }}>
+                          {t('trace.readFailed')}: {detailErr}
+                        </p>
+                      ) : !detail ? (
+                        // ⛔ 「正在读」与「读了但没有」必须分开（对照 `noSteps`）。
+                        <p className="text-[12px] text-muted">{t('trace.loading')}</p>
+                      ) : (
+                        <>
+                          {mine && detail.steps.length === 0 && (
+                            <p className="mb-1 text-[12px] text-muted">{t('trace.noSteps')}</p>
+                          )}
+                          {mine && detail.steps.map((s) => {
+                            const full = openSteps[s.id] ?? false
+                            const lines = s.output.split('\n')
+                            const clipped = !full && lines.length > STEP_LINES
+                            return (
+                              <div key={s.id} className="border-b border-line py-1 last:border-b-0">
+                                <div className="flex items-center gap-2 text-[12px]">
+                                  <span className="shrink-0 tabular-nums text-muted">#{s.n}</span>
+                                  {/* ⭐ 人化标签：只留末段，不铺完整路径（吸收
+                                      hermes-workspace 的 tool 标签做法）。*/}
+                                  <span className="min-w-0 flex-1 truncate text-ink">
+                                    {stepLabel(s.tool)}
+                                  </span>
+                                  <span
+                                    className="shrink-0"
+                                    style={{ color: s.ok ? undefined : '#a3272b' }}
+                                  >
+                                    {s.ok ? t('trace.stepOk') : t('trace.stepFailed')}
+                                  </span>
+                                </div>
+                                {/* ⭐ 长输出按**行**省略（`(+N 行)`），不按字符截断：
+                                    「多大」是信息，「前 200 字」是噪音。
+                                    吸收 super-hermes 的 `(+27 lines)` 形态。*/}
+                                {s.output && (
+                                  <pre
+                                    className={`mt-0.5 whitespace-pre-wrap break-words text-[12px] leading-snug text-muted ${
+                                      clipped ? 'max-h-[7.5em] overflow-hidden' : ''
+                                    }`}
+                                  >
+                                    {clipped ? lines.slice(0, STEP_LINES).join('\n') : s.output}
+                                  </pre>
+                                )}
+                                {(lines.length > STEP_LINES || full) && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setOpenSteps((p) => ({ ...p, [s.id]: !full }))
+                                    }
+                                    className="mt-0.5 text-[12px] text-muted underline hover:text-ink"
+                                  >
+                                    {clipped
+                                      ? t('trace.moreLines', { n: lines.length - STEP_LINES })
+                                      : t('trace.showLess')}
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })}
+                          {mine && (
+                            <div className="mt-1.5">
+                              <h4 className="text-[12px] font-medium text-muted">
+                                {t('trace.changes')}
+                              </h4>
+                              {detail.changes.length === 0 ? (
+                                <p className="text-[12px] text-muted">{t('trace.noChanges')}</p>
+                              ) : (
+                                <ul className="mt-0.5 space-y-0.5">
+                                  {detail.changes.map((c) => (
+                                    <li key={c.id} className="flex items-baseline gap-2 text-[12px]">
+                                      <span className="min-w-0 flex-1 truncate text-ink" title={c.path}>
+                                        {changeLabel(c.kind, c.path)}
+                                      </span>
+                                      <span className="shrink-0 tabular-nums text-[12px] text-muted">
+                                        {bytesLabel(c.kind, c.bytes)}
+                                      </span>
+                                      {/* ⭐⭐ 2026-10-07：渲染 `content_omitted`。
+                                       * ⛔ 此前它在 TS 接口里声明着、却**从不显示** ——
+                                       *   而 store 段头写明的意图正是「UI 据此说
+                                       *   「内容已略去」」。⇒ 链路是「写 → 传到界面 →
+                                       *   **丢在最后一格**」，与本轮开头修的
+                                       *   `AgentRunResult.trace` **完全同型**。
+                                       *   ⛔ 而且它是被 `check-dead-config-flag`
+                                       *   当成**新增死开关**抓出来的 —— 门抓的是真缺陷。
+                                       *   诚实边界：字节数**是真的**（见 store 注释
+                                       *   「写/改=改后内容长度」），略去的是**内容本体**；
+                                       *   而本轨迹页**本来就不展示 diff**，所以这句话
+                                       *   说明的是「库里没存内容」，不是「这里少显示了」。*/}
+                                      {c.content_omitted && (
+                                        <span className="shrink-0 text-[12px] text-muted">
+                                          {t('trace.contentOmitted')}
+                                        </span>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        {/* ⛔ 用途说明**常驻**（不是 tooltip）：`trace.usageHidden` 说的是
+         *    「为什么这里没有费用」—— 一个**需要解释的缺席**，
+         *    藏在 hover 里就等于没有。*/}
+        <p className="pt-1 text-center text-[12px] text-muted">{t('trace.usageHidden')}</p>
+      </div>
     </div>
   )
 }

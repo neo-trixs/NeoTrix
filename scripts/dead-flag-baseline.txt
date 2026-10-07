@@ -3,6 +3,26 @@
 # 格式：<字段名> | <分类>
 #   serde-mirror = 镜像外部序列化格式，只写不读是合法的
 #   behavioral   = 本仓字段；零读点意味着该能力/该调度从未接线
+
+# ── 第三类：cross-language-consumer（2026-10-07 新增）────────────────
+#   含义：字段在 **Rust 侧只写不读**，但它的**消费者在 Rust 之外**
+#         （经 serde 走 IPC → TypeScript 界面读取）。
+#   ⛔ **不是**给门加豁免：`nt_dead_flag.py` 的一条**刻意保守**的规则是
+#       「同名多声明 ⇒ 只认本文件读点」（防「同名不同符号互相救活」，
+#       该门自己记着这个误救活曾让 161 个死字段假活）。本类的字段
+#       **连「同名多声明」都不涉及** —— 它的读者根本不在 `.rs` 里，
+#       任何纯 Rust 的读点统计都**结构上**看不见。
+#   ⛔ 因此**不要**靠「制造一个 Rust 读点」来消掉它（那是为过门而造证据）。
+#   ⭐ 记账时必须写明：**界面在哪一行真的读了它**，否则本类会变成垃圾桶。
+#
+#   ⭐ `content_omitted`：写者 `nt_changes::record_change`；
+#     Rust 侧读者 `nt_run_trace::run_trace`（读进 ChangeView）；
+#     ⭐ **界面真的渲染它**：`neobot-ui/src/neobot-root.tsx` 的 TraceView
+#     里 `{c.content_omitted && …trace.contentOmitted…}`，
+#     并由 `scripts/ops/nt_check_trace.mjs` 断言「展开后必须看得到略去标记」
+#     （该断言已做变异验证：删掉渲染即变红）。
+#     ⓘ 它曾被本门报成新增，**是真的**：那时界面只在 TS 接口里声明它、
+#        从不渲染 ⇒ 链路断在最后一格（与 `AgentRunResult.trace` 同型）。
 #
 # ⚠️ 本文件同时服务两种模式（--types bool / --types numeric），故按字段名合并登记。
 # 数值型零读点字段（尤其 `*Config` 里的 `*_interval_secs`）的判读：
@@ -685,3 +705,18 @@ wired | behavioral
 within_budget | behavioral
 working_max | serde-mirror
 yin_yang | behavioral
+content_omitted | cross-language-consumer
+# ── 第四类：same-concept-sibling-read（2026-10-07 新增）──────────────
+#   含义：字段名**全仓有多个声明**，门的「同名多声明 ⇒ 只认本文件读点」
+#   规则因此把**同概念**的第二处声明判成零读点 —— ⛔ **假阳性**。
+#   ⓘ 与第三类的区别：第三类「读者在 Rust 之外」；本类「读者在 Rust 内、
+#      但在**兄弟模块**里」。⇒ 两者都活着，处置不同（见下）。
+#   ⭐ 实证：`LedgerEntry.measured`（nt_store/mod.rs）的真读点是
+#      `nt_store/nt_store_ledger.rs:69` 的 `if entry.measured { … }` ——
+#      它承载「未计量则费用强制为 0」这条**永不猜测律**；而同名声明
+#      `TurnUsage.measured`（nt_reply_tag.rs:64）把门带进了「同名」分支。
+#   ⛔ 正确的根治是让门**按类型解析**（`Type.field`）而不是按名字；
+#      但实测读点多为 `entry.measured` 这种**小写变量名**，按类型也认不出
+#      ⇒ 本轮只记账 + 记录盲区，⛔ 不改门（改门有制造假阴性的风险）。
+muted | cross-language-consumer
+measured | same-concept-sibling-read

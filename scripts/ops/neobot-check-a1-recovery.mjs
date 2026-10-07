@@ -153,7 +153,24 @@ for (const f of walk(NEOBOT)) {
   const rel = relative(ROOT, f)
   if (rel.endsWith('nt_store_tasks.rs')) continue // 正规写入方
   const src = readFileSync(f, 'utf8')
+  // ⭐⭐⭐ 2026-10-07：必须**剥掉 `#[cfg(test)]` 区间**，与 C2 同一口径。
+  //
+  // ⛔⛔ 改前这一段**逐行扫全文件**、不过滤测试代码 ⇒ 实测误报：
+  //   `nt_store_run_trace.rs:143` 报「裸 SQL 写 tasks.status」。
+  //   ⓘ **那一行在 `#[cfg(test)] mod tests` 里**，是**故意的**测试 ——
+  //     `unknown_status_is_kept_not_dropped` 把 status 改成 `'quantum'`，
+  //     用来证明「未知状态不会被 list_run_rows 静默丢行」。
+  //   ⓘ 另有一个名字很像的 `recover_stale_running` —— 但它改的是
+  //     `running → pending`，⛔ **不是** `status =` 字面量 ⇒ 不该命中本判据。
+  //   ⇒ ⭐⭐ 所以这是**门报了 PASS/FAIL 但结构上测错了对象**，
+  //      与 C2 当初「整文件判测试」是同一类错误的另一半。
+  //   ⓘ 门**自己**已有 `cfgTestRegions()`（C2 在用），只是 C3 没调。
+  //
+  // ⛔ 判据要精确到**列名**：本仓 `nt_store/mod.rs` 与 `nt_store_convos.rs`
+  //   都有 `UPDATE tasks SET`，但改的是 `conversation_id` —— 不该命中。
+  const testRanges = cfgTestRegions(src)
   src.split('\n').forEach((l, i) => {
+    if (testRanges.some(([a, b]) => i + 1 >= a && i + 1 <= b)) return
     if (SQL_STATUS.test(l)) {
       bad++
       say(`  ⛔ C3 ${rel}:${i + 1} 用裸 SQL 写 \`tasks.status\` ⇒ 绕过 store，sweep 与门都看不见`)
