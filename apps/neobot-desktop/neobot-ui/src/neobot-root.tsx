@@ -1475,10 +1475,14 @@ export function NeoBotRoot() {
           </div>
           {/* ⭐⭐ 同型缺陷**第 5 处**：⭐ 会话标题可很长（⭐ 用户可自命名）
            *    ⇒ 无 `min-width:0` ⇒ ⭐⭐ **撑破栏、把右侧操作挤出**。
-           *    ⭐ `min-w-0` 是 ellipsis 的硬前提（本项目已栽 5 次）。*/}
-          <span className="ml-2 min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+           *    ⭐ `min-w-0` 是 ellipsis 的硬前提（本项目已栽 5 次）。
+           * ⭐⭐ 2026-10-07：span → <h2>，给会话区一个真实标题层级
+           *    （实测整个对话视图 `h1~h6` = 0 个 ⇒ 读屏用户拿不到任何
+           *    文档结构，与视觉一样是「一层东西」。Tailwind preflight 已重置
+           *    标题的 UA 外边距 ⇒ 同 className 视觉等价，不会撑乱栏）。*/}
+          <h2 className="ml-2 min-w-0 flex-1 truncate text-sm font-semibold text-ink">
             {current?.title ?? 'NeoBot'}
-          </span>
+          </h2>
           {current && (
             <span className="ml-2 text-xs text-muted">
               {t('chat.taskCount', { n: current.task_count })}
