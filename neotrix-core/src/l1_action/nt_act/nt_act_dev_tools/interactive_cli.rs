@@ -80,33 +80,9 @@ impl InteractiveAgentCli {
     }
 }
 
-/// freebuff：免费交互 coding agent。默认启动形态对应 `freebuff
-/// --trust-agents --cwd <dir>`；交互 TUI 由用户接管，NeoTrix 不进它的 pool。
-pub fn freebuff_cli(cwd: Option<PathBuf>) -> InteractiveAgentCli {
-    let mut args = vec!["--trust-agents".to_string()];
-    if let Some(dir) = &cwd {
-        args.push("--cwd".to_string());
-        args.push(dir.to_string_lossy().to_string());
-    }
-    let mut c = InteractiveAgentCli::new("freebuff").with_args(args);
-    if let Some(dir) = cwd {
-        c = c.with_cwd(dir);
-    }
-    c
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn freebuff_cli_constructs_expected_shape() {
-        let c = freebuff_cli(Some(PathBuf::from("/tmp")));
-        assert_eq!(c.command, "freebuff");
-        assert!(c.args.iter().any(|a| a == "--trust-agents"));
-        assert!(c.args.windows(2).any(|w| w[0] == "--cwd" && w[1] == "/tmp"));
-        assert_eq!(c.cwd.as_deref(), Some(std::path::Path::new("/tmp")));
-    }
 
     #[test]
     fn probe_uses_version_and_handles_missing_binary() {

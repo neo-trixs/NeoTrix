@@ -156,89 +156,6 @@ impl ModelSource for CliFreeSource {
     }
 }
 
-/// freebuff：本机 CLI 后端的免费档模型发现源（账号登录型，**交互式**）。
-///
-/// freebuff **不提供** `models` 列表/headless completion，也不是
-/// `CODEBUFF_API_KEY` 型的 OpenAI 兼容服务——它要求交互式帐号登录。
-/// 因此它**不应**被当成可经 CustomProxy/HTTP key 直接 chat 调用的模型；
-/// 本源只做「可见 + 可探活」的发现登记，真实调用形态是交互 TUI agent
-/// （见 L1 的 `interactive_cli.rs` / `--agent freebuff`）。
-pub struct FreebuffFreeSource {
-    command: String,
-    timeout: Duration,
-}
-
-impl FreebuffFreeSource {
-    pub fn new() -> Self {
-        Self {
-            command: "freebuff".to_string(),
-            timeout: Duration::from_secs(10),
-        }
-    }
-    pub fn with_command(mut self, command: impl Into<String>) -> Self {
-        self.command = command.into();
-        self
-    }
-}
-
-impl Default for FreebuffFreeSource {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// 注意：freebuff 为账号登录的交互 CLI，**没有**稳定的 OpenAI 兼容公共端点；
-/// 该函数仅返回信息性配置（默认指向 freebuff 官网），不表示可经此直连 chat。
-pub fn freebuff_base_url() -> String {
-    std::env::var("NEOTRIX_FREEBUFF_URL")
-        .unwrap_or_else(|_| "https://freebuff.com".to_string())
-}
-
-impl ModelSource for FreebuffFreeSource {
-    fn name(&self) -> &str {
-        "freebuff"
-    }
-    fn category(&self) -> ProviderCategory {
-        ProviderCategory::Cloud
-    }
-    fn discover(&self) -> Vec<UnifiedModelEntry> {
-        let ok = run_capture(
-            &self.command,
-            &["--version".to_string()],
-            self.timeout,
-        )
-        .map(|o| o.trim().len() > 0)
-        .unwrap_or(false);
-        if !ok {
-            return Vec::new();
-        }
-        let model = std::env::var("NEOTRIX_FREEBUFF_MODEL")
-            .unwrap_or_else(|_| "glm-5.3-flash-2026-09-05".to_string());
-        // 只登记「存在且可探活」，不声称可经 key/HTTP chat 直接调用；
-        // 该档是账号登录的交互 agent，真实入口走 --agent freebuff。
-        let mut e = UnifiedModelEntry::cloud_free(
-            "freebuff",
-            &model,
-            &format!("{model} (Freebuff 交互 agent)"),
-            "https://freebuff.com",
-            "interactive-free",
-            false,
-            None,
-            LlmProviderType::CustomProxy,
-        );
-        e.source = "freebuff".to_string();
-        vec![e]
-    }
-    fn is_available(&self) -> bool {
-        run_capture(
-            &self.command,
-            &["--version".to_string()],
-            Duration::from_secs(5),
-        )
-        .is_ok()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -316,13 +233,6 @@ mod tests {
         assert_eq!(e.id, "opencode/mimo-v2.5-free");
         assert!(e.is_free);
         assert!(!e.requires_api_key);
-    }
-
-    #[test]
-    fn freebuff_free_source_unavailable_command_empty() {
-        let src = FreebuffFreeSource::new().with_command("/nonexistent-freebuff-xyz");
-        assert!(src.discover().is_empty());
-        assert!(!src.is_available());
     }
 
 }

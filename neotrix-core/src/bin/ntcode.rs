@@ -13,8 +13,8 @@
 use neotrix::l1_action::nt_dialogue_tui::NtTuiHuman;
 use neotrix::l1_action::nt_free_pool::NtFreePoolAsk;
 use neotrix::l1_action::nt_io::nt_io_provider::catalog::model_pool::{ModelSource, UnifiedModelPool};
-use neotrix::l1_action::nt_io::nt_io_provider::catalog::cli_free_source::{CliFreeSource, FreebuffFreeSource};
-use neotrix::l1_action::nt_act::nt_act_dev_tools::freebuff_cli;
+use neotrix::l1_action::nt_io::nt_io_provider::catalog::cli_free_source::CliFreeSource;
+use neotrix::l1_action::nt_act::nt_act_dev_tools::{find_external_cli_plugin, load_external_cli_plugins, plugins_dir};
 use neotrix::l1_action::nt_model_cli::NtModelCliAsk;
 use neotrix::l1_action::nt_stdin_human::NtStdinHuman;
 use neotrix::l5_cognition::nt_crystal_core::{
@@ -155,28 +155,35 @@ fn main() {
         }
     };
 
-    // 交互式外部 agent（freebuff 一类 TUI）：不进模型池，不伪装成 chat
+    // 交互式外部 agent 插件（descriptor 驱动，热插拔）：不进模型池，不伪装成 chat
     if let Some(name) = &args.agent {
-        match name.as_str() {
-            "freebuff" => {
-                let cli = freebuff_cli(args.workdir.clone());
-                if !cli.probe_available() {
-                    eprintln!("未找到可用的 `freebuff` 后端（--version 探活失败）。");
+        match find_external_cli_plugin(name) {
+            Some(p) => {
+                if !p.probe_available() {
+                    eprintln!("插件 `{name}` 探活失败（--version 不可用）。");
                     std::process::exit(1);
                 }
-                let mut child = match cli.launch() {
+                let mut child = match p.launch() {
                     Ok(c) => c,
                     Err(e) => {
-                        eprintln!("启动 freebuff 失败：{e}");
+                        eprintln!("启动插件 `{name}` 失败：{e}");
                         std::process::exit(1);
                     }
                 };
                 let status = child.wait().ok();
-                println!("\n(freebuff 已退出：{:?})", status);
+                println!("\n(`{name}` 已退出：{:?})", status);
                 std::process::exit(0);
             }
-            other => {
-                eprintln!("未知 agent：{other}（目前仅支持 freebuff）");
+            None => {
+                let names: Vec<String> = load_external_cli_plugins()
+                    .iter()
+                    .map(|p| p.name.clone())
+                    .collect();
+                if names.is_empty() {
+                    eprintln!("未找到任何 CLI 插件（插件目录 {:?}）。", plugins_dir());
+                } else {
+                    eprintln!("未知插件 `{name}`。已安装：{}", names.join(", "));
+                }
                 std::process::exit(1);
             }
         }
@@ -203,12 +210,17 @@ fn main() {
         Vec<String>,
     ) = match &args.model {
         Some(m) => {
-            // freebuff 是交互 agent + 自带服务端点，in-crate chat 尚未到
-            // CustomProxy 执行器接线；宁缺勿错路（不灌给 opencode 跑）。
-            if m.starts_with("freebuff/") {
+            // 若模型定点的主名是某个「交互 CLI 插件」的名字，说明它是
+            // 会话型 agent，不能当 chat completion 路由——显式报错并指引到
+            // `--agent`，不要维 fallback 装进 headless 执行器。
+            let (probe,) = (m.split('/').next().unwrap_or(m),);
+            if load_external_cli_plugins()
+                .iter()
+                .any(|p| p.name == probe && p.mode == "interactive")
+            {
                 eprintln!(
-                    "freebuff chat 尚未接入 NeoTrix 的 in-crate 执行器（需 CODEBUFF_API_KEY 全链路）。\n\
-                     可改用：ntcode --agent freebuff （交互启动），或等 CustomProxy 接线完成后再走 \"--model\"。"
+                    "「{m}」是交互 CLI agent 插件，不能用于 chat completion。\n\
+                     请改用 `ntcode --agent {probe}` 启动它。"
                 );
                 std::process::exit(1);
             }
@@ -231,10 +243,6 @@ fn main() {
             // 一张表展示；CLI 可直接调用的只有 cli-free 源，其余需 key/端点。
             let mut pool = UnifiedModelPool::default_pool();
             pool.add_source(Box::new(CliFreeSource::new()));
-            // freebuff 是交互式 TUI agent，不能作为 headless completion 直接调用；
-            // 但 freebuff CLI 经 OpenAI 兼容端点暴露免费档，故登记进池子供清单可见，
-            // 不进下游 cli_ids 自动调度（避免无端把套利 chat 塞进交互 agent）。
-            pool.add_source(Box::new(FreebuffFreeSource::new()));
             let entries = pool.refresh();
             println!("模型池统一清单（{} 个）：", entries.len());
             let mut order: Vec<&str> = Vec::new();
