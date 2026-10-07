@@ -169,12 +169,15 @@ pub struct InspectionReport {
     pub inspection_date: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum InspectionResult {
-    Pass,
-    ConditionalPass,
-    Fail,
-}
+// 2026-10-07 融合：`InspectionResult` 原在本文件与 `full_cycle.rs:434` 各有一份，
+// **变体与顺序逐字相同**，且两边的 derive 列表也相同（均无 `Hash`）。
+// 真源取 `full_cycle` —— 本文件 `:14-15` 已声明「SSOT imports: 底层类型统一
+// 从 trade_core 引用」，本文件位于该纪律之下却仍在别处重复定义（同 T1-2 形状）。
+//
+// ⛔ **同名不同类型（L15）**：`InspectionResult` 全仓另有
+// `l3_embodiment/nt_shield/shield_core/tool_inspection_stack.rs:8` 一份，
+// 与本处**无关**，⛔ 勿因本行而归并那一处。
+pub use super::full_cycle::InspectionResult;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Defect {
@@ -185,12 +188,14 @@ pub struct Defect {
     pub qty: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DefectSeverity {
-    Critical,
-    Major,
-    Minor,
-}
+// 2026-10-07 融合：`DefectSeverity` 原在本文件与 `full_cycle.rs:449` 各有一份，
+// **变体与顺序逐字相同**，derive 列表也相同。
+//
+// ⛔ **但父结构体 `Defect` 必须保留两份**（已逐字段核对）：
+//   本文件版  `{code, description, severity, location, qty}`  ← 有 `location`
+//   full_cycle `{code, description, severity, qty}`            ← 无 `location`
+// ⇒ 归并枚举、不动结构体，这正是 T1-2 写下的同一条分界线。
+pub use super::full_cycle::DefectSeverity;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Measurement {

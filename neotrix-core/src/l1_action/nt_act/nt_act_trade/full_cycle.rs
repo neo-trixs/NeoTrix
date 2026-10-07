@@ -411,14 +411,19 @@ pub struct Milestone {
     pub status: MilestoneStatus,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MilestoneStatus {
-    Pending,
-    InProgress,
-    Completed,
-    Delayed,
-    Blocked,
-}
+// 2026-10-07 融合（承接 T1-2 手法）：`MilestoneStatus` 原在本文件与
+// `trade_core.rs:539` 各有一份，**变体与顺序逐字相同**。
+// 真源是 `trade_core` —— 依据是同目录 `production_logistics.rs:14-15` 已声明
+// 「SSOT imports: 底层类型统一从 trade_core 引用」并 `use super::trade_core::MilestoneStatus`。
+//
+// ⛔ 唯一的真实差异：trade_core 版**多一个 `Hash` 派生**，本文件版没有。
+// ⇒ 归并取 `trade_core` 版（`Hash` 是自动派生的超集），
+// 本文件内的用法只需 `PartialEq`（`:435` 的 `m.status == MilestoneStatus::Completed`），
+// 不受加 `Hash` 影响。
+//
+// ⛔ **不归并父结构体**：`trade_core::Milestone`(:548) 带 `dependencies: Vec<String>`
+// 与 `Milestone::new`，本文件的用法不需要它 ⇒ 属不同设计，保留两份。
+pub use super::trade_core::MilestoneStatus;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InspectionReport {
