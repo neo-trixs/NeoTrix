@@ -485,6 +485,28 @@ jobs:
       #   指向的文件必须真实存在 —— 那正是给业务侧的**插口**。
       - name: Gate — check-executor-registry (能力声称 vs 派发事实 + 阻塞记录完整)
         run: bash scripts/check-executor-registry.sh --strict
+
+      # ⭐⭐⭐ 2026-10-07：接上 `nt_ci_wiring` —— 守「CI 步骤接线」这个**元缺陷**。
+      #
+      # # 它防的是什么
+      #
+      # 2026-10-07 实测才发现：desktop job 里 9 道读 dist 的门排在
+      # `Build frontend` **之前** ⇒ 干净检出里 dist 不存在 ⇒ 必红 ⇒
+      # 后续 `cargo test` 两组**从未执行过**。而同一文件声称「9 道 UI 门
+      # 首次在 CI 真正生效」。⇒「写进配置」≠「真的能跑」。
+      #
+      # 本门直接对 workflow YAML 做三条结构性判据（可证伪）：
+      #   (O) 读 neobot-ui/dist 的步骤必须在 build 之后 —— **精确信号**是
+      #       门脚本是否调用 `requireFreshDist(`/`neobotDistFresh(`（16 道门统一走它）。
+      #       ⛔ 不匹配裸 "dist" 子串：那会把 nt_neobot_ui_wiring（容忍性读）、
+      #       nt_feature_viability（只扫不读）、nt_security_wiring（为别的原因 exit 1）
+      #       全部误判 —— 本轮这三类都误报过，已按实测收紧。
+      #   (U) 门步骤若设 continue-on-error / if:恒假 ⇒ 结构上不可达 ⇒ 判红。
+      #   (L) 本地 ops 门 ↔ CI 双向对账（只报告缺口，不判红）。
+      #
+      # ⛔ 本门**不**验证「门在真实 runner 上绿」—— 那是 CI 的事。
+      - name: Gate — nt_ci_wiring (CI 步骤接线结构：build 排序 / 不可达 / 覆盖对账)
+        run: python3 scripts/ops/nt_ci_wiring.py
       # ⭐⭐ `neobot-desktop`：本次补的核心。此前 CI 一次都没跑过它，
       #   后果是 2026-10-02 那个 P0（前端载荷键 snake_case vs Tauri camelCase ⇒
       #   **消息从不落库、切会话历史永远空**）能带着「全部 UI 门全绿」活下来。
