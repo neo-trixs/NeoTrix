@@ -56,13 +56,61 @@ pub enum RelevanceGrade {
 }
 
 /// Configuration for the adaptive RAG pipeline
+///
+/// ⭐ 审计裁定 2026-10-07：7 个字段里 **4 个零读点**，且**不能直接接线**。
+///
+/// | 字段 | 状态 |
+/// |---|---|
+/// | `max_iterations` | ✅ 活（`iterative_retrieval` L421 使用） |
+/// | `web_search_fallback` | ✅ 活（1 处消费） |
+/// | `fts_limit_multiplier` | ⛔ 零读点 |
+/// | `rerank_weight_fts` / `rerank_weight_embed` | ⛔ 零读点，**且无语义对应**（见下） |
+/// | `fuse_weights: [f64; 4]` | ⛔ 零读点，**且通道数不符**（见下） |
+/// | `cache_ttl_secs` | ⛔ 零读点 |
+///
+/// ⛔ **为什么不能直接接线**（这是本条裁定的重点，勿简化）：
+/// 真实检索层（`nt_memory_search/nt_pure_fns.rs:390` `hybrid_search`）
+/// 用的是 **RRF（Reciprocal Rank Fusion）+ 标题加权**，**不是加权求和**：
+///   · 3 个 ranklist：`search_fts` + `bm25` + **Walsh 正交通道**（L417-423）
+///   · `bm25::rrf_fuse(&ranklists)`（L427）—— RRF **只用排名位置**，
+///     概念上不存在「给通道配一个浮点权重」这回事
+///   · 融合后再叠加标题加权（FtsTitle 精确 +1.0 / 前缀 +0.3，L443-450）
+///
+/// ⇒ `rerank_weight_fts` / `rerank_weight_embed` 若强行用于加权求和，
+///   就会**替换掉现役的 RRF + 标题加权** ⇒ **回归检索质量**，
+///   而当前实现（cycle 251「检索排序三层缺陷」的修复成果）反而被破坏。
+///
+/// ⚠️ 另注**通道数不符**：`fuse_weights` 是 `[f64; 4]`（4 通道），
+///   而真实实现是 **3** 个 ranklist ⇒ 元素数本身就对不上。
+///
+/// ⚠️ 另注**同名异型**（本轮第三次撞上）：
+///   `nt_memory_sweep_20260815.rs:570` 另有一个 `hybrid_search`，
+///   它确实用加权求和 `0.6 * s + 0.4 * k`（硬编码字面量）——
+///   但 `kb_search.rs:615` 调用的是 **`nt_pure_fns::hybrid_search`（RRF 版）**，
+///   ⛔ 不是这个。⇒ 若照那处的权重接线，会改错函数。
+///
+/// ⭐ 正解（未实施，需 owner 决策）：
+///   (a) 若要用**通道权重** ⇒ 改 `bm25::rrf_fuse` 为**加权 RRF**
+///       （RRF 分数 × 通道权重）—— 这是**算法增强**，会改变检索行为；
+///   (b) 若 4 个字段已过时 ⇒ 删除它们，让 config 只保留真实在用的
+///       （`max_iterations` / `web_search_fallback`），
+///       ⛔ 保留一个「看起来可调、实际无效」的 config 比没有 config 更危险。
+/// ⛔ 我**不擅自实施 (a)**：那会改变现役检索排序的行为与质量，
+///   属于需要 benchmark 验证的性能/质量决策。
 pub struct AdaptiveRagConfig {
+    /// ⛔ 零读点，见本 struct 裁定
     pub fts_limit_multiplier: usize,
+    /// ⛔ 零读点；⛔ 在 RRF 融合下**无语义对应**，见裁定
     pub rerank_weight_fts: f64,
+    /// ⛔ 零读点；⛔ 在 RRF 融合下**无语义对应**，见裁定
     pub rerank_weight_embed: f64,
+    /// ⛔ 零读点；⚠️ 声明 4 通道而实现是 **3** 通道，见裁定
     pub fuse_weights: [f64; 4],
+    /// ⛔ 零读点，见裁定
     pub cache_ttl_secs: u64,
+    /// ✅ 活：`iterative_retrieval` L421 使用
     pub max_iterations: usize,
+    /// ✅ 活：1 处消费
     pub web_search_fallback: bool,
 }
 
