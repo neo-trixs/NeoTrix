@@ -779,8 +779,78 @@ impl BackgroundLoop {
             self_improvement: crate::l5_cognition::l1_facade::SelfImprovementLoop::new(),
         }));
 
+        // ═══════════════════════════════════════════════════════════════════
+        // ⭐ 裁定 A（2026-10-07）：配置驱动的 handler 一律直接在此宏里校验
+        //     「间隔字段 ↔ handler 名」接线一致性。
+        //
+        // # 为什么（实测两个真 bug，都是「功能在跑、改配置无效」）
+        //
+        // | 字段 | Default | 曾被驱动于 | 后果 |
+        // |---|---|---|---|
+        // | telemetry_interval_secs | 300 | 硬编码常量 60 | 改配置无效 |
+        // | evolve_interval_secs     | 120 | evolution_interval_secs(300) | 改配置无效 |
+        //
+        // # ⛔ 为什么 D2 门抓不到（这是本校验存在的唯一理由）
+        //
+        // `rg evolve_interval_secs run.rs` 返回 0 命中 —— 看起来像「死配置忘了接线」，
+        // D2 会这么报；真正问题是**接错了另一个字段**。D2 只看「有无读点」，
+        // **看不到「读的是不是对应那个」** ⇒ 唯一能拦住的地方是接线瞬间。
+        //
+        // # 防绕过
+        //
+        // 旧分支启动前断言 `!stringify!($interval).starts_with("cfg.")`
+        // ⇒ `spawn_handler!(cfg.x, ...)` 一律 panics（须先点改为校验分支）。
+        //
+        // 范围：只校验名称对应关系。Default 合理性非本职；handler 内部逻辑不校验。
+        // ═══════════════════════════════════════════════════════════════════
         macro_rules! spawn_handler {
+            // ── arm 1：字段名 + handler 名都给 ⇒ 编译期静态比对 ──
+            ($cfgv:ident, $field:ident, $name:literal, |$lock:ident| $body:expr) => {{
+                if !nt_strip_interval_suffix(stringify!($field)).eq($name)
+                    && !NT_BG_WIRING_EXEMPT.iter().any(|(f, _)| *f == stringify!($field))
+                {
+                    panic!(
+                        "[bg-wiring] 接线错配：配置字段 `{}` 应当驱动 handler `{}`，实际写了 `{}`。\
+  \
+                         ⛔ 这类错配让「改配置无效」：字段有读点（不是死配置），但读的是另一个间隔。\
+  \
+                         确属命名例外请在 NT_BG_WIRING_EXEMPT 登记并附理由。",
+                        stringify!($field),
+                        nt_strip_interval_suffix(stringify!($field)),
+                        $name
+                    );
+                }
+                spawn_handler!($cfgv.$field, $name, |$lock| $body);
+            }};
+            // ── arm 2：只给字段名 ⇒ body 里必须出现 handle_<去后缀名> ──
+            ($cfgv:ident, $field:ident, |$lock:ident| $body:expr) => {{
+                let want = nt_strip_interval_suffix(stringify!($field));
+                if !stringify!($body).contains(&format!("handle_{want}"))
+                    && !NT_BG_WIRING_EXEMPT.iter().any(|(f, _)| *f == stringify!($field))
+                {
+                    panic!(
+                        "[bg-wiring] 接线错配：配置字段 `{}` 的 body 里没有调用 `handle_{}`。\
+  \
+                         ⛔ 这类错配让「改配置无效」：字段有读点（不是死配置），但驱动的是别的 handler。\
+  \
+                         确属命名例外请在 NT_BG_WIRING_EXEMPT 登记并附理由。",
+                        stringify!($field),
+                        want
+                    );
+                }
+                spawn_handler!($cfgv.$field, "handler", |$lock| $body);
+            }};
+            // ── 旧分支：常量间隔，字段路径直接拒绝 ──
             ($interval:expr, $name:literal, |$lock:ident| $body:expr) => {{
+                if stringify!($interval).starts_with("cfg.") {
+                    panic!(
+                        "[bg-wiring] `spawn_handler!(cfg.X, ...)` 已被禁用：\
+  \
+                         配置驱动的 handler 必须改用校验分支 `spawn_handler!(cfg, X, ...)`。\
+  \
+                         ⛔ 旧形式无法校验「字段 ↔ handler」接线一致性。"
+                    );
+                }
                 let h = this.clone();
                 let mut rx = shutdown_rx.clone();
                 self.handles.push(tokio::spawn(async move {
@@ -826,43 +896,43 @@ impl BackgroundLoop {
             };
         }
 
-        spawn_handler!(cfg.save_interval_secs, "save", |h| {
+        spawn_handler!(cfg, save_interval_secs, "save", |h| {
             h.handle_save().await;
             emit_event!(h, crate::l0_substrate::nt_core_event::CoreEvent::TaskSubmitted {
                 task: "save".into(), task_type: "storage".into(), priority: 2,
             });
         });
-        spawn_handler!(cfg.consolidate_interval_secs, "consolidate", |h| h.handle_consolidate().await);
-        spawn_handler!(cfg.goal_interval_secs, |h| h.handle_goal().await);
-        spawn_handler!(cfg.knowledge_chain_interval_secs, |h| h.handle_knowledge_chain().await);
-        spawn_handler!(cfg.knowledge_aging_interval_secs, |h| h.handle_knowledge_aging().await);
-        spawn_handler!(cfg.crystallization_interval_secs, |h| h.handle_crystallization().await);
+        spawn_handler!(cfg, consolidate_interval_secs, "consolidate", |h| h.handle_consolidate().await);
+        spawn_handler!(cfg, goal_interval_secs, |h| h.handle_goal().await);
+        spawn_handler!(cfg, knowledge_chain_interval_secs, |h| h.handle_knowledge_chain().await);
+        spawn_handler!(cfg, knowledge_aging_interval_secs, |h| h.handle_knowledge_aging().await);
+        spawn_handler!(cfg, crystallization_interval_secs, |h| h.handle_crystallization().await);
         // Continual Harness Refinement — 审查轨迹，应用有证据支持的状态更新
-        spawn_handler!(cfg.refinement_interval_secs, "refinement", |h| h.handle_refinement().await);
-        spawn_handler!(cfg.nt_act_voice_interval_secs, |h| h.handle_nt_act_voice_tick().await);
-        spawn_handler!(cfg.plugin_interval_secs, |h| h.handle_plugin_tick().await);
+        spawn_handler!(cfg, refinement_interval_secs, "refinement", |h| h.handle_refinement().await);
+        spawn_handler!(cfg, nt_act_voice_interval_secs, |h| h.handle_nt_act_voice_tick().await);
+        spawn_handler!(cfg, plugin_interval_secs, |h| h.handle_plugin_tick().await);
         // ⭐ **接线 `enable_exploration`**（2026-10-07，此前是「未接线规格」）：
         //   探索 handler **本来就在跑**（本行一直在 spawn 它），
         //   但开关 `cfg.enable_exploration` **零读点** ⇒ 用户无法关闭探索。
         //   ⇒ 这是典型的「**功能已实现、开关没接**」，正解是**接线**⛔ 不是删字段。
         //   `cfg` 是 `self.config.clone()`（L779），故按值捕获使闭包能带走它。
         let exploration_on = cfg.enable_exploration;
-        spawn_handler!(cfg.exploration_interval_secs, "exploration", |h| {
+        spawn_handler!(cfg, exploration_interval_secs, "exploration", |h| {
             if exploration_on {
                 h.handle_exploration().await;
             } else {
                 tracing::debug!("[bg-tick] exploration 被 enable_exploration=false 关闭");
             }
         });
-        spawn_handler!(cfg.curiosity_interval_secs, |h| h.handle_curiosity().await);
-        spawn_handler!(cfg.world_prediction_interval_secs, |h| h.handle_prediction().await);
-        spawn_handler!(cfg.metacog_interval_secs, |h| h.handle_awareness().await);
-        spawn_handler!(cfg.cleanup_interval_secs, |h| h.handle_cleanup().await);
+        spawn_handler!(cfg, curiosity_interval_secs, |h| h.handle_curiosity().await);
+        spawn_handler!(cfg, world_prediction_interval_secs, |h| h.handle_prediction().await);
+        spawn_handler!(cfg, metacog_interval_secs, |h| h.handle_awareness().await);
+        spawn_handler!(cfg, cleanup_interval_secs, |h| h.handle_cleanup().await);
         spawn_handler!(BACKUP_INTERVAL_SECS, |h| h.handle_backup().await); // every 6h
         // ── 守卫层 (Rust 化自 sh 守护脚本, cycle 207) ──
-        spawn_handler!(cfg.kb_guard_interval_secs, "kb_guard", |h| h.handle_kb_guard().await);
-        spawn_handler!(cfg.kb_backup_interval_secs, "kb_backup", |h| h.handle_kb_backup().await);
-        spawn_handler!(cfg.workspace_guard_interval_secs, "workspace_guard", |h| h.handle_workspace_guard().await);
+        spawn_handler!(cfg, kb_guard_interval_secs, "kb_guard", |h| h.handle_kb_guard().await);
+        spawn_handler!(cfg, kb_backup_interval_secs, "kb_backup", |h| h.handle_kb_backup().await);
+        spawn_handler!(cfg, workspace_guard_interval_secs, "workspace_guard", |h| h.handle_workspace_guard().await);
         spawn_handler!(AGENT_DISCOVERY_INTERVAL_SECS, |h| h.handle_agent_discovery().await);
         // ── 意识能力网内化吸收 (cycle 1053): 60s 检查 pending-absorb.json,
         //    替代原 .opencode/plugins/experience-tree-absorption.js idle 插件。
@@ -871,13 +941,13 @@ impl BackgroundLoop {
         //    缺失则记录感知盲区到 KB (NT-WORLD 感知缺失信号)。
         spawn_handler!(DAILY_INTEL_INTERVAL_SECS, "daily_intel", |h| h.handle_daily_intel_check().await);
         spawn_handler!(ALWAYS_ON_INTERVAL_SECS, "always_on", |h| h.handle_always_on().await);
-        spawn_handler!(cfg.scheduler_interval_secs, "scheduler", |h| h.handle_scheduler_tick().await);
+        spawn_handler!(cfg, scheduler_interval_secs, "scheduler", |h| h.handle_scheduler_tick().await);
         // ⭐ 2026-10-07 接线：此前错读 `evolution_interval_secs`（**另一个字段**，
         //   Default 3600），而 `handle_evolve` 的**正确驱动项**是
         //   `evolve_interval_secs`（Default 120）⇒ 改 `evolve_interval_secs`
         //   完全无效，且实际间隔是声明值的 30 倍。
-        spawn_handler!(cfg.evolve_interval_secs, "evolve", |h| h.handle_evolve().await);
-        spawn_handler!(cfg.nt_world_sense_interval_secs, "world_sense", |h| h.handle_world_sense().await);
+        spawn_handler!(cfg, evolve_interval_secs, "evolve", |h| h.handle_evolve().await);
+        spawn_handler!(cfg, nt_world_sense_interval_secs, "world_sense", |h| h.handle_world_sense().await);
         #[cfg(feature = "stealth-net")]
         // ⭐ **接线 `proxy_enabled`**（2026-10-07，此前是「未接线规格」）：
         //   心跳 handler **本来就在跑**，但开关零读点 ⇒ 用户无法关闭代理心跳。
@@ -885,7 +955,7 @@ impl BackgroundLoop {
         //      `proxy_heartbeat_interval_secs` 的**子串** ⇒ 误判为「已接线」。
         //      ⇒ 本次用**精确读点**（`cfg.proxy_enabled` 全仓 0 处）确认后才接线。
         let proxy_on = cfg.proxy_enabled;
-        spawn_handler!(cfg.proxy_heartbeat_interval_secs, "proxy_heartbeat", |h| {
+        spawn_handler!(cfg, proxy_heartbeat_interval_secs, "proxy_heartbeat", |h| {
             if proxy_on {
                 h.handle_proxy_heartbeat().await;
             } else {
@@ -919,7 +989,7 @@ impl BackgroundLoop {
         // (cfg.consciousness_interval_secs, 默认 600s), 与 SEAL 果实消费节奏对齐。
         // 此前硬编码 3600s (1h) 且不可配置 — SEAL (goal_interval 180s) 在大部分
         // 时间消费空果实, 意识核心进化节奏严重滞后于消费节奏。
-        spawn_handler!(cfg.consciousness_interval_secs, |h| h.handle_consciousness_tick().await);
+        spawn_handler!(cfg, consciousness_interval_secs, |h| h.handle_consciousness_tick().await);
         // 600s — Second Brain auto-sync (emotion + session notes to KB)
         spawn_handler!(SECOND_BRAIN_TICK_INTERVAL_SECS, |h| h.handle_second_brain_tick().await);
         // Startup: restore emotion state from KB (deferred 5s, then skips)
@@ -968,7 +1038,7 @@ impl BackgroundLoop {
         //   且实际间隔（60）与声明值（300）**不一致** —— 典型的
         //   「功能已实现、配置没接」（对照 commit 9d7bdfa0 同型）。
         //   ⇒ 改读 `cfg`，并删掉那个常量（它此后再无引用）。
-        spawn_handler!(cfg.telemetry_interval_secs, "telemetry", |h| h.handle_telemetry().await);
+        spawn_handler!(cfg, telemetry_interval_secs, "telemetry", |h| h.handle_telemetry().await);
         // 意识体智慧周期 — 价值观学习 + 叙事整合 + 规则结晶 + GC (E1)
         {
             const WISDOM_TICK_INTERVAL_SECS: u64 = 300; // 5 min
@@ -1547,3 +1617,22 @@ mod readiness_wiring_tests {
         );
     }
 }
+
+/// 去掉 `_interval_secs` / `_interval_ms` 后缀 —— 供 spawn_handler 接线校验用。
+fn nt_strip_interval_suffix(f: &str) -> &str {
+    f.strip_suffix("_interval_secs")
+        .or_else(|| f.strip_suffix("_interval_ms"))
+        .unwrap_or(f)
+}
+
+/// ⭐ `spawn_handler!` 接线一致性的**例外白名单**（裁定 A，2026-10-07）。
+/// 每一项必须附理由：字段名去掉 `_interval_secs` 后与 handler 名不一致的原因。
+/// 本表是**有界开集** —— 每项都是一个待消除的债，不是永久豁免。
+const NT_BG_WIRING_EXEMPT: &[(&str, &str)] = &[
+    // 元认知循环驱动的是"觉察"handler；metacog 是早期词汇，handler 沿用 handle_awareness。
+    ("metacog_interval_secs", "handle_awareness：元认知即觉察"),
+    // 世界预测 == 通用预测 handler；字段保留 world_ 前缀区别 world_crawl（世界爬取）。
+    ("world_prediction_interval_secs", "handle_prediction：handler 取简写"),
+    // `nt_` 是模块命名规约前缀，handler 名按规约去掉前缀。
+    ("nt_world_sense_interval_secs", "handler world_sense 去掉 nt_ 前缀"),
+];
