@@ -84,6 +84,21 @@ pub enum VerificationLevel {
 pub struct VerificationResult {
     pub passed: bool,
     pub compile_ok: bool,
+    /// ⭐ 审计裁定 2026-10-07（`check-fake-signal` R4 命中）：**门是误报** ——
+    /// 本字段由 **两条真实路径** 写入，⛔ 非伪信号：
+    ///
+    ///  1. **level ≥ CompileAndTest**（L129）：`Self::check_tests()`
+    ///     —— 它真的跑 `cargo test --lib -- --test-thread=1`（L183），
+    ///        并解析 stdout 里的 `"test result: ok"` ⇒ 真实测量。
+    ///  2. **level == CompileOnly**：`(true, vec![])`
+    ///     ⇒ 语义是「本级别不跑测试 ⇒ 不视为失败」，⛔ 不是「测过了」。
+    ///  3. **compile 失败 + level == CompileOnly**（L120）：`tests_ok: false`
+    ///     ⇒ 因 compile 先失败，tests 不会被跑；该字段表明「tests 未通过」。
+    ///
+    /// ⛔ 门为何误报：R4 把「字段的值只来源于字面量」当伪信号；
+    ///   但本字段 L120 的 `tests_ok: false` 与 L131 的 `(true, vec![])`
+    ///   都只是**在不运行测试的路径下**的固定值 —— 另一路径（L129）确有
+    ///   **真实测量**。⇒ 应由**读取侧的判定**决定，而非「是否有字面量赋值」。
     pub tests_ok: bool,
     pub properties_ok: bool,
     pub compile_errors: Vec<String>,
