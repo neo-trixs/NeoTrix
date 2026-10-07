@@ -1,7 +1,9 @@
 # NeoTrix 总蓝图：按图施工手册
 
-> **版本**: 1.6.15 | **日期**: 2026-09-22 | **状态**: 可执行 (Executable)
-> **变更记**: v1.6.15 M1–M7 批量收口（ADR-0005/F03/Footer/iocs/H抽验/fuzz/复验；SIM-52 建档）。
+> **版本**: 1.7.0 | **日期**: 2026-10-07 | **状态**: 可执行 (Executable)
+> **变更记**: v1.7.0 新增 §20 D-16 最短描述公理（理解＝held-out 上最短描述；自由能=complexity+accuracy；
+> 全仓 8 类压缩机制收编；free_energy 0 读点如实记为 intake，未造读点）。
+> v1.6.15 M1–M7 批量收口（ADR-0005/F03/Footer/iocs/H抽验/fuzz/复验；SIM-52 建档）。
 > v1.6.14 Phase 3 类型迁移提案（E8 留守/CRT 整体搬/CoT 拆分；SIM-51 建档）。
 > v1.6.13 CI 侦察（主干全红归因＋工单升级归因后裁决；SIM-50 建档）。
 > v1.6.12 并行收口（双路探针＋点火清单＋E8 留守修订；SIM-49 建档）。
@@ -85,8 +87,10 @@ STEP 4  消项  -> 该图索引表全绿 + 门禁通过，方可进入下一图
 | D-10 | 质量追溯链 | 需求→ADR→代码→测试→门→指标 | REFACTORING §2 | ADR / fitness / llvm-cov |
 | D-11 | 上帝视角决策树 | 每个动作的三问怎么过 | ROADMAP §0.2 | PR 模板检查单 |
 | D-12 | 回滚流程 | 改坏了怎么退回去 | ROADMAP §7 各卡回滚行 | git + re-export 别名 |
+| D-13 | 能力补齐矩阵 | 缺口从哪发现→外部方案→落哪→何时变硬门 | 本文件 §16 | make bench/cov/geiger/machete |
 | D-14 | SIM 预演环 | 动手前怎么证伪与补齐 | SIM-PROTOCOL.md 全文 | SIM 登记表 |
 | D-15 | 治理运行时接线 | 宪法加载了什么规则 | SIM-PROTOCOL.md §14 | nt_core_self_constitution.rs |
+| D-16 | 最短描述公理 | 理解/压缩是什么关系 | 本文件 §20 | aif/free_energy.rs + 8 类压缩机制 |
 
 ---
 
@@ -118,7 +122,12 @@ graph TD
     D12 --> D03
     D15[D-15 治理接线: 宪法读什么] -.-> D05
     STD -.-> D15
+    D16[D-16 最短描述: 什么算理解] -.->|判定词: 横切全部图| D05
+    D16 -.-> D04
 ```
+
+⭐ **D-16 是唯一横切型节点**（虚线 = 非流程一环，而是判定词）：
+改任何"压缩/蒸馏/遗忘/裁剪"类实现前，先用它判**是否同时压低了两项**。
 
 ### 索引
 
@@ -130,6 +139,10 @@ graph TD
 | D-03/D-14/D-11 | 执行：状态＋预演＋三问 | 跳 D-06/D-04 动手 |
 | D-05/D-10 | 验证：门＋证据 | 跳 D-12 兜底 / D-13 补齐 |
 | D-15/正典 | 治理：宪法读什么＋规则唯一源 | 实现前确认接线与模版 |
+| **D-16** | **认知：什么才算理解／压缩** | **改动任何"压缩/蒸馏/遗忘/裁剪"前先过本行** |
+
+⭐ **D-16 横切其余全部图**：它不是流程的一环，而是**判定词**——
+任何声称"我们压缩了""我们理解了"的实现，都要能指出它**同时**压低了哪两项。
 
 ASCII 摘要：定位(层/周) → 领卡 → 跟踪态 → 三问 → 动手 → 过门 → 留证 → 可滚。
 
@@ -604,11 +617,18 @@ graph TD
 | D-10 | REFACTORING §2 | ADR/fitness/cov | 5 分钟抽查 |
 | D-11 | ROADMAP §0.2+§8.1 | PR 模板 | 检查单全勾 |
 | D-12 | ROADMAP §7 回滚行 | git/别名/版本 | 回滚演练 |
+| D-13 | 本文件 §16 | 能力补齐矩阵 | make bench/cov/geiger |
 | D-14 | SIM-PROTOCOL.md | SIM 登记表 | 放行判定 |
 | D-15 | SIM-PROTOCOL.md §14 | nt_core_self_constitution.rs | 11 单测 |
+| D-16 | 本文件 §20 | aif/free_energy.rs | 两项同时压低 |
 
 **维护规则**: 图与索引表同生共死——改图必改表，改表必改图；图号永久稳定，增图只增不重排。
-（D-13 起为新增预留。）
+（D-17 起为新增预留。）
+
+⭐ **本轮修正**：原注写"（D-13 起为新增预留。）"，但 **D-13 实为已占用的
+「能力补齐矩阵」（§16）**，且本表**一直缺 D-13 行**。⇒ 本轮补行并把预留位推到 D-17。
+**教训**：⛔ 不可从单行括注推断卡位 —— 该括注说的是**索引表预留行**，
+不是"卡不存在"。查证方式为 `grep -n '^## §' ` 列全部节标题。
 
 ---
 
@@ -847,4 +867,80 @@ graph TD
 
 ---
 
-*End of Master Blueprint v1.6.15*
+## §20 D-16 最短描述公理（v1.7.0 新增）
+
+### 目的
+回答"理解和压缩是什么关系"——本图是全仓压缩类机制的**唯一公理源**，
+用来判定某处新代码**是不是**压缩、以及压缩**压对了没有**。
+
+> **公理（D-16）**：**理解 ＝ 在未见过的那部分数据上，描述长度最短。**
+> 形式化即自由能最小：`free_energy = complexity + accuracy`
+> （`l2_perception/nt_core_hcube/aif/free_energy.rs:13` `compute_vfe`）。
+
+### 四个环节
+
+```mermaid
+graph TD
+    W[世界: 不确定] -->|观测| L[学习: 从数据估概率分布 p]
+    L --> P[预测: 按 p 选更短的码]
+    P --> U[理解: 发现可压缩规律]
+    U --> L
+    P -->|码长| L
+    L -.->|两项必须同时压低| U
+```
+
+| 环节 | 操作 | 判据（缺一即伪理解） |
+|------|------|---------------------|
+| 学习 | 从数据估概率分布 | 分布要**在 held-out 上**仍成立 |
+| 预测 | 按分布选更短编码 | 选的是**最短可行码**，不是最短可行**记忆** |
+| 理解 | 发现可压缩规律 | 规律在**没见过的数据**上也成立 |
+| 表达 | 用有限规则生成无限意义 | 规则数有限，生成空间无限 |
+
+### ⛔ 反例护栏（本图的硬约束）
+
+⭐ **只有 complexity 项 ⇒ 伪理解。** 两类退化工：
+
+| 退化解 | 描述长度 | 理解 | 为什么必须拒 |
+|--------|---------|------|-------------|
+| 随机串 | 极长（≈原始） | 零 | 不可压缩 |
+| **训练集查找表** | **极短（≈ 0）** | **零** | ⭐ **可压缩到极致却没有泛化** |
+| 只留 complexity 的优化器 | 越短越好 | 负 | 会收敛到上一行 |
+
+⇒ **可压缩性只有在 held-out 上度量才是判据。** 工程落法：任何"压缩率"指标
+必须**同时**报告**信息损失**项，单报 ratio 无效。
+
+### 索引：全仓压缩机制收编（本卡管辖）
+
+| 机制 | 代码落点（实测） | 两项是否齐全 | 状态 |
+|------|-----------------|------------|------|
+| 自由能本体 | `l2_perception/nt_core_hcube/aif/free_energy.rs`（238 行，4 文件袋） | ✅ complexity+accuracy | ⛔ **0 读点**（袋外 0 命中） |
+| 轨迹压缩 | `l5_cognition/nt_core_trajectory_compress.rs:23` `compression_ratio()` | ❌ **只有 ratio，无损失项** | ⚠️ 见下 |
+| 状态轨迹去重 | `nt_core_trajectory_compress.rs:141` `compress_state_trajectory` | ✅ 无损（只并连续同态） | ✅ **唯一活路径**（`nt_finalize_broadcast.rs:29`） |
+| 记忆蒸馏 | `l4_emotion/nt_memory/distillation/` | ✅ 蒸馏+持久化 | ✅ |
+| 遗忘即压缩 | `l4_emotion/nt_memory/typed_memory/forgetting.rs` | ✅ 保留判据+衰减 | ✅ |
+| 上下文预算裁剪 | `nt_core_context/ccr.rs`、`context_budget.rs` | ✅ budget+truncate | ✅ |
+| 上下文成束 | `l2_perception/nt_core_code_search.rs:317` `context_bundle()` | ✅ 文件树+README+依赖 | ⚠️ 依赖清单维仍缺 |
+| 输出蒸馏 | `crates/neotrix-neobot/src/nt_output_distill.rs` | ✅ errors-first+ref 标记 | ✅ |
+
+⇒ **8 类机制散在 L0–L6，`entropy` 出现在 12 个文件，此前零条公理把它们连起来。**
+本卡的作用不是新增能力，是**让这 8 类成为同一原则的推论**，
+从而让第 9 类新机制可以被路由、被判真伪。
+
+### 🔴 待办（按 R-P79 记为 intake，未接线）
+
+- ⛔ **`free_energy` 0 读点。** 本轮**实测**：`FreeEnergyCalculator / compute_vfe / compute_efe`
+  在 `hcube/aif/` 之外 **0 命中**。
+- ⚠️ **轨迹压缩只报 ratio 不报损失** ⇒ 违反本卡 §反例护栏的"必须同时报告"要求。
+- ⚠️ **`compress_trajectory` 无生产调用方**（实测：`ReasoningEngine` 持有
+  `traces: Vec<ReasoningRecord>`，**不持有** `AgentTrajectory`），仅测试引用。
+- ⚠️ **`compress_state_trajectory` 的 `level` 是零读点参数**（实测：三个档位输出恒等），
+  而 `seal_loop.rs:1077` 硬编码 `Medium`。
+
+⭐ **故本轮不为 `free_energy` 造读点**：唯一现成落点需要新建 `AgentTrajectory`
+平行适配器 ⇒ **违反 NTS-B10「parallel adapters are forbidden」**，
+且无数据源时只会再造一个零读点字段（对照 commit `9d7bdfa0` 同病）。
+正确读点应是**"估计概率分布并据此决策"**的位置，待按此判据重新定位。
+
+---
+
+*End of Master Blueprint v1.7.0*

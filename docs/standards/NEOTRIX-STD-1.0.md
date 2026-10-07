@@ -95,6 +95,20 @@ enforce the spirit; both leave records. No silent overrides, ever.
 - **NTS-B10** Absorption strengthens nodes. External patterns MUST land on existing
   nodes; parallel adapters are forbidden (R-P42). Each absorption files SIM + ADR +
   blueprint writeback. [Verify: ABSORPTION docs + SIM registry] ← R-P42/SIM practice
+  **B10.1 URL-only intake (2026-10-07)**: a bare URL is a complete intake. No
+  local clone, no file list, no pre-approval, no maintainer relationship — the
+  GitHub open-source path MUST stay open. Retrieval is zero-clone (API/HTML).
+  **B10.2 Smelt-to-existing (化为已有)**: every intake lands on an existing node.
+  A pattern with no live call site is not discarded — it is demoted into the
+  evolution ledger as intake (强化 vs 新增 is a *record*, never a veto).
+  **B10.3 Precondition demotion**: `ABSORPTION-PRECONDITION-GATE` (three
+  questions) now decides *where* a pattern lands, not *whether*. Failing it routes
+  the source to the ledger, it does not discard it.
+  **B10.4 Record honesty is the only hard stop**: intake may never be blocked for
+  being open-source, but a recorded license/provenance MUST match reality —
+  `check-license.sh` governs record truth, not permission. No-license sources take
+  design, never verbatim code. [Verify: ABSORPTION docs + SIM registry + SIM
+  intake count > 0] ← R-P42/SIM practice + ABSORPTION-GITHUB-SKILL-FORGE
 - **NTS-B11** A2A ladder. Interop climbs AgentCard → full task lifecycle → server-gen IDs
   + mismatch rejection → streaming/push → multi-binding; A2A is agent↔agent,
   MCP is agent↔tools. [Verify: conformance tests per rung] ← R-P254

@@ -16,14 +16,45 @@ workflow
 - kb-pipeline
 
 ## Trigger Phrases
+- **裸 URL**（无其他文字）→ 默认走下方「URL-only 熔炼模式」，无需再问
 - "分析这个仓库" / "analyze this repo"
 - "对比当前项目" / "compare with current project"
 - "吸收XX的功能" / "absorb features from"
 - "哪些有而本项目没有" / "what features do they have that we don't"
 - "融合到当前架构" / "integrate into current architecture"
+- "熔炼" / "smelt" → URL-only 熔炼模式，强调化为已有、零新建平行模块
 - "继续后续迭代" / "continue with remaining phases" / "继续后续迭代对应的模块任务"
   → 自动加载 TODO.md，进入下一个未完成的 Phase
 - 粘贴 URL 列表 / "把这些 URL 入库" / "absorb these URLs" → 触发吸收对话方法论（六步流水线 + 启发式规则）
+
+## ⭐ 默认路径：URL-only 熔炼模式 (Smelt-by-URL)
+
+> **依据** `NEOTRIX-STD-1.0.md` **NTS-B10**（含 B10.1–B10.4）。规范源在标准文档，本节只是操作面。
+> **吸收自** `YuJunZhiXue/github-skill-forge`（无 LICENSE ⇒ 只取设计，见 `docs/architecture/ABSORPTION-GITHUB-SKILL-FORGE-2026-10-07.md`）。
+
+**一条 URL 就是完整入参。** 不克隆、不列文件、不预先批准、不问「要不要吸收」。
+GitHub 开源路径**常开**——开源本身**永不构成拒绝理由**。
+
+```
+0 信号初筛 → 1 零克隆取源 → 2 熔炼成束 → 3 化为已有 → 4 落账
+```
+
+| 段 | 做什么 | 已有落点（**化为已有**，零新建平行模块） |
+|---|--------|------------------------------------|
+| **0 信号初筛** | 记 `stars / archived / pushed_at / license / language / topics`。**只记录，不否决**；`--force` 等价 = 默认即 force | `scripts/ops/nt_absorption_enrich.py` 已取全部 6 字段 |
+| **1 零克隆取源** | GitHub API / raw / HTML，**不 `git clone`**。README + 源码按需 | ⛔ **本段无脚本落点** —— 历史上引用的 `scripts/kb_batch_absorb.py` 与 `absorb_to_capability.py` **实测已不存在**（`check-doc-drift.sh` 记为 deadlink）。⇒ **本段当前由 agent 用 `webfetch` 手工执行**（2026-10-07 实测：18 仓全可达，0 clone） |
+| **2 熔炼成束** | 剔杂物，只留**文件树 + README/文档 + 依赖清单**（`requirements.txt` / `package.json` / `pyproject.toml`），压成**单个上下文工件** | **强化** `l2_perception/nt_core_code_search.rs` 的 `context_bundle()`（同原语，我方已有 ⇒ 强化非新增）。⚠️ 依赖清单这一维我方**仍缺** |
+| **3 化为已有** | 四字段模式落既有节点；**同一原语已在别处 ⇒ 判「强化」**。无活调用点**不丢弃**，降级进演化账本 | NT-IO/SHIELD/ACT/MIND/CORE/WORLD/MEMORY 分支树（`.neotrix/layer-map.json`）——⚠️ 历史上的 `absorb_to_capability.py` 自动化映射**实测已不存在**，故本段判定**须人工 grounding**，禁止凭关键词猜 |
+| **4 落账** | KB 节点 + `absorbed_capability` 四元组；写 ADR/SIM；无消费者则记 ledger intake | NTS-B10 闭环 |
+
+⭐ **自动化降级为人工**：①②④ 有脚本（`nt_absorption_enrich.py` / Rust CLI `absorb-node`）；
+**③「化为已有」的判定脚本已不在** ⇒ 映射必须**逐条读代码核实**，
+否则就是 `ABSORPTION-INDEX-user-urls` 记录的 keyword 误映射（37 源错 6、47 源错 32）。
+
+**⛔ 唯一硬停 = 记录不撒谎**（NTS-B10.4）：吸收**永不因「是开源」被拦**，
+但**记录的许可/来源必须与事实一致**（`scripts/check-license.sh` 管记录真伪，不管许可）。
+**无 LICENSE ⇒ 只取设计，不取逐字代码**（默认全部版权保留）。
+⇒ 换言之：**门开着，但门框上要写清谁从哪儿来。**
 
 ## Workflow
 
