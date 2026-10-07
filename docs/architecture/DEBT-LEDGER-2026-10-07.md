@@ -16,7 +16,8 @@
 | `check-naming` | **1615** offender（advisory） | `check-naming.sh --strict` |
 | 能力未接线 | **3 / 5** DeclaredOnly + **1 / 5** Scaffold | `market.rs` 的 `executability` |
 | `check-executor-registry` | **RC=0** | 本会话新建 |
-| 元门 | 未登记 **0** · ⛔ **恒红 3** · 探针失败 **0** | `check-gate-satisfiable.sh --strict`（**见下方修正**） |
+| 元门 | 未登记 **0** · ⛔ **恒红 1** · 探针失败 **0** · 门总数 **23** | `check-gate-satisfiable.sh --strict` |
+| ⭐ `check-fake-signal` | findings **22**（R1 11 / R2 2 / R3 3 / R4 6）· baseline 记账 · `--strict` RC=0 · 探针 **4/4** | `bash scripts/check-fake-signal.sh --strict` |
 
 ## ⭐ D1 —— unwrap/expect 债务：**已清零**（`check-unwrap --strict` 首次全绿）
 
@@ -399,12 +400,15 @@ core 侧 8 个闭包都写成 `|text, _style|`（`_` 前缀 ⇒ **从未被使�
 
 ### 门矩阵（14 个）
 
-🟢 **12 绿**：`unwrap` ⭐·`executor-registry` · `silent-failure` · `doc-drift`
+🟢 **13 绿**：`unwrap` ⭐·`fake-signal`·`executor-registry` · `silent-failure` · `doc-drift`
 · `dead-config-flag` · `orphan-dirs` · `doc-claims` · `claims-numbers`
 · `agent-config` · `layer-deps` · `map-check` · `test-baseline`
 🔴 **1 红**：`naming` 1615（**advisory**，规约 vs 现实差 1616 ⇒ 该规约无约束力，
 advisory PASS ≠ 合规；⛔ 不宜直接升级为门禁）
-⛔ 元门：**未登记 0 · 恒红 3 · 探针失败 0**（**修正**，见下方）
+⛔ 元门：**未登记 0 · 探针失败 0 · 门总数 23**
+⭐ **恒红 3 → 1**（2026-10-07 复核）：仅剩 `check-layout`
+（根目录 `notes/` 是**工作区产物**，⛔ 非代码缺陷
+⇒ 属方案 §4 的「第三种成因：工作区状态」）
 
 ⭐ **本轮变化**：`check-unwrap` 由红转绿（`--strict` 首次 PASS）⇒
 元门「恒红」曾被本文件误记为 0/1 ⇒ **2026-10-07 复核实测为 3**（见下方修正）
@@ -486,14 +490,16 @@ D1 的 **7 类错误判据** + 全局 8 条：
 | `check-naming` | 🔴 1615 advisory | 🔴 **1612** advisory | 因本轮新增文件而变；**仍 advisory**（规约 vs 现实差 1612 ⇒ 无约束力，⛔ 不宜升级门禁） |
 | 元门 | 未登记 0 · 恒红 1 | ⛔ **恒红 3** | ⛔ 前两处记录（1 与 0）**均不实**，2026-10-07 复核修正 |
 
-⇒ **12 绿 · 1 红（naming，advisory）· ⛔ 恒红 3**。
+⇒ **13 绿 · 1 红（naming，advisory）· ⛔ 恒红 1**。
 
 ## ⛔ 2026-10-07 复核修正：本文件曾**不实**记录门状态
 
 R-SCAN-3 的原文教训：「**陈旧门记录会让下一个 agent 去『修』正确代码，比没有门更危险**」。
 本文件正是该教训的**新实例**：它同时写了「恒红 1」与「恒红 0」，**两处都不对**。
 
-**实测（`check-gate-satisfiable.sh --strict`，门总数 22）恒红 3 个**：
+**实测（`check-gate-satisfiable.sh --strict`，门总数 **23**）恒红 3 个**
+（⚠️ 此为 **2026-10-07 上午**的快照；同日 `check-fake-signal` 立门后
+`nt_core_paradigm` 被正确豁免，恒红 **3 → 1**，见 L409）：
 
 | 门 | 实测输出 | 归因（**都不是「门坏」**） |
 |---|---|---|
