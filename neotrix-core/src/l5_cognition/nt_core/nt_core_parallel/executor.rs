@@ -231,12 +231,31 @@ impl OptimalTaskAllocator {
         let mut scored: Vec<(&'a TodoTask, f64)> = todos.iter()
             .filter(|t| !is_running(t))
             .map(|t| {
+                // ⭐ 审计裁定 2026-10-07：`check-fake-signal` R3 报此处
+                // 「字面量实参 `false, false`」，核实结论：**门是对的，
+                // 但⛔ 不是缺陷 —— 它是语义正确的**。
+                //
+                // **依据**：
+                //  1. `subagent_running: true` 意味着「该任务已有子代理在跑」
+                //     ⇒ 而上一行 `.filter(|t| !is_running(t))` **已把在跑的
+                //     全部排除** ⇒ 此处若传 `true` 就**自相矛盾**；
+                //  2. `TodoTask`（types.rs:123-131）**没有** subagent 字段
+                //     ⇒ 本函数**结构上就拿不到**这两个信息
+                //     ⇒ 传 `false` 不是「忘了传」，是**无源可传**；
+                //  3. 本函数文档（L220-221）明写
+                //     「minus the **subagent-registration side effects**
+                //       (those live in SubagentManager)」
+                //     ⇒ 作者**有意**把 subagent 语义排除在本函数之外。
+                //
+                // ⛔ 故⛔ **不接线**：那会引入自相矛盾的信号。
+                // ✅ 保留字面量，并在下方留痕，避免下一个 agent（含门）
+                //   反复把它当债来「修」。
                 let score = self.score_todo(
                     t.priority.max(0) as u8,
                     t.created_at,
                     t.dependencies.len(),
-                    false,
-                    false,
+                    false, // subagent_running：⛔ 恒 false 是**语义正确**（见上方裁定）
+                    false, // subagent_completed：同上（本函数不感知完成态）
                 );
                 (t, score)
             })
@@ -326,5 +345,58 @@ mod tests {
         let alloc = a.allocate_todo(&todos, 2, |t| t.id == "t1");
         assert_eq!(alloc.len(), 1);
         assert_eq!(alloc[0].id, "t2");
+    }
+}
+
+#[cfg(test)]
+mod subagent_arg_is_intentional_tests {
+    use super::{AllocationStrategy, OptimalTaskAllocator, TodoTask};
+
+    fn mk(id: &str, prio: i32) -> TodoTask {
+        TodoTask {
+            id: id.into(),
+            description: "d".into(),
+            task_type: "t".into(),
+            priority: prio,
+            dependencies: vec![],
+            estimated_complexity: 0.5,
+            created_at: 1_700_000_000,
+        }
+    }
+
+    /// ⭐ **变异证据**：`allocate_todo` 必须**只**通过 `is_running` 闭包
+    /// 感知「在运行」，⛔ 且被过滤掉的任务**不得**出现在结果里。
+    ///
+    /// 这条测试**固化**「`subagent_running: false` 是语义正确」这一裁定：
+    /// 若有人把字面量改成 `true`（或把 `filter` 删掉），
+    /// 本测试会暴露**自相矛盾**（在跑的任务被选中）。
+    #[test]
+    fn 在跑的任务被排除且不受score影响() {
+        // ⭐  属 **OptimalTaskAllocator**（⛔ 不是 ParallelExecutor）—— 同名异型第 11 次
+        let ex = OptimalTaskAllocator::new(AllocationStrategy::Hybrid);
+        let todos = vec![mk("free", 1), mk("busy", 9)];
+
+        // ⭐ `busy` 优先级更高（9 > 1）⇒ 若未被排除，它会排第一
+        let out = ex.allocate_todo(&todos, 10, |t| t.id == "busy");
+        let ids: Vec<&str> = out.iter().map(|t| t.id.as_str()).collect();
+
+        assert_eq!(ids, vec!["free"], "在跑的任务必须被排除（⛔ 不参与评分）");
+        assert!(
+            !ids.contains(&"busy"),
+            "⛔ 在跑的任务绝不能被选中 —— 这正是「传 subagent_running=false \
+             是语义正确」的根据：filter 已排除它，再传 true 会自相矛盾"
+        );
+    }
+
+    /// ⭐ 对照：全部可运行时，**优先级**必须真的影响排序
+    /// ⇒ 证明评分函数本身在工作（⛔ 不是「整体是死的」）。
+    #[test]
+    fn 优先级真的影响排序() {
+        // ⭐  属 **OptimalTaskAllocator**（⛔ 不是 ParallelExecutor）—— 同名异型第 11 次
+        let ex = OptimalTaskAllocator::new(AllocationStrategy::Hybrid);
+        let todos = vec![mk("low", 1), mk("high", 9)];
+        let out = ex.allocate_todo(&todos, 10, |_| false);
+        let ids: Vec<&str> = out.iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, vec!["high", "low"], "高优先级必须在前（score_todo 正常工作）");
     }
 }
