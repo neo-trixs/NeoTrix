@@ -142,3 +142,55 @@ condition:
 门转绿的唯一正当原因是「取得了上游书面授权」并据此新签。
 
 </details>
+
+---
+
+## 已确认不吸收的外部 URL（2026-10-07 起）
+
+> 这些 URL 在全域吸收/熔炼轮（TradingAgents / memvid / huashu / tester-army/e2e / Ix / leviathan / CarterPerez）中被明确裁决 NOT absorbed。
+> 此节**永久留档**，避免下个窗口重复评估「强制吸收」。
+
+### CarterPerez-dev/Cybersecurity-Projects
+
+- URL:         <https://github.com/CarterPerez-dev/Cybersecurity-Projects>
+- License:     **AGPL-3.0**（强 copyleft）
+- 作者声明:    "copy directly"（鼓励直接复制）
+- **裁决**:    ⛔⛔ **永不吸收** —— AGPL 传染性条款会强制整个闭源 NeoTrix 开源
+- 评估日期:    2026-10-07
+- 评估证据:    `LICENSE` 含 `GNU AFFERO GENERAL PUBLIC LICENSE version 3` 字样；
+  README 文本含 `copy directly`
+
+### huashu-art-motion
+
+- URL:         <https://github.com/Unknown/huashu-art-motion> (待用户提供时取证)
+- License:     MIT (部分字体/资产另计)
+- **裁决**:    ⛔ 不吸收 —— 与本仓宪法/架构无直接能力对应（design/widget 库，与 NeoTrix 的熵注册表/治理结构关系不直）
+- 评估日期:    2026-10-07
+
+### ix-infrastructure/Ix
+
+- URL:         <https://github.com/ix-infrastructure/Ix>
+- License:     Apache-2.0
+- **裁决**:    ⛔ 不吸收 —— 与 `.project-map` + `check-layer-deps.sh` **重复实现**，会破坏单一真源（CODE-TOPOLOGY/D-16 mandates）
+- 评估日期:    2026-10-07
+
+### elstongun/leviathan
+
+- URL:         <https://github.com/elstongun/leviathan>
+- License:     Apache-2.0
+- **裁决**:    ⛔ 不吸收 —— 仓库仅 2 天历史，证据不足以承重（R-P79 §B10.4 记录真伪是唯一硬停）
+- 评估日期:    2026-10-07
+
+### TradingAgents / tester-army/e2e
+
+- URL:         <https://github.com/TauricResearch/TradingAgents> / <https://github.com/tester-army/e2e>
+- License:     Apache-2.0
+- **裁决**:    ⛔ 暂不吸收 —— 设计层面吻合的功能（决策持久化/结算、录制—重放）**未进 Rust 主实现**；记录它们的存在但本窗口不实现
+- 评估日期:    2026-10-07
+
+### memvid/memvid
+
+- URL:         <https://github.com/memvid/memvid>
+- License:     Apache-2.0
+- **裁决**:    ✅ **已吸收设计** —— checkpoint 帧校验和已落地（`7b3dfbbf`，FNV-1a 64，零外部依赖）
+- 评估日期:    2026-10-07
