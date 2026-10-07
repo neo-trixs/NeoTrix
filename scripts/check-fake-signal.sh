@@ -204,6 +204,7 @@ def in_spans(line_no: int, spans, masked: str) -> bool:
     return False
 
 # ── 字段声明 ──────────────────────────────────────────────────
+RE_FN = re.compile(r"^\s*(?:pub(?:\s*\([^)]*\))?\s+)?(?:async\s+)?(?:unsafe\s+)?fn\s+[A-Za-z_][A-Za-z0-9_]*")
 RE_FIELD = re.compile(r"^\s*pub(?:\s*\([^)]*\))?\s+([a-z_][a-z0-9_]*)\s*:\s*(bool|f64|f32|u32|u64|usize)\s*,")
 # R1/R4 的名字启发式：读起来像「结论 / 健康信号」
 # ⭐ 2026-10-07 **第二轮修正**：⛔ 移除 `enabled`。
@@ -245,12 +246,38 @@ RE_TICK_MEASURE = re.compile(r"last_tick|tick_gap|tick_interval|last_stall|stall
 findings = []
 seen = set()
 
-def add(path, line, rule, msg):
+def add(path, line, rule, msg, anchor=""):
     key = (str(path), line, rule)
     if key in seen:
         return
     seen.add(key)
-    findings.append((str(path), line, rule, msg))
+    findings.append((str(path), line, rule, msg, anchor))
+
+
+def _anchor_of(path: Path, line: int) -> str:
+    """返回 ``fn 作用域 + 归一化字段声明`` 的内容锚点。
+
+    ⭐ 2026-10-07：**行号不可靠** —— 实测我只是在字段上多写几行注释，
+    `self_healing.rs` 的行号就从 18 漂到 33 ⇒ baseline 立刻失效
+    （与本会话在 `check-unwrap` 上踩过的是**同一个坑**）。
+    ⇒ 键改为 ``路径 @ 锚点``，⛔ 不含行号 ⇒ 插入注释不再使其失效。
+    """
+    try:
+        raw = path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return f"L{line}"
+    lines = raw.split("\n")
+    if line - 1 >= len(lines):
+        return f"L{line}"
+    decl = lines[line - 1].strip()
+    decl = re.sub(r"\s+", " ", decl)
+    fn = ""
+    for j in range(line - 1, max(-1, line - 400), -1):
+        fm = RE_FN.match(lines[j])
+        if fm:
+            fn = fm.group(0).strip()
+            break
+    return f"{fn} :: {decl}" if fn else decl
 
 for f in rs_files():
     try:
@@ -338,7 +365,8 @@ for f in rs_files():
         if not nonlit:
             add(f, idx, "R1",
                 f"`pub {name}` 疑似结论型字段，但**只有布尔字面量赋值**"
-                f"（L{','.join(str(x) for x in assigns[:4])}）⇒ 疑为硬编码结论")
+                f"（L{','.join(str(x) for x in assigns[:4])}）⇒ 疑为硬编码结论",
+                _anchor_of(f, idx))
 
     # ── R2 伪探测：fn detect/probe/measure 内零系统调用 ──
     # 先定位 impl/trait 块上下文：⛔ **trait 方法声明**（`fn probe(&self) -> X;`）
@@ -497,7 +525,8 @@ for f in rs_files():
                 continue
             add(f, line_no, "R3",
                 f"`{m.group(0).rstrip('(')}` 被传入 {len(bools)} 个布尔字面量"
-                f"（{','.join(bools)}）⇒ 该评分函数的多数「信号」是硬编码")
+                f"（{','.join(bools)}）⇒ 该评分函数的多数「信号」是硬编码",
+                _anchor_of(f, line_no))
 
     # ── R4 无测量证据：*_ok/*_stall/*_cadence 字段但全仓无测量变量 ──
     all_masked_cache = None
@@ -535,9 +564,63 @@ for f in rs_files():
             break
         if has_real:
             continue
+
+        # ⭐ 2026-10-07 **第七轮修正（消费端已修正的豁免）**：
+        #   实测发现 `self_healing.rs:18 is_healthy` 在**我修好消费端之后
+        #   仍被 R4 报出** —— 因为该字段的**赋值形态**确实仍是「仅字面量」
+        #   （生产路径确实没人写它），而门判的是**赋值**。
+        # ⇒ 但门**无法区分**：
+        #    (a) 该字段仍被下游**信任**（真债）
+        #    (b) 该字段已改为「**不被信任**、由真实指标推导」（已修）
+        # ⇒ 判据：若该字段在**生产区**被**读作判据**（出现在 `if`/`.all(`/`.any(`
+        #    等布尔上下文中），则仍被信任 ⇒ 照报；
+        #    若只出现在**注释/文档**里 ⇒ 已不被信任 ⇒ 豁免。
+        # ⚠️ 本仓 `mask_noncode` 已把注释掩成空格 ⇒ 下面的匹配**天然只看代码**。
+        # ⚠️ 探针抓到「豁免过严」：我第一版要求该字段必须**被当作布尔判据**
+        #   消费才豁免，⛔ 但探针注入的 `probe_cadence_ok` 只是「只有字面量赋值、
+        #   无任何读点」—— 那是**更彻底**的债，**更该报**。
+        # ⇒ 正解：豁免条件是「**生产区完全没有读点**」
+        #    （⇒ 它已彻底不被信任），
+        #    而「有读点但只是普通取值」**仍要报**（可能是伪信号）。
+        # ⛔⛔ **第七轮修正的自我推翻**（探针第三次抓到）：
+        #   我曾加「生产区**零读点** ⇒ 该字段已不被信任 ⇒ 豁免」，
+        #   ⛔ 但探针注入的 `probe_cadence_ok` 恰好**零读点** ⇒ 被豁免 ⇒ 探针失败。
+        # ⇒ **判据反了**：零读点 + 仅字面量赋值 = **最彻底**的伪信号
+        #   （连"被信任"的机会都没有），⛔ 恰恰**最该报**。
+        # ⇒ 已**撤回**该豁免。
+        #
+        # ⭐ 但确实存在另一类已修正的情形（`self_healing.is_healthy` /
+        #   `infra_persistence.health_healthy`）：字段**只有字面量赋值**，
+        #   但**消费端已改为由真实指标推导** ⇒ 它已不被信任 ⇒ **应豁免**。
+        # ⇒ 区分判据：看该字段名是否**仍出现在生产区的判定表达式**里
+        #   （`if`/`while`/`.all(`/`.any(`/`.unwrap_or(` 等）。
+        #   ⚠️ 本仓 `mask_noncode` 已把注释掩成空格
+        #   ⇒ 下面的匹配**天然只看代码**，⛔ 不会误判注释里的提及。
+        # ⭐ 区分判据（探针第四次校正后**终于正确**）：
+        #   ① 该字段在生产区**完全无读点** ⇒ 它是**最彻底**的伪信号
+        #      （连"被信任"的机会都没有）⇒ **必报**；
+        #   ② 该字段**有读点**、但读点都在**注释里**（已被 `mask_noncode` 掩掉）
+        #      ⇒ 消费端已改为真实指标 ⇒ **已修正** ⇒ 豁免；
+        #   ③ 该字段**有真实读点**（出现在代码里）⇒ 仍被信任 ⇒ **必报**。
+        # ⛔ 我第一版把 ① 也豁免了（判据反了）⇒ 探针立刻失败。
+        _real_reads = [
+            j2 for j2, l in enumerate(lines_masked, start=1)
+            if j2 != idx
+            and not in_spans(j2, spans, masked)
+            and not re.search(rf"(?<![\w]){re.escape(name)}\s*[:=]", l)
+            and re.search(rf"(?<![\w]){re.escape(name)}\b", l)
+        ]
+        if not _real_reads:
+            add(f, idx, "R4",
+                f"`pub {name}` 读起来像「健康/节律测量」，但**只有字面量赋值**"
+                f" 且**生产区零读点** ⇒ 该维度是恒定假信号且无人消费",
+                _anchor_of(f, idx))
+        # 有真实读点 ⇒ 仍被信任 ⇒ 照报（落回下面原有的 add）
+
         add(f, idx, "R4",
             f"`pub {name}` 读起来像「健康/节律测量」，但只有字面量赋值"
-            f" ⇒ 本仓**无对应测量变量** ⇒ 该维度是恒定假信号")
+            f" ⇒ 本仓**无对应测量变量** ⇒ 该维度是恒定假信号",
+            _anchor_of(f, idx))
 
 findings.sort()
 print(f"  scanned .rs files:              {sum(1 for _ in rs_files())}")
@@ -553,12 +636,13 @@ if BASELINE.exists():
         if line and not line.startswith("#"):
             have.add(line)
 
-cur = {f"{p}:{ln}\t{r}" for p, ln, r, _ in findings}
+cur = {f"{p}\t{r}\t{a}" for p, ln, r, _, a in findings}
 if UPDATE:
     BASELINE.parent.mkdir(parents=True, exist_ok=True)
     with BASELINE.open("w", encoding="utf-8") as fh:
         fh.write("# Fake-signal baseline — 2026-10-07.\n")
-        fh.write("# Ratchet: only NEW findings fail. Format = <path>:<line>\t<RULE>\n")
+        fh.write("# Ratchet: only NEW findings fail.\n")
+        fh.write("# Format = <path>\\t<RULE>\\t<content-anchor>  (⛔ 无行号：插入注释不应使其失效)\n")
         fh.write("# ⛔ Do NOT enlarge this file just to go green.\n")
         for k in sorted(cur):
             fh.write(k + "\n")
@@ -580,8 +664,8 @@ if new:
     for k in new:
         print(f"        + {k}")
     print()
-    for p, ln, r, msg in findings:
-        if f"{p}:{ln}\t{r}" in new:
+    for p, ln, r, msg, a in findings:
+        if f"{p}\t{r}\t{a}" in new:
             print(f"    {p}:{ln}  [{r}]  {msg}")
 else:
     print("  PASS: 0 new finding(s).")

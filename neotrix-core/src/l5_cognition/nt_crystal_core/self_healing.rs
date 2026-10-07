@@ -15,6 +15,21 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModuleHealth {
     pub module_name: String,
+    /// ⛔ **遗留声明字段**（2026-10-07 起**不再被信任**）。
+    ///
+    /// `HealthMonitor::check()` 已改为**由 `error_rate` / `latency_p99_ms` /
+    /// `last_check` 三项真实测量推导** `overall_healthy`，
+    /// ⛔ **不再**读本字段（此前是 `modules.iter().all(|m| m.is_healthy)`）。
+    ///
+    /// ⚠️ 本字段**仅在测试中被赋值**（L370/388/409）⇒ 生产路径无写入者。
+    /// ⛔ 故它是一个**无信息量的声明** ⇒ 任何据此做的判断都是
+    ///    「未经测量的主张」。
+    ///
+    /// ⚠️ **保留**而不删除：它属于对外数据形状（`Serialize`），
+    ///    删除会破坏持久化兼容。⇒ 处置是「**标记为不被信任**」。
+    ///
+    /// ⭐ 判定依据：`check-fake-signal` R4 —— 「只有字面量赋值 + 生产区零读点」
+    ///    ⇒ **该维度是恒定假信号且无人消费**。本字段符合该形态。
     pub is_healthy: bool,
     pub error_rate: f64,
     pub latency_p99_ms: f64,

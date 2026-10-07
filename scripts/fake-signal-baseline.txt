@@ -1,25 +1,26 @@
 # Fake-signal baseline — 2026-10-07.
-# Ratchet: only NEW findings fail. Format = <path>:<line>	<RULE>
+# Ratchet: only NEW findings fail.
+# Format = <path>\t<RULE>\t<content-anchor>  (⛔ 无行号：插入注释不应使其失效)
 # ⛔ Do NOT enlarge this file just to go green.
-crates/neotrix-neobot/src/nt_engine.rs:85	R2
-neotrix-core/src/l1_action/nt_act/nt_act_cleanup/shared.rs:296	R1
-neotrix-core/src/l1_action/nt_core_llm/mod.rs:227	R1
-neotrix-core/src/l1_action/nt_file_ability/visual/visual.rs:127	R1
-neotrix-core/src/l1_action/nt_infra_persistence.rs:17	R4
-neotrix-core/src/l1_action/nt_io/nt_io_inference/apple_silicon.rs:188	R2
-neotrix-core/src/l1_action/nt_io/nt_io_inference/apple_silicon.rs:57	R1
-neotrix-core/src/l1_action/nt_io/nt_io_neocodex/agent/nt_agent_types.rs:23	R1
-neotrix-core/src/l1_action/nt_io/nt_io_provider/routing/provider_swap.rs:16	R1
-neotrix-core/src/l1_action/nt_io/nt_io_provider/routing/provider_swap.rs:16	R4
-neotrix-core/src/l1_action/traits.rs:135	R1
-neotrix-core/src/l3_embodiment/nt_shield/defense/unified_defense.rs:24	R1
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_cortex_sync.rs:150	R1
-neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_cortex_sync.rs:150	R4
-neotrix-core/src/l4_emotion/nt_sim_eval.rs:60	R4
-neotrix-core/src/l5_cognition/nt_cognition_facade.rs:52	R1
-neotrix-core/src/l5_cognition/nt_core/nt_core_parallel/executor.rs:234	R3
-neotrix-core/src/l5_cognition/nt_crystal_core/self_healing.rs:18	R4
-neotrix-core/src/l5_cognition/nt_goal/behavioral_verifier.rs:87	R4
-neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs:1155	R3
-neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs:295	R3
-neotrix-core/src/l6_meta/nt_agents_guard.rs:32	R1
+crates/neotrix-neobot/src/nt_engine.rs	R2	
+neotrix-core/src/l1_action/nt_act/nt_act_cleanup/shared.rs	R1	fn default :: pub safe: bool,
+neotrix-core/src/l1_action/nt_core_llm/mod.rs	R1	fn health :: pub healthy: bool,
+neotrix-core/src/l1_action/nt_file_ability/visual/visual.rs	R1	fn default :: pub extraction_bound_ok: bool,
+neotrix-core/src/l1_action/nt_infra_persistence.rs	R4	pub health_healthy: bool,
+neotrix-core/src/l1_action/nt_io/nt_io_inference/apple_silicon.rs	R1	pub _mlx_available: bool,
+neotrix-core/src/l1_action/nt_io/nt_io_inference/apple_silicon.rs	R2	
+neotrix-core/src/l1_action/nt_io/nt_io_neocodex/agent/nt_agent_types.rs	R1	pub shell_available: bool,
+neotrix-core/src/l1_action/nt_io/nt_io_provider/routing/provider_swap.rs	R1	pub is_healthy: bool,
+neotrix-core/src/l1_action/nt_io/nt_io_provider/routing/provider_swap.rs	R4	pub is_healthy: bool,
+neotrix-core/src/l1_action/traits.rs	R1	fn providers :: pub healthy: bool,
+neotrix-core/src/l3_embodiment/nt_shield/defense/unified_defense.rs	R1	pub is_safe: bool,
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_cortex_sync.rs	R1	pub fn report_lineage :: pub version_ok: bool,
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_cortex_sync.rs	R4	pub fn report_lineage :: pub version_ok: bool,
+neotrix-core/src/l4_emotion/nt_sim_eval.rs	R4	pub fn compute_facts :: pub format_ok: bool,
+neotrix-core/src/l5_cognition/nt_cognition_facade.rs	R1	pub healthy: bool,
+neotrix-core/src/l5_cognition/nt_core/nt_core_parallel/executor.rs	R3	pub fn allocate_todo :: let score = self.score_todo(
+neotrix-core/src/l5_cognition/nt_crystal_core/self_healing.rs	R4	pub is_healthy: bool,
+neotrix-core/src/l5_cognition/nt_goal/behavioral_verifier.rs	R4	fn run_bounded :: pub tests_ok: bool,
+neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs	R3	fn default :: Self::compute(true, false, true, true)
+neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs	R3	pub(crate) fn _recompute_readiness :: let score = _LoopReadyScore::compute(handlers_ok, kb_ok, true, true);
+neotrix-core/src/l6_meta/nt_agents_guard.rs	R1	pub ok: bool,
