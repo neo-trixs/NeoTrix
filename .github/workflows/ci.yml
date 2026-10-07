@@ -422,6 +422,43 @@ jobs:
         run: node scripts/ops/nt_check_trace.mjs
       - name: UI gate — nt_check_bytes (U+FFFD 字节安全)
         run: node scripts/ops/nt_check_bytes.mjs
+
+      # ⭐⭐⭐ 2026-10-07：接上最后 6 道 —— `STATUS.md` §1.5 声称的「11 道门禁」
+      #   至此**全部**在 CI 有执行点。
+      #
+      # # 缺口是怎么来的（实测）
+      #
+      # §1.5 把 11 道门平铺成一句，读起来像「CI 在跑 11 道」。实测
+      # 「.github/workflows/ci.yml 里能 grep 到 run: 行」这一条：
+      #   · 4 道在 CI（上一提交 9b1e741a 接入：layout/interact/trace/bytes）
+      #   · 6 道**零命中** ⇒ 只在本地跑，CI 一次都不会执行
+      #   · 1 道 nt_shot 是截图工具（需传参），本就不是自动门
+      # ⇒ 文档声称的门集与实际执行的门集几乎不相交 —— §4 教训 38 的形状。
+      #
+      # # 这 6 道各管什么（为什么值得占 CI 时间）
+      #
+      #   nt_check_api            契约三方对账（实现/显式拒绝/不做 三态齐全）
+      #   nt_check_status         STATUS.md 的**数字**与实测一致（防文档漂）
+      #   nt_check_upstream_1to1  vendored 前端与上游的差集 = 白名单 + macOS 菜单
+      #   nt_check_ui_calls       界面可达模块里每个 invoke 都有已注册命令
+      #   nt_check_ship_ui        tauri 指向 neobot-ui + 桌宠页在产物里 + 菜单接线
+      #   nt_check_visual         高度链/控件等高/行高下限/列宽上限/无溢出
+      #
+      # ⓘ 全部实测 rc=0；合计约 22s（visual 21s，其余 0-1s）⇒ 时长可忽略。
+      # ⚠️ 6 道里 5 道读 `neobot-ui/dist` ⇒ **必须**排在 `Build frontend` 之后
+      #    （本轮前两个提交刚修的顺序缺陷，见该步骤上的注释）。
+      - name: Gate — nt_check_api (契约三方对账)
+        run: node scripts/ops/nt_check_api.mjs
+      - name: Gate — nt_check_status (文档数字 vs 实测)
+        run: node scripts/ops/nt_check_status.mjs
+      - name: Gate — nt_check_upstream_1to1 (前端差集白名单 + 菜单 chrome)
+        run: node scripts/ops/nt_check_upstream_1to1.mjs
+      - name: Gate — nt_check_ui_calls (每个 invoke 都有已注册命令)
+        run: node scripts/ops/nt_check_ui_calls.mjs
+      - name: Gate — nt_check_ship_ui (交付路径：tauri 指向 + 桌宠页 + 菜单)
+        run: node scripts/ops/nt_check_ship_ui.mjs
+      - name: Gate — nt_check_visual (高度链/等高/行高/列宽/无溢出)
+        run: node scripts/ops/nt_check_visual.mjs
       # ⭐⭐ `neobot-desktop`：本次补的核心。此前 CI 一次都没跑过它，
       #   后果是 2026-10-02 那个 P0（前端载荷键 snake_case vs Tauri camelCase ⇒
       #   **消息从不落库、切会话历史永远空**）能带着「全部 UI 门全绿」活下来。
