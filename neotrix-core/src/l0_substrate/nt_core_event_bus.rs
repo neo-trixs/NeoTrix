@@ -8,7 +8,7 @@
 //!    source identity + timestamp) written *around* `CoreEvent` so the `CoreEvent`
 //!    enum schema is untouched (R-P84). Replay via [`replay`] / [`replay_enveloped`].
 //! 3. Actor runtime — [`ActorMessage`] / [`ActorHandler`] / [`ActorContext`],
-//!    with per-[`LayerId`] subscription helpers.
+//!    with per-[`EventRouteLayer`] subscription helpers.
 //!
 //! Why the consciousness threshold lives *here* (2026-10-03 dependency
 //! inversion, see `LAYER-DEBT-TIERS-2026-10-03.md`): this bus used to read a
@@ -34,7 +34,7 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 //
 // ⭐ 论证（实测消费者分布）：`CONSCIOUSNESS_THRESHOLDS` 共 6 处使用，
 //   其中 L5 用 `warn_quality` / `critical_quality`，而 **L0 只用
-//   `eventbus_critical` 这一个字段** —— ��「事件总线要用的阈值」是**基座自己的
+//   `eventbus_critical` 这一个字段** —— 而「事件总线要用的阈值」是**基座自己的
 //   策略**，把它放在 L5 会让基座必须依赖顶层才能做自己的工作。
 //   ⇒ **谁消费，谁拥有** ⇒ 阈值下沉到 L0，L5 反过来引用它
 //   （L5 → L0 是**合法**方向）。
@@ -277,91 +277,98 @@ pub fn replay_enveloped(path: &PathBuf) -> Vec<EventEnvelope> {
 // This implements the "淋巴循环" (lymphatic circulation) — events flow
 // through all layers so every subsystem has awareness of system-wide state.
 
-/// Layer identifier for event routing
+/// ⭐ Event-bus 层标识（词汇 C，2026-10-07 裁定 T0-4 独立化）。
+///
+/// ⛔ `L1`–`L9` 语义在本枚举里**不对应**目录层
+/// `l0_substrate`…`l6_meta`（词汇 A），也**不对应**
+/// capability-tree 的 12 档（词汇 B）。
+/// 为避免 L-前缀说谎，类型改名 `LayerId`→`EventRouteLayer`，
+/// 变体去掉 `Lx` 前缀；label() 里的 "L1".."L9" 日志标签保留为既有约定。
+/// 见 `docs/architecture/LAYER-VOCAB-MAP-2026-10-07.md`。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LayerId {
-    L1Body,
-    L2World,
-    L3Memory,
-    L4Knowledge,
-    L5Reasoning,
-    L6Self,
-    L7Capability,
-    L8Autonomic,
-    L9Meta,
+pub enum EventRouteLayer {
+    Body,
+    World,
+    Memory,
+    Knowledge,
+    Reasoning,
+    SelfTier,
+    Capability,
+    Autonomic,
+    Meta,
 }
 
-impl LayerId {
+impl EventRouteLayer {
     pub fn label(&self) -> &str {
         match self {
-            LayerId::L1Body => "L1",
-            LayerId::L2World => "L2",
-            LayerId::L3Memory => "L3",
-            LayerId::L4Knowledge => "L4",
-            LayerId::L5Reasoning => "L5",
-            LayerId::L6Self => "L6",
-            LayerId::L7Capability => "L7",
-            LayerId::L8Autonomic => "L8",
-            LayerId::L9Meta => "L9",
+            EventRouteLayer::Body => "L1",
+            EventRouteLayer::World => "L2",
+            EventRouteLayer::Memory => "L3",
+            EventRouteLayer::Knowledge => "L4",
+            EventRouteLayer::Reasoning => "L5",
+            EventRouteLayer::SelfTier => "L6",
+            EventRouteLayer::Capability => "L7",
+            EventRouteLayer::Autonomic => "L8",
+            EventRouteLayer::Meta => "L9",
         }
     }
 }
 
-fn filter_event_for_layer(event: &CoreEvent, layer: LayerId) -> bool {
+fn filter_event_for_layer(event: &CoreEvent, layer: EventRouteLayer) -> bool {
     match (event, layer) {
         // L1 (Body/I-O): task submission, agent feedback, NT-ACT actions, NT-IO events
-        (CoreEvent::TaskSubmitted { .. }, LayerId::L1Body) => true,
-        (CoreEvent::AgentFeedback { .. }, LayerId::L1Body) => true,
-        (CoreEvent::AgentTeam { .. }, LayerId::L1Body) => true,
-        (CoreEvent::ActToolInvocation { .. }, LayerId::L1Body) => true,
-        (CoreEvent::ActGoalProgress { .. }, LayerId::L1Body) => true,
-        (CoreEvent::IoProviderSwitch { .. }, LayerId::L1Body) => true,
-        (CoreEvent::IoRequestError { .. }, LayerId::L1Body) => true,
-        (CoreEvent::DownloadProgress { .. }, LayerId::L1Body) => true,
+        (CoreEvent::TaskSubmitted { .. }, EventRouteLayer::Body) => true,
+        (CoreEvent::AgentFeedback { .. }, EventRouteLayer::Body) => true,
+        (CoreEvent::AgentTeam { .. }, EventRouteLayer::Body) => true,
+        (CoreEvent::ActToolInvocation { .. }, EventRouteLayer::Body) => true,
+        (CoreEvent::ActGoalProgress { .. }, EventRouteLayer::Body) => true,
+        (CoreEvent::IoProviderSwitch { .. }, EventRouteLayer::Body) => true,
+        (CoreEvent::IoRequestError { .. }, EventRouteLayer::Body) => true,
+        (CoreEvent::DownloadProgress { .. }, EventRouteLayer::Body) => true,
         // L2 (World): external rewards, NT-WORLD crawl/fetch events
-        (CoreEvent::ExternalReward { .. }, LayerId::L2World) => true,
-        (CoreEvent::WorldCrawlCompleted { .. }, LayerId::L2World) => true,
-        (CoreEvent::WorldFetchError { .. }, LayerId::L2World) => true,
+        (CoreEvent::ExternalReward { .. }, EventRouteLayer::World) => true,
+        (CoreEvent::WorldCrawlCompleted { .. }, EventRouteLayer::World) => true,
+        (CoreEvent::WorldFetchError { .. }, EventRouteLayer::World) => true,
         // L3 (Memory): goal completion, budget, NT-MEMORY kb events
-        (CoreEvent::GoalCompleted { .. }, LayerId::L3Memory) => true,
-        (CoreEvent::BudgetExceeded { .. }, LayerId::L3Memory) => true,
-        (CoreEvent::MemoryKbWrite { .. }, LayerId::L3Memory) => true,
-        (CoreEvent::MemoryKbQuery { .. }, LayerId::L3Memory) => true,
+        (CoreEvent::GoalCompleted { .. }, EventRouteLayer::Memory) => true,
+        (CoreEvent::BudgetExceeded { .. }, EventRouteLayer::Memory) => true,
+        (CoreEvent::MemoryKbWrite { .. }, EventRouteLayer::Memory) => true,
+        (CoreEvent::MemoryKbQuery { .. }, EventRouteLayer::Memory) => true,
         // L4 (Knowledge): system errors (data integrity)
-        (CoreEvent::SystemError { component, .. }, LayerId::L4Knowledge) => component.contains("kb") || component.contains("store"),
+        (CoreEvent::SystemError { component, .. }, EventRouteLayer::Knowledge) => component.contains("kb") || component.contains("store"),
         // L5 (Reasoning): all events relevant to reasoning, NT-MIND events
-        (CoreEvent::TaskSubmitted { .. }, LayerId::L5Reasoning) => true,
-        (CoreEvent::GoalCompleted { .. }, LayerId::L5Reasoning) => true,
-        (CoreEvent::ExternalReward { .. }, LayerId::L5Reasoning) => true,
-        (CoreEvent::MindSealIteration { .. }, LayerId::L5Reasoning) => true,
-        (CoreEvent::MindDistillation { .. }, LayerId::L5Reasoning) => true,
-        (CoreEvent::GameTrainingUpdate { .. }, LayerId::L5Reasoning) => true,
-        (CoreEvent::GameConsciousnessFeedback { .. }, LayerId::L5Reasoning) => true,
+        (CoreEvent::TaskSubmitted { .. }, EventRouteLayer::Reasoning) => true,
+        (CoreEvent::GoalCompleted { .. }, EventRouteLayer::Reasoning) => true,
+        (CoreEvent::ExternalReward { .. }, EventRouteLayer::Reasoning) => true,
+        (CoreEvent::MindSealIteration { .. }, EventRouteLayer::Reasoning) => true,
+        (CoreEvent::MindDistillation { .. }, EventRouteLayer::Reasoning) => true,
+        (CoreEvent::GameTrainingUpdate { .. }, EventRouteLayer::Reasoning) => true,
+        (CoreEvent::GameConsciousnessFeedback { .. }, EventRouteLayer::Reasoning) => true,
         // L6 (Self): meta-cognitive events, NT-CORE consciousness events
-        (CoreEvent::AgentFeedback { .. }, LayerId::L6Self) => true,
-        (CoreEvent::GoalCompleted { .. }, LayerId::L6Self) => true,
-        (CoreEvent::ConsciousnessShift { .. }, LayerId::L6Self) => true,
-        (CoreEvent::ConsciousnessCritique { .. }, LayerId::L6Self) => true,
+        (CoreEvent::AgentFeedback { .. }, EventRouteLayer::SelfTier) => true,
+        (CoreEvent::GoalCompleted { .. }, EventRouteLayer::SelfTier) => true,
+        (CoreEvent::ConsciousnessShift { .. }, EventRouteLayer::SelfTier) => true,
+        (CoreEvent::ConsciousnessCritique { .. }, EventRouteLayer::SelfTier) => true,
         // L7 (Capability): agent team events
-        (CoreEvent::AgentTeam { .. }, LayerId::L7Capability) => true,
+        (CoreEvent::AgentTeam { .. }, EventRouteLayer::Capability) => true,
         // L8 (Autonomic): system errors, global halt, NT-SHIELD security events
-        (CoreEvent::SystemError { .. }, LayerId::L8Autonomic) => true,
-        (CoreEvent::GlobalHalt { .. }, LayerId::L8Autonomic) => true,
-        (CoreEvent::BudgetExceeded { .. }, LayerId::L8Autonomic) => true,
-        (CoreEvent::ShieldIntrusionDetected { .. }, LayerId::L8Autonomic) => true,
-        (CoreEvent::ShieldAuditCompleted { .. }, LayerId::L8Autonomic) => true,
+        (CoreEvent::SystemError { .. }, EventRouteLayer::Autonomic) => true,
+        (CoreEvent::GlobalHalt { .. }, EventRouteLayer::Autonomic) => true,
+        (CoreEvent::BudgetExceeded { .. }, EventRouteLayer::Autonomic) => true,
+        (CoreEvent::ShieldIntrusionDetected { .. }, EventRouteLayer::Autonomic) => true,
+        (CoreEvent::ShieldAuditCompleted { .. }, EventRouteLayer::Autonomic) => true,
         // L9 (Meta): all critical events, NT-CORE boot
-        (CoreEvent::GlobalHalt { .. }, LayerId::L9Meta) => true,
-        (CoreEvent::SystemError { severity, .. }, LayerId::L9Meta) => severity == "critical",
-        (CoreEvent::CoreBootStarted { .. }, LayerId::L9Meta) => true,
-        (CoreEvent::ConsciousnessShift { .. }, LayerId::L9Meta) => true,
+        (CoreEvent::GlobalHalt { .. }, EventRouteLayer::Meta) => true,
+        (CoreEvent::SystemError { severity, .. }, EventRouteLayer::Meta) => severity == "critical",
+        (CoreEvent::CoreBootStarted { .. }, EventRouteLayer::Meta) => true,
+        (CoreEvent::ConsciousnessShift { .. }, EventRouteLayer::Meta) => true,
         _ => false,
     }
 }
 
 /// Register a subscriber for a specific layer.
 /// Returns the tokio task handle so the caller can keep it alive.
-pub fn subscribe_layer(bus: &EventBus, layer: LayerId) -> tokio::task::JoinHandle<()> {
+pub fn subscribe_layer(bus: &EventBus, layer: EventRouteLayer) -> tokio::task::JoinHandle<()> {
     let mut rx = bus.subscribe();
     let layer_label = layer.label().to_string();
     tokio::spawn(async move {
@@ -405,15 +412,15 @@ pub fn subscribe_layer(bus: &EventBus, layer: LayerId) -> tokio::task::JoinHandl
 /// Returns handles so the caller can keep them alive for the process lifetime.
 pub fn subscribe_all_layers(bus: &EventBus) -> Vec<tokio::task::JoinHandle<()>> {
     vec![
-        subscribe_layer(bus, LayerId::L1Body),
-        subscribe_layer(bus, LayerId::L2World),
-        subscribe_layer(bus, LayerId::L3Memory),
-        subscribe_layer(bus, LayerId::L4Knowledge),
-        subscribe_layer(bus, LayerId::L5Reasoning),
-        subscribe_layer(bus, LayerId::L6Self),
-        subscribe_layer(bus, LayerId::L7Capability),
-        subscribe_layer(bus, LayerId::L8Autonomic),
-        subscribe_layer(bus, LayerId::L9Meta),
+        subscribe_layer(bus, EventRouteLayer::Body),
+        subscribe_layer(bus, EventRouteLayer::World),
+        subscribe_layer(bus, EventRouteLayer::Memory),
+        subscribe_layer(bus, EventRouteLayer::Knowledge),
+        subscribe_layer(bus, EventRouteLayer::Reasoning),
+        subscribe_layer(bus, EventRouteLayer::SelfTier),
+        subscribe_layer(bus, EventRouteLayer::Capability),
+        subscribe_layer(bus, EventRouteLayer::Autonomic),
+        subscribe_layer(bus, EventRouteLayer::Meta),
     ]
 }
 
@@ -422,9 +429,9 @@ pub fn subscribe_all_layers(bus: &EventBus) -> Vec<tokio::task::JoinHandle<()>> 
 /// shutdown flag and exit cleanly when `EventBus::shutdown()` is called.
 pub fn subscribe_all_layers_sync(bus: &EventBus) {
     let layers = [
-        LayerId::L1Body, LayerId::L2World, LayerId::L3Memory,
-        LayerId::L4Knowledge, LayerId::L5Reasoning, LayerId::L6Self,
-        LayerId::L7Capability, LayerId::L8Autonomic, LayerId::L9Meta,
+        EventRouteLayer::Body, EventRouteLayer::World, EventRouteLayer::Memory,
+        EventRouteLayer::Knowledge, EventRouteLayer::Reasoning, EventRouteLayer::SelfTier,
+        EventRouteLayer::Capability, EventRouteLayer::Autonomic, EventRouteLayer::Meta,
     ];
     let handles: Vec<_> = layers.into_iter().map(|layer| {
         let mut rx = bus.subscribe();
@@ -633,18 +640,18 @@ mod tests {
     fn test_layer_filter() {
         // L1Body should accept TaskSubmitted
         let e = CoreEvent::TaskSubmitted { task: "t".into(), task_type: "g".into(), priority: 1 };
-        assert!(filter_event_for_layer(&e, LayerId::L1Body));
-        assert!(!filter_event_for_layer(&e, LayerId::L4Knowledge));
+        assert!(filter_event_for_layer(&e, EventRouteLayer::Body));
+        assert!(!filter_event_for_layer(&e, EventRouteLayer::Knowledge));
         // L2World should accept ExternalReward
         let e2 = CoreEvent::ExternalReward { reward: 1.0, source: "env".into() };
-        assert!(filter_event_for_layer(&e2, LayerId::L2World));
-        assert!(!filter_event_for_layer(&e2, LayerId::L1Body));
+        assert!(filter_event_for_layer(&e2, EventRouteLayer::World));
+        assert!(!filter_event_for_layer(&e2, EventRouteLayer::Body));
         // L8Autonomic should accept SystemError
         let e3 = CoreEvent::SystemError { component: "db".into(), error: "timeout".into(), severity: "critical".into() };
-        assert!(filter_event_for_layer(&e3, LayerId::L8Autonomic));
+        assert!(filter_event_for_layer(&e3, EventRouteLayer::Autonomic));
         // L9Meta should accept only critical severity
         let e4 = CoreEvent::SystemError { component: "db".into(), error: "warn".into(), severity: "warning".into() };
-        assert!(!filter_event_for_layer(&e4, LayerId::L9Meta));
+        assert!(!filter_event_for_layer(&e4, EventRouteLayer::Meta));
     }
 
     #[test]
