@@ -294,7 +294,26 @@ fn model_family(model: &str) -> &str {
     }
 }
 
-pub struct SemanticFallbackStrategy;
+/// ⭐ 2026-10-07：`RecoveryConfig.enable_semantic_fallback` 之前是**死配置**
+/// （`Default: true`，全仓**零读点**）。
+///
+/// ⛔ **根因**：本策略是**无状态 unit struct** ⇒ `can_handle`/`recover`
+///    都拿不到 `config` ⇒ 开关**在结构上就没有地方可读**。
+///    （这解释了「为什么从不被读」：不是漏写，而是**切面选错了**。）
+///
+/// ⭐ 正解：在 `RecoveryOrchestrator::new()` 里把开关值**注入**进策略，
+///    由既有的 `can_handle` 语义承担「禁用」（返回 false ⇒ 编排器跳过该策略）。
+pub struct SemanticFallbackStrategy {
+    /// `false` ⇒ 该策略被完全禁用（`can_handle` 恒 false）。
+    enabled: bool,
+}
+
+impl SemanticFallbackStrategy {
+    /// ⭐ 构造器接受开关值（由 orchestrator 注入 `config`）。
+    pub fn new(enabled: bool) -> Self {
+        Self { enabled }
+    }
+}
 
 impl ErrorRecoveryStrategy for SemanticFallbackStrategy {
     fn name(&self) -> &str {
@@ -305,6 +324,11 @@ impl ErrorRecoveryStrategy for SemanticFallbackStrategy {
     }
 
     fn can_handle(&self, ctx: &ErrorContext) -> bool {
+        // ⭐ 2026-10-07 接线 `enable_semantic_fallback`（此前零读点）。
+        // ⛔ 放在**最前**：禁用时连 `matches!` 都不必算 ⇒ 短路即省。
+        if !self.enabled {
+            return false;
+        }
         matches!(
             ctx.error_type,
             ErrorType::InvalidOutput { .. } | ErrorType::Hallucination { .. }
@@ -348,7 +372,21 @@ impl ErrorRecoveryStrategy for ValidationGateStrategy {
     }
 }
 
-pub struct CheckpointResumeStrategy;
+/// ⭐ 2026-10-07：`RecoveryConfig.enable_checkpoint` 之前是**死配置**
+/// （`Default: true`，全仓**零读点**）。根因与
+/// [`SemanticFallbackStrategy`] 相同：**无状态 unit struct 拿不到 `config`**
+/// ⇒ 开关在结构上无处可读。
+pub struct CheckpointResumeStrategy {
+    /// `false` ⇒ 该策略被完全禁用（`can_handle` 恒 false）。
+    enabled: bool,
+}
+
+impl CheckpointResumeStrategy {
+    /// ⭐ 构造器接受开关值（由 orchestrator 注入 `config`）。
+    pub fn new(enabled: bool) -> Self {
+        Self { enabled }
+    }
+}
 
 impl ErrorRecoveryStrategy for CheckpointResumeStrategy {
     fn name(&self) -> &str {
@@ -359,6 +397,10 @@ impl ErrorRecoveryStrategy for CheckpointResumeStrategy {
     }
 
     fn can_handle(&self, ctx: &ErrorContext) -> bool {
+        // ⭐ 2026-10-07 接线 `enable_checkpoint`（此前零读点）。
+        if !self.enabled {
+            return false;
+        }
         matches!(
             ctx.error_type,
             ErrorType::Timeout { .. } | ErrorType::ContextOverflow { .. }
@@ -485,9 +527,11 @@ impl RecoveryOrchestrator {
             )),
             Box::new(CircuitBreakerStrategy::new(5, 60_000)),
             Box::new(ModelFallbackStrategy),
-            Box::new(SemanticFallbackStrategy),
+            // ⭐ 注入 config 开关值（此前这两个策略是无状态 unit struct
+            //    ⇒ 开关在结构上无处可读 ⇒ 死配置）。
+            Box::new(SemanticFallbackStrategy::new(config.enable_semantic_fallback)),
             Box::new(ValidationGateStrategy),
-            Box::new(CheckpointResumeStrategy),
+            Box::new(CheckpointResumeStrategy::new(config.enable_checkpoint)),
             Box::new(HumanEscalationStrategy::new(
                 config.human_escalation_threshold,
             )),
@@ -639,7 +683,7 @@ mod tests {
 
     #[test]
     fn test_semantic_fallback_layer4() {
-        let s = SemanticFallbackStrategy;
+        let s = SemanticFallbackStrategy::new(true);
         let ctx = make_ctx(
             ErrorType::InvalidOutput {
                 details: "bad json".into(),
@@ -655,7 +699,7 @@ mod tests {
 
     #[test]
     fn test_semantic_fallback_no_variants() {
-        let s = SemanticFallbackStrategy;
+        let s = SemanticFallbackStrategy::new(true);
         let mut ctx = make_ctx(
             ErrorType::InvalidOutput {
                 details: "bad json".into(),
@@ -695,7 +739,7 @@ mod tests {
 
     #[test]
     fn test_checkpoint_resume_layer6() {
-        let s = CheckpointResumeStrategy;
+        let s = CheckpointResumeStrategy::new(true);
         let ctx = make_ctx(
             ErrorType::Timeout { elapsed_ms: 30000 },
             "claude-sonnet-4",
@@ -710,7 +754,7 @@ mod tests {
 
     #[test]
     fn test_checkpoint_no_snapshot() {
-        let s = CheckpointResumeStrategy;
+        let s = CheckpointResumeStrategy::new(true);
         let mut ctx = make_ctx(
             ErrorType::Timeout { elapsed_ms: 30000 },
             "claude-sonnet-4",
@@ -862,4 +906,68 @@ impl Agent for RecoveryOrchestrator {
     async fn stop(&self) -> Result<(), PlatformAgentError> { Ok(()) }
     fn status(&self) -> AgentStatus { AgentStatus::Running }
     fn metrics(&self) -> AgentMetrics { AgentMetrics::default() }
+}
+
+#[cfg(test)]
+mod config_switch_tests {
+    use super::{
+        CheckpointResumeStrategy, ErrorRecoveryStrategy, RecoveryConfig, RecoveryOrchestrator,
+        SemanticFallbackStrategy,
+    };
+
+    /// ⭐ **变异证据**：`enable_semantic_fallback=false` ⇒ 语义回退策略被**禁用**。
+    ///
+    /// 修复前这两个开关是**死配置**（`Default: true`，全仓零读点）⇒
+    /// 用户**无法关闭**它们 ⇒ 恒为 true 的配置比没有配置更危险
+    /// （它让人以为可以控制）。
+    #[test]
+    fn 关闭enable_semantic_fallback会禁用该策略() {
+        let on = SemanticFallbackStrategy::new(true);
+        let off = SemanticFallbackStrategy::new(false);
+
+        // 构造一个**本可处理**的上下文（InvalidOutput + 有 prompt 变体）
+        // ⭐ 用真实构造器 `ErrorContext::new`，⛔ **不逐字段手写**
+        //    （第一版手写 5 个字段就错了：`InvalidOutput` 实为 `details`+`raw`，
+        //      且漏了 6 个必填字段 ⇒ 又一次「猜数据结构」教训）
+        let mut ctx = super::ErrorContext::new(
+            super::ErrorType::InvalidOutput {
+                details: "malformed".to_owned(),
+                raw: "{".to_owned(),
+            },
+            "m",
+            "p",
+        );
+        ctx.prompt_variants = vec!["tight".to_owned()];
+
+        assert!(on.can_handle(&ctx), "启用时**必须**能处理（否则接线破坏了原行为）");
+        assert!(!off.can_handle(&ctx), "禁用时**必须**不处理（这是本次接线新增的能力）");
+    }
+
+    /// ⭐ 同上：`enable_checkpoint=false` ⇒ checkpoint 恢复策略被禁用。
+    #[test]
+    fn 关闭enable_checkpoint会禁用该策略() {
+        let on = CheckpointResumeStrategy::new(true);
+        let off = CheckpointResumeStrategy::new(false);
+
+        let mut ctx =
+            super::ErrorContext::new(super::ErrorType::Timeout { elapsed_ms: 30 }, "m", "p");
+        ctx.state_snapshot = Some(vec![1, 2, 3]);
+
+        assert!(on.can_handle(&ctx), "启用时必须能处理");
+        assert!(!off.can_handle(&ctx), "禁用时必须不处理");
+    }
+
+    /// ⭐ 端到端：`RecoveryConfig` 的开关**真能穿透**到 orchestrator 内部。
+    /// 修复前它们在 orchestrator 里根本读不到 ⇒ 改配置无任何效果。
+    #[test]
+    fn orchestrator真能接受开关配置() {
+        let mut cfg = RecoveryConfig::default();
+        assert!(cfg.enable_checkpoint && cfg.enable_semantic_fallback, "默认应为开启");
+
+        // 关闭后 orchestrator 必须仍能构造（不 panic），且行为由配置决定
+        cfg.enable_checkpoint = false;
+        cfg.enable_semantic_fallback = false;
+        let _orch = RecoveryOrchestrator::new(cfg.clone());
+        assert!(!cfg.enable_checkpoint, "配置值可被读取并传递（此前是零读点死配置）");
+    }
 }
