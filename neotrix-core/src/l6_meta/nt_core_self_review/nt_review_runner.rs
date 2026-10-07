@@ -421,6 +421,9 @@ impl SelfReviewGate {
     fn check_architecture_layer_depth(&mut self) {
         let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
         let mut violations = 0usize;
+        // 2026-10-07（裁定 5C）：`classified` 只为报告层诚实性服务 —— 区分
+        // "检了 N 个文件、发现 0 个违规" 与 "一个文件都没检到"。
+        let mut classified = 0usize;
         if let Ok(entries) = std::fs::read_dir(&src_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -431,6 +434,7 @@ impl SelfReviewGate {
                 if source_layer.layer_index() < 0 {
                     continue;
                 }
+                classified += 1;
                 if let Ok(content) = read_source_cached(&path) {
                     for line in content.lines() {
                         if line.starts_with("use crate::") {
@@ -445,9 +449,50 @@ impl SelfReviewGate {
                 }
             }
         }
+        // ⛔ 2026-10-07 裁定 5C：只修**报告层**，不修判定层。
+        //
+        // 缺陷（已实测）：`read_dir` 后 `if ext != "rs" { continue }`（:424-428）
+        // **把目录本身跳过了** ⇒ `l0_substrate/`…`l6_meta/` 这些层目录从不进入；
+        // 剩下的顶层 `.rs` 又全不匹配 `ArchLayer::from_path` 的模式
+        // （`l0_core`/`l1_body`/`l8_seal` 等目录名**在本仓不存在**）
+        // ⇒ 可分类文件实测 = **0**，`violations` 恒为 0。
+        //
+        // ⛔ 原实现报 `Architecture depth: 0 reverse-layer imports` —— 一句
+        // **读起来像绿灯的谎**（它实际什么都没检）。这就是 D-16/L8 说的
+        // "报 PASS 却结构上不可能失败"。
+        //
+        // 本步只让它**诚实**：检到 0 个可分类文件时明说，并降级为 Info。
+        // ⛔ **不递归、不改模式** —— 那会立刻冒出上百个待裁决的真实问题，
+        // 而当前还没有可信的其他门（roadmap 1A 未落地）⇒ 先止血说谎，
+        // 再谈判定。递归改造属裁定 5A，排在 1A 之后。
+        if classified == 0 {
+            // ⛔ 用 `false` 而非 `true`：`check()` 只在 `!condition` 时把 finding
+            // 入库（:73-74），所以传 `true` 等于**什么都不报** ——
+            // 那正是原缺陷（报一句像绿灯的谎）。此处要的是**让诚实声明出现在报告里**，
+            // 故传 `false` + `Severity::Info`：它会成为一个 Info 级 finding，
+            // 不算失败（`passed + failed + warnings <= findings` 的不变量仍成立），
+            // 但读报告的人**看得见「这一项没检」**。
+            self.check(
+                false,
+                Severity::Info,
+                "arch_depth",
+                concat!(
+                    "Architecture depth: NOT CHECKED — 0 classifiable files. ",
+                    "The layer-name patterns in ArchLayer::from_path match no directory ",
+                    "that exists in this repo (l0_core/l1_body/l8_seal etc.), and ",
+                    "read_dir skips directories. This check is structurally unable to fail. ",
+                    "See roadmap 5C (report-layer fix only); 5A (real recursion + pattern ",
+                    "remap) is deferred until 1A gives us trustworthy gates.",
+                )
+                .to_string(),
+                file!(),
+                line!(),
+            );
+            return;
+        }
         let msg = format!(
-            "Architecture depth: {} reverse-layer imports (higher layer importing from lower)",
-            violations
+            "Architecture depth: {violations} reverse-layer imports \
+             (higher layer importing from lower), across {classified} classifiable files"
         );
         self.check(
             violations == 0,
