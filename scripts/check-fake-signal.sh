@@ -421,12 +421,49 @@ for f in rs_files():
             r"TcpStream::|UdpSocket::|\.request\s*\(|\.send\s*\(|\.call\s*\(|"
             r"http[s]?://"
         )
-        if not SYS_PROBE.search(body) and not RE_INDIRECT.search(body):
-            line_no = masked[:m.start()].count("\n") + 1
-            add(f, line_no, "R2",
-                f"`{m.group(1)}()` 函数体内**零系统调用标记**"
-                f"（sysctl/Command::/proc/cpuid/target_os/uname/std::fs 全无）"
-                f"⇒ 疑为「伪探测」")
+        # ⭐ 2026-10-07 **第六轮修正（R2 的语义边界）**：
+        #   `nt_core_paradigm.rs:38 detect()` 判 R2 是**误报** ——
+        #   它检测的是**内部异常集合**（`self.anomalies` 的 domain 多样性），
+        #   ⛔ **不涉及硬件/环境** ⇒ 本就不该调系统调用。
+        #
+        # ⇒ R2 的真实语义是「**声称探测外部环境，却从不探测外部**」。
+        # ⇒ 故必须排除「检测对象完全来自自身状态」的形态：
+        #    函数体只读 `self.<字段>`、零外部调用 ⇒ 它检测的是内部状态。
+        # ⭐⭐ **豁免的两条必要条件**（探针抓到的「豁免过头」）：
+        #   ① 函数体**读了 `self.` 的内部状态**（⇒ 检测对象在自身），
+        #   ② 且**返回值依赖那些状态**（⛔ 不是恒定字面量）。
+        #
+        #   ⛔ 只满足 ① **不**够：探针注入的
+        #      `probe_environment() -> String { "pretend-detected" }`
+        #      不读 `self`，但它**返回恒定字面量**
+        #      ⇒ 那是**真伪探测**（名字叫 probe、结果与实际无关）。
+        #   ⛔ 恒定字面量返回 ⇒ **永远**不是探测，无论它读没读 self。
+        RE_INTERNAL_ONLY = re.compile(r"self\.[a-z_][a-z0-9_]*")
+        #   ⛔ 正解：判「整个函数体**剥掉花括号后就是**一个字符串字面量」。
+        #   ⚠️ 我第一版用 `$` + MULTILINE 匹配「某行结尾的字面量」
+        #      ⇒ 会命中**函数体里任意一行**的字符串
+        #      ⇒ 连 `let a = self.foo(); "r"` 这种**真探测**都被误豁免。
+        _inner = body.strip().lstrip("{").rstrip("}").strip()
+        RE_CONST_RETURN = re.compile(
+            r'^(?:Ok\s*\(\s*)?(?:"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')\s*\)?$'
+        )
+        _is_const_return = bool(RE_CONST_RETURN.match(_inner))
+        # ⛔⛔ **必要条件**（2026-10-07 修正：我在加豁免时**误删**了这一行，
+        #   导致 telegram/llama/cloud_evade/http_engine 四处**真探测**
+        #   重新涌入 —— 它们分别走 HTTP、available_parallelism、
+        #   check_environment()、ureq ⇒ 都由 SYS_PROBE/RE_INDIRECT 覆盖）。
+        # ⇒ 判据必须是「必要条件 AND NOT 豁免」。
+        if SYS_PROBE.search(body) or RE_INDIRECT.search(body):
+            continue        # ✅ 真探测（系统调用 / HTTP / 间接调用）
+        if (RE_INTERNAL_ONLY.search(body)
+                and not _is_const_return):
+            continue        # ✅ 内部状态检测且返回值依赖它
+        # 走到这里 = 零外部证据 ⇒ 疑为伪探测（含恒定字面量返回）
+        line_no = masked[:m.start()].count("\n") + 1
+        add(f, line_no, "R2",
+            f"`{m.group(1)}()` 函数体内**零系统调用标记**"
+            f"（sysctl/Command::/proc/cpuid/target_os/uname/std::fs 全无）"
+            f"⇒ 疑为「伪探测」")
 
     # ── R3 字面量实参：加权/评分函数被传入布尔字面量 ──
     for m in re.finditer(r"\b(?:compute|score|grade|rate|readiness|health)\w*\s*\(", masked):
