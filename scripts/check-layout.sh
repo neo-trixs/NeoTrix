@@ -24,6 +24,9 @@
 # ④ **与 DOCUMENTATION-MAP.md 交叉校验**：两边清单不一致就红
 #    —— 防止「规范腐化」本身（规范失真比没有规范更贵）
 #
+# ⑤ **gitignore 过滤**：`git check-ignore` 判为忽略的项不计入违规
+#    （完整口径见下方 is_git_ignored）—— 但仍单列报告，不隐藏视野。
+#
 # ## ⛔ 为什么不一上来就阻断
 #
 # 本仓已有既存违反（`neotrix-core/docs/plans/` 5 个文件正是
@@ -49,7 +52,7 @@ for arg in "$@"; do
   case "$arg" in
     --strict) STRICT=1 ;;
     --update-baseline) UPDATE=1 ;;
-    -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
     *) echo "unknown arg: $arg" >&2; exit 2 ;;
   esac
 done
@@ -118,12 +121,65 @@ evals|数据|gaia_mini 评测任务与基线（tracked=0）
   #   src-tauri/ 仍在归档区未回流 ⇒ 本表对其保持空。
 RESIDUAL_KNOWN=""
 
+# ── 门只管「版本控制管的东西」（2026-10-07 定）─────────────────────
+# 实测误报：根目录 `notes/` 被 `.gitignore:20`（首版提交即存在的规则）
+# 明确忽略、`git ls-files notes` = 0 tracked，门却按**文件系统**扫描
+# 把它算成「新增违规」，`--strict` 恒红。而仓库自己的台账已判定
+# 「工作区产物 ⛔ 非代码缺陷」（DEBT-LEDGER-2026-10-07.md）。
+# ⇒ 恒红的门比没有门更坏（同文件 :30-31）。错的是门，不是 notes/。
+#
+# ⛔ 口径（为什么不反过来「把 notes/ 记账成债」）：本门约束的是
+# **入库物**（DOCUMENTATION-MAP:39「根目录禁止放会话笔记/分析报告」
+# 的真实意图 = 别让评审/PR 里出现这种东西）。`.gitignore` 已经
+# 声明「此处 git 不管」，把 git 拒绝管辖的目录判成布局违规，
+# 语义是错的：账本棘轮会把「工作区垃圾」永久记成「布局债」。
+# 同仓 `check-untracked-assets.sh` 用的就是
+# `git ls-files --others --exclude-standard`（= 排除 gitignore），
+# 本门与之口径一致，不是新发明。
+#
+# ⚠️ 本门因此**看不见**这一手：「新建根目录 + 同一提交把它写进
+# .gitignore」⇒ 两者都 git 不管 ⇒ 不报。诚实的说法是：那笔
+# .gitignore 改动是 **tracked 文件**，必进 PR diff 由人眼/评审拦，
+# 本门把该判据交给 git diff，而不是凭空再造一道新门（新依赖）。
+# ⚠️ 反向也一样：tracked 的东西绝不会被本过滤放过 ——
+# `git check-ignore` 默认**读索引**，已入库路径恒返非 0。实测 2026-10-07：
+# 把 README.md 显式写进 .git/info/exclude 后 `check-ignore README.md`
+# 仍 rc=1 ⇒ 「先入库再 gitignore」骗不过本门（它靠索引而非只看规则）。
+is_git_ignored() {
+  # 非 0 = 「不管」。仓库外调用 git 返 128，同样落到「不管」之外
+  # ⇒ 退化成改动前的全量扫描（fail-safe：新东西照样被拦）。
+  git check-ignore -q -- "$1"
+}
+
 # ── 收集现状（只取 git 跟踪的 + 未跟踪但存在的一级项）──────────────
 CUR=$(mktemp); trap 'rm -f "$CUR"' EXIT
+IGN=""   # 被 gitignore 排除的项（单列报告，不隐藏）
 
 # 根目录文件：跟踪的 ∪ 未跟踪但存在的
+#
+# ⛔⛔⛔ **盲区：dotfile / dot-directory 完全扫不到**（2026-10-07 记录，未修）
+#
+# `for f in *` 在 bash 里**不匹配以点开头的项** ⇒ 本门只审「非 dot 的根项」。
+# 实测：仓库根有 11 个非忽略 dot 项，**一个都进不了本门视野**：
+#   .blueprint .cargo .git .githooks .github .gitignore .neotrix
+#   .neotrix-absorb .npmrc .opencode
+# （另有 .cache / .project-map / .worktrees 已被 gitignore，同样扫不到。）
+#
+# ⓘ 也就是说：**在根目录新建一个 `.随便什么` 目录/文件，本门永远不报。**
+#   —— 本门不是「本仓根目录干净」的证明。
+#
+# ⛔ 为什么**本轮不修**：让它扫 dot 项需要先答一个政策问题 ——
+#   「根目录 dot 项里哪些是合规的」。上面 11 个全是合法工具/配置目录，
+#   若逐个塞进 ALLOW_FILES，白名单就从「违规清单」退化成「现状快照」，
+#   下一个人加新工具时会照着塞 ⇒ 门彻底失去约束力
+#   （与 `--nb-side-w` 声明了却零消费、`--nb-col-w` 同类问题）。
+#   ⛔ 这是**需要人裁决**的事，不是 agent 该替他定的。
+#   ⇒ 处置：先记录，等裁决。裁决方向二选一：
+#     ① 显式白名单「根目录允许存在的 dot 工具项」（须写理由，禁无脑追加）
+#     ② 判据改为「非 dot 根项 + 明确禁止的新增 dot 项」，即只拦增量不枚举存量
 for f in *; do
   [ -f "$f" ] || continue
+  if is_git_ignored "$f"; then IGN="$IGN$f"$'\n'; continue; fi
   echo "$f" >> "$CUR"
 done
 # 根目录目录：排除 .git
@@ -131,6 +187,7 @@ for d in */ .*/; do
   d="${d%/}"
   [ "$d" = ".git" ] || [ "$d" = "." ] || [ "$d" = ".." ] && continue
   [ -d "$d" ] || continue
+  if is_git_ignored "$d"; then IGN="$IGN$d/"$'\n'; continue; fi
   echo "$d/" >> "$CUR"
 done
 sort -u "$CUR" -o "$CUR"
@@ -163,7 +220,14 @@ if [ -d neotrix-core/docs ]; then
     base="${f##*/}"
     case "$base" in
       [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_*) ;;   # YYYY-MM-DD_ 前缀
-      *) DOCSVIOL="$DOCSVIOL  neotrix-core/docs/$f"$'\n' ;;
+      *)
+        # 同口径：gitignore 的文件不在本门辖区（探针只对**候选**跑，
+        # 合规日期前缀零开销 ⇒ 不给门加常态性能债）。
+        if is_git_ignored "neotrix-core/docs/$f"; then
+          IGN="${IGN}neotrix-core/docs/$f"$'\n'; continue
+        fi
+        DOCSVIOL="$DOCSVIOL  neotrix-core/docs/$f"$'\n'
+        ;;
     esac
   done <<EOF
 $(find neotrix-core/docs -type f 2>/dev/null | sed 's|^neotrix-core/docs/||')
@@ -196,6 +260,33 @@ if [ "$UPDATE" -eq 1 ]; then
 fi
 
 N_VIOL=0; [ -n "$VIOL" ] && N_VIOL=$(printf '%s' "$VIOL" | grep -c .)
+
+# ⭐⭐⭐ 2026-10-07 修 fail-open：账本缺失 ⇒ 棘轮静默失效 ⇒ `--strict` 假绿。
+#
+# # 实测（在隔离副本里，2 个真违规）
+#   有账本 → rc=1 ✅   删掉账本 → **rc=0** ⛔ 即「2 个真违规被判通过」。
+#
+# # 为什么这是 fail-open 而不是「无害降级」
+#
+# 本门的两类判据里，**只有「新增」会判红**（存量一律放过，靠棘轮记账）。
+# ⇒ 账本是新增判据的**唯一依据**；账本没了，`N_NEW` 恒为 0，
+#   `--strict` 就**结构上不可能失败** —— 正是 LESSONS L8 说的
+#   「报 PASS 却结构上不可能失败」，比没有门更危险（它训练人忽略红色）。
+# ⛔ 触发条件现实：账本是 tracked 文件，一次误删/一次 bad merge/一次
+#   `git clean` 之后的 checkout 事故就能造成，**且不会有任何提示**。
+#
+# ✅ 修法：**fail-closed**。`--strict` 下账本缺失 = 门无法履行职责 ⇒ 判红，
+#   并说清怎么补。advisory 模式只警告、不阻断（保持「只跑不判」的用法）。
+if [ ! -f "$BASELINE" ]; then
+  if [ "$STRICT" -eq 1 ]; then
+    echo "FAIL(strict): 账本 $BASELINE 不存在 —— 棘轮无法工作，本门结构上不可能失败。"
+    echo "  ⛔ 不把它当「无存量所以通过」：删掉账本会让**新增判据整体失效**。"
+    echo "  修法：bash scripts/check-layout.sh --update-baseline 重建账本，然后复查账本内容。"
+    exit 1
+  fi
+  echo "⚠ 警告: 账本 $BASELINE 不存在 —— 新增判据当前失效（本门只报存量，不判新增）。"
+fi
+
 N_NEW=0
 if [ -f "$BASELINE" ] && [ "$N_VIOL" -gt 0 ]; then
   N_NEW=$(comm -23 \
@@ -214,9 +305,11 @@ fi
 [ -z "$N_DOCS_NEW" ] && N_DOCS_NEW=0
 N_DOCGAP=0; [ -n "$DOCGAP" ] && N_DOCGAP=$(printf '%s' "$DOCGAP" | grep -c .)
 
+N_IGN=0; [ -n "$IGN" ] && N_IGN=$(printf '%s' "$IGN" | grep -c .)
+
 # ── 报告 ────────────────────────────────────────────────────────
 echo "=== NeoTrix layout check ==="
-echo "根目录项: $(grep -c . "$CUR")   不在白名单: $N_VIOL   其中新增(不在账本): $N_NEW"
+echo "根目录项: $(grep -c . "$CUR")（另 $N_IGN 项 git 不管，见下方单列）   不在白名单: $N_VIOL   其中新增(不在账本): $N_NEW"
 echo "neotrix-core/docs/ 违规: $N_DOCS   其中新增: ${N_DOCS_NEW}"
 echo "规范 vs 现实发散: $N_DOCGAP"
 
@@ -227,6 +320,10 @@ fi
 if [ -n "$KNOWN" ]; then
   echo "--- 已知残留（committed 已移除、磁盘 untracked 残留；处置后从本表删）---"
   printf '%s' "$KNOWN" | sed 's/^/  /'
+fi
+if [ "$N_IGN" -gt 0 ]; then
+  echo "--- git 不管（.gitignore 已声明 ⇒ 非布局违规，列出以免视野被缩）---"
+  printf '%s' "$IGN" | sed 's/^/  /'
 fi
 if [ "$N_DOCS" -gt 0 ]; then
   echo "--- neotrix-core/docs/ 违反 DOCUMENTATION-MAP:81（禁研究笔记）；存量 $N_DOCS / 新增 ${N_DOCS_NEW} ---"
@@ -243,6 +340,7 @@ if [ "$N_NEW" -gt 0 ] || [ "$N_DOCS_NEW" -gt 0 ] || [ "$N_DOCGAP" -gt 0 ]; then
     echo "FAIL(strict): 新增违规 ${N_NEW} / docs 新增违规 ${N_DOCS_NEW} / 规范发散 ${N_DOCGAP}"
     echo "  修法三选一：① 把文件挪进合规目录；② 确有理由则扩 ALLOW_FILES 并写明消费者；"
     echo "            ③ 确认是既存债则 --update-baseline 记账（棘轮）。"
+    echo "            （若该项属 .gitignore 已声明不管者 ⇒ 本门不判违规，见上方单列）"
     exit 1
   fi
 fi

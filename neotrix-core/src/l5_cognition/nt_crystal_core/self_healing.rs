@@ -30,6 +30,24 @@ pub struct ModuleHealth {
     ///
     /// ⭐ 判定依据：`check-fake-signal` R4 —— 「只有字面量赋值 + 生产区零读点」
     ///    ⇒ **该维度是恒定假信号且无人消费**。本字段符合该形态。
+    ///
+    /// ⭐⭐⭐ 2026-10-07 D2 切片复核：确认为 **nt-unwired-spec（有意保留，不删）**。
+    ///
+    /// # 为什么「生产区零读点」在这里是**正确设计**而不是漏接线
+    ///
+    /// `HealthMonitor::check`（见下）**故意不读**本字段，改由
+    /// `last_check` / `latency_p99_ms` / `error_rate` 三个**真实测量**推导
+    /// `overall_healthy` —— 因为本字段在生产路径上只是**调用方的主观声明**
+    /// （只在测试 L343/L361 被赋值）。理由在该函数上方已完整记录。
+    // nt-unwired-spec: 有意保留 —— 上面的 `check()` 刻意不读它，改用真实指标推导；
+    //   ⛔ **不要**为了「让它看起来被用上」而回退到 `all(|m| m.is_healthy)`：
+    //   那会让整体健康判定退回「调用方自称健康」，是 check-fake-signal R1/R4
+    //   命中过的形态。字段按原注释保留（ABI/其他消费方）。
+    //
+    //   ⓘ 名字键控的基线说明：`dead-flag-baseline.txt` 的 `is_healthy` 条目
+    //   只对**零读点的那个实例**生效。`nt_io_provider/routing/provider_swap.rs`
+    //   也有一个同名 `is_healthy`，但它在同文件 :38/:47/:59 **被读** ⇒ 是活的，
+    //   本就不在 dead 集合里，与本条目无关。
     pub is_healthy: bool,
     pub error_rate: f64,
     pub latency_p99_ms: f64,

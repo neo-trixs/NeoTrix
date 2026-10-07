@@ -108,21 +108,48 @@ Rust 侧共注册 74 个（22 neobot_ + 41 上游同名 + 11 显式拒绝）；
 
 ### 1.5 门禁（11 个，2 个已删除）
 
-`nt_check_api`（契约三方对账）· `nt_check_bytes`（U+FFFD）·
-`nt_check_status`（本文件与实测一致）· `nt_shot`（界面截图）·
-`nt_check_upstream_1to1`（**vendored 前端与上游的差集 = 白名单**，含 macOS 菜单/窗口 chrome 断言）·
-`nt_check_ui_calls`（**界面可达模块里的每个 invoke 都有已注册命令**，守 `frontend/`）·
-`nt_check_ship_ui`（**交付路径门**：tauri 指向 neobot-ui + pet.html 在产物里 + 原生菜单已接线）·
-`nt_check_visual`（**视觉门**：高度链/控件等高/行高下限/列宽上限/无溢出 —— 治「全绿但界面不能用」）·
-`nt_check_layout` v2（stub-boot 真渲染：分支/几何/暗色/a11y/零异常/零未登记）·
-`nt_check_interact`（真点：发送链参数/切会话换历史/记忆面板三步/宠物渲染/两页零异常）·
-`nt_check_trace`（**轨迹门**，2026-10-07 新增：三态可辨/状态原样透传/步与改动可展开/
-长输出按行折叠/**无每轮费用**/跑轮信号真换了文案/零异常）。
+⚠️ **「11 个」是 `scripts/ops/` 下的脚本数（`nt_check_*` + `nt_shot.mjs`），
+不是「CI 在跑 11 道」。** 下面逐道标了**是否真在 CI 里** —— 判据是
+`.github/workflows/ci.yml` 里 grep 得到该 `run:` 行（只出现在注释里不算）。
+
+**在 CI 执行（4 道，2026-10-07 提交 `9b1e741a` 接入）**
+
+- `nt_check_layout` v2（stub-boot 真渲染：分支/几何/暗色/a11y/零异常/零未登记）
+- `nt_check_interact`（真点：发送链参数/切会话换历史/记忆面板三步/宠物渲染/两页零异常）
+- `nt_check_trace`（**轨迹门**，2026-10-07 新增：三态可辨/状态原样透传/步与改动可展开/
+  长输出按行折叠/**无每轮费用**/跑轮信号真换了文案/零异常）
+- `nt_check_bytes`（U+FFFD 字节安全）
+
+**⛔ 存在但不在 CI（6 道，只能本地跑；CI 一次都不会执行）**
+
+- `nt_check_api`（契约三方对账）
+- `nt_check_status`（本文件与实测一致）
+- `nt_check_upstream_1to1`（**vendored 前端与上游的差集 = 白名单**，含 macOS 菜单/窗口 chrome 断言）
+- `nt_check_ui_calls`（**界面可达模块里的每个 invoke 都有已注册命令**，守 `frontend/`）
+- `nt_check_ship_ui`（**交付路径门**：tauri 指向 neobot-ui + pet.html 在产物里 + 原生菜单已接线）
+- `nt_check_visual`（**视觉门**：高度链/控件等高/行高下限/列宽上限/无溢出 —— 治「全绿但界面不能用」）
+
+**工具，非门**：`nt_shot`（界面截图，**需传参**才能跑，故不构成自动门禁）。
 ~~以下 2 个守旧自研 UI~~ **已删除**（2026-10-01 蜕皮）：
 `nt_check_ipc` 的职责由 **`nt_check_ui_calls`** 承接且更强（走真实 import 图，
 含 `@/` 别名；旧门只 grep 目录）· `nt_check_tokens` 守的
 `frontend/src/ui/tokens.css` **根本不存在**（上游用 Tailwind），留着是空气。
 前端 0 组自测（旧自研 UI 的 `selftest.ts` 已随旧 UI 退役）。
+
+**反向缺口：CI 实际在跑、但上文一个都没列的 `neobot-*` 门（11 道 UI 门 + 1 道市场门）**
+
+⛔ 这批门此前在本文**完全缺席** —— 于是文档声称的门集与 CI 真正执行的另一批
+几乎不相交（2026-10-07 实测，见 §4 教训 40）。实测在 `ci.yml` 有 `run:` 行的：
+`neobot-check-contrast`（对比度 AA）· `neobot-check-convo-groups`（会话分组）·
+`neobot-check-convo-keys`（会话键名）· `neobot-check-msg-copy`（消息复制按钮）·
+`neobot-check-shortcuts`（快捷键）· `neobot-check-theme-persist`（主题跨刷新持久）·
+`neobot-check-markdown`（markdown 渲染 + 语言跟随）· `neobot-msg-virtual`（消息虚拟化）·
+`neobot-ui-smoke`（UI 冒烟综合）· `neobot-check-layout-scale` · `neobot-check-selfcontained` ·
+`neobot-check-ipc-keys` · `neobot-check-a1-recovery` · `neobot-check-market.sh`
+（能力市场清单自洽）。
+
+⚠️ 上表**只登记「CI 在跑」这一事实**，未逐道核实各自判据覆盖面；⛔ 不得据此推断
+它们合起来就等于「CI 覆盖了全部 UI 风险」。
 
 > 复现：`node scripts/ops/nt_check_{api,bytes,ui_calls,ship_ui,upstream_1to1,layout,interact,trace,status}.mjs` ·
 > `cargo test -p neobot-desktop`（库测试107条：库 26 + app 81；另有 3 条进程隔离集成测试
