@@ -475,6 +475,16 @@ jobs:
       #   ⛔ 它**不**依赖 dist，将来若前移也安全。
       - name: Gate — check-layout (根目录布局：白名单须带理由/dot 文件入视野)
         run: bash scripts/check-layout.sh --strict
+
+      # ⭐⭐⭐ 2026-10-07：接上 `check-executor-registry` —— 它此前在
+      #   **全部 11 个 workflow 里零命中**，即「清单写着有能力、却没人查它
+      #   到底能不能跑」这个缺口**从未被机器守过**（而 `market.rs:63`
+      #   明写这个记账「要可被机器校验，见 scripts/check-executor-registry.sh」）。
+      # ⓘ 本轮给它加了 4 条判据 (d)(e)(f)(g)：未接线必须有机器可读的阻塞记录
+      #   （reason/owner/unblocked_when 必填），死条目判红，schema_source
+      #   指向的文件必须真实存在 —— 那正是给业务侧的**插口**。
+      - name: Gate — check-executor-registry (能力声称 vs 派发事实 + 阻塞记录完整)
+        run: bash scripts/check-executor-registry.sh --strict
       # ⭐⭐ `neobot-desktop`：本次补的核心。此前 CI 一次都没跑过它，
       #   后果是 2026-10-02 那个 P0（前端载荷键 snake_case vs Tauri camelCase ⇒
       #   **消息从不落库、切会话历史永远空**）能带着「全部 UI 门全绿」活下来。

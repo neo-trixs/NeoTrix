@@ -1,0 +1,46 @@
+{
+  "_README": "能力未接线的**机器可读阻塞记录** —— `scripts/check-executor-registry.sh` 的判据 (d)(e)(f) 消费本文件。",
+  "_why": "此前 D5 的「3 DeclaredOnly + 1 Scaffold」只存在于散文（账本 + 代码注释）⇒ 未接线状态无机器守卫，任何人新增一个 DeclaredOnly 能力都不会被发现。",
+  "_schema": {
+    "<capability-id>": {
+      "executability": "DeclaredOnly | Scaffold —— 必须与 market.rs 的声称一致",
+      "owner": "谁负责接线（必填，非空）",
+      "reason": "为什么现在接不上（必填，非空）",
+      "unblocked_when": "什么条件满足才算解锁（必填，非空）",
+      "schema_source": "权威输入 schema 的路径；null = 尚未提供。门会校验：非 null 时该路径必须存在且非空"
+    }
+  },
+  "_rules": [
+    "⛔ 本文件**不发明** schema。`schema_source: null` 是合法且预期的状态 —— 权威 schema 只能来自业务侧。",
+    "⛔ 门只对账「声称 vs 事实」，**不判定 Scaffold 实现了几成** —— 那是人工裁决，门去猜就等于发明。",
+    "⇒ 业务侧接入的唯一动作：把 schema 落到某个文件，把路径写进 `schema_source`。不需要改门、不需要改适配器。"
+  ],
+  "NT-MEMORY::trade::trade_product_spec": {
+    "executability": "DeclaredOnly",
+    "owner": "业务侧（贸易产品规格）",
+    "reason": "只有 get_product_knowledge_pack（知识包工厂），无顶层执行器 ⇒ 派发必返 None",
+    "unblocked_when": "给出产品规格的权威输入 schema + 一个顶层执行入口",
+    "schema_source": null
+  },
+  "NT-MIND::trade::trade_production_logistics": {
+    "executability": "DeclaredOnly",
+    "owner": "业务侧（生产物流）",
+    "reason": "顶层执行器数为 0（只有 LogisticsEngine 方法），无单一入口",
+    "unblocked_when": "给出生产物流的权威输入 schema + 一个顶层执行入口",
+    "schema_source": null
+  },
+  "NT-MIND::trade::trade_finance_compliance": {
+    "executability": "DeclaredOnly",
+    "owner": "业务侧（金融合规）",
+    "reason": "顶层执行器数为 0（只有 FinanceEngine 方法），无单一入口",
+    "unblocked_when": "给出金融合规的权威输入 schema + 一个顶层执行入口",
+    "schema_source": null
+  },
+  "NT-MIND::trade::foreign_trade_full_cycle": {
+    "executability": "Scaffold",
+    "owner": "业务侧（外贸全链）",
+    "reason": "状态机是真代码（TradePhase::all / can_advance_to），但 17 个阶段的业务逻辑全是注释 ⇒ 能跑通有产出却没做实事（最危险的一档）",
+    "unblocked_when": "17 个阶段各自补上真实业务逻辑，并由非桩证据测试覆盖",
+    "schema_source": null
+  }
+}

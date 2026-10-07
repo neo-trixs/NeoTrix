@@ -20,6 +20,17 @@
 #
 # ⛔ **不做**的事：不判定「Scaffold 到底实现了几成」—— 那是人工裁决，
 #    门去猜就等于发明。门只对账「声称 vs 事实」。
+#
+#   ④ (2026-10-07 新增) **未接线必须留下机器可读的阻塞记录** —— 消费
+#      `.neotrix/capability-blocking.json`：
+#      (d) 每个非 Executable 能力**必须**有阻塞条目，且 reason/owner/unblocked_when
+#          三项**非空** ⇒ 新增一个 DeclaredOnly 却没人登记 ⇒ 当场红。
+#          （此前这些状态只活在散文里 ⇒ 无人守卫。）
+#      (e) 阻塞条目**不得是死条目** —— 指向的能力必须存在、且**当前确实**非 Executable。
+#          ⇒ 能力接好了却忘记从阻塞表里划掉 ⇒ 当场红（账本腐烂可被发现）。
+#      (f) `schema_source` 非 null 时该路径**必须存在且非空** —— 这就是给业务侧的
+#          插口：schema 到位 ⇒ 写路径 ⇒ 门立刻验它真的到位。**不发明 schema**。
+#      (g) 仅报告不判红：声称已变为 Executable、却仍列在阻塞表里（提示该划掉）。
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 
@@ -141,11 +152,97 @@ done <<EOF
 $pairs
 EOF
 
+# ── ④ 未接线能力的机器可读阻塞记录 ────────────────────────────────
+BLOCK=".neotrix/capability-blocking.json"
+n_block=0
+if [ ! -f "$BLOCK" ]; then
+  # ⛔ fail-closed：缺表 = 判据无法执行 = 本门结构上不可能失败 ⇒ 判红
+  echo "  ❌ 找不到阻塞记录 $BLOCK ⇒ 判据 (d)(e)(f) 无法执行"
+  fail=1
+else
+  block_out=$(python3 - "$BLOCK" "$MANIFEST" <<'PYBLOCK'
+import json, os, re, sys
+blocking_path, manifest_path = sys.argv[1], sys.argv[2]
+try:
+    with open(blocking_path, encoding="utf-8") as fh:
+        doc = json.load(fh)
+except Exception as exc:
+    print(f"__ERR__阻塞记录不是合法 JSON：{exc}")
+    raise SystemExit(0)
+
+# 以下划线开头的键是文档键，不是能力条目
+entries = {k: v for k, v in doc.items() if not k.startswith("_")}
+
+# 从 market.rs 抽「id -> executability」，与主体门同一口径
+src = open(manifest_path, encoding="utf-8").read()
+real = {}
+for m in re.finditer(r"ManifestEntry\s*\{", src):
+    i = src.index("{", m.start()); d = 0
+    for j in range(i, len(src)):
+        if src[j] == "{": d += 1
+        elif src[j] == "}":
+            d -= 1
+            if d == 0: break
+    body = src[i + 1 : j]
+    mid = re.search(r'id:\s*"([^"]+)"', body)
+    mex = re.search(r"executability:\s*Executability::(\w+)", body)
+    if mid and mex:
+        real[mid.group(1)] = mex.group(1)
+
+lines, bad, warn = [], 0, 0
+for cid, info in sorted(entries.items()):
+    if not isinstance(info, dict):
+        lines.append(f"  ❌ {cid} 条目不是对象"); bad += 1; continue
+    kind = real.get(cid)
+    if kind is None:
+        lines.append(f"  ❌ 阻塞条目指向不存在的能力（死条目）：{cid}"); bad += 1; continue
+    if kind == "Executable":
+        # (g) 仅报告：已接线却仍列阻塞 —— 该划掉，否则阻塞表会失去意义
+        lines.append(f"  ℹ️ {cid} 声称已是 Executable，但仍列在阻塞表 ⇒ 该划掉了")
+        warn += 1
+        continue
+    for field in ("executability", "owner", "reason", "unblocked_when"):
+        v = str(info.get(field, "")).strip()
+        if not v:
+            lines.append(f"  ❌ {cid} 缺必填字段 `{field}`（阻塞记录必须写清为什么）")
+            bad += 1
+    if info.get("executability") != kind:
+        lines.append(f"  ❌ {cid} 阻塞记录声称 {info.get('executability')}，market.rs 实为 {kind}")
+        bad += 1
+    ss = info.get("schema_source", None)
+    if ss not in (None, ""):
+        if not os.path.isfile(ss) or os.path.getsize(ss) == 0:
+            lines.append(f"  ❌ {cid} 的 schema_source 指向 {ss}，但该文件不存在或为空")
+            bad += 1
+# (d) 反向：manifest 里每个非 Executable 都必须有阻塞条目
+missing = [cid for cid, k in real.items() if k != "Executable" and cid not in entries]
+for cid in sorted(missing):
+    lines.append(f"  ❌ {cid} 声称 {real[cid]} 却**没有**阻塞记录 ⇒ 未接线状态只靠散文，无机器守卫")
+    bad += 1
+
+print(f"__N__ {len(entries)} {bad} {warn}")
+for l in lines:
+    print(l)
+PYBLOCK
+)
+  n_block=$(printf '%s
+' "$block_out" | sed -n 's/^__N__ //p' | awk '{print $1}')
+  printf '%s
+' "$block_out" | grep -v '^__' | sed '/^$/d'
+  if printf '%s
+' "$block_out" | grep -q '^__ERR__'; then
+    fail=1
+  elif [ "$(printf '%s
+' "$block_out" | sed -n 's/^__N__ //p' | awk '{print $2}')" != "0" ]; then
+    fail=1
+  fi
+fi
+
 echo "=== 执行器登记制门 ==="
-echo "  条目: $n_total   声称可执行: $n_exec"
+echo "  条目: $n_total   声称可执行: $n_exec   阻塞记录: ${n_block:-0}"
 
 if [ "$fail" -ne 0 ]; then
-  echo "  executor-registry: FAIL —— 声称与事实不符"
+  echo "  executor-registry: FAIL —— 声称与事实不符，或未接线缺阻塞记录"
   exit 1
 fi
 if [ "$STRICT" -eq 1 ] && [ "$n_exec" -eq 0 ]; then
