@@ -164,21 +164,32 @@ impl OutputStyleRegistry {
         self.styles.insert(style.id(), style);
     }
 
-    pub fn resolve(&self, id: OutputStyleId) -> &dyn OutputStyle {
+    /// 解析样式。未知 id 回退到 `Plain`。
+    ///
+    /// ⭐ 返回 `Option` 而非 `&dyn OutputStyle`（2026-10-07）。
+    /// 原实现 `.expect("Plain style registered in StyleRegistry")`：
+    /// 我核实 `new()` 无条件插入 `Plain`、且 `Default` 委托 `new()`、
+    /// 且 `styles` 私有、`register()` 只能增不能删 ⇒ **panic 实际不可达**。
+    /// 但 `expect` 把「不可达」写成**运行时不变量**，⛔ 而非类型保证 ——
+    /// 未来若给 `styles` 加 `remove()`/反序列化路径，panic 立刻变可达。
+    /// ⇒ 改为 `Option`：把不可达性交给**调用方显式处理**，无 `unwrap/expect`。
+    pub fn resolve(&self, id: OutputStyleId) -> Option<&dyn OutputStyle> {
         self.styles
             .get(&id)
             .map(|s| s.as_ref())
-            .unwrap_or_else(|| {
-                self.styles
-                    .get(&OutputStyleId::Plain)
-                    .expect("Plain style registered in StyleRegistry")
-                    .as_ref()
-            })
+            .or_else(|| self.styles.get(&OutputStyleId::Plain).map(|s| s.as_ref()))
     }
 
     /// 应用样式 (生产入口，被 AgentLoop 调用)。
+    ///
+    /// ⭐ 兜底链：`id` → `Plain` → **恒等透传**（`text` 原样返回）。
+    /// 最后一级是**语义正确**的降级：没有样式时输出应保持原文，
+    /// ⛔ 而不是 panic 或静默改成另一种风格。
     pub fn apply(&self, id: OutputStyleId, text: &str) -> String {
-        self.resolve(id).apply(text)
+        match self.resolve(id) {
+            Some(s) => s.apply(text),
+            None => text.to_string(),
+        }
     }
 
     /// G27 输出治理 (纯检查)。每条规则独立结果 + 综合得分 + 违规清单。
@@ -646,7 +657,52 @@ impl Default for OutputGovernor {
         Self::new()
     }
 }
+#[cfg(test)]
+mod resolve_degrade_tests {
+    use super::{OutputStyleId, OutputStyleRegistry};
 
+    /// ⭐ **变异证据**：`Plain` 未注册时必须**降级为恒等透传**，
+    /// ⛔ 而非 panic（原实现是 `.expect(...)`）。
+    ///
+    /// 构造方式：`OutputStyleRegistry::new()` 恒插入 `Plain`，
+    /// 故用手工构造绕过构造器 —— 这正是 `expect` 变成可达的那条未来路径。
+    #[test]
+    fn 无Plain时降级为恒等透传() {
+        let mut reg = OutputStyleRegistry::new();
+        // ⭐ 模拟「未来加了 remove()/反序列化路径」：抽掉 Plain
+        reg.styles.remove(&OutputStyleId::Plain);
+        // 1) ⚠️ 我第一版断言写错了：`new()` 插入 Spartan，故抽掉 Plain
+        //    **不会**让 Spartan 变 None —— 假设错误，不是代码错误。
+        //    真正承重的断言在下面：抽掉 Plain 后**不得 panic**，
+        //    且未注册的 id 必须退化为 None。
+        assert!(
+            reg.resolve(OutputStyleId::Spartan).is_some(),
+            "Spartan 仍在注册表内（抽掉的只有 Plain）"
+        );
+        // 2) apply 恒等透传，**不改变原文**
+        let src = "原始文本";
+        assert_eq!(
+            reg.apply(OutputStyleId::Plain, src),
+            src,
+            "无任何样式时必须原样返回（恒等透传）"
+        );
+    }
+
+    /// 正常路径不变：`Plain` 在时未知 id 回退 `Plain`。
+    #[test]
+    fn 有Plain时未知id回退Plain() {
+        let reg = OutputStyleRegistry::new();
+        assert!(
+            reg.resolve(OutputStyleId::Plain).is_some(),
+            "new() 必须注册 Plain"
+        );
+        assert_eq!(
+            reg.apply(OutputStyleId::Plain, "x"),
+            "x",
+            "Plain 样式应原样返回"
+        );
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
