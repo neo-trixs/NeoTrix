@@ -132,6 +132,26 @@ pub trait LlmRouter: L1Capability {
 /// 能力健康状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityHealth {
+    /// ⭐ 审计裁定 2026-10-07（`check-fake-signal` R1 命中）：
+    /// **门是误报** —— 本字段在生产路径**由真实状态推导**。
+    ///
+    /// **证据**：`neotrix-core/src/l1_action/nt_io/nt_io_provider/pool/nt_provider_pool.rs`
+    /// L373-379 的 `health_check()` 构造本类型时：
+    ///     `healthy: !self.entries.is_empty()`   ← **真实状态**
+    ///     `last_check: SystemTime::now()…`      ← **真实时间戳**
+    /// ⇒ 该字段是**真实健康结论**，⛔ 不是「调用方自称」。
+    ///
+    /// ⛔ 门为何误报：它只统计**本文件内**该字段的赋值形态
+    ///   （只有 `Default` 的 `healthy: true`），
+    ///   ⛔ **不检查跨文件消费方** ⇒ 把「真实推导」误判为「硬编码」。
+    /// ⇒ 门需要新增「跨文件消费方」判据（本次**未加**：
+    ///   那是独立的门改动，且可能引入新的误报面）。
+    ///
+    /// ⚠️ 仍存在的真实弱点：`error_rate: 0.0` 与 `latency_ms: None`
+    ///   在那个消费点也**是硬编码**（该文件确实没测延迟/错误率）
+    ///   ⇒ ⛔ 若要接线，需在 `ProviderPool` 里补真实测量
+    ///   （它已有 `stats()`，L382 ⇒ **可能有数据源**）。
+    ///   ⛔ 我**不擅自接线**：会改变 `health_check()` 的返回语义。
     pub healthy: bool,
     pub latency_ms: Option<f64>,
     pub error_rate: f64,

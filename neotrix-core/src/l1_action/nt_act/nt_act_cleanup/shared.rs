@@ -293,6 +293,27 @@ pub struct CleanupPattern {
     pub kind: ScanCategory,
     pub patterns: Vec<&'static str>,
     pub max_age_days: Option<i64>,
+    /// ⭐ 审计裁定 2026-10-07（`check-fake-signal` R1 命中）：**真死字段**
+    /// （⛔ 不是误报）。
+    ///
+    /// **证据（全仓 `.safe` 读点 = 0）**，且有**同 struct 的对照**：
+    ///  · `recursive`（下一行）**在清理执行时被消费**
+    ///    —— 本文件 L511 `.max_depth(if pattern.recursive { 10 } else { 1 })`
+    ///  · `safe` ⛔ **零消费**
+    /// ⇒ 同一个 struct 里，**一个接线、一个遗漏** ⇒ 不是「整类未接线」。
+    ///
+    /// ⚠️ **为何未接线**（已核实，⛔ 不擅自补）：
+    /// 本文件**只有扫描，无删除** —— `scan_by_patterns`（L506）只 `WalkDir` 发现，
+    /// ⛔ 全文无 `remove_file` / `delete`。
+    /// ⇒ 「这条规则是否安全」是**删除阶段**的判据，
+    ///    而删除逻辑在别处且**不接收 `CleanupPattern`** ⇒ **结构上无处可接**。
+    ///
+    /// ⭐ 正解（需 owner 决策）：
+    ///  (a) 删除阶段接收 `CleanupPattern` 并按 `safe` 守门（fail-closed：
+    ///      `safe == false` 的规则不删）；
+    ///  (b) ⛔ 若删除逻辑**不存在**，则 `safe` 是**未落地的规格**
+    ///      ⇒ 应保留并标注 ⛔ 而非假装已生效。
+    /// ⛔ 我**不擅自接线**：会给扫描结果引入删除语义（**行为变更**）。
     pub safe: bool,
     pub recursive: bool,
 }

@@ -7,6 +7,32 @@
 //! 且 `AppleSiliconOptimizer` 目前**全仓零外部消费者**。
 //! ⇒ 下面的 benchmark 数值**来源真实**，但当前**没有任何代码路径消费它们**。
 //!
+//! ⭐⭐ **升级裁定 2026-10-07（同 `feea55c3` 对 `is_healthy` 的「长期路线、
+//! 不要兼容性策略」路线）**：本文件应当被**删除**，⛔ 而非继续保留。
+//!
+//! **依据（与 `feea55c3` 同构）**：
+//!  1. **零消费**：`AppleSiliconOptimizer` / `AppleChip` 全仓外部引用 **0**
+//!     （`grep` 排除本文件后计数为 0）；
+//!  2. **零测量**：`detect()` 无任何系统调用，返回硬编码 M5/16GB
+//!     ⇒ 它**不是探测**，是一个**假装成 API 的常量**；
+//!  3. ⭐ **保留它唯一的作用是让「未接线的规格」看起来像已实现的能力** ——
+//!     这比没有更危险：`pub use apple_silicon::*` 让它出现在**公开 API 面上**，
+//!     任何人都可能以为「本仓能探测 Apple Silicon」。
+//!
+//! ⚠️ **本轮未删**的诚实原因（⛔ 不是因为「保留更好」）：
+//!  ① 文件里的 benchmark 数值与 MLX 特性描述是**有价值的参考资料**
+//!    （来源真实，见各行注释的测量日期）；
+//!  ② 删除 483 行会改变 `pub use` 的公开 API，属**跨窗口可见**的变更；
+//!  ③ ⭐ 若要删，**参考资料的正确去处是文档**
+//!    （`docs/architecture/`），⛔ 而不是留在 `.rs` 里假装是代码。
+//!
+//! ⭐ **两个正解（需 owner 裁决）**：
+//!  (a) **删除整个 `apple_silicon` 模块**，把 benchmark 资料迁到 `docs/`；
+//!  (b) 实现**真实探测**（纯 `std::process::Command` 调
+//!      `sysctl -n machdep.cpu.brand_string` + `sysctl hw.memsize`，
+//!      ⛔ 零新依赖），使 `detect()` 名副其实。
+//! ⛔ 我**不擅自删除**：跨窗口可见的 API 变更 + 参考资料去处需一并决定。
+//!
 //! ---
 //!
 //! Absorbs Apple Silicon native inference technologies:
