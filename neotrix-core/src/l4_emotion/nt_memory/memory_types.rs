@@ -1,43 +1,15 @@
-//! 三类记忆 — 基于 Grok Build 模式
+//! 函数记忆 — 基于 Grok Build 模式
 //!
-//! Workflow/Subtask/Function 三种记忆类型。
+//! ⛔ 2026-10-06/07：工作流 / 子任务两类记忆经实测为死代码，已移除。
 
 use std::collections::HashMap;
 
-/// 工作流记忆（完整的任务执行流程）
-#[derive(Clone, Debug)]
-pub struct WorkflowMemory {
-    pub id: String,
-    pub task: String,
-    pub steps: Vec<WorkflowStep>,
-    pub success: bool,
-    pub total_tokens: u32,
-    pub created_at: i64,
-}
-
-/// 工作流步骤
-#[derive(Clone, Debug)]
-pub struct WorkflowStep {
-    pub action: String,
-    pub tool: String,
-    pub input_summary: String,
-    pub output_summary: String,
-    pub success: bool,
-}
-
-/// 子任务记忆（单个子任务的执行记录）
-#[derive(Clone, Debug)]
-pub struct SubtaskMemory {
-    pub id: String,
-    pub parent_workflow: String,
-    pub task: String,
-    pub result: String,
-    pub success: bool,
-    pub tokens_used: u32,
-    pub created_at: i64,
-}
-
-/// 函数记忆（工具/函数的使用模式）
+/// 函数记忆（工具/函数的使用模式）——
+///
+/// ⛔ 2026-10-07：原文件另有 `WorkflowMemory` / `WorkflowStep` / `SubtaskMemory`
+///   三个类型 + `TripleMemoryStore` 的 `workflows`/`subtasks` 字段 + 4 个方法，
+///   实测**全仓零消费者、零构造点** ⇒ 已删。
+///   ⇒ 模块顶注释说的「三类记忆」**不再成立**，改为「一类记忆」。
 #[derive(Clone, Debug)]
 pub struct FunctionMemory {
     pub function_name: String,
@@ -48,31 +20,21 @@ pub struct FunctionMemory {
     pub common_outputs: Vec<String>,
 }
 
-/// 三类记忆存储
+/// 记忆存储（⛔ 原名「三类记忆存储」，实际只存 `FunctionMemory` 一类）
 #[derive(Debug)]
 pub struct TripleMemoryStore {
-    workflows: Vec<WorkflowMemory>,
-    subtasks: Vec<SubtaskMemory>,
+    // ⛔ 已删 `workflows` / `subtasks`（2026-10-07）：其元素类型
+    //   `WorkflowMemory` / `SubtaskMemory` 全仓**零消费者**、**零构造点**
+    //   （实测，含排除 `.worktrees/` 后的全仓统计）⇒ 恒为空容器。
+    //   ⇒ 保留它们等于宣称「存了三类记忆」而实际只存一类。
     functions: HashMap<String, FunctionMemory>,
 }
 
 impl TripleMemoryStore {
     pub fn new() -> Self {
         Self {
-            workflows: Vec::new(),
-            subtasks: Vec::new(),
             functions: HashMap::new(),
         }
-    }
-
-    /// 记录工作流
-    pub(crate) fn _record_workflow(&mut self, workflow: WorkflowMemory) {
-        self.workflows.push(workflow);
-    }
-
-    /// 记录子任务
-    pub(crate) fn _record_subtask(&mut self, subtask: SubtaskMemory) {
-        self.subtasks.push(subtask);
     }
 
     /// 记录函数调用
@@ -96,14 +58,6 @@ impl TripleMemoryStore {
             / func.call_count as u64;
     }
 
-    /// 搜索工作流
-    pub(crate) fn _search_workflows(&self, query: &str) -> Vec<&WorkflowMemory> {
-        self.workflows
-            .iter()
-            .filter(|w| w.task.contains(query))
-            .collect()
-    }
-
     /// 获取函数统计
     pub(crate) fn _function_stats(&self, name: &str) -> Option<(&str, u32, u32, f64)> {
         self.functions.get(name).map(|f| {
@@ -121,12 +75,11 @@ impl TripleMemoryStore {
         })
     }
 
-    /// 总统计
-    pub fn stats(&self) -> (usize, usize, usize) {
-        (
-            self.workflows.len(),
-            self.subtasks.len(),
-            self.functions.len(),
-        )
+    /// 总统计：⚠️ 原为 `(workflows, subtasks, functions)` 三元组，
+    ///   但前两项对应的容器**恒为空**（死代码已删）⇒ 返回值里有两个恒为 0 的数字，
+    ///   **看起来像统计，实际是假的**。
+    /// ⇒ 改为只返回**真实的**函数记忆条数。
+    pub fn stats(&self) -> usize {
+        self.functions.len()
     }
 }

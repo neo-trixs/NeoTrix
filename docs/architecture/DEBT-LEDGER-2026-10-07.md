@@ -126,11 +126,21 @@
 （`neotrix-core/src crates/ apps/`），⛔ 不能用 `.`，
 否则 `.worktrees/` / `target/` 会把计数**放大数倍** ⇒ 结论直接反向。
 
-### 处置
+### ✅ 处置：**已删 47 行**（2026-10-07）
 
-⛔ **本轮不删**：整个子系统（`MemoryStore` + 3 类型 + 4 方法）删除前需确认
-`FunctionMemory` 路径是否仍被使用（`success_count` **确实被读**，L111/L118）
-⇒ 需**按类型逐个**判定，不能整文件删。
+| 删除 | 依据 |
+|---|---|
+| `WorkflowMemory` / `WorkflowStep` / `SubtaskMemory` | 全仓零消费者、**零构造点** |
+| `TripleMemoryStore.workflows` / `.subtasks` 字段 | 元素类型已删 ⇒ 恒空容器 |
+| `_record_workflow` / `_record_subtask` / `_search_workflows` | 文件外引用各 **0** |
+| `stats()` 三元组 → `usize` | 前两项**恒为 0** ⇒ 「看起来是统计，实际是假的」 |
+
+**保留**：`FunctionMemory` + `_record_function_call` + `_function_stats`
+（`success_count` **确实被读**，算 success_rate）· `pub mod memory_types;` 声明。
+
+⚠️ **又一次踩到 E0119**（孤立 `#[derive]` 残留）—— 这是配平法的**第三次**实证
+⇒ 判据第 8 条已两次补充：**删除后必须 build**，
+且**配平法只解决花括号，解决不了注释归属**。
 
 ⇒ 已从「188 待判定」中**精确分类出这 3 个 `pub success`**：
 它们是**只写不读**的标记（对照：`FunctionMemory.success_count` 确实被读）。
