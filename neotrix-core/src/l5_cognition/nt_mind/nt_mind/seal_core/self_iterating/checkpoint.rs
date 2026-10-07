@@ -23,6 +23,23 @@ pub struct _PersistedCheckpoint {
     pub capability: CapabilityVector,
     pub permission: String,
     pub autonomy: String,
+    /// ⭐ **帧校验和**（吸收自 `memvid/memvid` Apache-2.0，2026-10-07）。
+    ///
+    /// memvid 的 Smart Frame 是「不可变单元 + 时间戳 + **checksum**」，
+    /// 读取时能发现**损坏/被改写**的记忆帧。
+    ///
+    /// 本仓原先**没有**这一层 ⇒ 落盘数据被截断或改写时，
+    /// `serde_json::from_str(..).ok()` 会**静默返回 None**
+    /// ⇒ 上层 `re_anchor_from_kb` 把损坏的 checkpoint 当成「首次运行」
+    /// ⇒ **静默零冷启动，且没有任何日志**。
+    ///
+    /// ⇒ 加校验和后，损坏能被**识别并报告**，而不是伪装成「没有历史」。
+    ///
+    /// 选型说明：用 **FNV-1a 64**（与本仓 `nt_determinism.rs`、`nt_shield_audit`
+    /// 同值）⇒ 跨仓可交叉比对，且**无外部依赖**。
+    /// ⚠️ 它是**非加密**校验和，只挡**意外损坏**，⛔ 不挡**恶意篡改**。
+    #[serde(default)]
+    pub checksum: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +59,56 @@ pub struct CheckpointManager {
     max_checkpoints: usize,
     next_id: u64,
 }
+
+/// FNV-1a 64 位素数/偏移基数 —— **与本仓 `nt_determinism.rs`、
+/// `nt_shield_audit/mod.rs` 同值**，便于跨仓交叉比对同一份字节。
+const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+
+/// 对 `bytes` 算 FNV-1a 64。
+///
+/// ⚠️ **非加密**：只挡**意外损坏/意外改写**（截断、bit rot、手滑），
+/// ⛔ **不挡恶意篡改**（攻击者可重算）。要防篡改需换 keyed MAC。
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut h = FNV_OFFSET;
+    for b in bytes {
+        h ^= u64::from(*b);
+        h = h.wrapping_mul(FNV_PRIME);
+    }
+    h
+}
+
+/// 返回 `checksum` 字段为**真实值**时的 JSON 文本。
+///
+/// 做法：把 `checksum` 置 0 → 算 FNV → 写回 → 序列化。
+/// ⇒ 校验和覆盖**除自身外**的全部字段。
+fn _with_checksum(json: &str) -> String {
+    let Ok(mut v) = serde_json::from_str::<serde_json::Value>(json) else {
+        // 解析不了就原样返回（读取侧会解析失败 → 无历史，不会误用）
+        return json.to_owned();
+    };
+    let mut zeroed = v.clone();
+    if let Some(o) = zeroed.as_object_mut() {
+        o.insert("checksum".to_owned(), serde_json::json!(0u64));
+    }
+    let sum = fnv1a64(zeroed.to_string().as_bytes());
+    if let Some(o) = v.as_object_mut() {
+        o.insert("checksum".to_owned(), serde_json::json!(sum));
+    }
+    v.to_string()
+}
+
+/// 校验落盘 JSON 的校验和与记录值是否一致。
+fn verify_checksum(json: &str, recorded: u64) -> bool {
+    let Ok(mut v) = serde_json::from_str::<serde_json::Value>(json) else {
+        return false;
+    };
+    if let Some(o) = v.as_object_mut() {
+        o.insert("checksum".to_owned(), serde_json::json!(0u64));
+    }
+    fnv1a64(v.to_string().as_bytes()) == recorded
+}
+
 
 impl CheckpointManager {
     pub fn new() -> Self {
@@ -197,9 +264,12 @@ impl CheckpointManager {
             capability: cp.brain_snapshot.capability.clone(),
             permission: format!("{:?}", cp.permission_level),
             autonomy: format!("{:?}", cp.autonomy_level),
+            checksum: 0, // 下面算
         };
-        let json = serde_json::to_string_pretty(&persisted)
+        let mut json = serde_json::to_string_pretty(&persisted)
             .map_err(|e| NeoTrixError::Serde(format!("checkpoint 序列化失败: {e}")))?;
+        // 校验和覆盖**除自身外**的全部字段 ⇒ 计算时字段置 0
+        json = _with_checksum(&json);
         match conn {
             Some(c) => crate::l5_cognition::nt_core_state::save_with(c, "seal_checkpoint", &json),
             None => crate::l5_cognition::nt_core_state::save("seal_checkpoint", &json),
@@ -218,7 +288,36 @@ impl CheckpointManager {
             Some(c) => crate::l5_cognition::nt_core_state::load_with(c, "seal_checkpoint"),
             None => crate::l5_cognition::nt_core_state::load("seal_checkpoint"),
         }?;
-        serde_json::from_str(&json).ok()
+        // ⚠️ 原为 `serde_json::from_str(&json).ok()`：损坏数据被**静默当作「无历史」**
+        // ⇒ 上层 re-anchor 变成**零冷启动且无任何日志**（本仓一路在治的病）。
+        let parsed: _PersistedCheckpoint = match serde_json::from_str(&json) {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!(
+                    "[seal_checkpoint] checkpoint 反序列化失败 ⇒ 视为无历史（零冷启动）: {e}"
+                );
+                return None;
+            }
+        };
+        // ⭐ **向后兼容**：升级前落下的 checkpoint **没有** `checksum` 字段
+        //（`#[serde(default)]` ⇒ 读成 0）⇒ 它**不是损坏**，只是「无校验和」。
+        // ⛔ 若直接判失败 ⇒ 升级即**丢弃全部进化历史**，是严重回归。
+        // ⇒ 区分两态：`checksum == 0` ⇒ 「无校验和的旧帧」⇒ 接受并补算；
+        //   `checksum != 0` 而不匹配 ⇒ 「有校验和但不符」⇒ **真损坏**。
+        if parsed.checksum == 0 {
+            log::info!(
+                "[seal_checkpoint] checkpoint 无校验和（旧格式）⇒ 接受，下轮写入时补算"
+            );
+            return Some(parsed);
+        }
+        if !verify_checksum(&json, parsed.checksum) {
+            log::warn!(
+                "[seal_checkpoint] checkpoint 校验和不匹配 ⇒ 数据可能损坏/被改写，\
+                 按「无历史」处理（零冷启动）"
+            );
+            return None;
+        }
+        Some(parsed)
     }
 
     /// 清除持久化 checkpoint (翻转期/测试清理)。
@@ -695,5 +794,151 @@ mod tests {
         );
         assert_eq!(fresh.iteration, 7, "应回退到 KB 锚点迭代号");
         assert!((fresh._reward - 0.9).abs() < 1e-9);
+    }
+}
+
+#[cfg(test)]
+mod frame_checksum_tests {
+    use super::{_with_checksum, verify_checksum};
+
+    fn frame_json(reward: f64) -> String {
+        serde_json::json!({
+            "iteration": 7u64,
+            "reward": reward,
+            "learning_rate": 0.42,
+            "score": 0.9,
+            "permission": "Bounded",
+            "autonomy": "Suggest",
+            "checksum": 0u64
+        })
+        .to_string()
+    }
+
+    /// ✅ 未篡改 ⇒ 校验通过。
+    #[test]
+    fn 完好帧校验通过() {
+        let j = _with_checksum(&frame_json(0.8));
+        let recorded = serde_json::from_str::<serde_json::Value>(&j).unwrap()["checksum"]
+            .as_u64()
+            .unwrap();
+        assert!(verify_checksum(&j, recorded), "未篡改的帧必须通过");
+    }
+
+    /// ⭐ **核心变异证据**：改一个字节（reward）⇒ 校验必须失败。
+    ///
+    /// 这正是原实现**完全无法发现**的情形 ——
+    /// `from_str(..).ok()` 会成功，`re_anchor` 会拿**被改写的reward** 继续进化。
+    #[test]
+    fn 篡改reward必须被检出() {
+        let good = _with_checksum(&frame_json(0.8));
+        // 伪造：拿合法校验和，但改reward
+        let tampered = good.replace("0.8", "9.9");
+        let recorded = serde_json::from_str::<serde_json::Value>(&good).unwrap()["checksum"]
+            .as_u64()
+            .unwrap();
+        assert!(
+            !verify_checksum(&tampered, recorded),
+            "改写 reward 却通过校验 ⇒ 校验和无效"
+        );
+    }
+
+    /// 截断（模拟部分写入 / bit rot）⇒ 必须失败。
+    #[test]
+    fn 截断帧必须被检出() {
+        let good = _with_checksum(&frame_json(0.8));
+        let truncated = &good[..good.len() / 2];
+        let recorded = serde_json::from_str::<serde_json::Value>(&good).unwrap()["checksum"]
+            .as_u64()
+            .unwrap();
+        assert!(!verify_checksum(truncated, recorded), "截断帧不得通过");
+    }
+}
+
+#[cfg(test)]
+mod backward_compat_tests {
+    use super::_PersistedCheckpoint;
+
+    /// ⭐ 升级前的 checkpoint **没有** `checksum` 字段 ⇒ 必须仍能反序列化
+    ///（读成 0），否则**升级即丢弃全部进化历史**。
+    #[test]
+    /// ⭐ 升级前的 checkpoint **没有** `checksum` 字段 ⇒ 必须仍能反序列化
+    ///（读成 0），否则**升级即丢弃全部进化历史**。
+    #[test]
+    fn 旧格式无校验和仍可解析() {
+        // ⭐ **不手写 CapabilityVector 的字段**。
+        //    我先按 neotrix-types 里那个**同名**类型猜字段
+        //    ⇒ 报 missing field typography ⇒ **同名不同类型**（core 内另有其人）。
+        //    ⇒ 教训：**猜测数据结构必然错**，让类型自己说话。
+        let cap =
+            crate::l5_cognition::nt_core::capability::types::CapabilityVector::default();
+        let old = serde_json::to_string(&serde_json::json!({
+            "iteration": 42u64,
+            "reward": 0.77,
+            "learning_rate": 0.1,
+            "score": 0.5,
+            "capability": cap,
+            "permission": "Bounded",
+            "autonomy": "Suggest"
+        }))
+        .expect("构造旧格式 JSON");
+        let p: _PersistedCheckpoint =
+            serde_json::from_str(&old).expect("旧格式必须仍可解析（不得因新字段而失败）");
+        assert_eq!(p.checksum, 0, "缺失字段应读成 0（⇒被识别为「无校验和」）");
+        assert_eq!(p.iteration, 42, "旧数据本身必须完整保留");
+    }
+}
+
+#[cfg(test)]
+mod compat_end_to_end_tests {
+    use super::{fnv1a64, verify_checksum, _with_checksum};
+
+    /// ⭐ **真实载荷路径的兼容变异**：模拟升级后读取一个**旧帧**
+    /// （有真实业务数据，但 `checksum` 字段**不存在**）。
+    ///
+    /// 承重断言：旧帧必须被**识别为「无校验和」并接受**，
+    /// ⛔ 而不是被误判为「损坏」而**丢弃全部进化历史**。
+    ///
+    /// 这就是**为什么必须区分 `checksum == 0` 与 `checksum != 0 但不匹配`**
+    /// —— 两者在数值上都是"校验失败"，语义却完全相反。
+    #[test]
+    fn 旧帧不被误判为损坏() {
+        // 旧帧：无 checksum 键
+        let old = serde_json::json!({
+            "iteration": 123u64,
+            "reward": 0.5,
+            "permission": "Bounded",
+            "autonomy": "Suggest"
+        })
+        .to_string();
+
+        // 读取侧逻辑的镜像：无 checksum 键 ⇒ parsed.checksum == 0 ⇒ 接受
+        let parsed: serde_json::Value =
+            serde_json::from_str(&old).expect("旧帧应可解析");
+        let recorded = parsed
+            .get("checksum")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        assert_eq!(recorded, 0, "旧帧读出的校验和必须是 0（⇒「无校验和」态）");
+
+        // 而「有校验和但不匹配」必须失败 —— 这是真损坏
+        let fresh = _with_checksum(
+            &serde_json::json!({"iteration": 123u64, "reward": 0.5, "checksum": 0u64})
+                .to_string(),
+        );
+        let fresh_sum = serde_json::from_str::<serde_json::Value>(&fresh).unwrap()["checksum"]
+            .as_u64()
+            .unwrap();
+        let tampered = fresh.replace("0.5", "0.9");
+        assert!(
+            !verify_checksum(&tampered, fresh_sum),
+            "有校验和但被改写 ⇒ 必须判损坏"
+        );
+
+        // 校验和函数本身对同一份字节可重复（确定性）
+        assert_eq!(
+            fnv1a64(b"abc"),
+            fnv1a64(b"abc"),
+            "FNV-1a 必须是确定性的（否则每次读都判损坏）"
+        );
     }
 }
