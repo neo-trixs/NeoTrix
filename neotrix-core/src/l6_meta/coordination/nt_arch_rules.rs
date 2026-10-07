@@ -236,15 +236,22 @@ pub fn score_layer_debt(debt: &LayerDebt, in_baseline: bool, is_facade_path: boo
         (pro.len() as f64 - con.len() as f64).abs() / total
     };
 
+    // ⚠️ 2026-10-07 修正措辞：原三分支只有 `gap >= 4` 与 else，
+    //    ⇒ 跨 2 层（实测 guard.rs 是 L3→L5，gap=2）被标成「相邻层引用…
+    //    优先级最低」，**与它自己的 `跨 2 层` 论据自相矛盾**。
+    //    ⇒ 改为按 gap 分四档，每档的措辞与论据一致。
     let needs_human = if is_facade_path {
         "走 facade 通道 ⇒ 先确认它是否属 AGENTS.md §4.2 的豁免范围".to_string()
     } else if gap >= 4 {
         format!(
-            "跨 {} 层：需裁决是「消费方自己那层的 facade 用错了方向」还是「真该下沉」",
-            gap
+            "跨 {gap} 层（S1/S2 级）：需裁决是「消费方自己那层的 facade 用错了方向」还是「真该下沉」"
         )
+    } else if gap == 2 {
+        format!("跨 {gap} 层：需裁决是否该经本层 facade 转出，或该模块本身归属层判定有误")
+    } else if gap == 1 {
+        "跨 1 层：多为分层粒度问题，优先级最低；确认是否属合法的紧邻依赖".to_string()
     } else {
-        "相邻层引用：多为分层粒度问题，优先级最低".to_string()
+        format!("层距 {gap}（异常：源层与目标层相同却判反向）⇒ 疑似清单数据有误，请核实")
     };
 
     DebtVerdict {
@@ -546,5 +553,182 @@ mod rank_tests {
     fn rank_empty_is_ok() {
         let no_base = |_: &str| false;
         assert!(rank_layer_debts(&[], &no_base).is_empty());
+    }
+}
+
+// ============================================================================
+// 真实数据接入（裁定 ③A 的接线）：从 `.neotrix/arch-known-violations.tsv`
+// 读入已知债 → 红蓝对抗 → 产出可裁决的排序报告
+// ============================================================================
+
+/// 解析一行已知违反项（tab 分隔 6 列）。
+///
+/// ⛔ **不 panic**：解析失败返回 `None`（⛔ 本仓铁律禁 `unwrap`/`expect`）。
+/// ⛔ 忽略空行与 `#` 开头的注释行。
+pub fn parse_violation_line(line: &str) -> Option<LayerDebt> {
+    let t = line.trim();
+    if t.is_empty() || t.starts_with('#') {
+        return None;
+    }
+    // 允许 5 或 6 列（第 6 列 note 可选）
+    let mut cols = t.split('\t');
+    let path = cols.next()?.trim();
+    let line_no = cols.next()?.trim().parse::<u32>().ok()?;
+    let src = cols.next()?.trim().parse::<u8>().ok()?;
+    let tgt = cols.next()?.trim().parse::<u8>().ok()?;
+    let snippet = cols.next().unwrap_or("").trim().to_string();
+    if path.is_empty() || src > 6 || tgt > 6 {
+        return None;
+    }
+    Some(LayerDebt {
+        path: path.to_string(),
+        line: line_no,
+        src_layer: src,
+        tgt_layer: tgt,
+        snippet,
+    })
+}
+
+/// 读整份已知违反项清单。
+///
+/// ⛔ 文件缺失返回空 vec 而非报错 —— 调用方必须**自行判断**空是否合理。
+///   ⭐ 理由：门（`check-arch-rules.sh` 判据⑤）已经保证清单非空；
+///   若这里 panic，等于把"门缺失"变成"工具崩溃"，掩盖真因。
+pub fn load_known_violations(path: &str) -> Vec<LayerDebt> {
+    let Ok(s) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    s.lines().filter_map(parse_violation_line).collect()
+}
+
+/// 人类可读的排序报告（**不含任何"应该自动修"的暗示** —— 每行都以裁决提示收尾）。
+pub fn render_rank_report(verdicts: &[DebtVerdict]) -> String {
+    if verdicts.is_empty() {
+        return "架构债对抗评分：0 条。\n\
+                ⚠️ 这**不等于「架构健康」** —— 它可能只是「没人登记」。\n\
+                清单非空由 scripts/check-arch-rules.sh 判据⑤强制。\n"
+            .to_string();
+    }
+    let mut out = String::new();
+    out.push_str(&format!(
+        "架构债对抗评分 —— {} 条，按收敛分降序（红蓝对抗 + 结构事实）\n",
+        verdicts.len()
+    ));
+    out.push_str("⛔ 本报告**不自动改代码**：跨层依赖是跨窗口共享的架构决策。\n\n");
+    for (i, v) in verdicts.iter().enumerate() {
+        out.push_str(&format!(
+            "{}. [{:.3}] L{} → L{}（跨 {} 层） {}\n",
+            i + 1,
+            v.converged_score,
+            v.debt.src_layer,
+            v.debt.tgt_layer,
+            v.layer_gap,
+            v.debt.path
+        ));
+        out.push_str(&format!("   行 {} · 分歧 {:.2}\n", v.debt.line, v.divergence));
+        for p in &v.pro {
+            out.push_str(&format!("   🔵 {p}\n"));
+        }
+        for c in &v.con {
+            out.push_str(&format!("   🔴 {c}\n"));
+        }
+        out.push_str(&format!("   ⚖️ 裁决：{}\n\n", v.needs_human));
+    }
+    out
+}
+
+/// 端到端：读清单 → 打分 → 出报告。命令入口用。
+pub fn report_from_file(violations_path: &str, baseline_path: &str) -> String {
+    let debts = load_known_violations(violations_path);
+    let base_text = std::fs::read_to_string(baseline_path).unwrap_or_default();
+    let reader = |p: &str| base_text.contains(p);
+    let verdicts = rank_layer_debts(&debts, &reader);
+    render_rank_report(&verdicts)
+}
+
+#[cfg(test)]
+mod io_tests {
+    use super::*;
+
+    #[test]
+    fn parses_valid_line() {
+        let d = parse_violation_line("a.rs\t36\t1\t5\tuse crate::l5_x::y;\tnote")
+            .expect("应解析成功");
+        assert_eq!(d.path, "a.rs");
+        assert_eq!(d.line, 36);
+        assert_eq!(d.src_layer, 1);
+        assert_eq!(d.tgt_layer, 5);
+        assert_eq!(d.snippet, "use crate::l5_x::y;");
+    }
+
+    #[test]
+    fn parses_five_cols_without_note() {
+        let d = parse_violation_line("b.rs\t7\t3\t6\tsnip").expect("应解析成功");
+        assert_eq!(d.tgt_layer, 6);
+    }
+
+    /// ⛔ 注释与空行必须被忽略 —— 否则门文件的头部说明会被当成数据行。
+    #[test]
+    fn ignores_comments_and_blanks() {
+        assert!(parse_violation_line("# 注释：path line src tgt").is_none());
+        assert!(parse_violation_line("").is_none());
+        assert!(parse_violation_line("   \t\t ").is_none());
+    }
+
+    /// ⛔ 坏数据返回 None 而非 panic（本仓铁律）。
+    #[test]
+    fn malformed_returns_none_without_panic() {
+        assert!(parse_violation_line("a.rs\tnotanumber\t1\t5\tx").is_none());
+        assert!(parse_violation_line("a.rs\t36\t99\t5\tx").is_none());
+        assert!(parse_violation_line("a.rs\t36\t1\t5\tx").is_some());
+    }
+
+    /// 文件缺失 → 空 vec，**不 panic**（门缺失不该变成工具崩溃）。
+    #[test]
+    fn missing_file_yields_empty_not_panic() {
+        assert!(load_known_violations("/nonexistent/never/here.tsv").is_empty());
+    }
+
+    /// ⭐ 报告**必须**说明「0 条 ≠ 健康」。
+    #[test]
+    fn empty_report_warns_it_is_not_healthy() {
+        let r = render_rank_report(&[]);
+        assert!(
+            r.contains("不等于") && r.contains("没人登记"),
+            "空报告必须澄清「没人登记 ≠ 架构健康」，实际: {r}"
+        );
+    }
+
+    /// ⭐ 每条报告项都必须带裁决提示（门给信号，不代裁决）。
+    #[test]
+    fn report_always_ends_with_adjudication_prompt() {
+        let debts = vec![
+            LayerDebt { path: "x.rs".into(), line: 1, src_layer: 1, tgt_layer: 5, snippet: String::new() },
+            LayerDebt { path: "f/facade.rs".into(), line: 2, src_layer: 1, tgt_layer: 4, snippet: String::new() },
+        ];
+        let no_base = |_: &str| false;
+        let r = render_rank_report(&rank_layer_debts(&debts, &no_base));
+        assert_eq!(r.matches("⚖️ 裁决：").count(), 2, "每条都要有裁决提示");
+        assert!(r.contains("不自动改代码"));
+    }
+
+    /// ⭐ 端到端：读**真实仓库文件**。
+    /// ⛔ 断言「非空」而非「等于 6」—— 硬编码条数会变成陈旧数字，
+    ///    而门（`check-arch-rules.sh` 判据⑤）已保证清单非空。
+    #[test]
+    fn end_to_end_reads_real_repo_file() {
+        let root = env!("CARGO_MANIFEST_DIR");
+        let viol = format!("{root}/../.neotrix/arch-known-violations.tsv");
+        let base = format!("{root}/../.neotrix/arch-rules-baseline.txt");
+        let debts = load_known_violations(&viol);
+        assert!(!debts.is_empty(), "真实清单不应为空：{}", viol);
+        for d in &debts {
+            assert!(
+                d.src_layer <= 6 && d.tgt_layer <= 6,
+                "层号越界: {d:?}"
+            );
+        }
+        let report = report_from_file(&viol, &base);
+        assert!(report.contains("⚖️ 裁决："), "报告必须带裁决提示");
     }
 }
