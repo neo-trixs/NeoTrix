@@ -145,6 +145,51 @@
 ⇒ 已从「188 待判定」中**精确分类出这 3 个 `pub success`**：
 它们是**只写不读**的标记（对照：`FunctionMemory.success_count` 确实被读）。
 
+## D2-b ⚠️ 「死配置」有**两种相反含义** —— 批量删除会销毁规格
+
+### 最大单文件簇：`BackgroundConfig`（**18 / 42 字段装饰性**）
+
+取门的裁决（非我自写扫描器 —— 我第一版自写扫描器把声明本身算成读点，
+**全部误判为「有读点」** ⇒ 又一次「不要重写已有的门」）。
+位置：`l5_cognition/nt_mind/nt_mind_background_loop/config.rs`
+
+| 类型 | 死字段 | 明细 |
+|---|---|---|
+| bool | **6** | `enabled` · `proxy_enabled` · `system_proxy_enabled` · `geo_auto_update` · `agent_protocol_enabled` · `enable_exploration` |
+| numeric | **12** | `save_interval_secs` · `consolidate_interval_secs` · `evolve_interval_secs` · `cleanup_interval_secs` · `mine_interval_secs` · `metacog_interval_secs` · `thinking_interval_secs` · `geo_update_interval_hours` · `telemetry_interval_secs` · `nt_world_crawl_interval_secs` · `prediction_interval_secs` · `panorama_interval_secs` |
+
+⇒ **43% 的配置面在控制空气。** 结构体本身是活的（5 处外部构造引用）。
+
+### ⭐⭐ 关键区分：「死配置」有**两种相反**成因
+
+| 成因 | 含义 | 正确处置 |
+|---|---|---|
+| **A. 已废弃** | 该功能已被替代/移除，字段是残留 | ✅ **删除** |
+| **B. 未接线规格** | 功能**声明了但从未实现**，字段是「意图声明」 | ⛔ **必须保留**并标注 |
+
+⇒ **B 类占多数**（如 `enable_exploration`、`agent_protocol_enabled`
+明显对应真实功能名，只差读者没写）。
+⇒ **批量删除 B 类 = 把「要实现什么」的规格从代码里抹掉**
+⇒ 下一个 agent 读不到这些字段，就**再也不会知道探索功能本该存在**。
+
+⇒ ⇒ **因此D2 不能按「门报了就删」推进。**
+每个字段必须先回答：**「这个功能是没做，还是不做了？」**
+—— 这是**意图问题**，门无法回答（门只能回答「有没有人读」）。
+
+### 建议的处置流程（下一步）
+
+1. 对每个死字段，在**实现侧**搜功能名（如 `exploration`），
+   判定 A/B；
+2. **A 类** → 删字段 + 更新 5 处构造点；
+3. **B 类** → 保留，并在结构体上方写一段
+   「⚠️ 以下 N 个字段是**未接线规格**，实现对应功能时必须读取它们」
+   —— 让「死配置」变成**可执行的待办**，而不是隐性缺口；
+4. 给 `check-dead-config-flag` 增加**第三种分类**：`未接线规格`
+   （人工标注白名单），避免它把 B 类持续报成「待人工判定」。
+
+⇒ 步骤 3+4 是**门的增强**：让门区分「废弃」与「待实现」，
+否则它会逼迫后来者二选一，而两者都是错的。
+
 ## D3 —— 冗余：输出治理规则**在两个 crate 各存一份**（精确图景 + 阻塞）
 
 ### 实测：逐字相同的重复项共**22 个**
