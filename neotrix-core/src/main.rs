@@ -1051,8 +1051,15 @@ fn main() {
         Some(Commands::Login { url }) => run_login(url),
         Some(Commands::Proxy { args }) => {
             let cmd_str = args.join(" ");
-            let rt = tokio::runtime::Runtime::new().expect("tokio");
-            rt.block_on(entry::run_proxy_cmd(&cmd_str));
+            // ⛔ 原为 `.expect("tokio")`：`Runtime::new()` 会因 OS 线程创建失败而失败，
+            // 裸 panic 只打印 `"tokio"`（信息量为零）。
+            // ⇒ CLI 入口应给**可读错误**并走既有退出路径，而不是 panic。
+            match tokio::runtime::Runtime::new() {
+                Ok(rt) => rt.block_on(entry::run_proxy_cmd(&cmd_str)),
+                Err(e) => {
+                    eprintln!("neotrix proxy: tokio runtime 创建失败: {e}");
+                }
+            }
         }
         Some(Commands::Sandbox { command }) => match command {
             SandboxCommands::Run {

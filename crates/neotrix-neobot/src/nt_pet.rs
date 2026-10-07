@@ -212,6 +212,17 @@ fn read_manifest(directory: &Path) -> Result<PetManifest, String> {
 ///
 /// ⛔ 只读文件头，不解码像素 —— 8MB 的图集解码一次只为量尺寸是浪费，
 /// 且解码器是比头解析大得多的攻击面。
+/// 从字节流读大端 `u32`（PNG IHDR 的宽/高）。
+///
+/// ⚠️ 刻意用 `get(..)` 而非 `[..]` 索引：**切片越界本身就是 panic**，
+/// `try_into().unwrap()` 是**第二层** panic ⇒ 两层都去掉。
+fn be32_at(bytes: &[u8], at: usize) -> Option<u32> {
+    bytes
+        .get(at..at + 4)
+        .and_then(|s| s.try_into().ok())
+        .map(u32::from_be_bytes)
+}
+
 fn spritesheet_dimensions(
     bytes: &[u8],
     declared: Option<u8>,
@@ -222,8 +233,11 @@ fn spritesheet_dimensions(
         }
         (
             "image/png",
-            u32::from_be_bytes(bytes[16..20].try_into().unwrap()),
-            u32::from_be_bytes(bytes[20..24].try_into().unwrap()),
+            // ⚠️ 原为 `bytes[16..20].try_into().unwrap()`：
+            //   ⛔ **切片本身也会 panic**（越界），`unwrap` 只是第二层 panic。
+            //   ⇒ 用 `get(..)` + `ok_or(..)?`：越界返回 `Err`，与函数签名一致。
+            be32_at(bytes, 16).ok_or("PET_ASSET_FORMAT_INVALID: PNG 宽字段越界")?,
+            be32_at(bytes, 20).ok_or("PET_ASSET_FORMAT_INVALID: PNG 高字段越界")?,
         )
     } else if bytes.len() >= 30 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
         let chunk = &bytes[12..16];

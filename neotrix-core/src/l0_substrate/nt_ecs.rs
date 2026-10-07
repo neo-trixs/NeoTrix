@@ -523,11 +523,14 @@ impl UniversalWorld {
     pub fn receive_events<T: Event>(&mut self) -> Vec<T> {
         let mut events = Vec::new();
         let mut remaining = Vec::new();
+        // ⭐ 直接按 `downcast::<T>()` 的 `Result` 分派：
+        //   原写法先 `is::<T>()` 再 `downcast::<T>().unwrap()` —— **unwrap 是纯冗余**
+        //   （刚 `is` 过又 `unwrap`）。两者语义完全等价，但后者无 panic 路径。
         for event in self.events.drain(..) {
-            if event.is::<T>() {
-                events.push(*event.downcast::<T>().unwrap());
-            } else {
-                remaining.push(event);
+            match event.downcast::<T>() {
+                Ok(t) => events.push(*t),
+                // 换不回原类型 ⇒ 保留（与原 `else` 分支同义）
+                Err(ev) => remaining.push(ev),
             }
         }
         self.events = remaining;

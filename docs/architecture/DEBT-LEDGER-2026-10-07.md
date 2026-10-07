@@ -8,14 +8,14 @@
 
 | 项 | 实测值 | 门/工具 |
 |---|---|---|
-| `check-unwrap` NEW | **21** | `check-unwrap.sh --strict` |
+| `check-unwrap` NEW | **17** | `check-unwrap.sh --strict` |
 | 死配置待判定 | **188**（bool 136 + numeric 52） | `check-dead-config-flag.sh --types {bool,numeric}` |
 | `check-naming` | **1615** offender（advisory） | `check-naming.sh --strict` |
 | 能力未接线 | **3 / 5** DeclaredOnly + **1 / 5** Scaffold | `market.rs` 的 `executability` |
 | `check-executor-registry` | **RC=0** | 本会话新建 |
 | 元门 | 未登记 **0** · 恒红 **1** · 探针失败 **0** | `check-gate-satisfiable.sh --strict` |
 
-## D1 —— unwrap/expect 债务（21 处）
+## D1 —— unwrap/expect 债务（17 处）
 
 门已可信（2026-10-07 修好两处盲区：测试块不检测 + 打印截断）。
 ⚠️ **`check-unwrap` 之前报 16 是打印假象**，真实值一直是 24+。
@@ -45,7 +45,14 @@
 3. 降级语义必须区分「**无操作**」（返回空/None）与「**破坏**」（清空/默认值）。
 4. 每批修完必跑：目标包测试 + `check-unwrap` NEW 数下降 + **探针 RC=0**。
 
-✅ 已完成：`nt_governance.rs` **6 → 0**（`re_opt -> Option<Regex>` 全链路）。
+✅ 已完成（棘轮 27 → **17**，逐批验证 NEW 下降 + 探针 RC=0）：
+
+| 批次 | 内容 | 手法 |
+|---|---|---|
+| 1 | `nt_governance.rs` **6 → 0** | `re_opt -> Option<Regex>` 全链路，**消除「需要 fallback 正则」这个前提** |
+| 2 | `nt_ecs.rs:528` | `is::<T>() + downcast().unwrap()` → **`match downcast()`**（unwrap 本就冗余） |
+| 3 | `main.rs:1054` | `Runtime::new().expect("tokio")` → `match` + **可读错误**（裸 panic 信息量为零） |
+| 4 | `nt_pet.rs:225/226` | 新增 `be32_at() -> Option<u32>`（`get(..)` 而非 `[..]`，⛔ 切片越界本身也是 panic） |
 
 ## D2 —— 死配置（188 待判定）
 
