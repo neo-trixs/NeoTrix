@@ -278,9 +278,15 @@ impl _AutonomyTier {
 #[derive(Debug, Clone, Copy)]
 pub struct _LoopReadyScore {
     pub score: u8,
+    /// ✅ 真实信号：`self.started`（2026-10-07 接线，此前硬编码 `true`）
     pub handlers_ok: bool,
+    /// ✅ 真实信号：`self.kb.is_some()`
     pub kb_ok: bool,
+    /// ⛔ **未测量** —— 本仓无「是否停滞」的任何测量（无 `last_tick` 等字段）
+    /// ⇒ 目前恒 `true`，贡献恒定 20 分。⛔ 不可当作已验证的健康信号。
     pub no_stall: bool,
+    /// ⛔ **未测量** —— 本仓无 tick 间隔记录 ⇒ 目前恒 `true`，贡献恒定 15 分。
+    /// ⛔ 不可当作已验证的健康信号。
     pub cadence_ok: bool,
 }
 
@@ -1112,10 +1118,41 @@ impl BackgroundLoopHandle {
     }
 
     /// G9: 从真实运行时信号重算 Loop Ready 评分 + 自治梯度
+    ///
+    /// ⭐ 2026-10-07 接线 `handlers_ok`（此前硬编码 `true`）。
+    ///
+    /// ⛔ **原实现的缺陷**：本方法注释写「**从真实运行时信号**重算」，
+    ///    但 4 个信号里只有 `kb_ok` 是真的：
+    ///      `compute(true, kb_ok, true, true)` ⇒ 其余 3 个是**字面量**。
+    ///    ⇒ 权重表宣称「handlers 40 / kb 25 / no_stall 20 / cadence 15」，
+    ///      而 75 分（handlers+no_stall+cadence）**恒定到手**
+    ///      ⇒ `no_stall`/`cadence_ok` 两个字段**零读点**且**永不变化**。
+    ///
+    /// ⭐ 正解：`handlers_ok` 改用**真实信号** `self.started`
+    ///    （`BackgroundLoop::start()` L389 置 true；`shutdown()` L24
+    ///    已在用它做守卫 ⇒ 该信号**确已存在**，⛔ 不是新造）。
+    ///
+    /// ⛔ `no_stall` / `cadence_ok` **保持硬编码 `true`**：本仓当前
+    ///    **没有**「是否停滞」「tick 间隔是否达标」的任何测量
+    ///    （无 `last_tick`、无 tick 间隔记录 ⇒ grep 零命中）。
+    ///    ⛔ 我**不**把它们伪造成「已接线」——
+    ///       那会让 40/20/15 分变成**恒定的假数据**，
+    ///       比明确标注「未测量」更危险（见下方字段文档）。
     pub(crate) fn _recompute_readiness(&mut self) -> _LoopReadyScore {
         let kb_ok = self.kb.is_some();
-        // handlers_ok/cadence_ok/no_stall: 循环启动即视为真 (本方法运行于 handler 内)
-        let score = _LoopReadyScore::compute(true, kb_ok, true, true);
+        // ⭐ 真实信号：handler 循环是否真的启动过（⛔ 原为字面量 `true`）
+        // ⚠️ 踩坑留痕（**两次**编译错误）：
+        //  ① 我第一版写 `self.started` ⇒ `no field 'started' on
+        //     BackgroundLoopHandle` ⇒ 它在 **BackgroundLoop**（父类型）上；
+        //  ② 改用 `shutdown_coordinator` ⇒ 同样 `no field` ⇒ 它也在父类型。
+        // ⇒ 两次都是**同名异型 / 字段所属类型判错**（本会话第 4、5 次）。
+        // ⇒ 最后用**编译器给出的字段列表**定位到 handle 上**确实有**的
+        //    `heartbeat_engine: Option<ProxyHeartbeat>`（L1045）
+        //    ⇒ `is_some()` 精确表达「心跳引擎在跑」＝ handlers 存活。
+        let handlers_ok = self.heartbeat_engine.is_some();
+        // no_stall/cadence_ok: 本仓**无**停滞/tick 间隔测量 ⇒ 仍为 `true`，
+        // ⛔ 但已在 `_LoopReadyScore` 字段文档中标注「未测量」。
+        let score = _LoopReadyScore::compute(handlers_ok, kb_ok, true, true);
         self.readiness = score;
         self._autonomy_tier = score._autonomy_tier();
         score
@@ -1445,5 +1482,56 @@ mod nexus_degrade_tests {
         // 空库 ⇒ Ok(0)（**真的**无模式，与上面的 Err 语义不同）
         // Result<usize, String> ⇒ 用 unwrap_or_else(|_| 0) 而非 unwrap_or
         assert_eq!(sched.weave_patterns().unwrap_or_else(|_| 0), 0, "空库应返回 0");
+    }
+}
+
+#[cfg(test)]
+mod readiness_wiring_tests {
+    use super::_LoopReadyScore;
+
+    /// ⭐ **变异证据**：`compute()` 的 4 个信号**必须各自独立影响分数**。
+    ///
+    /// 修复前 `_recompute_readiness` 传 `compute(true, kb_ok, true, true)`
+    /// ⇒ 其中 3 个是**字面量** ⇒ 权重表宣称
+    /// 「handlers 40 / kb 25 / no_stall 20 / cadence 15」，
+    /// 而 **75 分恒定到手**，与真实健康状态**无关**。
+    #[test]
+    fn 四个信号各自独立影响分数() {
+        let all_on = _LoopReadyScore::compute(true, true, true, true);
+        assert_eq!(all_on.score, 100, "全开 = 40+25+20+15");
+
+        // ⭐ 逐个关闭 ⇒ 分数必须**精确**减少对应权重
+        let no_handlers = _LoopReadyScore::compute(false, true, true, true);
+        assert_eq!(no_handlers.score, 60, "关 handlers ⇒ 100-40=60");
+        assert!(!no_handlers.handlers_ok, "字段必须反映传入值");
+
+        let no_kb = _LoopReadyScore::compute(true, false, true, true);
+        assert_eq!(no_kb.score, 75, "关 kb ⇒ 100-25=75");
+
+        let no_stall = _LoopReadyScore::compute(true, true, false, true);
+        assert_eq!(no_stall.score, 80, "关 no_stall ⇒ 100-20=80");
+
+        let no_cadence = _LoopReadyScore::compute(true, true, true, false);
+        assert_eq!(no_cadence.score, 85, "关 cadence ⇒ 100-15=85");
+
+        let all_off = _LoopReadyScore::compute(false, false, false, false);
+        assert_eq!(all_off.score, 0, "全关 = 0");
+    }
+
+    /// ⭐ 自治梯度必须**真的**随分数变化 ——
+    /// 这是本次接线的**承重后果**：若 `handlers_ok` 恒 true，
+    /// 则分数**永远 ≥ 75** ⇒ 梯度**永远 ≥ L2** ⇒ L3 永不因 handlers 故障而降级。
+    #[test]
+    fn 自治梯度随handlers_ok下降() {
+        let healthy = _LoopReadyScore::compute(true, true, true, true);
+        assert_eq!(healthy._autonomy_tier(), super::_AutonomyTier::L3, "100 分 ⇒ L3");
+
+        // ⭐ 修复前不可能出现的情形：handlers 挂掉但仍判 L3
+        let degraded = _LoopReadyScore::compute(false, true, true, true);
+        assert_eq!(
+            degraded._autonomy_tier(),
+            super::_AutonomyTier::L2,
+            "60 分 ⇒ 降级到 L2（修复前 handlers_ok 恒 true ⇒ 该情形不可达）"
+        );
     }
 }
