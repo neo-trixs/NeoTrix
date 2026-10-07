@@ -168,6 +168,33 @@ impl CognitionFacade {
     ///
     /// 从 nt_core / nt_mind / consciousness_core 分别获取健康指标，
     /// 聚合为统一的 LayerHealth 摘要。
+    ///
+    /// ⛔⚠️ **审计裁定 2026-10-07：本函数返回的是**虚构的健康报告**。**
+    ///
+    /// **实测证据**（`check-fake-signal` R1）：
+    ///  1. 下面三个 `SubModuleHealth` **全部**是硬编码字面量
+    ///     —— `score: 1.0, healthy: true, issues: vec![]`；
+    ///  2. `CognitionFacade` 是**空 struct**（L113-116，构造为 `Self {}`）
+    ///     ⇒ **结构上不持有**任何子模块句柄 ⇒ **无法**探测真实状态；
+    ///  3. 文档却声称「从 nt_core / nt_mind / consciousness_core
+    ///     **分别获取**健康指标」⇒ **文档承诺 vs 实现不符**。
+    ///
+    /// ⚠️ ⭐ **同名异型 + 跨域错位的教科书案例**：
+    ///   `neotrix-core/src/l1_action/nt_action_facade.rs:239`
+    ///   也有 `pub fn health(&self) -> LayerHealth`，⛔ 但那个是**真实检查**
+    ///   （`kb.raw_conn().is_ok()` / `tool_executor.is_some()` 逐项判定）。
+    /// ⇒ 两个同名 API **质量天差地别** ⇒ 只按名字查找必然误判。
+    ///
+    /// ⛔ **后果**：任何调用方拿到的都是「三个子模块全满分、零问题」，
+    ///   ⛔ 即「**永远健康**」——这比「没有健康 API」更危险，
+    ///   因为它让监控/决策**以为**自己拿到了真信号。
+    ///
+    /// ⭐ 正解（未实施，需 owner 决策）：
+    ///   (a) 让 `CognitionFacade` **持有**三个子模块的**可探测句柄**
+    ///       （`Option<Arc<..>>`），再逐项检查 —— 与 `nt_action_facade`
+    ///       的做法对齐；
+    ///   (b) ⛔ 或**删除** `health()`，⛔ 绝不能让「恒健康」冒充真信号。
+    /// ⛔ 我**不擅自实施**：这会改变 facade 的**公开 API 与结构**。
     pub fn health(&self) -> LayerHealth {
         let reasoning = SubModuleHealth {
             name: "nt_core".into(),
