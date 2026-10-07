@@ -12,6 +12,8 @@
 use serde::Deserialize;
 use std::path::PathBuf;
 
+use crate::l1_action::nt_io::nt_io_plugin::{Plugin, PluginEvent};
+
 /// 一个外部 CLI 插件的 descriptor。
 #[derive(Debug, Clone, Deserialize)]
 pub struct ExternalCliPlugin {
@@ -100,6 +102,63 @@ pub fn load_external_cli_plugins() -> Vec<ExternalCliPlugin> {
 /// 按名字查找插件。
 pub fn find_external_cli_plugin(name: &str) -> Option<ExternalCliPlugin> {
     load_external_cli_plugins().into_iter().find(|p| p.name == name)
+}
+
+/// 把 descriptor 适配成统一的 `Plugin` 实例（name/version 为登记时一次性
+/// 静态化，cron `Plugin::name()` 需要 &'static str）。
+pub struct CliDescriptorPlugin {
+    name: &'static str,
+    version: &'static str,
+    pub descriptor: ExternalCliPlugin,
+}
+
+impl CliDescriptorPlugin {
+    pub fn new(descriptor: ExternalCliPlugin) -> Self {
+        let name = Box::leak(descriptor.name.clone().into_boxed_str());
+        let version = Box::leak("0.0.0-desc".to_string().into_boxed_str());
+        Self {
+            name,
+            version,
+            descriptor,
+        }
+    }
+}
+
+impl Plugin for CliDescriptorPlugin {
+    fn name(&self) -> &'static str {
+        self.name
+    }
+    fn version(&self) -> &'static str {
+        self.version
+    }
+    fn on_load(&self) -> Result<(), String> {
+        if self.descriptor.probe_available() {
+            Ok(())
+        } else {
+            Err(format!("`{name}` 探活失败", name = self.name))
+        }
+    }
+    fn on_unload(&self) -> Result<(), String> {
+        Ok(())
+    }
+    fn on_event(&self, _event: &PluginEvent) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+/// 所有 descriptor 插件 → `Box<dyn Plugin>` 列表，供统一注册表批量装载。
+pub fn external_cli_as_plugins() -> Vec<Box<dyn Plugin>> {
+    load_external_cli_plugins()
+        .into_iter()
+        .map(|p| Box::new(CliDescriptorPlugin::new(p)) as Box<dyn Plugin>)
+        .collect()
+}
+
+/// 把外部 CLI descriptor 批量注册进统一的共享注册表。
+pub async fn load_external_cli_into(
+    registry: &crate::l1_action::nt_io::nt_io_plugin::PluginRegistry,
+) -> Result<(), String> {
+    registry.load_batch(external_cli_as_plugins()).await.map(|_| ())
 }
 
 #[cfg(test)]

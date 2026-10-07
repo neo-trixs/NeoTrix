@@ -14,7 +14,8 @@ use neotrix::l1_action::nt_dialogue_tui::NtTuiHuman;
 use neotrix::l1_action::nt_free_pool::NtFreePoolAsk;
 use neotrix::l1_action::nt_io::nt_io_provider::catalog::model_pool::{ModelSource, UnifiedModelPool};
 use neotrix::l1_action::nt_io::nt_io_provider::catalog::cli_free_source::CliFreeSource;
-use neotrix::l1_action::nt_act::nt_act_dev_tools::{find_external_cli_plugin, load_external_cli_plugins, plugins_dir};
+use neotrix::l1_action::nt_act::nt_act_dev_tools::{find_external_cli_plugin, load_external_cli_plugins, plugins_dir, load_external_cli_into};
+use neotrix::l1_action::nt_io::nt_io_plugin::registry::global_registry;
 use neotrix::l1_action::nt_model_cli::NtModelCliAsk;
 use neotrix::l1_action::nt_stdin_human::NtStdinHuman;
 use neotrix::l5_cognition::nt_crystal_core::{
@@ -189,7 +190,7 @@ fn main() {
         }
     }
 
-    // 晶体：磁盘有记忆就载入，没有就新建（两条路都不 panic）
+    // 磁盘有记忆就载入，没有就新建（两条路都不 panic）
     let mut core = match CrystalCore::load() {
         Ok(c) => {
             println!("已载入晶体记忆。");
@@ -200,6 +201,17 @@ fn main() {
             CrystalCore::new("nt-dialogue")
         }
     };
+
+    // 外部 CLI descriptor 插件并入统一共享注册表（热插拔/事件分发共用一条）
+    {
+        let rt = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(_) => {
+                std::process::exit(1);
+            }
+        };
+        let _ = rt.block_on(load_external_cli_into(&global_registry()));
+    }
 
     // 模型选择回到池子：定点 or 发现免费档进池轮转，兜底默认。
     // 返回（问答桥，池共享句柄，池展示行，选择器模型）：TUI 事件驱动与行式共用。
