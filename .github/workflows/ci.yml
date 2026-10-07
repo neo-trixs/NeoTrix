@@ -382,6 +382,46 @@ jobs:
         run: node scripts/ops/neobot-check-markdown.mjs
       - name: neobot UI gate — neobot-ui-smoke (UI 冒烟（综合）)
         run: node scripts/ops/neobot-ui-smoke.mjs
+
+      # ⭐⭐⭐⭐⭐ 2026-10-07：接上 4 道此前**完全不在 CI 里**的门。
+      #
+      # # 为什么要接（实测，非推测）
+      #
+      # `apps/neobot-desktop/STATUS.md` §1.5「门禁（11 个）」列的就是这几道，
+      # 而实测它们在 `.github/workflows/` 里**零命中**：
+      #   nt_check_layout / nt_check_visual / nt_check_interact / nt_check_trace /
+      #   nt_check_bytes / nt_check_api / nt_check_status / nt_check_ui_calls /
+      #   nt_check_ship_ui / nt_check_upstream_1to1
+      # ⇒ **文档声称的门集与 CI 实际执行的门集几乎不相交**：§1.5 列的 11 道
+      #   大多不在 CI，而在 CI 跑的那批 `neobot-*` 门 §1.5 一个都没列。
+      # ⇒ 这正是 §4 教训 38 的形状（以为门在跑，实际不在）。
+      #
+      # # 本轮只接这 4 道，不一次接 10 道
+      #
+      # 理由：这 4 道覆盖**视觉可用性 + 交互正确性 + 轨迹完整性 + 字节安全**，
+      # 都是「坏了用户立刻有感」或「静默腐化」类；实测耗时 1-5s，可忽略。
+      # ⛔ 其余 6 道（api/status/ui_calls/ship_ui/upstream_1to1/visual）
+      #   属另一批接入决策，**不擅自加** —— 加门就是加 CI 时长与维护面。
+      #
+      # # 前置依赖（已在上面满足）
+      #
+      # · `Build frontend` 刚刚被移到这批门**之前**（本轮上一提交）——
+      #   这几道也读 `neobot-ui/dist`，顺序错了必然红。
+      # · Chrome：门内 `findChrome()` 覆盖 macOS/Linux 路径并支持 CHROME_PATH；
+      #   `macos-latest` 自带 Chrome，⛔ 不需下载浏览器。
+      # ⭐ 顺带修掉它们的**冷启动竞态**：原先起 Chrome 后固定 sleep 1500ms
+      #   就去连 CDP ⇒ 冷启动时 ECONNREFUSED 报「环境问题」红。
+      #   CI runner **每次都是冷的** ⇒ 不修就是给 CI 埋间歇性失败。
+      #   已改为**轮询就绪**（waitForCdp，30s 硬超时）；
+      #   验证：冷态连跑 3 轮全绿；坏端口下等满 30s 才失败（确认真在等）。
+      - name: UI gate — nt_check_layout (stub-boot 真渲染：几何/暗色/a11y/零未登记)
+        run: node scripts/ops/nt_check_layout.mjs
+      - name: UI gate — nt_check_interact (真点：发送链/切会话/宠物/两页)
+        run: node scripts/ops/nt_check_interact.mjs
+      - name: UI gate — nt_check_trace (轨迹三态/状态透传/无每轮费用)
+        run: node scripts/ops/nt_check_trace.mjs
+      - name: UI gate — nt_check_bytes (U+FFFD 字节安全)
+        run: node scripts/ops/nt_check_bytes.mjs
       # ⭐⭐ `neobot-desktop`：本次补的核心。此前 CI 一次都没跑过它，
       #   后果是 2026-10-02 那个 P0（前端载荷键 snake_case vs Tauri camelCase ⇒
       #   **消息从不落库、切会话历史永远空**）能带着「全部 UI 门全绿」活下来。

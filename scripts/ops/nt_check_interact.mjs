@@ -214,6 +214,34 @@ const server = createServer((req, res) => {
   res.end(readFileSync(p));
 });
 
+/**
+ * 等 CDP 端点就绪 —— ⛔ **轮询**，不是固定 sleep。
+ *
+ * # 为什么必须轮询（实测，非推理）
+ *
+ * ⛔ 改前是 `await new Promise(r => setTimeout(r, 1500))` 然后直接连。
+ * ⓘ 实测：Chrome **冷启动**时 1500ms 不够 ⇒ `connect ECONNREFUSED` ⇒
+ *   门报「环境问题」红。热态复跑则绿 ⇒ 表现为**间歇性**失败。
+ * ⓘ 而 GitHub Actions 的 runner **每次都是冷的** ⇒ ⛔ 固定 sleep 在 CI 上
+ *   近乎必然踩中 ⇒ 门红 ⇒ **跳过后续步骤** ⇒ 正是本轮刚修的那个老问题复发。
+ *
+ * ✅ 这里改成「连不上就重试，直到超时」，并把**超时**做成硬失败
+ *   （⛔ 不把「跑不出结果」当「没问题」）。
+ */
+async function waitForCdp(port, timeoutMs = 30000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastErr = null;
+  while (Date.now() < deadline) {
+    try {
+      return await cdpGet(`http://127.0.0.1:${port}/json`);
+    } catch (e) {
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+  throw new Error(`CDP ${port} 在 ${timeoutMs}ms 内未就绪：${lastErr}`);
+}
+
 function cdpGet(url) {
   return new Promise((res, rej) => {
     get(url, (r) => {
@@ -307,9 +335,8 @@ try {
     "about:blank",
   ], { stdio: ["ignore", "ignore", "pipe"] });
   child.on("error", () => {});
-  await new Promise((r) => setTimeout(r, 1500));
-
-  const targets = await cdpGet("http://127.0.0.1:9335/json");
+  // ⭐ 2026-10-07：固定 1500ms sleep 改为**轮询就绪**（见 waitForCdp 的理由）。
+  const targets = await waitForCdp(9335);
   const page = targets.find((t) => t.type === "page") || targets[0];
   const { ws, send } = await connect(page.webSocketDebuggerUrl);
   try {
