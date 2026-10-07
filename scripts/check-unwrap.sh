@@ -181,17 +181,55 @@ for dirpath, dirnames, filenames in os.walk("."):
             #   ⇒ 改为「是 cfg 属性」+「该行含 `test` ident」两条独立判据。
             for name, rx in TOKENS:
                 if rx.search(line):
-                    hits.append((rel, i, name))
+                    # ⭐ **内容锚点**（2026-10-07）：`路径:行号` 会因**行号漂移**失配
+                    #   ⇒ 上游任何编辑都可能让「同一位点」看起来是「新增」（假警报），
+                    #   或让既有的一条看起来「已修」（棘轮失真）。
+                    #   实测旧键已陈旧 **132** 条。
+                    # ⇒ 键改为 `路径 \x1f 所属函数名 \x1f 归一化代码行`。
+                    #   · 所属函数：向上找最近的 `fn ` 定义行（找不到用 `<toplevel>`）
+                    #   · 归一化：去掉所有空白 ⇒ 纯格式调整不触发新增
+                    fn_name = "<toplevel>"
+                    for k2 in range(i - 1, max(-1, i - 400), -1):
+                        cand = code[k2]
+                        m2 = re.search(r"\bfn\s+([A-Za-z_]\w*)", cand)
+                        if m2:
+                            fn_name = m2.group(1)
+                            break
+                    norm = re.sub(r"\s+", "", line)
+                    hits.append((rel, i, name, fn_name, norm))
 
 # Baseline is a LIST, never a count: a count would let "delete one, add one"
 # hide forever. Same rationale as layer-deps-baseline.txt.
-cur = {"%s:%d" % (p, l): n for p, l, n in hits}
+SEP = "\x1f"
+
+
+def anchor(path, fn_name, norm):
+    """内容锚点键：**行号漂移免疫**。"""
+    return "%s%s%s%s%s" % (path, SEP, fn_name, SEP, norm)
+
+
+# `cur` 用内容锚点作键；同时保留 `路径:行号` 索引，供 v1 旧账本过渡期折算
+cur = {}
+cur_by_line = {}
+for _p, _l, _n, _fn, _norm in hits:
+    _a = anchor(_p, _fn, _norm)
+    cur[_a] = _n
+    cur_by_line["%s:%d" % (_p, _l)] = (_a, _n)
 have = {}
 if os.path.exists(baseline_path):
     for line in open(baseline_path, encoding="utf-8"):
         line = line.rstrip("\n")
         if line and not line.startswith("#"):
-            have[line.split("\t")[0]] = line.split("\t")[-1]
+            key = line.split("\t")[0]
+            tok = line.split("\t")[-1]
+            if SEP in key:
+                # v2 内容锚点键 ⇒ 直接采用
+                have[key] = tok
+            elif key in cur_by_line:
+                # v1 `路径:行号` ⇒ **仅当该位点此刻仍被检出**时才折算成锚点。
+                # ⛔ 绝不无条件折算：旧账本那 132 条「已不存在」的条目若被折算，
+                #    会凭空造出 never-seen 的锚点 ⇒ **等于洗白**。
+                have[cur_by_line[key][0]] = tok
 
 if update:
     with open(baseline_path, "w", encoding="utf-8") as fh:
