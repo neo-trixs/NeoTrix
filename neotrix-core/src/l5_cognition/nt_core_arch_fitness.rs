@@ -780,3 +780,67 @@ mod tests {
         assert!(result.is_ok(), "干净对守卫必须在现状下通过: {:?}", result);
     }
 }
+
+/// 读取死代码检测的豁免基线 —— `.neotrix/arch-fitness-exempt.txt`，每行一条子串。
+///
+/// 语义：某条 failure 含任一豁免子串 ⇒ 跳过。空文件 ⇒ 无豁免（最严）。
+/// ⛔ 豁免必须**逐条**、带理由（写在文件内 `#` 注释里）；本函数只取子串。
+pub fn arch_fitness_exemptions() -> Vec<String> {
+    let p = repo_root().join(".neotrix/arch-fitness-exempt.txt");
+    let Ok(s) = std::fs::read_to_string(&p) else {
+        return Vec::new();
+    };
+    s.lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .map(str::to_string)
+        .collect()
+}
+
+#[cfg(test)]
+mod dead_code_gate {
+    use super::*;
+    use crate::l0_substrate::nt_core_self_test::SelfTest;
+
+    /// 裁定 1A（2026-10-07）：把 dead_code 检测结果接进门。
+    ///
+    /// **背景裁定**：`lib.rs:23` 的 `#![allow(dead_code)]` 是**有意的** R-P1 约定
+    /// （旁证：`recovery.rs:37-39` 特意加模块级 `#![deny(dead_code)]` 对抗它）。
+    /// ⇒ 保留约定，用 `DeadCodeFitness` 补位被压掉的编译器信号。
+    ///   （裁定 B「删 allow、交还编译器」被否：2483 文件/784,660 行从未被编译器审过。）
+    ///
+    /// **本测试补的是判据②**：结果**被消费为门**。
+    /// 现状（已修）：`test_all_have_names` 只 `assert!(!r.name.is_empty())`，
+    /// 把 `SelfTestResult.passed` 丢弃 ⇒ 该检测件检出了也没人看。
+    /// 判据③（抑制器不遮视野）的补法是**显式豁免基线**，不是删 allow。
+    ///
+    /// ⛔ 本测试只覆盖 `self_test()` 的**静态 allow 扫描**层；
+    /// `cargo check` 层按 `skip_cargo_check_tier()` 在 `cargo test` 内跳过
+    /// （见本文件内 2026-09-27 除根注释：测试进程内起 cargo 会与外层抢 target 锁）。
+    #[test]
+    fn arch_fitness_dead_code_result_is_consumed() {
+        // 直接调 self_test() 取 failures —— 断言的正是「results 曾被丢弃」这件事。
+        let failures: Vec<String> = match DeadCodeFitness.self_test() {
+            Ok(()) => Vec::new(),
+            Err(f) => f,
+        };
+        let exempt = arch_fitness_exemptions();
+        let unexpected: Vec<&String> = failures
+            .iter()
+            .filter(|f| !exempt.iter().any(|e: &String| f.contains(e.as_str())))
+            .collect();
+
+        assert!(
+            unexpected.is_empty(),
+            "arch_fitness_dead_code 检出 {} 项未豁免的死代码信号：\n{}\n\n             ⚠️ 若要豁免（如 `lib.rs` 的 crate 级 allow(dead_code) 是有意约定），\n\
+             请把该路径登记进 `.neotrix/arch-fitness-exempt.txt`。\n\
+             本门替代被 `lib.rs:23` 压掉的编译器信号（裁定 1A）。",
+            unexpected.len(),
+            unexpected
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+    }
+}

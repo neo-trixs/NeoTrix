@@ -1,0 +1,78 @@
+# arch_fitness_dead_code 豁免基线（裁定 1A，2026-10-07）
+#
+# 语义：某条 failure 含任一**子串**即跳过。空文件 = 无豁免（最严）。
+# ⚠️ 纪律：豁免**必须逐条、带理由**。本文件里每一条都要能回答：
+#    「这个模块为什么需要压掉编译器信号？」
+#
+# ───────────────────────────────────────────────────────────────────
+# 【规则】本文件登记的全部是**模块级** `#![allow(dead_code)]`
+#（形如 `neotrix-core/src/.../foo.rs` 内部），**不是** crate 级的
+# `lib.rs:23`。每条都有自己的模块文档，不是无脑复制的样板。
+#
+# 【为什么整体豁免而非逐个删 allow】
+# 裁定 1A 已定：`lib.rs:23` 的 crate 级 allow 是**有意的** R-P1 约定，
+# 保留它、由本门补位。同一约定在模块级的一致应用（"这个模块的类型体系
+# 面向未来接线，先不因未接线产生编译噪声"）属同类工程判断。
+# ⇒ 本门的作用从"禁止一切 allow"变为**"禁止没有登记的 allow"**：
+#    新增一个 `#![allow(dead_code)]` 而不登记 ⇒ CI 立刻红。
+#    这正是 LESSONS L8 判据②「结果被消费为门」的实际兑现。
+#
+# 【不豁免什么】
+# ⛔ 零消费者模块（跨域错位、已废弃实现）**不**靠 allow 豁免 ——
+#    那类应删除或归档（见 roadmap T1-*），不是登记了事。
+#    本文件里若出现这类条目，即为误登记，应重新裁决。
+
+# ── L1 动作层 ──────────────────────────────────────────────────────
+# 工具结果以「引用+预览」暴露；完整内容不序列化。部分 API 面向后续接线。
+neotrix-core/src/l1_action/nt_act/reference_view.rs
+# 网关韧性子系统的接口面（漂移检测/健康检查/弹性恢复/响应缓存/响应修复）。
+# 子模块间按需组合，整包导出。
+neotrix-core/src/l1_action/nt_io/nt_io_provider/gateway/resilience/mod.rs
+# 路由智能：评分/偏好信号，部分策略仍在演进。
+neotrix-core/src/l1_action/nt_io/nt_io_provider/gateway/routing/intelligence.rs
+# 工具调用的类型化契约。契约按工具族逐步补齐。
+neotrix-core/src/l1_action/nt_io/nt_io_contract.rs
+# R-P42：强化既有 nt_file_ability，非平行适配器。rel 改写能力随调用方铺开。
+neotrix-core/src/l1_action/nt_file_ability/merge/merge_docx.rs
+
+# ── L3 具体化层 ────────────────────────────────────────────────────
+# 外部 HTTP 统一出口 + egress guard。子能力随网关接线逐个落地。
+neotrix-core/src/l3_embodiment/nt_shield/http_intercept/mod.rs
+# 流量代理：协议族覆盖面随出站实现推进。
+neotrix-core/src/l3_embodiment/nt_shield/nt_shield_traffic/api_proxy.rs
+
+# ── L4 情绪/记忆层 ─────────────────────────────────────────────────
+# 开放知识库渲染面（可嵌入 HTML + 丰富组件），组件随消费方接入。
+neotrix-core/src/l4_emotion/nt_memory/nt_memory_openknowledge.rs
+
+# ── crate 级（本裁定 1A 的核心豁免）────────────────────────────────
+# `lib.rs:23` 的 `#![allow(dead_code)]` 是**有意的** R-P1 约定 —— 保留它。
+# 理由链：
+#   ① 保留约定，用 `DeadCodeFitness` 补位被压掉的编译器信号（本裁定的做法）；
+#   ② 备选方案 B「删 allow、交还编译器」已否决：2483 文件 / 784,660 行
+#      从未被编译器审过，删掉会立刻爆出大量 dead_code 噪声；
+#   ③ 历史旁证：`recovery.rs:37-39` 特意加模块级 `#![deny(dead_code)]`
+#      来对抗它 —— 说明已有人试过"交还编译器"并退回。
+# ⚠️ 本条豁免的是**这一处约定**，不是"全仓死代码"。新引入的模块级 allow
+#    仍须逐条登记，否则本门立刻红。
+neotrix-core/src/lib.rs
+
+# ── L5 认知层 ──────────────────────────────────────────────────────
+# 构建看门狗：告警系统，随构建流水线的检查项增加。
+neotrix-core/src/l6_meta/coordination/nt_meta_build_watchdog.rs
+# 后台环的游戏面 handler。游戏子系统独立演进中。
+neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_game.rs
+# 后台环主循环：handler 集合按运行模式扩展。
+neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs
+# 意识层感知面（WiFi 感知等环境信号）。
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/consciousness/wifi_sensing.rs
+# 图构建：schema 随领域扩展。
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/graph_build.rs
+# Hebbian 睡眠期学习：关联规则随证据积累演进。
+neotrix-core/src/l5_cognition/nt_mind/nt_mind/reason/sleep/hebbian.rs
+# 蒸馏：策略档位随 SEAL 协议演进。
+neotrix-core/src/l5_cognition/nt_mind/seal/distillation.rs
+# `/refine` 命令：审查轨迹、施加小步有证据的状态更新、快照回滚。
+neotrix-core/src/l5_cognition/nt_mind/harness/refinement.rs
+# 游戏规则随星座进度自适应演化。
+neotrix-core/src/l5_cognition/nt_mind/nt_game/evolution.rs
