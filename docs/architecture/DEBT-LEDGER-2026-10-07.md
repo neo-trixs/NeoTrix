@@ -8,16 +8,53 @@
 
 | 项 | 实测值 | 门/工具 |
 |---|---|---|
-| `check-unwrap` NEW | **3**（8 文件已清零；输出可 grep） |
-| 死配置待判定 | **188**（bool 136 + numeric 52） | `check-dead-config-flag.sh --types {bool,numeric}` |
+| `check-unwrap` NEW | ⭐ **0** —— `--strict` **首次全绿**（`PASS: 0 new violation(s); 514 known`） | `bash scripts/check-unwrap.sh --strict` |
+| `check-unwrap` 存量 | **514** 站点，全部记账在 `scripts/unwrap-baseline.txt`（**基线已瘦身 705 → 514**） | 同上 |
+| 死配置待判定 | **184**（bool 133 + numeric 51） | `python3 scripts/ops/nt_dead_flag.py --root . --types {bool,numeric}` |
+| 死配置「未接线规格」 | ⭐ **0**（bool 与 numeric **均归零**） | 同上 |
+| 名字债 | 133 条已定性、**全部留痕**（含 3 处「门报告错误」的撤标与 1 处「门是对的」裁定） | 同上 |
 | `check-naming` | **1615** offender（advisory） | `check-naming.sh --strict` |
 | 能力未接线 | **3 / 5** DeclaredOnly + **1 / 5** Scaffold | `market.rs` 的 `executability` |
 | `check-executor-registry` | **RC=0** | 本会话新建 |
 | 元门 | 未登记 **0** · 恒红 **1** · 探针失败 **0** | `check-gate-satisfiable.sh --strict` |
 
-## D1 —— unwrap/expect 债务（3 处·均已定性为「需 API 变更」）
+## ⭐ D1 —— unwrap/expect 债务：**已清零**（`check-unwrap --strict` 首次全绿）
 
-### ✅ 本会话已清 24处（27 → 3）
+### ✅ 本会话已清 28 处（27 → 0）
+
+#### ⭐ 最后 4 处（4 → 0）：**根因互不相同，无一是「删个 expect」**
+
+| 提交 | 站点 | 真实根因 | 修法 |
+|---|---|---|---|
+| `30c2c9f1` | `nt_io_output_style.rs` | `expect` 把「不可达」写成**运行时不变量**（未来加 `remove()` 即变可达） | `resolve → Option<&dyn>`；`apply` 三级兜底，末级**恒等透传**（没样式就该保持原文） |
+| `a8915b61` | `social_access/traits.rs` | **零调用方**的 panic 包装 | 删函数 + 迁移 2 个调用方到 `?` |
+| `4795e209` | `nt_mind_background_loop/run.rs` | ⭐ **无效 fallback**：失败后**重开完全相同的路径**，而失败原因（不可写/磁盘满/锁冲突）**不因重试消失** ⇒ 真实故障下必 panic；且 `log::warn!("creating temp")` **谎称在降级** | `kb: Arc<KB> → Option<Arc<KB>>` + 访问器返回 `Err`；handler 降级为 no-op |
+| `7e421b9a` | `goal_loop/loop_impl/core.rs` | **借用检查器限制**（⛔ 不是「可能失败」：上一行刚 `= Some(...)`，`.expect` 逻辑上恒成立） | 返回 `Option<&GoalTracker>`（13 处调用方全忽略返回值 ⇒ 零破坏） |
+
+**承重原则**（本轮反复用到）：
+- ⛔ 明确**不**fabricate 空 KB/空库 —— 那会让 `weave_patterns` 返回 `Ok(0)`，
+  把「KB 缺失」**伪装成「已挖掘但无模式」** ⇒ 必须用 `Option` 区分两种「没有」。
+- ⛔ **不**给门加豁免来「修」违规（那把症状变成谎言）。
+
+#### ⭐ 门本身的缺陷：`check-unwrap` 有一条**隐形债通道**（`690903a7`）
+
+| 证据 | 数值 |
+|---|---|
+| 基线文件真实条目 | **705** |
+| 门实际认账 | **514** |
+| **隐形（静默丢弃）** | **191 条（27%）** |
+
+**变异实验**（判定依据，非推断）：把一条**已失效**的 v1 条目改指向任意文件
+⇒ 门仍输出 `baseline entries: 514` + `PASS: 0 new` ⇒ **完全无感**。
+
+根因：v1 `path:line` 条目**仅当此刻该行号仍被检出**才折算成内容锚点，
+否则**静默丢弃** —— 既不计入 honoured、不报失效、也不算 NEW。
+
+修复：新增 `stale_baseline` 记录 + 显式输出 STALE 计数/样例/修复命令；
+⛔ **不**改原「绝不无条件折算」的反洗白语义。修复后同一变异**立即被捕获**。
+随后 `--update-baseline` 从**活站点**派生（⛔ 非手工删）⇒ **705 → 514**。
+
+### ✅ 此前已清 24 处（27 → 4）
 
 | 批次 | 内容 | 手法 |
 |---|---|---|
@@ -30,17 +67,21 @@
 | 7 | `coverage_ledger.rs` 3 | 锁投毒按**本仓范式** `PoisonError::into_inner` 恢复 |
 | 8 | memory_pack / pure_fns / rag / orchestrator / guardian / memory_filesystem / experience_memory 8 | 逐类：统一错误风格 / 去掉冗余 unwrap / `filter_map` 跳过不一致 / `Path::parent()` 用 `if let` / 时钟回拨用 `unwrap_or_default` |
 
-### ⛔ 剩余 3 处：**需要 API 变更**，不靠改写能清
+### ✅ 那 3 处「需 API 变更」的阻塞，**本轮已各寻得正解**
 
-| 位置 | 阻塞（已逐一核实） |
-|---|---|
-| `goal_loop/loop_impl/core.rs:290` `active_goal.as_ref().expect(..)` | 函数签名是 `-> &GoalTracker`（**非 Result**）⇒ 不能用 `?`；`GoalTracker` **不派生 `Default`**（只有 `Debug/Clone/Serialize/Deserialize`）⇒ `unwrap_or_default()` 会给**语义错**的空 tracker；而 borrowck 不允许「先取引用再赋值」。⇒ **只能改签名为 `Result<&GoalTracker, _>`**（会波及调用方） |
-| `nt_mind_background_loop/run.rs:712` | `open(None)` 失败后**再 `open(None).expect(..)`** ⇒ 同一失败原因下的二次 panic。`KnowledgeBase` **只有 `open(Option<PathBuf>)` 一个构造器**（⛔ 无内存态构造器 ⇒ 我曾发明 `open_transient()`，编译即失败）。⇒ 兜底无可返回值 ⇒ **需让 `NexusWeaver` 接受 `Option<Arc<KnowledgeBase>>`** |
-| `social_access/traits.rs:304` `panic!("{}", e)` | **刻意契约**：文档写明「业务路径请用 `try_standard`」⇒ 便捷包装就是「失败即崩」。`check-unwrap` 把 `panic!` 也算违规。⇒ 要清必须改签名返回 `Result` ⇒ **API 变更** |
+| 原判 | 当时的结论 | 本轮实测的正解 |
+|---|---|---|
+| `core.rs:290` | 签名 `-> &GoalTracker` 表达不了失败 | ⛔ **判断错了**：`.expect` 逻辑上**恒成立**（上一行刚 `= Some(...)`）⇒ 正解是返回 `Option<&T>`，**13 处调用方全忽略返回值** ⇒ 零破坏 |
+| `run.rs:712` | 「同一失败原因下的二次 open」 | ⛔ **低估了它**：不仅二次 open 无效，还在 `log::warn!("creating temp")` **谎称在降级** ⇒ 正解是 `Option` 表达缺失 + handler 降级为 no-op |
+| `traits.rs:304` | 「刻意契约：失败即崩」 | ⛔ **漏了调用方全貌**：2 个调用方（`reddit.rs`/`instagram.rs`）本就返回 `Result` ⇒ 可迁 `?` ⇒ 函数变**零调用方** ⇒ 删除 |
 
-⚠️ 我在这两处各试了 **4+ 版**（含发明 `open_transient`、用 `Default`、用下标索引、
-`unwrap_or_else`）全部失败 ⇒ **它们的正解都在函数签名上，不在函数体里。**
-⇒ 归类为「**需 API 变更**」而非「未尝试」，避免下个窗口重走。
+⚠️ **我在这三处各试了 4+ 版**，包括发明 `open_transient`、用 `Default`、用下标索引、
+`unwrap_or_else`、`unreachable!()` 换皮、以及批量正则改 `self.kb.*`
+（误伤同文件 `ExperienceQuery.kb` ⇒ 23 编译错误 ⇒ 回滚）。
+
+⇒ **教训**：反复失败说明**切面选错了**，不在于「改写不够巧妙」。
+   反复失败的信号应当触发**换切面**（改调用方 / 改字段类型 / 删函数），
+   ⛔ 而不是继续在函数体内试第 5 版。
 
 ### 逐类判据（供后续沿用）
 
@@ -93,7 +134,9 @@
 | 6 | `shanhai_query.rs`×3 | `open_kb() -> Result` + 可读错误（含**库路径**）；`fs::write` 失败给路径 |
 | 7 | `coverage_ledger.rs`×3 | 锁投毒按**本仓既有范式** `PoisonError::into_inner` 恢复（见 c022bfab）；`entries.last().unwrap()` ⇒ 用已记录的 `idx` |
 
-## D2 —— 死配置（188 待判定）
+## D2 —— 死配置（**184 待判定**：bool 133 + numeric 51）
+
+⭐ **本轮把「未接线规格」从 5 降到 0**，且发现其中多数标注**本身是错的**。
 
 零读点的 `pub` 配置字段。**批量 grep 会误判**（AGENTS.md R-SCAN-1b）：
 必须逐个**读现场**确认，且**同名 ≠ 同一符号**（`window_width` 在
@@ -203,7 +246,11 @@
 **剩余处置**：仍需逐个判定 A（已废弃 ⇒ 删）/ B（未接线 ⇒ 实现）。
 本提交只做了**分类与标注**，⛔ 未删任何字段。
 
-## D3 —— 冗余：输出治理规则**在两个 crate 各存一份**（精确图景 + 阻塞）
+## ⭐ D3 —— 冗余：**已清 ~347 行**（原为「输出治理规则在两个 crate 各存一份」）
+
+✅ 已完成：治理规则下沉到 neobot 真身（`nt_io_output_style.rs` 1091 → **791**，
+删 22 项逐字重复、约 300 行）+ `memory_types.rs` 132 → **85**（删死类型/字段/方法）。
+⚠️ 保留：`OutputStyleId` 容器 D3-Phase-2 未做（属 D3 剩余项，见下）。
 
 ### 实测：逐字相同的重复项共**22 个**
 
@@ -320,13 +367,25 @@ core 侧 8 个闭包都写成 `|text, _style|`（`_` 前缀 ⇒ **从未被使�
 - `.project-map/` 354M ⇒ 需**体积策略**（改 `.gitignore` 属另一窗口的未提交改动）
 - 3 个能力的业务逻辑缺口 ⇒ 需**产品/协议侧**给定 schema
 
-## 执行顺序（按「价值 ÷ 风险」）
+## 执行顺序（按「价值 ÷ 风险」·2026-10-07 刷新）
 
-1. **D1** 分批偿还（门已可信，可增量验证）⇒ 顺带清 D3
-2. **D3** 冗余下沉（两侧已同签名，此刻成本最低）
-3. **D2** 逐个读现场清理（⛔ 禁止批量 grep 判定）
-4. **D4** 先切片验证，再谈门禁
-5. **D5/D6** 保持诚实标注，等外部输入
+| # | 项 | 状态 | 说明 |
+|---|---|---|---|
+| 1 | **D1** unwrap | ✅ **已完成** | `--strict` 首绿；存量 514 全部记账 |
+| 2 | **D3** 冗余 | ✅ **主体完成**（-347 行） | 余 `OutputStyleId` 容器（D3-Phase-2） |
+| 3 | **门本身** | ✅ **本轮新增** | `check-unwrap` 隐形债通道已封（`690903a7`） |
+| 4 | **D2** 死配置 | ⏳ **剩 184 待判定** | ⛔ 禁止批量 grep 判定；实测比率约 **1/4 会翻车** |
+| 5 | **D4** 命名 | ⏳ 1615（advisory） | 先切片验证；⛔ 规约与现实差 1616 ⇒ 不宜直接门禁 |
+| 6 | **D5** 能力 | ⛔ 缺权威 schema | 3 DeclaredOnly + 1 Scaffold |
+| 7 | **D6** 外部裁决 | ⛔ 非代码可解 | `LICENSE-EXCEPTIONS` 仍 `void` |
+
+⭐ **D2 的下一步为什么不是「继续扫」**：
+本轮实测每个真接线需读 2–6 个文件的证据链，且**约 1/4 会翻车**
+（同名异 struct / 跨文件互救活 / 注释触发门标记）。
+⇒ 184 条预计需读 500+ 文件，**批量误判会污染基线**，比不做事更糟。
+
+⇒ **更优路径**：把 184 条按**目录**分片，每片先出「读现场清单」再动手，
+   ⛔ 禁止一次性批量判定。
 
 ## 本清单的纪律
 
@@ -340,17 +399,22 @@ core 侧 8 个闭包都写成 `|text, _style|`（`_` 前缀 ⇒ **从未被使�
 
 ### 门矩阵（14 个）
 
-🟢 **11 绿**：`executor-registry` · `silent-failure` · `doc-drift` · `dead-config-flag`
-· `orphan-dirs` · `doc-claims` · `claims-numbers` · `agent-config` · `layer-deps`
-· `map-check` · `test-baseline`
-🔴 **3红**：`unwrap` 3 · `naming` 1615（advisory）· 元门因此恒红 1
-🟢 元门：**未登记 0 · 探针失败 0**
+🟢 **12 绿**：`unwrap` ⭐·`executor-registry` · `silent-failure` · `doc-drift`
+· `dead-config-flag` · `orphan-dirs` · `doc-claims` · `claims-numbers`
+· `agent-config` · `layer-deps` · `map-check` · `test-baseline`
+🔴 **1 红**：`naming` 1615（**advisory**，规约 vs 现实差 1616 ⇒ 该规约无约束力，
+advisory PASS ≠ 合规；⛔ 不宜直接升级为门禁）
+🟢 元门：**未登记 0 · 恒红 0 · 探针失败 0**
+
+⭐ **本轮变化**：`check-unwrap` 由红转绿（`--strict` 首次 PASS）⇒
+元门「恒红 1」归零 ⇒ 这是本会话在**门维度**最实质的变化
+（此前 4 个门共 24 次提交都在治「门报得对不对」，本轮是**门本身变绿**）。
 
 ### 测试
 
 | 包 | 结果 |
 |---|---|
-| `neotrix`（core） | **13,589 绿** / 38 ignored |
+| `neotrix`（core） | ⭐ **13,599 绿** / 38 ignored |
 | `neotrix-neobot` | **569 绿** / 1 ignored |
 | `nt-core-capability-tree` | **63 绿** |
 
