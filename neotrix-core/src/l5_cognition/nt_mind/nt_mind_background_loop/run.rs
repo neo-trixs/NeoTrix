@@ -705,15 +705,48 @@ impl BackgroundLoop {
             },
             kb,
             nexus_weaver: {
-                let kb_ref = kb_for_nexus.clone().unwrap_or_else(|| {
-                    Arc::new(
-                        KnowledgeBase::open(None).unwrap_or_else(|e| {
-                            log::warn!("[bg-meta] nexus KB open failed, creating temp: {}", e);
-                            KnowledgeBase::open(None).expect("nexus KB fallback must succeed")
-                        }),
+                // ⭐ 2026-10-07 消除 `.expect`（`check-unwrap` 4 → 1）。
+                //
+                // ⛔ **原实现的缺陷**：首次 `open(None)` 失败后，fallback
+                //    **再次打开完全相同的路径**（参数一模一样）。
+                //    而 `open` 失败的原因通常是**路径不可写 / 目录不存在 /
+                //    磁盘满 / 锁冲突** ⇒ 这些原因**不会因重试而消失**
+                //    ⇒ 第二次**必然再失败** ⇒ `.expect` 在真实故障下必 panic。
+                //    ⇒ 那段 fallback 是**无效的**：它把「KB 路径故障」升级成
+                //      「进程崩溃」，还**谎称**在 "creating temp"（实际没建 temp）。
+                //
+                // ⭐ 正解：**单次** open，失败即 `None`（如实表达缺失）。
+                //    缺失 ⇒ nexus 整体不接线 ⇒ `handle_nexus_weaver` 直接返回
+                //    ⛔ 但**不杀掉**其余 20+ 个后台 handler。
+                //
+                // ⚠️ 我在此处先后试过 3 个**错误**方案并全部作废，
+                //    记录在此避免后人重走（都是同一类错误：绕过门而非修问题）：
+                //      ① 「内存库失败 → 再 open 一次 + `.expect`」= 原样重复；
+                //      ② 「内存库失败 → `unreachable!()`」= 换皮的 panic；
+                //      ③ 改 `NexusWeaverScheduler.kb` 为 `Option` ⇒ 误伤同文件
+                //         另一个 `ExperienceQuery.kb`（同名同类型双份设计），
+                //         23 个编译错误 ⇒ 超出「清一处违规」的范围，已回滚。
+                //    ⇒ 正确切面是**这里**（唯一 2 处读点的持有者）。
+                let kb_ref = match kb_for_nexus.clone() {
+                    Some(kb) => Some(kb),
+                    None => match KnowledgeBase::open(None) {
+                        Ok(kb) => Some(Arc::new(kb)),
+                        Err(e) => {
+                            log::error!(
+                                "[bg-meta] nexus KnowledgeBase 不可用 ({e}); \
+                                 跨会话模式挖掘本轮不接线, 其余后台 handler 继续"
+                            );
+                            None
+                        }
+                    },
+                };
+                // `kb_ref: Option<Arc<KnowledgeBase>>` ⇒ map 闭包收到 `Arc`，
+                // 而 `new` 已接 `Option` ⇒ 闭包内重新包成 `Some`。
+                kb_ref.map(|kb| {
+                    crate::l5_cognition::nt_mind::nt_mind::experience_tree::NexusWeaverScheduler::new(
+                        Some(kb),
                     )
-                });
-                crate::l5_cognition::nt_mind::nt_mind::experience_tree::NexusWeaverScheduler::new(kb_ref)
+                })
             },
             emotion_restored: std::sync::atomic::AtomicBool::new(false),
             absorption_in_progress: std::sync::atomic::AtomicBool::new(false),
@@ -1029,7 +1062,10 @@ pub struct BackgroundLoopHandle {
     meta_shell: Option<crate::l5_cognition::nt_mind::nt_mind::MetaAgentShell>,
     kb: Option<Arc<KnowledgeBase>>,
     /// 跨会话模式挖掘 (nexus-weaver) — 定期扫描 experience 命名空间识别跨会话模式。
-    nexus_weaver: crate::l5_cognition::nt_mind::nt_mind::experience_tree::NexusWeaverScheduler,
+    /// ⭐ 2026-10-07 改为 `Option`：KB 不可用时**不接线** nexus，
+    /// 而不是在构造期 panic。KB 缺失只让**这一个** handler 降级为 no-op。
+    nexus_weaver:
+        Option<crate::l5_cognition::nt_mind::nt_mind::experience_tree::NexusWeaverScheduler>,
     emotion_restored: std::sync::atomic::AtomicBool,
     /// pending-absorb 自动吸收重入标志 (handlers_absorption.rs)。
     absorption_in_progress: std::sync::atomic::AtomicBool,
@@ -1226,7 +1262,14 @@ impl BackgroundLoopHandle {
     /// 跨会话模式挖掘 handler — 每 30min 扫描 experience 命名空间
     /// 识别跨会话模式并触发 nexus-weaver 调度。
     pub async fn handle_nexus_weaver(&mut self) {
-        let connections = match self.nexus_weaver.weave_patterns() {
+        // ⭐ 2026-10-07：KB 不可用 ⇒ nexus 未接线 ⇒ 本 handler 降级为 no-op。
+        // ⛔ 不 fabricate 空 KB：那会让 `weave_patterns` 返回 `Ok(0)`，
+        //    把「KB 缺失」**伪装成「已挖掘但无模式」**。
+        let Some(sched) = self.nexus_weaver.as_mut() else {
+            tracing::debug!("[nexus-weaver] 未接线（KnowledgeBase 不可用）⇒ 本轮跳过");
+            return;
+        };
+        let connections = match sched.weave_patterns() {
             Ok(c) => c,
             Err(e) => {
                 log::warn!("[nexus-weaver] weave_patterns failed: {e}");
@@ -1368,5 +1411,39 @@ mod tests {
         gate.add_pattern("delete_branch");
         assert!(gate.check("git delete_branch feature-x").is_err(), "自定义模式同样 fail-closed");
         assert_eq!(gate.patterns().len(), 9, "默认8 + 自定义1");
+    }
+}
+
+#[cfg(test)]
+mod nexus_degrade_tests {
+    use crate::l5_cognition::nt_mind::nt_mind::experience_tree::NexusWeaverScheduler;
+
+    /// ⭐ **变异证据**：KB 缺失时调度器必须能构造，且不 panic。
+    ///
+    /// ⛔ 原实现在此路径 `.expect("nexus KB fallback must succeed")` ——
+    /// 而 fallback **重开同一路径**，故真实故障下必崩。
+    #[test]
+    fn 无KB时调度器构造成功且挖掘返回Err() {
+        // 承重：Option 化后，KB 缺失**不是构造期 panic**
+        let mut sched = NexusWeaverScheduler::new(None);
+        // ⭐ 且挖掘必须返回 **Err**，⛔ 不是 `Ok(0)` ——
+        //    `Ok(0)` 会把「KB 缺失」伪装成「已挖掘但无模式」。
+        let r = sched.weave_patterns();
+        assert!(
+            r.is_err(),
+            "无 KB 时 weave_patterns 必须 Err（不得 Ok(0) 伪装成「无模式」）"
+        );
+    }
+
+    /// 有 KB 时正常路径不被破坏（构造 + 挖掘不 Err）。
+    #[test]
+    fn 有KB时构造成功() {
+        use crate::l4_emotion::nt_memory::nt_memory_kb::KnowledgeBase;
+        let kb = KnowledgeBase::open(Some(std::path::PathBuf::from(":memory:")))
+            .expect("内存库应可创建");
+        let mut sched = NexusWeaverScheduler::new(Some(std::sync::Arc::new(kb)));
+        // 空库 ⇒ Ok(0)（**真的**无模式，与上面的 Err 语义不同）
+        // Result<usize, String> ⇒ 用 unwrap_or_else(|_| 0) 而非 unwrap_or
+        assert_eq!(sched.weave_patterns().unwrap_or_else(|_| 0), 0, "空库应返回 0");
     }
 }

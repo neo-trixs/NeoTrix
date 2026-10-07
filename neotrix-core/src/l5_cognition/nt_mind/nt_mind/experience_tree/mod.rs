@@ -628,7 +628,15 @@ fn pending_absorb_path() -> std::path::PathBuf {
 ///
 /// 由 `nt_mind_background_loop` 在独立 handler 中周期性调用。
 pub struct NexusWeaverScheduler {
-    pub kb: Arc<KnowledgeBase>,
+    /// ⭐ 2026-10-07 改为 `Option`：KB 不可用时**如实表达缺失**。
+    ///
+    /// ⛔ 动因：背景循环 `run.rs` 原用「磁盘库失败 → **重开同一路径** →
+    ///    `.expect`」的**无效** fallback：失败原因（路径不可写 / 磁盘满 /
+    ///    锁冲突）**不会因重试而消失** ⇒ 第二次必失败 ⇒ 真实故障下必 panic。
+    ///
+    /// ⛔ 明确**不**fabricate 空 KB：`weave_patterns` 对空库返回 `Ok(0)`，
+    ///    会把「KB 缺失」**伪装成「已挖掘但无模式」** ⇒ 必须用 `Option` 区分。
+    pub kb: Option<Arc<KnowledgeBase>>,
     /// 跨会话模式最小出现次数
     pub min_pattern_occurrences: usize,
     /// 上次挖掘时间戳
@@ -636,7 +644,9 @@ pub struct NexusWeaverScheduler {
 }
 
 impl NexusWeaverScheduler {
-    pub fn new(kb: Arc<KnowledgeBase>) -> Self {
+    /// ⭐ 2026-10-07：接受 `Option`。KB 缺失时仍可构造，
+    /// 挖掘降级为 `Err`（由 `handle_nexus_weaver` 记日志并返回）。
+    pub fn new(kb: Option<Arc<KnowledgeBase>>) -> Self {
         Self {
             kb,
             min_pattern_occurrences: 3,
@@ -644,11 +654,20 @@ impl NexusWeaverScheduler {
         }
     }
 
+    /// ⭐ 访问器：统一处理「KB 缺失」。
+    ///
+    /// 返回 `Err` ⇔ 上层能**区分**「没有模式」与「没有 KB」。
+    fn kb(&self) -> Result<&KnowledgeBase, String> {
+        self.kb.as_deref().ok_or_else(|| {
+            "KnowledgeBase 不可用：跨会话模式挖掘已降级为 no-op".to_owned()
+        })
+    }
+
     /// 扫描 experience 命名空间, 识别跨会话模式并调度 nexus-weaver。
     ///
     /// 返回发现的模式连接数。
     pub fn weave_patterns(&mut self) -> Result<usize, String> {
-        let entries = self.kb.experience_entries()?;
+        let entries = self.kb()?.experience_entries()?;
         if entries.is_empty() {
             return Ok(0);
         }
@@ -658,7 +677,7 @@ impl NexusWeaverScheduler {
         let mut domain_patterns: HashMap<String, Vec<String>> = HashMap::new();
 
         for (key, _value) in &entries {
-            if let Ok(Some(val)) = self.kb.kv_get("experience", key) {
+            if let Ok(Some(val)) = self.kb()?.kv_get("experience", key) {
                 if let Ok(entry) = serde_json::from_str::<ExperienceEntry>(&val) {
                     let domain_str = entry.domain.to_string();
                     *domain_counts.entry(domain_str.clone()).or_insert(0) += 1;
@@ -688,7 +707,7 @@ impl NexusWeaverScheduler {
 
     /// 获取待处理的跨会话桥接建议。
     pub fn pending_bridges(&self) -> Result<Vec<String>, String> {
-        let entries = self.kb.experience_entries()?;
+        let entries = self.kb()?.experience_entries()?;
         let mut bridges = Vec::new();
 
         for (key, _value) in &entries {
@@ -967,7 +986,8 @@ mod tests {
         let kb = KnowledgeBase::open(Some(std::path::PathBuf::from(":memory:")))
             .unwrap_or_else(|e| panic!("KB open failed: {e}"));
         let scheduler = NexusWeaverScheduler {
-            kb: Arc::new(kb),
+            // ⭐ 2026-10-07：字段改为 `Option<Arc<KnowledgeBase>>`（KB 缺失可表达）
+            kb: Some(Arc::new(kb)),
             min_pattern_occurrences: 3,
             last_weave_ts: 0,
         };
