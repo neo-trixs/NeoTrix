@@ -113,6 +113,31 @@ pub struct EvolutionResult {
 pub struct CognitionFacade {
     // 内部句柄 — 生命周期由创建方管理
     // Facade 不拥有这些资源，仅提供统一访问入口
+    //
+    // ⭐ 审计裁定 2026-10-07（接续 `7c3ed09e` / `d9a4f528`）：
+    //
+    //  ⛔ **本 struct 是空壳**。`new()` 返回 `Self {}`，无任何字段，
+    //      无子系统句柄，⛔ **结构上无法探测任何真实状态**。
+    //  ⛔ 而其 `health() -> LayerHealth`（L198）返回 `score: 1.0 / healthy: true / issues: []`
+    //      的字面量 ⇒ **虚构健康报告**（任何调用它的人都会以为系统「全满分健康」）。
+    //  ⛔ **2026-10-07 起，该实现禁止被用作生产健康判定**。
+    //
+    //  ⭐ **正确答案在 L1**：`neotrix-core/src/l1_action/nt_action_facade.rs:239`
+    //     `pub fn health(&self) -> LayerHealth` 才是真实逐项探测
+    //     （`kb.raw_conn().is_ok()` / `tool_executor.is_some()` /
+    //     `llm_router.health_check().healthy`，score = 健康项/3）。
+    //
+    //  ⚠️ 名字冲突提示：仓库内仅这两处 `struct LayerHealth`（L5 vs L1），
+    //     字段不同、语义不同 ⇒ 只按名字搜索会取错。
+    //  ⭐ 实测：**零生产调用方**消费 L5 版 `health()`（全仓仅其自身 5 处 `cfg(test)`），
+    //     这意味着**正确处置是删除 / 标 deprecated**，而非继续维护两份「健康 facade」。
+    //
+    //  方向：要 L5 也需要真实健康报告 ⇒ 让 `CognitionFacade` 持有 `&ActionFacade`
+    //     或 `&HealthChecker`（`nt_core_platform/health.rs` 现有 trait），
+    //     并 delegate。⛔ 本次（及本窗口）**不做 API 改动**（那是跨窗口可见的公共 API 变更），
+    //     只留痕+下架生产使用。
+    //
+    //  ⭐ 【已安全公告】两处 `LayerHealth` 同名但语义有别；需要真实健康时用 L1 版。
 }
 
 impl CognitionFacade {
