@@ -19,7 +19,6 @@ neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/nt_memory_cortex_sync.rs	R4	p
 neotrix-core/src/l4_emotion/nt_sim_eval.rs	R4	pub fn compute_facts :: pub format_ok: bool,
 neotrix-core/src/l5_cognition/nt_cognition_facade.rs	R1	pub healthy: bool,
 neotrix-core/src/l5_cognition/nt_core/nt_core_parallel/executor.rs	R3	pub fn allocate_todo :: let score = self.score_todo(
-neotrix-core/src/l5_cognition/nt_crystal_core/self_healing.rs	R4	pub is_healthy: bool,
 neotrix-core/src/l5_cognition/nt_goal/behavioral_verifier.rs	R4	fn run_bounded :: pub tests_ok: bool,
 neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs	R3	fn default :: Self::compute(true, false, true, true)
 neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs	R3	pub(crate) fn _recompute_readiness :: let score = _LoopReadyScore::compute(handlers_ok, kb_ok, true, true);
