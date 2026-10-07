@@ -1,7 +1,18 @@
 //! Skill Improver — trailofbits/skills skill-improver 插件吸收
 //! 
 //! 迭代修正技能直到通过质量门禁
-//! 集成 nt_mind_autofixer::autofixer
+//!
+//! ⛔ **2026-10-07 删除了原文第 4 行「集成 nt_mind_autofixer::autofixer」。**
+//! 该声明**与代码不符**：本文件对 `AutoFixer` / `auto_fix` / `cleanup_todos_tx` /
+//! `record_test_gap` / `split_file` / `_RepairBatch` 的引用数**实测为 0**
+//! （全文唯一 `use` 是测试段内的 `use super::*`）。
+//! ⇒ 一个审计者顺着注释会得出「L6 repair 包装了 L5 autofixer」，**与事实相反**。
+//! ⇒ 同名机制的真实现是两处**并列注册**（`.neotrix/capability_registry.json`
+//! 的 `nt_mind_autofixer::autofixer`(mind) 与 `nt_mind_repair::autofixer`(repair)），
+//! **它们之间没有集成关系**。归并属 roadmap `D-2`，本轮不并。
+//!
+//! ⛔ 另注：按 D-16 反例护栏，本文件「迭代修正技能直到通过质量门禁」的自述
+//! 需**同时**能指出「压缩了多少」与「损失了什么」，当前只有前者。
 
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
