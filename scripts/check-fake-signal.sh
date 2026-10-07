@@ -488,10 +488,17 @@ for f in rs_files():
             continue        # ✅ 内部状态检测且返回值依赖它
         # 走到这里 = 零外部证据 ⇒ 疑为伪探测（含恒定字面量返回）
         line_no = masked[:m.start()].count("\n") + 1
+        # ⭐ 2026-10-07 **漏传 anchor 的修复**（探针抓到的第 N 个 bug）：
+        #   本 `add()` 是**唯一**没带 `_anchor_of(...)` 的一处
+        #   ⇒ `anchor` 取默认 `""` ⇒ **同文件所有 R2 合并成一条**
+        #   （实测 baseline 键是 `nt_engine.rs \t R2 \t` ⇒ 锚点为空）
+        # ⇒ 后果：探针注入的 `probe_environment` 与既有的 `probe()` **同键**
+        #   ⇒ 被判「已知」⇒ 探针误报「门未触发」。
         add(f, line_no, "R2",
             f"`{m.group(1)}()` 函数体内**零系统调用标记**"
             f"（sysctl/Command::/proc/cpuid/target_os/uname/std::fs 全无）"
-            f"⇒ 疑为「伪探测」")
+            f"⇒ 疑为「伪探测」",
+            _anchor_of(f, line_no))
 
     # ── R3 字面量实参：加权/评分函数被传入布尔字面量 ──
     for m in re.finditer(r"\b(?:compute|score|grade|rate|readiness|health)\w*\s*\(", masked):

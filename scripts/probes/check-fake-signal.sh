@@ -64,7 +64,11 @@ import sys
 p = sys.argv[1]
 s = open(p, encoding="utf-8").read()
 probe_fn = '''
-    /// probe：伪探测（体内**零**系统调用/HTTP/env 证据）
+  # ⭐ 2026-10-07 去掉了注入体里的 `///` 文档注释（探针自身缺陷，⛔ 非门的问题）：
+  #   门断言时 grep 输出里的 `probe_environment`；而 `mask_noncode` 会把
+  #   **注释里的标识符**一并掩成空格 ⇒ grep 必然失配 ⇒ 误判「门未触发」。
+  #   实测：注入后 findings 确实 22 → 23（门是对的）。
+  # ⇒ 与 R1 的注入体对齐（R1 的 `///` 在 struct 上，不在字段上）。
     pub fn probe_environment(&self) -> String {
         "pretend-detected"
     }

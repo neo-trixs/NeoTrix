@@ -2,13 +2,13 @@
 # Ratchet: only NEW findings fail.
 # Format = <path>\t<RULE>\t<content-anchor>  (⛔ 无行号：插入注释不应使其失效)
 # ⛔ Do NOT enlarge this file just to go green.
-crates/neotrix-neobot/src/nt_engine.rs	R2	
+crates/neotrix-neobot/src/nt_engine.rs	R2	fn probe :: fn probe(&self) -> Result<String, NtBotError> {
 neotrix-core/src/l1_action/nt_act/nt_act_cleanup/shared.rs	R1	fn default :: pub safe: bool,
 neotrix-core/src/l1_action/nt_core_llm/mod.rs	R1	fn health :: pub healthy: bool,
 neotrix-core/src/l1_action/nt_file_ability/visual/visual.rs	R1	fn default :: pub extraction_bound_ok: bool,
 neotrix-core/src/l1_action/nt_infra_persistence.rs	R4	pub health_healthy: bool,
 neotrix-core/src/l1_action/nt_io/nt_io_inference/apple_silicon.rs	R1	pub _mlx_available: bool,
-neotrix-core/src/l1_action/nt_io/nt_io_inference/apple_silicon.rs	R2	
+neotrix-core/src/l1_action/nt_io/nt_io_inference/apple_silicon.rs	R2	pub fn detect :: pub fn detect() -> Result<Self, String> {
 neotrix-core/src/l1_action/nt_io/nt_io_neocodex/agent/nt_agent_types.rs	R1	pub shell_available: bool,
 neotrix-core/src/l1_action/nt_io/nt_io_provider/routing/provider_swap.rs	R1	pub is_healthy: bool,
 neotrix-core/src/l1_action/nt_io/nt_io_provider/routing/provider_swap.rs	R4	pub is_healthy: bool,
