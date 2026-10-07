@@ -220,13 +220,15 @@ impl _VectorRetriever {
 
     /// 检索相似块
     pub fn search(&self, query_embedding: &[f32], top_k: usize) -> Vec<RetrievalResult> {
+        // ⚠️ 原为 `.map(..)` + `chunks.get(id).expect("key exists")`：
+        //   ⛔ `index` 与 `chunks` **是两个容器**，一旦不同步就 panic
+        //   （而 `search` 是查询热路径，不该因数据不同步而崩）。
+        // ⇒ 改 `filter_map`：缺 chunk ⇒ **跳过该条**（并在结果里少一条）。
         let mut results: Vec<RetrievalResult> = self.index.iter()
-            .map(|(id, embedding)| {
+            .filter_map(|(id, embedding)| {
+                let chunk = self.chunks.get(id)?.clone();
                 let score = cosine_similarity(query_embedding, embedding);
-                RetrievalResult {
-                    chunk: self.chunks.get(id).expect("key exists").clone(),
-                    score,
-                }
+                Some(RetrievalResult { chunk, score })
             })
             .collect();
 

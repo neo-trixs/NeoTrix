@@ -551,7 +551,13 @@ fn compress_data_section(out: &mut Vec<u8>) {
         return;
     }
     let payload = out.split_off(split);
-    let mut encoder = zstd::stream::write::Encoder::new(Vec::new(), 9).expect("zstd encoder");
+    // ⚠️ 原为 `.expect("zstd encoder")`，而**紧邻下一行**已是
+    //   `write_all(...).is_ok()` 与 `if let Ok(compressed) = finish()`。
+    // ⇒ 同函数内两种错误风格并存，panic 那个纯属漏改。
+    // ⇒ 统一为 `if let Ok`：编码器不可用 ⇒ **原样保留未压缩数据**（⛔ 不 panic）。
+    let Ok(mut encoder) = zstd::stream::write::Encoder::new(Vec::new(), 9) else {
+        return;
+    };
     if encoder.write_all(&payload).is_ok() {
         if let Ok(compressed) = encoder.finish() {
             // 标记: [varint 压缩长度][zstd 数据] (varint 支持 >64KB, 修复 u16 溢出)

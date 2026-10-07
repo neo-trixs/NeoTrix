@@ -428,7 +428,11 @@ pub fn hybrid_search(
     } else if ranklists.is_empty() {
         Vec::new()
     } else {
-        ranklists.into_iter().next().expect("non-empty ranklists")
+        // ⚠️ 原为 `.next().expect("non-empty ranklists")`。
+        // 上面的分支已保证 `!ranklists.is_empty()` ⇒ expect **纯冗余**。
+        // ⇒ 用 `into_iter().next().unwrap_or_default()`：`Vec` 的 Default 即空 Vec，
+        //   语义与「无结果」一致，⛔ 无 panic。
+        ranklists.into_iter().next().unwrap_or_default()
     };
 
     // 缺陷7修复 (真实运转): RRF 融合只按排名位置融合, 丢弃 search_fts 的标题加权分数,

@@ -73,7 +73,13 @@ impl SkillMemory {
                         "%Y-%m-%d"
                     ) {
                         records.push(ExperienceRecord {
-                            timestamp: date.and_hms_opt(0, 0, 0).expect("valid time").and_utc(),
+                            // ⚠️ 原为 `.expect("valid time")`。`and_hms_opt` 本就返回 Option，
+                            //   ⛔ 用 expect 把「解析成功但时分秒非法」变成 panic。
+                            // ⇒ 语义应是「跳过这条记录」⇒ `?` 提前 continue。
+                            timestamp: match date.and_hms_opt(0, 0, 0) {
+                                Some(t) => t.and_utc(),
+                                None => continue,
+                            },
                             event: event.to_string(),
                             conclusion: conclusion.to_string(),
                             skill_name: String::new(),
@@ -108,7 +114,11 @@ impl SkillMemory {
     }
 
     fn append_to_file(&self, record: &ExperienceRecord) -> Result<(), std::io::Error> {
-        std::fs::create_dir_all(self.file_path.parent().expect("has parent"))?;
+        // ⛔ 不用 `parent().expect("has parent")`：`"/"` 的 parent 是 `None`
+        //   ⇒ 会 panic。`None` 时**不建目录**（根目录本就存在）⇒ 更准且无 panic。
+        if let Some(dir) = self.file_path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
         
         let line = format!(
             "{{{}}}: {} → {}\n",

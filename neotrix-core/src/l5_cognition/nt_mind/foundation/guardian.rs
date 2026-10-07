@@ -926,9 +926,14 @@ mod tests {
 fn temp_mape_dir() -> PathBuf {
     std::env::temp_dir().join(format!(
         "neotrix-mape-{}",
+        // ⚠️ 原为 `.expect("now is after UNIX_EPOCH")`。时钟被回拨到 epoch 之前时
+        //   `duration_since` 会失败 ⇒ panic。而这里只是**造一个临时目录名**，
+        //   因名失败而 panic **完全不划算**。
+        // ⇒ 失败时用 0（`unwrap_or_default`）：目录名退化为 `neotrix-mape-0`，
+        //   仍可用（只是可能撞名），⛔ 不 panic。
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .expect("now is after UNIX_EPOCH")
+            .unwrap_or_default()
             .as_nanos()
     ))
 }

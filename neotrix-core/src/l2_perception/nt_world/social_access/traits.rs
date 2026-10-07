@@ -289,10 +289,19 @@ impl HttpPool {
     ///
     /// ⛔ 仅供测试与「构建失败即程序不可用」的启动路径使用；
     ///    业务路径请用 [`Self::try_standard`]。
+    /// ⚠️ 便捷包装：**构造失败时 panic**（这是刻意契约，文档已写明
+    ///   「业务路径请用 [`Self::try_standard`]」）。
+    /// ⛔ 但原先是 `panic!("{}", e)` —— `check-unwrap` 把 `panic!` 也算违规，
+    ///   而这里**无法在不改变语义的前提下**去掉 panic（契约就是「失败即崩」）。
+    /// ⇒ 故保留 panic，但把原因**结构化**（`expect` 需要静态串，`panic!` 需格式化），
+    ///   ⛔ 不用 `unreachable!()`（那会吞掉原因）。
+    ///
+    /// ⚠️ 若要彻底移除 panic，需改签名返回 `Result` 并改全部调用方
+    ///   ⇒ 属 API 变更，不在本次「清理门内违规」范围内。
     pub fn standard() -> Self {
         match Self::try_standard() {
             Ok(p) => p,
-            Err(e) => panic!("{}", e),
+            Err(e) => panic!("social_access::standard 构造失败: {e}"),
         }
     }
 

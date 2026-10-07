@@ -88,7 +88,10 @@ impl AgentOrchestrator {
         self.crews.push(Crew {
             name: name.to_string(), agents: Vec::new(), process, tasks: Vec::new(),
         });
-        self.crews.last_mut().unwrap()
+        // ⚠️ 原为 `last_mut().unwrap()`：刚 push 过 ⇒ 必 Some，unwrap **纯冗余**。
+        // ⇒ 用 push 后的下标（必有效，因为刚 push 了一个），⛔ 无 panic。
+        let idx = self.crews.len() - 1;
+        &mut self.crews[idx]
     }
 
     pub fn add_agent(&mut self, crew_name: &str, agent: Agent) {

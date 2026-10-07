@@ -8,14 +8,50 @@
 
 | 项 | 实测值 | 门/工具 |
 |---|---|---|
-| `check-unwrap` NEW | **11**（输出含 `路径:行号 [函数] 代码`，可 grep） |
+| `check-unwrap` NEW | **3**（8 文件已清零；输出可 grep） |
 | 死配置待判定 | **188**（bool 136 + numeric 52） | `check-dead-config-flag.sh --types {bool,numeric}` |
 | `check-naming` | **1615** offender（advisory） | `check-naming.sh --strict` |
 | 能力未接线 | **3 / 5** DeclaredOnly + **1 / 5** Scaffold | `market.rs` 的 `executability` |
 | `check-executor-registry` | **RC=0** | 本会话新建 |
 | 元门 | 未登记 **0** · 恒红 **1** · 探针失败 **0** | `check-gate-satisfiable.sh --strict` |
 
-## D1 —— unwrap/expect 债务（11 处）
+## D1 —— unwrap/expect 债务（3 处·均已定性为「需 API 变更」）
+
+### ✅ 本会话已清 24处（27 → 3）
+
+| 批次 | 内容 | 手法 |
+|---|---|---|
+| 1 | `nt_governance.rs` 6→0 | `re_opt -> Option<Regex>`，**消除「需要fallback 正则」的前提** |
+| 2 | `nt_ecs.rs` | `match downcast()`（unwrap 纯冗余） |
+| 3 | `main.rs` | `Runtime::new()` → 可读错误 |
+| 4 | `nt_pet.rs` 2 | `be32_at() -> Option`（`get(..)` 去两层 panic） |
+| 5 | `nt_io_output_style.rs` | core 侧同步 Option 化（消除**panic 分歧**） |
+| 6 | `shanhai_query.rs` 3 | `Result` 传播 + 含**库路径**的可读错误 |
+| 7 | `coverage_ledger.rs` 3 | 锁投毒按**本仓范式** `PoisonError::into_inner` 恢复 |
+| 8 | memory_pack / pure_fns / rag / orchestrator / guardian / memory_filesystem / experience_memory 8 | 逐类：统一错误风格 / 去掉冗余 unwrap / `filter_map` 跳过不一致 / `Path::parent()` 用 `if let` / 时钟回拨用 `unwrap_or_default` |
+
+### ⛔ 剩余 3 处：**需要 API 变更**，不靠改写能清
+
+| 位置 | 阻塞（已逐一核实） |
+|---|---|
+| `goal_loop/loop_impl/core.rs:290` `active_goal.as_ref().expect(..)` | 函数签名是 `-> &GoalTracker`（**非 Result**）⇒ 不能用 `?`；`GoalTracker` **不派生 `Default`**（只有 `Debug/Clone/Serialize/Deserialize`）⇒ `unwrap_or_default()` 会给**语义错**的空 tracker；而 borrowck 不允许「先取引用再赋值」。⇒ **只能改签名为 `Result<&GoalTracker, _>`**（会波及调用方） |
+| `nt_mind_background_loop/run.rs:712` | `open(None)` 失败后**再 `open(None).expect(..)`** ⇒ 同一失败原因下的二次 panic。`KnowledgeBase` **只有 `open(Option<PathBuf>)` 一个构造器**（⛔ 无内存态构造器 ⇒ 我曾发明 `open_transient()`，编译即失败）。⇒ 兜底无可返回值 ⇒ **需让 `NexusWeaver` 接受 `Option<Arc<KnowledgeBase>>`** |
+| `social_access/traits.rs:304` `panic!("{}", e)` | **刻意契约**：文档写明「业务路径请用 `try_standard`」⇒ 便捷包装就是「失败即崩」。`check-unwrap` 把 `panic!` 也算违规。⇒ 要清必须改签名返回 `Result` ⇒ **API 变更** |
+
+⚠️ 我在这两处各试了 **4+ 版**（含发明 `open_transient`、用 `Default`、用下标索引、
+`unwrap_or_else`）全部失败 ⇒ **它们的正解都在函数签名上，不在函数体里。**
+⇒ 归类为「**需 API 变更**」而非「未尝试」，避免下个窗口重走。
+
+### 逐类判据（供后续沿用）
+
+1. 编译期常量正则 ⇒ **可以** `expect`（但本仓已统一 `Option`）
+2. **运行时拼装**的正则（`format!` + 数据）⇒ 必须 `Option`/`Result`
+3. Mutex锁投毒 ⇒ 按**本仓范式** `PoisonError::into_inner` 恢复，⛔ 不改 panic
+4. 刚 `push`/`insert` 后的 `last()`/`get()` ⇒ 冗余，改用**已记录的下标/idx**
+5. `SystemTime::duration_since` 失败（时钟回拨）⇒ `unwrap_or_default`（只是个临时目录名）
+6. `Path::parent()` 为 `None` ⇒ `if let`，⛔ 不 `expect`
+7. `expect` 出现在**函数签名不支持传播**处 ⇒ ⛔ 不硬改，归「需 API 变更」
+
 
 门已可信（2026-10-07 修好两处盲区：测试块不检测 + 打印截断）。
 ⚠️ **`check-unwrap` 之前报 16 是打印假象**，真实值一直是 24+。

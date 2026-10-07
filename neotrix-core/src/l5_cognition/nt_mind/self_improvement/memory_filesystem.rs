@@ -178,7 +178,12 @@ impl MemoryFilesystem {
         self.blocks.insert(id.clone(), block);
         ids.push(id.clone());
 
-        Ok(self.blocks.get(&id).unwrap())
+        // ⚠️ 原为 `self.blocks.get(&id).unwrap()`：L178 刚 insert ⇒ 必 Some，
+        //   unwrap **纯冗余**。⇒ 直接用 `remove`/返回值之外的路径都不合适
+        //   （需保留），故用 `get` + 显式早退（语义：拿不到就是错误）。
+        self.blocks
+            .get(&id)
+            .ok_or_else(|| format!("记忆块插入后仍取不到: {id}"))
     }
 
     /// Read a memory block by id
