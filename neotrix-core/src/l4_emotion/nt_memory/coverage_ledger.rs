@@ -385,7 +385,12 @@ impl CoverageLedger {
 
     /// 获取审计日志
     pub fn get_audit_log(&self) -> Vec<String> {
-        self.audit_log.lock().unwrap().clone()
+            // ⛔ 锁投毒按本仓既有范式**恢复**（`PoisonError::into_inner`，见 c022bfab）
+            //    ⛔ 不改成 panic：那会让「一次panic」把整个 ledger 永久锁死。
+        self.audit_log
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 
     /// 同步到 experience-tree 吸收协议
@@ -444,7 +449,10 @@ impl CoverageLedger {
         self.rebuild_merkle_tree();
         self.log_audit(&format!("Added entry {}", idx));
 
-        self.entries.last().unwrap()
+        // ⚠️ 原为 `self.entries.last().unwrap()`：L442 刚 `push` 过，
+        //   逻辑上必Some，但 `unwrap` 让「不变量被破坏」变成 panic 而非可查错。
+        // ⇒ 用 push 时记下的 `idx` 直接索引（同样是必成功，但**无 unwrap**）。
+        &self.entries[idx as usize]
     }
 
     /// 按内容过滤查询
@@ -461,7 +469,12 @@ impl CoverageLedger {
     }
 
     fn log_audit(&self, message: &str) {
-        let mut log = self.audit_log.lock().unwrap();
+            // ⛔ 锁投毒按本仓既有范式**恢复**（`PoisonError::into_inner`，见 c022bfab）
+            //    ⛔ 不改成 panic：那会让「一次panic」把整个 ledger 永久锁死。
+        let mut log = self
+            .audit_log
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         log.push(format!("[{}] {}", Utc::now().to_rfc3339(), message));
     }
 }

@@ -30,12 +30,17 @@ fn truncate_chars(s: &str, max: usize) -> String {
     }
 }
 
-fn open_kb() -> Connection {
+/// 打开 KB 连接。
+///
+/// ⚠️ 原为 `.expect("Failed to open KB")` / `.expect("Failed to init schema")`
+/// ⇒ 打不开库时**裸 panic**，只有一句无路径信息的英文。
+/// ⇒ 改为 `Result` 传播，让调用方给出**含路径的可读错误**（CLI 入口的价值）。
+fn open_kb() -> Result<Connection, String> {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     let db_path = format!("{}/.neotrix/knowledge.db", home);
-    let conn = Connection::open(&db_path).expect("Failed to open KB");
-    nt_memory_schema::initialize(&conn).expect("Failed to init schema");
-    conn
+    let conn = Connection::open(&db_path).map_err(|e| format!("打开 KB 失败 {db_path}: {e}"))?;
+    nt_memory_schema::initialize(&conn).map_err(|e| format!("初始化 KB schema 失败 {db_path}: {e}"))?;
+    Ok(conn)
 }
 
 fn cmd_stats(conn: &Connection) {
@@ -128,7 +133,11 @@ fn cmd_export_geojson(conn: &Connection, path: Option<&str>) {
     });
     match path {
         Some(p) => {
-            std::fs::write(p, &output).expect("Failed to write GeoJSON");
+            // ⚠️ 原为 `.expect("Failed to write GeoJSON")` ⇒ 写失败裸 panic
+            if let Err(e) = std::fs::write(&p, &output) {
+                eprintln!("shanhai_query: 写出 GeoJSON 失败 {p}: {e}");
+                std::process::exit(1);
+            }
             let features: serde_json::Value = serde_json::from_str(&output).unwrap_or_default();
             let n = features["features"].as_array().map(|a| a.len()).unwrap_or(0);
             println!("✅ GeoJSON exported to: {}", p);
@@ -159,7 +168,13 @@ fn main() {
         std::process::exit(1);
     }
 
-    let conn = open_kb();
+    let conn = match open_kb() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("shanhai_query: {e}");
+            std::process::exit(1);
+        }
+    };
     match args[1].as_str() {
         "stats" => cmd_stats(&conn),
         "peaks" => cmd_peaks(&conn),
