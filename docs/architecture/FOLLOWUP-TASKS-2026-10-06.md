@@ -863,3 +863,48 @@ map-check · test-baseline
    在 NEW=16 时**是靠分组侥幸通过**的 ⇒ 绿灯不代表被证明。
    ⇒ 纪律：探针若依赖「输出完整」，就必须先把输出变成完整。
 
+---
+
+## 冗余 / 扁平 / 跨域 三类缺陷：实测取证（2026-10-07）
+
+用户点名三类缺陷，本节给出**可复现的证据**（非推测）。
+
+### ① 冗余：`build_rules` 在两个 crate 各有一份，**74/75 行重复**
+
+| 位置 | 行数 | 闭包签名 |
+|---|---|---|
+| `crates/neotrix-neobot/src/nt_governance.rs:586` | **75** | `\|text\|` |
+| `neotrix-core/src/l1_action/nt_io/nt_io_output_style.rs:738` | **75** | `\|text, _style\|` |
+
+⇒ 实测 diff：**仅 `check_fn` 闭包参数个数不同**（core 侧多一个 `_style`），
+**其余 74 行逐字相同**（含 `EXTS`、`PLACEHOLDER_PURE_RE`、6 条规则定义、
+以及**两处 `.expect(...)`**）。
+
+⇒ **重构方案**（复用本会话已验证的依赖倒置模式）：
+把规则构造下沉到**共享 crate**（与 `nt-core-capability-tree::dispatch`/`market` 同模式），
+`check_fn` 统一为 `Fn(&str, &Style) -> bool`，两侧各自提供 `Style`。
+⚠️ **前置**：先核实 `r1..r6` 六个 check 函数本体是否也已重复
+（若是，则应连同规则表一起下沉；若否，则只下沉规则表 + 签名适配层）。
+
+### ② 扁平缺陷：配置存在却什么都不控制
+
+- 本会话已修 **2 个**：`nt_game/render` 的 `window_width/height`（零读点，全仓引用 0）
+- 本会话已修 **7 个**静默失败（配置/注册/审计链的 `.ok()` / `unwrap_or_default()` 吞错）
+⇒ **待判定仍 186**（bool 133 + numeric 53，dead-flag 门每次运行打印）
+
+### ③ 跨域错位：派发执行只在 core 进程内成立
+
+`neotrix-neobot` 依赖里**只有 `neotrix-types`，没有 core**（方向 `core → neotrix-neobot`）
+⇒ `neobot capability {list,never,canary}` 能「看」（读共享 crate 的清单与金丝雀），
+但**任何进程外「调」都必须在 core 侧二进制**。
+⚠️ 这是**架构约束**而非缺陷，但它是「为什么 CLI 不能调能力」的**唯一答案**，
+必须写在 CLI 帮助里，否则下一个人会重复踩。
+
+### 本节方法论
+
+三类缺陷**都不是靠读代码发现的**，而是靠**门 + 对拍**：
+- 冗余 ⇒ 同一函数名在两 crate 命中（比对行数与 diff 才确认是「重复」而非「同名」）
+- 扁平 ⇒ dead-flag 门的零读点清单 + **逐个读现场**（`window_width` 与
+  stealth_net 的同名字段**不是同一符号**，不可连坐）
+- 跨域 ⇒ 依赖清单实测（`grep '^name = ' Cargo.toml`）而非看 import
+
