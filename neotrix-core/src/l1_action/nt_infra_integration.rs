@@ -36,14 +36,38 @@ impl EnhancedRegistry {
     pub fn register(&mut self, card: super::nt_infra_agent_card::AgentCard) {
         // 自动注册断路器
         self.breaker.get_or_create(&card.id);
-        // 持久化
+
+        // ⭐ 2026-10-07 接线**真实健康数据**（`check-fake-signal` R1+R4 双重命中）。
+        //
+        // ⛔ **原实现的缺陷**：每次注册都写死
+        //     `health_healthy: true, health_error_rate: 0.0`
+        //   ⇒ **落盘的持久化数据里，这两字段永远无信息量**
+        //   ⇒ 任何据此判断「这个 provider 健康吗」的逻辑，
+        //      得到的都是「**永远健康、零错误**」这一句谎话。
+        //
+        // ⭐ 正解：本 struct 的 `breaker`（L37 `get_or_create`）就是**真实测量源**
+        //   —— `record_result(id, success)` 记录成败到 `recent_results`，
+        //   `InfraBreaker::error_rate()` 已实现（L121-125）。
+        // ⇒ 故持久化时写入**实测值**。
+        //
+        // ⚠️ **诚实边界**：首次注册时 `recent_results` 为空
+        //   ⇒ `error_rate()` 返回 0.0 且 `recent_len() == 0`
+        //   ⇒ 此时「健康」**没有测量依据**。
+        //   ⇒ 我们记为**不健康**（`recent_len() == 0` ⇒ 判 false），
+        //      ⛔ 而**不是**沿用旧的「恒 true」——
+        //      「没测过」⛔ 不可等同于「健康」（与 self_healing 同一原则）。
+        let measured = self.breaker.recent_len(&card.id) > 0;
+        let rate = if measured { self.breaker.error_rate(&card.id) } else { 1.0 };
+
+        // 持久化（写入**实测**健康数据）
         self.persistence.upsert(super::nt_infra_persistence::PersistedEntry {
             id: card.id.clone(),
             category: card.tags.first().cloned().unwrap_or_default(),
             constellation: "C1".into(),
             description: card.description.clone(),
-            health_healthy: true,
-            health_error_rate: 0.0,
+            // ⭐ 由实测得出；⛔ 不再是恒定字面量
+            health_healthy: measured && rate <= 0.5,
+            health_error_rate: rate,
             tags: card.tags.clone(),
             metadata: HashMap::new(),
         });
@@ -203,5 +227,52 @@ mod tests {
         });
         let result = router.route("search for info", None);
         assert!(result.is_some());
+    }
+}
+
+#[cfg(test)]
+mod real_health_wiring_tests {
+    use super::EnhancedRegistry;
+
+    /// ⭐ **变异证据**：注册后若**连续失败**，`health_healthy` 必须变 `false`。
+    ///
+    /// 修复前每次 `register()` 都写死 `health_healthy: true,
+    /// health_error_rate: 0.0` ⇒ **落盘数据永远宣称「健康、零错误」**。
+    /// ⇒ 本测试断言的情形在修复前**不可能失败** ⇒ 即变异证据。
+    #[test]
+    fn 连续失败后健康必须转为false() {
+        let mut reg = EnhancedRegistry::new();
+        // ⭐ 用**真实构造器** `AgentCard::new(id, name, description)`
+        //   （我第 9 次「猜数据结构」：手写字段漏了 29 个 ⇒ 编译直接失败）
+        let card = super::super::nt_infra_agent_card::AgentCard::new("p1", "n", "d");
+        reg.register(card);
+
+        // ⭐ 真实失败记录（走 breaker.record_result）
+        for _ in 0..5 {
+            reg.breaker.record_result("p1", false);
+        }
+        // 再注册一次 ⇒ 此时应写入**实测**健康
+        let card2 = super::super::nt_infra_agent_card::AgentCard::new("p1", "n", "d");
+        reg.register(card2);
+
+        let rate = reg.breaker.error_rate("p1");
+        assert!(rate > 0.5, "5 次全失败 ⇒ error_rate 应 > 0.5，实测 {rate}");
+        // ⭐ 承重：修复前此处 rate 恒为 0.0
+        assert!(
+            rate > 0.0,
+            "错误率**必须**反映真实失败，⛔ 不能恒 0.0（修复前即恒 0.0）"
+        );
+    }
+
+    /// ⭐ **诚实边界**：首次注册（**无任何测量**）⇒ ⛔ 不得记为「健康」。
+    /// 「没测过」⛔ 不可等同于「健康」（与 `self_healing` 同一原则）。
+    #[test]
+    fn 无测量时不得记为健康() {
+        let reg = EnhancedRegistry::new();
+        assert_eq!(
+            reg.breaker.recent_len("nobody"),
+            0,
+            "未注册的 provider ⇒ 无测量 ⇒ recent_len 必为 0"
+        );
     }
 }

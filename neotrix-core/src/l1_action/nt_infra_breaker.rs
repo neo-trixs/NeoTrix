@@ -170,6 +170,23 @@ impl BreakerRegistry {
     pub fn states(&self) -> HashMap<String, BreakerState> {
         self.breakers.iter().map(|(k, b)| (k.clone(), b.state())).collect()
     }
+
+    /// ⭐ 2026-10-07 转发 `error_rate()`（此前 `InfraBreaker` 有、
+    /// 而 `BreakerRegistry` **没有** ⇒ 外部无法读到真实错误率
+    /// ⇒ 逼得 `nt_infra_integration.rs` 硬编 `health_error_rate: 0.0`）。
+    ///
+    /// ⚠️ 无记录时返回 `0.0`（= `InfraBreaker::error_rate` 的既有语义）
+    ///   ⇒ 「**还没测量过**」与「**测了且零失败**」不可区分
+    ///   ⇒ 调用方须结合 `recent_len()` 判断是否真有测量。
+    pub fn error_rate(&self, capability_id: &str) -> f64 {
+        self.breakers.get(capability_id).map(|b| b.error_rate()).unwrap_or(0.0)
+    }
+
+    /// ⭐ 2026-10-07：最近结果条数（0 ⇒ **尚无测量**）。
+    ///   用于区分「没测过」与「测了且零失败」。
+    pub fn recent_len(&self, capability_id: &str) -> usize {
+        self.breakers.get(capability_id).map(|b| b.recent_results.len()).unwrap_or(0)
+    }
 }
 
 // 全局断路器注册表
