@@ -1172,7 +1172,7 @@ pub async fn create_gateway_async() -> GatewayV2 {
     // ── 6. LLM 代理池: 注册持久化第三方 key 条目 (provider_pool.toml) ──
     // 每个条目按 label 注册进 gateway (统一路由/健康/配额) + AccountPool
     // (并发租约/检疫/自动恢复)。池为空时零开销跳过。
-    let pool = super::super::pool::provider_pool::global_provider_pool();
+    let pool = super::super::pool::nt_provider_pool::global_provider_pool();
     if let Ok(guard) = pool.lock() {
         if !guard.entries.is_empty() {
             let n = guard.register_into_gateway(&mut gateway);
@@ -1348,8 +1348,8 @@ mod tests {
     fn test_pool_entry_registers_into_gateway() {
         // 直接验证 ProviderPool::register_into_gateway 接线:
         // 池条目按 label 注册为 gateway provider (可被 providers() 发现)。
-        let mut pool = crate::l1_action::nt_io::nt_io_provider::provider_pool::ProviderPool::default();
-        pool.entries.push(crate::l1_action::nt_io::nt_io_provider::provider_pool::PoolEntry {
+        let mut pool = crate::l1_action::nt_io::nt_io_provider::nt_provider_pool::ProviderPool::default();
+        pool.entries.push(crate::l1_action::nt_io::nt_io_provider::nt_provider_pool::PoolEntry {
             label: "t-pool-gw".to_string(),
             provider: "openai".to_string(),
             api_key: "sk-test-pool".to_string(),

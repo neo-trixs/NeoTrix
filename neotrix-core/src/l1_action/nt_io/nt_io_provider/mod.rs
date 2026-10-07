@@ -81,12 +81,12 @@ pub use health::rate_limiter::{RateLimiter, TokenBucket, AdaptivePacer, BrainTie
 pub use health::{circuit_breaker, compaction, context_budget, rate_limiter, rate_profiles};
 
 // ── 连接池 ──────────────────────────────────────────────────
-pub use pool::account_pool::{
+pub use pool::nt_account_pool::{
     AccountHealth, AccountLease, AccountPool, AccountPoolConfig, AccountPoolError,
 };
-pub use pool::free_pool::FreePool;
-pub use pool::provider_pool::{global_provider_pool, PoolEntry, ProviderPool};
-pub use pool::{account_pool, free_pool, provider_pool};
+pub use pool::nt_free_pool::FreePool;
+pub use pool::nt_provider_pool::{global_provider_pool, PoolEntry, ProviderPool};
+pub use pool::{nt_account_pool, nt_free_pool, nt_provider_pool};
 
 // ── 故障转移 / Provider 切换 ────────────────────────────────
 pub use routing::failover_history::{

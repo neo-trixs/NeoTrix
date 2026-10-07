@@ -30,6 +30,9 @@ pub struct LocalInterface {
     pub name: String,
     pub ips: Vec<IpAddr>,
     pub mac: Option<String>,
+    // nt-unwired-spec: 未接线规格 —— 分析器**填了**这个字段，但全仓**无人读**。
+    // D2 切片实测（2026-10-07）：本文件内零读点，所属 struct 也没有界面/契约消费者。
+    // ⛔ B 类（功能没做，不是不要了）⇒ 保留并标注：删掉等于抹掉「局域网设备当前是否在线」这个规格。
     pub is_up: bool,
 }
 

@@ -31,8 +31,17 @@ pub struct Section {
     pub virtual_address: u64,
     pub virtual_size: u64,
     pub raw_size: u64,
+    // nt-unwired-spec: 未接线规格 —— 分析器**填了**这个字段，但全仓**无人读**。
+    // D2 切片实测（2026-10-07）：本文件内零读点，所属 struct 也没有界面/契约消费者。
+    // ⛔ B 类（功能没做，不是不要了）⇒ 保留并标注：删掉等于抹掉「ELF/Mach-O/PE **节头的可执行位**（Unix 权限位语义）」这个规格。
     pub is_executable: bool,
+    // nt-unwired-spec: 未接线规格 —— 分析器**填了**这个字段，但全仓**无人读**。
+    // D2 切片实测（2026-10-07）：本文件内零读点，所属 struct 也没有界面/契约消费者。
+    // ⛔ B 类（功能没做，不是不要了）⇒ 保留并标注：删掉等于抹掉「节头的可写位」这个规格。
     pub is_writable: bool,
+    // nt-unwired-spec: 未接线规格 —— 分析器**填了**这个字段，但全仓**无人读**。
+    // D2 切片实测（2026-10-07）：本文件内零读点，所属 struct 也没有界面/契约消费者。
+    // ⛔ B 类（功能没做，不是不要了）⇒ 保留并标注：删掉等于抹掉「节头的可读位」这个规格。
     pub is_readable: bool,
 }
 

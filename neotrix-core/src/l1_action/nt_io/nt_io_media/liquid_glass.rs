@@ -1,9 +1,24 @@
 use std::collections::HashMap;
 
+/// 液态玻璃视觉参数。
+///
+/// ⭐⭐ 2026-10-07 D2 切片实测（逐字段 grep + 读 `render()`）：**8 个字段里只有
+/// `brightness` 被真正消费** —— `GlassRenderer::render`（:103-105）只把它乘进背景色。
+/// 其余 7 个（`blur_radius` / `saturation` / `contrast` / `border_width` /
+/// `border_color` / `tint_color` / `tint_opacity`）**只被 `Default` 写、从不被读**。
+///
+/// ⇒ 本结构属 **B 类「未接线规格」**：这些字段声明的是 `render()` **本该实现**
+///   的视觉行为（模糊、饱和、描边、着色），而渲染器还没做。
+///   ⛔ 按 D2-b **不删**：删掉就把「液态玻璃该有哪些参数」这个规格从代码里抹掉。
+///
+/// ⓘ 三个数组字段（`border_color` / `tint_color`）**结构上不可能**被死开关门看到
+///   —— 它的数值字段正则只认标量（`u8..f64`），`[f32; 4]` 不匹配
+///   ⇒ **「门只报了 4 个」不是因为另外 3 个是活的**。这条盲区已记入门内注释。
 #[derive(Debug, Clone)]
 pub struct GlassConfig {
     pub blur_radius: f32,
     pub saturation: f32,
+    /// ⭐ 本结构**唯一**被 `render()` 读取的字段。
     pub brightness: f32,
     pub contrast: f32,
     pub border_width: f32,

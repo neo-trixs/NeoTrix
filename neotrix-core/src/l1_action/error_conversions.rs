@@ -102,8 +102,8 @@ impl From<crate::l1_action::nt_io::nt_io_provider::gateway::execution::Inference
     }
 }
 
-impl From<crate::l1_action::nt_io::nt_io_provider::pool::account_pool::AccountPoolError> for NeoTrixError {
-    fn from(e: crate::l1_action::nt_io::nt_io_provider::pool::account_pool::AccountPoolError) -> Self {
+impl From<crate::l1_action::nt_io::nt_io_provider::pool::nt_account_pool::AccountPoolError> for NeoTrixError {
+    fn from(e: crate::l1_action::nt_io::nt_io_provider::pool::nt_account_pool::AccountPoolError) -> Self {
         NeoTrixError::OperationFailed(e.to_string())
     }
 }

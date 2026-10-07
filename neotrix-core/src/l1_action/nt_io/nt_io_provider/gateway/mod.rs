@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 
-use super::pool::account_pool::{AccountPool, AccountPoolConfig};
+use super::pool::nt_account_pool::{AccountPool, AccountPoolConfig};
 use super::common::generation_classifier::{GenerationAnalytics, GenerationClassifier};
 use super::catalog::provider_catalog::{CommunicationProfile, ProviderCategory};
 use super::health::rate_limiter::{AdaptivePacer, TieredSemaphore};

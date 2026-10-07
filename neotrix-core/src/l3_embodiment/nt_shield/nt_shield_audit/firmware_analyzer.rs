@@ -23,6 +23,9 @@ impl std::fmt::Display for FirmwareFormat {
 pub struct FirmwareInfo {
     pub format: FirmwareFormat,
     pub size: usize,
+    // nt-unwired-spec: 未接线规格 —— 分析器**填了**这个字段，但全仓**无人读**。
+    // D2 切片实测（2026-10-07）：本文件内零读点，所属 struct 也没有界面/契约消费者。
+    // ⛔ B 类（功能没做，不是不要了）⇒ 保留并标注：删掉等于抹掉「固件校验和是否通过」这个规格。
     pub checksum_valid: bool,
 }
 

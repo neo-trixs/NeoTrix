@@ -7,11 +7,11 @@ use crate::l0_substrate::nt_core_error::recovery::{ErrorContext, ErrorType, Reco
 use crate::l0_substrate::nt_core_cache::text_to_embedding;
 use crate::l1_action::nt_core_llm::{LlmError, LlmRequest, LlmResponse};
 use crate::l0_substrate::nt_core_span::{SpanKind, Tracer};
-use crate::l1_action::nt_io::nt_io_provider::pool::account_pool::{AccountPoolError};
+use crate::l1_action::nt_io::nt_io_provider::pool::nt_account_pool::{AccountPoolError};
 use crate::l1_action::nt_io::nt_io_provider::gateway::routing::agent_routing::ModelTier;
 use crate::l1_action::nt_io::nt_io_provider::health::circuit_breaker::BreakerState;
 use crate::l1_action::nt_io::nt_io_provider::health::context_budget::estimate_tokens;
-use crate::l1_action::nt_io::nt_io_provider::pool::free_pool::global_free_pool;
+use crate::l1_action::nt_io::nt_io_provider::pool::nt_free_pool::global_free_pool;
 use crate::l1_action::nt_io::nt_io_provider::health::rate_limiter::BrainTier;
 use crate::l1_action::nt_io::nt_io_provider::common::privacy_guard::{egress_privacy_guard, trust_from_name};
 use crate::l1_action::nt_io::nt_io_provider::gateway::types::{AttemptPhase, ProviderState};
