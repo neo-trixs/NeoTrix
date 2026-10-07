@@ -9,142 +9,33 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 // ============================================================
-// 1. 枚举类型
+// 1. 枚举类型 —— 真源是 unified_types（见下）
 // ============================================================
-
-/// 产品分类
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub enum ProductCategory {
-    /// 阀门
-    #[default]
-    Valve,
-    /// 泵
-    Pump,
-    /// 法兰
-    Flange,
-    /// 管件
-    PipeFitting,
-    /// 仪表
-    Instrument,
-    /// 其他
-    Other,
-}
-
-/// 驱动类型
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub enum DriveType {
-    /// 手动
-    #[default]
-    Manual,
-    /// 电动
-    Electric,
-    /// 气动
-    Pneumatic,
-    /// 液压
-    Hydraulic,
-    /// 电磁
-    Electromagnetic,
-    /// 无 (被动件)
-    None,
-}
-
-/// 连接类型
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub enum ConnectionType {
-    /// 法兰连接
-    #[default]
-    Flanged,
-    /// 焊接
-    Welded,
-    /// 螺纹连接
-    Threaded,
-    /// 卡套
-    Compression,
-    /// 快接
-    QuickConnect,
-    /// 对夹
-    Wafer,
-    /// 其他
-    Other,
-}
-
-/// 贸易条款 (Incoterms)
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub enum TradeTerms {
-    /// 工厂交货
-    #[default]
-    ExWorks,
-    /// 货交承运人
-    Fca,
-    /// 船上交货 (装运港)
-    Fob,
-    /// 成本加运费
-    Cfr,
-    /// 成本保险费加运费
-    Cif,
-    /// 目的地交货
-    Ddp,
-    /// 其他
-    Other(String),
-}
-
-/// 订单状态
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub enum OrderStatus {
-    /// 草稿
-    #[default]
-    Draft,
-    /// 已确认
-    Confirmed,
-    /// 生产中
-    InProduction,
-    /// 已发货
-    Shipped,
-    /// 已签收
-    Delivered,
-    /// 已完成
-    Completed,
-    /// 已取消
-    Cancelled,
-}
-
-/// 报价状态
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub enum QuoteStatus {
-    /// 草稿
-    #[default]
-    Draft,
-    /// 已发送
-    Sent,
-    /// 客户已确认
-    Accepted,
-    /// 客户已拒绝
-    Rejected,
-    /// 已过期
-    Expired,
-    /// 已撤回
-    Withdrawn,
-}
-
-/// 询价状态
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub enum InquiryStatus {
-    /// 收到询价
-    #[default]
-    Received,
-    /// 分析中
-    Analyzing,
-    /// 报价中
-    Quoting,
-    /// 已报价
-    Quoted,
-    /// 已成交
-    Won,
-    /// 已丢失
-    Lost,
-    /// 已取消
-    Cancelled,
-}
+//
+// 2026-10-07 融合（本文件 §2 辅助结构段之前全部 8 个类型）：
+//
+// 这 8 个类型原先在本文件与 `unified_types.rs` 各有一份，**逐字相同**
+// （含 derive 列表、`#[default]` 变体、`TradeTerms::Other(String)` 的负载，
+// 以及 `Product` 那 13 行手写 `impl Default`）。
+//
+// 三处独立证据指向 `unified_types` 为真源：
+//   1. 本文件头 `:3-4` 「子模块通过 `use super::data_model::*` 引用，**禁止重复定义**」
+//   2. `unified_types.rs:390` 「8. 通用枚举（**从 NeoTrix data_model 迁移**）」
+//   3. `nt_act_trade/mod.rs:48-57` 的 re-export 全部指向 `unified_types`
+//
+// ⇒ 本文件改为 `pub use` 再导出，保持 `use super::data_model::*` 的
+// **消费方零改动**（本文件内 `Product`/`Quote`/`Inquiry` 等结构体与
+// `tests/data_model_tests.rs:7` 的 glob 导入都无需修改）。
+//
+// ⛔ **不融合的是结构体**：`Product`/`Quote`/`Order`/`Inquiry`/`InquiryItem`/
+// `QuoteItem`/`Supplier` 在两处的**字段集不同**（如 `Inquiry`：本文件
+// `{inquiry_no, trade_terms, metadata}` vs unified `{customer, created_at, updated_at}`；
+// `currency: String` vs `Currency`），且可见性不同（`pub(crate)` vs `pub`）。
+// 那正是 2026-09-29 融合 `MaterialSpec` 时写下的同一条理由。
+pub use super::unified_types::{
+    ConnectionType, DriveType, InquiryStatus, OrderStatus, Product, ProductCategory,
+    QuoteStatus, TradeTerms,
+};
 
 // ============================================================
 // 2. 辅助结构
@@ -208,57 +99,6 @@ pub use super::unified_types::InquiryMetadata;
 // ============================================================
 // 3. 核心数据结构
 // ============================================================
-
-/// 产品
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Product {
-    /// 产品编码
-    pub code: String,
-    /// 产品分类
-    pub category: ProductCategory,
-    /// 子分类
-    pub subcategory: String,
-    /// 型号
-    pub model: String,
-    /// 材质
-    pub materials: Vec<MaterialSpec>,
-    /// 驱动类型
-    pub drive_type: DriveType,
-    /// 连接类型
-    pub connection_type: ConnectionType,
-    /// 标准 (如 API 600, GB/T 12235)
-    pub standard: String,
-    /// 压力等级
-    pub pressure: PressureRating,
-    /// 尺寸规格
-    pub size: SizeSpec,
-    /// 参考价格
-    pub price: PriceInfo,
-    /// 供应商 ID
-    pub supplier_id: String,
-    /// 质量等级
-    pub grade: String,
-}
-
-impl Default for Product {
-    fn default() -> Self {
-        Self {
-            code: String::new(),
-            category: ProductCategory::default(),
-            subcategory: String::new(),
-            model: String::new(),
-            materials: Vec::new(),
-            drive_type: DriveType::default(),
-            connection_type: ConnectionType::default(),
-            standard: String::new(),
-            pressure: PressureRating::default(),
-            size: SizeSpec::default(),
-            price: PriceInfo::default(),
-            supplier_id: String::new(),
-            grade: String::new(),
-        }
-    }
-}
 
 /// 供应商
 #[derive(Debug, Clone, Serialize, Deserialize)]
