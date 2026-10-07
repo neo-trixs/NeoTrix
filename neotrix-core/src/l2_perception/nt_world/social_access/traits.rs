@@ -285,25 +285,24 @@ impl HttpPool {
         Ok(Self { client })
     }
 
-    /// 便捷构造：失败时 panic。
-    ///
-    /// ⛔ 仅供测试与「构建失败即程序不可用」的启动路径使用；
-    ///    业务路径请用 [`Self::try_standard`]。
-    /// ⚠️ 便捷包装：**构造失败时 panic**（这是刻意契约，文档已写明
-    ///   「业务路径请用 [`Self::try_standard`]」）。
-    /// ⛔ 但原先是 `panic!("{}", e)` —— `check-unwrap` 把 `panic!` 也算违规，
-    ///   而这里**无法在不改变语义的前提下**去掉 panic（契约就是「失败即崩」）。
-    /// ⇒ 故保留 panic，但把原因**结构化**（`expect` 需要静态串，`panic!` 需格式化），
-    ///   ⛔ 不用 `unreachable!()`（那会吞掉原因）。
-    ///
-    /// ⚠️ 若要彻底移除 panic，需改签名返回 `Result` 并改全部调用方
-    ///   ⇒ 属 API 变更，不在本次「清理门内违规」范围内。
-    pub fn standard() -> Self {
-        match Self::try_standard() {
-            Ok(p) => p,
-            Err(e) => panic!("social_access::standard 构造失败: {e}"),
-        }
-    }
+    // ⛔ 2026-10-07 **删除** `standard()`（原为 `panic!` 契约的便捷包装）。
+    //
+    // ⭐ 完整取证链（**第二次尝试删除，第一次证据不足**）：
+    //  1. 生产调用方共 **2 个**：`reddit.rs:21` 与 `instagram.rs:20`
+    //     ⇒ 两者都已迁到 `try_standard()?`（二者本就返回 `Result`）。
+    //  2. 复核用 `--count` 看**全部**命中：`HttpPool::standard` 仅剩 2 处，
+    //     且**全是注释**（迁移说明）；`Self::standard` 0 处 ⇒ 真零调用方。
+    //  3. `check-unwrap`：删前 NEW=3，删后 NEW=**2** ⇒ 门确认 panic 已消失。
+    //
+    // ⇒ 零调用方的 panic 函数，其唯一作用是让门永远红，
+    //   并给未来留「一调用就重新引入 panic」的坑 ⇒ 删除 + 留痕。
+    //
+    // ⚠️ 第一次删我犯的错（留作教训）：只 grep 了 `reddit.rs` 就断言
+    //   「零调用方」，漏了 `instagram.rs` ⇒ 编译失败后回滚。
+    // ⇒ **「grep 只看第一个命中就下结论」= 未取证。**
+    //
+    // ⇒ 新增调用方请直接用 [`Self::try_standard`]。
+
 
     pub fn get(&self, url: &str) -> reqwest::RequestBuilder { self.client.get(url) }
     pub fn post(&self, url: &str) -> reqwest::RequestBuilder { self.client.post(url) }

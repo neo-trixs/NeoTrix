@@ -17,7 +17,11 @@ impl InstagramExtractor {
         username: &str,
         limit: usize,
     ) -> SocialAccessResult<Vec<UnifiedPost>> {
-        let j: serde_json::Value = HttpPool::standard()
+        // ⭐ 2026-10-07：与 `reddit.rs` 一并从 `HttpPool::standard()`（panic 契约）
+        //   迁到 `try_standard()?` ⇒ 错误以值传播，⛔ 不再带走进程。
+        let pool = HttpPool::try_standard()
+            .map_err(SocialAccessError::Network)?;
+        let j: serde_json::Value = pool
             .get(&format!(
                 "https://i.instagram.com/api/v1/users/web_profile_info/?username={}",
                 username

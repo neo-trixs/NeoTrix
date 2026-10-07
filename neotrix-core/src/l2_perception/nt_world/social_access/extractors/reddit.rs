@@ -18,7 +18,12 @@ impl RedditExtractor {
         use base64::Engine;
         let credentials = base64::engine::general_purpose::STANDARD
             .encode(format!("{}:{}", client_id, client_secret));
-        let r = HttpPool::standard()
+        // ⭐ 2026-10-07：从 `HttpPool::standard()`（panic 契约）迁到
+        //   `try_standard()?`。本函数已返回 `Result` ⇒ 错误**以值传播**，
+        //   ⛔ 不再让「HTTP client 构建失败」把整个进程带走。
+        let pool = HttpPool::try_standard()
+            .map_err(SocialAccessError::Network)?;
+        let r = pool
             .post("https://www.reddit.com/api/v1/access_token")
             .header("Authorization", format!("Basic {}", credentials))
             .form(&[("grant_type", "client_credentials")])
