@@ -89,7 +89,24 @@ ack_for() {
 #         独立 vendored 树**完全逃过门**。
 #      ② 祖先去重会把**嵌套的独立 vendored 树**当成「已被祖先覆盖」而跳过
 #         —— 但祖先记录并未覆盖它（法务上两棵树是两个上游、两条授权链）。
-VENDORED=$(find . -type d -name node_modules -prune -o -type d -name target -prune -o \
+# ⭐ 2026-10-07 修真缺陷：`.worktrees/` **未 prune** ⇒ worktree 副本被当成独立 vendoring 树。
+#
+# 实测（本轮门输出）：同一份代码的 3 个 worktree 副本被报了 3 次 FAIL。
+#   .worktrees/audit-bench/apps/neobot-desktop/frontend
+#   .worktrees/evo/apps/neobot-desktop/frontend
+#   .worktrees/nt-v2/apps/neobot-desktop/frontend
+# ⇒ 它们**不是 vendoring**：`AGENTS.md` §4.2 明确写 `.worktrees/*` 不属于生产代码。
+#
+# ⭐ 为什么这是个缺陷而不是“迟于保护”：
+# worktree 是 `git worktree add` 的**同一个 commit 的副本**，它与主棵**同源**
+# ⇒ 将其报成独立的“第二上游”会**虚增上游数**，使吆进行日归失真。
+#
+# ⛔ 不动任何许可逻辑：`deny` 名单、异常断言、签署判据全部原样保留。
+#   本次修的是**扫描范围**（误把工作副本当上游），不是**判据。**
+VENDORED=$(find . -type d -name node_modules -prune -o -type d -name target -prune \
+  -o -type d -name .worktrees -prune \
+  -o -type d -name .git -prune \
+  -o \
   -type f \( -name 'THIRD_PARTY_NOTICES.md' -o -name 'VENDOR*.md' \
            -o -name 'LICENSE.upstream*' \) -print 2>/dev/null \
   | sed 's#/[^/]*$##' | sort -u)
@@ -100,8 +117,10 @@ VENDORED=$(find . -type d -name node_modules -prune -o -type d -name target -pru
 # ⇒ 门只能检查它**看得见**的树，而「看得见」取决于对端是否留了记录。
 # `vendor/` 是 JS/TS 生态的第三方代码约定，路径本身是强信号；
 # 用它兜底可使「删记录 ⇒ 静默脱管」不可能发生。
-VENDOR_DIRS=$(find . -type d -name node_modules -prune -o -type d -name target -prune -o \
-      -type d -path '*/vendor/*' -print 2>/dev/null | sort -u)
+# ⭐ 同上：`.worktrees/` 与 `.git/` 一并 prune（worktree 副本非上游）。
+VENDOR_DIRS=$(find . -type d -name node_modules -prune -o -type d -name target -prune \
+  -o -type d -name .worktrees -prune -o -type d -name .git -prune \
+  -o -type d -path '*/vendor/*' -print 2>/dev/null | sort -u)
 VENDORED=$(printf '%s\n%s\n' "$VENDORED" "$VENDOR_DIRS" \
            | sed 's#^\./##' | sed '/^$/d' | sort -u)
 
