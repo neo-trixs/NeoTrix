@@ -250,6 +250,33 @@ def main() -> int:
 
     rel = lambda p: str(Path(p).resolve().relative_to(root))  # noqa: E731
 
+    # ── 第四类：**未接线规格**（2026-10-07 新增）──────────���─────────────
+    # 「死配置」有两种**相反**成因：
+    #   A. 已废弃        ⇒ 字段是残留，**应该删**
+    #   B. 未接线规格    ⇒ 功能声明了但读者没写，字段是**意图声明**，**必须留**
+    # ⛔ 门只能回答「有没有人读」，**答不了「是没做还是不做了」**（意图问题）。
+    # ⇒ 若把 B 类持续报成「待人工判定」，后来者只能二选一，
+    #    而**两个都是错的**（删 A 会销毁规格，留 A 会留垃圾）。
+    #
+    # 处置：用**代码内的标记**声明「这个字段是 B 类」——
+    #   ⭐ 标记必须**长在字段旁边**（而非外部清单文件），
+    #      否则清单会与代码漂移，变成第二份「关于代码的说法」。
+    #
+    # 标记语法：字段**上方 6 行内**出现
+    #   `nt-unwired-spec:` 或 `nt-unwired-spec:`的中文变体 `未接线规格`
+    SPEC_MARK_RE = re.compile(r"nt-unwired-spec|未接线规格")
+
+    def _is_spec(d):
+        try:
+            lines = open(d[1], encoding="utf-8", errors="ignore").read().split("\n")
+        except OSError:
+            return False
+        lo = max(0, d[2] - 7)          # d[2] 是 1-based 行号
+        return any(SPEC_MARK_RE.search(x) for x in lines[lo:d[2]])
+
+    spec = [d for d in dead if not d[4] and _is_spec(d)]
+    spec_set = {(d[0], d[1], d[2]) for d in spec}
+
     new = [d for d in dead if d[0] not in baseline]
     # ── 第三类：配置噪声 ──
     # 异名近名孪生（`apple_silicon` vs `is_apple_silicon`、`allowed` vs `allow`、
@@ -268,7 +295,8 @@ def main() -> int:
     print(
         f"dead-flag[{args.types}] 字段 {len(fields)} 个；零读点 {len(dead)} 个"
         f"（外部消费者 serde/uniffi {len(external)}、配置噪声 {len(noise)}、"
-        f"待人工判定 {len(behavioral) - len(noise)}）；"
+        f"**未接线规格 {len(spec)}**、"
+        f"待人工判定 {len(behavioral) - len(noise) - len(spec)}）；"
         f"基线已裁决 {len(baseline)}；新增 {len(new)}"
     )
 
@@ -279,6 +307,8 @@ def main() -> int:
             kind = "外部消费者(serde/uniffi)"
         elif (name, decl_path, line_no) in noise_set:
             kind = "配置噪声(异名近名)"
+        elif (name, decl_path, line_no) in spec_set:
+            kind = "**未接线规格**（功能声明了但未实现 ⇒⛔ 不要删）"
         else:
             kind = "**待人工判定**"
         print(f"      · {tag} {rel(decl_path)}:{line_no} `pub {name}`{hint}  ({kind})")

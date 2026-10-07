@@ -7,32 +7,94 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// 背景循环配置
 #[derive(Debug, Clone)]
 pub struct BackgroundConfig {
+    // ⛔⚠️ **本结构体 18 / 42 个字段是「未接线规格」**（字段上方标 `nt-unwired-spec`）：
+    //   它们声明了想要的行为（探索 / 代理 / 自动结晶 / 各循环间隔…），
+    //   但**读者从未实现**。
+    //   ⛔ **不要因为「门报死配置」就删它们** —— 删掉等于把「要实现什么」抹掉。
+    //   ⇒ 见 `docs/architecture/DEBT-LEDGER-2026-10-07.md` D2-b。
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub save_interval_secs: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub consolidate_interval_secs: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub evolve_interval_secs: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub cleanup_interval_secs: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub mine_interval_secs: u64,
     pub goal_interval_secs: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub metacog_interval_secs: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub thinking_interval_secs: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub geo_update_interval_hours: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub telemetry_interval_secs: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub enabled: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub proxy_enabled: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub system_proxy_enabled: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub geo_auto_update: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub agent_protocol_enabled: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub nt_world_crawl_interval_secs: u64,
     pub world_prediction_interval_secs: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub prediction_interval_secs: u64,
     pub evolution_interval_secs: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub panorama_interval_secs: u64,
     pub exploration_interval_secs: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub enable_exploration: bool,
     pub curiosity_interval_secs: u64,
     pub knowledge_chain_interval_secs: u64,
     pub knowledge_aging_interval_secs: u64,
     pub crystallization_interval_secs: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
+    ///    实现对应功能时**必须**读取本字段。
     pub enable_auto_crystallize: bool,
     pub tor_crawler_interval_secs: u64,
     pub tor_crawler_search_queries: Vec<String>,
