@@ -120,6 +120,7 @@ SIM 决定「任务能不能开」，本层决定「开工顺序和范围是什�
 | SIM-50 | CI 侦察：公开 API 归因（本文件 §49） | GO | 红基线清单 |
 | SIM-51 | Phase 3 类型迁移提案（本文件 §50） | GO (proposed，待 Architect 签) | 下沉三决 |
 | SIM-52 | M1–M7 执行（ADR-0005/SEAL/F03/Footer/iocs/H抽验/fuzz/复验） | GO | ADR-0005＋fuzz 骨架 |
+| SIM-53 | vibe-wise 三检查点熔炼为执行授权层（本文件 §4a） | GO | 本文件 §4a + §5 行 |
 
 ## §6 SIM-09 试跑：P1-04 五个新适应度函数编码
 
