@@ -81,15 +81,18 @@ worktree=3 个 | 合计 3709M | target 占 3480M | 带未提交改动: 1 个（m
 `nt_tui_e2e.py` · `nt_worktree_gate.sh` · `probes/check-arch-rules.sh` ·
 `probes/check-fake-signal.sh` · 1 份 handoff · 13 个未跟踪（含 `.freebuff/`）。
 
-ⓘ 收工时 `check-layout --strict` **rc=1**，唯一原因是 `.freebuff/`（19:36 由**他窗**新建的
-根目录）。**本窗口刻意没有替它加 `ALLOW_DIRS` 白名单** —— 那不是我拥有的东西，
-代加就是替别人掩盖。新 dot 目录会被判红，正是本窗口把 dot 纳入扫描想要的效果。
+ⓘ 收工时 `check-layout --strict` **曾一度 rc=1**，唯一原因是 `.freebuff/`（19:36 由**他窗**
+新建的根目录）—— 这正是本窗口把 dot 目录纳入扫描想要的效果：**新根目录会被判红**。
+**本窗口刻意没有替它加 `ALLOW_DIRS` 白名单**（那不是我拥有的东西，代加就是替别人掩盖）；
+他窗随后自行把它写进 `.git/info/exclude` ⇒ 归入「git 不管」单列，门自动恢复绿。
+⇒ 这件事验证了设计的意图：白名单要么**带理由**留下，要么被明确声明为 git 不管，
+**没有第三条无理由放行的路**（账本棘轮已在本轮移除）。
 
 ### 8.3 门状态
 
 | 门 | rc | 说明 |
 |---|---|---|
-| `check-layout --strict` | **1** | ⛔ **他窗**的 `.freebuff/`，非本窗口引入 |
+| `check-layout --strict` | 0 | ⛔ 收工一度为 **1**：他窗 19:36 新建根目录 `.freebuff/`，被本窗口的 dot 扫描判红。**他窗随后把它写进 `.git/info/exclude`** ⇒ 归入「git 不管」单列，门自动恢复绿（**本窗口未代加任何白名单**） |
 | `check-executor-registry --strict` | 0 | 本窗口扩展过 (d)(e)(f)(g) |
 | `check-dead-config-flag --strict` | 0 | 新增 0，基线 677 |
 | `check-arch-rules --strict` | 0 | （他窗已修） |
@@ -132,9 +135,9 @@ worktree=3 个 | 合计 3709M | target 占 3480M | 带未提交改动: 1 个（m
 
 ## 5. 留给接手者（按优先级）
 
-1. **`.freebuff/`** —— 他窗的根目录，`check-layout --strict` 因此为红。
-   **请转告创建者**：自己加理由进 `scripts/check-layout.sh` 的 `ALLOW_DIRS`，或移走。
-   ⛔ 别让别人代加白名单。
+1. ~~**`.freebuff/`**~~ —— **已由他窗自行处置**（写入 `.git/info/exclude`），
+   `check-layout` 已恢复绿。⛔ 本窗口未代加白名单；留此条是为了记录
+   「新根目录会被判红」这一行为已被实际验证过一次。
 2. **`.worktrees/merge-b` 有 3 处未提交** —— 转告其主人。
    `.worktrees/evo` 的 `target` 3480M 门判零风险可回收（`nt_worktree_gate.sh clean`）。
 3. **D5 的 schema** —— 框架已就位：`.neotrix/capability-blocking.json` 的
