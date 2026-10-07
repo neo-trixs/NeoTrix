@@ -13,7 +13,7 @@
 use neotrix::l1_action::nt_dialogue_tui::NtTuiHuman;
 use neotrix::l1_action::nt_free_pool::NtFreePoolAsk;
 use neotrix::l1_action::nt_io::nt_io_provider::catalog::model_pool::{ModelSource, UnifiedModelPool};
-use neotrix::l1_action::nt_io::nt_io_provider::catalog::cli_free_source::CliFreeSource;
+use neotrix::l1_action::nt_io::nt_io_provider::catalog::cli_free_source::{CliFreeSource, FreebuffFreeSource};
 use neotrix::l1_action::nt_model_cli::NtModelCliAsk;
 use neotrix::l1_action::nt_stdin_human::NtStdinHuman;
 use neotrix::l5_cognition::nt_crystal_core::{
@@ -182,6 +182,10 @@ fn main() {
             // 一张表展示；CLI 可直接调用的只有 cli-free 源，其余需 key/端点。
             let mut pool = UnifiedModelPool::default_pool();
             pool.add_source(Box::new(CliFreeSource::new()));
+            // freebuff 是交互式 TUI agent，不能作为 headless completion 直接调用；
+            // 但 freebuff CLI 经 OpenAI 兼容端点暴露免费档，故登记进池子供清单可见，
+            // 不进下游 cli_ids 自动调度（避免无端把套利 chat 塞进交互 agent）。
+            pool.add_source(Box::new(FreebuffFreeSource::new()));
             let entries = pool.refresh();
             println!("模型池统一清单（{} 个）：", entries.len());
             let mut order: Vec<&str> = Vec::new();
