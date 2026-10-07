@@ -183,7 +183,7 @@ impl AgentLoop {
         let reg = self
             .style_registry
             .get_or_insert_with(|| std::sync::Arc::new(OutputStyleRegistry::new()));
-        self.last_governance = Some(reg.govern(&styled, self.style));
+        self.last_governance = Some(reg.govern(&styled));
         self.messages.push(Message::new(Role::Assistant, &styled));
         self.trim_history();
         Ok(styled)

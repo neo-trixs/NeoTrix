@@ -10,10 +10,9 @@
 //! 报告附于 AgentLoop.last_governance 供观测。待完善: 插件式扩展 / 样式度量反馈。
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
-use regex::Regex;
 
 // ⭐⭐ **冗余下沉 · Phase 1**（2026-10-07，纯搬运，**零行为变更**）
 //
@@ -31,8 +30,28 @@ use neotrix_neobot::nt_governance::{
     //    本文件不再直接调用 ⇒ 引入即 unused。
     mask_code_fences, r1_answer_first, r2_no_hedging,
     r3_sections_concrete, r4_no_placeholder, r5_max_length, r6_no_dup_boilerplate,
-    r7_file_refs_exist, r8_hallucinated_paths, re_opt, strip_pure_placeholder_lines,
+    r7_file_refs_exist, r8_hallucinated_paths, re_opt,
     RuleResult, EXTS, PLACEHOLDER_INLINE_RE, PLACEHOLDER_PURE_RE,
+};
+
+// ⭐⭐⭐ **冗余下沉 · Phase 2**（2026-10-07）：治理**容器**也统一从 neobot 引用。
+//
+// ⛔ Phase 1 只共享了规则本体，**容器与类型仍在本文件另存一份** ⇒ 实测 7 项双份：
+//   GovernanceReport / AiSmell / SmellPattern / AiSmellDetector /
+//   GovernorRule / OutputGovernor / DEFAULT_MAX_MESSAGE_CHARS
+//   （前 6 项逐字相同；GovernorRule 仅差一个 `OutputStyleId` 死参数）
+//
+// ⛔ 原先保留本文件副本的理由是「`check_fn` 多带一个 `OutputStyleId`，
+//   为未来 style-aware 规则预留」。**该参数在本文件 10 条规则里无一使用**
+//   （全部写成 `|text, _style|`）⇒ ⭐ 那是**投机预留**，不是当前需求；
+//   而为它付出的代价是整条重复的类型层级 + 两个 impl 块（方法集实测完全相同）。
+// ⇒ 本轮已把死参数从整条链去掉（govern / govern_with_autofix / check_fn /
+//   10 个闭包），签名与 neobot 侧**完全一致** ⇒ 副本不再有任何存在理由。
+// ⛔ 不保留任何转发别名或 `#[deprecated]` 垫片：旧签名已无人调用，
+//   留兼容层只会让「同一条治理链有两种写法」继续共存。
+pub use neotrix_neobot::nt_governance::{
+    AiSmell, AiSmellDetector, GovernanceReport, GovernorRule, OutputGovernor,
+    SmellPattern, DEFAULT_MAX_MESSAGE_CHARS,
 };
 
 /// 内置输出样式标识。
@@ -193,13 +212,13 @@ impl OutputStyleRegistry {
     }
 
     /// G27 输出治理 (纯检查)。每条规则独立结果 + 综合得分 + 违规清单。
-    pub fn govern(&self, text: &str, style: OutputStyleId) -> GovernanceReport {
-        self.governor.govern(text, style)
+    pub fn govern(&self, text: &str) -> GovernanceReport {
+        self.governor.govern(text)
     }
 
     /// G27 输出治理 (auto-fix): 额外剥离可机械修复项 (结尾道歉 / 纯占位行)。
-    pub fn govern_with_autofix(&self, text: &str, style: OutputStyleId) -> GovernanceReport {
-        self.governor.govern_with_autofix(text, style)
+    pub fn govern_with_autofix(&self, text: &str) -> GovernanceReport {
+        self.governor.govern_with_autofix(text)
     }
 
     /// 设置治理器工作区根目录 (R07/R08 文件引用校验基准)。
@@ -222,146 +241,6 @@ impl OutputStyle for PlainStyle {
     fn apply(&self, text: &str) -> String {
         text.to_string()
     }
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// G27 OutputGovernor — 输出纪律治理器 (吸收自 i-have-adhd 10 条输出格式规则)
-// ────────────────────────────────────────────────────────────────────────────
-
-/// 单条规则的检查结果。
-#[derive(Debug, Clone)]
-pub struct GovernanceReport {
-    /// 每条规则的独立结果 (按 rule_id 顺序)。
-    pub rule_results: Vec<RuleResult>,
-    /// 综合得分 0-100 = 通过规则数 / 规则总数。
-    pub overall_score: u8,
-    /// 违规摘要 (格式 `R{NN}: {detail}`)。
-    pub violations: Vec<String>,
-    /// 自动修复清单 (空 = 无需修复)。
-    pub fixes_applied: Vec<String>,
-    /// auto-fix 后的文本 (仅 auto-fix 模式且发生修复时存在)。
-    pub fixed_text: Option<String>,
-    /// AI-smell 检测结果 (natural-japanese #14 吸收) — 机械式 AI 写作痕迹清单。
-    pub smells: Vec<AiSmell>,
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// AiSmellDetector — 机械式 AI 写作痕迹检测 (natural-japanese #14 吸收)
-// ────────────────────────────────────────────────────────────────────────────
-
-/// 单条 AI-smell 命中的结构化描述。
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AiSmell {
-    /// 模式标识 (如 `meta-speech` / `conclusion-signpost`)。
-    pub pattern_id: &'static str,
-    /// 命中行号 (1-based)。
-    pub line: usize,
-    /// 命中的原文片段 (截断显示)。
-    pub matched: String,
-    /// 建议改写 (消除机械感)。
-    pub suggestion: &'static str,
-}
-
-/// AI-smell 检测模式 — 正则 + 建议。
-pub struct SmellPattern {
-    pub id: &'static str,
-    pub regex: Option<Regex>,
-    pub suggestion: &'static str,
-}
-
-/// 机械式 AI 写作痕迹检测器 — 规则化 regex 检测 (非 LLM 打分)。
-pub struct AiSmellDetector {
-    patterns: Vec<SmellPattern>,
-    /// 每模式最多上报的命中数 (防止噪声淹没报告)。
-    max_per_pattern: usize,
-}
-
-impl Default for AiSmellDetector {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl AiSmellDetector {
-    pub fn new() -> Self {
-        Self {
-            patterns: Self::default_patterns(),
-            max_per_pattern: 3,
-        }
-    }
-
-    /// 内置模式集 — 高频机械 AI 标记。
-    fn default_patterns() -> Vec<SmellPattern> {
-        vec![
-            SmellPattern {
-                id: "meta-speech",
-                regex: re_opt(r"(?i)值得注意的是|需要注意的是|it's worth noting|it is worth noting|please note that|as an ai,|i am an ai",),
-                suggestion: "直接给结论/事实, 不要声明性前言",
-            },
-            SmellPattern {
-                id: "conclusion-signpost",
-                regex: re_opt(r"综上所述|总而言之|总的说来|in conclusion|to summarize|to sum up|overall, i think|in summary"),
-                suggestion: "删掉总结开场白, 直接给要点或删除冗余段",
-            },
-            SmellPattern {
-                id: "transition-cliche",
-                regex: re_opt(r"首先，|其次，|最后，|最后,|firstly,|secondly,|furthermore,|moreover,|additionally,"),
-                suggestion: "用清单/编号结构替代口语化过渡词",
-            },
-            SmellPattern {
-                id: "over-polished",
-                regex: re_opt(r"如下所示|如下：|以下是对|以下为|below is|here is the|as you can see|如您所见|正如您所知|as we all know|as you know"),
-                suggestion: "去掉恭维性引导, 直入主题",
-            },
-            SmellPattern {
-                id: "hedge-stack",
-                regex: re_opt(r"(?i)very very|extremely extremely|absolutely|undoubtedly|无疑|诚然|毋庸置疑|显然,"),
-                suggestion: "删减程度副词, 让论证自己说话",
-            },
-        ]
-    }
-
-    /// 对一段文本运行全部模式, 返回命中的 AI-smell (按行序去重排序)。
-    pub fn detect(&self, text: &str) -> Vec<AiSmell> {
-        let mut out: Vec<AiSmell> = Vec::new();
-        for p in &self.patterns {
-            let mut hits: Vec<AiSmell> = Vec::new();
-            // ⛔ 正则不可用 ⇒ 该模式**不产出命中**（已被 log::error! 记录）
-            let Some(p_regex) = p.regex.as_ref() else {
-                continue;
-            };
-            for cap in p_regex.captures_iter(text) {
-                if hits.len() >= self.max_per_pattern {
-                    break;
-                }
-                if let Some(m) = cap.get(0) {
-                    let line = text[..m.start()].matches('\n').count() + 1;
-                    let matched = truncate(m.as_str().trim(), 60);
-                    hits.push(AiSmell {
-                        pattern_id: p.id,
-                        line,
-                        matched,
-                        suggestion: p.suggestion,
-                    });
-                }
-            }
-            out.extend(hits);
-        }
-        // 按行号稳定排序 (同模式内保持正则顺序)。
-        out.sort_by_key(|s| s.line);
-        out
-    }
-
-    pub fn pattern_count(&self) -> usize {
-        self.patterns.len()
-    }
-}
-
-/// 单条治理规则 — 独立可测、可审计。
-pub struct GovernorRule {
-    pub id: u8,
-    pub description: &'static str,
-    pub check_fn: Box<dyn Fn(&str, OutputStyleId) -> RuleResult + Send + Sync>,
 }
 
 // ── 各规则检查实现 (纯函数, 便于单测) ───────────────────────────────
@@ -476,19 +355,6 @@ fn strip_trailing_apology(text: &str) -> Option<(String, Vec<String>)> {
     ))
 }
 
-/// G27 输出纪律治理器 — 10 条 i-have-adhd 规则, 纯检查 + 可机械 auto-fix。
-pub struct OutputGovernor {
-    rules: Vec<GovernorRule>,
-    workspace_root: PathBuf,
-    max_message_chars: usize,
-    placeholder_pure: Option<Regex>,
-    /// AI-smell 检测器 (natural-japanese #14 吸收)。
-    smell_detector: AiSmellDetector,
-}
-
-/// 默认单消息长度上限 (字符)。
-pub const DEFAULT_MAX_MESSAGE_CHARS: usize = 8_000;
-
 fn build_rules(root: &Path, max_message_chars: usize) -> Vec<GovernorRule> {
     let root = root.to_path_buf();
     let placeholder_pure = Arc::new(re_opt(PLACEHOLDER_PURE_RE));
@@ -510,152 +376,56 @@ fn build_rules(root: &Path, max_message_chars: usize) -> Vec<GovernorRule> {
         GovernorRule {
             id: 1,
             description: "①答案前置 — 结论先行，禁止'让我先/让我想想'等铺垫推迟答案。",
-            check_fn: Box::new(|text, _style| r1_answer_first(text)),
+            check_fn: Box::new(|text| r1_answer_first(text)),
         },
         GovernorRule {
             id: 2,
             description: "②禁止模糊对冲 — 不用'可能/或许/大概/我觉得/probably'等对冲词。",
-            check_fn: Box::new(|text, _style| r2_no_hedging(text)),
+            check_fn: Box::new(|text| r2_no_hedging(text)),
         },
         GovernorRule {
             id: 3,
             description: "③章节必须有实内容 — 标题后不得紧跟空行/纯占位/纯符号。",
-            check_fn: Box::new(move |text, _style| r3_sections_concrete(text, &placeholder_pure)),
+            check_fn: Box::new(move |text| r3_sections_concrete(text, &placeholder_pure)),
         },
         GovernorRule {
             id: 4,
             description: "④禁止空/占位文本 — 不允许 TODO/TBD/待补充/lorem ipsum 等占位符。",
-            check_fn: Box::new(move |text, _style| r4_no_placeholder(text, &placeholder_pure_for_inline, &placeholder_inline)),
+            check_fn: Box::new(move |text| r4_no_placeholder(text, &placeholder_pure_for_inline, &placeholder_inline)),
         },
         GovernorRule {
             id: 5,
             description: "⑤单消息长度上限 — 超阈值即违规。",
-            check_fn: Box::new(move |text, _style| r5_max_length(text, max_message_chars)),
+            check_fn: Box::new(move |text| r5_max_length(text, max_message_chars)),
         },
         GovernorRule {
             id: 6,
             description: "⑥禁止重复样板 — 相同长行 (≥25 字符) 出现 ≥3 次即违规。",
-            check_fn: Box::new(|text, _style| r6_no_dup_boilerplate(text)),
+            check_fn: Box::new(|text| r6_no_dup_boilerplate(text)),
         },
         GovernorRule {
             id: 7,
             description: "⑦文件引用必须存在 — 反引号/裸路径引用的文件必须真实存在于工作区。",
-            check_fn: Box::new(move |text, _style| {
+            check_fn: Box::new(move |text| {
                 r7_file_refs_exist(text, &root, &backtick_re, &bare_path_re, &line_suffix_re)
             }),
         },
         GovernorRule {
             id: 8,
             description: "⑧禁止幻影路径 — `file:line` 引用必须存在且行号在文件范围内。",
-            check_fn: Box::new(move |text, _style| r8_hallucinated_paths(text, &root_for_hallucinated, &line_ref_re)),
+            check_fn: Box::new(move |text| r8_hallucinated_paths(text, &root_for_hallucinated, &line_ref_re)),
         },
         GovernorRule {
             id: 9,
             description: "⑨语言一致 — 禁止显著中英混杂 (代码块除外)。",
-            check_fn: Box::new(|text, _style| r9_consistent_language(text)),
+            check_fn: Box::new(|text| r9_consistent_language(text)),
         },
         GovernorRule {
             id: 10,
             description: "⑩禁止结尾道歉 — 输出不得以'抱歉/对不起/sorry'收尾。",
-            check_fn: Box::new(|text, _style| r10_no_trailing_apology(text)),
+            check_fn: Box::new(|text| r10_no_trailing_apology(text)),
         },
     ]
-}
-
-impl OutputGovernor {
-    pub fn new() -> Self {
-        let root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        Self {
-            rules: build_rules(&root, DEFAULT_MAX_MESSAGE_CHARS),
-            workspace_root: root,
-            max_message_chars: DEFAULT_MAX_MESSAGE_CHARS,
-            placeholder_pure: re_opt(PLACEHOLDER_PURE_RE),
-            smell_detector: AiSmellDetector::new(),
-        }
-    }
-
-    pub fn rule_count(&self) -> usize {
-        self.rules.len()
-    }
-
-    pub fn workspace_root(&self) -> &Path {
-        &self.workspace_root
-    }
-
-    /// 设置工作区根目录 (R07/R08 文件引用校验基准), 重建依赖 root 的规则。
-    pub fn set_workspace_root(&mut self, root: impl AsRef<Path>) {
-        self.workspace_root = root.as_ref().to_path_buf();
-        self.rules = build_rules(&self.workspace_root, self.max_message_chars);
-    }
-
-    /// 设置单消息长度上限, 重建 R05。
-    pub(crate) fn _set_max_message_chars(&mut self, max: usize) {
-        self.max_message_chars = max;
-        self.rules = build_rules(&self.workspace_root, max);
-    }
-
-    /// 纯检查模式: 运行全部规则, 不修改文本。
-    pub fn govern(&self, text: &str, style: OutputStyleId) -> GovernanceReport {
-        let rule_results: Vec<RuleResult> = self
-            .rules
-            .iter()
-            .map(|rule| (rule.check_fn)(text, style))
-            .collect();
-        self.finalize(text, rule_results, false)
-    }
-
-    /// auto-fix 模式: 检查 + 剥离可机械修复项 (结尾道歉 / 纯占位行)。
-    pub fn govern_with_autofix(&self, text: &str, style: OutputStyleId) -> GovernanceReport {
-        let rule_results: Vec<RuleResult> = self
-            .rules
-            .iter()
-            .map(|rule| (rule.check_fn)(text, style))
-            .collect();
-        self.finalize(text, rule_results, true)
-    }
-
-    fn finalize(&self, text: &str, rule_results: Vec<RuleResult>, autofix: bool) -> GovernanceReport {
-        let total = self.rules.len().max(1) as f64;
-        let passed = rule_results.iter().filter(|r| r.passed).count() as f64;
-        let overall_score = (passed / total * 100.0).round() as u8;
-        let violations: Vec<String> = rule_results
-            .iter()
-            .filter(|r| !r.passed)
-            .map(|r| format!("R{:02}: {}", r.rule_id, r.detail))
-            .collect();
-
-        let mut fixes_applied: Vec<String> = Vec::new();
-        let mut fixed_text: Option<String> = None;
-        if autofix {
-            let mut cur = text.to_string();
-            if let Some((f, changes)) = strip_trailing_apology(&cur) {
-                cur = f;
-                fixes_applied.extend(changes);
-            }
-            if let Some((f, changes)) = strip_pure_placeholder_lines(&cur, &self.placeholder_pure) {
-                cur = f;
-                fixes_applied.extend(changes);
-            }
-            if !fixes_applied.is_empty() {
-                fixed_text = Some(cur);
-            }
-        }
-
-        GovernanceReport {
-            rule_results,
-            overall_score,
-            violations,
-            fixes_applied,
-            fixed_text,
-            smells: self.smell_detector.detect(text),
-        }
-    }
-}
-
-impl Default for OutputGovernor {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 #[cfg(test)]
 mod resolve_degrade_tests {
@@ -767,10 +537,7 @@ mod tests {
     #[test]
     fn governed_report_includes_smells() {
         let reg = OutputStyleRegistry::new();
-        let report = reg.govern(
-            "综上所述，这是对账户池的总结。\n其余内容正常。",
-            OutputStyleId::Plain,
-        );
+        let report = reg.govern("综上所述，这是对账户池的总结。\n其余内容正常。");
         assert!(!report.smells.is_empty(), "smells should be detected in govern()");
         assert!(report
             .smells
@@ -800,27 +567,27 @@ impl crate::l0_substrate::nt_core_self_test::SelfTest for OutputGovernorSelfTest
         }
 
         // 2. 空输入通过
-        let report = gov.govern("", OutputStyleId::Plain);
+        let report = gov.govern("");
         if !report.rule_results.iter().all(|r| r.passed) {
             failures.push("empty input should pass all rules".into());
         }
 
         // 3. 结尾道歉被捕获
-        let report = gov.govern("结论是 x。\n抱歉", OutputStyleId::Plain);
+        let report = gov.govern("结论是 x。\n抱歉");
         let r10_caught = report.rule_results.iter().any(|r| !r.passed && r.rule_id == 10);
         if !r10_caught {
             failures.push("trailing apology should be caught by R10".into());
         }
 
         // 4. 纯占位行被捕获 (占位规则为 R04)
-        let report = gov.govern("待补充", OutputStyleId::Plain);
+        let report = gov.govern("待补充");
         let r04_caught = report.rule_results.iter().any(|r| !r.passed && r.rule_id == 4);
         if !r04_caught {
             failures.push("pure placeholder lines should be caught by R04".into());
         }
 
         // 5. autofix 能去除结尾道歉
-        let report = gov.govern_with_autofix("结论是 x。\n抱歉", OutputStyleId::Plain);
+        let report = gov.govern_with_autofix("结论是 x。\n抱歉");
         if report.fixed_text.is_none() || report.fixed_text.as_deref().unwrap_or("").contains("抱歉") {
             failures.push("autofix should strip trailing apology".into());
         }
