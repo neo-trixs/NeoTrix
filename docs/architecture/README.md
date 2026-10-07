@@ -4,7 +4,7 @@
 
 ## 必读（按顺序）
 
-1. `NEOTRIX-MASTER-BLUEPRINT.md` — 唯一图纸入口（D-00~D-15，按图施工）
+1. `NEOTRIX-MASTER-BLUEPRINT.md` — 唯一图纸入口（D-00~D-16，按图施工；**D-16 是唯一横切型判定词**）
 2. `NEOTRIX-STD-1.0.md` 在 `../standards/` — 唯一规则正典（64→70 条款，MUST/SHOULD）
 3. `SIM-PROTOCOL.md` — SIM 登记表（§5）＋最新 SIM（永远读最后两节）
 4. `NEOTRIX-IMPLEMENTATION-ROADMAP.md` — WHEN/WHO/DONE（§5 阶段＋§7 节点卡）

@@ -98,13 +98,13 @@
 
 | 主题 | 正典 |
 |---|---|
-| **唯一图纸** | `NEOTRIX-MASTER-BLUEPRINT.md`（D-00~D-15，按图施工） |
+| **唯一图纸** | `NEOTRIX-MASTER-BLUEPRINT.md`（D-00~D-16，按图施工；**D-16 最短描述公理**横切全部图：任何"压缩/蒸馏/遗忘/裁剪"改动先判是否**同时**压低 complexity 与 accuracy） |
 | **唯一排期真源** | `FINAL-ROADMAP-2026-09-29.md`（45 仓四轮吸收定稿）· 特性级 `FEATURE-MAP-TASKS-2026-09-29.md` |
 | 架构现状 | `ARCHITECTURE.md` ⚠️ **§1-§12 已被 §13 推翻，只读 §13 起** |
 | 模块台账 | `ARCHITECTURE-MAP-ROADMAP-V2.md` —— **2026-09-29 已拆分，只留 §11 起的事实对账层**（可再生实测值）。§1–§7 的 308 行死数据已移入 `_superseded/ARCHITECTURE-MAP-ROADMAP-V2-deathsnap-2026-09-19.md`。更新规则 **R-P199**，口径限 `neotrix-core` L1–L6；`neobot` 独立 crate 不占 L 层故不进 ⇒ 见 `ABSORPTION-DSH-SIDEBAR-IM.md` |
 | 模块拓扑实测 | `DIR-AUDIT-2026-09-27.md`（16 包依赖图 + 8 类重复类型）· **目录解法** `DIR-REMEDY-2026-09-28.md` |
-| 外部吸收 | `ABSORPTION-AGENT-ARCH-2026-09-28.md`（8 源）+ `…ARCH2-2026-09-29.md`（30 源，含 5 个被证伪前提，3 仓无 LICENSE ⇒ 只取设计）+ `BATCH-FIX-2026-09-29.md` · `ABSORPTION-EXTERNAL-2026-09-27.md` · `ABSORPTION-AI-NATIVE-SDLC-2026-10-06.md`（工件链/`REVIEW.md`/agent 配置门；含「本仓已更强因而**不**照抄的 5 项」） |
-| 方法论教训 | `LESSONS-*.md` **8 档，按主题挑读，勿只读最新**。纪律类见 `…2026-09-24.md` §五（R36–R46：反引号当命令执行 / 门干跑有副作用 / `--only` 按路径取 diff / 全角标点吃字节 / 门记录声称已做而实现从未入库） |
+| 外部吸收 | **规则唯一源 = `NEOTRIX-STD-1.0.md` NTS-B10（含 B10.1 URL-only 入参 / B10.2 熔炼化为已有 / B10.3 前置门降级为分流 / B10.4 记录真伪是唯一硬停）** · 操作面 `skills/external-absorption/SKILL.md`「URL-only 熔炼模式」（裸 URL 即完整入参；五段=信号初筛→零克隆取源→熔炼成束→化为已有→落账）。⛔ **许可核实主路径 = `raw.githubusercontent.com`，不是 API**（匿名 API 403 会把 4/18 误判为不可用）。⛔ **「化为已有」的判定脚本 `kb_batch_absorb.py`/`absorb_to_capability.py` 实测已不存在** ⇒ 必须逐条读代码 grounding，禁止凭关键词猜（无名小仓误映射率 68%）。批次记录：`ABSORPTION-BATCH-18-MEMORY-2026-10-07.md`（**72 强化 : 14 新增**，含 2 条 AGPL / 1 非商用 / 1 无 LICENSE）· `ABSORPTION-GITHUB-SKILL-FORGE-2026-10-07.md`（5 条全强化）。更早：`ABSORPTION-AGENT-ARCH-2026-09-28.md`（8 源）+ `…ARCH2-2026-09-29.md`（30 源）+ `BATCH-FIX-2026-09-29.md` · `ABSORPTION-AI-NATIVE-SDLC-2026-10-06.md` |
+| 方法论教训 | `LESSONS-*.md` **9 档，按主题挑读，勿只读最新**。**吸收/开门类见 `…2026-10-07-open-gate-record-truth.md`（L1 门可宽门框必须实 / L2 许可核实主路径是 raw 非 API / L3「新增」占比畸高先怀疑检索不全 / L4 卡位不可从单行括注推断 / L5 门只扫 root-doc 故 skills/ 内脚本失效零敏感 / L6 零读点≠能力已建成 / L7 本机 rg 会吞标识符）**。纪律类见 `…2026-09-24.md` §五（R36–R46：反引号当命令执行 / 门干跑有副作用 / `--only` 按路径取 diff / 全角标点吃字节 / 门记录声称已做而实现从未入库） |
 | 文档规范 | `DOCUMENTATION-MAP.md` |
 | 本地模型 | `LOCAL-LLAMA-2026-09-28.md` |
 | 待办 | `TODO.md`（顶部人工摘要区）· 事故分诊 `sessions/handoff-disease-list-20260927.md` |
@@ -120,6 +120,7 @@
 - `DIR-REMEDY-2026-09-28.md` §2.5：`neotrix-core/src/neotrix/`（129 文件/43,834 行）是**不参与 L0–L6 的第二棵树**且完全逃过 `check-layer-deps.sh`；解法是**层归属显式化**（`layer-map.json`）而非搬目录。其 §2.5 记录 `nt_jev` + `nt_crystal_core` 是**活路径**（L1 有 6 个消费者），**勿当死代码删** ——「导出 ≠ 调用」已错过 3 次。
 - `LESSONS-20260929-checked-is-not-verified.md`：`nt_judge.rs` 标注「EVO-02 mu 式」，但 `qybaihe/mu` 自己的回测显示 **admission/chunk 准入是它成本最高（54% token）、收益为零（2412 块 drop 0 个）**。⇒ `handoff-evo-20260926.md:68` 把 admission 列 P0 的表述需改判。**我们是无 I/O 的纯规则实现，故那些数字不适用，但方法论要抄。**
 - 8 档 `LESSONS-*` 的元教训统一是：**任何「X 是好的/坏的」断言都要问「我是在哪个环境里验证的」；答「我的工作树」就等于还没有证据。**
+- ⭐ 2026-10-07 第 9 档的元教训补一条：**证据的粒度决定结论的粒度** —— 一条 grep 命中只能支持「存在某符号」，**不能**支持「机制缺失」「槽位为空」「模块重名」这类**关于整体的**断言。本轮 7 条里 4 条的根因都是**从一处证据跳到更大结论**（把「门开着」读成「记录可含糊」/ 把局部 `cursor` 读成缺 resume / 把「预留」括注读成槽位空 / 把 rg 命中读成模块叫 `n`）。四条真话全部是**再读一次那一行、再列一次全部标题**得来的 —— 成本极低，收益极高。
 
 ### 6.3 已废止（⛔ 勿读、勿实现）
 
