@@ -34,24 +34,20 @@
 # 而恒红的门比没有门更坏（它训练人忽略红色）。
 # 故：advisory 起步 + 账本棘轮，拦新增、既有记账。
 #
-# 用法：bash scripts/check-layout.sh [--strict] [--update-baseline]
+# 用法：bash scripts/check-layout.sh [--strict]
 #   默认 advisory（恒 exit 0）
 #   --strict           仅当有**新增**违规时 exit 1
-#   --update-baseline  把当前存量写入账本（棘轮）
 
 set -uo pipefail
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$ROOT" || exit 2
 
-BASELINE="scripts/layout-baseline.txt"
 DOCMAP="DOCUMENTATION-MAP.md"
 STRICT=0
-UPDATE=0
 for arg in "$@"; do
   case "$arg" in
     --strict) STRICT=1 ;;
-    --update-baseline) UPDATE=1 ;;
     -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
     *) echo "unknown arg: $arg" >&2; exit 2 ;;
   esac
@@ -252,75 +248,49 @@ if [ -f "$DOCMAP" ]; then
   done
 fi
 
-# ── 账本棘轮 ────────────────────────────────────────────────────
-if [ "$UPDATE" -eq 1 ]; then
-  { echo "# 根目录/目录结构存量基线（棘轮）— 每行一项。"
-    echo "# 生成于 check-layout.sh --update-baseline。"
-    echo "# ⛔ 绝不要为了让门变绿而删条目 —— 那等于让违规永久合法化。"
-    echo "# 处置正确姿势：把文件挪进合规目录，或把白名单扩到 ALLOW_FILES 并写明理由。"
-    printf '%s' "$VIOL"
-    printf '%s' "$DOCSVIOL" | sed 's/^ *//'
-  } > "$BASELINE"
-  echo "baseline updated: $BASELINE now has $(grep -vc '^#' "$BASELINE") entries"
-  exit 0
-fi
+# ⭐⭐⭐ 2026-10-07 **移除账本棘轮机制** —— 塌缩成单一裁决机制。
+#
+# # 为什么这是「最优解」而不是又一层兼容
+#
+# 本门此前有**两条**根目录裁决路径：
+#   ① ALLOW_FILES / ALLOW_DIRS —— 格式 `名称|类别|理由`，**理由必填**
+#   ② scripts/layout-baseline.txt —— 格式只有**名称**，⛔ **无理由字段**
+# ② 就是那条「兼容性策略」：它能用一行无理由的文字把一个根项永久放行。
+# 实测（上一提交记录）：把点项名写进账本 ⇒ rc=0 ⇒ 确认通路真实存在。
+#
+# # 为什么能直接删，而不是双轨并存
+#
+# 实测 `layout-baseline.txt` **条目数为 0**，当前违规数也是 **0** ——
+# 即账本机制**从未承载任何真实条目**，路径②是纯理论隐患。
+# ⇒ 删掉它**不丢任何已记录的债**，却永久消除无理由放行口。
+#
+# # 单一机制后的语义（更简单也更硬）
+#
+# 任何不在 ALLOW_* 的根项 = 未获理由的根项 ⇒ `--strict` 直接判红。
+# 「暂时不想处理」不再是合法理由；但若确有理由，写进 ALLOW_* 并写明，
+# 它会**留在代码评审里**（账本不会），这正是我们要的可见性。
+#
+# ⛔ 保留 `--update-baseline` 已删除：若有人（或旧文档）再用它会直接报错，
+#   而不是静默生成一个空账本造成「以为在记账其实没记」。
 
 N_VIOL=0; [ -n "$VIOL" ] && N_VIOL=$(printf '%s' "$VIOL" | grep -c .)
 
-# ⭐⭐⭐ 2026-10-07 修 fail-open：账本缺失 ⇒ 棘轮静默失效 ⇒ `--strict` 假绿。
-#
-# # 实测（在隔离副本里，2 个真违规）
-#   有账本 → rc=1 ✅   删掉账本 → **rc=0** ⛔ 即「2 个真违规被判通过」。
-#
-# # 为什么这是 fail-open 而不是「无害降级」
-#
-# 本门的两类判据里，**只有「新增」会判红**（存量一律放过，靠棘轮记账）。
-# ⇒ 账本是新增判据的**唯一依据**；账本没了，`N_NEW` 恒为 0，
-#   `--strict` 就**结构上不可能失败** —— 正是 LESSONS L8 说的
-#   「报 PASS 却结构上不可能失败」，比没有门更危险（它训练人忽略红色）。
-# ⛔ 触发条件现实：账本是 tracked 文件，一次误删/一次 bad merge/一次
-#   `git clean` 之后的 checkout 事故就能造成，**且不会有任何提示**。
-#
-# ✅ 修法：**fail-closed**。`--strict` 下账本缺失 = 门无法履行职责 ⇒ 判红，
-#   并说清怎么补。advisory 模式只警告、不阻断（保持「只跑不判」的用法）。
-if [ ! -f "$BASELINE" ]; then
-  if [ "$STRICT" -eq 1 ]; then
-    echo "FAIL(strict): 账本 $BASELINE 不存在 —— 棘轮无法工作，本门结构上不可能失败。"
-    echo "  ⛔ 不把它当「无存量所以通过」：删掉账本会让**新增判据整体失效**。"
-    echo "  修法：bash scripts/check-layout.sh --update-baseline 重建账本，然后复查账本内容。"
-    exit 1
-  fi
-  echo "⚠ 警告: 账本 $BASELINE 不存在 —— 新增判据当前失效（本门只报存量，不判新增）。"
-fi
-
-N_NEW=0
-if [ -f "$BASELINE" ] && [ "$N_VIOL" -gt 0 ]; then
-  N_NEW=$(comm -23 \
-    <(printf '%s' "$VIOL" | grep . | sort -u) \
-    <(grep -v '^#' "$BASELINE" 2>/dev/null | sort -u) | grep -c .)
-fi
-[ -z "$N_NEW" ] && N_NEW=0
+# ⭐ 单一机制：N_NEW 就是违规总数（无账本可豁免）
+N_NEW=$N_VIOL
 N_DOCS=0; [ -n "$DOCSVIOL" ] && N_DOCS=$(printf '%s' "$DOCSVIOL" | grep -c .)
-# docs 类同样走账本棘轮：既存债记账，只拦新增
-N_DOCS_NEW=0
-if [ -f "$BASELINE" ] && [ "$N_DOCS" -gt 0 ]; then
-  N_DOCS_NEW=$(comm -23 \
-    <(printf '%s' "$DOCSVIOL" | sed 's/^ *//' | sort -u) \
-    <(grep -v '^#' "$BASELINE" 2>/dev/null | sort -u) | grep -c .)
-fi
-[ -z "$N_DOCS_NEW" ] && N_DOCS_NEW=0
+N_DOCS_NEW=$N_DOCS
 N_DOCGAP=0; [ -n "$DOCGAP" ] && N_DOCGAP=$(printf '%s' "$DOCGAP" | grep -c .)
 
 N_IGN=0; [ -n "$IGN" ] && N_IGN=$(printf '%s' "$IGN" | grep -c .)
 
 # ── 报告 ────────────────────────────────────────────────────────
 echo "=== NeoTrix layout check ==="
-echo "根目录项: $(grep -c . "$CUR")（另 $N_IGN 项 git 不管，见下方单列）   不在白名单: $N_VIOL   其中新增(不在账本): $N_NEW"
+echo "根目录项: $(grep -c . "$CUR")（另 $N_IGN 项 git 不管，见下方单列）   不在白名单: $N_VIOL"
 echo "neotrix-core/docs/ 违规: $N_DOCS   其中新增: ${N_DOCS_NEW}"
 echo "规范 vs 现实发散: $N_DOCGAP"
 
 if [ "$N_VIOL" -gt 0 ]; then
-  echo "--- 不在白名单的根目录项（存量 ${N_VIOL} / 新增 ${N_NEW}）---"
+  echo "--- 不在白名单的根目录项（均未获理由，${N_VIOL} 个）---"
   printf '%s' "$VIOL" | sed 's/^/  /'
 fi
 if [ -n "$KNOWN" ]; then
@@ -332,7 +302,7 @@ if [ "$N_IGN" -gt 0 ]; then
   printf '%s' "$IGN" | sed 's/^/  /'
 fi
 if [ "$N_DOCS" -gt 0 ]; then
-  echo "--- neotrix-core/docs/ 违反 DOCUMENTATION-MAP:81（禁研究笔记）；存量 $N_DOCS / 新增 ${N_DOCS_NEW} ---"
+  echo "--- neotrix-core/docs/ 违反 DOCUMENTATION-MAP:81（禁研究笔记）：${N_DOCS} 个 ---"
   printf '%s' "$DOCSVIOL"
 fi
 if [ "$N_DOCGAP" -gt 0 ]; then
@@ -343,10 +313,12 @@ fi
 
 if [ "$N_NEW" -gt 0 ] || [ "$N_DOCS_NEW" -gt 0 ] || [ "$N_DOCGAP" -gt 0 ]; then
   if [ "$STRICT" -eq 1 ]; then
-    echo "FAIL(strict): 新增违规 ${N_NEW} / docs 新增违规 ${N_DOCS_NEW} / 规范发散 ${N_DOCGAP}"
-    echo "  修法三选一：① 把文件挪进合规目录；② 确有理由则扩 ALLOW_FILES 并写明消费者；"
-    echo "            ③ 确认是既存债则 --update-baseline 记账（棘轮）。"
-    echo "            （若该项属 .gitignore 已声明不管者 ⇒ 本门不判违规，见上方单列）"
+    echo "FAIL(strict): 未获理由的根目录项 ${N_VIOL} / docs 违规 ${N_DOCS} / 规范发散 ${N_DOCGAP}"
+    echo "  修法二选一（**没有第三条**）："
+    echo "    ① 把文件挪进合规目录；"
+    echo "    ② 确有理由 ⇒ 扩 ALLOW_FILES / ALLOW_DIRS 并**写明消费者**（三段格式：名称|类别|理由）。"
+    echo "  ⛔ 已移除 --update-baseline 账本：它无理由字段，会把根项永久放行。"
+    echo "  ⓔ 若该项属 .gitignore 已声明不管者 ⇒ 本门不判违规，见上方单列。"
     exit 1
   fi
 fi

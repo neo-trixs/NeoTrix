@@ -61,12 +61,16 @@ EXEMPT = {
     'check-fuzz-ready': 'advisory：门自身输出「DONE(advisory).」',
     'check-api-surface': 'advisory：门自身输出「DONE(advisory). Baseline: …」',
     'check-disk': '本机门：按磁盘余量给「长期处方」，⭐⭐ 与仓库状态无关，接进 CI 无意义',
-    'check-layout': 'advisory：门自身输出「DONE(advisory).」',
+    # ⭐ 2026-10-07：`check-layout` 的 advisory 豁免已**删除**（元门 P2 判为死豁免）。
+    #   旧理由是「门自身输出 DONE(advisory)」—— 那说的是**无参默认模式**；
+    #   而 CI 里接的是 `--strict` 形态，实测造违规时 rc=1 真会阻断 ⇒ 豁免无意义。
+    #   ⛔ 教训：豁免理由必须**指名它豁免的是哪个形态**（默认/advisory 还是 --strict），
+    #     否则「同一道门的两种退出码」会互相掩护 —— 与本仓「同名 ≠ 同一符号」同型。
     'nt-integration-evidence': 'report 类：产出证据文档，⭐⭐ 不判失败（⭐ 由人读）',
     'coverage-gaps': '⭐⭐ **report 器，非门**：门自身 docstring 写明「本工具是**筛选器**：能指出哪里可能有洞，⭐⭐ **不能证明哪里没问题**」⇒ 实测输出 24 项「调用了但没断言」，⭐⭐ 而**那是正常代码** ⇒ ⭐⭐ 接进 CI 必然恒红（本仓门纪律）',
     'audit-all': '⭐⭐ 聚合器：一条命令串跑多道 advisory 报告器，⭐⭐ 其成分门已各自登记豁免 ⇒ ⭐⭐ 本元门按**其成分门**判定，⭐⭐ 避免重复登记掩盖缺口',
 
-    # ── ② 需要参数 ⇒ 是工具，不�� CI 阻断项 ──
+# ── ② 需要参数 ⇒ 是工具，**不是** CI 阻断项 ──
     'mutation-check': '工具：命令形态是 `nt_mutation_check.py --audit <FILE.rs>`，⭐⭐ **需逐文件传参** ⇒ 无法无参运行 ⇒ 不适合做 CI 阻断',
     'nt-absorb-denylist': '工具：命令形态是 `nt_absorb_denylist.py <清单文件|->`，⭐⭐ **需传清单** ⇒ 同上',
 

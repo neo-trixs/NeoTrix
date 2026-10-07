@@ -459,6 +459,22 @@ jobs:
         run: node scripts/ops/nt_check_ship_ui.mjs
       - name: Gate — nt_check_visual (高度链/等高/行高/列宽/无溢出)
         run: node scripts/ops/nt_check_visual.mjs
+
+      # ⭐⭐⭐ 2026-10-07：把 `check-layout` 本身接进 CI。
+      #
+      # # 为什么这道必须进（它是本轮改动最多的一道）
+      #
+      # 它此前**只在 gate-registry.tsv 注册**、.github/workflows 里零命中
+      # ⇒ 它红时 CI 全绿。本轮我在它上面改了：gitignore 尊重、fail-open 修复、
+      # dot 文件入扫描、账本机制移除 —— 改了 4 次却没有任何自动信号。
+      # ⇒ **「改得最多的门最不在 CI 上跑」是最坏的组合**：改动越 untested 越危险。
+      #
+      # ⓘ 它读工作区文件系统（含 `git check-ignore`），⛔ 不需要 build。
+      #   实测 rc=0 / <1s ⇒ 时长可忽略。
+      # ⚠️ 排在 Build frontend 之后不影响它，但放在一起便于阅读；
+      #   ⛔ 它**不**依赖 dist，将来若前移也安全。
+      - name: Gate — check-layout (根目录布局：白名单须带理由/dot 文件入视野)
+        run: bash scripts/check-layout.sh --strict
       # ⭐⭐ `neobot-desktop`：本次补的核心。此前 CI 一次都没跑过它，
       #   后果是 2026-10-02 那个 P0（前端载荷键 snake_case vs Tauri camelCase ⇒
       #   **消息从不落库、切会话历史永远空**）能带着「全部 UI 门全绿」活下来。
