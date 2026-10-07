@@ -112,23 +112,22 @@ pub struct _CognitionSnapshot {
     pub last_update: chrono::DateTime<chrono::Utc>,
 }
 
-/// 会话快照数据
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SessionSnapshot {
-    pub session_id: String,
-    pub e8_state_sequence: Vec<u8>,
-    pub message_count: u64,
-    pub active_topics: Vec<String>,
-    pub created_at: u64,
-}
-
-/// 蒸馏结果
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DistillationResult {
-    pub nodes_created: usize,
-    pub edges_created: usize,
-    pub avatar_confidence: f64,
-}
+// ⛔ **2026-10-07 删除两处零消费副本**（roadmap T1-4）。
+//
+// 本文件原在 `:117` 与 `:127` 各定义一份 `SessionSnapshot` / `DistillationResult`，
+// 与 `nt_mind/foundation/l1_wrappers.rs:10` / `:85` 的**活定义逐字相同**
+// （字段名、类型、顺序、derive 列表全同）。
+//
+// 实测零消费（brace-aware 全仓搜索 `l5_cognition::traits::{SessionSnapshot,
+// DistillationResult}`，含花括号导入形式，**排除本文件**）：
+// ⛔ **零命中**。而 `l1_wrappers` 侧有活的 `SessionRecovery` / `UserDistillation`
+// trait 消费者（`:26` / `:64-65` 的 adapter），它们返回的是**活定义**的那个。
+//
+// ⇒ 本文件**仍是有消费者的**（其他符号 12 个文件在用），
+//   所以只删这两个重复类型，不动其余内容。
+// ⇒ 未改为 `pub use` 再导出：本文件是 L5 顶层 trait 契约面，
+//   向下引到 `nt_mind::foundation` 会给 traits 面引入具体实现路径；
+//   零消费者状态下删除比转发更干净。
 
 // ═══════════════════════════════════════════════════════════════════════
 // L6 → L5 Trait Abstractions (跨层引用隔离)

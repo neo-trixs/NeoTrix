@@ -365,21 +365,33 @@ fn test_facade_count() {
     println!("Facade count: {}/{}", facades.len(), MAX_FACADES);
 }
 
-/// Verify no crate-level #[allow(dead_code)] — dead items should be tracked by
+/// Report crate-level #[allow(dead_code)] — dead items should be tracked by
 /// auto-patrol, not compilation gate.
+///
+/// ⛔ **2026-10-07 改名的理由**：原名 `test_no_global_allow_dead_code` 与其行为
+/// **不符** —— 它**从不 fail**，只在命中时 `println!` 一句 WARNING。
+/// 一个名字说"验证没有 X"、实际"X 存在也不报"的测试，是 README
+/// 「claimed-but-not-enforced」清单的典型条目：它读起来像绿灯。
+///
+/// ⇒ 改名 `test_reports_crate_level_allow_dead_code`，让名字陈述真实行为
+/// （报告，而非门禁）。**⛔ 本轮刻意不把它改成 assert** ——
+/// 那会让 CI 立刻红，而红的原因（`lib.rs:23`）是**已登记在案的架构决策**
+/// （见 `l5_cognition/nt_core_arch_fitness.rs:299` 把 crate 级 allow 记为违规，
+/// 但该检测件的结果**未接入任何门**，见 roadmap `T0-1`）。
+/// ⇒ 真正的修复顺序是：先让 `arch_fitness_dead_code` 的结果被断言消费，
+///   再决定 `lib.rs:23` 是删除还是写入显式豁免基线。**不能倒过来。**
 #[test]
-fn test_no_global_allow_dead_code() {
+fn test_reports_crate_level_allow_dead_code() {
     let src = src_path();
     let lib_rs = format!("{}/lib.rs", src);
     let matches = grep_imports(&lib_rs, r"#\[allow\(dead_code\)\]");
 
     if !matches.is_empty() {
-        // This is an intentional crate-level allowance in lib.rs (R-P1).
-        // We flag it as a warning but don't fail — the project convention
-        // allows this with auto-patrol tracking.
+        // Intentional crate-level allowance (R-P1). Reported, not enforced —
+        // see the doc comment above for why it is not promoted to an assert yet.
         println!(
-            "WARNING: crate-level #![allow(dead_code)] found in lib.rs — \
-             tracked by auto-patrol, not compilation gate"
+            "REPORT: crate-level #![allow(dead_code)] found in lib.rs — \
+             tracked by auto-patrol; NOT a compilation gate (roadmap T0-1)"
         );
     }
 }
