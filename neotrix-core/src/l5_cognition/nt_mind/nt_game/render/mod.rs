@@ -41,8 +41,9 @@ pub use ui::{Screen, ScreenStack, UiState, Widget, WidgetContent, WidgetStyle};
 
 /// 渲染配置
 pub struct RenderConfig {
-    pub window_width: u32,
-    pub window_height: u32,
+    // ⛔ 已删 `window_width` / `window_height`（2026-10-07 dead-flag 清理）
+    //    实测：除声明与 `Default` 赋值外**零读点**，全仓（含 apps/ crates/）引用数 0
+    //    ⇒ 死配置：看起来在控制窗口尺寸，实际什么都不控制。
     pub window_title: String,
     pub target_fps: u32,
     pub clear_color: Color,
@@ -51,8 +52,6 @@ pub struct RenderConfig {
 impl Default for RenderConfig {
     fn default() -> Self {
         Self {
-            window_width: 1280,
-            window_height: 720,
             window_title: "NeoTrix Game".to_string(),
             target_fps: 60,
             clear_color: Color::rgb(20, 20, 30),
