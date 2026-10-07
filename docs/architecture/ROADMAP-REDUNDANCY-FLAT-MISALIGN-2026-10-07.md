@@ -125,12 +125,23 @@
 - **无 API 变更**（`mod.rs` 未导出 `data_model` 任何东西）；9 个测试经 glob 不受影响
 - **成本 S（约删 150 行）**
 
-### T1-3 两个 `CostLadder`，428 行，双零消费者
-- `l5_cognition/nt_core/nt_core_cost_ladder.rs:16`（325 行，有测试 + `FatigueDetector`）
-- `l5_cognition/nt_core_gwt/cost_ladder/mod.rs:12`（103 行，**doc 注释被剥掉** = 复制痕迹）
-- ⛔ 孤儿门已绿 —— 因它被**挂载**进编译树（`ORPHAN-ADJUDICATION-2026-10-06.md:31` 记为"已挂载"），
-  **挂载 ≠ 接线**，重复因此存活
-- **成本 S**
+### T1-3 ⛔ **已推翻（2026-10-07 动手时读代码）** —— 不是重复，是两种设计
+- 初版结论「两个 `CostLadder`，428 行，字段相同」**读代码后不成立**：
+  - `nt_core/nt_core_cost_ladder.rs:16`（325 行）：`Rung` + `CostLadder{rungs, matrix: NoveltyComplexityMatrix}`
+    + 独有 `TaskType` / `UsageStats` / `FatigueDetector`，5 个 impl 块
+  - `nt_core_gwt/cost_ladder/mod.rs:12`（103 行）：`Rung` + `CostLadder{rungs, +4 个 f64 阈值}`，2 个 impl 块
+- ⛔ **只有 `Rung` 逐字相同**；`CostLadder` **字段集不同** —— 一个用二维矩阵、一个用四个标量阈值
+  ⇒ 这是**两种设计选择**，不是复制品
+- 两者**皆零消费者**（全仓仅 `nt_core/mod.rs:10` 与 `nt_core_gwt/mod.rs:1` 两处 `pub mod`）
+- ⛔ **裁决：不归并**。让 gwt 版转 facade = 替作者做设计决策
+  （"四阈值" 是否应收敛为 "矩阵"，无法从代码判断）
+- ⇒ 降级 📋 **待接线**：`matrix` 形态明显更完整 ⇒ 接线方向应为
+  **保留主副本、归档 gwt 副本**，但那是**接线裁决**，不是清理，需单独决策
+
+⭐ **本条是「先出清单后动手」的一个反例样本**：初版结论来自字段比对表，
+比对表对了 `Rung` 就被推论成「整个模块重复」。
+⇒ 再次印证 L1：**证据的粒度决定结论的粒度**（此处粒度是"一个结构体"，
+却被用来支撑"一个模块"）。
 
 ### T1-4 `l6_meta/lib.rs` 是永不编译的死影子
 - 唯一同时有 `lib.rs` 与 `mod.rs` 的层（7 层中唯一）
@@ -211,14 +222,14 @@
 否则新冒出的问题又会被"记录成已知"。
 
 ### T1 冗余清理（可并行，互不依赖）
-| ID | 任务 | 成本 | 风险 |
-|---|---|---|---|
-| T1-2 | `data_model` 8 类型转 `pub use` | S | 无（先例在同文件） |
-| T1-3 | `CostLadder` 二合一 | S | `pub` API 移除（双零消费者） |
-| T1-4 | 删 `l6_meta/lib.rs` | S | 无（严格子集已证） |
-| T1-5 | 删 `l2_perception/nt_judgment/` | S | 先查跨 crate 消费者 |
-| T1-7a | `nt_core_guardian` **文档**修复 | S | 无 |
-| T1-8 | 缓存岛 + "LRU"→FIFO 头修正 | S | 无 |
+| ID | 任务 | 成本 | 风险 | 状态 |
+|---|---|---|---|---|
+| T1-2 | `data_model` 8 类型转 `pub use` | S | 无（先例在同文件） | ✅ `b2f6be18` −160 行 |
+| T1-3 | ~~`CostLadder` 二合一~~ | — | — | ⛔ **已推翻**（两种设计，见 §T1-3） |
+| T1-4 | 删 `l6_meta/lib.rs` | S | 无（严格子集已证） | ✅ `43e2380c` −68 行 |
+| T1-5 | 删 `l2_perception/nt_judgment/` | S | 先查跨 crate 消费者 | ✅ `43e2380c` −313 行 |
+| T1-7a | `nt_core_guardian` **文档**修复 | S | 无 | 🟨 本轮 |
+| T1-8 | 缓存岛 + "LRU"→FIFO 头修正 | S | 无 | 🟡 已修头（`ebf1d458`），剩可达性标注 |
 | T1-1 | 3 个零消费者熔断器归正典 | L | **勿动 4 个活路径** |
 | T1-6 | 裁 `nt_shield::osint` | S | `compliance` 留待裁决 |
 | T1-7b | `nt_core_guardian` 接线裁决 | L | 依赖裁决，不删 |
