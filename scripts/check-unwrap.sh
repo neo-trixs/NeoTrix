@@ -210,11 +210,19 @@ def anchor(path, fn_name, norm):
 
 # `cur` 用内容锚点作键；同时保留 `路径:行号` 索引，供 v1 旧账本过渡期折算
 cur = {}
+line_of = {}
+path_of = {}
+fn_of = {}
+norm_of = {}
 cur_by_line = {}
 for _p, _l, _n, _fn, _norm in hits:
     _a = anchor(_p, _fn, _norm)
     cur[_a] = _n
     cur_by_line["%s:%d" % (_p, _l)] = (_a, _n)
+    line_of[_a] = _l
+    path_of[_a] = _p
+    fn_of[_a] = _fn
+    norm_of[_a] = _norm
 have = {}
 if os.path.exists(baseline_path):
     for line in open(baseline_path, encoding="utf-8"):
@@ -266,7 +274,10 @@ if new:
         # ⇒ 结论：**这个探针从未真正证明过本门**（它只在小规模下成立）。
         # ⇒ 现在打印全部（行数可控，且「边界可见」优先于「输出短」）。
         for k in by_tok[t]:
-            print("      + %s" % k)
+            # ⚠️ 锚点含 `\x1f`（不可见）⇒ **必须还原**成可读/可 grep 形式，
+            #   否则「按 path:line 查」这一最常见动作会失效（我第一版漏了，输出不可读）。
+            _ln = line_of.get(k, "?")
+            print("      + %s:%s  [%s]  %s" % (path_of.get(k, "?"), _ln, fn_of.get(k, "?"), norm_of.get(k, "")))
 
 if not new:
     print("PASS: 0 new violation(s); %d known/recorded." % len(have))
