@@ -527,37 +527,30 @@ impl SelfReviewGate {
     /// 只有都不命中时才退回历史词汇的子串启发式。
     /// 这与我方铁律一致：`scripts/check-layer-deps.sh` 能做的绝不在别处重造，
     /// 而这里做的是它做不了的"文件级归类计数"。
+    /// 判定一行 `use crate::` 引的是哪一层 —— **归一后（②B）只认目录层真名**。
+    ///
+    /// # 为什么删掉全部子串启发式（②B）
+    ///
+    /// 旧实现有两类匹配，**两类都是缺陷来源**：
+    /// 1. `core::` / `::core::` ⇒ 把 `shield_core::`、`nt_core_*` 的**子串**
+    ///    误判成 L0。实测 55 处检出里 **54 处是这类假阳性**。
+    /// 2. `l1_body`/`l2_world`/`::act::`/`::memory::` … ⇒ 这些名字对应的
+    ///    **目录在本仓不存在**（`ArchLayer::REAL_DIRS` 里没有），它们是
+    ///    历史词汇 = **四套层词汇的来源**。归一即删除。
+    ///
+    /// ⇒ 现在只按 `crate::<层目录名>::` 精确匹配。
+    /// ⛔ 代价（诚实记下）：跨层引用的**子模块路径**（如
+    /// `crate::l1_action::nt_core_task_dispatcher::nt_dispatcher_core::`
+    /// 里的 `crate::l1_action` 仍能命中）**不依赖层目录名** ⇒ 仍能检出；
+    /// 但 `crate::neotrix_core::…`（外部 crate 的重导出）**检不到** ⇒
+    /// 命中数是**下界**。权威仍是 `scripts/check-layer-deps.sh`。
     fn detect_import_layer(&self, line: &str) -> ArchLayer {
-        // ── 精确：真实层目录名（必须最先判，否则被下面的 core:: 吃掉）──
-        for (name, layer) in REAL_LAYER_DIRS {
+        for (name, layer) in ArchLayer::REAL_DIRS {
             if line.contains(&format!("crate::{name}::")) {
                 return *layer;
             }
         }
-        // ── 历史词汇（保留；已知与真实层只有部分重叠，命中数是下界）──
-        if line.contains("core::") || line.contains("::core::") {
-            ArchLayer::L0Core
-        } else if line.contains("l1_body") || line.contains("::act::") {
-            ArchLayer::L1Act
-        } else if line.contains("l2_world") || line.contains("::world::") {
-            ArchLayer::L2World
-        } else if line.contains("l3_memory") || line.contains("::memory::") {
-            ArchLayer::L3Memory
-        } else if line.contains("l4_cognition") || line.contains("::cognition::") {
-            ArchLayer::L4Cognition
-        } else if line.contains("::prm::") || line.contains("nt_core_prm") {
-            ArchLayer::L5Prm
-        } else if line.contains("l6_self") || line.contains("::self") || line.contains("::mind::") {
-            ArchLayer::L6Self
-        } else if line.contains("l7_capability") || line.contains("::capability::") {
-            ArchLayer::L7Capability
-        } else if line.contains("l8_autonomic") || line.contains("l8_seal") {
-            ArchLayer::L8Seal
-        } else if line.contains("l9_transcendent") || line.contains("::transcendent::") {
-            ArchLayer::L9Transcendent
-        } else {
-            ArchLayer::Unknown
-        }
+        ArchLayer::Outside
     }
 
     /// Observer feedback integration — consumes OneObserver quality/patterns from reasoning engine.
@@ -1494,23 +1487,6 @@ pub fn scan_for_patterns(
     results
 }
 
-
-/// 真实层目录名 ⇄ `ArchLayer` 的映射（裁定 5A）。
-///
-/// ⚠️ **映射本身带妥协**：`l3_embodiment`（具体化/盾）没有对应枚举变体，
-/// 被映到 `L3Memory`；`l4_emotion`（情绪/记忆）映到 `L4Cognition`。
-/// ⛔ 这两处的**分层语义是错的**，改枚举要动 10+ 处 `layer_index()` 匹配，
-/// 属 roadmap T0-4（层词汇裁决）的范围。
-/// ⇒ 本表只保证「能分类并计数」，**不宣称「分类正确」**。
-static REAL_LAYER_DIRS: &[(&str, ArchLayer)] = &[
-    ("l0_substrate", ArchLayer::L0Core),
-    ("l1_action", ArchLayer::L1Act),
-    ("l2_perception", ArchLayer::L2World),
-    ("l3_embodiment", ArchLayer::L3Memory),
-    ("l4_emotion", ArchLayer::L4Cognition),
-    ("l5_cognition", ArchLayer::L5Prm),
-    ("l6_meta", ArchLayer::L6Self),
-];
 
 /// 递归收集目录下的 `.rs`（跳过 `target/` 与隐藏目录）—— 裁定 5A 第二批。
 fn collect_rs_files(dir: &Path) -> Vec<PathBuf> {

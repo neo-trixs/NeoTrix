@@ -78,28 +78,67 @@
         assert_eq!(br.module_crossings, 1);
     }
 
+    /// 裁定 ②B：断言**真实层目录名**，⛔ 不再断言历史词汇。
+    ///
+    /// ⛔ 旧断言用的是 `/src/core/`、`l1_body_impl`、`l2_world_impl`、
+    /// `l3_memory_impl`、`l8_autonomic_impl` —— **这些目录在本仓不存在**。
+    /// 旧实现正是靠匹配它们工作的，而那导致 `check_architecture_layer_depth`
+    /// 的可分类文件 = 0（该检查结构上不可能失败）。
     #[test]
     fn test_arch_layer_detection() {
+        let real = [
+            ("/repo/neotrix-core/src/l0_substrate/nt_core_error.rs", ArchLayer::L0Substrate),
+            ("/repo/neotrix-core/src/l1_action/nt_io/mod.rs", ArchLayer::L1Action),
+            ("/repo/neotrix-core/src/l2_perception/nt_world/mod.rs", ArchLayer::L2Perception),
+            ("/repo/neotrix-core/src/l3_embodiment/nt_shield/mod.rs", ArchLayer::L3Embodiment),
+            ("/repo/neotrix-core/src/l4_emotion/nt_memory/mod.rs", ArchLayer::L4Emotion),
+            ("/repo/neotrix-core/src/l5_cognition/nt_mind/mod.rs", ArchLayer::L5Cognition),
+            ("/repo/neotrix-core/src/l6_meta/coordination/mod.rs", ArchLayer::L6Meta),
+        ];
+        for (path, want) in real {
+            assert_eq!(
+                ArchLayer::from_path(Path::new(path)),
+                want,
+                "路径归类错误: {path}"
+            );
+        }
+    }
+
+    /// 顶层 `src/*.rs` 不属任何层 → `Outside`（`layer_index() == -1`）。
+    #[test]
+    fn test_arch_layer_outside_for_toplevel() {
         assert_eq!(
-            ArchLayer::from_path(Path::new("/src/core/foo.rs")),
-            ArchLayer::L0Core
+            ArchLayer::from_path(Path::new("/repo/neotrix-core/src/lib.rs")),
+            ArchLayer::Outside
         );
         assert_eq!(
-            ArchLayer::from_path(Path::new("/src/neotrix/l1_body_impl/bar.rs")),
-            ArchLayer::L1Act
+            ArchLayer::from_path(Path::new("/repo/neotrix-core/src/bin/x.rs")),
+            ArchLayer::Outside
         );
-        assert_eq!(
-            ArchLayer::from_path(Path::new("/src/neotrix/l2_world_impl/baz.rs")),
-            ArchLayer::L2World
-        );
-        assert_eq!(
-            ArchLayer::from_path(Path::new("/src/neotrix/l3_memory_impl/qux.rs")),
-            ArchLayer::L3Memory
-        );
-        assert_eq!(
-            ArchLayer::from_path(Path::new("/src/neotrix/l8_autonomic_impl/quux.rs")),
-            ArchLayer::L8Seal
-        );
+        assert_eq!(ArchLayer::Outside.layer_index(), -1);
+    }
+
+    /// 归一的回归护栏：`REAL_DIRS` 是**唯一定义处**，层名与目录名必须逐字一致。
+    ///
+    /// ⛔ 若有人在别处再写一份字符串匹配（= 四套词汇的成因），本测试发现不了；
+    ///    但若有人改了 `REAL_DIRS` 里的名字使其不再对应真实目录，本测试会红。
+    #[test]
+    fn test_real_dirs_are_the_single_source() {
+        assert_eq!(ArchLayer::REAL_DIRS.len(), 7, "目录层应为 7 层");
+        for (dir, layer) in ArchLayer::REAL_DIRS {
+            assert_eq!(ArchLayer::from_dir_name(dir), Some(*layer), "{dir} 往返不一致");
+            assert_eq!(layer.dir_name(), Some(*dir), "{dir} 反查不一致");
+            assert_eq!(
+                ArchLayer::from_path(Path::new(&format!(
+                    "/repo/neotrix-core/src/{dir}/foo.rs"
+                ))),
+                *layer,
+                "{dir} 路径归类不一致"
+            );
+            let idx = layer.layer_index();
+            assert!(idx >= 0);
+            assert_eq!(ArchLayer::from_index(idx), Some(*layer), "{dir} 层号往返不一致");
+        }
     }
 
     #[test]

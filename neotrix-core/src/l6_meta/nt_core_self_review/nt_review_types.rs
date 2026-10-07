@@ -78,108 +78,123 @@ impl fmt::Display for BlastRisk {
     }
 }
 
-// ─── moved: mod.rs:95-154 ArchLayer ───
-/// Architecture depth category — which NeoTrix domain layer a module belongs to.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+// ─── ArchLayer（2026-10-07 裁定 ②B：彻底归一到目录层 7 变体）───
+/// NeoTrix 目录分层 —— 与 `neotrix-core/src/l0_substrate`…`l6_meta` **逐字对齐**。
+///
+/// # 为什么彻底归一（②B）
+///
+/// 归一前本仓有**四套**层词汇并存（见
+/// `ROADMAP-REDUNDANCY-FLAT-MISALIGN-2026-10-07.md` §L10 的三轴表 + 本文件旧版）：
+/// | 套 | 取值 | 强制者 |
+/// |---|---|---|
+/// | 目录层（正典） | `l0_substrate`…`l6_meta`（7） | `check-layer-deps.sh` |
+/// | 域 | `NT-CORE`…`NT-REPAIR`（11） | ⛔ 无门 |
+/// | 能力高度 | `l0primitive`…`l8autonomic`（11） | ⛔ 无门 |
+/// | **本枚举（曾为 ArchLayer）** | `L0Core`…`L9Transcendent`（10） | ⛔ 无门，且**目录名全不存在** |
+///
+/// 旧枚举的 10 个名字（`l0_core`/`l1_body`/`l2_world`/`l3_memory`/
+/// `l4_cognition`/`l5_prm`/`l6_self`/`l7_capability`/`l8_seal`/
+/// `l9_transcendent`）**在本仓一个目录都不存在** ⇒ 它既不能分类真实文件，
+/// 又与正典层号**语义错位**（旧 `L3Memory` 实际要装 `l3_embodiment` 具体化/盾，
+/// 旧 `L4Cognition` 实际要装 `l4_emotion` 情绪/记忆）。
+///
+/// ⇒ 旧枚举的 3 个多余变体（`L7Capability`/`L8Seal`/`L9Transcendent`，
+/// 对应目录不存在）+ 2 个错语义映射，在本轮**一并消除**。
+/// ⛔ 保留的**不是**旧词汇，而是**目录层真名** —— 这才叫归一。
+///
+/// ⛔ **仍未归一的（有意）**：域轴（11）与能力高度轴（11）**不在本轮范围**。
+/// 它们描述的是「能力属哪一支」与「能力有多高」，与「代码在第几层」**正交**
+/// （实测 255/255 可解析节点里只有 13 格偏离对角 ⇒ 那是一条穿了两个名字的轴）。
+/// 强行塞进层枚举会让一个枚举同时表达三件事。⇒ 归一属 roadmap T0-4 后续。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ArchLayer {
-    L0Core,
-    L1Act,
-    L2World,
-    L3Memory,
-    L4Cognition,
-    L5Prm,
-    L6Self,
-    L7Capability,
-    L8Seal,
-    L9Transcendent,
-    Unknown,
+    /// `neotrix-core/src/l0_substrate` —— 基座，全仓都依赖它
+    L0Substrate,
+    /// `neotrix-core/src/l1_action` —— 动作层
+    L1Action,
+    /// `neotrix-core/src/l2_perception` —— 感知层
+    L2Perception,
+    /// `neotrix-core/src/l3_embodiment` —— 具体化层（盾 / OSINT / 交通）
+    L3Embodiment,
+    /// `neotrix-core/src/l4_emotion` —— 情绪/记忆层
+    L4Emotion,
+    /// `neotrix-core/src/l5_cognition` —— 认知层
+    L5Cognition,
+    /// `neotrix-core/src/l6_meta` —— 元/治理层
+    L6Meta,
+    /// 不在任何层目录内（`neotrix-core/src/*.rs`、`bin/`、`examples/` 等）
+    Outside,
 }
 
 impl ArchLayer {
-    /// 判定一个源文件属于哪一层。
+    /// 目录层真名 ⇄ 枚举的映射表 —— **归一的唯一定义处**。
     ///
-    /// # 2026-10-07（裁定 5A 第一批）：补真实目录名
+    /// ⛔ 其他地方（`detect_import_layer`、`from_path`、将来的规则注册表）
+    /// **必须引用本表**，⛔ 不得各写一份字符串匹配 —— 那正是"四套词汇"的成因。
+    pub const REAL_DIRS: &'static [(&'static str, ArchLayer)] = &[
+        ("l0_substrate", ArchLayer::L0Substrate),
+        ("l1_action", ArchLayer::L1Action),
+        ("l2_perception", ArchLayer::L2Perception),
+        ("l3_embodiment", ArchLayer::L3Embodiment),
+        ("l4_emotion", ArchLayer::L4Emotion),
+        ("l5_cognition", ArchLayer::L5Cognition),
+        ("l6_meta", ArchLayer::L6Meta),
+    ];
+
+    /// 层目录名 → 枚举。**不含 `Outside`**（Outside 只在 `layer_index` 里表达）。
+    pub fn from_dir_name(name: &str) -> Option<Self> {
+        Self::REAL_DIRS
+            .iter()
+            .find(|(d, _)| *d == name)
+            .map(|(_, l)| *l)
+    }
+
+    /// 枚举 → 层目录名。`Outside` 返回 `None`。
+    pub fn dir_name(self) -> Option<&'static str> {
+        Self::REAL_DIRS
+            .iter()
+            .find(|(_, l)| *l == self)
+            .map(|(d, _)| *d)
+    }
+
+    /// 判定一个源文件属于哪一层 —— **归一后的实现**。
     ///
-    /// ⛔ **原实现只认 `l0_core` / `l1_body` / `l2_world` / `l3_memory` /
-    /// `l4_cognition` / `l5_prm` / `l6_self` / `l7_capability` / `l8_seal` /
-    /// `l9_transcendent` —— 这 10 个目录名在本仓**一个都不存在**
-    /// （实测 2026-10-07）。真实层目录是 `l0_substrate` / `l1_action` /
-    /// `l2_perception` / `l3_embodiment` / `l4_emotion` / `l5_cognition` /
-    /// `l6_meta`。
-    /// ⇒ 配合 `check_architecture_layer_depth` 里 `read_dir` 跳过目录，
-    ///   **可分类文件实测为 0** ⇒ 该检查结构上不可能失败（见 roadmap 5C/5A）。
+    /// ⛔ 旧实现有两处缺陷（均已实测）：
+    /// 1. 只认 10 个**本仓不存在**的目录名 ⇒ 可分类文件 = 0
+    ///    （配合 `check_architecture_layer_depth` 跳过目录 ⇒ 该检查结构上不可能失败）。
+    /// 2. `p.contains("/core/")` 会被 `nt_core_*` 模块路径里的 `/core/` 子串误抓。
     ///
-    /// **旧模式全部保留**（不删）—— 因为 `tests.rs:80-104` 的
-    /// `test_arch_layer_detection` 断言的就是那些路径，且它们是本仓
-    /// 历史词汇的一部分（registry 的能力高度轴也用 `l0primitive` 一类命名，
-    /// 见 `ROADMAP-REDUNDANCY-FLAT-MISALIGN` §L10 的三轴表）。
-    /// ⛔ 保留 ≠ 认可：这是**第四套词汇**与第三套并存的历史包袱，
-    /// 归一属 roadmap T0-4（层词汇裁决），本轮只让检测能工作。
-    ///
-    /// ⚠️ **映射不是语义等价**：`l3_embodiment`（具体化/盾）被映到 `L3Memory`
-    /// 是因为枚举里没有 embodiment 变体；`l4_emotion` 映到 `L4Cognition` 同理。
-    /// 这两处**分层语义是错的**，但改枚举会动 10+ 处 `layer_index()` 匹配，
-    /// 属 T0-4 的范围。此处只保证「能分类」，不宣称「分类正确」。
+    /// ⇒ 现在只按**真实目录名**判定，且**按路径段**（含 `/` 前缀）而非裸子串。
     pub fn from_path(path: &Path) -> Self {
         let p = path.to_string_lossy();
-        // ── 真实层目录（先匹配，因为它们是活的）─────────────────────
-        // ⛔ 注意：`l0_substrate` 等必须先于 `/core/` 判定，否则
-        // `nt_core_*` 模块里的 `/core/` 子串会误抓。
-        if p.contains("/l0_substrate/") || p.contains("l0_substrate") {
-            Self::L0Core
-        } else if p.contains("/l1_action/") || p.contains("l1_action") {
-            Self::L1Act
-        } else if p.contains("/l2_perception/") || p.contains("l2_perception") {
-            Self::L2World
-        } else if p.contains("/l3_embodiment/") || p.contains("l3_embodiment") {
-            Self::L3Memory
-        } else if p.contains("/l4_emotion/") || p.contains("l4_emotion") {
-            Self::L4Cognition
-        } else if p.contains("/l5_cognition/") || p.contains("l5_cognition") {
-            Self::L5Prm
-        } else if p.contains("/l6_meta/") || p.contains("l6_meta") {
-            Self::L6Self
+        // 从后往前找层目录（路径越深越具体，但层目录通常靠前，两种都覆盖）
+        for (dir, layer) in Self::REAL_DIRS {
+            // 段匹配：`/l5_cognition/` 或 `src/l5_cognition/`
+            if p.contains(&format!("/{dir}/")) || p.contains(&format!("/src/{dir}/")) {
+                return *layer;
+            }
         }
-        // ── 历史词汇（保留，见上方说明）─────────────────────────────
-        else if p.contains("l0_core") || p.contains("/core/") {
-            Self::L0Core
-        } else if p.contains("l1_body") || p.contains("l1_act") {
-            Self::L1Act
-        } else if p.contains("l2_world") {
-            Self::L2World
-        } else if p.contains("l3_memory") {
-            Self::L3Memory
-        } else if p.contains("l4_cognition") {
-            Self::L4Cognition
-        } else if p.contains("l5_prm") || p.contains("nt_core_prm") {
-            Self::L5Prm
-        } else if p.contains("l6_self") || p.contains("l6_autonomic") {
-            Self::L6Self
-        } else if p.contains("l7_capability") {
-            Self::L7Capability
-        } else if p.contains("l8_autonomic") || p.contains("l8_seal") {
-            Self::L8Seal
-        } else if p.contains("l9_transcendent") {
-            Self::L9Transcendent
-        } else {
-            Self::Unknown
+        // 顶层 `neotrix-core/src/*.rs` 不属任何层
+        Self::Outside
+    }
+
+    /// 层号（0-6）。`Outside` 返回 -1，与旧语义一致（`layer_index() < 0` 表"不可分类"）。
+    pub fn layer_index(self) -> i32 {
+        match self {
+            Self::L0Substrate => 0,
+            Self::L1Action => 1,
+            Self::L2Perception => 2,
+            Self::L3Embodiment => 3,
+            Self::L4Emotion => 4,
+            Self::L5Cognition => 5,
+            Self::L6Meta => 6,
+            Self::Outside => -1,
         }
     }
 
-    pub fn layer_index(&self) -> i32 {
-        match self {
-            ArchLayer::L0Core => 0,
-            ArchLayer::L1Act => 1,
-            ArchLayer::L2World => 2,
-            ArchLayer::L3Memory => 3,
-            ArchLayer::L4Cognition => 4,
-            ArchLayer::L5Prm => 5,
-            ArchLayer::L6Self => 6,
-            ArchLayer::L7Capability => 7,
-            ArchLayer::L8Seal => 8,
-            ArchLayer::L9Transcendent => 9,
-            ArchLayer::Unknown => -1,
-        }
+    /// 层号 → 枚举（`layer_index()` 的逆，供映射表使用）。
+    pub fn from_index(i: i32) -> Option<Self> {
+        Self::REAL_DIRS.get(i as usize).map(|(_, l)| *l)
     }
 }
 
