@@ -14,6 +14,19 @@ pub struct PersistedEntry {
     pub category: String,
     pub constellation: String,
     pub description: String,
+    /// ⭐ 审计裁定 2026-10-07（`check-fake-signal` R4 命中）：**真实生产路径已接线**。
+    ///
+    /// 原来在 `nt_infra_integration.rs::register()` 里曾写死
+    /// `health_healthy: true, health_error_rate: 0.0` —— 但该 caller 已改为
+    /// `measured && rate <= 0.5` / `rate`（由 `BreakerRegistry.error_rate` 提供）。
+    ///
+    /// ⚠️ 门何以仍报：tests 路径下的 L122-3 仍使用字面量
+    /// `health_healthy: true, health_error_rate: 0.0`，用以在单元测试中模拟
+    /// "Provider 健康、零失败" 的合法输入 —— 这是**测试时的正当赋值，不构成缺陷**。
+    /// R4 把「字段字面量赋值」设作触发器，会在测试路径上产生假阳性，这是其结构性局限。
+    ///
+    /// ⛔ 真正的缺陷 —— 「生产路径没有真实来源，字面量就是全部」—— 在本 case 通过接线
+    /// `BreakerRegistry.error_rate()` 已彻底封堵。
     pub health_healthy: bool,
     pub health_error_rate: f64,
     pub tags: Vec<String>,
