@@ -427,6 +427,44 @@ def test_spans(masked):
             if mm:
                 j += mm.end()
                 continue
+            # ⭐ 2026-10-07 补：`#[cfg(test)]` 也可以**直接挂在 item 上**，
+            #    不带 `mod` 包裹。此前此处直接 `break` ⇒ `masked[j]` 指向 `fn`
+            #    而非 `{` ⇒ 该属性**不产生任何区间** ⇒ 整个 item 被划进
+            #    **生产区** ⇒ 报出假的 ZERO_CONSUMER。
+            #
+            # 实测受害（instrument 实证，非推断）：
+            #   crates/nt-core-capability-tree/src/dispatch.rs
+            #     L130 `#[cfg(test)] pub fn clear_for_tests()`
+            #     L138 `#[cfg(test)] pub fn test_guard()`
+            #   两者**只**被同文件 L145 的 `#[cfg(test)] mod tests` 使用
+            #   ⇒ 生产零消费者 ⇒ 门本不该报。
+            #   但 instrument 显示 test_spans 只产出 **1** 个区间（L145..L212）
+            #   ⇒ L130/L138 两个属性被完全跳过。
+            #
+            # ⚠️ 我曾两次提交「这里加个 item 正则」的修法，**两次都零效果**
+            #    （对照实验：修前修后 `当前/新增` 完全相同）。
+            #    根因：单段 `item` 正则**连 `clear_for_tests` 都匹配不到**
+            #    —— 因为 `fn` 之后还有**返回类型**才到 `{`。
+            # ⇒ 故必须**两段式**：先吃掉 item 关键字与名字，
+            #    再单独跳过函数签名（泛型 / 参数 / 返回类型）抵达 `{`。
+            mm = re.match(
+                r"(?:async\s+|const\s+|unsafe\s+|extern\s+\"[^\"]*\"\s*)*"
+                r"(?:fn|struct|enum|trait|union|const|static|type)\s+"
+                r"[A-Za-z_][A-Za-z0-9_]*",
+                masked[j:],
+            )
+            if mm:
+                j += mm.end()
+                # 第二段：跳到函数体的 `{`（含泛型 / 参数 / 返回类型）
+                sg = re.match(
+                    r"(?:\s*<[^;{]*?>)?\s*\([^;{()]*\)(?:\s*->\s*[^;{]+?)?\s*\{",
+                    masked[j:],
+                )
+                if sg:
+                    j += sg.end() - 1      # 停在 `{` 上
+                    break                  # 交由下面的 `{` 判定处理
+                # 非函数体（如 `const X: T = ...;` / `type X = Y;`）⇒ 交回
+                break
             break
         if j < len(masked) and masked[j] == "{":
             end = _match_brace(masked, j)
