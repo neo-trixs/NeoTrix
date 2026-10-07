@@ -35,9 +35,13 @@ import { createServer, get } from "node:http";
 import { tmpdir } from "node:os";
 import { join, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { neobotDistFresh } from './nt_dist_freshness.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DIST = join(ROOT, "apps/neobot-desktop/neobot-ui/dist");
+// ⭐⭐ 2026-10-07 P0-1：产物新鲜度断言（公用件，17 道读 dist 的门统一走这条）。
+//    ⛔ 不新鲜就在**开浏览器之前**退出 —— 否则白等几十秒再失败。
+neobotDistFresh('nt_check_interact');
 const W = 1280, H = 820;
 const PORT = 9342;
 const DOLPHIN_PNG = readFileSync(join(ROOT, "apps/neobot-desktop/icons/256x256.png")).toString("base64");

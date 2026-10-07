@@ -41,10 +41,11 @@
  */
 
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync, existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { createServer, get } from "node:http";
 import { tmpdir } from "node:os";
-import { join, dirname, extname, relative } from "node:path";
+import { join, dirname, extname } from "node:path";
+import { neobotDistFresh } from './nt_dist_freshness.mjs';
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -75,56 +76,10 @@ if (!existsSync(join(DIST, "index.html"))) {
 /** statSync 的安全版：文件可能在遍历途中消失（共享工作树）。 */
 function safeStat(p) { try { return statSync(p); } catch { return null; } }
 
-// ⭐⭐⭐ 2026-10-07 新增「产物新鲜度」断言（dist 比 src 旧 ⇒ 拒绝跑）。
-//
-// # 为什么必须有这道
-//
-// 实测：本门（以及另外 9+ 道读 dist 的 UI 门）此前**全都不看产物时效**。
-// ⓘ 逐一验证：同时含 neobot-ui/dist 与 mtime/statSync 的门 —— **零**。
-// ⇒ 真实事故：源码 14:56 改过，dist 仍是 13:53 的 ⇒ **门绿着测的是旧界面**。
-// ⓘ 复现：touch 源码（内容零改动）后跑本门 ⇒ 仍 rc=0 PASS，它**无法分辨**
-//   自己测的是哪一版。
-// ⇒ 这是 §4 教训 38 的形状，只是分叉在**产物时效**而非选择器：
-//   「文档说有门、实际没测到目标」。
-//
-// ⛔ 文案里**不得出现反引号包命令示例**（§4 教训 R36：check-disk.sh 那次
-//   反引号被 bash 当命令替换，真删了 115.2 GiB）。
-//
-// # 已知局限（必须写下来，否则会被当万能门）
-//
-// ⚠️ mtime 比对挡不住「改了又改回」：改文件又还原内容，mtime 会更新但产物
-//   其实是对的 —— 此时本断言**误报**（要求重建，实际不必）。
-//   要更硬得靠构建期内容哈希（vite manifest），成本高一档，暂不做。
-// ⚠️ 只比 mtime，不校验产物**真的**由当前源码生成（如手工拷了个旧 dist 进
-//   去并 touch 过 index.html ⇒ 假绿）。
-{
-  const SRC = join(ROOT, "apps/neobot-desktop/neobot-ui/src");
-  const newestSrc = (function walk(d) {
-    let newest = 0, newestRel = "";
-    if (!existsSync(d)) return { newest: 0, newestRel: "" };
-    for (const e of readdirSync(d)) {
-      if (e === "node_modules" || e === ".git") continue;
-      const p = join(d, e);
-      const st = safeStat(p);
-      if (!st) continue;
-      if (st.isDirectory()) {
-        const sub = walk(p);
-        if (sub.newest > newest) { newest = sub.newest; newestRel = sub.newestRel; }
-      } else if (st.isFile()) {
-        if (st.mtimeMs > newest) { newest = st.mtimeMs; newestRel = p; }
-      }
-    }
-    return { newest, newestRel };
-  })(SRC);
-
-  const distMtime = statSync(join(DIST, "index.html")).mtimeMs;
-  if (newestSrc.newest > distMtime) {
-    console.error("布局门 FAIL: 产物比源码旧 —— 门会测到旧界面（本次修复前正是此状态）");
-    console.error("  最新源码: " + relative(ROOT, newestSrc.newestRel));
-    console.error("  修法: cd apps/neobot-desktop/neobot-ui && pnpm run build");
-    process.exit(1);
-  }
-}
+// ⭐⭐ 2026-10-07 P0-1：产物新鲜度断言已抽成**公用件**
+//    `scripts/ops/nt_dist_freshness.mjs`（17 道读 dist 的门统一走那一条），
+//    本门改为调用它。⛔ 内联副本 = 第二份待腐化的真源。
+neobotDistFresh('布局门');
 
 // ── 退役 guard（v1 探针是旧 UI 选择器；本文件已是 v2，留此注释防回退） ──
 // 若 `frontend/src/ui/tokens.css` 回来了（旧 UI 回潮），下面的 v2 探针

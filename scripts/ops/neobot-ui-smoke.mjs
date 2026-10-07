@@ -27,6 +27,7 @@ import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { extname, join, normalize } from 'node:path'
 import { createRequire } from 'node:module'
+import { requireFreshDist } from './nt_dist_freshness.mjs';
 
 /** ⭐⭐⭐ 2026-10-03 主题/语言控件已移进**设置弹窗**（消除顶栏冗余）。
  * ⭐⭐ 因此控件**不在常驻 DOM** ⇒ 直接 `selectOption` 会失败；
@@ -110,6 +111,9 @@ const { chromium } = require('playwright')
 
 const UI = new URL('../../apps/neobot-desktop/neobot-ui/', import.meta.url).pathname
 const DIST = join(UI, 'dist')
+
+// ⭐⭐ 2026-10-07 P0-1：产物新鲜度（公用件）。
+requireFreshDist({ dist: DIST, src: join(UI, 'src'), label: 'smoke 门' });
 const PORT = 8731
 
 const MIME = {

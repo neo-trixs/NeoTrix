@@ -18,10 +18,15 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { requireFreshDist } from './nt_dist_freshness.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SHIP = join(ROOT, "apps/neobot-desktop/neobot-ui");
 const DIST = join(SHIP, "dist");
+
+// ⭐⭐ 2026-10-07 P0-1：产物新鲜度（公用件；本门的 DIST 由 SHIP 推导，
+//    故用 requireFreshDist 显式传坐标，而不是 neobotDistFresh 的默认坐标）。
+requireFreshDist({ dist: DIST, src: join(SHIP, "src"), label: "ship 门" });
 const CONF = join(ROOT, "apps/neobot-desktop/tauri.conf.json");
 
 const bad = [];

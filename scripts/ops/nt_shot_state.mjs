@@ -25,9 +25,13 @@ import { join, extname, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { neobotDistFresh } from './nt_dist_freshness.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const DIST = join(ROOT, "apps/neobot-desktop/frontend/dist");
+const DIST = join(ROOT, "apps/neobot-desktop/neobot-ui/dist");
+// ⭐⭐ 2026-10-07 P0-1：产物新鲜度断言（公用件，17 道读 dist 的门统一走这条）。
+//    ⛔ 不新鲜就在**开浏览器之前**退出 —— 否则白等几十秒再失败。
+neobotDistFresh('nt_shot_state');
 
 const OUT = process.argv[2];
 const SELECTORS = process.argv.slice(3);

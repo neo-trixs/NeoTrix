@@ -33,6 +33,7 @@ import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { neobotDistFresh } from './nt_dist_freshness.mjs'
 
 // ⭐⭐⭐ 2026-10-04：playwright 改从**自持交付树** `neobot-ui/` 解析。
 // ⭐⭐ 改前锚定 `frontend/`（vendored 冻结树）的 devDependency，而
@@ -45,6 +46,9 @@ const require = createRequire(
 const { chromium } = require('playwright')
 
 const DIST = fileURLToPath(new URL('../../apps/neobot-desktop/neobot-ui/dist/', import.meta.url))
+// ⭐⭐ 2026-10-07 P0-1：产物新鲜度断言（公用件，17 道读 dist 的门统一走这条）。
+//    ⛔ 不新鲜就在**开浏览器之前**退出 —— 否则白等几十秒再失败。
+neobotDistFresh('neobot-msg-virtual');
 const PORT = 8811
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 
@@ -64,7 +68,17 @@ const msgs = Array.from({ length: N }, (_, i) => ({
 
 const STUB = {
   neobot_convo_list: convos,
-  neobot_convo_messages: msgs,
+  // ⭐⭐ 2026-10-07 修「桩停在旧形态」：命令已从 `neobot_convo_messages`
+  //    改名/重构为 `neobot_convo_messages_page`，且**返回形状变了**
+  //    （裸数组 → {messages, hasMore, nextSeq}，见 `nt_run_trace` 那轮）。
+  // ⛔ 改前本门**一直**报「未找到 nb-msg-sizer ⇒ 窗口化未渲染」——
+  //    而窗口化其实是好的。那不是误报，是「门测错了对象」：
+  //    应用 invoke 的是一个没被桩登记的命令 ⇒ 抛 UNMOCKED ⇒ 历史拿不到
+  //    ⇒ 消息区为空 ⇒ 窗口化容器自然不存在。
+  // ⓘ 同一门（nt_check_layout）此前已修过同一个坑，见其 :113-127 注释。
+  // ⓘ 本门**未登记**在 scripts/gate-registry.tsv ⇒ 坏了也没人跑 ⇒ 这就是
+  //    它能带着旧形态活下来的原因（与「文档说有门、实际没跑」同类）。
+  neobot_convo_messages_page: { messages: msgs, hasMore: false, nextSeq: N },
   neobot_member_list: [],
   neobot_usage_summary: { days: 1, tokens: 0 },
   neobot_memory_list: { lines: [], bytes: 0, cap: 0, revisions: 0 },

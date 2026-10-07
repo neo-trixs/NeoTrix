@@ -32,12 +32,16 @@ import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { neobotDistFresh } from './nt_dist_freshness.mjs'
 
 const require = createRequire(
   new URL('../../apps/neobot-desktop/frontend/package.json', import.meta.url))
 const { chromium } = require('playwright')
 
 const DIST = fileURLToPath(new URL('../../apps/neobot-desktop/neobot-ui/dist/', import.meta.url))
+// ⭐⭐ 2026-10-07 P0-1：产物新鲜度断言（公用件，17 道读 dist 的门统一走这条）。
+//    ⛔ 不新鲜就在**开浏览器之前**退出 —— 否则白等几十秒再失败。
+neobotDistFresh('neobot-check-input-defects');
 const PORT = 8875
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 
