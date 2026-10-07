@@ -316,10 +316,28 @@ neotrix-core/config/crystal.toml
 .neotrix/worktree-salvage/
 .cache/
 
-# .project-map/ = codemap 索引, 由 `python3 scripts/ops/nt_mapgen.py` **1 秒重建**的
-# 纯派生产物。2026-09-29 起不入库: v2 schema 带符号行号后 14MB, 而 git 不删旧
-# blob ⇒ 每次重建都往历史里永久塞一份。与 target/ / neotrix-core/TODO.md 同类。
-# 干净检出后跑一次即可恢复; map-project.sh 是封装入口。
+# ⭐⭐⭐ 2026-10-07 更正 + 补齐（原文两处不实，害我连错三次）
+#
+# 原注释说「codemap 索引, 由 nt_mapgen.py **1 秒重建**」—— ⛔ **只对一半成立**：
+# 这个目录里是**两级成本悬殊**的东西，原文把它们混为一谈。
+#
+#   ① codemap.json（14MB）  = nt_mapgen.py 产出。**实测重建 2s**（rc=0）。
+#      消费者：nt_locate.py（--component 定点）、nt_topology.py。
+#   ② edges-*.jsonl（326MB）= 由 `scripts/ops/nt_audit_bootstrap.sh` 产出，
+#      ⛔ **不是 1 秒**：该脚本自述「实测 ~30min / 168MB」（edges-all 即 168MB，
+#      逐 crate 的 edges-<crate>.jsonl 合计到 326MB）。
+#      消费者：nt_dup_dead.py / nt_fn_drift.py / nt_absorption_live.py --graph。
+#
+# ⇒ 「删了跑一次即可恢复」这句话**只对 ① 成立**。② 要 30 分钟 CPU。
+#   这就是它长期留在磁盘上而没被清掉的**真实原因**（不是「忘了删」）。
+#   ⓘ 三个消费者对**缺库**都处理正确（实测逐个跑过）：
+#     nt_dup_dead / nt_fn_drift ⇒ rc=2「no edge db at ...」（响）；
+#     nt_absorption_live --graph ⇒ 明说「边表不存在，跳过图判据」，不冒充通过。
+#   ⇒ 库缺失**不会**静默给出「无问题」的错误结论，故 326MB 是纯体积问题、非正确性问题。
+#
+# 不入库的理由（不变）：派生数据，且 git 不删旧 blob ⇒ 每次入库都往历史里
+# 永久塞一份。与 target/ / apps/neobot-desktop/gen/ 同类。
+# 处置：① 随时可重建；② 想清空间就清，下次用这三个工具前先跑 bootstrap（约 30min）。
 .project-map/
 
 # Tauri 自动生成的 schema（每次 cargo check 都会重写，入库只增历史噪声）
