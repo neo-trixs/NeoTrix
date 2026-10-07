@@ -169,7 +169,36 @@ PY
 #
 # ⇒ 本探针**只用 `.bak` 文件**做还原（每个 probe_* 内部已 `cp "$T.bak" "$T"`），
 #    此处**不设**全局 checkout trap。
-trap 'echo "probe: 清理已完成（各 probe 内 .bak 还原）" >&2' EXIT
+# ⛔⛔ **第 4 次污染后的加固**：EXIT 时**核对**注入是否真的清干净。
+#
+# 实测事故（2026-10-07，本会话第 3 次）：探针的 `.bak` 还原在某些路径下失效
+# ⇒ `nt_core_traits.rs` 残留 `probe_cadence_ok`（R4 探针注入）
+# ⇒ ⛔ 下一次 `cargo build` 直接编译失败（`missing field probe_cadence_ok`）
+# ⇒ 而当时我正在改**别的**文件 ⇒ 第一反应是「build 坏了」而不是「探针污染」。
+#
+# ⭐ 教训：**探针的还原逻辑不可信** ⇒ 必须在退出时**验证**，⛔ 不能假定。
+# 做法：EXIT 时 grep 本探针的全部注入标记（`probe_cadence_ok` /
+# `probe_probe_ok` / `probe_environment` / `score_probe`），
+# 任一残留 ⇒ **显式报错**（⛔ 不静默），让污染立刻可见。
+probe_targets="neotrix-core/src/l0_substrate/nt_core_traits.rs
+neotrix-core/src/l0_substrate/nt_core_capability_types.rs
+crates/neotrix-neobot/src/nt_engine.rs
+neotrix-core/src/l5_cognition/nt_core/nt_core_parallel/executor.rs"
+
+_probe_cleanup_audit() {
+  local leaked=0 f
+  for f in $probe_targets; do
+    [ -f "$f" ] || continue
+    if grep -qE 'probe_cadence_ok|probe_probe_ok|probe_environment|score_probe' "$f" 2>/dev/null; then
+      echo "probe FAIL: 注入残留未清理 ⇒ $f" >&2
+      echo "  ⛔ 请执行: git checkout -- $f" >&2
+      leaked=1
+    fi
+  done
+  [ "$leaked" -eq 0 ] && echo "probe: 清理核对通过（无注入残留）" >&2
+  return $leaked
+}
+trap '_probe_cleanup_audit; echo "probe: 清理已完成（各 probe 内 .bak 还原）" >&2' EXIT
 
 echo "probe: check-fake-signal — 逐条注入 4 条规则"
 probe_r1

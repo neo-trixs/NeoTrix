@@ -124,6 +124,23 @@ pub struct VisualExtractResult {
     /// 公理一 (视觉理解是提取上限) 量化: 提取是否在保真上限内。
     /// true = 未接地 token 占比低于阈值 (可靠性 ≥ 0.5) 或未启用 grounding。
     /// false = 提取超出保真上限, 调用方应二次校正或标记人工复核。
+    /// ⭐ 审计裁定 2026-10-07（`check-fake-signal` R1 命中）：**门是误报** ——
+    /// 本字段在**生产路径由真实测量推导**。
+    ///
+    /// **证据**（本文件 L197-203，**非测试区**）：
+    ///     let report = ground_missing_tokens(source_text, &result.markdown);
+    ///     // 公理一 (视觉理解是提取上限): 可靠性 < 0.5 → 提取超出保真上限。
+    ///     result.extraction_bound_ok = report.reliability_score >= 0.5;
+    /// ⇒ 由 `ground_missing_tokens` 的**真实 `reliability_score`** 决定。
+    ///
+    /// ⛔ 门为何误报：它只统计**同 struct 内**该字段的赋值形态，
+    ///   看到 `Default` 的 `extraction_bound_ok: true`（L152）
+    ///   ⇒ 判「只有布尔字面量赋值」。
+    /// ⛔ 但 L201 是 `result.<field> = <表达式>` 形态（⛔ 非字面量），
+    ///   门应识别却未识别 ⇒ **门的赋值识别有缺口**。
+    ///
+    /// ✅ 默认值 `true` 的语义是「未做 grounding 校验时不阻塞」——
+    ///   ⭐ 这是**合理的 fail-open**，⛔ 不是伪信号。
     pub extraction_bound_ok: bool,
 }
 

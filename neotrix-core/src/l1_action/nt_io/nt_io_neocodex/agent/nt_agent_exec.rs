@@ -100,6 +100,25 @@ impl NeoCodexAgent {
         //   （`nt_sandboxed_shell::execute_guarded` 零消费者，很可能正是因此被搁置。）
         // ⇒ 改用 `agent_guardrails` 的 `PolicyEngine`：它有**真实判别力**，
         //   且接活路径前已过判别力门槛测试（24 条日常命令 0 误报 / 9 条恶意全拦）。
+        // ⭐ 2026-10-07 接线 `NeoCodexConfig.shell_available`（此前零读点）。
+        //
+        // ⛔ **原实现的缺陷**：`shell_available: true` 是**恒定字面量**
+        //   （`nt_agent_types.rs:40` 的 `Default`）⇒ 全仓零消费
+        //   ⇒ 用户把它设成 `false` 也**关不掉 shell**
+        //   ⇒ 「以为能控制、实际不能」—— 与同 struct 的
+        //      `thinking_enabled`（已接 L272/763）同型，但**这个漏了**。
+        //
+        // ⭐ 正解：在 shell 执行**入口**做**总闸**（fail-closed 到「拒绝执行」）。
+        // ⚠️ 与下方 `shell_guardrail()` 的关系：guardrail 判别**单条命令**
+        //   是否恶意；本开关判**能力是否启用** ⇒ 二者是**不同维度**，
+        //   ⛔ 不能互相替代（guardrail 不能替代总闸，反之亦然）。
+        // ⚠️ `Default: true` ⇒ **保持原行为不变**（不改变现役语义）。
+        if !self.config.shell_available {
+            log::warn!("[neocodex] shell 被配置禁用（shell_available=false）⇒ 拒绝执行");
+            // ⚠️ `exec_shell` 返回 **String**（⛔ 不是 Result）⇒ 用文本回报。
+            //    （我第一版按 Result 写 ⇒ 编译失败 ⇒ 又一次「猜 API」。）
+            return "[shell 已被配置禁用（shell_available=false）]".to_owned();
+        }
         let verdict = {
             let engine = shell_guardrail();
             let ctx = GuardrailContext::default();
@@ -1054,5 +1073,44 @@ impl NeoCodexAgent {
                 .map(|tree| tree.snapshots())
                 .unwrap_or_default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod shell_switch_tests {
+    use super::*;
+
+    /// ⭐ **变异证据**：`shell_available = false` ⇒ shell **必须**被拒绝。
+    ///
+    /// 修复前它是**恒定字面量**（`Default: true`）且零消费
+    /// ⇒ 用户设成 `false` 也**关不掉 shell**
+    /// ⇒ 本测试断言的情形修复前**不可能通过** ⇒ 即变异证据。
+    #[tokio::test]
+    async fn shell_available为false时拒绝执行() {
+        // ⭐ 用**真实构造器** `NeoCodexAgent::new(session_id)`
+        //   （本会话已第 15 次「猜 API」，⛔ 不再手写结构体字面量）
+        let mut agent =
+            crate::l1_action::nt_io::nt_io_neocodex::agent::nt_agent_types::NeoCodexAgent::new("t");
+        agent.config.shell_available = false;
+        let out = agent.exec_shell("echo hello").await;
+        assert!(
+            out.contains("shell_available=false"),
+            "禁用时必须拒绝执行，实际输出：{out}"
+        );
+        // ⭐ 对照：⛔ 绝不能真的执行（输出里不该有命令回显）
+        assert!(
+            !out.contains("hello"),
+            "禁用时**绝不能**执行命令（实际输出：{out}）"
+        );
+    }
+
+    /// ⭐ 对照：`shell_available = true`（**Default**）⇒ 行为**不变**。
+    #[test]
+    fn 默认配置下行为不变() {
+        let agent = crate::l1_action::nt_io::nt_io_neocodex::agent::nt_agent_types::NeoCodexAgent::new("t");
+        assert!(
+            agent.config.shell_available,
+            "Default 必须是 true（本次接线刻意不改默认行为）"
+        );
     }
 }
