@@ -224,11 +224,40 @@ pub trait UnifiedProvider: Send + Sync {
 /// Health status (stub)
 #[derive(Debug, Clone, Default)]
 pub struct HealthStatus {
+    /// ⛔⚠️ **伪信号**（审计裁定 2026-10-07，`check-fake-signal` R1 命中）。
+    ///
+    /// **实测证据**：
+    ///  1. 本 struct **零外部消费**（`nt_core_llm::HealthStatus` 全仓 0 处引用）；
+    ///  2. `healthy: true` 的**唯一**赋值点是 `healthy()` 构造器（L233）
+    ///     ⇒ 字面量取值集合 = `{true}`（**没有**任何 `false` 路径）
+    ///     ⇒ ⛔ **不存在**「不健康」这个状态；
+    ///  3. 唯一调用点 L220 `Box::pin(async { HealthStatus::healthy() })`
+    ///     ⛔ **不检查任何东西**，直接返回「健康」；
+    ///  4. 类型自称 `Health status (stub)` ⇒ 作者已标注它是桩。
+    ///
+    /// ⚠️ 后果：任何调用它做健康判断的代码，
+    ///   得到的**永远是「健康 + OK」** ⇒ 比「没有健康 API」更危险。
+    ///
+    /// ⚠️ ⭐ **同名异型 ×13**：全仓至少 **8 个** `HealthStatus` 定义
+    ///   （`ffi/types.rs`、`nt_core_platform/health.rs`、`runtime_monitor.rs`、
+    ///   `healing/self_healing/health_monitor.rs` 等）
+    ///   外加 `neotrix-types/shared_types.rs:64` 的**枚举**版本
+    ///   （`Healthy/Degraded/Unhealthy` —— ⭐ **那个才有真正的三态**）。
+    ///   ⇒ 只按名字查找**必然**取到错的那个。
+    ///
+    /// ⭐ 正解（需 owner 决策）：
+    ///  (a) 让 L220 **真的检查**（它已有 `&self`/provider 列表可查）
+    ///      并按结果构造 `healthy: true/false`；
+    ///  (b) 或改用 `neotrix-types::shared_types::HealthStatus`（**已有三态**）
+    ///      ⇒ ⛔ 别再定义第 9 个同名类型；
+    ///  (c) ⛔ 或删除本 stub（零消费 ⇒ 删除无破坏）。
+    /// ⛔ 我**不擅自删除**：属公开 API（L1 trait 的一部分）。
     pub healthy: bool,
     pub message: String,
 }
 
 impl HealthStatus {
+    /// ⚠️ 返回**恒定**「健康」⇒ ⛔ 不是检查结果（见字段文档的裁定）
     pub fn healthy() -> Self {
         Self { healthy: true, message: "OK".into() }
     }
