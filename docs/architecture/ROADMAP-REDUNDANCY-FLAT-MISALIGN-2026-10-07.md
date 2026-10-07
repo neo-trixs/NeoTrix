@@ -1,0 +1,269 @@
+# 核心路线任务清单 —— 冗余清理 + 扁平缺陷 + 跨域错位（2026-10-07）
+
+> **方法**：本仓**自有** 35 个门与地图工具 + 3 个审计子代理（read-only），⛔ 未造新扫描器。
+> **纪律**：数字全部来自门输出，禁凭记忆（AGENTS.md R-SCAN-3）。
+> **退出码纪律**：`out=$(...); rc=$?` 取脚本自身退出码 —— 管道后 `$?` 是 `tail` 的
+> （`FULL-AUDIT-2026-10-06.md` §方法已记此坑，本轮沿用）。
+> **交叉验证**：主 agent 对每条 P0/P1 结论**独立复核了代码行**，未只依赖子代理报告。
+
+---
+
+## 0. 一句话结论
+
+**架构门全绿，但绿得没有意义** —— 三条"裁判链"被证明**结构上无法失败**，
+而冗余的真正规模比台账记的**大约 40%**（同名检测器看不见"同机制、异类型名"）。
+
+⭐ **本轮最贵的三个发现，都是「声明了、检测了、消费了、但结构上不可能失败」**：
+
+| # | 链 | 断点 |
+|---|---|---|
+| 1 | `DeadCodeFitness` 死代码门 | `lib.rs:23` `#![allow(dead_code)]` 抑制信号 → 检测器报 19 处 → `test_all_have_names` **只断言 name 非空，丢弃 `.passed`** |
+| 2 | `ArchLayer` 分层深度检查 | `read_dir` **跳过目录** ⇒ `l0_substrate/`…`l6_meta/` 永不进入；实测**可分类文件 = 0** ⇒ `violations` 恒 0 ⇒ **无条件报 PASS** |
+| 3 | `content_omitted` 变更省略标记 | Rust 侧三处 doc 声称「**UI 据此说**内容过大」+ DB 列 + TS 字段 ⇒ **UI 渲染循环零读点** |
+
+---
+
+## 1. 基线（2026-10-07 实测）
+
+| 项 | 值 | 门 |
+|---|---|---|
+| 分层违规 | **0 new / 13 known** | `check-layer-deps.sh --strict` rc=0 |
+| `rs` 文件 / 行 | **2,860 / 910,151** | `nt_topology.py` |
+| 真重复组 / 可归并 | **230 / 258** | `CODE-TOPOLOGY.md` §维度 8 |
+| 零读点 bool | **585**（其中 423 合法 serde/uniffi） | `check-dead-config-flag.sh --types bool` |
+| 死代码 NEW | **1**（全仓唯一新棘轮项） | 同上 `--strict` |
+| `unwrap/expect/panic` 生产 | **4,141 / 2,987 / 176** | `CODE-TOPOLOGY.md` §维度 7 |
+| 命名 | **1,615** offender（advisory） | `check-naming.sh` |
+| `layer-map` 漂移 | **零**（8 trees + 2 unresolved 全对得上） | `check_layer_map_consumers.py` rc=0 |
+| 构建 | **rc=0**，1m49s | `cargo check -p neotrix --lib` |
+
+⚠️ **台账漂移（R-SCAN-3）**：同一门三处口径不一致 —— `AGENTS.md` 写 **8 known**、
+`LAYER-DEBT-TIERS` 写 **14 known**、实测 **13**。两处都是**记录陈旧**，不是缺陷。
+⇒ 已同步修正（见 §5 T0-2）。
+
+---
+
+## 2. ⭐ P0 —— 修裁判（先修裁判，再踢比赛）
+
+> **判据**：一条"保证"若无可执行面，它比没有这条保证更危险 —— 它读起来像绿灯。
+
+### T0-1 ⛔ `DeadCodeFitness` 结构上无法失败
+- **链**：`neotrix-core/src/lib.rs:23` `#![allow(dead_code)]`
+  → `l5_cognition/nt_core_arch_fitness.rs:299,316-336`（检测器**明确把 crate 级 allow 记为违规**）
+  → `l6_meta/healing/nt_core_self_test_integration.rs:653-661` `test_all_have_names`
+  **只 `assert!(!r.name.is_empty())`，丢弃 `r.passed`**
+- **实测**：19 个文件违反（含 `lib.rs` 自身）
+- **另有两处**：tier-2 `cargo check` 层被 `cfg!(test)` 跳过（`nt_core_arch_fitness.rs:304`）；
+  `tests/architecture_constraints.rs:371-385` 的 `test_no_global_allow_dead_code`
+  **只 `println!` 不 assert**
+- **完成定义**：`arch_fitness_dead_code` 有专测断言 `.passed`；`lib.rs:23` 删除或写入显式豁免基线；
+  两个测试名与断言一致
+- **风险**：改完 CI 会红 ⇒ 这正是目的，须配棘轮基线
+- **成本 M**
+
+### T0-2 ⛔ `ArchLayer` 分层检查恒报 PASS
+- **链**：`l6_meta/nt_core_self_review/nt_review_runner.rs:421-435`
+  `read_dir` 后 `if path.extension()... != "rs" { continue }` ⇒ **目录被跳过**
+  ⇒ `l0_substrate/`…`l6_meta/` 从不进入
+- **实测**（喂真实目录列表，R-SCAN-2）：**可分类文件 = 0**；`ArchLayer::from_path`
+  匹配的是 `l0_core`/`l1_body`/`l8_seal` 等**不存在**的目录名 ⇒ 全落 `Unknown` ⇒ `continue`
+- **完成定义**：改为递归 + 匹配真实层目录名；**先修报告层再修判定**（修完会立刻冒真问题）
+- **成本 S**（修法小，冒出的问题大）
+
+### T0-3 ⛔ `content_omitted`：跨语言零读点 + 假 UI 承诺
+- **链**：`crates/neotrix-neobot/src/nt_changes.rs:9,93,109`（写入）
+  → DB 列 `content_omitted INTEGER NOT NULL DEFAULT 0`
+  → `apps/neobot-desktop/neobot-ui/src/neobot-root.tsx:143`（TS 类型声明）
+  → **`:1979-1988` 渲染循环只读 `c.path` / `c.kind` / `c.bytes`**
+- **铁证**：`rg '内容过大'` **只命中那两处 Rust doc 注释自身** ⇒ 承诺的文案不存在
+- **旁证**：`check-dead-config-flag.sh --types bool --strict` rc=1，
+  而这是 1,603 个 bool 字段里**唯一的新棘轮项**
+  （`scripts/gate-registry.tsv:45` 将该门登记为 `injectable`，故 CI 看不见）
+- **完成定义**：二选一 —— (a) 补 UI 分支 + i18n key，兑现文档承诺；或 (b) 删字段 + 删列 + 删两处 doc。
+  **半吊子态（不拦的按钮）不可存活**
+- **成本 S**
+
+### T0-4 ⛔ 三套层词汇并存且互斥
+| 词表 | 范围 | 定义处 | 消费者 |
+|---|---|---|---|
+| **A** 正典 | `l0_substrate`…`l6_meta`（7） | 目录名 + `layer-map.json` | `check-layer-deps.sh`、CI |
+| **B** | `l0primitive`…`l8autonomic`（12） | `crates/nt-core-capability-tree/src/node.rs:145-158` | 318 节点 registry、CI `capability-truth` |
+| **C** | `l0_core`…`l9_transcendent`（9-10） | `l0_substrate/nt_core_event_bus.rs:282-292`、`nt_review_types.rs:84-96` | 见上 |
+
+- ⛔ **数字前缀相撞含义不同**：registry `L4Cognition` ≠ `l4_emotion`；`L6Self` ≠ `l6_meta`
+- ⛔ **B 的 `as_str()` 塌缩**：`L2Orchestrator` 与 `L2World` 同映射 `"L2"`
+  ⇒ `by_layer` 直方图**分不开 registry 自己在 JSON 里分开的节点**（44 vs 8）
+- ⛔ **B 的 `parse_layer` 兜底**：未知值 `_ => NodeLayer::L0Primitive` ⇒ **静默沉底**
+- **后果**：`check-layer-deps.sh` 与 `capability-truth` **各自自洽 ⇒ 同时绿却互相矛盾**
+- **完成定义**：产出映射表或裁决"三套是否刻意独立"；若独立 ⇒ 去掉 `L` 前缀让前缀不再说谎
+- **成本 L**
+
+---
+
+## 3. P1 —— 冗余清理（按"省多少 + 风险多低"排）
+
+### T1-1 ⭐ 10 个熔断器，3 个零消费者
+- **正典已存在**：`crates/neotrix-types/src/core/shared_types.rs:81`（文件头自述 "Canonical circuit breaker"）
+- **已证可归并（零消费者 ⇒ 无 API 破坏）**：
+  - `l1_action/nt_io/nt_io_provider/gateway/resilience/nt_circuit_breaker.rs:12`
+  - `l3_embodiment/nt_shield/circuit_breaker.rs:7`
+  - `l3_embodiment/nt_shield/defense/ring_boundary/circuit_breaker.rs:10`
+- ⛔ **勿动** 4 个活路径（`health/`、`nt_infra_breaker`、`goal_loop`、`nt_act_circuit_breaker`）
+  —— 构造签名不同（滑窗/强开/健康惩罚），可能带正典没有的语义
+- ⭐ **附带发现**：`nt_core_guardian/circuit_breaker.rs:1-3` 声称
+  「融合 self_healing + nt_infra_breaker ⇒ **单一实现**」，
+  但**两个源都仍是独立活实现** —— 这是**假融合声明**
+- **成本 L**
+
+### T1-2 ⭐ `nt_act_trade/data_model.rs` 违反自己的 SSOT 头
+- **8 个类型逐字重复**（含 `Product` 的 13 行手写 `impl Default`）：
+  `ProductCategory` `DriveType` `ConnectionType` `TradeTerms` `OrderStatus` `QuoteStatus` `InquiryStatus` `Product`
+- **三方自证矛盾**：`data_model.rs:1-4`「**禁止重复定义**」/
+  `unified_types.rs:390`「从 data_model **迁移**」/ `mod.rs:62`「统一从 unified_types 导出」
+- **同文件已有先例**：`data_model.rs:151-158` 2026-09-29 已用 `pub use` 融合 6 个类型并写下理由
+  ⇒ **同一手法直接适用**，前一轮只是停早了
+- **无 API 变更**（`mod.rs` 未导出 `data_model` 任何东西）；9 个测试经 glob 不受影响
+- **成本 S（约删 150 行）**
+
+### T1-3 两个 `CostLadder`，428 行，双零消费者
+- `l5_cognition/nt_core/nt_core_cost_ladder.rs:16`（325 行，有测试 + `FatigueDetector`）
+- `l5_cognition/nt_core_gwt/cost_ladder/mod.rs:12`（103 行，**doc 注释被剥掉** = 复制痕迹）
+- ⛔ 孤儿门已绿 —— 因它被**挂载**进编译树（`ORPHAN-ADJUDICATION-2026-10-06.md:31` 记为"已挂载"），
+  **挂载 ≠ 接线**，重复因此存活
+- **成本 S**
+
+### T1-4 `l6_meta/lib.rs` 是永不编译的死影子
+- 唯一同时有 `lib.rs` 与 `mod.rs` 的层（7 层中唯一）
+- **实测严格子集**：`comm -23` ⇒ `lib.rs` 声明的 `pub mod` 全部已含于 `mod.rs`（反向多 15 个）
+- ⛔ `check-truth-surface.sh --strict` rc=0 **抓不到**
+- **危害**：它对外宣称一个**缺了 `nt_laws`/`nt_approval`/`nt_core_guardian`** 的 L6 架构
+  ⇒ 下一个 agent 会得出「`nt_laws` 不存在」
+- **成本 S（删 68 行，`cargo check` 可证行为中性）**
+
+### T1-5 L2 `nt_judgment/` 与 L5 声明的裁决门重复
+- `l2_perception/nt_judgment/` 4 文件 313 行（`PolicyGate` / `JudgmentPrimitive` / `Verify`/`Screen`/`Classify`）
+- 而 `l5_cognition/nt_jev/mod.rs:17-27` **明写** `PRIMARY GATE`，
+  `l5_cognition/nt_jev/gate.rs:59` 已定义 `GateResult`
+- **实测零消费者 + 零测试**，每个 `judge()` 是硬编码桩（`confidence: 0.5`）
+- **逃过孤儿门的原因**：它**已挂在** `l2_perception/mod.rs:1`
+- **成本 S**（先确认无跨 crate 消费者）
+
+### T1-6 OSINT 在 L3 重复了一份，669 行零消费者
+- `l3_embodiment/nt_shield/osint/`（`OsintCollector`）vs `l2_perception/nt_world/osint/`（29 模块，**活的**）
+- **实测零 Rust 消费者**；5 处 JSON **声明**不算调用（「导出 ≠ 调用」已错过 3 次）
+- ⚠️ `nt_shield::compliance`（OWASP/ASVS **策略**框架）属**域归属问题**，
+  不是删不删的问题 ⇒ **本轮只裁 `osint`，其余留待裁决**
+
+### T1-7 `nt_core_guardian`：1,567 行自称统一 13 个机制，实际零融合零消费
+- **自证矛盾**：头写「**8 个**」，表列 **13 行**
+- **实测 4 个路径不存在**：`l0_substrate/schema_watchdog.rs`（真名带 `nt_core_` 前缀）、
+  `coordination/build_watchdog.rs`（真名 `nt_meta_build_watchdog.rs`）、`daemon_monitor.rs`、`entry/mod.rs supervisor`
+- **实测 4 个存在但从未融合**：`health_monitor.rs`(445L) `auto_repair.rs`(344L)
+  `nt_repair_self_heal.rs`(301L) `self_healing/circuit_breaker.rs`(354L) + `nt_infra_breaker.rs`
+- **实测零消费者**：全仓 `rg` 只命中 `l6_meta/mod.rs:17` 的 `pub mod` 声明
+- ⛔ **但它有测试** ⇒ 形态是「已建+已测+未接线」
+  ⇒ **建议修文档 + 显式接线裁决，⛔ 不删**
+  （本仓"导出 ≠ 调用"已错 3 次；对照 `CLAIMED-BUT-NOT-ENFORCED` §2 对 `nt_shield_ztnet` 的既有裁决）
+- **成本 S（文档修复，即真正的缺陷）/ L（若真要融合）**
+
+### T1-8 LRU 缓存岛：375 行外部不可达，且"LRU"被自己的代码证伪
+- `l2_perception/nt_world/source/`：`multi_cache.rs`(162，真 LRU) ← 仅 `cache_warmer.rs`(123) ← 仅 re-export
+  ⇒ **自指岛**；`search_cache.rs`(90) 仅 re-export
+- **自我证伪**：`search_cache.rs:12` 头写「LRU, TTL=1h」，
+  但 `:14` 是 `HashMap`，`:46-54` 淘汰按 `created_at` 最小
+  ⇒ 且 `created_at` **命中时不刷新** ⇒ 实为 **FIFO**
+- **成本 S**
+
+---
+
+## 4. P2 —— 跨域错位（需裁决，非纯重构）
+
+### T2-1 ⭐ L4 公开 API 返回 L6 的类型 —— 规则写在违反它的文件里
+- `l4_emotion/nt_feel_facade.rs:20-21` **明写规则**：「走**目标层**的 facade **不够**，
+  必须经**本层** facade 转出」
+- **同文件 `:29`** `pub use crate::l5_cognition::l1_facade::emotion_state::EmotionLabel;`
+  ⇒ 真实定义在 **`l6_meta/nt_core_self/emotion_state.rs:16`**（506 行）
+- **门为何看不见**：`check-layer-deps.sh:70` 排除 `-g '!*facade*'`，
+  而消费方 `emotion_engine.rs:320` 不含层字面量
+- ⛔ **另有 4 个同名 `EmotionEngine`**（L6/L4 ×3）⇒ **L15「同名≠同一符号」适用**，
+  盲目搬移会编译失败
+- **完成定义**：先出裁决（`emotion_state` 归 L4 还是接受门面洗白），**再**动代码
+- **成本 L（裁决优先）**
+
+### T2-2 三套层词汇（= T0-4 的裁决面，此处记影响面）
+见 §2 T0-4。补充已核实的**正例**：`l2_perception/nt_world/l1_facade.rs`、
+`l3_embodiment/l1_facade.rs`、`l6_meta/l1_facade.rs` 都是**正确的「本层 facade」**，
+其消费方也都走自己那层 ⇒ **门面机制本身健康，问题只在 L1/L4 两处用错方向**。
+
+---
+
+## 5. 排期与依赖
+
+### T0 修裁判（先做，且**不碰结构性代码**）
+| ID | 任务 | 成本 | 前置 |
+|---|---|---|---|
+| T0-2 | `ArchLayer` 递归 + 真实层名（先修报告层） | S | 无 |
+| T0-3 | `content_omitted` 二选一 | S | 无 |
+| T0-1 | `DeadCodeFitness` 断言化 + `lib.rs:23` 处置 | M | 配棘轮基线 |
+| T0-4 | 三套层词汇裁决（文档） | L | 无（纯裁决） |
+
+⭐ **顺序理由**：T0-2/T0-3 修完会**立刻冒出新问题** ⇒ 必须先有 T0-1 这类可信裁判，
+否则新冒出的问题又会被"记录成已知"。
+
+### T1 冗余清理（可并行，互不依赖）
+| ID | 任务 | 成本 | 风险 |
+|---|---|---|---|
+| T1-2 | `data_model` 8 类型转 `pub use` | S | 无（先例在同文件） |
+| T1-3 | `CostLadder` 二合一 | S | `pub` API 移除（双零消费者） |
+| T1-4 | 删 `l6_meta/lib.rs` | S | 无（严格子集已证） |
+| T1-5 | 删 `l2_perception/nt_judgment/` | S | 先查跨 crate 消费者 |
+| T1-7a | `nt_core_guardian` **文档**修复 | S | 无 |
+| T1-8 | 缓存岛 + "LRU"→FIFO 头修正 | S | 无 |
+| T1-1 | 3 个零消费者熔断器归正典 | L | **勿动 4 个活路径** |
+| T1-6 | 裁 `nt_shield::osint` | S | `compliance` 留待裁决 |
+| T1-7b | `nt_core_guardian` 接线裁决 | L | 依赖裁决，不删 |
+
+### T2 跨域（全部需先裁决）
+| ID | 任务 | 成本 | 前置 |
+|---|---|---|---|
+| T2-1 | `EmotionLabel` 归属裁决 + 迁移 | L | 4 个同名 `EmotionEngine` 逐一核实 |
+| T0-4 | 层词汇映射表 | L | 与 T2-1 同一决策面 |
+
+---
+
+## 6. ⛔ 本轮**不做**的（附实体依据）
+
+| 不做 | 依据 |
+|---|---|
+| 批量归并 258 组"可归并" | 全是**候选**不是结论（`CODE-TOPOLOGY.md` §维度 8 自述"下一个同类缺陷仍可能存在"）；逐组需读 doc comment 判语义 |
+| 修 `check-unwrap` 剩余 3 处 | 全部**需 API 变更**（`DEBT-LEDGER-2026-10-07.md` 已记：各试 4+ 版失败，正解在函数签名） |
+| 动 4 个活的熔断器 | 构造签名不同（滑窗/强开/健康惩罚），可能带正典缺的语义 |
+| 删 `nt_core_guardian` | 已建+已测+未接线 ⇒ 本仓既有裁决是"不删" |
+| 删 `nt_shield::compliance` | OWASP/ASVS 是**策略**内容，域归属需裁决 |
+| 归并 `l1_facade*` 家族 | `AGENTS.md` §4.2 明定 facade 是跨层引用**唯一合法通道** |
+| 修 `lib.rs:23` 而不配基线 | 会让 CI 全红 ⇒ 须与 T0-1 同批 |
+| 13 条已知分层违规 | 门已棘轮保护（0 new）；清它们属结构性改动，须 `cargo clean && cargo build` **跑两遍** |
+
+---
+
+## 7. 方法论沉淀（并入 `LESSONS-2026-10-07-open-gate-record-truth.md`）
+
+⭐⭐ **新增第 8 条：绿色不等于有效。**
+
+本轮 3 条 P0 里，**2 条是"报告了 PASS 但结构上不可能失败"**。
+判据（可直接复用）：
+
+> 一条"保证"要成立，必须**同时**满足三条：
+> ① 检测器**能被触发**（喂真实输入能冒出失败）
+> ② 结果**被消费为门**（断言 `.passed`，不是只断言 name 非空）
+> ③ 抑制器**不覆盖检测器自己的视野**
+>
+> 本轮三条链各断在一条：
+> `DeadCodeFitness` 断 ②+③（`#![allow(dead_code)]` 压掉信号 + 只断言 name）
+> `ArchLayer` 断 ①（目录被 `continue` 跳过，可分类文件 = 0）
+> `content_omitted` 断 ②（写了三处 doc 承诺，UI 零读点）
+
+⭐⭐ **附带一条量级修正**：**同名检测器看不见"同机制、异类型名"。**
+`CircuitState ×6` 的台账数字**低估约 40%** —— 因为 `BreakerState`、
+`CircuitBreaker`（别名）、包装类型都躲开了名字比对。
+⇒ 任何"可归并 N 组"的数字，都应视为**下界**。

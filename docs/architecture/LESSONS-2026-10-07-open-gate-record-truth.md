@@ -146,6 +146,43 @@ pub mod n;          # 实际是 pub mod nt_core_trajectory_compress;
 
 ---
 
+## L8 ⭐⭐⭐ **绿色不等于有效** —— 一条"保证"要同时成立三条
+
+场景：为「冗余 + 扁平缺陷 + 跨域错位」做全量评测。
+架构门全绿（`check-layer-deps --strict` rc=0、`check-truth-surface` rc=0、
+`layer-map` 零漂移、`cargo check` rc=0）⇒ **看起来很干净**。
+
+**结果 3 条 P0 里 2 条是「报告 PASS 但结构上不可能失败」。**
+
+### ⭐ 判据（可直接复用）：一条"保证"须**同时**满足三条
+
+| # | 条 | 反例形态 |
+|---|---|---|
+| ① | 检测器**能被触发** | 喂真实输入能冒出失败 |
+| ② | 结果**被消费为门** | 断言 `.passed`，不是只断言 name 非空 |
+| ③ | 抑制器**不覆盖检测器自己的视野** | 全局 `allow` 压掉被检测的信号 |
+
+### 本轮三条链各断一条（全部主 agent 复核过代码行）
+
+| 链 | 断在 | 实测 |
+|---|---|---|
+| `DeadCodeFitness` 死代码门 | **②+③** | `lib.rs:23` `#![allow(dead_code)]` 压掉信号；`test_all_have_names`（`nt_core_self_test_integration.rs:658-660`）**只 `assert!(!r.name.is_empty())`，丢弃 `.passed`** ⇒ 19 处违反映不出来 |
+| `ArchLayer` 分层深度检查 | **①** | `nt_review_runner.rs:424-428` `read_dir` 后 `if ext != "rs" { continue }` ⇒ **目录被跳过** ⇒ `l0_substrate/`…`l6_meta/` 从不进入；喂真实目录列表实测**可分类文件 = 0** ⇒ `violations` 恒 0 ⇒ 无条件 PASS |
+| `content_omitted` 变更省略 | **②** | Rust 侧三处 doc 声称「**UI 据此说**内容过大」+ DB 列 + TS 字段齐全 ⇒ **UI 渲染循环（`neobot-root.tsx:1979-1988`）零读点**；`rg '内容过大'` **只命中那两处 doc 自身** |
+
+⭐ **最刺的一条**：那条「必须经本层 facade」的规则，
+**就写在违反它的那个文件里** —— `l4_emotion/nt_feel_facade.rs:20-21` 写规则，
+`:29` 违反规则（转出 L6 的 `EmotionLabel`），而门因 `check-layer-deps.sh:70`
+排除 `-g '!*facade*'` **看不见**。
+
+### ⭐⭐ 附带量级修正：同名检测器看不见「同机制、异类型名」
+
+台账记 `CircuitState ×6`，实测同类**熔断器共 10 个** ——
+因为 `BreakerState`、`CircuitBreaker`（类型别名）、包装类型都躲开了名字比对。
+⇒ **任何「可归并 N 组」的数字都是下界，不是上界。**
+
+---
+
 ## 元教训
 
 本轮 7 条里，有 **4 条（L1/L3/L4/L7）的根因是同一个动作**：

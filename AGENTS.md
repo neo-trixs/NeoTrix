@@ -55,7 +55,7 @@
 
 | 门 | 当前值 | ⛔ 怎么读这个值 |
 |---|---|---|
-| `check-layer-deps.sh --strict` | exit 0，**8 known** | 棘轮 101→…→8，`PASS 0 new`。剩余 8 条全是**已记录不可改道项**，删会让 CI 红。**测量台必须是 `git worktree add --detach HEAD` 的干净检出** —— 脏树值会让违规变少，照抄会让 CI 以 `FAIL: N new` 红 |
+| `check-layer-deps.sh --strict` | exit 0，**13 known**（**2026-10-07 干净检出实测**；此前本表写 8、`LAYER-DEBT-TIERS` 写 14，**两处均已陈旧**） | 棘轮 101→…→13，`PASS 0 new`。剩余 13 条全是**已记录不可改道项**，删会让 CI 红。**测量台必须是 `git worktree add --detach HEAD` 的干净检出** —— 脏树值会让违规变少，照抄会让 CI 以 `FAIL: N new` 红。⚠️ `l0_substrate/nt_sampler.rs` 那条是**注释假阳性**，⛔ 勿"修" |
 | `check-naming.sh` | advisory，clean-HEAD **1,646** 无前缀文件 | **规约 vs 现实差 1,646 ⇒ 该规约无约束力，advisory PASS ≠ 合规** |
 | `check-truth-surface.sh` | — | ⛔ **本地红 ≠ CI 红**（他窗 WIP 造成 UNCOMMITTED_DEP）；干净检出 exit=0 |
 
@@ -104,10 +104,10 @@
 | 模块台账 | `ARCHITECTURE-MAP-ROADMAP-V2.md` —— **2026-09-29 已拆分，只留 §11 起的事实对账层**（可再生实测值）。§1–§7 的 308 行死数据已移入 `_superseded/ARCHITECTURE-MAP-ROADMAP-V2-deathsnap-2026-09-19.md`。更新规则 **R-P199**，口径限 `neotrix-core` L1–L6；`neobot` 独立 crate 不占 L 层故不进 ⇒ 见 `ABSORPTION-DSH-SIDEBAR-IM.md` |
 | 模块拓扑实测 | `DIR-AUDIT-2026-09-27.md`（16 包依赖图 + 8 类重复类型）· **目录解法** `DIR-REMEDY-2026-09-28.md` |
 | 外部吸收 | **规则唯一源 = `NEOTRIX-STD-1.0.md` NTS-B10（含 B10.1 URL-only 入参 / B10.2 熔炼化为已有 / B10.3 前置门降级为分流 / B10.4 记录真伪是唯一硬停）** · 操作面 `skills/external-absorption/SKILL.md`「URL-only 熔炼模式」（裸 URL 即完整入参；五段=信号初筛→零克隆取源→熔炼成束→化为已有→落账）。⛔ **许可核实主路径 = `raw.githubusercontent.com`，不是 API**（匿名 API 403 会把 4/18 误判为不可用）。⛔ **「化为已有」的判定脚本 `kb_batch_absorb.py`/`absorb_to_capability.py` 实测已不存在** ⇒ 必须逐条读代码 grounding，禁止凭关键词猜（无名小仓误映射率 68%）。批次记录：`ABSORPTION-BATCH-18-MEMORY-2026-10-07.md`（**72 强化 : 14 新增**，含 2 条 AGPL / 1 非商用 / 1 无 LICENSE）· `ABSORPTION-GITHUB-SKILL-FORGE-2026-10-07.md`（5 条全强化）。更早：`ABSORPTION-AGENT-ARCH-2026-09-28.md`（8 源）+ `…ARCH2-2026-09-29.md`（30 源）+ `BATCH-FIX-2026-09-29.md` · `ABSORPTION-AI-NATIVE-SDLC-2026-10-06.md` |
-| 方法论教训 | `LESSONS-*.md` **9 档，按主题挑读，勿只读最新**。**吸收/开门类见 `…2026-10-07-open-gate-record-truth.md`（L1 门可宽门框必须实 / L2 许可核实主路径是 raw 非 API / L3「新增」占比畸高先怀疑检索不全 / L4 卡位不可从单行括注推断 / L5 门只扫 root-doc 故 skills/ 内脚本失效零敏感 / L6 零读点≠能力已建成 / L7 本机 rg 会吞标识符）**。纪律类见 `…2026-09-24.md` §五（R36–R46：反引号当命令执行 / 门干跑有副作用 / `--only` 按路径取 diff / 全角标点吃字节 / 门记录声称已做而实现从未入库） |
+| 方法论教训 | `LESSONS-*.md` **9 档，按主题挑读，勿只读最新**。**吸收/开门/审计类见 `…2026-10-07-open-gate-record-truth.md`（L1 门可宽门框必须实 / L2 许可核实主路径是 raw 非 API / L3「新增」占比畸高先怀疑检索不全 / L4 卡位不可从单行括注推断 / L5 门只扫 root-doc 故 skills/ 内脚本失效零敏感 / L6 零读点≠能力已建成 / L7 本机 rg 会吞标识符 / ⭐⭐L8 **绿色≠有效**：一条保证须同时满足「能被触发 + 被消费为门 + 抑制器不遮视野」，本轮 3 条 P0 有 2 条是报 PASS 却结构上不可能失败）**。纪律类见 `…2026-09-24.md` §五（R36–R46：反引号当命令执行 / 门干跑有副作用 / `--only` 按路径取 diff / 全角标点吃字节 / 门记录声称已做而实现从未入库） |
 | 文档规范 | `DOCUMENTATION-MAP.md` |
 | 本地模型 | `LOCAL-LLAMA-2026-09-28.md` |
-| 待办 | `TODO.md`（顶部人工摘要区）· 事故分诊 `sessions/handoff-disease-list-20260927.md` |
+| 待办 | `TODO.md`（顶部人工摘要区）· 事故分诊 `sessions/handoff-disease-list-20260927.md` · ⭐ **冗余/扁平缺陷/跨域错位迭代任务清单 `ROADMAP-REDUNDANCY-FLAT-MISALIGN-2026-10-07.md`**（架构门全绿，但 3 条 P0 里 **2 条是「报 PASS 却结构上不可能失败」** ⇒ **先修裁判再清理**） |
 
 ### 6.1 承接前必读（省数小时）
 
