@@ -484,18 +484,18 @@ impl CapabilityCli {
 
     fn parse_layer(&self, s: &str) -> Result<NodeLayer, Box<dyn std::error::Error>> {
         match s.to_uppercase().as_str() {
-            "L0" => Ok(NodeLayer::L0Primitive),
-            "L1" => Ok(NodeLayer::L1Composite),
-            "L2" => Ok(NodeLayer::L2Orchestrator),
-            "L2W" => Ok(NodeLayer::L2World),
-            "L3" => Ok(NodeLayer::L3DomainService),
-            "L3M" => Ok(NodeLayer::L3Memory),
-            "L4" => Ok(NodeLayer::L4Application),
-            "L4C" => Ok(NodeLayer::L4Cognition),
-            "L5" => Ok(NodeLayer::L5Conscious),
-            "L6" => Ok(NodeLayer::L6Self),
-            "L7" => Ok(NodeLayer::L7Capability),
-            "L8" => Ok(NodeLayer::L8Autonomic),
+            "L2" | "L2ORCHESTRATOR" => Ok(NodeLayer::L2Orchestrator),
+            "L2W" | "L2WORLD" => Ok(NodeLayer::L2World),
+            "L3" | "L3DOMAINSERVICE" => Ok(NodeLayer::L3DomainService),
+            "L3M" | "L3MEMORY" => Ok(NodeLayer::L3Memory),
+            "L4" | "L4APPLICATION" => Ok(NodeLayer::L4Application),
+            "L4C" | "L4COGNITION" => Ok(NodeLayer::L4Cognition),
+            "L5" | "L5CONSCIOUS" => Ok(NodeLayer::L5Conscious),
+            "L6" | "L6SELF" => Ok(NodeLayer::L6Self),
+            "L7" | "L7CAPABILITY" => Ok(NodeLayer::L7Capability),
+            "L8" | "L8AUTONOMIC" => Ok(NodeLayer::L8Autonomic),
+            "L0" | "L0PRIMITIVE" => Ok(NodeLayer::L0Primitive),
+            "L1" | "L1COMPOSITE" => Ok(NodeLayer::L1Composite),
             _ => Err(format!("Unknown layer: {}", s).into()),
         }
     }
@@ -573,7 +573,20 @@ impl CapabilityCli {
             for n in nodes {
                 by_layer.entry(n.layer).or_default().push(n);
             }
-            for layer in [NodeLayer::L0Primitive, NodeLayer::L1Composite, NodeLayer::L2Orchestrator, NodeLayer::L3DomainService, NodeLayer::L4Application] {
+            for layer in [
+                NodeLayer::L0Primitive,
+                NodeLayer::L1Composite,
+                NodeLayer::L2Orchestrator,
+                NodeLayer::L2World,
+                NodeLayer::L3DomainService,
+                NodeLayer::L3Memory,
+                NodeLayer::L4Application,
+                NodeLayer::L4Cognition,
+                NodeLayer::L5Conscious,
+                NodeLayer::L6Self,
+                NodeLayer::L7Capability,
+                NodeLayer::L8Autonomic,
+            ] {
                 if let Some(layer_nodes) = by_layer.get(&layer) {
                     println!("  {} ({})", layer.as_str(), layer_nodes.len());
                     // `sibling_prefixes` 把「谁最后」收进原语，

@@ -160,18 +160,18 @@ pub enum NodeLayer {
 impl NodeLayer {
     pub fn as_str(&self) -> &'static str {
         match self {
-            NodeLayer::L0Primitive => "L0",
-            NodeLayer::L1Composite => "L1",
-            NodeLayer::L2Orchestrator => "L2",
-            NodeLayer::L3DomainService => "L3",
-            NodeLayer::L4Application => "L4",
-            NodeLayer::L4Cognition => "L4",
-            NodeLayer::L2World => "L2",
-            NodeLayer::L3Memory => "L3",
-            NodeLayer::L5Conscious => "L5",
-            NodeLayer::L6Self => "L6",
-            NodeLayer::L7Capability => "L7",
-            NodeLayer::L8Autonomic => "L8",
+            NodeLayer::L0Primitive => "l0primitive",
+            NodeLayer::L1Composite => "l1composite",
+            NodeLayer::L2Orchestrator => "l2orchestrator",
+            NodeLayer::L3DomainService => "l3domainservice",
+            NodeLayer::L4Application => "l4application",
+            NodeLayer::L4Cognition => "l4cognition",
+            NodeLayer::L2World => "l2world",
+            NodeLayer::L3Memory => "l3memory",
+            NodeLayer::L5Conscious => "l5conscious",
+            NodeLayer::L6Self => "l6self",
+            NodeLayer::L7Capability => "l7capability",
+            NodeLayer::L8Autonomic => "l8autonomic",
         }
     }
 }

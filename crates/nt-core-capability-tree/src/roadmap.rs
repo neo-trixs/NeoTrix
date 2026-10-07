@@ -58,17 +58,21 @@ fn parse_domain(s: &str) -> Option<Domain> {
 }
 
 /// 解析 layer 字符串为 NodeLayer 枚举
-fn parse_layer(s: &str) -> NodeLayer {
+fn parse_layer(s: &str) -> Option<NodeLayer> {
     match s.to_lowercase().as_str() {
-        "l0" | "l0primitive" => NodeLayer::L0Primitive,
-        "l1" | "l1composite" => NodeLayer::L1Composite,
-        "l2" | "l2orchestrator" => NodeLayer::L2Orchestrator,
-        "l3" | "l3domainservice" => NodeLayer::L3DomainService,
-        "l4" | "l4application" => NodeLayer::L4Application,
-        "l4cognition" => NodeLayer::L4Cognition,
-        "l5" | "l5conscious" => NodeLayer::L5Conscious,
-        "l6" | "l6self" => NodeLayer::L6Self,
-        _ => NodeLayer::L0Primitive,
+        "l0" | "l0primitive" => Some(NodeLayer::L0Primitive),
+        "l1" | "l1composite" => Some(NodeLayer::L1Composite),
+        "l2" | "l2orchestrator" => Some(NodeLayer::L2Orchestrator),
+        "l2world" => Some(NodeLayer::L2World),
+        "l3" | "l3domainservice" => Some(NodeLayer::L3DomainService),
+        "l3memory" => Some(NodeLayer::L3Memory),
+        "l4" | "l4application" => Some(NodeLayer::L4Application),
+        "l4cognition" => Some(NodeLayer::L4Cognition),
+        "l5" | "l5conscious" => Some(NodeLayer::L5Conscious),
+        "l6" | "l6self" => Some(NodeLayer::L6Self),
+        "l7" | "l7capability" => Some(NodeLayer::L7Capability),
+        "l8" | "l8autonomic" => Some(NodeLayer::L8Autonomic),
+        _ => None,
     }
 }
 
@@ -92,7 +96,9 @@ fn entry_to_node(entry: &RoadmapModuleEntry) -> Result<CapabilityNode, RegistryE
         RegistryError::Validation(format!("未知域: {}", entry.domain))
     })?;
 
-    let layer = parse_layer(&entry.layer);
+    let layer = parse_layer(&entry.layer).ok_or_else(|| {
+        RegistryError::Validation(format!("未知层: {}", entry.layer))
+    })?;
     let constellation = parse_constellation(&entry.constellation);
 
     let mut node = CapabilityNode::new_primitive(
