@@ -14,6 +14,7 @@ use neotrix::l1_action::nt_dialogue_tui::NtTuiHuman;
 use neotrix::l1_action::nt_free_pool::NtFreePoolAsk;
 use neotrix::l1_action::nt_io::nt_io_provider::catalog::model_pool::{ModelSource, UnifiedModelPool};
 use neotrix::l1_action::nt_io::nt_io_provider::catalog::cli_free_source::{CliFreeSource, FreebuffFreeSource};
+use neotrix::l1_action::nt_act::nt_act_dev_tools::freebuff_cli;
 use neotrix::l1_action::nt_model_cli::NtModelCliAsk;
 use neotrix::l1_action::nt_stdin_human::NtStdinHuman;
 use neotrix::l5_cognition::nt_crystal_core::{
@@ -35,12 +36,14 @@ struct Args {
     max_subtasks: usize,
     tui: bool,
     line: bool,
+    agent: Option<String>,
 }
 
 fn usage() -> &'static str {
     "用法: ntcode \"<目标>\" [--model provider/model] [--max-rounds N] [--timeout-secs N] [--workdir PATH] [--max-subtasks N] [--tui|--line]\n\
      不指定 --model 则发现 opencode 免费档进池轮转调用；NEOTRIX_DIALOGUE_MODEL 可指定默认模型。\n\
-     TTY 下默认全屏 TUI；--line 强制行式；管道/CI 自动回退行式。"
+     TTY 下默认全屏 TUI；--line 强制行式；管道/CI 自动回退行式。\n\
+     交互式外部 agent 直接以 ntcode --agent freebuff [--workdir PATH] 启动（不进模型池）。"
 }
 
 fn parse_args(argv: &[String]) -> Result<Args, String> {
@@ -52,6 +55,7 @@ fn parse_args(argv: &[String]) -> Result<Args, String> {
     let mut max_subtasks = 5usize;
     let mut tui = false;
     let mut line = false;
+    let mut agent: Option<String> = None;
 
     let mut i = 1;
     while i < argv.len() {
@@ -105,6 +109,14 @@ fn parse_args(argv: &[String]) -> Result<Args, String> {
                     .map_err(|_| "--max-subtasks 不是数字".to_string())?
                     .max(1);
             }
+            "--agent" => {
+                i += 1;
+                agent = Some(
+                    argv.get(i)
+                        .ok_or_else(|| "--agent 缺参数".to_string())?
+                        .clone(),
+                );
+            }
             other if other.starts_with('-') => {
                 return Err(format!("未知参数 {other}\n{usage}", usage = usage()));
             }
@@ -113,7 +125,7 @@ fn parse_args(argv: &[String]) -> Result<Args, String> {
         i += 1;
     }
 
-    if goal_parts.is_empty() {
+    if goal_parts.is_empty() && agent.is_none() {
         return Err(usage().to_string());
     }
     Ok(Args {
@@ -125,6 +137,7 @@ fn parse_args(argv: &[String]) -> Result<Args, String> {
         max_subtasks,
         tui,
         line,
+        agent,
     })
 }
 
@@ -141,6 +154,33 @@ fn main() {
             std::process::exit(1);
         }
     };
+
+    // 交互式外部 agent（freebuff 一类 TUI）：不进模型池，不伪装成 chat
+    if let Some(name) = &args.agent {
+        match name.as_str() {
+            "freebuff" => {
+                let cli = freebuff_cli(args.workdir.clone());
+                if !cli.probe_available() {
+                    eprintln!("未找到可用的 `freebuff` 后端（--version 探活失败）。");
+                    std::process::exit(1);
+                }
+                let mut child = match cli.launch() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        eprintln!("启动 freebuff 失败：{e}");
+                        std::process::exit(1);
+                    }
+                };
+                let status = child.wait().ok();
+                println!("\n(freebuff 已退出：{:?})", status);
+                std::process::exit(0);
+            }
+            other => {
+                eprintln!("未知 agent：{other}（目前仅支持 freebuff）");
+                std::process::exit(1);
+            }
+        }
+    }
 
     // 晶体：磁盘有记忆就载入，没有就新建（两条路都不 panic）
     let mut core = match CrystalCore::load() {
@@ -163,6 +203,15 @@ fn main() {
         Vec<String>,
     ) = match &args.model {
         Some(m) => {
+            // freebuff 是交互 agent + 自带服务端点，in-crate chat 尚未到
+            // CustomProxy 执行器接线；宁缺勿错路（不灌给 opencode 跑）。
+            if m.starts_with("freebuff/") {
+                eprintln!(
+                    "freebuff chat 尚未接入 NeoTrix 的 in-crate 执行器（需 CODEBUFF_API_KEY 全链路）。\n\
+                     可改用：ntcode --agent freebuff （交互启动），或等 CustomProxy 接线完成后再走 \"--model\"。"
+                );
+                std::process::exit(1);
+            }
             let mut op = NtModelCliAsk::new()
                 .with_model(m.clone())
                 .with_timeout(Duration::from_secs(args.timeout_secs));
