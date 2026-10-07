@@ -15,6 +15,26 @@ use std::sync::Arc;
 
 use regex::Regex;
 
+// ⭐⭐ **冗余下沉 · Phase 1**（2026-10-07，纯搬运，**零行为变更**）
+//
+// 这 8 条治理规则的 `check_fn` 本体、5 个助手、3 个常量与 `RuleResult`
+// 曾在本文件与 `neotrix_neobot::nt_governance` **各存一份逐字相同的副本**
+// （实测 8 个 `r*` 逐函数 diff 为空）⇒ 现统一从 neobot 引用。
+//
+// ⚠️ 依赖方向天然合适：`neotrix-core` 已依赖 `neotrix-neobot` ⇒ **零新 crate**。
+//
+// 本文件**只保留** `GovernorRule` 容器 —— 因其 `check_fn` 多带一个
+// `OutputStyleId`（8 条规则当前**都不使用**它，是为未来 style-aware 规则预留）。
+// ⇒ **规则逻辑共享、规则容器各自持有**。
+use neotrix_neobot::nt_governance::{
+    // ⛔ 不引 `extract_path_refs` / `has_known_ext`：它们只被**共享的** `r*` 内部使用，
+    //    本文件不再直接调用 ⇒ 引入即 unused。
+    mask_code_fences, r1_answer_first, r2_no_hedging,
+    r3_sections_concrete, r4_no_placeholder, r5_max_length, r6_no_dup_boilerplate,
+    r7_file_refs_exist, r8_hallucinated_paths, re_opt, strip_pure_placeholder_lines,
+    RuleResult, EXTS, PLACEHOLDER_INLINE_RE, PLACEHOLDER_PURE_RE,
+};
+
 /// 内置输出样式标识。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OutputStyleId {
@@ -199,31 +219,6 @@ impl OutputStyle for PlainStyle {
 
 /// 单条规则的检查结果。
 #[derive(Debug, Clone)]
-pub struct RuleResult {
-    pub rule_id: u8,
-    pub passed: bool,
-    pub detail: String,
-}
-
-impl RuleResult {
-    fn pass(id: u8, detail: impl Into<String>) -> Self {
-        Self {
-            rule_id: id,
-            passed: true,
-            detail: detail.into(),
-        }
-    }
-    fn fail(id: u8, detail: impl Into<String>) -> Self {
-        Self {
-            rule_id: id,
-            passed: false,
-            detail: detail.into(),
-        }
-    }
-}
-
-/// 单条规则检查的完整治理报告。
-#[derive(Debug, Clone)]
 pub struct GovernanceReport {
     /// 每条规则的独立结果 (按 rule_id 顺序)。
     pub rule_results: Vec<RuleResult>,
@@ -358,99 +353,7 @@ pub struct GovernorRule {
     pub check_fn: Box<dyn Fn(&str, OutputStyleId) -> RuleResult + Send + Sync>,
 }
 
-/// 已知文件扩展名 (R07/R08 路径引用识别)。
-const EXTS: &[&str] = &[
-    "rs", "md", "toml", "py", "ts", "tsx", "js", "jsx", "json", "yaml", "yml", "sh", "bash",
-    "go", "c", "cpp", "cc", "h", "hpp", "rb", "lua", "sql", "vue", "svelte", "css", "scss",
-    "html", "svg", "txt", "xml", "proto", "java", "kt", "swift", "zig", "ex", "cs", "php",
-    "ino", "lock", "png", "jpg", "jpeg", "gif", "pdf", "docx", "xlsx", "pptx",
-];
-
-fn has_known_ext(p: &str) -> bool {
-    let l = p.to_lowercase();
-    EXTS.iter().any(|e| l.ends_with(&format!(".{e}")))
-}
-
-/// 纯占位行 (整行只有占位符) — R04 违规 + auto-fix 可剥离。
-const PLACEHOLDER_PURE_RE: &str = r"^(?:\s*[\[<]?)?(?:\bTODO\b|\bTBD\b|\bFIXME\b|\bPLACEHOLDER\b|lorem ipsum|待补充|待完善|待定|占位|\.\.\.|…)(?:\s*[\]>]?)?$";
-
-/// 内联强占位符 (出现在行内即违规) — 全 Latin 加词边界防误伤。
-const PLACEHOLDER_INLINE_RE: &str = r"(?i)\b(TODO|TBD|FIXME|PLACEHOLDER)\b|lorem ipsum";
-
-/// 掩盖 ``` 代码块内容 (路径/语言检查跳过代码内文本)。
-fn mask_code_fences(text: &str) -> String {
-    let mut masked = String::new();
-    let mut in_fence = false;
-    for line in text.lines() {
-        if line.trim_start().starts_with("```") {
-            in_fence = !in_fence;
-            masked.push_str(line);
-        } else if in_fence {
-            masked.push_str(line.trim_end_matches(|c: char| !c.is_whitespace()).replace(|c: char| !c.is_whitespace(), " ").as_str());
-        } else {
-            masked.push_str(line);
-        }
-        masked.push('\n');
-    }
-    masked
-}
-
-/// 判断一行是否为纯占位行。
-fn is_placeholder_only(line: &str, pure_re: &Regex) -> bool {
-    pure_re.is_match(line.trim())
-}
-
-/// 提取文本中的路径引用 (反引号 + 裸路径)，排除 `file:line` 形态 (R08 处理)。
-fn extract_path_refs(
-    text: &str,
-    backtick_re: &Option<Regex>,
-    bare_re: &Option<Regex>,
-    line_suffix_re: &Option<Regex>,
-) -> Vec<String> {
-    // ⛔ 任一正则不可用 ⇒ 本规则**不触发**（降级已被 log::error! 记录）
-    let (Some(backtick_re), Some(bare_re), Some(line_suffix_re)) =
-        (backtick_re, bare_re, line_suffix_re)
-    else {
-        return Vec::new();
-    };
-    let masked = mask_code_fences(text);
-    let mut out: Vec<String> = Vec::new();
-    for cap in backtick_re.captures_iter(&masked) {
-        let inner = cap[1].trim();
-        if (inner.contains('/') || has_known_ext(inner)) && !line_suffix_re.is_match(inner) {
-            out.push(inner.to_string());
-        }
-    }
-    for cap in bare_re.captures_iter(&masked) {
-        let tok = cap[0].trim();
-        if line_suffix_re.is_match(tok) || tok.contains("//") || tok.contains('*') {
-            continue;
-        }
-        out.push(tok.to_string());
-    }
-    out
-}
-
 // ── 各规则检查实现 (纯函数, 便于单测) ───────────────────────────────
-
-/// R01 答案前置: 禁止以"让我先/让我想想"等铺垫推迟答案。
-fn r1_answer_first(text: &str) -> RuleResult {
-    let lines: Vec<&str> = text.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
-    let Some(first) = lines.first() else {
-        return RuleResult::pass(1, "空输入，无前置铺垫问题");
-    };
-    let lower = first.to_lowercase();
-    const DEFER: &[&str] = &[
-        "让我想", "让我看", "让我先", "让我来", "让我查", "让我分析", "让我调研",
-        "嗯，让我", "let me think", "let me check", "let me look", "let me review",
-        "let me investigate", "hmm, let me",
-    ];
-    if DEFER.iter().any(|d| lower.contains(d)) && lines.len() >= 3 {
-        RuleResult::fail(1, format!("答案被前置铺垫推迟: 首行 `{first}`"))
-    } else {
-        RuleResult::pass(1, "结论前置")
-    }
-}
 
 /// R02 禁止模糊对冲: "可能/或许/大概/我觉得/probably" 等。
 const HEDGES: &[&str] = &[
@@ -458,167 +361,12 @@ const HEDGES: &[&str] = &[
     "probably", "maybe", "perhaps", "i think", "i guess", "it seems",
 ];
 
-fn r2_no_hedging(text: &str) -> RuleResult {
-    let lower = text.to_lowercase();
-    let mut found: Vec<(String, usize)> = Vec::new();
-    let mut total = 0usize;
-    for h in HEDGES {
-        let n = lower.matches(h).count();
-        if n > 0 {
-            found.push(((*h).to_string(), n));
-            total += n;
-        }
-    }
-    if total >= 3 {
-        let shown: Vec<String> = found.iter().take(5).map(|(h, n)| format!("{h}×{n}")).collect();
-        RuleResult::fail(2, format!("发现 {total} 处对冲表述: {}", shown.join(", ")))
-    } else {
-        RuleResult::pass(2, "无模糊对冲")
-    }
-}
-
-/// R03 章节必须有实内容: 标题后不得紧跟空行/纯占位/纯符号。
-fn r3_sections_concrete(text: &str, pure_re: &Option<Regex>) -> RuleResult {
-    let Some(pure_re) = pure_re else {
-        return RuleResult::pass(3, "R03 未触发：placeholder_pure 正则不可用");
-    };
-    let lines: Vec<&str> = text.lines().collect();
-    let mut bad: Vec<String> = Vec::new();
-    for (i, raw) in lines.iter().enumerate() {
-        let line = raw.trim();
-        if !line.starts_with('#') {
-            continue;
-        }
-        let mut has_content = false;
-        for j in (i + 1)..lines.len().min(i + 4) {
-            let t = lines[j].trim();
-            if t.is_empty() {
-                continue;
-            }
-            if t.starts_with('#') {
-                break;
-            }
-            if is_placeholder_only(t, pure_re) || t.chars().filter(|c| !c.is_whitespace()).count() <= 1 {
-                break;
-            }
-            has_content = true;
-            break;
-        }
-        if !has_content {
-            bad.push(format!("`{line}`"));
-        }
-    }
-    if bad.is_empty() {
-        RuleResult::pass(3, "所有章节均有实内容")
-    } else {
-        RuleResult::fail(3, format!("空章节: {}", bad.join(", ")))
-    }
-}
-
-/// R04 禁止空/占位文本: TODO/TBD/待补充/lorem ipsum 等。
-fn r4_no_placeholder(text: &str, pure_re: &Option<Regex>, inline_re: &Option<Regex>) -> RuleResult {
-    let (Some(pure_re), Some(inline_re)) = (pure_re, inline_re) else {
-        return RuleResult::pass(4, "R04 未触发：placeholder 正则不可用");
-    };
-    let mut bad: Vec<String> = Vec::new();
-    for (i, raw) in text.lines().enumerate() {
-        let t = raw.trim();
-        if is_placeholder_only(t, pure_re) || inline_re.is_match(t) {
-            bad.push(format!("L{} `{t}`", i + 1));
-        }
-    }
-    if bad.is_empty() {
-        RuleResult::pass(4, "无占位文本")
-    } else {
-        RuleResult::fail(4, format!("占位文本: {}", bad.join("; ")))
-    }
-}
-
-/// R05 单消息长度上限。
-fn r5_max_length(text: &str, max_chars: usize) -> RuleResult {
-    let n = text.chars().count();
-    if n > max_chars {
-        RuleResult::fail(5, format!("单消息 {n} 字符 > 上限 {max_chars}"))
-    } else {
-        RuleResult::pass(5, format!("长度 {n} ≤ {max_chars}"))
-    }
-}
-
-/// R06 禁止重复样板: 相同长行 (≥25 字符) 出现 ≥3 次。
-fn r6_no_dup_boilerplate(text: &str) -> RuleResult {
-    let mut counts: HashMap<String, usize> = HashMap::new();
-    for line in text.lines() {
-        let t = line.trim();
-        if t.chars().count() >= 25 {
-            *counts.entry(t.to_string()).or_default() += 1;
-        }
-    }
-    let dups: Vec<(String, usize)> = counts.into_iter().filter(|(_, c)| *c >= 3).collect();
-    if dups.is_empty() {
-        RuleResult::pass(6, "无重复样板")
-    } else {
-        let shown: Vec<String> = dups
-            .iter()
-            .map(|(s, c)| format!("`{}`×{}", truncate(s, 40), c))
-            .collect();
-        RuleResult::fail(6, format!("重复样板行: {}", shown.join("; ")))
-    }
-}
-
 fn truncate(s: &str, max: usize) -> String {
     let mut t: String = s.chars().take(max).collect();
     if s.chars().count() > max {
         t.push('…');
     }
     t
-}
-
-/// R07 文件引用必须存在 (工作区真实文件)。
-fn r7_file_refs_exist(text: &str, root: &Path, backtick_re: &Option<Regex>, bare_re: &Option<Regex>, line_suffix_re: &Option<Regex>) -> RuleResult {
-    let mut missing: Vec<String> = Vec::new();
-    for p in extract_path_refs(text, backtick_re, bare_re, line_suffix_re) {
-        if p.contains("//") || p.starts_with('*') || p.starts_with("http") {
-            continue;
-        }
-        if !root.join(&p).is_file() && !missing.iter().any(|m| m == &p) {
-            missing.push(p);
-        }
-    }
-    if missing.is_empty() {
-        RuleResult::pass(7, "文件引用均存在")
-    } else {
-        RuleResult::fail(7, format!("引用了不存在的工作区文件: {}", missing.join(", ")))
-    }
-}
-
-/// R08 禁止幻影路径: `file:line` 引用必须存在且行号在文件范围内。
-fn r8_hallucinated_paths(text: &str, root: &Path, line_ref_re: &Option<Regex>) -> RuleResult {
-    let Some(line_ref_re) = line_ref_re else {
-        return RuleResult::pass(8, "R08 未触发：line_ref 正则不可用");
-    };
-    let masked = mask_code_fences(text);
-    let mut bad: Vec<String> = Vec::new();
-    for cap in line_ref_re.captures_iter(&masked) {
-        let path = &cap[1];
-        let line: usize = cap[2].parse().unwrap_or(0);
-        if path.contains("//") || path.contains("http") {
-            continue;
-        }
-        let full = root.join(path);
-        if !full.is_file() {
-            bad.push(format!("`{path}:{line}` 文件不存在"));
-        } else if let Ok(content) = std::fs::read_to_string(&full) {
-            let total = content.lines().count();
-            if line == 0 || line > total {
-                bad.push(format!("`{path}:{line}` 行号超范围 (文件共 {total} 行)"));
-            }
-        }
-    }
-    if bad.is_empty() {
-        RuleResult::pass(8, "无幻影路径")
-    } else {
-        RuleResult::fail(8, format!("幻影路径: {}", bad.join("; ")))
-    }
 }
 
 /// R09 语言一致: 禁止显著中英混杂 (代码块除外)。
@@ -717,37 +465,6 @@ fn strip_trailing_apology(text: &str) -> Option<(String, Vec<String>)> {
     ))
 }
 
-/// auto-fix R04: 移除纯占位行。
-fn strip_pure_placeholder_lines(
-    text: &str,
-    pure_re: &Option<Regex>,
-) -> Option<(String, Vec<String>)> {
-    // ⛔ 正则不可用 ⇒ **不动文本**（`None` = 无改动），⛔ 绝不「清空」
-    let pure_re = pure_re.as_ref()?;
-    let mut removed: Vec<String> = Vec::new();
-    let out: Vec<&str> = text
-        .lines()
-        .filter(|l| {
-            if is_placeholder_only(l, pure_re) {
-                removed.push(l.trim().to_string());
-                false
-            } else {
-                true
-            }
-        })
-        .collect();
-    if removed.is_empty() {
-        return None;
-    }
-    Some((
-        out.join("\n").trim_end().to_string(),
-        vec![format!(
-            "R04: 移除纯占位行 {}",
-            removed.iter().map(|s| format!("`{s}`")).collect::<Vec<_>>().join(" ")
-        )],
-    ))
-}
-
 /// G27 输出纪律治理器 — 10 条 i-have-adhd 规则, 纯检查 + 可机械 auto-fix。
 pub struct OutputGovernor {
     rules: Vec<GovernorRule>,
@@ -760,23 +477,6 @@ pub struct OutputGovernor {
 
 /// 默认单消息长度上限 (字符)。
 pub const DEFAULT_MAX_MESSAGE_CHARS: usize = 8_000;
-
-/// 构造正则，失败 ⇒ `None`（⛔ **不构造任何 fallback 正则**）。
-///
-/// # 为什么不「fallback 成永不匹配」
-///
-/// 那需要**再构造一次 `Regex::new`** ⇒ 要么 `expect`（AGENTS.md 禁）、
-/// 要么 `unreachable!()`（**本身就是 panic 路径**）。
-/// ⇒ 正确解是**消除该前提**：返`None`，让规则不触发（已 `log::error!`）。
-fn re_opt(pat: &str) -> Option<Regex> {
-    match Regex::new(pat) {
-        Ok(r) => Some(r),
-        Err(e) => {
-            log::error!("[output_style] 正则无法编译，规则将不触发: {pat:?} ({e})");
-            None
-        }
-    }
-}
 
 fn build_rules(root: &Path, max_message_chars: usize) -> Vec<GovernorRule> {
     let root = root.to_path_buf();

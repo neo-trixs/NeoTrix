@@ -134,10 +134,21 @@ core 侧 8 个闭包都写成 `|text, _style|`（`_` 前缀 ⇒ **从未被使�
 
 ### 建议的下沉路径（下一窗口可直接执行）
 
-**Phase 1（低风险，纯搬运）**
-把 `RuleResult` + `impl{pass,fail}`（`pub`）+ 5 个助手 + 3 个常量
-从 core 搬到 neobot（neobot 侧已是唯一真身 ⇒ core 改为 `use`）。
-⇒ core 的 `build_rules` 只留 `GovernorRule` 容器 + 8 个闭包壳。
+**✅ Phase 1 已完成（2026-10-07）**
+
+| 项 | 结果 |
+|---|---|
+| 删除的重复项 | **16 项**（8 `r*` + 4 助手 + `RuleResult` + `impl{pass,fail}` + `EXTS` + …） |
+| `nt_io_output_style.rs` | **1091 → 791 行（-300）** |
+| 行为变更 | **零**（core lib +13,589 绿 · neobot 569 绿 · 4 门 RC=0） |
+| `pass/fail` | 已 `pub`（core 跨 crate 需要） |
+| 依赖 | `core → neobot` 已存在 ⇒ **零新 crate** |
+
+⚠️ 执行中踩到 **E0119**（孤立 `#[derive]` 被留下）：我的配平删除器
+把 `RuleResult` 上方的 `///单条规则的检查结果。` 当成它自己的注释，
+于是留下一条**孤立 derive** 挂在 `GovernanceReport` 上。
+⇒ 教训：配平法对**注释归属**仍然会误判 ⇒ 删除后必须 **build**，
+⛔ 不能只看「括号配平成功」。
 
 **Phase 2（需决策）**
 `GovernorRule.check_fn` 是否**去掉 `OutputStyleId`**？

@@ -49,14 +49,14 @@ pub struct RuleResult {
 }
 
 impl RuleResult {
-    fn pass(id: u8, detail: impl Into<String>) -> Self {
+    pub fn pass(id: u8, detail: impl Into<String>) -> Self {
         Self {
             rule_id: id,
             passed: true,
             detail: detail.into(),
         }
     }
-    fn fail(id: u8, detail: impl Into<String>) -> Self {
+    pub fn fail(id: u8, detail: impl Into<String>) -> Self {
         Self {
             rule_id: id,
             passed: false,
