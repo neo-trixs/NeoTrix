@@ -126,6 +126,31 @@ AMBIGUOUS = re.compile(
     r"(\b(fs::|std::fs::)(remove_file|create_dir_all)\b)"
     r"|(\b(send|send_bytes|deliver|dispatch|emit|publish|enqueue|reply|post|upload)\w*\s*\()")
 
+# --- REPORTED, NOT GATED: unlisted persistence-shaped discards ---------------
+# 2026-10-07 新增第三桶。发现路径：TODO.md「P1/P2 静默失败」清单里的
+# 8 条（代表：`wal.rs:158` `let _ = self.flush_state(&state);`）
+# **一条都没被本门报出**，逐条读码确认它们**原样未修**
+# ⇒ 不是「已修」，是**覆盖缺口**（L8：绿色 ≠ 有效）。
+#
+# 根因：GATED 是**硬编码调用形状白名单**（kv_set / fs::write / writeln! …），
+# 名字不在表里的持久化调用走到 `if not GATED.search(rhs): continue` 就
+# **彻底消失** —— 既不门禁、不上报、不计数。这违背本门自己写下的原则
+# （「the count is printed on every run so the boundary of the gate is
+#   always visible」）。剔除 stdout/stderr 后实测 **60 处**完全不可见。
+#
+# ⛔ 为什么**只上报不门禁**：这 60 处里 best-effort 与真缺陷混居
+# （`let _ = brain.save_cortex()` vs 有意的尽力而为），逐条判定必须读上下文；
+# 直接设门会命中大量正确代码 ⇒「信号在正确代码上响」＝门失去读者
+# （见本文件 remove_file / .send 的同款裁定）。先把边界变可见，再逐条裁决。
+# ⚠️ 词干后必须允许**方法名后缀**：`flush_state(` / `save_wallet(` /
+# `save_cortex(` 是本仓真实形态，首版要求词干后紧跟 `(` ⇒ 这些一个都匹配不上
+# （首版实测漏掉 TODO 清单里的 `wal.rs:158 flush_state`）。用 `\w*` 收尾。
+UNLISTED = re.compile(
+    r"\.\s*(flush|persist|save|commit|store|append|write|sync|insert|upsert|"
+    r"prune|unlock|release|update|delete|remove|record|log|init|ensure)\w*\s*\("
+)
+OUTPUT_NOISE = re.compile(r"\b(stdout|stderr)\b")
+
 # Only unambiguous observation channels. An earlier, looser version also accepted
 # `.push(` / `record_` / `report.` and that produced a real false negative:
 # safe_applier.rs:102 `let _ = fs::write(...)` sat in the same block as
@@ -206,6 +231,7 @@ def is_test(lines, i):
 hits = {}
 ambiguous = 0
 ok_discarded = 0        # `.ok()` 丢弃 Result：报告但不设门（见下方注释）
+unlisted = {}           # 第三桶：白名单外的持久化形状丢弃（见 UNLISTED 注释）
 for root in ROOTS:
     for dirpath, _d, files in os.walk(root):
         for fn in sorted(files):
@@ -285,9 +311,17 @@ for root in ROOTS:
                 # 多数是有意的 best-effort；设门会误伤，改为「边界可见」。
                 if re.search(r"\.ok\(\)\s*;?\s*$", rhs):
                     ok_discarded += 1
-                if not GATED.search(rhs):
-                    continue
                 if is_test(lines, i):
+                    continue
+                if not GATED.search(rhs):
+                    # 第三桶：白名单外的持久化形状丢弃 —— 上报但不门禁。
+                    # 同样要求「未被观察」（OBSERVE），否则不算静默失败。
+                    if (UNLISTED.search(rhs)
+                            and not AMBIGUOUS.search(rhs)
+                            and not OUTPUT_NOISE.search(rhs)):
+                        ub, ue = enclosing_block(lines, i)
+                        if not OBSERVE.search("\n".join(lines[ub:ue + 1])):
+                            unlisted["%s:%d" % (p, i + 1)] = rhs.strip()[:88]
                     continue
                 a, b = enclosing_block(lines, i)
                 body = "\n".join(lines[a:b + 1])
@@ -326,6 +360,7 @@ print("  [silent-failure] baseline entries: %d（其中 %d 条**命中当前代�
 print("  [silent-failure] NEW (未基线、--strict 下阻断): %d" % len(new))
 print("  [silent-failure] out of scope by design (remove_file/.send*): %d" % ambiguous)
 print("  [silent-failure] reported, not gated (`.ok()` 丢弃 Result): %d" % ok_discarded)
+print("  [silent-failure] reported, not gated (unlisted persistence-shaped): %d" % len(unlisted))
 # ⚠️ 上面那个计数**含测试代码**。生产口径请用nt_ok_audit.py（按行区间排除
 # #[cfg(test)] 与整文件测试模块）—— 本仓实测两者的差距极大，
 # 且**测试里的 `.ok()` 多为合理用法**，混在一起会让这个数字失去判断价值。
@@ -336,6 +371,8 @@ if mode != "list":
 if mode == "list":
     for k in sorted(hits):
         print("    %-62s %s" % (k, hits[k]))
+    for k in sorted(unlisted):
+        print("    %-62s %s   [unlisted-not-gated]" % (k, unlisted[k]))
     print("  (list mode ignores baseline: this is the full current inventory)")
     sys.exit(0)
 
