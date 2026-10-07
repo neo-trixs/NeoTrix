@@ -101,6 +101,40 @@
 
 ✅ 已完成：`nt_game/render` 的 `window_width/height`（零读点，全仓引用 0）。
 
+## D2-a ✅ 分类：`memory_types.rs` 的工作流/子任务子系统**整体已死**（实测）
+
+### 证据链（逐级核实，非推测）
+
+| 判定对象 | 实测 | 结论 |
+|---|---|---|
+| `WorkflowMemory` / `SubtaskMemory` / `WorkflowStep` | 全仓**无构造点**（`success:` 的命中全属别的类型） | 从未被实例化 |
+| `_record_workflow` / `_record_subtask` / `_search_workflow` / `_search_subtask` | 类型文件外引用各 **0** | 死方法 |
+| 该文件的 `MemoryStore` **struct** | 全仓引用 **0**（唯2 处命中是`memory_bank.rs` 里**另一个同名 trait**） | 死类型 |
+
+⚠️ **`MemoryStore` 是同名双胞胎**：`memory_types.rs` 的 struct
+与 `l5_cognition/nt_mind/foundation/memory_bank.rs:89` 的 trait **同名但不同物**
+⇒ 这正是 AGENTS.md 「**同名 ≠ 同一符号**」的又一次实例。
+
+### ⭐ 我自己踩的坑：grep 被 `.worktrees/` 污染
+
+第一次统计 `WorkflowStep` 得到「56 处引用」⇒ 差点得出「它很常用，不能删」。
+**真相**：那 56 处里大量来自 `.worktrees/**` 的**其他工作树副本**。
+⇒ 排除 worktrees/target 后是 **10 处**，且**全部指向另一个定义**
+（`production_orchestrator.rs:32`，字段是 `id`/名称…，与本处不同）。
+
+⇒ **纪律补充（判据第 4 条）**：`grep -rn` **必须显式限定目录**
+（`neotrix-core/src crates/ apps/`），⛔ 不能用 `.`，
+否则 `.worktrees/` / `target/` 会把计数**放大数倍** ⇒ 结论直接反向。
+
+### 处置
+
+⛔ **本轮不删**：整个子系统（`MemoryStore` + 3 类型 + 4 方法）删除前需确认
+`FunctionMemory` 路径是否仍被使用（`success_count` **确实被读**，L111/L118）
+⇒ 需**按类型逐个**判定，不能整文件删。
+
+⇒ 已从「188 待判定」中**精确分类出这 3 个 `pub success`**：
+它们是**只写不读**的标记（对照：`FunctionMemory.success_count` 确实被读）。
+
 ## D3 —— 冗余：输出治理规则**在两个 crate 各存一份**（精确图景 + 阻塞）
 
 ### 实测：逐字相同的重复项共**22 个**
