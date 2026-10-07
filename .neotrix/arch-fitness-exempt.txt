@@ -76,3 +76,25 @@ neotrix-core/src/l5_cognition/nt_mind/seal/distillation.rs
 neotrix-core/src/l5_cognition/nt_mind/harness/refinement.rs
 # 游戏规则随星座进度自适应演化。
 neotrix-core/src/l5_cognition/nt_mind/nt_game/evolution.rs
+# 人工监督治理自检 —— 占位符，未接线
+# 依据：`HumanOversightSelfTest.self_test()` 显式返回
+# "not wired: ... has no governance rules to validate"；
+# 接入真实 governance rules/enforcement hooks 的当天，此条必须移除，
+# 否则以后此类失败会被静默吞掉（L8「绿色≠有效」）。
+HumanOversightSelfTest
+
+# panic 密度门：阈值 3000 是**目标**而非现状，当前 6685 ⇒ 持续棘轮
+# 移除条件：panic debt 清理到阈值以下前必须先保留沿基线 ratchet
+# （见 docs/architecture/ROADMAP-REDUNDANCY-FLAT-MISALIGN 的 P1 节）。
+panic 调用绝对数超阈值
+panic 密度超阈值
+
+# ConsciousnessTree 单例检查：当前真实 3 个生产实例化点
+# 分别在 nt_core_consciousness_tree:30 / 后台循环 background_loop/mod.rs:181 /
+# consciousness_core/core.rs:440。统一由单 owner 持有 ConsciousnessTree 是
+# 另一次重构（可能是 L5 切分后的遗留），先登记此豁免保证门可 JSON 断言。
+ConsciousnessTree 生产实例化点
+# 形式配套：tree_singleton 的 failure Vec 还附带 3 处路径行，必须逐条注册
+neotrix-core/src/l5_cognition/nt_core_consciousness_tree.rs:30
+neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/mod.rs:181
+neotrix-core/src/l5_cognition/consciousness_core/core.rs:440

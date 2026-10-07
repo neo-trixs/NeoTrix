@@ -651,12 +651,29 @@ mod tests {
 
     #[test]
     fn test_all_have_names() {
-        // 动态遍历注册表验证全部检测件都有非空名称 — 不依赖精确数组长度,
-        // 后台增补检测件时无需同步此测试 (Dark Forest: 防漂移)。
+        // 动态遍历注册表验证全部检测件 —— 判据（ROADMAP T0-1 §2③ / L8「绿色≠有效」）：
+        // ① `r.name` 非空（不依赖精确数组长度，后台增补检测件时无需同步此测试）；
+        // ② `r.passed` 为真，或其全部失败已登记显式豁免（抑制器不遮视野 ⇒ 结果必须
+        //    被消费为断言，不能只看名字）。豁免须逐条写明理由，落点
+        //    `.neotrix/arch-fitness-exempt.txt`（每条子串 + `#` 理由注释），本测试
+        //    与 `arch_fitness_dead_code_result_is_consumed` 共用同一豁免基线语义。
         let mut registry = SelfTestRegistry::new();
         register_absorbed_modules(&mut registry);
+        let exempt = crate::l5_cognition::nt_core_arch_fitness::arch_fitness_exemptions();
         for r in registry.run_all() {
-            assert!(!r.name.is_empty());
+            assert!(!r.name.is_empty(), "self-test 必须有非空名称");
+            let unexpected: Vec<&String> = r
+                .failures
+                .iter()
+                .filter(|f| !exempt.iter().any(|e| f.contains(e.as_str())))
+                .collect();
+            assert!(
+                r.passed || unexpected.is_empty(),
+                "self-test {} 未通过且存在未豁免失败: {:?}（失败须登记进 \
+                 .neotrix/arch-fitness-exempt.txt 并写明理由）",
+                r.name,
+                unexpected
+            );
         }
     }
 
