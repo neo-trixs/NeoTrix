@@ -49,8 +49,35 @@ impl HealthMonitor {
     }
 
     /// 检查模块健康
+    ///
+    /// ⭐ 2026-10-07 接线：整体健康**由真实指标推导**，⛔ 不再直接采信 `m.is_healthy`。
+    ///
+    /// ⛔ **原实现的缺陷**（`check-fake-signal` R1+R4 双重命中）：
+    ///   `modules.iter().all(|m| m.is_healthy)` ⇒ `overall_healthy` 完全取决于
+    ///   **调用方填的 `is_healthy`**；而实测该字段**只在测试里被赋值**
+    ///   （本文件 L343 `true` / L361 `false`）⇒ 生产路径里它是**调用方的主观声明**，
+    ///   ⛔ 而本 struct 明明带着**真实指标** `error_rate` / `latency_p99_ms`，
+    ///   且本文件 L104/L113 **已经**用它们与阈值比较了。
+    /// ⇒ 也就是说：**真实信号存在，但整体判定没用它** ⇒ 这是最坏的一种债
+    ///   （有真数据、却按声明记账）。
+    ///
+    /// ⭐ 正解：与同文件 L104/L113 **同一判据**（`error_rate_threshold`）
+    ///   推导 `overall_healthy`。
+    /// ⚠️ 保留 `m.is_healthy` 字段本身（ABI/其他消费方），
+    ///   ⛔ 但⛔ **不再**用它决定整体健康。
     pub fn check(&self, modules: &[ModuleHealth]) -> HealthSnapshot {
-        let overall = modules.iter().all(|m| m.is_healthy);
+        // ⭐ 由**真实指标**推导（与下方 L104 的判据一致）
+        let overall = modules.iter().all(|m| {
+            // ⭐⭐ 三个「真实测量」缺一不可（实测：本 struct 的
+            //   `is_healthy` 与 `last_check` 都**只在测试里被赋值**
+            //   —— `is_healthy` L343/361、`last_check` L365/383
+            //   ⇒ 生产路径上它们都是**未经测量的声明**）。
+            // ⇒ 判据：`last_check` 必须非 0（说明真被检查过）、
+            //   `latency_p99_ms` 必须 > 0、且错误率未超阈值。
+            m.last_check > 0
+                && m.latency_p99_ms > 0.0
+                && m.error_rate <= self.error_rate_threshold
+        });
         let snapshot = HealthSnapshot {
             timestamp: now_ms(),
             modules: modules.to_vec(),
@@ -368,5 +395,55 @@ mod tests {
         };
         let anomalies = detector.detect(&health);
         assert_eq!(anomalies.len(), 3); // high error, high latency, consecutive failures
+    }
+}
+
+#[cfg(test)]
+mod real_health_tests {
+    use super::{HealthMonitor, ModuleHealth};
+
+    fn mk(name: &str, error_rate: f64, p99: f64) -> ModuleHealth {
+        ModuleHealth {
+            module_name: name.to_owned(),
+            // ⭐ 刻意**恒 true**（模拟「调用方总是声明健康」）
+            is_healthy: true,
+            error_rate,
+            latency_p99_ms: p99,
+            // ⚠️ 这两个字段我**漏了**（第 8 次「猜数据结构」）⇒ 补上
+            last_check: 1_700_000_000_000,   // 非 0 ⇒ 表示真被检查过
+            consecutive_failures: 0,
+        }
+    }
+
+    /// ⭐ **变异证据**：`overall_healthy` 必须**随真实指标变化**。
+    ///
+    /// 修复前它是 `modules.iter().all(|m| m.is_healthy)`，
+    /// 而 `is_healthy` 在测试里恒 `true` ⇒ **无论错误率多高都判健康**。
+    #[test]
+    fn overall必须随真实错误率变化() {
+        let mon = HealthMonitor::new();
+
+        // 真实指标健康 ⇒ 判健康
+        let healthy = mon.check(&[mk("a", 0.01, 10.0)]);
+        assert!(healthy.overall_healthy, "低错误率 ⇒ 必须健康");
+
+        // ⭐ 承重：声明仍说健康，但**真实错误率超阈值** ⇒ 必须判不健康
+        let sick = mon.check(&[mk("a", 0.5, 10.0)]);
+        assert!(
+            !sick.overall_healthy,
+            "error_rate 0.5 > threshold 0.1 ⇒ 必须判**不健康**，\
+             即便 is_healthy 仍声明 true（修复前不可能失败 ⇒ 本测试即变异证据）"
+        );
+    }
+
+    /// ⭐ 对照：`latency_p99_ms` 也参与判定（延迟为 0 视为**无测量** ⇒ 不健康）。
+    #[test]
+    fn 无测量值视为不健康() {
+        let mon = HealthMonitor::new();
+        let no_measure = mon.check(&[mk("a", 0.0, 0.0)]);
+        assert!(
+            !no_measure.overall_healthy,
+            "latency_p99_ms == 0 ⇒ 该模块**没有测量数据** ⇒ ⛔ 不可判为健康"
+        );
     }
 }
