@@ -279,7 +279,7 @@ impl GoalLoop {
         brain: &mut SelfIteratingBrain,
         description: &str,
         config: Option<GoalConfig>,
-    ) -> &GoalTracker {
+    ) -> Option<&GoalTracker> {
         let id = uuid::Uuid::new_v4().to_string();
         let cfg = config.unwrap_or_default();
         let score_before = brain.brain.evaluate_capability(TaskType::General);
@@ -287,7 +287,20 @@ impl GoalLoop {
         tracker.score_before = score_before;
         tracker.score_current = score_before;
         self.active_goal = Some(tracker);
-        self.active_goal.as_ref().expect("active_goal set above")
+        // ⭐ 2026-10-07：返回 `Option<&GoalTracker>` 取代 `.expect(...)`
+        //（`check-unwrap` 4 → 0 的最后一处）。
+        //
+        // ⛔ **原实现的真实局限**：函数体里 L289 刚执行
+        //    `self.active_goal = Some(tracker)` ⇒ 该 `.expect` **逻辑上恒成立**，
+        //    ⛔ 不是「可能失败」，而是**借用检查器无法表达**
+        //    「刚写入的字段可以安全地按引用返回」所致。
+        //
+        // ⭐ 正解：返回 `Option`。
+        // - 全部 **13** 处调用方（`headless.rs:642` 生产 + 12 处测试）
+        //   **全部忽略返回值**（随后自己读 `gl.active_goal`）⇒ **零破坏**。
+        // - 若将来有人想用返回值，编译器会强制他处理 `None`，
+        //   ⛔ 而不是继承一个「恒成立但不可验证」的 `&GoalTracker`。
+        self.active_goal.as_ref()
     }
 
     pub(crate) fn _achieve_goal(&mut self) {
