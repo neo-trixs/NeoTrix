@@ -734,3 +734,102 @@ measured | same-concept-sibling-read
 #   ⓘ 名字键控的说明已移除。`nt_io_provider/routing/provider_swap.rs:16`
 #     另有一个同名 `is_healthy`，它在同文件 :38/:47/:59 **被读**（是活的），
 #     本就不在 dead 集合里，与本条无关。
+# ── 2026-10-07 D2 裁决：119 项「待人工判定」逐条定案（分类表，不改门）──────
+# 判据工具：scripts/ops/nt_pending_fields_adjudicate.py（⛔ 只读：采集证据不删字段）
+# 方法：对每个字段枚举**生产代码**（排除 #[cfg(test)] 块与 // 注释）里的用法，
+#       只认两种语法 —— 接收者访问 `.field`、struct 字面量 `field:` ——
+#       并把 struct 字面量匹配限定在**声明所在文件**，避开 L15 同名不同类型。
+#
+# ⚠️ **工具第一版产出过大量假阳性并已修**：`debug` 命中 `#[derive(Debug)]`、
+#    `text` 命中 `let text = …` ⇒ "名字在行里出现" **不是证据**（L1）。
+#    修法：剔除 derive/use/字符串字面量行；只认字段访问语法。
+#
+# 分类结果（119 = 48 + 9 + 58 + 4）：
+#   live-consumer  48 —— 生产区确有读取（门的"待人工判定"是**保守**分类，
+#                       它们其实多数是活的；多已在上方以 behavioral 等分类登记）
+#   unwired-spec    9 —— 生产在**填**、无人读 ⇒ **值真实的未接线规格**，
+#                       ⛔ 不该删（与 is_healthy 相反：那些是"填了没人看"，
+#                       这些是"值本身就是真实解析出来的数据"）
+#   test-only       4 —— 仅测试内使用
+#   dead-everywhere 58 —— 生产区零使用（含 Default 常量初始化）⇒ **假信号候选**
+#
+# ⛔ **本段刻意不写任何 `field | 分类` 登记行**：
+#    基线是**按字段名索引**（`load_baseline` 取 `split("|")[0]`），
+#    重复登记同名字段既无效又会误导（实测：`abstain` 早已以 `behavioral`
+#    登记在第 33 行，再写一条 `measured` 纯属噪声）。
+#    ⇒ 下面只留**候选清单（全部注释掉）**，结论进注释，供后续逐项处置取用。
+#
+# ── dead-everywhere 58 项（假信号候选，待逐项人工确认）─────────────────
+# ⛔ **故意注释掉** —— 它们是**候选不是判决**：工具只证明「生产区零使用」，
+#    **不证明**「值无意义」。反例：binary_analyzer 的 `is_executable`
+#    是「生产在填、值真实、只是无人消费」的未接线规格。
+#    要删请逐项读代码确认，取消注释并按门的分类词登记。
+#   agent_protocol_enabled             neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/config.rs:57  serde=False
+#   arb_opportunity                    neotrix-core/src/l1_action/nt_act/nt_act_crypto/bridge.rs:174  serde=False
+#   auto_claim_faucets                 neotrix-core/src/l1_action/nt_act/nt_act_crypto/mod.rs:77  serde=False
+#   auto_consistent                    neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/system_fingerprint.rs:409  serde=False
+#   auto_fallback                      neotrix-core/src/l1_action/nt_act/actions/orchestration/provider_migration_router.rs:164  serde=False
+#   auto_scan_on_start                 neotrix-core/src/l1_action/nt_act/nt_act_crypto/mod.rs:73  serde=False
+#   backed_up                          neotrix-core/src/l5_cognition/nt_mind/foundation/guardian.rs:141  serde=False
+#   behavior_safe                      neotrix-core/src/l3_embodiment/nt_shield/defense/ring_outer/mod.rs:19  serde=False
+#   bidirectional                      neotrix-core/src/l5_cognition/nt_mind/nt_mind/reason/cognitive_map.rs:9  serde=False
+#   blinking                           neotrix-core/src/l1_action/nt_io/nt_io_digital_human.rs:396  serde=False
+#   c2pa_enabled                       neotrix-core/src/l1_action/nt_act/video_audit_trail.rs:84  serde=False
+#   citation_required                  neotrix-core/src/l0_substrate/nt_core_answer_engine.rs:58  serde=False
+#   compilation_stable                 neotrix-core/src/l6_meta/nt_meta/monitor.rs:219  serde=False
+#   contained                          neotrix-core/src/l3_embodiment/nt_shield/defense/ring_boundary/mod.rs:16  serde=False
+#   cross_domain                       neotrix-core/src/l5_cognition/nt_crystal_core/nt_premise_selector.rs:123  serde=False
+#   debug                              neotrix-core/src/l3_embodiment/nt_shield/nt_shield_traffic/api_proxy.rs:26  serde=False
+#   deep_scan                          neotrix-core/src/l3_embodiment/nt_shield/nt_shield_agentic_scan.rs:134  serde=False
+#   degrade_gracefully                 neotrix-core/src/l6_meta/nt_core_observer_error.rs:146  serde=False
+#   detector_enabled                   neotrix-core/src/l5_cognition/nt_core/capability/nt_core_antidistil/mod.rs:260  serde=False
+#   dynamic_chain_bound                neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/system_proxy.rs:510  serde=False
+#   enable_cot_detection               neotrix-core/src/l3_embodiment/nt_shield/defense/anti_distillation/mod.rs:38  serde=False
+#   escape_detected                    neotrix-core/src/l3_embodiment/nt_shield/defense/ring_boundary/mod.rs:18  serde=False
+#   fail_fast                          neotrix-core/src/l5_cognition/nt_core/capability/nt_act_orch_patterns.rs:363  serde=False
+#   geo_auto_update                    neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/config.rs:54  serde=False
+#   goal_mode                          neotrix-core/src/l1_action/nt_io/nt_io_neocodex/agent/nt_agent_types.rs:25  serde=False
+#   guardrail_intact                   neotrix-core/src/l3_embodiment/nt_shield/defense/ring_outer/mod.rs:21  serde=False
+#   hardware_used                      neotrix-core/src/l2_perception/nt_world/nt_world_video_pipeline/nt_transcode.rs:79  serde=False
+#   has_audio                          neotrix-core/src/l2_perception/nt_world/nt_world_video_pipeline/nt_transcode.rs:44  serde=False
+#   has_git_context                    neotrix-core/src/l1_action/nt_router/mod.rs:53  serde=False
+#   has_issue                          neotrix-core/src/l3_embodiment/nt_shield/nt_shield_stealth_net/network_diagnostics/types.rs:204  serde=False
+#   has_persona                        neotrix-core/src/l1_action/nt_io/nt_io_digital_human.rs:556  serde=False
+#   has_self_test                      neotrix-core/src/l5_cognition/nt_core_consciousness_tree/types.rs:719  serde=False
+#   has_subtitles                      neotrix-core/src/l2_perception/nt_world/nt_world_video_pipeline/nt_transcode.rs:45  serde=False
+#   has_todos                          neotrix-core/src/l6_meta/nt_meta/self_model.rs:124  serde=False
+#   has_unsafe                         neotrix-core/src/l6_meta/nt_meta/self_model.rs:123  serde=False
+#   is_cloudflare                      neotrix-core/src/l3_embodiment/nt_shield/proxy_detection/ip_fingerprint.rs:109  serde=False
+#   is_frontrunable                    neotrix-core/src/l1_action/nt_act/nt_act_crypto/monitor.rs:70  serde=False
+#   is_particle                        crates/neotrix-types/src/core/nt_core_e8.rs:332  serde=False
+#   is_tor_exit                        neotrix-core/src/l3_embodiment/nt_shield/proxy_detection/ip_fingerprint.rs:108  serde=False
+#   mentions_files                     neotrix-core/src/l1_action/nt_router/mod.rs:51  serde=False
+#   prefer_same_category               neotrix-core/src/l1_action/nt_io/nt_io_provider/routing/provider_swap.rs:67  serde=False
+#   require_all_steps                  neotrix-core/src/l1_action/nt_act/nt_act_autonomy/per_agent.rs:476  serde=False
+#   requires_streaming                 neotrix-core/src/l1_action/nt_io/nt_io_provider/gateway/routing/intelligence.rs:144  serde=False
+#   resonance_detected                 neotrix-core/src/l3_embodiment/nt_shield/defense/ring_outer/mod.rs:20  serde=False
+#   retrieval_allowed                  neotrix-core/src/l3_embodiment/nt_shield/defense/ring_inner/mod.rs:20  serde=False
+#   review_required                    neotrix-core/src/l6_meta/nt_core_absorb/spec_driven.rs:92  serde=False
+#   safe                               neotrix-core/src/l1_action/nt_act/nt_act_cleanup/shared.rs:296  serde=False
+#   sandbox_enabled                    neotrix-core/src/l3_embodiment/nt_shield/nt_shield_agentic_scan.rs:131  serde=False
+#   save_on_start                      neotrix-core/src/l1_action/nt_media/persistence.rs:280  serde=False
+#   show_entities                      neotrix-core/src/l5_cognition/nt_mind/nt_game/world/minimap/mod.rs:15  serde=False
+#   show_pois                          neotrix-core/src/l5_cognition/nt_mind/nt_game/world/minimap/mod.rs:16  serde=False
+#   skill_auto_extract                 neotrix-core/src/l5_cognition/nt_mind/nt_mind/reason/thinking_bridge.rs:23  serde=False
+#   sub_stage_advanced                 neotrix-core/src/l5_cognition/nt_mind/nt_game/rpg/cultivation.rs:367  serde=False
+#   supports_structured_output         neotrix-core/src/l1_action/nt_io/nt_io_provider/gateway/execution.rs:1202  serde=False
+#   system_proxy_enabled               neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/config.rs:51  serde=False
+#   thresholds_evolved                 neotrix-core/src/l5_cognition/nt_mind/evolution/evolution_daemon.rs:612  serde=False
+#   vad_enabled                        neotrix-core/src/l1_action/nt_io/nt_io_digital_human.rs:20  serde=False
+#   watermarked                        neotrix-core/src/l3_embodiment/nt_shield/defense/ring_core/reasoning_shield.rs:23  serde=False
+#
+# ── unwired-spec 9 项（真规格：该接线，不是该删）─────────────────────
+#   cadence_ok                         neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs:290  写点 neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs:320
+#   evasion_applied                    neotrix-core/src/l3_embodiment/nt_shield/evasion/cloud_evade/mod.rs:35  写点 neotrix-core/src/l3_embodiment/nt_shield/evasion/cloud_evade/mod.rs:89
+#   has_modifier_colon                 neotrix-core/src/l5_cognition/nt_core/capability/nt_core_antidistil/watermark.rs:244  写点 neotrix-core/src/l5_cognition/nt_core/capability/nt_core_antidistil/watermark.rs:143
+#   is_entry                           neotrix-core/src/l2_perception/nt_world/cfg_builder.rs:12  写点 neotrix-core/src/l2_perception/nt_world/cfg_builder.rs:129
+#   is_keyframe                        neotrix-core/src/l1_action/nt_act/video_quality_scorer.rs:40  写点 neotrix-core/src/l1_action/nt_act/video_quality_scorer.rs:178
+#   is_sensor                          neotrix-core/src/l5_cognition/nt_mind/nt_game/render/scene.rs:27  写点 neotrix-core/src/l5_cognition/nt_mind/nt_game/render/components.rs:394
+#   no_stall                           neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs:287  写点 neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs:319
+#   repair_triggered_this_cycle        neotrix-core/src/l5_cognition/nt_mind/nt_mind/consciousness/panorama_pipeline.rs:33  写点 neotrix-core/src/l5_cognition/nt_mind/nt_mind/consciousness/panorama_pipeline.rs:210
+#   self_referential                   neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/hypercore.rs:45  写点 neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/hypercore.rs:53
