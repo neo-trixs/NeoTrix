@@ -276,7 +276,12 @@ impl KnowledgeBase {
                 .map(|gs| gs.as_ref().is_none())
                 .unwrap_or(false)
             {
-                let _ = self.init_graphrag(nt_memory_graphrag::GraphRagConfig::default());
+                // TODO.md P1（2026-10-07 修）：GraphRAG store 初始化失败此前静默 ——
+                // 后续 graphrag_extract 取不到 store ⇒ 实体/关系边全部派生不出来，
+                // 表现为「多跳查询静默少召回」，与 kb_write.rs:195/:300 同型漏网。
+                if let Err(e) = self.init_graphrag(nt_memory_graphrag::GraphRagConfig::default()) {
+                    log::warn!("[kb-write] graphrag 初始化失败，本轮不派生实体/关系边: {}", e);
+                }
             }
             if let Ok((entities, relations)) = self.graphrag_extract(text, &node_id) {
                 // 关系边回写主库: node → entity (graphrag 实体作为主库概念点)

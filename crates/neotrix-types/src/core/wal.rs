@@ -154,8 +154,18 @@ impl WriteAheadLog {
 
 impl Drop for WriteAheadLog {
     fn drop(&mut self) {
-        if let Ok(state) = self.state.lock() {
-            let _ = self.flush_state(&state);
+        // TODO.md P2（2026-10-07 修）：Drop 是退出前**最后**的落盘机会，
+        // 此处 `let _ =` 把错误丢掉且无任何日志 ⇒ 崩溃前最后一批状态无声丢失，
+        // 而主路径 append/commit/rotate 全部 `?` 正确传播 ⇒ 只有这一处降级点。
+        match self.state.lock() {
+            Ok(state) => {
+                if let Err(e) = self.flush_state(&state) {
+                    log::error!("[WAL] Drop 落盘失败（退出前最后落盘机会）: {}", e);
+                }
+            }
+            Err(_) => {
+                log::error!("[WAL] Drop 时 state 锁已中毒，无法落盘");
+            }
         }
     }
 }

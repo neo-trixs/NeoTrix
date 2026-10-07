@@ -284,6 +284,20 @@ for root in ROOTS:
                     if not m:
                         continue
                 rhs = m.group(1)
+                # ⭐ 单行 fn 尾随 `}`（2026-10-07 变异验证补齐）：
+                #   `pub fn clear(&mut self) { self.entries.clear(); let _ = self.save(); }`
+                #   group(1) = `self.save(); }` **不以 `;` 结尾** ⇒ 误入下方多行累积，
+                #   逐行累加到 EOF 仍未闭合 ⇒ 走 `else: continue` ⇒ **该站点永久不可见**。
+                #   实测全仓恰好 1 处（history_log.rs:85），同会话已修为
+                #   `if let Err` + log::warn ⇒ 修后桶内命中归 0，但**形式会复发**：
+                #   任何单行 fn 写 `let _ = persist()` 都会静默逃逸 ⇒ 这不是
+                #   「已修好」而是「扫描器的结构性盲区」（L8 绿色≠有效）。
+                #   修法只在**该行本身以 `}` 收尾**时剥语句后的闭合大括号；
+                #   多行形态首行以 `{`/`(` 收尾 ⇒ 不受影响，累积逻辑原样保留。
+                #   变异证据：修前 88 条可见该站点 → 修后 89 条；带同会话 .rs 修复复测 85 条不变。
+                if line.rstrip().endswith("}"):
+                    while rhs.rstrip().endswith("}"):
+                        rhs = rhs.rstrip()[:-1].rstrip()
                 if not rhs.rstrip().endswith(";"):
                     # 多行形态：向下累积直到括号配平且该行以 `;` 收尾。
                     depth = rhs.count("(") - rhs.count(")")

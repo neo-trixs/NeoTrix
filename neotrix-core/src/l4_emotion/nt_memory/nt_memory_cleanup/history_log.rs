@@ -46,7 +46,11 @@ impl HistoryLog {
     pub(crate) fn _log_operation(&mut self, entry: CleanupHistoryEntry) {
         self.entries.push(entry);
         if self.entries.len() > self.max_entries { self.entries.remove(0); }
-        let _ = self.save();
+        // TODO.md P1（2026-10-07 修）：清理历史落盘失败此前被静默丢弃，
+        // 于是「历史没存下来」与「没发生过清理」在事后完全无法区分。
+        if let Err(e) = self.save() {
+            log::warn!("[cleanup-history] 落盘失败，本次清理记录仅在内存: {}", e);
+        }
     }
 
     pub(crate) fn _get_recent(&self, count: usize) -> Vec<&CleanupHistoryEntry> {
@@ -82,7 +86,13 @@ impl HistoryLog {
         Ok(())
     }
 
-    pub fn clear(&mut self) { self.entries.clear(); let _ = self.save(); }
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        // TODO.md P1（2026-10-07 修）：clear 的落盘失败同 _log_operation，不能静默。
+        if let Err(e) = self.save() {
+            log::warn!("[cleanup-history] clear 后落盘失败，历史仍在磁盘上: {}", e);
+        }
+    }
 }
 
 impl Default for HistoryLog { fn default() -> Self { Self::new() } }
