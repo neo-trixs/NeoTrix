@@ -308,6 +308,79 @@
 
 ---
 
+## 6.6 ⭐ 第三轮追加：**Domain 轴**错位（第二轮只做了 Layer 轴）
+
+> ⛔ **一个前提纠正，它改变了整个任务**：registry 里的 `layer` 字段**不是目录层轴**。
+> 实测 `l0primitive` 在全仓只出现 3 处（枚举定义 `node.rs:145-158`、解析器 `roadmap.rs:63`、一张表）
+> ⇒ **318 个节点没有一个带目录层**。它是**第三条轴**（能力高度：primitive→composite→autonomic→autonomic），
+> 与目录层轴**正交**。按字面 cross-tab 出来的不是错位，是第三轴对域。
+> ⇒ 下表按**目录层 × 域**交叉（63/318 前缀不可解析，单列）。
+
+### layer × domain 全交叉表（318 节点）
+
+| domain ⇩ / layer ⇨ | NO_CODE | l0_sub | l1_act | l2_per | l3_emb | l4_emo | l5_cog | l6_meta | 合计 |
+|---|---|---|---|---|---|---|---|---|---|
+| core | 7 | 12 | 0 | 2 | 0 | 0 | 5 | 3 | **29** |
+| mind | 14 | 0 | 0 | 0 | 0 | 0 | 24 | 9 | **47** |
+| memory | 4 | 0 | 0 | 0 | 0 | 32 | 0 | 0 | **36** |
+| world | 9 | 0 | 0 | 31 | 0 | 0 | 0 | 0 | **40** |
+| act | 5 | 0 | 46 | 0 | 0 | 0 | 1 | 0 | **52** |
+| shield | 1 | 0 | 0 | 0 | 25 | 0 | 0 | 0 | **26** |
+| io | 7 | 0 | 37 | 0 | 0 | 1 | 0 | 0 | **45** |
+| meta | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 9 | **17** |
+| nexus | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | **6** |
+| governance | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 6 | **9** |
+| repair | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | **9** |
+| **合计** | **63** | 12 | 83 | 33 | 25 | 33 | 30 | 36 | **318** |
+
+⭐ **这张表接近完美对角**：255 个可解析节点中只有 **13 格偏离**对角。
+⇒ **这不是一条被装饰过的轴，而是一条穿了两个名字的轴**（`world↔l2`、`shield↔l3`、
+`memory↔l4`、`act↔l1`、`io↔l1` 近乎 100% 纯）。
+⇒ 而后加的 **4 个域（meta/nexus/governance/repair）全部塌进同一个 L6 桶**：24 节点 / 4 域 / 1 目录。
+
+### 新发现（全部主 agent 复核过代码行）
+
+| ID | 级别 | 位置 | 错位内容 | 成本 |
+|---|---|---|---|---|
+| **D-1** | High | `l6_meta/mod.rs:20-21` | ⛔ **NT-REPAIR 代码住在 NT-GOVERNANCE 目录里**：`pub use coordination as nt_governance; pub use healing as nt_repair;` 而 `coordination/nt_mind_repair/mod.rs:1` 自述「NT-REPAIR 自愈层」⇒ **一个域两个目录，无边界** | M |
+| **D-2** | High | `evolution.rs:427` | ⛔ **跨域重复对唯一的重复检测器结构性不可见**：`acc.entry((n.domain, n.layer))` ⇒ 按 `(domain, layer)` 分组 ⇒ 跨域同 tag 永不同组。实测 `auto_fix` 双注册：`nt_mind_autofixer::autofixer`(mind) 与 `nt_mind_repair::autofixer`(repair)，同 `l1composite`、**同 wiring_evidence 字符串** ⇒ 全库 **14/742 个 `provides` tag 跨域**，全部不可见。`:414` 注释自称「发现分散重复能力」—— 只发现**同域**分散 | M |
+| **D-3** | Medium | `nt_mind_repair/skill_improver/mod.rs:4` | 注释声称「**集成 nt_mind_autofixer::autofixer**」⇒ 实测**零引用**（`AutoFixer|auto_fix` 零命中；全文唯一 `use` 是测试里的 `use super::*`）⇒ 474 行模块文档断言了一个不存在的依赖。⛔ `check-doc-claims.sh` 只查「文档声称零消费者」，**方向相反**，故漏过 | S |
+| **D-4** | Medium | `capability_registry.json` | **NT-GOVERNANCE 一个实现两种 id 拼法**：`nt_governance::*`(6) vs `governance::enforcement`(1) ⇒ 而 `nt_governance` 是**整个 `coordination/` 的别名**（`mod.rs:20`），`governance` 却是真子目录 ⇒ 同代码两套命名，`fuse.rs:188` 按前缀分流会漏 | S |
+| **D-5** | Medium | `SKILL.md:132` / `nt_absorb_mapper.rs:19` | ⭐ **吸收工作流文档写 7 域，枚举有 11 域**，而 `nt_absorb_mapper.rs:19` 白纸黑字「7 域」+ `branch_capabilities()` 只返回 7 个 key。**但真正的真相是：这两个 mapper 都是死代码**（`branch_capabilities` 零非测试调用；`seal/domain_mapper.rs` 是未编译孤儿）⇒ **活的是 `l1_action/nt_capability_bridge.rs:70` `ROUTE_TABLE`，它经 `parse_domain` 处理全部 11 域**。⇒ 不是「文档陈旧」，是**「文档描述的执行路径上根本没有这段代码」** | M |
+| **D-6** | Low | `capability_registry.json` | **63/318（20%）节点 id 解析不到任何代码**（35 个 `exp::` 虚拟节点 + 28 个），其中 **29 个声称能力 tag**、8 个参与 registry 边。⛔ `capability-truth` 与 `nt-registry-determinism.sh` **都不校验 id 是否可解析到代码** ⇒ Dark Forest 三要素（编译+测试+消费者）缺第三项 | M |
+
+### ⛔ 第四腿再逆推：从 LLM 的 **attention sink** 反推我方的遗忘策略
+
+⭐ **这条来自真实机制的意外发现**，且直接命中我方生产代码：
+
+| LLM 机制（实测有文献） | 迁移到我方 |
+|---|---|
+| **attention sink**：softmax 分母恒为 1，模型把"想弱注意力"的多余概率质量**倾倒到最早的少数 token**；**任何删掉 sink 的 eviction 方案都会让生成质量崩塌** | ⇒ **按"最旧"剪枝是危险的默认** |
+| StreamingLLM 的解法：保留**最前 4 个** + 最近窗口 `W`，其余丢弃 | ⇒ 显式的 **sentinel 保留区** |
+
+**实测我方现状**：`decay_forgetting/pruner.rs:49` `prune_by_retention`
+按 `age` + `access_count` 算 `compute_retention` 再 `retain(>= min_retention)`
+⇒ **纯年龄/访问驱动，无任何"最早期条目"保护**。
+
+⚠️ **诚实边界**（必须一起记，否则就是又一次"看类比硬套"）：
+- attention sink 是**softmax 数值性质**，LLM 特有；
+- 我方是**文件系统式记忆 + 手写 retention 公式**，**无 softmax 分母**，**机制不同源**。
+⇒ 因此**这不是缺陷判定**，而是 📋 **一个被外部机制提示的待验假设**：
+「本仓最早写入的记忆是否承担了超出其 retention 分数的锚点作用？」
+⇒ 验证需要 held-out 实验（先移除最早期条目，看下游 recall 是否塌），
+**不是改代码能回答的** ⇒ 按 NTS-B10.2 记 intake，**不进 T0/T1**。
+
+⭐ **但同一条资料给出了两个「我方已有」的强确认**：
+| vLLM/TensorRT 机制 | 我方对应物 | 实测 |
+|---|---|---|
+| **paged KV + 内容哈希前缀复用**（prefix caching，共享前缀只存一次） | `tiered_memory/` | ✅ **已有**：`traits.rs:179` `budget_evictions` 优先级驱逐、`:199` 计数 |
+| **分优先级 LRU**（priority 0-100，低优先级先逐出） | 同上 | ✅ **已有**：即上条 |
+| `shared_prefix` 显式机制 | — | ❌ 0 处（但由上面的分优先级驱逐覆盖同一目的） |
+
+⇒ **结论：这两条无需新建任何东西。**（第二轮四腿的落点纪律在此继续成立。）
+
+---
+
 ## 7. 方法论沉淀（并入 `LESSONS-2026-10-07-open-gate-record-truth.md`）
 
 ⭐⭐ **新增第 8 条：绿色不等于有效。**

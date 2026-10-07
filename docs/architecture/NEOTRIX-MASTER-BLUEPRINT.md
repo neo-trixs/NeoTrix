@@ -923,6 +923,19 @@ graph TD
 | 输出蒸馏 | `crates/neotrix-neobot/src/nt_output_distill.rs` | ✅ errors-first+ref 标记 | ✅ |
 
 ⇒ **8 类机制散在 L0–L6，`entropy` 出现在 12 个文件，此前零条公理把它们连起来。**
+
+⭐ **附：三层坐标轴必须分清**（2026-10-07 实测，见 `LESSONS-…-open-gate-record-truth.md` L10）：
+
+| 轴 | 取值 | 定义处 | 强制者 |
+|---|---|---|---|
+| **目录层** | `l0_substrate`…`l6_meta`（7） | 目录名 + `.neotrix/layer-map.json` | `check-layer-deps.sh` |
+| **域** | `NT-CORE`…`NT-REPAIR`（**11**） | `crates/nt-core-capability-tree/src/node.rs:9-21` | ⛔ 无门强制 |
+| **能力高度** | `l0primitive`…`l8autonomic`（11） | 同上 `:145-158` | ⛔ 无门强制 |
+
+⚠️ registry 的 `layer` 字段是**能力高度**轴，**不是**目录层轴
+（实测 `l0primitive` 全仓仅 3 处命中；318 节点无一带目录层）。
+⛔ 三条轴**互不强制** ⇒ `check-layer-deps` 绿 **不代表**域一致性。
+⇒ 目录层 × 域实测**近乎完美对角**（255/255 可解析节点仅 13 格偏离）⇒ 那是一条穿了两个名字的轴。
 本卡的作用不是新增能力，是**让这 8 类成为同一原则的推论**，
 从而让第 9 类新机制可以被路由、被判真伪。
 
