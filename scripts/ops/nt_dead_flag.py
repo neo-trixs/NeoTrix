@@ -187,6 +187,42 @@ def locate_read_sites(root: Path, field: str, limit: int = 3, only_file: Path | 
     return hits
 
 
+def locate_macro_arg_reads(root: Path, field: str, limit: int = 3):
+    """二次复查（跨文件）：字段名以**宏实参**形式出现的读点。
+
+    ⭐ 2026-10-07 新增 —— 本门第 ⑤ 类盲区「宏间接」的修复。
+
+    为什么需要：`spawn_handler!(cfg, cleanup_interval_secs, |lock| …)` 展开为
+    `cfg.cleanup_interval_secs`（`nt_mind_background_loop/run.rs:821 → 854`），
+    这是**真实读点**，但文本上**没有点号** ⇒ `_RE_DOT_TOKEN` 计不到；
+    而 `locate_read_sites` 又按 `only_file=声明文件` 限定，读点在 run.rs 里
+    ⇒ 二次复查也救不回。2026-10-07 实测 numeric 因此新增 **19 条假阳性**
+    （全部 `*_interval_secs`，全部他窗已接线）。
+
+    ⚠️ 只认强形态 `宏名!(ident, FIELD, …)` —— 把**字段名本身**当第 2 个宏实参传，
+    在 Rust 里只可能是「传给会展开成 `$cfgv.$field` 的宏」；不匹配 `.field`
+    之外的任意裸 ident，避免把 `stringify!(field)` 这类**非读点**算进来。
+
+    ⚠️ 调用方必须先确认 `name_decls[name] == 1`（字段名全仓唯一），
+    否则同名不同符号会互相救活 —— 这正是 `locate_read_sites` 收紧
+    `only_file` 要防的坑（见其 docstring）。唯一时跨文件读点才成立。
+    """
+    pat = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\s*!\(\s*[A-Za-z_][A-Za-z0-9_]*\s*,\s*"
+                     + re.escape(field) + r"\s*[,)]")
+    hits = []
+    for path in iter_rs_files(root):
+        try:
+            code = strip_comments_and_strings(path.read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            continue
+        for idx, line in enumerate(code.split("\n"), start=1):
+            if pat.search(line):
+                hits.append(f"{path}:{idx}")
+                if len(hits) >= limit:
+                    return hits
+    return hits
+
+
 def load_baseline(path: Path):
     if not path.exists():
         return set()
@@ -242,6 +278,12 @@ def main() -> int:
         if reads == 0:
             # 二次复查：确认真的零读点（防止索引口径错误导致误报）
             if not locate_read_sites(root, name, limit=1, only_file=decl_path):
+                # 二次复查 ②（2026-10-07）：宏实参读点 —— 见 locate_macro_arg_reads。
+                # 仅字段名**全仓唯一**时才跨文件查，防同名不同符号互相救活。
+                if name_decls.get(name, 0) == 1 and locate_macro_arg_reads(root, name, limit=1):
+                    if args.audit:
+                        print(f"  活{name}: 1 读点(宏实参)")
+                    continue
                 dead.append((name, decl_path, line_no, struct_name, serde))
             else:
                 continue
@@ -252,6 +294,21 @@ def main() -> int:
 
     # ── ⭐ 本门已知的**四个盲区**（2026-10-07 实测逐个确认，记账在
     #    `scripts/dead-flag-baseline.txt`，⛔ 本轮**不改门**）：
+    #
+    #   ⑤（**已修**）**宏间接** —— 2026-10-07 发现并修复。
+    #      `spawn_handler!(cfg, cleanup_interval_secs, |lock| …)` 展开为
+    #      `cfg.cleanup_interval_secs`（`nt_mind_background_loop/run.rs:821→854`），
+    #      **是真读点**，但文本无点号 ⇒ `_RE_DOT_TOKEN` 计不到，且读点在 run.rs
+    #      而非声明文件 ⇒ `only_file` 限定的二次复查也救不回。
+    #      实测代价：numeric 一次性新增 **19 条假阳性**（全部他窗已接线的 `*_interval_secs`）。
+    #      ⭐ 修法是补盲区**而非把 19 条塞进 baseline** —— 塞 baseline 会让
+    #         「接线真被删掉」再也报不出来（陈旧账本比没账本更危险，AGENTS.md §5）。
+    #      ⭐ 修法见 `locate_macro_arg_reads()`：只认强形态 `宏名!(ident, FIELD, …)`
+    #         且**仅字段名全仓唯一时**跨文件查（防同名不同符号互相救活）。
+    #      ⭐ **变异证据（2026-10-07 实测，孤儿探针文件，用后即删）**：
+    #         - 真死字段 `zz_dead_alpha_interval_secs`（无点号、无宏实参）→ **仍被报为新增 1**
+    #         - 宏实参字段 `zz_mactest_beta_interval_secs` → 不报
+    #         ⇒ 召回未丢、精确度上升。
     #
     #   ① **读者在 Rust 之外**（跨语言）
     #      字段经 serde 走 IPC → 由 TypeScript 界面读取 ⇒ Rust 侧**结构上**
