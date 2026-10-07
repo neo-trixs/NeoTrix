@@ -1,10 +1,19 @@
-//! # CIRCUIT_BREAKER — 统一熔断器 (融合 self_healing/circuit_breaker + nt_infra_breaker)
+//! # CIRCUIT_BREAKER
 //!
-//! 融合:
-//! - `self_healing/circuit_breaker.rs` — 状态机 (Closed→Open→HalfOpen)
-//! - `l1_action/nt_infra_breaker.rs` — 基础熔断
+//! ⛔ **2026-10-07 修正：原文第 1 行与第 7 行的「融合」「单一实现」是假声明。**
 //!
-//! 单一实现, 支持:
+//! 原文称「统一熔断器 (融合 `self_healing/circuit_breaker` + `nt_infra_breaker`)」、
+//! 「**单一实现**」。**实测两个被点名的源都仍是独立活实现**：
+//! - `l6_meta/healing/self_healing/circuit_breaker.rs`（354 行，仍在编译树内）
+//! - `l1_action/nt_infra_breaker.rs`（244 行，仍在编译树内）
+//!
+//! ⇒ 本文件**不是**它们的归并结果，而是**第 11 份**独立熔断器实现。
+//! 全仓熔断器实测共 10 个（含本文件），正典声明在
+//! `crates/neotrix-types/src/core/shared_types.rs:81`。
+//! ⛔ 归并属 roadmap `T1-1`，**本轮不并**（另 4 个是活路径且构造签名不同，
+//> 盲目归并会把 bug 修进正确代码）。
+//!
+//! 本文件实际提供（原文未夸大的部分）:
 //! - 滑动窗口失败计数
 //! - 指数退避恢复
 //! - 风暴保护 (failure decay)

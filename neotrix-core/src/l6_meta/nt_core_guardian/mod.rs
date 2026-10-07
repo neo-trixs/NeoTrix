@@ -1,23 +1,38 @@
 //! # NT-CORE-GUARDIAN — 统一自守护模块
 //!
-//! 融合 NeoTrix 8 个分散的自管理机制到单一模块:
+//! ⛔ **2026-10-07 文档修正：原文「融合 NeoTrix 8 个分散的自管理机制」是错的。**
+//! 下面这张表**列 13 行**，且 4 个路径不存在、4 个存在但**从未被融合**。
+//! ⇒ 三处不符逐一列出后，再谈"融合到"。
 //!
-//! | 原始模块 | 融合到 | 职责 |
-//! |---------|--------|------|
-//! | `self_healing/health_monitor.rs` | `health.rs` | 组件健康采集 |
-//! | `l1_facade::self_audit` | `health.rs` | 系统级健康扫描 |
-//! | `healing/nt_mind_consciousness_monitor.rs` | `health.rs` | 意识层监控 |
-//! | `self_healing/auto_repair.rs` | `repair.rs` | 故障→修复动作 |
-//! | `diagnostic_chain/` | `repair.rs` | 诊断→修复闭环 |
-//! | `nt_repair_self_heal.rs` | `repair.rs` | SelfTest 自愈 |
-//! | `self_healing/circuit_breaker.rs` | `circuit_breaker.rs` | 熔断器 |
-//! | `l1_action/nt_infra_breaker.rs` | `circuit_breaker.rs` | 基础熔断 |
-//! | `l0_substrate/schema_watchdog.rs` | `watchdog.rs` | Schema 漂移检测 |
-//! | `coordination/build_watchdog.rs` | `watchdog.rs` | 构建状态监控 |
-//! | `foundation/guardian.rs` | `watchdog.rs` (KbGuardCheck) | KB 守卫 |
-//! | `daemon_monitor.rs` | `supervisor.rs` | 进程管理 |
-//! | `entry/mod.rs` supervisor | `supervisor.rs` | 进程级自守护 |
+//! | 原始模块（路径已逐一核实） | 融合到 | 实际状态 |
+//! |---------|--------|---------|
+//! | `l6_meta/healing/self_healing/health_monitor.rs` | `health.rs` | ⚠️ **未融合**（仍为独立活实现） |
+//! | `l1_facade::self_audit` | `health.rs` | ⚠️ 未融合 |
+//! | `l6_meta/healing/nt_mind_consciousness_monitor.rs` | `health.rs` | ⚠️ 未融合 |
+//! | `l6_meta/healing/self_healing/auto_repair.rs` | `repair.rs` | ⚠️ **未融合**（仍为独立活实现） |
+//! | `l6_meta/healing/diagnostic_chain/` | `repair.rs` | ⚠️ 未融合 |
+//! | `l6_meta/healing/nt_repair_self_heal.rs` | `repair.rs` | ⚠️ **未融合**（仍为独立活实现） |
+//! | `l6_meta/healing/self_healing/circuit_breaker.rs` | `circuit_breaker.rs` | ⚠️ **未融合** —— 见下方假融合声明 |
+//! | `l1_action/nt_infra_breaker.rs` | `circuit_breaker.rs` | ⚠️ **未融合**（仍为独立活实现） |
+//! | `l0_substrate/nt_core_schema_watchdog.rs` | `watchdog.rs` | ⛔ 原表写 `schema_watchdog.rs`，**真实文件名带 `nt_core_` 前缀** |
+//! | `l6_meta/coordination/nt_meta_build_watchdog.rs` | `watchdog.rs` | ⛔ 原表写 `coordination/build_watchdog.rs`，**真实文件名带 `nt_meta_` 前缀** |
+//! | `foundation/guardian.rs` | `watchdog.rs` (KbGuardCheck) | ⚠️ `KbGuardCheck` **全仓只出现在本模块内** ⇒ 该行两个方向都无从证伪 |
+//! | `daemon_monitor.rs` | `supervisor.rs` | ⛔ **该文件不存在** |
+//! | `entry/mod.rs` supervisor | `supervisor.rs` | ⛔ **该文件不存在** |
 //!
+//! ## ⛔ 三条未决问题（不要把本模块当"已完成的融合"）
+//!
+//! 1. **零消费者**：全仓 `--glob '*.rs'` 实测 `nt_core_guardian` 的**唯一**命中是
+//!    `l6_meta/mod.rs:17` 的 `pub mod nt_core_guardian;` ⇒ **导出 ≠ 调用**。
+//! 2. **已建 + 已测 + 未接线**：本模块有 `test_full_guardian_pipeline`，
+//!    故按本仓既有裁决（对照 `CLAIMED-BUT-NOT-ENFORCED-2026-10-05.md` §2 对
+//!    `nt_shield_ztnet` 的处置）**不删**，只标注接线待决。
+//! 3. ⛔ **本模块的 `circuit_breaker.rs` 自称「单一实现（融合 self_healing +
+//!    nt_infra_breaker）」** —— 实测**两个源都仍是独立活实现**
+//!    （`healing/self_healing/circuit_breaker.rs`、`l1_action/nt_infra_breaker.rs`）
+//!    ⇒ 那是**假融合声明**，与本表同型。
+//!
+//! **架构原则（原作者声明）**:
 //! 架构原则:
 //! - 单一事实源: 所有健康状态汇总到 HealthState
 //! - 分层消费: supervisor 读 HealthState 决定重启, repair 写 HealthState 记录修复
