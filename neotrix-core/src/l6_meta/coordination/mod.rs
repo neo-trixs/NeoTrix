@@ -10,6 +10,9 @@ pub mod nt_meta_concurrency_tester;
 pub mod nt_meta_async_safety;
 pub mod nt_meta_concurrency_detector;
 pub mod cross_module_audit;
+// 裁定 ①A/③A：架构规则注册表（开集+三条准入）+ 红蓝对抗分层债评分。
+// ⚠️ 只给排序信号，不做自动架构微调 —— 见文件头「为什么不做」。
+pub mod nt_arch_rules;
 pub mod template_tag_registry;
 pub mod quality_gate;
 pub mod quality_control;
