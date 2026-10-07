@@ -962,87 +962,109 @@ struct LegacyRegistryFile {
     experience_targets: Vec<serde_json::Value>,
 }
 
-fn legacy_domain_of(key: &str) -> Domain {
+fn legacy_domain_of(key: &str) -> Option<Domain> {
     let k = key.to_lowercase();
     if k.contains("memory") {
-        Domain::Memory
+        Some(Domain::Memory)
     } else if k.contains("mind") {
-        Domain::Mind
+        Some(Domain::Mind)
     } else if k.contains("world") {
-        Domain::World
+        Some(Domain::World)
     } else if k.contains("shield") {
-        Domain::Shield
+        Some(Domain::Shield)
     } else if k.contains("browse") || k.contains("_io") || k == "io" {
-        Domain::Io
+        Some(Domain::Io)
     } else if k.contains("meta") {
-        Domain::Meta
+        Some(Domain::Meta)
     } else if k.contains("nexus") {
-        Domain::Nexus
+        Some(Domain::Nexus)
     } else if k.contains("govern") {
-        Domain::Governance
+        Some(Domain::Governance)
     } else if k.contains("repair") {
-        Domain::Repair
+        Some(Domain::Repair)
     } else if k.contains("act") || k.contains("file") || k.contains("media") {
-        Domain::Act
+        Some(Domain::Act)
+    } else if k.contains("core") {
+        Some(Domain::Core)
     } else {
-        Domain::Core
+        None
     }
 }
 
-fn legacy_layer_of(level: &str) -> NodeLayer {
+fn legacy_layer_of(level: &str) -> Option<NodeLayer> {
     let l = level.to_uppercase();
     if l.starts_with("L0") {
-        NodeLayer::L0Primitive
+        Some(NodeLayer::L0Primitive)
     } else if l.starts_with("L1") {
-        NodeLayer::L1Composite
+        Some(NodeLayer::L1Composite)
     } else if l.starts_with("L2") {
-        NodeLayer::L2Orchestrator
+        Some(NodeLayer::L2Orchestrator)
     } else if l.starts_with("L3") {
-        NodeLayer::L3DomainService
+        Some(NodeLayer::L3DomainService)
     } else if l.starts_with("L4") {
-        NodeLayer::L4Application
+        Some(NodeLayer::L4Application)
     } else if l.starts_with("L5") {
-        NodeLayer::L5Conscious
+        Some(NodeLayer::L5Conscious)
     } else if l.starts_with("L6") {
-        NodeLayer::L6Self
+        Some(NodeLayer::L6Self)
     } else {
-        NodeLayer::L0Primitive
+        None
     }
 }
 
-fn legacy_constellation_of(c: &str) -> ConstellationLevel {
+fn legacy_constellation_of(c: &str) -> Option<ConstellationLevel> {
     match c.to_uppercase().as_str() {
-        "C1" => ConstellationLevel::C1UnitTest,
-        "C2" => ConstellationLevel::C2IntegrationTest,
-        "C3" => ConstellationLevel::C3Benchmark,
-        "C4" => ConstellationLevel::C4MainPipeline,
-        "C5" => ConstellationLevel::C5SelfHealing,
-        "C6" => ConstellationLevel::C6EvolutionLoop,
-        _ => ConstellationLevel::default(),
+        "C0" => Some(ConstellationLevel::C0Compile),
+        "C1" => Some(ConstellationLevel::C1UnitTest),
+        "C2" => Some(ConstellationLevel::C2IntegrationTest),
+        "C3" => Some(ConstellationLevel::C3Benchmark),
+        "C4" => Some(ConstellationLevel::C4MainPipeline),
+        "C5" => Some(ConstellationLevel::C5SelfHealing),
+        "C6" => Some(ConstellationLevel::C6EvolutionLoop),
+        _ => None,
     }
 }
 
 impl CapabilityTreeRegistry {
     /// 老文件迁移：domains 形文本 → 内存注册表。experience_targets 原样保留。
-    /// 坏条目（空 id）跳过单条，不炸整批；重复 id 后写优先（register 幂等忽略）。
+    /// 坏条目（空 id、未知 domain/level/constellation）跳过单条，不炸整批；重复 id 后写优先（register 幂等忽略）。
     pub fn migrate_legacy(text: &str) -> Result<Self, String> {
         let old: LegacyRegistryFile =
             serde_json::from_str(text).map_err(|e| format!("legacy parse: {e}"))?;
         let mut reg = Self::new();
         for (dkey, dom) in &old.domains {
-            let domain = legacy_domain_of(dkey);
+            let domain = match legacy_domain_of(dkey) {
+                Some(d) => d,
+                None => continue,
+            };
             for cap in &dom.capabilities {
                 if cap.id.trim().is_empty() {
                     continue;
                 }
+                let layer = if cap.level.trim().is_empty() {
+                    NodeLayer::L0Primitive
+                } else {
+                    match legacy_layer_of(&cap.level) {
+                        Some(l) => l,
+                        None => continue,
+                    }
+                };
+                let constellation = if cap.constellation.trim().is_empty() {
+                    ConstellationLevel::default()
+                } else {
+                    match legacy_constellation_of(&cap.constellation) {
+                        Some(c) => c,
+                        None => continue,
+                    }
+                };
                 let mut node = CapabilityNode::new_composite(
                     cap.id.clone(),
                     domain,
-                    legacy_layer_of(&cap.level),
+                    layer,
                     cap.provides.clone(),
                     Vec::new(),
                 );
-                node.constellation = legacy_constellation_of(&cap.constellation);
+                node.constellation = constellation;
                 node.metadata.insert(
                     "migrated_from".to_string(),
                     serde_json::Value::String("legacy-domains-v1".to_string()),

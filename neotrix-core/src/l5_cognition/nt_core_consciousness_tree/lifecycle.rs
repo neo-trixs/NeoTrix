@@ -41,6 +41,10 @@ impl ConsciousnessTree {
         principles
     }
 
+    /// 构造一棵独立树实例。生产纪律: 每个生产模块做新实例即该实例的唯一
+    /// owner (独立生命周期、不与其他生产树共享状态); 真正的「单例持有者」
+    /// 仅 `nt_mind_background_loop` 一处, 工厂/快照重建/SelfTest 等非持有者
+    /// 实例化点由 `arch_fitness_tree_singleton` 按 owner 维度豁免。
     pub fn new() -> Self {
         let atoms = Self::initialize_capability_atoms();
         Self {

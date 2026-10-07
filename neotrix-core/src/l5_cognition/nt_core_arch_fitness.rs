@@ -7,7 +7,7 @@
 //!   退役原因见 SIM-28/34：所扫目录不存在，功能由 ConfidenceLabelFitness＋脚本承接):
 //!   1. NoCycleFitness               — 能力网 DAG 无环
 //!   2. CapabilityConsistencyFitness — 能力网幂等: registry 重复边 = 0
-//!   3. TreeSingletonFitness         — ConsciousnessTree 生产单例 (实例化点 ≤ 1)
+//!   3. TreeSingletonFitness         — ConsciousnessTree 生产单例 (持有者 ≤ 1, 按 owner 豁免)
 //!   4. DeadCodeFitness              — dead_code warning = 0
 //!   5. PanicDensityFitness          — panic 债务 (unwrap/expect) 密度告警 (ADR-0002)
 //!   6. ConfidenceLabelFitness       — 跨层引用置信标注 + 干净对回归 (P1-04/B2, SIM-27/28)
@@ -177,9 +177,47 @@ impl SelfTest for CapabilityConsistencyFitness {
 // 4. TreeSingletonFitness — ConsciousnessTree 生产单例守卫
 // ─────────────────────────────────────────────────────────────
 
-/// ConsciousnessTree 生产单例: 生产代码中 `ConsciousnessTree::new` 实例化点
-/// 不得超过 1 (background_loop 为唯一持有者)。测试代码不计。
+/// ConsciousnessTree 生产单例: 生产代码中「单例持有者」级的
+/// `ConsciousnessTree::new` 实例化点不得超过 1 (background_loop 为唯一持有者)。
+/// 工厂/自测/快照重建等非持有者实例化点按 owner 维度豁免 (见
+/// `TREE_SINGLETON_EXEMPTIONS`, 每条携带豁免原因)。测试代码不计。
 pub struct TreeSingletonFitness;
+
+/// owner 维度豁免表: (文件后缀, 所属函数名, 豁免原因)。
+/// 判决依据: 每个生产模块就是其自家树实例的唯一 owner —— 独立生命周期、
+/// 互不共享状态、不并发持有同一逻辑单例 ⇒ 不构成「重建/双持有」。
+/// 本表只豁免「非持有者」实例化点; 真正的持有者 (background_loop) 必须保留 1 个。
+const TREE_SINGLETON_EXEMPTIONS: &[(&str, &str, &str)] = &[
+    (
+        "consciousness_core/kb_persistence.rs",
+        "load_or_new",
+        "CORE 进程唯一 tree 工厂 (LazyLock 语义), 单例链起点, 实例随后归 consciousness_core 独占持有",
+    ),
+    (
+        "consciousness_core/core.rs",
+        "tree_from_snapshot",
+        "快照重建工厂, 仅被 load_or_new 调用, 不独立持有",
+    ),
+    (
+        "nt_core_consciousness_tree.rs",
+        "self_test",
+        "T3 SelfTest 无状态自测实例, 用后即弃, 非生产持有者",
+    ),
+];
+
+/// 自行向上定位某行所在的所属函数名 (最近一个 `fn ` 开头的行)。
+fn enclosing_fn_name<'a>(lines: &'a [&'a str], idx: usize) -> Option<&'a str> {
+    let mut i = idx as isize - 1;
+    while i >= 0 {
+        let t = lines[i as usize].trim_start();
+        if t.starts_with("fn ") || t.contains(" fn ") {
+            let rest = t.splitn(2, "fn ").nth(1)?;
+            return rest.split(|c: char| !(c.is_alphanumeric() || c == '_')).next();
+        }
+        i -= 1;
+    }
+    None
+}
 
 impl SelfTest for TreeSingletonFitness {
     fn name(&self) -> &str {
@@ -198,12 +236,8 @@ impl SelfTest for TreeSingletonFitness {
             if file.ends_with("nt_core_arch_fitness.rs") {
                 continue;
             }
-            // 单例工厂宿主豁免 (T39-A4 已迁至 E2): kb_persistence.rs 的 load_or_new()
-            // 是 CORE 进程单例的唯一工厂 (LazyLock)。工厂内实例化是单例链起点,
-            // 守卫检测的是工厂之外的散落实例化。
-            if file.ends_with("consciousness_core/kb_persistence.rs") {
-                continue;
-            }
+            // 单例工厂宿主按 owner 维度豁免 (见 TREE_SINGLETON_EXEMPTIONS);
+            // 不在此处整文件豁免, 以便同文件其他生产持有者仍被检出。
             let Ok(content) = std::fs::read_to_string(&file) else {
                 continue;
             };
@@ -230,6 +264,15 @@ impl SelfTest for TreeSingletonFitness {
                     if test_ctx.get(i).copied().unwrap_or(false) {
                         continue;
                     }
+                    // owner 维度豁免: 命中 TREE_SINGLETON_EXEMPTIONS 的
+                    // (文件后缀, 所属函数) 对即为「非持有者」实例化点, 不计入。
+                    let exempt = TREE_SINGLETON_EXEMPTIONS.iter().any(|(suf, fn_name, _reason)| {
+                        file.ends_with(suf)
+                            && enclosing_fn_name(&lines, i) == Some(*fn_name)
+                    });
+                    if exempt {
+                        continue;
+                    }
                     sites.push(site);
                 }
             }
@@ -238,7 +281,7 @@ impl SelfTest for TreeSingletonFitness {
             Ok(())
         } else {
             let mut msg = vec![format!(
-                "ConsciousnessTree 生产实例化点 {} 处 (应单例 ≤1)",
+                "ConsciousnessTree 生产单例持有者 {} 处 (应唯一 = 1, 工厂/自测点已按 owner 豁免)",
                 sites.len()
             )];
             msg.extend(sites);

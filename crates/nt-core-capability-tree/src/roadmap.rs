@@ -77,16 +77,16 @@ fn parse_layer(s: &str) -> Option<NodeLayer> {
 }
 
 /// 解析 constellation 字符串为 ConstellationLevel 枚举
-fn parse_constellation(s: &str) -> ConstellationLevel {
+fn parse_constellation(s: &str) -> Option<ConstellationLevel> {
     match s.to_lowercase().as_str() {
-        "c0" | "c0compile" => ConstellationLevel::C0Compile,
-        "c1" | "c1unittest" => ConstellationLevel::C1UnitTest,
-        "c2" | "c2integrationtest" => ConstellationLevel::C2IntegrationTest,
-        "c3" | "c3benchmark" => ConstellationLevel::C3Benchmark,
-        "c4" | "c4mainpipeline" => ConstellationLevel::C4MainPipeline,
-        "c5" | "c5selfhealing" => ConstellationLevel::C5SelfHealing,
-        "c6" | "c6evolutionloop" => ConstellationLevel::C6EvolutionLoop,
-        _ => ConstellationLevel::C0Compile,
+        "c0" | "c0compile" => Some(ConstellationLevel::C0Compile),
+        "c1" | "c1unittest" => Some(ConstellationLevel::C1UnitTest),
+        "c2" | "c2integrationtest" => Some(ConstellationLevel::C2IntegrationTest),
+        "c3" | "c3benchmark" => Some(ConstellationLevel::C3Benchmark),
+        "c4" | "c4mainpipeline" => Some(ConstellationLevel::C4MainPipeline),
+        "c5" | "c5selfhealing" => Some(ConstellationLevel::C5SelfHealing),
+        "c6" | "c6evolutionloop" => Some(ConstellationLevel::C6EvolutionLoop),
+        _ => None,
     }
 }
 
@@ -99,7 +99,9 @@ fn entry_to_node(entry: &RoadmapModuleEntry) -> Result<CapabilityNode, RegistryE
     let layer = parse_layer(&entry.layer).ok_or_else(|| {
         RegistryError::Validation(format!("未知层: {}", entry.layer))
     })?;
-    let constellation = parse_constellation(&entry.constellation);
+    let constellation = parse_constellation(&entry.constellation).ok_or_else(|| {
+        RegistryError::Validation(format!("未知星座: {}", entry.constellation))
+    })?;
 
     let mut node = CapabilityNode::new_primitive(
         entry.id.clone(),
