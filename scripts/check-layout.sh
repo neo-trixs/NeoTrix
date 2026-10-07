@@ -78,6 +78,7 @@ clippy.toml|构建|cargo clippy 配置（工具按约定名自动读取）
 deny.toml|构建|cargo-deny 门配置，deny.yml 消费
 results.tsv|账本|进化实验账本：nt_evolution_exp.rs 写入 + check-evolution-ledger.sh 消费
 .gitignore|工具|忽略规则
+.npmrc|工具|npm/pnpm 按约定名在仓库根读取（registry 与 pnpm 设置），0 处脚本引用但工具链隐式依赖
 "
 
 # ── 根目录允许的隐藏目录 ────────────────────────────────────────
@@ -157,27 +158,32 @@ IGN=""   # 被 gitignore 排除的项（单列报告，不隐藏）
 
 # 根目录文件：跟踪的 ∪ 未跟踪但存在的
 #
-# ⛔⛔⛔ **盲区：dotfile / dot-directory 完全扫不到**（2026-10-07 记录，未修）
+# ⭐⭐⭐ 2026-10-07：**dot 文件**现在也在扫描范围内（原盲区已修）。
 #
-# `for f in *` 在 bash 里**不匹配以点开头的项** ⇒ 本门只审「非 dot 的根项」。
-# 实测：仓库根有 11 个非忽略 dot 项，**一个都进不了本门视野**：
-#   .blueprint .cargo .git .githooks .github .gitignore .neotrix
-#   .neotrix-absorb .npmrc .opencode
-# （另有 .cache / .project-map / .worktrees 已被 gitignore，同样扫不到。）
+# # 先更正一条我自己写错的注释
 #
-# ⓘ 也就是说：**在根目录新建一个 `.随便什么` 目录/文件，本门永远不报。**
-#   —— 本门不是「本仓根目录干净」的证明。
+# 本轮之前这里写着「dotfile / dot-directory 完全扫不到」—— ⛔ **后半句是错的**，
+# 实测（造 `.zzz-probe/`）门**本来就报红**（rc=1）：下方目录循环用的是
+# `for d in */ .*/`，dot 目录一直在扫，且 `ALLOW_DIRS` 早已为它们逐条写了理由。
+# ⓘ ⇒ **真实盲区只有 dot 文件**：旧的文件循环是 `for f in *`，bash 不匹配点开头项
+#   ⇒ `.gitignore`（明明在 ALLOW_FILES 里、理由都写好了）**形同虚设**，
+#   `.npmrc` 之类则完全不在视野内。
 #
-# ⛔ 为什么**本轮不修**：让它扫 dot 项需要先答一个政策问题 ——
-#   「根目录 dot 项里哪些是合规的」。上面 11 个全是合法工具/配置目录，
-#   若逐个塞进 ALLOW_FILES，白名单就从「违规清单」退化成「现状快照」，
-#   下一个人加新工具时会照着塞 ⇒ 门彻底失去约束力
-#   （与 `--nb-side-w` 声明了却零消费、`--nb-col-w` 同类问题）。
-#   ⛔ 这是**需要人裁决**的事，不是 agent 该替他定的。
-#   ⇒ 处置：先记录，等裁决。裁决方向二选一：
-#     ① 显式白名单「根目录允许存在的 dot 工具项」（须写理由，禁无脑追加）
-#     ② 判据改为「非 dot 根项 + 明确禁止的新增 dot 项」，即只拦增量不枚举存量
-for f in *; do
+# # 修法：文件循环一并收集点开头项。
+#
+# ⛔ **刻意不新建第二份「dot 白名单」** —— 那会让白名单分裂成两套口径。
+#   `ALLOW_FILES` / `ALLOW_DIRS` 本就带「文件名|类别|理由」三段格式，
+#   dot 项在同一个表里判即可（无理由就判违规，这是既有纪律，不新开例外）。
+# ⛔ **不 grandfather 存量**：现存 dot 项**全部**已带理由列入 ALLOW_*，
+#   即存量债为零 ⇒ 今后任何 dot 项若不在表里就是**新违规**，直接判红。
+#   ⚠️ 实情记录：判红仍经 `scripts/layout-baseline.txt` 棘轮，即**理论上**
+#   往账本里写一个点项名仍可 grandfather 它。本轮**刻意不去掉这条通路** ——
+#   去掉会让 dot 判据与根项判据走两套退出逻辑，是「兼容性策略」的另一种形式。
+#   ⇒ 正确用法：点项的裁决入口是 ALLOW_FILES/ALLOW_DIRS（带理由），
+#     ⛔ 不要用账本给点项开后门。
+#
+# ⭐ 点开头项一并收集（原为 `for f in *` ⇒ dot 文件永远看不见，见上方更正）
+for f in * .*; do
   [ -f "$f" ] || continue
   if is_git_ignored "$f"; then IGN="$IGN$f"$'\n'; continue; fi
   echo "$f" >> "$CUR"
