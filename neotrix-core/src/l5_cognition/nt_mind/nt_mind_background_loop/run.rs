@@ -806,9 +806,7 @@ impl BackgroundLoop {
         macro_rules! spawn_handler {
             // ── arm 1：字段名 + handler 名都给 ⇒ 编译期静态比对 ──
             ($cfgv:ident, $field:ident, $name:literal, |$lock:ident| $body:expr) => {{
-                if !nt_strip_interval_suffix(stringify!($field)).eq($name)
-                    && !NT_BG_WIRING_EXEMPT.iter().any(|(f, _)| *f == stringify!($field))
-                {
+                if !nt_bg_wiring_name_ok(stringify!($field), $name) {
                     panic!(
                         "[bg-wiring] 接线错配：配置字段 `{}` 应当驱动 handler `{}`，实际写了 `{}`。\
   \
@@ -825,9 +823,7 @@ impl BackgroundLoop {
             // ── arm 2：只给字段名 ⇒ body 里必须出现 handle_<去后缀名> ──
             ($cfgv:ident, $field:ident, |$lock:ident| $body:expr) => {{
                 let want = nt_strip_interval_suffix(stringify!($field));
-                if !stringify!($body).contains(&format!("handle_{want}"))
-                    && !NT_BG_WIRING_EXEMPT.iter().any(|(f, _)| *f == stringify!($field))
-                {
+                if !nt_bg_wiring_body_ok(stringify!($field), stringify!($body)) {
                     panic!(
                         "[bg-wiring] 接线错配：配置字段 `{}` 的 body 里没有调用 `handle_{}`。\
   \
@@ -1416,6 +1412,33 @@ mod tests {
     use crate::l5_cognition::l1_facade::WorldModelV2;
 
     #[test]
+    fn nt_bg_wiring_name_ok_正确配对() {
+        assert!(super::nt_bg_wiring_name_ok("evolve_interval_secs", "evolve"));
+        assert!(super::nt_bg_wiring_name_ok("telemetry_interval_secs", "telemetry"));
+        // 历史真 bug 的「接错驱动」形态必须被判据拦截：
+        assert!(!super::nt_bg_wiring_name_ok("evolve_interval_secs", "evolution"));
+        assert!(!super::nt_bg_wiring_name_ok("telemetry_interval_secs", "handler"));
+        // 例外表放行：字段名历史前缀的项
+        assert!(super::nt_bg_wiring_name_ok("nt_world_sense_interval_secs", "world_sense"));
+    }
+
+    #[test]
+    fn nt_bg_wiring_body_ok_名即handler() {
+        assert!(super::nt_bg_wiring_body_ok(
+            "goal_interval_secs",
+            "h.handle_goal().await"
+        ));
+        assert!(!super::nt_bg_wiring_body_ok(
+            "telemetry_interval_secs",
+            "let t = TELEMETRY_INTERVAL_SECS;"
+        ));
+        assert!(super::nt_bg_wiring_body_ok(
+            "metacog_interval_secs",
+            "h.handle_awareness().await"
+        ));
+    }
+
+    #[test]
     fn test_panorama_pipeline_new() {
         assert_eq!(PanoramaPipeline::new().cycle, 0);
     }
@@ -1623,6 +1646,22 @@ fn nt_strip_interval_suffix(f: &str) -> &str {
     f.strip_suffix("_interval_secs")
         .or_else(|| f.strip_suffix("_interval_ms"))
         .unwrap_or(f)
+}
+
+/// ⭐ arm1 判据：字段名去 `_interval_*` 后缀后应等于 handler 名；例外表放行。
+fn nt_bg_wiring_name_ok(field: &str, name: &str) -> bool {
+    if NT_BG_WIRING_EXEMPT.iter().any(|(f, _)| *f == field) {
+        return true;
+    }
+    nt_strip_interval_suffix(field) == name
+}
+
+/// ⭐ arm2 判据：body 文本里必须出现 `handle_<去后缀字段名>`；例外表放行。
+fn nt_bg_wiring_body_ok(field: &str, body_txt: &str) -> bool {
+    if NT_BG_WIRING_EXEMPT.iter().any(|(f, _)| *f == field) {
+        return true;
+    }
+    body_txt.contains(&format!("handle_{}", nt_strip_interval_suffix(field)))
 }
 
 /// ⭐ `spawn_handler!` 接线一致性的**例外白名单**（裁定 A，2026-10-07）。
