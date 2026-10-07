@@ -40,11 +40,13 @@ impl InnerRegistry {
             return Err(format!("plugin '{}' already registered", name));
         }
         plugin.on_load()?;
+        let capability = plugin.capability();
         self.plugins.insert(name, RegisteredPlugin {
             info: PluginInfo {
                 name,
                 version,
                 source: PluginSource::BuiltIn,
+                capability,
                 loaded_at: Instant::now(),
                 status: PluginStatus::Loaded,
             },
@@ -106,6 +108,7 @@ impl InnerRegistry {
                         name: fwd_name,
                         version: fwd_version,
                         source: PluginSource::BuiltIn,
+                        capability: p.capability(),
                         loaded_at: Instant::now(),
                         status: PluginStatus::Loaded,
                     };
@@ -153,6 +156,7 @@ impl InnerRegistry {
                             name,
                             version,
                             source: PluginSource::BuiltIn,
+                            capability: plugin.capability(),
                             loaded_at: Instant::now(),
                             status: PluginStatus::Loaded,
                         },
@@ -190,6 +194,7 @@ impl InnerRegistry {
                             name,
                             version,
                             source: PluginSource::BuiltIn,
+                            capability: plugin.capability(),
                             loaded_at: Instant::now(),
                             status: PluginStatus::Loaded,
                         },

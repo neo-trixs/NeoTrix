@@ -131,6 +131,13 @@ impl Plugin for CliDescriptorPlugin {
     fn version(&self) -> &'static str {
         self.version
     }
+    fn capability(&self) -> &'static str {
+        if self.descriptor.mode == "interactive" {
+            "cli_agent"
+        } else {
+            "external_cli"
+        }
+    }
     fn on_load(&self) -> Result<(), String> {
         if self.descriptor.probe_available() {
             Ok(())

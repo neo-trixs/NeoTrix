@@ -4,6 +4,7 @@ use std::time::Instant;
 pub mod registry;
 pub mod builtin;
 pub mod plugin_system;
+pub mod capability_plugins;
 #[cfg(feature = "sandbox")]
 pub mod wasm;
 
@@ -61,6 +62,7 @@ pub struct PluginInfo {
     pub name: &'static str,
     pub version: &'static str,
     pub source: PluginSource,
+    pub capability: &'static str,
     pub loaded_at: Instant,
     pub status: PluginStatus,
 }
@@ -86,6 +88,8 @@ impl fmt::Display for PluginStatus {
 pub trait Plugin: Send + Sync {
     fn name(&self) -> &'static str;
     fn version(&self) -> &'static str;
+    /// 外延能力类别，供 PluginRegistry 按 capability 分流。默认 generic。
+    fn capability(&self) -> &'static str { "generic" }
     fn on_load(&self) -> Result<(), String>;
     fn on_unload(&self) -> Result<(), String>;
     fn on_event(&self, event: &PluginEvent) -> Result<(), String>;

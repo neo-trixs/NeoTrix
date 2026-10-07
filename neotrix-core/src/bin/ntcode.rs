@@ -16,6 +16,7 @@ use neotrix::l1_action::nt_io::nt_io_provider::catalog::model_pool::{ModelSource
 use neotrix::l1_action::nt_io::nt_io_provider::catalog::cli_free_source::CliFreeSource;
 use neotrix::l1_action::nt_act::nt_act_dev_tools::{find_external_cli_plugin, load_external_cli_plugins, plugins_dir, load_external_cli_into};
 use neotrix::l1_action::nt_io::nt_io_plugin::registry::global_registry;
+use neotrix::l1_action::nt_io::nt_io_plugin::capability_plugins::builtin_capability_plugins;
 use neotrix::l1_action::nt_model_cli::NtModelCliAsk;
 use neotrix::l1_action::nt_stdin_human::NtStdinHuman;
 use neotrix::l5_cognition::nt_crystal_core::{
@@ -211,6 +212,8 @@ fn main() {
             }
         };
         let _ = rt.block_on(load_external_cli_into(&global_registry()));
+        let _ = rt
+            .block_on(global_registry().load_batch(builtin_capability_plugins()));
     }
 
     // 模型选择回到池子：定点 or 发现免费档进池轮转，兜底默认。
