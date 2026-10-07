@@ -25,6 +25,25 @@
 - `check-doc-claims.sh` rc=0 ✅ · `check-doc-drift.sh` rc=0（deadlink 4→2，余 2 条非本会话引入）✅
 - `nt_worktree_gate.sh check` rc=0；主树 32 处未提交（含他窗 WIP）；3 worktree / 3709M
 
-## 提交
-⛔ **未提交**（用户未要求）。提交须 `git commit --only` 显式列上表 6 个文件，
-禁 `-A`（共享 index，见 sessions/handoff-commit-only-2026-09-29.md）。
+## 提交（已落，4 笔，`git commit --only` 逐笔显式列路径，禁 `-A`）
+| 提交 | 内容 |
+|---|---|
+| `bbad9f69` | 规则四子款 + SKILL.md 熔炼模式 + D-16 卡 + 前置门指针 |
+| `f92ca3fb` | 18 仓批次 + forge 记录 + LESSONS 第 9 档 + 本交接 |
+| `902728ab` | AGENTS.md / README.md 指针层同步（D-16 上位、吸收规则改指 NTS-B10） |
+| `137332ac` | CODE-TOPOLOGY.md 重建（纯计数刷新 + 补回被覆盖的 machine-checked 段） |
+
+**11 个文件全部入库，工作树无本会话遗留 `.md`。**
+
+## 收工自查（模板 §8）
+- **worktree 去向**：本会话**未新建**任何 worktree。
+  现存 3 个（`merge-b` 带未提交改动 / `nt-v2` / `evo`）**均非本会话所有**，
+  ⛔ 不动 —— `merge-b` 的未提交改动不在任何提交里，手删即永久丢失。
+  `nt_worktree_gate.sh clean` 可零风险回收 3480M target，但**属他窗产物，本会话未执行**。
+- **未提交改动去向**：本会话 11 个文件全部已提交（上表 4 笔），无遗留。
+- **他窗 WIP**：主树仍有 `apps/neobot-desktop/*`、`crates/neotrix-neobot/*`、
+  `scripts/ops/nt_*.mjs`、`Cargo.lock` 等非本会话改动，⛔ 未触碰、未提交。
+- **门状态**：`cargo check -p neotrix --lib` rc=0 / 0 errors；
+  `check-doc-claims` rc=0；`check-doc-drift` rc=0（新增 deadlink 0）；
+  `check_layer_map_consumers` rc=0（11 条全可达）；
+  `check-license` rc=1 **既存红**（`apps/neobot-desktop/frontend/LICENSE.details`，他窗 WIP）。
