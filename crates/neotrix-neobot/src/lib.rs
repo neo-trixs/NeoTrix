@@ -59,6 +59,7 @@ pub mod nt_provider;
 pub mod nt_qwen_mm;
 pub mod nt_reply_tag;
 pub mod nt_routine;
+pub mod nt_run_trace;
 pub mod nt_secret_scan;
 pub mod nt_side_chat;
 pub mod nt_sidebar;
@@ -142,6 +143,10 @@ pub use nt_reply_tag::{
     TurnUsage,
 };
 pub use nt_routine::{fire_routine, frame_firing, read_firing, sweep_routines, Routine};
+pub use nt_run_trace::{
+    run_list, run_trace, ChangeView, RunListView, RunRow, RunTraceView, StepView,
+    RUN_CHANGES_LIMIT, RUN_LIST_DEFAULT_LIMIT, RUN_LIST_MAX_LIMIT,
+};
 pub use nt_side_chat::{first_prompt, inherit_context};
 pub use nt_sidebar::{
     builtin_tabs, builtin_viewers, resolve_open, viewer_for, OpenTarget, SidebarTab, TabRegistry,

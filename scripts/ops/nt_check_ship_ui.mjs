@@ -72,20 +72,53 @@ if (existsSync(join(SHIP, "src"))) {
     }
     return out;
   };
-  const mainRs = readFileSync(join(ROOT, "apps/neobot-desktop/src/main.rs"), "utf8");
+  // ⭐⭐ 2026-10-07 修：注册表真源在 `src/lib.rs` 的 `neobot_commands!` 宏，
+  //    **不在** `src/main.rs`（本仓第 6 次「搬家后下游没跟」，见
+  //    `lib.rs` 段头的 2026-10-02 P0 复盘）。旧实现读 main.rs ⇒ 只捞到 6 处
+  //    非注册引用 ⇒ `registered` 近乎为空 ⇒ 门把 70 多条**真注册**的命令
+  //    全报成「未注册」（实测第一条就是 `write_clipboard_text`，它明明在
+  //    `lib.rs:53` 注册着）。
+  // ⛔ 找不到宏体就 FAIL：缺前提必须失败（`STATUS.md` §4 教训 38）。
+  const libRs = readFileSync(join(ROOT, "apps/neobot-desktop/src/lib.rs"), "utf8");
+  const macroAt = libRs.indexOf("macro_rules! neobot_commands");
+  if (macroAt < 0) {
+    bad.push(
+      "lib.rs 里找不到 `macro_rules! neobot_commands` —— 注册表真源改名/搬走了，本门须同步（查不到 ≠ 通过）",
+    );
+    throw new Error("registry macro missing");
+  }
+  const firstEntry = libRs.indexOf("neobot_desktop::", macroAt);
+  const macroBody = libRs
+    .slice(firstEntry < 0 ? macroAt : firstEntry, libRs.indexOf("\n}", firstEntry))
+    // ⚠️ 先块后行（反过来的话 `//` 落在 /* */ 里会吃掉后面一大段真注册）
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
   const registered = new Set(
-    [...mainRs.replace(/\/\/.*$/gm, "").matchAll(/neobot_desktop::[a-z_:]+::([a-z_0-9]+)/g)].map((m) => m[1]),
+    [...macroBody.matchAll(/neobot_desktop::[a-z_:]+::([a-z_0-9]+)/g)].map((m) => m[1]),
   );
   const files = walk(join(SHIP, "src"));
   const calls = new Set();
+  // ⛔⛔ **先剥注释**（2026-10-07 修，本仓第 3 次同款缺陷）。
+  //
+  // 本仓的注释里**大量**记录「改前是什么样」，于是写着
+  //   `// ⛔ 旧形态：切会话就 invoke<ChatMessage[]>('neobot_convo_messages')`
+  // 而 `neobot_convo_messages` 这个命令**早已被 `_page` 取代并从注册表删除**。
+  // 不剥注释 ⇒ 门报「自研壳调用了未注册命令」，而**代码里根本没有这次调用**。
+  //
+  // ⓘ 同一族的另外两处已修：`nt_check_api.mjs`（④ 项）与
+  //    `nt_check_ui_calls.mjs`。三道门各踩一次 = 修法必须**共用**一个实现，
+  //    否则下次还是会漏掉其中一道。
+  const stripJsComments = (src) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+
   for (const f of files) {
-    const src = readFileSync(f, "utf8");
+    const src = stripJsComments(readFileSync(f, "utf8"));
     for (const m of src.matchAll(/invoke(?:<[^>]*>)?\(\s*['"]([a-z_:]+)['"]/g)) {
       if (!m[1].startsWith("plugin:")) calls.add(m[1]);
     }
   }
   for (const c of [...calls].sort()) {
-    if (!registered.has(c)) bad.push(`自研壳调用未注册命令 ${c}（${files.filter((f) => readFileSync(f, "utf8").includes(`'${c}'`)).map((f) => f.slice(SHIP.length + 1)).join(", ")}）`);
+    if (!registered.has(c)) bad.push(`自研壳调用未注册命令 ${c}（${files.filter((f) => stripJsComments(readFileSync(f, "utf8")).includes(`'${c}'`)).map((f) => f.slice(SHIP.length + 1)).join(", ")}）`);
   }
   ok.push(`自研壳 ${files.length} 个源文件 / ${calls.size} 种调用，全部已注册`);
 }

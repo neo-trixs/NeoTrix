@@ -131,6 +131,22 @@ pub const SPECS: &[ApiSpec] = &[
     ApiSpec::new("neobot_convo_messages_page", "会话",
         &["convo_id", "before_seq", "limit"], "MessagePage", Status::Implemented,
         "⭐ 分页读历史（cursor=最小 seq）；⛔ 旧的全量命令已移除 —— 长会话曾一次塞满 DOM"),
+    // ── 轨迹（跑过什么）：2026-10-07 新增 ──
+    //
+    // ⛔ **为什么补这两条**：跑轮把执行痕迹写进了 `tasks`/`steps`/`file_changes`
+    //    三张表，而**没有任何读口**把它们端到端取出来 ⇒ 界面看不见
+    //    「用了哪些工具、第几步失败、改了哪些文件」。同时 `neobot_send`
+    //    的返回里带着的 `trace` 字段（`AgentRunResult.trace`）在界面上
+    //    **被整个丢掉**（只取 `output`）⇒ 数据到了眼前再被扔掉。
+    //    ⇒ 这是本仓第 N 次「导出 ≠ 接入」（R-P79）。
+    //
+    // ⚠️ `convo_id` **可缺席**（= 全部会话），与 `neobot_convo_messages_page`
+    //    必须给会话**故意不同**：消息分页需要一个确定的容器，而轨迹页
+    //    允许「先看全部、再点进某个会话」，强制给 id 等于逼界面先选中会话。
+    ApiSpec::new("neobot_run_list", "轨迹", &["convo_id", "limit"], "RunListView", Status::Implemented,
+        "⭐ 列轨迹（跑过哪些轮次）；convo 缺席=全部。⚠️ 刻意不含费用/token/耗时 —— ledger 表不以 task_id 为键，摊到某轮是猜（数字走 neobot_usage_summary）"),
+    ApiSpec::new("neobot_run_trace", "轨迹", &["task_id"], "RunTraceView", Status::Implemented,
+        "⭐ 单轮完整轨迹（每一步 + 改了哪些文件）；run 不存在时 Err（不是空轨迹页）"),
     ApiSpec::new("neobot_skill_list", "其它", &[], "SkillListView", Status::Implemented,
         "技能清单（顶替上游插件页签）；skipped>0 = 有技能包装坏了"),
     ApiSpec::new("neobot_skill_install", "其它", &["path"], "null", Status::Implemented,

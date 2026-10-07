@@ -76,11 +76,20 @@ const convos = Array.from({ length: N }, (_, i) => ({
 const msgs = Array.from({ length: N }, (_, i) => ({
   id: `m${i}`, convo_id: 'c0', role: i % 2 ? 'assistant' : 'user',
   text: i === 0 ? `首条 ${MARK}` : `第 ${i} 条消息`.repeat(3),
-  created_at: '2026-10-01T00:00:00Z',
+  created_at: '2026-10-01T00:00:00Z', seq: i + 1,
 }))
 const STUB = {
   neobot_convo_list: convos,
-  neobot_convo_messages: msgs,
+  // ⭐ 2026-10-07 修：本仓**第 4/5 次**同型病 —— 命令改名后桩没跟。
+  //
+  //   `neobot_convo_messages`（全量）已被 `neobot_convo_messages_page` 取代并
+  //   从注册表**删除**（api.rs:117 记着这条复发链）。桩里仍写着旧名
+  //   ⇒ 前端 invoke 新命令 → 桩不命中 → 抛 UNMOCKED → **一条消息都不渲染**
+  //   ⇒ 门报「等不到 / 代码块未渲染」，而真凶在桩自己身上。
+  //   ⛔ 差一步就会去「修」**正确的前端代码**去迁就错的桩。
+  //   ⇒ 前两次同款修法见 `nt_check_layout.mjs` / `nt_check_interact.mjs` 的注释。
+  //   ⚠️ `seq` 必须给：前端拿它算分页游标；`hasMore/nextSeq` 形状同 MessagePage。
+  neobot_convo_messages_page: { messages: msgs, hasMore: false, nextSeq: null },
   neobot_member_list: [],
   neobot_usage_summary: { days: 1, tokens: 0 },
   neobot_memory_list: { lines: [], bytes: 0, cap: 0, revisions: 0 },

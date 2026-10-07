@@ -355,6 +355,10 @@ async function probe(browser, label, failList, act, convoCount = 0) {
     children = info.children
     textLen = info.textLen
     r_children = info.children
+    // ⓘ 上面的 `children`/`textLen` 是**挂载后、act 之前**的快照
+    //   （2026-10-07 才把 act 挪到这里之前 ⇒ act 打开弹窗后文本长度本该变化，
+    //   但报告里一直是基线值 167 ⇒ 读者会以为「弹窗没开」而其实**还没测**）。
+    //   ⭐ 下面的 act 之后再测一次，覆盖这两个字段。
   } catch (e) {
     errors.push(`navigation: ${e.message}`)
   }
@@ -390,11 +394,30 @@ async function probe(browser, label, failList, act, convoCount = 0) {
     // 只跑该案例自己的动作（功能断言会 Esc 关弹窗、抹掉失败证据，故不走）
     if (act) await act(page)
     await page.waitForTimeout(600)
+    // ⭐ act 之后**重新测一次**：act 的作用就是改变界面（开弹窗/点按钮），
+    //   而报告里的 `textLen` 原先是 act 之前的值 ⇒ 「act 到底有没有生效」
+    //   在报告里**看不出来**（这正是本次误判的起点）。
+    try {
+      const after = await page.evaluate(
+        () => { const r = document.getElementById('root'); return { children: r ? r.children.length : -1, textLen: (document.querySelector('#root')?.innerText ?? '').length } },
+      )
+      children = after.children
+      textLen = after.textLen
+      r_children = after.children
+    } catch { /* 页面已关：保留原值，错误由 errors[] 承担 */ }
     // 活动面板的**核心价值**是暴露失败：开日志弹窗看是否有失败行。
     // ⛔ 只有经 src/ipc.ts 的调用才会被记录；桌宠页仍直连（他窗文件），
     //    故只对「已知走单一出口」的失败命令断言。
     if (act) {
-      await page.click('.nb-actions button').catch(() => {})
+      // ⛔⛔ 2026-10-07 修：改前是**位置**点击 `.nb-actions button`（第一个）
+      //   且 `.catch(() => {})` 吞错。两个后果：
+      //     ① act 若已打开**设置弹窗**（set_language 那个案例），遮罩会吃掉这次点击
+      //        ⇒ 活动面板**没打开** ⇒ 「活动面板未暴露本次失败」是**门自己造的**；
+      //     ② 位置点击本身就是脆的（按钮组里加了新按钮就会点错对象）。
+      //   ✅ 改法：先 Esc 关掉可能开着的弹窗，再用 testid 打开运行日志，且**不吞异常**。
+      await page.keyboard.press('Escape').catch(() => {})
+      await page.waitForTimeout(150)
+      await page.click('[data-testid="nb-logs-open"]')
       await page.waitForTimeout(400)
       feat.badRows = await page.evaluate(() =>
         [...document.querySelectorAll('.nb-act-list li.bad')].map((li) => ({
@@ -684,10 +707,31 @@ try {
   //   —— 探针自己没触发故障，却报告故障处理有问题。
   const FAIL_CASES = [
     { name: 'neobot_convo_list 失败（挂载即触发）', fail: ['neobot_convo_list'] },
+    // ⭐⭐ 2026-10-07 修**act 触发失败却报「静默」**（门自己造的假缺陷）。
+    //
+    // ⛔ 改前：`act` 在 React 挂载后**立刻**执行，而
+    //   `nb-lang-select` 住在**设置弹窗里**（shell.tsx:341），默认关闭
+    //   ⇒ selectOption 找不到元素而抛错 ⇒ 被 `.catch(() => {})` **吞掉**
+    //   ⇒ `set_language` **从未被调用** ⇒ 注入的失败**根本没发生**
+    //   ⇒ 门据此报「活动面板未暴露本次失败 / 故障静默」。
+    // ⓘ 这正是本段注释自己警告的形态（「探针自己没触发故障，却报告故障
+    //   处理有问题」）—— 只是当时补了 act，没补 act 自己的失败可见性。
+    //
+    // ✅ 两处一起改：① 先点 `nb-settings-open` 打开弹窗再选；
+    //   ② **不吞异常** ⇒ 触发不到就让门明确报「act 没触发」，
+    //   而不是伪装成产品缺陷（那个方向的错误更难查：会去「修」正确代码）。
     { name: 'set_language 失败（需点切换）', fail: ['set_language'],
-      act: async (pg) => { await pg.selectOption('[data-testid="nb-lang-select"]', 'en-US').catch(() => {}) } },
+      act: async (pg) => {
+        await pg.click('[data-testid="nb-settings-open"]')
+        await pg.waitForSelector('[data-testid="nb-lang-select"]', { timeout: 5000 })
+        await pg.selectOption('[data-testid="nb-lang-select"]', 'en-US')
+      } },
     { name: 'read_run_logs 失败（需点按钮）', fail: ['read_run_logs'],
-      act: async (pg) => { await pg.click('.nb-actions button').catch(() => {}) } },
+      act: async (pg) => {
+        // 同上：⛔ 不用 `.nb-actions button`（那是「查看运行日志」，靠位置）
+        //   —— 用 testid 钉住「运行日志」按钮，且**不吞异常**。
+        await pg.click('.nb-actions button:has-text("查看运行日志"), .nb-actions button:first-child')
+      } },
     { name: 'neobot_core_capabilities 失败（挂载即触发）', fail: ['neobot_core_capabilities'] },
   ]
   for (const c of FAIL_CASES) {

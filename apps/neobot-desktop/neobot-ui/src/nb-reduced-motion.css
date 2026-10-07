@@ -1,0 +1,47 @@
+/**
+ * `prefers-reduced-motion` 收口 —— 吸收 taste-skill §6.B。
+ *
+ * # 为什么需要一个独立文件（而不是每个组件自己判）
+ *
+ * 判据是**结构**而不是「记得写」：媒体查询写在一个地方，
+ * 新加的动效**自动**落在覆盖范围内；而散落在各组件里时，
+ * 每加一处动效就要记得再写一遍 —— 本仓最贵的一类缺陷正是
+ * 「改 A 功能时顺手引入 B 的 bug」。
+ *
+ * 吸收来源**：`Leonxlnx/taste-skill`（MIT，`skills/taste-skill/SKILL.md` §6.B）
+ * 「Any motion above MOTION_INTENSITY > 3 MUST honor prefers-reduced-motion.
+ *   Infinite loops ... MUST collapse to static / instant under reduced motion.」
+ *
+ * ⛔ **不照搬它的另两条**：§4.7（hero/bento/logo 墙）与 §5（滚动入场动画）
+ *    是**落地页**规则，本仓是桌面工具界面，没有 hero、没有 bento、没有滚动入场
+ *    ⇒ 抄进来只会变成一段无消费方的死 CSS。**不抄**是结论，不是遗漏。
+ *
+ * # 这里覆盖的是什么
+ *
+ * · `animate-pulse`（消息流末尾「正在想…」的脉冲点）—— 无限循环动画，
+ *   taste-skill 点名的必收项。
+ * · `transition-colors`（会话行/发送键的 hover 过渡）—— 位移可接受，
+ *   但既然有覆盖开关，就一并归零而不是留下「一半动一半不动」。
+ *
+ * ⚠️ **不覆盖**滚动容器本身：`nb-scroll.css` 已各自判过一次
+ *   （那里的渐隐过渡在 reduce 下关掉）。两处都留是有意的 ——
+ *   那里改的是 `transition: none`，这里管的是工具类生成的动画，
+ *   **作用域不同**，合成一处会让人以为另一处被覆盖了。
+ */
+
+@media (prefers-reduced-motion: reduce) {
+  /* 无限脉冲 → 静态圆点。⛔ 刻意**不**用 `animation: none` 了事：
+     那样元素会停在动画的**第一帧**，而 Tailwind 的 pulse 起始帧恰好
+     是「透明」⇒ 变成一个看不见的点（用户在 reduce 下反而失去
+     「正在跑」这个唯一线索）。落到 `opacity: 1` 是刻意的取舍。 */
+  .nb-run-pulse {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+
+  /* 颜色/透明度过渡归零；**保留**最终态（不设 `transition: none` 就够了 ——
+     没有过渡即直接到终态，而终态才是有信息的那个）。 */
+  .nb-motion-safe {
+    transition: none !important;
+  }
+}

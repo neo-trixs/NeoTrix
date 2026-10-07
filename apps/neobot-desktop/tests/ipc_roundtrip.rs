@@ -257,8 +257,28 @@ fn neobot_convo_messages_page_键名错则硬失败并点名期望键() {
             ),
         )
         .expect("camelCase 键应成功");
-        let rows: serde_json::Value = ok.deserialize().expect("反序列化");
-        assert!(rows.is_array(), "应返回数组，实际：{rows}");
+        let page: serde_json::Value = ok.deserialize().expect("反序列化");
+        // ⚠️ **返回形状是 `{messages,hasMore,nextSeq}`，不是裸数组。**
+        //
+        // ⛔⛔ 这条断言在分页命令落地后**一直红着**，直到本轮才被发现 ——
+        //    而它红着的方式恰恰是最坏的一种：**测试本身过期**。
+        //    它断言 `rows.is_array()`，可 `MessagePage` 从来不是数组
+        //    （`api.rs:128` 早就把这记成「旧契约写 `ChatMessage[]`
+        //    ⇒ **形状本身就是错的**」并改了契约表，**唯独漏了这个测试**）。
+        //    ⇒ 这是 `api.rs:123` 那条「改名后下游没跟」的**第 5 次复发**，
+        //    只不过这次漏的下游是**测试自己**。
+        //
+        //    ⛔ 危害不止「2 条红」：`cargo test -p neobot-desktop` 因此
+        //    **在 HEAD 上就已经是红的**（实测 2026-10-07）⇒ 一个长期红的
+        //    套件会让人习惯性忽略它的输出，于是它**真正该抓的东西**
+        //    （键名不匹配落库）也跟着一起被忽略。
+        //    ⇒ 所以这里修的不是断言，是**这个套件的可用性**。
+        assert!(
+            page.get("messages").and_then(|v| v.as_array()).is_some(),
+            "应返回 `{{messages,hasMore,nextSeq}}`，实际：{page}"
+        );
+        assert!(page.get("hasMore").is_some(), "缺 `hasMore`：{page}");
+        assert!(page.get("nextSeq").is_some(), "缺 `nextSeq`：{page}");
 
         // ② ⛔ 错键 ⇒ 硬失败，且错误串**点名期望的键**。
         let bad = get_ipc_response(
@@ -300,7 +320,12 @@ fn 消息返回带seq游标() {
             ),
         )
         .expect("读历史");
-        let rows: Vec<serde_json::Value> = ok.deserialize().expect("反序列化");
+        let page: serde_json::Value = ok.deserialize().expect("反序列化");
+        // ⚠️ 同上：形状是 `{messages,…}`，不是裸数组（这正是上一条修的那个坑）。
+        let rows = page
+            .get("messages")
+            .and_then(|v| v.as_array())
+            .unwrap_or_else(|| panic!("应含 `messages` 数组，实际：{page}"));
         assert_eq!(rows.len(), 1, "应有一条消息");
         assert!(
             rows[0].get("seq").is_some(),

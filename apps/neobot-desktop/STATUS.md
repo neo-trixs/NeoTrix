@@ -71,7 +71,9 @@ neobot_member_list
 neobot_convo_group
 neobot_convo_dm
 neobot_send
-neobot_convo_messages
+neobot_convo_messages_page
+neobot_run_list
+neobot_run_trace
 neobot_evidence_summary
 neobot_core_capabilities
 neobot_panel_answer
@@ -104,7 +106,7 @@ Rust 侧共注册 74 个（22 neobot_ + 41 上游同名 + 11 显式拒绝）；
   留在库里只会让人以为要维护。本数字是 STATUS 自校验门算出来的，删完即红。
 - 同步 `skills/assets/icons/neobot/`（16→1024 全档 + ico）。
 
-### 1.5 门禁（10 个，2 个已删除）
+### 1.5 门禁（11 个，2 个已删除）
 
 `nt_check_api`（契约三方对账）· `nt_check_bytes`（U+FFFD）·
 `nt_check_status`（本文件与实测一致）· `nt_shot`（界面截图）·
@@ -113,15 +115,20 @@ Rust 侧共注册 74 个（22 neobot_ + 41 上游同名 + 11 显式拒绝）；
 `nt_check_ship_ui`（**交付路径门**：tauri 指向 neobot-ui + pet.html 在产物里 + 原生菜单已接线）·
 `nt_check_visual`（**视觉门**：高度链/控件等高/行高下限/列宽上限/无溢出 —— 治「全绿但界面不能用」）·
 `nt_check_layout` v2（stub-boot 真渲染：分支/几何/暗色/a11y/零异常/零未登记）·
-`nt_check_interact`（真点：发送链参数/切会话换历史/记忆面板三步/宠物渲染/两页零异常）。
+`nt_check_interact`（真点：发送链参数/切会话换历史/记忆面板三步/宠物渲染/两页零异常）·
+`nt_check_trace`（**轨迹门**，2026-10-07 新增：三态可辨/状态原样透传/步与改动可展开/
+长输出按行折叠/**无每轮费用**/跑轮信号真换了文案/零异常）。
 ~~以下 2 个守旧自研 UI~~ **已删除**（2026-10-01 蜕皮）：
 `nt_check_ipc` 的职责由 **`nt_check_ui_calls`** 承接且更强（走真实 import 图，
 含 `@/` 别名；旧门只 grep 目录）· `nt_check_tokens` 守的
 `frontend/src/ui/tokens.css` **根本不存在**（上游用 Tailwind），留着是空气。
 前端 0 组自测（旧自研 UI 的 `selftest.ts` 已随旧 UI 退役）。
 
-> 复现：`node scripts/ops/nt_check_{api,bytes,ui_calls,ship_ui,upstream_1to1,layout,interact,status}.mjs` ·
-> `cargo test -p neobot-desktop`（库测试97条：库 26 + app 71）
+> 复现：`node scripts/ops/nt_check_{api,bytes,ui_calls,ship_ui,upstream_1to1,layout,interact,trace,status}.mjs` ·
+> `cargo test -p neobot-desktop`（库测试107条：库 26 + app 81；另有 3 条进程隔离集成测试
+> `data_dir_env` + 5 条 **真实 IPC 往返** `ipc_roundtrip`）
+> ⚠️ `ipc_roundtrip` 那 5 条在 2026-10-07 之前是**红的**（2 条），且该套件在 HEAD 上
+> 就红 ⇒ 「cargo test 全绿」这句话在本轮之前**不成立**；详见 §4 教训 40。
 
 ---
 
@@ -233,8 +240,18 @@ Rust 侧共注册 74 个（22 neobot_ + 41 上游同名 + 11 显式拒绝）；
 | 37 | 颜色变量存在 ≠ 工具类存在 | `--color-nav-active` 写在 `:root` 里，但 Tailwind 只为**注册过的**颜色生成类，`bg-nav-active` 静默不存在 ⇒ 改用已注册且取值相同的 `bg-btn-active`。证据是构建后 grep 产物 CSS |
 | 38 | 「查不了」被写成「通过」 | 参考树被移走时，1:1 门打印 SKIP 并 exit 0 —— 门从「证明没漂移」退化成「什么都没做」，而 CI 眼里一样绿。缺前提必须 FAIL |
 | 39 | 门把自己的注释当数据 | api 门从我写的「见 desktop.rs」里读出命令 `rs`；字节门从注释里读出损坏字符。**门犯的错和它要抓的错常常同一种** —— 判据要能防住自己 |
+| 40 | **门停止运行 ⇒ 门腐化，而文档说它还活着** | `nt_check_layout` / `nt_check_interact` 的 `DIST` 指向 `frontend/dist` —— 参考树、`.gitignore` 显式忽略、**CI 永远构建不出来** ⇒ 两道门**一次都没跑过**；而 §1.5 把它列进门禁、§5 还写「已闭合」。复活后它们立刻各找出 4 条真问题（桩停在 `_page` 改名前、选择器是四层后代链、CSS 类名还是上游的 `.dsh-pet__sprite`、`convo_id` 断言方向反了） |
+| 41 | **源码搬家后，下游读源头的没跟**（第 6 次） | 2026-10-02 把命令注册表从 `main.rs` 搬进 `lib.rs` 的 `neobot_commands!`，**四道门**仍读 `main.rs` ⇒ 抽出近乎为空的注册集 ⇒ api 门「Rust 注册 **0**」并报 70+ 条谎报，status 门把 §1.3 的 **18 条真实命令**全报成「后端不存在」。⛔ 危害方向：门长期红 ⇒ **人去改文档迎合错的门**。api 门更严重：真有缺口时它抛 `ReferenceError: f is not defined` **崩掉** ⇒ **门在最该说话时说不出话** |
+| 42 | **看门狗阈值盖住了后端的已知超时** | 吸收 hermes-workspace 的两档 stall 预算时，本仓只有**一次**同步 HTTP（服务端 120s）⇒ 阈值若取小（如 120），看门狗会**先于**后端超时判死，用户看到「可能卡住了」而实际后端马上要返回一个**说得出原因**的真错误。⇒ 阈值必须**略大于**已知超时（取 135）。**用猜的超时盖住已知的超时，是把可解释的失败换成不可解释的猜测** |
+| 43 | **变异没被抓 = 门量错了作用域**（不是门坏了） | 新写的轨迹门第一版断言「轨迹页不得出现用量数字」，但只量了 `nb-trace` **面板**的文本，而那个数字渲染在**头栏** ⇒ 把条件改成两页都显示，门**全绿通过**。⇒ 改成量**整棵自持根**后同一变异变红。**门要抓的是「这一页出现」，量的却是「面板里出现」** —— 与 39 同一形状 |
+| 44 | **「批量跑门不可信」我给错了原因** | 观察到「单跑 PASS、批量红」，我归因为「Chrome 系门绑固定端口 ⇒ 串扰」。实测：残留 Chrome **0 个**、端口各不重叠、`interact→layout` 连跑 PASS ⇒ **归因错**。真因两条：① `nt_check_layout` **自身两处竞态**（等待条件在等一个窗口化后永远达不到的数；断言选中态而选中项可能在虚拟窗口外）② **共享树上并发写**（一次批量里 6 道门红，含非 Chrome 的快门，原样重跑 5/5 绿）。⇒ **观察是真的，原因是我猜的** |
+| 45 | **「报不出原因的空值」和断言失败一样有害** | 布局门的 `selBg = null` 让我连猜三轮「端口/时序/半就绪」。解法是先给探针补 `ariaCurrentCount` / `listButtonCount` 诊断字段，让 null **能说出原因**。⇒ 定位竞态的真实触发条件：桩的 `new Date().toISOString()` 是**毫秒级**，40 个会话有时同毫秒（`c1` 在顶部）、有时各差 1ms（**`c1` 掉到第 30 位**，而窗口化后 DOM 只有约 20 行 ⇒ 选中项**不在 DOM 里**） |
+| 46 | **改断言必须同步改等待条件** | 同一轮里我把布局门断言改成「`rows >= 40` ⇒ 判定窗口化被回退」，却把等待条件留在 `rows >= 40` ⇒ 两者**自相矛盾**：一旦真等到，门会立刻判自己失败。而等待条件因窗口化**永不成立** ⇒ 每次空跑 20 秒拿半就绪页面断言 |
+| 47 | **改一处注释也会让门从红转绿——但门改的是「它信的东西」** | `nt_check_bytes` 的 11 处坏字节逐条**读那一行**按上下文推断原字修复（例：`这<坏×2>栏`⇒`这三栏`、`PID<坏>: `⇒`PID: `）。⚠️ 修的全是**注释** ⇒ 字节门绿了，但**这类 bug 的真正危害在字符串字面量上**（落在那里会静默改变行为）。⇒ 字节门绿**等于**写入路径没修 |
+| 48 | ⭐⭐ **记录「字节被写坏」的文档，若粘贴坏字节就会把 bug 重新写回去** | 我在教训 47 里**引用**了那处损坏的原文（把两个坏字节原样贴进 STATUS 与 DEBT-LEDGER）⇒ 写完 1 分钟后 `nt_check_bytes` 又红了 2 处，**正是我刚写的两行**。⇒ 文档里描述这类 bug **只能用转义名或占位符**（`U+FFFD` / `<坏×2>`），⛔ **不可粘贴坏字节本身**。ⓘ 讽刺且真实：**这条 bug 是我在「修 bug」的同一段文字里重新制造的** |
 
-**共同根因**：把「没有观察到失败」当成了「验证通过」。
+**共同根因**（把前 48 条压成一句）：把「没有观察到失败」当成了「验证通过」；
+以及它的镜像 —— 把「观察到的失败」当成了噪声（41 与 4.3 的危害方向都是后者）。
 
 ---
 
@@ -468,6 +485,84 @@ tsc 不报、布局门不报、交互门不报（它没点那些按钮）—— 
 
 已改为：`NB_UPSTREAM` 环境变量 → 两个已知落点；**找不到就 FAIL 并打印找过的路径**。
 
+## §11 轨迹页 + 诚实增量（2026-10-07，吸收 6 个源）
+
+判据仍是 §0 三条（「能用 / 自洽 / 可维护」），但本轮先**找出功能缺陷**再改。
+逐条带「原来会怎样」。吸收来源与**不取清单**见
+`docs/architecture/ABSORPTION-2026-10-07-TRACE-AND-HONEST-INCREMENT.md`。
+
+### 轨迹页（补的是「跑过什么完全看不见」）
+
+| 问题 | 原来 | 现在 |
+|---|---|---|
+| **没有轨迹页** | `neobot_send` 返回里带着 `AgentRunResult.trace`，界面只取 `r.output` ⇒ **整段丢掉**；`tasks`/`steps`/`file_changes` 三张表**没有任何读口** | 新增 `neobot_run_list` / `neobot_run_trace` 两条命令 + 会话头 `对话/轨迹` 双页签 + `TraceView` |
+| **认不出的状态会让一轮从列表消失** | `list_convo_tasks` 对 `TaskStatus::parse` 认不出的值 `continue` **静默丢行**（`nt_types.rs:117` 自己记过这个坑） | 读口自己按 6 列取、**状态原样透传**；界面也不映射成已知集合（有单测用 `quantum` 守住） |
+| **读不到与真的没有是同一句话** | — | 三态分渲染：骨架 / 「读不到 + 重读」/ 「还没跑过，并指向对话页」 |
+| **长输出要么撑爆要么看不清** | — | 按**行**折叠成「还有 N 行」，可展开、也可**收起** |
+| 每轮费用？ | — | ⛔ **刻意不给**：`ledger` 不以 `task_id` 为键 ⇒ 摊到某轮是猜。轨迹页常驻一句解释为什么没有 |
+
+### 诚实增量（**不发造不出来的流**）
+
+| 问题 | 原来 | 现在 |
+|---|---|---|
+| **真流式能力在库里，GUI 是零消费方** | `run_turn_stream`（真 SSE）+ `run_local_turn_stream_as` 全仓**只有一个**消费者：`neobot run --stream`（CLI）。GUI 侧是**一次阻塞** `agent_run` | ⛔ **不改**发送路径：配对核心的 `POST /v1/agents/run` 是否支持 SSE **本仓无法验证** ⇒ 按「不可用就不渲染」只发**能证实**的三段信号 `neobot:run`（started / finished+trace / failed） |
+| **「正在想…」是无界脉冲** | 真卡住时它一直跳，用户分不清「慢」还是「死了」 | `RUN_STALL_SECS=135` 有界看门狗 + 一句说清下一步的话。⛔ 阈值**必须略大于**后端 120s，否则看门狗会盖住一个**说得出原因**的真错误 |
+| **失败只回一句截断原文** | `发送失败：<原文前 200 字>` | 7 类分类（unpaired/auth/rate/network/timeout/empty/other）给**可据以行动**的话；判据全落在**成对标记**上（泛化的 `token` 字样**不算** auth 证据） |
+| **空白回复看起来像成功** | 返回体没正文 ⇒ 一条正常的「（无输出）」气泡，不能重发也不标红 | 空白**计为失败**（带「重发」）—— 「没答上来」不该被说成「答上来了但是空的」 |
+
+### 顺带修的四类既存缺陷（详见 §4 教训 40–43）
+
+1. **四道门读的是已搬走的注册表**（本仓第 6 次「搬家后下游没跟」）
+2. **五道门不剥注释**；且剥注释**不能朴素做**（`api.rs` 的 note 里有字面量 `file://`）
+3. **两道门指向冻结且从不构建的树 ⇒ 从来没跑过**；复活后各找出 4 条真问题
+4. **`ipc_roundtrip` 在 HEAD 上就是红的**（已 `git stash` 证实非本轮引入）
+
+### 新门 `nt_check_trace`（第 11 道）
+
+九条断言，含 ⭐「轨迹页任何位置都没有用量数字 + 必须解释为什么没有」
+与「跑轮信号真换了文案」。**已做变异验证**：把用量条件改成两页都显示，
+门**第一版没抓到**（量错了作用域：只量面板、实际在头栏）⇒ 改量整根后变红；
+还原后复跑绿且 `diff` 与变异前逐字相同。
+
+
+## §12 债务同步修复（2026-10-07 14:2x，接上一节）
+
+本节记「**先测量债务、再同步修**」那一轮。全量清单在
+`docs/architecture/DEBT-LEDGER-2026-10-07.md` 的追加节（那里是权威单一来源）。
+
+### 修掉的（含「原来会怎样」）
+
+| # | 债务 | 原来会怎样 |
+|---|---|---|
+| 1 | **`content_omitted` 只写不读**（**上一轮自己造的**） | store 段头写明「UI 据此说『内容已略去』」，而轨迹页把字段传到 TS 接口却**从不渲染** ⇒ 与本节上一轮修的 `AgentRunResult.trace` **同型**：数据到了最后一格被丢 |
+| 2 | 新写的吸收记录里 **2 条死链** | 文档把**外部仓**路径写成本仓相对路径 ⇒ `check-doc-drift` 报「让下一个 agent 去读不存在的本地文件」 |
+| 3 | 另 2 条**既存**死链 | `neotrix-core/.../context_fs.rs`（省略路径）+ `src-tauri/Cargo.toml`（**目录已不存在**）仍被当可读路径引用 ⇒ 补全 / 标注已删 |
+| 4 | `neobot-check-markdown` / `-msg-copy` 红 | 桩里仍写**已删除**的 `neobot_convo_messages` ⇒ **一条消息都不渲染** ⇒ 门报「代码块未渲染」，真凶是桩 |
+| 5 | `neobot-ui-smoke` 红（4 项） | `act` 在弹窗打开前就执行且**吞掉异常** ⇒ 注入的失败**根本没发生**；`probe()` 又**先测量后跑 act** ⇒ 报告看不出 act 有没有生效 |
+| 6 | 死开关基线缺第三类 | 「Rust 只写不读、消费者在 Rust 之外」这一类**结构上**不可能有 Rust 读点 ⇒ 新增 `cross-language-consumer` |
+
+### ⭐ 门数变化
+
+`check-dead-config-flag` 新增 **1 → 0**（rc=0）· `check-doc-drift` 死链 **4 → 0**（rc=0）·
+`neobot-check-markdown` / `-msg-copy` / `neobot-ui-smoke` **三门由红转绿**。
+
+### ⭐ 本轮四条**测量错误**（比修的东西更值钱）
+
+1. `timeout 600` 跑 `check-test-baseline` → 它**实跑 805s** ⇒ **超时被我读成「门失败」**
+2. 同上把 `check-doc-drift` 的超时读成 FAIL ⇒ 单独重跑 rc=0
+3. `grep -oE '[0-9]+ offender'` 取 `check-naming` 得「15」，真值 **1612** ⇒ 只吃到后四位
+4. 看到 smoke 门报「`#root 子元素 = 0 ⛔ 未渲染`」就想改产品 ⇒ 那是**故意失败的控制探针**，不算判据
+
+⇒ 与 §4 的「超时不等于失败」「从门输出取数先确认没截断」「门红了先问门坏还是债错」同族，本轮全中。
+
+### ⚠️ 新发现的基础设施债
+
+**Chrome 系门绑固定端口**（布局 9333/9341 · 交互 9334/9342 · 轨迹 9352 …）：
+连续循环跑时出现「单跑 PASS、循环里 FAIL」。`nt_check_layout` 连跑 2 次均 PASS
+⇒ **FAIL 是端口/时序串扰，不是回归**。
+⇒ ⛔ **任何「批量跑门」脚本都不可信**；建议随机端口或串行锁。
+
+
 ## §6 许可边界（不可越过）
 
 | 仓库 | 许可 | 边界 |
@@ -481,5 +576,12 @@ tsc 不报、布局门不报、交互门不报（它没点那些按钮）—— 
 | thinkany-ai/douchat | **AGPL** | ⛔ **不可取码**，只读结构与思路 |
 | nightly-labs/openbot | **PolyForm Noncommercial** | ⛔ 不可取码（仅限非商业） |
 | hikariming/dshfind | **无 LICENSE** | ⛔ 无许可证 = 保留一切权利，只读 README |
+| Cranot/super-hermes | MIT | ✅ 2026-10-07 核实（SPDX + LICENSE 正文一致）。**只取做法**：按行数省略（`(+N lines)`）。⛔ 其 prism 技能属 `skills/` 内容，不进界面 |
+| Yonkoo11/hermes-dojo | MIT | ✅ 同上核实。**只取做法**：错误分类 + `fixable_by_skill`（明确「不是技能能修的」）。⛔ 其「把付费与套餐内混算」的坑已由 hermes-workspace 一并记 |
+| outsourc-e/hermes-workspace | MIT | ✅ 同上核实。**只取做法**：两档 stall 预算、人化工具标签、成本卡默认隐藏。⛔ `local-session-store` 的「静默吞读写错」**与本仓「坏历史=Err」直接冲突，不取** |
+| 42-evey/hermes-plugins | MIT | ✅ 同上核实。**只取做法**：空白回复计为失败。⛔ 分级 fallback 需多 provider 目录，本仓是单配对核心 |
+| titanwings/distilly（原 `colleague-skill`） | MIT | ✅ 同上核实。⚠️ **已改名 + 默认分支是 `dot-skill` 而非 `main`**（`raw.../main/README.md` 404）。其双通道输出契约本仓**已有**，记为不追 |
+| Leonxlnx/taste-skill | MIT | ✅ 同上核实。**只取 §6.B 的 `prefers-reduced-motion` + §9.G 的 em-dash 禁令**。⛔ §4.7/§5/§10/§12 是**落地页**规则（hero/bento/logo 墙/滚动入场），本仓是桌面工具界面，抄进来是**零消费方的死 CSS** |
+| egoist/mygo | — | ⛔ **未取**：实测（API + 全树 + AI 分支 + 最近 100 commit）该仓是 Go 桌面框架，**不含**任何 harness 界面/对话页/轨迹页。详见 `docs/architecture/ABSORPTION-2026-10-07-TRACE-AND-HONEST-INCREMENT.md` §0 |
 
 图标为原创构造（海豚），不临摹任何现有图标；favicon 黑豚剪影派生自上游（MIT，已注来源）。

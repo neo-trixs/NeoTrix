@@ -102,6 +102,11 @@ macro_rules! neobot_commands {
             // （自持树只在注释里提到）。⇒ **唯一真源 = `_page`**。
             // 详见 `commands.rs` 里同名的删除说明 + `api.rs` 的契约条目。
             neobot_desktop::commands::neobot_convo_messages_page,
+            // 轨迹读口（2026-10-07）：跑过什么此前在库里、界面上看不见。
+            // ⛔ 与 `neobot_convo_messages_page` 的差别**故意**：那条必须给会话，
+            //    这条允许缺席（= 全部会话）—— 理由见 `api.rs` 同名条目。
+            neobot_desktop::commands::neobot_run_list,
+            neobot_desktop::commands::neobot_run_trace,
             neobot_desktop::commands::neobot_convo_list,
             neobot_desktop::commands::neobot_member_list,
             neobot_desktop::commands::neobot_member_add,

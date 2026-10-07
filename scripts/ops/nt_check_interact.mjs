@@ -37,13 +37,13 @@ import { join, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const DIST = join(ROOT, "apps/neobot-desktop/frontend/dist");
+const DIST = join(ROOT, "apps/neobot-desktop/neobot-ui/dist");
 const W = 1280, H = 820;
 const PORT = 9342;
 const DOLPHIN_PNG = readFileSync(join(ROOT, "apps/neobot-desktop/icons/256x256.png")).toString("base64");
 
 if (!existsSync(join(DIST, "index.html")) || !existsSync(join(DIST, "pet.html"))) {
-  console.error("交互门 FAIL: dist 不存在 —— 先跑 pnpm --dir apps/neobot-desktop/frontend run build");
+  console.error("交互门 FAIL: dist 不存在 —— 先跑 cd apps/neobot-desktop/neobot-ui && ./node_modules/.bin/vite build");
   process.exit(1);
 }
 
@@ -112,10 +112,25 @@ const MAIN_STUB = `(() => {
       const fence = String.fromCharCode(96, 96, 96);
       return { status: 'ok', output: 'STUB-REPLY:**加粗**\\n' + fence + 'ts\\nconst a = 1\\n' + fence + '\\n<script>alert(1)</script>', trace: [], model_used: 'stub', mode: 'passthrough', tools: [], usage: null };
     }
-    if (cmd === 'neobot_convo_messages') {
-      window.__MSG_CALLS__.push(args.convo_id);
-      const cid = args.convo_id || 'c?';
-      return Array.from({ length: 3 }, (_, i) => ({ id: cid + '-m' + i, convo_id: cid, role: i % 2 ? 'assistant' : 'user', text: cid + '的历史' + i, created_at: new Date().toISOString() }));
+    // 2026-10-07 修（与 nt_check_layout.mjs 同一个病因）：
+    //   1) 命令改名 neobot_convo_messages -> neobot_convo_messages_page
+    //      （全量命令已删，见 api.rs:117 记的「改名后下游没跟」复发链）；
+    //   2) 键名 convo_id -> **convoId**（Tauri 取 camelCase 键；
+    //      写 snake_case 会**静默变 undefined** —— STATUS 教训 28 记的那个 P0，
+    //      桩里犯同样的错就是自己骗自己）；
+    //   3) 返回 MessagePage 形状 {messages,hasMore,nextSeq}，不是裸数组。
+    //   不改的后果（本次实测）：桩不命中 -> 落进 unmocked 抛错 -> 历史为空
+    //      -> 界面显示「还没有对话」-> 门报「切会话换历史等不到」。
+    //      而真凶是**桩停在旧形态**，不是界面坏了 —— 差一步就会去「修」正确代码。
+    //
+    // 注意：这段注释在**模板字符串**里，写它时不能出现反引号，也不能出现美元加大括号
+    // （那是模板插值）。这是 STATUS §9 记过的坑：node 报 Unexpected identifier，
+    // bash -n 与 tsc 都抓不到，只有真跑门才暴露。
+    if (cmd === 'neobot_convo_messages_page') {
+      const cid = (args && args.convoId) || 'c?';
+      window.__MSG_CALLS__.push(cid);
+      const messages = Array.from({ length: 3 }, (_, i) => ({ id: cid + '-m' + i, seq: i + 1, convo_id: cid, role: i % 2 ? 'assistant' : 'user', text: cid + '的历史' + i, created_at: new Date().toISOString() }));
+      return { messages: messages, hasMore: false, nextSeq: null };
     }
     if (cmd === 'plugin:event|listen' || cmd === 'plugin:event|unlisten') return 1;
     if (cmd === 'plugin:store|load') throw new Error('UNMOCKED:plugin:store|load');
@@ -326,9 +341,17 @@ try {
       if (!last.innerHTML.includes('&lt;script&gt;')) return null;
       return { bubbles: msgs.length, args: window.__SEND_ARGS__ };
     })()`, 8000, "bot 回复富文本气泡");
-    console.log(`  发送链：气泡 ${sent.bubbles} 个 · 后端收到 convo_id=${sent.args && sent.args.convo_id} text=${sent.args && sent.args.text}`);
-    if (!sent.args || sent.args.convo_id !== "c1" || sent.args.text !== "你好海豚") {
-      bad.push(`neobot_send 参数不对：${JSON.stringify(sent.args)}（应为 {convo_id:'c1', text:'你好海豚'}）`);
+    console.log(`  发送链：气泡 ${sent.bubbles} 个 · 后端收到 convoId=${sent.args && sent.args.convoId} text=${sent.args && sent.args.text}`);
+    // 2026-10-07 修：⛔ 本断言此前要求 **convo_id**（snake_case），是**反的**。
+    //   Tauri 从 IPC body 取的是 **camelCase** 键（宏把形参名转成 camelCase），
+    //   而 Option 形参在键名不匹配时**静默变 None**（不报错）⇒ 那正是
+    //   STATUS §4 教训 28 记的 P0：「界面正常显示回复、但一条都没落库」。
+    //   ⛔⛔ 后果的方向性很要命：门若这样长期红着，人会去「修」**正确的前端代码**
+    //     去迁就错的门 —— 把 P0 装回产品。真实 IPC 往返那道
+    //     `tests/ipc_roundtrip.rs`（2026-10-02 起）才是这条的正解，
+    //     本门只做「生产包里真的发出去了没有」的补充。
+    if (!sent.args || sent.args.convoId !== "c1" || sent.args.convo_id !== undefined || sent.args.text !== "你好海豚") {
+      bad.push(`neobot_send 参数不对：${JSON.stringify(sent.args)}（应为 {convoId:'c1', text:'你好海豚'}，且**不得**出现 snake_case 的 convo_id）`);
     }
 
     // 切会话 → 历史必须换到 c2。
@@ -344,9 +367,15 @@ try {
     })()`);
     const switched = await waitFor(send, `(() => {
       const calls = window.__MSG_CALLS__ || [];
-      const msgs = [...document.querySelectorAll('[data-testid="neobot-root"] section div.overflow-y-auto > div > div > div')];
-      const first = msgs[0];
-      if (calls[calls.length - 1] === 'c2' && first && first.textContent.startsWith('c2的历史')) {
+      // 2026-10-07 换选择器：改前是四层后代链 section > div.overflow-y-auto > div > div > div
+      //   那不是选择器，是「当前 DOM 恰好长这样」的快照：改一层包裹
+      //   （本次给消息区外面套了页签三元）它就静默失配 => first 为 undefined
+      //   => 门报「等不到」，指向完全错误的方向。
+      // 改用**稳定 testid**：nb-msg-copy 每条消息各有一个（在气泡内）。
+      // 注意：这段注释也在模板字符串里 ⇒ 不能出现反引号（见上面 STUB 处的同款警告）。
+      const first = document.querySelector('[data-testid="neobot-root"] [data-testid="nb-msg-copy"]');
+      const bubble = first && first.closest('.rounded-2xl');
+      if (calls[calls.length - 1] === 'c2' && bubble && (bubble.textContent || '').includes('c2的历史')) {
         return { calls };
       }
       return null;
@@ -457,7 +486,15 @@ try {
     await send("Page.addScriptToEvaluateOnNewDocument", { source: PET_STUB });
     await send("Page.navigate", { url: `http://127.0.0.1:${PORT}/pet.html` });
     const pet = await waitFor(send, `(() => {
-      const sprite = document.querySelector('.dsh-pet__sprite');
+      // 2026-10-07 修：改前是 .dsh-pet__sprite（**上游 DSH 的类名**）。
+      //   交付树（neobot-ui/）的宠物组件用的是自家命名 nb-pet-sprite
+      //   （见 src/pet/pet.tsx 的 className 与 src/pet/pet.css）。
+      //   ⛔ 于是 sprite 恒为 null -> 门报「等不到宠物精灵渲染」。
+      //   ⛔ 这是同一族的第 3 个变体：门停下之后，**路径**没改（前两处）、
+      //      **命令名**没改（再前两处）、**类名**没改（此处）——
+      //      每一次都表现为「门说界面坏了」，而真凶在门自己身上。
+      //      ⇒ 教训合并成一句：门停下就会腐化，复活它之前先校它的**名字**。
+      const sprite = document.querySelector('.nb-pet-sprite');
       if (!sprite) return null;
       const r = sprite.getBoundingClientRect();
       if (r.width < 2 || r.height < 2) return null;

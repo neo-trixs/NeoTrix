@@ -9,9 +9,12 @@
 
 use std::path::PathBuf;
 
-use neotrix_neobot::nt_core::{agent_run, capabilities_or_default, CapabilitiesInfo, AgentRunResult};
+use neotrix_neobot::nt_core::{
+    agent_run, capabilities_or_default, CapabilitiesInfo, AgentRunResult, TraceRow,
+};
 use neotrix_neobot::nt_evidence::{audit, EvidenceReport};
 use neotrix_neobot::nt_panel::{Answer, AnswerOutcome, Panel, PublishError, Registry};
+use neotrix_neobot::nt_run_trace::{run_list, run_trace, RunListView, RunTraceView};
 use neotrix_neobot::nt_store::NeobotStore;
 use serde::Serialize;
 
@@ -230,18 +233,101 @@ pub fn neobot_evidence_summary(text: String) -> EvidenceReport {
     audit(&text)
 }
 
+/// 跑轮**生命周期**事件名。前端 `listen` 同一个名字。
+///
+/// # 为什么只有生命周期、没有 token 增量
+///
+/// `neobot_send` 走的是**配对核心的 `POST /v1/agents/run`**（服务端 agent
+/// loop），本仓**无法验证**那个端点是否支持 SSE —— 它是外部配对端点，
+/// 契约不在仓里。按本仓纪律（「不可用就不渲染」「缺席 ≠ 空」），
+/// 发一个自己造不出来的 `delta` 流就是**对不存在能力的投机实现**
+/// （`neobot-ui/src/ipc.ts` 早先那轮已按这个理由否掉过一次，那次是对的）。
+///
+/// ⛔ 但那次结论「后端没有可流的东西」**不完全准确**，别照抄：
+/// 库里**确实**有真流式（`nt_http_engine::run_turn_stream` 的 SSE 解析 +
+/// `nt_agent::run_local_turn_stream_as` 的 `on_delta`/`on_step`），
+/// 只是**当前这条发送路径够不着它**（它走服务端，不是本地引擎）。
+/// ⇒ 所以这里发的是**能证实的真实信号**：跑前/跑后/失败 + 服务端那一次
+/// 返回的 `trace` 摘要。界面因此从「盲脉冲等结果」变成「看得见状态」。
+pub const RUN_EVENT: &str = "neobot:run";
+
+/// 跑轮生命周期信号（`RUN_EVENT` 的载荷）。
+///
+/// ⛔ 字段纪律（每条都对应一类「说谎」的写法）：
+///   · **没有 `delta`/`token` 字段** —— 见 `RUN_EVENT` 的注释。
+///   · `trace` 缺失即空数组，**界面不得据此断言「这次没有执行痕迹」**：
+///     服务端可以只回 `output`（`AgentRunResult.trace` 是 `Vec` 无 `#[serde(default)]`
+///     之前的旧解析路径也可能空）。空 = 「没拿到」，不是「没有」。
+///   · `error` 只在 `failed` 出现；`None` 不等于成功（只有 `finished` 才算）。
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub struct RunSignal {
+    /// `started` | `finished` | `failed`（三态闭集，界面按它分色）。
+    pub phase: String,
+    /// 发起时的会话（缺席 = 脱离会话手动跑）。
+    pub convo_id: Option<String>,
+    /// 从 `started` 算起的毫秒数（`started` 恒为 0）。
+    pub elapsed_ms: i64,
+    /// 服务端这一次返回的执行痕迹（**仅 `finished`**）。
+    pub trace: Vec<TraceRow>,
+    /// 失败原因摘要（**仅 `failed`**）。
+    pub error: Option<String>,
+}
+
+impl RunSignal {
+    fn new(phase: &str, convo_id: Option<&str>) -> Self {
+        Self {
+            phase: phase.to_owned(),
+            convo_id: convo_id.map(str::to_owned),
+            elapsed_ms: 0,
+            trace: Vec::new(),
+            error: None,
+        }
+    }
+}
+
+/// 发一条跑轮信号。
+///
+/// ⛔ **发不出去只记日志，不让整条发送失败** —— 这与
+///    `neobot_panel_publish` 的「发不出去就报」**故意相反**：
+///    面板推送**就是**那次命令的交付物（收不到 ≡ 没发）；
+///    而跑轮信号是**播报**：跑轮本身要么成功要么失败，
+///    让「界面没收到播报」反过来把一次真跑完的轮次报成失败，
+///    是拿观测手段去污染被观测的事实。
+fn emit_run<R: tauri::Runtime>(app: &tauri::AppHandle<R>, signal: &RunSignal) {
+    if let Err(e) = tauri::Emitter::emit(app, RUN_EVENT, signal) {
+        crate::desktop::emit_log_line(
+            "warn",
+            "neobot-root",
+            &format!("跑轮信号发送失败（不影响本轮结果）：{e}"),
+        );
+    }
+}
+
 /// `neobot_send(convo_id?, text) -> AgentRunResult`
 ///
 /// 会话内的一轮：问落库 → 跑 → 答落库，全进 `messages` 表。
 /// `convo_id` 缺席/空白 = 脱离会话手动跑（旧行为保留，不落库）。
 ///
-/// 失败语义（故意不对称，丢数据比报错贵得多）：
+/// **失败语义（故意不对称，丢数据比报错贵得多）**：
 ///   · 问落库失败 ⇒ 直接 Err，不跑（跑了也记不住问了什么）。
 ///   · 跑失败 ⇒ Err，问句已在库里（它确实问过）。
 ///   · 答落库失败 ⇒ Err，但**把回复内容嵌进错误里** ——
 ///     回复已经算出来了，吞掉等于白跑一次还拿不到结果。
+///
+/// 另发 [`RUN_EVENT`] 三段信号（`started` → `finished`/`failed`）。
+///
+/// ⭐ `app` 收 **泛型 `AppHandle<R>`** 而非 `AppHandle`（后者会把签名钉成
+/// `AppHandle<Wry>`）：那会让本命令在 `tests/ipc_roundtrip.rs` 的
+/// `MockRuntime` harness 下 **编译期 E0277**，于是这条命令的
+/// 「载荷键 ↔ 形参」往返**永远无法被测**。该测试文件 `:86` 早就把这个
+/// 形状记下来了，并写下正解就是加泛型 —— 现在第一次用上。
 #[tauri::command]
-pub async fn neobot_send(convo_id: Option<String>, text: String) -> Result<AgentRunResult, String> {
+pub async fn neobot_send<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    convo_id: Option<String>,
+    text: String,
+) -> Result<AgentRunResult, String> {
     if text.trim().is_empty() {
         // 空白消息不是「跑了但没输出」，是**请求本身不成立**。给它一个
         // 明确错误，比跑一轮再回一句空强。
@@ -258,15 +344,39 @@ pub async fn neobot_send(convo_id: Option<String>, text: String) -> Result<Agent
             .append_message(id, "user", text.trim())
             .map_err(|e| e.to_string())?;
     }
+    // ⭐ 跑前播报：界面据此把「正在想…」从一个**盲脉冲**换成
+    //    「确实开始了、属于哪个会话、什么时候开始」。
+    let started = std::time::Instant::now();
+    emit_run(&app, &RunSignal::new("started", convo.as_deref()));
     // context 必须**整个 move 进闭包**：agent_run 收 Option<&str>，
     // 而借用跨不过 spawn_blocking 的 'static 边界（E0597 的教训）。
     let goal = text.clone();
-    let out = tauri::async_runtime::spawn_blocking(move || {
+    let run = tauri::async_runtime::spawn_blocking(move || {
         let store = open_store()?;
         agent_run(&store, &goal, None).map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| format!("发送任务异常：{e}"))??;
+    .map_err(|e| format!("发送任务异常：{e}"));
+    // ⛔ 跑轮层面的失败（spawn / agent_run / HTTP）在此收口成 `failed` 信号，
+    //    再原样返回 Err —— 信号与返回值**同一口径**，不发「信号说成功、
+    //    调用方收到失败」这种互相打架的组合。
+    let out = match run {
+        Ok(Ok(out)) => out,
+        Ok(Err(e)) => {
+            let mut sig = RunSignal::new("failed", convo.as_deref());
+            sig.elapsed_ms = elapsed_ms(started);
+            sig.error = Some(e.clone());
+            emit_run(&app, &sig);
+            return Err(e);
+        }
+        Err(e) => {
+            let mut sig = RunSignal::new("failed", convo.as_deref());
+            sig.elapsed_ms = elapsed_ms(started);
+            sig.error = Some(e.clone());
+            emit_run(&app, &sig);
+            return Err(e);
+        }
+    };
     if let Some(ref id) = convo {
         let store = open_store()?;
         store
@@ -277,7 +387,22 @@ pub async fn neobot_send(convo_id: Option<String>, text: String) -> Result<Agent
     if let Ok(dir) = data_dir() {
         record_send_usage(&dir, &out);
     }
+    // ⭐ 跑完播报：带服务端那一次的 `trace` 摘要（此前它在返回体里，
+    //    界面只取 `output` ⇒ **整段被丢掉**，用户看不到这轮用了什么）。
+    //    ⛔ 答落库失败那一支（上面的 `?`）**不发** `finished` ——
+    //    那一支的整轮结果对用户是「失败」，发 finished 会与返回值打架。
+    let mut sig = RunSignal::new("finished", convo.as_deref());
+    sig.elapsed_ms = elapsed_ms(started);
+    sig.trace = out.trace.clone();
+    emit_run(&app, &sig);
     Ok(out)
+}
+
+/// 毫秒耗时（`Instant` → `i64`；单调时钟，不受系统改时间影响）。
+fn elapsed_ms(started: std::time::Instant) -> i64 {
+    // ⛔ `as_millis()` 是 u128，直接 `as i64` 在极端值下会回绕；
+    //    先夹到 i64::MAX 再转，保持「要么真值要么饱和、不回绕」。
+    i64::try_from(started.elapsed().as_millis()).unwrap_or(i64::MAX)
 }
 
 /// 用量账本文件（`<data_dir>/usage.json`，与库 `UsageLedger` 同形）。
@@ -687,6 +812,47 @@ pub fn neobot_convo_messages_page(
         .list_messages_page(&convo, before_seq, take + 1)
         .map_err(|e| e.to_string())?;
     Ok(shape_page(probe, take))
+}
+
+/// `neobot_run_list(convo_id?, limit?) -> RunListView`
+///
+/// 列轨迹（= 跑过哪些轮次）。**`convo_id` 缺席 = 全部会话** ——
+/// 与 `neobot_convo_messages_page` 不同：那条**必须**给会话
+/// （消息分页需要一个确定的容器），而轨迹页允许「先看全部、再点进某个会话」，
+/// 强制给 id 等于让界面必须先选中会话才能查一次账。
+///
+/// ⛔ 「读不到」是 `Err`，「真的没有」是 `Ok` 且 `runs` 为空 ——
+///    界面把两者说成同一句话，用户就会以为「这个功能是空的」。
+///
+/// ⚠️ **本视图刻意不含费用/token/耗时**：库 `ledger` 表不以 `task_id` 为键
+///    （见 `nt_run_trace` 模块头不变量 2），按时间窗摊到某轮是**猜**。
+///    界面要数字走 `neobot_usage_summary`（`usage.json` 的按天账）。
+#[tauri::command]
+pub fn neobot_run_list(
+    convo_id: Option<String>,
+    limit: Option<i64>,
+) -> Result<RunListView, String> {
+    // ⛔ 同样走唯一规范化入口：带首尾空白的 id 必须与写路径同一口径
+    //    （否则「写了 `c1`、读 ` c1 `」⇒ 轨迹页显示「没有跑过」）。
+    let convo = normalize_convo_arg(convo_id);
+    let store = open_store()?;
+    run_list(&store, convo.as_deref(), limit.unwrap_or(0))
+        .map_err(|e| format!("读取轨迹列表失败：{e}"))
+}
+
+/// `neobot_run_trace(task_id) -> RunTraceView`
+///
+/// 取一轮的完整轨迹（每一步 + 改了哪些文件）。
+///
+/// ⛔ 不存在的 `task_id` 是 **Err**，不是「空轨迹页」—— 空页同时意味着
+///    「存在但没记录」，而那说明读口坏了；两种都渲染成空白是本仓最贵的那类假绿。
+#[tauri::command]
+pub fn neobot_run_trace(task_id: String) -> Result<RunTraceView, String> {
+    // 复用库侧的规范化（trim + 空串拒绝），**不**自己 `trim()`：
+    // 已有两处规范化入口就是本文件栽过的坑（`normalize_convo_id` 的注释）。
+    let store = open_store()?;
+    run_trace(&store, task_id.trim())
+        .map_err(|e| format!("读取轨迹失败：{e}"))
 }
 
 /// 骨架下发给界面的面板事件名。前端 `listen` 同一个名字。
@@ -1403,5 +1569,130 @@ mod data_dir_tests {
     fn 游标取本页最小seq() {
         let p = shape_page((1..=6).map(msg).collect(), 5);
         assert_eq!(p.next_seq, Some(5), "本页是 seq 1..5 ⇒ 游标应是 5（最小值）");
+    }
+}
+
+#[cfg(test)]
+mod run_trace_tests {
+    use super::*;
+    use neotrix_neobot::nt_types::{AgentTask, TaskStatus};
+
+    fn temp_store() -> (tempdir::TempDir, NeobotStore) {
+        let d = tempdir::TempDir::new("nb-trace").expect("临时目录");
+        let store = NeobotStore::open(d.path().join("nb.db").to_str().unwrap()).expect("开库");
+        (d, store)
+    }
+
+    fn seed(store: &NeobotStore, id: &str, convo: Option<&str>) {
+        store
+            .save_task(&AgentTask {
+                id: id.to_owned(),
+                title: format!("轮次 {id}"),
+                status: TaskStatus::Done,
+                created_at: "2026-10-07T00:00:00Z".to_owned(),
+                updated_at: "2026-10-07T00:00:10Z".to_owned(),
+                claimed_by: None,
+                conversation_id: convo.map(str::to_owned),
+                claimed_at: None,
+                visibility: "team".to_owned(),
+                lease_id: None,
+                lease_until: None,
+                attempts: 0,
+                error: None,
+            })
+            .expect("存任务");
+    }
+
+    /// 契约门之外再加一道：**返回形状里不许出现费用/token 字段**。
+    ///
+    /// ⛔ 这是「不把账摊到某一轮」这条不变量的**序列化层**守卫。
+    ///    库侧那条守的是结构体定义；这里守的是**真跑一遍后序列化出来的 JSON** ——
+    ///    只有后者能抓住「有人给 `RunRow` 加了个 `#[serde(flatten)]` 的用量结构」
+    ///    这种定义层看不出来的漂移。
+    #[test]
+    fn 轨迹列表不含用量字段() {
+        let (_d, store) = temp_store();
+        seed(&store, "t1", Some("c1"));
+        let json = serde_json::to_string(&run_list(&store, Some("c1"), 0).expect("列"))
+            .expect("序列化");
+        for banned in ["cost", "token", "usd", "latency"] {
+            assert!(!json.contains(banned), "轨迹视图泄漏出用量字段 `{banned}`：{json}");
+        }
+    }
+
+    /// 真的按会话分流：别的会话的轮次不得串进本页。
+    #[test]
+    fn 轨迹列表按会话分流() {
+        let (_d, store) = temp_store();
+        seed(&store, "a", Some("c1"));
+        seed(&store, "b", Some("c2"));
+        let got = run_list(&store, Some("c1"), 0).expect("列").runs;
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].id, "a");
+        // 缺席 convo = 全部（界面允许「先看全部」）。
+        assert_eq!(run_list(&store, None, 0).expect("列").runs.len(), 2);
+    }
+
+    /// 单轮详情把步与文件改动一起取回；不存在的 id 是 Err。
+    #[test]
+    fn 单轮轨迹含步与改动且不存在时报错() {
+        let (_d, store) = temp_store();
+        seed(&store, "a", Some("c1"));
+        store.add_step("a", 0, "bash", true, "ok").expect("步");
+        let got = run_trace(&store, "a").expect("轨迹");
+        assert_eq!(got.steps.len(), 1);
+        assert_eq!(got.steps[0].tool, "bash");
+        let err = run_trace(&store, "ghost").expect_err("不存在必须报错");
+        assert!(err.to_string().contains("run not found"), "{err}");
+    }
+
+    /// 空范围 = `Ok` + 空，**不是** Err：界面把两者说成同一句话，
+    /// 用户就会以为「这个功能是空的」而不是「这一段没跑过」。
+    #[test]
+    fn 空范围是空列表不是错误() {
+        let (_d, store) = temp_store();
+        let got = run_list(&store, Some("ghost"), 0).expect("空范围应当 Ok");
+        assert!(got.runs.is_empty());
+    }
+
+    /// `RunSignal` 的三态字段纪律。
+    ///
+    /// ⛔ 这些断言看起来琐碎，但它们守的是「界面据此分色/分文案」的口径：
+    ///    `started` 必须 `elapsed_ms == 0` 且 `trace` 为空（此刻还没有任何痕迹），
+    ///    `failed` 必须**带** `error`。少了任一条，界面就会拿空串去显示
+    ///    「失败原因：（空）」。
+    #[test]
+    fn 跑轮信号三态字段齐备() {
+        let s = RunSignal::new("started", Some("c1"));
+        assert_eq!(s.phase, "started");
+        assert_eq!(s.convo_id.as_deref(), Some("c1"));
+        assert_eq!(s.elapsed_ms, 0, "刚开始时耗时必须为 0（不是未知的 -1）");
+        assert!(s.trace.is_empty(), "started 阶段不可能有执行痕迹");
+        assert!(s.error.is_none());
+
+        let mut f = RunSignal::new("failed", None);
+        f.elapsed_ms = 1234;
+        f.error = Some("core unpaired (pair first)".to_owned());
+        let v = serde_json::to_value(&f).expect("序列化");
+        assert_eq!(v["phase"], "failed");
+        assert_eq!(v["elapsed_ms"], 1234);
+        assert!(v["error"].is_string(), "failed 必须带原因：{v}");
+        assert!(v["convo_id"].is_null(), "脱离会话手动跑时 convo 缺席：{v}");
+        // ⛔ 载荷里**不许**出现 delta/token 字段 —— 见 RUN_EVENT 的注释
+        //    （发一个造不出来的流就是对不存在能力的投机实现）。
+        let text = v.to_string();
+        for banned in ["delta", "chunk", "token"] {
+            assert!(!text.contains(banned), "跑轮信号不许带 `{banned}` 字段：{text}");
+        }
+    }
+
+    /// 耗时取自 `Instant`，单调且不回绕。
+    #[test]
+    fn 耗时用单调钟() {
+        let t0 = std::time::Instant::now();
+        std::thread::sleep(std::time::Duration::from_millis(12));
+        let ms = elapsed_ms(t0);
+        assert!(ms >= 10, "睡 12ms 后耗时应 >=10，实际 {ms}");
+        assert!(i64::try_from(ms).is_ok(), "耗时必须落在 i64 内（不回绕）");
     }
 }

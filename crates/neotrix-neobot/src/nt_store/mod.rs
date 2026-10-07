@@ -24,6 +24,12 @@ pub struct Conversation {
     pub task_count: i64,
     pub last_active: String,
     /// 免打扰（不亮未读、不打扰）。
+    ///
+    /// ⭐ 2026-10-07 查证（D2 切片实测）：**活的**跨语言字段。
+    ///   写者 `set_conversation_muted`；`list_conversations` 把它查出来；
+    ///   ⭐ 消费者在**界面**：`neobot-root.tsx` 的 `c.muted &&` 渲染静音条 ▬。
+    ///   ⇒ Rust 生产代码只写不「读字段」，纯 Rust 读点统计**结构上看不见**
+    ///   （`dead-flag-baseline.txt` 记为 `cross-language-consumer`）。
     pub muted: bool,
     /// 未读数（已读水位本地版：水位之后新建任务数）。
     pub unread: i64,
@@ -88,6 +94,15 @@ pub struct FileChange {
     /// 读=读到的长度；写/改=**改后**内容长度（真实增删行数由前端 diff 算）。
     pub bytes: i64,
     /// 任一侧超 `nt_changes::CHANGE_CONTENT_CAP`，内容整笔略去。
+    ///
+    /// ⭐ 2026-10-07 补消费者注释：本字段**生产代码里只写不读**
+    /// （写者 `nt_changes::record_change`，读者只有本文件外的单测）。
+    /// 它本来的意图是「**UI 据此说「内容已略去」**」（见本结构上方段头），
+    /// 但那一跳直到 2026-10-07 才补上：轨迹页拿到 `ChangeView.content_omitted`
+    /// 却**一直没渲染** ⇒ `check-dead-config-flag` 把它报成新增死开关。
+    /// ⛔ 教训：加一个与既有字段**同名**的 DTO 字段，会让门走「同名多声明
+    ///    ⇒ 只认本文件读点」那一支 ⇒ 旧声明看起来全无读者。
+    ///    ⇒ **同名不是免费的**（AGENTS.md L15 的又一次复现）。
     pub content_omitted: bool,
 }
 
@@ -136,6 +151,10 @@ pub struct LedgerEntry {    pub id: String,
 pub struct ChannelRow {
     pub id: String,
     pub title: String,
+    /// nt-unwired-spec: 未接线规格 —— 渠道「启用/停用」**声明了但没人读**
+    /// （D2 切片实测：读点**只有单测**，界面无渠道页、契约里 0 条渠道命令）。
+    /// ⛔ 按 D2-b 的两类划分，这是 **B 类（功能没做，不是不要了）**
+    /// ⇒ **保留并标注**，⛔ 不删：删掉就把「渠道该有开关」这个规格从代码里抹掉。
     pub enabled: bool,
     /// 缺省访问模式（新机器人继承）。
     pub access_mode: String,
@@ -555,6 +574,10 @@ mod nt_store_routines;
 /// 否则配平检查的读口只能拿位置性元组，而位置性元组正是本文件
 /// `delivery_row` 取列事故的同款形状。
 pub use nt_store_routines::StepRow;
+mod nt_store_run_trace;
+/// 重导出：同 [`StepRow`] 的理由 —— 轨迹域层要按字段取值
+/// （`status` 原样透传），拿位置性元组就等于把列序写进业务代码。
+pub use nt_store_run_trace::RunStoreRow;
 mod nt_store_tasks;
 mod nt_store_tool_calls;
 /// 重导出：调用方能用 `.ok` / `.output`，但**写不出**该类型（模块私有），

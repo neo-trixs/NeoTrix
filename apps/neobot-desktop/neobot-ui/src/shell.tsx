@@ -270,7 +270,12 @@ export function Shell({ children }: { children?: React.ReactNode }) {
 
         <div className="nb-actions">
 
-          <button type="button" disabled={busy} onClick={() => void openLogs()}>
+          {/* ⭐ 2026-10-07 补 testid：`neobot-ui-smoke.mjs` 此前用
+              `.nb-actions button` 的**位置**点它（第一个），而同一按钮组里
+              后面又加了设置/退出 ⇒ 位置会漂；且门在 act 里可能**已打开设置弹窗**，
+              位置点击会被遮罩吞掉 ⇒ 活动面板读不到失败行。
+              ⇒ 按邻里的 `nb-settings-open` 同一办法给稳定钩子。*/}
+          <button type="button" data-testid="nb-logs-open" disabled={busy} onClick={() => void openLogs()}>
             {t('shell.openLogs')}
           </button>
           <span className="nb-actions-sep" aria-hidden="true" />

@@ -41,7 +41,7 @@ else bad "无 Aqua 会话（= ${mgr}）⇒ GUI 无法验证，⛔ 不是「通�
 PID=$!
 # ⭐⭐ 这里必须用 `${PID}` ⛔ 不能用 `${PID}，`
 # ⭐⭐ **原因**：紧跟 `$PID` 的中文逗号 `，`（U+FF0C，多字节）
-# ⭐⭐ 被 bash 当成变量名的延续 ⇒ `unbound variable`（实测报 `PID�: unbound variable`）
+# ⭐⭐ 被 bash 当成变量名的延续 ⇒ `unbound variable`（实测报 `PID: unbound variable`）
 say "已启动 pid=${PID}，等待窗口出现"
 WIN=""
 for _ in $(seq 1 30); do

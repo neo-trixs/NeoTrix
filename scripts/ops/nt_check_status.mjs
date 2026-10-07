@@ -86,14 +86,68 @@ if (claimedPng && Number(claimedPng[1]) !== pngs.length) {
 }
 
 // ③ IPC 命令数（直接数后端注册表，别读文档）
-const mainRs = readFileSync(join(ROOT, "apps/neobot-desktop/src/main.rs"), "utf8");
-const hStart = mainRs.indexOf("generate_handler![");
-const hEnd = mainRs.indexOf("])", hStart);
-const handler = mainRs.slice(hStart, hEnd);
+//
+// ⭐⭐ 2026-10-07 修：真源在 `src/lib.rs` 的 `neobot_commands!` 宏，
+//    **不在** `src/main.rs`（本仓第 6 次「搬家后下游没跟」——这次共 4 道门
+//    同时中招：api / ui_calls / ship_ui / status）。
+//    ⛔ 改前在 main.rs 里找 `generate_handler![` ⇒ 找不到 ⇒ hStart = -1 ⇒
+//      slice(-1, …) 拿到一段乱码 ⇒ 抽出 0 个命令 ⇒ 门把 §1.3 列的
+//      **18 条 neobot_ 命令全部报成「后端不存在」**。
+//    ⛔ 危害形态：门长期红 ⇒ 人会去改 **STATUS.md** 去迎合错的门
+//      （把真实的 18 条命令从文档里删掉）—— 那就是让文档开始说谎。
+const mainRs = readFileSync(join(ROOT, "apps/neobot-desktop/src/lib.rs"), "utf8");
+const hStart = mainRs.indexOf("macro_rules! neobot_commands");
+if (hStart < 0) {
+  problems.push("lib.rs 里找不到 `macro_rules! neobot_commands` —— 注册表真源改名/搬走了，本门须同步（查不到 ≠ 通过）");
+}
+const firstEntry = mainRs.indexOf("neobot_desktop::", Math.max(hStart, 0));
+const hEnd = mainRs.indexOf("\n}", Math.max(firstEntry, 0));
+// ⛔⛔ 必须**剥注释**（本仓第 5 道门中同一个缺陷，此处是 STATUS 门）：
+//   注册宏里那几行「2026-10-04：**已删除** neobot_convo_messages」之类的说明
+//   **正文里就写着已删命令的名字** ⇒ 不剥注释时：
+//     · 抽出的命令数虚高；
+//     · `neobot_convo_messages` 与 `neobot_convo_messages_page` 各出现 2 次
+//       ⇒ 门报「后端注册表有重复命令」——**而那两条其实一条都没注册**。
+//   ⇒ 门犯的错和它要抓的错是同一种：**把注释里的字当数据**。
+//   ⭐ 系统性修法（尚未做，建议）：5 道门各写了一份剥法 ⇒ 应抽成
+//     `scripts/ops/lib/strip-comments.mjs` 共用。本轮先逐门补齐，
+//     因为「共用模块」要动 5 个文件的 import，风险大于收益。
+function stripRustComments(src) {
+  let out = "";
+  let inStr = false;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (inStr) {
+      out += c;
+      if (c === "\\") { out += src[i + 1] ?? ""; i++; }
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') { inStr = true; out += c; continue; }
+    if (c === "/" && src[i + 1] === "/") {
+      while (i < src.length && src[i] !== "\n") i++;
+      out += "\n";
+      continue;
+    }
+    if (c === "/" && src[i + 1] === "*") {
+      let depth = 0;
+      while (i < src.length) {
+        if (src[i] === "/" && src[i + 1] === "*") { depth++; i++; }
+        else if (src[i] === "*" && src[i + 1] === "/") { depth--; i++; if (depth === 0) break; }
+        else if (src[i] === "\n") out += "\n";
+        i++;
+      }
+      continue;
+    }
+    out += c;
+  }
+  return out;
+}
+const handler = firstEntry < 0 ? "" : stripRustComments(mainRs.slice(firstEntry, hEnd));
 const cmds = [...handler.matchAll(/\b(neobot_[a-z0-9_]+)\b/g)]
   .map((m) => m[1])
   .filter((c) => c !== "neobot_desktop");
-if (new Set(cmds).size !== cmds.length) problems.push("后端 generate_handler 有重复命令");
+if (new Set(cmds).size !== cmds.length) problems.push("后端注册表有重复命令");
 const uniqCmds = new Set(cmds);
 // 文档 §1.3 用代码块列命令，逐个核对
 // ⚠️ 必须限定在 §1.3 的**清单块**内。只查「文档任意位置出现过」是不够的：
