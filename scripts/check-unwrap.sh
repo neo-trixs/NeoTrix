@@ -75,6 +75,50 @@ TOKENS = [("unwrap", re.compile(r"\.unwrap\(\)")),
           ("expect", re.compile(r"\.expect\(")),
           ("panic",  re.compile(r"\bpanic!\("))]
 
+def test_ranges(code):
+    """生产代码行号集合（0基），排除所有 `#[cfg(test)]` mod 块。
+
+    ⭐⭐ 2026-10-07 替换「只置位不复位」的朴素 `in_test_block`。
+    病根：原实现一旦见到 `#[cfg(test)]`，就把**该文件此后全部行**当测试代码跳过
+    ⇒ 测试块**之后**的生产代码对门完全不可见。
+    实测受害：`nt_memory/coverage_ledger.rs`（cfg(test) 在 477 行 / 共 566 行）。
+
+    ⛔ 为什么不数括号：剥离注释后的 Rust 源码里括号不可靠（字符串/字符字面量、
+    宏体、`#[cfg(x)] mod y {` 同行形态…）。实测三版括号计数互相矛盾。
+
+    ⇒ 用**缩进配对**：测试块结尾 = 首个与 `mod` 行**同缩进**的裸 `}`。
+      A. `#[cfg(test)] mod t {`（**同行**）⇒ 延伸到 EOF
+      B. 属性**独占行** ⇒ 下一非空行是 `mod ... {`，按同缩进的裸 `}` 闭合
+    """
+    prod = set()
+    i, n = 0, len(code)
+    while i < n:
+        line = code[i]
+        if re.match(r"\s*#\[cfg\(", line) and re.search(r"\btest\b", line):
+            t = line.strip()
+            if re.match(r"#\[cfg\([^)]*\)\s*mod\s+\w+", t):
+                i = n
+                continue
+            j = i + 1
+            while j < n and (not code[j].strip() or code[j].strip().startswith("//")):
+                j += 1
+            t2 = code[j].strip() if j < n else ""
+            if re.match(r"(?:pub(?:\([^)]*\))?\s+)?mod\s+\w+.*\{\s*$", t2):
+                ind = len(code[j]) - len(code[j].lstrip())
+                k = j + 1
+                while k < n:
+                    raw = code[k]
+                    if raw.strip() == "}" and len(raw) - len(raw.lstrip()) == ind:
+                        k += 1
+                        break
+                    k += 1
+                i = k
+                continue
+        prod.add(i)
+        i += 1
+    return prod
+
+
 def is_production(path):
     """Production = not a test file, not a test module, not a test-only crate.
 
@@ -114,9 +158,11 @@ for dirpath, dirnames, filenames in os.walk("."):
         except OSError:
             continue
         code = _strip_noncode(text).splitlines()
-        in_test_block = False
-        depth = 0
+        # ⭐ 生产行判定改用 test_ranges（见其 docstring）
+        prod_lines = test_ranges(code)
         for i, line in enumerate(code, 1):
+            if (i - 1) not in prod_lines:
+                continue
             # ⭐⭐ 2026-10-02 修的**假阳性**：原先只认**字面** `#[cfg(test)]`，
             #    而 `#[cfg(all(test, feature = "…"))]` / `#[cfg(any(test, …))]`
             #    同样是「仅测试期编译」，却不被识别 ⇒ 该模块里的 unwrap 被算成**生产代码**。
@@ -133,11 +179,6 @@ for dirpath, dirnames, filenames in os.walk("."):
             #     **失配**：`all(test, …)` 的 cfg 体里**自带括号**，`[^)]*` 匹配不到
             #     闭合的 `)]` ⇒ 整个正则不命中（实测：修完仍 26，850 仍在名单）。
             #   ⇒ 改为「是 cfg 属性」+「该行含 `test` ident」两条独立判据。
-            is_cfg_attr = re.match(r"\s*#\[cfg\(", line) is not None
-            if is_cfg_attr and re.search(r"\btest\b", line):
-                in_test_block = True
-            if in_test_block:
-                continue
             for name, rx in TOKENS:
                 if rx.search(line):
                     hits.append((rel, i, name))
@@ -180,10 +221,14 @@ if new:
     print("  NEW violations: %d" % len(new))
     for t in sorted(by_tok):
         print("    %s: %d" % (t, len(by_tok[t])))
-        for k in by_tok[t][:8]:
+        # ⚠️⛔ 原为 `by_tok[t][:8]`：**每种 token 只打印前 8 条**。
+        #   ⇒ 门探针 `check-unwrap` 断言「输出里指名注入文件」，
+        #     而注入文件常排在后面 ⇒ **NEW 一旦超过 8，探针必假失败**。
+        #   实测：NEW 16 时靠分组侥幸通过；NEW 升到 28 时注入项被挤出窗口 ⇒ 探针变红。
+        # ⇒ 结论：**这个探针从未真正证明过本门**（它只在小规模下成立）。
+        # ⇒ 现在打印全部（行数可控，且「边界可见」优先于「输出短」）。
+        for k in by_tok[t]:
             print("      + %s" % k)
-        if len(by_tok[t]) > 8:
-            print("      … %d more" % (len(by_tok[t]) - 8))
 
 if not new:
     print("PASS: 0 new violation(s); %d known/recorded." % len(have))
