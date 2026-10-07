@@ -7,14 +7,13 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// 背景循环配置
 #[derive(Debug, Clone)]
 pub struct BackgroundConfig {
-    // ⛔⚠️ **本结构体 18 / 42 个字段是「未接线规格」**（字段上方标 `nt-unwired-spec`）：
+    // ⛔⚠️ **本结构体 18 / 42 个字段是「未接线规格」**（`enable_exploration` 已接线）（字段上方标 `nt-unwired-spec`）：
     //   它们声明了想要的行为（探索 / 代理 / 自动结晶 / 各循环间隔…），
     //   但**读者从未实现**。
     //   ⛔ **不要因为「门报死配置」就删它们** —— 删掉等于把「要实现什么」抹掉。
     //   ⇒ 见 `docs/architecture/DEBT-LEDGER-2026-10-07.md` D2-b。
-    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
-    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
-    ///    实现对应功能时**必须**读取本字段。
+    // ✅ **已接线**（2026-10-07）：`run.rs` 的 exploration handler 现在读它
+    //    （此前探索**一直在跑**而开关零读点 ⇒ 用户无法关闭）。
     pub save_interval_secs: u64,
     /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。

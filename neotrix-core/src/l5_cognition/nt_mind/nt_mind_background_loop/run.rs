@@ -800,7 +800,19 @@ impl BackgroundLoop {
         spawn_handler!(cfg.refinement_interval_secs, "refinement", |h| h.handle_refinement().await);
         spawn_handler!(cfg.nt_act_voice_interval_secs, |h| h.handle_nt_act_voice_tick().await);
         spawn_handler!(cfg.plugin_interval_secs, |h| h.handle_plugin_tick().await);
-        spawn_handler!(cfg.exploration_interval_secs, |h| h.handle_exploration().await);
+        // ⭐ **接线 `enable_exploration`**（2026-10-07，此前是「未接线规格」）：
+        //   探索 handler **本来就在跑**（本行一直在 spawn 它），
+        //   但开关 `cfg.enable_exploration` **零读点** ⇒ 用户无法关闭探索。
+        //   ⇒ 这是典型的「**功能已实现、开关没接**」，正解是**接线**⛔ 不是删字段。
+        //   `cfg` 是 `self.config.clone()`（L779），故按值捕获使闭包能带走它。
+        let exploration_on = cfg.enable_exploration;
+        spawn_handler!(cfg.exploration_interval_secs, "exploration", |h| {
+            if exploration_on {
+                h.handle_exploration().await;
+            } else {
+                tracing::debug!("[bg-tick] exploration 被 enable_exploration=false 关闭");
+            }
+        });
         spawn_handler!(cfg.curiosity_interval_secs, |h| h.handle_curiosity().await);
         spawn_handler!(cfg.world_prediction_interval_secs, |h| h.handle_prediction().await);
         spawn_handler!(cfg.metacog_interval_secs, |h| h.handle_awareness().await);
