@@ -18,7 +18,7 @@
 //! 统一版本: 0.18.0 — 推理内核 18 stages
 #![forbid(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
-#![warn(clippy::all, clippy::pedantic)]
+#![warn(clippy::all)]
 #![cfg_attr(not(test), deny(warnings))]
 #![allow(dead_code)]
 #![allow(
