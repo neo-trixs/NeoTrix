@@ -36,6 +36,22 @@ pub fn contains_gold(output: &str, gold: &str) -> f64 {
     }
 }
 
+/// karotte 式 transcript 判定：把输出当 JSON 解析，检查 `status` 字段
+/// 等于 gold（如 `"completed"`）。非 JSON / 缺字段 ⇒ 0.0。
+/// 对齐 karotte 的「task 模板 + transcript.json + 终态判定」契约，
+/// 本层不跑 VM，只吃 transcript 文本。
+#[must_use]
+pub fn transcript_success_scorer(output: &str, gold: &str) -> f64 {
+    let parsed: Result<serde_json::Value, _> = serde_json::from_str(output);
+    match parsed {
+        Ok(v) => match v.get("status").and_then(|s| s.as_str()) {
+            Some(s) if gold.is_empty() || s == gold => 1.0,
+            _ => 0.0,
+        },
+        Err(_) => 0.0,
+    }
+}
+
 /// 跑一组 case：返回 (mean_score, pass_rate)。
 #[must_use]
 pub fn evaluate(cases: &[EvalCase<'_>], outputs: &[&str], threshold: f64) -> (f64, f64) {
@@ -67,6 +83,14 @@ mod tests {
         assert_eq!(contains_gold("the answer is 2", "2"), 1.0);
         assert_eq!(contains_gold("no idea", "2"), 0.0);
         assert_eq!(contains_gold("anything", ""), 1.0);
+    }
+
+    #[test]
+    fn transcript_success_scorer_parses_status() {
+        assert_eq!(transcript_success_scorer(r#"{"status":"completed"}"#, "completed"), 1.0);
+        assert_eq!(transcript_success_scorer(r#"{"status":"failed"}"#, "completed"), 0.0);
+        assert_eq!(transcript_success_scorer("not json", "completed"), 0.0);
+        assert_eq!(transcript_success_scorer(r#"{"other":1}"#, "completed"), 0.0);
     }
 
     #[test]

@@ -3,8 +3,8 @@
 > 生成器 `scripts/ops/nt_topology.py`，索引 `scripts/ops/nt_mapgen.py`（1 秒重建）。
 > **⛔ 本文件由代码生成，改它会被下次重建覆盖 —— 要改判据请改生成器。**
 
-- **rs 文件** 2,870 · **代码行** 920,451 · **符号** 84,590
-- 符号行号已全量核对：**84,590 个符号 100% 命中真实声明行**
+- **rs 文件** 2,873 · **代码行** 921,189 · **符号** 84,644
+- 符号行号已全量核对：**84,644 个符号 100% 命中真实声明行**
 
 ## 维度 2 · 代码树分叉（⛔ 不可从目录名推断）
 
@@ -17,11 +17,11 @@
 
 | 树 | 文件 | 行数 | 占比 | |
 |---|---:|---:|---:|---|
-| 主分层树 (L0–L6) | 2483 | 789,425 | ███████████████████ | `layered` |
-| 其他 | 1351 | 207,493 | █████ | `other` |
-| 文档/会话 | 503 | 104,098 | ██ | `doc` |
-| 独立 crate | 252 | 85,225 | ██ | `crate` |
-| core 内、层外 (entry/bin/examples) | 153 | 44,076 | █ | `core-outside-layers` |
+| 主分层树 (L0–L6) | 2484 | 789,713 | ███████████████████ | `layered` |
+| 其他 | 1351 | 207,504 | █████ | `other` |
+| 文档/会话 | 510 | 104,714 | ███ | `doc` |
+| 独立 crate | 253 | 85,645 | ██ | `crate` |
+| core 内、层外 (entry/bin/examples) | 154 | 44,114 | █ | `core-outside-layers` |
 | 第二棵树（2026-09-30 B 方案后仅剩门面 re-export 面） | 1 | 40 |  | `second-tree` |
 
 > ✅ **第二棵树已清空**：仅剩 `neotrix-core/src/neotrix/mod.rs`（40 行，纯 re-export 面，无实现）。
@@ -32,19 +32,19 @@
 
 | 层 | 文件 | 行数 | 符号 | 占比 |
 |---|---:|---:|---:|---|
-| `l0_substrate` | 66 | 27,781 | 2,952 | `█` |
+| `l0_substrate` | 67 | 28,066 | 2,977 | `█` |
 | `l1_action` | 553 | 175,886 | 16,438 | `████` |
 | `l2_perception` | 360 | 97,364 | 10,114 | `██` |
 | `l3_embodiment` | 246 | 69,968 | 7,079 | `██` |
 | `l4_emotion` | 257 | 88,965 | 7,137 | `██` |
 | `l5_cognition` | 750 | 250,841 | 23,842 | `██████` |
-| `l6_meta` | 233 | 76,175 | 7,056 | `██` |
+| `l6_meta` | 233 | 76,178 | 7,056 | `██` |
 
 ## 维度 1 · 物理目录树
 
 ```
-neotrix-core/  (2620 文件, 831,106 行)
-crates/  (237 文件, 84,443 行)
+neotrix-core/  (2622 文件, 831,432 行)
+crates/  (238 文件, 84,855 行)
 apps/  (12 文件, 4,862 行)
 docs/  (1 文件, 40 行)
 ```
@@ -57,7 +57,7 @@ docs/  (1 文件, 40 行)
 |---:|---|---:|---:|---:|---|
 | 1 | `neotrix-core/src/l0_substrate/nt_ecs.rs` | 1,709 | 267 | 133 | `neotrix::l0_substrate::nt_ecs` |
 | 2 | `neotrix-core/src/l5_cognition/nt_core_gate/nt_provenance.rs` | 2,821 | 238 | 117 | `neotrix::l5_cognition::nt_core_gate::nt_provenance` |
-| 3 | `crates/neotrix-neobot/src/nt_agent.rs` | 4,469 | 210 | 19 | `neotrix_neobot::nt_agent` |
+| 3 | `crates/neotrix-neobot/src/nt_agent.rs` | 4,496 | 210 | 19 | `neotrix_neobot::nt_agent` |
 | 4 | `crates/neotrix-neobot/src/nt_channel_dispatch.rs` | 2,889 | 196 | 20 | `neotrix_neobot::nt_channel_dispatch` |
 | 5 | `neotrix-core/src/l5_cognition/nt_mind/nt_game/tests/mod.rs` | 1,485 | 181 | 0 | `neotrix::l5_cognition::nt_mind::nt_game::tests` |
 | 6 | `neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/mod.rs` | 484 | 173 | 99 | `neotrix::l4_emotion::nt_memory::nt_memory_kb` |
@@ -74,8 +74,8 @@ docs/  (1 文件, 40 行)
 | 17 | `neotrix-core/src/l4_emotion/nt_memory/nt_trade_product_spec.rs` | 1,245 | 142 | 25 | `neotrix::l4_emotion::nt_memory::nt_trade_product_spec` |
 | 18 | `neotrix-core/src/l1_action/nt_io/nt_io_provider/gateway/execution.rs` | 1,375 | 141 | 64 | `neotrix::l1_action::nt_io::nt_io_provider::gateway::execution` |
 | 19 | `neotrix-core/src/l6_meta/nt_approval.rs` | 1,734 | 141 | 35 | `neotrix::l6_meta::nt_approval` |
-| 20 | `neotrix-core/src/l1_action/nt_act/nt_act_trade/capability_registry.rs` | 1,238 | 140 | 39 | `neotrix::l1_action::nt_act::nt_act_trade::capability_registry` |
-| 21 | `crates/neotrix-neobot/src/bin/neobot.rs` | 2,390 | 138 | 0 | `neotrix_neobot::bin::neobot` |
+| 20 | `crates/neotrix-neobot/src/bin/neobot.rs` | 2,422 | 140 | 0 | `neotrix_neobot::bin::neobot` |
+| 21 | `neotrix-core/src/l1_action/nt_act/nt_act_trade/capability_registry.rs` | 1,238 | 140 | 39 | `neotrix::l1_action::nt_act::nt_act_trade::capability_registry` |
 | 22 | `neotrix-core/src/l1_action/nt_act/nt_act_trade/trade_core.rs` | 931 | 137 | 46 | `neotrix::l1_action::nt_act::nt_act_trade::trade_core` |
 | 23 | `neotrix-core/src/l5_cognition/nt_mind/nt_mind/seal_core/self_iterating/stage_contracts.rs` | 886 | 137 | 29 | `neotrix::l5_cognition::nt_mind::nt_mind::seal_core::self_iterating::stage_contracts` |
 | 24 | `crates/neotrix-neobot/src/nt_channel_telegram.rs` | 2,408 | 136 | 18 | `neotrix_neobot::nt_channel_telegram` |
@@ -151,9 +151,9 @@ python3 scripts/ops/nt_topology.py   # → 本文件
 
 | 位置 | `.unwrap()` | `.expect()` | `panic!` |
 |---|---:|---:|---:|
-| 全仓 | 5150 | 3607 | 241 |
+| 全仓 | 5150 | 3615 | 244 |
 | 测试目录内 | 1011 | 427 | 50 |
-| **生产代码** | **4139** | **3180** | **191** |
+| **生产代码** | **4139** | **3188** | **194** |
 
 **⛔ `AGENTS.md` / `RUST-STANDARDS.md` 明令生产代码禁这三者，但全仓无任何门或基线在度量** ⇒ 一次性历史债，存量裸奔，随时可能新增而无报警。
 
@@ -181,7 +181,7 @@ python3 scripts/ops/nt_topology.py   # → 本文件
 | 口径 | 数量 | 含义 |
 |---|---:|---|
 | 重复的**类型名** | 996 | 同名出现 ≥2 次的**名字**数 |
-| 名义多余定义 | 1637 | 每名保留 1 份后余下的（**含异构**） |
+| 名义多余定义 | 1639 | 每名保留 1 份后余下的（**含异构**） |
 | **结构完全相同**的真重复组 | **222** | 字段集合逐项相同 |
 | **真正可归并的定义** | **249** | 只有这个数才叫「可归并」 |
 
@@ -200,7 +200,7 @@ python3 scripts/ops/nt_topology.py   # → 本文件
 ⇒ 996 个同名里，**只有 249 个结构真同构**（占名义多余的 15%）。
 其余是**合法的同名异构**（如 `TaskStatus` 出现 12 次却是 10 个不同枚举）—— 报原始名数会是对正确代码的误报，与 `unsafe` 字面量陷阱同一层次。
 
-> ⚠️ 本表第一版把「名义多余 1637」误写成「可归并」并算出 160% —— **那正是本节警告的那个错误，我自己犯了一遍**。三个数已分列，逐个标明含义。
+> ⚠️ 本表第一版把「名义多余 1639」误写成「可归并」并算出 160% —— **那正是本节警告的那个错误，我自己犯了一遍**。三个数已分列，逐个标明含义。
 
 #### Top 12 真同构组（按可归并数）
 
@@ -263,8 +263,8 @@ python3 scripts/ops/nt_topology.py   # → 本文件
 
 ## 维度 6 · 运行时语义（手写段，2026-10-08）
 
-> ⚠️ 本节由人工维护，**重跑 `nt_topology.py` 会覆盖**。正文源文档：
-> `docs/architecture/ABSORPTION-TODOS-DEV-2026-10-08.md` §3。
+> ⚠️ 本节由人工维护，**重跑 `nt_topology.py` 会覆盖**（2026-10-08 实测已被覆盖一次，已补回）。
+> 正文源文档：`docs/architecture/ABSORPTION-TODOS-DEV-2026-10-08.md` §3。
 
 todos.dev 的「任务→agent→worktree→进度可视化」四元组是本地图的运行时语义：
 
