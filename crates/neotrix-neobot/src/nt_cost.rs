@@ -11,43 +11,7 @@
 //! （Sonnet 5 $2/$10、Fable 5.1 $10/$50、Mythos 5.1 $10/$50）+ 独立计算器交叉
 //! （Opus 5/4.8/4.7/4.6 $5/$25、Sonnet 4.6/4.5 $3/$15、Haiku 4.5 $1/$5）。
 //! 注意 Sonnet 5 于 2026-09-01 起执行标准价 $3/$15，此处取标准价。
-/// 计价策略（环境变量显式配置）。
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct CostPolicy {
-    /// 美元/百万 input token（None = 未配置）。
-    pub price_in_per_m: Option<f64>,
-    /// 美元/百万 output token（None = 未配置）。
-    pub price_out_per_m: Option<f64>,
-}
-
-impl CostPolicy {
-    /// 本地默认：无配置（全 0 费、未计量）。
-    pub fn local_default() -> Self {
-        Self {
-            price_in_per_m: None,
-            price_out_per_m: None,
-        }
-    }
-
-    /// `NEOBOT_PRICE_IN_PER_M` / `NEOBOT_PRICE_OUT_PER_M`（>0 才认）。
-    pub fn from_env() -> Self {
-        Self {
-            price_in_per_m: parse_price("NEOBOT_PRICE_IN_PER_M"),
-            price_out_per_m: parse_price("NEOBOT_PRICE_OUT_PER_M"),
-        }
-    }
-
-    pub fn is_configured(self) -> bool {
-        self.price_in_per_m.is_some() || self.price_out_per_m.is_some()
-    }
-}
-
-fn parse_price(env: &str) -> Option<f64> {
-    std::env::var(env)
-        .ok()
-        .and_then(|raw| raw.trim().parse::<f64>().ok())
-        .filter(|v| v.is_finite() && *v > 0.0)
-}
+pub use neotrix_types::nt_cost_policy::CostPolicy;
 
 /// Claude 官方价目（美元/百万 token；长名优先，子串命中）。
 /// 2026-09-01 起 Sonnet 5 执行标准价，此处取标准价。

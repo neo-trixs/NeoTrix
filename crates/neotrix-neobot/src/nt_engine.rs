@@ -35,6 +35,10 @@ pub trait EngineAdapter {
     fn model_name(&self) -> &str {
         ""
     }
+    /// 本引擎取 key 的环境变量名（落账本口径；空 = 免 key）。引擎缺省 None。
+    fn key_env_name(&self) -> Option<&str> {
+        None
+    }
     /// 引擎能否把**多模态内容部件**（OpenAI `image_url`）真正送进模型。
     ///
     /// 默认 `false` —— 拿不准就说拿不准。`read_image` 在返回 `false` 的引擎上

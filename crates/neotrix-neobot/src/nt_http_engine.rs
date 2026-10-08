@@ -87,6 +87,8 @@ pub struct HttpEngine {
     offer_computer: bool,
     /// 跨会话个人记忆（`MEMORY.md` 全文；None/空则不注入）。
     memory_context: Option<String>,
+    /// 本引擎取 key 的环境变量名（落账本口径；永不存 key 值）。
+    key_env_name: String,
 }
 
 impl std::fmt::Debug for HttpEngine {
@@ -110,6 +112,7 @@ impl HttpEngine {
             api_key,
             offer_computer: false,
             memory_context: None,
+            key_env_name: String::new(),
         })
     }
 
@@ -125,6 +128,12 @@ impl HttpEngine {
         self
     }
 
+    /// 记录本引擎取 key 的环境变量名（落账本口径）。
+    pub(crate) fn with_key_env_name(mut self, key_env_name: String) -> Self {
+        self.key_env_name = key_env_name;
+        self
+    }
+
     pub fn from_env() -> Result<Self, NtBotError> {
         let (config, api_key) = HttpEngineConfig::from_env()?;
         let offer = std::env::var("NEOBOT_OFFER_COMPUTER")
@@ -135,6 +144,7 @@ impl HttpEngine {
             api_key,
             offer_computer: offer,
             memory_context: None,
+            key_env_name: String::new(),
         })
     }
 
@@ -154,6 +164,7 @@ impl HttpEngine {
             api_key: api_key.to_owned(),
             offer_computer: false,
             memory_context: None,
+            key_env_name: String::new(),
         }
     }
 
@@ -788,6 +799,15 @@ impl EngineAdapter for HttpEngine {
     fn engine_id(&self) -> &str {
         // `engine_id` 返回静态语义名; 模型名走 `model_name` (ledger 用).
         "http"
+    }
+
+    fn key_env_name(&self) -> Option<&str> {
+        let k = self.key_env_name.trim();
+        if k.is_empty() {
+            None
+        } else {
+            Some(k)
+        }
     }
 
     fn model_name(&self) -> &str {

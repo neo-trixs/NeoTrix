@@ -73,8 +73,8 @@ impl NeobotStore {
         };
         self.conn.execute(
             "INSERT INTO ledger(id,at,engine,model,actor,purpose,in_tokens,out_tokens,
-              cost_usd,measured,status,latency_ms,error)
-             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)",
+              cost_usd,measured,status,latency_ms,error,session_id,key_env)
+             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)",
             params![
                 entry.id,
                 entry.at,
@@ -88,7 +88,9 @@ impl NeobotStore {
                 i64::from(entry.measured),
                 entry.status,
                 entry.latency_ms.max(0),
-                entry.error
+                entry.error,
+                entry.session_id,
+                entry.key_env
             ],
         )?;
         Ok(())
@@ -234,6 +236,8 @@ mod tests {
                     status: "ok".to_owned(),
                     latency_ms: 12,
                     error: None,
+                    session_id: None,
+                    key_env: None,
                 })
                 .expect("record");
         }
@@ -253,6 +257,8 @@ mod tests {
                 status: "ok".to_owned(),
                 latency_ms: 1,
                 error: None,
+                session_id: None,
+                key_env: None,
             })
             .expect("record");
         let sums = store.ledger_sums().expect("sums");

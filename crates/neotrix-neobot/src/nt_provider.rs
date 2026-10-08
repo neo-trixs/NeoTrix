@@ -250,7 +250,8 @@ impl Provider {
             timeout_secs: crate::nt_http_engine::DEFAULT_TIMEOUT_SECS,
         };
         config.validate()?;
-        crate::nt_http_engine::HttpEngine::new(config, self.read_key())
+        Ok(crate::nt_http_engine::HttpEngine::new(config, self.read_key())?
+            .with_key_env_name(self.key_env.trim().to_owned()))
     }
 }
 

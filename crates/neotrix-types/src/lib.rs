@@ -6,6 +6,7 @@
 #![deny(dead_code)]
 
 pub mod core;
+pub mod nt_cost_policy;
 pub mod knowledge_access;
 pub mod l1_error;
 pub mod llm_types;
@@ -13,6 +14,7 @@ pub mod nt_error;
 pub mod search_backend;
 pub mod write_guard_types;
 pub use core::self_measure;
+pub use nt_cost_policy::CostPolicy;
 pub use core::self_model;
 
 // Re-export sub-modules so external code can use neotrix_types::nt_core_bank::X etc.

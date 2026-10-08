@@ -59,6 +59,7 @@ pub mod nt_provider;
 pub mod nt_qwen_mm;
 pub mod nt_reply_tag;
 pub mod nt_routine;
+pub mod nt_routing;
 pub mod nt_run_trace;
 pub mod nt_secret_scan;
 pub mod nt_side_chat;
@@ -142,6 +143,9 @@ pub use nt_reply_tag::{
     labels_for_turn, normalize_tools, tools_from_trace, usage_for_turn, ReplyMode, TurnLabels,
     TurnUsage,
 };
+pub use nt_routing::{
+    RouteGroup, RouteMode, RoutingEngine, build_engine_by_name,
+};
 pub use nt_routine::{fire_routine, frame_firing, read_firing, sweep_routines, Routine};
 pub use nt_run_trace::{
     run_list, run_trace, ChangeView, RunListView, RunRow, RunTraceView, StepView,
@@ -155,7 +159,7 @@ pub use nt_sidebar::{
 pub use nt_store::{
     classify_attachment, Attachment, BotRow, ChannelRow, Conversation, CorePair, FileChange,
     FileChangeView, LedgerActorSum, LedgerEntry, LedgerSum, NeobotStore, PathTally,
-    PendingDelivery, CLAIM_TTL_SECS,
+    PendingDelivery, QuotaLimit, QuotaWindow, CLAIM_TTL_SECS,
 };
 pub use nt_types::{
     AgentTask, TaskStatus, TokenUsage, ToolCall, ToolName, ToolResult, TranscriptItem,

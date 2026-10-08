@@ -83,6 +83,17 @@ enum Cmd {
         #[arg(long, default_value_t = false)]
         by_actor: bool,
     },
+    /// 额度窗口：快照 + 人工声明的上限（`set`/`rm`/`list`）.
+    Quota {
+        #[command(subcommand)]
+        cmd: Option<QuotaCmd>,
+        /// 先从 ledger 重算并覆盖三类窗口.
+        #[arg(long, default_value_t = false)]
+        snapshot: bool,
+        /// 只看某一类窗口.
+        #[arg(long)]
+        kind: Option<String>,
+    },
     /// 定时例行（15min 地板 + 10 连败自停）.
     Routine {
         #[command(subcommand)]
@@ -133,6 +144,11 @@ enum Cmd {
     Provider {
         #[command(subcommand)]
         cmd: ProviderCmd,
+    },
+    /// 路由组管理（Magpie-style group/<name>：order/rotate/usage + failover）.
+    Route {
+        #[command(subcommand)]
+        cmd: RouteCmd,
     },
     /// 晶体核心配对（灵魂嵌入：配对走核心，未配对纯本地）.
     Core {
@@ -303,6 +319,48 @@ enum ProviderCmd {
 }
 
 #[derive(Debug, Subcommand)]
+enum QuotaCmd {
+    /// 人工声明额度上限（**不是探针读来的**；source 记 manual）.
+    Set {
+        #[arg(long)] key_env: String,
+        #[arg(long, default_value = "")] provider: String,
+        #[arg(long, default_value = "daily")] kind: String,
+        /// 窗口内 token 输入上限.
+        #[arg(long)] limit_in: Option<i64>,
+        /// 窗口内 token 输出上限.
+        #[arg(long)] limit_out: Option<i64>,
+        /// 窗口内费用上限 USD.
+        #[arg(long)] limit_cost: Option<f64>,
+    },
+    /// 删除一条上限声明.
+    Rm {
+        #[arg(long)] key_env: String,
+        #[arg(long, default_value = "")] provider: String,
+        #[arg(long, default_value = "daily")] kind: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum RouteCmd {
+    /// 新增/更新路由组（members 逗号分隔；mode: order|rotate|usage）.
+    Add {
+        #[arg(long)] name: String,
+        #[arg(long, value_delimiter = ',')] members: Vec<String>,
+        #[arg(long, default_value = "order")] mode: String,
+    },
+    List,
+    Remove {
+        #[arg(long)] name: String,
+    },
+    On {
+        #[arg(long)] name: String,
+    },
+    Off {
+        #[arg(long)] name: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
 enum CoreCmd {
     /// 配对晶体核心（灵魂嵌入；探活成功才写，死端点拒绝）.
     Pair {
@@ -435,6 +493,26 @@ fn real_main() -> Result<(), NtBotError> {
             AuditCmd::Prune { days } => cmd_audit_prune(days),
         },
         Cmd::Ledger { by_actor } => cmd_ledger(by_actor),
+        Cmd::Quota {
+            cmd,
+            snapshot,
+            kind,
+        } => match cmd {
+            Some(QuotaCmd::Set {
+                key_env,
+                provider,
+                kind,
+                limit_in,
+                limit_out,
+                limit_cost,
+            }) => cmd_quota_set(&key_env, &provider, &kind, limit_in, limit_out, limit_cost),
+            Some(QuotaCmd::Rm {
+                key_env,
+                provider,
+                kind,
+            }) => cmd_quota_rm(&key_env, &provider, &kind),
+            None => cmd_quota(snapshot, kind.as_deref()),
+        },
         Cmd::Routine { cmd } => match cmd {
             RoutineCmd::Add { name, interval, instruction, owner } => {
                 cmd_routine_add(&name, interval, &instruction, &owner)
@@ -493,6 +571,13 @@ fn real_main() -> Result<(), NtBotError> {
             ProviderCmd::On { name } => cmd_provider_toggle(&name, true),
             ProviderCmd::Off { name } => cmd_provider_toggle(&name, false),
             ProviderCmd::Preset { name } => cmd_provider_preset(&name),
+        },
+        Cmd::Route { cmd } => match cmd {
+            RouteCmd::Add { name, members, mode } => cmd_route_add(&name, &members, &mode),
+            RouteCmd::List => cmd_route_list(),
+            RouteCmd::Remove { name } => cmd_route_remove(&name),
+            RouteCmd::On { name } => cmd_route_toggle(&name, true),
+            RouteCmd::Off { name } => cmd_route_toggle(&name, false),
         },
         Cmd::Core { cmd } => match cmd {
             CoreCmd::Pair { base_url, model, key_env, token_env } => {
@@ -802,14 +887,16 @@ fn cmd_run(
     // 核心离线则回落本地回显并明示（不静默）。
     let engine: Box<dyn EngineAdapter> = match provider_name {
         Some(name) => {
-            let provider = store.get_provider(name)?.ok_or_else(|| {
-                NtBotError::Store(format!("no such provider '{name}'"))
-            })?;
-            if !provider.enabled {
-                return Err(NtBotError::Store(format!("provider '{name}' is off")));
-            }
+            // provider 名先按路由组解析（group/<name> failover），否则按普通端点。
             let memory = neotrix_neobot::nt_memory::memory_for_config(&cfg);
-            Box::new(provider.http_engine(model_override)?.with_memory_context(memory))
+            match neotrix_neobot::build_engine_by_name(&store, name, model_override, memory)? {
+                Some(engine) => engine,
+                None => {
+                    return Err(NtBotError::Store(format!(
+                        "no such provider or route group '{name}'"
+                    )));
+                }
+            }
         }
         None if engine_name.trim().is_empty() || engine_name.trim() == "echo" => {
             // 灵魂优先：HTTP 配对且活着 → 核心；CLI 配对（Zen）→ 本机 opencode；
@@ -985,6 +1072,118 @@ fn cmd_ledger(by_actor: bool) -> Result<(), NtBotError> {
             println!("{engine}/{model} in={input} out={output} cost=${cost:.4}");
         }
     }
+    // 降级单独一段（N6.2）：它是「内容被丢弃」的次数，**不含** token/cost，
+    // 与上面的费用聚合是两个问题，混在一行会让人以为降级也花了钱。
+    let degraded = store.ledger_degraded_counts()?;
+    if !degraded.is_empty() {
+        for (engine, n) in degraded {
+            println!("{engine} degraded={n}（工具输出整体丢弃，cost=0，不计入上面各行）");
+        }
+    }
+    Ok(())
+}
+
+/// 费用上限的显示：既不装无限，也不装 0。
+fn money(v: f64) -> String {
+    // 空 SUM 会给出 `-0.0` ⇒ 印出 `$-0.0000`；归一成 0 再显示。
+    if v.abs() < 1e-9 {
+        return "$0.0000".to_owned();
+    }
+    format!("${v:.4}")
+}
+
+fn cmd_quota(snapshot: bool, kind: Option<&str>) -> Result<(), NtBotError> {
+    let cfg = load_config()?;
+    let store = open_store(&cfg)?;
+    if snapshot {
+        let n = store.snapshot_quota_windows()?;
+        println!("neobot quota: snapshot 覆盖 {n} 个窗口行");
+    }
+    let rows = store.list_quota_windows(kind)?;
+    if rows.is_empty() {
+        println!("neobot quota: 暂无窗口数据（先跑 `neobot quota --snapshot`）");
+    }
+    for w in &rows {
+        println!(
+            "{} {} key_env={} {}/{} in={} out={} cost={}",
+            w.window_kind,
+            w.window_start,
+            w.key_env,
+            w.engine,
+            w.model,
+            w.tokens_in,
+            w.tokens_out,
+            money(w.cost_usd)
+        );
+    }
+    // 上限声明逐条列出，并给出「已用 / 上限 / 剩余」的三态措辞。
+    for l in store.list_quota_limits()? {
+        let (ti, to, cost, _) =
+            store.quota_used_vs_limit(&l.key_env, &l.provider, &l.window_kind)?;
+        let used = match (l.limit_cost_usd, l.limit_in) {
+            (Some(_), _) => format!("已用 {}", money(cost)),
+            (None, Some(_)) => format!("已用 in={ti} out={to}"),
+            (None, None) => format!("已用 in={ti} out={to} cost={}", money(cost)),
+        };
+        let limits = [
+            l.limit_in.map(|v| format!("in<={v}")),
+            l.limit_out.map(|v| format!("out<={v}")),
+            l.limit_cost_usd.map(|v| format!("cost<={}", money(v))),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(" ");
+        let remaining = l.limit_cost_usd.map(|lim| {
+            let r = lim - cost;
+            if r < 0.0 {
+                format!("**已超** {}（上限 {}）", money(cost - lim), money(lim))
+            } else {
+                format!("剩余 {}", money(r))
+            }
+        });
+        println!(
+            "{} {}/{} {used} · 上限 {limits} · {} · 来源 {} · 更新 {}",
+            l.window_kind,
+            l.key_env,
+            l.provider,
+            remaining.unwrap_or_else(|| "未设上限（无声明）".to_owned()),
+            l.source,
+            l.updated_at
+        );
+    }
+    Ok(())
+}
+
+fn cmd_quota_set(
+    key_env: &str,
+    provider: &str,
+    kind: &str,
+    limit_in: Option<i64>,
+    limit_out: Option<i64>,
+    limit_cost: Option<f64>,
+) -> Result<(), NtBotError> {
+    let cfg = load_config()?;
+    let store = open_store(&cfg)?;
+    store.upsert_quota_limit(&neotrix_neobot::QuotaLimit {
+        key_env: key_env.trim().to_owned(),
+        provider: provider.trim().to_owned(),
+        window_kind: kind.trim().to_owned(),
+        limit_in,
+        limit_out,
+        limit_cost_usd: limit_cost,
+        source: "manual".to_owned(),
+        updated_at: String::new(),
+    })?;
+    println!("neobot quota: 已声明上限 {key_env}/{provider}/{kind}（source=manual）");
+    Ok(())
+}
+
+fn cmd_quota_rm(key_env: &str, provider: &str, kind: &str) -> Result<(), NtBotError> {
+    let cfg = load_config()?;
+    let store = open_store(&cfg)?;
+    store.remove_quota_limit(key_env, provider, kind)?;
+    println!("neobot quota: 已删除上限 {key_env}/{provider}/{kind}");
     Ok(())
 }
 
@@ -1663,6 +1862,50 @@ fn cmd_provider_toggle(name: &str, enabled: bool) -> Result<(), NtBotError> {
     Ok(())
 }
 
+fn cmd_route_add(name: &str, members: &[String], mode: &str) -> Result<(), NtBotError> {
+    let cfg = load_config()?;
+    let store = open_store(&cfg)?;
+    store.upsert_route_group(&neotrix_neobot::RouteGroup {
+        name: name.trim().to_owned(),
+        members: members.iter().map(|m| m.trim().to_owned()).collect(),
+        mode: mode.trim().to_owned(),
+        enabled: true,
+    })?;
+    println!("neobot route '{name}' added (mode={mode}, {} members)", members.len());
+    Ok(())
+}
+
+fn cmd_route_list() -> Result<(), NtBotError> {
+    let cfg = load_config()?;
+    let store = open_store(&cfg)?;
+    for g in store.list_route_groups()? {
+        println!(
+            "{} {} mode={} members=[{}]",
+            if g.enabled { "[on]" } else { "[off]" },
+            g.name,
+            g.mode,
+            g.members.join(", ")
+        );
+    }
+    Ok(())
+}
+
+fn cmd_route_remove(name: &str) -> Result<(), NtBotError> {
+    let cfg = load_config()?;
+    let store = open_store(&cfg)?;
+    store.remove_route_group(name)?;
+    println!("neobot route '{name}' removed");
+    Ok(())
+}
+
+fn cmd_route_toggle(name: &str, enabled: bool) -> Result<(), NtBotError> {
+    let cfg = load_config()?;
+    let store = open_store(&cfg)?;
+    store.set_route_group_enabled(name, enabled)?;
+    println!("neobot route '{name}' {}", if enabled { "on" } else { "off" });
+    Ok(())
+}
+
 fn cmd_provider_preset(name: &str) -> Result<(), NtBotError> {
     let Some((_, base_url, key_env, model)) = neotrix_neobot::PRESETS
         .iter()
@@ -1728,29 +1971,43 @@ fn cmd_capability_never() -> Result<(), NtBotError> {
 
 /// 金丝雀触发情况 —— 此前没有任何出口读 `fired_count`。
 fn cmd_capability_canary() -> Result<(), NtBotError> {
-    match neotrix_neobot::nt_capability_canary::status() {
-        Ok(v) if v.is_empty() => println!("金丝雀：空"),
-        Ok(v) => {
-            println!("金丝雀 {} 项：", v.len());
-            for s in &v {
-                println!(
-                    "  {}  fired={}  healthy={}",
-                    s.capability.id, s.fired_count, s.healthy
-                );
-            }
+    // 窗口按会话分桶 ⇒ CLI 逐会话打印；无存活会话时退回默认键的冷启动视图。
+    let sessions = match neotrix_neobot::nt_capability_canary::sessions() {
+        Ok(v) if v.is_empty() => vec![neotrix_neobot::nt_capability_canary::DEFAULT_SESSION.to_owned()],
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("无法枚举金丝雀会话：{e}");
+            return Ok(());
         }
-        Err(e) => eprintln!("无法读取金丝雀状态：{e}"),
-    }
-    // id 空间不一致的**直接证据**：非空即说明 signal() 与 expect() 用的不是同一套 id
-    match neotrix_neobot::nt_capability_canary::unmatched_signals() {
-        Ok(v) if v.is_empty() => println!("  未登记信号：0 项（signal 与 expect 的 id 空间一致）"),
-        Ok(v) => {
-            println!("  [WARN] 收到过但无金丝雀登记的信号：{} 项（id 空间不一致）", v.len());
-            for (id, n) in v.iter().take(8) {
-                println!("      UNMATCHED  {id}  x{n}");
+    };
+    for session in &sessions {
+        println!("[会话 {session}]");
+        match neotrix_neobot::nt_capability_canary::status(session) {
+            Ok(v) if v.is_empty() => println!("金丝雀：空"),
+            Ok(v) => {
+                println!("金丝雀 {} 项：", v.len());
+                for s in &v {
+                    println!(
+                        "  {}  fired={}  healthy={}",
+                        s.capability.id, s.fired_count, s.healthy
+                    );
+                }
             }
+            Err(e) => eprintln!("无法读取金丝雀状态：{e}"),
         }
-        Err(e) => eprintln!("无法读取未登记信号：{e}"),
+        // id 空间不一致的**直接证据**：非空即说明 signal() 与 expect() 用的不是同一套 id
+        match neotrix_neobot::nt_capability_canary::unmatched_signals(session) {
+            Ok(v) if v.is_empty() => {
+                println!("  未登记信号：0 项（signal 与 expect 的 id 空间一致）")
+            }
+            Ok(v) => {
+                println!("  [WARN] 收到过但无金丝雀登记的信号：{} 项（id 空间不一致）", v.len());
+                for (id, n) in v.iter().take(8) {
+                    println!("      UNMATCHED  {id}  x{n}");
+                }
+            }
+            Err(e) => eprintln!("无法读取未登记信号：{e}"),
+        }
     }
     Ok(())
 }

@@ -101,6 +101,26 @@ impl NeobotStore {
         })
     }
 
+    /// 记该会话**最新一条**消息的投递态与平台 message_id
+    /// （N2-P2 占位→编辑；`status` = sent | edited | degraded | failed）。
+    ///
+    /// 取「最新一条」用 `(created_at, rowid)` 排序而非只按 `created_at`：
+    /// 同秒落库的多条消息 `created_at` 相等，只按它排会**随机**挑到另一条。
+    pub fn mark_latest_delivery(
+        &self,
+        convo_id: &str,
+        platform_msg_id: &str,
+        status: &str,
+    ) -> Result<bool, NtBotError> {
+        let changed = self.conn.execute(
+            "UPDATE messages SET platform_msg_id=?2, delivery_status=?3
+             WHERE id = (SELECT id FROM messages WHERE convo_id=?1
+                         ORDER BY created_at DESC, rowid DESC LIMIT 1)",
+            params![convo_id.trim(), platform_msg_id.trim(), status.trim()],
+        )?;
+        Ok(changed > 0)
+    }
+
     /// 读一个会话的**全部**消息（时间正序）。会话不存在即报错 ——
     /// 「空会话」与「不存在的会话」对调用方是两种处境（见模块头 ①）。
     ///

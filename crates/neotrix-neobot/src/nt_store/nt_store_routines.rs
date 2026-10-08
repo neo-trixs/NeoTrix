@@ -175,6 +175,34 @@ impl NeobotStore {
     }
 
     /// 成本账聚合（按 engine+model+actor 切账；SUM 收敛同上）。
+    /// 按 key_env 聚合总成本/用量（quota 窗口切片；COALESCE 空串为 '-'）。
+    pub fn ledger_sums_by_key_env(
+        &self,
+    ) -> Result<Vec<(String, String, String, i64, i64, f64)>, NtBotError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT engine, model, COALESCE(NULLIF(key_env, ''), '-') AS ke,
+              COALESCE(CAST(SUM(in_tokens) AS INTEGER),0),
+              COALESCE(CAST(SUM(out_tokens) AS INTEGER),0),
+              COALESCE(SUM(cost_usd),0.0)
+             FROM ledger GROUP BY engine, model, ke",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, i64>(3)?,
+                r.get::<_, i64>(4)?,
+                r.get::<_, f64>(5)?,
+            ))
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
     pub fn ledger_sums_by_actor(&self) -> Result<Vec<LedgerActorSum>, NtBotError> {
         let mut stmt = self.conn.prepare(
             "SELECT engine, model, actor, COALESCE(CAST(SUM(in_tokens) AS INTEGER),0), COALESCE(CAST(SUM(out_tokens) AS INTEGER),0), COALESCE(SUM(cost_usd),0.0)

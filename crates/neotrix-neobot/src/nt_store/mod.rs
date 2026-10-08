@@ -303,6 +303,30 @@ impl NeobotStore {
                status TEXT NOT NULL DEFAULT 'ok',
                latency_ms INTEGER NOT NULL DEFAULT 0, error TEXT,
               session_id TEXT, key_env TEXT);
+              -- N4 额度窗口：把 ledger 的实时 SUM **快照**成可按窗口
+              -- （daily/weekly/monthly）读/画的持久表。刻意不做「窗口内
+              -- 增量累加」—— 快照法对「历史被改/删」自愈（重算即真值），
+              -- 增量法一旦有回填/删除就永久漂移。
+              CREATE TABLE IF NOT EXISTS quota_windows(
+                key_env TEXT NOT NULL, engine TEXT NOT NULL DEFAULT '',
+                model TEXT NOT NULL DEFAULT '',
+                window_kind TEXT NOT NULL DEFAULT 'daily',
+                window_start TEXT NOT NULL,
+                tokens_in INTEGER NOT NULL DEFAULT 0,
+                tokens_out INTEGER NOT NULL DEFAULT 0,
+                cost_usd REAL NOT NULL DEFAULT 0.0,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (key_env, engine, model, window_kind, window_start));
+              -- N6.1 人工声明的额度上限（**不是探针读来的**）：`limit_*`
+              -- 可空 = 未设；`source` 记来源（manual/探针名）⇒ 出表时
+              -- 不把「人填的」说成「供应商报的」。
+              CREATE TABLE IF NOT EXISTS quota_limits(
+                key_env TEXT NOT NULL, provider TEXT NOT NULL,
+                window_kind TEXT NOT NULL DEFAULT 'daily',
+                limit_in INTEGER, limit_out INTEGER, limit_cost_usd REAL,
+                source TEXT NOT NULL DEFAULT 'manual',
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (key_env, provider, window_kind));
               CREATE TABLE IF NOT EXISTS outbox(
                 id TEXT PRIMARY KEY, topic TEXT NOT NULL,
                 payload TEXT NOT NULL, claimed INTEGER NOT NULL DEFAULT 0,
@@ -434,6 +458,11 @@ impl NeobotStore {
             //    编出来的键会让「这一行到底配不配得上」永远判不出来。
             //    幂等性同上：第二次执行报 duplicate column，由 `.ok()` 吞掉。
             "ALTER TABLE steps ADD COLUMN tool_call_id TEXT",
+            // N2 edit_of 占位消息：出站占位/媒体消息记录平台 message_id 与投递态，
+            // 便于流式「先占位→覆盖编辑」。两列追加在末尾，不动既有列序
+            // （messages 的读行按 `r.get(0..5)` 取列，顺序不能动）。
+            "ALTER TABLE messages ADD COLUMN platform_msg_id TEXT",
+            "ALTER TABLE messages ADD COLUMN delivery_status TEXT NOT NULL DEFAULT 'pending'",
         ] {
             let _applied: Option<usize> = self.conn.execute(alter, []).ok();
         }
@@ -447,7 +476,9 @@ impl NeobotStore {
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS messages(
                id TEXT PRIMARY KEY, convo_id TEXT NOT NULL, role TEXT NOT NULL,
-               text TEXT NOT NULL, created_at TEXT NOT NULL)",
+               text TEXT NOT NULL, created_at TEXT NOT NULL,
+               platform_msg_id TEXT,
+               delivery_status TEXT NOT NULL DEFAULT 'pending')",
             [],
         )?;
         self.conn.execute(
@@ -586,6 +617,8 @@ mod nt_store_ledger;
 mod nt_store_messages;
 pub use nt_store_messages::{ChatMessage, MESSAGE_MAX_CHARS};
 mod nt_store_providers;
+mod nt_store_quota;
+pub use nt_store_quota::{QuotaLimit, QuotaWindow};
 mod nt_store_routes;
 mod nt_store_reply_tag;
 mod nt_store_routines;
