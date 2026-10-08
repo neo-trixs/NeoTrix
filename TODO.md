@@ -1080,12 +1080,13 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 - 验收：`quota --kind daily` 在「有上限/无上限/无数据」三态下措辞各不相同且都不撒谎；2 条测。
 
 ### N6.2 · neobot 侧 `degraded` 记账对齐（N3 尾巴）
-- [ ] core `COST_TRACKER.degraded_count` 已就位（降级≠花钱）；**补 neobot ledger 侧**：`ledger.status` 已有 `ok/failed` 口径 → 增加 `degraded` 枚举并在压缩降级时落一行（或经 outbox/telemetry 侧信道），口径与 `neobot ledger` 出表一致。
-- [ ] 面：`neobot ledger --by-actor` 增加 degraded 计数列。
-- 验收：一次压缩降级 ⇒ `neobot ledger` 出现 `degraded` 行且 `cost_usd=0`。
+- [x] core `COST_TRACKER.degraded_count` 已就位（降级≠花钱）。
+- [x] neobot ledger 侧 `degraded` 行已落地（✅ 判据 `nt_output_distill::is_degraded`：只有蒸馏塌成 `…` 才算降级，**errors-first 压缩不算**；`run_loop` 累计 `degraded_tools` 并落 `purpose=tool-output-degrade`、`status=degraded`、`cost_usd=0`、`measured=false` 的一行；best-effort 记账不挡本轮）。
+- [x] 面：`neobot ledger` 增独立降级段（`{engine} degraded=N`）+ `store.ledger_degraded_counts()`；**降级不含 token/cost**，与费用聚合分列。1 测锁定「降级行 cost=0 不改变费用合计」。
 
-### N6.3 · 本地协议翻译网关（N5-1，独立大件，单开窗口）
-- [ ] P0 **只读设计**：`docs/architecture/neobot-gateway-design.md` —— 端点矩阵（`/v1/chat/completions`、`/v1/responses`、`/v1/messages`、`generateContent`）、流式分块对齐、工具调用形状差异表、错误映射表（Anthropic 的 `stop_reason` ↔ OpenAI `finish_reason` 等）。
+### N6.3 · 本地协议翻译网关（N5-1，独立大件，单开窗口 · 设计已就绪，待主人拍依赖口径）
+- [x] P0 **只读设计**：✅ `docs/architecture/neobot-gateway-design.md`（端点矩阵 6 行 / 形状差异表 9 维（system·用户·助手·工具结果·结束原因·用量·鉴权头）/ 错误映射表 7 行（401 不许变 500、429 带 Retry-After、502 不伪装 500）/ 与 `build_engine_by_name` 的「先组后 provider」解析口径 / P1-P3 分期与验收 / 4 条风险登记）。**未决**：P1 是否引 HTTP server 依赖（引依赖须先过 `check-feature-gates.sh`；否则手写极简 HTTP/1.1）——由主人在开工时拍板。
+- [ ] **开工前必做（未做）**：① 依赖口径由主人拍板（`axum 0.8` 已在 **neotrix-core** 用着但**不在 workspace 依赖表**、neobot 未引 ⇒ 引它 = 改 `crates/neotrix-neobot/Cargo.toml`；或手写极简 HTTP/1.1 零新依赖）。② 改 Cargo.toml 前必须跑 `bash scripts/check-feature-gates.sh`（本轮**未跑成**：用户中止）。
 - [ ] P1 骨架：`crates/neotrix-neobot/src/nt_gateway/`（`mod.rs` 端点分发 + `translate_*`），**复用现有 `HttpEngine`**（已是 OpenAI 客户端），不做第二套 HTTP 栈。
 - [ ] P1 路由接线：网关 → `build_engine_by_name`（已有路由组/failover/Quota 模式），使「网关入口 = 路由组成员」而非新机制。
 - [ ] P2 与 Magpie 对齐项：per-client gateway key + 日/周/月限额（复用 N6.1 的 `quota_limits`）、middleware（先只做 `model-map`/`param-override` 两个，别一次做五个）。
@@ -1107,6 +1108,13 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 - [ ] `quota_windows` 为快照法 ⇒ 大 ledger 上每次快照是全表扫描（单机可接受；十万行后需加索引或改为物化）。
 - [ ] `nt_channel_serve` worker 无池上限（每消息一线程）；极端并发需补有界池 + 背压。
 - [ ] `ChatMessage` 读行仍按位置元组（`r.get(0..5)`）；新增两列后**不要再插中间列**。
+
+> **本轮（2026-10-08 收口）已落地且验证过的**：N1 `/stop` worker 解耦 + 真并发回归 ·
+> N2 占位→编辑 + 流式增量编辑 + Telegram e2e · N3 `CostPolicy` 上移 neotrix-types + 蒸馏死循环 +
+> 压缩预算门/降级记账 · N4 路由组 Quota + ledger 两列 + `quota` CLI + `quota_windows` 快照 +
+> `quota_limits` 人工上限 · N6.1 P0 · N6.2 degraded 记账 · N6.3 P0 设计文档。
+> 收口时基线：`neotrix-neobot --lib` **606 绿**、`nt_lock_audit` 0 处、`nt_smoke.sh` 全绿。
+> ⛔ **本轮所有改动均未提交**（共享 index 纪律），交接见 `sessions/handoff-2026-10-08-neobot-n1-n6.md`。
 
 ## N5 · 长期演化但不进本轮
 - [ ] 协议翻译网关（OpenAI/Anthropic/Gemini 互译，127.0.0.1）—— 对齐 Magpie。
@@ -2966,6 +2974,27 @@ note: candidate #2 is defined in an impl for the type `run::BackgroundLoopHandle
   形态写事件 **0**。⚠️ **C8 会真的 spawn descriptor 里写的命令** —— 「只读」指不写仓库/不写 `$HOME`，
   ⛔ **不是**「不执行任何东西」，这也是 CI 只接 self-test 的原因。
 
+## F6 · ✅ 已完成（2026-10-08 12:40）显示/解析配对缺陷（**照抄屏幕永远不成立**）
+
+> 本条**不在**原 F0–F5 计划内 —— 是做 F 系列验收时**端到端跑 `ntcode --line`** 才暴露出来的。
+
+- **现象**：上窗那行是 `format!("  [{}] {}：{}", d.id, …)`（**显示层加方括号**），
+  而 `nt_stdin_human.rs` 的四条 arm（`ok ` / `no ` / `<id>!` / `<id>:`）
+  **原样存不剥** ⇒ 与需求单真实裸 id 永不相等
+  ⇒ **用户照抄屏幕的批准永远失效** ⇒ `ntcode --line` 死锁在同一道复核门。
+- **三次实测判据**：`ok [review-fc47da46]` ⇒ `Stalled`/exit **2**；
+  `[review-fc47da46]: 收到` ⇒ 同上；`ok review-fc47da46` ⇒ `Converged`/exit **0**。
+- **修法是「容忍」不是「报错拒绝」**：加装饰的是显示层 ⇒ 把屏幕上那个**合法字符串**
+  判成非法输入，是要求用户去猜一个他无从得知的内部约定。
+  新增 `normalize_demand_id()`（剥**成对**外层括号，裸 id 走原路径），
+  4 条 arm 全接；⛔ 不做「不成对就报错」（宁可原样保留也不要猜意图，有单测钉住）。
+- **验收**：单测 5 passed；**端到端证伪** —— 同一份方括号输入修后 `Converged`，
+  且实录记的是**裸 id**（方括号确实被剥了）。
+- ⚠️ **这条曾只更新了一半**：知识只写在**修复处**，**「因」那一侧**（显示侧那行）零交叉引用
+  ⇒ 下一个人改显示层就会把同一个 bug 请回来。已补显示侧注释 + `RUST-STANDARDS.md` **§17.9**
+  （**R-DISP-1** 容忍而非报错 / **R-DISP-2** 知识必须同时落在「因」与「治」两侧 / **R-DISP-3** 开关是否生效只看唯一真源）。
+  教训档见 `LESSONS-2026-10-08-cli-plugin-and-shared-index.md` **L1**（+ **L7** 同族）。
+
 ## F4 · 🟢 P2 两个并行 wrapper 的冗余裁决 —— **⚠️ 原立论已被推翻，须重写**
 
 > **原立论是错的**（取证期间发现）：本节原写「`ExternalCliPlugin`（**无** cwd）」——
@@ -3003,6 +3032,55 @@ note: candidate #2 is defined in an impl for the type `run::BackgroundLoopHandle
 - [ ] `bash scripts/check-feature-gates.sh --quick` rc=0（⛔ 需 cargo 窗口空闲，⛔ 禁与他窗并行）
 - [ ] 真 TTY 复核：`ntcode --agent freebuff`（F2 钉死 cwd 后，会话应落 `projects/neotrix/`）
 - [ ] F4 裁决落地（删 `InteractiveAgentCli` 前先补 3 项残余能力）
+
+## 📋 本节后续待办（2026-10-08 收工时点，按优先级；⛔ 全部未做）
+
+> **本节 F0/F1/F2/F3/F5/F6 已完成并入库**（`8774ed2f` + `5346c623`）。
+> 下面是**接手者**的清单。⚠️ 每条都写明「为什么还没做」与「⛔ 不要怎么���」。
+
+### 🔴 P0 · 先解他窗 WIP 造成的编译破损，否则一切验收都是空的
+
+| # | 事项 | 状态与判据 |
+|---|---|---|
+| **P0-1** | **停掉 freebuff agent 会话**（PID 49219，收工时已跑 **1h41m+**，仍在写这个仓库） | ⛔ 未做。它已写 3 个文件；⚠️ 我整轮把部分改动误判为「他窗 WIP」，**归因需要取证**（它的日志里有逐次写文件记录）。**它不停，任何验收都在移动靶子上做** |
+| **P0-2** | `cargo check -p neotrix --lib` 收尾确认 | ⛔ 未跑完（用户叫停）。`nt_lock_audit` **可疑 0 处**（12:45 实测）；`nt_crystal_dialogue.rs` 只加了注释，**理论上不破编译**，但 ⛔ **「理论上」不是证据** —— 接手者请先跑一遍 |
+
+### 🟡 P1 · 资源标识漂移类（**没有门能管，唯一的防线是人**）
+
+| # | 事项 | 判据 |
+|---|---|---|
+| **P1-1** | `ntcode.rs` 的 `FALLBACK_FREE_MODEL` 我已改成 `opencode/mimo-v2.6-flash-free`，但**这类漂移会再发生** | ⛔ **故意没立门**：CI runner 上没有 `opencode`，立联网判据 = 「报 PASS 却结构上不可能失败」的空门（L8）；立即线清单门 = 清单自己也会漂。⇒ 复核方式写在常量旁的注释里（`opencode models` 跑一遍对比） |
+| **P1-2** | 全仓还有多少硬编码**资源标识**（模型 id / URL / 端点）已经漂移？ | ⛔ **完全未查**。这是「门管不到、只有人能看见」的一整类。建议做法：按 `RUST-STANDARDS.md` **§17.9 R-DISP-3** 逐个问「这个字符串今天还有效吗」，⛔ 别用结构门（layer-deps/claims-numbers）去覆盖 |
+
+### 🟡 P1 · 验收缺口（本会话**故意没跑**，不是忘了）
+
+| # | 事项 | 为什么没跑 |
+|---|---|---|
+| **P1-3** | `bash scripts/check-feature-gates.sh --quick` | 需 6 次内部 cargo check；⚠️ 期间他窗**同时**开了 `cargo test --lib` 全量 + `cargo check --all-targets`（AGENTS.md §2 明写 ⛔ 禁并行全量构建，16G 机必爆 swap）⇒ 我只排队不抢 |
+| **P1-4** | `cargo test -p neotrix --lib` 全量（13,695 个） | 只跑了受影响的 5 个过滤器。⚠️ 本会话在 `nt_stdin_human.rs` / `external_cli_plugins.rs` / `ntcode.rs` 三个文件动了手，**全量回归未做** |
+| **P1-5** | `scripts/check-gate-satisfiable.sh --strict` | ⛔ 我**禁跑**了它：它会 `eval` 执行 15 个**含写操作**的探针（`cp .bak`/`sed -i`/`rm -f`）。新门已登记且壳头注含 `--strict` 字面量（**元门能发现它**），但**未实跑验证过** |
+| **P1-6** | 真 TTY 下 `ntcode --agent freebuff` 复核 F2（cwd 钉死后会话应落 `projects/neotrix/`） | 全部实测都在**无 TTY 管道**里做的。⚠️ F2 的效果**只在真 TTY 下才最终可信** |
+
+### 🟢 P2 · 已立案未做
+
+| # | 事项 | 备注 |
+|---|---|---|
+| **P2-1** | **F4**：删 `InteractiveAgentCli`（真调用 0） | ⛔ **别现在做** —— 他窗正在重构同一子系统（加 `shared_handle()` / `cli_descriptors_from_registry`）。且删前先补它唯一残余的 3 项能力（可配 `probe_timeout` / 探活合并 `args` / `args` builder）。**这是 breaking 变更**（`pub use` 在全 `pub mod` 链上） |
+| **P2-2** | `capability()` 返回的 `"cli_agent"` / `"external_cli"` **结构上不可能被消费** | `shared_handles_by_capability` 全仓只查 `"model_source"`/`"llm_provider"`；`capabilities_with` 零调用方。⚠️ 但他窗正在加 `shared_handle()`，**很可能就是在修这个** ⇒ 先看他们的落点再立案 |
+| **P2-3** | `mode: "headless"` 分支从未可达 + `Box::leak` 的「cron 需要 `&'static str`」理由无对应消费方 | `nt_io_plugin/` 下 `rg cron` 零命中；真实约束只是 trait 签名。⛔ 别在没查清他窗改动前动 |
+| **P2-4** | 「TUI 打字能不能自动化」**结论是负的、未解决** | PTY 探针实测：发 prompt 无回复、`log.jsonl` 无记录 ⇒ **未消耗额度**。要解决只能在你真终端里手测 |
+
+### ⛔ 不要做的事（都是本会话踩过的）
+
+1. ⛔ **不要把并发下的编译/扫描告警当缺陷** —— 可能是**别人正在改的中间态**
+   （`external_cli_plugins.rs:304` 的 E0308 是假的：他在加 `shared_handle()`）。
+   判据：`stat -f "%Sm" <file>`，**距今 < 60 秒 ⇒ 不是缺陷**。
+2. ⛔ **不要用 `--all-targets` / 全量 `--test` 与他窗并行**（AGENTS.md §2）。
+3. ⛔ **不要用 `--only` 当安全证明** —— 它挡不住别人把你扫进他的 commit
+   （实测 `scripts/gate-registry.tsv` 的登记行被 `c8b55e54` 卷走）。
+   提交后必须 `git log -S '<我独有的字符串>' -- <文件>` **自查归属**。
+4. ⛔ **不要相信「设置/配置里有这个开关」** —— 它可能被**构建期常量短路**成死开关
+   （freebuff 的 `adsEnabled:false` 即是）。判据只看**唯一真源**（§17.9 R-DISP-3）。
 
 ## ⚠️ 本节遗留的两个他窗 WIP 阻塞（非本节引入，别误记成本节的锅）
 

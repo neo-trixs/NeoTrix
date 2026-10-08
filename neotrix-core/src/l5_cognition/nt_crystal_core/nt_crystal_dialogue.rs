@@ -191,6 +191,20 @@ impl NtDialogueWindow {
         } else {
             w.push_str(&format!("内需：{} 项\n", demands.len()));
             for d in demands {
+                // ⚠️ 这里的 `[{}]` 是**显示层加的装饰**（需求单真实 id 是裸的）。
+                //
+                // 2026-10-08 实测事故：这个括号曾让 `ntcode --line` **永远收敛不了** ——
+                // 用户**照抄屏幕上这串**（`ok [review-fc47da46]`），
+                // 而 `l1_action::nt_stdin_human::normalize_demand_id` 当时**不剥**括号
+                // ⇒ `demand_id` 存成 `[review-…]`、与真实裸 id 比对不上 ⇒ 批准静默失效
+                // ⇒ 同一道复核门在下一轮原样重上（实测 `终态：Stalled`、exit 2）。
+                // 现在解析层会剥成对外层括号（`normalize_demand_id`），两侧归一。
+                //
+                // ⛔ **改这里之前先读那条纪律**：若将来决定不再显示方括号，
+                // 解析层的容忍**可以保留**（两种输入都成立）；
+                // 但若新增别的装饰（`#` 前缀、`>` 引用号、颜色转义…），
+                // **必须同时**告诉解析层，否则同一个 bug 会以另一种样子回来。
+                // 判据与全部实测见 `docs/architecture/LESSONS-2026-10-08-cli-plugin-and-shared-index.md` L1。
                 w.push_str(&format!("  [{}] {}：{}\n", d.id, d.kind.label(), d.text));
             }
             w.push_str("请回复：批准（可附demand id）/ 给出答案 / 沉默=挂起。\n");
