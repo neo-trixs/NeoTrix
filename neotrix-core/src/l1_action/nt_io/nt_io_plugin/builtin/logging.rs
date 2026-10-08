@@ -21,6 +21,7 @@ impl Plugin for LoggingPlugin {
         log::info!("[plugin/logging] unloaded");
         Ok(())
     }
+    fn as_any(&self) -> &dyn std::any::Any { self }
 
     fn on_event(&self, event: &PluginEvent) -> Result<(), String> {
         match event {

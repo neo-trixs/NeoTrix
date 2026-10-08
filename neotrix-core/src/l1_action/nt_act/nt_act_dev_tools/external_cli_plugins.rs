@@ -148,6 +148,7 @@ impl Plugin for CliDescriptorPlugin {
     fn on_unload(&self) -> Result<(), String> {
         Ok(())
     }
+    fn as_any(&self) -> &dyn std::any::Any { self }
     fn on_event(&self, _event: &PluginEvent) -> Result<(), String> {
         Ok(())
     }

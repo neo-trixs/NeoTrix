@@ -497,6 +497,7 @@ mod tests {
             }
         }
         fn on_event(&self, _e: &PluginEvent) -> Result<(), String> { Ok(()) }
+        fn as_any(&self) -> &dyn std::any::Any { self }
     }
 
     fn mock(name: &'static str, fail_load: bool, load_calls: &Arc<AtomicU32>) -> Box<dyn Plugin> {

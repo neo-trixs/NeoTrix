@@ -11,7 +11,79 @@
 #![forbid(unsafe_code)]
 
 use super::{Plugin, PluginEvent};
-use crate::l1_action::nt_io::nt_io_provider::common::factory::LlmProviderType;
+use crate::l1_action::nt_io::nt_io_provider::common::factory::{
+    LlmProviderType, create_provider_from_type,
+};
+use crate::l1_action::nt_io::nt_io_provider::catalog::model_pool::{
+    CloudFreeSource, LocalEndpointSource, LocalGgufSource,
+};
+use crate::l1_action::nt_io::nt_io_provider::catalog::cli_free_source::CliFreeSource;
+use std::sync::Arc;
+
+use crate::l1_action::nt_io::nt_io_provider::common::types::LlmProvider;
+use crate::l1_action::nt_io::nt_io_provider::catalog::model_pool::ModelSource;
+
+/// 真实 provider 的 Plugin 包装：持有 `Arc<dyn LlmProvider>`，登记进 registry，
+/// 让消费方按 `capability="llm_provider"` + name 取回真实对象。
+pub struct ProviderPlugin {
+    name: &'static str,
+    provider: Arc<dyn LlmProvider>,
+}
+
+impl Plugin for ProviderPlugin {
+    fn name(&self) -> &'static str {
+        self.name
+    }
+    fn version(&self) -> &'static str {
+        env!("CARGO_PKG_VERSION")
+    }
+    fn capability(&self) -> &'static str {
+        "llm_provider"
+    }
+    fn on_load(&self) -> Result<(), String> {
+        Ok(())
+    }
+    fn on_unload(&self) -> Result<(), String> {
+        Ok(())
+    }
+    fn on_event(&self, _event: &PluginEvent) -> Result<(), String> {
+        Ok(())
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+/// 真实 ModelSource 的 Plugin 包装：持有 `Box<dyn ModelSource>`，登记进 registry，
+/// 消费方按 `capability="model_source"` 取回。
+pub struct SourcePlugin {
+    name: String,
+    source: Box<dyn ModelSource>,
+}
+
+impl Plugin for SourcePlugin {
+    fn name(&self) -> &'static str {
+        Box::leak(self.source.name().to_string().into_boxed_str())
+    }
+    fn version(&self) -> &'static str {
+        env!("CARGO_PKG_VERSION")
+    }
+    fn capability(&self) -> &'static str {
+        "model_source"
+    }
+    fn on_load(&self) -> Result<(), String> {
+        Ok(())
+    }
+    fn on_unload(&self) -> Result<(), String> {
+        Ok(())
+    }
+    fn on_event(&self, _event: &PluginEvent) -> Result<(), String> {
+        Ok(())
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
 
 /// 以能力标签为主体的轻量 Plugin：只负责「登记存在、分类」，不构造对象。
 pub struct CapabilityPlugin {
@@ -46,6 +118,7 @@ impl Plugin for CapabilityPlugin {
     fn on_unload(&self) -> Result<(), String> {
         Ok(())
     }
+    fn as_any(&self) -> &dyn std::any::Any { self }
     fn on_event(&self, _event: &PluginEvent) -> Result<(), String> {
         Ok(())
     }
@@ -73,15 +146,30 @@ fn model_source_names() -> Vec<(&'static str, &'static str)> {
     ]
 }
 
-/// 生产可用的內建能力插件全集。
+/// 生产可用的外部能力插件全集：真实 provider / model_source 对象登记进 registry。
 pub fn builtin_capability_plugins() -> Vec<Box<dyn Plugin>> {
     let mut out: Vec<Box<dyn Plugin>> = Vec::new();
-    for (name, cap) in provider_names() {
-        let _ = LlmProviderType::from_name(name); // 触发一次静态收录路径
-        out.push(Box::new(CapabilityPlugin::new(name, cap)) as Box<dyn Plugin>);
+    for (slug, _cap) in provider_names() {
+        if let Some(t) = LlmProviderType::from_name(slug) {
+            // 不拿到 key，构造仅代表「该provider 可被接通」——这才是完整的 registry 语义。
+            out.push(Box::new(ProviderPlugin {
+                name: slug,
+                provider: create_provider_from_type(t, None),
+            }) as Box<dyn Plugin>);
+        }
     }
-    for (name, cap) in model_source_names() {
-        out.push(Box::new(CapabilityPlugin::new(name, cap)) as Box<dyn Plugin>);
+    let sources: Vec<Box<dyn ModelSource>> = vec![
+        Box::new(LocalGgufSource::default_m5()),
+        Box::new(CloudFreeSource::new()),
+        Box::new(LocalEndpointSource::new()),
+        Box::new(CliFreeSource::new()),
+    ];
+    for s in sources {
+        let nm = s.name().to_string();
+        out.push(Box::new(SourcePlugin {
+            name: nm,
+            source: s,
+        }) as Box<dyn Plugin>);
     }
     out
 }

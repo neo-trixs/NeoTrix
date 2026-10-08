@@ -88,9 +88,12 @@ impl fmt::Display for PluginStatus {
 pub trait Plugin: Send + Sync {
     fn name(&self) -> &'static str;
     fn version(&self) -> &'static str;
-    /// 外延能力类别，供 PluginRegistry 按 capability 分流。默认 generic。
-    fn capability(&self) -> &'static str { "generic" }
+    /// 底层状态（异常插件需恢复）；默认实现可在 struct 上覆盖。
     fn on_load(&self) -> Result<(), String>;
     fn on_unload(&self) -> Result<(), String>;
     fn on_event(&self, event: &PluginEvent) -> Result<(), String>;
+    /// 允许把 `&dyn Plugin` 向下转成具体插件类型（由具体 impl 返回 `self`）。
+    fn as_any(&self) -> &dyn std::any::Any;
+    /// 外延能力类别，供 PluginRegistry 按 capability 分流。默认 generic。
+    fn capability(&self) -> &'static str { "generic" }
 }

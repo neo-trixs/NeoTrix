@@ -100,6 +100,7 @@ impl Plugin for WasmPluginWrapper {
         self.call_export("_on_unload", "")?;
         Ok(())
     }
+    fn as_any(&self) -> &dyn std::any::Any { self }
 
     fn on_event(&self, event: &PluginEvent) -> Result<(), String> {
         self.call_export("_on_event", &format!("{}", event))?;
