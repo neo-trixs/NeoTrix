@@ -70,6 +70,12 @@ pub struct _CausalRecord {
     pub timestamp: String,
 }
 
+impl Default for CausalEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CausalEngine {
     pub fn new() -> Self {
         Self {

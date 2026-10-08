@@ -6,6 +6,12 @@ use super::super::traits::{SocialPlatformAdapter, FeedResult, TrendingTopic, Aut
 
 pub struct InstagramExtractor;
 
+impl Default for InstagramExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InstagramExtractor {
     pub fn new() -> Self {
         Self

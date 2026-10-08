@@ -65,6 +65,12 @@ pub struct ObservabilitySubstrate {
     pub active_spans: HashMap<String, usize>,
 }
 
+impl Default for ObservabilitySubstrate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ObservabilitySubstrate {
     pub fn new() -> Self {
         Self { spans: Vec::new(), metrics: Vec::new(), logs: Vec::new(), active_spans: HashMap::new() }

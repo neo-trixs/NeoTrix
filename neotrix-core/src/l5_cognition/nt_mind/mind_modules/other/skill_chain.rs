@@ -310,12 +310,12 @@ impl _ChainExecutor {
 
         for step in &self.chain.steps {
             in_degree.entry(step.id.clone()).or_insert(0);
-            graph.entry(step.id.clone()).or_insert_with(Vec::new);
+            graph.entry(step.id.clone()).or_default();
 
             for dep in &step.dependencies {
                 graph
                     .entry(dep.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(step.id.clone());
                 *in_degree.entry(step.id.clone()).or_insert(0) += 1;
             }

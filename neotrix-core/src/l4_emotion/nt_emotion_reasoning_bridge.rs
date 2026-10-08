@@ -197,6 +197,12 @@ pub struct CoreBridge {
     pub current_pad: PadVector,
 }
 
+impl Default for CoreBridge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CoreBridge {
     pub fn new() -> Self {
         Self {

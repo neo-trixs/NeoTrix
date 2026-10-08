@@ -95,7 +95,7 @@ impl DesktopBuilder {
         let frontend_dir = self.config.root.join("neocodex-frontend");
         if frontend_dir.exists() {
             let output = Command::new("npx")
-                .args(&["tsc", "--noEmit"])
+                .args(["tsc", "--noEmit"])
                 .current_dir(&frontend_dir)
                 .output()
                 .map_err(|e| format!("Failed to run tsc: {}", e))?;
@@ -110,7 +110,7 @@ impl DesktopBuilder {
 
         println!("==> [check] Rust cargo check (desktop + core)");
         let output = Command::new("cargo")
-            .args(&["check", "--all-targets", "-p", "neotrix-tauri"])
+            .args(["check", "--all-targets", "-p", "neotrix-tauri"])
             .current_dir(&self.config.root)
             .output()
             .map_err(|e| format!("Failed to run cargo check: {}", e))?;

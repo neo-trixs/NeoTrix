@@ -3,6 +3,12 @@ use crate::l2_perception::nt_world::source::engine::MediaSource;
 
 pub struct TwitterSource;
 
+impl Default for TwitterSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TwitterSource {
     pub fn new() -> Self { Self }
 }

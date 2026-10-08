@@ -181,7 +181,7 @@ impl SinkAnalyzer {
                         name: pattern.clone(),
                         category: *category,
                         severity: self.estimate_severity(category),
-                        location: format!("line_unknown"),
+                        location: "line_unknown".to_string(),
                         parameters: vec![],
                     };
                     self.sinks.push(sink);

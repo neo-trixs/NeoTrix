@@ -78,7 +78,7 @@ fn extract_meta(html: &str, property: &str) -> Option<String> {
 }
 
 /// 递归寻找首个含 `play_addr.url_list` 的 aweme detail 对象。
-fn find_detail<'a>(v: &'a Value) -> Option<&'a Value> {
+fn find_detail(v: &Value) -> Option<&Value> {
     match v {
         Value::Object(map) => {
             if map

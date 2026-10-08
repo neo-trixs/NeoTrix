@@ -294,6 +294,12 @@ pub struct RelationshipState {
     pub avg_disclosure_depth: f64,
 }
 
+impl Default for RelationshipState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RelationshipState {
     pub fn new() -> Self {
         Self {
@@ -627,6 +633,12 @@ pub struct AffectiveInterface {
     pub strategy: EmpathyStrategy,
 }
 
+impl Default for AffectiveInterface {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AffectiveInterface {
     pub fn new() -> Self {
         Self {
@@ -721,7 +733,7 @@ pub fn estimate_disclosure(text: &str) -> (bool, f64) {
     let has_personal = personal.iter().any(|p| lower.contains(p));
     // CJK 无空格: 空白词数恒为 1, 需按字符折算字数 (≈2 字/词) 否则披露深度被严重低估。
     let whitespace_words = text.split_whitespace().count();
-    let cjk_units = (text.chars().filter(|c| !c.is_whitespace()).count() + 1) / 2;
+    let cjk_units = text.chars().filter(|c| !c.is_whitespace()).count().div_ceil(2);
     let words = whitespace_words.max(cjk_units);
     let length_depth = (words as f64 / 40.0).min(0.4);
     let depth = (0.2 + length_depth) * if has_personal { 1.0 } else { 0.4 };

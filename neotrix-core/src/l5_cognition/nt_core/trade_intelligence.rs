@@ -549,7 +549,7 @@ impl TradeIntelligence {
                         action: format!("Mitigate {}: {}", risk.risk_type_str(), risk.mitigation),
                         priority: Priority::Urgent,
                         expected_outcome: "Reduce exposure".to_string(),
-                        deadline: Some(now_ts() + 1 * 86400),
+                        deadline: Some(now_ts() + 86400),
                     });
                 }
                 RiskSeverity::Medium => {

@@ -309,7 +309,7 @@ impl NtArchiveTrain {
                 consciousness
                     .memories
                     .get(pid)
-                    .map_or(false, |m| m.domain == domain)
+                    .is_some_and(|m| m.domain == domain)
             });
             if !from_batch {
                 // 链按时间倒序，本批已过即停（近似：遇到连续 50 条非本批则停）
@@ -317,7 +317,7 @@ impl NtArchiveTrain {
             }
             let so: String = ch.conclusion.chars().take(300).collect();
             let dup = core.knowledge.patterns.iter().any(|p| {
-                p.so_implications.first().map_or(false, |s| s == &so)
+                p.so_implications.first() == Some(&so)
             });
             if dup {
                 continue;
@@ -394,7 +394,7 @@ impl NtArchiveTrain {
                 consciousness
                     .memories
                     .get(pid)
-                    .map_or(false, |m| m.domain == domain)
+                    .is_some_and(|m| m.domain == domain)
             });
             if !in_batch {
                 if fresh.len() > 200 {

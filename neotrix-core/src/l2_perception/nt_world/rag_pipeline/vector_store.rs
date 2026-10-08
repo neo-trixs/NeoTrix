@@ -121,6 +121,7 @@ struct IndexEntry {
 /// Entries are flushed to disk on every `save()` call. Load is lazy — only
 /// entries already persisted are restored; the caller decides when to persist.
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct DiskVectorStore {
     entries: Vec<StoreEntry>,
     /// Pre-computed index for O(1) dot-product search (built via `build_index`).
@@ -129,15 +130,6 @@ pub struct DiskVectorStore {
     path: Option<std::path::PathBuf>,
 }
 
-impl Default for DiskVectorStore {
-    fn default() -> Self {
-        Self {
-            entries: Vec::new(),
-            index: None,
-            path: None,
-        }
-    }
-}
 
 impl DiskVectorStore {
     pub fn new() -> Self {
@@ -358,7 +350,7 @@ fn search_brute_force(
     let mut scored: Vec<(usize, f32)> = entries
         .iter()
         .enumerate()
-        .filter(|(_, e)| filter.map_or(true, |f| f(&e.metadata)))
+        .filter(|(_, e)| filter.is_none_or(|f| f(&e.metadata)))
         .map(|(i, e)| (i, cosine_similarity(query, &e.embedding)))
         .collect();
 
@@ -389,7 +381,7 @@ fn search_index(
     let mut scored: Vec<(usize, f32)> = index
         .iter()
         .enumerate()
-        .filter(|(_, e)| filter.map_or(true, |f| f(&e.metadata)))
+        .filter(|(_, e)| filter.is_none_or(|f| f(&e.metadata)))
         .map(|(i, e)| {
             // Dot product of normalized vectors == cosine similarity.
             let dot: f32 = q_norm

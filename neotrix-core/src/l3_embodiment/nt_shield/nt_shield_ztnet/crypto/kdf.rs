@@ -40,7 +40,7 @@ pub fn hkdf_blake2s(
 
     while output.len() < output_len {
         let mut hasher = Blake2s256::new();
-        hasher.update(&prk);
+        hasher.update(prk);
         hasher.update(&t);
         hasher.update(info);
         hasher.update([counter]);

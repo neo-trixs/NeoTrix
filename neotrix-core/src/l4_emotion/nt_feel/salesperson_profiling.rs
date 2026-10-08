@@ -250,7 +250,7 @@ impl SalespersonProfiler {
 
         let emoji_count: u32 = messages
             .iter()
-            .filter(|m| m.chars().any(|c| is_emoji(c)))
+            .filter(|m| m.chars().any(is_emoji))
             .count() as u32;
         let emoji_usage = emoji_count as f32 / messages.len() as f32;
 

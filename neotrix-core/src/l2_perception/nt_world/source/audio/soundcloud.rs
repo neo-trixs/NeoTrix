@@ -3,6 +3,12 @@ use crate::l2_perception::nt_world::source::engine::MediaSource;
 
 pub struct SoundCloudSource;
 
+impl Default for SoundCloudSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SoundCloudSource {
     pub fn new() -> Self { Self }
 }

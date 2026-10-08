@@ -7,6 +7,12 @@ pub struct NtActionModule {
     total_actions: Mutex<u64>,
 }
 
+impl Default for NtActionModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NtActionModule {
     pub fn new() -> Self {
         Self {

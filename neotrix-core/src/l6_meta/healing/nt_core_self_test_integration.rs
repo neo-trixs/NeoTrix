@@ -29,31 +29,31 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     //     &mut registry,
     // );
     // CAD 意识核心统一编排 (NT-CORE): SEAL级联 / Runeword / T3证据 / 经验吸收
-    nt_core_cad_consciousness::register_cad_consciousness_self_tests(&mut registry);
+    nt_core_cad_consciousness::register_cad_consciousness_self_tests(registry);
     // CAD 真实生成管线 (GenCAD 四步: CSR→CCIP→CDP→Decoder) — 替换架构占位
     // crate::l2_perception::nt_world::cad_generator::register_cad_generator_self_tests(&mut registry);
     // LLM 核心 (NT-CORE): 统一错误域接入 + token 预算引擎自测 (卫生层 P0)
     // crate::l1_action::nt_core_llm::register_llm_self_tests(&mut registry); // stub returns empty Vec
     // 缓存核心 (NT-CORE): 精确层往返 + 容量计数自测
-    crate::l0_substrate::nt_core_cache::register_cache_self_tests(&mut registry);
+    crate::l0_substrate::nt_core_cache::register_cache_self_tests(registry);
     // VSA/HyperCube 核心 (NT-CORE): 卦象嵌入自相似 + 异卦分离 + bind 自相似
-    crate::l2_perception::nt_core_e8_vsa::register_e8_vsa_self_tests(&mut registry);
+    crate::l2_perception::nt_core_e8_vsa::register_e8_vsa_self_tests(registry);
     // KB 类型核心 (NT-CORE): NodeType 枚举全变体往返
-    crate::l6_meta::nt_core_kb_types::register_kb_types_self_tests(&mut registry);
+    crate::l6_meta::nt_core_kb_types::register_kb_types_self_tests(registry);
     // NT-MEMORY 四态记忆资产 (吸收 TencentDB-Agent-Memory): ChatMemory/Skill/LlmWiki/CodeGraph 分类
-    crate::l6_meta::nt_core_memory_asset::register_memory_asset_self_tests(&mut registry);
+    crate::l6_meta::nt_core_memory_asset::register_memory_asset_self_tests(registry);
     // 2026-08-29 外部吸收 (archify/diagram-design): NT-CORE 可验证架构图原语
-    crate::l5_cognition::nt_core_arch_diagram::register_arch_diagram_self_tests(&mut registry);
+    crate::l5_cognition::nt_core_arch_diagram::register_arch_diagram_self_tests(registry);
     // 2026-08-29 外部吸收 (firecrawl/anydoc): NT-WORLD 文档格式路由
-    crate::l1_action::nt_file_ability::register_format_route_self_tests(&mut registry);
+    crate::l1_action::nt_file_ability::register_format_route_self_tests(registry);
     // 2026-08-29 外部吸收 (reverse-skill): NT-SHIELD 安全技能路由
-    crate::l3_embodiment::nt_shield::shield_core::nt_shield_skill_router::register_skill_router_self_tests(&mut registry);
+    crate::l3_embodiment::nt_shield::shield_core::nt_shield_skill_router::register_skill_router_self_tests(registry);
     // 2026-08-29 外部吸收 (affaan-m/ECC): NT-MIND SEAL 进化维度 instincts/security
-    crate::l5_cognition::nt_mind::nt_mind::nt_mind_seal_ecc::register_seal_ecc_self_tests(&mut registry);
+    crate::l5_cognition::nt_mind::nt_mind::nt_mind_seal_ecc::register_seal_ecc_self_tests(registry);
     // 意识核心本体 (NT-CORE): 跨会话 CoreSnapshot 持久化往返
-    crate::l5_cognition::consciousness_core::register_consciousness_core_self_tests(&mut registry);
+    crate::l5_cognition::consciousness_core::register_consciousness_core_self_tests(registry);
     // 意识度量 IIT Φ (NT-CORE): 同步可约→phi=0 + 变化状态 phi∈[0,1] + 共振矩阵维度
-    crate::l5_cognition::nt_core::nt_iit_phi::register_iit_phi_self_tests(&mut registry);
+    crate::l5_cognition::nt_core::nt_iit_phi::register_iit_phi_self_tests(registry);
     registry.register(Box::new(
         crate::l3_embodiment::nt_shield::nt_shield_traffic::FingerprintStore::new(),
     ));
@@ -77,7 +77,7 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
         crate::l5_cognition::nt_mind::nt_mind_skill_engine::PromptLibrary::new(),
     ));
     // 2026-08-29 外部吸收 (anthropics/skills Agent Skills 标准): SKILL.md 必需字段校验
-    crate::l5_cognition::nt_mind::nt_mind_skill_engine::register_skill_standard_self_tests(&mut registry);
+    crate::l5_cognition::nt_mind::nt_mind_skill_engine::register_skill_standard_self_tests(registry);
     // 新增: SelfReflectionEngine (Reflexion-inspired verbal reinforcement learning)
     registry.register(Box::new(
         crate::l5_cognition::nt_mind::nt_mind::experience_tree::self_reflection::SelfReflectionEngine::new(8),

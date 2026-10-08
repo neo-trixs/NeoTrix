@@ -208,7 +208,7 @@ impl DataRecord {
     pub fn age(&self) -> Option<Duration> { self.created_at.elapsed().ok() }
     pub fn is_expired(&self, policy: &RetentionPolicy) -> bool {
         let max_age = policy.max_age_for(&self.data_type);
-        self.age().map_or(false, |age| age > max_age)
+        self.age().is_some_and(|age| age > max_age)
     }
 }
 

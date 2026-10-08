@@ -142,7 +142,7 @@ impl DefensePipeline {
 
         // Stage 2: Output Sanitization
         if self.config.stage2_enabled {
-            let (result, next) = Self::run_stage(2, &current, |s| Self::stage_2_output_sanitization(s));
+            let (result, next) = Self::run_stage(2, &current, Self::stage_2_output_sanitization);
             stage_results.push(result);
             match next {
                 Ok(v) => current = v,
@@ -158,7 +158,7 @@ impl DefensePipeline {
 
         // Stage 3: Behavior Monitoring
         if self.config.stage3_enabled {
-            let (result, next) = Self::run_stage(3, &current, |s| Self::stage_3_behavior_monitoring(s));
+            let (result, next) = Self::run_stage(3, &current, Self::stage_3_behavior_monitoring);
             stage_results.push(result);
             match next {
                 Ok(v) => current = v,
@@ -190,7 +190,7 @@ impl DefensePipeline {
 
         // Stage 5: Response Filtering
         if self.config.stage5_enabled {
-            let (result, next) = Self::run_stage(5, &current, |s| Self::stage_5_response_filtering(s));
+            let (result, next) = Self::run_stage(5, &current, Self::stage_5_response_filtering);
             stage_results.push(result);
             match next {
                 Ok(v) => current = v,
@@ -206,7 +206,7 @@ impl DefensePipeline {
 
         // Stage 6: Memory Scrubbing
         if self.config.stage6_enabled {
-            let (result, next) = Self::run_stage(6, &current, |s| Self::stage_6_memory_scrubbing(s));
+            let (result, next) = Self::run_stage(6, &current, Self::stage_6_memory_scrubbing);
             stage_results.push(result);
             match next {
                 Ok(v) => current = v,
@@ -222,7 +222,7 @@ impl DefensePipeline {
 
         // Stage 7: Audit Logging (never blocks, always passes)
         if self.config.stage7_enabled {
-            let (result, next) = Self::run_stage(7, &current, |s| Self::stage_7_audit_logging(s));
+            let (result, next) = Self::run_stage(7, &current, Self::stage_7_audit_logging);
             stage_results.push(result);
             // stage 7 is non-blocking
             if let Ok(v) = next {

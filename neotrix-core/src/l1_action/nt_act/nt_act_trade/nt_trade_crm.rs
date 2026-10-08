@@ -591,11 +591,10 @@ impl TradeCrmEngine {
                         return false;
                     }
                 }
-                if !filters.tags.is_empty() {
-                    if !filters.tags.iter().any(|t| c.tags.contains(t)) {
+                if !filters.tags.is_empty()
+                    && !filters.tags.iter().any(|t| c.tags.contains(t)) {
                         return false;
                     }
-                }
                 if let Some(min_rev) = filters.min_revenue {
                     if c.total_revenue < min_rev {
                         return false;

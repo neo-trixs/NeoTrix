@@ -104,7 +104,7 @@ impl InfrastructureMapper {
             // Domain → IPs
             let entry = domain_to_ips
                 .entry(obs.email_domain.clone())
-                .or_insert_with(HashSet::new);
+                .or_default();
             for ip in &obs.ip_addresses {
                 entry.insert(ip.clone());
             }
@@ -113,7 +113,7 @@ impl InfrastructureMapper {
             for ip in &obs.ip_addresses {
                 ip_to_accounts
                     .entry(ip.clone())
-                    .or_insert_with(HashSet::new)
+                    .or_default()
                     .insert(obs.account_id.clone());
             }
 
@@ -290,7 +290,7 @@ impl InfrastructureMapper {
             // Find domains used by group accounts
             let mut group_domains: HashSet<String> = HashSet::new();
             for (_domain, ips) in domain_to_ips.iter() {
-                if !ips.intersection(&group_ips).next().is_some() {
+                if ips.intersection(&group_ips).next().is_none() {
                     continue;
                 }
                 // At least one IP in this domain's set overlaps with group IPs

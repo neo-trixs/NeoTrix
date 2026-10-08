@@ -59,7 +59,7 @@ impl InteractiveAgentCli {
     /// 复用 crate 的超时可杀进程出口，避免各写一份进程逻辑。
     pub fn probe_available(&self) -> bool {
         let mut argv = vec!["--version".to_string()];
-        argv.extend(self.args.iter().cloned().filter(|a| a != "--version"));
+        argv.extend(self.args.iter().filter(|&a| a != "--version").cloned());
         crate::l1_action::nt_model_cli::run_capture(&self.command, &argv, self.probe_timeout)
             .map(|o| !o.trim().is_empty())
             .unwrap_or(false)

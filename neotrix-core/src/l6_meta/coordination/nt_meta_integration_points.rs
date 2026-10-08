@@ -165,13 +165,11 @@ impl IntegrationPointManager {
             .map(|p| &p.integration_type)
             .collect();
 
-        let all_types = vec![
-            IntegrationType::SEALPipeline,
+        let all_types = [IntegrationType::SEALPipeline,
             IntegrationType::GWTAttention,
             IntegrationType::GoalLoop,
             IntegrationType::SelfHealing,
-            IntegrationType::PerformanceMonitoring,
-        ];
+            IntegrationType::PerformanceMonitoring];
 
         let missing_integrations: Vec<String> = all_types.iter()
             .filter(|t| !implemented_types.contains(t))

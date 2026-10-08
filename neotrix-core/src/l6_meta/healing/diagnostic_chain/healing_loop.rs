@@ -28,10 +28,7 @@ impl HealingLoop {
     /// (all signals healthy or retry cap reached).
     pub fn run_cycle(&mut self, signals: &[HealthSignal]) -> Option<RepairAction> {
         // 1. Diagnose from signals.
-        let diagnostic = match Diagnostician::analyze(signals) {
-            Some(d) => d,
-            None => return None,
-        };
+        let diagnostic = Diagnostician::analyze(signals)?;
 
         // 2. Check retry cap.
         if self.attempt >= self.config.max_repair_attempts {

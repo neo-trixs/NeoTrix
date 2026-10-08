@@ -54,6 +54,12 @@ impl Default for NowPlaying {
 
 pub struct PlayerDisplay;
 
+impl Default for PlayerDisplay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PlayerDisplay {
     pub fn new() -> Self {
         Self

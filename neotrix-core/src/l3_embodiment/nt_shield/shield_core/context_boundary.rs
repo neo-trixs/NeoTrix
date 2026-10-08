@@ -77,6 +77,12 @@ pub struct ContextBoundary {
 }
 
 
+impl Default for ContextBoundary {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ContextBoundary {
     pub fn new() -> Self {
         let mut allowed_actions = HashMap::new();

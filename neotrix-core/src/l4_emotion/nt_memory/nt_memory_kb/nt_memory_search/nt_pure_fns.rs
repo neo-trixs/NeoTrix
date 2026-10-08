@@ -597,7 +597,6 @@ pub fn hybrid_search(
     // Tier 2: FTS5 title-only fallback — catches nodes missed by RRF fusion
     let remaining = limit - results.len();
     let fts_title_query: String = query
-        .trim()
         .split_whitespace()
         .collect::<Vec<&str>>()
         .join(" OR ");

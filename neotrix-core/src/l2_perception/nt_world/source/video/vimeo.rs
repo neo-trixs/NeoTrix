@@ -3,6 +3,12 @@ use crate::l2_perception::nt_world::source::engine::MediaSource;
 
 pub struct VimeoSource;
 
+impl Default for VimeoSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VimeoSource {
     pub fn new() -> Self { Self }
 }

@@ -137,7 +137,7 @@ pub fn merge_docx(inputs: &[std::path::PathBuf], out: &Path) -> Result<OfficeMer
     }
     if inputs.len() == 1 {
         let data = std::fs::read(&inputs[0]).map_err(FileAbilityError::Io)?;
-        std::fs::write(&out, &data).map_err(FileAbilityError::Io)?;
+        std::fs::write(out, &data).map_err(FileAbilityError::Io)?;
         return Ok(OfficeMergeReport { items: 1, parts: 0 });
     }
 
@@ -237,7 +237,7 @@ pub fn merge_docx(inputs: &[std::path::PathBuf], out: &Path) -> Result<OfficeMer
     rebuild_content_types(&mut out_parts);
 
     // 5. 写 zip
-    let file = std::fs::File::create(&out).map_err(FileAbilityError::Io)?;
+    let file = std::fs::File::create(out).map_err(FileAbilityError::Io)?;
     write_zip(file, &out_parts).map_err(FileAbilityError::Io)?;
     Ok(OfficeMergeReport {
         items: item_count,

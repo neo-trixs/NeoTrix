@@ -260,25 +260,22 @@ impl NtProtocol for _NoiseIkSession {
         match input {
             _SessionInput::Start => {
                 if self.role == _Role::Initiator && self.state == _ProtocolState::Initial {
-                    match self.hs.as_mut() {
-                        Some(h) => match h._create_message1() {
-                            Ok(msg) => {
-                                self.state = _ProtocolState::Handshaking;
-                                evs.push(_SessionEvent::HandshakeMessageReady {
-                                    msg: msg.clone(),
-                                    is_first: true,
-                                });
-                                self.txq.push_back(msg);
-                            }
-                            Err(e) => {
-                                self.state = _ProtocolState::Error {
-                                    message: e.to_string(),
-                                };
-                                evs.push(_SessionEvent::Failed { reason: e.to_string() });
-                            }
-                        },
-                        None => {}
-                    }
+                    if let Some(h) = self.hs.as_mut() { match h._create_message1() {
+                        Ok(msg) => {
+                            self.state = _ProtocolState::Handshaking;
+                            evs.push(_SessionEvent::HandshakeMessageReady {
+                                msg: msg.clone(),
+                                is_first: true,
+                            });
+                            self.txq.push_back(msg);
+                        }
+                        Err(e) => {
+                            self.state = _ProtocolState::Error {
+                                message: e.to_string(),
+                            };
+                            evs.push(_SessionEvent::Failed { reason: e.to_string() });
+                        }
+                    } }
                 }
             }
             _SessionInput::Wire(bytes) => match self.state {

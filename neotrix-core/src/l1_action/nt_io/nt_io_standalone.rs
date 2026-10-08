@@ -105,8 +105,6 @@ pub fn format_kernel_output(v: &[f64], prompt: &str, stage: usize, energy: f64, 
                 prompt, stage_info.label, e,
                 circuit_names.len(), if circuit_names.len() == 1 { "" } else { "s" },
             );
-            if !circuit_names.is_empty() {
-            }
             resp.push_str(" Could you provide more detail or clarify the question?");
             resp
         }

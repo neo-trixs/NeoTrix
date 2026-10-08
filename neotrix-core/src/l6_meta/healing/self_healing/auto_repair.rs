@@ -106,14 +106,14 @@ impl AutoRepair {
                     failures.push(Failure::new(
                         &status.component,
                         FailureSeverity::High,
-                        format!("component in Critical state"),
+                        "component in Critical state".to_string(),
                     ));
                 }
                 HealthStatusKind::Degraded => {
                     failures.push(Failure::new(
                         &status.component,
                         FailureSeverity::Medium,
-                        format!("component degraded"),
+                        "component degraded".to_string(),
                     ));
                 }
                 HealthStatusKind::Healthy => {}

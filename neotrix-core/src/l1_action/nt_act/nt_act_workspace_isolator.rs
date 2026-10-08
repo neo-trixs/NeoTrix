@@ -35,10 +35,12 @@ use tokio::sync::RwLock;
 
 /// Isolation level for workspace operations
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Default)]
 pub enum IsolationLevel {
     /// No isolation — work directly on main branch
     None,
     /// Worktree isolation — separate git worktree per task
+    #[default]
     Worktree,
     /// Container isolation — Docker/container per task
     Container,
@@ -46,11 +48,6 @@ pub enum IsolationLevel {
     Vm,
 }
 
-impl Default for IsolationLevel {
-    fn default() -> Self {
-        Self::Worktree
-    }
-}
 
 /// Status of a workspace
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -107,6 +104,7 @@ pub type IsolatedWorkspace = SandboxWorkspaceExecutor;
 
 /// Merge strategy for combining workspace changes
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Default)]
 pub enum MergeStrategy {
     /// Fast-forward merge (linear history)
     FastForward,
@@ -115,14 +113,10 @@ pub enum MergeStrategy {
     /// Rebase merge (replay commits on main)
     Rebase,
     /// No-merge — just create PR for manual review
+    #[default]
     PullRequest,
 }
 
-impl Default for MergeStrategy {
-    fn default() -> Self {
-        Self::PullRequest
-    }
-}
 
 /// Result of a workspace operation
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

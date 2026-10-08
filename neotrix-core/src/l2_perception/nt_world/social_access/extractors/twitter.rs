@@ -159,6 +159,12 @@ fn item_from_parts(id: &str, text: &str, author: &str, thumb: Option<String>) ->
 
 pub struct TwitterExtractor;
 
+impl Default for TwitterExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TwitterExtractor {
     pub fn new() -> Self {
         Self

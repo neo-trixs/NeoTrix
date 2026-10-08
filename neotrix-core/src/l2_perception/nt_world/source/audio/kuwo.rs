@@ -3,6 +3,12 @@ use crate::l2_perception::nt_world::source::engine::MediaSource;
 
 pub struct KuwoSource;
 
+impl Default for KuwoSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl KuwoSource {
     pub fn new() -> Self { Self }
 

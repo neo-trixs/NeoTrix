@@ -20,18 +20,15 @@ pub struct RetrievalResult {
 
 /// 检索来源
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum RetrievalSource {
     Vector,
     Text,
     Graph,
+    #[default]
     Fused,
 }
 
-impl Default for RetrievalSource {
-    fn default() -> Self {
-        Self::Fused
-    }
-}
 
 /// 混合检索融合器
 pub struct RetrievalFusion {

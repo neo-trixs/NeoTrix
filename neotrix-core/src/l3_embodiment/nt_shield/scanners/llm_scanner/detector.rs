@@ -66,6 +66,12 @@ pub struct CompositeDetector {
     detectors: Vec<Detector>,
 }
 
+impl Default for CompositeDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CompositeDetector {
     pub fn new() -> Self {
         Self {

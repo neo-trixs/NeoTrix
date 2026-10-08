@@ -30,17 +30,11 @@ impl WeightedOption {
 /// using the cognitive coupling map and returns the options sorted by
 /// final weight (descending).
 #[derive(Debug)]
+#[derive(Default)]
 pub struct InfluenceEngine {
     coupling: CognitiveCoupling,
 }
 
-impl Default for InfluenceEngine {
-    fn default() -> Self {
-        Self {
-            coupling: CognitiveCoupling::default(),
-        }
-    }
-}
 
 impl InfluenceEngine {
     pub fn new(coupling: CognitiveCoupling) -> Self {

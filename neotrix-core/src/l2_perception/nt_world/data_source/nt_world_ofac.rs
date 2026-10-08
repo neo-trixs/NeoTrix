@@ -194,13 +194,11 @@ pub struct _OfacIngestReport {
 
 // ── SearchBackend ────────────────────────────────────────────
 
+#[derive(Default)]
 pub struct OfacBackend {
     fetcher: OfacFetcher,
 }
 
-impl Default for OfacBackend {
-    fn default() -> Self { Self { fetcher: OfacFetcher::new() } }
-}
 
 impl OfacBackend {
     pub fn new() -> Self { Self::default() }

@@ -71,7 +71,7 @@ impl TemporalQuery {
             Self::At(t) => entry.is_valid_at(*t),
             Self::Range { from, to } => {
                 // Entry is relevant if its validity window overlaps [from, to).
-                entry.valid_from < *to && entry.valid_to.map_or(true, |vt| vt > *from)
+                entry.valid_from < *to && entry.valid_to.is_none_or(|vt| vt > *from)
             }
             Self::LatestByPrefix { prefix } => entry.id.starts_with(prefix),
             Self::All => true,

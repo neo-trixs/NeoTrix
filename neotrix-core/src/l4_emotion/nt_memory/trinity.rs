@@ -52,6 +52,12 @@ pub struct TrinityMemory {
 }
 
 
+impl Default for TrinityMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TrinityMemory {
     pub fn new() -> Self {
         Self {

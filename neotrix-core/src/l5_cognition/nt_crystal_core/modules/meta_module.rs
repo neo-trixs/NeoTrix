@@ -8,6 +8,12 @@ pub struct NtMetaModule {
     self_model: Mutex<HashMap<String, f64>>,
 }
 
+impl Default for NtMetaModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NtMetaModule {
     pub fn new() -> Self {
         let mut self_model = HashMap::new();

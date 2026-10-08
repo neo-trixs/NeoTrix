@@ -41,7 +41,7 @@ impl NetEvent {
 
     /// 投递可见性：全播人人可见，单播仅目标可见（viewFor 在传输层的对应物）
     pub fn visible_to(&self, player: PlayerId) -> bool {
-        self.to.map_or(true, |t| t == player)
+        self.to.is_none_or(|t| t == player)
     }
 }
 

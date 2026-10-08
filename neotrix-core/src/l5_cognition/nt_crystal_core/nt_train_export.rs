@@ -154,7 +154,7 @@ impl NtTrainExport {
         consciousness
             .reasoning_chains
             .iter()
-            .filter(|ch| Self::chain_ts(consciousness, ch).map_or(false, |t| t >= since_ts))
+            .filter(|ch| Self::chain_ts(consciousness, ch).is_some_and(|t| t >= since_ts))
             .filter_map(|ch| Self::chain_to_sft(consciousness, ch))
             .collect()
     }
@@ -164,7 +164,7 @@ impl NtTrainExport {
         consciousness
             .reasoning_chains
             .iter()
-            .filter(|ch| Self::chain_ts(consciousness, ch).map_or(false, |t| t >= since_ts))
+            .filter(|ch| Self::chain_ts(consciousness, ch).is_some_and(|t| t >= since_ts))
             .filter_map(|ch| Self::chain_to_think(consciousness, ch))
             .collect()
     }

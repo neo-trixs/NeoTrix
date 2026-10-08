@@ -22,6 +22,12 @@ pub struct AdReport {
 
 pub struct AdAnalyzer;
 
+impl Default for AdAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AdAnalyzer {
     pub fn new() -> Self {
         Self

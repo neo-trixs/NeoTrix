@@ -246,13 +246,13 @@ impl VideoStitcher {
 
         // 拼接滤镜
         let clip_count = timeline.clips.len();
-        cmd.push_str(&format!("[0:v]"));
+        cmd.push_str(&"[0:v]".to_string());
         for i in 1..clip_count {
             cmd.push_str(&format!("[{}:v]", i));
         }
         cmd.push_str(&format!("concat={}:v=1:a=0[vout]", clip_count));
 
-        cmd.push_str("\"");
+        cmd.push('"');
 
         // 输出
         cmd.push_str(&format!(

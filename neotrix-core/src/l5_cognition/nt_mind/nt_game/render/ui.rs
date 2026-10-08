@@ -341,7 +341,7 @@ impl Widget {
                 }
             }
             Layout::Grid { cols, spacing } => {
-                let rows = (self.children.len() + cols - 1) / cols;
+                let rows = self.children.len().div_ceil(*cols);
                 let cell_w = if *cols == 0 {
                     w
                 } else {

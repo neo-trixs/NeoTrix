@@ -46,14 +46,14 @@ impl ComponentStore {
         self.stores
             .get_mut(&TypeId::of::<T>())
             .and_then(|s| s.downcast_mut::<HashMap<EntityId, T>>())
-            .map_or(false, |m| m.remove(&entity).is_some())
+            .is_some_and(|m| m.remove(&entity).is_some())
     }
 
     pub fn has<T: Component + 'static>(&self, entity: EntityId) -> bool {
         self.stores
             .get(&TypeId::of::<T>())
             .and_then(|s| s.downcast_ref::<HashMap<EntityId, T>>())
-            .map_or(false, |m| m.contains_key(&entity))
+            .is_some_and(|m| m.contains_key(&entity))
     }
 
     pub fn entities_with<T: Component + 'static>(&self) -> Vec<EntityId> {

@@ -267,7 +267,7 @@ impl CoverageLedger {
         let mut current_layer = self.merkle_tree.first().cloned().unwrap_or_default();
 
         while level + 1 < self.merkle_tree.len() && current_layer.len() > 1 {
-            let sibling_idx = if idx % 2 == 0 { idx + 1 } else { idx - 1 };
+            let sibling_idx = if idx.is_multiple_of(2) { idx + 1 } else { idx - 1 };
             if sibling_idx < current_layer.len() {
                 proof_path.push(current_layer[sibling_idx].clone());
             }

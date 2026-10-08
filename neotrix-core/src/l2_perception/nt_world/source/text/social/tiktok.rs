@@ -3,6 +3,12 @@ use crate::l2_perception::nt_world::source::engine::MediaSource;
 
 pub struct TikTokSource;
 
+impl Default for TikTokSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TikTokSource {
     pub fn new() -> Self { Self }
 }

@@ -430,6 +430,7 @@ pub trait RiskRule: Send + Sync {
     fn evaluate(&self, context: &dyn std::any::Any) -> Option<RiskFinding>;
 }
 
+#[derive(Default)]
 pub struct RiskAssessor {
     rules: Vec<Box<dyn RiskRule>>,
     weights: HashMap<String, f64>,
@@ -453,14 +454,6 @@ impl Clone for RiskAssessor {
     }
 }
 
-impl Default for RiskAssessor {
-    fn default() -> Self {
-        Self {
-            rules: Vec::new(),
-            weights: HashMap::new(),
-        }
-    }
-}
 
 impl RiskAssessor {
     pub fn new() -> Self {
@@ -580,19 +573,12 @@ pub struct ScheduleDeviation {
 }
 
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct ProgressTracker {
     milestones: Vec<Milestone>,
     critical_path: Vec<String>,
 }
 
-impl Default for ProgressTracker {
-    fn default() -> Self {
-        Self {
-            milestones: Vec::new(),
-            critical_path: Vec::new(),
-        }
-    }
-}
 
 impl ProgressTracker {
     pub fn new(milestones: Vec<Milestone>, critical_path: Vec<String>) -> Self {
@@ -710,7 +696,7 @@ pub fn aql_sample_size(lot_size: u64, aql_level: f64) -> u32 {
 
 /// AQL 判定: Ac (接收数) 和 Re (拒收数)
 pub fn aql_accept_reject(sample_size: u32, aql_level: f64) -> (u32, u32) {
-    let ac = ((sample_size as f64 * aql_level / 100.0) as u32).max(0);
+    let ac = ((sample_size as f64 * aql_level / 100.0) as u32);
     (ac, ac + 1)
 }
 

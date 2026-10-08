@@ -42,7 +42,7 @@ pub async fn verify_sha256(path: &Path, expected: &str) -> Result<bool, Pipeline
 pub async fn compute_sha256(path: &Path) -> Result<String, PipelineError> {
     super::super::persistence::compute_sha256_streaming(path)
         .await
-        .map_err(|e| PipelineError::Io(e))
+        .map_err(PipelineError::Io)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -102,7 +102,7 @@ pub(crate) async fn stream_http_download(
 
         if output.exists() && pre_start_byte >= total {
             let final_bytes = pre_start_byte;
-            if let Some(ref sha) = expected_sha256 {
+            if let Some(sha) = expected_sha256 {
                 if !verify_sha256(output, sha).await? {
                     return Err(PipelineError::Io("SHA-256 integrity check failed".into()));
                 }

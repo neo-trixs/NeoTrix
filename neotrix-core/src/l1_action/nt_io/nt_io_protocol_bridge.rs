@@ -193,6 +193,12 @@ pub struct ProtocolBridge {
     message_history: Vec<A2AMessage>,
 }
 
+impl Default for ProtocolBridge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProtocolBridge {
     pub fn new() -> Self {
         Self {

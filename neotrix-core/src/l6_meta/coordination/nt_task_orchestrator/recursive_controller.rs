@@ -74,7 +74,7 @@ impl RecursiveController {
         }
 
         // 简单分解: 按分句分割
-        let subtasks: Vec<String> = task.split(|c| c == ';' || c == '\n')
+        let subtasks: Vec<String> = task.split([';', '\n'])
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .take(self.max_children)

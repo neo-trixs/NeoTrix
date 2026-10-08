@@ -7,6 +7,12 @@ use crate::l2_perception::nt_world::social_access::SocialAccessError;
 
 pub struct YtdlpExtractor;
 
+impl Default for YtdlpExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl YtdlpExtractor {
     pub fn new() -> Self { Self }
 

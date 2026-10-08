@@ -60,12 +60,12 @@ fn parse_cert_entry(entry: &serde_json::Value, domain: &str) -> Option<CertEntry
     let not_before = entry["not_before"].as_str()
         .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
         .map(|dt| dt.with_timezone(&Utc))
-        .unwrap_or_else(|| Utc::now());
+        .unwrap_or_else(Utc::now);
 
     let not_after = entry["not_after"].as_str()
         .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
         .map(|dt| dt.with_timezone(&Utc))
-        .unwrap_or_else(|| Utc::now());
+        .unwrap_or_else(Utc::now);
 
     subdomains.into_iter().next().map(|sub| CertEntry {
         subdomain: sub.to_string(),

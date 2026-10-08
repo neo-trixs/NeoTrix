@@ -380,7 +380,7 @@ impl NeoCodexAgent {
                             duration_ms: 0,
                             success: false,
                         });
-                        messages.push(Message::tool(&denied, &format!("call-{}", step)));
+                        messages.push(Message::tool(&denied, format!("call-{}", step)));
                         step += 1;
                         continue;
                     }
@@ -410,7 +410,7 @@ impl NeoCodexAgent {
                             }),
                         }],
                     ));
-                    messages.push(Message::tool(&result, &format!("call-{}", step)));
+                    messages.push(Message::tool(&result, format!("call-{}", step)));
                     self.context.push(
                         "assistant",
                         response.content.clone(),
@@ -572,7 +572,7 @@ impl NeoCodexAgent {
                             duration_ms: 0,
                             success: false,
                         });
-                        messages.push(Message::tool(&denied, &format!("call-{}", step)));
+                        messages.push(Message::tool(&denied, format!("call-{}", step)));
                         step += 1;
                         continue;
                     }
@@ -606,7 +606,7 @@ impl NeoCodexAgent {
                             }),
                         }],
                     ));
-                    messages.push(Message::tool(&result, &format!("call-{}", step)));
+                    messages.push(Message::tool(&result, format!("call-{}", step)));
                     self.context.push(
                         "assistant",
                         response_content.clone(),

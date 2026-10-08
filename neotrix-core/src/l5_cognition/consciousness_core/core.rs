@@ -231,11 +231,8 @@ impl ConsciousnessCoreHandle {
             .set_branch_health_from_self_tests(&selftest_results);
         {
             let bridge = crate::l5_cognition::nt_core::capability::consciousness_bridge::bridge();
-            match bridge.pre_tick_check(base_cycle) {
-                crate::l5_cognition::nt_core::capability::consciousness_bridge::QuickVerdict::Warn(msg) => {
-                    log::warn!("[consciousness-tick] value warning: {}", msg);
-                }
-                _ => {}
+            if let crate::l5_cognition::nt_core::capability::consciousness_bridge::QuickVerdict::Warn(msg) = bridge.pre_tick_check(base_cycle) {
+                log::warn!("[consciousness-tick] value warning: {}", msg);
             }
             let _ = base_cycle;
             let stats = bridge.dispatch_stats();

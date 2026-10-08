@@ -162,7 +162,7 @@ impl PatternRouter {
             {
                 boost += 0.2;
             }
-            if pattern.metadata.get(key).map_or(false, |v| v == value) {
+            if pattern.metadata.get(key) == Some(value) {
                 boost += 0.1;
             }
         }

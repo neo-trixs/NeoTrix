@@ -153,7 +153,7 @@ impl NtOrchestrator {
         rep.reflected = cycle.reflected;
 
         // 3. 定时进化 + 落盘
-        if self.ticks % self.config.evolve_every.max(1) == 0 {
+        if self.ticks.is_multiple_of(self.config.evolve_every.max(1)) {
             let _ = CrystalEngine::evolve(core);
             rep.evolved = true;
             if self.config.save_on_evolve {

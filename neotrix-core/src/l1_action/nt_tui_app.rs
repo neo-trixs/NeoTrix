@@ -498,10 +498,7 @@ fn app_key(
     }
     // 选择器开时：全权交状态机（Pick 回模型名）
     if app.state.picker.is_some() {
-        match apply_key(&mut app.state, code, mods) {
-            TuiKeyOutcome::Pick(m) => app.apply_pick(m),
-            _ => {}
-        }
+        if let TuiKeyOutcome::Pick(m) = apply_key(&mut app.state, code, mods) { app.apply_pick(m) }
         return false;
     }
     // 斜杠命令（Enter 且行首 `/`）：App 层截获，不进通用收集

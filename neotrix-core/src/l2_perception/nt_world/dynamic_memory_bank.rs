@@ -138,7 +138,7 @@ impl _DynamicMemoryBank {
     
     /// 存储实体
     pub fn _store_entity(&mut self, entity_id: &str, state: EntityState) {
-        let bank = self.banks.entry(state.entity_type).or_insert_with(HashMap::new);
+        let bank = self.banks.entry(state.entity_type).or_default();
         
         let entry = WorldMemoryEntry {
             entity_id: entity_id.to_string(),
@@ -266,15 +266,15 @@ impl _DynamicMemoryBank {
             }
         }
         
-        let base_score = if query_words.is_empty() {
-            0.0
-        } else {
-            matches as f32 / query_words.len() as f32
-        };
+        
         
         // 不做硬性上限截断：截断到 0.6 会让 identity_retrieval_threshold(0.7) 永远无法命中
         // 真实语义相似度应通过向量嵌入计算
-        base_score
+        if query_words.is_empty() {
+            0.0
+        } else {
+            matches as f32 / query_words.len() as f32
+        }
     }
     
     /// 获取记忆库统计

@@ -54,7 +54,7 @@ impl DeferredLoader {
     }
 
     pub fn is_loaded(&self, name: &str) -> bool {
-        self.modules.get(name).map_or(false, |m| m.loaded)
+        self.modules.get(name).is_some_and(|m| m.loaded)
     }
     pub fn loaded_count(&self) -> usize {
         self.modules.values().filter(|m| m.loaded).count()

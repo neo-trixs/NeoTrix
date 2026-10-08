@@ -398,7 +398,7 @@ impl AutoInspector {
             if let Ok(entries) = std::fs::read_dir(&layer_dir) {
                 for entry in entries.flatten() {
                     let path = entry.path();
-                    if path.extension().map_or(false, |e| e == "rs") {
+                    if path.extension().is_some_and(|e| e == "rs") {
                         if let Ok(content) = std::fs::read_to_string(&path) {
                             self.check_cross_layer_deps(
                                 &content,
@@ -515,8 +515,8 @@ impl AutoInspector {
             // pub mod lN_xxx 或 mod lN_xxx
             if line.starts_with("pub mod ") || line.starts_with("mod ") {
                 for (dep_layer, dep_num) in layer_map {
-                    if *dep_layer != current_layer && line.contains(dep_layer) {
-                        if *dep_num > current_num && current_num < 6 {
+                    if *dep_layer != current_layer && line.contains(dep_layer)
+                        && *dep_num > current_num && current_num < 6 {
                             issues.push(Issue {
                                 severity: IssueSeverity::High,
                                 location: format!("{}:{}", file_path.display(), line),
@@ -527,7 +527,6 @@ impl AutoInspector {
                                 auto_fixable: false,
                             });
                         }
-                    }
                 }
             }
         }
@@ -645,11 +644,11 @@ impl AutoInspector {
     fn generate_fix_command(&self, issue: &Issue) -> String {
         match issue.severity {
             IssueSeverity::Critical => {
-                format!("cargo fix --lib -p neotrix --allow-dirty")
+                "cargo fix --lib -p neotrix --allow-dirty".to_string()
             }
-            IssueSeverity::High => format!("cargo fix --lib -p neotrix"),
-            IssueSeverity::Medium => format!("cargo clippy --fix --lib -p neotrix"),
-            IssueSeverity::Low => format!("cargo fmt"),
+            IssueSeverity::High => "cargo fix --lib -p neotrix".to_string(),
+            IssueSeverity::Medium => "cargo clippy --fix --lib -p neotrix".to_string(),
+            IssueSeverity::Low => "cargo fmt".to_string(),
             IssueSeverity::Info => String::new(),
         }
     }

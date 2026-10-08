@@ -44,6 +44,12 @@ pub struct ContinualRefiner {
     next_snapshot_id: u32,
 }
 
+impl Default for ContinualRefiner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ContinualRefiner {
     pub fn new() -> Self {
         Self {

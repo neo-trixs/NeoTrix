@@ -68,6 +68,12 @@ pub struct HookManager {
     hook_count: u32,
 }
 
+impl Default for HookManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HookManager {
     pub fn new() -> Self {
         Self {

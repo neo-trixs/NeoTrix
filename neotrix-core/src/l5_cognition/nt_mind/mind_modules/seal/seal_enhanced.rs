@@ -379,7 +379,7 @@ impl _SEALPipelineEnhanced {
             adjustments.push(_LearningAdjustment {
                 parameter: "exploration_budget".into(),
                 old_value: self.config.exploration_budget as f64,
-                new_value: (self.config.exploration_budget as f64 * 1.2) as f64,
+                new_value: (self.config.exploration_budget as f64 * 1.2),
                 reason: "Low success rate, increasing exploration".into(),
                 confidence: 0.7,
             });

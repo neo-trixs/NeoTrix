@@ -165,18 +165,14 @@ impl WritingStyleAnalyzer {
     pub fn analyze_email(&self, subject: &str, body: &str) -> WritingStyleAnalysis {
         let combined = format!("{} {}", subject, body);
         let text_chunks: Vec<String> = split_into_sentences(&combined)
-            .into_iter()
-            .map(String::from)
-            .collect();
+            .into_iter().collect();
         self.analyze_text_chunks(&text_chunks, Some(subject))
     }
 
     pub fn analyze_whatsapp(&self, messages: &[String]) -> WritingStyleAnalysis {
         let text_chunks: Vec<String> = messages
             .iter()
-            .flat_map(|m| split_into_sentences(m))
-            .map(String::from)
-            .collect();
+            .flat_map(|m| split_into_sentences(m)).collect();
         self.analyze_text_chunks(&text_chunks, None)
     }
 
@@ -234,7 +230,7 @@ impl WritingStyleAnalyzer {
         for tpl in &self.templates {
             let pattern_lower = tpl.pattern.to_lowercase();
             let similarity = fuzzy_similarity(&lower, &pattern_lower);
-            if similarity > 0.4 && best.map_or(true, |(_, best_sim)| similarity > best_sim) {
+            if similarity > 0.4 && best.is_none_or(|(_, best_sim)| similarity > best_sim) {
                 best = Some((tpl, similarity));
             }
         }

@@ -88,11 +88,11 @@ impl EpisodicMemoryStore {
         self.index_by_time.push(id.clone());
         self.index_by_emotion
             .entry(emotion)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(id.clone());
         self.index_by_domain
             .entry(domain)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(id.clone());
 
         // Store memory

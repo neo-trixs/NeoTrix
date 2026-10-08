@@ -68,6 +68,12 @@ pub struct _AgentJournal {
     pub entries: Vec<String>,
 }
 
+impl Default for _AgentJournal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl _AgentJournal {
     pub fn new() -> Self {
         Self { entries: Vec::new() }

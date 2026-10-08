@@ -266,6 +266,12 @@ impl ModelSource for LocalGgufSource {
 
 pub struct CloudFreeSource;
 
+impl Default for CloudFreeSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CloudFreeSource {
     pub fn new() -> Self { Self }
 }
@@ -317,6 +323,12 @@ impl ModelSource for CloudFreeSource {
 
 pub struct LocalEndpointSource {
     endpoints: Vec<(String, String, String)>, // (id, url, name)
+}
+
+impl Default for LocalEndpointSource {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LocalEndpointSource {

@@ -7,6 +7,12 @@ pub struct NtPerceptionModule {
     last_input_domain: Mutex<String>,
 }
 
+impl Default for NtPerceptionModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NtPerceptionModule {
     pub fn new() -> Self {
         Self {

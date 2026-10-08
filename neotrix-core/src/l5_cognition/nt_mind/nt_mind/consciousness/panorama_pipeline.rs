@@ -155,7 +155,7 @@ impl PanoramaPipeline {
 
                 let edit_mem = ReasoningMemory::new(
                     &format!("repair_{}", self.cycle),
-                    TaskType::MetaCognition.into(),
+                    TaskType::MetaCognition,
                     &repair.suggested_edits,
                     0.5 + repair.severity * 0.5,
                 );
@@ -196,7 +196,7 @@ impl PanoramaPipeline {
 
         let mem = ReasoningMemory::new(
             &format!("panorama_cycle_{}", self.cycle),
-            TaskType::Learning.into(),
+            TaskType::Learning,
             &[
                 MicroEdit::AdjustDimension("prediction_energy".into(), fe_report.prediction_energy.min(1.0)),
                 MicroEdit::AdjustDimension("phi".into(), phi_report.phi.min(1.0)),

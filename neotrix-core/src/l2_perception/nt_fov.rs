@@ -83,11 +83,10 @@ pub fn compute_fov(
                 let dy = (wy - oy) as f64;
                 if dx * dx + dy * dy <= rp2 {
                     let is_op = if in_map { opaque(wx, wy) } else { true };
-                    if is_op || is_symmetric(&line, t) {
-                        if in_map {
+                    if (is_op || is_symmetric(&line, t))
+                        && in_map {
                             visible.insert((wx, wy));
                         }
-                    }
                     if let Some(p) = prev {
                         let p_op = {
                             let (px2, py2) = xf(ox, oy, p.depth, p.column);

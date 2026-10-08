@@ -368,7 +368,7 @@ impl CrossSourceFusionEngine {
                         id: format!("CONTRA-{:04}", core.knowledge.contradictions.len() + 1),
                         thesis: format!("{}: {}", t1.id, t1.core_claim),
                         antithesis: format!("{}: {}", t2.id, t2.core_claim),
-                        resolution: format!("Both theories may describe different aspects of consciousness"),
+                        resolution: "Both theories may describe different aspects of consciousness".to_string(),
                         category: "theoretical".into(),
                     };
                     core.knowledge.add_contradiction(contradiction);

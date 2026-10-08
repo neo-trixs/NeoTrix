@@ -280,19 +280,12 @@ pub struct HanziRepairResult {
 
 /// 修复执行器: 拆字 → 计划 → 完整性校验 (NT-REPAIR 自愈语义)。
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct RepairHarness {
     engine: HanziChaiziEngine,
     planner: VideoClipPlanner,
 }
 
-impl Default for RepairHarness {
-    fn default() -> Self {
-        Self {
-            engine: HanziChaiziEngine::default(),
-            planner: VideoClipPlanner::default(),
-        }
-    }
-}
 
 impl RepairHarness {
     pub fn new(engine: HanziChaiziEngine, planner: VideoClipPlanner) -> Self {

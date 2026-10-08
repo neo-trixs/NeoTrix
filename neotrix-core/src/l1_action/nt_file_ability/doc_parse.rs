@@ -316,7 +316,7 @@ fn extract_tables_json(blocks: &[Block]) -> Option<Vec<serde_json::Value>> {
 
 fn table_to_json(table: &Table) -> serde_json::Value {
     let grid = &table.grid;
-    let headers = grid.first().map(|row| row.iter().map(|c| cell_text(c)).collect::<Vec<_>>()).unwrap_or_default();
+    let headers = grid.first().map(|row| row.iter().map(cell_text).collect::<Vec<_>>()).unwrap_or_default();
     let rows: Vec<Vec<String>> = grid.iter().skip(1).map(|row| row.iter().map(cell_text).collect()).collect();
     serde_json::json!({
         "headers": headers,

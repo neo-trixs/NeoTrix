@@ -15,6 +15,12 @@ pub struct SessionReplayGuard {
     signature_to_account: Arc<RwLock<HashMap<String, String>>>,
 }
 
+impl Default for SessionReplayGuard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SessionReplayGuard {
     pub fn new() -> Self {
         Self {

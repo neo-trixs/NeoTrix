@@ -4,6 +4,12 @@ use crate::l2_perception::nt_world::source::crypto;
 
 pub struct MiguSource;
 
+impl Default for MiguSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MiguSource {
     pub fn new() -> Self { Self }
 }
@@ -25,7 +31,7 @@ impl MediaSource for MiguSource {
                 let title = s["songName"].as_str()?.to_string();
                 let artist = s["singerName"].as_str().map_or("Unknown", |s| s).to_string();
                 let album = s["albumName"].as_str().map_or("", |s| s).to_string();
-                let duration = s["duration"].as_str().and_then(|d| d.parse::<u64>().ok()).map(|s| std::time::Duration::from_secs(s));
+                let duration = s["duration"].as_str().and_then(|d| d.parse::<u64>().ok()).map(std::time::Duration::from_secs);
                 Some(MediaItem { id, title, artist, album, duration, cover_url: None, media_type: MediaType::Audio, qualities: vec![Quality::Flac, Quality::High, Quality::Standard] })
             }).collect();
             let total = json["pgt"].as_u64().unwrap_or(0) as usize * 30;

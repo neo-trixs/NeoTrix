@@ -56,6 +56,12 @@ pub struct CrystalKnowledge {
     pub domain_tags: Vec<String>,
 }
 
+impl Default for CrystalKnowledge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CrystalKnowledge {
     pub fn new() -> Self {
         let mut k = Self {

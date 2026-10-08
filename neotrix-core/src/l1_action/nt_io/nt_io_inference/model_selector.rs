@@ -323,9 +323,9 @@ impl ModelSelector {
         let mut scored: Vec<(String, f64, f64, f64)> = self.known_models.iter()
             .filter(|(_, m)| {
                 // Memory fit filter: model must fit in VRAM
-                let fits = m.file_size_int4_gb <= vram_gb;
+                
                 // For MoE, active params determine actual compute cost
-                fits
+                m.file_size_int4_gb <= vram_gb
             })
             .map(|(name, m)| {
                 let params = ModelParams {

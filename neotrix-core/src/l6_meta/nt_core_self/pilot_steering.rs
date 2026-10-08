@@ -278,6 +278,12 @@ pub struct SharedMemory {
     pattern_to_skill: HashMap<String, String>, // pattern_id -> skill_id
 }
 
+impl Default for SharedMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SharedMemory {
     pub fn new() -> Self {
         Self {

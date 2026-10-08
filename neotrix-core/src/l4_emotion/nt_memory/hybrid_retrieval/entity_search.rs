@@ -31,7 +31,7 @@ impl EntityIndex {
         for entity in entities {
             self.entity_to_docs
                 .entry(entity.to_lowercase())
-                .or_insert_with(HashSet::new)
+                .or_default()
                 .insert(doc_id.to_string());
         }
     }

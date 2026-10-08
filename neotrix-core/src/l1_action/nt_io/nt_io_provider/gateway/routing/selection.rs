@@ -179,14 +179,14 @@ impl GatewayV2 {
             // (该模型被锁定则跳过, 路由到其它 provider)
             if states.contains_key(model)
                 && !chain.contains(&model.to_string())
-                && !states.get(model).map_or(false, |s| s.is_model_locked(model))
+                && !states.get(model).is_some_and(|s| s.is_model_locked(model))
             {
                 chain.push(model.to_string());
             }
             // 裸 provider 名: `llm7` keyless 注册名
             if states.contains_key(prefix)
                 && !chain.contains(&prefix.to_string())
-                && !states.get(prefix).map_or(false, |s| s.is_model_locked(model))
+                && !states.get(prefix).is_some_and(|s| s.is_model_locked(model))
             {
                 chain.push(prefix.to_string());
             }
@@ -233,7 +233,7 @@ impl GatewayV2 {
                 continue;
             }
             // 请求了具体模型且该 provider 上此模型被锁定 → 跳过, 路由到其它 provider
-            if !model.is_empty() && states.get(name).map_or(false, |s| s.is_model_locked(model)) {
+            if !model.is_empty() && states.get(name).is_some_and(|s| s.is_model_locked(model)) {
                 continue;
             }
             chain.push(name.clone());
@@ -298,7 +298,7 @@ impl GatewayV2 {
             });
             self.register_provider_with_category(
                 &name,
-                provider.into(),
+                provider,
                 entry.is_free,
                 ProviderCategory::Cloud,
             );
@@ -346,7 +346,7 @@ impl GatewayV2 {
             });
             self.register_provider_with_category(
                 &name,
-                provider.into(),
+                provider,
                 entry.is_free,
                 entry.category,
             );

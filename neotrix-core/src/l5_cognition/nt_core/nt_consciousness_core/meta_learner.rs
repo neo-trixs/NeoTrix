@@ -68,6 +68,12 @@ pub struct _MetaLearningRecord {
     pub timestamp: String,
 }
 
+impl Default for MetaLearner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MetaLearner {
     pub fn new() -> Self {
         Self {

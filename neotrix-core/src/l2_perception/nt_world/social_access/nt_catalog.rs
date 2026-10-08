@@ -175,7 +175,7 @@ impl PlatformCatalog {
             .find_map(|key| {
                 self.specs
                     .get(key)
-                    .filter(|s| s.aliases().iter().any(|a| *a == id))
+                    .filter(|s| s.aliases().contains(&id))
             })
     }
 

@@ -40,7 +40,7 @@ impl DaemonMonitor {
 
             // 检查进程是否存在
             let output = Command::new("kill")
-                .args(&["-0", &pid])
+                .args(["-0", &pid])
                 .output()
                 .map_err(|e| format!("Failed to check process: {}", e))?;
 
@@ -55,7 +55,7 @@ impl DaemonMonitor {
 
                 // 获取内存和运行时间
                 let ps_output = Command::new("ps")
-                    .args(&["-o", "rss=", "-p", &pid])
+                    .args(["-o", "rss=", "-p", &pid])
                     .output()
                     .ok();
                 if let Some(output) = ps_output {
@@ -66,7 +66,7 @@ impl DaemonMonitor {
                 }
 
                 let ps_output = Command::new("ps")
-                    .args(&["-o", "etime=", "-p", &pid])
+                    .args(["-o", "etime=", "-p", &pid])
                     .output()
                     .ok();
                 if let Some(output) = ps_output {
@@ -95,7 +95,7 @@ impl DaemonMonitor {
                 .to_string();
 
             let output = Command::new("kill")
-                .args(&["-0", &pid])
+                .args(["-0", &pid])
                 .output()
                 .map_err(|e| format!("Failed to check process: {}", e))?;
 
@@ -147,7 +147,7 @@ impl DaemonMonitor {
         } else {
             // 尝试 pkill
             let output = Command::new("pkill")
-                .args(&["-f", "target/debug/daemon"])
+                .args(["-f", "target/debug/daemon"])
                 .output()
                 .map_err(|e| format!("Failed to pkill daemon: {}", e))?;
 

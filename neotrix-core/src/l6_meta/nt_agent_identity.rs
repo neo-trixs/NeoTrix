@@ -112,6 +112,12 @@ pub struct AgentIdentityRegistry {
     personas: HashMap<String, AgentPersona>,
 }
 
+impl Default for AgentIdentityRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AgentIdentityRegistry {
     pub fn new() -> Self {
         Self {

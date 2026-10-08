@@ -149,6 +149,12 @@ pub struct UnconsciousCommunicator {
     counter: u64,
 }
 
+impl Default for UnconsciousCommunicator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UnconsciousCommunicator {
     pub fn new() -> Self {
         Self {

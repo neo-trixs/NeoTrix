@@ -167,7 +167,7 @@ impl TaskRouter {
 
         while let Some(PrioritizedTask { task, .. }) = heap.pop() {
             if let Some(best_agent) = Self::find_best_agent(&task, agents, &agent_loads) {
-                let estimated_duration = Self::estimate_duration(&task, &best_agent);
+                let estimated_duration = Self::estimate_duration(&task, best_agent);
                 let agent_id = best_agent.agent_id.clone();
                 assignments.push(Assignment {
                     agent_id: agent_id.clone(),

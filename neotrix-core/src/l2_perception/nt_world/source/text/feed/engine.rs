@@ -18,6 +18,12 @@ pub struct FeedEngine {
     last_modified: HashMap<String, String>,
 }
 
+impl Default for FeedEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FeedEngine {
     pub fn new() -> Self {
         Self {

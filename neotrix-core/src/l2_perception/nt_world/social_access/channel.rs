@@ -407,6 +407,12 @@ pub struct ChannelRegistry {
     config: HashMap<String, String>,
 }
 
+impl Default for ChannelRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ChannelRegistry {
     pub fn new() -> Self {
         Self {

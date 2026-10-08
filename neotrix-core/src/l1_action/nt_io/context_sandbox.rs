@@ -83,7 +83,7 @@ impl ContextSandbox {
 
     /// 沙箱化工具输出: 压缩 + 存储 + 返回摘要
     pub fn sandbox(&mut self, tool_name: &str, output: &str) -> SandboxedOutput {
-        let level = self.get_level(tool_name).clone();
+        let level = *self.get_level(tool_name);
         let summary = Self::compress(output, &level, self.config.max_summary_tokens);
         let original_tokens = Self::estimate_tokens(output);
         let summary_tokens = Self::estimate_tokens(&summary);

@@ -126,7 +126,7 @@ impl NtPredictLoop {
                     rusqlite::params![p, domain],
                 )
                 .map_err(|e| format!("update priority: {e}"))?;
-            total += n as usize;
+            total += n;
         }
         Ok(total)
     }

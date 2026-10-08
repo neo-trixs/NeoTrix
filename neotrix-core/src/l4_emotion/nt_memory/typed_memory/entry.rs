@@ -148,8 +148,8 @@ impl TypedMemoryStore {
                 self.entries.remove(&oldest_id);
             }
         }
-        let old = self.entries.insert(entry.id.clone(), entry);
-        old
+        
+        self.entries.insert(entry.id.clone(), entry)
     }
     pub fn get(&mut self, id: &str) -> Option<&TypedMemoryEntry> {
         let entry = self.entries.get(id)?;
@@ -186,7 +186,7 @@ impl TypedMemoryStore {
         let expired: Vec<String> = self
             .entries
             .iter()
-            .filter(|(_, e)| e.ttl.map_or(false, |ttl| e.timestamp + ttl < now))
+            .filter(|(_, e)| e.ttl.is_some_and(|ttl| e.timestamp + ttl < now))
             .map(|(id, _)| id.clone())
             .collect();
         for id in &expired {

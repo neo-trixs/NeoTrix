@@ -79,6 +79,12 @@ pub struct AgentOrchestrator {
     pub event_log: Vec<(u64, FlowEvent)>,
 }
 
+impl Default for AgentOrchestrator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AgentOrchestrator {
     pub fn new() -> Self {
         Self { crews: Vec::new(), event_log: Vec::new() }

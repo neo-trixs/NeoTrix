@@ -214,7 +214,7 @@ impl TradeTaskEngine {
             .filter(|t| {
                 t.status == TradeTaskStatus::Pending || t.status == TradeTaskStatus::InProgress
             })
-            .filter(|t| assignee_id.map_or(true, |a| t.assignee_id == a))
+            .filter(|t| assignee_id.is_none_or(|a| t.assignee_id == a))
             .collect()
     }
 
@@ -225,7 +225,7 @@ impl TradeTaskEngine {
             .values()
             .filter(|t| {
                 (t.status == TradeTaskStatus::Pending || t.status == TradeTaskStatus::InProgress)
-                    && t.due_at.map_or(false, |d| d < now)
+                    && t.due_at.is_some_and(|d| d < now)
             })
             .collect()
     }
@@ -239,7 +239,7 @@ impl TradeTaskEngine {
             .filter(|t| {
                 !t.reminded
                     && t.status != TradeTaskStatus::Completed
-                    && t.remind_at.map_or(false, |r| r <= now)
+                    && t.remind_at.is_some_and(|r| r <= now)
             })
             .map(|t| t.id.clone())
             .collect();

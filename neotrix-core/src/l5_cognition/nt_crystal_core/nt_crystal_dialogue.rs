@@ -398,7 +398,7 @@ impl NtInnerLoop {
         let mut reflection = report.fused.minority.join("；");
         if !report.fused.contradictions.is_empty() {
             if !reflection.is_empty() {
-                reflection.push_str("；");
+                reflection.push('；');
             }
             reflection.push_str(&report.fused.contradictions.join("；"));
         }

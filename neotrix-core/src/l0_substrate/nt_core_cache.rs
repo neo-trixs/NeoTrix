@@ -762,7 +762,7 @@ impl SelfTest for CacheSelfTest {
         if cache.is_empty() {
             failures.push("cache_core: cache reported empty after insert".into());
         }
-        if cache.len() < 1 {
+        if cache.is_empty() {
             failures.push(format!("cache_core: len {} < 1 after insert", cache.len()));
         }
         if failures.is_empty() {

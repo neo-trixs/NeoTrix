@@ -192,7 +192,7 @@ async fn extract_youtube(
                             ext: best["mimeType"]
                                 .as_str()
                                 .and_then(|m| m.split(';').next())
-                                .and_then(|m| m.split('/').last())
+                                .and_then(|m| m.split('/').next_back())
                                 .map(String::from),
                             duration: v
                                 .get("videoDetails")
@@ -243,7 +243,7 @@ async fn extract_youtube(
                             ext: best["mimeType"]
                                 .as_str()
                                 .and_then(|m| m.split(';').next())
-                                .and_then(|m| m.split('/').last())
+                                .and_then(|m| m.split('/').next_back())
                                 .map(String::from),
                             duration: v
                                 .get("videoDetails")
@@ -520,7 +520,7 @@ async fn list_youtube_formats(
                     ext: f["mimeType"]
                         .as_str()
                         .and_then(|m| m.split(';').next())
-                        .and_then(|m| m.split('/').last())
+                        .and_then(|m| m.split('/').next_back())
                         .unwrap_or("")
                         .to_string(),
                     resolution: f["qualityLabel"].as_str().unwrap_or("").to_string(),
@@ -549,7 +549,7 @@ async fn list_youtube_formats(
                     ext: f["mimeType"]
                         .as_str()
                         .and_then(|m| m.split(';').next())
-                        .and_then(|m| m.split('/').last())
+                        .and_then(|m| m.split('/').next_back())
                         .unwrap_or("")
                         .to_string(),
                     resolution: f["qualityLabel"].as_str().unwrap_or("").to_string(),

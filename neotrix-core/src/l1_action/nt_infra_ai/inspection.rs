@@ -77,6 +77,12 @@ pub struct RedundancyAgent {
     config: AgentConfig,
 }
 
+impl Default for RedundancyAgent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RedundancyAgent {
     pub fn new() -> Self {
         Self {
@@ -134,6 +140,12 @@ pub struct ArchitectureAgent {
     config: AgentConfig,
 }
 
+impl Default for ArchitectureAgent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ArchitectureAgent {
     pub fn new() -> Self {
         Self {
@@ -185,6 +197,12 @@ impl InspectionAgent for ArchitectureAgent {
 /// Type consistency agent.
 pub struct TypeAgent {
     config: AgentConfig,
+}
+
+impl Default for TypeAgent {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TypeAgent {
@@ -242,6 +260,12 @@ impl InspectionAgent for TypeAgent {
 /// Dead code detection agent.
 pub struct DeadCodeAgent {
     config: AgentConfig,
+}
+
+impl Default for DeadCodeAgent {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DeadCodeAgent {

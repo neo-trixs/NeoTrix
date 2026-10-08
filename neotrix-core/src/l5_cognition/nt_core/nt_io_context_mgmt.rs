@@ -27,20 +27,17 @@ pub struct ContextManager {
 /// For >256K tokens: use paged KV virtualization (GPU→Host→NVMe tiered).
 /// The threshold is configurable (default 256K tokens).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum ContextStrategy {
     /// Compaction mode: summarize + drop low-priority items when window full.
     /// Fast, low memory, suitable for short sessions (<256K tokens).
+    #[default]
     Compaction,
     /// Paged KV mode: GPU→Host→NVMe tiered storage with page-level access.
     /// Supports arbitrarily long sessions, constant GPU memory (~35 GiB).
     PagedKv,
 }
 
-impl Default for ContextStrategy {
-    fn default() -> Self {
-        Self::Compaction
-    }
-}
 
 /// Paged KV virtualization state (KVMem arXiv:2609.04852).
 ///
@@ -94,6 +91,7 @@ impl Default for PagedKvState {
 /// Inter-step KL divergence is ~37× higher than intra-step (KVMem finding),
 /// so the working set updates once per step, not per token.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct WorkingSet {
     /// Retained page indices (GPU-resident, no transfer needed).
     pub retained: Vec<usize>,
@@ -103,15 +101,6 @@ pub struct WorkingSet {
     pub outgoing: Vec<usize>,
 }
 
-impl Default for WorkingSet {
-    fn default() -> Self {
-        Self {
-            retained: Vec::new(),
-            incoming: Vec::new(),
-            outgoing: Vec::new(),
-        }
-    }
-}
 
 /// Memory tier for paged KV storage.
 #[derive(Debug, Clone, Serialize, Deserialize)]

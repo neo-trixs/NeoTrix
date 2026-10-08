@@ -269,7 +269,7 @@ impl IpFingerprintEngine {
     /// Check if an email domain is disposable.
     pub fn _is_disposable_email(&self, domain: &str) -> bool {
         self.config.disposable_email_domains.iter().any(|d| d == domain)
-            || EXTRA_DISPOSABLE_DOMAINS.iter().any(|d| *d == domain)
+            || EXTRA_DISPOSABLE_DOMAINS.contains(&domain)
     }
 
     /// Build DetectionSignals from fingerprints.

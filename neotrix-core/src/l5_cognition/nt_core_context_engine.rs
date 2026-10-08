@@ -651,7 +651,7 @@ impl ContextEngine {
             }
         }
 
-        let index_size: usize = index.values().map(|e| std::mem::size_of_val(e)).sum();
+        let index_size: usize = index.values().map(std::mem::size_of_val).sum();
 
         ContextStats {
             total_files,

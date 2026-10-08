@@ -122,7 +122,7 @@ impl DagScheduler {
     }
 
     /// Get entries for a specific turn
-    pub fn entries_for_turn<'a>(entries: &'a [ScheduleEntry], turn: u32) -> Vec<&'a ScheduleEntry> {
+    pub fn entries_for_turn(entries: &[ScheduleEntry], turn: u32) -> Vec<&ScheduleEntry> {
         entries.iter().filter(|e| e.start_turn == turn).collect()
     }
 

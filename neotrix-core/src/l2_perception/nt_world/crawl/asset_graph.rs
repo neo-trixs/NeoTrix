@@ -98,12 +98,11 @@ impl AssetGraphWriter {
             None,
             Some(&h.full_host),
         )?;
-        if host_id != root_id {
-            if !kb.edge_exists(&root_id, &host_id, RelationType::PartOf)? {
+        if host_id != root_id
+            && !kb.edge_exists(&root_id, &host_id, RelationType::PartOf)? {
                 kb.upsert_edge(&root_id, &host_id, RelationType::PartOf, 1.0, None)?;
                 edges += 1;
             }
-        }
 
         if !h.service.is_empty() {
             let service_id = kb.insert_or_get_node(
@@ -113,12 +112,11 @@ impl AssetGraphWriter {
                 None,
                 Some(&h.full_host),
             )?;
-            if service_id != host_id {
-                if !kb.edge_exists(&host_id, &service_id, RelationType::PartOf)? {
+            if service_id != host_id
+                && !kb.edge_exists(&host_id, &service_id, RelationType::PartOf)? {
                     kb.upsert_edge(&host_id, &service_id, RelationType::PartOf, 1.0, None)?;
                     edges += 1;
                 }
-            }
             if !h.endpoint.is_empty() && h.endpoint != format!("/{}", h.service) {
                 let ep_id = kb.insert_or_get_node(
                     &format!("asset:{}", h.endpoint.trim_end_matches('/')),
@@ -127,12 +125,11 @@ impl AssetGraphWriter {
                     Some(url),
                     Some(&h.full_host),
                 )?;
-                if ep_id != service_id {
-                    if !kb.edge_exists(&service_id, &ep_id, RelationType::BelongsTo)? {
+                if ep_id != service_id
+                    && !kb.edge_exists(&service_id, &ep_id, RelationType::BelongsTo)? {
                         kb.upsert_edge(&service_id, &ep_id, RelationType::BelongsTo, 1.0, None)?;
                         edges += 1;
                     }
-                }
             }
         }
         Ok(edges)

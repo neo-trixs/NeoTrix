@@ -81,8 +81,8 @@ impl KnowledgeGraph {
 
     /// 添加边
     pub fn add_edge(&mut self, edge: _KGEdge) {
-        self.edges.entry(edge.source.clone()).or_insert_with(Vec::new).push(edge.clone());
-        self.reverse_edges.entry(edge.target.clone()).or_insert_with(Vec::new).push(edge);
+        self.edges.entry(edge.source.clone()).or_default().push(edge.clone());
+        self.reverse_edges.entry(edge.target.clone()).or_default().push(edge);
     }
 
     /// BFS 遍历

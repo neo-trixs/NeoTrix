@@ -205,11 +205,7 @@ impl VideoObjectStorage {
     /// 生成 CDN URL
     pub(crate) fn _generate_cdn_url(&self, object_id: &str) -> Option<String> {
         if let Some(object) = self.objects.get(object_id) {
-            if let Some(cdn_base) = &self.config.cdn_base_url {
-                Some(format!("{}/{}", cdn_base, object.key))
-            } else {
-                None
-            }
+            self.config.cdn_base_url.as_ref().map(|cdn_base| format!("{}/{}", cdn_base, object.key))
         } else {
             None
         }

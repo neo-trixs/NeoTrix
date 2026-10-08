@@ -51,7 +51,7 @@ impl RecursiveStrategy {
             && self
                 .levels
                 .get(depth)
-                .map_or(false, |l| l.success_rate < 0.3)
+                .is_some_and(|l| l.success_rate < 0.3)
     }
     pub fn count(&self) -> usize {
         self.levels.len()

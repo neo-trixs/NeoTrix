@@ -166,7 +166,7 @@ pub fn load_external_cli_plugins() -> Vec<ExternalCliPlugin> {
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().map(|e| e == "json").unwrap_or(false) ==false {
+        if !path.extension().map(|e| e == "json").unwrap_or(false) {
             continue;
         }
         if let Ok(text) = std::fs::read_to_string(&path) {

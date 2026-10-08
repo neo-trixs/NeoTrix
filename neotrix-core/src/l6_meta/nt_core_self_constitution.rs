@@ -57,7 +57,7 @@ impl RuleCategory {
             24 | 25 | 30 | 33 | 36 | 41 => RuleCategory::BehavioralGrounding,
             10 | 19 | 23 | 26 | 28 | 37 | 39 => RuleCategory::MetaCognition,
             43 => RuleCategory::AbsorptionProtocol,
-            79 | 80 | 81 | 82 | 83 => RuleCategory::AbsorptionProtocol,
+            79..=83 => RuleCategory::AbsorptionProtocol,
             42 | 44 | 45 | 46 | 47 | 48 => RuleCategory::TreeGrowth,
             11 | 31 | 40 => RuleCategory::CodeQualityPattern,
             14 | 15 | 16 | 18 | 38 => RuleCategory::Reliability,

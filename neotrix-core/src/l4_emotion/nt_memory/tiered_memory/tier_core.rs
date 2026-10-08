@@ -213,7 +213,7 @@ impl CoreStore {
             total_chars: self.total_chars(),
             char_budget: self.char_budget,
             writes: self.writes,
-            cache_hit_rate: if self.access_cache.len() > 0 {
+            cache_hit_rate: if !self.access_cache.is_empty() {
                 self.access_cache.len() as f64 / (self.access_cache.len() + 1) as f64
             } else {
                 0.0

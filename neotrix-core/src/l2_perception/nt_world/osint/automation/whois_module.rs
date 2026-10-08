@@ -99,7 +99,7 @@ fn extract_name_servers(response: &str) -> Vec<String> {
         let trimmed = line.trim();
         let lower = trimmed.to_lowercase();
         if lower.starts_with("name server") || lower.starts_with("nserver") {
-            if let Some(val) = trimmed.splitn(2, ':').nth(1) {
+            if let Some(val) = trimmed.split_once(':').map(|x| x.1) {
                 let ns = val.trim().to_lowercase();
                 if !ns.is_empty() && seen.insert(ns.clone()) {
                     servers.push(ns);
@@ -220,7 +220,7 @@ impl OsintModule for WhoisModule {
                 "whois_registrar",
                 "registrar",
                 reg.clone(),
-                &format!("whois:{}", whois_server_for_domain(&result.domain)),
+                format!("whois:{}", whois_server_for_domain(&result.domain)),
                 0.9,
             ));
         }

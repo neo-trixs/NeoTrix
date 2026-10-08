@@ -8,6 +8,12 @@ use super::super::SocialAccessError;
 
 pub struct JinaReaderExtractor;
 
+impl Default for JinaReaderExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl JinaReaderExtractor {
     pub fn new() -> Self {
         Self

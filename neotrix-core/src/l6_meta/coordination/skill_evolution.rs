@@ -44,7 +44,9 @@ impl SkillMaturity {
 /// Where a skill comes from (evolution-state provenance)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum SkillSource {
+    #[default]
     Builtin,
     Local {
         #[serde(default)]
@@ -64,11 +66,6 @@ pub enum SkillSource {
     },
 }
 
-impl Default for SkillSource {
-    fn default() -> Self {
-        Self::Builtin
-    }
-}
 
 /// Security audit record for a skill candidate.
 ///

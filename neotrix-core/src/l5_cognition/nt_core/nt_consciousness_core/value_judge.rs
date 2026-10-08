@@ -44,6 +44,12 @@ pub struct JudgmentRecord {
     pub timestamp: String,
 }
 
+impl Default for ValueJudge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ValueJudge {
     pub fn new() -> Self {
         Self {

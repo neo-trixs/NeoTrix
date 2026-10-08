@@ -153,6 +153,12 @@ pub struct CookieStore {
     file_path: Option<PathBuf>,
 }
 
+impl Default for CookieStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CookieStore {
     pub fn new() -> Self {
         Self {
@@ -667,6 +673,12 @@ impl Default for UniversalBrowser {
 /// 平台注册表 — 管理所有平台的浏览器配置
 pub struct PlatformRegistry {
     platforms: HashMap<String, PlatformConfig>,
+}
+
+impl Default for PlatformRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PlatformRegistry {

@@ -152,7 +152,7 @@ impl AdsbFetcher {
             let summary = format!("callsign={} type={} mil={} alt={} gs={}", evt.callsign.trim(), evt.r#type, evt.mil, evt.alt_baro, evt.gs);
             let existing = kb.find_node_by_url(&url).ok().flatten();
             let is_new = existing.is_none();
-            let _id = kb.insert_or_get_node(&evt.callsign.trim(), neotrix_types::knowledge_access::NodeType::External, Some(&summary), Some(&url), Some("adsb"))
+            let _id = kb.insert_or_get_node(evt.callsign.trim(), neotrix_types::knowledge_access::NodeType::External, Some(&summary), Some(&url), Some("adsb"))
                 .map_err(|e| format!("KB ingest failed for {}: {}", evt.icao, e))?;
             if is_new { report.nodes_created += 1; } else { report.nodes_reused += 1; }
         }
@@ -189,13 +189,11 @@ pub struct _AdsbIngestReport {
 
 // ── SearchBackend ────────────────────────────────────────────
 
+#[derive(Default)]
 pub struct AdsbBackend {
     fetcher: AdsbFetcher,
 }
 
-impl Default for AdsbBackend {
-    fn default() -> Self { Self { fetcher: AdsbFetcher::default() } }
-}
 
 impl AdsbBackend {
     pub fn new() -> Self { Self::default() }

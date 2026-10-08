@@ -353,6 +353,12 @@ pub struct DecisionEngine {
     goap_planner: GOAPPlanner,
 }
 
+impl Default for DecisionEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DecisionEngine {
     pub fn new() -> Self {
         let mut goap_planner = GOAPPlanner::new();

@@ -573,7 +573,7 @@ impl SelfImprovementLoop {
             plans_generated: plans.len(),
             plans_applied: applied.len(),
             verified: verification.is_some(),
-            overall_improved: verification.as_ref().map_or(false, |v| v.overall_improved),
+            overall_improved: verification.as_ref().is_some_and(|v| v.overall_improved),
             duration_ms: timestamp_now() - start,
         }
     }

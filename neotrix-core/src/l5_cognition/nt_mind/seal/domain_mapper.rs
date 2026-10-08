@@ -515,7 +515,7 @@ impl DomainMapper {
             };
         }
 
-        let fallback = Self::type_fallback(&input);
+        let fallback = Self::type_fallback(input);
         let sc = Self::guess_source_core(&blob);
         MappingResult {
             domain: fallback.0,
@@ -584,11 +584,10 @@ impl DomainMapper {
             let title_hits = rule.pattern.find_iter(title).count() as u32;
             let blob_hits = rule.pattern.find_iter(blob).count() as u32;
             let score = title_hits * rule.title_weight + blob_hits;
-            if score > 0 {
-                if best.as_ref().map_or(true, |b| score > b.2) {
+            if score > 0
+                && best.as_ref().is_none_or(|b| score > b.2) {
                     best = Some((rule.domain.clone(), rule.capability.clone(), score));
                 }
-            }
         }
         best
     }

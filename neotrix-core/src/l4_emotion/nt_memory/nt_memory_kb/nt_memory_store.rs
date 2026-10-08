@@ -305,7 +305,7 @@ pub fn find_node_by_title_and_type(
     let mut stmt = conn.prepare(sql)?;
     let mut rows = stmt.query(params![param_value, node_type.as_str()])?;
     match rows.next()? {
-        Some(row) => Ok(Some(row_to_knowledge_node(&row)?)),
+        Some(row) => Ok(Some(row_to_knowledge_node(row)?)),
         None => Ok(None),
     }
 }
@@ -376,7 +376,7 @@ pub fn find_node_by_url(conn: &Connection, url: &str) -> rusqlite::Result<Option
     )?;
     let mut rows = stmt.query(params![url])?;
     match rows.next()? {
-        Some(row) => Ok(Some(row_to_knowledge_node(&row)?)),
+        Some(row) => Ok(Some(row_to_knowledge_node(row)?)),
         None => Ok(None),
     }
 }
@@ -841,7 +841,7 @@ pub fn get_nodes_in_cluster(
             supersedes, parent_id, depth, cluster_id
          FROM nodes WHERE cluster_id=?1 ORDER BY depth, title",
     )?;
-    let rows = stmt.query_map(params![cluster_id], |row| row_to_knowledge_node(row))?;
+    let rows = stmt.query_map(params![cluster_id], row_to_knowledge_node)?;
     let mut nodes = Vec::new();
     for row in rows {
         nodes.push(row?);
@@ -859,7 +859,7 @@ pub fn get_node_children(
             supersedes, parent_id, depth, cluster_id
          FROM nodes WHERE parent_id=?1 ORDER BY depth, title",
     )?;
-    let rows = stmt.query_map(params![parent_id], |row| row_to_knowledge_node(row))?;
+    let rows = stmt.query_map(params![parent_id], row_to_knowledge_node)?;
     let mut nodes = Vec::new();
     for row in rows {
         nodes.push(row?);
@@ -968,7 +968,7 @@ pub fn get_all_nodes(conn: &Connection) -> rusqlite::Result<Vec<KnowledgeNode>> 
     let mut stmt = conn.prepare(
         "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, recall_weight, created_at, updated_at, access_count, metadata, supersedes, parent_id, depth, cluster_id FROM nodes"
     )?;
-    let rows = stmt.query_map([], |row| row_to_knowledge_node(row))?;
+    let rows = stmt.query_map([], row_to_knowledge_node)?;
     let mut nodes = Vec::new();
     for row in rows {
         nodes.push(row?);

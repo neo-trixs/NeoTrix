@@ -61,7 +61,7 @@ impl Game2048 {
         }
         let idx = (self.next_random() as usize) % empty.len();
         let (r, c) = empty[idx];
-        self.board[r][c] = if self.next_random() % 10 == 0 { 4 } else { 2 };
+        self.board[r][c] = if self.next_random().is_multiple_of(10) { 4 } else { 2 };
     }
 
     fn slide_row_left(row: &mut [u32; GRID]) -> u32 {
@@ -194,13 +194,13 @@ impl NtGameEnv for Game2048 {
         };
 
         let old_board = self.board;
-        let score_gain;
+        
 
         // Rotate so the desired direction becomes "left", slide, rotate back
         for _ in 0..dir {
             self.rotate_board();
         }
-        score_gain = self.move_left();
+        let score_gain = self.move_left();
         for _ in 0..(4 - dir) % 4 {
             self.rotate_board();
         }

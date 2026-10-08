@@ -110,7 +110,7 @@ impl PipelineCheckpointing {
 
         self.checkpoints
             .entry(job_id.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(checkpoint.clone());
 
         self.stats.total_checkpoints += 1;

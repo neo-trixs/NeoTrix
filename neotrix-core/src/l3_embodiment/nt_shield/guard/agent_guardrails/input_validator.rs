@@ -104,7 +104,7 @@ impl InputValidator for PromptInjectionDetector {
                     rule_id: format!("injection_pattern:{}", pattern_str),
                     category: GuardrailCategory::PromptInjection,
                     severity: ViolationSeverity::Block,
-                    message: format!("Prompt injection detected: pattern matched"),
+                    message: "Prompt injection detected: pattern matched".to_string(),
                     matched: Some(mat.as_str().to_string()),
                     confidence: 0.9,
                 });
@@ -230,7 +230,7 @@ impl InputValidator for CredentialLeakDetector {
 ///
 /// ⚠️ 刻意**不做**的：变量展开、命令替换、算术、进程替换 ——
 ///   那些需要真正的求值器。当前身份是**粗筛 pre-filter**，见函数头自评。
-fn split_outside_quotes<'a>(input: &'a str, delim: char) -> Vec<&'a str> {
+fn split_outside_quotes(input: &str, delim: char) -> Vec<&str> {
     let mut parts = Vec::new();
     let mut start = 0usize;
     let mut chars = input.char_indices().peekable();

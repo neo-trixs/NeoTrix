@@ -54,6 +54,12 @@ pub enum _GenerationType {
     Synthesis,
 }
 
+impl Default for Generator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Generator {
     pub fn new() -> Self {
         Self {

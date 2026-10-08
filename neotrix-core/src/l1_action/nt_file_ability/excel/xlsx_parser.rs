@@ -66,20 +66,17 @@ use crate::l1_action::nt_file_ability::types::{FileAbilityError, Result, TableDa
 
 /// 解析模式
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum ParseMode {
     /// 快速模式: 只解析 sharedStrings + sheet1，纯文本
     Fast,
     /// 完整模式: calamine 驱动，支持公式/日期
     Full,
     /// 自动模式: 根据文件大小选择 (默认)
+    #[default]
     Auto,
 }
 
-impl Default for ParseMode {
-    fn default() -> Self {
-        Self::Auto
-    }
-}
 
 /// 解析配置
 #[derive(Debug, Clone)]

@@ -1280,7 +1280,7 @@ impl ModelManager {
 
     /// 清除模型缓存
     pub fn clear_cache(&mut self) -> Result<(), std::io::Error> {
-        for (_, path) in &self.loaded_models {
+        for path in self.loaded_models.values() {
             if path.exists() {
                 std::fs::remove_file(path)?;
             }

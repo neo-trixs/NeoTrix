@@ -20,8 +20,10 @@ use super::unified::{CrawlResult, CrawlSource, DataSource, SourceDomain};
 
 /// Network access stealth level for blocked/restricted feeds
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Default)]
 pub enum StealthLevel {
     /// Direct connection — no obfuscation
+    #[default]
     None,
     /// HTTP/SOCKS proxy routing
     Proxy,
@@ -33,11 +35,6 @@ pub enum StealthLevel {
     Stealth,
 }
 
-impl Default for StealthLevel {
-    fn default() -> Self {
-        Self::None
-    }
-}
 
 impl StealthLevel {
     pub fn as_str(&self) -> &'static str {

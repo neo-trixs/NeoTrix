@@ -59,6 +59,12 @@ pub struct CtmShortTerm {
 #[deprecated]
 pub type Workspace = CtmShortTerm;
 
+impl Default for CtmShortTerm {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CtmShortTerm {
     pub fn new() -> Self {
         Self {
@@ -78,7 +84,7 @@ impl CtmShortTerm {
     /// 检查是否通过意识门控
     pub fn is_conscious(&self) -> bool {
         self.current_chunk.as_ref()
-            .map_or(false, |c| c.score >= self.threshold)
+            .is_some_and(|c| c.score >= self.threshold)
     }
 
     /// 检查是否应该继续迭代
@@ -248,6 +254,12 @@ pub struct LinkGraph {
     module_index: HashMap<String, usize>,
 }
 
+impl Default for LinkGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LinkGraph {
     pub fn new() -> Self {
         Self {
@@ -376,6 +388,12 @@ pub struct ConsciousnessLoop {
     pub affect: AffectState,
     pub links: LinkGraph,
     pub base_priorities: HashMap<String, f64>,
+}
+
+impl Default for ConsciousnessLoop {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ConsciousnessLoop {

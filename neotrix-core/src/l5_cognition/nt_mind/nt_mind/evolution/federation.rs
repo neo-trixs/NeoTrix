@@ -405,13 +405,12 @@ impl CollectiveVerdictManager {
                 .filter(|v| v.vote == Vote::Abstain)
                 .count();
 
-            if session.is_critical && self.require_unanimity_for_critical {
-                if abstain > 0 || (impermissible > 0 && permissible > 0) {
+            if session.is_critical && self.require_unanimity_for_critical
+                && (abstain > 0 || (impermissible > 0 && permissible > 0)) {
                     session.status = CollectiveVerdictStatus::DegradedConsensus;
                     session.final_verdict = Some(Vote::Impermissible);
                     return Ok(());
                 }
-            }
 
             let verdict = if permissible > impermissible && permissible > abstain {
                 Vote::Permissible

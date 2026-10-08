@@ -449,7 +449,7 @@ impl Pipeline for SpecDrivenPipeline {
             .get("spec_id")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
-        let total_specs = self.specs.len() as usize;
+        let total_specs = self.specs.len();
         let active_specs = self
             .specs
             .iter()

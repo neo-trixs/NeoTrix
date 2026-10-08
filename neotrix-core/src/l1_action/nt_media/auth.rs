@@ -47,17 +47,11 @@ pub struct CookieEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 struct CookieStore {
     cookies: HashMap<String, Vec<CookieEntry>>,
 }
 
-impl Default for CookieStore {
-    fn default() -> Self {
-        Self {
-            cookies: HashMap::new(),
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct CookieJar {
@@ -76,11 +70,11 @@ impl CookieJar {
 
     /// Cookie jar backed by a JSON file on disk.
     pub fn with_file(path: PathBuf) -> Self {
-        let jar = Self {
+        
+        Self {
             inner: Arc::new(RwLock::new(HashMap::new())),
             file_path: Some(path),
-        };
-        jar
+        }
     }
 
     /// Load cookies from the backing file into memory.
@@ -256,7 +250,7 @@ fn parse_cookie_expires(date_str: &str) -> Option<u64> {
     ];
     for fmt in &formats {
         if let Ok(t) =
-            chrono::NaiveDateTime::parse_from_str(&date_str.replace("GMT", "").trim(), fmt)
+            chrono::NaiveDateTime::parse_from_str(date_str.replace("GMT", "").trim(), fmt)
         {
             return Some(t.and_utc().timestamp() as u64);
         }

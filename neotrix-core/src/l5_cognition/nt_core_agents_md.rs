@@ -242,9 +242,9 @@ impl AgentsMdDiscovery {
         let modified = metadata
             .modified()
             .ok()
-            .and_then(|t| {
+            .map(|t| {
                 let datetime: chrono::DateTime<chrono::Utc> = t.into();
-                Some(datetime.to_rfc3339())
+                datetime.to_rfc3339()
             })
             .unwrap_or_default();
 

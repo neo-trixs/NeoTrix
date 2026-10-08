@@ -362,6 +362,12 @@ pub struct PlatformAdapterRegistry {
     adapters: HashMap<String, Arc<dyn SocialPlatformAdapter>>,
 }
 
+impl Default for PlatformAdapterRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PlatformAdapterRegistry {
     pub fn new() -> Self {
         Self { adapters: HashMap::new() }
@@ -384,6 +390,12 @@ impl PlatformAdapterRegistry {
 pub struct FeedService {
     registry: PlatformAdapterRegistry,
     recommender: UniversalRecommender,
+}
+
+impl Default for FeedService {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FeedService {

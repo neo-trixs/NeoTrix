@@ -178,13 +178,13 @@ impl _MediaAssetRegistry {
         // 更新标签索引
         for tag in &metadata.tags {
             self.tag_index.entry(tag.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(id.clone());
         }
         
         // 更新类型索引
         self.type_index.entry(metadata.asset_type)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(id.clone());
         
         self.assets.insert(id.clone(), metadata);
@@ -237,7 +237,7 @@ impl _MediaAssetRegistry {
         if let Some(ref keyword) = query.keyword {
             candidates.retain(|a| {
                 a.name.contains(keyword)
-                    || a.description.as_ref().map_or(false, |d| d.contains(keyword))
+                    || a.description.as_ref().is_some_and(|d| d.contains(keyword))
                     || a.tags.iter().any(|t| t.contains(keyword))
             });
         }

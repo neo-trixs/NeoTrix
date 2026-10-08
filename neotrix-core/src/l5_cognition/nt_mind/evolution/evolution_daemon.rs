@@ -101,6 +101,12 @@ pub struct _PersistentIssueTracker {
     counter: u64,
 }
 
+impl Default for _PersistentIssueTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl _PersistentIssueTracker {
     pub fn new() -> Self {
         Self {

@@ -220,6 +220,12 @@ pub struct HotVectorStore {
     index: HashMap<String, usize>,
 }
 
+impl Default for HotVectorStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HotVectorStore {
     pub fn new() -> Self {
         Self {

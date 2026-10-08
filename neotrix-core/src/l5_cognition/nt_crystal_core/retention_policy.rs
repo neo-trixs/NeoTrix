@@ -243,17 +243,14 @@ impl StrategyEvolver {
 
 /// 趋势方向
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum Trend {
     Improving,
+    #[default]
     Stable,
     Declining,
 }
 
-impl Default for Trend {
-    fn default() -> Self {
-        Self::Stable
-    }
-}
 
 /// 性能摘要
 #[derive(Debug, Default)]

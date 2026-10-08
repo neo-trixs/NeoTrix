@@ -206,7 +206,7 @@ fn dispatch_collection_merge(
         };
         let report = merge_tables_with_mode(
             &schema,
-            &req.inputs[0].parent().unwrap_or(std::path::Path::new(".")),
+            req.inputs[0].parent().unwrap_or(std::path::Path::new(".")),
             &req.output,
             mode,
         )

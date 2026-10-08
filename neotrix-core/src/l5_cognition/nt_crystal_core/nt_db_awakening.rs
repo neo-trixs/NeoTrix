@@ -400,12 +400,9 @@ impl NtDbAwakening {
             .map_err(|e| format!("query edges: {e}"))?;
         for item in rows {
             let (src, dst) = item.map_err(|e| format!("read edge row: {e}"))?;
-            match (node_mem.get(&src), node_mem.get(&dst)) {
-                (Some(a), Some(b)) => {
-                    consciousness.connect(a, b);
-                    report.connections += 1;
-                }
-                _ => {}
+            if let (Some(a), Some(b)) = (node_mem.get(&src), node_mem.get(&dst)) {
+                consciousness.connect(a, b);
+                report.connections += 1;
             }
         }
         Ok(())

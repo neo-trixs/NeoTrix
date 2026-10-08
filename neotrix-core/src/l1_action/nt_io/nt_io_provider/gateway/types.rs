@@ -404,7 +404,7 @@ impl OriEvalSuite {
             }
 
             // Tool call scoring (simplified: check if tool call info exists in response)
-            let has_tool = resp.tool_calls.as_ref().map_or(false, |tc| !tc.is_empty());
+            let has_tool = resp.tool_calls.as_ref().is_some_and(|tc| !tc.is_empty());
             if let Some(ref expected) = case.expected_tool {
                 if has_tool && content.contains(&expected.to_lowercase()) {
                     tool_correct += 1;
@@ -490,7 +490,7 @@ impl GatewayV2 {
 
         for task in tasks {
             let request = LlmRequest::new(
-                &self.provider_model(provider_name).unwrap_or_default(),
+                self.provider_model(provider_name).unwrap_or_default(),
                 &task.prompt,
             );
             let start = Instant::now();

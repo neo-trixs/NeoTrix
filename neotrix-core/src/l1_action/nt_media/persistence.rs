@@ -21,7 +21,9 @@ use tokio::sync::RwLock;
 
 /// Per-chunk download lifecycle status for streaming pipeline tracking.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum ChunkDownloadStatus {
+    #[default]
     Pending,
     InProgress,
     Complete,
@@ -421,7 +423,7 @@ pub async fn maybe_save_chunk(
 ) -> Result<(), String> {
     state.mark_chunk_complete(chunk_index, checksum);
     let completed = state.completed_count() as u32;
-    if completed % config.save_interval == 0 || state.is_complete() {
+    if completed.is_multiple_of(config.save_interval) || state.is_complete() {
         let path = sidecar_path(&state.file_path);
         save_sidecar(&path, state).await?;
     }
@@ -559,6 +561,12 @@ impl DownloadRecord {
 pub struct DownloadStore {
     records: Arc<RwLock<Vec<DownloadRecord>>>,
     file_path: PathBuf,
+}
+
+impl Default for DownloadStore {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DownloadStore {
@@ -1160,8 +1168,3 @@ mod tests {
     }
 }
 
-impl Default for ChunkDownloadStatus {
-    fn default() -> Self {
-        ChunkDownloadStatus::Pending
-    }
-}

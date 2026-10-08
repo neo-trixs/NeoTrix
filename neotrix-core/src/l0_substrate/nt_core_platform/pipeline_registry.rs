@@ -199,7 +199,7 @@ impl PipelineRegistryBuilder {
         let registry = PipelineRegistry::new();
         for (id, name, description, layer, domain, pipeline) in self.registrations {
             registry.register(id, name, description, layer, domain, pipeline).await
-                .map_err(|e| PlatformError::Pipeline(e))?;
+                .map_err(PlatformError::Pipeline)?;
         }
         Ok(registry)
     }

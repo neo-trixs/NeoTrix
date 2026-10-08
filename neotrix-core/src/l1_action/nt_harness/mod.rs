@@ -85,7 +85,7 @@ pub struct OnlineContextCompact;
 impl EfficiencyMechanism for OnlineContextCompact {
     fn name(&self) -> &str { "context_compact" }
     fn should_activate(&self, ctx: &HarnessContext) -> bool {
-        ctx.turn_count > 0 && ctx.turn_count % 5 == 0
+        ctx.turn_count > 0 && ctx.turn_count.is_multiple_of(5)
     }
     fn apply(&self, ctx: &mut HarnessContext) -> Result<(), String> {
         // At subtask boundaries, compact the output buffer
@@ -117,11 +117,10 @@ impl HarnessRegistry {
     pub fn apply_all(&self, ctx: &mut HarnessContext) -> Vec<String> {
         let mut applied = Vec::new();
         for m in &self.mechanisms {
-            if m.should_activate(ctx) {
-                if m.apply(ctx).is_ok() {
+            if m.should_activate(ctx)
+                && m.apply(ctx).is_ok() {
                     applied.push(m.name().to_string());
                 }
-            }
         }
         applied
     }

@@ -232,6 +232,12 @@ pub trait DynOsintModule: Send + Sync {
     >;
 }
 
+impl Default for OsintModuleRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OsintModuleRegistry {
     pub fn new() -> Self {
         Self {

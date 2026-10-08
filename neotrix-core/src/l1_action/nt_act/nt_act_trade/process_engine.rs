@@ -293,17 +293,11 @@ pub trait EventHandler: Send + Sync {
 }
 
 /// 事件总线 — 简单的发布-订阅机制
+#[derive(Default)]
 pub struct EventBus {
     handlers: Vec<Arc<dyn EventHandler>>,
 }
 
-impl Default for EventBus {
-    fn default() -> Self {
-        Self {
-            handlers: Vec::new(),
-        }
-    }
-}
 
 impl EventBus {
     pub fn new() -> Self {

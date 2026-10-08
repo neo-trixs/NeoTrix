@@ -88,6 +88,12 @@ pub struct _HarnessEvolution {
 }
 
 
+impl Default for _HarnessEvolution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl _HarnessEvolution {
     pub fn new() -> Self {
         Self {

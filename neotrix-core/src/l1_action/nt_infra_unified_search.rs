@@ -185,17 +185,13 @@ impl KnowledgeSearchBackend for KnowledgeSearchAdapter {
 ///
 /// Holds optional backend references. Missing backends are silently skipped
 /// for their scope (never panic, never block).
+#[derive(Default)]
 pub struct UnifiedSearch {
     web: Option<Arc<dyn WebSearchBackend>>,
     code: Option<Arc<dyn CodeSearchBackend>>,
     knowledge: Option<Arc<dyn KnowledgeSearchBackend>>,
 }
 
-impl Default for UnifiedSearch {
-    fn default() -> Self {
-        Self { web: None, code: None, knowledge: None }
-    }
-}
 
 impl UnifiedSearch {
     pub fn new() -> Self {
@@ -224,7 +220,7 @@ impl UnifiedSearch {
     pub fn search(&self, query: &SearchQuery) -> Vec<UnifiedSearchResult> {
         match query.scope {
             SearchScope::Web => self.search_web(&query.query, query.max_results),
-            SearchScope::Code => self.search_code(&query),
+            SearchScope::Code => self.search_code(query),
             SearchScope::Knowledge => self.search_knowledge(&query.query, query.max_results),
             SearchScope::All => self.fan_out_search(query),
         }

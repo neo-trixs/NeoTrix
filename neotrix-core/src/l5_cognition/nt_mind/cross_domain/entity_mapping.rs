@@ -322,7 +322,7 @@ impl EntityMapper {
     pub fn register_entity_definition(&mut self, definition: EntityDefinition) {
         self.entity_definitions
             .entry(definition.framework.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(definition);
     }
 

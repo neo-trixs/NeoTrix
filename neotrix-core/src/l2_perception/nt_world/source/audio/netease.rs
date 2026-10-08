@@ -4,6 +4,12 @@ use crate::l2_perception::nt_world::source::crypto;
 
 pub struct NeteaseSource;
 
+impl Default for NeteaseSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NeteaseSource {
     pub fn new() -> Self { Self }
 }

@@ -35,7 +35,9 @@ pub struct WorkSpace {
 
 /// Workspace 运行形态：本地 / 远端 / 沙箱执行器。
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum WorkspaceKind {
+    #[default]
     Local,
     Remote {
         #[serde(default)]
@@ -44,11 +46,6 @@ pub enum WorkspaceKind {
     Sandbox,
 }
 
-impl Default for WorkspaceKind {
-    fn default() -> Self {
-        Self::Local
-    }
-}
 
 /// MCP 服务器绑定（E1.1 Workspace.mcp_servers 条目＋S7.1 三开关＋ERP 门）。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

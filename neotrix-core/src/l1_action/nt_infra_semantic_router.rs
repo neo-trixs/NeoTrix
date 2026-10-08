@@ -55,11 +55,10 @@ impl SemanticRouter {
             let matches = rule.keywords.iter()
                 .filter(|kw| query_lower.contains(&kw.to_lowercase()))
                 .count() as u32;
-            if matches > 0 {
-                if best_match.as_ref().map_or(true, |(_, score)| matches > *score) {
+            if matches > 0
+                && best_match.as_ref().is_none_or(|(_, score)| matches > *score) {
                     best_match = Some((rule, matches));
                 }
-            }
         }
 
         best_match.map(|(rule, score)| {

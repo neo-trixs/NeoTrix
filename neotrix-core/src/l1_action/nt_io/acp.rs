@@ -35,6 +35,12 @@ pub struct AcpServer {
     >,
 }
 
+impl Default for AcpServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AcpServer {
     pub fn new() -> Self {
         Self {

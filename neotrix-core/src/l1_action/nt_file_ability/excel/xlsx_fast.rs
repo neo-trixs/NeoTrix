@@ -213,8 +213,7 @@ fn read_sheet<R: Read + std::io::Seek>(
                             let text = if cell_type == "s" {
                                 // 共享字符串: current_value 是索引
                                 current_value
-                                    .parse::<usize>()
-                                    .and_then(|idx| Ok(strings[idx].clone()))
+                                    .parse::<usize>().map(|idx| strings[idx].clone())
                                     .unwrap_or_default()
                             } else {
                                 current_value.clone()

@@ -443,7 +443,7 @@ impl NtLlmAsk for NtModelCliAsk {
                 let mut v = self
                     .argv_template
                     .clone()
-                    .unwrap_or_else(Vec::new);
+                    .unwrap_or_default();
                 v.push(self.prompt_clipped(prompt));
                 v
             }

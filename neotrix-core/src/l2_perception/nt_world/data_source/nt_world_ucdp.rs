@@ -288,13 +288,11 @@ pub struct _UcdpIngestReport {
 
 // ── SearchBackend ────────────────────────────────────────────
 
+#[derive(Default)]
 pub struct UcdpBackend {
     fetcher: UcdpFetcher,
 }
 
-impl Default for UcdpBackend {
-    fn default() -> Self { Self { fetcher: UcdpFetcher::new() } }
-}
 
 impl UcdpBackend {
     pub fn new() -> Self { Self::default() }

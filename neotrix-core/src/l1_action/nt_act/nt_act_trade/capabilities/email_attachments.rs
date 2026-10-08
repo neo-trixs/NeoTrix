@@ -63,14 +63,10 @@ pub fn parse_attachments(value: &serde_json::Value) -> Vec<AttachmentInfo> {
                 file_type
             };
             out.push(AttachmentInfo {
-                file_code: s("fileCode")
-                    .is_empty()
-                    .then(|| s("code"))
-                    .unwrap_or_else(|| s("fileCode")),
-                file_name: s("fileName")
-                    .is_empty()
-                    .then(|| s("name"))
-                    .unwrap_or_else(|| s("fileName")),
+                file_code: if s("fileCode")
+                    .is_empty() { s("code") } else { s("fileCode") },
+                file_name: if s("fileName")
+                    .is_empty() { s("name") } else { s("fileName") },
                 file_type,
             });
         }

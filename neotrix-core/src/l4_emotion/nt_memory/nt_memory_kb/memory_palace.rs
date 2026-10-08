@@ -53,7 +53,7 @@ impl MemoryPalace {
             for kw in keywords {
                 self.keyword_index
                     .entry(kw)
-                    .or_insert_with(HashSet::new)
+                    .or_default()
                     .insert(key.clone());
             }
             room.items.push(item);

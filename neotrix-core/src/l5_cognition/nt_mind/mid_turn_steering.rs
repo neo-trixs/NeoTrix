@@ -112,7 +112,7 @@ impl MidTurnSteering {
     fn compute_logical_consistency(&self, reasoning: &[String]) -> f64 {
         if reasoning.is_empty() { return 0.5; }
         let consistency = if reasoning.len() > 1 {
-            reasoning.windows(2).filter(|w| w[0].len() > 0).count() as f64 / reasoning.len() as f64
+            reasoning.windows(2).filter(|w| !w[0].is_empty()).count() as f64 / reasoning.len() as f64
         } else { 0.5 };
         consistency.min(1.0)
     }

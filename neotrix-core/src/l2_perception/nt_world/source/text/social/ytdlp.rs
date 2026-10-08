@@ -4,6 +4,12 @@ use std::process::Command;
 
 pub struct YtdlpSource;
 
+impl Default for YtdlpSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl YtdlpSource {
     pub fn new() -> Self { Self }
 }

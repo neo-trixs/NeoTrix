@@ -176,7 +176,7 @@ fn aggregate_weighted(
             .find(|w| w.agent_handle == r.agent_handle)
             .map(|w| w.weight)
             .unwrap_or(1.0);
-        if best.map_or(true, |(_, bw)| w > bw) {
+        if best.is_none_or(|(_, bw)| w > bw) {
             best = Some((r, w));
         }
     }

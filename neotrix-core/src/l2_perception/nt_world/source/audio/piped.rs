@@ -3,6 +3,12 @@ use crate::l2_perception::nt_world::source::engine::MediaSource;
 
 pub struct PipedSource;
 
+impl Default for PipedSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PipedSource {
     pub fn new() -> Self { Self }
 }

@@ -298,10 +298,10 @@ impl SelfTest for CadAbsorptionSelfTest {
 // ════════════════════════════════════════════════════════════════════════
 
 pub fn register_cad_consciousness_self_tests(registry: &mut SelfTestRegistry) {
-    registry.register(Box::new(CadSealStageSelfTest::default()));
-    registry.register(Box::new(CadRunewordSelfTest::default()));
-    registry.register(Box::new(CadWiringEvidenceSelfTest::default()));
-    registry.register(Box::new(CadAbsorptionSelfTest::default()));
+    registry.register(Box::new(CadSealStageSelfTest));
+    registry.register(Box::new(CadRunewordSelfTest));
+    registry.register(Box::new(CadWiringEvidenceSelfTest));
+    registry.register(Box::new(CadAbsorptionSelfTest));
 }
 
 #[cfg(test)]

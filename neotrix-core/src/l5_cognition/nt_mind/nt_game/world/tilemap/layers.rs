@@ -57,10 +57,10 @@ impl LayeredTileMap {
 
     pub fn is_walkable(&self, x: usize, y: usize) -> bool {
         self.get_tile(MapLayer::Terrain, x, y)
-            .map_or(false, |t| t.walkable)
+            .is_some_and(|t| t.walkable)
             && self
                 .get_tile(MapLayer::Objects, x, y)
-                .map_or(true, |t| t.walkable)
+                .is_none_or(|t| t.walkable)
     }
 
     pub fn width(&self) -> usize {

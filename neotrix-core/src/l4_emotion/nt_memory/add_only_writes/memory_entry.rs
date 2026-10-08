@@ -120,13 +120,13 @@ impl AddOnlyMemoryEntry {
     /// Is this fact valid at timestamp `t`?
     #[inline]
     pub fn is_valid_at(&self, t: i64) -> bool {
-        self.valid_from <= t && self.valid_to.map_or(true, |to| t < to)
+        self.valid_from <= t && self.valid_to.is_none_or(|to| t < to)
     }
 
     /// Is this fact currently valid (no valid_to, or valid_to > now)?
     #[inline]
     pub fn is_valid_now(&self) -> bool {
-        self.valid_to.map_or(true, |to| to > now_ts())
+        self.valid_to.is_none_or(|to| to > now_ts())
     }
 
     /// Has this entry been superseded?

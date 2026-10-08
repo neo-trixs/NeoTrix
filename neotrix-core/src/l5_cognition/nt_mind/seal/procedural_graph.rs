@@ -523,11 +523,10 @@ impl ProceduralGraph {
         }
 
         for node_id in self.nodes.keys() {
-            if matches!(color.get(node_id.as_str()), Some(Color::White)) {
-                if has_cycle_dfs(node_id, &self.edges, &mut color) {
+            if matches!(color.get(node_id.as_str()), Some(Color::White))
+                && has_cycle_dfs(node_id, &self.edges, &mut color) {
                     return true;
                 }
-            }
         }
 
         false

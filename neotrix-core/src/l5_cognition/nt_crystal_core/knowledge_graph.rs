@@ -51,6 +51,12 @@ pub struct KnowledgeGraphManager {
     pub entity_index: HashMap<String, Vec<NodeId>>,
 }
 
+impl Default for KnowledgeGraphManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl KnowledgeGraphManager {
     pub fn new() -> Self {
         Self {
@@ -112,7 +118,7 @@ impl KnowledgeGraphManager {
     pub fn temporal_query(&self, time: u64) -> Vec<&GraphEdge> {
         self.edges
             .iter()
-            .filter(|e| e.valid_from <= time && e.valid_to.map_or(true, |t| t > time))
+            .filter(|e| e.valid_from <= time && e.valid_to.is_none_or(|t| t > time))
             .collect()
     }
 
@@ -166,14 +172,14 @@ impl KnowledgeGraphManager {
 fn is_index_token(c: char) -> bool {
     // 拉丁首字母大写（旧行为）+ CJK 统一表意（旧 extract_entities 漏中文，皇極种子补）。
     c.is_uppercase()
-        || ('\u{3400}' <= c && c <= '\u{4DBF}'
-            || '\u{4E00}' <= c && c <= '\u{9FFF}'
-            || '\u{F900}' <= c && c <= '\u{FAFF}')
+        || (('\u{3400}'..='\u{4DBF}').contains(&c)
+            || ('\u{4E00}'..='\u{9FFF}').contains(&c)
+            || ('\u{F900}'..='\u{FAFF}').contains(&c))
 }
 
 fn extract_entities(text: &str) -> Vec<String> {
     text.split_whitespace()
-        .filter(|w| w.chars().next().map_or(false, is_index_token) && w.len() > 2)
+        .filter(|w| w.chars().next().is_some_and(is_index_token) && w.len() > 2)
         .map(|w| w.to_string())
         .collect()
 }

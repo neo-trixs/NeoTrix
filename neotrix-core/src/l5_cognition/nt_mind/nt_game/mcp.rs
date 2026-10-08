@@ -392,7 +392,7 @@ impl GameTool for GameMetricsTool {
             .metrics
             .lock()
             .map_err(|e| format!("lock poisoned: {}", e))?;
-        Ok(serde_json::to_value(&*metrics).map_err(|e| e.to_string())?)
+        serde_json::to_value(&*metrics).map_err(|e| e.to_string())
     }
 }
 

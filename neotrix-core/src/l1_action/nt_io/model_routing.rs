@@ -445,13 +445,13 @@ impl ModelRoutingLayer {
             .filter(|m| {
                 m.enabled
                     && m.model_type == request.task_type
-                    && self.states.get(&m.id).map_or(false, |s| s.available)
+                    && self.states.get(&m.id).is_some_and(|s| s.available)
                     && request.required_tags.iter().all(|t| m.tags.contains(t))
             })
             .collect();
 
         let complexity_score = request.complexity.as_ref()
-            .map(|c| ComplexityClassifier::complexity_score(c))
+            .map(ComplexityClassifier::complexity_score)
             .unwrap_or(0.5);
 
         match self.config.strategy {
@@ -459,8 +459,8 @@ impl ModelRoutingLayer {
                 candidates.sort_by(|a, b| b.priority.cmp(&a.priority));
                 if complexity_score > 0.7 {
                     candidates.sort_by(|a, b| {
-                        let a_cap = a.max_concurrent as u32;
-                        let b_cap = b.max_concurrent as u32;
+                        let a_cap = a.max_concurrent;
+                        let b_cap = b.max_concurrent;
                         b_cap.cmp(&a_cap)
                     });
                 }
@@ -469,16 +469,16 @@ impl ModelRoutingLayer {
                 candidates.sort_by(|a, b| a.price_per_second.partial_cmp(&b.price_per_second).unwrap_or(std::cmp::Ordering::Equal));
                 if complexity_score > 0.6 {
                     candidates.sort_by(|a, b| {
-                        let a_quality = a.rate_limit as f64 / (a.price_per_second as f64 + 0.01);
-                        let b_quality = b.rate_limit as f64 / (b.price_per_second as f64 + 0.01);
+                        let a_quality = a.rate_limit as f64 / (a.price_per_second + 0.01);
+                        let b_quality = b.rate_limit as f64 / (b.price_per_second + 0.01);
                         b_quality.partial_cmp(&a_quality).unwrap_or(std::cmp::Ordering::Equal)
                     });
                 }
             }
             RoutingStrategy::HighestQuality => {
                 candidates.sort_by(|a, b| {
-                    let a_quality = a.rate_limit as f64 / (a.price_per_second as f64 + 0.01);
-                    let b_quality = b.rate_limit as f64 / (b.price_per_second as f64 + 0.01);
+                    let a_quality = a.rate_limit as f64 / (a.price_per_second + 0.01);
+                    let b_quality = b.rate_limit as f64 / (b.price_per_second + 0.01);
                     b_quality.partial_cmp(&a_quality).unwrap_or(std::cmp::Ordering::Equal)
                 });
                 if complexity_score > 0.5 {
@@ -598,7 +598,7 @@ impl ModelRoutingLayer {
             success: true,
             selected_model: model_id.clone(),
             output: None,
-            cost: cost,
+            cost,
             latency_ms: 0,
             retries,
             error: None,

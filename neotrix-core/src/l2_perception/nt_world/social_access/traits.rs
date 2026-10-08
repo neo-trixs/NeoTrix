@@ -81,6 +81,7 @@ impl From<String> for SocialPlatform {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct Credentials {
     pub access_token: Option<String>,
     pub refresh_token: Option<String>,
@@ -88,11 +89,6 @@ pub struct Credentials {
     pub oauth_state: Option<String>,
 }
 
-impl Default for Credentials {
-    fn default() -> Self {
-        Self { access_token: None, refresh_token: None, expires_at: None, oauth_state: None }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AuthState { Guest, Authenticated, Expired, Error }

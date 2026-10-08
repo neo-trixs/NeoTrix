@@ -159,7 +159,7 @@ impl RuntimeMonitor {
             self.alert(AlertSeverity::Warning, "Memory usage exceeds threshold", "memory");
         }
         if metrics.error_rate > self.error_rate_threshold {
-            self.alert(AlertSeverity::Critical, &format!("Error rate exceeds threshold"), "error_rate");
+            self.alert(AlertSeverity::Critical, &"Error rate exceeds threshold".to_string(), "error_rate");
         }
     }
 

@@ -126,14 +126,14 @@ impl SelfReflectionEngine {
     }
 
     fn compute_confidence(&self, feedback: &str) -> f64 {
-        let signal_strength = if feedback.contains("error") || feedback.contains("fail") {
+        
+        if feedback.contains("error") || feedback.contains("fail") {
             0.3
         } else if feedback.contains("success") || feedback.contains("pass") {
             0.8
         } else {
             0.5
-        };
-        signal_strength
+        }
     }
 
     /// Retrieve recent reflections for injection into the agent loop.
@@ -156,7 +156,7 @@ impl SelfTest for SelfReflectionEngine {
     fn self_test(&self) -> Result<(), Vec<String>> {
         // Verify engine can be created and buffer operations work
         drop(self.buffer.lock().map_err(|e| vec![format!("mutex poisoned: {}", e)])?);
-        let _ = self.buffer.lock().unwrap_or_else(|e| e.into_inner()).push(ReflectionRecord::default());
+        self.buffer.lock().unwrap_or_else(|e| e.into_inner()).push(ReflectionRecord::default());
         Ok(())
     }
 }

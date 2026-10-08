@@ -9,6 +9,12 @@ pub struct SessionPool {
     sessions: HashMap<SocialPlatform, SessionEntry>,
 }
 
+impl Default for SessionPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SessionPool {
     pub fn new() -> Self {
         Self { sessions: HashMap::new() }
@@ -40,6 +46,12 @@ pub struct SocialAccessManager {
     recommender: UniversalRecommender,
     /// 上一次 `get_feed` 是否真的发生了排序（见 `last_fetch_was_ranked`）。
     last_ranked: bool,
+}
+
+impl Default for SocialAccessManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SocialAccessManager {

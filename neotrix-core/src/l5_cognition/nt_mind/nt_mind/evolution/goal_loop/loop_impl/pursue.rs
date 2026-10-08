@@ -81,12 +81,9 @@ impl GoalLoop {
         // E1.2: ValueGate 价值裁决 — 目标迭代前检查（非阻断式，log-and-pass）
         {
             let bridge = crate::l5_cognition::nt_core::capability::consciousness_bridge::bridge();
-            match bridge.pre_tick_check(0) {
-                crate::l5_cognition::nt_core::capability::consciousness_bridge::QuickVerdict::Warn(msg) => {
-                    log::warn!("[goal-loop] value warning during pursue: {}", msg);
-                    // 不阻断执行，但记录告警供审计
-                }
-                _ => {}
+            if let crate::l5_cognition::nt_core::capability::consciousness_bridge::QuickVerdict::Warn(msg) = bridge.pre_tick_check(0) {
+                log::warn!("[goal-loop] value warning during pursue: {}", msg);
+                // 不阻断执行，但记录告警供审计
             }
         }
 

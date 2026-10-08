@@ -53,6 +53,12 @@ pub struct ChunkPlanner {
     config: ChunkConfig,
 }
 
+impl Default for ChunkPlanner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ChunkPlanner {
     pub fn new() -> Self {
         Self {

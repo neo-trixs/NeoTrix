@@ -400,6 +400,12 @@ pub struct AgentLifecycleManager {
     current_cost: f64,
 }
 
+impl Default for AgentLifecycleManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AgentLifecycleManager {
     pub fn new() -> Self {
         Self {
@@ -484,7 +490,7 @@ impl AgentLifecycleManager {
         let persona = self
             .gallery
             .install(&preset_id)
-            .map_err(|e| AgentError::InitializationFailed(e))?;
+            .map_err(AgentError::InitializationFailed)?;
 
         let instance = AgentInstance {
             persona: persona.clone(),
@@ -499,7 +505,7 @@ impl AgentLifecycleManager {
         // 注册到身份注册表
         self.identity_registry
             .register(persona)
-            .map_err(|e| AgentError::InitializationFailed(e))?;
+            .map_err(AgentError::InitializationFailed)?;
 
         self.instances
             .insert(persona_id, instance.clone());
@@ -689,6 +695,12 @@ pub struct RoutingRecord {
     pub duration_ms: u64,
 }
 
+impl Default for TaskRouter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TaskRouter {
     pub fn new() -> Self {
         Self {
@@ -775,6 +787,12 @@ pub struct AutoOrchestrator {
     lifecycle: AgentLifecycleManager,
     /// 任务路由器
     router: TaskRouter,
+}
+
+impl Default for AutoOrchestrator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AutoOrchestrator {

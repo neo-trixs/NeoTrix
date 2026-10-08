@@ -210,7 +210,7 @@ impl AudioOrchestrator {
             // placeholder for ducking logic
         }
         
-        cmd.push_str("\"");
+        cmd.push('"');
         
         // 输出
         cmd.push_str(&format!(" -map \"[aout]\" {}", output_path));

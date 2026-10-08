@@ -39,6 +39,12 @@ pub struct ContractRegistry {
     contracts: HashMap<String, ToolIoContract>,
 }
 
+impl Default for ContractRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ContractRegistry {
     pub fn new() -> Self {
         Self {

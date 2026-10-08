@@ -3,6 +3,12 @@ use crate::l2_perception::nt_world::source::engine::MediaSource;
 
 pub struct SemanticScholarSource;
 
+impl Default for SemanticScholarSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SemanticScholarSource {
     pub fn new() -> Self { Self }
 }

@@ -77,7 +77,7 @@ impl FileCentricState {
         if let Some(snapshot) = self.snapshots.get(task_id) {
             let path = self.workspace_dir.join(format!("{}.json", task_id));
             let json = serde_json::to_string_pretty(snapshot)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                .map_err(|e| std::io::Error::other(e))?;
             std::fs::write(path, json)?;
         }
         Ok(())
@@ -89,7 +89,7 @@ impl FileCentricState {
         if path.exists() {
             let json = std::fs::read_to_string(&path)?;
             let snapshot: FileTaskSnapshot = serde_json::from_str(&json)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                .map_err(|e| std::io::Error::other(e))?;
             self.snapshots.insert(task_id.to_string(), snapshot);
         }
         Ok(())

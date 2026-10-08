@@ -73,8 +73,8 @@ impl AccountClustering {
             if let Ok(time) = creation_time.parse::<u64>() {
                 let windows = self.creation_windows.read().await;
                 for window in windows.iter() {
-                    if time >= window.start_time && time <= window.end_time {
-                        if window.account_ids.len() >= self.config.cluster_min_accounts {
+                    if time >= window.start_time && time <= window.end_time
+                        && window.account_ids.len() >= self.config.cluster_min_accounts {
                             signals.push(DetectionSignal {
                                 signal_type: "creation_window_cluster".to_string(),
                                 confidence: 0.9,
@@ -86,7 +86,6 @@ impl AccountClustering {
                                 ),
                             });
                         }
-                    }
                 }
             }
         }

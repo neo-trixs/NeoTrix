@@ -43,9 +43,9 @@ pub async fn extract_thumbnail(
         }
         #[cfg(not(feature = "audio-decode"))]
         {
-            return Err(ThumbError::Unsupported(
+            Err(ThumbError::Unsupported(
                 "audio album art requires audio-decode feature".into(),
-            ));
+            ))
         }
     } else if kind.is_video() {
         #[cfg(feature = "video-decode")]
@@ -54,9 +54,9 @@ pub async fn extract_thumbnail(
         }
         #[cfg(not(feature = "video-decode"))]
         {
-            return Err(ThumbError::Unsupported(
+            Err(ThumbError::Unsupported(
                 "video thumbnail requires video-decode feature".into(),
-            ));
+            ))
         }
     } else if is_image_path(path) {
         extract_image_thumbnail(path).await

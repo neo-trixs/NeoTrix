@@ -5,6 +5,12 @@ pub struct PluginLoader {
     plugins: HashMap<String, Box<dyn MediaSourcePlugin>>,
 }
 
+impl Default for PluginLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PluginLoader {
     pub fn new() -> Self {
         Self { plugins: HashMap::new() }

@@ -83,6 +83,12 @@ pub struct BenchmarkResult {
     pub timestamp: Instant,
 }
 
+impl Default for PerformanceAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PerformanceAnalyzer {
     pub fn new() -> Self {
         Self {
@@ -211,6 +217,12 @@ pub struct StrategyManager {
     effectiveness: HashMap<String, f64>,
 }
 
+impl Default for StrategyManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StrategyManager {
     pub fn new() -> Self {
         Self {
@@ -256,6 +268,12 @@ pub struct RewardCalculator {
     weights: HashMap<String, f64>,
 }
 
+impl Default for RewardCalculator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RewardCalculator {
     pub fn new() -> Self {
         let mut weights = HashMap::new();
@@ -287,6 +305,12 @@ pub struct CudaAgentEnvironment {
     strategies: StrategyManager,
     reward_calculator: RewardCalculator,
     tasks: Vec<OptimizationTask>,
+}
+
+impl Default for CudaAgentEnvironment {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CudaAgentEnvironment {

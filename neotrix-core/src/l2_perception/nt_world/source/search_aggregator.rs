@@ -19,8 +19,8 @@ impl SearchAggregator {
             if let Ok(search_result) = source.search(query, page).await {
                 for item in search_result.data {
                     let key = format!("{}:{}", item.title, item.artist);
-                    if !seen.contains_key(&key) {
-                        seen.insert(key, true);
+                    if let std::collections::hash_map::Entry::Vacant(e) = seen.entry(key) {
+                        e.insert(true);
                         results.push(item);
                     }
                 }

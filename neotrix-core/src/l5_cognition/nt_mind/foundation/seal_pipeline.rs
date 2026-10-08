@@ -97,6 +97,12 @@ pub struct L1OracleGate {
     inner: crate::l1_action::nt_act::nt_act_autonomy::oracle_gate::OracleGate,
 }
 
+impl Default for L1OracleGate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl L1OracleGate {
     pub fn new() -> Self {
         Self {
@@ -143,6 +149,12 @@ impl crate::l0_substrate::nt_core_self_test::SelfTest for L1OracleGate {
 /// L1 implementation of _SemanticEntropyGateContract
 pub struct L1SemanticEntropyGate {
     inner: crate::l1_action::nt_act::nt_act_code::semantic_entropy::SemanticEntropyGate,
+}
+
+impl Default for L1SemanticEntropyGate {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl L1SemanticEntropyGate {
@@ -195,6 +207,12 @@ impl crate::l0_substrate::nt_core_self_test::SelfTest for L1SemanticEntropyGate 
 /// L1 implementation of _ActionSandboxContract
 pub struct L1ActionSandbox {
     inner: crate::l1_action::nt_act::actions::security::sandbox::ActionSandbox,
+}
+
+impl Default for L1ActionSandbox {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl L1ActionSandbox {

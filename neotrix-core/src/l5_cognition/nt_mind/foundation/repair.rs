@@ -361,7 +361,7 @@ impl _RepairPlanner {
 
     fn find_matching_pattern(&self, diagnosis: &Diagnosis) -> Option<String> {
         // 简化: 基于根因描述的关键词匹配
-        for (sig, _pattern) in &self.pattern_library {
+        for sig in self.pattern_library.keys() {
             if diagnosis.root_causes.iter().any(|rc| rc.hypothesis.contains(sig)) {
                 return Some(sig.clone());
             }

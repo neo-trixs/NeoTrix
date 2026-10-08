@@ -112,7 +112,7 @@ impl InfraBreaker {
     pub fn allow(&self) -> bool {
         match self.inner.state {
             BreakerState::Closed => true,
-            BreakerState::Open { .. } => false,
+            BreakerState::Open => false,
             BreakerState::HalfOpen => self.half_open_calls < self.config.half_open_max_calls,
         }
     }

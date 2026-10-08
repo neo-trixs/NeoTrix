@@ -377,7 +377,7 @@ impl _DeliberationEngine {
         let mut support = 0.0;
         let mut conflict = 0.0;
 
-        for (_, edges) in &graph.edges {
+        for edges in graph.edges.values() {
             for edge in edges {
                 match edge.edge_type {
                     crate::l5_cognition::nt_mind::nt_mind::evolution::deliberation::EdgeType::Supports => support += edge.weight,
@@ -404,7 +404,7 @@ impl _DeliberationEngine {
         let mut pro_weight = 0.0;
         let mut con_weight = 0.0;
 
-        for (_, node) in &graph.nodes {
+        for node in graph.nodes.values() {
             let weight = self.role_weight(&node.author);
             if node.claim.contains("支持")
                 || node.claim.contains("允许")

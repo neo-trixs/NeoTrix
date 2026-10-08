@@ -644,7 +644,7 @@ impl KnowledgeGapDetector {
             Err(_) => return vec![],
         };
         let rows = match stmt.query_map([], |row| {
-            Ok(row.get::<_, String>(0)?)
+            row.get::<_, String>(0)
         }) {
             Ok(r) => r,
             Err(_) => return vec![],
@@ -708,7 +708,7 @@ impl KnowledgeGapDetector {
             domain_abstractions.entry(domain).or_default().insert(abstraction, count);
         }
 
-        let levels = vec!["building_block", "pattern", "architecture", "case_study"];
+        let levels = ["building_block", "pattern", "architecture", "case_study"];
         for (domain, abs_map) in domain_abstractions {
             for i in 0..levels.len()-1 {
                 let current = levels[i];
@@ -892,16 +892,16 @@ impl KnowledgeGapDetector {
              )"
         ).expect("SQL prepare");
 
-        let stats = stmt.query_row([], |row| {
+        
+
+        stmt.query_row([], |row| {
             Ok(ConnectivityStats {
                 avg_degree: row.get(0)?,
                 isolated_nodes: row.get(1)?,
                 max_degree: row.get(2)?,
                 weak_components: 0, // Would need connected components algorithm
             })
-        }).unwrap_or_default();
-
-        stats
+        }).unwrap_or_default()
     }
 
     /// Write new gap reports to KB knowledge_gap_reports table

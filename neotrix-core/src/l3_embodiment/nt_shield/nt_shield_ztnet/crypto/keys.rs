@@ -59,7 +59,7 @@ impl PrivateKey {
     /// ECDH Diffie-Hellman 密钥交换
     pub fn diffie_hellman(&self, peer: &PublicKey) -> _SharedSecret {
         let secret = self.inner.diffie_hellman(&peer.inner);
-        _SharedSecret(secret.as_bytes().clone())
+        _SharedSecret(*secret.as_bytes())
     }
 
     /// 零化内存中的私钥材料

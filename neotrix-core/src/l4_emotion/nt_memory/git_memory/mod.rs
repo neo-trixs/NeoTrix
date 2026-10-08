@@ -39,6 +39,12 @@ pub struct GitMemoryStore {
     pub commits: Vec<MemoryCommit>,
 }
 
+impl Default for GitMemoryStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GitMemoryStore {
     pub fn new() -> Self {
         let mut branches = HashMap::new();

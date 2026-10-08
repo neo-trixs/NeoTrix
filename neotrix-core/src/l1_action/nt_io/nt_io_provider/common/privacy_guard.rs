@@ -311,11 +311,11 @@ fn scan_extended_payload(req: &LlmRequest) -> Vec<&'static str> {
         }
     }
     if let Some(ref so) = req.structured_output {
-        if let Ok(s) = serde_json::to_string(&*so) {
+        if let Ok(s) = serde_json::to_string(so) {
             leaks.extend(scan_internals(&s));
         }
     }
-    for (_, v) in &req.provider_params {
+    for v in req.provider_params.values() {
         if let Ok(s) = serde_json::to_string(v) {
             leaks.extend(scan_internals(&s));
         }

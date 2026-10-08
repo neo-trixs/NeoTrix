@@ -65,6 +65,12 @@ pub struct _PatternRecord {
     pub timestamp: String,
 }
 
+impl Default for PatternEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PatternEngine {
     pub fn new() -> Self {
         Self {

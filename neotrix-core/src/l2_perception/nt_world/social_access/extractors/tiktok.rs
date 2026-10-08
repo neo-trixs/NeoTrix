@@ -14,6 +14,12 @@ use super::super::traits::{SocialPlatformAdapter, SessionEntry, FeedResult, Tren
 
 pub struct TikTokExtractor;
 
+impl Default for TikTokExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TikTokExtractor {
     pub fn new() -> Self {
         Self

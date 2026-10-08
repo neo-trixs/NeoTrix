@@ -471,11 +471,9 @@ impl UniversalWorld {
     {
         let mut results = Vec::new();
         
-        for entity_option in &self.entities {
-            if let Some(entity) = entity_option {
-                if let Some(item) = T::get_components(self, *entity) {
-                    results.push((*entity, item));
-                }
+        for entity in self.entities.iter().flatten() {
+            if let Some(item) = T::get_components(self, *entity) {
+                results.push((*entity, item));
             }
         }
         
@@ -798,6 +796,12 @@ pub struct SystemDependency {
     pub after: Vec<String>,
 }
 
+impl Default for SystemDependency {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SystemDependency {
     pub fn new() -> Self {
         Self { reads: vec![], writes: vec![], before: vec![], after: vec![] }
@@ -1061,7 +1065,7 @@ impl ChangeDetector {
 
     pub fn register_component<T: Component>(&mut self) {
         let type_id = TypeId::of::<T>();
-        self.change_ticks.entry(type_id).or_insert_with(ChangeTick::new);
+        self.change_ticks.entry(type_id).or_default();
     }
 
     pub fn mark_changed<T: Component>(&mut self, entity_id: EntityId, tick: u64) {
@@ -1081,7 +1085,7 @@ impl ChangeDetector {
         let type_id = TypeId::of::<T>();
         self.records
             .get(&(entity_id, type_id))
-            .map_or(false, |r| r.changed && r.tick > since_tick)
+            .is_some_and(|r| r.changed && r.tick > since_tick)
     }
 
     pub fn was_any_changed<T: Component>(&self, since_tick: u64) -> Vec<EntityId> {
@@ -1151,7 +1155,7 @@ impl ChangeTracker {
         entity_id: EntityId,
         value: &T,
     ) -> Changed<T> {
-        let entity_ticks = self.world_ticks.entry(entity_id).or_insert_with(HashMap::new);
+        let entity_ticks = self.world_ticks.entry(entity_id).or_default();
         let type_id = TypeId::of::<T>();
         let last_tick = entity_ticks.get(&type_id).copied().unwrap_or(0);
         let is_changed = self.tick > last_tick;

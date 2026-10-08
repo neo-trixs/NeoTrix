@@ -56,17 +56,14 @@ impl CapabilityMeta {
 
 /// 能力状态指示器
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub enum CapabilityStatus {
+    #[default]
     Healthy,
     Degraded,
     Unhealthy,
 }
 
-impl Default for CapabilityStatus {
-    fn default() -> Self {
-        Self::Healthy
-    }
-}
 
 /// 能力指标
 #[derive(Debug, Clone)]

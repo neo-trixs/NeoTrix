@@ -165,13 +165,11 @@ pub struct _BgpviewIngestReport {
 
 // ── SearchBackend ────────────────────────────────────────────
 
+#[derive(Default)]
 pub struct BgpviewBackend {
     fetcher: BgpviewFetcher,
 }
 
-impl Default for BgpviewBackend {
-    fn default() -> Self { Self { fetcher: BgpviewFetcher::default() } }
-}
 
 impl BgpviewBackend {
     pub fn new() -> Self { Self::default() }

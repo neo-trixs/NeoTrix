@@ -53,6 +53,12 @@ pub struct _AbstractRecord {
     pub timestamp: String,
 }
 
+impl Default for AbstractEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AbstractEngine {
     pub fn new() -> Self {
         Self {

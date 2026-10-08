@@ -79,7 +79,7 @@ impl RISEReflector {
             }
         }
         let projected_capabilities = current_capabilities.iter().map(|c| format!("{}+", c)).collect();
-        let projected_knowledge = current_capabilities.iter().enumerate().map(|(_i, c)| format!("{}[t+{}]", c, self.time_horizon)).collect();
+        let projected_knowledge = current_capabilities.iter().map(|c| format!("{}[t+{}]", c, self.time_horizon)).collect();
         let confidence = self.compute_projection_confidence(current_capabilities, growth_rate);
         let projected_state_hash = self.hash_projection(current_capabilities, growth_rate);
         *self.projection_count.lock().unwrap() += 1;

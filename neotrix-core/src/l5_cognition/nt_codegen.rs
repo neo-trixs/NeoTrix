@@ -168,7 +168,7 @@ impl CodeGenerator {
             code.push_str("}\n\n");
         }
 
-        for (name, _system_def) in &self.game_def.systems {
+        for name in self.game_def.systems.keys() {
             code.push_str(&format!("fn {}_system(", name));
             code.push_str(") {\n");
             code.push_str("    // TODO: implement system logic\n");
@@ -198,7 +198,7 @@ impl CodeGenerator {
         let mut code = String::new();
         code.push_str("# Auto-generated Godot GDScript code\n\n");
 
-        for (name, _) in &self.game_def.entities {
+        for name in self.game_def.entities.keys() {
             code.push_str("extends Node\n\n");
             code.push_str(&format!("class_name {}\n\n", name));
             code.push_str("func _ready():\n");

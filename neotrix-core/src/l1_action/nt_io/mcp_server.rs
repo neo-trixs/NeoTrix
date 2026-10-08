@@ -26,6 +26,12 @@ pub struct McpHttpRegistry {
 #[deprecated(note = "use `McpHttpRegistry` instead")]
 pub type McpToolRegistry = McpHttpRegistry;
 
+impl Default for McpHttpRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl McpHttpRegistry {
     pub fn new() -> Self {
         Self { tools: Vec::new() }

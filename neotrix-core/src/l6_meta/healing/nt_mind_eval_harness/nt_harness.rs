@@ -308,7 +308,7 @@ Provide your score and brief justification in JSON:
             .api_key_env
             .as_ref()
             .and_then(|env| std::env::var(env).ok());
-        Ok(Arc::from(create_provider_from_type(provider_type, api_key)))
+        Ok(create_provider_from_type(provider_type, api_key))
     }
 }
 

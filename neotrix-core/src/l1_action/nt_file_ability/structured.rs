@@ -47,18 +47,16 @@ pub fn read_structured(path: impl AsRef<Path>) -> Result<StructuredData> {
             std::fs::write(&temp_path, raw).map_err(FileAbilityError::Io)?;
             let zim: zim::Zim = zim::Zim::new(&temp_path).map_err(|e| FileAbilityError::Parse(e.to_string()))?;
             let mut entries = Vec::new();
-            for entry_result in zim.iterate_by_urls() {
-                if let Ok(entry) = entry_result {
-                    if let Ok(Some(content)) = zim.entry_content(&entry) {
-                        let text = content.with(|bytes| {
-                            String::from_utf8_lossy(bytes).chars().take(5000).collect::<String>()
-                        }).unwrap_or_default();
-                        entries.push(serde_json::json!({
-                            "title": entry.title,
-                            "url": entry.url,
-                            "text": text,
-                        }));
-                    }
+            for entry in zim.iterate_by_urls().flatten() {
+                if let Ok(Some(content)) = zim.entry_content(&entry) {
+                    let text = content.with(|bytes| {
+                        String::from_utf8_lossy(bytes).chars().take(5000).collect::<String>()
+                    }).unwrap_or_default();
+                    entries.push(serde_json::json!({
+                        "title": entry.title,
+                        "url": entry.url,
+                        "text": text,
+                    }));
                 }
             }
             let _ = std::fs::remove_file(&temp_path);

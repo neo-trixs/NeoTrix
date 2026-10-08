@@ -831,7 +831,7 @@ Output your result for this subtask only."#,
             ))?;
         engine
             .reason(&full_prompt)
-            .map_err(|e| TaskDispatchError::ReasoningError(e))
+            .map_err(TaskDispatchError::ReasoningError)
     }
 
     /// 使用 Kernel 执行

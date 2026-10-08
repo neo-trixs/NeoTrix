@@ -56,7 +56,7 @@ impl ProviderBreaker {
         match self.inner.state {
             BreakerState::Closed => 1.0,
             BreakerState::HalfOpen => 0.5,
-            BreakerState::Open { .. } => 0.0,
+            BreakerState::Open => 0.0,
         }
     }
 

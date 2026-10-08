@@ -54,7 +54,7 @@ impl CrawlSource for SpiderBridge {
                         title: None,
                         content: resp.body.clone(),
                         links: resp.links.clone(),
-                        metadata: resp.metadata.clone().into_iter().map(|(k, v)| (k, v)).collect(),
+                        metadata: resp.metadata.clone().into_iter().collect(),
                     });
                     Ok(())
                 },
@@ -82,7 +82,7 @@ impl CrawlSource for SpiderBridge {
                         title: None,
                         content: resp.body.clone(),
                         links: resp.links.clone(),
-                        metadata: resp.metadata.clone().into_iter().map(|(k, v)| (k, v)).collect(),
+                        metadata: resp.metadata.clone().into_iter().collect(),
                     });
                     Ok(())
                 },
@@ -270,18 +270,15 @@ impl CrawlSource for CamofoxBridge {
             client.start()?;
             let mut results = Vec::new();
             for url in &urls {
-                match client._open_tab(url, "bridge") {
-                    Ok(tab_id) => {
-                        let snapshot = client.snapshot(&tab_id, "bridge").unwrap_or_default();
-                        results.push(CrawlResult {
-                            url: url.clone(),
-                            title: None,
-                            content: snapshot,
-                            links: Vec::new(),
-                            metadata: HashMap::new(),
-                        });
-                    }
-                    Err(_) => {}
+                if let Ok(tab_id) = client._open_tab(url, "bridge") {
+                    let snapshot = client.snapshot(&tab_id, "bridge").unwrap_or_default();
+                    results.push(CrawlResult {
+                        url: url.clone(),
+                        title: None,
+                        content: snapshot,
+                        links: Vec::new(),
+                        metadata: HashMap::new(),
+                    });
                 }
             }
             Ok(results)

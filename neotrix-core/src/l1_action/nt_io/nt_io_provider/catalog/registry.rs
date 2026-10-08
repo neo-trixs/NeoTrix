@@ -14,6 +14,12 @@ pub struct ProviderRegistry {
     cost_cache: RwLock<HashMap<String, CostEstimate>>,
 }
 
+impl Default for ProviderRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProviderRegistry {
     pub fn new() -> Self {
         Self {

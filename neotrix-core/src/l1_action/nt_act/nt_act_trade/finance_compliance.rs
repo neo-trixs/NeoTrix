@@ -446,9 +446,9 @@ impl FinanceEngine {
         _lc_text: &str,
         _contract: &super::full_cycle::Contract,
     ) -> Vec<Discrepancy> {
-        let discrepancies = Vec::new();
+        
         // Simplified - would check actual documents against LC terms
-        discrepancies
+        Vec::new()
     }
 
     fn extract_lc_number(lc_text: &str) -> Option<String> {

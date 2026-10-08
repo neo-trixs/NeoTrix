@@ -56,6 +56,12 @@ struct SpanStoreInner {
     next_id: u64,
 }
 
+impl Default for SpanStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SpanStore {
     pub fn new() -> Self {
         Self {

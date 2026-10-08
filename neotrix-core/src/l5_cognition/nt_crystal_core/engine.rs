@@ -147,8 +147,8 @@ impl CrystalEngine {
         // 从可复用方案中提取因果链（R-P0-3：已存在同 problem+approach 的跳过，保证幂等）
         for sol in core.experience.reusable_solutions() {
             let dup = core.knowledge.patterns.iter().any(|p| {
-                p.if_conditions.first().map_or(false, |c| c == &sol.problem)
-                    && p.then_consequences.first().map_or(false, |c| c == &sol.approach)
+                (p.if_conditions.first() == Some(&sol.problem))
+                    && (p.then_consequences.first() == Some(&sol.approach))
             });
             if dup {
                 continue;

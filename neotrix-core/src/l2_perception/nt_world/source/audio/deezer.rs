@@ -3,6 +3,12 @@ use crate::l2_perception::nt_world::source::engine::MediaSource;
 
 pub struct DeezerSource;
 
+impl Default for DeezerSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DeezerSource {
     pub fn new() -> Self { Self }
 }

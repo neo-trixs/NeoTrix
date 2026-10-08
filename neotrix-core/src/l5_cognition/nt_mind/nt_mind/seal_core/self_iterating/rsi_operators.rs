@@ -185,7 +185,7 @@ impl RsiOperatorChain {
             });
         }
 
-        if reward >= 0.3 && reward < 0.6 && eval_count < 10 {
+        if (0.3..0.6).contains(&reward) && eval_count < 10 {
             // 中等 reward: 评估覆盖不足, 改进 harness
             operators.push(RsiOperator::HarnessRsi {
                 metrics: vec![
@@ -272,7 +272,7 @@ impl BrainStage for MetaRsiStage {
         }
 
         // 收集当前数据/指标/配置用于执行
-        let mut data: Vec<String> = brain.brain.harness_history.iter().cloned().collect();
+        let mut data: Vec<String> = brain.brain.harness_history.to_vec();
         let mut metrics: HashMap<String, f64> = HashMap::new();
         metrics.insert("reward".into(), brain._reward);
         metrics.insert("entropy".into(), brain.entropy_crisis_level);

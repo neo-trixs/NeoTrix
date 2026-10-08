@@ -387,7 +387,7 @@ impl HttpInterceptProxy {
             response_body: modified_resp.body,
             modified_request: !modified.modifications.is_empty(),
             modified_response: !modified_resp.modifications.is_empty(),
-            rules_matched: modified.modifications.iter().cloned().collect(),
+            rules_matched: modified.modifications.to_vec(),
             duration_secs: Some(timestamp.elapsed().as_secs_f64()),
         };
 
@@ -438,9 +438,9 @@ impl HttpInterceptProxy {
             return false;
         }
         match rule.rule_type {
-            RuleType::Url => resp.headers.get("host").map_or(false, |h| h.contains(&rule.pattern)),
+            RuleType::Url => resp.headers.get("host").is_some_and(|h| h.contains(&rule.pattern)),
             RuleType::Method => false,
-            RuleType::Host => resp.headers.get("host").map_or(false, |h| h == &rule.pattern),
+            RuleType::Host => resp.headers.get("host") == Some(&rule.pattern),
             RuleType::Header => resp.headers.keys().any(|k| k.to_lowercase().contains(&rule.pattern.to_lowercase())),
             RuleType::Body => String::from_utf8_lossy(&resp.body).contains(&rule.pattern),
         }

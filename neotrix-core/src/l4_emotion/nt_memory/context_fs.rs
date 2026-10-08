@@ -40,6 +40,12 @@ pub struct ContextFileSystem {
 }
 
 
+impl Default for ContextFileSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ContextFileSystem {
     pub fn new() -> Self {
         let mut fs = Self {

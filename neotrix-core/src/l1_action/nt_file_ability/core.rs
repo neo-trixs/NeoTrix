@@ -212,12 +212,10 @@ impl FileAbility {
             }
         };
         let mut texts = Vec::new();
-        for entry_result in zim.iterate_by_urls() {
-            if let Ok(entry) = entry_result {
-                if let Ok(Some(content)) = zim.entry_content(&entry) {
-                    let text = content.with(|bytes| String::from_utf8_lossy(bytes).into_owned()).unwrap_or_default();
-                    texts.push(text);
-                }
+        for entry in zim.iterate_by_urls().flatten() {
+            if let Ok(Some(content)) = zim.entry_content(&entry) {
+                let text = content.with(|bytes| String::from_utf8_lossy(bytes).into_owned()).unwrap_or_default();
+                texts.push(text);
             }
         }
         let _ = std::fs::remove_file(&temp_path);

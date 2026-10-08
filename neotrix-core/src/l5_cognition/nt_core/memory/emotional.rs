@@ -111,11 +111,11 @@ impl EmotionalMemoryStore {
         // Update indexes
         self.index_by_emotion
             .entry(emotion)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(id.clone());
         self.index_by_valence
             .entry(valence)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(id.clone());
         self.emotion_history.push(id.clone());
 

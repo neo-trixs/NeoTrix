@@ -450,7 +450,7 @@ impl MessagingRouter {
         })?;
         let body = template
             .render(vars)
-            .map_err(|e| CapabilityError::InvalidInput(e))?;
+            .map_err(CapabilityError::InvalidInput)?;
         let msg = Message {
             id: uuid::Uuid::new_v4().to_string(),
             channel: format!("{:?}", channel),

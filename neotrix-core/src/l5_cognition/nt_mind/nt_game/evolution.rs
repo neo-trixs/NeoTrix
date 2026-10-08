@@ -305,14 +305,13 @@ impl GameEvolutionLoop {
 
         // Check constellation advance
         let mut advanced = false;
-        if self.config.auto_advance && constellation < self.config.max_constellation {
-            if win_rate >= self.config.advance_threshold
+        if self.config.auto_advance && constellation < self.config.max_constellation
+            && win_rate >= self.config.advance_threshold
                 && *ep_count >= self.config.min_episodes_before_advance
             {
                 self.state.current_constellation = constellation + 1;
                 advanced = true;
             }
-        }
 
         self.state.is_running = false;
 

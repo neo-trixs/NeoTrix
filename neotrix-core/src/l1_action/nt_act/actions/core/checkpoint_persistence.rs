@@ -163,14 +163,14 @@ impl CheckpointPersistence {
             std::fs::create_dir_all(parent)
                 .and_then(|_| {
                     let json = serde_json::to_string_pretty(&data)
-                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                        .map_err(|e| std::io::Error::other(e))?;
                     std::fs::write(&file_path, json)
                 })
                 .map(|_| {
-                    let file_size = std::fs::metadata(&file_path)
+                    
+                    std::fs::metadata(&file_path)
                         .map(|m| m.len())
-                        .unwrap_or(0);
-                    file_size
+                        .unwrap_or(0)
                 })
         } else {
             Err(std::io::Error::new(
@@ -291,7 +291,7 @@ impl CheckpointPersistence {
         let now = current_timestamp();
         let expired: Vec<String> = self.index.iter()
             .filter(|(_, meta)| {
-                meta.expires_at.map_or(false, |exp| exp < now)
+                meta.expires_at.is_some_and(|exp| exp < now)
             })
             .map(|(id, _)| id.clone())
             .collect();

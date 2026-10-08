@@ -16,7 +16,7 @@ impl TemporalInterval {
     }
 
     pub fn contains(&self, ts: u64) -> bool {
-        ts >= self.start && self.end.map_or(true, |e| ts <= e)
+        ts >= self.start && self.end.is_none_or(|e| ts <= e)
     }
 
     pub fn overlaps(&self, other: &TemporalInterval) -> bool {

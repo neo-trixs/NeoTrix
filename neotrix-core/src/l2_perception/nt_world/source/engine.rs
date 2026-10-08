@@ -28,6 +28,12 @@ pub struct MediaEngine {
     cache: HashMap<String, SearchResult>,
 }
 
+impl Default for MediaEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MediaEngine {
     pub fn new() -> Self { Self { sources: Vec::new(), cache: HashMap::new() } }
     pub fn add_source(&mut self, source: Arc<dyn MediaSource>, priority: u32) {

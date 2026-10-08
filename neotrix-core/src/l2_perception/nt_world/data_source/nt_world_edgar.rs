@@ -456,14 +456,10 @@ pub struct _EdgarIngestReport {
 // ── SearchBackend 适配 (R-P42 强化 Ordered Backend Router) ──────
 
 /// SEC EDGAR 作为有序搜索后端 (P1 第2个情报后端，免费无key)。
+#[derive(Default)]
 pub struct EdgarBackend {
 }
 
-impl Default for EdgarBackend {
-    fn default() -> Self {
-        Self { }
-    }
-}
 
 impl EdgarBackend {
     pub fn new() -> Self {

@@ -41,11 +41,10 @@ impl DockerfileChecker {
             let trimmed = line.trim();
             let upper = trimmed.to_uppercase();
 
-            if upper.starts_with("FROM ") {
-                if trimmed.to_lowercase().ends_with(":latest") || !trimmed.contains(":") {
+            if upper.starts_with("FROM ")
+                && (trimmed.to_lowercase().ends_with(":latest") || !trimmed.contains(":")) {
                     uses_latest = true;
                 }
-            }
 
             if upper.starts_with("USER ") {
                 let user_part = trimmed[5..].trim();

@@ -122,8 +122,8 @@ impl SelfEvolver {
         state
             .active_modules
             .iter()
-            .enumerate()
-            .map(|(_i, module_id)| {
+            
+            .map(|module_id| {
                 // 用模块名哈希生成确定性指标
                 let hash = module_id.bytes().fold(0u64, |acc, b| {
                     acc.wrapping_mul(31).wrapping_add(b as u64)

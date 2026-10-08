@@ -3,6 +3,12 @@ use crate::l2_perception::nt_world::source::engine::MediaSource;
 
 pub struct AnnasArchiveSource;
 
+impl Default for AnnasArchiveSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AnnasArchiveSource {
     pub fn new() -> Self { Self }
 }

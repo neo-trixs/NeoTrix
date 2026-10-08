@@ -217,10 +217,10 @@ fn parse_attributes(tag_content: &str) -> std::collections::HashMap<String, Stri
 }
 
 /// Select best variant based on preferred bandwidth
-pub fn select_variant<'a>(
-    master: &'a MasterPlaylist,
+pub fn select_variant(
+    master: &MasterPlaylist,
     preferred_bandwidth: Option<u64>,
-) -> Option<&'a VariantStream> {
+) -> Option<&VariantStream> {
     if master.variants.is_empty() {
         return None;
     }

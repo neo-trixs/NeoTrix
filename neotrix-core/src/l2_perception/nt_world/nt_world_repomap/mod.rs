@@ -189,19 +189,17 @@ impl RepoMap {
                 let entry = entry?;
                 let path = entry.path();
                 if path.is_dir()
-                    && !path.file_name().map_or(false, |n| {
+                    && !path.file_name().is_some_and(|n| {
                         n == "target" || n == ".git" || n == "node_modules"
                     })
                 {
                     count += self.index_directory(&path)?;
                 } else if path
                     .extension()
-                    .map_or(false, |e| e == "rs" || e == "py" || e == "ts" || e == "js")
-                {
-                    if self.index_file(&path).is_ok() {
+                    .is_some_and(|e| e == "rs" || e == "py" || e == "ts" || e == "js")
+                    && self.index_file(&path).is_ok() {
                         count += 1;
                     }
-                }
             }
         }
         Ok(count)

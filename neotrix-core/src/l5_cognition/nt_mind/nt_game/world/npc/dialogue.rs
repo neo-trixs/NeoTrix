@@ -75,11 +75,8 @@ impl DialogueTree {
     }
 
     fn apply_effect(&mut self, effect: &DialogueEffect) {
-        match effect {
-            DialogueEffect::SetFlag(key, value) => {
-                self.flags.insert(key.clone(), value.clone());
-            }
-            _ => {}
+        if let DialogueEffect::SetFlag(key, value) = effect {
+            self.flags.insert(key.clone(), value.clone());
         }
     }
 

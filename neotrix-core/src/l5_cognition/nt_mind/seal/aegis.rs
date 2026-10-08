@@ -101,6 +101,12 @@ pub struct AegisEngine {
 }
 
 
+impl Default for AegisEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AegisEngine {
     pub fn new() -> Self {
         Self {

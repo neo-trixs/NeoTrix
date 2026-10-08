@@ -320,7 +320,7 @@ impl OutputValidator for OutputLengthValidator {
                         .char_indices()
                         .map(|(i, _)| i)
                         .filter(|&i| i <= self.max_length)
-                        .last()
+                        .next_back()
                         .unwrap_or(0);
                     output[..cut].to_string()
                 },

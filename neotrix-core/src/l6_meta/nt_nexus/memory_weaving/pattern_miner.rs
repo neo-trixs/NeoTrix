@@ -129,7 +129,7 @@ impl PatternMiner {
                     }
 
                     // Generate a stable pattern ID from the keyword pair
-                    let mut pair = vec![kw_a, kw_b];
+                    let mut pair = [kw_a, kw_b];
                     pair.sort();
                     let pattern_key = format!("{}:{}", domain, pair.join("+"));
 

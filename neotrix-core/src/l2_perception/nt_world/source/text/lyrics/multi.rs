@@ -3,6 +3,12 @@ use crate::l2_perception::nt_world::source::engine::MediaSource;
 
 pub struct MultiLyricSource;
 
+impl Default for MultiLyricSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MultiLyricSource {
     pub fn new() -> Self { Self }
 

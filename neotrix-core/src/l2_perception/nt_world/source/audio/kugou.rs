@@ -4,6 +4,12 @@ use crate::l2_perception::nt_world::source::crypto;
 
 pub struct KugouSource;
 
+impl Default for KugouSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl KugouSource {
     pub fn new() -> Self { Self }
 }

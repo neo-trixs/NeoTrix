@@ -391,7 +391,7 @@ impl _NoiseHandshake {
     fn mix_hash(&mut self, data: &[u8]) {
         use blake2::{Blake2s256, Digest};
         let mut hasher = Blake2s256::new();
-        hasher.update(&self.hash);
+        hasher.update(self.hash);
         hasher.update(data);
         self.hash = hasher.finalize().into();
     }

@@ -278,7 +278,7 @@ impl SkillTree {
         node.prerequisites.iter().all(|prereq_id| {
             self.nodes
                 .get(prereq_id)
-                .map_or(false, |p| p.current_rank > 0)
+                .is_some_and(|p| p.current_rank > 0)
         })
     }
 
@@ -542,7 +542,7 @@ impl Character {
 
     pub fn skill_check(&self, stat: Stat, difficulty: u32) -> bool {
         let modifier = self.level.level as i32 / 5;
-        let effective = self.effective_stat(stat) as i32 + modifier;
+        let effective = self.effective_stat(stat) + modifier;
         effective as u32 >= difficulty
     }
 }

@@ -170,13 +170,11 @@ pub struct _OcIngestReport {
 
 // ── SearchBackend ────────────────────────────────────────────
 
+#[derive(Default)]
 pub struct OpencorporatesBackend {
     fetcher: OpencorporatesFetcher,
 }
 
-impl Default for OpencorporatesBackend {
-    fn default() -> Self { Self { fetcher: OpencorporatesFetcher::default() } }
-}
 
 impl OpencorporatesBackend {
     pub fn new() -> Self { Self::default() }

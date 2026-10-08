@@ -12,6 +12,12 @@ pub struct ReasoningProtector {
     _decoy_patterns: Vec<String>,
 }
 
+impl Default for ReasoningProtector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ReasoningProtector {
     pub fn new() -> Self {
         Self {

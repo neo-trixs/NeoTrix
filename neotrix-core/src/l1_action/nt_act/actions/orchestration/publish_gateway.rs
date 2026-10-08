@@ -267,7 +267,7 @@ impl PublishGateway {
                 }
             };
 
-            task.status = result.status.clone();
+            task.status = result.status;
             task.updated_at = current_timestamp();
 
             self.history.push(result.clone());

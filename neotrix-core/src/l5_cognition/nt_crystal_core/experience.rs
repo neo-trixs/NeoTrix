@@ -50,6 +50,12 @@ pub struct CrystalExperience {
     next_id: usize,
 }
 
+impl Default for CrystalExperience {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CrystalExperience {
     pub fn new() -> Self {
         Self {

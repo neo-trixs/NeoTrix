@@ -129,7 +129,7 @@ impl CompressionPolicy {
             let take = target_len.clamp(1, words.len() - 1);
             words.into_iter().take(take).collect::<Vec<_>>().join(" ")
         };
-        let ratio = if entry.content.len() > 0 {
+        let ratio = if !entry.content.is_empty() {
             summary.len() as f64 / entry.content.len() as f64
         } else {
             0.0

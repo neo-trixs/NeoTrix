@@ -352,13 +352,11 @@ pub struct _UsgsIngestReport {
 
 // ── SearchBackend ────────────────────────────────────────────
 
+#[derive(Default)]
 pub struct UsgsBackend {
     fetcher: UsgsFetcher,
 }
 
-impl Default for UsgsBackend {
-    fn default() -> Self { Self { fetcher: UsgsFetcher::new() } }
-}
 
 impl UsgsBackend {
     pub fn new() -> Self { Self::default() }

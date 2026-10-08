@@ -275,7 +275,7 @@ impl RecursiveSelfImprover {
         }
         // 收敛条件: 达到最大深度或最后一层改进量极小
         chain.converged
-            || chain.layers.last().map_or(true, |l| {
+            || chain.layers.last().is_none_or(|l| {
                 l.output.score_delta.abs() < self.convergence_threshold
             })
     }

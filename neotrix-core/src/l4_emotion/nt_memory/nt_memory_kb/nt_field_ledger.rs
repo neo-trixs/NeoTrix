@@ -282,7 +282,7 @@ pub fn field_verify_chain(conn: &Connection) -> Result<bool, String> {
 
     let mut prev_hash = GENESIS_HASH.to_string();
     let mut expect_version: u64 = 1;
-    while let Some(row) = rows.next() {
+    for row in rows {
         let (version, entries_json, hash) = row.map_err(|e| e.to_string())?;
         if version != expect_version {
             return Ok(false); // 版本断裂

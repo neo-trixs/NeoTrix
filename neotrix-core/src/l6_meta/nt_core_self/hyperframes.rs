@@ -126,6 +126,12 @@ pub enum TemplateCategory {
     Custom,
 }
 
+impl Default for TemplateSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TemplateSystem {
     pub fn new() -> Self {
         Self { templates: Vec::new() }

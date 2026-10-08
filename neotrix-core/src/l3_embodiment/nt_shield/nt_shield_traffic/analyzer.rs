@@ -136,7 +136,7 @@ impl SensitivityDetector for DefaultSensitivityDetector {
                     findings.push(SensitiveFinding {
                         category: category.to_string(),
                         description: format!("{} detected", category),
-                        severity: severity.clone(),
+                        severity: *severity,
                         offset: Some(cap.start()),
                     });
                 }

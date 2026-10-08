@@ -127,9 +127,9 @@ pub fn allowed_roots(home: &Path) -> Vec<PathBuf> {
 
 /// 路径标准化 + 符号链接解析 (等价 NSString.standardizingPath + resolvingSymlinksInPath)
 pub fn normalize(path: &Path) -> PathBuf {
-    let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    
     // strip \\?\\ prefix on Windows is not needed (macOS target)
-    canonical
+    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
 /// path 是否等于 root 或严格位于 root 之下 (防 /tmpfoo 穿过 /tmp)

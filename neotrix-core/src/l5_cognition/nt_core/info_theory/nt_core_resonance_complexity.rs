@@ -167,12 +167,12 @@ impl _ResonanceComplexityEngine {
 
     /// 计算复杂度指数
     pub(crate) fn _calculate_complexity_index(&self) -> _ComplexityIndex {
-        let d = 1.8; // 分形维度
-        let c = 0.75; // 空间相干性
-        let g = 2.0; // 信号增益
-        let tau = 150.0; // 驻留时间 (ms)
+        let d = 1.8_f64; // 分形维度
+        let c = 0.75_f64; // 空间相干性
+        let g = 2.0_f64; // 信号增益
+        let tau = 150.0_f64; // 驻留时间 (ms)
 
-        let composite: f64 = (d as f64 * c as f64 * g as f64 * tau as f64).sqrt() / 100.0_f64;
+        let composite: f64 = (d * c * g * tau).sqrt() / 100.0_f64;
 
         _ComplexityIndex {
             fractal_dimension: d,

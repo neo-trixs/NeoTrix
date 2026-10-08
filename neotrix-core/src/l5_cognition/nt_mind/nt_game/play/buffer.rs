@@ -139,7 +139,7 @@ impl GameTrajectoryBuffer {
         let wins = self
             .buffer
             .iter()
-            .filter(|t| t.steps.last().map_or(false, |s| s.reward > 0.0))
+            .filter(|t| t.steps.last().is_some_and(|s| s.reward > 0.0))
             .count();
         let win_rate = wins as f64 / total as f64;
 

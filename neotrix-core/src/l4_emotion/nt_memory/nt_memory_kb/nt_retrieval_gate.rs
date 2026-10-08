@@ -25,14 +25,14 @@
 //!
 //! 1. **判据是「反事实必要性」，不是相似度**（waku 原文）
 //!    > 「how much **does leaving this one out change the answer**?」
-//!    本模块 `RetrievalQuestion::OmissionImpact` 表达同一判据。
+//!    > 本模块 `RetrievalQuestion::OmissionImpact` 表达同一判据。
 //!
 //! 2. **fail-open，且理由必须写明**（waku 原文）
 //!    > 「a slow or broken judge **must never cost a memory**」
-//!    ⇒ 闸失败 ⇒ **照旧检索**（`GateError` ⇒ admit）。
-//!    **对照本仓的 SSRF 守卫是 fail-closed**（失败 = 发出内网请求，**不可撤销**）。
-//!    ⇒ **两边都对**：*失败方向由「失败时损失什么」决定*。
-//!    **「永远 fail-closed」同样是未经论证的教条。**
+//!    > ⇒ 闸失败 ⇒ **照旧检索**（`GateError` ⇒ admit）。
+//!    > **对照本仓的 SSRF 守卫是 fail-closed**（失败 = 发出内网请求，**不可撤销**）。
+//!    > ⇒ **两边都对**：*失败方向由「失败时损失什么」决定*。
+//!    > **「永远 fail-closed」同样是未经论证的教条。**
 //!
 //! 3. **不发明没有测量的阈值**（守本仓自己的纪律）
 //!    waku 能写 `0.5, measured 12 of 12`，是因为它**测过**

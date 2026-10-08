@@ -204,9 +204,8 @@ impl AgentGallery {
             .iter()
             .find(|(_, pid)| *pid == persona_id)
             .map(|(preset_id, _)| preset_id.clone())
-            .map(|preset_id| {
-                self.installed.remove(&preset_id);
-                preset_id
+            .inspect(|preset_id| {
+                self.installed.remove(preset_id);
             })
     }
 

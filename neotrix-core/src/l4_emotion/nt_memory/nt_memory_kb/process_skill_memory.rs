@@ -11,6 +11,12 @@ pub struct ProcessSkillMemory {
     skills: Vec<ProcessSkill>,
 }
 
+impl Default for ProcessSkillMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProcessSkillMemory {
     pub fn new() -> Self {
         Self { skills: Vec::new() }

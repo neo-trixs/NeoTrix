@@ -183,7 +183,7 @@ impl PlatformGateway {
                     && self
                         .capabilities
                         .get(&p.id)
-                        .map_or(false, |c| c.task_types.contains(&task_type.to_string()))
+                        .is_some_and(|c| c.task_types.contains(&task_type.to_string()))
             })
             .collect()
     }

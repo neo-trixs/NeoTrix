@@ -16,6 +16,12 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MemoryId(pub String);
 
+impl Default for MemoryId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemoryId {
     pub fn new() -> Self { Self(uuid::Uuid::new_v4().to_string()) }
 }
@@ -101,6 +107,12 @@ pub struct OrchestratorStats {
     pub total_writes: u64,
     pub total_reads: u64,
     pub total_consolidations: u64,
+}
+
+impl Default for MemoryOrchestrator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MemoryOrchestrator {
@@ -271,7 +283,7 @@ fn cosine_sim(a: &[f64], b: &[f64]) -> f64 {
 
 fn extract_entities(text: &str) -> Vec<String> {
     text.split_whitespace()
-        .filter(|w| w.chars().next().map_or(false, |c| c.is_uppercase()) && w.len() > 2)
+        .filter(|w| w.chars().next().is_some_and(|c| c.is_uppercase()) && w.len() > 2)
         .map(|w| w.to_string())
         .collect()
 }

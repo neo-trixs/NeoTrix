@@ -120,7 +120,7 @@ impl ConsciousnessTree {
                     );
                     let penalty = (CALIB_W_ECE * ece).min(CALIB_MAX_PENALTY);
                     branch.calibrated_health =
-                        (branch.health as f64) * (1.0 - penalty as f64);
+                        branch.health * (1.0 - penalty as f64);
                 }
             }
         }

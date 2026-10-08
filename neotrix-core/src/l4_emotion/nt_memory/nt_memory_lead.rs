@@ -279,7 +279,7 @@ impl LeadManager {
         // 进程漂移；调用方若「取第一条」或按序输出，结果就不可复现。
         let mut out: Vec<&Lead> = self.leads.values().filter(|l|
             l.stage != LeadStage::ClosedWon && l.stage != LeadStage::ClosedLost
-                && l.next_follow_up.map_or(true, |t| t <= now)
+                && l.next_follow_up.is_none_or(|t| t <= now)
         ).collect();
         out.sort_by(|a, b| a.id.cmp(&b.id));
         out

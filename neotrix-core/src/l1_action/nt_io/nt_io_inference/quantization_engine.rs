@@ -450,16 +450,15 @@ impl QuantizationEngine {
             let mut qlevel = level.clone();
             qlevel.fits_in_memory = fits;
             
-            if fits && level.quality_score >= min_quality {
-                if selected.is_none() || level.quality_score > selected.as_ref().expect("Some value").quality_score {
+            if fits && level.quality_score >= min_quality
+                && (selected.is_none() || level.quality_score > selected.as_ref().expect("Some value").quality_score) {
                     selected = Some(qlevel.clone());
                 }
-            }
             candidates.push(qlevel);
         }
         
         // If nothing fits at full context, try half context
-        if selected.is_none() && self.quantization_hierarchy.len() > 0 {
+        if selected.is_none() && !self.quantization_hierarchy.is_empty() {
             let best = &self.quantization_hierarchy[0];
             let half_ctx = best.clone(); // Would need half-context adjustment
             if half_ctx.memory_gb * 0.5 <= target {
@@ -531,7 +530,7 @@ impl QuantizationEngine {
         let utilization = quantized_size / hw.vram_gb;
         
         // Best fit is 50-80% utilization
-        if utilization >= 0.5 && utilization <= 0.8 {
+        if (0.5..=0.8).contains(&utilization) {
             100.0
         } else if utilization < 0.5 {
             utilization / 0.5 * 100.0
@@ -709,7 +708,7 @@ impl QuantizationEngine {
         );
         
         Ok(EvoPressResult {
-            model_name: model_path.split('/').last().unwrap_or("unknown").to_string(),
+            model_name: model_path.split('/').next_back().unwrap_or("unknown").to_string(),
             original_perplexity: baseline_perplexity,
             optimized_perplexity: best_perplexity,
             compression_ratio: config.target_compression,
@@ -796,7 +795,7 @@ impl QuantizationEngine {
             .map(|h| h.architecture.clone())
             .unwrap_or_else(|| {
                 // Fallback: detect from filename
-                if let Some(name) = model_path.split('/').last() {
+                if let Some(name) = model_path.split('/').next_back() {
                     if name.contains("Qwen") || name.contains("qwen") { "qwen".to_string() }
                     else if name.contains("Llama") || name.contains("llama") { "llama".to_string() }
                     else if name.contains("Mistral") || name.contains("mistral") { "mistral".to_string() }
@@ -811,7 +810,7 @@ impl QuantizationEngine {
             .map(|h| h.parameter_count)
             .unwrap_or_else(|| {
                 // Fallback: detect from filename
-                if let Some(name) = model_path.split('/').last() {
+                if let Some(name) = model_path.split('/').next_back() {
                     for token in name.split(['-', '_', ' ']) {
                         if let Some(num_str) = token.strip_suffix('B').or_else(|| token.strip_suffix('b')) {
                             if let Ok(params) = num_str.parse::<f64>() {
@@ -945,8 +944,8 @@ impl QuantizationEngine {
         hw: &HardwareCapabilities,
     ) -> QuantizationConfig {
         // MLA models benefit most from KV cache compression
-        if matches!(model_params.attention_type, AttentionType::MultiHeadLatentAttention) {
-            if hw.supports_fp8 {
+        if matches!(model_params.attention_type, AttentionType::MultiHeadLatentAttention)
+            && hw.supports_fp8 {
                 return QuantizationConfig {
                     format: "FP8".to_string(),
                     level: "FP8".to_string(),
@@ -954,7 +953,6 @@ impl QuantizationEngine {
                     quality_loss: 0.003,
                 };
             }
-        }
         
         // Apple Silicon → MLX 4-bit (or llmfit dynamic selection)
         if hw.supports_metal && hw.vram_gb < 64.0 {
@@ -1199,7 +1197,7 @@ pub fn read_gguf_header(path: &str) -> Result<GgufHeaderInfo, String> {
     
     // Extract quantization from filename as fallback
     if info.architecture.is_empty() {
-        if let Some(filename) = path.split('/').last() {
+        if let Some(filename) = path.split('/').next_back() {
             for quant in &["Q8_0", "Q6_K", "Q5_K_M", "Q5_K_S", "Q4_K_M", "Q4_K_S", "Q3_K_M", "Q2_K", "IQ4_XS", "IQ3_XXS"] {
                 if filename.contains(quant) {
                     info.quantization = quant.to_string();
@@ -1210,7 +1208,7 @@ pub fn read_gguf_header(path: &str) -> Result<GgufHeaderInfo, String> {
     }
     
     // Extract parameter count from filename (e.g., "9B" in "Qwen3.5-9B")
-    if let Some(filename) = path.split('/').last() {
+    if let Some(filename) = path.split('/').next_back() {
         for token in filename.split(['-', '_', ' ']) {
             if let Some(num_str) = token.strip_suffix('B').or_else(|| token.strip_suffix('b')) {
                 if let Ok(params) = num_str.parse::<f64>() {
@@ -1222,7 +1220,7 @@ pub fn read_gguf_header(path: &str) -> Result<GgufHeaderInfo, String> {
     }
     
     // Infer from filename patterns
-    if let Some(filename) = path.split('/').last() {
+    if let Some(filename) = path.split('/').next_back() {
         if filename.contains("MoE") || filename.contains("moe") || filename.contains("-A") {
             info.architecture = "moe".to_string();
         }

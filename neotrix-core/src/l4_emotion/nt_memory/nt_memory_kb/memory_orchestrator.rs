@@ -45,6 +45,12 @@ pub struct ElasticMemoryOrchestrator {
     max_compressed_size: usize,
 }
 
+impl Default for ElasticMemoryOrchestrator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ElasticMemoryOrchestrator {
     pub fn new() -> Self {
         Self {

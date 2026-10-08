@@ -441,7 +441,7 @@ impl NtAwakenLoop {
             }
         }
 
-        if self.cycles % reflect_every.max(1) == 0 {
+        if self.cycles.is_multiple_of(reflect_every.max(1)) {
             report.reflected = consciousness.reflect(10).is_some();
         }
         report.avg_reward = if report.proposed > 0 {

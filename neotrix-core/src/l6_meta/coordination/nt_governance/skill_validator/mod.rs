@@ -189,7 +189,7 @@ impl SkillValidator {
 
         // Version semver check
         if let Some(version) = plugin.get("version").and_then(|v| v.as_str()) {
-            if !semver::Version::parse(version).is_ok() {
+            if semver::Version::parse(version).is_err() {
                 report.add_finding(ValidationFinding {
                     rule_id: "PLUGIN-004".to_string(),
                     category: RuleCategory::PluginMetadata,
@@ -394,7 +394,7 @@ impl SkillValidator {
         };
         for entry in refs_entries.filter_map(|e| e.ok()) {
             let path = entry.path();
-            if path.extension().map_or(false, |e| e == "md") {
+            if path.extension().is_some_and(|e| e == "md") {
                 let content = match std::fs::read_to_string(&path) {
                     Ok(c) => c,
                     Err(e) => {
@@ -497,7 +497,7 @@ impl SkillValidator {
         };
         for entry in cmd_entries.filter_map(|e| e.ok()) {
             let path = entry.path();
-            if path.extension().map_or(false, |e| e == "md") {
+            if path.extension().is_some_and(|e| e == "md") {
                 let content = match std::fs::read_to_string(&path) {
                     Ok(c) => c,
                     Err(_) => continue, // Can't read file, skip this command check
@@ -690,7 +690,7 @@ impl SkillValidator {
             let path = entry.path();
             if path.is_dir() {
                 files.extend(self.find_files(&path, ext)?);
-            } else if path.extension().map_or(false, |e| e == ext) {
+            } else if path.extension().is_some_and(|e| e == ext) {
                 files.push(path);
             }
         }
@@ -720,8 +720,8 @@ impl SkillValidator {
     pub fn self_test() -> Result<(), String> {
         let temp_dir = tempfile::tempdir().map_err(|e| e.to_string())?;
         let plugin_root = temp_dir.path().join("test-plugin");
-        std::fs::create_dir_all(&plugin_root.join(".claude-plugin")).map_err(|e| e.to_string())?;
-        std::fs::create_dir_all(&plugin_root.join("skills").join("test-skill")).map_err(|e| e.to_string())?;
+        std::fs::create_dir_all(plugin_root.join(".claude-plugin")).map_err(|e| e.to_string())?;
+        std::fs::create_dir_all(plugin_root.join("skills").join("test-skill")).map_err(|e| e.to_string())?;
         
         // Create minimal plugin.json
         std::fs::write(

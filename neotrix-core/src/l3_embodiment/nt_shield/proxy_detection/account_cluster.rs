@@ -377,7 +377,7 @@ impl AccountClusterEngine {
             };
 
             // Keep the highest-risk cluster
-            if best_cluster.as_ref().map_or(true, |best| {
+            if best_cluster.as_ref().is_none_or(|best| {
                 result.risk_assessment.confidence > best.risk_assessment.confidence
             }) {
                 best_cluster = Some(result);

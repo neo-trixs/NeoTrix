@@ -415,7 +415,7 @@ impl ValueCompass {
 
     /// 调整价值观权重（受保护操作）。
     pub fn adjust_weight(&mut self, id: &str, new_weight: f64) -> Result<(), String> {
-        if new_weight < 0.0 || new_weight > 1.0 {
+        if !(0.0..=1.0).contains(&new_weight) {
             return Err("权重必须在 [0,1]".into());
         }
         let Some(v) = self.values.get_mut(id) else {

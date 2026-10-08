@@ -463,7 +463,7 @@ impl AttentionManager {
             );
             AttentionDomain::Code
         } else {
-            current_domain.clone()
+            *current_domain
         }
     }
 
@@ -626,7 +626,7 @@ impl AttentionManager {
             );
             AttentionDomain::Code
         } else {
-            current_domain.clone()
+            *current_domain
         }
     }
 
@@ -646,7 +646,7 @@ impl AttentionManager {
 
         if history.is_empty() {
             // 无优化历史, 保持当前域
-            return current_domain.clone();
+            return *current_domain;
         }
 
         // 计算近期优化的平均奖励 (最近 5 次或全部)
@@ -663,7 +663,7 @@ impl AttentionManager {
             );
             AttentionDomain::Code
         } else {
-            current_domain.clone()
+            *current_domain
         }
     }
 

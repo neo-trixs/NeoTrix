@@ -121,8 +121,8 @@ impl KVCacheOptimizer {
     ) -> KVCacheLayout {
         let per_token_bytes = match self.quantization.bits {
             8 => 2 * head_dim * kv_heads * 2,  // K+V, fp16 per element
-            4 => 2 * head_dim * kv_heads * 1,  // K+V, fp16 quantized to 4-bit
-            3 => 2 * head_dim * kv_heads * 1,  // 3-bit (TurboQuant)
+            4 => 2 * head_dim * kv_heads,  // K+V, fp16 quantized to 4-bit
+            3 => 2 * head_dim * kv_heads,  // 3-bit (TurboQuant)
             _ => 2 * head_dim * kv_heads * 2,
         };
         

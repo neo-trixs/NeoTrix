@@ -36,7 +36,7 @@ impl ConfigFields {
         let mut fields = Self::default();
 
         // 支持两种分隔符: 逗号和分号
-        let pairs: Vec<&str> = raw.split(|c| c == ',' || c == '；' || c == ';').collect();
+        let pairs: Vec<&str> = raw.split([',', '；', ';']).collect();
 
         for pair in pairs {
             let pair = pair.trim();

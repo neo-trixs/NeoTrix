@@ -470,7 +470,7 @@ impl CaseBase {
             .insert(case.id.clone());
         indices
             .by_severity
-            .entry(case.severity.clone())
+            .entry(case.severity)
             .or_default()
             .insert(case.id.clone());
         for v in &case.values_in_conflict {

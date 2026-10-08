@@ -228,7 +228,7 @@ impl ActionFacade {
 
         let node_id = kb
             .insert_or_get_node(title, neotrix_types::knowledge_access::NodeType::from_str(node_type), Some(summary), None, None)
-            .map_err(|e| FacadeError::StoreFailed(format!("{e}")))?;
+            .map_err(|e| FacadeError::StoreFailed(e.to_string()))?;
 
         Ok(node_id)
     }
@@ -243,7 +243,7 @@ impl ActionFacade {
 
         // nt_memory
         total += 1;
-        if self.kb.as_ref().map_or(false, |kb| kb.raw_conn().is_ok()) {
+        if self.kb.as_ref().is_some_and(|kb| kb.raw_conn().is_ok()) {
             modules.push("nt_memory:ok".into());
             healthy_count += 1;
         } else {
@@ -264,7 +264,7 @@ impl ActionFacade {
         if self
             .llm_router
             .as_ref()
-            .map_or(false, |r| r.health_check().healthy)
+            .is_some_and(|r| r.health_check().healthy)
         {
             modules.push("nt_io:ok".into());
             healthy_count += 1;

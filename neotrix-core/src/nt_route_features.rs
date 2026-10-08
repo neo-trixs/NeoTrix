@@ -71,7 +71,7 @@ const DOMAIN_TABLE: &[(&[&str], &str)] = &[
     (&["sidecar", "8149"], "sidecar"),
 ];
 
-fn hit_table<'a>(text: &str, table: &[(&[&str], &'a str)], out: &mut Vec<String>) {
+fn hit_table(text: &str, table: &[(&[&str], &str)], out: &mut Vec<String>) {
     let mut seen = HashSet::new();
     for (keys, name) in table {
         if keys.iter().any(|k| text.contains(k)) && seen.insert(*name) {

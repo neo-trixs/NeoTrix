@@ -295,13 +295,11 @@ pub struct _CisaKevIngestReport {
 
 // ── SearchBackend ────────────────────────────────────────────
 
+#[derive(Default)]
 pub struct UrlhausBackend {
     fetcher: UrlhausFetcher,
 }
 
-impl Default for UrlhausBackend {
-    fn default() -> Self { Self { fetcher: UrlhausFetcher::new() } }
-}
 
 impl UrlhausBackend {
     pub fn new() -> Self { Self::default() }

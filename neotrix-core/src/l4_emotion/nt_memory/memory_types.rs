@@ -30,6 +30,12 @@ pub struct TripleMemoryStore {
     functions: HashMap<String, FunctionMemory>,
 }
 
+impl Default for TripleMemoryStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TripleMemoryStore {
     pub fn new() -> Self {
         Self {

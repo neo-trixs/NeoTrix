@@ -259,9 +259,7 @@ impl DownloadEngine {
         //   真 ENOSPC 会在 `merge_chunks` 的 `create` 处以可读错误浮出。
         // ⛔ 不用 let-chain（本仓 edition < 2024， 编译不过）。
         if total_size > 0 && !dest.exists() {
-            if let Err(e) = check_disk_space(&dest, total_size, self.config.min_disk_space) {
-                return Err(e);
-            }
+            check_disk_space(&dest, total_size, self.config.min_disk_space)?
         }
 
         // Resume: existing bytes

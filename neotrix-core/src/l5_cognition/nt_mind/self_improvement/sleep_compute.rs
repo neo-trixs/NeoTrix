@@ -676,7 +676,7 @@ impl SleepComputer {
             for tag in &block.tags {
                 tag_groups
                     .entry(tag.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(block.id.clone());
             }
         }

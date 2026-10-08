@@ -3,6 +3,12 @@ use crate::l2_perception::nt_world::source::engine::MediaSource;
 
 pub struct ArxivSource;
 
+impl Default for ArxivSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ArxivSource {
     pub fn new() -> Self { Self }
 }

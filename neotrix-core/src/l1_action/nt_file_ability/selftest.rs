@@ -279,11 +279,9 @@ impl SelfTest for DocParseSelfTest {
         // 无 GPU 环境下应默认为 Fast
         if std::env::var("CUDA_VISIBLE_DEVICES").is_err()
             && !std::path::Path::new("/dev/nvidia0").exists()
-        {
-            if mode != super::doc_parse::PdfParseMode::Fast {
+            && mode != super::doc_parse::PdfParseMode::Fast {
                 errors.push("PdfParseMode::default() should be Fast without GPU".to_string());
             }
-        }
 
         // 4. PdfParseConfig 默认值验证
         let config = super::doc_parse::PdfParseConfig::default();

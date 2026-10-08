@@ -30,6 +30,7 @@ mod event_types;
 mod structured;
 pub mod types;
 mod doc_parse;
+mod genoffice;
 mod format_route;
 pub mod image_super_resolution;
 pub mod capability;
@@ -46,6 +47,7 @@ pub mod visual;
 
 pub use core::*;
 pub use doc_parse::*;
+pub use genoffice::*;
 pub use e8::*;
 pub use embedding::*;
 pub use encoding::*;

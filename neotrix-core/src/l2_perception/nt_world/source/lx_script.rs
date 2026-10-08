@@ -3,6 +3,12 @@ use super::engine::MediaSource;
 
 pub struct LxScriptSource;
 
+impl Default for LxScriptSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LxScriptSource {
     pub fn new() -> Self {
         Self

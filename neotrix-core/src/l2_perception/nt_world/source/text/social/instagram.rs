@@ -3,6 +3,12 @@ use crate::l2_perception::nt_world::source::engine::MediaSource;
 
 pub struct InstagramSource;
 
+impl Default for InstagramSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InstagramSource {
     pub fn new() -> Self { Self }
 }

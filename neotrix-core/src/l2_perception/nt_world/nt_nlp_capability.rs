@@ -9,6 +9,12 @@ pub struct NlpCapability {
     health: CapabilityHealth,
 }
 
+impl Default for NlpCapability {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NlpCapability {
     pub fn new() -> Self {
         Self {

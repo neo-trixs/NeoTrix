@@ -53,7 +53,7 @@ impl ExternalConfig {
         self.values.insert(key.to_string(), value.to_string());
     }
 
-    pub fn keys<'a>(&'a self) -> Vec<&'a str> {
+    pub fn keys(&self) -> Vec<&str> {
         self.values.keys().map(|s| s.as_str()).collect()
     }
 }

@@ -37,6 +37,12 @@ pub struct HealthMonitor {
     pub history: Vec<HealthSnapshot>,
 }
 
+impl Default for HealthMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HealthMonitor {
     pub fn new() -> Self {
         Self {
@@ -77,12 +83,12 @@ impl HealthMonitor {
                 && m.latency_p99_ms > 0.0
                 && m.error_rate <= self.error_rate_threshold
         });
-        let snapshot = HealthSnapshot {
+        
+        HealthSnapshot {
             timestamp: now_ms(),
             modules: modules.to_vec(),
             overall_healthy: overall,
-        };
-        snapshot
+        }
     }
 }
 
@@ -114,6 +120,12 @@ pub struct Anomaly {
 pub struct AnomalyDetector {
     pub error_rate_threshold: f64,
     pub latency_threshold_ms: f64,
+}
+
+impl Default for AnomalyDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AnomalyDetector {
@@ -176,6 +188,12 @@ pub struct CascadeFault {
 pub struct CascadeDetector {
     /// 依赖图: 模块 → 依赖的模块列表
     pub dependency_graph: HashMap<String, Vec<String>>,
+}
+
+impl Default for CascadeDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CascadeDetector {
@@ -247,6 +265,12 @@ pub struct RecoveryPlanner {
     pub default_mode: RecoveryMode,
 }
 
+impl Default for RecoveryPlanner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RecoveryPlanner {
     pub fn new() -> Self {
         Self {
@@ -304,6 +328,12 @@ pub struct RecoveryEvent {
     pub success: bool,
     pub timestamp: u64,
     pub details: String,
+}
+
+impl Default for SelfHealingEngine {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SelfHealingEngine {

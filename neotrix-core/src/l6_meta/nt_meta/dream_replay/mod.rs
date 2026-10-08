@@ -27,6 +27,12 @@ pub struct DiscoveryTree {
     pub root_id: String,
 }
 
+impl Default for DiscoveryTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DiscoveryTree {
     pub fn new() -> Self {
         let root = DiscoveryNode {
@@ -91,6 +97,12 @@ pub struct PolicyEvaluation {
     pub avg_reward: f64,
     pub win_rate: f64,
     pub sample_count: usize,
+}
+
+impl Default for DreamReplaySimulator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DreamReplaySimulator {

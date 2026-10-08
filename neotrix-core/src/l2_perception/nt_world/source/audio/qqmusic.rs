@@ -3,6 +3,12 @@ use crate::l2_perception::nt_world::source::engine::MediaSource;
 
 pub struct QQMusicSource;
 
+impl Default for QQMusicSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl QQMusicSource {
     pub fn new() -> Self { Self }
 

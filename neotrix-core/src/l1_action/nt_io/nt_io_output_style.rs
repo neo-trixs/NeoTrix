@@ -376,12 +376,12 @@ fn build_rules(root: &Path, max_message_chars: usize) -> Vec<GovernorRule> {
         GovernorRule {
             id: 1,
             description: "①答案前置 — 结论先行，禁止'让我先/让我想想'等铺垫推迟答案。",
-            check_fn: Box::new(|text| r1_answer_first(text)),
+            check_fn: Box::new(r1_answer_first),
         },
         GovernorRule {
             id: 2,
             description: "②禁止模糊对冲 — 不用'可能/或许/大概/我觉得/probably'等对冲词。",
-            check_fn: Box::new(|text| r2_no_hedging(text)),
+            check_fn: Box::new(r2_no_hedging),
         },
         GovernorRule {
             id: 3,
@@ -401,7 +401,7 @@ fn build_rules(root: &Path, max_message_chars: usize) -> Vec<GovernorRule> {
         GovernorRule {
             id: 6,
             description: "⑥禁止重复样板 — 相同长行 (≥25 字符) 出现 ≥3 次即违规。",
-            check_fn: Box::new(|text| r6_no_dup_boilerplate(text)),
+            check_fn: Box::new(r6_no_dup_boilerplate),
         },
         GovernorRule {
             id: 7,
@@ -418,12 +418,12 @@ fn build_rules(root: &Path, max_message_chars: usize) -> Vec<GovernorRule> {
         GovernorRule {
             id: 9,
             description: "⑨语言一致 — 禁止显著中英混杂 (代码块除外)。",
-            check_fn: Box::new(|text| r9_consistent_language(text)),
+            check_fn: Box::new(r9_consistent_language),
         },
         GovernorRule {
             id: 10,
             description: "⑩禁止结尾道歉 — 输出不得以'抱歉/对不起/sorry'收尾。",
-            check_fn: Box::new(|text| r10_no_trailing_apology(text)),
+            check_fn: Box::new(r10_no_trailing_apology),
         },
     ]
 }

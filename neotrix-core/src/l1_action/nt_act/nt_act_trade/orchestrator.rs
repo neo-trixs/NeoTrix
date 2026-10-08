@@ -433,9 +433,9 @@ impl TradeOrchestrator {
                 },
             },
             negotiation_engine: NegotiationEngine::default(),
-            production_engine: ProductionEngine::default(),
-            logistics_engine: LogisticsEngine::default(),
-            finance_engine: FinanceEngine::default(),
+            production_engine: ProductionEngine,
+            logistics_engine: LogisticsEngine,
+            finance_engine: FinanceEngine,
             active_trades: HashMap::new(),
         }
     }
@@ -790,7 +790,7 @@ impl TradeOrchestrator {
         let order = ProductionOrder {
             production_order_id: format!("PO-{}", uuid::Uuid::new_v4().simple()),
             contract_id: order_id.to_string(),
-            bom: materials.iter().map(|m| m.clone()).collect(),
+            bom: materials.iter().cloned().collect(),
             routing: Vec::new(),
             schedule: ProductionSchedule {
                 start_date: String::new(),

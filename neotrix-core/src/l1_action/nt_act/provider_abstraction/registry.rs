@@ -6,6 +6,12 @@ pub struct ProviderRegistry {
     configs: HashMap<String, ProviderConfig>,
 }
 
+impl Default for ProviderRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProviderRegistry {
     pub fn new() -> Self {
         Self {

@@ -25,6 +25,12 @@ pub struct ReferenceManager {
     next_id: u32,
 }
 
+impl Default for ReferenceManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ReferenceManager {
     pub fn new() -> Self {
         Self {

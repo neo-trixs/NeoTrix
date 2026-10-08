@@ -78,13 +78,11 @@ impl GameVsaEncoder {
             trajectory.hexagrams.iter().copied().collect();
         let diversity = distinct.len() as f64 / trajectory.hexagrams.len().max(1) as f64;
 
-        let features = vec![
-            reward_norm,
+        let features = [reward_norm,
             length_norm,
             avg_hex,
             resonance_density,
-            diversity,
-        ];
+            diversity];
 
         // Unit-normalize
         let norm: f64 = features.iter().map(|&f| f * f).sum::<f64>().sqrt();

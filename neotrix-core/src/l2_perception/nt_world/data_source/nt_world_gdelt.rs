@@ -230,15 +230,11 @@ pub struct _GdeltIngestReport {
 // ── SearchBackend 适配 (R-P42 强化 Ordered Backend Router) ──────
 
 /// GDELT 作为有序搜索后端 (P1 首个情报后端，免费无key)。
+#[derive(Default)]
 pub struct GdeltBackend {
     fetcher: GdeltFetcher,
 }
 
-impl Default for GdeltBackend {
-    fn default() -> Self {
-        Self { fetcher: GdeltFetcher::new() }
-    }
-}
 
 impl GdeltBackend {
     pub fn new() -> Self {

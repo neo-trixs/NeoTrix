@@ -79,6 +79,12 @@ impl HotStore {
     }
 }
 
+impl Default for WarmStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WarmStore {
     pub fn new() -> Self {
         Self {
@@ -158,6 +164,12 @@ impl ColdStore {
         } else {
             Ok(false)
         }
+    }
+}
+
+impl Default for JitForWeights {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

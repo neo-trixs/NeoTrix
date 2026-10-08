@@ -11,11 +11,10 @@ pub struct RouterStats {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum TaskComplexity { Trivial, Simple, Moderate, Complex, Critical }
+#[derive(Default)]
+pub enum TaskComplexity { Trivial, Simple, #[default]
+Moderate, Complex, Critical }
 
-impl Default for TaskComplexity {
-    fn default() -> Self { TaskComplexity::Moderate }
-}
 
 impl TaskComplexity {
     pub fn from_str(s: &str) -> Option<Self> {

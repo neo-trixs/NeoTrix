@@ -2,17 +2,14 @@
 
 /// Fetcher backend type
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub enum FetcherBackend {
+    #[default]
     Http,
     Browser,
     Stealthy,
 }
 
-impl Default for FetcherBackend {
-    fn default() -> Self {
-        FetcherBackend::Http
-    }
-}
 
 /// Configuration for a web fetch
 #[derive(Debug, Clone, Default)]

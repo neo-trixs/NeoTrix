@@ -942,7 +942,7 @@ pub fn create_provider(config: ProviderConfig) -> Arc<dyn LlmProvider> {
         }
         log::info!("[factory] provider {:?} routed through proxy {}", config.provider_type, proxy_url);
     }
-    Arc::from(provider)
+    provider
 }
 
 /// Convenience wrapper: create a provider from type + optional API key with default config.

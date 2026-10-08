@@ -570,7 +570,7 @@ impl ExternalAgentManager {
         let session = PooledSession::new(&session_id, agent_id, child);
         self.pool
             .entry(agent_id.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(session);
 
         Ok(session_id)

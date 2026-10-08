@@ -3,6 +3,12 @@ use crate::l2_perception::nt_world::source::engine::MediaSource;
 
 pub struct BandcampSource;
 
+impl Default for BandcampSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BandcampSource {
     pub fn new() -> Self { Self }
 }
@@ -15,7 +21,7 @@ impl MediaSource for BandcampSource {
     fn search(&self, query: &str, page: u32) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<SearchResult, String>> + Send>> {
         let query = query.to_string();
         Box::pin(async move {
-            let url = format!("https://bandcamp.com/api/bcsearch_public_api/1/autocomplete_elastic",);
+            let url = "https://bandcamp.com/api/bcsearch_public_api/1/autocomplete_elastic".to_string();
             let body = serde_json::json!({
                 "search_text": query,
                 "search_filter": "t",

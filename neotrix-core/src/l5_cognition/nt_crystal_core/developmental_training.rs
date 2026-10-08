@@ -110,6 +110,12 @@ pub struct DevelopmentalTrainer {
     counter: u64,
 }
 
+impl Default for DevelopmentalTrainer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DevelopmentalTrainer {
     pub fn new() -> Self {
         Self {

@@ -61,6 +61,12 @@ pub enum TrendDirection {
     Unknown,
 }
 
+impl Default for Extrapolator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Extrapolator {
     pub fn new() -> Self {
         Self {

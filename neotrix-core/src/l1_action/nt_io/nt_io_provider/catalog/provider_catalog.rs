@@ -765,7 +765,7 @@ pub fn lookup_provider_cost(provider_name: &str) -> Option<f64> {
 /// 查询 model 的成本信息 (每千 token 美元)
 pub fn lookup_model_cost(provider_name: &str, model_name: &str) -> Option<f64> {
     PROVIDER_CATALOG.iter()
-        .find(|p| p.name == provider_name && p.models.iter().any(|m| *m == model_name))
+        .find(|p| p.name == provider_name && p.models.contains(&model_name))
         .map(|p| p.capabilities.cost_per_1k_tokens)
 }
 

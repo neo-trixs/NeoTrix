@@ -1413,7 +1413,7 @@ impl ReleasedText {
     #[must_use]
     pub fn digest(&self) -> u64 {
         let code_keys = sorted_keys(
-            self.cut_codes.iter().map(|c| format!("{c}")).collect::<Vec<String>>(),
+            self.cut_codes.iter().map(|c| c.to_string()).collect::<Vec<String>>(),
         );
         Digest::new()
             .section("release")

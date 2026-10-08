@@ -133,7 +133,7 @@ impl JevGate {
         }
 
         // Apply confidence threshold
-        for (_id, decision) in &mut decisions {
+        for decision in decisions.values_mut() {
             self.apply_confidence_threshold(decision);
         }
 

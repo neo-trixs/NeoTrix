@@ -146,7 +146,7 @@ impl _TemplateTagRegistry {
         if self.tags.contains_key(source_tag_id) && self.tags.contains_key(target_tag_id) {
             self.tag_reuse
                 .entry(source_tag_id.to_string())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(target_tag_id.to_string());
         }
     }
@@ -160,7 +160,7 @@ impl _TemplateTagRegistry {
         if self.templates.contains_key(source_template_id) && self.templates.contains_key(target_template_id) {
             self.template_reuse
                 .entry(source_template_id.to_string())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(target_template_id.to_string());
         }
     }

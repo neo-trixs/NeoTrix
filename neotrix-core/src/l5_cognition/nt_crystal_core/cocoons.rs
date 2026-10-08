@@ -243,20 +243,20 @@ impl CocoonStore {
         let mut domain_groups: HashMap<String, Vec<String>> = HashMap::new();
 
         // 按领域分组
-        for (id, _cocoon) in &self.cocoons {
+        for id in self.cocoons.keys() {
             // 从茧ID中提取领域（假设格式为 cocoon-{domain}-{timestamp}）
             let domain = id.split('-').nth(1).unwrap_or("unknown").to_string();
             domain_groups.entry(domain).or_default().push(id.clone());
         }
 
         // 找出需要合并的茧
-        for (_domain, ids) in &domain_groups {
+        for ids in domain_groups.values() {
             let small_cocoons: Vec<String> = ids
                 .iter()
                 .filter(|id| {
                     self.cocoons
                         .get(*id)
-                        .map_or(false, |c| c.memories.len() < min_memories)
+                        .is_some_and(|c| c.memories.len() < min_memories)
                 })
                 .cloned()
                 .collect();

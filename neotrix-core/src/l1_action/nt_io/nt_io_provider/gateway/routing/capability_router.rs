@@ -81,7 +81,7 @@ impl CapabilityRouter {
                         .partial_cmp(&b.capabilities.cost_per_1k_tokens)
                         .unwrap_or(std::cmp::Ordering::Equal),
                 )
-                .then(a.name.cmp(&b.name))
+                .then(a.name.cmp(b.name))
         });
 
         Ok(sorted.first()

@@ -76,7 +76,7 @@ impl DefaultEvalHarnessFactory {
         let name = std::env::var("NT_EVAL_JUDGE_PROVIDER").ok()?;
         let t = LlmProviderType::from_name(&name)?;
         let key = std::env::var("NT_EVAL_JUDGE_API_KEY").ok();
-        Some(Arc::from(create_provider_from_type(t, key)))
+        Some(create_provider_from_type(t, key))
     }
 }
 
@@ -91,10 +91,10 @@ impl EvalHarnessFactory for DefaultEvalHarnessFactory {
                 // ⛔ 不用「随便挑个云厂商」：那会在没配 key 时静默降级成别的模型，
                 //    让「没配 judge」看起来像「配了且跑过了」。
                 // 且闭环钩子只用两个纯函数方法，此 provider 实际不会被调用。
-                Arc::from(create_provider_from_type(
+                create_provider_from_type(
                     LlmProviderType::Ollama,
                     None,
-                )) as Arc<dyn crate::l1_action::nt_io::nt_io_provider::LlmProvider>,
+                ) as Arc<dyn crate::l1_action::nt_io::nt_io_provider::LlmProvider>,
                 "none".into(),
             ),
         };

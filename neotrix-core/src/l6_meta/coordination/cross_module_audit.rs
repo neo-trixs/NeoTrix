@@ -173,9 +173,7 @@ impl CrossModuleAudit {
                         ),
                         affected_modules: vec!["DynamicParams".to_string(), "ScalingRating".to_string()],
                     });
-                    suggestions.push(format!(
-                        "建议调整动态参数或重新标记等级以保持一致"
-                    ));
+                    suggestions.push("建议调整动态参数或重新标记等级以保持一致".to_string());
                 } else {
                     details.push(_CrossModuleDetail {
                         dimension: "动态等级一致性".to_string(),

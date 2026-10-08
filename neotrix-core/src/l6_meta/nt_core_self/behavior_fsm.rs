@@ -40,6 +40,12 @@ pub struct FsmModel {
     pub accepting_states: HashSet<String>,
 }
 
+impl Default for FsmModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FsmModel {
     pub fn new() -> Self {
         Self {
@@ -350,6 +356,12 @@ pub struct FailurePredictor {
     state_failure_rates: HashMap<String, f64>,
     /// 全局失败率
     global_failure_rate: f64,
+}
+
+impl Default for FailurePredictor {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FailurePredictor {

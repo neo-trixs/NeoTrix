@@ -91,7 +91,7 @@ impl AgentLoadBalancer {
         self.stats
             .iter()
             .find(|s| s.agent_id == agent_id)
-            .map(|s| s.active_tasks as u32)
+            .map(|s| s.active_tasks)
             .unwrap_or(0)
     }
 

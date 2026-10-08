@@ -85,18 +85,18 @@ impl SemanticMemoryStore {
         // Update indexes
         self.index_by_domain
             .entry(domain)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(id.clone());
         self.index_by_level
             .entry(level)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(id.clone());
 
         // Update relation graph
         for relation in &memory.relations {
             self.relation_graph
                 .entry(relation.from.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(relation.to.clone());
         }
 

@@ -356,7 +356,7 @@ impl SelfIteratingBrain {
         // 内存内已有 checkpoints (进程内多轮) → 与锚点奖励对比;
         // 空环 (冷启动) → 无条件 re-anchor (P3 语义不变)。
         let decision = self._anchor_decision(&cp);
-        self._last_anchor_decision = Some(decision.clone());
+        self._last_anchor_decision = Some(decision);
         if decision == AnchorDecision::Continue {
             log::info!(
                 "[re-anchor] CONTINUE iter={} reward={:.4} (内存轨迹优于锚点, 保持)",

@@ -196,7 +196,7 @@ fn strip_leading_date(token: &str) -> (Option<&str>, &str) {
     }
     if i > 0
         && bytes.get(i) == Some(&b'.')
-        && bytes.get(i + 1).map_or(false, |b| b.is_ascii_digit())
+        && bytes.get(i + 1).is_some_and(|b| b.is_ascii_digit())
     {
         let mut j = i + 1;
         while j < bytes.len() && bytes[j].is_ascii_digit() {

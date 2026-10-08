@@ -130,6 +130,12 @@ pub struct DeterministicArbitrator {
     counter: u64,
 }
 
+impl Default for DeterministicArbitrator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DeterministicArbitrator {
     pub fn new() -> Self {
         let mut rules = Vec::new();

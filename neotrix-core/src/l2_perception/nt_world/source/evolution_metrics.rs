@@ -7,6 +7,12 @@ pub struct EvolutionMetrics {
     pub source_health: HashMap<String, f64>,
 }
 
+impl Default for EvolutionMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EvolutionMetrics {
     pub fn new() -> Self {
         Self {

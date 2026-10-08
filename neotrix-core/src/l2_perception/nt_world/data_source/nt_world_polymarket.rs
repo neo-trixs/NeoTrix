@@ -172,13 +172,11 @@ pub struct _PolymarketIngestReport {
 
 // ── SearchBackend ────────────────────────────────────────────
 
+#[derive(Default)]
 pub struct PolymarketBackend {
     fetcher: PolymarketFetcher,
 }
 
-impl Default for PolymarketBackend {
-    fn default() -> Self { Self { fetcher: PolymarketFetcher::new() } }
-}
 
 impl PolymarketBackend {
     pub fn new() -> Self { Self::default() }

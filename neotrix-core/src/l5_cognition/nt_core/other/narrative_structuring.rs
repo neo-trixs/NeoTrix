@@ -288,7 +288,7 @@ impl _NarrativeStructuring {
                 CameraMovement::Static
             };
             
-            let duration = (self.config.default_shot_duration as f64 * duration_multiplier) as f64;
+            let duration = (self.config.default_shot_duration as f64 * duration_multiplier);
             
             _ShotUnit {
                 id: format!("shot_{}", i + 1),

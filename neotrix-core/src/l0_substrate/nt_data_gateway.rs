@@ -125,15 +125,11 @@ pub fn mask_dsn(dsn: &str) -> String {
 
 /// 查询权限（默认拒绝写）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub struct QueryPolicy {
     pub allow_write: bool,
 }
 
-impl Default for QueryPolicy {
-    fn default() -> Self {
-        Self { allow_write: false }
-    }
-}
 
 impl QueryPolicy {
     pub fn check_write(&self) -> Result<(), GatewayError> {

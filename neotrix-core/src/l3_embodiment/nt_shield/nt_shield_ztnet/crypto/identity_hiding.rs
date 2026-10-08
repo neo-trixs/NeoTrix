@@ -47,7 +47,7 @@ impl _IdentityHider {
     pub fn _obfuscate_public_key(&self, public_key: &[u8; 32]) -> [u8; 32] {
         use blake2::{Blake2s256, Digest};
         let mut hasher = Blake2s256::new();
-        hasher.update(&self.seed);
+        hasher.update(self.seed);
         hasher.update(public_key);
         let result: [u8; 32] = hasher.finalize().into();
         result

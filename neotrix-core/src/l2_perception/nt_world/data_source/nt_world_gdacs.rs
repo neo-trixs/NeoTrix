@@ -208,13 +208,11 @@ pub struct _GdacsIngestReport {
 
 // ── SearchBackend ────────────────────────────────────────────
 
+#[derive(Default)]
 pub struct GdacsBackend {
     fetcher: GdacsFetcher,
 }
 
-impl Default for GdacsBackend {
-    fn default() -> Self { Self { fetcher: GdacsFetcher::new() } }
-}
 
 impl GdacsBackend {
     pub fn new() -> Self { Self::default() }

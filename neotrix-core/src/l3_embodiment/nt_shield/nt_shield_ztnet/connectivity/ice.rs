@@ -265,8 +265,8 @@ impl _IceAgent {
             _CandidateType::Relay => 0,
         };
 
-        let local_pref = type_pref * 65535 + (65535 - local.address.port() as u32);
-        local_pref
+        
+        type_pref * 65535 + (65535 - local.address.port() as u32)
     }
 
     /// 获取最佳对端

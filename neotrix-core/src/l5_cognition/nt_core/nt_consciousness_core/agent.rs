@@ -60,12 +60,12 @@ impl GapRegistry {
         
         self.gaps_by_dimension
             .entry(gap.dimension.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(gap.clone());
         
         self.gaps_by_severity
             .entry(gap.severity.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(gap);
     }
 

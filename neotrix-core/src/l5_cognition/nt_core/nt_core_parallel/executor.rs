@@ -131,8 +131,8 @@ impl OptimalTaskAllocator {
     fn allocate_by_capability(&self, tasks: &[Task], agents: &[Agent]) -> Vec<(AgentId, Vec<usize>)> {
         let mut allocation: Vec<(AgentId, Vec<usize>)> = agents.iter().map(|a| (a.id.clone(), Vec::new())).collect();
         let mut scores: Vec<(usize, usize, f64)> = Vec::new();
-        for (_ti, _task) in tasks.iter().enumerate() {
-            for (_ai, agent) in agents.iter().enumerate() {
+        for _task in tasks.iter() {
+            for agent in agents.iter() {
                 if agent.busy { continue; }
 //                 scores.push((ti, ai, Self::cosine_similarity(&task.input, &agent.capability)));
             }

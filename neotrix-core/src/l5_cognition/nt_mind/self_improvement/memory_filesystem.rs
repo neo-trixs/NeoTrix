@@ -164,7 +164,7 @@ impl MemoryFilesystem {
         }
 
         let capacity = self.label_capacities.get(&label).copied().unwrap_or(100);
-        let ids = self.label_index.entry(label.clone()).or_insert_with(Vec::new);
+        let ids = self.label_index.entry(label.clone()).or_default();
 
         if ids.len() >= capacity {
             // Evict oldest block by access_count (FIFO fallback)

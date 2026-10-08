@@ -26,15 +26,15 @@ impl GitHook {
 
         // 检查 TODO.md 和 TODO.yml 是否同时被修改但不同步
         let output = Command::new("git")
-            .args(&["diff", "--cached", "--name-only"])
+            .args(["diff", "--cached", "--name-only"])
             .current_dir(&self.root)
             .output()
             .map_err(|e| format!("Failed to run git diff: {}", e))?;
 
         if output.status.success() {
             let changed_files = String::from_utf8_lossy(&output.stdout);
-            if changed_files.contains("TODO.md") || changed_files.contains("TODO.yml") {
-                if todo_md.exists() && todo_yml.exists() {
+            if (changed_files.contains("TODO.md") || changed_files.contains("TODO.yml"))
+                && todo_md.exists() && todo_yml.exists() {
                     // 简单校验：TODO.md 的 [ ] 数量与 TODO.yml 的 pending 总量大致对齐
                     let todo_content = fs::read_to_string(&todo_md)
                         .map_err(|e| format!("Failed to read TODO.md: {}", e))?;
@@ -52,12 +52,11 @@ impl GitHook {
                         ));
                     }
                 }
-            }
         }
 
         // 运行同步
         let output = Command::new("neotrix")
-            .args(&["todo", "sync"])
+            .args(["todo", "sync"])
             .current_dir(&self.root)
             .output()
             .ok();

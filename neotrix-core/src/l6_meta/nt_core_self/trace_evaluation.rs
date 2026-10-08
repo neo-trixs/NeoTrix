@@ -110,6 +110,12 @@ pub struct TraceEvaluator {
     benchmarks: HashMap<String, f64>, // task_type -> baseline_score
 }
 
+impl Default for TraceEvaluator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TraceEvaluator {
     pub fn new() -> Self {
         let mut weights = HashMap::new();

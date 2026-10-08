@@ -318,7 +318,7 @@ impl ResourceRouter {
         self.routing_history.push(record);
         self.trim_history();
 
-        let usage = self.usage_stats.entry(selected.id.clone()).or_insert_with(ResourceUsage::default);
+        let usage = self.usage_stats.entry(selected.id.clone()).or_default();
         usage.total_requests += 1;
 
         result

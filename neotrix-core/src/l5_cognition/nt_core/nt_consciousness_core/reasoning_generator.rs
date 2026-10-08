@@ -77,6 +77,12 @@ pub struct _ReasoningRecord {
     pub timestamp: String,
 }
 
+impl Default for ReasoningGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ReasoningGenerator {
     pub fn new() -> Self {
         Self {

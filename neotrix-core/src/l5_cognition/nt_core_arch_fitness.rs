@@ -211,7 +211,7 @@ fn enclosing_fn_name<'a>(lines: &'a [&'a str], idx: usize) -> Option<&'a str> {
     while i >= 0 {
         let t = lines[i as usize].trim_start();
         if t.starts_with("fn ") || t.contains(" fn ") {
-            let rest = t.splitn(2, "fn ").nth(1)?;
+            let rest = t.split_once("fn ")?.1;
             return rest.split(|c: char| !(c.is_alphanumeric() || c == '_')).next();
         }
         i -= 1;

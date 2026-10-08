@@ -5,8 +5,10 @@ use std::collections::HashMap;
 
 /// 生长阶段
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Default)]
 pub enum GrowthPhase {
     /// 编译通过
+    #[default]
     Compile,
     /// 单元测试通过
     UnitTest,
@@ -22,11 +24,6 @@ pub enum GrowthPhase {
     Autonomous,
 }
 
-impl Default for GrowthPhase {
-    fn default() -> Self {
-        Self::Compile
-    }
-}
 
 impl GrowthPhase {
     pub fn as_str(&self) -> &'static str {
@@ -82,6 +79,12 @@ pub struct GrowthCycle {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityScores {
     pub scores: HashMap<String, f64>,
+}
+
+impl Default for CapabilityScores {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CapabilityScores {
@@ -174,6 +177,12 @@ pub struct CrystalEvolution {
     pub adaptations: Vec<Adaptation>,
     pub current_phase: GrowthPhase,
     next_cycle_id: u64,
+}
+
+impl Default for CrystalEvolution {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CrystalEvolution {

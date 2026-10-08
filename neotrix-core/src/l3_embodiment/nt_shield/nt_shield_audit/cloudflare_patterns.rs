@@ -158,7 +158,7 @@ impl CloudflareAuditEngine {
             self.findings.push(MachineReadableFinding {
                 id: check.id.clone(),
                 title: check.title.clone(),
-                severity: check.severity.clone(),
+                severity: check.severity,
                 cvss_score: Self::severity_to_cvss(&check.severity),
                 domain: check.domain.clone(),
                 description: check.description.clone(),

@@ -284,7 +284,7 @@ impl TradeDataPipeline {
     pub fn with_registry(registry: PlatformRegistry) -> Self {
         Self {
             registry,
-            normalizer: DataNormalizer::default(),
+            normalizer: DataNormalizer,
         }
     }
 

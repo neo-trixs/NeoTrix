@@ -231,7 +231,7 @@ impl AdaptiveSwitching {
         }
 
         // Compute trend from last N improvements
-        let recent: Vec<f64> = self.improvement_history.iter().copied().collect();
+        let recent: Vec<f64> = self.improvement_history.to_vec();
         let avg: f64 = recent.iter().sum::<f64>() / recent.len() as f64;
 
         if current_rate > avg * 1.5 {

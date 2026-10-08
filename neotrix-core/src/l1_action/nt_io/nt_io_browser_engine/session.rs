@@ -105,18 +105,15 @@ pub struct BrowserConfig {
 
 /// 历史保留策略
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Default)]
 pub enum HistoryRetention {
     /// 全量输出（调试用；可能含页面敏感信息）
+    #[default]
     Full,
     /// 仅元数据（output 截断 200 字符；审计用 AuditEvent）
     MetadataOnly,
 }
 
-impl Default for HistoryRetention {
-    fn default() -> Self {
-        HistoryRetention::Full
-    }
-}
 
 impl Default for BrowserConfig {
     fn default() -> Self {

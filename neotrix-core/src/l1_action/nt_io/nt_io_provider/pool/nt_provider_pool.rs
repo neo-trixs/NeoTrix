@@ -181,7 +181,7 @@ impl ProviderPool {
             let gateway_name = format!("{}/{}", entry.provider, entry.model);
             gateway.register_provider_with_category(
                 &gateway_name,
-                provider.into(),
+                provider,
                 is_free,
                 crate::l1_action::nt_io::nt_io_provider::provider_catalog::ProviderCategory::Cloud,
             );

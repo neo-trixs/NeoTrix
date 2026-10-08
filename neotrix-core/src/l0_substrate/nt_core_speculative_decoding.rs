@@ -135,6 +135,12 @@ pub struct SpeculativeDecodingEngine {
     history: Vec<SpeculativeResult>,
 }
 
+impl Default for SpeculativeDecodingEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SpeculativeDecodingEngine {
     pub fn new() -> Self {
         let draft_models = vec![
@@ -268,7 +274,7 @@ impl SpeculativeDecodingEngine {
             total_draft_tokens: draft_tokens.len() as u32,
             accepted_draft_tokens: accepted_count,
             rejected_draft_tokens: rejected_count,
-            acceptance_rate: if draft_tokens.len() > 0 {
+            acceptance_rate: if !draft_tokens.is_empty() {
                 accepted_count as f32 / draft_tokens.len() as f32
             } else {
                 0.0

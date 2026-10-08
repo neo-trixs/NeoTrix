@@ -27,7 +27,7 @@ pub fn chunk_document(doc: &Document, chunk_size: usize, overlap: usize) -> Docu
         // Find a valid UTF-8 boundary (avoid splitting a char).
         let text = if end < len {
             let mut safe_end = end;
-            while safe_end > start && !std::str::from_utf8(&content_bytes[start..safe_end]).is_ok()
+            while safe_end > start && std::str::from_utf8(&content_bytes[start..safe_end]).is_err()
             {
                 safe_end -= 1;
             }

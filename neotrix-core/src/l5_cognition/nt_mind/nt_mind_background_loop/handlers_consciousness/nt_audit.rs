@@ -43,7 +43,7 @@ impl SelfTest for CognitiveLoadMonitorSelfTest {
         }
         // average_load must be within [0, 1]
         let avg = m.average_load();
-        if avg < 0.0 || avg > 1.0 {
+        if !(0.0..=1.0).contains(&avg) {
             failures.push(format!(
                 "cognitive_load_monitor: average_load {} out of range",
                 avg
@@ -333,7 +333,7 @@ impl BackgroundLoopHandle {
         if let Some(ref kb) = self.kb {
             match kb.weave_once() {
                 Ok(report) => {
-                    if report.permanent_links.len() > 0 || report.stale_links_marked.len() > 0 {
+                    if !report.permanent_links.is_empty() || !report.stale_links_marked.is_empty() {
                         log::info!(
                             "[bg] nexus_weave: {} 弱连接标记, {} 强连接永久, {} 新建, {} 强化",
                             report.stale_links_marked.len(),

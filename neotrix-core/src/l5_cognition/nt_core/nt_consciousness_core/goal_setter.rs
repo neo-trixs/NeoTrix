@@ -69,6 +69,12 @@ pub enum _GoalAction {
     Adjusted,
 }
 
+impl Default for GoalSetter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GoalSetter {
     pub fn new() -> Self {
         Self {

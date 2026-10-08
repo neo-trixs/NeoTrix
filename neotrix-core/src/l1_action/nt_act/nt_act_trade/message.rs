@@ -16,18 +16,15 @@ use uuid::Uuid;
 
 /// 消息优先级，影响路由调度顺序
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum MessagePriority {
     Low = 0,
+    #[default]
     Normal = 1,
     High = 2,
     Critical = 3,
 }
 
-impl Default for MessagePriority {
-    fn default() -> Self {
-        Self::Normal
-    }
-}
 
 // ============================================================
 // 2. 消息头 — MessageHeader

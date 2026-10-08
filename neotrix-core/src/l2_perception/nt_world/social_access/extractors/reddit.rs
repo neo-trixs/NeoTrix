@@ -5,6 +5,12 @@ use super::super::traits::{SocialPlatformAdapter, FeedResult, TrendingTopic, Aut
 
 pub struct RedditExtractor;
 
+impl Default for RedditExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RedditExtractor {
     pub fn new() -> Self {
         Self

@@ -143,7 +143,7 @@ impl NegotiationEngine {
         self.round += 1;
         if let Some(c) = concession {
             self.concessions_made.push(c);
-            self.current_quote = self.current_quote - (record.concession.as_ref().map(|c| c.original - c.conceded).unwrap_or(0.0));
+            self.current_quote -= (record.concession.as_ref().map(|c| c.original - c.conceded).unwrap_or(0.0));
         }
 
         record

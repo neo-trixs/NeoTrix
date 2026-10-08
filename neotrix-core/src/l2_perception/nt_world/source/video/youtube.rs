@@ -3,6 +3,12 @@ use crate::l2_perception::nt_world::source::engine::MediaSource;
 
 pub struct YouTubeSource;
 
+impl Default for YouTubeSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl YouTubeSource {
     pub fn new() -> Self { Self }
 }

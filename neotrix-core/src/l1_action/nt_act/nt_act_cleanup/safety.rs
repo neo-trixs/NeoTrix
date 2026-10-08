@@ -210,7 +210,7 @@ pub fn can_remove(
     if excludes(path, excluded) || excludes(&std, excluded) {
         return SafetyVerdict::Reject("excluded");
     }
-    if !path.exists() && !path.symlink_metadata().is_ok() {
+    if !path.exists() && path.symlink_metadata().is_err() {
         return SafetyVerdict::Reject("missing");
     }
     if use_allowlist && !is_safe_to_delete(&resolved, &home_std) {

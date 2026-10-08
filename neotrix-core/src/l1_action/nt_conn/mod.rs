@@ -4,11 +4,10 @@ use std::sync::Mutex;
 use lazy_static::lazy_static;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum ConnectorKind { GitHub, Slack, Webhook, Api, Database, Custom(String) }
+#[derive(Default)]
+pub enum ConnectorKind { #[default]
+GitHub, Slack, Webhook, Api, Database, Custom(String) }
 
-impl Default for ConnectorKind {
-    fn default() -> Self { ConnectorKind::GitHub }
-}
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum ConnectorConfig {

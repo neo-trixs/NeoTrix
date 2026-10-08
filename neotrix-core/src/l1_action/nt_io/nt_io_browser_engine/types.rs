@@ -70,8 +70,10 @@ pub enum BrowserAction {
 
 /// 后端种类
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Default)]
 pub enum BackendKind {
     /// 纯内存占位（默认）：零网络，单测 hermetic
+    #[default]
     Mock,
     /// 真抓取：HTTP + 自研 CookieJar + scraper DOM
     Http,
@@ -81,11 +83,6 @@ pub enum BackendKind {
     Cdp,
 }
 
-impl Default for BackendKind {
-    fn default() -> Self {
-        BackendKind::Mock
-    }
-}
 
 /// 后端能力声明（诚实面：不支持的动作直接报错，不装成功）
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]

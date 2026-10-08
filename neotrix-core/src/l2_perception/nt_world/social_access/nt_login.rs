@@ -222,11 +222,11 @@ pub fn evaluate(target: &LoginTarget, observation: &Observation) -> ProbeOutcome
             SuccessProbe::UrlContains { needle } => observation
                 .current_url
                 .as_deref()
-                .map_or(false, |u| u.contains(needle.as_str())),
+                .is_some_and(|u| u.contains(needle.as_str())),
             SuccessProbe::BodyContains { needle } => observation
                 .body_excerpt
                 .as_deref()
-                .map_or(false, |b| b.contains(needle.as_str())),
+                .is_some_and(|b| b.contains(needle.as_str())),
         };
         if hit {
             matched_by = Some(probe.describe());

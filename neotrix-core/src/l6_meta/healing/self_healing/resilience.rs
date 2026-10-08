@@ -100,7 +100,7 @@ impl ResilienceManager {
                 }
             }
 
-            let result = self.circuit_breaker.call(|| op());
+            let result = self.circuit_breaker.call(&op);
 
             match result {
                 Ok(val) => {

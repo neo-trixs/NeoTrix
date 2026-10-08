@@ -85,11 +85,11 @@ impl TypedMemoryStore {
         if let Some(entry) = self.multitier.get(id) {
             return Some(entry.clone());
         }
-        let result = self.conn.query_row("SELECT id, estate, content, confidence, timestamp, ttl, access_count FROM typed_memory WHERE id=?1", params![id], |row| {
+        
+        self.conn.query_row("SELECT id, estate, content, confidence, timestamp, ttl, access_count FROM typed_memory WHERE id=?1", params![id], |row| {
             let estate_str: String = row.get(1)?;
             Ok(TypedMemoryEntry { id: row.get(0)?, estate: MemoryEstate::from_str(&estate_str), content: row.get(2)?, confidence: row.get(3)?, timestamp: row.get(4)?, ttl: row.get::<_, Option<i64>>(5)?, conflicts: Vec::new(), access_count: row.get(6)? })
-        }).ok();
-        result
+        }).ok()
     }
 
     pub fn get_by_estate(&self, estate: MemoryEstate) -> Vec<TypedMemoryEntry> {

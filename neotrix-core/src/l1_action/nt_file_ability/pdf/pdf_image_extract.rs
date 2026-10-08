@@ -229,7 +229,7 @@ impl<'a> XObjectImageIterator<'a> {
                                                                     .unwrap_or((0, 0))
                                                                     .0;
                                                                 if !callback(
-                                                                    &xobj_dict, page_num, xref,
+                                                                    xobj_dict, page_num, xref,
                                                                 )? {
                                                                     return Ok(());
                                                                 }
@@ -473,7 +473,7 @@ fn is_unicolor(data: &[u8], width: u32, height: u32, channels: u8) -> bool {
     }
 
     // 采样检查 (每 100 像素检查一个)
-    let sample_step = 100.max(1);
+    let sample_step = 100;
     let first_pixel = &data[..channels as usize];
 
     for i in (0..pixel_count).step_by(sample_step) {

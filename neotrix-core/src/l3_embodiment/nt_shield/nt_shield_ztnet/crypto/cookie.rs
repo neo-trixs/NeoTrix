@@ -109,8 +109,8 @@ impl _CookieManager {
     /// cookie = MAC(cookie_key, peer_ip || timestamp)
     pub fn _generate_cookie(&self, peer_ip: IpAddr) -> [u8; COOKIE_SIZE] {
         let mut hasher = Blake2s256::new();
-        hasher.update(&self.cookie_key);
-        hasher.update(&peer_ip.to_string().as_bytes());
+        hasher.update(self.cookie_key);
+        hasher.update(peer_ip.to_string().as_bytes());
         let result: [u8; 32] = hasher.finalize().into();
         let mut cookie = [0u8; COOKIE_SIZE];
         cookie.copy_from_slice(&result[..COOKIE_SIZE]);

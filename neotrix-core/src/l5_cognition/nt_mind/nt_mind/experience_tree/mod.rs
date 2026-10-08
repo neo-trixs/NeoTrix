@@ -90,22 +90,23 @@ impl Provenance {
 
 /// 条目类型: pattern | rule | defect | insight | cycle | artifact
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum EntryType {
     Pattern,
     Rule,
     Defect,
+    #[default]
     Insight,
     Cycle,
     Artifact,
 }
 
-impl Default for EntryType {
-    fn default() -> Self { EntryType::Insight }
-}
 
 /// 7 域 + 扩展域
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum Domain {
+    #[default]
     Core,
     Mind,
     Memory,
@@ -119,9 +120,6 @@ pub enum Domain {
     Nexus,
 }
 
-impl Default for Domain {
-    fn default() -> Self { Domain::Core }
-}
 
 impl std::fmt::Display for Domain {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -144,16 +142,15 @@ impl std::fmt::Display for Domain {
 
 /// 来源: dialogue | audit | research | absorption
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum Source {
+    #[default]
     Dialogue,
     Audit,
     Research,
     Absorption,
 }
 
-impl Default for Source {
-    fn default() -> Self { Source::Dialogue }
-}
 
 /// 快照 — 会话开始时记录的上下文状态。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -362,7 +359,7 @@ pub fn persist(
     let namespace = "experience";
 
     for (i, classified) in classify.entries.iter().enumerate() {
-        let key = format!("branch_{}_{:04x}_{:04x}", cycle, i, (&classified.entry.session_id).chars().take(4).fold(0u16, |acc, c| acc.wrapping_add(c as u16)));
+        let key = format!("branch_{}_{:04x}_{:04x}", cycle, i, classified.entry.session_id.chars().take(4).fold(0u16, |acc, c| acc.wrapping_add(c as u16)));
         let json = serde_json::to_string(&classified.entry)
             .map_err(|e| format!("persist: serialize entry: {e}"))?;
 

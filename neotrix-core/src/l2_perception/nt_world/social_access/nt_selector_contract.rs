@@ -24,7 +24,7 @@
 //!
 //! # 与既有 `BrowserCaps` 的关系
 //!
-//// 核实更正（2026-10-03）：`nt_io_browser_engine::types::BackendCaps`
+//! 核实更正（2026-10-03）：`nt_io_browser_engine::types::BackendCaps`
 //! **已经**是一个后端能力契约（`javascript`/`screenshot`/`form_submit`/`cookie_persist`），
 //! 即 lightpanda 那条「CDP 契约」设计**早已吸收**，只是命名不同。
 //! （此前我在 LICENSES.md 记为「未落地」，是**搜错了字符串**，已更正。）

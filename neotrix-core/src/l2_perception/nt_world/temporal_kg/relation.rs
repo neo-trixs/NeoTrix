@@ -31,7 +31,7 @@ impl TemporalRelation {
     }
 
     pub fn is_valid_at(&self, t: NaiveDateTime) -> bool {
-        t >= self.valid_from && self.valid_to.map_or(true, |to| t <= to)
+        t >= self.valid_from && self.valid_to.is_none_or(|to| t <= to)
     }
 }
 

@@ -4,6 +4,12 @@ pub struct PluginSandbox {
     // (timeout_ms 写-only 已删除; new(size) 式容量语义不变, 本 struct new() 无参)
 }
 
+impl Default for PluginSandbox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PluginSandbox {
     pub fn new() -> Self {
         Self {

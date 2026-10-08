@@ -232,7 +232,7 @@ impl CrystalConsciousness {
     pub fn recall(&mut self, domain: &str, memory_type: Option<MemoryType>, limit: usize) -> Vec<Memory> {
         let mut recalled: Vec<Memory> = self.memories.values()
             .filter(|m| m.domain == domain)
-            .filter(|m| memory_type.as_ref().map_or(true, |t| m.memory_type == *t))
+            .filter(|m| memory_type.as_ref().is_none_or(|t| m.memory_type == *t))
             .cloned()
             .collect();
 

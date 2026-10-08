@@ -65,7 +65,7 @@ impl _TurnMessage {
             _TurnMethod::ChannelBind => 0x0009,
         };
 
-        buf.put_u16(0x0000 | method_num);
+        buf.put_u16(method_num);
         buf.put_u16(0);  // Length placeholder
         buf.put_u32(0x2112A442);  // Magic Cookie
         buf.put_slice(&self.transaction_id);

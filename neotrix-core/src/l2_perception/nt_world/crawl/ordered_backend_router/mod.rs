@@ -151,7 +151,7 @@ impl OrderedBackendRouter {
         // 检查是否需要全量健康检查
         let needs_check = {
             let last = self.last_full_check.read().await;
-            last.map_or(true, |t| t.elapsed() > self.check_interval)
+            last.is_none_or(|t| t.elapsed() > self.check_interval)
         };
 
         if needs_check {

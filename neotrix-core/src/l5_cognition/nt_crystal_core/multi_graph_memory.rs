@@ -19,6 +19,12 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MemoryNodeId(pub String);
 
+impl Default for MemoryNodeId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemoryNodeId {
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
@@ -126,6 +132,12 @@ pub struct Graph<E: Clone> {
     pub edges: Vec<(MemoryNodeId, MemoryNodeId, E)>,
 }
 
+impl<E: Clone> Default for Graph<E> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<E: Clone> Graph<E> {
     pub fn new() -> Self {
         Self {
@@ -187,6 +199,12 @@ pub struct MultiGraphMemory {
 
     /// 实体索引 (实体→节点列表)
     pub entity_index: HashMap<String, Vec<MemoryNodeId>>,
+}
+
+impl Default for MultiGraphMemory {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MultiGraphMemory {

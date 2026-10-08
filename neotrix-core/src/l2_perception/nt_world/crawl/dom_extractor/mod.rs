@@ -121,12 +121,12 @@ impl DOMExtractor {
     pub async fn extract(&mut self, _page_content: &str) -> Vec<ExtractedItem> {
         // 这里模拟从 page_content 中解析
         // 实际实现应调用 browser-act 的 extract-tweets.py 脚本
-        let items = Vec::new();
+        
         
         // 简化：从 HTML 中提取数据
         // 实际应使用类似 browser-act 的 React Fiber 访问
         
-        items
+        Vec::new()
     }
 
     /// 滚动分页提取循环

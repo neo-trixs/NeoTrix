@@ -378,13 +378,13 @@ impl JoinfExtractor {
         };
 
         // 创建 Selenium 会话
-        let mut session = SeleniumSession::new(config).map_err(|e| JoinfError::Selenium(e))?;
+        let mut session = SeleniumSession::new(config).map_err(JoinfError::Selenium)?;
 
         // 执行登录
         session
             .login(&login_url, username, password)
             .await
-            .map_err(|e| JoinfError::Selenium(e))?;
+            .map_err(JoinfError::Selenium)?;
 
         // 提取 Cookie
         let cookies = session.extract_cookies().await;
@@ -450,7 +450,7 @@ impl JoinfExtractor {
     pub async fn close_session(&self) -> std::result::Result<(), JoinfError> {
         let sess = self.selenium.read().await;
         if let Some(ref session) = *sess {
-            session.close().await.map_err(|e| JoinfError::Selenium(e))?;
+            session.close().await.map_err(JoinfError::Selenium)?;
         }
         let mut sess = self.selenium.write().await;
         *sess = None;

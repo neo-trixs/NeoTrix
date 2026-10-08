@@ -551,6 +551,7 @@ pub struct InquiryMetadata {
 
 /// 产品
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct Product {
     pub code: String,
     pub category: ProductCategory,
@@ -567,25 +568,6 @@ pub struct Product {
     pub grade: String,
 }
 
-impl Default for Product {
-    fn default() -> Self {
-        Self {
-            code: String::new(),
-            category: ProductCategory::default(),
-            subcategory: String::new(),
-            model: String::new(),
-            materials: Vec::new(),
-            drive_type: DriveType::default(),
-            connection_type: ConnectionType::default(),
-            standard: String::new(),
-            pressure: PressureRating::default(),
-            size: SizeSpec::default(),
-            price: PriceInfo::default(),
-            supplier_id: String::new(),
-            grade: String::new(),
-        }
-    }
-}
 
 /// 供应商
 #[derive(Debug, Clone, Serialize, Deserialize)]

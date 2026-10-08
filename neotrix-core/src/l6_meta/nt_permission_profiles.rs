@@ -417,7 +417,7 @@ pub fn switch_profile_with_audit(name: &str, actor: &str) -> Result<String, Stri
     // 留痕：无论是否改动审批模式都记一笔（审计要能回答「谁在什么时候切到了什么」）
     let mut msg = format!("Switched to profile: {name}");
     if let Some(n) = &plan.notice {
-        msg.push_str("\n");
+        msg.push('\n');
         msg.push_str(n);
     }
     msg.push_str(&format!(

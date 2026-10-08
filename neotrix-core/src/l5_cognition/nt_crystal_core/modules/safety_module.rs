@@ -7,6 +7,12 @@ pub struct NtSafetyModule {
     violations: Mutex<u64>,
 }
 
+impl Default for NtSafetyModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NtSafetyModule {
     pub fn new() -> Self {
         Self {

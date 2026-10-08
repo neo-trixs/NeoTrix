@@ -112,9 +112,9 @@ impl SalienceCalculator {
     }
 
     /// Score multiple entries, returning (index, score) pairs sorted descending.
-    pub fn score_all<'a, E: SalienceEntry>(
+    pub fn score_all<E: SalienceEntry>(
         &self,
-        entries: &'a [E],
+        entries: &[E],
     ) -> Vec<(usize, f64)> {
         let mut scored: Vec<(usize, f64)> = entries
             .iter()

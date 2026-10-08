@@ -163,7 +163,7 @@ fn extract_key_facts(content: &str) -> Vec<String> {
     for sentence in content.split(['。', '！', '？', '.', '!', '?', '\n']) {
         let s = sentence.trim();
         let len = s.chars().count();
-        if len >= 4 && len <= 200 {
+        if (4..=200).contains(&len) {
             facts.push(s.to_string());
         }
     }

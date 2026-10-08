@@ -668,7 +668,7 @@ impl GatewayV2 {
             let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
             provider_names.iter().filter_map(|name| {
                 states.get(name).and_then(|s| {
-                    if matches!(s.circuit_breaker.state(), BreakerState::Open { .. }) {
+                    if matches!(s.circuit_breaker.state(), BreakerState::Open) {
                         let saved = s.circuit_breaker.half_open_max_probes();
                         Some((name.clone(), saved))
                     } else { None }
@@ -866,7 +866,7 @@ impl GatewayV2 {
     async fn attempt_aggressive_retry_stream(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let provider_names: Vec<String> = { let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() }); states.keys().cloned().collect() };
         if provider_names.is_empty() { return Err(LlmError::Unknown("No providers available for aggressive retry".to_string())); }
-        let set_aggressive: Vec<(String, u64)> = { let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() }); provider_names.iter().filter_map(|name| { states.get(name).and_then(|s| { if matches!(s.circuit_breaker.state(), BreakerState::Open { .. }) { let saved = s.circuit_breaker.half_open_max_probes(); Some((name.clone(), saved)) } else { None } }) }).collect() };
+        let set_aggressive: Vec<(String, u64)> = { let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() }); provider_names.iter().filter_map(|name| { states.get(name).and_then(|s| { if matches!(s.circuit_breaker.state(), BreakerState::Open) { let saved = s.circuit_breaker.half_open_max_probes(); Some((name.clone(), saved)) } else { None } }) }).collect() };
         { let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() }); for (name, _) in &set_aggressive { if let Some(state) = states.get_mut(name) { state.circuit_breaker.set_half_open_max_probes(5); state.circuit_breaker.cooldown_reset(); } } }
         for name in &provider_names {
             { let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() }); if let Some(state) = states.get_mut(name) { if !state.rate_limiter.allow_request(10.0) { continue; } } }
@@ -1310,6 +1310,12 @@ pub struct UniversalAdapter {
     models: Vec<AdapterModelConfig>,
     active_model: Option<String>,
     converters: HashMap<String, Box<dyn FormatConverter>>,
+}
+
+impl Default for UniversalAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl UniversalAdapter {

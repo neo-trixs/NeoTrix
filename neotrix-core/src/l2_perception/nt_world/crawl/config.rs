@@ -90,17 +90,14 @@ impl CrawlFormat {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum CrawlStrategy {
     Polite,
+    #[default]
     Balanced,
     Aggressive,
 }
 
-impl Default for CrawlStrategy {
-    fn default() -> Self {
-        CrawlStrategy::Balanced
-    }
-}
 
 impl CrawlStrategy {
     pub fn delay_ms(&self) -> u64 {

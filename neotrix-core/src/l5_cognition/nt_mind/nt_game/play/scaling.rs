@@ -67,7 +67,7 @@ impl ScalingScheduler {
     /// has been reached. Returns the new horizon after potential scaling.
     pub fn maybe_scale(&mut self) -> usize {
         self.step_count += 1;
-        if self.step_count % self.config.scaling_interval == 0 {
+        if self.step_count.is_multiple_of(self.config.scaling_interval) {
             self.current_horizon =
                 (self.current_horizon + self.config.step_size).min(self.config.max_horizon);
         }

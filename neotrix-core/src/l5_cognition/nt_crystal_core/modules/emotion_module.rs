@@ -8,6 +8,12 @@ pub struct NtEmotionModule {
     dominance: Mutex<f64>,
 }
 
+impl Default for NtEmotionModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NtEmotionModule {
     pub fn new() -> Self {
         Self {
@@ -39,7 +45,7 @@ impl CTMModule for NtEmotionModule {
             _ => 0.0,
         });
 
-        let new_arousal = input_arousal.unwrap_or_else(|| match input.chunk_type {
+        let new_arousal = input_arousal.unwrap_or(match input.chunk_type {
             ChunkType::Override => 0.9,
             ChunkType::Safety => 0.7,
             ChunkType::Perception => 0.6,

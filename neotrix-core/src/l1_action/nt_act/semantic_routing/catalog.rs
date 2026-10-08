@@ -46,13 +46,13 @@ impl PatternCatalog {
         let pattern_type = pattern.pattern_type.clone();
         self.patterns_by_type
             .entry(pattern_type.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(pattern.clone());
 
         for skill_id in &pattern.associated_skills {
             self.patterns_by_skill
                 .entry(skill_id.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(pattern.clone());
         }
     }
@@ -76,7 +76,7 @@ impl PatternCatalog {
         }
         self.skill_patterns
             .entry(skill_id.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(pattern_id);
     }
 

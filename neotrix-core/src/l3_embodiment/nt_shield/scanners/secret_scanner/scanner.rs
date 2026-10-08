@@ -108,7 +108,7 @@ impl SecretScanner {
             }
 
             if let Some(ext) = entry_path.extension().and_then(|e| e.to_str()) {
-                if extensions.iter().any(|e| *e == ext) {
+                if extensions.contains(&ext) {
                     report.files_scanned += 1;
                     let findings = self.scan_file(&entry_path);
                     let _file_key = entry_path.to_string_lossy().to_string();

@@ -237,7 +237,7 @@ impl DomainModelingContext {
         for c in &adr.consequences {
             content.push_str(&format!("- {}\n", c));
         }
-        content.push_str("\n");
+        content.push('\n');
         
         if !adr.alternatives.is_empty() {
             content.push_str("## Alternatives Considered\n");
@@ -247,7 +247,7 @@ impl DomainModelingContext {
                 for p in &alt.pros { content.push_str(&format!("- {}\n", p)); }
                 content.push_str("**Cons**:\n");
                 for c in &alt.cons { content.push_str(&format!("- {}\n", c)); }
-                content.push_str("\n");
+                content.push('\n');
             }
         }
         
@@ -339,7 +339,7 @@ impl DomainModelingEngine {
         if self.context.adr_dir.exists() {
             for entry in std::fs::read_dir(&self.context.adr_dir)? {
                 let entry = entry?;
-                if entry.path().extension().map_or(false, |e| e == "md") {
+                if entry.path().extension().is_some_and(|e| e == "md") {
                     let content = std::fs::read_to_string(entry.path())?;
                     if let Some(adr) = self.parse_adr_file(&content, entry.path()) {
                         self.context.adrs.insert(adr.id.clone(), adr);

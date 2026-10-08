@@ -8,7 +8,9 @@ use std::collections::HashMap;
 
 /// 资产类型枚举
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Default)]
 pub enum AssetType {
+    #[default]
     Domain,
     Ip,
     Port,
@@ -23,11 +25,6 @@ pub enum AssetType {
     Onion,
 }
 
-impl Default for AssetType {
-    fn default() -> Self {
-        AssetType::Domain
-    }
-}
 
 /// 统一资产实体
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

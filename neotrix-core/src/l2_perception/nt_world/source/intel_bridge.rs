@@ -208,7 +208,7 @@ impl IntelSource for UsgsBridge {
 
             let mut items = Vec::new();
             if let Some(features) = json["features"].as_array() {
-                for (_i, feature) in features.iter().enumerate() {
+                for feature in features.iter() {
                     let props = &feature["properties"];
                     let geometry = &feature["geometry"];
 
@@ -777,7 +777,7 @@ impl IntelSource for AoiBridge {
 
                     let (lat, lon) = coords
                         .map(|c| {
-                            let lon = c.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0);
+                            let lon = c.first().and_then(|v| v.as_f64()).unwrap_or(0.0);
                             let lat = c.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0);
                             (lat, lon)
                         })

@@ -43,7 +43,7 @@ impl EntityManager {
     }
 
     pub fn is_alive(&self, id: EntityId) -> bool {
-        self.entities.get(&id).map_or(false, |e| e.alive)
+        self.entities.get(&id).is_some_and(|e| e.alive)
     }
 
     pub fn tag(&mut self, id: EntityId, tag: &str) {
@@ -55,7 +55,7 @@ impl EntityManager {
     pub fn has_tag(&self, id: EntityId, tag: &str) -> bool {
         self.entities
             .get(&id)
-            .map_or(false, |e| e.tags.contains(&tag.to_string()))
+            .is_some_and(|e| e.tags.contains(&tag.to_string()))
     }
 
     pub fn count(&self) -> usize {

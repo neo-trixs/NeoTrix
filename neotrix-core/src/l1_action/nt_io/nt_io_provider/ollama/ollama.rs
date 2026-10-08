@@ -95,15 +95,14 @@ impl LlmProvider for OllamaProvider {
 
                 let tool_calls = resp.get("message")
                     .and_then(|m| m.get("tool_calls"))
-                    .map(|tc| match serde_json::from_value::<Vec<super::types::ToolCallInfo>>(tc.clone()) {
+                    .and_then(|tc| match serde_json::from_value::<Vec<super::types::ToolCallInfo>>(tc.clone()) {
                         Ok(v) if !v.is_empty() => Some(v),
                         Ok(_) => None,
                         Err(e) => {
                             log::debug!("[ollama] tool_calls deserialization failed (non-fatal): {}", e);
                             None
                         }
-                    })
-                    .flatten();
+                    });
 
                 let prompt_tokens = resp.get("prompt_eval_count").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 let completion_tokens = resp.get("eval_count").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
@@ -182,15 +181,14 @@ impl LlmProvider for OllamaProvider {
                             let content = v["message"]["content"].as_str().unwrap_or("").to_string();
                             let tool_calls = v.get("message")
                                 .and_then(|m| m.get("tool_calls"))
-                                .map(|tc| match serde_json::from_value::<Vec<super::types::ToolCallInfo>>(tc.clone()) {
+                                .and_then(|tc| match serde_json::from_value::<Vec<super::types::ToolCallInfo>>(tc.clone()) {
                                     Ok(v) if !v.is_empty() => Some(v),
                                     Ok(_) => None,
                                     Err(e) => {
                                         log::debug!("[ollama] streaming tool_calls deserialization failed (non-fatal): {}", e);
                                         None
                                     }
-                                })
-                                .flatten();
+                                });
 
                             if !content.is_empty() || tool_calls.is_some() {
                                 let finish_reason = if tool_calls.is_some() {

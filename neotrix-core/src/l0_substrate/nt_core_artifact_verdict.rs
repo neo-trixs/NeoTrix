@@ -245,7 +245,7 @@ impl VerdictRecord {
         }
         // 位置序**规范化**：同一事实的引用集合不因组装顺序而漂移
         // （`sorted_keys` 纪律的同一条，直接作用于证据列表）。
-        let refs = sorted_keys(evidence_refs.into_iter());
+        let refs = sorted_keys(evidence_refs);
         Self {
             code: code.into(),
             subject: subject.into(),

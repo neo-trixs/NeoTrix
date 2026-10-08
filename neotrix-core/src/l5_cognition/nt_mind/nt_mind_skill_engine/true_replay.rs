@@ -59,6 +59,12 @@ pub struct _TrueReplayValidator {
     candidate_runner: Option<Arc<dyn _CandidateRunner>>,
 }
 
+impl Default for _TrueReplayValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl _TrueReplayValidator {
     pub fn new() -> Self {
         Self {

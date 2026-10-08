@@ -3,6 +3,12 @@ use crate::l2_perception::nt_world::source::engine::MediaSource;
 
 pub struct GeniusSource;
 
+impl Default for GeniusSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GeniusSource {
     pub fn new() -> Self { Self }
 }

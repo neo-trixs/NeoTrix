@@ -169,7 +169,7 @@ impl _LongTermMemory {
 
         // 按类型分类
         let category = format!("{:?}", item.memory_type);
-        self.categories.entry(category).or_insert_with(Vec::new).push(item.id.clone());
+        self.categories.entry(category).or_default().push(item.id.clone());
     }
 
     /// 获取记忆项

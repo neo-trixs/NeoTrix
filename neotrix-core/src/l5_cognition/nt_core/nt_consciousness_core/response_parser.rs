@@ -148,7 +148,7 @@ impl ResponseParser {
         let len = stripped.len();
         
         for size in 4..=(len / 2) {
-            if len % size == 0 {
+            if len.is_multiple_of(size) {
                 let repeats = len / size;
                 let piece = &stripped[..size];
                 if (repeats >= 3 || piece.len() >= 12) 

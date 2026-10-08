@@ -91,7 +91,7 @@ impl TickSchedule {
             TickTier::Slow => self.slow_interval,
             TickTier::Background => self.background_interval,
         };
-        self.tick % interval == 0
+        self.tick.is_multiple_of(interval)
     }
 
     /// Get the current tick number

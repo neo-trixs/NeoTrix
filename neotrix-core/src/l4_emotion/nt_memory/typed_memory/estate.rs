@@ -4,9 +4,11 @@ use serde::{Deserialize, Serialize};
 
 /// Memory estates — typed semantic memory categories.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum MemoryEstate {
     Procedural,
     Episodic,
+    #[default]
     Semantic,
     Working,
     Reflexive,
@@ -39,9 +41,6 @@ impl MemoryEstate {
     }
 }
 
-impl Default for MemoryEstate {
-    fn default() -> Self { Self::Semantic }
-}
 
 #[cfg(test)]
 mod tests {
