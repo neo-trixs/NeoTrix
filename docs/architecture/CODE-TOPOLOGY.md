@@ -259,11 +259,14 @@ python3 scripts/ops/nt_topology.py   # → 本文件
 
 ⚠️ **归并不是免费的**：`Severity` 散在 L1/L3 与两个 crate，合并会改公开 API 与跨层依赖方向 ⇒ 需逐组评估，不宜批量脚本化。
 
+
+<!-- MANUAL-BEGIN -->
+
 ---
 
 ## 维度 6 · 运行时语义（手写段，2026-10-08）
 
-> ⚠️ 本节由人工维护，**重跑 `nt_topology.py` 会覆盖**（2026-10-08 实测已被覆盖一次，已补回）。
+> ✅ 本节已被 `nt_topology.py` 手写段保留区保护（`<!-- MANUAL-BEGIN/END -->`），重跑不再丢失。
 > 正文源文档：`docs/architecture/ABSORPTION-TODOS-DEV-2026-10-08.md` §3。
 
 todos.dev 的「任务→agent→worktree→进度可视化」四元组是本地图的运行时语义：
@@ -275,3 +278,4 @@ todos.dev 的「任务→agent→worktree→进度可视化」四元组是本地
    35 条谓词的 PASS/VIOLATED 即健康面；本轮实测 35 holds / 0 violated。
 3. **`nt_find.py`（84 条意图索引）= local Chief**：意图→工具路由即「Chief 拆任务」
    的本地等价物；缺的是「单点入口」的文档化声明（TODO.md 顶部已补吸收入口指针）。
+<!-- MANUAL-END -->

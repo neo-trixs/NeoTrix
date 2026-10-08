@@ -748,6 +748,21 @@ def main():
       "合并会改公开 API 与跨层依赖方向 ⇒ 需逐组评估，不宜批量脚本化。")
     A("")
 
+    # 手写段保留区（2026-10-08 加固）：用 <!-- MANUAL-BEGIN --> ... <!-- MANUAL-END -->
+    # 包裹的内容在重建时原样保留（旧位置会丢失 ⇒ 一律移到文件尾的保留区重组）。
+    _manual = []
+    if os.path.exists(OUT):
+        _old = open(OUT, encoding="utf-8").read()
+        _manual = re.findall(
+            r"<!-- MANUAL-BEGIN -->.*?<!-- MANUAL-END -->", _old, re.DOTALL)
+    if _manual:
+        L.append("")
+        L.append("<!-- MANUAL-BEGIN -->")
+        for block in _manual:
+            L.append(block[block.index("-->") + 3:].rsplit("<!--", 1)[0].rstrip())
+        L.append("<!-- MANUAL-END -->")
+        print(f"  [topology] preserved {len(_manual)} manual block(s)")
+
     with open(OUT, "w", encoding="utf-8") as fh:
         fh.write("\n".join(L))
     print(f"[topology] -> {OUT}  ({len(L)} lines)")
