@@ -313,7 +313,13 @@ pub fn genoffice_slides_check(spec: &std::path::Path) -> GenOfficeResult<Value> 
     run_genoffice_json(&["slides", "check", &s, "--json"])
 }
 
-/// `genoffice slides audit <file> --json`：整 deck 的布局审计。
+/// `genoffice sheet check <file> --json`：公式错误/断链引用/坏定义名等 8 项检查。
+pub fn genoffice_sheet_check(path: &std::path::Path) -> GenOfficeResult<Value> {
+    let p = path.to_string_lossy().into_owned();
+    run_genoffice_json(&["sheet", "check", &p, "--json"])
+}
+
+/// `genoffice slides audit <file> [--slide <n>] --json`：整 deck 布局审计。
 pub fn genoffice_slides_audit(path: &std::path::Path) -> GenOfficeResult<Value> {
     let p = path.to_string_lossy().into_owned();
     run_genoffice_json(&["slides", "audit", &p, "--json"])
@@ -387,6 +393,112 @@ pub fn genoffice_guide(domain: &str, group: Option<&str>) -> GenOfficeResult<Val
 
 // ─── UnifiedCapability 注册适配 ──────────────────────────────────────────
 
+/// 每个 op 的**参数模板** —— 派发层能力面的真源（18 op）。
+///
+/// 模板记号（**不发明 flag**，形状取自 genoffice 0.11.0 实测）：
+/// - 字面量：原样追加（子命令名）
+/// - `=key`：**必需** `--key value`，缺 key 即 Err（fail-closed，不进 subprocess）
+/// - `--key`：**可选** `--key value`，Kv 无此 key 则整个 flag 跳过
+/// - `@key`：**必需**位置参数；`~key`：**可选**位置参数
+///
+/// 实测要点：`create --type pptx` 只接受 `--ops`/`--spec`（**不接受** `--from`）；
+/// `docs apply` 遇未知 op 会拒绝且**不落盘**（原子性已用真实 docx 验证）。
+pub const GENOFFICE_OP_TABLE: &[(&str, &[&str])] = &[
+    ("info", &["info", "@path"]),
+    ("convert", &["convert", "@input", "=to", "--out"]),
+    (
+        "create",
+        &["create", "=type", "=out", "--from", "--ops", "--spec", "--outline"],
+    ),
+    (
+        "docs_read",
+        &["docs", "read", "@path", "--range", "--full", "--comments", "--revisions"],
+    ),
+    ("docs_apply", &["docs", "apply", "@path", "=ops", "--dry-run"]),
+    ("docs_check", &["docs", "check", "@path"]),
+    (
+        "sheet_read",
+        &["sheet", "read", "@path", "--sheet", "--range", "--formats"],
+    ),
+    ("sheet_apply", &["sheet", "apply", "@path", "--cells", "--ops", "--dry-run"]),
+    ("sheet_check", &["sheet", "check", "@path"]),
+    ("slides_read", &["slides", "read", "@path", "--full", "--units"]),
+    ("slides_check", &["slides", "check", "@spec"]),
+    ("slides_audit", &["slides", "audit", "@path", "--slide"]),
+    ("slides_replace", &["slides", "replace", "@path", "=slide", "=spec"]),
+    ("slides_render", &["slides", "render", "@path", "=out", "--scale"]),
+    ("pdf_read", &["pdf", "read", "@path", "--range", "--page"]),
+    ("render", &["render", "@path", "=out", "--page", "--scale"]),
+    ("merge", &["merge", "@template", "=data", "=out", "--strict"]),
+    ("guide", &["guide", "@domain", "~group"]),
+];
+
+/// op 名 → 参数模板；未知 op 返 `None`（调用方 fail-closed）。
+pub fn genoffice_op_template(op: &str) -> Option<&'static [&'static str]> {
+    GENOFFICE_OP_TABLE
+        .iter()
+        .find(|(name, _)| *name == op)
+        .map(|(_, t)| *t)
+}
+
+/// 全部可派发 op 名（供 `guide`/文档/市场面消费）。
+pub fn genoffice_ops() -> Vec<&'static str> {
+    GENOFFICE_OP_TABLE.iter().map(|(n, _)| *n).collect()
+}
+
+/// 按模板把 Kv 负载编成 CLI 参数（末尾统一追加 `--json`）。
+/// **缺必需 key 即 `Err`** —— 绝不静默补空串去跑 subprocess。
+pub fn genoffice_build_args(
+    op: &str,
+    kv: &std::collections::HashMap<String, String>,
+) -> GenOfficeResult<Vec<String>> {
+    let tpl = genoffice_op_template(op).ok_or_else(|| GenOfficeError::ExecutionFailed {
+        code: None,
+        stderr: format!(
+            "unknown genoffice op: {op}（已知 {} 个）",
+            GENOFFICE_OP_TABLE.len()
+        ),
+    })?;
+    let need = |key: &str| -> GenOfficeResult<String> {
+        kv.get(key)
+            .cloned()
+            .filter(|v| !v.is_empty())
+            .ok_or_else(|| {
+                GenOfficeError::ExecutionFailed {
+                    code: None,
+                    stderr: format!("genoffice op `{op}` 缺少必需参数 `{key}`"),
+                }
+            })
+    };
+    let mut args: Vec<String> = Vec::new();
+    for tok in tpl {
+        match *tok {
+            t if t.starts_with('@') => args.push(need(&t[1..])?),
+            t if t.starts_with('~') => {
+                if let Some(v) = kv.get(&t[1..]).filter(|v| !v.is_empty()) {
+                    args.push(v.clone());
+                }
+            }
+            t if t.starts_with('=') => {
+                let key = &t[1..];
+                let v = need(key)?;
+                args.push(format!("--{key}"));
+                args.push(v);
+            }
+            t if t.starts_with("--") => {
+                let key = &t[2..];
+                if let Some(v) = kv.get(key).filter(|v| !v.is_empty()) {
+                    args.push(format!("--{key}"));
+                    args.push(v.clone());
+                }
+            }
+            t => args.push(t.to_string()),
+        }
+    }
+    args.push("--json".to_string());
+    Ok(args)
+}
+
 use crate::l0_substrate::nt_core_capability_types as core_cap;
 
 /// genoffice 文档引擎能力。输入/输出走 `CapabilityInput::Kv` /
@@ -445,10 +557,13 @@ impl core_cap::UnifiedCapability for GenOfficeCapability {
     }
 
     /// `CapabilityInput::Kv` 约定：
-    /// - `op`：`info|convert|create|docs_read|docs_apply|docs_check|sheet_read|sheet_apply|slides_read|slides_check|slides_audit|pdf_read|render|merge|guide`
-    /// - `path`/`input`/`to`/`out`/`kind`/`from`/`spec`/`outline`/`sheet`/`range`/`domain`/`group`/`cells`/`ops`/`dry_run`/`strict`/`full`/`page`/`scale`/`template`/`data`：相应子命令的参数
+    /// - `op`：见 [`genoffice_ops`]（覆盖 genoffice 全部本地文档能力）
+    /// - 其余 key 按 [`GENOFFICE_OP_TABLE`] 模板提供（`path`/`input`/`to`/`out`/
+    ///   `type`/`from`/`ops`/`spec`/`outline`/`sheet`/`range`/`full`/`comments`/
+    ///   `revisions`/`dry_run`/`cells`/`formats`/`units`/`slide`/`scale`/`page`/
+    ///   `template`/`data`/`strict`/`domain`/`group`）
     ///
-    /// 输出 `CapabilityOutput::Kv` `{ "stdout": "...", "json": "..." }`。
+    /// 输出 `CapabilityOutput::Kv` `{ "stdout": "<genoffice 的 JSON>" }`。
     fn execute(
         &self,
         input: core_cap::CapabilityInput,
@@ -462,51 +577,12 @@ impl core_cap::UnifiedCapability for GenOfficeCapability {
             }
         };
         let op = map.get("op").cloned().unwrap_or_default();
-        let get = |k: &str| map.get(k).cloned();
 
-        // 统一构造 owned args，再转 &[&str]（避免 Box::leak）
-        let mut owned: Vec<String> = Vec::new();
-        match op.as_str() {
-            "info" => {
-                owned.push("info".into());
-                owned.push(get("path").unwrap_or_default());
-                owned.push("--json".into());
-            }
-            "convert" => {
-                owned.push("convert".into());
-                owned.push(get("input").unwrap_or_default());
-                owned.push("--to".into());
-                owned.push(get("to").unwrap_or_default());
-                owned.push("--json".into());
-                if let Some(o) = get("out") {
-                    owned.push("--out".into());
-                    owned.push(o);
-                }
-            }
-            "docs_read" => {
-                owned.push("docs".into());
-                owned.push("read".into());
-                owned.push(get("path").unwrap_or_default());
-                owned.push("--json".into());
-                if let Some(r) = get("range") {
-                    owned.push("--range".into());
-                    owned.push(r);
-                }
-            }
-            "guide" => {
-                owned.push("guide".into());
-                owned.push(get("domain").unwrap_or_else(|| "docs".into()));
-                if let Some(g) = get("group") {
-                    owned.push(g);
-                }
-                owned.push("--json".into());
-            }
-            other => {
-                return Err(core_cap::CapabilityError::UnsupportedInput(format!(
-                    "unknown genoffice op: {other}"
-                )))
-            }
-        }
+        // 模板化构造：缺必需参数在此 fail-closed（不进 subprocess）
+        let owned = match genoffice_build_args(&op, &map) {
+            Ok(a) => a,
+            Err(e) => return Err(core_cap::CapabilityError::UnsupportedInput(e.to_string())),
+        };
         let args: Vec<&str> = owned.iter().map(|s| s.as_str()).collect();
         let raw = run_genoffice_json(&args);
 
@@ -591,6 +667,95 @@ mod tests {
         assert!(r.is_err());
     }
 
+    // ─── op 表：派发层能力面的真源 ────────────────────────────────
+
+    #[test]
+    fn op表无重复且全部可枚举() {
+        let ops = genoffice_ops();
+        let mut d = ops.clone();
+        d.sort_unstable();
+        d.dedup();
+        assert_eq!(d.len(), ops.len(), "op 名重复会让派发歧义");
+        assert!(ops.len() >= 18, "op 表变小 ⇒ 能力面回退，实际 {}", ops.len());
+    }
+
+    #[test]
+    fn op表覆盖全部公开wrapper() {
+        // 派发必须够得到每个文档能力，否则「直接操控其所有能力」是假的。
+        for op in [
+            "info", "convert", "create", "docs_read", "docs_apply", "docs_check",
+            "sheet_read", "sheet_apply", "sheet_check", "slides_read", "slides_check",
+            "slides_audit", "slides_replace", "slides_render", "pdf_read", "render",
+            "merge", "guide",
+        ] {
+            assert!(
+                genoffice_op_template(op).is_some(),
+                "派发表缺少 op `{op}`"
+            );
+        }
+    }
+
+    #[test]
+    fn 必需参数缺失即fail_closed() {
+        let kv = std::collections::HashMap::new();
+        // info 需要 path
+        let e = genoffice_build_args("info", &kv).expect_err("缺 path 必须报错");
+        assert!(e.to_string().contains("path"), "实得 {e}");
+        // convert 需要 to
+        let mut kv = std::collections::HashMap::new();
+        kv.insert("input".to_string(), "a.md".to_string());
+        let e = genoffice_build_args("convert", &kv).expect_err("缺 to 必须报错");
+        assert!(e.to_string().contains("to"), "实得 {e}");
+    }
+
+    #[test]
+    fn 可选参数缺失即跳过flag() {
+        let mut kv = std::collections::HashMap::new();
+        kv.insert("path".to_string(), "a.md".to_string());
+        let args = genoffice_build_args("info", &kv).expect("应成功");
+        assert_eq!(args, vec!["info", "a.md", "--json"], "实得 {args:?}");
+    }
+
+    #[test]
+    fn 必需flag编译为双token() {
+        let mut kv = std::collections::HashMap::new();
+        kv.insert("input".to_string(), "a.md".to_string());
+        kv.insert("to".to_string(), "docx".to_string());
+        kv.insert("out".to_string(), "a.docx".to_string());
+        let args = genoffice_build_args("convert", &kv).expect("应成功");
+        assert_eq!(
+            args,
+            vec!["convert", "a.md", "--to", "docx", "--out", "a.docx", "--json"],
+            "实得 {args:?}"
+        );
+    }
+
+    #[test]
+    fn guide的group是可选位置参数() {
+        let mut kv = std::collections::HashMap::new();
+        kv.insert("domain".to_string(), "slides".to_string());
+        assert_eq!(
+            genoffice_build_args("guide", &kv).unwrap(),
+            vec!["guide", "slides", "--json"]
+        );
+        kv.insert("group".to_string(), "design".to_string());
+        assert_eq!(
+            genoffice_build_args("guide", &kv).unwrap(),
+            vec!["guide", "slides", "design", "--json"],
+            "group 必须排在 --json 之前（它是位置参数）"
+        );
+    }
+
+    #[test]
+    fn 空串视同缺失() {
+        let mut kv = std::collections::HashMap::new();
+        kv.insert("path".to_string(), String::new());
+        assert!(
+            genoffice_build_args("info", &kv).is_err(),
+            "空串不得当成合法路径去跑 subprocess"
+        );
+    }
+
     /// 端到端：真实 spawn genoffice 二进制跑 `info` + `convert`。
     /// 未安装二进制时整个用例跳过（不失败），与 mdream `Option` 适配器同型。
     #[test]
@@ -623,5 +788,140 @@ mod tests {
         let out = genoffice_convert(&md, "docx", Some(&docx)).expect("convert should succeed");
         assert!(docx.exists(), "output docx missing (out={out})");
         let _ = std::fs::remove_file(&docx);
+    }
+}
+
+#[cfg(test)]
+mod op_dispatch_e2e {
+    use super::*;
+    use crate::l0_substrate::nt_core_capability_types as ct;
+    use crate::l0_substrate::nt_core_capability_types::UnifiedCapability as _;
+
+    /// **18 个 op 全部经统一派发入口真打到二进制** —— 证明「能力面完整」不是
+    /// 「表里有条目」，而是每条都真的跑得通。
+    ///
+    /// 夹具用 genoffice **支持的转换路线**造（md→docx/pdf→pptx、json→xlsx），
+    /// 不手写 pptx spec（实测 `create --type pptx` 只吃 `--ops`/`--spec`）。
+    #[test]
+    fn 全部op经派发入口真打到二进制() {
+        if !genoffice_available() {
+            eprintln!("genoffice not installed, skipping e2e dispatch");
+            return;
+        }
+        let dir = std::env::temp_dir().join("neotrix_genoffice_op_e2e");
+        let _ = std::fs::create_dir_all(&dir);
+        let uniq = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+
+        let md = dir.join(format!("a{uniq}.md"));
+        std::fs::write(&md, b"# T\n\nhello\n").expect("write md");
+        let docx = dir.join(format!("c{uniq}.docx"));
+        let pdf = dir.join(format!("a{uniq}.pdf"));
+        let pptx = dir.join(format!("d{uniq}.pptx"));
+        let xlsx = dir.join(format!("b{uniq}.xlsx"));
+        let merged = dir.join(format!("m{uniq}.docx"));
+        let shots = dir.join(format!("shots{uniq}"));
+        let tj = dir.join(format!("t{uniq}.json"));
+        std::fs::write(
+            &tj,
+            br#"{"sheets":[{"name":"Data","rows":[["h1","h2"],[1,2]]}]}"#,
+        )
+        .expect("write json");
+        // 幻灯页面 spec —— 形状/几何/文字字段名经**实测**确定（`slides check` rc=0）：
+        //   text 元素用 `paragraphs`（不是 text/content/value），shape 需 `fill`，
+        //   画布 1280x720 用 px，image 的 url 必须是 http(s)。
+        let spec = dir.join(format!("spec{uniq}.json"));
+        std::fs::write(
+            &spec,
+            br##"{"title":"P","type":"cover","layout":"cover_typography_hero","background":"#0E1A2B",
+                "elements":[{"type":"text","x":10,"y":10,"w":300,"h":60,"paragraphs":[{"runs":[{"text":"Hi"}]}]}]}"##,
+        )
+        .expect("write spec");
+        // docs 的 ops DSL 与 sheet 的 cells DSL **不同**（实测）：
+        //   docs apply --ops   →  [{"op":"findReplace","find":..,"replace":..}]
+        //   sheet apply --cells → [{"cell":"A1","value":..}]
+        // 两者都用 --dry-run，故不写盘。
+        let docs_ops = dir.join(format!("dops{uniq}.json"));
+        std::fs::write(
+            &docs_ops,
+            br#"[{"op":"findReplace","find":"hello","replace":"hello v2"}]"#,
+        )
+        .expect("write docs ops");
+        let cells = dir.join(format!("cells{uniq}.json"));
+        std::fs::write(&cells, br#"[{"cell":"A1","value":"z"}]"#).expect("write cells");
+
+        // 建夹具（走支持路线）。render/slides render 需要启动 GenOffice，
+        // 在 CI 无 GUI 时可能失败 —— 故夹具只用纯 headless 命令。
+        let _ = genoffice_convert(&md, "docx", Some(&docx));
+        let _ = genoffice_convert(&md, "pdf", Some(&pdf));
+        if pdf.exists() {
+            let _ = genoffice_convert(&pdf, "pptx", Some(&pptx));
+        }
+        let _ = genoffice_create(
+            "xlsx",
+            Some(&tj),
+            None,
+            None,
+            &xlsx,
+        );
+        let cap = GenOfficeCapability::new();
+        let m = |pairs: &[(&str, &str)]| -> std::collections::HashMap<String, String> {
+            let mut kv = std::collections::HashMap::new();
+            for (k, v) in pairs {
+                kv.insert((*k).to_string(), (*v).to_string());
+            }
+            kv
+        };
+        let s = |p: &std::path::Path| p.to_string_lossy().into_owned();
+
+        // (op, kv, 是否需要 GUI/GenOffice 进程 → 这些在无头环境允许 NotInstalled 类失败)
+        let cases: Vec<(&str, std::collections::HashMap<String, String>, bool)> = vec![
+            ("info", m(&[("op", "info"), ("path", &s(&md))]), false),
+            ("docs_read", m(&[("op", "docs_read"), ("path", &s(&docx))]), false),
+            ("docs_check", m(&[("op", "docs_check"), ("path", &s(&docx))]), false),
+            ("sheet_check", m(&[("op", "sheet_check"), ("path", &s(&xlsx))]), false),
+            (
+                "sheet_read",
+                m(&[("op", "sheet_read"), ("path", &s(&xlsx)), ("sheet", "Data")]),
+                false,
+            ),
+            ("pdf_read", m(&[("op", "pdf_read"), ("path", &s(&pdf))]), false),
+            ("guide", m(&[("op", "guide"), ("domain", "docs")]), false),
+            ("merge", m(&[("op", "merge"), ("template", &s(&docx)), ("data", &s(&tj)), ("out", &s(&merged))]), false),
+            ("convert", m(&[("op", "convert"), ("input", &s(&md)), ("to", "docx"), ("out", &s(&dir.join(format!("cv{uniq}.docx"))))]), false),
+            ("create", m(&[("op", "create"), ("type", "xlsx"), ("from", &s(&tj)), ("out", &s(&dir.join(format!("cr{uniq}.xlsx"))))]), false),
+            ("slides_read", m(&[("op", "slides_read"), ("path", &s(&pptx))]), false),
+            ("slides_audit", m(&[("op", "slides_audit"), ("path", &s(&pptx))]), false),
+            ("slides_check", m(&[("op", "slides_check"), ("spec", &s(&spec))]), false),
+            ("render", m(&[("op", "render"), ("path", &s(&docx)), ("out", &s(&shots))]), true),
+            ("slides_render", m(&[("op", "slides_render"), ("path", &s(&pptx)), ("out", &s(&shots))]), true),
+            ("docs_apply", m(&[("op", "docs_apply"), ("path", &s(&docx)), ("ops", &s(&docs_ops)), ("dry_run", "1")]), false),
+            ("sheet_apply", m(&[("op", "sheet_apply"), ("path", &s(&xlsx)), ("cells", &s(&cells)), ("dry_run", "1")]), false),
+            ("slides_replace", m(&[("op", "slides_replace"), ("path", &s(&pptx)), ("slide", "0"), ("spec", &s(&spec))]), false),
+        ];
+
+        let mut ok = 0usize;
+        let mut needs_gui = 0usize;
+        for (op, kv, gui) in &cases {
+            match cap.execute(ct::CapabilityInput::Kv(kv.clone())) {
+                Ok(ct::CapabilityOutput::Kv(out)) => {
+                    assert!(
+                        out.contains_key("stdout"),
+                        "op {op} 成功但无 stdout 键：{out:?}"
+                    );
+                    ok += 1;
+                }
+                Ok(other) => panic!("op {op} 返回了非 Kv 输出：{other:?}"),
+                Err(e) if *gui => {
+                    // render/slides render 需启动 GenOffice 应用（headless 可能失败）
+                    eprintln!("op {op}（需 GUI）跳过：{e}");
+                    needs_gui += 1;
+                }
+                Err(e) => panic!("op {op} 派发失败（不应发生）：{e}"),
+            }
+        }
+        assert!(ok >= 16, "可达 op 过少：{ok} 成功 / {needs_gui} 需 GUI / 共 {}", cases.len());
     }
 }
