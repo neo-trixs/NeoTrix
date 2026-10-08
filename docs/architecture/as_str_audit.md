@@ -40,7 +40,7 @@
 | 轴 | as_str 输出 | registry JSON 真值 | 是否同格式 |
 |---|---|---|---|
 | `NodeLayer` | `l2orchestrator`… | 同左 | ✅ 一致 |
-| `ConstellationLevel` | `C0`/`C1`/… | `c0compile`/`c1unittest`/`c2integrationtest`/`c4mainpipeline`/`c5selfhealing`/`c6evolutionloop` | ❌ `by_constellation` histogram key ≠ JSON 值 |
-| `Domain` | `NT-CORE`… | 混合：`NT-CORE`(2)/`NT-IO`(1)/`NT-META`(4) 大写，其余 `core`/`act`/`io`/`memory`/`meta`/`mind`/`governance` 小写 | ❌ 双格式并存，`by_domain` key（`NT-*`）与多数 JSON 值不同源 |
+| `ConstellationLevel` | `c0compile`/`c1unittest`/`c2integrationtest`/`c4mainpipeline`/`c5selfhealing`/`c6evolutionloop` | 同左 | ✅ 已对齐 |
+| `Domain` | `core`/`mind`…（snake_case） | 一致于 serde `rename_all="snake_case"` | ✅ 已对齐 |
 
-结论：`NodeLayer` 轴已修复；`ConstellationLevel` 与 `Domain` 两轴仍是旧式 semantics 冲突，应记为后续 T0-x 候选，禁止沿用旧口径「修」已正确的 `NodeLayer`。
+结论：`NodeLayer`、`ConstellationLevel`、`Domain` 三轴 as_str 均已与 registry JSON schema 对齐；此前 T0-4 表述中的两轴冲突为早期口径，已失效。
