@@ -199,6 +199,87 @@ pub fn receipt_for_error(action: &str, err: &NtBotError) -> ActionReceipt {
     }
 }
 
+/// **一次性控制租约**（`computer-use` P6 吸收；MiMo「1–20s 一次性租约」形状）。
+///
+/// 语义要点（三条，全部是事故驱动的）：
+/// 1. **租约不自动续期**：到期即失效，需要人（或上层）重新授权 ——
+///    「自动续期」等于把一次性授权变成永久授权，急停就失效了。
+/// 2. **过期动作不回退成 Unknown**：租约过期发生在**派发之前**，属
+///    `Failed` + `ChangeAuth`（重新授权即可），不是「可能已发出」。
+/// 3. **上下界**：`1..=20` 秒。0 或 >20 直接拒收（0 = 永久授权的入口洞）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionLease {
+    owner: String,
+    expires_at_ms: i64,
+}
+
+/// 租约的秒数合法区间（MiMo 同款）。
+pub const LEASE_MIN_SECS: i64 = 1;
+/// 租约的秒数合法上界（MiMo 同款）。
+pub const LEASE_MAX_SECS: i64 = 20;
+
+impl ActionLease {
+    /// 签发租约。秒数不在 `1..=20` ⇒ 拒收（`Invalid`），不静默夹取。
+    pub fn grant(owner: &str, now_ms: i64, secs: i64) -> Result<Self, NtBotError> {
+        if !(LEASE_MIN_SECS..=LEASE_MAX_SECS).contains(&secs) {
+            return Err(NtBotError::Invalid(format!(
+                "lease seconds must be {LEASE_MIN_SECS}..={LEASE_MAX_SECS}, got {secs}"
+            )));
+        }
+        Ok(Self {
+            owner: owner.to_owned(),
+            expires_at_ms: now_ms + secs * 1000,
+        })
+    }
+
+    /// 此刻是否仍持有控制权。
+    #[must_use]
+    pub fn is_valid(&self, now_ms: i64) -> bool {
+        now_ms < self.expires_at_ms
+    }
+
+    /// 剩余毫秒（0 = 已过期）。
+    #[must_use]
+    pub fn remaining_ms(&self, now_ms: i64) -> i64 {
+        (self.expires_at_ms - now_ms).max(0)
+    }
+
+    /// 持有者（审计面）。
+    #[must_use]
+    pub fn owner(&self) -> &str {
+        &self.owner
+    }
+}
+
+/// verify-after **回读三态**（`computer-use` P3/P7 吸收）。
+///
+/// 动作「成功返回」不等于「页面真的变了」；反之「读不到」也不等于「没变」。
+/// ⇒ 三态必须分开，其中 `Drift` 是**停止信号**（继续动作只会越走越偏）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VerifyOutcome {
+    /// 回读与预期一致。
+    Match,
+    /// 回读与预期**不一致**（页面漂移/元素已不在）⇒ 停止并上报。
+    Drift,
+    /// 回读不可得（截图/DOM 读不到）⇒ 效果未知，问人。
+    Unavailable,
+}
+
+/// verify-after 结果 → 处置建议。
+///
+/// - `Drift` ⇒ `Stop`（**不重试**：重试就是拿旧句柄继续点）；
+/// - `Unavailable` ⇒ `AskHuman`（**不重试**：可能已生效）；
+/// - `Match` ⇒ 无需补救（返回 `None` 表示「没有建议」）。
+#[must_use]
+pub fn verify_advice(outcome: VerifyOutcome) -> Option<RetryAdvice> {
+    match outcome {
+        VerifyOutcome::Match => None,
+        VerifyOutcome::Drift => Some(RetryAdvice::Stop),
+        VerifyOutcome::Unavailable => Some(RetryAdvice::AskHuman),
+    }
+}
+
 /// 从 URL/类 URL 目标中提取 host (无 `url` 依赖的最小实现).
 pub fn host_of(target: &str) -> Option<String> {
     let after_scheme = target.split_once("://").map(|(_, rest)| rest).unwrap_or(target);
@@ -260,6 +341,35 @@ mod tests {
         assert!(r.sent, "传输层失败不能断言未派发");
         assert_eq!(r.outcome, ActionOutcome::Unknown);
         assert_eq!(r.advice, RetryAdvice::Retry, "幂等传输失败才可自动重试");
+    }
+
+    #[test]
+    fn lease_bounds_are_enforced_and_never_auto_renew() {
+        use super::{ActionLease, LEASE_MAX_SECS, LEASE_MIN_SECS};
+        let now = 1_000_000i64;
+        assert!(ActionLease::grant("me", now, 0).is_err(), "0 秒=永久授权的入口洞");
+        assert!(ActionLease::grant("me", now, LEASE_MAX_SECS + 1).is_err());
+        let lease = ActionLease::grant("me", now, LEASE_MAX_SECS).expect("grant");
+        assert!(lease.is_valid(now));
+        assert_eq!(lease.remaining_ms(now), LEASE_MAX_SECS * 1000);
+        // 到点即失效，且**不**自动续期：同一时刻再问仍是无效。
+        let after = now + LEASE_MAX_SECS * 1000;
+        assert!(!lease.is_valid(after));
+        assert_eq!(lease.remaining_ms(after), 0);
+        assert_eq!(lease.owner(), "me");
+        assert_eq!(LEASE_MIN_SECS, 1);
+    }
+
+    #[test]
+    fn verify_drift_stops_and_unavailable_asks_human() {
+        use super::{verify_advice, RetryAdvice, VerifyOutcome};
+        assert_eq!(verify_advice(VerifyOutcome::Match), None);
+        assert_eq!(verify_advice(VerifyOutcome::Drift), Some(RetryAdvice::Stop));
+        assert_eq!(
+            verify_advice(VerifyOutcome::Unavailable),
+            Some(RetryAdvice::AskHuman),
+            "读不到 ≠ 没生效 ⇒ 只能问人"
+        );
     }
 
     #[test]
