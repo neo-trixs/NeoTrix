@@ -367,8 +367,33 @@ pub struct CapabilityNode {
     #[serde(default)]
     pub kind: CapabilityKind,
     pub provides: Vec<String>,                // 提供的能力标签
+    /// **树内**依赖：可解析为节点 id **或**某个节点的 `provides` 标签
+    /// （双命名空间，见 `registry::CapabilityTreeRegistry::register`）。
+    /// ⛔ 语义收敛为「**必须能解析**」：注册表自洽性的判据就是本字段全解析。
     #[serde(default)]
-    pub requires: Vec<String>,                // 依赖的能力标签
+    pub requires: Vec<String>,
+    /// **树外**依赖：指向注册表**之外**的组件/概念（如 `memory.kv_store`、
+    /// `shield.policy_engine` 这类代码子系统名），或「已声明但尚未在树内落地」
+    /// 的能力（如 `neobot::nt_store_quota`）。
+    ///
+    /// # 为什么要有这个字段（2026-10-08）
+    ///
+    /// 实测：注册表里 **30** 条 `requires` 既不匹配节点 id 也不匹配任何
+    /// `provides` 标签（另有 4 条形似节点 id 但同样不存在）。它们**不是垃圾**：
+    /// 记的是真实的架构依赖意图（`memory.kv_store` 确实存在，只是不在能力树里）。
+    ///
+    /// 但混在 `requires` 里有两害：
+    /// 1. **永久噪音**：每次 `cli::load_registry` 都刷 30 行
+    ///    `eprintln WARNING`，且永远无法消除 ⇒ 训练人忽略告警
+    ///    （与「死边」的处理先例同源：`cli.rs` 对边已是「跳过并警告」）。
+    /// 2. **真回归被淹没**：日后真的写错一个 `requires`，与这 30 条静态噪音混在一起，
+    ///    判据失效。
+    ///
+    /// ⇒ 显式分流：**`requires` 只放能解析的**（于是
+    ///   `validate_dependencies` 恢复为有意义的自洽性信号），
+    ///   树外的意图原样搬进本字段，**一条信息都不删**。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub external_requires: Vec<String>,
     #[serde(default)]
     pub rune_sockets: Vec<RuneSocket>,        // 占用的 Rune 槽
     #[serde(default)]
@@ -408,6 +433,7 @@ impl CapabilityNode {
             constellation: ConstellationLevel::C0Compile,
             provides,
             requires: vec![],
+            external_requires: vec![],
             rune_sockets: vec![],
             dependents: vec![],
             evolution_log: vec![],
@@ -438,6 +464,7 @@ impl CapabilityNode {
             constellation: ConstellationLevel::C0Compile,
             provides,
             requires,
+            external_requires: Vec::new(),
             rune_sockets: vec![],
             dependents: vec![],
             evolution_log: vec![],
@@ -468,6 +495,7 @@ impl CapabilityNode {
             constellation: ConstellationLevel::C0Compile,
             provides,
             requires,
+            external_requires: Vec::new(),
             rune_sockets: vec![],
             dependents: vec![],
             evolution_log: vec![],

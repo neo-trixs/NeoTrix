@@ -127,9 +127,52 @@ def audit_registry_enums() -> int:
         bad = 1
         print(f"  ❌ 判据④：evolution_log[].op 非法取值 {bad_ops}")
 
+    # ── 判据④之二：`requires` 必须全部可解析（节点 id 或 provides 标签）──
+    #
+    # 2026-10-08 实测：修复前有 30 条 `requires` 两者都不是 ⇒ 每次
+    # `cli::load_registry` 刷 30 行永久警告（告警疲劳，真回归被淹没）。
+    # 修法是显式分流到 `external_requires`（树外依赖），**不删数据**。
+    # 本条与 `cli.rs::真实注册表requires全部可解析` 是同一不变式的两道门。
+    nodes = {n.get("id") for n in data.get("nodes", [])}
+    tags = set()
+    for n in data.get("nodes", []):
+        tags.update(n.get("provides") or [])
+    unresolved = [
+        (n.get("id"), r)
+        for n in data.get("nodes", [])
+        for r in (n.get("requires") or [])
+        if r not in nodes and r not in tags
+    ]
+    if unresolved:
+        bad = 1
+        print(
+            f"  ❌ 判据④：requires 有 {len(unresolved)} 条不可解析"
+            f"（既非节点 id 也非 provides 标签）⇒ 每次加载刷永久警告："
+        )
+        for nid, r in unresolved[:10]:
+            print(f"       {nid} --> {r}")
+        if len(unresolved) > 10:
+            print(f"       …另有 {len(unresolved) - 10} 条")
+        print("       ⇒ 树外依赖请写进 `external_requires`")
+
+    # ── 判据④之三：edges 端点必须存在 ──
+    dead = [
+        e for e in data.get("edges", [])
+        if (not isinstance(e, list) or len(e) < 2
+            or e[0] not in nodes or e[1] not in nodes)
+    ]
+    if dead:
+        bad = 1
+        print(f"  ❌ 判据④：edges 有 {len(dead)} 条死边（端点不存在）：{dead[:5]}")
+
     if not bad:
         n = len(data.get("nodes", []))
-        print(f"  判据④：注册表 {n} 节点的 domain/layer/constellation/op 全部合法 ✅")
+        ext = sum(len(x.get("external_requires") or []) for x in data.get("nodes", []))
+        print(
+            f"  判据④：注册表 {n} 节点枚举全合法 ✅ | "
+            f"requires 全可解析 ✅ | 无死边 ✅"
+            f"（external_requires {ext} 条为树外依赖，按定义不要求可解析）"
+        )
     return bad
 
 

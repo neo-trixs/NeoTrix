@@ -11,7 +11,6 @@
         "csv_read",
         "csv_write"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -47,7 +46,6 @@
       "provides": [
         "xlsx_read_fast"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -85,7 +83,6 @@
         "parse_xlsx_fast",
         "parse_xlsx_full"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -122,7 +119,6 @@
         "xlsx_merge",
         "schema_driven_merge"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -158,7 +154,6 @@
       "provides": [
         "template_detect"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -194,7 +189,6 @@
       "provides": [
         "config_parse"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -230,7 +224,6 @@
       "provides": [
         "path_metadata_extract"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -268,7 +261,6 @@
         "table_to_json",
         "table_to_csv"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -304,7 +296,6 @@
       "provides": [
         "chunk_table"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -342,7 +333,6 @@
         "detect_template_schema",
         "parse_config_schema"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -383,7 +373,6 @@
         "parse_config",
         "extract_metadata"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -421,7 +410,6 @@
         "pdf_page_edit",
         "pdf_text_edit"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -458,7 +446,6 @@
         "pdf_icon_enhance",
         "pdf_extract_sr_embed"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -496,7 +483,6 @@
         "pdf_xobject_traverse",
         "pdf_embedded_images"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -532,7 +518,6 @@
       "provides": [
         "pdf_merge"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -570,7 +555,6 @@
         "image_upscale",
         "image_sr_model_select"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -622,7 +606,6 @@
         "pptx_merge",
         "office_merge"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -660,7 +643,6 @@
         "anyparse",
         "unified_doc_parse"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -697,7 +679,6 @@
         "visual_route",
         "vision_prompt_route"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -734,7 +715,6 @@
         "grounding_validate",
         "token_grounding"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -771,7 +751,6 @@
         "ocr_extract",
         "ocr_recognize"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -822,7 +801,6 @@
         "format_route",
         "doc_format_route"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -860,7 +838,6 @@
         "structured_write",
         "json_yaml_rw"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -897,7 +874,6 @@
         "encoding_detect",
         "text_encoding_detect"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -934,7 +910,6 @@
         "intent_isolation",
         "need_to_know"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_core_parallel::atomic_decomposition"
@@ -1113,7 +1088,6 @@
         "docker-prune",
         "project-molting"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -1193,7 +1167,6 @@
         "xlsx_consolidation",
         "xlsx_parse"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -1295,7 +1268,6 @@
         "dpp",
         "merge"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -1406,7 +1378,6 @@
         "revertible",
         "audit"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_shield_sandbox::credential_vault_injection"
@@ -1585,7 +1556,6 @@
         "disclosure",
         "reference"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_skill_engine::complementarity_attribution",
@@ -1707,7 +1677,6 @@
         "provenance",
         "ledger"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -1803,7 +1772,6 @@
         "merge",
         "version"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -2026,7 +1994,6 @@
         "traceability",
         "audit"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -2233,7 +2200,6 @@
         "error_first压缩",
         "artifact_还原"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_distiller::verbalized_sampling"
@@ -2808,7 +2774,6 @@
         "burn_in",
         "回滚last_good"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_evolution_loop::independent_auditor_gate",
@@ -3207,7 +3172,6 @@
         "重评",
         "re_evaluate"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -3804,7 +3768,6 @@
         "r01_r10_rules",
         "auto_fix"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_agent_mcp_gateway::governed_mcp"
@@ -3971,7 +3934,6 @@
         "visual_type_27",
         "g17"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -4052,7 +4014,6 @@
         "anti_injection",
         "g16_"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_autofixer::gauntlet_gate"
@@ -5126,7 +5087,6 @@
         "strip",
         "leak_scan"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_background_loop::loop_ready_scoring",
@@ -5233,7 +5193,6 @@
         "attribution",
         "heldout"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_eval_harness::ap_acc_compliance_gate"
@@ -5311,7 +5270,6 @@
         "mode_routing",
         "task_routing"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_core_parallel::atomic_decomposition",
@@ -5391,7 +5349,6 @@
         "mediation",
         "arbiter"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_agent_mcp_gateway::governed_mcp"
@@ -5478,7 +5435,6 @@
       "provides": [
         "latent_reason"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_core_parallel::staged_shared_context"
@@ -5557,7 +5513,6 @@
         "kv_cache",
         "mem_groups"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_memory_kb::retrieval_self_evolution",
@@ -5636,7 +5591,6 @@
       "provides": [
         "harness_opt"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_evolution_loop::rst_flywheel"
@@ -5738,7 +5692,6 @@
       "provides": [
         "harness_scaffold"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_eval_harness::ap_acc_compliance_gate"
@@ -5825,7 +5778,6 @@
       "provides": [
         "self_verify"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_evolution_loop::rst_flywheel"
@@ -5910,7 +5862,6 @@
       "provides": [
         "fit_markdown"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_world_scrape::design_token_extractor"
@@ -5989,7 +5940,6 @@
       "provides": [
         "async_resilient"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_world_absorber::api_registry_meta"
@@ -6068,7 +6018,6 @@
       "provides": [
         "agentic_browse"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_world_code_search::hybrid_symbol_search"
@@ -6225,7 +6174,6 @@
       "provides": [
         "sweep_delta"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_background_loop::loop_ready_scoring"
@@ -6400,7 +6348,6 @@
       "provides": [
         "retrieval_matrix"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_memory_visibility::visibility_gate",
@@ -6487,7 +6434,6 @@
       "provides": [
         "single_file"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_memory_historian::temporal_context_graph"
@@ -6565,7 +6511,6 @@
       "provides": [
         "vision_preprocess"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_io_multimodal_transform::intent_aware_vision"
@@ -6644,7 +6589,6 @@
       "provides": [
         "cpu_tts"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_world_video_pipeline::video_production_chain"
@@ -6724,7 +6668,6 @@
       "provides": [
         "yagni_ladder"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_autofixer::healer_registry"
@@ -6811,7 +6754,6 @@
       "provides": [
         "metadata_aggregate"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_world_absorber::api_registry_meta"
@@ -6897,7 +6839,6 @@
       "provides": [
         "media_sniff"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_world_video_pipeline::asset_enricher"
@@ -6983,7 +6924,6 @@
       "provides": [
         "prompt_assets"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_skill_engine::complementarity_attribution"
@@ -7069,7 +7009,6 @@
       "provides": [
         "device_sandbox"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_shield_sandbox::credential_vault_injection"
@@ -7154,7 +7093,6 @@
       "provides": [
         "expert_team_diff"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_autofixer::gauntlet_gate"
@@ -7235,7 +7173,6 @@
         "call_chain",
         "fanout"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -7327,7 +7264,6 @@
         "egress_policy",
         "trust_boundary"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_shield_approval::confirmation_gate"
@@ -7415,7 +7351,6 @@
         "m_open",
         "hypothesis_space"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -7506,7 +7441,6 @@
         "hyperparam_sensitivity",
         "scale_frontier"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -7602,7 +7536,6 @@
         "evidence_credibility",
         "site_learning_registry"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_world_crawl::ordered_backend_router"
@@ -7716,7 +7649,6 @@
         "response_healing",
         "key_normalization"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_io_provider::expert_cache_pin_prefetch"
@@ -7804,7 +7736,6 @@
         "cargo_fix",
         "test_stub"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_autofixer::healer_registry",
@@ -7900,7 +7831,6 @@
         "symbol_indexing",
         "ranked_hits"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_core_retrieval::code_graph_mcp"
@@ -7988,7 +7918,6 @@
         "unified_absorption",
         "webpage_report"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_world_absorber::api_registry_meta"
@@ -8100,7 +8029,6 @@
         "provenance_sign",
         "record_audit"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_memory_kb::temporal_audit_ledger"
@@ -8187,7 +8115,6 @@
         "video_chain_runner",
         "chain_execution"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_world_video_pipeline::video_production_chain"
@@ -8282,7 +8209,6 @@
         "request_scraper",
         "browser_scrape"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_world_scrape::design_token_extractor"
@@ -8370,7 +8296,6 @@
         "pipeline_execution",
         "pipeline_output"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_world_video_pipeline::asset_enricher"
@@ -8458,7 +8383,6 @@
         "cli_execute",
         "bridge"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -8543,7 +8467,6 @@
         "untrusted_data_fence",
         "nonce_delim"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -8626,7 +8549,6 @@
         "revertible_effects",
         "inverse_ledger"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -8710,7 +8632,6 @@
         "fiber_lifecycle",
         "withdrawal_guard"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -8794,7 +8715,6 @@
         "task_state_dag",
         "attempt_token"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -8878,7 +8798,6 @@
         "event_driven_claim",
         "idle_edge"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -8961,7 +8880,6 @@
         "account_pool",
         "rate_limit_quarantine"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -9054,7 +8972,6 @@
         "spill_storage",
         "opaque_locator"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -9138,7 +9055,6 @@
         "oracle_ladder",
         "t0_t3"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -9234,7 +9150,6 @@
         "rhythm_expression",
         "visual_affect_contract"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_io_digital_human::pipeline"
@@ -9408,7 +9323,6 @@
         "user_emotion_reward",
         "trust_weighted_reward"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_skill_engine::phase_boundary_manager"
@@ -9502,7 +9416,6 @@
       "provides": [
         "vector_storage"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -9551,7 +9464,6 @@
       "provides": [
         "consciousness_tree"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -9608,7 +9520,6 @@
       "provides": [
         "build_hygiene"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -9656,7 +9567,6 @@
       "provides": [
         "performance_concurrency"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -9704,7 +9614,6 @@
       "provides": [
         "meta_cognition"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -9761,7 +9670,6 @@
       "provides": [
         "tool_routing"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -9810,7 +9718,6 @@
       "provides": [
         "tool_routing"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -9859,7 +9766,6 @@
       "provides": [
         "frontend_ui"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -9908,7 +9814,6 @@
       "provides": [
         "root_cause_method"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -9957,7 +9862,6 @@
       "provides": [
         "tool_routing"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10006,7 +9910,6 @@
       "provides": [
         "frontend_ui"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10056,7 +9959,6 @@
       "provides": [
         "tool_routing"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10104,7 +10006,6 @@
       "provides": [
         "frontend_ui"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10152,7 +10053,6 @@
       "provides": [
         "skill_crystallize"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10201,7 +10101,6 @@
       "provides": [
         "frontend_ui"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10250,7 +10149,6 @@
       "provides": [
         "performance_concurrency"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10299,7 +10197,6 @@
       "provides": [
         "hybrid_retrieval"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10348,7 +10245,6 @@
       "provides": [
         "failure_recovery"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10397,7 +10293,6 @@
       "provides": [
         "schema_migration"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10446,7 +10341,6 @@
       "provides": [
         "root_cause_method"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10496,7 +10390,6 @@
       "provides": [
         "build_hygiene"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10545,7 +10438,6 @@
       "provides": [
         "build_hygiene"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10595,7 +10487,6 @@
       "provides": [
         "skill_crystallize"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10644,7 +10535,6 @@
       "provides": [
         "architecture_decision"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10693,7 +10583,6 @@
       "provides": [
         "security_governance"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10742,7 +10631,6 @@
       "provides": [
         "performance_concurrency"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10791,7 +10679,6 @@
       "provides": [
         "architecture_decision"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10839,7 +10726,6 @@
       "provides": [
         "e8"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10888,7 +10774,6 @@
       "provides": [
         "tdd"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10937,7 +10822,6 @@
       "provides": [
         "performance_concurrency"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -10994,7 +10878,6 @@
       "provides": [
         "content_extraction"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -11042,7 +10925,6 @@
       "provides": [
         "skill_crystallize"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -11093,7 +10975,6 @@
         "category_recall",
         "memory_eviction"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -11179,7 +11060,6 @@
         "open_pattern_detect",
         "continuity_context"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -11265,7 +11145,6 @@
         "connection_reinforce",
         "nearest_neighbor"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -11351,7 +11230,6 @@
         "implicit_connection",
         "session_continuity"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -11437,7 +11315,6 @@
         "edge_weighting",
         "staleness_mark"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -11524,7 +11401,6 @@
         "compliance_report",
         "severity_grading"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -11611,7 +11487,6 @@
         "fail_closed",
         "tool_gate"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -11698,7 +11573,6 @@
         "hitl_approval",
         "evidence_hash_chain"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -11786,7 +11660,6 @@
         "negative_drift",
         "enforcement_tracking"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -11873,7 +11746,6 @@
         "degradation_detect",
         "metric_capture"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -11960,7 +11832,6 @@
         "single_winner_source",
         "evidence_gate"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -12046,7 +11917,6 @@
         "risk_assess",
         "strategy_select"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -12133,7 +12003,6 @@
         "transactional_rollback",
         "compile_fix"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -12227,7 +12096,6 @@
         "pattern_learn",
         "known_trap_promote"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -12316,7 +12184,6 @@
         "g29",
         "anomaly_detector"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_core_telemetry"
@@ -12472,7 +12339,6 @@
         "reasoning_trace_guard",
         "audit"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_shield",
@@ -12560,7 +12426,6 @@
         "ingest",
         "shield"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_memory_kb"
@@ -12647,7 +12512,6 @@
         "retrieval",
         "provenance"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_memory_kb"
@@ -12734,7 +12598,6 @@
         "converge_check",
         "verify"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_core_self",
@@ -12823,7 +12686,6 @@
         "self_curriculum",
         "anti_hallucination"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_world_absorber"
@@ -12918,7 +12780,6 @@
         "distillation",
         "triplet"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_memory_kb"
@@ -13005,7 +12866,6 @@
         "resume",
         "checkpoint"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_memory_kb"
@@ -13091,7 +12951,6 @@
         "embed_binding",
         "drift_protection"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_memory_kb"
@@ -13178,7 +13037,6 @@
         "primitive_completeness",
         "vsa"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_core_hcube"
@@ -13264,7 +13122,6 @@
         "symbolic_regression",
         "reversible_distill"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_evolution_loop"
@@ -13350,7 +13207,6 @@
         "shadow_review",
         "absorption_quality"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind_evolution_loop"
@@ -13437,7 +13293,6 @@
         "predictive_cache",
         "response_cache"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_io_provider"
@@ -13524,7 +13379,6 @@
         "sandbox",
         "credential"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_shield_sandbox"
@@ -13719,7 +13573,6 @@
         "secret_auth",
         "replay_protection"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_agent_mcp_gateway"
@@ -13824,7 +13677,6 @@
         "desktop_package_dir",
         "desktop_package"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_io_desktop"
@@ -13920,7 +13772,6 @@
         "updater_pubkey",
         "updater_sign"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_io_desktop"
@@ -14015,7 +13866,6 @@
       "provides": [
         "performance_concurrency"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -14065,7 +13915,6 @@
       "provides": [
         "skill_crystallize"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -14115,7 +13964,6 @@
       "provides": [
         "build_hygiene"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -14167,7 +14015,6 @@
         "automated_refactoring",
         "code_transformation"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -14253,7 +14100,6 @@
         "DBX单调收紧",
         "PolicyDecision strictness"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -14338,7 +14184,6 @@
         "ScienceFlow re-anchor",
         "resumable state"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -14432,7 +14277,6 @@
         "proxy_selection",
         "proxy_self_healing"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_shield_traffic::tls_fingerprint"
@@ -14517,7 +14361,6 @@
         "self_evaluation",
         "cycle_result"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -14630,7 +14473,6 @@
         "weakness_analysis",
         "tech_debt"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -14717,7 +14559,6 @@
         "weakness_to_goals",
         "module_roadmap"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -14969,7 +14810,6 @@
         "skill_tool_protocol",
         "user_vs_model_invocation"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_io::plugin_marketplace"
@@ -15134,7 +14974,6 @@
         "dom_scraping",
         "structured_extraction"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -15499,7 +15338,6 @@
         "9514_icons",
         "60_categories"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_io::architecture_templates",
@@ -15737,7 +15575,6 @@
         "hanzi_chaizi_video",
         "repair_media_gen"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -15771,7 +15608,6 @@
         "skill_health_check",
         "skill_diagnosis"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -15804,7 +15640,6 @@
       "provides": [
         "cad_image_retrieval"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -15837,7 +15672,6 @@
       "provides": [
         "design_pattern_extract"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -15871,7 +15705,6 @@
         "pdf_translate",
         "math_pdf"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -15905,7 +15738,6 @@
         "doc_translate",
         "babeldoc_backend"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -15938,7 +15770,6 @@
       "provides": [
         "recurrent_working_memory"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -15971,7 +15802,6 @@
       "provides": [
         "best_practice_critic"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16005,7 +15835,6 @@
         "nlp_processing",
         "zh_en_nlp"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16038,7 +15867,6 @@
       "provides": [
         "ai_image_prompt_gen"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16071,7 +15899,6 @@
       "provides": [
         "bgm_promo_skill"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16104,7 +15931,6 @@
       "provides": [
         "diagram_render"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16138,7 +15964,6 @@
         "hermes_quota",
         "rate_limit"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16172,7 +15997,6 @@
         "hermes_plugins",
         "plugin_ecosystem"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16205,7 +16029,6 @@
       "provides": [
         "eli5_explain"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16238,7 +16061,6 @@
       "provides": [
         "interactive_viz"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16272,7 +16094,6 @@
         "writing_dedup",
         "unslop"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16306,7 +16127,6 @@
         "dag_eval_loop",
         "loop_engine"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16340,7 +16160,6 @@
         "model_routing",
         "strong_weak_route"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16374,7 +16193,6 @@
         "multi_agent_sqlite",
         "squad_collab"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16408,7 +16226,6 @@
         "agent_team",
         "eval_harness"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16442,7 +16259,6 @@
         "thought_rail",
         "decision_track"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16476,7 +16292,6 @@
         "remote_desktop",
         "session_orch"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16510,7 +16325,6 @@
         "plan_follow",
         "agentiker_plan"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16544,7 +16358,6 @@
         "code_intel",
         "agentiker_code"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16577,7 +16390,6 @@
       "provides": [
         "hermes_skill_node"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16611,7 +16423,6 @@
         "web_crawl",
         "content_extract"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16645,7 +16456,6 @@
         "site_change_detect",
         "fts5_index"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16679,7 +16489,6 @@
         "ods_parse",
         "doc_system"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16713,7 +16522,6 @@
         "pindo_monitor",
         "quote_detect"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16747,7 +16555,6 @@
         "human_oversight",
         "skill_atrophy_counteract"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16791,7 +16598,6 @@
         "self_evolution_lesson_extract",
         "narrative_pattern"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16825,7 +16631,6 @@
         "gasp_vault_mapping",
         "gasp_stage_to_seal_mapping"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16861,7 +16666,6 @@
         "five_element_agent",
         "seal_analog"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16907,7 +16711,6 @@
         "make_stage_map",
         "rp42_eval_gate"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16951,7 +16754,6 @@
         "lineage_journal",
         "consciousness_tree_map"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -16993,9 +16795,6 @@
         "agentic_wiki_ref",
         "entry_kb_reference"
       ],
-      "requires": [
-        "nt_memory_kb::ingest_node"
-      ],
       "rune_sockets": [
         "unknown",
         "unknown"
@@ -17027,7 +16826,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "nt_memory_kb::ingest_node"
+      ]
     },
     {
       "id": "nt_memory::graphify",
@@ -17038,10 +16840,6 @@
         "kg_construction",
         "entity_relation_extraction",
         "graph_retrieval"
-      ],
-      "requires": [
-        "nt_memory_kb::insert_node",
-        "nt_memory_kb::insert_edge"
       ],
       "rune_sockets": [
         "unknown",
@@ -17075,7 +16873,11 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "nt_memory_kb::insert_node",
+        "nt_memory_kb::insert_edge"
+      ]
     },
     {
       "id": "nt_core::doop",
@@ -17086,7 +16888,6 @@
         "pointer_analysis",
         "declarative_static_analysis"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17120,7 +16921,6 @@
         "codebase_simplification",
         "redundancy_detection"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17154,7 +16954,6 @@
         "planning",
         "blueprint_generation"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17188,7 +16987,6 @@
         "three_scope_reasoning",
         "scope_mapping"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17222,7 +17020,6 @@
         "security_catalog",
         "security_classification"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17257,7 +17054,6 @@
         "proxy_pool",
         "broker_match"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17292,7 +17088,6 @@
         "osint_category_search",
         "intel_source_catalog"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17327,7 +17122,6 @@
         "ip_probe_target",
         "asn_lookup"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17362,7 +17156,6 @@
         "bot_orchestration",
         "embodied_dispatch"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17397,7 +17190,6 @@
         "exec_coordination",
         "decompose_reconcile"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17432,7 +17224,6 @@
         "gwt_attention_routing",
         "handler_dispatch"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17466,7 +17257,6 @@
         "autonomous_work_agent",
         "self_learning_memory"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17500,7 +17290,6 @@
         "rsi_benchmark",
         "self_improvement_eval"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17536,7 +17325,6 @@
         "dual_track_branch",
         "codegraph_mcp"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17581,7 +17369,6 @@
         "shot_card_selection",
         "remotion_render"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17627,7 +17414,6 @@
         "camera_control",
         "ai_director"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17673,7 +17459,6 @@
         "video_gen",
         "audio_gen"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17725,7 +17510,6 @@
         "research_corpus_explore",
         "cordis_search"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17759,7 +17543,6 @@
         "agent_internet_access",
         "zero_api_fee_reach"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17793,7 +17576,6 @@
         "seo",
         "web_presence"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17829,7 +17611,6 @@
         "embodiment",
         "actuator_coupling"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17864,7 +17645,6 @@
       "provides": [
         "world_model"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -17901,7 +17681,6 @@
         "email.receive",
         "email.sync"
       ],
-      "requires": [],
       "rune_sockets": [
         "crimson"
       ],
@@ -17983,9 +17762,6 @@
         "memory.add_only_writes",
         "memory.write_append"
       ],
-      "requires": [
-        "memory.kv_store"
-      ],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [],
@@ -18004,7 +17780,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "memory.kv_store"
+      ]
     },
     {
       "id": "nt_memory::hybrid_retrieval",
@@ -18014,10 +17793,6 @@
       "provides": [
         "memory.hybrid_retrieval",
         "memory.bm25_vector_fusion"
-      ],
-      "requires": [
-        "memory.kv_store",
-        "memory.bm25_index"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18037,7 +17812,11 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "memory.kv_store",
+        "memory.bm25_index"
+      ]
     },
     {
       "id": "nt_memory::admission_control",
@@ -18047,9 +17826,6 @@
       "provides": [
         "memory.admission_control",
         "memory.ingress_gate"
-      ],
-      "requires": [
-        "memory.kv_store"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18069,7 +17845,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "memory.kv_store"
+      ]
     },
     {
       "id": "nt_memory::decay_forgetting",
@@ -18079,9 +17858,6 @@
       "provides": [
         "memory.decay_forgetting",
         "memory.forgetting_curve"
-      ],
-      "requires": [
-        "memory.kv_store"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18101,7 +17877,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "memory.kv_store"
+      ]
     },
     {
       "id": "nt_act::nt_act_typed_agent",
@@ -18111,9 +17890,6 @@
       "provides": [
         "act.typed_agent",
         "act.agent_dispatch"
-      ],
-      "requires": [
-        "act.orchestrator"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18133,7 +17909,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "act.orchestrator"
+      ]
     },
     {
       "id": "nt_act::provider_abstraction",
@@ -18143,9 +17922,6 @@
       "provides": [
         "act.provider_abstraction",
         "act.model_routing"
-      ],
-      "requires": [
-        "act.orchestrator"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18165,7 +17941,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "act.orchestrator"
+      ]
     },
     {
       "id": "nt_world::temporal_kg",
@@ -18175,9 +17954,6 @@
       "provides": [
         "world.temporal_kg",
         "world.temporal_reasoning"
-      ],
-      "requires": [
-        "world.knowledge_graph"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18197,7 +17973,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "world.knowledge_graph"
+      ]
     },
     {
       "id": "nt_shield::guard::agent_guardrails",
@@ -18207,9 +17986,6 @@
       "provides": [
         "shield.agent_guardrails",
         "shield.action_boundary"
-      ],
-      "requires": [
-        "shield.policy_engine"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18229,7 +18005,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "shield.policy_engine"
+      ]
     },
     {
       "id": "nt_shield::compliance",
@@ -18239,9 +18018,6 @@
       "provides": [
         "shield.compliance",
         "shield.regulatory_check"
-      ],
-      "requires": [
-        "shield.policy_engine"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18261,7 +18037,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "shield.policy_engine"
+      ]
     },
     {
       "id": "nt_feel::cognitive_bridge",
@@ -18271,9 +18050,6 @@
       "provides": [
         "feel.cognitive_bridge",
         "feel.emotion_cognition_link"
-      ],
-      "requires": [
-        "feel.affective_interface"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18293,7 +18069,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "feel.affective_interface"
+      ]
     },
     {
       "id": "nt_core::nt_state_graph",
@@ -18304,7 +18083,6 @@
         "core.state_graph",
         "core.state_machine"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [],
@@ -18366,9 +18144,6 @@
         "mind.self_improvement",
         "mind.meta_learning"
       ],
-      "requires": [
-        "mind.skill_engine"
-      ],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [],
@@ -18387,7 +18162,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "mind.skill_engine"
+      ]
     },
     {
       "id": "nt_meta::otel_bridge",
@@ -18398,7 +18176,6 @@
         "meta.otel_bridge",
         "meta.telemetry_export"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [],
@@ -18428,7 +18205,6 @@
         "meta.eval_engine",
         "meta.evaluation_harness"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [],
@@ -18458,7 +18234,6 @@
         "meta.session_replay",
         "meta.conversation_trace"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [],
@@ -18488,7 +18263,6 @@
         "meta.gwt_router",
         "meta.global_workspace_routing"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [],
@@ -18518,9 +18292,6 @@
         "nexus.memory_weaving",
         "nexus.cross_session_linking"
       ],
-      "requires": [
-        "nexus.cross_session_memory"
-      ],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [],
@@ -18539,7 +18310,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "nexus.cross_session_memory"
+      ]
     },
     {
       "id": "nt_repair::diagnostic_chain",
@@ -18549,9 +18323,6 @@
       "provides": [
         "repair.diagnostic_chain",
         "repair.causal_diagnostic"
-      ],
-      "requires": [
-        "repair.causal_trace"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18571,7 +18342,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "repair.causal_trace"
+      ]
     },
     {
       "id": "nt_memory::entity_linking",
@@ -18583,7 +18357,6 @@
         "memory.entity_resolution"
       ],
       "requires": [
-        "memory.kv_store",
         "memory.add_only_writes"
       ],
       "rune_sockets": [],
@@ -18603,7 +18376,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "memory.kv_store"
+      ]
     },
     {
       "id": "nt_memory::consolidation",
@@ -18615,7 +18391,6 @@
         "memory.working_memory_merge"
       ],
       "requires": [
-        "memory.kv_store",
         "memory.admission_control"
       ],
       "rune_sockets": [],
@@ -18635,7 +18410,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "memory.kv_store"
+      ]
     },
     {
       "id": "nt_memory::distillation",
@@ -18647,7 +18425,6 @@
         "memory.cross_session_compress"
       ],
       "requires": [
-        "memory.kv_store",
         "memory.consolidation"
       ],
       "rune_sockets": [],
@@ -18667,7 +18444,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "memory.kv_store"
+      ]
     },
     {
       "id": "nt_act::mcp_protocol",
@@ -18709,9 +18489,6 @@
         "world.rag_pipeline",
         "world.document_chunk_vector"
       ],
-      "requires": [
-        "world.knowledge_graph"
-      ],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [],
@@ -18729,7 +18506,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "world.knowledge_graph"
+      ]
     },
     {
       "id": "nt_world::osint::social_search",
@@ -18739,9 +18519,6 @@
       "provides": [
         "world.osint.social_search",
         "world.social_platform_enum"
-      ],
-      "requires": [
-        "world.knowledge_graph"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18760,7 +18537,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "world.knowledge_graph"
+      ]
     },
     {
       "id": "nt_world::osint::automation",
@@ -18770,9 +18550,6 @@
       "provides": [
         "world.osint.automation",
         "world.recon_engine"
-      ],
-      "requires": [
-        "world.knowledge_graph"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18791,7 +18568,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "world.knowledge_graph"
+      ]
     },
     {
       "id": "nt_world::osint::harvest",
@@ -18801,9 +18581,6 @@
       "provides": [
         "world.osint.harvest",
         "world.subdomain_email_harvest"
-      ],
-      "requires": [
-        "world.knowledge_graph"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18822,7 +18599,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "world.knowledge_graph"
+      ]
     },
     {
       "id": "nt_world::osint::ad_graph",
@@ -18832,9 +18612,6 @@
       "provides": [
         "world.osint.ad_graph",
         "world.attack_path_analysis"
-      ],
-      "requires": [
-        "world.knowledge_graph"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18853,7 +18630,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "world.knowledge_graph"
+      ]
     },
     {
       "id": "nt_shield::scanners::llm_scanner",
@@ -18863,9 +18643,6 @@
       "provides": [
         "shield.scanners.llm_scanner",
         "shield.llm_probing"
-      ],
-      "requires": [
-        "shield.policy_engine"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18884,7 +18661,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "shield.policy_engine"
+      ]
     },
     {
       "id": "nt_shield::scanners::red_team",
@@ -18894,9 +18674,6 @@
       "provides": [
         "shield.scanners.red_team",
         "shield.adversarial_simulation"
-      ],
-      "requires": [
-        "shield.policy_engine"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18915,7 +18692,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "shield.policy_engine"
+      ]
     },
     {
       "id": "nt_shield::scanners::secret_scanner",
@@ -18925,9 +18705,6 @@
       "provides": [
         "shield.scanners.secret_scanner",
         "shield.secret_detection"
-      ],
-      "requires": [
-        "shield.policy_engine"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18946,7 +18723,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "shield.policy_engine"
+      ]
     },
     {
       "id": "nt_shield::scanners::container_scan",
@@ -18956,9 +18736,6 @@
       "provides": [
         "shield.scanners.container_scan",
         "shield.sbom_vuln_scan"
-      ],
-      "requires": [
-        "shield.policy_engine"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -18977,7 +18754,10 @@
         "runeword": "",
         "scry_enabled": false,
         "last_promotion_level": "c0compile"
-      }
+      },
+      "external_requires": [
+        "shield.policy_engine"
+      ]
     },
     {
       "id": "nt_core::multi_agent::coordinator",
@@ -19236,7 +19016,6 @@
         "governance.enforcement",
         "governance.audit_compliance"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [],
@@ -19265,7 +19044,6 @@
         "fast_policy",
         "fast_decision"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -19287,7 +19065,6 @@
         "score_eval",
         "transcript_success_scorer"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -19308,7 +19085,6 @@
       "provides": [
         "reexplore_measure"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -19329,9 +19105,6 @@
       "provides": [
         "quota_aware_routing"
       ],
-      "requires": [
-        "neobot::nt_store_quota"
-      ],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -19344,6 +19117,9 @@
           "to_node": "neobot::nt_routing::quota_mode",
           "note": "A1 magpie+freellmapi 吸收：额度感知路由真接线。"
         }
+      ],
+      "external_requires": [
+        "neobot::nt_store_quota"
       ]
     },
     {
@@ -19354,7 +19130,6 @@
       "provides": [
         "wecom_channel"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -19375,7 +19150,6 @@
       "provides": [
         "resume_verdict"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -19396,7 +19170,6 @@
       "provides": [
         "ssd_offload_mode"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -19417,7 +19190,6 @@
       "provides": [
         "agent_home_export_import"
       ],
-      "requires": [],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -19603,10 +19375,6 @@
     [
       "nt_io_messaging::EmailProvider",
       "nt_io_mail"
-    ],
-    [
-      "neobot::nt_store_quota",
-      "neobot::nt_routing::quota_mode"
     ]
   ],
   "experience_targets": [

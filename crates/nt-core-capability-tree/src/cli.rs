@@ -860,7 +860,7 @@ impl CapabilityCli {
                     rationale: format!("经验驱动: 强化 {} | {}", capability_tag, rationale),
                 });
             } else {
-                let new_id = format!("exp::{}::{}", domain.as_str().to_lowercase(), capability_tag);
+                let new_id = format!("exp::nt-{}::{}", domain.as_str(), capability_tag);
                 // 同名 exp:: 节点已存在 (含 deprecated): 不重复 Bud。
                 // 该能力已沉淀为真实模块节点时由经验蒸馏切换目标, deprecated 占位不应复活。
                 if registry.get(&new_id).is_some() {
@@ -1313,6 +1313,78 @@ mod registry_roundtrip_tests {
         }
         let out = reg.export();
         assert_eq!(out.nodes.len(), expected, "★ 往返后节点数变了 ⇒ 静默截断回归");
+    }
+
+    /// **注册表自洽性不变式**：`requires` 里的每一条**必须能解析**
+    /// （节点 id **或**某个节点的 `provides` 标签 —— 双命名空间）。
+    ///
+    /// # 为什么这条必须锁死（2026-10-08 实测事故）
+    ///
+    /// 修复前：真实注册表有 **30** 条 `requires` 既不是节点 id 也不是
+    /// `provides` 标签 ⇒ 每次 `cli::load_registry` 都刷 30 行
+    /// `eprintln WARNING`，且**永远无法消除** ⇒ 告警疲劳；
+    /// 日后真的写错一个 `requires`，会与这 30 条静态噪音混在一起，判据失效。
+    ///
+    /// 修法不是删数据（那是丢架构意图），而是显式分流到 `external_requires`
+    /// ⇒ 于是本不变式可成立，`validate_dependencies` 恢复为**有意义**的信号。
+    ///
+    /// ⛔ 本用例**只**校验 `requires`（树内）；`external_requires` 按定义
+    ///   指向树外，**不要求**可解析 —— 那正是它存在的理由。
+    #[test]
+    fn 真实注册表requires全部可解析() {
+        use crate::registry::RegistryExport;
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../.neotrix/capability_registry.json");
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            eprintln!("跳过：{} 不在工作区", path.display());
+            return;
+        };
+        let export: RegistryExport =
+            serde_json::from_str(&content).expect("真实注册表应可解析");
+
+        let ids: std::collections::HashSet<&str> =
+            export.nodes.iter().map(|n| n.id.as_str()).collect();
+        let tags: std::collections::HashSet<&str> = export
+            .nodes
+            .iter()
+            .flat_map(|n| n.provides.iter().map(String::as_str))
+            .collect();
+
+        let unresolved: Vec<(&str, &str)> = export
+            .nodes
+            .iter()
+            .flat_map(|n| n.requires.iter().map(move |r| (n.id.as_str(), r.as_str())))
+            .filter(|(_, r)| !ids.contains(r) && !tags.contains(r))
+            .collect();
+
+        assert!(
+            unresolved.is_empty(),
+            "★ requires 出现不可解析项（{} 条）⇒ 每次加载都会刷永久警告。\n             树外依赖请写进 `external_requires`（树内依赖才写 `requires`）：\n{:#?}",
+            unresolved.len(),
+            unresolved
+        );
+    }
+
+    /// 反向锁：`external_requires` 必须**真的被保留**（不得被静默丢弃）。
+    /// 它承载树外依赖的架构意图，丢了就是丢信息。
+    #[test]
+    fn external_requires被保留而非丢弃() {
+        use crate::registry::RegistryExport;
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../.neotrix/capability_registry.json");
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            return;
+        };
+        let export: RegistryExport = serde_json::from_str(&content).expect("应可解析");
+        let total: usize = export
+            .nodes
+            .iter()
+            .map(|n| n.external_requires.len())
+            .sum();
+        assert!(
+            total > 0,
+            "★ external_requires 一条都没有 ⇒ 树外依赖的架构意图被丢弃了"
+        );
     }
 
     /// **非老 schema 的坏文件不得被判为可迁移。**
