@@ -81,10 +81,20 @@ pub struct CdpBackend<T> { transport: T }   // 已落地：navigate/click/type/k
   写动作回执非明确确认词（`clicked/typed/navigating/keyed/scrolled`）⇒ 返回 `Io` 错 ⇒ 上层映射 `Unknown` ⇒ **禁止自动重试**；
   文件类动作（`read_file/write_file/list_files`）在窄口**拒收**（属 `nt_workspace` jail，重复实现=第二条无门路径）；
   `truncate_for_detail()` 定长截断防上下文炸。
-- **待落地（core 半边）**：在 `neotrix-core`（已有 chromiumoxide 依赖；现 `crawl::BrowserCircuit` 仅文本级 `fetch/login`）
-  实现 `impl neotrix_neobot::nt_computer::CdpTransport for <chromiumoxide 会话>`，并暴露一个工厂；
-  **接线位置**须由 owner 指定（CLI/desktop/core loop 谁注入）——**未注入前默认仍走 `NoopBackend` 诚实失败**，
-  ⛔ 不允许「为了能跑」而把 Noop 换成假实现。
+- **已落地（core 半边，`536b0f0c`+`后续`）**：`neotrix-core/.../computer_transport.rs`（`stealth-net` feature 下编译）
+  实现 `CoreCdpTransport`（chromiumoxide 页面同步桥：专用 current_thread runtime + `block_on`；
+  `evaluate` = `Page::evaluate` 回字符串、非字符串结果 ⇒ 如实 `Io` 错；
+  `current_url` = `Page::url()`，取不到为 `None` 不编假）。`computer_backend()` 工厂存在。
+  ✅ `cargo check -p neotrix --lib --features stealth-net` rc=0；默认特性下该文件被 cfg 掉 ⇒ 别处零影响。
+  ⛔ **尚未注入到任何生产调用点**（CLI/desktop 谁构造 `CdpBackend` 是 owner 决定项）；
+  **未注入前默认仍走 `NoopBackend` 诚实失败**，不允许「为了能跑」而把 Noop 换成假实现。
+
+- **✅ 2026-10-08 verify_after 三态 UI 已闭环**（本轮）：
+  `verify_after()` 写动作后回读 `querySelector(target)?'present':'absent'`；
+  输出旁路追加 `|verify=match|drift|unavailable` ⇒ `record_computer_receipt` ⇒
+  ledger `status=applied` 行的 `error` 详情由 store 读口解析出 `verify` 字段 ⇒
+  桌面对话区回执 chip 呈现（`applied · retry · match` 完整链）。
+  读动作不追加后缀（无须回读）。若 transport 报错 ⇒ `unavailable`（**动作不改判失败**）。
 - **验收**：core 半边落地后，端到端一次真实 `click` + `verify_after` 回读三态（Match/Drift/Unavailable）+ 急停联动。
 
 ## 5. 记录纪律

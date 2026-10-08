@@ -204,7 +204,7 @@ impl NeobotStore {
     pub fn computer_receipts(
         &self,
         limit: i64,
-    ) -> Result<Vec<(String, String, String, String, bool)>, NtBotError> {
+    ) -> Result<Vec<(String, String, String, String, bool, String)>, NtBotError> {
         let mut stmt = self.conn.prepare(
             "SELECT at, status, error FROM ledger
              WHERE purpose='computer-act'
@@ -228,7 +228,13 @@ impl NeobotStore {
                 .unwrap_or_default()
                 .to_owned();
             let sent = detail.contains("sent=true");
-            Ok((at, action, status, advice, sent))
+            // verify-after 三态（`match`/`drift`/`unavailable`）；没有就空串（**不猜**）。
+            let verify = detail
+                .split("verify=")
+                .nth(1)
+                .map(|s| s.trim_end_matches([']', '\n', ' ']).trim().to_owned())
+                .unwrap_or_default();
+            Ok((at, action, status, advice, sent, verify))
         })?;
         let mut out = Vec::new();
         for row in rows {

@@ -395,7 +395,14 @@ export function NeoBotRoot() {
     remaining_ms: 0,
   })
   const [receipts, setReceipts] = useState<
-    Array<{ at: string; action: string; status: string; advice: string; sent: boolean }>
+    Array<{
+      at: string
+      action: string
+      status: string
+      advice: string
+      sent: boolean
+      verify: string
+    }>
   >([])
   const busy = sel ? (busyByConvo[sel] ?? false) : false
   const [histLoading, setHistLoading] = useState(false)
@@ -915,7 +922,14 @@ export function NeoBotRoot() {
         .then(setLease)
         .catch(() => {})
       void invoke<
-        Array<{ at: string; action: string; status: string; advice: string; sent: boolean }>
+        Array<{
+          at: string
+          action: string
+          status: string
+          advice: string
+          sent: boolean
+          verify: string
+        }>
       >('neobot_computer_receipts', { limit: 5 })
         .then(setReceipts)
         .catch(() => {})
@@ -1819,6 +1833,7 @@ export function NeoBotRoot() {
                   >
                     {r.action || '-'} · {r.status}
                     {r.advice ? ` · ${r.advice}` : ''}
+                    {r.verify ? ` · ${r.verify}` : ''}
                   </span>
                 ))}
               </div>

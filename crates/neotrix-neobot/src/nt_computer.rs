@@ -383,7 +383,41 @@ impl<T: CdpTransport> ComputerBackend for CdpBackend<T> {
                 crate::nt_computer::truncate_for_detail(&out)
             )));
         }
-        Ok(out)
+        // verify-after（**只有确认成功的写动作才回读**；读动作无须回读）：
+        // 结果追加在输出尾部 `|verify=match|drift|unavailable`。
+        // ⛔ 回读失败 ⇒ `unavailable`，**不**把动作改成失败（那会诱发重试）。
+        let suffix = if is_write {
+            match verify_after(&self.transport, call) {
+                VerifyOutcome::Match => "|verify=match",
+                VerifyOutcome::Drift => "|verify=drift",
+                VerifyOutcome::Unavailable => "|verify=unavailable",
+            }
+        } else {
+            ""
+        };
+        Ok(format!("{out}{suffix}"))
+    }
+}
+
+/// verify-after 的**唯一执行点**：写动作之后回读目标是否还在。
+///
+/// 三态判据（`computer-use` P3）：`Match`=选择器仍命中；`Drift`=元素漂移⇒
+/// 上层应 `Stop`；`Unavailable`=回读不可得⇒效果未知⇒`AskHuman`。
+#[must_use]
+pub fn verify_after<T: CdpTransport>(transport: &T, call: &ComputerCall) -> VerifyOutcome {
+    if call.target.trim().is_empty() {
+        return VerifyOutcome::Unavailable;
+    }
+    let probe = match serde_json::to_string(&call.target) {
+        Ok(sel) => format!(
+            "(function(){{try{{return document.querySelector({sel})?'present':'absent';}}catch(e){{return 'error';}}}})()"
+        ),
+        Err(_) => return VerifyOutcome::Unavailable,
+    };
+    match transport.evaluate(&probe) {
+        Ok(v) if v.contains("present") => VerifyOutcome::Match,
+        Ok(v) if v.contains("absent") => VerifyOutcome::Drift,
+        _ => VerifyOutcome::Unavailable,
     }
 }
 
@@ -655,7 +689,9 @@ mod tests {
         // 写动作 + 明确确认 ⇒ Ok
         let ok = CdpBackend::new(Fake { calls: RefCell::new(vec![]), reply: "clicked".into() });
         let call = parse_computer_call(&serde_json::json!({"action":"click","target":"#go"})).expect("parse");
-        assert_eq!(ok.execute(&call).expect("exec"), "clicked");
+        let out = ok.execute(&call).expect("exec");
+        assert!(out.starts_with("clicked"), "{out}");
+        assert!(out.contains("verify="), "写动作必须带回读三态: {out}");
         let logged = ok.transport.calls.borrow()[0].clone();
         assert!(logged.contains("querySelector(\"#go\")"), "选择器必须是 JSON 转义后的字面量: {logged}");
 
@@ -665,6 +701,43 @@ mod tests {
         let receipt = super::receipt_for_error("click", &err);
         assert_eq!(receipt.outcome, super::ActionOutcome::Unknown, "非确认回执 ⇒ 效果未知");
         assert!(receipt.sent);
+    }
+
+    #[test]
+    fn cdp_verify_after_appends_three_state_to_output() {
+        use super::{CdpBackend, CdpTransport, ComputerBackend};
+        use crate::nt_error::NtBotError;
+
+        struct Probe {
+            probe_reply: &'static str,
+        }
+        impl CdpTransport for Probe {
+            fn evaluate(&self, script: &str) -> Result<String, NtBotError> {
+                if script.contains("'present'") {
+                    Ok(self.probe_reply.to_owned())
+                } else {
+                    Ok("clicked".to_owned())
+                }
+            }
+        }
+
+        let call = parse_computer_call(&serde_json::json!({"action":"click","target":"#go"})).expect("parse");
+        for (reply, want) in [
+            ("present", "|verify=match"),
+            ("absent", "|verify=drift"),
+            ("weird", "|verify=unavailable"),
+        ] {
+            let out = CdpBackend::new(Probe { probe_reply: reply })
+                .execute(&call)
+                .expect("exec");
+            assert!(out.ends_with(want), "reply={reply} out={out}");
+        }
+        // 读动作不追加 verify 后缀
+        let read = parse_computer_call(&serde_json::json!({"action":"screenshot"})).expect("parse");
+        let out = CdpBackend::new(Probe { probe_reply: "present" })
+            .execute(&read)
+            .expect("exec");
+        assert!(!out.contains("verify="), "{out}");
     }
 
     #[test]

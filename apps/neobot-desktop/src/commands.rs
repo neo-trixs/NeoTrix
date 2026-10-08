@@ -69,12 +69,13 @@ pub fn neobot_computer_receipts(limit: Option<i64>) -> Result<Vec<ComputerReceip
         .map_err(|e| e.to_string())?;
     Ok(rows
         .into_iter()
-        .map(|(at, action, status, advice, sent)| ComputerReceiptRow {
+        .map(|(at, action, status, advice, sent, verify)| ComputerReceiptRow {
             at,
             action,
             status,
             advice,
             sent,
+            verify,
         })
         .collect())
 }
@@ -90,6 +91,8 @@ pub struct ComputerReceiptRow {
     pub advice: String,
     /// 动作是否**已派发**（false ⇒ 一定没生效，可放心重来）。
     pub sent: bool,
+    /// verify-after 三态：`match` / `drift` / `unavailable`；空 = 未回读。
+    pub verify: String,
 }
 
 /// `neobot_stop_all() -> usize` —— **全局急停**（kill switch）。
