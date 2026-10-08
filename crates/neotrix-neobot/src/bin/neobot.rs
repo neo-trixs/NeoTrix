@@ -219,6 +219,12 @@ enum Cmd {
         /// 目标 shell.
         shell: String,
     },
+    /// 启动本地协议翻译网关（feature = "gateway-http" 驱动；依赖 axum）.
+    Gateway {
+        /// 监听地址（默认 127.0.0.1:8080）.
+        #[arg(long, default_value = "127.0.0.1:8080")]
+        addr: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -536,6 +542,7 @@ fn real_main() -> Result<(), NtBotError> {
             CapabilityCmd::Canary => cmd_capability_canary(),
         },
         Cmd::Completions { shell } => cmd_completions(&shell),
+        Cmd::Gateway { addr } => cmd_gateway(&addr),
         Cmd::Export { out } => cmd_export(out.as_deref()),
         Cmd::Run { title, text, engine, provider, model, convo, stream } => {
             cmd_run(&title, &text, &engine, provider.as_deref(), model.as_deref(), convo.as_deref(), stream)
@@ -1205,6 +1212,31 @@ fn cmd_audit_prune(days: i64) -> Result<(), NtBotError> {
     let cutoff = (chrono::Utc::now() - chrono::Duration::days(days.max(0))).to_rfc3339();
     let n = store.prune_audit(&cutoff)?;
     println!("neobot audit pruned: {n} rows older than {days}d");
+    Ok(())
+}
+
+/// `neobot gateway --addr 127.0.0.1:8080`：启动本地 HTTP 协议翻译壳。
+///
+/// 未启用 feature 时**如实回报**而不是静默不工作——解构 teuer(与 P1-2 ledger
+/// 审计的「拒绝静默」同源纪律）。
+#[cfg(feature = "gateway-http")]
+fn cmd_gateway(addr: &str) -> Result<(), NtBotError> {
+    let cfg = load_config()?;
+    let store = open_store(&cfg)?;
+    eprintln!("[neobot] nt_gateway_http binding {addr}...");
+    let rt = tokio::runtime::Runtime::new().map_err(|e| NtBotError::Io(format!("rt: {e}")))?;
+    rt.block_on(neotrix_neobot::nt_gateway::run_server(
+        neotrix_neobot::nt_gateway::GatewayConfig {
+            addr: addr.to_owned(),
+            store,
+        },
+    ))?;
+    Ok(())
+}
+
+#[cfg(not(feature = "gateway-http"))]
+fn cmd_gateway(_addr: &str) -> Result<(), NtBotError> {
+    eprintln!("[neobot] feature 'gateway-http' is off; rebuild with --features gateway-http");
     Ok(())
 }
 

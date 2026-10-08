@@ -43,5 +43,13 @@ neotrix-types = { workspace = true }   # nt_governance 的 R09 语言一致性�
 #   而反虚标审计（`maturity_audit`）要防的正是那种「谁说了算」的分叉。
 nt_core_capability_tree = { path = "../nt-core-capability-tree" }
 
+# 本地协议翻译网关 (N6.3) — HTTP 传输壳。默认 off；打开：
+#   cargo build -p neotrix-neobot --features gateway-http
+# axum 选 0.8（与 neotrix-core 同版本），引入前已跑 check-feature-gates.sh。
+axum = { version = "0.8", optional = true }
+
+[features]
+gateway-http = ["dep:axum"]
+
 [lints]
 workspace = true
