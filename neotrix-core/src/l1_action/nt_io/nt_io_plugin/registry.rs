@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -312,6 +313,28 @@ impl PluginRegistry {
 
     pub async fn list(&self) -> Vec<PluginInfo> {
         self.inner.read().await.list()
+    }
+
+    /// 按 capability 取出注册表中所有插件的**共享句柄**。
+    ///
+    /// 这是「统一接入口」的取物口：`capability` 说类别，句柄把真实对象交回
+    /// 消费方（provider / model_source 据此拿到自己的 `Arc<dyn …>`），
+    /// 于是消费方不再自行 `new` 这些对象 —— 「登记什么就跑什么」。
+    /// 载体不含共享句柄的插件（如 CLI descriptor）返回 `None`，自然被过滤。
+    pub async fn shared_handles_by_capability(
+        &self,
+        capability: &str,
+    ) -> Vec<Arc<dyn Any + Send + Sync>> {        let inner = self.inner.read().await;
+        let mut out = Vec::new();
+        for registered in inner.plugins.values() {
+            if registered.info.capability != capability {
+                continue;
+            }
+            if let Some(handle) = registered.plugin.shared_handle() {
+                out.push(handle);
+            }
+        }
+        out
     }
 
     pub async fn dispatch(&self, event: &PluginEvent) {

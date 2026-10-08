@@ -1,4 +1,5 @@
 use std::fmt;
+use std::sync::Arc;
 use std::time::Instant;
 
 pub mod registry;
@@ -94,6 +95,12 @@ pub trait Plugin: Send + Sync {
     fn on_event(&self, event: &PluginEvent) -> Result<(), String>;
     /// 允许把 `&dyn Plugin` 向下转成具体插件类型（由具体 impl 返回 `self`）。
     fn as_any(&self) -> &dyn std::any::Any;
+    /// 共享句柄：把插件持有的**真实对象**（如 `Arc<dyn LlmProvider>`）交回给
+    /// 注册表，使消费方能按 capability 取到同一个实例，而不是各自 `new` 一份。
+    /// 载体里没有共享对象时默认 `None`。
+    fn shared_handle(&self) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
+        None
+    }
     /// 外延能力类别，供 PluginRegistry 按 capability 分流。默认 generic。
     fn capability(&self) -> &'static str { "generic" }
 }

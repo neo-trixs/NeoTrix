@@ -15,4 +15,4 @@ pub use build_desktop::DesktopBuilder;
 pub use daemon_monitor::DaemonMonitor;
 pub use git_hook::GitHook;
 pub use interactive_cli::InteractiveAgentCli;
-pub use external_cli_plugins::{ExternalCliPlugin, find_external_cli_plugin, load_external_cli_plugins, plugins_dir, CliDescriptorPlugin, external_cli_as_plugins, load_external_cli_into};
+pub use external_cli_plugins::{ExternalCliPlugin, find_external_cli_plugin, load_external_cli_plugins, plugins_dir, CliDescriptorPlugin, external_cli_as_plugins, load_external_cli_into, cli_descriptors_from_registry, find_cli_agent_by_name};

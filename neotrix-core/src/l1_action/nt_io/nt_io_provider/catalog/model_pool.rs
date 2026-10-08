@@ -17,6 +17,7 @@
 //! ```
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use neotrix_neobot::nt_llama::{default_max_model_gb, llamacpp_base_url, ollama_base_url};
 
@@ -378,7 +379,9 @@ impl ModelSource for LocalEndpointSource {
 // ═══════════════════════════════════════════════════════════
 
 pub struct UnifiedModelPool {
-    sources: Vec<Box<dyn ModelSource>>,
+    /// 源以 `Arc` 共享持有：既能被本池直接 `new`，也能由 `PluginRegistry`
+    /// 交回**同一个**实例（统一接入口），避免 pool 与 registry 各造一份。
+    sources: Vec<Arc<dyn ModelSource>>,
     cache: std::sync::RwLock<Vec<UnifiedModelEntry>>,
 }
 
@@ -393,14 +396,25 @@ impl UnifiedModelPool {
     /// 创建默认池 (包含所有内置源)
     pub fn default_pool() -> Self {
         let mut pool = Self::new();
-        pool.add_source(Box::new(LocalGgufSource::default_m5()));
-        pool.add_source(Box::new(CloudFreeSource::new()));
-        pool.add_source(Box::new(LocalEndpointSource::new()));
+        pool.add_source(Arc::new(LocalGgufSource::default_m5()));
+        pool.add_source(Arc::new(CloudFreeSource::new()));
+        pool.add_source(Arc::new(LocalEndpointSource::new()));
+        pool
+    }
+
+    /// 用 `PluginRegistry` 里已登记的真实 source 组池 —— 统一接入口的收口点。
+    /// registry 登记了哪些 `capability="model_source"`，池就跑哪些；池不再
+    /// 自行 `new`，故 CLI/后台与 registry 共享同一批 source 实例。
+    pub fn from_registry_sources(sources: Vec<Arc<dyn ModelSource>>) -> Self {
+        let mut pool = Self::new();
+        for source in sources {
+            pool.add_source(source);
+        }
         pool
     }
 
     /// 添加模型源插件
-    pub fn add_source(&mut self, source: Box<dyn ModelSource>) {
+    pub fn add_source(&mut self, source: Arc<dyn ModelSource>) {
         self.sources.push(source);
     }
 

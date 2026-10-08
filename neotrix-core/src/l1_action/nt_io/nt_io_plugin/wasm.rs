@@ -20,8 +20,11 @@ pub fn resolve_wasm_engine() -> wasmtime::Engine {
 }
 
 pub struct WasmPluginWrapper {
-    name: String,
-    version: String,
+    /// name/version 在构造时一次性内部化为 `&'static str`：`Plugin::name()`
+    /// 返回 `&'static str`，若每次调用都 `Box::leak`，register/list/dispatch
+    /// 每次读名字都会漏一份内存。
+    name: &'static str,
+    version: &'static str,
     wasm_bytes: Vec<u8>,
 }
 
@@ -32,12 +35,15 @@ impl WasmPluginWrapper {
         let _module = wasmtime::Module::new(engine, &wasm_bytes)
             .map_err(|e| format!("Invalid wasm module: {}", e))?;
 
-        let name = path.file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("unknown")
-            .to_string();
+        let name: &'static str = Box::leak(
+            path.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown")
+                .to_string()
+                .into_boxed_str(),
+        );
 
-        let version = "0.1.0-wasm".to_string();
+        let version: &'static str = Box::leak("0.1.0-wasm".to_string().into_boxed_str());
 
         Ok(Self { name, version, wasm_bytes })
     }
@@ -84,11 +90,11 @@ impl WasmPluginWrapper {
 
 impl Plugin for WasmPluginWrapper {
     fn name(&self) -> &'static str {
-        Box::leak(self.name.clone().into_boxed_str())
+        self.name
     }
 
     fn version(&self) -> &'static str {
-        Box::leak(self.version.clone().into_boxed_str())
+        self.version
     }
 
     fn on_load(&self) -> Result<(), String> {
