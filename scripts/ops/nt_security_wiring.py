@@ -1063,7 +1063,7 @@ def main(argv):
             if nxt and not nxt.startswith("-"):
                 base_path = nxt
             break
-    if "--baseline" in argv:
+    if "--baseline" in argv or "--update-baseline" in argv:
         target = base_path or BASELINE
         res = analyze(ROOTS, REPO)
         _, reasons = read_baseline(target)
