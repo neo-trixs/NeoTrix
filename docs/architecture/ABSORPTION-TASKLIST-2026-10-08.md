@@ -65,10 +65,11 @@
 
 ### A7. 逆向工程 MCP 能力（morluto/rea）
 - **源**：`morluto/rea`（MIT，17,126★）`rea-agents` MCP
-- **现状**：`NT-WORLD/retrieve` 分支；`nt_crawl_sources.rs` 有 crawl 队列
-- **改**：📋 路线图——评估把 rea 作为 WORLD 的外部 MCP server 接入；
-  不新增模块，只在 `skills/` 加一份配置模板
-- **验**：设计文档评审 + 1 个 spike（真实二进制跑 1 次 MCP 调用）
+- **2026-10-08 spike 实测**：本机 `which rea*` 均未命中；`npx --no-install rea-agents`
+  报告包未装（注册表中存在 `rea-agents@4.0.1`）。
+- **裁决**：**📋 intake**——不在本工作区直接安装/执行第三方 MCP server；
+  未来如需逆向能力，走独立 worktree + `npx rea-agents` 起服务。
+- **验**：spike 记录即产出，不验代码。
 
 ### A8. persona/工作区对照（openhanako + row-bot + paseo-bots）
 - **源**：`liliMozi/openhanako`（Apache，6,718★）、`siddsachar/row-bot`（Apache，1,572★）、
