@@ -60,16 +60,16 @@
 | # | 缺陷 | 位置 | 状态 | 判据 / 备注 |
 |---|---|---|---|---|
 | 3 | `capability_invoke` **不执行能力本体**，只做市场校验+计数+回执 | `crates/neotrix-neobot/src/nt_agent.rs` | 已核实（设计缺口） | trade 执行入口在 core L1，neobot 不依赖 core ⇒ 循环依赖。刻意不编造假结果。接法 A/B/C 见 `handoff-2026-10-06-capability-invoke.md` §3 |
-| 4 | `dispatch_by_capability` **只解析节点就 `counts += 1`** ⇒ rationale 路径污染 `registered_never_invoked()` | `crates/neotrix-neobot/src/nt_capability_registry.rs` | 已核实（读码） | 应拆 `resolve_by_capability()`（无副作用）+ `record_invocation(id)`（仅执行成功后）。⛔ 注意 `record_dispatch`（`82824585` 新增）已具「成功后记账」语义，收敛时须一并处理，否则计数规则仍有两处 |
-| 5 | 金丝雀窗口**进程全局**，多会话互相 `reset()` | `crates/neotrix-neobot/src/nt_capability_canary.rs` | **已核实** | `static CANARY: OnceLock<Mutex<Canary>>` + `static WINDOW_TICKS: AtomicUsize`，均无 `convo_id` 键。⇒ 需按会话键化 |
-| 6 | `maybe_compact_context` **只有测试调用**，未接生产 | `neotrix-core/.../nt_io_agent_loop/` | **已核实** | 全仓调用点仅 `nt_loop_tests.rs:527,555`。接它会新增 LLM 调用 ⇒ 须先纳入 `nt_cost.rs` 预算，否则等于悄悄加钱 |
+| 4 | `dispatch_by_capability` **只解析节点就 `counts += 1`** ⇒ rationale 路径污染 `registered_never_invoked()` | `crates/neotrix-neobot/src/nt_capability_registry.rs` | **✅ 已修**（2026-10-07） | `dispatch_by_capability` 改纯解析不计数，`record_dispatch` 成为唯一成功记账入口；9 单测锁定 |
+| 5 | 金丝雀窗口**进程全局**，多会话互相 `reset()` | `crates/neotrix-neobot/src/nt_capability_canary.rs` | **✅ 已修**（2026-10-07，P1-5 落盘 + E0502 修复） | 窗口按会话键化（`windows: BTreeMap<String, SessionWindow>`），`tick/signal/status` 均以 session 为首参；9 单测锁定跨会话不互相重置 |
+| 6 | `maybe_compact_context` **只有测试调用**，未接生产 | `neotrix-core/.../nt_io_agent_loop/` | **部分过时（2026-10-07 复核）** | 全仓已在 `nt_loop_core.rs:25,75,206` 接生产；但摘要调用不进账本 ⇒ 「悄悄加钱」仍成立。core `COST_TRACKER.record_agent_cost` 无生产调用点，禁用于计费 |
 | 7 | core 侧旧 `distill_output` **预算过小时死循环** | `neotrix-core/src/l1_action/nt_io/nt_io_agent_loop/nt_loop_step.rs:156-161` | **已核实** | `while estimate_tokens(&clipped) > max_tokens && clipped.len() > 8`，每轮 `truncate(0.7*len)` 后 `push_str(15 字符)` ⇒ 存在 `len≈50` 的不动点；当 `max_tokens` 小到 50 字符都装不下即**永不退出**。循环后的兜底分支在该情形**不可达**。neobot 侧已修（`8196dd10`），core 这份属他窗未改 |
 
 ## P2
 
 | # | 缺陷 | 位置 | 状态 | 判据 / 备注 |
 |---|---|---|---|---|
-| 8 | 2 处 **U+FFFD 编码损坏**在 core | `neotrix-core/src/l0_substrate/nt_core_event_bus.rs`、`neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/kb_search.rs` | **已核实，各 1 处** | 纯文本修复（1 行内）。建议加个门，否则编码损坏会静默传播 |
+| 8 | 2 处 **U+FFFD 编码损坏**在 core | `neotrix-core/src/l0_substrate/nt_core_event_bus.rs`、`neotrix-core/src/l4_emotion/nt_memory/nt_memory_kb/kb_search.rs` | **✅ 已修**（2026-10-08 复测：两文件 `grep U+FFFD` 零命中） | 纯文本修复（1 行内）。建议加个门，否则编码损坏会静默传播 |
 | 9 | `mod_orphan::scan_tree_sorted_by_lines_desc` 失败 | `neotrix-core/src/l0_substrate/nt_core_platform/mod_orphan.rs:682` | **✅ 已修**（2026-10-06 12:38 复测 `scan_tree_sorted` = **1 passed**）| 他窗于本日修正断言（2→3）并附裁决依据「扫描器是对的，本测试陈旧」⇒ 属**测试陈旧**而非扫描器缺陷。棘轮已正确归零（见排期 §5 A3 裁决） |
 | 10 | 商业许可阻断：例外条目 `status: void` | `.neotrix/LICENSE-EXCEPTIONS.md` | 未核实（本轮未读该文件现状） | ⛔ 不得改门规避 |
 | 11 | 能力市场无 API/UI；KB namespace/sensitivity → `ring_inner` 结果层门未接 | 多处 | 未核实 | 承接自 `handoff-2026-10-05-tui-wiring-and-six-defects.md` 等，⛔ 动手前先复现 |
@@ -97,9 +97,7 @@
 | # | 缺陷 | 位置 | 状态 | 判据 / 备注 |
 |---|---|---|---|---|
 | 13 | **测试隔离缺陷**：单独跑 PASS、全量跑 FAIL | `neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/handlers_game.rs::tests::test_constellation_advance` | **已核实**（2026-10-06） | 同一测试 `cargo test -p neotrix --lib test_constellation_advance` **2 passed**，而全量 `cargo test -p neotrix --lib` 记录它 FAILED ⇒ **跨测试状态污染**，不是断言错。⚠️ 该文件当时有 **-317 行未提交改动**（他窗在途重构）⇒ 尚未定位污染源，⛔ **不要**先改断言。查污染源的方向：全量与单测的差异在「谁先跑了什么」⇒ 需按测试序逐段二分，或用 `--test-threads=1` 缩小范围。⚠️ 同型问题在 nextest 上更早暴露（`group_contracts` 13/13，见「编译与磁盘」C4）⇒ 两者可能是同一类根因。 |
-
-
-## 地图刷新带出的结构澄清（2026-10-06 13:36）
+| 14 | **自治梯度 L3 结构上不可达**：`_LoopReadyScore` 降权后满分 65（40+25），而 `_autonomy_tier` 阈值仍是降权前的 80/50 ⇒ L3（自主进化档）永远到不了；5 个测试仍按旧权重断言 100/80/85（全量跑必红，2026-10-08 后台全量实测 4 failed 实证） | `neotrix-core/src/l5_cognition/nt_mind/nt_mind_background_loop/run.rs` | **✅ 已修**（2026-10-08）：阈值重标定 65/40（保留「无 KB 不得 L3」「无 handlers 不得 L2」语义），5 测试同步修正，定向复测全绿 | T0-2 同族「结构上不可能」；发现途径：吸收对照（openbot per-agent 健康→自治梯度） |
 
 | # | 事项 | 状态 | 判据 / 备注 |
 |---|---|---|---|

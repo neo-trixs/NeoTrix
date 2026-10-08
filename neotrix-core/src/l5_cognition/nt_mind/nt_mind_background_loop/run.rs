@@ -325,11 +325,12 @@ impl _LoopReadyScore {
         }
     }
 
-    /// 派生自治梯度: >=80 → L3, >=50 → L2, else L1
+    /// 派生自治梯度: >=65 → L3（= handlers+kb 双真，降权后满分）, >=40 → L2（仅 handlers 真），else L1。
+    /// ⛔ 阈值 80/50 是降权前（满分 100）时代遗留 —— 不重标定则 L3 **结构上不可达**。
     pub(crate) fn _autonomy_tier(&self) -> _AutonomyTier {
-        if self.score >= 80 {
+        if self.score >= 65 {
             _AutonomyTier::L3
-        } else if self.score >= 50 {
+        } else if self.score >= 40 {
             _AutonomyTier::L2
         } else {
             _AutonomyTier::L1
@@ -1644,15 +1645,15 @@ mod tests {
     #[test]
     fn test_loop_ready_score_full_kit() {
         let s = _LoopReadyScore::compute(true, true, true, true);
-        assert_eq!(s.score, 100);
+        assert_eq!(s.score, 65, "降权后满分 = 40+25（no_stall/cadence 不贡献）");
         assert_eq!(s._autonomy_tier(), _AutonomyTier::L3);
     }
 
     #[test]
     fn test_loop_ready_score_no_kb_downgrades_tier() {
-        // KB 缺失 → 75 分 → L2 (自动修复), 不能 L3 自主进化
+        // KB 缺失 → 40 分（仅 handlers）→ L2 (自动修复), 不能 L3 自主进化
         let s = _LoopReadyScore::compute(true, false, true, true);
-        assert_eq!(s.score, 75);
+        assert_eq!(s.score, 40);
         assert_eq!(s._autonomy_tier(), _AutonomyTier::L2);
     }
 
@@ -1745,21 +1746,22 @@ mod readiness_wiring_tests {
     #[test]
     fn 四个信号各自独立影响分数() {
         let all_on = _LoopReadyScore::compute(true, true, true, true);
-        assert_eq!(all_on.score, 100, "全开 = 40+25+20+15");
+        assert_eq!(all_on.score, 65, "降权后满分 = 40+25");
 
         // ⭐ 逐个关闭 ⇒ 分数必须**精确**减少对应权重
         let no_handlers = _LoopReadyScore::compute(false, true, true, true);
-        assert_eq!(no_handlers.score, 60, "关 handlers ⇒ 100-40=60");
+        assert_eq!(no_handlers.score, 25, "关 handlers ⇒ 65-40=25");
         assert!(!no_handlers.handlers_ok, "字段必须反映传入值");
 
         let no_kb = _LoopReadyScore::compute(true, false, true, true);
-        assert_eq!(no_kb.score, 75, "关 kb ⇒ 100-25=75");
+        assert_eq!(no_kb.score, 40, "关 kb ⇒ 65-25=40");
 
+        // ⭐ 已降权字段：翻转**不得**改变分数（假读点回归哨兵）
         let no_stall = _LoopReadyScore::compute(true, true, false, true);
-        assert_eq!(no_stall.score, 80, "关 no_stall ⇒ 100-20=80");
+        assert_eq!(no_stall.score, 65, "no_stall 已降权 ⇒ 不影响分数");
 
         let no_cadence = _LoopReadyScore::compute(true, true, true, false);
-        assert_eq!(no_cadence.score, 85, "关 cadence ⇒ 100-15=85");
+        assert_eq!(no_cadence.score, 65, "cadence_ok 已降权 ⇒ 不影响分数");
 
         let all_off = _LoopReadyScore::compute(false, false, false, false);
         assert_eq!(all_off.score, 0, "全关 = 0");
@@ -1771,14 +1773,14 @@ mod readiness_wiring_tests {
     #[test]
     fn 自治梯度随handlers_ok下降() {
         let healthy = _LoopReadyScore::compute(true, true, true, true);
-        assert_eq!(healthy._autonomy_tier(), super::_AutonomyTier::L3, "100 分 ⇒ L3");
+        assert_eq!(healthy._autonomy_tier(), super::_AutonomyTier::L3, "65 分（降权后满分）⇒ L3");
 
         // ⭐ 修复前不可能出现的情形：handlers 挂掉但仍判 L3
         let degraded = _LoopReadyScore::compute(false, true, true, true);
         assert_eq!(
             degraded._autonomy_tier(),
-            super::_AutonomyTier::L2,
-            "60 分 ⇒ 降级到 L2（修复前 handlers_ok 恒 true ⇒ 该情形不可达）"
+            super::_AutonomyTier::L1,
+            "25 分（仅 kb）⇒ 降级到 L1：无 handlers 无从自动修复（L2 阈值 40 = 仅 handlers 真）"
         );
     }
 }

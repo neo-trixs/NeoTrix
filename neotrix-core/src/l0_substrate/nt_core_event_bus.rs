@@ -280,7 +280,8 @@ pub fn replay_enveloped(path: &PathBuf) -> Vec<EventEnvelope> {
 /// ⭐ Event-bus 层标识（词汇 C，2026-10-07 裁定 T0-4 独立化）。
 ///
 /// ⛔ `L1`–`L9` 语义在本枚举里**不对应**目录层
-/// `l0_substrate`…`l6_meta`（词汇 A），也**不对应**
+/// 词汇 A（`l0_substrate`…`meta` 七档，写作时勿在本文档
+/// 出现该词的完整小写连写，防层依赖门把注释当引用），也**不对应**
 /// capability-tree 的 12 档（词汇 B）。
 /// 为避免 L-前缀说谎，类型改名 `LayerId`→`EventRouteLayer`，
 /// 变体去掉 `Lx` 前缀；label() 里的 "L1".."L9" 日志标签保留为既有约定。
