@@ -1395,30 +1395,200 @@ fn execute_tool(
     sink: &crate::nt_changes::ChangeSink<'_>,
     stop: &StopToken,
 ) -> Result<ToolOutcome, NtBotError> {
-    match &call.name {
-        ToolName::SetTurnStatus => Ok(ToolResult {
-            ok: parse_status_arg(&call.args).is_some(),
-            output: "status recorded".to_owned(),
-            truncated: false,
-        }
-        .into()),
-        ToolName::Bash => Ok(execute_bash(config, call, stop)?.into()),
-        ToolName::ReadFile => Ok(execute_read(config, call, sink)?.into()),
-        ToolName::ReadImage => execute_read_image(config, engine, call),
-        ToolName::WriteFile => Ok(execute_write(config, call, turn_written, sink)?.into()),
-        ToolName::EditFile => Ok(execute_edit(config, call, turn_written, sink)?.into()),
-        ToolName::ComputerAct => Ok(execute_computer(call)?.into()),
-        ToolName::WebSearch => Ok(execute_web_search(call)?.into()),
-        ToolName::WebFetch => Ok(execute_web_fetch(call)?.into()),
-        ToolName::SidebarOpen => Ok(execute_sidebar_open(call)?.into()),
-        ToolName::QwenMediaInfo
-        | ToolName::QwenReadVideo
-        | ToolName::QwenVisualize
-        | ToolName::QwenSaveView => execute_qwen_mm(config, engine, call, stop),
-        ToolName::PdfGroundText => Ok(execute_pdf_ground_text(config, call)?.into()),
-        ToolName::CapabilityInvoke => Ok(execute_capability_invoke(call)?.into()),
-        ToolName::Unknown(raw) => Err(NtBotError::Invalid(format!("unknown tool '{raw}'"))),
+    let routes = TOOL_ROUTES.get_or_init(build_builtin_routes);
+    let handler = routes
+        .get(call.name.as_str())
+        .ok_or_else(|| NtBotError::Invalid(format!("unknown tool: {}", call.name.as_str())))?;
+    handler(config, engine, call, turn_written, sink, stop)
+}
+
+type ToolExecFn = fn(
+    config: &NeobotConfig,
+    engine: &dyn EngineAdapter,
+    call: &crate::nt_types::ToolCall,
+    turn_written: &mut usize,
+    sink: &crate::nt_changes::ChangeSink<'_>,
+    stop: &StopToken,
+) -> Result<ToolOutcome, NtBotError>;
+
+static TOOL_ROUTES: std::sync::OnceLock<
+    std::collections::HashMap<&'static str, ToolExecFn>,
+> = std::sync::OnceLock::new();
+
+fn set_turn_status_fn(
+    _: &NeobotConfig,
+    _: &dyn EngineAdapter,
+    call: &crate::nt_types::ToolCall,
+    _: &mut usize,
+    _: &crate::nt_changes::ChangeSink<'_>,
+    _: &StopToken,
+) -> Result<ToolOutcome, NtBotError> {
+    Ok(ToolResult {
+        ok: parse_status_arg(&call.args).is_some(),
+        output: "status recorded".to_owned(),
+        truncated: false,
     }
+    .into())
+}
+
+fn bash_fn(
+    config: &NeobotConfig,
+    _: &dyn EngineAdapter,
+    call: &crate::nt_types::ToolCall,
+    _: &mut usize,
+    _: &crate::nt_changes::ChangeSink<'_>,
+    stop: &StopToken,
+) -> Result<ToolOutcome, NtBotError> {
+    Ok(execute_bash(config, call, stop)?.into())
+}
+
+fn read_file_fn(
+    config: &NeobotConfig,
+    _: &dyn EngineAdapter,
+    call: &crate::nt_types::ToolCall,
+    _: &mut usize,
+    sink: &crate::nt_changes::ChangeSink<'_>,
+    _: &StopToken,
+) -> Result<ToolOutcome, NtBotError> {
+    Ok(execute_read(config, call, sink)?.into())
+}
+
+fn read_image_fn(
+    config: &NeobotConfig,
+    engine: &dyn EngineAdapter,
+    call: &crate::nt_types::ToolCall,
+    _: &mut usize,
+    _: &crate::nt_changes::ChangeSink<'_>,
+    _: &StopToken,
+) -> Result<ToolOutcome, NtBotError> {
+    execute_read_image(config, engine, call)
+}
+
+fn write_file_fn(
+    config: &NeobotConfig,
+    _: &dyn EngineAdapter,
+    call: &crate::nt_types::ToolCall,
+    turn_written: &mut usize,
+    sink: &crate::nt_changes::ChangeSink<'_>,
+    _: &StopToken,
+) -> Result<ToolOutcome, NtBotError> {
+    Ok(execute_write(config, call, turn_written, sink)?.into())
+}
+
+fn edit_file_fn(
+    config: &NeobotConfig,
+    _: &dyn EngineAdapter,
+    call: &crate::nt_types::ToolCall,
+    turn_written: &mut usize,
+    sink: &crate::nt_changes::ChangeSink<'_>,
+    _: &StopToken,
+) -> Result<ToolOutcome, NtBotError> {
+    Ok(execute_edit(config, call, turn_written, sink)?.into())
+}
+
+fn computer_act_fn(
+    _: &NeobotConfig,
+    _: &dyn EngineAdapter,
+    call: &crate::nt_types::ToolCall,
+    _: &mut usize,
+    _: &crate::nt_changes::ChangeSink<'_>,
+    _: &StopToken,
+) -> Result<ToolOutcome, NtBotError> {
+    Ok(execute_computer(call)?.into())
+}
+
+fn web_search_fn(
+    _: &NeobotConfig,
+    _: &dyn EngineAdapter,
+    call: &crate::nt_types::ToolCall,
+    _: &mut usize,
+    _: &crate::nt_changes::ChangeSink<'_>,
+    _: &StopToken,
+) -> Result<ToolOutcome, NtBotError> {
+    Ok(execute_web_search(call)?.into())
+}
+
+fn web_fetch_fn(
+    _: &NeobotConfig,
+    _: &dyn EngineAdapter,
+    call: &crate::nt_types::ToolCall,
+    _: &mut usize,
+    _: &crate::nt_changes::ChangeSink<'_>,
+    _: &StopToken,
+) -> Result<ToolOutcome, NtBotError> {
+    Ok(execute_web_fetch(call)?.into())
+}
+
+fn sidebar_open_fn(
+    _: &NeobotConfig,
+    _: &dyn EngineAdapter,
+    call: &crate::nt_types::ToolCall,
+    _: &mut usize,
+    _: &crate::nt_changes::ChangeSink<'_>,
+    _: &StopToken,
+) -> Result<ToolOutcome, NtBotError> {
+    Ok(execute_sidebar_open(call)?.into())
+}
+
+fn qwen_mm_fn(
+    config: &NeobotConfig,
+    engine: &dyn EngineAdapter,
+    call: &crate::nt_types::ToolCall,
+    _: &mut usize,
+    _: &crate::nt_changes::ChangeSink<'_>,
+    stop: &StopToken,
+) -> Result<ToolOutcome, NtBotError> {
+    execute_qwen_mm(config, engine, call, stop)
+}
+
+fn pdf_ground_text_fn(
+    config: &NeobotConfig,
+    _: &dyn EngineAdapter,
+    call: &crate::nt_types::ToolCall,
+    _: &mut usize,
+    _: &crate::nt_changes::ChangeSink<'_>,
+    _: &StopToken,
+) -> Result<ToolOutcome, NtBotError> {
+    Ok(execute_pdf_ground_text(config, call)?.into())
+}
+
+fn capability_invoke_fn(
+    _: &NeobotConfig,
+    _: &dyn EngineAdapter,
+    call: &crate::nt_types::ToolCall,
+    _: &mut usize,
+    _: &crate::nt_changes::ChangeSink<'_>,
+    _: &StopToken,
+) -> Result<ToolOutcome, NtBotError> {
+    Ok(execute_capability_invoke(call)?.into())
+}
+
+fn build_builtin_routes() -> std::collections::HashMap<&'static str, ToolExecFn> {
+    let mut m: std::collections::HashMap<&'static str, ToolExecFn> =
+        std::collections::HashMap::new();
+    m.insert("set_turn_status", set_turn_status_fn);
+    m.insert("bash", bash_fn);
+    m.insert("read_file", read_file_fn);
+    m.insert("read_image", read_image_fn);
+    m.insert("write_file", write_file_fn);
+    m.insert("edit_file", edit_file_fn);
+    m.insert("computer_act", computer_act_fn);
+    m.insert("web_search", web_search_fn);
+    m.insert("web_fetch", web_fetch_fn);
+    m.insert("sidebar_open", sidebar_open_fn);
+    for qwen in [
+        "qwen_media_info",
+        "qwen_read_video",
+        "qwen_visualize",
+        "qwen_save_view",
+    ] {
+        m.insert(qwen, qwen_mm_fn);
+    }
+    m.insert("pdf_ground_text", |config, _engine, call, _turn_written, _sink, _stop| {
+        Ok(execute_pdf_ground_text(config, call)?.into())
+    });
+    m.insert("capability_invoke", capability_invoke_fn);
+    m
 }
 
 /// Qwen-MM-Plugins 会话工具的执行（模型自主调，2026-09-29）。
