@@ -258,3 +258,20 @@ python3 scripts/ops/nt_topology.py   # → 本文件
   - `neotrix-core/src/l3_embodiment/nt_shield/guard/output_sentinel.rs:20`
 
 ⚠️ **归并不是免费的**：`Severity` 散在 L1/L3 与两个 crate，合并会改公开 API 与跨层依赖方向 ⇒ 需逐组评估，不宜批量脚本化。
+
+---
+
+## 维度 6 · 运行时语义（手写段，2026-10-08）
+
+> ⚠️ 本节由人工维护，**重跑 `nt_topology.py` 会覆盖**。正文源文档：
+> `docs/architecture/ABSORPTION-TODOS-DEV-2026-10-08.md` §3。
+
+todos.dev 的「任务→agent→worktree→进度可视化」四元组是本地图的运行时语义：
+
+1. **`nt-registry-determinism.sh` 的 318 节点/43 边从静态台账升级成任务图**：
+   每个吸收批次、每个 ROADMAP 条目是一个节点，`absorbed_capability`
+   四元组（source→branch）作为边属性。
+2. **`nt_map_reconcile.py` 断言面 = 全域 code map 的进度看板**：
+   35 条谓词的 PASS/VIOLATED 即健康面；本轮实测 35 holds / 0 violated。
+3. **`nt_find.py`（84 条意图索引）= local Chief**：意图→工具路由即「Chief 拆任务」
+   的本地等价物；缺的是「单点入口」的文档化声明（TODO.md 顶部已补吸收入口指针）。
