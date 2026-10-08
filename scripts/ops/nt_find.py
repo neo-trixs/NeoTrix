@@ -19,7 +19,7 @@
 ## 为什么每条都带 `when_not`
 吸收 awesome-autoresearch 的领养前检查表（`check-skill-gate.sh:3-6`）时发现：
 只写「什么时候用」而不写「什么时候**别**用」，agent 会把它用错。实测案例：
-`check-naming.sh` 的 PASS **不代表合规**（规约 vs 现实差 1,646 个文件）；
+`check-naming.sh` 的 PASS **不代表合规**（规约 vs 现实差 1,612 个文件，2026-10-08 clean-HEAD 实测）；该门已改递减棘轮 ⇒ PASS 只意味着「没新增」，**不是**「存量已清」；
 `nt_lock_audit.py` 报 12 条里 **2/3 是误报**。这两种误用都会造成真实损害。
 """
 import argparse

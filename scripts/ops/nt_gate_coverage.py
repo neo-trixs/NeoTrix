@@ -53,7 +53,7 @@ UI = os.path.join(REPO, 'apps/neobot-desktop/neobot-ui')
 # ⭐⭐ 它的门只扫 `color:`，于是尺寸漂了它不会红）。
 EXEMPT = {
     # ── ① advisory 门：实测自称 advisory，接进 CI 只会「恒红」──
-    'check-naming': 'advisory：门自身输出「naming convention reported, not enforced」；接入 CI 只会恒红（本仓门纪律：恒红的门=没有门）',
+    'check-naming': 'ratchet（2026-10-08 起）：基线 1612（scripts/naming-baseline.txt，干净检出实测）；新增违规 ⇒ 两个模式都判红，可接 CI；无回归 ⇒ exit 0 但输出明写 PASS≠合规（存量 1612 未清）',
     'check-skill-gate': 'advisory：门自身输出「advisory only (use --strict to enforce)」；⭐ --strict 形态是否阻断属另案',
     'check-doc-drift': 'advisory：只报 root-doc deadlinks 数量，不判失败',
     'check-supply-iocs': 'advisory-review：输出「packages above lack license metadata; check before…」',
