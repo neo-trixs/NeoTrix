@@ -10,6 +10,7 @@ members = [
     "crates/nt-core-capability-tree",
     "crates/nt-term-viz",
     "crates/neotrix-neobot",
+    "crates/nt-computer-cdp",
     "crates/neotrix-audit",
     "apps/neobot-desktop",
 ]
@@ -44,6 +45,7 @@ neotrix-reasoning = { version = "0.23.0", path = "crates/neotrix-reasoning" }
 neotrix-gateway = { version = "0.23.0", path = "crates/neotrix-gateway" }
 neotrix-multi-agent = { version = "0.23.0", path = "crates/neotrix-multi-agent" }
 neotrix-neobot = { version = "0.23.0", path = "crates/neotrix-neobot" }
+nt-computer-cdp = { version = "0.23.0", path = "crates/nt-computer-cdp" }
 neotrix-audit = { version = "0.23.0", path = "crates/neotrix-audit" }
 nt_core_capability_tree = { version = "0.1.0", path = "crates/nt-core-capability-tree" }
 

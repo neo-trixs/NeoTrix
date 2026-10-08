@@ -68,7 +68,7 @@ pub mod nt_snapshot;
 /// D 期 computer-use 吸收：core 侧 CDP transport（实现 neobot 定义的窄口）。
 /// 仅在 `stealth-net` 下编译（chromiumoxide 是可选依赖）。
 #[cfg(feature = "stealth-net")]
-pub mod computer_transport;
+pub use nt_computer_cdp as computer_transport;
 
 // 平坦路径兼容：拆分前外部经 `nt_io_browser_engine::{X}` 直引类型，
 // 此处集中重导出，保持外部路径零断裂（新增引用请走子模块路径）。

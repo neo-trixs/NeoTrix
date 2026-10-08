@@ -5836,6 +5836,7 @@ dependencies = [
  "neotrix-types",
  "notify",
  "noyalib",
+ "nt-computer-cdp",
  "nt-term-viz",
  "nt_core_capability_tree",
  "num-bigint 0.4.8",
@@ -6243,6 +6244,19 @@ dependencies = [
  "serde_core",
  "serde_ignored",
  "smallvec",
+]
+
+[[package]]
+name = "nt-computer-cdp"
+version = "0.23.0"
+dependencies = [
+ "chromiumoxide",
+ "chrono",
+ "futures",
+ "neotrix-neobot",
+ "serde_json",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]

@@ -104,6 +104,7 @@ neotrix-gateway = { workspace = true }
 neotrix-multi-agent = { workspace = true }
 nt_core_capability_tree = { workspace = true }
 neotrix-neobot = { workspace = true }
+nt-computer-cdp = { workspace = true, optional = true }
 thiserror = "1"
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -262,7 +263,7 @@ harness = false
 # 避免静默降级到可推导的机器派生密钥（C-3 安全加固）。
 default = ["keyring", "anydoc", "stealth-net"]
 # pmtiles feature removed - now a regular dependency
-stealth-net = ["dep:chromiumoxide"]
+stealth-net = ["dep:chromiumoxide", "dep:nt-computer-cdp"]
 sandbox = ["dep:wasmtime", "dep:agent-sandbox"]
 telemetry = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry"]
 rkyv-storage = ["dep:rkyv", "dep:memmap2"]
