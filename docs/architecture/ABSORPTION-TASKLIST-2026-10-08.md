@@ -93,16 +93,16 @@
 - **源**：`AMAP-ML/LongHorizon-Harness`（MIT）、arxiv 2610.02525（MIRA 外层 meta-reasoner）
 - **现状**：`neotrix-core/src/l6_meta/nt_nexus/checkpoint.rs` 已有 checkpoint；
   `nt-io-agent-loop` 的 loop step 可在 `nt_loop_step.rs` 承载
-- **改**：在 loop step 边界显式写入 checkpoint（已对半做，补「resume 判据」：
-  与 `nt_crawl_sources` 的 `claim_hf_pending_url` resume 同型——pending/completed 位）
-- **验**：注入中断后 resume 测试；不重复执行已完成 step（at-least-once）
+- **2026-10-08 接线裁决**：`resume_verdict`（L6）已落地（a75dc5ab，11 测试绿），
+  但 **L1 loop 无法 import L6 类型**（层规则 l0→l6 单向，check-layer-deps 会红）
+  ⇒ 「loop step completion 时写 Checkpoint」属结构性重构（facade 聚合或
+  CheckpointStore 下沉 loop 同级），本轮记 intake，下一轮单独做。
 
 ### B3. 并行调度重探索成本度量（SquidAgent）
 - **源**：arxiv 2610.08647
-- **现状**：多 agent 并行入口未明；先 `rg "parallel|spawn" neotrix-core/src/l6_meta`
-- **改**：给并行 worker 加 `re-exploration tokens` 计量字段（orchestrator 已有上下文，
-  worker 重建的子集计为浪费），输出 metric
-- **验**：3 条单测：浪费计数、0 浪费路径、序列化稳定
+- **2026-10-08 接线裁决**：`nt_reexplore::measure`（L0 纯函数契约 + 3 测试绿）已落地；
+  仓内未找到消费它的并行 worker 生产点 ⇒ **契约即产出，接线点待并行 spawn 真实落地**
+  （与 `nt-unwired-spec` 同型：规格已存在、等待读取方）。
 
 ## C. 设计/文档侧（无代码或低代码）
 

@@ -20,6 +20,7 @@
 #![forbid(unsafe_code)]
 
 pub mod nt_agent;
+pub mod nt_agent_home;
 pub mod nt_audit;
 pub mod nt_cancel;
 pub mod nt_capability_canary;
