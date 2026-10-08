@@ -905,7 +905,40 @@ fn run_loop(
             // dry-run: 记录但不执行. 执行错误转失败结果 (模型可见, 可换路),
             // 只有落库/审计失败才 `?` 中断.
             let outcome = if will_execute {
-                match execute_tool(config, engine, call, &mut turn_written, &sink, stop) {
+                let raw = execute_tool(config, engine, call, &mut turn_written, &sink, stop);
+                // P0：`computer_act` 的回执三态在此落账（`execute_tool` 拿不到 store，
+                // 而账本必须能回答「这次动作**发出去没有**」——执行点只知道 ok/err）。
+                if call.name == crate::nt_types::ToolName::ComputerAct {
+                    let action = call
+                        .args
+                        .get("action")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    match &raw {
+                        Ok(o) => record_computer_receipt(
+                            store,
+                            action,
+                            &crate::nt_computer::ActionReceipt {
+                                action: action.to_owned(),
+                                sent: true,
+                                outcome: crate::nt_computer::ActionOutcome::Applied,
+                                advice: crate::nt_computer::RetryAdvice::Retry,
+                                detail: o
+                                    .result
+                                    .output
+                                    .chars()
+                                    .take(120)
+                                    .collect::<String>(),
+                            },
+                        ),
+                        Err(err) => record_computer_receipt(
+                            store,
+                            action,
+                            &crate::nt_computer::receipt_for_error(action, err),
+                        ),
+                    }
+                }
+                match raw {
                     Ok(outcome) => outcome,
                     Err(err) => ToolOutcome::from(ToolResult {
                         ok: false,
@@ -1643,6 +1676,59 @@ fn execute_computer(call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBo
     })
 }
 
+/// `computer_act` 的**回执落账**（P0：把三态语义接进生产路径）。
+///
+/// 为什么单独一个函数：执行点 `execute_computer` 只知道「成功/失败」，
+/// 而账本需要知道的是**「发出去没有」**（`computer-use` P7）。两者不是同一件事，
+/// 所以映射必须显式存在一处，而不是让每个调用点自己猜。
+///
+/// 落一行 `purpose='computer-act'`：
+/// - `status` = `applied` / `outcome_unknown` / `failed`（`ActionOutcome` 的字符串形）；
+/// - `error`  = 人话原因 + **处置建议**（retry / change_auth / stop / ask_human）。
+///
+/// ⛔ `outcome_unknown` **不允许**被上层当失败自动重试 —— 这行账本就是那道闸的证据。
+fn record_computer_receipt(
+    store: &crate::NeobotStore,
+    action: &str,
+    receipt: &crate::nt_computer::ActionReceipt,
+) {
+    use crate::nt_computer::{ActionOutcome, RetryAdvice};
+    let status = match receipt.outcome {
+        ActionOutcome::Applied => "applied",
+        ActionOutcome::Unknown => "outcome_unknown",
+        ActionOutcome::Failed => "failed",
+    };
+    let advice = match receipt.advice {
+        RetryAdvice::Retry => "retry",
+        RetryAdvice::ChangeAuth => "change_auth",
+        RetryAdvice::Stop => "stop",
+        RetryAdvice::AskHuman => "ask_human",
+    };
+    // best-effort：写不进账本不挡本轮（与降级记账/续租同款纪律）。
+    let _row: Result<(), NtBotError> = store.record_ledger(&crate::nt_store::LedgerEntry {
+        id: Uuid::new_v4().to_string(),
+        at: Utc::now().to_rfc3339(),
+        engine: "computer".to_owned(),
+        model: String::new(),
+        actor: "bot".to_owned(),
+        purpose: "computer-act".to_owned(),
+        in_tokens: 0,
+        out_tokens: 0,
+        cost_usd: 0.0,
+        measured: false,
+        status: status.to_owned(),
+        latency_ms: 0,
+        error: Some(format!(
+            "{} [advice={advice} sent={}] {}",
+            action,
+            receipt.sent,
+            receipt.detail
+        )),
+        session_id: None,
+        key_env: None,
+    });
+}
+
 /// 联网搜索执行（客户端直调；count 越界钳制 1-10，缺 query 直接 Invalid）。
 fn execute_web_search(call: &crate::nt_types::ToolCall) -> Result<ToolResult, NtBotError> {
     let Some(query) = call.args.get("query").and_then(|v| v.as_str()) else {
@@ -2228,6 +2314,37 @@ mod tests {
     /// 而这些既有用例验的是别的东西 —— 它们的**断言一个字都不改**）。
     fn live_stop() -> super::StopToken {
         super::StopToken::new()
+    }
+
+    #[test]
+    fn computer_act_receipt_lands_in_ledger_with_three_state_semantics() {
+        use crate::nt_computer::{parse_computer_call, ComputerBackend as _, NoopBackend};
+        use crate::nt_types::{ToolCall, ToolName};
+        let store = NeobotStore::open(":memory:").expect("open");
+
+        // 失败路径：Noop 拒执行 ⇒ receipt_for_error ⇒ failed + stop（可查、可禁重试）
+        let call = ToolCall {
+            name: ToolName::ComputerAct,
+            args: serde_json::json!({"action": "click", "target": "#go"}),
+            id: "c1".to_owned(),
+        };
+        let parsed = parse_computer_call(&call.args).expect("parse");
+        let err = NoopBackend.execute(&parsed).expect_err("noop refuses");
+        let receipt = crate::nt_computer::receipt_for_error("click", &err);
+        super::record_computer_receipt(&store, "click", &receipt);
+        assert_eq!(
+            store.ledger_count_by_status("failed").expect("count failed"),
+            1,
+            "backend refused ⇒ 一行 failed 账"
+        );
+        // 事件流读口能看到建议（stop ⇒ 不许重试）
+        let events = store.task_events("").expect("events");
+        assert!(events.is_empty(), "task-event 与 computer-act 是两条不同的线");
+        assert_eq!(
+            store.ledger_count_by_status("ok").expect("count ok"),
+            0,
+            "失败不许伪装成正常调用"
+        );
     }
 
     #[test]
