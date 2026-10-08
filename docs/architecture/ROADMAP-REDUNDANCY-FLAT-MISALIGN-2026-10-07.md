@@ -240,11 +240,11 @@
 | T1-3 | ~~`CostLadder` 二合一~~ | — | — | ⛔ **已推翻**（两种设计，见 §T1-3） |
 | T1-4 | 删 `l6_meta/lib.rs` | S | 无（严格子集已证） | ✅ `43e2380c` −68 行 |
 | T1-5 | 删 `l2_perception/nt_judgment/` | S | 先查跨 crate 消费者 | ✅ `43e2380c` −313 行 |
-| T1-7a | `nt_core_guardian` **文档**修复 | S | 无 | ⏸ 2026-10-08 未取证（主树已无该文件，仅余 `l6_meta/mod.rs` / `nt_arch_rules.rs` 两处引用残迹）⇒ 先确认文件真身再动，本轮**未盲改** |
+| T1-7a | `nt_core_guardian` **文档**修复 | S | 无 | ✅ 已由 `70d9d928` 完成（模块 `mod.rs:3-33` 列出真机制表，标出 4 个路径不存在 + 3 条未决问题）。⛔ 2026-10-08 自我更正：本行原写「主树已无该文件」是**错的** —— 该模块是**目录**形态（7 文件 / 1,593 行）；上一轮用 `find -name 'nt_core_guardian*'` 只匹配文件名、不匹配目录内的 `mod.rs` ⇒ 误判文件消失（取证方法缺陷，非代码事实）。|
 | T1-8 | 缓存岛 + "LRU"→FIFO 头修正 | S | 无 | 🟡 已修头（`ebf1d458`），剩可达性标注 |
 | T1-1 | ~~3 个零消费者熔断器归正典~~ | — | — | ⛔ **已推翻**（三种并发模型，见 §T1-1）→ ✅ 改为标注 |
 | T1-6 | 裁 `nt_shield::osint` | S | `compliance` 留待裁决 | ✅ 已由 `2b539d63` 删除（**699 行**，非本节 §T1-6 所记 669）。风险已排除：无 uniffi/无绑定层；18 处 serde 派生因零 Rust 消费者而无格式契约。|
-| T1-7b | `nt_core_guardian` 接线裁决 | L | 依赖裁决，不删 |
+| T1-7b | `nt_core_guardian` 接线裁决 | L | 依赖裁决，不删 | 🟡 **仍成立且证据更强**（2026-10-08 复测）：**57 个导出符号全仓 0 命中**，`nt_core_guardian::` 路径限定调用 = 0；独立佐证见 `scripts/security-wiring-baseline.txt:1167` 的 `ZERO_CONSUMER` 条目。⚠️ 13 处 `use ...guardian` 命中**全是另两个同前缀模块**（`foundation::guardian::KbGuard`、`nt_shield::guard::prompt_guardian`）⇒ L15 同名≠同一符号，勿误判为消费方。⛔ 不删仍有效：已建+已测（`test_full_guardian_pipeline`）+ 未接线。|
 
 ### T2 跨域（全部需先裁决）
 | ID | 任务 | 成本 | 前置 |

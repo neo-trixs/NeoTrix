@@ -13,7 +13,11 @@ pub mod evolution;
 /// L1 Facade
 pub mod l1_facade;
 
-/// NT-CORE-GUARDIAN — 统一自守护模块 (融合 8 个分散机制)
+/// NT-CORE-GUARDIAN — 统一自守护模块
+/// ⛔ 2026-10-08 修正括注：本行原文写「融合 8 个分散机制」，而该模块自己的
+///    `nt_core_guardian/mod.rs:3` 已写明「原文『融合 8 个机制』是错的」。
+///    ⇒ 拆穿假声明的提交（`70d9d928`）改了模块内文档，**漏改了宿主这一行**。
+///    真机制数与未决问题见 `nt_core_guardian/mod.rs:3-33`（13 行表）。
 pub mod nt_core_guardian;
 
 pub mod nt_meta;
