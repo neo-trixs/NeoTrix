@@ -568,6 +568,24 @@ jobs:
       - name: No decorative star in newly added comments
         run: bash scripts/ops/nt-no-star-noise.sh
 
+      # ⭐⭐⭐ 2026-10-08：外部 CLI descriptor 探活门（TODO.md F3）接 **--self-test**。
+      #
+      # ⛔⛔ **为什么只接 self-test、绝不接 live 探活**：
+      #   live 形态要读 $HOME/.config/neotrix/plugins（等价 NEOTRIX_PLUGINS_DIR）
+      #   ⇒ **CI runner 上那个目录根本不存在**（仓里零文件往 HOME 写）
+      #   ⇒ 接进 CI 就是「报 PASS 却结构上不可能失败」的空门（L8）：
+      #   它永远走 C7 分支绿着，而**一条 descriptor 都没验过**。
+      #   ⛔ 若哪天真要在 CI 验 descriptor，只能把夹具**随仓入库**并用
+      #     NEOTRIX_PLUGINS_DIR 指过去 —— 那是另一次有判断的改动。
+      #
+      # ⓘ self-test 形态：12 条注入式断言（7 条负向 + 1 条正例对照 + C6/C7/--list
+      #   + 2 条真源漂移哨兵），夹具只落 tempfile.mkdtemp() 的系统临时目录，
+      #   ⛔ 不碰 HOME、不落仓库、不需要 cargo。实测 <1s。
+      # ⓘ 它验证的是**门本身**：判据抽取（从 external_cli_plugins.rs 的 struct
+      #   正则抽字段集/必填集/类型）与 C1-C8 全部能在注入下变红。
+      - name: Gate — check-cli-plugin-descriptors self-test (injected negative fixtures, no cargo)
+        run: bash scripts/check-cli-plugin-descriptors.sh --self-test
+
   coverage:
     runs-on: ubuntu-latest
     steps:

@@ -1037,6 +1037,82 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 > **Batch3 吸收执行 (47 源)**: 四波 21 任务 20/20 闭环 · **交接 Wave 4: 10 任务待做** (🔴P0×3 越层修复/e8_state 合成值/测试抖动加固 · 🟡P1×3 情报工具接线/SEAL C0→C2/补全排序 · ⚪P2×4) → ⚠️ 原引 `docs/absorption-knowledge-base/batch3-2026-08-26-unified-evolution-todo.md`**已随 `477bf669`（文档标准化清理）连同整个 `docs/absorption-knowledge-base/` 删除**。吸收成果的现行落点是 `docs/architecture/ABSORPTION-*.md` 系列（见 AGENTS.md §6）；Wave 4 的 10 项待做若仍有效，需重新归档到 `docs/architecture/` 下 Wave 4 段 + 根 `HANDOFF.md` (2026-08-26 版)
 ---
 
+# neobot 长期进化 TODO（2026-10-08 拍板最优解，本 session 裁决）
+
+> 决策来源：`sessions/im-stop-design-2026-10-07.md` / `edit-of-design-2026-10-07.md` / `compact-context-budget-2026-10-07.md` / `neobot-usage-quota-design-2026-10-07.md` 各文件「拍板」节。
+> 执行纪律：每个 § 一个 PR；`#![forbid(unsafe_code)]`、零 unsafe、模块 nt_ 前缀；改完跑 `nt_lock_audit`。
+
+## N1 · IM `/stop` 兑现（架构级，主人已拍板：worker 池）
+- [x] P0：同步跑轮已解耦（serve 层每条消息一个 worker 线程：独立 NeobotStore 连接同库 + 独立 TelegramChannel + 独立 engine；主线程 `mpsc+recv_timeout(200ms)` 收成确定性统计；跑轮期抵达的 `/stop` 能翻转同登记 ⇒ `/stop` 真可停）。非 telegram/缺 token/引擎不可用保持旧同步语义。
+- [ ] P1：worker 池并发上限、`TurnStatus` 语义、桌面/IM 双端契约同步；验收：跑中 `/stop` 必中断、outbox/audit/ledger 配平。
+- 验收：新增回归测试（已接通但恒 NothingToStop 的场景翻绿）。
+
+## N2 · edit_of 占位消息（schema 演进）
+- [x] schema：`messages` 加 `platform_msg_id TEXT`、`delivery_status TEXT NOT NULL DEFAULT 'pending'`（✅ 幂等 ALTER + 新库建表同步；nt_store_messages 8 单测）。
+- [x] `ChannelAdapter::can_edit()` 默认 false、`TelegramChannel` 覆写 true（✅ lib check 0 error）。
+- [x] 占位→编辑链路已通（✅ `on_inbound` 4.9 步：能编辑渠道先发 `PLACEHOLDER_TEXT=⏳ 思考中…` 取回 message_id，跑完以 `edit_of` 覆盖；不能编辑/占位发不出 ⇒ 如实降级为新消息。`messages` 两列有消费点：`mark_latest_delivery` 记 `sent|edited|failed`。3 侧回归（含「非编辑渠道零占位」）。剩余：真正的**流式**增量编辑（每个 hop 覆盖一次，而非只在末尾覆盖一次）+ Telegram 端到端集成测。
+- 验收：占位→编辑→失败降级三态测试 + Telegram 集成。
+
+## N3 · 压缩/蒸馏预算门（#6/#7）
+- [x] `CostPolicy` 上移 `neotrix-types`（✅ neotrix-types::nt_cost_policy，`neobot check`+`--lib` 0 error，6 单测）。
+- [x] core `distill_output` 死循环修复（✅ nt_loop_step.rs:156 已改 + distill 115 测试，check 0 error）。
+- [x] 摘要调用进账本（✅ maybe_compact_context 记 COST_TRACKER["agent-loop-compaction"]，prompt/completion tokens 可见）。
+- [x] `HiveAgentLoop` 接线（✅ 裁决：HiveRouter 所有权归调用方，默认不装）；`neobot quota` 出表 ✅。
+- [x] 超支降级 + `degraded` 记账（✅ `COMPACTION_SUMMARY_INPUT_MAX_TOKENS=24k` 预算门；超限 ⇒ 跳过 LLM 摘要、**明确驱逐**最旧一半并留可见说明行；`COST_TRACKER.record_degraded` 新列 `degraded_count`（与 cost 不混）。2 新测锁定：降级必驱逐 + 降级≠花钱。
+- 验收：超支/刚好/富余三档矩阵测试。
+
+## N4 · 路由组 Quota + ledger 出表口径
+- [x] `RouteMode::Quota`（✅ fail_last 失败冷却最久优先，parse/order/单测 8 侧）。
+- [x] ledger 加 `session_id`/`key_env` 列（✅ ALTER 幂等补列 + struct 透传，key_env 现由 HttpEngine::key_env_name() 接线，3 侧 ledger 测试）。
+- [x] `neobot usage` 已由 `neobot ledger [--by-actor]` 覆盖；**`neobot quota` 已落地**（按 `key_env` 聚合：`ledger_sums_by_key_env` + `Cmd::Quota`）。**`quota_windows` 持久窗口表已落地**（✅ `nt_store_quota.rs`：daily/weekly/monthly 三窗口，**快照法**（按窗口重算覆盖，历史上修/删自愈，不漂移），UTC 统一口径；CLI `neobot quota --snapshot [--kind]`；2 测锁定幂等+空库）。剩余：配额上限与「刷新提醒」（需外部额度 API，非本地可算 ⇒ 待主人给口径）。
+
+## N6 · 剩余任务实施方案（2026-10-08 编制，按可交付顺序）
+
+> 编制原则：每项独立 PR；先补**事实层**（表/列/探针），再补**面**（CLI/前端）；
+> 「需要外部口径」的项一律停在事实层，不造假上限。
+> 前置事实：N1/N2/N3/N4 的 P0 已落地（见上），当前基线 `neotrix-neobot --lib` 603 绿、`nt_smoke.sh` 全绿。
+
+### N6.1 · provider 额度探针（**N4 尾巴**，需主人给口径 → 先做可离线部分）
+- [x] **P0 事实层**：`quota_limits` 表已落地（✅ `limit_*` 可空=未知 + `source` 列记来源）。
+- [x] P0 表单维护：`neobot quota set --key-env K1 --provider deepseek --limit-cost 1.0`（✅ **人工填**，`source=manual`；`quota rm` 同路径删）；入库门：窗口名只认 daily/weekly/monthly、`limit_*` 全空拒收。
+- [x] P0 出表：`neobot quota` 输出 `已用 / 上限 / 剩余 / 来源 / 更新`（✅ 无限额时写「未设上限（无声明）」、超限写「**已超** $x（上限 $y）」、`$-0.0000` 已归一为 `$0.0000`）。2 条测锁定三态与「别的 key 用量不许串进来」。
+- [ ] P1 自动探针（**需主人指定 provider + 口径**）：优先挑 OpenAI/Anthropic 的响应头（`x-ratelimit-*`）—— 先做只读探针并把原始头落 `probe_raw`，解析规则由主人确认后再上。
+- 验收：`quota --kind daily` 在「有上限/无上限/无数据」三态下措辞各不相同且都不撒谎；2 条测。
+
+### N6.2 · neobot 侧 `degraded` 记账对齐（N3 尾巴）
+- [ ] core `COST_TRACKER.degraded_count` 已就位（降级≠花钱）；**补 neobot ledger 侧**：`ledger.status` 已有 `ok/failed` 口径 → 增加 `degraded` 枚举并在压缩降级时落一行（或经 outbox/telemetry 侧信道），口径与 `neobot ledger` 出表一致。
+- [ ] 面：`neobot ledger --by-actor` 增加 degraded 计数列。
+- 验收：一次压缩降级 ⇒ `neobot ledger` 出现 `degraded` 行且 `cost_usd=0`。
+
+### N6.3 · 本地协议翻译网关（N5-1，独立大件，单开窗口）
+- [ ] P0 **只读设计**：`docs/architecture/neobot-gateway-design.md` —— 端点矩阵（`/v1/chat/completions`、`/v1/responses`、`/v1/messages`、`generateContent`）、流式分块对齐、工具调用形状差异表、错误映射表（Anthropic 的 `stop_reason` ↔ OpenAI `finish_reason` 等）。
+- [ ] P1 骨架：`crates/neotrix-neobot/src/nt_gateway/`（`mod.rs` 端点分发 + `translate_*`），**复用现有 `HttpEngine`**（已是 OpenAI 客户端），不做第二套 HTTP 栈。
+- [ ] P1 路由接线：网关 → `build_engine_by_name`（已有路由组/failover/Quota 模式），使「网关入口 = 路由组成员」而非新机制。
+- [ ] P2 与 Magpie 对齐项：per-client gateway key + 日/周/月限额（复用 N6.1 的 `quota_limits`）、middleware（先只做 `model-map`/`param-override` 两个，别一次做五个）。
+- 验收：`curl` 级测试覆盖 4 个端点各 1 例 + 跨协议流式 1 例；失败映射不许把 401 变 500。
+- ⛔ 前置门：本项改 `Cargo.toml`/依赖面（若引 axum/tokio），开工前先跑 `check-feature-gates.sh`。
+
+### N6.4 · OTLP 出口（N5-2）
+- [ ] P0 事实核查：core 已有 `nt_io_telemetry::init_l` + `otel_bridge`（含 `cost_tracker`）⇒ **先查「哪些 span 已导出、哪些没接」**，禁止重复造。
+- [ ] P1：neobot 侧把 `ledger`/`quota_windows` 的成本口径接进已有 exporter（**不新建 exporter**）。
+- 验收：`OTEL_EXPORTER_OTLP_ENDPOINT` 指向本地 collector 时能看到 span；未配置时**零网络**（local-first 不破）。
+
+### N6.5 · 移动端 PWA / LAN 前端（N5-3，**跨仓需主人授权**）
+- [ ] P0 清单：对照 HanaAgent 已验证路径（PWA 托管 + 设备访问密钥 + 会话/工作台文件），列出 Neo/neobot 侧改动清单与本仓需暴露的接口面。
+- [ ] P1：先定「本仓只提供只读 HTTP 快照（会话/文件），前端在跨仓做」——**不把前端塞进本仓**（本仓已迁出 `apps/neobot-desktop` 的教训）。
+- 验收：主人点头后再排期；未点头不动。
+
+### N6.6 · 已知技术债（登记，非本轮）
+- [ ] `deliver_result` 生产零调用（worker 池计划的未来基础，**不删**）。
+- [ ] `quota_windows` 为快照法 ⇒ 大 ledger 上每次快照是全表扫描（单机可接受；十万行后需加索引或改为物化）。
+- [ ] `nt_channel_serve` worker 无池上限（每消息一线程）；极端并发需补有界池 + 背压。
+- [ ] `ChatMessage` 读行仍按位置元组（`r.get(0..5)`）；新增两列后**不要再插中间列**。
+
+## N5 · 长期演化但不进本轮
+- [ ] 协议翻译网关（OpenAI/Anthropic/Gemini 互译，127.0.0.1）—— 对齐 Magpie。
+- [ ] OTLP 导出、按 key_env 聚合成本的一屏。
+- [ ] 移动端 PWA / LAN 前端（HanaAgent 已验证路径）。
+
 # 统一进化清单（2026-09-27 重建）
 
 > 本节由三份审计合并去重而成，是**唯一**的进化任务入口。
@@ -2822,3 +2898,117 @@ note: candidate #2 is defined in an impl for the type `run::BackgroundLoopHandle
 | 删文件 | 1 个（83 行，唯一经逐行 diff 相同证明的重复） |
 | 修的门/测试自身缺陷 | 4 个（空跑断言、删除声明门从未生效、真 flaky、检测器假阳性） |
 | 孤儿（修正口径后） | 35 → **13**（保守）/ 99 → **82**（宽松） |
+
+---
+
+# 外部 CLI agent 插件（freebuff）接入收口 · 2026-10-08
+
+> **来源**：本 session 实测 `ntcode --agent freebuff` 端到端跑通后开的清单。
+> **实测地基**（⛔ 全部真跑，非手推）：
+> CLI `freebuff@0.2.22` @ `/opt/homebrew/bin/freebuff` ·
+> descriptor `~/.config/neotrix/plugins/freebuff.json`（`mode: interactive`）·
+> 凭据 `~/.config/manicode/credentials.json`（0600，钥匙串 `svce=freebuff-cli`）·
+> 会话落 `~/.config/manicode/projects/<目录名>/chats/<session-id>/`。
+> `ntcode --agent freebuff` 五段全通：descriptor 载入 → `freebuff --version` 探活
+> → spawn（stdio 直通）→ 认证换到 `userId` → 服务端签发会话 ID。
+> 反向拦截亦验证：`--model freebuff` exit **1** + 指引回 `--agent`。
+>
+> **纪律**：改 `.rs` 后必跑 `nt_lock_audit.py`（R-SCAN-3，禁沿用旧值）；
+> ⛔ 禁并行全量构建（AGENTS.md §2），cargo 串行；descriptor/插件脚本属
+> **本机态不入库**，验收判据是「脚本 rc」不是「文件已提交」。
+
+## F0 · ✅ 已完成（2026-10-08）`--workdir` 在 `--agent` 路径空转
+
+- **原铁证**：`ExternalCliPlugin::launch()` **结构体里根本没有 cwd 字段**，`launch()` 也**从不调 `current_dir()`**
+  ⇒ freebuff 继承 ntcode 的 cwd。而 `ntcode.rs` 的 usage 明写
+  `ntcode --agent freebuff [--workdir PATH]` ⇒ **文档承诺 ≠ 实现**。
+- **实测佐证**：带 `--workdir <repo>` 在 `neotrix-core/` 下跑，
+  freebuff 建的会话落在 `projects/neotrix-core/`，与 `projects/neotrix/` 历史完全隔离。
+- **落地**：`ExternalCliPlugin` 加 `#[serde(default)] pub cwd: Option<PathBuf>` + `with_cwd()` +
+  `merge_cli_workdir(Option<&Path>)`；`launch()` 内 `if let Some(dir) = &self.cwd { cmd.current_dir(dir); }`；
+  `ntcode` 在 probe 前调 `merge_cli_workdir(args.workdir.as_deref())`（**CLI 覆盖 descriptor**）。
+- **验收**：`cargo test -p neotrix --lib external_cli_plugins` **6 passed / 0 failed**（含 4 个新测试）。
+
+## F1 · ✅ 已完成（2026-10-08）会话续接从 ntcode 不可达
+
+- **落地**：新增 `--agent-arg <ARG>`（**可重复、按出现顺序累积**）作为通用插件透传口。
+  ⛔ **不是** `--continue` 写死特例，也**不加 serde 字段** —— 透传是调用方一次性决定的事，
+  不是插件作者声明的一部分（且 F3 门的 `TRUTH-rust-field-set-unchanged` 哨兵会因加字段立刻红）。
+- **probe 隔离是结构性的**：透传走**函数参数**，`probe_argv()` 只读 `self.probe_args`，
+  `launch_argv(&[extra]) = self.args ++ extra` ⇒ 续接参数**不可能**污染探活。
+- **解析安全性**：缺参数报错（`--agent-arg 缺参数`）；取值 `i += 1` 原样吃掉
+  （`--agent-arg --model` 里的 `--model` 只当字符串，不被二次解析）；
+  **未给 `--agent` 却给了 `--agent-arg` ⇒ 显式报错**（⛔ 静默忽略 = 用户以为传进去了）。
+- **验收**：lib 4 → **10 个测试**，bin 新增 **5 个** `parse_args` 测试。
+
+## F2 · ✅ 已完成（2026-10-08）项目身份按目录名分裂
+
+- **落地**：`~/.config/neotrix/plugins/freebuff.json` 加 `"cwd": "/Users/neo/Downloads/neotrix"`
+  钉死到仓库根（备份 `freebuff.json.bak-20261008-112725`）；约束写进 `usage()` 与 `cwd` 字段文档。
+- **优先级裁决（有意取舍，非缺陷）**：descriptor `cwd` = 本机环境默认，CLI `--workdir` = 调用点显式意图，
+  docker/make/npm/git 同方向 ⇒ **CLI 赢**。
+- ⛔ **残留风险（未修，已记录）**：`--workdir` 覆盖项目绑定时**完全无声**。
+  建议的 3 行警告留待 `ntcode.rs` 的并发 hunk 落地后再加。
+
+## F3 · ✅ 已完成（2026-10-08）descriptor 探活门
+
+- **落地 3 新文件**：`scripts/check-cli-plugin-descriptors.sh`（21 行壳，
+  ⛔ 头注必须含 `--strict` 字面量，否则 `check-gate-satisfiable.sh` 发现不到它，这层壳就没有存在理由）·
+  `scripts/ops/nt_cli_plugin_probe.py`（判据 C1–C8，**C6 fail-closed 防空转**）·
+  `scripts/probes/check-cli-plugin-descriptors.sh`（注入落点是 `NEOTRIX_PLUGINS_DIR` 指向的临时目录）。
+- **登记 4 点**：`ci.yml` 的 `desktop` job（⛔ **只接 `--self-test`**，不接 live 探活 ——
+  runner 上没有 `~/.config/neotrix/plugins`，接了就成 L8「报 PASS 却结构上不可能失败」的空门）·
+  `gate-registry.tsv` · `.neotrix/task-index.json`（7 键齐全，`tool` 首词必须可被 P1 正则抽出）· `Makefile`。
+  ⛔ **未加 `EXEMPT`**（加了会触发元门 P2 死豁免）。
+- **验收**：`--self-test` **12/12 绿**；**证伪实测**：注入 `command` 拼错的副本 ⇒ **rc=1 且指名该文件**，
+  同目录的合规 `freebuff.json` 未被误报 ⇒ 证明是**分辨**而非「见啥都红」。
+- **写操作自查**：用 `sys.addaudithook` 拦 `open(w/a/x/+)`/`os.remove`/`subprocess.Popen` ⇒ 默认与 `--strict`
+  形态写事件 **0**。⚠️ **C8 会真的 spawn descriptor 里写的命令** —— 「只读」指不写仓库/不写 `$HOME`，
+  ⛔ **不是**「不执行任何东西」，这也是 CI 只接 self-test 的原因。
+
+## F4 · 🟢 P2 两个并行 wrapper 的冗余裁决 —— **⚠️ 原立论已被推翻，须重写**
+
+> **原立论是错的**（取证期间发现）：本节原写「`ExternalCliPlugin`（**无** cwd）」——
+> **F0 已落地，`ExternalCliPlugin` 现在有 `cwd` 且 `launch()` 调 `current_dir()`**。
+> ⛔ 照原文裁决会去「合并」一个已经合完的东西（AGENTS.md 教训 L8：先证伪，再动手）。
+
+- **已取证的事实（`rg -n --no-ignore` 两轮 + 退出码逐条确认）**：
+  `InteractiveAgentCli` **真调用 0**（全 `pub mod` 链可达 ⇒ 对外部 crate 是**公开 API**，
+  但本仓零调用；⛔ `pub use` **不算**消费者）；
+  `ExternalCliPlugin` 的**自由函数**真调用 9 处（全在 `ntcode.rs`）——
+  ⚠️ 反向陷阱：**类型名 `ExternalCliPlugin` 在 `ntcode.rs` 里一次都没出现**，计数必须按函数而非类型名。
+- **裁决建议**：留 `ExternalCliPlugin`，`InteractiveAgentCli` **建议删**（连带 `mod.rs` 的 `pub mod` + `pub use`
+  + 它自己 2 个测试；真调用点 0 ⇒ 改动面只有删除）。⚠️ **这是对外部 crate 的 breaking 变更**。
+- **删之前先补 3 项它唯一残余价值**（现状全部 0 调用）：可配 `probe_timeout`（`ExternalCliPlugin` 硬编码 10s）·
+  探活 argv 合并 `args` · `args` 的 builder。
+- 🆕 **两条独立缺陷，建议另立条目**：
+  ① `capability()` 返回的 `"cli_agent"`/`"external_cli"` **结构上不可能被消费** ——
+  `shared_handles_by_capability` 全仓只查 `"model_source"`/`"llm_provider"`；`mode: "headless"`
+  分支**从未被取到**（磁盘唯一 descriptor 是 `interactive`，仓内 `*.json` 里 `"mode"` 零命中）。
+  ② `external_cli_plugins.rs` 里「cron `Plugin::name()` 需要 `&'static str`」这条 `Box::leak` 理由
+  **无对应消费方**（`nt_io_plugin/` 下 `rg cron` 零命中；本仓 cron 在 `nt_act_scheduler.rs` /
+  `l6_meta/nt_core_scheduler/engine.rs`，**从不读 `Plugin::name()`**）⇒ 真实约束只是 trait 签名。
+
+## F5 · ✅ 已完成（2026-10-08）usage 对齐 + 补测试
+
+`--workdir` 落地后 usage 承诺为真；新增 4 个 lib 测试（F0）+ 5 个 bin `parse_args` 测试（F1）。
+⚠️ 其中 `launch_applies_descriptor_cwd` **刻意不用**同文件既有的「读不到就 return」容错写法 ——
+那会把失败吞成绿（L8）。每个新测试都附「实现被改坏时它会真的红」的说明。
+
+## 验收清单
+
+- [x] `cargo test -p neotrix --lib external_cli_plugins` 绿（**6 passed / 0 failed**，F1 后应为 10）
+- [x] `python3 scripts/ops/nt_lock_audit.py neotrix-core/src` rc=0（**改 `.rs` 后重跑，禁沿用旧值**）
+- [x] F3 门 `--strict` rc=0 · `--self-test` 12/12 绿 · 证伪实测 rc=1 且指名文件
+- [ ] `bash scripts/check-feature-gates.sh --quick` rc=0（⛔ 需 cargo 窗口空闲，⛔ 禁与他窗并行）
+- [ ] 真 TTY 复核：`ntcode --agent freebuff`（F2 钉死 cwd 后，会话应落 `projects/neotrix/`）
+- [ ] F4 裁决落地（删 `InteractiveAgentCli` 前先补 3 项残余能力）
+
+## ⚠️ 本节遗留的两个他窗 WIP 阻塞（非本节引入，别误记成本节的锅）
+
+1. **`ntcode.rs` 的 `CliFreeSource` 编译破损**：他窗删了 `use ...cli_free_source::CliFreeSource;`
+   但 `main()` 里仍有 `CliFreeSource::new().is_available()` ⇒ **bin 当前编译红**，
+   连带 `cargo test -p neotrix --bin ntcode` 必红。⛔ 本节未碰（属他窗 hunk）。
+2. **F0 的一条注释是假的**：「放在 probe 之前，使探活与真正 spawn 跑在同一工作目录」——
+   `probe_available → run_capture → run_with_timeout` **全程无 `current_dir`** ⇒ `self.cwd`
+   从未作用于探活。对 `--version` 无害（cwd 无关），但属 R46「文档声称已做而实现从未入库」家族。

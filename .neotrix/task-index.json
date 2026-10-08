@@ -1378,6 +1378,28 @@
       "read_only": true,
       "when_not": "⛔ 不要用它判「某处就是缺陷」—— 它只做**生产代码**清点（已按区间排除 #[cfg(test)] 与整文件测试模块）；实测 25 处IO/写类里只有 1 处是真缺陷，其余为清理路径/Option 转换/缓存时间戳等**正确**用法。⛔ 也不要拿它替代 check-silent-failure.sh --strict：后者是**设门**的判据，前者只是报告。",
       "spec": "FOLLOWUP-TASKS-2026-10-06 P0.5-b"
+    },
+    {
+      "id": "cli-plugin-descriptors",
+      "query": [
+        "descriptor",
+        "外部 CLI 插件",
+        "插件目录",
+        "plugins 目录",
+        "freebuff.json",
+        "NEOTRIX_PLUGINS_DIR",
+        "probe_args",
+        "探活",
+        "mode 写错",
+        "command 拼错",
+        "外部 CLI",
+        "ntcode --agent"
+      ],
+      "tool": "bash scripts/check-cli-plugin-descriptors.sh [--strict|--list|--self-test]",
+      "kind": "gate",
+      "read_only": true,
+      "when_not": "⛔ 不要用它判**Rust 侧**有没有 bug —— 它判的是 descriptor 这个 JSON 文件的形状与可执行性，判据真源是 external_cli_plugins.rs 的 struct 定义（从真源正则抽出，不是抄一份常量）。⛔ 不要在 CI 里跑 live 形态（不带 --self-test）：CI runner 上 $HOME/.config/neotrix/plugins 不存在 ⇒ 恒走 C7 分支绿着 ⇒ 那正是「报 PASS 却结构上不可能失败」的空门；CI 已接的只有 --self-test。⛔ 报 C8 探活失败时**先确认命令在不在 PATH**（本门只 spawn `command + probe_args`，⛔ 不用 command -v ⇒ 因为绝对路径的 command 在 command -v 下会失败，两者不等价），别急着去改 descriptor。⛔ 报 C6「0 个 *.json」时不要当绿灯过 —— 那是说**本门是空门、从没验过**，不是「没问题」。⛔ 报 C2 未知字段时**不要**直接删字段：Rust 不认它 ⇒ serde 静默忽略 ⇒ 写了等于没写，多半是拼写错（args 写成 argz）。⛔ 报 C5 JSON 解析失败是最阴的一条：Rust 侧 load_external_cli_plugins 是 `if let Ok(p)` ⇒ **静默跳过** ⇒ 插件隐形且零报错，所以本门把它判红而不是当警告。⛔ mode 是 Rust 侧的 String 不是 enum，C3 的 {interactive, headless} 是**策略**常量；报 headless 的 WARN 表示该形态在真源里没有消费路径，不是错误。⚠️ 别拿它替代单测 probe_available —— 那是判 Rust 函数，本门判的是用户机器上的配置。",
+      "spec": "TODO.md F3（2026-10-08）· 判据 C1-C8 · 真源 neotrix-core/src/l1_action/nt_act/nt_act_dev_tools/external_cli_plugins.rs"
     }
   ],
   "excluded": {

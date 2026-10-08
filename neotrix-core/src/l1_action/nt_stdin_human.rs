@@ -24,6 +24,37 @@ pub struct NtStdinHuman {
     max_lines: usize,
 }
 
+/// 归一化需求单 id：剥掉**外层成对方括号**，空则 `None`。
+///
+/// ## 2026-10-08 实测缺陷（本函数存在的理由）
+///
+/// 上窗显示那一行是 `format!("  [{}] {}：{}", d.id, d.kind.label(), d.text)`
+/// （`l5_cognition/nt_crystal_core/nt_crystal_dialogue.rs`）⇒ **屏幕上带方括号**。
+/// 而解析层原样把用户输入的 `[id]` 存进 `demand_id`，与需求单真实的**裸 id**
+/// 比对不上 ⇒ **批准永不生效** ⇒ 同一道复核门在下一轮原样重上。
+///
+/// 实测（`ntcode --line`，无 TTY 管道喂回复）：
+/// - `ok [review-fc47da46]` ⇒ `终态：Stalled（2 轮）`、exit **2**（照抄屏幕，死锁在复核门）
+/// - `ok review-fc47da46`   ⇒ `终态：Converged（2 轮）`、exit **0**
+///
+/// ⇒ 用户**照抄自己看到的东西**是不成立的，这是可复制性缺陷而非用法错误。
+/// ⛔ 报错拒绝不是好选择：那会把「屏幕上的合法字符串」判成非法输入，
+/// 而显示层才是加括号的那一方（真实 id 永不含方括号）。
+/// ⇒ 故做成**容忍**：剥掉成对外层括号，裸 id 走原路径，两种输入都成立。
+fn normalize_demand_id(raw: &str) -> Option<String> {
+    let t = raw.trim();
+    let t = t
+        .strip_prefix('[')
+        .and_then(|rest| rest.strip_suffix(']'))
+        .unwrap_or(t)
+        .trim();
+    if t.is_empty() {
+        None
+    } else {
+        Some(t.to_string())
+    }
+}
+
 impl NtStdinHuman {
     pub fn new() -> Self {
         Self { max_lines: 50 }
@@ -46,18 +77,16 @@ impl NtStdinHuman {
                 break;
             }
             if let Some(rest) = t.strip_prefix("ok ") {
-                let id = rest.trim();
                 out.push(NtHumanReply {
-                    demand_id: if id.is_empty() { None } else { Some(id.to_string()) },
+                    demand_id: normalize_demand_id(rest),
                     text: String::new(),
                     approved: true,
                 });
                 continue;
             }
             if let Some(rest) = t.strip_prefix("no ") {
-                let id = rest.trim();
                 out.push(NtHumanReply {
-                    demand_id: if id.is_empty() { None } else { Some(id.to_string()) },
+                    demand_id: normalize_demand_id(rest),
                     text: String::new(),
                     approved: false,
                 });
@@ -70,7 +99,7 @@ impl NtStdinHuman {
                 let text = rest[1..].trim();
                 if !id.is_empty() && !id.contains(char::is_whitespace) && !text.is_empty() {
                     out.push(NtHumanReply {
-                        demand_id: Some(id.to_string()),
+                        demand_id: normalize_demand_id(id),
                         text: text.to_string(),
                         approved: false,
                     });
@@ -84,7 +113,7 @@ impl NtStdinHuman {
                 let text = rest[1..].trim();
                 if !id.is_empty() && !id.contains(char::is_whitespace) && !text.is_empty() {
                     out.push(NtHumanReply {
-                        demand_id: Some(id.to_string()),
+                        demand_id: normalize_demand_id(id),
                         text: text.to_string(),
                         approved: true,
                     });
@@ -93,7 +122,7 @@ impl NtStdinHuman {
                 if !id.is_empty() && !id.contains(char::is_whitespace) && text.is_empty() {
                     // "<id>:" 空文 = 批准关闭
                     out.push(NtHumanReply {
-                        demand_id: Some(id.to_string()),
+                        demand_id: normalize_demand_id(id),
                         text: String::new(),
                         approved: true,
                     });
@@ -192,5 +221,45 @@ mod tests {
     fn test_parse_empty_is_silence() {
         let rs = NtStdinHuman::parse_lines(&lines(&["", "   "]));
         assert!(rs.is_empty());
+    }
+
+    /// 2026-10-08 补：**照抄屏幕上那串（含方括号）必须也能批准成功**。
+    ///
+    /// 为什么可能失败：显示层 `format!("  [{}] …", d.id)` 加了方括号，
+    /// 解析层若原样存 `[id]` ⇒ 与裸 id 比对不上 ⇒ 批准静默失效 ⇒
+    /// `ntcode --line` 永远 `Stalled`。本测试钉住「两种输入归一到同一个 id」。
+    #[test]
+    fn bracketed_id_from_display_normalizes_to_bare_id() {
+        let bare = NtStdinHuman::parse_lines(&lines(&["ok review-e5f6a7b8"]));
+        let bracketed = NtStdinHuman::parse_lines(&lines(&["ok [review-e5f6a7b8]"]));
+        assert_eq!(
+            bracketed[0].demand_id, bare[0].demand_id,
+            "照抄屏幕（含方括号）必须归一到与裸 id 相同的 demand_id"
+        );
+        assert_eq!(bracketed[0].demand_id.as_deref(), Some("review-e5f6a7b8"));
+
+        // `<id>: 文字` 与 `<id>! 文字` 两条 arm 同样要容忍方括号。
+        let colon = NtStdinHuman::parse_lines(&lines(&["[review-e5f6a7b8]: 同意"]));
+        assert_eq!(colon[0].demand_id.as_deref(), Some("review-e5f6a7b8"));
+        let bang = NtStdinHuman::parse_lines(&lines(&["[review-e5f6a7b8]! 不同意"]));
+        assert_eq!(bang[0].demand_id.as_deref(), Some("review-e5f6a7b8"));
+
+        // `no` 那条 arm 也一样。
+        let no = NtStdinHuman::parse_lines(&lines(&["no [review-e5f6a7b8]"]));
+        assert_eq!(no[0].demand_id.as_deref(), Some("review-e5f6a7b8"));
+
+        // 负例：只有**空**才归 None；`[]` 剥完是空 ⇒ None（不是 Some("[]")）。
+        assert_eq!(
+            NtStdinHuman::parse_lines(&lines(&["ok []"]))[0].demand_id,
+            None,
+            "空括号剥完应为空 id ⇒ None"
+        );
+        // 负例：不成对的单边括号**不剥**（宁可原样，也不要猜用户的意图）。
+        assert_eq!(
+            NtStdinHuman::parse_lines(&lines(&["ok [review-e5f6a7b8"]))[0]
+                .demand_id
+                .as_deref(),
+            Some("[review-e5f6a7b8")
+        );
     }
 }

@@ -425,7 +425,22 @@ supply-iocs:
 license-gate:
 	bash scripts/check-license.sh
 
-.PHONY: sync-todo watch-todo daemon-todo install-hook install-launchd uninstall-launchd check-conflicts todo-stats shanhai-pipeline shanhai-stats shanhai-mappings shanhai-evidence shanhai-export shanhai-visualize shanhai-all build-shanhai desktop-check desktop-build desktop-package-dir desktop-package lint test check build layer-deps doc-drift doc-drift-strict coverage-gate bench-baseline bench-compare geiger machete build-surface build-surface-strict fuzz arch-acyclic audit-all supply-iocs license-gate
+# 外部 CLI descriptor 探活门 (TODO.md F3, 2026-10-08; 只读, 无需 cargo)
+# 判据真源 = neotrix-core/.../external_cli_plugins.rs 的 struct 定义（正则抽出）,
+# 覆盖 C1 必填/C2 未知字段/C3 mode/C4 类型/C5 可解析/C6 防空转/C7 目录缺失/C8 探活。
+# ⛔ **刻意不进 audit-all**：那个 target 用 ';' 串联、只取最后一条 rc,
+#    而成员全是 advisory 报告器 ⇒ 加进去等于既不被阻断又不被计数。
+# ⛔ 只读门: 唯一写入面是 --self-test(夹具落 tempfile.mkdtemp), 默认与 --strict 零写。
+cli-plugin-descriptors:
+	bash scripts/check-cli-plugin-descriptors.sh
+
+cli-plugin-descriptors-strict:
+	bash scripts/check-cli-plugin-descriptors.sh --strict
+
+cli-plugin-descriptors-self-test:
+	bash scripts/check-cli-plugin-descriptors.sh --self-test
+
+.PHONY: sync-todo watch-todo daemon-todo install-hook install-launchd uninstall-launchd check-conflicts todo-stats shanhai-pipeline shanhai-stats shanhai-mappings shanhai-evidence shanhai-export shanhai-visualize shanhai-all build-shanhai desktop-check desktop-build desktop-package-dir desktop-package lint test check build layer-deps doc-drift doc-drift-strict coverage-gate bench-baseline bench-compare geiger machete build-surface build-surface-strict fuzz arch-acyclic audit-all supply-iocs license-gate cli-plugin-descriptors cli-plugin-descriptors-strict cli-plugin-descriptors-self-test
 
 # 进化实验账本活性门（防「造了没人跑」）
 evolution-gate:
