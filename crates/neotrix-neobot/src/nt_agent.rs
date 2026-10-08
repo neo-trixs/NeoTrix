@@ -1032,7 +1032,29 @@ fn run_loop(
         } else if current != TurnStatus::Continue {
             break;
         }
-        enforce_transcript_budget(&mut history);
+        let trimmed = enforce_transcript_budget(&mut history);
+        // 转录预算驱逐（N6.x→N7 吸收兜底）：本轮被踢掉的 Tool 结果行，
+        // 必须在账本里看得见，否则「这轮为什么内容少一截」查不出。
+        // best-effort，不挡本轮。
+        if trimmed > 0 {
+            let _trim_row: Result<(), NtBotError> = store.record_ledger(&crate::nt_store::LedgerEntry {
+                id: Uuid::new_v4().to_string(),
+                at: Utc::now().to_rfc3339(),
+                engine: engine.engine_id().to_owned(),
+                model: engine.model_name().to_owned(),
+                actor: actor_name.to_owned(),
+                purpose: "transcript-budget-trim".to_owned(),
+                in_tokens: 0,
+                out_tokens: 0,
+                cost_usd: 0.0,
+                measured: false,
+                status: "trimmed".to_owned(),
+                latency_ms: 0,
+                error: Some(format!("{trimmed} tool message(s) evicted by transcript budget")),
+                session_id: ctx.convo_id.map(|c| c.to_owned()),
+                key_env: engine.key_env_name().map(str::to_owned),
+            });
+        }
         // 租约心跳（C0）：每跳之后问一次闸（`due()` = 距上次够间隔 **且**
         // 本轮未到次数上限）。不快也不慢地写库：按时间闸退避、按次数封顶。
         //
@@ -1100,7 +1122,8 @@ fn transcript_weight(item: &crate::nt_types::TranscriptItem) -> usize {
             .unwrap_or(0)
 }
 
-fn enforce_transcript_budget(history: &mut Vec<crate::nt_types::TranscriptItem>) {
+fn enforce_transcript_budget(history: &mut Vec<crate::nt_types::TranscriptItem>) -> usize {
+    let mut evicted = 0usize;
     while history.len() > TRANSCRIPT_CAP_ITEMS {
         let Some(pos) = history
             .iter()
@@ -1109,6 +1132,7 @@ fn enforce_transcript_budget(history: &mut Vec<crate::nt_types::TranscriptItem>)
             break;
         };
         history.remove(pos);
+        evicted += 1;
     }
     let mut bytes: usize = history.iter().map(transcript_weight).sum();
     while bytes > TRANSCRIPT_CAP_BYTES {
@@ -1123,7 +1147,9 @@ fn enforce_transcript_budget(history: &mut Vec<crate::nt_types::TranscriptItem>)
             break;
         }
         history.remove(pos);
+        evicted += 1;
     }
+    evicted
 }
 
 /// 历史回填截断 (4KiB/条, 防上下文爆炸; 全量仍在 steps 表).
@@ -2229,7 +2255,8 @@ mod tests {
                 image: None,
             },
         ];
-        enforce_transcript_budget(&mut history);
+        let evicted = enforce_transcript_budget(&mut history);
+        assert!(evicted > 0, "驱逐应有计数");
         // 300KiB 的旧 Tool 行被丢，用户原文与回复保留。
         assert_eq!(history.len(), 2);
         assert!(history.iter().all(|item| item.role != TranscriptRole::Tool));
