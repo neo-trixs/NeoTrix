@@ -622,9 +622,14 @@ impl OsintSource for CryptoPubBridge {
 //    auto_patrol / automation / search_engine / report / social_search / username_checker / metadata
 //    —— `investigate` 恒返回空 findings + `confidence: 0.0`（:631）⇒ 连真实逻辑都没调。
 //    其中 **ad_graph(578 行) + harvest(1,017 行) 共 1,595 行真实实现被桩悬空**。
-// 2. **15 个真桥**（:658-672，DnsBridge…CryptoPubBridge）实现完整且正确，但消费链断两次：
-//    create_osint_bridges() → UnifiedEngine::investigate_osint()，而 with_osint_sources()
-//    的**唯一**调用点（unified_engine.rs:389）在 `#[cfg(test)]` 内；UnifiedEngine 生产消费者 = 0。
+// 2. **15 个真桥**（:658-672，DnsBridge…CryptoPubBridge）实现完整且正确，但消费链断在**两跳**：
+//    `create_osint_bridges()` 的非测试调用方只有两个，**两个都是死的**：
+//      ① `with_osint_sources()`（unified_engine.rs:45-48）—— 唯一调用点 :389 在 `#[cfg(test)]` 内，
+//         且 `UnifiedEngine` 模块外只有 `mod.rs:268` 的 `pub use` 与注释 ⇒ 生产消费者 = 0；
+//      ② `bridge_all_osint_sources()`（:711-713）—— 模块外只有 `mod.rs:265` 的 `pub use` ⇒ 同样零消费者。
+//    ⇒ 这正是 `nt_security_wiring.py` 抓不到的原因：**它只做一跳**——
+//      `create_osint_bridges` 确实有非测试调用方，所以不算 ZERO_CONSUMER；
+//      而那个调用方自己零消费，门就停了。**判据缺的是「消费方是否也零消费」这一跳。**
 // 3. ⚠️ **不是「整块零消费」**：osint/mod.rs:702 `doctor_osint` 与 :676 `run_osint` 是**生产代码**，
 //    经 backend_router.rs 分发真实 investigate —— 但它们同样零外部调用者。
 //    ⇒ 准确表述：**15 真桥 + 2 条真实分发路径，全部止步于零生产消费者**。
