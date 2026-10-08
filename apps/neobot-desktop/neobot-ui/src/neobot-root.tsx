@@ -388,6 +388,15 @@ export function NeoBotRoot() {
   //    （`:581` 的 `if (!text || busy) return` 一刀切整个界面）。
   //    ⭐ 这是**串台**的一种：不是内容串，是**可用性**串。
   const [busyByConvo, setBusyByConvo] = useState<Record<string, boolean>>({})
+  // computer 控制面：租约倒计时 + 最近回执（只读后端真相，失败静默不打断对话）
+  const [lease, setLease] = useState<{ active: boolean; owner: string; remaining_ms: number }>({
+    active: false,
+    owner: '',
+    remaining_ms: 0,
+  })
+  const [receipts, setReceipts] = useState<
+    Array<{ at: string; action: string; status: string; advice: string; sent: boolean }>
+  >([])
   const busy = sel ? (busyByConvo[sel] ?? false) : false
   const [histLoading, setHistLoading] = useState(false)
   // ⭐⭐ 2026-10-03：历史**分页**（接上 `neobot_convo_messages_page`）
@@ -900,6 +909,20 @@ export function NeoBotRoot() {
   useEffect(() => {
     installOpenghostShim()
     void invoke('log_frontend', { level: 'info', target: 'neobot-root', message: 'mounted' }).catch(() => {})
+    // 租约倒计时 + 回执：1s 轮询（只读；失败静默 —— 它是辅助信息，不该刷错误）
+    const tickComputer = () => {
+      void invoke<{ active: boolean; owner: string; remaining_ms: number }>('neobot_computer_lease_status')
+        .then(setLease)
+        .catch(() => {})
+      void invoke<
+        Array<{ at: string; action: string; status: string; advice: string; sent: boolean }>
+      >('neobot_computer_receipts', { limit: 5 })
+        .then(setReceipts)
+        .catch(() => {})
+    }
+    tickComputer()
+    const timer = window.setInterval(tickComputer, 1000)
+    return () => window.clearInterval(timer)
     // 能力矩阵以此为准（旧自研 UI 的静态默认矩阵已随旧 UI 删除）。
     void invoke<CapabilitySnapshot>('neobot_core_capabilities')
       .then((v) => {
@@ -1765,6 +1788,41 @@ export function NeoBotRoot() {
               aria-label={t('chat.inputLabel')}
               className="max-h-40 min-h-[var(--nb-row-2-h)] flex-1 resize-none overflow-y-auto rounded-2xl border border-line bg-panel px-3 py-2 text-[13px] text-ink outline-none focus:border-info-hover"
             />
+            {/* computer 控制租约 + 回执三态（吸收 computer-use P6/P7）。
+             *  租约 = 「此刻谁持有控制权、到什么时候」；回执 = 「这个动作发出去没有」。
+             *  两者都只读后端真相（lease registry / ledger），前端不做本地猜测。 */}
+            {(lease.active || receipts.length > 0) && (
+              <div className="mx-auto mb-1 flex w-full max-w-[var(--nb-col-w)] flex-wrap items-center gap-2 text-[12px]">
+                {lease.active && (
+                  <span
+                    className="rounded-full border px-2 py-0.5"
+                    style={{ borderColor: 'var(--nb-color-line-strong)' }}
+                    title={t('chat.leaseHint')}
+                  >
+                    {t('chat.lease')} {Math.ceil(lease.remaining_ms / 1000)}s · {lease.owner}
+                  </span>
+                )}
+                {receipts.slice(0, 3).map((r, i) => (
+                  <span
+                    key={`${r.at}-${i}`}
+                    className="rounded-full border px-2 py-0.5"
+                    style={{
+                      borderColor:
+                        r.status === 'applied'
+                          ? 'var(--nb-color-line-strong)'
+                          : r.status === 'outcome_unknown'
+                            ? 'var(--nb-color-btn-danger-hover)'
+                            : 'var(--nb-color-line)',
+                      opacity: r.status === 'failed' ? 0.7 : 1,
+                    }}
+                    title={`${r.action} · advice=${r.advice || '-'} · sent=${r.sent}`}
+                  >
+                    {r.action || '-'} · {r.status}
+                    {r.advice ? ` · ${r.advice}` : ''}
+                  </span>
+                ))}
+              </div>
+            )}
             {/* 全局急停（kill switch）。吸收 computer-use P7：急停属于**协议层**，
              * UI 只是它的第二个入口；0 轮可停时如实说 0，不假装成功。 */}
             {busy && (

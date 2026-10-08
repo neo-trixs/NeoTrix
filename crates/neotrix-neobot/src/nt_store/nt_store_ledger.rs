@@ -197,6 +197,46 @@ impl NeobotStore {
         Ok(n)
     }
 
+    /// 最近的 `computer_act` 回执（倒序）：`(at, action, status, advice, sent)`。
+    ///
+    /// `status` ∈ applied/outcome_unknown/failed；`advice` ∈ retry/change_auth/stop/ask_human。
+    /// UI 的「这个动作到底发出去没有」看的就是这里。
+    pub fn computer_receipts(
+        &self,
+        limit: i64,
+    ) -> Result<Vec<(String, String, String, String, bool)>, NtBotError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT at, status, error FROM ledger
+             WHERE purpose='computer-act'
+             ORDER BY at DESC LIMIT ?1",
+        )?;
+        let rows = stmt.query_map(params![limit.max(1)], |r| {
+            let at: String = r.get(0)?;
+            let status: String = r.get(1)?;
+            let detail: String = r.get::<_, Option<String>>(2)?.unwrap_or_default();
+            // error 字段的形状是「action [advice=… sent=…] 详情」，这里如实拆，
+            // 拆不出就退化为空串（**不猜**）。
+            let action = detail
+                .split_whitespace()
+                .next()
+                .unwrap_or_default()
+                .to_owned();
+            let advice = detail
+                .split("advice=")
+                .nth(1)
+                .and_then(|s| s.split_whitespace().next())
+                .unwrap_or_default()
+                .to_owned();
+            let sent = detail.contains("sent=true");
+            Ok((at, action, status, advice, sent))
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
     // ---- task activity timeline（multica-ai/multica 吸收 lite 落地）----
 
     /// 记一条「任务侧事件」到 ledger：purpose 固为 `"task-event"`，
@@ -332,6 +372,37 @@ mod tests {
         let event = AuditEvent::new("bot", "bash", AuditDecision::Deny, Some("workspace-jail".to_owned()), "x");
         store.record_audit(&event).expect("record");
         assert_eq!(store.list_audit(10).expect("list").len(), 1);
+    }
+
+    #[test]
+    fn computer_receipts_are_readable_with_advice_and_sent_flag() {
+        let store = NeobotStore::open(":memory:").expect("open");
+        store
+            .record_ledger(&super::super::LedgerEntry {
+                id: "r1".into(),
+                at: "2026-10-08T10:00:00Z".into(),
+                engine: "computer".into(),
+                model: String::new(),
+                actor: "bot".into(),
+                purpose: "computer-act".into(),
+                in_tokens: 0,
+                out_tokens: 0,
+                cost_usd: 0.0,
+                measured: false,
+                status: "failed".into(),
+                latency_ms: 0,
+                error: Some("click [advice=stop sent=false] backend refused".into()),
+                session_id: None,
+                key_env: None,
+            })
+            .expect("record");
+        let rows = store.computer_receipts(5).expect("read");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].1, "click");
+        assert_eq!(rows[0].2, "failed");
+        assert_eq!(rows[0].3, "stop");
+        assert!(!rows[0].4, "sent=false 必须如实读出");
+        assert_eq!(store.computer_receipts(5).expect("read2").len(), 1, "别的 purpose 不混进来");
     }
 
     #[test]

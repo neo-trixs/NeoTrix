@@ -46,6 +46,52 @@ pub fn open_store() -> Result<NeobotStore, String> {
     NeobotStore::open(db.to_str().ok_or("数据目录不是合法 UTF-8")?).map_err(|e| e.to_string())
 }
 
+/// `neobot_computer_lease_status() -> LeaseStatus` —— 当前控制租约（含倒计时）。
+#[tauri::command]
+pub fn neobot_computer_lease_status() -> neotrix_neobot::nt_computer::LeaseStatus {
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    neotrix_neobot::nt_computer::lease_status(now_ms)
+}
+
+/// `neobot_computer_lease_grant(owner, secs)` —— 签发一次性控制租约（1..=20s）。
+#[tauri::command]
+pub fn neobot_computer_lease_grant(owner: String, secs: i64) -> Result<neotrix_neobot::nt_computer::LeaseStatus, String> {
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    neotrix_neobot::nt_computer::register_lease(&owner, now_ms, secs).map_err(|e| e.to_string())
+}
+
+/// `neobot_computer_receipts(limit)` —— 最近 computer 动作回执（倒序）。
+#[tauri::command]
+pub fn neobot_computer_receipts(limit: Option<i64>) -> Result<Vec<ComputerReceiptRow>, String> {
+    let store = open_store()?;
+    let rows = store
+        .computer_receipts(limit.unwrap_or(10))
+        .map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|(at, action, status, advice, sent)| ComputerReceiptRow {
+            at,
+            action,
+            status,
+            advice,
+            sent,
+        })
+        .collect())
+}
+
+/// 回执行线（UI 直接吃这个形状，不暴露 SQLite 行）。
+#[derive(Debug, Clone, Serialize)]
+pub struct ComputerReceiptRow {
+    pub at: String,
+    pub action: String,
+    /// `applied` / `outcome_unknown` / `failed`。
+    pub status: String,
+    /// `retry` / `change_auth` / `stop` / `ask_human`。
+    pub advice: String,
+    /// 动作是否**已派发**（false ⇒ 一定没生效，可放心重来）。
+    pub sent: bool,
+}
+
 /// `neobot_stop_all() -> usize` —— **全局急停**（kill switch）。
 ///
 /// 吸收 `freeall12/computer-use` P7：急停必须是**协议层**的东西，

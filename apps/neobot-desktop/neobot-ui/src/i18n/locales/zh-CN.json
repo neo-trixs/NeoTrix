@@ -131,5 +131,7 @@
   "trace.contentOmitted": "内容已略去（超过上限）",
   "chat.stopAll": "全局急停",
   "chat.stopAllLabel": "全局急停（停止所有正在运行的轮次）",
-  "chat.stopAllHint": "协议层急停：翻转所有运行中轮次的停止令牌（freeall12/computer-use P7）"
+  "chat.stopAllHint": "协议层急停：翻转所有运行中轮次的停止令牌（freeall12/computer-use P7）",
+  "chat.lease": "控制租约",
+  "chat.leaseHint": "一次性控制租约（1–20 秒）；到期自动失效，不自动续期"
 }

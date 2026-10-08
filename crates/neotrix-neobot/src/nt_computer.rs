@@ -394,6 +394,76 @@ pub fn truncate_for_detail(raw: &str) -> String {
     raw.chars().take(LIMIT).collect()
 }
 
+/// 进程内**当前控制租约登记处**（P2：让 UI 能显示「还有几秒」）。
+///
+/// 语义边界（诚实声明）：
+/// - 它**不是**跨进程/跨会话的授权系统，只是「本进程此刻谁持有控制权、到什么时候」；
+/// - 不跨进程持久化 ⇒ 桌面/CLI 各自独立，**重启即失效**（这是有意的：租约要短命）；
+/// - 真正的动作门控仍以 `ActionLease` 值为准，本登记处只是**同一份真相的可见面**。
+static LEASE_REGISTRY: std::sync::OnceLock<std::sync::Mutex<Option<ActionLease>>> =
+    std::sync::OnceLock::new();
+
+fn lease_registry() -> &'static std::sync::Mutex<Option<ActionLease>> {
+    LEASE_REGISTRY.get_or_init(|| std::sync::Mutex::new(None))
+}
+
+/// 现在的租约状态（给 UI/CLI 读）。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct LeaseStatus {
+    pub active: bool,
+    pub owner: String,
+    /// 剩余毫秒（0 = 无租约或已过期）。
+    pub remaining_ms: i64,
+}
+
+/// 签发并登记租约（越界秒数由 [`ActionLease::grant`] 拒收）。
+pub fn register_lease(owner: &str, now_ms: i64, secs: i64) -> Result<LeaseStatus, NtBotError> {
+    let lease = ActionLease::grant(owner, now_ms, secs)?;
+    let remaining = lease.remaining_ms(now_ms);
+    let Ok(mut slot) = lease_registry().lock() else {
+        return Err(NtBotError::Store("lease registry lock poisoned".to_owned()));
+    };
+    *slot = Some(lease);
+    Ok(LeaseStatus {
+        active: true,
+        owner: owner.to_owned(),
+        remaining_ms: remaining,
+    })
+}
+
+/// 撤销当前租约（急停的协议层另一半：翻令牌 + 撤租约）。
+pub fn revoke_lease() {
+    if let Ok(mut slot) = lease_registry().lock() {
+        *slot = None;
+    }
+}
+
+/// 读当前租约状态（过期即视为无租约，并顺手清位）。
+pub fn lease_status(now_ms: i64) -> LeaseStatus {
+    let Ok(mut slot) = lease_registry().lock() else {
+        return LeaseStatus {
+            active: false,
+            owner: String::new(),
+            remaining_ms: 0,
+        };
+    };
+    match slot.as_ref() {
+        Some(lease) if lease.is_valid(now_ms) => LeaseStatus {
+            active: true,
+            owner: lease.owner().to_owned(),
+            remaining_ms: lease.remaining_ms(now_ms),
+        },
+        _ => {
+            *slot = None;
+            LeaseStatus {
+                active: false,
+                owner: String::new(),
+                remaining_ms: 0,
+            }
+        }
+    }
+}
+
 /// **元素句柄台账**（`computer-use` P3 吸收）。
 ///
 /// 句柄失效是 CU/BU 的**第一大错误源**：模型拿着「42 号元素」去点，页面可能
@@ -641,6 +711,22 @@ mod tests {
         ledger.set_scope("example.com/b");
         assert_eq!(ledger.live_count(), 0);
         assert_eq!(ledger.scope(), "example.com/b");
+    }
+
+    #[test]
+    fn lease_registry_reports_countdown_and_revokes() {
+        use super::{lease_status, register_lease, revoke_lease};
+        let now = 2_000_000i64;
+        revoke_lease();
+        let st = register_lease("desktop", now, 5).expect("grant");
+        assert!(st.active);
+        assert_eq!(st.remaining_ms, 5000);
+        assert_eq!(lease_status(now + 2500).remaining_ms, 2500);
+        assert!(lease_status(now + 5000).active == false, "到点即失效并清位");
+        register_lease("desktop", now, 5).expect("re-grant");
+        revoke_lease();
+        assert!(!lease_status(now).active, "撤销后立即无租约");
+        assert!(register_lease("x", now, 0).is_err(), "0 秒仍拒收");
     }
 
     #[test]

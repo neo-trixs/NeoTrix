@@ -131,5 +131,7 @@
   "trace.contentOmitted": "content omitted (over cap)",
   "chat.stopAll": "Stop all",
   "chat.stopAllLabel": "Stop all running turns",
-  "chat.stopAllHint": "Protocol-level kill switch: flips the stop token of every live turn"
+  "chat.stopAllHint": "Protocol-level kill switch: flips the stop token of every live turn",
+  "chat.lease": "Lease",
+  "chat.leaseHint": "One-shot control lease (1-20s); expires, never auto-renews"
 }
