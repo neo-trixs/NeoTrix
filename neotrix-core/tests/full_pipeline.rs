@@ -229,10 +229,8 @@ fn test_breaker_registry_per_capability() {
 fn test_triple_memory_store_stats() {
     let store = TripleMemoryStore::new();
 
-    let (w, s, f) = store.stats();
-    assert_eq!(w, 0);
-    assert_eq!(s, 0);
-    assert_eq!(f, 0);
+    let count = store.stats();
+    assert_eq!(count, 0);
 
     // Internal methods are crate-private, so we verify stats returns zeros
     // for a fresh store. Full workflow recording is tested in unit tests.
