@@ -500,6 +500,32 @@ impl Checkpoint {
     }
 }
 
+/// 从 `tool_hook` 闭包到 `ToolCallRecord` 的适配器：返回一个
+/// `(hook_closure, shared_buffer)` 对。调用方把 hook 传给
+/// `AgentLoop::with_tool_hook`，稍后从 buffer 取出记录 `make_tool_call`
+/// 落进 Checkpoint —— 完成 L1→L6 的 checkpoint 接线（依赖倒置：
+/// L1 只持有闭包，L6 提供构造方）。
+pub fn checkpoint_tool_hook() -> (
+    std::sync::Arc<dyn Fn(&str, bool) + Send + Sync>,
+    std::sync::Arc<std::sync::Mutex<Vec<ToolCallRecord>>>,
+) {
+    let buf: std::sync::Arc<std::sync::Mutex<Vec<ToolCallRecord>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let buf2 = buf.clone();
+    let hook = std::sync::Arc::new(move |name: &str, success: bool| {
+        if let Ok(mut v) = buf2.lock() {
+            v.push(ToolCallRecord {
+                tool_name: name.to_string(),
+                args_hash: String::new(),
+                result_summary: String::new(),
+                duration_ms: 0,
+                success,
+            });
+        }
+    });
+    (hook, buf)
+}
+
 /// Resume 判据（LongHorizon-Harness 式 plan→act→verify→checkpoint→recover）：
 /// 续跑时**跳过**已成功记录的工具调用，**重跑**失败/未记录的。
 /// 纯函数，不读写任何外部状态（与 `nt_crawl_sources` 的 pending/completed
@@ -691,6 +717,24 @@ mod tests {
             .push(Checkpoint::make_tool_call("search", "h1", "ok", 10, true));
         cp.tool_calls
             .push(Checkpoint::make_tool_call("delete", "h2", "err", 5, false));
+        let v = resume_verdict(&cp);
+        assert_eq!(v.skip, vec!["search".to_string()]);
+        assert_eq!(v.rerun, vec!["delete".to_string()]);
+    }
+
+    #[test]
+    fn checkpoint_tool_hook_collects_and_feeds_resume_verdict() {
+        let (hook, buf) = checkpoint_tool_hook();
+        hook("search", true);
+        hook("delete", false);
+        let records = std::mem::take(&mut *buf.lock().unwrap());
+        assert_eq!(records.len(), 2);
+        let mut cp = Checkpoint::new("s1", "a1");
+        for r in records {
+            cp.tool_calls.push(Checkpoint::make_tool_call(
+                &r.tool_name, &r.args_hash, &r.result_summary, r.duration_ms, r.success,
+            ));
+        }
         let v = resume_verdict(&cp);
         assert_eq!(v.skip, vec!["search".to_string()]);
         assert_eq!(v.rerun, vec!["delete".to_string()]);
