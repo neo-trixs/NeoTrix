@@ -8,6 +8,7 @@
 
 pub mod dispatch; // 能力派发端口（core 注册 / neobot 消费）
 pub mod spine; // 能力脊柱：运行时能力唯一真源（可拔可换 + executability 派生）
+pub mod planner; // 能力面投影与组合：能力→tool schema、随用随调相关性、链路自我组合
 pub mod market; // 能力市场清单（纯数据，两侧共读）
 pub mod epistemic;
 pub mod node;
