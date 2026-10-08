@@ -20,6 +20,8 @@ pub enum EscapeType {
 /// 逃逸检测结果
 #[derive(Debug, Clone)]
 pub struct EscapeResult {
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub detected: bool,
     pub escape_type: EscapeType,
     pub severity: f64,

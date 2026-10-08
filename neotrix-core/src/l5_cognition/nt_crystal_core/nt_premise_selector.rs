@@ -120,6 +120,8 @@ pub struct PremiseChain {
     pub chain_type: ReasoningType,
     /// 前提是否跨 ≥2 域（= `chain_type == CrossDomain`，冗余存一份便于
     /// 调用方不 import `ReasoningType` 就能判）。
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub cross_domain: bool,
 }
 

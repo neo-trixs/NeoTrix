@@ -507,6 +507,8 @@ pub struct SystemProxyStatus {
     pub https_proxy: Option<String>,
     pub socks_proxy: Option<String>,
     pub no_proxy: Option<String>,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub dynamic_chain_bound: bool,
 }
 

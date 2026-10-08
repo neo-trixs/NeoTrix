@@ -49,6 +49,8 @@ impl _AgentIdentity {
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgentSkill {
     pub name: String,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub promoted: bool,
 }
 

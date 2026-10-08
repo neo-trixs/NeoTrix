@@ -261,6 +261,8 @@ pub fn format_size(bytes: u64) -> String {
 /// 清理配置 (消除 dry_run 冗余)
 #[derive(Debug, Clone)]
 pub struct CleanupConfig {
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub dry_run: bool,
     pub use_trash: bool,
     pub archive_before_delete: bool,
@@ -314,6 +316,8 @@ pub struct CleanupPattern {
     ///  (b) ⛔ 若删除逻辑**不存在**，则 `safe` 是**未落地的规格**
     ///      ⇒ 应保留并标注 ⛔ 而非假装已生效。
     /// ⛔ 我**不擅自接线**：会给扫描结果引入删除语义（**行为变更**）。
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub safe: bool,
     pub recursive: bool,
 }

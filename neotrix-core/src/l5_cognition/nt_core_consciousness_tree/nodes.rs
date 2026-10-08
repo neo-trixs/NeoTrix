@@ -167,6 +167,8 @@ pub struct EvolutionForecast {
     // ⛔ 死开关门把它判成「零读点」：它按「声明文件内读点」计数，而读点在
     //   兄弟文件 lifecycle.rs ⇒ **跨文件消费被当成没消费**（与 chunk_size/concurrency
     //   同类，门的第二类误报）。不删。
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub abstain: bool,
     /// 情景树叶子概率摘要 (bull/bear/sideways)
     pub scenario_probs: Vec<(String, f64)>,

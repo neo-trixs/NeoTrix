@@ -22,6 +22,8 @@ pub struct NeoCodexConfig {
     pub auto_compact: bool,
     pub shell_available: bool,
     pub thinking_enabled: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub goal_mode: bool,
     /// P2-1: generation parameters surfaced from the desktop settings panel.
     /// Previously hardcoded (temperature 0.3 / max_tokens 4096) so the
@@ -53,6 +55,8 @@ pub struct AgentState {
     pub tokens_used: usize,
     pub mode: NeoCodexMode,
     pub mode_start: Instant,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub goal_active: bool,
     /// Permission policy for the streaming path (P0-2). Mirrors Claude Code
     /// Manual/AcceptEdits/Plan and Codex approval modes. Stored on the agent

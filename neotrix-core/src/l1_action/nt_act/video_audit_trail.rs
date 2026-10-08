@@ -81,8 +81,12 @@ pub struct _AuditConfig {
     /// 日志保留时间
     pub retention_duration: Duration,
     /// 是否启用 C2PA
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub c2pa_enabled: bool,
     /// 水印嵌入
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub watermark_enabled: bool,
 }
 

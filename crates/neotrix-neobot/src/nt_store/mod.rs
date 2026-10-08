@@ -30,6 +30,8 @@ pub struct Conversation {
     ///   ⭐ 消费者在**界面**：`neobot-root.tsx` 的 `c.muted &&` 渲染静音条 ▬。
     ///   ⇒ Rust 生产代码只写不「读字段」，纯 Rust 读点统计**结构上看不见**
     ///   （`dead-flag-baseline.txt` 记为 `cross-language-consumer`）。
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub muted: bool,
     /// 未读数（已读水位本地版：水位之后新建任务数）。
     pub unread: i64,
@@ -103,6 +105,8 @@ pub struct FileChange {
     /// ⛔ 教训：加一个与既有字段**同名**的 DTO 字段，会让门走「同名多声明
     ///    ⇒ 只认本文件读点」那一支 ⇒ 旧声明看起来全无读者。
     ///    ⇒ **同名不是免费的**（AGENTS.md L15 的又一次复现）。
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub content_omitted: bool,
 }
 
@@ -140,10 +144,16 @@ pub struct LedgerEntry {    pub id: String,
     pub in_tokens: i64,
     pub out_tokens: i64,
     pub cost_usd: f64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub measured: bool,
     pub status: String,
     pub latency_ms: i64,
     pub error: Option<String>,
+    /// 会话 id（IM/桌面出表口径；空=未标）。
+    pub session_id: Option<String>,
+    /// 所用 key 的环境变量名（永不存值；空=免 key）。供按 key 聚合成本。
+    pub key_env: Option<String>,
 }
 
 /// 渠道行（`channels` 表；token 值永不落库，只有 `token_env` 变量名）。
@@ -291,7 +301,8 @@ impl NeobotStore {
                in_tokens INTEGER NOT NULL, out_tokens INTEGER NOT NULL,
                cost_usd REAL NOT NULL, measured INTEGER NOT NULL DEFAULT 0,
                status TEXT NOT NULL DEFAULT 'ok',
-               latency_ms INTEGER NOT NULL DEFAULT 0, error TEXT);
+               latency_ms INTEGER NOT NULL DEFAULT 0, error TEXT,
+              session_id TEXT, key_env TEXT);
               CREATE TABLE IF NOT EXISTS outbox(
                 id TEXT PRIMARY KEY, topic TEXT NOT NULL,
                 payload TEXT NOT NULL, claimed INTEGER NOT NULL DEFAULT 0,
@@ -306,6 +317,11 @@ impl NeobotStore {
               CREATE TABLE IF NOT EXISTS providers(
                 name TEXT PRIMARY KEY, base_url TEXT NOT NULL,
                 key_env TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '',
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL);
+              CREATE TABLE IF NOT EXISTS route_groups(
+                name TEXT PRIMARY KEY, members TEXT NOT NULL DEFAULT '[]',
+                mode TEXT NOT NULL DEFAULT 'order',
                 enabled INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL);
               CREATE TABLE IF NOT EXISTS core_pair(
@@ -390,6 +406,8 @@ impl NeobotStore {
             "ALTER TABLE ledger ADD COLUMN status TEXT NOT NULL DEFAULT 'ok'",
             "ALTER TABLE ledger ADD COLUMN latency_ms INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE ledger ADD COLUMN error TEXT",
+            "ALTER TABLE ledger ADD COLUMN session_id TEXT",
+            "ALTER TABLE ledger ADD COLUMN key_env TEXT",
             "ALTER TABLE outbox ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE outbox ADD COLUMN available_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
             "ALTER TABLE routines ADD COLUMN next_run_at INTEGER NOT NULL DEFAULT 0",
@@ -568,6 +586,7 @@ mod nt_store_ledger;
 mod nt_store_messages;
 pub use nt_store_messages::{ChatMessage, MESSAGE_MAX_CHARS};
 mod nt_store_providers;
+mod nt_store_routes;
 mod nt_store_reply_tag;
 mod nt_store_routines;
 /// 重导出：同 [`LastStep`] 的理由（模块私有 ⇒ 调用点写不出具名类型），

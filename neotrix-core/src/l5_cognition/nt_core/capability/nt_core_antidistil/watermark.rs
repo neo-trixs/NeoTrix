@@ -241,6 +241,8 @@ pub struct WatermarkBits {
     pub apostrophe: ApostropheVariant,
     pub has_slash: bool,
     pub space_count: u8,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub has_modifier_colon: bool,
 }
 

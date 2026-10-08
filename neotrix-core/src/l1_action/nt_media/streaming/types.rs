@@ -95,6 +95,8 @@ pub struct StreamingPipelineConfig {
     // ⛔ 死开关门曾把它报成「零读点」—— 那是**门的第二类误报**（详见 nt_dead_flag.py）：
     //    本字段在 types.rs 声明、在 pipeline.rs 被读，而门对「同名多声明」的字段
     //    只统计**声明文件内**的读点 ⇒ 跨模块消费被当成没消费。
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub chunk_size: usize,
     pub persistence: Option<Arc<super::super::persistence::DownloadStore>>,
     pub auth: Option<AuthConfig>,
@@ -102,6 +104,8 @@ pub struct StreamingPipelineConfig {
     // ⛔ 死开关门曾把它报成「零读点」—— 那是**门的第二类误报**（详见 nt_dead_flag.py）：
     //    本字段在 types.rs 声明、在 pipeline.rs 被读，而门对「同名多声明」的字段
     //    只统计**声明文件内**的读点 ⇒ 跨模块消费被当成没消费。
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub concurrency: usize,
     pub verify_sha256: Option<String>,
     pub stall_timeout: Duration,

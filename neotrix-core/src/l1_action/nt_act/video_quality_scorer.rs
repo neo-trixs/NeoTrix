@@ -37,6 +37,8 @@ pub struct _FrameQuality {
     /// 帧大小 (字节)
     pub size_bytes: u32,
     /// 是否是关键帧
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub is_keyframe: bool,
 }
 
@@ -143,8 +145,12 @@ pub struct _ScorerConfig {
     /// 时序一致性阈值
     pub temporal_consistency_threshold: f64,
     /// 音视频同步阈值 (ms)
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub av_sync_threshold_ms: f64,
     /// 问题检测灵敏度
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub issue_sensitivity: f64,
 }
 

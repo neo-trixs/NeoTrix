@@ -41,7 +41,11 @@ pub struct _StreamInfo {
     pub height: u32,
     pub bitrate_kbps: u32,
     pub fps: f64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub has_audio: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub has_subtitles: bool,
 }
 
@@ -76,6 +80,8 @@ pub struct _TranscodeResult {
     pub duration_ms: u64,
     pub output_size_bytes: u64,
     pub actual_codec: VideoCodec,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub hardware_used: bool,
     pub compression_ratio: f64,
 }

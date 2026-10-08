@@ -79,6 +79,8 @@ pub struct ProxyDetectionConfig {
     /// Time window (seconds) for creation-timestamp clustering
     pub creation_window_seconds: u64,
     /// Minimum accounts in a creation window to flag
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub creation_window_threshold: usize,
     /// Disposable email domains (built-in + extensible)
     pub disposable_email_domains: Vec<String>,

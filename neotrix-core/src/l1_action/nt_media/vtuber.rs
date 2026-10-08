@@ -32,6 +32,8 @@ pub struct VtuberFrame {
 #[derive(Debug, Clone)]
 pub struct VtuberConfig {
     pub voice_backend: VoiceBackend,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub sample_rate: u32,
     pub expression_model: String,
 }

@@ -43,6 +43,8 @@ impl VisionAnalyzer for PlaceholderAnalyzer {
 /// 变换配置。
 #[derive(Debug, Clone)]
 pub struct TransformConfig {
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub enabled: bool,
     /// 目标模型列表 (空 = 全部模型均 text-only 处理)。
     pub target_models: Vec<String>,

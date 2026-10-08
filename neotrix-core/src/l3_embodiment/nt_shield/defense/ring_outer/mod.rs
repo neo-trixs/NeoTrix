@@ -16,8 +16,14 @@ pub use guardrail_sentinel::GuardrailSentinel;
 #[derive(Debug, Clone)]
 pub struct OuterVerification {
     pub filtered_output: String,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub behavior_safe: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub resonance_detected: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub guardrail_intact: bool,
     pub signals: Vec<String>,
 }

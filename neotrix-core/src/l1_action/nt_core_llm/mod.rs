@@ -113,6 +113,8 @@ pub fn truncate_preserving(text: &str, max_tokens: usize) -> &str {
 pub struct BudgetResult {
     pub input_tokens: usize,
     pub output_tokens: usize,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub within_budget: bool,
     pub is_cliff: bool,
     pub messages_evicted: usize,
@@ -198,7 +200,11 @@ pub struct ProviderMetadata {
 /// Provider capability flags
 #[derive(Debug, Clone, Default)]
 pub struct ProviderCapabilities {
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub text: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub vision: bool,
     pub tools: bool,
     pub streaming: bool,

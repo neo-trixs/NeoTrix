@@ -21,6 +21,8 @@ pub struct IoRouterConfig {
     /// 最大重试次数
     pub max_retries: u32,
     /// 最大故障转移链长度
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub fallback_chain_length: u32,
     /// 是否启用成本预算
     pub enable_cost_budget: bool,

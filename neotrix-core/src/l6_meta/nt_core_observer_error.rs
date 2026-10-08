@@ -143,6 +143,8 @@ pub struct FallbackHandler {
     /// Score to use in the degraded report (default: 0.5 — neutral)
     pub fallback_score: f64,
     /// Whether to degrade gracefully (vs. panic/error)
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub degrade_gracefully: bool,
 }
 

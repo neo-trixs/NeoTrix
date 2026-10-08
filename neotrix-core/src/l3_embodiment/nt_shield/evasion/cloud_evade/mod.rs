@@ -30,8 +30,12 @@ pub enum EvasionTechnique {
 #[derive(Debug, Clone)]
 pub struct EvasionResult {
     pub technique: EvasionTechnique,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub detected: bool,
     pub environment: String,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub evasion_applied: bool,
 }
 

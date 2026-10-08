@@ -105,7 +105,11 @@ pub struct IpFingerprint {
     pub asn_name: Option<String>,
     pub country: Option<String>,
     pub residential_proxy_probability: f64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub is_tor_exit: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub is_cloudflare: bool,
     pub provider_category: ProviderCategory,
 }

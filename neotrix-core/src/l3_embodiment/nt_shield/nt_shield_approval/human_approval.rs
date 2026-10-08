@@ -55,6 +55,8 @@ pub struct ApprovalPolicy {
     /// 审批超时时间
     pub timeout: Duration,
     /// 所需审批人数 (Critical 级别)
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub required_approvers: usize,
     /// 可用审批人列表
     pub available_approvers: Vec<String>,

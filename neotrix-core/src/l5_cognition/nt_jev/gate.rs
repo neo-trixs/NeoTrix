@@ -36,6 +36,8 @@ pub struct GateConfig {
     /// Confidence threshold below which needs_review is set
     pub confidence_threshold: f64,
     /// Probability mass validation tolerance
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub validation_tolerance: f64,
     /// Block on any error (hard gate)
     pub hard_block: bool,

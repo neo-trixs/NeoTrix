@@ -45,6 +45,8 @@ pub struct RenderConfig {
     //    实测：除声明与 `Default` 赋值外**零读点**，全仓（含 apps/ crates/）引用数 0
     //    ⇒ 死配置：看起来在控制窗口尺寸，实际什么都不控制。
     pub window_title: String,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub target_fps: u32,
     pub clear_color: Color,
 }

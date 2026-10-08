@@ -44,6 +44,8 @@ pub struct BackgroundConfig {
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
     /// ⭐ 总开关：`BackgroundLoop::start()` 首行读取（run.rs:387）。
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub enabled: bool,
     /// ⭐ **已接线**（2026-10-07）：派发点 run.rs:837 `proxy_heartbeat` 现按此开关守门。
     /// ⇒ 2026-10-07 撤销原标注：门报告与真实读点不符（本字段其实已被读取/已接线）。
@@ -83,11 +85,15 @@ pub struct BackgroundConfig {
     pub kb_guard_interval_secs: u64,
     /// 工作区守卫周期 (git status 快照对比), 默认 600s
     pub workspace_guard_interval_secs: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     /// KB 完整备份周期, 默认 21600s (6h)
     pub kb_backup_interval_secs: u64,
     /// 意识核心进化周期 (ConsciousnessTree run_growth_cycle), 默认 600s (10min)。
     /// 缺陷1修复 (自我运转实际情况): 此前硬编码 3600s (1h) 且不可配置, 而 SEAL
     /// 消费果实频率为 goal_interval_secs (默认 180s) — 时序错配导致 SEAL 在
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     /// 大部分时间消费空果实。改为配置驱动, 与 SEAL 消费节奏对齐。
     pub consciousness_interval_secs: u64,
     /// EFE 前瞻探索强度 (Active Inference, arXiv:2401.12917)。

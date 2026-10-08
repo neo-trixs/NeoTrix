@@ -172,6 +172,8 @@ pub struct ProviderInfo {
     /// API key 环境变量 (None = keyless)
     pub api_key_env: Option<&'static str>,
     /// 是否免费 (keyless 或 free tier)
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub is_free: bool,
     /// 支持的模型列表
     pub models: &'static [&'static str],

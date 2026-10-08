@@ -23,6 +23,8 @@ use crate::l3_embodiment::l1_facade::{
 pub struct ApiProxyConfig {
     pub listen_addr: String,
     pub upstream_timeout: Duration,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub debug: bool,
 }
 

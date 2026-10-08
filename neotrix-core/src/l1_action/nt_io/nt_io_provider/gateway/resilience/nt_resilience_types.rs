@@ -14,6 +14,8 @@ pub enum CircuitState {
 pub struct AnomalyConfig {
     pub window_size: usize,
     pub z_score_threshold: f64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub min_samples: usize,
 }
 
@@ -42,6 +44,8 @@ pub struct AutoRecoveryConfig {
     pub base_delay: Duration,
     pub max_delay: Duration,
     pub backoff_factor: f64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub circuit_breaker_threshold: u32,
     pub recovery_check_interval: Duration,
 }

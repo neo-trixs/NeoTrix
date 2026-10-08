@@ -9,6 +9,8 @@ pub struct BasicBlock {
     pub start_address: u64,
     pub end_address: u64,
     pub instructions: Vec<String>,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub is_entry: bool,
     pub is_exit: bool,
 }

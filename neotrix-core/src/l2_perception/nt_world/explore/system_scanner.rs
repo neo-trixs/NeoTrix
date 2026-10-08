@@ -55,6 +55,8 @@ pub struct ScanPath {
     pub path: PathBuf,
     pub category: ScanCategory,
     pub risk_level: ScanRiskLevel,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub recursive: bool,
 }
 

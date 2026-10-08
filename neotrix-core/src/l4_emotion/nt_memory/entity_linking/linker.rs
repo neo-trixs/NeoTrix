@@ -14,6 +14,8 @@ use super::entity::{Entity, EntityType};
 #[derive(Debug, Clone)]
 pub struct LinkerConfig {
     /// Maximum edit distance (Levenshtein) for fuzzy name matching.
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub max_edit_distance: usize,
     /// Minimum overlap ratio (0.0..1.0) for name matching.
     pub min_name_overlap: f64,

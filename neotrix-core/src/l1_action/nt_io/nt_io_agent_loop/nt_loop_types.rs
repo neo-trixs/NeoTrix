@@ -23,6 +23,8 @@ pub(crate) const COMPACTION_SUMMARY_MAX_TOKENS: u32 = 1024;
 pub struct ToolInvocation {
     pub name: String,
     pub arguments: String,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub success: bool,
     pub output: String,
 }
@@ -56,4 +58,11 @@ pub struct AgentLoop {
     pub(crate) secret_scanner: Option<Box<dyn SecretScanner>>,
     /// G27 最近一次最终输出的治理报告 (观测杠杆: 每次 emit_final 可见纪律合规)。
     pub(crate) last_governance: Option<GovernanceReport>,
+    /// 金丝雀观察窗口的**会话键**（2026-10-07 键化，修 `OPEN-DEFECTS` P1-5）。
+    ///
+    /// `new()` 默认 `neotrix_neobot::nt_capability_canary::DEFAULT_SESSION`；
+    /// 真实会话生命周期由 `begin_session_window(session)` 显式设置
+    /// ⇒ `execute_tools` 的 tick 只推进**本会话**窗口，
+    /// 不再与其他会话互相 reset。
+    pub(crate) canary_session: String,
 }

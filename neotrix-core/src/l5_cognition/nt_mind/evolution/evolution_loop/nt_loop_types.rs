@@ -268,6 +268,8 @@ pub struct EvolutionLoop {
     pub issues: Vec<Issue>,
     pub consecutive_stagnant: u32,
     pub fixed_history: Vec<u32>,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub enabled: bool,
 
     /// 被进化的目标项目目录（None = 自身/Cargo 项目根，保持旧行为）

@@ -40,8 +40,12 @@ pub struct CompactionConfig {
     /// Minimum keep probability threshold
     pub keep_threshold: f64,
     /// Number of recent messages to never touch
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub preserve_recent: usize,
     /// Max characters to keep from truncated results
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub truncate_head_chars: usize,
 }
 

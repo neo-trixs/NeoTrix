@@ -330,6 +330,8 @@ pub struct AssetOutput {
 /// 文件增强输出
 #[derive(Debug, Clone)]
 pub struct FileEnhanceOutput {
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub success: bool,
     pub input_path: String,
     pub output_path: String,

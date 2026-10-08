@@ -33,6 +33,8 @@ pub struct VisualPromptCacheConfig {
     /// 缓存过期时间
     pub ttl: Duration,
     /// 相似度阈值
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub similarity_threshold: f64,
 }
 

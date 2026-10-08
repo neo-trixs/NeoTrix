@@ -126,6 +126,8 @@ pub struct RemediationAction {
     pub name: &'static str,
     pub description: &'static str,
     pub risk: RemediationRisk,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub reversible: bool,
     pub execute: fn() -> Result<String, String>,
     pub verify: fn() -> bool,
@@ -201,6 +203,8 @@ pub enum VpnType {
 pub struct NetworkDiagnosticReport {
     pub environment: NetworkEnvironment,
     pub endpoints: Vec<EndpointDiagnostic>,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub has_issue: bool,
     pub primary_root_cause: Option<ConnectionFailureRootCause>,
     pub recommendation: Option<&'static str>,

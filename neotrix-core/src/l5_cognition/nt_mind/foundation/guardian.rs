@@ -138,6 +138,8 @@ impl Default for _KbGuardConfig {
 
 #[derive(Debug, Default)]
 pub struct _KbGuardReport {
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub backed_up: bool,
     pub restored: bool,
     pub backup_path: Option<PathBuf>,
@@ -282,6 +284,8 @@ pub struct MapeGateConfig {
     /// 晋升所需最低通过指标数
     pub min_metrics_pass: u32,
     /// 判定失败的最小指标通过数 (低于则提前回滚)
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub min_metrics_to_continue: u32,
 }
 
@@ -620,6 +624,8 @@ impl WorkspaceGuard {
 
 #[derive(Debug, Default)]
 pub struct _FileEditSafetyReport {
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub backed_up: bool,
     pub backup_path: Option<PathBuf>,
     pub verified: bool,

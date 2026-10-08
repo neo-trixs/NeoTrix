@@ -472,7 +472,11 @@ impl Reflector for ReflectorAgent {
 #[derive(Debug, Clone)]
 pub struct PerConfig {
     pub max_iterations: usize,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub min_score_to_converge: f64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub require_all_steps: bool,
 }
 

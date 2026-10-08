@@ -35,14 +35,20 @@ pub struct DetectionSignal {
 #[derive(Debug, Clone)]
 pub struct AntiDistillationConfig {
     /// Enable CoT extraction detection
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub enable_cot_detection: bool,
     /// Enable account clustering
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub enable_account_clustering: bool,
     /// Request rate threshold (requests per minute)
     pub rate_threshold: u32,
     /// Minimum accounts for cluster detection
     pub cluster_min_accounts: usize,
     /// Time window for cluster detection (seconds)
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub cluster_time_window: u64,
 }
 

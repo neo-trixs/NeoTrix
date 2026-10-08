@@ -24,6 +24,8 @@ pub struct FallbackConfig {
     /// 是否跳过熔断模型
     pub skip_open_circuit: bool,
     /// 最小健康延迟阈值 (ms)，高于此值视为降级
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub healthy_latency_ms: f64,
     /// 最大错误率阈值 (0.0-1.0)，高于此值视为不健康
     pub max_error_rate: f32,

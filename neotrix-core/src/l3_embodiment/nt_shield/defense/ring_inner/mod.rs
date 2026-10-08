@@ -17,6 +17,8 @@ pub use intent_remapper::IntentRemapper;
 pub struct InnerVerification {
     pub sanitized_input: String,
     pub trust_level: super::ring_core::TrustLevel,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub retrieval_allowed: bool,
     pub remapped_intent: Option<String>,
     pub signals: Vec<String>,

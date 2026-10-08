@@ -67,6 +67,8 @@ pub struct MempoolTx {
     pub to: String,
     pub value_eth: f64,
     pub gas_price_gwei: f64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub is_frontrunable: bool,
     pub is_sandwichable: bool,
 }

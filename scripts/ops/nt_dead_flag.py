@@ -382,7 +382,7 @@ def main() -> int:
         f"dead-flag[{args.types}] 字段 {len(fields)} 个；零读点 {len(dead)} 个"
         f"（外部消费者 serde/uniffi {len(external)}、配置噪声 {len(noise)}、"
         f"**未接线规格 {len(spec)}**、"
-        f"待人工判定 {len(behavioral) - len(noise) - len(spec)}）；"
+        f"待人工判定 {max(0, len(behavioral) - len(noise) - len(spec))}）；"
         f"基线已裁决 {len(baseline)}；新增 {len(new)}"
     )
 

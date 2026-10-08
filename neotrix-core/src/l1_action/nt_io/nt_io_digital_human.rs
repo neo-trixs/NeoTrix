@@ -15,8 +15,12 @@ pub use crate::l1_action::nt_action_facade::nt_feel_facade::{
 pub struct AsrConfig {
     pub engine: String,
     pub language: String,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub sample_rate: u32,
     pub streaming: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub vad_enabled: bool,
 }
 
@@ -393,6 +397,8 @@ pub struct AvatarState {
     pub expression: Emotion,
     pub animation: String,
     pub lip_sync: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub blinking: bool,
 }
 
@@ -553,6 +559,8 @@ pub struct SessionStats {
     pub utterance_count: u64,
     pub duration: Duration,
     pub current_emotion: Emotion,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub has_persona: bool,
 }
 

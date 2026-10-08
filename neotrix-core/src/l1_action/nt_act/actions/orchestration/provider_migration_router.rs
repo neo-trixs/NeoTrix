@@ -161,6 +161,8 @@ pub struct RoutingConfig {
     /// 健康检查间隔
     pub health_check_interval: Duration,
     /// 自动故障转移
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub auto_fallback: bool,
 }
 

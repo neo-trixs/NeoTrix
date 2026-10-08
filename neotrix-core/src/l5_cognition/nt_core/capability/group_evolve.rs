@@ -83,7 +83,11 @@ pub struct Vote {
 pub struct GroupCoordinatorConfig {
     pub max_peers: u32,
     pub consensus_threshold: f64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub heartbeat_interval_ms: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub max_history: usize,
 }
 

@@ -38,6 +38,8 @@ pub struct UnifiedModelEntry {
     pub size_gb: f64,
     pub tier: String,
     pub is_free: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub requires_api_key: bool,
     pub api_key_env: Option<String>,
     pub provider_type: LlmProviderType,

@@ -257,6 +257,8 @@ impl AntiDistillationSystem {
 pub struct AntiDistilStats {
     pub watermark_enabled: bool,
     pub tracer_enabled: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub detector_enabled: bool,
     pub total_traces: u64,
     pub total_alerts: u64,

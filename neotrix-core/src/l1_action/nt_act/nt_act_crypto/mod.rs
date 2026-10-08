@@ -70,10 +70,14 @@ pub struct CryptoAgent {
 
 #[derive(Clone, Debug)]
 pub struct CryptoAgentConfig {
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub auto_scan_on_start: bool,
     pub max_gas_price_gwei: f64,
     pub min_opportunity_value_usd: f64,
     pub preferred_chains: Vec<ChainType>,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub auto_claim_faucets: bool,
     pub auto_execute: bool,
     pub learning_rate: f64,

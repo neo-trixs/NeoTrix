@@ -64,6 +64,8 @@ impl ProviderHealth {
 pub struct SwapRule {
     pub trigger_consecutive_failures: u32,
     pub trigger_success_rate_below: f64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub prefer_same_category: bool,
     pub cooldown_secs: u64,
 }
@@ -85,6 +87,8 @@ pub struct SwapRecord {
     pub to: LlmProviderType,
     pub reason: String,
     pub timestamp: Instant,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub success: bool,
 }
 

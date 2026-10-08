@@ -45,6 +45,8 @@ pub struct CircuitBreakerConfig {
     /// 滑动窗口大小
     pub window_size: usize,
     /// 失败衰减半衰期 (秒)
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub failure_decay_secs: u64,
 }
 

@@ -185,6 +185,8 @@ pub struct DialogueAbsorbConfig {
     /// 单次最多吸收的条目数 (默认 8)
     pub max_entries: usize,
     /// 重要性下界 (默认 0.1) — 低于该值的会话不参与能力吸收
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub min_importance: f64,
     /// 关键词命中的最低维度提升 (默认 0.5), 每条命中再 +0.1, 封顶 0.95
     pub boost_base: f64,

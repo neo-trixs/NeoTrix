@@ -34,6 +34,8 @@ pub struct ConsciousnessTree {
     /// metrics from the shared knowledge base (Session B: task-cog-consciousness).
     pub kb: Option<Arc<KnowledgeBase>>,
     /// Awakened flag — set by `awaken()` once the 11 branch nodes are loaded.
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub awakened: bool,
 }
 
@@ -99,6 +101,8 @@ pub struct InformationRoots {
 
 #[derive(Debug, Clone)]
 pub struct ConsciousnessCore {
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub gwt_resonance_active: bool,
     /// 注意力来源通道 — 映射自 x.ai 双搜索通道 ("web"/"x_search"/"auto")
     pub attention_source: String,
@@ -715,6 +719,8 @@ pub struct ModuleLeaf {
     pub name: String,
     pub branch: BranchKind,
     pub lines: usize,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub has_tests: bool,
     // nt-unwired-spec: 未接线规格 —— D2 切片实测（2026-10-07）全仓零读点
     //   （in 者读点=0，且声明数=1，非同名遮蔽）⇒ 规格存在但未接线 ⇒ B 类保留。

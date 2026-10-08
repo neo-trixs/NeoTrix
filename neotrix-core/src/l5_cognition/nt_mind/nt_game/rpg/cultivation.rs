@@ -364,6 +364,8 @@ impl BreakthroughAttempt {
 pub struct BreakthroughResult {
     pub success: bool,
     pub realm_gained: Option<CultivationRealm>,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub sub_stage_advanced: bool,
     pub qi_cost: u64,
     pub instability_lost: f64,

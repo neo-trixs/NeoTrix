@@ -25,6 +25,8 @@ pub struct ConsolidationConfig {
     pub pattern_to_principle_threshold: u32,  // How many patterns to create a principle
     pub principle_to_wisdom_threshold: u32,   // How many principles to create wisdom
     pub emotional_tagging_enabled: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub decay_interval_hours: u64,
     pub max_memories_per_type: usize,
 }

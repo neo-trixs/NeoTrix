@@ -89,6 +89,8 @@ pub struct SpecDiff {
 #[derive(Debug, Clone)]
 pub struct SpecPipelineConfig {
     pub max_active_specs: u32,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub review_required: bool,
     pub auto_evolve: bool,
     pub min_confidence: f64,

@@ -128,9 +128,13 @@ pub struct VulnerabilityFinding {
 pub struct ScanConfig {
     pub enabled_hunters: Vec<_HunterKind>,
     pub min_severity: _SeverityLevel,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub sandbox_enabled: bool,
     pub max_findings: usize,
     pub timeout_seconds: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub deep_scan: bool,
 }
 

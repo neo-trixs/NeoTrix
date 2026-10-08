@@ -277,6 +277,8 @@ pub struct ChunkPersistenceConfig {
     /// Save sidecar after every N completed chunks (default: 5).
     pub save_interval: u32,
     /// Also save on resume-start and on-complete.
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub save_on_start: bool,
 }
 

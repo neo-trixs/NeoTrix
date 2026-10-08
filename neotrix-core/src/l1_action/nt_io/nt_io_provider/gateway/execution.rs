@@ -120,6 +120,8 @@ impl CoordinationRequest {
 pub struct CoordinationOutcome {
     pub response: LlmResponse,
     pub used_profile: CommunicationProfile,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub degraded: bool,
     pub provider_name: String,
 }
@@ -1199,9 +1201,13 @@ impl InferenceResponse {
 pub struct ModelCapabilities {
     pub supports_tools: bool,
     pub supports_streaming: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub supports_structured_output: bool,
     pub max_context_tokens: u32,
     pub supports_images: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub supports_audio: bool,
     pub cost_per_1k_tokens: f64,
 }

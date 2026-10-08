@@ -20,6 +20,8 @@ pub struct ProtectionResult {
     pub encrypted_signature: String,
     pub protection_level: ProtectionLevel,
     pub decoy_injected: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub watermarked: bool,
 }
 

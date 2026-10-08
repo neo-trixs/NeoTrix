@@ -42,6 +42,8 @@ pub struct SelfModificationProposal {
 /// improving both task agents and its own meta-agent logic.
 pub struct HyperMetaAgent {
     pub budget: u32,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub self_referential: bool,
     pub protected_paths: Vec<String>,
 }

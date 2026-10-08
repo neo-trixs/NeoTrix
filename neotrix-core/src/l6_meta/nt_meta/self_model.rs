@@ -120,7 +120,11 @@ pub struct FileInfo {
     pub module: String,
     pub lines: usize,
     pub is_test_file: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub has_unsafe: bool,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub has_todos: bool,
     pub pub_fns: usize,
     pub last_modified: chrono::DateTime<chrono::Utc>,

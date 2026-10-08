@@ -11,6 +11,8 @@ pub struct McpTool {
 
 /// 工具调用结果
 pub struct ToolResult {
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub success: bool,
     pub output: String,
     pub error: Option<String>,

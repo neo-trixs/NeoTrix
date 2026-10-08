@@ -213,6 +213,8 @@ pub struct ReasoningTraceReport {
     pub session_binding_missing: usize,
     pub pii_findings: Vec<String>,
     pub injection_findings: Vec<String>,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub divergence_suspected: bool,
 }
 

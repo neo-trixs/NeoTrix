@@ -30,6 +30,8 @@ pub struct PanoramaReport {
     pub cycle: u64,
     pub total_anomalies: u64,
     pub repairs_triggered: u64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub repair_triggered_this_cycle: bool,
     pub anomaly: bool,
 }

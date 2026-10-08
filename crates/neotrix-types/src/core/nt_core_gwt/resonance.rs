@@ -274,6 +274,8 @@ pub struct ResonanceReport {
     pub raw_saliences: [f64; MODULE_COUNT],
     pub entropy: f64,
     pub resonator_clusters: Vec<Vec<usize>>,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub complement_activated: bool,
     /// Budget-modulated saliences (if budget gate was applied).
     pub budget_saliences: Option<[f64; MODULE_COUNT]>,

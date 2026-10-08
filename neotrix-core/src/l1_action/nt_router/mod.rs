@@ -48,8 +48,12 @@ pub struct TaskContext {
     pub complexity: TaskComplexity,
     pub priority: u8,
     pub prompt_length: usize,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub mentions_files: bool,
     pub file_count: usize,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub has_git_context: bool,
     pub keywords: Vec<String>,
 }

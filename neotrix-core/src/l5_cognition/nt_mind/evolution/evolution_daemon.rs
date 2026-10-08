@@ -46,6 +46,8 @@ pub enum _IssueLifecycle {
 pub struct EvolutionConfig {
     pub verbose: bool,
     pub max_fix_attempts: u32,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub cycle_interval: u64,
     /// 启用真实 AutoFixer 变更（默认 false：仅计算目标/评分，不落盘）。
     /// 由 NEOTRIX_EVOLVE_MUTATE=1 环境变量也可开启。
@@ -609,6 +611,8 @@ pub struct _CycleGoalReport {
     pub cycle: u64,
     pub fixes_applied: u32,
     pub patterns_distilled: u32,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub thresholds_evolved: bool,
     pub total_tracked: usize,
     pub unresolved: usize,

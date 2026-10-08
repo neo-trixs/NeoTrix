@@ -58,6 +58,8 @@ pub struct SkillParameter {
     pub name: String,
     pub param_type: String,
     pub description: String,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub required: bool,
     pub default: Option<String>,
 }

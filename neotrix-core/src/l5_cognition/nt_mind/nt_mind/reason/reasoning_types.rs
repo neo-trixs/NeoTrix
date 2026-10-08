@@ -33,6 +33,8 @@ impl Default for _CascadeConfig {
 #[derive(Debug, Clone)]
 pub struct _CascadeResult {
     pub fast_response: String,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub escalated: bool,
     pub deep_response: Option<String>,
     pub confidence: f64,

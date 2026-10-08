@@ -115,6 +115,8 @@ pub struct _DeltaConfig {
     /// 低于该级别的 delta 不产出 (过滤噪声)
     pub min_severity: Severity,
     /// 跨源相关性窗口: 同 token 出现在 >= 该数量的源 → 视为强信号
+    /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
+    ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     pub correlation_window: usize,
 }
 
