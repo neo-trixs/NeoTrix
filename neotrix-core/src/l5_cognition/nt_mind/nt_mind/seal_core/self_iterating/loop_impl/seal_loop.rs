@@ -1252,7 +1252,7 @@ mod tests {
         // 记忆库空、默认模型占位。
         assert_eq!(brain.reasoning_bank.stats().total_memories, 0);
         assert_eq!(brain.default_model, "default");
-        assert!(brain.evaluation_history.is_empty());
+        assert!(brain.brain.evaluation_history.is_empty());
     }
 
     // 2. 状态转换：iterate() 推进 iteration 并记录评估历史。
@@ -1265,13 +1265,13 @@ mod tests {
         assert_eq!(brain.iteration, 1);
         assert!((0.0..=1.0).contains(&r1.score_before));
         assert!((0.0..=1.0).contains(&r1.score_after));
-        assert_eq!(brain.evaluation_history.len(), 1);
+        assert_eq!(brain.brain.evaluation_history.len(), 1);
         assert_eq!(r1.absorbed_count, 0, "single general iteration absorbs no candidates");
 
         let r2 = brain.iterate(TaskType::General);
         assert_eq!(r2.iteration, 2);
         assert_eq!(brain.iteration, 2);
-        assert_eq!(brain.evaluation_history.len(), 2);
+        assert_eq!(brain.brain.evaluation_history.len(), 2);
 
         let report = brain.get_brain_report();
         assert!(report.iteration == 2);

@@ -188,7 +188,7 @@ mod tests {
         let r3 = system.kernel_iterate("optimize query performance");
         assert_eq!(r3.iteration, 3);
 
-        assert!(system.evaluation_history.len() == 0);
+        assert!(system.brain.evaluation_history.len() == 0);
     }
 
     #[test]

@@ -103,3 +103,80 @@ impl ReasoningBrain {
         crate::l5_cognition::nt_core_state::load("brain_metadata").is_some()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::brain_impl::DefaultSealStrategy as _;
+    use crate::l5_cognition::nt_mind::nt_mind::seal_core::core::CapabilityVector;
+    use crate::l5_cognition::nt_mind::nt_mind::seal_core::self_iterating::brain_ewc::EvaluationRecord;
+    use crate::l2_perception::nt_world::nt_world_model::TaskType;
+
+    /// P2.2 变异证据：evaluation_history 落盘后跨重启存活。
+    /// 修前 `brain_metadata.json` 不含该字段 ⇒ `RewardLedger` 每次重启都从空重来，
+    /// 于是「跨迭代累积的真实测量」这条设计前提失效。
+    #[test]
+    fn evaluation_history_survives_save_load_roundtrip() {
+        let dir = std::env::temp_dir().join("nt_brain_eval_hist_roundtrip");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+
+        let mut brain = ReasoningBrain::new();
+        brain.evaluation_history.push(EvaluationRecord {
+            iteration: 7,
+            task_type: TaskType::General,
+            score_before: 0.10,
+            score_after: 0.85,
+            improved: true,
+        });
+
+        brain.save_to_dir(Some(dir.as_path())).expect("save_to_dir");
+        let loaded = ReasoningBrain::load_from_dir(Some(dir.as_path())).expect("load_from_dir");
+
+        assert_eq!(
+            loaded.evaluation_history.len(),
+            1,
+            "evaluation_history 未跨重启存活 ⇒ RewardLedger 会退化成每轮从零重推"
+        );
+        let rec = &loaded.evaluation_history[0];
+        assert_eq!(rec.iteration, 7);
+        assert_eq!(rec.score_after, 0.85);
+        assert!(rec.improved);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 旧档兼容：没有 evaluation_history 字段的历史 brain_metadata.json 仍须可读。
+    /// 这是 `#[serde(default)]` 的存在理由 —— 否则加字段会把所有既有存档变成硬失败。
+    #[test]
+    fn legacy_metadata_without_evaluation_history_still_loads() {
+        let dir = std::env::temp_dir().join("nt_brain_eval_hist_legacy");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+
+        let mut meta = BrainMetadata {
+            capability: CapabilityVector::default(),
+            task_affinity: std::collections::HashMap::new(),
+            absorption_history: Vec::new(),
+            learning_rate: 0.05,
+            total_absorb_count: 0,
+            custom_sources: std::collections::HashMap::new(),
+            evaluation_history: Vec::new(),
+        };
+        let mut as_json = serde_json::to_value(&meta).expect("to_value");
+        as_json
+            .as_object_mut()
+            .expect("metadata is object")
+            .remove("evaluation_history");
+        std::fs::write(
+            dir.join("brain_metadata.json"),
+            serde_json::to_string(&as_json).expect("to_string"),
+        )
+        .expect("write legacy metadata");
+
+        let loaded = ReasoningBrain::load_from_dir(Some(dir.as_path())).expect("load legacy");
+        assert!(loaded.evaluation_history.is_empty(), "缺字段须回落为空而非报错");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
