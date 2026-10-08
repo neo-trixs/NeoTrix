@@ -43,8 +43,7 @@ impl L1Capability for KbSearchEngine {
             error_rate: 0.0,
             last_check: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+                .map_or(0, |d| d.as_secs()),
             message: None,
         }
     }
