@@ -4,7 +4,7 @@
 
 | 真源 | 条目 | 说明 |
 |---|---:|---|
-| **本文件** | **22 条（已修 6 / 待处理 16）** | 逐条标`已核实`/`未核实`/`已修`；⚠️ `未核实`项是转述，**别当既成事实动手** |
+| **本文件** | **22 条（已修/已处置 15 / 待处理 7）**（2026-10-08 对账） | 逐条标`已核实`/`未核实`/`已修`；⚠️ `未核实`项是转述，**别当既成事实动手** |
 | `FINAL-ROADMAP-2026-09-29.md` 批次 A~E | 18 项未完成 | **排期真源**（AGENTS.md §6 钦定）；与本文件**有重叠**，见下方去重说明 |
 | 同上 §6 需裁决 | 3 项 | ⛔ **需项目所有者/外部信息**，agent 不能自裁（mu 署名链 / Aegis 署名 / Aegis 22 skill） |
 | `FEATURE-MAP-TASKS-2026-09-29.md` | 特性级 N-x 清单 | 批次 A/B/C/D/E 的完整条目在此（排期 §5 只列本轮新增） |
@@ -21,7 +21,7 @@
 ⇒ **真实待办量级是「16 条缺陷 + 18 项排期」的并集，去重后约 20~24 项**，
 不是 34。逐项映射见下表。
 
-### 待处理 16 条 → 映射到排期批次
+### 待处理 7 条 → 映射到排期批次（2026-10-08 对账：P1-4/P1-5/P1-6/P2-8/C1~C5 已关闭 ⇒ #13 · #3 · #10 · #11 · #12 · N1 · N3）
 
 | 缺陷 | 归属 | 可否现在做 |
 |---|---|---|
@@ -62,8 +62,8 @@
 | 3 | `capability_invoke` **不执行能力本体**，只做市场校验+计数+回执 | `crates/neotrix-neobot/src/nt_agent.rs` | 已核实（设计缺口） | trade 执行入口在 core L1，neobot 不依赖 core ⇒ 循环依赖。刻意不编造假结果。接法 A/B/C 见 `handoff-2026-10-06-capability-invoke.md` §3 |
 | 4 | `dispatch_by_capability` **只解析节点就 `counts += 1`** ⇒ rationale 路径污染 `registered_never_invoked()` | `crates/neotrix-neobot/src/nt_capability_registry.rs` | **✅ 已修**（2026-10-07） | `dispatch_by_capability` 改纯解析不计数，`record_dispatch` 成为唯一成功记账入口；9 单测锁定 |
 | 5 | 金丝雀窗口**进程全局**，多会话互相 `reset()` | `crates/neotrix-neobot/src/nt_capability_canary.rs` | **✅ 已修**（2026-10-07，P1-5 落盘 + E0502 修复） | 窗口按会话键化（`windows: BTreeMap<String, SessionWindow>`），`tick/signal/status` 均以 session 为首参；9 单测锁定跨会话不互相重置 |
-| 6 | `maybe_compact_context` **只有测试调用**，未接生产 | `neotrix-core/.../nt_io_agent_loop/` | **部分过时（2026-10-07 复核）** | 全仓已在 `nt_loop_core.rs:25,75,206` 接生产；但摘要调用不进账本 ⇒ 「悄悄加钱」仍成立。core `COST_TRACKER.record_agent_cost` 无生产调用点，禁用于计费 |
-| 7 | core 侧旧 `distill_output` **预算过小时死循环** | `neotrix-core/src/l1_action/nt_io/nt_io_agent_loop/nt_loop_step.rs:156-161` | **已核实** | `while estimate_tokens(&clipped) > max_tokens && clipped.len() > 8`，每轮 `truncate(0.7*len)` 后 `push_str(15 字符)` ⇒ 存在 `len≈50` 的不动点；当 `max_tokens` 小到 50 字符都装不下即**永不退出**。循环后的兜底分支在该情形**不可达**。neobot 侧已修（`8196dd10`），core 这份属他窗未改 |
+| 6 | `maybe_compact_context` **只有测试调用**，未接生产 | `neotrix-core/.../nt_io_agent_loop/` | **✅ 已修**（2026-10-08 复核） | 全仓已在 `nt_loop_core.rs:25,75,206` 接生产；摘要经 `record_agent_cost("agent-loop-compaction", …)`（`nt_loop_step.rs:613`）记账，降级走 `record_degraded`（:560）⇒「悄悄加钱」口已封 |
+| 7 | core 侧旧 `distill_output` **预算过小时死循环** | `neotrix-core/src/l1_action/nt_io/nt_io_agent_loop/nt_loop_step.rs:156-161` | **✅ 已修**（`bbeabfb8`，2026-10-08 现场重读确认） | 原死循环已换「逐字符裁剪 + `guard` 收敛 + `TAIL_MARK` 早返兜底」新范式（与 neobot `8196dd10` 同口径）。原病：`while … && clipped.len() > 8` 每轮 `truncate(0.7×len)`+固定 15 字符标记在 `len≈50` 不动点 ⇒ 永不退出且兜底不可达 |
 
 ## P2
 
@@ -92,6 +92,7 @@
 |---|---|---|---|
 | N1 | 集成测试被**禁用**（`.disabled` 后缀，文件有完整文档头 ⇒ 有意为之非垃圾） | `neotrix-core/tests/nt_meta_integration.rs.disabled` | nt_meta ⨯ nt_core 跨模块集成测试全部不参与 `cargo test` |
 | N3 | `nt-core-capability-tree` 3 个文件仍有 48 个装饰性 `⭐` | `registry.rs` 15 / `node.rs` 27 / `cli.rs` 6 | ⏸ **本轮有意跳过**：`registry.rs` 的 mtime 比当前时间还晚 54 分钟 ⇒ 疑似他窗带偏时钟在写，按并发纪律不撞车 |
+| N4 | **clippy 不可当门**：`make clippy`（Makefile:284 `--all-targets --all-features -- -D warnings`）与 CI 同口径 ⇒ neotrix lib **43161 error**（全为既有 pedantic denied 项：must_use ×9102、doc_markdown ×5969、uninlined_format_args ×4574……），结构成因 = `lib.rs` 的 `#![cfg_attr(not(test), deny(warnings))]` + `#![warn(clippy::all, clippy::pedantic)]`（2026-10-08 实测） | 全仓基线 | neobot 侧 `--no-deps --all-targets` **0 error**、本轮文件 0 命中；**neotrix bin 单元因 lib 先败而无法 lint 取证** ⇒「改动行 0 新增」只对 neobot 可证。修法方向：分 crate 收 pedantic deny，不要全仓一把梭 |
 
 ### P1 补充（本轮新发现）
 | # | 缺陷 | 位置 | 状态 | 判据 / 备注 |

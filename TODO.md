@@ -1123,7 +1123,7 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 ### N6.6 · 已知技术债（登记，非本轮）
 - [ ] `deliver_result` 生产零调用（worker 池计划的未来基础，**不删**）。
 - [ ] `quota_windows` 为快照法 ⇒ 大 ledger 上每次快照是全表扫描（单机可接受；十万行后需加索引或改为物化）。
-- [ ] `nt_channel_serve` worker 无池上限（每消息一线程）；极端并发需补有界池 + 背压。
+- [ ] `nt_channel_serve` worker 无池上限（每消息一线程）；极端并发需补有界池 + 背压。吸收来源：Captain_Who `docs/architecture/multi-agent.md`（父子 Agent 树 + 并发上限 + journal-before-notify，🔴 P1 规模）→ `ABSORPTION-CAPTAIN-WHO-2026-10-08.md` §3。
 - [ ] `ChatMessage` 读行仍按位置元组（`r.get(0..5)`）；新增两列后**不要再插中间列**。
 
 > **本轮（2026-10-08 收口）已落地且验证过的**：N1 `/stop` worker 解耦 + 真并发回归 ·
@@ -1131,7 +1131,30 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 > 压缩预算门/降级记账 · N4 路由组 Quota + ledger 两列 + `quota` CLI + `quota_windows` 快照 +
 > `quota_limits` 人工上限 · N6.1 P0 · N6.2 degraded 记账 · N6.3 P0 设计文档。
 > 收口时基线：`neotrix-neobot --lib` **606 绿**、`nt_lock_audit` 0 处、`nt_smoke.sh` 全绿。
-> ⛔ **本轮所有改动均未提交**（共享 index 纪律），交接见 `sessions/handoff-2026-10-08-neobot-n1-n6.md`。
+> ✅ **2026-10-08 对账**：本轮改动已提交（`5d19d81b` IM /stop worker + 占位流式编辑 / `19d18ef9` 路由组 Quota + 额度窗口 / `bbeabfb8` 蒸馏死循环+压缩预算门 / nt_store 全量现身 git log 并清洁）。原收工交接见 `sessions/handoff-2026-10-08-neobot-n1-n6.md`。
+
+## N7 · CLI 命令面扫描轮（2026-10-08 下午，neotrix + neobot）
+
+> 决策来源：本会话扫描报告 —— neotrix 32 子命令面 / neobot 23 子命令面，发现 9 项（N-1/N-2/B-1…B-5）。交接：`sessions/handoff-2026-10-08-cli-neobot-scan.md`。基线：`neotrix-neobot --lib` **609 绿**（+3 新）、bin 单测 **9 绿**、neotrix bin **41 绿**、`nt_lock_audit` 0、neobot clippy `--no-deps --all-targets` 0 error。
+
+### ✅ 已修（本轮落地，已验证）
+- **N-1** `neotrix completions bash | head` EPIPE panic ⇒ 改为先生成到 `Vec<u8>` 再写 stdout（`entry/status.rs`），EPIPE→`exit(0)`、其它错→`exit(1)`。
+- **N-2** `neotrix status --json` 纯 JSON 直出（`Commands::Status { json }`），状态仍只走 stderr/stdout 分流。
+- **B-1/B-2** `nt_cli` 协议只有读端 ⇒ `format_result_envelope`/`append_cli_result`（camelCase `sideEffects`，`normalize_side_effects` 同时兼容 `side_effects`/`sideEffects`），`neobot -p` 与 run 已写回执。
+- **B-3** `neobot completions <shell>` 5 shell + EPIPE 容错 + `--help` EXAMPLES。
+- **B-4** `neobot ledger --json` / `neobot quota --json`（`snapshot_rows/kind/windows/limits`，上限 null=未声明，`over_limit`/`remaining_cost_usd`）。
+- **B-5** neobot bin 单测 0 ⇒ 9 条（管道 stdin / 空 stdin / envelope / completions / bare-call exit 2）。
+
+### 🔲 可执行（下一窗口）
+- neotrix 其余只读子命令 `--json` 矩阵（目前仅 `status`）；`completions` 抽样完好（bash -n 门已过）。
+- 吸收来源：`Captain_Who` 的 Multi-Agent 父子树 + Observer-only 子会话 + journal-before-notify（对照 N6.6 worker 池上限），见 `ABSORPTION-CAPTAIN-WHO-2026-10-08.md`。
+
+### ⛔ 需裁决 / 阻塞
+- `make clippy` 与 CI 结构性红（lib `deny(warnings)` + `warn(pedantic)` ⇒ 43161 基线 error）⇒ clippy 不可当门；neotrix bin 单元无法 lint 取证（neobot 可证 0 新增）。
+- N6.3 网关依赖口径（axum vs 手写 HTTP/1.1）由主人拍板。
+- P1-3 `capability_invoke` 执行端口 A/B/C 裁决。
+
+> 本轮改动**全部未提交**（共享 index 纪律，禁 `-A`）：`neotrix-core/src/main.rs`、`neotrix-core/src/entry/status.rs`、`crates/neotrix-neobot/src/bin/neobot.rs`、`crates/neotrix-neobot/src/nt_cli.rs`、`crates/neotrix-neobot/Cargo.toml`、`Cargo.lock`（+2 行：`clap_complete` 系 + 预存 `tokio` 系）。patch 兜底 `.neotrix/patches/2026-10-08-cli-neobot-scan-fixes.patch`。提交纪律：`git add <显式路径> && git commit --only <同一批>`。
 
 ## N5 · 长期演化但不进本轮
 - [ ] 协议翻译网关（OpenAI/Anthropic/Gemini 互译，127.0.0.1）—— 对齐 Magpie。
