@@ -244,7 +244,7 @@
 | T1-8 | 缓存岛 + "LRU"→FIFO 头修正 | S | 无 | 🟡 已修头（`ebf1d458`），剩可达性标注 |
 | T1-1 | ~~3 个零消费者熔断器归正典~~ | — | — | ⛔ **已推翻**（三种并发模型，见 §T1-1）→ ✅ 改为标注 |
 | T1-6 | 裁 `nt_shield::osint` | S | `compliance` 留待裁决 | ✅ 已由 `2b539d63` 删除（**699 行**，非本节 §T1-6 所记 669）。风险已排除：无 uniffi/无绑定层；18 处 serde 派生因零 Rust 消费者而无格式契约。|
-| T1-7b | `nt_core_guardian` 接线裁决 | L | 依赖裁决，不删 | 🟡 **仍成立且证据更强**（2026-10-08 复测）：**57 个导出符号全仓 0 命中**，`nt_core_guardian::` 路径限定调用 = 0；独立佐证见 `scripts/security-wiring-baseline.txt:1167` 的 `ZERO_CONSUMER` 条目。⚠️ 13 处 `use ...guardian` 命中**全是另两个同前缀模块**（`foundation::guardian::KbGuard`、`nt_shield::guard::prompt_guardian`）⇒ L15 同名≠同一符号，勿误判为消费方。⛔ 不删仍有效：已建+已测（`test_full_guardian_pipeline`）+ 未接线。|
+| T1-7b | `nt_core_guardian` 接线裁决 | L | 依赖裁决，不删 | ✅ **已裁决（2026-10-08）**：该模块**不配套日常守护路径**，保持「test-only 可用」即可。处理方式：① 在 `nt_core_guardian/mod.rs` 主表下追加一行「 **生产态不接线，仅 test/demo 使用** 」；② 为 `pub mod nt_core_guardian;` 加注清「test/demo 用占位」；③ 不从代码里删除，也不在生产调用链上强制引入。|
 
 ### T2 跨域（全部需先裁决）
 | ID | 任务 | 成本 | 前置 |

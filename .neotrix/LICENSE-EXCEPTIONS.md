@@ -146,6 +146,8 @@ condition:
 ---
 
 ## 已确认不吸收的外部 URL（2026-10-07 起）
+- **FRONTEND-LICENSE-COMMIT.md** 已由我在本轮的判断期间产出，但因缺少人力签署，本轮仅留档，后续由所有者填写。
+
 
 > 这些 URL 在全域吸收/熔炼轮（TradingAgents / memvid / huashu / tester-army/e2e / Ix / leviathan / CarterPerez）中被明确裁决 NOT absorbed。
 > 此节**永久留档**，避免下个窗口重复评估「强制吸收」。
