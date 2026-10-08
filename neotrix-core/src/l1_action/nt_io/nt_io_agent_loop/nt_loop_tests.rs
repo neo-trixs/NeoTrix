@@ -184,6 +184,25 @@ async fn test_turn_simple_stop() {
 }
 
 #[tokio::test]
+async fn test_tool_hook_fires_with_name_and_success() {
+    let (llm, _seen) = backend_with(vec![
+        ("".into(), FinishReason::Tool, vec![tool_call("calc", "c1", "{\"expr\":\"1+1\"}")]),
+        ("done".into(), FinishReason::Stop, vec![]),
+    ]);
+    let calc = MockCalc { calls: Arc::new(Mutex::new(Vec::new())) };
+    let seen = Arc::new(Mutex::new(Vec::<(String, bool)>::new()));
+    let seen2 = seen.clone();
+    let mut loop_ = AgentLoop::new(llm, "mock", "sys")
+        .with_tools(vec![Box::new(calc)])
+        .with_tool_hook(Arc::new(move |name: &str, ok: bool| {
+            seen2.lock().unwrap().push((name.to_string(), ok));
+        }));
+    let out = loop_.turn("compute").await.expect("turn ok");
+    assert_eq!(out, "done");
+    assert_eq!(seen.lock().unwrap().as_slice(), &[("calc".to_string(), true)]);
+}
+
+#[tokio::test]
 async fn test_turn_without_system_prompt() {
     let (llm, _seen) = backend_with(vec![("ok".into(), FinishReason::Stop, vec![])]);
     let mut loop_ = AgentLoop::new(llm, "mock", "");

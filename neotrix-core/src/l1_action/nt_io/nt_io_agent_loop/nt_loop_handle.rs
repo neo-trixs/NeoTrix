@@ -32,6 +32,7 @@ impl AgentLoop {
             max_tool_output_tokens: 3_000,
             last_usage: None,
             tool_log: Vec::new(),
+            tool_hook: None,
             style: OutputStyleId::Plain,
             guard: None,
             multimodal: None,
@@ -62,6 +63,12 @@ impl AgentLoop {
     pub fn begin_session_window(&mut self, session: &str) {
         self.canary_session = session.to_owned();
         neotrix_neobot::nt_capability_canary::reset(session);
+    }
+
+    /// 装上工具调用钩子（B2 接线：loop→checkpoint 的反向通道）。
+    pub fn with_tool_hook(mut self, hook: Arc<dyn Fn(&str, bool) + Send + Sync>) -> Self {
+        self.tool_hook = Some(hook);
+        self
     }
 
     pub(crate) fn _with_multimodal_transform(mut self, stage: MultimodalTransform) -> Self {

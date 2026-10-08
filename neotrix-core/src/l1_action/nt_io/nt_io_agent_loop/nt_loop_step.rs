@@ -349,6 +349,9 @@ impl AgentLoop {
                 success: result.is_ok(),
                 output: content.clone(),
             });
+            if let Some(h) = &self.tool_hook {
+                h(&call.name, result.is_ok());
+            }
             self.messages.push(Message::tool(&history_content, &call.id));
         }
         self.trim_history();

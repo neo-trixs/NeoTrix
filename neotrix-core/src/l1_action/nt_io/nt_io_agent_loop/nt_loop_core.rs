@@ -154,6 +154,9 @@ impl AgentLoop {
                             success: result.is_ok(),
                             output: content.clone(),
                         });
+                        if let Some(h) = &self.tool_hook {
+                            h(&call.name, result.is_ok());
+                        }
                         let history_content = self.trim_tool_output(&content);
                         self.messages.push(Message::tool(&history_content, &call.id));
                     }
@@ -282,6 +285,9 @@ impl AgentLoop {
                                 success: false,
                                 output: content.clone(),
                             });
+                            if let Some(h) = &self.tool_hook {
+                                h(&name, false);
+                            }
                             let history_content = self.trim_tool_output(&content);
                             self.messages.push(Message::tool(&history_content, &call.id));
                             continue;
@@ -315,6 +321,9 @@ impl AgentLoop {
                             success,
                             output: content.clone(),
                         });
+                        if let Some(h) = &self.tool_hook {
+                            h(&name, success);
+                        }
                         let history_content = self.trim_tool_output(&content);
                         self.messages.push(Message::tool(&history_content, &call.id));
                     }

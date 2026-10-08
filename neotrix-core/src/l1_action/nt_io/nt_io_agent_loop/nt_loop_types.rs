@@ -52,6 +52,11 @@ pub struct AgentLoop {
     pub(crate) last_usage: Option<Usage>,
     /// 本会话已执行的工具调用记录。
     pub tool_log: Vec<ToolInvocation>,
+    /// 工具调用钩子（B2 吸收 LongHorizon-Harness 的 loop→checkpoint 反向接线）：
+    /// AgentLoop **不** import L6 类型，只通过这条闭包把 tool 调用名+成败
+    /// 透出去——由上层编排方（CheckpointStore 所在层）接住。
+    /// 层规则守护：L1 永不直接引用 L6（check-layer-deps 单向），依赖倒置由闭包完成。
+    pub(crate) tool_hook: Option<Arc<dyn Fn(&str, bool) + Send + Sync>>,
     /// 输出样式 (NT-IO output_style 骨架接线)。默认 Plain 原样透传。
     pub(crate) style: OutputStyleId,
     /// 心智病毒传播防护 (NT-SHIELD propagation_guard 骨架接线)。
