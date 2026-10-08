@@ -128,5 +128,8 @@
   "run.errTimeout": "No reply in time: the endpoint is slow or stuck; check this request in the run log.",
   "run.errOther": "(the raw text above is the backend error; there is no more specific class for it.)",
   "trace.liveTitle": "This run's steps (from the server; covers only the latest run)",
-  "trace.contentOmitted": "content omitted (over cap)"
+  "trace.contentOmitted": "content omitted (over cap)",
+  "chat.stopAll": "Stop all",
+  "chat.stopAllLabel": "Stop all running turns",
+  "chat.stopAllHint": "Protocol-level kill switch: flips the stop token of every live turn"
 }

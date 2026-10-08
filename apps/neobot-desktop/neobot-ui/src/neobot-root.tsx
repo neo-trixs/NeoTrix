@@ -1765,6 +1765,39 @@ export function NeoBotRoot() {
               aria-label={t('chat.inputLabel')}
               className="max-h-40 min-h-[var(--nb-row-2-h)] flex-1 resize-none overflow-y-auto rounded-2xl border border-line bg-panel px-3 py-2 text-[13px] text-ink outline-none focus:border-info-hover"
             />
+            {/* 全局急停（kill switch）。吸收 computer-use P7：急停属于**协议层**，
+             * UI 只是它的第二个入口；0 轮可停时如实说 0，不假装成功。 */}
+            {busy && (
+              <button
+                type="button"
+                onClick={() => {
+                  void invoke<number>('neobot_stop_all')
+                    .then(n =>
+                      void invoke('log_frontend', {
+                        level: 'info',
+                        target: 'neobot-root',
+                        message: `stop_all flipped ${String(n)}`,
+                      })
+                    )
+                    .catch(e =>
+                      void invoke('log_frontend', {
+                        level: 'error',
+                        target: 'neobot-root',
+                        message: `stop_all failed: ${String(e).slice(0, 160)}`,
+                      })
+                    )
+                }}
+                aria-label={t('chat.stopAllLabel')}
+                title={t('chat.stopAllHint')}
+                className="nb-danger h-9 shrink-0 rounded-full border px-3 text-[13px]"
+                style={{
+                  borderColor: 'var(--nb-color-line-strong)',
+                  color: 'var(--nb-color-ink)',
+                }}
+              >
+                {t('chat.stopAll')}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => void send()}

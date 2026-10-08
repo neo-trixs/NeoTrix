@@ -89,6 +89,7 @@ macro_rules! neobot_commands {
             neobot_desktop::commands::neobot_panel_clear,
             neobot_desktop::commands::neobot_panel_demo_publish,
             neobot_desktop::commands::neobot_agent_run,
+            neobot_desktop::commands::neobot_stop_all,
             neobot_desktop::commands::neobot_send,
             neobot_desktop::commands::neobot_usage_summary,
             neobot_desktop::commands::neobot_memory_list,

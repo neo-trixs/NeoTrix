@@ -261,6 +261,27 @@ pub fn signal_run_cancel(convo_id: Option<&str>) -> StopState {
     StopState::Signalled { convo_id: key }
 }
 
+/// **全停**：把登记表里**所有**正在跑的轮次都翻掉（kill switch）。
+///
+/// 20 家 CU/BU 产品的共识件（`freeall12/computer-use` P7）：急停必须在
+/// **协议层**生效，提示词层/UI 层的「停一下」只是补充。
+/// 豁免自身与状态查询：本函数只翻令牌，不做任何 IO。
+///
+/// 返回翻掉的轮次数（0 = 此刻没有可停的轮次，如实说 0 而非报成功）。
+pub fn signal_stop_all() -> usize {
+    let Ok(mut table) = run_registry().lock() else {
+        return 0;
+    };
+    let mut n = 0usize;
+    for slot in table.values() {
+        if !slot.token.is_cancelled() {
+            slot.token.cancel();
+            n += 1;
+        }
+    }
+    n
+}
+
 /// 本轮任务 id 认领用的窗口大小（与 `list_convo_tasks` 的 `created_at DESC`
 /// 排序配套：新建的那条必然在最新一端）。
 const TASK_WINDOW: i64 = 200;
@@ -1237,6 +1258,22 @@ const ALL_DUE_NOW: &str = "9999-12-31T23:59:59Z";
 mod tests {
     use super::*;
     use crate::nt_store::BotRow;
+
+    #[test]
+    fn signal_stop_all_flips_every_live_run() {
+        use crate::nt_cancel::StopToken;
+        let t1 = StopToken::new();
+        let t2 = StopToken::new();
+        let reg1 = register_run(Some("kill-all-a"), &t1);
+        let reg2 = register_run(Some("kill-all-b"), &t2);
+        let flipped = signal_stop_all();
+        // 全局登记表是跨测试共享的 ⇒ 只断言「我这两个都被翻了」。
+        assert!(flipped >= 2, "至少翻两个：实际 {flipped}");
+        assert!(t1.is_cancelled(), "a 轮已被翻");
+        assert!(t2.is_cancelled(), "b 轮已被翻");
+        drop(reg1);
+        drop(reg2);
+    }
 
     struct FakeChannel {
         sent: std::cell::RefCell<Vec<OutboundMessage>>,

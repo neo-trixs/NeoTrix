@@ -46,6 +46,18 @@ pub fn open_store() -> Result<NeobotStore, String> {
     NeobotStore::open(db.to_str().ok_or("数据目录不是合法 UTF-8")?).map_err(|e| e.to_string())
 }
 
+/// `neobot_stop_all() -> usize` —— **全局急停**（kill switch）。
+///
+/// 吸收 `freeall12/computer-use` P7：急停必须是**协议层**的东西，
+/// 提示词层/UI 层的「停一下」只是补充（本命令正是 UI 层的那一半，
+/// 真正翻牌子的另一半在 `nt_channel_dispatch::signal_stop_all`）。
+///
+/// 返回翻掉的轮次数；**0 = 此刻没有可停的轮次**（如实说 0，不假装成功）。
+#[tauri::command]
+pub fn neobot_stop_all() -> Result<usize, String> {
+    Ok(neotrix_neobot::nt_channel_dispatch::signal_stop_all())
+}
+
 /// `neobot_agent_run(goal, context?) -> AgentRunResult`
 #[tauri::command]
 pub async fn neobot_agent_run(goal: String, context: Option<String>) -> Result<AgentRunResult, String> {

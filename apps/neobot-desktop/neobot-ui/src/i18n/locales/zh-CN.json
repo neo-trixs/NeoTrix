@@ -128,5 +128,8 @@
   "run.errTimeout": "等了太久没回音：是端点慢还是卡住，去运行日志看这次请求。",
   "run.errOther": "（上面的原文是后端给的真实错误，没有更具体的分类。）",
   "trace.liveTitle": "这一次的执行痕迹（服务端返回，只覆盖最近一轮）",
-  "trace.contentOmitted": "内容已略去（超过上限）"
+  "trace.contentOmitted": "内容已略去（超过上限）",
+  "chat.stopAll": "全局急停",
+  "chat.stopAllLabel": "全局急停（停止所有正在运行的轮次）",
+  "chat.stopAllHint": "协议层急停：翻转所有运行中轮次的停止令牌（freeall12/computer-use P7）"
 }
