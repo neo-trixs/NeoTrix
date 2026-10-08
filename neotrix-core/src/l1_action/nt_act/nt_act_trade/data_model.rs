@@ -1,7 +1,24 @@
-//! Trade Data Model — 统一数据模型 (Single Source of Truth)
+//! Trade Data Model — 外贸领域数据模型
 //!
-//! 所有 trade 子模块共用的领域数据结构统一在此定义。
-//! 子模块通过 `use super::data_model::*` 引用，禁止重复定义。
+//! ⛔ **2026-10-08 撤下 SSOT 承诺（ROADMAP T1-2）**：本头曾声明
+//! 「统一数据模型 (Single Source of Truth) / 所有 trade 子模块共用的领域数据结构统一在此定义」
+//! —— 该承诺**三条断言里有两条实证为假**，且 `unified_types.rs:1-4` **逐字重复同一条承诺**，
+//! 同一模块树里两个文件自称 SSOT。事实如下：
+//!
+//! - **真源在 `unified_types.rs`**（`nt_act_trade/mod.rs:51` 的 re-export 早已指向它）。
+//!   本文件 `:35-96` 的 13 个类型**全部是 `pub use` 再导出**，零本地定义。
+//! - **「子模块通过 `use super::data_model::*` 引用」= 假**：全仓仅
+//!   `tests/data_model_tests.rs:7` 一处命中，**零个生产子模块**用它。
+//! - **本文件真正持有的 8 个 struct**（`ContactInfo`/`Supplier`/`InquiryItem`/`Inquiry`/
+//!   `QuoteItem`/`Quote`/`OrderItem`/`Order`，`:73-300`）与 `unified_types` 的同名类型
+//!   **字段集不同**（同名不同概念，AGENTS.md L15），且**零外部消费者** ——
+//!   唯一消费者是 `tests/data_model_tests.rs`，它在**一次 glob 里同时断言两个世界**
+//!   （`:14-26` 断 unified 的 `Product`，`:29-74` 断本文件的 `code`/`status`/`order_no`）。
+//! - ⛔ **不要按名字删这 8 个 struct**：`scripts/ops/nt_dup_types.py:225-230` 逐字记录了
+//!   上一轮按名字删 15 个类型的后果 —— `cargo check` 报 `E0119`+`E0560`，已回滚。
+//!   按字段判据（`nt_dup_types.py`）复测 13 个名字，**真重复组为 0**。
+//!
+//! ⇒ 保留本文件作为「零外部消费者的本地建模 + 测试钉子」，不再宣称 SSOT。
 
 #![forbid(unsafe_code)]
 
@@ -46,8 +63,10 @@ pub use super::unified_types::{
 // 字段名+类型+顺序完全一致（`{name, standard, grade}: String`），且都无 impl 块。
 // `nt_act_trade/mod.rs:51` 的 re-export 早已指向 `unified_types` ⇒ 那里是真源。
 //
-// 保留 re-export 以兼容本文件内 `Product`(:260) / `Quote`(:353) 仍引用它 ——
-// 那两个类型与 unified_types 的同名类型**字段集不同**，不能一起融合。
+// 保留 re-export 供本文件下方的本地 struct 引用 ——
+// 注意：`Product` **不在本文件定义**（只在下一行被再导出），`Quote` 是本文件 `:236` 的本地类型。
+// ⛔ 2026-10-08 修正腐化指针：原文写「本文件内 `Product`(:260) / `Quote`(:353)」，
+// 但本文件仅 338 行且 `:353` 不存在，`Product` 也不是本地定义 ⇒ 该指针已随编辑漂移。
 pub use super::unified_types::MaterialSpec;
 // 2026-09-29 自动融合（nt_fuse_types.py）：`PressureRating` 原在本文件与
 // `l1_action/nt_act/nt_act_trade/unified_types.rs` 各有一份，字段名+类型+impl 块完全相同。

@@ -29,8 +29,8 @@ pub mod nt_shield_comm;
 pub mod nt_shield_internal_scan;
 // pub mod nt_shield_cleanup; // DEAD: zero external references
 pub mod http_intercept;
-// osint 已归档 2026-10-07 (roadmap T1-6，669 行已删)：OSINT 属感知(L2)，
-// 真源是 l2_perception/nt_world/osint/ 的 29 个模块且**是活的**（被
+  // osint 已归档 2026-10-07 (roadmap T1-6，699 行已删)：OSINT 属感知(L2)，
+  // 真源是 l2_perception/nt_world/osint/ 的 30 个模块且**是活的**（被
 // nt_core_self_test_integration.rs 消费）。本目录原是 L3 embodiment 下的
 // 未接线第二份副本，实测零外部 Rust 消费者。
 // ⛔ 删除而非"留文件摘 mod"：同目录既有先例 nt_shield_cleanup / nt_shield_recon

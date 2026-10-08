@@ -302,6 +302,20 @@ echo "NEW offenders  -> EMPTY:$N_EMPTY  UNDECLARED:$N_UNDECL  UNREACHABLE:$N_UNR
 if [ "$N_GONE" -gt 0 ]; then
   echo "--- resolved (drop from baseline via --update-baseline) ---"
   cat "$GONE"
+  # ⛔ 2026-10-08（ROADMAP T1-4 取证结论）：本门**抓得到**影子文件，但抓到的条目会被
+  #    baseline 当「已知容忍项」扣掉 ⇒ 缺陷不是结构性漏网，是**基线腐烂在无人报警中积累**。
+  #    实测：265 条基线里 **237 条已 RESOLVED**（对应文件早不存在），门却一直 `DONE(advisory)`。
+  #    一个从不提醒自己已经过期的容忍表，等于没有容忍表。
+  # ⇒ 加**陈旧度上界**：只要有条目已解决却还留在表里 ⇒ 判红，直到有人跑 --update-baseline。
+  #    ⛔ 这不是「收紧」，是把已有信息（`resolved since baseline: N`）变成可执行门 ——
+  #    改前它就打印在第 299 行，读者只能自己决定要不要管。
+  if [ "${UPDATE:-0}" -eq 0 ]; then
+    echo
+    echo "⛔ 基线已腐烂：$N_GONE 条条目对应的问题**已解决**，却仍留在 $BASELINE 里。"
+    echo "   本门此前一直打印 DONE(advisory) ⇒ 报绿而基线早已失效（L8「绿色≠有效」）。"
+    echo "   合法出路：bash scripts/check-truth-surface.sh --update-baseline"
+    exit 1
+  fi
 fi
 
   # 2026-09-28 修：条件漏了 N_DEP ⇒ UNCOMMITTED_DEP offender **只计数、从不出现在

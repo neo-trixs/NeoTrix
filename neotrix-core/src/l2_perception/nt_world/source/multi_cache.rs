@@ -139,12 +139,22 @@ mod tests {
 
     #[test]
     fn test_lru_eviction() {
+        // ⛔ 2026-10-08 补强：原序列是 `set a, set b, set c` 后断言 `a` 被淘汰 ——
+        // 该序列在 **LRU 与 FIFO 下输出完全相同**（`a` 都是最老的那个），
+        // ⇒ 旧断言**结构上不可能失败**，它证明不了本类型是 LRU 而非 FIFO。
+        // 仓外探针实测（逐字复刻两份策略）：
+        //   原序列      LRU: a=false b=true c=true | FIFO: 同 ⇒ 区分不了
+        //   加 get(a) 后 LRU: a=true  b=false c=true | FIFO: a=false b=true c=true ⇒ 分得开
+        // 真正的判别式是「**读**是否提升 recency」，故必须先 get 再 set。
         let mut cache = MultiLevelCache::with_capacity(2, 300);
         cache.set("a".into(), sample_result("a"));
         cache.set("b".into(), sample_result("b"));
+        // 关键一步：读 a 把它从 LRU 端提升为 MRU（`lru::LruCache::get` 的语义）
+        assert!(cache.get("a").is_some(), "前置：a 必须先能读到");
         cache.set("c".into(), sample_result("c"));
-        assert!(cache.get("a").is_none());
-        assert!(cache.get("b").is_some());
+        // LRU 下被淘汰的是**最久未用**的 b；FIFO 下则仍是 a —— 这一条断言才 discriminating
+        assert!(cache.get("a").is_some(), "a 刚被读过 ⇒ LRU 下不该被淘汰");
+        assert!(cache.get("b").is_none(), "b 是最久未用 ⇒ 应被淘汰（若此条红，说明实现是 FIFO 而非 LRU）");
         assert!(cache.get("c").is_some());
     }
 
