@@ -48,18 +48,6 @@ pub struct BackgroundConfig {
     /// ⭐ **已接线**（2026-10-07）：派发点 run.rs:837 `proxy_heartbeat` 现按此开关守门。
     /// ⇒ 2026-10-07 撤销原标注：门报告与真实读点不符（本字段其实已被读取/已接线）。
     pub proxy_enabled: bool,
-    /// ⭐ ⛔ **跨域错位**：同名实现在 `l3_embodiment/nt_shield/nt_shield_stealth_net/system_proxy.rs`（L3 另一模块），与本 background loop 无关 ⇒ 留此会诱导未来 agent 去 L3 找接线点。
-    /// ⇒ 保留字段以便该能力落地时直接消费。
-    /// ⛔ **未接线规格**（nt-unwired-spec）：跨域错位，保留字段供能力落地后消费。
-    pub system_proxy_enabled: bool,
-    /// ⭐ **功能未实现**：全仓无 `handle_geo*` 被 `spawn_handler!` 派发 ⇒ 非「开关漏接」，是能力缺位。
-    /// ⇒ 保留字段以便该能力落地时直接消费。
-    /// ⛔ **未接线规格**（nt-unwired-spec）：即功能未实现，保留字段供能力落地后消费。
-    pub geo_auto_update: bool,
-    /// ⭐ **功能未实现**：全仓无 `handle_agent_protocol*` 被派发 ⇒ 非「开关漏接」，是能力缺位。
-    /// ⇒ 保留字段以便该能力落地时直接消费。
-    /// ⛔ **未接线规格**（nt-unwired-spec）：即功能未实现，保留字段供能力落地后消费。
-    pub agent_protocol_enabled: bool,
     /// ⛔ **未接线规格**（nt-unwired-spec）：本字段零读点 ——
     ///    功能已**声明**但读者未实现。⛔ **不要删**（删掉即销毁规格）。
     ///    实现对应功能时**必须**读取本字段。
@@ -129,9 +117,6 @@ impl Default for BackgroundConfig {
             telemetry_interval_secs: 300,
             enabled: true,
             proxy_enabled: true,
-            system_proxy_enabled: true,
-            geo_auto_update: true,
-            agent_protocol_enabled: false,
             nt_world_crawl_interval_secs: 43200,
             world_prediction_interval_secs: 60,
             prediction_interval_secs: 60,

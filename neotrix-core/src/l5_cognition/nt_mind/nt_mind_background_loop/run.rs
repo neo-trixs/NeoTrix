@@ -285,12 +285,14 @@ pub struct _LoopReadyScore {
     /// ✅ 真实信号：`self.kb.is_some()`
     pub kb_ok: bool,
     /// ⛔ **未测量** —— 本仓无「是否停滞」的任何测量（无 `last_tick` 等字段）
-    /// ⇒ 目前恒 `true`，贡献恒定 20 分。⛔ 不可当作已验证的健康信号。
+    /// ⇒ 目前恒 `true`。⛔ 不可当作已验证的健康信号。
     /// ⛔ **未接线规格**（nt-unwired-spec）：该信号至今无测量实现。
+    /// 降过制：此后只作为延后字段，不再对总分贡献分值。
     pub no_stall: bool,
-    /// ⛔ **未测量** —— 本仓无 tick 间隔记录 ⇒ 目前恒 `true`，贡献恒定 15 分。
+    /// ⛔ **未测量** —— 本仓无 tick 间隔记录 ⇒ 目前恒 `true`。
     /// ⛔ 不可当作已验证的健康信号。
     /// ⛔ **未接线规格**（nt-unwired-spec）：该信号至今无测量实现。
+    /// 降过制：此后只作为延后字段，不再对总分贡献分值。
     pub cadence_ok: bool,
 }
 
@@ -301,7 +303,7 @@ impl Default for _LoopReadyScore {
 }
 
 impl _LoopReadyScore {
-    /// 权重: handlers 40 / kb 25 / no_stall 20 / cadence 15
+    /// 权重: handlers 40 / kb 25（no_stall/cadence 已降过制，只作延后字段，不再贡献分值）
     pub fn compute(handlers_ok: bool, kb_ok: bool, no_stall: bool, cadence_ok: bool) -> Self {
         let mut score = 0u8;
         if handlers_ok {
@@ -310,12 +312,10 @@ impl _LoopReadyScore {
         if kb_ok {
             score += 25;
         }
-        if no_stall {
-            score += 20;
-        }
-        if cadence_ok {
-            score += 15;
-        }
+        // ⛔ no_stall / cadence_ok 此前恒 true 且贡献 20/15 分 ⇒ 假读点，已降过制，
+        //    保留字段与签名（消费方兼容），但不再计入总分。
+        let _ = no_stall;
+        let _ = cadence_ok;
         Self {
             score,
             handlers_ok,
