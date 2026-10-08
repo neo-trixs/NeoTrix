@@ -269,6 +269,51 @@ pub fn with_registry<R>(f: impl FnOnce(&mut CapabilityTreeRegistry) -> R) -> Res
     Ok(f(&mut reg))
 }
 
+/// **可上架 ∧ 本进程有派发器** —— 真正调得动的子集。
+///
+/// # 为什么要有这个「交集」（2026-10-08）
+///
+/// `nt_capability_market::listable()` 只判 `kind/license/version`
+/// （`nt_capability_market.rs`），**完全不看本进程有没有派发器**。
+/// 而派发器住在 `neotrix-core`，`neotrix-neobot` **不得反向依赖它**
+/// （core → neobot 固定方向）⇒ 在 `neobot` CLI 与部分其它进程里，
+/// 派发表恒空 ⇒ `dispatch()` 返 `None` ⇒ 每个 id 都得到
+/// `CAPABILITY_BODY_NOT_EXECUTED`。
+///
+/// 症状：模型/用户被展示了一批**调不动**的能力，每次尝试都白跑一轮。
+/// ⇒ 上架面必须按 `dispatch::is_registered(id)` 求交集。
+///
+/// # ⛔ 为什么**不**直接把不可调动的从市场里删掉
+///
+/// 那会让「能力缺口」重新变成**不可见**——正是 `nt_capability_market.rs`
+/// 自己文档反对的（「若市场只显示可上架…不可见又回来了」）。
+/// ⇒ 保留 `listed_but_not_dispatchable()` 做**诚实暴露**，
+/// 本函数只用于**要真调**的上架面（tool 清单）。
+pub fn dispatchable_ids() -> Result<Vec<String>, String> {
+    let _ = seed_from_market_manifest();
+    with_registry(|reg| {
+        crate::nt_capability_market::listable(reg)
+            .into_iter()
+            .map(|e| e.id)
+            .filter(|id| nt_core_capability_tree::dispatch::is_registered(&id))
+            .collect()
+    })
+}
+
+/// **可上架 ∧ 本进程无派发器** —— 「登记了但此处调不动」的诚实清单。
+///
+/// 上架面用它**显式报出缺口**，而不是把能力藏起来。
+pub fn listed_but_not_dispatchable() -> Result<Vec<String>, String> {
+    let _ = seed_from_market_manifest();
+    with_registry(|reg| {
+        crate::nt_capability_market::listable(reg)
+            .into_iter()
+            .map(|e| e.id)
+            .filter(|id| !nt_core_capability_tree::dispatch::is_registered(&id))
+            .collect()
+    })
+}
+
 /// 当前已登记的节点数 ——  **涌现门要盯的就是这个数**（见路线 §5 第 2 步）。
 ///
 ///  「节点数不增长即判红」是**反向护栏**：钉住涌现必须是**行为**，

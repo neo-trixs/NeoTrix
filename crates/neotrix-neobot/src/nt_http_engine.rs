@@ -406,14 +406,13 @@ fn capability_market_ids() -> Vec<String> {
     //    真实现实现在 core 且本 crate 不得反向依赖它（core → neobot 固定）⇒
     //    清单下沉到 （两侧共读）才能在这里对上号。
     //    幂等；已播种时是no-op。
-    let _ = crate::nt_capability_registry::seed_from_market_manifest();
-    crate::nt_capability_registry::with_registry(|reg| {
-        crate::nt_capability_market::listable(reg)
-            .into_iter()
-            .map(|e| e.id)
-            .collect()
-    })
-    .unwrap_or_default()
+    // ⚠️ 只取**本进程真有派发器**的子集（`dispatchable_ids`）：
+    //    派发器在 core，neobot 不能反向依赖 ⇒ 某些进程派发表恒空 ⇒
+    //    把调不动的 id 塞进 description 只会让模型每次白跑一轮
+    //    `CAPABILITY_BODY_NOT_EXECUTED`。缺口由
+    //    `nt_capability_registry::listed_but_not_dispatchable()` 显式暴露，
+    //    **不在这里藏**（藏了缺口就又不可见了）。
+    crate::nt_capability_registry::dispatchable_ids().unwrap_or_default()
 }
 
 fn tool_schemas(offer_computer: bool, offer_vision: bool) -> Vec<serde_json::Value> {
@@ -1015,7 +1014,7 @@ fn accumulate_tool_calls(
 
 #[cfg(test)]
 mod tests {
-    use super::{tool_schemas, HttpEngine, HttpEngineConfig};
+    use super::{capability_market_ids, tool_schemas, HttpEngine, HttpEngineConfig};
     use crate::nt_engine::EngineAdapter;
 
     ///  **市场非空时 `capability_invoke` 必须摆上桌。**
@@ -1060,6 +1059,17 @@ mod tests {
             serde_json::Value::String("test".to_owned()),
         );
         crate::nt_capability_registry::register_node(node).expect("登记应成功");
+        // ⚠️ 新契约（2026-10-08）：上架面只摆**本进程真有派发器**的能力
+        //    （`capability_market_ids` → `dispatchable_ids`）。只登记节点
+        //    而不注册派发器 ⇒ 该能力不可调 ⇒ **不得**摆上桌（原用例正是
+        //    漏了这一半，于是把「调不动」当成了「已上架」）。
+        nt_core_capability_tree::dispatch::register_dispatcher(
+            &id,
+            |_id: &str, _input: serde_json::Value, _s: &str| {
+                Box::pin(async { Ok(serde_json::json!({ "ok": true })) })
+            },
+        )
+        .expect("派发器注册应成功");
 
         let schemas = tool_schemas(false, false);
         let entry = schemas
@@ -1082,6 +1092,47 @@ mod tests {
         assert!(
             desc.contains(&id),
             "★ 工具描述里必须列出真实可调 id（★ 否则模型只能瞎猜）: {desc}"
+        );
+    }
+
+    /// **负向回归锁**：已登记（可上架）但**本进程无派发器**的能力
+    /// **不得**出现在 `capability_invoke` 的描述里 —— 否则模型每次尝试都只得到
+    /// `CAPABILITY_BODY_NOT_EXECUTED`，白跑一轮。
+    #[test]
+    fn 已登记但无派发器的能力不上桌() {
+        use nt_core_capability_tree::node::{CapabilityKind, CapabilityNode, Domain};
+        let id = format!(
+            "NT-TEST::nodispatch::{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        );
+        let mut node = CapabilityNode::new_primitive(
+            id.clone(),
+            Domain::Mind,
+            vec!["test.nodispatch".to_owned()],
+        );
+        node.kind = CapabilityKind::Skill;
+        node.metadata.insert(
+            crate::nt_capability_market::meta_keys::LICENSE.to_owned(),
+            serde_json::Value::String("LicenseRef-Test".to_owned()),
+        );
+        node.metadata.insert(
+            crate::nt_capability_market::meta_keys::VERSION.to_owned(),
+            serde_json::Value::String("0.0.1".to_owned()),
+        );
+        node.metadata.insert(
+            crate::nt_capability_market::meta_keys::CATEGORY.to_owned(),
+            serde_json::Value::String("test".to_owned()),
+        );
+        crate::nt_capability_registry::register_node(node).expect("登记应成功");
+        // ⛔ 刻意**不**注册派发器。
+
+        let ids = capability_market_ids();
+        assert!(
+            !ids.contains(&id),
+            "★ 无派发器的能力被摆上桌了（id={id}, ids={ids:?}）"
         );
     }
 

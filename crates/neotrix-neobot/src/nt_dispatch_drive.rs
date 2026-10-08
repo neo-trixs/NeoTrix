@@ -36,6 +36,51 @@ pub fn drive<T>(fut: BoxFuture<'static, T>) -> Result<T, String> {
         .map(|rt| rt.block_on(fut))
 }
 
+/// 同 [`drive`]，但带**真实超时强制**（`timeout_ms`，`None` = 不限）。
+///
+/// # 为什么需要它（2026-10-08）
+///
+/// `enforced_timeout_ms(CapabilityInvoke)` 在 `nt_agent` 里一直是**影子值**：
+/// 只喂 `timeout_policy` / `shadow_line` / 日志，**没有任何生产分支读它来中止**
+/// ⇒ 一个卡死的能力（或一个永不返回的外部进程）会**永久挂住整个轮次**。
+/// 而 `reversibility_of(CapabilityInvoke)` 又把它标成 `Irreversible`
+/// ⇒ 挂住的同时还不可回滚。
+///
+/// ⛔ 与 `drive` 的差别必须显式：超时**到点即返回 Err**，但被驱动的 future
+/// **不会真的被杀掉**（它已在自己那条 runtime 上跑）。
+/// 因此这里只保证**调用方不被挂住**（fail-closed 交给上层），
+/// **不**承诺子任务已终止 —— 那需要进程级隔离，属另一项设计。
+pub fn drive_with_timeout<T>(fut: BoxFuture<'static, T>, timeout_ms: Option<u64>) -> Result<T, String> {
+    if tokio::runtime::Handle::try_current().is_ok() {
+        return Err(
+            "DISPATCH_REQUIRES_SYNC_CONTEXT:已在 async runtime 内，⛔ 不能 block_on；\
+             该路径需改走 async 入口"
+                .to_owned(),
+        );
+    }
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .map_err(|e| format!("DISPATCH_RUNTIME_INIT_FAILED: {e}"))?;
+    match timeout_ms {
+        None => Ok(rt.block_on(fut)),
+        Some(ms) => {
+            // ⚠️ 计时器必须在 **block_on 内部**创建：`tokio::time::timeout` 立即
+            //    构造 `Sleep`，它需要**当前线程**的 reactor。上一版把它构在
+            //    `block_on` 之外 ⇒ panic "there is no reactor running"。
+            //    （实测：`timeout(...)` 包裹 + `block_on(该 future)` 即可。）
+            rt.block_on(async move {
+                match tokio::time::timeout(std::time::Duration::from_millis(ms), fut).await {
+                    Ok(v) => Ok(v),
+                    Err(_) => Err(format!(
+                        "DISPATCH_TIMEOUT:能力超过 {ms}ms 未返回，已放弃等待"
+                    )),
+                }
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -75,5 +120,44 @@ mod tests {
             Ok(Err("实现内部失败".to_owned())),
             "实现失败必须表现为 Ok(Err(..))（驱动成功、实现失败）"
         );
+    }
+}
+
+#[cfg(test)]
+mod timeout_tests {
+    use super::*;
+
+    fn pending_forever() -> BoxFuture<'static, &'static str> {
+        Box::pin(std::future::pending())
+    }
+
+    /// 影子超时曾是真缺陷：`drive` 会**永久阻塞**在永不返回的 future 上。
+    /// 此用例锁定「到点放弃」——它是 `drive_with_timeout` 存在的唯一理由。
+    #[test]
+    fn 超时后放弃而非挂死() {
+        let t0 = std::time::Instant::now();
+        let r = drive_with_timeout(pending_forever(), Some(120));
+        let elapsed = t0.elapsed();
+        let msg = r.expect_err("永不返回的 future 必须超时失败");
+        assert!(msg.contains("DISPATCH_TIMEOUT"), "实得 {msg}");
+        assert!(
+            elapsed < std::time::Duration::from_secs(5),
+            "必须在超时附近返回，实耗 {elapsed:?}"
+        );
+    }
+
+    /// 超时不得**误伤**及时返回的实现。
+    #[test]
+    fn 及时返回不被超时误伤() {
+        let r = drive_with_timeout(Box::pin(async { 42u32 }), Some(5_000));
+        assert_eq!(r.expect("应成功"), 42);
+    }
+
+    /// `None` = 不限，必须保持 `drive` 的原语义（成功路径）。
+    #[test]
+    fn 无超时等价于原drive() {
+        let r = drive_with_timeout(Box::pin(async { "ok" }), None);
+        assert_eq!(r.expect("应成功"), "ok");
+        assert_eq!(drive(Box::pin(async { "ok" })).expect("应成功"), "ok");
     }
 }

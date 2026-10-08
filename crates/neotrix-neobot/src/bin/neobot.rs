@@ -2230,29 +2230,46 @@ fn cmd_provider_preset(name: &str) -> Result<(), NtBotError> {
 /// 详见 `docs/architecture/B1-CAPABILITY-INVOKE-WIRING-2026-10-06.md`。
 fn cmd_capability_list() -> Result<(), NtBotError> {
     // 与生产同一路径：惰性播种后读注册表（否则 CLI 会显示空，而生产非空）
-    let _ = neotrix_neobot::nt_capability_registry::seed_from_market_manifest();
-    // `capability_market_ids()` 是 `nt_http_engine` 的**私有**函数，不可从 CLI 调
-    // ⇒ 走公开的 `with_registry` + `nt_capability_market::listable`。
-    let ids: Vec<String> = match neotrix_neobot::nt_capability_registry::with_registry(|reg| {
-        neotrix_neobot::nt_capability_market::listable(reg)
-            .into_iter()
-            .map(|e| e.id)
-            .collect()
-    }) {
-        Ok(v) => v,
-        Err(e) => {
+    // ⚠️ 分两桶如实报出（2026-10-08）：可派发 / 已登记但本进程无派发器。
+    //    不把后者藏起来 —— 那正是「上架了却调不动」的缺口，必须看得见。
+    //    `capability_market_ids()` 是 `nt_http_engine` 的**私有**函数，不可从 CLI 调
+    //    ⇒ 走公开的 `dispatchable_ids` / `listed_but_not_dispatchable`。
+    let (dispatchable, not_dispatchable) = match (
+        neotrix_neobot::nt_capability_registry::dispatchable_ids(),
+        neotrix_neobot::nt_capability_registry::listed_but_not_dispatchable(),
+    ) {
+        (Ok(d), Ok(n)) => (d, n),
+        (Err(e), _) | (_, Err(e)) => {
             eprintln!("无法读取能力注册表：{e}");
             return Ok(());
         }
     };
-    if ids.is_empty() {
+    if dispatchable.is_empty() && not_dispatchable.is_empty() {
         println!("能力市场：空（本进程未播种；生产由 BackgroundLoop 播种）");
         return Ok(());
     }
-    println!("已上架能力 {} 项：", ids.len());
-    for id in &ids {
-        let n = neotrix_neobot::nt_capability_registry::invoke_count(id);
-        println!("  {id}    invoked={n}");
+    if !dispatchable.is_empty() {
+        println!("可调用能力 {} 项：", dispatchable.len());
+        for id in &dispatchable {
+            let n = neotrix_neobot::nt_capability_registry::invoke_count(id);
+            println!("  {id}    invoked={n}");
+        }
+    }
+    if !not_dispatchable.is_empty() {
+        println!(
+            "\n已登记但本进程**无派发器**（调用将返回 CAPABILITY_BODY_NOT_EXECUTED）{} 项：",
+            not_dispatchable.len()
+        );
+        for id in &not_dispatchable {
+            println!(
+                "  {id}    invoked={}",
+                neotrix_neobot::nt_capability_registry::invoke_count(id)
+            );
+        }
+        println!(
+            "  ⛔ 派发实现位于 neotrix-core，而本 crate 不得反向依赖它（core → neobot）。\n     \
+             在 neotrix-core 侧启动进程（如 `neotrix dialog say` / nt-crystal-serve）即可执行。"
+        );
     }
     Ok(())
 }
