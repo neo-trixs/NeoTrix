@@ -341,6 +341,14 @@ pub struct LlamaServerConfig {
     /// 前端 (OpenCode / Copilot 等) 都会踩到, 且间歇复现。NeoTrix 自身是 agent
     /// 框架, 默认开启这个绕过。
     pub no_prefill_assistant: bool,
+    /// SSD 流式 MoE 档位 (Edge0 吸收, Apache-2.0)：开启后 llama-server 走
+    /// `--no-mmap`（权重从磁盘流式读取而非文件映射），降低常驻内存。
+    /// 默认 false；只有确认目标模型大于可用 RAM 时打开。
+    pub ssd_offload: bool,
+    /// prerouter 路由预测 (Edge0 `Recover-LoRA`+prerouter 吸收)：
+    /// ⚠️ **未接线规格**：Edge0 该能力依赖其自有 fork 的补丁，上游 llama.cpp
+    /// 无对应 flag。字段保留做规格记账，**不发任何 flag**（零读点开关）。
+    pub router_predict: bool,
 }
 
 impl Default for LlamaServerConfig {
@@ -362,6 +370,8 @@ impl Default for LlamaServerConfig {
             jinja: true,          // 缺了 = 工具调用/思考块全漏
             reasoning: ReasoningMode::Auto,
             no_prefill_assistant: true,  // agent 循环必需
+            ssd_offload: false,   // 默认关：需目标模型 > RAM 才开
+            router_predict: false, // 未接线规格（见字段文档）
         }
     }
 }
@@ -423,6 +433,11 @@ impl LlamaServerConfig {
         if !self.load_mode.is_empty() && self.load_mode != "none" {
             args.push("--load-mode".to_string());
             args.push(self.load_mode.clone());
+        }
+
+        // SSD 流式档位 (Edge0)：--no-mmap 强制从磁盘流式读，绕开 mmap 驻留。
+        if self.ssd_offload {
+            args.push("--no-mmap".to_string());
         }
 
         args.extend(self.extra_args.clone());
@@ -541,6 +556,8 @@ pub fn compute_optimal_config(model_path: &Path, hw: &HardwareProfile) -> LlamaS
         // 需要深度思考时把这里改成 ReasoningMode::On。
         reasoning: ReasoningMode::Off,
         no_prefill_assistant: true,  // agent 循环必需
+        ssd_offload: false,
+        router_predict: false,
     }
 }
 
@@ -793,6 +810,32 @@ pub fn find_executable() -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ssd_offload_emits_no_mmap_flag() {
+        let mut cfg = LlamaServerConfig::default();
+        assert!(!cfg.ssd_offload);
+        assert!(
+            !cfg.to_args().iter().any(|a| a == "--no-mmap"),
+            "default must not emit --no-mmap"
+        );
+        cfg.ssd_offload = true;
+        assert!(
+            cfg.to_args().iter().any(|a| a == "--no-mmap"),
+            "ssd_offload=true must emit --no-mmap"
+        );
+    }
+
+    #[test]
+    fn router_predict_is_spec_only_no_flag() {
+        let mut cfg = LlamaServerConfig::default();
+        cfg.router_predict = true;
+        // 未接线规格：打开字段也不得凭空发 flag（零读点开关红线）。
+        assert!(
+            !cfg.to_args().iter().any(|a| a.contains("router") || a.contains("prerouter")),
+            "router_predict must not emit any flag until upstream flag exists"
+        );
+    }
 
     #[test]
     fn test_hardware_detect() {
