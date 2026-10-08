@@ -51,6 +51,10 @@ pub mod keys {
 /// ⇒ 但它必须是**同一个串**（core 与 neobot 两侧都写它），故放这里共用。
 pub const TRADE_LICENSE: &str = "LicenseRef-NeoTrix-Internal";
 
+/// genoffice 适配器（NeoTrix 自有实现，外部二进制为 Apache-2.0，但本仓适配器
+/// 按 Internal 许可声明）。
+pub const GENOFFICE_LICENSE: &str = "LicenseRef-NeoTrix-Internal";
+
 /// 能力**是否可执行** —— 「执行器登记制」的记账字段。
 ///
 /// # 为什么要有这个枚举（2026-10-06）
@@ -161,6 +165,22 @@ pub const TRADE_MANIFEST: &[ManifestEntry] = &[
         executability: Executability::Scaffold,
     },
 ];
+
+/// genoffice 文档引擎的市场清单（**1 条**）。
+///
+/// 实现模块：`neotrix-core/src/l1_action/nt_file_ability/genoffice.rs`。
+/// 与贸易能力同门面的登记结构，但域不同（Act/文件能力，非 Mind/Memory 贸易）。
+///
+/// `executability: Executable` ⇒ 真派发表中已注册 `NT-ACT::nt_file_ability::genoffice`
+/// （见 `tree_dispatch.rs` 中 `dispatch_genoffice`），且该执行器直通
+/// `GenOfficeCapability::execute`，e2e 测试已真跑通（真 spawn 二进制）。
+pub const GENOFFICE_MANIFEST: &[ManifestEntry] = &[ManifestEntry {
+    id: "NT-ACT::nt_file_ability::genoffice",
+    domain: crate::node::Domain::Act,
+    category: "office/document-engine",
+    description: "genoffice 文档引擎（docx/xlsx/pptx/pdf/markdown/html 读写转渲染），外部二进制适配，AI 已移除、由 NeoTrix 核心编排",
+    executability: Executability::Executable,
+}];
 
 #[cfg(test)]
 mod tests {

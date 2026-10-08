@@ -557,15 +557,20 @@ mod read_side_tests {
 ///
 /// **幂等**：已存在的 id 直接跳过，可反复调用。
 pub fn seed_from_market_manifest() -> Result<usize, String> {
-    use nt_core_capability_tree::market::{keys, TRADE_LICENSE, TRADE_MANIFEST};
+    use nt_core_capability_tree::market::{keys, GENOFFICE_LICENSE, GENOFFICE_MANIFEST, TRADE_LICENSE, TRADE_MANIFEST};
     use nt_core_capability_tree::node::{CapabilityKind, CapabilityNode};
     let ver = env!("CARGO_PKG_VERSION").to_owned();
     let mut added = 0usize;
-    for e in TRADE_MANIFEST {
-        with_registry(|reg| {
-            if reg.nodes.contains_key(e.id) {
-                return;
-            }
+    // 两个清单**同级播种**，各带自己的 LICENSE 串（本仓适配器皆为 NeoTrix Internal）
+    for (manifest, license) in [
+        (TRADE_MANIFEST, TRADE_LICENSE),
+        (GENOFFICE_MANIFEST, GENOFFICE_LICENSE),
+    ] {
+        for e in manifest {
+            with_registry(|reg| {
+                if reg.nodes.contains_key(e.id) {
+                    return;
+                }
             let mut meta = std::collections::HashMap::new();
             meta.insert(
                 keys::VERSION.to_owned(),
@@ -573,7 +578,7 @@ pub fn seed_from_market_manifest() -> Result<usize, String> {
             );
             meta.insert(
                 keys::LICENSE.to_owned(),
-                serde_json::Value::String(TRADE_LICENSE.to_owned()),
+                serde_json::Value::String(license.to_owned()),
             );
             meta.insert(
                 keys::CATEGORY.to_owned(),
@@ -589,7 +594,52 @@ pub fn seed_from_market_manifest() -> Result<usize, String> {
             node.metadata = meta;
             reg.nodes.insert(e.id.to_owned(), node);
             added += 1;
-        })?;
+            })?;
+        }
     }
     Ok(added)
+}
+
+#[cfg(test)]
+mod market_seed_tests {
+    use super::*;
+
+    /// **自动加载判据**：市场清单里的 genoffice 条目必须被播种进注册表，
+    /// 且带齐 `market.version` / `market.license` / `market.category`
+    /// —— 缺任一项都会被 `is_listable()` 判为不可上架。
+    ///
+    /// ⛔ 本文件另有一个 `mod tests`，此处**必须单开 mod**，
+    /// 否则 `serial()` 锁不同步、且会与那边共享全局注册表状态。
+    #[test]
+    fn genoffice被自动播种进市场注册表() {
+        use nt_core_capability_tree::market::keys;
+        // 幂等：重复播种安全（已存在的 id 直接跳过）
+        let _ = seed_from_market_manifest().expect("播种");
+
+        let (found, ver, lic, cat) = with_registry(|reg| {
+            let n = reg
+                .nodes
+                .get("NT-ACT::nt_file_ability::genoffice")
+                .expect("genoffice 必须被播种进注册表");
+            let g = |k: &str| {
+                n.metadata
+                    .get(k)
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_owned()
+            };
+            (
+                n.id.clone(),
+                g(keys::VERSION),
+                g(keys::LICENSE),
+                g(keys::CATEGORY),
+            )
+        })
+        .expect("registry");
+
+        assert_eq!(found, "NT-ACT::nt_file_ability::genoffice");
+        assert!(!ver.is_empty(), "market.version 缺失 ⇒ 不可上架");
+        assert!(!lic.is_empty(), "market.license 缺失 ⇒ 不可上架");
+        assert_eq!(cat, "office/document-engine");
+    }
 }

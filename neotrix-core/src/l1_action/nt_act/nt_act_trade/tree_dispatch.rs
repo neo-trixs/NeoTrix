@@ -29,22 +29,35 @@ use super::quote_negotiation::RequirementConfirmation;
 /// 树 id 常量：打点与注册**必须用同一个串**，故只在此定义。
 const _TREE_ID_FULL_CYCLE: &str = "NT-MIND::trade::foreign_trade_full_cycle";
 const _TREE_ID_QUOTE: &str = "NT-MIND::trade::trade_quote_negotiation";
+const _TREE_ID_GENOFFICE: &str = "NT-ACT::nt_file_ability::genoffice";
 
 /// 派发 `foreign_trade_full_cycle`：输入 = `TradeContext`。
-fn dispatch_full_cycle(_id: &str, input: Value) -> BoxFuture<'static, Result<Value, String>> {
+///
+/// `session` 为调用方（agent 轮次）的会话键 ⇒ 金丝雀打点只进该会话窗口。
+fn dispatch_full_cycle(
+    _id: &str,
+    input: Value,
+    session: &str,
+) -> BoxFuture<'static, Result<Value, String>> {
+    let session = session.to_owned();
     Box::pin(async move {
         // ⛔ 反序列化失败 ⇒ 明确 Err（fail-closed），绝不「填空跑一次」
         let ctx: TradeContext = serde_json::from_value(input)
             .map_err(|e| format!("TradeContext 反序列化失败: {e}"))?;
         let result = full_cycle::execute_trade_full_cycle(ctx);
         // ✅ **执行成功后**才打点（金丝雀必须度量「真被执行」，不是「被查过」）
-        neotrix_neobot::nt_capability_canary::signal(_TREE_ID_FULL_CYCLE);
+        neotrix_neobot::nt_capability_canary::signal(&session, _TREE_ID_FULL_CYCLE);
         serde_json::to_value(result).map_err(|e| format!("TradeResult 序列化失败: {e}"))
     })
 }
 
 /// 派发 `trade_quote_negotiation`：输入 = `{requirement, product_spec, market_env}`。
-fn dispatch_quote_negotiation(_id: &str, input: Value) -> BoxFuture<'static, Result<Value, String>> {
+fn dispatch_quote_negotiation(
+    _id: &str,
+    input: Value,
+    session: &str,
+) -> BoxFuture<'static, Result<Value, String>> {
+    let session = session.to_owned();
     Box::pin(async move {
         #[derive(serde::Deserialize)]
         struct Args {
@@ -54,7 +67,7 @@ fn dispatch_quote_negotiation(_id: &str, input: Value) -> BoxFuture<'static, Res
         }
         let a: Args = serde_json::from_value(input)
             .map_err(|e| format!("报价参数反序列化失败: {e}"))?;
-        neotrix_neobot::nt_capability_canary::signal(_TREE_ID_QUOTE);
+        neotrix_neobot::nt_capability_canary::signal(&session, _TREE_ID_QUOTE);
         let (quotes, records) = super::quote_negotiation::execute_quote_negotiation(
             a.requirement,
             a.product_spec,
@@ -62,6 +75,33 @@ fn dispatch_quote_negotiation(_id: &str, input: Value) -> BoxFuture<'static, Res
         );
         serde_json::to_value(serde_json::json!({ "quotes": quotes, "negotiations": records }))
             .map_err(|e| format!("报价结果序列化失败: {e}"))
+    })
+}
+
+/// 派发 `genoffice`：输入 = `{op, ..}` Kv（直通 `GenOfficeCapability::execute`）。
+///
+/// 与贸易能力一个表（`dispatch` 表是进程级单例），但 id 与执行器落在文件能力域。
+fn dispatch_genoffice(
+    _id: &str,
+    input: Value,
+    session: &str,
+) -> BoxFuture<'static, Result<Value, String>> {
+    let session = session.to_owned();
+    Box::pin(async move {
+        use crate::l0_substrate::nt_core_capability_types as ct;
+        use crate::l0_substrate::nt_core_capability_types::UnifiedCapability as _;
+        let map: std::collections::HashMap<String, String> = serde_json::from_value(input)
+            .map_err(|e| format!("genoffice Kv 输入反序列化失败: {e}"))?;
+        let cap = crate::l1_action::nt_file_ability::GenOfficeCapability::new();
+        match cap.execute(ct::CapabilityInput::Kv(map)) {
+            Ok(ct::CapabilityOutput::Kv(mut m)) => {
+                neotrix_neobot::nt_capability_canary::signal(&session, _TREE_ID_GENOFFICE);
+                let stdout = m.remove("stdout").unwrap_or_default();
+                Ok(serde_json::json!({ "stdout": stdout }))
+            }
+            Ok(other) => Err(format!("genoffice 返回非 Kv 输出: {other:?}")),
+            Err(e) => Err(e.to_string()),
+        }
     })
 }
 
@@ -106,9 +146,10 @@ pub fn ensure_trade_dispatchers() {
 pub fn register_tree_dispatchers() -> Vec<String> {
     let mut failed = Vec::new();
     // 显式标注为 DispatchFn 指针类型：否则数组被推断为首元素的**具体 fn item 类型**
-    let pairs: [(&str, dispatch::DispatchFn); 2] = [
+    let pairs: [(&str, dispatch::DispatchFn); 3] = [
         (_TREE_ID_FULL_CYCLE, dispatch_full_cycle),
         (_TREE_ID_QUOTE, dispatch_quote_negotiation),
+        (_TREE_ID_GENOFFICE, dispatch_genoffice),
     ];
     for (id, f) in pairs {
         if let Err(e) = dispatch::register_dispatcher(id, f) {
@@ -122,10 +163,9 @@ pub fn register_tree_dispatchers() -> Vec<String> {
 mod tests {
     use super::*;
 
-    /// ⚠️ 金丝雀是**进程级全局**，而测试**并行**执行
-    /// ⇒ 两个 canary 测试会互相 `reset()`，实测 `--test-threads=1` 时
-    /// 6 绿、并行时必红（与 `dispatch` 派发表同类问题）。
-    static CANARY_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    /// ⚠️ 金丝雀窗口自 2026-10-07 **按会话键化**（`OPEN-DEFECTS` P1-5）
+    /// ⇒ 每个测试用自己的会话键即可互不干扰，⛔ 不再需要
+    /// `CANARY_LOCK` 串行化（旧实现是进程全局窗口，并行必红）。
     use nt_core_capability_tree::dispatch::{dispatch, registered_count};
 
     /// 注册后，这两个 id 必须**从 `None` 变成`Some`** —— 这是接线生效的判据。
@@ -139,7 +179,7 @@ mod tests {
             "NT-MIND::trade::trade_quote_negotiation",
         ] {
             assert!(
-                dispatch(id, Value::Null).is_ok_and(|o| o.is_some()),
+                dispatch(id, Value::Null, "test:tree:注册").is_ok_and(|o| o.is_some()),
                 "id {id} 注册后应可派发"
             );
         }
@@ -153,9 +193,13 @@ mod tests {
         assert!(failed.is_empty(), "{failed:?}");
         let input =
             serde_json::to_value(full_cycle::capability_spec().context).expect("仓内 spec 转 JSON");
-        let fut = dispatch("NT-MIND::trade::foreign_trade_full_cycle", input)
-            .expect("派发表可用")
-            .expect("已注册");
+        let fut = dispatch(
+            "NT-MIND::trade::foreign_trade_full_cycle",
+            input,
+            "test:tree:合法输入",
+        )
+        .expect("派发表可用")
+        .expect("已注册");
         let out = tokio::runtime::Builder::new_current_thread()
             .build()
             .expect("runtime")
@@ -173,6 +217,7 @@ mod tests {
         let fut = dispatch(
             "NT-MIND::trade::foreign_trade_full_cycle",
             serde_json::json!({ "这不是 TradeContext": true }),
+            "test:tree:非法输入",
         )
         .expect("派发表可用")
         .expect("已注册");
@@ -190,22 +235,25 @@ mod tests {
     ///
     /// 这是「执行确实发生了」的**外部可观测证据** ——
     /// 之前只有「派发返回 Some」这种自证，无第三方观测。
+    ///
+    /// **本会话键专属**：窗口按会话分桶后，本测试的计数不受
+    /// 其他并行测试影响（那也是 P1-5 修复的收益）。
     #[test]
     fn 真实执行后金丝雀必须打点() {
         use neotrix_neobot::nt_capability_canary as cn;
+        const S: &str = "test:tree:真实执行打点";
         // ⚠️ 必须先注册派发器，否则 dispatch 返 None（我第一次就漏了这行，
         //    症状是 expect("已注册")  panic —— 错误信息完全指错了方向）
         let failed = register_tree_dispatchers();
         assert!(failed.is_empty(), "{failed:?}");
-        let _cg = CANARY_LOCK.lock().expect("金丝雀测试锁");
-        cn::reset();
+        cn::reset(S);
         cn::expect(cn::CanaryCapability {
             id: _TREE_ID_FULL_CYCLE.to_owned(),
             description: "外贸全链".to_owned(),
             fix: "在 tree_dispatch 执行后 signal".to_owned(),
         })
         .expect("登记金丝雀");
-        let before = cn::status()
+        let before = cn::status(S)
             .expect("status")
             .into_iter()
             .find(|c| c.capability.id == _TREE_ID_FULL_CYCLE)
@@ -214,7 +262,7 @@ mod tests {
 
         let input =
             serde_json::to_value(full_cycle::capability_spec().context).expect("仓内 spec 转 JSON");
-        let fut = dispatch(_TREE_ID_FULL_CYCLE, input)
+        let fut = dispatch(_TREE_ID_FULL_CYCLE, input, S)
             .expect("表可用")
             .expect("已注册");
         tokio::runtime::Builder::new_current_thread()
@@ -223,15 +271,14 @@ mod tests {
             .block_on(fut)
             .expect("执行应成功");
 
-        let after = cn::status()
+        let after = cn::status(S)
             .expect("status")
             .into_iter()
             .find(|c| c.capability.id == _TREE_ID_FULL_CYCLE)
             .map(|c| c.fired_count)
             .unwrap_or(0);
-        // 用 `>` 而非 `== before+1`：其他测试经`TradeCapabilityRegistry::get()`
-        //也会 signal（金丝雀是全局的），并行时可能多出计数。
-        // 但**必须严格增长** —— 那才是「本次执行确实被打点」的证据。
+        // 用 `>` 而非 `== before+1`：即使将来同一会话键被复用，
+        // **必须严格增长** —— 那才是「本次执行确实被打点」的证据。
         assert!(
             after > before,
             "真实执行后金丝雀 fired 必须增长（{before} → {after}）"
@@ -244,26 +291,26 @@ mod tests {
     #[test]
     fn 执行失败不得打点() {
         use neotrix_neobot::nt_capability_canary as cn;
+        const S: &str = "test:tree:执行失败不打点";
         // ⚠️ 必须先注册派发器，否则 dispatch 返 None（我第一次就漏了这行，
         //    症状是 expect("已注册")  panic —— 错误信息完全指错了方向）
         let failed = register_tree_dispatchers();
         assert!(failed.is_empty(), "{failed:?}");
-        let _cg = CANARY_LOCK.lock().expect("金丝雀测试锁");
-        cn::reset();
+        cn::reset(S);
         cn::expect(cn::CanaryCapability {
             id: _TREE_ID_FULL_CYCLE.to_owned(),
             description: "外贸全链".to_owned(),
             fix: "在 tree_dispatch 执行后 signal".to_owned(),
         })
         .expect("登记金丝雀");
-        let before = cn::status()
+        let before = cn::status(S)
             .expect("status")
             .into_iter()
             .find(|c| c.capability.id == _TREE_ID_FULL_CYCLE)
             .map(|c| c.fired_count)
             .unwrap_or(0);
 
-        let fut = dispatch(_TREE_ID_FULL_CYCLE, serde_json::json!({ "错的": 1 }))
+        let fut = dispatch(_TREE_ID_FULL_CYCLE, serde_json::json!({ "错的": 1 }), S)
             .expect("表可用")
             .expect("已注册");
         let got = tokio::runtime::Builder::new_current_thread()
@@ -271,7 +318,7 @@ mod tests {
             .expect("runtime")
             .block_on(fut);
         assert!(got.is_err(), "非法输入必须失败");
-        let after = cn::status()
+        let after = cn::status(S)
             .expect("status")
             .into_iter()
             .find(|c| c.capability.id == _TREE_ID_FULL_CYCLE)
@@ -290,9 +337,64 @@ mod tests {
             "NT-MIND::trade::trade_finance_compliance",
         ] {
             assert!(
-                dispatch(id, Value::Null).expect("表可用").is_none(),
+                dispatch(id, Value::Null, "test:tree:failclosed")
+                    .expect("表可用")
+                    .is_none(),
                 "id {id} 无权威 schema ⇒ 必须保持 None（fail-closed）"
             );
+        }
+    }
+
+    /// genoffice 必须**从 None 变成 Some** —— 证明市场清单里的
+    /// `Executable` 声明有真实接线（`check-executor-registry.sh` 判据 b）。
+    #[test]
+    fn genoffice已注册进派发表() {
+        register_tree_dispatchers();
+        assert!(
+            dispatch(
+                _TREE_ID_GENOFFICE,
+                Value::Null,
+                "test:tree:genoffice:registered"
+            )
+            .expect("表可用")
+            .is_some(),
+            "genoffice id 已注册 ⇒ dispatch 必须返 Some（否则市场声称 Executable 是假的）"
+        );
+    }
+
+    /// genoffice 真实派发：e2e 走 `guide docs`（本地 op 目录，无需文件）。
+    /// 二进制未安装时跳过（fail-open 于「环境缺失」，但仍返回 Some 上面已验证）。
+    #[test]
+    fn genoffice真实派发guide成功() {
+        register_tree_dispatchers();
+        let Some(fut) = dispatch(
+            _TREE_ID_GENOFFICE,
+            serde_json::json!({"op": "guide", "domain": "docs"}),
+            "test:tree:genoffice:e2e",
+        )
+        .expect("派发表可用") else {
+            panic!("genoffice 已注册，dispatch 必须返 Some");
+        };
+        // 与本文件既有测试同一手法：临时 current_thread runtime 驱动 future
+        let res = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime")
+            .block_on(fut);
+        // 二进制缺失时 GenOfficeCapability 返回 NotInstalled ⇒ 这里允许 Err(NotInstalled)；
+        // 装了二进制则必须成功并返回 stdout。
+        match res {
+            Ok(v) => assert!(
+                v.get("stdout").and_then(|s| s.as_str()).is_some(),
+                "成功派发应返回 {{stdout}}，实得 {v:?}"
+            ),
+            Err(e) => {
+                // 仅允许「未安装」这一种失败（环境缺失），其它错误视为缺陷
+                assert!(
+                    e.contains("未安装") || e.contains("GENOFFICE_BIN"),
+                    "genoffice 派发失败且非「未安装」原因：{e}"
+                );
+            }
         }
     }
 }

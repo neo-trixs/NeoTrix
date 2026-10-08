@@ -26,14 +26,19 @@
 //!
 //! ## 与 `signal()` 的关系
 //!
-//! 实现方在**真正的派发路径**里调 `nt_capability_canary::signal(树 id)`
+//! 实现方在**真正的派发路径**里调
+//! `nt_capability_canary::signal(会话键, 树 id)`
 //! （core 的 `TradeCapabilityRegistry::get()` 已如此）⇒
 //! 端口一旦被调用，金丝雀的 `fired_count` 才会动。
+//!
+//! **会话键随本端口一起传达**（2026-10-07，修 `OPEN-DEFECTS` P1-5）：
+//! 金丝雀窗口已按会话分桶，若实现方拿不到会话键，打点就无处归属
+//! ⇒ 端口签名必须携带它。
 
 use std::collections::BTreeMap;
 use std::sync::{Mutex, OnceLock};
 
-/// 派发函数签名：`输入 id` → `输入负载` → `结构化结果`。
+/// 派发函数签名：`输入 id` → `输入负载` → `会话键` → `结构化结果`。
 ///
 /// # ⛔⛔ **本签名目前与实际执行形态不匹配 —— 不要据此注册实现**
 ///
@@ -70,6 +75,12 @@ pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T
 /// **执行器归属**：本端口**不选执行器** —— 谁调用谁提供
 /// （neobot 与 core 都已有 `tokio`）⇒ 端口只产出 future，不drive 它。
 ///
+/// # 第三个参数 = 金丝雀**会话键**（2026-10-07）
+///
+/// 实现方执行成功后要调 `signal(会话键, 树 id)`；窗口按会话分桶
+/// ⇒ 会话键必须从调用方一路传到这里，否则打点无法归属
+///（修 `OPEN-DEFECTS` P1-5「金丝雀窗口进程全局，多会话互相 reset」）。
+///
 /// # 仍存一个障碍（见 T4.5）
 ///
 /// `TradeCapabilityRegistry` 只有 `new() -> Self`（实例），
@@ -77,7 +88,8 @@ pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T
 /// core 侧需增设全局落点（或改用捕获式注册）。在此之前
 /// `register_dispatcher` 不应被真实实现调用；生产 `dispatch` 返回 `None`
 /// ⇒ 调用方 fail-closed ⇒ **与接线前行为一致**。
-pub type DispatchFn = fn(&str, serde_json::Value) -> BoxFuture<'static, Result<serde_json::Value, String>>;
+pub type DispatchFn =
+    fn(&str, serde_json::Value, &str) -> BoxFuture<'static, Result<serde_json::Value, String>>;
 
 type Table = BTreeMap<String, DispatchFn>;
 
@@ -101,9 +113,12 @@ pub fn register_dispatcher(id: &str, f: DispatchFn) -> Result<(), String> {
 /// - `Ok(Some(v))` ⇒ **真实执行过**，`v` 是实现返回的结果；
 /// - `Ok(None)` ⇒ **本进程没有该能力的实现** ⇒ 调用方**必须** fail-closed；
 /// - `Err(e)` ⇒ 实现已调用但**执行失败**（锁投毒等基础设施问题）。
+///
+/// `session` 原样传给实现 ⇒ 实现成功后的金丝雀打点归属该会话。
 pub fn dispatch(
     id: &str,
     input: serde_json::Value,
+    session: &str,
 ) -> Result<Option<BoxFuture<'static, Result<serde_json::Value, String>>>, String> {
     let f = {
         let t = table().lock().map_err(|e| format!("派发表锁投毒: {e}"))?;
@@ -113,7 +128,7 @@ pub fn dispatch(
         // ⛔ 找不到实现 ⇒ None。**绝不能**退化成 `Ok(Some(json!({})))`
         //    ——那会让「没实现」看起来像「执行成功」。
         None => Ok(None),
-        Some(f) => Ok(Some(f(id, input))),
+        Some(f) => Ok(Some(f(id, input, session))),
     }
 }
 
@@ -149,6 +164,7 @@ mod tests {
     fn ok_impl(
         _id: &str,
         _input: serde_json::Value,
+        _session: &str,
     ) -> BoxFuture<'static, Result<serde_json::Value, String>> {
         Box::pin(async { Ok(serde_json::json!({"executed": true})) })
     }
@@ -156,6 +172,7 @@ mod tests {
     fn boom_impl(
         _id: &str,
         _input: serde_json::Value,
+        _session: &str,
     ) -> BoxFuture<'static, Result<serde_json::Value, String>> {
         Box::pin(async { Err("实现内部失败".to_owned()) })
     }
@@ -172,7 +189,7 @@ mod tests {
     fn 未注册必须返回None而非空成功() {
         let _g = test_guard();
         clear_for_tests();
-        let got = dispatch("NT-MIND::trade::nonexistent", serde_json::json!({}));
+        let got = dispatch("NT-MIND::trade::nonexistent", serde_json::json!({}), "test:dispatch");
         assert!(
             matches!(got, Ok(None)),
             "无实现必须是 None（让调用方 fail-closed），实得 Ok/Err 已判但有实现={}",
@@ -185,7 +202,7 @@ mod tests {
         let _g = test_guard();
         clear_for_tests();
         register_dispatcher("NT-MIND::trade::x", ok_impl).expect("注册");
-        let fut = dispatch("NT-MIND::trade::x", serde_json::json!({"a":1})).expect("派发").expect("有实现");
+        let fut = dispatch("NT-MIND::trade::x", serde_json::json!({"a":1}), "test:dispatch").expect("派发").expect("有实现");
         assert_eq!(block_on(fut), Ok(serde_json::json!({"executed": true})));
         assert_eq!(registered_count(), 1);
     }
@@ -195,7 +212,7 @@ mod tests {
         let _g = test_guard();
         clear_for_tests();
         register_dispatcher("NT-MIND::trade::boom", boom_impl).expect("注册");
-        let fut = dispatch("NT-MIND::trade::boom", serde_json::json!({})).expect("派发").expect("有实现");
+        let fut = dispatch("NT-MIND::trade::boom", serde_json::json!({}), "test:dispatch").expect("派发").expect("有实现");
         assert!(matches!(block_on(fut), Err(ref e) if e.contains("实现内部失败")));
     }
 
@@ -205,7 +222,7 @@ mod tests {
         clear_for_tests();
         register_dispatcher("NT-MIND::trade::dup", ok_impl).expect("注册");
         register_dispatcher("NT-MIND::trade::dup", boom_impl).expect("覆盖注册");
-        let fut = dispatch("NT-MIND::trade::dup", serde_json::json!({})).expect("派发").expect("有实现");
+        let fut = dispatch("NT-MIND::trade::dup", serde_json::json!({}), "test:dispatch").expect("派发").expect("有实现");
         assert!(block_on(fut).is_err(), "同名应被后者覆盖");
         clear_for_tests();
     }
