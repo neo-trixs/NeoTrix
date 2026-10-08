@@ -277,15 +277,25 @@ pub fn run_browse_act(path: &str) {
     });
 }
 
-pub fn run_search(query: &str, count: usize) {
+pub fn run_search(query: &str, count: usize, json: bool) {
     use neotrix::l2_perception::nt_world::nt_world_search::UnifiedSearch;
 
     let engine = UnifiedSearch::new();
-    println!("{} Searching for: {}", info("🔍"), query);
-    println!();
+    if !json {
+        println!("{} Searching for: {}", info("🔍"), query);
+        println!();
+    }
 
     match engine.search(query, count) {
         Ok(results) => {
+            if json {
+                if results.is_empty() {
+                    println!("[]");
+                } else if let Ok(text) = serde_json::to_string_pretty(&results) {
+                    println!("{text}");
+                }
+                return;
+            }
             if results.is_empty() {
                 println!("{} No results found.", warn("ℹ️"));
                 return;

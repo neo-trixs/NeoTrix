@@ -242,6 +242,8 @@ enum Commands {
         query: String,
         #[arg(long, short = 'n', default_value_t = 5, help = "Number of results")]
         count: usize,
+        #[arg(long, help = "Emit raw results as a JSON array (machine-readable)")]
+        json: bool,
     },
 
     // ── System & Ops ──
@@ -1085,8 +1087,8 @@ fn main() {
                 entry::run_sandbox_upload(path, session_id);
             }
         },
-        Some(Commands::Search { query, count }) => {
-            run_search(query, *count);
+        Some(Commands::Search { query, count, json }) => {
+            run_search(query, *count, *json);
         }
         Some(Commands::Discover {
             port,

@@ -1149,8 +1149,9 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 - **B-4** `neobot ledger --json` / `neobot quota --json`（`snapshot_rows/kind/windows/limits`，上限 null=未声明，`over_limit`/`remaining_cost_usd`）。
 - **B-5** neobot bin 单测 0 ⇒ 9 条（管道 stdin / 空 stdin / envelope / completions / bare-call exit 2）。
 
-### 🔲 可执行（下一窗口）
-- neotrix 其余只读子命令 `--json` 矩阵（目前仅 `status`）；`completions` 抽样完好（bash -n 门已过）。
+### ✅ 已落地（续）
+- neotrix `Search` 加 `--json`，2026-10-08 落地：`UnifiedSearch` 结果直出 `Vec<WebSearchResult>` JSON 数组；其余 Discover/Consciousness/Profile Show/Wallet List/Exec/Reason/Daemon 已有 `--json`。
+- observer-only 子会话投影 + 持久 `compaction_head_seq` + clippy pedantic deny 分级收口：路线图 P1，见 `ABSORPTION-CAPTAIN-WHO-2026-10-08.md`。
 - 吸收来源：`Captain_Who` 的 Multi-Agent 父子树 + Observer-only 子会话 + journal-before-notify（对照 N6.6 worker 池上限），见 `ABSORPTION-CAPTAIN-WHO-2026-10-08.md`。**2026-10-08 P1-1/P1-2/P1-3 三联已落地（代码+单测绿，未提交→已提交）**：WorkerPool max=8；`mark_outcome_unknown` 写账本 `status='outcome_unknown'`；`enforce_transcript_budget` 驱逐数入账本 `status='trimmed'`。
 
 ### ⛔ 需裁决 / 阻塞
@@ -1158,7 +1159,7 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 - N6.3 网关依赖口径（axum vs 手写 HTTP/1.1）由主人拍板。
 - P1-3 `capability_invoke` 执行端口 A/B/C 裁决。
 
-> 本轮改动**全部未提交**（共享 index 纪律，禁 `-A`）：`neotrix-core/src/main.rs`、`neotrix-core/src/entry/status.rs`、`crates/neotrix-neobot/src/bin/neobot.rs`、`crates/neotrix-neobot/src/nt_cli.rs`、`crates/neotrix-neobot/Cargo.toml`、`Cargo.lock`（+2 行：`clap_complete` 系 + 预存 `tokio` 系）。patch 兜底 `.neotrix/patches/2026-10-08-cli-neobot-scan-fixes.patch`。提交纪律：`git add <显式路径> && git commit --only <同一批>`。
+> 本轮 CLI 改动（`--json`/写端/EPIPE/P1-1/2/3）已提交（`828d78c2`/`0b028a5b`/`19905af9`/`bd8b8cdd`/`2b5e305b`/`a73b0daf`，共享 index，`--only` 落地）；其后追加的 `Search --json`（`entry/browse.rs` + `main.rs`）单独提交。patch 兜底 `.neotrix/patches/2026-10-08-cli-neobot-scan-fixes.patch` 保留备查。
 
 ## N5 · 长期演化但不进本轮
 - [ ] 协议翻译网关（OpenAI/Anthropic/Gemini 互译，127.0.0.1）—— 对齐 Magpie。
