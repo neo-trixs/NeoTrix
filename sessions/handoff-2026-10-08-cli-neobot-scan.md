@@ -105,3 +105,16 @@ RC=4
 | `TODO.md`、`sessions/OPEN-DEFECTS.md`、`ABSORPTION-CAPTAIN-WHO-2026-10-08.md`、本文件 | 文档本轮改动 | 建议与代码同批 `--only` |
 
 > 「留给下一个 agent」不算合法去向。上面六条代码**等待用户明确指令才提交**；patch 兜底已落。
+
+---
+
+## 9. P1-1/P1-2/P1-3 落地（2026-10-08 同会话，已验证未提交→提交）
+
+| 编号 | 来源机制（Captain_Who 吸收） | 落地 | 验证 |
+|---|---|---|---|
+| P1-1 | multi-agent.md 进程级并发上限 | `nt_channel_serve::WorkerPool`（max=8，溢出本批退同步，不再 spawn；`reap()` 收尸），`WORKER_POOL_MAX=8` | `cargo test -p neotrix-neobot --lib -- nt_channel_serve` 含 2 条新单测 |
+| P1-2 | journal-before-notify / 外部副作用 `outcome_unknown` 不自播 | `mark_outcome_unknown` 每回收 1 行 → ledger `status='outcome_unknown'`；`ledger_count_by_status(status)` 新查询 | nt_store 单测 +1；全量上线探活 `ledger_count_by_status("outcome_unknown")` |
+| P1-3 | context-management active compaction head | v1：`enforce_transcript_budget` 返回驱逐数 → 账本 `purpose=transcript-budget-trim,status='trimmed'`；**不是**完整 head 持久化（设计见 `ABSORPTION-CAPTAIN-WHO-2026-10-08.md` §4-3'） | nt_agent 主路径单测改绿 +1 |
+
+约束/纪律：① 未改 `.rs` 侧以上述之外符号行为；② 修复后 `nt_lock_audit` 0 处；③ `cargo test -p neotrix-neobot --lib -- nt_store nt_channel_serve nt_agent` 122 passed；④ `cargo check -p neotrix-neobot --lib` 0 error。
+

@@ -45,7 +45,7 @@
 | multi-agent.md | Agent 父子树 + Mailbox/Wake/receipt/事件；子会话 observer-only | neobot `nt_channel_serve` worker 并行 + outbox 投递 | **强化候选**（我们已有 worker 池雏形，但无 registry 记录子会话身份） | `nt_channel_serve.rs` + `nt_store_convos.rs`；**接线裁决 = 路线图（P1）**：并发上限 + 子会话 observer 只读投影 |
 | multi-agent.md | **结果/状态/cursor 先落 SQLite，再发通知**；未知外部副作用 `outcome_unknown` 不自动重放 | neobot `nt_channel_dispatch` outbox + `TurnStatus` | **强化**（outbox 已存在，见 N1/N2 收口）⇒ 缺的是 `outcome_unknown` 语义位 | `nt_store/` 与 `nt_channel_dispatch.rs`；可加一列 `outcome_unknown` |
 | multi-agent.md | 同一 Agent 同时最多一个活跃 Turn；根 Human Turn 与子 Wake Turn 共用进程级并发上限 | `nt_channel_serve.rs:283` 每消息一线程（N6.6 债） | **新增候选**（我们目前无上限）⇒ 这是**本轮最该抄的形状** | `nt_channel_serve` 有界池 + 令牌租约 |
-| agent-runtime + context-management | 逻辑日志 = messages + journal + **active compaction head**；不原地改 | `nt_loop_core` compact_context / `maybe_compact_context`（✅ 已接生产，OPEN-DEFECTS #6 封口） | **强化候选**（我们已有 budget 门+降级记账，但缺持久 compaction head） | `nt_loop_step.rs` 持久化 head 列 |
+| agent-runtime + context-management | 逻辑日志 = messages + journal + **active compaction head**；不原地改 | `nt_loop_core` compact_context / `maybe_compact_context`（✅ 已接生产，OPEN-DEFECTS #6 封口） | **强化已开始**（已有 budget 门+降级记账；**missing piece = 持久 compaction head**） | ① v1 已落地（2026-10-08）：`enforce_transcript_budget` 驱逐计数 → 账本 `transcript-budget-trim/status='trimmed'`；② 剩件 = 持久 `compaction_head_seq` 列 |
 | agent-runtime | Checkpoint / Tool 投影 / 取消与 Steering | `nt_loop_checkpoint` / `nt_turn_ledger` | 已覆盖 ⇒ **登记，不新增** | — |
 | overview | Renderer/Main/Core Server 信任边界 + JSON-RPC 2.0 行分隔 | neobot `nt_channel_serve` + `nt_cli` envelope | 已覆盖（`nt_cli` 已成束）⇒ **登记，不新增** | — |
 | docs/subsystems/* | Skills/MCP/子智能体模板 | `nt_skills_catalog`/`nt_mcp_client`（neobot 侧已有对应能力） | 已覆盖 ⇒ 登记 | — |
@@ -59,7 +59,7 @@
 | 裁决 | 机制 | 落点 |
 |---|---|---|
 | 📋 路线图 P1 | `nt_channel_serve` 有界 worker 池 + observer-only 子会话 + `outcome_unknown` 语义 | `crates/neotrix-neobot/src/nt_channel_serve.rs` + `nt_store_messages` |
-| 📋 路线图 P1 | 持久 **active compaction head**（紧凑化头位落库，ContextAssembler 只读既存前缀） | `nt_loop_step.rs` + `nt_store_messages`（新列，幂等 ALTER） |
+| 📋 路线图 P1 | 持久 **active compaction head**（紧凑化头位落库，ContextAssembler 只读既存前缀） | `nt_loop_step.rs` + `nt_store_messages`（新列，幂等 ALTER）—— 2026-10-08 另：`transcript-budget-trim` 驱逐计数已落账 |
 | ✅ 已覆盖不做 | JSON-RPC 行分隔、outbox 先写后发、MCP catalog、Skills catalog、Turn 并发上限语义 | — |
 | ❌ 拒绝 | 子 Agent 可被用户直接对话、Usage 在树层重聚合（违反不变量 #6）、Provider wire 污染 application 层 | —— |
 

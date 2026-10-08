@@ -1127,7 +1127,7 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 ### N6.6 · 已知技术债（登记，非本轮）
 - [ ] `deliver_result` 生产零调用（worker 池计划的未来基础，**不删**）。
 - [ ] `quota_windows` 为快照法 ⇒ 大 ledger 上每次快照是全表扫描（单机可接受；十万行后需加索引或改为物化）。
-- [ ] `nt_channel_serve` worker 无池上限（每消息一线程）；极端并发需补有界池 + 背压。吸收来源：Captain_Who `docs/architecture/multi-agent.md`（父子 Agent 树 + 并发上限 + journal-before-notify，🔴 P1 规模）→ `ABSORPTION-CAPTAIN-WHO-2026-10-08.md` §3。
+- [x] `nt_channel_serve` worker 无池上限（每消息一线程）；极端并发需补有界池 + 背压。**2026-10-08 P1-1 落地**：`WorkerPool` 限 max=8，满员本批退回同步路径；吸收来源：Captain_Who `docs/architecture/multi-agent.md` → `ABSORPTION-CAPTAIN-WHO-2026-10-08.md` §3。
 - [ ] `ChatMessage` 读行仍按位置元组（`r.get(0..5)`）；新增两列后**不要再插中间列**。
 
 > **本轮（2026-10-08 收口）已落地且验证过的**：N1 `/stop` worker 解耦 + 真并发回归 ·
@@ -1151,7 +1151,7 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 
 ### 🔲 可执行（下一窗口）
 - neotrix 其余只读子命令 `--json` 矩阵（目前仅 `status`）；`completions` 抽样完好（bash -n 门已过）。
-- 吸收来源：`Captain_Who` 的 Multi-Agent 父子树 + Observer-only 子会话 + journal-before-notify（对照 N6.6 worker 池上限），见 `ABSORPTION-CAPTAIN-WHO-2026-10-08.md`。
+- 吸收来源：`Captain_Who` 的 Multi-Agent 父子树 + Observer-only 子会话 + journal-before-notify（对照 N6.6 worker 池上限），见 `ABSORPTION-CAPTAIN-WHO-2026-10-08.md`。**2026-10-08 P1-1/P1-2/P1-3 三联已落地（代码+单测绿，未提交→已提交）**：WorkerPool max=8；`mark_outcome_unknown` 写账本 `status='outcome_unknown'`；`enforce_transcript_budget` 驱逐数入账本 `status='trimmed'`。
 
 ### ⛔ 需裁决 / 阻塞
 - `make clippy` 与 CI 结构性红（lib `deny(warnings)` + `warn(pedantic)` ⇒ 43161 基线 error）⇒ clippy 不可当门；neotrix bin 单元无法 lint 取证（neobot 可证 0 新增）。
