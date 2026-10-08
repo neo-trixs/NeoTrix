@@ -200,3 +200,28 @@
 门给出三选一：① 移除 vendored 树（架构级决定）② 取得上游书面授权 ③ **项目所有者**签署 `.neotrix/LICENSE-EXCEPTIONS.md`。
 ⛔ 三条**都需要人类/所有者权限**，且门自身写明「改本门 / 删 deny 名单让检查变绿 = 不可接受」。
 ⇒ 本轮**未动**，如实上报为阻塞点。
+
+### § 3.10 T1-7 自我更正 + osint 伪接线（2026-10-08）
+
+**① 我自己上一轮写错了一条，已更正（`f77bf51a`）**
+
+我曾用 `find -name 'nt_core_guardian*'` 判定该模块「已消失」，并把这个结论**写进了 ROADMAP**。子代理复核推翻：它是**目录**形态（7 文件 / 1,593 行 / `mod.rs`），该 glob 只匹配文件名、不匹配目录内的 `mod.rs`。
+⇒ **方法缺陷被当成了代码事实** —— AGENTS.md R-SCAN-1b 的又一实例：一条检索的**空结果**不构成「不存在」的证据。
+连带修两处真实漂移：`l6_meta/mod.rs:16` 的括注「融合 8 个分散机制」（该模块自身 `mod.rs:3` 已拆穿此说，拆穿它的 `70d9d928` 改了模块内文档却漏改宿主那行）；`nt_arch_rules.rs:13` 的 1,567 行旧值 + 「自称」过时态。
+T1-7a → ✅ 已由 `70d9d928` 完成；T1-7b → 仍成立且证据更强（57 个导出符号全仓 0 命中 + `security-wiring-baseline.txt:1167` 佐证）。并记下 13 处 `use ...guardian` **全是另两个同前缀模块**（L15），防止下个窗口误判为消费方。
+
+**② osint 伪接线（`3e6a8a87`）—— 本轮最有价值的发现**
+
+`osint_bridge.rs` 788 行 + `ad_graph`/`harvest` 1,595 行真实实现，**看着已接线，实则生产零消费**。子代理**纠正了上一轮两处错误**（`create_osint_bridges` 实有 3 处非测试调用；桩是 10 个不是 6 个），并收窄结论：不是「整块零消费」，而是 **15 真桥 + `doctor_osint`/`run_osint` 两条真实分发路径，全部止步于零生产消费者**。
+
+⛔⭐ **新结构性盲区（已实测三个门，全部零命中）**：
+
+| 门 | 判据 | 为何抓不到 |
+|---|---|---|
+| `check-truth-surface` | UNREACHABLE = 能否从 crate root **编译** | `source/mod.rs:89` 已 `pub mod osint_bridge;` ⇒ 可达 |
+| `nt_orphan_dir.py` | 目录是否被 `mod` **挂载** | 同上 |
+| `nt_security_wiring.py` | ZERO_CONSUMER | **它确实有这类别，但未收录 osint_bridge/UnifiedEngine** |
+
+⇒ **「编译进库但生产零消费」这一整类缺陷，现有门体系抓不到。**
+这正是 L8「绿色≠有效」：三个门都报绿（`nt_security_wiring` 另有 27 条他窗新增，与我无关 —— 其中 `nt_reward.rs::report_regression` 经查由 `a5d602b4`(10-06) 引入、我的 P2.2 提交零次碰过该文件）。
+⇒ **建议下一轮立项**：给 `nt_security_wiring.py` 补一条「生产可达但零消费者」判据（须先定义「生产」= 非 `#[cfg(test)]` 路径），否则这一类只能靠人工取证发现。
