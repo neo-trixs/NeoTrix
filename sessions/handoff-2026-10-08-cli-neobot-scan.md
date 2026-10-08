@@ -118,3 +118,7 @@ RC=4
 
 约束/纪律：① 未改 `.rs` 侧以上述之外符号行为；② 修复后 `nt_lock_audit` 0 处；③ `cargo test -p neotrix-neobot --lib -- nt_store nt_channel_serve nt_agent` 122 passed；④ `cargo check -p neotrix-neobot --lib` 0 error。
 
+### 9b. CLI `--json` 矩阵收尾（2026-10-08 下午，已提交 `218d203f`）
+
+`neotrix Search` 补 `--json`：`UnifiedSearch` 结果直出 `Vec<WebSearchResult>` JSON；`entry/browse.rs::run_search(query,count,json)`。其余机器可读出口已饱和（`status`/`Exec`/`Reason`/`Discover`/`Consciousness`/`Profile Show`/`Wallet List`/`Daemon`）。
+
