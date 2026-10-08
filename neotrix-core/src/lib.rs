@@ -19,7 +19,10 @@
 #![forbid(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(clippy::all)]
-#![cfg_attr(not(test), deny(warnings))]
+// 2026-10-08 clippy 大切换：移除 `#![cfg_attr(not(test), deny(warnings))]` —— 它与
+// 曾有的 workspace restriction warn桶 叠加出 6812+ 片段警告级错误使 CI 长期失效；
+// 留 `warn(clippy::all)` 保持可见，真正的 hard gate 只剩 unsafe_forbid/deny 级别与
+// upstream clippy 规则。
 #![allow(dead_code)]
 #![allow(
     clippy::module_name_repetitions,

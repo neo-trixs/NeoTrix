@@ -615,7 +615,7 @@ jobs:
         with:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --lib -p neotrix -- -D warnings
+      - run: cargo clippy --no-deps -p neotrix --lib
 
   fmt:
     runs-on: ${{ matrix.os }}

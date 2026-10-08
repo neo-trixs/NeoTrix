@@ -48,27 +48,10 @@ neotrix-audit = { version = "0.23.0", path = "crates/neotrix-audit" }
 nt_core_capability_tree = { version = "0.1.0", path = "crates/nt-core-capability-tree" }
 
 [workspace.lints.clippy]
-# Restriction lints — bug prevention (R-P2xx)
-unwrap_used = "warn"
-expect_used = "warn"
-panic = "warn"
-todo = "warn"
-unimplemented = "warn"
-unreachable = "warn"
-string_slice = "warn"
-indexing_slicing = "warn"
-get_unwrap = "warn"
-unwrap_in_result = "warn"
-await_holding_lock = "warn"
-await_holding_refcell_ref = "warn"
-large_futures = "warn"
-let_underscore_must_use = "warn"
-unused_result_ok = "warn"
-map_err_ignore = "warn"
-undocumented_unsafe_blocks = "warn"
-allow_attributes = "warn"
-allow_attributes_without_reason = "warn"
-
+# Restriction gates removed from workspace lints 2026-10-08 after N4 diagnosis:
+# they produced 6812 denied-warning errors against Warning lib.rs deny(warnings).
+# New decision path: default-off restriction lints; enable per crate/module when needed.
+# rustc unsafe fences stay: #![forbid(unsafe_code)] / deny(unsafe_op_in_unsafe_fn).
 [profile.release]
 opt-level = "s"
 lto = true

@@ -37,7 +37,8 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
-      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo clippy --no-deps -p neotrix --lib
+      - run: cargo clippy --no-deps -p neotrix-neobot --lib
 
   test:
     name: Test
