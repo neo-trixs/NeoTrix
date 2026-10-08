@@ -14,6 +14,10 @@
 > **当前权威状态表** → `docs/architecture/ROADMAP-REDUNDANCY-FLAT-MISALIGN-2026-10-07.md`
 > 的收尾表（2026-10-08 已按实测回填 T1-2 / T1-4 / T1-6 / T1-8 / T1-7a）。
 >
+> **当前权威吸收迭代入口** → `docs/architecture/ABSORPTION-TASKLIST-2026-10-08.md`
+> （34 源批次入库 `ABSORPTION-BATCH-2026-10-08-NEOBOT-34.md`；A1–A8/B1–B3/C1–C3 均可直接实施，
+> 每条带目标文件、改动点、验收命令）。
+>
 > ---
 >
 > 智能同步生成，最后更新：**2026-09-30（单点真身收敛：tokenize/rrf_fuse 两份→一份）**
