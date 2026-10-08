@@ -118,3 +118,78 @@ market **5 绿** · neobot **633 绿** · `check-executor-registry.sh` **PASS** 
 - [x] ② 本窗未开新 worktree（无需 prune；主树未提交 34 处，其中本窗 2 处）
 - [x] ③ 本 handoff 已写
 - 未提交改动归属：`genoffice.rs` + `nt_file_ability.rs` 两处为本窗；其余 32 处为他窗 WIP / 索引补丁 —— **未 git commit**（共享 index，`git commit --only <我的文件>` 仅在有明确提交意图时执行；本窗未被要求提交 ⇒ 保留未提交）。
+
+---
+
+# 第二阶段：架构审计 → 插件化脊柱 → 两个 P0 修复（2026-10-08 晚，本窗）
+
+> 上文为 genoffice 接入阶段。本节记录之后做的架构审计与体系化建设。
+> 本窗全部提交已在 `feat/multi-agent-absorb-2026-10-08` 分支。
+
+## 起因：用户要求「插件化、热插拔、随用随调、智能耦合、自我组合」
+
+对 neotrix + neobot 做了一次**带证据的**全面审计（两份 explore 报告，
+每条结论追 `file:line`）。核心实测结论：
+
+| 编号 | 结论 | 证据 |
+|---|---|---|
+| H1 | **13 套**并行能力/插件表示法、**13 个**能力注册表，只有 1 条有活回路 | 全审计 |
+| H2 | L0 `UnifiedCapability`：18 个生产实现、**0 个生产构造点**；`create_*` 工厂的 Rust 调用者全为 0 | `ocr/mod.rs:399` 等 |
+| H4 | `TradeCapabilityRegistry` + `global_trade_registry()` 零生产消费者 | `capability_registry.rs:211` |
+| H5 | `Executability` 唯一 Rust 读者是一个 `println!` | `nt_crystal_serve.rs:1938` |
+| H9 | 磁盘 326 节点树与 6 个 manifest id **互不相交**，只在某个进程全局相遇 | `.neotrix/capability_registry.json` |
+| H10 | `NativeBus` 完整第 6 套，生产 attach 的却是**空总线** | `handlers_wisdom.rs:20` |
+| 热插拔 | 全仓**只有** `PluginRegistry` 支持；其余全是 insert-only | `nt_io_plugin/registry.rs` |
+| neobot 工具面 | 全部 6 个能力只暴露**一个**硬编码工具 `capability_invoke`，id 塞 description；**无重试/队列/异步/批量** | `nt_http_engine.rs` |
+| 智能路由 | `SemanticRouter`/`CapabilityCatalog`/`route_entity_aware` 零生产消费者；唯一活的 `ExperienceRouter` **只写 rationale 从不执行** | 全审计 |
+
+## 关键取证：`capability_invoke` 在 3 个生产进程里跑得动几个？
+
+只有 **1 个**（`neotrix dialog say`）。`neobot` CLI 与桌面端恒为
+`CAPABILITY_BODY_NOT_EXECUTED` —— 派发器住在 core，而 `neotrix-neobot`
+**不得反向依赖** core（`core → neobot` 固定，core 对 neobot 108 处引用，反转不可承受）。
+
+## 架构决策：晶体为宿主（非依赖反转、非新增装配 crate）
+
+`nt_crystal_serve` 是**唯一同时持有 core + neobot** 的进程，且 neobot 已有
+与它配对的 HTTP 客户端 ⇒ **让晶体当能力宿主，薄客户端代理调用**。
+依赖方向不变，无需新 crate。实测：`POST /v1/capabilities/invoke` 真执行 genoffice。
+
+## 本窗提交清单（14 个，按主题）
+
+### 阶段一：适配器 + 市场接线（genoffice）
+- `635a8c05` genoffice 适配器模块（同时修复 `61ace1b2` 他窗 clippy 批量提交把 facade 扫进 HEAD却漏掉模块文件导致的 HEAD 损坏）
+- `ee2a7b13` 登记插件市场：`GENOFFICE_MANIFEST`(Executable) + `dispatch_genoffice` + `seed_from_market_manifest` 双清单播种；四文件原子提交（含他窗的 `dispatch.rs` 2→3 参数 canary 重构）
+- `a2a2d0ab` 派发层能力面补全 **4/14 → 18/18**：模板化 `GENOFFICE_OP_TABLE` + 全 op e2e。**参数形状全实测**（pptx create 只吃 `--ops`/`--spec`；text 字段是 `paragraphs`；docs ops 与 sheet cells 是两套 DSL）
+- `3210c09f` `dispatch::is_registered` id 级探针 + `dialog say` 注册派发器
+- `0a4db86e` 修 `CapabilityTreeRegistry::remove` 的**状态损坏**（先删后校验）。变异验证
+
+### 阶段二：止血（P1）
+- `f1ec7fe5` 上架面只摆「本进程真调得动」的能力（`dispatchable_ids`）；`capability_invoke` 超时从影子值变真强制（`drive_with_timeout`）。修自己打破的回归（旧测试把「调不动」当「已上架」）+ 负向锁 + 变异验证（旧代码下打印出 6 个调不动 id 被广告）
+
+### 阶段三：架构地基（P2）
+- `0eb34ff7` **能力脊柱** `CapabilitySpine`：唯一真源 `id→{exec,meta,health,counter}`；`Arc<dyn CapabilityExecutor>` 带状态；`unregister`/`replace` 事务化；`executability` **派生**（未登记/不健康⇒DeclaredOnly，清单 Scaffold⇒尊重）。9 单测 + 变异验证
+- `e2e928ab` 脊柱↔`dispatch::Table` 桥。**方向刻意不对称**：`register_dispatcher` 自动进脊柱；脊柱→`Table` 显式且只接受 `as_fn_ptr()==Some`（防带状态执行器被静默降级）。3 桥测试 + 变异验证
+- `b3056dc1` **投影与组合** `planner`：`tool_schema`（真实入参）、`project_tools`（按本轮 query 相关性 = 随用随调）、`compose_chain`（`stage:N` 排序 = 自我组合）。13 单测 + 2 处变异验证。**测试抓出两真 bug 并修**：CJK 前缀匹配、工具名映射不可逆
+- `85fe308b` 端到端闭环测试：登记→派生→投影→组合→执行→拔除→换回，全程可观察断言；不健康者「可派发集合/模型面/链路」三处同步消失
+
+### 阶段四：先修裁判（P4）
+- `f492e801` 能力体系**裁决台账** `config/capability_systems.toml`（17 条，处置闭集 + 证据强制）+ 台账门（判据①锚点漂移 ②处置闭集 ③证据强制）。**零假阳性**，不查消费者数量。已记进 `gate-registry.tsv`
+
+### 阶段五：两个 P0（注册表在生产里整体不可解析）
+- `4da41072` **326 节点注册表 serde fail-fast ⇒ 整树在生产里不可见**。真因是**六处**非法枚举值（domain neobot×4 / layer l1primitive×4+l6meta×1 / constellation c2system×4+c3experience×1 / op "bud"×7）。修法分两类判：① domain 补代码（加 `Domain::Neobot`，触发仅 1 处穷尽匹配）② layer/constellation/op 修数据（已取证校准成熟度，`resume_verdict` 从虚报 c3experience 降到有证据支撑的 c1unittest）③ `skill_tree.rs` 的 `.ok()?` **静默加载器**改显式告警 + 逐节点容错计数。台账门加判据④（枚举合法性）。crate **首次 94 绿/0 红**
+- `66db875a` **30 条「悬空 requires」**（我上轮口径错了，按代码双命名空间口径重算）+ 1 条死边。这 30 条不是垃圾，是树外组件/概念引用 ⇒ **显式分流**到新增的 `CapabilityNode::external_requires`（不删数据）⇒ `requires` 语义收敛为「必须能解析」，`validate_dependencies` 恢复为有意义信号。不变式用例 + 台账门判据④扩展（含死边检查）+ 变异验证（真实 rc=1）
+
+## 当前状态（本窗视角）
+
+- 能力脊柱 + 投影/组合 + 晶体宿主 + 裁决台账 + 台账门 全部就位、全部有变异验证。
+- `nt_core_capability_tree` **96 绿 / 0 红**；`neotrix`(lib)/`neobot` 全绿；四道门（台账门 / executor-registry / lock_audit/ 门可满足性元门 advisory）全过。
+- **接线进 neobot 模型面**（`project_tools` 替换 `nt_http_engine` 的硬编码工具清单）**未做**：他窗在 `nt_agent.rs`/`nt_types.rs` 施工，已按指示不碰。他已在 `21a4b37a` 落 PluginManifest 静态解析 + `ToolName::Plugin` 动态路由、`86ddcb57` 自造清单、`6c28c77b` 挂容、`4fec77aa` 出 PLUGIN-ECOSYSTEM 蓝图 —— **与本窗方向互补**，最终接线应两窗合力做。
+- 元门 advisory 红：`check-claims-numbers.sh`（`AGENTS.md` 写「84 条」而 `task-index.json` 实 596 条）。**既有漂移，本窗未碰** `task-index.json`。
+
+## 收工自查
+
+- [x] ① `nt_worktree_gate.sh check` 已跑（收工义务 §1）
+- [x] ② 本窗未开新 worktree
+- [x] ③ 本 handoff 已更新
+- [x] ④ 本窗所有改动已按 `git commit --only` 落入 `feat/multi-agent-absorb-2026-10-08`，未扫他人改动（四文件原子提交的 `ee2a7b13` 例外已在 commit message 里写明含他窗的 `dispatch.rs`；JSON 一并提交的 `4da41072` 已在 message 里写明含他窗后台蒸馏写入），已做 `git status` 干净度核对。
