@@ -236,3 +236,43 @@
 - **`check-feature-gates.sh --quick`** 未跑（需 6 次内部 cargo check，且他窗曾并行开 `--all-targets`）。
 - **`InteractiveAgentCli` 删除（F4）**：⛔ 未做 —— 真调用 0，但那是 breaking 变更，且他窗正在重构同一子系统。
 
+
+---
+
+## F. 最终状态（2026-10-08 12:56 收工）
+
+### 本会话三个提交
+
+| hash | 题 | 量 |
+|---|---|---|
+| `8774ed2f` | `fix(ntcode+stdin_human): 外部 CLI 插件接入收口 F0/F1/F2/F3/F5 + 两处真缺陷` | 11 files, +2047 / -49 |
+| `5346c623` | `docs(lessons): 外部 CLI 接入 + 共享工作树并发 10 条` | 2 files, +174 / -1 |
+| `926ebb39` | `docs(standards): L1「照抄屏幕」只更新了一半 —— 补显示侧 + 立 R-DISP 纪律 + 交后续待办` | 5 files, +169 / -6 |
+
+⚠️ 期间**其他窗口的两个提交插在中间**：`536f5076 refact(plugin): PluginRegistry 成为真实对象唯一来源`
+（他窗对他自己那批改动的收口）、`7375fd92 test(neobot-ui): …`。
+
+### 收工门
+
+| 门 | rc | 核实时间 | 说明 |
+|---|---|---|---|
+| `nt_worktree_gate.sh check` | **0** | 12:56 | ⚠️ 同一条命令我先后读到 **4** 与 **0** 两次（并发写入期的瞬态）；以最后一次带完整输出的 **rc=0** 为准。`.worktrees/merge-b` 3 处未提交、`.worktrees/evo` target 3480M 可回收 —— **都不是本会话的** |
+| `nt_lock_audit.py` | **0**（可疑 0 处） | 12:45 | 改 `.rs` 后重跑，**非沿用旧值** |
+| descriptor 门 `--strict` / `--self-test` | **0** / **0**（12/12） | 12:39 | 证伪实测 rc=1 且指名文件 |
+
+### ⛔ 未完成的验证（如实记，勿当已验）
+
+1. `cargo check -p neotrix --lib` **被用户叫停在半途** ⇒ `nt_crystal_dialogue.rs`
+   只加了注释、**理论上不破编译**，但 ⛔ **「理论上」不是证据**。
+2. `cargo test -p neotrix --lib` **全量（13,695）未跑**，只跑了 5 个受影响过滤器。
+3. `check-feature-gates.sh --quick` 未跑（需 6 次内部 cargo check）。
+4. `check-gate-satisfiable.sh --strict` 未跑（会 `eval` 执行含写操作的探针，我按 R-SCAN-4 禁跑）。
+5. 真 TTY 下 `ntcode --agent freebuff` 的 F2 复核未做。
+
+### 环境状态
+
+- ✅ **freebuff agent 会话已停**（PID 49219，收工前跑满 1h41m+，写过 3 个文件）。
+  ⚠️ 它写的 3 个文件（`nt_core_event_bus.rs` / `nt_mind_background_loop/run.rs`）
+  **仍是脏的**，本会话**未定性、未提交、也未弃用** ⇒ 下一个接手者请先决定它们的去向。
+- 主树 **71 处未提交**（本会话的 18 个文件已全部入库，其余**均非本会话**）。
+- 本会话**新建 worktree 数 = 0**，⛔ 未碰任何 worktree。
