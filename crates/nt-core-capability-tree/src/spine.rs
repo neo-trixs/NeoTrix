@@ -124,6 +124,14 @@ pub trait CapabilityExecutor: Send + Sync {
     fn health(&self) -> CapabilityHealth {
         CapabilityHealth::Healthy
     }
+    /// **能否降级成无捕获 `fn` 指针**放进 `dispatch::Table`。
+    ///
+    /// 默认 `None` = **不能**（带状态的插件就属于这种）⇒ `sync_spine_into_dispatch`
+    /// 会跳过并**如实报出**，绝不把带状态执行器悄悄塞进无捕获表（那会丢状态）。
+    /// 只有 [`SpineExecutor`]（本就持有 `DispatchFn` 的适配器）才返回 `Some`。
+    fn as_fn_ptr(&self) -> Option<crate::dispatch::DispatchFn> {
+        None
+    }
 }
 
 /// 执行器健康态。
@@ -164,6 +172,9 @@ impl CapabilityExecutor for SpineExecutor {
     }
     fn execute(&self, input: Value, session: &str) -> BoxFuture<'static, Result<Value, String>> {
         (self.f)(&self.desc.id, input, session)
+    }
+    fn as_fn_ptr(&self) -> Option<crate::dispatch::DispatchFn> {
+        Some(self.f)
     }
 }
 
