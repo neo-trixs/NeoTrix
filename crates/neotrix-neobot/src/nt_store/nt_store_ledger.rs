@@ -196,6 +196,52 @@ impl NeobotStore {
         let n = self.conn.execute("DELETE FROM audit WHERE at < ?1", params![cutoff])?;
         Ok(n)
     }
+
+    // ---- task activity timeline（multica-ai/multica 吸收 lite 落地）----
+
+    /// 记一条「任务侧事件」到 ledger：purpose 固为 `"task-event"`，
+    /// `status=kind`（progress/blocker/comment/review 等语义由调用方担），
+    /// 费用/tokens 全 0、`measured=false`——这一行只带语义不带账钱。
+    pub fn record_task_event(&self, task_id: &str, kind: &str, detail: &str) -> Result<(), NtBotError> {
+        self.record_ledger(&super::LedgerEntry {
+            id: uuid::Uuid::new_v4().to_string(),
+            at: chrono::Utc::now().to_rfc3339(),
+            engine: "agent".to_owned(),
+            model: String::new(),
+            actor: "system".to_owned(),
+            purpose: "task-event".to_owned(),
+            in_tokens: 0,
+            out_tokens: 0,
+            cost_usd: 0.0,
+            measured: false,
+            status: kind.to_owned(),
+            latency_ms: 0,
+            error: if detail.is_empty() { None } else { Some(detail.to_owned()) },
+            session_id: Some(task_id.to_owned()),
+            key_env: None,
+        })
+    }
+
+    /// 倒序取任务的活动事件流（at, kind, detail）。
+    pub fn task_events(&self, task_id: &str) -> Result<Vec<(String, String, String)>, NtBotError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT at,status,error FROM ledger
+             WHERE purpose='task-event' AND session_id=?1
+             ORDER BY at DESC",
+        )?;
+        let rows = stmt.query_map(params![task_id], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, Option<String>>(2).map(|x| x.unwrap_or_default())?,
+            ))
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
 }
 
 #[cfg(test)]
@@ -286,5 +332,25 @@ mod tests {
         let event = AuditEvent::new("bot", "bash", AuditDecision::Deny, Some("workspace-jail".to_owned()), "x");
         store.record_audit(&event).expect("record");
         assert_eq!(store.list_audit(10).expect("list").len(), 1);
+    }
+
+    #[test]
+    fn task_activity_events_are_visible_and_costless() {
+        let store = NeobotStore::open(":memory:").expect("open memory db");
+        store
+            .record_task_event("t-1", "progress", "half way done")
+            .expect("record");
+        store
+            .record_task_event("t-1", "blocker", "needs your prod creds")
+            .expect("record2");
+        // 账本上不能把行当「实调用」：cost=0、measured=false, degenerate accordingly.
+        assert_eq!(store.ledger_count_by_status("progress").expect("c1"), 1);
+        assert_eq!(store.ledger_count_by_status("blocker").expect("c2"), 1);
+        assert_eq!(store.ledger_count_by_status("ok").expect("c3"), 0, " task-event不该伪装正常调用");
+        let events = store.task_events("t-1").expect("list");
+        assert_eq!(events.len(), 2);
+        assert!(events.iter().any(|(_, kind, _)| kind == "blocker"), "含 blocker");
+        // 其他任务不许混入
+        assert_eq!(store.task_events("other").expect("other").len(), 0);
     }
 }
