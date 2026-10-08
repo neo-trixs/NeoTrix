@@ -7,7 +7,7 @@ use crate::l2_perception::nt_world::nt_world_model::TaskType;
 use super::super::core::{CapabilityVector, KnowledgeSource, AbsorptionRecord, PerformanceEvaluator};
 use super::super::memory::ReasoningBank;
 use super::brain_seal::{SealEditStrategy, DefaultSealStrategy};
-use super::brain_ewc::{FisherMatrix, WeightUpdateRecord};
+  use super::brain_ewc::{FisherMatrix, WeightUpdateRecord, EvaluationRecord};
 
 /// AbsorbValidator trait
 pub trait AbsorbValidator {
@@ -56,11 +56,12 @@ pub struct ReasoningBrain {
     pub harness_current: Option<String>,
     pub weight_history: Vec<WeightUpdateRecord>,
     pub learning_rate_budget: f64,
-    pub max_budget: f64,
-    pub strategy: Box<dyn SealEditStrategy>,
-    pub fisher: Option<FisherMatrix>,
-    pub ewc_lambda: f64,
-}
+      pub max_budget: f64,
+      pub strategy: Box<dyn SealEditStrategy>,
+      pub fisher: Option<FisherMatrix>,
+      pub ewc_lambda: f64,
+      pub evaluation_history: Vec<EvaluationRecord>,
+  }
 
 impl ReasoningBrain {
     pub fn new() -> Self {
@@ -78,9 +79,10 @@ impl ReasoningBrain {
             learning_rate_budget: 5.0,
             max_budget: 10.0,
             strategy: Box::new(DefaultSealStrategy),
-            fisher: Some(FisherMatrix::new(23)),
-            ewc_lambda: 0.5,
-        }
+              fisher: Some(FisherMatrix::new(23)),
+              ewc_lambda: 0.5,
+              evaluation_history: Vec::new(),
+          }
     }
 
     pub fn register_knowledge_source(&mut self, name: &str, vector: CapabilityVector) {
@@ -295,8 +297,10 @@ pub struct BrainMetadata {
     pub absorption_history: Vec<AbsorptionRecord>,
     pub learning_rate: f64,
     pub total_absorb_count: u64,
-    pub custom_sources: HashMap<String, CapabilityVector>,
-}
+      pub custom_sources: HashMap<String, CapabilityVector>,
+      #[serde(default)]
+      pub evaluation_history: Vec<EvaluationRecord>,
+  }
 
 impl Clone for ReasoningBrain {
     fn clone(&self) -> Self {
@@ -314,11 +318,12 @@ impl Clone for ReasoningBrain {
             learning_rate_budget: self.learning_rate_budget,
             max_budget: self.max_budget,
             strategy: Box::new(DefaultSealStrategy),
-            fisher: self.fisher.clone(),
-            ewc_lambda: self.ewc_lambda,
-        }
-    }
-}
+              fisher: self.fisher.clone(),
+              ewc_lambda: self.ewc_lambda,
+              evaluation_history: self.evaluation_history.clone(),
+          }
+      }
+  }
 
 impl Default for ReasoningBrain {
     fn default() -> Self {

@@ -143,7 +143,7 @@ impl SelfIteratingBrain {
         let score_after = self.brain.evaluate_capability(task_type);
         let improved = score_after > score_before;
 
-        self.evaluation_history.push(EvaluationRecord {
+        self.brain.evaluation_history.push(EvaluationRecord {
             iteration: self.iteration,
             task_type,
             score_before,
@@ -247,7 +247,7 @@ impl SelfIteratingBrain {
         }
 
         let score_after = self.brain.evaluate_capability(task_type);
-        self.evaluation_history.push(EvaluationRecord {
+        self.brain.evaluation_history.push(EvaluationRecord {
             iteration: self.iteration,
             task_type,
             score_before,
@@ -857,7 +857,7 @@ impl SelfIteratingBrain {
         let result = chain.run_chain(&mut self.brain, &mut self.reasoning_bank)?;
         if result.mined > 0 {
             self.iteration += 1;
-            self.evaluation_history.push(EvaluationRecord {
+            self.brain.evaluation_history.push(EvaluationRecord {
                 iteration: self.iteration,
                 task_type: TaskType::General,
                 score_before: 0.0,

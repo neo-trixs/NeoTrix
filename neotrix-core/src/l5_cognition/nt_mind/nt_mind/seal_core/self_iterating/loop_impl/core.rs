@@ -1,4 +1,4 @@
-use super::super::brain_impl::{AbsorbValidator, ReasoningBrain, EvaluationRecord};
+use super::super::brain_impl::{AbsorbValidator, ReasoningBrain};
 use super::super::super::core::{CapabilityVector, KnowledgeSource, PerformanceEvaluator, RewardSource};
 use super::super::super::self_edit::MicroEdit;
 use super::super::super::memory::ReasoningBank;
@@ -42,9 +42,8 @@ pub struct SelfIteratingBrain {
     pub brain: ReasoningBrain,
     pub iteration: u64,
     pub quality_threshold: f64,
-    pub auto_absorb: bool,
-    pub evaluation_history: Vec<EvaluationRecord>,
-    pub reasoning_bank: ReasoningBank,
+      pub auto_absorb: bool,
+      pub reasoning_bank: ReasoningBank,
     pub policy_learning_rate: f64,
     pub regularization_weight: f64,
     pub auto_memory_iteration: bool,
@@ -201,9 +200,8 @@ impl SelfIteratingBrain {
             brain: ReasoningBrain::new(),
             iteration: 0,
             quality_threshold: 0.85,
-            auto_absorb: true,
-            evaluation_history: Vec::new(),
-            reasoning_bank: ReasoningBank::new(100),
+              auto_absorb: true,
+              reasoning_bank: ReasoningBank::new(100),
             policy_learning_rate: 0.01,
             regularization_weight: 0.001,
             auto_memory_iteration: true,
@@ -630,7 +628,7 @@ impl SelfIteratingBrain {
             iteration: self.iteration,
             total_absorbed: stats.total_absorbed,
             capability_sum: stats.capability_sum,
-            recent_improvement: self.evaluation_history.iter()
+            recent_improvement: self.brain.evaluation_history.iter()
                 .rev()
                 .take(5)
                 .filter(|r| r.improved)
@@ -700,11 +698,11 @@ pub struct EvoStats {
 
 impl SelfIteratingBrain {
     pub(crate) fn _growth_curve_slope(&self) -> f64 {
-        let n = self.evaluation_history.len();
+        let n = self.brain.evaluation_history.len();
         if n < 3 {
             return 0.0;
         }
-        let recent: Vec<_> = self.evaluation_history.iter().rev().take(10).collect();
+        let recent: Vec<_> = self.brain.evaluation_history.iter().rev().take(10).collect();
         let n = recent.len();
         let indices: Vec<f64> = (0..n).map(|i| i as f64).collect();
         let scores: Vec<f64> = recent.iter().map(|r| r.score_after).collect();
@@ -716,10 +714,10 @@ impl SelfIteratingBrain {
     }
 
     pub(crate) fn _transfer_efficiency(&self) -> f64 {
-        if self.evaluation_history.len() < 2 {
+        if self.brain.evaluation_history.len() < 2 {
             return 0.0;
         }
-        let recent: Vec<_> = self.evaluation_history.iter().rev().take(20).collect();
+        let recent: Vec<_> = self.brain.evaluation_history.iter().rev().take(20).collect();
         if recent.len() < 2 {
             return 0.0;
         }
@@ -749,7 +747,7 @@ impl SelfIteratingBrain {
         let growth = self._growth_curve_slope();
         let transfer = self._transfer_efficiency();
         let error_avoid = self._error_avoidance_rate();
-        let recent_imp: f64 = self.evaluation_history.iter().rev().take(5)
+        let recent_imp: f64 = self.brain.evaluation_history.iter().rev().take(5)
             .map(|r| if r.improved { 1.0 } else { 0.0 })
             .sum::<f64>() / 5.0_f64.max(1.0);
         let tool_success = if self.tool_call_count > 0 {

@@ -119,7 +119,7 @@ impl BrainStage for GoalContractStage {
     /// 每轮迭代都重新结算奖励/惩罚。
     ///
     /// ⚠️ 本stage 的实现**必须**是纯函数式的：它每轮从
-    /// `brain.evaluation_history`（跨迭代累积的真实测量）重新推导账本，
+    /// `brain.brain.evaluation_history`（跨迭代累积的真实测量）重新推导账本，
     /// 而**不在stage 内部存状态**——`BrainStage::process` 收 `&self`，
     /// 存状态就得引入内部可变性，而那会让「奖励」脱离真实测量、
     /// 退化成自说自话（正是本仓规则记载的「导出 ≠ 调用」同一族缺陷）。
@@ -132,7 +132,7 @@ impl BrainStage for GoalContractStage {
 
         let mut ledger = RewardLedger::new();
 
-        for rec in brain.evaluation_history.iter() {
+        for rec in brain.brain.evaluation_history.iter() {
             let goal = format!("task:{:?}", rec.task_type);
             // 产物用**真实测量值**拼装：不含自我声明，空产物即降级为惩罚。
             let artifact = format!(
@@ -179,7 +179,7 @@ impl BrainStage for GoalContractStage {
         log::debug!(
             "[goal_contract] iter={} records={} net={:.3} untrusted={} autonomy {:?}→{:?}",
             brain.iteration,
-            brain.evaluation_history.len(),
+            brain.brain.evaluation_history.len(),
             net,
             untrusted,
             before,
@@ -487,19 +487,19 @@ mod e2e_evolution_tests {
     #[test]
     fn 端到端_iterate到autonomy真的会传导() {
         let mut brain = SelfIteratingBrain::new();
-        let before_hist = brain.evaluation_history.len();
+        let before_hist = brain.brain.evaluation_history.len();
 
         for _ in 0..3 {
             // ⚠️ `TaskType` 是**无 Default 的裸枚举**（实测踩到 ⇒ 别用 `::default()`）
             brain.iterate(TaskType::General);
         }
-        let grew = brain.evaluation_history.len();
+        let grew = brain.brain.evaluation_history.len();
         assert!(
             grew > before_hist,
             "iterate() 必须在**生产路径**上写 evaluation_history（{before_hist} → {grew}）"
         );
 
-        let rec = &brain.evaluation_history[grew - 1];
+        let rec = &brain.brain.evaluation_history[grew - 1];
         assert!(
             rec.score_before.is_finite() && rec.score_after.is_finite(),
             "评分必须是有限值，before={} after={}",

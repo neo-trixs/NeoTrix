@@ -38,7 +38,7 @@ impl BrainStage for _UQCalibrationStage {
         20
     }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let hist = &brain.evaluation_history;
+        let hist = &brain.brain.evaluation_history;
         let recent_count = hist.len().min(20);
         let volatility =
             if recent_count >= 4 {

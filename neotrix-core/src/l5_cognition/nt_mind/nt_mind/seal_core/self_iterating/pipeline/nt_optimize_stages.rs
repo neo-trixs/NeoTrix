@@ -335,7 +335,7 @@ impl BrainStage for _MetaImprovementStage {
         10
     }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let hist = &brain.evaluation_history;
+        let hist = &brain.brain.evaluation_history;
         let recent_count = hist.len().min(10);
         if recent_count >= 3 {
             let recent: Vec<f64> = hist

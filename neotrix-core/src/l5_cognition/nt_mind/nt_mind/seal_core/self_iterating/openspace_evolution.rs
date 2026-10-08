@@ -179,7 +179,7 @@ impl OpenSpaceEvolveStage {
         }
 
         let stage_results = &brain._stage_results;
-        let eval_hist = &brain.evaluation_history;
+        let eval_hist = &brain.brain.evaluation_history;
 
         if !stage_results.is_empty() {
             let stage_count = stage_results.len();

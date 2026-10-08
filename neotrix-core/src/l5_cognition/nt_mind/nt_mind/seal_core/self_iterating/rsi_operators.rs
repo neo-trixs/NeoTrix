@@ -170,7 +170,7 @@ impl RsiOperatorChain {
     pub fn recommend(brain: &SelfIteratingBrain) -> Self {
         let reward = brain._reward;
         let cap_count = brain.brain.capability.arr().len();
-        let eval_count = brain.evaluation_history.len();
+        let eval_count = brain.brain.evaluation_history.len();
 
         let mut operators = Vec::new();
 

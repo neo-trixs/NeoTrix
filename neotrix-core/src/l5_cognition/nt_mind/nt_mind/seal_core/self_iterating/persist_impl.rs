@@ -20,9 +20,10 @@ impl ReasoningBrain {
             task_affinity: self.task_affinity.clone(),
             absorption_history: self.absorption_history.clone(),
             learning_rate: self.learning_rate,
-            total_absorb_count: self.total_absorb_count,
-            custom_sources: self.custom_sources.clone(),
-        };
+              total_absorb_count: self.total_absorb_count,
+              custom_sources: self.custom_sources.clone(),
+              evaluation_history: self.evaluation_history.clone(),
+          };
         let metadata_json = serde_json::to_string_pretty(&metadata)
             .map_err(|e| NeoTrixError::Serde(format!("元数据序列化失败: {}", e)))?;
 
@@ -82,9 +83,10 @@ impl ReasoningBrain {
             task_affinity: metadata.task_affinity,
             absorption_history: metadata.absorption_history,
             learning_rate: metadata.learning_rate,
-            total_absorb_count: metadata.total_absorb_count,
-            custom_sources: metadata.custom_sources,
-            source_access_tracker: SourceAccessTracker::default(),
+              total_absorb_count: metadata.total_absorb_count,
+              custom_sources: metadata.custom_sources,
+              evaluation_history: metadata.evaluation_history,
+              source_access_tracker: SourceAccessTracker::default(),
             harness_history: Vec::new(),
             harness_current: None,
             weight_history: Vec::new(),
