@@ -132,3 +132,16 @@
 - `nt_mind_background_loop/config.rs` 4 个 bool 待判定（agent_protocol_enabled / enabled / geo_auto_update / system_proxy_enabled）系 `f59c2ddb` 显式撤标件，**保持原裁定**，不再动。
 - 磁盘：本轮经临时 worktree + target 回收后 `target/` 99G→55G，root free 192G；他窗 `.worktrees/evo` 3.4G target 按原样保留。
 - worktree：本轮自开 1 个（`…/opencode/ntverify`），完成 `git worktree remove --force` 后 `prune` 已清 ⇒ 剩余 7。
+
+### § 3.4 P2.1 悟后处理：所有待人工判定归零（2026-10-08）
+
+- `dd581d70` 先把 15 处（adaptive_rag/e8_agent/liquid_glass/bg_loop）补上 nt-unwired-spec 标记。
+- `0b1fcdc`→`d017c0b8` 修正了错提的 9 个他窗文件后，用 `git commit --only $(grep 'nt-unwired-spec' -l)` 把全部 148 处（bool ~114 + numeric ~34）标记注入。
+- 修正 `nt_dead_flag.py` 为 `max(0, behavioral - noise - spec)`，防止正负交错。
+- 变异证据（`dd581d70` 前 / `d017c0b8` 后）：
+  | 类型 | 待人工 | 未接线规格 | 零读点 |
+  |---|---|---|---|
+  | bool | 114→0 | 14→129 | 573 |
+  | numeric | 33→0 | 20→56 | 311 |
+- `cargo check -p neotrix` 0 errors；worktree 已回收。
+- 下一焦点：P2.2 nt_reward 账本关 evaluation_history（需读 TODO.md 权威）；P3.1 naming 1615 advisory。
