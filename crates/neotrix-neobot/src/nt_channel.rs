@@ -169,6 +169,14 @@ pub trait ChannelAdapter {
     /// 发一条。
     fn send(&self, out: &OutboundMessage) -> Result<String, NtBotError>;
 
+    /// 该渠道是否支持「编辑已发消息」（缺省 false；Telegram 覆写为 true）。
+    ///
+    /// 占位消息先发 → 流式更新覆盖编辑 的能力位：不能编辑时 dispatch 会
+    /// 把「⏳ 思考中…」占位连同后续流式替换降级成普通文本消息（不增加表）。
+    fn can_edit(&self) -> bool {
+        false
+    }
+
     /// 能否发附件（不能时 dispatch 降级为纯文字并如实回报）。
     fn supports_attachments(&self) -> bool {
         false

@@ -131,9 +131,10 @@ pub fn has_node(id: &str) -> bool {
 ///  ⇒ 这就是「注册了但没调用」的**结构性根因**。
 ///  `provides`  **本来就是连接键**， 而索引一直在维护它 ⇒ 只是没有 API。
 ///
-///  **计数语义与 `lookup` 一致**： **真的取到节点**才计数；
-///  标签无提供者 ⇒ 返回空 vec 且  **不计数**
-/// （ 否则「路由到不存在的能力」会被误读成「有真实调用」）。
+///  **计数语义与 `dispatch_by_capability` 一致：**
+///  **零副作用，纯解析**；标签无提供者 ⇒ 返回空 vec 且不计数。
+///  计数只能经 `lookup` / `record_dispatch` 写入
+/// （ 否则「路由到不存在的能力」或「只解析未执行」会被误读成「有真实调用」）。
 pub fn resolve_by_capability(capability_tag: &str) -> Result<Vec<CapabilityNode>, String> {
     let ids = {
         let reg = slot().lock().map_err(|e| format!("注册表锁投毒: {e}"))?;
@@ -152,22 +153,16 @@ pub fn resolve_by_capability(capability_tag: &str) -> Result<Vec<CapabilityNode>
     Ok(out)
 }
 
-/// 同 [`resolve_by_capability`]，但对**真正取到的**能力递增计数。
+/// 同 [`resolve_by_capability`]，但**纯解析、不计数**。
 ///
-/// ⚠️ 修复记录：原实现把 `counts += 1` 放在 `if let Some(n)` **之外**
-/// ⇒ 标签无提供者时也会计数，与本函数上方文档「取到才计数」**直接矛盾**，
-/// 也与 `lookup` 的 `if found.is_some()` 守卫不一致
-/// ⇒ 「路由到不存在的能力」被误记成「有真实调用」，
-/// 而 `registered_never_invoked()` 直接建立在这份计数上 ⇒ 该清单不可信。
+/// ⚠️ 修复记录（OPEN-DEFECTS #4）：原实现在解析到节点后即 `counts += 1`，
+/// ⇒ 「解析但未执行」被记成「已调用」，`registered_never_invoked()` 清单
+/// 因此被污染（解析一次就永久消失）。现改为**无副作用的纯解析**。
+///
+/// 语义闭环：调用方执行成功后应自行调 [`record_dispatch`] 记一次真实派发；
+/// 仅解析（路由命中、rationale 附注、探测）**绝不**影响计数。
 pub fn dispatch_by_capability(capability_tag: &str) -> Result<Vec<CapabilityNode>, String> {
-    let out = resolve_by_capability(capability_tag)?;
-    if !out.is_empty() {
-        let mut c = counts().lock().map_err(|e| format!("计数锁投毒: {e}"))?;
-        for n in &out {
-            *c.entry(n.id.clone()).or_insert(0) += 1;
-        }
-    }
-    Ok(out)
+    resolve_by_capability(capability_tag)
 }
 
 ///  **「注册了但一次都没被调用」的清单** ——  **三家参考仓库都没有的能力**。
@@ -194,17 +189,16 @@ pub fn registered_never_invoked() -> Result<Vec<String>, String> {
 ///
 /// ## 为什么需要它
 ///
-/// `dispatch_by_capability` 会 `counts += 1`，但它按**标签**解析
-/// （`hybrid_retrieval` 这类路由标签），而不是按**市场条目 id**。
-/// ⇒ 「模型按 id 调用一个已上架能力」这条通路**没有计数原语**。
+/// `dispatch_by_capability` 只按**标签**解析（`hybrid_retrieval` 这类路由标签），
+/// 是纯解析、不计数；而「模型按 id 调用一个已上架能力」这条通路**还需要记账原语**。
 ///
 /// ⛔ 刻意**不**在 executor 里直接操作 `counts()`：那是本模块的私有状态，
 ///   绕过它就等于把计数规则散到多处 ⇒ 将来改规则会漏改。
 ///
 /// ## 与「查到的次数」的关系
 ///
-/// `invoke_count` 只读，本函数是唯一的写入口（除 `dispatch_by_capability`
-/// 内部那一处）。二者的分工：**本函数记「派发发生了」，不记「能力被执行
+/// `invoke_count` 只读，本函数是唯一的按 id 写入口（另一入口是 `lookup`
+/// 的「取到即计数」）。二者的分工：**本函数记「派发发生了」，不记「能力被执行
 /// 成功」** —— 执行结果由调用方的 `ok` 字段表达，混进计数会让「调用过」
 /// 变成一个含混的数字。
 ///
@@ -502,6 +496,37 @@ mod read_side_tests {
             let _ = lookup(id).expect("锁").expect("已登记");
             assert_eq!(invoke_count(id), expect, " 计数应单调累加到 {expect}");
         }
+    }
+
+    /// **dispatch 是纯解析、不计数；record_dispatch 才是派发记账** ——
+    /// OPEN-DEFECTS #4 回归：解析即计数会让「parsed but never executed」
+    /// 污染 `registered_never_invoked()`。
+    #[test]
+    fn dispatch只解析不计数_record_dispatch才计数() {
+        let id = "test::read_side::dispatch_no_count";
+        let node = CapabilityNode::new_primitive(
+            id.to_owned(),
+            nt_core_capability_tree::node::Domain::Mind,
+            vec!["test.read_side.dispatch".to_owned()],
+        );
+        let _ = register_node(node);
+        let tag = "test.read_side.dispatch";
+
+        let before = invoke_count(id);
+        let resolved = dispatch_by_capability(tag).expect("锁");
+        assert!(
+            resolved.iter().any(|n| n.id == id),
+            "dispatch 必须解析出该节点"
+        );
+        assert_eq!(
+            invoke_count(id),
+            before,
+            "dispatch 是纯解析 ⇒ 计数不得变"
+        );
+
+        let after = record_dispatch(id).expect("锁");
+        assert_eq!(after, before + 1, "record_dispatch 必须计数 +1");
+        assert_eq!(invoke_count(id), before + 1);
     }
 }
 

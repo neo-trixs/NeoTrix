@@ -311,6 +311,153 @@ const STOPPED_MARK: &str = "stopped by user";
 /// `nt_agent` 的 hop 记法：`… at hop {hop}/{steps}`。
 const HOP_MARK: &str = " at hop ";
 
+/// N2-P2 占位文案（能编辑的渠道在跑轮前先发它，跑完用 `edit_of` 覆盖）。
+pub const PLACEHOLDER_TEXT: &str = "⏳ 思考中…";
+
+/// N2-P3 流式增量编辑的**最小间隔**（毫秒，生产值）。
+///
+/// **为什么必须节流**（两个理由都指向「编辑请求」这个动作本身）：
+///
+/// 1. **平台限频**：`editMessageText` 与发消息**共用同一套频率上限**
+///    （Telegram 对同一 chat 的编辑同样计数，且限频按「群/频道」维度）。
+///    一轮回答几百 token 就是几百次编辑请求 —— 不节流必然把 429 打出来，
+///    而 429 之后这一轮的正文就再也送不到用户面前了。
+/// 2. **用户体感**：客户端里每 token 一次编辑是肉眼不可辨的连续重排，
+///    只烧配额不增信息；真正有信息量的是「句子边界」那几次。
+///
+/// **1200ms 的取法**：一次覆盖约等于 6 个汉字的阅读时间，够形成「逐句浮现」
+/// 的打字机观感；同时把编辑次数从 O(token) 压到 O(时长/1.2s) —— 一轮
+/// 10~30s 的回答落在 8~25 次编辑，稳在限频线内。
+pub const STREAM_EDIT_MIN_INTERVAL_MS: u64 = 1200;
+
+/// 末尾强制发的三种结局（[`StreamEdit::finish`]）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FinalEdit {
+    /// 真发了一次覆盖，正文以「编辑占位」的形式落在平台上。
+    Sent,
+    /// 平台上**已经**是逐字相同的正文（同一个占位上）⇒ 没有再发 —— 不是
+    /// 「刚发过」，是「本来就在」。
+    AlreadyShown,
+    /// 平台拒收这次编辑 ⇒ 如实失败，调用方**不许**记成已编辑。
+    Failed,
+}
+
+/// 流式占位编辑器（N2-P3）：把 `on_delta` 收到的增量**原文**就地覆盖占位。
+///
+/// **四条纪律**：
+///
+/// - **原文律**：累积文本 = `on_delta` 收到的片段按到达顺序**拼接**，一个字
+///   都不加工（不补标点、不截断、不改写）。引擎给什么就显示什么 —— 自行
+///   「润色」出来的流式正文是编造。
+/// - **节流律**：距上次**尝试**编辑不足 `min_interval` 就只攒不发。计时按
+///   尝试而非成功：平台持续失败时若按成功计，节流会退化成「每 token 一次
+///   尝试」，那正是本结构要防的事。
+/// - **不阻断律**：编辑失败只记在本结构里（末尾那次覆盖仍是最终保障），
+///   **绝不**把失败冒泡成跑轮失败 —— 用户已经拿到占位，不该因为他那边没
+///   渲染好编辑而拿不到答案。
+/// - **同文不发**（只在 [`StreamEdit::finish`] 里判，见该方法）：平台上已经
+///   是这段字就再改一次，纯属白花限频额度。
+///
+/// `min_interval` 是**字段**而非直接读常量：生产传
+/// [`STREAM_EDIT_MIN_INTERVAL_MS`]，测试传几十毫秒（不必为验证节流逻辑而
+/// 让测试睡两秒）。
+struct StreamEdit<'a> {
+    adapter: &'a dyn ChannelAdapter,
+    chat: String,
+    placeholder_id: String,
+    min_interval: std::time::Duration,
+    /// 累积原文（`on_delta` 片段按序拼接）。
+    text: String,
+    /// 上次**尝试**编辑的时刻；`None` = 还没编辑过。
+    last_edit_at: Option<std::time::Instant>,
+    /// 上次**成功**送达的文本（`finish` 的「同文不发」判据）。
+    sent_text: Option<String>,
+}
+
+impl<'a> StreamEdit<'a> {
+    fn new(
+        adapter: &'a dyn ChannelAdapter,
+        chat: &str,
+        placeholder_id: &str,
+        min_interval: std::time::Duration,
+    ) -> Self {
+        Self {
+            adapter,
+            chat: chat.to_owned(),
+            placeholder_id: placeholder_id.to_owned(),
+            min_interval,
+            text: String::new(),
+            last_edit_at: None,
+            sent_text: None,
+        }
+    }
+
+    /// 收到一段增量：先累积，再按节流决定要不要真发一次覆盖。
+    fn push(&mut self, delta: &str) {
+        if delta.is_empty() {
+            return;
+        }
+        self.text.push_str(delta);
+        let now = std::time::Instant::now();
+        // 第一次有正文就立刻覆盖：占位已经显示「⏳ 思考中…」，让用户尽早
+        // 看到正文起点（此后一律按节流）。空文本不编辑 —— 拿空正文去覆盖
+        // 占位只会把「思考中」擦成一片空白。
+        let due = match self.last_edit_at {
+            None => !self.text.trim().is_empty(),
+            Some(last) => now.duration_since(last) >= self.min_interval,
+        };
+        if due {
+            let sent = self.adapter.send(&OutboundMessage {
+                chat: self.chat.clone(),
+                text: self.text.clone(),
+                attachments: Vec::new(),
+                edit_of: Some(self.placeholder_id.clone()),
+            });
+            self.last_edit_at = Some(now);
+            // 只记**成功**送达的文本：失败的那次没落到用户屏幕上，同文的
+            // 重试仍要发出去。
+            if sent.is_ok() {
+                self.sent_text = Some(self.text.clone());
+            }
+        }
+    }
+
+    /// 末尾强制发：带**权威正文**（落库后的答案）覆盖占位 —— 不受节流约束
+    /// （末尾这一次必须落地）。
+    ///
+    /// **同文不发**：与上次**成功**送达的文本逐字相同时返回
+    /// [`FinalEdit::AlreadyShown`] 且**不调** `send`。这不是省事的分支而是
+    /// 必需的一条：非流式引擎的退化 `run_turn_stream` 只吐**一个** delta
+    /// （= 全文），流式那次编辑已经把最终答案原样送上了平台 —— 末尾再改
+    /// 一次是同一次限频额度买同一段字。
+    fn finish(&mut self, final_text: &str) -> FinalEdit {
+        if self.sent_text.as_deref() == Some(final_text) {
+            return FinalEdit::AlreadyShown;
+        }
+        match self.adapter.send(&OutboundMessage {
+            chat: self.chat.clone(),
+            text: final_text.to_owned(),
+            attachments: Vec::new(),
+            edit_of: Some(self.placeholder_id.clone()),
+        }) {
+            Ok(_) => {
+                self.sent_text = Some(final_text.to_owned());
+                FinalEdit::Sent
+            }
+            Err(_) => FinalEdit::Failed,
+        }
+    }
+
+    /// 累积到的原文（末尾兜底用；空则回 `None`）。
+    fn text(&self) -> Option<&str> {
+        if self.text.trim().is_empty() {
+            None
+        } else {
+            Some(self.text.as_str())
+        }
+    }
+}
+
 /// 从任务的 `error` 里解析「第几跳/共几跳」（认不出回 `None`）。
 fn stopped_hop(error: Option<&str>) -> Option<(usize, usize)> {
     let error = error?;
@@ -455,8 +602,33 @@ pub fn on_inbound(
         format!("{}\n\n{}", msg.text, notes.join("\n"))
     };
 
+    // 4.9) 占位消息（N2-P2）：渠道能编辑时先发一条「⏳ 思考中…」占位，
+    // 拿它回传的 message_id，跑轮结束用 `edit_of` 覆盖成最终答案。
+    // 不能编辑/发不出去 ⇒ `None` ⇒ 末尾如实走「新消息」降级。
+    let placeholder_id = if adapter.can_edit() {
+        match adapter.send(&OutboundMessage {
+            chat: msg.chat.clone(),
+            text: PLACEHOLDER_TEXT.to_owned(),
+            attachments: Vec::new(),
+            edit_of: None,
+        }) {
+            Ok(id) if !id.trim().is_empty() => Some(id),
+            // 占位发不出去不阻断跑轮（用户只是看不到进度提示）。
+            _ => None,
+        }
+    } else {
+        None
+    };
+
+    // 4.95) 「占位可被覆盖」这件事**只在这里判一次**：能编辑 **且** 平台回了
+    //        message_id。跑轮中的流式覆盖（第 5 步）与末尾的最终覆盖（第 6 步）
+    //        共用这一个裁决 —— 两处各判一次就会出现「中途判能编辑、末尾判不能」
+    //        的自相矛盾（那正是 N2-P2 要消灭的重复消息）。
+    let editable_placeholder: Option<String> =
+        placeholder_id.filter(|id| !id.trim().is_empty() && adapter.can_edit());
+
     // 5) 跑轮（走与桌面**同一条**跑轮内层 `run_local_turn_cancellable`：
-    //    同一网关、同一账本、同一组取消检查点 —— 差别只有 `stop` 那一参）。
+    //    同一网关、同一账本、同一组取消检查点 —— 差别只有 `stop` 与 `on_delta`）。
     let actor = crate::nt_policy::Actor::Person;
     let actor_name = format!("{}:{}", bot.channel, msg.sender);
     let title = default_convo_title(&msg.sender_name, &msg.sender);
@@ -480,7 +652,26 @@ pub fn on_inbound(
     // 「命令入口 → 登记表 → 跑轮」三段都真，缺的是**第二个执行流**。
     let stop = StopToken::new();
     let registration = register_run(Some(&convo_id), &stop);
-    let status = run_local_turn_cancellable(&ctx, None, None, Some(&stop))?;
+    // 5.1) 流式增量编辑（N2-P3）：占位可覆盖时，跑轮**带上 `on_delta`**，每个
+    //      增量就地覆盖占位（按 [`STREAM_EDIT_MIN_INTERVAL_MS`] 节流）——
+    //      用户看到的是正文逐句浮现，而不是一块「⏳ 思考中…」从头等到尾。
+    //      其余情况（不能编辑 / 占位发不出去）**不进入流式路径**：`on_delta`
+    //      传 `None`，与本切片之前**逐字同一条**调用。
+    let mut stream_edit = editable_placeholder.as_deref().map(|id| {
+        StreamEdit::new(
+            adapter,
+            msg.chat.as_str(),
+            id,
+            std::time::Duration::from_millis(STREAM_EDIT_MIN_INTERVAL_MS),
+        )
+    });
+    let status = match stream_edit.as_mut() {
+        Some(stream) => {
+            let mut on_delta = |delta: &str| stream.push(delta);
+            run_local_turn_cancellable(&ctx, Some(&mut on_delta), None, Some(&stop))?
+        }
+        None => run_local_turn_cancellable(&ctx, None, None, Some(&stop))?,
+    };
     // 这一轮真的结束了才注销（含上面 `?` 早退：守卫随栈帧析构，没有漏注销的路径）。
     drop(registration);
 
@@ -491,20 +682,65 @@ pub fn on_inbound(
     //    结束是两件事，只有这一轮任务自己的终态能证明后者。
     let task_id = claim_turn_task_id(store, &convo_id, &tasks_before);
     let stopped = turn_stop_state(store, &task_id);
+    // 流式兜底正文：跑轮**一个字都没落库**（多跳跑满 `max_steps`、每跳都在调
+    // 工具因而没写 `reply` 行…）时，末尾这次覆盖**不能**拿状态文案把用户刚
+    // 看到的流式正文抹掉 —— 那会让「已经流出来的东西」凭空消失，是流式化
+    // 引入的**倒退**（本切片之前用户只看到占位，没有正文可丢）。取的是
+    // `on_delta` 累积的**原文**，不是任何拼装。
+    let streamed = stream_edit.as_ref().and_then(|s| s.text()).map(str::to_owned);
     let reply = match stopped {
         // 被叫停的这一轮：说实话「停在哪一跳」。早先这里发的是
         // `status_text(Waiting)` = 「已行动，等外部条件」—— 对一个被用户叫停
         // 的轮次来说那是**反的**（它啥也没「行动」到底就收手了）。
+        // 这一句**优先于**流式兜底：它报的是轮次终态，丢掉比正文不全更糟。
         Some(state) => state.text(),
-        None => last_reply_of(store, &convo_id).unwrap_or_else(|| status_text(&status)),
+        None => last_reply_of(store, &convo_id)
+            .or(streamed)
+            .unwrap_or_else(|| status_text(&status)),
     };
     // 同上：结果已落库，这一步只是把它递到渠道上。
-    drop(adapter.send(&OutboundMessage {
-        chat: msg.chat.clone(),
-        text: reply,
-        attachments: Vec::new(),
-        edit_of: None,
-    }));
+    //
+    // N2-P2 占位→编辑（2026-10-08）：渠道能编辑（Telegram `can_edit()==true`）
+    // 且占位真的发出去了时，最终答案走 `edit_of` **覆盖占位**，而不是让
+    // 用户在聊天里同时看到「⏳ 思考中…」和最终答案两条消息。
+    // 任一环缺失（不能编辑 / 占位发不出去 / 平台没回 message_id）都**如实
+    // 降级**为新消息，不假装编辑成功。
+    let edit_of = editable_placeholder.clone();
+    // N2-P3：这一次发送兼两副职责 —— ① **流式的最后一次强制发**（权威正文，
+    //    不受节流约束）；② 无占位时的兜底交付（就是那条新消息）。
+    //
+    // 两条路的 `platform_id` 语义不同，故不塞进同一个 `Result` 里混算：
+    // 真发 ⇒ 平台回的是**编辑后仍是同一条**消息（id = 占位 id）；同文已送达
+    // ⇒ 压根没调用平台，id 仍是占位自己的那条；拒收 ⇒ 没有 id。
+    let mut platform_id = String::new();
+    let mut delivery_status = "failed";
+    if let Some(stream) = stream_edit.as_mut() {
+        match stream.finish(reply.as_str()) {
+            // 「已送达」两种结局在记账上**同形**：正文确实以「编辑占位」的
+            // 形式在平台上（只是后一种没白花一次额度）。
+            FinalEdit::Sent | FinalEdit::AlreadyShown => {
+                platform_id = edit_of.clone().unwrap_or_default();
+                delivery_status = "edited";
+            }
+            FinalEdit::Failed => delivery_status = "failed",
+        }
+    } else {
+        match adapter.send(&OutboundMessage {
+            chat: msg.chat.clone(),
+            text: reply,
+            attachments: Vec::new(),
+            edit_of: edit_of.clone(),
+        }) {
+            Ok(id) => {
+                platform_id = id;
+                delivery_status = if edit_of.is_some() { "edited" } else { "sent" };
+            }
+            Err(_) => delivery_status = "failed",
+        }
+    }
+    // 投递态记账（N2-P2 两列消费点）：`edited`（覆盖占位）/ `sent` / `failed`。
+    // 记账失败**不阻断**投递：投递已经发生或已经失败了。
+    let _ = store.mark_latest_delivery(&convo_id, &platform_id, delivery_status);
     Ok(InboundOutcome::Turn {
         task_id,
         status: status.as_str().to_owned(),
@@ -2238,6 +2474,401 @@ mod tests {
         // 超长截断到 40 字符。
         let long = "x".repeat(100);
         assert_eq!(default_convo_title(&long, "s").chars().count(), 40);
+    }
+
+    /// N2-P2：能编辑的渠道跑轮前发占位、跑完用 `edit_of` 覆盖它；
+    /// 不能编辑的渠道**一条占位都不发**（不许让用户看到占位+答案两条）。
+    struct EditChannel {
+        sent: std::cell::RefCell<Vec<OutboundMessage>>,
+        can_edit: bool,
+        next_id: std::cell::Cell<usize>,
+        /// 编辑（`edit_of` 有值）一律失败：发新消息照常成功。
+        fail_edits: bool,
+    }
+
+    impl EditChannel {
+        fn editing() -> Self {
+            Self {
+                sent: std::cell::RefCell::new(Vec::new()),
+                can_edit: true,
+                next_id: std::cell::Cell::new(100),
+                fail_edits: false,
+            }
+        }
+        fn plain() -> Self {
+            Self {
+                sent: std::cell::RefCell::new(Vec::new()),
+                can_edit: false,
+                next_id: std::cell::Cell::new(100),
+                fail_edits: false,
+            }
+        }
+        /// 能编辑，但**每次编辑都失败**（平台限频/`message to edit not found`）。
+        fn editing_failing() -> Self {
+            Self { fail_edits: true, ..Self::editing() }
+        }
+    }
+
+    impl ChannelAdapter for EditChannel {
+        fn channel_id(&self) -> &str {
+            "fake"
+        }
+        fn display_name(&self) -> &str {
+            "假渠道"
+        }
+        fn token_env(&self) -> &str {
+            "NEOBOT_FAKE_TOKEN"
+        }
+        fn can_edit(&self) -> bool {
+            self.can_edit
+        }
+        fn probe(&self) -> crate::nt_channel::ChannelHealth {
+            crate::nt_channel::ChannelHealth { ok: true, detail: String::new(), info: String::new() }
+        }
+        fn poll(&mut self) -> Result<Vec<InboundMessage>, NtBotError> {
+            Ok(Vec::new())
+        }
+        fn send(&self, out: &OutboundMessage) -> Result<String, NtBotError> {
+            self.sent.borrow_mut().push(out.clone());
+            if self.fail_edits && out.edit_of.is_some() {
+                return Err(NtBotError::Invalid("edit rejected by platform".to_owned()));
+            }
+            let id = self.next_id.get();
+            self.next_id.set(id + 1);
+            Ok(id.to_string())
+        }
+    }
+
+    #[test]
+    fn placeholder_is_sent_then_edited_when_channel_can_edit() {
+        let st = store("ph1");
+        let cfg = config("ph1");
+        open_channel(&st, "open");
+        let mut b = bot();
+        b.conversation_id = Some(st.create_conversation("dm", "A", &[]).expect("c"));
+        st.upsert_bot(&b).expect("bot");
+        let ch = EditChannel::editing();
+        let engine = crate::nt_engine::LocalEchoEngine;
+        on_inbound(&st, &cfg, &engine, &ch, &b, &msg("m1", "你好", true)).expect("run");
+        let sent = ch.sent.borrow();
+        assert_eq!(sent.len(), 2, "占位 + 覆盖编辑，正好两条：{:?}", sent.len());
+        assert_eq!(sent[0].text, super::PLACEHOLDER_TEXT);
+        assert!(sent[0].edit_of.is_none(), "占位是新建消息，不是编辑");
+        assert_eq!(
+            sent[1].edit_of.as_deref(),
+            Some("100"),
+            "最终答案必须覆盖占位那条：{:?}",
+            sent[1].edit_of
+        );
+        assert_ne!(sent[1].text, super::PLACEHOLDER_TEXT, "答案应替换占位内容");
+        drop(std::fs::remove_dir_all(&cfg.data_dir));
+    }
+
+    #[test]
+    fn non_editable_channel_gets_no_placeholder() {
+        let st = store("ph2");
+        let cfg = config("ph2");
+        open_channel(&st, "open");
+        let mut b = bot();
+        b.conversation_id = Some(st.create_conversation("dm", "A", &[]).expect("c"));
+        st.upsert_bot(&b).expect("bot");
+        let ch = EditChannel::plain();
+        let engine = crate::nt_engine::LocalEchoEngine;
+        on_inbound(&st, &cfg, &engine, &ch, &b, &msg("m1", "你好", true)).expect("run");
+        let sent = ch.sent.borrow();
+        assert_eq!(sent.len(), 1, "不能编辑 ⇒ 只发答案，不发占位");
+        assert!(sent[0].edit_of.is_none());
+        assert_ne!(sent[0].text, super::PLACEHOLDER_TEXT);
+        drop(std::fs::remove_dir_all(&cfg.data_dir));
+    }
+
+    // ── N2-P3 流式增量编辑 ───────────────────────────────────────────────
+
+    /// 慢引擎：按 `chunks` 逐段吐增量（段间停 `gap_ms`），返回的
+    /// `assistant_text` 是各段**原文**的拼接 —— 与真实流式引擎同构
+    /// （增量拼起来 == 最终答案），所以「末尾权威答案」与「累积原文」一致，
+    /// 测试不必去分辨两者。
+    struct DripEngine {
+        chunks: Vec<String>,
+        gap_ms: u64,
+    }
+
+    impl DripEngine {
+        fn new(chunks: &[&str], gap_ms: u64) -> Self {
+            Self { chunks: chunks.iter().map(|s| (*s).to_owned()).collect(), gap_ms }
+        }
+        fn full_text(&self) -> String {
+            self.chunks.concat()
+        }
+    }
+
+    impl crate::nt_engine::EngineAdapter for DripEngine {
+        fn engine_id(&self) -> &str {
+            "drip"
+        }
+        fn probe(&self) -> Result<String, NtBotError> {
+            Ok("drip ready".to_owned())
+        }
+        fn run_turn(
+            &self,
+            _prompt: &str,
+            _inbox: &[String],
+        ) -> Result<crate::nt_engine::EngineTurn, NtBotError> {
+            Ok(crate::nt_engine::EngineTurn {
+                assistant_text: self.full_text(),
+                status: crate::nt_types::TurnStatus::Done,
+                tool_calls: Vec::new(),
+                usage: None,
+                side_effects: Vec::new(),
+            })
+        }
+        fn run_turn_stream(
+            &self,
+            _prompt: &str,
+            _history: &[crate::nt_types::TranscriptItem],
+            on_delta: &mut dyn FnMut(&str),
+        ) -> Result<crate::nt_engine::EngineTurn, NtBotError> {
+            let turn = self.run_turn("", &[])?;
+            for (i, chunk) in self.chunks.iter().enumerate() {
+                on_delta(chunk);
+                // 最后一段之后不睡：那一轮已经收尾了，睡它只会拖慢测试。
+                if i + 1 < self.chunks.len() {
+                    std::thread::sleep(std::time::Duration::from_millis(self.gap_ms));
+                }
+            }
+            Ok(turn)
+        }
+    }
+
+    /// N2-P3 要求 ①：有占位 + 慢引擎多次 delta ⇒ 出站里出现 **≥2 次**
+    /// `edit_of=占位id` 的覆盖，且**最后一次**的文本含全部内容。
+    ///
+    /// 段间停顿取 `STREAM_EDIT_MIN_INTERVAL_MS + 120ms`：节流是**按生产常量**
+    /// 验证的（不是靠测试把间隔调小来「证明」节流存在），多出的 120ms 是
+    /// 给调度抖动留的余量。
+    #[test]
+    fn stream_edits_placeholder_while_engine_drips() {
+        let st = store("ph3");
+        let cfg = config("ph3");
+        open_channel(&st, "open");
+        let mut b = bot();
+        b.conversation_id = Some(st.create_conversation("dm", "A", &[]).expect("c"));
+        st.upsert_bot(&b).expect("bot");
+        let ch = EditChannel::editing();
+        let engine = DripEngine::new(
+            &["第一段。", "第二段。", "第三段。"],
+            super::STREAM_EDIT_MIN_INTERVAL_MS + 120,
+        );
+        on_inbound(&st, &cfg, &engine, &ch, &b, &msg("m1", "你好", true)).expect("run");
+        let full = engine.full_text();
+        let sent = ch.sent.borrow();
+        assert_eq!(sent[0].text, super::PLACEHOLDER_TEXT, "第一条永远是占位");
+        let edits: Vec<&OutboundMessage> =
+            sent.iter().filter(|m| m.edit_of.as_deref() == Some("100")).collect();
+        assert!(
+            edits.len() >= 2,
+            "占位 id=100 上应有 ≥2 次覆盖编辑，实得 {}：{:?}",
+            edits.len(),
+            sent.iter().map(|m| (&m.edit_of, &m.text)).collect::<Vec<_>>()
+        );
+        // 中途那次编辑带的是**累积原文**，且逐次变长（不重发、不截断）。
+        let mid = &edits[edits.len() - 2].text;
+        assert!(full.starts_with(mid.as_str()), "中途编辑必须是最终答案的前缀：{mid:?}");
+        assert!(!mid.trim().is_empty());
+        let last = sent.last().expect("至少有一条出站");
+        assert_eq!(last.edit_of.as_deref(), Some("100"), "末尾覆盖占位");
+        for part in ["第一段。", "第二段。", "第三段。"] {
+            assert!(last.text.contains(part), "末尾编辑必须含全部内容，缺 {part}：{last:?}");
+        }
+        drop(std::fs::remove_dir_all(&cfg.data_dir));
+    }
+
+    /// N2-P3 要求 ③：无占位（`can_edit=false`）⇒ **零占位零编辑**。
+    /// 即便引擎真的在滴增量，也不能进入流式编辑路径（否则用户会看到一串
+    /// 凭空出现的覆盖）。
+    #[test]
+    fn non_editable_channel_never_streams_edits() {
+        let st = store("ph4");
+        let cfg = config("ph4");
+        open_channel(&st, "open");
+        let mut b = bot();
+        b.conversation_id = Some(st.create_conversation("dm", "A", &[]).expect("c"));
+        st.upsert_bot(&b).expect("bot");
+        let ch = EditChannel::plain();
+        // 段间停顿取 0：若流式路径被误开，这里会立刻冒出多次编辑。
+        let engine = DripEngine::new(&["第一段。", "第二段。", "第三段。"], 0);
+        on_inbound(&st, &cfg, &engine, &ch, &b, &msg("m1", "你好", true)).expect("run");
+        let full = engine.full_text();
+        let sent = ch.sent.borrow();
+        assert_eq!(sent.len(), 1, "不能编辑 ⇒ 只有答案一条，零占位零编辑：{:?}", sent);
+        assert!(sent[0].edit_of.is_none());
+        assert!(sent[0].text.contains(&full), "一次性送达的必须是完整答案：{:?}", sent[0].text);
+        drop(std::fs::remove_dir_all(&cfg.data_dir));
+    }
+
+    /// 节流本体（单元级，间隔取小值以便毫秒级验证两个方向）：
+    /// ① 一串密集增量只触发**一次**编辑 —— 这正是「每 token 一次编辑会打爆
+    ///    rate limit」要防的行为；② 熬过间隔后再来一个增量，才发第二次。
+    #[test]
+    fn stream_edit_throttle_suppresses_burst_deltas() {
+        let ch = EditChannel::editing();
+        let gap = std::time::Duration::from_millis(120);
+        let mut stream = super::StreamEdit::new(&ch, "c1", "100", gap);
+        // 密集爆发：5 段增量在几微秒内到达。
+        for part in ["甲", "乙", "丙", "丁", "戊"] {
+            stream.push(part);
+        }
+        assert_eq!(ch.sent.borrow().len(), 1, "密集增量只应有第一次覆盖（立即发）");
+        assert_eq!(ch.sent.borrow()[0].text, "甲", "第一次覆盖带的是当时累积到的原文");
+        assert_eq!(stream.text(), Some("甲乙丙丁戊"), "累积原文一个字不少，且原样拼接");
+        std::thread::sleep(gap + std::time::Duration::from_millis(40));
+        stream.push("己");
+        let sent = ch.sent.borrow();
+        assert_eq!(sent.len(), 2, "熬过间隔才允许第二次覆盖");
+        assert_eq!(sent[1].text, "甲乙丙丁戊己");
+        assert_eq!(sent[1].edit_of.as_deref(), Some("100"));
+    }
+
+    /// `finish` 的三态 + 「同文不发」：非流式引擎的退化 `run_turn_stream` 只吐
+    /// 一个 delta（= 全文），那次流式编辑已经把最终答案**逐字**送上平台 ——
+    /// 末尾再改一次是同一次限频额度买同一段字，故必须不调用 `send`。
+    #[test]
+    fn stream_edit_finish_skips_identical_content_and_reports_failures() {
+        let ch = EditChannel::editing();
+        let mut stream =
+            super::StreamEdit::new(&ch, "c1", "100", std::time::Duration::from_millis(0));
+        stream.push("甲乙丙");
+        assert_eq!(
+            stream.finish("甲乙丙"),
+            super::FinalEdit::AlreadyShown,
+            "同文已送达 ⇒ 不该再调平台"
+        );
+        assert_eq!(ch.sent.borrow().len(), 1, "同文那次不许发出去：{:?}", ch.sent.borrow());
+        // 权威正文与流式文本不同（多一句跑轮侧事实）⇒ 末尾**必须**发。
+        assert_eq!(stream.finish("甲乙丙（收尾说明）"), super::FinalEdit::Sent);
+        assert_eq!(ch.sent.borrow().len(), 2);
+        assert_eq!(ch.sent.borrow()[1].text, "甲乙丙（收尾说明）");
+
+        // 平台拒收 ⇒ 如实 `Failed`（调用方据此记 failed，不谎称已编辑）。
+        let broken = EditChannel::editing_failing();
+        let mut stream2 = super::StreamEdit::new(&broken, "c1", "100", std::time::Duration::from_millis(0));
+        assert_eq!(stream2.finish("答不上来"), super::FinalEdit::Failed);
+    }
+
+    /// 诚实纪律：编辑**失败**不阻断跑轮 —— 跑轮照跑完、任务照落终态、
+    /// 投递态照记 `failed`（不假装「已编辑」）。
+    #[test]
+    fn failing_edits_do_not_block_the_turn() {
+        let st = store("ph5");
+        let cfg = config("ph5");
+        open_channel(&st, "open");
+        let mut b = bot();
+        b.conversation_id = Some(st.create_conversation("dm", "A", &[]).expect("c"));
+        st.upsert_bot(&b).expect("bot");
+        let ch = EditChannel::editing_failing();
+        let engine = DripEngine::new(
+            &["第一段。", "第二段。"],
+            super::STREAM_EDIT_MIN_INTERVAL_MS + 120,
+        );
+        let outcome = on_inbound(&st, &cfg, &engine, &ch, &b, &msg("m1", "你好", true)).expect("run");
+        let InboundOutcome::Turn { status, .. } = outcome else {
+            panic!("应当跑完一轮：{outcome:?}");
+        };
+        assert_eq!(status, "done", "编辑失败不该把跑轮判成别的终态");
+        let task = st.list_tasks(1).expect("list").remove(0);
+        assert_eq!(task.status, crate::nt_types::TaskStatus::Done, "{task:?}");
+        let sent = ch.sent.borrow();
+        assert_eq!(sent[0].text, super::PLACEHOLDER_TEXT);
+        assert!(sent.iter().skip(1).all(|m| m.edit_of.as_deref() == Some("100")));
+        drop(std::fs::remove_dir_all(&cfg.data_dir));
+    }
+
+    /// N1 真并发回归：**另一个执行流**（独立线程 = serve 层 worker 的形态）
+    /// 在一轮「正在飞」时把 `/stop` 的信号递到同一枚令牌。
+    ///
+    /// 与 `SelfStoppingEngine` 的差别是**发起方**：那条是引擎在自己
+    /// `run_turn` 里翻旗（同一执行流），本条是主线程翻旗、worker 跑轮
+    /// （两个执行流）—— 也正是 `nt_channel_serve` 解耦后 IM 上 `/stop`
+    /// 的真实时序。
+    #[test]
+    fn stop_from_another_thread_interrupts_a_running_turn() {
+        use crate::nt_engine::{EngineAdapter, EngineTurn};
+        use crate::nt_types::{ToolCall, ToolName};
+        use std::sync::Mutex;
+        use std::time::Duration;
+
+        struct SlowEngine {
+            sleep_ms: u64,
+            calls: Mutex<usize>,
+        }
+
+        impl EngineAdapter for SlowEngine {
+            fn engine_id(&self) -> &str {
+                "slow"
+            }
+            fn probe(&self) -> Result<String, crate::NtBotError> {
+                Ok("slow ready".to_owned())
+            }
+            fn run_turn(
+                &self,
+                _prompt: &str,
+                _inbox: &[String],
+            ) -> Result<EngineTurn, crate::NtBotError> {
+                if let Ok(mut n) = self.calls.lock() {
+                    *n += 1;
+                }
+                std::thread::sleep(Duration::from_millis(self.sleep_ms));
+                Ok(EngineTurn {
+                    assistant_text: String::new(),
+                    status: crate::nt_types::TurnStatus::Continue,
+                    tool_calls: vec![ToolCall {
+                        id: "c0".to_owned(),
+                        name: ToolName::Bash,
+                        args: serde_json::json!({"command": "echo hi"}),
+                    }],
+                    usage: None,
+                    side_effects: Vec::new(),
+                })
+            }
+        }
+
+        let cfg = config("conc");
+        // 必须用**文件库**：worker 线程要另开一个连接读同库（`:memory:` 不可共享）。
+        std::fs::create_dir_all(&cfg.data_dir).expect("data dir");
+        let st = NeobotStore::open(&cfg.db_path().to_string_lossy()).expect("store");
+        open_channel(&st, "open");
+        let (b, convo) = bound_bot(&st, "conc");
+        let cfg_t = cfg.clone();
+        let b_t = b.clone();
+        let convo_t = convo.clone();
+        // worker 线程：自己的 store 连接（同库），跑一轮「长活」。
+        let worker = std::thread::spawn(move || {
+            let st2 = NeobotStore::open(&cfg_t.db_path().to_string_lossy()).expect("store2");
+            let ch = FakeChannel { sent: std::cell::RefCell::new(Vec::new()), fail: false };
+            let engine = SlowEngine { sleep_ms: 300, calls: Mutex::new(0) };
+            on_inbound(&st2, &cfg_t, &engine, &ch, &b_t, &msg("m1", "长活", true)).expect("run");
+            st2
+        });
+        // 主线程：轮次登记后（已在飞）把停止信号递过去。
+        let mut flipped = false;
+        for _ in 0..300 {
+            if let StopState::Signalled { .. } = signal_run_cancel(Some(&convo_t)) {
+                flipped = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        assert!(flipped, "第二个执行流应能把停止信号递到在飞轮次");
+        let st2 = worker.join().expect("join");
+        // 只有那一轮自己的终态能说「停了」：落库应为 cancelled。
+        let task = st2.list_tasks(1).expect("list").remove(0);
+        assert_eq!(task.status, crate::nt_types::TaskStatus::Cancelled, "{task:?}");
+        assert!(
+            task.error.as_deref().unwrap_or_default().contains("stopped by user"),
+            "{:?}",
+            task.error
+        );
+        drop(std::fs::remove_dir_all(&cfg.data_dir));
     }
 }
 

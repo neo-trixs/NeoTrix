@@ -1503,8 +1503,13 @@ mod capability_seeding_tests {
                 // 「历史上调用过几次」；金丝雀答「在当前观察窗口内它到底活不活」，
                 // 且冷启动期不判红（关键性质 —— 缺这一项任何刚启动的进程都会被
                 // 判红，然后这个门就会被整体关掉，比没有门更坏）。
-                "canary": neotrix_neobot::nt_capability_canary::status()
+                "canary": neotrix_neobot::nt_capability_canary::sessions()
                     .unwrap_or_default()
+                    .iter()
+                    .flat_map(|s| {
+                        neotrix_neobot::nt_capability_canary::status(s).unwrap_or_default()
+                    })
+                    .collect::<Vec<_>>()
                     .iter()
                     .map(|st| serde_json::json!({
                         "id": st.capability.id,
@@ -1513,7 +1518,13 @@ mod capability_seeding_tests {
                         "warning": st.warning,
                     }))
                     .collect::<Vec<_>>(),
-                "canary_ticks": neotrix_neobot::nt_capability_canary::window_ticks(),
+                "canary_ticks": neotrix_neobot::nt_capability_canary::sessions()
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|s| {
+                        neotrix_neobot::nt_capability_canary::window_ticks(s).unwrap_or(0)
+                    })
+                    .sum::<usize>(),
                 // 反向核对：登记了却不在能力树里 => 第三种状态。
                 //
                 // 市场「未上架清单」（治「静默消失」）。必须单独算的原因：市场

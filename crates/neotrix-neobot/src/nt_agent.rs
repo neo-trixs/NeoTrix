@@ -542,11 +542,9 @@ fn run_local_turn_inner(
 
     // 本轮是新的观察窗口：金丝雀计数归零。
     //
-    // 纪律照抄 plur `tools.ts:3594`：不 reset 的话，一次信号就能让金丝雀在
-    // **整个进程生命周期**保持健康（它记的 #192 事故）。判据是
-    // `fired>0 || ticks<3`，ticks 只增不减会让第一项一旦为真就永不失效，
-    // 于是「早已坏掉的能力」看起来一直健康。
-    nt_capability_canary::reset();
+    // ⚠️ 位置：**必须在 `convo_id` 解析出来之后**再 reset（会话键化，
+    // 2026-10-07 修 OPEN-DEFECTS P1-5）—— 旧实现在此处用进程全局窗口，
+    // 任何会话的一轮开始都会清掉**所有会话**的计数。判据见下方 `reset` 处。
     // 检查点 C0（取消）：**入轮清一次旗**。
     //
     // 语义是「进入这一轮时的值」就是「这一轮专属的停止意图」。共享令牌
@@ -595,6 +593,16 @@ fn run_local_turn_inner(
         }
         None => store.create_conversation("group", title, &[])?,
     };
+    // 本轮是新的观察窗口：金丝雀计数归零 —— **只归零本会话**。
+    //
+    // 纪律照抄 plur `tools.ts:3594`：不 reset 的话，一次信号就能让金丝雀在
+    // **整个进程生命周期**保持健康（它记的 #192 事故）。判据是
+    // `fired>0 || ticks<3`，ticks 只增不减会让第一项一旦为真就永不失效，
+    // 于是「早已坏掉的能力」看起来一直健康。
+    //
+    // ⚠️ 键化（2026-10-07，修 OPEN-DEFECTS P1-5）：`convo_id` 是唯一会话键
+    // ⇒ A 会话起轮不碰 B 会话的窗口/计数。
+    nt_capability_canary::reset(&convo_id);
     let task = AgentTask {
         id: Uuid::new_v4().to_string(),
         title: title.to_owned(),
@@ -608,12 +616,12 @@ fn run_local_turn_inner(
         lease_until: Some(lease_until),
         attempts: 1,
         error: None,
-        conversation_id: Some(convo_id),
+        conversation_id: Some(convo_id.clone()),
     };
     store.save_task(&task)?;
-    let outcome = run_loop(ctx, &task.id, &lease_id, on_delta, on_step, stop, lease);
+    let outcome = run_loop(ctx, &task.id, &lease_id, on_delta, on_step, stop, lease, &convo_id);
     // turn 级错误（落库失败等）记终态 Failed + error 后原错返回，不吞错。
-    let (status, stopped_at) = match outcome {
+    let (status, stopped_at, _degraded_tools) = match outcome {
         Ok(pair) => pair,
         Err(err) => {
             let failed = AgentTask {
@@ -696,7 +704,8 @@ fn run_loop(
     mut on_step: Option<StepCallback<'_>>,
     stop: &StopToken,
     mut lease: LeaseHeartbeat,
-) -> Result<(TurnStatus, Option<usize>), NtBotError> {
+    session: &str,
+) -> Result<(TurnStatus, Option<usize>, usize), NtBotError> {
     use crate::nt_types::{TranscriptItem, TranscriptRole};
     let store = ctx.store;
     let config = ctx.config;
@@ -711,6 +720,9 @@ fn run_loop(
     let mut turn_written: usize = 0;
     // 被叫停的那一跳（0 基）。`None` = 正常跑完。
     let mut stopped_at: Option<usize> = None;
+    // N6.2：本轮「工具输出被降级成省略标记」的次数（内容整体丢弃）。
+    // 压缩（errors-first 蒸馏）**不算**降级 —— 只有塌成 `…` 才算（N6.2 判据）。
+    let mut degraded_tools = 0usize;
     // 本轮文件改动账（侧边栏「本轮文件」视角；写/改/读都记账）。
     let sink = crate::nt_changes::ChangeSink {
         store,
@@ -776,6 +788,11 @@ fn run_loop(
                 status: turn.status.as_str().to_owned(),
                 latency_ms: hop_latency_ms,
                 error: None,
+                // 会话口径 + key 口径出表（2026-10-08 拍板补列）。
+                session_id: ctx.convo_id.map(|c| c.to_owned()),
+                // 引擎暴露取 key 的 env 名（HttpEngine 由 Provider::http_engine 注入）；
+                // 本地回显/CLI 工程不持有 key_env ⇒ 维持 None，不猜。
+                key_env: engine.key_env_name().map(|s| s.to_owned()),
             })?;
         }
         // CLI 副作用回传 → step 行（落库前复核：kind 非空才记）。
@@ -813,7 +830,7 @@ fn run_loop(
         // 刻意不放在 hop 开头 —— 那会把「这一跳模型没调任何工具」也算成一轮，
         // 窗口被无关轮次灌水，阈值（ticks < 3）形同虚设。
         for _call in turn.tool_calls.iter() {
-            nt_capability_canary::tick();
+            nt_capability_canary::tick(session);
         }
 
         let mut saw_status: Option<TurnStatus> = None;
@@ -978,6 +995,9 @@ fn run_loop(
                 }
                 emit(call.name.as_str(), result.ok, &snippet);
             }
+            if crate::nt_output_distill::is_degraded(&result.output) {
+                degraded_tools += 1;
+            }
             history.push(TranscriptItem {
                 role: TranscriptRole::Tool,
                 // 蒸馏已**下沉到 truncate_output**（见该函数文档），这里原样带上。
@@ -1031,7 +1051,32 @@ fn run_loop(
     if current == TurnStatus::Continue {
         current = TurnStatus::Waiting;
     }
-    Ok((current, stopped_at))
+    // N6.2：本轮发生过「工具输出整体丢弃」⇒ 账本落一行 `degraded`。
+    //
+    // ⛔ 为什么**单独一行**而不是并进费用行：降级不是花钱（cost=0），
+    //   也不是失败（工具本身可能 ok）⇒ 混进任一行都会让「这轮为什么
+    //   什么都没拿到」变成查不出来的问题。
+    //   best-effort 记账：写不进去不挡本轮（与续租/清扫同款纪律）。
+    if degraded_tools > 0 {
+        let _degraded_row: Result<(), NtBotError> = store.record_ledger(&crate::nt_store::LedgerEntry {
+            id: Uuid::new_v4().to_string(),
+            at: Utc::now().to_rfc3339(),
+            engine: engine.engine_id().to_owned(),
+            model: engine.model_name().to_owned(),
+            actor: actor_name.to_owned(),
+            purpose: "tool-output-degrade".to_owned(),
+            in_tokens: 0,
+            out_tokens: 0,
+            cost_usd: 0.0,
+            measured: false,
+            status: "degraded".to_owned(),
+            latency_ms: 0,
+            error: Some(format!("{degraded_tools} tool output(s) collapsed to placeholder")),
+            session_id: ctx.convo_id.map(|c| c.to_owned()),
+            key_env: engine.key_env_name().map(str::to_owned),
+        });
+    }
+    Ok((current, stopped_at, degraded_tools))
 }
 
 /// 转录预算（rish 转录上限思想本地值：总量 256KiB / 200 条）。
@@ -1709,7 +1754,12 @@ fn execute_capability_invoke(call: &crate::nt_types::ToolCall) -> Result<ToolRes
     // 本 crate 消费。`Ok(None)` = **本进程没有该能力的实现**
     // ⇒ 保持 fail-closed；`Ok(Some(_))` = **真的执行了** ⇒ 此时才计数。
     let input = payload.clone().unwrap_or_else(|| serde_json::json!({}));
-    let dispatched = nt_core_capability_tree::dispatch::dispatch(id, input.clone());
+    // 本执行端口没有会话上下文 ⇒ 用默认会话键（与 CLI 冷启动视图同源）。
+    let dispatched = nt_core_capability_tree::dispatch::dispatch(
+        id,
+        input.clone(),
+        crate::nt_capability_canary::DEFAULT_SESSION,
+    );
 
     //  **这里是真执行的边界**（2026-06 实测确认，见 commit 信息）：
     // 能力**本体**（trade 域的 `execute_trade` 等）的执行入口在

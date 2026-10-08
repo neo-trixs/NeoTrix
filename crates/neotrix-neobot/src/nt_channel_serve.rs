@@ -229,39 +229,92 @@ pub fn run_once(
         let Some(adapter_ref) = reg.get(&row.id) else {
             continue;
         };
-        // **这个 `for msg in inbound` 就是同步调度的全部**：一条消息的跑轮
-        // （`on_inbound` 内）不返回，下一条消息**不会被 `poll` 到**，也就
-        // 不可能在这轮跑完之前进入本循环。
-        //
-        // 于是 IM 上 `/stop` 的真实时序是：用户发出去 → 躺在平台队列 →
-        // 上一轮**跑完**、`on_inbound` 返回、RAII 守卫注销登记 → 才被 poll
-        // 出来 → 查停止登记表（空的）⇒ 如实答「没有可停的轮次」。
-        // `on_inbound` 里那条管道（命令入口 → 登记表 → 跑轮）已接通，
-        // 缺的是**第二个执行流**：把收取与跑轮解耦（线程池 / async）。
-        // 在那之前，**IM 的 `/stop` 停不了任何一轮**，而它会如实这么说 ——
-        // 别把本循环改成并发后忘了删这段注释里「停不了」的结论。
+        // **这条 `for msg in inbound` 不再是同步调度的全部**（2026-10-08 解耦）：
+        // 跑轮在 worker 线程执行（`on_inbound`），主线程在本批通道跑完后
+        // 用有界等待收成确定性统计；worker 线程跑完其收据后 NMake 200ms
+        // 超时判为「长 HTTP 轮，放手」。
+        // 复效：跑轮期间抵达的 /stop 能在下一条消息里被 poll 到，经
+        // `signal_run_cancel` 翻转同一登记表 ⇒ IM /stop 真正可停。
+        let mut handles: Vec<std::sync::mpsc::Receiver<Result<InboundOutcome, String>>> =
+            Vec::new();
         for msg in inbound {
             stats.received += 1;
             // 一条消息交给**认领这个发件人**的那个机器人。
             let bot = route_bot(&bots, access, &msg);
-            let engine = match engine_for(config) {
-                Ok(engine) => engine,
-                Err(err) => {
-                    stats.failed += 1;
-                    eprintln!("[neobot] 引擎不可用：{err}");
-                    break;
+            // 缺 token：同步记失败，不给 worker 发（测试路径与旧行为一致）。
+            if bot_token_missing(&bot.token_env) {
+                stats.failed += 1;
+                continue;
+            }
+            if row.id != "telegram" {
+                // 非 telegram 适配器（测试 Fake 等）保持原串行语义。
+                let engine = match engine_for(config) {
+                    Ok(engine) => engine,
+                    Err(err) => {
+                        stats.failed += 1;
+                        eprintln!("[neobot] 引擎不可用：{err}");
+                        break;
+                    }
+                };
+                match nt_channel_dispatch::on_inbound(
+                    store,
+                    config,
+                    engine.as_ref(),
+                    adapter_ref,
+                    bot,
+                    &msg,
+                ) {
+                    Ok(InboundOutcome::Turn { .. }) => stats.ran += 1,
+                    Ok(_) => stats.ignored += 1,
+                    Err(_) => stats.failed += 1,
                 }
-            };
-            match nt_channel_dispatch::on_inbound(
-                store,
-                config,
-                engine.as_ref(),
-                adapter_ref,
-                bot,
-                &msg,
-            ) {
-                Ok(InboundOutcome::Turn { .. }) => stats.ran += 1,
-                Ok(_) => stats.ignored += 1,
+                continue;
+            }
+            // 跑轮与收取解耦：worker 线程跑 `on_inbound`，主线程继续 poll、
+            // 使得跑轮期间抵达的 /stop 能经 `signal_run_cancel` 翻转同一登记。
+            //
+            // worker 用「独立 NeobotStore 连接同库 WAL + 独立 TelegramChannel
+            // + 独立 engine」：NeobotStore/ChannelAdapter 均不 Sync，这是 Rust
+            // 安全下唯一能让 turn 真并行的形态（store 由 worker 自己持有）。
+            let config_w = config.clone();
+            let bot_w = bot.clone();
+            let msg_w = msg.clone();
+            let (tx, rx) = std::sync::mpsc::channel::<Result<InboundOutcome, String>>();
+            std::thread::spawn(move || {
+                let res = (|| -> Result<InboundOutcome, String> {
+                    let worker_store = NeobotStore::open(
+                        &config_w.db_path().to_string_lossy(),
+                    )
+                    .map_err(|e| e.to_string())?;
+                    let worker_engine = engine_for(&config_w).map_err(|e| e)?;
+                    let worker_adapter = TelegramChannel::new(&bot_w.token_env);
+                    nt_channel_dispatch::on_inbound(
+                        &worker_store,
+                        &config_w,
+                        worker_engine.as_ref(),
+                        &worker_adapter,
+                        &bot_w,
+                        &msg_w,
+                    )
+                    .map_err(|e| e.to_string())
+                })();
+                // 接收端可能已在 200ms 后放弃对超时轮次的等待 ⇒ 丢弃亦可。
+                let _ = tx.send(res);
+            });
+            handles.push(rx);
+        }
+        // 主线程按序对每个 worker 做有界等待：
+        //  快速轮次（ echo / 命令 / 已就位的工具轮 ）直接收成确定性统计；
+        //  长轮次（真 HTTP）则放手给 detached worker，主线程继续收取，
+        //  跑轮期间抵达的 /stop 才能在下一轮 poll 时被翻转 ⇒ 真正兑现 /stop。
+        for rx in handles.drain(..) {
+            match rx.recv_timeout(std::time::Duration::from_millis(200)) {
+                Ok(Ok(InboundOutcome::Turn { .. })) => stats.ran += 1,
+                Ok(Ok(_)) => stats.ignored += 1,
+                Ok(Err(_)) => stats.failed += 1,
+                // 超时（长 HTTP 轮）⇒ detached worker 继续跑；其 outbox 回执由
+                // 后续 poll 的 drain 送出。200ms 是「快速轮次等待」的上限，
+                // 不是把跑轮本身卡住。
                 Err(_) => stats.failed += 1,
             }
         }

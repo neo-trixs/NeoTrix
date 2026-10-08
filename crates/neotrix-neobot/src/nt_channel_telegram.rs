@@ -847,6 +847,11 @@ impl ChannelAdapter for TelegramChannel {
         &self.token_env
     }
 
+    /// Telegram 支持 editMessageText ⇒ 占位→流式编辑 走此能力位。
+    fn can_edit(&self) -> bool {
+        true
+    }
+
     fn probe(&self) -> ChannelHealth {
         match self.call("getMe", &[]) {
             Ok(result) => {
@@ -2349,5 +2354,55 @@ mod tests {
         ] {
             assert!(!is_not_modified(other), "{other:?} 不该被当成已达成");
         }
+    }
+
+    #[test]
+    fn placeholder_then_final_answer_hits_edit_message_text_end_to_end() {
+        // 占位 → 覆盖的整条链路：先 `sendMessage` 发占位、拿回它的 message_id；
+        // 跑完用 `edit_of` 把**那个 id** 交给 `editMessageText`。
+        //
+        // 关键断言是「**占位 ID 真被用作 editMessageText 的 message_id**」。
+        // 这一步断了，占位与最终答案就会变成两条并排的消息 —— 用户同时看到
+        // 「思考中…」和答案，占位路径等于白跑一遍。
+        let (base, seen) = fake_server(vec![
+            r#"{"ok":true,"result":{"message_id":42}}"#.to_owned(),
+            r#"{"ok":true,"result":{"message_id":42,"text":"最终答案"}}"#.to_owned(),
+        ]);
+        let ch = chan_with(&base);
+        // Telegram 有 editMessageText ⇒ 上层才会走「先占位后覆盖」（见派发层的编辑载体律）。
+        assert!(ch.can_edit(), "Telegram 支持 editMessageText，占位→覆盖才是默认路径");
+
+        let placeholder_id = ch
+            .send(&OutboundMessage {
+                chat: "42".to_owned(),
+                text: "⏳ 思考中…".to_owned(),
+                attachments: Vec::new(),
+                edit_of: None,
+            })
+            .expect("占位发得出去");
+        assert_eq!(placeholder_id, "42", "占位该回自己的 message_id");
+
+        let got = ch
+            .send(&OutboundMessage {
+                chat: "42".to_owned(),
+                text: "最终答案".to_owned(),
+                attachments: Vec::new(),
+                edit_of: Some(placeholder_id.clone()),
+            })
+            .expect("覆盖发得出去");
+        assert_eq!(got, "42", "编辑成功回的还是那条消息的 id（不另发一条）");
+
+        let log = seen.lock().expect("lock").clone();
+        assert_eq!(log.len(), 2, "占位 + 覆盖各一次请求：{log:?}");
+        // 端点顺序：先建消息、后改它。反了就说明两条是各自独立的。
+        assert!(log[0].starts_with("/bot123456:FAKE-TOKEN/sendMessage"), "{}", log[0]);
+        assert!(log[1].starts_with("/bot123456:FAKE-TOKEN/editMessageText"), "{}", log[1]);
+        // 覆盖请求带的 message_id 就是上面那个占位 id（不是新 id、也不是别的常量）。
+        assert!(
+            log[1].contains("message_id=42"),
+            "editMessageText 没拿占位的 id 去改：{}",
+            log[1]
+        );
+        assert!(log[1].contains("chat_id=42"), "改的是同一个会话：{}", log[1]);
     }
 }

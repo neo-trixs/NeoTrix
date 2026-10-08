@@ -58,6 +58,16 @@ fn estimate_tokens(text: &str) -> usize {
 /// 在小预算下**本身就超预算** ⇒ 违反「任何输入都不超预算」这条硬不变量。
 const SHORT_FALLBACK: &str = "…";
 
+/// 该输出是否属于**降级**：预算装不下标记本身时蒸馏会塌成 [`SHORT_FALLBACK`]，
+/// 正文内容被整体丢弃。
+///
+/// 为什么需要这个判据（N6.2）：「被砍了一刀」与「**内容没了**」是两种事，
+/// 前者正常压缩、后者降级；账本要能分清，否则「这轮为什么什么都没拿到」
+/// 永远查不出来。
+pub fn is_degraded(output: &str) -> bool {
+    output.trim() == SHORT_FALLBACK
+}
+
 /// 把超长工具输出蒸馏为 errors-first 摘要（`max_tokens` 为硬预算）。
 ///
 /// ⛔ **不超预算**：任何极端 token 估算情形下都靠末尾的逐字符裁剪兜底。

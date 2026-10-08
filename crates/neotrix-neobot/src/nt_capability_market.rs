@@ -44,7 +44,7 @@
 //! # 与本仓既有设施的接线（都不是新概念）
 //! - `nt_capability_registry::with_registry` ⇒ 拿**进程级真源**
 //! - `nt_capability_registry::nodes_providing(tag)` ⇒ 按标签定位
-//! - `nt_capability_canary::status()` ⇒ **「被调用过吗」** 市场要显示它
+//! - `nt_capability_canary::status(session)` ⇒ **「被调用过吗」** 市场要显示它
 
 use nt_core_capability_tree::node::{CapabilityKind, CapabilityNode};
 use nt_core_capability_tree::registry::CapabilityTreeRegistry;

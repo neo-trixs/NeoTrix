@@ -1938,7 +1938,8 @@ fn run_capability_call(id: &str, payload: &str) -> Result<(), String> {
     println!("id={}  可执行性={:?}", entry.id, entry.executability);
 
     ensure_trade_dispatchers();
-    let fut = dispatch(id, input).map_err(|e| format!("派发表不可用: {e}"))?;
+    let fut = dispatch(id, input, neotrix_neobot::nt_capability_canary::DEFAULT_SESSION)
+        .map_err(|e| format!("派发表不可用: {e}"))?;
     let Some(fut) = fut else {
         return Err(format!(
             "未注册派发实现（executability={:?}）⇒ fail-closed，无结果可返回",
