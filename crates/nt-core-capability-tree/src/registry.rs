@@ -261,15 +261,32 @@ impl CapabilityTreeRegistry {
 
     /// 删除节点 (仅允许无依赖者时)
     pub fn remove(&mut self, id: &str) -> Result<CapabilityNode, RegistryError> {
-        let node = self.nodes.shift_remove(id)
-            .ok_or(RegistryError::NotFound(id.to_string()))?;
+        // ⛔⛔ **先校验、后改动**（2026-10-08 修状态损坏）。
+        //
+        // 原实现先 `self.nodes.shift_remove(id)` 再因 `dependents` 非空早退
+        // `Err(CircularDependency)` ⇒ **失败后节点已从 `nodes` 消失**，
+        // 而 `node_indices` / `dag` / `domain_index` / `layer_index` /
+        // `constellation_index` / `provides_index` 的清理都在早退**之后**
+        // ⇒ 返回 Err 之后注册表处于**不一致状态**：节点查不到，但索引与
+        // DAG 仍指向它。任何基于 `remove` 的热拔插都会踩到它。
+        let node = self
+            .nodes
+            .get(id)
+            .cloned()
+            .ok_or_else(|| RegistryError::NotFound(id.to_string()))?;
 
         if !node.dependents.is_empty() {
             return Err(RegistryError::CircularDependency(
                 id.to_string(),
-                format!("has dependents: {:?}", node.dependents)
+                format!("has dependents: {:?}", node.dependents),
             ));
         }
+
+        // 校验通过 ⇒ 现在才真正移除（此时不会失败）
+        let node = self
+            .nodes
+            .shift_remove(id)
+            .ok_or(RegistryError::NotFound(id.to_string()))?;
 
         // 从 DAG 移除
         if let Some(&idx) = self.node_indices.get(id) {
@@ -658,7 +675,7 @@ impl CapabilityTreeRegistry {
                     rationale: format!("经验驱动: 强化 {} | {}", capability_tag, rationale),
                 });
             } else {
-                let new_id = format!("exp::{}::{}", domain.as_str().to_lowercase(), capability_tag);
+                let new_id = format!("exp::nt-{}::{}", domain.as_str(), capability_tag);
                 // 同名 exp:: 节点已存在 (含 deprecated): 不重复 Bud。
                 // 该能力已沉淀为真实模块节点时由经验蒸馏切换目标, deprecated 占位不应复活。
                 if self.nodes.contains_key(&new_id) {
@@ -1013,14 +1030,14 @@ fn legacy_layer_of(level: &str) -> Option<NodeLayer> {
 }
 
 fn legacy_constellation_of(c: &str) -> Option<ConstellationLevel> {
-    match c.to_uppercase().as_str() {
-        "C0" => Some(ConstellationLevel::C0Compile),
-        "C1" => Some(ConstellationLevel::C1UnitTest),
-        "C2" => Some(ConstellationLevel::C2IntegrationTest),
-        "C3" => Some(ConstellationLevel::C3Benchmark),
-        "C4" => Some(ConstellationLevel::C4MainPipeline),
-        "C5" => Some(ConstellationLevel::C5SelfHealing),
-        "C6" => Some(ConstellationLevel::C6EvolutionLoop),
+    match c.trim().to_lowercase().as_str() {
+        "c0" | "c0compile" => Some(ConstellationLevel::C0Compile),
+        "c1" | "c1unittest" => Some(ConstellationLevel::C1UnitTest),
+        "c2" | "c2integration" | "c2integrationtest" => Some(ConstellationLevel::C2IntegrationTest),
+        "c3" | "c3benchmark" => Some(ConstellationLevel::C3Benchmark),
+        "c4" | "c4mainpipeline" => Some(ConstellationLevel::C4MainPipeline),
+        "c5" | "c5selfhealing" => Some(ConstellationLevel::C5SelfHealing),
+        "c6" | "c6evolutionloop" => Some(ConstellationLevel::C6EvolutionLoop),
         _ => None,
     }
 }
@@ -1095,6 +1112,66 @@ pub struct RegistryStats {
 mod tests {
     use super::*;
     use crate::node::CapabilityNode;
+
+    /// **回归锁**：`remove` 被拒（节点有 dependents）时，注册表必须**保持一致**
+    /// —— 节点仍在 `nodes` 里，且各索引仍能查得到。
+    ///
+    /// 2026-10-08：原实现先 `shift_remove` 再早退 `Err` ⇒ 返回 Err 后
+    /// 节点已消失而索引/DAG 仍指向它（状态损坏）。任何基于 remove 的
+    /// 热拔插都会踩到它。此用例是那条 bug 的可证伪判据。
+    #[test]
+    fn remove被拒时注册表保持一致() {
+        let mut reg = build_test_registry();
+        let id = "p1";
+        // ⛔ 必须走 `add_dependency`：它才做**双向同步**（`dependents` + `requires`）。
+        // 直接写 `node.requires` 不会回填 `dependents`（build_test_registry 就是
+        // 这么写的），那样 `p1.dependents` 为空、删除根本不会被拒 ⇒ 测不到本 bug。
+        reg.add_dependency("c1", id)
+            .expect("建立 c1→p1 依赖");
+        assert!(
+            !reg.nodes[id].dependents.is_empty(),
+            "前置：p1 必须有 dependents，否则 remove 不会被拒"
+        );
+        let before_nodes = reg.nodes.len();
+        let before_provides = reg.nodes_providing("read").len();
+        assert!(before_provides > 0, "前置：provides 索引必须能查到它");
+
+        let err = reg.remove(id).expect_err("有 dependents 不得删除成功");
+        assert!(matches!(err, RegistryError::CircularDependency(..)), "实得 {err:?}");
+
+        // 失败后必须仍是删除前的样子
+        assert_eq!(reg.nodes.len(), before_nodes, "失败后节点数不得变化");
+        assert!(
+            reg.nodes.get(id).is_some(),
+            "失败后节点必须仍在 nodes 里（原实现会把它弄丢）"
+        );
+        assert_eq!(
+            reg.nodes_providing("read").len(),
+            before_provides,
+            "失败后 provides 索引不得变化"
+        );
+        assert!(
+            reg.node_indices.contains_key(id),
+            "失败后 DAG 索引不得变化"
+        );
+
+        // 对照：真正无 dependents 的节点可以删干净，且索引同步清理
+        let leaf = reg.nodes.keys().find(|k| {
+            reg.nodes[*k].dependents.is_empty() && **k != id
+        }).cloned();
+        if let Some(leaf) = leaf {
+            let tag = reg.nodes[&leaf].provides.first().cloned();
+            let _ = reg.remove(&leaf);
+            assert!(reg.nodes.get(&leaf).is_none(), "成功删除后不得残留");
+            if let Some(tag) = tag {
+                assert!(
+                    !reg.nodes_providing(&tag).contains(&leaf),
+                    "成功删除后索引必须同步清理"
+                );
+            }
+            assert!(!reg.node_indices.contains_key(&leaf));
+        }
+    }
 
     fn build_test_registry() -> CapabilityTreeRegistry {
         let mut reg = CapabilityTreeRegistry::new();
