@@ -1,0 +1,158 @@
+# 能力体系裁决台账（P4，2026-10-08）
+#
+# ## 这份文件解决什么
+#
+# 2026-10-08 审计实测：仓里有 **13 套**并行的能力/插件表示法、**13 个**能力
+# 注册表，而**只有一条**有活的 register→list→invoke 回路。多数系统
+# 「定义了、建了、文档也写了，但没有生产消费者」。
+#
+# 历来的做法是**直接删**。但：
+# - 审计本身警告「grep 命中不构成证据」⇒ 删除不可逆，误删代价高；
+# - 仓里的教训写得很清楚：**先修裁判再清理**
+#   （`ROADMAP-REDUNDANCY-FLAT-MISALIGN-2026-10-07`：3 条 P0 里 2 条是
+#   「报 PASS 却结构上不可能失败」）。
+#
+# ⇒ 因此本轮**不删任何东西**，而是把「每个能力体系是什么、当前什么处置、
+# 证据在哪」变成**机器可查的台账**，并立一道门守住它：
+#   `scripts/ops/check_capability_inventory.sh`
+#
+# ## 处置语义（闭集，门会校验）
+#
+# | disposition | 含义 | 允许退役？ |
+# |---|---|---|
+# | `spine` | 脊柱本体或与其直接桥接（运行时唯一真源） | ❌ |
+# | `active` | 有真实生产消费者 | ❌ |
+# | `bridge-only` | 仅作为脊柱的**存量适配**存在，不得新增使用 | ⚠️ 只可删适配层 |
+# | `dormant` | 定义完整但**零生产消费者**；保留是因为可能有未记录的调用面 | ⚠️ 需先记录再删 |
+# | `deprecated` | 已判死，**禁止新增调用**，待择期删除 | ✅ |
+#
+# ## 门能查什么、不能查什么（诚实边界）
+#
+# ✅ 能查（零假阳性）：
+#   - 每个声明的体系，其 `anchor` 符号**仍存在**（漂移检测）；
+#   - `disposition` 取值在闭集内；
+#   - 每个体系都有 `evidence` 字段（强制写证据，杜绝「据说没人用」）。
+# ⛔ **不查**「生产消费者数量」——那需要判定「哪些调用点在 `#[cfg(test)]` 里」，
+#   文本级正则必然产生假阳性，而假阳性会让人去「修」正确代码
+#   （AGENTS.md R-SCAN-1）。该判断必须**人工读代码**并写进 `evidence`。
+#
+# ⇒ 这道门的作用是**防新增**（新体系必须先声明+写证据）与**防漂移**，
+#   而不是替人做消费者计数。
+
+schema_version = 1
+
+[[system]]
+id = "spine"
+disposition = "spine"
+anchor = "crates/nt-core-capability-tree/src/spine.rs"
+symbol = "pub struct Spine"
+evidence = "P2 新建：运行时能力唯一真源。派发与上架读同一份；unregister/replace 可拔可换；executability 派生。12 个单测 + 2 处变异验证。"
+
+[[system]]
+id = "dispatch_table"
+disposition = "spine"
+anchor = "crates/nt-core-capability-tree/src/dispatch.rs"
+symbol = "pub type DispatchFn"
+evidence = "既有生产派发面（唯一有活回路者）。已与脊柱桥接：register_dispatcher 自动进脊柱；反向同步需显式且只接受 as_fn_ptr()==Some 的无捕获适配器（3 个桥测试 + 1 处变异验证）。"
+
+[[system]]
+id = "market_manifest"
+disposition = "spine"
+anchor = "crates/nt-core-capability-tree/src/market.rs"
+evidence = "两侧共读的纯数据清单（TRADE_MANIFEST 5 条 + GENOFFICE_MANIFEST 1 条）。manifest_entry/all_manifest_entries 已覆盖两个清单。⚠️ Executability 是**编译期声明**，真实可执行性由脊柱派生（spine::Spine::executability）。"
+
+[[system]]
+id = "capability_tree_registry"
+disposition = "active"
+anchor = "crates/nt-core-capability-tree/src/registry.rs"
+symbol = "pub struct CapabilityTreeRegistry"
+evidence = "能力元数据树（326 节点）。消费者：neobot nt_capability_registry 进程全局、consciousness_runtime、nt_capability_bridge、ffi/skill_tree。2026-10-08 已修 remove()「先删后校验」状态损坏（commit 0a4db86e，含变异验证）。"
+
+[[system]]
+id = "neobot_process_registry"
+disposition = "active"
+anchor = "crates/neotrix-neobot/src/nt_capability_registry.rs"
+evidence = "OnceLock<Mutex<CapabilityTreeRegistry>> 门面。dispatchable_ids/listed_but_not_dispatchable 已落地（commit f1ec7fe5）：上架面只摆真调得动的能力，缺口显式暴露不隐藏。"
+
+[[system]]
+id = "plugin_registry"
+disposition = "active"
+anchor = "neotrix-core/src/l1_action/nt_io/nt_io_plugin/registry.rs"
+symbol = "pub struct PluginRegistry"
+evidence = "**全仓唯一支持热拔插的系统**：unregister(registry.rs) 调 on_unload；hot_reload/hot_reload_batch 事务化带回滚；watch_dir 监听。但 WASM 路径结构性失效：sandbox 不在 default features，且 wasm.rs 的 call_export 无条件返回 Err(\"not wired\") ⇒ 永不成功装载。"
+
+[[system]]
+id = "l0_unified_capability"
+disposition = "bridge-only"
+anchor = "neotrix-core/src/l0_substrate/nt_core_capability_types.rs"
+symbol = "pub trait UnifiedCapability"
+evidence = "18 个生产实现，但**零生产构造点**：create_ocr_capability / create_nlp_capability / create_shield_capabilities / create_genoffice_capability 等工厂的 Rust 调用者均为 0；CapabilityRegistry::new() 生产出现 0 次（16 处全在 #[cfg(test)]）。⛔ 禁止新增使用；新增能力请实现 spine::CapabilityExecutor。"
+
+[[system]]
+id = "file_ability_local_trait"
+disposition = "deprecated"
+anchor = "neotrix-core/src/l1_action/nt_file_ability/capability.rs"
+symbol = "pub trait UnifiedCapability"
+evidence = "L0 同名 trait 的**逐字段复制品**（Domain 10 vs 11 变体、CapabilityOutput 2 vs 26 变体），仅 1 个实现、0 生产消费者。同一个 struct 同时实现两个同名 trait 且 execute 签名不同 ⇒ 典型 AGENTS.md L15「同名≠同一符号」。待删。"
+
+[[system]]
+id = "trade_capability_registry"
+disposition = "dormant"
+anchor = "neotrix-core/src/l1_action/nt_act/nt_act_trade/capability_registry.rs"
+symbol = "pub struct TradeCapabilityRegistry"
+evidence = "global_trade_registry() 的调用者仅 :217-230（#[cfg(test)] mod global_registry_tests）⇒ 0 生产 ⇒ 全局贸易注册表在每个运行进程里都是空的。另内嵌一个 L0 CapabilityRegistry + 自有 local HashMap + type_index ⇒ 同一批能力三份索引。无 remove/clear。"
+
+[[system]]
+id = "native_bus"
+disposition = "dormant"
+anchor = "neotrix-core/src/l5_cognition/nt_core/capability/native_bus.rs"
+symbol = "pub struct NativeBus"
+evidence = "完整的第 6 套能力系统（自有注册/派发/守卫链/证据日志）。生产里被 attach（handlers_wisdom.rs:50、consciousness_orchestrator.rs:68）但**建的是空总线**：register_wisdom_capabilities 的 4 个能力只有测试调用者。dispatch 在持锁状态下调用 cap.execute() ⇒ 慢能力互相阻塞。"
+
+[[system]]
+id = "capability_catalog_l5"
+disposition = "dormant"
+anchor = "neotrix-core/src/l5_cognition/nt_core/capability/registry.rs"
+symbol = "pub struct CapabilityCatalog"
+evidence = "有 find_by_tag/calculate_similarity/route_by_capability/resolve_fallback/remove 等丰富检索，但 CapabilityCatalog::new() 的生产调用只有 cluster_self_test.rs:24,33，而该文件是「编译期代码」（其 #[cfg(test)] 从 :56 才开始）⇒ 无运行实例。CapabilityClusterSelfTest 生产实例化 0 次（唯一引用在 pipeline/nt_credit_stages.rs:527 是注释）。"
+
+[[system]]
+id = "capability_node_trait"
+disposition = "deprecated"
+anchor = "neotrix-core/src/l0_substrate/nt_core_traits.rs"
+symbol = "pub trait CapabilityNode"
+evidence = "4 个 impl（MetaObserver/EvolutionHarness/TranscendentLoop/ConsonanceOrchestrator）但 **dyn CapabilityNode 零使用**、通过该 trait 的方法调用零次；其名义桥 fusion::fuse_trait_nodes 收的是手搓的 TraitNodeDescriptor，不是 dyn CapabilityNode，生产调用者 0。EvolutionHarness 实际经另一个 trait EvolutionHarnessApi 消费。待删。"
+
+[[system]]
+id = "pipeline_registry"
+disposition = "dormant"
+anchor = "neotrix-core/src/l0_substrate/nt_core_platform/pipeline_registry.rs"
+symbol = "pub struct PipelineRegistry"
+evidence = "与 CapabilityRegistry **形状逐字段雷同**（HashMap + by_layer + by_domain），且真的能 execute。但 init_pipeline_registry/init_all 0 生产调用 ⇒ 有 5 个真实 Pipeline 实现（nt_latent_reasoning / seal / adversarial_pipeline / gwt::compaction / absorb::spec_driven）从未被 register 过。"
+
+[[system]]
+id = "geo_media_traits"
+disposition = "deprecated"
+anchor = "neotrix-core/src/l5_cognition/nt_core/capability/nt_cap_geo.rs"
+symbol = "pub trait GeoCapability"
+evidence = "GeoCapability 与 MediaCapability（nt_cap_media.rs）+ MediaRegistry 均为**零 impl、零外部消费者**，只被 capability/mod.rs re-export。同型：a2a.rs 的 A2ARegistry（0 外部）、l7_l1_bridge.rs 的 L7OrchestratorRegistry（0 外部）。"
+
+[[system]]
+id = "capability_kind_dup"
+disposition = "deprecated"
+anchor = "neotrix-core/src/l5_cognition/nt_core/capability/types.rs"
+symbol = "pub enum CapabilityKind"
+evidence = "**同名第三份** CapabilityKind（另两份：nt-core-capability-tree/src/node.rs、l1_action/nt_file_ability/capability.rs）。唯一消费者 traits.rs:11 的 CapabilityPlugin::capability_kinds()，而 CapabilityPlugin 0 impl 0 消费者 ⇒ 生产消费者 0。另 node.rs 的 CapabilityKind 才是市场在读的（MarketEntry::is_listable），但磁盘 326 节点**一个 kind 键都没有** ⇒ 全部按 serde default 落到 Skill。"
+
+[[system]]
+id = "hermes_community_registry"
+disposition = "deprecated"
+anchor = "neotrix-core/src/l1_action/nt_io/l3_vendor_skills/nt_io_hermes_community.rs"
+symbol = "pub struct HermesCommunityRegistry"
+evidence = "**与 nt_io_plugin 的 PluginRegistry 同名不同物**（此处还有同名 trait PluginRegistry）⇒ 审计阻断「同名≠同一符号」的实例。0 外部消费者，只有自身测试。"
+
+[[system]]
+id = "crystal_capability_host"
+disposition = "active"
+anchor = "neotrix-core/src/bin/nt_crystal_serve.rs"
+evidence = "晶体=能力宿主（commit d143c462）。POST /v1/capabilities/invoke 真执行，实测 genoffice 返回 executed:true。/v1/capabilities 的 features 已如实化（hot_reload_providers:true / hot_reload_capabilities:false）。薄客户端(neobot/桌面)经它即可驱动能力，无需反向依赖 core。"
