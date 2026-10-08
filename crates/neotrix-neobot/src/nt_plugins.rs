@@ -82,6 +82,15 @@ pub fn init(data_dir: &Path) -> Result<(), NtBotError> {
     let mut all = reg()
         .write()
         .map_err(|_| NtBotError::Store("plugin registry poisoned".to_owned()))?;
+    // P4: 过完能力树 Registry, 让 registry_audit/node_count 能看见 plugin 清单。
+    for m in &loaded {
+        let node = nt_core_capability_tree::node::CapabilityNode::new_primitive(
+            m.name.clone(),
+            nt_core_capability_tree::node::Domain::Neobot,
+            vec!["dynamic_tool".to_owned()],
+        );
+        let _ = crate::nt_capability_registry::register_node(node);
+    }
     *all = loaded;
     Ok(())
 }

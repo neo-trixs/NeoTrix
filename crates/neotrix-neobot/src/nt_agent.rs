@@ -939,6 +939,35 @@ fn run_loop(
                         ),
                     }
                 }
+                // P5: 记录 plugin 调用作为 ledger 行（可审计且可在 Router 上按份近用）。
+                if let crate::nt_types::ToolName::Plugin(name) = &call.name {
+                    let status = match &raw {
+                        Ok(o) if o.result.ok => "applied",
+                        _ => "failed",
+                    };
+                    let detail = match &raw {
+                        Ok(o) if o.result.ok => "ok".to_owned(),
+                        Ok(o) => o.result.output.chars().take(120).collect::<String>(),
+                        Err(e) => e.to_string(),
+                    };
+                    let _ = store.record_ledger(&crate::nt_store::LedgerEntry {
+                        id: Uuid::new_v4().to_string(),
+                        at: Utc::now().to_rfc3339(),
+                        engine: "plugin".to_owned(),
+                        model: name.to_owned(),
+                        actor: actor_name.to_owned(),
+                        purpose: "plugin-invoke".to_owned(),
+                        in_tokens: 0,
+                        out_tokens: 0,
+                        cost_usd: 0.0,
+                        measured: false,
+                        status: status.to_owned(),
+                        latency_ms: 0,
+                        error: Some(detail),
+                        session_id: ctx.convo_id.map(|c| c.to_owned()),
+                        key_env: None,
+                    });
+                }
                 match raw {
                     Ok(outcome) => outcome,
                     Err(err) => ToolOutcome::from(ToolResult {
