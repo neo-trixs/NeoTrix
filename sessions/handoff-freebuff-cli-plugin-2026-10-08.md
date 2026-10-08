@@ -98,7 +98,7 @@
 
 ### 8.1 worktree 去向
 
-`sh scripts/ops/nt_worktree_gate.sh check` → **exit 0**，输出摘要：
+`sh scripts/ops/nt_worktree_gate.sh check` → **exit 4**（12:58 复核；⛔ 下文摘要上方早先写的「exit 0」是 `| tail` 吃掉的 `$?`，已订正），输出摘要：
 
 ```
 /Users/neo/Downloads/neotrix/.worktrees/evo     | d524e278 | HEAD | 0 脏 | 3562M | target 3480M | 近3h活动 no
@@ -146,7 +146,8 @@
 | `check-cli-plugin-descriptors.sh --strict` | **0** | 2026-10-08 11:39 | live 探活读真 descriptor |
 | `check-cli-plugin-descriptors.sh --self-test` | **0** | 2026-10-08 11:39 | **12/12 绿**（L8 证伪自测） |
 | `nt_gate_coverage.py` | **0** | 2026-10-08 11:30 | P1–P5 全绿；新门 `wired=True` / `in EXEMPT=False` ⇒ 结构上不可能触发 P2 死豁免 |
-| `nt_worktree_gate.sh check` | **0** | 2026-10-08 11:04 | 见 §8.1 |
+| `nt_worktree_gate.sh check` | **4** ⛔**订正** | 2026-10-08 12:58 | ⛔ **本会话早先记的「rc=0」是错的** —— 当时跑的是 `sh … | tail -15; echo $?`，`$?` 取的是 **`tail` 的退出码**，不是脚本的。脚本头注：`0 无可回收 / 3 有可回收 target / 4 有脏 worktree`。
+⇒ **4 = 有脏 worktree**，即 `.worktrees/merge-b` 那 3 处 —— **不是本会话的** |
 
 **红门归属**：`ntcode.rs` bin 目标编译红 = **他窗 WIP**（`CliFreeSource` import 被删但调用还在），
 ⛔ 非本会话引入，本会话也没碰那个 hunk。
@@ -256,7 +257,9 @@
 
 | 门 | rc | 核实时间 | 说明 |
 |---|---|---|---|
-| `nt_worktree_gate.sh check` | **0** | 12:56 | ⚠️ 同一条命令我先后读到 **4** 与 **0** 两次（并发写入期的瞬态）；以最后一次带完整输出的 **rc=0** 为准。`.worktrees/merge-b` 3 处未提交、`.worktrees/evo` target 3480M 可回收 —— **都不是本会话的** |
+| `nt_worktree_gate.sh check` | **4** | 12:58（连采 3 次**稳定为 4**） | ⛔ **12:56 那次记的「先后读到 4 与 0，以 0 为准」是错的** —— 0 来自 `tail`。
+**4 = 有脏 worktree** = `.worktrees/merge-b` 那 3 处；`.worktrees/evo` target 3480M 另判可回收。
+**均非本会话**（本会话新建 worktree = 0，⛔ 未碰任何 worktree） |
 | `nt_lock_audit.py` | **0**（可疑 0 处） | 12:45 | 改 `.rs` 后重跑，**非沿用旧值** |
 | descriptor 门 `--strict` / `--self-test` | **0** / **0**（12/12） | 12:39 | 证伪实测 rc=1 且指名文件 |
 
