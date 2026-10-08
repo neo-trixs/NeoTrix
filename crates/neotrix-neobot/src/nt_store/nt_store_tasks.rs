@@ -1,6 +1,6 @@
 //! `nt_store_tasks` — 任务 insert/status-CAS/认领租约/租约回收（`NeobotStore` 的 impl 片段）。
 
-use super::NeobotStore;
+use super::{LedgerEntry, NeobotStore};
 use crate::nt_error::NtBotError;
 use crate::nt_types::AgentTask;
 use rusqlite::params;
@@ -258,6 +258,28 @@ impl NeobotStore {
              WHERE status='running' AND (lease_until IS NULL OR lease_until < ?1)",
             params![now, note],
         )?;
+        // 恢复事实必须可观测：每次真回收落一行 ledger
+        // （status='outcome_unknown'，token/cost 全 0，`measured=false` 按「永不猜测」律）。
+        // 失败不挡恢复（best-effort，与降级记账同口径）。
+        if n > 0 {
+            let _ = self.record_ledger(&LedgerEntry {
+                id: uuid::Uuid::new_v4().to_string(),
+                at: now.to_owned(),
+                engine: "tasks-recovery".to_owned(),
+                model: String::new(),
+                actor: "system".to_owned(),
+                purpose: "crash-recovery".to_owned(),
+                in_tokens: 0,
+                out_tokens: 0,
+                cost_usd: 0.0,
+                measured: false,
+                status: "outcome_unknown".to_owned(),
+                latency_ms: 0,
+                error: Some(note.to_owned()),
+                session_id: None,
+                key_env: None,
+            });
+        }
         Ok(n)
     }
 
@@ -464,6 +486,47 @@ mod tests {
         );
     }
 
+
+    #[test]
+    // 2026-10-08: 中文测试名违反 Rust 标识符语法（空格）。
+    fn mark_outcome_unknown_lands_in_ledger() {
+        let store = NeobotStore::open(":memory:").expect("open");
+        let task = AgentTask {
+            id: "r1".to_owned(),
+            title: "old".to_owned(),
+            status: TaskStatus::Running,
+            created_at: "2026-10-02T00:00:00Z".to_owned(),
+            updated_at: "2026-10-02T00:00:00Z".to_owned(),
+            claimed_by: None,
+            claimed_at: None,
+            visibility: crate::nt_types::default_visibility(),
+            lease_id: None,
+            lease_until: None,
+            attempts: 0,
+            error: None,
+            conversation_id: None,
+        };
+        store.save_task(&task).expect("save");
+        assert_eq!(
+            store
+                .mark_outcome_unknown("2026-10-08T00:00:00Z", "crash while running")
+                .expect("sweep"),
+            1
+        );
+        // 恢复事实必须在 ledger 上可观测（永不为空）。
+        assert_eq!(
+            store
+                .ledger_count_by_status("outcome_unknown")
+                .expect("count"),
+            1,
+            "每次真回收都要落一行 outcome_unknown 账本"
+        );
+        assert_eq!(
+            store.ledger_count_by_status("ok").expect("count2"),
+            0,
+            "恢复事件不能算正常调用"
+        );
+    }
 
     #[test]
     fn rename_and_delete_task() {        let store = NeobotStore::open(":memory:").expect("open memory db");

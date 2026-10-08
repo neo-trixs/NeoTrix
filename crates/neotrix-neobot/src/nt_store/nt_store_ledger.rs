@@ -98,6 +98,16 @@ impl NeobotStore {
 
     // ---- outbox（实时 outbox：attempts + available_at 退避） ----
 
+    /// 按 status 计账本行（最简监控面：crash-recovery ~ outcomes_unknown 行数）。
+    pub fn ledger_count_by_status(&self, status: &str) -> Result<i64, NtBotError> {
+        let n: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM ledger WHERE status=?1",
+            params![status],
+            |r| r.get(0),
+        )?;
+        Ok(n)
+    }
+
     pub fn enqueue_outbox(&self, id: &str, topic: &str, payload: &str) -> Result<(), NtBotError> {
         self.conn.execute(
             "INSERT INTO outbox(id,topic,payload,claimed) VALUES(?1,?2,?3,0)",
