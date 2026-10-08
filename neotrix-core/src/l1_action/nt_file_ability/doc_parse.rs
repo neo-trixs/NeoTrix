@@ -54,6 +54,36 @@ pub fn parse_bytes(bytes: &[u8], format: Format) -> ParseResult<FileModel> {
     Ok(document_to_filemodel(doc))
 }
 
+/// 用 mdream（MIT，harlan-zw）做 HTML→Markdown 的可选加速通道。
+///
+/// 存在即用、不存在即回落 anydoc——这是「适配器注册」式接入，不是平行实现：
+/// 仅当环境变量 `MDREAM_BIN` 指向一个可执行文件时调用；
+/// 其它情况返回 `None`，调用方继续走 anydoc。
+///
+/// 依据：mdream 在 README 自称「fastest HTML to markdown convertor,
+/// optimized for LLMs, supports streaming」——价值在于流式/表格/strikethrough
+/// 的保真，但本层只吃 bytes 不做流式（TODO）。
+pub fn html_to_markdown_via_mdream(bytes: &[u8]) -> Option<String> {
+    let bin = std::env::var("MDREAM_BIN").ok()?;
+    let mut child = std::process::Command::new(bin)
+        .args(["--format", "markdown"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .ok()?;
+    use std::io::Write as _;
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(bytes);
+    }
+    let out = child.wait_with_output().ok()?;
+    if out.status.success() {
+        String::from_utf8(out.stdout).ok()
+    } else {
+        None
+    }
+}
+
 /// PDF 字节 → FileModel。
 ///
 /// 2026-09-29 修正：`parse_pdf_bytes_enhanced` 走 `to_document(bytes, Pdf)`，
@@ -483,6 +513,12 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::NamedTempFile;
+
+    #[test]
+    fn mdream_adapter_returns_none_when_bin_unset() {
+        std::env::remove_var("MDREAM_BIN");
+        assert!(html_to_markdown_via_mdream(b"<p>hi</p>").is_none());
+    }
 
     #[test]
     fn test_parse_any_content_sniff_beats_extension() {

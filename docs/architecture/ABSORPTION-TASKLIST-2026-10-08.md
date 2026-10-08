@@ -57,9 +57,11 @@
 
 ### A6. 代理池健康检查（mubeng）
 - **源**：`mubeng/mubeng`（Apache，2,729★）fast proxy checker + IP rotator
-- **现状**：`nt_provider.rs`/proxy 相关取证点未明；先 grep 现状
-- **改**：若生产已有 proxy pool，补健康检查循环+脏代理出池（仿 mubeng 的 checker→rotator 两段）
-- **验**：3 条测试：脏代理剔除、轮换顺序、零 panic
+- **现状实测**：仓内 `ProxyPool` 仅以 imported asset（`import_proxy_pool` 导入 KB）存在，
+  **无活的健康检查/轮换循环消费者**；`proxy_daemon` 只是 env 查询的薄壳。
+- **裁决 2026-10-08**：**📋 intake（无消费者）**——与 R-P79 红线一致：
+  不为了「吸收」而给不存在的轮换循环加代码；待某组件真正按 pool 轮询时再落实 checker。
+- **验**：本条不验代码，只在 §3 code map 任务清单中保持 intake 记录。
 
 ### A7. 逆向工程 MCP 能力（morluto/rea）
 - **源**：`morluto/rea`（MIT，17,126★）`rea-agents` MCP

@@ -95,6 +95,8 @@ pub mod nt_judge;
 /// System-1 式 typed 判定与极简 eval 契约（harness-evals 吸收）：
 /// Score 0-1 + threshold pass/fail。纯逻辑、零 I/O。
 pub mod nt_agent_eval;
+/// 并行多 agent 重探索成本计量（SquidAgent 吸收）：纯函数 measurement contract。
+pub mod nt_reexplore;
 /// EVO-08 统一数据面网关（DbKind/端点校验/注册表/DSN 脱敏/默认拒写）
 pub mod nt_data_gateway;
 /// 确定性采样器（温度/top-k/top-p/重复惩罚，2026-09-28 自已归档的
