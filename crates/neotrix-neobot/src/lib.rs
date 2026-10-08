@@ -58,6 +58,7 @@ pub mod nt_panel;
 pub mod nt_pdf_ground;
 pub mod nt_pet;
 pub mod nt_policy;
+pub mod nt_plugins;
 pub mod nt_prompt_guard;
 pub mod nt_provider;
 pub mod nt_qwen_mm;

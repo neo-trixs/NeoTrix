@@ -244,6 +244,8 @@ pub enum ToolName {
     /// 能力本体的执行入口在各自的 executor（trade 域等），
     /// 本工具走的是那条链（见 `execute_capability_invoke`）。
     CapabilityInvoke,
+    /// 运行时注册的插件（从 data_dir/plugins/*.json 发现）。
+    Plugin(String),
     Unknown(String),
 }
 
@@ -266,6 +268,7 @@ impl ToolName {
             Self::QwenSaveView => "qwen_save_view",
             Self::PdfGroundText => "pdf_ground_text",
             Self::CapabilityInvoke => "capability_invoke",
+            Self::Plugin(name) => name.as_str(),
             Self::Unknown(_) => "unknown_tool",
         }
     }
@@ -299,7 +302,12 @@ impl ToolName {
             // ⛔ 不收 `invoke_capability` 之类的别名 —— 别名越多，模型选错的机会
             // 越多，而撞名会让模型随机挑并绕过派发（`read_image` 的教训）。
             "capability_invoke" => Self::CapabilityInvoke,
-            _ => Self::Unknown(raw.to_owned()),
+            _ => {
+                if crate::nt_plugins::is_registered(raw) {
+                    return Self::Plugin(raw.to_owned());
+                }
+                Self::Unknown(raw.to_owned())
+            },
         }
     }
 
@@ -324,6 +332,7 @@ impl ToolName {
             // 能力市场调用：intent 是"invoke_capability"（★ 不是 read/write），
             // ★ 因为它**执行的是能力本体**，★ 具体副作用由该能力自己决定。
             Self::CapabilityInvoke => "invoke_capability",
+            Self::Plugin(_) => "plugin",
             Self::Unknown(_) => "unknown_tool",
         }
     }

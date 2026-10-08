@@ -177,6 +177,7 @@ pub fn evaluate_policy(ctx: &PolicyContext) -> PolicyDecision {    // 1) 人接�
         //    那里才读得到市场 ⇒ **fail-closed 仍然成立**，只是换了个位置判。
         ToolName::CapabilityInvoke => PolicyDecision::Allow,
         ToolName::Unknown(raw) => deny("unknown-tool", &format!("unknown tool '{raw}'")),
+        ToolName::Plugin(raw) => deny("plugin-not-allowed", &format!("plugin '{raw}' not in allowlist")),
         ToolName::Bash | ToolName::ComputerAct => {
             deny("default-deny", "no explicit allow rule matched")
         }

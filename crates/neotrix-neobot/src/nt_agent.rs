@@ -176,7 +176,7 @@ pub fn reversibility_of(tool: &ToolName) -> NeobotReversibility {
         | ToolName::QwenSaveView => {
             NeobotReversibility::Irreversible
         }
-        ToolName::Unknown(_) => NeobotReversibility::Irreversible,
+        ToolName::Unknown(_) | ToolName::Plugin(_) => NeobotReversibility::Irreversible,
     }
 }
 
@@ -211,7 +211,8 @@ pub fn enforced_timeout_ms(tool: &ToolName) -> Option<f64> {
         | ToolName::SidebarOpen
         | ToolName::SetTurnStatus
         | ToolName::PdfGroundText
-        | ToolName::Unknown(_) => None,
+        | ToolName::Unknown(_)
+        | ToolName::Plugin(_) => None,
     }
 }
 
@@ -1396,10 +1397,23 @@ fn execute_tool(
     stop: &StopToken,
 ) -> Result<ToolOutcome, NtBotError> {
     let routes = TOOL_ROUTES.get_or_init(build_builtin_routes);
-    let handler = routes
-        .get(call.name.as_str())
-        .ok_or_else(|| NtBotError::Invalid(format!("unknown tool: {}", call.name.as_str())))?;
-    handler(config, engine, call, turn_written, sink, stop)
+    if let Some(handler) = routes.get(call.name.as_str()) {
+        return handler(config, engine, call, turn_written, sink, stop);
+    }
+    // Unknown to the core routes: check plugins registered from data_dir/plugins.
+    if let Some(plugin) = crate::nt_plugins::lookup(call.name.as_str()) {
+        let output = crate::nt_plugins::invoke(&plugin, &call.args, &config.data_dir)?;
+        return Ok(ToolResult {
+            ok: true,
+            output,
+            truncated: false,
+        }
+        .into());
+    }
+    Err(NtBotError::Invalid(format!(
+        "unknown tool: {}",
+        call.name.as_str()
+    )))
 }
 
 type ToolExecFn = fn(
@@ -2060,7 +2074,16 @@ fn execute_capability_invoke(call: &crate::nt_types::ToolCall) -> Result<ToolRes
     // 显式标注 exec_out 类型：移除 `Some(v)` 臂后已无锚点可推(E0282)
     let (ok, executed, counted, reason, exec_out): (bool, bool, bool, String, Option<serde_json::Value>) = match dispatched {
         // 有实现 ⇒ **真实执行**（驱动 future，按上下文安全分流）。
-        Ok(Some(fut)) => match crate::nt_dispatch_drive::drive(fut) {
+        //
+        // ⚠️ 超时是**真的强制**（2026-10-08）：此前 `enforced_timeout_ms` 只是
+        //    影子值（只喂日志/策略），卡死的能力会永久挂住整轮，而它又被标成
+        //    `Irreversible` ⇒ 挂住且不可回滚。现改为 `drive_with_timeout`，
+        //    超时即 fail-closed 返回（被判词消费），调用方不被挂住。
+        Ok(Some(fut)) => match crate::nt_dispatch_drive::drive_with_timeout(
+            fut,
+            crate::nt_agent::enforced_timeout_ms(&ToolName::CapabilityInvoke)
+                .map(|ms| ms as u64),
+        ) {
             // ⚠️ `drive` 的 `Result` **嵌套**实现自身的 `Result`
             //（外层=能否驱动，内层=实现执行结果）⇒ 必须三层全匹配，⛔ 不可 `?` 混掉。
             // ✅ 真实执行成功 ⇒ 现在才计数（闭环要求「成功后计数」）
