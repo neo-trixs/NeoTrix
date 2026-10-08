@@ -32,6 +32,7 @@ pub mod nt_channel_cmd;
 pub mod nt_channel_dispatch;
 pub mod nt_channel_serve;
 pub mod nt_channel_telegram;
+pub mod nt_channel_wecom;
 pub mod nt_cli;
 pub mod nt_computer;
 pub mod nt_config;
@@ -39,6 +40,8 @@ pub mod nt_core;
 pub mod nt_cost;
 pub mod nt_daemon;
 pub mod nt_determinism;
+#[cfg(feature = "gateway-http")]
+pub mod nt_gateway;
 pub mod nt_effect_key;
 pub mod nt_engine;
 pub mod nt_error;
