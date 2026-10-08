@@ -280,6 +280,228 @@ pub fn verify_advice(outcome: VerifyOutcome) -> Option<RetryAdvice> {
     }
 }
 
+/// **窄 CDP 传输口**（D 期：core ↔ neobot 的唯一接缝）。
+///
+/// 依赖方向是 **core → neobot**（core 依赖 neobot），所以
+/// 「CDP 能力」必须由 neobot **先定义口**、core **后实现口** ——
+/// 反过来做（neobot 依赖 core）会造环，也正是当初不写第二套浏览器栈的原因。
+///
+/// 口只有两个方法，是**刻意窄**的：CDP 的坑（target 生命周期、frame 漂移、
+/// 连接复用、进程回收）全部留在实现侧；本 crate 只表达意图。
+/// ⛔ 当前本仓**没有**注入 transport 的生产接线 ⇒ 默认仍走 [`NoopBackend`]
+/// （诚实失败）；core 侧实现见 `docs/architecture/ABSORPTION-COMPUTER-USE-2026-10-08.md` §4-D。
+pub trait CdpTransport {
+    /// 执行一段 JS 并回传结果（同步，宿主负责超时）。
+    fn evaluate(&self, script: &str) -> Result<String, NtBotError>;
+    /// 当前页 URL（用于作用域/回读；实现拿不到就如实报 `None`）。
+    fn current_url(&self) -> Option<String> {
+        None
+    }
+}
+
+/// 把动作编译成**确定性 JS**（不拼字符串进 eval 之外的通道）。
+///
+/// 返回 `(脚本, 该动作是否属于「写」动作)`。写动作 ⇒ 回执默认
+/// `Unknown`（除非回读确认），因为「发出去没有」是三态。
+fn compile_action(call: &ComputerCall) -> Result<(String, bool), NtBotError> {
+    let q = |s: &str| -> String {
+        serde_json::to_string(s).unwrap_or_else(|_| "\"".to_owned())
+    };
+    Ok(match call.action {
+        ComputerAction::Navigate => {
+            let url = q(&call.target);
+            (format!("location.assign({url}); 'navigating'"), true)
+        }
+        ComputerAction::Click => {
+            let sel = q(&call.target);
+            (
+                format!("(function(){{var e=document.querySelector({sel});if(!e)return 'no-element';e.click();return 'clicked';}})()"),
+                true,
+            )
+        }
+        ComputerAction::Type => {
+            let sel = q(&call.target);
+            let text = q(&call.text);
+            (
+                format!("(function(){{var e=document.querySelector({sel});if(!e)return 'no-element';e.focus();e.value={text};e.dispatchEvent(new Event('input',{{bubbles:true}}));return 'typed';}})()"),
+                true,
+            )
+        }
+        ComputerAction::Key => {
+            let key = q(&call.text);
+            (
+                format!("(function(){{var e=new KeyboardEvent('keydown',{{key:{key},bubbles:true}}));document.activeElement&&document.activeElement.dispatchEvent(e);return 'keyed';}})()"),
+                true,
+            )
+        }
+        ComputerAction::Scroll => {
+            let target = q(&call.target);
+            (
+                format!("(function(){{var e=document.querySelector({target})||document.scrollingElement;if(!e)return 'no-element';e.scrollTop=e.scrollHeight;return 'scrolled';}})()"),
+                true,
+            )
+        }
+        ComputerAction::Screenshot => ("'screenshot-not-supported-by-narrow-port'".to_owned(), false),
+        // ⛔ 文件类动作**不属于**浏览器窄口：workspace 文件读写走 nt_workspace jail，
+        //    在这里重做一遍就是造第二条无门路径（合规问题，不是能力问题）。
+        ComputerAction::ReadFile | ComputerAction::WriteFile | ComputerAction::ListFiles => {
+            return Err(NtBotError::Invalid(
+                "narrow CDP port does not serve file actions; use nt_workspace".to_owned(),
+            ));
+        }
+    })
+}
+
+/// CDP 后端：**只在宿主注入了 [`CdpTransport`] 时才存在**。
+///
+/// 与 [`NoopBackend`] 的区别不是「更聪明」，而是「真的接了线」——
+/// 没有 transport 时**不允许**退化到 Noop 后假装能点。
+#[derive(Debug, Clone)]
+pub struct CdpBackend<T> {
+    transport: T,
+}
+
+impl<T: CdpTransport> CdpBackend<T> {
+    /// 用宿主 transport 构造。
+    pub const fn new(transport: T) -> Self {
+        Self { transport }
+    }
+}
+
+impl<T: CdpTransport> ComputerBackend for CdpBackend<T> {
+    fn backend_id(&self) -> &str {
+        "cdp"
+    }
+
+    fn execute(&self, call: &ComputerCall) -> Result<String, NtBotError> {
+        let (script, is_write) = compile_action(call)?;
+        let out = self.transport.evaluate(&script)?;
+        // 回读语义：写动作若回执不是明确成功词 ⇒ 效果未知（**不许重试**）。
+        if is_write && !matches!(out.as_str(), "clicked" | "typed" | "navigating") {
+            return Err(NtBotError::Io(format!(
+                "cdp write returned non-confirmation: {}",
+                crate::nt_computer::truncate_for_detail(&out)
+            )));
+        }
+        Ok(out)
+    }
+}
+
+/// 错误详情的定长截断（**不进 prompt 的原始 body**，防上下文炸）。
+#[must_use]
+pub fn truncate_for_detail(raw: &str) -> String {
+    const LIMIT: usize = 120;
+    raw.chars().take(LIMIT).collect()
+}
+
+/// **元素句柄台账**（`computer-use` P3 吸收）。
+///
+/// 句柄失效是 CU/BU 的**第一大错误源**：模型拿着「42 号元素」去点，页面可能
+/// 已经变了。本台账把三件事从「模型自觉」变成**协议层纪律**：
+///
+/// 1. **作用域显式**：每个 ref 绑定一个 `scope`（通常是 URL 规范化后的 host+
+///    path 前缀）。作用域变了 ⇒ ref 失效，**不跨页复用**；
+/// 2. **主动回收**：新一次观察（`begin_observation`）会把上一批未见过的 ref
+///    全部作废 —— 「没被这一轮重新观察到」就等于**不存在**；
+/// 3. **校验由知道真相的一侧做**：台账只回答「这个 ref 在当前观察里活着吗」，
+///    **不**去猜描述是否还对（那是 observe 面的事）。
+#[derive(Debug, Clone)]
+pub struct ElementLedger {
+    scope: String,
+    observation: u64,
+    refs: std::collections::BTreeMap<String, ElementRefEntry>,
+}
+
+#[derive(Debug, Clone)]
+struct ElementRefEntry {
+    selector: String,
+    generation: u64,
+}
+
+/// 句柄解析结果（**三态**，不用 `Option` 压平）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RefLookup {
+    /// 命中当前观察内的活句柄。
+    Live { selector: String },
+    /// 句柄曾存在，但已被更新的观察淘汰（作用域相同）。
+    Stale { selector: String },
+    /// 从没见过（模型编的号，或另一页的号）。
+    Unknown,
+}
+
+impl ElementLedger {
+    /// 开一台账（作用域 = 规范化后的 target）。
+    #[must_use]
+    pub fn new(scope: &str) -> Self {
+        Self {
+            scope: scope.to_owned(),
+            observation: 0,
+            refs: std::collections::BTreeMap::new(),
+        }
+    }
+
+    /// 作用域（当前绑定）。
+    #[must_use]
+    pub fn scope(&self) -> &str {
+        &self.scope
+    }
+
+    /// 当前观察代号（每 `begin_observation` 递增一次）。
+    #[must_use]
+    pub fn observation(&self) -> u64 {
+        self.observation
+    }
+
+    /// 开新一轮观察：**旧句柄全部作废**，返回被淘汰的数量。
+    ///
+    /// 这是「回收」纪律的执行点 —— 不依赖模型记得上一轮有什么。
+    pub fn begin_observation(&mut self) -> u64 {
+        self.observation = self.observation.saturating_add(1);
+        let n = self.refs.len();
+        self.refs.clear();
+        self.observation
+    }
+
+    /// 切换作用域（跨页导航）：作废全部句柄。
+    pub fn set_scope(&mut self, scope: &str) {
+        if self.scope != scope {
+            self.scope = scope.to_owned();
+            self.begin_observation();
+        }
+    }
+
+    /// 登记一次观察里看到的元素。
+    pub fn observe(&mut self, handle: &str, selector: &str) {
+        self.refs.insert(
+            handle.to_owned(),
+            ElementRefEntry {
+                selector: selector.to_owned(),
+                generation: self.observation,
+            },
+        );
+    }
+
+    /// 查句柄。
+    #[must_use]
+    pub fn lookup(&self, handle: &str) -> RefLookup {
+        match self.refs.get(handle) {
+            Some(entry) if entry.generation == self.observation => RefLookup::Live {
+                selector: entry.selector.clone(),
+            },
+            Some(entry) => RefLookup::Stale {
+                selector: entry.selector.clone(),
+            },
+            None => RefLookup::Unknown,
+        }
+    }
+
+    /// 当前观察里的活句柄数。
+    #[must_use]
+    pub fn live_count(&self) -> usize {
+        self.refs.len()
+    }
+}
+
 /// 从 URL/类 URL 目标中提取 host (无 `url` 依赖的最小实现).
 pub fn host_of(target: &str) -> Option<String> {
     let after_scheme = target.split_once("://").map(|(_, rest)| rest).unwrap_or(target);
@@ -341,6 +563,84 @@ mod tests {
         assert!(r.sent, "传输层失败不能断言未派发");
         assert_eq!(r.outcome, ActionOutcome::Unknown);
         assert_eq!(r.advice, RetryAdvice::Retry, "幂等传输失败才可自动重试");
+    }
+
+    #[test]
+    fn cdp_backend_writes_through_transport_and_refuses_fake_success() {
+        use super::{CdpBackend, CdpTransport, ComputerBackend};
+        use crate::nt_error::NtBotError;
+        use std::cell::RefCell;
+
+        struct Fake {
+            calls: RefCell<Vec<String>>,
+            reply: String,
+        }
+        impl CdpTransport for Fake {
+            fn evaluate(&self, script: &str) -> Result<String, NtBotError> {
+                self.calls.borrow_mut().push(script.to_owned());
+                Ok(self.reply.clone())
+            }
+        }
+
+        // 写动作 + 明确确认 ⇒ Ok
+        let ok = CdpBackend::new(Fake { calls: RefCell::new(vec![]), reply: "clicked".into() });
+        let call = parse_computer_call(&serde_json::json!({"action":"click","target":"#go"})).expect("parse");
+        assert_eq!(ok.execute(&call).expect("exec"), "clicked");
+        let logged = ok.transport.calls.borrow()[0].clone();
+        assert!(logged.contains("querySelector(\"#go\")"), "选择器必须是 JSON 转义后的字面量: {logged}");
+
+        // 写动作 + 非确认回执 ⇒ **Io 错**（上层映射成 Unknown ⇒ 禁止重试）
+        let ambiguous = CdpBackend::new(Fake { calls: RefCell::new(vec![]), reply: "no-element".into() });
+        let err = ambiguous.execute(&call).expect_err("no-element must not look like success");
+        let receipt = super::receipt_for_error("click", &err);
+        assert_eq!(receipt.outcome, super::ActionOutcome::Unknown, "非确认回执 ⇒ 效果未知");
+        assert!(receipt.sent);
+    }
+
+    #[test]
+    fn cdp_port_refuses_file_actions_instead_of_guessing() {
+        use super::{CdpBackend, CdpTransport, ComputerBackend};
+        use crate::nt_error::NtBotError;
+        struct Never;
+        impl CdpTransport for Never {
+            fn evaluate(&self, _script: &str) -> Result<String, NtBotError> {
+                panic!("file action must not reach the transport");
+            }
+        }
+        let backend = CdpBackend::new(Never);
+        for raw in ["read_file", "write_file", "list_files"] {
+            let call = parse_computer_call(&serde_json::json!({"action": raw})).expect("parse");
+            let err = backend.execute(&call).expect_err("file actions belong to nt_workspace");
+            let receipt = super::receipt_for_error(raw, &err);
+            assert!(!receipt.sent, "参数错 ⇒ 未派发");
+            assert_eq!(receipt.advice, super::RetryAdvice::Stop);
+        }
+    }
+
+    #[test]
+    fn element_ledger_recycles_on_new_observation_and_scope_change() {
+        use super::{ElementLedger, RefLookup};
+        let mut ledger = ElementLedger::new("example.com/a");
+        let first = ledger.begin_observation();
+        ledger.observe("e1", "button.send");
+        ledger.observe("e2", "input.to");
+        assert_eq!(ledger.live_count(), 2);
+        assert!(matches!(ledger.lookup("e1"), RefLookup::Live { .. }));
+
+        // 新观察 ⇒ 上一轮没被重新观察到的句柄**全部作废**
+        let second = ledger.begin_observation();
+        assert_eq!(second, first + 1);
+        assert!(matches!(ledger.lookup("e1"), RefLookup::Unknown));
+        assert_eq!(ledger.live_count(), 0);
+
+        // 编造的号永远 Unknown（不编 selector）
+        assert_eq!(ledger.lookup("e99"), RefLookup::Unknown);
+
+        // 换作用域 ⇒ 再次作废
+        ledger.observe("e1", "a");
+        ledger.set_scope("example.com/b");
+        assert_eq!(ledger.live_count(), 0);
+        assert_eq!(ledger.scope(), "example.com/b");
     }
 
     #[test]

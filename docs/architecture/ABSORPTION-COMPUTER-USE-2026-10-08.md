@@ -64,7 +64,28 @@
 - 租约：`tasks.lease_id` 复用 + UI 倒计时；到期→`outcome_unknown`（复用 P1-2 已落账的语义）；
 - 回读：动作后可选 `verify_after`（截图/DOM 文本比对），三态展示。
 
-**D. 真后端（暂缓）**：CDP 后端建议**不在 neobot 实现**（neobot 不依赖 core；core 已有 `BrowserCircuit`）。要么 core 暴露窄接口给 neobot，要么保持 `NoopBackend` 诚实失败。**需裁决**。
+**D. 真后端（2026-10-08 裁决=「core 实现口、neobot 定义口」，neobot 半边已落地）**
+
+依赖方向是 **core → neobot**，故口必须**由 neobot 先定义**：
+
+```rust
+// crates/neotrix-neobot/src/nt_computer.rs（已落地）
+pub trait CdpTransport {
+    fn evaluate(&self, script: &str) -> Result<String, NtBotError>;
+    fn current_url(&self) -> Option<String> { None }
+}
+pub struct CdpBackend<T> { transport: T }   // 已落地：navigate/click/type/key/scroll/screenshot
+```
+
+- **已落地（neobot 半边）**：`compile_action()` 把动作编译成**确定性 JS**（选择器/文本经 `serde_json` 转义）；
+  写动作回执非明确确认词（`clicked/typed/navigating/keyed/scrolled`）⇒ 返回 `Io` 错 ⇒ 上层映射 `Unknown` ⇒ **禁止自动重试**；
+  文件类动作（`read_file/write_file/list_files`）在窄口**拒收**（属 `nt_workspace` jail，重复实现=第二条无门路径）；
+  `truncate_for_detail()` 定长截断防上下文炸。
+- **待落地（core 半边）**：在 `neotrix-core`（已有 chromiumoxide 依赖；现 `crawl::BrowserCircuit` 仅文本级 `fetch/login`）
+  实现 `impl neotrix_neobot::nt_computer::CdpTransport for <chromiumoxide 会话>`，并暴露一个工厂；
+  **接线位置**须由 owner 指定（CLI/desktop/core loop 谁注入）——**未注入前默认仍走 `NoopBackend` 诚实失败**，
+  ⛔ 不允许「为了能跑」而把 Noop 换成假实现。
+- **验收**：core 半边落地后，端到端一次真实 `click` + `verify_after` 回读三态（Match/Drift/Unavailable）+ 急停联动。
 
 ## 5. 记录纪律
 
