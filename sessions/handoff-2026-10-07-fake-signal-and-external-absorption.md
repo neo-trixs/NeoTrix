@@ -177,3 +177,26 @@
 ⚠️ 踩坑：`$BASELINE）` 被 bash 并进变量名（全角标点吃字节，`LESSONS-20260924` R36–R46 同款），三处改用 `${}` 显式闭合才通过。
 
 ⛔ 主树 offender 数（1612）**不可**当基线用，须在 `git worktree add --detach HEAD` 干净检出上量（registry 原记「主树1629/clean-HEAD1646」的差异已被他窗提交掉，现已对齐）。
+
+### § 3.8 T0/T1 复核：4 条 P1 任务书，3 条前提被推翻（2026-10-08）
+
+派 4 个 `general` 子代理并行取证，**结论全部与任务书相反**：
+
+| 任务 | 任务书说 | 实测真相 | 处置 |
+|---|---|---|---|
+| T1-2 | 8 个逐字副本违反 SSOT | 副本**早已 `pub use` 化完**（`nt_dup_types.py` 复测 13 个名字 0 真重复组）；真问题 = `data_model.rs:1-4` 与 `unified_types.rs:1-4` **逐字重复同一 SSOT 承诺**，且「子模块用 `use data_model::*`」**零个生产子模块**用它 | 撤下承诺改为陈述事实 + 钉住「⛔ 不要按名字删这 8 个 struct」（`nt_dup_types.py:225-230` 有上一轮 E0119+E0560 回滚史） |
+| T1-4 | `l6_meta/lib.rs` 死影子 | 文件**已由 `43e2380c` 删除**；门其实**抓到了**（UNDECLARED+UNREACHABLE 两���都在 baseline）**被 baseline 吞**；真病灶 = **265 条基线里 237 条已 RESOLVED 而门一直 DONE(advisory)** | `--update-baseline` 265→32，并加**陈旧度上界**判据 |
+| T1-6 | L3 重复 669 行待裁 | **已由 `2b539d63` 删除**，实际 **699 行**（文档少 30）；无 uniffi/无绑定层风险 | ROADMAP + `nt_shield/mod.rs` 注记订正数字 |
+| T1-8 | 375 行外部不可达 | 实为 **398 行**；「不可达」**是措辞错误** —— 在 `lib.rs:65→nt_world/mod.rs:24→source/mod.rs:235/246/248` 上**按名可达**，正确表述是**零调用点**；真缺陷 = `test_lru_eviction` **结构上不可能失败** | 补强断言（先 `get(a)` 提升 recency）+ 订正措辞 |
+
+**本轮最值钱的一条**：`test_lru_eviction` 原序列 `set a/b/c` 后断言 `a` 淘汰，在 **LRU 与 FIFO 下输出完全相同** ⇒ 它证明不了本类型是 LRU。仓外探针逐字复刻两份策略实测：原序列区分不了，加一次 `get(a)` 后分得开。已改，5 passed。
+
+⚠️ **元教训升级**：这轮 4 条任务书里 3 条前提被推翻，而它们**都出自一份看起来很权威的 roadmap**。⇒ 「文档列了待办」与「代码里有这个问题」之间没有推理链，必须先复现。这条已写进 TODO.md 顶部。
+
+### § 3.9 剩下的唯一真阻塞：许可门（**需人类裁决，我不代签**）
+
+`check-license.sh` rc=1，根因 `apps/neobot-desktop/frontend/LICENSE.details`：
+**MIT + 附加条款「No Commercial Secondary Development」**（禁止商业二次开发，与 MIT 冲突时附加条款优先）。
+门给出三选一：① 移除 vendored 树（架构级决定）② 取得上游书面授权 ③ **项目所有者**签署 `.neotrix/LICENSE-EXCEPTIONS.md`。
+⛔ 三条**都需要人类/所有者权限**，且门自身写明「改本门 / 删 deny 名单让检查变绿 = 不可接受」。
+⇒ 本轮**未动**，如实上报为阻塞点。
