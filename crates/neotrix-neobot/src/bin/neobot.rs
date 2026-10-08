@@ -1228,6 +1228,7 @@ fn cmd_gateway(addr: &str) -> Result<(), NtBotError> {
     rt.block_on(neotrix_neobot::nt_gateway::run_server(
         neotrix_neobot::nt_gateway::GatewayConfig {
             addr: addr.to_owned(),
+            cfg,
             store,
         },
     ))?;

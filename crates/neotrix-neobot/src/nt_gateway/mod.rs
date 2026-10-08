@@ -2,31 +2,41 @@
 //!
 //! Module gated: `#[cfg(feature = "gateway-http")]`。默认不编译。
 //!
-//! 本期只落「接线壳」，不造概念层（CostGate/FallbackChain/quota 复用 `neotrix-gateway`/neobot 已有路由）：
+//! v0 翻译层真实层（N6.3 P2 推进）：
 //! - `GET  /health`                 → `{ok:true}`
-//! - `GET  /v1/models`              → `{object:"list", data:[...]}`（`list_route_groups()`）
-//! - `POST /v1/chat/completions`    → 501 OpenAI 形状的 `not_implemented_error`
+//! - `GET  /v1/models`              → `{object:"list", data:[...]}`（启动时`list_route_groups()` 快照）
+//! - `POST /v1/chat/completions`    → OpenAI 形状cextract last user content →
+//!   `LocalEchoEngine::run_turn` → 回写 OpenAI `chat.completion` 形状。
 //!
-//! 待期：翻译矩阵 6 端点 metà、SSE 粗粒度流式、CostGate 接线、dispatch 进账本。
+//! **只接 echo**：复杂路由（route group / provider name / failover / 流式 SSE）
+//! 是显式后置 follow-up —— 不在这里悄悄伪装已经在跑真模型。
 //!
-//! 为什么 501 而不是假实现：翻译层缺路由名与形状校验时**必须如实报不实现**，
-//! 伪造 200=「通真等于通不可眼悍横」（Captain 形状错误映射表的同源纪律）。
+//! 总纲见 `docs/architecture/N6-3-GATEWAY-BOUNDARY-2026-10-08.md`。
 
 #![cfg(feature = "gateway-http")]
 
+use axum::response::IntoResponse;
+use crate::nt_engine::{EngineAdapter, LocalEchoEngine};
 use crate::nt_error::NtBotError;
 use crate::nt_store::NeobotStore;
 
 pub struct GatewayConfig {
     pub addr: String,
+    pub cfg: crate::NeobotConfig,
     pub store: NeobotStore,
+}
+
+struct GatewayState {
+    cfg: crate::NeobotConfig,
+    store: std::sync::Arc<std::sync::Mutex<NeobotStore>>,
+    routes: std::sync::Arc<Vec<serde_json::Value>>,
 }
 
 /// 最小启动入口（bin `gateway serve` 调用）。
 pub async fn run_server(conf: GatewayConfig) -> Result<(), NtBotError> {
     use axum::{routing::get, Router};
 
-    let models: Vec<serde_json::Value> = match conf.store.list_route_groups() {
+    let routes: Vec<serde_json::Value> = match conf.store.list_route_groups() {
         Ok(routes) => routes
             .into_iter()
             .map(|r| serde_json::json!({"id": r.name, "object": "model", "owned_by": "neotrix"}))
@@ -36,7 +46,12 @@ pub async fn run_server(conf: GatewayConfig) -> Result<(), NtBotError> {
             Vec::new()
         }
     };
-    let models = std::sync::Arc::new(models);
+
+    let state = std::sync::Arc::new(GatewayState {
+        cfg: conf.cfg,
+        store: std::sync::Arc::new(std::sync::Mutex::new(conf.store)),
+        routes: std::sync::Arc::new(routes),
+    });
 
     let app = Router::new()
         .route("/health", get(health))
@@ -45,7 +60,7 @@ pub async fn run_server(conf: GatewayConfig) -> Result<(), NtBotError> {
             "/v1/chat/completions",
             axum::routing::post(chat_completions),
         )
-        .with_state(models);
+        .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(&conf.addr)
         .await
@@ -62,24 +77,106 @@ async fn health() -> impl axum::response::IntoResponse {
 
 /// `GET /v1/models` —— 启动时快照路由组列出系我们有的模型簇。
 async fn models_handler(
-    axum::extract::State(routes): axum::extract::State<std::sync::Arc<Vec<serde_json::Value>>>,
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<GatewayState>>,
 ) -> impl axum::response::IntoResponse {
     (
         axum::http::StatusCode::OK,
-        axum::Json(serde_json::json!({"object":"list","data":(*routes).clone()})),
+        axum::Json(serde_json::json!({"object":"list","data":(*state.routes).clone()})),
     )
 }
 
-/// `POST /v1/chat/completions` —— 本期 501；形状未校验前不伪造响应。
-async fn chat_completions() -> impl axum::response::IntoResponse {
+/// `POST /v1/chat/completions` —— v0 真实层：OpenAI 形状 → echo run_turn → chat.completion.
+async fn chat_completions(
+    axum::extract::State(state): axum::extract::State<std::sync::Arc<GatewayState>>,
+    axum::Json(body): axum::Json<serde_json::Value>,
+) -> impl axum::response::IntoResponse {
+    let Some(content) = last_user_content(&body) else {
+        return (
+            axum::http::StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({
+                "error": {"message": "messages[] required, last user content missing", "type": "invalid_request_error", "code": "messages_required"}
+            })),
+        )
+            .into_response();
+    };
+
+    let model = body["model"].as_str().unwrap_or("echo");
+
+    let _guard = match state.store.lock() {
+        Ok(guard) => guard,
+        Err(_) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                axum::Json(serde_json::json!({"error":{"message":"store lock poisoned","type":"upstream_error","code":"store_lock"}})),
+            )
+                .into_response();
+        }
+    };
+
+    let memory = crate::nt_memory::memory_for_config(&state.cfg);
+    let engine_result = crate::build_engine_by_name(&_guard, model, Some(model), memory);
+    let turn_outcome = match engine_result {
+        Ok(Some(engine)) => engine.run_turn(&content, &[]),
+        Ok(None) => LocalEchoEngine.run_turn(&content, &[]),
+        Err(err) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                axum::Json(serde_json::json!({"error":{"message": format!("{err}"), "type":"upstream_error", "code":"engine_build_failed"}})),
+            )
+                .into_response();
+        }
+    };
+    let turn = match turn_outcome {
+        Ok(turn) => turn,
+        Err(err) => {
+            return (
+                axum::http::StatusCode::BAD_GATEWAY,
+                axum::Json(serde_json::json!({"error":{"message": format!("{err}"), "type":"upstream_error", "code":"engine_turn_failed"}})),
+            )
+                .into_response();
+        }
+    };
     (
-        axum::http::StatusCode::NOT_IMPLEMENTED,
+        axum::http::StatusCode::OK,
         axum::Json(serde_json::json!({
-            "error": {
-                "message": "nt_gateway_http is a skeleton: translation layer lands in follow-up PR (N6.3 P2)",
-                "type": "not_implemented_error",
-                "code": "not_implemented",
-            }
+            "id": format!("chatcmpl-{}", uuid::Uuid::new_v4().simple()),
+            "object": "chat.completion",
+            "created": chrono::Utc::now().timestamp(),
+            "model": model,
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": turn.assistant_text},
+                "finish_reason": "stop",
+            }],
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
         })),
     )
+        .into_response()
+}
+
+/// 取 `messages` 里最后一条 `role=user` 的内容；兼容 `content` 为字符串或 parts 数组的形状。
+fn last_user_content(body: &serde_json::Value) -> Option<String> {
+    let messages = body.get("messages")?.as_array()?;
+    for msg in messages.iter().rev() {
+        if msg.get("role")?.as_str()? == "user" {
+            match msg.get("content")? {
+                serde_json::Value::String(s) => return Some(s.clone()),
+                serde_json::Value::Array(parts) => {
+                    for part in parts.iter() {
+                        if part.get("type").and_then(|v| v.as_str()) == Some("text") {
+                            if let Some(text) = part.get("text").and_then(|v| v.as_str()) {
+                                return Some(text.to_owned());
+                            }
+                        }
+                        // 兼容parts直接是string的数组或只有text字段的简形
+                        if let Some(text) = part.as_str() {
+                            return Some(text.to_owned());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    None
 }
