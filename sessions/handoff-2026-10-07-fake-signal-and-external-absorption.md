@@ -145,3 +145,18 @@
   | numeric | 33→0 | 20→56 | 311 |
 - `cargo check -p neotrix` 0 errors；worktree 已回收。
 - 下一焦点：P2.2 nt_reward 账本关 evaluation_history（需读 TODO.md 权威）；P3.1 naming 1615 advisory。
+
+### § 3.5 P2.2 兑现：evaluation_history 落盘（2026-10-08）
+
+**先纠正 todo 本身的措辞**：P2.2 写的是「nt_reward 账本**接** evaluation_history」，但接���早已完成（`goal_contract.rs` 读 history → 构造 RewardLedger → 回写 autonomy，2026-10-06 e2e 测过）。真正的缺口是 **evaluation_history 从不持久化** —— `persist_impl.rs` 只存 capability/BrainMetadata，重启后账本归零。
+
+- `44d9ea70` 把 `evaluation_history` 从 `SelfIteratingBrain` 搬到 `ReasoningBrain`（既有 save/load 通道的宿主），`BrainMetadata` 增同名字段 + `#[serde(default)]`。
+- `9eedacd9` 补两条证伪测试：往返存活 + 旧档兼容。
+- 验证：`evaluation_history` 2 passed；`seal_loop` 15 / `goal_contract` 4 / `rsi_operators` 7 / `openspace` 12 全绿；fake-signal RC=0；dead-flag bool+numeric --strict RC=0。
+- ⚠️ 他窗遗留（不属我、勿代改）：`check-unwrap --strict` 红于 `run.rs:872` panic；`check-silent-failure --strict` 红于 `nt_media/persistence.rs:453` set_len；`--tests` 目标曾红于 `nt_io_plugin` 的 Any/Arc 与 `neobot` 的 PLACEHOLDER_TEXT。
+
+### § 3.6 一次事故记录：共享 index 下误提交他窗文件
+
+`git commit`（未带 `--only`）把**他窗已暂存**的 9 个文件连同我的改动一起提成了 `0b1fcdcf`。AGENTS.md §1 早已写明该风险，实操时仍踩到。
+补救：`git reset HEAD^`（保留工作树）→ 用 `grep -l '未接线规格'` 反查**我自己**改过的文件并逐一 `git add` → `d017c0b8`（106 files / +316 −2，纯净）。
+⇒ **判据固化**：`git commit` 必须带 `--only <显式文件列表>`；无 `--only` 的 commit 在本仓共享 index 下等价于「提交别人的暂存区」。
