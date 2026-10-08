@@ -237,6 +237,7 @@ pub fn run_once(
         // `signal_run_cancel` 翻转同一登记表 ⇒ IM /stop 真正可停。
         let mut handles: Vec<std::sync::mpsc::Receiver<Result<InboundOutcome, String>>> =
             Vec::new();
+        let mut pool = WorkerPool::new(WORKER_POOL_MAX);
         for msg in inbound {
             stats.received += 1;
             // 一条消息交给**认领这个发件人**的那个机器人。
@@ -270,6 +271,33 @@ pub fn run_once(
                 }
                 continue;
             }
+            // Captain_Who multi-agent.md 并发上限吸收：
+            // 活跃 worker 先收尸再判定；满员 ⇒ 本条**退回同步路径**，不再起线程
+            // （否则每轮为每个 msg 无限起线程，极端并发线程数不封顶）。
+            pool.reap();
+            if !pool.can_spawn() {
+                let engine = match engine_for(config) {
+                    Ok(engine) => engine,
+                    Err(err) => {
+                        stats.failed += 1;
+                        eprintln!("[neobot] 引擎不可用：{err}");
+                        break;
+                    }
+                };
+                match nt_channel_dispatch::on_inbound(
+                    store,
+                    config,
+                    engine.as_ref(),
+                    adapter_ref,
+                    bot,
+                    &msg,
+                ) {
+                    Ok(InboundOutcome::Turn { .. }) => stats.ran += 1,
+                    Ok(_) => stats.ignored += 1,
+                    Err(_) => stats.failed += 1,
+                }
+                continue;
+            }
             // 跑轮与收取解耦：worker 线程跑 `on_inbound`，主线程继续 poll、
             // 使得跑轮期间抵达的 /stop 能经 `signal_run_cancel` 翻转同一登记。
             //
@@ -280,7 +308,7 @@ pub fn run_once(
             let bot_w = bot.clone();
             let msg_w = msg.clone();
             let (tx, rx) = std::sync::mpsc::channel::<Result<InboundOutcome, String>>();
-            std::thread::spawn(move || {
+            let worker_handle = std::thread::spawn(move || {
                 let res = (|| -> Result<InboundOutcome, String> {
                     let worker_store = NeobotStore::open(
                         &config_w.db_path().to_string_lossy(),
@@ -301,6 +329,7 @@ pub fn run_once(
                 // 接收端可能已在 200ms 后放弃对超时轮次的等待 ⇒ 丢弃亦可。
                 let _ = tx.send(res);
             });
+            pool.admit(worker_handle);
             handles.push(rx);
         }
         // 主线程按序对每个 worker 做有界等待：
@@ -388,6 +417,44 @@ pub fn bot_token_missing(token_env: &str) -> bool {
         .unwrap_or(true)
 }
 
+/// 每轮活跃 worker 线程上限（Captain_Who multi-agent.md 并发上限吸收）。
+/// 满员时本批通道内剩余消息退回**同步路径**，不再起线程 ⇒ 线程数有顶。
+pub const WORKER_POOL_MAX: usize = 8;
+
+/// 跟踪本轮未收尸的 worker 把柄。`thread::spawn` 不计；`reap`/`admit`/`can_spawn` 三件套。
+pub(crate) struct WorkerPool {
+    max: usize,
+    live: Vec<std::thread::JoinHandle<()>>,
+}
+
+impl WorkerPool {
+    pub(crate) fn new(max: usize) -> Self {
+        Self { max, live: Vec::new() }
+    }
+
+    /// 收掉已结束的把柄，返回当前活跃数。不变量：`活跃 = live.len()`（收尸后）。
+    pub(crate) fn reap(&mut self) -> usize {
+        let mut i = 0;
+        while i < self.live.len() {
+            if self.live[i].is_finished() {
+                // swap_remove 未处理的把柄会立即 detach（必要时等待）；noop 线程 200ms 外就是正常语义。
+                let _ = self.live.swap_remove(i);
+            } else {
+                i += 1;
+            }
+        }
+        self.live.len()
+    }
+
+    pub(crate) fn admit(&mut self, h: std::thread::JoinHandle<()>) {
+        self.live.push(h);
+    }
+
+    pub(crate) fn can_spawn(&self) -> bool {
+        self.live.len() < self.max
+    }
+}
+
 /// 白名单解析（服务循环里判断「有没有人会被放行」用）。
 pub fn bot_allow_list(raw: &str) -> Vec<String> {
     crate::nt_store::parse_allow_list(raw)
@@ -428,6 +495,27 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn worker_pool_respects_max() {
+        let mut pool = WorkerPool::new(0);
+        assert!(!pool.can_spawn(), "max=0 永不准 spawn");
+        let mut pool = WorkerPool::new(1);
+        pool.admit(std::thread::spawn(|| {}));
+        assert!(!pool.can_spawn(), "未收尸前的线程不让出额度");
+    }
+
+    #[test]
+    fn worker_pool_reaps_finished() {
+        let mut pool = WorkerPool::new(1);
+        pool.admit(std::thread::spawn(|| {}));
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(200);
+        while pool.reap() > 0 && std::time::Instant::now() < deadline {
+            std::thread::yield_now();
+        }
+        assert_eq!(pool.reap(), 0, "已结束的 worker 必须被收尸");
+        assert!(pool.can_spawn(), "收尸后恢复容量");
+    }
+
     fn run_once_on_empty_store_is_a_noop() {
         let st = store("empty");
         let cfg = config("empty");
