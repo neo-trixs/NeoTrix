@@ -87,7 +87,11 @@
   `ABSORPTION-BATCH-18-MEMORY-2026-10-07.md` 第 1 条 intake
 - **改**：新增 `benches/agent_eval.rs`，引入 Normalized Score(0-1)+threshold pass/fail
   的极简等价物（不依赖外部 Python 包）：`struct EvalCase { prompt, gold, scorer }`
-- **验**：`cargo bench --bench agent_eval -- --test` 冒烟 1 用例
+- **验**：`cargo bench --bench agent_eval -- --test` 冒烟 1 用例。
+  **2026-10-08 实测阻塞**：release profile 完整构建（neotrix lib 双 crate-type +
+  codegen-units=1）两次被 30min 超时 SIGTERM 终止 ⇒ 真实 Criterion 数字至今未产出。
+  当前保证 = lib 级单测 4 绿 + bench target 的 dev-profile `cargo check` 通过。
+  等待 16G 机外的完整 release 构建窗口补跑。
 
 ### B2. 长程 loop checkpoint/recover（LongHorizon-Harness + MIRA）
 - **源**：`AMAP-ML/LongHorizon-Harness`（MIT）、arxiv 2610.02525（MIRA 外层 meta-reasoner）
