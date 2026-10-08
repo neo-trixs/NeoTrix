@@ -24,8 +24,9 @@ pub enum RouteMode {
     Rotate,
     /// 已用次数最少者优先。
     Usage,
-    /// 额度感知：最近一次失败距今最久的成员优先（失败即额度可能已耗尽，
-    /// 冷却时间越久的账号额度恢复可能性越高；全新成员 last_fail=0 排最前）。
+    /// 额度感知：按每日剩余额度排序 —— 已声明上限且剩余最多者优先，
+    /// 未声明上限次之，已耗尽排最后。额度来自 `QuotaWindow`/`QuotaLimit`
+    /// 快照（构造期装入，`set_quota_remaining`）。
     Quota,
 }
 
@@ -45,7 +46,7 @@ impl RouteMode {
             "usage" => Ok(Self::Usage),
             "quota" => Ok(Self::Quota),
             other => Err(NtBotError::Invalid(format!(
-                "unknown route mode '{other}' (order|rotate|usage)"
+                "unknown route mode '{other}' (order|rotate|usage|quota)"
             ))),
         }
     }
@@ -57,7 +58,7 @@ pub struct RouteGroup {
     pub name: String,
     /// 成员 provider 名（顺序即 order 模式的尝试顺序）。
     pub members: Vec<String>,
-    /// order | rotate | usage。
+    /// order | rotate | usage | quota。
     pub mode: String,
     pub enabled: bool,
 }
@@ -66,6 +67,9 @@ pub struct RouteGroup {
 pub struct RouteMember {
     pub provider: String,
     pub engine: Box<dyn EngineAdapter>,
+    /// 该成员对应 key 的环境变量名（来自 providers.key_env）。
+    /// 用于把 QuotaWindow/QuotaLimit（按 key_env 维度）映射到路由成员。
+    pub key_env: String,
 }
 
 /// 组行为：按模式排引擎顺序，逐个尝试直到成功或遇到不可重试错误。
@@ -77,6 +81,10 @@ pub struct RoutingEngine {
     use_counts: Vec<AtomicUsize>,
     /// 成员上次失败的 unix 秒（0=从未失败）；失败只写这里，不攒计数。
     fail_last: Vec<AtomicUsize>,
+    /// 各成员每日剩余额度（tokens_in 口径）：
+    /// `Some(r)` = 已声明上限且可推算（`r` 可为负=已耗尽）；
+    /// `None` = 未声明上限，视为「未知可用」。
+    quota_remaining: Vec<Option<i64>>,
 }
 
 impl RoutingEngine {
@@ -90,10 +98,18 @@ impl RoutingEngine {
             name: name.to_owned(),
             use_counts: members.iter().map(|_| AtomicUsize::new(0)).collect(),
             fail_last: members.iter().map(|_| AtomicUsize::new(0)).collect(),
+            quota_remaining: members.iter().map(|_| None).collect(),
             members,
             mode,
             rotation: AtomicUsize::new(0),
         })
+    }
+
+    /// 设定各成员的每日剩余额度（构造期快照，与 quota 快照法口径一致）。
+    pub fn set_quota_remaining(&mut self, remaining: Vec<Option<i64>>) {
+        if remaining.len() == self.members.len() {
+            self.quota_remaining = remaining;
+        }
     }
 
     pub fn group_name(&self) -> &str {
@@ -115,10 +131,26 @@ impl RoutingEngine {
                 idx
             }
             RouteMode::Quota => {
-                // 失败越久（fail_last 越小）越先——额度越可能恢复。
-                let mut idx: Vec<usize> = (0..n).collect();
-                idx.sort_by_key(|&i| self.fail_last[i].load(Ordering::Relaxed));
-                idx
+                // 额度优先级三桶：已声明且剩余>0（多→少）→ 未声明上限 → 已耗尽。
+                let n = self.members.len();
+                let mut available: Vec<(usize, i64)> = Vec::new();
+                let mut unknown: Vec<usize> = Vec::new();
+                let mut exhausted: Vec<usize> = Vec::new();
+                for i in 0..n {
+                    match self.quota_remaining[i] {
+                        Some(r) if r > 0 => available.push((i, r)),
+                        Some(_) => exhausted.push(i),
+                        None => unknown.push(i),
+                    }
+                }
+                available.sort_by_key(|&(_, r)| std::cmp::Reverse(r));
+                available
+                    .into_iter()
+                    .map(|(i, _)| i)
+                    .chain(unknown)
+                    .chain(exhausted)
+                    // 未设定任何快照时（全默认 None）保持成员原顺序。
+                    .collect()
             }
         }
     }
@@ -287,6 +319,7 @@ pub fn build_engine_by_name(
             members.push(RouteMember {
                 provider: member_name.clone(),
                 engine: Box::new(engine),
+                key_env: provider.key_env.clone(),
             });
         }
         if members.is_empty() {
@@ -294,7 +327,29 @@ pub fn build_engine_by_name(
                 "route group '{name}' has no enabled members"
             )));
         }
-        return Ok(Some(Box::new(RoutingEngine::new(name, mode, members)?)));
+        let mut engine_builder = RoutingEngine::new(name, mode, members)?;
+        if matches!(mode, RouteMode::Quota) {
+            let windows = store.list_quota_windows(Some("daily")).unwrap_or_default();
+            let limits = store.list_quota_limits().unwrap_or_default();
+            let remaining: Vec<Option<i64>> = engine_builder
+                .members
+                .iter()
+                .map(|m| {
+                    let used: i64 = windows
+                        .iter()
+                        .filter(|w| w.key_env == m.key_env)
+                        .map(|w| w.tokens_in)
+                        .sum();
+                    limits
+                        .iter()
+                        .find(|l| l.key_env == m.key_env && l.window_kind == "daily")
+                        .and_then(|l| l.limit_in)
+                        .map(|limit| limit - used)
+                })
+                .collect();
+            engine_builder.set_quota_remaining(remaining);
+        }
+        return Ok(Some(Box::new(engine_builder)));
     }
     match store.get_provider(name)? {
         Some(provider) => {
@@ -367,7 +422,57 @@ mod tests {
         RouteMember {
             provider: name.to_owned(),
             engine: Box::new(engine),
+            key_env: String::new(),
         }
+    }
+
+    #[test]
+    fn quota_prefers_remaining_most_then_unknown_then_exhausted() {
+        let e = RoutingEngine::new(
+            "g",
+            RouteMode::Quota,
+            vec![
+                member("a", StubEngine::ok("stub")),
+                member("b", StubEngine::ok("stub")),
+                member("c", StubEngine::ok("stub")),
+            ],
+        )
+        .expect("new");
+        let mut e = e;
+        e.set_quota_remaining(vec![Some(0), None, Some(1000)]);
+        let order = e.attempt_order();
+        // a=已耗尽, b=未声明, c=剩1000 → 期望顺序 [c, b, a]
+        assert_eq!(order, vec![2, 1, 0]);
+    }
+
+    #[test]
+    fn quota_without_snapshot_keeps_member_order() {
+        let e = RoutingEngine::new(
+            "g",
+            RouteMode::Quota,
+            vec![
+                member("a", StubEngine::ok("stub")),
+                member("b", StubEngine::ok("stub")),
+            ],
+        )
+        .expect("new");
+        assert_eq!(e.attempt_order(), vec![0, 1]);
+    }
+
+    #[test]
+    fn quota_exhausted_members_sorts_last_within_bucket() {
+        let e = RoutingEngine::new(
+            "g",
+            RouteMode::Quota,
+            vec![
+                member("a", StubEngine::ok("stub")),
+                member("b", StubEngine::ok("stub")),
+            ],
+        )
+        .expect("new");
+        let mut e = e;
+        e.set_quota_remaining(vec![Some(-5), Some(500)]);
+        assert_eq!(e.attempt_order(), vec![1, 0]);
     }
 
     #[test]
