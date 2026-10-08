@@ -4,8 +4,14 @@
 
 use super::info;
 
-pub fn show_status() {
+/// `json=true` 时直出 `ServerProxy::status()` 原始对象（与面板同源，零字段差）。
+pub fn show_status(json: bool) {
     let status = neotrix::l1_action::nt_io::nt_io_proxy_server::ServerProxy::status();
+    if json {
+        // 机器可读通道：不染色、不套框，`serde_json` 紧凑单行（jq 友好）。
+        println!("{}", status);
+        return;
+    }
     // ⚠️ 2026-10-05 迁移到 nt_term_viz::panel。
     //
     // 首版缺陷：**每一行的补空格数都不同**，而顶/底边是手数横线。
@@ -74,6 +80,18 @@ pub fn generate_completions(shell: &str, cmd: &mut clap::Command) {
             std::process::exit(1);
         }
     };
-    let mut stdout = std::io::stdout();
-    clap_complete::generate(shell, cmd, "neotrix", &mut stdout);
+    // EPIPE 容错：clap_complete 内部对写失败是 `.expect(...)`（实测
+    // `neotrix completions bash | head` 直接 panic 出 BrokenPipe）。改为先在
+    // 内存里生成完毕，再自己写 stdout —— 下游提前关管（head/管道截断）时
+    // 按 Unix 惯例静默退 0，不把 panic 甩给用户。
+    let mut buf: Vec<u8> = Vec::new();
+    clap_complete::generate(shell, cmd, "neotrix", &mut buf);
+    use std::io::Write as _;
+    if let Err(err) = std::io::stdout().write_all(&buf) {
+        if err.kind() == std::io::ErrorKind::BrokenPipe {
+            std::process::exit(0);
+        }
+        eprintln!("error: failed to write completion: {err}");
+        std::process::exit(1);
+    }
 }

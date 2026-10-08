@@ -27,6 +27,8 @@ uuid = { workspace = true }
 thiserror = "1"
 rusqlite = { version = "0.31", features = ["bundled"] }
 clap = { version = "4", features = ["derive"] }
+# `neobot completions <shell>`（与 neotrix 同口径 5 shell；lock 已有 clap_complete）。
+clap_complete = "4"
 ureq = { version = "2", features = ["json"] }
 zip = { version = "1", default-features = false, features = ["deflate"] }
 # nt_llama 的进程生命周期日志。`log` 是零后端 facade (~10KB, 仅 cfg-if),

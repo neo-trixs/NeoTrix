@@ -248,7 +248,13 @@ enum Commands {
     #[command(about = "Run benchmarks")]
     Bench { category: Option<String> },
     #[command(about = "Show brain/daemon status")]
-    Status,
+    Status {
+        #[arg(
+            long,
+            help = "Emit the raw status object as JSON (machine-readable; same data as the panel)"
+        )]
+        json: bool,
+    },
     #[command(about = "Start background daemon")]
     Daemon {
         #[arg(long)]
@@ -838,7 +844,7 @@ fn main() {
         Some(Commands::Sysops { .. })
             | Some(Commands::Social { .. })
             | Some(Commands::Guard { .. })
-            | Some(Commands::Status)
+            | Some(Commands::Status { .. })
             | Some(Commands::Completions { .. })
             | Some(Commands::Features { .. })
             | Some(Commands::Config { .. })
@@ -1030,7 +1036,7 @@ fn main() {
             }
         }
         Some(Commands::Bench { category }) => run_benchmark(category.as_deref()),
-        Some(Commands::Status) => show_status(),
+        Some(Commands::Status { json }) => show_status(*json),
         Some(Commands::Daemon { evolve }) => {
             if *evolve {
                 run_daemon_evolution(&cli.profile);

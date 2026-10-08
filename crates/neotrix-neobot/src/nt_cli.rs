@@ -84,7 +84,13 @@ fn normalize_side_effects(value: &serde_json::Value) -> Vec<SideEffect> {
     if let Some(single) = keep_effect(value) {
         return vec![single];
     }
-    if let Some(inner) = value.get("sideEffects") {
+    // 包络行：camelCase `sideEffects` 是本协议的出站键名；snake_case
+    // `side_effects` 是 serde derive 的默认键 —— 两个都认，
+    // 免得「哪端忘了 rename」变成静默 0 条（协议错必须能被消费才发现）。
+    if let Some(inner) = value
+        .get("sideEffects")
+        .or_else(|| value.get("side_effects"))
+    {
         return normalize_side_effects(inner);
     }
     Vec::new()
@@ -101,17 +107,9 @@ fn keep_effect(value: &serde_json::Value) -> Option<SideEffect> {
     })
 }
 
-/// 往回传文件追加一行包络（子进程侧用；父进程读后删）。
-/// 无 env 或 effects 为空 → 静默跳过；写失败 → stderr 标记 + 原错返回。
-pub fn append_side_effects_result(
-    path: &std::path::Path,
-    effects: &[SideEffect],
-) -> Result<(), NtBotError> {
+/// 写一个包络行到回传文件（追加；失败打 stderr 标记 + 原错返回）。
+fn append_envelope_line(path: &std::path::Path, line: &str) -> Result<(), NtBotError> {
     use std::io::Write as _;
-    if effects.is_empty() {
-        return Ok(());
-    }
-    let line = serde_json::to_string(&serde_json::json!({ "sideEffects": effects }))?;
     match std::fs::OpenOptions::new().create(true).append(true).open(path) {
         Ok(mut file) => {
             if let Err(err) = writeln!(file, "{line}") {
@@ -127,9 +125,50 @@ pub fn append_side_effects_result(
     }
 }
 
+/// 往回传文件追加一行包络（子进程侧用；父进程读后删）。
+/// 无 env 或 effects 为空 → 静默跳过；写失败 → stderr 标记 + 原错返回。
+pub fn append_side_effects_result(
+    path: &std::path::Path,
+    effects: &[SideEffect],
+) -> Result<(), NtBotError> {
+    if effects.is_empty() {
+        return Ok(());
+    }
+    let line = serde_json::to_string(&serde_json::json!({ "sideEffects": effects }))?;
+    append_envelope_line(path, &line)
+}
+
+/// 把一次 CLI 调用的结果打成一行包络 JSON。
+///
+/// ⭐ 键名必须是 camelCase `sideEffects`：解析端 `parse_side_effects_jsonl`
+/// 的包络分支只认这个键（serde derive 出来的 `side_effects` 会被静默丢成
+/// 0 条 effect —— 静默协议错，比报错更坏）。
+pub fn format_result_envelope(result: &CliResult) -> Result<String, NtBotError> {
+    let value = serde_json::json!({
+        "ok": result.ok,
+        "text": result.text,
+        "exit_code": result.exit_code,
+        "sideEffects": result.side_effects,
+    });
+    Ok(serde_json::to_string(&value)?)
+}
+
+/// 往回传文件追加一行**完整结果包络**（`ok`/`text`/`exit_code`/`sideEffects`）。
+///
+/// 与 `append_side_effects_result` 的差别：结果包络**即使零副作用也写**
+/// —— 包络本身就是这次调用的回执（`text` 是答复正文），跳过等于把答复丢了。
+/// 写失败：stderr 标记 + 原错返回（同族口径）。
+pub fn append_cli_result(path: &std::path::Path, result: &CliResult) -> Result<(), NtBotError> {
+    let line = format_result_envelope(result)?;
+    append_envelope_line(path, &line)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{append_side_effects_result, format_side_effect, parse_side_effect, parse_side_effects_jsonl};
+    use super::{
+        CliResult, SideEffect, append_cli_result, append_side_effects_result, format_result_envelope,
+        format_side_effect, parse_side_effect, parse_side_effects_jsonl,
+    };
 
     #[test]
     fn side_effect_roundtrip() {
@@ -171,6 +210,70 @@ mod tests {
         let marked = format!("{}[{{\"kind\":\"m\",\"payload\":{{}}}}]", super::SIDE_EFFECT_WRITE_FAILED_PREFIX);
         let (rescued, _) = parse_side_effects_jsonl(&marked);
         assert_eq!(rescued.len(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 结果包络的**键名**是协议的一部分：出站必须 camelCase `sideEffects`，
+    /// 否则解析端会静默读出 0 条（本测试锁死这条往返）。
+    #[test]
+    fn result_envelope_roundtrip_keeps_camel_case_key() {
+        let result = CliResult {
+            ok: true,
+            text: "hello".to_owned(),
+            exit_code: 0,
+            side_effects: vec![SideEffect {
+                kind: "reply".to_owned(),
+                payload: serde_json::json!({"text": "hello"}),
+            }],
+        };
+        let line = format_result_envelope(&result).expect("envelope");
+        assert!(line.contains("\"sideEffects\""), "出站键必须 camelCase: {line}");
+        let (effects, malformed) = parse_side_effects_jsonl(&line);
+        assert_eq!(malformed, 0);
+        assert_eq!(effects.len(), 1);
+        assert_eq!(effects[0].kind, "reply");
+        assert_eq!(effects[0].payload["text"], "hello");
+    }
+
+    /// serde derive 默认键 `side_effects` 也必须能被解析端认出 ——
+    /// 两端各自演化时这是最后一道防线（静默丢包比报错更坏）。
+    #[test]
+    fn snake_case_envelope_also_parses() {
+        let line = serde_json::json!({
+            "ok": false,
+            "text": "t",
+            "exit_code": 3,
+            "side_effects": [{"kind": "task", "payload": {"id": "7"}}],
+        })
+        .to_string();
+        let (effects, malformed) = parse_side_effects_jsonl(&line);
+        assert_eq!(malformed, 0);
+        assert_eq!(effects.len(), 1);
+        assert_eq!(effects[0].kind, "task");
+    }
+
+    /// 结果包络**零副作用也写**（回执即 `text`/`ok`），与副作用变体的
+    /// 「空则跳过」有意不同；写完可被解析端安全读回（0 条 effect、0 坏行）。
+    #[test]
+    fn append_cli_result_writes_even_with_no_side_effects() {
+        let dir = crate::nt_testutil::temp_dir("cli-result-empty");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("result.jsonl");
+        let _ = std::fs::remove_file(&path);
+        let result = CliResult {
+            ok: true,
+            text: "no effects here".to_owned(),
+            exit_code: 0,
+            side_effects: Vec::new(),
+        };
+        append_cli_result(&path, &result).expect("append");
+        let raw = std::fs::read_to_string(&path).expect("read");
+        assert!(raw.contains("no effects here"));
+        let (effects, malformed) = parse_side_effects_jsonl(&raw);
+        assert_eq!(effects.len(), 0);
+        assert_eq!(malformed, 0);
+        // 空副作用变体仍保持「跳过不写」
+        append_side_effects_result(&path, &[]).expect("skip");
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

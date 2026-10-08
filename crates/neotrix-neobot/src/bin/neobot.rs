@@ -7,16 +7,20 @@
 //! neobot init                 # 建 ~/.neobot + workspace + config.json
 //! neobot doctor               # 自检 (目录/DB/引擎探活 + 残留回收)
 //! neobot run -t 标题 --text 内容   # 跑一轮本地任务 (默认 echo 引擎, 零模型)
+//! neobot -p "内容"            # 单发 print 模式: 回答打 stdout (Claude/OpenAI CLI 同律)
+//! echo "内容" | neobot -p     # 无参从 stdin 读; 设了 NEOBOT_RESULT_PATH 则回执走 JSONL 包络
 //! neobot task list            # 列任务
 //! neobot task claim <id> --actor alice
 //! neobot audit list           # 列审计
-//! neobot ledger [--by-actor]  # 成本账
+//! neobot ledger [--by-actor] [--json]  # 成本账 (人读表 / 机器可读)
+//! neobot quota --snapshot [--json]     # 额度窗口
 //! neobot routine add --name daily --interval 900 --instruction "..."
 //! neobot routine sweep        # 跑到期例行
 //! neobot skill list / install <dir>
 //! neobot member add alice --kind human
 //! neobot control take --holder alice
 //! neobot policy drill         # fail-closed 演练
+//! neobot completions bash     # 生成 shell 补全
 //! ```
 
 #![forbid(unsafe_code)]
@@ -31,10 +35,38 @@ use neotrix_neobot::{
 };
 
 #[derive(Debug, Parser)]
-#[command(name = "neobot", version, about = "NeoBot local-first agent app")]
+#[command(
+    name = "neobot",
+    version,
+    about = "NeoBot local-first agent app",
+    arg_required_else_help = true,
+    after_help = "\
+EXAMPLES:
+  neobot init                             初始化数据目录与配置
+  neobot run -t 标题 -x 内容              跑一轮本地任务 (默认 echo 引擎)
+  neobot -p \"内容\"                       单发 print 模式: 回答打 stdout
+  echo \"内容\" | neobot -p                无参从 stdin 读
+  neobot ledger --json                    成本账 (机器可读)
+  neobot quota --snapshot --json          额度窗口 (机器可读)
+  neobot completions bash > ~/.local/share/bash-completion/completions/neobot
+"
+)]
 struct Cli {
     #[command(subcommand)]
-    cmd: Cmd,
+    cmd: Option<Cmd>,
+
+    /// 单发 print 模式 (Claude/OpenAI CLI 同律): `-p "text"` 带参,
+    /// 或 `-p` 无参从 stdin 读. 回答打 stdout; 设了 `NEOBOT_RESULT_PATH`
+    /// 则回执经 JSONL 包络回传 (`nt_cli` 协议). 引擎解析与 `run` 缺省同律
+    /// (echo / 配对灵魂路由); 要指定端点用 `run --provider`.
+    #[arg(
+        short = 'p',
+        long,
+        value_name = "TEXT",
+        num_args = 0..=1,
+        default_missing_value = ""
+    )]
+    prompt: Option<String>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -82,6 +114,9 @@ enum Cmd {
         /// 按 actor 切分.
         #[arg(long, default_value_t = false)]
         by_actor: bool,
+        /// 机器可读: JSON 一行对象 `{sums, degraded, by_actor}` (降级段独立, cost=0).
+        #[arg(long, default_value_t = false)]
+        json: bool,
     },
     /// 额度窗口：快照 + 人工声明的上限（`set`/`rm`/`list`）.
     Quota {
@@ -93,6 +128,9 @@ enum Cmd {
         /// 只看某一类窗口.
         #[arg(long)]
         kind: Option<String>,
+        /// 机器可读: JSON 一行对象 `{windows, limits}` (上限 null = 未声明).
+        #[arg(long, default_value_t = false)]
+        json: bool,
     },
     /// 定时例行（15min 地板 + 10 连败自停）.
     Routine {
@@ -175,6 +213,11 @@ enum Cmd {
     Capability {
         #[command(subcommand)]
         cmd: CapabilityCmd,
+    },
+    /// 生成 shell 补全脚本（bash|zsh|fish|powershell|elvish；与 neotrix 同律）.
+    Completions {
+        /// 目标 shell.
+        shell: String,
     },
 }
 
@@ -461,7 +504,24 @@ fn main() {
 
 fn real_main() -> Result<(), NtBotError> {
     let cli = Cli::parse();
-    match cli.cmd {
+    // `-p` 是独立入口（与子命令互斥，结构上就是两条路）：优先判定。
+    if let Some(prompt) = cli.prompt {
+        let text = if prompt.trim().is_empty() {
+            read_prompt_from_stdin()?
+        } else {
+            prompt
+        };
+        return cmd_print(&text);
+    }
+    let Some(cmd) = cli.cmd else {
+        // `arg_required_else_help` 已挡住裸调用；这里是无害兜底（⛔ 不 panic）。
+        use clap::CommandFactory as _;
+        let mut command = Cli::command();
+        let _ = command.print_help();
+        eprintln!("neobot: 缺少子命令（单发模式用 `neobot -p [TEXT]`）");
+        std::process::exit(2);
+    };
+    match cmd {
         Cmd::Init => cmd_init(),
         Cmd::Doctor => cmd_doctor(),
         Cmd::Channel { cmd } => match cmd {
@@ -475,6 +535,7 @@ fn real_main() -> Result<(), NtBotError> {
             CapabilityCmd::Never => cmd_capability_never(),
             CapabilityCmd::Canary => cmd_capability_canary(),
         },
+        Cmd::Completions { shell } => cmd_completions(&shell),
         Cmd::Export { out } => cmd_export(out.as_deref()),
         Cmd::Run { title, text, engine, provider, model, convo, stream } => {
             cmd_run(&title, &text, &engine, provider.as_deref(), model.as_deref(), convo.as_deref(), stream)
@@ -492,11 +553,12 @@ fn real_main() -> Result<(), NtBotError> {
             AuditCmd::List => cmd_audit_list(),
             AuditCmd::Prune { days } => cmd_audit_prune(days),
         },
-        Cmd::Ledger { by_actor } => cmd_ledger(by_actor),
+        Cmd::Ledger { by_actor, json } => cmd_ledger(by_actor, json),
         Cmd::Quota {
             cmd,
             snapshot,
             kind,
+            json,
         } => match cmd {
             Some(QuotaCmd::Set {
                 key_env,
@@ -511,7 +573,7 @@ fn real_main() -> Result<(), NtBotError> {
                 provider,
                 kind,
             }) => cmd_quota_rm(&key_env, &provider, &kind),
-            None => cmd_quota(snapshot, kind.as_deref()),
+            None => cmd_quota(snapshot, kind.as_deref(), json),
         },
         Cmd::Routine { cmd } => match cmd {
             RoutineCmd::Add { name, interval, instruction, owner } => {
@@ -882,51 +944,7 @@ fn cmd_run(
 ) -> Result<(), NtBotError> {
     let mut cfg = load_config()?;
     let store = open_store(&cfg)?;
-    // --provider 优先：走注册端点的 HTTP 引擎（key 读其 key_env）。
-    // 无 --provider 且引擎为默认 echo：配对且活着的晶体核心优先（灵魂嵌入）；
-    // 核心离线则回落本地回显并明示（不静默）。
-    let engine: Box<dyn EngineAdapter> = match provider_name {
-        Some(name) => {
-            // provider 名先按路由组解析（group/<name> failover），否则按普通端点。
-            let memory = neotrix_neobot::nt_memory::memory_for_config(&cfg);
-            match neotrix_neobot::build_engine_by_name(&store, name, model_override, memory)? {
-                Some(engine) => engine,
-                None => {
-                    return Err(NtBotError::Store(format!(
-                        "no such provider or route group '{name}'"
-                    )));
-                }
-            }
-        }
-        None if engine_name.trim().is_empty() || engine_name.trim() == "echo" => {
-            // 灵魂优先：HTTP 配对且活着 → 核心；CLI 配对（Zen）→ 本机 opencode；
-            // 配对但不可用 → 明示回落，不静默。
-            if let Some(http) = neotrix_neobot::core_engine(&store)? {
-                let memory = neotrix_neobot::nt_memory::memory_for_config(&cfg);
-                eprintln!("neobot: soul online, routing via crystal core");
-                Box::new(http.with_memory_context(memory))
-            } else if let Ok(Some(pair)) = store.get_core_pair() {
-                if pair.via == "cli" {
-                    match OpencodeEngine::new(&pair.model) {
-                        Ok(engine) => {
-                            eprintln!("neobot: soul online, routing via opencode zen");
-                            Box::new(engine)
-                        }
-                        Err(e) => {
-                            eprintln!("neobot: soul offline ({e}), fell back to local echo");
-                            resolve_engine(&mut cfg, engine_name, model_override)?
-                        }
-                    }
-                } else {
-                    eprintln!("neobot: soul offline, fell back to local echo");
-                    resolve_engine(&mut cfg, engine_name, model_override)?
-                }
-            } else {
-                resolve_engine(&mut cfg, engine_name, model_override)?
-            }
-        }
-        None => resolve_engine(&mut cfg, engine_name, model_override)?,
-    };
+    let engine = resolve_run_engine(&mut cfg, &store, engine_name, provider_name, model_override)?;
     // CLI 发起方记名：NEOBOT_ACTOR（默认 bot；定时/自动化用 routine 名）。
     let (actor, actor_name) = cli_actor();
     let mut emit = |delta: &str| {
@@ -953,6 +971,136 @@ fn cmd_run(
         )?
     };
     println!("neobot run ok: status={} actor={actor_name}", status.as_str());
+    Ok(())
+}
+
+/// `run`/`-p` 共用的引擎解析（**唯一真身**，两条入口不得各抄一份）：
+/// `--provider` 优先走注册端点（key 只读其 `key_env`，路由组先于普通端点）；
+/// 无 provider 且引擎为默认 echo：配对且活着的晶体核心优先（灵魂嵌入），
+/// 核心离线则回落本地回显并明示（不静默）。
+fn resolve_run_engine(
+    cfg: &mut NeobotConfig,
+    store: &neotrix_neobot::NeobotStore,
+    engine_name: &str,
+    provider_name: Option<&str>,
+    model_override: Option<&str>,
+) -> Result<Box<dyn EngineAdapter>, NtBotError> {
+    Ok(match provider_name {
+        Some(name) => {
+            // provider 名先按路由组解析（group/<name> failover），否则按普通端点。
+            let memory = neotrix_neobot::nt_memory::memory_for_config(cfg);
+            match neotrix_neobot::build_engine_by_name(store, name, model_override, memory)? {
+                Some(engine) => engine,
+                None => {
+                    return Err(NtBotError::Store(format!(
+                        "no such provider or route group '{name}'"
+                    )));
+                }
+            }
+        }
+        None if engine_name.trim().is_empty() || engine_name.trim() == "echo" => {
+            // 灵魂优先：HTTP 配对且活着 → 核心；CLI 配对（Zen）→ 本机 opencode；
+            // 配对但不可用 → 明示回落，不静默。
+            if let Some(http) = neotrix_neobot::core_engine(store)? {
+                let memory = neotrix_neobot::nt_memory::memory_for_config(cfg);
+                eprintln!("neobot: soul online, routing via crystal core");
+                Box::new(http.with_memory_context(memory))
+            } else if let Ok(Some(pair)) = store.get_core_pair() {
+                if pair.via == "cli" {
+                    match OpencodeEngine::new(&pair.model) {
+                        Ok(engine) => {
+                            eprintln!("neobot: soul online, routing via opencode zen");
+                            Box::new(engine)
+                        }
+                        Err(e) => {
+                            eprintln!("neobot: soul offline ({e}), fell back to local echo");
+                            resolve_engine(cfg, engine_name, model_override)?
+                        }
+                    }
+                } else {
+                    eprintln!("neobot: soul offline, fell back to local echo");
+                    resolve_engine(cfg, engine_name, model_override)?
+                }
+            } else {
+                resolve_engine(cfg, engine_name, model_override)?
+            }
+        }
+        None => resolve_engine(cfg, engine_name, model_override)?,
+    })
+}
+
+/// `-p` 无参时从 stdin 读提示（管道口：`echo "..." | neobot -p`）。
+/// 空输入是**错误**而不是空跑 —— 静默跑一轮空 prompt 只会把账本写脏。
+fn read_prompt_from_stdin() -> Result<String, NtBotError> {
+    use std::io::Read as _;
+    let mut buf = String::new();
+    std::io::stdin()
+        .read_to_string(&mut buf)
+        .map_err(|err| NtBotError::Io(err.to_string()))?;
+    if buf.trim().is_empty() {
+        return Err(NtBotError::Invalid(
+            "empty prompt: give `-p TEXT` or pipe text to stdin".to_owned(),
+        ));
+    }
+    Ok(buf)
+}
+
+/// `-p` 单发 print 模式：**stdout 只有回答正文**（下游 `CliEngine` 把 stdout
+/// 当答复直读，混进状态行即协议破坏），状态/灵魂提示一律走 stderr。
+///
+/// 回执（`ok`/`text`/`exit_code`/副作用行）按 `nt_cli` 协议写
+/// `NEOBOT_RESULT_PATH` —— 这是协议的**写端**：读端在 `nt_engine::CliEngine`
+/// （它 spawn `neobot -p` 并读该文件）。缺了任一端，这条链就是死的。
+fn cmd_print(text: &str) -> Result<(), NtBotError> {
+    let mut cfg = load_config()?;
+    let store = open_store(&cfg)?;
+    let engine = resolve_run_engine(&mut cfg, &store, "echo", None, None)?;
+    let (actor, actor_name) = cli_actor();
+    let mut reply = String::new();
+    let status = {
+        let mut emit = |delta: &str| {
+            reply.push_str(delta);
+            print!("{delta}");
+            use std::io::Write as _;
+            let _ = std::io::stdout().flush();
+        };
+        run_local_turn_stream_as(
+            &store,
+            &cfg,
+            engine.as_ref(),
+            actor,
+            &actor_name,
+            "cli prompt",
+            text,
+            None,
+            &mut emit,
+            None,
+        )?
+    };
+    if !reply.ends_with('\n') {
+        println!();
+    }
+    // 回执包络：主通道（stdout）已给正文，这里是结构化副本 —— sidecar 落库前复核用。
+    let result_path = std::env::var(neotrix_neobot::nt_cli::RESULT_PATH_ENV)
+        .ok()
+        .map(|raw| raw.trim().to_owned())
+        .filter(|raw| !raw.is_empty());
+    if let Some(path) = result_path {
+        let result = neotrix_neobot::nt_cli::CliResult {
+            ok: true,
+            text: reply.clone(),
+            exit_code: 0,
+            side_effects: vec![neotrix_neobot::nt_cli::SideEffect {
+                kind: "reply".to_owned(),
+                payload: serde_json::json!({
+                    "text": reply,
+                    "status": status.as_str(),
+                    "engine": engine.engine_id(),
+                }),
+            }],
+        };
+        neotrix_neobot::nt_cli::append_cli_result(std::path::Path::new(&path), &result)?;
+    }
     Ok(())
 }
 
@@ -1060,9 +1208,49 @@ fn cmd_audit_prune(days: i64) -> Result<(), NtBotError> {
     Ok(())
 }
 
-fn cmd_ledger(by_actor: bool) -> Result<(), NtBotError> {
+fn cmd_ledger(by_actor: bool, json: bool) -> Result<(), NtBotError> {
     let cfg = load_config()?;
     let store = open_store(&cfg)?;
+    // 降级单独一段（N6.2）：它是「内容被丢弃」的次数，**不含** token/cost，
+    // 与费用聚合是两个问题，混在一行会让人以为降级也花了钱。
+    let degraded = store.ledger_degraded_counts()?;
+    if json {
+        // 机器可读出表：字段名与人读行一一对应，降级独立成段（不混进 sums）。
+        let sums: Vec<serde_json::Value> = if by_actor {
+            store
+                .ledger_sums_by_actor()?
+                .into_iter()
+                .map(|(engine, model, actor, input, output, cost)| {
+                    serde_json::json!({
+                        "engine": engine, "model": model, "actor": actor,
+                        "tokens_in": input, "tokens_out": output, "cost_usd": cost,
+                    })
+                })
+                .collect()
+        } else {
+            store
+                .ledger_sums()?
+                .into_iter()
+                .map(|(engine, model, input, output, cost)| {
+                    serde_json::json!({
+                        "engine": engine, "model": model,
+                        "tokens_in": input, "tokens_out": output, "cost_usd": cost,
+                    })
+                })
+                .collect()
+        };
+        let degraded_rows: Vec<serde_json::Value> = degraded
+            .iter()
+            .map(|(engine, n)| serde_json::json!({ "engine": engine, "count": n }))
+            .collect();
+        let out = serde_json::json!({
+            "by_actor": by_actor,
+            "sums": sums,
+            "degraded": degraded_rows,
+        });
+        println!("{}", serde_json::to_string_pretty(&out)?);
+        return Ok(());
+    }
     if by_actor {
         for (engine, model, actor, input, output, cost) in store.ledger_sums_by_actor()? {
             println!("{engine}/{model} actor={actor} in={input} out={output} cost=${cost:.4}");
@@ -1072,11 +1260,8 @@ fn cmd_ledger(by_actor: bool) -> Result<(), NtBotError> {
             println!("{engine}/{model} in={input} out={output} cost=${cost:.4}");
         }
     }
-    // 降级单独一段（N6.2）：它是「内容被丢弃」的次数，**不含** token/cost，
-    // 与上面的费用聚合是两个问题，混在一行会让人以为降级也花了钱。
-    let degraded = store.ledger_degraded_counts()?;
     if !degraded.is_empty() {
-        for (engine, n) in degraded {
+        for (engine, n) in &degraded {
             println!("{engine} degraded={n}（工具输出整体丢弃，cost=0，不计入上面各行）");
         }
     }
@@ -1092,14 +1277,68 @@ fn money(v: f64) -> String {
     format!("${v:.4}")
 }
 
-fn cmd_quota(snapshot: bool, kind: Option<&str>) -> Result<(), NtBotError> {
+fn cmd_quota(snapshot: bool, kind: Option<&str>, json: bool) -> Result<(), NtBotError> {
     let cfg = load_config()?;
     let store = open_store(&cfg)?;
-    if snapshot {
-        let n = store.snapshot_quota_windows()?;
+    let snapshot_rows = if snapshot {
+        Some(store.snapshot_quota_windows()?)
+    } else {
+        None
+    };
+    let rows = store.list_quota_windows(kind)?;
+    if json {
+        // 机器可读出表：三态不撒谎 —— 上限 null = 未声明（不是 0、不是无穷）；
+        // `over_limit` 只在声明了上限时才可能为 true。
+        let windows: Vec<serde_json::Value> = rows
+            .iter()
+            .map(|w| {
+                serde_json::json!({
+                    "window_kind": w.window_kind,
+                    "window_start": w.window_start,
+                    "key_env": w.key_env,
+                    "engine": w.engine,
+                    "model": w.model,
+                    "tokens_in": w.tokens_in,
+                    "tokens_out": w.tokens_out,
+                    "cost_usd": w.cost_usd,
+                    "updated_at": w.updated_at,
+                })
+            })
+            .collect();
+        let mut limit_rows = Vec::new();
+        for l in store.list_quota_limits()? {
+            let (ti, to, cost, _) =
+                store.quota_used_vs_limit(&l.key_env, &l.provider, &l.window_kind)?;
+            limit_rows.push(serde_json::json!({
+                "window_kind": l.window_kind,
+                "key_env": l.key_env,
+                "provider": l.provider,
+                "limit_in": l.limit_in,
+                "limit_out": l.limit_out,
+                "limit_cost_usd": l.limit_cost_usd,
+                "used": {
+                    "tokens_in": ti,
+                    "tokens_out": to,
+                    "cost_usd": cost,
+                },
+                "remaining_cost_usd": l.limit_cost_usd.map(|lim| lim - cost),
+                "over_limit": l.limit_cost_usd.map_or(false, |lim| cost > lim),
+                "source": l.source,
+                "updated_at": l.updated_at,
+            }));
+        }
+        let out = serde_json::json!({
+            "snapshot_rows": snapshot_rows,
+            "kind": kind,
+            "windows": windows,
+            "limits": limit_rows,
+        });
+        println!("{}", serde_json::to_string_pretty(&out)?);
+        return Ok(());
+    }
+    if let Some(n) = snapshot_rows {
         println!("neobot quota: snapshot 覆盖 {n} 个窗口行");
     }
-    let rows = store.list_quota_windows(kind)?;
     if rows.is_empty() {
         println!("neobot quota: 暂无窗口数据（先跑 `neobot quota --snapshot`）");
     }
@@ -1151,6 +1390,37 @@ fn cmd_quota(snapshot: bool, kind: Option<&str>) -> Result<(), NtBotError> {
             l.source,
             l.updated_at
         );
+    }
+    Ok(())
+}
+
+/// 生成 shell 补全脚本 —— 与 `neotrix completions` 同律：
+/// 先在内存生成完毕再写 stdout（EPIPE 容错，⛔ 不把 clap_complete 的
+/// `.expect` panic 甩给 `| head` 场景）；不支持的 shell 显式报错退 1。
+fn cmd_completions(shell: &str) -> Result<(), NtBotError> {
+    use clap::CommandFactory as _;
+    use clap_complete::Shell;
+    let shell = match shell {
+        "bash" => Shell::Bash,
+        "zsh" => Shell::Zsh,
+        "fish" => Shell::Fish,
+        "powershell" => Shell::PowerShell,
+        "elvish" => Shell::Elvish,
+        other => {
+            return Err(NtBotError::Invalid(format!(
+                "unsupported shell '{other}'. Use: bash, zsh, fish, powershell, elvish"
+            )));
+        }
+    };
+    let mut command = Cli::command();
+    let mut buf: Vec<u8> = Vec::new();
+    clap_complete::generate(shell, &mut command, "neobot", &mut buf);
+    use std::io::Write as _;
+    if let Err(err) = std::io::stdout().write_all(&buf) {
+        if err.kind() == std::io::ErrorKind::BrokenPipe {
+            std::process::exit(0);
+        }
+        return Err(NtBotError::Io(err.to_string()));
     }
     Ok(())
 }
@@ -2010,4 +2280,111 @@ fn cmd_capability_canary() -> Result<(), NtBotError> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    //! bin 的 CLI 面测试：23+ 子命令的解析/路由此前**零锁定**
+    //! （lib 600+ 绿管不到 bin）—— 这里锁 `-p` 入口、`--json` 旗、补全命令，
+    //! 以及「bin 出站包络 ↔ lib 解析端」的协议接线。
+
+    use super::{Cli, Cmd, cmd_completions};
+    use clap::Parser as _;
+
+    #[test]
+    fn bare_p_enters_print_mode_with_stdin_fallback() {
+        let cli = Cli::try_parse_from(["neobot", "-p"]).expect("bare -p parses");
+        assert!(cli.cmd.is_none(), "裸 -p 不带子命令");
+        assert_eq!(cli.prompt.as_deref(), Some(""), "空串 = 从 stdin 读");
+    }
+
+    #[test]
+    fn p_with_text_carries_prompt() {
+        let cli = Cli::try_parse_from(["neobot", "-p", "hello world"]).expect("-p text parses");
+        assert!(cli.cmd.is_none());
+        assert_eq!(cli.prompt.as_deref(), Some("hello world"));
+    }
+
+    #[test]
+    fn p_swallows_following_token_as_text_not_subcommand() {
+        // 文档承诺的语义：`-p` 的值取下一个 token，即使它长得像子命令。
+        let cli = Cli::try_parse_from(["neobot", "-p", "task"]).expect("parses");
+        assert_eq!(cli.prompt.as_deref(), Some("task"));
+        assert!(cli.cmd.is_none(), "task 被当文本吃掉，不进子命令");
+    }
+
+    #[test]
+    fn subcommand_without_p_still_parses_ledger_json() {
+        let cli = Cli::try_parse_from(["neobot", "ledger", "--json"]).expect("ledger parses");
+        assert!(cli.prompt.is_none());
+        match cli.cmd {
+            Some(Cmd::Ledger { by_actor, json }) => {
+                assert!(!by_actor);
+                assert!(json);
+            }
+            other => panic!("expected Ledger, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn quota_json_flag_parses() {
+        let cli =
+            Cli::try_parse_from(["neobot", "quota", "--snapshot", "--json"]).expect("quota parses");
+        assert!(cli.prompt.is_none());
+        match cli.cmd {
+            Some(Cmd::Quota { snapshot, json, .. }) => {
+                assert!(snapshot);
+                assert!(json);
+            }
+            other => panic!("expected Quota, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn completions_shell_parses() {
+        let cli = Cli::try_parse_from(["neobot", "completions", "bash"]).expect("completions");
+        match cli.cmd {
+            Some(Cmd::Completions { shell }) => assert_eq!(shell, "bash"),
+            other => panic!("expected Completions, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bare_invocation_is_help_error_not_success() {
+        let err = Cli::try_parse_from(["neobot"]).expect_err("no-args must not parse");
+        assert_eq!(
+            err.kind(),
+            clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
+        );
+    }
+
+    #[test]
+    fn unsupported_completions_shell_is_an_error() {
+        let err = cmd_completions("nushell").expect_err("unsupported shell must error");
+        assert!(err.to_string().contains("unsupported shell"), "{err}");
+    }
+
+    /// 协议接线：bin 的 `-p` 出站包络必须能被 lib 的解析端读回。
+    /// （缺了这半边，`CliEngine` 读到的就是 0 条 —— 静默协议错。）
+    #[test]
+    fn print_mode_envelope_reaches_lib_parser() {
+        use neotrix_neobot::nt_cli::{
+            CliResult, SideEffect, format_result_envelope, parse_side_effects_jsonl,
+        };
+        let result = CliResult {
+            ok: true,
+            text: "answer".to_owned(),
+            exit_code: 0,
+            side_effects: vec![SideEffect {
+                kind: "reply".to_owned(),
+                payload: serde_json::json!({"text": "answer", "status": "done"}),
+            }],
+        };
+        let line = format_result_envelope(&result).expect("envelope");
+        let (effects, malformed) = parse_side_effects_jsonl(&line);
+        assert_eq!(malformed, 0);
+        assert_eq!(effects.len(), 1);
+        assert_eq!(effects[0].kind, "reply");
+        assert_eq!(effects[0].payload["status"], "done");
+    }
 }
