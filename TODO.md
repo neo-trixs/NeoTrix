@@ -1160,6 +1160,8 @@ git -C ~/Downloads/Neo/neobot log --oneline -- apps/neobot-desktop/tests/nt_smok
 - P1-3 `capability_invoke` 执行端口 A/B/C 裁决。
 
 > 本轮 CLI 改动（`--json`/写端/EPIPE/P1-1/2/3）已提交（`828d78c2`/`0b028a5b`/`19905af9`/`bd8b8cdd`/`2b5e305b`/`a73b0daf`，共享 index，`--only` 落地）；其后追加的 `Search --json`（`entry/browse.rs` + `main.rs`）单独提交。patch 兜底 `.neotrix/patches/2026-10-08-cli-neobot-scan-fixes.patch` 保留备查。
+>
+> 后续实施方案（P1-1b observer-only 投影 / clippy 分级收口 / N6.3 网关前置门）见 `docs/architecture/TODO-P1LANE-2026-10-08.md`。
 
 ## N5 · 长期演化但不进本轮
 - [ ] 协议翻译网关（OpenAI/Anthropic/Gemini 互译，127.0.0.1）—— 对齐 Magpie。
