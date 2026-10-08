@@ -236,14 +236,14 @@
 ### T1 冗余清理（可并行，互不依赖）
 | ID | 任务 | 成本 | 风险 | 状态 |
 |---|---|---|---|---|
-| T1-2 | `data_model` 8 类型转 `pub use` | S | 无（先例在同文件） | ✅ `b2f6be18` −160 行 |
+| T1-2 | `data_model` 8 类型转 `pub use` | S | 无（先例在同文件） | ✅ `b2f6be18` −160 行。**2026-10-08 补**：8 类型转 `pub use` 早已闭环（`nt_dup_types.py` 复测 13 个名字 0 真重复组），但 `data_model.rs:1-4` 的 SSOT 头**一个字没改**且 `unified_types.rs:1-4` 逐字重复同一承诺 ⇒ 两个文件自称 SSOT。头注释已改为陈述事实（零个生产子模块用 `use data_model::*`，唯一消费者是 `tests/data_model_tests.rs`），并钉住「⛔ 不要按名字删这 8 个 struct」（`nt_dup_types.py:225-230` 有 上一轮 E0119+E0560 的回滚史）|
 | T1-3 | ~~`CostLadder` 二合一~~ | — | — | ⛔ **已推翻**（两种设计，见 §T1-3） |
 | T1-4 | 删 `l6_meta/lib.rs` | S | 无（严格子集已证） | ✅ `43e2380c` −68 行 |
 | T1-5 | 删 `l2_perception/nt_judgment/` | S | 先查跨 crate 消费者 | ✅ `43e2380c` −313 行 |
-| T1-7a | `nt_core_guardian` **文档**修复 | S | 无 | 🟨 本轮 |
+| T1-7a | `nt_core_guardian` **文档**修复 | S | 无 | ⏸ 2026-10-08 未取证（主树已无该文件，仅余 `l6_meta/mod.rs` / `nt_arch_rules.rs` 两处引用残迹）⇒ 先确认文件真身再动，本轮**未盲改** |
 | T1-8 | 缓存岛 + "LRU"→FIFO 头修正 | S | 无 | 🟡 已修头（`ebf1d458`），剩可达性标注 |
 | T1-1 | ~~3 个零消费者熔断器归正典~~ | — | — | ⛔ **已推翻**（三种并发模型，见 §T1-1）→ ✅ 改为标注 |
-| T1-6 | 裁 `nt_shield::osint` | S | `compliance` 留待裁决 |
+| T1-6 | 裁 `nt_shield::osint` | S | `compliance` 留待裁决 | ✅ 已由 `2b539d63` 删除（**699 行**，非本节 §T1-6 所记 669）。风险已排除：无 uniffi/无绑定层；18 处 serde 派生因零 Rust 消费者而无格式契约。|
 | T1-7b | `nt_core_guardian` 接线裁决 | L | 依赖裁决，不删 |
 
 ### T2 跨域（全部需先裁决）
