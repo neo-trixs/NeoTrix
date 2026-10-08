@@ -64,6 +64,7 @@ impl CapabilityTreeRegistry {
             Domain::Nexus => "nexus",
             Domain::Governance => "governance",
             Domain::Repair => "repair",
+            Domain::Neobot => "neobot",
         }
     }
 

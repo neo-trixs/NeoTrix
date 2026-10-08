@@ -130,14 +130,36 @@ fn load_from_registry_path(path: &std::path::Path) -> Option<Vec<SkillNode>> {
         return None;
     }
     let content = std::fs::read_to_string(path).ok()?;
+    // ⛔⛔ 2026-10-08：此处曾用 `.ok()?` —— **完全静默**。
+    //   后果实测：`.neotrix/capability_registry.json` 出现非法枚举值
+    //   （`domain:"neobot"` / `layer:"l1primitive"` / `constellation:"c2system"`
+    //   / `op:"bud"`）⇒ serde fail-fast ⇒ 整份 **326 节点注册表解析失败**
+    //   ⇒ 本函数返回 None，**能力树在生产里彻底消失且零日志**。
+    //   这正是本仓一路在治的「建成未用却看着健康」的极端形态：
+    //   连「建成」都看不见了。
+    // ⇒ 改为**显式告警**：失败必须留痕，否则同型事故会重演且无人知晓。
     let export: nt_core_capability_tree::registry::RegistryExport =
-        serde_json::from_str(&content).ok()?;
+        match serde_json::from_str(&content) {
+            Ok(t) => t,
+            Err(e) => {
+                log::warn!(
+                    "[skill_tree] 能力注册表解析失败（{}）⇒ 能力树为空：{e}。\
+                     请跑 `python3 scripts/ops/capability_inventory_gate.py` 定位非法取值",
+                    path.display()
+                );
+                return None;
+            }
+        };
     if export.nodes.is_empty() {
+        log::warn!("[skill_tree] 能力注册表为空节点：{}", path.display());
         return None;
     }
     let mut registry = CapabilityTreeRegistry::new();
     for node in export.nodes {
-        registry.register(node).ok()?;
+        if let Err(e) = registry.register(node) {
+            // 逐节点容错并**计数上报**，而非整表丢弃
+            log::warn!("[skill_tree] 节点登记失败（已跳过）：{e}");
+        }
     }
     // 外部消费者容错: 端点不在注册表中的边跳过 (与 cli.rs load_registry 一致)
     for (from, to) in export.edges {

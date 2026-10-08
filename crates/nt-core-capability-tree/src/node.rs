@@ -18,39 +18,55 @@ pub enum Domain {
     Nexus,
     Governance,
     Repair,
+    /// `neobot` 独立 crate 的能力域。
+    ///
+    /// 2026-10-08：本变体不是「发明」，而是**补上代码与数据的漂移** ——
+    /// `.neotrix/capability_registry.json` 里本就有 4 个 `domain: "neobot"`
+    /// 节点（`neobot::nt_routing::quota_mode` / `nt_channel_wecom` /
+    /// `nt_llama::ssd_offload` / `nt_agent_home`，均带完整 evolution_log），
+    /// 而枚举里没有对应值 ⇒ 整份注册表 `serde` 解析失败 ⇒
+    /// **326 个节点在生产里全部不可见**（`skill_tree.rs` 用 `.ok()?` 静默吞掉，
+    /// 后台维护循环 `log::warn` 后 `return None`）。
+    ///
+    /// ⛔ 与 AGENTS.md §6 的裁决不冲突：那条讲的是**架构台账**
+    /// （R-P199 口径限 neotrix-core L1–L6，neobot 不占 L 层），
+    /// 不是能力树的 Domain 取值集。
+    Neobot,
 }
 
 impl Domain {
     pub fn as_str(&self) -> &'static str {
         match self {
-            Domain::Core => "NT-CORE",
-            Domain::Mind => "NT-MIND",
-            Domain::Memory => "NT-MEMORY",
-            Domain::World => "NT-WORLD",
-            Domain::Act => "NT-ACT",
-            Domain::Shield => "NT-SHIELD",
-            Domain::Io => "NT-IO",
-            Domain::Meta => "NT-META",
-            Domain::Nexus => "NT-NEXUS",
-            Domain::Governance => "NT-GOVERNANCE",
-            Domain::Repair => "NT-REPAIR",
+            Domain::Core => "core",
+            Domain::Mind => "mind",
+            Domain::Memory => "memory",
+            Domain::World => "world",
+            Domain::Act => "act",
+            Domain::Shield => "shield",
+            Domain::Io => "io",
+            Domain::Meta => "meta",
+            Domain::Nexus => "nexus",
+            Domain::Governance => "governance",
+            Domain::Repair => "repair",
+            Domain::Neobot => "neobot",
         }
     }
 
-    /// 从 "NT-*" 字符串解析域 (大小写不敏感); 无法识别时返回 None。
+    /// 从域名字符串解析 (大小写不敏感); 兼容新格式裸名 (core/act/...) 与老格式 "NT-*"; 无法识别时返回 None。
     pub fn parse(name: &str) -> Option<Self> {
         match name.to_uppercase().as_str() {
-            "NT-CORE" => Some(Domain::Core),
-            "NT-MIND" => Some(Domain::Mind),
-            "NT-MEMORY" => Some(Domain::Memory),
-            "NT-WORLD" => Some(Domain::World),
-            "NT-ACT" => Some(Domain::Act),
-            "NT-SHIELD" => Some(Domain::Shield),
-            "NT-IO" => Some(Domain::Io),
-            "NT-META" => Some(Domain::Meta),
-            "NT-NEXUS" => Some(Domain::Nexus),
-            "NT-GOVERNANCE" => Some(Domain::Governance),
-            "NT-REPAIR" => Some(Domain::Repair),
+            "CORE" | "NT-CORE" => Some(Domain::Core),
+            "MIND" | "NT-MIND" => Some(Domain::Mind),
+            "MEMORY" | "NT-MEMORY" => Some(Domain::Memory),
+            "WORLD" | "NT-WORLD" => Some(Domain::World),
+            "ACT" | "NT-ACT" => Some(Domain::Act),
+            "SHIELD" | "NT-SHIELD" => Some(Domain::Shield),
+            "IO" | "NT-IO" => Some(Domain::Io),
+            "META" | "NT-META" => Some(Domain::Meta),
+            "NEXUS" | "NT-NEXUS" => Some(Domain::Nexus),
+            "GOVERNANCE" | "NT-GOVERNANCE" => Some(Domain::Governance),
+            "REPAIR" | "NT-REPAIR" => Some(Domain::Repair),
+            "NEOBOT" | "NT-NEOBOT" => Some(Domain::Neobot),
             _ => None,
         }
     }
@@ -194,13 +210,13 @@ pub enum ConstellationLevel {
 impl ConstellationLevel {
     pub fn as_str(&self) -> &'static str {
         match self {
-            ConstellationLevel::C0Compile => "C0",
-            ConstellationLevel::C1UnitTest => "C1",
-            ConstellationLevel::C2IntegrationTest => "C2",
-            ConstellationLevel::C3Benchmark => "C3",
-            ConstellationLevel::C4MainPipeline => "C4",
-            ConstellationLevel::C5SelfHealing => "C5",
-            ConstellationLevel::C6EvolutionLoop => "C6",
+            ConstellationLevel::C0Compile => "c0compile",
+            ConstellationLevel::C1UnitTest => "c1unittest",
+            ConstellationLevel::C2IntegrationTest => "c2integrationtest",
+            ConstellationLevel::C3Benchmark => "c3benchmark",
+            ConstellationLevel::C4MainPipeline => "c4mainpipeline",
+            ConstellationLevel::C5SelfHealing => "c5selfhealing",
+            ConstellationLevel::C6EvolutionLoop => "c6evolutionloop",
         }
     }
 

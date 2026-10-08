@@ -19271,7 +19271,7 @@
       "evolution_log": [
         {
           "cycle": "absorb-2026-10-08",
-          "op": "bud",
+          "op": "budding",
           "from_nodes": [],
           "to_node": "nt_judge::fast_policy",
           "note": "A4 laya 吸收：System-1 typed 判定（yes/no/score）。"
@@ -19293,7 +19293,7 @@
       "evolution_log": [
         {
           "cycle": "absorb-2026-10-08",
-          "op": "bud",
+          "op": "budding",
           "from_nodes": [],
           "to_node": "nt_agent_eval::score_eval",
           "note": "B1 harness-evals/karotte 吸收：Score 0-1 + threshold。"
@@ -19314,7 +19314,7 @@
       "evolution_log": [
         {
           "cycle": "absorb-2026-10-08",
-          "op": "bud",
+          "op": "budding",
           "from_nodes": [],
           "to_node": "nt_reexplore::measure",
           "note": "B3 SquidAgent 吸收：并行 worker 重探索计量契约（未接线）。"
@@ -19324,8 +19324,8 @@
     {
       "id": "neobot::nt_routing::quota_mode",
       "domain": "neobot",
-      "layer": "l1primitive",
-      "constellation": "c2system",
+      "layer": "l0primitive",
+      "constellation": "c2integrationtest",
       "provides": [
         "quota_aware_routing"
       ],
@@ -19349,8 +19349,8 @@
     {
       "id": "neobot::nt_channel_wecom",
       "domain": "neobot",
-      "layer": "l1primitive",
-      "constellation": "c2system",
+      "layer": "l0primitive",
+      "constellation": "c2integrationtest",
       "provides": [
         "wecom_channel"
       ],
@@ -19360,7 +19360,7 @@
       "evolution_log": [
         {
           "cycle": "absorb-2026-10-08",
-          "op": "bud",
+          "op": "budding",
           "from_nodes": [],
           "to_node": "neobot::nt_channel_wecom",
           "note": "A2 dsh-im 吸收：WeCom 适配器（probe/send/poll 骨架）。"
@@ -19370,8 +19370,8 @@
     {
       "id": "nt_nexus::checkpoint::resume_verdict",
       "domain": "core",
-      "layer": "l6meta",
-      "constellation": "c3experience",
+      "layer": "l0primitive",
+      "constellation": "c1unittest",
       "provides": [
         "resume_verdict"
       ],
@@ -19381,7 +19381,7 @@
       "evolution_log": [
         {
           "cycle": "absorb-2026-10-08",
-          "op": "bud",
+          "op": "budding",
           "from_nodes": [],
           "to_node": "nt_nexus::checkpoint::resume_verdict",
           "note": "B2 LongHorizon-Harness 吸收：at-least-once resume 判据。"
@@ -19391,8 +19391,8 @@
     {
       "id": "neobot::nt_llama::ssd_offload",
       "domain": "neobot",
-      "layer": "l1primitive",
-      "constellation": "c2system",
+      "layer": "l0primitive",
+      "constellation": "c2integrationtest",
       "provides": [
         "ssd_offload_mode"
       ],
@@ -19402,7 +19402,7 @@
       "evolution_log": [
         {
           "cycle": "absorb-2026-10-08",
-          "op": "bud",
+          "op": "budding",
           "from_nodes": [],
           "to_node": "neobot::nt_llama::ssd_offload",
           "note": "A3 Edge0 吸收：--no-mmap SSD 流式档位。"
@@ -19412,8 +19412,8 @@
     {
       "id": "neobot::nt_agent_home",
       "domain": "neobot",
-      "layer": "l1primitive",
-      "constellation": "c2system",
+      "layer": "l0primitive",
+      "constellation": "c2integrationtest",
       "provides": [
         "agent_home_export_import"
       ],
@@ -19423,7 +19423,7 @@
       "evolution_log": [
         {
           "cycle": "absorb-2026-10-08",
-          "op": "bud",
+          "op": "budding",
           "from_nodes": [],
           "to_node": "neobot::nt_agent_home",
           "note": "A8 openhanako+row-bot 吸收：一个 agent=一个目录。"
@@ -19665,6 +19665,62 @@
       "promoted_at": 1790302595,
       "rationale": "[蒸馏-NT-META] 聚合 4 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: 第六批31源P166-P196入茧（超导/激光/PN结/高分子/胶体/反射弧/操纵子/素数/费马/厄尔尼诺/地磁/凌星/潮汐锁定/抗原抗",
       "signal": 0.76
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::meta_cognition",
+      "action": "awakening_note",
+      "rationale": "许可探针必须覆盖 Rust 生态的 LICENSE-APACHE + LICENSE-MIT 双件组合，否则会把合法宽松仓误判为「无 LICENSE」",
+      "signal": 0.74,
+      "promoted_at": 1791452113
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::meta_cognition",
+      "action": "awakening_note",
+      "rationale": "排名/热度只当信号不当结论：必须读 README 第一行确认机制，否则会把「数学证明稿仓库」误判成「eval 框架」",
+      "signal": 0.74,
+      "promoted_at": 1791452113
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::meta_cognition",
+      "action": "awakening_note",
+      "rationale": "无生产消费者的功能不接线（R-P79）：A6 代理池/A7 rea MCP/B3 重探索计量三处都判 intake 而非造代码",
+      "signal": 0.78,
+      "promoted_at": 1791452113
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::meta_cognition",
+      "action": "awakening_note",
+      "rationale": "编辑后必须逐文件复读：一次长 newString 会把无关行改坏（本轮实测污染 3 处：last_usage 赋值丢内容、vec![] 缺 ], 、两处括号被合并）",
+      "signal": 0.78,
+      "promoted_at": 1791452113
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::meta_cognition",
+      "action": "awakening_note",
+      "rationale": "L1 需要向 L6 传事件时用依赖倒置闭包（Fn(&ToolInvocation)），不要跨层 import：层门只允许 l0→l6 单向",
+      "signal": 0.74,
+      "promoted_at": 1791452113
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::meta_cognition",
+      "action": "awakening_note",
+      "rationale": "生成型文档（nt_topology.py → CODE-TOPOLOGY.md）必须有人工段保留区，否则每次重建静默吃掉手写内容",
+      "signal": 0.7,
+      "promoted_at": 1791452113
+    },
+    {
+      "domain": "NT-META",
+      "capability": "failure_recovery",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '子代理派发连续 3 次被 cancel 时不要重试，直接切主 agent 手工取证（skill 兜底协议），四字段模式与 artifact 不变' 命中能力标签 'failure_recovery' 于域 Meta, 应强化对应能力节点 | ⛔ 未命中已注册能力（路由标签 'failure_recovery' 无提供者）",
+      "signal": 0.7,
+      "promoted_at": 1791452113
     }
   ]
 }
