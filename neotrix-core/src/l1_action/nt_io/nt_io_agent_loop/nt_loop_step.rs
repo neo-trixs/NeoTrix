@@ -343,15 +343,16 @@ impl AgentLoop {
             };
             // 完整输出进 tool_log 供审计, 回填历史经 trim_tool_output 截断。
             let history_content = self.trim_tool_output(&content);
-            self.tool_log.push(ToolInvocation {
+            let invocation = ToolInvocation {
                 name: call.name.clone(),
                 arguments: call.arguments.clone(),
                 success: result.is_ok(),
                 output: content.clone(),
-            });
+            };
             if let Some(h) = &self.tool_hook {
-                h(&call.name, result.is_ok());
+                h(&invocation);
             }
+            self.tool_log.push(invocation);
             self.messages.push(Message::tool(&history_content, &call.id));
         }
         self.trim_history();

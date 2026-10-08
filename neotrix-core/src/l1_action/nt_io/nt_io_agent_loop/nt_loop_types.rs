@@ -56,7 +56,7 @@ pub struct AgentLoop {
     /// AgentLoop **不** import L6 类型，只通过这条闭包把 tool 调用名+成败
     /// 透出去——由上层编排方（CheckpointStore 所在层）接住。
     /// 层规则守护：L1 永不直接引用 L6（check-layer-deps 单向），依赖倒置由闭包完成。
-    pub(crate) tool_hook: Option<Arc<dyn Fn(&str, bool) + Send + Sync>>,
+    pub(crate) tool_hook: Option<Arc<dyn Fn(&ToolInvocation) + Send + Sync>>,
     /// 输出样式 (NT-IO output_style 骨架接线)。默认 Plain 原样透传。
     pub(crate) style: OutputStyleId,
     /// 心智病毒传播防护 (NT-SHIELD propagation_guard 骨架接线)。

@@ -194,8 +194,8 @@ async fn test_tool_hook_fires_with_name_and_success() {
     let seen2 = seen.clone();
     let mut loop_ = AgentLoop::new(llm, "mock", "sys")
         .with_tools(vec![Box::new(calc)])
-        .with_tool_hook(Arc::new(move |name: &str, ok: bool| {
-            seen2.lock().unwrap().push((name.to_string(), ok));
+        .with_tool_hook(Arc::new(move |inv: &crate::l1_action::nt_io::nt_io_agent_loop::nt_loop_types::ToolInvocation| {
+            seen2.lock().unwrap().push((inv.name.clone(), inv.success));
         }));
     let out = loop_.turn("compute").await.expect("turn ok");
     assert_eq!(out, "done");

@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use super::nt_loop_types::AgentLoop;
+use super::nt_loop_types::{AgentLoop, ToolInvocation};
 use crate::l1_action::nt_io::nt_io_multimodal_transform::MultimodalTransform;
 use crate::l1_action::nt_io::nt_io_output_style::{GovernanceReport, OutputStyleId};
 use crate::l1_action::nt_io::nt_io_provider::types::{LlmProvider, Message, Role, Usage};
@@ -66,7 +66,7 @@ impl AgentLoop {
     }
 
     /// 装上工具调用钩子（B2 接线：loop→checkpoint 的反向通道）。
-    pub fn with_tool_hook(mut self, hook: Arc<dyn Fn(&str, bool) + Send + Sync>) -> Self {
+    pub fn with_tool_hook(mut self, hook: Arc<dyn Fn(&ToolInvocation) + Send + Sync>) -> Self {
         self.tool_hook = Some(hook);
         self
     }

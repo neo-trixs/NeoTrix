@@ -148,15 +148,16 @@ impl AgentLoop {
                             }
                             Err(e) => format!("TOOL_ERROR: {}", e),
                         };
-                        self.tool_log.push(ToolInvocation {
+                        let invocation = ToolInvocation {
                             name: call.name.clone(),
                             arguments: call.arguments.clone(),
                             success: result.is_ok(),
                             output: content.clone(),
-                        });
+                        };
                         if let Some(h) = &self.tool_hook {
-                            h(&call.name, result.is_ok());
+                            h(&invocation);
                         }
+                        self.tool_log.push(invocation);
                         let history_content = self.trim_tool_output(&content);
                         self.messages.push(Message::tool(&history_content, &call.id));
                     }
@@ -279,15 +280,16 @@ impl AgentLoop {
                         {
                             let content = format!("TOOL_ERROR: {}", approval_err);
                             on_tool(&name, &args_str, &content, 0, false);
-                            self.tool_log.push(ToolInvocation {
+                            let invocation = ToolInvocation {
                                 name: name.clone(),
                                 arguments: args_str.clone(),
                                 success: false,
                                 output: content.clone(),
-                            });
+                            };
                             if let Some(h) = &self.tool_hook {
-                                h(&name, false);
+                                h(&invocation);
                             }
+                            self.tool_log.push(invocation);
                             let history_content = self.trim_tool_output(&content);
                             self.messages.push(Message::tool(&history_content, &call.id));
                             continue;
@@ -315,15 +317,16 @@ impl AgentLoop {
                             cancelled = true;
                             break;
                         }
-                        self.tool_log.push(ToolInvocation {
+                        let invocation = ToolInvocation {
                             name: name.clone(),
                             arguments: args_str.clone(),
                             success,
                             output: content.clone(),
-                        });
+                        };
                         if let Some(h) = &self.tool_hook {
-                            h(&name, success);
+                            h(&invocation);
                         }
+                        self.tool_log.push(invocation);
                         let history_content = self.trim_tool_output(&content);
                         self.messages.push(Message::tool(&history_content, &call.id));
                     }

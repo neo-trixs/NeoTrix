@@ -16,6 +16,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 //    "cross-referencing with NexusCore"）⇒ 编译器判定为 unused import。
 // ⇒ 接入时删掉它。`ExperienceRef` 保留（下面真用到）。
 use super::ExperienceRef;
+use crate::l1_action::nt_io::nt_io_agent_loop::nt_loop_types::ToolInvocation;
 use crate::l5_cognition::l1_facade::KnowledgeBase;
 
 // ─── Domain Types ───
@@ -506,20 +507,20 @@ impl Checkpoint {
 /// 落进 Checkpoint —— 完成 L1→L6 的 checkpoint 接线（依赖倒置：
 /// L1 只持有闭包，L6 提供构造方）。
 pub fn checkpoint_tool_hook() -> (
-    std::sync::Arc<dyn Fn(&str, bool) + Send + Sync>,
+    std::sync::Arc<dyn Fn(&ToolInvocation) + Send + Sync>,
     std::sync::Arc<std::sync::Mutex<Vec<ToolCallRecord>>>,
 ) {
     let buf: std::sync::Arc<std::sync::Mutex<Vec<ToolCallRecord>>> =
         std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let buf2 = buf.clone();
-    let hook = std::sync::Arc::new(move |name: &str, success: bool| {
+    let hook = std::sync::Arc::new(move |inv: &ToolInvocation| {
         if let Ok(mut v) = buf2.lock() {
             v.push(ToolCallRecord {
-                tool_name: name.to_string(),
-                args_hash: String::new(),
-                result_summary: String::new(),
+                tool_name: inv.name.clone(),
+                args_hash: inv.arguments.clone(),
+                result_summary: inv.output.clone(),
                 duration_ms: 0,
-                success,
+                success: inv.success,
             });
         }
     });
@@ -725,8 +726,8 @@ mod tests {
     #[test]
     fn checkpoint_tool_hook_collects_and_feeds_resume_verdict() {
         let (hook, buf) = checkpoint_tool_hook();
-        hook("search", true);
-        hook("delete", false);
+        hook(&ToolInvocation { name: "search".into(), arguments: String::new(), success: true, output: String::new() });
+        hook(&ToolInvocation { name: "delete".into(), arguments: String::new(), success: false, output: String::new() });
         let records = std::mem::take(&mut *buf.lock().unwrap());
         assert_eq!(records.len(), 2);
         let mut cp = Checkpoint::new("s1", "a1");
