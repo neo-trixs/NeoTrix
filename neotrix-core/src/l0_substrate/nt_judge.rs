@@ -162,6 +162,134 @@ pub fn judge_chunk_default(chunk: &str) -> JudgeVerdict {
     ChunkAdmission::default_policy().judge(chunk)
 }
 
+/// System-1 式快速判定结果（laya 式非自回归决策：typed yes/no/score，无模型调用）。
+#[derive(Debug, Clone, PartialEq)]
+pub enum FastDecision {
+    /// 明确肯定（score ≥ `threshold_yes`）。
+    Yes {
+        /// 命中信号强度（0..=1）。
+        score: f64,
+        /// 判定理由（命中的信号词）。
+        reason: String,
+    },
+    /// 明确否定（score ≤ `threshold_no`）。
+    No {
+        /// 命中信号强度（0..=1）。
+        score: f64,
+        /// 判定理由。
+        reason: String,
+    },
+    /// 无法拍板：给出分数供上游阈值化或升级 System-2。
+    Score {
+        /// 信号分数（0..=1）。
+        value: f64,
+        /// 判定理由。
+        reason: String,
+    },
+}
+
+/// System-1 快速判定策略：正/负信号词计分，纯规则、非自回归。
+#[derive(Debug, Clone)]
+pub struct FastPolicy {
+    positive: Vec<String>,
+    negative: Vec<String>,
+    threshold_yes: f64,
+    threshold_no: f64,
+}
+
+impl FastPolicy {
+    /// 构造策略；信号词归一化为小写、空串词条忽略。
+    /// `fallback` 语义：无任何信号命中时给出中性分数 0.5（进 `Score` 分支）。
+    #[must_use]
+    pub fn new(
+        positive: Vec<String>,
+        negative: Vec<String>,
+        threshold_yes: f64,
+        threshold_no: f64,
+    ) -> Self {
+        let norm = |v: Vec<String>| {
+            v.into_iter()
+                .map(|t| t.to_lowercase())
+                .filter(|t| !t.is_empty())
+                .collect()
+        };
+        Self {
+            positive: norm(positive),
+            negative: norm(negative),
+            threshold_yes,
+            threshold_no,
+        }
+    }
+
+    /// 信号比例：正信号 / (正+负)；无命中时中性 0.5。
+    #[must_use]
+    pub fn signal_ratio(&self, text: &str) -> f64 {
+        let lower = text.to_lowercase();
+        let p = self
+            .positive
+            .iter()
+            .filter(|t| lower.contains(t.as_str()))
+            .count() as f64;
+        let n = self
+            .negative
+            .iter()
+            .filter(|t| lower.contains(t.as_str()))
+            .count() as f64;
+        if p + n == 0.0 {
+            0.5
+        } else {
+            p / (p + n)
+        }
+    }
+
+    /// 纯函数判定：按信号比例分入 Yes / No / Score 三分支。
+    #[must_use]
+    pub fn decide(&self, text: &str) -> FastDecision {
+        let ratio = self.signal_ratio(text);
+        let lower = text.to_lowercase();
+        let hits: Vec<&str> = self
+            .positive
+            .iter()
+            .chain(self.negative.iter())
+            .filter(|t| lower.contains(t.as_str()))
+            .map(String::as_str)
+            .collect();
+        let reason = if hits.is_empty() {
+            "no signal".to_string()
+        } else {
+            hits.join(",")
+        };
+        if ratio >= self.threshold_yes {
+            FastDecision::Yes {
+                score: ratio,
+                reason,
+            }
+        } else if ratio <= self.threshold_no {
+            FastDecision::No {
+                score: ratio,
+                reason,
+            }
+        } else {
+            FastDecision::Score {
+                value: ratio,
+                reason,
+            }
+        }
+    }
+}
+
+/// 默认策略便捷纯函数：正信号 `yes/ok/true`，负信号 `no/error/false`，阈值 0.67/0.33。
+#[must_use]
+pub fn decide_fast_default(text: &str) -> FastDecision {
+    FastPolicy::new(
+        vec!["yes".into(), "ok".into(), "true".into()],
+        vec!["no".into(), "error".into(), "false".into()],
+        0.67,
+        0.33,
+    )
+    .decide(text)
+}
+
 /// Forget 墓碑：已遗忘条目的可审计存根。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tombstone {
@@ -231,6 +359,19 @@ pub enum JudgeSource {
 
 /// 真实发生的结果（M-4 的对比基准面）。
 #[derive(Debug, Clone, PartialEq, Eq)]
+
+/// ⭐ 审计裁定 2026-10-07（`nt_security_wiring.py` 报 ZERO_CONSUMER **正确**）：
+///
+/// `JudgeOutcome::Matched` / `Mismatched` 的**全部构造点都在 `#[cfg(test)]` 内**
+/// （本文件 502/506/516）⇒ **生产零用例**。
+///
+/// ⇒ 故本枚举目前是**死规格**：类型存在，但生产路径从不回填 `outcome`。
+///    这意味着 M-4 想测的「judge 判决 vs 真实 outcome」对比面
+///    **在生产中永不产生** ⇒ 影子模式目前**无法自我验证准确率**。
+///
+/// ⛔ 我**刻意不**擅自改语义（接上生产回填 = 产品决策：
+///    「在哪个决策点记录真实 outcome」属行为变更，需 owner 裁决）。
+///    此处只留痕，使下一个 agent 一眼看到「这不是漏接线，是已知缺口」。
 pub enum JudgeOutcome {
     /// 真实结果与judge 判决**一致**。
     Matched,
@@ -401,6 +542,54 @@ mod tests {
         assert_eq!(verdict.reason(), "sensitive term matched");
         let clean = judge_chunk_default("hello world");
         assert!(clean.is_admit());
+    }
+
+    #[test]
+    fn fast_policy_yes_branch_on_positive_signal() {
+        let p = FastPolicy::new(vec!["deploy".into()], vec!["rollback".into()], 0.67, 0.33);
+        let d = p.decide("ship it, deploy now");
+        match d {
+            FastDecision::Yes { score, reason } => {
+                assert!(score >= 0.67);
+                assert!(reason.contains("deploy"));
+            }
+            other => panic!("expected Yes, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn fast_policy_no_branch_on_negative_signal() {
+        let p = FastPolicy::new(vec!["deploy".into()], vec!["rollback".into()], 0.67, 0.33);
+        let d = p.decide("must rollback immediately");
+        match d {
+            FastDecision::No { score, .. } => assert!(score <= 0.33),
+            other => panic!("expected No, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn fast_policy_score_branch_when_no_signal_or_balanced() {
+        let p = FastPolicy::new(vec!["deploy".into()], vec!["rollback".into()], 0.67, 0.33);
+        // 无信号 → 中性 0.5 → Score
+        let d = p.decide("unrelated text");
+        match d {
+            FastDecision::Score { value, reason } => {
+                assert!((value - 0.5).abs() < 1e-9);
+                assert_eq!(reason, "no signal");
+            }
+            other => panic!("expected Score, got {other:?}"),
+        }
+        // 一正一负 → 各半 → Score
+        let d2 = p.decide("deploy and rollback");
+        assert!(matches!(d2, FastDecision::Score { .. }));
+    }
+
+    #[test]
+    fn decide_fast_default_keyword_paths() {
+        let yes = decide_fast_default("yes this is ok");
+        assert!(matches!(yes, FastDecision::Yes { .. }));
+        let no = decide_fast_default("no, that is an error");
+        assert!(matches!(no, FastDecision::No { .. }));
     }
 
     #[test]
