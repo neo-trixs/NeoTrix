@@ -500,6 +500,33 @@ impl Checkpoint {
     }
 }
 
+/// Resume 判据（LongHorizon-Harness 式 plan→act→verify→checkpoint→recover）：
+/// 续跑时**跳过**已成功记录的工具调用，**重跑**失败/未记录的。
+/// 纯函数，不读写任何外部状态（与 `nt_crawl_sources` 的 pending/completed
+/// 位同型：at-least-once，宁可重跑不漏跑）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResumeVerdict {
+    /// 可跳过的工具调用名（已成功记录）。
+    pub skip: Vec<String>,
+    /// 必须重跑的工具调用名（失败记录）。
+    pub rerun: Vec<String>,
+}
+
+/// 从 checkpoint 推出 resume 动作。
+#[must_use]
+pub fn resume_verdict(cp: &Checkpoint) -> ResumeVerdict {
+    let mut skip = Vec::new();
+    let mut rerun = Vec::new();
+    for tc in &cp.tool_calls {
+        if tc.success {
+            skip.push(tc.tool_name.clone());
+        } else {
+            rerun.push(tc.tool_name.clone());
+        }
+    }
+    ResumeVerdict { skip, rerun }
+}
+
 // ─── Tests ───
 
 #[cfg(test)]
@@ -655,6 +682,26 @@ mod tests {
         assert_eq!(refs[0].session_id, "s1");
         assert_eq!(refs[0].domain, "nexus");
         assert!(refs[0].summary.contains("decisions:1"));
+    }
+
+    #[test]
+    fn resume_verdict_splits_success_and_failure() {
+        let mut cp = Checkpoint::new("s1", "a1");
+        cp.tool_calls
+            .push(Checkpoint::make_tool_call("search", "h1", "ok", 10, true));
+        cp.tool_calls
+            .push(Checkpoint::make_tool_call("delete", "h2", "err", 5, false));
+        let v = resume_verdict(&cp);
+        assert_eq!(v.skip, vec!["search".to_string()]);
+        assert_eq!(v.rerun, vec!["delete".to_string()]);
+    }
+
+    #[test]
+    fn resume_verdict_empty_checkpoint_reruns_nothing() {
+        let cp = Checkpoint::new("s1", "a1");
+        let v = resume_verdict(&cp);
+        assert!(v.skip.is_empty());
+        assert!(v.rerun.is_empty());
     }
 
     #[test]
