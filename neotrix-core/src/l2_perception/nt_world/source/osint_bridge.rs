@@ -613,6 +613,29 @@ impl OsintSource for CryptoPubBridge {
 
 // ───────────────────────────────────────────────────────────────────────────
 // Placeholder bridges (modules without standalone investigate functions)
+//
+// ⛔⛔ **ZERO_PRODUCTION_CONSUMER**（2026-10-08 取证；判据落 scripts/security-wiring-baseline.txt）
+//
+// 本文件 788 行看着像「15 个真桥已接进生产」，实测**生产零消费**，且现有门抓不到：
+//
+// 1. **10 个桩**（`placeholder_bridge!` 实例化，:639-648）：sweep / ad_graph / harvest /
+//    auto_patrol / automation / search_engine / report / social_search / username_checker / metadata
+//    —— `investigate` 恒返回空 findings + `confidence: 0.0`（:631）⇒ 连真实逻辑都没调。
+//    其中 **ad_graph(578 行) + harvest(1,017 行) 共 1,595 行真实实现被桩悬空**。
+// 2. **15 个真桥**（:658-672，DnsBridge…CryptoPubBridge）实现完整且正确，但消费链断两次：
+//    create_osint_bridges() → UnifiedEngine::investigate_osint()，而 with_osint_sources()
+//    的**唯一**调用点（unified_engine.rs:389）在 `#[cfg(test)]` 内；UnifiedEngine 生产消费者 = 0。
+// 3. ⚠️ **不是「整块零消费」**：osint/mod.rs:702 `doctor_osint` 与 :676 `run_osint` 是**生产代码**，
+//    经 backend_router.rs 分发真实 investigate —— 但它们同样零外部调用者。
+//    ⇒ 准确表述：**15 真桥 + 2 条真实分发路径，全部止步于零生产消费者**。
+//
+// ⛔ 为什么门抓不到（已实测，非推测）：check-truth-surface.sh 的 UNREACHABLE 判的是
+//    「文件能否从 crate root 编译」，而 source/mod.rs:89 已 `pub mod osint_bridge;`
+//    ⇒ 可达 ⇒ 不报；nt_orphan_dir.py 判「目录是否被 mod 挂载」，同理不报。
+//    ⇒ **「编译进库但生产零消费」是现有门体系的结构性盲区**（L8「绿色≠有效」）。
+//
+// 判据：**不接线、不删除**。真桥是规格资产且 TODO.yml ds-2/ds-4 已在规划接线；
+// 删除会销毁那 1,595 行真实实现。
 // ───────────────────────────────────────────────────────────────────────────
 
 macro_rules! placeholder_bridge {
