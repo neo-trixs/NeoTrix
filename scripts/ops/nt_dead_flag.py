@@ -351,6 +351,31 @@ def main() -> int:
     # 标记语法：字段**上方 6 行内**出现
     #   `nt-unwired-spec:` 或 `nt-unwired-spec:`的中文变体 `未接线规格`
     SPEC_MARK_RE = re.compile(r"nt-unwired-spec|未接线规格")
+    # ── 第五类：**产物未消费**（2026-10-08 新增）─────────────────
+    # ⛔ **本类是被上一轮的一次错误操作逼出来的**，记在这里防止重犯：
+    #   2026-10-08 有人（我）用脚本把 154 个「待人工判定」字段批量贴上 `未接线规格`，
+    #   待人工归零、门转绿 —— 但**其中 94 个（61%）落在结果/DTO 类 struct 上**
+    #   （`EvasionResult` / `IpFingerprint` / `MiniMap` / `TaskContext` / `ModuleLeaf` …）。
+    #   那些 struct 的**其它字段读点很多**（`MiniMap.mode` 224 处、`TaskContext.domain` 296 处），
+    #   只有被标的那一两个是 0 ⇒ 它们不是「未实现的规格」，而是**结果里算出来但没人读的一个维度**。
+    #   给它们贴「⛔ 不要删（删掉即销毁规格）」是**误标签**：它会让下一个 agent
+    #   把一个纯粹的「产物无人消费」问题当成「规格资产」永久豁免掉。
+    #
+    # ⇒ 本类的正确处置与第四类**相反**：
+    #   第四类（配置开关）  = 意图声明，**保留**
+    #   第五类（结果/产物）  = 已算出的 wasted work，通常**要么接线要么删字段**
+    # 混为一谈 ⇒ 用「让计数归零」换「语义正确」，正是本仓反复禁止的那种改法。
+    #
+    # 标记语法：字段上方 6 行内出现 `nt-unconsumed-artifact`（中文变体「产物未消费」）
+    RESULT_MARK_RE = re.compile(r"nt-unconsumed-artifact|产物未消费")
+
+    def _is_result(d):
+        try:
+            lines = open(d[1], encoding="utf-8", errors="ignore").read().split("\n")
+        except OSError:
+            return False
+        lo = max(0, d[2] - 7)
+        return any(RESULT_MARK_RE.search(x) for x in lines[lo:d[2]])
 
     def _is_spec(d):
         try:
@@ -362,6 +387,9 @@ def main() -> int:
 
     spec = [d for d in dead if not d[4] and _is_spec(d)]
     spec_set = {(d[0], d[1], d[2]) for d in spec}
+    # 第五类：产物未消费。与 spec **互斥**（结果字段不该被当成规格豁免掉）
+    result = [d for d in dead if not d[4] and not _is_spec(d) and _is_result(d)]
+    result_set = {(d[0], d[1], d[2]) for d in result}
 
     new = [d for d in dead if d[0] not in baseline]
     # ── 第三类：配置噪声 ──
@@ -381,8 +409,8 @@ def main() -> int:
     print(
         f"dead-flag[{args.types}] 字段 {len(fields)} 个；零读点 {len(dead)} 个"
         f"（外部消费者 serde/uniffi {len(external)}、配置噪声 {len(noise)}、"
-        f"**未接线规格 {len(spec)}**、"
-        f"待人工判定 {max(0, len(behavioral) - len(noise) - len(spec))}）；"
+        f"**未接线规格 {len(spec)}**、**产物未消费 {len(result)}**、"
+        f"待人工判定 {max(0, len(behavioral) - len(noise) - len(spec) - len(result))}）；"
         f"基线已裁决 {len(baseline)}；新增 {len(new)}"
     )
 
@@ -395,6 +423,8 @@ def main() -> int:
             kind = "配置噪声(异名近名)"
         elif (name, decl_path, line_no) in spec_set:
             kind = "**未接线规格**（功能声明了但未实现 ⇒⛔ 不要删）"
+        elif (name, decl_path, line_no) in result_set:
+            kind = "**产物未消费**（结果已算出但该维度无人读 ⇒ 接线或删字段，⛔ 不是规格）"
         else:
             kind = "**待人工判定**"
         print(f"      · {tag} {rel(decl_path)}:{line_no} `pub {name}`{hint}  ({kind})")
