@@ -1584,9 +1584,7 @@ fn build_builtin_routes() -> std::collections::HashMap<&'static str, ToolExecFn>
     ] {
         m.insert(qwen, qwen_mm_fn);
     }
-    m.insert("pdf_ground_text", |config, _engine, call, _turn_written, _sink, _stop| {
-        Ok(execute_pdf_ground_text(config, call)?.into())
-    });
+    m.insert("pdf_ground_text", pdf_ground_text_fn);
     m.insert("capability_invoke", capability_invoke_fn);
     m
 }
