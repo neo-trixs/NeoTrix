@@ -182,6 +182,29 @@ pub const GENOFFICE_MANIFEST: &[ManifestEntry] = &[ManifestEntry {
     executability: Executability::Executable,
 }];
 
+/// 按 id 查清单条目（**覆盖两个清单**）。
+///
+/// # 为什么需要它（2026-10-08）
+///
+/// `TRADE_MANIFEST` 原是唯一 id 源，于是**只看贸易清单**的调用方
+/// （`nt_crystal_serve` 的 `run_capability_call`）**认不出 `genoffice`** ——
+/// 即「已上架且已接线的真实能力，在晶体 CLI 上被报成『能力未上架』」。
+/// ⇒ 需要「这个 id 是什么」的地方必须走本函数，
+/// ⛔ 不得再直接 `TRADE_MANIFEST.iter()`。
+pub fn manifest_entry(id: &str) -> Option<&'static ManifestEntry> {
+    all_manifest_entries().find(|e| e.id == id)
+}
+
+/// **全部清单条目**（贸易 + genoffice）—— 两侧共读的唯一 id 源。
+pub fn all_manifest_entries() -> impl Iterator<Item = &'static ManifestEntry> {
+    TRADE_MANIFEST.iter().chain(GENOFFICE_MANIFEST.iter())
+}
+
+/// 全部可上架 id（清单顺序稳定）。
+pub fn manifest_ids() -> Vec<&'static str> {
+    all_manifest_entries().map(|e| e.id).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -224,5 +247,43 @@ mod tests {
     #[test]
     fn 清单非空() {
         assert!(!TRADE_MANIFEST.is_empty(), "清单为空 ⇒ 市场无从展示");
+    }
+}
+#[cfg(test)]
+mod two_manifest_tests {
+    use super::*;
+
+    /// 两个清单的 id 必须全局唯一 —— 否则 `manifest_entry` 只能命中其中一个，
+    /// 而播种侧是「先到先得」，会出现「查到 A、跑的是 B」。
+    #[test]
+    fn 两清单id全局唯一() {
+        let ids = manifest_ids();
+        let mut d = ids.clone();
+        d.sort_unstable();
+        d.dedup();
+        assert_eq!(d.len(), ids.len(), "两清单之间 id 重复");
+        assert!(ids.contains(&"NT-ACT::nt_file_ability::genoffice"), "genoffice 必须可查");
+    }
+
+    /// 回归锁：`manifest_entry` 必须能查到**非贸易**清单的条目。
+    /// 原实现只看 `TRADE_MANIFEST` ⇒ genoffice 被报「能力未上架」。
+    #[test]
+    fn 能查到非贸易清单的条目() {
+        assert!(
+            manifest_entry("NT-ACT::nt_file_ability::genoffice").is_some(),
+            "genoffice 在 GENOFFICE_MANIFEST 里，manifest_entry 必须能查到"
+        );
+        assert!(manifest_entry("NT-MIND::trade::trade_quote_negotiation").is_some());
+        assert!(manifest_entry("不存在的 id").is_none());
+    }
+
+    /// `manifest_ids()` 必须覆盖两个清单（防止又有人只迭代贸易清单）。
+    #[test]
+    fn ids覆盖两个清单() {
+        assert_eq!(
+            manifest_ids().len(),
+            TRADE_MANIFEST.len() + GENOFFICE_MANIFEST.len(),
+            "必须同时覆盖两个清单"
+        );
     }
 }

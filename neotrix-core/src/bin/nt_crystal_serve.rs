@@ -499,6 +499,125 @@ async fn handle_health(
     }))
 }
 
+/// `/capabilities/invoke`：**在晶体侧真实执行**一个已上架能力。
+///
+/// # 为什么要有这个端点（2026-10-08）
+///
+/// 能力执行器住在 `neotrix-core`，而 `neotrix-neobot`（CLI / 桌面 / 渠道）
+/// **不得反向依赖 core**（`core → neobot` 固定方向）⇒ 那些进程里派发表恒空
+/// ⇒ `capability_invoke` 恒返回 `CAPABILITY_BODY_NOT_EXECUTED`。
+///
+/// 晶体服务端是**唯一同时持有 core + neobot 的进程**，且 neobot 侧**已经有**
+/// 与它配对的 HTTP 客户端（`nt_core.rs` 的 `/capabilities`、`/agents/run`）。
+/// ⇒ 最优解不是让 neobot 依赖 core，而是**让晶体成为能力宿主**：
+/// 薄客户端把调用**代理**给晶体。**不需要反转依赖，也不需要新 crate。**
+///
+/// 契约：`{ "id": "<tree id>", "input": <任意 JSON> }`
+/// ⇒ `{ ok, id, executed, output | error }`。
+/// ⛔ 失败一律 `ok:false` 并给出**分类原因**；绝不以空结果冒充成功
+///   （与 `run_capability_call` 的 fail-closed 一致）。
+async fn handle_capability_invoke(
+    axum::extract::State(state): axum::extract::State<Arc<CrystalState>>,
+    headers: HeaderMap,
+    body: Option<axum::Json<serde_json::Value>>,
+) -> axum::response::Response {
+    if !auth_ok(&state, &headers) {
+        return unauthorized();
+    }
+    use neotrix::l1_action::nt_act::nt_act_trade::tree_dispatch::ensure_trade_dispatchers;
+
+    let Some(axum::Json(payload)) = body else {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({ "ok": false, "error": "body 不是 JSON 对象" })),
+        )
+            .into_response();
+    };
+    let Some(id) = payload.get("id").and_then(|v| v.as_str()).map(str::to_owned) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({ "ok": false, "error": "缺 id" })),
+        )
+            .into_response();
+    };
+    let input = payload
+        .get("input")
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!({}));
+
+    // 清单查询覆盖**两个**清单（⛔ 不再只认贸易清单 ⇒ 否则认不出 genoffice）
+    let Some(entry) = nt_core_capability_tree::market::manifest_entry(&id) else {
+        return (
+            StatusCode::NOT_FOUND,
+            axum::Json(serde_json::json!({
+                "ok": false, "id": id, "executed": false,
+                "error": format!("能力未上架: {id}"),
+                "known": nt_core_capability_tree::market::manifest_ids(),
+            })),
+        )
+            .into_response();
+    };
+
+    ensure_trade_dispatchers();
+    let dispatched = nt_core_capability_tree::dispatch::dispatch(
+        &id,
+        input,
+        neotrix_neobot::nt_capability_canary::DEFAULT_SESSION,
+    );
+    let fut = match dispatched {
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({ "ok": false, "id": id, "executed": false, "error": format!("派发表不可用: {e}") })),
+            )
+                .into_response()
+        }
+        // ⛔ 本进程也没有实现 ⇒ fail-closed，并把清单声称的可执行性如实带回
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                axum::Json(serde_json::json!({
+                    "ok": false, "id": id, "executed": false,
+                    "error": "本进程未注册该能力的派发实现",
+                    "declared_executability": format!("{:?}", entry.executability),
+                })),
+            )
+                .into_response()
+        }
+        Ok(Some(f)) => f,
+    };
+
+    // ⛔⛔ 这里**不能**用 `block_on_dispatch`：本 handler 已在 axum 的 tokio
+    //    runtime 内，`block_on` 会 panic（`Cannot start a runtime from within a
+    //    runtime`），既有实现正是因此直接返回
+    //    「已在 async runtime 内，⛔ 不能 block_on」⇒ 端点形同虚设。
+    //    ⇒ 异步宿主就该**直接 await**（`DispatchFn` 的 future 是 `Send`）。
+    //    顺带加真实超时，避免一个卡死能力挂住整个 HTTP 连接。
+    const CAPABILITY_INVOKE_TIMEOUT_MS: u64 = 120_000;
+    let outcome = match tokio::time::timeout(
+        std::time::Duration::from_millis(CAPABILITY_INVOKE_TIMEOUT_MS),
+        fut,
+    )
+    .await
+    {
+        Ok(r) => r,
+        Err(_) => Err(format!(
+            "DISPATCH_TIMEOUT:能力超过 {CAPABILITY_INVOKE_TIMEOUT_MS}ms 未返回"
+        )),
+    };
+    match outcome {
+        Ok(output) => axum::Json(serde_json::json!({
+            "ok": true, "id": id, "executed": true, "output": output
+        }))
+        .into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            axum::Json(serde_json::json!({ "ok": false, "id": id, "executed": false, "error": e })),
+        )
+            .into_response(),
+    }
+}
+
 /// 服务端 agent 循环实际可用的 neotrix 原生手（`/capabilities` 广播表与
 /// `run_agent_loop` 的执行能力必须一致，增工具先增实现再增表）。
 fn agent_tool_table() -> serde_json::Value {
@@ -665,6 +784,20 @@ async fn handle_capabilities(
     }
     let (ids, degraded) = state.pool_view();
     let memory_read = neotrix_memory_available();
+    // ⛔ `hot_reload` 的真实含义（2026-10-08 修正）：它**只**重载 LLM provider 池
+    //    （`handle_reload` 走 `load_file` + `build_pool`），**不**重载能力/插件。
+    //    此前此处笼统写 `true`，会被读成「能力插件也能热插拔」——那是假的。
+    //    ⇒ 拆成两个字段，各自说清边界。
+    //
+    // ⚠️ 必须**先**幂等注册派发器再统计：否则本进程刚起时 `dispatchable_now`
+    //    恒为空（注册只在 invoke 路径里发生）⇒ 上报与事实不符，正是本轮在治的病。
+    neotrix::l1_action::nt_act::nt_act_trade::tree_dispatch::ensure_trade_dispatchers();
+    let capability_ids = nt_core_capability_tree::market::manifest_ids();
+    let dispatchable: Vec<&str> = capability_ids
+        .iter()
+        .copied()
+        .filter(|id| nt_core_capability_tree::dispatch::is_registered(id))
+        .collect();
     axum::Json(serde_json::json!({
         "model": CRYSTAL_MODEL,
         "crystal_version": CRYSTAL_VERSION,
@@ -672,8 +805,17 @@ async fn handle_capabilities(
         "features": {
             "agent_run": true,
             "memory_read": memory_read,
-            "hot_reload": true,
-            "streaming_tool_calls": true,
+            // 只重载 LLM provider 池
+            "hot_reload_providers": true,
+            // 能力调用端点（本进程持有派发器 ⇒ 可真实执行）
+            "capability_invoke": true,
+            // ⛔ 能力/插件热插拔**尚未实现**，如实说 false
+            "hot_reload_capabilities": false,
+        },
+        "capabilities": {
+            "invoke_path": "/v1/capabilities/invoke",
+            "ids": capability_ids,
+            "dispatchable_now": dispatchable,
         },
         "pool": { "count": ids.len(), "degraded": degraded },
     }))
@@ -1931,10 +2073,8 @@ fn run_capability_call(id: &str, payload: &str) -> Result<(), String> {
     let input: serde_json::Value = serde_json::from_str(payload)
         .map_err(|e| format!("参数不是合法 JSON: {e}"))?;
 
-    let entry = nt_core_capability_tree::market::TRADE_MANIFEST
-        .iter()
-        .find(|e| e.id == id)
-        .ok_or_else(|| format!("能力未上架: {id}"))?;
+    let entry = nt_core_capability_tree::market::manifest_entry(id)
+        .ok_or_else(|| format!("能力未上架: {id}（已知 {:?}）", nt_core_capability_tree::market::manifest_ids()))?;
     println!("id={}  可执行性={:?}", entry.id, entry.executability);
 
     ensure_trade_dispatchers();
@@ -2020,6 +2160,10 @@ fn real_main() -> Result<(), String> {
         .route("/v1/models", axum::routing::get(handle_models))
         .route("/v1/chat/completions", axum::routing::post(handle_chat))
         .route("/v1/capabilities", axum::routing::get(handle_capabilities))
+        .route(
+            "/v1/capabilities/invoke",
+            axum::routing::post(handle_capability_invoke),
+        )
         .route("/v1/agents/run", axum::routing::post(handle_agent_run))
         .route("/v1/admin/reload", axum::routing::post(handle_reload))
         .route("/healthz", axum::routing::get(handle_health))
