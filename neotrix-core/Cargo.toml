@@ -250,6 +250,10 @@ name = "memory_bench"
 harness = false
 
 [[bench]]
+name = "agent_eval"
+harness = false
+
+[[bench]]
 name = "security_bench"
 harness = false
 
