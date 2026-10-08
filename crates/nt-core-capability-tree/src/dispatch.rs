@@ -137,6 +137,34 @@ pub fn registered_count() -> usize {
     table().lock().map(|t| t.len()).unwrap_or(0)
 }
 
+/// 某个 id 在**本进程**是否已注册派发实现（**id 级**探针，只读）。
+///
+/// # ⭐ 为什么需要它（两个已有的读数都答不了这道题）
+///
+/// - `market::ManifestEntry::executability` 是**仓级编译期常量**：
+///   6 条清单在 `market.rs` 里写死 ⇒ 它答的是「这个能力**设计上**能不能干活」，
+///   不是「**这个进程**里能不能跑」，且**没有任何运行期读者**拿它做派发判断。
+/// - [`registered_count`] `> 0` 只答「**有没有**接上实现」，答不了
+///   「**这个 id** 可不可跑」—— 派发表是**按 id** 的进程级全局表，
+///   不同 id 落在不同装配层（trade / genoffice / 未来第三批），
+///   完全可能「接了 3 个里的 1 个」而计数依然非 0。
+///
+/// ⇒ 上架面（清单、`capability_invoke` 回执、诊断/列表命令）需要一道
+/// **id 级**探针：「它是否真的 runnable **in THIS process**」只能问表本身。
+/// 这是「**写着健康、实际不能跑**」的反面：光看静态字段会**高估**可执行性。
+///
+/// # ⛔ 它**不执行**实现
+///
+/// 只 `contains_key`，⛔ 不取值、不构造 future、不碰 `session` ⇒ 探针
+/// **零副作用**、零金丝雀打点（打点的语义是「真被执行过」，见本文件头）。
+///
+/// 锁投毒时返 `false`（fail-closed，与 [`registered_count`] 同款处置）；
+/// 但本表**锁内从不跑用户代码**（`dispatch` 先把 fn 指针拷出来、再在锁外调用）
+/// ⇒ 投毒实际不可达。
+pub fn is_registered(id: &str) -> bool {
+    table().lock().map(|t| t.contains_key(id)).unwrap_or(false)
+}
+
 /// 清空派发表（**仅测试用**：进程内注册是全局状态，测试之间需隔离）。
 ///
 /// ⚠️ 必须与 [`test_guard`] 一起用：派发表是**进程级全局**，
@@ -224,6 +252,31 @@ mod tests {
         register_dispatcher("NT-MIND::trade::dup", boom_impl).expect("覆盖注册");
         let fut = dispatch("NT-MIND::trade::dup", serde_json::json!({}), "test:dispatch").expect("派发").expect("有实现");
         assert!(block_on(fut).is_err(), "同名应被后者覆盖");
+        clear_for_tests();
+    }
+
+    /// ⭐ 探针答的是「**这个 id** 可不可跑」，不是「有没有接上实现」。
+    #[test]
+    fn 探针按id判定而非按数量() {
+        let _g = test_guard();
+        clear_for_tests();
+        register_dispatcher("NT-MIND::trade::probe", ok_impl).expect("注册");
+        assert!(registered_count() >= 1, "计数非 0 却答不出 id ⇒ 探针没意义");
+        assert!(is_registered("NT-MIND::trade::probe"), "刚注册的 id 必须为真");
+        // ⛔ 计数非 0 **不能**推出别的 id 可跑 ⇒ 这正是探针存在的理由。
+        assert!(
+            !is_registered("some-other-id"),
+            "未注册 id 必须为假（fail-closed 方向：不得高估可执行性）"
+        );
+        clear_for_tests();
+    }
+
+    /// 空表 ⇒ 任何 id 都不可跑（探针的基线）。
+    #[test]
+    fn 空表时探针必为假() {
+        let _g = test_guard();
+        clear_for_tests();
+        assert!(!is_registered("NT-MIND::trade::probe"), "空表不得报任何 id 可跑");
         clear_for_tests();
     }
 }

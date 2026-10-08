@@ -75,6 +75,22 @@ pub enum DialogCmd {
 }
 
 pub fn run_dialog(cmd: DialogCmd) -> Result<(), String> {
+    // 派发接线：本入口是薄封装，**不构造** `ConsciousnessRuntime`
+    // ⇒ 进程级派发表恒空 ⇒ `capability_invoke` 对**每个**清单 id 都只能
+    // 诚实回 `CAPABILITY_BODY_NOT_EXECUTED`（`dispatch` 返 `None` ⇒ fail-closed）。
+    //
+    // ⛔ 必须在 neobot 轮次开跑**之前**：能力本体的执行边界就在
+    //    `execute_capability_invoke` 里，**晚一步**注册＝本轮仍然 fail-closed。
+    //
+    // `Once` 幂等（重复调用零副作用），失败项的 `log::warn!` 已在
+    // `ensure_trade_dispatchers` 内部 ⇒ 此处**不重复**告警。
+    //
+    // ⚠️ 诚实记账：`dialog agent` 是**跨进程**（POST 给已配对的 crystal 端），
+    //    真正需要这条接线的是**进程内**跑 neobot 轮次的 `dialog say`
+    //    （`run_local_turn_as` → 工具循环 → `execute_capability_invoke`）；
+    //    但放在入口统一接线可覆盖全部子命令（含未来新增的在进程引擎），
+    //    且代价是 3 条 `BTreeMap::insert`。
+    neotrix::l1_action::nt_act::nt_act_trade::tree_dispatch::ensure_trade_dispatchers();
     match cmd {
         DialogCmd::Say { text, provider, model, convo } => say(&text, provider.as_deref(), model.as_deref(), convo.as_deref()),
         DialogCmd::Agent { goal, context, steps } => agent(&goal, context.as_deref(), steps),
