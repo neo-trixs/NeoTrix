@@ -286,9 +286,11 @@ pub struct _LoopReadyScore {
     pub kb_ok: bool,
     /// ⛔ **未测量** —— 本仓无「是否停滞」的任何测量（无 `last_tick` 等字段）
     /// ⇒ 目前恒 `true`，贡献恒定 20 分。⛔ 不可当作已验证的健康信号。
+    /// ⛔ **未接线规格**（nt-unwired-spec）：该信号至今无测量实现。
     pub no_stall: bool,
     /// ⛔ **未测量** —— 本仓无 tick 间隔记录 ⇒ 目前恒 `true`，贡献恒定 15 分。
     /// ⛔ 不可当作已验证的健康信号。
+    /// ⛔ **未接线规格**（nt-unwired-spec）：该信号至今无测量实现。
     pub cadence_ok: bool,
 }
 

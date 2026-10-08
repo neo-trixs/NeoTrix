@@ -89,10 +89,11 @@ pub struct E8AgentConfig {
     ///    里的 `"multi hop query"` **只是查询字符串**，其注释明写
     ///    「title/summary 刻意不含查询词 ⇒ **仅靠 score 判定**」
     ///    ⇒ ⛔ 该测试**不**验证图遍历，切勿据其命名误判为已实现。
+    /// ⛔⚠️ **未接线规格**（nt-unwired-spec）：已由 struct 顶 doc 证实零读点
     pub graph_hop_limit: usize,
     /// 图跳衰减系数
     ///
-    /// ⛔⚠️ **未接线规格**，理由同 [`Self::graph_hop_limit`]。
+    /// ⛔⚠️ **未接线规格**（nt-unwired-spec），理由同 [`Self::graph_hop_limit`]。
     pub decay: f64,
 }
 

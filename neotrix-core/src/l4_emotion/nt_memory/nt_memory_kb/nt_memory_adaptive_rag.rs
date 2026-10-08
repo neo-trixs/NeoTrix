@@ -98,14 +98,18 @@ pub enum RelevanceGrade {
 /// ⛔ 我**不擅自实施 (a)**：那会改变现役检索排序的行为与质量，
 ///   属于需要 benchmark 验证的性能/质量决策。
 pub struct AdaptiveRagConfig {
+    /// ⛔ **未接线规格**（nt-unwired-spec）：见本 struct 裁定表格
     /// ⛔ 零读点，见本 struct 裁定
     pub fts_limit_multiplier: usize,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：见本 struct 裁定表格
     /// ⛔ 零读点；⛔ 在 RRF 融合下**无语义对应**，见裁定
     pub rerank_weight_fts: f64,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：见本 struct 裁定表格
     /// ⛔ 零读点；⛔ 在 RRF 融合下**无语义对应**，见裁定
     pub rerank_weight_embed: f64,
     /// ⛔ 零读点；⚠️ 声明 4 通道而实现是 **3** 通道，见裁定
     pub fuse_weights: [f64; 4],
+    /// ⛔ **未接线规格**（nt-unwired-spec）：见本 struct 裁定
     /// ⛔ 零读点，见裁定
     pub cache_ttl_secs: u64,
     /// ✅ 活：`iterative_retrieval` L421 使用

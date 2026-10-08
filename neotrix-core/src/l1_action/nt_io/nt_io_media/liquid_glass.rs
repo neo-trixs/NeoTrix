@@ -16,14 +16,18 @@ use std::collections::HashMap;
 ///   ⇒ **「门只报了 4 个」不是因为另外 3 个是活的**。这条盲区已记入门内注释。
 #[derive(Debug, Clone)]
 pub struct GlassConfig {
+    /// ⛔ **未接线规格**（nt-unwired-spec）：struct 顶 doc 已裁定 B 类
     pub blur_radius: f32,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：struct 顶 doc 已裁定 B 类
     pub saturation: f32,
     /// ⭐ 本结构**唯一**被 `render()` 读取的字段。
     pub brightness: f32,
     pub contrast: f32,
+    /// ⛔ **未接线规格**（nt-unwired-spec）：struct 顶 doc 已裁定 B 类
     pub border_width: f32,
     pub border_color: [f32; 4],
     pub tint_color: [f32; 4],
+    /// ⛔ **未接线规格**（nt-unwired-spec）：struct 顶 doc 已裁定 B 类
     pub tint_opacity: f32,
 }
 
