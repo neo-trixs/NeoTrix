@@ -58,6 +58,11 @@ pub struct AgentCostAccount {
     pub budget_limit: Option<f64>,
     pub tool_calls: u64,
     pub last_active: u64,
+    /// 因预算超支而**降级**的次数（压缩/摘要被跳过，退回纯驱逐等）。
+    ///
+    /// 为什么不塞进 `cost_usd`：降级不等于花钱，硬拒也不等于降级。
+    /// 单独一列才能回答「这轮为什么变便宜了」。
+    pub degraded_count: u64,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -233,6 +238,7 @@ impl CostTracker {
                 budget_limit,
                 tool_calls: 0,
                 last_active: now,
+                degraded_count: 0,
             },
         );
     }
@@ -255,6 +261,21 @@ impl CostTracker {
             account.total_tokens_out += tokens_out;
             account.session_count += 1;
             account.tool_calls += tool_calls;
+            account.last_active = now;
+        }
+    }
+
+    /// 记一次「因预算超支而降级」（不是花钱，是**没花**）。
+    ///
+    /// 与 `record_agent_cost` 分开：混进 cost 会让「降级」看起来像
+    /// 「这次调用便宜」，而真相是「这次调用压根没发生」。
+    pub fn record_degraded(&mut self, id: &str) {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        if let Some(account) = self.agent_accounts.get_mut(id) {
+            account.degraded_count += 1;
             account.last_active = now;
         }
     }
@@ -325,6 +346,21 @@ pub static COST_TRACKER: LazyLock<Mutex<CostTracker>> = LazyLock::new(|| {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 降级计数与花钱计数**互不冒充**：降级 +1 但 cost 不变。
+    #[test]
+    fn degraded_does_not_pretend_to_be_cost() {
+        let mut ct = CostTracker::new();
+        ct.register_agent("agent-1", "Alpha", None);
+        ct.record_degraded("agent-1");
+        let acc = ct.get_agent_account("agent-1").expect("account");
+        assert_eq!(acc.degraded_count, 1);
+        assert_eq!(acc.total_cost, 0.0, "降级不是花钱，cost 必须仍是 0");
+        assert_eq!(acc.session_count, 0, "降级也不该记一次会话");
+        // 未登记的 id 不静默建账户（保持 record_agent_cost 的同款语义）。
+        ct.record_degraded("nope");
+        assert!(ct.get_agent_account("nope").is_none());
+    }
 
     #[test]
     fn test_register_and_record_agent_cost() {

@@ -38,6 +38,7 @@ impl AgentLoop {
             style_registry: None,
             secret_scanner: None,
             last_governance: None,
+            canary_session: neotrix_neobot::nt_capability_canary::DEFAULT_SESSION.to_owned(),
         }
     }
 
@@ -49,13 +50,18 @@ impl AgentLoop {
     /// 不 reset 的话，一次信号就能让金丝雀在整个进程生命周期保持健康
     /// （它记的 #192 事故）。
     ///
+    /// 2026-10-07 会话键化（`OPEN-DEFECTS` P1-5）：`session` 指定本循环
+    /// 的窗口桶 ⇒ 只归零**本会话**的窗口，⛔ 不碰其他会话
+    ///（旧实现是进程全局，两个会话互相 reset）。
+    ///
     /// 不放在 `new()` 里的理由：测试也调 `new()`，构造即归零 ⇒ 并行测试互相
     /// 清零对方的计数 ⇒ 门与测试读到随机值。归零必须是显式的会话事件，
     /// 不能挂在「对象被构造过」这个事实上。
     ///
     /// 幂等：重复调只是把窗口再归零，无副作用。
-    pub fn begin_session_window(&mut self) {
-        neotrix_neobot::nt_capability_canary::reset();
+    pub fn begin_session_window(&mut self, session: &str) {
+        self.canary_session = session.to_owned();
+        neotrix_neobot::nt_capability_canary::reset(session);
     }
 
     pub(crate) fn _with_multimodal_transform(mut self, stage: MultimodalTransform) -> Self {

@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use serde_json::Value;
 
-use super::nt_loop_types::{AgentLoop, ToolInvocation, COMPACTION_MIN_MESSAGES, COMPACTION_SUMMARY_MAX_TOKENS, COMPACTION_THRESHOLD_RATIO};
+use super::nt_loop_types::{AgentLoop, ToolInvocation, COMPACTION_MIN_MESSAGES, COMPACTION_SUMMARY_INPUT_MAX_TOKENS, COMPACTION_SUMMARY_MAX_TOKENS, COMPACTION_THRESHOLD_RATIO};
 use crate::l0_substrate::nt_core_traits::{SecretRiskLevel, ToolOutput};
 use crate::l1_action::nt_io::nt_io_output_style::{OutputStyleId, OutputStyleRegistry};
 use crate::l1_action::nt_io::nt_io_provider::context_budget::{apply_context_budget, estimate_messages_tokens, estimate_tokens};
@@ -152,12 +152,34 @@ pub(crate) fn distill_output(content: &str, max_tokens: usize) -> String {
     // 在 tiktoken 精确计数下可能仍超预算。改为逐字符裁剪直至精确达标。
     if estimate_tokens(&out) > max_tokens {
         // 保留头部信息密度: 从尾部逐步裁减到预算内。
+        // ⛔⛔ 死循环修复（2026-10-07，对齐 neobot `nt_output_distill.rs` 已修范式 `8196dd10`）：
+        // 原写法「truncate 到 0.7×len 后 push 固定 11 字符标记」在 `len≈50` 形成不动点 ⇒ 永不退出。
+        // 修法：每轮强制砍字符 + 收敛 guard，不依赖「乘 0.7」启发式。
+        const TAIL_MARK: &str = "…[truncated]…";
+        if estimate_tokens(TAIL_MARK) > max_tokens {
+            return "…[output exceeds budget, see tool_log]…".to_string();
+        }
         let mut clipped = out.clone();
-        while estimate_tokens(&clipped) > max_tokens && clipped.len() > 8 {
-            let cut = (clipped.len() as f64 * 0.7).max(1.0) as usize;
-            let keep = clipped.char_indices().nth(cut).map(|(i, _)| i).unwrap_or(cut);
+        let mut guard = clipped.len() + 16;
+        while estimate_tokens(&clipped) > max_tokens {
+            let budget_bytes = max_tokens.saturating_mul(4).max(8);
+            if clipped.len() <= budget_bytes && estimate_tokens(&clipped) <= max_tokens {
+                break;
+            }
+            if guard == 0 {
+                break;
+            }
+            guard -= 1;
+            let keep = clipped
+                .char_indices()
+                .nth(clipped.len() * 3 / 4)
+                .map(|(i, _)| i)
+                .unwrap_or(0);
+            if keep == 0 {
+                break;
+            }
             clipped.truncate(keep);
-            clipped.push_str("\n…[truncated]…");
+            clipped.push_str(TAIL_MARK);
         }
         if estimate_tokens(&clipped) > max_tokens {
             // 兜底极端: 预算太小连头部都装不下, 返回省略标记。
@@ -302,7 +324,7 @@ impl AgentLoop {
         // 刻意不在 `turn()` 入口打 tick —— 那会把「用户问了一句但模型没调
         // 任何能力」也算成一轮，窗口被无关轮次灌水，阈值形同虚设。
         for _call in calls {
-            neotrix_neobot::nt_capability_canary::tick();
+            neotrix_neobot::nt_capability_canary::tick(&self.canary_session);
         }
 
         // 2. 逐个执行。
@@ -523,6 +545,35 @@ impl AgentLoop {
             })
             .collect();
 
+        // 预算门：待摘要块超 `COMPACTION_SUMMARY_INPUT_MAX_TOKENS` ⇒
+        // **降级为纯驱逐**（退回 `trim_history` 的驱逐路径），并把这次降级
+        // 记进 COST_TRACKER —— 不记就等于「压缩白跑一次还花了钱」隐形。
+        let summary_input_tokens = estimate_tokens(&block.join("\n---\n"));
+        if summary_input_tokens > COMPACTION_SUMMARY_INPUT_MAX_TOKENS {
+            let mut ct = match crate::l6_meta::nt_cost_tracker::COST_TRACKER.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            if ct.get_agent_account("agent-loop-compaction").is_none() {
+                ct.register_agent("agent-loop-compaction", "AgentLoop compaction", None);
+            }
+            ct.record_degraded("agent-loop-compaction");
+            // 降级 = **明确驱逐**最旧一半 + 留一行可见说明（模型要看得见
+            // 「这段被驱逐了」，凭空消失会让人以为没发生过）。
+            let evicted = compact_count;
+            self.messages.splice(
+                1..=compact_count,
+                std::iter::once(Message::new(
+                    Role::Assistant,
+                    &format!(
+                        "【上下文驱逐 (预算超限, 未摘要)】最旧 {evicted} 轮已从上下文移除；\
+                         摘要被预算门拦下（详见 degraded_count）。"
+                    ),
+                )),
+            );
+            return;
+        }
+
         let request = LlmRequest {
             model: self.model.clone(),
             messages: vec![
@@ -548,7 +599,26 @@ impl AgentLoop {
         };
 
         let summary = match self.backend.complete(&request).await {
-            Ok(resp) => resp.content.trim().to_string(),
+            Ok(resp) => {
+                // 账本纪律：摘要调用同样消耗 token ⇒ 记入 COST_TRACKER，
+                // 否则整轮成本被低报（开销“悄悄加钱”）。cost 未知记 0，
+                // 价格口径留给外层 CostPolicy（核心 crate 不持价目表）。
+                let mut ct = match crate::l6_meta::nt_cost_tracker::COST_TRACKER.lock() {
+                    Ok(guard) => guard,
+                    Err(poisoned) => poisoned.into_inner(),
+                };
+                if ct.get_agent_account("agent-loop-compaction").is_none() {
+                    ct.register_agent("agent-loop-compaction", "AgentLoop compaction", None);
+                }
+                ct.record_agent_cost(
+                    "agent-loop-compaction",
+                    0.0,
+                    u64::from(resp.usage.prompt_tokens),
+                    u64::from(resp.usage.completion_tokens),
+                    0,
+                );
+                resp.content.trim().to_string()
+            }
             Err(_) => {
                 // 摘要失败 → 静默回退到纯驱逐。
                 return;

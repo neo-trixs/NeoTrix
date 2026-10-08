@@ -535,6 +535,44 @@ async fn test_compaction_replaces_old_turns_at_high_water() {
     assert_eq!(loop_.messages[0].role, Role::System);
 }
 
+/// N3 预算门：待摘要块**过大** ⇒ 不发 LLM 摘要、降级为纯驱逐，
+/// 并把这次降级记进 COST_TRACKER（`degraded_count`），cost 不许变。
+#[tokio::test]
+async fn test_compaction_degrades_when_summary_input_exceeds_budget() {
+    use crate::l6_meta::nt_cost_tracker::COST_TRACKER;
+    // 摘要脚本留空：真发出去会因无响应而 panic/失败 ⇒ 被调用即测试失败。
+    let (backend, _seen) = backend_with(vec![]);
+    let mut loop_ = AgentLoop::new(backend, "mock", "sys");
+    // 每条 ~8k token，8 条 ⇒ 摘要输入远超 COMPACTION_SUMMARY_INPUT_MAX_TOKENS。
+    for i in 0..12 {
+        loop_.messages.push(Message::new(
+            Role::User,
+            &format!("turn {i}: {}", "x".repeat(32_000)),
+        ));
+    }
+    let tokens_before = estimate_messages_tokens(&loop_.messages);
+    loop_ = loop_.with_context_token_budget(tokens_before);
+    let before_len = loop_.messages.len();
+
+    loop_.maybe_compact_context().await;
+
+    // ① 降级也要收上下文（纯驱逐），不是「什么都不做」。
+    assert!(
+        loop_.messages.len() < before_len,
+        "degraded path must still evict: {} vs {}",
+        loop_.messages.len(),
+        before_len
+    );
+    // ② 降级被记账，且不是被记成花费。
+    let acc = COST_TRACKER
+        .lock()
+        .map(|g| g.get_agent_account("agent-loop-compaction"))
+        .unwrap_or(None)
+        .expect("account");
+    assert!(acc.degraded_count >= 1, "degraded_count must rise: {acc:?}");
+    assert_eq!(acc.total_cost, 0.0, "降级不是花钱");
+}
+
 #[tokio::test]
 async fn test_compaction_skipped_below_threshold() {
     let (backend, _seen) = backend_with(vec![(

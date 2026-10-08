@@ -17,6 +17,12 @@ pub(crate) const COMPACTION_THRESHOLD_RATIO: f64 = 0.9;
 pub(crate) const COMPACTION_MIN_MESSAGES: usize = 8;
 /// 摘要输出预算。
 pub(crate) const COMPACTION_SUMMARY_MAX_TOKENS: u32 = 1024;
+/// **摘要输入**预算 (估算 token)：待摘要块超此值 ⇒ 跳过 LLM 摘要、降级为纯驱逐。
+///
+/// 为什么不设更大：摘要要把整块旧历史再发一遍，超大块的「压缩省下的」
+/// 远小于「这一发花掉的」——这正是「悄悄加钱」的典型形态。
+/// 降级记 `COST_TRACKER` 的 `degraded_count`（不是 cost，见 record_degraded）。
+pub(crate) const COMPACTION_SUMMARY_INPUT_MAX_TOKENS: usize = 24_000;
 
 /// 一次工具执行的记录（供调用方观测/审计）。
 #[derive(Debug, Clone)]

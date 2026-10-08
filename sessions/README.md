@@ -150,3 +150,5 @@
 - 文件名沿用 `handoff-<日期>-<主题>.md`；日期用 `YYYY-MM-DD`。
 - 交接里的**待修缺陷**不要只写在正文里 —— 同步登记到 `OPEN-DEFECTS.md`，
   否则缺陷会随窗口关闭而沉底（`handoff-disease-list-20260927.md` 的教训）。
+
+| `handoff-2026-10-08-neobot-n1-n6.md` | Handoff — neobot N1~N6 演进轮收口（`/stop` worker 解耦 · 占位→流式编辑 · 成本/压缩门 · 额度窗口 · 网关设计） | 20261008 | 6K |

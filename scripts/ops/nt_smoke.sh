@@ -99,7 +99,9 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 SMOKE_TMP=$(mktemp -d "${TMPDIR:-/tmp}/neobot-smoke.XXXXXX") || exit 9
-NEOBOT_DATA_DIR="$SMOKE_TMP/data"
+# 必须以 `.neobot` 结尾：壳的 shape 断言（commands.rs::data_dir_is_absolute）
+# 钉死 `dir.ends_with(".neobot")`，命名为 `data` 会让该单测在冒烟下误红。
+NEOBOT_DATA_DIR="$SMOKE_TMP/.neobot"
 NEOBOT_ENGINE=echo
 export NEOBOT_DATA_DIR NEOBOT_ENGINE
 mkdir -p "$NEOBOT_DATA_DIR"
@@ -215,16 +217,18 @@ run_step "2 壳测试 (neobot-desktop)" "$LOGDIR/02-shell.log" \
   sh -c 'cargo test -p neobot-desktop'
 
 # ─── 3+4. 前端 ───
-# 两者单独跑：typecheck 失败时 selftest 必然也失败，合跑会把两个原因压成一个。
-if [ ! -d "$FRONTEND/node_modules" ]; then
-  echo "[smoke] node_modules 缺失 —— 跳过前端两步（不自动 npm install：那要联网）"
+# 2026-10-07 拍板：桌面壳/前端真源已迁 `~/Downloads/Neo/neobot`，本仓 smoke
+# 不再自持前端门 —— 改为在 Neo/neobot 在位时委托其路径跑同两步，否则 SKIP。
+NEOBOT_REPO="$HOME/Downloads/Neo/neobot"
+if [ -d "$NEOBOT_REPO/apps/neobot-desktop/frontend/node_modules" ]; then
+  run_step "3 前端类型 (typecheck @ Neo/neobot)" "$LOGDIR/03-fe-type.log" \
+    sh -c "cd '$NEOBOT_REPO/apps/neobot-desktop/frontend' && npm run --silent typecheck"
+  run_step "4 前端自测 (selftest @ Neo/neobot)" "$LOGDIR/04-fe-selftest.log" \
+    sh -c "cd '$NEOBOT_REPO/apps/neobot-desktop/frontend' && npm run --silent selftest"
+else
+  echo "[smoke] Neo/neobot 前端未在位 —— 跳过前端两步"
   record "3 前端类型" "SKIP" 0
   record "4 前端自测" "SKIP" 0
-else
-  run_step "3 前端类型 (typecheck)" "$LOGDIR/03-fe-type.log" \
-    sh -c "cd '$FRONTEND' && npm run --silent typecheck"
-  run_step "4 前端自测 (selftest)" "$LOGDIR/04-fe-selftest.log" \
-    sh -c "cd '$FRONTEND' && npm run --silent selftest"
 fi
 
 # ─── 5. 编译检查 ───
@@ -238,8 +242,13 @@ run_step "5 编译检查 (neobot-desktop --all-targets)" "$LOGDIR/05-check.log" 
 #    而真实前端走 `invoke("cmd", { key: v })` —— Tauri 把 JSON 键映射到 Rust 形参名，
 #    **键名对不上时编译期无感知、运行期静默失败**（参数变 None）。这是唯一的跨语言接缝，
 #    曾经完全没有覆盖（脚本头「已知缺口」里明写着这条）。纯 python，不吃编译时间。
-run_step "6 IPC 键名核对 (nt_ipc_keys.py)" "$LOGDIR/06-ipc-keys.log" \
-  sh -c 'python3 scripts/ops/nt_ipc_keys.py'
+#    2026-10-07：桌面 nt_commands 已迁出本仓 ⇒ 仅当 Neo/neobot 在位时跑，否则 SKIP。
+if [ -d "$HOME/Downloads/Neo/neobot/apps/neobot-desktop/src/nt_commands" ]; then
+  run_step "6 IPC 键名核对 (nt_ipc_keys.py @ Neo/neobot)" "$LOGDIR/06-ipc-keys.log" \
+    sh -c "python3 '$ROOT/scripts/ops/nt_ipc_keys.py' --root '$HOME/Downloads/Neo/neobot'"
+else
+  record "6 IPC 键名核对 (Neo/neobot 不在位, SKIP)" "SKIP" 0
+fi
 
 summarise
 exit "$FAILED"
