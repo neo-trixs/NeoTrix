@@ -22,8 +22,6 @@ pub struct WecomChannel {
     token_env: String,
     /// API 根（生产 `https://qyapi.weixin.qq.com`；测试注入假服务器）。
     api_base: String,
-    /// 连续失败次数（探活健康位）。
-    failures: u32,
 }
 
 impl WecomChannel {
@@ -32,7 +30,6 @@ impl WecomChannel {
         Self {
             token_env,
             api_base,
-            failures: 0,
         }
     }
 
