@@ -164,3 +164,24 @@
   ☑ `nt_lock_audit`（`crates/neotrix-neobot/src` 与 `neotrix-core/src/bin` 均 **0**）。
 - 门红归因：`nt_worktree_gate` RC=4 = **他窗 WIP**（非本会话引入）。
 - L9 归属自查：4 笔提交逐个 `git show --stat` ⇒ **只含本会话文件**，无他方文件混入。
+
+## 9. 经验吸收记录（experience-tree 五阶段，cycle 1272）
+
+后台吸收循环**未运行**（`ps` 无 serve/daemon，`~/.neotrix/pending-absorb.json` 不存在）
+⇒ 写 pending 会静默滞留 ⇒ 改走 CLI 直吸（幂等门禁按 `session_id`）。
+
+- **6 条已落盘**：`session_id=sess_1791507543_561619`、`cycle=1272`，
+  key = `branch_1272_{0..5}_*`（域：NT-SHIELD×2 / NT-META×2 / NT-GOVERNANCE×2）。
+  条目：① mod 声明入库源文件漏 add（defect）② 全仓扫描器 102 报 1 真的三条根因（pattern）
+  ③ 收工门退出码被管道吃掉（rule）④ 他方写入三步取证+移交（pattern）
+  ⑤ 预判型断检出：他方依赖未跟踪 `nt_core_embedder`（insight）⑥ 任务前提也要时间戳（rule）。
+- **核对**：`list --cycle 1272` = 6 entries；`route-verify` = **0 ghost / 105 routes**
+  （新补 `干净检出`、`mtime 他窗在写`、`任务前提 陈旧` 3 条，key 全部取自
+  `query --json` 与 `list --cycle`，⛔ 未手写 hash）；`hub` = total_entries **784→790**、
+  concepts 17942→18289、`hub.cycles` 已含 `1272`；检索回测
+  `query --kw "干净检出"` ⇒ 新 defect **μ=16.7 居首**。
+- ⚠️ **本轮吸收自身踩到 L8「绿≠有效」**：首次 `absorb /tmp/...json` **RC=0 却 0 条落盘** ——
+  `cmd_absorb`（`exp_absorb.rs:118-171`）要的是**外层对象** `{session_id, cycle, ts, entries:[…]}`，
+  我给的是顶层数组 ⇒ `session.get("entries")` 取空、session_id/cycle 回退默认值，
+  于是打印 `0 entries ... cycle=unknown` 仍 RC=0。**若不看输出正文只看退出码就会以为吸收成功。**
+  修正为外层对象后复吸 = `6 entries ... cycle=1272`。教训已含在本节，供下轮写 session 文件者直接照抄契约。
