@@ -47,9 +47,15 @@ pub struct ChatMessage {
     ///    ① `MAX()+1` 是「先读后写」两步，而**本 crate 零事务** + 双进程共库
     ///       （`neobot_send` 对同一会话分两次写、每次新开连接）⇒ 有窗口，失败形态是**静默错号**；
     ///    ② `ALTER … DEFAULT 0` 会让**全部历史行 seq=0** ⇒ 存量数据上分页第一页就捞光、之后再捞不到。
-    ///    `rowid` 已存在、已是整型、单调，且**代码里对 `messages` 零 DELETE/UPDATE**
-    ///    （`rg 'DELETE FROM messages|UPDATE messages'` 零命中）⇒ 无重号来源。
+    ///    `rowid` 已存在、已是整型、单调，且**代码里对 `messages` 零 DELETE**
+    ///    （实测 2026-10-09：`grep -rn 'DELETE FROM messages'` 只命中本注释，真零）⇒
+    ///    已发号的 rowid 永不回收；`UPDATE` 有 2 处（`mark_latest_delivery` 改
+    ///    platform_msg_id/delivery_status、`stamp_compaction_head` 改
+    ///    compaction_head_seq），但 **UPDATE 不改 rowid** ⇒ 仍无重号来源。
     pub seq: i64,
+    /// 本行若是 compaction 摘要行，则记录该次摘要的首条保留消息 `seq`。
+    /// 历史普通消息恒为 `NULL`。
+    pub compaction_head_seq: Option<i64>,
 }
 
 /// 单条消息文本上限（字符数）。见模块头 ③。
@@ -98,6 +104,7 @@ impl NeobotStore {
             text: text.to_owned(),
             created_at: now,
             seq,
+            compaction_head_seq: None,
         })
     }
 
@@ -167,7 +174,7 @@ impl NeobotStore {
         //    （`LIMIT -1` = 不限），那会让调用方的「我只要 20 条」悄悄变成「全给我」。
         let limit = limit.clamp(0, i64::MAX);
         let mut stmt = self.conn.prepare(
-            "SELECT id,convo_id,role,text,created_at,rowid FROM messages
+            "SELECT id,convo_id,role,text,created_at,rowid,compaction_head_seq FROM messages
              WHERE convo_id=?1 AND (?2 IS NULL OR rowid > ?2)
              ORDER BY rowid ASC LIMIT ?3",
         )?;
@@ -179,9 +186,40 @@ impl NeobotStore {
                 text: r.get(3)?,
                 created_at: r.get(4)?,
                 seq: r.get(5)?,
+                compaction_head_seq: r.get(6)?,
             })
         })?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    /// compaction 摘要落库后调用：把该次摘要记录的「首条保留消息 seq」
+    /// 写进这条摘要消息自己的 `compaction_head_seq`。
+    ///
+    /// 不更新别的行——head 是「这条摘要之后从 seq=head 起算」的说法，
+    /// 让摘要行自己携带即可；读侧用 `latest_compaction_head` 找最后一次。
+    pub fn stamp_compaction_head(&self, message_id: &str, head_seq: i64) -> Result<bool, NtBotError> {
+        let changed = self.conn.execute(
+            "UPDATE messages SET compaction_head_seq=?2 WHERE id=?1",
+            params![message_id, head_seq],
+        )?;
+        Ok(changed > 0)
+    }
+
+    /// 读某会话最近一次 compaction 摘要行的 head seq。
+    ///
+    /// 过滤 `compaction_head_seq IS NOT NULL`，避免把普通消息的 NULL 误当成 head。
+    pub fn latest_compaction_head(&self, convo_id: &str) -> Result<Option<i64>, NtBotError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT compaction_head_seq FROM messages
+             WHERE convo_id=?1 AND compaction_head_seq IS NOT NULL
+             ORDER BY rowid DESC LIMIT 1",
+        )?;
+        let mut rows = stmt.query_map(params![convo_id], |r| r.get(0))?;
+        match rows.next() {
+            Some(Ok(head)) => Ok(Some(head)),
+            Some(Err(e)) => Err(e.into()),
+            None => Ok(None),
+        }
     }
 }
 
@@ -325,6 +363,19 @@ mod tests {
         assert_eq!(v[0].role, "user");
         assert_eq!(v[1].role, "assistant");
         assert_eq!(v[0].text, "你好");
+    }
+
+    #[test]
+    fn compaction_head_seq_可持久化并读回() {
+        let s = open();
+        let c = convo_with_member(&s);
+        s.append_message(&c, "user", "hello").expect("写");
+        let summary = s.append_message(&c, "assistant", "【上下文摘要】").expect("写");
+        assert!(summary.compaction_head_seq.is_none());
+        s.stamp_compaction_head(&summary.id, summary.seq).expect("stamp");
+        assert_eq!(s.latest_compaction_head(&c).expect("read"), Some(summary.seq));
+        let all = s.list_messages(&c).expect("读");
+        assert_eq!(all[1].compaction_head_seq, Some(summary.seq));
     }
 
     #[test]

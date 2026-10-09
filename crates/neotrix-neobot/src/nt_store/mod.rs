@@ -459,10 +459,14 @@ impl NeobotStore {
             //    幂等性同上：第二次执行报 duplicate column，由 `.ok()` 吞掉。
             "ALTER TABLE steps ADD COLUMN tool_call_id TEXT",
             // N2 edit_of 占位消息：出站占位/媒体消息记录平台 message_id 与投递态，
-            // 便于流式「先占位→覆盖编辑」。两列追加在末尾，不动既有列序
-            // （messages 的读行按 `r.get(0..5)` 取列，顺序不能动）。
+            // 便于流式「先占位→覆盖编辑」；P6 追加 `compaction_head_seq` 记摘要行的
+            // 首条保留 seq。**三列都追加在末尾，不动既有列序**（messages 的读行按
+            // `r.get(0..N)` 位置取列，中间插列会让存量行整体错位）。
+            //    幂等性：老库靠这里补列，新库列已由下面 CREATE 带上 ⇒ ALTER 报
+            //    duplicate column，由 `.ok()` 吞掉（与其它 ALTER 同款）。
             "ALTER TABLE messages ADD COLUMN platform_msg_id TEXT",
             "ALTER TABLE messages ADD COLUMN delivery_status TEXT NOT NULL DEFAULT 'pending'",
+            "ALTER TABLE messages ADD COLUMN compaction_head_seq INTEGER",
         ] {
             let _applied: Option<usize> = self.conn.execute(alter, []).ok();
         }
@@ -478,7 +482,8 @@ impl NeobotStore {
                id TEXT PRIMARY KEY, convo_id TEXT NOT NULL, role TEXT NOT NULL,
                text TEXT NOT NULL, created_at TEXT NOT NULL,
                platform_msg_id TEXT,
-               delivery_status TEXT NOT NULL DEFAULT 'pending')",
+               delivery_status TEXT NOT NULL DEFAULT 'pending',
+               compaction_head_seq INTEGER)",
             [],
         )?;
         self.conn.execute(

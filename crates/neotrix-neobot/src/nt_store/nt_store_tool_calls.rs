@@ -549,10 +549,16 @@ mod tests {
             1,
             "旧 tasks 行存活"
         );
+        // 旧库那行必须读得回来 —— 而 `list_messages` 现在 SELECT 了
+        // `compaction_head_seq`（P6），旧库原本没有这列 ⇒ 这句能通过，
+        // 就证明上面的 `ALTER TABLE messages ADD COLUMN compaction_head_seq`
+        // **真的在存量库上补了列**（否则 SQL 直接报 no such column）。
+        // 且存量行是 `NULL` 而不是被 DEFAULT/回填编出来的一个 seq。
+        let legacy_msgs = store.list_messages("c9").expect("messages");
+        assert_eq!(legacy_msgs.len(), 1, "旧 messages 行存活");
         assert_eq!(
-            store.list_messages("c9").expect("messages").len(),
-            1,
-            "旧 messages 行存活"
+            legacy_msgs[0].compaction_head_seq, None,
+            "旧存量行的 compaction_head_seq 必须是 NULL（没被回填编造）"
         );
         // 旧库**没有**任何调用行 —— 调用侧证据是零，不是被编造出来的。
         assert!(
