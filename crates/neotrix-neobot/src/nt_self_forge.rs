@@ -11,10 +11,10 @@
 //! 不能替用户决定要不要把代码对上/补丁，也没有强行让远程项目可代入依赖树
 //! 的假象；真正的代码级插件化通过目录结构/集成测试逐步逼近。
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::nt_error::NtBotError;
-use crate::nt_plugins::{self, PluginManifest};
+use crate::nt_plugins::PluginManifest;
 
 /// `<owner>/<repo>\n` slug from GitHub URL; for now strict enough for f  te 键入 check.
 fn owner_repo_from_url(url: &str) -> Option<(String, String)> {
@@ -41,6 +41,23 @@ pub fn url_slug(url: &str) -> Result<String, NtBotError> {
     Ok(format!("{owner}-{repo}"))
 }
 
+/// absorb-node 的候选节点 JSON（单节点数组形状）。
+pub fn absorb_node_candidate(url: &str) -> Result<serde_json::Value, NtBotError> {
+    let slug = url_slug(url)?;
+    Ok(serde_json::json!([{
+        "node_type": "external-absorption",
+        "title": slug,
+        "summary": format!("Generated from {url}"),
+        "content": url,
+        "url": url,
+        "domain": "github.com",
+        "language": "auto",
+        "importance": 3,
+        "meta": {"source": url, "generated_by": "nt_self_forge"},
+        "capability": {"branch": "NT-ACT", "capability": "self-forge", "evidence": url}
+    }]))
+}
+
 /// 写一个以后每次 invoke `absorb-node` 的 manifest，(), The manifest name is stable.
 pub fn forge_from_url(url: &str, data_dir: &Path) -> Result<PluginManifest, NtBotError> {
     let slug = url_slug(url)?;
@@ -65,18 +82,7 @@ pub fn forge_from_url(url: &str, data_dir: &Path) -> Result<PluginManifest, NtBo
         NtBotError::Invalid(format!("write manifest {}: {e}", manifest_path.display()))
     })?;
 
-    let absorb_json = serde_json::json!([{
-        "node_type": "external-absorption",
-        "title": slug,
-        "summary": format!("Generated from {url}"),
-        "content": url,
-        "url": url,
-        "domain": "github.com",
-        "language": "auto",
-        "importance": 3,
-        "meta": {"source": url, "generated_by": "nt_self_forge"},
-        "capability": {"branch": "NT-ACT", "capability": "self-forge", "evidence": url}
-    }]);
+    let absorb_json = absorb_node_candidate(url)?;
     std::fs::write(
         &absorb_payload,
         serde_json::to_vec_pretty(&absorb_json)?,

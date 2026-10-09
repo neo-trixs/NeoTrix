@@ -142,6 +142,9 @@ enum Cmd {
         /// 节点 JSON 文件 (数组或单对象), 或 "-" 读 stdin
         #[arg(default_value = "-")]
         input: String,
+        /// 直接从 GitHub URL 生成 `nt_self_forge` 候选节点 JSON 吸收
+        #[arg(long)]
+        url: Option<String>,
         #[arg(long)]
         dry_run: bool,
         /// 写 metadata.absorbed_capability 四元组 (R-P79 闭环)
@@ -311,9 +314,15 @@ fn main() {
         Cmd::Close { cycle } => exp_absorb::cmd_close(&conn, &cycle),
         Cmd::Absorb { session } => exp_absorb::cmd_absorb(&mut conn, &session),
         Cmd::Feedback { key, outcome } => exp_absorb::cmd_feedback(&mut conn, &key, &outcome),
-        Cmd::AbsorbNode { input, dry_run, apply_capability } => {
-            exp_absorb::cmd_absorb_node(&conn, &input, dry_run, apply_capability)
-        }
+        Cmd::AbsorbNode {
+            input,
+            url,
+            dry_run,
+            apply_capability,
+        } => match url {
+            Some(url) => exp_absorb::cmd_absorb_node_from_url(&conn, &url, dry_run, apply_capability),
+            None => exp_absorb::cmd_absorb_node(&conn, &input, dry_run, apply_capability),
+        },
         Cmd::UpdateNodeMetadata { input, dry_run } => {
             exp_absorb::cmd_update_node_metadata(&conn, &input, dry_run)
         }

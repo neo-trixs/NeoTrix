@@ -680,6 +680,30 @@ pub(crate) fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, app
         })
     };
     let v: Value = serde_json::from_str(&raw).expect("node json is valid JSON");
+    absorb_node_value(conn, v, dry_run, apply_capability);
+}
+
+/// 直接从 URL 生成 `nt_self_forge` 的候选节点并走同一条 absorb_node 路径。
+///
+/// 这是 `absorb-node --url ...` 的生产入口：候选 JSON 与 `nt_self_forge::forge_from_url`
+/// 写入的 payload 同构，避免两条「自我锻造」JSON 口径漂移。
+pub(crate) fn cmd_absorb_node_from_url(
+    conn: &Connection,
+    url: &str,
+    dry_run: bool,
+    apply_capability: bool,
+) {
+    let v = match neotrix_neobot::nt_self_forge::absorb_node_candidate(url) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("[absorb-node] ✗ self_forge candidate: {e}");
+            std::process::exit(1);
+        }
+    };
+    absorb_node_value(conn, v, dry_run, apply_capability);
+}
+
+fn absorb_node_value(conn: &Connection, v: Value, dry_run: bool, apply_capability: bool) {
 
     // 2. 归一化为节点数组 (单对象 → [对象])
     let nodes: Vec<Value> = match v {
