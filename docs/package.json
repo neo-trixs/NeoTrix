@@ -1,0 +1,14 @@
+{
+  "name": "neotrix-docs",
+  "version": "0.18.0",
+  "description": "NeoTrix documentation site",
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.0"
+  }
+}

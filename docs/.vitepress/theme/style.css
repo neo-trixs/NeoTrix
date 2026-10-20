@@ -1,0 +1,214 @@
+:root {
+  /* ── Inspora-informed warm palette: white/cream canvas, warm amber brand ── */
+  --vp-c-brand-1: #b45309;
+  --vp-c-brand-2: #92400e;
+  --vp-c-brand-3: #7c3412;
+  --vp-c-brand-soft: rgba(180, 83, 9, 0.1);
+
+  /* Cream-white canvas (inspora #ffffff with warm tint) */
+  --vp-c-bg: #fdfcf9;
+  --vp-c-bg-alt: #f7f5ef;
+  --vp-c-bg-elv: #ffffff;
+  --vp-c-bg-soft: #f2efe6;
+
+  /* Inspora ink grays with warm cast */
+  --vp-c-text-1: #262419;
+  --vp-c-text-2: #5c5545;
+  --vp-c-text-3: #8f8666;
+
+  /* Hairline borders (inspora #e6e6e6 / black-6%) */
+  --vp-c-border: #e6e2d6;
+  --vp-c-divider: #efece2;
+  --vp-c-gutter: #f4f1e8;
+
+  --vp-c-mute: #f0ede4;
+
+  --vp-button-brand-bg: #262419;
+  --vp-button-brand-hover-bg: #3d392a;
+  --vp-button-brand-active-bg: #4a4533;
+
+  --vp-c-default-1: #e6e2d6;
+  --vp-c-default-2: #efece2;
+  --vp-c-default-3: #f4f1e8;
+
+  /* Warm amber as the single chromatic accent (inspora = no color, we keep amber brand) */
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #f59e0b, #d97706 55%, #92400e);
+  --vp-home-hero-image-background-image: linear-gradient(135deg, #f59e0b 0%, #e8833a 60%, #b45309 100%);
+  --vp-home-hero-image-filter: blur(70px);
+
+  --vp-c-tip: #d97706;
+  --vp-c-warning: #b45309;
+  --vp-c-danger: #dc2626;
+
+  --vp-code-color: #92400e;
+  --vp-code-bg: #f7f5ef;
+  --vp-code-line-highlight-bg: rgba(245, 158, 11, 0.1);
+
+  --vp-custom-block-tip-bg: rgba(245, 158, 11, 0.06);
+  --vp-custom-block-tip-border: rgba(180, 83, 9, 0.2);
+
+  --vp-font-family-base: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  --vp-font-family-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+.dark {
+  --vp-c-bg: #1c1a14;
+  --vp-c-bg-alt: #242119;
+  --vp-c-bg-elv: #2b271d;
+  --vp-c-bg-soft: #312d21;
+  --vp-c-text-1: #f3efe2;
+  --vp-c-text-2: #c2b998;
+  --vp-c-text-3: #8f8666;
+  --vp-c-border: #3a3527;
+  --vp-c-divider: #322e22;
+  --vp-button-brand-bg: #f59e0b;
+  --vp-button-brand-hover-bg: #fbbf24;
+  --vp-c-tip: #f59e0b;
+}
+
+.vp-doc h2 {
+  border-top: none;
+  padding-top: 32px;
+}
+
+.vp-doc h2 + h3 {
+  padding-top: 0;
+}
+
+.vp-doc a {
+  color: var(--vp-c-brand-1);
+}
+
+.vp-doc a:hover {
+  color: var(--vp-c-brand-2);
+  text-decoration: underline;
+}
+
+.custom-block.tip {
+  border-left: 4px solid var(--vp-c-brand-1);
+}
+
+.vp-code-group .tabs {
+  background: var(--vp-c-bg-soft);
+}
+
+.vp-code-group .tab {
+  color: var(--vp-c-text-2);
+}
+
+.vp-code-group .tab.active {
+  color: var(--vp-c-brand-1);
+  border-bottom-color: var(--vp-c-brand-1);
+}
+
+table {
+  width: 100%;
+}
+
+th {
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-brand-1);
+}
+
+th, td {
+  border-color: var(--vp-c-border);
+}
+
+tr:nth-child(2n) {
+  background: var(--vp-c-bg-soft);
+}
+
+/* ── Inspora-informed product touches ── */
+
+/* Feature cards: inspora hairline border + warm surface, tight radius */
+.VPFeature {
+  border: 1px solid var(--vp-c-border);
+  border-radius: 10px;
+  background: var(--vp-c-bg-elv);
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.VPFeature:hover {
+  transform: translateY(-2px);
+  border-color: #d4cfc0;
+  box-shadow: 0 10px 30px -12px rgba(38, 36, 25, 0.12);
+}
+
+.VPFeature .icon {
+  background: rgba(245, 158, 11, 0.1) !important;
+  border-radius: 8px;
+}
+
+/* Hero name: subtle warm amber drop */
+.vp-doc .VPHomeHero h1,
+.VPHomeHero h1 {
+  filter: drop-shadow(0 3px 22px rgba(217, 119, 6, 0.28));
+}
+
+/* Hero image: app-tile card, inspora-tight */
+.VPImage.image-src {
+  border-radius: 16px;
+  border: 1px solid #e6e2d6;
+  box-shadow: 0 18px 50px -20px rgba(38, 36, 25, 0.25);
+}
+
+/* Buttons: inspora ink pill CTA (dark button on light canvas) */
+.VPButton.brand {
+  background: #262419;
+  border: none;
+  color: #fdfcf9;
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-weight: 500;
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+.VPButton.brand:hover {
+  background: #3d392a;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px -8px rgba(38, 36, 25, 0.4);
+}
+
+/* Secondary button: hairline outline pill */
+.VPButton.alt {
+  border: 1px solid #d4cfc0;
+  color: var(--vp-c-text-1);
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-weight: 500;
+}
+.VPButton.alt:hover {
+  border-color: #262419;
+  background: rgba(38, 36, 25, 0.04);
+}
+
+/* Tagline: inspora muted gray */
+.VPHomeHero .tagline {
+  color: var(--vp-c-text-2);
+  max-width: 640px;
+}
+
+/* Footer subtle */
+.VPFooter {
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+/* Code blocks: warm-tint surface, hairline border */
+div[class*='language-'] {
+  border: 1px solid var(--vp-c-border);
+  border-radius: 10px;
+}
+
+/* Nav: hairline bottom border */
+.VPNavBar {
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+
+.VPNavBarTitle .title {
+  color: var(--vp-c-text-1);
+}
+
+/* Cards used inside docs (inspora grid feel) */
+.vp-doc .custom-block {
+  border-radius: 10px;
+}

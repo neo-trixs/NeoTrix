@@ -1,0 +1,209 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900">
+  <defs>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ea580c"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#059669"/>
+    </marker>
+    <marker id="arrow-purple" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7c3aed"/>
+    </marker>
+    <marker id="arrow-gray" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/>
+    </marker>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="900" fill="#f8fafc"/>
+
+  <!-- Title -->
+  <text x="600" y="35" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="bold" fill="#0f172a">NeoTrix — 7-Domain Cross-Domain Data Flow</text>
+  <text x="600" y="55" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" fill="#64748b">BackgroundLoop orchestrates 25+ handler tasks connecting all domains</text>
+
+  <!-- ==================== LAYER: WORLD ==================== -->
+  <rect x="40" y="80" width="350" height="170" rx="10" fill="#e0f2fe" stroke="#7dd3fc" stroke-width="2"/>
+  <text x="60" y="105" font-family="monospace" font-size="14" font-weight="bold" fill="#0369a1">NT-WORLD (Scout)</text>
+  <text x="60" y="125" font-family="sans-serif" font-size="11" fill="#0c4a6e">Crawl · OSINT · Scrape · Sense · Browse · Map</text>
+  <rect x="60" y="140" width="150" height="28" rx="4" fill="#bae6fd" filter="url(#shadow)"/>
+  <text x="135" y="159" text-anchor="middle" font-family="monospace" font-size="11" fill="#0369a1">UnifiedCrawler</text>
+  <rect x="220" y="140" width="150" height="28" rx="4" fill="#bae6fd" filter="url(#shadow)"/>
+  <text x="295" y="159" text-anchor="middle" font-family="monospace" font-size="11" fill="#0369a1">nt_world_osint</text>
+  <rect x="60" y="175" width="150" height="28" rx="4" fill="#bae6fd" filter="url(#shadow)"/>
+  <text x="135" y="194" text-anchor="middle" font-family="monospace" font-size="11" fill="#0369a1">nt_world_scrape</text>
+  <rect x="220" y="175" width="150" height="28" rx="4" fill="#bae6fd" filter="url(#shadow)"/>
+  <text x="295" y="194" text-anchor="middle" font-family="monospace" font-size="11" fill="#0369a1">nt_world_sense</text>
+
+  <!-- ==================== LAYER: MEMORY ==================== -->
+  <rect x="420" y="80" width="350" height="170" rx="10" fill="#fef3c7" stroke="#fcd34d" stroke-width="2"/>
+  <text x="440" y="105" font-family="monospace" font-size="14" font-weight="bold" fill="#92400e">NT-MEMORY (Librarian)</text>
+  <text x="440" y="125" font-family="sans-serif" font-size="11" fill="#78350f">KB · SQLite · FTS5 · BM25 · Embeddings · GraphRAG</text>
+  <rect x="440" y="140" width="150" height="28" rx="4" fill="#fde68a" filter="url(#shadow)"/>
+  <text x="515" y="159" text-anchor="middle" font-family="monospace" font-size="11" fill="#92400e">KnowledgeBase</text>
+  <rect x="600" y="140" width="150" height="28" rx="4" fill="#fde68a" filter="url(#shadow)"/>
+  <text x="675" y="159" text-anchor="middle" font-family="monospace" font-size="11" fill="#92400e">nt_memory_historian</text>
+  <rect x="440" y="175" width="150" height="28" rx="4" fill="#fde68a" filter="url(#shadow)"/>
+  <text x="515" y="194" text-anchor="middle" font-family="monospace" font-size="11" fill="#92400e">nt_memory_embed</text>
+  <rect x="600" y="175" width="150" height="28" rx="4" fill="#fde68a" filter="url(#shadow)"/>
+  <text x="675" y="194" text-anchor="middle" font-family="monospace" font-size="11" fill="#92400e">nt_memory_wiki</text>
+
+  <!-- ==================== LAYER: CORE ==================== -->
+  <rect x="800" y="80" width="350" height="170" rx="10" fill="#ede9fe" stroke="#c4b5fd" stroke-width="2"/>
+  <text x="820" y="105" font-family="monospace" font-size="14" font-weight="bold" fill="#5b21b6">NT-CORE (E8 Guide)</text>
+  <text x="820" y="125" font-family="sans-serif" font-size="11" fill="#3b0764">GWT · Consciousness · E8 · PRM · SelfTest · Agent</text>
+  <rect x="820" y="140" width="150" height="28" rx="4" fill="#ddd6fe" filter="url(#shadow)"/>
+  <text x="895" y="159" text-anchor="middle" font-family="monospace" font-size="11" fill="#5b21b6">GlobalWorkspace</text>
+  <rect x="980" y="140" width="150" height="28" rx="4" fill="#ddd6fe" filter="url(#shadow)"/>
+  <text x="1055" y="159" text-anchor="middle" font-family="monospace" font-size="11" fill="#5b21b6">ConsciousnessTree</text>
+  <rect x="820" y="175" width="150" height="28" rx="4" fill="#ddd6fe" filter="url(#shadow)"/>
+  <text x="895" y="194" text-anchor="middle" font-family="monospace" font-size="11" fill="#5b21b6">SelfTestRegistry</text>
+  <rect x="980" y="175" width="150" height="28" rx="4" fill="#ddd6fe" filter="url(#shadow)"/>
+  <text x="1055" y="194" text-anchor="middle" font-family="monospace" font-size="11" fill="#5b21b6">E8 Hexagram</text>
+
+  <!-- ==================== DATA FLOW ARROWS (top row) ==================== -->
+  <!-- 1. WORLD crawl → MEMORY KB -->
+  <path d="M 390,157 L 420,157" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arrow-blue)" fill="none"/>
+  <rect x="363" y="145" width="50" height="18" rx="3" fill="#f8fafc" opacity="0.95"/>
+  <text x="388" y="158" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#2563eb">① absorb_url()</text>
+
+  <!-- 2. MEMORY KB → CORE GWT/Consciousness -->
+  <path d="M 770,157 L 800,157" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arrow-blue)" fill="none"/>
+  <rect x="741" y="145" width="52" height="18" rx="3" fill="#f8fafc" opacity="0.95"/>
+  <text x="767" y="158" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#2563eb">② KB stats</text>
+
+  <!-- ==================== LAYER: BackgroundLoop ==================== -->
+  <rect x="200" y="290" width="800" height="180" rx="12" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+  <text x="600" y="318" text-anchor="middle" font-family="monospace" font-size="16" font-weight="bold" fill="#e2e8f0">BACKGROUNDLOOP (Central Orchestrator)</text>
+  <text x="600" y="338" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#94a3b8">25+ handler tasks at different intervals, holding refs to all 7 domain modules</text>
+
+  <!-- Handler boxes -->
+  <rect x="220" y="355" width="175" height="45" rx="5" fill="#334155"/>
+  <text x="307" y="374" text-anchor="middle" font-family="monospace" font-size="11" font-weight="bold" fill="#a5b4fc">handle_crawl_queue</text>
+  <text x="307" y="390" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#94a3b8">300s · WORLD→MEMORY</text>
+
+  <rect x="410" y="355" width="175" height="45" rx="5" fill="#334155"/>
+  <text x="497" y="374" text-anchor="middle" font-family="monospace" font-size="11" font-weight="bold" fill="#a5b4fc">handle_consciousness</text>
+  <text x="497" y="390" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#94a3b8">3600s · CORE→MEMORY→ACT</text>
+
+  <rect x="600" y="355" width="175" height="45" rx="5" fill="#334155"/>
+  <text x="687" y="374" text-anchor="middle" font-family="monospace" font-size="11" font-weight="bold" fill="#a5b4fc">handle_architecture</text>
+  <text x="687" y="390" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#94a3b8">3600s · CORE (SelfTest)</text>
+
+  <rect x="790" y="355" width="185" height="45" rx="5" fill="#334155"/>
+  <text x="882" y="374" text-anchor="middle" font-family="monospace" font-size="11" font-weight="bold" fill="#a5b4fc">handle_event_bus</text>
+  <text x="882" y="390" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#94a3b8">continuous · ALL→ACT/MEMORY</text>
+
+  <rect x="220" y="410" width="175" height="45" rx="5" fill="#334155"/>
+  <text x="307" y="429" text-anchor="middle" font-family="monospace" font-size="11" font-weight="bold" fill="#a5b4fc">handle_decomposition</text>
+  <text x="307" y="445" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#94a3b8">600s · ACT→IO→MEMORY</text>
+
+  <rect x="410" y="410" width="175" height="45" rx="5" fill="#334155"/>
+  <text x="497" y="429" text-anchor="middle" font-family="monospace" font-size="11" font-weight="bold" fill="#a5b4fc">handle_exploration</text>
+  <text x="497" y="445" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#94a3b8">config · WORLD→MIND</text>
+
+  <rect x="600" y="410" width="175" height="45" rx="5" fill="#334155"/>
+  <text x="687" y="429" text-anchor="middle" font-family="monospace" font-size="11" font-weight="bold" fill="#a5b4fc">handle_awareness</text>
+  <text x="687" y="445" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#94a3b8">config · CORE→MEMORY</text>
+
+  <rect x="790" y="410" width="185" height="45" rx="5" fill="#334155"/>
+  <text x="882" y="429" text-anchor="middle" font-family="monospace" font-size="11" font-weight="bold" fill="#a5b4fc">handle_agent_discovery</text>
+  <text x="882" y="390" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#94a3b8">60s · ACT→IO</text>
+
+  <!-- ==================== DOWN ARROWS: Domains → BackgroundLoop ==================== -->
+  <path d="M 215,250 L 215,290" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-orange)" fill="none" stroke-dasharray="5,3"/>
+  <rect x="185" y="262" width="50" height="16" rx="3" fill="#f8fafc" opacity="0.95"/>
+  <text x="210" y="274" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#ea580c">schedules</text>
+  <path d="M 770,250 L 770,290" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-orange)" fill="none" stroke-dasharray="5,3"/>
+  <rect x="745" y="262" width="50" height="16" rx="3" fill="#f8fafc" opacity="0.95"/>
+  <text x="770" y="274" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#ea580c">triggers</text>
+
+  <!-- ==================== LAYER: ACT + IO + SHIELD ==================== -->
+  <rect x="40" y="520" width="350" height="170" rx="10" fill="#dcfce7" stroke="#86efac" stroke-width="2"/>
+  <text x="60" y="545" font-family="monospace" font-size="14" font-weight="bold" fill="#166534">NT-ACT (Assassin)</text>
+  <text x="60" y="565" font-family="sans-serif" font-size="11" fill="#14532d">MCP · Goals · Autonomy · Social · Crypto · Orchestrator</text>
+  <rect x="60" y="580" width="150" height="28" rx="4" fill="#86efac" filter="url(#shadow)"/>
+  <text x="135" y="599" text-anchor="middle" font-family="monospace" font-size="11" fill="#166534">McpGateway</text>
+  <rect x="220" y="580" width="150" height="28" rx="4" fill="#86efac" filter="url(#shadow)"/>
+  <text x="295" y="599" text-anchor="middle" font-family="monospace" font-size="11" fill="#166534">GoalLoop</text>
+  <rect x="60" y="615" width="150" height="28" rx="4" fill="#86efac" filter="url(#shadow)"/>
+  <text x="135" y="634" text-anchor="middle" font-family="monospace" font-size="11" fill="#166534">nt_act_autonomy</text>
+  <rect x="220" y="615" width="150" height="28" rx="4" fill="#86efac" filter="url(#shadow)"/>
+  <text x="295" y="634" text-anchor="middle" font-family="monospace" font-size="11" fill="#166534">nt_act_crypto</text>
+
+  <rect x="420" y="520" width="350" height="170" rx="10" fill="#fce7f3" stroke="#f9a8d4" stroke-width="2"/>
+  <text x="440" y="545" font-family="monospace" font-size="14" font-weight="bold" fill="#9d174d">NT-IO (Tech Priest)</text>
+  <text x="440" y="565" font-family="sans-serif" font-size="11" fill="#831843">LLM Gateway · CLI · Web · ACP · LSP · Humanize</text>
+  <rect x="440" y="580" width="150" height="28" rx="4" fill="#f9a8d4" filter="url(#shadow)"/>
+  <text x="515" y="599" text-anchor="middle" font-family="monospace" font-size="11" fill="#9d174d">Gateway (LLM)</text>
+  <rect x="600" y="580" width="150" height="28" rx="4" fill="#f9a8d4" filter="url(#shadow)"/>
+  <text x="675" y="599" text-anchor="middle" font-family="monospace" font-size="11" fill="#9d174d">CLI (50+ cmds)</text>
+  <rect x="440" y="615" width="150" height="28" rx="4" fill="#f9a8d4" filter="url(#shadow)"/>
+  <text x="515" y="634" text-anchor="middle" font-family="monospace" font-size="11" fill="#9d174d">nt_io_web</text>
+  <rect x="600" y="615" width="150" height="28" rx="4" fill="#f9a8d4" filter="url(#shadow)"/>
+  <text x="675" y="634" text-anchor="middle" font-family="monospace" font-size="11" fill="#9d174d">nt_io_humanize</text>
+
+  <rect x="800" y="520" width="350" height="170" rx="10" fill="#e5e7eb" stroke="#9ca3af" stroke-width="2"/>
+  <text x="820" y="545" font-family="monospace" font-size="14" font-weight="bold" fill="#374151">NT-SHIELD (Shadow)</text>
+  <text x="820" y="565" font-family="sans-serif" font-size="11" fill="#1f2937">Auth · Approval · Encryption · Stealth · Vault · OSINT</text>
+  <rect x="820" y="580" width="150" height="28" rx="4" fill="#9ca3af" filter="url(#shadow)"/>
+  <text x="895" y="599" text-anchor="middle" font-family="monospace" font-size="11" fill="#374151">SecurityManager</text>
+  <rect x="980" y="580" width="150" height="28" rx="4" fill="#9ca3af" filter="url(#shadow)"/>
+  <text x="1055" y="599" text-anchor="middle" font-family="monospace" font-size="11" fill="#374151">nt_shield_approval</text>
+  <rect x="820" y="615" width="150" height="28" rx="4" fill="#9ca3af" filter="url(#shadow)"/>
+  <text x="895" y="634" text-anchor="middle" font-family="monospace" font-size="11" fill="#374151">StealthNet</text>
+  <rect x="980" y="615" width="150" height="28" rx="4" fill="#9ca3af" filter="url(#shadow)"/>
+  <text x="1055" y="634" text-anchor="middle" font-family="monospace" font-size="11" fill="#374151">crypto (PQC)</text>
+
+  <!-- ==================== LAYER: MIND ==================== -->
+  <rect x="40" y="725" width="1110" height="70" rx="10" fill="#d1fae5" stroke="#6ee7b7" stroke-width="2"/>
+  <text x="60" y="750" font-family="monospace" font-size="14" font-weight="bold" fill="#065f46">NT-MIND (Engineer)</text>
+  <text x="230" y="750" font-family="sans-serif" font-size="12" fill="#064e3b">SEAL Pipeline · SelfEvolver · MetaCognitionBridge · Distillation · SkillCrystallizer</text>
+  <text x="60" y="775" font-family="sans-serif" font-size="10" fill="#047857">Self-healing loop: scan code → analyze → propose fixes → apply → verify → evolve</text>
+
+  <!-- ==================== DOWN ARROWS: BackgroundLoop → Bottom ==================== -->
+  <path d="M 307,470 L 307,520" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)" fill="none"/>
+  <rect x="282" y="488" width="50" height="16" rx="3" fill="#f8fafc" opacity="0.95"/>
+  <text x="307" y="500" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#2563eb">④ goals</text>
+  <path d="M 687,470 L 687,520" stroke="#7c3aed" stroke-width="2" marker-end="url(#arrow-purple)" fill="none"/>
+  <rect x="662" y="488" width="50" height="16" rx="3" fill="#f8fafc" opacity="0.95"/>
+  <text x="687" y="500" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#7c3aed">⑤ LLM call</text>
+  <path d="M 882,470 L 882,520" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-orange)" fill="none" stroke-dasharray="5,3"/>
+  <rect x="857" y="488" width="50" height="16" rx="3" fill="#f8fafc" opacity="0.95"/>
+  <text x="882" y="500" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#ea580c">⑥ events</text>
+
+  <!-- ==================== CROSS ARROWS (bottom row) ==================== -->
+  <!-- MCP Gateway → IO (external services) -->
+  <path d="M 370,599 L 420,599" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)" fill="none"/>
+  <rect x="345" y="589" width="55" height="16" rx="3" fill="#f8fafc" opacity="0.95"/>
+  <text x="372" y="601" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#2563eb">call_tool()</text>
+
+  <!-- IO → SHIELD (approval gates) -->
+  <path d="M 770,599 L 800,599" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-orange)" fill="none" stroke-dasharray="5,3"/>
+  <rect x="745" y="589" width="42" height="16" rx="3" fill="#f8fafc" opacity="0.95"/>
+  <text x="766" y="601" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#ea580c">approve</text>
+
+  <!-- ACT → SHIELD (security check) -->
+  <path d="M 370,634 L 420,634" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-orange)" fill="none" stroke-dasharray="5,3"/>
+  <rect x="340" y="624" width="52" height="16" rx="3" fill="#f8fafc" opacity="0.95"/>
+  <text x="366" y="636" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#ea580c">inspect()</text>
+
+  <!-- SHIELD → MEMORY (security results) -->
+  <path d="M 975,634 L 975,250" stroke="#059669" stroke-width="1.5" marker-end="url(#arrow-green)" fill="none"/>
+  <rect x="950" y="435" width="50" height="16" rx="3" fill="#f8fafc" opacity="0.95"/>
+  <text x="975" y="447" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#059669">results</text>
+
+  <!-- ==================== LEGEND ==================== -->
+  <rect x="970" y="725" width="170" height="70" rx="6" fill="#ffffff" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="980" y="742" font-family="sans-serif" font-size="10" font-weight="bold" fill="#475569">Legend</text>
+  <line x1="980" y1="752" x2="1010" y2="752" stroke="#2563eb" stroke-width="2.5"/>
+  <text x="1015" y="755" font-family="sans-serif" font-size="9" fill="#475569">Primary data flow</text>
+  <line x1="980" y1="765" x2="1010" y2="765" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="1015" y="768" font-family="sans-serif" font-size="9" fill="#475569">Control / schedule</text>
+  <line x1="980" y1="778" x2="1010" y2="778" stroke="#7c3aed" stroke-width="2"/>
+  <text x="1015" y="781" font-family="sans-serif" font-size="9" fill="#475569">LLM / routing</text>
+
+</svg>

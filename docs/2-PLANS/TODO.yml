@@ -1,0 +1,74 @@
+sprint:
+  name: "2026-06-30 三循环吸收后"
+  priority: P0
+  items:
+    - "nt_core_observer: +PRM head"
+    - "nt_core_policy: epsilon-greedy → GRPO + beam search"
+    - "nt_core_sae: sparse autoencoder for E8 interpretability"
+    - "nt_mind_seal: +DPOStage + ConstitutionalSelfCritique + SafetyCheck"
+    - "nt_core_gwt: 5-layer context compaction"
+    - "nt_core_gwt: WTA competitive ignition gate"
+    - "E8 VSA embedding: 6-bit → R^1024 hypervectors"
+
+backlog:
+  P1:
+    - "nt_shield_perm: permission mode chain"
+    - "nt_agent_mcp_*: 2-transport + OAuth 2.1"
+    - "nt_memory_kb: procedural memory stage"
+    - "nt_core_deploy: edge deployment pipeline"
+    - "nt_agent: planner/executor/reflector split"
+    - "nt_core_observer: 3-layer error recovery"
+    - "nt_core_ssm: Mamba-1 → Mamba-2 (SSD)"
+    - "nt_world_jepa: ViT backbone + masking + action-conditioned"
+    - "nt_core_iit_phi: fix to actual IIT cause-effect"
+    - "nt_core_fep_iit: active inference loop"
+  P2:
+    - "GWT: learned MoE routing via HyperCube"
+    - "scaling law characterization"
+    - "HyperCube VSA: MAP→FHRR at D=2048"
+    - "HyperCube: INT4 quantization"
+    - "GWT resonance: Kuramoto→Resonator Network"
+    - "feature steering via SAE clamping"
+    - "EP cache infrastructure"
+    - "privacy architecture: data sovereignty + PCC"
+    - "hybrid local/cloud orchestration"
+    - "E8 transition matrix: differentiable VSA"
+    - "Rust ML: Candle+Burn+ndarray selection"
+    - "HOT/AST consciousness modules"
+    - "power budget model for edge"
+    - "embodied awareness: nt_core_aware"
+
+tech_debt:
+  - "neotrix-types clippy: 18 warnings"
+  - "examples: 4 unused variables"
+  - "15 binary compile errors"
+  - "daemon: 2 unused variables"
+
+absorbed:
+  date: 2026-06-30
+  cycles_completed: 3
+  sources:
+    cycle1:
+      - anthropic (GitHub topic + 3 papers)
+      - openai (GitHub topic + 5 papers)
+      - apple-neural-engine (GitHub topic + 4 papers)
+      - apple-intelligence (GitHub topic + 3 papers)
+    cycle2:
+      - MCP protocol spec
+      - SAE interpretability
+      - PRM + test-time compute
+      - agent design patterns
+      - on-device ML deployment
+      - RL alignment (DPO/GRPO/Constitutional)
+    cycle3:
+      - SSM/Mamba-2 SSD
+      - VSA/HD computing (FHRR, HRR, MAP)
+      - JEPA world models
+      - consciousness theories (GWT/IIT/FEP/AST/HOT)
+      - neurosymbolic AI integration
+      - Rust ML inference engines
+      - resonator networks
+  blind_spots_found: 32
+  new_modules_proposed:
+    - nt_core_sae
+    - nt_core_deploy
