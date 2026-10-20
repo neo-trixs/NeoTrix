@@ -1,0 +1,224 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 340" fill="none">
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#1a0533"/>
+      <stop offset="100%" stop-color="#080012"/>
+    </radialGradient>
+
+    <!-- Crystal facet gradients per pipeline stage -->
+    <linearGradient id="facetInput" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#1e3a5f" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="facetE8" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c084fc" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="facetVSA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#22c55e" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#0a3d1a" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="facetGWT" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#3d2a04" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="facetSEAL" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ec4899" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#3d0a2a" stop-opacity="0.05"/>
+    </linearGradient>
+
+    <!-- Edge glows per stage -->
+    <linearGradient id="edgeInput" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.3"/>
+    </linearGradient>
+    <linearGradient id="edgeE8" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c084fc" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.3"/>
+    </linearGradient>
+    <linearGradient id="edgeVSA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4ade80" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#22c55e" stop-opacity="0.2"/>
+    </linearGradient>
+    <linearGradient id="edgeGWT" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.2"/>
+    </linearGradient>
+    <linearGradient id="edgeSEAL" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f472b6" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#ec4899" stop-opacity="0.3"/>
+    </linearGradient>
+
+    <filter id="glowBox"><feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#8b5cf6" flood-opacity="0.12"/></filter>
+  </defs>
+
+  <rect width="900" height="340" fill="url(#bg)" rx="16"/>
+
+  <!-- Wafer substrate scan lines -->
+  <g opacity="0.03">
+    <line x1="0" y1="60" x2="900" y2="60" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="0" y1="120" x2="900" y2="120" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="0" y1="180" x2="900" y2="180" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="0" y1="240" x2="900" y2="240" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="0" y1="300" x2="900" y2="300" stroke="#a855f7" stroke-width="0.3"/>
+  </g>
+
+  <!-- ===== PIPELINE: Crystal silicon die blocks ===== -->
+
+  <!-- Stage 1: Input (Crystal facet) -->
+  <g>
+    <rect x="18" y="85" width="115" height="170" rx="12" fill="url(#facetInput)" stroke="url(#edgeInput)" stroke-width="1.2" filter="url(#glowBox)"/>
+    <polygon points="18,85 133,85 125,72 26,72" fill="#3b82f6" opacity="0.08"/>
+    <text x="75" y="130" text-anchor="middle" fill="#60a5fa" font-family="system-ui,sans-serif" font-size="13" font-weight="700">INPUT</text>
+    <text x="75" y="150" text-anchor="middle" fill="#8870aa" font-family="system-ui,sans-serif" font-size="9">Sensory · Text · Code</text>
+    <text x="75" y="165" text-anchor="middle" fill="#8870aa" font-family="system-ui,sans-serif" font-size="9">Image · Audio</text>
+    <!-- Neural input node -->
+    <circle cx="75" cy="195" r="12" fill="none" stroke="#3b82f6" stroke-width="0.8" opacity="0.4"/>
+    <circle cx="75" cy="195" r="4" fill="#3b82f6" opacity="0.2"/>
+    <path d="M70 188 Q75 183 80 188" fill="none" stroke="#60a5fa" stroke-width="0.8" opacity="0.5"/>
+  </g>
+
+  <!-- Neural arrow -->
+  <g opacity="0.5">
+    <path d="M133 170 L160 170" stroke="#c084fc" stroke-width="0.8" stroke-dasharray="2 2"/>
+    <polygon points="158,165 168,170 158,175" fill="#c084fc"/>
+  </g>
+
+  <!-- Stage 2: E8 Kernel -->
+  <g>
+    <rect x="172" y="70" width="145" height="200" rx="12" fill="url(#facetE8)" stroke="url(#edgeE8)" stroke-width="1.2" filter="url(#glowBox)"/>
+    <polygon points="172,70 317,70 309,57 180,57" fill="#c084fc" opacity="0.08"/>
+    <text x="245" y="105" text-anchor="middle" fill="#c084fc" font-family="system-ui,sans-serif" font-size="13" font-weight="700">E8 REASONING</text>
+    <text x="245" y="122" text-anchor="middle" fill="#8870aa" font-family="system-ui,sans-serif" font-size="9">64-State Crystal Matrix</text>
+    <!-- 8×8 mini crystal -->
+    <g transform="translate(205, 135)">
+      <rect x="0" y="0" width="80" height="80" rx="4" fill="none" stroke="#2d0a55" stroke-width="0.5"/>
+      <!-- Colored cells -->
+      <rect x="0" y="0" width="10" height="10" rx="1.5" fill="#c084fc" opacity="0.5"/>
+      <rect x="10" y="0" width="10" height="10" rx="1.5" fill="#c084fc" opacity="0.3"/>
+      <rect x="20" y="0" width="10" height="10" rx="1.5" fill="#06b6d4" opacity="0.5"/>
+      <rect x="40" y="0" width="10" height="10" rx="1.5" fill="#22c55e" opacity="0.5"/>
+      <rect x="60" y="0" width="10" height="10" rx="1.5" fill="#8b5cf6" opacity="0.5"/>
+      <rect x="0" y="10" width="10" height="10" rx="1.5" fill="#c084fc" opacity="0.3"/>
+      <rect x="10" y="10" width="10" height="10" rx="1.5" fill="#c084fc" opacity="0.5"/>
+      <rect x="20" y="10" width="10" height="10" rx="1.5" fill="#06b6d4" opacity="0.3"/>
+      <rect x="40" y="10" width="10" height="10" rx="1.5" fill="#22c55e" opacity="0.3"/>
+      <rect x="60" y="10" width="10" height="10" rx="1.5" fill="#8b5cf6" opacity="0.3"/>
+      <rect x="0" y="20" width="10" height="10" rx="1.5" fill="#8b5cf6" opacity="0.5"/>
+      <rect x="20" y="20" width="10" height="10" rx="1.5" fill="#8b5cf6" opacity="0.5"/>
+      <rect x="40" y="20" width="10" height="10" rx="1.5" fill="#8b5cf6" opacity="0.4"/>
+      <rect x="60" y="20" width="10" height="10" rx="1.5" fill="#f59e0b" opacity="0.5"/>
+      <rect x="0" y="30" width="10" height="10" rx="1.5" fill="#8b5cf6" opacity="0.3"/>
+      <rect x="30" y="30" width="10" height="10" rx="1.5" fill="#8b5cf6" opacity="0.5"/>
+      <rect x="50" y="30" width="10" height="10" rx="1.5" fill="#8b5cf6" opacity="0.3"/>
+      <rect x="60" y="30" width="10" height="10" rx="1.5" fill="#f59e0b" opacity="0.3"/>
+      <rect x="0" y="40" width="10" height="10" rx="1.5" fill="#f59e0b" opacity="0.5"/>
+      <rect x="20" y="40" width="10" height="10" rx="1.5" fill="#ec4899" opacity="0.5"/>
+      <rect x="40" y="40" width="10" height="10" rx="1.5" fill="#ec4899" opacity="0.4"/>
+      <rect x="60" y="40" width="10" height="10" rx="1.5" fill="#ec4899" opacity="0.3"/>
+      <rect x="10" y="50" width="10" height="10" rx="1.5" fill="#ec4899" opacity="0.5"/>
+      <rect x="40" y="50" width="10" height="10" rx="1.5" fill="#ec4899" opacity="0.3"/>
+      <rect x="60" y="50" width="10" height="10" rx="1.5" fill="#ef4444" opacity="0.5"/>
+      <rect x="0" y="60" width="10" height="10" rx="1.5" fill="#ef4444" opacity="0.3"/>
+      <rect x="20" y="60" width="10" height="10" rx="1.5" fill="#ef4444" opacity="0.5"/>
+      <rect x="40" y="60" width="10" height="10" rx="1.5" fill="#6b7280" opacity="0.4"/>
+      <rect x="60" y="60" width="10" height="10" rx="1.5" fill="#6b7280" opacity="0.3"/>
+      <rect x="0" y="70" width="10" height="10" rx="1.5" fill="#6b7280" opacity="0.3"/>
+      <rect x="30" y="70" width="10" height="10" rx="1.5" fill="#6b7280" opacity="0.5"/>
+      <rect x="50" y="70" width="10" height="10" rx="1.5" fill="#6b7280" opacity="0.3"/>
+      <rect x="70" y="70" width="10" height="10" rx="1.5" fill="#6b7280" opacity="0.5"/>
+    </g>
+    <text x="245" y="235" text-anchor="middle" fill="#8870aa" font-family="system-ui,sans-serif" font-size="8">8 Groups · 64 States</text>
+  </g>
+
+  <!-- Neural arrow -->
+  <g opacity="0.5">
+    <path d="M317 170 L344 170" stroke="#c084fc" stroke-width="0.8" stroke-dasharray="2 2"/>
+    <polygon points="342,165 352,170 342,175" fill="#c084fc"/>
+  </g>
+
+  <!-- Stage 3: VSA HyperCube -->
+  <g>
+    <rect x="356" y="75" width="140" height="190" rx="12" fill="url(#facetVSA)" stroke="url(#edgeVSA)" stroke-width="1.2" filter="url(#glowBox)"/>
+    <polygon points="356,75 496,75 488,62 364,62" fill="#22c55e" opacity="0.08"/>
+    <text x="426" y="108" text-anchor="middle" fill="#4ade80" font-family="system-ui,sans-serif" font-size="13" font-weight="700">VSA CUBE</text>
+    <text x="426" y="125" text-anchor="middle" fill="#8870aa" font-family="system-ui,sans-serif" font-size="9">4096-Dim Crystal Memory</text>
+    <!-- Crystal tesseract -->
+    <g transform="translate(386, 135)">
+      <polygon points="40,0 80,15 40,35 0,15" fill="none" stroke="#22c55e" stroke-width="0.8" opacity="0.4"/>
+      <polygon points="40,35 80,50 40,70 0,50" fill="none" stroke="#22c55e" stroke-width="0.5" opacity="0.2"/>
+      <line x1="0" y1="15" x2="0" y2="50" stroke="#22c55e" stroke-width="0.5" opacity="0.2"/>
+      <line x1="80" y1="15" x2="80" y2="50" stroke="#22c55e" stroke-width="0.5" opacity="0.2"/>
+      <!-- Memory nodes -->
+      <circle cx="10" cy="18" r="2.5" fill="#22c55e" opacity="0.7"/>
+      <circle cx="30" cy="25" r="2" fill="#8b5cf6" opacity="0.6"/>
+      <circle cx="55" cy="12" r="2.5" fill="#3b82f6" opacity="0.7"/>
+      <circle cx="70" cy="28" r="1.5" fill="#22c55e" opacity="0.5"/>
+      <circle cx="20" cy="45" r="2" fill="#ec4899" opacity="0.6"/>
+      <circle cx="60" cy="42" r="2" fill="#f59e0b" opacity="0.5"/>
+      <circle cx="45" cy="55" r="1.5" fill="#22c55e" opacity="0.4"/>
+      <circle cx="15" cy="55" r="2" fill="#06b6d4" opacity="0.6"/>
+    </g>
+    <text x="426" y="235" text-anchor="middle" fill="#8870aa" font-family="system-ui,sans-serif" font-size="8">Bind · Bundle · Permute</text>
+  </g>
+
+  <!-- Neural arrow -->
+  <g opacity="0.5">
+    <path d="M496 170 L523 170" stroke="#c084fc" stroke-width="0.8" stroke-dasharray="2 2"/>
+    <polygon points="521,165 531,170 521,175" fill="#c084fc"/>
+  </g>
+
+  <!-- Stage 4: GWT Spotlight -->
+  <g>
+    <rect x="535" y="75" width="140" height="190" rx="12" fill="url(#facetGWT)" stroke="url(#edgeGWT)" stroke-width="1.2" filter="url(#glowBox)"/>
+    <polygon points="535,75 675,75 667,62 543,62" fill="#f59e0b" opacity="0.08"/>
+    <text x="605" y="108" text-anchor="middle" fill="#fbbf24" font-family="system-ui,sans-serif" font-size="13" font-weight="700">GWT SPOTLIGHT</text>
+    <text x="605" y="125" text-anchor="middle" fill="#8870aa" font-family="system-ui,sans-serif" font-size="9">Global Workspace</text>
+    <!-- Competition arena -->
+    <g transform="translate(565, 135)">
+      <circle cx="40" cy="40" r="28" fill="none" stroke="#f59e0b" stroke-width="0.8" opacity="0.3"/>
+      <circle cx="40" cy="40" r="18" fill="none" stroke="#f59e0b" stroke-width="1" opacity="0.4"/>
+      <circle cx="40" cy="40" r="8" fill="#f59e0b" opacity="0.15"/>
+      <circle cx="18" cy="18" r="4" fill="#3b82f6" opacity="0.5"/>
+      <circle cx="62" cy="18" r="4" fill="#8b5cf6" opacity="0.5"/>
+      <circle cx="18" cy="62" r="4" fill="#ec4899" opacity="0.5"/>
+      <circle cx="62" cy="62" r="4" fill="#22c55e" opacity="0.5"/>
+      <!-- Winner spark -->
+      <circle cx="40" cy="40" r="2.5" fill="#fbbf24" opacity="0.8"/>
+    </g>
+    <text x="605" y="235" text-anchor="middle" fill="#8870aa" font-family="system-ui,sans-serif" font-size="8">11 Specialists Compete</text>
+  </g>
+
+  <!-- Neural arrow -->
+  <g opacity="0.5">
+    <path d="M675 170 L702 170" stroke="#c084fc" stroke-width="0.8" stroke-dasharray="2 2"/>
+    <polygon points="700,165 710,170 700,175" fill="#c084fc"/>
+  </g>
+
+  <!-- Stage 5: SEAL Evolution -->
+  <g>
+    <rect x="714" y="70" width="145" height="200" rx="12" fill="url(#facetSEAL)" stroke="url(#edgeSEAL)" stroke-width="1.2" filter="url(#glowBox)"/>
+    <polygon points="714,70 859,70 851,57 722,57" fill="#ec4899" opacity="0.08"/>
+    <text x="787" y="105" text-anchor="middle" fill="#f472b6" font-family="system-ui,sans-serif" font-size="13" font-weight="700">SEAL EVOLVE</text>
+    <text x="787" y="122" text-anchor="middle" fill="#8870aa" font-family="system-ui,sans-serif" font-size="9">Self-Editing</text>
+    <!-- Evolution loop -->
+    <g transform="translate(750, 135)">
+      <path d="M30 20 A25 25 0 1 1 29 20" fill="none" stroke="#ec4899" stroke-width="1.5" opacity="0.5"/>
+      <polygon points="29,18 25,26 33,26" fill="#ec4899" opacity="0.5"/>
+      <text x="40" y="32" fill="#8870aa" font-family="system-ui,sans-serif" font-size="7">Mutate</text>
+      <path d="M30 45 A25 25 0 1 0 29 46" fill="none" stroke="#ec4899" stroke-width="1.5" opacity="0.5"/>
+      <polygon points="29,47 25,39 33,39" fill="#ec4899" opacity="0.5"/>
+      <text x="40" y="54" fill="#8870aa" font-family="system-ui,sans-serif" font-size="7">Verify</text>
+    </g>
+    <text x="787" y="235" text-anchor="middle" fill="#8870aa" font-family="system-ui,sans-serif" font-size="8">Gen 55 · 430+ Mutations</text>
+  </g>
+
+  <!-- Feedback loop (bottom bus) -->
+  <g opacity="0.3">
+    <path d="M75 255 L75 295 L787 295 L787 270" fill="none" stroke="#c084fc" stroke-width="0.5" stroke-dasharray="2 4"/>
+    <path d="M426 255 L426 295" fill="none" stroke="#c084fc" stroke-width="0.5" stroke-dasharray="2 4"/>
+    <path d="M605 255 L605 295" fill="none" stroke="#c084fc" stroke-width="0.5" stroke-dasharray="2 4"/>
+    <path d="M787 295 L787 310 L75 310 L75 275" fill="none" stroke="#c084fc" stroke-width="0.8" stroke-dasharray="4 4"/>
+  </g>
+  <text x="430" y="325" text-anchor="middle" fill="#66508a" font-family="system-ui,sans-serif" font-size="8">Learning Feedback Loop (ΔN)</text>
+</svg>
